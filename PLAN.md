@@ -228,14 +228,12 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
-- **Water Works:**
-  - iPhone: the scenes are small, the controls are 40–50 px, and landscape is cramped.
-  - Tanks: the wheel valves overlap the feed pipe.
-  - Fountain: the jets are faint, and the dial and lever float.
-  - Wheel: odd pipes.
-  - Pipes: the Flush lever overlaps the tank.
-  - The pump shows ON during the ending.
-  - The icon is off-center; dark mode is unchecked.
+- **Water Works** (redesigned as the water table):
+  - On phones the controls are small and the panel has empty space.
+  - "Meet up" layout: one sunflower gets no stream.
+  - The brush cup overlaps the toys, and the squeegee hangs over a leg.
+  - Tap-pouring has no visible pitcher.
+  - Streams are straight lines, and the squeegee needs several passes.
 - **Engine Room:**
   - Phone landscape: the stroke names run together, and Big covers cylinder 4.
   - The start hint covers the engine.
