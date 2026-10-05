@@ -20,8 +20,9 @@ You can also install a single app on its own by opening its folder (for example 
 
 1. Put the app in its own folder with its own `index.html`, `manifest.webmanifest`, `sw.js` and `icons/`.
 2. In the app's `sw.js`, give `CACHE` a name with an app-specific prefix (for example `my-app-v1`) and only delete caches with that prefix in `activate`. All apps share one origin, so they share cache storage.
-3. Add the app to `APPS` in the top-level `index.html`.
-4. Add the app's files to `CORE` in the top-level `sw.js` and bump its `CACHE`.
+3. Give the app a Home button that links to `../` so there is a way back to the launcher (see the `homebtn` in `spin-shop/index.html`).
+4. Add the app to `APPS` in the top-level `index.html`.
+5. Add the app's files to `CORE` in the top-level `sw.js` and bump its `CACHE`.
 
 ## Updating an app
 
