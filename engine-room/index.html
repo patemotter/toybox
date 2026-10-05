@@ -1,0 +1,1429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Engine Room</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Engine Room">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 1366px;
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header h1 { margin: 0; white-space: nowrap; font-size: 1.35rem; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
+.homebtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 34px;
+  padding: 2px 12px 2px 9px; font-weight: 700; font-size: 1rem; color: var(--ink); text-decoration: none;
+  background: var(--panel); border: 3px solid var(--edge); border-radius: 12px; box-shadow: 2px 2px 0 var(--edge);
+}
+.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.hdr-right { display: flex; gap: 10px; align-items: center; }
+.app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 1.1rem; color: var(--ink); background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 16px; padding: 0.45rem 0.8rem; min-height: 52px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge); transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+
+/* ---------- Stage ---------- */
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; background: var(--plate);
+  border: 3px solid var(--edge); border-radius: 24px; box-shadow: 4px 4px 0 var(--edge); padding: 6px;
+}
+.scene {
+  position: relative; width: 100%; height: 100%; border: 3px solid #1D2340; border-radius: 18px;
+  overflow: hidden; background: #DCEAF7; touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hint {
+  position: absolute; left: 50%; top: 64px; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  background: var(--accent); color: #1D2340; border: 4px solid #1D2340; border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340; padding: 0.1rem 1rem 0.2rem; font-size: clamp(1.1rem, 3.4vw, 2rem);
+  font-weight: 800; max-width: calc(100% - 24px); text-align: center; line-height: 1.15;
+}
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+.slowtag {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  background: #8338EC; color: #FFFFFF; border: 3px solid #1D2340; border-radius: 999px; padding: 0 0.9rem;
+  font-weight: 800; font-size: clamp(1rem, 2.6vw, 1.4rem); box-shadow: 3px 3px 0 #1D2340; white-space: nowrap;
+}
+.slowtag[hidden] { display: none; }
+
+/* Play-timer gauge */
+.fuel { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.fuel[hidden] { display: none; }
+.fuel-bar { width: clamp(70px, 18vw, 150px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num[hidden] { display: none; }
+
+/* Big mode */
+.bigtoggle {
+  position: absolute; top: 10px; right: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0.1rem 0.85rem 0.1rem 0.6rem; font-size: 1rem; color: #1D2340; background: #FFFFFF;
+  border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; border-radius: 999px;
+}
+.bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.bigtoggle:active { box-shadow: 0 0 0 #1D2340; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header, body.big .panel { display: none; }
+body.big .wrap { max-width: none; padding: max(6px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
+body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- Panel ---------- */
+.panel {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px;
+  background: var(--panel); border: 3px solid var(--edge); border-bottom-width: 0; border-radius: 24px 24px 0 0;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+.ctrl { display: flex; gap: 8px; align-items: stretch; }
+.mach { flex: 1 1 0; min-width: 0; padding: 0.2rem 0.3rem; font-size: clamp(0.9rem, 2.8vw, 1.2rem); line-height: 1.05; }
+.drive { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.crank { flex: none; width: 112px; height: 112px; touch-action: none; cursor: grab; border-radius: 50%; }
+.crank svg { width: 100%; height: 100%; display: block; pointer-events: none; overflow: visible; }
+.drivecol { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.drivecol .btn { width: 100%; white-space: nowrap; }
+.start { background: #2E9E5B; color: #FFFFFF; font-size: 1.35rem; min-height: 60px; }
+.start.on { background: #E63946; }
+.throttle { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; touch-action: none; cursor: pointer; }
+.throttle .track { position: relative; width: 56px; height: 104px; background: #E6EEF8; border: 3px solid #1D2340; border-radius: 16px; overflow: hidden; }
+.throttle .tfill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#F77F00, #FFC93C); }
+.throttle .knob { position: absolute; left: 4px; right: 4px; height: 24px; background: #FFFFFF; border: 3px solid #1D2340; border-radius: 10px; }
+.throttle span { font-weight: 800; font-size: 0.95rem; line-height: 1; }
+.gate { display: flex; gap: 6px; padding: 6px; background: #3B4766; border: 3px solid #1D2340; border-radius: 18px; }
+.gate[hidden] { display: none; }
+.gate .btn { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 0; font-size: 1.3rem; border-radius: 999px; }
+body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer: toast, farewell ---------- */
+.toast {
+  position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 45;
+  background: var(--accent); color: #1D2340; border: 3px solid #1D2340; border-radius: 999px; padding: 0.3rem 1rem;
+  font-size: 1.3rem; font-weight: 800; white-space: nowrap; box-shadow: 3px 3px 0 #1D2340; opacity: 0;
+  transition: opacity 0.4s ease; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 22px;
+  padding: 10px 16px 12px; box-shadow: 4px 4px 0 #1D2340; text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; font-size: 1.3rem; min-height: 56px; padding: 0.4rem 1.2rem; }
+.goodbye[hidden] { display: none; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+  color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 6px 6px 0 var(--edge); padding: 18px 18px 20px;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 18px 0 6px; font-size: 1.2rem; font-weight: 800; text-align: center; }
+.sheet h4 { margin: 12px 0 6px; font-size: 1.05rem; font-weight: 800; text-align: center; }
+.sheet .opt-txt { color: var(--muted); font-weight: 500; }
+.sheet .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sheet .row .btn { flex: 0 0 calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
+.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 0; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.textin {
+  display: block; width: 100%; font: inherit; font-size: 1.1rem; color: var(--ink); background: var(--bg);
+  border: 3px solid var(--edge); border-radius: 14px; padding: 0.45rem 0.8rem; -webkit-user-select: text; user-select: text;
+}
+.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 1.05rem; cursor: pointer; }
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+.hold .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255, 201, 60, 0.75); }
+.hold .label { position: relative; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: 100%; max-width: 420px; max-height: 100%; overflow: hidden; background: var(--plate); color: #1D2340;
+  border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 16px 20px 22px; text-align: center;
+}
+.rest-art { display: block; width: min(62vw, 260px, 34vh); aspect-ratio: 1; height: auto; margin: 0 auto 6px; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next { margin: 14px auto 0; display: inline-block; background: var(--accent); border: 3px solid #1D2340; border-radius: 16px; padding: 0.4rem 1.1rem; font-size: 1.5rem; font-weight: 700; }
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px; height: 48px; border: 3px solid var(--edge); border-radius: 14px; background: var(--panel);
+  font-size: 1.3rem; cursor: pointer; opacity: 0.7; touch-action: none;
+}
+
+/* Landscape: machine on the left, controls on the right. */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .stage { margin-bottom: 8px; }
+  .panel { flex: 0 0 min(36%, 360px); margin-bottom: 8px; border-bottom-width: 3px; border-radius: 24px; justify-content: center; padding-bottom: 10px; }
+  .machines { flex-direction: column; }
+  .mach { flex: 0 0 auto; min-height: 56px; }
+}
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .homebtn { min-height: 44px; font-size: 1.1rem; }
+  .app { gap: 14px; margin-top: 10px; }
+  .stage { padding: 10px; }
+  .panel { gap: 12px; padding: 12px 14px 14px; }
+  .mach { min-height: 62px; font-size: 1.3rem; }
+  .crank { width: 140px; height: 140px; }
+  .throttle .track { width: 64px; height: 130px; }
+  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
+  .bigtoggle { top: 14px; right: 14px; min-height: 52px; font-size: 1.15rem; }
+  .gate .btn { min-height: 60px; font-size: 1.5rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  header { justify-content: flex-end; }
+  header h1 { display: none; }
+  #timerbtn { min-height: 36px !important; }
+  .wrap { padding-top: 6px; }
+  .app { margin-top: 0; }
+  .panel { gap: 5px; padding: 6px 8px; }
+  .machines { flex-direction: row; gap: 5px; }
+  .mach { flex: 1 1 0; min-height: 44px; font-size: 0.85rem; padding: 0.1rem; }
+  .crank { width: 92px; height: 92px; }
+  .throttle .track { width: 48px; height: 80px; }
+  .start { min-height: 48px; font-size: 1.1rem; }
+  .drivecol .btn { min-height: 44px; }
+  .gate { padding: 4px; }
+  .gate .btn { min-height: 40px; font-size: 1.1rem; }
+}
+@media (max-width: 480px) {
+  header h1 { font-size: 1.15rem; }
+  .homebtn span { display: none; }
+  .homebtn { padding: 2px 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .hint.go { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Engine Room</h1>
+    <div class="hdr-right">
+      <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+      <button class="btn" data-action="timer" id="timerbtn" style="min-height:44px;font-size:1rem;padding:0.1rem 0.8rem;white-space:nowrap">⏱ Grown-ups</button>
+    </div>
+  </header>
+
+  <main class="app">
+    <div class="stage">
+      <div class="scene" id="scene">
+        <canvas id="cv" aria-label="A machine with moving parts"></canvas>
+        <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+        <div class="hint" id="hint" hidden></div>
+        <div class="slowtag" id="slowTag" hidden>Slow motion</div>
+        <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
+      </div>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to say goodbye</p>
+        <button class="btn goodbye" id="goodbyeBtn">Last spin</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ctrl machines">
+        <button class="btn mach" data-mach="car" aria-pressed="true">Car engine</button>
+        <button class="btn mach" data-mach="steam" aria-pressed="false">Steam engine</button>
+        <button class="btn mach" data-mach="gear" aria-pressed="false">Gearbox</button>
+      </div>
+      <div class="drive">
+        <div class="crank" id="crank" role="slider" aria-label="Crank: turn it by hand" tabindex="0">
+          <svg viewBox="-60 -60 120 120" aria-hidden="true">
+            <circle r="55" fill="#E6EEF8" stroke="#1D2340" stroke-width="4"/>
+            <circle r="44" fill="none" stroke="#1D2340" stroke-width="2" stroke-dasharray="4 8" opacity="0.5"/>
+            <g id="crankArm">
+              <rect x="-9" y="-44" width="18" height="52" rx="9" fill="#E63946" stroke="#1D2340" stroke-width="4"/>
+              <circle cy="-38" r="15" fill="#FFC93C" stroke="#1D2340" stroke-width="4"/>
+            </g>
+            <circle r="9" fill="#1D2340"/>
+          </svg>
+        </div>
+        <div class="drivecol">
+          <button class="btn start" id="startBtn">Start</button>
+          <button class="btn" id="slowBtn" aria-pressed="false">Slow-mo</button>
+        </div>
+        <div class="throttle" id="throttle" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+          <div class="track"><div class="tfill" id="tfill"></div><div class="knob" id="tknob"></div></div>
+          <span>Throttle</span>
+        </div>
+      </div>
+      <div class="gate" id="gate" hidden>
+        <button class="btn" data-gear="0">N</button>
+        <button class="btn" data-gear="1">1</button>
+        <button class="btn" data-gear="2">2</button>
+        <button class="btn" data-gear="3">3</button>
+        <button class="btn" data-gear="4">4</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <h2 id="sheetTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">When time is up, the engine winds down and rests, and the controls lock.</p>
+        <h4>How long</h4>
+        <div class="row" id="minuteRow"></div>
+        <h4>Next activity <span class="opt-txt">(optional)</span></h4>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Last spin button to press</label>
+        <div class="sheet-actions"><button class="btn primary" id="timerStart">Start timer</button></div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+      <hr>
+      <h3>Sound</h3>
+      <p class="sub" id="soundState">Sound is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Hold to turn sound on</span></button>
+      </div>
+      <div class="sheet-actions"><button class="btn" data-action="timerclose">Close</button></div>
+    </div>
+  </div>
+
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <svg class="rest-art" id="restArt" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The engine is resting.</p>
+      <p class="rest-line">It will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function mod(a, n) { return ((a % n) + n) % n; }
+  var TAU = Math.PI * 2, PI = Math.PI;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var INK = "#1D2340", LW = 5, SLOW = 0.125;
+
+  // ---------- Machines ----------
+  // Each machine has its own world box (drawn in world units, fitted to the canvas),
+  // a pivot used when you drag on the picture to turn it, and a speed range for the throttle.
+  var MACH = {
+    car: { W: 1000, H: 730, pivot: [230, 560], minRpm: 60, maxRpm: 360 },
+    steam: { W: 1000, H: 640, pivot: [800, 430], minRpm: 20, maxRpm: 150 },
+    gear: { W: 1200, H: 600, pivot: [85, 230], minRpm: 60, maxRpm: 360 }
+  };
+  // Gearbox: four gear pairs on the same two shafts (teeth add up to 54, so they all share one spacing).
+  var PAIRS = [
+    { n: "1st", a: 12, b: 42, x: 307, col: "#E63946" },
+    { n: "2nd", a: 18, b: 36, x: 554, col: "#F77F00" },
+    { n: "3rd", a: 22, b: 32, x: 773, col: "#2E9E5B" },
+    { n: "4th", a: 27, b: 27, x: 960, col: "#3A86FF" }
+  ];
+  var GY1 = 230, GY2 = 380, GMOD = 300 / 54;
+  function gR(T) { return T * GMOD / 2; }
+  // Car engine: cylinders 1-4 left to right; firing order 1-3-4-2 over two turns (720°).
+  var CX = [380, 520, 660, 800], OFF = [0, 3 * PI, PI, 2 * PI];
+  var CYC = 560, CR = 45, CL = 150;
+
+  // ---------- State ----------
+  var KEY = "engineroom-state-v1";
+  var st = { machine: "car", throttle: 0.35, slow: false, gear: 1 };
+  try {
+    var so = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (so && typeof so === "object") {
+      if (MACH[so.machine]) st.machine = so.machine;
+      if (typeof so.throttle === "number") st.throttle = clamp(so.throttle, 0, 1);
+      if (typeof so.slow === "boolean") st.slow = so.slow;
+      if (typeof so.gear === "number" && so.gear >= 0 && so.gear <= 4) st.gear = Math.round(so.gear);
+    }
+  } catch (e) { /* defaults */ }
+  function saveState() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* ignore */ } }
+
+  var eng = { th: 0, w: 0, running: false, prevTh: 0, fc: [0, 0, 0, 0], pc: 0, drag: 0, dragAcc: 0 };
+  var flash = [0, 0, 0, 0], lastFire = -1, firePulse = 0;
+  var gov = 0.3, psi = 0, wOut = 0, collarX = PAIRS[0].x, roadOff = 0, needle = 0;
+  var fx = [], rings = [], picks = [], parts = [];
+  var ending = false, now = 0, lastT = 0;
+  function resetCounters() {
+    for (var k = 0; k < 4; k++) eng.fc[k] = Math.floor((eng.th - OFF[k]) / (2 * TAU));
+    eng.pc = Math.floor(eng.th / PI);
+    eng.prevTh = eng.th;
+  }
+  resetCounters();
+
+  // ---------- Canvas ----------
+  var cv = $("cv"), ctx = cv.getContext("2d"), scene = $("scene");
+  var CW = 1, CH = 1, DPR = 1, S = 1, OX = 0, OY = 0;
+  function resize() {
+    var r = scene.getBoundingClientRect(), m = MACH[st.machine];
+    CW = Math.max(1, r.width - 6); CH = Math.max(1, r.height - 6);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    S = Math.min(CW / m.W, CH / m.H) * 0.97;
+    OX = (CW - m.W * S) / 2; OY = (CH - m.H * S) / 2;
+  }
+  window.addEventListener("resize", resize);
+  function toWorld(cx, cy) {
+    var r = cv.getBoundingClientRect();
+    return { x: (cx - r.left - OX) / S, y: (cy - r.top - OY) / S };
+  }
+
+  // ---------- Drawing helpers (world units) ----------
+  function rr(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function fs(fill, lw) { if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (lw !== 0) { ctx.lineWidth = lw || LW; ctx.strokeStyle = INK; ctx.stroke(); } }
+  function box(x, y, w, h, r, fill, lw) { rr(x, y, w, h, r); fs(fill, lw); }
+  function disc(x, y, r, fill, lw) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fs(fill, lw); }
+  function bar(x1, y1, x2, y2, w, fill) {
+    var a = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1);
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(a); rr(-w / 2, -w / 2, len + w, w, w / 2); fs(fill); ctx.restore();
+  }
+  function part(id, name, shape) { shape.id = id; shape.name = name; parts.push(shape); }
+  function pc(id, name, x, y, r) { part(id, name, { t: "c", x: x, y: y, r: r }); }
+  function pr(id, name, x, y, w, h) { part(id, name, { t: "r", x: x, y: y, w: w, h: h }); }
+  function pb(id, name, x1, y1, x2, y2, w) { part(id, name, { t: "s", x1: x1, y1: y1, x2: x2, y2: y2, w: w }); }
+  function hitShape(p, x, y) {
+    if (p.t === "c") return Math.hypot(x - p.x, y - p.y) <= p.r;
+    if (p.t === "r") return x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h;
+    var dx = p.x2 - p.x1, dy = p.y2 - p.y1, L2 = dx * dx + dy * dy || 1;
+    var t = clamp(((x - p.x1) * dx + (y - p.y1) * dy) / L2, 0, 1);
+    return Math.hypot(x - (p.x1 + t * dx), y - (p.y1 + t * dy)) <= p.w / 2 + 6;
+  }
+  function gearPath(cx, cy, r, T, ang) {
+    var m = 2 * r / T, ro = r + m, ri = r - 1.25 * m, per = TAU / T;
+    ctx.beginPath();
+    for (var i = 0; i < T; i++) {
+      var a0 = ang + i * per;
+      var pts = [[a0 - 0.3 * per, ri], [a0 - 0.15 * per, ro], [a0 + 0.15 * per, ro], [a0 + 0.3 * per, ri]];
+      for (var j = 0; j < 4; j++) {
+        var px = cx + Math.cos(pts[j][0]) * pts[j][1], py = cy + Math.sin(pts[j][0]) * pts[j][1];
+        if (i === 0 && j === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+  }
+  function spokes(cx, cy, r, n, ang, w, col) {
+    ctx.save(); ctx.lineCap = "round";
+    for (var i = 0; i < n; i++) {
+      var a = ang + i * TAU / n;
+      ctx.strokeStyle = INK; ctx.lineWidth = w + LW * 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // A belt around pulleys [[x, y, r], ...]; dashes move with the belt.
+  function belt(ps, offset, col, w) {
+    var segs = [], cxm = 0, cym = 0;
+    ps.forEach(function (p) { cxm += p[0] / ps.length; cym += p[1] / ps.length; });
+    for (var i = 0; i < ps.length; i++) {
+      if (ps.length === 2 && i === 1) break;
+      var A = ps[i], B = ps[(i + 1) % ps.length];
+      var D = Math.hypot(B[0] - A[0], B[1] - A[1]), al = Math.atan2(B[1] - A[1], B[0] - A[0]), be = Math.acos(clamp((A[2] - B[2]) / D, -1, 1));
+      var cands = [al + be, al - be].map(function (n) {
+        return [A[0] + Math.cos(n) * A[2], A[1] + Math.sin(n) * A[2], B[0] + Math.cos(n) * B[2], B[1] + Math.sin(n) * B[2]];
+      });
+      if (ps.length === 2) { segs.push(cands[0], cands[1]); continue; }
+      var d0 = Math.hypot((cands[0][0] + cands[0][2]) / 2 - cxm, (cands[0][1] + cands[0][3]) / 2 - cym);
+      var d1 = Math.hypot((cands[1][0] + cands[1][2]) / 2 - cxm, (cands[1][1] + cands[1][3]) / 2 - cym);
+      segs.push(d0 > d1 ? cands[0] : cands[1]);
+    }
+    ctx.save(); ctx.lineCap = "round";
+    function strokeAll(width, color, dash) {
+      ctx.lineWidth = width; ctx.strokeStyle = color;
+      ctx.setLineDash(dash || []); ctx.lineDashOffset = offset;
+      segs.forEach(function (s) { ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); ctx.stroke(); });
+      ps.forEach(function (p) { ctx.beginPath(); ctx.arc(p[0], p[1], p[2], 0, TAU); ctx.stroke(); });
+    }
+    strokeAll(w + 6, INK); strokeAll(w, col); strokeAll(w * 0.45, "rgba(255,255,255,0.55)", [16, 18]);
+    ctx.restore();
+    return segs;
+  }
+  function label(text, x, y, size, col, align) {
+    ctx.font = "800 " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
+    ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = col || INK; ctx.fillText(text, x, y);
+  }
+
+  // ---------- Car engine ----------
+  function carPhase(k) { return mod(eng.th - OFF[k], 2 * TAU); }
+  function camLobe(x, y, base, lift, ang, col) {
+    ctx.beginPath();
+    for (var i = 0; i <= 36; i++) {
+      var a = i / 36 * TAU, d = Math.atan2(Math.sin(a - ang), Math.cos(a - ang));
+      var rad = base + lift * Math.max(0, Math.cos(d * 1.7));
+      if (i === 0) ctx.moveTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); else ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+    }
+    ctx.closePath(); fs(col, 4);
+  }
+  function valveLift(phi, center) { var d = Math.atan2(Math.sin((phi - center) / 2), Math.cos((phi - center) / 2)); return Math.max(0, Math.cos(d * 1.7)); }
+  function drawCar() {
+    var th = eng.th, camY = 165, camBase = 17, camLift = 20;
+    // Front: fan belt from the crank pulley to the alternator and the fan.
+    var spin = th;
+    disc(95, 470, 50, "#2E9E5B"); pc("alt", "Alternator", 95, 470, 50);
+    ctx.save(); ctx.translate(95, 470); ctx.rotate(spin * 50 / 22);
+    for (var v = 0; v < 6; v++) { ctx.rotate(TAU / 6); box(14, -5, 26, 10, 5, "#1F7A45", 3); }
+    ctx.restore();
+    // Crankcase, block and bores
+    box(300, 480, 580, 170, 34, "#7D8BA0"); pr("case", "Crankcase (oil pan)", 300, 480, 580, 170);
+    box(300, 285, 580, 205, 16, "#AEB9C8"); pr("block", "Engine block", 300, 285, 580, 205);
+    // Main shaft
+    bar(230, CYC, 920, CYC, 26, "#5C677D");
+    var k, x, phi;
+    for (k = 0; k < 4; k++) {
+      x = CX[k]; phi = carPhase(k);
+      var pinY = CYC - (CR * Math.cos(phi) + Math.sqrt(CL * CL - Math.pow(CR * Math.sin(phi), 2)));
+      var top = pinY - 34;
+      box(x - 56, 296, 112, 192, 6, "#2C3550", 4);
+      pr("cyl" + k, "Cylinder " + (k + 1), x - 56, 296, 112, 192);
+      // Gas above the piston: fire, smoke, fresh air and fuel, squeezed mix.
+      var gas, ga = 1;
+      if (phi < PI) { var f = phi / PI; gas = f < 0.4 ? "#FFD23F" : f < 0.75 ? "#F77F00" : "#B5562B"; }
+      else if (phi < TAU) { gas = "#8A8F99"; ga = 1 - (phi - PI) / PI * 0.6; }
+      else if (phi < 3 * PI) { gas = "#9ED8FF"; ga = 0.5 + (phi - TAU) / PI * 0.5; }
+      else { gas = "#3A86FF"; ga = 0.6 + (phi - 3 * PI) / PI * 0.4; }
+      ctx.globalAlpha = ga; box(x - 53, 299, 106, top - 299, 4, gas, 0); ctx.globalAlpha = 1;
+      if (flash[k] > 0) { ctx.globalAlpha = flash[k]; box(x - 53, 299, 106, top - 299, 4, "#FFF6B0", 0); ctx.globalAlpha = 1; }
+      // Crank web + counterweight, rod, piston
+      var cpx = x + CR * Math.sin(phi), cpy = CYC - CR * Math.cos(phi);
+      ctx.beginPath(); ctx.arc(x, CYC, 58, -PI / 2 + phi + PI - 1.1, -PI / 2 + phi + PI + 1.1); ctx.lineTo(x, CYC); ctx.closePath(); fs("#C1121F");
+      bar(x, CYC, cpx, cpy, 46, "#E63946");
+      disc(x, CYC, 13, "#5C677D", 4);
+      bar(x, pinY, cpx, cpy, 24, "#6C7A8D");
+      pb("rod" + k, "Connecting rod", x, pinY, cpx, cpy, 24);
+      disc(cpx, cpy, 12, "#FFC93C", 4);
+      box(x - 50, top, 100, 66, 10, "#D7DEE7");
+      ctx.strokeStyle = INK; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x - 50, top + 14); ctx.lineTo(x + 50, top + 14); ctx.moveTo(x - 50, top + 24); ctx.lineTo(x + 50, top + 24); ctx.stroke();
+      disc(x, pinY, 9, "#8A97AA", 3);
+      pr("piston" + k, "Piston " + (k + 1), x - 50, top, 100, 66);
+    }
+    pb("crank", "Crankshaft", 300, CYC, 880, CYC, 70);
+    // Head, valves, spark plugs
+    box(300, 205, 580, 95, 14, "#8A97AA"); pr("head", "Cylinder head", 300, 205, 580, 95);
+    box(300, 125, 580, 82, 30, "#5E6B85"); pr("cover", "Valve cover", 300, 125, 580, 82);
+    bar(310, camY, 920, camY, 14, "#3B4766");
+    pb("cam", "Camshaft (turns half as fast)", 310, camY, 880, camY, 40);
+    for (k = 0; k < 4; k++) {
+      x = CX[k]; phi = carPhase(k);
+      [[-28, 2.5 * PI, "#3A86FF", "Intake valve (air in)"], [28, 1.5 * PI, "#F77F00", "Exhaust valve (smoke out)"]].forEach(function (vd) {
+        var vx = x + vd[0], li = valveLift(phi, vd[1]);
+        var lobeAng = (phi - vd[1]) / 2 + PI / 2;
+        var stemTop = camY + camBase + camLift * li, headY = 293 + 22 * li;
+        bar(vx, stemTop + 4, vx, headY, 9, "#C9D3DE");
+        box(vx - 20, headY, 40, 10, 5, vd[2], 4);
+        camLobe(vx, camY, camBase, camLift, lobeAng, "#8338EC");
+        pb((vd[0] < 0 ? "iv" : "ev") + k, vd[3], vx, stemTop, vx, headY + 10, 40);
+      });
+      // Spark plug
+      box(x - 9, 214, 18, 62, 5, "#FFFFFF", 4);
+      box(x - 6, 274, 12, 22, 3, "#8A97AA", 3);
+      pr("plug" + k, "Spark plug " + (k + 1), x - 12, 210, 24, 90);
+      if (flash[k] > 0) {
+        var fr = 18 + 44 * flash[k];
+        ctx.save(); ctx.globalAlpha = flash[k]; ctx.translate(x, 300);
+        ctx.beginPath();
+        for (var s = 0; s < 16; s++) { var a = s / 16 * TAU, rad = s % 2 ? fr * 0.45 : fr; ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
+        ctx.closePath(); ctx.fillStyle = "#FFE45E"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#F77F00"; ctx.stroke();
+        ctx.restore();
+      }
+      // Cylinder number: lights up when it fires (order 1-3-4-2).
+      var lit = flash[k] > 0;
+      disc(x, 92, 28 + (lit ? 8 * flash[k] : 0), lit ? "#FFC93C" : "#FFFFFF", 4);
+      label(String(k + 1), x, 95, 36, INK);
+      pc("num" + k, "Cylinder " + (k + 1), x, 92, 30);
+    }
+    // Timing belt: crank to camshaft at the back end (cam wheel is twice as big, so it turns half as fast).
+    belt([[920, CYC, 26], [920, camY, 52]], -th * 26, "#1D2340", 12);
+    gearPath(920, camY, 46, 24, th / 2); fs("#B8C2D0", 4); disc(920, camY, 12, "#5C677D", 4);
+    gearPath(920, CYC, 22, 12, th); fs("#B8C2D0", 4);
+    pc("tbelt", "Timing belt", 920, (CYC + camY) / 2, 40);
+    // Front pulleys and fan belt
+    belt([[230, 330, 32], [230, CYC, 50], [95, 470, 22]], -th * 50, "#3B4766", 13);
+    disc(230, CYC, 44, "#C9D3DE", 4); spokes(230, CYC, 40, 3, th, 8, "#8A97AA"); disc(230, CYC, 10, INK, 0);
+    pc("pulley", "Crank pulley", 230, CYC, 50);
+    disc(95, 470, 18, "#C9D3DE", 4);
+    pb("fbelt", "Fan belt", 95, 470, 230, CYC, 26);
+    // Fan
+    ctx.save(); ctx.translate(230, 330); ctx.rotate(th * 50 / 32);
+    for (var b = 0; b < 5; b++) {
+      ctx.rotate(TAU / 5);
+      ctx.beginPath(); ctx.moveTo(12, -10); ctx.quadraticCurveTo(70, -42, 92, -6); ctx.quadraticCurveTo(70, 16, 12, 10); ctx.closePath(); fs("#FF5DA2", 4);
+    }
+    ctx.restore();
+    disc(230, 330, 22, "#C9D3DE", 4);
+    pc("fan", "Fan (cools the engine)", 230, 330, 95);
+    // Stroke names under each cylinder
+    var fsz = Math.max(26, 15 / S);
+    for (k = 0; k < 4; k++) {
+      phi = carPhase(k);
+      var nm = phi < PI ? "Power" : phi < TAU ? "Exhaust" : phi < 3 * PI ? "Intake" : "Squeeze";
+      var col = phi < PI ? "#C1121F" : phi < TAU ? "#4A5578" : phi < 3 * PI ? "#2D5BD7" : "#8338EC";
+      label(nm, CX[k], 690, fsz, col);
+    }
+  }
+
+  // ---------- Steam engine ----------
+  var FX = 800, FY = 430, FR = 165, SR = 62, SL = 240, PROD = 180;
+  function drawSteam() {
+    var th = eng.th;
+    var pinX = FX + SR * Math.cos(th), pinY = FY + SR * Math.sin(th);
+    var xh = pinX - Math.sqrt(SL * SL - Math.pow(pinY - FY, 2));
+    var xp = xh - PROD;
+    var fire = eng.running && !ending ? 0.45 + 0.55 * st.throttle : 0.12 + Math.min(0.3, Math.abs(eng.w) / 20);
+    // Bed
+    box(260, 520, 740, 70, 14, "#8D99AE"); pr("bed", "Engine bed", 260, 520, 740, 70);
+    // Boiler and firebox
+    box(30, 470, 230, 120, 14, "#6B4232"); pr("firebox", "Firebox (the fire heats the water)", 30, 470, 230, 120);
+    box(55, 500, 180, 70, 12, "#2B1A14", 4);
+    for (var i = 0; i < 6; i++) {
+      var fxp = 75 + i * 28, fh = (26 + 26 * fire) * (0.75 + 0.25 * Math.sin(now / 90 + i * 1.7));
+      ctx.beginPath(); ctx.moveTo(fxp - 14, 568); ctx.quadraticCurveTo(fxp - 6, 568 - fh * 0.6, fxp, 568 - fh); ctx.quadraticCurveTo(fxp + 6, 568 - fh * 0.6, fxp + 14, 568); ctx.closePath();
+      ctx.fillStyle = i % 2 ? "#FFC93C" : "#F77F00"; ctx.fill();
+    }
+    box(45, 120, 44, 190, 6, "#3B4766"); box(35, 108, 64, 22, 6, "#3B4766");
+    pr("chimney", "Chimney", 35, 108, 64, 200);
+    box(20, 300, 250, 175, 70, "#C0392B"); pr("boiler", "Boiler (water turns to steam)", 20, 300, 250, 175);
+    ctx.strokeStyle = INK; ctx.lineWidth = 4;
+    [80, 145, 210].forEach(function (bx) { ctx.beginPath(); ctx.moveTo(bx, 302); ctx.lineTo(bx, 473); ctx.stroke(); });
+    ctx.beginPath(); ctx.arc(150, 302, 30, PI, TAU); fs("#E9B949");
+    // Pressure gauge
+    disc(225, 360, 28, "#FFFFFF", 4);
+    var ga = -PI * 0.8 + PI * 1.1 * (fire);
+    bar(225, 360, 225 + Math.cos(ga) * 18, 360 + Math.sin(ga) * 18, 5, "#E63946");
+    pc("gauge", "Pressure gauge", 225, 360, 30);
+    // Steam pipe to the valve chest
+    ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.strokeStyle = INK; ctx.lineWidth = 28; ctx.beginPath(); ctx.moveTo(150, 280); ctx.lineTo(150, 250); ctx.lineTo(380, 250); ctx.lineTo(380, 332); ctx.stroke();
+    ctx.strokeStyle = "#D9893B"; ctx.lineWidth = 18; ctx.stroke(); ctx.restore();
+    pb("pipe", "Steam pipe", 150, 250, 380, 250, 28);
+    // Cylinder with steam on the pushing side
+    box(286, 368, 188, 124, 12, "#7D8BA0"); pr("cyl", "Cylinder", 286, 368, 188, 124);
+    box(298, 380, 164, 100, 6, "#2C3550", 4);
+    var leftPush = Math.sin(th) < 0;
+    ctx.globalAlpha = 0.95;
+    box(301, 383, Math.max(1, xp - 17 - 301), 94, 4, leftPush ? "#FFFFFF" : "#9AA3B5", 0);
+    box(xp + 17, 383, Math.max(1, 459 - xp - 17), 94, 4, leftPush ? "#9AA3B5" : "#FFFFFF", 0);
+    ctx.globalAlpha = 1;
+    box(xp - 17, 384, 34, 92, 6, "#D7DEE7"); pr("piston", "Piston", xp - 17, 384, 34, 92);
+    // Valve chest and slide valve
+    box(305, 330, 150, 42, 10, "#AEB9C8"); pr("chest", "Valve chest (sends steam left, then right)", 305, 330, 150, 42);
+    var vx = 380 + 22 * Math.cos(th + PI / 2);
+    box(vx - 26, 338, 52, 26, 6, "#E9B949", 4);
+    // Guides, piston rod, crosshead
+    box(478, FY - 40, 175, 12, 5, "#5C677D", 4); box(478, FY + 28, 175, 12, 5, "#5C677D", 4);
+    bar(xp, FY, xh, FY, 12, "#C9D3DE"); pb("prod", "Piston rod", xp, FY, xh, FY, 14);
+    // Governor belt (drawn behind the flywheel)
+    belt([[FX, FY, 28], [660, 230, 28]], -th * 28, "#3B4766", 10);
+    // Flywheel
+    disc(FX, FY, FR, "#3B4766"); disc(FX, FY, FR - 26, "#DCEAF7", 4);
+    spokes(FX, FY, FR - 24, 6, th, 16, "#5C677D");
+    disc(FX, FY, 30, "#5C677D", 4);
+    pc("fly", "Flywheel (keeps it turning smoothly)", FX, FY, FR);
+    // Crank and connecting rod
+    bar(FX, FY, pinX, pinY, 40, "#E63946");
+    box(xh - 26, FY - 24, 52, 48, 10, "#FFC93C"); pr("xhead", "Crosshead (slides back and forth)", xh - 26, FY - 24, 52, 48);
+    bar(xh, FY, pinX, pinY, 24, "#6C7A8D"); pb("crod", "Connecting rod", xh, FY, pinX, pinY, 24);
+    disc(xh, FY, 9, "#8A97AA", 3); disc(pinX, pinY, 12, "#FFC93C", 4);
+    pc("crank", "Crank", (FX + pinX) / 2, (FY + pinY) / 2, 30);
+    // Governor: balls fly out as it spins faster.
+    var gx = 660, gtop = 70, gl = 95, spinA = th;
+    box(gx - 34, 210, 68, 40, 10, "#8A97AA"); gearPath(gx, 230, 26, 14, th); fs("#C9D3DE", 3);
+    bar(gx, 210, gx, gtop, 12, "#5C677D");
+    var sx = Math.sin(gov) * gl, sy = Math.cos(gov) * gl, sleeveY = gtop + sy * 1.55;
+    box(gx - 14, sleeveY - 10, 28, 20, 6, "#E9B949", 3);
+    [[0, 1], [PI, -1]].forEach(function (bd) {
+      var c = Math.cos(spinA + bd[0]), depth = Math.sin(spinA + bd[0]);
+      var bx = gx + sx * c, by = gtop + sy;
+      ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(gx, gtop); ctx.lineTo(bx, by); ctx.lineTo(gx, sleeveY); ctx.stroke();
+      disc(bx, by, 22 + depth * 4, "#E9B949", 4);
+    });
+    disc(gx, gtop, 9, INK, 0);
+    pc("gov", "Governor (balls fly out when it is fast)", gx, 150, 90);
+  }
+
+  // ---------- Gearbox ----------
+  function gearPhase(p) { return -PI / 2 - (0.5 - p.a / 4) * TAU / p.b; }
+  function drawGearbox() {
+    var th = eng.th;
+    // Engine on the left drives the top shaft.
+    box(10, 140, 150, 180, 20, "#7D8BA0"); pr("eng", "Engine", 10, 140, 150, 180);
+    disc(85, GY1, 64, "#3B4766"); spokes(85, GY1, 54, 4, th, 12, "#E63946"); disc(85, GY1, 14, "#5C677D", 4);
+    pc("fly", "Engine flywheel", 85, GY1, 64);
+    label("Engine", 85, 300, Math.max(24, 14 / S), "#FFFFFF");
+    // Case
+    box(185, 95, 870, 405, 30, "rgba(174,185,200,0.55)", 4); pr("case", "Gearbox case", 185, 95, 870, 405);
+    bar(85, GY1, 1050, GY1, 18, "#5C677D"); pb("in", "Top shaft (turns with the engine)", 150, GY1, 1050, GY1, 22);
+    // Output shaft: striped so you can see it turn.
+    bar(190, GY2, 1120, GY2, 22, "#8A97AA"); pb("out", "Output shaft (turns the wheel)", 190, GY2, 1120, GY2, 26);
+    ctx.save(); ctx.beginPath(); ctx.rect(190, GY2 - 9, 930, 18); ctx.clip();
+    ctx.fillStyle = "#3B4766";
+    var so = mod(-psi * 11 * 6, 36);
+    for (var sx = 190 - 36 + so; sx < 1120; sx += 36) { ctx.beginPath(); ctx.moveTo(sx, GY2 - 9); ctx.lineTo(sx + 12, GY2 - 9); ctx.lineTo(sx + 2, GY2 + 9); ctx.lineTo(sx - 10, GY2 + 9); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    var fsz = Math.max(26, 15 / S);
+    PAIRS.forEach(function (p, i) {
+      var on = st.gear === i + 1;
+      var ra = gR(p.a), rb = gR(p.b), angB = -th * p.a / p.b + gearPhase(p);
+      gearPath(p.x, GY2, rb, p.b, angB); fs(on ? p.col : "#E6EEF8", 4);
+      ctx.globalAlpha = on ? 1 : 0.5; spokes(p.x, GY2, rb * 0.62, 4, angB, 6, on ? "#FFFFFF" : p.col); ctx.globalAlpha = 1;
+      disc(p.x, GY2, 16, "#5C677D", 4);
+      pc("gb" + i, p.n + " gear, big: " + p.b + " teeth", p.x, GY2, rb);
+      gearPath(p.x, GY1, ra, p.a, th); fs(p.col, 4);
+      disc(p.x, GY1, Math.min(14, ra * 0.4), "#5C677D", 4);
+      pc("ga" + i, p.n + " gear, small: " + p.a + " teeth", p.x, GY1, ra);
+      // Gear name: the one in use is lit.
+      var ly = 545;
+      if (on) { box(p.x - 62, ly - 26, 124, 52, 26, "#FFC93C", 4); }
+      label(p.n, p.x, ly + 2, fsz, on ? INK : "#4A5578");
+    });
+    // Dog collar slides to lock the chosen gear to the output shaft.
+    if (st.gear > 0) {
+      box(collarX - 18, GY2 - 30, 36, 60, 10, "#FFC93C");
+      ctx.strokeStyle = INK; ctx.lineWidth = 3;
+      for (var c = -1; c <= 1; c++) { ctx.beginPath(); ctx.moveTo(collarX - 18, GY2 + c * 14); ctx.lineTo(collarX + 18, GY2 + c * 14); ctx.stroke(); }
+      pr("collar", "Collar (locks this gear to the shaft)", collarX - 20, GY2 - 32, 40, 64);
+    } else {
+      label("Neutral", 620, 470, fsz, "#4A5578");
+    }
+    // Wheel and road
+    var wx = 1120, wr = 72, roadY = GY2 + wr;
+    ctx.fillStyle = "#4A5578"; ctx.fillRect(1030, roadY, 170, 40);
+    ctx.fillStyle = "#FFFFFF";
+    for (var rx = 1030 - 60 + mod(roadOff, 60); rx < 1200; rx += 60) ctx.fillRect(Math.max(1030, rx), roadY + 16, Math.max(0, Math.min(30, rx + 30 - 1030)), 8);
+    disc(wx, GY2, wr, "#2B3040"); disc(wx, GY2, wr * 0.58, "#C9D3DE", 4);
+    spokes(wx, GY2, wr * 0.55, 5, -psi, 9, "#8A97AA"); disc(wx, GY2, 12, "#5C677D", 4);
+    pc("wheel", "Wheel", wx, GY2, wr);
+  }
+
+  // ---------- Tachometer (no numbers: green to red) ----------
+  function drawTach() {
+    var m = MACH[st.machine];
+    var r = clamp(Math.min(CW, CH) * 0.09, 34, 70), x = 12 + r, y = CH - 12 - r * 0.35;
+    var a0 = PI * 1.0, a1 = PI * 2.0;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r, a0, a1); ctx.lineTo(x, y); ctx.closePath();
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    var bands = [["#2E9E5B", 0, 0.55], ["#FFC93C", 0.55, 0.8], ["#E63946", 0.8, 1]];
+    bands.forEach(function (b) {
+      ctx.beginPath(); ctx.arc(x, y, r * 0.78, a0 + PI * b[1], a0 + PI * b[2]);
+      ctx.lineWidth = r * 0.2; ctx.strokeStyle = b[0]; ctx.stroke();
+    });
+    var f = clamp(needle / (m.maxRpm * 1.05), 0, 1), na = a0 + PI * f;
+    ctx.lineCap = "round"; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(4, r * 0.1);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(na) * r * 0.86, y + Math.sin(na) * r * 0.86); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 0.13, 0, TAU); ctx.fillStyle = "#E63946"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Simulation ----------
+  function rpmW(rpm) { return rpm * TAU / 60; }
+  function step(dt) {
+    var m = MACH[st.machine];
+    var sc = st.slow ? SLOW : 1, ds = dt * sc;
+    if (eng.drag) {
+      var wi = eng.dragAcc / Math.max(ds, 1e-4);
+      eng.w += (wi - eng.w) * 0.5; eng.dragAcc = 0;
+    } else {
+      if (eng.running && !ending) {
+        var target = rpmW(m.minRpm + st.throttle * (m.maxRpm - m.minRpm));
+        eng.w += (target - eng.w) * Math.min(1, ds * 1.6);
+      } else {
+        eng.w *= Math.exp(-(ending ? dt * 0.9 : ds * 0.55));
+        if (Math.abs(eng.w) < 0.04) eng.w = 0;
+      }
+      eng.th += eng.w * ds;
+    }
+    events(eng.th);
+    eng.prevTh = eng.th;
+    var rpm = Math.abs(eng.w) * 60 / TAU;
+    needle += (rpm - needle) * Math.min(1, dt * 5);
+    for (var k = 0; k < 4; k++) flash[k] = Math.max(0, flash[k] - dt * (st.slow ? 1.2 : 3.5));
+    gov += ((0.3 + 0.9 * clamp(rpm / 150, 0, 1)) - gov) * Math.min(1, dt * 2);
+    // Gearbox output
+    if (st.gear > 0) {
+      var p = PAIRS[st.gear - 1];
+      wOut = eng.w * p.a / p.b;
+      collarX += (p.x - collarX) * Math.min(1, dt * 10);
+    } else {
+      wOut *= Math.exp(-ds * 0.8);
+    }
+    psi += wOut * ds;
+    roadOff -= wOut * ds * 72;
+    var pdt = dt * (st.slow ? 0.35 : 1);
+    fx = fx.filter(function (q) { q.life += pdt; q.x += q.vx * pdt; q.y += q.vy * pdt; q.vy += (q.g || 0) * pdt; q.r += (q.grow || 0) * pdt; return q.life < q.max; });
+    rings = rings.filter(function (q) { q.life += dt; return q.life < 0.6; });
+    picks = picks.filter(function (q) { return now < q.until; });
+  }
+  function events(th) {
+    if (st.machine === "car") {
+      for (var k = 0; k < 4; k++) {
+        var c = Math.floor((th - OFF[k]) / (2 * TAU));
+        if (c > eng.fc[k]) fire(k);
+        eng.fc[k] = c;
+      }
+    } else if (st.machine === "steam") {
+      var pcount = Math.floor(th / PI);
+      if (pcount !== eng.pc) puff();
+      eng.pc = pcount;
+    }
+  }
+  function fire(k) {
+    flash[k] = 1; lastFire = k;
+    if (!reduceMotion) for (var i = 0; i < 10; i++) {
+      var a = rand(0, TAU), v = rand(120, 380);
+      fx.push({ x: CX[k], y: 305, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, life: 0, max: rand(0.25, 0.5), r: rand(5, 10), col: i % 2 ? "#FFC93C" : "#F77F00", g: 0 });
+    }
+    putt();
+  }
+  function puff() {
+    for (var i = 0; i < 4; i++) fx.push({ x: 67 + rand(-10, 10), y: 104, vx: rand(-30, 50), vy: rand(-170, -110), life: 0, max: rand(1.2, 1.8), r: rand(16, 26), grow: 28, col: "#FFFFFF", smoke: true });
+    chuff();
+  }
+
+  // ---------- Draw ----------
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = "#DCEAF7"; ctx.fillRect(0, 0, CW, CH);
+    ctx.strokeStyle = "rgba(29,35,64,0.06)"; ctx.lineWidth = 1;
+    for (var gx = 0; gx < CW; gx += 32) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke(); }
+    for (var gy = 0; gy < CH; gy += 32) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CW, gy); ctx.stroke(); }
+    ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
+    ctx.lineJoin = "round";
+    parts = [];
+    if (st.machine === "car") drawCar(); else if (st.machine === "steam") drawSteam(); else drawGearbox();
+    fx.forEach(function (q) {
+      var f = q.life / q.max;
+      ctx.globalAlpha = q.smoke ? 0.85 * (1 - f) : 1 - f;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.fillStyle = q.col; ctx.fill();
+      if (q.smoke) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.stroke(); }
+    });
+    ctx.globalAlpha = 1;
+    rings.forEach(function (q) {
+      var f = q.life / 0.6;
+      ctx.globalAlpha = 1 - f; ctx.lineWidth = 8; ctx.strokeStyle = "#FFC93C";
+      ctx.beginPath(); ctx.arc(q.x, q.y, 20 + 90 * f, 0, TAU); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    // Highlights for tapped parts, with their names.
+    picks.forEach(function (pk) {
+      var p = null;
+      for (var i = 0; i < parts.length; i++) if (parts[i].id === pk.id) { p = parts[i]; break; }
+      if (!p) return;
+      var pulse = 0.6 + 0.4 * Math.sin(now / 120);
+      ctx.save(); ctx.lineWidth = 10; ctx.strokeStyle = "rgba(255,201,60," + pulse + ")";
+      ctx.setLineDash([]);
+      var lx, ly;
+      if (p.t === "c") { ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, TAU); ctx.stroke(); lx = p.x; ly = p.y - p.r - 10; }
+      else if (p.t === "r") { rr(p.x - 6, p.y - 6, p.w + 12, p.h + 12, 12); ctx.stroke(); lx = p.x + p.w / 2; ly = p.y - 10; }
+      else { ctx.lineCap = "round"; ctx.lineWidth = p.w + 14; ctx.strokeStyle = "rgba(255,201,60," + (pulse * 0.6) + ")"; ctx.beginPath(); ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); ctx.stroke(); lx = (p.x1 + p.x2) / 2; ly = Math.min(p.y1, p.y2) - p.w / 2 - 10; }
+      ctx.restore();
+      pk.lx = lx; pk.ly = ly; pk.name = p.name;
+    });
+    // Name tags drawn in screen pixels so they stay readable on a phone.
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    picks.forEach(function (pk) {
+      if (pk.lx == null) return;
+      var size = clamp(Math.min(CW, CH) * 0.045, 18, 30);
+      ctx.font = "800 " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
+      var w = ctx.measureText(pk.name).width + size * 1.2, h = size * 1.6;
+      var x = clamp(OX + pk.lx * S - w / 2, 6, CW - w - 6), y = clamp(OY + pk.ly * S - h, 6, CH - h - 6);
+      rr(x, y, w, h, h / 2); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+      label(pk.name, x + w / 2, y + h / 2 + 1, size, INK);
+    });
+    drawTach();
+    var ang = eng.th * 180 / PI;
+    $("crankArm").setAttribute("transform", "rotate(" + (ang % 360).toFixed(1) + ")");
+  }
+  function loop(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t; now = t;
+    step(dt);
+    draw();
+    if (ending) checkEndingDone();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Hint ----------
+  var hintTimer = null;
+  function hint(text, ms) {
+    var el = $("hint");
+    el.textContent = text; el.hidden = false;
+    el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(function () { el.hidden = true; }, ms || 2600);
+  }
+
+  // ---------- Input: drag the picture to turn it, tap a part to see its name ----------
+  var ptrs = {};
+  function angleAt(p) { var m = MACH[st.machine]; return Math.atan2(p.y - m.pivot[1], p.x - m.pivot[0]); }
+  function wrapA(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+  cv.addEventListener("pointerdown", function (e) {
+    if (ending) return;
+    e.preventDefault(); unlockAudioIfOn();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var w = toWorld(e.clientX, e.clientY);
+    ptrs[e.pointerId] = { sx: e.clientX, sy: e.clientY, a: angleAt(w), crank: false };
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var p = ptrs[e.pointerId];
+    if (!p || ending) return;
+    var w = toWorld(e.clientX, e.clientY);
+    if (!p.crank && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 12 && !anyCrank()) { p.crank = true; eng.drag++; p.a = angleAt(w); }
+    if (p.crank) { var a = angleAt(w), d = wrapA(a - p.a); p.a = a; turnBy(d); }
+  });
+  function anyCrank() { for (var k in ptrs) if (ptrs[k].crank) return true; return false; }
+  function endPtr(e) {
+    var p = ptrs[e.pointerId];
+    if (!p) return;
+    delete ptrs[e.pointerId];
+    if (p.crank) { eng.drag = Math.max(0, eng.drag - 1); return; }
+    if (e.type === "pointercancel" || ending) return;
+    tapAt(toWorld(e.clientX, e.clientY));
+  }
+  cv.addEventListener("pointerup", endPtr);
+  cv.addEventListener("pointercancel", endPtr);
+  function turnBy(d) { eng.th += d; eng.dragAcc += d; }
+  function tapAt(w) {
+    rings.push({ x: w.x, y: w.y, life: 0 });
+    for (var i = parts.length - 1; i >= 0; i--) {
+      if (hitShape(parts[i], w.x, w.y)) {
+        var id = parts[i].id;
+        picks = picks.filter(function (q) { return q.id !== id; });
+        picks.push({ id: id, until: now + 3500 });
+        if (picks.length > 3) picks.shift();
+        blip();
+        return;
+      }
+    }
+    pop();
+  }
+
+  // Panel crank
+  var crankEl = $("crank"), crankPtr = null, crankA = 0;
+  function crankAngle(e) { var r = crankEl.getBoundingClientRect(); return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)); }
+  crankEl.addEventListener("pointerdown", function (e) {
+    if (ending || crankPtr !== null) return;
+    e.preventDefault(); unlockAudioIfOn();
+    crankPtr = e.pointerId; crankA = crankAngle(e); eng.drag++;
+    try { crankEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  });
+  crankEl.addEventListener("pointermove", function (e) {
+    if (crankPtr !== e.pointerId) return;
+    var a = crankAngle(e), d = wrapA(a - crankA); crankA = a; turnBy(d);
+  });
+  function crankUp(e) { if (crankPtr !== e.pointerId) return; crankPtr = null; eng.drag = Math.max(0, eng.drag - 1); }
+  crankEl.addEventListener("pointerup", crankUp);
+  crankEl.addEventListener("pointercancel", crankUp);
+  crankEl.addEventListener("keydown", function (e) { if (e.key === "ArrowRight" || e.key === "ArrowUp") { eng.th += 0.4; e.preventDefault(); } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") { eng.th -= 0.4; e.preventDefault(); } });
+
+  // Throttle lever
+  var thrEl = $("throttle"), thrPtr = null;
+  function drawThrottle() {
+    var track = thrEl.querySelector(".track"), h = track.clientHeight, kh = $("tknob").offsetHeight;
+    $("tfill").style.height = (st.throttle * 100).toFixed(1) + "%";
+    $("tknob").style.top = ((1 - st.throttle) * (h - kh)).toFixed(1) + "px";
+    thrEl.setAttribute("aria-valuenow", String(Math.round(st.throttle * 100)));
+  }
+  function thrSet(e) {
+    var r = thrEl.querySelector(".track").getBoundingClientRect();
+    st.throttle = clamp(1 - (e.clientY - r.top - 12) / Math.max(1, r.height - 24), 0, 1);
+    drawThrottle();
+  }
+  thrEl.addEventListener("pointerdown", function (e) {
+    if (ending) return;
+    e.preventDefault(); unlockAudioIfOn(); thrPtr = e.pointerId;
+    try { thrEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    thrSet(e);
+    if (!eng.running) setRunning(true);
+  });
+  thrEl.addEventListener("pointermove", function (e) { if (thrPtr === e.pointerId) thrSet(e); });
+  function thrUp(e) { if (thrPtr === e.pointerId) { thrPtr = null; saveState(); } }
+  thrEl.addEventListener("pointerup", thrUp);
+  thrEl.addEventListener("pointercancel", thrUp);
+  thrEl.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") st.throttle = clamp(st.throttle + 0.1, 0, 1);
+    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") st.throttle = clamp(st.throttle - 0.1, 0, 1);
+    else return;
+    e.preventDefault(); drawThrottle(); saveState();
+  });
+
+  function setRunning(on) {
+    eng.running = !!on;
+    var b = $("startBtn");
+    b.textContent = on ? "Stop" : "Start";
+    b.classList.toggle("on", !!on);
+    if (on) {
+      var m = MACH[st.machine];
+      rings.push({ x: m.pivot[0], y: m.pivot[1], life: 0 });
+      if (Math.abs(eng.w) < 2) eng.w = Math.max(eng.w, 2);
+      vroom();
+    }
+  }
+  function setMachine(name) {
+    st.machine = name; saveState();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mach]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mach === name)); });
+    $("gate").hidden = name !== "gear";
+    picks = []; fx = []; rings = [];
+    resetCounters();
+    resize();
+  }
+  function setGear(g) {
+    if (g === st.gear) return;
+    st.gear = g; saveState();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-gear]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.gear) === g)); });
+    if (g > 0) rings.push({ x: PAIRS[g - 1].x, y: GY2, life: 0 });
+    clack();
+  }
+  function setSlow(on) {
+    st.slow = !!on; saveState();
+    $("slowBtn").setAttribute("aria-pressed", String(st.slow));
+    $("slowTag").hidden = !st.slow;
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.mach && !ending) { setMachine(t.dataset.mach); blip(); }
+    else if (t.dataset.gear && !ending) setGear(Number(t.dataset.gear));
+    else if (t.id === "startBtn" && !ending) { unlockAudioIfOn(); setRunning(!eng.running); }
+    else if (t.id === "slowBtn" && !ending) { setSlow(!st.slow); blip(); }
+    else if (t.dataset.action === "timer") openTimer();
+    else if (t.dataset.action === "timerclose") closeTimer();
+    else if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); }
+    else if (t.id === "timerStart") startTimer();
+    else if (t.id === "goodbyeBtn") goodbyeSpin();
+    else if (t.id === "bigToggle") setBig(!document.body.classList.contains("big"), true);
+  });
+  // Slide a finger along the gear gate to shift.
+  $("gate").addEventListener("pointermove", function (e) {
+    if (ending || !e.buttons) return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el && el.dataset && el.dataset.gear) setGear(Number(el.dataset.gear));
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var SKEY = "engineroom-sound-v1";
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null, lastSnd = 0;
+  function unlockAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = 0.8;
+        master.connect(actx.destination);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function unlockAudioIfOn() { if (soundOn) unlockAudio(); }
+  function canPlay() { return soundOn && actx && actx.state === "running"; }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function limited() { if (now - lastSnd < 45) return true; lastSnd = now; return false; }
+  function putt() { if (!limited()) tone(rand(105, 125), 0.09, 0.05, "triangle", 60); }
+  function chuff() { if (!limited()) tone(rand(260, 300), 0.22, 0.03, "sine", 110); }
+  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
+  function pop() { tone(380, 0.12, 0.03, "sine", 620); }
+  function clack() { tone(660, 0.06, 0.05, "triangle"); setTimeout(function () { tone(990, 0.08, 0.04, "triangle"); }, 60); }
+  function vroom() { tone(90, 0.5, 0.05, "triangle", 220); }
+  function chime() { tone(523, 0.4, 0.04); setTimeout(function () { tone(784, 0.6, 0.04); }, 120); }
+  document.addEventListener("visibilitychange", function () { if (actx && document.hidden) actx.suspend(); });
+  function updateSoundUI() {
+    $("soundState").textContent = soundOn ? "Sound is on. Soft engine putts." : "Sound is off.";
+    $("soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { unlockAudio(); setTimeout(chime, 60); }
+    updateSoundUI();
+  }
+
+  // ---------- Play timer (same behavior and storage format as spin-shop) ----------
+  var TKEY = "engineroom-timer-v1";
+  var BKEY = "engineroom-big-v1";
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000, UNLOCK_MS = 4000;
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true, phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) { if (typeof o[k] === "boolean") t[k] = o[k]; });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* defaults */ }
+    return t;
+  }
+  function saveTimer() { try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ } }
+  var timer = loadTimer();
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) { if (lastTimerKey !== "off") { $("fuel").hidden = true; lastTimerKey = "off"; } return; }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    $("fuel").hidden = false;
+    var fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(timer.showMinutes && timer.phase === "running");
+    $("fuelNum").textContent = String(mins);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.hidden = true; }, 450); }, 7000);
+  }
+  function minutesText(ms) { var m = Math.ceil(ms / 60000); return m === 1 ? "1 minute" : m + " minutes"; }
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    $("timerbtn").textContent = on ? "⏱ Timer on" : "⏱ Grown-ups";
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes)); });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+  }
+  function openTimer() { updateTimerUI(); updateSoundUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000; timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+  function stopTimer() {
+    timer.phase = "idle"; saveTimer();
+    ending = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function releaseAll() {
+    ptrs = {}; crankPtr = null; thrPtr = null; eng.drag = 0; eng.dragAcc = 0;
+  }
+  function beginEnding() {
+    clearTimeout(toastTimer); $("toast").classList.remove("show"); $("toast").hidden = true;
+    timer.phase = "ending"; saveTimer();
+    endingStartedAt = performance.now(); farewellAt = 0; restScheduled = false;
+    ending = true;
+    // Let go of the crank and turn the engine off: it winds down on its own.
+    releaseAll();
+    setRunning(false);
+    picks = [];
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to say goodbye";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  function goodbyeSpin() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Bye bye, engine!";
+    if (soundOn) unlockAudio();
+    eng.w = rpmW(MACH[st.machine].maxRpm * 0.6);
+    chime();
+  }
+  function checkEndingDone() {
+    if (timer.phase !== "ending" || restScheduled) return;
+    if (timer.goodbye && !farewellAt) return;
+    var t = performance.now();
+    if (t - endingStartedAt < 3000 || (farewellAt && t - farewellAt < 2500)) return;
+    if (Math.abs(eng.w) > 0.05) return;
+    restScheduled = true;
+    setTimeout(goRest, 1200);
+  }
+  function restSVG() {
+    var o = '<circle cx="34" cy="-36" r="9" fill="#FFF4CC" stroke="#1D2340" stroke-width="2"/><circle cx="38" cy="-39" r="8" fill="#2B3A67"/>';
+    // A sleepy engine: block, cylinders, flywheel.
+    o += '<rect x="-38" y="-6" width="60" height="38" rx="5" fill="#AEB9C8" stroke="#1D2340" stroke-width="2.5"/>';
+    o += '<rect x="-34" y="-20" width="52" height="16" rx="4" fill="#5E6B85" stroke="#1D2340" stroke-width="2.5"/>';
+    for (var i = 0; i < 4; i++) o += '<rect x="' + (-32 + i * 12.5) + '" y="0" width="9" height="20" rx="2" fill="#2C3550"/>';
+    o += '<circle cx="30" cy="22" r="17" fill="#3B4766" stroke="#1D2340" stroke-width="2.5"/><circle cx="30" cy="22" r="11" fill="#DCEAF7" stroke="#1D2340" stroke-width="2"/>';
+    o += '<path d="M30 11v22M19 22h22" stroke="#5C677D" stroke-width="3"/><circle cx="30" cy="22" r="3.5" fill="#E63946" stroke="#1D2340" stroke-width="1.5"/>';
+    o += '<rect x="-44" y="32" width="90" height="6" rx="3" fill="#8D99AE" stroke="#1D2340" stroke-width="2"/>';
+    o += '<text x="-36" y="-28" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">z</text><text x="-26" y="-38" font-family="Baloo 2, sans-serif" font-weight="800" font-size="10" fill="#FFFFFF">z</text><text x="-19" y="-45" font-family="Baloo 2, sans-serif" font-weight="800" font-size="7" fill="#FFFFFF">z</text>';
+    return o;
+  }
+  function showRest() {
+    $("restArt").innerHTML = restSVG();
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+  function goRest() {
+    timer.phase = "resting"; saveTimer();
+    ending = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    eng.w = 0; wOut = 0;
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+    showRest();
+  }
+  function unlock() {
+    timer.phase = "idle"; saveTimer();
+    $("rest").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI();
+  }
+  function timerTick() {
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+  function makeHold(btn, ms, onDone, onPress) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") { if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return; e.preventDefault(); }
+      if (id) return;
+      if (onPress) onPress();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  MINUTE_CHOICES.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn"; b.dataset.minutes = String(m); b.textContent = m + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  makeHold($("holdSound"), HOLD_MS, toggleSound, function () { if (!soundOn) unlockAudio(); });
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  // Big mode: hide the title and controls so the machine fills the screen.
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    resize(); drawThrottle();
+  }
+
+  // ---------- Start ----------
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
+  setMachine(st.machine);
+  var g0 = st.gear; st.gear = -1; setGear(g0);
+  if (g0 > 0) collarX = PAIRS[g0 - 1].x;
+  setSlow(st.slow);
+  drawThrottle();
+  updateSoundUI();
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") showRest();
+  drawTimer();
+  updateTimerUI();
+  setInterval(timerTick, 250);
+  window.addEventListener("resize", drawThrottle);
+  setTimeout(function () { if (!eng.running && !eng.w && timer.phase !== "resting") hint("Press Start, or turn the crank!", 3500); }, 600);
+  requestAnimationFrame(loop);
+
+  // Test hook (harmless).
+  window.__engine = {
+    state: function () { return { machine: st.machine, th: eng.th, w: eng.w, running: eng.running, gear: st.gear, slow: st.slow, throttle: st.throttle, picks: picks.map(function (p) { return p.name; }), psi: psi, wOut: wOut }; },
+    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; }
+  };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

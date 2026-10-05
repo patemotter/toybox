@@ -10,7 +10,7 @@ Shared rules for every app are in "Every app" at the bottom.
 | – | 3D Printer, Water Works, Engine Room, Car Builder builder rows, shared timer (phase 1) | In progress |
 | 1 | Water Works | In progress |
 | 2 | Math Grid | Done |
-| 3 | Engine Room | In progress |
+| 3 | Engine Room | Done |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
 | 5 | Construction Site | Queued |
 | 6 | Train Builder | Queued |
@@ -228,6 +228,17 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Engine Room:**
+  - Phone landscape: the stroke names run together, and Big covers cylinder 4.
+  - The start hint covers the engine.
+  - Empty space around the landscape panel.
+  - The steam engine is small on phone portrait.
+  - The gearbox collar sits on the hub, and the 4th gear crowds the wheel.
+  - Name tags can cover parts.
+  - The tachometer is small on iPhone.
+  - The icon linkage is off.
+  - The crank has no label.
+- **All apps:** check that Grown-ups stays reachable in phone landscape. Gear Box and its copies hide the whole header there.
 - **3D Printer:**
   - On iPad the printer is small and the shelf takes a lot of width.
   - The shelf thumbnails are small, and phone portrait has no shelf in the scene.
