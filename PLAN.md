@@ -7,9 +7,9 @@ Shared rules for every app are in "Every app" at the bottom.
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Marble Run, Car Builder, Water Works | In progress |
+| – | 3D Printer, Car Builder, Water Works, Math Grid | In progress |
 | 1 | Water Works | In progress |
-| 2 | Math Grid | Queued |
+| 2 | Math Grid | In progress |
 | 3 | Engine Room | Queued |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
 | 5 | Construction Site | Queued |
@@ -234,6 +234,15 @@ Known so far:
   - Cranking small gears is fiddly.
   - The jam triangle's teeth overlap.
   - The speed dial has no min/max labels.
+- **Marble Run:**
+  - Run labels overflow their buttons on iPad landscape.
+  - "DROP" overflows its circle.
+  - The loop entry curves look beaded.
+  - The "Pull down!" hint overlaps the ramps, and the plunger ruler numbers are tiny.
+  - The Machine run needs tuning (wheel to seesaw vs trampoline).
+  - Marbles overlap in the funnels and the lift cups.
+  - The lift rail is too close to the Zigzag ramps.
+  - Empty panel space on iPad landscape.
 - **Saw Bench:**
   - Band saw: the top of its upper housing is cut off, and the hint overlaps it.
   - Scroll saw: a grey block shows behind the table.

@@ -12,6 +12,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Color Mixing: pour paints, stir with a finger, and name the new color | [`color-mixing/`](color-mixing/) |
 | Workshop: safety gear, a Tool Wall of 81 tools, and Drill Press, Saw Bench and Hammer & Screws stations | [`workshop/`](workshop/) |
 | Gear Box: build gear trains and crank them, with speeds, ratios and turns | [`gear-box/`](gear-box/) |
+| Marble Run: five marble runs with a plunger, a Drop button and a lift that loops them | [`marble-run/`](marble-run/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
