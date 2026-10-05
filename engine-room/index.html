@@ -170,6 +170,7 @@ body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bot
 .gate { display: flex; gap: 6px; padding: 6px; background: #3B4766; border: 3px solid #1D2340; border-radius: 18px; }
 .gate[hidden] { display: none; }
 .gate .btn { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 0; font-size: 1.3rem; border-radius: 999px; }
+.gate .abbtn[aria-pressed="true"] { background: #F77F00; color: #FFFFFF; }
 body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
 /* ---------- Timer: toast, farewell ---------- */
@@ -321,6 +322,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         <button class="btn mach" data-mach="car" aria-pressed="true">Car engine</button>
         <button class="btn mach" data-mach="steam" aria-pressed="false">Steam engine</button>
         <button class="btn mach" data-mach="gear" aria-pressed="false">Gearbox</button>
+        <button class="btn mach" data-mach="jet" aria-pressed="false">Jet engine</button>
       </div>
       <div class="drive">
         <div class="crank" id="crank" role="slider" aria-label="Crank: turn it by hand" tabindex="0">
@@ -349,6 +351,9 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         <button class="btn" data-gear="2">2</button>
         <button class="btn" data-gear="3">3</button>
         <button class="btn" data-gear="4">4</button>
+      </div>
+      <div class="gate jetrow" id="jetRow" hidden>
+        <button class="btn abbtn" id="abBtn" aria-pressed="false">Afterburner</button>
       </div>
     </div>
   </main>
@@ -417,7 +422,8 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var MACH = {
     car: { W: 1000, H: 730, pivot: [230, 560], minRpm: 60, maxRpm: 360 },
     steam: { W: 1000, H: 640, pivot: [800, 430], minRpm: 20, maxRpm: 150 },
-    gear: { W: 1200, H: 600, pivot: [85, 230], minRpm: 60, maxRpm: 360 }
+    gear: { W: 1200, H: 600, pivot: [85, 230], minRpm: 60, maxRpm: 360 },
+    jet: { W: 1330, H: 560, pivot: [160, 280], minRpm: 50, maxRpm: 220 }
   };
   // Gearbox: four gear pairs on the same two shafts (teeth add up to 54, so they all share one spacing).
   var PAIRS = [
@@ -434,13 +440,14 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   // ---------- State ----------
   var KEY = "engineroom-state-v1";
-  var st = { machine: "car", throttle: 0.35, slow: false, gear: 1 };
+  var st = { machine: "car", throttle: 0.35, slow: false, gear: 1, ab: false };
   try {
     var so = JSON.parse(localStorage.getItem(KEY) || "null");
     if (so && typeof so === "object") {
       if (MACH[so.machine]) st.machine = so.machine;
       if (typeof so.throttle === "number") st.throttle = clamp(so.throttle, 0, 1);
       if (typeof so.slow === "boolean") st.slow = so.slow;
+      if (typeof so.ab === "boolean") st.ab = so.ab;
       if (typeof so.gear === "number" && so.gear >= 0 && so.gear <= 4) st.gear = Math.round(so.gear);
     }
   } catch (e) { /* defaults */ }
@@ -809,6 +816,291 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     pc("wheel", "Wheel", wx, GY2, wr);
   }
 
+  // ---------- Jet engine (side cutaway of a turbofan) ----------
+  // Shapes are given as [x, radius] lists along the engine; the picture is mirrored about the middle line.
+  var JCY = 280;
+  var NAC_OUT = [[62, 232], [70, 244], [95, 254], [200, 260], [440, 258], [650, 238], [765, 190]];
+  var NAC_IN = [[62, 232], [72, 222], [100, 215], [640, 214], [765, 182]];
+  var CASE_OUT = [[212, 124], [232, 140], [520, 140], [700, 134], [760, 132], [900, 128], [1060, 96]];
+  var CORE_OUT = [[212, 124], [232, 116], [330, 110], [560, 74], [575, 104], [680, 104], [692, 94], [740, 100], [880, 118], [1060, 90]];
+  var CORE_IN = [[175, 44], [232, 40], [330, 44], [560, 46], [575, 34], [680, 34], [692, 44], [880, 50], [1010, 0]];
+  var SPIN = [[82, 0], [92, 16], [110, 28], [140, 39], [175, 44]];
+  var HP = 1.5; // the small inner spool turns faster than the fan
+  // Rows of spinning blades: x, chord, number of blades, colour, spool (1 = fan shaft, HP = core shaft).
+  var ROWS = [
+    { x: 250, c: 18, n: 20, col: "#2E9E5B", sp: 1 }, { x: 283, c: 18, n: 20, col: "#2E9E5B", sp: 1 }, { x: 314, c: 18, n: 20, col: "#2E9E5B", sp: 1 },
+    { x: 360, c: 16, n: 24, col: "#3A86FF", sp: HP }, { x: 396, c: 16, n: 24, col: "#3A86FF", sp: HP }, { x: 432, c: 15, n: 24, col: "#3A86FF", sp: HP },
+    { x: 466, c: 14, n: 24, col: "#3A86FF", sp: HP }, { x: 500, c: 13, n: 24, col: "#3A86FF", sp: HP }, { x: 533, c: 12, n: 24, col: "#3A86FF", sp: HP },
+    { x: 706, c: 18, n: 22, col: "#E63946", sp: HP }, { x: 734, c: 18, n: 22, col: "#E63946", sp: HP },
+    { x: 770, c: 20, n: 20, col: "#F77F00", sp: 1 }, { x: 804, c: 22, n: 20, col: "#F77F00", sp: 1 }, { x: 838, c: 24, n: 20, col: "#F77F00", sp: 1 }, { x: 870, c: 24, n: 20, col: "#F77F00", sp: 1 }
+  ];
+  var jet = { phase: "off", t: 0, flame: 0, ab: 0, ign: 0, spark: 0, acc: 0, p: [] };
+  function pl(a, x) {
+    if (x <= a[0][0]) return a[0][1];
+    for (var i = 1; i < a.length; i++) if (x <= a[i][0]) { var p = a[i - 1], q = a[i]; return p[1] + (q[1] - p[1]) * (x - p[0]) / (q[0] - p[0]); }
+    return a[a.length - 1][1];
+  }
+  function xsOf(arrs, x0, x1) {
+    var xs = [x0, x1];
+    arrs.forEach(function (a) { if (a) a.forEach(function (q) { if (q[0] > x0 && q[0] < x1) xs.push(q[0]); }); });
+    xs.sort(function (a, b) { return a - b; });
+    return xs;
+  }
+  // Ring between two outlines, top and bottom halves.
+  function jband(outer, inner, x0, x1, fill, lw) {
+    var xs = xsOf([outer, inner], x0, x1);
+    [-1, 1].forEach(function (s) {
+      ctx.beginPath();
+      xs.forEach(function (x, i) { var y = JCY + s * pl(outer, x); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+      for (var i = xs.length - 1; i >= 0; i--) ctx.lineTo(xs[i], JCY + s * (inner ? pl(inner, xs[i]) : 0));
+      ctx.closePath(); fs(fill, lw);
+    });
+  }
+  // Solid body round the middle line (both halves in one shape).
+  function jbody(a, x0, x1, fill, lw) {
+    var xs = xsOf([a], x0, x1), i;
+    ctx.beginPath();
+    for (i = 0; i < xs.length; i++) { if (i) ctx.lineTo(xs[i], JCY - pl(a, xs[i])); else ctx.moveTo(xs[i], JCY - pl(a, xs[i])); }
+    for (i = xs.length - 1; i >= 0; i--) ctx.lineTo(xs[i], JCY + pl(a, xs[i]));
+    ctx.closePath(); fs(fill, lw);
+  }
+  function shade(col, k) {
+    var n = parseInt(col.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return "rgb(" + Math.round(r * k) + "," + Math.round(g * k) + "," + Math.round(b * k) + ")";
+  }
+  // One row of blades seen from the side. Only the far half shows (the near half is cut away),
+  // so each blade slides up past the hub. Fast rows blur into a band.
+  function rotor(x, chord, n, rh, rt, ang, col, spd) {
+    var blur = reduceMotion ? 0 : clamp((spd / 60) / (TAU / n) * 2.2 - 0.5, 0, 1);
+    if (blur > 0) {
+      ctx.globalAlpha = 0.6 * blur;
+      box(x - chord / 2, JCY - rt, chord, rt - rh, 4, col, 0); box(x - chord / 2, JCY + rh, chord, rt - rh, 4, col, 0);
+    }
+    ctx.globalAlpha = 1 - 0.65 * blur;
+    var dark = shade(col, 0.7);
+    for (var i = 0; i < n; i++) {
+      var phi = ang + i * TAU / n, c = Math.cos(phi), s = Math.sin(phi);
+      if (c > 0) continue;
+      var y2 = JCY + rt * s, y1 = JCY + rh * s, w = chord * (0.55 + 0.45 * -c);
+      if (Math.abs(y2 - y1) < 2) continue;
+      var top = Math.min(y1, y2), h = Math.abs(y2 - y1);
+      box(x - w / 2, top, w, h, Math.min(5, w / 2), -c > 0.5 ? col : dark, 2.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function stripes(x0, x1, y0, h, off, col) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, h); ctx.clip();
+    ctx.fillStyle = col;
+    for (var sx = x0 - 30 + mod(off, 30); sx < x1 + 10; sx += 30) { ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx + 10, y0); ctx.lineTo(sx + 2, y0 + h); ctx.lineTo(sx - 8, y0 + h); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+  function flameShape(x, y, len, half, col, wob) {
+    ctx.beginPath(); ctx.moveTo(x, y - half);
+    ctx.quadraticCurveTo(x + len * 0.55, y - half * (1.05 + wob), x + len, y);
+    ctx.quadraticCurveTo(x + len * 0.55, y + half * (1.05 - wob), x, y + half);
+    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  }
+  function drawJet() {
+    var th = eng.th, thH = th * HP, sc = st.slow ? SLOW : 1, spd = Math.abs(eng.w) * sc, t = now / 1000;
+    var fl = jet.flame, ab = jet.ab;
+    // Hot glow behind the nozzle.
+    if (fl > 0.02 || ab > 0.02) {
+      var gl = 100 + 160 * fl;
+      ctx.save(); ctx.globalAlpha = 0.45 * Math.max(fl, ab);
+      var g = ctx.createLinearGradient(1060, 0, 1060 + gl, 0);
+      g.addColorStop(0, "#FFB347"); g.addColorStop(1, "rgba(255,179,71,0)");
+      flameShape(1056, JCY, gl, 92, g, 0); ctx.restore();
+    }
+    // Afterburner: a long flame with bright shock diamonds.
+    if (ab > 0.02) {
+      var L = (215 + 30 * Math.sin(t * 23) + 18 * Math.sin(t * 37)) * (0.4 + 0.6 * ab), wb = 0.08 * Math.sin(t * 31);
+      ctx.save(); ctx.globalAlpha = Math.min(1, ab * 1.3);
+      flameShape(1050, JCY, L, 88, "#FF4D2E", wb);
+      flameShape(1050, JCY, L * 0.82, 70, "#FF9F1C", -wb);
+      flameShape(1050, JCY, L * 0.6, 50, "#FFE45E", wb);
+      flameShape(1050, JCY, L * 0.3, 30, "#FFFFFF", 0);
+      for (var d = 0; d < 4; d++) {
+        var dx = 1100 + d * 42 * (0.4 + 0.6 * ab), dh = 34 * (1 - d * 0.18), dw = 22;
+        ctx.globalAlpha = Math.min(1, ab * 1.3) * (0.9 - d * 0.15) * (0.8 + 0.2 * Math.sin(t * 40 + d));
+        ctx.beginPath(); ctx.moveTo(dx - dw, JCY); ctx.lineTo(dx, JCY - dh); ctx.lineTo(dx + dw, JCY); ctx.lineTo(dx, JCY + dh); ctx.closePath();
+        ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#7FD1FF"; ctx.stroke();
+      }
+      ctx.restore();
+      pr("ab", "Afterburner (extra fire!)", 1070, JCY - 80, Math.min(170, L * 0.6), 160);
+    }
+    // Air inside the nacelle, core flow path, core cowl.
+    jbody(NAC_IN, 62, 765, "#BFE0FF", 0);
+    jband(CORE_OUT, CORE_IN, 212, 1060, "#2C3550", 0);
+    // Fixed vanes (stators) between the spinning rows.
+    ctx.globalAlpha = 0.7;
+    [233, 267, 299, 340, 378, 414, 449, 483, 517, 549, 692, 720, 752, 787, 821, 855].forEach(function (sx) {
+      var ro = pl(CORE_OUT, sx), ri = pl(CORE_IN, sx);
+      box(sx - 4, JCY - ro, 8, ro - ri, 3, "#8A97AA", 0); box(sx - 4, JCY + ri, 8, ro - ri, 3, "#8A97AA", 0);
+    });
+    ctx.globalAlpha = 1;
+    // Combustion chamber: two liners with fuel nozzles and flames.
+    var lx = 586, lw = 90;
+    [-1, 1].forEach(function (s) {
+      var ly = JCY + s * 73 - 26;
+      box(lx, ly, lw, 52, 16, "#5A2418", 4);
+      ctx.save(); rr(lx + 3, ly + 3, lw - 6, 46, 13); ctx.clip();
+      if (fl > 0.02) {
+        for (var i = 0; i < 3; i++) {
+          var len = (24 + 64 * fl) * (0.8 + 0.2 * Math.sin(now / 70 + i * 2.1 + s));
+          flameShape(lx + 4, ly + 26, len, 18 - i * 5, ["#F77F00", "#FFC93C", "#FFF6B0"][i], 0.15 * Math.sin(now / 55 + i));
+        }
+      }
+      if (jet.ign > 0) { ctx.globalAlpha = jet.ign; ctx.fillStyle = "#FFF6B0"; ctx.fillRect(lx, ly, lw, 52); ctx.globalAlpha = 1; }
+      ctx.restore();
+      box(lx - 16, JCY + s * 73 - 7, 22, 14, 5, "#FFC93C", 3);
+      // Igniter spark while the starter is turning.
+      if (jet.spark > 0) {
+        ctx.save(); ctx.translate(lx + 30, JCY + s * 73); ctx.globalAlpha = jet.spark;
+        ctx.beginPath();
+        for (var k = 0; k < 12; k++) { var a = k / 12 * TAU, rad = k % 2 ? 7 : 20; ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
+        ctx.closePath(); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#7FD1FF"; ctx.stroke();
+        ctx.restore();
+      }
+    });
+    // Spinning rows (behind the hub).
+    rotor(160, 46, 14, 40, 208, th, "#FFC93C", spd);
+    ROWS.forEach(function (r) {
+      rotor(r.x, r.c, r.n, pl(CORE_IN, r.x) + 1, pl(CORE_OUT, r.x) - 3, (r.sp === 1 ? th : thH) + r.x, r.col, spd * r.sp);
+    });
+    // Hub, rotor discs and the two shafts.
+    jbody(CORE_IN, 175, 1010, "#4A5578", 4);
+    ROWS.forEach(function (r) { var ri = pl(CORE_IN, r.x) - 2, sr = r.sp === 1 ? 9 : 22; box(r.x - 5, JCY - ri, 10, ri - sr, 3, shade(r.col, 0.8), 0); box(r.x - 5, JCY + sr, 10, ri - sr, 3, shade(r.col, 0.8), 0); });
+    box(150, JCY - 10, 735, 20, 8, "#C9D3DE", 4);
+    stripes(150, 885, JCY - 8, 16, -th * 18, "#5C677D");
+    box(338, JCY - 24, 408, 14, 6, "#8A97AA", 3); box(338, JCY + 10, 408, 14, 6, "#8A97AA", 3);
+    stripes(338, 746, JCY - 22, 10, -thH * 18, "#3B4766"); stripes(338, 746, JCY + 12, 10, -thH * 18, "#3B4766");
+    // Core cowl (between core and bypass) and the nacelle around the fan.
+    jband(CASE_OUT, CORE_OUT, 212, 1060, "#AEB9C8", 4);
+    jband(NAC_OUT, NAC_IN, 62, 765, "#B8C2D0", 4);
+    // Nose cone with a swirl that turns with the fan.
+    jbody(SPIN, 82, 175, "#F4FAFF", 4);
+    ctx.save(); ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.strokeStyle = INK;
+    [0, PI].forEach(function (o) {
+      var down = false;
+      ctx.beginPath();
+      for (var x = 84; x <= 172; x += 4) {
+        var a = th + o + (x - 82) * 0.035, r = pl(SPIN, x);
+        if (Math.cos(a) > 0) { var y = JCY + r * Math.sin(a); if (down) ctx.lineTo(x, y); else { ctx.moveTo(x, y); down = true; } }
+        else down = false;
+      }
+      ctx.stroke();
+    });
+    ctx.restore();
+    // Air: blue around the bypass, squeezed in the compressor, red-hot after the fire.
+    drawJetAir();
+    // Ignition flash
+    if (jet.ign > 0) {
+      [-1, 1].forEach(function (s) {
+        var fr = 30 + 70 * jet.ign;
+        ctx.save(); ctx.globalAlpha = jet.ign; ctx.translate(630, JCY + s * 73);
+        ctx.beginPath();
+        for (var k = 0; k < 16; k++) { var a = k / 16 * TAU, rad = k % 2 ? fr * 0.45 : fr; ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad); }
+        ctx.closePath(); ctx.fillStyle = "#FFE45E"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#F77F00"; ctx.stroke();
+        ctx.restore();
+      });
+    }
+    // Tap targets (later ones win).
+    pr("bypT", "Bypass (air goes around)", 232, JCY - 212, 520, 70);
+    pr("bypB", "Bypass (air goes around)", 232, JCY + 142, 520, 70);
+    pr("inlet", "Inlet (air comes in)", 55, JCY - 262, 70, 60);
+    pr("inletB", "Inlet (air comes in)", 55, JCY + 202, 70, 60);
+    pr("nozzle", "Nozzle", 885, JCY - 130, 180, 260);
+    pr("turb", "Turbine (spins the shaft)", 688, JCY - 124, 196, 248);
+    pr("comb", "Combustion chamber (fuel burns)", 570, JCY - 106, 116, 212);
+    pr("comp", "Compressor (squeezes the air)", 228, JCY - 122, 340, 244);
+    pr("fan", "Fan", 80, JCY - 212, 108, 424);
+    pr("shaft", "Shaft", 175, JCY - 26, 710, 52);
+  }
+  // Particle paths: inner and outer radius of the stream at x.
+  function jetLane(q, x) {
+    var ri, ro;
+    if (q.core) {
+      ri = x < 175 ? pl(SPIN, x) : pl(CORE_IN, x);
+      ro = x < 212 ? 124 : x <= 1060 ? pl(CORE_OUT, x) : 90 + (x - 1060) * (0.08 + 0.25 * jet.ab);
+    } else if (x < 765) {
+      ri = x < 212 ? 130 : pl(CASE_OUT, x); ro = pl(NAC_IN, x);
+    } else {
+      ri = pl(CASE_OUT, x) + 2; ro = ri + 50 + (x - 765) * 0.05;
+    }
+    return ri + 5 + q.lane * Math.max(0, ro - ri - 10);
+  }
+  function jetSpeed(q, x) {
+    if (!q.core) return x < 212 ? 1 : x < 765 ? 1 + 0.3 * (x - 212) / 553 : 1.4;
+    if (x < 230) return 1;
+    if (x < 560) return 1 - 0.55 * (x - 230) / 330;
+    if (x < 690) return 0.7;
+    if (x < 880) return 0.9 + 0.7 * (x - 690) / 190;
+    if (x < 1060) return 1.6 + 1.2 * (x - 880) / 180;
+    return 3 * (1 + 0.5 * jet.ab);
+  }
+  function stepJet(dt, ds) {
+    var sc = st.slow ? SLOW : 1;
+    if (eng.running && !ending && st.machine === "jet") {
+      var m = MACH.jet;
+      if (jet.phase === "start") {
+        jet.t += ds;
+        eng.w += (rpmW(m.minRpm) * 0.5 - eng.w) * Math.min(1, ds * 1.5);
+        jet.spark = jet.t > 1.2 && mod(jet.t, 0.25) < 0.1 ? 1 : 0;
+        if (jet.t >= 2) igniteJet();
+      } else {
+        var target = rpmW(m.minRpm + st.throttle * (m.maxRpm - m.minRpm));
+        eng.w += (target - eng.w) * Math.min(1, ds * (jet.t < 3.5 ? 0.9 : 1.6));
+        jet.t += ds;
+      }
+    } else jet.spark = 0;
+    var lit = eng.running && !ending && jet.phase === "run";
+    jet.flame += ((lit ? 0.25 + 0.75 * st.throttle : 0) - jet.flame) * Math.min(1, dt * (st.slow ? 1 : 4));
+    jet.ab += ((lit && st.ab ? 1 : 0) - jet.ab) * Math.min(1, dt * (st.slow ? 1.2 : 5));
+    jet.ign = Math.max(0, jet.ign - dt * (st.slow ? 0.8 : 2));
+    // Move the air.
+    var v = eng.w * 18;
+    jet.p = jet.p.filter(function (q) {
+      q.x += v * jetSpeed(q, q.x) * ds;
+      if (q.core && q.x > 588 && q.x < 680 && jet.flame > 0.05) q.heat = Math.max(q.heat, jet.flame);
+      return q.x > 40 && q.x < 1400;
+    });
+    if (v > 0) {
+      jet.acc += v * ds / 3;
+      while (jet.acc >= 1) {
+        jet.acc -= 1;
+        if (jet.p.length < 420) jet.p.push({ x: 50 + rand(0, 10), lane: rand(0, 1), side: Math.random() < 0.5 ? -1 : 1, core: Math.random() < 0.4, heat: 0 });
+      }
+    }
+  }
+  function igniteJet() {
+    jet.phase = "run"; jet.ign = 1; jet.spark = 0; jet.t = 0;
+    rings.push({ x: 630, y: JCY - 73, life: 0 }); rings.push({ x: 630, y: JCY + 73, life: 0 });
+    if (!reduceMotion) for (var i = 0; i < 16; i++) {
+      var a = rand(0, TAU), vv = rand(150, 420);
+      fx.push({ x: 630, y: JCY + (i % 2 ? 73 : -73), vx: Math.cos(a) * vv, vy: Math.sin(a) * vv * 0.6, life: 0, max: rand(0.3, 0.6), r: rand(6, 12), col: i % 2 ? "#FFC93C" : "#F77F00", g: 0 });
+    }
+    hint("Fire! Whoosh!", 1800);
+    whoosh();
+  }
+  function jetCol(q) {
+    var x = q.x;
+    if (!q.core) return "#2D6FE0";
+    if (q.heat > 0.05) return x < 700 ? "#FF5A1F" : x < 1060 ? "#FF8C1A" : "#FFC93C";
+    return x < 330 ? "#2D6FE0" : x < 575 ? "#7B4FE0" : "#9A6CF0";
+  }
+  function drawJetAir() {
+    var sc = st.slow ? SLOW : 1, v = eng.w * 18 * sc;
+    ctx.save(); ctx.lineCap = "round";
+    jet.p.forEach(function (q) {
+      var y = JCY + q.side * jetLane(q, q.x), L = clamp(Math.abs(v * jetSpeed(q, q.x)) * 0.035, 3, 80) * (v < 0 ? -1 : 1);
+      var col = jetCol(q), hot = q.core && q.heat > 0.05 && q.x > 1000;
+      if (hot) { ctx.globalAlpha = 0.35; ctx.strokeStyle = "#FFB347"; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(q.x - L, y); ctx.lineTo(q.x, y); ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = col; ctx.lineWidth = q.core ? (q.x > 330 && q.x < 575 ? 5 : 7) : 6;
+      ctx.beginPath(); ctx.moveTo(q.x - L, y); ctx.lineTo(q.x, y); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   // ---------- Tachometer (no numbers: green to red) ----------
   function drawTach() {
     var m = MACH[st.machine];
@@ -838,15 +1130,19 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       var wi = eng.dragAcc / Math.max(ds, 1e-4);
       eng.w += (wi - eng.w) * 0.5; eng.dragAcc = 0;
     } else {
-      if (eng.running && !ending) {
+      if (eng.running && !ending && st.machine === "jet") {
+        /* handled in stepJet */
+      } else if (eng.running && !ending) {
         var target = rpmW(m.minRpm + st.throttle * (m.maxRpm - m.minRpm));
         eng.w += (target - eng.w) * Math.min(1, ds * 1.6);
       } else {
         eng.w *= Math.exp(-(ending ? dt * 0.9 : ds * 0.55));
         if (Math.abs(eng.w) < 0.04) eng.w = 0;
       }
+      if (st.machine === "jet") stepJet(dt, ds);
       eng.th += eng.w * ds;
     }
+    if (eng.drag && st.machine === "jet") stepJet(dt, ds);
     events(eng.th);
     eng.prevTh = eng.th;
     var rpm = Math.abs(eng.w) * 60 / TAU;
@@ -904,7 +1200,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
     ctx.lineJoin = "round";
     parts = [];
-    if (st.machine === "car") drawCar(); else if (st.machine === "steam") drawSteam(); else drawGearbox();
+    if (st.machine === "car") drawCar(); else if (st.machine === "steam") drawSteam(); else if (st.machine === "jet") drawJet(); else drawGearbox();
     fx.forEach(function (q) {
       var f = q.life / q.max;
       ctx.globalAlpha = q.smoke ? 0.85 * (1 - f) : 1 - f;
@@ -1072,12 +1368,29 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       if (Math.abs(eng.w) < 2) eng.w = Math.max(eng.w, 2);
       vroom();
     }
+    jetPhase();
+  }
+  // Jet: Start runs the starter first (it turns the shaft), then the fuel lights.
+  function jetPhase() {
+    if (!eng.running || st.machine !== "jet") { jet.phase = "off"; return; }
+    if (jet.phase !== "off") return;
+    jet.phase = "start";
+    jet.t = eng.w > rpmW(MACH.jet.minRpm) * 0.4 ? 0.9 : 0;
+    if (!ending) hint("The starter turns the fan…", 1800);
+  }
+  function setAB(on) {
+    st.ab = !!on; saveState();
+    $("abBtn").setAttribute("aria-pressed", String(st.ab));
+    if (st.ab && !eng.running) setRunning(true);
+    if (st.ab) { rings.push({ x: 1080, y: JCY, life: 0 }); tone(140, 0.6, 0.05, "triangle", 70); } else blip();
   }
   function setMachine(name) {
     st.machine = name; saveState();
     Array.prototype.forEach.call(document.querySelectorAll("[data-mach]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mach === name)); });
     $("gate").hidden = name !== "gear";
-    picks = []; fx = []; rings = [];
+    $("jetRow").hidden = name !== "jet";
+    picks = []; fx = []; rings = []; jet.p = []; jet.phase = "off"; jet.flame = 0; jet.ab = 0; jet.ign = 0;
+    jetPhase();
     resetCounters();
     resize();
   }
@@ -1101,6 +1414,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     else if (t.dataset.gear && !ending) setGear(Number(t.dataset.gear));
     else if (t.id === "startBtn" && !ending) { unlockAudioIfOn(); setRunning(!eng.running); }
     else if (t.id === "slowBtn" && !ending) { setSlow(!st.slow); blip(); }
+    else if (t.id === "abBtn" && !ending) { unlockAudioIfOn(); setAB(!st.ab); }
     else if (t.dataset.action === "timer") openTimer();
     else if (t.dataset.action === "timerclose") closeTimer();
     else if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); }
@@ -1157,6 +1471,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
   function pop() { tone(380, 0.12, 0.03, "sine", 620); }
   function clack() { tone(660, 0.06, 0.05, "triangle"); setTimeout(function () { tone(990, 0.08, 0.04, "triangle"); }, 60); }
+  function whoosh() { tone(180, 0.7, 0.05, "sine", 520); setTimeout(function () { tone(90, 0.8, 0.04, "triangle", 60); }, 80); }
   function vroom() { tone(90, 0.5, 0.05, "triangle", 220); }
   function chime() { tone(523, 0.4, 0.04); setTimeout(function () { tone(784, 0.6, 0.04); }, 120); }
   document.addEventListener("visibilitychange", function () { if (actx && document.hidden) actx.suspend(); });
@@ -1399,6 +1714,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var g0 = st.gear; st.gear = -1; setGear(g0);
   if (g0 > 0) collarX = PAIRS[g0 - 1].x;
   setSlow(st.slow);
+  $("abBtn").setAttribute("aria-pressed", String(st.ab));
   drawThrottle();
   updateSoundUI();
   if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
@@ -1413,7 +1729,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   // Test hook (harmless).
   window.__engine = {
-    state: function () { return { machine: st.machine, th: eng.th, w: eng.w, running: eng.running, gear: st.gear, slow: st.slow, throttle: st.throttle, picks: picks.map(function (p) { return p.name; }), psi: psi, wOut: wOut }; },
+    state: function () { return { machine: st.machine, th: eng.th, w: eng.w, running: eng.running, gear: st.gear, slow: st.slow, throttle: st.throttle, picks: picks.map(function (p) { return p.name; }), psi: psi, wOut: wOut, jet: { phase: jet.phase, flame: jet.flame, ab: jet.ab, air: jet.p.length, hot: jet.p.filter(function (q) { return q.heat > 0.05; }).length } }; },
     toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; }
   };
 })();
