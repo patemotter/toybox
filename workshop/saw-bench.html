@@ -877,6 +877,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (HEIGHTS.indexOf(p.height) === -1) p.height = 30;
     }
     if (id === "mitersaw" && ANGLES.indexOf(p.angle) === -1) p.angle = 0;
+    if (id === "mitersaw" && p.view !== "side") p.view = "front";
     return p;
   }
   var CIRC_DEPTHS = [10, 20, 30, 45, 60];
@@ -1759,7 +1760,15 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.spin = 0; this.speed = 0; this.blade = 0; this.stroke = 0; this.plunge = 0;
       this.flip = set.edge === "rip" ? -1 : 1;
       this.R = saw.id === "tracksaw" ? 82 : 92;
+      // default: the operator's view (behind the saw, looking down at the cut); "side" = the old profile
+      this.op = set.view !== "side";
+      this.ck = null;
       this.newWork(true);
+    },
+    setView: function () {
+      this.op = this.set.view !== "side";
+      this.ck = null; this.pid = null; this.held = false;
+      this.layout();
     },
     newWork: function (instant) {
       var wk = endWork(this.saw, this.set);
@@ -1801,14 +1810,21 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         if (saw.spine) S = Math.min(S, saw.spine * Ss * 0.85 / wk.h);
         this.S = S; this.Ss = Math.max(Ss, 0.2);
       }
+      // the side-view scales also set the hand-saw stroke length (so the pacing is the same in both views)
+      this.sideS = this.S; this.sideSs = this.Ss;
       this.floorY = H - 16;
       bin.place(14, H - 14);
+      this.ck = null;
+      if (this.op) this.opLayout();
       this.drawBg();
     },
     // Station-fixed projection (bench, clamps) and board projection.
     pst: function (x, ys, z) { return [this.stX + (x + ys * KX) * this.S, this.stY - (z + ys * KY) * this.S]; },
-    P: function (x, y, z) { return this.pst(x, y - this.cView, z); },
+    // Board point: x across the board, y along it (0 = the end being cut off), z up.
+    // Operator's view: the board runs left-right, x goes away from you, the cut is at world X = 0.
+    P: function (x, y, z) { return this.op ? this.wp(this.cView - y, x, z) : this.pst(x, y - this.cView, z); },
     drawBg: function () {
+      if (this.op) { this.opDrawBg(); return; }
       var g = bgx, wk = this.wk, self = this, S = this.S, i, p;
       g.setTransform(DPR, 0, 0, DPR, 0, 0);
       PX = 1;
@@ -1883,36 +1899,53 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     },
     // ---------- board drawing ----------
     // Draw the board from y0 to y1 (mm along the board), using projection fn.
+    // Screen axes of the board at position y for a projection: o origin, a along the board,
+    // x across, z up (per mm). Works for both views.
+    axes: function (proj, y) {
+      var o = proj(0, y, 0), a = proj(0, y + 1, 0), x = proj(1, y, 0), z = proj(0, y, 1);
+      return { o: o, a: [a[0] - o[0], a[1] - o[1]], x: [x[0] - o[0], x[1] - o[1]], z: [z[0] - o[0], z[1] - o[1]] };
+    },
+    // Is the side facet of the section from a to b facing the camera?
+    facing: function (ax, a, b) {
+      var dx = b[0] - a[0], dz = b[1] - a[1];
+      var ex = dx * ax.x[0] + dz * ax.z[0], ey = dx * ax.x[1] + dz * ax.z[1];
+      var cr = ex * ax.a[1] - ey * ax.a[0];
+      var n = Math.sqrt(ex * ex + ey * ey) * Math.sqrt(ax.a[0] * ax.a[0] + ax.a[1] * ax.a[1]) || 1;
+      return cr / n > 0.001;
+    },
     extrude: function (g, y0, y1, proj, opts) {
       var wk = this.wk, mat = this.mat, pts = wk.pts, n = pts.length, i, a, b, nx, nz, P0 = [], P1 = [];
       if (y1 - y0 < 0.5) return;
+      var ax = this.axes(proj, y0), vis = [];
       for (i = 0; i < n; i++) { P0.push(proj(pts[i][0], y0, pts[i][1])); P1.push(proj(pts[i][0], y1, pts[i][1])); }
-      // side surfaces facing us (outward normal toward the receding direction)
+      // side surfaces facing us
       for (i = 0; i < n; i++) {
         a = pts[i]; b = pts[(i + 1) % n];
         nx = b[1] - a[1]; nz = -(b[0] - a[0]);
         var len = Math.sqrt(nx * nx + nz * nz) || 1; nx /= len; nz /= len;
-        if (nx * KX + nz * KY <= 0.001) continue;
+        vis[i] = this.facing(ax, a, b);
+        if (!vis[i]) continue;
         var j = (i + 1) % n;
         polyPath(g, [P0[i], P0[j], P1[j], P1[i]]);
         var light = 0.78 + 0.3 * Math.max(0, nx * -0.35 + nz * 0.94);
         if (wk.shape === "rect") {
           g.save(); g.clip();
-          var isTop = nz > 0.7, isRight = nx > 0.7;
-          var rx = KX * this.S, ry = -KY * this.S;
-          var plyEdge = mat.ply && ((wk.w < wk.h && isTop) || (wk.w >= wk.h && isRight));
+          var isTop = nz > 0.7, isSide = Math.abs(nx) > 0.7;
+          var rx = ax.a[0], ry = ax.a[1];
+          var plyEdge = mat.ply && ((wk.w < wk.h && isTop) || (wk.w >= wk.h && isSide));
           if (plyEdge) {
             this.plyStripes(g, P0[i], P0[j], P1[j], P1[i], isTop ? wk.w : wk.h);
           } else if (wk.grain === "z" && !isTop) {
-            grainFill(g, wk.mat, 0, -this.S, rx, ry, P0[i][0], P0[i][1]);
+            grainFill(g, wk.mat, ax.z[0], ax.z[1], rx, ry, P0[i][0], P0[i][1]);
           } else if (wk.grain === "z" && isTop) {
             g.fillStyle = mat.end; g.fillRect(-10, -10, W + 20, H + 20);
             g.save();
-            g.transform(this.S, 0, rx, ry, proj(0, 0, wk.h)[0], proj(0, 0, wk.h)[1]);
+            var o0 = proj(0, 0, wk.h);
+            g.transform(ax.x[0], ax.x[1], rx, ry, o0[0], o0[1]);
             drawRings(g, mat, wk.pith[0], wk.pith[1], dist(wk.pith[0], wk.pith[1], -wk.w / 2, this.L) + 8, 5, wk.seed, Math.max(0, wk.pith[0] - wk.w / 2 - 8));
             g.restore();
           } else {
-            grainFill(g, wk.mat, rx, ry, isTop ? this.S : 0, isTop ? 0 : -this.S, P0[i][0], P0[i][1]);
+            grainFill(g, wk.mat, rx, ry, isTop ? ax.x[0] : ax.z[0], isTop ? ax.x[1] : ax.z[1], P0[i][0], P0[i][1]);
           }
           g.fillStyle = "rgba(29,35,64," + (isTop ? 0 : 0.16) + ")"; g.fillRect(-10, -10, W + 20, H + 20);
           g.restore();
@@ -1936,9 +1969,16 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       polyPath(g, hull); g.lineWidth = 3; g.strokeStyle = OUT; g.lineJoin = "round"; g.stroke();
       polyPath(g, P0); g.lineWidth = 2.6; g.stroke();
       if (wk.shape === "rect") {
-        var e = wk.ease || 0;
-        var tr0 = proj(wk.w / 2 - e, y0, wk.h), tr1 = proj(wk.w / 2 - e, y1, wk.h);
-        g.beginPath(); g.moveTo(tr0[0], tr0[1]); g.lineTo(tr1[0], tr1[1]); g.lineWidth = 1.6; g.stroke();
+        // crease along the top edge we can see
+        g.lineWidth = 1.6;
+        for (i = 0; i < n; i++) {
+          var pi = (i + n - 1) % n, ta = pts[pi], tb = pts[i], tc = pts[(i + 1) % n];
+          var topPrev = Math.abs(tb[1] - ta[1]) < 0.01 && tb[0] < ta[0] && tb[1] >= wk.h - 0.01;
+          var topNext = Math.abs(tc[1] - tb[1]) < 0.01 && tc[0] < tb[0] && tb[1] >= wk.h - 0.01;
+          if (vis[pi] && vis[i] && (topPrev || topNext)) {
+            g.beginPath(); g.moveTo(P0[i][0], P0[i][1]); g.lineTo(P1[i][0], P1[i][1]); g.stroke();
+          }
+        }
       }
     },
     plyStripes: function (g, a, b, c2, d, across) {
@@ -1950,10 +1990,11 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       }
     },
     endFace: function (g, proj, y0, opts) {
-      var wk = this.wk, mat = this.mat, o = proj(0, y0, 0), S = this.S, i;
+      var wk = this.wk, mat = this.mat, ax = this.axes(proj, y0), o = ax.o, i;
+      var S = Math.sqrt(Math.abs(ax.x[0] * ax.z[1] - ax.x[1] * ax.z[0])) || 1;
       g.fillStyle = mat.end; g.fillRect(-10, -10, W + 20, H + 20);
       g.save();
-      g.transform(S, 0, 0, -S, o[0], o[1]);
+      g.transform(ax.x[0], ax.x[1], ax.z[0], ax.z[1], o[0], o[1]);
       if (mat.metal) {
         g.fillStyle = mat.end; g.fillRect(-400, -400, 800, 800);
         for (i = -60; i < 60; i += 3) line(g, -100, i, 100, i + 20, "rgba(255,255,255,0.25)", 0.8);
@@ -1966,7 +2007,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         }
       } else if (wk.grain === "z") {
         g.restore(); g.save();
-        grainFill(g, wk.mat, 0, -S, S, 0, o[0], o[1]);
+        grainFill(g, wk.mat, ax.z[0], ax.z[1], ax.x[0], ax.x[1], o[0], o[1]);
       } else if (mat.ply) {
         var flat = wk.w >= wk.h, n = Math.max(3, Math.round((flat ? wk.h : wk.w) / 3) | 1);
         for (i = 0; i < n; i++) {
@@ -2000,12 +2041,15 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     // ---------- the kerf on the visible outline at y = c ----------
     // Visible outline of the section at board position y, down to depthMM below the top.
     outlineAt: function (y, depthMM, xLimit) {
-      var wk = this.wk, pts = wk.pts, n = pts.length, top = wk.h, i, a, b, nx, nz, out = [], self = this;
+      var wk = this.wk, pts = wk.pts, n = pts.length, top = wk.h, i, k, a, b, out = [], self = this;
+      var ax = this.axes(function (x, yy, z) { return self.P(x, yy, z); }, y), s0 = 0;
       function addPt(p) { out.push(self.P(Math.min(p[0], xLimit), y, p[1])); }
-      for (i = 0; i < n; i++) {
+      // start just after a hidden facet so the visible run is one piece
+      for (k = 0; k < n; k++) if (!this.facing(ax, pts[k], pts[(k + 1) % n])) { s0 = k + 1; break; }
+      for (k = 0; k < n; k++) {
+        i = (s0 + k) % n;
         a = pts[i]; b = pts[(i + 1) % n];
-        nx = b[1] - a[1]; nz = -(b[0] - a[0]);
-        if (nx * KX + nz * KY <= 0.001) continue;
+        if (!this.facing(ax, a, b)) continue;
         var za = a[1], zb = b[1], lim = top - depthMM;
         if (za < lim && zb < lim) continue;
         var pa = a, pb = b;
@@ -2043,11 +2087,20 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     },
     pieceLabel: function (g) {
       var wk = this.wk, p = this.P(-wk.w / 2, 0, 0), q = this.P(wk.w / 2, 0, 0);
+      if (this.op) {
+        // under the piece that comes off, on the floor side of the board
+        var u = this.P(-wk.w / 2, this.c / 2, 0), lb = this.P(-wk.w / 2, 0, 0);
+        var lx = Math.max(u[0], this.P(-wk.w / 2, this.c, 0)[0] + 40);
+        label(g, mmText(this.c), inchText(this.c), Math.min(lx, W - 70), Math.max(u[1], lb[1]) + 34, "center");
+        return;
+      }
       if (p[0] - 130 < bin.x + bin.w) label(g, mmText(this.c), inchText(this.c), q[0] + 12, q[1] + 4, "left");
       else label(g, mmText(this.c), inchText(this.c), p[0] - 12, p[1] + 4, "right");
     },
     // ---------- input ----------
     down: function (pt) {
+      // a finger or mouse that went away without an "up" must not lock the saw
+      if (this.pid != null && !downIds[this.pid]) { this.pid = null; this.held = false; }
       if (this.pid != null) { puff(pt.x, pt.y); return; }
       this.pid = pt.id; this.lx = pt.x; this.ly = pt.y;
       this.held = true;
@@ -2057,6 +2110,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       var dx = pt.x - this.lx, dy = pt.y - this.ly;
       this.lx = pt.x; this.ly = pt.y;
       if (this.slideT < 1 || this.waitNew) return;
+      if (this.op) { this.opMove(dx, dy); return; }
       if (this.kind === "hand") this.handMove(dx, dy);
       else if (this.kind === "slide") { this.tx += dx / this.S; if (this.saw.id === "circular") this.wob = clamp(this.wob + dy * 0.03, -5, 5); }
       else { this.tx = clamp((this.tx || 0) + dx / this.S, -60, 60); this.tdep = clamp(this.tdep + dy / this.S, -40, this.wk.h + 10); }
@@ -2066,13 +2120,18 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.pid = null; this.held = false;
       Sound.setRasp(0);
     },
-    handMove: function (dx) {
-      var wk = this.wk, saw = this.saw, Ss = this.Ss;
-      // keep the teeth across the board: section must stay between tip and heel
-      var secL = -wk.w / 2 * this.S, secR = wk.w / 2 * this.S;
+    // How far the hand saw can travel (px of finger) with its teeth still across the board.
+    // Uses the side-view scales in both views, so a stroke cuts the same amount either way.
+    strokeRange: function () {
+      var wk = this.wk, saw = this.saw, Ss = this.sideSs, S = this.sideS;
+      var secL = -wk.w / 2 * S, secR = wk.w / 2 * S;
       var minOff = secR - (saw.heel - 6 - saw.engage) * Ss, maxOff = secL - (saw.tip + 6 - saw.engage) * Ss;
       if (minOff > maxOff) { var m = (minOff + maxOff) / 2; minOff = maxOff = m; }
-      var nOff = clamp(this.sawOff + dx, Math.min(minOff, 0), Math.max(maxOff, 0));
+      return [Math.min(minOff, 0), Math.max(maxOff, 0)];
+    },
+    handMove: function (dx) {
+      var wk = this.wk, saw = this.saw, Ss = this.sideSs, rg = this.strokeRange();
+      var nOff = clamp(this.sawOff + dx, rg[0], rg[1]);
       var real = nOff - this.sawOff;
       this.sawOff = nOff;
       if (!real) return;
@@ -2080,16 +2139,23 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.cutDir = real > 0 ? 1 : -1;
       this.cutting = cutting;
       if (!cutting || this.depth >= wk.h) { this.lastStroke = 0; return; }
-      var hpx = wk.h * this.S;
-      var rate = hpx / ((saw.strokes || 7) * this.mat.mult * 125);
-      var add = Math.abs(real) * rate / this.S;
-      if (saw.spine) add = Math.min(add, Math.max(0, saw.spine * Ss / this.S - this.depth));
+      var hpx = wk.h * this.sideS;
+      // cutting travel needed to get through: strokes x 280 px of tooth travel (was 125; it felt too fast)
+      var rate = hpx / ((saw.strokes || 7) * this.mat.mult * 280);
+      var add = Math.abs(real) * rate / this.sideS;
+      if (saw.spine) add = Math.min(add, Math.max(0, saw.spine * Ss / this.sideS - this.depth));
       this.depth = Math.min(wk.h, this.depth + add);
       this.cutAmt = (this.cutAmt || 0) + Math.abs(real);
       this.strokeEnergy = Math.min(1, (this.strokeEnergy || 0) + Math.abs(real) / 60);
       // dust out of the kerf on the side the teeth are moving toward
       var side = real > 0 ? 1 : -1;
       var ex = this.P(side * wk.w / 2 * (wk.shape === "rect" ? 1 : 0.9), this.c, Math.max(0, wk.h - this.depth));
+      if (this.op) {
+        // pull: the dust spills out of the kerf on your side; push: out of the far side, over the top
+        ex = real > 0 ? this.P(-wk.w / 2 * (wk.shape === "rect" ? 1 : 0.8), this.c, Math.max(0, wk.h - this.depth * 0.7))
+          : this.P(wk.w / 2 * 0.8, this.c, wk.h);
+        side = real > 0 ? -1 : 1;
+      }
       var n = Math.min(8, Math.abs(real) * 0.18 + 0.5);
       emitCut(ex[0], ex[1], side, n, this.mat, false);
       if (this.depth >= wk.h - 0.01) this.release();
@@ -2102,7 +2168,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       var spr = makeSprite(function (g, ox, oy) {
         self.extrude(g, 0, c, function (x, y, z) { var p = self.P(x, y, z); return [p[0] + ox, p[1] + oy]; }, {});
       }, this.hullBox(0, c));
-      dropPiece(spr, (this.kind === "hand" ? 1 : -1) * rnd(40, 90), rnd(-60, -10), rnd(-3, 3), mmText(c), inchText(c));
+      dropPiece(spr, (this.op || this.kind === "hand" ? 1 : -1) * rnd(40, 90), rnd(-60, -10), rnd(-3, 3), mmText(c), inchText(c));
       Sound.setRasp(0);
       // re-base the board: what's left starts at the cut
       this.L -= c + this.saw.kerf;
@@ -2180,7 +2246,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
           if (this.xpTop > prev) {
             this.kpts.push([this.xpTop, track ? 0 : this.wob]);
             var e = this.P(clamp(this.xs - hcTop, -wk.w / 2, wk.w / 2), this.c, h);
-            emitCut(e[0], e[1] - 4, -1, Math.min(7, (this.xpTop - prev) * 0.7 + 1), this.mat, true);
+            emitCut(e[0], e[1] - 4, this.op ? 1 : -1, Math.min(7, (this.xpTop - prev) * 0.7 + 1), this.mat, true);
           }
         }
         if (hcBot >= 0) this.xpBot = Math.max(this.xpBot, this.xs + hcBot);
@@ -2201,8 +2267,8 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         var v = (metal ? 30 : 55) / this.mat.mult;
         this.depth = Math.min(wk.h, this.depth + v * dt);
         cutting = true;
-        var e = this.P(wk.w / 2 * 0.9, this.c, Math.max(0, wk.h - this.depth));
-        if (Math.random() < 0.9) emitCut(e[0], e[1], 1, 2.2, this.mat, true);
+        var e = this.P((this.op ? -1 : 1) * wk.w / 2 * 0.9, this.c, Math.max(0, wk.h - this.depth));
+        if (Math.random() < 0.9) emitCut(e[0], e[1], this.op ? (Math.random() < 0.5 ? -1 : 1) : 1, 2.2, this.mat, true);
       }
       this.cutting = cutting;
       this.toolDepth = Math.min(want, this.depth);
@@ -2225,11 +2291,15 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (this.L <= 0.5 && this.waitNew) { this.drawSupportFront(g); return; }
       var farEnd = wk.support === "wall" ? this.cView + 230 : this.L;
       var c = this.c;
-      var key = [this.cView, c, this.L, wk.seed, wk.mat, W, H, DPR].join("|");
+      var key = [this.cView, c, this.L, wk.seed, wk.mat, W, H, DPR, this.op].join("|");
       if (key !== this.ck) {
         this.ck = key;
         var fg = this.layer("farC");
-        if (wk.support === "sawbuck") {
+        if (this.op) {
+          this.opSupport(fg, 0);
+          this.extrude(fg, c, farEnd, P, { sawn: true });
+          this.opSupport(fg, 1);
+        } else if (wk.support === "sawbuck") {
           var xb = this.cView + 70;
           this.extrude(fg, Math.max(c, xb), farEnd, P, { sawn: true });
           this.drawSawbuck(fg, 70);
@@ -2242,7 +2312,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         this.marks(fg);
         var ng = this.layer("nearC");
         this.extrude(ng, 0, c, P, { sawn: false });
-        if (wk.support === "vise") this.drawVise(ng, true);
+        if (wk.support === "vise" && !this.op) this.drawVise(ng, true);
       }
       g.drawImage(this.farC, 0, 0, W, H);
       // the tool
@@ -2251,19 +2321,24 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       g.drawImage(this.nearC, 0, 0, W, H);
       if (this.kind === "slide") this.kerfSlide(g);
       else if (this.depth > 0) this.kerf(g, this.depth, 1e9);
+      // tool parts on the off-cut side of the blade sit on top of the board
+      if (this.op) withAway(g, this.toolAnchor(), function () { self.opToolFront(g); });
       if (this.slideT >= 1 && !this.waitNew) this.pieceLabel(g);
       this.drawHints(g);
     },
     drawSupportFront: function (g) {
+      if (this.op) { this.opSupport(g, 0); this.opSupport(g, 1); return; }
       if (this.wk.support === "vise") { this.drawVise(g, false); this.drawVise(g, true); }
       if (this.wk.support === "sawbuck") this.drawSawbuck(g, 70);
       if (this.wk.support === "bench") this.drawClamp(g);
     },
     toolAnchor: function () {
       var top = this.P(0, this.c, this.wk.h);
+      if (this.op) return [top[0], top[1] + 40];
       return [top[0], top[1] - 60];
     },
     drawTool: function (g) {
+      if (this.op) { this.opDrawTool(g); return; }
       var wk = this.wk, saw = this.saw, top = this.P(0, this.c, wk.h);
       if (this.kind === "hand") {
         var Ss = this.Ss;
@@ -2310,9 +2385,14 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       g.beginPath();
       p = this.P(-wk.w / 2, this.c, wk.h); g.moveTo(p[0], p[1]);
       for (i = 0; i < this.kpts.length; i++) { p = this.P(this.kpts[i][0], this.c + this.kpts[i][1], wk.h); g.lineTo(p[0], p[1]); }
-      if (this.xpTop >= wk.w / 2 - 0.5) {
+      if (this.xpTop >= wk.w / 2 - 0.5 && !this.op) {
         var d = Math.min(wk.h, this.set.depth);
         p = this.P(wk.w / 2, this.c, wk.h - d); g.lineTo(p[0], p[1]);
+      }
+      if (this.op) {
+        // you see the kerf go down the near edge of the board
+        p = this.P(-wk.w / 2, this.c, wk.h - Math.min(wk.h, this.set.depth));
+        g.moveTo(p[0], p[1]); p = this.P(-wk.w / 2, this.c, wk.h); g.lineTo(p[0], p[1]);
       }
       g.lineCap = "round"; g.lineJoin = "round";
       g.strokeStyle = "rgba(29,35,64,0.85)"; g.lineWidth = kw + 2; g.stroke();
@@ -2363,11 +2443,323 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         g.strokeStyle = "#B98550"; g.lineWidth = 26 * S; g.stroke();
       });
     },
+    // ===================================================================
+    // Operator's view (the default): you stand behind the saw and look down at the cut.
+    // An orthographic camera behind the saw, a little to the right, looking down.
+    // World mm: X along the board (+ right, where the piece comes off), Y away from you, Z up.
+    // The cut is at X = 0; the board's x (across) is world Y.
+    // ===================================================================
+    setCam: function () {
+      var sup = this.wk.support, psi = 28, phi = 42;
+      if (this.kind === "slide") { psi = 22; phi = 52; }
+      else if (sup === "wall") { psi = 24; phi = 22; }
+      else if (sup === "vise") { psi = 26; phi = 50; }
+      else if (sup === "sawbuck") { psi = 26; phi = 34; }
+      psi *= Math.PI / 180; phi *= Math.PI / 180;
+      this.ex = [Math.cos(psi), Math.sin(psi) * Math.sin(phi)];
+      this.ey = [Math.sin(psi), -Math.cos(psi) * Math.sin(phi)];
+      this.ez = [0, -Math.cos(phi)];
+    },
+    pj: function (X, Y, Z) { return [X * this.ex[0] + Y * this.ey[0], X * this.ex[1] + Y * this.ey[1] + Z * this.ez[1]]; },
+    wp: function (X, Y, Z) { var q = this.pj(X, Y, Z); return [this.ox + q[0] * this.S, this.oy + q[1] * this.S]; },
+    // The tool picture's plane: its x axis (a) and its y axis (n, "down" in the picture), on screen per tool mm.
+    toolFrame: function (s) {
+      // lean: the saw is tipped a little (top toward the kept board) so you see its face, not just its back
+      var th = this.tilt, ln = this.lean || 0, sl = Math.sin(ln), cl = Math.cos(ln), a, n;
+      if (s == null) s = this.Ss;
+      if (this.kind === "slide") { a = this.pj(0, 1, 0); n = this.pj(sl, 0, -cl); }          // the saw's nose points away
+      else { a = this.pj(0, -Math.cos(th), Math.sin(th)); n = this.pj(sl, -Math.sin(th) * cl, -Math.cos(th) * cl); } // handle toward you
+      return { a: [a[0] * s, a[1] * s], n: [n[0] * s, n[1] * s] };
+    },
+    opLayout: function () {
+      var wk = this.wk, saw = this.saw, k = this.kind, self = this, i, h = wk.h, w2 = wk.w / 2;
+      this.setCam();
+      this.tilt = k === "hand" ? (saw.spine ? 0.02 : 0.09) : (k === "recip" ? 0.2 : 0);
+      this.lean = k === "hand" ? 0.6 : (k === "recip" ? 0.5 : 0.42);
+      this.benchX = k === "slide" ? -45 : -30;
+      this.benchY0 = -w2 - 45;
+      this.benchZ = wk.support === "vise" ? -95 : 0;
+      this.wallY = -w2 - 45;
+      // points to keep on screen, from the top of the cut: board part at scale S, tool part at scale Ss
+      var pts = [];
+      function add(u, v) { pts.push([u[0], u[1], v ? v[0] : 0, v ? v[1] : 0]); }
+      var xl = k === "slide" ? -200 : -170;
+      [xl, 150].forEach(function (X) { [-w2, w2].forEach(function (Y) { [0, h].forEach(function (Z) { add(self.pj(X, Y, Z - h)); }); }); });
+      var box = SPRITES[saw.id].box, fr = this.toolFrame(1), a = fr.a, n = fr.n;
+      function corners(u, off) {
+        [box[0], box[2]].forEach(function (sx) { [box[1], box[3]].forEach(function (sy) {
+          add(u, [(off + sx) * a[0] + sy * n[0], (off + sx) * a[1] + sy * n[1]]);
+        }); });
+      }
+      if (k === "slide") {
+        var zc = (saw.id === "tracksaw" ? 13 : 0) + (this.R - this.set.depth) * Math.cos(this.lean);
+        [-w2 - this.R - 24, w2 + this.R * 0.3].forEach(function (xs) {
+          var u = self.pj(-(self.R - self.set.depth) * Math.sin(self.lean), xs, zc);
+          [box[0], box[2]].forEach(function (sx) { [box[1], box[3]].forEach(function (sy) {
+            add([u[0] + sx * a[0] + sy * n[0], u[1] + sx * a[1] + sy * n[1]]);
+          }); });
+        });
+      } else if (k === "hand") {
+        var rg = this.strokeRange();
+        [0, h].forEach(function (d) {
+          [rg[0] / self.sideSs, rg[1] / self.sideSs].forEach(function (m) { corners(self.pj(0, 0, -d), m - saw.engage); });
+        });
+      } else {
+        [0, h].forEach(function (d) { corners(self.pj(0, 0, -d), 110); });
+      }
+      var mT = clamp(H * 0.1, 56, 92) + 12, mB = k === "recip" ? 30 : 50, mS = 10, aw = W - 2 * mS, ah = H - mT - mB;
+      function bb(S, Ss) {
+        var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        pts.forEach(function (p) {
+          var x = p[0] * S + p[2] * Ss, y = p[1] * S + p[3] * Ss;
+          if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        });
+        return [x0, y0, x1, y1];
+      }
+      function fits(S, Ss) { var b = bb(S, Ss); return b[2] - b[0] <= aw && b[3] - b[1] <= ah; }
+      function most(lo, hi, f) {
+        if (!f(lo)) return lo;
+        for (var it = 0; it < 24; it++) { var mid = (lo + hi) / 2; if (f(mid)) lo = mid; else hi = mid; }
+        return lo;
+      }
+      var S, Ss;
+      if (k === "slide") { S = most(0.05, 3, function (s) { return fits(s, 0); }); Ss = S; }
+      else {
+        var b0 = bb(1, 0);
+        S = Math.min(aw * 0.6 / (b0[2] - b0[0]), ah * 0.42 / (b0[3] - b0[1]), 3.2);
+        for (i = 0; i < 40; i++) {
+          Ss = most(0.02, S, function (s) { return fits(S, s); });
+          if (Ss >= S * 0.6 || S < 0.3) break;
+          S *= 0.94;
+        }
+      }
+      this.S = S; this.Ss = Ss;
+      var b = bb(S, Ss);
+      var Ax = mS + (aw - (b[2] - b[0])) / 2 - b[0], Ay = mT + (ah - (b[3] - b[1])) / 2 - b[1];
+      this.ox = Ax; this.oy = Ay - h * this.ez[1] * S;
+      this.stX = W / 2;
+    },
+    // A box in world mm with the faces we can see: top, front (toward you), right end.
+    box3: function (g, x0, x1, y0, y1, z0, z1, cTop, cFront, cSide, lw) {
+      var a = this.wp(x0, y0, z1), b = this.wp(x1, y0, z1), c = this.wp(x1, y1, z1), d = this.wp(x0, y1, z1);
+      var e = this.wp(x0, y0, z0), f = this.wp(x1, y0, z0), k = this.wp(x1, y1, z0);
+      lw = lw || 2.6;
+      if (cSide) { polyPath(g, [b, c, k, f]); fs(g, cSide, lw); }
+      if (cFront) { polyPath(g, [a, b, f, e]); fs(g, cFront, lw); }
+      if (cTop) { polyPath(g, [a, b, c, d]); fs(g, cTop, lw); }
+      return [a, b, c, d];
+    },
+    // A round bar between two world points (thick stroke with an outline).
+    bar3: function (g, p, q, wmm, col, hi) {
+      var a = this.wp(p[0], p[1], p[2]), b = this.wp(q[0], q[1], q[2]), wd = Math.max(3, wmm * this.S);
+      g.lineCap = "round";
+      line(g, a[0], a[1], b[0], b[1], OUT, wd + 5);
+      line(g, a[0], a[1], b[0], b[1], col, wd);
+      if (hi) line(g, a[0], a[1], b[0], b[1], hi, wd * 0.28);
+    },
+    opDrawBg: function () {
+      var g = bgx, wk = this.wk, sup = wk.support, self = this, i, a, b;
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      PX = 1;
+      if (sup === "wall") { this.opWallBg(g); return; }
+      var zt = this.benchZ, zf = sup === "sawbuck" ? -620 : zt - 820, yw = 1300;
+      // pegboard wall, far away
+      g.fillStyle = "#C9A06A"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "rgba(70,40,15,0.35)";
+      for (var yy = 12; yy < H; yy += 24) for (var xx = 12; xx < W; xx += 24) { g.beginPath(); g.arc(xx, yy, 2.6, 0, 7); g.fill(); }
+      // the floor, meeting the wall along a line
+      var f0 = this.wp(-8000, yw, zf), f1 = this.wp(8000, yw, zf);
+      polyPath(g, [f0, f1, [f1[0], H + 6000], [f0[0], H + 6000]]);
+      g.fillStyle = "#7A5E4A"; g.fill();
+      g.save(); g.clip();
+      for (i = 0; i < 40; i++) { a = this.wp(-8000, yw - i * 150, zf); b = this.wp(8000, yw - i * 150, zf); line(g, a[0], a[1], b[0], b[1], "rgba(0,0,0,0.14)", 2); }
+      g.restore();
+      line(g, f0[0], f0[1], f1[0], f1[1], "rgba(29,35,64,0.6)", 4);
+      if (sup === "sawbuck") return;
+      // the workbench: legs, top, front apron, the end you can see
+      var bx = this.benchX, y0 = this.benchY0, y1 = y0 + 640, X0 = -8000, ap = 70;
+      polyPath(g, [this.wp(X0, y0 + 30, zf), this.wp(bx + 60, y0 + 30, zf), this.wp(bx + 60, y1 + 80, zf), this.wp(X0, y1 + 80, zf)]);
+      g.fillStyle = "rgba(20,12,6,0.32)"; g.fill();
+      [y1 - 80, y0 + 20].forEach(function (ly) { self.box3(g, bx - 100, bx - 36, ly, ly + 64, zf, zt - ap, null, "#A87A45", "#8E6538"); });
+      var top = this.box3(g, X0, bx, y0, y1, zt - ap, zt, "#E2BE85", "#C08D52", "#A87A45", 3);
+      g.save(); polyPath(g, top); g.clip();
+      for (i = 1; i < 7; i++) { a = this.wp(X0, y0 + i * 92, zt); b = this.wp(bx, y0 + i * 92, zt); line(g, a[0], a[1], b[0], b[1], "rgba(150,100,50,0.4)", 2); }
+      a = this.wp(X0, y0 + 4, zt); b = this.wp(bx, y0 + 4, zt); line(g, a[0], a[1], b[0], b[1], "rgba(255,255,255,0.35)", 3);
+      g.restore();
+    },
+    opWallBg: function (g) {
+      var wk = this.wk, yw = this.wallY, self = this;
+      g.fillStyle = "#E9E6DC"; g.fillRect(0, 0, W, H);
+      var hole = [[-390, -170], [-230, -240], [-40, -205], [150, -255], [330, -205], [410, 20], [380, wk.h + 170], [220, wk.h + 250], [10, wk.h + 215], [-200, wk.h + 268], [-375, wk.h + 160], [-430, 30]]
+        .map(function (p) { return self.wp(p[0], yw, p[1]); });
+      // tape seam on the drywall
+      var s0 = this.wp(-460, yw, wk.h + 330), s1 = this.wp(-460, yw, -400);
+      line(g, s0[0], -10, s1[0], H + 10, "rgba(29,35,64,0.08)", 14);
+      g.save();
+      smooth(g, hole); g.fillStyle = "#3E3329"; g.fill(); g.clip();
+      // the other room's drywall, seen from the back, then the studs
+      var bk = [this.wp(-3000, yw + 140, -3000), this.wp(3000, yw + 140, -3000), this.wp(3000, yw + 140, 3000), this.wp(-3000, yw + 140, 3000)];
+      polyPath(g, bk); g.fillStyle = "#5A4A3A"; g.fill();
+      [[-268, -230], [262, 300]].forEach(function (s) { self.box3(g, s[0], s[1], yw, yw + 89, -3000, 3000, null, "#E7C68C", "#C9A46A", 3); });
+      g.restore();
+      smooth(g, hole); g.lineWidth = 10; g.strokeStyle = "#D6D1C2"; g.stroke();
+      smooth(g, hole); g.lineWidth = 4; g.strokeStyle = OUT; g.stroke();
+      g.fillStyle = "#6B5242"; g.fillRect(0, this.floorY - 40, W, H);
+      g.fillStyle = "rgba(29,35,64,0.5)"; g.fillRect(0, this.floorY - 42, W, 3);
+    },
+    // Supports: layer 0 is behind the board, layer 1 in front of it.
+    opSupport: function (g, layer) {
+      var sup = this.wk.support;
+      PX = 1;
+      if (sup === "bench" && layer === 1) this.opClamp(g);
+      if (sup === "vise") this.opVise(g, layer === 1);
+      if (sup === "sawbuck") this.opSawbuck(g, layer === 1);
+    },
+    opClamp: function (g) {
+      var wk = this.wk, S = this.S, ys = Math.min(260, this.L - this.cView - 40);
+      if (ys < 50 || this.L <= 0.5) return;
+      var X = -ys, w2 = wk.w / 2, yb = this.benchY0 - 18, zt = wk.h + 16, zb = -120;
+      var tIn = this.wp(X, Math.min(w2 * 0.2, 30), zt), t = this.wp(X, yb, zt), b = this.wp(X, yb, zb), bIn = this.wp(X, this.benchY0 + 30, zb);
+      var wd = Math.max(7, 13 * S * 0.7);
+      g.lineCap = "round"; g.lineJoin = "round";
+      g.beginPath(); g.moveTo(tIn[0], tIn[1]); g.lineTo(t[0], t[1]); g.lineTo(b[0], b[1]); g.lineTo(bIn[0], bIn[1]);
+      g.strokeStyle = OUT; g.lineWidth = wd + 5; g.stroke();
+      g.strokeStyle = C.orange; g.lineWidth = wd; g.stroke();
+      g.beginPath(); g.moveTo(t[0], t[1]); g.lineTo(b[0], b[1]); g.strokeStyle = "rgba(255,255,255,0.35)"; g.lineWidth = wd * 0.3; g.stroke();
+      // pad pressing on the board
+      var p = this.wp(X, Math.min(w2 * 0.2, 30), wk.h);
+      rrect(g, p[0] - wd * 1.2, p[1] - (tIn[1] - p[1] > 0 ? 0 : 0) - Math.abs(p[1] - tIn[1]), wd * 2.4, Math.abs(p[1] - tIn[1]) + 2, 3);
+      fs(g, C.grip, 2.4);
+      // screw handle under the lower jaw
+      rrect(g, bIn[0] - wd * 0.35, bIn[1], wd * 0.7, wd * 2.6, 2); fs(g, C.steelD, 2);
+      rrect(g, bIn[0] - wd * 1.4, bIn[1] + wd * 2.4, wd * 2.8, wd * 1.4, wd * 0.6); fs(g, C.grip, 2.4);
+    },
+    opVise: function (g, front) {
+      var wk = this.wk, w2 = wk.w / 2, jh = wk.h * 0.72, x0 = -140, x1 = -26, jt = 22, zt = this.benchZ, i, a, b;
+      if (!front) {
+        this.box3(g, x0 - 10, x1 + 8, -w2 - jt - 8, w2 + 150, zt, -24, "#5B86C2", "#3E6FA8", "#2F5A92");
+        this.box3(g, x0, x1, w2, w2 + jt, -24, jh, "#5B86C2", "#3E6FA8", "#2F5A92");
+        for (i = 1; i < 4; i++) { a = this.wp(x0 + 4, w2, -24 + i * (jh + 24) / 4); b = this.wp(x1 - 4, w2, -24 + i * (jh + 24) / 4); line(g, a[0], a[1], b[0], b[1], OUT, 1.5); }
+        return;
+      }
+      this.box3(g, x0, x1, -w2 - jt, -w2, -24, jh, "#5B86C2", "#3E6FA8", "#2F5A92");
+      for (i = 1; i < 4; i++) { a = this.wp(x0 + 4, -w2 - jt, -24 + i * (jh + 24) / 4); b = this.wp(x1 - 4, -w2 - jt, -24 + i * (jh + 24) / 4); line(g, a[0], a[1], b[0], b[1], "rgba(29,35,64,0.5)", 1.5); }
+      // the screw comes out toward you, with its sliding T bar
+      var xm = (x0 + x1) / 2, zs = jh * 0.25 - 12, yb = -w2 - jt - 95;
+      this.bar3(g, [xm, -w2 - jt, zs], [xm, yb, zs], 16, C.steelD, "rgba(255,255,255,0.5)");
+      this.bar3(g, [xm - 85, yb, zs], [xm + 85, yb, zs], 11, C.steel, "rgba(255,255,255,0.6)");
+      [-1, 1].forEach(function (sg) { var q = this.wp(xm + sg * 85, yb, zs); g.beginPath(); g.arc(q[0], q[1], Math.max(5, 11 * this.S), 0, 7); fs(g, C.grip, 2.4); }, this);
+    },
+    opSawbuck: function (g, front) {
+      var wk = this.wk, r = wk.w / 2, h = wk.h, self = this, zf = -620, top = h * 0.8, wd = 34;
+      // each X frame: leg 1 goes from near-top to far-floor, leg 2 from far-top to near-floor
+      var t1 = (r + 46) / (2 * r + 306);
+      var cz = top + t1 * (zf - top);
+      if (!front) this.bar3(g, [-560, 0, cz], [-110, 0, cz], wd * 0.8, "#A87A45");
+      [-560, -110].forEach(function (X) {
+        var l1a = [X + 22, -r - 46, top], l1c = [X + 22, 0, cz], l1b = [X + 22, r + 260, zf];
+        var l2a = [X - 22, r + 46, top], l2c = [X - 22, 0, cz], l2b = [X - 22, -r - 260, zf];
+        if (!front) { self.bar3(g, l1c, l1b, wd, "#B98550"); self.bar3(g, l2a, l2c, wd, "#B98550"); }
+        else { self.bar3(g, l2c, l2b, wd, "#C99560"); self.bar3(g, l1a, l1c, wd, "#C99560"); }
+      });
+    },
+    // ---------- the tool ----------
+    opDrawTool: function (g) {
+      var wk = this.wk, saw = this.saw, k = this.kind, fr = this.toolFrame(), o;
+      var det = Math.abs(fr.a[0] * fr.n[1] - fr.a[1] * fr.n[0]) || 1;
+      var track = saw.id === "tracksaw";
+      if (k === "hand") {
+        var T = this.P(0, this.c, wk.h - this.depth), m = this.sawOff / this.sideSs - saw.engage;
+        var lift = this.lift + (this.cutting ? 0 : (this.held ? 1.5 : 0));
+        o = [T[0] + fr.a[0] * m, T[1] + fr.a[1] * m - lift];
+      } else if (k === "slide") {
+        var R = this.R, D = this.set.depth * this.plunge, sh = track ? R - this.set.depth : R - D;
+        // blade center: above the shoe, tipped with the lean so the shoe level meets the cut line
+        this.zc = wk.h + (track ? 13 : 0) + sh * Math.cos(this.lean);
+        this.xc = -sh * Math.sin(this.lean);
+        if (track) this.opRail(g);
+        this.opSlideBody(g, false);
+        o = this.wp(this.xc, this.xs, this.zc);
+      } else {
+        var T2 = this.P(0, this.c, wk.h - (this.toolDepth || 0));
+        o = [T2[0] + fr.a[0] * 110, T2[1] + fr.a[1] * 110];
+      }
+      g.save();
+      g.transform(fr.a[0], fr.a[1], fr.n[0], fr.n[1], o[0], o[1]);
+      PX = 1 / Math.sqrt(det);
+      if (k === "hand") {
+        if (saw.id === "ryoba") {
+          var target = this.set.edge === "rip" ? -1 : 1;
+          this.flip += (target - this.flip) * 0.25;
+          if (Math.abs(target - this.flip) < 0.01) this.flip = target;
+          drawRyoba(g, { flip: this.flip });
+        } else SPRITES[saw.id].fn(g, {});
+      } else if (k === "slide") {
+        if (track) drawTrack(g, { depth: this.set.depth, plunge: this.plunge, spin: this.spin, speed: this.speed });
+        else drawCircular(g, { depth: this.set.depth * this.plunge, spin: this.spin, speed: this.speed, guard: this.guard });
+      } else drawRecip(g, { stroke: this.stroke });
+      g.restore();
+      PX = 1;
+    },
+    // Tool parts on the off-cut side of the blade (drawn over the board).
+    opToolFront: function (g) {
+      if (this.kind === "slide" && this.saw.id === "circular") this.opSlideBody(g, true);
+    },
+    // Base plate (shoe) and the motor of a power saw, in 3D around the blade's side picture.
+    opSlideBody: function (g, right) {
+      var wk = this.wk, xs = this.xs, track = this.saw.id === "tracksaw", zs = wk.h + (track ? 13 : 0), self = this;
+      PX = 1;
+      if (right) { this.box3(g, 0, 26, xs - 150, xs + 168, zs, zs + 6, C.alu, C.aluD, C.aluD, 2.2); return; }
+      if (track) {
+        this.box3(g, -160, -2, xs - 150, xs + 150, zs, zs + 8, C.alu, C.aluD, C.aluD, 2.4);
+        // the body is wide: its far side shows behind the blade's side picture
+        this.box3(g, -95, -6, xs - 105, xs + 100, zs + 8, zs + 70, "#4A5160", C.gray, C.gray, 2.4);
+        return;
+      }
+      this.box3(g, -150, 0, xs - 150, xs + 168, zs, zs + 6, C.alu, C.aluD, C.aluD, 2.4);
+      // motor: a yellow drum sticking out to the left of the blade
+      var ln = this.lean, mx = this.xc - 73 * Math.sin(ln) - 8, zc = this.zc + 73 * Math.cos(ln), yc = xs + 21, rr = 44, pts = [], i, t;
+      for (i = 0; i < 24; i++) {
+        t = i / 24 * Math.PI * 2;
+        pts.push(this.wp(mx - 118, yc + Math.cos(t) * rr, zc + Math.sin(t) * rr));
+        pts.push(this.wp(mx, yc + Math.cos(t) * rr, zc + Math.sin(t) * rr));
+      }
+      polyPath(g, convexHull(pts)); fs(g, C.yellow, 3);
+      for (i = 0; i < 4; i++) {
+        var a = this.wp(mx - 100 + i * 14, yc - rr * 0.2, zc + rr), b = this.wp(mx - 100 + i * 14, yc + rr * 0.7, zc + rr * 0.7);
+        line(g, a[0], a[1], b[0], b[1], "rgba(29,35,64,0.55)", Math.max(2, 4 * this.S));
+      }
+      void self;
+    },
+    opRail: function (g) {
+      var wk = this.wk, w2 = wk.w / 2, h = wk.h, y0 = -w2 - 190, y1 = w2 + 190;
+      PX = 1;
+      this.box3(g, -175, -2, y0, y1, h, h + 10, C.alu, C.aluD, C.aluD, 2.4);
+      this.box3(g, -112, -96, y0 + 4, y1 - 4, h + 10, h + 14, C.aluD, C.aluD, C.aluD, 2);
+      this.box3(g, -2, 2, y0, y1, h, h + 4, C.grip, C.grip, C.grip, 1.6);
+    },
+    opMove: function (dx, dy) {
+      var k = this.kind;
+      if (k === "hand") { this.handMove(dy); return; }
+      if (k === "slide") {
+        // up the screen pushes the saw forward along the line
+        var ey = this.ey;
+        this.tx += -dy / (this.S * -ey[1]);
+        if (this.saw.id === "circular") {
+          var off = dx - (-dy) * ey[0] / (-ey[1]);
+          this.wob = clamp(this.wob + off * 0.03, -5, 5);
+        }
+        return;
+      }
+      this.tdep = clamp(this.tdep + dy / (this.S * -this.ez[1]), -40, this.wk.h + 10);
+    },
     drawHints: function (g) {
       var saw = this.saw, txt, dir;
       if (this.kind === "hand") {
         txt = saw.cut === "pull" ? "Pull!" : (saw.cut === "push" ? "Push!" : "Push + pull");
         dir = saw.cut === "pull" ? 1 : (saw.cut === "push" ? -1 : 0);
+        // operator's view: pull = toward you (down the screen), push = away (up)
+        if (this.op) dir = saw.cut === "pull" ? 2 : (saw.cut === "push" ? 3 : 4);
         var lit = this.cutting && this.held && this.strokeEnergy > 0.1;
         strokeHint(g, this.stX, 30, txt, dir, lit, saw.jp ? "Japanese saws cut on the pull" : (saw.cut === "push" ? "Western saws cut on the push" : ""));
         if (saw.id === "ryoba") {
@@ -2375,7 +2767,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
           smallTag(g, this.stX, H - 30, t);
         }
       } else if (this.kind === "slide") {
-        strokeHint(g, this.stX, 30, "Hold and slide", 1, this.held, saw.id === "tracksaw" ? "The track keeps it perfectly straight" : "Follow the line");
+        strokeHint(g, this.stX, 30, this.op ? "Hold and push" : "Hold and slide", this.op ? 3 : 1, this.held, saw.id === "tracksaw" ? "The track keeps it perfectly straight" : "Follow the line");
         var D = this.set.depth, h = this.wk.h;
         smallTag(g, this.stX, H - 30, "Depth " + D + " mm · Board " + h + " mm");
         if (this.hint) bigTag(g, W / 2, H * 0.45, "Set the depth deeper!");
@@ -2477,6 +2869,93 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     return inside;
   }
 
+  // -------------------------------------------------------------------
+  // The board as a raster, to find where the real kerf has cut it apart.
+  // Cell states: 0 wood, 1 kerf, 2 gone (cut off, or the drilled hole).
+  // -------------------------------------------------------------------
+  var GC = 1.25, GW = Math.round(BW / GC), GH = Math.round(BH / GC), GN = GW * GH;
+  var LAB = new Int32Array(GN), STK = new Int32Array(GN), MASK = new Uint8Array(GN);
+  function polyArea(p) {
+    var a = 0, i, j;
+    for (i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]);
+    return Math.abs(a / 2);
+  }
+  function polyBox(p) {
+    var b = [1e9, 1e9, -1e9, -1e9];
+    p.forEach(function (q) { b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]); b[2] = Math.max(b[2], q[0]); b[3] = Math.max(b[3], q[1]); });
+    return b;
+  }
+  // Douglas-Peucker on an open polyline.
+  function simplifyLine(pts, tol) {
+    var n = pts.length, keep = new Uint8Array(n), stack = [0, n - 1], out = [], i;
+    keep[0] = keep[n - 1] = 1;
+    while (stack.length) {
+      var e = stack.pop(), s = stack.pop(), a = pts[s], b = pts[e];
+      var dx = b[0] - a[0], dy = b[1] - a[1], L = Math.sqrt(dx * dx + dy * dy) || 1e-9, best = -1, bi = -1;
+      for (i = s + 1; i < e; i++) {
+        var dd = Math.abs((pts[i][0] - a[0]) * dy - (pts[i][1] - a[1]) * dx) / L;
+        if (dd > best) { best = dd; bi = i; }
+      }
+      if (bi > 0 && best > tol) { keep[bi] = 1; stack.push(s, bi, bi, e); }
+    }
+    for (i = 0; i < n; i++) if (keep[i]) out.push(pts[i]);
+    return out;
+  }
+  // Outline of the cells with MASK set inside the cell box [i0..i1] x [j0..j1]: walk the cell
+  // edges (cells on the right), keep the longest loop, then simplify and round it a little. mm units.
+  function traceMask(i0, j0, i1, j1) {
+    var W1 = GW + 1, out = {}, i, j, best = null, bestA = 0;
+    function add(ax, ay, bx, by) { var k = ay * W1 + ax; (out[k] || (out[k] = [])).push(by * W1 + bx); }
+    for (j = j0; j <= j1; j++) for (i = i0; i <= i1; i++) {
+      if (!MASK[j * GW + i]) continue;
+      if (j === 0 || !MASK[(j - 1) * GW + i]) add(i, j, i + 1, j);
+      if (i === GW - 1 || !MASK[j * GW + i + 1]) add(i + 1, j, i + 1, j + 1);
+      if (j === GH - 1 || !MASK[(j + 1) * GW + i]) add(i + 1, j + 1, i, j + 1);
+      if (i === 0 || !MASK[j * GW + i - 1]) add(i, j + 1, i, j);
+    }
+    Object.keys(out).forEach(function (key) {
+      var list = out[key];
+      while (list.length) {
+        var start = +key, a = start, b = list.pop(), loop = [], guard = 0;
+        while (guard++ < 200000) {
+          var ax = a % W1, ay = (a - ax) / W1, bx = b % W1, by = (b - bx) / W1;
+          loop.push([(ax + bx) / 2 * GC, (ay + by) / 2 * GC]);
+          if (b === start) break;
+          var nl = out[b];
+          if (!nl || !nl.length) break;
+          // at a pinch corner prefer the right-hand turn
+          var dx = bx - ax, dy = by - ay, pickI = 0, pickS = -9;
+          for (var q = 0; q < nl.length; q++) {
+            var cx = nl[q] % W1, cy = (nl[q] - cx) / W1, ex = cx - bx, ey = cy - by, cr = dx * ey - dy * ex;
+            var sc = cr > 0 ? 2 : (cr === 0 ? 1 : 0);
+            if (sc > pickS) { pickS = sc; pickI = q; }
+          }
+          a = b; b = nl.splice(pickI, 1)[0];
+        }
+        if (loop.length > 3) {
+          var ar = polyArea(loop);
+          if (ar > bestA) { bestA = ar; best = loop; }
+        }
+      }
+    });
+    if (!best) return null;
+    // edges on the board's own edge go a little past it, so no hairline of board is left there
+    best = best.map(function (p) {
+      return [p[0] <= 0.01 ? -3 : (p[0] >= BW - 0.01 ? BW + 3 : p[0]), p[1] <= 0.01 ? -3 : (p[1] >= BH - 0.01 ? BH + 3 : p[1])];
+    });
+    // simplify (split the loop at its far point), then one round of corner cutting
+    var far = 0, fd = -1;
+    best.forEach(function (p, k) { var dd = dist(p[0], p[1], best[0][0], best[0][1]); if (dd > fd) { fd = dd; far = k; } });
+    var A = simplifyLine(best.slice(0, far + 1), 0.45), B = simplifyLine(best.slice(far).concat([best[0]]), 0.45);
+    var poly = A.concat(B.slice(1, -1)), sm = [];
+    if (poly.length < 3) return null;
+    for (i = 0; i < poly.length; i++) {
+      var p = poly[i], r = poly[(i + 1) % poly.length];
+      sm.push([p[0] * 0.75 + r[0] * 0.25, p[1] * 0.75 + r[1] * 0.25], [p[0] * 0.25 + r[0] * 0.75, p[1] * 0.25 + r[1] * 0.75]);
+    }
+    return sm;
+  }
+
   // Shared parts of the two curve scenes (the tool moves, or the board moves).
   var CurveBase = {
     startWork: function () {
@@ -2487,18 +2966,47 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.removed = []; this.trail = []; this.cur = null;
       this.done = false; this.waitNew = 0; this.cutDist = 0;
       this.grainSeed = rnd(0, 200);
+      // raster of the board; the drilled hole is already gone
+      this.grid = new Uint8Array(GN);
+      this.kerfR = Math.max(this.saw.kerf / 2, GC * 0.62);
+      this.splitT = 0; this.splitDirty = false;
+      this.d.offArea = polyArea(this.d.offcut); this.d.offBox = polyBox(this.d.offcut);
+      if (this.d.hole) this.stamp(this.d.hole[0], this.d.hole[1], this.d.hole[0], this.d.hole[1], 5.5, 2);
     },
     inWood: function (x, y) {
       if (x < 0 || y < 0 || x > BW || y > BH) return false;
       if (this.d.hole && dist(x, y, this.d.hole[0], this.d.hole[1]) < 5) return false;
-      for (var i = 0; i < this.removed.length; i++) if (pointInPoly(x, y, this.removed[i])) return false;
-      return true;
+      var i = Math.min(GW - 1, Math.floor(x / GC)), j = Math.min(GH - 1, Math.floor(y / GC));
+      return this.grid[j * GW + i] !== 2;
+    },
+    // Mark the raster cells within r mm of the segment a-b as kerf (v = 1) or gone (v = 2).
+    stamp: function (ax, ay, bx, by, r, v) {
+      var g = this.grid, i, j, changed = false;
+      var i0 = Math.max(0, Math.floor((Math.min(ax, bx) - r) / GC)), i1 = Math.min(GW - 1, Math.floor((Math.max(ax, bx) + r) / GC));
+      var j0 = Math.max(0, Math.floor((Math.min(ay, by) - r) / GC)), j1 = Math.min(GH - 1, Math.floor((Math.max(ay, by) + r) / GC));
+      var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy, r2 = r * r;
+      for (j = j0; j <= j1; j++) for (i = i0; i <= i1; i++) {
+        var cx = (i + 0.5) * GC, cy = (j + 0.5) * GC, t = L2 ? clamp(((cx - ax) * dx + (cy - ay) * dy) / L2, 0, 1) : 0;
+        var ex = ax + dx * t - cx, ey = ay + dy * t - cy, k = j * GW + i;
+        if (ex * ex + ey * ey <= r2 && g[k] < v) { g[k] = v; changed = true; }
+      }
+      if (changed && v === 1) this.splitDirty = true;
+    },
+    // The blade has just come out of the wood (off the edge, or into a hole or an earlier cut).
+    cutOut: function (px, py, x, y) {
+      if (this.done) return;
+      this.stamp(px, py, x, y, this.kerfR, 1);
+      if (this.cur) this.cur.push([x, y]);
+      this.cur = null;
+      this.splitT = 1;
     },
     // Record the cut at board point (x, y); returns true when the shape is finished.
     cutAt: function (x, y, prevX, prevY) {
       var cur = this.cur;
+      this.stamp(prevX, prevY, x, y, this.kerfR, 1);
       if (!cur || dist(cur[cur.length - 1][0], cur[cur.length - 1][1], x, y) > 30) { cur = this.cur = [[prevX, prevY]]; this.trail.push(cur); }
       if (dist(cur[cur.length - 1][0], cur[cur.length - 1][1], x, y) > 1.2) cur.push([x, y]);
+      if (this.d.spoiled) return false;
       var s = this.d.samp, i, hit = 0, tol = 10;
       for (i = 0; i < s.length; i++) {
         if (!s[i][2] && Math.abs(s[i][0] - x) < tol && Math.abs(s[i][1] - y) < tol && dist(s[i][0], s[i][1], x, y) < tol) s[i][2] = true;
@@ -2508,22 +3016,43 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       return this.progress >= 0.93;
     },
     // Board drawing in the current transform (mm units).
-    boardPath: function (g) {
+    boardPath: function (g, pad) {
+      pad = pad || 0;
       g.beginPath();
-      g.rect(0, 0, BW, BH);
+      g.rect(-pad, -pad, BW + 2 * pad, BH + 2 * pad);
       this.removed.forEach(function (poly) {
         g.moveTo(poly[0][0], poly[0][1]);
         for (var i = poly.length - 1; i >= 0; i--) g.lineTo(poly[i][0], poly[i][1]);
         g.closePath();
       });
     },
-    drawBoard: function (g, S) {
-      var mat = this.mat, d = this.d, self = this, thick = mat.kind === "drywall" ? 12 : 18;
-      // thickness/shadow
-      g.save(); g.translate(0, thick * 0.55); this.boardPath(g); g.fillStyle = "rgba(40,25,10,0.35)"; g.fill("evenodd"); g.restore();
-      g.save(); g.translate(0, thick * 0.32); this.boardPath(g); g.fillStyle = mat.ply ? "#C79E62" : shadeColor(mat.face, 0.8); g.fill("evenodd"); g.restore();
-      this.boardPath(g);
-      g.save(); g.clip("evenodd");
+    // M maps board mm to canvas px ([a, b, c, d, e, f] as in ctx.transform). With this.lift (the
+    // slanted machine view) the board is a slab: M is its top face, the sides show below it.
+    drawBoard: function (g, M) {
+      var mat = this.mat, d = this.d, self = this, thick = mat.kind === "drywall" ? 12 : 18, i, k;
+      var sc = Math.sqrt(Math.abs(M[0] * M[3] - M[1] * M[2])), L = this.lift || 0;
+      var sideCol = mat.ply ? "#C79E62" : shadeColor(mat.face, 0.8);
+      function on(dx, dy) { g.setTransform(DPR, 0, 0, DPR, dx * DPR, dy * DPR); g.transform(M[0], M[1], M[2], M[3], M[4], M[5]); }
+      function px() { g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+      // the board left: its rectangle, less the removed parts (clipped to the rectangle, as those
+      // parts reach a little past the board's edges so no hairline seam shows)
+      function clipB(dx, dy) { on(dx, dy); g.beginPath(); g.rect(0, 0, BW, BH); g.clip(); self.boardPath(g, 10); g.clip("evenodd"); }
+      function layer(dx, dy, fill, stroke, lw) {
+        g.save(); clipB(dx, dy);
+        if (fill) { px(); g.fillStyle = fill; g.fillRect(-20, -20, W + 40, H + 40); }
+        if (stroke) { on(dx, dy); self.boardPath(g); px(); g.lineWidth = lw; g.strokeStyle = stroke; g.stroke(); }
+        g.restore();
+      }
+      g.save();
+      g.lineJoin = "round"; g.lineCap = "round";
+      var sh = L ? L + 7 : thick * 0.55 * sc, sd = L || thick * 0.32 * sc;
+      layer(0, sh, L ? "rgba(20,24,40,0.30)" : "rgba(40,25,10,0.35)");
+      if (L) {
+        for (k = 6; k >= 1; k--) layer(0, L * k / 6, sideCol);
+        if (mat.ply) for (k = 1; k < 5; k++) layer(0, L * k / 5, null, "rgba(140,90,35,0.5)", 2.4);
+        layer(0, L, null, OUT, 6);
+      } else layer(0, sd, sideCol);
+      g.save(); clipB(0, 0);
       if (mat.kind === "drywall") {
         g.fillStyle = mat.face; g.fillRect(-10, -10, BW + 20, BH + 20);
         g.fillStyle = "rgba(0,0,0,0.05)";
@@ -2534,53 +3063,171 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         g.fillStyle = mat.face; g.fillRect(-10, -10, BW + 20, BH + 20);
         grainFill(g, this.set.mat, 1, 0, 0, 1, -this.grainSeed, 0, 1.1);
       }
-      g.restore();
-      this.boardPath(g);
-      g.lineWidth = 3 / S; g.strokeStyle = OUT; g.stroke();
-      // the line to follow
+      // the line to follow, the drilled hole and the kerfs: only where the board still is
       var src = d.closed ? d.pts.concat([d.pts[0]]) : d.pts;
       g.beginPath(); g.moveTo(src[0][0], src[0][1]);
       for (i = 1; i < src.length; i++) g.lineTo(src[i][0], src[i][1]);
-      g.setLineDash([7, 5]); g.strokeStyle = "rgba(29,35,64,0.75)"; g.lineWidth = 2.2 / S; g.stroke();
+      px(); g.setLineDash([7 * sc, 5 * sc]); g.strokeStyle = "rgba(29,35,64,0.75)"; g.lineWidth = 2.2; g.stroke();
       g.setLineDash([]);
       if (d.lead) {
-        g.beginPath(); g.moveTo(d.lead[0][0], d.lead[0][1]); g.lineTo(d.lead[1][0], d.lead[1][1]);
-        g.setLineDash([3, 5]); g.strokeStyle = "rgba(29,35,64,0.5)"; g.stroke(); g.setLineDash([]);
+        on(0, 0); g.beginPath(); g.moveTo(d.lead[0][0], d.lead[0][1]); g.lineTo(d.lead[1][0], d.lead[1][1]);
+        px(); g.setLineDash([3 * sc, 5 * sc]); g.strokeStyle = "rgba(29,35,64,0.5)"; g.stroke(); g.setLineDash([]);
       }
       if (d.hole) {
-        g.beginPath(); g.arc(d.hole[0], d.hole[1], 5.5, 0, 7);
-        g.fillStyle = "#2A1A10"; g.fill(); g.lineWidth = 1.6 / S; g.strokeStyle = OUT; g.stroke();
+        on(0, 0); g.beginPath(); g.arc(d.hole[0], d.hole[1], 5.5, 0, 7);
+        g.fillStyle = "#2A1A10"; g.fill(); px(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke();
       }
-      // kerf
-      var kw = Math.max(2.6 / S, this.saw.kerf);
-      g.lineCap = "round"; g.lineJoin = "round";
+      var kw = Math.max(2.6, this.saw.kerf * sc);
       this.trail.forEach(function (tr) {
         if (tr.length < 2) return;
-        g.beginPath(); g.moveTo(tr[0][0], tr[0][1]);
+        on(0, 0); g.beginPath(); g.moveTo(tr[0][0], tr[0][1]);
         for (var j = 1; j < tr.length; j++) g.lineTo(tr[j][0], tr[j][1]);
-        g.strokeStyle = "rgba(29,35,64,0.55)"; g.lineWidth = kw + 1.6 / S; g.stroke();
+        px();
+        g.strokeStyle = "rgba(29,35,64,0.55)"; g.lineWidth = kw + 1.6; g.stroke();
         g.strokeStyle = "#2A1A10"; g.lineWidth = kw; g.stroke();
       });
+      // outline: a double-width stroke kept inside the board, so cut-away edges leave no line
+      on(0, 0); this.boardPath(g); px(); g.lineWidth = 6; g.strokeStyle = OUT; g.stroke();
+      g.restore();
+      g.restore();
     },
-    // Piece cut out: a sprite of the polygon in board texture, then it drops into the bin.
-    releasePiece: function (toScreen, rot, S) {
-      var d = this.d, self = this, poly = d.offcut, xs = [], ys = [];
-      poly.forEach(function (p) { var s = toScreen(p[0], p[1]); xs.push(s[0]); ys.push(s[1]); });
-      var box = [Math.min.apply(null, xs) - 8, Math.min.apply(null, ys) - 8, Math.max.apply(null, xs) + 8, Math.max.apply(null, ys) + 16];
-      var o = toScreen(0, 0);
+    // A piece cut free: a sprite of the polygon (board mm) in board texture, dropped into the bin.
+    dropPoly: function (poly, l1, l2) {
+      poly = poly.map(function (p) { return [clamp(p[0], 0, BW), clamp(p[1], 0, BH)]; });
+      var M = this.boardM(), self = this, mat = this.mat, xs = [], ys = [];
+      var sc = Math.sqrt(Math.abs(M[0] * M[3] - M[1] * M[2])), off = this.lift || 8 * sc;
+      var side = mat.ply ? "#C79E62" : shadeColor(mat.face, 0.78);
+      poly.forEach(function (p) { xs.push(M[0] * p[0] + M[2] * p[1] + M[4]); ys.push(M[1] * p[0] + M[3] * p[1] + M[5]); });
+      var box = [Math.min.apply(null, xs) - 8, Math.min.apply(null, ys) - 8, Math.max.apply(null, xs) + 8, Math.max.apply(null, ys) + off + 8];
       var spr = makeSprite(function (g, ox, oy) {
-        g.translate(o[0] + ox, o[1] + oy); g.rotate(rot); g.scale(S, S);
-        g.save(); g.translate(0, 8); polyPath(g, poly); g.fillStyle = self.mat.ply ? "#C79E62" : shadeColor(self.mat.face, 0.78); g.fill(); g.restore();
-        polyPath(g, poly); g.save(); g.clip();
-        g.fillStyle = self.mat.face; g.fillRect(-10, -10, BW + 20, BH + 20);
-        if (self.mat.kind !== "drywall") grainFill(g, self.set.mat, 1, 0, 0, 1, -self.grainSeed, 0, 1.1);
+        function on(dy) { g.setTransform(DPR, 0, 0, DPR, ox * DPR, (oy + dy) * DPR); g.transform(M[0], M[1], M[2], M[3], M[4], M[5]); }
+        function px() { g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+        var k;
+        g.lineJoin = "round";
+        for (k = 4; k >= 1; k--) { on(off * k / 4); polyPath(g, poly); g.fillStyle = side; g.fill(); }
+        on(off); polyPath(g, poly); px(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+        on(0); polyPath(g, poly);
+        g.save(); g.clip();
+        g.fillStyle = mat.face; g.fillRect(-10, -10, BW + 20, BH + 20);
+        if (mat.kind !== "drywall") grainFill(g, self.set.mat, 1, 0, 0, 1, -self.grainSeed, 0, 1.1);
         g.restore();
-        polyPath(g, poly); g.lineWidth = 3 / S; g.strokeStyle = OUT; g.stroke();
+        on(0); polyPath(g, poly); px(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
       }, box);
-      this.removed.push(poly);
-      this.trail = []; this.cur = null;
-      dropPiece(spr, rnd(-40, 40), rnd(-160, -60), rnd(-2, 2), d.label, d.size);
+      dropPiece(spr, rnd(-40, 40), rnd(-160, -60), rnd(-2, 2), l1, l2);
+    },
+    // Mark the cells inside a polygon as gone.
+    fillPoly: function (poly) {
+      var b = polyBox(poly), i, j;
+      for (j = Math.max(0, Math.floor(b[1] / GC)); j <= Math.min(GH - 1, Math.floor(b[3] / GC)); j++) {
+        for (i = Math.max(0, Math.floor(b[0] / GC)); i <= Math.min(GW - 1, Math.floor(b[2] / GC)); i++) {
+          if (pointInPoly((i + 0.5) * GC, (j + 0.5) * GC, poly)) this.grid[j * GW + i] = 2;
+        }
+      }
+    },
+    // Followed the drawn line all the way round: the drawn shape comes out.
+    releaseShape: function () {
+      var d = this.d;
+      this.fillPoly(d.offcut);
+      this.removed.push(d.offcut);
+      this.dropPoly(d.offcut, d.label, d.size);
+      this.cur = null;
       this.done = true; this.waitNew = 1.8;
+    },
+    // A few times a second while cutting: has the kerf cut the board apart? Flood-fill the uncut
+    // wood; every part but the biggest falls off (the drawn shape, when that is what came free).
+    splitCheck: function (dt) {
+      this.splitT += dt;
+      if (!this.splitDirty || this.done || this.splitT < 0.1) return;
+      this.splitT = 0; this.splitDirty = false;
+      var g = this.grid, lab = LAB, stk = STK, sizes = [0], i, c, n, sp, id, x;
+      for (i = 0; i < GN; i++) lab[i] = 0;
+      for (i = 0; i < GN; i++) {
+        if (g[i] || lab[i]) continue;
+        id = sizes.length; sp = 0; n = 0;
+        stk[sp++] = i; lab[i] = id;
+        while (sp) {
+          c = stk[--sp]; n++; x = c % GW;
+          if (x > 0 && !g[c - 1] && !lab[c - 1]) { lab[c - 1] = id; stk[sp++] = c - 1; }
+          if (x < GW - 1 && !g[c + 1] && !lab[c + 1]) { lab[c + 1] = id; stk[sp++] = c + 1; }
+          if (c >= GW && !g[c - GW] && !lab[c - GW]) { lab[c - GW] = id; stk[sp++] = c - GW; }
+          if (c < GN - GW && !g[c + GW] && !lab[c + GW]) { lab[c + GW] = id; stk[sp++] = c + GW; }
+        }
+        sizes.push(n);
+      }
+      if (sizes.length < 3) return;
+      // crumbs between overlapping passes of the blade just become kerf
+      var big = [], crumbs = false, CR = 14;
+      for (i = 1; i < sizes.length; i++) { if (sizes[i] > CR) big.push(i); else crumbs = true; }
+      if (crumbs) for (i = 0; i < GN; i++) if (lab[i] && sizes[lab[i]] <= CR) { g[i] = 1; lab[i] = 0; }
+      if (big.length < 2) return;
+      var box = {}, self = this, d = this.d, match = 0, keep = 0;
+      big.forEach(function (q) { box[q] = [GW, GH, -1, -1]; });
+      for (i = 0; i < GN; i++) {
+        var b = box[lab[i]];
+        if (!b) continue;
+        x = i % GW; var y = (i - x) / GW;
+        if (x < b[0]) b[0] = x; if (x > b[2]) b[2] = x; if (y < b[1]) b[1] = y; if (y > b[3]) b[3] = y;
+      }
+      if (!d.spoiled) big.forEach(function (q) { if (!match && self.isShape(q, sizes[q], box[q])) match = q; });
+      big.forEach(function (q) { if (q !== match && (!keep || sizes[q] > sizes[keep])) keep = q; });
+      big.forEach(function (q) { if (q !== keep) self.cutFree(q, box[q], sizes[q], q === match); });
+      // the drawn shape is out, or the board is used up: a new board comes
+      if (match || sizes[keep] < GN * 0.35) { this.done = true; this.waitNew = 1.8; }
+    },
+    // Is part id (cell box b) the drawn shape?
+    isShape: function (id, size, b) {
+      var d = this.d, ob = d.offBox, i, j, inside = 0, area = size * GC * GC;
+      if (area < d.offArea * 0.7 || area > d.offArea * 1.3) return false;
+      for (j = b[1]; j <= b[3]; j++) for (i = b[0]; i <= b[2]; i++) {
+        if (LAB[j * GW + i] !== id) continue;
+        var x = (i + 0.5) * GC, y = (j + 0.5) * GC;
+        if (x >= ob[0] && x <= ob[2] && y >= ob[1] && y <= ob[3] && pointInPoly(x, y, d.offcut)) inside++;
+      }
+      return inside * GC * GC > Math.max(area * 0.85, d.offArea * 0.75);
+    },
+    // Part id has come free: it leaves the board with its share of the kerf, then falls.
+    cutFree: function (id, b, size, isShape) {
+      var g = this.grid, d = this.d, ob = d.offBox, i, j, k, s, D = 2, over = 0;
+      var i0 = Math.max(0, b[0] - D), j0 = Math.max(0, b[1] - D), i1 = Math.min(GW - 1, b[2] + D), j1 = Math.min(GH - 1, b[3] + D);
+      for (j = b[1]; j <= b[3]; j++) for (i = b[0]; i <= b[2]; i++) if (LAB[j * GW + i] === id) MASK[j * GW + i] = 1;
+      for (s = 0; s < D; s++) {
+        var add = [];
+        for (j = j0; j <= j1; j++) for (i = i0; i <= i1; i++) {
+          k = j * GW + i;
+          if (MASK[k] || g[k] !== 1) continue;
+          if ((i > 0 && MASK[k - 1]) || (i < GW - 1 && MASK[k + 1]) || (j > 0 && MASK[k - GW]) || (j < GH - 1 && MASK[k + GW])) add.push(k);
+        }
+        add.forEach(function (q) { MASK[q] = 1; });
+      }
+      var poly = traceMask(i0, j0, i1, j1);
+      for (j = j0; j <= j1; j++) for (i = i0; i <= i1; i++) {
+        k = j * GW + i;
+        if (!MASK[k]) continue;
+        MASK[k] = 0; g[k] = 2;
+        if (!isShape && !d.spoiled) {
+          var x = (i + 0.5) * GC, y = (j + 0.5) * GC;
+          if (x >= ob[0] && x <= ob[2] && y >= ob[1] && y <= ob[3] && pointInPoly(x, y, d.offcut)) over++;
+        }
+      }
+      // a piece cut out of the drawn shape spoils it: from now on only real cuts count
+      if (over * GC * GC > d.offArea * 0.02) d.spoiled = true;
+      if (!poly) return;
+      this.removed.push(poly);
+      var pb = polyBox(poly), M = this.boardM();
+      pb = [Math.max(0, pb[0]), Math.max(0, pb[1]), Math.min(BW, pb[2]), Math.min(BH, pb[3])];
+      var cx = (pb[0] + pb[2]) / 2, cy = (pb[1] + pb[3]) / 2;
+      var sx = M[0] * cx + M[2] * cy + M[4], sy = M[1] * cx + M[3] * cy + M[5];
+      if (!isShape && size * GC * GC < BW * BH * 0.01) {
+        // a sliver: it just crumbles away
+        puff(sx, sy); puff(sx, sy);
+        emitPlan(sx, sy, 8, this.mat, 0, 0, true);
+        return;
+      }
+      if (isShape) this.dropPoly(d.offcut, d.label, d.size);
+      else {
+        var w = Math.max(1, Math.round(pb[2] - pb[0])), h = Math.max(1, Math.round(pb[3] - pb[1]));
+        this.dropPoly(poly, w + " × " + h + " mm", inchText(w).replace(" in", "") + " × " + inchText(h));
+      }
     }
   };
 
@@ -2666,13 +3313,11 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
           }
           if (this.inWood(B[0], B[1]) && !this.done) {
             cutting = true;
-            if (this.cutAt(B[0], B[1], px, py)) {
-              var self = this;
-              this.releasePiece(function (x, y) { return self.toScreen(x, y); }, 0, this.S);
-            }
-          }
+            if (this.cutAt(B[0], B[1], px, py)) this.releaseShape();
+          } else if (this.inWood(px, py)) this.cutOut(px, py, B[0], B[1]);
         }
       }
+      this.splitCheck(dt);
       // stroke: hand saws go up and down as they move; the jigsaw blade runs on its own
       var prevX = this.strokeX || 0;
       if (power) this.phase += this.speed * dt * 60;
@@ -2688,12 +3333,10 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (power) Sound.setMotor(this.speed, cutting ? 1 : 0, 1.6);
       else Sound.setRasp(this.cutting ? clamp(moved * 2, 0, 1) : 0, this.mat.kind);
     },
+    boardM: function () { return [this.S, 0, 0, this.S, this.ox + this.slide * W, this.oy]; },
     draw: function (g) {
-      var S = this.S, o = this.toScreen(0, 0), self = this;
-      g.save();
-      g.translate(o[0], o[1]); g.scale(S, S);
-      this.drawBoard(g, S);
-      g.restore();
+      var self = this;
+      this.drawBoard(g, this.boardM());
       var b = this.toScreen(this.B[0], this.B[1]);
       withAway(g, [b[0], b[1] - 80], function () { self.drawTool(g, b); });
       this.drawHints(g);
@@ -2738,15 +3381,26 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (this.d.hole && !this.trail.length && !this.done) smallTag(g, W / 2, H * 0.3 + 40, saw.id === "keyhole" ? "Start in the drilled hole" : "The blade goes through the drilled hole");
     }
   };
-  ["startWork", "inWood", "cutAt", "boardPath", "drawBoard", "releasePiece"].forEach(function (k) { Curve[k] = CurveBase[k]; });
+  Object.keys(CurveBase).forEach(function (k) { Curve[k] = CurveBase[k]; });
 
   // ===================================================================
   // Band saw and scroll saw: the blade stays put; push and turn the board.
+  // Seen the way you use them: standing at the front of the machine, a little to the right,
+  // looking down at the blade (an orthographic 3/4 view: yaw MPSI, looking down MPHI). All the
+  // board physics happens in a flat top-down frame ("t" coordinates, canvas px); view() maps it
+  // onto the table on the screen (an affine map, so the board is still drawn with one transform).
+  // The old straight-down picture is still there behind the "Top view" button.
+  // Machine mm: x to the right of the blade, y toward you, z up from the table; the blade is at 0.
   // ===================================================================
+  var MPSI = 18 * Math.PI / 180, MPHI = 40 * Math.PI / 180;
+  var MEX = [Math.cos(MPSI), Math.sin(MPSI) * Math.sin(MPHI)];    // +x on the screen (per mm, times S)
+  var MEY = [-Math.sin(MPSI), Math.cos(MPSI) * Math.sin(MPHI)];   // +y (toward you)
+  var MEZ = Math.cos(MPHI);                                       // +z goes up the screen by this
   var Machine = {
     enter: function (saw, set) {
       this.saw = saw; this.set = set; this.di = null;
       this.band = saw.id === "bandsaw";
+      this.top = set.view === "top";
       this.speed = 0; this.spin = 0; this.phase = 0; this.slide = 0;
       this.newWork(true);
     },
@@ -2768,25 +3422,163 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.ty = this.Pb[1] - (bx * s + by * c) * S;
     },
     layout: function () {
-      var keep = this.tx != null && this.Pb ? this.toBoard(this.Pb[0], this.Pb[1]) : null;
-      this.S = Math.min(W * 0.62 / BW, H * 0.5 / BH, 2.2);
-      this.Pb = [W * 0.56, H * (this.band ? 0.4 : 0.36)];
+      var keep = this.tx != null && this.Pb ? this.tBoard(this.Pb[0], this.Pb[1]) : null;
+      this.thick = this.mat && this.mat.kind === "drywall" ? 12 : 18;
+      if (this.top) {
+        this.A = [1, 0, 0, 1]; this.lift = 0;
+        this.S = Math.min(W * 0.62 / BW, H * 0.5 / BH, 2.2);
+        this.Pb = [W * 0.56, H * (this.band ? 0.4 : 0.36)];
+      } else {
+        this.A = [MEX[0], MEY[0], MEX[1], MEY[1]];
+        this.S = Math.min(W / 600, H / 560, 2.2);
+        this.Pb = [W * (this.band ? 0.6 : 0.5), H * (this.band ? 0.6 : 0.56)];
+        this.lift = this.thick * this.S * MEZ;
+      }
       if (keep) this.placeAt(keep[0], keep[1]);
       bin.place(10, H - 10);
       this.dustOnTop = false;
       this.floorY = 0;
       if (this.rot == null) this.rot = 0;
       if (this.tx == null) this.placeAt(BW / 2, 0);
-      this.drawBg();
+      if (this.top) this.drawBg(); else this.drawBgFront();
     },
-    toScreen: function (x, y) {
+    // flat top-down frame (canvas px) <-> board mm
+    tScreen: function (x, y) {
       var c = Math.cos(this.rot), s = Math.sin(this.rot), S = this.S;
       return [this.tx + this.slide * W + (x * c - y * s) * S, this.ty + (x * s + y * c) * S];
     },
-    toBoard: function (sx, sy) {
+    tBoard: function (sx, sy) {
       var c = Math.cos(this.rot), s = Math.sin(this.rot), S = this.S;
       var x = (sx - this.tx) / S, y = (sy - this.ty) / S;
       return [x * c + y * s, -x * s + y * c];
+    },
+    // flat frame -> the board's top face on the screen, and back
+    view: function (X, Y) {
+      var A = this.A, dx = X - this.Pb[0], dy = Y - this.Pb[1];
+      return [this.Pb[0] + A[0] * dx + A[1] * dy, this.Pb[1] + A[2] * dx + A[3] * dy - this.lift];
+    },
+    unview: function (sx, sy) {
+      var A = this.A, u = sx - this.Pb[0], v = sy + this.lift - this.Pb[1], det = A[0] * A[3] - A[1] * A[2];
+      return [this.Pb[0] + (A[3] * u - A[1] * v) / det, this.Pb[1] + (A[0] * v - A[2] * u) / det];
+    },
+    toScreen: function (x, y) { var p = this.tScreen(x, y); return this.view(p[0], p[1]); },
+    boardM: function () {
+      var c = Math.cos(this.rot), s = Math.sin(this.rot), S = this.S, A = this.A;
+      var o = this.view(this.tx + this.slide * W, this.ty);
+      return [A[0] * c * S + A[1] * s * S, A[2] * c * S + A[3] * s * S, -A[0] * s * S + A[1] * c * S, -A[2] * s * S + A[3] * c * S, o[0], o[1]];
+    },
+    // a point on the machine (mm) on the screen
+    fp: function (x, y, z) {
+      var S = this.S;
+      return [this.Pb[0] + (x * MEX[0] + y * MEY[0]) * S, this.Pb[1] + (x * MEX[1] + y * MEY[1] - (z || 0) * MEZ) * S];
+    },
+    // ---- small 3D drawing kit (we look from the front right: tops, fronts and right sides show) ----
+    poly3: function (g, pts, fill, lw) {
+      var self = this;
+      polyPath(g, pts.map(function (p) { return self.fp(p[0], p[1], p[2]); }));
+      fs(g, fill, lw == null ? 2.6 : lw);
+    },
+    box: function (g, x0, x1, y0, y1, z0, z1, cTop, cFront, cSide, lw) {
+      if (cSide) this.poly3(g, [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], cSide, lw);
+      if (cFront) this.poly3(g, [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], cFront, lw);
+      if (cTop) this.poly3(g, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], cTop, lw);
+    },
+    // a shape drawn on its front (x, z) and pushed back from y1 to y0 (convex outline)
+    prism: function (g, prof, y0, y1, cFront, cSide, lw) {
+      var self = this, all = [];
+      prof.forEach(function (p) { all.push(self.fp(p[0], y0, p[1]), self.fp(p[0], y1, p[1])); });
+      polyPath(g, convexHull(all)); fs(g, cSide, lw == null ? 2.6 : lw);
+      polyPath(g, prof.map(function (p) { return self.fp(p[0], y1, p[1]); })); fs(g, cFront, lw == null ? 2.6 : lw);
+    },
+    // ctx transform for drawing on the front plane y = yF in mm, picture y pointing down (z = -y)
+    onFront: function (g, yF) {
+      var o = this.fp(0, yF, 0), S = this.S;
+      g.transform(MEX[0] * S, MEX[1] * S, 0, MEZ * S, o[0], o[1]);
+      PX = 1 / S;
+    },
+    // a flat circle on a level plane (z), as screen points
+    disc: function (cx, cy, z, r) {
+      var pts = [], i;
+      for (i = 0; i < 32; i++) pts.push(this.fp(cx + Math.cos(i / 32 * Math.PI * 2) * r, cy + Math.sin(i / 32 * Math.PI * 2) * r, z));
+      return pts;
+    },
+    rounded: function (x0, x1, z0, z1, r) {
+      var pts = [], i, c = [[x1 - r, z0 + r, -Math.PI / 2], [x1 - r, z1 - r, 0], [x0 + r, z1 - r, Math.PI / 2], [x0 + r, z0 + r, Math.PI]];
+      c.forEach(function (k) { for (i = 0; i <= 4; i++) { var a = k[2] + i / 4 * Math.PI / 2; pts.push([k[0] + Math.cos(a) * r, k[1] + Math.sin(a) * r]); } });
+      return pts;
+    },
+    drawBgFront: function () {
+      var g = bgx, S = this.S, self = this, band = this.band, x, y, i, a, b;
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      PX = 1;
+      // pegboard wall, then the floor meeting it along a line
+      g.fillStyle = "#D7B680"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "rgba(110,72,34,0.30)";
+      for (y = 16; y < H; y += 30) for (x = 16; x < W; x += 30) { g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); }
+      var zf = band ? -900 : -760;
+      a = this.fp(-6000, -700, zf); b = this.fp(6000, -700, zf);
+      polyPath(g, [a, b, [b[0], H + 4000], [a[0], H + 4000]]); g.fillStyle = "#7C808A"; g.fill();
+      g.save(); g.clip();
+      for (i = 0; i < 30; i++) { var p0 = this.fp(-6000, -700 + i * 160, zf), p1 = this.fp(6000, -700 + i * 160, zf); line(g, p0[0], p0[1], p1[0], p1[1], "rgba(0,0,0,0.10)", 2); }
+      g.restore();
+      line(g, a[0], a[1], b[0], b[1], "rgba(29,35,64,0.55)", 4);
+      if (band) this.bandBody(g, zf); else this.scrollBody(g, zf);
+      // the table: cast iron top, its thick edges
+      var tx0 = band ? -230 : -200, tx1 = band ? 230 : 200, ty0 = band ? -210 : -160, ty1 = band ? 210 : 160, tz = band ? 40 : 22;
+      var top = [this.fp(tx0, ty0, 0), this.fp(tx1, ty0, 0), this.fp(tx1, ty1, 0), this.fp(tx0, ty1, 0)];
+      this.box(g, tx0, tx1, ty0, ty1, -tz, 0, null, "#7E8896", "#6A7482", 3);
+      polyPath(g, top);
+      var gr = g.createLinearGradient(top[0][0], top[0][1], top[2][0], top[2][1]);
+      gr.addColorStop(0, "#9AA5B2"); gr.addColorStop(1, "#C8D0DA");
+      fs(g, gr, 3);
+      g.save(); polyPath(g, top); g.clip();
+      for (i = 1; i < 8; i++) { a = this.fp(tx0, lerp(ty0, ty1, i / 8), 0); b = this.fp(tx1, lerp(ty0, ty1, i / 8), 0); line(g, a[0], a[1], b[0], b[1], "rgba(255,255,255,0.22)", 2); }
+      if (band) {
+        // miter slot front to back, and the blade slot out to the right edge
+        this.poly3(g, [[122, ty0, 0], [140, ty0, 0], [140, ty1, 0], [122, ty1, 0]], "#6E7887", 2);
+        this.poly3(g, [[0, -1.5, 0], [tx1 + 5, -1.5, 0], [tx1 + 5, 1.5, 0], [0, 1.5, 0]], "#3B4150", 0);
+      }
+      g.restore();
+      // front edge highlight
+      a = this.fp(tx0, ty1, -3); b = this.fp(tx1, ty1, -3); line(g, a[0], a[1], b[0], b[1], "rgba(255,255,255,0.35)", 2.5);
+      // throat plate round the blade, with its slot
+      polyPath(g, this.disc(0, 0, 0, band ? 38 : 30)); fs(g, band ? "#F7C548" : "#E9EDF2", 2.5);
+      this.poly3(g, [[-2.5, -14, 0], [2.5, -14, 0], [2.5, 14, 0], [-2.5, 14, 0]], "#1D2340", 0);
+      if (!band) {
+        // the scroll saw's speed knob and switch on the front of the base
+        var kn = this.fp(-120, 152, -70);
+        g.beginPath(); g.ellipse(kn[0], kn[1], 16 * S + 4, 16 * S + 4, 0, 0, 7); fs(g, C.grip, 2.5);
+        line(g, kn[0], kn[1], kn[0] + 8 * S, kn[1] - 10 * S, "#FFFFFF", 3);
+        var sw = this.fp(80, 152, -60);
+        rrect(g, sw[0] - 14 * S - 6, sw[1] - 10 * S - 4, 28 * S + 12, 20 * S + 8, 5); fs(g, C.yellow, 2.5);
+      }
+    },
+    bandBody: function (g, zf) {
+      // the closed stand down to the floor, the lower wheel housing, the C-frame spine
+      this.box(g, -290, 50, -170, 120, zf, -560, null, "#4A5160", "#3B4150", 3);
+      var lo = this.rounded(-300, 60, -560, -60, 40);
+      this.prism(g, lo, -150, 40, C.yellow, C.yellowD, 3);
+      g.save();
+      polyPath(g, this.rounded(-275, 35, -530, -90, 30).map(function (p) { return this.fp(p[0], 40, p[1]); }, this));
+      g.lineWidth = 2.5; g.strokeStyle = "rgba(29,35,64,0.55)"; g.stroke();
+      g.restore();
+      var kb = this.fp(10, 40, -300); g.beginPath(); g.arc(kb[0], kb[1], Math.max(5, 11 * this.S), 0, 7); fs(g, C.grip, 2.5);
+      // trunnion under the table, and the spine rising behind it to the upper wheel housing
+      this.box(g, -70, 70, -60, 50, -120, -38, null, C.aluD, "#6E7887", 2.5);
+      this.box(g, -280, -215, -150, -60, -80, 200, "#F2B530", C.yellowD, "#C98A12", 3);
+    },
+    scrollBody: function (g, zf) {
+      var self = this;
+      // legs of the stand
+      [[-170, 150], [170, 150], [-170, -420], [170, -420]].forEach(function (p, k) {
+        if (k > 1) return;
+        var t0 = self.fp(p[0] * 0.7, p[1] * 0.8, -170), t1 = self.fp(p[0], p[1], zf);
+        line(g, t0[0], t0[1], t1[0], t1[1], OUT, 16); line(g, t0[0], t0[1], t1[0], t1[1], C.grip, 11);
+      });
+      // the long base casting under the table, and the rear column the arm pivots on
+      this.box(g, -130, 130, -540, 150, -170, -22, "#6B7586", C.gray, "#4A5160", 3);
+      this.box(g, -60, 60, -540, -430, -22, 150, "#6B7586", C.gray, "#4A5160", 3);
+      this.box(g, -70, 70, -120, 80, -60, -22, null, C.aluD, "#6E7887", 2.5);
     },
     drawBg: function () {
       var g = bgx, Pb = this.Pb, i;
@@ -2808,14 +3600,36 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(Pb[0] + tw * 0.28, y0 - 2, 10, th + 4);
       }
     },
+    // finger point -> the flat frame, so drags map onto the table
+    flat: function (pt) { var p = this.unview(pt.x, pt.y); return { id: pt.id, x: p[0], y: p[1] }; },
     down: function (pt) {
-      if (this.pid != null) {
-        if (this.pid2 == null) { this.pid2 = pt.id; this.p2 = [pt.x, pt.y]; } else puff(pt.x, pt.y);
+      var vb = this.vbtn;
+      // a finger or mouse that went away without an "up" must not lock the board
+      if (this.pid != null && !downIds[this.pid]) { this.pid = null; this.held = false; this.pid2 = null; }
+      if (this.pid2 != null && !downIds[this.pid2]) this.pid2 = null;
+      if (this.pid == null && vb && pt.x >= vb[0] - 6 && pt.x <= vb[0] + vb[2] + 6 && pt.y >= vb[1] - 6 && pt.y <= vb[1] + vb[3] + 6) {
+        this.toggleView();
         return;
       }
+      if (this.pid != null) {
+        if (this.pid2 == null) { pt = this.flat(pt); this.pid2 = pt.id; this.p2 = [pt.x, pt.y]; } else puff(pt.x, pt.y);
+        return;
+      }
+      pt = this.flat(pt);
       this.pid = pt.id; this.held = true; this.lp = [pt.x, pt.y];
     },
+    toggleView: function () {
+      this.top = !this.top;
+      this.set.view = this.top ? "top" : "front";
+      saveApp();
+      Sound.click();
+      particles = [];
+      clearDust();
+      this.queue = null;
+      this.layout();
+    },
     move: function (pt) {
+      pt = this.flat(pt);
       if (this.slide || this.waitNew) { if (pt.id === this.pid) this.lp = [pt.x, pt.y]; return; }
       if (pt.id === this.pid2) {
         // two fingers: twist the board around the blade
@@ -2836,22 +3650,22 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.pid = null; this.held = false; this.pid2 = null;
     },
     turn: function (a) {
-      var B = this.toBoard(this.Pb[0], this.Pb[1]);
+      var B = this.tBoard(this.Pb[0], this.Pb[1]);
       var pivot = this.inWood(B[0], B[1]) ? B : [BW / 2, BH / 2];
-      var p = this.toScreen(pivot[0], pivot[1]);
+      var p = this.tScreen(pivot[0], pivot[1]);
       this.rot += a;
-      var q = this.toScreen(pivot[0], pivot[1]);
+      var q = this.tScreen(pivot[0], pivot[1]);
       this.tx += p[0] - q[0]; this.ty += p[1] - q[1];
     },
     // One-finger (or mouse) drag always slides the board, never turns it, so it behaves the same
     // everywhere. Turning is only the turn buttons or a two-finger twist.
     push: function (dx, dy) {
-      var B = this.toBoard(this.Pb[0], this.Pb[1]);
+      var B = this.tBoard(this.Pb[0], this.Pb[1]);
       var engaged = this.inWood(B[0], B[1]);
       if (!engaged) {
         // free: slide the board anywhere, but stop it at the blade if the motor is not up to speed
         this.tx += dx; this.ty += dy;
-        var nb = this.toBoard(this.Pb[0], this.Pb[1]);
+        var nb = this.tBoard(this.Pb[0], this.Pb[1]);
         if (this.inWood(nb[0], nb[1]) && this.speed < 0.5) { this.tx -= dx; this.ty -= dy; }
         else if (this.inWood(nb[0], nb[1])) this.cutAt(nb[0], nb[1], B[0], B[1]);
         return;
@@ -2870,7 +3684,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       var q = this.queue, cutting = false;
       if (q && (q[0] || q[1])) {
         var v = this.saw.speed / this.mat.mult * this.S;
-        var B = this.toBoard(this.Pb[0], this.Pb[1]);
+        var B = this.tBoard(this.Pb[0], this.Pb[1]);
         var feedIn = this.inWood(B[0], B[1]);
         var mx = q[0], my = q[1];
         if (feedIn) {
@@ -2882,31 +3696,119 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         q[0] -= mx; q[1] -= my;
         if (Math.abs(q[0]) < 0.01 && Math.abs(q[1]) < 0.01) { q[0] = 0; q[1] = 0; }
         if (!this.held) { q[0] = 0; q[1] = 0; }
-        var NB = this.toBoard(this.Pb[0], this.Pb[1]);
+        var NB = this.tBoard(this.Pb[0], this.Pb[1]);
         if (this.inWood(NB[0], NB[1]) && !this.done) {
           if (feedIn && (mx || my)) cutting = true;
-          if (this.cutAt(NB[0], NB[1], B[0], B[1])) {
-            var self = this;
-            this.releasePiece(function (x, y) { return self.toScreen(x, y); }, this.rot, this.S);
-          }
-        }
+          if (this.cutAt(NB[0], NB[1], B[0], B[1])) this.releaseShape();
+        } else if (feedIn) this.cutOut(B[0], B[1], NB[0], NB[1]);
       }
-      if (cutting || (this.speed > 0.5 && this.held && Math.random() < 0.1)) {
-        if (cutting) emitPlan(this.Pb[0], this.Pb[1] + 4, 1.6, this.mat, 0, 1, true);
+      this.splitCheck(dt);
+      if (cutting) {
+        var bp = this.view(this.Pb[0], this.Pb[1]);
+        emitPlan(bp[0], bp[1] + (this.top ? 4 : 0), 1.6, this.mat, 0, 1, true);
       }
       this.cutting = cutting;
       Sound.setMotor(this.speed, cutting ? 1 : 0, this.band ? 0.9 : 1.4);
     },
     draw: function (g) {
-      var S = this.S, o = this.toScreen(0, 0), self = this;
-      g.save();
-      g.translate(o[0], o[1]); g.rotate(this.rot); g.scale(S, S);
-      this.drawBoard(g, S);
-      g.restore();
+      var self = this;
+      if (!this.top) this.bladeSeg(g, this.Pb[1] - this.lift - 2, this.Pb[1]);
+      this.drawBoard(g, this.boardM());
       withAway(g, [this.Pb[0], this.Pb[1] - 100], function () {
-        if (self.band) self.drawBandTop(g); else self.drawScrollTop(g);
+        if (self.top) { if (self.band) self.drawBandTop(g); else self.drawScrollTop(g); }
+        else if (self.band) self.drawBandFront(g); else self.drawScrollFront(g);
       });
-      strokeHint(g, W * 0.72, 30, "Slide the board", 3, this.cutting, this.band ? "Follow the line" : "Turn it with ↺ ↻ for tight curves");
+      PX = 1;
+      strokeHint(g, this.top ? W * 0.72 : (this.band ? W * 0.74 : W * 0.3), 30, "Slide the board", 3, this.cutting, this.band ? "Follow the line" : "Turn it with ↺ ↻ for tight curves");
+      this.drawViewBtn(g);
+    },
+    // "Top view" / "Front view" switch, bottom right of the bench
+    drawViewBtn: function (g) {
+      if (endingNow()) { this.vbtn = null; return; }
+      var f = Math.round(clamp(Math.min(W, H) * 0.034, 14, 19)), t = this.top ? "Front view" : "Top view";
+      g.font = "800 " + f + "px " + FONT;
+      var w = g.measureText(t).width + 54, h = Math.max(48, f + 26), x = W - w - 10, y = H - h - 10;
+      this.vbtn = [x, y, w, h];
+      g.save();
+      rrect(g, x + 3, y + 4, w, h, h / 2); g.fillStyle = "rgba(29,35,64,0.35)"; g.fill();
+      pill(g, x, y, w, h, "#FFFFFF");
+      // an eye
+      var ex = x + 25, ey = y + h / 2;
+      g.beginPath(); g.moveTo(ex - 13, ey); g.quadraticCurveTo(ex, ey - 13, ex + 13, ey); g.quadraticCurveTo(ex, ey + 13, ex - 13, ey); g.closePath();
+      g.fillStyle = "#CDE9FF"; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
+      g.beginPath(); g.arc(ex, ey, 4.2, 0, 7); g.fillStyle = OUT; g.fill();
+      g.fillStyle = OUT; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(t, x + 44, ey + 1);
+      g.restore();
+    },
+    // the blade, edge on (teeth toward you), between two heights on the screen; the teeth run down
+    bladeSeg: function (g, ya, yb) {
+      if (yb - ya < 1) return;
+      var x = this.Pb[0], w = Math.max(3, (this.band ? 5 : 3) * Math.min(1.4, this.S));
+      line(g, x, ya, x, yb, OUT, w + 3.5);
+      line(g, x, ya, x, yb, "#E3E8EE", w);
+      g.save();
+      g.setLineDash([3, 4]); g.lineDashOffset = this.band ? -this.spin * 60 : Math.sin(this.phase) * 8;
+      line(g, x, ya, x, yb, "#6E7887", 1.6);
+      g.restore();
+    },
+    drawBandFront: function (g) {
+      var self = this, S = this.S, face = this.Pb[1] - this.lift, zG = this.thick + 12, hb = 195, i;
+      PX = 1;
+      // the upper wheel housing: a deep yellow box, round on top, with its door open
+      var wc = [-126, 345], wr = 128, hr = 150, prof = [];
+      for (i = 0; i <= 16; i++) { var a = Math.PI * i / 16; prof.push([wc[0] + Math.cos(a) * hr, wc[1] + Math.sin(a) * hr]); }
+      prof.push([wc[0] - hr, hb], [wc[0] + hr, hb]);
+      this.prism(g, prof, -150, 40, C.yellow, C.yellowD, 3);
+      g.save();
+      this.onFront(g, 40);
+      g.beginPath(); g.arc(wc[0], -wc[1], wr + 10, 0, 7); fs(g, "#3B4150", 2.6);
+      bandWheel(g, wc[0], -wc[1], wr - 4, this.spin * 0.6);
+      g.beginPath(); g.arc(wc[0], -wc[1], wr - 2, 0, 7); g.strokeStyle = "#DDE3EA"; g.lineWidth = 6; g.stroke();
+      g.setLineDash([8, 10]); g.lineDashOffset = -this.spin * 60;
+      g.strokeStyle = OUT; g.lineWidth = 2; g.stroke(); g.setLineDash([]);
+      // the door hinge strip on the left
+      rrect(g, wc[0] - hr + 6, -hb - 130, 10, 100, 4); fs(g, C.grip, 2.4);
+      g.restore(); PX = 1;
+      // tension knob on top
+      this.box(g, wc[0] - 12, wc[0] + 12, -30, -6, wc[1] + hr, wc[1] + hr + 40, C.steelL, C.steel, C.steelD, 2.2);
+      this.box(g, wc[0] - 34, wc[0] + 34, -40, 4, wc[1] + hr + 40, wc[1] + hr + 56, C.gripL, C.grip, C.grip, 2.4);
+      // guide post (behind the blade), the blade, the sliding yellow blade guard, the guide block
+      this.box(g, -30, -12, -30, -12, zG + 30, hb, C.steelL, C.steel, C.steelD, 2.4);
+      this.bladeSeg(g, this.fp(0, 0, hb)[1], face);
+      this.box(g, -8, 10, -8, 14, zG + 40, hb - 4, "#FFE08A", C.yellow, C.yellowD, 2.4);
+      this.box(g, -30, 30, -30, 16, zG, zG + 40, C.steelL, C.alu, C.aluD, 2.6);
+      [-16, 16].forEach(function (x) { var p = self.fp(x, 16, zG + 20); g.beginPath(); g.arc(p[0], p[1], Math.max(3, 6 * S), 0, 7); fs(g, C.grip, 2); });
+      // the blade below the guide, down into the board (or the table)
+      this.bladeSeg(g, this.fp(0, 0, zG)[1] - 2, face);
+      // guide height knob on the post
+      this.box(g, -46, -30, -26, -14, hb - 60, hb - 40, C.gripL, C.grip, C.grip, 2);
+    },
+    drawScrollFront: function (g) {
+      var self = this, S = this.S, face = this.Pb[1] - this.lift, th = this.thick, s = Math.sin(this.phase) * 9;
+      PX = 1;
+      // the upper arm: pivots at the back, its front end goes up and down with the blade
+      var zb = 150, zf = 118 + s, ah = 46, x0 = -30, x1 = 30, yb = -470, yf = 24;
+      this.poly3(g, [[x1, yb, zb], [x1, yf, zf], [x1, yf, zf + ah], [x1, yb, zb + ah]], C.yellowD, 3);
+      this.poly3(g, [[x0, yb, zb + ah], [x1, yb, zb + ah], [x1, yf, zf + ah], [x0, yf, zf + ah]], C.yellow, 3);
+      this.poly3(g, [[x0, yf, zf], [x1, yf, zf], [x1, yf, zf + ah], [x0, yf, zf + ah]], "#F2B530", 3);
+      // a white stripe along the top
+      this.poly3(g, [[-12, yb + 20, zb + ah], [-4, yb + 20, zb + ah], [-4, yf - 20, zf + ah], [-12, yf - 20, zf + ah]], "rgba(255,255,255,0.45)", 0);
+      // tension knob at the back of the arm
+      this.box(g, -10, 10, -440, -420, zb + ah, zb + ah + 30, C.steelL, C.steel, C.steelD, 2);
+      this.box(g, -26, 26, -446, -414, zb + ah + 30, zb + ah + 46, C.gripL, C.grip, C.grip, 2.2);
+      // blade clamp under the nose, and the blade down into the board
+      var cz = zf - 20;
+      this.bladeSeg(g, this.fp(0, 0, cz)[1], face);
+      this.box(g, -10, 10, -10, 10, cz, zf, C.steelL, C.steelD, C.steelX, 2.2);
+      // hold-down: a rod down from the arm to a clear foot resting on the board
+      this.box(g, -34, -26, 8, 16, th + 4, zf - 4, C.steelL, C.steel, C.steelD, 2);
+      this.box(g, -32, 30, -16, 22, th + 1, th + 5, "rgba(210,240,255,0.55)", "rgba(170,220,255,0.65)", "rgba(150,200,240,0.65)", 2);
+      // dust blower hose
+      var h0 = this.fp(x0, yf - 6, zf + ah * 0.4), h1 = this.fp(-8, 14, th + 16), h2 = this.fp(-60, yf, zf - 40);
+      g.beginPath(); g.moveTo(h0[0], h0[1]); g.quadraticCurveTo(h2[0], h2[1], h1[0], h1[1]);
+      g.lineCap = "round"; g.strokeStyle = OUT; g.lineWidth = Math.max(7, 10 * S); g.stroke();
+      g.strokeStyle = "#2E9E5B"; g.lineWidth = Math.max(4, 6 * S); g.stroke();
+      void self;
     },
     drawBandTop: function (g) {
       var Pb = this.Pb, se = Math.min(H * 0.36 / 400, this.S * 0.62);
@@ -2943,204 +3845,524 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       line(g, Pb[0], Pb[1] - 10 * se, Pb[0], Pb[1] + 2, "#E3E8EE", 2);
     }
   };
-  ["startWork", "inWood", "cutAt", "boardPath", "drawBoard", "releasePiece"].forEach(function (k) { Machine[k] = CurveBase[k]; });
+  Object.keys(CurveBase).forEach(function (k) { Machine[k] = CurveBase[k]; });
 
   // ===================================================================
-  // Table saw, seen from above: set the rip fence and blade height, feed the
-  // board with the push stick. Each pass rips a strip as wide as the fence setting.
+  // A small 3D camera for the machine scenes that are drawn in a 3/4 view
+  // (table saw, miter saw). World units are mm, z is up.
   // ===================================================================
-  var TBL = { R: 127, len: 260, w0: 220, thick: { pine: 19, oak: 25, plywood: 18 } };
+  function v3sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function v3dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function v3cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function v3norm(a) { var l = Math.sqrt(v3dot(a, a)) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  function Cam3(eye, at) {
+    this.eye = eye;
+    this.f = v3norm(v3sub(at, eye));
+    this.r = v3norm(v3cross(this.f, [0, 0, 1]));
+    this.u = v3cross(this.r, this.f);
+    this.F = 1; this.cx = 0; this.cy = 0;
+  }
+  Cam3.prototype.raw = function (x, y, z) {
+    var d = [x - this.eye[0], y - this.eye[1], z - this.eye[2]], Z = Math.max(1, v3dot(d, this.f));
+    return [v3dot(d, this.r) / Z, v3dot(d, this.u) / Z, Z];
+  };
+  Cam3.prototype.P = function (x, y, z) { var q = this.raw(x, y, z); return [this.cx + this.F * q[0], this.cy - this.F * q[1]]; };
+  // screen pixels per mm around a point
+  Cam3.prototype.k = function (x, y, z) { return this.F / this.raw(x, y, z)[2]; };
+  // Scale and centre so the given world points fill the screen box.
+  Cam3.prototype.fit = function (pts, x0, y0, x1, y1) {
+    var a = 1e9, b = -1e9, c = 1e9, d = -1e9, i, q;
+    for (i = 0; i < pts.length; i++) {
+      q = this.raw(pts[i][0], pts[i][1], pts[i][2]);
+      a = Math.min(a, q[0]); b = Math.max(b, q[0]); c = Math.min(c, q[1]); d = Math.max(d, q[1]);
+    }
+    this.F = Math.min((x1 - x0) / (b - a), (y1 - y0) / (d - c));
+    this.cx = (x0 + x1) / 2 - this.F * (a + b) / 2;
+    this.cy = (y0 + y1) / 2 + this.F * (c + d) / 2;
+  };
+  // Where a screen point lands on the horizontal plane at height z (null above the horizon).
+  Cam3.prototype.onZ = function (sx, sy, z) {
+    var a = (sx - this.cx) / this.F, b = -(sy - this.cy) / this.F, f = this.f, r = this.r, u = this.u;
+    var dir = [f[0] + r[0] * a + u[0] * b, f[1] + r[1] * a + u[1] * b, f[2] + r[2] * a + u[2] * b];
+    if (dir[2] > -1e-4) return null;
+    var t = (z - this.eye[2]) / dir[2];
+    return [this.eye[0] + dir[0] * t, this.eye[1] + dir[1] * t];
+  };
+  Cam3.prototype.path = function (g, pts) {
+    var self = this;
+    polyPath(g, pts.map(function (p) { return self.P(p[0], p[1], p[2]); }));
+  };
+  Cam3.prototype.poly = function (g, pts, fill, w) { this.path(g, pts); fs(g, fill, w); };
+  // The faces of an upright box that face the camera: left/right side, front (low y), top.
+  Cam3.prototype.box = function (g, x0, x1, y0, y1, z0, z1, top, front, side, w) {
+    var e = this.eye;
+    if (side && e[0] < x0) this.poly(g, [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]], side, w);
+    if (side && e[0] > x1) this.poly(g, [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]], side, w);
+    if (front && e[1] < y0) this.poly(g, [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]], front, w);
+    if (top && e[2] > z1) this.poly(g, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], top, w);
+  };
+  // Rounded rectangle lying flat at height z, as a world point list.
+  function flatRound(x0, x1, y0, y1, r, z) {
+    var pts = [], c = [[x1 - r, y1 - r, 0], [x0 + r, y1 - r, 1], [x0 + r, y0 + r, 2], [x1 - r, y0 + r, 3]];
+    c.forEach(function (k) {
+      for (var i = 0; i <= 4; i++) {
+        var a = (k[2] + i / 4) * Math.PI / 2;
+        pts.push([k[0] + Math.cos(a) * r, k[1] + Math.sin(a) * r, z]);
+      }
+    });
+    return pts;
+  }
+  // Keep the part of a 2D polygon where f(p) >= 0.
+  function clipPoly(pts, f) {
+    var out = [], n = pts.length, i;
+    for (i = 0; i < n; i++) {
+      var a = pts[i], b = pts[(i + 1) % n], fa = f(a), fb = f(b);
+      if (fa >= 0) out.push(a);
+      if ((fa >= 0) !== (fb >= 0)) {
+        var t = fa / (fa - fb);
+        out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    return out;
+  }
+  // Fill the current path with wood grain laid on a face: corner o, grain along a, across b (screen points).
+  function faceGrain(g, mat, o, a, b, lenA, lenB, seed) {
+    var ax = (a[0] - o[0]) / lenA, ay = (a[1] - o[1]) / lenA, bx = (b[0] - o[0]) / lenB, by = (b[1] - o[1]) / lenB;
+    grainFill(g, mat, ax, ay, bx, by, o[0] - ax * seed, o[1] - ay * seed, 1.1);
+  }
+
+  // ===================================================================
+  // Table saw, seen from the operator's spot: in front of the saw, a little to
+  // the left of the blade, looking down at the table. Set the rip fence and the
+  // blade height, then slide the board along the fence with the push stick.
+  // Each pass rips a strip as wide as the fence setting.
+  // World mm: x across (blade plane x = 0, fence on the right), y away from you
+  // (blade centre y = 0), z up (table top z = 0).
+  // ===================================================================
+  var TBL = { R: 127, len: 300, w0: 220, thick: { pine: 19, oak: 25, plywood: 18 },
+    front: -340, back: 340, left: -460, right: 640, cab: 260 };
   var Table = {
     enter: function (saw, set) {
       this.saw = saw; this.set = set;
-      this.speed = 0; this.spin = 0;
+      this.speed = 0; this.spin = 0; this.spinA = 0; this.coast = 0;
+      this.hD = set.height; this.fD = set.fence; this.wheelA = 0; this.guardZ = 0;
+      this.pid = null; this.held = false; this.vel = 0;
       this.newWork(true);
     },
     newWork: function (instant) {
       this.mat = MATS[this.set.mat];
       this.thick = TBL.thick[this.set.mat] || 19;
-      this.bw = TBL.w0; this.grooves = []; this.kerfLen = 0;
-      this.strips = 0; this.hint = 0; this.state = "ready";
+      this.bw = TBL.w0; this.grooves = []; this.kerfLen = 0; this.kerfTop = 0;
+      this.hint = 0; this.xOff = 0; this.strips = 0;
       this.grainSeed = rnd(0, 200);
       this.layout();
-      this.by = this.startY() + (instant ? 0 : H);
+      this.y0 = this.startY() - (instant ? 0 : 700);
+      this.target = this.y0;
       this.state = instant ? "ready" : "return";
     },
     layout: function () {
-      var R = TBL.R;
-      this.S = Math.min((H - 88) / (125 + 110 + TBL.len), W * 0.5 / (TBL.w0 + 60), 2);
-      this.Pb = [W * 0.44, 125 * this.S + 12];
+      var T = TBL;
+      this.cam = new Cam3([-520, -1330, 1000], [10, 0, -40]);
+      this.cam.fit([[-260, T.front, 0], [250, T.front, 0], [-260, T.back - 60, 0], [250, T.back - 60, 0], [0, 0, 120],
+        [-220, T.front - 60, -175], [220, T.front - 60, -175]], 8, Math.min(70, H * 0.1), W - 8, H - 6);
       this.floorY = 0; this.dustOnTop = false;
       bin.place(10, H - 10);
-      if (this.by == null) this.by = this.startY();
+      if (this.y0 == null) this.y0 = this.startY();
       this.drawBg();
     },
-    hc: function () { var R = TBL.R, h = this.set.height; return Math.sqrt(Math.max(0, R * R - (R - h) * (R - h))); },
-    fenceX: function () { return this.Pb[0] + (this.set.fence + this.saw.kerf / 2) * this.S; },
-    startY: function () { return this.Pb[1] + this.hc() * this.S + 14; },
+    // half length of the blade's cut at height z above the table, for a blade raised h
+    chord: function (z, h) { var R = TBL.R, d = z - (h - R); return d >= R ? 0 : Math.sqrt(R * R - d * d); },
+    fenceX: function () { return this.fD + this.saw.kerf / 2; },
+    startY: function () { return -this.chord(0, this.set.height) - 16 - TBL.len; },
+    endY: function () { return this.chord(0, this.hD) + 2; },
     setFence: function () {
       // moving the fence starts a fresh pass
-      this.kerfLen = 0; this.grooves = [];
-      if (this.state === "feed" || this.state === "ready") { this.state = "return"; }
+      this.kerfLen = 0; this.kerfTop = 0; this.grooves = [];
+      if (this.state === "feed" || this.state === "ready") this.state = "return";
     },
     drawBg: function () {
-      var g = bgx, S = this.S, Pb = this.Pb, i;
+      var g = bgx, c = this.cam, T = TBL, i, x, y;
       g.setTransform(DPR, 0, 0, DPR, 0, 0); PX = 1;
-      g.fillStyle = "#3F434F"; g.fillRect(0, 0, W, H);
-      // cast iron table with wings
-      rrect(g, 10, 6, W - 20, H - 12, 18); fs(g, "#B3BDC9", 3);
-      g.fillStyle = "rgba(255,255,255,0.16)";
-      for (i = 0; i < 10; i++) g.fillRect(20, 18 + i * (H - 30) / 10, W - 40, 2);
-      // miter slots either side of the blade
-      [-1, 1].forEach(function (sg) {
-        var x = Pb[0] + sg * 150 * S;
-        g.fillStyle = "#7B8593"; g.fillRect(x - 9 * S, 6, 18 * S, H - 12);
-        g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(x - 9 * S, 4, 18 * S, H - 8);
-      });
-      // throat plate
-      rrect(g, Pb[0] - 32 * S, Pb[1] - 118 * S, 64 * S, 236 * S, 10 * S); fs(g, "#F7C548", 3);
-      g.fillStyle = "#2A2F3A"; g.fillRect(Pb[0] - 3 * S, Pb[1] - 108 * S, 6 * S, 216 * S);
-      // front rail ruler (mm from the blade)
-      var ry = H - 44;
-      rrect(g, 12, ry, W - 24, 32, 6); fs(g, "#FFF4C8", 3);
-      g.fillStyle = OUT; g.textAlign = "center"; g.textBaseline = "top";
-      g.font = "800 13px " + FONT;
-      var every = 25 * S > 34 ? 25 : (50 * S > 34 ? 50 : 100), last = 0;
-      for (i = 0; i <= 300; i += 5) {
-        var x = Pb[0] + i * S;
-        if (x > W - 40) break;
-        g.fillRect(x - 0.75, ry, 1.5, i % every === 0 ? 14 : (i % 10 === 0 ? 9 : 5));
-        if (i % every === 0) g.fillText(String(i), x, ry + 15);
-        last = x;
+      // pegboard wall behind the saw
+      g.fillStyle = "#C9A06A"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "rgba(70,40,15,0.35)";
+      for (y = 12; y < H; y += 24) for (x = 12; x < W; x += 24) { g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }
+      // the shadowy space under the table and the shop floor
+      var a = c.P(T.left - 3000, T.front, -28), b = c.P(T.right + 3000, T.front, -28);
+      polyPath(g, [a, b, [b[0], H + 20], [a[0], H + 20]]); g.fillStyle = "#4A4F5C"; g.fill();
+      // cabinet (safety yellow) with a dark base band
+      c.box(g, -T.cab, T.cab, T.front + 14, T.back, -1400, -28, null, C.yellow, null);
+      c.poly(g, [[-T.cab + 20, T.front + 14, -60], [T.cab - 20, T.front + 14, -60], [T.cab - 20, T.front + 14, -64], [-T.cab + 20, T.front + 14, -64]], C.yellowD, 0);
+      for (i = 0; i < 5; i++) {
+        var vx = 110 + i * 22;
+        c.poly(g, [[vx, T.front + 14, -205], [vx + 10, T.front + 14, -205], [vx + 10, T.front + 14, -290], [vx, T.front + 14, -290]], "#3A3F4B", 2);
       }
-      g.textAlign = "left"; g.fillText("mm", last + 14, ry + 15);
+      // cast iron top, with the extension wing on the fence side
+      c.box(g, T.left, T.right, T.front, T.back, -30, 0, "#B3BDC9", "#8E99A8", "#9AA5B3");
+      for (i = 1; i < 14; i++) {
+        y = T.front + i * (T.back - T.front) / 14;
+        var p0 = c.P(T.left + 6, y, 0), p1 = c.P(T.right - 6, y, 0);
+        line(g, p0[0], p0[1], p1[0], p1[1], "rgba(255,255,255,0.18)", 2);
+      }
+      [-280, 300].forEach(function (sx) {
+        var q0 = c.P(sx, T.front, 0), q1 = c.P(sx, T.back, 0), q2 = c.P(sx, T.front, -30);
+        line(g, q0[0], q0[1], q1[0], q1[1], "rgba(29,35,64,0.45)", 2);
+        line(g, q0[0], q0[1], q2[0], q2[1], "rgba(29,35,64,0.45)", 2);
+      });
+      // miter slots either side of the blade
+      [-178, 172].forEach(function (sx) {
+        c.poly(g, [[sx, T.front, 0], [sx + 19, T.front, 0], [sx + 19, T.back, 0], [sx, T.back, 0]], "#6C7685", 2);
+        c.poly(g, [[sx, T.front, 0], [sx + 19, T.front, 0], [sx + 19, T.front, -18], [sx, T.front, -18]], "#2A2F3A", 2);
+      });
+      // throat plate with the blade slot
+      c.poly(g, flatRound(-50, 50, -185, 185, 22, 0), "#F7C548", 3);
+      c.poly(g, flatRound(-5, 5, -158, 158, 4, 0), "#2A2F3A", 2);
+      [[-34, -160], [34, -160], [-34, 160], [34, 160]].forEach(function (s) {
+        var p = c.P(s[0], s[1], 0), r = 5 * c.k(s[0], s[1], 0);
+        g.beginPath(); g.ellipse(p[0], p[1], r, r * 0.6, 0, 0, 7); fs(g, "#C9CFD8", 1.5);
+      });
+      // front fence rail with the ruler tape (mm from the blade to the fence)
+      var rf = T.front - 62, rb = T.front - 14, rz = -20;
+      c.box(g, T.left - 20, T.right + 40, rf, rb, -66, rz, "#D5DCE4", "#AEB8C4", "#C2CBD5");
+      var k0 = this.saw.kerf / 2, tx1 = Math.min(T.right, 420);
+      c.poly(g, [[k0 - 14, rf + 8, rz], [tx1, rf + 8, rz], [tx1, rb - 8, rz], [k0 - 14, rb - 8, rz]], "#FFF4C8", 2.5);
+      var kk = c.k(0, rf, rz), every = 50 * kk > 34 ? 50 : 100, last = null;
+      g.fillStyle = OUT; g.textAlign = "center"; g.textBaseline = "middle";
+      g.font = "800 " + Math.round(clamp(15 * kk, 10, 17)) + "px " + FONT;
+      for (i = 0; i <= 400; i += 5) {
+        x = k0 + i;
+        if (x > tx1 - 8) break;
+        var L = i % 10 === 0 ? 15 : 8;
+        if (i % every === 0) L = 20;
+        var t0 = c.P(x, rb - 8, rz), t1 = c.P(x, rb - 8 - L, rz);
+        line(g, t0[0], t0[1], t1[0], t1[1], OUT, i % every === 0 ? 2 : 1.2);
+        if (i % every === 0) { var tp = c.P(x, rf + 16, rz); g.fillText(String(i), tp[0], tp[1]); last = tp; }
+      }
+      if (last) { g.textAlign = "left"; g.fillText("mm", last[0] + 14 * kk + 10, last[1]); }
     },
     down: function (pt) {
       if (this.pid != null) { puff(pt.x, pt.y); return; }
-      this.pid = pt.id; this.held = true; this.ly = pt.y; this.q = 0;
+      this.pid = pt.id; this.held = true; this.vel = 0;
+      var w = this.cam.onZ(pt.x, pt.y, this.thick);
+      this.lw = w ? w[1] : null; this.lt = performance.now();
+      if (this.state !== "return" && (this.target == null || this.target < this.y0)) this.target = this.y0;
     },
+    // The board follows the finger along the fence: finger travel is turned back into
+    // table distance, so the board stays under the finger wherever you grab.
     move: function (pt) {
       if (pt.id !== this.pid) return;
-      this.q = (this.q || 0) + (pt.y - this.ly); this.ly = pt.y;
+      var w = this.cam.onZ(pt.x, pt.y, this.thick), now = performance.now();
+      if (!w) return;
+      var d = this.lw == null ? 0 : clamp(w[1] - this.lw, -400, 400);
+      var dtm = Math.max(4, now - this.lt);
+      this.lw = w[1]; this.lt = now;
+      this.vel = this.vel * 0.5 + (d / dtm * 1000) * 0.5;
+      if (this.state === "return") return;
+      this.target = clamp(this.target + d, this.startY() - 80, this.endY() + 60);
     },
-    up: function (pt) { if (pt.id !== this.pid) return; this.pid = null; this.held = false; this.q = 0; },
-    update: function (dt) {
-      var S = this.S, Pb = this.Pb, running = this.held && !endingNow();
-      this.speed = clamp(this.speed + (running ? dt * 3 : -dt * 0.7), 0, 1);
-      this.spin += this.speed * dt * 30;
-      if (this.hint) this.hint = Math.max(0, this.hint - dt);
-      var front = Pb[1] + this.hc() * S, cutting = false;
-      if (this.state === "return") {
-        var target = this.startY();
-        this.by += (target - this.by) * Math.min(1, dt * 5);
-        if (Math.abs(target - this.by) < 1) { this.by = target; this.state = "ready"; }
-        this.q = 0;
-      } else if (this.state === "ready" || this.state === "feed") {
-        var q = this.q || 0, step = q;
-        if (q < 0 && this.by < front + 2) {
-          // the board is at the blade: feed at the cutting speed, only with the motor running
-          var v = (this.speed < 0.5 ? 0 : 95 / this.mat.mult) * S * dt;
-          step = Math.max(q, -v);
-          cutting = step < 0;
-        }
-        step = Math.max(step, this.startY() - this.by > 0 ? -1e9 : -1e9);
-        this.by = Math.min(this.by + step, this.startY() + 40);
-        this.q = q - step;
-        if (!this.held) this.q = 0;
-        if (this.by < front) {
-          this.state = "feed";
-          this.kerfLen = Math.max(this.kerfLen, Math.min(TBL.len, (front - this.by) / S));
-          if (cutting) emitPlan(Pb[0], front + 2, 2.2, this.mat, 0, 1, true);
-        }
-        if (this.by + TBL.len * S <= front + 1) this.finishPass();
-      } else if (this.state === "out") {
-        this.outY -= dt * 300;
-        if (this.outY < -TBL.len * S) { this.state = "return"; }
+    up: function (pt) {
+      if (pt.id !== this.pid) return;
+      this.pid = null; this.held = false;
+      // a flick keeps the board going through the cut
+      if (this.state !== "return" && this.vel > 120 && performance.now() - this.lt < 150) {
+        this.target = clamp(this.target + this.vel * 0.35, this.startY() - 80, this.endY() + 60);
       }
+    },
+    update: function (dt) {
+      var T = TBL, set = this.set, kerf = this.saw.kerf;
+      // the crank wheel turns as the blade rises; the fence slides to its new spot
+      var hOld = this.hD;
+      this.hD += (set.height - this.hD) * Math.min(1, dt * 6);
+      if (Math.abs(set.height - this.hD) < 0.05) this.hD = set.height;
+      this.wheelA += (this.hD - hOld) * 0.22;
+      this.fD += (set.fence - this.fD) * Math.min(1, dt * 8);
+      if (Math.abs(set.fence - this.fD) < 0.05) this.fD = set.fence;
+      // motor runs while you hold the board or it is still sliding through
+      var gap = this.target - this.y0;
+      if (this.held || (this.state === "feed" && gap > 0.5)) this.coast = 1.2;
+      else this.coast = Math.max(0, this.coast - dt);
+      var running = this.coast > 0 && !endingNow();
+      this.speed = clamp(this.speed + (running ? dt * 4 : -dt * 0.7), 0, 1);
+      this.spin += this.speed * dt * 30;
+      this.spinA += this.speed * dt * 4.2;
+      if (this.hint) this.hint = Math.max(0, this.hint - dt);
+      var hc0 = this.chord(0, this.hD), cutting = false, lead;
+      if (this.state === "ready" && !this.held && this.kerfLen === 0 && this.y0 + T.len > -hc0 - 4) this.state = "return";
+      if (this.state === "return") {
+        var sy = this.startY();
+        this.y0 += (sy - this.y0) * Math.min(1, dt * 7);
+        if (Math.abs(sy - this.y0) < 30) this.xOff += -this.xOff * Math.min(1, dt * 10);
+        if (Math.abs(sy - this.y0) < 0.6 && Math.abs(this.xOff) < 0.6) { this.y0 = sy; this.xOff = 0; this.state = "ready"; }
+        this.target = this.y0;
+      } else {
+        lead = this.y0 + T.len;
+        var free = Math.max(0, -hc0 - lead), step = gap;
+        if (gap > free) {
+          // in the wood: the blade sets the pace (a quick, generous one)
+          var v = 560 / this.mat.mult * clamp((this.speed - 0.15) / 0.5, 0, 1);
+          step = free + Math.min(gap - free, v * dt);
+          cutting = step > free + 0.01;
+        }
+        this.y0 = Math.max(this.y0 + step, this.startY() - 80);
+        lead = this.y0 + T.len;
+        if (lead > -hc0) {
+          this.state = "feed";
+          this.kerfLen = Math.max(this.kerfLen, Math.min(T.len, lead + hc0));
+          var hT = this.chord(this.thick, this.hD);
+          if (this.hD > this.thick) this.kerfTop = Math.max(this.kerfTop, clamp(lead + hT, 0, T.len));
+          if (cutting) {
+            var ep = this.hD > this.thick ? this.cam.P(0, -hT, this.thick) : this.cam.P(0, Math.max(-hc0, this.y0), 0);
+            emitPlan(ep[0], ep[1], 2.4, this.mat, 0.2, 1, true);
+          }
+        }
+        if (this.y0 > this.endY()) this.finishPass();
+      }
+      // the clear guard rides up onto the board
+      var x1 = this.fenceX() + this.xOff, x0 = x1 - this.bw, gy0 = -hc0 - 30, gy1 = hc0 + 46;
+      var under = x0 < 26 && x1 > -26 && this.y0 + T.len > gy0 && this.y0 < gy1;
+      this.guardZ += ((under ? this.thick : 0) - this.guardZ) * Math.min(1, dt * 14);
       this.cutting = cutting;
       Sound.setMotor(this.speed, cutting ? 1 : 0, 0.95);
     },
     finishPass: function () {
-      var S = this.S, self = this, F = this.set.fence;
-      if (this.set.height < this.thick) {
-        // not through: just a groove; raise the blade
-        this.grooves.push(this.fenceX() - F * S - this.saw.kerf / 2 * S);
-        this.hint = 3; this.state = "return"; this.kerfLen = 0;
+      var self = this, F = this.set.fence, kerf = this.saw.kerf, T = TBL;
+      if (this.hD < this.thick - 0.5) {
+        // not through: just a groove underneath; raise the blade
+        this.grooves.push({ x: 0, h: this.hD });
+        this.hint = 3; this.state = "return"; this.kerfLen = 0; this.kerfTop = 0;
         return;
       }
-      // the strip between the blade and the fence comes off
-      var x0 = this.fenceX() - F * S, y0 = this.by, w = F * S, h = TBL.len * S, thick = this.thick;
+      // the strip between the blade and the fence comes off, out the back of the saw
+      var c = this.cam, sx0 = kerf / 2, sx1 = this.fenceX(), y0 = this.y0, y1 = y0 + T.len, th = this.thick;
+      var box = [1e9, 1e9, -1e9, -1e9];
+      [[sx0, y0, 0], [sx1, y0, 0], [sx0, y1, 0], [sx1, y1, 0], [sx0, y0, th], [sx1, y0, th], [sx0, y1, th], [sx1, y1, th]].forEach(function (p) {
+        var q = c.P(p[0], p[1], p[2]);
+        box[0] = Math.min(box[0], q[0] - 5); box[1] = Math.min(box[1], q[1] - 5);
+        box[2] = Math.max(box[2], q[0] + 5); box[3] = Math.max(box[3], q[1] + 5);
+      });
+      var seed = this.grainSeed;
       var spr = makeSprite(function (g, ox, oy) {
-        g.translate(ox + x0, oy + y0);
-        rrect(g, 0, 4, w, h, 2); g.fillStyle = shadeColor(self.mat.face, 0.75); g.fill();
-        g.save(); rrect(g, 0, 0, w, h, 2); g.clip();
-        g.fillStyle = self.mat.face; g.fillRect(0, 0, w, h);
-        grainFill(g, self.set.mat, 0, S, S, 0, -self.grainSeed, 0, 1.1);
-        g.restore();
-        rrect(g, 0, 0, w, h, 2); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-      }, [x0 - 4, y0 - 4, x0 + w + 4, y0 + h + 10]);
-      dropPiece(spr, rnd(-200, -120), rnd(-320, -220), rnd(-3, -1.5), mmText(F) + " strip", inchText(F) + " wide");
-      this.bw -= F + this.saw.kerf;
+        g.translate(ox, oy);
+        self.drawSlab(g, sx0, sx1, y0, y1, th, seed, true);
+      }, box);
+      dropPiece(spr, -rnd(160, 260), -rnd(320, 420), -rnd(1.5, 3), mmText(F) + " strip", inchText(F) + " wide");
+      this.bw -= F + kerf;
+      this.xOff = -(F + kerf);
       this.strips++;
-      this.kerfLen = 0; this.grooves = [];
-      if (this.bw < F + 8) { this.state = "return"; this.bw = TBL.w0; this.grainSeed = rnd(0, 200); this.by = this.startY() + H; }
-      else this.state = "return";
+      this.kerfLen = 0; this.kerfTop = 0; this.grooves = [];
+      if (this.bw < F + 8) {
+        this.bw = T.w0; this.xOff = 0; this.grainSeed = rnd(0, 200);
+        this.y0 = this.startY() - 700;
+      }
+      this.state = "return";
+    },
+    // A board as a slab: the left side, the near end and the grainy top.
+    drawSlab: function (g, x0, x1, y0, y1, th, seed, all) {
+      var c = this.cam, m = this.mat, len = y1 - y0, w = x1 - x0;
+      PX = 1;
+      // left side (long grain)
+      c.poly(g, [[x0, y0, 0], [x0, y1, 0], [x0, y1, th], [x0, y0, th]], shadeColor(m.face, 0.8), 2.5);
+      if (all) c.poly(g, [[x1, y0, 0], [x1, y1, 0], [x1, y1, th], [x1, y0, th]], shadeColor(m.face, 0.7), 2.5);
+      // near end (end grain)
+      c.path(g, [[x0, y0, 0], [x1, y0, 0], [x1, y0, th], [x0, y0, th]]);
+      g.fillStyle = m.end; g.fill();
+      if (m.ply) {
+        g.save(); g.clip();
+        for (var i = 1; i < 5; i++) { var a = c.P(x0, y0, th * i / 5), b = c.P(x1, y0, th * i / 5); line(g, a[0], a[1], b[0], b[1], m.ring, 1.5); }
+        g.restore();
+      }
+      c.poly(g, [[x0, y0, 0], [x1, y0, 0], [x1, y0, th], [x0, y0, th]], null, 2.5);
+      // top
+      var o = c.P(x0, y0, th);
+      c.path(g, [[x0, y0, th], [x1, y0, th], [x1, y1, th], [x0, y1, th]]);
+      g.save(); g.clip();
+      g.fillStyle = m.face; g.fillRect(-4000, -4000, 8000, 8000);
+      faceGrain(g, this.set.mat, o, c.P(x0, y1, th), c.P(x1, y0, th), len, w, seed);
+      g.restore();
+      c.poly(g, [[x0, y0, th], [x1, y0, th], [x1, y1, th], [x0, y1, th]], null, 3);
+    },
+    drawBoard: function (g, x0, x1, y0, y1) {
+      var c = this.cam, th = this.thick, kerf = this.saw.kerf;
+      c.path(g, [[x0 - 3, y0 - 5, 0], [x1, y0 - 5, 0], [x1, y1, 0], [x0 - 3, y1, 0]]);
+      g.fillStyle = "rgba(20,20,30,0.22)"; g.fill();
+      this.drawSlab(g, x0, x1, y0, y1, th, this.grainSeed);
+      // pencil line where the blade will run
+      var kx = x1 - this.fenceX(), a, b;
+      g.setLineDash([7, 6]);
+      a = c.P(kx, y0 + 3, th); b = c.P(kx, y1 - 3, th);
+      line(g, a[0], a[1], b[0], b[1], "rgba(29,35,64,0.55)", 2);
+      g.setLineDash([]);
+      // grooves from passes with the blade too low: notches in the near end
+      this.grooves.forEach(function (gr) {
+        var gx = kx + gr.x;
+        c.poly(g, [[gx - kerf, y0, 0], [gx + kerf, y0, 0], [gx + kerf, y0, gr.h], [gx - kerf, y0, gr.h]], "#2A1A10", 1.5);
+      });
+      // the kerf through the top, from the far end back to the blade
+      if (this.kerfTop > 0) {
+        a = c.P(kx, y1, th); b = c.P(kx, y1 - this.kerfTop, th);
+        var kw = Math.max(3.5, kerf * c.k(kx, y1, th));
+        line(g, a[0], a[1], b[0], b[1], OUT, kw + 2);
+        line(g, a[0], a[1], b[0], b[1], "#2A1A10", kw);
+      }
+    },
+    // Blade (and the riving knife behind it) in the plane x = 0, clipped by keep(y, z) >= 0.
+    bladeShapes: function () {
+      var R = TBL.R, zc = this.hD - R, N = 24, st = Math.PI * 2 / N, pts = [], i, a;
+      for (i = 0; i < N; i++) {
+        a = this.spinA + i * st;
+        pts.push([Math.cos(a) * (R - 11), zc + Math.sin(a) * (R - 11)]);
+        pts.push([Math.cos(a + st * 0.45) * (R - 5), zc + Math.sin(a + st * 0.45) * (R - 5)]);
+        pts.push([Math.cos(a + st * 0.8) * R, zc + Math.sin(a + st * 0.8) * R]);
+        pts.push([Math.cos(a + st * 0.86) * (R - 7), zc + Math.sin(a + st * 0.86) * (R - 7)]);
+      }
+      var ring = [];
+      for (i = 0; i < 48; i++) { a = i / 48 * Math.PI * 2; ring.push([Math.cos(a) * (R - 26), zc + Math.sin(a) * (R - 26)]); }
+      // riving knife: follows the blade just behind it, a little lower than the teeth
+      var Rk = R + 9, top = this.hD - 8, tA = Math.asin(clamp((top - zc) / Rk, -1, 1)), bA = Math.asin(clamp(-zc / Rk, -1, 1));
+      var knife = [];
+      for (i = 0; i <= 8; i++) { a = tA + (bA - tA) * i / 8; knife.push([Math.cos(a) * Rk, zc + Math.sin(a) * Rk]); }
+      knife.push([Math.cos(bA) * Rk + 80, -2]);
+      knife.push([Math.cos(tA) * Rk + 44, top]);
+      return { blade: pts, ring: ring, knife: knife };
+    },
+    drawBlade: function (g, keep, zMin) {
+      var c = this.cam, sh = this.bladeShapes();
+      function f(p) { return Math.min(p[1] - zMin, keep(p)); }
+      function draw(pts, fill, w) {
+        pts = clipPoly(pts, f);
+        if (pts.length < 3) return;
+        polyPath(g, pts.map(function (p) { return c.P(0, p[0], p[1]); }));
+        fs(g, fill, w);
+      }
+      PX = 1;
+      draw(sh.knife, "#5B6475", 2.5);
+      draw(sh.blade, "#DDE3EA", 2.5);
+      var inner = clipPoly(sh.ring, f);
+      if (inner.length > 2) {
+        polyPath(g, inner.map(function (p) { return c.P(0, p[0], p[1]); }));
+        g.fillStyle = "#EEF2F6"; g.fill();
+      }
+      // carbide tips and a blur while it spins
+      if (this.speed > 0.25) {
+        var R = TBL.R, zc = this.hD - R, i, a, pts = [];
+        g.save();
+        g.globalAlpha = Math.min(0.55, this.speed * 0.6);
+        for (i = 0; i <= 40; i++) {
+          a = i / 40 * Math.PI * 2; pts.push([Math.cos(a) * (R - 2), zc + Math.sin(a) * (R - 2)]);
+        }
+        var band = clipPoly(pts, f);
+        if (band.length > 2) {
+          polyPath(g, band.map(function (p) { return c.P(0, p[0], p[1]); }));
+          g.strokeStyle = "#FFFFFF"; g.lineWidth = 4; g.stroke();
+        }
+        g.restore();
+      }
+    },
+    drawGuard: function (g) {
+      var c = this.cam, hc0 = this.chord(0, this.hD), zb = this.guardZ, zt = Math.max(this.hD, this.thick) + 30 + zb * 0.3;
+      var x0 = -26, x1 = 26, y0 = -hc0 - 30, y1 = hc0 + 46;
+      // arm back to the riving knife
+      var a = c.P(0, y1 - 6, zt - 8), b = c.P(0, y1 + 70, this.hD - 14);
+      line(g, a[0], a[1], b[0], b[1], OUT, 9); line(g, a[0], a[1], b[0], b[1], "#5B6475", 5);
+      c.box(g, x0, x1, y0, y1, zb, zt, "rgba(190,230,255,0.42)", "rgba(160,212,250,0.30)", "rgba(170,220,255,0.26)", 3);
+      var h0 = c.P(x0 + 4, y0 + 10, zt), h1 = c.P(x0 + 4, y1 - 10, zt);
+      line(g, h0[0], h0[1], h1[0], h1[1], "rgba(255,255,255,0.75)", 3);
+      h0 = c.P(x0, y0 + 14, zb + 6); h1 = c.P(x0, y0 + 14, zt - 6);
+      line(g, h0[0], h0[1], h1[0], h1[1], "rgba(255,255,255,0.6)", 3);
+    },
+    drawStick: function (g, xs, y0) {
+      var c = this.cam, th = this.thick;
+      var prof = [[64, 0], [0, 0], [0, -11], [-14, -11], [-176, 96], [-204, 112], [-192, 136], [-156, 132], [64, 18]];
+      function side(dx) { return prof.map(function (p) { return c.P(xs + dx, y0 + p[0], th + p[1]); }); }
+      var far = side(7), near = side(-7), i, n = prof.length;
+      PX = 1;
+      polyPath(g, far); fs(g, "#B84A1E", 2.5);
+      for (i = 0; i < n; i++) {
+        var j = (i + 1) % n;
+        polyPath(g, [near[i], near[j], far[j], far[i]]); fs(g, "#C9531F", 2);
+      }
+      polyPath(g, near); fs(g, "#E85D2A", 3);
+      // grip
+      var gp = [[-150, 116], [-188, 122], [-196, 108], [-160, 100]].map(function (p) { return c.P(xs - 7.5, y0 + p[0], th + p[1]); });
+      polyPath(g, gp); fs(g, C.grip, 2);
+    },
+    drawWheel: function (g) {
+      var c = this.cam, T = TBL, y = T.front + 13, cz = -150, cx = 0, i, a;
+      function ring(r, dy) {
+        var pts = [];
+        for (i = 0; i < 28; i++) { a = i / 28 * Math.PI * 2; pts.push(c.P(cx + Math.cos(a) * r, y + (dy || 0), cz + Math.sin(a) * r)); }
+        return pts;
+      }
+      polyPath(g, ring(64)); fs(g, "#2E3440", 3);
+      polyPath(g, ring(48)); fs(g, "#4C5566", 2);
+      for (i = 0; i < 3; i++) {
+        a = this.wheelA + i * Math.PI * 2 / 3;
+        var p0 = c.P(cx, y - 4, cz), p1 = c.P(cx + Math.cos(a) * 56, y - 4, cz + Math.sin(a) * 56);
+        line(g, p0[0], p0[1], p1[0], p1[1], OUT, 11); line(g, p0[0], p0[1], p1[0], p1[1], "#8E99A8", 6);
+      }
+      polyPath(g, ring(14, -8)); fs(g, "#C9CFD8", 2.5);
+      // the crank handle on the rim
+      var hx = cx + Math.cos(this.wheelA) * 56, hz = cz + Math.sin(this.wheelA) * 56;
+      var q0 = c.P(hx, y - 4, hz), q1 = c.P(hx, y - 46, hz), r = 10 * c.k(hx, y - 46, hz);
+      line(g, q0[0], q0[1], q1[0], q1[1], OUT, r * 2 + 3); line(g, q0[0], q0[1], q1[0], q1[1], C.red, r * 2 - 3);
+      g.beginPath(); g.ellipse(q1[0], q1[1], r, r, 0, 0, 7); fs(g, C.redD, 2.5);
+    },
+    drawSwitch: function (g) {
+      var c = this.cam, T = TBL, y = T.front - 64, x0 = -228, x1 = -142, on = this.speed > 0.08;
+      c.box(g, x0, x1, y, y + 10, -170, -64, "#3A3F4B", "#2E3440", "#3A3F4B", 3);
+      // green ON button
+      var p = c.P((x0 + x1) / 2, y - 1, -86), r = 13 * c.k((x0 + x1) / 2, y, -86);
+      g.beginPath(); g.ellipse(p[0], p[1], r, r, 0, 0, 7); fs(g, on ? "#4BE38A" : "#2C8C55", 2.5);
+      if (on) { g.beginPath(); g.ellipse(p[0], p[1], r * 1.8, r * 1.8, 0, 0, 7); g.fillStyle = "rgba(90,255,150,0.25)"; g.fill(); }
+      // big red OFF paddle
+      c.box(g, x0 + 8, x1 - 8, y - 16, y, -158, -112, "#FF6B6B", C.red, C.redD, 2.5);
+      var t = c.P((x0 + x1) / 2, y - 16, -135), fsz = Math.round(clamp(20 * c.k(0, y, -135), 9, 15));
+      g.fillStyle = "#FFFFFF"; g.font = "800 " + fsz + "px " + FONT; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("OFF", t[0], t[1]);
+    },
+    drawFence: function (g, fx) {
+      var c = this.cam, T = TBL;
+      // the head clamps onto the front rail
+      c.box(g, fx, fx + 76, T.front - 74, T.front - 4, -78, 70, "#5A6272", "#3D4452", "#4C5566", 3);
+      // the long fence along the table
+      c.box(g, fx, fx + 48, T.front - 4, T.back + 20, 0, 66, "#FFA94D", "#D96A00", C.orange, 3);
+      var s0 = c.P(fx, T.front, 50), s1 = c.P(fx, T.back + 10, 50);
+      line(g, s0[0], s0[1], s1[0], s1[1], "rgba(255,255,255,0.45)", 3);
+      // lock handle
+      var h0 = c.P(fx + 38, T.front - 40, 70), h1 = c.P(fx + 38, T.front - 120, 112);
+      line(g, h0[0], h0[1], h1[0], h1[1], OUT, 13); line(g, h0[0], h0[1], h1[0], h1[1], C.grip, 8);
+      g.beginPath(); g.arc(h1[0], h1[1], 8, 0, 7); fs(g, C.red, 2.5);
+      // cursor window over the tape, with the red hairline at the fence face
+      var rf = T.front - 62, rb = T.front - 14;
+      c.poly(g, [[fx - 22, rf + 4, -18], [fx, rf + 4, -18], [fx, rb - 4, -18], [fx - 22, rb - 4, -18]], "rgba(190,230,255,0.45)", 2.5);
+      var r0 = c.P(fx, rf + 4, -17), r1 = c.P(fx, rb - 4, -17);
+      line(g, r0[0], r0[1], r1[0], r1[1], "#E63946", 3);
     },
     draw: function (g) {
-      var S = this.S, Pb = this.Pb, self = this, fx = this.fenceX(), hc = this.hc();
-      var bx = fx - this.bw * S, by = this.by, bw = this.bw * S, bh = TBL.len * S;
-      // board
+      var c = this.cam, T = TBL, self = this, th = this.thick;
+      var fx = this.fenceX(), x1 = fx + this.xOff, x0 = x1 - this.bw, y0 = this.y0, y1 = y0 + T.len;
       PX = 1;
-      rrect(g, bx + 4, by + 6, bw, bh, 3); g.fillStyle = "rgba(20,20,30,0.3)"; g.fill();
-      g.save(); rrect(g, bx, by, bw, bh, 3); g.clip();
-      g.fillStyle = this.mat.face; g.fillRect(bx, by, bw, bh);
-      grainFill(g, this.set.mat, 0, S, S, 0, bx - this.grainSeed, by, 1.1);
-      g.restore();
-      rrect(g, bx, by, bw, bh, 3); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-      // pencil line where the blade will go, grooves, and the kerf so far
-      var kx = fx - this.set.fence * S - this.saw.kerf / 2 * S;
-      g.setLineDash([7, 6]); line(g, kx, by + 2, kx, by + bh - 2, "rgba(29,35,64,0.6)", 2); g.setLineDash([]);
-      this.grooves.forEach(function (x) { line(g, x, by, x, by + bh, "rgba(42,26,16,0.55)", Math.max(3, self.saw.kerf * S)); });
-      if (this.kerfLen > 0) {
-        line(g, kx, by, kx, by + this.kerfLen * S, OUT, Math.max(4, this.saw.kerf * S) + 2);
-        line(g, kx, by, kx, by + this.kerfLen * S, this.set.height < this.thick ? "#7A5230" : "#2A1A10", Math.max(3, this.saw.kerf * S));
-      }
-      // blade (seen from above: a thin slit of steel, teeth running toward you)
-      g.save();
-      line(g, Pb[0], Pb[1] - hc * S, Pb[0], Pb[1] + hc * S, OUT, 7);
-      line(g, Pb[0], Pb[1] - hc * S, Pb[0], Pb[1] + hc * S, "#DDE3EA", 4);
-      g.setLineDash([4, 5]); g.lineDashOffset = -this.spin * 40;
-      line(g, Pb[0], Pb[1] - hc * S, Pb[0], Pb[1] + hc * S, OUT, 1.6); g.setLineDash([]);
-      g.restore();
-      // riving knife behind the blade
-      line(g, Pb[0], Pb[1] - hc * S - 4, Pb[0], Pb[1] - hc * S - 60 * S, OUT, 6);
-      line(g, Pb[0], Pb[1] - hc * S - 4, Pb[0], Pb[1] - hc * S - 60 * S, "#5B6475", 3);
-      // fence: rides on the front rail, the board slides against it
-      rrect(g, fx, 8, 44 * S, H - 50, 4); fs(g, C.orange);
-      line(g, fx + 8 * S, 14, fx + 8 * S, H - 50, "rgba(255,255,255,0.45)", 3);
-      rrect(g, fx - 6, H - 52, 44 * S + 12, 22, 5); fs(g, C.grip);
-      line(g, fx, H - 46, fx, H - 10, "#E63946", 3);
-      // push stick on the strip side of the board, at its back end
-      var sx = fx - this.set.fence * S * 0.5, sy = by + bh;
-      if (this.state !== "out") {
-        g.save(); g.translate(sx, sy); g.rotate(-0.15);
-        // push stick with a notch that hooks the end of the board
-        polyPath(g, [[-11 * S, -14 * S], [-2 * S, -14 * S], [-2 * S, 2], [11 * S, 2], [13 * S, 170 * S], [-13 * S, 170 * S]]); fs(g, "#E85D2A");
-        rrect(g, -8 * S, 120 * S, 16 * S, 46 * S, 6); fs(g, C.grip, 2);
-        g.restore();
-      }
-      // clear blade guard, lifted when the board is under it
-      var under = by < Pb[1] + hc * S && by + bh > Pb[1] - hc * S;
-      var lift = under ? this.thick * S * 0.7 : 0;
-      withAway(g, [Pb[0], Pb[1]], function () {
-        rrect(g, Pb[0] - 26 * S, Pb[1] - hc * S - 40 * S - lift, 52 * S, hc * 2 * S + 54 * S, 12 * S);
-        g.fillStyle = "rgba(170,220,255,0.38)"; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-        line(g, Pb[0] - 18 * S, Pb[1] - hc * S - 30 * S - lift, Pb[0] - 18 * S, Pb[1] + hc * S - lift, "rgba(255,255,255,0.6)", 3);
+      this.drawWheel(g);
+      this.drawSwitch(g);
+      this.drawFence(g, fx);
+      var straddle = x0 < -1 && x1 > 1;
+      if (straddle) this.drawBlade(g, function (p) { return p[0] - y1; }, 0);
+      else this.drawBlade(g, function () { return 1; }, 0);
+      this.drawBoard(g, x0, x1, y0, y1);
+      var xs = x1 - (fx - this.saw.kerf / 2) / 2 - 1;
+      withAway(g, c.P(0, 0, 60), function () {
+        self.drawStick(g, xs, y0);
+        if (straddle) {
+          self.drawBlade(g, function (p) { return y0 - p[0]; }, 0);
+          self.drawBlade(g, function (p) { return Math.min(p[0] - y0, y1 - p[0]); }, th);
+        }
+        self.drawGuard(g);
       });
       this.drawInset(g);
-      strokeHint(g, W * 0.68, 30, "Push the stick", 3, this.cutting, "Hold it against the fence");
-      smallTag(g, fx + 44 * S + 90, H * 0.55, "Fence " + this.set.fence + " mm · " + inchText(this.set.fence));
-      if (this.hint) bigTag(g, W / 2, H * 0.5, "Raise the blade to cut through!");
+      strokeHint(g, W * 0.66, 30, "Push the stick", 3, this.cutting, "Drag the board up past the blade");
+      var tg = c.P(fx + 40, T.front - 74, -80);
+      smallTag(g, tg[0] + 40, Math.min(tg[1] + 22, H - 24), "Fence " + this.set.fence + " mm · " + inchText(this.set.fence));
+      if (this.hint) bigTag(g, W / 2, H * 0.45, "Raise the blade to cut through!");
     },
     // Side view inset: how high the blade comes up through the board.
     drawInset: function (g) {
@@ -3154,7 +4376,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       g.lineWidth = 2; g.strokeStyle = OUT; g.strokeRect(x + 6, tY - this.thick * s, w - 12, this.thick * s);
       // blade arc
       g.save(); g.beginPath(); g.rect(x, y, w, tY - y); g.clip();
-      g.beginPath(); g.arc(cx, tY + (R - this.set.height) * s, R * s, 0, 7);
+      g.beginPath(); g.arc(cx, tY + (R - this.hD) * s, R * s, 0, 7);
       g.fillStyle = "rgba(205,213,222,0.85)"; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
       g.restore();
       g.fillStyle = "#8E99A8"; g.fillRect(x, tY, w, h); line(g, x, tY, x + w, tY, OUT, 3);
@@ -3168,9 +4390,382 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
   };
 
   // ===================================================================
-  // Miter saw: side view of the chop, plus a top view of the miter scale.
+  // Miter saw from where you stand to use it: in front of the saw, looking a
+  // little down at it. The board lies left to right against the fence. Drag the
+  // handle down to chop; let go and it springs back up. The turntable swings to the
+  // miter angle, read on the scale at the front of the base.
+  // World mm: x to the right, y away from you (fence face y = 0), z up (table z = 0).
+  // The turntable turns about (0, -45). The head is the side-view drawing stood up
+  // in the blade plane: side-view x is the distance along the blade, side-view y is -z.
   // ===================================================================
+  function rr2(x, y, w, h, r) {
+    var pts = [], c = [[x + w - r, y + h - r, 0], [x + r, y + h - r, 1], [x + r, y + r, 2], [x + w - r, y + r, 3]];
+    c.forEach(function (k) {
+      for (var i = 0; i <= 3; i++) { var a = (k[2] + i / 3) * Math.PI / 2; pts.push([k[0] + Math.cos(a) * r, k[1] + Math.sin(a) * r]); }
+    });
+    return pts;
+  }
+  function sectorPts(r0, r1, a0, a1) {
+    var pts = [], n = 18, i, a;
+    for (i = 0; i <= n; i++) { a = a0 + (a1 - a0) * i / n; pts.push([Math.cos(a) * r1, Math.sin(a) * r1]); }
+    if (r0 <= 0) pts.push([0, 0]);
+    else for (i = n; i >= 0; i--) { a = a0 + (a1 - a0) * i / n; pts.push([Math.cos(a) * r0, Math.sin(a) * r0]); }
+    return pts;
+  }
+  var MF = { cy: -45, fenceH: 92, gap: 72 };
   var Miter = {
+    enter: function (saw, set) {
+      this.saw = saw; this.set = set;
+      this.alpha = MITER.up; this.speed = 0; this.spin = 0; this.spinA = 0;
+      this.theta = set.angle; this.pid = null; this.held = false;
+      this.newWork(true);
+    },
+    newWork: function (instant) {
+      this.mat = MATS[this.set.mat];
+      this.sec = this.set.mat === "oak" ? { w: 70, h: 30 } : { w: 89, h: 38 };
+      this.lens = [100, 150, 120, 80, 130].sort(function () { return Math.random() - 0.5; });
+      // board end: x = endA * planY + endB - shift, planY = -45 - y (0 at the turntable centre line)
+      this.endA = 0; this.endB = this.lens[0]; this.base = 0;
+      this.shift = instant ? 0 : 700; this.cut = false;
+      this.grainSeed = rnd(0, 200);
+      this.layout();
+    },
+    setAngle: function () { /* the turntable swings to the new detent in update() */ },
+    layout: function () {
+      this.cam = new Cam3([-250, -1400, 1000], [0, -20, 120]);
+      this.cam.fit([[-300, -170, -70], [300, -170, -70], [-300, 130, 0], [300, 130, 0], [0, -315, -70],
+        [0, -130, 495], [0, 240, 300]], 8, clamp(H * 0.15, 56, 100), W - 8, H - 8);
+      this.floorY = 0; this.dustOnTop = false;
+      bin.place(10, H - 10);
+      this.drawBg();
+    },
+    rot: function () { var t = this.theta * Math.PI / 180; return [Math.sin(t), Math.cos(t)]; },
+    // a point in the blade plane: s along the blade (toward the fence), n across it (+ = motor side)
+    bp: function (s, n, z) {
+      var r = this.rot();
+      return [-s * r[0] + n * r[1], MF.cy + s * r[1] + n * r[0], z];
+    },
+    // side-view drawing coordinates -> world
+    sideP: function (px, py, n) { return this.bp(px + 5, n, -py); },
+    PS: function (px, py, n) { var q = this.sideP(px, py, n); return this.cam.P(q[0], q[1], q[2]); },
+    // a point on the arm, in the arbor frame of the side-view drawing (turned by the arm angle)
+    headPt: function (alpha, lx, ly) {
+      var arb = miterArbor(alpha), c = Math.cos(alpha), s = Math.sin(alpha);
+      return [arb[0] + lx * c - ly * s, arb[1] + lx * s + ly * c];
+    },
+    handleY: function (alpha) { var p = this.headPt(alpha, -205, -90); return this.PS(p[0], p[1], 0)[1]; },
+    drawBg: function () {
+      var g = bgx, c = this.cam, i, x, y, m;
+      g.setTransform(DPR, 0, 0, DPR, 0, 0); PX = 1;
+      g.fillStyle = "#C9A06A"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "rgba(70,40,15,0.35)";
+      for (y = 12; y < H; y += 24) for (x = 12; x < W; x += 24) { g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }
+      // workbench top the saw stands on
+      var a = c.P(-3000, 700, -70), b = c.P(3000, 700, -70);
+      polyPath(g, [a, b, [b[0], H + 20], [a[0], H + 20]]); g.fillStyle = "#E2BE85"; g.fill();
+      line(g, a[0], a[1], b[0], b[1], OUT, 3);
+      for (i = 1; i < 5; i++) {
+        var p0 = c.P(-3000, 700 - i * 160, -70), p1 = c.P(3000, 700 - i * 160, -70);
+        line(g, p0[0], p0[1], p1[0], p1[1], "rgba(150,100,50,0.35)", 2);
+      }
+      // base
+      c.box(g, -310, 310, -170, 130, -70, -22, C.alu, C.aluD, C.aluD);
+      // the scale plate out front: a fan around the turntable centre
+      var fan = [[0, MF.cy, -22]], fanF = [];
+      for (i = 0; i <= 24; i++) {
+        m = (-58 + 116 * i / 24) * Math.PI / 180;
+        fan.push([Math.sin(m) * 262, MF.cy - Math.cos(m) * 262, -22]);
+      }
+      for (i = 0; i < 24; i++) {
+        var q0 = fan[i + 1], q1 = fan[i + 2];
+        fanF.push([[q0[0], q0[1], -70], [q1[0], q1[1], -70], [q1[0], q1[1], -22], [q0[0], q0[1], -22]]);
+      }
+      fanF.forEach(function (q) { c.path(g, q); g.fillStyle = C.aluD; g.fill(); g.strokeStyle = C.aluD; g.lineWidth = 1; g.stroke(); });
+      c.path(g, fan.slice(1).map(function (p) { return [p[0], p[1], -70]; }).concat(fan.slice(1).reverse()));
+      fs(g, null, 3);
+      c.poly(g, fan, "#EEF2F6", 3);
+      // degree marks and numbers
+      var kk = c.k(0, -300, -22);
+      g.font = "800 " + Math.round(clamp(17 * kk, 10, 17)) + "px " + FONT; g.textAlign = "center"; g.textBaseline = "middle";
+      for (m = -50; m <= 50; m += 5) {
+        var big = [0, 15, 22.5, 30, 45].indexOf(Math.abs(m)) !== -1, ang = m * Math.PI / 180;
+        var r1 = big ? 236 : 228, t0 = c.P(Math.sin(ang) * 214, MF.cy - Math.cos(ang) * 214, -22), t1 = c.P(Math.sin(ang) * r1, MF.cy - Math.cos(ang) * r1, -22);
+        line(g, t0[0], t0[1], t1[0], t1[1], OUT, big ? 2.4 : 1.2);
+      }
+      [-45, -30, -22.5, -15, 0, 15, 22.5, 30, 45].forEach(function (d) {
+        var ang = d * Math.PI / 180, r = Math.abs(d) === 22.5 ? 244 : 250;
+        var p = c.P(Math.sin(ang) * r, MF.cy - Math.cos(ang) * r, -22);
+        g.fillStyle = OUT; g.fillText(String(Math.abs(d)), p[0], p[1] + 8 * kk);
+      });
+      // side tables
+      c.box(g, -310, -152, -150, 125, -22, 0, C.alu, C.aluD, C.aluD);
+      c.box(g, 152, 310, -150, 125, -22, 0, C.alu, C.aluD, C.aluD);
+    },
+    down: function (pt) {
+      if (this.pid != null) { puff(pt.x, pt.y); return; }
+      this.pid = pt.id; this.held = true; this.ly = pt.y;
+    },
+    // The handle follows the finger: screen travel is turned into arm angle.
+    move: function (pt) {
+      if (pt.id !== this.pid) return;
+      var dy = pt.y - this.ly; this.ly = pt.y;
+      if (this.shift > 0.5 || (this.cut && dy > 0)) return;
+      var a = this.alpha, e = 0.01, k = (this.handleY(a + e) - this.handleY(a - e)) / (2 * e);
+      if (k > -40) k = -40;
+      this.alpha = clamp(a + dy / k, MITER.down, MITER.up);
+    },
+    up: function (pt) { if (pt.id !== this.pid) return; this.pid = null; this.held = false; },
+    update: function (dt) {
+      var running = this.held && !endingNow();
+      this.speed = clamp(this.speed + (running ? dt * 3 : -dt * 0.8), 0, 1);
+      this.spin -= this.speed * dt * 30;
+      this.spinA -= this.speed * dt * 4.2;
+      this.theta += (this.set.angle - this.theta) * Math.min(1, dt * 6);
+      if (Math.abs(this.theta - this.set.angle) < 0.05) this.theta = this.set.angle;
+      if (!this.held) this.alpha = Math.min(MITER.up, this.alpha + dt * 0.9);
+      if (this.shift > 0) this.shift = Math.max(0, this.shift - dt * 900);
+      // how far the blade has come into the board
+      var arb = miterArbor(this.alpha), low = -(arb[1]) - MITER.R;
+      var into = clamp((this.sec.h - low) / (this.sec.h + 4), 0, 1);
+      var cutting = into > 0 && this.speed > 0.5 && this.held && !this.cut;
+      if (into > 0 && this.speed < 0.5 && !this.cut) this.alpha = Math.max(this.alpha, this.alphaAtTop());
+      if (cutting) {
+        var t = Math.tan(this.theta * Math.PI / 180), zz = this.sec.h * (1 - into), w = this.sec.w;
+        var e = this.cam.P((-45 + w) * t, -w, zz);
+        emitPlan(e[0], e[1], 2.2, this.mat, -0.25, 1, true);
+        var f = this.cam.P(-45 * t, 0, zz);
+        emitPlan(f[0], f[1], 0.8, this.mat, 0.3, -1, true);
+      }
+      if (!this.cut && this.alpha <= MITER.down + 0.004 && this.speed >= 0.5) this.release();
+      if (this.cut && this.alpha > MITER.up - 0.05) {
+        // slide the board along for the next piece
+        this.cut = false;
+        this.endA = Math.tan(this.theta * Math.PI / 180); this.endB = this.lens[0];
+        this.shift = this.lens[0]; this.base += this.lens[0];
+      }
+      this.cutting = cutting;
+      Sound.setMotor(this.speed, cutting ? 1 : 0, 1.1);
+    },
+    alphaAtTop: function () {
+      // arm angle where the blade just touches the top of the board
+      var a, lo = MITER.down, hi = MITER.up;
+      for (var i = 0; i < 20; i++) { a = (lo + hi) / 2; if (-miterArbor(a)[1] - MITER.R > this.sec.h) hi = a; else lo = a; }
+      return hi;
+    },
+    endX: function (planY) { return this.endA * planY + this.endB - this.shift; },
+    release: function () {
+      var self = this, sec = this.sec, t = Math.tan(this.theta * Math.PI / 180), c = this.cam;
+      var y0 = -45, y1 = -45 + sec.w;
+      var cut0 = y0 * t, cut1 = y1 * t, end0 = this.endX(y0), end1 = this.endX(y1);
+      var len = Math.round(Math.max(end0 - cut0, end1 - cut1));
+      var pts = [[cut0, 0], [end0, 0], [end1, -sec.w], [cut1, -sec.w]], box = [1e9, 1e9, -1e9, -1e9];
+      pts.forEach(function (p) {
+        [0, sec.h].forEach(function (z) {
+          var q = c.P(p[0], p[1], z);
+          box[0] = Math.min(box[0], q[0] - 5); box[1] = Math.min(box[1], q[1] - 5);
+          box[2] = Math.max(box[2], q[0] + 5); box[3] = Math.max(box[3], q[1] + 5);
+        });
+      });
+      var gx = this.base - this.shift;
+      var spr = makeSprite(function (g, ox, oy) {
+        g.translate(ox, oy);
+        self.drawSlab(g, pts, sec.h, gx, true);
+      }, box);
+      dropPiece(spr, rnd(-200, -120), -rnd(260, 360), -rnd(2, 4), len + " mm", (this.theta ? this.theta + "° miter · " : "") + inchText(len));
+      // the board now ends at the cut
+      this.endA = t; this.endB = 0; this.shift = 0;
+      this.cut = true;
+      this.lens.push(this.lens.shift());
+    },
+    // A board lying on the table: pts = [back-left, back-right, front-right, front-left] (x, y) at z 0..h.
+    // With cutFace, the left end is a saw cut and shows its end grain.
+    drawSlab: function (g, pts, h, gx, cutFace) {
+      var c = this.cam, m = this.mat, w = this.sec.w;
+      PX = 1;
+      function at(p, z) { return [p[0], p[1], z]; }
+      if (cutFace) {
+        c.path(g, [at(pts[3], 0), at(pts[0], 0), at(pts[0], h), at(pts[3], h)]);
+        g.fillStyle = m.end; g.fill();
+        fs(g, null, 2.5);
+      }
+      c.poly(g, [at(pts[3], 0), at(pts[2], 0), at(pts[2], h), at(pts[3], h)], shadeColor(m.face, 0.8), 2.5);
+      c.path(g, pts.map(function (p) { return at(p, h); }));
+      g.save(); g.clip();
+      g.fillStyle = m.face; g.fillRect(-4000, -4000, 8000, 8000);
+      faceGrain(g, this.set.mat, c.P(gx - 500, -w, h), c.P(gx - 100, -w, h), c.P(gx - 500, 0, h), 400, w, this.grainSeed);
+      g.restore();
+      c.poly(g, pts.map(function (p) { return at(p, h); }), null, 3);
+    },
+    drawTurntable: function (g) {
+      var c = this.cam, i, a, R = 150, self = this, top = [], bot = [];
+      for (i = 0; i < 40; i++) {
+        a = i / 40 * Math.PI * 2;
+        top.push([Math.cos(a) * R, MF.cy + Math.sin(a) * R, 0]);
+        bot.push([Math.cos(a) * R, MF.cy + Math.sin(a) * R, -22]);
+      }
+      // rim facing us
+      for (i = 0; i < 40; i++) {
+        var j = (i + 1) % 40, mx = (top[i][0] + top[j][0]) / 2, my = (top[i][1] + top[j][1]) / 2;
+        if ((c.eye[0] - mx) * mx + (c.eye[1] - my) * (my - MF.cy) > 0) {
+          c.path(g, [top[i], top[j], bot[j], bot[i]]); g.fillStyle = C.aluD; g.fill(); g.strokeStyle = C.aluD; g.lineWidth = 1; g.stroke();
+        }
+      }
+      c.poly(g, top, "#C6CED8", 3);
+      // the arm out to the scale, with a clear window and a red hairline
+      var arm = [[-150, -20], [-206, -17], [-206, 17], [-150, 20]];
+      c.poly(g, arm.map(function (p) { return self.bp(p[0], p[1], 0); }), C.alu, 3);
+      var win = [[-206, -15], [-262, -15], [-262, 15], [-206, 15]];
+      c.poly(g, win.map(function (p) { return self.bp(p[0], p[1], 0.5); }), "rgba(190,230,255,0.5)", 2);
+      var h0 = c.P.apply(c, this.bp(-208, 0, 1)), h1 = c.P.apply(c, this.bp(-240, 0, 1));
+      line(g, h0[0], h0[1], h1[0], h1[1], C.red, 3);
+      // lock knob under the front of the arm
+      var kn = this.bp(-282, 0, -40), kr = 17 * c.k(kn[0], kn[1], kn[2]), kp = c.P(kn[0], kn[1], kn[2]);
+      var kb = c.P.apply(c, this.bp(-258, 0, -10));
+      line(g, kb[0], kb[1], kp[0], kp[1], OUT, 12); line(g, kb[0], kb[1], kp[0], kp[1], C.grip, 7);
+      g.beginPath(); g.ellipse(kp[0], kp[1], kr, kr * 0.8, 0, 0, 7); fs(g, C.grip, 2.5);
+      // kerf slot through the turntable
+      var slot = [[-150, -5], [150, -5], [150, 5], [-150, 5]];
+      c.poly(g, slot.map(function (p) { return self.bp(p[0], p[1], 0.5); }), "#2A2F3A", 1.5);
+    },
+    drawFence: function (g) {
+      var c = this.cam, H2 = MF.fenceH, gp = MF.gap;
+      c.box(g, -330, -gp, 0, 20, 0, H2, "#D5DCE4", C.alu, C.aluD, 3);
+      c.box(g, gp, 330, 0, 20, 0, H2, "#D5DCE4", C.alu, C.aluD, 3);
+      var a = c.P(-325, 0, H2 - 18), b = c.P(-gp - 6, 0, H2 - 18);
+      line(g, a[0], a[1], b[0], b[1], "rgba(255,255,255,0.6)", 3);
+      a = c.P(gp + 6, 0, H2 - 18); b = c.P(325, 0, H2 - 18);
+      line(g, a[0], a[1], b[0], b[1], "rgba(255,255,255,0.6)", 3);
+    },
+    // Prism: a side-view outline given thickness across the blade (n0..n1).
+    prism: function (g, pts, n0, n1, fill, w) {
+      var c = this.cam, self = this, nearSide = this.nearN < 0 ? n0 : n1, farSide = this.nearN < 0 ? n1 : n0;
+      function proj(n) { return pts.map(function (p) { return self.PS(p[0], p[1], n); }); }
+      var F = proj(farSide), N = proj(nearSide), side = shadeColor(fill, 0.78), quads = [], i;
+      for (i = 0; i < pts.length; i++) {
+        var j = (i + 1) % pts.length, m = this.sideP((pts[i][0] + pts[j][0]) / 2, (pts[i][1] + pts[j][1]) / 2, (n0 + n1) / 2);
+        quads.push({ d: c.raw(m[0], m[1], m[2])[2], q: [N[i], N[j], F[j], F[i]] });
+      }
+      quads.sort(function (a, b) { return b.d - a.d; });
+      PX = 1;
+      polyPath(g, F); fs(g, side, w || 3);
+      quads.forEach(function (q) { polyPath(g, q.q); fs(g, side, 1.5); });
+      polyPath(g, N); fs(g, fill, w || 3);
+      return N;
+    },
+    drawPost: function (g) {
+      this.prism(g, rr2(202, -128, 46, 130, 10), -40, 40, C.aluD);
+    },
+    drawBlade: function (g) {
+      var c = this.cam, self = this, R = MITER.R, arb = miterArbor(this.alpha), N = 24, st = Math.PI * 2 / N, i, a, pts = [];
+      for (i = 0; i < N; i++) {
+        a = this.spinA + i * st;
+        [[0, R - 11], [0.14, R - 7], [0.2, R], [0.55, R - 5]].forEach(function (k) {
+          pts.push([arb[0] + Math.cos(a + k[0] * st) * k[1], arb[1] + Math.sin(a + k[0] * st) * k[1]]);
+        });
+      }
+      // hide what is below the table, and inside the board
+      var co = Math.cos(this.theta * Math.PI / 180), s0 = (45 - this.sec.w) / co, s1 = 45 / co, h = this.sec.h;
+      function quad(sa, sb, za, zb) {
+        var q = [self.PS(sa - 5, -za, 0), self.PS(sb - 5, -za, 0), self.PS(sb - 5, -zb, 0), self.PS(sa - 5, -zb, 0)];
+        g.moveTo(q[0][0], q[0][1]); g.lineTo(q[1][0], q[1][1]); g.lineTo(q[2][0], q[2][1]); g.lineTo(q[3][0], q[3][1]); g.closePath();
+      }
+      g.save();
+      g.beginPath();
+      quad(-500, 500, h, 900); quad(-500, s0, 0.5, 900); quad(s1, 500, 0.5, 900);
+      g.clip();
+      PX = 1;
+      polyPath(g, pts.map(function (p) { return self.PS(p[0], p[1], 0); })); fs(g, "#DDE3EA", 2.5);
+      var ring = [];
+      for (i = 0; i < 36; i++) { a = i / 36 * Math.PI * 2; ring.push(this.PS(arb[0] + Math.cos(a) * (R - 26), arb[1] + Math.sin(a) * (R - 26), 0)); }
+      polyPath(g, ring); g.fillStyle = "#EEF2F6"; g.fill();
+      if (this.speed > 0.25) {
+        ring = [];
+        for (i = 0; i < 40; i++) { a = i / 40 * Math.PI * 2; ring.push(this.PS(arb[0] + Math.cos(a) * (R - 2), arb[1] + Math.sin(a) * (R - 2), 0)); }
+        g.globalAlpha = Math.min(0.55, this.speed * 0.6);
+        polyPath(g, ring); g.strokeStyle = "#FFFFFF"; g.lineWidth = 4; g.stroke();
+        g.globalAlpha = 1;
+      }
+      g.restore();
+    },
+    drawHead: function (g) {
+      var self = this, c = this.cam, a = this.alpha, R = MITER.R;
+      var tuck = clamp((MITER.up - a) / (MITER.up - MITER.down), 0, 1);
+      function arbF(rot) { return function (p) { var cr = Math.cos(rot), sr = Math.sin(rot); return self.headPt(a, p[0] * cr - p[1] * sr, p[0] * sr + p[1] * cr); }; }
+      function pivF(p) { var ca = Math.cos(a), sa = Math.sin(a); return [MITER.pivot[0] + p[0] * ca - p[1] * sa, MITER.pivot[1] + p[0] * sa + p[1] * ca]; }
+      var motor = rr2(20, -118, 120, 86, 30).map(arbF(0));
+      var arm = rr2(-236, -26, 250, 40, 16).map(pivF);
+      var guard = sectorPts(0, R + 16, Math.PI * 0.98, Math.PI * 2.06).map(arbF(0));
+      var lower = sectorPts(R - 18, R + 5, -0.1, Math.PI * 0.95).map(arbF(tuck * 1.6));
+      function motorArm() {
+        self.prism(g, arm, 18, 54, C.alu);
+        self.prism(g, motor, 22, 136, C.yellow);
+        // cooling vents on the motor
+        for (var i = 0; i < 4; i++) {
+          var p0 = self.headPt(a, 46 + i * 14, -104), p1 = self.headPt(a, 46 + i * 14, -60);
+          var nn = self.nearN < 0 ? 22 : 136, q0 = self.PS(p0[0], p0[1], nn), q1 = self.PS(p1[0], p1[1], nn);
+          line(g, q0[0], q0[1], q1[0], q1[1], "rgba(29,35,64,0.5)", 4);
+        }
+      }
+      if (this.nearN < 0) motorArm();
+      this.drawBlade(g);
+      this.prism(g, guard, -24, 24, C.yellow);
+      // clear lower guard on our side of the blade, tucking up as the arm comes down
+      var ln = this.nearN < 0 ? -20 : 20;
+      polyPath(g, lower.map(function (p) { return self.PS(p[0], p[1], ln); }));
+      g.fillStyle = C.clear; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+      // arbor bolt
+      var ab = miterArbor(a), bp = this.PS(ab[0], ab[1], this.nearN < 0 ? -26 : 26), br = 15 * c.k(0, 0, 100);
+      g.beginPath(); g.arc(bp[0], bp[1], br, 0, 7); fs(g, C.steelD, 2.4);
+      if (this.nearN > 0) motorArm();
+      // pivot
+      var pv = this.PS(MITER.pivot[0], MITER.pivot[1], this.nearN < 0 ? -42 : 42), pr = 16 * c.k(0, 150, 100);
+      g.beginPath(); g.arc(pv[0], pv[1], pr, 0, 7); fs(g, C.grip, 2.6);
+      // D-handle with its trigger, out front where your hand goes
+      var outer = [[-120, -60], [-170, -110], [-230, -120], [-250, -86], [-200, -60], [-150, -38]].map(arbF(0));
+      var hole = [[-150, -70], [-184, -98], [-222, -100], [-228, -88], [-190, -72], [-160, -58]].map(arbF(0));
+      var nearH = this.nearN < 0 ? -16 : 16;
+      [[-nearH, C.gripL], [nearH, C.grip]].forEach(function (k) {
+        smooth(g, outer.map(function (p) { return self.PS(p[0], p[1], k[0]); }));
+        smooth(g, hole.map(function (p) { return self.PS(p[0], p[1], k[0]); }), true);
+        g.fillStyle = k[1]; g.fill("evenodd"); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+      });
+      var trig = [[-196, -74], [-186, -78], [-180, -64], [-190, -62]].map(arbF(0));
+      smooth(g, trig.map(function (p) { return self.PS(p[0], p[1], self.nearN < 0 ? -17 : 17); })); fs(g, C.yellow, 2);
+    },
+    draw: function (g) {
+      var self = this, c = this.cam, sec = this.sec, t = Math.tan(this.theta * Math.PI / 180);
+      var r = this.rot();
+      this.nearN = (c.eye[0]) * r[1] + (c.eye[1] - MF.cy) * r[0];
+      PX = 1;
+      this.drawTurntable(g);
+      var anchor = this.PS(MITER.pivot[0], MITER.pivot[1], 0);
+      withAway(g, anchor, function () { self.drawPost(g); });
+      this.drawFence(g);
+      // the board against the fence, its end past the blade by the next length
+      var y0 = -45, y1 = -45 + sec.w, L = -900;
+      var e0 = this.endX(y0), e1 = this.endX(y1);
+      this.drawSlab(g, [[L, 0], [e0, 0], [e1, -sec.w], [L, -sec.w]], sec.h, this.base - this.shift, false);
+      // pencil line where the blade will go
+      if (!this.cut && this.shift < 1) {
+        var p0 = c.P(y0 * t, 0, sec.h), p1 = c.P(y1 * t, -sec.w, sec.h);
+        g.setLineDash([7, 6]); line(g, p0[0], p0[1], p1[0], p1[1], "rgba(29,35,64,0.6)", 2); g.setLineDash([]);
+      }
+      withAway(g, anchor, function () { self.drawHead(g); });
+      // next piece length on the board
+      if (!this.cut && this.shift < 1) {
+        var lp = c.P(((y0 + y1) / 2 * t + (e0 + e1) / 2) / 2, -sec.w / 2, sec.h);
+        label(g, Math.round(this.endB) + " mm", inchText(this.endB), clamp(lp[0] + 30, 70, W - 70), lp[1] + 34, "center");
+      }
+      // angle readout
+      label(g, this.set.angle + "°", this.set.angle ? "miter" : "square cut", W - 14, H - 40, "right");
+      strokeHint(g, W * 0.27, 30, "Pull down!", 2, this.cutting, "Drag the handle down to chop");
+    }
+  };
+
+  // ===================================================================
+  // Miter saw, "Side view": side view of the chop, plus a top view of the miter scale.
+  // ===================================================================
+  var MiterSide = {
     enter: function (saw, set) {
       this.saw = saw; this.set = set;
       this.alpha = MITER.up; this.speed = 0; this.spin = 0;
@@ -3681,6 +5276,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     var w2 = t2 ? g.measureText(t2).width : 0;
     var w = Math.max(w1, w2) + 20, h = f1 + (t2 ? f2 : 0) + 8;
     var x0 = align === "center" ? x - w / 2 : (align === "right" ? x - w : x);
+    x0 = Math.max(4, Math.min(x0, W - w - 4));
     rrect(g, x0, y - h / 2, w, h, 10);
     g.fillStyle = "#FFFFFF"; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
     g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = OUT;
@@ -3711,7 +5307,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     if (endingNow()) return;
     var f = Math.round(clamp(Math.min(W, H) * 0.062, 22, 38));
     g.font = "800 " + f + "px " + FONT;
-    var vert = dir === 2 || dir === 3;
+    var vert = dir === 2 || dir === 3 || dir === 4;
     var tw = g.measureText(text).width, aw = vert ? f * 0.9 : f * 1.9, w = tw + aw + 34, h = f + 16;
     x = clamp(x, w / 2 + 8, W - w / 2 - 8);
     var x0 = x - w / 2, y0 = y - h / 2 + 4;
@@ -3725,11 +5321,11 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     g.save();
     g.translate(ax + aw / 2 + (dir === 1 ? bounce : (dir === -1 ? -bounce : 0)), ay + (dir === 2 ? bounce : (dir === 3 ? -bounce : 0)));
     if (dir === -1) g.scale(-1, 1);
-    if (dir === 2) g.rotate(Math.PI / 2);
+    if (dir === 2 || dir === 4) g.rotate(Math.PI / 2);
     if (dir === 3) g.rotate(-Math.PI / 2);
-    var L = vert ? h * 0.36 : aw * 0.5, k = vert ? f * 0.3 : f * 0.36;
+    var L = vert ? h * (dir === 4 ? 0.42 : 0.36) : aw * 0.5, k = vert ? f * 0.3 : f * 0.36;
     g.beginPath();
-    if (dir === 0) {
+    if (dir === 0 || dir === 4) {
       g.moveTo(-L, 0); g.lineTo(-L + k, -k); g.lineTo(-L + k, -k * 0.4); g.lineTo(L - k, -k * 0.4); g.lineTo(L - k, -k);
       g.lineTo(L, 0); g.lineTo(L - k, k); g.lineTo(L - k, k * 0.4); g.lineTo(-L + k, k * 0.4); g.lineTo(-L + k, k);
     } else {
@@ -3812,7 +5408,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
   // ===================================================================
   // Choosing a saw
   // ===================================================================
-  var SCENES = { end: End, curve: Curve, band: Machine, scroll: Machine, table: Table, miter: Miter };
+  var SCENES = { end: End, curve: Curve, band: Machine, scroll: Machine, table: Table, miter: Miter, miterSide: MiterSide };
   function selectSaw(id, fromLoad) {
     if (!SAW[id]) id = "ryoba";
     var s = SAW[id];
@@ -3824,7 +5420,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     saveApp();
     particles = []; falling = [];
     clearDust();
-    scene = SCENES[s.scene];
+    scene = SCENES[s.scene === "miter" && sawSettings(id).view === "side" ? "miterSide" : s.scene];
     scene.enter(s, sawSettings(id));
     buildControls();
     markRack();
@@ -3909,11 +5505,16 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       h += '<span class="grp"><span class="glabel">Angle</span>';
       ANGLES.forEach(function (a) { h += '<button class="btn angle" data-act="angle" data-v="' + a + '" aria-pressed="' + (set.angle === a) + '">' + a + '°</button>'; });
       h += '</span>';
+      h += '<button class="btn" data-act="view" aria-label="Switch to the ' + (set.view === "side" ? "front" : "side") + ' view">' + (set.view === "side" ? "Front view" : "Side view") + '</button>';
     }
     if (s.scene === "band" || s.scene === "scroll") {
       h += '<span class="grp"><span class="glabel">Turn</span>' +
         '<button class="btn step" data-act="turn" data-v="-1" aria-label="Turn the board left">↺</button>' +
         '<button class="btn step" data-act="turn" data-v="1" aria-label="Turn the board right">↻</button></span>';
+    }
+    if (s.scene === "end") {
+      var side = set.view === "side";
+      h += '<button class="btn viewbtn" data-act="view" aria-pressed="' + side + '" aria-label="' + (side ? "Back to my view" : "Side view") + '"><span class="nb1">' + (side ? "My" : "Side") + '</span><span class="nb2"> view</span></button>';
     }
     var nl = newLabel(set.mat).split(" ");
     h += '<button class="btn newbtn" data-act="new" aria-label="' + nl.join(" ") + '"><span class="nb1">' + nl[0] + '</span><span class="nb2"> ' + nl.slice(1).join(" ") + '</span></button>';
@@ -3925,6 +5526,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     var s = curSaw, set = sawSettings(s.id), act = b.dataset.act, v = b.dataset.v, list, i;
     Sound.unlock(); Sound.click();
     if (act === "new") { scene.newWork(false); return; }
+    if (act === "view" && s.scene === "end") { set.view = set.view === "side" ? "op" : "side"; if (scene.setView) scene.setView(); changed(); return; }
     if (act === "mat") {
       set.mat = s.mats[(s.mats.indexOf(set.mat) + 1) % s.mats.length];
       scene.enter(s, set); changed(); return;
@@ -3938,6 +5540,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     if (act === "fence") { i = clamp(FENCES.indexOf(set.fence) + Number(v), 0, FENCES.length - 1); set.fence = FENCES[i]; if (scene.setFence) scene.setFence(); changed(); return; }
     if (act === "height") { i = clamp(HEIGHTS.indexOf(set.height) + Number(v), 0, HEIGHTS.length - 1); set.height = HEIGHTS[i]; changed(); return; }
     if (act === "angle") { set.angle = Number(v); if (scene.setAngle) scene.setAngle(); changed(); return; }
+    if (act === "view") { set.view = set.view === "side" ? "front" : "side"; selectSaw(s.id); return; }
     if (act === "turn") { if (scene.turn) scene.turn(Number(v) * Math.PI / 12); return; }
   });
 

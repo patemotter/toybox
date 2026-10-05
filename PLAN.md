@@ -7,7 +7,7 @@ Shared rules for every app are in "Every app" at the bottom.
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | Saw Bench finish, 3D Printer, Marble Run, Car Builder, Gear Box | In progress |
+| – | 3D Printer, Marble Run, Car Builder, Gear Box | In progress |
 | 1 | Water Works | Queued |
 | 2 | Math Grid | Queued |
 | 3 | Engine Room | Queued |
@@ -228,6 +228,14 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Saw Bench:**
+  - Band saw: the top of its upper housing is cut off, and the hint overlaps it.
+  - Scroll saw: a grey block shows behind the table.
+  - Miter saw: the head drawing is weak, the angle numbers overlap, and the size label can cover the head.
+  - Table saw: the fence ruler numbers are hidden.
+  - Reciprocating saw: the wall view is too zoomed in.
+  - Edge-cut pieces show about 3 mm too large.
+  - "Top view" takes room on phones.
 
 ---
 
