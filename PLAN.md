@@ -262,6 +262,26 @@ Known so far:
 
 ---
 
+### Number cleanup (part of the polish pass)
+
+Remove numbers that are clutter; keep the ones that matter. Proposed:
+- **Remove:**
+  - Gear Box: RPM labels and turn counters; show a ratio only when two gears are tapped.
+  - Drill Press: RPM readouts and the depth readout (the dial still sets depth); keep the hole count only if wanted.
+  - Hammer & Screws: Hits, Turns, "41 of 50 mm in", and the in-wood ruler.
+  - Saw Bench: piece-length labels on every cut, and pieces counters.
+  - Tool Wall: live readouts in tool jobs (depth, turns, rpm), except measuring tools.
+  - Car Builder: speedometer digits (keep the needle).
+  - Marble Run: plunger power numbers.
+  - Rocket Builder: altitude counter.
+- **Keep:**
+  - Measuring tools (tape, level, calipers, square).
+  - Sizes you pick: bit sizes, nail lengths, screw sizes, socket sizes, sandpaper grit.
+  - Settings you set: table-saw fence, miter angle, blade height.
+  - Math Grid.
+  - Peg Drop bin counts (counting is the play there).
+- **Undecided:** simple counters like Fish: N, Marbles/Laps, Pieces, Crushed: N.
+
 ## On hold: Workshop Projects
 
 Build something step by step across the stations (cut, drill, nail, sand, paint), such as a birdhouse or a toy car. Revisit after the new Workshop stations exist.
@@ -275,6 +295,6 @@ Build something step by step across the stations (cut, drill, nail, sand, paint)
 - Sound off by default, changed only with a 2-second grown-up hold.
 - Grown-up timer with the "winding down" ending and a rest screen; Home button; a "Big" button to hide the controls.
 - Works with touch and with a mouse; one screen, no page scroll; iPad first, iPhone too.
-- No fail states; big visuals; real names and real numbers.
+- No fail states; big visuals; real names. Numbers only where relevant: a measurement the tool takes, a size or setting you choose, or when numbers are the point (Math Grid). No live readouts (turns, depth, RPM, hits, temperatures) as decoration.
 - Pace: features first, save early, one quick test pass, report within about 20 minutes with a list of UI issues to polish later.
 - Add each finished app to the launcher (`APPS` in `index.html`) and the top-level `sw.js` `CORE` list, and bump both caches.
