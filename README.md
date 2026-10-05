@@ -10,6 +10,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Peg Drop: drop balls through glowing pegs and count them in the bins | [`peg-drop/`](peg-drop/) |
 | Rocket Builder: build a rocket, count down, and launch it into space | [`rocket-builder/`](rocket-builder/) |
 | Color Mixing: pour paints, stir with a finger, and name the new color | [`color-mixing/`](color-mixing/) |
+| Workshop: safety gear, a Tool Wall of 81 tools, and Drill Press, Saw Bench and Hammer & Screws stations | [`workshop/`](workshop/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
