@@ -887,6 +887,40 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   .pic { font-size: 0.64rem; }
   .tab { font-size: 0.7rem; }
 }
+
+/* Build pane: several part rows at once, each option a zoomed picture of that part */
+.pager { display: flex; gap: 6px; justify-content: center; margin: 0 0 6px; }
+.pager[hidden] { display: none; }
+.pager .btn { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 0.1rem 0.3rem; font-size: clamp(0.8rem, 3.4vw, 1rem); }
+.prows { display: flex; flex-direction: column; gap: 6px; }
+.prow h4 { margin: 0 0 2px 4px; font-size: 0.85rem; line-height: 1.15; font-weight: 800; color: var(--muted); }
+.prow .popts { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.popt {
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 0;
+  padding: 3px 2px 2px; min-height: 0; min-width: 0; overflow: hidden;
+  font-size: clamp(0.64rem, 2.9vw, 0.9rem); line-height: 1.1; white-space: nowrap;
+}
+.popt svg { width: 100%; height: 44px; display: block; border-radius: 10px; background: #E4F3FF; }
+.popt span { display: block; text-align: center; overflow: hidden; text-overflow: clip; }
+.popt .numpic { height: 44px; display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; }
+.prows.many .popt .numpic { font-size: 1.3rem; }
+@media (min-width: 744px) and (min-height: 640px) {
+  .pager { gap: 10px; margin-bottom: 10px; }
+  .pager .btn { min-height: 48px; font-size: 1.1rem; }
+  .prows { gap: 10px; }
+  .prow h4 { font-size: 1.05rem; margin-bottom: 4px; }
+  .prow .popts { gap: 10px; }
+  .popt { font-size: 1rem; padding: 5px 4px 4px; }
+  .popt svg, .popt .numpic { height: 76px; }
+  .popt .numpic { font-size: 2.4rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .pager .btn { min-height: 32px; font-size: 0.8rem; }
+  .prow h4 { font-size: 0.75rem; }
+  .popt { font-size: 0.66rem; }
+  .popt svg, .popt .numpic { height: 36px; }
+  .popt .numpic { font-size: 1.2rem; }
+}
 </style>
 </head>
 <body>
@@ -922,12 +956,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
           <div class="picrow" id="kinds"></div>
         </div>
         <div data-pane="build" id="pane-build" role="tabpanel" aria-labelledby="tab-build">
-          <section>
-            <div class="row four" id="buildParts"></div>
-          </section>
-          <section>
-            <div class="options" id="options"></div>
-          </section>
+          <div class="pager" id="pager"></div>
+          <div class="prows" id="prows"></div>
         </div>
         <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
           <section>
@@ -1390,7 +1420,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     var o = "";
     if (c.paint !== "none" && band) {
       var id = "cp" + (uid++);
-      o += '<clipPath id="' + id + '"><path d="' + skin + '"/></clipPath><g clip-path="url(#' + id + ')">' + paintS(c.paint, band, c.col.stripes) + "</g>" +
+      o += '<clipPath id="' + id + '"><path d="' + skin + '"/></clipPath><g data-part="paint" clip-path="url(#' + id + ')">' + paintS(c.paint, band, c.col.stripes) + "</g>" +
         pth(skin, "none", 5);
     }
     if (c.number && door) o += part("number", numberS(door.x, door.y, door.r, c.number, c.col.number));
@@ -1626,7 +1656,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     o += pth(rp([[-150, -84, 8], [-178, -96, 16], [-178, -148, 16], [-150, -160, 8], [-120, -160, 4], [-120, -84, 4]]), K.trim, 5);
     for (var i = 0; i < 4; i++) o += rct(-108 + i * 16, -146, 8, 26, 3, shade(K.body, 0.3), 0);
     o += beam([[-140, -166], [-140, -176], [-20, -176], [-20, -166]], 4, STEEL_D, 3);
-    o += tailS(-182, -134, 8, 14);
+    o += tailS(-182, -134, 8, 14) + headS(c, 98, -104, 9);
     o += stacksS(v, c, -95, -158, 60);
     add(v, part("body", o));
     // the arm: boom -> stick -> tool
@@ -1687,6 +1717,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     o += pth(body, K.body, 5);
     o += decalS(c, body, { x0: -160, x1: 132, y0: -146, y1: -82 }, { x: 40, y: -114, r: 22 });
     for (var i = 0; i < 5; i++) o += rct(118, -136 + i * 11, 10, 5, 2, "rgba(29,35,64,0.5)", 0);
+    o += headS(c, 104, -118, 9);
     o += rct(-10, -142, 100, 8, 4, shade(K.body, 0.25), 0);
     o += stacksS(v, c, 70, -152, 56);
     add(v, part("body", o));
@@ -2099,7 +2130,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
 
   function defCfg(k) { return JSON.parse(JSON.stringify(KINDS[k].def)); }
   function freshState() {
-    var s = { fam: "build", kind: "excavator", cfgs: {}, buildPart: "", colorPart: "body", tab: "vehicle" };
+    var s = { fam: "build", kind: "excavator", cfgs: {}, buildPart: "", buildPage: 0, colorPart: "body", tab: "vehicle" };
     KIND_IDS.forEach(function (k) { s.cfgs[k] = defCfg(k); });
     return s;
   }
@@ -2125,6 +2156,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
           });
         }
         if (typeof o.buildPart === "string") s.buildPart = o.buildPart;
+        if (typeof o.buildPage === "number") s.buildPage = o.buildPage;
         if (typeof o.colorPart === "string") s.colorPart = o.colorPart;
         if (["vehicle", "build", "colors"].indexOf(o.tab) !== -1) s.tab = o.tab;
       }
@@ -2245,6 +2277,85 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     return list;
   }
 
+
+  // ---- build rows ----
+  // Which part of the drawing each option row zooms in on.
+  var ZOOM = { tool: "tool", cab: "cab", wheels: "wheels", rims: "wheels", engine: "engine", top: "top", lights: "lights", paint: "paint" };
+  var ROW_ORDER = ["tool", "wheels", "top", "paint", "rims", "engine", "cab", "lights", "number"];
+  var lastPer = 0;
+  function rowsPerPage() {
+    if (window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches) return 2;
+    if (window.matchMedia("(min-width: 744px) and (min-height: 640px)").matches) return 4;
+    return 3;
+  }
+  function buildPages(k) {
+    var ps = kindParts(k).slice().sort(function (a, b) { return ROW_ORDER.indexOf(a[0]) - ROW_ORDER.indexOf(b[0]); });
+    var per = rowsPerPage(), out = [];
+    for (var i = 0; i < ps.length; i += per) out.push(ps.slice(i, i + per));
+    return out;
+  }
+  // Union of the bounding boxes of the drawing's [data-part=name] groups (vehicle units), or null.
+  function partBoxes(svgStr, name) {
+    meas.innerHTML = "<g>" + svgStr + "</g>";
+    var r = null;
+    Array.prototype.forEach.call(meas.querySelectorAll('[data-part="' + name + '"]'), function (g) {
+      var b;
+      try { b = g.getBBox(); } catch (e) { return; }
+      if (!b.width && !b.height) return;
+      if (!r) r = { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
+      else { r.x0 = Math.min(r.x0, b.x); r.y0 = Math.min(r.y0, b.y); r.x1 = Math.max(r.x1, b.x + b.width); r.y1 = Math.max(r.y1, b.y + b.height); }
+    });
+    var all = null;
+    if (!r) { try { var b2 = meas.firstChild.getBBox(); all = { x0: b2.x, y0: b2.y, x1: b2.x + b2.width, y1: b2.y + b2.height }; } catch (e) { /* ignore */ } }
+    meas.innerHTML = "";
+    return r || (all ? { whole: true, x0: all.x0, y0: all.y0, x1: all.x1, y1: all.y1 } : null);
+  }
+  function partRow(k, c, p) {
+    var id = p[0], opts = p[2];
+    var row = document.createElement("div");
+    row.className = "prow";
+    var h = document.createElement("h4");
+    h.textContent = p[1];
+    row.appendChild(h);
+    var box = document.createElement("div");
+    box.className = "popts";
+    row.appendChild(box);
+    var pics = [], Z = null;
+    if (id !== "number") {
+      opts.forEach(function (o) {
+        var cc = JSON.parse(JSON.stringify(c));
+        cc[id] = o[0];
+        var s = vehicleSVG(makeVehicle(k, cc), {});
+        var b = partBoxes(s, ZOOM[id] || "body");
+        pics.push(s);
+        if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
+      });
+      if (!Z) Z = partBoxes(pics[0], "__none__") || { x0: -300, y0: -300, x1: 300, y1: 0 };
+      // stripes: a close-up of a panel near the front, not the whole long side
+      if (id === "paint" && Z.x1 - Z.x0 > 1.8 * (Z.y1 - Z.y0)) {
+        var pw = Math.max(1.8 * (Z.y1 - Z.y0), 150), pc = Z.x0 + (Z.x1 - Z.x0) * 0.62;
+        Z = { x0: pc - pw / 2, x1: pc + pw / 2, y0: Z.y0, y1: Z.y1 };
+      }
+      // padding, a minimum size (so tiny parts keep some context) and the button's shape
+      var pad = 16, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2;
+      var w = Math.max(Z.x1 - Z.x0 + 2 * pad, 130), hh = Math.max(Z.y1 - Z.y0 + 2 * pad, 90), AR = 1.5;
+      if (w / hh < AR) w = hh * AR; else hh = w / AR;
+      var vb = [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" ");
+    }
+    opts.forEach(function (o, i) {
+      var bt = document.createElement("button");
+      bt.className = "btn popt";
+      bt.dataset.ppart = id;
+      bt.dataset.opt = String(o[0]);
+      bt.setAttribute("aria-pressed", String(o[0] === c[id]));
+      bt.setAttribute("aria-label", p[1] + ": " + (id === "number" ? (o[0] ? String(o[0]) : "None") : o[1]));
+      if (id === "number") bt.innerHTML = '<span class="numpic">' + (o[0] ? o[0] : "–") + "</span>";
+      else bt.innerHTML = '<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + pics[i] + "</svg><span>" + o[1] + "</span>";
+      box.appendChild(bt);
+    });
+    return row;
+  }
+
   var lastBB = null;
   function render() {
     var k = state.kind, c = cfg(), fam = KINDS[k].fam;
@@ -2274,36 +2385,31 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
       kinds.appendChild(bt);
     });
 
-    // Build tab
-    var parts = kindParts(k);
-    if (!partSpec(k, state.buildPart)) state.buildPart = parts[0][0];
-    var bp = $("buildParts");
-    bp.innerHTML = "";
-    parts.forEach(function (p) {
+    // Build tab: several part rows at once (paged), each option a zoomed picture of that part.
+    var pages = buildPages(k), per = rowsPerPage();
+    if (!(state.buildPage >= 0 && state.buildPage < pages.length)) state.buildPage = 0;
+    var pg = $("pager");
+    pg.hidden = pages.length < 2;
+    pg.innerHTML = "";
+    pages.forEach(function (pp, i) {
       var bt = document.createElement("button");
       bt.className = "btn";
-      bt.dataset.bpart = p[0];
-      bt.textContent = p[1];
-      bt.setAttribute("aria-pressed", String(p[0] === state.buildPart));
-      bp.appendChild(bt);
+      bt.dataset.page = String(i);
+      bt.textContent = "Parts " + (i + 1);
+      bt.setAttribute("aria-label", pp.map(function (p) { return p[1]; }).join(", "));
+      bt.setAttribute("aria-pressed", String(i === state.buildPage));
+      pg.appendChild(bt);
     });
-    var spec = partSpec(k, state.buildPart), ob = $("options");
-    ob.className = "options" + (spec[2].length > 5 ? " many" : "");
-    ob.innerHTML = "";
-    spec[2].forEach(function (o) {
-      var bt = document.createElement("button");
-      bt.className = "btn opt";
-      bt.dataset.opt = String(o[0]);
-      bt.setAttribute("aria-pressed", String(o[0] === c[state.buildPart]));
-      if (state.buildPart === "number") {
-        bt.innerHTML = '<span class="numpic">' + (o[0] ? o[0] : "–") + "</span><span>" + (o[0] ? "Number" : "None") + "</span>";
-      } else {
-        var cc = JSON.parse(JSON.stringify(c));
-        cc[state.buildPart] = o[0];
-        bt.innerHTML = thumb(k, cc, 10) + "<span>" + o[1] + "</span>";
-      }
-      ob.appendChild(bt);
-    });
+    var rows = $("prows");
+    rows.innerHTML = "";
+    pages[state.buildPage].forEach(function (p) { rows.appendChild(partRow(k, c, p)); });
+    // keep every page the same height so the panel does not jump between pages
+    rows.style.minHeight = "";
+    var rh = 0;
+    Array.prototype.forEach.call(rows.children, function (r) { rh = Math.max(rh, r.offsetHeight); });
+    var gap = parseFloat(getComputedStyle(rows).rowGap) || 0;
+    if (rh && pages.length > 1) rows.style.minHeight = Math.ceil(rh * per + gap * (per - 1)) + "px";
+    lastPer = per;
 
     // Colors tab
     var cps = colorParts();
@@ -2327,6 +2433,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     save();
     vbKey = ""; // drive pictures are rebuilt from the new design
   }
+
+  window.addEventListener("resize", function () { if (rowsPerPage() !== lastPer) { state.buildPage = 0; render(); } });
 
   function restartAnim(el, cls) {
     if (!el || reduce) return;
@@ -2426,10 +2534,11 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
       if (t.dataset.fam !== state.fam) { state.kind = FAM_BY[t.dataset.fam].kinds[0]; changed = true; }
     }
     else if (t.dataset.kind) { changed = state.kind !== t.dataset.kind; state.kind = t.dataset.kind; if (!changed) changed = true; }
-    else if (t.dataset.bpart) { state.buildPart = t.dataset.bpart; }
-    else if (t.dataset.opt !== undefined) {
-      var spec = partSpec(state.kind, state.buildPart);
-      c[state.buildPart] = spec[2].filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
+    else if (t.dataset.page) { state.buildPage = Number(t.dataset.page); }
+    else if (t.dataset.ppart && t.dataset.opt !== undefined) {
+      var spec = partSpec(state.kind, t.dataset.ppart);
+      if (!spec) return;
+      c[t.dataset.ppart] = spec[2].filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
       changed = true;
     }
     else if (t.dataset.part) { state.colorPart = t.dataset.part; }
@@ -3279,19 +3388,23 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     });
     ctx.fillStyle = OUT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "800 " + Math.round(R * 0.2) + "px " + FONT;
+    // tick marks at every step; labels only at the start, middle and end of the dial
+    ctx.lineCap = "round";
     for (var vv = 0; vv <= P.dial; vv += P.step) {
       var a = a0 + (a1 - a0) * vv / P.dial;
-      ctx.fillText(String(vv), cx + Math.cos(a) * R * 0.62, cy + Math.sin(a) * R * 0.62);
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.7, cy + Math.sin(a) * R * 0.7); ctx.lineTo(cx + Math.cos(a) * R * 0.78, cy + Math.sin(a) * R * 0.78);
+      ctx.lineWidth = R * 0.045; ctx.strokeStyle = OUT; ctx.stroke();
     }
+    [0, P.dial / 2, P.dial].forEach(function (lv) {
+      var a = a0 + (a1 - a0) * lv / P.dial;
+      ctx.fillText(String(lv), cx + Math.cos(a) * R * 0.5, cy + Math.sin(a) * R * 0.5);
+    });
     var shown = Math.round(dv.speed * P.factor);
     var na = a0 + (a1 - a0) * clamp(shown / P.dial, 0, 1.04);
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(na) * R * 0.8, cy + Math.sin(na) * R * 0.8);
     ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = R * 0.11; ctx.stroke();
     ctx.strokeStyle = "#E63946"; ctx.lineWidth = R * 0.06; ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.1, 0, 7); ctx.fillStyle = OUT; ctx.fill();
-    ctx.font = "800 " + Math.round(R * 0.36) + "px " + FONT;
-    ctx.fillStyle = OUT;
-    ctx.fillText(String(shown), cx, cy + R * 0.5);
     ctx.restore();
   }
   function draw() {
@@ -3311,6 +3424,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     var el = $("dhud");
     if (!dv || dv.park) { el.hidden = true; return; }
     el.hidden = false;
+    // Counters stay (the dad's call): laps for fast cars, crushed cars for monster trucks.
     if (dv.fam === "fast") el.textContent = "Lap " + dv.lap;
     else if (dv.fam === "monster") el.textContent = "Crushed: " + dv.crushed;
     else el.textContent = KINDS[dv.kind].label;
