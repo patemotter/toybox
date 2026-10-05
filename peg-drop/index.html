@@ -1,0 +1,2750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Peg Drop</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Peg Drop">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+}
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+header h1 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+/* Home: a link back to the Toybox launcher. */
+.homebtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 2px 12px 2px 9px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--edge);
+  -webkit-tap-highlight-color: transparent;
+}
+.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 16px;
+  padding: 0.45rem 0.8rem;
+  min-height: 52px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.gbtn { flex: none; min-height: 40px; font-size: 1rem; padding: 0.15rem 0.8rem; }
+
+.app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 3px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 4px 4px 0 var(--edge);
+  background: #121633;
+  overflow: hidden;
+}
+.stage.shake { animation: shake 0.45s ease; }
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-8px, 3px); }
+  40% { transform: translate(7px, -4px); }
+  60% { transform: translate(-5px, 2px); }
+  80% { transform: translate(3px, -1px); }
+}
+#board {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: pointer;
+}
+.total {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  pointer-events: none;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.55;
+  box-shadow: 3px 3px 0 #1D2340;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.12s ease;
+}
+.total.pop { transform: scale(1.15); }
+.mins {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  pointer-events: none;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1.55;
+  box-shadow: 3px 3px 0 #1D2340;
+}
+.mins[hidden], .timebar[hidden] { display: none; }
+.timebar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 7px;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.15);
+}
+.timebar i { display: block; height: 100%; width: 100%; background: #2E9E5B; }
+
+/* ---------- Controls ---------- */
+.panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 var(--edge);
+  padding: 10px 12px 12px;
+}
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 60px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  padding: 0.2rem 0.4rem;
+  white-space: nowrap;
+  color: #1D2340;
+  border-color: #1D2340;
+}
+.act svg { width: 34px; height: 34px; flex: none; }
+#drop10 { background: #FFC93C; }
+#rain { background: #8FDBFF; }
+#rain[aria-pressed="true"] {
+  background: repeating-linear-gradient(135deg, #8FDBFF 0 14px, #C4ECFF 14px 28px);
+  background-size: 40px 40px;
+  animation: rainbg 0.8s linear infinite;
+}
+@keyframes rainbg { from { background-position: 0 0; } to { background-position: 40px 0; } }
+#emptyBtn { background: #FF9ECF; }
+.group { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.glabel {
+  flex: none;
+  width: 3.6em;
+  font-weight: 800;
+  font-size: 1.05rem;
+  text-align: right;
+  color: var(--muted);
+}
+.boards {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.boardbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 6px 2px 2px;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  min-width: 0;
+}
+.boardbtn svg { width: 50px; height: 50px; display: block; }
+.ballrow { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; }
+.swatches {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+.swatch {
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 58px;
+  justify-self: center;
+  border-radius: 50%;
+  border: 3px solid #1D2340;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1D2340;
+  display: grid;
+  place-items: center;
+  box-shadow: 2px 2px 0 #1D2340;
+}
+.swatch[data-color="rainbow"] {
+  background: conic-gradient(#FF4D6D, #FF9F1C, #FFD23F, #5BE36B, #3EC8FF, #5B7CFF, #B26BFF, #FF6FD8, #FF4D6D);
+}
+.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; }
+.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
+.swatch .tick {
+  width: 58%;
+  height: 58%;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 2px solid #1D2340;
+  display: grid;
+  place-items: center;
+  font-size: 0.9em;
+  line-height: 1;
+}
+.sizes { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sizebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 96px;
+  font-size: 1.1rem;
+  padding: 0.2rem 0.5rem;
+}
+.sizebtn i { display: block; border-radius: 50%; background: #FF4D6D; border: 2px solid #1D2340; flex: none; }
+.minibar { display: none; }
+
+/* ---------- Timer: toast, goodbye, lock-down ---------- */
+.toast {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: var(--accent);
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 #1D2340;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 22px;
+  padding: 10px 16px 12px;
+  box-shadow: 4px 4px 0 #1D2340;
+  text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye {
+  background: var(--accent);
+  color: #1D2340;
+  border-color: #1D2340;
+  box-shadow: 3px 3px 0 #1D2340;
+  font-size: 1.3rem;
+  min-height: 56px;
+  padding: 0.4rem 1.2rem;
+}
+.goodbye[hidden] { display: none; }
+body.ending .panel,
+body.ending .homebtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+  background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 4px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 6px 6px 0 var(--edge);
+  padding: 18px 18px 20px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 16px 0 8px; font-size: 1.1rem; font-weight: 800; text-align: center; }
+.sheet .opt { color: var(--muted); font-weight: 500; }
+.sheet section { border-top: 3px dashed var(--muted); margin-top: 16px; padding-top: 4px; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.row .btn { flex: 1 1 0; min-width: 0; padding: 0.2rem 0.3rem; white-space: nowrap; }
+.textin {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 1.1rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  padding: 0.45rem 0.8rem;
+}
+.textin:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold {
+  position: relative;
+  overflow: hidden;
+  -webkit-touch-callout: none;
+}
+.hold .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: rgba(255, 201, 60, 0.75);
+}
+.hold .label { position: relative; }
+.status { margin: 0 0 8px; text-align: center; font-weight: 700; font-size: 1.1rem; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: auto;
+  min-width: min(100%, 360px);
+  max-width: 100%;
+  max-height: 100%;
+  background: var(--plate);
+  color: #1D2340;
+  border: 4px solid var(--edge);
+  border-radius: 28px;
+  box-shadow: 6px 6px 0 var(--edge);
+  padding: 18px 20px 22px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.rest-art {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(72vw, 360px);
+  max-height: 50vh;
+  min-height: 0;
+  margin: 0 auto 6px;
+  border: 3px solid #1D2340;
+  border-radius: 18px;
+  opacity: 0.92;
+}
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next {
+  margin: 16px auto 0;
+  display: inline-block;
+  background: var(--accent);
+  border: 3px solid #1D2340;
+  border-radius: 16px;
+  padding: 0.4rem 1.1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px;
+  height: 48px;
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel);
+  font-size: 1.3rem;
+  cursor: pointer;
+  opacity: 0.7;
+  touch-action: none;
+}
+.lock:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Landscape: board on the left, controls on the right ---------- */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .panel {
+    flex: 0 0 min(40%, 420px);
+    justify-content: center;
+    gap: 14px;
+    padding: 14px;
+  }
+  .group { flex-direction: column; align-items: stretch; gap: 6px; }
+  .glabel { width: auto; text-align: left; padding-left: 4px; }
+  .act { flex-direction: column; gap: 0; padding: 6px 2px 4px; line-height: 1.1; }
+  .boards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boardbtn { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 8px; }
+  .ballrow { flex-direction: column; align-items: stretch; gap: 12px; }
+  .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .sizes .sizebtn { min-height: 56px; }
+}
+
+/* ---------- Phones (portrait) ---------- */
+@media (max-width: 600px) and (orientation: portrait) {
+  .wrap { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+  .app { gap: 8px; margin-bottom: 8px; }
+  .panel { gap: 8px; padding: 8px; border-radius: 18px; }
+  .actions { gap: 6px; }
+  .act { min-height: 50px; font-size: 1.1rem; gap: 4px; }
+  .act svg { width: 24px; height: 24px; }
+  .glabel { display: none; }
+  .boards { gap: 6px; }
+  .boardbtn { font-size: 0.86rem; padding: 3px 1px 1px; border-radius: 12px; }
+  .boardbtn svg { width: 34px; height: 34px; }
+  .ballrow { flex-direction: column; align-items: stretch; gap: 8px; }
+  .swatches { gap: 6px; }
+  .swatch { font-size: 1rem; }
+  .sizes .sizebtn { min-height: 42px; }
+  .total { font-size: 1.05rem; top: 7px; right: 7px; padding: 0 10px; }
+  .mins { font-size: 1rem; top: 7px; left: 7px; }
+}
+
+/* ---------- Big screens (tablets) ---------- */
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .gbtn, .homebtn { min-height: 46px; font-size: 1.1rem; }
+  .app { gap: 14px; margin-top: 12px; margin-bottom: 14px; }
+  .total { font-size: 1.6rem; top: 12px; right: 12px; padding: 0 18px; }
+  .mins { font-size: 1.35rem; top: 12px; left: 12px; }
+  .act { min-height: 68px; font-size: 1.5rem; }
+  .act svg { width: 40px; height: 40px; }
+  .boardbtn { font-size: 1.15rem; }
+  .boardbtn svg { width: 56px; height: 56px; }
+  .sizebtn { min-height: 58px; font-size: 1.2rem; }
+}
+
+@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
+  .panel { gap: 18px; }
+  .act { min-height: 104px; }
+  .act svg { width: 46px; height: 46px; }
+  .boardbtn { min-height: 76px; }
+  .group { gap: 8px; }
+}
+
+/* ---------- Short landscape phones: no header, tighter panel ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  header { display: none; }
+  .wrap { padding-top: 6px; }
+  .app { margin-top: 0; margin-bottom: 6px; gap: 8px; }
+  .panel { flex-basis: min(44%, 330px); gap: 6px; padding: 8px; border-radius: 18px; justify-content: space-between; }
+  .glabel { display: none; }
+  .actions { gap: 6px; }
+  .act { min-height: 44px; font-size: 1rem; gap: 3px; flex-direction: row; padding: 0.2rem 0.3rem; }
+  .act svg { width: 22px; height: 22px; }
+  .boards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .boardbtn { flex-direction: column; justify-content: center; gap: 0; font-size: 0.74rem; padding: 2px 1px 1px; border-radius: 12px; min-height: 48px; }
+  .boardbtn svg { width: 28px; height: 28px; }
+  .ballrow { gap: 6px; }
+  .swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+  .swatch { border-width: 2px; font-size: 0.9rem; }
+  .sizes .sizebtn { min-height: 40px; font-size: 0.95rem; }
+  .minibar { display: grid; grid-template-columns: auto 1fr; gap: 6px; }
+  .minibar .homebtn { min-height: 40px; }
+  .minibar .gbtn { min-height: 40px; }
+  .total { font-size: 1rem; top: 6px; right: 6px; padding: 0 10px; }
+  .mins { font-size: 0.95rem; top: 6px; left: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .stage.shake { animation: none; }
+  #rain[aria-pressed="true"] { animation: none; }
+  .total { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Peg Drop</h1>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn gbtn" data-action="timer" id="timerbtn">Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage" id="stage">
+      <canvas id="board" role="img" aria-label="A board of pegs. Tap to drop balls."></canvas>
+      <div class="timebar" id="timebar" hidden><i id="timefill"></i></div>
+      <div class="mins" id="mins" hidden></div>
+      <div class="total" id="total" aria-live="polite">Total: <span id="totalNum">0</span></div>
+      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to say goodbye</p>
+        <button class="btn goodbye" id="goodbyeBtn">Last drop</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="actions">
+        <button class="btn act" id="drop10"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="11" cy="10" r="6" fill="#FF4D6D" stroke="#1D2340" stroke-width="3"/><circle cx="27" cy="16" r="6" fill="#3EC8FF" stroke="#1D2340" stroke-width="3"/><circle cx="15" cy="29" r="6" fill="#5BE36B" stroke="#1D2340" stroke-width="3"/><path d="M30 26v9m-4-4 4 4 4-4" fill="none" stroke="#1D2340" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Drop 10</span></button>
+        <button class="btn act" id="rain" aria-pressed="false"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 20a8 8 0 0 1 5-12 10 10 0 0 1 18 4 6 6 0 0 1-1 11H11a5 5 0 0 1-2-3z" fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><circle cx="12" cy="30" r="3.5" fill="#FFD23F" stroke="#1D2340" stroke-width="2.5"/><circle cx="21" cy="34" r="3.5" fill="#FF6FD8" stroke="#1D2340" stroke-width="2.5"/><circle cx="30" cy="30" r="3.5" fill="#5B7CFF" stroke="#1D2340" stroke-width="2.5"/></svg><span>Rain</span></button>
+        <button class="btn act" id="emptyBtn"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 6v20h28V6" fill="none" stroke="#1D2340" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 26l9 7M32 26l-9 7" stroke="#1D2340" stroke-width="3.5" stroke-linecap="round"/><circle cx="20" cy="34" r="3.5" fill="#FFD23F" stroke="#1D2340" stroke-width="2.5"/><circle cx="14" cy="20" r="4" fill="#5BE36B" stroke="#1D2340" stroke-width="2.5"/><circle cx="25" cy="20" r="4" fill="#FF4D6D" stroke="#1D2340" stroke-width="2.5"/></svg><span>Empty</span></button>
+      </div>
+      <div class="group">
+        <div class="glabel">Board</div>
+        <div class="boards" id="boards"></div>
+      </div>
+      <div class="group">
+        <div class="glabel">Balls</div>
+        <div class="ballrow">
+          <div class="swatches" id="swatches"></div>
+          <div class="sizes">
+            <button class="btn sizebtn" data-size="small"><i style="width:12px;height:12px"></i>Small</button>
+            <button class="btn sizebtn" data-size="big"><i style="width:22px;height:22px"></i>Big</button>
+          </div>
+        </div>
+      </div>
+      <div class="minibar">
+        <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+        <button class="btn gbtn" data-action="timer">Grown-ups</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Grown-up settings: play timer, sound, tilt -->
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="timerTitle">
+      <h2 id="timerTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">When time is up, the balls stop dropping and settle into the bins, and the controls lock.</p>
+        <h3>How long</h3>
+        <div class="row" id="minuteRow"></div>
+        <h3>Next activity <span class="opt">(optional)</span></h3>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the board</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Last drop button to press</label>
+        <div class="sheet-actions">
+          <button class="btn primary" id="timerStart">Start timer</button>
+        </div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+
+      <section>
+        <h3>Sound</h3>
+        <p class="status" id="soundStatus">Sound is off.</p>
+        <div class="sheet-actions" style="margin-top:0">
+          <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="holdSoundLabel">Hold to turn sound on</span></button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Tilt and shake</h3>
+        <p class="sub" id="tiltNote">Tip the device to steer the balls. Shake it to bounce them.</p>
+        <div class="sheet-actions">
+          <button class="btn" id="tiltBtn">Turn on tilt</button>
+        </div>
+      </section>
+
+      <div class="sheet-actions">
+        <button class="btn" data-action="timerclose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rest screen shown when play time is over -->
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <img class="rest-art" id="restArt" alt="">
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The pegs are resting.</p>
+      <p class="rest-line">They will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = "pegdrop-v1";
+  var SOUND_KEY = "pegdrop-sound-v1";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var COLORS = [
+    ["Red", "#FF4D6D"], ["Orange", "#FF9F1C"], ["Yellow", "#FFD23F"], ["Green", "#5BE36B"],
+    ["Sky", "#3EC8FF"], ["Blue", "#5B7CFF"], ["Purple", "#B26BFF"], ["Pink", "#FF6FD8"]
+  ];
+  var NC = COLORS.length;
+  var LAYOUTS = [["classic", "Classic"], ["bumpers", "Bumpers"], ["spinners", "Spinners"], ["zigzag", "Zigzag"]];
+  var LAYOUT_IDS = LAYOUTS.map(function (l) { return l[0]; });
+  var CAP = 150;               // most live (moving) balls at once
+  var STEP = 1 / 240;          // fixed physics timestep
+  var TRAIL = 7;               // trail length in frames
+
+  // Bins are fixed per device (not per orientation), so turning the iPad keeps the counts.
+  var scrMin = Math.min(window.screen && screen.width || window.innerWidth, window.screen && screen.height || window.innerHeight);
+  var B = scrMin >= 600 ? 11 : 9;
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---------- Saved settings ----------
+  function emptyCounts() {
+    var a = [], i, k, row;
+    for (i = 0; i < B; i++) { row = []; for (k = 0; k < NC; k++) row.push(0); a.push(row); }
+    return a;
+  }
+  function freshState() {
+    return { layout: "classic", color: "rainbow", size: "small", bins: {} };
+  }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (LAYOUT_IDS.indexOf(o.layout) !== -1) s.layout = o.layout;
+        if (o.color === "rainbow" || (Number.isInteger(o.color) && o.color >= 0 && o.color < NC)) s.color = o.color;
+        if (o.size === "small" || o.size === "big") s.size = o.size;
+        if (o.bins && typeof o.bins === "object") {
+          LAYOUT_IDS.forEach(function (id) {
+            var b = o.bins[id];
+            if (!Array.isArray(b) || b.length !== B) return;
+            var ok = b.every(function (row) {
+              return Array.isArray(row) && row.length === NC && row.every(function (n) { return Number.isInteger(n) && n >= 0 && n < 100000; });
+            });
+            if (ok) s.bins[id] = b;
+          });
+        }
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return s;
+  }
+  var state = loadState();
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Sound (off by default; soft synthesized plinks) ----------
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SOUND_KEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null;
+  function makeAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        var lp = actx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 3200;
+        master = actx.createGain();
+        master.gain.value = 0.55;
+        master.connect(lp);
+        lp.connect(actx.destination);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { /* audio unavailable */ }
+  }
+  // Only ever started or resumed from inside a user gesture.
+  document.addEventListener("pointerdown", function () { if (soundOn) makeAudio(); }, true);
+
+  var tokens = 4, tokenT = 0, lastSoundT = 0;
+  function takeToken() {
+    var now = performance.now();
+    tokens = Math.min(4, tokens + (now - tokenT) * 0.012);   // about 12 sounds a second at most
+    tokenT = now;
+    if (tokens < 1 || now - lastSoundT < 38) return false;
+    tokens -= 1;
+    lastSoundT = now;
+    return true;
+  }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    if (!soundOn || !actx || actx.state !== "running") return;
+    try {
+      var t = actx.currentTime + (delay || 0);
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur * 0.7);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(master);
+      o.start(t);
+      o.stop(t + dur + 0.03);
+    } catch (e) { /* ignore */ }
+  }
+  // Pentatonic notes from high (top rows) to low (bottom rows).
+  var NOTES = [1318.5, 1174.7, 1046.5, 880, 784, 659.3, 587.3, 523.3, 440, 392, 329.6, 293.7, 261.6];
+  function plink(row, strength) {
+    if (!soundOn || !takeToken()) return;
+    var idx = Math.round(clamp(row / Math.max(1, pegRows - 1), 0, 1) * (NOTES.length - 1));
+    tone(NOTES[idx], 0.25, 0.03 + 0.03 * strength, "sine");
+  }
+  function boing() { if (soundOn && takeToken()) tone(330, 0.3, 0.06, "sine", 620); }
+  function thup(i) { if (soundOn && takeToken()) tone(196 + i * 12, 0.18, 0.05, "triangle"); }
+  function chime() {
+    [784, 988, 1175].forEach(function (f, k) { tone(f, 0.35, 0.05, "sine", 0, k * 0.09); });
+  }
+  function whoosh() {
+    [880, 740, 587, 440, 330].forEach(function (f, k) { tone(f, 0.3, 0.04, "sine", 0, k * 0.07); });
+  }
+
+  // ---------- Canvas and world ----------
+  var stage = $("stage"), canvas = $("board"), ctx = canvas.getContext("2d");
+  var base = document.createElement("canvas"), bctx = base.getContext("2d");
+  var DPR = 1, CW = 0, CH = 0, W = 0, H = 0, OX = 0;
+  var su = 1, bw = 60, topH = 60, labelH = 40, binH = 120, binTop = 0, floorY = 0, divR = 3;
+  var pegR = 6, smallR = 7.5, bigR = 11.5, G = 1100, numFont = 30, pegE = 0.5;
+  var galtonTop = 1e9, galtonVx = 0;   // Classic: sideways speed limit inside the triangle
+  var pegs = [], pegGrid = [], pgw = 1, pgh = 1, pcs = 40, pegRows = 1;
+  var segs = [], bumpers = [], bodies = [], bins = [], balls = [], parts = [];
+  var activePegs = [];
+  var gravX = 0, gravY = 1, tiltX = 0, tiltY = 1;
+  var rainbowI = 0;
+  var built = false;
+
+  // Glow sprites: one soft radial blob per color, plus white.
+  var glow = [];
+  function makeGlows() {
+    var list = COLORS.map(function (c) { return c[1]; }).concat(["#FFFFFF"]);
+    glow = list.map(function (hex) {
+      var c = document.createElement("canvas");
+      c.width = c.height = 64;
+      var g = c.getContext("2d");
+      var grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, hex);
+      grd.addColorStop(0.35, hex + "AA");
+      grd.addColorStop(1, hex + "00");
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 64, 64);
+      return c;
+    });
+  }
+  makeGlows();
+  var WHITE = NC;
+
+  function binHue(i) { return Math.round(i * 300 / Math.max(1, B - 1)); }
+
+  function addSeg(ax, ay, bx, by, r, kind, col, e) {
+    var s = { ax: ax, ay: ay, bx: bx, by: by, r: r, kind: kind, col: col, e: e == null ? 0.35 : e };
+    s.len2 = (bx - ax) * (bx - ax) + (by - ay) * (by - ay) || 1;
+    s.x0 = Math.min(ax, bx) - r; s.x1 = Math.max(ax, bx) + r;
+    s.y0 = Math.min(ay, by) - r; s.y1 = Math.max(ay, by) + r;
+    segs.push(s);
+    return s;
+  }
+
+  // Exclusion zones keep pegs away from bumpers and spinners so balls can't get trapped.
+  var excl = [];
+  function addPeg(x, y, row) {
+    var i, z;
+    if (x < pegR + 1 || x > W - pegR - 1) return;
+    for (i = 0; i < excl.length; i++) {
+      z = excl[i];
+      if ((x - z.x) * (x - z.x) + (y - z.y) * (y - z.y) < z.r * z.r) return;
+    }
+    pegs.push({ x: x, y: y, r: pegR, row: row, lit: 0, tint: 0, c: 0, active: false });
+  }
+
+  // Staggered rows from yBot upward; the bottom row lines up with the bin dividers.
+  function staggerRows(yTop, yBot, dyWanted) {
+    var n = Math.max(1, Math.floor((yBot - yTop) / dyWanted) + 1);
+    var dy = n > 1 ? Math.min(dyWanted * 1.25, (yBot - yTop) / (n - 1)) : 0;
+    var k, i, y, row;
+    for (k = 0; k < n; k++) {
+      y = yBot - k * dy;
+      row = n - 1 - k;
+      if (k % 2 === 0) { for (i = 1; i < B; i++) addPeg(i * bw, y, row); }
+      // Offset rows skip the pegs right next to the walls, so big balls never wedge there.
+      else { for (i = 1; i < B - 1; i++) addPeg((i + 0.5) * bw, y, row); }
+    }
+    return n;
+  }
+
+  function buildLayout(id) {
+    var fieldTop = topH + 8 * su;
+    var fieldBot = binTop - 22 * su;
+    var cx = W / 2;
+    var dyStd = bw * 0.8;
+    var i, k, x, y;
+    pegE = id === "classic" ? 0.3 : 0.5;
+    galtonTop = 1e9;
+
+    if (id === "classic") {
+      // A funnel feeds the middle; a triangle of pegs spreads the balls into a bell curve.
+      var gap = bw;
+      var slope = 0.36;
+      var yw = topH * 0.75;
+      var run = cx - gap / 2;
+      var fy = yw + slope * run;
+      addSeg(-4 * su, yw, cx - gap / 2, fy, 5 * su, "funnel", "#8FDBFF", 0.3);
+      addSeg(W + 4 * su, yw, cx + gap / 2, fy, 5 * su, "funnel", "#8FDBFF", 0.3);
+      var y0 = fy + bw * 0.55;
+      var rowsWanted = B - 1;
+      var dy = (fieldBot - y0) / (rowsWanted - 1);
+      dy = clamp(dy, bw * 0.5, bw * 0.87);
+      var rows = Math.min(rowsWanted, Math.floor((fieldBot - y0) / dy) + 1);
+      // Build from the bottom row (B-1 pegs, on the dividers) upward.
+      for (k = 0; k < rows; k++) {
+        var count = B - 1 - k;
+        y = fieldBot - k * dy;
+        for (i = 0; i < count; i++) addPeg(cx + (i - (count - 1) / 2) * bw, y, rows - 1 - k);
+      }
+      pegRows = rows;
+      galtonTop = fieldBot - (rows - 1) * dy - dy * 0.5;
+      galtonVx = 190 * su;
+      // Rails along the triangle's sides keep balls inside, leaving room for a big ball to pass.
+      var topCount = B - rows;
+      var yTop = fieldBot - (rows - 1) * dy;
+      var need = pegR + 5 * su + bigR * 2.4;
+      var off = need * Math.sqrt(dy * dy + bw * bw / 4) / dy;
+      var slopeX = rows > 1 ? (bw / 2) / dy : 0;
+      var exT = dy * 0.5, exB = dy * 0.4;
+      [-1, 1].forEach(function (sg) {
+        var edgeTop = cx + sg * ((topCount - 1) / 2 * bw + off);
+        var xa = edgeTop - sg * slopeX * exT, ya = yTop - exT;
+        var xb = edgeTop + sg * slopeX * ((fieldBot - yTop) + exB), yb = fieldBot + exB;
+        if (sg < 0 && xb < 5 * su) { yb -= (5 * su - xb) / slopeX; xb = 5 * su; }
+        if (sg > 0 && xb > W - 5 * su) { yb -= (xb - (W - 5 * su)) / slopeX; xb = W - 5 * su; }
+        addSeg(cx + sg * gap / 2, fy, xa, ya, 5 * su, "funnel", "#8FDBFF", 0.3);
+        addSeg(xa, ya, xb, yb, 5 * su, "funnel", "#8FDBFF", 0.3).kick = -sg;
+      });
+    } else if (id === "bumpers") {
+      var fh = fieldBot - fieldTop;
+      var bR = Math.max(bw * 0.42, 20 * su);
+      var spots = [[0.27, 0.2], [0.73, 0.2], [0.5, 0.48], [0.2, 0.74], [0.8, 0.74]];
+      spots.forEach(function (p) {
+        var bx = W * p[0], by = fieldTop + fh * p[1];
+        bumpers.push({ x: bx, y: by, r: bR, flash: 0, c: 0 });
+        excl.push({ x: bx, y: by, r: bR + pegR + bigR * 2.6 });
+      });
+      pegRows = staggerRows(fieldTop + 4 * su, fieldBot, dyStd);
+    } else if (id === "spinners") {
+      var fh2 = fieldBot - fieldTop;
+      var L = Math.min(bw * 1.0, 70 * su);
+      var mills = [[0.3, 0.24, 1], [0.7, 0.42, -1], [0.32, 0.72, -1]];
+      if (W / bw > 7 && fh2 > L * 7) mills.push([0.74, 0.86, 1]);
+      mills.forEach(function (p) {
+        var mx = clamp(W * p[0], L + bigR * 3, W - L - bigR * 3), my = fieldTop + fh2 * p[1];
+        var w0 = (reduce ? 1.0 : 1.7) * p[2];
+        bodies.push({ kind: "mill", cx: mx, cy: my, a: Math.random() * 3, w: w0, w0: w0, L: L, cr: 6 * su, hub: 9 * su,
+          vx: 0, vy: 0, k: 1 / (9000 * su * su), R: L + 6 * su, segs: [] });
+        excl.push({ x: mx, y: my, r: L + pegR + bigR * 2.4 });
+      });
+      pegRows = staggerRows(fieldTop + 4 * su, fieldBot, dyStd);
+    } else {
+      // Zigzag ramps, then a moving bucket, then pegs.
+      var f = 0.52, s = 0.2, cr = 5 * su;
+      var clear = s * (2 * f - 1) * W + bigR * 3.6 + 2 * cr;
+      var yr = fieldTop + 6 * su;
+      var nR = 3;
+      var fhz = fieldBot - fieldTop;
+      // Fewer ramps if the board is short.
+      while (nR > 1 && (nR - 1) * clear + s * f * W > fhz * 0.52) nR--;
+      for (k = 0; k < nR; k++) {
+        if (k % 2 === 0) addSeg(-4 * su, yr, f * W, yr + s * (f * W + 4 * su), cr, "ramp", "#8FDBFF", 0.2);
+        else addSeg(W + 4 * su, yr, (1 - f) * W, yr + s * (f * W + 4 * su), cr, "ramp", "#8FDBFF", 0.2);
+        yr += clear;
+      }
+      var rampEnd = yr - clear + s * f * W;
+      var hw = bw * 0.52, hh = bw * 0.27, fl = bw * 0.12;
+      var R = Math.sqrt((hw + fl) * (hw + fl) + hh * hh) + 5 * su;
+      var byc = rampEnd + R + bigR * 2.2;
+      var amp = Math.max(0, W / 2 - R - bigR * 3);
+      bodies.push({ kind: "bucket", cx: cx, cy: byc, baseX: cx, amp: amp, t: 0, a: 0, w: 0, vx: 0, vy: 0,
+        phase: "move", timer: 0, dir: 1, cr: 5.5 * su, R: R, hw: hw, hh: hh, fl: fl,
+        local: [[-hw - fl, -hh, -hw, hh], [-hw, hh, hw, hh], [hw, hh, hw + fl, -hh]], segs: [] });
+      var pegTop = byc + R + bigR * 2.4;
+      pegRows = staggerRows(Math.min(pegTop, fieldBot), fieldBot, dyStd);
+    }
+  }
+
+  function build() {
+    CW = stage.clientWidth;
+    CH = stage.clientHeight;
+    if (CW < 10 || CH < 10) return;
+    var oldW = W, oldH = H, oldSu = su;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(CW * DPR);
+    canvas.height = Math.round(CH * DPR);
+    W = Math.min(CW, Math.round(CH * 1.1));
+    H = CH;
+    OX = Math.round((CW - W) / 2);
+    bw = W / B;
+    su = Math.max(0.42, Math.min(bw / 64, H / 560));
+    pegR = 6 * su;
+    smallR = 8 * su;
+    bigR = 14 * su;
+    G = 1150 * su;
+    divR = 3 * su;
+    numFont = Math.round(Math.min(bw * 0.5, 34 * su, 40));
+    numFont = Math.max(numFont, 14);
+    labelH = Math.round(numFont * 1.3 + 6);
+    topH = Math.round(58 * su);
+    binH = clamp(H * 0.19, 90 * su, 190 * su);
+    floorY = H - labelH;
+    binTop = floorY - binH;
+
+    // Keep what is already in the bins; keep flying balls by scaling their positions.
+    var keep = [];
+    if (built) {
+      absorbAllInBins();
+      balls.forEach(function (b) {
+        if (b.y > H + 4) return;
+        b.x = b.x * W / oldW;
+        b.y = b.y * H / oldH;
+        b.r = b.r * su / oldSu;
+        b.vx = 0; b.vy = 0;
+        b.sleep = false;
+        resetTrail(b);
+        keep.push(b);
+      });
+    }
+    balls = keep;
+
+    pegs = []; segs = []; bumpers = []; bodies = []; excl = []; activePegs = [];
+    var savedBins = bins;
+    bins = [];
+    var i;
+    for (i = 0; i < B; i++) {
+      var old = savedBins[i];
+      bins.push({ x0: i * bw, x1: (i + 1) * bw, packed: old ? old.packed : [], ph: 0, glow: 0, gc: 0,
+        count: 0, loose: 0, shown: 0, pop: 0, pc: 0, door: 0, cache: null, dirty: true, L: null });
+    }
+    for (i = 1; i < B; i++) addSeg(i * bw, binTop, i * bw, floorY, divR, "div", "#DDE5FF", 0.3);
+    buildLayout(state.layout);
+    if (!pegRows) pegRows = 1;
+
+    // Static peg grid for fast lookups.
+    pcs = Math.max(20, bw * 0.75);
+    pgw = Math.ceil(W / pcs) + 1;
+    pgh = Math.ceil(H / pcs) + 1;
+    pegGrid = new Array(pgw * pgh);
+    pegs.forEach(function (p) {
+      var gx = clamp(Math.floor(p.x / pcs), 0, pgw - 1), gy = clamp(Math.floor(p.y / pcs), 0, pgh - 1);
+      var k = gy * pgw + gx;
+      (pegGrid[k] || (pegGrid[k] = [])).push(p);
+    });
+    packCols = 0;
+    updatePackCols();
+    bins.forEach(function (bn) { bn.L = packLayout(bn.packed.length); bn.ph = bn.L.h; bn.dirty = true; });
+    updateBodies(0);
+    drawBase();
+    built = true;
+  }
+
+  // How the packed (settled) balls in a bin are drawn. All bins share one ball size, chosen by the
+  // fullest bin, so the stack heights stay a fair bar chart of the counts.
+  var packCols = 3;
+  function colsFor(n) {
+    var iw = bw - 2 * divR - 2, maxH = binH * 0.8, cols = 3;
+    while (cols < 9 && Math.ceil(n / cols) * (2 * iw / (2 * cols) * 0.93) > maxH) cols++;
+    return cols;
+  }
+  function packLayout(n) {
+    var iw = bw - 2 * divR - 2;
+    var maxH = binH * 0.8;
+    var cols = packCols;
+    var pr = iw / (2 * cols);
+    var rowH = 2 * pr * 0.93;
+    var maxRows = Math.max(1, Math.floor(maxH / rowH));
+    return { cols: cols, pr: pr, rowH: rowH, maxRows: maxRows, h: Math.min(maxH, n / cols * rowH) };
+  }
+  function updatePackCols() {
+    var mx = 0;
+    for (var i = 0; i < bins.length; i++) mx = Math.max(mx, bins[i].packed.length);
+    var c = colsFor(mx);
+    if (c !== packCols) {
+      packCols = c;
+      for (i = 0; i < bins.length; i++) bins[i].dirty = true;
+    }
+  }
+
+  function drawBinCache(bn) {
+    var c = bn.cache;
+    var w = Math.ceil(bw * DPR), h = Math.ceil(binH * DPR);
+    if (!c) { c = bn.cache = document.createElement("canvas"); }
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    var g = c.getContext("2d");
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.clearRect(0, 0, bw, binH);
+    var L = bn.L = packLayout(bn.packed.length);
+    var n = Math.min(bn.packed.length, L.maxRows * L.cols);
+    var k, row, col, x, y;
+    for (k = 0; k < n; k++) {
+      row = (k / L.cols) | 0;
+      col = k % L.cols;
+      x = divR + 1 + L.pr + col * 2 * L.pr;
+      y = binH - L.pr - row * L.rowH;
+      g.beginPath();
+      g.arc(x, y, L.pr * 0.94, 0, Math.PI * 2);
+      g.fillStyle = COLORS[bn.packed[k]][1];
+      g.fill();
+      g.lineWidth = Math.max(1, L.pr * 0.14);
+      g.strokeStyle = "rgba(10,12,40,0.55)";
+      g.stroke();
+      g.beginPath();
+      g.arc(x - L.pr * 0.3, y - L.pr * 0.32, L.pr * 0.3, 0, Math.PI * 2);
+      g.fillStyle = "rgba(255,255,255,0.45)";
+      g.fill();
+    }
+    bn.dirty = false;
+  }
+
+  function drawBase() {
+    base.width = Math.round(CW * DPR);
+    base.height = Math.round(CH * DPR);
+    var g = bctx;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.fillStyle = "#121633";
+    g.fillRect(0, 0, CW, CH);
+    // Side areas (wide screens): soft dots.
+    if (OX > 2) {
+      g.fillStyle = "rgba(255,255,255,0.06)";
+      var sx, sy;
+      for (sy = 14; sy < CH; sy += 28) for (sx = 14; sx < CW; sx += 28) {
+        if (sx > OX - 8 && sx < OX + W + 8) continue;
+        g.beginPath(); g.arc(sx + ((sy / 28) % 2) * 14, sy, 3, 0, Math.PI * 2); g.fill();
+      }
+    }
+    g.save();
+    g.translate(OX, 0);
+    var grd = g.createLinearGradient(0, 0, 0, H);
+    grd.addColorStop(0, "#2E3A93");
+    grd.addColorStop(0.6, "#222A6E");
+    grd.addColorStop(1, "#181D4E");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, W, H);
+    // Drop zone at the top.
+    g.fillStyle = "rgba(255,255,255,0.07)";
+    g.fillRect(0, 0, W, topH);
+    g.setLineDash([10 * su, 9 * su]);
+    g.lineWidth = 2.5 * su;
+    g.strokeStyle = "rgba(255,255,255,0.28)";
+    g.beginPath(); g.moveTo(8, topH); g.lineTo(W - 8, topH); g.stroke();
+    g.setLineDash([]);
+    // Bins.
+    var i;
+    for (i = 0; i < B; i++) {
+      var bg = g.createLinearGradient(0, binTop, 0, floorY);
+      bg.addColorStop(0, "hsla(" + binHue(i) + ",90%,65%,0.04)");
+      bg.addColorStop(1, "hsla(" + binHue(i) + ",90%,65%,0.22)");
+      g.fillStyle = bg;
+      g.fillRect(i * bw, binTop, bw, binH);
+    }
+    // Number strip under the bins.
+    g.fillStyle = "#0F1336";
+    g.fillRect(0, floorY, W, H - floorY);
+    // Walls at the board's edges.
+    g.fillStyle = "#0B0F2A";
+    g.fillRect(0, 0, 3 * su, H);
+    g.fillRect(W - 3 * su, 0, 3 * su, H);
+    // Static rails: dark outline then color.
+    segs.forEach(function (s) {
+      g.lineCap = "round";
+      g.strokeStyle = "#0B0F2A";
+      g.lineWidth = 2 * s.r + 4 * su;
+      g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
+    });
+    segs.forEach(function (s) {
+      g.strokeStyle = s.col;
+      g.lineWidth = 2 * s.r;
+      g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
+      if (s.kind !== "div") {
+        g.strokeStyle = "rgba(255,255,255,0.55)";
+        g.lineWidth = s.r * 0.6;
+        g.beginPath(); g.moveTo(s.ax, s.ay - s.r * 0.35); g.lineTo(s.bx, s.by - s.r * 0.35); g.stroke();
+      }
+    });
+    // Pegs (unlit look).
+    pegs.forEach(function (p) {
+      g.beginPath();
+      g.arc(p.x, p.y, p.r + 1.6 * su, 0, Math.PI * 2);
+      g.fillStyle = "#0B0F2A";
+      g.fill();
+      g.beginPath();
+      g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      g.fillStyle = "#E4EAFF";
+      g.fill();
+      g.beginPath();
+      g.arc(p.x - p.r * 0.3, p.y - p.r * 0.3, p.r * 0.35, 0, Math.PI * 2);
+      g.fillStyle = "#FFFFFF";
+      g.fill();
+    });
+    g.restore();
+  }
+
+  // ---------- Kinematic pieces (spinners, bucket) ----------
+  function updateBodies(h) {
+    var i, b, k, c, s, l;
+    for (i = 0; i < bodies.length; i++) {
+      b = bodies[i];
+      if (b.kind === "mill") {
+        var target = ending ? 0 : b.w0;
+        b.w += (target - b.w) * Math.min(1, h * (ending ? 1.2 : 0.6));
+        b.a += b.w * h;
+        c = Math.cos(b.a); s = Math.sin(b.a);
+        b.segs.length = 0;
+        for (k = 0; k < 4; k++) {
+          var ca = Math.cos(b.a + k * Math.PI / 2), sa = Math.sin(b.a + k * Math.PI / 2);
+          b.segs.push({ ax: b.cx + ca * b.hub * 0.6, ay: b.cy + sa * b.hub * 0.6, bx: b.cx + ca * b.L, by: b.cy + sa * b.L, r: b.cr, e: 0.4 });
+        }
+      } else {
+        if (b.phase === "move" && !ending) {
+          b.t += h * 0.6;
+          var nx = b.baseX + b.amp * Math.sin(b.t);
+          b.vx = h > 0 ? (nx - b.cx) / h : 0;
+          b.cx = nx;
+        } else {
+          b.vx = 0;
+        }
+        b.a += b.w * h;
+        c = Math.cos(b.a); s = Math.sin(b.a);
+        b.segs.length = 0;
+        for (k = 0; k < b.local.length; k++) {
+          l = b.local[k];
+          b.segs.push({ ax: b.cx + l[0] * c - l[1] * s, ay: b.cy + l[0] * s + l[1] * c,
+            bx: b.cx + l[2] * c - l[3] * s, by: b.cy + l[2] * s + l[3] * c, r: b.cr, e: 0.25 });
+        }
+      }
+    }
+  }
+
+  function bucketCount(bk) {
+    var n = 0, c = Math.cos(-bk.a), s = Math.sin(-bk.a), i, b, dx, dy, lx, ly;
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      dx = b.x - bk.cx; dy = b.y - bk.cy;
+      if (dx * dx + dy * dy > bk.R * bk.R) continue;
+      lx = dx * c - dy * s; ly = dx * s + dy * c;
+      if (Math.abs(lx) < bk.hw + bk.fl && ly > -bk.hh - b.r && ly < bk.hh) n++;
+    }
+    return n;
+  }
+
+  function updateBucket(bk, dt) {
+    bk.timer += dt;
+    if (bk.phase === "move") {
+      var n = bucketCount(bk);
+      if ((n >= 3 && bk.timer > 2.2) || (n >= 1 && bk.timer > 6) || (ending && n >= 1 && bk.timer > 0.6)) {
+        bk.phase = "tip";
+        bk.dir = bk.vx >= 0 ? 1 : -1;
+        bk.timer = 0;
+      }
+    } else if (bk.phase === "tip") {
+      bk.w = 3.4 * bk.dir;
+      if (Math.abs(bk.a) >= 2.1) { bk.w = 0; bk.phase = "hold"; bk.timer = 0; }
+    } else if (bk.phase === "hold") {
+      bk.w = 0;
+      if (bk.timer > 0.7) { bk.phase = "back"; bk.timer = 0; }
+    } else if (bk.phase === "back") {
+      bk.w = -2.4 * (bk.a > 0 ? 1 : -1);
+      if (Math.abs(bk.a) < 0.06) { bk.a = 0; bk.w = 0; bk.phase = "move"; bk.timer = 0; }
+    }
+  }
+
+  // ---------- Balls ----------
+  function resetTrail(b) {
+    for (var k = 0; k < TRAIL; k++) { b.tx[k] = b.x; b.ty[k] = b.y; }
+  }
+  function nextColor() {
+    if (state.color === "rainbow") { rainbowI = (rainbowI + 1) % NC; return rainbowI; }
+    return state.color;
+  }
+  function spawn(x, y) {
+    if (balls.length >= CAP && !absorbOne()) return false;
+    var r = state.size === "big" ? bigR : smallR;
+    var m = (r / smallR) * (r / smallR);
+    var b = {
+      x: clamp(x, r + 3 * su, W - r - 3 * su), y: y == null ? r + 3 : y,
+      vx: rand(-25, 25) * su, vy: 60 * su, r: r, m: m, im: 1 / m, c: nextColor(),
+      sleep: false, restT: 0, stillT: 0, nudges: 0, bin: -1, lastBin: -1, age: 0, inBinT: 0,
+      tx: new Float32Array(TRAIL), ty: new Float32Array(TRAIL)
+    };
+    resetTrail(b);
+    balls.push(b);
+    burst(b.x, b.y, b.c, 4, 120, 0.4);
+    return true;
+  }
+
+  function wakeBin(i) {
+    for (var k = 0; k < balls.length; k++) if (balls[k].bin === i) { balls[k].sleep = false; balls[k].restT = 0; }
+  }
+  function wakeAll() {
+    for (var k = 0; k < balls.length; k++) { balls[k].sleep = false; balls[k].restT = 0; balls[k].stillT = 0; }
+  }
+  function absorb(idx) {
+    var b = balls[idx], bn = bins[b.bin];
+    bn.packed.push(b.c);
+    bn.dirty = true;
+    balls[idx] = balls[balls.length - 1];
+    balls.pop();
+    wakeBin(b.bin);
+    countsDirty = true;
+  }
+  function absorbOne() {
+    var best = -1, bestAge = -1, i, b;
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      if (b.bin >= 0 && bins[b.bin].door < 0.05 && b.age > bestAge) { best = i; bestAge = b.age; }
+    }
+    if (best < 0) return false;
+    absorb(best);
+    return true;
+  }
+  function absorbAllInBins() {
+    for (var i = balls.length - 1; i >= 0; i--) {
+      if (balls[i].bin >= 0 && bins[balls[i].bin] && bins[balls[i].bin].door < 0.05) absorb(i);
+    }
+  }
+
+  // ---------- Particles ----------
+  function burst(x, y, c, n, speed, life) {
+    if (reduce) n = Math.ceil(n * 0.3);
+    for (var k = 0; k < n && parts.length < 700; k++) {
+      var a = Math.random() * Math.PI * 2, sp = speed * su * (0.4 + Math.random() * 0.8);
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40 * su, life: life * (0.6 + Math.random() * 0.6),
+        ttl: life, c: c, s: (3 + Math.random() * 4) * su, k: 0 });
+    }
+  }
+  function ring(x, y, c, r0, life) {
+    if (parts.length < 720) parts.push({ x: x, y: y, vx: 0, vy: 0, life: life, ttl: life, c: c, s: r0, k: 1 });
+  }
+
+  // ---------- Physics ----------
+  var ending = false;
+  var bgrid = null, bnext = null, bcs = 30, bgw = 1, bgh = 1;
+  var hitPeg = null, hitImpact = 0;
+
+  function collideCapsule(b, s, body) {
+    var abx = s.bx - s.ax, aby = s.by - s.ay;
+    var len2 = s.len2 || (abx * abx + aby * aby) || 1;
+    var t = ((b.x - s.ax) * abx + (b.y - s.ay) * aby) / len2;
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    var qx = s.ax + abx * t, qy = s.ay + aby * t;
+    var dx = b.x - qx, dy = b.y - qy, rr = b.r + s.r;
+    var d2 = dx * dx + dy * dy;
+    if (d2 >= rr * rr) return 0;
+    var d = Math.sqrt(d2), nx, ny;
+    if (d < 1e-4) { var L = Math.sqrt(len2); nx = -aby / L; ny = abx / L; if (ny > 0) { nx = -nx; ny = -ny; } }
+    else { nx = dx / d; ny = dy / d; }
+    b.x = qx + nx * rr;
+    b.y = qy + ny * rr;
+    var svx = 0, svy = 0;
+    if (body) { svx = body.vx - body.w * (qy - body.cy); svy = body.vy + body.w * (qx - body.cx); }
+    var rvx = b.vx - svx, rvy = b.vy - svy;
+    var vn = rvx * nx + rvy * ny;
+    if (vn >= 0) return 0.001;
+    var e = -vn > 90 * su ? s.e : 0;
+    var jn = -(1 + e) * vn;
+    b.vx += jn * nx;
+    b.vy += jn * ny;
+    // A little friction on real knocks only, so balls still roll freely along ramps.
+    if (e > 0) {
+      var tx = -ny, ty = nx, vt = rvx * tx + rvy * ty;
+      b.vx -= vt * 0.04 * tx;
+      b.vy -= vt * 0.04 * ty;
+    }
+    if (body && body.kind === "mill") {
+      var rx = qx - body.cx, ry = qy - body.cy;
+      body.w -= (rx * ny - ry * nx) * jn * b.m * body.k;
+      body.w = clamp(body.w, -8, 8);
+    }
+    return -vn;
+  }
+
+  function collideStatic(b) {
+    var r = b.r, i, k, cell, p, dx, dy, d2, rr, d, nx, ny, vn, e;
+    // Walls and ceiling.
+    if (b.x < r) { b.x = r; if (b.vx < 0) b.vx = -b.vx * 0.4; }
+    else if (b.x > W - r) { b.x = W - r; if (b.vx > 0) b.vx = -b.vx * 0.4; }
+    if (b.y < r) { b.y = r; if (b.vy < 0) b.vy = -b.vy * 0.3; }
+    // Pegs.
+    var gx0 = Math.max(0, Math.floor((b.x - r - pegR) / pcs)), gx1 = Math.min(pgw - 1, Math.floor((b.x + r + pegR) / pcs));
+    var gy0 = Math.max(0, Math.floor((b.y - r - pegR) / pcs)), gy1 = Math.min(pgh - 1, Math.floor((b.y + r + pegR) / pcs));
+    var gx, gy;
+    for (gy = gy0; gy <= gy1; gy++) {
+      for (gx = gx0; gx <= gx1; gx++) {
+        cell = pegGrid[gy * pgw + gx];
+        if (!cell) continue;
+        for (k = 0; k < cell.length; k++) {
+          p = cell[k];
+          dx = b.x - p.x; dy = b.y - p.y; rr = r + p.r;
+          d2 = dx * dx + dy * dy;
+          if (d2 >= rr * rr) continue;
+          d = Math.sqrt(d2) || 1e-4;
+          nx = dx / d; ny = dy / d;
+          if (d2 === 0) { nx = Math.random() < 0.5 ? -1 : 1; ny = 0; }
+          b.x = p.x + nx * rr; b.y = p.y + ny * rr;
+          vn = b.vx * nx + b.vy * ny;
+          if (vn < 0) {
+            e = -vn > 80 * su ? pegE : 0;
+            b.vx -= (1 + e) * vn * nx;
+            b.vy -= (1 + e) * vn * ny;
+            // A tiny random sideways push so nothing balances on a peg forever.
+            var j = (Math.random() - 0.5) * (0.18 * -vn + 14 * su);
+            b.vx += -ny * j; b.vy += nx * j;
+            if (-vn > 70 * su) onPegHit(p, b, -vn);
+          }
+        }
+      }
+    }
+    // Bumpers.
+    for (i = 0; i < bumpers.length; i++) {
+      p = bumpers[i];
+      dx = b.x - p.x; dy = b.y - p.y; rr = r + p.r;
+      d2 = dx * dx + dy * dy;
+      if (d2 >= rr * rr) continue;
+      d = Math.sqrt(d2) || 1e-4;
+      nx = dx / d; ny = dy / d;
+      b.x = p.x + nx * rr; b.y = p.y + ny * rr;
+      vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) {
+        var out = Math.max(-vn * 0.9, 520 * su);
+        b.vx += (-vn + out) * nx;
+        b.vy += (-vn + out) * ny;
+        onBumper(p, b);
+      }
+    }
+    // Rails (funnel, ramps, dividers).
+    for (i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (b.x + r < s.x0 || b.x - r > s.x1 || b.y + r < s.y0 || b.y - r > s.y1) continue;
+      // Classic side rails bounce balls back into the pegs, like a real Galton board's walls.
+      if (collideCapsule(b, s, null) && s.kick) b.vx = s.kick * Math.max(s.kick * b.vx, 150 * su);
+    }
+    // Moving pieces.
+    for (i = 0; i < bodies.length; i++) {
+      var bd = bodies[i];
+      dx = b.x - bd.cx; dy = b.y - bd.cy;
+      if (dx * dx + dy * dy > (bd.R + r + 6) * (bd.R + r + 6)) continue;
+      if (bd.kind === "mill") {
+        rr = r + bd.hub;
+        d2 = dx * dx + dy * dy;
+        if (d2 < rr * rr) {
+          d = Math.sqrt(d2) || 1e-4;
+          b.x = bd.cx + dx / d * rr; b.y = bd.cy + dy / d * rr;
+          vn = (b.vx * dx + b.vy * dy) / d;
+          if (vn < 0) { b.vx -= 1.4 * vn * dx / d; b.vy -= 1.4 * vn * dy / d; }
+        }
+      }
+      for (k = 0; k < bd.segs.length; k++) {
+        var imp = collideCapsule(b, bd.segs[k], bd);
+        if (imp > 150 * su && bd.kind === "mill") { bd.flash = 1; if (Math.random() < 0.3) burst(b.x, b.y, b.c, 2, 160, 0.35); }
+      }
+    }
+    // Bin floors (trapdoors), raised by the packed balls.
+    if (b.y > binTop - r) {
+      var bi = clamp(Math.floor(b.x / bw), 0, B - 1);
+      var bn = bins[bi];
+      if (bn.door < 0.05) {
+        var fy = floorY - bn.ph;
+        if (b.y + r > fy && b.y < floorY + r * 0.5) {
+          b.y = fy - r;
+          if (b.vy > 0) {
+            e = b.vy > 140 * su ? 0.22 : 0;
+            b.vy = -b.vy * e;
+            b.vx *= 0.94;
+          }
+        }
+      }
+    }
+  }
+
+  function onPegHit(p, b, impact) {
+    p.lit = 1;
+    p.tint = 1;
+    p.c = b.c;
+    if (!p.active) { p.active = true; activePegs.push(p); }
+    if (impact > 260 * su && Math.random() < 0.6) burst(p.x, p.y, b.c, 3, 150, 0.35);
+    plink(p.row, Math.min(1, impact / (700 * su)));
+  }
+  function onBumper(p, b) {
+    p.flash = 1;
+    p.c = b.c;
+    burst(b.x, b.y, b.c, 8, 260, 0.5);
+    ring(p.x, p.y, b.c, p.r, 0.45);
+    boing();
+  }
+
+  function ballPairs() {
+    var n = balls.length, i, j, a, b, cx, cy, gx, gy, cell;
+    if (!n) return;
+    bcs = 2 * bigR + 2;
+    bgw = Math.ceil(W / bcs) + 2;
+    bgh = Math.ceil((H + 400) / bcs) + 2;
+    if (!bgrid || bgrid.length < bgw * bgh) bgrid = new Int32Array(bgw * bgh);
+    if (!bnext || bnext.length < n) bnext = new Int32Array(Math.max(n, CAP + 20));
+    bgrid.fill(-1, 0, bgw * bgh);
+    for (i = 0; i < n; i++) {
+      a = balls[i];
+      cx = clamp(Math.floor(a.x / bcs), 0, bgw - 1);
+      cy = clamp(Math.floor(a.y / bcs), 0, bgh - 1);
+      a.gc = cy * bgw + cx;
+      bnext[i] = bgrid[a.gc];
+      bgrid[a.gc] = i;
+    }
+    for (i = 0; i < n; i++) {
+      a = balls[i];
+      cx = a.gc % bgw; cy = (a.gc / bgw) | 0;
+      for (gy = cy - 1; gy <= cy + 1; gy++) {
+        if (gy < 0 || gy >= bgh) continue;
+        for (gx = cx - 1; gx <= cx + 1; gx++) {
+          if (gx < 0 || gx >= bgw) continue;
+          j = bgrid[gy * bgw + gx];
+          while (j >= 0) {
+            if (j > i) {
+              b = balls[j];
+              if (!(a.sleep && b.sleep)) pair(a, b);
+            }
+            j = bnext[j];
+          }
+        }
+      }
+    }
+  }
+
+  function pair(a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r;
+    var d2 = dx * dx + dy * dy;
+    if (d2 >= rr * rr) return;
+    var d = Math.sqrt(d2) || 1e-4, nx = dx / d, ny = dy / d;
+    if (d2 === 0) { nx = 1; ny = 0; }
+    var rvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (a.sleep && rvn < -160 * su) { a.sleep = false; a.restT = 0; }
+    if (b.sleep && rvn < -160 * su) { b.sleep = false; b.restT = 0; }
+    var wa = a.sleep ? 0 : a.im, wb = b.sleep ? 0 : b.im, ws = wa + wb;
+    if (ws === 0) return;
+    var corr = (rr - d) / ws * 0.85;
+    a.x -= nx * corr * wa; a.y -= ny * corr * wa;
+    b.x += nx * corr * wb; b.y += ny * corr * wb;
+    if (rvn < 0) {
+      var e = rvn < -110 * su ? 0.3 : 0;
+      var jn = -(1 + e) * rvn / ws;
+      a.vx -= jn * wa * nx; a.vy -= jn * wa * ny;
+      b.vx += jn * wb * nx; b.vy += jn * wb * ny;
+      // Gentle rolling friction between touching balls.
+      var tx = -ny, ty = nx;
+      var vt = (b.vx - a.vx) * tx + (b.vy - a.vy) * ty;
+      var jt = vt * 0.02 / ws;
+      a.vx += jt * wa * tx; a.vy += jt * wa * ty;
+      b.vx -= jt * wb * tx; b.vy -= jt * wb * ty;
+    }
+  }
+
+  function step(h) {
+    var i, b, vmax = 1400 * su, sp2;
+    var gx = G * gravX, gy = G * gravY;
+    updateBodies(h);
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      if (b.sleep) continue;
+      b.vx += gx * h;
+      b.vy += gy * h;
+      b.vx *= 0.9994; b.vy *= 0.9994;
+      if (b.y > galtonTop && b.y < binTop) b.vx = clamp(b.vx, -galtonVx, galtonVx);
+      sp2 = b.vx * b.vx + b.vy * b.vy;
+      if (sp2 > vmax * vmax) { var f = vmax / Math.sqrt(sp2); b.vx *= f; b.vy *= f; }
+      b.x += b.vx * h;
+      b.y += b.vy * h;
+    }
+    ballPairs();
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      if (!b.sleep) collideStatic(b);
+    }
+  }
+
+  // ---------- Per-frame bookkeeping ----------
+  var countsDirty = true, totalShown = -1, lastCountsSave = 0;
+  function perFrame(dt) {
+    var i, b, sp, bn, k;
+    for (i = 0; i < bins.length; i++) bins[i].loose = 0;
+    for (i = balls.length - 1; i >= 0; i--) {
+      b = balls[i];
+      b.age += dt;
+      // Fell out of the bottom (trapdoors open).
+      if (b.y > H + b.r * 3) { balls[i] = balls[balls.length - 1]; balls.pop(); continue; }
+      sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      var inBin = b.y > binTop + b.r * 0.4 && b.y < floorY + 2;
+      var bi = inBin ? clamp(Math.floor(b.x / bw), 0, B - 1) : -1;
+      if (bi >= 0 && bi !== b.lastBin) {
+        bn = bins[bi];
+        bn.glow = 1; bn.gc = b.c;
+        burst(b.x, binTop + 6 * su, b.c, 5, 170, 0.45);
+        thup(bi);
+        b.lastBin = bi;
+      }
+      b.bin = bi;
+      if (bi >= 0) {
+        bn = bins[bi];
+        bn.loose++;
+        // Settle and sleep inside a bin.
+        if (!b.sleep && sp < 14 * su && bn.door < 0.05) { b.restT += dt; if (b.restT > 0.35) { b.sleep = true; b.vx = 0; b.vy = 0; } }
+        else if (!b.sleep) b.restT = 0;
+        if (bn.door < 0.05 && (b.sleep || sp < 25 * su)) {
+          b.inBinT += dt;
+          var crowded = balls.length > 90 && b.inBinT > 0.6;
+          var overfull = b.y - b.r < binTop + 2 * su && b.inBinT > 0.3;
+          if (b.inBinT > 2.6 || crowded || overfull) { absorb(i); continue; }
+        } else b.inBinT = 0;
+        b.stillT = 0;
+      } else {
+        b.sleep = false;
+        b.inBinT = 0;
+        // Stuck somewhere on the board: nudge it, and after many tries let it pop.
+        var inBucket = false;
+        for (k = 0; k < bodies.length; k++) {
+          var bd = bodies[k];
+          if (bd.kind === "bucket" && Math.abs(b.x - bd.cx) < bd.R && Math.abs(b.y - bd.cy) < bd.R) inBucket = true;
+        }
+        if (sp < 28 * su && !inBucket && b.y > topH * 0.5) {
+          b.stillT += dt;
+          if (b.stillT > 0.9) {
+            b.stillT = 0;
+            b.nudges++;
+            if (b.nudges > 6 || ending) { pop(i); continue; }
+            b.vx += (Math.random() < 0.5 ? -1 : 1) * rand(110, 230) * su;
+            b.vy -= rand(120, 200) * su;
+          }
+        } else if (sp > 60 * su) b.stillT = 0;
+        if (b.age > 45 && !inBucket) { pop(i); continue; }
+      }
+      // Trail.
+      for (k = TRAIL - 1; k > 0; k--) { b.tx[k] = b.tx[k - 1]; b.ty[k] = b.ty[k - 1]; }
+      b.tx[0] = b.x; b.ty[0] = b.y;
+    }
+    var total = 0;
+    updatePackCols();
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      // Smoothly move the packed floor toward its target height.
+      var target = bn.door > 0.05 ? 0 : packLayout(bn.packed.length).h;
+      if (Math.abs(bn.ph - target) > 0.2) {
+        var before = bn.ph;
+        bn.ph += (target - bn.ph) * Math.min(1, dt * 10);
+        if (bn.ph < before) wakeBin(i);
+      } else bn.ph = target;
+      bn.count = bn.packed.length + bn.loose;
+      if (bn.count > bn.shown) { bn.pop = 1; bn.pc = bn.gc; countsDirty = true; }
+      else if (bn.count < bn.shown) countsDirty = true;
+      bn.shown = bn.count;
+      bn.glow = Math.max(0, bn.glow - dt * 1.6);
+      bn.pop = Math.max(0, bn.pop - dt * 3);
+      if (bn.dirty) drawBinCache(bn);
+      total += bn.count;
+    }
+    if (total !== totalShown) {
+      var up = total > totalShown && totalShown >= 0;
+      totalShown = total;
+      $("totalNum").textContent = String(total);
+      if (up && !reduce) {
+        var t = $("total");
+        t.classList.add("pop");
+        clearTimeout(popT);
+        popT = setTimeout(function () { t.classList.remove("pop"); }, 120);
+      }
+    }
+    // Pegs fade back to white.
+    for (i = activePegs.length - 1; i >= 0; i--) {
+      var p = activePegs[i];
+      p.lit = Math.max(0, p.lit - dt * 3);
+      p.tint = Math.max(0, p.tint - dt * 0.28);
+      if (p.tint <= 0 && p.lit <= 0) { p.active = false; activePegs[i] = activePegs[activePegs.length - 1]; activePegs.pop(); }
+    }
+    for (i = 0; i < bumpers.length; i++) bumpers[i].flash = Math.max(0, bumpers[i].flash - dt * 3);
+    for (i = 0; i < bodies.length; i++) {
+      if (bodies[i].kind === "bucket") updateBucket(bodies[i], dt);
+      if (bodies[i].flash) bodies[i].flash = Math.max(0, bodies[i].flash - dt * 3);
+    }
+    // Particles.
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0 || p.y > H + 40) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+      if (p.k === 2) { p.vy += G * dt; }
+      else if (p.k === 0) { p.vy += G * 0.25 * dt; p.vx *= 0.98; p.vy *= 0.98; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+    // Trapdoors.
+    if (emptyT > 0) emptyT -= dt;
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      var want = emptyT > 0.5 ? 1 : 0;
+      bn.door += (want - bn.door) * Math.min(1, dt * (want ? 9 : 5));
+      if (want === 0 && bn.door < 0.02) bn.door = 0;
+    }
+    if (countsDirty && performance.now() - lastCountsSave > 2500) saveCounts();
+  }
+  var popT = null;
+
+  function pop(i) {
+    var b = balls[i];
+    burst(b.x, b.y, b.c, 8, 200, 0.5);
+    ring(b.x, b.y, b.c, b.r, 0.35);
+    balls[i] = balls[balls.length - 1];
+    balls.pop();
+  }
+
+  function countsArray() {
+    return bins.map(function (bn) {
+      var row = [], k;
+      for (k = 0; k < NC; k++) row.push(0);
+      bn.packed.forEach(function (c) { row[c]++; });
+      return row;
+    });
+  }
+  function saveCounts() {
+    if (!bins.length) return;
+    var arr = countsArray();
+    // Loose balls sitting in bins count too.
+    balls.forEach(function (b) { if (b.bin >= 0) arr[b.bin][b.c]++; });
+    state.bins[state.layout] = arr;
+    save();
+    countsDirty = false;
+    lastCountsSave = performance.now();
+  }
+  // Rebuild packed lists from saved per-color counts, mixing the colors.
+  function packedFromCounts(row) {
+    var left = row.slice(), out = [], any = true, k;
+    while (any) {
+      any = false;
+      for (k = 0; k < NC; k++) if (left[k] > 0) { out.push(k); left[k]--; any = true; }
+    }
+    return out;
+  }
+  function loadBinsFor(id) {
+    var saved = state.bins[id];
+    bins = [];
+    for (var i = 0; i < B; i++) bins.push({ packed: saved ? packedFromCounts(saved[i]) : [] });
+  }
+
+  // ---------- Drawing ----------
+  function render(now) {
+    var i, k, b, p, bn, s;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(base, 0, 0, CW, CH);
+    ctx.save();
+    ctx.translate(OX, 0);
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
+
+    // Bin glow.
+    ctx.globalCompositeOperation = "lighter";
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      if (bn.glow > 0.01) {
+        ctx.globalAlpha = bn.glow * 0.45;
+        ctx.fillStyle = COLORS[bn.gc][1];
+        ctx.fillRect(bn.x0 + divR, binTop, bw - 2 * divR, binH);
+        ctx.globalAlpha = bn.glow * 0.8;
+        ctx.drawImage(glow[bn.gc], bn.x0 - bw * 0.2, binTop - bw * 0.5, bw * 1.4, bw);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    // Packed balls.
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      if (!bn.packed.length || !bn.cache) continue;
+      var drop = bn.door > 0.05 ? bn.door * binH : 0;
+      var lift = (bn.L ? bn.L.h : 0) - bn.ph;
+      ctx.drawImage(bn.cache, bn.x0, binTop + drop + lift, bw, binH);
+    }
+
+    // Lit pegs.
+    ctx.globalCompositeOperation = "lighter";
+    for (i = 0; i < activePegs.length; i++) {
+      p = activePegs[i];
+      var gs = p.r * (3.2 + 4 * p.lit);
+      ctx.globalAlpha = Math.min(1, 0.3 * p.tint + 0.7 * p.lit);
+      ctx.drawImage(glow[p.c], p.x - gs, p.y - gs, gs * 2, gs * 2);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    for (i = 0; i < activePegs.length; i++) {
+      p = activePegs[i];
+      var pr = p.r * (1 + 0.5 * p.lit);
+      ctx.globalAlpha = Math.min(1, p.tint * 1.3);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS[p.c][1];
+      ctx.fill();
+      if (p.lit > 0.3) {
+        ctx.globalAlpha = p.lit;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, pr * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Bumpers.
+    for (i = 0; i < bumpers.length; i++) {
+      p = bumpers[i];
+      var br = p.r * (1 + 0.16 * p.flash);
+      if (p.flash > 0.02) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = p.flash;
+        ctx.drawImage(glow[p.c], p.x - br * 2.2, p.y - br * 2.2, br * 4.4, br * 4.4);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+      }
+      ctx.beginPath(); ctx.arc(p.x, p.y, br + 2.5 * su, 0, Math.PI * 2); ctx.fillStyle = "#0B0F2A"; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, br, 0, Math.PI * 2); ctx.fillStyle = p.flash > 0.3 ? COLORS[p.c][1] : "#FF5FAE"; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, br * 0.66, 0, Math.PI * 2); ctx.fillStyle = "#FFE066"; ctx.fill();
+      ctx.lineWidth = 2.5 * su; ctx.strokeStyle = "#0B0F2A"; ctx.stroke();
+      drawStar(p.x, p.y, br * 0.42, p.flash);
+    }
+
+    // Moving pieces.
+    for (i = 0; i < bodies.length; i++) {
+      var bd = bodies[i];
+      if (bd.kind === "mill") drawMill(bd);
+      else drawBucket(bd);
+    }
+
+    // Trails (glowing) then balls.
+    ctx.globalCompositeOperation = "lighter";
+    var trailN = reduce ? 3 : TRAIL;
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      if (b.sleep) continue;
+      var vx = b.x - b.tx[TRAIL - 1], vy = b.y - b.ty[TRAIL - 1];
+      if (vx * vx + vy * vy < 9 * su * su) continue;
+      for (k = trailN - 1; k >= 1; k--) {
+        var f = 1 - k / trailN;
+        var tr = b.r * (0.9 + 1.1 * f);
+        ctx.globalAlpha = 0.12 + 0.4 * f;
+        ctx.drawImage(glow[b.c], b.tx[k] - tr, b.ty[k] - tr, tr * 2, tr * 2);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    var lw = Math.max(1.5, 2.2 * su);
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS[b.c][1];
+      ctx.fill();
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = "#0B0F2A";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(b.x - b.r * 0.32, b.y - b.r * 0.34, b.r * 0.32, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fill();
+    }
+
+    // Particles.
+    for (i = 0; i < parts.length; i++) {
+      p = parts[i];
+      var a = p.life / p.ttl;
+      if (p.k === 0) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = Math.min(1, a * 1.4);
+        var ps = p.s * (0.6 + a);
+        ctx.drawImage(glow[p.c], p.x - ps, p.y - ps, ps * 2, ps * 2);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(p.x - ps * 0.18, p.y - ps * 0.18, ps * 0.36, ps * 0.36);
+      } else if (p.k === 1) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = a;
+        ctx.lineWidth = 4 * su * a + 1;
+        ctx.strokeStyle = COLORS[p.c][1];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.s + (1 - a) * 46 * su, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS[p.c][1];
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, p.s * 0.14);
+        ctx.strokeStyle = "#0B0F2A";
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+
+    // Trapdoors.
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      var x0 = bn.x0 + divR, len = bw - 2 * divR;
+      ctx.save();
+      ctx.translate(x0, floorY);
+      ctx.rotate(bn.door * 1.45);
+      ctx.fillStyle = "#0B0F2A";
+      ctx.fillRect(-1, -3.5 * su, len + 2, 7 * su);
+      ctx.fillStyle = "hsl(" + binHue(i) + ",85%,62%)";
+      ctx.fillRect(0, -2 * su, len, 4 * su);
+      ctx.restore();
+    }
+
+    // Big counts under the bins.
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (i = 0; i < bins.length; i++) {
+      bn = bins[i];
+      var sc = 1 + 0.45 * bn.pop;
+      var fsz = Math.round(numFont * sc);
+      var txt = String(bn.count);
+      var fit = Math.min(fsz, Math.floor((bw - 4) / (txt.length * 0.55)));
+      ctx.font = "800 " + fit + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = bn.pop > 0.05 ? COLORS[bn.pc][1] : (bn.count ? "#FFFFFF" : "rgba(255,255,255,0.35)");
+      ctx.fillText(txt, bn.x0 + bw / 2, floorY + labelH / 2 + 2);
+    }
+
+    // Drop markers for fingers, and the "Tap to drop" hint on an empty board.
+    var fk;
+    for (fk in fingers) {
+      if (!Object.prototype.hasOwnProperty.call(fingers, fk)) continue;
+      var fg = fingers[fk];
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.9;
+      var gsz = 26 * su;
+      ctx.drawImage(glow[fg.c], fg.x - gsz, 4 * su - gsz * 0.5, gsz * 2, gsz * 2);
+      ctx.globalAlpha = 0.25;
+      ctx.drawImage(glow[fg.c], fg.x - gsz * 1.2, fg.y - gsz * 1.2, gsz * 2.4, gsz * 2.4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
+    if (!balls.length && totalShown === 0 && !ending) {
+      var bob = reduce ? 0 : Math.sin(now / 300) * 4 * su;
+      var hs = Math.round(Math.max(18, Math.min(30 * su, 34)));
+      ctx.font = "800 " + hs + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.fillText("Tap to drop!", W / 2, topH * 0.45 + bob);
+    }
+    ctx.restore();
+  }
+
+  function drawStar(x, y, r, flash) {
+    ctx.beginPath();
+    for (var k = 0; k < 10; k++) {
+      var a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r;
+      if (k) ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      else ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = flash > 0.3 ? "#FFFFFF" : "#FF5FAE";
+    ctx.fill();
+  }
+
+  var MILL_COLS = ["#FFD23F", "#FF9F1C", "#FFD23F", "#FF9F1C"];
+  function drawMill(bd) {
+    var k, s;
+    ctx.lineCap = "round";
+    for (k = 0; k < bd.segs.length; k++) {
+      s = bd.segs[k];
+      ctx.strokeStyle = "#0B0F2A";
+      ctx.lineWidth = 2 * bd.cr + 5 * su;
+      ctx.beginPath(); ctx.moveTo(bd.cx, bd.cy); ctx.lineTo(s.bx, s.by); ctx.stroke();
+    }
+    for (k = 0; k < bd.segs.length; k++) {
+      s = bd.segs[k];
+      ctx.strokeStyle = MILL_COLS[k];
+      ctx.lineWidth = 2 * bd.cr;
+      ctx.beginPath(); ctx.moveTo(bd.cx, bd.cy); ctx.lineTo(s.bx, s.by); ctx.stroke();
+    }
+    if (bd.flash > 0.02) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = bd.flash * 0.7;
+      ctx.drawImage(glow[2], bd.cx - bd.L * 1.2, bd.cy - bd.L * 1.2, bd.L * 2.4, bd.L * 2.4);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
+    ctx.beginPath(); ctx.arc(bd.cx, bd.cy, bd.hub + 2.5 * su, 0, Math.PI * 2); ctx.fillStyle = "#0B0F2A"; ctx.fill();
+    ctx.beginPath(); ctx.arc(bd.cx, bd.cy, bd.hub, 0, Math.PI * 2); ctx.fillStyle = "#FF4D6D"; ctx.fill();
+    ctx.beginPath(); ctx.arc(bd.cx, bd.cy, bd.hub * 0.38, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+  }
+
+  function drawBucket(bd) {
+    var k, s;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    // Soft fill inside the cup.
+    var c = Math.cos(bd.a), sn = Math.sin(bd.a);
+    function P(lx, ly) { return [bd.cx + lx * c - ly * sn, bd.cy + lx * sn + ly * c]; }
+    var q = [P(-bd.hw - bd.fl, -bd.hh), P(-bd.hw, bd.hh), P(bd.hw, bd.hh), P(bd.hw + bd.fl, -bd.hh)];
+    ctx.beginPath();
+    ctx.moveTo(q[0][0], q[0][1]);
+    for (k = 1; k < 4; k++) ctx.lineTo(q[k][0], q[k][1]);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,159,28,0.18)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(q[0][0], q[0][1]);
+    for (k = 1; k < 4; k++) ctx.lineTo(q[k][0], q[k][1]);
+    ctx.strokeStyle = "#0B0F2A";
+    ctx.lineWidth = 2 * bd.cr + 5 * su;
+    ctx.stroke();
+    ctx.strokeStyle = "#FF9F1C";
+    ctx.lineWidth = 2 * bd.cr;
+    ctx.stroke();
+    s = P(0, bd.hh * 0.15);
+    ctx.fillStyle = "#FFD23F";
+    ctx.beginPath(); ctx.arc(s[0], s[1], 3.2 * su, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ---------- Input ----------
+  var fingers = {};
+  var playLocked = function () { return timer.phase === "ending" || timer.phase === "resting"; };
+  function boardPoint(e) {
+    var r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left - OX, y: e.clientY - r.top };
+  }
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (playLocked() || !built) return;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var pt = boardPoint(e);
+    var c = state.color === "rainbow" ? (rainbowI + 1) % NC : state.color;
+    fingers[e.pointerId] = { x: clamp(pt.x, 0, W), y: clamp(pt.y, 0, H), next: performance.now() + 260, c: c };
+    dropAt(pt.x);
+    ring(clamp(pt.x, 0, W), clamp(pt.y, 0, H), c, 6 * su, 0.4);
+    // Tapping a spinner gives it a push.
+    bodies.forEach(function (bd) {
+      if (bd.kind === "mill" && Math.abs(pt.x - bd.cx) < bd.L * 1.2 && Math.abs(pt.y - bd.cy) < bd.L * 1.2) {
+        bd.w += (bd.w0 >= 0 ? 1 : -1) * 5;
+        bd.flash = 1;
+      }
+    });
+    bumpers.forEach(function (bp) {
+      if (Math.abs(pt.x - bp.x) < bp.r * 1.4 && Math.abs(pt.y - bp.y) < bp.r * 1.4) { bp.flash = 1; bp.c = c; ring(bp.x, bp.y, c, bp.r, 0.4); }
+    });
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    var f = fingers[e.pointerId];
+    if (!f) return;
+    var pt = boardPoint(e);
+    f.x = clamp(pt.x, 0, W);
+    f.y = clamp(pt.y, 0, H);
+  });
+  function lift(e) { delete fingers[e.pointerId]; }
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (ev) { canvas.addEventListener(ev, lift); });
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
+
+  function dropAt(x) {
+    if (x < 0 || x > W) x = clamp(x, 0, W);
+    if (spawn(x)) {
+      var b = balls[balls.length - 1];
+      ring(b.x, b.y, b.c, b.r, 0.3);
+    }
+  }
+
+  var queue = [];   // timed drops for "Drop 10"
+  var raining = false, rainNext = 0;
+  function drop10() {
+    var now = performance.now(), k;
+    for (k = 0; k < 10; k++) {
+      var x = state.layout === "classic" ? rand(0.12, 0.88) * W : rand(0.08, 0.92) * W;
+      queue.push({ t: now + k * 70, x: x });
+    }
+  }
+  function setRain(on) {
+    raining = on;
+    $("rain").setAttribute("aria-pressed", String(on));
+  }
+  var emptyT = 0;
+  function emptyBins() {
+    if (emptyT > 0) return;
+    emptyT = 1.9;
+    var i, k, cnt = 0;
+    for (i = 0; i < bins.length; i++) {
+      var bn = bins[i], L = bn.L || packLayout(bn.packed.length);
+      var n = Math.min(bn.packed.length, L.maxRows * L.cols);
+      for (k = 0; k < n && cnt < 420; k++, cnt++) {
+        var row = (k / L.cols) | 0, col = k % L.cols;
+        parts.push({ x: bn.x0 + divR + 1 + L.pr + col * 2 * L.pr, y: floorY - L.pr - row * L.rowH,
+          vx: rand(-40, 40) * su, vy: rand(-60, 30) * su, life: 3, ttl: 3, c: bn.packed[k], s: L.pr * 0.94, k: 2 });
+      }
+      bn.packed = [];
+      bn.dirty = true;
+      bn.glow = 1;
+      bn.gc = i % NC;
+    }
+    wakeAll();
+    countsDirty = true;
+    saveCounts();
+    whoosh();
+  }
+
+  // ---------- Tilt and shake (optional, behind the grown-up sheet) ----------
+  var tiltOn = false;
+  function screenAngle() {
+    if (typeof window.orientation === "number") return window.orientation;
+    if (screen.orientation && typeof screen.orientation.angle === "number") return screen.orientation.angle;
+    return 0;
+  }
+  function onOrient(e) {
+    if (e.beta == null || e.gamma == null) return;
+    var be = e.beta * Math.PI / 180, ga = e.gamma * Math.PI / 180;
+    // Gravity in device coordinates (x right, y down the screen in portrait).
+    var dx = Math.cos(be) * Math.sin(ga), dy = Math.sin(be);
+    var th = screenAngle() * Math.PI / 180;
+    var sx = dx * Math.cos(th) + dy * Math.sin(th);
+    var sy = -dx * Math.sin(th) + dy * Math.cos(th);
+    var len = Math.sqrt(sx * sx + sy * sy);
+    if (len < 0.12) { tiltX = 0; tiltY = 1; return; }
+    sx /= len; sy /= len;
+    // Balls always fall downward a bit, so they still reach the bins.
+    sy = Math.max(sy, 0.45);
+    len = Math.sqrt(sx * sx + sy * sy);
+    tiltX = sx / len; tiltY = sy / len;
+  }
+  var lastShake = 0;
+  function onMotion(e) {
+    var a = e.acceleration, m = 0;
+    if (a && a.x != null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x != null) {
+      var g = e.accelerationIncludingGravity;
+      m = Math.abs(Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) - 9.8);
+    }
+    var now = performance.now();
+    if (m > 15 && now - lastShake > 700) { lastShake = now; shakeBalls(); }
+  }
+  function shakeBalls() {
+    if (playLocked()) return;
+    wakeAll();
+    balls.forEach(function (b) {
+      b.vy -= rand(380, 720) * su;
+      b.vx += rand(-220, 220) * su;
+    });
+    // Light up lots of pegs.
+    pegs.forEach(function (p) {
+      if (Math.random() < 0.5) {
+        p.lit = 1; p.tint = 1; p.c = (Math.random() * NC) | 0;
+        if (!p.active) { p.active = true; activePegs.push(p); }
+      }
+    });
+    if (!reduce) {
+      stage.classList.remove("shake");
+      void stage.offsetWidth;
+      stage.classList.add("shake");
+    }
+    chime();
+  }
+  function setTilt(on) {
+    tiltOn = on;
+    if (on) {
+      window.addEventListener("deviceorientation", onOrient);
+      window.addEventListener("devicemotion", onMotion);
+    } else {
+      window.removeEventListener("deviceorientation", onOrient);
+      window.removeEventListener("devicemotion", onMotion);
+      tiltX = 0; tiltY = 1;
+    }
+    updateGrownUpUI();
+  }
+  function requestTilt() {
+    if (tiltOn) { setTilt(false); return; }
+    var DOE = window.DeviceOrientationEvent, DME = window.DeviceMotionEvent;
+    var asks = [];
+    try {
+      if (DME && typeof DME.requestPermission === "function") asks.push(DME.requestPermission());
+      if (DOE && typeof DOE.requestPermission === "function") asks.push(DOE.requestPermission());
+    } catch (e) { /* ignore */ }
+    if (!asks.length) { setTilt(true); return; }
+    Promise.all(asks).then(function (res) {
+      if (res.every(function (r) { return r === "granted"; })) setTilt(true);
+      else { $("tiltNote").textContent = "Tilt was not allowed. You can allow it in Settings."; }
+    }).catch(function () { $("tiltNote").textContent = "Tilt is not available here."; });
+  }
+
+  // ---------- Controls ----------
+  var BOARD_ICONS = {
+    classic: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#2E3A93" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M6 10 L26 20 M54 10 L34 20" stroke="#8FDBFF" stroke-width="4" stroke-linecap="round"/>' +
+      [[30, 26], [24, 34], [36, 34], [18, 42], [30, 42], [42, 42]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#E4EAFF"/>'; }).join("") +
+      '<circle cx="18" cy="52" r="3.4" fill="#FF4D6D"/><circle cx="26" cy="51" r="3.4" fill="#FFD23F"/><circle cx="34" cy="51" r="3.4" fill="#5BE36B"/><circle cx="42" cy="52" r="3.4" fill="#3EC8FF"/><circle cx="30" cy="45" r="3.4" fill="#B26BFF"/>',
+    bumpers: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#2E3A93" stroke="#1D2340" stroke-width="3"/>' +
+      '<circle cx="20" cy="20" r="9" fill="#FF5FAE" stroke="#0B0F2A" stroke-width="2"/><circle cx="20" cy="20" r="5" fill="#FFE066"/>' +
+      '<circle cx="40" cy="36" r="9" fill="#FF5FAE" stroke="#0B0F2A" stroke-width="2"/><circle cx="40" cy="36" r="5" fill="#FFE066"/>' +
+      [[40, 14], [12, 38], [24, 44], [48, 52], [14, 52], [30, 30]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#E4EAFF"/>'; }).join(""),
+    spinners: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#2E3A93" stroke="#1D2340" stroke-width="3"/>' +
+      '<g transform="rotate(20 30 30)"><path d="M30 12 V48 M12 30 H48" stroke="#0B0F2A" stroke-width="9" stroke-linecap="round"/><path d="M30 12 V48" stroke="#FFD23F" stroke-width="5" stroke-linecap="round"/><path d="M12 30 H48" stroke="#FF9F1C" stroke-width="5" stroke-linecap="round"/></g>' +
+      '<circle cx="30" cy="30" r="5" fill="#FF4D6D" stroke="#0B0F2A" stroke-width="2"/>' +
+      [[10, 10], [50, 10], [10, 50], [50, 50]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="#E4EAFF"/>'; }).join(""),
+    zigzag: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#2E3A93" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M6 10 L38 18 M54 22 L22 30" stroke="#8FDBFF" stroke-width="4" stroke-linecap="round"/>' +
+      '<path d="M20 38 L23 48 H37 L40 38" fill="none" stroke="#0B0F2A" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<path d="M20 38 L23 48 H37 L40 38" fill="none" stroke="#FF9F1C" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="30" cy="43" r="3.4" fill="#5BE36B"/><circle cx="44" cy="17" r="3.4" fill="#FF4D6D"/>'
+  };
+  LAYOUTS.forEach(function (l) {
+    var b = document.createElement("button");
+    b.className = "btn boardbtn";
+    b.dataset.layout = l[0];
+    b.innerHTML = '<svg viewBox="0 0 60 60" aria-hidden="true">' + BOARD_ICONS[l[0]] + "</svg><span>" + l[1] + "</span>";
+    $("boards").appendChild(b);
+  });
+  (function () {
+    var r = document.createElement("button");
+    r.className = "swatch";
+    r.dataset.color = "rainbow";
+    r.setAttribute("aria-label", "Rainbow");
+    r.title = "Rainbow";
+    $("swatches").appendChild(r);
+    COLORS.slice(0, 7).forEach(function (c, i) {
+      var b = document.createElement("button");
+      b.className = "swatch";
+      b.dataset.color = String(i);
+      b.style.background = c[1];
+      b.setAttribute("aria-label", c[0]);
+      b.title = c[0];
+      $("swatches").appendChild(b);
+    });
+  })();
+
+  function renderControls() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-layout]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".swatch"), function (b) {
+      var on = String(state.color) === b.dataset.color;
+      b.setAttribute("aria-pressed", String(on));
+      b.innerHTML = on ? '<span class="tick">✓</span>' : "";
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.size === state.size));
+    });
+  }
+
+  function switchLayout(id) {
+    if (id === state.layout) return;
+    saveCounts();
+    balls.forEach(function (b) { burst(b.x, b.y, b.c, 2, 120, 0.4); });
+    balls = [];
+    emptyT = 0;
+    state.layout = id;
+    loadBinsFor(id);
+    build();
+    totalShown = -1;
+    save();
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.action === "timer") { openTimer(); return; }
+    if (t.dataset.action === "timerclose") { closeTimer(); return; }
+    if (t.id === "timerStart") { startTimer(); return; }
+    if (t.id === "goodbyeBtn") { lastDrop(); return; }
+    if (t.id === "tiltBtn") { requestTilt(); return; }
+    if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); return; }
+    if (t.classList.contains("hold")) return;
+    if (playLocked()) return;
+    if (t.id === "drop10") { drop10(); return; }
+    if (t.id === "rain") { setRain(!raining); return; }
+    if (t.id === "emptyBtn") { emptyBins(); return; }
+    if (t.dataset.layout) { switchLayout(t.dataset.layout); renderControls(); return; }
+    if (t.dataset.color) { state.color = t.dataset.color === "rainbow" ? "rainbow" : Number(t.dataset.color); save(); renderControls(); return; }
+    if (t.dataset.size) { state.size = t.dataset.size; save(); renderControls(); return; }
+  });
+
+  // ---------- Main loop ----------
+  var last = performance.now(), acc = 0;
+  var frameCost = 0;
+  function frame(now) {
+    var t0 = performance.now();
+    var dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (built) {
+      // Steering gravity (tilt) eases toward the device's direction.
+      var ease = Math.min(1, dt * 6);
+      gravX += ((tiltOn ? tiltX : 0) - gravX) * ease;
+      gravY += ((tiltOn ? tiltY : 1) - gravY) * ease;
+      if (tiltOn && Math.abs(gravX) > 0.05) for (var w = 0; w < balls.length; w++) if (balls[w].sleep && Math.abs(gravX) > 0.25) balls[w].sleep = false;
+
+      if (!playLocked()) {
+        var fk;
+        for (fk in fingers) {
+          if (!Object.prototype.hasOwnProperty.call(fingers, fk)) continue;
+          var f = fingers[fk];
+          if (now >= f.next) { dropAt(f.x); f.next = now + 85; f.c = state.color === "rainbow" ? (rainbowI + 1) % NC : state.color; }
+        }
+        while (queue.length && queue[0].t <= now) dropAt(queue.shift().x);
+        if (raining && now >= rainNext) { dropAt(rand(0.04, 0.96) * W); rainNext = now + 75; }
+      }
+      acc += dt;
+      var n = 0;
+      while (acc >= STEP && n < 14) { step(STEP); acc -= STEP; n++; }
+      if (n >= 14) acc = 0;
+      perFrame(dt);
+      render(now);
+      if (ending) checkEndingDone();
+      frameCost = frameCost * 0.95 + (performance.now() - t0) * 0.05;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function resize() {
+    build();
+    if (built) render(performance.now());
+  }
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  // ---------- Play timer (grown-up controlled) ----------
+  // Phases: idle -> running -> ending (balls settle, optional Last drop) -> resting (locked) -> idle.
+  // The end time is stored as a wall-clock timestamp, so the timer keeps counting through reloads
+  // and while the tab is in the background.
+  var TKEY = "pegdrop-timer-v1";
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000;
+  var UNLOCK_MS = 4000;
+
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true,
+      phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) {
+          if (typeof o[k] === "boolean") t[k] = o[k];
+        });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return t;
+  }
+  function saveTimer() {
+    try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ }
+  }
+  var timer = loadTimer();
+
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+
+  // A bar along the top of the board shows the time left; an optional chip shows the minutes.
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) {
+      if (lastTimerKey !== "off") { $("timebar").hidden = true; $("mins").hidden = true; lastTimerKey = "off"; }
+      return;
+    }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    var col = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("timebar").hidden = false;
+    $("timefill").style.width = (f * 100).toFixed(1) + "%";
+    $("timefill").style.background = col;
+    var showM = timer.showMinutes && timer.phase === "running";
+    $("mins").hidden = !showM;
+    if (showM) $("mins").textContent = "⏱ " + mins + " min";
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg;
+    el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.classList.remove("show");
+      setTimeout(function () { el.hidden = true; }, 450);
+    }, 7000);
+  }
+
+  function minutesText(ms) {
+    var m = Math.ceil(ms / 60000);
+    return m === 1 ? "1 minute" : m + " minutes";
+  }
+
+  function updateGrownUpUI() {
+    $("soundStatus").textContent = soundOn ? "Sound is on (soft)." : "Sound is off.";
+    $("holdSoundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+    var canTilt = "DeviceOrientationEvent" in window;
+    $("tiltBtn").disabled = !canTilt;
+    $("tiltBtn").textContent = !canTilt ? "Tilt not available" : (tiltOn ? "Turn off tilt" : "Turn on tilt");
+    $("tiltBtn").setAttribute("aria-pressed", String(tiltOn));
+  }
+
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes));
+    });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+    updateGrownUpUI();
+  }
+
+  function openTimer() { updateTimerUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    // Skip a warning the timer is already shorter than (a 5-minute timer gets no "5 more minutes").
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer();
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    closeTimer();
+  }
+
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000;
+    timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer();
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  // Ending bookkeeping (performance.now() timestamps; not persisted).
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+
+  function stopTimer() {
+    timer.phase = "idle";
+    saveTimer();
+    ending = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    restScheduled = false;
+    farewellAt = 0;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    closeTimer();
+  }
+
+  function beginEnding() {
+    // Clear any warning still on screen so the goodbye message is the only one.
+    clearTimeout(toastTimer);
+    $("toast").classList.remove("show");
+    $("toast").hidden = true;
+    timer.phase = "ending";
+    saveTimer();
+    ending = true;
+    // Stop dropping: no more rain, pours or queued drops.
+    setRain(false);
+    fingers = {};
+    queue = [];
+    endingStartedAt = performance.now();
+    farewellAt = 0;
+    restScheduled = false;
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to say goodbye";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  // One last little shower of rainbow balls down the middle.
+  function lastDrop() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    var keep = state.color;
+    state.color = "rainbow";
+    for (var k = 0; k < 5; k++) spawn(W / 2 + (k - 2) * bw * 0.6);
+    state.color = keep;
+    chime();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Bye bye!";
+  }
+
+  function allSettled() {
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      if (b.bin < 0) return false;
+      if (!b.sleep && b.vx * b.vx + b.vy * b.vy > 900 * su * su) return false;
+    }
+    for (i = 0; i < bodies.length; i++) {
+      if (bodies[i].kind === "bucket" && bodies[i].phase !== "move") return false;
+    }
+    return emptyT <= 0;
+  }
+
+  // Called every frame while ending: rest once every ball has settled in a bin.
+  function checkEndingDone() {
+    if (restScheduled) return;
+    var now = performance.now();
+    if (timer.goodbye) {
+      if (!farewellAt || now - farewellAt < 2000) return;
+    } else if (now - endingStartedAt < 3000) {
+      return;
+    }
+    var waited = now - (timer.goodbye ? farewellAt : endingStartedAt);
+    if (allSettled() || waited > 15000) {
+      restScheduled = true;
+      setTimeout(goRest, 1200);
+    }
+  }
+
+  function snapshot() {
+    try {
+      if (built) render(performance.now());
+      var w = 320, h = Math.round(320 * H / W);
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(canvas, OX * DPR, 0, W * DPR, H * DPR, 0, 0, w, h);
+      return c.toDataURL("image/png");
+    } catch (e) { return ""; }
+  }
+
+  function showRest() {
+    var url = snapshot();
+    if (url) { $("restArt").src = url; $("restArt").hidden = false; }
+    else $("restArt").hidden = true;
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+
+  function goRest() {
+    timer.phase = "resting";
+    saveTimer();
+    ending = false;
+    absorbAllInBins();
+    balls = [];
+    updatePackCols();
+    bins.forEach(function (bn) { bn.L = packLayout(bn.packed.length); bn.ph = bn.L.h; bn.door = 0; drawBinCache(bn); });
+    parts = [];
+    saveCounts();
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    perFrame(0);
+    showRest();
+  }
+
+  function unlock() {
+    timer.phase = "idle";
+    saveTimer();
+    $("rest").hidden = true;
+    restScheduled = false;
+    farewellAt = 0;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  function tick() {
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+
+  // Press-and-hold buttons for grown-up actions, so a quick tap does nothing.
+  function makeHold(btn, ms, onDone, onStart) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") {
+        if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return;
+        e.preventDefault();
+      }
+      if (id) return;
+      if (onStart) onStart();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { makeAudio(); chime(); }
+    updateGrownUpUI();
+  }
+
+  MINUTE_CHOICES.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn";
+    b.dataset.minutes = String(m);
+    b.textContent = m + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  // The AudioContext is created on the press itself (a user gesture), then switched on after the hold.
+  makeHold($("holdSound"), HOLD_MS, toggleSound, makeAudio);
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveCounts(); });
+  window.addEventListener("pagehide", saveCounts);
+
+  loadBinsFor(state.layout);
+  renderControls();
+  build();
+  // Resume whatever the timer was doing before a reload.
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") { perFrame(0); showRest(); }
+  drawTimer();
+  updateTimerUI();
+  setInterval(tick, 250);
+  requestAnimationFrame(frame);
+
+  // Test hook (harmless): lets automated checks read the board state.
+  window.__pegdrop = {
+    balls: function () { return balls.length; },
+    total: function () { return totalShown; },
+    counts: function () { return bins.map(function (b) { return b.count; }); },
+    layout: function () { return state.layout; },
+    cost: function () { return frameCost; },
+    shake: shakeBalls
+  };
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
