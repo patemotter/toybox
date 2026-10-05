@@ -12,7 +12,7 @@ Shared rules for every app are in "Every app" at the bottom.
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Done |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
-| 5 | Construction Site | Queued |
+| 5 | Construction Site | Done (v1 stations) |
 | 6 | Train Builder | Queued |
 | 7 | New Workshop stations | Queued |
 | 8 | UI polish pass | After everything is in |
@@ -289,6 +289,14 @@ Known so far:
   - Marbles overlap in the funnels and the lift cups.
   - The lift rail is too close to the Zigzag ramps.
   - Empty panel space on iPad landscape.
+- **Construction Site:**
+  - iPhone portrait: the scenes are small, with empty sky.
+  - Map: the station buttons cover the lots.
+  - Excavator: the swing squashes the arm, and the parked bucket sits in the pile.
+  - Bulldozer: the levers crowd the phone, and long drags make it loop.
+  - Concrete: the cab is cut off in portrait, the trowel shine is blocky, and the two cars overlap on the finished road.
+  - Wrecking ball: the ball draws over the cab, and flying blocks vanish at the edge.
+  - Gate: the goggle lenses look tan on the card, and the labels wrap on the phone.
 - **Saw Bench:**
   - Band saw: the top of its upper housing is cut off, and the hint overlaps it.
   - Scroll saw: a grey block shows behind the table.
