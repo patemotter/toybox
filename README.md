@@ -15,6 +15,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Marble Run: five marble runs with a plunger, a Drop button and a lift that loops them | [`marble-run/`](marble-run/) |
 | Car Builder: build construction vehicles, fast cars and monster trucks, then drive them | [`car-builder/`](car-builder/) |
 | Math Grid: a big times and plus table to tap, drag and build blocks on | [`math-grid/`](math-grid/) |
+| 3D Printer: pick spool colors, print a Benchy layer by layer, and fill your shelf | [`3d-printer/`](3d-printer/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 

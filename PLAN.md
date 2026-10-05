@@ -228,6 +228,16 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **3D Printer:**
+  - On iPad the printer is small and the shelf takes a lot of width.
+  - The shelf thumbnails are small, and phone portrait has no shelf in the scene.
+  - The camera covers the shelf label.
+  - The viewer shadow is too big.
+  - The name sign is cramped.
+  - The status label covers the screen.
+  - The open door is a flat slab.
+  - The plate stays bright on the rest screen.
+  - The icon is plain.
 - **Math Grid:**
   - iPhone landscape: the panel has a gap and small buttons.
   - iPhone 0–12: the squares are small.
