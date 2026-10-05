@@ -7,10 +7,10 @@ Shared rules for every app are in "Every app" at the bottom.
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Car Builder, Water Works, Math Grid | In progress |
+| – | 3D Printer, Water Works, Math Grid, Engine Room | In progress |
 | 1 | Water Works | In progress |
 | 2 | Math Grid | In progress |
-| 3 | Engine Room | Queued |
+| 3 | Engine Room | In progress |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
 | 5 | Construction Site | Queued |
 | 6 | Train Builder | Queued |
@@ -228,6 +228,14 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Car Builder:**
+  - On iPhone portrait the tab and picture labels are clipped, the action buttons stack in two rows, and the vehicle is small in the drive view.
+  - The speedometer's center number overlaps its labels, and Turbo pegs the needle.
+  - The number buttons all say "Number".
+  - Big vehicles overflow the garage roof.
+  - The arena stands are plain and the floodlight sits behind the HUD.
+  - The cranes float, and dump dirt sometimes lands in the wrong place.
+  - To add: loader, crane truck, fire truck, ambulance, police car and tractor (the drawing code exists already).
 - **Gear Box:**
   - On iPhone portrait the plate uses only half the height, small gears are tiny, and the example buttons cut off their text.
   - The RPM labels can overlap or be covered by attachments.
