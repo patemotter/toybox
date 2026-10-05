@@ -246,6 +246,36 @@ body.ending .night { opacity: 1; }
 }
 .fuel-num[hidden] { display: none; }
 
+/* ---------- Big mode: controls hidden, the rocket and launch pad fill the screen ---------- */
+.bigtoggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0.1rem 0.85rem 0.1rem 0.6rem;
+  font-size: 1rem;
+  color: #1D2340;
+  background: #FFFFFF;
+  border-color: #1D2340;
+  box-shadow: 3px 3px 0 #1D2340;
+  border-radius: 999px;
+}
+.bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.bigtoggle:active { box-shadow: 0 0 0 #1D2340; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header,
+body.big .panel { display: none; }
+body.big .wrap {
+  max-width: none;
+  padding: max(6px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px));
+}
+body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+body.big .stage { margin-bottom: 0; }
+
 /* ---------- Panel: build + colors ---------- */
 .panel {
   flex: 0 0 auto;
@@ -729,6 +759,8 @@ body.ending .launchbar { visibility: hidden; }
   .tabbar { gap: 8px; padding: 8px 10px 10px; }
   .tab { min-height: 56px; font-size: 1.2rem; }
   .fuel { top: 12px; left: 12px; }
+  .bigtoggle { top: 14px; right: 14px; min-height: 52px; font-size: 1.15rem; padding: 0.15rem 1rem 0.15rem 0.75rem; }
+  .bigtoggle svg { width: 26px; height: 26px; }
   .fuel-bar { height: 22px; }
   .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
   .fback { min-height: 56px; font-size: 1.25rem; }
@@ -793,6 +825,7 @@ body.ending .launchbar { visibility: hidden; }
         <div class="scene" id="scene">
           <svg id="art" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax meet" role="img" aria-label="A rocket on its launch pad"></svg>
           <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+          <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
         </div>
         <div class="launchbar">
           <button class="btn launch" id="launch"><svg viewBox="-50 -60 100 120" aria-hidden="true"><path d="M0 -55 C 22 -35 24 -5 20 25 L -20 25 C -24 -5 -22 -35 0 -55 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><circle cy="-12" r="9" fill="#5BC0EB" stroke="#1D2340" stroke-width="6"/><path d="M -20 0 L -40 30 L -20 25 Z M 20 0 L 40 30 L 20 25 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/><path d="M -12 30 Q 0 62 12 30 Z" fill="#F77F00" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/></svg><span>Launch!</span></button>
@@ -910,6 +943,7 @@ body.ending .launchbar { visibility: hidden; }
 
   var OUT = "#1D2340";
   var KEY = "rocketbuilder-v1";
+  var BKEY = "rocketbuilder-big-v1";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var PALETTE = [
@@ -1390,6 +1424,7 @@ body.ending .launchbar { visibility: hidden; }
   }
   $("scene").addEventListener("pointerdown", function (e) {
     if (timer.phase === "resting") return;
+    if (e.target.closest && e.target.closest("button")) return;   // the Big/Back button sits on the picture
     var p = svgPoint(e);
     sparkles(p.x, p.y, 7, 50);
     if (timer.phase === "ending") return;
@@ -1425,6 +1460,7 @@ body.ending .launchbar { visibility: hidden; }
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
     if (t.dataset.action === "timer") { openTimer(); return; }
     if (t.dataset.action === "timerclose") { closeTimer(); return; }
+    if (t.id === "bigToggle") { setBig(!document.body.classList.contains("big"), true); return; }
     if (t.id === "timerStart") { startTimer(); return; }
     if (t.id === "tiltBtn") { toggleTilt(); return; }
     if (t.id === "goodbyeBtn") { goodbyeLaunch(); return; }
@@ -2767,6 +2803,20 @@ body.ending .launchbar { visibility: hidden; }
   makeHold($("unlockBtn"), UNLOCK_MS, unlock);
   $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  // Big mode: hide the title and controls so the rocket and launch pad fill the screen.
+  // The picture is an SVG that scales itself, so no re-layout is needed.
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+  }
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
 
   showTab(tab);
   render();

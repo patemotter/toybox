@@ -288,6 +288,29 @@ button {
 .tool.clear { background: #F26CA7; color: #1D2340; }
 .tool.clear:active { background: #FFC93C; }
 
+/* ---------- Big mode: controls hidden, the picture fills the screen ---------- */
+.bigtoggle {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0.1rem 0.85rem 0.1rem 0.6rem;
+  font-size: 1rem;
+  border-radius: 999px;
+}
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header,
+body.big .panel { display: none; }
+body.big .wrap {
+  max-width: none;
+  padding: max(6px, env(safe-area-inset-top, 0px)) max(6px, env(safe-area-inset-right, 0px)) max(6px, env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px));
+}
+body.big .app { margin-top: 0; }
+
 /* ---------- Timer bits on the picture ---------- */
 .toast {
   position: absolute;
@@ -501,6 +524,8 @@ body.ending #view { cursor: default; }
   .tool { font-size: 1.05rem; gap: 6px; border-radius: 16px; }
   .tool svg { width: 28px; height: 28px; }
   .swatch .tick { font-size: 1.4rem; }
+  .bigtoggle { top: 18px; left: 18px; min-height: 52px; font-size: 1.15rem; padding: 0.15rem 1rem 0.15rem 0.75rem; }
+  .bigtoggle svg { width: 26px; height: 26px; }
 }
 /* Tablet portrait: one row each for numbers, colors, and tools. */
 @media (min-width: 744px) and (min-height: 640px) and (orientation: portrait) {
@@ -541,6 +566,7 @@ body.ending #view { cursor: default; }
     <div class="stage" id="stage">
       <canvas id="view" role="img" aria-label="Drawing space. Draw with your fingers and every line is copied around the middle."></canvas>
       <svg class="ring" id="ring" aria-hidden="true"></svg>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
       <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
       <div class="farewell" id="farewell" hidden>
         <p id="farewellText">Time to say goodbye</p>
@@ -637,6 +663,7 @@ body.ending #view { cursor: default; }
   var KEY = "kaleido-v1";          // settings
   var AKEY = "kaleido-art-v1";     // saved drawing (downscaled PNG data URL)
   var SKEY = "kaleido-sound-v1";   // sound on/off
+  var BKEY = "kaleido-big-v1";     // Big mode (controls hidden)
   var OUT = "#1D2340";
   var COUNTS = [2, 3, 4, 6, 8, 12];
   var PALETTE = [
@@ -1256,6 +1283,7 @@ body.ending #view { cursor: default; }
     if (!t) return;
     if (t.dataset.action === "grownups") { openTimer(); return; }
     if (t.dataset.action === "timerclose") { closeTimer(); return; }
+    if (t.id === "bigToggle") { setBig(!document.body.classList.contains("big"), true); return; }
     if (t.id === "timerStart") { startTimer(); return; }
     if (t.id === "goodbyeBtn") { goodbyeSpin(); return; }
     if (t.id === "shakeBtn") { turnOnShake(); return; }
@@ -1639,8 +1667,24 @@ body.ending #view { cursor: default; }
   $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
 
+  // ---------- Big mode: hide the title and controls so the picture fills the screen ----------
+  var ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+  var ICON_SHRINK = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? ICON_SHRINK : ICON_EXPAND;
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    if (W) resize();
+  }
+
   // ---------- Start ----------
   if (reduce && state.spin) state.spin = false;
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
   resize();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
   window.addEventListener("resize", resize);
