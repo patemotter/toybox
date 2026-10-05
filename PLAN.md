@@ -8,7 +8,7 @@ Shared rules for every app are in "Every app" at the bottom.
 | # | Item | Status |
 | --- | --- | --- |
 | – | 3D Printer, Water Works, Engine Room, Car Builder builder rows, shared timer (phase 1) | In progress |
-| 1 | Water Works | In progress |
+| 1 | Water Works | Done |
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Done |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
@@ -228,6 +228,14 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Water Works:**
+  - iPhone: the scenes are small, the controls are 40–50 px, and landscape is cramped.
+  - Tanks: the wheel valves overlap the feed pipe.
+  - Fountain: the jets are faint, and the dial and lever float.
+  - Wheel: odd pipes.
+  - Pipes: the Flush lever overlaps the tank.
+  - The pump shows ON during the ending.
+  - The icon is off-center; dark mode is unchecked.
 - **Engine Room:**
   - Phone landscape: the stroke names run together, and Big covers cylinder 4.
   - The start hint covers the engine.
