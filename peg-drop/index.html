@@ -765,6 +765,10 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var LAYOUT_IDS = LAYOUTS.map(function (l) { return l[0]; });
   var CAP = 150;               // most live (moving) balls at once
   var STEP = 1 / 240;          // fixed physics timestep
+  var SIM_SPEED = 0.55;        // slow motion: physics runs at this fraction of real time
+  var POUR_MS = 170;           // gap between balls while a finger pours
+  var RAIN_MS = 170;           // gap between balls while it rains
+  var DROP10_MS = 150;         // gap between the balls of "Drop 10"
   var TRAIL = 7;               // trail length in frames
 
   // Bins are fixed per device (not per orientation), so turning the iPad keeps the counts.
@@ -1645,12 +1649,12 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   // ---------- Per-frame bookkeeping ----------
   var countsDirty = true, totalShown = -1, lastCountsSave = 0;
-  function perFrame(dt) {
+  function perFrame(dt, sdt) {
     var i, b, sp, bn, k;
     for (i = 0; i < bins.length; i++) bins[i].loose = 0;
     for (i = balls.length - 1; i >= 0; i--) {
       b = balls[i];
-      b.age += dt;
+      b.age += sdt;
       // Fell out of the bottom (trapdoors open).
       if (b.y > H + b.r * 3) { balls[i] = balls[balls.length - 1]; balls.pop(); continue; }
       sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -1668,10 +1672,10 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         bn = bins[bi];
         bn.loose++;
         // Settle and sleep inside a bin.
-        if (!b.sleep && sp < 14 * su && bn.door < 0.05) { b.restT += dt; if (b.restT > 0.35) { b.sleep = true; b.vx = 0; b.vy = 0; } }
+        if (!b.sleep && sp < 14 * su && bn.door < 0.05) { b.restT += sdt; if (b.restT > 0.35) { b.sleep = true; b.vx = 0; b.vy = 0; } }
         else if (!b.sleep) b.restT = 0;
         if (bn.door < 0.05 && (b.sleep || sp < 25 * su)) {
-          b.inBinT += dt;
+          b.inBinT += sdt;
           var crowded = balls.length > 90 && b.inBinT > 0.6;
           var overfull = b.y - b.r < binTop + 2 * su && b.inBinT > 0.3;
           if (b.inBinT > 2.6 || crowded || overfull) { absorb(i); continue; }
@@ -1687,7 +1691,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
           if (bd.kind === "bucket" && Math.abs(b.x - bd.cx) < bd.R && Math.abs(b.y - bd.cy) < bd.R) inBucket = true;
         }
         if (sp < 28 * su && !inBucket && b.y > topH * 0.5) {
-          b.stillT += dt;
+          b.stillT += sdt;
           if (b.stillT > 0.9) {
             b.stillT = 0;
             b.nudges++;
@@ -1742,7 +1746,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     }
     for (i = 0; i < bumpers.length; i++) bumpers[i].flash = Math.max(0, bumpers[i].flash - dt * 3);
     for (i = 0; i < bodies.length; i++) {
-      if (bodies[i].kind === "bucket") updateBucket(bodies[i], dt);
+      if (bodies[i].kind === "bucket") updateBucket(bodies[i], sdt);
       if (bodies[i].flash) bodies[i].flash = Math.max(0, bodies[i].flash - dt * 3);
     }
     // Particles.
@@ -2137,7 +2141,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     var now = performance.now(), k;
     for (k = 0; k < 10; k++) {
       var x = state.layout === "classic" ? rand(0.12, 0.88) * W : rand(0.08, 0.92) * W;
-      queue.push({ t: now + k * 70, x: x });
+      queue.push({ t: now + k * DROP10_MS, x: x });
     }
   }
   function setRain(on) {
@@ -2360,16 +2364,18 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         for (fk in fingers) {
           if (!Object.prototype.hasOwnProperty.call(fingers, fk)) continue;
           var f = fingers[fk];
-          if (now >= f.next) { dropAt(f.x); f.next = now + 85; f.c = state.color === "rainbow" ? (rainbowI + 1) % NC : state.color; }
+          if (now >= f.next) { dropAt(f.x); f.next = now + POUR_MS; f.c = state.color === "rainbow" ? (rainbowI + 1) % NC : state.color; }
         }
         while (queue.length && queue[0].t <= now) dropAt(queue.shift().x);
-        if (raining && now >= rainNext) { dropAt(rand(0.04, 0.96) * W); rainNext = now + 75; }
+        if (raining && now >= rainNext) { dropAt(rand(0.04, 0.96) * W); rainNext = now + RAIN_MS; }
       }
-      acc += dt;
+      // Ball motion runs in slow motion (sdt); glows, sparkles and doors stay in real time (dt).
+      var sdt = dt * SIM_SPEED;
+      acc += sdt;
       var n = 0;
       while (acc >= STEP && n < 14) { step(STEP); acc -= STEP; n++; }
       if (n >= 14) acc = 0;
-      perFrame(dt);
+      perFrame(dt, sdt);
       render(now);
       if (ending) checkEndingDone();
       frameCost = frameCost * 0.95 + (performance.now() - t0) * 0.05;
@@ -2637,7 +2643,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     lastTimerKey = "";
     drawTimer();
     updateTimerUI();
-    perFrame(0);
+    perFrame(0, 0);
     showRest();
   }
 
@@ -2721,7 +2727,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   // Resume whatever the timer was doing before a reload.
   if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
   else if (timer.phase === "ending") beginEnding();
-  else if (timer.phase === "resting") { perFrame(0); showRest(); }
+  else if (timer.phase === "resting") { perFrame(0, 0); showRest(); }
   drawTimer();
   updateTimerUI();
   setInterval(tick, 250);
