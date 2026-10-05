@@ -266,7 +266,7 @@ Known so far:
 
 Remove numbers that are clutter; keep the ones that matter. Proposed:
 - **Remove:**
-  - Gear Box: RPM labels and turn counters; show a ratio only when two gears are tapped.
+  - Gear Box: done (RPM and turn labels removed; the motor dial reads Slow/Medium/Fast).
   - Drill Press: RPM readouts and the depth readout (the dial still sets depth); keep the hole count only if wanted.
   - Hammer & Screws: Hits, Turns, "41 of 50 mm in", and the in-wood ruler.
   - Saw Bench: piece-length labels on every cut, and pieces counters.
@@ -280,7 +280,7 @@ Remove numbers that are clutter; keep the ones that matter. Proposed:
   - Settings you set: table-saw fence, miter angle, blade height.
   - Math Grid.
   - Peg Drop bin counts (counting is the play there).
-- **Undecided:** simple counters like Fish: N, Marbles/Laps, Pieces, Crushed: N.
+- **Counters stay** (the dad's call): Fish: N, Marbles/Laps, Pieces, Crushed: N, Holes, Nails/Screws.
 
 ## On hold: Workshop Projects
 

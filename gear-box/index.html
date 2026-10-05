@@ -330,7 +330,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         </div>
         <div class="dialbox">
           <div class="dial" id="dial" role="slider" aria-label="Motor speed" aria-valuemin="0" aria-valuemax="60" tabindex="0"><svg viewBox="-50 -50 100 100" id="dialSvg"></svg></div>
-          <div class="dialnum"><span id="dialNum">10</span><small>RPM</small></div>
+          <div class="dialnum"><span id="dialNum">Slow</span></div>
         </div>
       </div>
       <div class="ctrl" id="atts"></div>
@@ -752,6 +752,9 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var now = 0, lastT = 0, cranking = null, crankW = 0, jamWob = 0, lastHint = 0, clickAcc = 0, lastClick = 0;
   var ending = false, coastBoost = 0;
   var LIFT_MAX = 60, CM_PER_TURN = 5;
+  // Calmer speeds: the motor dial's top setting turns the driver at 24 RPM (dial value x 0.4),
+  // and a flicked crank coasts no faster than that.
+  var MOTOR_SCALE = 0.4, MAX_W = 24 * TAU / 60;
 
   function step(dt) {
     var d = byId(driverId);
@@ -759,8 +762,8 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       var w = d.w;
       if (ending) { w *= Math.exp(-dt * 1.6); if (coastBoost > 0) { coastBoost -= dt; w = Math.max(Math.abs(w), 9) * (w < 0 ? -1 : 1); } if (Math.abs(w) < 0.03) w = 0; }
       else if (cranking) { if (performance.now() - cranking.t > 60) crankW *= Math.exp(-dt * 10); w = crankW; }
-      else if (mode === "motor") { var tgt = motorRpm * TAU / 60; w += (tgt - w) * Math.min(1, dt * 3); }
-      else { w *= Math.exp(-dt * 1.4); if (Math.abs(w) < 0.02) w = 0; }
+      else if (mode === "motor") { var tgt = motorRpm * MOTOR_SCALE * TAU / 60; w += (tgt - w) * Math.min(1, dt * 3); }
+      else { w *= Math.exp(-dt * 2); if (Math.abs(w) < 0.02) w = 0; }
       if (jammed) {
         if (Math.abs(w) > 0.05 || cranking) { jamWob = 1; showHintThrottled(); }
         d.w = 0;
@@ -839,17 +842,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       }
     });
     if (d) drawCrank(d, d.drawA);
-    // live numbers
-    gears.forEach(function (g) {
-      var x = OX + g.x * S, y = OY + g.y * S, size = Math.max(13, Math.min(22, S * 0.95));
-      var under = y + hubR(g.T) * S + size * 1.0;
-      var rpm = rpmOf(g);
-      if (rpm > 0 || g.turns > 0) {
-        var arrow = g.w > 0.01 ? "↻ " : g.w < -0.01 ? "↺ " : "";
-        pill(arrow + rpm + " RPM", x, under, size, g.id === driverId ? "#FFF4CC" : "#FFFFFF");
-        if (g.turns > 0) pill(g.turns + (g.turns === 1 ? " turn" : " turns"), x, under + size * 1.5, size * 0.85, "#E6F2FF");
-      }
-    });
+    // No live RPM / turn readouts on the gears (they were clutter); tap a pair for their ratio.
     rings.forEach(function (r) {
       var t = r.life / 0.6;
       ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.4 + t), 0, TAU); ctx.lineWidth = 6 * (1 - t); ctx.strokeStyle = r.col; ctx.stroke();
@@ -906,7 +899,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     if (selected.length === 1) {
       var g = byId(selected[0]);
       if (g) {
-        txt = g.T + " teeth · " + rpmOf(g) + " RPM · " + g.turns + (g.turns === 1 ? " turn" : " turns");
+        txt = g.T + " teeth";
         showDrive = g.id !== driverId;
         if (!showDrive) txt += " · drives";
       }
@@ -1040,7 +1033,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     if (p.kind === "crank") {
       cranking = null;
       var d = byId(driverId);
-      if (d) d.w = crankW;
+      if (d) d.w = clamp(crankW, -MAX_W, MAX_W);
       return;
     }
     if (p.kind === "press") { if (!cancel) tapGear(p.gear); return; }
@@ -1172,7 +1165,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     o += '<line x1="0" y1="0" x2="' + (Math.sin(a) * 30).toFixed(1) + '" y2="' + (-Math.cos(a) * 30).toFixed(1) + '" stroke="#E63946" stroke-width="8" stroke-linecap="round"/>';
     o += '<circle r="6" fill="#1D2340"/>';
     $("dialSvg").innerHTML = o;
-    $("dialNum").textContent = String(motorRpm);
+    $("dialNum").textContent = motorRpm === 0 ? "Off" : motorRpm <= 20 ? "Slow" : motorRpm <= 40 ? "Medium" : "Fast";
     $("dial").setAttribute("aria-valuenow", String(motorRpm));
   }
   var dialPtr = null;
