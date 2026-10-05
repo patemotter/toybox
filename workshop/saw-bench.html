@@ -2843,8 +2843,9 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       var q = this.toScreen(pivot[0], pivot[1]);
       this.tx += p[0] - q[0]; this.ty += p[1] - q[1];
     },
-    // Finger drag: push forward (up the screen) to feed into the blade; sideways turns the board.
-    push: function (dx, dy, fx, fy) {
+    // One-finger (or mouse) drag always slides the board, never turns it, so it behaves the same
+    // everywhere. Turning is only the turn buttons or a two-finger twist.
+    push: function (dx, dy) {
       var B = this.toBoard(this.Pb[0], this.Pb[1]);
       var engaged = this.inWood(B[0], B[1]);
       if (!engaged) {
@@ -2855,13 +2856,9 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         else if (this.inWood(nb[0], nb[1])) this.cutAt(nb[0], nb[1], B[0], B[1]);
         return;
       }
-      var lat = this.band ? 0.12 : 0.45;
-      var rx = fx - this.Pb[0], ry = fy - this.Pb[1], r2 = Math.max(rx * rx + ry * ry, 90 * 90);
-      var dLat = dx * (1 - lat);
-      var dth = (rx * 0 - ry * dLat) / r2;
-      this.turn(dth * 1.3);
+      // in the wood: the board follows the finger, at the speed the blade can cut
       this.queue = (this.queue || [0, 0]);
-      this.queue[0] += dx * lat; this.queue[1] += dy;
+      this.queue[0] += dx; this.queue[1] += dy;
     },
     update: function (dt) {
       if (this.slide > 0) this.slide = Math.max(0, this.slide - dt * 2.2);
@@ -2874,7 +2871,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (q && (q[0] || q[1])) {
         var v = this.saw.speed / this.mat.mult * this.S;
         var B = this.toBoard(this.Pb[0], this.Pb[1]);
-        var feedIn = q[1] < 0;
+        var feedIn = this.inWood(B[0], B[1]);
         var mx = q[0], my = q[1];
         if (feedIn) {
           var lim = this.speed < 0.5 ? 0 : v * dt;
@@ -2887,7 +2884,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         if (!this.held) { q[0] = 0; q[1] = 0; }
         var NB = this.toBoard(this.Pb[0], this.Pb[1]);
         if (this.inWood(NB[0], NB[1]) && !this.done) {
-          if (feedIn && my) cutting = true;
+          if (feedIn && (mx || my)) cutting = true;
           if (this.cutAt(NB[0], NB[1], B[0], B[1])) {
             var self = this;
             this.releasePiece(function (x, y) { return self.toScreen(x, y); }, this.rot, this.S);
@@ -2909,7 +2906,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       withAway(g, [this.Pb[0], this.Pb[1] - 100], function () {
         if (self.band) self.drawBandTop(g); else self.drawScrollTop(g);
       });
-      strokeHint(g, W * 0.72, 30, "Push the board", 3, this.cutting, this.band ? "Steer it along the line" : "Turn the board for tight curves");
+      strokeHint(g, W * 0.72, 30, "Slide the board", 3, this.cutting, this.band ? "Follow the line" : "Turn it with ↺ ↻ for tight curves");
     },
     drawBandTop: function (g) {
       var Pb = this.Pb, se = Math.min(H * 0.36 / 400, this.S * 0.62);
