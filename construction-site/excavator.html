@@ -1,0 +1,1491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Excavator</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Construction">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap {
+  max-width: 1400px; height: 100%; margin: 0 auto; display: flex; flex-direction: column;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+}
+header { flex: none; display: flex; align-items: center; gap: 8px; }
+header h1 { margin: 0; font-size: 1.6rem; font-weight: 800; line-height: 1; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.spacer { flex: 1 1 auto; }
+.homebtn, .mapbtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 46px; padding: 2px 12px 2px 9px;
+  font-weight: 700; font-size: 1rem; color: var(--ink); text-decoration: none; background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 14px; box-shadow: 2px 2px 0 var(--edge); white-space: nowrap;
+}
+.mapbtn { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 2px 2px 0 #1D2340; }
+.homebtn:active, .mapbtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible, .mapbtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg, .mapbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.badge {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 6px;
+  border: 3px dashed var(--edge); border-radius: 999px; font-size: 0.9rem; font-weight: 700; color: var(--ink); white-space: nowrap;
+}
+.badge svg { width: 34px; height: 26px; display: block; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 1.1rem; color: var(--ink); background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 16px; padding: 0.45rem 0.8rem; min-height: 52px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge); transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.gubtn { min-height: 46px; font-size: 1rem; padding: 0.1rem 0.8rem; white-space: nowrap; }
+
+.app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; border: 3px solid var(--edge); border-radius: 24px;
+  box-shadow: 4px 4px 0 var(--edge); overflow: hidden; background: #A9DCFF; touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.loads {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 18px; box-shadow: 3px 3px 0 #1D2340;
+  padding: 0 14px; font-weight: 800; font-size: clamp(1.1rem, 2.8vw, 1.6rem); line-height: 1.5; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: translateX(-50%) scale(1.6); } 100% { transform: translateX(-50%) scale(1); } }
+.hint {
+  position: absolute; left: 50%; top: 58px; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  background: var(--accent); color: #1D2340; border: 4px solid #1D2340; border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340; padding: 0.05rem 1rem 0.15rem; font-size: clamp(1.05rem, 3.2vw, 1.8rem);
+  font-weight: 800; white-space: nowrap; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
+}
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+
+/* Play-timer gauge */
+.fuel { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.fuel[hidden] { display: none; }
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num[hidden] { display: none; }
+
+/* Big mode */
+.bigtoggle {
+  position: absolute; top: 10px; right: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 46px; padding: 0.1rem 0.85rem 0.1rem 0.6rem; font-size: 1rem; color: #1D2340; background: #FFFFFF;
+  border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; border-radius: 999px;
+}
+.bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.bigtoggle:active { box-shadow: 0 0 0 #1D2340; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header, body.big .panel { display: none; }
+body.big .wrap { max-width: none; padding: max(6px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+body.big .app { margin-top: 0; }
+
+/* ---------- Controls panel: two joysticks, swing, scoop/dump ---------- */
+.panel {
+  flex: 0 0 auto; display: grid; gap: 10px; padding: 10px; height: clamp(200px, 27vh, 330px);
+  grid-template-columns: 116px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "boom arm arm" "boom swing curl";
+  background: var(--panel); border: 3px solid var(--edge); border-radius: 24px; box-shadow: 4px 4px 0 var(--edge);
+}
+.stick {
+  position: relative; touch-action: none; cursor: grab; border-radius: 20px; min-width: 0; min-height: 0;
+  background: repeating-linear-gradient(135deg, #FFC72C 0 14px, #1D2340 14px 28px); border: 3px solid #1D2340;
+}
+.stick .slot { position: absolute; background: #2B2F3A; border-radius: 999px; border: 3px solid #1D2340; box-shadow: inset 0 3px 0 rgba(0,0,0,0.35); }
+.stick.v .slot { left: 50%; top: 14px; bottom: 14px; width: 22px; transform: translateX(-50%); }
+.stick.h .slot { top: 50%; left: 14px; right: 14px; height: 22px; transform: translateY(-50%); }
+.stick .knob {
+  position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #FF8A70 0 18%, #E63946 45%, #B5262F 100%);
+  border: 4px solid #1D2340; box-shadow: 3px 4px 0 #1D2340; pointer-events: none;
+  transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1);
+}
+.stick.held .knob { transition: none; }
+.stick .lbl {
+  position: absolute; pointer-events: none; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 12px;
+  padding: 0 8px; font-weight: 800; font-size: 1rem; line-height: 1.35;
+}
+.stick.v .lbl { left: 50%; bottom: 4px; transform: translateX(-50%); }
+.stick.h .lbl { left: 6px; top: 4px; }
+.stick .arr { position: absolute; pointer-events: none; width: 30px; height: 30px; }
+.stick .arr path { fill: #FFFFFF; stroke: #1D2340; stroke-width: 3; stroke-linejoin: round; }
+.stick.v .arr.a1 { left: 50%; top: 2px; transform: translateX(-50%); }
+.stick.v .arr.a2 { display: none; }
+.stick.h .arr.a1 { left: 2px; top: 50%; transform: translateY(-50%); }
+.stick.h .arr.a2 { right: 2px; top: 50%; transform: translateY(-50%); }
+#boomStick { grid-area: boom; }
+#armStick { grid-area: arm; }
+.acts { display: contents; }
+.act { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; font-size: clamp(1rem, 2.6vw, 1.4rem); padding: 0.2rem 0.4rem; white-space: nowrap; }
+.act svg { width: 34px; height: 34px; flex: none; pointer-events: none; }
+.act span { pointer-events: none; }
+#swingBtn { grid-area: swing; }
+#curlBtn { grid-area: curl; background: var(--accent); color: #1D2340; }
+/* In Big mode the two action buttons float on the stage. */
+body.big .acts { display: flex; position: absolute; right: 10px; bottom: 10px; z-index: 3; gap: 10px; }
+body.big .act { min-height: 64px; padding: 0.2rem 0.9rem; }
+body.ending .panel, body.ending .acts, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer: toast, farewell ---------- */
+.toast {
+  position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 45;
+  background: var(--accent); color: #1D2340; border: 3px solid #1D2340; border-radius: 999px; padding: 0.3rem 1rem;
+  font-size: 1.3rem; font-weight: 800; white-space: nowrap; box-shadow: 3px 3px 0 #1D2340; opacity: 0;
+  transition: opacity 0.4s ease; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute; left: 50%; top: 58px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 22px;
+  padding: 10px 16px 12px; box-shadow: 4px 4px 0 #1D2340; text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; font-size: 1.3rem; min-height: 56px; padding: 0.4rem 1.2rem; }
+.goodbye[hidden] { display: none; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+  color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 6px 6px 0 var(--edge); padding: 18px 18px 20px;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 18px 0 6px; font-size: 1.2rem; font-weight: 800; text-align: center; }
+.sheet h4 { margin: 12px 0 6px; font-size: 1.05rem; font-weight: 800; text-align: center; }
+.sheet .opt-txt { color: var(--muted); font-weight: 500; }
+.sheet .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sheet .row .btn { flex: 0 0 calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
+.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 0; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.textin {
+  display: block; width: 100%; font: inherit; font-size: 1.1rem; color: var(--ink); background: var(--bg);
+  border: 3px solid var(--edge); border-radius: 14px; padding: 0.45rem 0.8rem; -webkit-user-select: text; user-select: text;
+}
+.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 1.05rem; cursor: pointer; }
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+.hold .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255, 201, 60, 0.75); }
+.hold .label { position: relative; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: 100%; max-width: 420px; max-height: 100%; overflow: hidden; background: var(--plate); color: #1D2340;
+  border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 16px 20px 22px; text-align: center;
+}
+.rest-art { display: block; width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; height: auto; margin: 0 auto 6px; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next { margin: 14px auto 0; display: inline-block; background: var(--accent); border: 3px solid #1D2340; border-radius: 16px; padding: 0.4rem 1.1rem; font-size: 1.5rem; font-weight: 700; }
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px; height: 48px; border: 3px solid var(--edge); border-radius: 14px; background: var(--panel);
+  font-size: 1.3rem; cursor: pointer; opacity: 0.7; touch-action: none;
+}
+
+/* Landscape: stage on the left, controls on the right. */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .panel {
+    height: auto; width: min(32%, 330px); flex: 0 0 auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) 120px;
+    grid-template-areas: "boom swing" "boom curl" "arm arm";
+  }
+  .act { flex-direction: column; gap: 2px; }
+  .act svg { width: 44px; height: 44px; }
+}
+@media (max-width: 700px) {
+  header h1 { font-size: 1.25rem; }
+  .badge span, .homebtn span { display: none; }
+  .badge { padding: 0 6px; }
+  .homebtn { padding: 2px 8px; }
+  .panel { height: clamp(190px, 27vh, 260px); grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px; }
+  .stick .knob { width: 58px; height: 58px; margin: -29px 0 0 -29px; }
+  .act svg { width: 28px; height: 28px; }
+}
+@media (max-width: 480px) {
+  header h1 { display: none; }
+  .gubtn { font-size: 0.9rem; padding: 0.2rem 0.5rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .wrap { padding-top: 4px; padding-bottom: 4px; }
+  header h1 { font-size: 1.15rem; }
+  .homebtn, .mapbtn, .gubtn { min-height: 38px; font-size: 0.9rem; }
+  .badge span { display: none; }
+  .app { margin-top: 4px; gap: 6px; }
+  .panel { height: auto; width: 250px; gap: 6px; padding: 6px; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) 84px; }
+  .stick .knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
+  .act { font-size: 1rem; min-height: 0; }
+  .act svg { width: 30px; height: 30px; }
+  .stick .lbl { font-size: 0.85rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .hint.go, .loads.pop { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="mapbtn" id="mapbtn" href="./" aria-label="Back to the site map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Site map</span></a>
+    <h1>Excavator</h1>
+    <span class="spacer"></span>
+    <span class="badge" title="Hard hat and safety vest are on"><svg viewBox="0 0 34 26" aria-hidden="true"><path d="M4 18 C4 6 30 6 30 18 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="1.5" y="17" width="31" height="5" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5"/><path d="M17 7 V17" stroke="#1D2340" stroke-width="2"/></svg><span>Hard hat on</span></span>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn gubtn" id="gubtn" data-action="timer">Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage" id="stage">
+      <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck"></canvas>
+      <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+      <div class="loads" id="loads">Loads: 0</div>
+      <div class="hint" id="hint" hidden></div>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to say goodbye</p>
+        <button class="btn goodbye" id="goodbyeBtn">Park it</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="stick v" id="boomStick" role="slider" aria-label="Boom up and down" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
+        <svg class="arr a1" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 L27 19 H19 V27 H11 V19 H3 Z"/></svg>
+        <div class="slot"></div><div class="knob"></div><span class="lbl">Boom</span>
+      </div>
+      <div class="stick h" id="armStick" role="slider" aria-label="Arm in and out" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
+        <svg class="arr a1" viewBox="0 0 30 30" aria-hidden="true"><path d="M3 15 L19 3 V11 H27 V19 H19 V27 Z"/></svg>
+        <svg class="arr a2" viewBox="0 0 30 30" aria-hidden="true"><path d="M27 15 L11 3 V11 H3 V19 H11 V27 Z"/></svg>
+        <div class="slot"></div><div class="knob"></div><span class="lbl">Arm</span>
+      </div>
+      <div class="acts" id="acts">
+        <button class="btn act" id="swingBtn"><svg viewBox="0 0 40 40" aria-hidden="true" id="swingIcon"></svg><span id="swingLabel">To truck</span></button>
+        <button class="btn act" id="curlBtn"><svg viewBox="0 0 40 40" aria-hidden="true" id="curlIcon"></svg><span id="curlLabel">Scoop</span></button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <h2 id="sheetTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">When time is up, the excavator parks its bucket and rests, and the controls lock. The timer carries on across the site pages.</p>
+        <h4>How long</h4>
+        <div class="row" id="minuteRow"></div>
+        <h4>Next activity <span class="opt-txt">(optional)</span></h4>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a “Park it” button to press</label>
+        <div class="sheet-actions"><button class="btn primary" id="timerStart">Start timer</button></div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+      <hr>
+      <h3>Sound</h3>
+      <p class="sub" id="soundState">Sound is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Hold to turn sound on</span></button>
+      </div>
+      <div class="sheet-actions"><button class="btn" data-action="timerclose">Close</button></div>
+    </div>
+  </div>
+
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <svg class="rest-art" id="restArt" viewBox="0 0 240 200" aria-hidden="true"></svg>
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The site is resting.</p>
+      <p class="rest-line">The excavator will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Safety gear check (once per visit, on the site map) ----------
+  var gearOn = true;
+  try { gearOn = sessionStorage.getItem("site-gear") === "on"; } catch (e) { gearOn = true; }
+  if (!gearOn) { location.replace("./?next=excavator"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  var DEG = Math.PI / 180;
+  var OUT = "#1D2340";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var STATEKEY = "site-excavator-v1";
+  var TKEY = "site-timer-v1";
+  var SKEY = "site-sound-v1";
+  var BKEY = "site-big-v1";
+
+  // ---------- World (units; y is up, ground at y = 0) ----------
+  var WORLD_W = 1000, VIEW_UP = 590, VIEW_DOWN = 56;
+  var CX = 480;                       // swing centre of the excavator
+  var FOOT = { x: 62, y: 168 };       // boom foot (machine coords: x forward, y up)
+  var L1 = 280, L2 = 215;             // boom and arm lengths
+  var LIM1 = [-28 * DEG, 72 * DEG];   // boom angle (from horizontal)
+  var LIM2 = [-158 * DEG, -28 * DEG]; // arm angle relative to the boom
+  var LIM3 = [-125 * DEG, 40 * DEG];  // bucket angle relative to the arm
+  var CURL = -110 * DEG, OPEN = 36 * DEG;
+  var CAP = 2600;                     // bucket holds this much dirt
+  var TRUCK_CAP = 6400;               // a truck is full after about 3 buckets
+  var PV = 26;                        // dirt in one pour grain
+
+  // Bucket outline in bucket coords (u from pin toward the teeth, v toward the opening).
+  var BUCKET = [[-8, 12], [-8, -14], [10, -40], [46, -52], [80, -40], [98, -14], [104, -2], [120, 3], [100, 9]];
+  var TEETH = [120, 3], LIP = [100, 9], TOPLIP = [-8, 12], BUCKET_MID = [48, -18], BUCKET_LOW = [46, -40];
+
+  // Machine state
+  var m = { a1: 60 * DEG, a2: -115 * DEG, a3: OPEN, curlTarget: OPEN, fill: 0, swing: 0, swingFrom: 0, swingTo: 0, swingT: 1, swingPhase: "", liftT: 0 };
+  var parking = false;
+
+  // Dirt pile heightmap
+  var PX0 = 630, PCW = 5, PN = 130;
+  var pile = new Float32Array(PN), pileInit = new Float32Array(PN), pileTotal0 = 0, regrow = 0;
+  for (var i0 = 0; i0 < PN; i0++) {
+    var xx = PX0 + (i0 + 0.5) * PCW, d0 = (xx - 875) / 245;
+    var h0 = Math.max(0, 1 - d0 * d0);
+    pileInit[i0] = 152 * Math.pow(h0, 0.85) + (xx > 1060 ? Math.min(60, (xx - 1060) * 0.5) : 0);
+    pile[i0] = pileInit[i0]; pileTotal0 += pileInit[i0] * PCW;
+  }
+  var pebbles = [];
+  for (var k0 = 0; k0 < 90; k0++) pebbles.push({ x: rand(PX0 + 20, PX0 + PN * PCW), y: rand(6, 150), r: rand(2.5, 6), c: Math.random() < 0.5 ? "#5E3A1B" : "#B98552" });
+
+  // Dump truck (faces left: cab on the left, bed toward the excavator)
+  var TRUCK_COLORS = [["#F77F00", "#E63946"], ["#2D7FF9", "#FFC72C"], ["#2E9E5B", "#F77F00"], ["#E63946", "#2D7FF9"], ["#8E5CD9", "#FFC72C"]];
+  var BED0 = 108, BED1 = 296, BEDN = 24, BED_FLOOR = 108, BED_RIM = 128;
+  var truck = newTruck(0);
+  truck.state = "in"; truck.dx = 0;
+  var truckCount = 0;
+  function newTruck(n) {
+    return { dx: -700, v: 0, state: "gone", t: 0, bed: new Float32Array(BEDN), load: 0, colors: TRUCK_COLORS[n % TRUCK_COLORS.length], wheel: 0, beepT: 0, lastPour: 0, bounce: 0 };
+  }
+
+  var loads = 0;
+  try { var so = JSON.parse(localStorage.getItem(STATEKEY) || "null"); if (so && typeof so.loads === "number" && so.loads >= 0) loads = Math.floor(so.loads); } catch (e) { /* ignore */ }
+  function saveState() { try { localStorage.setItem(STATEKEY, JSON.stringify({ loads: loads })); } catch (e) { /* ignore */ } }
+
+  var grains = [], puffs = [], crumbs = [], beeps = [];
+  var clouds = [{ x: 140, y: 500, s: 1 }, { x: 560, y: 545, s: 0.8 }, { x: 900, y: 470, s: 1.15 }];
+
+  // ---------- Kinematics ----------
+  function facing() { return Math.cos(m.swing); }
+  function side() { return m.swing < Math.PI / 2 ? 1 : -1; }
+  function fk(a1, a2, a3) {
+    var c1 = Math.cos(a1), s1 = Math.sin(a1), b = a1 + a2, c2 = Math.cos(b), s2 = Math.sin(b), ph = b + a3;
+    var t1 = { x: FOOT.x + L1 * c1, y: FOOT.y + L1 * s1 };
+    var t2 = { x: t1.x + L2 * c2, y: t1.y + L2 * s2 };
+    return { t1: t1, t2: t2, b: b, ph: ph, U: { x: Math.cos(ph), y: Math.sin(ph) }, V: { x: Math.sin(ph), y: -Math.cos(ph) } };
+  }
+  function bpt(k, p) { return { x: k.t2.x + p[0] * k.U.x + p[1] * k.V.x, y: k.t2.y + p[0] * k.U.y + p[1] * k.V.y }; }
+  function toWorldX(lx) { return CX + lx * facing(); }
+  // How far the arm and bucket poke into something solid (0 = fine).
+  function penetration(a1, a2, a3) {
+    var k = fk(a1, a2, a3), sd = side(), pen = 0;
+    var pts = BUCKET.map(function (p) { return bpt(k, p); });
+    pts.push(k.t2, k.t1);
+    var truckIn = truck.state !== "gone";
+    for (var i = 0; i < pts.length; i++) {
+      var lx = pts[i].x, y = pts[i].y, X = CX + lx * sd, need = 0;
+      if (Math.abs(lx) < 165) need = 76;
+      if (lx < 20) need = Math.max(need, 300);
+      if (truckIn) {
+        var tx = X - truck.dx;
+        if (tx > BED0 + 14 && tx < BED1 - 14) need = Math.max(need, BED_FLOOR + bedHeightAt(X) + 6);
+        else if (tx > BED0 - 4 && tx < BED1 + 12) need = Math.max(need, BED_RIM + 8);
+        else if (tx > 0 && tx <= BED0 - 4) need = Math.max(need, 185);
+      }
+      pen = Math.max(pen, need - y);
+    }
+    return pen;
+  }
+  var curPen = 0;
+  function trySet(a1, a2, a3) {
+    a1 = clamp(a1, LIM1[0], LIM1[1]); a2 = clamp(a2, LIM2[0], LIM2[1]); a3 = clamp(a3, LIM3[0], LIM3[1]);
+    var p = penetration(a1, a2, a3);
+    if (p <= 0.5 || p <= curPen + 0.01) { m.a1 = a1; m.a2 = a2; m.a3 = a3; curPen = p; return true; }
+    return false;
+  }
+  function angDiff(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+  // Two-joint IK for the arm tip with joint limits (analytic elbow-up, then clamped coordinate descent).
+  function solveIK(px, py) {
+    var dx = px - FOOT.x, dy = py - FOOT.y, d = Math.sqrt(dx * dx + dy * dy);
+    d = clamp(d, Math.abs(L1 - L2) + 1, L1 + L2 - 1);
+    var c = clamp((d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1);
+    var a2 = clamp(-Math.acos(c), LIM2[0], LIM2[1]);
+    var a1 = 0, it;
+    for (it = 0; it < 6; it++) {
+      a1 = clamp(Math.atan2(dy, dx) - Math.atan2(L2 * Math.sin(a2), L1 + L2 * Math.cos(a2)), LIM1[0], LIM1[1]);
+      var ex = FOOT.x + L1 * Math.cos(a1), ey = FOOT.y + L1 * Math.sin(a1);
+      a2 = clamp(angDiff(Math.atan2(py - ey, px - ex) - a1), LIM2[0], LIM2[1]);
+    }
+    return [a1, a2];
+  }
+
+  // ---------- Heightmaps ----------
+  function pileCol(X) { return Math.floor((X - PX0) / PCW); }
+  function pileAt(X) { var i = pileCol(X); return i >= 0 && i < PN ? pile[i] : 0; }
+  function relaxPile() {
+    var maxd = PCW * 0.85;
+    for (var pass = 0; pass < 2; pass++) {
+      for (var i = 0; i < PN - 1; i++) {
+        var d = pile[i] - pile[i + 1];
+        if (d > maxd) { var mv = (d - maxd) * 0.25; pile[i] -= mv; pile[i + 1] += mv; }
+        else if (d < -maxd) { var mv2 = (-d - maxd) * 0.25; pile[i + 1] -= mv2; pile[i] += mv2; }
+      }
+    }
+  }
+  function pileTotal() { var s = 0; for (var i = 0; i < PN; i++) s += pile[i] * PCW; return s; }
+  var BEDW = (BED1 - BED0) / BEDN;
+  function bedHeightAt(X) { var i = Math.floor((X - truck.dx - BED0) / BEDW); return i >= 0 && i < BEDN ? truck.bed[i] : 0; }
+  function relaxBed(t) {
+    var maxd = BEDW * 1.15;
+    for (var pass = 0; pass < 2; pass++) for (var i = 0; i < BEDN - 1; i++) {
+      var d = t.bed[i] - t.bed[i + 1];
+      if (Math.abs(d) > maxd) { var mv = (Math.abs(d) - maxd) * 0.25 * (d > 0 ? 1 : -1); t.bed[i] -= mv; t.bed[i + 1] += mv; }
+    }
+  }
+
+  // ---------- Canvas ----------
+  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0;
+  function resize() {
+    var r = $("stage").getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    S = Math.min(cw / WORLD_W, ch / (VIEW_UP + VIEW_DOWN));
+    OX = (cw - WORLD_W * S) / 2;
+    OY = ch - VIEW_DOWN * S;
+  }
+  window.addEventListener("resize", resize);
+  function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - OX) / S, y: (OY - (cy - r.top)) / S }; }
+  function worldT() { ctx.setTransform(dpr * S, 0, 0, -dpr * S, dpr * OX, dpr * OY); }
+  function visLeft() { return -OX / S; }
+  function visRight() { return (cw - OX) / S; }
+
+  function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
+  function shape(pts, fill, lw) { path(pts); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw || 5; ctx.strokeStyle = OUT; ctx.stroke(); }
+  function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath(); }
+  function circle(x, y, r, fill, lw) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); if (lw !== 0) { ctx.lineWidth = lw || 5; ctx.strokeStyle = OUT; ctx.stroke(); } }
+  function fatLine(pts, w, col, ow) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.strokeStyle = OUT; ctx.lineWidth = w + 2 * (ow === undefined ? 5 : ow); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.stroke();
+  }
+  function cylinder(a, b, frac) {
+    var m2 = { x: lerp(a.x, b.x, frac), y: lerp(a.y, b.y, frac) };
+    fatLine([m2, b], 6, "#E8ECF2", 3.5);
+    fatLine([a, m2], 14, "#3A4150", 4);
+    circle(a.x, a.y, 6, "#9AA3B2", 3); circle(b.x, b.y, 6, "#9AA3B2", 3);
+  }
+
+  // ---------- Drawing: scene ----------
+  function drawSky() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var g = ctx.createLinearGradient(0, 0, 0, OY);
+    g.addColorStop(0, "#6EC3FF"); g.addColorStop(1, "#D7F1FF");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+    worldT();
+    circle(90, 520, 38, "#FFE066", 0);
+    ctx.globalAlpha = 0.35; circle(90, 520, 56, "#FFF3B0", 0); ctx.globalAlpha = 1;
+    clouds.forEach(function (c) {
+      ctx.fillStyle = "#FFFFFF";
+      [[0, 0, 26], [30, 12, 32], [64, 0, 24], [32, -6, 26]].forEach(function (q) { ctx.beginPath(); ctx.arc(c.x + q[0] * c.s, c.y + q[1] * c.s, q[2] * c.s, 0, Math.PI * 2); ctx.fill(); });
+    });
+    // distant hills and a hazard barrier
+    var L = visLeft() - 10, R = visRight() + 10;
+    ctx.fillStyle = "#9CCB7A";
+    ctx.beginPath(); ctx.moveTo(L, 0);
+    for (var x = L; x <= R; x += 20) ctx.lineTo(x, 60 + 26 * Math.sin(x * 0.006) + 14 * Math.sin(x * 0.017 + 1));
+    ctx.lineTo(R, 0); ctx.closePath(); ctx.fill();
+    for (var bx = Math.floor(L / 160) * 160; bx < R; bx += 160) drawBarrier(bx + 40, 22);
+  }
+  function drawBarrier(x, y) {
+    ctx.save();
+    rrect(x, y + 22, 90, 18, 4); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.clip();
+    ctx.fillStyle = "#F77F00";
+    for (var s = -20; s < 110; s += 22) { ctx.beginPath(); ctx.moveTo(x + s, y + 22); ctx.lineTo(x + s + 11, y + 22); ctx.lineTo(x + s + 29, y + 40); ctx.lineTo(x + s + 18, y + 40); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    rrect(x, y + 22, 90, 18, 4); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = OUT; ctx.fillRect(x + 8, y - 2, 6, 24); ctx.fillRect(x + 76, y - 2, 6, 24);
+  }
+  function drawGround() {
+    var L = visLeft() - 10, R = visRight() + 10;
+    ctx.fillStyle = "#B07A45"; ctx.fillRect(L, -VIEW_DOWN - 400, R - L, VIEW_DOWN + 400 + 22);
+    ctx.fillStyle = "#C48A52"; ctx.fillRect(L, 0, R - L, 22);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(L, 22); ctx.lineTo(R, 22); ctx.stroke();
+    ctx.fillStyle = "#8C5A2E";
+    for (var x = Math.floor(L / 70) * 70; x < R; x += 70) { ctx.beginPath(); ctx.ellipse(x + 20, -18, 9, 5, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 52, -38, 6, 4, 0, 0, 7); ctx.fill(); }
+    // traffic cones at the edges
+    drawCone(L + 40, 4); drawCone(R - 40, 4);
+  }
+  function drawCone(x, y) {
+    shape([[x - 22, y], [x + 22, y], [x + 22, y + 7], [x - 22, y + 7]], "#3A4150", 3);
+    shape([[x - 15, y + 7], [x + 15, y + 7], [x + 4, y + 62], [x - 4, y + 62]], "#F77F00", 3.5);
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.moveTo(x - 11, y + 26); ctx.lineTo(x + 11, y + 26); ctx.lineTo(x + 8, y + 38); ctx.lineTo(x - 8, y + 38); ctx.closePath(); ctx.fill();
+  }
+  function drawPile() {
+    ctx.beginPath(); ctx.moveTo(PX0, 0);
+    for (var i = 0; i < PN; i++) ctx.lineTo(PX0 + (i + 0.5) * PCW, pile[i]);
+    ctx.lineTo(PX0 + PN * PCW, 0); ctx.closePath();
+    var g = ctx.createLinearGradient(0, 160, 0, 0); g.addColorStop(0, "#8B5A2B"); g.addColorStop(1, "#6B421E");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.save(); ctx.clip();
+    pebbles.forEach(function (p) { if (p.y < pileAt(p.x) - 4) circle(p.x, p.y, p.r, p.c, 0); });
+    ctx.restore();
+    ctx.beginPath(); ctx.moveTo(PX0, 0);
+    for (var j = 0; j < PN; j++) ctx.lineTo(PX0 + (j + 0.5) * PCW, pile[j]);
+    ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.stroke();
+  }
+  function drawTruck(t) {
+    ctx.save(); ctx.translate(t.dx, t.bounce);
+    var cab = t.colors[0], bedc = t.colors[1];
+    // chassis
+    rrect(30, 42, 272, 22, 6); ctx.fillStyle = "#3A4150"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    // bed contents (behind the near wall)
+    ctx.beginPath(); ctx.moveTo(BED0, BED_FLOOR);
+    for (var i = 0; i < BEDN; i++) ctx.lineTo(BED0 + (i + 0.5) * BEDW, BED_FLOOR + t.bed[i]);
+    ctx.lineTo(BED1, BED_FLOOR); ctx.closePath();
+    ctx.fillStyle = "#7A4B22"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    // bed
+    shape([[112, 76], [300, 76], [306, BED_RIM], [104, BED_RIM]], bedc, 5);
+    shape([[104, BED_RIM - 4], [84, BED_RIM + 30], [100, BED_RIM + 30], [118, BED_RIM]], bedc, 4);
+    ctx.strokeStyle = "rgba(29,35,64,0.45)"; ctx.lineWidth = 4;
+    for (var r = 150; r < 300; r += 46) { ctx.beginPath(); ctx.moveTo(r, 80); ctx.lineTo(r, BED_RIM - 4); ctx.stroke(); }
+    // cab
+    shape([[8, 44], [100, 44], [100, 160], [52, 160], [40, 120], [8, 112]], cab, 5);
+    shape([[50, 152], [92, 152], [92, 118], [44, 118]], "#9FD6F5", 4);
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.moveTo(56, 148); ctx.lineTo(66, 148); ctx.lineTo(56, 124); ctx.lineTo(50, 124); ctx.closePath(); ctx.fill();
+    rrect(2, 44, 22, 16, 4); ctx.fillStyle = "#C9CED6"; ctx.fill(); ctx.lineWidth = 3.5; ctx.strokeStyle = OUT; ctx.stroke();
+    circle(14, 96, 7, "#FFF3B0", 3.5);
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(70, 112); ctx.lineTo(96, 112); ctx.stroke();
+    // beacon and reverse light
+    var flash = (t.state === "arriving" || t.state === "leaving") && Math.floor(performance.now() / 250) % 2 === 0;
+    rrect(66, 160, 20, 10, 3); ctx.fillStyle = flash ? "#FFB703" : "#C77D00"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    if (flash) { ctx.globalAlpha = 0.35; circle(76, 166, 22, "#FFD166", 0); ctx.globalAlpha = 1; }
+    var rev = t.state === "arriving" && flash;
+    rrect(298, 50, 12, 12, 3); ctx.fillStyle = rev ? "#FFFFFF" : "#E63946"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    if (rev) { ctx.globalAlpha = 0.4; circle(310, 56, 20, "#FFFFFF", 0); ctx.globalAlpha = 1; }
+    // wheels
+    [62, 214, 262].forEach(function (wx) { drawWheel(wx, 28, 27, t.wheel); });
+    ctx.restore();
+  }
+  function drawWheel(x, y, r, a) {
+    circle(x, y, r, "#2B2F3A", 5);
+    circle(x, y, r * 0.5, "#C9CED6", 3.5);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+    for (var k = 0; k < 4; k++) { var aa = a + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(aa) * r * 0.18, y + Math.sin(aa) * r * 0.18); ctx.lineTo(x + Math.cos(aa) * r * 0.45, y + Math.sin(aa) * r * 0.45); ctx.stroke(); }
+  }
+
+  // ---------- Drawing: excavator ----------
+  var YEL = "#FFC72C", YEL_D = "#E0A800";
+  function drawTracks() {
+    ctx.save(); ctx.translate(CX, 0);
+    rrect(-158, 0, 316, 66, 33); ctx.fillStyle = "#2B2F3A"; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.strokeStyle = "#555D6E"; ctx.lineWidth = 4;
+    for (var x = -126; x <= 126; x += 18) { ctx.beginPath(); ctx.moveTo(x, 2); ctx.lineTo(x, 9); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, 57); ctx.lineTo(x, 64); ctx.stroke(); }
+    rrect(-112, 20, 224, 26, 8); ctx.fillStyle = YEL_D; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    circle(-124, 33, 22, "#6B7385", 4); circle(-124, 33, 8, "#C9CED6", 3);
+    circle(124, 33, 24, "#6B7385", 4); circle(124, 33, 9, "#C9CED6", 3);
+    for (var rx = -70; rx <= 70; rx += 46.6) circle(rx, 14, 9, "#6B7385", 3);
+    rrect(-76, 64, 152, 16, 4); ctx.fillStyle = "#3A4150"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.restore();
+  }
+  function drawHouse() {
+    // counterweight + body
+    shape([[-150, 80], [104, 80], [104, 166], [-118, 166], [-142, 156], [-156, 128], [-156, 100]], YEL, 5);
+    ctx.save(); path([[-156, 86], [-122, 86], [-122, 150], [-156, 150]]); ctx.clip();
+    ctx.fillStyle = OUT;
+    for (var s = 60; s < 200; s += 26) { ctx.beginPath(); ctx.moveTo(-160, s); ctx.lineTo(-160, s + 13); ctx.lineTo(-110, s - 37); ctx.lineTo(-110, s - 50); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(-122, 84); ctx.lineTo(-122, 160); ctx.stroke();
+    // engine hood with grille
+    rrect(-128, 160, 132, 26, 8); ctx.fillStyle = YEL; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 3.5;
+    for (var g = -110; g < -20; g += 14) { ctx.beginPath(); ctx.moveTo(g, 104); ctx.lineTo(g, 144); ctx.stroke(); }
+    // exhaust
+    rrect(-64, 184, 12, 34, 3); ctx.fillStyle = "#555D6E"; ctx.fill(); ctx.lineWidth = 3.5; ctx.stroke();
+    // handrail
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-120, 186); ctx.lineTo(-120, 200); ctx.lineTo(-80, 200); ctx.lineTo(-80, 186); ctx.stroke();
+    // step
+    rrect(60, 72, 40, 10, 3); ctx.fillStyle = "#3A4150"; ctx.fill(); ctx.stroke();
+  }
+  function drawCab() {
+    shape([[6, 160], [100, 160], [100, 178], [92, 278], [16, 278], [6, 266]], YEL, 5);
+    shape([[20, 186], [86, 186], [82, 264], [22, 264]], "#9FD6F5", 4);
+    ctx.fillStyle = "rgba(255,255,255,0.75)"; path([[28, 192], [40, 192], [32, 258], [26, 258]]); ctx.fill();
+    // operator
+    circle(58, 226, 13, "#F2C094", 3);
+    ctx.beginPath(); ctx.arc(58, 230, 15, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineTo(43, 230); ctx.closePath(); ctx.fillStyle = YEL; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(52, 188); ctx.lineTo(52, 212); ctx.stroke();
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(14, 168); ctx.lineTo(92, 168); ctx.stroke();
+    circle(94, 282, 6, "#FFB703", 3);
+  }
+  function drawArm(k) {
+    var a1 = m.a1, dir = { x: Math.cos(a1), y: Math.sin(a1) }, perp = { x: -dir.y, y: dir.x };
+    var F = FOOT, T1 = k.t1, T2 = k.t2;
+    var knee = { x: F.x + dir.x * L1 * 0.52 + perp.x * 34, y: F.y + dir.y * L1 * 0.52 + perp.y * 34 };
+    // boom cylinder (under the boom)
+    var bc = { x: F.x + dir.x * L1 * 0.42 - perp.x * 6, y: F.y + dir.y * L1 * 0.42 - perp.y * 6 };
+    cylinder({ x: 96, y: 128 }, bc, 0.58);
+    // boom
+    fatLine([F, knee, T1], 36, YEL);
+    ctx.strokeStyle = "rgba(29,35,64,0.25)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(F.x, F.y); ctx.lineTo(knee.x, knee.y); ctx.lineTo(T1.x, T1.y); ctx.stroke();
+    circle(F.x, F.y, 12, "#9AA3B2", 4);
+    // arm
+    var u2 = { x: Math.cos(k.b), y: Math.sin(k.b) }, p2 = { x: -u2.y, y: u2.x };
+    var stub = { x: T1.x - u2.x * 52 + p2.x * 6, y: T1.y - u2.y * 52 + p2.y * 6 };
+    var ac = { x: knee.x + perp.x * 18, y: knee.y + perp.y * 18 };
+    cylinder(ac, stub, 0.55);
+    fatLine([stub, T1, T2], 26, YEL);
+    circle(T1.x, T1.y, 11, "#9AA3B2", 4);
+    // bucket cylinder along the arm
+    var side2 = -1; // the bucket opening side of the arm
+    var bA = { x: T1.x + u2.x * 30 + p2.x * 22 * side2, y: T1.y + u2.y * 30 + p2.y * 22 * side2 };
+    var link = bpt(k, [-2, 26]);
+    var bB = { x: T2.x - u2.x * 36 + p2.x * 18 * side2, y: T2.y - u2.y * 36 + p2.y * 18 * side2 };
+    fatLine([bB, link], 7, "#6B7385", 3);
+    fatLine([T2, link], 7, "#6B7385", 3);
+    cylinder(bA, bB, 0.6);
+  }
+  function drawBucket(k) {
+    var pts = BUCKET.map(function (p) { var q = bpt(k, p); return [q.x, q.y]; });
+    var cav = BUCKET.slice(0, 7).concat([LIP]);
+    // inside (dark), dirt, then outline
+    path(cav.map(function (p) { var q = bpt(k, p); return [q.x, q.y]; })); ctx.fillStyle = "#3A4150"; ctx.fill();
+    if (m.fill > 0.01) {
+      var f = Math.min(1, m.fill / 0.7);
+      var dp = cav.map(function (p) { return bpt(k, [lerp(BUCKET_LOW[0], p[0], f), lerp(BUCKET_LOW[1], p[1], f)]); });
+      ctx.beginPath(); ctx.moveTo(dp[0].x, dp[0].y);
+      for (var i = 1; i < dp.length; i++) ctx.lineTo(dp[i].x, dp[i].y);
+      if (m.fill > 0.7) {
+        var hump = (Math.min(1.2, m.fill) - 0.7) / 0.3 * 30;
+        var c1 = bpt(k, [60, LIP[1] + hump * 1.5]);
+        var c2 = bpt(k, [10, TOPLIP[1] + hump * 1.3]);
+        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, dp[0].x, dp[0].y);
+      }
+      ctx.closePath(); ctx.fillStyle = "#7A4B22"; ctx.fill(); ctx.lineWidth = 3.5; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.fillStyle = "#5E3A1B";
+      [[30, -26], [56, -30], [70, -18], [40, -10]].forEach(function (p) { if (f > 0.5) { var q = bpt(k, p); circle(q.x, q.y, 4, "#5E3A1B", 0); } });
+    }
+    // bucket shell (outer back plate) drawn as a thick outline with a yellow band
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var j = 1; j < 8; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 17; ctx.stroke();
+    ctx.strokeStyle = YEL; ctx.lineWidth = 8; ctx.stroke();
+    // tooth
+    var t0 = bpt(k, [98, -6]), t1 = bpt(k, TEETH), t2 = bpt(k, [102, 8]);
+    shape([[t0.x, t0.y], [t1.x, t1.y], [t2.x, t2.y]], "#C9CED6", 4);
+    var pin = bpt(k, [0, 0]); circle(pin.x, pin.y, 9, "#9AA3B2", 4);
+  }
+  function drawExcavator() {
+    worldT();
+    drawTracks();
+    var f = facing(), fs = Math.abs(f) < 0.06 ? (f < 0 ? -0.06 : 0.06) : f;
+    ctx.save(); ctx.translate(CX, 0); ctx.scale(fs, 1);
+    var k = fk(m.a1, m.a2, m.a3);
+    var near = f > 0; // the cab is on the near side when facing the pile
+    drawHouse();
+    if (!near) drawCab();
+    drawArm(k);
+    drawBucket(k);
+    if (near) drawCab();
+    ctx.restore();
+  }
+  function drawParticles() {
+    crumbs.forEach(function (c) { ctx.globalAlpha = clamp(c.life / 0.6, 0, 1); circle(c.x, c.y, c.r, c.col, 0); });
+    ctx.globalAlpha = 1;
+    grains.forEach(function (g) { circle(g.x, g.y, g.r, g.col, g.big ? 3 : 0); });
+    puffs.forEach(function (p) { ctx.globalAlpha = clamp(1 - p.life / p.max, 0, 1) * p.a; circle(p.x, p.y, p.r, p.col, 0); });
+    ctx.globalAlpha = 1;
+  }
+  function drawBeeps() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    beeps.forEach(function (b) {
+      var sx = OX + b.x * S, sy = OY - b.y * S, a = clamp(1 - b.life / 1.1, 0, 1);
+      ctx.globalAlpha = a;
+      ctx.font = "800 " + Math.max(16, Math.round(34 * S)) + "px " + fontFam;
+      ctx.lineWidth = Math.max(4, 8 * S); ctx.strokeStyle = OUT; ctx.strokeText("BEEP", sx, sy);
+      ctx.fillStyle = "#FFD166"; ctx.fillText("BEEP", sx, sy);
+    });
+    ctx.globalAlpha = 1;
+  }
+  var fontFam = '"Baloo 2", "Trebuchet MS", sans-serif';
+  function draw() {
+    drawSky();
+    drawGround();
+    drawPile();
+    if (truck.state !== "gone") drawTruck(truck);
+    drawExcavator();
+    worldT();
+    drawParticles();
+    drawBeeps();
+  }
+
+  // ---------- Simulation ----------
+  var drag = null; // { id, off: {x,y}, goal: {x,y}, want: {x,y} }
+  var sticks = { boom: 0, arm: 0 };
+  var lastTeeth = null, digSndT = 0, pourSndT = 0, smokeT = 0, motion = 0, hintState = "", lastPourAt = 0;
+  var ending = false;
+
+  function startSwing(to) {
+    if (ending && !parking) return;
+    if (m.swingPhase) return;
+    var target = to === "truck" ? Math.PI : 0;
+    if (Math.abs(m.swing - target) < 0.01) return;
+    drag = null;
+    m.swingFrom = m.swing; m.swingTo = target; m.swingT = 0; m.swingPhase = "lift"; m.liftT = 0; m.carry = null;
+    if (m.fill > 0.05) setCurl(CURL);
+    whoosh();
+    updateButtons();
+  }
+  function setCurl(t) { m.curlTarget = t; updateButtons(); }
+  function bucketMinY() {
+    var k = fk(m.a1, m.a2, m.a3), mn = 1e9;
+    BUCKET.forEach(function (p) { mn = Math.min(mn, bpt(k, p).y); });
+    return mn;
+  }
+
+  function step(dt) {
+    var oldA = [m.a1, m.a2, m.a3];
+    // Swing: lift the bucket clear, then turn.
+    if (m.swingPhase === "lift") {
+      // Glide the arm tip to a carry spot that lands the bucket over the truck bed (or the pile).
+      m.liftT += dt;
+      if (!m.carry) { var k0 = fk(m.a1, m.a2, m.a3); m.carry = { x: k0.t2.x, y: k0.t2.y }; }
+      var cxT = 252, cyT = 250, cdx = cxT - m.carry.x, cdy = cyT - m.carry.y, cd = Math.sqrt(cdx * cdx + cdy * cdy), cmx = 520 * dt;
+      // rise first, then move across
+      if (m.carry.y < cyT - 40) { cdx *= 0.25; }
+      if (cd > cmx) { cdx *= cmx / cd; cdy *= cmx / cd; }
+      m.carry.x += cdx; m.carry.y += cdy;
+      var cs = solveIK(m.carry.x, m.carry.y);
+      m.a1 = cs[0]; m.a2 = cs[1];
+      m.a3 += clamp(m.curlTarget - m.a3, -140 * DEG * dt, 140 * DEG * dt);
+      if ((cd < 4 && Math.abs(m.curlTarget - m.a3) < 0.05) || m.liftT > 2.2) { m.swingPhase = "turn"; m.swingT = 0; m.carry = null; }
+    } else if (m.swingPhase === "turn") {
+      m.swingT = Math.min(1, m.swingT + dt / (reduce ? 0.6 : 1.4));
+      var e = m.swingT * m.swingT * (3 - 2 * m.swingT);
+      m.swing = lerp(m.swingFrom, m.swingTo, e);
+      if (m.swingT >= 1) { m.swing = m.swingTo; m.swingPhase = ""; curPen = penetration(m.a1, m.a2, m.a3); updateButtons(); }
+    } else {
+      curPen = penetration(m.a1, m.a2, m.a3);
+      if (parking) {
+        var P = [-6 * DEG, -100 * DEG, -40 * DEG];
+        if (side() < 0) startSwing("pile");
+        else {
+          trySet(m.a1 + clamp(P[0] - m.a1, -40 * DEG * dt, 40 * DEG * dt), m.a2, m.a3);
+          trySet(m.a1, m.a2 + clamp(P[1] - m.a2, -40 * DEG * dt, 40 * DEG * dt), m.a3);
+          trySet(m.a1, m.a2, m.a3 + clamp(P[2] - m.a3, -60 * DEG * dt, 60 * DEG * dt));
+        }
+      } else if (drag && drag.want) {
+        // Glide the goal toward the finger, then solve.
+        var dx = drag.want.x - drag.goal.x, dy = drag.want.y - drag.goal.y, dd = Math.sqrt(dx * dx + dy * dy), mx = 900 * dt;
+        if (dd > mx) { dx *= mx / dd; dy *= mx / dd; }
+        drag.goal.x += dx; drag.goal.y += dy;
+        var gy = drag.goal.y, sol, pass;
+        for (pass = 0; pass < 3; pass++) {
+          sol = solveIK(drag.goal.x, gy);
+          var pen = penetration(sol[0], sol[1], m.a3);
+          if (pen <= 0.5) break;
+          gy += pen + 1;
+        }
+        if (!trySet(sol[0], sol[1], m.a3)) {
+          // move each joint alone if the pair is blocked
+          trySet(sol[0], m.a2, m.a3); trySet(m.a1, sol[1], m.a3);
+        }
+      } else if (sticks.boom || sticks.arm) {
+        if (sticks.boom) trySet(m.a1 + sticks.boom * 55 * DEG * dt, m.a2, m.a3);
+        if (sticks.arm) trySet(m.a1, m.a2 + sticks.arm * side() * 70 * DEG * dt, m.a3);
+      }
+      // bucket curl toward its target
+      if (!parking && Math.abs(m.curlTarget - m.a3) > 0.001) {
+        var da = clamp(m.curlTarget - m.a3, -150 * DEG * dt, 150 * DEG * dt);
+        if (!trySet(m.a1, m.a2, m.a3 + da)) trySet(m.a1, m.a2, m.a3 + da * 0.3);
+      }
+    }
+    motion = Math.abs(m.a1 - oldA[0]) + Math.abs(m.a2 - oldA[1]) + Math.abs(m.a3 - oldA[2]) + (m.swingPhase === "turn" ? 0.02 : 0);
+
+    var k = fk(m.a1, m.a2, m.a3), sd = facing();
+    var tl = bpt(k, TEETH), teeth = { x: CX + tl.x * sd, y: tl.y };
+    var vel = lastTeeth ? { x: (teeth.x - lastTeeth.x) / Math.max(dt, 0.001), y: (teeth.y - lastTeeth.y) / Math.max(dt, 0.001) } : { x: 0, y: 0 };
+    lastTeeth = teeth;
+    var inDirt = false;
+
+    // Dig: the teeth bite into the pile.
+    if (!m.swingPhase && side() > 0 && !parking) {
+      var surf = pileAt(teeth.x);
+      if (teeth.y < surf - 2) {
+        inDirt = true;
+        var mid = bpt(k, BUCKET_MID), cx = (CX + mid.x * sd + teeth.x) / 2, cy = (mid.y + teeth.y) / 2, R = 40;
+        var removed = 0, cut = [], i;
+        for (i = Math.max(0, pileCol(cx - R)); i <= Math.min(PN - 1, pileCol(cx + R)); i++) {
+          var x = PX0 + (i + 0.5) * PCW, ddx = x - cx;
+          if (Math.abs(ddx) >= R) continue;
+          var level = cy - Math.sqrt(R * R - ddx * ddx) * 0.6;
+          if (pile[i] > level) { cut.push([i, pile[i] - Math.max(0, level)]); removed += (pile[i] - Math.max(0, level)) * PCW; }
+        }
+        var room = Math.max(0, (1 - m.fill) * CAP), spillMax = 160;
+        var take = Math.min(removed, room + spillMax, 9000 * dt + 40);
+        if (removed > 0) {
+          var kf = take / removed;
+          cut.forEach(function (c) { pile[c[0]] -= c[1] * kf; });
+          var into = Math.min(take, room);
+          m.fill += into / CAP;
+          var spill = take - into;
+          while (spill > 1) { var v = Math.min(spill, PV * 2); spill -= v; grains.push({ x: cx + rand(-20, 20), y: cy + rand(10, 40), vx: rand(-60, 60), vy: rand(60, 160), r: rand(6, 10), col: "#6B421E", vol: v, big: true }); }
+          if (Math.random() < 0.4) puffs.push({ x: teeth.x + rand(-20, 20), y: Math.max(teeth.y, surf - 10), r: rand(10, 20), vr: 30, vx: rand(-30, 30), vy: rand(20, 60), life: 0, max: 0.8, col: "#C8A06A", a: 0.6 });
+          if (m.fill > 0.4 && m.curlTarget !== CURL) setCurl(CURL);
+          digSndT -= dt; if (digSndT <= 0 && take > 30) { digSnd(); digSndT = 0.16; }
+        }
+      }
+    }
+
+    // Pour: dirt slides out when the bucket opening faces down.
+    var ny = k.V.y; // opening normal (y up)
+    if (m.fill > 0.001 && !inDirt) {
+      var rate = clamp((0.28 - ny) / 0.6, 0, 1);
+      // a heaped bucket drops clods as it swings around
+      if (m.fill > 0.75 && motion > 0.012 && Math.random() < 0.25) {
+        var cp = bpt(k, [50, 20]); var cv2 = Math.min(m.fill * CAP, PV * 1.5);
+        m.fill -= cv2 / CAP;
+        grains.push({ x: CX + cp.x * sd, y: cp.y, vx: vel.x * 0.4 + rand(-40, 40), vy: Math.max(0, vel.y * 0.3) + rand(0, 60), r: rand(6, 10), col: "#6B421E", vol: cv2, big: true });
+      }
+      if (rate > 0) {
+        var amt = Math.min(m.fill * CAP, rate * CAP * 1.3 * dt);
+        m.fill -= amt / CAP;
+        if (m.fill < 0.002) m.fill = 0;
+        var n = Math.max(1, Math.round(amt / PV));
+        var lip1 = bpt(k, LIP), lip2 = bpt(k, TOPLIP);
+        for (var g = 0; g < n; g++) {
+          var t = Math.random(), lx = lerp(lip1.x, lip2.x, t), ly = lerp(lip1.y, lip2.y, t);
+          grains.push({ x: CX + lx * sd, y: ly, vx: k.V.x * sd * 70 + vel.x * 0.5 + rand(-25, 25), vy: k.V.y * 70 + Math.min(0, vel.y * 0.3) + rand(-20, 10), r: rand(4, 8), col: Math.random() < 0.3 ? "#5E3A1B" : "#7A4B22", vol: amt / n });
+        }
+        lastPourAt = performance.now();
+        pourSndT -= dt; if (pourSndT <= 0) { pourSnd(); pourSndT = 0.12; }
+      }
+    }
+
+    // Grains fall and land on the pile, in the truck, or on the ground.
+    var keep = [];
+    for (var gi = 0; gi < grains.length; gi++) {
+      var p = grains[gi];
+      p.vy -= 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      var landed = false;
+      var inBed = truck.state === "in" && p.x > truck.dx + BED0 && p.x < truck.dx + BED1;
+      if (inBed && p.y <= BED_FLOOR + bedHeightAt(p.x) + truck.bounce) {
+        var bi = Math.floor((p.x - truck.dx - BED0) / BEDW);
+        truck.bed[bi] += p.vol / BEDW * 1.9; /* loose dirt heaps up */ truck.load += p.vol; truck.lastPour = performance.now();
+        landed = true;
+      } else if (!inBed && truck.state !== "gone" && p.x > truck.dx && p.x < truck.dx + 310 && p.y < BED_RIM && p.y > 40) {
+        // bounced off the truck side: fall to the ground beside it
+        p.vx *= -0.3; p.x += p.vx * dt * 2;
+      }
+      if (!landed && p.x > PX0 && p.x < PX0 + PN * PCW && p.y <= pileAt(p.x)) {
+        var pi = pileCol(p.x); pile[pi] += p.vol / PCW; landed = true;
+      }
+      if (!landed && p.y <= 0) {
+        crumbs.push({ x: p.x, y: 2, r: p.r, col: p.col, life: 2.5 });
+        landed = true;
+      }
+      if (!landed) keep.push(p);
+    }
+    grains = keep;
+    crumbs = crumbs.filter(function (c) { c.life -= dt; return c.life > 0; });
+
+    relaxPile();
+    if (truck.state !== "gone") relaxBed(truck);
+
+    // Refill the pile when it gets small.
+    if (!regrow && pileTotal() < pileTotal0 * 0.28 && !inDirt) { regrow = 2.5; hint("More dirt!", 2200); }
+    if (regrow > 0) {
+      regrow = Math.max(0, regrow - dt);
+      for (var ri = 0; ri < PN; ri++) if (pile[ri] < pileInit[ri]) pile[ri] += (pileInit[ri] - pile[ri]) * Math.min(1, dt * 1.6);
+    }
+
+    stepTruck(dt);
+
+    // Exhaust smoke while working, and drifting clouds.
+    smokeT -= dt;
+    if (!ending || parking) {
+      if (smokeT <= 0 && (motion > 0.002 || Math.random() < 0.03)) {
+        var ex = CX + (-58) * facing();
+        puffs.push({ x: ex, y: 222, r: rand(8, 12), vr: 26, vx: rand(-12, 12), vy: rand(50, 80), life: 0, max: 1.4, col: "#7D8597", a: motion > 0.002 ? 0.55 : 0.3 });
+        smokeT = motion > 0.002 ? 0.09 : 0.4;
+      }
+    }
+    puffs = puffs.filter(function (q) { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.r += q.vr * dt; return q.life < q.max; });
+    beeps = beeps.filter(function (b) { b.life += dt; b.y += 40 * dt; return b.life < 1.1; });
+    clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > visRight() + 40) c.x = visLeft() - 140; });
+
+    updateHint(inDirt);
+  }
+
+  function stepTruck(dt) {
+    var t = truck;
+    t.bounce *= Math.pow(0.02, dt);
+    if (t.state === "in") {
+      if (t.load >= TRUCK_CAP && performance.now() - t.lastPour > 900 && performance.now() - lastPourAt > 900) {
+        t.state = "full"; t.t = 0; hint("Full! Bye bye, truck!", 2600); honk();
+      }
+    } else if (t.state === "full") {
+      t.t += dt; t.bounce = Math.sin(t.t * 30) * 2 * Math.max(0, 1 - t.t);
+      if (t.t > 1.1) { t.state = "leaving"; t.v = 0; loads++; saveState(); showLoads(true); chime(); }
+    } else if (t.state === "leaving") {
+      t.v = Math.min(520, t.v + 300 * dt); t.dx -= t.v * dt; t.wheel -= t.v * dt / 27;
+      if (Math.random() < 0.3) puffs.push({ x: t.dx + 300, y: 30, r: 10, vr: 30, vx: 40, vy: 30, life: 0, max: 0.9, col: "#C8A06A", a: 0.5 });
+      if (t.dx + 330 < visLeft() - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
+    } else if (t.state === "gone") {
+      t.t += dt;
+      if (t.t > 0.8) { t.state = "arriving"; t.dx = visLeft() - 360; t.startDx = t.dx; t.t = 0; t.beepT = 0; hint("Beep beep! New truck!", 2600); }
+    } else if (t.state === "arriving") {
+      var dist = -t.dx;
+      t.v = clamp(dist * 1.6, 40, 300); t.dx = Math.min(0, t.dx + t.v * dt); t.wheel += t.v * dt / 27;
+      t.beepT -= dt;
+      if (t.beepT <= 0) { beeps.push({ x: t.dx + 330, y: 190, life: 0 }); beepSnd(); t.beepT = 0.6; }
+      if (t.dx >= -0.5) { t.dx = 0; t.state = "in"; t.bounce = 4; }
+    }
+  }
+
+  // ---------- Hints ----------
+  var hintTimer = null;
+  function hint(text, ms) {
+    var el = $("hint");
+    if (ending) { el.hidden = true; return; }
+    el.textContent = text; el.hidden = false;
+    el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(function () { el.hidden = true; }, ms || 2600);
+  }
+  var hintCooldown = 0;
+  function updateHint(inDirt) {
+    if (ending || m.swingPhase) return;
+    var s;
+    if (side() > 0) s = m.fill >= 0.75 ? "full" : (m.fill < 0.05 ? "dig" : "");
+    else s = m.fill > 0.1 ? "dump" : (truck.state === "in" ? "back" : "");
+    if (!s || s === hintState) return;
+    if (performance.now() < hintCooldown) return;
+    hintState = s; hintCooldown = performance.now() + 1500;
+    if (s === "dig") hint("Dig into the dirt!");
+    else if (s === "full") hint("Full bucket! Swing to the truck");
+    else if (s === "dump") hint("Tap Dump!");
+    else if (s === "back") hint("Swing back to dig more");
+  }
+
+  // ---------- Buttons and icons ----------
+  function updateButtons() {
+    var toTruck = (m.swingPhase ? m.swingTo : m.swing) < Math.PI / 2;
+    $("swingLabel").textContent = toTruck ? "To truck" : "To dirt";
+    $("swingIcon").innerHTML = toTruck
+      ? '<path d="M30 12 C22 4 8 8 7 22" fill="none" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M1 18 L7 30 L14 19 Z" fill="#1D2340"/><rect x="15" y="22" width="22" height="10" rx="2" fill="#F77F00" stroke="#1D2340" stroke-width="2.5"/><circle cx="20" cy="34" r="3.5" fill="#1D2340"/><circle cx="32" cy="34" r="3.5" fill="#1D2340"/>'
+      : '<path d="M10 12 C18 4 32 8 33 22" fill="none" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M39 18 L33 30 L26 19 Z" fill="#1D2340"/><path d="M2 36 C6 22 20 22 26 36 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/>';
+    var curled = m.curlTarget === CURL;
+    $("curlLabel").textContent = curled ? "Dump" : "Scoop";
+    $("curlIcon").innerHTML = curled
+      ? '<g transform="rotate(150 20 18)"><path d="M6 10 C6 30 34 32 34 12 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/></g><circle cx="16" cy="32" r="3" fill="#7A4B22"/><circle cx="23" cy="36" r="2.5" fill="#7A4B22"/>'
+      : '<path d="M6 14 C6 34 34 36 34 16 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M10 15 C14 8 26 8 30 15 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/>';
+  }
+  function showLoads(pop) {
+    var el = $("loads");
+    el.textContent = "Loads: " + loads;
+    if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  }
+
+  // ---------- Input: drag the bucket, tap to swing ----------
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (soundOn) unlockAudio();
+    if (ending) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    var sd = side();
+    var lx = (w.x - CX) * sd;
+    if (m.swingPhase) return;
+    if (drag && drag.id !== e.pointerId) return;
+    if (lx < -40) { startSwing(w.x < CX ? "truck" : "pile"); return; }
+    var k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID);
+    var bx = CX + bm.x * sd, dist = Math.hypot(w.x - bx, w.y - bm.y);
+    var off = dist < 90 ? { x: k.t2.x - lx, y: k.t2.y - w.y } : { x: k.t2.x - bm.x, y: k.t2.y - bm.y };
+    drag = { id: e.pointerId, off: off, goal: { x: k.t2.x, y: k.t2.y }, want: { x: lx + off.x, y: w.y + off.y } };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || drag.id !== e.pointerId || m.swingPhase) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    var lx = (w.x - CX) * side();
+    drag.want = { x: lx + drag.off.x, y: w.y + drag.off.y };
+  });
+  function endDrag(e) { if (drag && drag.id === e.pointerId) drag = null; }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+
+  // Joysticks: spring back to the middle when let go.
+  function makeStick(el, axis, key) {
+    var knob = el.querySelector(".knob"), id = null;
+    function set(e) {
+      var r = el.getBoundingClientRect(), v;
+      if (axis === "v") { var hy = (r.height - 28) / 2 - 30; v = clamp(((r.top + r.height / 2) - e.clientY) / Math.max(20, hy), -1, 1); knob.style.transform = "translateY(" + (-v * Math.max(20, hy)) + "px)"; }
+      else { var hx = (r.width - 28) / 2 - 30; v = clamp((e.clientX - (r.left + r.width / 2)) / Math.max(20, hx), -1, 1); knob.style.transform = "translateX(" + (v * Math.max(20, hx)) + "px)"; }
+      if (Math.abs(v) < 0.12) v = 0;
+      sticks[key] = ending ? 0 : v;
+      el.setAttribute("aria-valuenow", v.toFixed(2));
+    }
+    function release() { id = null; el.classList.remove("held"); knob.style.transform = ""; sticks[key] = 0; el.setAttribute("aria-valuenow", "0"); }
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); if (ending) return;
+      if (soundOn) unlockAudio();
+      id = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      set(e);
+    });
+    el.addEventListener("pointermove", function (e) { if (id === e.pointerId) set(e); });
+    el.addEventListener("pointerup", function (e) { if (id === e.pointerId) release(); });
+    el.addEventListener("pointercancel", function (e) { if (id === e.pointerId) release(); });
+    el.addEventListener("lostpointercapture", function (e) { if (id === e.pointerId) release(); });
+    el.addEventListener("keydown", function (e) {
+      var v = 0;
+      if (axis === "v") v = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
+      else v = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (v && !ending) { e.preventDefault(); sticks[key] = v; }
+    });
+    el.addEventListener("keyup", function () { sticks[key] = 0; });
+    return release;
+  }
+  var relBoom = makeStick($("boomStick"), "v", "boom");
+  var relArm = makeStick($("armStick"), "h", "arm");
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "swingBtn" && !ending) { if (soundOn) unlockAudio(); startSwing(side() > 0 ? "truck" : "pile"); }
+    else if (t.id === "curlBtn" && !ending) { if (soundOn) unlockAudio(); setCurl(m.curlTarget === CURL ? OPEN : CURL); clunk(); }
+    else if (t.dataset.action === "timer") openTimer();
+    else if (t.dataset.action === "timerclose") closeTimer();
+    else if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); }
+    else if (t.id === "timerStart") startTimer();
+    else if (t.id === "goodbyeBtn") goodbyePark();
+    else if (t.id === "bigToggle") setBig(!document.body.classList.contains("big"), true);
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null;
+  function unlockAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain(); master.gain.value = 0.8; master.connect(actx.destination);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function canPlay() { return soundOn && actx && actx.state === "running"; }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function digSnd() { tone(rand(110, 140), 0.14, 0.035, "triangle", 80); }
+  function pourSnd() { tone(rand(260, 360), 0.12, 0.016, "sine", 180); }
+  function whoosh() { tone(200, 0.7, 0.025, "sine", 320); }
+  function clunk() { tone(240, 0.1, 0.035, "triangle", 160); }
+  function beepSnd() { tone(1000, 0.16, 0.022, "sine"); }
+  function honk() { tone(392, 0.22, 0.03, "triangle"); setTimeout(function () { tone(330, 0.3, 0.03, "triangle"); }, 260); }
+  function chime() { tone(523, 0.4, 0.035); setTimeout(function () { tone(784, 0.6, 0.035); }, 120); }
+  document.addEventListener("visibilitychange", function () { if (actx && document.hidden) actx.suspend(); });
+  function updateSoundUI() {
+    $("soundState").textContent = soundOn ? "Sound is on. Soft digs and beeps." : "Sound is off.";
+    $("soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { unlockAudio(); setTimeout(chime, 60); }
+    updateSoundUI();
+  }
+
+  // ---------- Play timer (same behavior and storage format as spin-shop) ----------
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000, UNLOCK_MS = 4000;
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true, phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) { if (typeof o[k] === "boolean") t[k] = o[k]; });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* defaults */ }
+    return t;
+  }
+  function saveTimer() { try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ } }
+  var timer = loadTimer();
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) { if (lastTimerKey !== "off") { $("fuel").hidden = true; lastTimerKey = "off"; } return; }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    $("fuel").hidden = false;
+    var fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(timer.showMinutes && timer.phase === "running");
+    $("fuelNum").textContent = String(mins);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.hidden = true; }, 450); }, 7000);
+  }
+  function minutesText(ms) { var mm = Math.ceil(ms / 60000); return mm === 1 ? "1 minute" : mm + " minutes"; }
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    $("gubtn").textContent = on ? "⏱ Timer on" : "Grown-ups";
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes)); });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+  }
+  function openTimer() { updateTimerUI(); updateSoundUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000; timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+  function stopTimer() {
+    timer.phase = "idle"; saveTimer();
+    ending = false; parking = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function beginEnding() {
+    clearTimeout(toastTimer); $("toast").classList.remove("show"); $("toast").hidden = true;
+    timer.phase = "ending"; saveTimer();
+    endingStartedAt = performance.now(); farewellAt = 0; restScheduled = false;
+    ending = true; drag = null; relBoom(); relArm();
+    $("hint").hidden = true;
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to say goodbye";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    if (!timer.goodbye) parking = true;
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  function goodbyePark() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Bye bye, excavator!";
+    if (soundOn) unlockAudio();
+    parking = true;
+    chime();
+  }
+  function checkEndingDone() {
+    if (timer.phase !== "ending" || restScheduled) return;
+    if (timer.goodbye && !farewellAt) return;
+    var t = performance.now();
+    if (t - endingStartedAt < 3000 || (farewellAt && t - farewellAt < 3000)) return;
+    if (m.swingPhase) return;
+    restScheduled = true;
+    setTimeout(goRest, 1200);
+  }
+  function restSVG() {
+    var o = '<rect width="240" height="200" fill="#2B3A67"/>';
+    o += '<circle cx="196" cy="38" r="16" fill="#FFF4CC" stroke="#1D2340" stroke-width="2.5"/><circle cx="203" cy="33" r="14" fill="#2B3A67"/>';
+    o += '<circle cx="40" cy="30" r="2" fill="#FFF"/><circle cx="120" cy="20" r="2" fill="#FFF"/><circle cx="160" cy="60" r="1.6" fill="#FFF"/><circle cx="80" cy="55" r="1.6" fill="#FFF"/>';
+    o += '<rect y="160" width="240" height="40" fill="#8C5A2E"/><path d="M0 160 H240" stroke="#1D2340" stroke-width="3"/>';
+    // dump truck (left)
+    o += '<g stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"><rect x="14" y="140" width="80" height="8" fill="#3A4150"/><path d="M40 112 H96 L94 140 H42 Z" fill="#E63946"/><path d="M12 140 V116 L22 114 L26 100 H40 V140 Z" fill="#F77F00"/><path d="M28 104 H37 V116 H24 Z" fill="#9FD6F5"/>';
+    o += '<circle cx="26" cy="150" r="9" fill="#2B2F3A"/><circle cx="76" cy="150" r="9" fill="#2B2F3A"/><circle cx="26" cy="150" r="3.5" fill="#C9CED6"/><circle cx="76" cy="150" r="3.5" fill="#C9CED6"/></g>';
+    // excavator (right), bucket resting on the ground
+    o += '<g stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><rect x="118" y="140" width="84" height="20" rx="10" fill="#2B2F3A"/><path d="M116 112 H186 V136 H112 Z" fill="#FFC72C"/><path d="M168 112 V84 H186 L188 112 Z" fill="#FFC72C"/><path d="M171 88 H184 V108 H171 Z" fill="#9FD6F5"/>';
+    o += '<path d="M180 112 L206 76 L230 112" fill="none" stroke="#1D2340" stroke-width="11"/><path d="M180 112 L206 76 L230 112" fill="none" stroke="#FFC72C" stroke-width="6"/><path d="M222 140 C222 158 238 160 238 146 L236 130 Z" fill="#FFC72C" transform="translate(-12 0)"/></g>';
+    o += '<text x="138" y="80" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#FFFFFF">z</text><text x="150" y="66" font-family="Baloo 2, sans-serif" font-weight="800" font-size="13" fill="#FFFFFF">z</text><text x="160" y="54" font-family="Baloo 2, sans-serif" font-weight="800" font-size="9" fill="#FFFFFF">z</text>';
+    return o;
+  }
+  function showRest() {
+    $("restArt").innerHTML = restSVG();
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+  function goRest() {
+    timer.phase = "resting"; saveTimer();
+    ending = false; parking = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+    showRest();
+  }
+  function unlock() {
+    timer.phase = "idle"; saveTimer();
+    $("rest").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI();
+  }
+  function timerTick() {
+    checkEndingDone();
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+  // Another site page may change the shared timer (same device, other tab).
+  window.addEventListener("storage", function (e) {
+    if (e.key === SKEY) { try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (err) { /* ignore */ } updateSoundUI(); return; }
+    if (e.key !== TKEY) return;
+    var t = loadTimer(), was = timer.phase;
+    timer = t;
+    if (t.phase === "resting" && was !== "resting") goRest();
+    else if (t.phase === "ending" && was === "running") { timer.phase = "running"; beginEnding(); }
+    else if (t.phase === "idle" && (was === "resting" || was === "ending")) { if (was === "ending") stopTimer(); $("rest").hidden = true; }
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+  });
+  function makeHold(btn, ms, onDone, onPress) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") { if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return; e.preventDefault(); }
+      if (id) return;
+      if (onPress) onPress();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  MINUTE_CHOICES.forEach(function (mm) {
+    var b = document.createElement("button");
+    b.className = "btn"; b.dataset.minutes = String(mm); b.textContent = mm + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  makeHold($("holdSound"), HOLD_MS, toggleSound, function () { if (!soundOn) unlockAudio(); });
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  // Big mode: hide the header and joysticks; the two action buttons float on the stage.
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    if (on) $("stage").appendChild($("acts")); else $("panel").appendChild($("acts"));
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    resize();
+  }
+
+  // ---------- Loop ----------
+  var lastT = 0;
+  function loop(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t;
+    if (timer.phase !== "resting") step(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Start ----------
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
+  resize();
+  updateButtons();
+  showLoads(false);
+  updateSoundUI();
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") showRest();
+  drawTimer();
+  updateTimerUI();
+  setInterval(timerTick, 250);
+  requestAnimationFrame(loop);
+
+  // Test hook (harmless).
+  window.__exc = {
+    state: function () { return { a1: m.a1 / DEG, a2: m.a2 / DEG, a3: m.a3 / DEG, fill: m.fill, swing: m.swing, phase: m.swingPhase, truck: truck.state, load: truck.load, loads: loads, pile: pileTotal(), pile0: pileTotal0, grains: grains.length }; },
+    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY - y * S }; },
+    bucket: function () { var k = fk(m.a1, m.a2, m.a3), b = bpt(k, BUCKET_MID), r = cv.getBoundingClientRect(); return { x: r.left + OX + (CX + b.x * facing()) * S, y: r.top + OY - b.y * S }; },
+    fillTruck: function () { truck.load = TRUCK_CAP; truck.lastPour = 0; lastPourAt = 0; }
+  };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
