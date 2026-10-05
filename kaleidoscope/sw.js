@@ -1,11 +1,8 @@
-// Service worker for the Toybox launcher.
-// It pre-caches the launcher AND every app's files, so installing Toybox alone
-// makes every app available offline. Each app also has its own sw.js for when
-// it is installed on its own; inside an app's folder, that app's worker wins.
+// Service worker for offline use.
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
-// After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v3";
+// After changing any file, bump CACHE so old copies are discarded.
+const CACHE = "kaleidoscope-v1";
 const CORE = [
   "./",
   "./index.html",
@@ -13,25 +10,7 @@ const CORE = [
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/icon-maskable-512.png",
-
-  // Spin Shop
-  "./spin-shop/",
-  "./spin-shop/index.html",
-  "./spin-shop/manifest.webmanifest",
-  "./spin-shop/icons/icon-180.png",
-  "./spin-shop/icons/icon-192.png",
-  "./spin-shop/icons/icon-512.png",
-  "./spin-shop/icons/icon-maskable-512.png",
-
-  // Kaleidoscope
-  "./kaleidoscope/",
-  "./kaleidoscope/index.html",
-  "./kaleidoscope/manifest.webmanifest",
-  "./kaleidoscope/icons/icon-180.png",
-  "./kaleidoscope/icons/icon-192.png",
-  "./kaleidoscope/icons/icon-512.png",
-  "./kaleidoscope/icons/icon-maskable-512.png"
+  "./icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -41,9 +20,10 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  // Only delete this app's old caches: every app in Toybox shares the same origin's cache storage.
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("toybox-") && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("kaleidoscope-") && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -53,7 +33,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
-  // Pages use Google Fonts; cache them too so the look is the same offline.
+  // The page's font comes from Google Fonts; cache it too so the look is the same offline.
   const isFont = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
   if (!sameOrigin && !isFont) return;
 

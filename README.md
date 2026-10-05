@@ -5,6 +5,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | App | Folder |
 | --- | --- |
 | Spin Shop: build a wheel, fan, flower or pinwheel and spin it | [`spin-shop/`](spin-shop/) |
+| Kaleidoscope: finger painting mirrored into a big spinning pattern | [`kaleidoscope/`](kaleidoscope/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
