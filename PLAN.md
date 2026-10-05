@@ -278,6 +278,11 @@ Known so far:
   - The jam triangle's teeth overlap.
   - The speed dial has no min/max labels.
 - **Marble Run:**
+  - The second run row and the lift row shrink the board on phones.
+  - Kit: the supports and housing overlap pieces, and the base plates sit over the tray.
+  - Mix 1: the spiral post covers the squiggle end.
+  - Marbles hop about 30 px entering some tracks.
+  - Marbles can sit in the plunger lane.
   - Run labels overflow their buttons on iPad landscape.
   - "DROP" overflows its circle.
   - The loop entry curves look beaded.

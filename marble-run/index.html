@@ -205,7 +205,7 @@ body.big header, body.big .panel { display: none; }
   box-shadow: 4px 4px 0 var(--edge);
   padding: 10px 12px 12px;
 }
-.runs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.runs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .runbtn {
   display: flex;
   flex-direction: column;
@@ -220,6 +220,9 @@ body.big header, body.big .panel { display: none; }
 .runbtn svg { width: 52px; height: 52px; display: block; }
 .runbtn .long { display: none; }
 .playrow { display: flex; gap: 12px; align-items: center; }
+.lifts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.liftbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 2px 8px; font-size: 1rem; white-space: nowrap; min-width: 0; }
+.liftbtn svg { width: 30px; height: 30px; flex: none; }
 .dropbtn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -452,7 +455,10 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   .wrap { padding-top: 6px; }
   .app { margin-top: 0; margin-bottom: 6px; gap: 8px; }
   .panel { flex-basis: min(44%, 330px); gap: 6px; padding: 8px; border-radius: 18px; justify-content: space-between; }
-  .runs { gap: 5px; }
+  .runs { gap: 5px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .lifts { gap: 5px; }
+  .liftbtn { min-height: 34px; font-size: 0.8rem; padding: 0 4px; gap: 3px; border-radius: 12px; }
+  .liftbtn svg { width: 20px; height: 20px; }
   .runbtn { font-size: 0.74rem; padding: 2px 1px 1px; border-radius: 12px; }
   .runbtn svg { width: 30px; height: 30px; }
   .dropbtn { min-height: 48px; font-size: 1.2rem; }
@@ -502,6 +508,10 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
     <div class="panel" id="panel">
       <div class="runs" id="runs"></div>
+      <div class="lifts" role="group" aria-label="Lift">
+        <button class="btn liftbtn" data-lift="conveyor" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="3" width="14" height="26" rx="4" fill="#3B3F52" stroke="#1D2340" stroke-width="2.5"/><path d="M7 9h18M7 17h18M7 25h18" stroke="#FFD23F" stroke-width="3.5" stroke-linecap="round"/></svg><span>Conveyor</span></button>
+        <button class="btn liftbtn" data-lift="spiral" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="14" y="2" width="4" height="28" fill="#5B7CFF" stroke="#1D2340" stroke-width="2"/><path d="M5 27 Q16 31 27 24 Q16 19 5 20 Q16 24 27 17 Q16 12 5 13 Q16 17 27 10 Q16 5 5 6" fill="none" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/><path d="M5 27 Q16 31 27 24 Q16 19 5 20 Q16 24 27 17 Q16 12 5 13 Q16 17 27 10 Q16 5 5 6" fill="none" stroke="#FF9F1C" stroke-width="2.5" stroke-linecap="round"/></svg><span>Spiral</span></button>
+      </div>
       <div class="playrow">
         <button class="btn dropbtn" id="dropBtn"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="16" r="11" fill="#FFD23F" stroke="#1D2340" stroke-width="3"/><circle cx="16" cy="12" r="3.5" fill="#FFFFFF"/><path d="M20 30v8m-5-5 5 5 5-5" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Drop</span></button>
         <div class="swatches" id="swatches"></div>
@@ -600,7 +610,8 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   ];
   var NC = COLORS.length, RAINBOW = NC;   // color index NC = a rainbow-swirl marble
   var RUNS = [["zigzag", "Zigzag", "Zigzag"], ["spiral", "Spiral", "Spiral tower"], ["loop", "Loop", "Loop-de-loop"],
-    ["funnels", "Funnels", "Funnels"], ["machine", "Machine", "Machine"]];
+    ["funnels", "Funnels", "Funnels"], ["machine", "Machine", "Machine"], ["mix1", "Mix 1", "Mix 1"], ["mix2", "Mix 2", "Mix 2"],
+    ["kit", "Kit", "Kit"]];
   var RUN_IDS = RUNS.map(function (r) { return r[0]; });
 
   // The world is a fixed 1000 x 1160 board, scaled to fit the stage.
@@ -627,7 +638,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   function colHex(c) { return c >= NC ? "#FFFFFF" : COLORS[c][1]; }
 
   // ---------- Saved settings ----------
-  function freshState() { return { run: "zigzag", color: "mix", laps: 0, marbles: [] }; }
+  function freshState() { return { run: "zigzag", color: "mix", laps: 0, marbles: [], lift: "conveyor" }; }
   function loadState() {
     var s = freshState();
     try {
@@ -636,6 +647,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         if (RUN_IDS.indexOf(o.run) !== -1) s.run = o.run;
         if (o.color === "mix" || o.color === "rainbow" || (Number.isInteger(o.color) && o.color >= 0 && o.color < NC)) s.color = o.color;
         if (Number.isInteger(o.laps) && o.laps >= 0 && o.laps < 1e9) s.laps = o.laps;
+        if (o.lift === "spiral") s.lift = "spiral";
         if (Array.isArray(o.marbles)) s.marbles = o.marbles.filter(function (c) { return Number.isInteger(c) && c >= 0 && c <= NC; }).slice(0, CAP);
       }
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
@@ -757,6 +769,8 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var bodies = [];      // wheels, seesaws, buckets
   var bells = [];       // ring when a marble passes
   var bars = [];        // xylophone bars
+  var spinners = [];    // pinwheels that spin when a marble passes
+  var decor = [];       // support columns, base plates, clear housings, rings (drawing only)
   var paths = [];       // helix and loops (marbles follow them in "3D")
   var funnels = [];
   var boosters = [];
@@ -804,7 +818,10 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var TRAY_Y = 1040;   // marbles below this line are in the tray
   var plunger = { pull: 0, shown: 0, grab: null, head: HEAD0, fire: 0, power: 0, powerT: 0, seg: null };
   var hopper = { queue: [], wait: 0, gate: 0, pending: 0 };
-  var lift = { u: 0, v: 240, carry: [], boost: 0, gear: 0 };
+  var lift = { u: 0, v: 240, carry: [], boost: 0, gear: 0, th: 0 };
+  // Spiral (screw) lift: a helical ramp around a post. Each carry slot rides one groove.
+  var SCR_P = 160, SCR_RO = 50, SCR_RI = 11, SCR_RM = 28, SCR_SQ = 0.3, SCR_EXIT = 70;
+  function spiralLift() { return state.lift === "spiral"; }
 
   function buildCommon() {
     var glass = { kind: "glass", col: "#BFE6FF" };
@@ -848,7 +865,11 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   BUILD.spiral = function () {
     addSeg(345, 335, 505, 378, { col: "#B26BFF", band: true });
-    var cx = 520, Rh = 215, sq = 0.30, top = 418, turns = 3.25, pitch = (960 - top) / turns;
+    makeTower(520, 215, 418, 960, 3.25, 330, 1060);
+  };
+  // A helix around a striped post. Marbles enter at the back top moving right and leave on the right side.
+  function makeTower(cx, Rh, top, bot, turns, postTop, postBot) {
+    var sq = 0.30, pitch = (bot - top) / turns;
     var p = newPath("helix");
     var phi0 = -Math.PI / 2, phi1 = phi0 + Math.PI * 2 * turns, n = Math.round(turns * 160), i;
     var lastX = 0, lastY = 0, lastZ = 0;
@@ -863,10 +884,60 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       lastX = X; lastY = Yh; lastZ = Z;
     }
     p.k = 0.25;
-    p.enter = { x0: 500, x1: 560, y: p.ys[0], dy: 30, dir: 1 };
+    p.enter = { x0: cx - 20, x1: cx + 40, y: p.ys[0], dy: 30, dir: 1 };
     finishPath(p);
-    tower = { cx: cx, top: 330, bot: 1060, w: 120, Rh: Rh, sq: sq, flash: 0, path: p };
-  };
+    tower = { cx: cx, top: postTop, bot: postBot, w: Rh > 150 ? 120 : 70, Rh: Rh, sq: sq, flash: 0, path: p };
+  }
+
+  // A smooth track (squiggle, S-curve, half-pipe): marbles ride it like a tube and never stall on it.
+  // pts may be a list of pieces [{pts, col}] chained into one track, each drawn in its own color.
+  function trackPath(pts, o) {
+    var p = newPath("track"), i, j, acc = 0, pieces = pts[0].pts ? pts : [{ pts: pts, col: o.col }];
+    pts = [];
+    p.dcol = [];
+    var cols = [];
+    pieces.forEach(function (pc, k) { pc.pts.forEach(function (q, m) { if (k && !m) return; pts.push(q); cols.push(pc.col || o.col || "#FFD23F"); }); });
+    var dense = [pts[0]];
+    p.dcol.push(cols[0]);
+    for (i = 1; i < pts.length; i++) {
+      var dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1], n = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dy * dy) / 4));
+      for (j = 1; j <= n; j++) { dense.push([pts[i - 1][0] + dx * j / n, pts[i - 1][1] + dy * j / n]); p.dcol.push(cols[i]); }
+    }
+    for (i = 0; i < dense.length; i++) {
+      if (i) acc += Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]);
+      p.xs.push(dense[i][0]); p.ys.push(dense[i][1]); p.zs.push(0); p.cosA.push(0); p.ss.push(acc);
+    }
+    for (i = 0; i < dense.length; i++) {
+      var a = Math.min(dense.length - 1, i + 1), c = Math.max(0, i - 1);
+      p.ga.push(G * (p.ys[a] - p.ys[c]) / ((p.ss[a] - p.ss[c]) || 1));
+    }
+    p.k = o.k == null ? 0.15 : o.k;
+    p.minV = o.minV || 150;
+    p.col = o.col || "#FFD23F";
+    var d = o.dir || (pts[1][0] >= pts[0][0] ? 1 : -1);
+    p.enter = o.enter || { x0: pts[0][0] - (d > 0 ? 30 : 10), x1: pts[0][0] + (d > 0 ? 10 : 30), y: pts[0][1], dy: 28, dir: d, any: !!o.any };
+    finishPath(p);
+    return p;
+  }
+  function wavePts(x0, y0, x1, y1, amp, waves, n) {
+    var pts = [], i;
+    n = n || 60;
+    for (i = 0; i <= n; i++) {
+      var t = i / n;
+      pts.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - amp * Math.sin(Math.PI * 2 * waves * t)]);
+    }
+    return pts;
+  }
+  function bezChain(list, n) {
+    var pts = [], i;
+    for (i = 0; i + 2 < list.length; i += 2) {
+      var seg = bezPts(list[i], list[i + 1], list[i + 2], n || 14);
+      if (i) seg.shift();
+      pts = pts.concat(seg);
+    }
+    return pts;
+  }
+  function addSpinner(x, y, r, col) { spinners.push({ x: x, y: y, r: r, col: col, a: 0, w: 0.6, flash: 0 }); }
 
   function loopPath(cx, cy, R, dir, off) {
     var p = newPath("loop"), n = 260, i;
@@ -911,6 +982,81 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     addSeg(745, 865, 520, 900, { col: "#B26BFF", band: true });
     funnels.push(makeFunnel(400, 940, 185, 95, -1, "#5BE36B"));
   };
+  // Mix 1: zigzag ramp, a spinning funnel, a bell ramp, a half-pipe turn into a squiggle, a small spiral.
+  BUILD.mix1 = function () {
+    addSeg(345, 335, 455, 372, { col: "#FF4D6D", band: true });
+    funnels.push(makeFunnel(520, 440, 165, 115, 1, "#FF9F1C"));
+    var ry = function (x) { return 592 + (620 - x) * 53 / 420; };
+    addSeg(620, 592, 200, 645, { col: "#FFD23F", band: true });
+    [450, 380, 310, 240].forEach(function (x, k) {
+      bells.push({ x: x, y: ry(x) - 31 - 44, note: 3 + k, col: COLORS[[4, 3, 6, 0][k]][1], swing: 0, flash: 0, cd: 0, sensor: true });
+    });
+    trackPath([
+      { pts: bezChain([[200, 614], [140, 618], [135, 676], [130, 736], [215, 742]]), col: "#FF9F1C" },
+      { pts: wavePts(215, 742, 655, 766, 16, 2.5, 80), col: "#5BE36B" }
+    ], { minV: 170, dir: -1, enter: { x0: 180, x1: 212, y: 614, dy: 28, dir: -1 } });
+    makeTower(680, 110, 800, 985, 2.25, 735, 1060);
+  };
+
+  // Mix 2: a paddle wheel, a loop-de-loop, a funnel, then a xylophone ramp.
+  BUILD.mix2 = function () {
+    var i;
+    addSeg(345, 335, 560, 380, { col: "#5B7CFF", band: true });
+    bodies.push(makeWheel(644, 474, 82, 6, -1.5));
+    polySeg(bezPts([775, 585], [640, 800], [470, 800]), { col: "#3EC8FF", band: false });
+    loopPath(470, 689, 80, -1, 46);
+    boosters.push({ x0: 458, x1: 570, y0: 734, y1: 781, dir: -1, v: 960, glow: 0 });
+    addSeg(470, 800, 300, 815, { col: "#B26BFF", band: true });
+    addSeg(112, 760, 112, 900, { kind: "glass", col: "#BFE6FF", e: 0.1 });
+    funnels.push(makeFunnel(240, 880, 115, 80, -1, "#5BE36B"));
+    for (i = 0; i < 8; i++) {
+      var x0 = 172 + i * 44, y0 = 985 + i * 6;
+      bars.push({ x0: x0, x1: x0 + 36, y0: y0, y1: y0 + 6, col: COLORS[i % NC][1], lit: 0, note: 9 - i });
+      addSeg(x0, y0, x0 + 36, y0 + 6, { kind: "bar", bar: i, col: COLORS[i % NC][1], e: 0.15 });
+    }
+  };
+
+  // Kit: pieces like a real marble-run kit, in see-through jewel plastic on columns and red base plates.
+  var JEWEL = { blue: "#2E7BFF", yellow: "#FFC400", green: "#2FBF4A", orange: "#FF7A1A", purple: "#9B3DFF", red: "#FF3B3B" };
+  BUILD.kit = function () {
+    var i, x = 345, y = 335, st = [[x, y]];
+    // Supports first (drawn behind everything).
+    decor.push({ k: "col", x: 470, y0: 398, y1: 1100, w: 40 });
+    decor.push({ k: "col", x: 790, y0: 590, y1: 1100, w: 40 });
+    decor.push({ k: "col", x: 250, y0: 640, y1: 1100, w: 40, col: "#7AD7FF" });
+    decor.push({ k: "arch", x: 610, y: 600, w: 96, h: 120, col: JEWEL.blue });
+    decor.push({ k: "arch", x: 400, y: 900, w: 96, h: 200, col: JEWEL.yellow });
+    [[470, 1104], [790, 1104], [250, 1104], [400, 1104], [610, 1104]].forEach(function (q) { decor.push({ k: "plate", x: q[0], y: q[1], w: 96 }); });
+    // Stair-step track (purple).
+    for (i = 0; i < 5; i++) { st.push([x + 36, y + 5]); st.push([x + 44, y + 18]); x += 44; y += 18; }
+    polySeg(st, { col: JEWEL.purple });
+    // Slotted funnel bowl (green).
+    var fb = makeFunnel(680, 470, 110, 75, 1, JEWEL.green);
+    fb.slots = true;
+    funnels.push(fb);
+    // Long straight ramp (blue) ending in a ring catch.
+    addSeg(780, 580, 230, 640, { col: JEWEL.blue, band: true });
+    addSeg(164, 596, 164, 652, { kind: "post", col: JEWEL.orange });
+    decor.push({ k: "ring", x: 198, y: 668, r: 32, col: JEWEL.orange });
+    // S-curve drop (orange) and half-pipe turn (red) into the wavy squiggle (yellow).
+    var s1 = bezChain([[198, 668], [200, 690], [230, 690]]).concat([[275, 690]]).concat(arcPts(275, 730, 40, -Math.PI / 2, Math.PI / 2, 14).slice(1)).concat([[185, 770]]);
+    var s2 = arcPts(185, 810, 40, -Math.PI / 2, -Math.PI * 1.5, 14);
+    trackPath([
+      { pts: s1, col: JEWEL.orange },
+      { pts: s2, col: JEWEL.red },
+      { pts: wavePts(185, 850, 470, 878, 12, 1.5, 60), col: JEWEL.yellow }
+    ], { minV: 170, enter: { x0: 176, x1: 222, y: 672, dy: 30, dir: 1, any: true } });
+    // Pinwheel spinner over the squiggle.
+    addSpinner(330, 858, 30, JEWEL.purple);
+    // Paddle wheel inside a clear tube.
+    bodies.push(makeWheel(560, 930, 50, 6, -1.6));
+    decor.push({ k: "housing", x: 560, y: 930, r: 72 });
+    // Blue swirl bowl with a yellow spinner, dropping into the tray.
+    var sb = makeFunnel(705, 985, 110, 55, -1, JEWEL.blue);
+    sb.spinner = JEWEL.yellow;
+    funnels.push(sb);
+  };
+
   function makeFunnel(cx, cy, R, D, dir, col) {
     return { cx: cx, cy: cy, R: R, sq: 0.34, D: D, dep: R * 0.22, hole: 24, dir: dir, col: col, spin: 0, boost: 0, flash: 0 };
   }
@@ -981,6 +1127,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   function buildWorld(id) {
     segs = []; bodies = []; bells = []; bars = []; paths = []; funnels = []; boosters = []; tramps = []; tower = null;
+    spinners = []; decor = [];
     buildCommon();
     BUILD[id]();
     runInfo = id;
@@ -1088,8 +1235,67 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     // Lift tower back.
     g.fillStyle = darkBoard ? "#2B3F7A" : "#BFD0FF";
     g.fillRect(880, 70, 110, 1080);
-    g.fillStyle = "#3B3F52";
-    g.fillRect(907, 90, 56, 1060);
+    if (spiralLift()) {
+      // Clear tube: a soft glassy inside with a darker back edge.
+      g.fillStyle = darkBoard ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.45)";
+      g.fillRect(884, 70, 102, 1080);
+      g.fillStyle = "rgba(29,35,64,0.12)";
+      g.fillRect(884, 70, 14, 1080);
+      // Tube joints, like stacked clear tube pieces.
+      g.strokeStyle = "rgba(29,35,64,0.18)"; g.lineWidth = 3;
+      for (var jy = 190; jy < 1100; jy += 76) { g.beginPath(); g.moveTo(884, jy); g.lineTo(986, jy); g.stroke(); }
+    } else {
+      g.fillStyle = "#3B3F52";
+      g.fillRect(907, 90, 56, 1060);
+    }
+    // Kit-style supports: translucent column tubes and arches standing on red base plates.
+    decor.forEach(function (d) {
+      if (d.k === "col") {
+        g.globalAlpha = 0.55;
+        g.fillStyle = d.col || "#2FBF4A";
+        g.fillRect(d.x - d.w / 2, d.y0, d.w, d.y1 - d.y0);
+        g.globalAlpha = 1;
+        g.strokeStyle = OUT; g.lineWidth = 3;
+        g.strokeRect(d.x - d.w / 2, d.y0, d.w, d.y1 - d.y0);
+        g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 4;
+        g.beginPath(); g.moveTo(d.x - d.w / 2 + 6, d.y0 + 6); g.lineTo(d.x - d.w / 2 + 6, d.y1 - 6); g.stroke();
+        g.strokeStyle = "rgba(29,35,64,0.25)"; g.lineWidth = 2;
+        for (var cy = d.y0 + 40; cy < d.y1 - 10; cy += 40) { g.beginPath(); g.moveTo(d.x - d.w / 2, cy); g.lineTo(d.x + d.w / 2, cy); g.stroke(); }
+      } else if (d.k === "arch") {
+        g.globalAlpha = 0.6;
+        g.fillStyle = d.col;
+        g.beginPath();
+        g.moveTo(d.x - d.w / 2, d.y + d.h); g.lineTo(d.x - d.w / 2, d.y); g.lineTo(d.x + d.w / 2, d.y); g.lineTo(d.x + d.w / 2, d.y + d.h);
+        g.lineTo(d.x + d.w / 2 - 16, d.y + d.h); g.quadraticCurveTo(d.x + d.w / 2 - 16, d.y + 18, d.x, d.y + 18);
+        g.quadraticCurveTo(d.x - d.w / 2 + 16, d.y + 18, d.x - d.w / 2 + 16, d.y + d.h); g.closePath();
+        g.fill(); g.globalAlpha = 1; g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+      } else if (d.k === "plate") {
+        rrect(g, d.x - d.w / 2, d.y - 12, d.w, 18, 8);
+        g.fillStyle = "#FF3B3B"; g.fill(); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+        g.fillStyle = "rgba(255,255,255,0.45)"; g.fillRect(d.x - d.w / 2 + 8, d.y - 9, d.w - 16, 4);
+      } else if (d.k === "ring") {
+        g.beginPath(); g.ellipse(d.x, d.y, d.r, d.r * 0.32, 0, Math.PI, Math.PI * 2);
+        g.lineWidth = 16; g.strokeStyle = OUT; g.stroke();
+        g.lineWidth = 10; g.strokeStyle = d.col; g.stroke();
+      }
+    });
+    // Smooth tracks (squiggles, S-curves, half-pipes): a translucent channel the marbles ride in.
+    paths.forEach(function (pa) {
+      if (pa.kind !== "track") return;
+      var all = [], runs = [], cur = null, i3;
+      for (i3 = 0; i3 < pa.n; i3++) {
+        all.push([pa.xs[i3], pa.ys[i3]]);
+        if (!cur || cur.col !== pa.dcol[i3]) { if (cur) cur.pts.push([pa.xs[i3], pa.ys[i3]]); cur = { col: pa.dcol[i3], pts: [] }; runs.push(cur); }
+        cur.pts.push([pa.xs[i3], pa.ys[i3]]);
+      }
+      g.lineWidth = 2 * RM + 14; g.strokeStyle = OUT; poly(g, all);
+      runs.forEach(function (r) {
+        g.lineWidth = 2 * RM + 8; g.strokeStyle = mix(r.col, "#FFFFFF", 0.55); poly(g, r.pts);
+        g.lineWidth = 16; g.strokeStyle = r.col; poly(g, r.pts);
+        g.lineWidth = 5; g.strokeStyle = "rgba(255,255,255,0.75)";
+        poly(g, r.pts.map(function (q) { return [q[0] - 4, q[1] - 5]; }));
+      });
+    });
     // Plunger lane glass back.
     g.fillStyle = "rgba(255,255,255,0.35)";
     g.fillRect(16, 340, 72, 390);
@@ -1180,6 +1386,27 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     f2.lineWidth = 5;
     f2.beginPath(); f2.moveTo(30, 360); f2.lineTo(30, 700); f2.stroke();
     f2.beginPath(); f2.moveTo(170, 160); f2.lineTo(220, 205); f2.stroke();
+    decor.forEach(function (d) {
+      if (d.k === "housing") {
+        // A clear tube piece around a spinner: glassy disc with a bright rim.
+        f2.fillStyle = "rgba(255,255,255,0.18)";
+        f2.beginPath(); f2.arc(d.x, d.y, d.r, 0, Math.PI * 2); f2.fill();
+        f2.lineWidth = 5; f2.strokeStyle = "rgba(29,35,64,0.55)"; f2.stroke();
+        f2.lineWidth = 6; f2.strokeStyle = "rgba(255,255,255,0.7)";
+        f2.beginPath(); f2.arc(d.x, d.y, d.r - 8, Math.PI * 1.1, Math.PI * 1.45); f2.stroke();
+        f2.fillStyle = "rgba(255,255,255,0.22)";
+        f2.fillRect(d.x - 32, d.y - d.r - 60, 64, 60 - d.r * 0.2 + 12);
+        f2.lineWidth = 4; f2.strokeStyle = "rgba(29,35,64,0.5)";
+        f2.beginPath(); f2.moveTo(d.x - 32, d.y - d.r - 60); f2.lineTo(d.x - 32, d.y - d.r + 12);
+        f2.moveTo(d.x + 32, d.y - d.r - 60); f2.lineTo(d.x + 32, d.y - d.r + 12); f2.stroke();
+      } else if (d.k === "ring") {
+        f2.beginPath(); f2.ellipse(d.x, d.y, d.r, d.r * 0.32, 0, 0, Math.PI);
+        f2.lineWidth = 16; f2.strokeStyle = OUT; f2.stroke();
+        f2.lineWidth = 10; f2.strokeStyle = d.col; f2.stroke();
+        f2.lineWidth = 3; f2.strokeStyle = "rgba(255,255,255,0.65)";
+        f2.beginPath(); f2.ellipse(d.x, d.y - 2, d.r - 4, d.r * 0.32 - 3, 0, 0.4, Math.PI - 0.4); f2.stroke();
+      }
+    });
   }
   function poly(g, pts) {
     g.beginPath();
@@ -1403,6 +1630,22 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     }
     lift.u = (lift.u + du) % (LIFT_SPAN * 1000);
     lift.gear += lift.v * h / 40;
+    // The screw turns backward at half the groove rate, so a riding marble circles forward while it climbs.
+    lift.th = (lift.th - Math.PI * du / SCR_P) % (Math.PI * 2);
+  }
+  // Where a marble riding groove k sits: around the post, climbing; near the top it slides out to the chute.
+  function liftSpiralPos(b, h) {
+    var sK = (lift.u + b.cup * LIFT_SPC) % LIFT_SPAN;
+    var ph = lift.th + Math.PI * 2 * sK / SCR_P;
+    var tx = LIFT_X + SCR_RM * Math.cos(ph), ty = LIFT_BOT - sK - RM - 3 + SCR_SQ * SCR_RM * Math.sin(ph);
+    var e = clamp((sK - (LIFT_SPAN - SCR_EXIT)) / SCR_EXIT, 0, 1);
+    e = e * e * (3 - 2 * e);
+    tx += (912 - tx) * e; ty += (LIFT_TOP - RM - 6 - ty) * e;
+    b.z = e > 0.5 ? 1 : Math.sin(ph);
+    var nx = b.x + (tx - b.x) * Math.min(1, h * 14);
+    b.ang += (nx - b.x) / RM;
+    b.x = nx; b.y = ty;
+    b.spin = 0;
   }
   function liftPickup(b) {
     if (ending) return;
@@ -1577,6 +1820,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   function pathStep(b, h) {
     var p = b.path, i = pathAt(p, b);
     b.v += (p.ga[i] - p.k * b.v) * h;
+    if (p.minV && b.v < p.minV) b.v = p.minV;
     b.s += b.v * h;
     i = pathAt(p, b);
     var seg = (p.ss[i + 1] - p.ss[i]) || 1, f = clamp((b.s - p.ss[i]) / seg, 0, 1);
@@ -1596,7 +1840,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     var sp = b.v;
     b.mode = "free";
     b.vx = tx * sp; b.vy = ty * sp;
-    b.cool = 0.25;
+    b.cool = b.path && b.path.kind === "track" ? 0.03 : 0.25;
     b.path = null;
     b.z = 1;
   }
@@ -1626,9 +1870,9 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     for (var i = 0; i < paths.length; i++) {
       var p = paths[i], e = p.enter;
       if (b.x < e.x0 || b.x > e.x1 || Math.abs(b.y - e.y) > e.dy) continue;
-      if (b.vx * e.dir <= 0) continue;
+      if (!e.any && b.vx * e.dir <= 0) continue;
       b.mode = "path"; b.path = p; b.s = 2; b.pi = 0;
-      b.v = Math.max(Math.sqrt(b.vx * b.vx + b.vy * b.vy), p.kind === "helix" ? 160 : 0);
+      b.v = Math.max(Math.sqrt(b.vx * b.vx + b.vy * b.vy), p.kind === "helix" || p.kind === "track" ? 160 : 0);
       if (b.v * e.dir < 0) b.v = 0;
       return;
     }
@@ -1699,9 +1943,12 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       else if (b.mode === "orbit") orbitStep(b, h);
       else if (b.mode === "spout") spoutStep(b, h);
       else if (b.mode === "lift") {
-        b.x += (LIFT_X - b.x) * Math.min(1, h * 12);
-        b.y = cupY(b.cup) - RM - 3;
-        b.spin = 0;
+        if (spiralLift()) liftSpiralPos(b, h);
+        else {
+          b.x += (LIFT_X - b.x) * Math.min(1, h * 12);
+          b.y = cupY(b.cup) - RM - 3;
+          b.spin = 0;
+        }
       }
     }
     pathPairs();
@@ -1810,6 +2057,16 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       f.flash = Math.max(0, f.flash - dt * 2);
     }
     if (tower) tower.flash = Math.max(0, tower.flash - dt * 2);
+    for (i = 0; i < spinners.length; i++) {
+      var sp = spinners[i];
+      for (var j = 0; j < balls.length; j++) {
+        var bj = balls[j], dx = bj.x - sp.x, dy = bj.y - sp.y;
+        if (dx * dx + dy * dy < (sp.r + RM + 6) * (sp.r + RM + 6)) { if (sp.w < 9) { sp.w = 9; sp.flash = 1; } }
+      }
+      sp.w += (0.6 - sp.w) * Math.min(1, dt * 0.8);
+      sp.a += sp.w * dt;
+      sp.flash = Math.max(0, sp.flash - dt * 2);
+    }
     DROP_BTN.down = Math.max(0, DROP_BTN.down - dt * 6);
     DROP_BTN.flash = Math.max(0, DROP_BTN.flash - dt * 2);
     plunger.fire = Math.max(0, plunger.fire - dt * 5);
@@ -1884,7 +2141,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   }
 
   function render(now) {
-    var i, b, k, p;
+    var i, b, k, p, spiral = spiralLift();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
@@ -1897,6 +2154,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     drawFunnels();
     drawBoosters();
     drawBodies();
+    drawSpinners();
     drawBars();
     drawTramps();
     drawBells(now);
@@ -1937,12 +2195,12 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     ctx.fillStyle = "rgba(29,35,64,0.16)";
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "spout" || (b.mode === "path" && b.z < 0)) continue;
+      if (b.mode === "spout" || (b.mode === "path" && b.z < 0) || (b.mode === "lift" && spiral)) continue;
       ctx.beginPath(); ctx.arc(b.x + 5, b.y + 7, RM, 0, Math.PI * 2); ctx.fill();
     }
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "spout" || (b.mode === "path" && b.z < 0)) continue;
+      if (b.mode === "spout" || (b.mode === "path" && b.z < 0) || (b.mode === "lift" && spiral)) continue;
       drawMarble(b, b.x, b.y, marbleScale(b));
     }
     for (i = 0; i < hopper.queue.length && i < HOP_SLOTS.length; i++) {
@@ -1987,6 +2245,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   }
 
   function drawLift() {
+    if (spiralLift()) { drawScrew(); return; }
     var k, y;
     // Belt marks move up.
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -2019,6 +2278,106 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     });
   }
 
+  // Spiral lift: back half of the screw, marbles behind the post, the post, front half, marbles in front, glass.
+  function screwRuns(front) {
+    var runs = [], cur = null, s, ds = SCR_P / 40, s0 = 24, s1 = LIFT_SPAN - SCR_EXIT * 0.4;
+    for (s = s0; s <= s1; s += ds) {
+      var ph = lift.th + Math.PI * 2 * s / SCR_P, z = Math.sin(ph);
+      if ((z >= 0) === front) {
+        if (!cur) { cur = { pts: [], s: s }; runs.push(cur); }
+        cur.pts.push([Math.cos(ph), z, LIFT_BOT - s]);
+      } else if (cur) {
+        cur.pts.push([Math.cos(ph), z, LIFT_BOT - s]);
+        cur = null;
+      }
+    }
+    return runs;
+  }
+  function drawScrewRuns(front) {
+    var runs = screwRuns(front), i, j, r, q;
+    for (i = 0; i < runs.length; i++) {
+      r = runs[i].pts;
+      if (r.length < 2) continue;
+      ctx.beginPath();
+      for (j = 0; j < r.length; j++) {
+        q = r[j];
+        if (j) ctx.lineTo(LIFT_X + SCR_RO * q[0], q[2] + SCR_SQ * SCR_RO * q[1]);
+        else ctx.moveTo(LIFT_X + SCR_RO * q[0], q[2] + SCR_SQ * SCR_RO * q[1]);
+      }
+      for (j = r.length - 1; j >= 0; j--) {
+        q = r[j];
+        ctx.lineTo(LIFT_X + SCR_RI * q[0], q[2] + SCR_SQ * SCR_RI * q[1]);
+      }
+      ctx.closePath();
+      ctx.fillStyle = front ? "#FFFFFF" : "#CBD8EA";
+      ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+      // Chunky outer rim (the thread edge).
+      ctx.beginPath();
+      for (j = 0; j < r.length; j++) {
+        q = r[j];
+        var x = LIFT_X + SCR_RO * q[0], y = q[2] + SCR_SQ * SCR_RO * q[1];
+        if (j) ctx.lineTo(x, y + 4); else ctx.moveTo(x, y + 4);
+      }
+      ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.lineWidth = 4; ctx.strokeStyle = front ? "#EEF4FF" : "#AFC0D8"; ctx.stroke();
+    }
+  }
+  function drawScrewMarbles(front) {
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      if (b.mode !== "lift" || (b.z >= 0) !== front) continue;
+      var sc = 0.9 + 0.1 * (b.z + 1) / 2;
+      if (front) {
+        ctx.fillStyle = "rgba(29,35,64,0.16)";
+        ctx.beginPath(); ctx.arc(b.x + 4, b.y + 6, RM * sc, 0, Math.PI * 2); ctx.fill();
+      }
+      drawMarble(b, b.x, b.y, sc);
+    }
+  }
+  function drawScrew() {
+    var top = 96, bot = 1150, k;
+    drawScrewRuns(false);
+    drawScrewMarbles(false);
+    // Central post with stripes that wind around as it turns.
+    ctx.fillStyle = "#F4F8FF";
+    ctx.fillRect(LIFT_X - SCR_RI, top, SCR_RI * 2, bot - top);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(LIFT_X - SCR_RI, top, SCR_RI * 2, bot - top); ctx.clip();
+    ctx.strokeStyle = "rgba(120,150,190,0.45)"; ctx.lineWidth = 5;
+    var off = ((-lift.th / (Math.PI * 2)) * 40) % 40;
+    for (k = top - 40 + off; k < bot + 40; k += 40) {
+      ctx.beginPath(); ctx.moveTo(LIFT_X - SCR_RI, k + 10); ctx.lineTo(LIFT_X + SCR_RI, k - 10); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+    ctx.strokeRect(LIFT_X - SCR_RI, top, SCR_RI * 2, bot - top);
+    drawScrewRuns(true);
+    drawScrewMarbles(true);
+    // Blue motor cap on top, with ridges that turn with the screw.
+    rrect(ctx, 903, 66, 64, 44, 12);
+    ctx.fillStyle = "#2E9BE0"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.save(); rrect(ctx, 905, 68, 60, 40, 10); ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 5;
+    var ro = ((-lift.th / (Math.PI * 2)) * 60) % 15;
+    for (k = 895 + ro; k < 975; k += 15) { ctx.beginPath(); ctx.moveTo(k, 70); ctx.lineTo(k, 106); ctx.stroke(); }
+    ctx.restore();
+    // Blue motor base at the foot: marbles roll in and the screw scoops them up.
+    ctx.beginPath();
+    ctx.moveTo(878, 1160); ctx.lineTo(878, 1122); ctx.quadraticCurveTo(878, 1104, 896, 1104);
+    ctx.lineTo(974, 1104); ctx.quadraticCurveTo(994, 1104, 994, 1122); ctx.lineTo(994, 1160); ctx.closePath();
+    ctx.fillStyle = "#2E9BE0"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(888, 1110, 96, 8);
+    // Little motor light that glows while it turns.
+    ctx.beginPath(); ctx.arc(966, 1136, 7, 0, Math.PI * 2);
+    ctx.fillStyle = lift.v > 30 ? "#5BE36B" : "#3B3F52"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    // Glass shine on the tube.
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(973, 200); ctx.lineTo(973, 1020); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(962, 260); ctx.lineTo(962, 700); ctx.stroke();
+  }
+
   function drawFunnels() {
     for (var i = 0; i < funnels.length; i++) {
       var f = funnels[i], ry = f.R * f.sq;
@@ -2042,6 +2401,13 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
         }
         ctx.stroke();
       }
+      if (f.slots) {
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        for (k = 0; k < 10; k++) {
+          var sa = f.spin * 0.3 + k * Math.PI / 5, sx = f.cx + Math.cos(sa) * f.R * 0.62, sy = f.cy + Math.sin(sa) * f.R * 0.62 * f.sq + f.dep * 0.3;
+          ctx.beginPath(); ctx.ellipse(sx, sy, 5, 14 * f.sq + 3, sa + Math.PI / 2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
       ctx.restore();
       ctx.beginPath(); ctx.ellipse(f.cx, f.cy + f.dep, f.hole + 4, (f.hole + 4) * f.sq * 1.4, 0, 0, Math.PI * 2);
       ctx.fillStyle = OUT; ctx.fill();
@@ -2059,6 +2425,11 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   function drawFunnelRims() {
     for (var i = 0; i < funnels.length; i++) {
       var f = funnels[i];
+      if (f.spinner) {
+        ctx.strokeStyle = OUT; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(f.cx, f.cy + f.dep); ctx.lineTo(f.cx, f.cy - 40); ctx.stroke();
+        pinwheel(f.cx, f.cy - 44, 34, f.spin * 2, f.spinner);
+      }
       ctx.beginPath(); ctx.ellipse(f.cx, f.cy, f.R, f.R * f.sq, 0, 0, Math.PI);
       ctx.lineWidth = 16; ctx.strokeStyle = OUT; ctx.stroke();
       ctx.lineWidth = 10; ctx.strokeStyle = f.col; ctx.stroke();
@@ -2084,6 +2455,33 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     }
   }
   var WHEEL_COLS = ["#FF4D6D", "#FFD23F", "#3EC8FF", "#5BE36B", "#B26BFF", "#FF9F1C"];
+  function pinwheel(x, y, r, a, col) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    for (var k = 0; k < 6; k++) {
+      ctx.rotate(Math.PI / 3);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, -r * 0.18); ctx.lineTo(r * 0.92, r * 0.3); ctx.closePath();
+      ctx.fillStyle = k % 2 ? col : mix(col, "#FFFFFF", 0.35); ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.restore();
+  }
+  function drawSpinners() {
+    for (var i = 0; i < spinners.length; i++) {
+      var sp = spinners[i];
+      ctx.strokeStyle = OUT; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x, sp.y - sp.r - 18); ctx.stroke();
+      if (sp.flash > 0.02) {
+        ctx.globalAlpha = sp.flash * 0.6;
+        ctx.drawImage(glows[2], sp.x - sp.r * 1.6, sp.y - sp.r * 1.6, sp.r * 3.2, sp.r * 3.2);
+        ctx.globalAlpha = 1;
+      }
+      pinwheel(sp.x, sp.y - sp.r - 18, sp.r, sp.a, sp.col);
+    }
+  }
   function drawBodies() {
     for (var i = 0; i < bodies.length; i++) {
       var bd = bodies[i], k, s;
@@ -2445,6 +2843,9 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
   // ---------- Controls ----------
   var RUN_ICONS = {
+    mix1: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><path d="M8 9 L22 13" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9 L22 13" fill="none" stroke="#FF4D6D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 17 h20 l-7 9 h-6z" fill="#FF9F1C" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><path d="M10 34 q5 -5 10 0 t10 0 t10 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 34 q5 -5 10 0 t10 0 t10 0" fill="none" stroke="#5BE36B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="36" width="5" height="20" fill="#B26BFF" stroke="#1D2340" stroke-width="2"/><path d="M34 42 Q42 47 51 41 M34 50 Q42 55 51 49" fill="none" stroke="#1D2340" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 42 Q42 47 51 41 M34 50 Q42 55 51 49" fill="none" stroke="#FFD23F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+    mix2: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><path d="M7 9 L20 14" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9 L20 14" fill="none" stroke="#5B7CFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g stroke="#1D2340" stroke-width="3.5" stroke-linecap="round"><path d="M28 9V25M20 17H36M22.5 11.5 33.5 22.5M33.5 11.5 22.5 22.5"/></g><circle cx="28" cy="17" r="3" fill="#FF4D6D" stroke="#1D2340" stroke-width="2"/><path d="M40 40 a9 9 0 1 0 -1 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 40 a9 9 0 1 0 -1 0" fill="none" stroke="#FF4D6D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 33 h16 l-6 7 h-4z" fill="#5BE36B" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="6" y="47.0" width="7" height="4" fill="#FF4D6D" stroke="#1D2340" stroke-width="1.5"/><rect x="15" y="48.5" width="7" height="4" fill="#FFD23F" stroke="#1D2340" stroke-width="1.5"/><rect x="24" y="50.0" width="7" height="4" fill="#5BE36B" stroke="#1D2340" stroke-width="1.5"/><rect x="33" y="51.5" width="7" height="4" fill="#3EC8FF" stroke="#1D2340" stroke-width="1.5"/><rect x="42" y="53.0" width="7" height="4" fill="#B26BFF" stroke="#1D2340" stroke-width="1.5"/>',
+    kit: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><rect x="13" y="20" width="8" height="34" fill="#2FBF4A" fill-opacity="0.6" stroke="#1D2340" stroke-width="2"/><rect x="38" y="30" width="8" height="24" fill="#7AD7FF" fill-opacity="0.7" stroke="#1D2340" stroke-width="2"/><rect x="7" y="51" width="46" height="5" rx="2" fill="#FF3B3B" stroke="#1D2340" stroke-width="2"/><path d="M7 10 h6 v4 h6 v4 h6 v4" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10 h6 v4 h6 v4 h6 v4" fill="none" stroke="#9B3DFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 28 q5 -6 10 0 t10 0" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 28 q5 -6 10 0 t10 0" fill="none" stroke="#FFC400" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 36 h22 l-8 7 h-6z" fill="#2E7BFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><circle cx="41" cy="15" r="7" fill="#2E7BFF" fill-opacity="0.5" stroke="#1D2340" stroke-width="2"/><circle cx="41" cy="15" r="2.5" fill="#FFC400" stroke="#1D2340" stroke-width="1.5"/>',
     zigzag: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/>' +
       '<path d="M8 14 L48 22 M52 30 L12 38 M8 46 L48 54" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/>' +
       '<path d="M8 14 L48 22" stroke="#FF4D6D" stroke-width="4" stroke-linecap="round"/><path d="M52 30 L12 38" stroke="#FFD23F" stroke-width="4" stroke-linecap="round"/><path d="M8 46 L48 54" stroke="#5BE36B" stroke-width="4" stroke-linecap="round"/>' +
@@ -2499,6 +2900,9 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     });
   })();
   function renderControls() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-lift]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.lift === state.lift));
+    });
     Array.prototype.forEach.call(document.querySelectorAll("[data-run]"), function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.run === state.run));
     });
@@ -2508,6 +2912,17 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       b.innerHTML = on ? '<span class="tick">✓</span>' : "";
     });
   }
+  // Switching lifts: marbles riding the lift drop back down the tube and get picked up again.
+  function switchLift(id) {
+    if (id === state.lift || (id !== "spiral" && id !== "conveyor")) return;
+    lift.carry.forEach(function (b) { if (b) { b.mode = "free"; b.cup = -1; b.vx = 0; b.vy = 0; b.x = LIFT_X; } });
+    lift.carry = [];
+    state.lift = id;
+    drawLayers();
+    burst(LIFT_X, 600, RAINBOW, 12, 240, 0.6);
+    tick();
+    save();
+  }
   // Switching runs: every marble goes back into the hopper and drops in again.
   function switchRun(id) {
     if (id === state.run) return;
@@ -2516,6 +2931,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     lift.carry = [];
     state.run = id;
     buildWorld(id);
+    if (id === "kit" && state.lift !== "spiral") { state.lift = "spiral"; lift.carry = []; }
     drawLayers();
     save();
   }
@@ -2547,6 +2963,7 @@ body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     if (t.classList.contains("hold")) return;
     if (playLocked()) return;
     if (t.dataset.run) { switchRun(t.dataset.run); renderControls(); return; }
+    if (t.dataset.lift) { switchLift(t.dataset.lift); renderControls(); return; }
     if (t.dataset.color) { state.color = (t.dataset.color === "mix" || t.dataset.color === "rainbow") ? t.dataset.color : Number(t.dataset.color); save(); renderControls(); return; }
   });
 
