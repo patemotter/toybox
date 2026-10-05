@@ -7,9 +7,9 @@ Shared rules for every app are in "Every app" at the bottom.
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Water Works, Math Grid, Engine Room | In progress |
+| – | 3D Printer, Water Works, Engine Room, Car Builder builder rows, shared timer (phase 1) | In progress |
 | 1 | Water Works | In progress |
-| 2 | Math Grid | In progress |
+| 2 | Math Grid | Done |
 | 3 | Engine Room | In progress |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
 | 5 | Construction Site | Queued |
@@ -228,6 +228,12 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Math Grid:**
+  - iPhone landscape: the panel has a gap and small buttons.
+  - iPhone 0–12: the squares are small.
+  - Long pattern text is cut off and "Multiples of" wraps on iPad.
+  - The empty timer bar looks like a blank pill during the ending (Gear Box too).
+  - The icon could be livelier.
 - **Car Builder:**
   - On iPhone portrait the tab and picture labels are clipped, the action buttons stack in two rows, and the vehicle is small in the drive view.
   - The speedometer's center number overlaps its labels, and Turbo pegs the needle.

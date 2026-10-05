@@ -14,6 +14,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Gear Box: build gear trains and crank them, with speeds, ratios and turns | [`gear-box/`](gear-box/) |
 | Marble Run: five marble runs with a plunger, a Drop button and a lift that loops them | [`marble-run/`](marble-run/) |
 | Car Builder: build construction vehicles, fast cars and monster trucks, then drive them | [`car-builder/`](car-builder/) |
+| Math Grid: a big times and plus table to tap, drag and build blocks on | [`math-grid/`](math-grid/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 

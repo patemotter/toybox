@@ -1,0 +1,1347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Math Grid</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Math Grid">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 1366px;
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header h1 { margin: 0; white-space: nowrap; font-size: 1.35rem; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
+.homebtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 34px;
+  padding: 2px 12px 2px 9px; font-weight: 700; font-size: 1rem; color: var(--ink); text-decoration: none;
+  background: var(--panel); border: 3px solid var(--edge); border-radius: 12px; box-shadow: 2px 2px 0 var(--edge);
+}
+.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.hdr-right { display: flex; gap: 10px; align-items: center; }
+.app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 1.1rem; color: var(--ink); background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 16px; padding: 0.45rem 0.8rem; min-height: 52px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge); transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+
+/* ---------- Stage: the number grid ---------- */
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px;
+  background: var(--plate); border: 3px solid var(--edge); border-radius: 24px; box-shadow: 4px 4px 0 var(--edge); padding: 6px;
+}
+.eqbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 52px; }
+.eq {
+  flex: 1 1 auto; min-width: 0; text-align: center; color: #1D2340; font-weight: 800; line-height: 1.05;
+  font-size: clamp(1.5rem, 5.4vw, 3.4rem); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.eq.go { animation: eqPop 0.4s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes eqPop { 0% { transform: scale(0.55); } 100% { transform: scale(1); } }
+.scene {
+  position: relative; flex: 1 1 auto; min-height: 0; border: 3px solid #1D2340; border-radius: 18px;
+  overflow: hidden; background: #24305E; touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* Play-timer gauge */
+.fuel { flex: none; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.fuel[hidden] { display: none; }
+.fuel-bar { width: clamp(50px, 12vw, 120px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num[hidden] { display: none; }
+
+/* Big mode */
+.bigtoggle {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0.1rem 0.85rem 0.1rem 0.6rem; font-size: 1rem; color: #1D2340; background: #FFFFFF;
+  border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; border-radius: 999px;
+}
+.bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.bigtoggle:active { box-shadow: 0 0 0 #1D2340; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header, body.big .panel { display: none; }
+body.big .wrap { max-width: none; padding: max(6px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
+body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- Panel: modes, patterns, build ---------- */
+.panel {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px;
+  background: var(--panel); border: 3px solid var(--edge); border-bottom-width: 0; border-radius: 24px 24px 0 0;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+.ctrl { display: flex; gap: 8px; align-items: stretch; }
+.ctrl .btn { min-width: 0; padding: 0.2rem 0.4rem; font-size: clamp(0.9rem, 2.8vw, 1.2rem); white-space: nowrap; line-height: 1.1; }
+.seg { display: flex; gap: 6px; flex: 1 1 0; min-width: 0; }
+.seg .btn { flex: 1 1 0; }
+.op { font-size: 1.5em; font-weight: 800; margin-right: 4px; vertical-align: -0.08em; }
+.pats { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 8px; }
+.pats .btn { min-width: 0; padding: 0.2rem 0.3rem; font-size: clamp(0.9rem, 2.6vw, 1.15rem); line-height: 1.05; }
+.multi { display: flex; gap: 4px; min-width: 0; }
+.multi .main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.multi .main b { font-size: 1.6em; line-height: 1; }
+.multi .step { flex: 0 0 auto; width: 44px; padding: 0; font-size: 1.5rem; }
+.btn.build { background: #8AC926; color: #1D2340; font-size: clamp(1.1rem, 3.2vw, 1.5rem); }
+.btn.clear { background: #FFE3E3; color: #1D2340; }
+.ctrl .build { flex: 2 1 0; }
+.ctrl .clear { flex: 1 1 0; }
+body.ending .panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer: toast, farewell ---------- */
+.toast {
+  position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 45;
+  background: var(--accent); color: #1D2340; border: 3px solid #1D2340; border-radius: 999px; padding: 0.3rem 1rem;
+  font-size: 1.3rem; font-weight: 800; white-space: nowrap; box-shadow: 3px 3px 0 #1D2340; opacity: 0;
+  transition: opacity 0.4s ease; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 22px;
+  padding: 10px 16px 12px; box-shadow: 4px 4px 0 #1D2340; text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; font-size: 1.3rem; min-height: 56px; padding: 0.4rem 1.2rem; }
+.goodbye[hidden] { display: none; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+  color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 6px 6px 0 var(--edge); padding: 18px 18px 20px;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 18px 0 6px; font-size: 1.2rem; font-weight: 800; text-align: center; }
+.sheet h4 { margin: 12px 0 6px; font-size: 1.05rem; font-weight: 800; text-align: center; }
+.sheet .opt-txt { color: var(--muted); font-weight: 500; }
+.sheet .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sheet .row .btn { flex: 0 0 calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
+.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 0; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.textin {
+  display: block; width: 100%; font: inherit; font-size: 1.1rem; color: var(--ink); background: var(--bg);
+  border: 3px solid var(--edge); border-radius: 14px; padding: 0.45rem 0.8rem; -webkit-user-select: text; user-select: text;
+}
+.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 1.05rem; cursor: pointer; }
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+.hold .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255, 201, 60, 0.75); }
+.hold .label { position: relative; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: 100%; max-width: 420px; max-height: 100%; overflow: hidden; background: var(--plate); color: #1D2340;
+  border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 16px 20px 22px; text-align: center;
+}
+.rest-art { display: block; width: min(62vw, 260px, 34vh); aspect-ratio: 1; height: auto; margin: 0 auto 6px; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next { margin: 14px auto 0; display: inline-block; background: var(--accent); border: 3px solid #1D2340; border-radius: 16px; padding: 0.4rem 1.1rem; font-size: 1.5rem; font-weight: 700; }
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px; height: 48px; border: 3px solid var(--edge); border-radius: 14px; background: var(--panel);
+  font-size: 1.3rem; cursor: pointer; opacity: 0.7; touch-action: none;
+}
+
+/* Landscape: grid on the left, controls on the right. */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .stage { margin-bottom: 8px; }
+  .panel { flex: 0 0 min(36%, 380px); margin-bottom: 8px; border-bottom-width: 3px; border-radius: 24px; justify-content: space-between; padding-bottom: 10px; }
+  .ctrl.modes { flex-direction: column; }
+  .pats { grid-template-columns: 1fr 1fr; }
+  .pats .multi { grid-column: 1 / -1; }
+  .ctrl .btn, .pats .btn { font-size: clamp(0.9rem, 1.8vw, 1.25rem); }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .pats { grid-template-columns: 1fr 1fr 1fr; }
+  .pats .multi { grid-column: 1 / -1; }
+  .pats .btn { font-size: 0.95rem; }
+}
+@media (max-width: 440px) {
+  header { gap: 6px; }
+  header h1 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 1.15rem; }
+  .hdr-right { gap: 6px; }
+  .hdr-right .btn { padding: 0.1rem 0.5rem !important; }
+}
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .homebtn { min-height: 44px; font-size: 1.1rem; }
+  .app { gap: 14px; margin-top: 10px; }
+  .stage { padding: 10px; gap: 8px; }
+  .eqbar { min-height: 64px; }
+  .panel { gap: 12px; padding: 12px 14px 14px; }
+  .ctrl, .pats { gap: 10px; }
+  .ctrl .btn, .pats .btn { min-height: 60px; }
+  .multi .step { width: 56px; }
+  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
+  .bigtoggle { min-height: 52px; font-size: 1.15rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  header { display: none; }
+  .wrap { padding-top: 6px; }
+  .app { margin-top: 0; }
+  .stage { padding: 4px; gap: 4px; }
+  .eqbar { min-height: 40px; }
+  .eq { font-size: 1.6rem; }
+  .bigtoggle { min-height: 38px; }
+  .panel { gap: 5px; padding: 6px 8px; }
+  .pats { gap: 5px; }
+  .ctrl { gap: 5px; }
+  .ctrl.modes { flex-direction: row; flex-wrap: wrap; }
+  .ctrl.modes .seg { flex: 1 1 100%; }
+  .ctrl .btn, .pats .btn { min-height: 42px; font-size: 0.9rem; }
+  .multi .step { width: 38px; }
+  .multi .main b { font-size: 1.2em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .eq.go { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Math Grid</h1>
+    <div class="hdr-right">
+      <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+      <button class="btn" data-action="timer" id="timerbtn" style="min-height:44px;font-size:1rem;padding:0.1rem 0.8rem;white-space:nowrap">⏱ Grown-ups</button>
+    </div>
+  </header>
+
+  <main class="app">
+    <div class="stage">
+      <div class="eqbar">
+        <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+        <div class="eq" id="eq" aria-live="polite">Tap a number!</div>
+        <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
+      </div>
+      <div class="scene" id="scene">
+        <canvas id="cv" aria-label="A number grid"></canvas>
+      </div>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to say goodbye</p>
+        <button class="btn goodbye" id="goodbyeBtn">Goodnight, numbers</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ctrl modes">
+        <div class="seg">
+          <button class="btn" data-mode="add" aria-pressed="false"><span class="op">+</span>Add</button>
+          <button class="btn" data-mode="times" aria-pressed="true"><span class="op">×</span>Times</button>
+        </div>
+        <div class="seg">
+          <button class="btn" data-size="10" aria-pressed="true">0 to 10</button>
+          <button class="btn" data-size="12" aria-pressed="false">0 to 12</button>
+        </div>
+      </div>
+      <div class="pats">
+        <div class="multi">
+          <button class="btn step" data-step="-1" aria-label="Smaller number">−</button>
+          <button class="btn main" data-pat="mult" aria-pressed="false"><span>Multiples of</span><b id="multN">3</b></button>
+          <button class="btn step" data-step="1" aria-label="Bigger number">+</button>
+        </div>
+        <button class="btn" data-pat="dbl" aria-pressed="false">Doubles</button>
+        <button class="btn" data-pat="sq" aria-pressed="false">Squares</button>
+        <button class="btn" data-pat="same" aria-pressed="false">Same answer</button>
+      </div>
+      <div class="ctrl">
+        <button class="btn build" id="buildBtn">Build it</button>
+        <button class="btn clear" id="clearBtn">Clear</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <h2 id="sheetTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">When time is up, the blocks settle and rest, and the controls lock.</p>
+        <h4>How long</h4>
+        <div class="row" id="minuteRow"></div>
+        <h4>Next activity <span class="opt-txt">(optional)</span></h4>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Goodnight button to press</label>
+        <div class="sheet-actions"><button class="btn primary" id="timerStart">Start timer</button></div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+      <hr>
+      <h3>Sound</h3>
+      <p class="sub" id="soundState">Sound is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Hold to turn sound on</span></button>
+      </div>
+      <hr>
+      <h3>Spoken numbers</h3>
+      <p class="sub" id="voiceState">The device's voice is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdVoice"><span class="fill"></span><span class="label" id="voiceLabel">Hold to turn the voice on</span></button>
+      </div>
+      <hr>
+      <h3>Shake</h3>
+      <p class="sub" id="tiltState">Shake the device to make the blocks tumble.</p>
+      <div class="sheet-actions">
+        <button class="btn" id="tiltBtn">Turn on tilt</button>
+      </div>
+      <div class="sheet-actions"><button class="btn" data-action="timerclose">Close</button></div>
+    </div>
+  </div>
+
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <svg class="rest-art" id="restArt" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The numbers are resting.</p>
+      <p class="rest-line">They will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  var TAU = Math.PI * 2;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
+
+  // One bright color per number 0-12.
+  var COLORS = ["#C9D3E0", "#E63946", "#F77F00", "#FFC93C", "#2E9E5B", "#3A86FF", "#8338EC", "#FF5DA2", "#00B4D8", "#8AC926", "#FF8C42", "#9B5DE5", "#06D6A0"];
+  function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function inkOn(h) { var c = hexRgb(h); return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] < 140 ? "#FFFFFF" : "#1D2340"; }
+  function colorOf(v) { return COLORS[((v % 13) + 13) % 13]; }
+  function easeOutBack(t) { var c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
+  function easeOutBounce(t) {
+    var n = 7.5625, d = 2.75;
+    if (t < 1 / d) return n * t * t;
+    if (t < 2 / d) { t -= 1.5 / d; return n * t * t + 0.75; }
+    if (t < 2.5 / d) { t -= 2.25 / d; return n * t * t + 0.9375; }
+    t -= 2.625 / d; return n * t * t + 0.984375;
+  }
+
+  // ---------- State ----------
+  var KEY = "mathgrid-state-v1";
+  var mode = "times", N = 10, sel = null, pat = "", multN = 3, sameV = 12, hasBlocks = false;
+  function val(r, c) { return mode === "times" ? r * c : r + c; }
+  function opSym() { return mode === "times" ? "×" : "+"; }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ mode: mode, N: N, sel: sel, pat: pat, multN: multN, sameV: sameV, blocks: hasBlocks })); } catch (e) { /* ignore */ }
+  }
+  function load() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!o || typeof o !== "object") return;
+      if (o.mode === "add" || o.mode === "times") mode = o.mode;
+      if (o.N === 10 || o.N === 12) N = o.N;
+      if (o.sel && typeof o.sel.r === "number" && typeof o.sel.c === "number") sel = { r: clamp(o.sel.r | 0, 0, N), c: clamp(o.sel.c | 0, 0, N) };
+      if (["", "mult", "dbl", "sq", "same"].indexOf(o.pat) !== -1) pat = o.pat;
+      if (typeof o.multN === "number") multN = clamp(o.multN | 0, 1, 12);
+      if (typeof o.sameV === "number") sameV = clamp(o.sameV | 0, 0, 144);
+      hasBlocks = !!o.blocks;
+    } catch (e) { /* defaults */ }
+  }
+
+  // ---------- Canvas + layout ----------
+  var cv = $("cv"), ctx = cv.getContext("2d"), scene = $("scene");
+  var CW = 1, CH = 1, DPR = 1, cs = 20, OX = 0, OY = 0;
+  function resize() {
+    var r = scene.getBoundingClientRect();
+    CW = Math.max(1, r.width - 6); CH = Math.max(1, r.height - 6);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    var n = N + 2;
+    cs = Math.min(CW / n, CH / n);
+    OX = (CW - cs * n) / 2; OY = (CH - cs * n) / 2;
+  }
+  window.addEventListener("resize", resize);
+  // Grid index (0 = header, 1 = number 0, ...) under a client point.
+  function hit(cx, cy, clampBody) {
+    var r = cv.getBoundingClientRect();
+    var gx = (cx - r.left - OX) / cs, gy = (cy - r.top - OY) / cs;
+    var n = N + 2;
+    if (clampBody) return { ci: clamp(Math.floor(gx), 1, n - 1), ri: clamp(Math.floor(gy), 1, n - 1) };
+    if (gx < 0 || gy < 0 || gx >= n || gy >= n) return null;
+    return { ci: Math.floor(gx), ri: Math.floor(gy) };
+  }
+  function cellCenter(ri, ci) { return { x: OX + (ci + 0.5) * cs, y: OY + (ri + 0.5) * cs }; }
+
+  // ---------- Effects ----------
+  var fx = [], rings = [];
+  function burst(x, y, n, col) {
+    if (reduceMotion) n = Math.min(n, 4);
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, TAU), sp = rand(90, 360);
+      fx.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, life: 0, max: rand(0.45, 0.9), r: rand(3, 8), col: col || COLORS[1 + (i % 12)] });
+    }
+  }
+  function ring(x, y, r, col) { rings.push({ x: x, y: y, r: r, life: 0, col: col || "#FFFFFF" }); }
+
+  // ---------- Lights: taps, patterns ----------
+  var now = 0, selT = -9999, patT = -9999, jiggle = 0;
+  var ptrs = {};
+  var crossCols = ["#FFC93C", "#FF5DA2", "#00B4D8", "#8AC926", "#FF8C42"];
+
+  function patMatch(r, c) {
+    var v = val(r, c);
+    if (pat === "mult") return v > 0 && v % multN === 0;
+    if (pat === "dbl" || pat === "sq") return r === c;
+    if (pat === "same") return v === sameV;
+    return false;
+  }
+  function patColor() {
+    if (pat === "mult") return colorOf(multN);
+    if (pat === "dbl") return "#FF5DA2";
+    if (pat === "sq") return "#00B4D8";
+    return "#FFC93C";
+  }
+  function waysCount() {
+    var n = 0;
+    for (var r = 0; r <= N; r++) for (var c = 0; c <= N; c++) if (val(r, c) === sameV) n++;
+    return n;
+  }
+  function patText() {
+    var s = opSym();
+    if (pat === "mult") {
+      var l = [];
+      for (var k = 1; k <= 4; k++) l.push(multN * k);
+      return "Multiples of " + multN + ": " + l.join(", ") + "…";
+    }
+    if (pat === "dbl") return "Doubles: 1 + 1, 2 + 2, 3 + 3…";
+    if (pat === "sq") return "Squares: 1, 4, 9, 16, 25…";
+    if (pat === "same") { var w = waysCount(); return w + (w === 1 ? " way" : " ways") + " to make " + sameV; }
+    return "";
+  }
+  function eqText(r, c) { return r + " " + opSym() + " " + c + " = " + val(r, c); }
+  function sayEq(r, c) { say(r + (mode === "times" ? " times " : " plus ") + c + " is " + val(r, c)); }
+
+  var eqEl = $("eq");
+  function setEq(t, pop) {
+    if (eqEl.textContent !== t) eqEl.textContent = t;
+    if (pop && !reduceMotion) { eqEl.classList.remove("go"); void eqEl.offsetWidth; eqEl.classList.add("go"); }
+  }
+  function restEq() {
+    if (sel) setEq(eqText(sel.r, sel.c), false);
+    else if (pat) setEq(patText(), false);
+    else setEq("Tap a number!", false);
+  }
+
+  // ---------- Blocks ----------
+  // Each block lives in a grid cell. x/y are in cell units (grid index, top-left corner).
+  var blocks = [], build = null, tumbleUntil = 0, settling = false;
+  function blockPlan(r, c) {
+    var list = [], i, j, k;
+    if (mode === "times") {
+      for (i = 1; i <= r; i++) for (j = 1; j <= c; j++) {
+        list.push({ key: "t" + i + "," + j, hx: j + 1, hy: i + 1, col: colorOf(i), n: (i - 1) * c + j });
+      }
+    } else {
+      var tot = r + c, second = c === r ? colorOf((c + 4) % 12 + 1) : colorOf(c);
+      for (k = 0; k < tot; k++) {
+        var col = k < r ? colorOf(r) : second;
+        list.push({ key: "a" + k + col, hx: 2 + (k % N), hy: 2 + Math.floor(k / N), col: col, n: k + 1 });
+      }
+    }
+    return list;
+  }
+  function mkBlock(p) { return { key: p.key, hx: p.hx, hy: p.hy, col: p.col, n: p.n, x: p.hx, y: p.hy, st: "home", t0: now, born: now, vx: 0, vy: 0, fx: 0, fy: 0, tx: 0, ty: 0, dl: 0, rot: 0, vr: 0 }; }
+  function fillBlocks(r, c, animate) {
+    var have = {};
+    blocks.forEach(function (b) { have[b.key] = b; });
+    var plan = blockPlan(r, c), out = [], added = 0;
+    plan.forEach(function (p) {
+      var b = have[p.key];
+      if (b) { b.n = p.n; b.hx = p.hx; b.hy = p.hy; if (b.st === "home") { b.x = p.hx; b.y = p.hy; } out.push(b); }
+      else { b = mkBlock(p); if (!animate) b.born = -9999; out.push(b); added++; }
+    });
+    blocks = out;
+    hasBlocks = blocks.length > 0;
+    return added;
+  }
+  function clearBlocks(poof) {
+    if (poof && blocks.length) {
+      blocks.slice(0, 40).forEach(function (b) { burst(OX + (b.x + 0.5) * cs, OY + (b.y + 0.5) * cs, 2, b.col); });
+    }
+    blocks = []; build = null; hasBlocks = false;
+  }
+
+  // "Build it": blocks drop in one at a time with a count.
+  function startBuild() {
+    if (ending) return;
+    if (!sel) sel = { r: 3, c: 4 };
+    if (sel.r === 0 || sel.c === 0) {
+      if (mode === "times" || sel.r + sel.c === 0) { sel = { r: sel.r || 3, c: sel.c || 4 }; }
+    }
+    clearBlocks(false);
+    var plan = blockPlan(sel.r, sel.c);
+    var iv = plan.length <= 12 ? 0.45 : Math.max(0.07, 5.4 / plan.length);
+    build = { plan: plan, i: 0, next: now / 1000 + 0.25, iv: iv };
+    selT = now;
+    setEq(eqText(sel.r, sel.c).replace(/= \d+$/, "= ?"), true);
+    hasBlocks = true;
+    save();
+    updateButtons();
+  }
+  function stepBuild() {
+    if (!build) return;
+    var t = now / 1000;
+    while (build && t >= build.next && build.i < build.plan.length) {
+      var p = build.plan[build.i], b = mkBlock(p);
+      b.st = "drop"; b.t0 = now; b.y = -OY / cs - 1.2;
+      blocks.push(b);
+      build.i++;
+      build.next += build.iv;
+      setEq(String(build.i), true);
+      note(build.i, 0.035);
+      if (build.plan.length <= 20 || build.i % 5 === 0) say(String(build.i));
+    }
+    if (build && build.i >= build.plan.length && t >= build.next + 0.25) {
+      build = null;
+      setEq(eqText(sel.r, sel.c) + "!", true);
+      var cc = cellCenter(sel.r + 1, sel.c + 1);
+      burst(cc.x, cc.y, 30, null);
+      ring(cc.x, cc.y, cs * 2, "#FFC93C");
+      chime();
+      setTimeout(function () { sayEq(sel.r, sel.c); }, 350);
+    }
+  }
+
+  // Shake: blocks tumble, then snap back.
+  function shake(power) {
+    if (ending) return;
+    power = power || 1;
+    if (!blocks.length) { jiggle = 1; blip(); return; }
+    build = null;
+    var minX = -OX / cs, minY = -OY / cs;
+    blocks.forEach(function (b) {
+      if (b.st === "drop") { b.y = b.hy; }
+      if (b.st !== "tumble") { b.vx = 0; b.vy = 0; }
+      b.st = "tumble";
+      b.vx += rand(-14, 14) * power; b.vy += rand(-24, -6) * power;
+      b.vr += rand(-10, 10);
+      b.x = Math.max(b.x, minX);
+      b.y = Math.max(b.y, minY);
+    });
+    tumbleUntil = now + 1700;
+    whoosh();
+  }
+
+  function stepBlocks(dt) {
+    var minX = -OX / cs, minY = -OY / cs, maxX = (CW - OX) / cs - 1, maxY = (CH - OY) / cs - 1;
+    blocks.forEach(function (b) {
+      var t;
+      if (b.st === "drop") {
+        t = clamp((now - b.t0) / 420, 0, 1);
+        var y0 = -OY / cs - 1.2;
+        b.x = b.hx; b.y = y0 + (b.hy - y0) * easeOutBounce(t);
+        if (t >= 1) { b.st = "home"; b.y = b.hy; }
+      } else if (b.st === "tumble") {
+        b.vy += 60 * dt;
+        b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vr * dt;
+        if (b.x < minX) { b.x = minX; b.vx = Math.abs(b.vx) * 0.6; }
+        if (b.x > maxX) { b.x = maxX; b.vx = -Math.abs(b.vx) * 0.6; }
+        if (b.y < minY) { b.y = minY; b.vy = Math.abs(b.vy) * 0.5; }
+        if (b.y > maxY) { b.y = maxY; b.vy = -Math.abs(b.vy) * 0.45; b.vx *= 0.85; b.vr *= 0.8; if (Math.abs(b.vy) < 1.5) b.vy = 0; }
+        if (now > tumbleUntil) { b.st = "return"; b.fx = b.x; b.fy = b.y; b.t0 = now + rand(0, 300); b.fr = b.rot; }
+      } else if (b.st === "return") {
+        t = clamp((now - b.t0) / 650, 0, 1);
+        var e = easeOutBack(t);
+        b.x = b.fx + (b.hx - b.fx) * e; b.y = b.fy + (b.hy - b.fy) * e; b.rot = b.fr * (1 - t);
+        if (t >= 1) { b.st = "home"; b.x = b.hx; b.y = b.hy; b.rot = 0; if (Math.random() < 0.15) note(b.n, 0.02); }
+      } else if (b.st === "settle") {
+        t = clamp((now - b.t0) / 1100, 0, 1);
+        var es = easeOutBounce(t);
+        b.x = b.fx + (b.tx - b.fx) * Math.min(1, t * 1.6); b.y = b.fy + (b.ty - b.fy) * es; b.rot = b.fr * (1 - t);
+      }
+    });
+  }
+  // Timer ending: blocks settle into a neat pile at the bottom.
+  function settleBlocks() {
+    settling = true;
+    build = null;
+    var n = N + 2, maxY = (CH - OY) / cs - 1;
+    var order = blocks.slice().sort(function (a, b) { return a.x - b.x; });
+    var cols = Math.floor(CW / cs) || n, x0 = -OX / cs + (CW / cs - cols) / 2;
+    order.forEach(function (b, k) {
+      b.st = "settle"; b.fx = b.x; b.fy = b.y; b.fr = b.rot || 0;
+      b.tx = x0 + (k % cols); b.ty = maxY - Math.floor(k / cols);
+      b.t0 = now + (reduceMotion ? 0 : rand(0, 500));
+    });
+  }
+
+  // ---------- Drawing ----------
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  }
+  function text(t, x, y, size, col) {
+    ctx.font = "800 " + Math.round(size) + "px " + FONT;
+    ctx.fillStyle = col; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(t, x, y + size * 0.06);
+  }
+  function crossList() {
+    var l = [];
+    Object.keys(ptrs).forEach(function (k) { var p = ptrs[k]; if (p.cur && p.cur.ri > 0 && p.cur.ci > 0) l.push({ r: p.cur.ri - 1, c: p.cur.ci - 1, col: crossCols[p.slot % crossCols.length] }); });
+    if (sel && !l.length) l.push({ r: sel.r, c: sel.c, col: "#FFC93C" });
+    return l;
+  }
+
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = "#24305E"; ctx.fillRect(0, 0, CW, CH);
+    var n = N + 2, g = Math.max(1.5, cs * 0.07), rad = cs * 0.2;
+    var crosses = crossList();
+    var fade = ending ? clamp((now - endingStartedAt) / 1500, 0, 1) : 0;
+    var selPop = clamp((now - selT) / 350, 0, 1);
+    var pc = patColor();
+    var jg = jiggle * (reduceMotion ? 0.3 : 1);
+    var lw = Math.max(1.5, cs * 0.07);
+
+    for (var ri = 0; ri < n; ri++) {
+      for (var ci = 0; ci < n; ci++) {
+        var r = ri - 1, c = ci - 1;
+        var x = OX + ci * cs, y = OY + ri * cs, s = 1, fill, ink, label, fsz = cs * 0.42;
+        if (jg > 0) { x += Math.sin(now * 0.05 + ri * 1.7 + ci * 2.3) * jg * cs * 0.12; y += Math.cos(now * 0.047 + ri * 2.1 + ci * 1.3) * jg * cs * 0.12; }
+        var inRow = false, inCol = false, rowCol = null, colCol = null;
+        for (var k = 0; k < crosses.length; k++) {
+          var X = crosses[k];
+          if (ri > 0 && X.r === r) { inRow = true; rowCol = X.col; }
+          if (ci > 0 && X.c === c) { inCol = true; colCol = X.col; }
+        }
+        if (ri === 0 && ci === 0) {
+          fill = "#FFFFFF"; ink = "#1D2340"; label = opSym(); fsz = cs * 0.75;
+        } else if (ri === 0 || ci === 0) {
+          var hv = ri === 0 ? c : r;
+          fill = colorOf(hv); ink = inkOn(fill); label = String(hv); fsz = cs * 0.55;
+          var lit = (ri === 0 && inCol) || (ci === 0 && inRow) || (pat === "mult" && hv === multN);
+          if (lit) s = 1 + 0.18 * (fade ? 1 - fade : 1);
+        } else {
+          var v = val(r, c);
+          fill = ((Math.floor(r / 5) + Math.floor(c / 5)) % 2) ? "#EEF3FF" : "#FFFFFF";
+          ink = "#4A5578"; label = String(v); fsz = cs * (v >= 100 ? 0.34 : 0.42);
+          if (inRow || inCol) {
+            fill = inRow && inCol ? "#FFC93C" : (inRow ? mixA(rowCol || colorOf(r)) : mixA(colCol || colorOf(c)));
+            ink = "#1D2340";
+          }
+          if (pat && patMatch(r, c) && fade < 1) {
+            var d = (r + c) * 0.035, pt = clamp(((now - patT) / 1000 - d) / 0.32, 0, 1);
+            if (pt > 0) {
+              s = Math.max(s, (0.55 + 0.45 * easeOutBack(pt)) * (1 + (reduceMotion ? 0 : 0.05 * Math.sin(now * 0.006 + r + c))));
+              fill = pc; ink = inkOn(pc); fsz = cs * (v >= 100 ? 0.4 : 0.5);
+            }
+          }
+        }
+        var w = (cs - g) * s, ox = x + (cs - w) / 2, oy = y + (cs - w) / 2;
+        rr(ox, oy, w, w, rad); ctx.fillStyle = fill; ctx.fill();
+        if (ri === 0 || ci === 0 || s > 1.001) { ctx.lineWidth = lw; ctx.strokeStyle = "#1D2340"; ctx.stroke(); }
+        text(label, x + cs / 2, y + cs / 2, fsz * Math.max(1, s * 0.95), ink);
+      }
+    }
+    // The tapped square pops big.
+    crosses.forEach(function (X) {
+      if (blocks.length && sel && X.r === sel.r && X.c === sel.c) return;
+      var cc = cellCenter(X.r + 1, X.c + 1), pop = sel && X.r === sel.r && X.c === sel.c && !Object.keys(ptrs).length ? selPop : 1;
+      var s = 1 + 0.45 * easeOutBack(pop), w = cs * s;
+      rr(cc.x - w / 2, cc.y - w / 2, w, w, rad * s); ctx.fillStyle = X.col; ctx.fill();
+      ctx.lineWidth = Math.max(3, cs * 0.12); ctx.strokeStyle = "#1D2340"; ctx.stroke();
+      var v = val(X.r, X.c);
+      text(String(v), cc.x, cc.y, cs * s * (v >= 100 ? 0.42 : 0.55), "#1D2340");
+    });
+    // Blocks
+    var bw = cs - g, tot = blocks.length;
+    blocks.forEach(function (b) {
+      var bx = OX + (b.x + 0.5) * cs, by = OY + (b.y + 0.5) * cs;
+      var sc = clamp((now - b.born) / 260, 0, 1);
+      sc = b.born < 0 ? 1 : easeOutBack(sc);
+      if (sc <= 0) return;
+      ctx.save(); ctx.translate(bx, by); if (b.rot) ctx.rotate(b.rot); ctx.scale(sc, sc);
+      rr(-bw / 2 + cs * 0.06, -bw / 2 + cs * 0.08, bw, bw, rad); ctx.fillStyle = "rgba(10,14,30,0.35)"; ctx.fill();
+      rr(-bw / 2, -bw / 2, bw, bw, rad); ctx.fillStyle = b.col; ctx.fill();
+      ctx.lineWidth = Math.max(2, cs * 0.09); ctx.strokeStyle = "#1D2340"; ctx.stroke();
+      rr(-bw * 0.36, -bw * 0.4, bw * 0.5, bw * 0.16, bw * 0.08); ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fill();
+      var last = !build && b.n === tot && b.st === "home";
+      if (last) { ctx.lineWidth = Math.max(3, cs * 0.12); ctx.strokeStyle = "#FFFFFF"; rr(-bw / 2 - 3, -bw / 2 - 3, bw + 6, bw + 6, rad + 3); ctx.stroke(); }
+      // Only the newest block (while building) and the total carry a number, to keep the grid uncluttered.
+      if (last || (build && b.n === tot)) text(String(b.n), 0, cs * 0.04, cs * (b.n >= 100 ? 0.36 : 0.46) * (last ? 1.15 : 1), inkOn(b.col));
+      ctx.restore();
+    });
+    if (fade > 0) { ctx.fillStyle = "rgba(20,26,56," + (0.35 * fade).toFixed(3) + ")"; ctx.fillRect(0, 0, CW, CH); }
+    rings.forEach(function (o) {
+      var t = o.life / 0.6;
+      ctx.beginPath(); ctx.arc(o.x, o.y, o.r * (0.4 + t), 0, TAU); ctx.lineWidth = 7 * (1 - t); ctx.strokeStyle = o.col; ctx.stroke();
+    });
+    fx.forEach(function (p) {
+      ctx.globalAlpha = 1 - p.life / p.max;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fillStyle = p.col; ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+  }
+  var mixCache = {};
+  function mixA(h) {
+    if (mixCache[h]) return mixCache[h];
+    var c = hexRgb(h);
+    return (mixCache[h] = "rgb(" + c.map(function (v) { return Math.round(v + (255 - v) * 0.45); }).join(",") + ")");
+  }
+
+  var lastT = 0;
+  function loop(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t; now = t;
+    stepBuild();
+    stepBlocks(dt);
+    jiggle = Math.max(0, jiggle - dt * 1.2);
+    fx = fx.filter(function (p) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * dt; return p.life < p.max; });
+    rings = rings.filter(function (o) { o.life += dt; return o.life < 0.6; });
+    draw();
+    if (ending) checkEndingDone();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Pointer input (several fingers at once) ----------
+  var slotN = 0;
+  cv.addEventListener("pointerdown", function (e) {
+    if (ending) return;
+    e.preventDefault();
+    unlockAudioIfOn();
+    var h = hit(e.clientX, e.clientY, false);
+    var rc = cv.getBoundingClientRect();
+    if (!h) { ring(e.clientX - rc.left, e.clientY - rc.top, 40, "#FFFFFF"); blip(); return; }
+    var p = { start: h, cur: h, moved: false, slot: slotN++ };
+    ptrs[e.pointerId] = p;
+    if (h.ri > 0 && h.ci > 0) {
+      var cc = cellCenter(h.ri, h.ci);
+      ring(cc.x, cc.y, cs, crossCols[p.slot % crossCols.length]);
+      note(val(h.ri - 1, h.ci - 1), 0.04);
+      setEq(eqText(h.ri - 1, h.ci - 1), true);
+    }
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var p = ptrs[e.pointerId];
+    if (!p || ending) return;
+    var body = p.start.ri > 0 && p.start.ci > 0;
+    var h = hit(e.clientX, e.clientY, body);
+    if (!h) return;
+    if (h.ri === p.cur.ri && h.ci === p.cur.ci) return;
+    p.cur = h;
+    if (!body) return;
+    if (!p.moved) {
+      p.moved = true;
+      if (build) build = null;
+      if (blocks.some(function (b) { return b.st !== "home"; })) clearBlocks(false);
+      if (pat) { pat = ""; updateButtons(); }
+    }
+    // Drag: a rectangle of blocks fills in from the corner to this square.
+    sel = { r: h.ri - 1, c: h.ci - 1 };
+    var added = fillBlocks(sel.r, sel.c, true);
+    if (added) note(val(sel.r, sel.c), 0.03);
+    setEq(mode === "times" ? sel.r + (sel.r === 1 ? " row" : " rows") + " of " + sel.c + " = " + val(sel.r, sel.c) : eqText(sel.r, sel.c), false);
+  });
+  function endPtr(e) {
+    var p = ptrs[e.pointerId];
+    if (!p) return;
+    delete ptrs[e.pointerId];
+    if (ending || e.type === "pointercancel") { restEq(); return; }
+    var h = p.cur;
+    if (p.moved) {
+      selT = now - 1000;
+      var cc = cellCenter(h.ri, h.ci);
+      burst(cc.x, cc.y, 16, null);
+      chime();
+      sayEq(sel.r, sel.c);
+      save();
+      return;
+    }
+    if (h.ri === 0 && h.ci === 0) { setMode(mode === "times" ? "add" : "times"); return; }
+    if (h.ri === 0 || h.ci === 0) { tapHeader(h.ri === 0 ? h.ci - 1 : h.ri - 1, h); return; }
+    tapCell(h.ri - 1, h.ci - 1);
+  }
+  cv.addEventListener("pointerup", endPtr);
+  cv.addEventListener("pointercancel", endPtr);
+
+  function tapCell(r, c) {
+    build = null;
+    clearBlocks(true);
+    sel = { r: r, c: c };
+    selT = now;
+    var v = val(r, c);
+    if (pat === "same") { sameV = v; patT = now; }
+    var cc = cellCenter(r + 1, c + 1);
+    burst(cc.x, cc.y, 18, null);
+    ring(cc.x, cc.y, cs * 1.4, "#FFC93C");
+    setEq(pat === "same" ? patText() : eqText(r, c), true);
+    sayEq(r, c);
+    save();
+  }
+  function tapHeader(v, h) {
+    var cc = cellCenter(h.ri, h.ci);
+    burst(cc.x, cc.y, 12, colorOf(v));
+    if (v < 1) { blip(); setEq(String(v), true); say(String(v)); return; }
+    multN = v;
+    setPat("mult", true);
+  }
+
+  // ---------- Controls ----------
+  function setMode(m) {
+    if (m !== mode) { clearBlocks(true); build = null; }
+    mode = m;
+    if (pat) patT = now;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mode]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === m)); });
+    restEq();
+    save();
+  }
+  function setSize(n) {
+    if (n === N) return;
+    N = n;
+    clearBlocks(false); build = null;
+    if (sel) sel = { r: Math.min(sel.r, N), c: Math.min(sel.c, N) };
+    resize();
+    patT = now;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === n)); });
+    restEq();
+    save();
+    chime();
+  }
+  function setPat(p, force) {
+    if (pat === p && !force) { pat = ""; patT = now; updateButtons(); restEq(); save(); blip(); return; }
+    pat = p;
+    if (p === "dbl" && mode !== "add") setMode("add");
+    if (p === "sq" && mode !== "times") setMode("times");
+    if (p === "same") { sameV = sel ? val(sel.r, sel.c) : 12; if (sameV === 0 && mode === "times") sameV = 12; }
+    patT = now;
+    clearBlocks(true); build = null;
+    sel = null;
+    updateButtons();
+    setEq(patText(), true);
+    if (p === "mult") say("Multiples of " + multN);
+    else if (p === "same") say(waysCount() + " ways to make " + sameV);
+    else if (p === "dbl") say("Doubles");
+    else say("Squares");
+    chime();
+    save();
+  }
+  function updateButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pat]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.pat === pat)); });
+    $("multN").textContent = String(multN);
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.mode && !ending) { unlockAudioIfOn(); setMode(t.dataset.mode); blip(); }
+    else if (t.dataset.size && !ending) { unlockAudioIfOn(); setSize(Number(t.dataset.size)); }
+    else if (t.dataset.pat && !ending) { unlockAudioIfOn(); setPat(t.dataset.pat, false); }
+    else if (t.dataset.step && !ending) {
+      unlockAudioIfOn();
+      multN = clamp(multN + Number(t.dataset.step), 1, 12);
+      setPat("mult", true);
+    }
+    else if (t.id === "buildBtn" && !ending) { unlockAudioIfOn(); startBuild(); }
+    else if (t.id === "clearBtn" && !ending) { clearBlocks(true); sel = null; pat = ""; patT = now; updateButtons(); restEq(); save(); whoosh(); }
+    else if (t.dataset.action === "timer") openTimer();
+    else if (t.dataset.action === "timerclose") closeTimer();
+    else if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); }
+    else if (t.id === "timerStart") startTimer();
+    else if (t.id === "goodbyeBtn") goodnight();
+    else if (t.id === "tiltBtn") toggleTilt();
+    else if (t.id === "bigToggle") setBig(!document.body.classList.contains("big"), true);
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var SKEY = "mathgrid-sound-v1";
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null;
+  function unlockAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = 0.8;
+        master.connect(actx.destination);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function unlockAudioIfOn() { if (soundOn) unlockAudio(); }
+  function canPlay() { return soundOn && actx && actx.state === "running"; }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  var PENTA = [0, 2, 4, 7, 9];
+  // Bigger numbers play higher notes (pentatonic, so any mix sounds nice).
+  function note(v, vol) {
+    var k = Math.min(Math.round(Math.sqrt(Math.max(0, v)) * 3), 24);
+    var semi = PENTA[k % 5] + 12 * Math.floor(k / 5);
+    tone(330 * Math.pow(2, semi / 12), 0.22, vol || 0.04, "triangle");
+  }
+  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
+  function whoosh() { tone(700, 0.25, 0.035, "sine", 250); }
+  function chime() { tone(523, 0.4, 0.04); setTimeout(function () { tone(784, 0.6, 0.04); }, 120); }
+  document.addEventListener("visibilitychange", function () { if (actx && document.hidden) actx.suspend(); });
+  function updateSoundUI() {
+    $("soundState").textContent = soundOn ? "Sound is on. Soft notes." : "Sound is off.";
+    $("soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { unlockAudio(); setTimeout(chime, 60); }
+    updateSoundUI();
+  }
+
+  // ---------- Spoken numbers (device voice; off by default) ----------
+  var VKEY = "mathgrid-voice-v1";
+  var voiceOn = false;
+  var hasVoice = typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
+  try { voiceOn = hasVoice && localStorage.getItem(VKEY) === "on"; } catch (e) { /* ignore */ }
+  function say(t) {
+    if (!voiceOn || !hasVoice) return;
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(t);
+      u.rate = 0.95; u.pitch = 1.1; u.volume = 0.9;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+  function updateVoiceUI() {
+    if (!hasVoice) { $("voiceState").textContent = "This device has no voice."; $("holdVoice").disabled = true; return; }
+    $("voiceState").textContent = voiceOn ? "The voice says the numbers." : "The device's voice is off.";
+    $("voiceLabel").textContent = voiceOn ? "Hold to turn the voice off" : "Hold to turn the voice on";
+  }
+  function toggleVoice() {
+    voiceOn = !voiceOn;
+    try { localStorage.setItem(VKEY, voiceOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    updateVoiceUI();
+    if (voiceOn) say("1, 2, 3");
+    else if (hasVoice) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+  }
+
+  // ---------- Tilt / shake (optional; asked for from a grown-up tap) ----------
+  var TILTKEY = "mathgrid-tilt-v1";
+  var tiltOn = false, tiltListening = false, lastShake = 0, lastAcc = null;
+  var needsPermission = typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function";
+  var hasTilt = typeof DeviceMotionEvent !== "undefined";
+  function onMotion(e) {
+    var a = e.accelerationIncludingGravity;
+    if (!a || a.x == null) return;
+    var mag = 0;
+    if (lastAcc) mag = Math.abs(a.x - lastAcc.x) + Math.abs(a.y - lastAcc.y) + Math.abs(a.z - lastAcc.z);
+    lastAcc = { x: a.x, y: a.y, z: a.z };
+    var t = performance.now();
+    if (mag > 22 && t - lastShake > 350) { lastShake = t; shake(clamp(mag / 30, 0.8, 1.8)); }
+  }
+  function listenTilt(on) {
+    if (on && !tiltListening) { window.addEventListener("devicemotion", onMotion); tiltListening = true; }
+    if (!on && tiltListening) { window.removeEventListener("devicemotion", onMotion); tiltListening = false; lastAcc = null; }
+  }
+  function saveTilt() { try { localStorage.setItem(TILTKEY, tiltOn ? "on" : "off"); } catch (e) { /* ignore */ } }
+  function toggleTilt() {
+    if (!hasTilt) return;
+    if (tiltOn) { tiltOn = false; listenTilt(false); saveTilt(); updateTiltUI(); return; }
+    if (needsPermission) {
+      DeviceMotionEvent.requestPermission().then(function (res) {
+        if (res === "granted") { tiltOn = true; listenTilt(true); saveTilt(); }
+        updateTiltUI(res !== "granted");
+      }).catch(function () { updateTiltUI(true); });
+    } else {
+      tiltOn = true; listenTilt(true); saveTilt(); updateTiltUI();
+    }
+  }
+  function updateTiltUI(denied) {
+    var b = $("tiltBtn");
+    if (!hasTilt) { $("tiltState").textContent = "Shake is not available on this device."; b.disabled = true; return; }
+    b.textContent = tiltOn ? "Turn off tilt" : "Turn on tilt";
+    $("tiltState").textContent = denied ? "Tilt was not allowed. You can try again." :
+      (tiltOn ? "Tilt is on. Shake the device to make the blocks tumble." : "Shake the device to make the blocks tumble.");
+  }
+  try { if (localStorage.getItem(TILTKEY) === "on" && hasTilt && !needsPermission) { tiltOn = true; listenTilt(true); } } catch (e) { /* ignore */ }
+
+  // ---------- Play timer (same behavior and storage format as spin-shop) ----------
+  var TKEY = "mathgrid-timer-v1";
+  var BKEY = "mathgrid-big-v1";
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000, UNLOCK_MS = 4000;
+  var ending = false;
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true, phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) { if (typeof o[k] === "boolean") t[k] = o[k]; });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* defaults */ }
+    return t;
+  }
+  function saveTimer() { try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ } }
+  var timer = loadTimer();
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) { if (lastTimerKey !== "off") { $("fuel").hidden = true; lastTimerKey = "off"; } return; }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    $("fuel").hidden = false;
+    var fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(timer.showMinutes && timer.phase === "running");
+    $("fuelNum").textContent = String(mins);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.hidden = true; }, 450); }, 7000);
+  }
+  function minutesText(ms) { var m = Math.ceil(ms / 60000); return m === 1 ? "1 minute" : m + " minutes"; }
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    $("timerbtn").textContent = on ? "⏱ Timer on" : "⏱ Grown-ups";
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes)); });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+  }
+  function openTimer() { updateTimerUI(); updateSoundUI(); updateVoiceUI(); updateTiltUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000; timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+  function stopTimer() {
+    timer.phase = "idle"; saveTimer();
+    ending = false; settling = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    blocks.forEach(function (b) { if (b.st === "settle") { b.st = "return"; b.fx = b.x; b.fy = b.y; b.fr = b.rot || 0; b.t0 = now; } });
+    restEq();
+    drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function beginEnding() {
+    clearTimeout(toastTimer); $("toast").classList.remove("show"); $("toast").hidden = true;
+    timer.phase = "ending"; saveTimer();
+    endingStartedAt = performance.now(); farewellAt = 0; restScheduled = false;
+    ending = true;
+    ptrs = {};
+    build = null;
+    blocks.forEach(function (b) { if (b.st === "drop") { b.st = "home"; b.y = b.hy; } });
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to say goodbye";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    setEq("Time to rest", true);
+    if (!timer.goodbye) settleBlocks();
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  function goodnight() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Goodnight, numbers!";
+    if (soundOn) unlockAudio();
+    settleBlocks();
+    say("Goodnight, numbers");
+    chime();
+  }
+  function checkEndingDone() {
+    if (timer.phase !== "ending" || restScheduled) return;
+    if (timer.goodbye && !farewellAt) return;
+    var t = performance.now();
+    if (t - endingStartedAt < 3000 || (farewellAt && t - farewellAt < 2200)) return;
+    restScheduled = true;
+    setTimeout(goRest, 1200);
+  }
+  function restSVG() {
+    var o = '<circle cx="34" cy="-34" r="9" fill="#FFF4CC" stroke="#1D2340" stroke-width="2"/><circle cx="38" cy="-37" r="8" fill="#2B3A67"/>';
+    var bl = [[-33, 18, 1], [-11, 18, 2], [11, 18, 3], [-22, -4, 4], [0, -4, 5]];
+    bl.forEach(function (b) {
+      var col = COLORS[b[2]], x = b[0], y = b[1];
+      o += '<rect x="' + (x - 10) + '" y="' + (y - 10) + '" width="20" height="20" rx="4" fill="' + col + '" stroke="#1D2340" stroke-width="2"/>';
+      o += '<text x="' + x + '" y="' + (y + 1) + '" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="800" font-size="11" fill="' + inkOn(col) + '">' + b[2] + '</text>';
+      o += '<path d="M' + (x - 6) + " " + (y + 5) + "q2 2 4 0M" + (x + 2) + " " + (y + 5) + 'q2 2 4 0" fill="none" stroke="' + inkOn(col) + '" stroke-width="1.4" stroke-linecap="round"/>';
+    });
+    o += '<rect x="-46" y="29" width="92" height="6" rx="3" fill="#C9D3E0" stroke="#1D2340" stroke-width="2"/>';
+    o += '<text x="-36" y="-26" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">z</text><text x="-26" y="-36" font-family="Baloo 2, sans-serif" font-weight="800" font-size="10" fill="#FFFFFF">z</text><text x="-19" y="-43" font-family="Baloo 2, sans-serif" font-weight="800" font-size="7" fill="#FFFFFF">z</text>';
+    return o;
+  }
+  function showRest() {
+    $("restArt").innerHTML = restSVG();
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+  function goRest() {
+    timer.phase = "resting"; saveTimer();
+    ending = false; settling = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    // Next time, the blocks are back in their squares.
+    blocks.forEach(function (b) { b.st = "home"; b.x = b.hx; b.y = b.hy; b.rot = 0; });
+    restEq();
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+    showRest();
+  }
+  function unlock() {
+    timer.phase = "idle"; saveTimer();
+    $("rest").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI();
+  }
+  function timerTick() {
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+  function makeHold(btn, ms, onDone, onPress) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") { if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return; e.preventDefault(); }
+      if (id) return;
+      if (onPress) onPress();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  MINUTE_CHOICES.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn"; b.dataset.minutes = String(m); b.textContent = m + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  makeHold($("holdSound"), HOLD_MS, toggleSound, function () { if (!soundOn) unlockAudio(); });
+  makeHold($("holdVoice"), HOLD_MS, toggleVoice);
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  // Big mode: hide the title and controls so the grid fills the screen.
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    resize();
+  }
+
+  // ---------- Start ----------
+  load();
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
+  Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === N)); });
+  setMode(mode);
+  resize();
+  if (hasBlocks && sel) fillBlocks(sel.r, sel.c, false);
+  if (pat) patT = -9999;
+  updateButtons();
+  restEq();
+  if (pat && !sel) setEq(patText(), false);
+  updateSoundUI();
+  updateVoiceUI();
+  updateTiltUI();
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") showRest();
+  drawTimer();
+  updateTimerUI();
+  setInterval(timerTick, 250);
+  requestAnimationFrame(loop);
+
+  // Test hook (harmless).
+  window.__math = {
+    state: function () { return { mode: mode, N: N, sel: sel, pat: pat, multN: multN, sameV: sameV, blocks: blocks.length, building: !!build, eq: eqEl.textContent, ending: ending, tumbling: blocks.some(function (b) { return b.st === "tumble"; }) }; },
+    cell: function (r, c) { var rc = cv.getBoundingClientRect(), p = cellCenter(r + 1, c + 1); return { x: rc.left + p.x, y: rc.top + p.y }; },
+    shake: function () { shake(1.2); }
+  };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
