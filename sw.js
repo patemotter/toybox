@@ -5,7 +5,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v27";
+const CACHE = "toybox-v28";
 const CORE = [
   "./",
   "./index.html",
@@ -14,6 +14,10 @@ const CORE = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
+
+  // Shared (grown-up timer, sound, Big: used by migrated apps)
+  "./common/toybox.css",
+  "./common/toybox.js",
 
   // Spin Shop
   "./spin-shop/",
