@@ -1,0 +1,1622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bulldozer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Construction Site">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 1366px;
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+header { display: flex; align-items: center; gap: 10px; min-width: 0; }
+header h1 { margin: 0; white-space: nowrap; font-size: 1.35rem; font-weight: 800; line-height: 1; letter-spacing: -0.01em; }
+.spacer { flex: 1 1 auto; }
+.homebtn, .mapbtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 40px;
+  padding: 2px 12px 2px 9px; font-weight: 700; font-size: 1rem; color: var(--ink); text-decoration: none; white-space: nowrap;
+  background: var(--panel); border: 3px solid var(--edge); border-radius: 12px; box-shadow: 2px 2px 0 var(--edge);
+}
+.mapbtn { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 2px 2px 0 #1D2340; }
+.homebtn:active, .mapbtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible, .mapbtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg, .mapbtn svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.badge {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0 10px 0 6px;
+  border: 3px dashed var(--edge); border-radius: 999px; font-size: 0.9rem; font-weight: 700; color: var(--ink); white-space: nowrap;
+}
+.badge svg { width: 34px; height: 28px; display: block; }
+.app { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 1.1rem; color: var(--ink); background: var(--panel);
+  border: 3px solid var(--edge); border-radius: 16px; padding: 0.45rem 0.8rem; min-height: 52px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge); transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.gubtn { min-height: 40px; font-size: 1rem; padding: 0.1rem 0.8rem; white-space: nowrap; }
+
+/* ---------- Stage: the dirt field ---------- */
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; background: var(--plate);
+  border: 3px solid var(--edge); border-radius: 24px; box-shadow: 4px 4px 0 var(--edge); padding: 6px;
+}
+.scene {
+  position: relative; width: 100%; height: 100%; border: 3px solid #1D2340; border-radius: 18px;
+  overflow: hidden; background: #6FAE45; touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.count {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  display: flex; align-items: center; gap: 6px; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340;
+  border-radius: 999px; box-shadow: 3px 3px 0 #1D2340; padding: 2px 14px 2px 8px; font-weight: 800;
+  font-size: clamp(1rem, 2.4vw, 1.4rem); line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.count svg { width: 1.5em; height: 1.5em; flex: none; }
+.count.bump { animation: bump 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bump { 0% { transform: translateX(-50%) scale(1.6); } 100% { transform: translateX(-50%) scale(1); } }
+.hint, .cheer {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  background: var(--accent); color: #1D2340; border: 4px solid #1D2340; border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340; padding: 0.1rem 1rem 0.2rem; font-size: clamp(1.1rem, 3.4vw, 2rem);
+  font-weight: 800; white-space: nowrap;
+}
+.hint[hidden], .cheer[hidden] { display: none; }
+.cheer { top: 50%; bottom: auto; transform: translate(-50%, -50%); font-size: clamp(1.6rem, 6vw, 3.4rem); background: #FFFFFF; z-index: 3; padding: 0.1rem 1.4rem 0.25rem; }
+.cheer.go { animation: cheerPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes cheerPop { 0% { transform: translate(-50%, -50%) scale(0.2); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+/* Track levers (the other way to drive) */
+.lever {
+  position: absolute; z-index: 2; top: 64px; bottom: 14px; width: clamp(70px, 9vw, 96px);
+  background: rgba(29, 35, 64, 0.35); border: 3px solid #1D2340; border-radius: 999px; touch-action: none;
+}
+.lever[hidden] { display: none; }
+.lever.l { left: 10px; }
+.lever.r { right: 10px; }
+.lever .mid { position: absolute; left: 14%; right: 14%; top: 50%; height: 4px; margin-top: -2px; background: rgba(255, 255, 255, 0.7); border-radius: 2px; }
+.lever .ar { position: absolute; left: 50%; width: 34px; height: 34px; margin-left: -17px; pointer-events: none; }
+.lever .ar.up { top: 6px; }
+.lever .ar.dn { bottom: 6px; }
+.lever .knob {
+  position: absolute; left: 50%; top: 50%; width: 118%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  background: #FFC21A; border: 4px solid #1D2340; border-radius: 50%; box-shadow: 3px 3px 0 #1D2340; pointer-events: none;
+  display: grid; place-items: center; font-weight: 800; font-size: 0.9rem; color: #1D2340; line-height: 1;
+}
+
+/* Play-timer gauge */
+.fuel { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.fuel[hidden] { display: none; }
+.fuel-bar { width: clamp(70px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num[hidden] { display: none; }
+body.levers .fuel { left: calc(clamp(70px, 9vw, 96px) + 22px); }
+
+/* Big mode */
+.bigtoggle {
+  position: absolute; top: 10px; right: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0.1rem 0.85rem 0.1rem 0.6rem; font-size: 1rem; color: #1D2340; background: #FFFFFF;
+  border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; border-radius: 999px;
+}
+.bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.bigtoggle:active { box-shadow: 0 0 0 #1D2340; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.big header, body.big .panel { display: none; }
+body.big .wrap { max-width: none; padding: max(6px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
+body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- Panel: jobs list, drive mode, new field ---------- */
+.panel {
+  flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; padding: 8px 10px 10px;
+  background: var(--panel); border: 3px solid var(--edge); border-bottom-width: 0; border-radius: 24px 24px 0 0;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+.jobs { display: flex; gap: 6px; flex: 3 1 480px; min-width: 0; }
+.job {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 4px; min-height: 52px;
+  font: inherit; font-weight: 800; font-size: clamp(0.85rem, 2.2vw, 1.1rem); line-height: 1.05; text-align: left; color: #1D2340;
+  background: #FFF4D6; border: 3px solid #1D2340; border-radius: 16px; box-shadow: 3px 3px 0 #1D2340; cursor: pointer;
+}
+.job:active { transform: translate(3px, 3px); box-shadow: 0 0 0 #1D2340; }
+.job svg { width: 42px; height: 42px; flex: none; }
+.job .tick { display: none; }
+.job.done { background: #BFEBC9; }
+.job.done .tick { display: inline; }
+.ctrl { display: flex; gap: 8px; flex: 2 1 320px; min-width: 0; }
+.seg { display: flex; gap: 6px; flex: 2 1 0; min-width: 0; }
+.seg .btn { flex: 1 1 0; min-width: 0; padding: 0.2rem 0.4rem; white-space: nowrap; }
+.newbtn { flex: 1.2 1 0; min-width: 0; white-space: nowrap; padding: 0.2rem 0.5rem; background: #FFD9A8; }
+.newbtn.pulse { animation: pulse 1.1s ease-in-out infinite; background: var(--accent); color: #1D2340; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+body.ending .panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+body.ending .lever { pointer-events: none; opacity: 0.5; }
+
+/* ---------- Timer: toast, farewell ---------- */
+.toast {
+  position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 45;
+  background: var(--accent); color: #1D2340; border: 3px solid #1D2340; border-radius: 999px; padding: 0.3rem 1rem;
+  font-size: 1.3rem; font-weight: 800; white-space: nowrap; box-shadow: 3px 3px 0 #1D2340; opacity: 0;
+  transition: opacity 0.4s ease; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 22px;
+  padding: 10px 16px 12px; box-shadow: 4px 4px 0 #1D2340; text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; font-size: 1.3rem; min-height: 56px; padding: 0.4rem 1.2rem; }
+.goodbye[hidden] { display: none; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%; max-width: 460px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--panel);
+  color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 6px 6px 0 var(--edge); padding: 18px 18px 20px;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 18px 0 6px; font-size: 1.2rem; font-weight: 800; text-align: center; }
+.sheet h4 { margin: 12px 0 6px; font-size: 1.05rem; font-weight: 800; text-align: center; }
+.sheet .opt-txt { color: var(--muted); font-weight: 500; }
+.sheet .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.sheet .row .btn { flex: 0 0 calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
+.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 0; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.textin {
+  display: block; width: 100%; font: inherit; font-size: 1.1rem; color: var(--ink); background: var(--bg);
+  border: 3px solid var(--edge); border-radius: 14px; padding: 0.45rem 0.8rem; -webkit-user-select: text; user-select: text;
+}
+.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 1.05rem; cursor: pointer; }
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold { position: relative; overflow: hidden; -webkit-touch-callout: none; }
+.hold .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255, 201, 60, 0.75); }
+.hold .label { position: relative; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: 100%; max-width: 420px; max-height: 100%; overflow: hidden; background: var(--plate); color: #1D2340;
+  border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 16px 20px 22px; text-align: center;
+}
+.rest-art { display: block; width: min(62vw, 260px, 34vh); aspect-ratio: 1; height: auto; margin: 0 auto 6px; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next { margin: 14px auto 0; display: inline-block; background: var(--accent); border: 3px solid #1D2340; border-radius: 16px; padding: 0.4rem 1.1rem; font-size: 1.5rem; font-weight: 700; }
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px; height: 48px; border: 3px solid var(--edge); border-radius: 14px; background: var(--panel);
+  font-size: 1.3rem; cursor: pointer; opacity: 0.7; touch-action: none;
+}
+
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .homebtn, .mapbtn, .gubtn { min-height: 48px; font-size: 1.1rem; }
+  .app { gap: 12px; margin-top: 10px; }
+  .stage { padding: 10px; }
+  .panel { gap: 10px; padding: 12px 14px 14px; }
+  .job, .seg .btn, .newbtn { min-height: 62px; }
+  .seg .btn, .newbtn { font-size: 1.25rem; }
+  .job svg { width: 50px; height: 50px; }
+  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
+  .bigtoggle { top: 14px; right: 14px; min-height: 52px; font-size: 1.15rem; }
+  .lever { top: 80px; }
+}
+@media (max-width: 700px) {
+  header { gap: 6px; }
+  header h1 { font-size: 1.2rem; }
+  .badge span, .homebtn span { display: none; }
+  .badge { padding: 0 6px; }
+  .homebtn { padding: 2px 8px; }
+  .job { font-size: 0.85rem; padding: 2px 4px 2px 2px; gap: 3px; }
+  .job svg { width: 34px; height: 34px; }
+}
+@media (max-width: 480px) {
+  header h1 { display: none; }
+  .count { left: 8px; transform: none; padding: 2px 10px 2px 6px; }
+  .count.bump { animation: none; }
+  .fuel { top: 54px; }
+  body.levers .fuel { left: 8px; top: auto; bottom: 14px; left: 50%; transform: translateX(-50%); }
+  .lever { width: 60px; top: 60px; }
+  .lever .knob { width: 104%; font-size: 0.75rem; }
+  .gubtn { font-size: 0.9rem; padding: 0.2rem 0.5rem; }
+}
+/* Short landscape phones: controls in a column at the side. */
+.mini { display: none; }
+@media (orientation: landscape) and (max-height: 520px) {
+  header { display: none; }
+  .wrap { padding-top: 6px; }
+  .app { flex-direction: row; margin-top: 0; }
+  .stage { margin-bottom: 6px; }
+  .panel { flex: 0 0 210px; flex-direction: column; flex-wrap: nowrap; margin-bottom: 6px; border-bottom-width: 3px; border-radius: 20px; padding: 6px; gap: 5px; }
+  .jobs { flex-direction: column; flex: 1 1 auto; gap: 4px; }
+  .job { min-height: 0; font-size: 0.85rem; }
+  .job svg { width: 28px; height: 28px; }
+  .ctrl { flex: 0 0 auto; flex-direction: column; gap: 5px; }
+  .seg .btn, .newbtn { min-height: 40px; font-size: 0.95rem; flex: 1 1 auto; }
+  .mini { display: flex; gap: 5px; }
+  .mini a { flex: 1 1 0; justify-content: center; min-height: 38px; font-size: 0.9rem; padding: 2px 4px; }
+  .mini a span { display: inline; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .cheer.go, .count.bump, .newbtn.pulse { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="mapbtn" href="./" aria-label="Back to the site map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Site map</span></a>
+    <h1>Bulldozer</h1>
+    <span class="spacer"></span>
+    <span class="badge" title="Hard hat is on"><svg viewBox="0 0 34 28" aria-hidden="true"><path d="M5 20 C5 8 29 8 29 20 Z" fill="#FFC21A" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 8.5 V20" stroke="#1D2340" stroke-width="2"/><rect x="2" y="19" width="30" height="5" rx="2.5" fill="#FFC21A" stroke="#1D2340" stroke-width="2.5"/></svg><span>Hard hat on</span></span>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn gubtn" data-action="timer" id="timerbtn">Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage">
+      <div class="scene" id="scene">
+        <canvas id="cv" role="img" aria-label="A dirt field with a big yellow bulldozer"></canvas>
+        <div class="count" id="count"><svg viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0-10.5 3.1-3.6 10.4-3.2 4.8 1.6 6.6 9 0 5 -6.6 9 -4.8 1.6 -10.4-3.2 -3.1-3.6Z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span>Jobs done: <b id="countNum">0</b></span></div>
+        <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+        <div class="lever l" id="leverL" hidden><div class="mid"></div><svg class="ar up" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="ar dn" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="knob">Left</div></div>
+        <div class="lever r" id="leverR" hidden><div class="mid"></div><svg class="ar up" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="ar dn" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="knob">Right</div></div>
+        <div class="hint" id="hint" hidden></div>
+        <div class="cheer" id="cheer" hidden></div>
+        <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
+      </div>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to park</p>
+        <button class="btn goodbye" id="goodbyeBtn">Beep beep!</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="mini">
+        <a class="mapbtn" href="./" aria-label="Back to the site map"><span>Site map</span></a>
+        <a class="homebtn" href="../" aria-label="Back to Toybox"><span>Home</span></a>
+        <button class="btn gubtn" data-action="timer" style="min-height:38px;font-size:0.9rem;padding:0 6px">Grown-ups</button>
+      </div>
+      <div class="jobs" id="jobs">
+        <button class="job" data-job="hole"><svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="27" rx="19" ry="13" fill="#B08257" stroke="#1D2340" stroke-width="3"/><ellipse cx="24" cy="29" rx="12" ry="7.5" fill="#5A3A22"/><circle cx="24" cy="27" r="20.5" fill="none" stroke="#FF7A1A" stroke-width="2.5" stroke-dasharray="5 4"/></svg><span>Fill the hole <span class="tick">✓</span></span></button>
+        <button class="job" data-job="pile"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 40 Q16 12 24 12 Q32 12 43 40 Z" fill="#C79461" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M33 40 V6" stroke="#1D2340" stroke-width="3"/><path d="M33 6 L45 10 L33 14 Z" fill="#E63946" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/></svg><span>Make a pile <span class="tick">✓</span></span></button>
+        <button class="job" data-job="flat"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M3 30 Q8 20 13 28 Q18 18 24 28 Q30 21 35 28 Q40 19 45 30 V40 H3 Z" fill="#C79461" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M6 13 H42" stroke="#2E9E5B" stroke-width="4" stroke-linecap="round"/><path d="M36 8 L42 13 L36 18" fill="none" stroke="#2E9E5B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Make it flat <span class="tick">✓</span></span></button>
+      </div>
+      <div class="ctrl">
+        <div class="seg">
+          <button class="btn" data-mode="finger" aria-pressed="true">Drag</button>
+          <button class="btn" data-mode="levers" aria-pressed="false">Levers</button>
+        </div>
+        <button class="btn newbtn" id="newField">New field</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <h2 id="sheetTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">One timer for the whole site. When time is up, the bulldozer stops and parks, and the controls lock.</p>
+        <h4>How long</h4>
+        <div class="row" id="minuteRow"></div>
+        <h4>Next activity <span class="opt-txt">(optional)</span></h4>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Beep beep button to press</label>
+        <div class="sheet-actions"><button class="btn primary" id="timerStart">Start timer</button></div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+      <hr>
+      <h3>Sound</h3>
+      <p class="sub" id="soundState">Sound is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Hold to turn sound on</span></button>
+      </div>
+      <div class="sheet-actions"><button class="btn" data-action="timerclose">Close</button></div>
+    </div>
+  </div>
+
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <svg class="rest-art" id="restArt" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The site is resting.</p>
+      <p class="rest-line">The machines will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  // Gear-up once per visit: without the hard hat, go to the site gate first.
+  var gearOn = true;
+  try { gearOn = sessionStorage.getItem("site-gear") === "on"; } catch (e) { gearOn = true; }
+  if (!gearOn) { location.replace("./?next=bulldozer"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  var TAU = Math.PI * 2;
+  var OUT = "#1D2340";
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DKEY = "site-dozer-v1";
+
+  // ---------- Field model ----------
+  // The field is a grid of cells. Each cell has hard ground (base, below 0 in the hole) and a
+  // layer of loose dirt on top. Heights are in cell units, so slopes compare directly.
+  var LONG = 104;          // cells along the long side of the field
+  var TP = 4;              // texture pixels per cell
+  var REPOSE = 0.9;        // steepest allowed step between neighbour cells before dirt slides
+  var CUT = 0;             // the blade scrapes loose dirt down to this level
+  var BL = 9, BW = 7.6;    // blade distance ahead of the dozer centre, and half its width
+  var GAUGE = 9.4;         // distance between the two tracks
+  var MAXV = 13, MAXW = 2.1;
+
+  var GW = 0, GH = 0, N = 0, base, dirt, blk, gxA, gyA, noiseA, pebA, markA, tex, tctx, img, TW, TH;
+  var jobs = [];
+  var frameNo = 1;
+  var dz = { x: 20, y: 20, a: 0, v: 0, w: 0, tl: 0, tr: 0, lift: 0, load: 0 };
+  var target = null;
+  var mode = "finger";
+  var lev = { l: 0, r: 0 };
+  var jobsDone = 0;
+  var dirtyBox = null, settleBox = null;
+  var particles = [];
+  var ending = false, coastOnly = false;
+  var fieldChanged = false;
+  var hinted = false;
+
+  function idx(i, j) { return j * GW + i; }
+  function addBox(b, x0, y0, x1, y1) {
+    if (!b) return { x0: x0, y0: y0, x1: x1, y1: y1 };
+    if (x0 < b.x0) b.x0 = x0; if (y0 < b.y0) b.y0 = y0; if (x1 > b.x1) b.x1 = x1; if (y1 > b.y1) b.y1 = y1;
+    return b;
+  }
+  function markDirty(i, j) { dirtyBox = addBox(dirtyBox, i, j, i, j); }
+
+  function alloc(w, h) {
+    GW = w; GH = h; N = w * h;
+    base = new Float32Array(N); dirt = new Float32Array(N); blk = new Uint32Array(N);
+    gxA = new Float32Array(N); gyA = new Float32Array(N);
+    TW = GW * TP; TH = GH * TP;
+    noiseA = new Int8Array(TW * TH); pebA = new Uint8Array(TW * TH); markA = new Uint8Array(TW * TH);
+    for (var p = 0; p < noiseA.length; p++) noiseA[p] = Math.round((Math.random() + Math.random() - 1) * 100);
+    var peb = Math.round(TW * TH * 0.004);
+    for (var q = 0; q < peb; q++) {
+      var px = 1 + Math.floor(Math.random() * (TW - 3)), py = 1 + Math.floor(Math.random() * (TH - 3)), big = Math.random() < 0.35;
+      pebA[py * TW + px] = 1; if (big) { pebA[py * TW + px + 1] = 1; pebA[(py + 1) * TW + px] = 1; }
+      var sx = px + (big ? 2 : 1), sy = py + (big ? 2 : 1);
+      if (sy < TH && sx < TW) { pebA[sy * TW + sx - 1] = 2; pebA[sy * TW + sx] = 2; pebA[(sy - 1) * TW + sx] = 2; }
+    }
+    tex = document.createElement("canvas"); tex.width = TW; tex.height = TH;
+    tctx = tex.getContext("2d");
+    img = tctx.createImageData(TW, TH);
+  }
+
+  function holeBase() {
+    var h = jobByType("hole");
+    for (var k = 0; k < N; k++) base[k] = 0;
+    if (!h) return;
+    var R = h.R, D = h.D;
+    for (var j = Math.max(0, Math.floor(h.y - R)); j <= Math.min(GH - 1, Math.ceil(h.y + R)); j++) {
+      for (var i = Math.max(0, Math.floor(h.x - R)); i <= Math.min(GW - 1, Math.ceil(h.x + R)); i++) {
+        var dx = i + 0.5 - h.x, dy = j + 0.5 - h.y, r = Math.sqrt(dx * dx + dy * dy) / R;
+        if (r < 1) base[idx(i, j)] = -D * Math.pow(1 - r * r, 0.7);
+      }
+    }
+  }
+  function mound(cx, cy, R, H) {
+    for (var j = Math.max(0, Math.floor(cy - R)); j <= Math.min(GH - 1, Math.ceil(cy + R)); j++) {
+      for (var i = Math.max(0, Math.floor(cx - R)); i <= Math.min(GW - 1, Math.ceil(cx + R)); i++) {
+        var dx = i + 0.5 - cx, dy = j + 0.5 - cy, r = Math.sqrt(dx * dx + dy * dy) / R;
+        if (r < 1) dirt[idx(i, j)] += H * Math.pow(1 - r * r, 1.5) * (0.88 + Math.random() * 0.24);
+      }
+    }
+  }
+  function jobByType(t) { for (var i = 0; i < jobs.length; i++) if (jobs[i].type === t) return jobs[i]; return null; }
+
+  function fieldDims() {
+    var r = $("scene").getBoundingClientRect();
+    var asp = r.width > 10 && r.height > 10 ? r.width / r.height : 1.4;
+    if (asp >= 1) return [LONG, clamp(Math.round(LONG / asp), 44, LONG)];
+    return [clamp(Math.round(LONG * asp), 44, LONG), LONG];
+  }
+
+  function newField() {
+    var d = fieldDims();
+    alloc(d[0], d[1]);
+    var placed = [];
+    function spot(rad) {
+      for (var t = 0; t < 600; t++) {
+        var x = rand(rad + 2, GW - rad - 2), y = rand(Math.min(rad + 9, GH / 2), GH - rad - 2), ok = true;
+        for (var k = 0; k < placed.length; k++) {
+          var p = placed[k], dd = Math.hypot(p.x - x, p.y - y);
+          if (dd < p.r + rad + (t < 300 ? 3 : 0)) { ok = false; break; }
+        }
+        if (ok) { placed.push({ x: x, y: y, r: rad }); return { x: x, y: y }; }
+      }
+      var f = { x: rand(rad, GW - rad), y: rand(rad, GH - rad) }; placed.push({ x: f.x, y: f.y, r: rad }); return f;
+    }
+    var short = Math.min(GW, GH);
+    var flatW = Math.round(short * 0.34), flatH = Math.round(short * 0.26);
+    var fz = spot(Math.hypot(flatW, flatH) / 2);
+    var hz = spot(8.5), pz = spot(9.5), st = spot(10);
+    var piles = [spot(9), spot(8.5)];
+    jobs = [
+      { type: "hole", x: hz.x, y: hz.y, R: 7, D: 2.4, done: false },
+      { type: "pile", x: pz.x, y: pz.y, R: 8, init: 0, target: 0, frac: 0, done: false },
+      { type: "flat", x: fz.x, y: fz.y, w: flatW, h: flatH, done: false }
+    ];
+    holeBase();
+    // A thin uneven layer of loose dirt everywhere.
+    for (var b = 0; b < 30; b++) mound(rand(0, GW), rand(0, GH), rand(6, 14), rand(0.12, 0.4));
+    // Big dirt piles to push.
+    piles.forEach(function (p) { mound(p.x, p.y, rand(8, 9.5), rand(3.6, 4.6)); });
+    // Bumps in the flat zone.
+    var fj = jobs[2], nb = 7 + Math.floor(Math.random() * 4);
+    for (var m = 0; m < nb; m++) mound(fj.x + rand(-0.4, 0.4) * fj.w, fj.y + rand(-0.4, 0.4) * fj.h, rand(2.5, 4.5), rand(1.3, 2.6));
+    for (var k = 0; k < N; k++) if (base[k] < 0) dirt[k] = 0;
+    slump(0, 0, GW - 1, GH - 1, 30);
+    var pj = jobs[1];
+    pj.init = zoneVolume(pj); pj.target = pj.init + 70;
+    dz.x = st.x; dz.y = st.y; dz.a = Math.atan2(GH / 2 - st.y, GW / 2 - st.x); dz.v = 0; dz.w = 0; dz.lift = 0;
+    target = null; particles = []; settleBox = null;
+    renderBox(0, 0, GW - 1, GH - 1);
+    fieldChanged = true;
+    updateJobsUI();
+    $("newField").classList.remove("pulse");
+  }
+
+  // ---------- Dirt simulation ----------
+  var NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [-1, -1, 1.414], [1, -1, 1.414], [-1, 1, 1.414]];
+  // Let dirt that is too steep slide downhill (only inside the given box). Returns the box where dirt moved.
+  function slump(x0, y0, x1, y1, iters) {
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(GW - 1, x1); y1 = Math.min(GH - 1, y1);
+    var moved = null;
+    for (var it = 0; it < iters; it++) {
+      var fwd = ((frameNo + it) & 1) === 0;
+      for (var jj = y0; jj <= y1; jj++) {
+        var j = fwd ? jj : y1 - (jj - y0);
+        for (var ii = x0; ii <= x1; ii++) {
+          var i = fwd ? ii : x1 - (ii - x0);
+          var k = j * GW + i, d = dirt[k];
+          if (d <= 0.0005) continue;
+          var s = base[k] + d;
+          for (var n = 0; n < 8; n++) {
+            var o = NB[(n + it) & 7], ni = i + o[0], nj = j + o[1];
+            if (ni < 0 || nj < 0 || ni >= GW || nj >= GH) continue;
+            var nk = nj * GW + ni;
+            if (blk[nk] === frameNo) continue;
+            var thr = REPOSE * o[2], diff = s - base[nk] - dirt[nk];
+            if (diff > thr) {
+              var mv = (diff - thr) * 0.2;
+              if (mv > d) mv = d;
+              d -= mv; s -= mv; dirt[nk] += mv;
+              if (mv > 0.004) {
+                moved = addBox(moved, Math.min(i, ni), Math.min(j, nj), Math.max(i, ni), Math.max(j, nj));
+                if (mv > 0.05) clearMarks(ni, nj);
+              }
+              if (d <= 0.0005) break;
+            }
+          }
+          dirt[k] = d;
+        }
+      }
+    }
+    if (moved) dirtyBox = addBox(dirtyBox, moved.x0, moved.y0, moved.x1, moved.y1);
+    return moved;
+  }
+  function clearMarks(i, j) {
+    var p0 = j * TP * TW + i * TP;
+    for (var y = 0; y < TP; y++) for (var x = 0; x < TP; x++) markA[p0 + y * TW + x] = 0;
+  }
+
+  // The blade footprint: mark its cells as walls for the slide step and, when the blade is down
+  // and moving, scrape loose dirt off them and drop it just in front of the blade.
+  function blade(scrape) {
+    var fx = Math.cos(dz.a), fy = Math.sin(dz.a), rx = -fy, ry = fx;
+    var bx = dz.x + fx * BL, by = dz.y + fy * BL;
+    var ext = BW + 2;
+    var x0 = Math.max(0, Math.floor(bx - ext)), x1 = Math.min(GW - 1, Math.ceil(bx + ext));
+    var y0 = Math.max(0, Math.floor(by - ext)), y1 = Math.min(GH - 1, Math.ceil(by + ext));
+    var moved = 0;
+    for (var j = y0; j <= y1; j++) {
+      for (var i = x0; i <= x1; i++) {
+        var dx = i + 0.5 - dz.x, dy = j + 0.5 - dz.y;
+        var u = dx * fx + dy * fy, v = dx * rx + dy * ry;
+        if (u < BL - 1.4 || u > BL + 0.6 || v < -BW || v > BW) continue;
+        var k = j * GW + i;
+        blk[k] = frameNo;
+        if (!scrape) continue;
+        var d = dirt[k], s = base[k] + d;
+        if (d <= 0.001 || s <= CUT) continue;
+        var rem = Math.min(d, s - CUT);
+        var tx = dz.x + fx * (BL + 1.6) + rx * v, ty = dz.y + fy * (BL + 1.6) + ry * v;
+        var ti = clamp(Math.floor(tx), 0, GW - 1), tj = clamp(Math.floor(ty), 0, GH - 1);
+        var tu = (ti + 0.5 - dz.x) * fx + (tj + 0.5 - dz.y) * fy;
+        if (tu < BL + 0.7) continue; // pushed against the edge: the dirt stays put
+        var tk = tj * GW + ti;
+        dirt[k] = d - rem; dirt[tk] += rem; moved += rem;
+        clearMarks(i, j); clearMarks(ti, tj);
+        markDirty(i, j); markDirty(ti, tj);
+      }
+    }
+    return { moved: moved, box: { x0: x0 - 6, y0: y0 - 6, x1: x1 + 6, y1: y1 + 6 } };
+  }
+
+  // Track marks behind each track (cleat stripes), stamped into the texture-resolution mark map.
+  var lastRear = null;
+  function stampTracks() {
+    var fx = Math.cos(dz.a), fy = Math.sin(dz.a), rx = -fy, ry = fx;
+    var rear = [];
+    for (var s = -1; s <= 1; s += 2) rear.push({ x: dz.x - fx * 6.2 + rx * s * GAUGE / 2, y: dz.y - fy * 6.2 + ry * s * GAUGE / 2, dist: s < 0 ? dz.tl : dz.tr });
+    if (lastRear) {
+      for (var t = 0; t < 2; t++) {
+        var a = lastRear[t], b = rear[t];
+        var len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 0.001 || len > 4) continue;
+        var steps = Math.ceil(len * TP * 1.5);
+        for (var q = 1; q <= steps; q++) {
+          var f = q / steps, cx = a.x + (b.x - a.x) * f, cy = a.y + (b.y - a.y) * f;
+          var dist = a.dist + (b.dist - a.dist) * f;
+          var cleat = (((dist % 1.1) + 1.1) % 1.1) < 0.45;
+          var val = cleat ? 210 : 120;
+          for (var w = -1.3; w <= 1.3; w += 0.5 / TP) {
+            var px = Math.floor((cx + rx * w) * TP), py = Math.floor((cy + ry * w) * TP);
+            if (px < 0 || py < 0 || px >= TW || py >= TH) continue;
+            var edge = Math.abs(w) > 1.05 ? 0.55 : 1;
+            var p = py * TW + px, nv = Math.round(val * edge);
+            if (markA[p] < nv) markA[p] = nv;
+          }
+          markDirty(Math.floor(cx - 1.5), Math.floor(cy - 1.5)); markDirty(Math.ceil(cx + 1.5), Math.ceil(cy + 1.5));
+        }
+      }
+    }
+    lastRear = rear;
+  }
+
+  // ---------- Dirt texture ----------
+  function renderBox(x0, y0, x1, y1) {
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(GW - 1, x1); y1 = Math.min(GH - 1, y1);
+    if (x1 < x0 || y1 < y0) return;
+    var i, j, k;
+    for (j = Math.max(0, y0 - 1); j <= Math.min(GH - 1, y1 + 1); j++) {
+      for (i = Math.max(0, x0 - 1); i <= Math.min(GW - 1, x1 + 1); i++) {
+        k = j * GW + i;
+        var il = i > 0 ? k - 1 : k, ir = i < GW - 1 ? k + 1 : k, ju = j > 0 ? k - GW : k, jd = j < GH - 1 ? k + GW : k;
+        gxA[k] = (base[ir] + dirt[ir] - base[il] - dirt[il]) / (ir - il || 1);
+        gyA[k] = (base[jd] + dirt[jd] - base[ju] - dirt[ju]) / ((jd - ju) / GW || 1);
+      }
+    }
+    var data = img.data;
+    var px0 = x0 * TP, px1 = (x1 + 1) * TP - 1, py0 = y0 * TP, py1 = (y1 + 1) * TP - 1;
+    for (var py = py0; py <= py1; py++) {
+      var fy = (py + 0.5) / TP - 0.5, j0 = Math.floor(fy);
+      if (j0 < 0) j0 = 0; if (j0 > GH - 2) j0 = GH - 2;
+      var ty = fy - j0; if (ty < 0) ty = 0; if (ty > 1) ty = 1;
+      for (var px = px0; px <= px1; px++) {
+        var fx = (px + 0.5) / TP - 0.5, i0 = Math.floor(fx);
+        if (i0 < 0) i0 = 0; if (i0 > GW - 2) i0 = GW - 2;
+        var tx = fx - i0; if (tx < 0) tx = 0; if (tx > 1) tx = 1;
+        var k00 = j0 * GW + i0, k10 = k00 + 1, k01 = k00 + GW, k11 = k01 + 1;
+        var w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+        var dd = dirt[k00] * w00 + dirt[k10] * w10 + dirt[k01] * w01 + dirt[k11] * w11;
+        var bb = base[k00] * w00 + base[k10] * w10 + base[k01] * w01 + base[k11] * w11;
+        var gx = gxA[k00] * w00 + gxA[k10] * w10 + gxA[k01] * w01 + gxA[k11] * w11;
+        var gy = gyA[k00] * w00 + gyA[k10] * w10 + gyA[k01] * w01 + gyA[k11] * w11;
+        var s = bb + dd;
+        var loose = dd > 0.5 ? 1 : (dd < 0 ? 0 : dd * 2);
+        // packed ground -> loose dirt colour
+        var r = 150 + 30 * loose, g = 113 + 17 * loose, b = 76 + 4 * loose;
+        var hl = 1 + (s > 5 ? 5 : (s < -3 ? -3 : s)) * 0.045;
+        if (s < 0) hl += s * 0.05;
+        var sh = 1 + (gx + gy) * 0.5;
+        if (sh < 0.55) sh = 0.55; else if (sh > 1.45) sh = 1.45;
+        var p = py * TW + px;
+        var mul = hl * sh * (1 - markA[p] * 0.0014);
+        var pb = pebA[p];
+        if (pb === 1) { r = 196; g = 186; b = 168; mul = sh * (0.9 + hl * 0.1); }
+        else if (pb === 2) { mul *= 0.72; }
+        var gr = noiseA[p] * (0.06 + 0.1 * loose);
+        var o = p * 4;
+        data[o] = r * mul + gr; data[o + 1] = g * mul + gr * 0.85; data[o + 2] = b * mul + gr * 0.6; data[o + 3] = 255;
+      }
+    }
+    tctx.putImageData(img, 0, 0, px0, py0, px1 - px0 + 1, py1 - py0 + 1);
+  }
+
+  // ---------- Jobs ----------
+  function zoneVolume(z) {
+    var v = 0, R = z.R;
+    for (var j = Math.max(0, Math.floor(z.y - R)); j <= Math.min(GH - 1, Math.ceil(z.y + R)); j++)
+      for (var i = Math.max(0, Math.floor(z.x - R)); i <= Math.min(GW - 1, Math.ceil(z.x + R)); i++) {
+        var dx = i + 0.5 - z.x, dy = j + 0.5 - z.y;
+        if (dx * dx + dy * dy <= R * R) v += dirt[j * GW + i];
+      }
+    return v;
+  }
+  function checkJobs() {
+    jobs.forEach(function (z) {
+      if (z.done) return;
+      var ok = false;
+      if (z.type === "hole") {
+        var cnt = 0, good = 0, sum = 0;
+        for (var j = Math.max(0, Math.floor(z.y - z.R)); j <= Math.min(GH - 1, Math.ceil(z.y + z.R)); j++)
+          for (var i = Math.max(0, Math.floor(z.x - z.R)); i <= Math.min(GW - 1, Math.ceil(z.x + z.R)); i++) {
+            var k = j * GW + i;
+            if (base[k] < -0.3) { cnt++; var s = base[k] + dirt[k]; sum += s; if (s >= -0.35) good++; }
+          }
+        z.frac = cnt ? good / cnt : 1;
+        ok = cnt > 0 && good >= cnt * 0.92 && sum / cnt >= -0.25;
+      } else if (z.type === "pile") {
+        z.frac = clamp((zoneVolume(z) - z.init) / (z.target - z.init), 0, 1);
+        ok = z.frac >= 1;
+      } else if (z.type === "flat") {
+        var mx = -99, mn = 99;
+        for (var jj = Math.max(0, Math.floor(z.y - z.h / 2)); jj <= Math.min(GH - 1, Math.floor(z.y + z.h / 2)); jj++)
+          for (var ii = Math.max(0, Math.floor(z.x - z.w / 2)); ii <= Math.min(GW - 1, Math.floor(z.x + z.w / 2)); ii++) {
+            var ss = base[jj * GW + ii] + dirt[jj * GW + ii];
+            if (ss > mx) mx = ss; if (ss < mn) mn = ss;
+          }
+        ok = mx <= 0.9 && mx - mn <= 1.1;
+      }
+      if (ok) jobDone(z);
+    });
+  }
+  var CHEERS = { hole: "Hole filled!", pile: "Big pile!", flat: "Nice and flat!" };
+  function jobDone(z) {
+    z.done = true; z.doneAt = performance.now();
+    jobsDone++;
+    saveState();
+    $("countNum").textContent = String(jobsDone);
+    var c = $("count"); c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
+    var all = jobs.every(function (q) { return q.done; });
+    cheer(all ? "All jobs done!" : CHEERS[z.type]);
+    if (all) $("newField").classList.add("pulse");
+    burst(z.x, z.y, 40, true);
+    chime(all);
+    updateJobsUI();
+  }
+  var cheerTimer = null;
+  function cheer(text) {
+    var el = $("cheer");
+    el.textContent = text; el.hidden = false;
+    el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
+    clearTimeout(cheerTimer);
+    cheerTimer = setTimeout(function () { el.hidden = true; }, 2200);
+  }
+  function updateJobsUI() {
+    Array.prototype.forEach.call(document.querySelectorAll(".job"), function (b) {
+      var z = jobByType(b.dataset.job);
+      b.classList.toggle("done", !!(z && z.done));
+    });
+  }
+  var flashJob = null, flashAt = 0;
+
+  // ---------- Particles ----------
+  function burst(x, y, n, party) {
+    if (reduceMotion) n = Math.ceil(n / 3);
+    var cols = ["#FFC93C", "#FF7A1A", "#2E9E5B", "#3A86FF", "#E63946", "#FFFFFF"];
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, TAU), sp = rand(8, 26);
+      particles.push({ k: party ? "star" : "clod", x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: rand(0.8, 1.5), sz: rand(0.9, 1.8), col: cols[i % cols.length], rot: rand(0, TAU) });
+    }
+  }
+  function clods(n) {
+    var fx = Math.cos(dz.a), fy = Math.sin(dz.a), rx = -fy, ry = fx;
+    for (var i = 0; i < n; i++) {
+      var side = Math.random() < 0.5 ? -1 : 1, along = rand(0.75, 1.05) * BW * side;
+      var x = dz.x + fx * (BL + 1.6) + rx * along, y = dz.y + fy * (BL + 1.6) + ry * along;
+      var sp = rand(2, 7);
+      particles.push({ k: "clod", x: x, y: y, vx: fx * dz.v * 0.6 + rx * side * sp, vy: fy * dz.v * 0.6 + ry * side * sp, life: 0, max: rand(0.35, 0.7), sz: rand(0.35, 0.8), col: Math.random() < 0.5 ? "#8E6239" : "#B48252" });
+    }
+  }
+  function smoke(n, strong) {
+    var fx = Math.cos(dz.a), fy = Math.sin(dz.a), rx = -fy, ry = fx;
+    var sx = dz.x + fx * 1.4 - rx * 2.1, sy = dz.y + fy * 1.4 - ry * 2.1;
+    for (var i = 0; i < n; i++) particles.push({ k: "smoke", x: sx, y: sy, vx: rand(-1, 1) + 2.5, vy: rand(-1, 1) - 3, life: 0, max: rand(0.9, 1.5) * (strong ? 1.4 : 1), sz: rand(0.6, 1.0) * (strong ? 1.5 : 1) });
+  }
+  function stepParticles(dt) {
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.life += dt;
+      if (p.life >= p.max) { particles.splice(i, 1); continue; }
+      var drag = p.k === "smoke" ? 0.6 : 3;
+      p.vx *= Math.exp(-drag * dt); p.vy *= Math.exp(-drag * dt);
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.rot !== undefined) p.rot += dt * 4;
+    }
+    if (particles.length > 400) particles.splice(0, particles.length - 400);
+  }
+
+  // ---------- Driving ----------
+  function wrapA(a) { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; }
+  var smokeAcc = 0, clodAcc = 0;
+  function drive(dt) {
+    var wantV = 0, wantW = 0;
+    if (!ending && mode === "finger" && target) {
+      var dx = target.x - dz.x, dy = target.y - dz.y, dist = Math.hypot(dx, dy);
+      if (dist < 1.4 && !target.held) { target = null; }
+      else if (dist >= 1.4) {
+        var ang = wrapA(Math.atan2(dy, dx) - dz.a);
+        if (Math.abs(ang) > 2.25 && dist < 26) {
+          var ar = wrapA(ang - Math.PI);
+          wantW = clamp(ar * 3.5, -MAXW, MAXW);
+          wantV = Math.abs(ar) < 0.9 ? -MAXV * 0.65 * clamp(dist / 6, 0.25, 1) * Math.cos(ar) : 0;
+        } else {
+          wantW = clamp(ang * 3.5, -MAXW, MAXW);
+          wantV = Math.abs(ang) < 1.0 ? MAXV * clamp(dist / 7, 0.25, 1) * Math.pow(Math.cos(ang), 2) : 0;
+        }
+      }
+    } else if (!ending && mode === "levers") {
+      var vl = lev.l * MAXV, vr = lev.r * MAXV;
+      wantV = (vl + vr) / 2;
+      wantW = clamp((vl - vr) / GAUGE, -MAXW, MAXW);
+    }
+    // A heavy load slows the dozer a little.
+    var slow = 1 / (1 + dz.load * 0.004);
+    wantV *= slow;
+    var acc = 26 * dt;
+    dz.v += clamp(wantV - dz.v, -acc, acc);
+    dz.w += clamp(wantW - dz.w, -6 * dt, 6 * dt);
+    dz.lift += clamp((dz.v < -0.2 ? 1 : 0) - dz.lift, -3 * dt, 3 * dt);
+    var dist2 = Math.abs(dz.v * dt), rot = Math.abs(dz.w * dt);
+    var steps = Math.max(1, Math.ceil(Math.max(dist2 / 0.35, rot / 0.05)));
+    var moved = 0;
+    for (var s = 0; s < steps; s++) {
+      var h = dt / steps;
+      dz.a = wrapA(dz.a + dz.w * h);
+      dz.x = clamp(dz.x + Math.cos(dz.a) * dz.v * h, 3, GW - 3);
+      dz.y = clamp(dz.y + Math.sin(dz.a) * dz.v * h, 3, GH - 3);
+      dz.tl += (dz.v + dz.w * GAUGE / 2) * h;
+      dz.tr += (dz.v - dz.w * GAUGE / 2) * h;
+      var scrape = dz.lift < 0.5 && (Math.abs(dz.v) > 0.05 || Math.abs(dz.w) > 0.05);
+      var res = blade(scrape);
+      moved += res.moved;
+      settleBox = addBox(settleBox, res.box.x0, res.box.y0, res.box.x1, res.box.y1);
+    }
+    if (Math.abs(dz.v) > 0.05 || Math.abs(dz.w) > 0.05) { stampTracks(); fieldChanged = true; }
+    else lastRear = null;
+    dz.load = dz.load * 0.9 + moved * 0.1 * 60 * dt * 10;
+    var spd = Math.min(1, Math.abs(dz.v) / MAXV + Math.abs(dz.w) / MAXW * 0.5);
+    smokeAcc += dt * (spd > 0.05 ? 3 + spd * 6 : 0.6);
+    while (smokeAcc > 1) { smokeAcc -= 1; smoke(1); }
+    clodAcc += moved * 0.6;
+    while (clodAcc > 1) { clodAcc -= 1; clods(1); }
+    return spd;
+  }
+
+  // ---------- Drawing ----------
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var dpr = 1, CW = 0, CH = 0, S = 1, OX = 0, OY = 0;
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    CW = Math.max(1, r.width); CH = Math.max(1, r.height);
+    cv.width = Math.round(CW * dpr); cv.height = Math.round(CH * dpr);
+    layout();
+  }
+  function layout() {
+    if (!GW) return;
+    S = Math.min(CW / GW, CH / GH);
+    OX = (CW - GW * S) / 2; OY = (CH - GH * S) / 2;
+  }
+  function rr(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
+    c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r); c.lineTo(x + r, y + h);
+    c.arcTo(x, y + h, x, y + h - r, r); c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r); c.closePath();
+  }
+  function sign(x, y, text, done) {
+    var fs = clamp(S * 2.6, 13, 26);
+    ctx.font = "800 " + fs + "px " + "\"Baloo 2\", \"Trebuchet MS\", sans-serif";
+    var w = ctx.measureText(text).width + fs * 0.9, h = fs * 1.35;
+    var sx = OX + x * S - w / 2, sy = OY + y * S - h / 2;
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; rr(ctx, sx + 3, sy + 3, w, h, 8); ctx.fill();
+    ctx.fillStyle = done ? "#5FD07A" : "#FFC93C"; rr(ctx, sx, sy, w, h, 8); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = OUT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(text, sx + w / 2, sy + h / 2 + fs * 0.06);
+  }
+  function cone(x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = "#FF7A1A"; ctx.fill(); ctx.lineWidth = 0.28; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = r * 0.22; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 0.3, 0, TAU); ctx.fillStyle = "#FF9A44"; ctx.fill(); ctx.lineWidth = 0.2; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  function drawJobs(now) {
+    jobs.forEach(function (z) {
+      var flash = flashJob === z.type && now - flashAt < 1600 ? 0.5 + 0.5 * Math.sin((now - flashAt) / 90) : 0;
+      ctx.save();
+      ctx.translate(OX, OY); ctx.scale(S, S);
+      var col = z.done ? "#2E9E5B" : "#FF7A1A";
+      if (z.type === "hole") {
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.R + 0.9, 0, TAU);
+        ctx.setLineDash(z.done ? [] : [1.6, 1.1]); ctx.lineWidth = 0.55 + flash * 0.6; ctx.strokeStyle = col; ctx.stroke(); ctx.setLineDash([]);
+      } else if (z.type === "pile") {
+        for (var c = 0; c < 9; c++) { var a = c / 9 * TAU + 0.3; cone(z.x + Math.cos(a) * (z.R + 1.2), z.y + Math.sin(a) * (z.R + 1.2), 0.95 + flash * 0.3); }
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.R, 0, TAU); ctx.setLineDash([0.9, 1.1]); ctx.lineWidth = 0.3; ctx.strokeStyle = z.done ? col : "rgba(255,255,255,0.75)"; ctx.stroke(); ctx.setLineDash([]);
+      } else {
+        var x0 = z.x - z.w / 2, y0 = z.y - z.h / 2, L = Math.min(z.w, z.h) * 0.28;
+        ctx.setLineDash([1.2, 1]); ctx.lineWidth = 0.28; ctx.strokeStyle = z.done ? col : "rgba(255,255,255,0.7)"; ctx.strokeRect(x0, y0, z.w, z.h); ctx.setLineDash([]);
+        [[x0, y0, 1, 1], [x0 + z.w, y0, -1, 1], [x0, y0 + z.h, 1, -1], [x0 + z.w, y0 + z.h, -1, -1]].forEach(function (k) {
+          ctx.beginPath(); ctx.moveTo(k[0] + k[2] * L, k[1]); ctx.lineTo(k[0], k[1]); ctx.lineTo(k[0], k[1] + k[3] * L);
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          ctx.lineWidth = 1.5 + flash * 0.6; ctx.strokeStyle = OUT; ctx.stroke();
+          ctx.lineWidth = 1.0 + flash * 0.6; ctx.strokeStyle = z.done ? "#5FD07A" : "#FFC93C"; ctx.stroke();
+        });
+      }
+      ctx.restore();
+    });
+    // Flag for the pile job: it rises as the pile grows.
+    var pj = jobByType("pile");
+    if (pj) {
+      var fxp = OX + (pj.x + pj.R * 0.72) * S, base0 = OY + (pj.y - pj.R * 0.72) * S, poleH = Math.max(40, S * 9);
+      var fr = pj.done ? 1 : (pj.frac || 0);
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(fxp + 4, base0 + 3); ctx.lineTo(fxp + 4 + poleH * 0.3, base0 + 3 - poleH * 0.1); ctx.stroke();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(fxp, base0); ctx.lineTo(fxp, base0 - poleH); ctx.stroke();
+      var fy0 = base0 - poleH * (0.25 + 0.75 * fr), fl = poleH * 0.42, wave = Math.sin(now / 180) * 3;
+      ctx.beginPath(); ctx.moveTo(fxp, fy0); ctx.quadraticCurveTo(fxp + fl * 0.5, fy0 + 3 + wave, fxp + fl, fy0 + fl * 0.32); ctx.quadraticCurveTo(fxp + fl * 0.5, fy0 + fl * 0.5 + wave, fxp, fy0 + fl * 0.62); ctx.closePath();
+      ctx.fillStyle = pj.done ? "#2E9E5B" : "#E63946"; ctx.fill(); ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.stroke();
+      ctx.restore();
+    }
+    jobs.forEach(function (z) {
+      var label = z.type === "hole" ? "Fill" : (z.type === "pile" ? "Pile" : "Flat");
+      var sy = z.type === "flat" ? z.y - z.h / 2 - 2.6 : z.y - z.R - 3.2;
+      if (sy < 2.5) sy = z.type === "flat" ? z.y + z.h / 2 + 2.6 : z.y + z.R + 3.2;
+      sign(z.x, sy, z.done ? label + " ✓" : label, z.done);
+    });
+  }
+  function drawTrack(y0, travel) {
+    // y0: inner edge; track runs x -6.6..6.4, 2.6 wide
+    var x0 = -6.7, len = 13.1, w = 2.6;
+    rr(ctx, x0, y0, len, w, 1.2); ctx.fillStyle = "#3C414C"; ctx.fill();
+    ctx.save(); rr(ctx, x0, y0, len, w, 1.2); ctx.clip();
+    var sp = 1.1, off = ((-travel % sp) + sp) % sp;
+    ctx.fillStyle = "#666C7A";
+    for (var x = x0 - sp + off; x < x0 + len; x += sp) ctx.fillRect(x, y0, 0.48, w);
+    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x0, y0 + w * 0.42, len, w * 0.16);
+    ctx.restore();
+    rr(ctx, x0, y0, len, w, 1.2); ctx.lineWidth = 0.32; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  function drawDozer(now) {
+    ctx.save();
+    ctx.translate(OX + dz.x * S, OY + dz.y * S);
+    ctx.rotate(dz.a);
+    ctx.scale(S, S);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    var lift = dz.lift;
+    // shadow
+    ctx.fillStyle = "rgba(20,12,4,0.28)";
+    rr(ctx, -7.2 + 0.6, -6.3 + 0.8, 14.6, 12.6, 1.4); ctx.fill();
+    rr(ctx, 7.9 + 0.6 + lift * 0.6, -BW - 0.2 + 0.8 + lift * 0.6, 1.9, BW * 2 + 0.4, 0.6); ctx.fill();
+    // tracks
+    drawTrack(-6.0, dz.tl);
+    drawTrack(3.4, dz.tr);
+    // push arms and lift cylinders
+    var bladeX = 8.0 + lift * 0.35;
+    ctx.strokeStyle = OUT; ctx.lineWidth = 1.15;
+    ctx.beginPath(); ctx.moveTo(3.2, -4.7); ctx.lineTo(bladeX + 0.3, -5.6); ctx.moveTo(3.2, 4.7); ctx.lineTo(bladeX + 0.3, 5.6); ctx.stroke();
+    ctx.strokeStyle = "#F2B705"; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(3.2, -4.7); ctx.lineTo(bladeX + 0.3, -5.6); ctx.moveTo(3.2, 4.7); ctx.lineTo(bladeX + 0.3, 5.6); ctx.stroke();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 0.75;
+    ctx.beginPath(); ctx.moveTo(3.4, -2.3); ctx.lineTo(bladeX + 0.2, -2.6); ctx.moveTo(3.4, 2.3); ctx.lineTo(bladeX + 0.2, 2.6); ctx.stroke();
+    ctx.strokeStyle = "#C9D2DE"; ctx.lineWidth = 0.4;
+    ctx.beginPath(); ctx.moveTo(5.4, -2.4); ctx.lineTo(bladeX + 0.2, -2.6); ctx.moveTo(5.4, 2.4); ctx.lineTo(bladeX + 0.2, 2.6); ctx.stroke();
+    // blade
+    ctx.beginPath();
+    ctx.moveTo(bladeX, -BW + 0.4);
+    ctx.quadraticCurveTo(bladeX - 0.5, 0, bladeX, BW - 0.4);
+    ctx.lineTo(bladeX + 0.7, BW + 0.2);
+    ctx.lineTo(bladeX + 1.65, BW - 0.1);
+    ctx.quadraticCurveTo(bladeX + 1.05, 0, bladeX + 1.65, -BW + 0.1);
+    ctx.lineTo(bladeX + 0.7, -BW - 0.2);
+    ctx.closePath();
+    ctx.fillStyle = "#FFC21A"; ctx.fill(); ctx.lineWidth = 0.34; ctx.strokeStyle = OUT; ctx.stroke();
+    // cutting edge
+    ctx.beginPath(); ctx.moveTo(bladeX + 1.65, -BW + 0.1); ctx.quadraticCurveTo(bladeX + 1.05, 0, bladeX + 1.65, BW - 0.1);
+    ctx.strokeStyle = "#4B505C"; ctx.lineWidth = 0.55; ctx.stroke();
+    // body / hull
+    rr(ctx, -6.3, -3.7, 11.2, 7.4, 0.9); ctx.fillStyle = "#FFC21A"; ctx.fill(); ctx.lineWidth = 0.34; ctx.strokeStyle = OUT; ctx.stroke();
+    // track fenders
+    ctx.fillStyle = "#E6A800";
+    ctx.fillRect(-5.9, -3.7, 10.3, 0.55); ctx.fillRect(-5.9, 3.15, 10.3, 0.55);
+    // engine hood
+    rr(ctx, -0.2, -2.7, 4.9, 5.4, 0.7); ctx.fillStyle = "#FFD23F"; ctx.fill(); ctx.lineWidth = 0.28; ctx.stroke();
+    ctx.strokeStyle = "rgba(29,35,64,0.55)"; ctx.lineWidth = 0.22;
+    for (var g = 0; g < 4; g++) { ctx.beginPath(); ctx.moveTo(1.6 + g * 0.7, -1.5); ctx.lineTo(1.6 + g * 0.7, 1.5); ctx.stroke(); }
+    // grille
+    rr(ctx, 4.5, -2.0, 0.6, 4.0, 0.2); ctx.fillStyle = "#3C414C"; ctx.fill(); ctx.lineWidth = 0.22; ctx.strokeStyle = OUT; ctx.stroke();
+    // exhaust stack and air intake
+    ctx.beginPath(); ctx.arc(1.4, -2.1, 0.62, 0, TAU); ctx.fillStyle = "#5B6170"; ctx.fill(); ctx.lineWidth = 0.24; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.beginPath(); ctx.arc(1.4, -2.1, 0.32, 0, TAU); ctx.fillStyle = "#15171D"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0.6, 2.0, 0.5, 0, TAU); ctx.fillStyle = "#2B2F38"; ctx.fill(); ctx.stroke();
+    // cab: glass all round, roof on top
+    rr(ctx, -5.6, -3.1, 5.0, 6.2, 0.6); ctx.fillStyle = "#35506E"; ctx.fill(); ctx.lineWidth = 0.3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 0.25;
+    ctx.beginPath(); ctx.moveTo(-1.0, -2.6); ctx.lineTo(-1.0, -1.3); ctx.moveTo(-5.2, 1.4); ctx.lineTo(-5.2, 2.6); ctx.stroke();
+    rr(ctx, -5.1, -2.55, 4.0, 5.1, 0.5); ctx.fillStyle = "#FFC21A"; ctx.fill(); ctx.lineWidth = 0.3; ctx.strokeStyle = OUT; ctx.stroke();
+    rr(ctx, -4.5, -1.95, 2.8, 3.9, 0.4); ctx.fillStyle = "#FFD23F"; ctx.fill();
+    // beacon light on the roof
+    var blink = (Math.floor(now / 400) % 2 === 0) && (Math.abs(dz.v) > 0.1 || Math.abs(dz.w) > 0.1);
+    ctx.beginPath(); ctx.arc(-3.1, 0, 0.55, 0, TAU); ctx.fillStyle = blink ? "#FF9A1F" : "#E07000"; ctx.fill(); ctx.lineWidth = 0.22; ctx.strokeStyle = OUT; ctx.stroke();
+    if (blink) { ctx.beginPath(); ctx.arc(-3.1, 0, 1.3, 0, TAU); ctx.fillStyle = "rgba(255,170,40,0.35)"; ctx.fill(); }
+    // ripper at the back
+    ctx.fillStyle = "#3C414C"; ctx.strokeStyle = OUT; ctx.lineWidth = 0.26;
+    rr(ctx, -7.9, -2.6, 0.9, 5.2, 0.3); ctx.fill(); ctx.stroke();
+    for (var t = -1; t <= 1; t++) { ctx.beginPath(); ctx.moveTo(-7.9, t * 1.7 - 0.35); ctx.lineTo(-8.9, t * 1.7); ctx.lineTo(-7.9, t * 1.7 + 0.35); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+  }
+  function star(x, y, r, rot) {
+    ctx.beginPath();
+    for (var i = 0; i < 10; i++) { var a = rot + i * Math.PI / 5, rad = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); }
+    ctx.closePath();
+  }
+  function drawParticles(top) {
+    ctx.save(); ctx.translate(OX, OY); ctx.scale(S, S);
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i], f = p.life / p.max;
+      if ((p.k === "smoke") !== top) continue;
+      if (p.k === "smoke") {
+        ctx.globalAlpha = 0.45 * (1 - f);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.sz * (1 + f * 2.2), 0, TAU); ctx.fillStyle = "#6E7280"; ctx.fill();
+      } else if (p.k === "clod") {
+        ctx.globalAlpha = 1 - f * f;
+        ctx.fillStyle = p.col; ctx.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (var j = 0; j < particles.length; j++) {
+      var q = particles[j];
+      if (q.k !== "star" || !top) continue;
+      var g = q.life / q.max;
+      ctx.globalAlpha = 1 - g * g;
+      star(q.x, q.y, q.sz, q.rot); ctx.fillStyle = q.col; ctx.fill(); ctx.lineWidth = 0.25; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  function drawTarget(now) {
+    if (!target || mode !== "finger") return;
+    var x = OX + target.x * S, y = OY + target.y * S, r = Math.max(14, S * 2.2) * (1 + 0.12 * Math.sin(now / 150));
+    ctx.save();
+    ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = "#FFC93C"; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+    ctx.fillStyle = "#FFC93C"; ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+  }
+  function draw(now) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#6FAE45"; ctx.fillRect(0, 0, CW, CH);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(tex, OX, OY, GW * S, GH * S);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.strokeRect(OX - 1.5, OY - 1.5, GW * S + 3, GH * S + 3);
+    drawJobs(now);
+    drawParticles(false);
+    drawTarget(now);
+    drawDozer(now);
+    drawParticles(true);
+  }
+
+  // ---------- Main loop ----------
+  var last = 0, checkAcc = 0, saveAcc = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    var dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
+    last = now;
+    if (!GW) return;
+    frameNo++;
+    var spd = drive(dt);
+    // Slide steep dirt near the blade and wherever dirt was still moving last frame.
+    var box = settleBox;
+    settleBox = null;
+    if (box) {
+      var mv = slump(box.x0, box.y0, box.x1, box.y1, 2);
+      if (mv) settleBox = addBox(settleBox, mv.x0 - 2, mv.y0 - 2, mv.x1 + 2, mv.y1 + 2);
+    }
+    if (dirtyBox) { renderBox(dirtyBox.x0 - 1, dirtyBox.y0 - 1, dirtyBox.x1 + 1, dirtyBox.y1 + 1); dirtyBox = null; }
+    stepParticles(dt);
+    checkAcc += dt;
+    if (checkAcc > 0.3) { checkAcc = 0; checkJobs(); }
+    saveAcc += dt;
+    if (saveAcc > 4) { saveAcc = 0; if (fieldChanged) saveState(); }
+    engineUpdate(spd);
+    draw(now);
+    if (ending) checkEndingDone();
+  }
+
+  // ---------- Input ----------
+  function toWorld(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left - OX) / S, y: (e.clientY - r.top - OY) / S };
+  }
+  var fingerId = null;
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    unlockAudioIfOn();
+    if (ending || mode !== "finger") return;
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    fingerId = e.pointerId;
+    var w = toWorld(e);
+    target = { x: clamp(w.x, 0, GW), y: clamp(w.y, 0, GH), held: true };
+    if (!hinted) { hinted = true; $("hint").hidden = true; }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (e.pointerId !== fingerId || !target) return;
+    var w = toWorld(e);
+    target.x = clamp(w.x, 0, GW); target.y = clamp(w.y, 0, GH);
+  });
+  function fingerUp(e) {
+    if (e.pointerId !== fingerId) return;
+    fingerId = null;
+    if (target) target.held = false;
+  }
+  cv.addEventListener("pointerup", fingerUp);
+  cv.addEventListener("pointercancel", fingerUp);
+
+  function setupLever(el, key) {
+    var knob = el.querySelector(".knob"), pid = null;
+    function set(v) {
+      lev[key] = v;
+      var r = el.getBoundingClientRect(), travel = (r.height - knob.offsetHeight) / 2 - 4;
+      knob.style.top = "calc(50% + " + (-v * Math.max(0, travel)).toFixed(1) + "px)";
+    }
+    function fromEvent(e) {
+      var r = el.getBoundingClientRect(), travel = Math.max(20, (r.height - knob.offsetHeight) / 2 - 4);
+      var v = -(e.clientY - (r.top + r.height / 2)) / travel;
+      v = clamp(v, -1, 1);
+      if (Math.abs(v) < 0.12) v = 0;
+      set(v);
+    }
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); unlockAudioIfOn();
+      if (ending) return;
+      pid = e.pointerId;
+      try { el.setPointerCapture(pid); } catch (er) { /* ignore */ }
+      fromEvent(e);
+      if (!hinted) { hinted = true; $("hint").hidden = true; }
+    });
+    el.addEventListener("pointermove", function (e) { if (e.pointerId === pid && !ending) fromEvent(e); });
+    function up(e) { if (e.pointerId !== pid) return; pid = null; set(0); }
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("lostpointercapture", function (e) { if (e.pointerId === pid) { pid = null; set(0); } });
+    return set;
+  }
+  var setL = setupLever($("leverL"), "l"), setR = setupLever($("leverR"), "r");
+
+  function setMode(m) {
+    mode = m === "levers" ? "levers" : "finger";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mode]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === mode)); });
+    $("leverL").hidden = mode !== "levers"; $("leverR").hidden = mode !== "levers";
+    document.body.classList.toggle("levers", mode === "levers");
+    setL(0); setR(0); target = null;
+    if (!hinted) showHint();
+  }
+  function showHint() {
+    var h = $("hint");
+    h.textContent = mode === "levers" ? "Push the levers to drive" : "Drag to drive the bulldozer";
+    h.hidden = false;
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.mode && !ending) { setMode(t.dataset.mode); saveState(); blip(); }
+    else if (t.dataset.job) { flashJob = t.dataset.job; flashAt = performance.now(); blip(); }
+    else if (t.id === "newField" && !ending) { newField(); saveState(); whooshSnd(); }
+    else if (t.dataset.action === "timer") openTimer();
+    else if (t.dataset.action === "timerclose") closeTimer();
+    else if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); }
+    else if (t.id === "timerStart") startTimer();
+    else if (t.id === "goodbyeBtn") goodbyeBeep();
+    else if (t.id === "bigToggle") setBig(!document.body.classList.contains("big"), true);
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Saving ----------
+  function u8ToB64(u8) {
+    var s = "", CH = 0x8000;
+    for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+    return btoa(s);
+  }
+  function b64ToU8(b) { var s = atob(b), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  function saveState() {
+    fieldChanged = false;
+    try {
+      var q = new Uint16Array(N);
+      for (var k = 0; k < N; k++) q[k] = Math.min(65535, Math.round(dirt[k] * 100));
+      localStorage.setItem(DKEY, JSON.stringify({
+        jobsDone: jobsDone, mode: mode, gw: GW, gh: GH,
+        jobs: jobs.map(function (z) { var o = {}; for (var key in z) if (key !== "doneAt") o[key] = z[key]; return o; }),
+        dz: { x: dz.x, y: dz.y, a: dz.a }, dirt: u8ToB64(new Uint8Array(q.buffer))
+      }));
+    } catch (e) { /* ignore */ }
+  }
+  function loadState() {
+    try {
+      var o = JSON.parse(localStorage.getItem(DKEY) || "null");
+      if (!o || typeof o !== "object") return false;
+      if (typeof o.jobsDone === "number" && o.jobsDone >= 0) jobsDone = Math.floor(o.jobsDone);
+      if (o.mode === "levers") mode = "levers";
+      if (!(o.gw >= 20 && o.gw <= 200 && o.gh >= 20 && o.gh <= 200 && Array.isArray(o.jobs) && typeof o.dirt === "string")) return false;
+      var u = b64ToU8(o.dirt);
+      if (u.length !== o.gw * o.gh * 2) return false;
+      alloc(o.gw, o.gh);
+      var q = new Uint16Array(u.buffer);
+      for (var k = 0; k < N; k++) dirt[k] = q[k] / 100;
+      jobs = o.jobs.filter(function (z) { return z && (z.type === "hole" || z.type === "pile" || z.type === "flat") && isFinite(z.x) && isFinite(z.y); });
+      if (jobs.length !== 3) return false;
+      holeBase();
+      if (o.dz && isFinite(o.dz.x) && isFinite(o.dz.y) && isFinite(o.dz.a)) { dz.x = clamp(o.dz.x, 3, GW - 3); dz.y = clamp(o.dz.y, 3, GH - 3); dz.a = o.dz.a; }
+      renderBox(0, 0, GW - 1, GH - 1);
+      updateJobsUI();
+      if (jobs.every(function (z) { return z.done; })) $("newField").classList.add("pulse");
+      return true;
+    } catch (e) { return false; }
+  }
+  window.addEventListener("pagehide", function () { if (fieldChanged) saveState(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && fieldChanged) saveState(); });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var SKEY = "site-sound-v1";
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null, eng = null;
+  function unlockAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = 0.8;
+        master.connect(actx.destination);
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function unlockAudioIfOn() { if (soundOn) unlockAudio(); }
+  function canPlay() { return soundOn && actx && actx.state === "running"; }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
+  function whooshSnd() { tone(500, 0.35, 0.035, "sine", 160); }
+  function chime(big) {
+    tone(523, 0.4, 0.04); setTimeout(function () { tone(659, 0.4, 0.04); }, 110);
+    setTimeout(function () { tone(784, 0.6, 0.04); }, 220);
+    if (big) setTimeout(function () { tone(1047, 0.8, 0.035); }, 360);
+  }
+  function horn() { tone(392, 0.25, 0.045, "triangle"); setTimeout(function () { tone(392, 0.35, 0.045, "triangle"); }, 330); }
+  // A soft low engine hum that rises with speed.
+  function engineUpdate(spd) {
+    if (!actx) return;
+    var on = canPlay() && !document.hidden;
+    if (!eng) {
+      if (!on) return;
+      try {
+        var o = actx.createOscillator(), o2 = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+        o.type = "sawtooth"; o.frequency.value = 46; o2.type = "triangle"; o2.frequency.value = 23;
+        lp.type = "lowpass"; lp.frequency.value = 240; lp.Q.value = 0.7; g.gain.value = 0;
+        o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master); o.start(); o2.start();
+        eng = { o: o, o2: o2, lp: lp, g: g };
+      } catch (e) { return; }
+    }
+    var t = actx.currentTime;
+    var vol = on && spd > 0.03 ? 0.03 + 0.05 * spd : 0;
+    eng.g.gain.setTargetAtTime(vol, t, 0.15);
+    eng.o.frequency.setTargetAtTime(44 + 30 * spd, t, 0.2);
+    eng.o2.frequency.setTargetAtTime(22 + 15 * spd, t, 0.2);
+    eng.lp.frequency.setTargetAtTime(220 + 260 * spd, t, 0.2);
+  }
+  document.addEventListener("visibilitychange", function () { if (actx && document.hidden) actx.suspend(); });
+  function updateSoundUI() {
+    $("soundState").textContent = soundOn ? "Sound is on. A soft engine hum and chimes." : "Sound is off.";
+    $("soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { unlockAudio(); setTimeout(function () { chime(false); }, 60); }
+    updateSoundUI();
+  }
+
+  // ---------- Play timer (same behavior and storage format as spin-shop; shared by the whole site) ----------
+  var TKEY = "site-timer-v1";
+  var BKEY = "site-big-v1";
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000, UNLOCK_MS = 4000;
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true, phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) { if (typeof o[k] === "boolean") t[k] = o[k]; });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* defaults */ }
+    return t;
+  }
+  function saveTimer() { try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ } }
+  var timer = loadTimer();
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) { if (lastTimerKey !== "off") { $("fuel").hidden = true; lastTimerKey = "off"; } return; }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    $("fuel").hidden = false;
+    var fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(timer.showMinutes && timer.phase === "running");
+    $("fuelNum").textContent = String(mins);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg; el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.hidden = true; }, 450); }, 7000);
+  }
+  function minutesText(ms) { var m = Math.ceil(ms / 60000); return m === 1 ? "1 minute" : m + " minutes"; }
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    Array.prototype.forEach.call(document.querySelectorAll('[data-action="timer"]'), function (b) { b.textContent = on ? "⏱ Timer on" : "Grown-ups"; });
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes)); });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+  }
+  function openTimer() { updateTimerUI(); updateSoundUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI(); closeTimer();
+  }
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000; timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer(); lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+  function stopTimer() {
+    timer.phase = "idle"; saveTimer();
+    wake();
+    closeTimer();
+  }
+  function wake() {
+    ending = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    $("rest").hidden = true;
+    restScheduled = false; farewellAt = 0; lastTimerKey = "";
+    drawTimer(); updateTimerUI();
+  }
+  function beginEnding() {
+    clearTimeout(toastTimer); $("toast").classList.remove("show"); $("toast").hidden = true;
+    if (timer.phase !== "ending") { timer.phase = "ending"; saveTimer(); }
+    endingStartedAt = performance.now(); farewellAt = 0; restScheduled = false;
+    ending = true;
+    // Let go of the controls; the bulldozer rolls to a stop.
+    target = null; fingerId = null; setL(0); setR(0);
+    $("hint").hidden = true;
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to park the bulldozer";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+  }
+  function goodbyeBeep() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Bye bye, bulldozer!";
+    if (soundOn) unlockAudio();
+    horn();
+    smoke(8, true);
+    setTimeout(function () { smoke(6, true); }, 330);
+  }
+  function checkEndingDone() {
+    if (timer.phase !== "ending" || restScheduled) return;
+    if (timer.goodbye && !farewellAt) return;
+    var t = performance.now();
+    if (t - endingStartedAt < 3000 || (farewellAt && t - farewellAt < 2200)) return;
+    if (Math.abs(dz.v) > 0.05 || Math.abs(dz.w) > 0.05) return;
+    restScheduled = true;
+    setTimeout(goRest, 1000);
+  }
+  function restSVG() {
+    var o = '<circle cx="30" cy="-34" r="9" fill="#FFF4CC" stroke="#1D2340" stroke-width="2"/><circle cx="34" cy="-37" r="8" fill="#2B3A67"/>';
+    o += '<rect x="-50" y="22" width="100" height="28" fill="#8E6239"/><path d="M-50 22 H50" stroke="#1D2340" stroke-width="2"/>';
+    // bulldozer, side view, parked
+    o += '<g stroke="#1D2340" stroke-width="2" stroke-linejoin="round">';
+    o += '<rect x="-34" y="10" width="40" height="12" rx="6" fill="#3C414C"/>';
+    o += '<circle cx="-28" cy="16" r="3.5" fill="#666C7A"/><circle cx="0" cy="16" r="3.5" fill="#666C7A"/><circle cx="-14" cy="16" r="3" fill="#666C7A"/>';
+    o += '<rect x="-30" y="-2" width="34" height="12" rx="2" fill="#FFC21A"/>';
+    o += '<path d="M-30 -2 V-20 H-12 L-10 -2 Z" fill="#FFC21A"/><path d="M-27 -17 H-14 L-13 -5 H-27 Z" fill="#9FC8E8"/>';
+    o += '<rect x="-6" y="-9" width="3" height="8" fill="#5B6170"/>';
+    o += '<path d="M4 4 L12 6 M4 12 L12 12" stroke-width="3"/>';
+    o += '<path d="M12 -4 Q9 8 13 22 L17 22 Q14 8 16 -4 Z" fill="#FFC21A"/>';
+    o += '</g>';
+    // traffic cone
+    o += '<g stroke="#1D2340" stroke-width="2" stroke-linejoin="round"><path d="M30 22 L35 -2 L40 22 Z" fill="#FF7A1A"/><path d="M32.3 12 H37.7" stroke="#FFFFFF" stroke-width="3"/><rect x="26" y="20" width="18" height="4" rx="1" fill="#FF7A1A"/></g>';
+    o += '<text x="-38" y="-30" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#FFFFFF">z</text><text x="-28" y="-38" font-family="Baloo 2, sans-serif" font-weight="800" font-size="10" fill="#FFFFFF">z</text><text x="-21" y="-44" font-family="Baloo 2, sans-serif" font-weight="800" font-size="7" fill="#FFFFFF">z</text>';
+    return o;
+  }
+  function showRest() {
+    $("restArt").innerHTML = restSVG();
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+  function goRest() {
+    if (timer.phase !== "resting") { timer.phase = "resting"; saveTimer(); }
+    ending = false;
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    dz.v = 0; dz.w = 0;
+    if (fieldChanged) saveState();
+    lastTimerKey = ""; drawTimer(); updateTimerUI();
+    showRest();
+  }
+  function unlock() {
+    timer.phase = "idle"; saveTimer();
+    wake();
+  }
+  function timerTick() {
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+  // Another Construction Site page may change the shared timer, sound or Big setting.
+  window.addEventListener("storage", function (e) {
+    if (e.key === TKEY) {
+      var t = loadTimer(), was = timer.phase;
+      timer = t;
+      if (t.phase === "resting" && was !== "resting") goRest();
+      else if (t.phase === "ending" && was !== "ending") beginEnding();
+      else if (t.phase === "running" && remainingMs() <= 0) beginEnding();
+      else if ((t.phase === "idle" || t.phase === "running") && (was === "resting" || was === "ending")) wake();
+      lastTimerKey = ""; drawTimer(); updateTimerUI();
+    } else if (e.key === SKEY) {
+      try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (er) { /* ignore */ }
+      updateSoundUI();
+    } else if (e.key === BKEY) {
+      var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (er) { /* ignore */ }
+      setBig(on, false);
+    }
+  });
+  function makeHold(btn, ms, onDone, onPress) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") { if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return; e.preventDefault(); }
+      if (id) return;
+      if (onPress) onPress();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+  MINUTE_CHOICES.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn"; b.dataset.minutes = String(m); b.textContent = m + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  makeHold($("holdSound"), HOLD_MS, toggleSound, function () { if (!soundOn) unlockAudio(); });
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  // Big mode: hide the title and controls so the field fills the screen.
+  function setBig(on, remember) {
+    on = !!on;
+    document.body.classList.toggle("big", on);
+    var b = $("bigToggle");
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
+    $("bigLabel").textContent = on ? "Back" : "Big";
+    $("bigIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
+    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
+    resize();
+  }
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+
+  // ---------- Start ----------
+  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
+  if (!loadState()) newField();
+  $("countNum").textContent = String(jobsDone);
+  setMode(mode);
+  resize();
+  updateSoundUI();
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") showRest();
+  drawTimer();
+  updateTimerUI();
+  setInterval(timerTick, 250);
+  requestAnimationFrame(loop);
+
+  // Test hook (harmless).
+  window.__dozer = {
+    state: function () { return { x: dz.x, y: dz.y, a: dz.a, v: dz.v, gw: GW, gh: GH, mode: mode, jobsDone: jobsDone, jobs: jobs.map(function (z) { return { type: z.type, done: z.done, x: z.x, y: z.y, frac: z.frac }; }) }; },
+    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; },
+    peak: function () { var b = 0; for (var k = 1; k < N; k++) if (dirt[k] > dirt[b]) b = k; return { x: b % GW + 0.5, y: Math.floor(b / GW) + 0.5, h: dirt[b] }; },
+    hole: function () { var h = jobByType('hole'); return { x: h.x, y: h.y }; },
+    volume: function () { var v = 0; for (var k = 0; k < N; k++) v += dirt[k]; return v; },
+    place: function (x, y, a) { dz.x = x; dz.y = y; dz.a = a; lastRear = null; },
+    complete: function (t) { var z = jobByType(t); if (z && !z.done) jobDone(z); }
+  };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
