@@ -1,0 +1,2796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rocket Builder</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Rocket Builder">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --go: #E63946;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 1180px;
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+header h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.timerbtn { display: none; }
+/* Home: a link back to the Toybox launcher. */
+.homebtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 2px 12px 2px 9px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--edge);
+  -webkit-tap-highlight-color: transparent;
+}
+.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg, .tab-home svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 6px;
+}
+.btn {
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--ink);
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 16px;
+  padding: 0.45rem 0.8rem;
+  min-height: 52px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--edge);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---------- Stage: the rocket on its launch pad ---------- */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--plate);
+  border: 3px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 4px 4px 0 var(--edge);
+  padding: 6px;
+}
+.stage-inner { height: 100%; display: flex; flex-direction: column; gap: 6px; }
+.scene {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  border: 3px solid #1D2340;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #8FD0F7;
+  touch-action: none;
+  cursor: pointer;
+}
+#art { display: block; width: 100%; height: 100%; touch-action: none; }
+.launchbar { flex: none; display: flex; justify-content: center; }
+.launch {
+  width: min(100%, 560px);
+  min-height: 60px;
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #FFFFFF;
+  background: var(--go);
+  border-color: #1D2340;
+  box-shadow: 4px 4px 0 #1D2340;
+  text-shadow: 2px 2px 0 #1D2340;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.launch:active { box-shadow: 0 0 0 #1D2340; }
+.launch svg { width: 1.3em; height: 1.3em; flex: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .launch { animation: throb 1.6s ease-in-out infinite; }
+  .launch:active { animation: none; }
+}
+@keyframes throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+/* Builder animations on the SVG rocket. */
+.rocket, .spark, .puff { transform-box: fill-box; }
+.rocket { transform-origin: 50% 100%; }
+.rocket.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+.rocket.hop { animation: hop 0.65s ease-out; }
+@keyframes pop { 0% { transform: scale(0.9, 1.1); } 45% { transform: scale(1.07, 0.94); } 100% { transform: none; } }
+@keyframes hop { 0% { transform: none; } 30% { transform: translateY(-46px) rotate(-3deg); } 62% { transform: translateY(0) scale(1.06, 0.93); } 82% { transform: translateY(-8px) rotate(1deg); } 100% { transform: none; } }
+.spark { transform-origin: 50% 50%; animation: spark 0.7s ease-out forwards; }
+@keyframes spark { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 45% { transform: scale(1.25) rotate(60deg); opacity: 1; } 100% { transform: scale(0) rotate(120deg); opacity: 0; } }
+.puff { transform-origin: 50% 50%; animation: puff 0.9s ease-out forwards; }
+@keyframes puff { 0% { transform: scale(0.3); opacity: 0.95; } 100% { transform: scale(2.2); opacity: 0; } }
+.night { opacity: 0; transition: opacity 4s ease; }
+body.ending .night { opacity: 1; }
+
+/* Play-timer gauge in the corner of the picture. */
+.fuel {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.fuel[hidden] { display: none; }
+.fuel-bar {
+  width: clamp(70px, 22vw, 170px);
+  height: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num {
+  min-width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.fuel-num[hidden] { display: none; }
+
+/* ---------- Panel: build + colors ---------- */
+.panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-bottom-width: 0;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+}
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  overflow: hidden;
+  padding: 10px 10px 8px;
+}
+.panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
+.panel[data-tab="build"] [data-pane="build"],
+.panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
+.panel section + section { margin-top: 10px; }
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  padding-right: 3px;
+}
+.row .btn {
+  flex: 0 0 calc((100% - 12px) / 3);
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.2rem 0.2rem;
+  font-size: clamp(0.76rem, 3.5vw, 1rem);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.row.four .btn { flex-basis: calc((100% - 18px) / 4); font-size: clamp(0.68rem, 3vw, 1rem); padding: 0.2rem 0.1rem; }
+.row.four .dot { width: 11px; height: 11px; margin-right: 3px; border-width: 1.5px; }
+.dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #1D2340;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+#buildParts, #colorParts { min-height: 86px; align-content: flex-start; }
+.options {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 5px 2px 3px;
+  min-height: 0;
+  font-size: clamp(0.7rem, 3.2vw, 0.95rem);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.opt svg { width: 44px; height: 54px; display: block; }
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.swatch {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 50%;
+  border: 3px solid var(--edge);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  box-shadow: 2px 2px 0 var(--edge);
+}
+.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; }
+.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
+.tabbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1.2fr);
+  gap: 5px;
+  padding: 5px 6px 6px;
+  border-top: 3px solid var(--edge);
+  background: var(--panel);
+}
+.tab {
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(0.78rem, 3.6vw, 1.05rem);
+  color: var(--ink);
+  background: transparent;
+  border: 3px solid transparent;
+  border-radius: 14px;
+  min-height: 44px;
+  padding: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: #1D2340; border-color: var(--edge); }
+.tab-surprise { border-color: var(--edge); border-style: dashed; }
+.tab-home { display: none; align-items: center; justify-content: center; padding: 2px 8px; border-color: var(--edge); }
+.tab:active { transform: translate(1px, 1px); }
+.tab:focus-visible { outline: 4px solid var(--focus); outline-offset: 1px; }
+
+/* ---------- Timer: toast, goodbye, lock-down ---------- */
+.toast {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  background: var(--accent);
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 3px 3px 0 #1D2340;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.farewell {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 22px;
+  padding: 10px 16px 12px;
+  box-shadow: 4px 4px 0 #1D2340;
+  text-align: center;
+}
+.farewell[hidden] { display: none; }
+.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
+.goodbye {
+  background: var(--accent);
+  color: #1D2340;
+  border-color: #1D2340;
+  box-shadow: 3px 3px 0 #1D2340;
+  font-size: 1.3rem;
+  min-height: 56px;
+  padding: 0.4rem 1.2rem;
+}
+.goodbye[hidden] { display: none; }
+body.ending .panel-body,
+body.ending [data-action="surprise"],
+body.ending .homebtn,
+body.ending .tab-home { pointer-events: none; opacity: 0.4; }
+body.ending .launchbar { visibility: hidden; }
+
+/* ---------- Grown-up sheet ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+  background: rgba(13, 20, 38, 0.55);
+}
+.modal[hidden] { display: none; }
+.sheet {
+  width: 100%;
+  max-width: 460px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  color: var(--ink);
+  border: 4px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 6px 6px 0 var(--edge);
+  padding: 18px 18px 20px;
+}
+.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
+.sheet h3 { margin: 18px 0 6px; font-size: 1.2rem; font-weight: 800; text-align: center; }
+.sheet h4 { margin: 12px 0 6px; font-size: 1.05rem; font-weight: 800; text-align: center; }
+.sheet .opt-txt { color: var(--muted); font-weight: 500; }
+.sheet .row .btn { flex-basis: calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
+.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 0; }
+.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
+.textin {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 1.1rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  padding: 0.45rem 0.8rem;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.textin:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
+.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn.primary { background: var(--accent); color: #1D2340; }
+.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
+.hold {
+  position: relative;
+  overflow: hidden;
+  -webkit-touch-callout: none;
+}
+.hold .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: rgba(255, 201, 60, 0.75);
+}
+.hold .label { position: relative; }
+
+/* ---------- Rest screen ---------- */
+.rest {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+}
+.rest[hidden] { display: none; }
+.rest-card {
+  width: 100%;
+  max-width: 420px;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--plate);
+  color: #1D2340;
+  border: 4px solid var(--edge);
+  border-radius: 28px;
+  box-shadow: 6px 6px 0 var(--edge);
+  padding: 16px 20px 22px;
+  text-align: center;
+}
+.rest-art {
+  display: block;
+  width: min(62vw, 240px, 34vh);
+  aspect-ratio: 520 / 660;
+  height: auto;
+  margin: 0 auto 6px;
+  border: 3px solid #1D2340;
+  border-radius: 18px;
+}
+.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
+.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
+.rest-next {
+  margin: 14px auto 0;
+  display: inline-block;
+  background: var(--accent);
+  border: 3px solid #1D2340;
+  border-radius: 16px;
+  padding: 0.4rem 1.1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.rest-next[hidden] { display: none; }
+.lock {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right, 0px));
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: 64px;
+  height: 48px;
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel);
+  font-size: 1.3rem;
+  cursor: pointer;
+  opacity: 0.7;
+  touch-action: none;
+}
+.lock:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Flight: full-screen launch ---------- */
+.flight {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  background: #5BB8F0;
+  touch-action: none;
+  color: #1D2340;
+}
+.flight[hidden] { display: none; }
+#fcv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hud {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.93);
+  border: 3px solid #1D2340;
+  border-radius: 20px;
+  box-shadow: 4px 4px 0 #1D2340;
+  padding: 2px 18px 4px;
+  white-space: nowrap;
+}
+.hud .lbl { font-size: clamp(0.95rem, 2.6vw, 1.4rem); font-weight: 800; line-height: 1.1; margin-top: 2px; }
+.hud .num {
+  font-size: clamp(2rem, 7.5vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  min-width: 6.4ch;
+}
+.hud .best { font-size: clamp(0.95rem, 2.6vw, 1.3rem); font-weight: 700; line-height: 1.1; }
+.hud .best[hidden] { display: none; }
+.fback {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: max(10px, env(safe-area-inset-left, 0px));
+  min-height: 48px;
+  font-size: 1.05rem;
+  padding: 0.2rem 0.9rem;
+  color: #1D2340;
+  background: #FFFFFF;
+  border-color: #1D2340;
+  box-shadow: 3px 3px 0 #1D2340;
+}
+.count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.count span {
+  display: block;
+  font-size: min(58vh, 78vw);
+  font-weight: 800;
+  line-height: 1;
+  color: #FFC93C;
+  -webkit-text-stroke: 0.03em #1D2340;
+  text-shadow: 0.05em 0.05em 0 #1D2340;
+  opacity: 0;
+}
+.count span.lift { font-size: min(22vh, 17vw); color: #FFFFFF; }
+.count span.go { animation: countPop 0.75s cubic-bezier(.2, .9, .3, 1) forwards; }
+.count span.lift.go { animation: liftPop 1.2s ease-out forwards; }
+@keyframes countPop {
+  0% { transform: scale(2.4); opacity: 0; }
+  22% { transform: scale(0.95); opacity: 1; }
+  32% { transform: scale(1.04); opacity: 1; }
+  78% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.55); opacity: 0; }
+}
+@keyframes liftPop {
+  0% { transform: scale(0.3) rotate(-6deg); opacity: 0; }
+  20% { transform: scale(1.1) rotate(2deg); opacity: 1; }
+  70% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.4) translateY(-30%); opacity: 0; }
+}
+.banner {
+  position: absolute;
+  left: 50%;
+  top: max(15%, 104px);
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: #FFC93C;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  box-shadow: 5px 5px 0 #1D2340;
+  padding: 0.1rem 1.1rem 0.25rem;
+  font-size: clamp(1.6rem, 5.6vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.banner[hidden] { display: none; }
+.banner.go { animation: bannerPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bannerPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+.fhint {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.93);
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  padding: 0.1rem 1rem 0.2rem;
+  font-size: clamp(1.1rem, 3.6vw, 1.6rem);
+  font-weight: 800;
+  white-space: nowrap;
+  transition: opacity 0.5s ease;
+}
+.fhint[hidden] { display: none; }
+.fhint.fade { opacity: 0; }
+.landbar {
+  position: absolute;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  width: min(92vw, 560px);
+}
+.landbar[hidden] { display: none; }
+.landbar .launch { flex: 1 1 auto; width: auto; }
+.landbar .bbuild { flex: none; font-size: 1.2rem; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+
+/* Landscape (phone on its side, tablet, desktop): picture on the left, controls on the right. */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .stage { flex: 1 1 auto; margin-bottom: 8px; }
+  .panel {
+    flex: 0 0 min(56%, 460px);
+    margin-bottom: 8px;
+    border-bottom-width: 3px;
+    border-radius: 24px;
+  }
+  .panel-body { align-content: center; }
+}
+
+/* Larger screens (tablets, desktop): bigger touch targets, and controls kept to a comfortable width. */
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .homebtn { min-height: 44px; font-size: 1.1rem; }
+  .app { gap: 14px; margin-top: 10px; }
+  .stage { padding: 10px; }
+  .stage-inner { gap: 10px; }
+  .launch { min-height: 76px; font-size: 2.4rem; }
+  .panel-body { padding: 16px 18px 14px; }
+  .panel-body > [data-pane] { width: 100%; max-width: 560px; justify-self: center; }
+  .panel section + section { margin-top: 16px; }
+  .row { gap: 10px; }
+  .row .btn { flex-basis: calc((100% - 20px) / 3); min-height: 56px; font-size: 1.1rem; }
+  .row.four .btn { flex-basis: calc((100% - 30px) / 4); font-size: 1.05rem; }
+  .row .dot { width: 18px; height: 18px; margin-right: 6px; }
+  #buildParts, #colorParts { min-height: 122px; }
+  .options { gap: 10px; }
+  .opt { font-size: 1.05rem; padding: 7px 4px 5px; }
+  .opt svg { width: 76px; height: 94px; }
+  .swatches { gap: 10px; margin-top: 12px; }
+  .swatch { font-size: 1.4rem; }
+  .tabbar { gap: 8px; padding: 8px 10px 10px; }
+  .tab { min-height: 56px; font-size: 1.2rem; }
+  .fuel { top: 12px; left: 12px; }
+  .fuel-bar { height: 22px; }
+  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
+  .fback { min-height: 56px; font-size: 1.25rem; }
+  .landbar .launch { min-height: 84px; font-size: 2.6rem; }
+  .landbar .bbuild { font-size: 1.4rem; padding: 0.4rem 1.4rem; }
+}
+@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
+  .panel { flex-basis: min(44%, 520px); }
+  .row .btn { min-height: 64px; }
+  .opt svg { width: 88px; height: 110px; }
+}
+
+/* Short landscape phones: no title, tighter panel. */
+@media (orientation: landscape) and (max-height: 520px) {
+  header { display: none; }
+  .tabbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1.2fr) minmax(48px, auto); }
+  .tab-home { display: flex; }
+  .wrap { padding-top: 6px; }
+  .app { margin-top: 0; }
+  .panel-body { padding: 8px 10px 6px; }
+  .launch { min-height: 52px; font-size: 1.6rem; }
+  .swatches { gap: 6px; }
+  /* vw-based sizes are tuned for portrait; the landscape panel is narrower than the screen width suggests. */
+  .row .btn, .row.four .btn { font-size: 0.82rem; }
+  .opt { font-size: 0.72rem; }
+  .opt svg { width: 40px; height: 48px; }
+  .tab { font-size: 0.8rem; }
+  .hud { padding: 0 14px 2px; }
+  .hud .num { font-size: 2.1rem; }
+  .hud .lbl, .hud .best { font-size: 0.9rem; }
+  .landbar {
+    left: auto;
+    right: max(14px, env(safe-area-inset-right, 0px));
+    transform: none;
+    width: auto;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .landbar .launch { min-height: 56px; font-size: 1.4rem; padding: 0.3rem 1rem; }
+  .banner { left: max(14px, env(safe-area-inset-left, 0px)); top: 42%; transform: none; font-size: 1.6rem; }
+  .banner.go { animation: bannerPopL 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+}
+@keyframes bannerPopL { 0% { transform: scale(0.3); } 100% { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .tab { transition: none; }
+  .rocket.pop, .rocket.hop { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Rocket Builder</h1>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn timerbtn" data-action="timer" id="timerbtn">⏱ Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage">
+      <div class="stage-inner">
+        <div class="scene" id="scene">
+          <svg id="art" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax meet" role="img" aria-label="A rocket on its launch pad"></svg>
+          <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+        </div>
+        <div class="launchbar">
+          <button class="btn launch" id="launch"><svg viewBox="-50 -60 100 120" aria-hidden="true"><path d="M0 -55 C 22 -35 24 -5 20 25 L -20 25 C -24 -5 -22 -35 0 -55 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><circle cy="-12" r="9" fill="#5BC0EB" stroke="#1D2340" stroke-width="6"/><path d="M -20 0 L -40 30 L -20 25 Z M 20 0 L 40 30 L 20 25 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/><path d="M -12 30 Q 0 62 12 30 Z" fill="#F77F00" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/></svg><span>Launch!</span></button>
+        </div>
+      </div>
+      <div class="farewell" id="farewell" hidden>
+        <p id="farewellText">Time to say goodbye</p>
+        <button class="btn goodbye" id="goodbyeBtn">Goodbye launch</button>
+      </div>
+    </div>
+
+    <div class="panel" data-tab="build">
+      <div class="panel-body">
+        <div data-pane="build" id="pane-build" role="tabpanel" aria-labelledby="tab-build">
+          <section>
+            <div class="row" id="buildParts"></div>
+          </section>
+          <section>
+            <div class="options" id="options"></div>
+          </section>
+        </div>
+        <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
+          <section>
+            <div class="row four" id="colorParts"></div>
+            <div class="swatches" id="swatches"></div>
+          </section>
+        </div>
+      </div>
+      <nav class="tabbar" role="tablist" aria-label="Controls">
+        <button class="tab" role="tab" id="tab-build" data-tab="build" aria-controls="pane-build">Build</button>
+        <button class="tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
+        <button class="tab tab-surprise" data-action="surprise">Surprise</button>
+        <button class="tab" data-action="timer">Grown-ups</button>
+        <a class="tab tab-home" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+      </nav>
+    </div>
+  </main>
+
+  <!-- Grown-up settings: play timer, sound, tilt -->
+  <div class="modal" id="timerModal" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+      <h2 id="sheetTitle">Grown-ups</h2>
+      <h3>Play timer</h3>
+      <div id="timerSetup">
+        <p class="sub">When time is up, the rocket lands and rests, and the controls lock.</p>
+        <h4>How long</h4>
+        <div class="row" id="minuteRow"></div>
+        <h4>Next activity <span class="opt-txt">(optional)</span></h4>
+        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
+        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
+        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
+        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Goodbye launch button to press</label>
+        <div class="sheet-actions">
+          <button class="btn primary" id="timerStart">Start timer</button>
+        </div>
+      </div>
+      <div id="timerRunning" hidden>
+        <p class="time-left" id="timerLeft"></p>
+        <p class="sub">Hold a button for 2 seconds.</p>
+        <div class="sheet-actions">
+          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
+          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
+        </div>
+      </div>
+      <hr>
+      <h3>Sound</h3>
+      <p class="sub" id="soundState">Sound is off.</p>
+      <div class="sheet-actions">
+        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Hold to turn sound on</span></button>
+      </div>
+      <hr>
+      <h3>Tilt</h3>
+      <p class="sub" id="tiltState">Tilt the device to steer the rocket while it flies.</p>
+      <div class="sheet-actions">
+        <button class="btn" id="tiltBtn">Turn on tilt</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn" data-action="timerclose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rest screen shown when play time is over -->
+  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
+    <div class="rest-card">
+      <svg class="rest-art" id="restArt" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
+      <h2 id="restTitle">All done!</h2>
+      <p class="rest-line">The rocket is resting.</p>
+      <p class="rest-line">It will be right here next time.</p>
+      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
+    </div>
+    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
+  </div>
+</div>
+
+<!-- Full-screen launch -->
+<div class="flight" id="flight" hidden>
+  <canvas id="fcv" aria-label="The rocket flying"></canvas>
+  <div class="hud" id="hud"><div class="lbl">Altitude</div><div class="num" id="altNum">0 m</div><div class="best" id="altBest" hidden></div></div>
+  <div class="count" aria-live="polite"><span id="countNum"></span></div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="fhint" id="fhint" hidden>Tap to boost!</div>
+  <button class="btn fback" id="fback">Back</button>
+  <div class="landbar" id="landbar" hidden>
+    <button class="btn launch" id="again"><span>Launch again!</span></button>
+    <button class="btn bbuild" id="fbuild">Build</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var OUT = "#1D2340";
+  var KEY = "rocketbuilder-v1";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var PALETTE = [
+    ["Red", "#E63946"], ["Orange", "#F77F00"], ["Yellow", "#FFC93C"], ["Lime", "#A7D129"],
+    ["Green", "#2E9E5B"], ["Teal", "#1FA6A0"], ["Sky", "#5BC0EB"], ["Blue", "#2D5BD7"],
+    ["Purple", "#7B4FC9"], ["Pink", "#F26CA7"], ["Brown", "#8B5A3C"], ["Gray", "#9AA3AF"],
+    ["White", "#FFFFFF"], ["Black", "#26282E"]
+  ];
+  var HEX = {};
+  PALETTE.forEach(function (p) { HEX[p[0]] = p[1]; });
+  var NAMES = PALETTE.map(function (p) { return p[0]; });
+  function hex(name) { return HEX[name] || "#999999"; }
+  function rgb(h) {
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+  function isDark(h) {
+    var c = rgb(h);
+    return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 120;
+  }
+  // Linear blend of hex color a toward hex color b by fraction t.
+  function mix(a, b, t) {
+    var x = rgb(a), y = rgb(b);
+    return "#" + [0, 1, 2].map(function (k) {
+      var v = Math.round(x[k] + (y[k] - x[k]) * t);
+      return (v < 16 ? "0" : "") + v.toString(16);
+    }).join("");
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function n2(v) { return (Math.round(v * 100) / 100).toString(); }
+  // 12400 -> "12,400"
+  function fmt(v) { return String(Math.max(0, Math.floor(v))).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+
+  // ---------- What can be built ----------
+  var BUILD = [
+    { id: "nose", label: "Nose", opts: [["pointy", "Pointy"], ["round", "Round"], ["capsule", "Capsule"], ["dome", "Dome"]] },
+    { id: "stages", label: "Stages", opts: [[1, "1 stage"], [2, "2 stages"], [3, "3 stages"]] },
+    { id: "size", label: "Size", opts: [["short", "Short"], ["medium", "Medium"], ["tall", "Tall"]] },
+    { id: "fins", label: "Fins", opts: [["swept", "Swept"], ["big", "Big"], ["round", "Round"], ["zigzag", "Zigzag"]] },
+    { id: "windows", label: "Windows", opts: [[0, "None"], [1, "1 window"], [2, "2 windows"], [3, "3 windows"]] },
+    { id: "boosters", label: "Boosters", opts: [[0, "None"], [2, "2 boosters"]] }
+  ];
+  var BUILD_BY = {};
+  BUILD.forEach(function (b) { BUILD_BY[b.id] = b; });
+  var CPARTS = [["nose", "Nose"], ["body", "Body"], ["bands", "Stripes"], ["fins", "Fins"],
+    ["windows", "Windows"], ["boosters", "Boosters"], ["flame", "Flame"]];
+
+  function freshState() {
+    return {
+      nose: "pointy", stages: 2, size: "medium", fins: "swept", windows: 2, boosters: 0,
+      colors: { nose: "Red", body: "White", bands: "Blue", fins: "Red", windows: "Sky", boosters: "Gray", flame: "Orange" },
+      buildPart: "nose", colorPart: "nose"
+    };
+  }
+  function validOpt(id, v) {
+    return BUILD_BY[id].opts.some(function (o) { return o[0] === v; });
+  }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        BUILD.forEach(function (b) { if (validOpt(b.id, o[b.id])) s[b.id] = o[b.id]; });
+        if (o.colors) Object.keys(s.colors).forEach(function (k) { if (HEX[o.colors[k]]) s.colors[k] = o.colors[k]; });
+        if (BUILD_BY[o.buildPart]) s.buildPart = o.buildPart;
+        if (CPARTS.some(function (p) { return p[0] === o.colorPart; })) s.colorPart = o.colorPart;
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return s;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  var state = loadState();
+
+  // ---------- Rocket geometry (SVG units; y = 0 is the pad, up is negative) ----------
+  var NOZ = 20;   // engine bell height under each stage
+  var AD = 16;    // adapter (stripe colored) between stages
+  var TOTAL = { short: 190, medium: 250, tall: 320 };
+  var FR = { 1: [1], 2: [0.56, 0.44], 3: [0.4, 0.32, 0.28] };
+  var WID = { 1: [96], 2: [100, 82], 3: [104, 86, 72] };
+  var FIN_S = 56;
+  var FIN_REACH = { swept: 1, big: 1.35, round: 1.2, zigzag: 1.1 };
+
+  function rectS(x, y, w, h, fill, extra) {
+    return '<rect x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(w) + '" height="' + n2(h) + '" fill="' + fill + '"' + (extra || "") + "/>";
+  }
+  var STROKE5 = ' stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"';
+
+  function bellS(cx, yb, w, h) {
+    return '<path d="M ' + n2(cx - 0.21 * w) + " " + n2(yb - 2) + " L " + n2(cx - 0.3 * w) + " " + n2(yb + h) + " L " + n2(cx + 0.3 * w) + " " + n2(yb + h) +
+      " L " + n2(cx + 0.21 * w) + " " + n2(yb - 2) + ' Z" fill="#5B6684"' + STROKE5 + "/>" +
+      '<path d="M ' + n2(cx - 0.29 * w) + " " + n2(yb + h - 5) + " L " + n2(cx + 0.29 * w) + " " + n2(yb + h - 5) + '" stroke="#9AA3AF" stroke-width="3"/>';
+  }
+  // A cylinder section with shading: highlight on the left, shadow on the right.
+  function tubeS(cx, top, w, h, fill, stripeY, stripe) {
+    var x = cx - w / 2, o = "";
+    o += rectS(x, top, w, h, fill);
+    if (stripe) o += rectS(x, stripeY, w, 12, stripe, ' stroke="' + OUT + '" stroke-width="3"');
+    o += rectS(x + w * 0.14, top + 2, w * 0.13, h - 4, "rgba(255,255,255,0.45)");
+    o += rectS(x + w * 0.72, top + 2, w * 0.17, h - 4, "rgba(29,35,64,0.13)");
+    o += rectS(x, top, w, h, "none", STROKE5 + ' rx="4"');
+    return o;
+  }
+  function windowS(y, r, glass) {
+    return '<circle cx="0" cy="' + n2(y) + '" r="' + n2(r + 6) + '" fill="#C9D2E3"' + STROKE5 + "/>" +
+      '<circle cx="0" cy="' + n2(y) + '" r="' + n2(r) + '" fill="' + glass + '" stroke="' + OUT + '" stroke-width="3.5"/>' +
+      '<ellipse cx="' + n2(-r * 0.32) + '" cy="' + n2(y - r * 0.35) + '" rx="' + n2(r * 0.28) + '" ry="' + n2(r * 0.2) + '" transform="rotate(-35 ' + n2(-r * 0.32) + " " + n2(y - r * 0.35) + ')" fill="rgba(255,255,255,0.8)"/>';
+  }
+
+  function noseS(type, w, y0, c) {
+    var col = hex(c.nose), o = "", h, top, d;
+    if (type === "round") {
+      h = 0.8 * w;
+      d = "M " + n2(-w / 2) + " " + y0 + " C " + n2(-w / 2) + " " + n2(y0 - 0.72 * h) + " " + n2(-0.27 * w) + " " + n2(y0 - h) + " 0 " + n2(y0 - h) +
+        " C " + n2(0.27 * w) + " " + n2(y0 - h) + " " + n2(w / 2) + " " + n2(y0 - 0.72 * h) + " " + n2(w / 2) + " " + y0 + " Z";
+      o += '<path d="' + d + '" fill="' + col + '"' + STROKE5 + "/>";
+      o += '<ellipse cx="' + n2(-0.22 * w) + '" cy="' + n2(y0 - 0.45 * h) + '" rx="' + n2(0.07 * w) + '" ry="' + n2(0.22 * h) + '" fill="rgba(255,255,255,0.45)"/>';
+      top = y0 - h;
+    } else if (type === "capsule") {
+      h = 0.62 * w;
+      var tw = 0.2 * w;
+      d = "M " + n2(-w / 2) + " " + y0 + " L " + n2(-tw) + " " + n2(y0 - h + 8) + " Q " + n2(-tw) + " " + n2(y0 - h) + " " + n2(-tw + 8) + " " + n2(y0 - h) +
+        " L " + n2(tw - 8) + " " + n2(y0 - h) + " Q " + n2(tw) + " " + n2(y0 - h) + " " + n2(tw) + " " + n2(y0 - h + 8) + " L " + n2(w / 2) + " " + y0 + " Z";
+      o += '<line x1="0" y1="' + n2(y0 - h) + '" x2="0" y2="' + n2(y0 - h - 32) + '" stroke="' + OUT + '" stroke-width="10" stroke-linecap="round"/>';
+      o += '<line x1="0" y1="' + n2(y0 - h) + '" x2="0" y2="' + n2(y0 - h - 32) + '" stroke="#C9D2E3" stroke-width="4" stroke-linecap="round"/>';
+      o += '<circle cx="0" cy="' + n2(y0 - h - 36) + '" r="8" fill="' + hex(c.bands) + '"' + STROKE5 + "/>";
+      o += '<path d="' + d + '" fill="' + col + '"' + STROKE5 + "/>";
+      o += '<path d="M ' + n2(-0.33 * w) + " " + n2(y0 - 4) + " L " + n2(-0.17 * w) + " " + n2(y0 - h + 10) + '" stroke="rgba(255,255,255,0.5)" stroke-width="' + n2(0.07 * w) + '" stroke-linecap="round"/>';
+      top = y0 - h - 44;
+    } else if (type === "dome") {
+      var R = w / 2 - 3;
+      var glass = mix(hex(c.windows), "#FFFFFF", 0.45);
+      o += '<path d="M ' + n2(-R) + " " + n2(y0 - 10) + " A " + n2(R) + " " + n2(R) + " 0 0 1 " + n2(R) + " " + n2(y0 - 10) + ' Z" fill="' + glass + '"' + STROKE5 + "/>";
+      // a little star inside the glass
+      o += '<path d="' + starD(0, y0 - 10 - R * 0.45, R * 0.36, R * 0.16, 5) + '" fill="#FFC93C" stroke="' + OUT + '" stroke-width="3" stroke-linejoin="round"/>';
+      o += '<path d="M ' + n2(-R * 0.62) + " " + n2(y0 - 10 - R * 0.35) + " A " + n2(R * 0.72) + " " + n2(R * 0.72) + " 0 0 1 " + n2(-R * 0.15) + " " + n2(y0 - 10 - R * 0.85) + '" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="6" stroke-linecap="round"/>';
+      o += rectS(-w / 2, y0 - 14, w, 16, col, STROKE5 + ' rx="5"');
+      top = y0 - 10 - R;
+    } else {
+      h = 1.25 * w;
+      d = "M " + n2(-w / 2) + " " + y0 + " C " + n2(-w / 2) + " " + n2(y0 - 0.45 * h) + " " + n2(-0.2 * w) + " " + n2(y0 - 0.85 * h) + " 0 " + n2(y0 - h) +
+        " C " + n2(0.2 * w) + " " + n2(y0 - 0.85 * h) + " " + n2(w / 2) + " " + n2(y0 - 0.45 * h) + " " + n2(w / 2) + " " + y0 + " Z";
+      o += '<path d="' + d + '" fill="' + col + '"' + STROKE5 + "/>";
+      o += '<path d="M ' + n2(-0.3 * w) + " " + n2(y0 - 6) + " Q " + n2(-0.28 * w) + " " + n2(y0 - 0.5 * h) + " " + n2(-0.08 * w) + " " + n2(y0 - 0.82 * h) + '" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="' + n2(0.07 * w) + '" stroke-linecap="round"/>';
+      top = y0 - h;
+    }
+    return { svg: o, top: top };
+  }
+
+  function starD(cx, cy, R, r, n) {
+    var d = "", k, a, rr;
+    for (k = 0; k < n * 2; k++) {
+      a = k * Math.PI / n;
+      rr = k % 2 ? r : R;
+      d += (k ? " L " : "M ") + n2(cx + rr * Math.sin(a)) + " " + n2(cy - rr * Math.cos(a));
+    }
+    return d + " Z";
+  }
+
+  function finD(style, x0, yb, L, S) {
+    if (style === "big") {
+      return "M " + n2(x0) + " " + n2(yb - 1.25 * L) + " L " + n2(x0 + 1.35 * S) + " -6 L " + n2(x0 + 1.35 * S) + " 0 L " + n2(x0) + " 0 Z";
+    }
+    if (style === "round") {
+      return "M " + n2(x0) + " " + n2(yb - L) + " C " + n2(x0 + 1.25 * S) + " " + n2(yb - 0.9 * L) + " " + n2(x0 + 1.2 * S) + " 0 " + n2(x0 + 0.55 * S) + " 0 L " + n2(x0) + " 0 Z";
+    }
+    if (style === "zigzag") {
+      return "M " + n2(x0) + " " + n2(yb - L) + " L " + n2(x0 + 0.75 * S) + " " + n2(yb - 0.62 * L) + " L " + n2(x0 + 0.42 * S) + " " + n2(yb - 0.38 * L) +
+        " L " + n2(x0 + 1.1 * S) + " 0 L " + n2(x0 + 0.2 * S) + " 0 L " + n2(x0) + " " + n2(yb) + " Z";
+    }
+    return "M " + n2(x0) + " " + n2(yb - L) + " L " + n2(x0 + S) + " -12 L " + n2(x0 + S) + " 0 L " + n2(x0 + 0.25 * S) + " 0 L " + n2(x0) + " " + n2(yb) + " Z";
+  }
+
+  // Builds the rocket as drawing layers. Each layer belongs to a group that moves as one piece in flight:
+  // stage index (0 = bottom), or "bL"/"bR" for the side boosters. Layers are listed back to front.
+  function geo(cfg) {
+    var c = cfg.colors, n = cfg.stages, total = TOTAL[cfg.size];
+    var st = [], y = -NOZ, i, k, h;
+    for (i = 0; i < n; i++) {
+      h = total * FR[n][i];
+      st.push({ i: i, w: WID[n][i], yb: y, yt: y - h, top: i === n - 1 });
+      y -= h;
+    }
+    st.forEach(function (s) { s.bodyTop = s.top ? s.yt : s.yt + AD; s.exit = s.yb + NOZ; });
+    var T = st[n - 1];
+    var nose = noseS(cfg.nose, T.w, T.yt, c);
+
+    // Windows: a column of portholes from the top down, each belonging to the stage it sits on.
+    var r = 14, wins = [], wy = T.bodyTop + r + 16, si = n - 1;
+    for (k = 0; k < cfg.windows && si >= 0; k++) {
+      while (si >= 0 && wy > st[si].yb - 30 - r) {
+        si--;
+        if (si >= 0) wy = Math.max(wy, st[si].bodyTop + r + 12);
+      }
+      if (si < 0) break;
+      if (wy < st[si].bodyTop + r + 10) wy = st[si].bodyTop + r + 10;
+      if (wy > st[si].yb - 30 - r) { k--; continue; }
+      wins.push({ y: wy, s: si });
+      wy += 2 * r + 16;
+    }
+    var glass = hex(c.windows);
+
+    var s0 = st[0];
+    var h0 = s0.yb - s0.bodyTop;
+    var L = clamp(h0 * 0.75, 44, 92);
+    var x0 = s0.w / 2 - 3;
+    var reach = FIN_S * FIN_REACH[cfg.fins];
+    var bw = Math.max(28, 0.32 * s0.w);
+    var bh = clamp(h0 * 0.85, 80, 170);
+    var bcx = s0.w / 2 + bw / 2 - 6;
+
+    var layers = [];
+    for (i = n - 1; i >= 0; i--) {
+      var s = st[i];
+      if (i === 0) {
+        var fd = finD(cfg.fins, x0, s0.yb, L, FIN_S);
+        var finTop = s0.yb - (cfg.fins === "big" ? 1.25 : 1) * L;
+        layers.push({
+          group: "0",
+          svg: '<path d="' + fd + '" transform="scale(-1 1)" fill="' + hex(c.fins) + '"' + STROKE5 + "/>" +
+            '<path d="' + fd + '" fill="' + hex(c.fins) + '"' + STROKE5 + "/>",
+          bbox: [-(x0 + reach) - 8, finTop - 8, x0 + reach + 8, 8]
+        });
+        if (cfg.boosters) {
+          [-1, 1].forEach(function (side) {
+            var cx = side * bcx, btop = s0.yb - bh, ch = bw * 1.25, o = "";
+            o += bellS(cx, s0.yb, bw * 1.4, NOZ * 0.75);
+            o += tubeS(cx, btop, bw, bh, hex(c.boosters), btop + 14, hex(c.bands));
+            o += '<path d="M ' + n2(cx - bw / 2) + " " + n2(btop) + " Q " + n2(cx - bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx) + " " + n2(btop - ch) +
+              " Q " + n2(cx + bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx + bw / 2) + " " + n2(btop) + ' Z" fill="' + hex(c.nose) + '"' + STROKE5 + "/>";
+            layers.push({
+              group: side < 0 ? "bL" : "bR",
+              svg: o,
+              bbox: [cx - bw * 0.7 - 6, btop - ch - 8, cx + bw * 0.7 + 6, s0.yb + NOZ + 8]
+            });
+          });
+        }
+      }
+      var o2 = bellS(0, s.yb, s.w, NOZ);
+      o2 += tubeS(0, s.bodyTop, s.w, s.yb - s.bodyTop, hex(c.body), s.yb - 28, hex(c.bands));
+      if (!s.top) {
+        var wu = st[i + 1].w;
+        o2 += '<path d="M ' + n2(-s.w / 2) + " " + n2(s.bodyTop) + " L " + n2(-wu / 2) + " " + n2(s.yt) + " L " + n2(wu / 2) + " " + n2(s.yt) + " L " + n2(s.w / 2) + " " + n2(s.bodyTop) +
+          ' Z" fill="' + hex(c.bands) + '"' + STROKE5 + "/>";
+      }
+      wins.forEach(function (wn) { if (wn.s === i) o2 += windowS(wn.y, r, glass); });
+      if (s.top) o2 += nose.svg;
+      layers.push({
+        group: String(i),
+        svg: o2,
+        bbox: [-s.w / 2 - 8, (s.top ? nose.top : s.yt) - 8, s.w / 2 + 8, s.yb + NOZ + 8]
+      });
+    }
+    var bb = [Infinity, Infinity, -Infinity, -Infinity];
+    layers.forEach(function (l) {
+      bb[0] = Math.min(bb[0], l.bbox[0]); bb[1] = Math.min(bb[1], l.bbox[1]);
+      bb[2] = Math.max(bb[2], l.bbox[2]); bb[3] = Math.max(bb[3], l.bbox[3]);
+    });
+    return {
+      stages: st, layers: layers, bbox: bb, noseTop: nose.top, top: T,
+      booster: cfg.boosters ? { cx: bcx, w: bw, exit: s0.yb + NOZ * 0.75 } : null
+    };
+  }
+
+  function rocketSVG(g) {
+    return g.layers.map(function (l) { return '<g data-g="' + l.group + '">' + l.svg + "</g>"; }).join("");
+  }
+
+  // ---------- The launch pad scene (builder picture and rest picture) ----------
+  function cloudS(x, y, s) {
+    var parts = [[-0.36, 0.06, 0.27], [0, -0.14, 0.36], [0.36, 0.04, 0.26], [0.14, 0.14, 0.26], [-0.16, 0.14, 0.26]];
+    var a = "", b = "";
+    parts.forEach(function (p) {
+      a += '<circle cx="' + n2(x + p[0] * s) + '" cy="' + n2(y + p[1] * s) + '" r="' + n2(p[2] * s + 3) + '" fill="' + OUT + '"/>';
+      b += '<circle cx="' + n2(x + p[0] * s) + '" cy="' + n2(y + p[1] * s) + '" r="' + n2(p[2] * s - 1) + '" fill="#FFFFFF"/>';
+    });
+    return a + b;
+  }
+  function towerS() {
+    var o = "", x1 = -228, x2 = -192, top = -400, y, k = 0;
+    var lines = "";
+    for (y = 0; y > top; y -= 36) {
+      lines += "M " + x1 + " " + y + " L " + x2 + " " + (y - 36) + " M " + x2 + " " + y + " L " + x1 + " " + (y - 36) + " ";
+      k++;
+    }
+    lines += "M " + x1 + " 0 L " + x1 + " " + top + " M " + x2 + " 0 L " + x2 + " " + top + " M -192 -330 L -70 -330 M -192 -300 L -70 -330";
+    o += '<path d="' + lines + '" fill="none" stroke="' + OUT + '" stroke-width="11" stroke-linecap="round"/>';
+    o += '<path d="' + lines + '" fill="none" stroke="#E63946" stroke-width="5" stroke-linecap="round"/>';
+    o += '<rect x="-236" y="' + (top - 16) + '" width="52" height="18" rx="5" fill="#FFC93C"' + STROKE5 + "/>";
+    o += '<circle cx="-210" cy="' + (top - 26) + '" r="8" fill="#E63946"' + STROKE5 + "/>";
+    return o;
+  }
+  function sceneSVG(cfg, night) {
+    var g = geo(cfg);
+    var o = "<defs>" +
+      '<linearGradient id="' + (night ? "n" : "d") + 'sky" gradientUnits="userSpaceOnUse" x1="0" y1="-640" x2="0" y2="20">' +
+      '<stop offset="0" stop-color="#4FAEEB"/><stop offset="1" stop-color="#CBEBFF"/></linearGradient>' +
+      '<linearGradient id="' + (night ? "n" : "d") + 'dusk" gradientUnits="userSpaceOnUse" x1="0" y1="-640" x2="0" y2="20">' +
+      '<stop offset="0" stop-color="#1B1F4A"/><stop offset="0.6" stop-color="#5B3C8C"/><stop offset="1" stop-color="#F28C6B"/></linearGradient>' +
+      "</defs>";
+    var id = night ? "n" : "d";
+    o += '<rect x="-3000" y="-3600" width="6000" height="3640" fill="url(#' + id + 'sky)"/>';
+    o += '<g transform="translate(190 -500)"><circle r="44" fill="#FFC93C"' + STROKE5 + '/><circle r="30" fill="#FFE07A"/></g>';
+    o += cloudS(-120, -470, 120) + cloudS(150, -300, 90);
+    var stars = "";
+    [[-200, -560], [-60, -520], [80, -580], [210, -420], [-150, -380], [30, -430], [-230, -250], [230, -540], [120, -500], [-20, -600]].forEach(function (p, i) {
+      stars += '<path d="' + starD(p[0], p[1], i % 3 ? 7 : 11, i % 3 ? 3 : 4.5, 4) + '" fill="#FFF6C8"/>';
+    });
+    o += '<g class="night"' + (night ? ' style="opacity:1;transition:none"' : "") + '><rect x="-3000" y="-3600" width="6000" height="3640" fill="url(#' + id + 'dusk)"/>' + stars +
+      '<g transform="translate(-170 -520)"><circle r="34" fill="#FFF6C8"' + STROKE5 + '/><circle cx="14" cy="-8" r="30" fill="#2A2C66"/></g></g>';
+    o += '<ellipse cx="-230" cy="30" rx="220" ry="80" fill="#5DAE4A"' + STROKE5 + "/>";
+    o += '<ellipse cx="250" cy="34" rx="240" ry="70" fill="#5DAE4A"' + STROKE5 + "/>";
+    o += '<rect x="-3000" y="16" width="6000" height="3000" fill="#7CC55A" stroke="' + OUT + '" stroke-width="5"/>';
+    o += towerS();
+    // pad
+    o += '<rect x="-150" y="-2" width="300" height="24" rx="5" fill="#9AA3AF"' + STROKE5 + "/>";
+    for (var k = 0; k < 5; k++) {
+      o += '<path d="M ' + (-120 + k * 54) + " 3 l 18 0 l -10 14 l -18 0 Z" + '" fill="#FFC93C" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    }
+    o += '<rect x="-128" y="22" width="20" height="20" fill="#6C7590"' + STROKE5 + '/><rect x="108" y="22" width="20" height="20" fill="#6C7590"' + STROKE5 + "/>";
+    o += '<g class="rocket" id="' + (night ? "restRocket" : "rocketG") + '">' + rocketSVG(g) + "</g>";
+    if (!night) o += '<g id="fxG"></g>';
+    return o;
+  }
+
+  // ---------- Controls ----------
+  var $ = function (id) { return document.getElementById(id); };
+  var art = $("art");
+
+  BUILD.forEach(function (b) {
+    var el = document.createElement("button");
+    el.className = "btn";
+    el.dataset.bpart = b.id;
+    el.textContent = b.label;
+    $("buildParts").appendChild(el);
+  });
+  PALETTE.forEach(function (p) {
+    var b = document.createElement("button");
+    b.className = "swatch";
+    b.dataset.color = p[0];
+    b.style.background = p[1];
+    b.style.color = isDark(p[1]) ? "#FFFFFF" : "#1D2340";
+    b.setAttribute("aria-label", p[0]);
+    b.title = p[0];
+    $("swatches").appendChild(b);
+  });
+
+  // Mini rocket for an option button, cropped to show the part being picked.
+  function miniView(g, part) {
+    var T = g.top, b = g.bbox, size;
+    if (part === "nose") {
+      size = Math.max(T.yt - g.noseTop + 50, T.w + 60);
+      return [-size / 2, T.yt + 26 - size, size, size * 1.23];
+    }
+    if (part === "fins") {
+      size = Math.max(b[2] - b[0] + 10, 170);
+      return [-size / 2, 22 - size * 1.23, size, size * 1.23];
+    }
+    if (part === "windows") return [-100, T.bodyTop - 50, 200, 246];
+    if (part === "boosters") return [-150, -320, 300, 340];
+    return [-210, -500, 420, 520];
+  }
+
+  var optionsFor = null;
+  function buildOptionButtons(part) {
+    var el = $("options");
+    el.innerHTML = "";
+    BUILD_BY[part].opts.forEach(function (o) {
+      var b = document.createElement("button");
+      b.className = "btn opt";
+      b.dataset.opt = String(o[0]);
+      b.innerHTML = '<svg viewBox="0 0 10 10" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg><span>' + o[1] + "</span>";
+      el.appendChild(b);
+    });
+    optionsFor = part;
+  }
+
+  function colorPartsVisible() {
+    return CPARTS.filter(function (p) {
+      if (p[0] === "boosters" && !state.boosters) return false;
+      if (p[0] === "windows" && !state.windows && state.nose !== "dome") return false;
+      return true;
+    });
+  }
+
+  function render() {
+    var g = geo(state);
+    art.innerHTML = sceneSVG(state, false);
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-bpart]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.bpart === state.buildPart));
+    });
+    if (optionsFor !== state.buildPart) buildOptionButtons(state.buildPart);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-opt]"), function (b) {
+      var spec = BUILD_BY[state.buildPart];
+      var val = spec.opts.filter(function (o) { return String(o[0]) === b.dataset.opt; })[0][0];
+      b.setAttribute("aria-pressed", String(val === state[state.buildPart]));
+      var cfg = Object.assign({}, state);
+      cfg[state.buildPart] = val;
+      var mg = geo(cfg);
+      var vb = miniView(mg, state.buildPart);
+      var svg = b.querySelector("svg");
+      svg.setAttribute("viewBox", vb.map(n2).join(" "));
+      svg.innerHTML = rocketSVG(mg);
+    });
+
+    var parts = colorPartsVisible();
+    if (!parts.some(function (p) { return p[0] === state.colorPart; })) state.colorPart = parts[0][0];
+    var partsEl = $("colorParts");
+    partsEl.innerHTML = "";
+    parts.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "btn";
+      b.dataset.part = p[0];
+      b.setAttribute("aria-pressed", String(p[0] === state.colorPart));
+      b.innerHTML = '<span class="dot" style="background:' + hex(state.colors[p[0]]) + '"></span>' + p[1];
+      partsEl.appendChild(b);
+    });
+    var current = state.colors[state.colorPart];
+    Array.prototype.forEach.call(document.querySelectorAll("[data-color]"), function (b) {
+      var on = b.dataset.color === current;
+      b.setAttribute("aria-pressed", String(on));
+      b.textContent = on ? "✓" : "";
+    });
+    art.setAttribute("aria-label", "A " + state.size + " rocket with " + state.stages + (state.stages === 1 ? " stage" : " stages") + " on its launch pad");
+    save();
+    layerKey = ""; // flight pictures are rebuilt from the new design
+    return g;
+  }
+
+  // Builder effects: a squash-and-stretch pop, sparkles, steam puffs.
+  function restartAnim(el, cls) {
+    if (!el || reduce) return;
+    el.classList.remove("pop", "hop");
+    void el.getBoundingClientRect();
+    el.classList.add(cls);
+  }
+  var SPARK_COLS = ["#FFC93C", "#F26CA7", "#5BC0EB", "#A7D129", "#FFFFFF", "#F77F00"];
+  function sparkles(x, y, n, spread) {
+    var fx = $("fxG");
+    if (!fx) return;
+    var s = "";
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, d = spread * (0.3 + Math.random() * 0.7);
+      var px = x + Math.cos(a) * d, py = y + Math.sin(a) * d, r = rand(10, 22);
+      s += '<path class="spark" style="animation-delay:' + Math.round(Math.random() * 160) + 'ms" d="' + starD(px, py, r, r * 0.38, 4) + '" fill="' + pick(SPARK_COLS) + '" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    }
+    var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.innerHTML = s;
+    fx.appendChild(g);
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1000);
+  }
+  function puffs(x, y, n) {
+    var fx = $("fxG");
+    if (!fx) return;
+    var s = "";
+    for (var i = 0; i < n; i++) {
+      s += '<circle class="puff" style="animation-delay:' + Math.round(i * 40) + 'ms" cx="' + n2(x + rand(-70, 70)) + '" cy="' + n2(y + rand(-14, 6)) + '" r="' + n2(rand(16, 30)) + '" fill="#FFFFFF" stroke="#C9D2E3" stroke-width="4"/>';
+    }
+    var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.innerHTML = s;
+    fx.appendChild(g);
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1300);
+  }
+  function celebrate(g) {
+    restartAnim($("rocketG"), "pop");
+    sparkles(0, (g.noseTop) / 2, 12, 150);
+  }
+
+  function svgPoint(e) {
+    var m = art.getScreenCTM();
+    if (!m) return { x: 0, y: -200 };
+    var p = art.createSVGPoint();
+    p.x = e.clientX; p.y = e.clientY;
+    return p.matrixTransform(m.inverse());
+  }
+  $("scene").addEventListener("pointerdown", function (e) {
+    if (timer.phase === "resting") return;
+    var p = svgPoint(e);
+    sparkles(p.x, p.y, 7, 50);
+    if (timer.phase === "ending") return;
+    restartAnim($("rocketG"), "hop");
+    puffs(0, 0, 6);
+    if (soundOn) { unlockAudio(); blip(); }
+  });
+
+  // Phone-and-tablet control tabs.
+  var tab = "build";
+  function showTab(name) {
+    tab = name;
+    $("tab-build").closest(".panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    });
+  }
+
+  function surprise() {
+    BUILD.forEach(function (b) { state[b.id] = pick(b.opts)[0]; });
+    if (Math.random() < 0.6 && state.windows === 0) state.windows = 1 + Math.floor(Math.random() * 3);
+    Object.keys(state.colors).forEach(function (k) { state.colors[k] = pick(NAMES); });
+    // Keep neighbouring parts from vanishing into each other.
+    while (state.colors.bands === state.colors.body) state.colors.bands = pick(NAMES);
+    while (state.colors.fins === state.colors.body) state.colors.fins = pick(NAMES);
+    while (state.colors.nose === state.colors.body) state.colors.nose = pick(NAMES);
+    if (state.colors.flame === "Black" || state.colors.flame === "Brown" || state.colors.flame === "Gray") state.colors.flame = pick(["Orange", "Red", "Yellow", "Pink", "Purple", "Sky", "Lime"]);
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.dataset.action === "timer") { openTimer(); return; }
+    if (t.dataset.action === "timerclose") { closeTimer(); return; }
+    if (t.id === "timerStart") { startTimer(); return; }
+    if (t.id === "tiltBtn") { toggleTilt(); return; }
+    if (t.id === "goodbyeBtn") { goodbyeLaunch(); return; }
+    if (t.id === "fback" || t.id === "fbuild") { closeFlight(); return; }
+    if (t.id === "again") { if (timer.phase === "idle" || timer.phase === "running") { if (soundOn) unlockAudio(); startFlight(false); } return; }
+    if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); return; }
+    if (t.classList.contains("hold")) return;
+    if (timer.phase === "ending" || timer.phase === "resting") return;
+    if (t.id === "launch") { if (soundOn) unlockAudio(); openFlight(false); return; }
+    var changed = false;
+    if (t.dataset.bpart) { state.buildPart = t.dataset.bpart; }
+    else if (t.dataset.opt !== undefined) {
+      var spec = BUILD_BY[state.buildPart];
+      var val = spec.opts.filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
+      state[state.buildPart] = val;
+      changed = true;
+    }
+    else if (t.dataset.part) { state.colorPart = t.dataset.part; }
+    else if (t.dataset.color) { state.colors[state.colorPart] = t.dataset.color; changed = true; }
+    else if (t.dataset.action === "surprise") { surprise(); changed = true; }
+    else return;
+    var g = render();
+    if (changed) {
+      celebrate(g);
+      if (soundOn) { unlockAudio(); blip(); }
+    }
+  });
+
+  // No pinch-zoom or double-tap zoom on iOS.
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var SKEY = "rocketbuilder-sound-v1";
+  var soundOn = false;
+  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { /* ignore */ }
+  var actx = null, master = null, noiseBuf = null, rumble = null;
+
+  // Only ever called from a tap or press, so iOS lets the audio start.
+  function unlockAudio() {
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = 0.8;
+        master.connect(actx.destination);
+        var len = Math.floor(actx.sampleRate * 1.5);
+        noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+        var d = noiseBuf.getChannelData(0), last = 0;
+        for (var i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
+      }
+      if (actx.state === "suspended") actx.resume();
+    } catch (e) { actx = null; }
+  }
+  function canPlay() { return soundOn && actx && actx.state === "running"; }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
+  function beep(hi) { tone(hi ? 880 : 587, hi ? 0.5 : 0.28, 0.07, "sine"); }
+  function whoosh(vol) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf;
+    f.type = "bandpass"; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.exponentialRampToValueAtTime(1400, t + 0.5);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + 0.8);
+  }
+  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
+  function startRumble() {
+    if (!canPlay() || rumble) return;
+    var src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf; src.loop = true;
+    f.type = "lowpass"; f.frequency.value = 220;
+    g.gain.value = 0.0001;
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start();
+    rumble = { src: src, f: f, g: g };
+  }
+  function setRumble(level) {
+    if (!rumble || !actx) return;
+    rumble.g.gain.setTargetAtTime(Math.max(0.0001, level), actx.currentTime, 0.12);
+    rumble.f.frequency.setTargetAtTime(160 + level * 1800, actx.currentTime, 0.2);
+  }
+  function stopRumble() {
+    if (!rumble) return;
+    var r = rumble;
+    rumble = null;
+    try {
+      r.g.gain.setTargetAtTime(0.0001, actx.currentTime, 0.15);
+      r.src.stop(actx.currentTime + 0.8);
+    } catch (e) { /* ignore */ }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (!actx) return;
+    if (document.hidden) actx.suspend();
+  });
+
+  function updateSoundUI() {
+    $("soundState").textContent = soundOn ? "Sound is on. Soft beeps and rocket rumble." : "Sound is off.";
+    $("soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
+    if (soundOn) { unlockAudio(); setTimeout(chime, 60); } else { stopRumble(); }
+    updateSoundUI();
+  }
+
+  // ---------- Tilt (optional; asked for from a grown-up tap) ----------
+  var TILTKEY = "rocketbuilder-tilt-v1";
+  var tiltOn = false, tiltX = 0, tiltListening = false;
+  var needsPermission = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+  var hasTilt = typeof DeviceOrientationEvent !== "undefined";
+  function onOrient(e) {
+    if (e.gamma == null) return;
+    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
+    var v;
+    if (ang === 90) v = e.beta;
+    else if (ang === -90 || ang === 270) v = -e.beta;
+    else if (ang === 180) v = -e.gamma;
+    else v = e.gamma;
+    tiltX = clamp((v || 0) / 25, -1, 1);
+  }
+  function listenTilt(on) {
+    if (on && !tiltListening) { window.addEventListener("deviceorientation", onOrient); tiltListening = true; }
+    if (!on && tiltListening) { window.removeEventListener("deviceorientation", onOrient); tiltListening = false; tiltX = 0; }
+  }
+  function saveTilt() { try { localStorage.setItem(TILTKEY, tiltOn ? "on" : "off"); } catch (e) { /* ignore */ } }
+  function toggleTilt() {
+    if (!hasTilt) return;
+    if (tiltOn) { tiltOn = false; listenTilt(false); saveTilt(); updateTiltUI(); return; }
+    if (needsPermission) {
+      DeviceOrientationEvent.requestPermission().then(function (res) {
+        if (res === "granted") { tiltOn = true; listenTilt(true); saveTilt(); }
+        updateTiltUI(res !== "granted");
+      }).catch(function () { updateTiltUI(true); });
+    } else {
+      tiltOn = true; listenTilt(true); saveTilt(); updateTiltUI();
+    }
+  }
+  function updateTiltUI(denied) {
+    var b = $("tiltBtn");
+    if (!hasTilt) { $("tiltState").textContent = "Tilt is not available on this device."; b.disabled = true; return; }
+    b.textContent = tiltOn ? "Turn off tilt" : "Turn on tilt";
+    $("tiltState").textContent = denied ? "Tilt was not allowed. You can try again." :
+      (tiltOn ? "Tilt is on. Tilt the device to steer the rocket." : "Tilt the device to steer the rocket while it flies.");
+  }
+  // Where no permission prompt is needed, remember the choice. On iOS a grown-up taps the button each visit.
+  try { if (localStorage.getItem(TILTKEY) === "on" && hasTilt && !needsPermission) { tiltOn = true; listenTilt(true); } } catch (e) { /* ignore */ }
+
+  // ---------- Flight ----------
+  var F = $("flight"), cv = $("fcv"), ctx = cv.getContext("2d");
+  var W = 0, H = 0, DPR = 1, SC = 1, padY = 0, followY = 0;
+  var fl = null, running = false, lastT = 0;
+  var layerKey = "", layerList = null, G = null;
+  var stars = [], speedLines = [];
+
+  function sizeFlight() {
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    SC = Math.min(0.5 * H / 480, 0.62 * W / 300);
+    padY = H * 0.86;
+    followY = H * 0.68;
+    prepLayers();
+  }
+  window.addEventListener("resize", function () { if (!F.hidden) sizeFlight(); });
+
+  // Each rocket layer becomes its own small bitmap, so pieces can fall away on their own.
+  function prepLayers() {
+    var key = JSON.stringify([state.nose, state.stages, state.size, state.fins, state.windows, state.boosters, state.colors]) + "|" + SC.toFixed(3) + "|" + DPR;
+    if (key === layerKey) return;
+    layerKey = key;
+    G = geo(state);
+    var list = G.layers.map(function (l) { return { group: l.group, bbox: l.bbox, canvas: null, old: null }; });
+    // Keep showing the previous bitmaps (stretched) until the new ones are ready.
+    if (layerList && layerList.length === list.length) list.forEach(function (o, i) { o.old = layerList[i].canvas || layerList[i].old; });
+    layerList = list;
+    G.layers.forEach(function (l, i) {
+      var o = list[i];
+      var bw = l.bbox[2] - l.bbox[0], bh = l.bbox[3] - l.bbox[1];
+      var pw = Math.max(1, Math.ceil(bw * SC * DPR)), ph = Math.max(1, Math.ceil(bh * SC * DPR));
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + pw + '" height="' + ph + '" viewBox="' + [l.bbox[0], l.bbox[1], bw, bh].map(n2).join(" ") + '">' + l.svg + "</svg>";
+      var img = new Image();
+      img.onload = function () {
+        if (layerKey !== key) return;
+        var c = document.createElement("canvas");
+        c.width = pw; c.height = ph;
+        c.getContext("2d").drawImage(img, 0, 0, pw, ph);
+        o.canvas = c;
+        o.old = null;
+      };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    });
+  }
+
+  function makeStars() {
+    stars = [];
+    for (var i = 0; i < 150; i++) {
+      stars.push({ x: Math.random(), y: Math.random(), r: rand(0.8, 2.6), d: rand(0.04, 0.16), tw: Math.random() * 6.3, big: Math.random() < 0.08 });
+    }
+    speedLines = [];
+    for (i = 0; i < 18; i++) speedLines.push({ x: Math.random(), y: Math.random(), l: rand(0.6, 1.2) });
+  }
+  makeStars();
+
+  // Sky colors by altitude (m): top of screen, bottom of screen.
+  var SKY = [
+    [0, "#4FAEEB", "#BFE6FF"],
+    [8000, "#3C8EE0", "#9CD5FA"],
+    [25000, "#2152B3", "#5D9DE2"],
+    [50000, "#121F5C", "#2C4E9C"],
+    [80000, "#060A1E", "#14214D"],
+    [130000, "#03040E", "#0B1234"]
+  ];
+  function skyAt(alt) {
+    var i = 0;
+    while (i < SKY.length - 2 && alt > SKY[i + 1][0]) i++;
+    var a = SKY[i], b = SKY[i + 1];
+    var t = clamp((alt - a[0]) / (b[0] - a[0]), 0, 1);
+    return [mix(a[1], b[1], t), mix(a[2], b[2], t)];
+  }
+
+  function newClouds(lo, hi, n) {
+    var list = [];
+    for (var i = 0; i < n; i++) {
+      list.push({ x: rand(-0.1, 1.1) * W, rise: lo + (hi - lo) * (i + Math.random() * 0.8) / n, s: rand(0.55, 1.1) * Math.min(W, H) * 0.32, fg: Math.random() < 0.35 });
+    }
+    return list;
+  }
+
+  function newFlight(goodbye) {
+    var groups = {};
+    G.layers.forEach(function (l) { groups[l.group] = { on: true, dx: 0, dy: 0, s: 1 }; });
+    return {
+      phase: "count", t: 0, total: 0, goodbye: goodbye,
+      rise: 0, v: 0, cam: 0, P: 0, alt: 0, apogee: 0,
+      boost: 0, x: 0, vx: 0, ang: 0, shake: 0, flame: 0, flameGap: 0,
+      active: 0, sepIdx: 0, groups: groups, debris: [], parts: [], texts: [], rings: [],
+      clouds: [{ x: W * 0.18, rise: H * 0.62, s: Math.min(W, H) * 0.3, fg: false }, { x: W * 0.86, rise: H * 0.42, s: Math.min(W, H) * 0.24, fg: false }]
+        .concat(newClouds(H * 1.4, H * 6, 8)),
+      planets: [], lastCount: -1, chute: 0, sway: 0, swayV: 0, landT: 0, emit: { fire: 0, smoke: 0 },
+      seps: sepPlan(), spaceShown: false, D: 0, ptrs: {}, dragX: 0
+    };
+  }
+  // Altitudes (m) where boosters and spent stages fall away.
+  function sepPlan() {
+    var p = [];
+    if (state.boosters) p.push({ alt: 15000, kind: "boosters" });
+    if (state.stages === 2) p.push({ alt: 55000, kind: "stage", idx: 0 });
+    if (state.stages === 3) { p.push({ alt: 35000, kind: "stage", idx: 0 }); p.push({ alt: 70000, kind: "stage", idx: 1 }); }
+    return p;
+  }
+
+  function openFlight(goodbye) {
+    F.hidden = false;
+    sizeFlight();
+    startFlight(goodbye);
+    if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
+  }
+  function startFlight(goodbye) {
+    prepLayers();
+    fl = newFlight(goodbye);
+    $("landbar").hidden = true;
+    $("altBest").hidden = true;
+    $("banner").hidden = true;
+    $("fhint").hidden = true;
+    $("fback").hidden = false;
+    $("altNum").textContent = "0 m";
+    showCount(3);
+    beep(false);
+    fl.lastCount = 3;
+  }
+  function closeFlight() {
+    F.hidden = true;
+    fl = null;
+    running = false;
+    stopRumble();
+    clearTimeout(bannerTimer);
+    $("countNum").className = "";
+    if (timer.phase === "ending") checkEndingDone();
+  }
+
+  function showCount(n) {
+    var el = $("countNum");
+    el.className = "";
+    el.textContent = n > 0 ? String(n) : "Liftoff!";
+    el.style.color = n === 3 ? "#E63946" : n === 2 ? "#FFC93C" : n === 1 ? "#A7D129" : "";
+    void el.offsetWidth;
+    el.className = (n > 0 ? "" : "lift ") + "go";
+    if (fl) fl.rings.push({ x: W / 2, y: H / 2, r: Math.min(W, H) * 0.2, life: 0, max: 0.7, col: n === 3 ? "#E63946" : n === 2 ? "#FFC93C" : n === 1 ? "#A7D129" : "#FFFFFF", w: 18 });
+  }
+  var bannerTimer = null;
+  function banner(text, ms) {
+    var el = $("banner");
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.remove("go");
+    void el.offsetWidth;
+    el.classList.add("go");
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(function () { el.hidden = true; }, ms || 1600);
+  }
+
+  // ---- particles ----
+  var MAXP = 460;
+  function addP(kind, x, y, vx, vy, r, gr, life, col) {
+    var ps = fl.parts;
+    if (ps.length >= MAXP) {
+      // Recycle the oldest smoke first so fire and sparkles always show.
+      for (var i = 0; i < ps.length; i++) if (ps[i].kind === 1) { ps.splice(i, 1); break; }
+      if (ps.length >= MAXP) ps.shift();
+    }
+    ps.push({ kind: kind, x: x, y: y, vx: vx, vy: vy, r: r, gr: gr, age: 0, life: life, col: col, rot: Math.random() * 6 });
+  }
+  function sparkleBurst(x, y, n, speed) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, s = speed * rand(0.3, 1);
+      addP(2, x, y - fl.cam, Math.cos(a) * s, Math.sin(a) * s, rand(7, 15) * Math.max(0.7, SC), 0, rand(0.5, 0.9), pick(SPARK_COLS));
+    }
+  }
+
+  // Rocket point (units) -> world position (px), honoring the current tilt.
+  function rocketOrigin() { return { x: W / 2 + fl.x, y: padY - fl.rise }; }
+  function toWorld(ux, uy) {
+    var o = rocketOrigin(), c = Math.cos(fl.ang), s = Math.sin(fl.ang);
+    var px = ux * SC, py = uy * SC;
+    return { x: o.x + px * c - py * s, y: o.y + px * s + py * c };
+  }
+  function nozzles() {
+    var list = [];
+    if (fl.phase === "descent" || fl.phase === "landed") return list;
+    var s = G.stages[fl.active];
+    list.push({ p: toWorld(0, s.exit), w: s.w * 0.6 * SC, main: true });
+    if (G.booster && fl.groups.bL && fl.groups.bL.on) {
+      list.push({ p: toWorld(-G.booster.cx, G.booster.exit), w: G.booster.w * 0.8 * SC, main: false });
+      list.push({ p: toWorld(G.booster.cx, G.booster.exit), w: G.booster.w * 0.8 * SC, main: false });
+    }
+    return list;
+  }
+
+  function emit(dt) {
+    var nz = nozzles();
+    if (!nz.length || fl.flame <= 0.02 || fl.flameGap > 0) return;
+    var power = fl.flame * (1 + 0.6 * fl.boost);
+    var smokeK = clamp(1 - fl.alt / 45000, 0, 1);
+    var fireRate = 70 * power, smokeRate = (fl.phase === "ignite" ? 150 : 34 * power) * (fl.phase === "ignite" ? 1 : smokeK);
+    if (reduce) smokeRate *= 0.6;
+    fl.emit.fire += fireRate * dt;
+    fl.emit.smoke += smokeRate * dt;
+    var cols = flameCols();
+    while (fl.emit.fire >= 1) {
+      fl.emit.fire -= 1;
+      nz.forEach(function (n) {
+        if (!n.main && Math.random() < 0.5) return;
+        addP(0, n.p.x + rand(-0.3, 0.3) * n.w, n.p.y, rand(-0.2, 0.2) * H * 0.3, -fl.v + H * rand(0.9, 1.5) * (1 + 0.3 * fl.boost),
+          n.w * rand(0.22, 0.38), -n.w * 0.4, rand(0.18, 0.34), pick(cols));
+      });
+    }
+    while (fl.emit.smoke >= 1) {
+      fl.emit.smoke -= 1;
+      nz.forEach(function (n) {
+        if (!n.main && Math.random() < 0.6) return;
+        if (fl.phase === "ignite") {
+          var side = Math.random() < 0.5 ? -1 : 1;
+          addP(1, n.p.x + side * rand(0, 0.5) * n.w, padY - rand(0, 10), side * H * rand(0.25, 0.9), -H * rand(0.02, 0.12),
+            n.w * rand(0.5, 0.9), Math.min(W, H) * rand(0.05, 0.1), rand(1.6, 2.6), Math.random());
+        } else {
+          addP(1, n.p.x + rand(-0.3, 0.3) * n.w, n.p.y + n.w * 0.6, rand(-0.12, 0.12) * H, -fl.v * 0.1 + H * 0.2,
+            n.w * rand(0.45, 0.7), Math.min(W, H) * rand(0.05, 0.09), rand(1.0, 1.7), Math.random());
+        }
+      });
+    }
+  }
+  function flameCols() {
+    var base = hex(state.colors.flame);
+    return [base, mix(base, "#FFE066", 0.5), "#FFE066", mix(base, "#FFFFFF", 0.4)];
+  }
+
+  function updateParts(dt) {
+    var ps = fl.parts, i, p;
+    for (i = ps.length - 1; i >= 0; i--) {
+      p = ps[i];
+      p.age += dt;
+      if (p.age >= p.life) { ps.splice(i, 1); continue; }
+      if (p.kind === 1) {
+        p.vx *= Math.exp(-dt * 1.6);
+        p.vy *= Math.exp(-dt * 1.2);
+        p.vy -= H * 0.04 * dt;
+      } else if (p.kind === 2) {
+        p.vx *= Math.exp(-dt * 2.5);
+        p.vy *= Math.exp(-dt * 2.5);
+        p.vy += H * 0.25 * dt;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.r = Math.max(0.5, p.r + p.gr * dt);
+      // Exhaust hitting the pad spreads out sideways.
+      if ((p.kind === 0 || p.kind === 1) && p.y > padY - 2 && p.vy > 0) {
+        p.y = padY - 2;
+        p.vx = (p.x < W / 2 + fl.x ? -1 : 1) * Math.max(Math.abs(p.vx), H * rand(0.4, 1.0));
+        p.vy = -Math.abs(p.vy) * 0.08;
+      }
+    }
+  }
+
+  // ---- separation ----
+  function separate(plan) {
+    var groups = plan.kind === "boosters" ? ["bL", "bR"] : [String(plan.idx)];
+    var o = rocketOrigin();
+    groups.forEach(function (gid) {
+      fl.groups[gid].on = false;
+      var ls = [];
+      layerList.forEach(function (l) { if (l.group === gid) ls.push(l); });
+      var piv;
+      if (gid === "bL" || gid === "bR") piv = { x: (gid === "bL" ? -1 : 1) * G.booster.cx, y: G.stages[0].yb - 60 };
+      else { var s = G.stages[plan.idx]; piv = { x: 0, y: (s.yb + s.yt) / 2 }; }
+      var side = gid === "bL" ? -1 : gid === "bR" ? 1 : (Math.random() < 0.5 ? -1 : 1);
+      fl.debris.push({
+        layers: ls, ox: o.x, oy: o.y, piv: piv, ang: fl.ang, dx: 0, dy: 0,
+        vx: side * W * (gid.charAt(0) === "b" ? 0.28 : 0.06), vy: -fl.v * 0.9,
+        va: side * (gid.charAt(0) === "b" ? 1.6 : 0.9), age: 0
+      });
+      var wp = toWorld(piv.x, piv.y);
+      for (var i = 0; i < 16; i++) addP(1, wp.x + rand(-30, 30) * SC, wp.y + rand(0, 60) * SC, rand(-1, 1) * H * 0.3, -fl.v * 0.6 + rand(-0.2, 0.2) * H, rand(14, 30) * SC, Math.min(W, H) * 0.06, rand(0.8, 1.3), Math.random());
+      sparkleBurst(wp.x, wp.y + fl.cam, 14, H * 0.6);
+    });
+    if (plan.kind === "stage") {
+      fl.active = plan.idx + 1;
+      fl.flameGap = 0.28;
+      var joint = toWorld(0, G.stages[plan.idx].yt);
+      fl.rings.push({ x: joint.x, y: joint.y, world: true, r: 20 * SC, life: 0, max: 0.6, col: "#FFFFFF", w: 10 });
+      banner("Stage " + (plan.idx + 1) + " away!", 1500);
+    } else {
+      banner("Boosters away!", 1500);
+    }
+    if (!reduce) fl.shake = Math.max(fl.shake, 7);
+    whoosh(0.08);
+  }
+
+  // ---- input on the flight screen: every finger gets a big response ----
+  cv.addEventListener("pointerdown", function (e) {
+    if (!fl) return;
+    e.preventDefault();
+    if (soundOn) unlockAudio();
+    var x = e.clientX, y = e.clientY;
+    fl.ptrs[e.pointerId] = x;
+    sparkleBurst(x, y, 9, H * 0.5);
+    var ph = fl.phase;
+    if (ph === "ascent" || ph === "coast" || ph === "ignite") {
+      fl.boost = Math.min(3, fl.boost + 1);
+      if (ph === "coast") { fl.v += H * 0.9; fl.flameGap = 0; }
+      if (!reduce) fl.shake = Math.max(fl.shake, 6);
+      var nz = nozzles();
+      if (nz.length) {
+        var p = nz[0].p;
+        fl.rings.push({ x: p.x, y: p.y, world: true, r: nz[0].w * 0.6, life: 0, max: 0.5, col: "#FFE066", w: 12 });
+        var cols = flameCols();
+        for (var i = 0; i < 24; i++) addP(0, p.x, p.y, rand(-1, 1) * H * 0.45, -fl.v + H * rand(0.6, 1.8), nz[0].w * rand(0.25, 0.45), -nz[0].w * 0.3, rand(0.25, 0.45), pick(cols));
+        fl.texts.push({ text: pick(["Boost!", "Zoom!", "Whoosh!", "Faster!"]), x: clamp(x, W * 0.2, W * 0.8), y: y, age: 0, life: 1.0, col: pick(SPARK_COLS) });
+      }
+      whoosh(0.1);
+    } else if (ph === "count") {
+      for (var k = 0; k < 6; k++) addP(1, W / 2 + fl.x + rand(-1, 1) * 80 * SC, padY - 4, rand(-1, 1) * H * 0.4, -H * rand(0.05, 0.2), rand(16, 30) * SC, Math.min(W, H) * 0.08, rand(0.9, 1.4), Math.random());
+    } else if (ph === "descent") {
+      fl.swayV += (x < W / 2 ? -1 : 1) * 0.9;
+    }
+  });
+  function ptrMove(e) { if (fl && fl.ptrs[e.pointerId] !== undefined) fl.ptrs[e.pointerId] = e.clientX; }
+  function ptrUp(e) { if (fl) delete fl.ptrs[e.pointerId]; }
+  cv.addEventListener("pointermove", ptrMove);
+  cv.addEventListener("pointerup", ptrUp);
+  cv.addEventListener("pointercancel", ptrUp);
+  cv.addEventListener("pointerleave", ptrUp);
+  F.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+  // ---- simulation ----
+  var COUNT_STEP = 0.75;
+  var DESCENT_T = 4.6;
+  function altFromRise(r) { return 760 * Math.pow(Math.max(0, r) / H, 1.92); }
+
+  function step(dt) {
+    var f = fl;
+    f.t += dt;
+    f.total += dt;
+    f.boost = Math.max(0, f.boost - dt * 1.3);
+    f.shake *= Math.exp(-dt * 5);
+    f.flameGap = Math.max(0, f.flameGap - dt);
+    var prevCam = f.cam;
+
+    // Steering: tilt and dragging fingers nudge the rocket sideways while it flies.
+    var flying = f.phase === "ascent" || f.phase === "coast" || (f.phase === "descent" && f.t < DESCENT_T * 0.65);
+    var drag = 0, nd = 0;
+    Object.keys(f.ptrs).forEach(function (k) { drag += f.ptrs[k] - W / 2; nd++; });
+    var target = flying ? (tiltOn ? tiltX * W * 0.3 : 0) + (nd ? clamp(drag / nd, -W * 0.3, W * 0.3) * 0.5 : 0) : 0;
+    target = clamp(target, -W * 0.32, W * 0.32);
+    f.vx += ((target - f.x) * 5 - f.vx * 3.2) * dt;
+    f.x += f.vx * dt;
+    f.ang = f.phase === "descent" ? 0 : clamp(f.vx / W * 0.5, -0.3, 0.3);
+
+    if (f.phase === "count") {
+      var n = 3 - Math.floor(f.t / COUNT_STEP);
+      if (n !== f.lastCount && n > 0) { f.lastCount = n; showCount(n); beep(false); }
+      // Venting steam while waiting.
+      if (Math.random() < dt * 14) addP(1, W / 2 + rand(-1, 1) * 70 * SC, padY - rand(10, 60) * SC, rand(-1, 1) * H * 0.15, -H * 0.05, rand(10, 18) * SC, Math.min(W, H) * 0.04, rand(0.8, 1.2), Math.random());
+      if (f.t >= COUNT_STEP * 3) {
+        f.phase = "ignite"; f.t = 0;
+        showCount(0);
+        beep(true);
+        startRumble();
+        if (!reduce) f.shake = 14;
+      }
+    } else if (f.phase === "ignite") {
+      f.flame = Math.min(1, f.t / 0.35);
+      if (!reduce) f.shake = Math.max(f.shake, 6);
+      setRumble(0.05 + 0.06 * f.flame);
+      if (f.t >= 0.65) {
+        f.phase = "ascent"; f.t = 0;
+        $("fhint").hidden = false;
+        $("fhint").classList.remove("fade");
+      }
+    } else if (f.phase === "ascent") {
+      f.flame = 1;
+      var a = H * (0.6 + 1.3 * Math.min(1, f.t / 1.2)) * (1 + 0.9 * f.boost);
+      var vmax = H * (3.4 + 1.6 * f.boost);
+      f.v += a * dt;
+      if (f.v > vmax) f.v -= (f.v - vmax) * Math.min(1, dt * 2.5);
+      f.rise += f.v * dt;
+      f.alt = altFromRise(f.rise);
+      if (!reduce && f.t < 1.2) f.shake = Math.max(f.shake, 5 * (1 - f.t / 1.2));
+      setRumble(0.07 + 0.03 * f.boost);
+      if (f.t > 3) $("fhint").classList.add("fade");
+      while (f.sepIdx < f.seps.length && f.alt >= f.seps[f.sepIdx].alt) { separate(f.seps[f.sepIdx]); f.sepIdx++; }
+      if (f.alt >= 100000) {
+        f.phase = "coast"; f.t = 0;
+        banner("Space!", 1800);
+        $("fhint").classList.add("fade");
+        spawnPlanets();
+        if (soundOn) chime();
+      }
+    } else if (f.phase === "coast") {
+      f.flame = Math.max(Math.min(1, f.boost), 1 - f.t / 0.5, 0);
+      f.v *= Math.exp(-dt * 1.25);
+      f.rise += f.v * dt;
+      f.alt = altFromRise(f.rise);
+      setRumble(0.06 * f.flame);
+      while (f.sepIdx < f.seps.length && f.alt >= f.seps[f.sepIdx].alt) { separate(f.seps[f.sepIdx]); f.sepIdx++; }
+      if (f.t >= 2.4 && f.v < H * 0.45) startDescent();
+    } else if (f.phase === "descent") {
+      f.flame = 0;
+      var u = Math.min(1, f.t / DESCENT_T);
+      f.rise = f.D * Math.pow(1 - u, 1.55);
+      f.alt = f.apogee * Math.pow(f.rise / f.D, 3);
+      f.chute = f.t < 0.3 ? 0 : Math.min(1, (f.t - 0.3) / 0.6);
+      if (f.t >= 0.3 && !f.chuteShown) { f.chuteShown = true; banner("Parachute!", 1400); tone(330, 0.25, 0.05, "sine", 160); }
+      f.swayV += (-f.sway * 3 - f.swayV * 0.9) * dt;
+      f.sway += f.swayV * dt;
+      f.sway = clamp(f.sway, -0.35, 0.35);
+      if (u >= 1) land();
+    } else if (f.phase === "landed") {
+      f.chute = Math.max(0, 1 - f.t / 0.6);
+      f.sway *= Math.exp(-dt * 4);
+      // Rebuild: lower stages pop back in, the top piece lifts back into place.
+      var rb = clamp((f.t - 0.5) / 0.7, 0, 1);
+      var e2 = rb === 0 ? 0 : 1 + 2.7 * Math.pow(rb - 1, 3) + 1.7 * Math.pow(rb - 1, 2);
+      Object.keys(f.groups).forEach(function (k) {
+        var gs = f.groups[k];
+        if (k === String(G.stages.length - 1)) { gs.dy = f.topDrop * (1 - Math.min(1, e2)); return; }
+        gs.on = rb > 0;
+        gs.s = Math.max(0, e2);
+      });
+      if (rb > 0 && !f.rebuilt) {
+        f.rebuilt = true;
+        var c0 = toWorld(0, G.stages[0].yb - 80);
+        sparkleBurst(c0.x, c0.y + f.cam, 26, H * 0.7);
+      }
+      if (f.t > 1.4 && !f.done) landedDone();
+    }
+
+    // Camera follows the rocket once it is high enough.
+    var follow = f.phase === "descent" ? H * 0.78 : followY;
+    f.cam = Math.max(0, f.rise - (padY - follow));
+    if (!f.resetCam) f.P += f.cam - prevCam;
+    f.resetCam = false;
+
+    // Debris.
+    f.debris = f.debris.filter(function (d) {
+      d.age += dt;
+      d.vy += H * 2.0 * dt;
+      d.dx += d.vx * dt;
+      d.dy += d.vy * dt;
+      d.ang += d.va * dt;
+      return d.age < 4 && d.oy + d.dy + f.cam < H + 600;
+    });
+    emit(dt);
+    updateParts(dt);
+    f.texts = f.texts.filter(function (t) { t.age += dt; t.y -= H * 0.25 * dt; return t.age < t.life; });
+    f.rings = f.rings.filter(function (r) { r.life += dt; return r.life < r.max; });
+
+    $("altNum").textContent = fmt(f.alt) + " m";
+  }
+
+  function spawnPlanets() {
+    var m = Math.min(W, H);
+    fl.planets = [
+      { kind: "ring", x: W * 0.2, y: H * 0.3, r: m * 0.085, P0: fl.P, born: fl.total },
+      { kind: "moon", x: W * 0.82, y: H * 0.5, r: m * 0.06, P0: fl.P, born: fl.total + 0.4 },
+      { kind: "small", x: W * 0.7, y: H * 0.16, r: m * 0.03, P0: fl.P, born: fl.total + 0.8 }
+    ];
+  }
+
+  function startDescent() {
+    var f = fl;
+    f.apogee = f.alt;
+    banner("Top: " + fmt(f.apogee) + " m", 1500);
+    f.phase = "descent"; f.t = 0;
+    f.v = 0; f.boost = 0;
+    stopRumble();
+    // Jump the world to just above the clouds; nothing on screen is tied to the ground right now.
+    f.D = H * 7.5;
+    f.rise = f.D;
+    f.resetCam = true;
+    f.cam = Math.max(0, f.rise - (padY - H * 0.78));
+    f.parts = f.parts.filter(function (p) { return p.kind === 2; });
+    f.debris = [];
+    f.clouds = newClouds(H * 1.0, H * 4.6, 7).concat([{ x: W * 0.18, rise: H * 0.62, s: Math.min(W, H) * 0.3, fg: false }, { x: W * 0.86, rise: H * 0.42, s: Math.min(W, H) * 0.24, fg: false }]);
+    // Only the top piece comes home; draw it shifted so its engine bell sits on the pad.
+    var topId = String(G.stages.length - 1);
+    f.topDrop = -G.top.exit;
+    f.groups[topId].dy = f.topDrop;
+    f.active = G.stages.length - 1;
+    Object.keys(f.groups).forEach(function (k) { if (k !== topId) f.groups[k].on = false; });
+  }
+
+  function land() {
+    var f = fl;
+    f.phase = "landed"; f.t = 0;
+    f.rise = 0;
+    f.alt = 0;
+    var o = rocketOrigin();
+    for (var i = 0; i < 18; i++) {
+      var side = i % 2 ? 1 : -1;
+      addP(1, o.x + side * rand(10, 60) * SC, padY - 4, side * H * rand(0.2, 0.6), -H * rand(0, 0.08), rand(12, 24) * SC, Math.min(W, H) * 0.05, rand(0.8, 1.3), Math.random());
+    }
+    banner("Touchdown!", 1500);
+    $("fback").hidden = true;
+    $("fhint").hidden = true;
+    $("altBest").textContent = "Highest: " + fmt(f.apogee) + " m";
+    $("altBest").hidden = false;
+    chime();
+  }
+
+  function landedDone() {
+    var f = fl;
+    f.done = true;
+    if (f.goodbye) {
+      banner("Bye bye, rocket!", 2400);
+      if (!restScheduled) { restScheduled = true; setTimeout(goRest, 2400); }
+      return;
+    }
+    if (timer.phase === "ending" || timer.phase === "resting") {
+      setTimeout(function () { if (fl === f) closeFlight(); }, 1500);
+      return;
+    }
+    $("landbar").hidden = false;
+  }
+
+  // ---- drawing ----
+  function drawCloud(x, y, s) {
+    var parts = [[-0.36, 0.06, 0.27], [0, -0.14, 0.36], [0.36, 0.04, 0.26], [0.14, 0.14, 0.26], [-0.16, 0.14, 0.26]];
+    ctx.fillStyle = OUT;
+    ctx.beginPath();
+    parts.forEach(function (p) { ctx.moveTo(x + p[0] * s + p[2] * s + 3, y + p[1] * s); ctx.arc(x + p[0] * s, y + p[1] * s, p[2] * s + 3, 0, Math.PI * 2); });
+    ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    parts.forEach(function (p) { ctx.moveTo(x + p[0] * s + p[2] * s - 1, y + p[1] * s); ctx.arc(x + p[0] * s, y + p[1] * s, p[2] * s - 1, 0, Math.PI * 2); });
+    ctx.fill();
+  }
+
+  function drawGround(cam) {
+    var gy = padY + cam;
+    if (gy - H * 0.6 > H) return;
+    var m = Math.min(W, H);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = OUT;
+    // hills
+    ctx.fillStyle = "#5DAE4A";
+    ctx.beginPath(); ctx.ellipse(W * 0.12, gy + 14, W * 0.4, m * 0.14, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(W * 0.92, gy + 18, W * 0.42, m * 0.12, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+    // ground
+    ctx.fillStyle = "#7CC55A";
+    ctx.fillRect(-20, gy + 14 * SC, W + 40, H + 40);
+    ctx.beginPath(); ctx.moveTo(-20, gy + 14 * SC); ctx.lineTo(W + 20, gy + 14 * SC); ctx.stroke();
+    // tower
+    var cx = W / 2, x1 = cx - 228 * SC, x2 = cx - 192 * SC, top = gy - 400 * SC, yy;
+    ctx.lineCap = "round";
+    var path = function () {
+      ctx.beginPath();
+      for (yy = gy; yy > top + 1; yy -= 36 * SC) {
+        ctx.moveTo(x1, yy); ctx.lineTo(x2, yy - 36 * SC);
+        ctx.moveTo(x2, yy); ctx.lineTo(x1, yy - 36 * SC);
+      }
+      ctx.moveTo(x1, gy); ctx.lineTo(x1, top);
+      ctx.moveTo(x2, gy); ctx.lineTo(x2, top);
+    };
+    path(); ctx.lineWidth = 11 * SC; ctx.strokeStyle = OUT; ctx.stroke();
+    path(); ctx.lineWidth = 5 * SC; ctx.strokeStyle = "#E63946"; ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = OUT;
+    ctx.fillStyle = "#FFC93C";
+    roundRect(x1 - 8 * SC, top - 16 * SC, 52 * SC, 18 * SC, 5 * SC); ctx.fill(); ctx.stroke();
+    // pad
+    ctx.fillStyle = "#6C7590";
+    ctx.fillRect(cx - 128 * SC, gy + 22 * SC, 20 * SC, 20 * SC); ctx.strokeRect(cx - 128 * SC, gy + 22 * SC, 20 * SC, 20 * SC);
+    ctx.fillRect(cx + 108 * SC, gy + 22 * SC, 20 * SC, 20 * SC); ctx.strokeRect(cx + 108 * SC, gy + 22 * SC, 20 * SC, 20 * SC);
+    ctx.fillStyle = "#9AA3AF";
+    roundRect(cx - 150 * SC, gy - 2 * SC, 300 * SC, 24 * SC, 5 * SC); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#FFC93C";
+    ctx.lineWidth = 2;
+    for (var k = 0; k < 5; k++) {
+      var px = cx + (-120 + k * 54) * SC;
+      ctx.beginPath(); ctx.moveTo(px, gy + 3 * SC); ctx.lineTo(px + 18 * SC, gy + 3 * SC); ctx.lineTo(px + 8 * SC, gy + 17 * SC); ctx.lineTo(px - 10 * SC, gy + 17 * SC); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawEarth(alt) {
+    var vis = clamp((alt - 55000) / 50000, 0, 1);
+    if (vis <= 0) return;
+    var R = Math.max(W, H) * 3, top = H - vis * H * 0.2, cx = W / 2, cy = top + R;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R + 16, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(91,192,235,0.35)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = "#2D5BD7"; ctx.fill();
+    ctx.clip();
+    ctx.fillStyle = "#2E9E5B";
+    [[-0.3, 0.02, 0.16], [0.18, 0.05, 0.12], [0.42, 0.01, 0.08], [-0.05, 0.09, 0.1]].forEach(function (c) {
+      ctx.beginPath(); ctx.ellipse(cx + c[0] * W, top + c[1] * H + 10, c[2] * W, c[2] * W * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    [[-0.12, 0.01, 0.1], [0.3, 0.03, 0.08]].forEach(function (c) {
+      ctx.beginPath(); ctx.ellipse(cx + c[0] * W, top + c[1] * H + 6, c[2] * W, c[2] * W * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+
+  function drawPlanets(alt) {
+    var fade = clamp((alt - 35000) / 30000, 0, 1);
+    if (fade <= 0) return;
+    fl.planets.forEach(function (p) {
+      var a = fade * clamp((fl.total - p.born) / 0.8, 0, 1);
+      if (a <= 0) return;
+      var y = p.y + (fl.P - p.P0) * 0.035;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      if (p.kind === "ring") {
+        ctx.save(); ctx.translate(p.x, y); ctx.rotate(-0.35);
+        ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.9, p.r * 0.5, 0, Math.PI, Math.PI * 2);
+        ctx.lineWidth = p.r * 0.32; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = p.r * 0.2; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fillStyle = "#F77F00"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.fillRect(-p.r * 0.9, -p.r * 0.3, p.r * 1.8, p.r * 0.18);
+        ctx.beginPath(); ctx.ellipse(0, 0, p.r * 1.9, p.r * 0.5, 0, 0, Math.PI);
+        ctx.lineWidth = p.r * 0.32; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = p.r * 0.2; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+        ctx.restore();
+      } else if (p.kind === "moon") {
+        ctx.beginPath(); ctx.arc(p.x, y, p.r, 0, Math.PI * 2); ctx.fillStyle = "#C9D2E3"; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#9AA3AF";
+        [[-0.35, -0.2, 0.22], [0.3, 0.25, 0.18], [0.1, -0.45, 0.12]].forEach(function (c) {
+          ctx.beginPath(); ctx.arc(p.x + c[0] * p.r, y + c[1] * p.r, c[2] * p.r, 0, Math.PI * 2); ctx.fill();
+        });
+      } else {
+        ctx.beginPath(); ctx.arc(p.x, y, p.r, 0, Math.PI * 2); ctx.fillStyle = "#F26CA7"; ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+
+  function drawFlame(n, len, t) {
+    var w = n.w, x = n.p.x, y = n.p.y + fl.cam;
+    var cols = flameCols();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(fl.ang);
+    var layer = function (ww, ll, col, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(-ww / 2, -2);
+      ctx.bezierCurveTo(-ww * 0.7, ll * 0.35, -ww * 0.2, ll * 0.75, 0, ll);
+      ctx.bezierCurveTo(ww * 0.2, ll * 0.75, ww * 0.7, ll * 0.35, ww / 2, -2);
+      ctx.closePath();
+      ctx.fillStyle = col;
+      ctx.fill();
+      if (stroke) { ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); }
+    };
+    var fl1 = 0.85 + 0.15 * Math.sin(t * 40 + x) + 0.1 * Math.random();
+    layer(w * 1.05, len * fl1, cols[0], true);
+    layer(w * 0.75, len * 0.72 * fl1, cols[1], false);
+    layer(w * 0.45, len * 0.42 * fl1, "#FFF8DC", false);
+    ctx.restore();
+  }
+
+  function drawLayerSet(ls, groups) {
+    ls.forEach(function (l) {
+      var gs = groups ? groups[l.group] : null;
+      if (groups && (!gs || !gs.on || gs.s <= 0.01)) return;
+      var img = l.canvas || l.old;
+      if (!img) return;
+      var x = l.bbox[0] * SC, y = l.bbox[1] * SC, w = (l.bbox[2] - l.bbox[0]) * SC, h = (l.bbox[3] - l.bbox[1]) * SC;
+      if (gs) {
+        y += gs.dy * SC;
+        if (gs.s !== 1) {
+          var cx = x + w / 2, cy = y + h / 2;
+          x = cx - w / 2 * gs.s; y = cy - h / 2 * gs.s; w *= gs.s; h *= gs.s;
+        }
+      }
+      ctx.drawImage(img, x, y, w, h);
+    });
+  }
+
+  function drawChute(k) {
+    // In rocket-local px, above the top piece's nose.
+    var wTop = G.top.w * SC, noseY = (G.noseTop + fl.groups[String(G.stages.length - 1)].dy) * SC;
+    var full = wTop * 2.4, cw = full * (0.15 + 0.85 * k), ch = cw * 0.48;
+    var cy = noseY - full * 0.8 * (0.3 + 0.7 * k);
+    var nose = hex(state.colors.nose);
+    var c1 = nose === "#FFFFFF" ? hex(state.colors.bands) : nose;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, k * 3);
+    // lines
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = OUT;
+    ctx.beginPath();
+    [-0.5, -0.25, 0, 0.25, 0.5].forEach(function (s) { ctx.moveTo(s * cw, cy); ctx.lineTo(0, noseY + 4); });
+    ctx.stroke();
+    // canopy
+    var dome = function () {
+      ctx.beginPath();
+      ctx.ellipse(0, cy, cw / 2, ch, 0, Math.PI, 0);
+      var g = 6, i;
+      for (i = g; i > 0; i--) {
+        var xa = -cw / 2 + cw * i / g, xb = -cw / 2 + cw * (i - 1) / g;
+        ctx.quadraticCurveTo((xa + xb) / 2, cy + ch * 0.16, xb, cy);
+      }
+      ctx.closePath();
+    };
+    dome();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.save();
+    dome(); ctx.clip();
+    ctx.fillStyle = c1;
+    for (var i = 0; i < 6; i += 2) ctx.fillRect(-cw / 2 + cw * i / 6, cy - ch - 4, cw / 6, ch + ch * 0.3);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.ellipse(-cw * 0.18, cy - ch * 0.62, cw * 0.14, ch * 0.16, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    dome();
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.restore();
+    return cy;
+  }
+
+  function drawStar4(x, y, r, rot) {
+    ctx.beginPath();
+    for (var k = 0; k < 8; k++) {
+      var a = rot + k * Math.PI / 4, rr = k % 2 ? r * 0.38 : r;
+      if (k) ctx.lineTo(x + rr * Math.sin(a), y - rr * Math.cos(a)); else ctx.moveTo(x + rr * Math.sin(a), y - rr * Math.cos(a));
+    }
+    ctx.closePath();
+  }
+
+  function draw() {
+    var f = fl, cam = f.cam;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var sk = skyAt(f.alt);
+    var grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, sk[0]); grad.addColorStop(1, sk[1]);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    var sx = 0, sy = 0;
+    if (f.shake > 0.3 && !reduce) { sx = (Math.random() - 0.5) * 2 * f.shake; sy = (Math.random() - 0.5) * 2 * f.shake; }
+    ctx.translate(sx, sy);
+
+    // Stars.
+    var starA = clamp((f.alt - 22000) / 40000, 0, 1);
+    if (starA > 0) {
+      ctx.fillStyle = "#FFF6C8";
+      stars.forEach(function (s) {
+        var y = ((s.y * H + f.P * s.d) % H + H) % H;
+        var a = starA * (0.65 + 0.35 * Math.sin(f.total * 3 + s.tw));
+        ctx.globalAlpha = a;
+        if (s.big) { drawStar4(s.x * W, y, s.r * 4, 0); ctx.fill(); }
+        else { ctx.beginPath(); ctx.arc(s.x * W, y, s.r, 0, Math.PI * 2); ctx.fill(); }
+      });
+      ctx.globalAlpha = 1;
+    }
+    drawEarth(f.alt);
+    drawPlanets(f.alt);
+
+    // Sun (far away, so it barely moves) and clouds.
+    var sunA = clamp(1 - f.alt / 20000, 0, 1);
+    if (sunA > 0) {
+      var m = Math.min(W, H);
+      ctx.globalAlpha = sunA;
+      ctx.beginPath(); ctx.arc(W * 0.84, H * 0.2 + cam * 0.05, m * 0.07, 0, Math.PI * 2);
+      ctx.fillStyle = "#FFC93C"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.arc(W * 0.84, H * 0.2 + cam * 0.05, m * 0.047, 0, Math.PI * 2); ctx.fillStyle = "#FFE07A"; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    f.clouds.forEach(function (c) { if (!c.fg) { var y = padY - c.rise + cam; if (y > -c.s && y < H + c.s) drawCloud(c.x, y, c.s); } });
+
+    drawGround(cam);
+
+    // Smoke behind everything that flies.
+    var ps = f.parts, i, p, a;
+    for (i = 0; i < ps.length; i++) {
+      p = ps[i];
+      if (p.kind !== 1) continue;
+      a = 1 - p.age / p.life;
+      ctx.globalAlpha = 0.85 * Math.pow(a, 0.7);
+      ctx.fillStyle = "#AEB8CC";
+      ctx.beginPath(); ctx.arc(p.x + p.r * 0.12, p.y + cam + p.r * 0.12, p.r * 1.04, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = p.col < 0.5 ? "#F4F6FA" : "#E4E9F2";
+      ctx.beginPath(); ctx.arc(p.x, p.y + cam, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Flames, then fire particles.
+    if (f.flame > 0.02 && f.flameGap <= 0) {
+      nozzles().forEach(function (n) {
+        var len = n.w * Math.min(5, 2.0 + 1.5 * f.boost) * f.flame * (n.main ? 1.15 : 0.8) * (f.phase === "ignite" ? 0.8 : 1);
+        drawFlame(n, len, f.total);
+      });
+    }
+    for (i = 0; i < ps.length; i++) {
+      p = ps[i];
+      if (p.kind !== 0) continue;
+      a = 1 - p.age / p.life;
+      ctx.globalAlpha = Math.min(1, a * 1.4);
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y + cam, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Spent stages and boosters tumbling away.
+    f.debris.forEach(function (d) {
+      ctx.save();
+      var px = d.ox + d.dx + d.piv.x * SC, py = d.oy + d.dy + cam + d.piv.y * SC;
+      ctx.translate(px, py);
+      ctx.rotate(d.ang);
+      ctx.translate(-d.piv.x * SC, -d.piv.y * SC);
+      drawLayerSet(d.layers, null);
+      ctx.restore();
+    });
+
+    // The rocket.
+    if (layerList) {
+      var o = rocketOrigin();
+      ctx.save();
+      ctx.translate(o.x, o.y + cam);
+      ctx.rotate(f.ang);
+      if (f.phase === "descent" || (f.phase === "landed" && f.chute > 0)) {
+        var piv = (G.noseTop + f.groups[String(G.stages.length - 1)].dy) * SC - G.top.w * SC * 2;
+        ctx.translate(0, piv); ctx.rotate(f.sway); ctx.translate(0, -piv);
+        if (f.chute > 0) drawChute(f.chute);
+      }
+      drawLayerSet(layerList, f.groups);
+      ctx.restore();
+    }
+
+    f.clouds.forEach(function (c) { if (c.fg) { var y = padY - c.rise + cam; if (y > -c.s && y < H + c.s) { ctx.globalAlpha = 0.92; drawCloud(c.x, y, c.s); ctx.globalAlpha = 1; } } });
+
+    // Speed lines when going fast.
+    var sp = Math.abs(f.phase === "descent" ? 0 : f.v) / H;
+    var inten = clamp((sp - 1.8) / 2.5, 0, 1);
+    if (inten > 0 && !reduce) {
+      ctx.strokeStyle = "rgba(255,255,255," + (0.5 * inten).toFixed(3) + ")";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      speedLines.forEach(function (s) {
+        var len = H * 0.18 * s.l * inten;
+        var y = ((s.y * H * 1.4 + f.P * 1.6 * s.l) % (H * 1.4) + H * 1.4) % (H * 1.4) - len;
+        ctx.moveTo(s.x * W, y); ctx.lineTo(s.x * W, y + len);
+      });
+      ctx.stroke();
+    }
+
+    // Rings, sparkles and words.
+    f.rings.forEach(function (r) {
+      var k = r.life / r.max;
+      ctx.globalAlpha = 1 - k;
+      ctx.lineWidth = r.w * (1 - k) + 2;
+      ctx.strokeStyle = r.col;
+      ctx.beginPath(); ctx.arc(r.x, r.y + (r.world ? cam : 0), r.r * (1 + k * 3), 0, Math.PI * 2); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = OUT;
+    ctx.lineJoin = "round";
+    for (i = 0; i < ps.length; i++) {
+      p = ps[i];
+      if (p.kind !== 2) continue;
+      a = 1 - p.age / p.life;
+      var rr = p.r * (a < 0.3 ? a / 0.3 : 1);
+      ctx.fillStyle = p.col;
+      drawStar4(p.x, p.y + cam, rr, p.rot + p.age * 4);
+      ctx.fill(); ctx.stroke();
+    }
+    var fs = Math.round(clamp(Math.min(W, H) * 0.075, 26, 64));
+    ctx.font = "800 " + fs + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    f.texts.forEach(function (t) {
+      var k = t.age / t.life;
+      ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+      var s = k < 0.15 ? 0.5 + k / 0.15 * 0.5 : 1;
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.scale(s, s);
+      ctx.lineWidth = fs * 0.16;
+      ctx.strokeStyle = OUT;
+      ctx.strokeText(t.text, 0, 0);
+      ctx.fillStyle = t.col;
+      ctx.fillText(t.text, 0, 0);
+      ctx.restore();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function loop(t) {
+    if (!running) return;
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    lastT = t;
+    if (fl) {
+      step(dt);
+      if (fl) draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Play timer (grown-up controlled) ----------
+  // Phases: idle -> running -> ending (rocket lands, optional Goodbye launch) -> resting (locked) -> idle.
+  // The end time is stored as a wall-clock timestamp, so the timer keeps counting through reloads
+  // and while the tab is in the background.
+  var TKEY = "rocketbuilder-timer-v1";
+  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
+  var HOLD_MS = 2000;
+  var UNLOCK_MS = 4000;
+
+  function freshTimer() {
+    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true,
+      phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
+  }
+  function loadTimer() {
+    var t = freshTimer();
+    try {
+      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (o && typeof o === "object") {
+        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
+        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
+        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) {
+          if (typeof o[k] === "boolean") t[k] = o[k];
+        });
+        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
+        if (typeof o.endAt === "number") t.endAt = o.endAt;
+        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return t;
+  }
+  function saveTimer() {
+    try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ }
+  }
+  var timer = loadTimer();
+
+  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
+
+  // Gauge in the corner of the picture: the bar is the time left.
+  var lastTimerKey = "";
+  function drawTimer() {
+    var active = timer.phase === "running" || timer.phase === "ending";
+    if (!active) {
+      if (lastTimerKey !== "off") { $("fuel").hidden = true; lastTimerKey = "off"; }
+      return;
+    }
+    var rem = timer.phase === "running" ? remainingMs() : 0;
+    var f = timer.total > 0 ? rem / timer.total : 0;
+    var mins = Math.ceil(rem / 60000);
+    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase;
+    if (key === lastTimerKey) return;
+    lastTimerKey = key;
+    $("fuel").hidden = false;
+    var fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    var num = $("fuelNum");
+    num.hidden = !(timer.showMinutes && timer.phase === "running");
+    num.textContent = String(mins);
+  }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $("toast");
+    el.textContent = msg;
+    el.hidden = false;
+    requestAnimationFrame(function () { el.classList.add("show"); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.classList.remove("show");
+      setTimeout(function () { el.hidden = true; }, 450);
+    }, 7000);
+  }
+
+  function minutesText(ms) {
+    var m = Math.ceil(ms / 60000);
+    return m === 1 ? "1 minute" : m + " minutes";
+  }
+
+  function updateTimerUI() {
+    var on = timer.phase !== "idle";
+    $("timerbtn").textContent = on ? "⏱ Timer on" : "⏱ Grown-ups";
+    $("timerSetup").hidden = on;
+    $("timerRunning").hidden = !on;
+    if (on) {
+      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
+      $("holdAdd").hidden = timer.phase !== "running";
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes));
+    });
+    $("nextInput").value = timer.next;
+    $("optMinutes").checked = timer.showMinutes;
+    $("optWarnings").checked = timer.warnings;
+    $("optGoodbye").checked = timer.goodbye;
+  }
+
+  function openTimer() { updateTimerUI(); updateSoundUI(); updateTiltUI(); $("timerModal").hidden = false; }
+  function closeTimer() { $("timerModal").hidden = true; }
+
+  function startTimer() {
+    timer.total = timer.minutes * 60000;
+    timer.endAt = Date.now() + timer.total;
+    timer.phase = "running";
+    // Skip a warning the timer is already shorter than (a 5-minute timer gets no "5 more minutes").
+    timer.warned5 = timer.total <= 5 * 60000;
+    timer.warned1 = timer.total <= 60000;
+    saveTimer();
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    closeTimer();
+  }
+
+  function addFive() {
+    if (timer.phase !== "running") return;
+    timer.endAt += 5 * 60000;
+    timer.total += 5 * 60000;
+    var rem = remainingMs();
+    if (rem > 5 * 60000) timer.warned5 = false;
+    if (rem > 60000) timer.warned1 = false;
+    saveTimer();
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  // Ending bookkeeping (performance.now() timestamps; not persisted).
+  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
+
+  function stopTimer() {
+    timer.phase = "idle";
+    saveTimer();
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    restScheduled = false;
+    farewellAt = 0;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    closeTimer();
+  }
+
+  function beginEnding() {
+    // Clear any warning still on screen so the goodbye message is the only one.
+    clearTimeout(toastTimer);
+    $("toast").classList.remove("show");
+    $("toast").hidden = true;
+    timer.phase = "ending";
+    saveTimer();
+    endingStartedAt = performance.now();
+    farewellAt = 0;
+    restScheduled = false;
+    document.body.classList.add("ending");
+    $("farewellText").textContent = "Time to say goodbye";
+    $("goodbyeBtn").hidden = !timer.goodbye;
+    $("farewell").hidden = false;
+    // A rocket in the air finishes its flight and lands; it just can't go again.
+    $("landbar").hidden = true;
+    if (fl && fl.done && !fl.goodbye) setTimeout(function () { if (fl && fl.done) closeFlight(); }, 1200);
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  function goodbyeLaunch() {
+    if (timer.phase !== "ending" || farewellAt) return;
+    farewellAt = performance.now();
+    $("goodbyeBtn").hidden = true;
+    $("farewellText").textContent = "Bye bye!";
+    if (soundOn) unlockAudio();
+    openFlight(true);
+  }
+
+  // Rest once the rocket is home on its pad.
+  function checkEndingDone() {
+    if (timer.phase !== "ending" || restScheduled) return;
+    if (fl) return; // a flight in progress lands first (a goodbye flight goes to rest by itself)
+    if (timer.goodbye) return; // waiting for the Goodbye launch
+    if (performance.now() - endingStartedAt < 4000) return;
+    restScheduled = true;
+    setTimeout(goRest, 1200);
+  }
+
+  function showRest() {
+    $("restArt").innerHTML = sceneSVG(state, true);
+    var next = timer.next.trim();
+    $("restNext").hidden = !next;
+    $("restNextText").textContent = next;
+    $("rest").hidden = false;
+  }
+
+  function goRest() {
+    if (!F.hidden) closeFlight();
+    timer.phase = "resting";
+    saveTimer();
+    document.body.classList.remove("ending");
+    $("farewell").hidden = true;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+    showRest();
+  }
+
+  function unlock() {
+    timer.phase = "idle";
+    saveTimer();
+    $("rest").hidden = true;
+    restScheduled = false;
+    farewellAt = 0;
+    lastTimerKey = "";
+    drawTimer();
+    updateTimerUI();
+  }
+
+  function tick() {
+    if (timer.phase === "ending") { checkEndingDone(); return; }
+    if (timer.phase !== "running") return;
+    var rem = remainingMs();
+    if (timer.warnings) {
+      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
+      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
+    }
+    if (rem <= 0) { beginEnding(); return; }
+    drawTimer();
+    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
+  }
+
+  // Press-and-hold buttons for grown-up actions, so a quick tap does nothing.
+  function makeHold(btn, ms, onDone, onPress) {
+    var fill = btn.querySelector(".fill"), id = null;
+    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
+    function start(e) {
+      if (e.type === "keydown") {
+        if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return;
+        e.preventDefault();
+      }
+      if (id) return;
+      if (onPress) onPress();
+      fill.style.transition = "width " + ms + "ms linear";
+      fill.style.width = "100%";
+      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+    }
+    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
+    btn.addEventListener("pointerdown", start);
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
+    btn.addEventListener("keydown", start);
+    btn.addEventListener("keyup", cancel);
+    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+
+  MINUTE_CHOICES.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn";
+    b.dataset.minutes = String(m);
+    b.textContent = m + " min";
+    $("minuteRow").appendChild(b);
+  });
+  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
+  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
+  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
+  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
+  makeHold($("holdAdd"), HOLD_MS, addFive);
+  makeHold($("holdStop"), HOLD_MS, stopTimer);
+  // Pressing (not just finishing) the sound hold unlocks audio on iOS, since it is a real touch.
+  makeHold($("holdSound"), HOLD_MS, toggleSound, function () { if (!soundOn) unlockAudio(); });
+  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
+  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
+
+  showTab(tab);
+  render();
+  updateSoundUI();
+  updateTiltUI();
+  // Resume whatever the timer was doing before a reload.
+  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
+  else if (timer.phase === "ending") beginEnding();
+  else if (timer.phase === "resting") showRest();
+  drawTimer();
+  updateTimerUI();
+  setInterval(tick, 250);
+
+  // Test hook (harmless): lets automated checks peek at the flight.
+  window.__rocket = { flight: function () { return fl; } };
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

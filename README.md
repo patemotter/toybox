@@ -8,6 +8,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Kaleidoscope: finger painting mirrored into a big spinning pattern | [`kaleidoscope/`](kaleidoscope/) |
 | Fish Tank: feed fish, make them flip, and fill the tank | [`fish-tank/`](fish-tank/) |
 | Peg Drop: drop balls through glowing pegs and count them in the bins | [`peg-drop/`](peg-drop/) |
+| Rocket Builder: build a rocket, count down, and launch it into space | [`rocket-builder/`](rocket-builder/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
