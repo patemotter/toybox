@@ -7,8 +7,8 @@ Shared rules for every app are in "Every app" at the bottom.
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Marble Run, Car Builder, Gear Box | In progress |
-| 1 | Water Works | Queued |
+| – | 3D Printer, Marble Run, Car Builder, Water Works | In progress |
+| 1 | Water Works | In progress |
 | 2 | Math Grid | Queued |
 | 3 | Engine Room | Queued |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
@@ -228,6 +228,12 @@ Known so far:
 - **Peg Drop:** the rest screen in Big mode hasn't been checked.
 - **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
 - **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
+- **Gear Box:**
+  - On iPhone portrait the plate uses only half the height, small gears are tiny, and the example buttons cut off their text.
+  - The RPM labels can overlap or be covered by attachments.
+  - Cranking small gears is fiddly.
+  - The jam triangle's teeth overlap.
+  - The speed dial has no min/max labels.
 - **Saw Bench:**
   - Band saw: the top of its upper housing is cut off, and the hint overlaps it.
   - Scroll saw: a grey block shows behind the table.
