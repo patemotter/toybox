@@ -230,6 +230,8 @@ header p {
   flex: none;
 }
 .cgroup { display: flex; align-items: center; gap: 14px; }
+/* Min / Max jump straight to the fewest or most. */
+.counter .btn.minmax { width: auto; min-width: 64px; padding: 0 10px; font-size: 1.15rem; }
 .cgroup[hidden] { display: none; }
 .numbox { display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .num {
@@ -586,6 +588,9 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
   .counter { gap: 10px; row-gap: 2px; }
   .cgroup { gap: 10px; }
   .counter .btn { width: 48px; height: 48px; font-size: 1.8rem; }
+  .counter .btn.minmax { min-width: 48px; padding: 0 8px; font-size: 0.95rem; }
+  /* Narrow phones: no room for Min/Max next to the lights counter, so hide them there. */
+  @media (max-width: 600px) { .counter.has-lights .btn.minmax { display: none; } }
   .num { font-size: 2.25rem; min-width: 1.6ch; }
   .num.word { font-size: 1.25rem; height: 2.25rem; }
   .numcap { font-size: 0.78rem; margin-top: 1px; }
@@ -675,6 +680,7 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
   .styles.six { gap: 8px; }
   .panel section + section { margin-top: 16px; }
   .counter .btn { width: 60px; height: 60px; font-size: 2.1rem; }
+  .counter .btn.minmax { min-width: 60px; font-size: 1.1rem; }
   .num { font-size: 2.8rem; }
   .num.word { font-size: 1.5rem; height: 2.8rem; }
   .numcap { font-size: 0.95rem; }
@@ -776,9 +782,11 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
             <h2>How many</h2>
             <div class="counter" id="counter">
               <div class="cgroup">
+                <button class="btn minmax" id="minBtn" aria-label="Fewest">Min</button>
                 <button class="btn" id="minus" aria-label="One less">−</button>
                 <div class="numbox"><div class="num" id="num" aria-live="polite">6</div><div class="numcap" id="numCap">spokes</div></div>
                 <button class="btn" id="plus" aria-label="One more">+</button>
+                <button class="btn minmax" id="maxBtn" aria-label="Most">Max</button>
               </div>
               <div class="cgroup" id="lightsGroup" hidden>
                 <button class="btn" id="lminus" aria-label="One less light">−</button>
@@ -1708,7 +1716,10 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
     $("numCap").textContent = n === 1 ? mode.one : mode.many;
     $("minus").disabled = n <= MIN;
     $("plus").disabled = n >= MAX;
+    $("minBtn").disabled = n <= MIN;
+    $("maxBtn").disabled = n >= MAX;
     $("lightsGroup").hidden = !hasLights;
+    $("counter").classList.toggle("has-lights", !!hasLights);
     $("counter").classList.toggle("two", hasLights);
     if (hasLights) {
       // After 6 bulbs, one more step gives a single big dome.
@@ -1828,6 +1839,8 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
     else if (t.dataset.light) { if ("lights" in cfg) cfg.lightColor = t.dataset.light; }
     else if (t.id === "minus") { cfg.count = Math.max(MIN, cfg.count - 1); }
     else if (t.id === "plus") { cfg.count = Math.min(MAX, cfg.count + 1); }
+    else if (t.id === "minBtn") { cfg.count = MIN; }
+    else if (t.id === "maxBtn") { cfg.count = MAX; }
     else if (t.id === "lminus") { if ("lights" in cfg) cfg.lights = Math.max(0, cfg.lights - 1); }
     else if (t.id === "lplus") { if ("lights" in cfg) cfg.lights = Math.min(LDOME, cfg.lights + 1); }
     else if (t.dataset.action === "surprise") { surprise(cfg); }
