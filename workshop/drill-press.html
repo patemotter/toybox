@@ -677,6 +677,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     phase: 0,             // spindle rotation phase (radians)
     q: 0,                 // quill travel (world units)
     feedHeld: false,
+    spokeOff: 0, spokeHeld: false,   // feed spokes' turn (drawn), separate from quill travel
     jaw: 0,               // 0 = jaws tight on the shank, 1 = wide open
     key: "holder",        // holder | chuck | drag | fly
     keyAng: 0,            // chuck key turn angle (radians)
@@ -1045,7 +1046,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var SPOKE_L = 124;
   var DIAL_A0 = -0.75 * Math.PI, DIAL_RANGE = 1.5 * Math.PI, DIAL_MAX = 50;
   function dialAng(mm) { return DIAL_A0 + clamp(mm, 0, DIAL_MAX) / DIAL_MAX * DIAL_RANGE; }
-  function spokeAng() { return -0.35 + R.q / TRAVEL * 2.4; }
+  function spokeAng() { return -0.35 + R.spokeOff; }
   function drawFeed(c, penMM) {
     var i, a, x, y;
     // Dial ring
@@ -2308,6 +2309,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     } else {
       R.q = R.feedHeld ? want : Math.max(want, R.q - 300 * dt);
     }
+    // Spokes follow the finger while held; otherwise they ease back to match the quill.
+    if (!R.spokeHeld) R.spokeOff += (R.q / TRAVEL * 2.4 - R.spokeOff) * Math.min(1, dt * 10);
     var pen = penMM();
     if (canCut && pen > 0.05) {
       var h = R.curHole && R.curHole.bit === b.id ? R.curHole : null;
@@ -2910,8 +2913,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var dh = Math.hypot(w.x - HUB.x, w.y - HUB.y);
     if (dh < 74) return { type: "dial" };
     if (dh < SPOKE_L + 34) {
-      R.feedHeld = true; R.qWant = R.q;
-      return { type: "feed", last: Math.atan2(w.y - HUB.y, w.x - HUB.x) };
+      R.feedHeld = true; R.qWant = R.q; R.spokeHeld = true;
+      return { type: "feed", last: Math.atan2(w.y - HUB.y, w.x - HUB.x), lastY: w.y };
     }
     if (Math.hypot(w.x - 566, w.y - 398) < 42) { S.light = !S.light; save(); blip(S.light ? 900 : 600, 0.05, 0.05, "triangle"); return { type: "none" }; }
     if (R.clampHandle && Math.hypot(w.x - R.clampHandle.x, w.y - R.clampHandle.y) < 46) return { type: "clamp", wy0: w.y, done: false };
@@ -2957,9 +2960,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         if (Math.hypot(w.x - kh.x, w.y - kh.y) > 12) { turnKey(dA); d.turned += Math.abs(dA); }
         break;
       case "feed":
+        // Pulling any spoke DOWN lowers the bit (and up raises it), whichever side of the hub it is on;
+        // the spokes turn with the finger so the grabbed handle stays under it.
         a = Math.atan2(w.y - HUB.y, w.x - HUB.x);
         dA = wrapA(a - d.last); d.last = a;
-        R.qWant = clamp(R.qWant + dA * TRAVEL / 2.4, 0, Math.min(TRAVEL + 10, R.q + 28));
+        R.spokeOff += dA;
+        R.qWant = clamp(R.qWant + (w.y - d.lastY) * 0.9, 0, Math.min(TRAVEL + 10, R.q + 28));
+        d.lastY = w.y;
         break;
       case "feedV":
         R.qWant = clamp(d.q0 + (w.y - d.y0) * 0.9, 0, Math.min(TRAVEL + 10, R.q + 28));
@@ -3053,6 +3060,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       case "feed":
       case "feedV":
         if (!anyFeedHeld()) R.feedHeld = false;
+        if (!anyFeedHeld()) R.spokeHeld = false;
         break;
       case "clamp":
         if (!d.done) setClamp(!S.clamp);
@@ -3339,7 +3347,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
   function releaseAll() {
     drags = {};
-    R.feedHeld = false;
+    R.feedHeld = false; R.spokeHeld = false;
     if (R.dragBit) { flyBack(R.dragBit.id, R.dragBit.si, R.dragBit.x, R.dragBit.y, M.s); R.dragBit = null; }
     if (R.key === "drag") { R.keyFly = { fx: R.keyPos.x, fy: R.keyPos.y, t: 0 }; R.key = "fly"; }
     R.lidTarget = 0;
