@@ -35,6 +35,7 @@
  *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1", big: "fishtank-big-v1" },
  *        // Hooks (all optional):
  *        onEnding: function (done) {},  // time is up: wind the app's motion down, call done() once settled
+ *        endingMaxMs: 15000,            // optional: longest wait for done() (a long goodbye animation)
  *        onGoodbye: function () {},     // the goodbye button was pressed: a little farewell animation
  *        onRest: function () {},        // the rest screen is up (pause the loop if you like)
  *        onWake: function () {},        // back to idle after ending/rest (stop or unlock): wake things up
@@ -52,7 +53,7 @@
  *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
- * 3.5 s passed) AND for done() (15 s at most), then 1.2 s more, then shows the rest screen.
+ * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
  * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode.
  */
 (function () {
@@ -431,7 +432,7 @@
     } else if (t - endingStartedAt < 6000) {
       return;
     }
-    if (!settled && t - endingStartedAt < 15000) return;
+    if (!settled && t - endingStartedAt < (opts.endingMaxMs || 15000)) return;
     restScheduled = true;
     restTimeout = setTimeout(goRest, 1200);
   }
