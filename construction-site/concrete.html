@@ -295,12 +295,21 @@ body.ending .bar, body.ending .mainbtn, body.ending .homebtn, body.ending .mapbt
   .btn { transition: none; }
   .hint.go, .loads.pop, .step.now.popin, .mainbtn.wiggle { animation: none; }
 }
+/* Phones: keep the header (with the longer "All machines" label) on one line. */
+@media (max-width: 480px) {
+  header { gap: 4px; }
+  header .mapbtn { padding: 2px 8px 2px 4px; gap: 2px; font-size: 0.95rem; }
+  header .mapbtn svg { width: 18px; height: 18px; }
+  header .badge { padding: 0 4px; }
+  header .badge svg { width: 28px; height: 23px; }
+  header .gubtn { padding: 0.1rem 0.45rem; font-size: 0.85rem; }
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <a class="mapbtn" id="mapbtn" href="./" aria-label="Back to the site map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Site map</span></a>
+    <a class="mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <h1>Concrete</h1>
     <span class="spacer"></span>
     <span class="badge" title="Hard hat and safety vest are on"><svg viewBox="0 0 34 26" aria-hidden="true"><path d="M4 18 C4 6 30 6 30 18 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="1.5" y="17" width="31" height="5" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5"/><path d="M17 7 V17" stroke="#1D2340" stroke-width="2"/></svg><span>Hard hat on</span></span>
@@ -1660,6 +1669,162 @@ body.ending .bar, body.ending .mainbtn, body.ending .homebtn, body.ending .mapbt
     smooth: function () { var s = 0; for (var i = 0; i < F.sm.length; i++) s += F.sm[i]; return s / F.sm.length; },
     fill: function () { for (var i = 0; i < N; i++) F.h[i] = BH * 1.08 + Math.sin(i * 0.2) * 6; }
   };
+})();
+</script>
+<!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Construction Site page. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "site-timer-v1", SKEY = "site-sound-v1", GEAR_KEY = "site-gear", SKIP_KEY = "site-check-skip";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["hat", "Hard hat?"], ["vest", "Safety vest?"], ["gog", "Eye protection?"], ["muf", "Ear protection?"]];
+
+  function gearOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return false; } }
+  // A full gear-up just happened (the gate sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  function timerBusy() {
+    try {
+      var t = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (!t) return false;
+      if (t.phase === "ending" || t.phase === "resting") return true;
+      return t.phase === "running" && typeof t.endAt === "number" && t.endAt <= Date.now();
+    } catch (e) { return false; }
+  }
+  // The site map with ?next= sends you straight on to that station, which does its own check.
+  function redirecting() { return /(^|[?&])next=/.test(location.search); }
+
+  // ---------- The worker, wearing all the gear (same drawing as the site gate) ----------
+  var INK = "#1D2340", YEL = "#FFC93C", YEL2 = "#F2AE1C", GLASS = "#BFE6FF", SKIN = "#F2C49B";
+  function P(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + (fill || "none") + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '" stroke-linejoin="round" stroke-linecap="round"' + (extra || "") + "/>"; }
+  function Rc(x, y, w, h, rx, fill, sw, extra) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 0) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"' + (extra || "") + "/>"; }
+  function C(cx, cy, r, fill, sw) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"/>'; }
+  function hatSVG() { return P("M64 62 Q64 20 100 20 Q136 20 136 62 Z", YEL, 4) + Rc(54, 56, 92, 12, 6, YEL, 4) + Rc(95, 22, 10, 36, 4, YEL2, 3); }
+  function vestSVG() {
+    var f = "#FF7A1A";
+    return P("M62 118 Q62 106 76 104 L86 104 L98 150 L98 198 L62 198 Z", f, 4) + P("M138 118 Q138 106 124 104 L114 104 L102 150 L102 198 L138 198 Z", f, 4) +
+      Rc(62, 164, 36, 9, 0, "#E6EEF7", 3) + Rc(102, 164, 36, 9, 0, "#E6EEF7", 3) + Rc(74, 106, 7, 58, 0, "#E6EEF7", 3) + Rc(119, 106, 7, 58, 0, "#E6EEF7", 3);
+  }
+  function gogSVG() {
+    return Rc(63, 69, 74, 8, 3, "#2E9E5B", 4) + Rc(74, 63, 52, 22, 10, "#FF7A1A", 4) +
+      Rc(79, 67, 19, 14, 6, GLASS, 3, ' fill-opacity="0.55"') + Rc(102, 67, 19, 14, 6, GLASS, 3, ' fill-opacity="0.55"') +
+      P("M82 70 L88 70", "none", 2.5, ' stroke="#FFFFFF"') + P("M105 70 L111 70", "none", 2.5, ' stroke="#FFFFFF"');
+  }
+  function mufSVG() {
+    var arc = "M60 66 Q60 26 100 26 Q140 26 140 66";
+    return P(arc, "none", 9) + P(arc, "none", 4, ' stroke="#E63946"') + Rc(50, 58, 20, 32, 9, "#E63946", 4) + Rc(130, 58, 20, 32, 9, "#E63946", 4) +
+      Rc(66, 63, 6, 22, 3, INK, 0) + Rc(128, 63, 6, 22, 3, INK, 0);
+  }
+  function workerSVG() {
+    var o = '<ellipse cx="100" cy="284" rx="64" ry="8" fill="rgba(70,40,10,0.22)"/>';
+    o += P("M62 258 L96 258 L98 282 L54 282 Q54 266 62 258 Z", "#7A4B1E", 4) + P("M138 258 L104 258 L102 282 L146 282 Q146 266 138 258 Z", "#7A4B1E", 4);
+    o += P("M64 198 L136 198 L134 262 L106 262 L100 222 L94 262 L66 262 Z", "#34508F", 4);
+    o += Rc(40, 108, 24, 76, 12, "#3A86FF", 4) + Rc(136, 108, 24, 76, 12, "#3A86FF", 4);
+    o += C(52, 188, 11, SKIN, 4) + C(148, 188, 11, SKIN, 4);
+    o += Rc(92, 96, 16, 12, 2, SKIN, 3);
+    o += P("M62 198 L62 120 Q62 104 80 104 L120 104 Q138 104 138 120 L138 198 Z", "#3A86FF", 4);
+    o += Rc(62, 190, 76, 10, 2, "#4A3420", 3);
+    o += '<g class="sc-g" data-k="vest">' + vestSVG() + "</g>";
+    o += C(100, 70, 33, SKIN, 4);
+    o += P("M67 64 Q66 36 100 36 Q134 36 133 64 Q118 50 100 52 Q82 50 67 64 Z", "#6B3E1E", 4);
+    o += C(88, 72, 4.5, INK, 0) + C(112, 72, 4.5, INK, 0) + C(80, 84, 5, "#F59BA0", 0) + C(120, 84, 5, "#F59BA0", 0);
+    o += P("M88 86 Q100 97 112 86", "none", 4);
+    o += '<g class="sc-g" data-k="gog">' + gogSVG() + "</g>";
+    o += '<g class="sc-g" data-k="muf">' + mufSVG() + "</g>";
+    o += '<g class="sc-g" data-k="hat">' + hatSVG() + "</g>";
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,330px);aspect-ratio:200/296;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#F6DDB0;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0;pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14%)}}" +
+    "@media (max-height:600px){.sc-man-wrap{height:26vh}.sc ul{gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], actx = null;
+  function pop(n) {
+    try {
+      if (localStorage.getItem(SKEY) !== "on") return;
+      if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; actx = new AC(); }
+      if (actx.state === "suspended") actx.resume();
+      if (actx.state !== "running") return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 90;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(clearTimeout); timers = [];
+    var node = el;
+    node.classList.add("out");
+    setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }, reduce ? 160 : (fast ? 260 : 420));
+  }
+  function show() {
+    if (el) return;
+    if (!gearOn() || takeSkip() || redirecting() || timerBusy()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Safety check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Safety check!</h2><div class="sc-man-wrap"><svg viewBox="0 0 200 296" aria-hidden="true">' + workerSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1700);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 340); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1420);
+      later(function () { close(false); }, 1800);
+    }
+  }
+  document.addEventListener("keydown", function (e) { if (el && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); close(true); } }, true);
+  // The timer ended on another page: get out of the way of the rest screen.
+  window.addEventListener("storage", function (e) { if (e.key === TKEY && el && timerBusy()) close(true); });
+  // Coming back with the Back button (page restored from memory) counts as arriving again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) show(); });
+  if (navigator.webdriver) window.__safetyCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  show();
 })();
 </script>
 <script>
