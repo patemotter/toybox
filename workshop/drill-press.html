@@ -515,12 +515,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var B = { x: 0, y: 0, w: 1, h: 1 };                     // board view (top / side)
   var C = { x: 0, y: 0, w: 1, h: 1 };                     // bit case
   var bgCanvas = document.createElement("canvas");
-  var WY0 = -40, WW = 620, WH = 1040;                     // world box: x 0..620, y -40..1000
+  // World box: x 0..620, y -40..820. The lower column and the base (down to y 1000) are left out of
+  // view so the head, chuck and table get the room.
+  var WY0 = -40, WW = 620, WH = 860;
 
   function layout() {
     var pad = CW < 520 || CH < 420 ? 6 : 10;
     if (CW / CH >= 1.0) {
-      var mw = Math.min(CW * 0.44, CH * 0.62 + 20);
+      var mw = Math.min(CW * 0.46, CH * 0.74 + 20);
       M = { x: pad, y: pad, w: mw, h: CH - 2 * pad };
       var rx = M.x + M.w + pad, rw = CW - rx - pad;
       var bh = Math.round((CH - 3 * pad) * 0.42);
@@ -528,14 +530,18 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       C = { x: rx, y: 2 * pad + bh, w: rw, h: CH - 3 * pad - bh };
     } else {
       var mh = Math.round(CH * 0.58);
-      var mw2 = Math.min(CW * 0.6, mh * 0.6 + 20);
+      var mw2 = Math.min(CW * 0.66, mh * 0.74 + 20);
+      // Narrow screens: the drill is limited by width, so don't spend spare height on the lower
+      // stand; give it to the bit case instead.
+      mh = Math.max(Math.round(CH * 0.4), Math.min(mh, Math.round(WH * Math.min(mw2 / WW, mh / WH)) + 4));
       M = { x: pad, y: pad, w: mw2, h: mh };
       B = { x: M.x + M.w + pad, y: pad, w: CW - M.w - 3 * pad, h: mh };
       C = { x: pad, y: mh + 2 * pad, w: CW - 2 * pad, h: CH - mh - 3 * pad };
     }
     M.s = Math.min(M.w / WW, M.h / WH);
     M.ox = M.x + (M.w - WW * M.s) / 2;
-    M.oy = M.y + (M.h - WH * M.s) - WY0 * M.s;
+    // Top-aligned: any spare height shows more of the column below the table, not empty pegboard above.
+    M.oy = M.y + Math.min(M.h - WH * M.s, 4) - WY0 * M.s;
   }
   function toWorld(px, py) { return { x: (px - M.ox) / M.s, y: (py - M.oy) / M.s }; }
   function toScreen(x, y) { return { x: M.ox + x * M.s, y: M.oy + y * M.s }; }
@@ -1936,7 +1942,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function autoTable() {
     var b = curBit();
     var tipRest = 386 + (b ? b.len : 34);
-    R.tableTarget = clamp(tipRest + 18 + matT(S.mat), 440, 860);
+    R.tableTarget = clamp(tipRest + 18 + matT(S.mat), 440, 700);
   }
 
   function toggleSwitch() {
@@ -2612,7 +2618,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     hits = [];
     screenXf();
     ctx.drawImage(bgCanvas, 0, 0, CW, CH);
+    // The machine is cut off at the bottom of its area (the lower column runs on out of view).
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, CW, M.y + M.h); ctx.clip();
     drawMachine(ctx);
+    ctx.restore();
+    screenXf();
     drawBoardView(ctx);
     drawCase(ctx);
     drawBeltOverlay(ctx);
@@ -2800,7 +2811,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         a = Math.atan2(w.y - (R.tableY + 58), w.x - 124);
         dA = wrapA(a - d.last); d.last = a;
         var minT = tipY() + 3 + matT(S.mat);
-        R.tableTarget = clamp(R.tableTarget - dA * 16, Math.max(440, minT), 860);
+        R.tableTarget = clamp(R.tableTarget - dA * 16, Math.max(440, minT), 700);
         break;
       case "boardM":
         S.py = clamp(d.py0 - (p.x - d.sx) / M.s, 8, BH - 8);
