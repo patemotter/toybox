@@ -782,10 +782,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     R.toolHeld = false;
   }
   function startSeq(kind, wood) {
-    R.seq = { kind: kind, wood: wood, stage: "stop", t: 0 };
-    if (R.on) blip(140, 0.12, 0.08, "sine", 80);
-    R.on = false; R.fastStop = true; R.sand = null;
+    var piece = { wood: S.wood, r: S.r.slice(), fin: avg(S.fin), gloss: avg(S.gloss) };
+    var slot = Math.min(S.shelf.length, shelfGeom().K - 1);
+    if (S.shelf.length >= shelfGeom().K) slot = shelfGeom().K - 1;
+    R.seq = { kind: kind, wood: wood, stage: "away", t: 0, piece: piece, from: { ox: M.ox, oy: M.oy, s: M.s }, slot: slot };
+    R.sand = null;
     releaseTool();
+    resetBlank(kind === "new" ? wood : S.wood);
+    blip(kind === "done" ? 520 : 300, 0.12, 0.06, "triangle", kind === "done" ? 780 : 200);
   }
   function doneBtn() {
     if (busy() || R.seq) return;
@@ -808,18 +812,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var q = R.seq;
     if (!q) return;
     q.t += dt;
-    if (q.stage === "stop") {
-      if (R.spin < 0.05 || q.t > 2.5) {
-        R.spin = 0;
-        q.piece = { wood: S.wood, r: S.r.slice(), fin: avg(S.fin), gloss: avg(S.gloss) };
-        q.from = { ox: M.ox, oy: M.oy, s: M.s };
-        q.slot = Math.min(S.shelf.length, shelfGeom().K - 1);
-        if (S.shelf.length >= shelfGeom().K) q.slot = shelfGeom().K - 1;
-        q.stage = "away"; q.t = 0;
-        resetBlank(q.kind === "new" ? q.wood : S.wood);
-        blip(q.kind === "done" ? 520 : 300, 0.12, 0.06, "triangle", q.kind === "done" ? 780 : 200);
-      }
-    } else if (q.stage === "away") {
+    if (q.stage === "away") {
       if (q.t >= 1.3) {
         if (q.kind === "done") {
           S.pieces++;
@@ -1713,6 +1706,23 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     onBig: function () { resize(); },
     onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
     onTimer: function (info) { TI = info; }
+  });
+  Toybox.offFirst({
+    running: function () { return R.on || R.spin > 0.05; },
+    name: "wood lathe",
+    off: function (done) {
+      if (R.on) blip(160, 0.1, 0.08, "triangle", 90);
+      R.on = false; R.fastStop = true; R.sand = null; releaseTool();
+      var t0 = performance.now();
+      var iv = setInterval(function () {
+        if ((!R.on && R.spin <= 0.05) || performance.now() - t0 >= 850) {
+          clearInterval(iv);
+          R.spin = 0; R.fastStop = false;
+          done();
+        }
+      }, 30);
+    },
+    flash: function () { R.flash.switch = now + 3.2; }
   });
 
   var lastLabel = "";

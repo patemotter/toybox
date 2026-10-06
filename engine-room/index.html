@@ -290,24 +290,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
     S = Math.min(CW / m.W, CH / m.H) * 0.97;
-    // Phones held upright: turn the machine a quarter turn (top to the right) when that makes it much bigger.
-    var Sr = Math.min(CW / m.H, CH / m.W) * 0.97;
-    ROT = Sr > S * 1.25;
-    if (ROT) { S = Sr; OX = (CW - m.H * S) / 2; OY = (CH - m.W * S) / 2; }
-    else { OX = (CW - m.W * S) / 2; OY = (CH - m.H * S) / 2; }
+    OX = (CW - m.W * S) / 2; OY = (CH - m.H * S) / 2;
   }
-  var ROT = false;
   // world -> screen px (inside the canvas)
-  function w2s(x, y) { var m = MACH[st.machine]; return ROT ? { x: OX + (m.H - y) * S, y: OY + x * S } : { x: OX + x * S, y: OY + y * S }; }
+  function w2s(x, y) { return { x: OX + x * S, y: OY + y * S }; }
   function worldXf() {
-    var m = MACH[st.machine];
-    if (ROT) ctx.setTransform(0, DPR * S, -DPR * S, 0, DPR * (OX + m.H * S), DPR * OY);
-    else ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
+    ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
   }
   window.addEventListener("resize", resize);
   function toWorld(cx, cy) {
     var r = cv.getBoundingClientRect();
-    if (ROT) return { x: (cy - r.top - OY) / S, y: MACH[st.machine].H - (cx - r.left - OX) / S };
     return { x: (cx - r.left - OX) / S, y: (cy - r.top - OY) / S };
   }
 
@@ -391,9 +383,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.font = "800 " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
     ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
     ctx.fillStyle = col || INK;
-    // On a turned machine, words painted on it are turned back so they read the right way up.
-    if (ROT && ctx.getTransform().b !== 0) { ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.fillText(text, 0, 0); ctx.restore(); }
-    else ctx.fillText(text, x, y);
+    ctx.fillText(text, x, y);
   }
 
   // ---------- Car engine ----------
@@ -1414,6 +1404,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   Toybox.init({
     app: "engine-room",
+    orientation: "landscape",
     big: { button: $("bigToggle") },
     timerIntro: "When time is up, the engine winds down and rests, and the controls lock.",
     goodbyeOption: "End with a Last spin button to press",
@@ -1431,7 +1422,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     onWake: onWake,
     onBig: function () { resize(); drawThrottle(); },
     onSound: function (on) { if (on) setTimeout(chime, 60); },
-    onTimer: drawFuel
+    onTimer: drawFuel,
+    onTurn: function (shown) { if (!shown) { resize(); drawThrottle(); } }
   });
   window.addEventListener("resize", drawThrottle);
   setTimeout(function () { if (!eng.running && !eng.w && !Toybox.timer.locked()) hint("Press Start, or turn the crank!", 3500); }, 600);

@@ -1216,7 +1216,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function update(dt) {
     // switch -> spin up / spin down
     if (R.on) R.spin = Math.min(1, R.spin + dt * 1.7);
-    else R.spin = Math.max(0, R.spin - dt * 0.55);
+    else R.spin = Math.max(0, R.spin - dt * (R.fastStop ? 1.5 : 0.55));
     R.phase += dt * (R.spin * 47 + (R.spin > 0 ? 0.4 : 0));
     if (R.pending && !R.on && R.spin < 0.03 && !R.chg) startChange();
     runChange(dt);
@@ -1574,6 +1574,24 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     onWake: onWake,
     onBig: function () { resize(); },
     onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
+  });
+  Toybox.offFirst({
+    running: function () { return R.on || R.spin > 0.05; },
+    name: "router table",
+    off: function (done) {
+      if (R.on) blip(260, 0.08, 0.07, "square", 180);
+      R.on = false; R.fastStop = true; R.pending = null; drags = {}; R.target = R.bx;
+      updateAria();
+      var t0 = performance.now();
+      var iv = setInterval(function () {
+        if ((!R.on && R.spin <= 0.05) || performance.now() - t0 >= 850) {
+          clearInterval(iv);
+          R.spin = 0; R.fastStop = false;
+          done();
+        }
+      }, 30);
+    },
+    flash: function () { R.flashSwitch = now + 3.2; }
   });
 
   var lastLabel = "";
