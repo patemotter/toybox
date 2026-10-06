@@ -1,0 +1,1676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Train Builder</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Train Builder">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 1366px;
+  height: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1; }
+.homebtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  min-height: 38px; padding: 2px 12px 2px 9px;
+  font-weight: 700; font-size: 1rem; color: var(--ink); text-decoration: none;
+  background: var(--panel); border: 3px solid var(--edge); border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--edge);
+}
+.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.app {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 8px; margin-top: 8px;
+}
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0;
+  border: 3px solid var(--edge); border-radius: 22px; overflow: hidden;
+  background: #9ED8F5; box-shadow: 4px 4px 0 var(--edge);
+  touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.counter {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+}
+.count {
+  padding: 2px 14px; font-weight: 800; font-size: 1.3rem; line-height: 1.6;
+  color: #1D2340; background: #FFFFFF; border: 3px solid #1D2340; border-radius: 999px;
+  box-shadow: 3px 3px 0 #1D2340;
+}
+.count.pop, .toot.pop { animation: pop 0.35s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.stage .bigtoggle {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340;
+}
+.stage .bigtoggle[aria-pressed="true"] { background: var(--accent); }
+.go {
+  position: absolute; right: 12px; bottom: 12px; z-index: 2;
+  min-height: 64px; padding: 0.2rem 1.4rem; font-size: 1.8rem; font-weight: 800;
+  background: #2E9E5B; color: #FFFFFF; border-color: #1D2340; box-shadow: 4px 4px 0 #1D2340; border-radius: 20px;
+}
+.go:active { box-shadow: 0 0 0 #1D2340; }
+/* Run controls float over the layout so they stay in Big mode. */
+.runctl { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; pointer-events: none; }
+.runctl[hidden], .go[hidden] { display: none; }
+.lever {
+  position: absolute; left: 12px; bottom: 12px; width: 84px; height: 210px; pointer-events: auto;
+  background: rgba(255,255,255,0.88); border: 3px solid #1D2340; border-radius: 22px; box-shadow: 3px 3px 0 #1D2340;
+  touch-action: none; cursor: grab;
+}
+.lever .slot { position: absolute; left: 50%; top: 22px; bottom: 22px; width: 14px; margin-left: -7px; background: #1D2340; border-radius: 7px; }
+.lever .knob {
+  position: absolute; left: 50%; width: 64px; height: 46px; margin-left: -32px; margin-top: -23px;
+  background: #E63946; border: 3px solid #1D2340; border-radius: 14px; box-shadow: 2px 3px 0 #1D2340;
+}
+.lever .tag { position: absolute; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 0.85rem; color: #1D2340; line-height: 1; }
+.lever .tag.top { top: 3px; } .lever .tag.bot { bottom: 3px; }
+.rbtns { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
+.toot { min-height: 76px; min-width: 120px; font-size: 1.7rem; font-weight: 800; background: #FFC93C; color: #1D2340; border-color: #1D2340; box-shadow: 4px 4px 0 #1D2340; border-radius: 22px; }
+.daynight { min-height: 60px; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+.toot:active, .daynight:active { box-shadow: 0 0 0 #1D2340; }
+
+/* ---------- Panel ---------- */
+.panel {
+  flex: 0 0 auto; display: flex; flex-direction: column;
+  background: var(--panel); border: 3px solid var(--edge); border-bottom-width: 0;
+  border-radius: 22px 22px 0 0; box-shadow: 4px 0 0 var(--edge);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.panel-body { padding: 10px 10px 6px; min-height: 0; }
+[data-pane] { display: none; }
+.panel[data-tab="engines"] [data-pane="engines"],
+.panel[data-tab="cars"] [data-pane="cars"],
+.panel[data-tab="paint"] [data-pane="paint"],
+.panel[data-tab="track"] [data-pane="track"] { display: block; }
+.picks { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 8px; }
+#carPicks { --cols: 5; }
+#trackPicks { --cols: 3; }
+.pick {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  padding: 4px 2px 2px; min-height: 76px; font-size: 0.95rem; line-height: 1.1;
+  background: var(--plate); color: #1D2340;
+}
+.pick canvas { width: 100%; height: 52px; display: block; pointer-events: none; }
+.pick.hop { animation: hop 0.3s ease; }
+@keyframes hop { 0% { transform: translateY(0); } 40% { transform: translateY(-8px); } 100% { transform: translateY(0); } }
+.pick[aria-pressed="true"] { background: var(--accent); }
+.prow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.prow:first-child { margin-top: 0; }
+.sw { flex: 1 0 34px; height: 44px; min-height: 44px; padding: 0; border-radius: 12px; }
+.sw[aria-pressed="true"] { outline: 4px solid var(--focus); outline-offset: 1px; }
+.st, .nm { flex: 1 0 40px; min-height: 46px; padding: 2px; font-size: 1.15rem; font-weight: 800; background: var(--plate); color: #1D2340; }
+.st canvas { width: 100%; height: 34px; display: block; pointer-events: none; }
+.hint { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 1rem; line-height: 1.2; }
+.tabbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; padding: 6px 8px 8px; }
+.tab {
+  font: inherit; font-weight: 800; font-size: 0.95rem; min-height: 50px; padding: 2px;
+  color: var(--ink); background: var(--panel); border: 3px solid var(--edge); border-radius: 14px; box-shadow: 2px 2px 0 var(--edge);
+  cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+.tab:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homesm { display: none !important; }
+.prow#swatches { flex-wrap: nowrap; }
+#swatches .sw { flex: 1 1 0; min-width: 0; }
+.tbadge { position: absolute; top: 10px; right: 112px; z-index: 2; }
+
+body.big header, body.big .panel { display: none; }
+body.big .wrap { max-width: none; padding: max(6px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+body.big .app { margin-top: 0; }
+
+/* Small phones */
+@media (max-width: 480px) {
+  .pick { min-height: 64px; font-size: 0.8rem; }
+  .pick canvas { height: 40px; }
+  #carPicks { --cols: 3; }
+  .tab { font-size: 0.8rem; }
+  .lever { width: 66px; height: 160px; }
+  .lever .knob { width: 50px; height: 38px; margin-left: -25px; margin-top: -19px; }
+  .toot { min-height: 64px; min-width: 96px; font-size: 1.35rem; }
+  .daynight { min-height: 52px; font-size: 1rem; }
+  .count { font-size: 1.1rem; }
+  .go { min-height: 56px; font-size: 1.5rem; }
+  .sw { height: 38px; min-height: 38px; flex-basis: 26px; }
+  .st, .nm { min-height: 40px; flex-basis: 28px; }
+}
+/* Tablets */
+@media (min-width: 744px) and (min-height: 640px) {
+  .wrap { padding-top: 12px; }
+  header h1 { font-size: 2rem; }
+  .homebtn { min-height: 46px; font-size: 1.1rem; }
+  .app { gap: 12px; margin-top: 10px; }
+  .panel-body { padding: 14px 16px 8px; }
+  .pick { min-height: 100px; font-size: 1.1rem; }
+  .pick canvas { height: 70px; }
+  .tab { min-height: 58px; font-size: 1.15rem; }
+  .sw { height: 54px; min-height: 54px; }
+  .st, .nm { min-height: 56px; font-size: 1.4rem; }
+  .st canvas { height: 42px; }
+  .count { font-size: 1.6rem; }
+  .tbadge { right: 136px; }
+}
+/* Landscape: the panel becomes a column on the right. */
+@media (orientation: landscape) {
+  .app { flex-direction: row; }
+  .panel {
+    flex: 0 0 min(42%, 520px); border-bottom-width: 3px; border-radius: 22px; box-shadow: 4px 4px 0 var(--edge);
+    margin-bottom: max(10px, env(safe-area-inset-bottom, 0px)); justify-content: space-between;
+  }
+  .stage { margin-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  #carPicks { --cols: 3; }
+  .panel-body { overflow: hidden; }
+  .tab { font-size: 0.95rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  header { display: none; }
+  .wrap { padding-top: 6px; }
+  .app { margin-top: 0; }
+  .panel-body { padding: 6px 8px 2px; }
+  .pick { min-height: 50px; font-size: 0.75rem; padding: 2px; }
+  .pick canvas { height: 30px; }
+  #carPicks { --cols: 5; }
+  .tab { min-height: 42px; font-size: 0.78rem; }
+  .tabbar { padding: 4px 6px 6px; gap: 4px; }
+  .sw { height: 32px; min-height: 32px; flex-basis: 22px; }
+  .st, .nm { min-height: 34px; font-size: 0.95rem; flex-basis: 24px; }
+  .st canvas { height: 24px; }
+  .prow { margin-top: 5px; gap: 4px; }
+  .hint { font-size: 0.85rem; margin-bottom: 3px; }
+  .lever { width: 60px; height: 140px; }
+  .lever .knob { width: 46px; height: 34px; margin-left: -23px; margin-top: -17px; }
+  .toot { min-height: 58px; min-width: 88px; font-size: 1.25rem; }
+  .daynight { min-height: 48px; font-size: 0.95rem; }
+  .count { font-size: 1rem; }
+  .go { min-height: 50px; font-size: 1.3rem; }
+  .homesm { display: flex !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .count.pop, .pick.hop { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Train Builder</h1>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+  </header>
+
+  <main class="app">
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="The train"></canvas>
+      <div class="counter"><a class="homebtn homesm" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a><div class="count" id="count">Cars: 0</div></div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" hidden></svg>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+      <button class="btn go" id="go">Go!</button>
+      <div class="runctl" id="runctl" hidden>
+        <div class="lever" id="lever" aria-label="Speed lever" role="slider"><span class="tag top">Fast</span><div class="slot"></div><div class="knob" id="knob"></div><span class="tag bot">Stop</span></div>
+        <div class="rbtns">
+          <button class="btn daynight" id="daynight">Night</button>
+          <button class="btn toot" id="toot">Toot!</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel" data-tab="engines">
+      <div class="panel-body">
+        <div data-pane="engines"><div class="picks" id="engPicks"></div></div>
+        <div data-pane="cars"><div class="picks" id="carPicks"></div></div>
+        <div data-pane="paint">
+          <p class="hint" id="paintHint">Tap a train car to paint it.</p>
+          <div class="prow" id="swatches"></div>
+          <div class="prow" id="styles"></div>
+          <div class="prow" id="nums"></div>
+        </div>
+        <div data-pane="track"><div class="picks" id="trackPicks"></div></div>
+      </div>
+      <nav class="tabbar" role="tablist" aria-label="Controls">
+        <button class="tab" role="tab" data-tab="engines">Engines</button>
+        <button class="tab" role="tab" data-tab="cars">Cars</button>
+        <button class="tab" role="tab" data-tab="paint">Paint</button>
+        <button class="tab" role="tab" data-tab="track">Track</button>
+        <button class="tab" id="grownbtn">Grown-ups</button>
+      </nav>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var OUT = "#1D2340";
+  var KEY = "trainbuilder-v1";
+  var TAU = Math.PI * 2;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  var COLORS = ["#E63946", "#F77F00", "#FFC93C", "#A7D129", "#2E9E5B", "#1FA6A0",
+    "#5BC0EB", "#2D5BD7", "#7B4FC9", "#F26CA7", "#8B5A3C", "#26282E"];
+  function rgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+  function shade(h, f) {
+    var c = rgb(h);
+    var t = f < 0 ? 0 : 255, k = Math.abs(f);
+    return "rgb(" + c.map(function (v) { return Math.round(v + (t - v) * k); }).join(",") + ")";
+  }
+  function isDark(h) { var c = rgb(h); return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 120; }
+
+  // ---------- Piece catalog ----------
+  // len: side-view length in build units. eng: an engine. h: body height.
+  var TYPES = {
+    steam:    { name: "Steam", len: 250, eng: true, color: "#26282E" },
+    diesel:   { name: "Diesel", len: 180, eng: true, color: "#FFC93C" },
+    electric: { name: "Electric", len: 180, eng: true, color: "#2D5BD7" },
+    fast:     { name: "High-speed", len: 220, eng: true, color: "#FFFFFF" },
+    boxcar:   { name: "Boxcar", len: 160, color: "#E63946" },
+    tanker:   { name: "Tanker", len: 160, color: "#9AA3AF" },
+    hopper:   { name: "Hopper", len: 145, color: "#2E9E5B" },
+    logs:     { name: "Logs", len: 165, color: "#8B5A3C" },
+    pipes:    { name: "Pipes", len: 165, color: "#2D5BD7" },
+    boxes:    { name: "Containers", len: 165, color: "#7B4FC9" },
+    passenger:{ name: "Passenger", len: 180, color: "#1FA6A0" },
+    coal:     { name: "Coal", len: 130, color: "#F77F00" },
+    caboose:  { name: "Caboose", len: 125, color: "#E63946" }
+  };
+  var ENGINES = ["steam", "diesel", "electric", "fast"];
+  var CARS = ["boxcar", "tanker", "hopper", "logs", "pipes", "boxes", "passenger", "coal", "caboose"];
+  var STYLES = ["plain", "stripe", "dots", "zigzag"];
+  var MAXP = 12;
+  var GAP = 14; // coupler gap between pieces (build units)
+
+  // ---------- Saved state ----------
+  var state = { pieces: [], layout: "oval", night: false, speed: 0.5, tab: "engines", sel: -1 };
+  (function load() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (Array.isArray(o.pieces)) {
+          o.pieces.forEach(function (p) {
+            if (p && TYPES[p.t] && state.pieces.length < MAXP) {
+              state.pieces.push({ t: p.t, color: COLORS.indexOf(p.color) >= 0 || p.color === "#FFFFFF" || p.color === "#9AA3AF" ? p.color : TYPES[p.t].color,
+                style: STYLES.indexOf(p.style) >= 0 ? p.style : "plain", num: (p.num | 0) >= 1 && (p.num | 0) <= 9 ? p.num | 0 : 1 });
+            }
+          });
+        }
+        if (["oval", "eight", "switch"].indexOf(o.layout) >= 0) state.layout = o.layout;
+        state.night = !!o.night;
+        if (typeof o.speed === "number") state.speed = clamp(o.speed, 0, 1);
+        if (["engines", "cars", "paint", "track"].indexOf(o.tab) >= 0) state.tab = o.tab;
+      }
+    } catch (e) { /* defaults */ }
+  })();
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ pieces: state.pieces.map(function (p) { return { t: p.t, color: p.color, style: p.style, num: p.num }; }),
+        layout: state.layout, night: state.night, speed: state.speed, tab: state.tab }));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Sound (only when the grown-up turned it on) ----------
+  function ac() { return Toybox.sound.ready(); }
+  function tone(ctx, type, f0, f1, t0, dur, vol) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0);
+    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function sClunk() {
+    var ctx = ac(); if (!ctx) return;
+    var t = ctx.currentTime;
+    tone(ctx, "sine", 150, 55, t, 0.22, 0.22);
+    tone(ctx, "triangle", 420, 180, t, 0.07, 0.06);
+  }
+  function sWhistle() {
+    var ctx = ac(); if (!ctx) return;
+    var t = ctx.currentTime, d = 1.1;
+    [523, 659, 784].forEach(function (f) {
+      var o = ctx.createOscillator(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      lfo.frequency.value = 5.5; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(o.frequency);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.045, t + 0.08);
+      g.gain.setValueAtTime(0.045, t + d - 0.3);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); lfo.start(t); o.stop(t + d + 0.05); lfo.stop(t + d + 0.05);
+    });
+  }
+  function sPoof() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 700, 200, ctx.currentTime, 0.25, 0.08); }
+  function sClick() { var ctx = ac(); if (!ctx) return; tone(ctx, "square", 900, 600, ctx.currentTime, 0.05, 0.03); }
+  function sDing() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 988, 980, ctx.currentTime, 0.35, 0.04); }
+  function sChime() {
+    var ctx = ac(); if (!ctx) return;
+    var t = ctx.currentTime;
+    tone(ctx, "sine", 659, 659, t, 0.5, 0.06); tone(ctx, "sine", 523, 523, t + 0.25, 0.7, 0.06);
+  }
+
+  // ---------- Drawing helpers ----------
+  function rr(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+  }
+  function trim(c, color, lw) { c.fillStyle = color; c.fill(); c.lineWidth = lw || 5; c.strokeStyle = OUT; c.stroke(); }
+  // Fill the current path with the piece color and its style pattern, then outline it.
+  function body(c, p, x, y, w, h) {
+    c.fillStyle = p.color; c.fill();
+    if (p.style !== "plain") {
+      c.save(); c.clip();
+      var alt = isDark(p.color) ? "#FFFFFF" : (p.color === "#FFFFFF" ? "#E63946" : OUT);
+      c.fillStyle = alt; c.strokeStyle = alt;
+      if (p.style === "stripe") { c.fillRect(x - 5, y + h * 0.55, w + 10, h * 0.14); c.globalAlpha = 0.6; c.fillRect(x - 5, y + h * 0.75, w + 10, h * 0.06); }
+      else if (p.style === "dots") {
+        c.globalAlpha = 0.85;
+        for (var i = 0; i * 26 < w + 30; i++) for (var j = 0; j * 26 < h + 30; j++) {
+          c.beginPath(); c.arc(x + i * 26 + (j % 2 ? 13 : 0), y + 8 + j * 26, 5, 0, TAU); c.fill();
+        }
+      } else if (p.style === "zigzag") {
+        c.lineWidth = 7; c.lineJoin = "miter"; c.beginPath();
+        for (var k = 0; k * 20 <= w + 20; k++) c.lineTo(x + k * 20, y + h * 0.55 + (k % 2 ? -12 : 12));
+        c.stroke();
+      }
+      c.restore();
+    }
+    c.lineWidth = 5; c.strokeStyle = OUT; c.lineJoin = "round"; c.stroke();
+  }
+  function wheel(c, x, y, r, spin) {
+    c.beginPath(); c.arc(x, y, r, 0, TAU); trim(c, "#4A5578", 4);
+    c.beginPath(); c.arc(x, y, r * 0.55, 0, TAU); c.fillStyle = "#C9D3E6"; c.fill();
+    c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath();
+    c.moveTo(x, y); c.lineTo(x + Math.cos(spin) * r * 0.8, y + Math.sin(spin) * r * 0.8); c.stroke();
+    c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fillStyle = OUT; c.fill();
+  }
+  function decal(c, x, y, r, n) {
+    c.beginPath(); c.arc(x, y, r, 0, TAU); trim(c, "#FFFFFF", 4);
+    c.fillStyle = OUT; c.font = "800 " + Math.round(r * 1.5) + "px " + "'Baloo 2', 'Trebuchet MS', sans-serif";
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(n), x, y + r * 0.1);
+  }
+  function win(c, x, y, w, h, lit) { rr(c, x, y, w, h, 5); trim(c, lit ? "#FFE680" : "#BEE9FF", 4); }
+  function truck(c, x0, len, y, spin, r) {
+    r = r || 15;
+    wheel(c, x0 + len * 0.17, y - r, r, spin); wheel(c, x0 + len * 0.17 + r * 2.3, y - r, r, spin);
+    wheel(c, x0 + len * 0.83, y - r, r, spin); wheel(c, x0 + len * 0.83 - r * 2.3, y - r, r, spin);
+  }
+  function couplers(c, x0, len, y) {
+    c.fillStyle = "#4A5578"; c.strokeStyle = OUT; c.lineWidth = 3;
+    c.fillRect(x0 - 9, y - 30, 12, 10); c.strokeRect(x0 - 9, y - 30, 12, 10);
+    c.fillRect(x0 + len - 3, y - 30, 12, 10); c.strokeRect(x0 + len - 3, y - 30, 12, 10);
+  }
+  // Side view of one piece; x0 = front (left) end, gy = rail top. Faces left.
+  function drawSide(c, p, x0, gy, spin, lit) {
+    var t = p.t, L = TYPES[t].len;
+    c.lineJoin = "round"; c.lineCap = "round";
+    couplers(c, x0, L, gy);
+    if (t === "steam") {
+      var E = 160;
+      // tender
+      rr(c, E + x0 + 8, gy - 100, L - E - 8, 70, 10); body(c, p, E + x0 + 8, gy - 100, L - E - 8, 70);
+      c.beginPath(); c.moveTo(E + x0 + 14, gy - 100); c.quadraticCurveTo(E + x0 + (L - E) / 2, gy - 136, x0 + L - 6, gy - 100); c.closePath(); trim(c, "#26282E", 4);
+      wheel(c, x0 + E + 34, gy - 15, 15, spin); wheel(c, x0 + L - 26, gy - 15, 15, spin);
+      // frame
+      rr(c, x0 + 4, gy - 44, E, 16, 4); trim(c, "#4A5578", 4);
+      // boiler
+      rr(c, x0 + 10, gy - 104, 110, 58, 26); body(c, p, x0 + 10, gy - 104, 110, 58);
+      // smokestack, dome
+      c.beginPath(); c.moveTo(x0 + 22, gy - 102); c.lineTo(x0 + 18, gy - 140); c.lineTo(x0 + 48, gy - 140); c.lineTo(x0 + 44, gy - 102); c.closePath(); trim(c, "#26282E", 4);
+      rr(c, x0 + 62, gy - 122, 26, 22, 10); trim(c, "#FFC93C", 4);
+      // cab
+      rr(c, x0 + 112, gy - 140, 52, 96, 6); body(c, p, x0 + 112, gy - 140, 52, 96);
+      rr(c, x0 + 104, gy - 150, 68, 14, 6); trim(c, "#26282E", 4);
+      win(c, x0 + 122, gy - 128, 32, 26, lit);
+      decal(c, x0 + 138, gy - 72, 18, p.num);
+      // headlight
+      c.beginPath(); c.arc(x0 + 10, gy - 92, 9, 0, TAU); trim(c, lit ? "#FFF3A0" : "#FFE680", 3);
+      // cowcatcher
+      c.beginPath(); c.moveTo(x0 + 4, gy - 40); c.lineTo(x0 - 18, gy - 6); c.lineTo(x0 + 28, gy - 6); c.closePath(); trim(c, "#E63946", 4);
+      wheel(c, x0 + 40, gy - 16, 14, spin);
+      wheel(c, x0 + 78, gy - 24, 22, spin); wheel(c, x0 + 128, gy - 24, 22, spin);
+      c.strokeStyle = "#C9D3E6"; c.lineWidth = 6; c.beginPath();
+      c.moveTo(x0 + 78 + Math.cos(spin) * 12, gy - 24 + Math.sin(spin) * 12); c.lineTo(x0 + 128 + Math.cos(spin) * 12, gy - 24 + Math.sin(spin) * 12); c.stroke();
+      c.strokeStyle = OUT; c.lineWidth = 2; c.stroke();
+      return;
+    }
+    if (t === "diesel") {
+      rr(c, x0 + 4, gy - 42, L - 8, 14, 4); trim(c, "#4A5578", 4);
+      rr(c, x0 + 46, gy - 104, L - 56, 64, 8); body(c, p, x0 + 46, gy - 104, L - 56, 64);
+      rr(c, x0 + 8, gy - 128, 50, 88, 10); body(c, p, x0 + 8, gy - 128, 50, 88);
+      win(c, x0 + 16, gy - 118, 34, 26, lit);
+      for (var g = 0; g < 4; g++) { c.fillStyle = OUT; c.fillRect(x0 + 120 + g * 12, gy - 96, 5, 24); }
+      decal(c, x0 + 86, gy - 72, 18, p.num);
+      c.beginPath(); c.arc(x0 + 8, gy - 60, 8, 0, TAU); trim(c, "#FFE680", 3);
+      truck(c, x0, L, gy, spin, 14);
+      return;
+    }
+    if (t === "electric") {
+      rr(c, x0 + 4, gy - 42, L - 8, 14, 4); trim(c, "#4A5578", 4);
+      // pantograph
+      c.strokeStyle = OUT; c.lineWidth = 4; c.beginPath();
+      c.moveTo(x0 + 70, gy - 124); c.lineTo(x0 + 100, gy - 150); c.lineTo(x0 + 80, gy - 170); c.moveTo(x0 + 60, gy - 172); c.lineTo(x0 + 110, gy - 172); c.stroke();
+      rr(c, x0 + 6, gy - 126, L - 12, 86, 14); body(c, p, x0 + 6, gy - 126, L - 12, 86);
+      win(c, x0 + 14, gy - 114, 30, 28, lit); win(c, x0 + L - 44, gy - 114, 30, 28, lit);
+      decal(c, x0 + L / 2, gy - 82, 20, p.num);
+      c.beginPath(); c.arc(x0 + 10, gy - 56, 7, 0, TAU); trim(c, "#FFE680", 3);
+      truck(c, x0, L, gy, spin, 14);
+      return;
+    }
+    if (t === "fast") {
+      rr(c, x0 + 10, gy - 42, L - 14, 14, 4); trim(c, "#4A5578", 4);
+      c.beginPath(); c.moveTo(x0 - 4, gy - 44); c.quadraticCurveTo(x0 + 6, gy - 108, x0 + 84, gy - 118);
+      c.lineTo(x0 + L - 6, gy - 118); c.quadraticCurveTo(x0 + L, gy - 118, x0 + L, gy - 110); c.lineTo(x0 + L, gy - 44); c.closePath();
+      body(c, p, x0, gy - 118, L, 74);
+      c.beginPath(); c.moveTo(x0 + 26, gy - 92); c.quadraticCurveTo(x0 + 44, gy - 110, x0 + 74, gy - 110); c.lineTo(x0 + 76, gy - 92); c.closePath(); trim(c, lit ? "#FFE680" : "#26282E", 4);
+      for (var w = 0; w < 4; w++) win(c, x0 + 96 + w * 28, gy - 104, 20, 22, lit);
+      rr(c, x0 + 4, gy - 62, L - 8, 8, 4); trim(c, "#E63946", 3);
+      decal(c, x0 + 160, gy - 74, 15, p.num);
+      truck(c, x0 + 6, L - 6, gy, spin, 13);
+      return;
+    }
+    // Cars: frame + trucks first.
+    rr(c, x0 + 4, gy - 44, L - 8, 14, 4); trim(c, "#4A5578", 4);
+    if (t === "boxcar") {
+      rr(c, x0 + 6, gy - 134, L - 12, 92, 6); body(c, p, x0 + 6, gy - 134, L - 12, 92);
+      rr(c, x0 + L / 2 - 26, gy - 124, 52, 76, 3); trim(c, shade(p.color, -0.25), 4);
+      c.beginPath(); c.moveTo(x0 + L / 2 - 26, gy - 124); c.lineTo(x0 + L / 2 + 26, gy - 48); c.moveTo(x0 + L / 2 + 26, gy - 124); c.lineTo(x0 + L / 2 - 26, gy - 48); c.stroke();
+      decal(c, x0 + 32, gy - 100, 17, p.num);
+    } else if (t === "tanker") {
+      rr(c, x0 + L / 2 - 16, gy - 136, 32, 20, 6); trim(c, shade(p.color, -0.2), 4);
+      rr(c, x0 + 4, gy - 124, L - 8, 80, 40); body(c, p, x0 + 4, gy - 124, L - 8, 80);
+      c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath(); c.moveTo(x0 + 44, gy - 122); c.lineTo(x0 + 44, gy - 46); c.moveTo(x0 + L - 44, gy - 122); c.lineTo(x0 + L - 44, gy - 46); c.stroke();
+      decal(c, x0 + L / 2, gy - 84, 18, p.num);
+    } else if (t === "hopper") {
+      c.beginPath(); c.moveTo(x0 + 20, gy - 132); c.quadraticCurveTo(x0 + L / 2, gy - 160, x0 + L - 20, gy - 132); c.closePath(); trim(c, "#A27B5C", 4);
+      c.beginPath(); c.moveTo(x0 + 4, gy - 132); c.lineTo(x0 + L - 4, gy - 132); c.lineTo(x0 + L - 22, gy - 62); c.lineTo(x0 + L / 2 + 14, gy - 42); c.lineTo(x0 + L / 2 - 14, gy - 42); c.lineTo(x0 + 22, gy - 62); c.closePath();
+      body(c, p, x0, gy - 132, L, 90);
+      c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath();
+      for (var r = 1; r < 4; r++) { c.moveTo(x0 + r * L / 4, gy - 132); c.lineTo(x0 + r * L / 4, gy - 70); } c.stroke();
+      decal(c, x0 + L / 2, gy - 100, 16, p.num);
+    } else if (t === "logs" || t === "pipes" || t === "boxes") {
+      rr(c, x0 + 2, gy - 58, L - 4, 18, 4); body(c, p, x0 + 2, gy - 58, L - 4, 18);
+      if (t === "logs") {
+        for (var lr = 2; lr >= 0; lr--) {
+          var yy = gy - 72 - lr * 24, xx = x0 + 12 + lr * 10;
+          rr(c, xx, yy - 13, L - 24 - lr * 20, 26, 13); trim(c, "#8B5A3C", 3);
+          c.beginPath(); c.arc(xx + 11, yy, 9, 0, TAU); trim(c, "#E8C08F", 3);
+        }
+      } else if (t === "pipes") {
+        for (var pr = 2; pr >= 0; pr--) {
+          var py = gy - 72 - pr * 22;
+          rr(c, x0 + 14 + pr * 6, py - 11, L - 28 - pr * 12, 22, 4); trim(c, "#9AA3AF", 3);
+          c.beginPath(); c.arc(x0 + 22 + pr * 6, py, 7, 0, TAU); trim(c, "#4A5578", 3);
+        }
+      } else {
+        var cw = (L - 20) / 2;
+        rr(c, x0 + 8, gy - 116, cw - 2, 58, 3); trim(c, "#F77F00", 4);
+        rr(c, x0 + 10 + cw, gy - 116, cw - 2, 58, 3); trim(c, "#5BC0EB", 4);
+        rr(c, x0 + 30, gy - 168, L - 60, 52, 3); trim(c, "#A7D129", 4);
+        c.strokeStyle = OUT; c.lineWidth = 2;
+        [[x0 + 8, cw - 2, gy - 116, 58], [x0 + 10 + cw, cw - 2, gy - 116, 58], [x0 + 30, L - 60, gy - 168, 52]].forEach(function (b) {
+          c.beginPath(); for (var i = 1; i < 6; i++) { c.moveTo(b[0] + i * b[1] / 6, b[2] + 6); c.lineTo(b[0] + i * b[1] / 6, b[2] + b[3] - 6); } c.stroke();
+        });
+      }
+      decal(c, x0 + 26, gy - 49, 13, p.num);
+    } else if (t === "passenger") {
+      c.beginPath(); c.moveTo(x0 + 6, gy - 128); c.quadraticCurveTo(x0 + L / 2, gy - 148, x0 + L - 6, gy - 128); c.closePath(); trim(c, "#4A5578", 4);
+      rr(c, x0 + 6, gy - 130, L - 12, 88, 8); body(c, p, x0 + 6, gy - 130, L - 12, 88);
+      for (var pw = 0; pw < 5; pw++) win(c, x0 + 18 + pw * 30, gy - 118, 22, 28, lit);
+      decal(c, x0 + L / 2, gy - 66, 15, p.num);
+    } else if (t === "coal") {
+      c.fillStyle = "#26282E";
+      for (var cl = 0; cl < 9; cl++) { c.beginPath(); c.arc(x0 + 20 + cl * 11, gy - 104 - (cl % 3) * 5, 14, 0, TAU); c.fill(); }
+      rr(c, x0 + 6, gy - 104, L - 12, 62, 6); body(c, p, x0 + 6, gy - 104, L - 12, 62);
+      decal(c, x0 + L / 2, gy - 74, 17, p.num);
+    } else if (t === "caboose") {
+      rr(c, x0 + 34, gy - 160, 56, 36, 6); body(c, p, x0 + 34, gy - 160, 56, 36);
+      win(c, x0 + 46, gy - 152, 32, 18, lit);
+      rr(c, x0 + 26, gy - 168, 72, 12, 6); trim(c, "#26282E", 4);
+      rr(c, x0 + 12, gy - 128, L - 24, 86, 6); body(c, p, x0 + 12, gy - 128, L - 24, 86);
+      win(c, x0 + 22, gy - 116, 24, 24, lit); win(c, x0 + L - 46, gy - 116, 24, 24, lit);
+      decal(c, x0 + L / 2, gy - 82, 16, p.num);
+      c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath();
+      c.moveTo(x0 + 2, gy - 44); c.lineTo(x0 + 2, gy - 82); c.lineTo(x0 + 12, gy - 82); c.moveTo(x0 + L - 2, gy - 44); c.lineTo(x0 + L - 2, gy - 82); c.lineTo(x0 + L - 12, gy - 82); c.stroke();
+    }
+    truck(c, x0, L, gy, spin, 13);
+  }
+
+  // ---------- Thumbnails for the picture buttons ----------
+  function thumb(cv, fn) {
+    var r = Math.min(2, window.devicePixelRatio || 1);
+    var w = cv.clientWidth || 120, h = cv.clientHeight || 60;
+    cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+    var c = cv.getContext("2d");
+    c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h);
+    fn(c, w, h);
+  }
+  // ---------- Build scene (side view) ----------
+  var cv = $("cv"), cx = cv.getContext("2d"), DPR = 1, W = 300, H = 200;
+  var stage = $("stage");
+  // Animated pieces: {p, x, vx, roll, jig, id}
+  var anim = [];
+  var nextId = 1;
+  state.pieces.forEach(function (p) { anim.push({ p: p, x: 0, vx: 0, roll: false, jig: 0, id: nextId++, drag: null, spin: 0 }); });
+  function layoutX() { // target x of each piece (front end), build units
+    var x = 0, out = [];
+    anim.forEach(function (a) { out.push(x); x += TYPES[a.p.t].len + GAP; });
+    return out;
+  }
+  function trainLen() { var t = 0; anim.forEach(function (a) { t += TYPES[a.p.t].len + GAP; }); return Math.max(0, t - GAP); }
+  (function () { var xs = layoutX(); anim.forEach(function (a, i) { a.x = xs[i]; }); })();
+  var bscale = 1, bview = { ox: 0, gy: 0 };
+  var fx = []; // effects: {k, x, y, t, ...} in screen px
+  function buildMetrics() {
+    var len = Math.max(trainLen(), 400);
+    var target = Math.min((W - 40) / (len + 40), (H - 100 - 56) / 185, 1.6);
+    return target;
+  }
+  function counterText() {
+    var n = 0; state.pieces.forEach(function (p) { if (!TYPES[p.t].eng) n++; });
+    return "Cars: " + n;
+  }
+  function bumpCount() {
+    var el = $("count"); el.textContent = counterText();
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+  }
+
+  function addPiece(t) {
+    if (Toybox.timer.locked()) return;
+    if (state.pieces.length >= MAXP) { Toybox.toast("The train is full!"); return; }
+    if (mode !== "build") setTab(TYPES[t].eng ? "engines" : "cars");
+    var used = {};
+    state.pieces.forEach(function (p) { used[p.num] = 1; });
+    var num = 1; while (used[num] && num < 9) num++;
+    var p = { t: t, color: TYPES[t].color, style: "plain", num: num };
+    state.pieces.push(p);
+    var a = { p: p, x: 0, vx: -60, roll: true, jig: 0, id: nextId++, drag: null, spin: 0, isNew: true };
+    // Start just off the right edge of the view.
+    a.x = (W - bview.ox) / bscale + 40;
+    anim.push(a);
+    state.sel = state.pieces.length - 1;
+    save(); bumpCount(); refreshPaint();
+  }
+  function removeAt(i, sx, sy) {
+    var a = anim[i];
+    anim.splice(i, 1); state.pieces.splice(i, 1);
+    if (state.sel === i) state.sel = -1; else if (state.sel > i) state.sel--;
+    for (var k = 0; k < 26; k++) {
+      var ang = rand(0, TAU), sp = rand(120, 520);
+      fx.push({ k: "bit", x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 120, t: 0, life: rand(0.6, 1.1), r: rand(6, 16), c: k % 3 ? a.p.color : "#FFFFFF" });
+    }
+    fx.push({ k: "ring", x: sx, y: sy, t: 0, life: 0.5 });
+    sPoof();
+    // Pieces behind roll forward and couple again.
+    var xs = layoutX();
+    anim.forEach(function (b, j) { if (j >= i && b.x - xs[j] > 2) b.roll = true; });
+    save(); bumpCount(); refreshPaint();
+  }
+  function clunk(a, sx, sy, idx) {
+    sClunk();
+    fx.push({ k: "clunk", x: sx, y: sy, t: 0, life: 0.6 });
+    for (var k = 0; k < 8; k++) {
+      var ang = rand(-Math.PI, 0), sp = rand(120, 300);
+      fx.push({ k: "bit", x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, t: 0, life: 0.5, r: rand(4, 8), c: "#FFC93C" });
+    }
+    anim.forEach(function (b, j) { b.jig = Math.max(b.jig, 1 - Math.abs(j - idx) * 0.12); });
+  }
+
+  function stepBuild(dt) {
+    var target = buildMetrics();
+    bscale += (target - bscale) * Math.min(1, dt * 4);
+    var len = trainLen();
+    bview.ox = (W - len * bscale) / 2;
+    bview.gy = H - Math.max(88, H * 0.16);
+    var xs = layoutX();
+    anim.forEach(function (a, i) {
+      if (a.drag) return;
+      var tx = xs[i];
+      if (a.roll) {
+        a.vx = Math.max(a.vx - 1400 * dt, -900);
+        a.x += a.vx * dt;
+        a.spin += a.vx * dt / 15;
+        if (a.x <= tx) {
+          a.x = tx; a.vx = 0; a.roll = false;
+          clunk(a, bview.ox + tx * bscale - GAP * bscale / 2, bview.gy - 25 * bscale, i);
+        }
+      } else {
+        var d = tx - a.x;
+        if (Math.abs(d) > 0.5) { a.x += d * Math.min(1, dt * 10); a.spin += d * dt * 0.6; } else a.x = tx;
+        if (d < -3) a.roll = true;
+      }
+      a.jig = Math.max(0, a.jig - dt * 2.2);
+    });
+  }
+
+  var clouds = [[0.15, 0.16, 1], [0.55, 0.1, 1.3], [0.85, 0.22, 0.9]];
+  function cloud(c, x, y, s) {
+    c.fillStyle = "rgba(255,255,255,0.9)";
+    c.beginPath(); c.arc(x, y, 22 * s, 0, TAU); c.arc(x + 26 * s, y - 10 * s, 28 * s, 0, TAU); c.arc(x + 54 * s, y, 22 * s, 0, TAU); c.fill();
+  }
+  function drawBuild(t) {
+    var c = cx;
+    var night = state.night;
+    var g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, night ? "#14204A" : "#7CC8F2"); g.addColorStop(1, night ? "#2B3B78" : "#CDEBFF");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    if (night) { c.fillStyle = "#FFF6C8"; for (var si = 0; si < 30; si++) { c.beginPath(); c.arc((si * 137.5) % W, ((si * 71) % (H * 0.5)) + 8, 1.6 + (si % 3), 0, TAU); c.fill(); } }
+    else clouds.forEach(function (q, i) { cloud(c, ((q[0] * W + t * 8 * (i + 1)) % (W + 160)) - 80, q[1] * H + 30, q[2] * Math.min(1.4, W / 700)); });
+    // hills
+    c.fillStyle = night ? "#1E4A3A" : "#8FD06A";
+    c.beginPath(); c.moveTo(0, bview.gy - 30);
+    for (var hx = 0; hx <= W + 40; hx += 40) c.lineTo(hx, bview.gy - 40 - Math.sin(hx * 0.008 + 1) * 40 - Math.sin(hx * 0.021) * 12);
+    c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+    c.fillStyle = night ? "#2C5A3E" : "#6BBF4E"; c.fillRect(0, bview.gy, W, H - bview.gy);
+    // track: ties + rail
+    var s = bscale;
+    c.fillStyle = "#8B5A3C";
+    var tw = 34 * s;
+    for (var tx = (bview.ox % tw) - tw; tx < W; tx += tw) c.fillRect(tx, bview.gy + 2, tw * 0.55, 10 * s + 4);
+    c.fillStyle = "#4A5578"; c.fillRect(0, bview.gy - 3, W, 7);
+    c.fillStyle = OUT; c.fillRect(0, bview.gy + 4, W, 2);
+    if (!anim.length) {
+      c.fillStyle = night ? "#FFFFFF" : OUT; c.textAlign = "center"; c.textBaseline = "middle";
+      c.font = "800 " + Math.round(Math.min(44, W / 12)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+      c.fillText("Tap an engine to start!", W / 2, H * 0.42);
+    }
+    // pieces (the dragged ones last)
+    var order = anim.slice().sort(function (a, b) { return (a.drag ? 1 : 0) - (b.drag ? 1 : 0); });
+    order.forEach(function (a) {
+      var i = anim.indexOf(a);
+      var x = bview.ox + a.x * s, y = bview.gy;
+      var jy = a.jig > 0 ? -Math.abs(Math.sin(a.jig * 18)) * 10 * a.jig * s * 2 : 0;
+      c.save();
+      if (a.drag) { x += a.drag.dx; y += a.drag.dy; c.globalAlpha = Math.max(0.35, 1 - Math.abs(a.drag.dy) / 400); }
+      c.translate(x, y + jy); c.scale(s, s);
+      if (a.drag) c.rotate(clamp(a.drag.dx / 900, -0.2, 0.2));
+      drawSide(c, a.p, 0, 0, a.spin, night);
+      c.restore();
+      if (i === state.sel && state.tab === "paint" && !a.drag) {
+        var ax = x + TYPES[a.p.t].len * s / 2, ay = y - 200 * s - 14 + Math.sin(t * 6) * 6;
+        c.beginPath(); c.moveTo(ax, ay + 22); c.lineTo(ax - 18, ay); c.lineTo(ax - 7, ay); c.lineTo(ax - 7, ay - 18); c.lineTo(ax + 7, ay - 18); c.lineTo(ax + 7, ay); c.lineTo(ax + 18, ay); c.closePath();
+        trim(c, "#FFC93C", 4);
+      }
+    });
+    if (night && anim.length) {
+      // headlight beam from the front
+      var hx0 = bview.ox + anim[0].x * s, hy0 = bview.gy - 90 * s;
+      var hg = c.createRadialGradient(hx0, hy0, 4, hx0, hy0, 260 * s);
+      hg.addColorStop(0, "rgba(255,240,150,0.85)"); hg.addColorStop(1, "rgba(255,240,150,0)");
+      c.fillStyle = hg; c.beginPath(); c.moveTo(hx0, hy0); c.lineTo(hx0 - 300 * s, hy0 - 80 * s); c.lineTo(hx0 - 300 * s, hy0 + 90 * s); c.closePath(); c.fill();
+    }
+  }
+  function drawFx(dt) {
+    var c = cx;
+    for (var i = fx.length - 1; i >= 0; i--) {
+      var f = fx[i]; f.t += dt;
+      if (f.t >= f.life) { fx.splice(i, 1); continue; }
+      var k = f.t / f.life;
+      if (f.k === "bit") {
+        f.vy += 700 * dt; f.x += f.vx * dt; f.y += f.vy * dt;
+        c.globalAlpha = 1 - k; c.beginPath(); c.arc(f.x, f.y, f.r * (1 - k * 0.5), 0, TAU); c.fillStyle = f.c; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+      } else if (f.k === "ring") {
+        c.globalAlpha = 1 - k; c.lineWidth = 8; c.strokeStyle = "#FFFFFF"; c.beginPath(); c.arc(f.x, f.y, 20 + k * 160, 0, TAU); c.stroke();
+      } else if (f.k === "clunk") {
+        var sc = 1 + Math.sin(Math.min(1, k * 3) * Math.PI) * 0.4;
+        c.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3;
+        c.save(); c.translate(f.x, f.y - 40 - k * 30); c.scale(sc, sc);
+        c.beginPath();
+        for (var j = 0; j < 16; j++) { var rr2 = j % 2 ? 22 : 44; c.lineTo(Math.cos(j / 16 * TAU) * rr2, Math.sin(j / 16 * TAU) * rr2 * 0.8); }
+        c.closePath(); trim(c, "#FFC93C", 4);
+        c.fillStyle = OUT; c.font = "800 26px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillText("Clunk!", 0, 2);
+        c.restore();
+      } else if (f.k === "text") {
+        c.globalAlpha = k < 0.75 ? 1 : (1 - k) / 0.25;
+        var s2 = 0.6 + Math.min(1, k * 5) * 0.4;
+        c.save(); c.translate(f.x, f.y - k * 40); c.scale(s2, s2);
+        c.font = "800 " + f.size + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+        var tw = c.measureText(f.text).width;
+        rr(c, -tw / 2 - 18, -f.size * 0.7, tw + 36, f.size * 1.4, 20); trim(c, "#FFFFFF", 4);
+        c.fillStyle = OUT; c.fillText(f.text, 0, 3); c.restore();
+      }
+      c.globalAlpha = 1;
+    }
+  }
+
+  // ---------- Run scene: layouts as spline track segments ----------
+  var TILT = 0.74, HT = 0.62; // y squash for the angled view; height factor for vertical things
+  var WW = 1000, WH = 760;
+  function catmull(pts, closed, t0, t1) {
+    // returns dense points along a Catmull-Rom spline through pts; optional end tangents for open curves
+    var out = [], n = pts.length;
+    function P(i) {
+      if (closed) return pts[(i + n) % n];
+      if (i < 0) return [pts[0][0] - t0[0], pts[0][1] - t0[1]];
+      if (i >= n) return [pts[n - 1][0] + t1[0], pts[n - 1][1] + t1[1]];
+      return pts[i];
+    }
+    var segs = closed ? n : n - 1;
+    for (var i = 0; i < segs; i++) {
+      var p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+      for (var k = 0; k < 24; k++) {
+        var t = k / 24, t2 = t * t, t3 = t2 * t;
+        out.push([
+          0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+          0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+        ]);
+      }
+    }
+    out.push(closed ? out[0].slice() : pts[n - 1].slice());
+    return out;
+  }
+  // Resample a polyline evenly by arc length (step 4 units). Points carry z (height).
+  function resample(raw, zf) {
+    var cum = [0];
+    for (var i = 1; i < raw.length; i++) cum.push(cum[i - 1] + Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]));
+    var len = cum[cum.length - 1], n = Math.max(2, Math.round(len / 4)), pts = [], j = 0;
+    for (var k = 0; k <= n; k++) {
+      var d = len * k / n;
+      while (j < cum.length - 2 && cum[j + 1] < d) j++;
+      var f = (d - cum[j]) / ((cum[j + 1] - cum[j]) || 1);
+      var x = raw[j][0] + (raw[j + 1][0] - raw[j][0]) * f, y = raw[j][1] + (raw[j + 1][1] - raw[j][1]) * f;
+      pts.push({ x: x, y: y, z: zf ? zf(k / n) : 0 });
+    }
+    return { pts: pts, len: len, step: len / n };
+  }
+  function segPoint(seg, s) {
+    s = clamp(s, 0, seg.len);
+    var f = s / seg.step, i = Math.min(seg.pts.length - 2, Math.floor(f)), k = f - i;
+    var a = seg.pts[i], b = seg.pts[i + 1];
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+  function nearest(seg, x, y) {
+    var best = 1e9, bs = 0;
+    seg.pts.forEach(function (p, i) { var d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y); if (d < best) { best = d; bs = i * seg.step; } });
+    return bs;
+  }
+
+  var LAYOUTS = {};
+  function mkSeg(id, r) { return { id: id, pts: r.pts, len: r.len, step: r.step }; }
+  (function () {
+    // Oval
+    var ov = mkSeg("ov", resample(catmull([[230, 150], [500, 135], [770, 150], [900, 380], [770, 610], [500, 625], [230, 610], [100, 380]], true)));
+    ov.next = function () { return ov; }; ov.prev = function () { return ov; };
+    LAYOUTS.oval = { segs: [ov], start: ov, station: { seg: ov, s: nearest(ov, 500, 625) },
+      tunnel: { seg: ov, a: nearest(ov, 860, 240), b: nearest(ov, 860, 520) },
+      crossing: { seg: ov, s: nearest(ov, 360, 140) }, switches: [] };
+    // Figure 8: one closed curve that crosses itself; the crossing pass near t=0 goes over a bridge.
+    var raw = [];
+    for (var i = 0; i <= 240; i++) { var t = i / 240 * TAU; raw.push([500 + 400 * Math.sin(t), 380 + 245 * Math.sin(2 * t)]); }
+    var e8 = mkSeg("e8", resample(raw, function (u) { var c = Math.cos(u * TAU); return c > 0 ? 70 * Math.pow(c, 2.2) : 0; }));
+    e8.next = function () { return e8; }; e8.prev = function () { return e8; };
+    LAYOUTS.eight = { segs: [e8], start: e8, station: { seg: e8, s: nearest(e8, 800, 140) },
+      tunnel: { seg: e8, a: nearest(e8, 140, 250), b: nearest(e8, 140, 510) },
+      crossing: { seg: e8, s: nearest(e8, 260, 620) }, bridge: true, switches: [] };
+    // Switches: a loop with two places to choose the way.
+    var R0 = [1, 0], L0 = [-1, 0];
+    var L = [300, 200], Rr = [700, 200], BR = [700, 600], BL = [300, 600];
+    var c1 = mkSeg("c1", resample(catmull([Rr, [860, 260], [900, 400], [860, 540], BR], false, [120, 0], [-120, 0])));
+    var d = mkSeg("d", resample(catmull([BR, [500, 600], BL], false, [-120, 0], [-120, 0])));
+    var e = mkSeg("e", resample(catmull([BR, [600, 690], [400, 690], BL], false, [-120, 0], [-120, 0])));
+    var c2 = mkSeg("c2", resample(catmull([BL, [140, 540], [100, 400], [140, 260], L], false, [-120, 0], [120, 0])));
+    var a = mkSeg("a", resample(catmull([L, [500, 200], Rr], false, [120, 0], [120, 0])));
+    var b = mkSeg("b", resample(catmull([L, [400, 140], [500, 70], [600, 140], Rr], false, [120, 0], [120, 0])));
+    var sw1 = { x: BR[0], y: BR[1], ways: [d, e], on: 0, seg: c1, flip: 0 };
+    var sw2 = { x: L[0], y: L[1], ways: [a, b], on: 1, seg: c2, flip: 0 };
+    c1.next = function () { return sw1.ways[sw1.on]; };
+    d.next = e.next = function () { return c2; };
+    c2.next = function () { return sw2.ways[sw2.on]; };
+    a.next = b.next = function () { return c1; };
+    c1.prev = function () { return sw2.ways[sw2.on]; };
+    d.prev = e.prev = function () { return c1; };
+    c2.prev = function () { return sw1.ways[sw1.on]; };
+    a.prev = b.prev = function () { return c2; };
+    LAYOUTS["switch"] = { segs: [c1, d, e, c2, a, b], start: d, station: { seg: d, s: d.len * 0.5 },
+      tunnel: { seg: b, a: b.len * 0.3, b: b.len * 0.7 },
+      crossing: { seg: c1, s: nearest(c1, 900, 400) }, switches: [sw1, sw2], stationWay: { sw: sw1, on: 0 } };
+  })();
+
+  // ---------- Run state ----------
+  var mode = "build";
+  var run = null;
+  var RSC = 0.36; // run pieces are this much of their build length (world units)
+  var RW = 30;    // run piece width
+  function runLen() { var t = 0; state.pieces.forEach(function (p) { t += TYPES[p.t].len * RSC + 5; }); return t; }
+  function startRun() {
+    var lay = LAYOUTS[state.layout];
+    var st = lay.station;
+    run = { lay: lay, seg: st.seg, s: st.s, d: 0, v: 0, trail: [], dwell: 0, atStation: true, stLeft: 0, puffs: [], loads: [], gate: 0, ding: 0, toot: 0, ending: false, endDone: null, smokeT: 0 };
+    // Head starts with its middle at the platform; trail is laid out backward along the route.
+    var half = runLen() / 2;
+    var p = advance(st.seg, st.s, half);
+    run.seg = p.seg; run.s = p.s;
+    var back = runLen() + 60, seg = run.seg, s = run.s, pts = [];
+    for (var dd = 0; dd <= back; dd += 3) {
+      var q = segPoint(seg, s); pts.push(q);
+      s -= 3; while (s < 0) { seg = seg.prev(); s += seg.len; }
+    }
+    pts.reverse();
+    pts.forEach(function (q, i) { run.trail.push({ x: q.x, y: q.y, z: q.z, d: (i - (pts.length - 1)) * 3 }); });
+    run.d = 0;
+    run.stLeft = 0; run.atStation = true; run.dwell = 0.6;
+    buildLayer();
+  }
+  function advance(seg, s, dist) {
+    s += dist;
+    var guard = 0;
+    while (s > seg.len && guard++ < 20) { s -= seg.len; seg = seg.next(); }
+    return { seg: seg, s: s };
+  }
+  // Distance along the route (following the switches) from the head to a point; -1 if not within reach.
+  function distAhead(seg, s, target, maxd) {
+    var d = 0, guard = 0;
+    while (guard++ < 8) {
+      if (seg === target.seg && target.s >= s - 0.01) { var r = d + (target.s - s); return r <= maxd ? r : -1; }
+      d += seg.len - s; s = 0; seg = seg.next();
+      if (d > maxd) return -1;
+    }
+    return -1;
+  }
+  function trailAt(d) {
+    var tr = run.trail, lo = 0, hi = tr.length - 1;
+    if (d <= tr[0].d) return tr[0];
+    if (d >= tr[hi].d) return tr[hi];
+    while (hi - lo > 1) { var m = (lo + hi) >> 1; if (tr[m].d < d) lo = m; else hi = m; }
+    var a = tr[lo], b = tr[hi], f = (d - a.d) / ((b.d - a.d) || 1);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f };
+  }
+  var VMAX = 300;
+  function stepRun(dt) {
+    if (!run) return;
+    var lay = run.lay;
+    var want = state.speed * VMAX;
+    if (run.ending) want = Math.max(want, 0.9 * VMAX);
+    if (!state.pieces.length) want = 0;
+    // Station: brake to a stop with the train's middle at the platform.
+    var stop = advance(lay.station.seg, lay.station.s, runLen() / 2);
+    var dAhead = distAhead(run.seg, run.s, stop, 900);
+    if (run.atStation) {
+      want = 0;
+      if (run.dwell > 0) {
+        run.dwell -= dt;
+        if (Math.random() < dt * 6 && !run.ending) spawnLoad();
+        if (run.dwell <= 0 && !run.ending) { run.atStation = false; run.stLeft = 1; }
+      }
+    } else if (dAhead >= 0 && !run.stLeft && want > 0) {
+      var vmax = Math.sqrt(2 * 160 * Math.max(0, dAhead));
+      if (dAhead < 1.5 && run.v < 30) {
+        run.v = 0; run.atStation = true; run.dwell = 3.2; sChime();
+        if (run.ending && run.endDone) { var dn = run.endDone; run.endDone = null; setTimeout(dn, 800); }
+      }
+      want = Math.min(want, Math.max(vmax, 12));
+    }
+    if (run.stLeft && (dAhead < 0 || dAhead > 300)) run.stLeft = 0;
+    var acc = want > run.v ? 120 : 200;
+    if (run.v < want) run.v = Math.min(want, run.v + acc * dt); else run.v = Math.max(want, run.v - acc * dt);
+    // move the head in small steps so the trail follows the curves
+    var go = run.v * dt;
+    while (go > 0) {
+      var st = Math.min(3, go); go -= st;
+      run.s += st; run.d += st;
+      while (run.s > run.seg.len) { run.s -= run.seg.len; run.seg = run.seg.next(); }
+      var q = segPoint(run.seg, run.s);
+      run.trail.push({ x: q.x, y: q.y, z: q.z, d: run.d });
+    }
+    var keep = run.d - runLen() - 80;
+    while (run.trail.length > 2 && run.trail[1].d < keep) run.trail.shift();
+    // crossing gates: down while any part of the train is near the crossing
+    var cr = lay.crossing, near = false;
+    var hp = segPoint(cr.seg, cr.s);
+    if (state.pieces.length) {
+      if (distAhead(run.seg, run.s, cr, 220) >= 0) near = true;
+      else carPoses().forEach(function (cp) { if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < cp.len / 2 + 50) near = true; });
+    }
+    run.gate += ((near ? 1 : 0) - run.gate) * Math.min(1, dt * 3);
+    if (near) { run.ding -= dt; if (run.ding <= 0) { run.ding = 0.7; sDing(); } } else run.ding = 0;
+    // smoke from steam engines
+    run.smokeT -= dt;
+    if (run.smokeT <= 0 && run.v > 5) {
+      run.smokeT = 0.35 - state.speed * 0.2;
+      carPoses().forEach(function (cp) { if (cp.p.t === "steam") puff(cp, 0.32, 1); });
+    }
+    for (var i = run.puffs.length - 1; i >= 0; i--) {
+      var f = run.puffs[i]; f.t += dt;
+      if (f.t > f.life) { run.puffs.splice(i, 1); continue; }
+      f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt; f.r += f.gr * dt;
+    }
+    for (var j = run.loads.length - 1; j >= 0; j--) { var L = run.loads[j]; L.t += dt; if (L.t > L.life) run.loads.splice(j, 1); }
+    run.toot = Math.max(0, run.toot - dt);
+    for (var k = 0; k < lay.switches.length; k++) lay.switches[k].flip = Math.max(0, lay.switches[k].flip - dt * 2.5);
+  }
+  function puff(cp, at, size) {
+    var x = cp.x + Math.cos(cp.ang) * cp.len * at, y = cp.y + Math.sin(cp.ang) * cp.len * at;
+    run.puffs.push({ x: x, y: y, z: cp.z + 34, vx: rand(-8, 8), vy: rand(-8, 8), vz: rand(30, 50) * size, r: 8 * size, gr: 14 * size, t: 0, life: reduce ? 0.8 : 1.6 * size });
+  }
+  function spawnLoad() {
+    var poses = carPoses();
+    var cars = poses.filter(function (cp) { return !TYPES[cp.p.t].eng; });
+    if (!cars.length) cars = poses;
+    if (!cars.length) return;
+    var cp = cars[Math.floor(Math.random() * cars.length)];
+    var lay = run.lay, sp = segPoint(lay.station.seg, lay.station.s);
+    var nx = Math.cos(sp.ang + Math.PI / 2), ny = Math.sin(sp.ang + Math.PI / 2);
+    var plat = { x: cp.x + nx * 60, y: cp.y + ny * 60 };
+    var onload = Math.random() < 0.5;
+    run.loads.push({ a: onload ? plat : { x: cp.x, y: cp.y }, b: onload ? { x: cp.x, y: cp.y } : plat, z: cp.z, t: 0, life: 0.7,
+      c: ["#F77F00", "#FFC93C", "#E63946", "#5BC0EB", "#A7D129"][Math.floor(Math.random() * 5)], kind: cp.p.t === "passenger" ? "person" : "box" });
+  }
+  function carPoses() {
+    var out = [], off = 0;
+    if (!run) return out;
+    state.pieces.forEach(function (p) {
+      var len = TYPES[p.t].len * RSC;
+      var f = trailAt(run.d - off - len * 0.12), b = trailAt(run.d - off - len * 0.88);
+      var ang = Math.atan2(f.y - b.y, f.x - b.x);
+      out.push({ p: p, x: (f.x + b.x) / 2, y: (f.y + b.y) / 2, z: (f.z + b.z) / 2, ang: ang, len: len });
+      off += len + 5;
+    });
+    return out;
+  }
+
+  // ---------- Run drawing ----------
+  var vs = 1, vox = 0, voy = 0; // world -> screen
+  function runFit() {
+    var sw = WW, sh = WH * TILT + 40;
+    vs = Math.min(W / sw, (H - 10) / sh);
+    vox = (W - WW * vs) / 2; voy = (H - WH * TILT * vs) / 2 + 20 * vs;
+  }
+  function SX(x) { return vox + x * vs; }
+  function SY(y, z) { return voy + (y * TILT - (z || 0) * HT) * vs; }
+  var layer = null, bridgeLayer = null, hillLayer = null;
+  function mkLayer() { var l = document.createElement("canvas"); l.width = cv.width; l.height = cv.height; var c = l.getContext("2d"); c.setTransform(DPR, 0, 0, DPR, 0, 0); return { cv: l, c: c }; }
+  function trackPath(c, seg, a, b, lift) {
+    c.beginPath();
+    var i0 = Math.floor(a / seg.step), i1 = Math.ceil(b / seg.step);
+    for (var i = Math.max(0, i0); i <= Math.min(seg.pts.length - 1, i1); i++) {
+      var p = seg.pts[i]; var X = SX(p.x), Y = SY(p.y, lift ? p.z : 0);
+      if (i === Math.max(0, i0)) c.moveTo(X, Y); else c.lineTo(X, Y);
+    }
+  }
+  function drawRails(c, seg, a, b, dim, elevated) {
+    c.lineCap = "round"; c.lineJoin = "round";
+    trackPath(c, seg, a, b, elevated); c.strokeStyle = dim ? "rgba(120,110,100,0.5)" : "#B7A58C"; c.lineWidth = 40 * vs; c.stroke();
+    // ties
+    c.strokeStyle = dim ? "rgba(110,80,60,0.45)" : "#7A5236"; c.lineWidth = 6 * vs;
+    c.beginPath();
+    var i0 = Math.max(0, Math.floor(a / seg.step)), i1 = Math.min(seg.pts.length - 2, Math.ceil(b / seg.step));
+    for (var i = i0; i <= i1; i += 3) {
+      var p = seg.pts[i], q = seg.pts[i + 1], ang = Math.atan2(q.y - p.y, q.x - p.x);
+      var nx = -Math.sin(ang) * 17, ny = Math.cos(ang) * 17, z = elevated ? p.z : 0;
+      c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); c.lineTo(SX(p.x - nx), SY(p.y - ny, z));
+    }
+    c.stroke();
+    // rails: two offset lines
+    [-10, 10].forEach(function (o) {
+      c.beginPath();
+      for (var i = i0; i <= i1 + 1; i++) {
+        var p = seg.pts[i], q = seg.pts[Math.min(seg.pts.length - 1, i + 1)], pp = seg.pts[Math.max(0, i - 1)];
+        var ang = Math.atan2(q.y - pp.y, q.x - pp.x), nx = -Math.sin(ang) * o, ny = Math.cos(ang) * o, z = elevated ? p.z : 0;
+        if (i === i0) c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); else c.lineTo(SX(p.x + nx), SY(p.y + ny, z));
+      }
+      c.strokeStyle = dim ? "rgba(90,95,110,0.5)" : "#5B6478"; c.lineWidth = 4 * vs; c.stroke();
+    });
+  }
+  function buildLayer() {
+    if (!run) return;
+    runFit();
+    var lay = run.lay;
+    layer = mkLayer(); bridgeLayer = null; hillLayer = mkLayer();
+    var c = layer.c;
+    // grass
+    c.fillStyle = "#7CC95A"; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#6DBA4C";
+    for (var i = 0; i < 60; i++) { c.beginPath(); c.arc((i * 173) % W, (i * 97) % H, 18 + (i % 4) * 8, 0, TAU); c.fill(); }
+    // pond + trees for fun
+    c.fillStyle = "#5BC0EB"; c.strokeStyle = OUT; c.lineWidth = 3;
+    c.beginPath(); c.ellipse(SX(500), SY(lay === LAYOUTS.eight ? 160 : 380), 90 * vs, 50 * vs * TILT, 0, 0, TAU); c.fill(); c.stroke();
+    // road + crossing
+    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
+    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang);
+    // the road runs from just inside the loop out past the edge of the world
+    if (rx * (cr.x - 500) + ry * (cr.y - 380) < 0) { rx = -rx; ry = -ry; }
+    var r0x = cr.x - rx * 130, r0y = cr.y - ry * 130, r1x = cr.x + rx * 700, r1y = cr.y + ry * 700;
+    c.strokeStyle = "#5A5F6E"; c.lineWidth = 56 * vs; c.lineCap = "round";
+    c.beginPath(); c.moveTo(SX(r0x), SY(r0y)); c.lineTo(SX(r1x), SY(r1y)); c.stroke();
+    c.strokeStyle = "#FFE680"; c.lineWidth = 4 * vs; c.setLineDash([16 * vs, 14 * vs]); c.lineCap = "butt";
+    c.beginPath(); c.moveTo(SX(r0x), SY(r0y)); c.lineTo(SX(r1x), SY(r1y)); c.stroke();
+    c.setLineDash([]);
+    // station platform
+    var sp = segPoint(lay.station.seg, lay.station.s);
+    c.save(); c.translate(SX(sp.x), SY(sp.y)); c.transform(1, 0, 0, TILT, 0, 0); c.rotate(sp.ang);
+    var nx = 0, ny = 1;
+    rr(c, -150 * vs, 26 * vs, 300 * vs, 40 * vs, 6 * vs); trim(c, "#D9C9A8", 3);
+    rr(c, -60 * vs, 66 * vs, 120 * vs, 50 * vs, 6 * vs); trim(c, "#E63946", 3);
+    c.restore();
+    // track: tunnel portal shadows below, then all segments
+    lay.segs.forEach(function (seg) {
+      var dim = false;
+      lay.switches.forEach(function (sw) { if (sw.ways.indexOf(seg) >= 0 && sw.ways[sw.on] !== seg) dim = true; });
+      if (lay.bridge) {
+        // ground part only; the raised part is drawn later over the lower pass
+        var a = -1, i;
+        for (i = 0; i < seg.pts.length; i++) {
+          var up = seg.pts[i].z > 2;
+          if (!up && a < 0) a = i;
+          if ((up || i === seg.pts.length - 1) && a >= 0) { drawRails(c, seg, a * seg.step, i * seg.step, false, false); a = -1; }
+        }
+        bridgeLayer = mkLayer();
+        var bc = bridgeLayer.c, i0 = -1;
+        for (i = 0; i < seg.pts.length; i++) {
+          var u2 = seg.pts[i].z > 2;
+          if (u2 && i0 < 0) i0 = i;
+          if ((!u2 || i === seg.pts.length - 1) && i0 >= 0) {
+            // pillars + deck
+            for (var k = i0; k < i; k += 14) {
+              var pp = seg.pts[k];
+              if (pp.z < 18) continue;
+              bc.fillStyle = "#B4A08A"; bc.strokeStyle = OUT; bc.lineWidth = 2.5;
+              bc.beginPath(); bc.rect(SX(pp.x) - 6 * vs, SY(pp.y, pp.z), 12 * vs, pp.z * HT * vs); bc.fill(); bc.stroke();
+            }
+            trackPath(bc, seg, i0 * seg.step, i * seg.step, true); bc.strokeStyle = OUT; bc.lineWidth = 50 * vs; bc.lineCap = "round"; bc.stroke();
+            trackPath(bc, seg, i0 * seg.step, i * seg.step, true); bc.strokeStyle = "#C9B79E"; bc.lineWidth = 44 * vs; bc.stroke();
+            drawRails(bc, seg, i0 * seg.step, i * seg.step, false, true);
+            i0 = -1;
+          }
+        }
+      } else drawRails(c, seg, 0, seg.len, dim, false);
+    });
+    // trees
+    [[60, 80], [940, 90], [60, 700], [950, 700], [500, 380], [380, 330], [640, 450]].forEach(function (t, i) {
+      if (lay === LAYOUTS.eight && i >= 4) return;
+      if (lay !== LAYOUTS.eight && i === 4) return;
+      tree(c, t[0], t[1]);
+    });
+    // tunnel hill (drawn over the train)
+    var tn = lay.tunnel, hc = hillLayer.c;
+    if (tn.a > tn.b) { var tmp = tn.a; tn.a = tn.b; tn.b = tmp; }
+    var pa = segPoint(tn.seg, tn.a), pb = segPoint(tn.seg, tn.b);
+    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.lineCap = "butt"; hc.lineJoin = "round";
+    hc.strokeStyle = OUT; hc.lineWidth = 120 * vs; hc.stroke();
+    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.strokeStyle = "#5FA641"; hc.lineWidth = 112 * vs; hc.stroke();
+    trackPath(hc, tn.seg, tn.a + 30, tn.b - 30, false); hc.strokeStyle = "#76BF55"; hc.lineWidth = 70 * vs; hc.lineCap = "round"; hc.stroke();
+    [pa, pb].forEach(function (p, i) {
+      var ang = p.ang;
+      hc.save(); hc.translate(SX(p.x), SY(p.y)); hc.transform(1, 0, 0, TILT, 0, 0); hc.rotate(ang);
+      rr(hc, (i ? -16 : -2) * vs, -42 * vs, 18 * vs, 84 * vs, 6 * vs); trim(hc, "#B4A08A", 3);
+      hc.restore();
+    });
+    tree(hc, (pa.x + pb.x) / 2 + 10, (pa.y + pb.y) / 2 - 10);
+  }
+  function tree(c, x, y) {
+    var X = SX(x), Y = SY(y);
+    c.fillStyle = "rgba(0,0,0,0.15)"; c.beginPath(); c.ellipse(X + 8 * vs, Y + 4 * vs, 30 * vs, 14 * vs, 0, 0, TAU); c.fill();
+    c.fillStyle = "#8B5A3C"; c.fillRect(X - 5 * vs, Y - 30 * vs, 10 * vs, 30 * vs);
+    c.beginPath(); c.arc(X, Y - 46 * vs, 30 * vs, 0, TAU); trim(c, "#2E9E5B", 3);
+    c.beginPath(); c.arc(X - 8 * vs, Y - 54 * vs, 10 * vs, 0, TAU); c.fillStyle = "#4FBF6E"; c.fill();
+  }
+  // An oriented box in the angled view.
+  function box(c, cx0, cy0, z, ang, L, Wd, Hh, top, side) {
+    var ca = Math.cos(ang), sa = Math.sin(ang), hl = L / 2, hw = Wd / 2;
+    var corners = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]].map(function (q) { return [cx0 + q[0] * ca - q[1] * sa, cy0 + q[0] * sa + q[1] * ca]; });
+    for (var i = 0; i < 4; i++) {
+      var a = corners[i], b = corners[(i + 1) % 4];
+      var mx = (a[0] + b[0]) / 2 - cx0, my = (a[1] + b[1]) / 2 - cy0;
+      if (my <= 0.01) continue; // faces away from the viewer
+      c.beginPath();
+      c.moveTo(SX(a[0]), SY(a[1], z)); c.lineTo(SX(b[0]), SY(b[1], z)); c.lineTo(SX(b[0]), SY(b[1], z + Hh)); c.lineTo(SX(a[0]), SY(a[1], z + Hh)); c.closePath();
+      c.fillStyle = side; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+    }
+    c.beginPath();
+    corners.forEach(function (q, i) { if (i) c.lineTo(SX(q[0]), SY(q[1], z + Hh)); else c.moveTo(SX(q[0]), SY(q[1], z + Hh)); });
+    c.closePath(); c.fillStyle = top; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+  }
+  // Local transform for drawing on top of a car (u along, v across), at height h.
+  function topT(c, cp, h) {
+    var ca = Math.cos(cp.ang), sa = Math.sin(cp.ang);
+    c.setTransform(DPR * vs * ca, DPR * vs * sa * TILT, -DPR * vs * sa, DPR * vs * ca * TILT, DPR * SX(cp.x), DPR * SY(cp.y, cp.z + h));
+  }
+  function drawCarTop(c, cp, night) {
+    var p = cp.p, t = p.t, L = cp.len, Wd = RW, col = p.color;
+    var side = shade(col, -0.3);
+    // shadow
+    c.save(); topT(c, cp, 0); c.fillStyle = "rgba(0,0,0,0.2)"; c.fillRect(-L / 2 + 4, -Wd / 2 + 6, L, Wd); c.restore();
+    var h = 22;
+    if (t === "logs" || t === "pipes" || t === "boxes") h = 8;
+    if (t === "coal" || t === "hopper") h = 18;
+    if (t === "steam") {
+      // engine part forward, tender behind
+      var eL = L * 0.64, tL = L - eL - 2;
+      var fxp = cp.x + Math.cos(cp.ang) * (L / 2 - eL / 2), fyp = cp.y + Math.sin(cp.ang) * (L / 2 - eL / 2);
+      var bxp = cp.x - Math.cos(cp.ang) * (L / 2 - tL / 2), byp = cp.y - Math.sin(cp.ang) * (L / 2 - tL / 2);
+      box(c, bxp, byp, cp.z, cp.ang, tL, Wd, 20, col, side);
+      c.save(); topT(c, { x: bxp, y: byp, z: cp.z, ang: cp.ang }, 20);
+      c.fillStyle = "#26282E"; rr(c, -tL / 2 + 4, -Wd / 2 + 5, tL - 8, Wd - 10, 6); c.fill(); c.restore();
+      box(c, fxp, fyp, cp.z, cp.ang, eL, Wd - 4, 24, col, side);
+      c.save(); topT(c, { x: fxp, y: fyp, z: cp.z, ang: cp.ang }, 24);
+      rr(c, -eL / 2 + 2, -Wd / 2 + 6, eL * 0.62, Wd - 16, 8); trim(c, shade(col, 0.15), 2);
+      c.beginPath(); c.arc(eL / 2 - 14, 0, 7, 0, TAU); trim(c, "#26282E", 2);
+      rr(c, -eL / 2 + 2, -Wd / 2 + 2, eL * 0.32, Wd - 8, 3); trim(c, "#26282E", 2);
+      c.restore();
+    } else if (t === "fast") {
+      box(c, cp.x - Math.cos(cp.ang) * 8, cp.y - Math.sin(cp.ang) * 8, cp.z, cp.ang, L - 16, Wd, 20, col, side);
+      c.save(); topT(c, cp, 20);
+      c.beginPath(); c.moveTo(L / 2 - 16, -Wd / 2); c.quadraticCurveTo(L / 2 + 10, 0, L / 2 - 16, Wd / 2); c.closePath(); trim(c, col, 2.5);
+      c.fillStyle = "#26282E"; rr(c, L / 2 - 22, -Wd / 2 + 6, 14, Wd - 12, 5); c.fill();
+      c.fillStyle = "#E63946"; c.fillRect(-L / 2 + 8, -2, L - 30, 4);
+      c.restore();
+    } else {
+      box(c, cp.x, cp.y, cp.z, cp.ang, L, Wd, h, col, side);
+      c.save(); topT(c, cp, h);
+      if (p.style === "stripe") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; c.fillRect(-L / 2 + 2, -3, L - 4, 6); }
+      else if (p.style === "dots") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; for (var dx = -L / 2 + 8; dx < L / 2 - 4; dx += 12) { c.beginPath(); c.arc(dx, (dx % 24 ? -5 : 5), 3, 0, TAU); c.fill(); } }
+      else if (p.style === "zigzag") { c.strokeStyle = isDark(col) ? "#FFFFFF" : OUT; c.lineWidth = 3; c.beginPath(); for (var zx = -L / 2 + 4, zi = 0; zx < L / 2 - 2; zx += 8, zi++) c.lineTo(zx, zi % 2 ? -6 : 6); c.stroke(); }
+      if (t === "diesel") { c.beginPath(); c.arc(-L / 4, 0, 6, 0, TAU); c.arc(0, 0, 6, 0, TAU); trim(c, "#4A5578", 2); rr(c, L / 2 - 20, -Wd / 2 + 3, 16, Wd - 6, 3); trim(c, shade(col, 0.2), 2); }
+      else if (t === "electric") { c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-10, -10); c.lineTo(6, 0); c.lineTo(-10, 10); c.moveTo(-14, -12); c.lineTo(-14, 12); c.stroke(); }
+      else if (t === "boxcar") { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(-L / 2 + 4, 0); c.lineTo(L / 2 - 4, 0); c.stroke(); }
+      else if (t === "tanker") { c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-L / 2 + 6, -Wd / 2 + 4, L - 12, 5); c.beginPath(); c.arc(0, 0, 7, 0, TAU); trim(c, shade(col, -0.15), 2); }
+      else if (t === "hopper") { c.fillStyle = "#A27B5C"; rr(c, -L / 2 + 5, -Wd / 2 + 5, L - 10, Wd - 10, 6); c.fill(); }
+      else if (t === "coal") { c.fillStyle = "#26282E"; rr(c, -L / 2 + 4, -Wd / 2 + 4, L - 8, Wd - 8, 6); c.fill(); }
+      else if (t === "logs") { for (var li = -1; li <= 1; li++) { rr(c, -L / 2 + 6, li * 9 - 4, L - 12, 9, 4); trim(c, "#8B5A3C", 2); } }
+      else if (t === "pipes") { for (var pi = -1; pi <= 1; pi++) { rr(c, -L / 2 + 6, pi * 9 - 4, L - 12, 8, 4); trim(c, "#9AA3AF", 2); } }
+      else if (t === "boxes") { rr(c, -L / 2 + 4, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#F77F00", 2); rr(c, 2, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#5BC0EB", 2); }
+      else if (t === "passenger") { c.fillStyle = night ? "#FFE680" : "rgba(255,255,255,0.45)"; for (var wx = -L / 2 + 8; wx < L / 2 - 8; wx += 12) { c.fillRect(wx, -Wd / 2 + 1, 7, 3); c.fillRect(wx, Wd / 2 - 4, 7, 3); } }
+      else if (t === "caboose") { rr(c, -10, -Wd / 2 + 4, 20, Wd - 8, 3); trim(c, shade(col, 0.2), 2); }
+      // number decal on the roof
+      if (t !== "logs" && t !== "pipes" && t !== "boxes" && t !== "coal" && t !== "hopper") {
+        c.save(); c.translate(t === "diesel" || t === "electric" ? L / 4 : -L / 4 + 4, 0); c.rotate(-Math.PI / 2 * 0);
+        c.beginPath(); c.arc(0, 0, 8, 0, TAU); trim(c, "#FFFFFF", 2);
+        c.fillStyle = OUT; c.font = "800 12px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(p.num), 0, 1);
+        c.restore();
+      }
+      c.restore();
+    }
+  }
+  function drawRun(t) {
+    var c = cx, lay = run.lay;
+    c.drawImage(layer.cv, 0, 0, W, H);
+    var poses = carPoses();
+    var night = state.night;
+    // station building
+    var sp = segPoint(lay.station.seg, lay.station.s);
+    var low = poses.filter(function (q) { return q.z <= 2; }), high = poses.filter(function (q) { return q.z > 2; });
+    low.sort(function (a, b) { return a.y - b.y; }); high.sort(function (a, b) { return a.y - b.y; });
+    low.forEach(function (q) { drawCarTop(c, q, night); });
+    if (bridgeLayer) c.drawImage(bridgeLayer.cv, 0, 0, W, H);
+    high.forEach(function (q) { drawCarTop(c, q, night); });
+    c.drawImage(hillLayer.cv, 0, 0, W, H);
+    // station roof + sign
+    var nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
+    var bx = sp.x + nx * 95, by = sp.y + ny * 95;
+    box(c, bx, by, 0, sp.ang, 120, 50, 40, "#E63946", "#B02A35");
+    c.fillStyle = OUT; c.font = "800 " + Math.round(22 * vs) + "px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+    rr(c, SX(bx) - 52 * vs, SY(by, 40) - 50 * vs, 104 * vs, 30 * vs, 8 * vs); trim(c, "#FFFFFF", 3);
+    c.fillStyle = OUT; c.fillText("Station", SX(bx), SY(by, 40) - 34 * vs);
+    // loads moving between platform and cars
+    run.loads.forEach(function (L) {
+      var k = L.t / L.life, x = L.a.x + (L.b.x - L.a.x) * k, y = L.a.y + (L.b.y - L.a.y) * k, z = L.z + 24 + Math.sin(k * Math.PI) * 50;
+      if (L.kind === "person") { c.beginPath(); c.arc(SX(x), SY(y, z), 9 * vs, 0, TAU); trim(c, L.c, 2.5); c.beginPath(); c.arc(SX(x), SY(y, z + 16), 6 * vs, 0, TAU); trim(c, "#F2C9A0", 2.5); }
+      else { c.fillStyle = L.c; rr(c, SX(x) - 10 * vs, SY(y, z) - 10 * vs, 20 * vs, 20 * vs, 3); trim(c, L.c, 2.5); }
+    });
+    // crossing gates
+    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
+    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang), tx = Math.cos(cr.ang), ty = Math.sin(cr.ang);
+    var down = run.gate;
+    [-1, 1].forEach(function (sd) {
+      var px = cr.x + rx * sd * 50 + tx * sd * 36, py = cr.y + ry * sd * 50 + ty * sd * 36;
+      var len = 60;
+      var ex = px - tx * sd * len * down, ey = py - ty * sd * len * down, ez = 22 + (1 - down) * len;
+      c.strokeStyle = OUT; c.lineWidth = 9 * vs; c.lineCap = "round";
+      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.strokeStyle = "#FFFFFF"; c.lineWidth = 5 * vs; c.setLineDash([8 * vs, 8 * vs]);
+      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.strokeStyle = "#E63946"; c.lineDashOffset = 8 * vs; c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.setLineDash([]); c.lineDashOffset = 0;
+      c.fillStyle = "#4A5578"; c.fillRect(SX(px) - 3 * vs, SY(py, 30), 6 * vs, 30 * HT * vs);
+      var on = down > 0.3 && Math.floor(t * 3) % 2 === (sd > 0 ? 0 : 1);
+      c.beginPath(); c.arc(SX(px), SY(py, 34), 8 * vs, 0, TAU); trim(c, on ? "#FF4A4A" : "#5A2A2A", 2.5);
+      if (on) { c.fillStyle = "rgba(255,80,80,0.35)"; c.beginPath(); c.arc(SX(px), SY(py, 34), 22 * vs, 0, TAU); c.fill(); }
+    });
+    // switches: big tap targets with an arrow showing the way
+    lay.switches.forEach(function (sw) {
+      var way = sw.ways[sw.on], p0 = segPoint(way, 0), p1 = segPoint(way, 70);
+      var X = SX(p0.x), Y = SY(p0.y) - 6, r = Math.max(26, 34 * vs) * (1 + sw.flip * 0.3);
+      c.beginPath(); c.arc(X, Y, r, 0, TAU); trim(c, "#FFC93C", 4);
+      var ang = Math.atan2(SY(p1.y) - SY(p0.y), SX(p1.x) - SX(p0.x));
+      c.save(); c.translate(X, Y); c.rotate(ang);
+      c.beginPath(); c.moveTo(r * 0.6, 0); c.lineTo(-r * 0.1, -r * 0.5); c.lineTo(-r * 0.1, -r * 0.2); c.lineTo(-r * 0.6, -r * 0.2); c.lineTo(-r * 0.6, r * 0.2); c.lineTo(-r * 0.1, r * 0.2); c.lineTo(-r * 0.1, r * 0.5); c.closePath();
+      trim(c, "#FFFFFF", 3); c.restore();
+      sw.sx = X; sw.sy = Y; sw.sr = r;
+    });
+    // smoke puffs
+    run.puffs.forEach(function (f) {
+      var k = f.t / f.life;
+      c.globalAlpha = (1 - k) * 0.9;
+      c.beginPath(); c.arc(SX(f.x), SY(f.y, f.z), f.r * vs * 1.4, 0, TAU);
+      c.fillStyle = f.dark ? "#C9D3E6" : "#FFFFFF"; c.fill(); c.lineWidth = 2; c.strokeStyle = "rgba(29,35,64,0.5)"; c.stroke();
+    });
+    c.globalAlpha = 1;
+    if (night) {
+      c.fillStyle = "rgba(12,20,60,0.55)"; c.fillRect(0, 0, W, H);
+      c.save(); c.globalCompositeOperation = "lighter";
+      if (poses.length) {
+        var h0 = poses[0], hx = h0.x + Math.cos(h0.ang) * h0.len / 2, hy = h0.y + Math.sin(h0.ang) * h0.len / 2;
+        var sx = SX(hx), sy = SY(hy, h0.z + 14);
+        var ex2 = SX(hx + Math.cos(h0.ang) * 220), ey2 = SY(hy + Math.sin(h0.ang) * 220, h0.z);
+        var g = c.createRadialGradient(sx, sy, 2, sx, sy, 220 * vs);
+        g.addColorStop(0, "rgba(255,240,160,0.75)"); g.addColorStop(1, "rgba(255,240,160,0)");
+        c.fillStyle = g;
+        var px2 = -Math.sin(h0.ang) * 70, py2 = Math.cos(h0.ang) * 70;
+        c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex2 + px2 * vs, ey2 + py2 * TILT * vs); c.lineTo(ex2 - px2 * vs, ey2 - py2 * TILT * vs); c.closePath(); c.fill();
+        c.beginPath(); c.arc(sx, sy, 7 * vs + 3, 0, TAU); c.fillStyle = "rgba(255,250,200,0.9)"; c.fill();
+      }
+      // station lamps and windows
+      [-120, 0, 120].forEach(function (o) {
+        var lx = sp.x + Math.cos(sp.ang) * o + nx * 50, ly = sp.y + Math.sin(sp.ang) * o + ny * 50;
+        var g2 = c.createRadialGradient(SX(lx), SY(ly, 20), 1, SX(lx), SY(ly, 20), 50 * vs);
+        g2.addColorStop(0, "rgba(255,220,120,0.7)"); g2.addColorStop(1, "rgba(255,220,120,0)");
+        c.fillStyle = g2; c.beginPath(); c.arc(SX(lx), SY(ly, 20), 50 * vs, 0, TAU); c.fill();
+      });
+      poses.forEach(function (q) {
+        if (q.p.t === "passenger" || q.p.t === "caboose" || q.p.t === "fast") {
+          var g3 = c.createRadialGradient(SX(q.x), SY(q.y, q.z + 20), 1, SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7);
+          g3.addColorStop(0, "rgba(255,220,120,0.45)"); g3.addColorStop(1, "rgba(255,220,120,0)");
+          c.fillStyle = g3; c.beginPath(); c.arc(SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7, 0, TAU); c.fill();
+        }
+      });
+      c.restore();
+    }
+    if (run.toot > 0 && poses.length) {
+      var h1 = poses[0], k2 = 1 - run.toot / 1.4;
+      var X1 = SX(h1.x), Y1 = SY(h1.y, h1.z + 60) - 30 - k2 * 30;
+      c.globalAlpha = k2 > 0.8 ? (1 - k2) / 0.2 : 1;
+      c.font = "800 " + Math.round(Math.max(28, 44 * vs)) + "px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+      var tw = c.measureText("TOOT TOOT!").width;
+      var bxx = clamp(X1, tw / 2 + 20, W - tw / 2 - 20), byy = Math.max(40, Y1);
+      rr(c, bxx - tw / 2 - 16, byy - 30, tw + 32, 58, 22); trim(c, "#FFFFFF", 4);
+      c.fillStyle = OUT; c.fillText("TOOT TOOT!", bxx, byy + 2);
+      c.globalAlpha = 1;
+    }
+  }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function frame(ts) {
+    var dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts;
+    var t = ts / 1000;
+    cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (Toybox.timer.phase() !== "resting") {
+      if (mode === "build") { stepBuild(dt); drawBuild(t); }
+      else if (run) { stepRun(dt); drawRun(t); }
+      drawFx(dt);
+    }
+    requestAnimationFrame(frame);
+  }
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width - 6); H = Math.max(50, r.height - 6);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    if (run) buildLayer();
+    renderPicks();
+  }
+  window.addEventListener("resize", function () { setTimeout(resize, 30); });
+
+  // ---------- Input on the stage ----------
+  var drags = {};
+  function local(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (Toybox.timer.locked()) return;
+    var p = local(e);
+    if (mode === "build") {
+      for (var i = anim.length - 1; i >= 0; i--) {
+        var a = anim[i], x0 = bview.ox + a.x * bscale, x1 = x0 + TYPES[a.p.t].len * bscale;
+        if (p.x >= x0 - 6 && p.x <= x1 + 6 && p.y >= bview.gy - 180 * bscale && p.y <= bview.gy + 20 && !a.drag && !a.roll) {
+          a.drag = { dx: 0, dy: 0, sx: p.x, sy: p.y, moved: false, id: e.pointerId };
+          drags[e.pointerId] = a;
+          try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+          return;
+        }
+      }
+    } else if (run) {
+      var lay = run.lay;
+      for (var k = 0; k < lay.switches.length; k++) {
+        var sw = lay.switches[k];
+        if (sw.sx !== undefined && Math.hypot(p.x - sw.sx, p.y - sw.sy) < sw.sr + 18) { flipSwitch(sw); return; }
+      }
+      // tapping the train toots
+      var poses = carPoses();
+      for (var j = 0; j < poses.length; j++) { if (Math.hypot(p.x - SX(poses[j].x), p.y - SY(poses[j].y, poses[j].z)) < Math.max(30, poses[j].len * vs * 0.6)) { toot(); return; } }
+      fx.push({ k: "ring", x: p.x, y: p.y, t: 0, life: 0.45 });
+    }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var a = drags[e.pointerId]; if (!a) return;
+    var p = local(e);
+    a.drag.dx = p.x - a.drag.sx; a.drag.dy = p.y - a.drag.sy;
+    if (Math.hypot(a.drag.dx, a.drag.dy) > 12) a.drag.moved = true;
+  });
+  function endDrag(e) {
+    var a = drags[e.pointerId]; if (!a) return;
+    delete drags[e.pointerId];
+    var i = anim.indexOf(a), d = a.drag;
+    a.drag = null;
+    if (i < 0) return;
+    if (!d.moved) {
+      state.sel = i; a.jig = 1; setTab("paint"); refreshPaint(); return;
+    }
+    var far = Math.abs(d.dy) > Math.max(70, H * 0.22) || Math.abs(d.dx) > W * 0.4;
+    if (far && !Toybox.timer.locked()) {
+      removeAt(i, bview.ox + a.x * bscale + d.dx + TYPES[a.p.t].len * bscale / 2, bview.gy - 60 * bscale + d.dy);
+    } else { a.jig = 0.8; }
+  }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+
+  function flipSwitch(sw) {
+    sw.on = 1 - sw.on; sw.flip = 1; sClick();
+    buildLayer();
+  }
+  function toot() {
+    if (!run || Toybox.timer.locked()) return;
+    run.toot = 1.4; sWhistle();
+    var poses = carPoses();
+    if (poses.length) for (var i = 0; i < 6; i++) { var cp = poses[0]; puff(cp, 0.3, 1.6); run.puffs[run.puffs.length - 1].vz = 60 + i * 12; run.puffs[run.puffs.length - 1].vx = rand(-30, 30); }
+    var b = $("toot"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+  }
+  $("toot").addEventListener("click", toot);
+  $("daynight").addEventListener("click", function () {
+    if (Toybox.timer.locked()) return;
+    state.night = !state.night; save(); updateRunUI();
+    fx.push({ k: "text", x: W / 2, y: H * 0.35, t: 0, life: 1.2, text: state.night ? "Night!" : "Day!", size: 48 });
+  });
+  // Speed lever
+  (function () {
+    var lev = $("lever"), id = null;
+    function set(e) {
+      var r = lev.getBoundingClientRect(), pad = r.height * 0.14;
+      state.speed = clamp(1 - (e.clientY - r.top - pad) / (r.height - pad * 2), 0, 1);
+      updateRunUI();
+    }
+    lev.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); if (Toybox.timer.locked()) return;
+      id = e.pointerId; try { lev.setPointerCapture(id); } catch (er) { /* ignore */ } set(e);
+    });
+    lev.addEventListener("pointermove", function (e) { if (e.pointerId === id) set(e); });
+    function up(e) { if (e.pointerId === id) { id = null; save(); } }
+    lev.addEventListener("pointerup", up); lev.addEventListener("pointercancel", up);
+  })();
+  function updateRunUI() {
+    var lev = $("lever"), h = lev.clientHeight || 200, pad = h * 0.14;
+    $("knob").style.top = (pad + (1 - state.speed) * (h - pad * 2)) + "px";
+    $("daynight").textContent = state.night ? "Day" : "Night";
+  }
+
+  // ---------- Panel ----------
+  var panel = $("panel");
+  function setTab(tab) {
+    state.tab = tab;
+    panel.dataset.tab = tab;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === tab)); });
+    var want = tab === "track" ? "run" : "build";
+    if (want !== mode) { mode = want; if (mode === "run") startRun(); else run = null; }
+    $("go").hidden = mode !== "build" || !state.pieces.length;
+    $("runctl").hidden = mode !== "run";
+    if (mode === "run") updateRunUI();
+    if (tab === "paint") refreshPaint();
+    renderPicks();
+    save();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+    b.addEventListener("click", function () { if (!Toybox.timer.locked()) setTab(b.dataset.tab); });
+  });
+  $("go").addEventListener("click", function () { if (!Toybox.timer.locked()) setTab("track"); });
+
+  function pickBtn(label, draw, onTap) {
+    var b = document.createElement("button");
+    b.className = "btn pick";
+    var c = document.createElement("canvas");
+    var s = document.createElement("span"); s.textContent = label;
+    b.appendChild(c); b.appendChild(s);
+    b.addEventListener("click", function () {
+      if (Toybox.timer.locked()) return;
+      b.classList.remove("hop"); void b.offsetWidth; b.classList.add("hop");
+      onTap();
+    });
+    b._draw = function () { thumb(c, draw); };
+    return b;
+  }
+  ENGINES.forEach(function (t) {
+    $("engPicks").appendChild(pickBtn(TYPES[t].name, function (c, w, h) { pieceThumbDraw(c, w, h, t); }, function () { addPiece(t); }));
+  });
+  CARS.forEach(function (t) {
+    $("carPicks").appendChild(pickBtn(TYPES[t].name, function (c, w, h) { pieceThumbDraw(c, w, h, t); }, function () { addPiece(t); }));
+  });
+  function pieceThumbDraw(c, w, h, t) {
+    var p = { t: t, color: TYPES[t].color, style: "plain", num: 1 };
+    var L = TYPES[t].len + 30, Hh = 180, s = Math.min(w / L, h / Hh) * 0.95;
+    c.translate(w / 2 - (TYPES[t].len / 2) * s, h - 3); c.scale(s, s);
+    drawSide(c, p, 0, 0, 0.6, false);
+  }
+  var trackNames = { oval: "Oval", eight: "Figure 8", "switch": "Switches" };
+  ["oval", "eight", "switch"].forEach(function (k) {
+    var b = pickBtn(trackNames[k], function (c, w, h) {
+      var lay = LAYOUTS[k], s = Math.min(w / WW, h / (WH * TILT)) * 0.9;
+      c.translate((w - WW * s) / 2, (h - WH * TILT * s) / 2);
+      lay.segs.forEach(function (seg) {
+        c.beginPath();
+        seg.pts.forEach(function (p, i) { if (i % 3 && i !== seg.pts.length - 1) return; var X = p.x * s, Y = (p.y * TILT - p.z * HT) * s; if (i) c.lineTo(X, Y); else c.moveTo(X, Y); });
+        c.strokeStyle = OUT; c.lineWidth = 7; c.lineJoin = "round"; c.lineCap = "round"; c.stroke();
+        c.strokeStyle = "#B7A58C"; c.lineWidth = 3; c.stroke();
+      });
+    }, function () {
+      state.layout = k; save(); startRun(); renderPicks();
+    });
+    b.dataset.layout = k;
+    $("trackPicks").appendChild(b);
+  });
+  function renderPicks() {
+    Array.prototype.forEach.call(document.querySelectorAll(".pick"), function (b) {
+      if (b.dataset.layout) b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout));
+      if (b.offsetParent) b._draw();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".st"), function (b) { if (b.offsetParent && b._draw) b._draw(); });
+  }
+  // Paint pane
+  COLORS.concat(["#FFFFFF"]).forEach(function (col) {
+    var b = document.createElement("button");
+    b.className = "btn sw"; b.style.background = col; b.dataset.color = col; b.setAttribute("aria-label", "Color");
+    b.addEventListener("click", function () { paint({ color: col }); });
+    $("swatches").appendChild(b);
+  });
+  STYLES.forEach(function (st) {
+    var b = document.createElement("button");
+    b.className = "btn st"; b.dataset.style = st; b.setAttribute("aria-label", st);
+    var c = document.createElement("canvas"); b.appendChild(c);
+    b._draw = function () {
+      thumb(c, function (cc, w, h) {
+        var col = selPiece() ? selPiece().color : "#E63946";
+        rr(cc, 4, 4, w - 8, h - 8, 6);
+        body(cc, { color: col, style: st }, 4, 4, w - 8, h - 8);
+      });
+    };
+    b.addEventListener("click", function () { paint({ style: st }); });
+    $("styles").appendChild(b);
+  });
+  for (var n = 1; n <= 9; n++) (function (n) {
+    var b = document.createElement("button");
+    b.className = "btn nm"; b.textContent = String(n); b.dataset.num = n;
+    b.addEventListener("click", function () { paint({ num: n }); });
+    $("nums").appendChild(b);
+  })(n);
+  function selPiece() { return state.sel >= 0 && state.sel < state.pieces.length ? state.pieces[state.sel] : null; }
+  function paint(ch) {
+    if (Toybox.timer.locked()) return;
+    if (!selPiece()) { if (!state.pieces.length) return; state.sel = state.pieces.length - 1; }
+    var p = selPiece();
+    for (var k in ch) p[k] = ch[k];
+    var a = anim[state.sel]; if (a) a.jig = 1;
+    if (mode === "build" && a) {
+      var x = bview.ox + (a.x + TYPES[p.t].len / 2) * bscale;
+      for (var i = 0; i < 12; i++) { var ang = rand(0, TAU), sp = rand(100, 300); fx.push({ k: "bit", x: x, y: bview.gy - 80 * bscale, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 150, t: 0, life: 0.7, r: rand(5, 10), c: p.color }); }
+    }
+    sClick(); save(); refreshPaint();
+  }
+  function refreshPaint() {
+    var p = selPiece();
+    if (!p && state.pieces.length && state.tab === "paint") { state.sel = state.pieces.length - 1; p = selPiece(); }
+    $("paintHint").textContent = p ? "Painting the " + TYPES[p.t].name.toLowerCase() + ". Tap a car to pick another." : "Add a train car first.";
+    Array.prototype.forEach.call(document.querySelectorAll(".sw"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.color === p.color)); });
+    Array.prototype.forEach.call(document.querySelectorAll(".st"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.style === p.style)); if (b.offsetParent && b._draw) b._draw(); });
+    Array.prototype.forEach.call(document.querySelectorAll(".nm"), function (b) { b.setAttribute("aria-pressed", String(!!p && +b.dataset.num === p.num)); });
+    $("go").hidden = mode !== "build" || !state.pieces.length;
+  }
+
+  // ---------- iOS zoom guards ----------
+  ["gesturestart", "gesturechange"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  // ---------- Timer ending: the train pulls into the station and stops ----------
+  function onEnding(done) {
+    if (!state.pieces.length) { setTimeout(done, 1500); return; }
+    if (mode !== "run") setTab("track");
+    var lay = run.lay;
+    if (lay.stationWay) { var sw = lay.stationWay.sw; if (sw.on !== lay.stationWay.on) flipSwitch(sw); }
+    run.ending = true;
+    if (run.atStation && run.dwell > -1) { run.dwell = 0; setTimeout(done, 1500); return; }
+    run.endDone = done;
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 300 200" aria-hidden="true">' +
+      '<rect x="0" y="0" width="300" height="200" rx="24" fill="#2B3B78"/>' +
+      '<circle cx="240" cy="44" r="22" fill="#FFF3A0"/><circle cx="250" cy="38" r="20" fill="#2B3B78"/>' +
+      '<rect x="0" y="150" width="300" height="50" fill="#2C5A3E"/>' +
+      '<rect x="150" y="70" width="120" height="58" rx="6" fill="#E63946" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="140" y="58" width="140" height="18" rx="6" fill="#8B5A3C" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="196" y="96" width="28" height="32" fill="#FFE680" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="0" y="146" width="300" height="8" fill="#5B6478"/>' +
+      '<rect x="30" y="92" width="80" height="44" rx="18" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="92" y="78" width="40" height="58" rx="5" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="100" y="86" width="24" height="18" rx="3" fill="#FFE680" stroke="#1D2340" stroke-width="3"/>' +
+      '<rect x="38" y="70" width="18" height="24" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<circle cx="54" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="88" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="118" cy="142" r="10" fill="#4A5578" stroke="#1D2340" stroke-width="4"/>' +
+      '<text x="62" y="52" font-size="26" font-weight="800" fill="#FFFFFF" font-family="sans-serif">z z</text></svg>';
+  }
+
+  // ---------- Start ----------
+  $("count").textContent = counterText();
+  setTab(state.tab === "paint" && !state.pieces.length ? "engines" : state.tab);
+  resize();
+  requestAnimationFrame(frame);
+  Toybox.init({
+    app: "train-builder",
+    grownButton: $("grownbtn"),
+    grownLabel: ["Grown-ups", "⏱ Grown-ups"],
+    badge: $("tbadge"),
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the train pulls into the station and rests, and the controls lock.",
+    goodbyeOption: "End with a Goodbye toot button to press",
+    farewellText: "Last stop!",
+    goodbyeLabel: "Goodbye toot",
+    farewellDone: "Bye bye, train!",
+    restLine: "The train is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft clunks, a whistle and a crossing bell. Hold for 2 seconds.",
+    endingMaxMs: 25000,
+    onEnding: onEnding,
+    onGoodbye: function () { if (run) { run.toot = 1.4; sWhistle(); } },
+    onWake: function () { if (run) { run.ending = false; run.endDone = null; run.dwell = 1; } },
+    onBig: function () { setTimeout(resize, 30); },
+    onSound: function (on) { if (on) setTimeout(sChime, 60); }
+  });
+  stage.appendChild($("tb-farewell"));
+  if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, anim: anim, add: addPiece,
+    piecePos: function (i) { var a = anim[i], r = cv.getBoundingClientRect(); return { x: r.left + bview.ox + (a.x + TYPES[a.p.t].len / 2) * bscale, y: r.top + bview.gy - 50 * bscale }; } };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

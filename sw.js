@@ -5,7 +5,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v45";
+const CACHE = "toybox-v46";
 const CORE = [
   "./",
   "./index.html",
@@ -159,7 +159,16 @@ const CORE = [
   "./construction-site/icons/icon-180.png",
   "./construction-site/icons/icon-192.png",
   "./construction-site/icons/icon-512.png",
-  "./construction-site/icons/icon-maskable-512.png"
+  "./construction-site/icons/icon-maskable-512.png",
+
+  // Train Builder
+  "./train-builder/",
+  "./train-builder/index.html",
+  "./train-builder/manifest.webmanifest",
+  "./train-builder/icons/icon-180.png",
+  "./train-builder/icons/icon-192.png",
+  "./train-builder/icons/icon-512.png",
+  "./train-builder/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

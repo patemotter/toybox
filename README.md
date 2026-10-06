@@ -19,6 +19,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Engine Room: look inside a car engine, a steam engine and a gearbox, and run them | [`engine-room/`](engine-room/) |
 | Water Works: a water table to pour into funnels, turn valves and spin water wheels | [`water-works/`](water-works/) |
 | Construction Site: gear up, then bulldozer, excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
+| Train Builder: Couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station. | [`train-builder/`](train-builder/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
