@@ -203,6 +203,9 @@ Keep only:
 - Each agent owns specific files. Don't edit files outside your assignment. Shared files (`common/`, the
   launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are edited by the coordinator only, unless assigned.
 - A folder's `sw.js` may be shared by agents on different pages of the same app: re-read it right before bumping.
+- **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
+  tree**: other agents' uncommitted work lives there. To compare with an older version, export it with
+  `git show HEAD:<path> > <scratch file>` instead.
 - Subagents don't commit or push; the coordinator reviews screenshots, smoke-tests and commits per app/group.
 - Pace: get it working first, save early, one quick test pass, report within about 20 minutes, listing UI issues
   you noticed but didn't polish. Report: what works, what changed, open questions for the dad, screenshot paths.
