@@ -35,6 +35,13 @@
  *        sections: [el],                          // extra sheet sections (e.g. tilt); moved in, unhidden
  *        big: { button: el } or { into: el },     // wire an existing .bigtoggle, or create one in `into`
  *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1", big: "fishtank-big-v1" },
+ *        orientation: "landscape",                // optional: "landscape" or "portrait". Held the other way,
+ *                                                 // the app is covered by a "Turn it sideways!" / "Turn it
+ *                                                 // upright!" card with a turning tablet and a small "Play
+ *                                                 // like this" button (rotation lock must never trap him; the
+ *                                                 // choice is kept for the session in sessionStorage
+ *                                                 // "toybox-turn-ok:<app>", which tests may set to skip it).
+ *                                                 // The card goes away by itself when the device is turned.
  *        // Hooks (all optional):
  *        onEnding: function (done, info) {},  // time is up: wind the app's motion down, call done() once
  *                                       // settled; info.goodbye is true when the Goodbye button will show
@@ -45,7 +52,8 @@
  *        onBig: function (on) {},       // Big mode changed (also called once at init)
  *        onSound: function (on) {},     // sound setting changed (also from another page)
  *        onOpen: function () {},        // the grown-up sheet opened (refresh the app's own sections)
- *        onTimer: function (info) {}    // badge-style updates: {phase, remainingMs, fraction, minutes, showMinutes}
+ *        onTimer: function (info) {},   // badge-style updates: {phase, remainingMs, fraction, minutes, showMinutes}
+ *        onTurn: function (shown) {}    // the "turn the device" card was shown (true) or went away (false)
  *      });
  * 4. Ask the module instead of keeping your own state:
  *      Toybox.timer.locked()   true while ending or resting: ignore play input then
@@ -62,9 +70,27 @@
  *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
+ *      Toybox.turning()        true while the "turn the device" card covers the app.
+ * 5. "Switch it off first" (pages with a powered machine: the Workshop's big machines). A real workshop
+ *    rule: you switch the machine off before you walk away. Register once, after init:
+ *      Toybox.offFirst({
+ *        running: function () { return S.on; },            // is a machine running right now?
+ *        name: function () { return "table saw"; },        // for "Switch off the table saw first!" (or a string)
+ *        off: function (done) { stopMotor(done); },        // switch it off with the usual wind-down, then done()
+ *        flash: function () { flashSwitch(); }             // optional: draw attention to the machine's own switch
+ *      });
+ *    While running() is true, a tap on any link that leaves the page (Home, Back, "Try it!", "Back to the
+ *    plan"; anchors with an href other than "#...") is held back and a card slides up: "Switch off the
+ *    table saw first!" with one big switch drawn like the machines' own (green ON lit, red OFF paddle).
+ *    A tap on it calls off(done); the page navigates when done() is called (or after 3.5 s regardless,
+ *    so he is never stuck). A tap outside the card cancels and stays. Links with data-tb-noguard are
+ *    never held back. Scripts that navigate themselves call Toybox.beforeLeave(function () { go(); }):
+ *    it runs the function at once when nothing is running (returns true), else after the switch-off.
+ *    Nothing is held back while the timer is ending or resting (the app winds down on its own then).
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
  * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
- * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode.
+ * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode,
+ * "turn" while the turn-the-device card shows, "offask" while the switch-off card shows.
  */
 (function () {
   "use strict";
@@ -323,6 +349,41 @@
           '<div class="rest-next" id="tb-restNext" hidden>Next: <strong id="tb-restNextText"></strong></div>' +
         "</div>" +
         '<button class="lock hold" id="tb-unlock" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>' +
+      "</div>" +
+      // "Turn the device" card (only used when init got an orientation): a tablet that turns, one line, a way out.
+      '<div class="tb-turn" id="tb-turn" hidden role="dialog" aria-modal="true" aria-labelledby="tb-turnTitle">' +
+        '<div class="tb-turn-card">' +
+          '<div class="tb-turn-art" aria-hidden="true">' +
+            '<svg viewBox="0 0 160 160"><g class="tb-tablet">' +
+              '<rect x="33" y="9" width="100" height="148" rx="14" fill="rgba(29,35,64,0.3)"/>' +
+              '<rect x="30" y="6" width="100" height="148" rx="14" fill="#FFFFFF" stroke="#1D2340" stroke-width="5"/>' +
+              '<rect x="40" y="20" width="80" height="112" rx="5" fill="#CDE9FF" stroke="#1D2340" stroke-width="3"/>' +
+              '<circle cx="104" cy="44" r="11" fill="#FFC93C" stroke="#1D2340" stroke-width="3"/>' +
+              '<path d="M42 110 Q 62 84 82 104 T 118 100 V 130 H 42 Z" fill="#8BD17C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+              '<circle cx="80" cy="143" r="5" fill="#1D2340"/>' +
+            "</g></svg>" +
+          "</div>" +
+          '<div class="tb-turn-text"><h2 id="tb-turnTitle"></h2>' +
+          '<button class="btn" id="tb-turnSkip">Play like this</button></div>' +
+        "</div>" +
+      "</div>" +
+      // "Switch it off first" card (Toybox.offFirst): the machines' own switch, big; the paddle is the way out.
+      '<div class="tb-off" id="tb-off" hidden role="dialog" aria-modal="true" aria-labelledby="tb-offTitle">' +
+        '<div class="tb-off-card">' +
+          '<div class="tb-off-text"><h2 id="tb-offTitle"></h2><p class="tb-off-sub" id="tb-offSub"></p></div>' +
+          '<button class="tb-off-switch" id="tb-offBtn" aria-label="Switch it off">' +
+            '<svg viewBox="0 0 120 152" aria-hidden="true">' +
+              '<rect x="9" y="11" width="104" height="134" rx="14" fill="rgba(29,35,64,0.35)"/>' +
+              '<rect x="4" y="6" width="104" height="134" rx="14" fill="#2E3440" stroke="#1D2340" stroke-width="4"/>' +
+              '<circle cx="56" cy="44" r="27" fill="rgba(90,255,150,0.3)"/>' +
+              '<circle cx="56" cy="44" r="17" fill="#4BE38A" stroke="#1D2340" stroke-width="3"/>' +
+              '<rect class="tb-off-ring" x="12" y="76" width="88" height="54" rx="12" fill="none" stroke="#FFC93C" stroke-width="5"/>' +
+              '<rect x="20" y="88" width="72" height="36" rx="8" fill="#B32D38" stroke="#1D2340" stroke-width="3"/>' +
+              '<rect x="20" y="82" width="72" height="36" rx="8" fill="#E63946" stroke="#1D2340" stroke-width="3"/>' +
+              '<text x="56" y="101" text-anchor="middle" dominant-baseline="central" font-size="20" font-weight="800" font-family="Baloo 2, Trebuchet MS, sans-serif" fill="#FFFFFF">OFF</text>' +
+            "</svg>" +
+          "</button>" +
+        "</div>" +
       "</div>";
     while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
 
@@ -348,6 +409,13 @@
       // Apps have no grown-up sheet: the Grown-ups button and its extra sections stay hidden.
       (opts.sections || []).forEach(function (el) { if (el) el.hidden = true; });
     }
+
+    $("tb-turnSkip").addEventListener("click", function () {
+      try { sessionStorage.setItem(turnKey(), "1"); } catch (e) { /* ignore */ }
+      checkTurn();
+    });
+    $("tb-offBtn").addEventListener("click", doOff);
+    $("tb-off").addEventListener("click", function (e) { if (e.target === this) cancelOff(); });
 
     $("tb-next").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
     $("tb-optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); redraw(true); });
@@ -645,6 +713,7 @@
   }
 
   function tick() {
+    if (opts.orientation) checkTurn();
     if (timer.phase === "ending") { if (!windingHere) beginEnding(); checkEndingDone(); return; }
     if (timer.phase !== "running") return;
     var rem = remainingMs();
@@ -696,6 +765,116 @@
     }
   }
 
+  // ---------- Orientation: an app may prefer landscape or portrait (opts.orientation) ----------
+  // Held the other way, an opaque card covers the app: a tablet picture that turns, "Turn it sideways!" /
+  // "Turn it upright!", and a small "Play like this" button (rotation lock must never trap him). The choice
+  // lasts the session. The card hides itself as soon as the device is turned, and while the timer is
+  // ending or resting (the goodbye and the rest screen must stay visible).
+  var turnTimer = null;
+  function turnKey() { return "toybox-turn-ok:" + (opts.app || "app"); }
+  function wrongWay() {
+    var want = opts.orientation;
+    if (want !== "landscape" && want !== "portrait") return false;
+    var land = window.innerWidth > window.innerHeight;
+    return want === "landscape" ? !land : land;
+  }
+  function turnSkipped() { try { return sessionStorage.getItem(turnKey()) === "1"; } catch (e) { return false; } }
+  function turning() { var el = $("tb-turn"); return !!el && !el.hidden; }
+  function checkTurn() {
+    var el = $("tb-turn");
+    if (!el) return;
+    var show = wrongWay() && !turnSkipped() && timer.phase !== "ending" && timer.phase !== "resting";
+    if (show === !el.hidden) return;
+    el.hidden = !show;
+    document.body.classList.toggle("turn", show);
+    hook("onTurn", show);
+  }
+  function wireTurn() {
+    var want = opts.orientation;
+    if (want !== "landscape" && want !== "portrait") return;
+    $("tb-turnTitle").textContent = want === "landscape" ? "Turn it sideways!" : "Turn it upright!";
+    $("tb-turn").classList.add(want === "landscape" ? "to-land" : "to-port");
+    // iOS reports the new size a moment after the turn: check now and again shortly after.
+    function later() { clearTimeout(turnTimer); turnTimer = setTimeout(checkTurn, 120); setTimeout(checkTurn, 600); }
+    window.addEventListener("resize", later);
+    window.addEventListener("orientationchange", later);
+    checkTurn();
+  }
+
+  // ---------- "Switch it off first": leaving a page while a machine runs (Toybox.offFirst) ----------
+  var offCfg = null, offWired = false, offPending = null, offBusy = false, offFallback = null;
+  function needOff() {
+    if (!offCfg || timer.phase === "ending" || timer.phase === "resting") return false;
+    try { return !!offCfg.running(); } catch (e) { return false; }
+  }
+  function offFirst(cfg) {
+    offCfg = cfg && typeof cfg.running === "function" && typeof cfg.off === "function" ? cfg : null;
+    if (!offCfg || offWired) return;
+    offWired = true;
+    // Capture phase: runs before the page's own handlers, so a held-back link does nothing else either.
+    document.addEventListener("click", function (e) {
+      if (!offCfg || e.defaultPrevented || e.button) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a || a.hasAttribute("data-tb-noguard") || a.target === "_blank") return;
+      var href = a.getAttribute("href") || "";
+      if (!href || href.charAt(0) === "#" || /^javascript:/i.test(href)) return;
+      if (!needOff()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var to = a.href;
+      askOff(function () { location.href = to; });
+    }, true);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") cancelOff(); });
+  }
+  // Scripts that navigate themselves: proceed() runs at once when nothing is running (returns true),
+  // otherwise after the switch-off.
+  function beforeLeave(proceed) {
+    if (!needOff()) { proceed(); return true; }
+    askOff(proceed);
+    return false;
+  }
+  function askOff(proceed) {
+    var el = $("tb-off");
+    if (!el) { proceed(); return; }
+    offPending = proceed;
+    offBusy = false;
+    var name = typeof offCfg.name === "function" ? offCfg.name() : offCfg.name;
+    $("tb-offTitle").textContent = "Switch off the " + (name || "machine") + " first!";
+    $("tb-offSub").textContent = "Tap the switch.";
+    el.classList.remove("busy");
+    el.hidden = false;
+    document.body.classList.add("offask");
+    if (typeof offCfg.flash === "function") { try { offCfg.flash(); } catch (e) { /* ignore */ } }
+  }
+  function cancelOff() {
+    var el = $("tb-off");
+    if (!el || el.hidden || offBusy) return;
+    el.hidden = true;
+    document.body.classList.remove("offask");
+    offPending = null;
+  }
+  function doOff() {
+    if (offBusy || !offPending) return;
+    offBusy = true;
+    var el = $("tb-off"), went = false;
+    el.classList.add("busy");
+    $("tb-offSub").textContent = "Switching off…";
+    function go() {
+      if (went) return;
+      went = true;
+      clearTimeout(offFallback);
+      var p = offPending;
+      offPending = null;
+      offBusy = false;
+      el.hidden = true;
+      document.body.classList.remove("offask");
+      if (p) p();
+    }
+    offFallback = setTimeout(go, 3500); // never stuck: leave even if the page forgets to call done()
+    try { offCfg.off(go); } catch (e) { go(); }
+  }
+
   // ---------- Init ----------
   function init(o) {
     if (inited) return;
@@ -708,6 +887,7 @@
     if (opts.big) setBig(get(bigKey()) === "1", false);
     updateSoundUI();
     sync();
+    wireTurn();
     setInterval(tick, 250);
 
     // While sound is on, any touch, click or key press starts/resumes audio (iOS needs a gesture).
@@ -782,6 +962,9 @@
     toast: toast,
     openSheet: openSheet,
     closeSheet: closeSheet,
-    sheetOpen: sheetOpen
+    sheetOpen: sheetOpen,
+    turning: turning,
+    offFirst: offFirst,
+    beforeLeave: beforeLeave
   };
 })();

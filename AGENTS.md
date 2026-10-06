@@ -118,6 +118,11 @@ Keep only:
   the action, turn wide layouts upright) rather than leaving empty sky.
 - **No picture-in-picture insets** unless they show something unique (kept: the Router Table end view, now a
   small corner panel). Alternate full views behind a button are fine.
+- **An app may prefer one orientation**: `Toybox.init({ orientation: "landscape" })` (or `"portrait"`). Held the
+  other way, the shared layer covers the app with a "Turn it sideways!" / "Turn it upright!" card (a turning
+  tablet picture and a small "Play like this" button, so rotation lock never traps him; remembered for the session).
+  The app must still work in the other orientation behind that button; it just needn't be framed as carefully.
+  Current users: Train Builder (landscape), Engine Room (landscape), Concrete (portrait). Everything else is both ways.
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
@@ -159,6 +164,15 @@ Keep only:
 - **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`), the same quick
   check on each station.
 - The launcher clears both gear flags on load and on `pageshow`, so leaving the app means gearing up again.
+- **Power tools**: the safety check also runs whenever he changes to a different power tool on the same page
+  (sessionStorage `workshop-check-tool` remembers which tools were checked this visit).
+- **Machines keep running** between goes on the same screen: a finished job ("Done!", "Again") does not switch the
+  machine off; only his tap on the red paddle, the timer, or leaving the page does.
+- **"Switch it off first"**: leaving a page (Home, Back, "Try it!", "Back to the plan") while a switched machine
+  runs shows the shared card from `Toybox.offFirst(...)` (see `common/toybox.js` header, section 5): "Switch off
+  the table saw first!" with one big switch; a tap on it winds the machine down, then the link goes. A tap outside
+  stays. Pages with a switched machine register it; closing a card on the same page (the wall's "Hang it back")
+  just switches off quietly.
 
 ### Timer (shared)
 - The grown-up sets a play timer (shared across all apps, `toybox-timer-v1`). When time is up the app winds its
@@ -179,6 +193,10 @@ Keep only:
   `toybox-settings-v1`); `Toybox.tiltReady(cb)` for tilt. `home: true` in `Toybox.init` is for the launcher only.
 - `Toybox.fresh()`: true on the first load of a page under a new launch id. The launcher stores
   `sessionStorage["toybox-launch"]` when a tile is tapped; each page records `toybox-seen:<path>`.
+- `orientation: "landscape"|"portrait"` in `Toybox.init` shows the turn-the-device card (`Toybox.turning()`,
+  `onTurn(shown)`; bypass in tests with `sessionStorage["toybox-turn-ok:<app>"]="1"`). `Toybox.offFirst({ running,
+  name, off(done), flash })` registers the "switch it off first" card; `Toybox.beforeLeave(fn)` for script-driven
+  navigation; `data-tb-noguard` on a link exempts it.
 - The module swallows the click that follows a finished hold, syncs timer/sound/Big across open tabs, and
   re-reads state on back/forward restore. Don't copy timer/sound code into apps; extend `common/` instead.
 - Keys: `toybox-timer-v1`, `toybox-sound-v1` ("1"/"0"), `toybox-big-<app>`. App state uses an app-prefixed
@@ -239,10 +257,12 @@ Keep only:
 
 ## 6. Open questions for the dad (decide before changing)
 
-- Engine Room on an upright iPhone turns the machines a quarter turn to make them bigger. Keep?
-- Lathe and Router Table switch themselves on after two pushes while off. Keep, or always require the switch?
 - Saw Bench's idle hand can show again for each newly picked saw (max 2 per saw). Too much?
 - Math Grid squares are ~28px on iPhone; bigger means a larger rewrite.
 - Math Grid "0 to 10 / 0 to 12" resets on a fresh visit (treated as the child's choice, not a grown-up setting).
-- Concrete scene is only slightly bigger on upright phones (bigger needs camera panning while pouring).
 - Spin Shop's "Zoom" speed label might read as camera zoom.
+
+Decided (kept here so nobody reopens them): the two-step machines (switch on, then push/feed/press; the second
+push while off switches on for him) stay as they are everywhere, lathe and planer included. Engine Room's
+quarter-turn on upright phones is replaced by `orientation: "landscape"`; Concrete uses `orientation: "portrait"`
+instead of a bigger landscape scene.

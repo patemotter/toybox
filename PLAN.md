@@ -367,6 +367,15 @@ fractions; numbers appear only inside project steps that measure or set a machin
   Hammer & Screws (the house grows join by join), Tool Wall planer/sander deep links, a Projects card on the Tool
   Wall (`?next=project` in the gear-up list). Project two candidates: a tool tote, a wooden toy train engine.
 
+## In progress: two shared cards (common/toybox.js)
+
+- **Turn the device**: `Toybox.init({ orientation })`. Adopted: Train Builder (landscape), Concrete (portrait).
+  To do: Engine Room → landscape and delete its quarter-turn layout for upright phones.
+- **Switch it off first**: `Toybox.offFirst(...)` guards the way out while a machine runs. To wire (each page
+  provides `running / name / off(done) / flash`): Tool Wall mini-plays (in progress), then Saw Bench (table,
+  band, scroll, miter saws), Drill Press, Lathe, Router Table. Machines keep running between goes on the same
+  screen; "Done!" / "Again" no longer switch them off.
+
 ---
 
 ## Every app
