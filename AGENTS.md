@@ -122,6 +122,11 @@ Keep only:
 - **Direct manipulation**: drag the saw, turn the wheel, pull the tape, spin the toy with a finger. If a control
   is drawn on a machine, it must work (switches, height wheels, handles); don't draw fake controls. Remove HTML
   buttons that duplicate a working on-machine control.
+- **Operator's view**: draw every machine and tool from where you'd stand to use it (the drill press from the
+  front, a little above, with the table and board top visible), not a side elevation.
+- **No procedural extras**: keep the fun core of each tool and drop steps that only add waiting or fiddling:
+  material pickers, size pickers, chuck keys, waiting for a spindle to stop, setup sequences. If something like
+  that stays, it happens automatically or with one tap.
 - Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
 - Forgiving input: big hit areas, snapping, auto-assist after a few misses. Two-step machines (switch on, then
   work): if he pushes while it's off, say "Switch it on!" and flash the switch; on the second try switch it on
