@@ -64,192 +64,153 @@ body {
   font-family: var(--font);
   font-size: 18px;
   line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
-.wrap {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 20px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));
-}
-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-/* Home: a link back to the Toybox launcher. */
-.homebtn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 34px;
-  padding: 2px 12px 2px 9px;
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--ink);
-  text-decoration: none;
-  background: var(--panel);
-  border: 3px solid var(--edge);
-  border-radius: 12px;
-  box-shadow: 2px 2px 0 var(--edge);
-  -webkit-tap-highlight-color: transparent;
-}
-.homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
-.homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
-.homebtn svg, .tab-home svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-header h1 {
-  margin: 0;
-  font-size: clamp(2.3rem, 6vw, 3.6rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-header p {
-  margin: 0.5rem 0 0;
-  color: var(--muted);
-  font-size: 1.15rem;
-  max-width: 60ch;
-}
-.app {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 24px;
-  margin-top: 22px;
-  align-items: start;
-}
-@media (max-width: 860px) {
-  .app { grid-template-columns: 1fr; }
-}
-.stage, .panel {
-  border: 4px solid var(--edge);
-  box-shadow: 6px 6px 0 var(--edge);
-}
-.stage {
-  background: var(--plate);
-  border-radius: 32px;
-  padding: 14px 14px 18px;
-}
+html, body { height: 100%; }
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+.stage { background: var(--plate); padding: 6px; }
+.stage-inner { height: 100%; display: flex; align-items: center; justify-content: center; }
 #art {
   display: block;
+  flex: 0 1 auto;
   width: 100%;
+  height: 100%;
   max-width: 100%;
-  height: auto;
-  max-height: 66vh;
-  margin: 0 auto;
+  max-height: 100%;
   cursor: pointer;
   touch-action: none;
   border-radius: 24px;
 }
 #art:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
-.hint {
-  display: none;
-  text-align: center;
-  color: #4A5578;
-  margin: 6px 0 10px;
-  font-size: 1rem;
-}
-.speeds {
+.hint { display: none; }
+/* Speed: Stop / Slow / Fast / Zoom, the first row of the panel. */
+.speeds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.speeds .btn { min-height: 46px; font-size: 1.05rem; padding: 0.2rem 0.3rem; }
+/* Big mode: the panel goes away, the header stays (Big turns into Back). */
+body.big .tb-panel { display: none; }
+/* Timer: the shared toast and ending banner (common/toybox.js) sit inside the picture frame here. */
+.stage .toast { position: absolute; top: 10px; z-index: 2; font-size: 1.3rem; }
+.stage .farewell { position: absolute; bottom: 12px; z-index: 2; }
+.stage .farewell p { font-size: 1.25rem; }
+body.ending .panel-body,
+body.ending .speeds,
+body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Panel: speeds, the picked tab's choices, then the tab bar with Surprise ---------- */
+.panel-body {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
-.panel {
-  background: var(--panel);
-  border-radius: 28px;
-  padding: 18px 20px 22px;
-}
-.panel section + section { margin-top: 20px; }
-.panel-body > [data-pane] + [data-pane] { margin-top: 20px; }
-.panel h2 {
-  text-align: center;
-  margin: 0 0 8px;
-  font-size: 1.3rem;
-  font-weight: 800;
-}
-.modes {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
+.tb-panel .panel-body.tb-choices { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.panel-body h2 { display: none; }
+.panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
+.tb-panel[data-tab="make"] [data-pane="make"],
+.tb-panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
+.panel-body section + section { margin-top: 10px; }
+.panel-body section.sec-swatches { margin-top: 0; }
+.note { display: none; }
+.readout { display: none; }
+.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+.tb-tabs .tab-style { display: none; }
+
+.modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .mode {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 10px 6px 6px;
-  font-size: 1.2rem;
+  font-size: clamp(0.68rem, 2.9vw, 0.95rem);
+  padding: 6px 1px 4px;
+  white-space: nowrap;
 }
-.mode svg { width: 64px; height: 64px; display: block; }
-/* Four styles per row; a leftover style (e.g. the fifth wheel style) is centered on its row. */
-.styles {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-}
-.styles > .style { flex: 0 0 calc((100% - 36px) / 4); min-width: 0; }
+.mode svg { width: 44px; height: 44px; display: block; }
+/* All styles for the current thing share one row, so nothing is hidden off-screen. */
+.styles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 .style {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 4px 4px;
-  font-size: 1.05rem;
+  font-size: clamp(0.64rem, 2.8vw, 0.9rem);
+  padding: 5px 1px 3px;
+  min-height: 0;
 }
-.style svg { width: 56px; height: 56px; display: block; }
+.style svg { width: 38px; height: 38px; display: block; }
+.style span { white-space: nowrap; }
+.styles.six { gap: 4px; }
 .counter {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 14px;
-  row-gap: 6px;
+  gap: 10px;
+  row-gap: 2px;
 }
 .counter .btn {
-  width: 64px;
-  height: 64px;
-  font-size: 2.2rem;
+  width: 48px;
+  height: 48px;
+  font-size: 1.8rem;
   line-height: 1;
   padding: 0;
   flex: none;
 }
-.cgroup { display: flex; align-items: center; gap: 14px; }
+.cgroup { display: flex; align-items: center; gap: 10px; }
 /* Min / Max jump straight to the fewest or most. */
-.counter .btn.minmax { width: auto; min-width: 64px; padding: 0 10px; font-size: 1.15rem; }
+.counter .btn.minmax { width: auto; min-width: 48px; padding: 0 8px; font-size: 0.95rem; }
 .cgroup[hidden] { display: none; }
+/* Narrow phones: no room for Min/Max next to the lights counter, so hide them there. */
+@media (max-width: 600px) { .counter.has-lights .btn.minmax { display: none; } }
 .numbox { display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .num {
-  font-size: 3.6rem;
+  font-size: 2.25rem;
   font-weight: 800;
   line-height: 1;
-  min-width: 2.2ch;
+  min-width: 1.6ch;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 /* What the number counts ("spokes", "lights"), so two counters side by side read clearly. */
-.numcap { font-size: 1rem; font-weight: 700; color: var(--muted); line-height: 1; }
+.numcap { font-size: 0.78rem; font-weight: 700; color: var(--muted); line-height: 1; margin-top: 1px; }
 /* "Dome" in place of a number: smaller, so the counter keeps its width. */
-.num.word { font-size: 1.8rem; height: 3.6rem; display: flex; align-items: center; justify-content: center; }
+.num.word { font-size: 1.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; }
+.counter.two { gap: 18px; }
+.counter.two .cgroup { gap: 6px; }
+.counter.two .btn { width: 44px; }
 .row {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
+  padding-right: 3px;
+}
+.row .btn {
+  flex: 0 0 calc((100% - 12px) / 3);
+  min-width: 0;
+  min-height: 40px;
+  padding: 0.2rem 0.2rem;
+  font-size: clamp(0.76rem, 3.5vw, 1rem);
+  white-space: nowrap;
+  overflow: hidden;
 }
 .dot {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   border: 2px solid #1D2340;
-  vertical-align: -3px;
-  margin-right: 6px;
+  vertical-align: -2px;
+  margin-right: 4px;
 }
+/* Reserve two rows for color parts so the panel height (and picture size) never jumps. */
+#parts { min-height: 86px; align-content: flex-start; }
 .swatches {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 8px;
 }
 .swatch {
   aspect-ratio: 1;
@@ -259,7 +220,7 @@ header p {
   cursor: pointer;
   padding: 0;
   font: inherit;
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: 800;
   display: grid;
   place-items: center;
@@ -276,212 +237,16 @@ header p {
 #over .glow { animation: glowpulse 2.4s ease-in-out infinite alternate; }
 @keyframes glowpulse { from { opacity: 0.72; } to { opacity: 1; } }
 .swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
-.readout { margin: 12px 0 0; text-align: center; font-size: 1.15rem; font-weight: 700; }
-.note { color: var(--muted); margin: 8px 0 0; text-align: center; }
-.surprise { width: 100%; margin-top: 22px; font-size: 1.35rem; min-height: 60px; background: var(--accent); color: #1D2340; }
-.tabbar { display: none; }
-.bigbtn { display: none; }
-.stage { position: relative; }
-/* Timer: the shared toast and ending banner (common/toybox.js) sit inside the picture frame here. */
-.stage .toast { position: absolute; top: 10px; z-index: 2; font-size: 1.3rem; }
-.stage .farewell { position: absolute; bottom: 12px; z-index: 2; }
-.stage .farewell p { font-size: 1.25rem; }
-body.ending .panel-body,
-body.ending .speeds,
-body.ending [data-action="surprise"],
-body.ending .homebtn,
-body.ending .tab-home { pointer-events: none; opacity: 0.4; }
 
-
-/* One-screen layout, used at every size (phone, tablet, desktop): the page never scrolls.
-   Picture plus one control group at a time, with tabs at the bottom of the controls.
-   Portrait stacks picture over controls; landscape puts them side by side (below). */
-@media all {
-  html, body { height: 100%; }
-  body { overflow: hidden; overscroll-behavior: none; }
-  .wrap {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding-top: 8px;
-    padding-bottom: 0;
-  }
-  header h1 { font-size: 1.35rem; }
-  header p { display: none; }
-  .app {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    margin-top: 6px;
-  }
-  .stage {
-    position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
-    container-type: size;
-    padding: 6px;
-    border-width: 3px;
-    border-radius: 24px;
-    box-shadow: 4px 4px 0 var(--edge);
-  }
-  .stage-inner { height: 100%; display: flex; flex-direction: column; }
-  #art { flex: 1 1 0; min-width: 0; min-height: 0; width: 100%; height: auto; max-height: none; }
-  .hint { display: none; }
-  .speeds { gap: 6px; margin-top: 6px; }
-  .speeds .btn { min-height: 42px; font-size: 1rem; padding: 0.2rem 0.3rem; }
-  /* When the picture area is wider than tall, the round picture leaves empty space at the sides,
-     so the speed buttons move into a column beside it and the picture gets the full height. */
-  @container (min-aspect-ratio: 11/10) {
-    .stage-inner { flex-direction: row; align-items: stretch; justify-content: center; }
-    /* Square picture box so the picture and the speed column sit together, centered. */
-    #art { flex: 0 1 auto; aspect-ratio: 1 / 1; width: auto; height: 100%; }
-    .speeds {
-      grid-template-columns: 1fr;
-      grid-auto-rows: minmax(0, 46px);
-      align-content: center;
-      width: 78px;
-      flex: none;
-      margin: 0 0 0 6px;
-    }
-  }
-  .bigbtn {
-    display: inline-flex;
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    min-height: 40px;
-    padding: 0.2rem 0.75rem;
-    font-size: 1rem;
-    z-index: 1;
-  }
-  /* Big mode: controls and title hidden, the picture fills the screen. */
-  body.big header,
-  body.big .panel { display: none; }
-  .panel {
-    flex: 0 0 auto;
-    max-height: none;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    border-width: 3px;
-    border-bottom-width: 0;
-    border-radius: 24px 24px 0 0;
-    box-shadow: none;
-    overflow: hidden;
-  }
-  .panel-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: grid;
-    overflow: hidden;
-    overscroll-behavior: none;
-    padding: 10px 10px 8px;
-  }
-  .panel h2 { display: none; }
-  .panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-  .panel[data-tab="make"] [data-pane="make"],
-  .panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
-  .panel section + section { margin-top: 10px; }
-  .note { display: none; }
-  #surprise { display: none; }
-  .modes { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-  .mode { font-size: clamp(0.68rem, 2.9vw, 0.95rem); padding: 6px 1px 4px; white-space: nowrap; }
-  .mode svg { width: 44px; height: 44px; }
-  /* All styles for the current thing share one row, so nothing is hidden off-screen. */
-  .styles { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-  .style { font-size: clamp(0.64rem, 2.8vw, 0.9rem); padding: 5px 1px 3px; min-height: 0; }
-  .style svg { width: 38px; height: 38px; }
-  .style span { white-space: nowrap; }
-  /* Six styles (fans) still share one row on a phone: a little less space between them. */
-  .styles.six { gap: 4px; }
-  .counter { gap: 10px; row-gap: 2px; }
-  .cgroup { gap: 10px; }
-  .counter .btn { width: 48px; height: 48px; font-size: 1.8rem; }
-  .counter .btn.minmax { min-width: 48px; padding: 0 8px; font-size: 0.95rem; }
-  /* Narrow phones: no room for Min/Max next to the lights counter, so hide them there. */
-  @media (max-width: 600px) { .counter.has-lights .btn.minmax { display: none; } }
-  .num { font-size: 2.25rem; min-width: 1.6ch; }
-  .num.word { font-size: 1.25rem; height: 2.25rem; }
-  .numcap { font-size: 0.78rem; margin-top: 1px; }
-  /* Two counters side by side (ceiling fan blades and lights). */
-  .counter.two { gap: 18px; }
-  .counter.two .cgroup { gap: 6px; }
-  .counter.two .btn { width: 44px; }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-    padding-right: 3px;
-  }
-  .row .btn {
-    flex: 0 0 calc((100% - 12px) / 3);
-    min-width: 0;
-    min-height: 40px;
-    padding: 0.2rem 0.2rem;
-    font-size: clamp(0.76rem, 3.5vw, 1rem);
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .row .dot { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
-  /* Reserve two rows for color parts so the panel height (and picture size) never jumps. */
-  #parts { min-height: 86px; align-content: flex-start; }
-  .swatches { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
-  .swatch { font-size: 1.1rem; }
-  /* The selected part button and the check mark already show the current color. */
-  .readout { display: none; }
-  .tabbar {
-    display: grid;
-    gap: 5px;
-    padding: 5px 6px 6px;
-    border-top: 3px solid var(--edge);
-    background: var(--panel);
-  }
-  .tab {
-    font: inherit;
-    font-weight: 700;
-    font-size: clamp(0.82rem, 3.8vw, 1.05rem);
-    color: var(--ink);
-    background: transparent;
-    border: 3px solid transparent;
-    border-radius: 14px;
-    min-height: 42px;
-    padding: 2px;
-    cursor: pointer;
-  }
-  .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; border-color: var(--edge); }
-  .tab-surprise { border-color: var(--edge); border-style: dashed; }
-  /* Home tab: only shown where the header (and its Home button) is hidden. */
-  .tab-home { display: none; align-items: center; justify-content: center; padding: 2px 8px; border-color: var(--edge); }
-  .tab:active { transform: translate(1px, 1px); }
-  .tab:focus-visible { outline: 4px solid var(--focus); outline-offset: 1px; }
-}
-
-/* Landscape (phone on its side, tablet, desktop): picture on the left, controls on the right. */
+/* Landscape: the panel is a column on the right; the choices sit in the middle of it. */
 @media (orientation: landscape) {
-  .app { flex-direction: row; }
-  .stage { flex: 1 1 auto; margin-bottom: 8px; }
-  .panel {
-    flex: 0 0 min(56%, 460px);
-    max-height: none;
-    margin-bottom: 8px;
-    border-bottom-width: 3px;
-    border-radius: 24px;
-  }
-  /* The panel is taller than its content here, so center the controls vertically. */
-  .panel-body { align-content: center; }
+  .tb-body .tb-panel { width: min(52%, 460px); justify-content: space-between; }
+  .tb-body .tb-panel .panel-body.tb-choices { flex: 1 1 auto; align-content: center; }
 }
 
-/* Larger screens (tablets, desktop): bigger touch targets, and controls kept to a comfortable width. */
-@media (min-width: 744px) and (min-height: 640px) {
-  .wrap { padding-top: 12px; }
-  header h1 { font-size: 2rem; }
-  .app { gap: 14px; margin-top: 10px; }
-  .panel-body { padding: 16px 18px 14px; }
+/* Larger screens (tablets, desktop): bigger touch targets. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-panel { gap: 12px; }
   .panel-body > [data-pane] { width: 100%; max-width: 560px; justify-self: center; }
   .modes { gap: 12px; }
   .mode { font-size: 1.1rem; padding: 8px 4px 6px; }
@@ -490,7 +255,7 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
   .style { font-size: 0.95rem; padding: 7px 2px 5px; }
   .style svg { width: 54px; height: 54px; }
   .styles.six { gap: 8px; }
-  .panel section + section { margin-top: 16px; }
+  .panel-body section + section { margin-top: 16px; }
   .counter .btn { width: 60px; height: 60px; font-size: 2.1rem; }
   .counter .btn.minmax { min-width: 60px; font-size: 1.1rem; }
   .num { font-size: 2.8rem; }
@@ -504,88 +269,50 @@ body.ending .tab-home { pointer-events: none; opacity: 0.4; }
   .row .dot { width: 18px; height: 18px; margin-right: 6px; }
   #parts { min-height: 110px; }
   .swatches { gap: 10px; margin-top: 12px; }
-  .tabbar { gap: 8px; padding: 8px 10px 10px; }
-  .tab { min-height: 52px; font-size: 1.15rem; }
-  .speeds { gap: 10px; margin-top: 10px; }
-  .speeds .btn { min-height: 52px; font-size: 1.15rem; }
-  .bigbtn { top: 12px; left: 12px; min-height: 46px; font-size: 1.1rem; }
-  @container (min-aspect-ratio: 11/10) {
-    .speeds { width: 104px; grid-auto-rows: minmax(0, 56px); margin-left: 10px; }
-  }
+  .speeds { gap: 10px; }
+  .speeds .btn { min-height: 54px; font-size: 1.15rem; }
 }
-@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
-  .panel { flex-basis: min(42%, 520px); }
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(42%, 520px); }
   .style { font-size: 0.85rem; }
   .modes { gap: 10px; }
   .mode { font-size: 0.9rem; }
 }
 
-/* Short landscape phones: no title, tighter panel. */
+/* Short landscape phones: tighter panel. */
 @media (orientation: landscape) and (max-height: 520px) {
-  header { display: none; }
-  .tab-home { display: flex; }
-  .wrap { padding-top: 6px; }
-  .app { margin-top: 0; }
-  .panel-body { padding: 8px 10px 6px; }
-  .speeds .btn { font-size: 0.9rem; }
+  .speeds .btn { font-size: 0.9rem; min-height: 44px; }
   .swatches { gap: 6px; }
-  /* vw-based sizes are tuned for portrait; the landscape panel is narrower than the screen width suggests. */
   .row .btn { font-size: 0.82rem; }
   .style { font-size: 0.68rem; }
   .mode { font-size: 0.8rem; }
-  .tab { font-size: 0.8rem; }
 }
-
-/* ---------- Header: title and Home ---------- */
-header { align-items: center; }
-.hdr-right { display: flex; gap: 8px; align-items: center; }
-header .homebtn { min-height: 44px; }
-.panel section.sec-swatches { margin-top: 0; }
-.tab-style { display: none; }
-.tabbar { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 
 /* Phones: fewer controls at once. Make (thing + how many), Style (style + pattern) and Colors
    each show two rows; the sections share two grid rows so the panel never changes height. */
 @media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
-  .tab-style { display: block; }
-  .panel-body { grid-template-rows: auto auto; row-gap: 10px; align-content: center; }
+  .tb-tabs .tab-style { display: block; }
+  .tb-panel .panel-body.tb-choices { grid-template-rows: auto auto; row-gap: 10px; align-content: center; }
   .panel-body > [data-pane] { display: contents; }
   .panel-body section { margin: 0 !important; min-width: 0; visibility: hidden; align-self: center; }
   .sec-modes, .sec-styles, .sec-parts { grid-area: 1 / 1; }
   .sec-count, .sec-pattern, .sec-swatches { grid-area: 2 / 1; }
-  .panel[data-tab="make"] .sec-modes, .panel[data-tab="make"] .sec-count,
-  .panel[data-tab="style"] .sec-styles, .panel[data-tab="style"] .sec-pattern,
-  .panel[data-tab="colors"] .sec-parts, .panel[data-tab="colors"] .sec-swatches { visibility: visible; }
+  .tb-panel[data-tab="make"] .sec-modes, .tb-panel[data-tab="make"] .sec-count,
+  .tb-panel[data-tab="style"] .sec-styles, .tb-panel[data-tab="style"] .sec-pattern,
+  .tb-panel[data-tab="colors"] .sec-parts, .tb-panel[data-tab="colors"] .sec-swatches { visibility: visible; }
   /* Just - and + on phones; Min and Max stay on bigger screens. */
   .counter .btn.minmax { display: none; }
-  .bigbtn span { display: none; }
-  .bigbtn { padding: 0; width: 46px; min-height: 44px; justify-content: center; }
-  .tab { font-size: 1rem; min-height: 46px; padding: 0; }
-  .tab-surprise { font-size: 0.9rem; letter-spacing: -0.01em; }
-  .speeds .btn { min-height: 46px; font-size: 1.05rem; }
   /* Picture buttons are just pictures on a phone: the names would have to be squeezed tiny. */
   .mode span, .style span { display: none; }
   .mode, .style { padding: 4px 1px; min-height: 60px; justify-content: center; }
   .mode svg { width: 50px; height: 50px; }
   .style svg { width: 46px; height: 46px; }
   .row .btn { font-size: 1rem; min-height: 44px; }
-  .panel-body { padding: 8px 8px 6px; }
   .swatches { gap: 4px; }
-}
-/* Phone header: icon-only Home. */
-@media (max-width: 600px) and (orientation: portrait) {
-  header h1 { font-size: 1.5rem; }
-  header .homebtn { min-height: 44px; width: 46px; padding: 0; justify-content: center; }
-  header .homebtn span { display: none; }
-}
-/* Short landscape phones: the header is hidden, so Home sits at the end of the tabs. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)) 48px; }
-  .tab { font-size: 0.95rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn, .tab { transition: none; }
+  .btn { transition: none; }
   #over .glow { animation: none; }
 }
 /* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
@@ -594,35 +321,18 @@ header .homebtn { min-height: 44px; }
 .ghosthand > svg { position: relative; }
 .ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
 .ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
-/* Coach: one short line in a pill near the top of the play area (fades once he has done it). */
-.coach {
-  position: absolute; left: 50%; top: 10px; z-index: 3; transform: translateX(-50%);
-  width: max-content; max-width: calc(100% - 130px);
-  background: #FFFFFF; color: #1D2340; border: 4px solid #1D2340; border-radius: 22px; box-shadow: 4px 4px 0 #1D2340;
-  padding: 0.2rem 1rem; font-size: 1.4rem; font-weight: 800; line-height: 1.15; text-align: center;
-  pointer-events: none; transition: opacity 0.6s ease;
-}
-.coach.off { opacity: 0; }
-body.ending .coach, body.big .coach { visibility: hidden; }
-@media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
-  .coach { font-size: 1.05rem; padding: 0.12rem 0.75rem; border-width: 3px; box-shadow: 3px 3px 0 #1D2340; }
-}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="titles">
-      <h1>Spin Shop</h1>
-      <p>Pick a thing, pick a number, pick colors. Tap the picture to give it a push.</p>
-    </div>
-    <div class="hdr-right">
-      <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    </div>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Spin Shop</h1>
+    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
-  <main class="app">
-    <div class="stage" id="stage">
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
       <div class="stage-inner">
         <svg id="art" viewBox="-250 -250 500 500" role="img" tabindex="0" aria-label="">
           <defs id="artdefs"></defs>
@@ -633,15 +343,13 @@ body.ending .coach, body.big .coach { visibility: hidden; }
           </g>
           <g id="timerG"></g>
         </svg>
-        <p class="hint">Turn it with your finger, or tap it for a push</p>
-        <div class="speeds" id="speeds"></div>
       </div>
-      <button class="btn bigbtn" id="bigbtn" aria-pressed="false">Big</button>
-      <div class="coach" id="coach" role="status" aria-live="polite">Spin it!</div>
-    </div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Spin it!</div>
+    </main>
 
-    <div class="panel" data-tab="make">
-      <div class="panel-body">
+    <section class="tb-panel" data-tab="make">
+      <div class="speeds" id="speeds"></div>
+      <div class="tb-choices panel-body">
         <div data-pane="make" id="pane-make" role="tabpanel" aria-labelledby="tab-make">
           <section class="sec-modes">
             <h2>Make a</h2>
@@ -691,19 +399,16 @@ body.ending .coach, body.big .coach { visibility: hidden; }
             <p class="note" id="rainbowNote" hidden>Rainbow picks a different color for each one.</p>
           </section>
         </div>
-
-        <button class="btn surprise" id="surprise" data-action="surprise">Surprise me</button>
       </div>
 
-      <nav class="tabbar" role="tablist" aria-label="Controls">
-        <button class="tab" role="tab" id="tab-make" data-tab="make" aria-controls="pane-make">Make</button>
-        <button class="tab tab-style" role="tab" id="tab-style" data-tab="style" aria-controls="pane-make">Style</button>
-        <button class="tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
-        <button class="tab tab-surprise" data-action="surprise">Surprise</button>
-        <a class="tab tab-home" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+      <nav class="tb-tabs" role="tablist" aria-label="Controls">
+        <button class="btn tab" role="tab" id="tab-make" data-tab="make" aria-controls="pane-make">Make</button>
+        <button class="btn tab tab-style" role="tab" id="tab-style" data-tab="style" aria-controls="pane-make">Style</button>
+        <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
+        <button class="btn tb-surprise" data-action="surprise">Surprise</button>
       </nav>
-    </div>
-  </main>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -1642,7 +1347,7 @@ body.ending .coach, body.big .coach { visibility: hidden; }
   var tab = "make";
   function showTab(name) {
     tab = name;
-    $("tab-make").closest(".panel").setAttribute("data-tab", name);
+    $("tab-make").closest(".tb-panel").setAttribute("data-tab", name);
     Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
       if (b.classList.contains("tab")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
     });
