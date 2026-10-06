@@ -15,7 +15,10 @@ Shared rules for every app are in "Every app" at the bottom.
 | 5 | Construction Site | Done (v1 stations) |
 | 6 | Train Builder | Done |
 | 7 | New Workshop stations | Done |
-| 8 | UI polish pass | After everything is in |
+| 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
+| 9 | Jigsaw Puzzles | Planned |
+| 10 | Kitchen Helper | Planned |
+| 11 | Music Room | Planned |
 | – | Workshop Projects | On hold |
 
 ---
@@ -327,6 +330,89 @@ Remove numbers that are clutter; keep the ones that matter. Proposed:
   - Math Grid.
   - Peg Drop bin counts (counting is the play there).
 - **Counters stay** (the dad's call): Fish: N, Marbles/Laps, Pieces, Crushed: N, Holes, Nails/Screws.
+
+## 9. Jigsaw Puzzles
+
+**Folder:** `jigsaw/`.
+
+**Goal:** real jigsaw puzzles with proper knobbed pieces, sized from very easy to a real challenge, with pictures of the things he loves.
+
+**Pictures:**
+- Drawn in the Toybox style (SVG, offline): an excavator digging, a rocket on the pad, a marble run, a gear train, a steam train on a bridge, a fish tank, a workbench of tools, a fire truck, a construction crane at sunset, a 3D printer printing a Benchy.
+- **Grown-up option:** use a photo from the device (file picker in the grown-up sheet). It stays on the device only.
+
+**Pick a puzzle:** big picture buttons for the pictures, then a size choice shown as small grids: 4, 6, 9, 12, 16, 24 pieces (the piece count is a size you choose, so the number shows).
+
+**Play:**
+- Pieces are cut with real tab-and-blank edges (each edge a bezier knob, generated per puzzle).
+- The board shows a faint outline of the grid; a **Peek** button fades the whole picture in for a few seconds.
+- Pieces start scattered around the board (on iPhone: in a sideways-scrolling tray under the board).
+- Drag a piece (two fingers can carry two pieces): near its spot it snaps in with a click and a little bounce; anywhere else it stays where it was dropped. No wrong-piece buzzer.
+- Forgiving snap radius, larger for small pieces; after a few near misses the right spot glows.
+- Pieces don't rotate (simpler for v1); a grown-up option can turn rotation on later.
+- Counter: "Pieces: 5 of 12".
+
+**Finish:** a sparkle sweeps the picture and it comes alive for a few seconds (the excavator digs, the rocket lifts off, the marbles roll). The finished puzzle joins a **My puzzles** shelf (his collection; kept across visits).
+
+**Idle help:** the shared ghost hand carries the piece that fits best to its spot.
+
+**Tech:** render the chosen SVG to an offscreen canvas once; each piece is a `Path2D` clip of that image, cached to its own small canvas for fast dragging. Seeded edge shapes so a puzzle can be rebuilt from saved state.
+
+**Fresh visit:** back to the picture chooser; the My puzzles shelf is kept. **Timer ending:** pieces settle, the board dims. Rest line: "The puzzle is resting."
+
+**Agents:** 1.
+
+---
+
+## 10. Kitchen Helper
+
+**Folder:** `kitchen/`, built like the Workshop: a kitchen home page plus one page per station.
+
+**Getting ready (like the Workshop gear-up):** wash hands (pump soap, scrub with bubbles, rinse, dry on a towel) and put on an apron and a chef hat. Once per visit; a quick "Clean hands? ✓ CHECK!" when coming back to a station.
+
+**Stations (v1):**
+- **Blender:** drag in banana, strawberries, blueberries, spinach, yogurt, milk, ice. The lid must go on before it runs (a real rule; the lid glows until it's on). Low / High / Pulse buttons; the contents swirl and blend into a smoothie whose color mixes from the fruit (like Color Mixing). Pour into a cup, add a straw.
+- **Cutting board:** a kid-safe nylon knife; drag across food to slice: banana, cucumber, carrot, strawberry, cheese, bread; an apple slicer you press down. Prompts like "Cut it in half!" and "Now in quarters!" show the pieces (fractions as pictures). Slices slide into a bowl.
+- **Stand mixer:** tilt the head up, pick the whisk, paddle or dough hook and click it on, add flour (a puff cloud), crack eggs, sugar, butter, then lower and lock the head. The speed lever goes Stir / Low / Medium / High. Batter smooths out, cream whips into peaks, dough climbs the hook. Spinning beater, a big draw.
+- **Stove:** stir a pot of soup or pasta with a big spoon (circle drag, bubbles, steam); make pancakes: pour batter, wait for the bubbles, flip with a spatula (a good flick flips higher), stack them up.
+
+**Later stations:** oven with cookie cutters and a glowing window, a toaster that pops, a juicer, a sink full of dishes and bubbles.
+
+**Rules:** no fail states, nothing burns or breaks; real names for tools and foods. Counters where natural ("Pancakes: 4", "Smoothies: 2"). Food finished at a station goes onto a **table** shown on the kitchen home page (his collection for the visit; kept across visits).
+
+**Timer ending:** appliances switch off and spin down; rest line "The kitchen is resting."
+
+**Agents:** 1 for the kitchen home page and hand washing, then 1 per station (4 in v1), each owning its own page, like the Workshop.
+
+---
+
+## 11. Music Room
+
+**Folder:** `music/`.
+
+**Goal:** real instruments he can play with his hands, that look just as exciting with the sound off (on the plane, sound stays off unless a grown-up turns it on; headphones recommended in the sheet note).
+
+**Instruments (picture buttons):**
+- **Xylophone:** rainbow bars that bounce when hit, note letters on the bars (C D E F G A B C).
+- **Piano:** a big keyboard of about two octaves, slides sideways on phones; keys light up.
+- **Drum kit:** kick, snare, toms, hi-hat and crash; drum heads ripple, cymbals wobble.
+- **Bells / boomwhackers:** a row of colored tubes or handbells to tap.
+- **Guitar / ukulele:** strum across the strings with a finger, strings vibrate visibly; chord buttons (C, G, F, Am).
+- **Shakers:** maracas and tambourine that play by shaking the device (tilt permission in the grown-up sheet) or by tapping.
+
+**Visual music (works with sound off):** every note sends up a colored shape that floats and fades; the same note has the same color on every instrument (boomwhacker colors: C red, D orange, E yellow, F green, G teal, A blue, B purple). A wide ribbon across the top draws the tune as colored notes.
+
+**Play along:** simple songs as colored note paths: Twinkle Twinkle, Mary Had a Little Lamb, Hot Cross Buns, Row Row Row Your Boat, Old MacDonald. The next bar or key glows; it waits for him (no timing pressure, no fail).
+
+**Beat Grid:** an 8-step grid (rows are drums or notes, columns are steps), a playhead sweeps across and plays the lit cells, tempo Slow / Medium / Fast. Patterns and counting without numbers in the way (step dots grouped in fours).
+
+**Sound:** Web Audio synthesis only: mallet tones (sine plus a short partial), piano (additive with fast decay), plucked strings (Karplus-Strong), drums (noise bursts and pitch sweeps), bells. Several fingers at once play chords.
+
+**Fresh visit:** back to the xylophone; saved Beat Grid patterns are kept (his collection). **Timer ending:** the instruments play a soft last chord and the lights dim. Rest line: "The instruments are resting."
+
+**Agents:** 1 (2 if the Beat Grid and play-along songs are split from the instruments).
+
+---
 
 ## On hold: Workshop Projects
 
