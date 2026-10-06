@@ -281,7 +281,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .act { min-height: 48px; font-size: 1.05rem; }
   .long { display: none; }
   .short { display: inline; }
-  .prompt { font-size: 1.15rem; }
+  .prompt { font-size: 1.15rem; top: 50px; }
   .woods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wood { min-height: 100px; }
 }
@@ -309,6 +309,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .wood svg { width: 50px; height: 50px; }
   .nbl { display: none; }
   .nbs { display: inline; }
+  .prompt { top: 40px; font-size: 1rem; padding: 0.2rem 0.8rem; }
 }
 /* Declutter: calm phone header (Back, Home icon, Grown-ups clock icon, Big icon) like the Drill Press. */
 .gubtn::before {
@@ -751,7 +752,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (want < block - 4 && now - R.hintAt > 3.5) {
         R.hintAt = now;
         if (R.on && S.speed === 0) say("Turn the dial to spin", "dial");
-        else if (!R.on) say("Switch on to cut", "switch");
+        else if (!R.on) {
+          R.offTries = (R.offTries || 0) + 1;
+          // Second try with the lathe off: switch it on for him (the switch flips where he can see it).
+          if (R.offTries >= 2) { R.offTries = 0; toggleSwitch(); say("Switched on! Now cut", "switch"); }
+          else say("Switch on to cut", "switch");
+        }
       }
       return;
     }
@@ -1544,6 +1550,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function toggleSwitch() {
     if (busy() || R.seq) return;
     R.on = !R.on;
+    if (R.on) $("prompt").classList.remove("show");
     if (R.on && S.speed === 0) { S.speed = 1; save(); }
     blip(R.on ? 440 : 160, 0.1, 0.08, "triangle", R.on ? 660 : 90);
     R.flash.switch = 0;
@@ -1627,6 +1634,100 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+
+  // ---------- Idle help: the Toybox ghost hand ----------
+  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
+  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
+  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
+  function makeIdleGhost(plan, opts) {
+    opts = opts || {};
+    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
+    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
+      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
+    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
+      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
+      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
+      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
+      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
+    document.body.appendChild(el);
+    var dot = el.querySelector(".gh-dot");
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
+    var down = {};
+    function poke() { last = Date.now(); armed = true; stop(); }
+    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
+    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
+    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
+    document.addEventListener("keydown", poke, true);
+    function busy() {
+      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
+      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+      return false;
+    }
+    function play(p) {
+      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
+      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
+      el.style.transformOrigin = "16px 14px";
+      if (reduce) {
+        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
+          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
+        anim = el.animate(frames, { duration: 2600, fill: "both" });
+      } else if (p.hold) {
+        // Press and keep holding (a hold-to-pour button).
+        var hq = pts[0];
+        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
+          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
+          { opacity: 0, transform: at(hq, s * 1.05) }];
+        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
+      } else if (p.tap || pts.length === 1) {
+        var q = pts[0];
+        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
+          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
+          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
+          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
+        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
+      } else {
+        // Fade in, press down, slide along the points, hold, lift and fade.
+        var n = pts.length - 1;
+        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
+        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
+        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
+        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
+        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
+      }
+      dot.style.opacity = "1";
+      anim.onfinish = function () { stop(); };
+    }
+    setInterval(function () {
+      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
+      var p = null;
+      try { p = plan(); } catch (e) { p = null; }
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      play(p);
+    }, 400);
+    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
+  }
+  // Idle help: tap the switch, then push the tool up into the spinning wood.
+  makeIdleGhost(function () {
+    if (busy() || R.seq || R.sand || toolDragging() || !$("picker").hidden) return null;
+    var cr = cv.getBoundingClientRect(), i, z;
+    if (!R.on || S.speed === 0) {
+      for (i = 0; i < hits.length; i++) {
+        z = hits[i];
+        if (z.kind === "switch") { say("Switch on the lathe!", "switch"); return { pts: [[cr.left + z.x + z.w / 2, cr.top + z.y + z.h / 2]], tap: true }; }
+      }
+      return null;
+    }
+    if (R.everCut) return null;
+    var hx = cr.left + M.ox + (R.tipX + 30) * M.s, hy = cr.top + M.oy + (AXY + R.tipD + 120) * M.s;
+    say("Push the tool up!");
+    return { pts: [[hx, hy], [hx, hy - Math.max(70, 120 * M.s)], [hx - 60 * M.s, hy - Math.max(70, 120 * M.s)]] };
+  });
 
   // ---------- Toolbar: tools, New blank, Sand, Done ----------
   function toolSVG(id) {
@@ -1790,6 +1891,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
   if (params.debug === "1") window.__lathe = { S: function () { return S; }, R: R, M: function () { return M; }, P: function () { return P; }, hits: function () { return hits; }, parts: function () { return parts.length; } };
   requestAnimationFrame(frame);
+  // First thing to do, said once at the start: switch it on.
+  setTimeout(function () { if (!R.on && !busy()) say("Switch on the lathe!", "switch"); }, 900);
 })();
 </script>
 <!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Workshop page. -->

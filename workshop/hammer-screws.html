@@ -3224,12 +3224,20 @@ body.ending .camout { display: none; }
     if (alt) return { k: "circle", x: t.x, y: t.y - 40, r: Math.max(46, 24 * LB.k), R: R, rev: state.dir === "rev" };
     return { k: "hold", x: t.x, y: t.y + 4, R: R, ring: R * 1.7 };
   }
-  function gDot(c, x, y, R, press) {
-    var r = R * (press ? 0.84 : 1);
-    c.fillStyle = "rgba(255,255,255,0.9)"; c.strokeStyle = OUT; c.lineWidth = 4;
-    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.stroke();
-    c.fillStyle = "rgba(255,201,60,0.95)"; c.beginPath(); c.arc(x, y, r * 0.45, 0, Math.PI * 2); c.fill();
+  // The Toybox ghost hand on a canvas (same look as every page): fingertip at (x, y), s = scale (1 is about 64 px tall).
+  function ghostHand(c, x, y, s, press) {
+    function box(x0, y0, w, h, r) {
+      c.beginPath(); c.moveTo(x0 + r, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, r); c.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+      c.arcTo(x0, y0 + h, x0, y0, r); c.arcTo(x0, y0, x0 + w, y0, r); c.closePath(); c.fill(); c.stroke();
+    }
+    c.save(); c.translate(x, y); c.scale(s * (press ? 0.92 : 1), s * (press ? 0.92 : 1));
+    c.lineJoin = "round"; c.strokeStyle = "#1D2340";
+    c.lineWidth = 2; c.fillStyle = "rgba(255,201,60,0.95)"; c.beginPath(); c.arc(0, 2, press ? 12 : 9, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.lineWidth = 3; c.fillStyle = "#FFFFFF"; c.globalAlpha *= 0.92;
+    box(-12, 22, 44, 40, 16); box(10, 14, 14, 24, 7); box(-9, -6, 18, 40, 9);
+    c.restore();
   }
+  function gDot(c, x, y, R, press) { ghostHand(c, x, y, clamp(R / 24, 0.95, 1.35), press); }
   function gRipple(c, x, y, R, f) {
     if (f <= 0 || f >= 1) return;
     c.strokeStyle = "rgba(255,255,255," + (0.95 * (1 - f)).toFixed(3) + ")"; c.lineWidth = 7 * (1 - f) + 1;
@@ -3283,7 +3291,7 @@ body.ending .camout { display: none; }
   }
   function updateGhost() {
     var now = nowMs(), want = !locked() && endPose === 0 && !Toybox.sheetOpen() && $("camout").hidden &&
-      !Object.keys(gest).length && !trig.on && now - idleSince > GHOST_IDLE && ham.phase !== "tapin";
+      !Object.keys(gest).length && !trig.on && now - idleSince > GHOST_IDLE && now - idleSince < GHOST_IDLE + 2 * GHOST_CYC && ham.phase !== "tapin";
     var plan = want ? ghostPlan() : null;
     ghostA = plan ? Math.min(1, ghostA + 0.05) : 0;
     $("trigger").classList.toggle("nudge", !!plan && plan.k === "hold" && DRIVERS[state.driver].kind === "power" && state.mode === "screw");

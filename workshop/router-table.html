@@ -1256,6 +1256,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function toggleSwitch() {
     if (busy() || R.chg) return;
     R.on = !R.on;
+    if (R.on) $("prompt").classList.remove("show");
     R.pending = null;
     blip(R.on ? 330 : 260, 0.08, 0.07, "square", R.on ? 440 : 180);
     updateAria();
@@ -1308,7 +1309,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
           R.target = R.bx;
           R.bump = 1;
           R.flashSwitch = now + 1.6;
-          if (now - R.lastSay > 2.6) say(R.chg || R.spin > 0.05 ? "Wait for the bit…" : "Switch the router on!");
+          if (now - R.lastSay > 2.6) {
+            if (R.chg || R.spin > 0.05) say("Wait for the bit…");
+            else if ((R.offTries = (R.offTries || 0) + 1) >= 2) {
+              // Second push with the router off: switch it on for him (the switch flips where he can see it).
+              R.offTries = 0; toggleSwitch(); say("Switched on! Now push");
+            } else say("Switch the router on!");
+          }
           break;
         }
       } else total += cutPass(nb, true);
@@ -1453,6 +1460,100 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+
+  // ---------- Idle help: the Toybox ghost hand ----------
+  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
+  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
+  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
+  function makeIdleGhost(plan, opts) {
+    opts = opts || {};
+    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
+    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
+      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
+    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
+      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
+      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
+      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
+      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
+    document.body.appendChild(el);
+    var dot = el.querySelector(".gh-dot");
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
+    var down = {};
+    function poke() { last = Date.now(); armed = true; stop(); }
+    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
+    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
+    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
+    document.addEventListener("keydown", poke, true);
+    function busy() {
+      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
+      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+      return false;
+    }
+    function play(p) {
+      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
+      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
+      el.style.transformOrigin = "16px 14px";
+      if (reduce) {
+        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
+          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
+        anim = el.animate(frames, { duration: 2600, fill: "both" });
+      } else if (p.hold) {
+        // Press and keep holding (a hold-to-pour button).
+        var hq = pts[0];
+        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
+          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
+          { opacity: 0, transform: at(hq, s * 1.05) }];
+        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
+      } else if (p.tap || pts.length === 1) {
+        var q = pts[0];
+        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
+          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
+          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
+          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
+        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
+      } else {
+        // Fade in, press down, slide along the points, hold, lift and fade.
+        var n = pts.length - 1;
+        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
+        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
+        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
+        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
+        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
+      }
+      dot.style.opacity = "1";
+      anim.onfinish = function () { stop(); };
+    }
+    setInterval(function () {
+      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
+      var p = null;
+      try { p = plan(); } catch (e) { p = null; }
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      play(p);
+    }, 400);
+    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
+  }
+  // Idle help: tap the switch, then push the board past the spinning bit.
+  makeIdleGhost(function () {
+    if (busy() || R.chg || R.fly || !R.board) return null;
+    for (var id in drags) if (drags.hasOwnProperty(id)) return null;
+    var cr = cv.getBoundingClientRect();
+    if (!R.on) {
+      var sr = switchScreenRect();
+      say("Switch the router on!");
+      return { pts: [[cr.left + sr.x + sr.w / 2, cr.top + sr.y + sr.h / 2]], tap: true };
+    }
+    if (R.spin < 0.45 || R.bx <= BXMIN + 20) return null;
+    var br = boardScreenRect(), x0 = cr.left + br.x + br.w * 0.62, y0 = cr.top + br.y + br.h * 0.5;
+    var dx = Math.min((R.bx - BXMIN) * TV.s, cr.width * 0.55, 260);
+    say("Push the board!");
+    return { pts: [[x0, y0], [x0 - dx, y0]] };
+  });
 
   // ---------- Toolbar ----------
   function n1(v) { return Math.round(v * 10) / 10; }
@@ -1660,6 +1761,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
   if (params.debug === "1" || navigator.webdriver) window.__rt = { S: function () { return S; }, R: R, toScreen: toScreen, TV: function () { return TV; }, E: function () { return E; }, H: function () { return H; }, sw: switchScreenRect, board: boardScreenRect, done: function () { return doneCount; } };
   requestAnimationFrame(frame);
+  // First thing to do, said once at the start: switch it on.
+  setTimeout(function () { if (!R.on && !busy()) say("Switch the router on!"); }, 900);
 })();
 </script>
 <!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Workshop page. -->
