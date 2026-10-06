@@ -86,19 +86,11 @@ body {
   user-select: none;
   -webkit-touch-callout: none;
 }
-/* Panel: the board swatches (choices), then the tab bar with just New. */
-.mats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.mat { min-height: 72px; }
-.chip {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 3px solid #1D2340;
-}
-.mat[aria-pressed="true"] .chip { width: 38px; height: 38px; }
-.short { display: none; }
-/* Friendly rule prompt ("Switch off to change the bit"): the coach line spot. */
+/* Panel: the bit case (one tile per bit), then New board. */
+.bits { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.bit { min-height: 76px; }
+.bit canvas { pointer-events: none; }
+/* Friendly prompt ("Switch it on!"): the coach line spot. */
 .prompt {
   position: absolute;
   left: 50%;
@@ -125,42 +117,37 @@ body {
 .prompt.show + .tb-coach { opacity: 0; }
 /* Big: hide the panel so the drill press fills the screen. */
 body.big .tb-panel { display: none; }
-body.ending .toolbar,
-body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
+body.ending .toolbar { pointer-events: none; opacity: 0.4; }
 
 /* Rest picture size (the rest screen itself is in common/toybox.css). */
 .rest-art { width: min(60vw, 240px); }
 
-/* Phones: one row of swatches without words. */
+/* Phones: one row of bit pictures without words. */
 @media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .mat { min-height: 52px; padding: 0; font-size: 0.85rem; }
-  .long { display: none; }
-  .short { display: inline; }
+  .bit { min-height: 56px; padding: 2px; }
+  .bit span { display: none; }
+  .bit canvas { width: 44px; height: 44px; }
   .prompt { font-size: 1.15rem; top: auto; bottom: 10px; }
 }
 @media (max-width: 600px) and (orientation: portrait) {
-  /* The bit case fills the bottom of the stage here, so the coach line sits at the top, right of the counter. */
-  .coach.tb-coach { top: 10px; bottom: auto; left: auto !important; right: 10px; transform: none; max-width: calc(100% - 150px) !important; }
-  .mats { gap: 6px; }
-  .mat span:not(.chip) { display: none; }
+  .bits { gap: 6px; }
 }
-/* Landscape: the swatches are a column grid in the side panel. */
+/* Landscape: the bits are a two-column grid in the side panel. */
 @media (orientation: landscape) {
   .tb-body .tb-panel { width: min(24%, 260px); }
-  .mats { grid-template-columns: 1fr 1fr; }
+  .bits { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); }
   .tb-body .tb-panel .tb-tabs .btn { white-space: normal; line-height: 1.1; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .tb-body .tb-panel { width: 150px; padding: 6px; gap: 6px; }
-  .mats { grid-template-columns: 1fr; grid-auto-rows: minmax(0, 1fr); gap: 5px; }
-  .mat { min-height: 0; }
-  .mat { flex-direction: row; gap: 4px; }
-  .chip, .mat[aria-pressed="true"] .chip { width: 20px; height: 20px; border-width: 2px; border-radius: 6px; }
+  .bits { gap: 5px; }
+  .bit { min-height: 0; }
+  .bit canvas { width: 40px; height: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prompt { transition: opacity 0.2s ease; }
 }
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+/* Ghost hand: a see-through hand that shows the main move (same look as Bulldozer and Measuring). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
 .ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ghosthand > svg { position: relative; }
@@ -178,14 +165,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A drill press with a bit case"></canvas>
+      <canvas id="cv" role="img" aria-label="A drill press seen from the front"></canvas>
       <div class="tb-counter" id="holesCount">Holes: 0</div>
       <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
       <div class="tb-coach coach" id="coach" role="status" aria-live="polite">Turn it on!</div>
     </main>
     <section class="tb-panel toolbar" id="toolbar">
-      <div class="tb-choices mats" id="mats" role="group" aria-label="Boards"></div>
-      <nav class="tb-tabs" id="tabsRow"></nav>
+      <div class="tb-choices bits" id="bits" role="group" aria-label="Bit case"></div>
+      <nav class="tb-tabs" id="tabsRow"><button class="btn tb-new newbtn" id="newBoard" aria-label="New board">New board</button></nav>
     </section>
   </div>
 </div>
@@ -204,9 +191,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       params[k] = i < 0 ? "" : decodeURIComponent(kv.slice(i + 1).replace(/\+/g, " "));
     });
   } catch (e) { /* ignore bad query */ }
-  var BIT_ORDER = ["twist", "brad", "spade", "forstner", "holesaw", "auger", "step", "countersink", "plug", "masonry"];
+  var BIT_ORDER = ["twist", "spade", "forstner", "holesaw", "auger", "step"];
   var linkTool = /^[a-z]{2,20}$/.test(params.tool || "") ? params.tool : "";
-  var linkBit = BIT_ORDER.indexOf(params.bit) !== -1 ? params.bit : (BIT_ORDER.indexOf(linkTool) !== -1 ? linkTool : "");
+  // Tool Wall links for bits that are not in this simpler case open with the closest one.
+  var BIT_ALIAS = { brad: "twist", masonry: "twist", countersink: "step", plug: "forstner" };
+  var wantBit = BIT_ALIAS[params.bit] || params.bit, wantTool = BIT_ALIAS[linkTool] || linkTool;
+  var linkBit = BIT_ORDER.indexOf(wantBit) !== -1 ? wantBit : (BIT_ORDER.indexOf(wantTool) !== -1 ? wantTool : "");
   var gearOn = true;
   try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
   if (!gearOn) {
@@ -217,119 +207,83 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 
   var OUT = "#1D2340";
   var SKEY = "workshop-drill-v1";
-  var SOUNDKEY = "workshop-sound-v1";
-  var DS = 1.6;            // world units per millimetre (depths and diameters)
-  var BW = 220, BH = 140;  // board size in world units (top view)
-  var TRAVEL = 112;        // quill travel in world units
-  var X0 = 420;            // spindle axis x in machine world units
-  var QUILL_Y = 330;       // where the quill leaves the head
-  var RPMS = [500, 900, 1500, 2500, 3000];
-  var SPEED_WORDS = ["Slowest", "Slow", "Medium", "Fast", "Fastest"];
+  var DS = 1.6;            // world units per millimetre
+  var BW = 250, BH = 170;  // board size in world units (across, front to back)
+  var TRAVEL = 112;        // quill travel
+  var RPM = 1500;          // one calm speed
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Bits: real names, sizes in mm with inch equivalents, stylised lengths in world units.
+  // The bit case: real names, one size each. len = stylised length in world units.
   var BITS = {
-    twist: { name: "Twist", len: 136, sizes: [[3, "3 mm"], [6, "6 mm · 1/4\""], [10, "10 mm"]], def: 1, shank: "round", metal: "#C8CDD6", flute: "#8E96A3" },
-    brad: { name: "Brad-point", len: 132, sizes: [[6, "6 mm"], [10, "10 mm"], [12, "12 mm"]], def: 1, shank: "round", metal: "#D9DDE3", flute: "#9AA2AE" },
-    spade: { name: "Spade", len: 150, sizes: [[16, "16 mm · 5/8\""], [25, "25 mm · 1\""], [32, "32 mm · 1 1/4\""]], def: 1, shank: "hex", metal: "#C9CED6", flute: "#8D95A1" },
-    forstner: { name: "Forstner", len: 100, sizes: [[25, "25 mm · 1\""], [35, "35 mm · 1 3/8\""], [50, "50 mm · 2\""]], def: 1, shank: "round", metal: "#B9C0CB", flute: "#7E8794" },
-    holesaw: { name: "Hole saw", len: 112, sizes: [[38, "38 mm · 1 1/2\""], [51, "51 mm · 2\""], [64, "64 mm · 2 1/2\""]], def: 1, shank: "hex", metal: "#C9CED6", flute: "#E36A1E" },
-    auger: { name: "Auger", len: 186, sizes: [[12, "12 mm · 1/2\""], [19, "19 mm · 3/4\""], [25, "25 mm · 1\""]], def: 1, shank: "hex", metal: "#9AA0A8", flute: "#5E6570" },
-    step: { name: "Step bit", len: 112, sizes: [[20, "4–20 mm"]], def: 0, shank: "hex", metal: "#E8B83A", flute: "#B3841C" },
-    countersink: { name: "Countersink", len: 84, sizes: [[16, "90° · 16 mm"]], def: 0, shank: "hex", metal: "#C8CDD6", flute: "#7E8794" },
-    plug: { name: "Plug cutter", len: 96, sizes: [[10, "10 mm"], [13, "13 mm · 1/2\""]], def: 0, shank: "round", metal: "#C8CDD6", flute: "#7E8794" },
-    masonry: { name: "Masonry", len: 146, sizes: [[6, "6 mm"], [8, "8 mm"], [10, "10 mm"]], def: 1, shank: "round", metal: "#7D848F", flute: "#4E5560" }
+    twist: { name: "Twist", mm: 8, len: 136, metal: "#C8CDD6" },
+    spade: { name: "Spade", mm: 25, len: 150, metal: "#C9CED6" },
+    forstner: { name: "Forstner", mm: 30, len: 100, metal: "#B9C0CB" },
+    holesaw: { name: "Hole saw", mm: 38, len: 112, metal: "#C9CED6" },
+    auger: { name: "Auger", mm: 19, len: 186, metal: "#9AA0A8" },
+    step: { name: "Step bit", mm: 20, len: 112, metal: "#E8B83A" }
   };
   // Shank diameter (mm) that the chuck jaws close onto.
   function shankMM(id, mm) {
-    if (id === "twist" || id === "brad") return mm;
-    if (id === "masonry") return mm * 0.95;
-    if (id === "auger") return mm >= 19 ? 11 : 8;
+    if (id === "twist") return mm;
+    if (id === "auger") return 8;
     if (id === "forstner") return 10;
-    if (id === "plug") return 10;
-    if (id === "holesaw") return 9.5;
-    if (id === "step") return 9.5;
+    if (id === "holesaw" || id === "step") return 9.5;
     return 6.35;
   }
   // Step bit: 4, 6, 8 … 20 mm, each step 3 mm tall.
   var STEP_H = 3;
   function stepDia(depthMM) { return Math.min(20, 4 + 2 * Math.floor(Math.max(0, depthMM) / STEP_H)); }
 
-  var MATS = {
-    pine: { name: "Pine", t: 30, col: "#F3D69C", dark: "#C99B55", chip: "#F7E1AC", sound: 900, rate: 34, kind: "wood" },
-    oak: { name: "Oak", t: 25, col: "#C99761", dark: "#87592C", chip: "#D7AA75", sound: 700, rate: 20, kind: "wood" },
-    plywood: { name: "Plywood", t: 18, col: "#ECD5A6", dark: "#B48A4E", chip: "#F0DDB4", sound: 800, rate: 26, kind: "wood" },
-    acrylic: { name: "Acrylic", t: 6, col: "#BFE6F7", dark: "#6FB6D6", chip: "#F2FBFF", sound: 1500, rate: 14, kind: "plastic" },
-    metal: { name: "Sheet metal", short: "Metal", t: 1.5, col: "#C3CAD3", dark: "#7D8794", chip: "#D9DEE5", sound: 2600, rate: 7, kind: "metal" },
-    brick: { name: "Brick", t: 55, col: "#C8553D", dark: "#8E3324", chip: "#C96A52", sound: 500, rate: 7, kind: "masonry" }
-  };
-  var MAT_ORDER = ["pine", "oak", "plywood", "acrylic", "metal", "brick"];
-  function matT(m) { return Math.max(5, MATS[m].t * DS); } // visual thickness (world units)
-
-  // How well a bit cuts a material (1 = made for it). Never zero: wrong-ish combos still work, slowly.
-  function goodness(bit, mat) {
-    var k = MATS[mat].kind;
-    if (bit === "masonry") return k === "masonry" ? 1 : (k === "metal" ? 0.35 : 0.75);
-    if (k === "masonry") return 0.28;
-    if (bit === "twist" || bit === "step" || bit === "countersink") return 1;
-    if (k === "metal") return bit === "holesaw" ? 0.6 : 0.25;
-    if (k === "plastic") return (bit === "brad" || bit === "forstner") ? 0.9 : 0.6;
-    return 1;
-  }
+  // One good board: pine.
+  var WOOD = { t: 30, col: "#F3D69C", dark: "#C99B55", chip: "#F7E1AC", rate: 34 };
+  function boardT() { return WOOD.t * DS; }
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function ease(t) { t = clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
   var $ = function (id) { return document.getElementById(id); };
-  // Small deterministic random for textures.
   function seeded(seed) {
     var s = (seed >>> 0) || 1;
     return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
   }
+  function mixHex(a, b, t) {
+    var x = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
+    var y = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
+    return "#" + [0, 1, 2].map(function (k) {
+      var v = Math.round(x[k] + (y[k] - x[k]) * t);
+      return (v < 16 ? "0" : "") + v.toString(16);
+    }).join("");
+  }
 
   // ---------- Saved state ----------
   function freshState() {
-    var sizes = {};
-    BIT_ORDER.forEach(function (b) { sizes[b] = BITS[b].def; });
-    return {
-      chuck: { id: "twist", si: BITS.twist.def }, // bit in the chuck (or null)
-      sizes: sizes,
-      belt: 2, mat: "pine", depth: 20, clamp: false, light: true, view: "top",
-      px: BW / 2, py: BH / 2, holes: [], plugs: [], seed: 1 + Math.floor(Math.random() * 1e6), made: 0
-    };
+    return { chuck: { id: "twist", si: 0 }, mat: "pine", px: BW / 2, py: BH / 2, holes: [], seed: 1 + Math.floor(Math.random() * 1e6), made: 0, slid: false };
   }
+  function goodHole(h) { return h && BITS[h.bit] && typeof h.x === "number" && typeof h.y === "number" && typeof h.mm === "number" && typeof h.d === "number"; }
   function loadState() {
     var s = freshState();
     try {
       var o = JSON.parse(localStorage.getItem(SKEY) || "null");
       if (!o || typeof o !== "object") return s;
-      if (o.chuck === null) s.chuck = null;
-      else if (o.chuck && BITS[o.chuck.id] && BITS[o.chuck.id].sizes[o.chuck.si]) s.chuck = { id: o.chuck.id, si: o.chuck.si };
-      if (o.sizes) BIT_ORDER.forEach(function (b) { if (BITS[b].sizes[o.sizes[b]]) s.sizes[b] = o.sizes[b]; });
-      if (RPMS[o.belt]) s.belt = o.belt;
-      if (MATS[o.mat]) s.mat = o.mat;
-      if (typeof o.depth === "number") s.depth = clamp(Math.round(o.depth), 1, 50);
-      if (typeof o.clamp === "boolean") s.clamp = o.clamp;
-      if (typeof o.light === "boolean") s.light = o.light;
-      if (o.view === "top" || o.view === "side") s.view = o.view;
-      if (typeof o.px === "number") s.px = clamp(o.px, 0, BW);
-      if (typeof o.py === "number") s.py = clamp(o.py, 0, BH);
+      var cid = o.chuck && (typeof o.chuck === "string" ? o.chuck : o.chuck.id);
+      if (BITS[cid]) s.chuck = { id: cid, si: 0 };
       if (typeof o.seed === "number") s.seed = o.seed;
       if (typeof o.made === "number") s.made = o.made;
-      if (Array.isArray(o.holes)) s.holes = o.holes.filter(function (h) {
-        return h && BITS[h.bit] && typeof h.x === "number" && typeof h.y === "number" && typeof h.mm === "number" && typeof h.d === "number";
-      }).slice(-150);
-      if (o.boards && typeof o.boards === "object") {
-        s.boards = {};
-        MAT_ORDER.forEach(function (m) {
-          var b = o.boards[m];
-          if (b && Array.isArray(b.holes)) s.boards[m] = { holes: b.holes.filter(function (h) { return h && BITS[h.bit] && typeof h.x === "number" && typeof h.d === "number"; }).slice(-150), plugs: Array.isArray(b.plugs) ? b.plugs.slice(-40) : [], seed: typeof b.seed === "number" ? b.seed : 1 };
-        });
+      if (typeof o.slid === "boolean") s.slid = o.slid;
+      if (typeof o.px === "number") s.px = clamp(o.px, 40, BW - 40);
+      if (typeof o.py === "number") s.py = clamp(o.py, 20, BH - 20);
+      // Older saves kept a board per material: only the pine board carries over.
+      var holes = o.holes;
+      if (o.mat && o.mat !== "pine") {
+        var pb = o.boards && o.boards.pine;
+        holes = pb && pb.holes;
+        if (pb && typeof pb.seed === "number") s.seed = pb.seed;
       }
-      if (Array.isArray(o.plugs)) s.plugs = o.plugs.filter(function (p) {
-        return p && typeof p.x === "number" && typeof p.y === "number" && typeof p.mm === "number";
-      }).slice(-40);
+      if (Array.isArray(holes)) s.holes = holes.filter(goodHole).map(function (h) {
+        return { bit: h.bit, mm: h.mm, x: clamp(h.x, 0, BW), y: clamp(h.y, 0, BH), d: h.d };
+      }).slice(-150);
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
     return s;
   }
@@ -342,13 +296,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
     }, 300);
   }
-  // Opened fresh from the Toybox home screen: a new board, the first bit, no holes (nothing here is a
-  // keepsake collection). A reload, or coming back from the Tool Wall, keeps the saved bench.
+  // Opened fresh from the Toybox home screen: a new board, the first bit, no holes. A reload, or coming
+  // back from the Tool Wall, keeps the bench as it was.
   var S = Toybox.fresh() ? freshState() : loadState();
   if (Toybox.fresh()) save();
-  if (BIT_ORDER.indexOf(linkBit) !== -1) {
-    S.chuck = { id: linkBit, si: S.sizes[linkBit] };
-  }
+  if (linkBit) S.chuck = { id: linkBit, si: 0 };
 
   // ---------- Live (not saved) machine state ----------
   var R = {
@@ -356,66 +308,106 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     rpm: 0,               // current visual rpm (spins up and down)
     phase: 0,             // spindle rotation phase (radians)
     q: 0,                 // quill travel (world units)
+    qWant: 0,
     feedHeld: false,
-    spokeOff: 0, spokeHeld: false,   // feed spokes' turn (drawn), separate from quill travel
+    spokeT: 0,            // feed handle turn, 0..1 of the travel (drawn)
     jaw: 0,               // 0 = jaws tight on the shank, 1 = wide open
-    key: "holder",        // holder | chuck | drag | fly
-    keyAng: 0,            // chuck key turn angle (radians)
-    keyPos: { x: 0, y: 0 },
-    tableY: 640, tableTarget: 640, crank: 0,
-    lid: 0, lidTarget: 0, belt: S.belt, beltDrag: null,
-    tight: true,          // jaws are gripping the bit
-    cutting: 0,           // 0..1 how hard we're cutting this frame
+    swap: null,           // bit change in progress
+    tableY: 588, tableTarget: 588,
+    cutting: 0,
     curHole: null,
-    sawSlug: null,        // plug stuck inside the hole saw
-    auto: null,           // auto bit-change script
     shake: 0,
     boardSlide: 0,        // new-board animation offset
-    flash: {},            // highlight timers for parts
-    dust: 0               // dust haze amount
+    flash: {},            // highlight timers
+    dust: 0,
+    offTries: 0,          // pulls on the handle while switched off
+    thruAt: -10,
+    ui: {}                // where the controls are this frame (view units)
   };
 
-  // ---------- Canvas and layout ----------
+  // ---------- Canvas, camera and layout ----------
+  // World units (DS per mm): x to the right, y DOWN (like the screen), z toward you. The spindle axis is
+  // x = 0, z = 0. You stand in front of the drill press, a little to the right of the bit, with your
+  // eyes above the table: the head is seen nearly straight on, the table and the board from above.
   var cv = $("cv"), ctx = cv.getContext("2d");
   var DPR = 1, CW = 300, CH = 300;
-  var M = { x: 0, y: 0, w: 1, h: 1, s: 1, ox: 0, oy: 0 }; // machine region; world -> screen
-  var B = { x: 0, y: 0, w: 0, h: 0 };                     // (the old top/side board view; kept empty)
-  var C = { x: 0, y: 0, w: 1, h: 1 };                     // bit case
-  var bgCanvas = document.createElement("canvas");
-  // World box: x 0..620, y -40..820. The lower column and the base (down to y 1000) are left out of
-  // view so the head, chuck and table get the room.
-  var WY0 = -40, WW = 620, WH = 860;
+  var M = { x: 0, y: 0, w: 1, h: 1, s: 1, ox: 0, oy: 0 }; // view units -> screen
+  var CAM = { yaw: 0.2, pitch: 0.52, dist: 1500, ty: 440 };
+  var EYE = [0, 0, 0], RX = [1, 0, 0], DX = [0, 1, 0], FX = [0, 0, -1];
+  (function setupCam() {
+    var sp = Math.sin(CAM.yaw), cp = Math.cos(CAM.yaw), st = Math.sin(CAM.pitch), ct = Math.cos(CAM.pitch);
+    EYE = [CAM.dist * sp * ct, CAM.ty - CAM.dist * st, CAM.dist * cp * ct];
+    FX = [-sp * ct, st, -cp * ct];
+    RX = [cp, 0, -sp];
+    DX = [sp * st, ct, cp * st];
+  })();
+  // World point -> view point (view units: about world units at the spindle). k = local scale.
+  function P(x, y, z) {
+    var vx = x - EYE[0], vy = y - EYE[1], vz = z - EYE[2];
+    var zc = vx * FX[0] + vy * FX[1] + vz * FX[2];
+    var k = CAM.dist / zc;
+    return { x: (vx * RX[0] + vz * RX[2]) * k, y: (vx * DX[0] + vy * DX[1] + vz * DX[2]) * k, k: k };
+  }
+  function Pv(p) { return P(p[0], p[1], p[2]); }
+  // View point -> world point on the level plane y = yPlane.
+  function onPlane(vx, vy, yPlane) {
+    var F = CAM.dist;
+    var dx = RX[0] * vx / F + DX[0] * vy / F + FX[0];
+    var dy = DX[1] * vy / F + FX[1];
+    var dz = RX[2] * vx / F + DX[2] * vy / F + FX[2];
+    if (Math.abs(dy) < 1e-6) return { x: 0, z: 0 };
+    var t = (yPlane - EYE[1]) / dy;
+    return { x: EYE[0] + dx * t, z: EYE[2] + dz * t };
+  }
+
+  // ---------- The drill press, in world units ----------
+  var HEAD = { x0: -128, x1: 128, z0: -330, z1: 0, y0: 122, y1: 300 };
+  var BOSS = { r: 54, y0: 150, y1: 336 };
+  var COVER = { hw: 124, zf: -50, zb: -420, y0: 60, y1: 124 };
+  var MOTOR = { x: 56, z: -430, r: 88, y0: 120, y1: 316 };
+  var COL = { z: -236, r: 40 };
+  var TBL = { hw: 190, zf: 160, zb: -160, th: 26 };
+  var HUB = { x: 128, y: 238, z: -40, r: 30, w: 24 };
+  var SPOKE_L = 134, SPLAY = 0.45, SPOKE_A0 = -0.62, SPOKE_RANGE = 2.0;
+  var SW = { x0: -116, x1: -60, y0: 176, y1: 266, z: 22 };
+  var LAMP = { x: -184, y: 346, z: 70 };
+  var QUILL_Y = 330;
 
   function layout() {
     var pad = CW < 520 || CH < 420 ? 6 : 10;
-    // The Big button sits top right on bigger screens (top left on phones): keep the bit case clear of it.
-    var bb = $("bigToggle").getBoundingClientRect(), cr = cv.getBoundingClientRect();
-    var bigRight = bb.width > 0 && bb.left - cr.left > CW / 2;
-    if (CW / CH >= 1.0) {
-      var mw = Math.min(CW * 0.5, CH * 0.74 + 20);
-      M = { x: pad, y: pad, w: mw, h: CH - 2 * pad };
-      var rx = M.x + M.w + pad, ty = bigRight ? Math.round(bb.bottom - cr.top) + pad : pad;
-      C = { x: rx, y: ty, w: CW - rx - pad, h: CH - ty - pad };
-    } else {
-      // The machine gets the whole width; the bit case fills the rest below it.
-      var mw2 = CW - 2 * pad, mh = Math.round(CH * (CW >= 600 ? 0.64 : 0.58));
-      mh = Math.max(Math.round(CH * 0.4), Math.min(mh, Math.round(WH * Math.min(mw2 / WW, mh / WH)) + 4));
-      M = { x: pad, y: pad, w: mw2, h: mh };
-      C = { x: pad, y: mh + 2 * pad, w: CW - 2 * pad, h: CH - mh - 3 * pad };
+    M = { x: pad, y: pad, w: CW - 2 * pad, h: CH - 2 * pad };
+    // Fit the head, the feed handles, the table and the board (the lower column runs on out of view).
+    var pts = [], i, a;
+    for (i = 0; i < 16; i++) {
+      a = i / 15 * Math.PI;
+      pts.push(P(Math.cos(a) * COVER.hw, COVER.y0, (i < 8 ? COVER.zb : COVER.zf) + Math.sin(a) * COVER.hw * (i < 8 ? -1 : 1)));
     }
-    B = { x: C.x, y: C.y, w: 0, h: 0 };
-    M.s = Math.min(M.w / WW, M.h / WH);
-    // Small screens: tip the board further toward you so its top (and every hole) reads bigger.
-    BOARD_F = M.s < 0.75 ? 0.58 : 0.36;
-    M.ox = M.x + (M.w - WW * M.s) / 2;
-    // Top-aligned: any spare height shows more of the column below the table, not empty pegboard above.
-    M.oy = M.y + Math.min(M.h - WH * M.s, 4) - WY0 * M.s;
+    pts.push(P(HEAD.x0, HEAD.y1, HEAD.z1), P(LAMP.x - 34, LAMP.y + 30, LAMP.z));
+    for (i = 0; i < 12; i++) {
+      a = i / 12 * Math.PI * 2;
+      pts.push(P(HUB.x + HUB.w + SPOKE_L * Math.sin(SPLAY) + 18, HUB.y + Math.sin(a) * (SPOKE_L + 18), HUB.z + Math.cos(a) * (SPOKE_L + 18)));
+    }
+    var ty = 600;
+    pts.push(P(-TBL.hw, ty + TBL.th, TBL.zf), P(TBL.hw, ty + TBL.th, TBL.zf), P(-TBL.hw, ty, TBL.zb), P(TBL.hw, ty, TBL.zb));
+    // Short, wide screens: frame from the switch down to the board, so the bit and the board are bigger
+    // (the top of the belt cover and the highest swing of the handles may go out of view).
+    if (M.h / M.w < 0.62) {
+      pts = [P(SW.x0, SW.y0 - 10, SW.z), P(LAMP.x - 34, LAMP.y + 30, LAMP.z), P(HUB.x + HUB.w + SPOKE_L * 0.6, HUB.y, HUB.z + 40),
+        P(-TBL.hw, ty, TBL.zf - 20), P(TBL.hw, ty, TBL.zf - 20)];
+    }
+    var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    pts.forEach(function (p) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+    M.s = Math.min(M.w / (x1 - x0), M.h / (y1 - y0));
+    M.ox = M.x + (M.w - (x1 - x0) * M.s) / 2 - x0 * M.s;
+    // Top-aligned on tall screens: spare room shows more of the column under the table.
+    M.oy = M.y + Math.min((M.h - (y1 - y0) * M.s) / 2, 24) - y0 * M.s;
   }
-  function toWorld(px, py) { return { x: (px - M.ox) / M.s, y: (py - M.oy) / M.s }; }
-  function toScreen(x, y) { return { x: M.ox + x * M.s, y: M.oy + y * M.s }; }
-  function worldXf() { ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.ox, DPR * M.oy); }
+  function toView(px, py) { return { x: (px - M.ox) / M.s, y: (py - M.oy) / M.s }; }
+  function toScreen(v) { return { x: M.ox + v.x * M.s, y: M.oy + v.y * M.s }; }
+  function viewXf() { ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.ox, DPR * M.oy); }
   function screenXf() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
 
+  var bgCanvas = document.createElement("canvas");
   function resize() {
     var r = cv.getBoundingClientRect();
     DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -445,11 +437,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
     return g;
   }
-  function vgrad(c, y0, y1, stops) {
-    var g = c.createLinearGradient(0, y0, 0, y1);
-    stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
-    return g;
-  }
   function steel(c, x0, x1) { return hgrad(c, x0, x1, [[0, "#6E7683"], [0.3, "#E9EDF2"], [0.55, "#B6BDC7"], [1, "#5D6470"]]); }
   function label(c, text, x, y, size, color, align, weight) {
     c.font = (weight || 800) + " " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
@@ -464,376 +451,346 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     rr(c, x - w / 2, y - h / 2, w, h, h / 2);
     fs(c, bg || "#FFFFFF", Math.max(2, size * 0.16));
     label(c, text, x, y + size * 0.06, size, fg || OUT);
-    return { x: x - w / 2, y: y - h / 2, w: w, h: h };
   }
+  function poly(c, pts) {
+    c.beginPath();
+    for (var i = 0; i < pts.length; i++) { if (i) c.lineTo(pts[i].x, pts[i].y); else c.moveTo(pts[i].x, pts[i].y); }
+    c.closePath();
+  }
+  function v3sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function v3dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function v3cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function v3norm(a) { var l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  function hull(pts) {
+    var p = pts.slice().sort(function (a, b) { return a.x - b.x || a.y - b.y; });
+    if (p.length < 3) return p;
+    function cr(o, a, b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
+    var lo = [], up = [], i;
+    for (i = 0; i < p.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p[i]) <= 0) lo.pop(); lo.push(p[i]); }
+    for (i = p.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p[i]) <= 0) up.pop(); up.push(p[i]); }
+    up.pop(); lo.pop();
+    return lo.concat(up);
+  }
+  // Footprints (in x/z, seen from above)
+  function circleFP(cx, cz, r, n) {
+    var o = [];
+    for (var i = 0; i < n; i++) { var a = i / n * Math.PI * 2; o.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
+    return o;
+  }
+  function rrectFP(x0, z0, x1, z1, r, n) {
+    var o = [], k, a;
+    n = n || 5;
+    var cs = [[x1 - r, z1 - r, 0], [x0 + r, z1 - r, 0.5], [x0 + r, z0 + r, 1], [x1 - r, z0 + r, 1.5]];
+    cs.forEach(function (cc) {
+      for (k = 0; k <= n; k++) { a = (cc[2] + k / n * 0.5) * Math.PI; o.push([cc[0] + Math.cos(a) * r, cc[1] + Math.sin(a) * r]); }
+    });
+    return o;
+  }
+  function boxFP(x0, z0, x1, z1) { return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]; }
 
-  // ---------- Background: pegboard wall and workbench ----------
+  // Light from the upper left, in front.
+  var LIGHT = v3norm([-0.45, -0.75, 0.5]);
+  function shadeBy(col, n, extra) {
+    var l = v3dot(n, LIGHT), f = (l > 0 ? l * 0.2 : l * 0.3) + (extra || 0);
+    return f >= 0 ? mixHex(col, "#FFFFFF", Math.min(0.8, f)) : mixHex(col, OUT, Math.min(0.8, -f));
+  }
+  // A solid: a footprint (x/z) pushed from y0 (top) down to y1, with an optional second footprint for the
+  // bottom (a cone or a lamp shade) and an optional move xf(p) -> p. It draws the faces you can see, shaded
+  // by the light, then a chunky outline. Returns the projected top and bottom outlines.
+  function solid(c, fp, y0, y1, col, o) {
+    o = o || {};
+    var n = fp.length, i, j, T = [], B = [], tp = [], bp = [], fp2 = o.fp2 || fp;
+    var cen = [0, 0, 0];
+    for (i = 0; i < n; i++) {
+      var t = [fp[i][0], y0, fp[i][1]], b = [fp2[i][0], y1, fp2[i][1]];
+      if (o.xf) { t = o.xf(t); b = o.xf(b); }
+      T.push(t); B.push(b);
+      tp.push(Pv(t)); bp.push(Pv(b));
+      cen[0] += t[0] + b[0]; cen[1] += t[1] + b[1]; cen[2] += t[2] + b[2];
+    }
+    cen = [cen[0] / (2 * n), cen[1] / (2 * n), cen[2] / (2 * n)];
+    var lw = o.lw == null ? 4 : o.lw;
+    var hl = hull(tp.concat(bp));
+    poly(c, hl); c.fillStyle = mixHex(col, OUT, 0.15); c.fill();
+    var norms = [];
+    for (i = 0; i < n; i++) {
+      j = (i + 1) % n;
+      var fc = [(T[i][0] + T[j][0] + B[i][0] + B[j][0]) / 4, (T[i][1] + T[j][1] + B[i][1] + B[j][1]) / 4, (T[i][2] + T[j][2] + B[i][2] + B[j][2]) / 4];
+      var nn = v3cross(v3sub(B[j], B[i]), v3sub(T[i], B[i]));
+      if (v3dot(nn, v3sub(fc, cen)) < 0) nn = [-nn[0], -nn[1], -nn[2]];
+      nn = v3norm(nn);
+      var vis = v3dot(nn, v3sub(EYE, fc)) > 0;
+      norms.push({ n: nn, vis: vis });
+      if (!vis) continue;
+      c.beginPath(); c.moveTo(bp[i].x, bp[i].y); c.lineTo(bp[j].x, bp[j].y); c.lineTo(tp[j].x, tp[j].y); c.lineTo(tp[i].x, tp[i].y); c.closePath();
+      c.fillStyle = shadeBy(col, nn, o.side); c.fill();
+      c.lineWidth = 0.8; c.strokeStyle = c.fillStyle; c.stroke();
+    }
+    var tc = [0, 0, 0], bc = [0, 0, 0];
+    for (i = 0; i < n; i++) { tc[0] += T[i][0] / n; tc[1] += T[i][1] / n; tc[2] += T[i][2] / n; bc[0] += B[i][0] / n; bc[1] += B[i][1] / n; bc[2] += B[i][2] / n; }
+    var up = v3norm(v3sub(tc, bc));
+    var topVis = v3dot(up, v3sub(EYE, tc)) > 0;
+    var cap = topVis ? tp : bp;
+    var capN = topVis ? up : [-up[0], -up[1], -up[2]];
+    if (!o.noCap) { poly(c, cap); c.fillStyle = o.capFill || shadeBy(col, capN, o.cap); c.fill(); }
+    if (lw) {
+      c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT;
+      c.lineWidth = lw * 0.5;
+      for (i = 0; i < n; i++) {
+        var na = norms[(i + n - 1) % n], nb = norms[i];
+        if (na.vis && nb.vis && v3dot(na.n, nb.n) < 0.75) { c.beginPath(); c.moveTo(bp[i].x, bp[i].y); c.lineTo(tp[i].x, tp[i].y); c.stroke(); }
+      }
+      if (!o.noCap) { poly(c, cap); c.lineWidth = lw * 0.65; c.stroke(); }
+      poly(c, hl); c.lineWidth = lw; c.stroke();
+    }
+    return { top: tp, bot: bp, hull: hl, topVis: topVis };
+  }
+  // Draw on a flat face: local (u, v) in world units along the unit vectors U and V from the 3D point O.
+  function planeXf(c, O, U, V, span) {
+    span = span || 40;
+    var p0 = Pv(O), pu = P(O[0] + U[0] * span, O[1] + U[1] * span, O[2] + U[2] * span), pv = P(O[0] + V[0] * span, O[1] + V[1] * span, O[2] + V[2] * span);
+    c.transform((pu.x - p0.x) / span, (pu.y - p0.y) / span, (pv.x - p0.x) / span, (pv.y - p0.y) / span, p0.x, p0.y);
+  }
+  var FRONT_U = [1, 0, 0], FRONT_V = [0, 1, 0];
+  // Draw along the spindle axis: local x across (world units), local y = world y, exact at y = ya and y = yb.
+  function axisXf(c, ya, yb) {
+    var A = P(0, ya, 0), Bp = P(0, yb, 0);
+    var sy = (Bp.y - A.y) / (yb - ya), kx = (A.k + Bp.k) / 2;
+    c.transform(kx, 0, 0, sy, A.x, A.y - ya * sy);
+  }
+  function axisPt(y) { return P(0, y, 0); }
+
+  // ---------- Background: pegboard wall ----------
   function buildBg() {
     bgCanvas.width = cv.width; bgCanvas.height = cv.height;
     var c = bgCanvas.getContext("2d");
     c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    var benchY = toScreen(0, 985).y;
     c.fillStyle = "#C9A877";
     c.fillRect(0, 0, CW, CH);
-    // Pegboard holes
     var step = Math.max(18, Math.min(30, CW / 34));
     c.fillStyle = "rgba(90,60,25,0.45)";
-    for (var y = step / 2; y < benchY; y += step) {
+    for (var y = step / 2; y < CH; y += step) {
       for (var x = step / 2; x < CW; x += step) {
         c.beginPath(); c.arc(x, y, Math.max(2, step * 0.11), 0, Math.PI * 2); c.fill();
       }
     }
-    // Bench top across the canvas below the machine
-    var bh = CH - benchY;
-    if (bh > 2) {
-      c.fillStyle = "#B7793F";
-      c.fillRect(0, benchY, CW, bh);
-      c.fillStyle = "#D99A55";
-      c.fillRect(0, benchY, CW, Math.min(bh, 10 * M.s + 4));
-      var rand = seeded(77);
-      c.strokeStyle = "rgba(110,60,20,0.35)";
-      c.lineWidth = 2;
-      for (var i = 0; i < 14; i++) {
-        var gy = benchY + 8 + rand() * (bh - 8);
-        c.beginPath(); c.moveTo(0, gy);
-        c.bezierCurveTo(CW * 0.3, gy + rand() * 8 - 4, CW * 0.6, gy + rand() * 8 - 4, CW, gy + rand() * 6 - 3);
-        c.stroke();
-      }
-      c.fillStyle = OUT;
-      c.fillRect(0, benchY - 1.5, CW, 3);
-    }
   }
 
   // ---------- Machine colours ----------
-  var YEL = "#F6B92B", YEL_D = "#C98A12", YEL_L = "#FFD873";
-  var DARK = "#3A3F4A", IRON = "#8E96A2", IRON_D = "#5E6672";
+  var YEL = "#F6B92B";
+  var DARK = "#3A3F4A";
 
-  function drawBase(c) {
-    // Base casting
+  var now = 0; // seconds, from requestAnimationFrame
+  function busy() { return Toybox.timer.locked(); }
+
+  // ---------- The machine parts ----------
+  function coverFP() {
+    var o = [], i, a;
+    for (i = 0; i <= 10; i++) { a = i / 10 * Math.PI; o.push([Math.cos(a) * COVER.hw, COVER.zf + Math.sin(a) * COVER.hw]); }
+    for (i = 0; i <= 10; i++) { a = Math.PI + i / 10 * Math.PI; o.push([Math.cos(a) * COVER.hw, COVER.zb + Math.sin(a) * COVER.hw]); }
+    return o;
+  }
+  // The half of a level ring that faces you (for fins and grooves on round parts).
+  function nearArc(cx, cz, r, y) {
+    var aE = Math.atan2(EYE[2] - cz, EYE[0] - cx), pts = [];
+    for (var i = 0; i <= 16; i++) { var a = aE - Math.PI / 2 + i / 16 * Math.PI; pts.push(P(cx + Math.cos(a) * r, y, cz + Math.sin(a) * r)); }
+    return pts;
+  }
+  function strokePts(c, pts) {
     c.beginPath();
-    c.moveTo(60, 930); c.lineTo(560, 930); c.lineTo(584, 986); c.lineTo(36, 986); c.closePath();
-    fs(c, vgrad(c, 930, 986, [[0, YEL_L], [0.25, YEL], [1, YEL_D]]), 5);
-    c.fillStyle = "rgba(29,35,64,0.55)";
-    rr(c, 250, 948, 110, 14, 7); c.fill();
-    rr(c, 400, 948, 110, 14, 7); c.fill();
-    // Bolt heads
-    [70, 548].forEach(function (x) {
-      c.beginPath(); c.arc(x, 968, 8, 0, Math.PI * 2); fs(c, "#B6BDC7", 3);
-    });
-    // Column flange
-    rr(c, 126, 900, 94, 32, 6); fs(c, vgrad(c, 900, 932, [[0, YEL_L], [1, YEL_D]]), 4);
+    pts.forEach(function (p, i) { if (i) c.lineTo(p.x, p.y); else c.moveTo(p.x, p.y); });
+    c.stroke();
   }
 
-  function drawColumn(c) {
-    c.beginPath(); c.rect(150, 270, 46, 634);
-    fs(c, steel(c, 150, 196), 4);
-    // Rack along the front of the column
-    c.beginPath(); c.rect(196, 360, 9, 530); fs(c, "#9AA2AE", 3);
-    c.strokeStyle = "rgba(29,35,64,0.6)"; c.lineWidth = 2;
-    for (var y = 368; y < 888; y += 9) { c.beginPath(); c.moveTo(197, y); c.lineTo(205, y); c.stroke(); }
-  }
-
-  function drawMotor(c, t) {
-    // Mount plate
-    rr(c, 100, 168, 52, 96, 6); fs(c, IRON_D, 4);
-    // Motor can with cooling fins
-    rr(c, 10, 140, 104, 150, 22);
-    fs(c, hgrad(c, 10, 114, [[0, "#3C424C"], [0.4, "#6C7380"], [1, "#3A3F49"]]), 5);
-    c.strokeStyle = "rgba(20,24,32,0.65)"; c.lineWidth = 3;
-    for (var y = 160; y < 280; y += 12) { c.beginPath(); c.moveTo(20, y); c.lineTo(104, y); c.stroke(); }
-    // End bell + fan cover
-    rr(c, 2, 286, 120, 20, 8); fs(c, "#2E333C", 4);
-    // Junction box
-    rr(c, 28, 186, 40, 44, 6); fs(c, "#555C68", 3);
-    // Motor shaft up into the belt cover
-    c.beginPath(); c.rect(56, 116, 14, 26); fs(c, steel(c, 56, 70), 3);
-    // Hum: little sound waves when running
+  function drawMotor(c) {
+    solid(c, circleFP(MOTOR.x, MOTOR.z, MOTOR.r, 28), MOTOR.y0, MOTOR.y1, "#5C6370", { lw: 4 });
+    c.strokeStyle = "rgba(20,24,32,0.5)"; c.lineWidth = 3; c.lineCap = "round";
+    for (var y = MOTOR.y0 + 24; y < MOTOR.y1 - 8; y += 15) strokePts(c, nearArc(MOTOR.x, MOTOR.z, MOTOR.r + 1, y));
+    solid(c, circleFP(MOTOR.x, MOTOR.z, MOTOR.r - 12, 24), MOTOR.y1, MOTOR.y1 + 18, "#3E444F", { lw: 3.5 });
+    // Hum: little sound waves beside the motor when it runs
     if (R.rpm > 30) {
-      var a = Math.min(1, R.rpm / 1500);
+      var a = Math.min(1, R.rpm / RPM), m = P(MOTOR.x + MOTOR.r + 20, (MOTOR.y0 + MOTOR.y1) / 2, MOTOR.z);
       c.strokeStyle = "rgba(29,35,64," + (0.25 + 0.35 * a).toFixed(2) + ")";
-      c.lineWidth = 4; c.lineCap = "round";
+      c.lineWidth = 4;
       for (var k = 0; k < 3; k++) {
-        var ph = ((t * 2.4 + k / 3) % 1);
-        var r0 = 20 + ph * 44;
+        var ph = ((now * 1.6 + k / 3) % 1);
         c.globalAlpha = 1 - ph;
-        c.beginPath(); c.arc(62, 215, r0, Math.PI * 0.72, Math.PI * 1.28); c.stroke();
+        c.beginPath(); c.arc(m.x, m.y, 14 + ph * 40, -0.6, 0.6); c.stroke();
       }
       c.globalAlpha = 1;
     }
   }
-
-  function headPath(c) {
-    c.beginPath();
-    c.moveTo(108, 118);
-    c.lineTo(474, 118);
-    c.quadraticCurveTo(508, 118, 508, 152);
-    c.lineTo(508, 300);
-    c.quadraticCurveTo(508, 330, 478, 330);
-    c.lineTo(262, 330);
-    c.lineTo(222, 292);
-    c.lineTo(108, 292);
-    c.closePath();
+  function drawColumn(c) {
+    solid(c, circleFP(0, COL.z, COL.r, 24), HEAD.y1 - 20, R.tableY + 900, "#C3CAD3", { lw: 4, side: 0.05 });
   }
   function drawHead(c) {
-    headPath(c);
-    fs(c, vgrad(c, 118, 330, [[0, YEL_L], [0.18, YEL], [1, YEL_D]]), 5);
-    // Panel line and quill boss
-    c.strokeStyle = "rgba(29,35,64,0.35)"; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(232, 136); c.lineTo(232, 300); c.stroke();
-    rr(c, 384, 316, 72, 30, 8); fs(c, vgrad(c, 316, 346, [[0, YEL], [1, YEL_D]]), 4);
-    // Head lock bolts on the column side
-    [150, 200].forEach(function (y) { c.beginPath(); c.arc(124, y + 40, 7, 0, Math.PI * 2); fs(c, "#B6BDC7", 3); });
-  }
-
-  // Step pulleys: 5 steps each. Motor pulley small on top, spindle pulley big on top.
-  var PUL_TOP = 80, PUL_STEP = 8;
-  function pulleyR(isMotor, i, scale) {
-    var r = isMotor ? 12 + i * 6 : 36 - i * 6;
-    return r * (scale || 1);
-  }
-  function drawPulleysSmall(c) {
-    var i, y, r;
-    for (i = 0; i < 5; i++) {
-      y = PUL_TOP + i * PUL_STEP;
-      r = pulleyR(true, i);
-      c.beginPath(); c.rect(63 - r, y, r * 2, PUL_STEP); fs(c, "#AEB5C0", 2);
-      r = pulleyR(false, i);
-      c.beginPath(); c.rect(X0 - r, y, r * 2, PUL_STEP); fs(c, "#AEB5C0", 2);
-    }
-    var bi = R.belt;
-    y = PUL_TOP + bi * PUL_STEP + 1;
-    c.beginPath(); c.rect(63 + pulleyR(true, bi) - 2, y, X0 - pulleyR(false, bi) - 63 - pulleyR(true, bi) + 4, PUL_STEP - 2);
-    fs(c, "#2B2B2B", 2);
-  }
-  function lidPath(c) {
-    c.beginPath();
-    c.moveTo(40, 124);
-    c.lineTo(40, 96);
-    c.quadraticCurveTo(40, 70, 70, 70);
-    c.lineTo(468, 70);
-    c.quadraticCurveTo(500, 70, 500, 100);
-    c.lineTo(500, 124);
-    c.closePath();
-  }
-  function drawLid(c) {
-    var ang = -R.lid * 0.24;
-    // Pulleys show when the lid lifts
-    if (R.lid > 0.02) {
-      c.save();
-      c.beginPath(); c.rect(36, 72, 470, 52); c.fillStyle = "#2E333C"; c.fill();
-      drawPulleysSmall(c);
+    solid(c, rrectFP(HEAD.x0, HEAD.z0, HEAD.x1, HEAD.z1, 30, 5), HEAD.y0, HEAD.y1, YEL, { lw: 5 });
+    // The rounded quill housing on the front
+    var fp = [], i, a;
+    for (i = 0; i <= 16; i++) { a = i / 16 * Math.PI; fp.push([Math.cos(a) * BOSS.r, Math.sin(a) * BOSS.r]); }
+    solid(c, fp, BOSS.y0, BOSS.y1, YEL, { lw: 5 });
+    // A few bolt heads on the side
+    [[HEAD.y0 + 26, -250], [HEAD.y1 - 26, -250]].forEach(function (b) {
+      c.save(); planeXf(c, [HEAD.x1, b[0], b[1]], [0, 0, 1], [0, 1, 0], 30);
+      c.beginPath(); c.arc(0, 0, 8, 0, Math.PI * 2); fs(c, "#B6BDC7", 3);
       c.restore();
-    }
-    c.save();
-    c.translate(40, 124); c.rotate(ang); c.translate(-40, -124);
-    lidPath(c);
-    fs(c, vgrad(c, 70, 124, [[0, YEL_L], [1, YEL]]), 5);
-    // Lid knob
-    c.beginPath(); c.arc(470, 82, 10, 0, Math.PI * 2); fs(c, DARK, 3);
-    if (R.flash.lid && R.flash.lid > now) {
-      c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      lidPath(c); c.lineWidth = 9; c.strokeStyle = "#FF6B2C"; c.stroke();
-      c.globalAlpha = 1;
-    }
-    if (R.lid < 0.5) {
-      rr(c, 190, 80, 170, 34, 10); fs(c, "#FFFFFF", 3);
-      label(c, "Tap for speed", 275, 98, 19, OUT);
-    }
-    c.restore();
+    });
+  }
+  function drawCover(c) {
+    var s = solid(c, coverFP(), COVER.y0, COVER.y1, "#FFC93C", { lw: 5 });
+    // a raised rib along the top and the knob at the front
+    c.strokeStyle = "rgba(29,35,64,0.25)"; c.lineWidth = 3;
+    strokePts(c, [P(-COVER.hw + 30, COVER.y0, COVER.zf), P(-COVER.hw + 30, COVER.y0, COVER.zb)]);
+    solid(c, circleFP(0, COVER.zf + 70, 13, 14), COVER.y0 - 12, COVER.y0, DARK, { lw: 3 });
+    return s;
   }
 
   function drawSwitch(c) {
-    var on = R.running;
-    rr(c, 500, 136, 58, 86, 10); fs(c, "#30353F", 4);
-    if (!on && !busy() && !R.auto) {
-      var pr = 13 * (1.9 + (reduce ? 0 : 0.35 * Math.sin(now * 5)));
-      c.beginPath(); c.arc(529, 160, pr, 0, Math.PI * 2); c.lineWidth = 5; c.strokeStyle = "rgba(255,201,60,0.95)"; c.stroke();
-    }
-    // Green ON button behind the paddle
-    c.beginPath(); c.arc(529, 160, 13, 0, Math.PI * 2); fs(c, on ? "#5BE37A" : "#2E9E5B", 3);
-    label(c, "I", 529, 161, 18, "#FFFFFF");
-    // Red paddle (STOP): pulled out when on
+    var on = R.running, cx = (SW.x0 + SW.x1) / 2;
+    solid(c, boxFP(SW.x0, -2, SW.x1, SW.z), SW.y0, SW.y1, "#3A3F4A", { lw: 4 });
     c.save();
-    c.translate(529, 200);
-    if (on) c.scale(1.18, 1.18);
-    rr(c, -30, -16, 60, 36, 10);
+    planeXf(c, [0, 0, SW.z], FRONT_U, FRONT_V, 60);
+    if (!on && !busy() && !R.swap) {
+      var pr = 14 * (1.85 + (reduce ? 0 : 0.35 * Math.sin(now * 5)));
+      c.beginPath(); c.arc(cx, SW.y0 + 25, pr, 0, Math.PI * 2); c.lineWidth = 5; c.strokeStyle = "rgba(255,201,60,0.95)"; c.stroke();
+    }
+    // Green ON button and the red paddle (STOP) under it, pulled out when on
+    c.beginPath(); c.arc(cx, SW.y0 + 25, 15, 0, Math.PI * 2); fs(c, on ? "#5BE37A" : "#2E9E5B", 3);
+    label(c, "I", cx, SW.y0 + 26, 19, "#FFFFFF");
+    c.save();
+    c.translate(cx, SW.y0 + 64);
+    if (on) c.scale(1.15, 1.15);
+    rr(c, -25, -16, 50, 32, 9);
     fs(c, on ? "#FF4D4D" : "#D7263D", 4);
-    label(c, "O", 0, 3, 22, "#FFFFFF");
+    label(c, "O", 0, 2, 21, "#FFFFFF");
     c.restore();
     if (R.flash.sw && R.flash.sw > now) {
       c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      rr(c, 492, 128, 74, 102, 14); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
+      rr(c, SW.x0 - 10, SW.y0 - 10, SW.x1 - SW.x0 + 20, SW.y1 - SW.y0 + 20, 14); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
       c.globalAlpha = 1;
     }
-    label(c, on ? "ON" : "OFF", 529, 240, 22, on ? "#127A3A" : OUT);
+    c.restore();
+    var a = P(SW.x0, SW.y0, SW.z), b = P(SW.x1, SW.y1, SW.z), g = P(cx, SW.y0 + 25, SW.z);
+    R.ui.sw = { x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y), x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y), btn: g };
   }
 
-  function drawLamp(c) {
-    // Gooseneck from the head front down to the lamp shade
-    c.lineCap = "round";
-    c.strokeStyle = OUT; c.lineWidth = 13;
-    c.beginPath(); c.moveTo(500, 300); c.bezierCurveTo(560, 300, 590, 340, 572, 388); c.stroke();
-    c.strokeStyle = "#7A828E"; c.lineWidth = 7;
-    c.stroke();
-    c.save();
-    c.translate(566, 398); c.rotate(0.55);
-    c.beginPath(); c.moveTo(-26, -6); c.lineTo(26, -6); c.lineTo(36, 22); c.lineTo(-36, 22); c.closePath();
-    fs(c, "#3A3F4A", 4);
-    c.beginPath(); c.ellipse(0, 22, 32, 7, 0, 0, Math.PI * 2);
-    fs(c, S.light ? "#FFF3B0" : "#9AA2AE", 3);
-    c.restore();
+  function bez3(p0, p1, p2, p3, t) {
+    var u = 1 - t;
+    return [0, 1, 2].map(function (i) { return u * u * u * p0[i] + 3 * u * u * t * p1[i] + 3 * u * t * t * p2[i] + t * t * t * p3[i]; });
   }
-  function drawLightCone(c) {
-    if (!S.light) return;
-    var top = R.tableY - matT(S.mat);
+  function drawLamp(c) {
+    var p0 = [-104, 294, -4], p1 = [-196, 286, 22], p2 = [-214, 314, 62], p3 = [LAMP.x, LAMP.y - 8, LAMP.z], pts = [];
+    for (var i = 0; i <= 16; i++) pts.push(Pv(bez3(p0, p1, p2, p3, i / 16)));
+    c.lineCap = "round"; c.lineJoin = "round";
+    c.strokeStyle = OUT; c.lineWidth = 14; strokePts(c, pts);
+    c.strokeStyle = "#8A929E"; c.lineWidth = 8; strokePts(c, pts);
+    c.save(); planeXf(c, [-104, 290, 0], FRONT_U, FRONT_V, 30);
+    c.beginPath(); c.arc(0, 0, 11, 0, Math.PI * 2); fs(c, DARK, 3);
+    c.restore();
+    solid(c, circleFP(LAMP.x, LAMP.z, 14, 18), LAMP.y - 12, LAMP.y + 20, "#3A3F4A", { fp2: circleFP(LAMP.x, LAMP.z, 33, 18), lw: 3.5 });
+    // the lit rim of the shade
+    c.strokeStyle = "#FFE680"; c.lineWidth = 4;
+    strokePts(c, nearArc(LAMP.x, LAMP.z, 31, LAMP.y + 20));
+  }
+  // Warm light from the lamp on the board (drawn over everything, added light).
+  function drawLight(c) {
+    var top = boardTopW(), cx = -40, cz = 30, rp = 170, i, a, pts = [];
+    for (i = 0; i < 16; i++) { a = i / 16 * Math.PI * 2; pts.push(P(LAMP.x + Math.cos(a) * 30, LAMP.y + 20, LAMP.z + Math.sin(a) * 30)); }
+    var pool = [];
+    for (i = 0; i < 24; i++) { a = i / 24 * Math.PI * 2; pool.push(P(cx + Math.cos(a) * rp, top, cz + Math.sin(a) * rp * 0.8)); }
+    var l0 = P(LAMP.x, LAMP.y + 20, LAMP.z), l1 = P(cx, top, cz);
     c.save();
     c.globalCompositeOperation = "lighter";
-    var g = c.createRadialGradient(560, 410, 10, 470, top, 220);
-    g.addColorStop(0, "rgba(255,240,170,0.42)");
-    g.addColorStop(1, "rgba(255,240,170,0)");
-    c.fillStyle = g;
-    c.beginPath(); c.moveTo(540, 405); c.lineTo(590, 420); c.lineTo(560, top + 4); c.lineTo(300, top + 4); c.closePath();
-    c.fill();
+    poly(c, hull(pts.concat(pool)));
+    var g = c.createLinearGradient(l0.x, l0.y, l1.x, l1.y);
+    g.addColorStop(0, "rgba(255,240,170,0.32)"); g.addColorStop(1, "rgba(255,240,170,0.05)");
+    c.fillStyle = g; c.fill();
     c.restore();
   }
 
-  // Table, arm, collar and crank. Top surface at R.tableY.
-  function drawTable(c) {
-    var ty = R.tableY;
-    // Collar around the column
-    rr(c, 138, ty + 22, 76, 64, 10); fs(c, vgrad(c, ty + 22, ty + 86, [[0, YEL_L], [1, YEL_D]]), 4);
-    // Arm out to the table
-    c.beginPath();
-    c.moveTo(210, ty + 36); c.lineTo(392, ty + 26); c.lineTo(392, ty + 58); c.lineTo(210, ty + 72); c.closePath();
-    fs(c, YEL, 4);
-    // Tilt boss and bevel scale under the table
-    c.beginPath(); c.arc(420, ty + 40, 30, Math.PI, 0); c.closePath(); fs(c, YEL_D, 4);
-    c.strokeStyle = OUT; c.lineWidth = 2;
-    for (var k = -4; k <= 4; k++) {
-      var a = -Math.PI / 2 + k * 0.28;
-      c.beginPath(); c.moveTo(420 + Math.cos(a) * 20, ty + 40 + Math.sin(a) * 20); c.lineTo(420 + Math.cos(a) * 27, ty + 40 + Math.sin(a) * 27); c.stroke();
+  // Feed handles: three spokes on a hub on the right of the head, splayed out a little, knobs toward you.
+  function spokeBase() { return SPOKE_A0 + R.spokeT * SPOKE_RANGE; }
+  function knobPts(base) {
+    var res = [], root = [HUB.x + HUB.w, HUB.y, HUB.z], sS = Math.sin(SPLAY), cS = Math.cos(SPLAY);
+    for (var i = 0; i < 3; i++) {
+      var a = base + i * 2 * Math.PI / 3;
+      var d = [sS, cS * Math.sin(a), cS * Math.cos(a)];
+      var e = [root[0] + d[0] * SPOKE_L, root[1] + d[1] * SPOKE_L, root[2] + d[2] * SPOKE_L];
+      res.push({ i: i, a: a, w: e, p: Pv(e), depth: v3dot(v3sub(e, EYE), FX) });
     }
-    // Table top (cast iron) with T-slot ends
-    c.beginPath(); c.rect(250, ty, 342, 26);
-    fs(c, vgrad(c, ty, ty + 26, [[0, "#C3C9D2"], [0.3, IRON], [1, IRON_D]]), 4);
-    c.fillStyle = "#2E333C";
-    [300, 380, 460, 540].forEach(function (x) { c.fillRect(x - 5, ty + 4, 10, 12); });
-    // Crank on the collar
-    var hx = 124, hy = ty + 58;
-    c.beginPath(); c.arc(hx, hy, 12, 0, Math.PI * 2); fs(c, DARK, 3);
-    var ex = hx + Math.cos(R.crank) * 34, ey = hy + Math.sin(R.crank) * 34;
-    c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = 11;
-    c.beginPath(); c.moveTo(hx, hy); c.lineTo(ex, ey); c.stroke();
-    c.strokeStyle = "#C3C9D2"; c.lineWidth = 6; c.stroke();
-    c.beginPath(); c.arc(ex, ey, 11, 0, Math.PI * 2); fs(c, "#E63946", 3);
-    // Lock handle
-    c.strokeStyle = OUT; c.lineWidth = 6;
-    c.beginPath(); c.moveTo(176, ty + 86); c.lineTo(176, ty + 108); c.stroke();
-    c.beginPath(); c.arc(176, ty + 110, 7, 0, Math.PI * 2); fs(c, DARK, 2);
+    return res;
   }
-
-  // Feed hub with depth-stop dial and three spokes.
-  var HUB = { x: 300, y: 252 };
-  var SPOKE_L = 124;
-  var DIAL_A0 = -0.75 * Math.PI, DIAL_RANGE = 1.5 * Math.PI, DIAL_MAX = 50;
-  function dialAng(mm) { return DIAL_A0 + clamp(mm, 0, DIAL_MAX) / DIAL_MAX * DIAL_RANGE; }
-  function spokeAng() { return -0.35 + R.spokeOff; }
-  function drawFeed(c, penMM) {
-    var i, a, x, y;
-    // Dial ring
-    c.beginPath(); c.arc(HUB.x, HUB.y, 60, 0, Math.PI * 2); fs(c, "#FFFFFF", 4);
-    c.strokeStyle = OUT;
-    for (i = 0; i <= 50; i += 5) {
-      a = dialAng(i) - Math.PI / 2;
-      c.lineWidth = i % 10 === 0 ? 3 : 2;
-      c.beginPath();
-      c.moveTo(HUB.x + Math.cos(a) * (i % 10 === 0 ? 46 : 51), HUB.y + Math.sin(a) * (i % 10 === 0 ? 46 : 51));
-      c.lineTo(HUB.x + Math.cos(a) * 57, HUB.y + Math.sin(a) * 57);
-      c.stroke();
+  function drawFeed(c) {
+    var ks = knobPts(spokeBase()), root = P(HUB.x + HUB.w, HUB.y, HUB.z);
+    var hubDepth = v3dot(v3sub([HUB.x + HUB.w, HUB.y, HUB.z], EYE), FX);
+    ks.sort(function (a, b) { return b.depth - a.depth; });
+    function spoke(kn) {
+      var k = kn.p.k;
+      c.lineCap = "round";
+      c.strokeStyle = OUT; c.lineWidth = 15 * k;
+      c.beginPath(); c.moveTo(root.x, root.y); c.lineTo(kn.p.x, kn.p.y); c.stroke();
+      c.strokeStyle = "#D6DBE2"; c.lineWidth = 8 * k; c.stroke();
+      var r = 20 * k;
+      c.beginPath(); c.arc(kn.p.x, kn.p.y, r, 0, Math.PI * 2);
+      var g = c.createRadialGradient(kn.p.x - r * 0.35, kn.p.y - r * 0.35, r * 0.1, kn.p.x, kn.p.y, r);
+      g.addColorStop(0, "#6A707C"); g.addColorStop(1, "#1F2228");
+      fs(c, g, 3.5);
     }
-    // Black needle: how deep the bit is now
-    a = dialAng(penMM) - Math.PI / 2;
-    c.lineCap = "round";
-    c.strokeStyle = OUT; c.lineWidth = 4;
-    c.beginPath(); c.moveTo(HUB.x, HUB.y); c.lineTo(HUB.x + Math.cos(a) * 54, HUB.y + Math.sin(a) * 54); c.stroke();
-    // Red depth stop
-    a = dialAng(S.depth) - Math.PI / 2;
-    x = HUB.x + Math.cos(a) * 66; y = HUB.y + Math.sin(a) * 66;
-    c.save(); c.translate(x, y); c.rotate(a + Math.PI / 2);
-    c.beginPath(); c.moveTo(0, 12); c.lineTo(-13, -10); c.lineTo(13, -10); c.closePath();
-    fs(c, "#E63946", 3);
-    c.restore();
-    if (R.flash.dial && R.flash.dial > now) {
-      c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      c.beginPath(); c.arc(HUB.x, HUB.y, 70, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
-      c.globalAlpha = 1;
-    }
-    // Spokes
-    var sa = spokeAng();
-    for (i = 0; i < 3; i++) {
-      a = sa + i * 2 * Math.PI / 3;
-      x = HUB.x + Math.cos(a) * SPOKE_L; y = HUB.y + Math.sin(a) * SPOKE_L;
-      c.strokeStyle = OUT; c.lineWidth = 13;
-      c.beginPath(); c.moveTo(HUB.x, HUB.y); c.lineTo(x, y); c.stroke();
-      c.strokeStyle = "#D6DBE2"; c.lineWidth = 7; c.stroke();
-      c.beginPath(); c.arc(x, y, 17, 0, Math.PI * 2); fs(c, "#26282E", 3);
-      c.beginPath(); c.arc(x - 5, y - 5, 5, 0, Math.PI * 2); c.fillStyle = "rgba(255,255,255,0.45)"; c.fill();
-    }
-    c.beginPath(); c.arc(HUB.x, HUB.y, 20, 0, Math.PI * 2); fs(c, "#B6BDC7", 4);
-    c.beginPath(); c.arc(HUB.x, HUB.y, 7, 0, Math.PI * 2); fs(c, DARK, 0);
+    ks.forEach(function (kn) { if (kn.depth >= hubDepth) spoke(kn); });
+    solid(c, circleFP(0, 0, HUB.r, 20), -HUB.w, 0, "#B6BDC7", { lw: 4, xf: function (p) { return [HUB.x - p[1], HUB.y + p[0], HUB.z + p[2]]; } });
+    ks.forEach(function (kn) { if (kn.depth < hubDepth) spoke(kn); });
+    c.beginPath(); c.arc(root.x, root.y, 7, 0, Math.PI * 2); c.fillStyle = DARK; c.fill();
     if (R.flash.feed && R.flash.feed > now) {
       c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      c.beginPath(); c.arc(HUB.x, HUB.y, SPOKE_L + 20, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
+      ks.forEach(function (kn) { c.beginPath(); c.arc(kn.p.x, kn.p.y, 34 * kn.p.k, 0, Math.PI * 2); c.lineWidth = 7; c.strokeStyle = "#FF6B2C"; c.stroke(); });
       c.globalAlpha = 1;
     }
+    R.ui.knobs = ks; R.ui.root = root;
   }
 
-  // Chuck geometry for the current quill position.
+  // ---------- Quill, chuck and bit ----------
   function chuckTop() { return 346 + R.q; }
   function bitTop() { return chuckTop() + 40; }
-  function curBit() { return S.chuck ? { id: S.chuck.id, mm: BITS[S.chuck.id].sizes[S.chuck.si][0], len: BITS[S.chuck.id].len } : null; }
-  function tipY() { var b = curBit(); return b ? bitTop() + b.len - bitDrop() : chuckTop() + 74; }
-  // A loose bit slides down a little in open jaws.
+  function curBit() { return S.chuck && BITS[S.chuck.id] ? { id: S.chuck.id, mm: BITS[S.chuck.id].mm, len: BITS[S.chuck.id].len } : null; }
   function bitDrop() { return R.jaw > 0.55 ? (R.jaw - 0.55) * 22 : 0; }
-  function keyhole() { return { x: X0 + 14, y: chuckTop() + 34 }; }
+  function tipY() { var b = curBit(); return b ? bitTop() + b.len - bitDrop() : chuckTop() + 74; }
 
   function drawQuill(c) {
     var yc = chuckTop();
-    c.beginPath(); c.rect(X0 - 22, 320, 44, yc - 318);
-    fs(c, steel(c, X0 - 22, X0 + 22), 4);
+    c.save(); axisXf(c, QUILL_Y, yc + 2);
+    c.beginPath(); c.rect(-22, QUILL_Y, 44, yc - QUILL_Y + 2);
+    fs(c, steel(c, -22, 22), 4);
+    c.restore();
   }
   function drawChuck(c) {
     var yc = chuckTop(), i;
-    var spin = R.phase;
+    c.save(); axisXf(c, yc, yc + 66);
     // Arbor cone
-    c.beginPath(); c.moveTo(X0 - 16, yc - 2); c.lineTo(X0 + 16, yc - 2); c.lineTo(X0 + 26, yc + 10); c.lineTo(X0 - 26, yc + 10); c.closePath();
-    fs(c, steel(c, X0 - 26, X0 + 26), 3);
-    // Sleeve with bevel gear teeth
-    rr(c, X0 - 31, yc + 8, 62, 46, 6);
-    fs(c, steel(c, X0 - 31, X0 + 31), 4);
+    c.beginPath(); c.moveTo(-16, yc - 2); c.lineTo(16, yc - 2); c.lineTo(26, yc + 10); c.lineTo(-26, yc + 10); c.closePath();
+    fs(c, steel(c, -26, 26), 3);
+    // Sleeve with knurled grip that spins
+    rr(c, -31, yc + 8, 62, 46, 6);
+    fs(c, steel(c, -31, 31), 4);
     c.save();
-    rr(c, X0 - 31, yc + 8, 62, 46, 6); c.clip();
+    rr(c, -31, yc + 8, 62, 46, 6); c.clip();
     c.fillStyle = "rgba(29,35,64,0.55)";
     for (i = 0; i < 14; i++) {
-      var u = ((i / 14 + spin / (2 * Math.PI)) % 1);
-      var xx = X0 - Math.cos(u * Math.PI) * 31;
+      var u = ((i / 14 + R.phase / (2 * Math.PI)) % 1);
+      var xx = -Math.cos(u * Math.PI) * 31;
       var w = Math.max(1, Math.sin(u * Math.PI) * 5);
       c.fillRect(xx - w / 2, yc + 8, w, 10);
       c.fillRect(xx - w / 3, yc + 24, w * 0.66, 26);
     }
     if (R.rpm > 200) {
-      c.fillStyle = "rgba(220,226,234," + Math.min(0.75, R.rpm / 3000).toFixed(2) + ")";
-      c.fillRect(X0 - 31, yc + 8, 62, 46);
+      c.fillStyle = "rgba(220,226,234," + Math.min(0.75, R.rpm / 2400).toFixed(2) + ")";
+      c.fillRect(-31, yc + 8, 62, 46);
     }
     c.restore();
     c.strokeStyle = OUT; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(X0 - 31, yc + 19); c.lineTo(X0 + 31, yc + 19); c.stroke();
-    // Key hole
-    var kh = keyhole();
-    c.beginPath(); c.arc(kh.x, kh.y, 5, 0, Math.PI * 2); fs(c, "#1D2340", 0);
+    c.beginPath(); c.moveTo(-31, yc + 19); c.lineTo(31, yc + 19); c.stroke();
     // Nose
-    c.beginPath(); c.moveTo(X0 - 31, yc + 54); c.lineTo(X0 + 31, yc + 54); c.lineTo(X0 + 20, yc + 66); c.lineTo(X0 - 20, yc + 66); c.closePath();
-    fs(c, steel(c, X0 - 31, X0 + 31), 3);
+    c.beginPath(); c.moveTo(-31, yc + 54); c.lineTo(31, yc + 54); c.lineTo(20, yc + 66); c.lineTo(-20, yc + 66); c.closePath();
+    fs(c, steel(c, -31, 31), 3);
     // Jaws: open = pulled up and spread
     var b = curBit();
     var shank = b ? shankMM(b.id, b.mm) * DS : 6;
@@ -841,86 +798,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var jy = yc + 64 - R.jaw * 6;
     [-1, 1].forEach(function (sd) {
       c.beginPath();
-      var xi = X0 + sd * gap / 2;
-      c.moveTo(xi, jy + 12);
-      c.lineTo(xi + sd * 9, jy + 12);
-      c.lineTo(xi + sd * 13, jy - 4);
-      c.lineTo(xi + sd * 2, jy - 4);
+      var xi = sd * gap / 2;
+      c.moveTo(xi, jy + 12); c.lineTo(xi + sd * 9, jy + 12); c.lineTo(xi + sd * 13, jy - 4); c.lineTo(xi + sd * 2, jy - 4);
       c.closePath();
       fs(c, "#9AA2AE", 3);
     });
-  }
-
-  // The chuck key: T-handle. Where it is depends on R.key.
-  function drawKeySide(c, x, y, rot) {
-    // Side profile of the key (used in the holder and while dragging); (x,y) = T-bar centre.
-    c.save(); c.translate(x, y); c.rotate(rot || 0);
-    c.lineCap = "round";
-    c.strokeStyle = OUT; c.lineWidth = 12;
-    c.beginPath(); c.moveTo(-34, 0); c.lineTo(34, 0); c.moveTo(0, 0); c.lineTo(0, 54); c.stroke();
-    c.strokeStyle = "#E63946"; c.lineWidth = 7;
-    c.beginPath(); c.moveTo(-32, 0); c.lineTo(32, 0); c.stroke();
-    c.strokeStyle = "#C3C9D2"; c.lineWidth = 6;
-    c.beginPath(); c.moveTo(0, 6); c.lineTo(0, 46); c.stroke();
-    // pilot and gear teeth
-    c.fillStyle = "#AEB5C0";
-    c.beginPath(); c.rect(-8, 44, 16, 9); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
     c.restore();
-  }
-  function drawKeyInChuck(c) {
-    // Shaft points at you; the T-bar turns around the key hole.
-    var kh = keyhole();
-    c.save(); c.translate(kh.x, kh.y); c.rotate(R.keyAng);
-    c.lineCap = "round";
-    c.strokeStyle = OUT; c.lineWidth = 16;
-    c.beginPath(); c.moveTo(-46, 0); c.lineTo(46, 0); c.stroke();
-    c.strokeStyle = "#E63946"; c.lineWidth = 10; c.stroke();
-    c.beginPath(); c.arc(0, 0, 10, 0, Math.PI * 2); fs(c, "#C3C9D2", 3);
-    // grip marks
-    c.fillStyle = "#FFFFFF";
-    c.beginPath(); c.arc(38, 0, 3.5, 0, Math.PI * 2); c.fill();
-    c.restore();
-  }
-  function drawKeyHolder(c) {
-    rr(c, 128, 392, 22, 14, 3); fs(c, DARK, 3);
-    c.strokeStyle = OUT; c.lineWidth = 4;
-    c.beginPath(); c.moveTo(130, 406); c.lineTo(122, 420); c.stroke();
-  }
-  var KEY_HOME = { x: 112, y: 436 };
-
-  // F-clamp holding the board to the table, on whichever board edge is farther from the bit.
-  function drawClamp(c, boardLeft, boardRight, top) {
-    var ty = R.tableY;
-    var sideRight = R.clampSide > 0;
-    var bx = sideRight ? boardRight + 10 : boardLeft - 10;
-    var dir = sideRight ? -1 : 1;
-    var padX = bx + dir * 30;
-    var cl = R.clampT;
-    // Bar
-    c.beginPath(); c.rect(bx - 5, top - 34, 10, ty + 92 - (top - 34)); fs(c, steel(c, bx - 5, bx + 5), 3);
-    // Top jaw resting on the board
-    c.beginPath(); c.moveTo(bx, top - 34); c.lineTo(padX, top - 34); c.lineTo(padX, top - 10); c.lineTo(bx, top - 18); c.closePath();
-    fs(c, "#FF8A3D", 4);
-    rr(c, padX - 10, top - 10, 20, 10, 3); fs(c, "#26282E", 2);
-    // Lower jaw, screw and handle under the table
-    var jy = ty + 48;
-    c.beginPath(); c.moveTo(bx, jy); c.lineTo(padX + dir * -2, jy); c.lineTo(padX, jy + 14); c.lineTo(bx, jy + 18); c.closePath();
-    fs(c, "#FF8A3D", 4);
-    var padY = ty + 26 + (1 - cl) * 14;
-    c.beginPath(); c.rect(padX - 3, padY, 6, jy - padY); fs(c, "#C3C9D2", 2);
-    rr(c, padX - 10, padY, 20, 7, 2); fs(c, "#26282E", 2);
-    // Handle (drag it)
-    var hy = jy + 14;
-    rr(c, padX - 11, hy, 22, 50, 9);
-    fs(c, cl > 0.5 ? "#2E9E5B" : "#FFC93C", 4);
-    c.strokeStyle = "rgba(29,35,64,0.45)"; c.lineWidth = 2;
-    for (var k = 0; k < 4; k++) { c.beginPath(); c.moveTo(padX - 8, hy + 12 + k * 9); c.lineTo(padX + 8, hy + 12 + k * 9); c.stroke(); }
-    R.clampHandle = { x: padX, y: hy + 25 };
-    if (R.flash.clamp && R.flash.clamp > now) {
-      c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      c.beginPath(); c.arc(padX, hy + 25, 40, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
-      c.globalAlpha = 1;
-    }
   }
 
   // ---------- Bits ----------
@@ -945,23 +828,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     c.fillStyle = dark;
     for (var y = y0 - pitch * 2 + off; y < y1 + pitch; y += pitch) {
       c.beginPath();
-      c.moveTo(cx - w / 2, y);
-      c.lineTo(cx + w / 2, y - sl);
-      c.lineTo(cx + w / 2, y - sl + pitch * 0.42);
-      c.lineTo(cx - w / 2, y + pitch * 0.42);
-      c.closePath();
-      c.fill();
+      c.moveTo(cx - w / 2, y); c.lineTo(cx + w / 2, y - sl); c.lineTo(cx + w / 2, y - sl + pitch * 0.42); c.lineTo(cx - w / 2, y + pitch * 0.42);
+      c.closePath(); c.fill();
     }
     c.restore();
     c.beginPath(); c.rect(cx - w / 2, y0, w, y1 - y0); fs(c, null, 2.5);
-  }
-  function mixHex(a, b, t) {
-    var x = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
-    var y = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
-    return "#" + [0, 1, 2].map(function (k) {
-      var v = Math.round(x[k] + (y[k] - x[k]) * t);
-      return (v < 16 ? "0" : "") + v.toString(16);
-    }).join("");
   }
   function blurEnvelope(c, cx, y0, y1, w, blur) {
     if (blur <= 0.05) return;
@@ -971,7 +842,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     c.fillStyle = "#E3E8EF"; c.fill();
     c.restore();
   }
-
   function drawBit(c, id, mm, cx, top, len, phase, blur) {
     var bd = BITS[id];
     var d = mm * DS;
@@ -979,45 +849,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var tip = top + len;
     var k, y, w;
     c.lineJoin = "round";
-    if (id === "twist" || id === "brad" || id === "masonry") {
-      var sEnd = top + len * (id === "masonry" ? 0.36 : 0.4);
-      var tipH = id === "brad" ? d * 0.18 : d * 0.32;
-      var bodyEnd = tip - tipH;
-      shankRect(c, cx, top, sEnd, id === "masonry" ? d * 0.95 : d, false, id === "masonry" ? "#C9CED6" : null);
+    if (id === "twist") {
+      var sEnd = top + len * 0.4, tipH = d * 0.32, bodyEnd = tip - tipH;
+      shankRect(c, cx, top, sEnd, d, false, null);
       blurEnvelope(c, cx, sEnd, tip, d, blur);
-      var bw = id === "masonry" ? d * 0.92 : d;
-      flutes(c, cx, sEnd, bodyEnd, bw, Math.max(10, d * (id === "masonry" ? 2.2 : 1.6)), phase, bd.metal, id === "masonry" ? "#30353F" : "rgba(40,46,58,0.75)", 0.7);
-      if (id === "twist") {
-        c.beginPath(); c.moveTo(cx - d / 2, bodyEnd); c.lineTo(cx + d / 2, bodyEnd); c.lineTo(cx, tip); c.closePath();
-        fs(c, "#B9C0CB", 2.5);
-      } else if (id === "brad") {
-        // W-shaped tip: outer spurs and a centre brad point
-        c.beginPath();
-        c.moveTo(cx - d / 2, bodyEnd);
-        c.lineTo(cx + d / 2, bodyEnd);
-        c.lineTo(cx + d / 2 - 1, bodyEnd + tipH * 0.9);
-        c.lineTo(cx + d * 0.22, bodyEnd + tipH * 0.25);
-        c.lineTo(cx + d * 0.09, bodyEnd + tipH * 0.4);
-        c.lineTo(cx, tip + d * 0.22);
-        c.lineTo(cx - d * 0.09, bodyEnd + tipH * 0.4);
-        c.lineTo(cx - d * 0.22, bodyEnd + tipH * 0.25);
-        c.lineTo(cx - d / 2 + 1, bodyEnd + tipH * 0.9);
-        c.closePath();
-        fs(c, "#D9DDE3", 2.5);
-      } else {
-        // Carbide tip: wider arrowhead brazed on
-        var tw = d * 1.12;
-        c.beginPath();
-        c.moveTo(cx - tw / 2, bodyEnd - d * 0.35);
-        c.lineTo(cx + tw / 2, bodyEnd - d * 0.35);
-        c.lineTo(cx + tw / 2, bodyEnd);
-        c.lineTo(cx, tip);
-        c.lineTo(cx - tw / 2, bodyEnd);
-        c.closePath();
-        fs(c, "#E4E7EC", 2.5);
-        c.strokeStyle = "#D9A441"; c.lineWidth = 2;
-        c.beginPath(); c.moveTo(cx - tw / 2 + 1, bodyEnd - d * 0.35); c.lineTo(cx + tw / 2 - 1, bodyEnd - d * 0.35); c.stroke();
-      }
+      flutes(c, cx, sEnd, bodyEnd, d, Math.max(10, d * 1.6), phase, bd.metal, "rgba(40,46,58,0.75)", 0.7);
+      c.beginPath(); c.moveTo(cx - d / 2, bodyEnd); c.lineTo(cx + d / 2, bodyEnd); c.lineTo(cx, tip); c.closePath();
+      fs(c, "#B9C0CB", 2.5);
       return;
     }
     if (id === "spade") {
@@ -1027,27 +865,15 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var fore = Math.max(0.14, Math.abs(Math.cos(phase)));
       if (blur > 0.05) { c.save(); c.globalAlpha = Math.min(0.5, blur * 0.55); rr(c, cx - d / 2, pTop, d, pBot - pTop + 6, 3); c.fillStyle = "#E3E8EF"; c.fill(); c.restore(); }
       w = d * fore;
-      // neck
       c.beginPath(); c.moveTo(cx - sw / 2, sE); c.lineTo(cx + sw / 2, sE); c.lineTo(cx + Math.max(sw / 2, w / 2), pTop); c.lineTo(cx - Math.max(sw / 2, w / 2), pTop); c.closePath();
       fs(c, "#B9C0CB", 2.5);
-      // paddle with pointed shoulders and the centre spur
       c.beginPath();
-      c.moveTo(cx - w / 2, pTop);
-      c.lineTo(cx + w / 2, pTop);
-      c.lineTo(cx + w / 2, pBot + 4);
-      c.lineTo(cx + w * 0.38, pBot - 3);
-      c.lineTo(cx + w * 0.1, pBot);
-      c.lineTo(cx + Math.max(1.5, w * 0.06), tip - 2);
-      c.lineTo(cx, tip);
-      c.lineTo(cx - Math.max(1.5, w * 0.06), tip - 2);
-      c.lineTo(cx - w * 0.1, pBot);
-      c.lineTo(cx - w * 0.38, pBot - 3);
-      c.lineTo(cx - w / 2, pBot + 4);
+      c.moveTo(cx - w / 2, pTop); c.lineTo(cx + w / 2, pTop); c.lineTo(cx + w / 2, pBot + 4); c.lineTo(cx + w * 0.38, pBot - 3);
+      c.lineTo(cx + w * 0.1, pBot); c.lineTo(cx + Math.max(1.5, w * 0.06), tip - 2); c.lineTo(cx, tip); c.lineTo(cx - Math.max(1.5, w * 0.06), tip - 2);
+      c.lineTo(cx - w * 0.1, pBot); c.lineTo(cx - w * 0.38, pBot - 3); c.lineTo(cx - w / 2, pBot + 4);
       c.closePath();
       fs(c, hgrad(c, cx - w / 2, cx + w / 2, [[0, "#9AA2AE"], [0.45, "#EEF1F5"], [1, "#8C95A2"]]), 2.5);
-      if (fore > 0.35) {
-        c.beginPath(); c.ellipse(cx, pTop + (pBot - pTop) * 0.32, Math.max(1.5, w * 0.12), 4, 0, 0, Math.PI * 2); fs(c, "#3A3F4A", 1.5);
-      }
+      if (fore > 0.35) { c.beginPath(); c.ellipse(cx, pTop + (pBot - pTop) * 0.32, Math.max(1.5, w * 0.12), 4, 0, 0, Math.PI * 2); fs(c, "#3A3F4A", 1.5); }
       return;
     }
     if (id === "forstner") {
@@ -1055,13 +881,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       shankRect(c, cx, top, fE, sw, false);
       var hTop = top + len * 0.66, hBot = tip - 4;
       blurEnvelope(c, cx, hTop, hBot, d, blur);
-      // neck
       c.beginPath(); c.moveTo(cx - sw / 2, fE); c.lineTo(cx + sw / 2, fE); c.lineTo(cx + d * 0.3, hTop); c.lineTo(cx - d * 0.3, hTop); c.closePath();
       fs(c, "#AEB5C0", 2.5);
-      // rim cylinder
       rr(c, cx - d / 2, hTop, d, hBot - hTop, 3);
       fs(c, hgrad(c, cx - d / 2, cx + d / 2, [[0, "#6E7683"], [0.4, "#E1E5EB"], [1, "#5D6470"]]), 2.5);
-      // chip lifter windows sliding round
       c.save(); rr(c, cx - d / 2, hTop, d, hBot - hTop, 3); c.clip();
       for (k = 0; k < 2; k++) {
         var u = ((phase / (2 * Math.PI) + k * 0.5) % 1 + 1) % 1;
@@ -1072,14 +895,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         }
       }
       c.restore();
-      // rim teeth (fine saw rim)
       c.fillStyle = "#DDE2E8";
       var n = Math.max(6, Math.round(d / 6));
       for (k = 0; k < n; k++) {
         var tx = cx - d / 2 + (((k + phase / (2 * Math.PI) * n) % n + n) % n) / n * d;
         c.beginPath(); c.moveTo(tx, hBot); c.lineTo(tx + d / n * 0.7, hBot); c.lineTo(tx + 1, hBot + 3); c.closePath(); c.fill();
       }
-      // centre brad point
       c.beginPath(); c.moveTo(cx - 3, hBot); c.lineTo(cx + 3, hBot); c.lineTo(cx, tip); c.closePath(); fs(c, "#DDE2E8", 2);
       return;
     }
@@ -1087,23 +908,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var aE = top + len * 0.34;
       shankRect(c, cx, top, aE, sw, true);
       var cupTop = top + len * 0.44, cupBot = tip - 14;
-      // arbor flange + drive pins
       rr(c, cx - 14, aE, 28, cupTop - aE, 3); fs(c, "#C3C9D2", 2.5);
-      // pilot drill (twist) poking out below
       flutes(c, cx, cupBot - 6, tip - 4, 6.35 * DS * 0.9, 10, phase, "#C8CDD6", "rgba(40,46,58,0.75)", 0.7);
       c.beginPath(); c.moveTo(cx - 5, tip - 4); c.lineTo(cx + 5, tip - 4); c.lineTo(cx, tip); c.closePath(); fs(c, "#B9C0CB", 2);
       blurEnvelope(c, cx, cupTop, cupBot + 4, d, blur);
-      // cup
       rr(c, cx - d / 2, cupTop, d, cupBot - cupTop, 4);
       fs(c, hgrad(c, cx - d / 2, cx + d / 2, [[0, "#B9470F"], [0.4, "#FF8A3D"], [1, "#A9400D"]]), 3);
-      // slug stuck in the saw
-      if (R.sawSlug && S.chuck && S.chuck.id === "holesaw" && Math.abs(top - bitTop() + bitDrop()) < 0.1) {
-        c.save(); c.globalAlpha = 0.95;
-        rr(c, cx - d / 2 + 4, cupBot - R.sawSlug.h, d - 8, R.sawSlug.h - 1, 2);
-        fs(c, MATS[R.sawSlug.mat].col, 2);
-        c.restore();
-      }
-      // side slots sliding round
       c.save(); rr(c, cx - d / 2, cupTop, d, cupBot - cupTop, 4); c.clip();
       for (k = 0; k < 3; k++) {
         var v = ((phase / (2 * Math.PI) + k / 3) % 1 + 1) % 1;
@@ -1112,7 +922,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         rr(c, sx - 4, cupTop + 6, 8, (cupBot - cupTop) * 0.62, 4); c.fillStyle = "#2E333C"; c.fill();
       }
       c.restore();
-      // teeth
       c.fillStyle = "#E1E5EB";
       c.beginPath(); c.moveTo(cx - d / 2, cupBot);
       var nt = Math.max(8, Math.round(d / 5)), sh = ((phase / (2 * Math.PI)) % 1) * (d / nt);
@@ -1130,9 +939,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       shankRect(c, cx, top, gE, sw, true);
       var hB = tip - 16;
       blurEnvelope(c, cx, gE, hB, d, blur);
-      // core
       c.beginPath(); c.rect(cx - d * 0.16, gE, d * 0.32, hB - gE); fs(c, "#7D848F", 2);
-      // single big helix: draw lobes that slide down as it turns
       var pitch = d * 1.5, off = ((phase / (2 * Math.PI)) % 1) * pitch;
       c.save(); c.beginPath(); c.rect(cx - d / 2 - 2, gE + 6, d + 4, hB - gE - 6); c.clip();
       for (y = gE - pitch + off; y < hB + pitch; y += pitch) {
@@ -1145,10 +952,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         fs(c, hgrad(c, cx - d / 2, cx + d / 2, [[0, "#6E7683"], [0.45, "#DDE2E8"], [1, "#5D6470"]]), 2.5);
       }
       c.restore();
-      // spurs and cutter
       c.beginPath(); c.moveTo(cx - d / 2, hB); c.lineTo(cx + d / 2, hB); c.lineTo(cx + d / 2 - 2, hB + 8); c.lineTo(cx + 5, hB + 5); c.lineTo(cx - 5, hB + 5); c.lineTo(cx - d / 2 + 2, hB + 8); c.closePath();
       fs(c, "#C3C9D2", 2.5);
-      // threaded lead screw
       c.beginPath(); c.moveTo(cx - 5, hB + 4); c.lineTo(cx + 5, hB + 4); c.lineTo(cx, tip); c.closePath(); fs(c, "#C3C9D2", 2);
       c.strokeStyle = OUT; c.lineWidth = 1.2;
       for (k = 0; k < 4; k++) { var ly = hB + 6 + k * 2.5; var lw = 5 * (1 - (ly - hB) / 16); c.beginPath(); c.moveTo(cx - lw, ly); c.lineTo(cx + lw, ly + 1.5); c.stroke(); }
@@ -1168,7 +973,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         c.beginPath(); c.rect(cx - dia / 2, yy, dia, hh);
         fs(c, hgrad(c, cx - dia / 2, cx + dia / 2, [[0, "#A87A12"], [0.4, "#FFD45A"], [1, "#9C700F"]]), 2);
       }
-      // straight flute sliding round
       var fu = ((phase / (2 * Math.PI)) % 1 + 1) % 1;
       if (Math.sin(fu * 2 * Math.PI) > 0) {
         var fx = -Math.cos(fu * 2 * Math.PI);
@@ -1179,241 +983,116 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         }
       }
       c.beginPath(); c.moveTo(cx - 2 * DS, sBot); c.lineTo(cx + 2 * DS, sBot); c.lineTo(cx, tip); c.closePath(); fs(c, "#FFD45A", 2);
-      return;
-    }
-    if (id === "countersink") {
-      var cE = top + len * 0.5;
-      shankRect(c, cx, top, cE, sw, true);
-      var bT = top + len * 0.62, coneTop = tip - d / 2;
-      blurEnvelope(c, cx, bT, tip, d, blur);
-      c.beginPath(); c.moveTo(cx - sw / 2, cE); c.lineTo(cx + sw / 2, cE); c.lineTo(cx + d / 2, bT); c.lineTo(cx - d / 2, bT); c.closePath();
-      fs(c, "#AEB5C0", 2.5);
-      c.beginPath(); c.rect(cx - d / 2, bT, d, coneTop - bT);
-      fs(c, hgrad(c, cx - d / 2, cx + d / 2, [[0, "#6E7683"], [0.4, "#E1E5EB"], [1, "#5D6470"]]), 2.5);
-      c.beginPath(); c.moveTo(cx - d / 2, coneTop); c.lineTo(cx + d / 2, coneTop); c.lineTo(cx, tip); c.closePath();
-      fs(c, hgrad(c, cx - d / 2, cx + d / 2, [[0, "#6E7683"], [0.4, "#E9EDF2"], [1, "#5D6470"]]), 2.5);
-      // flutes on the cone
-      c.save(); c.beginPath(); c.moveTo(cx - d / 2, coneTop); c.lineTo(cx + d / 2, coneTop); c.lineTo(cx, tip); c.closePath(); c.clip();
-      c.strokeStyle = "rgba(29,35,64,0.7)"; c.lineWidth = 2.5;
-      for (k = 0; k < 5; k++) {
-        var cu = ((phase / (2 * Math.PI) + k / 5) % 1 + 1) % 1;
-        if (Math.sin(cu * 2 * Math.PI) < 0) continue;
-        var ex = cx - Math.cos(cu * 2 * Math.PI) * d / 2;
-        c.beginPath(); c.moveTo(ex, coneTop); c.lineTo(cx, tip); c.stroke();
-      }
-      c.restore();
-      return;
-    }
-    if (id === "plug") {
-      var pE = top + len * 0.48;
-      shankRect(c, cx, top, pE, sw, false);
-      var od = (mm + 9) * DS;
-      var bTop = top + len * 0.58, bBot = tip - 3;
-      blurEnvelope(c, cx, bTop, tip, od, blur);
-      c.beginPath(); c.moveTo(cx - sw / 2, pE); c.lineTo(cx + sw / 2, pE); c.lineTo(cx + od / 2, bTop); c.lineTo(cx - od / 2, bTop); c.closePath();
-      fs(c, "#AEB5C0", 2.5);
-      rr(c, cx - od / 2, bTop, od, bBot - bTop, 3);
-      fs(c, hgrad(c, cx - od / 2, cx + od / 2, [[0, "#6E7683"], [0.4, "#E1E5EB"], [1, "#5D6470"]]), 2.5);
-      // hollow centre where the plug forms
-      c.beginPath(); c.rect(cx - d / 2, bTop + 8, d, bBot - bTop - 8); fs(c, "#2E333C", 2);
-      // four cutting wings sliding round
-      for (k = 0; k < 4; k++) {
-        var pu = ((phase / (2 * Math.PI) + k / 4) % 1 + 1) % 1;
-        if (Math.sin(pu * 2 * Math.PI) < 0) continue;
-        var px2 = cx - Math.cos(pu * 2 * Math.PI) * (od / 2 - 3);
-        c.beginPath(); c.moveTo(px2 - 3, bTop + 4); c.lineTo(px2 + 3, bTop + 4); c.lineTo(px2 + 3, tip); c.lineTo(px2 - 3, bBot); c.closePath();
-        fs(c, "#F2F4F7", 1.5);
-      }
-      return;
     }
   }
-  // Visual size of a bit (for hit tests and slots): [width, length]
-  function bitBox(id, mm) {
-    var w = mm * DS;
-    if (id === "plug") w = (mm + 9) * DS;
-    if (id === "step") w = 20 * DS;
-    if (id === "masonry") w = mm * DS * 1.12;
-    return { w: Math.max(w, shankMM(id, mm) * DS), len: BITS[id].len };
-  }
+  // Width of a bit's cutting end (world units)
+  function bitW(id) { return Math.max(id === "step" ? 20 * DS : BITS[id].mm * DS, shankMM(id, BITS[id].mm) * DS); }
 
-  // ---------- Boards, holes and sections ----------
-  function zS(mat) { return matT(mat) / MATS[mat].t; } // world units per mm of depth
+  // ---------- The board and its holes ----------
   function leadMM(id, mm) {
-    if (id === "twist" || id === "masonry") return mm * 0.3;
-    if (id === "brad") return mm * 0.12;
+    if (id === "twist") return mm * 0.3;
     if (id === "spade") return 4;
     if (id === "forstner") return 1.2;
     if (id === "holesaw") return 8.75;
     if (id === "auger") return 10;
-    if (id === "countersink") return 8;
     return 0;
   }
   function holeDia(h) {
     if (h.bit === "step") return stepDia(h.d);
-    if (h.bit === "countersink") return Math.min(16, 2 * h.d);
-    if (h.bit === "plug") return h.mm + 9;
     if (h.bit === "holesaw") return h.mm + 2;
     return h.mm;
   }
-  function holeThrough(h) { return h.d >= MATS[S.mat].t + leadMM(h.bit, h.mm) - 0.01; }
+  function holeThrough(h) { return h.d >= WOOD.t + leadMM(h.bit, h.mm) - 0.01; }
+  function boardTopW() { return R.tableY - boardT(); }
+  function bxw(u) { return u - S.px + R.boardSlide; }
+  function bzw(v) { return v - S.py; }
 
-  var topTex = document.createElement("canvas");
-  var TEXS = 2; // texture pixels per board unit
+  var TEXS = 3; // texture pixels per board unit
+  var topTex = document.createElement("canvas"), boardTop = document.createElement("canvas");
+  var boardDirty = true;
   function buildBoardTex() {
     topTex.width = BW * TEXS; topTex.height = BH * TEXS;
-    var c = topTex.getContext("2d");
-    var m = MATS[S.mat], rand = seeded(S.seed), i, y, x;
+    var c = topTex.getContext("2d"), rand = seeded(S.seed), i, y, x;
     c.setTransform(TEXS, 0, 0, TEXS, 0, 0);
-    c.fillStyle = m.col; c.fillRect(0, 0, BW, BH);
-    if (m.kind === "wood") {
-      c.lineCap = "round";
-      for (i = 0; i < (S.mat === "plywood" ? 26 : 38); i++) {
-        y = rand() * BH;
-        c.strokeStyle = "rgba(" + (S.mat === "oak" ? "100,60,25," : "150,95,35,") + (0.18 + rand() * 0.3).toFixed(2) + ")";
-        c.lineWidth = 0.6 + rand() * 1.8;
-        c.beginPath(); c.moveTo(-5, y);
-        var a1 = rand() * 10 - 5, a2 = rand() * 10 - 5;
-        c.bezierCurveTo(BW * 0.33, y + a1, BW * 0.66, y + a2, BW + 5, y + rand() * 6 - 3);
-        c.stroke();
-      }
-      if (S.mat === "pine") {
-        for (i = 0; i < 2; i++) {
-          x = 30 + rand() * (BW - 60); y = 20 + rand() * (BH - 40);
-          c.fillStyle = "rgba(120,70,25,0.55)";
-          c.beginPath(); c.ellipse(x, y, 7 + rand() * 4, 4 + rand() * 2, 0, 0, Math.PI * 2); c.fill();
-          c.strokeStyle = "rgba(120,70,25,0.35)"; c.lineWidth = 1;
-          c.beginPath(); c.ellipse(x, y, 13, 8, 0, 0, Math.PI * 2); c.stroke();
-        }
-      }
-      if (S.mat === "oak") {
-        c.fillStyle = "rgba(240,210,160,0.45)";
-        for (i = 0; i < 40; i++) { c.fillRect(rand() * BW, rand() * BH, 4 + rand() * 8, 0.9); }
-      }
-    } else if (m.kind === "metal") {
-      for (i = 0; i < 120; i++) {
-        c.strokeStyle = "rgba(" + (rand() < 0.5 ? "255,255,255," : "70,80,95,") + (0.08 + rand() * 0.15).toFixed(2) + ")";
-        c.lineWidth = 0.5;
-        y = rand() * BH;
-        c.beginPath(); c.moveTo(0, y); c.lineTo(BW, y); c.stroke();
-      }
-      c.fillStyle = "rgba(255,255,255,0.25)";
-      c.beginPath(); c.moveTo(0, 0); c.lineTo(80, 0); c.lineTo(0, 80); c.closePath(); c.fill();
-    } else if (m.kind === "plastic") {
-      c.fillStyle = "rgba(255,255,255,0.45)";
-      c.beginPath(); c.moveTo(20, 0); c.lineTo(70, 0); c.lineTo(0, 70); c.lineTo(0, 20); c.closePath(); c.fill();
-      c.beginPath(); c.moveTo(100, 0); c.lineTo(115, 0); c.lineTo(0, 115); c.lineTo(0, 100); c.closePath(); c.fill();
-    } else {
-      for (i = 0; i < 500; i++) {
-        c.fillStyle = rand() < 0.5 ? "rgba(90,25,15,0.35)" : "rgba(240,170,140,0.35)";
-        c.fillRect(rand() * BW, rand() * BH, 1 + rand() * 2, 1 + rand() * 2);
-      }
+    c.fillStyle = WOOD.col; c.fillRect(0, 0, BW, BH);
+    c.lineCap = "round";
+    for (i = 0; i < 44; i++) {
+      y = rand() * BH;
+      c.strokeStyle = "rgba(150,95,35," + (0.18 + rand() * 0.3).toFixed(2) + ")";
+      c.lineWidth = 0.6 + rand() * 1.8;
+      c.beginPath(); c.moveTo(-5, y);
+      var a1 = rand() * 10 - 5, a2 = rand() * 10 - 5;
+      c.bezierCurveTo(BW * 0.33, y + a1, BW * 0.66, y + a2, BW + 5, y + rand() * 6 - 3);
+      c.stroke();
     }
-    c.strokeStyle = "rgba(29,35,64,0.25)"; c.lineWidth = 2;
-    c.strokeRect(1, 1, BW - 2, BH - 2);
+    for (i = 0; i < 2; i++) {
+      x = 30 + rand() * (BW - 60); y = 20 + rand() * (BH - 40);
+      c.fillStyle = "rgba(120,70,25,0.55)";
+      c.beginPath(); c.ellipse(x, y, 7 + rand() * 4, 4 + rand() * 2, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = "rgba(120,70,25,0.35)"; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(x, y, 13, 8, 0, 0, Math.PI * 2); c.stroke();
+    }
+    boardDirty = true;
   }
-
-  // Draws one hole seen from above. Board units; caller sets the transform.
+  // One hole seen from above, in board units.
   function drawHoleTop(c, h) {
-    var m = MATS[S.mat];
-    var r = holeDia(h) * DS / 2;
-    var thr = holeThrough(h);
-    var bottom = m.kind === "wood" ? mixHex(m.col, m.dark, 0.75) : mixHex(m.col, "#1D2340", 0.45);
-    var deep = "#2B2F38";
+    var r = holeDia(h) * DS / 2, thr = holeThrough(h);
+    var bottom = mixHex(WOOD.col, WOOD.dark, 0.75), deep = "#2B2F38";
     var cx = h.x, cy = h.y, k, a;
     var rand = seeded(Math.round(h.x * 131 + h.y * 977));
-    // dust halo for brick and masonry, swarf ring for metal
-    if (m.kind === "masonry" || h.bit === "masonry") {
-      var g = c.createRadialGradient(cx, cy, r, cx, cy, r + 16);
-      g.addColorStop(0, "rgba(220,140,110,0.75)"); g.addColorStop(1, "rgba(220,140,110,0)");
-      c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r + 16, 0, Math.PI * 2); c.fill();
-    }
     function circlePath(rad, jag) {
       c.beginPath();
-      var n = 36;
-      for (var i = 0; i <= n; i++) {
-        var aa = i / n * Math.PI * 2;
-        var rr2 = rad + (jag ? (rand() - 0.5) * jag : 0);
-        if (i === 0) c.moveTo(cx + Math.cos(aa) * rr2, cy + Math.sin(aa) * rr2);
-        else c.lineTo(cx + Math.cos(aa) * rr2, cy + Math.sin(aa) * rr2);
+      for (var i = 0; i <= 36; i++) {
+        var aa = i / 36 * Math.PI * 2, rr2 = rad + (jag ? (rand() - 0.5) * jag : 0);
+        if (i === 0) c.moveTo(cx + Math.cos(aa) * rr2, cy + Math.sin(aa) * rr2); else c.lineTo(cx + Math.cos(aa) * rr2, cy + Math.sin(aa) * rr2);
       }
       c.closePath();
     }
     function cavity(rad, flat, jag) {
       circlePath(rad, jag);
-      if (thr) { c.fillStyle = m.kind === "plastic" ? "rgba(60,70,85,0.55)" : deep; c.fill(); }
+      if (thr) { c.fillStyle = deep; c.fill(); }
       else if (flat) { c.fillStyle = bottom; c.fill(); }
       else {
         var gg = c.createRadialGradient(cx, cy, 0, cx, cy, rad);
-        gg.addColorStop(0, mixHex(m.col, "#1D2340", 0.6)); gg.addColorStop(0.7, bottom); gg.addColorStop(1, deep);
+        gg.addColorStop(0, mixHex(WOOD.col, "#1D2340", 0.6)); gg.addColorStop(0.7, bottom); gg.addColorStop(1, deep);
         c.fillStyle = gg; c.fill();
       }
       c.lineWidth = 1.2; c.strokeStyle = "rgba(29,35,64,0.8)"; c.stroke();
     }
-    if (h.plugged) {
-      circlePath(r, 0); c.fillStyle = MATS[h.plugged].col; c.fill();
-      c.strokeStyle = "rgba(29,35,64,0.6)"; c.lineWidth = 1.2; c.stroke();
-      c.strokeStyle = "rgba(110,60,20,0.35)";
-      for (k = 1; k < 4; k++) { c.beginPath(); c.arc(cx + 1, cy, r * k / 4, 0, Math.PI * 2); c.stroke(); }
-      return;
-    }
     var b = h.bit;
-    if (b === "holesaw" || (b === "plug" && !h.plugOut)) {
-      var rin = (b === "plug" ? h.mm : h.mm - 2) * DS / 2;
-      var ringDeep = h.d - leadMM(b, h.mm);
-      if (h.slugOut || (b === "holesaw" && ringDeep >= m.t)) {
-        cavity(r, true, 0);
-      } else {
-        if (ringDeep > 0) {
-          c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.arc(cx, cy, rin, 0, Math.PI * 2, true);
-          c.fillStyle = deep; c.fill();
-          c.lineWidth = 1; c.strokeStyle = "rgba(29,35,64,0.8)"; c.stroke();
-        }
-        if (b === "holesaw") { c.beginPath(); c.arc(cx, cy, 6.35 * DS / 2, 0, Math.PI * 2); c.fillStyle = deep; c.fill(); }
+    if (b === "holesaw") {
+      var rin = (h.mm - 2) * DS / 2;
+      if (h.d - leadMM(b, h.mm) >= WOOD.t) { cavity(r, true, 0); return; }
+      if (h.d - leadMM(b, h.mm) > 0) {
+        c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.arc(cx, cy, rin, 0, Math.PI * 2, true);
+        c.fillStyle = deep; c.fill();
+        c.lineWidth = 1; c.strokeStyle = "rgba(29,35,64,0.8)"; c.stroke();
       }
-      return;
-    }
-    if (b === "plug") { cavity(r, true, 1.6); return; }
-    if (b === "countersink") {
-      var gc = c.createRadialGradient(cx, cy, 0, cx, cy, r);
-      gc.addColorStop(0, thr ? deep : mixHex(m.col, "#1D2340", 0.55));
-      gc.addColorStop(1, mixHex(m.col, "#FFFFFF", 0.15));
-      c.fillStyle = gc; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = "rgba(29,35,64,0.7)"; c.lineWidth = 1; c.stroke();
+      c.beginPath(); c.arc(cx, cy, 6.35 * DS / 2, 0, Math.PI * 2); c.fillStyle = deep; c.fill();
       return;
     }
     if (b === "step") {
-      var top = stepDia(h.d), s;
-      for (s = top; s >= 4; s -= 2) {
-        var depthAt = h.d - (s - 4) / 2 * STEP_H;
+      var tp = stepDia(h.d), s;
+      for (s = tp; s >= 4; s -= 2) {
         c.beginPath(); c.arc(cx, cy, s * DS / 2, 0, Math.PI * 2);
-        c.fillStyle = (depthAt >= m.t || m.kind === "metal") && s === top && h.d >= m.t ? deep : mixHex(m.col, "#1D2340", 0.25 + 0.4 * (1 - s / Math.max(4, top)));
-        if (m.kind === "metal" && h.d >= m.t) c.fillStyle = s === top ? deep : "rgba(0,0,0,0)";
+        c.fillStyle = thr && s === tp ? deep : mixHex(WOOD.col, "#1D2340", 0.25 + 0.4 * (1 - s / Math.max(4, tp)));
         c.fill();
-        c.strokeStyle = m.kind === "metal" ? "rgba(255,255,255,0.8)" : "rgba(29,35,64,0.55)"; c.lineWidth = 1; c.stroke();
-      }
-      if (m.kind === "metal" && h.d >= m.t) {
-        c.beginPath(); c.arc(cx, cy, top * DS / 2 + 2, 0, Math.PI * 2); c.strokeStyle = "rgba(255,255,255,0.9)"; c.lineWidth = 2.5; c.stroke();
+        c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 1; c.stroke();
       }
       return;
     }
     var jag = 0, flat = false;
     if (b === "spade") { jag = 3.2; flat = true; }
-    if (b === "forstner") { flat = true; }
-    if (b === "brad") { flat = true; }
-    if (b === "masonry") { jag = m.kind === "masonry" ? 2.5 : 1.8; }
-    if (b === "twist" && m.kind === "wood") jag = 0.9;
-    if (m.kind === "masonry" && b !== "masonry") jag = 3;
-    // tear-out fibres around twist and spade holes in wood
-    if (m.kind === "wood" && (b === "twist" || b === "spade" || b === "auger")) {
-      c.strokeStyle = mixHex(m.col, "#FFFFFF", 0.35); c.lineWidth = 1.2;
+    if (b === "forstner") flat = true;
+    if (b === "twist") jag = 0.9;
+    // tear-out fibres round twist, spade and auger holes
+    if (b === "twist" || b === "spade" || b === "auger") {
+      c.strokeStyle = mixHex(WOOD.col, "#FFFFFF", 0.35); c.lineWidth = 1.2;
       for (k = 0; k < (b === "spade" ? 22 : 10); k++) {
         a = rand() * Math.PI * 2;
         c.beginPath(); c.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
         c.lineTo(cx + Math.cos(a) * (r + 2 + rand() * (b === "spade" ? 7 : 3)), cy + Math.sin(a) * (r + 2 + rand() * 3)); c.stroke();
       }
-    }
-    if (m.kind === "metal" && b !== "step") {
-      c.beginPath(); c.arc(cx, cy, r + 2, 0, Math.PI * 2); c.strokeStyle = "rgba(255,255,255,0.9)"; c.lineWidth = 2; c.stroke();
     }
     cavity(r, flat, jag);
     if (!thr) {
@@ -1421,252 +1100,178 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         c.strokeStyle = "rgba(255,255,255,0.18)"; c.lineWidth = 0.8;
         for (k = 1; k < 5; k++) { c.beginPath(); c.arc(cx, cy, r * k / 5, 0, Math.PI * 2); c.stroke(); }
         c.beginPath(); c.arc(cx, cy, 1.2, 0, Math.PI * 2); c.fillStyle = deep; c.fill();
-      } else if (b === "spade" || b === "auger" || b === "brad") {
+      } else if (b === "spade" || b === "auger") {
         c.beginPath(); c.arc(cx, cy, b === "auger" ? 2.6 : 2, 0, Math.PI * 2); c.fillStyle = deep; c.fill();
       }
     }
-    if (h.crack) {
-      c.strokeStyle = "rgba(255,255,255,0.9)"; c.lineWidth = 1;
-      for (k = 0; k < 4; k++) {
-        a = rand() * Math.PI * 2;
-        var l = 6 + rand() * 10;
-        c.beginPath(); c.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-        c.lineTo(cx + Math.cos(a + 0.12) * (r + l * 0.6), cy + Math.sin(a + 0.12) * (r + l * 0.6));
-        c.lineTo(cx + Math.cos(a - 0.05) * (r + l), cy + Math.sin(a - 0.05) * (r + l));
-        c.stroke();
-      }
-    }
   }
-
-  // Plug objects lying on the board (made by the plug cutter or popped out of the hole saw).
-  function drawPlugTop(c, p) {
-    var r = p.mm * DS / 2;
-    c.beginPath(); c.arc(p.x + 2, p.y + 3, r, 0, Math.PI * 2); c.fillStyle = "rgba(29,35,64,0.35)"; c.fill();
-    c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI * 2); fs(c, MATS[p.mat].col, 1.6);
-    c.strokeStyle = "rgba(110,60,20,0.4)"; c.lineWidth = 0.8;
-    for (var k = 1; k < 4; k++) { c.beginPath(); c.arc(p.x + 0.8, p.y, r * k / 4, 0, Math.PI * 2); c.stroke(); }
-    if (p.grab) { c.beginPath(); c.arc(p.x, p.y, r + 4, 0, Math.PI * 2); c.strokeStyle = "#FFC93C"; c.lineWidth = 3; c.stroke(); }
+  function refreshBoardTop() {
+    if (boardTop.width !== topTex.width) { boardTop.width = topTex.width; boardTop.height = topTex.height; }
+    var c = boardTop.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, boardTop.width, boardTop.height);
+    c.drawImage(topTex, 0, 0);
+    c.setTransform(TEXS, 0, 0, TEXS, 0, 0);
+    S.holes.forEach(function (h) { drawHoleTop(c, h); });
+    boardDirty = false;
   }
-
-  // Hole cross-section as polygons in (mm across, mm deep).
-  function holeProfile(h) {
-    var m = MATS[S.mat];
-    var r = h.mm / 2, d = h.d, b = h.bit, z;
-    var P = [];
-    function V(pts) { P.push(pts); }
-    if (h.plugged) return P;
-    if (b === "twist" || b === "masonry") {
-      var cone = 0.6 * r;
-      if (d <= cone) V([[-d / 0.6, 0], [0, d], [d / 0.6, 0]]);
-      else V([[-r, 0], [-r, d - cone], [0, d], [r, d - cone], [r, 0]]);
-    } else if (b === "brad") {
-      z = Math.max(0, d - 0.12 * h.mm);
-      V([[-r, 0], [-r, z + 0.4], [-0.15 * r, z], [0, d], [0.15 * r, z], [r, z + 0.4], [r, 0]]);
-    } else if (b === "spade" || b === "forstner" || b === "auger") {
-      var lead = leadMM(b, h.mm);
-      z = Math.max(0, d - lead);
-      var cw = b === "forstner" ? 0.6 : (b === "spade" ? 1.4 : 1.8);
-      if (z > 0) V([[-r, 0], [-r, z], [-cw, z], [0, d], [cw, z], [r, z], [r, 0]]);
-      else V([[-cw, 0], [0, d], [cw, 0]]);
-    } else if (b === "holesaw" || b === "plug") {
-      var rin = b === "plug" ? r : r - 1, rout = b === "plug" ? r + 4.5 : r + 1;
-      var rd = d - leadMM(b, h.mm);
-      if (h.slugOut || h.plugOut || (b === "holesaw" && rd >= m.t)) {
-        V([[-rout, 0], [-rout, Math.max(0, rd)], [rout, Math.max(0, rd)], [rout, 0]]);
-      } else if (rd > 0) {
-        V([[-rout, 0], [-rout, rd], [-rin, rd], [-rin, 0]]);
-        V([[rin, 0], [rin, rd], [rout, rd], [rout, 0]]);
-      }
-      if (b === "holesaw") V([[-3.2, 0], [-3.2, Math.max(0, d - 1.9)], [0, d], [3.2, Math.max(0, d - 1.9)], [3.2, 0]]);
-    } else if (b === "step") {
-      var pts = [], dz, prev = null;
-      for (dz = 0; dz <= d; dz += 0.5) {
-        var hw = stepDia(d - dz) / 2;
-        if (d - dz < 1.2) hw = Math.min(hw, 2 * (d - dz) / 1.2);
-        if (prev !== null && hw !== prev) pts.push([-prev, dz]);
-        pts.push([-hw, dz]);
-        prev = hw;
-      }
-      pts.push([0, d]);
-      var right = pts.slice(0, -1).map(function (p) { return [-p[0], p[1]]; }).reverse();
-      V(pts.concat(right));
-    } else if (b === "countersink") {
-      var w0 = Math.min(8, d);
-      if (d > 8) V([[-8, 0], [-8, d - 8], [0, d], [8, d - 8], [8, 0]]);
-      else V([[-w0, 0], [0, d], [w0, 0]]);
-    }
-    return P;
-  }
-
-  // Board section. (ox, oy) = where board coordinate u = 0 meets the board top, sc = screen units per board unit.
-  // axis "y": the cut runs along the board's y (machine side view, at x = S.px). axis "x": along x at y = S.py.
-  function drawSection(c, ox, oy, sc, axis, len, at) {
-    var m = MATS[S.mat], T = matT(S.mat) * sc, zs = zS(S.mat) * sc;
-    var L = len * sc;
+  // Paint a source triangle (texture px) onto a view triangle: exact at the corners, so neighbours meet.
+  function texTri(c, img, s0, s1, s2, d0, d1, d2, grow) {
+    var X1 = s1[0] - s0[0], Y1 = s1[1] - s0[1], X2 = s2[0] - s0[0], Y2 = s2[1] - s0[1];
+    var den = X1 * Y2 - X2 * Y1;
+    if (!den) return;
+    var a = ((d1.x - d0.x) * Y2 - (d2.x - d0.x) * Y1) / den, b = ((d1.y - d0.y) * Y2 - (d2.y - d0.y) * Y1) / den;
+    var cc = ((d2.x - d0.x) * X1 - (d1.x - d0.x) * X2) / den, d = ((d2.y - d0.y) * X1 - (d1.y - d0.y) * X2) / den;
+    var e = d0.x - a * s0[0] - cc * s0[1], f = d0.y - b * s0[0] - d * s0[1];
+    var mx = (d0.x + d1.x + d2.x) / 3, my = (d0.y + d1.y + d2.y) / 3;
     c.save();
-    c.beginPath(); c.rect(ox, oy, L, T); c.clip();
-    c.fillStyle = m.col; c.fillRect(ox, oy, L, T);
-    var i, rand = seeded(S.seed + (axis === "x" ? 5 : 9));
-    if (S.mat === "plywood") {
-      var plies = 7;
-      for (i = 0; i < plies; i++) {
-        c.fillStyle = i % 2 ? mixHex(m.col, "#8B5A3C", 0.25) : m.col;
-        c.fillRect(ox, oy + i * T / plies, L, T / plies);
-      }
-    } else if (m.kind === "wood") {
-      c.strokeStyle = "rgba(130,80,30,0.35)"; c.lineWidth = Math.max(1, sc);
-      for (i = 0; i < 6; i++) {
-        var gy = oy + (0.1 + rand() * 0.8) * T;
-        c.beginPath(); c.moveTo(ox, gy); c.lineTo(ox + L, gy + (rand() - 0.5) * 4 * sc); c.stroke();
-      }
-    } else if (m.kind === "masonry") {
-      c.fillStyle = "rgba(90,25,15,0.3)";
-      for (i = 0; i < 120; i++) c.fillRect(ox + rand() * L, oy + rand() * T, 2 * sc, 2 * sc);
-    } else if (m.kind === "plastic") {
-      c.fillStyle = "rgba(255,255,255,0.4)"; c.fillRect(ox, oy + T * 0.15, L, T * 0.2);
-    }
-    // holes crossing this cut line
-    S.holes.forEach(function (h) {
-      var hc = axis === "y" ? h.y : h.x;
-      var off = axis === "y" ? h.x - (at == null ? S.px : at) : h.y - S.py;
-      var hr = holeDia(h) * DS / 2;
-      if (Math.abs(off) >= hr) return;
-      var f = Math.sqrt(1 - (off / hr) * (off / hr));
-      var thr = holeThrough(h);
-      holeProfile(h).forEach(function (poly) {
-        c.beginPath();
-        poly.forEach(function (p, j) {
-          var X = ox + (hc + p[0] * DS * f) * sc, Y = oy + p[1] * zs;
-          if (j === 0) c.moveTo(X, Y); else c.lineTo(X, Y);
-        });
-        c.closePath();
-        c.fillStyle = m.kind === "plastic" ? "rgba(40,48,62,0.7)" : (thr ? "#262A33" : "#3A3F4A");
-        c.fill();
-        c.lineWidth = Math.max(1, 1.5 * sc); c.strokeStyle = "rgba(255,255,255,0.35)"; c.stroke();
-      });
-      if (h.plugged) {
-        var pr = holeDia(h) * DS / 2 * f;
-        c.fillStyle = MATS[h.plugged].col;
-        c.fillRect(ox + (hc - pr) * sc, oy, pr * 2 * sc, Math.min(T, h.d * zs));
-      }
+    c.beginPath();
+    [d0, d1, d2].forEach(function (p, i) {
+      var dx = p.x - mx, dy = p.y - my, l = Math.hypot(dx, dy) || 1;
+      var x = p.x + dx / l * grow, y = p.y + dy / l * grow;
+      if (i) c.lineTo(x, y); else c.moveTo(x, y);
     });
+    c.closePath(); c.clip();
+    c.transform(a, b, cc, d, e, f);
+    c.drawImage(img, 0, 0);
     c.restore();
-    c.beginPath(); c.rect(ox, oy, L, T); fs(c, null, Math.max(2, 3 * sc));
+  }
+  function drawBoard(c) {
+    var top = boardTopW(), ty = R.tableY, i, j;
+    // soft shadow on the table
+    poly(c, [P(bxw(0) + 10, ty, bzw(0) + 4), P(bxw(BW) + 10, ty, bzw(0) + 4), P(bxw(BW) + 10, ty, bzw(BH) + 10), P(bxw(0) + 10, ty, bzw(BH) + 10)]);
+    c.fillStyle = "rgba(29,35,64,0.25)"; c.fill();
+    var sd = solid(c, boxFP(bxw(0), bzw(0), bxw(BW), bzw(BH)), top, ty, WOOD.col, { lw: 3.5, noCap: true, side: -0.05 });
+    // end grain lines on the front edge
+    c.strokeStyle = "rgba(150,95,35,0.35)"; c.lineWidth = 1.5;
+    for (i = 1; i < 4; i++) strokePts(c, [P(bxw(0), top + boardT() * i / 4, bzw(BH)), P(bxw(BW), top + boardT() * i / 4 + 2, bzw(BH))]);
+    if (boardDirty) refreshBoardTop();
+    var NU = 6, NV = 4, G = [];
+    for (i = 0; i <= NU; i++) {
+      G.push([]);
+      for (j = 0; j <= NV; j++) G[i].push(P(bxw(i * BW / NU), top, bzw(j * BH / NV)));
+    }
+    var grow = 0.8 / M.s;
+    for (i = 0; i < NU; i++) {
+      for (j = 0; j < NV; j++) {
+        var s00 = [i * BW / NU * TEXS, j * BH / NV * TEXS], s10 = [(i + 1) * BW / NU * TEXS, j * BH / NV * TEXS];
+        var s11 = [(i + 1) * BW / NU * TEXS, (j + 1) * BH / NV * TEXS], s01 = [i * BW / NU * TEXS, (j + 1) * BH / NV * TEXS];
+        texTri(c, boardTop, s00, s10, s11, G[i][j], G[i + 1][j], G[i + 1][j + 1], grow);
+        texTri(c, boardTop, s00, s11, s01, G[i][j], G[i + 1][j + 1], G[i][j + 1], grow);
+      }
+    }
+    // small holes would be thin from up here: give each a clear dark mark
+    S.holes.forEach(function (h) {
+      var r = holeDia(h) * DS / 2, p = P(bxw(h.x), top, bzw(h.y));
+      if (r * p.k * M.s >= 5) return;
+      c.beginPath(); c.ellipse(p.x, p.y, Math.max(r * p.k, 5 / M.s), Math.max(r * p.k * 0.55, 3 / M.s), 0, 0, Math.PI * 2);
+      c.fillStyle = holeThrough(h) ? "#1D2028" : "#3A3F4A"; c.fill();
+    });
+    // red laser cross where the bit will come down
+    c.save();
+    poly(c, sd.top); c.clip();
+    c.strokeStyle = "rgba(255,40,40,0.85)"; c.lineWidth = 2.5; c.lineCap = "butt";
+    strokePts(c, [P(bxw(0), top, 0), P(bxw(BW), top, 0)]);
+    strokePts(c, [P(0, top, bzw(0)), P(0, top, bzw(BH))]);
+    var hc = P(0, top, 0);
+    c.beginPath(); c.arc(hc.x, hc.y, 4.5, 0, Math.PI * 2); c.fillStyle = "#FF2828"; c.fill();
+    c.restore();
+    poly(c, sd.top); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+    R.ui.boardTop = sd.top;
   }
 
-  // ---------- Chips, shavings, sparks, dust ----------
+  function drawTable(c) {
+    var ty = R.tableY;
+    solid(c, rrectFP(-TBL.hw, TBL.zb, TBL.hw, TBL.zf, 18, 4), ty, ty + TBL.th, "#A7AFBA", { lw: 4.5 });
+    [-112, 112].forEach(function (x) {
+      poly(c, [P(x - 9, ty, TBL.zb + 4), P(x + 9, ty, TBL.zb + 4), P(x + 9, ty, TBL.zf - 4), P(x - 9, ty, TBL.zf - 4)]);
+      c.fillStyle = "#3A3F4A"; c.fill();
+    });
+    var hole = [];
+    for (var i = 0; i < 20; i++) { var a = i / 20 * Math.PI * 2; hole.push(P(Math.cos(a) * 28, ty, Math.sin(a) * 28)); }
+    poly(c, hole); c.fillStyle = "#3A3F4A"; c.fill();
+  }
+
+  // ---------- Chips and dust (3D, drawn in view) ----------
   var parts = [];
-  var MAX_SETTLED = reduce ? 90 : 220;
-  function boardLeftW() { return X0 - S.py + R.boardSlide; }
-  function boardTopW() { return R.tableY - matT(S.mat); }
-  function surfaceAt(x) {
-    var bl = boardLeftW();
-    if (x >= bl && x <= bl + BH) return { y: boardTopW(), on: "board" };
-    if (x >= 250 && x <= 592) return { y: R.tableY, on: "table" };
-    if (x >= 40 && x <= 580) return { y: 930, on: "base" };
-    return { y: 986, on: "bench" };
+  var MAX_SETTLED = reduce ? 50 : 80;
+  function surfaceAt(x, z) {
+    var u = x + S.px - R.boardSlide, v = z + S.py;
+    if (u >= 0 && u <= BW && v >= 0 && v <= BH) return { y: boardTopW(), on: "board", u: u, v: v };
+    if (Math.abs(x) <= TBL.hw && z >= TBL.zb && z <= TBL.zf) return { y: R.tableY, on: "table" };
+    return null;
   }
   function addPart(p) {
-    if (parts.length > 700) return;
+    if (parts.length > 600) return;
     p.rot = p.rot || rnd(0, 6.28);
     p.vr = p.vr || rnd(-8, 8);
     p.age = 0;
     parts.push(p);
   }
   function emitChips(dt, b, rate) {
-    var m = MATS[S.mat], kind = m.kind;
-    var r = Math.max(4, bitBox(b.id, b.mm).w / 2);
-    var top = boardTopW();
+    var r = Math.max(4, bitW(b.id) / 2), top = boardTopW();
     var spin = 0.5 + Math.min(1, R.rpm / 2000);
     var n = rate * dt * (reduce ? 0.35 : 1);
     var whole = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
     for (var i = 0; i < whole; i++) {
-      var sd = Math.random() < 0.5 ? -1 : 1;
-      var x = X0 + sd * r * rnd(0.6, 1.05);
-      var base = { x: x, y: top - 2, vx: sd * rnd(50, 200) * spin, vy: -rnd(80, 260) * spin, col: m.chip };
+      var a = rnd(0, Math.PI * 2);
+      var base = { x: Math.cos(a) * r * rnd(0.6, 1.05), y: top - 2, z: Math.sin(a) * r * rnd(0.6, 1.05),
+        vx: Math.cos(a) * rnd(60, 210) * spin, vz: Math.sin(a) * rnd(60, 210) * spin + rnd(0, 60), vy: -rnd(90, 260) * spin, col: WOOD.chip };
       var t;
-      if (kind === "metal") {
-        t = Math.random() < 0.55 ? "spark" : "swarf";
-        if (t === "spark") { base.vx *= 2.2; base.vy *= 1.6; base.life = rnd(0.25, 0.6); base.col = pick(["#FFE066", "#FFB703", "#FFFFFF"]); }
-        else { base.col = "#D9DEE5"; base.sz = rnd(4, 8); }
-      } else if (kind === "masonry") {
-        t = Math.random() < 0.75 ? "dust" : "chunk";
-        if (t === "dust") { base.vx *= 0.5; base.vy = -rnd(20, 90); base.sz = rnd(8, 18); base.life = rnd(1.2, 2.4); }
-        else base.sz = rnd(2, 4);
-        R.dust = Math.min(1, R.dust + 0.02);
-      } else if (kind === "plastic") {
-        t = b.id === "step" || b.id === "twist" ? "swarf" : "spiral";
-        base.col = "#F2FBFF"; base.sz = rnd(3, 6);
-        if (b.id === "spade" || b.id === "auger") t = "chunk";
-      } else {
-        switch (b.id) {
-          case "twist": t = "spiral"; base.sz = rnd(2.5, 4.5); break;
-          case "brad": t = Math.random() < 0.6 ? "saw" : "spiral"; base.sz = rnd(2, 3.5); break;
-          case "spade": t = "chunk"; base.sz = rnd(2.5, 6); break;
-          case "forstner": t = "curl"; base.sz = rnd(5, 9); break;
-          case "holesaw": t = "saw"; base.sz = rnd(1.2, 2.4); break;
-          case "auger": t = "curl"; base.sz = rnd(7, 13); base.vy = -rnd(220, 380); base.vx *= 0.5; break;
-          case "step": t = "spiral"; base.sz = rnd(2, 3.5); break;
-          case "countersink": t = "spiral"; base.sz = rnd(1.5, 3); break;
-          case "plug": t = Math.random() < 0.5 ? "saw" : "spiral"; base.sz = rnd(1.5, 3); break;
-          default: t = "saw"; base.sz = rnd(1.2, 2.4);
-        }
-        if (b.id === "masonry") { t = "saw"; base.sz = rnd(1.2, 2.5); }
+      switch (b.id) {
+        case "twist": t = "spiral"; base.sz = rnd(2.5, 4.5); break;
+        case "spade": t = "chunk"; base.sz = rnd(2.5, 6); break;
+        case "forstner": t = "curl"; base.sz = rnd(5, 9); break;
+        case "holesaw": t = "saw"; base.sz = rnd(1.4, 2.6); break;
+        case "auger": t = "curl"; base.sz = rnd(7, 13); base.vy = -rnd(220, 380); base.vx *= 0.5; base.vz *= 0.5; break;
+        default: t = "spiral"; base.sz = rnd(2, 3.5);
       }
       base.type = t;
-      if (base.sz) base.sz *= reduce ? 1.4 : 1.8;
+      base.sz *= reduce ? 1.2 : 1.45;
       addPart(base);
-    }
-    // wood bits in metal or brick throw sparks too
-    if ((kind === "metal" || kind === "masonry") && Math.random() < dt * 25 * (b.id === "masonry" && kind === "masonry" ? 0.15 : 1)) {
-      addPart({ type: "spark", x: X0 + rnd(-r, r), y: top - 1, vx: rnd(-420, 420), vy: -rnd(120, 380), life: rnd(0.2, 0.5), col: pick(["#FFE066", "#FFB703", "#FFFFFF"]) });
     }
   }
   function updateParts(dt) {
-    var settled = 0, i, p;
+    var settled = 0, onBoard = 0, i, p;
     for (i = parts.length - 1; i >= 0; i--) {
       p = parts[i];
       p.age += dt;
-      if (p.type === "dust") {
-        p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.97; p.vy *= 0.97; p.sz += dt * 18;
-        if (p.age > p.life) parts.splice(i, 1);
-        continue;
-      }
-      if (p.type === "spark") {
-        p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
-        if (p.age > p.life) parts.splice(i, 1);
-        continue;
-      }
       if (p.settled) {
         settled++;
-        if (p.on === "board") { p.x = boardLeftW() + p.bu; p.y = boardTopW() + ((p.bd == null ? S.px : p.bd) - S.px) * BOARD_F; }
-        else if (p.on === "table") p.y = R.tableY;
-        if (tilt.on && Math.abs(tilt.x) > 0.08) {
+        if (p.on === "board") {
+          if (tilt.on && Math.abs(tilt.x) > 0.08) {
+            p.u += tilt.x * 90 * dt;
+            if (p.u < 0 || p.u > BW) { p.settled = false; p.x = bxw(p.u); p.z = bzw(p.v); p.y = boardTopW(); p.vy = 0; p.vx = tilt.x * 120; p.vz = 0; }
+          }
+        } else if (tilt.on && Math.abs(tilt.x) > 0.08) {
           p.x += tilt.x * 90 * dt;
-          var s2 = surfaceAt(p.x);
-          if (s2.on !== p.on || (p.on !== "board" && Math.abs(s2.y - p.y) > 2)) { p.settled = false; p.vy = 0; p.vx = tilt.x * 120; }
-          else if (p.on === "board") p.bu = p.x - boardLeftW();
+          if (Math.abs(p.x) > TBL.hw) { p.settled = false; p.vy = 0; p.vx = tilt.x * 120; p.vz = 0; }
         }
         continue;
       }
       p.vy += 820 * dt;
-      p.vx *= Math.pow(0.4, dt);
-      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= Math.pow(0.4, dt); p.vz *= Math.pow(0.4, dt);
+      var py = p.y;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       p.rot += p.vr * dt;
-      var s = surfaceAt(p.x);
-      if (p.y >= s.y && p.vy > 0) {
-        if (p.type === "plug") { landPlug(p); parts.splice(i, 1); continue; }
+      var s = surfaceAt(p.x, p.z);
+      if (s && p.vy > 0 && p.y >= s.y && py <= s.y + 4) {
         if (p.vy > 260 && Math.random() < 0.5) { p.vy *= -0.3; p.y = s.y - 0.5; continue; }
+        // nothing settles on the hole itself: it skips off, so the hole stays in sight
+        var hr = Math.hypot(p.x, p.z), keep = R.curHole ? holeDia(R.curHole) * DS / 2 + 18 : 22;
+        if (s.on === "board" && hr < keep) {
+          var ox = hr > 0.5 ? p.x / hr : 1, oz = hr > 0.5 ? p.z / hr : 0;
+          p.vx = ox * rnd(120, 200); p.vz = oz * rnd(120, 200); p.vy = -rnd(80, 150); p.y = s.y - 1;
+          continue;
+        }
         p.y = s.y; p.settled = true; p.on = s.on; p.vr = 0;
-        // chips on the board scatter over its top face (it is seen a little from above)
-        if (s.on === "board") { p.bu = p.x - boardLeftW(); p.bd = clamp(S.px + rnd(-45, 45), 6, BW - 6); }
+        if (s.on === "board") { p.u = s.u; p.v = s.v; }
       }
-      if (p.y > 1100) parts.splice(i, 1);
+      if (p.y > R.tableY + 500) parts.splice(i, 1);
     }
     // only a small heap stays on the board, so the holes still show; the rest is brushed off
-    var onBoard = 0;
     for (i = parts.length - 1; i >= 0; i--) {
-      if (parts[i].settled && parts[i].on === "board" && ++onBoard > 28) { parts.splice(i, 1); settled--; }
+      if (parts[i].settled && parts[i].on === "board" && ++onBoard > 20) { parts.splice(i, 1); settled--; }
     }
     if (settled > MAX_SETTLED) {
       for (i = 0; i < parts.length && settled > MAX_SETTLED; i++) {
@@ -1677,33 +1282,28 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
   function drawSpiralPath(c, sz, turns) {
     c.beginPath();
-    var n = 18;
-    for (var k = 0; k <= n; k++) {
-      var a = k / n * turns * Math.PI * 2, rad = sz * (0.25 + 0.75 * k / n);
+    for (var k = 0; k <= 18; k++) {
+      var a = k / 18 * turns * Math.PI * 2, rad = sz * (0.25 + 0.75 * k / 18);
       if (k === 0) c.moveTo(Math.cos(a) * rad, Math.sin(a) * rad); else c.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
     }
   }
-  function drawParts(c) {
+  function partPos(p) {
+    if (p.settled && p.on === "board") return P(bxw(p.u), boardTopW(), bzw(p.v));
+    if (p.settled && p.on === "table") return P(p.x, R.tableY, p.z);
+    return P(p.x, p.y, p.z);
+  }
+  function drawParts(c, settledOnly) {
     c.lineCap = "round"; c.lineJoin = "round";
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i];
-      if (p.type === "dust") {
-        c.globalAlpha = Math.max(0, 0.55 * (1 - p.age / p.life));
-        c.fillStyle = "#D9907A";
-        c.beginPath(); c.arc(p.x, p.y, p.sz, 0, Math.PI * 2); c.fill();
-        c.globalAlpha = 1;
-        continue;
-      }
-      if (p.type === "spark") {
-        c.strokeStyle = p.col; c.lineWidth = 2.5;
-        c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025); c.stroke();
-        continue;
-      }
+      if (!!p.settled !== settledOnly) continue;
+      var q = partPos(p);
       c.save();
-      c.translate(p.x, p.y - (p.settled ? (p.sz || 2) * 0.5 : 0));
+      c.translate(q.x, q.y - (p.settled ? p.sz * 0.4 * q.k : 0));
+      c.scale(q.k, p.settled ? q.k * 0.7 : q.k);
       c.rotate(p.rot);
-      if (p.type === "spiral" || p.type === "swarf") {
-        drawSpiralPath(c, p.sz, p.type === "swarf" ? 2.2 : 1.6);
+      if (p.type === "spiral") {
+        drawSpiralPath(c, p.sz, 1.6);
         c.strokeStyle = OUT; c.lineWidth = 3.4; c.stroke();
         c.strokeStyle = p.col; c.lineWidth = 1.8; c.stroke();
       } else if (p.type === "curl") {
@@ -1713,31 +1313,26 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       } else if (p.type === "chunk") {
         c.beginPath(); c.moveTo(-p.sz, -p.sz * 0.4); c.lineTo(p.sz * 0.6, -p.sz * 0.7); c.lineTo(p.sz, p.sz * 0.5); c.lineTo(-p.sz * 0.3, p.sz * 0.6); c.closePath();
         fs(c, p.col, 1.4);
-      } else if (p.type === "plug") {
-        rr(c, -p.w / 2, -p.h / 2, p.w, p.h, 2); fs(c, p.col, 2);
+      } else if (p.type === "disc") {
+        c.beginPath(); c.ellipse(0, 0, p.sz, p.sz * 0.45, 0, 0, Math.PI * 2); fs(c, p.col, 2.5);
       } else {
         c.fillStyle = p.col; c.fillRect(-p.sz / 2, -p.sz / 2, p.sz, p.sz);
       }
       c.restore();
     }
-    if (R.dust > 0.02) {
-      var dg = c.createRadialGradient(X0, boardTopW(), 20, X0, boardTopW(), 420);
-      dg.addColorStop(0, "rgba(217,144,122," + (R.dust * 0.55).toFixed(3) + ")");
-      dg.addColorStop(1, "rgba(217,144,122,0)");
-      c.fillStyle = dg;
-      c.fillRect(X0 - 420, boardTopW() - 420, 840, 840);
-    }
   }
   function shakeChips() {
     parts.forEach(function (p) {
-      if (p.settled) { p.settled = false; p.vy = -rnd(150, 420); p.vx = rnd(-120, 120); p.vr = rnd(-10, 10); }
+      if (!p.settled) return;
+      if (p.on === "board") { p.x = bxw(p.u); p.z = bzw(p.v); p.y = boardTopW(); }
+      else p.y = R.tableY;
+      p.settled = false; p.vy = -rnd(150, 420); p.vx = rnd(-120, 120); p.vz = rnd(-60, 60); p.vr = rnd(-10, 10);
     });
   }
 
   // ---------- Sound (off by default; soft synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. The drill press builds its motor hum and
-  // grinding noise once per context.
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js). The drill press
+  // builds its motor hum and drilling noise once per context.
   var AC = null, master = null, humG = null, humO1 = null, humO2 = null, grindG = null, grindF = null;
   function ensureAudio() {
     var a = Toybox.sound.ready();
@@ -1765,12 +1360,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (!AC) return;
     var t = AC.currentTime;
     var on = Toybox.sound.on() && Toybox.timer.phase() !== "resting";
-    var f = Math.min(1, R.rpm / 3000);
-    humG.gain.setTargetAtTime(on && R.rpm > 20 ? 0.035 + 0.035 * f : 0, t, 0.08);
-    humO1.frequency.setTargetAtTime(40 + f * 30, t, 0.1);
-    humO2.frequency.setTargetAtTime(90 + f * 140, t, 0.1);
+    var f = Math.min(1, R.rpm / RPM);
+    humG.gain.setTargetAtTime(on && R.rpm > 20 ? 0.035 + 0.03 * f : 0, t, 0.08);
+    humO1.frequency.setTargetAtTime(40 + f * 25, t, 0.1);
+    humO2.frequency.setTargetAtTime(90 + f * 110, t, 0.1);
     grindG.gain.setTargetAtTime(on ? R.cutting * 0.06 : 0, t, 0.05);
-    grindF.frequency.setTargetAtTime(MATS[S.mat].sound * (0.7 + 0.6 * f), t, 0.1);
+    grindF.frequency.setTargetAtTime(900 * (0.7 + 0.6 * f), t, 0.1);
   }
   function blip(freq, dur, vol, type, freq2) {
     ensureAudio();
@@ -1790,49 +1385,205 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Machine logic ----------
-  var now = 0; // seconds, from requestAnimationFrame
-  R.clampT = S.clamp ? 1 : 0;
-  R.clampSide = S.py > BH / 2 ? -1 : 1;
-  R.qWant = 0;
-  R.flyBit = null;  // {id, si, fx, fy, fs, tx, ty, ts, t, dur, done}
-  R.dragBit = null; // {id, si, x, y, from}
-  R.keyWiggle = 0;
-  R.tightAt = -10;
-  R.stopAt = -10;
-
   var promptTimer = null;
   function say(msg, flashKey) {
     var el = $("prompt");
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(promptTimer);
-    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 3400);
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 3200);
     if (flashKey) R.flash[flashKey] = now + 3.2;
   }
-  function busy() { return Toybox.timer.locked(); }
-
-  function bitMM(id, si) { return BITS[id].sizes[si][0]; }
-  function chuckBitScreen() {
-    var p = toScreen(X0, bitTop() - bitDrop());
-    return { x: p.x, y: p.y, s: M.s };
-  }
-
+  // The table rises or drops so the bit's tip waits just above the board.
   function autoTable() {
     var b = curBit();
-    var tipRest = 386 + (b ? b.len : 34);
-    R.tableTarget = clamp(tipRest + 18 + matT(S.mat), 440, 700);
+    R.tableTarget = clamp(386 + (b ? b.len : 100) + 18 + boardT(), 440, 700);
+  }
+  function switchOn() {
+    if (R.running) return;
+    R.running = true; R.offTries = 0;
+    blip(160, 0.12, 0.12, "sine", 90);
+  }
+  function toggleSwitch() {
+    if (busy()) return;
+    if (R.swap) { R.swap.turnOn = true; return; }
+    if (!R.running) switchOn();
+    else { R.running = false; blip(120, 0.1, 0.1, "sine", 70); }
+  }
+  // He pulled the handle while it was off: say so and flash the switch; the second time, switch it on for him.
+  function offPull() {
+    if (R.running || R.swap || busy()) return;
+    if (++R.offTries >= 2) { switchOn(); return; }
+    say("Switch it on!", "sw");
+  }
+  function releaseFeed() {
+    for (var k in drags) { if (drags[k].type === "feed" || drags[k].type === "feedV") delete drags[k]; }
+    R.feedHeld = false;
+  }
+
+  // ---------- Changing the bit: tap one in the case ----------
+  // The motor stops, the chuck opens by itself, the old bit goes back to the case, the new one flies in
+  // and the jaws close on it. No chuck key, no waiting.
+  function tileView(id) {
+    var el = document.querySelector('[data-bit="' + id + '"]'), cr = cv.getBoundingClientRect();
+    if (el) {
+      var r = el.getBoundingClientRect();
+      if (r.width > 0) return { v: toView(r.left + r.width / 2 - cr.left, r.top + r.height / 2 - cr.top), s: Math.min(r.height * 0.8, 60) / BITS[id].len / M.s };
+    }
+    return { v: toView(CW / 2, CH + 80), s: 0.4 };
+  }
+  function chuckCenter(id) {
+    var top = bitTop() - bitDrop(), p = P(0, top + BITS[id].len / 2, 0);
+    return { v: p, s: p.k };
+  }
+  function startSwap(id) {
+    if (busy() || !BITS[id]) return;
+    if (R.swap) {
+      if (R.swap.phase === "stop" || R.swap.phase === "open" || R.swap.phase === "out") R.swap.target = id; else R.swap.next = id;
+      updateTiles();
+      return;
+    }
+    if (S.chuck && S.chuck.id === id) { say(BITS[id].name + " bit!"); R.flash.chuck = now + 1.4; return; }
+    R.swap = { phase: "stop", t: 0, target: id, old: S.chuck ? S.chuck.id : null, next: null, turnOn: false };
+    if (R.running) { R.running = false; blip(120, 0.1, 0.1, "sine", 70); }
+    releaseFeed();
+    R.curHole = null;
+    blip(500, 0.05, 0.05, "triangle");
+    updateTiles();
+    say(BITS[id].name + " bit");
+  }
+  function runSwap(dt) {
+    var W = R.swap;
+    if (!W) return;
+    W.t += dt;
+    function go(ph) { W.phase = ph; W.t = 0; }
+    if (W.phase === "stop") {
+      if ((R.rpm < 40 && R.q < 2) || W.t > 1.4) { R.rpm = 0; go("open"); }
+    } else if (W.phase === "open") {
+      R.jaw = ease(W.t / 0.3);
+      if (W.t >= 0.3) { R.jaw = 1; W.from = W.old ? chuckCenter(W.old) : null; S.chuck = null; go("out"); blip(400, 0.06, 0.06, "triangle"); }
+    } else if (W.phase === "out") {
+      if (!W.old || W.t >= 0.45) go("in");
+    } else if (W.phase === "in") {
+      if (W.t >= 0.5) { S.chuck = { id: W.target, si: 0 }; go("close"); blip(520, 0.06, 0.07, "triangle"); }
+    } else if (W.phase === "close") {
+      R.jaw = 1 - ease(W.t / 0.3);
+      if (W.t >= 0.3) {
+        R.jaw = 0; blip(700, 0.06, 0.08, "square", 900);
+        autoTable(); save();
+        var nx = W.next, on = W.turnOn;
+        R.swap = null;
+        if (nx && nx !== S.chuck.id) { startSwap(nx); if (on && R.swap) R.swap.turnOn = true; }
+        else { updateTiles(); if (on) switchOn(); }
+      }
+    }
+  }
+  function drawSwapBits(c) {
+    var W = R.swap;
+    if (!W) return;
+    var a, b, f, id;
+    if (W.phase === "out" && W.old && W.from) { id = W.old; a = W.from; b = tileView(id); f = ease(W.t / 0.45); }
+    else if (W.phase === "in") { id = W.target; a = tileView(id); b = chuckCenter(id); f = ease(W.t / 0.5); }
+    else return;
+    var x = lerp(a.v.x, b.v.x, f), y = lerp(a.v.y, b.v.y, f) - Math.sin(f * Math.PI) * 60, s = lerp(a.s, b.s, f), len = BITS[id].len;
+    c.save();
+    c.translate(x, y); c.rotate(Math.sin(f * Math.PI) * 0.35 * (W.phase === "out" ? 1 : -1)); c.scale(s, s);
+    drawBit(c, id, BITS[id].mm, 0, -len / 2, len, 0, 0);
+    c.restore();
+  }
+
+  // ---------- Drilling ----------
+  function findOrMakeHole(b) {
+    for (var i = S.holes.length - 1; i >= 0; i--) {
+      var h = S.holes[i];
+      if (h.bit === b.id && Math.abs(h.x - S.px) < 1.5 && Math.abs(h.y - S.py) < 1.5) return h;
+    }
+    var nh = { bit: b.id, mm: b.mm, x: Math.round(S.px * 10) / 10, y: Math.round(S.py * 10) / 10, d: 0 };
+    S.holes.push(nh);
+    if (S.holes.length > 150) S.holes.shift();
+    S.made++;
+    return nh;
+  }
+  // Quill travel at which the bit's tip touches the board
+  function contactQ() { var b = curBit(); return boardTopW() - (386 + (b ? b.len : 34)); }
+  function penMM() { return Math.max(0, (R.q - contactQ()) / DS); }
+
+  function updateDrill(dt) {
+    var b = curBit();
+    var cq = contactQ();
+    var canCut = b && R.running && R.jaw === 0 && !R.swap && R.rpm > 150;
+    var stopQ = cq + (WOOD.t + 12) * DS;    // a little past the bottom of the board
+    var qmax = Math.min(TRAVEL, canCut ? stopQ : Math.max(0, cq));
+    var want = R.feedHeld ? R.qWant : 0;
+    var before = penMM();
+    R.cutting = 0;
+    if (want > qmax) want = qmax;
+    if (want > R.q) {
+      var nq = want;
+      if (canCut && nq > cq) {
+        var start = Math.max(R.q, cq);
+        var rate = WOOD.rate * clamp(14 / b.mm, 0.4, 1.2) * DS * (0.6 + 0.4 * Math.min(1, R.rpm / RPM));
+        nq = Math.min(want, start + rate * dt);
+      }
+      R.q = nq;
+    } else {
+      R.q = R.feedHeld ? want : Math.max(want, R.q - 300 * dt);
+    }
+    // The handle follows the finger while held; otherwise it turns back with the quill.
+    var st = (R.feedHeld ? Math.max(R.q, R.qWant) : R.q) / TRAVEL;
+    R.spokeT += (st - R.spokeT) * Math.min(1, dt * 12);
+    var pen = penMM();
+    if (canCut && pen > 0.05) {
+      var h = R.curHole && R.curHole.bit === b.id ? R.curHole : null;
+      if (!h) { h = findOrMakeHole(b); R.curHole = h; }
+      if (pen > h.d) {
+        var wasThr = holeThrough(h);
+        var grow = pen - Math.max(h.d, before);
+        h.d = Math.round(pen * 10) / 10;
+        boardDirty = true;
+        if (grow > 0) {
+          R.cutting = Math.min(1, grow / dt / 8 + 0.3);
+          emitChips(dt, b, 60 + 90 * R.cutting);
+          R.shake = Math.max(R.shake, 0.5 + 0.5 * R.cutting);
+        }
+        if (!wasThr && holeThrough(h)) {
+          R.thruAt = now;
+          blip(660, 0.12, 0.08, "sine", 990);
+          if (b.id === "holesaw") {
+            // the round slug drops out under the board
+            addPart({ type: "disc", x: 0, y: boardTopW() + 6, z: 0, vx: rnd(-40, 40), vy: 60, vz: 140, sz: (b.mm - 2) * DS / 2, col: WOOD.col, vr: 0, rot: 0.01 });
+          }
+        }
+      } else if (R.q > cq) {
+        R.cutting = 0.15; // spinning in an existing hole
+      }
+    }
+    if (R.curHole && R.q < cq - 2) { R.curHole = null; save(); }
+  }
+
+  function updateMachine(dt) {
+    if (R.running) R.rpm += (RPM - R.rpm) * Math.min(1, dt * 2.2);
+    else if (R.swap) R.rpm = Math.max(0, R.rpm - (R.rpm * 5 + 500) * dt);   // a quick brake for a bit change
+    else R.rpm = Math.max(0, R.rpm - (R.rpm * 0.8 + 160) * dt);             // spins down over a couple of seconds
+    var vis = R.rpm > 0 ? (reduce ? 1 + R.rpm / 900 : 2 + R.rpm / 230) : 0;  // visual revolutions per second
+    R.phase = (R.phase + vis * 2 * Math.PI * dt) % (Math.PI * 200);
+    R.shake = Math.max(R.running ? 0.35 : 0, R.shake - dt * 2);
+    var dy = R.tableTarget - R.tableY;
+    if (Math.abs(dy) > 0.2) R.tableY += clamp(dy, -240 * dt, 240 * dt);
+    R.boardSlide *= Math.pow(0.004, dt);
+    if (Math.abs(R.boardSlide) < 0.5) R.boardSlide = 0;
   }
 
   // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  // After a few quiet seconds, a see-through hand shows the next move. A touch re-arms it and it shows
+  // at most three times per visit.
   function makeGhost(plan, opt) {
     opt = opt || {};
     var IDLE = opt.idle || 4500, MAX = opt.max || 2;
     var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var reduceM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
     function build() {
       el = document.createElement("div");
       el.className = "ghosthand";
@@ -1846,8 +1597,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       document.body.appendChild(el);
     }
     function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
     function poke() { last = Date.now(); armed = true; if (run) stop(); }
     document.addEventListener("pointerdown", poke, true);
     document.addEventListener("keydown", poke, true);
@@ -1856,7 +1605,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
       return !!(opt.ok && !opt.ok());
     }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
     function at(pts, f) {
       if (pts.length < 2) return pts[0];
       var segs = [], tot = 0, i;
@@ -1881,7 +1629,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
       } else {
         a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var f = reduceM ? 0.5 : ease((t - 0.16) / 0.66);
         var q = at(p.pts, f); x = q[0]; y = q[1];
         press = t > 0.12 && t < 0.86;
         sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
@@ -1898,11 +1646,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
       el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
       el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
+      carryEl.innerHTML = "";
       run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
       requestAnimationFrame(frame);
     }
@@ -1916,375 +1660,99 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }, 250);
     return {
       learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
       poke: poke,
-      // test hook: show it now
       show: function () { var p = plan(); if (p) show(p); return !!p; }
     };
   }
-  // Page px of a point inside an element, as fractions of its box.
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
-  }
-  // Coach line and ghost hand: turn it on, then pull the handle down to drill.
+  // Coach line and ghost hand: turn it on, pull the handle down, then slide the board for the next hole.
   function coachStep() {
-    if (busy() || R.auto) return "";
+    if (busy() || R.swap) return "";
     if (!S.holes.length) return R.running ? "Pull the handle down!" : "Turn it on!";
+    if (!S.slid) return "Slide the board!";
     return "";
   }
   setInterval(function () {
     var c = $("coach"), t = coachStep();
     if (t) c.textContent = t;
     c.classList.toggle("off", !t);
-    c.style.left = Math.round(M.x + M.w / 2) + "px";
-    c.style.maxWidth = Math.round(M.w - 16) + "px";
   }, 300);
+  function pagePt(v) { var r = cv.getBoundingClientRect(), s = toScreen(v); return [r.left + s.x, r.top + s.y]; }
+  // The knob to pull: the one up and toward you.
+  function pullKnob() {
+    var ks = knobPts(spokeBase()), best = null;
+    ks.forEach(function (k) { var sc = k.w[2] - Math.max(0, k.w[1] - HUB.y) * 2; if (!best || sc > best.sc) best = { i: k.i, sc: sc }; });
+    return best.i;
+  }
   var ghost = makeGhost(function () {
-    var r = cv.getBoundingClientRect(), t = coachStep(), a, b;
-    if (!t || R.dragBit || R.key === "chuck" || R.key === "drag") return null;
-    if (!R.running) { a = toScreen(529, 168); return { pts: [[r.left + a.x, r.top + a.y]], tap: true }; }
-    a = toScreen(HUB.x + 100, HUB.y - 12); b = toScreen(HUB.x + 100, HUB.y + 120);
-    return { pts: [[r.left + a.x, r.top + a.y], [r.left + b.x, r.top + b.y]] };
+    var t = coachStep(), j;
+    if (!t || R.ui.sw === undefined) return null;
+    if (t === "Turn it on!") return { pts: [pagePt(R.ui.sw.btn)], tap: true };
+    if (t === "Pull the handle down!") {
+      var i = pullKnob(), pts = [];
+      for (j = 0; j <= 6; j++) pts.push(pagePt(knobPts(spokeBase() + j * 0.2)[i].p));
+      return { pts: pts };
+    }
+    var top = boardTopW(), u = clamp(S.px + 70, 20, BW - 20), v = clamp(S.py + 30, 10, BH - 10);
+    return { pts: [pagePt(P(bxw(u), top, bzw(v))), pagePt(P(bxw(u) - 90, top, bzw(v)))] };
   }, { max: 3 });
-  function toggleSwitch() {
-    if (R.auto || busy()) return;
-    if (!R.running) {
-      if (R.key === "chuck" || R.key === "drag") { say("Take the chuck key out first", "key"); R.keyWiggle = now; blip(330, 0.15, 0.05, "triangle"); return; }
-      if (S.chuck && R.jaw > 0.04) { say("Tighten the chuck first", "key"); return; }
-      if (R.lid > 0.1) { say("Close the belt cover first", "lid"); return; }
-      R.running = true;
-      blip(160, 0.12, 0.12, "sine", 90);
-    } else {
-      R.running = false;
-      blip(120, 0.1, 0.1, "sine", 70);
-    }
-  }
-
-  // Jaws: counter-clockwise opens ("lefty loosey"), clockwise tightens.
-  function turnKey(dA) {
-    var before = R.jaw;
-    var dj = -dA / (3 * Math.PI);
-    var nj = clamp(R.jaw + dj, 0, 1);
-    if (nj === R.jaw) return; // at a limit: the key won't turn further
-    var used = (nj - R.jaw) / dj;
-    R.keyAng += dA * used;
-    R.jaw = nj;
-    if (Math.floor(R.keyAng / 0.5) !== Math.floor((R.keyAng - dA * used) / 0.5)) blip(1500, 0.025, 0.035, "triangle");
-    if (before > 0 && R.jaw === 0) tightened();
-  }
-  function tightened() {
-    R.tightAt = now;
-    blip(700, 0.06, 0.08, "square", 900);
-    if (S.chuck) { autoTable(); }
-  }
-
-  function removeBitToCase(animFromChuck) {
-    if (!S.chuck) return;
-    var id = S.chuck.id, si = S.chuck.si;
-    dropSawSlug();
-    if (animFromChuck) {
-      var p = chuckBitScreen(), slot = slotPos(id);
-      R.flyBit = { id: id, si: si, fx: p.x, fy: p.y, fs: M.s, tx: slot.x, ty: slot.y, ts: slot.s, t: 0, dur: 0.45 };
-    }
-    S.chuck = null;
-    save();
-  }
-
-  // A bit dropped on the chuck. Returns true if it went in.
-  function tryInsert(id, si) {
-    if (R.running) { say("Switch off to change the bit", "sw"); return false; }
-    if (R.jaw < 0.6) {
-      say(R.key === "chuck" ? "Turn the key ↺ to open the jaws" : "Open the jaws with the chuck key", "key");
-      return false;
-    }
-    if (S.chuck) removeBitToCase(true);
-    S.chuck = { id: id, si: si };
-    S.sizes[id] = si;
-    blip(520, 0.06, 0.07, "triangle");
-    save();
-    return true;
-  }
-
-  function dropSawSlug() {
-    if (!R.sawSlug) return;
-    var sl = R.sawSlug;
-    R.sawSlug = null;
-    var b = curBit();
-    var y = b ? bitTop() + b.len - 20 : chuckTop() + 80;
-    addPart({ type: "plug", x: X0, y: y, vx: rnd(-60, 60), vy: -60, w: sl.mm * DS, h: sl.h, col: MATS[sl.mat].col, mm: sl.mm, mat: sl.mat, bx: sl.bx, by: sl.by, vr: rnd(-4, 4) });
-    blip(260, 0.12, 0.08, "sine", 520);
-  }
-  function landPlug(p) {
-    var bx = clamp(p.bx, 10, BW - 10), by = clamp(p.by, 10, BH - 10);
-    S.plugs.push({ x: bx, y: by, mm: p.mm, mat: p.mat });
-    if (S.plugs.length > 40) S.plugs.shift();
-    boardDirty = true;
-    blip(420, 0.08, 0.07, "sine", 300);
-    save();
-  }
-
-  // ---------- Auto bit change (tap a bit in the case) ----------
-  function autoChange(id, si) {
-    if (R.auto || busy()) return;
-    if (S.chuck && S.chuck.id === id && S.chuck.si === si && R.jaw === 0 && R.key === "holder") {
-      say("That bit is already in!"); R.flash.chuck = now + 1.2; return;
-    }
-    var steps = [], j0, a0, kp0;
-    if (R.running) steps.push({ dur: 1.1, start: function () { R.running = false; say("Switch off first… done!", "sw"); blip(120, 0.1, 0.1, "sine", 70); } });
-    steps.push({ dur: 0.45, start: function () {
-      if (R.key === "chuck") { this.dur = 0; return; }
-      kp0 = R.key === "holder" ? { x: KEY_HOME.x, y: KEY_HOME.y } : { x: R.keyPos.x, y: R.keyPos.y };
-      R.key = "fly";
-    }, update: function (f) {
-      var kh = keyhole();
-      R.keyPos = { x: lerp(kp0.x, kh.x, f), y: lerp(kp0.y, kh.y, f) - Math.sin(f * Math.PI) * 60 };
-    }, end: function () { R.key = "chuck"; R.keyAng = 0; blip(900, 0.04, 0.05, "triangle"); } });
-    steps.push({ dur: 0.6, start: function () { j0 = R.jaw; a0 = R.keyAng; }, update: function (f) {
-      var nj = lerp(j0, 1, f);
-      R.keyAng = a0 - (nj - j0) * 3 * Math.PI; R.jaw = nj;
-      if (Math.random() < 0.3) blip(1500, 0.02, 0.03, "triangle");
-    } });
-    steps.push({ dur: 0.5, start: function () { if (!S.chuck) { this.dur = 0; return; } removeBitToCase(true); } });
-    steps.push({ dur: 0.55, start: function () {
-      var slot = slotPos(id), p = toScreen(X0, bitTop() - bitDrop());
-      S.sizes[id] = si;
-      R.flyBit = { id: id, si: si, fx: slot.x, fy: slot.y, fs: slot.s, tx: p.x, ty: p.y, ts: M.s, t: 0, dur: 0.5, into: true };
-    }, end: function () { R.flyBit = null; S.chuck = { id: id, si: si }; blip(520, 0.06, 0.07, "triangle"); } });
-    steps.push({ dur: 0.6, start: function () { a0 = R.keyAng; }, update: function (f) {
-      R.jaw = lerp(1, 0, f); R.keyAng = a0 + f * 3 * Math.PI;
-      if (Math.random() < 0.3) blip(1500, 0.02, 0.03, "triangle");
-    }, end: function () { R.jaw = 0; tightened(); } });
-    steps.push({ dur: 0.45, start: function () { var kh = keyhole(); kp0 = { x: kh.x, y: kh.y }; R.key = "fly"; }, update: function (f) {
-      R.keyPos = { x: lerp(kp0.x, KEY_HOME.x, f), y: lerp(kp0.y, KEY_HOME.y, f) - Math.sin(f * Math.PI) * 60 };
-    }, end: function () { R.key = "holder"; } });
-    R.auto = { steps: steps, i: 0, t: 0, started: false };
-    save();
-  }
-  function runAuto(dt) {
-    var A = R.auto;
-    if (!A) return;
-    var st = A.steps[A.i];
-    if (!A.started) { A.started = true; A.t = 0; if (st.start) st.start.call(st); }
-    A.t += dt;
-    var f = st.dur > 0 ? Math.min(1, A.t / st.dur) : 1;
-    if (st.update) st.update.call(st, f);
-    if (f >= 1) {
-      if (st.end) st.end.call(st);
-      A.i++; A.started = false;
-      if (A.i >= A.steps.length) R.auto = null;
-    }
-  }
-
-  // ---------- Drilling ----------
-  var hintedClamp = false;
-  var boardDirty = true;
-  function findOrMakeHole(b) {
-    for (var i = S.holes.length - 1; i >= 0; i--) {
-      var h = S.holes[i];
-      if (h.bit === b.id && h.mm === b.mm && Math.abs(h.x - S.px) < 1.5 && Math.abs(h.y - S.py) < 1.5) return h;
-    }
-    var nh = { bit: b.id, mm: b.mm, x: Math.round(S.px * 10) / 10, y: Math.round(S.py * 10) / 10, d: 0 };
-    S.holes.push(nh);
-    if (S.holes.length > 150) S.holes.shift();
-    S.made++;
-    return nh;
-  }
-  function contactQ() {
-    var b = curBit();
-    var tipRest = b ? bitTop() - R.q + b.len - bitDrop() : chuckTop() - R.q + 74;
-    return boardTopW() - tipRest;
-  }
-  function penMM() { return Math.max(0, (R.q - contactQ()) / zS(S.mat)); }
-
-  function updateDrill(dt) {
-    var b = curBit();
-    var m = MATS[S.mat];
-    var cq = contactQ();
-    var canCut = b && R.running && R.jaw === 0 && R.rpm > 150;
-    var maxPen = Math.min(S.depth, m.t + 12);
-    var stopQ = cq + maxPen * zS(S.mat);
-    var qmax = Math.min(TRAVEL, canCut ? stopQ : Math.max(0, cq));
-    var want = R.feedHeld ? R.qWant : 0;
-    var before = penMM();
-    R.cutting = 0;
-    if (want > qmax) {
-      if (R.feedHeld && want > qmax + 4) {
-        if (!b) { if (R.q >= qmax - 1) say("Put a bit in the chuck", "case"); }
-        else if (!R.running) { if (R.q >= qmax - 1) say("Switch on to drill", "sw"); }
-        else if (qmax === stopQ && R.q >= stopQ - 0.5 && now - R.stopAt > 0.6) { R.stopAt = now; R.flash.dial = now + 0.6; blip(220, 0.06, 0.06, "sine"); }
-      }
-      want = qmax;
-    }
-    if (want > R.q) {
-      var nq = want;
-      if (canCut && nq > cq) {
-        var start = Math.max(R.q, cq);
-        var rate = m.rate * goodness(b.id, S.mat) * clamp(14 / b.mm, 0.4, 1.2) * zS(S.mat) * (0.6 + 0.4 * Math.min(1, R.rpm / 1500));
-        nq = Math.min(want, start + rate * dt);
-      }
-      R.q = nq;
-    } else {
-      R.q = R.feedHeld ? want : Math.max(want, R.q - 300 * dt);
-    }
-    // Spokes follow the finger while held; otherwise they ease back to match the quill.
-    if (!R.spokeHeld) R.spokeOff += (R.q / TRAVEL * 2.4 - R.spokeOff) * Math.min(1, dt * 10);
-    var pen = penMM();
-    if (canCut && pen > 0.05) {
-      var h = R.curHole && R.curHole.bit === b.id ? R.curHole : null;
-      if (!h) { h = findOrMakeHole(b); R.curHole = h; }
-      if (pen > h.d) {
-        var grow = pen - Math.max(h.d, before);
-        h.d = Math.round(pen * 10) / 10;
-        boardDirty = true;
-        if (m.kind === "plastic" && pen > 1 && (b.id === "spade" || b.id === "auger" || b.id === "masonry" || (b.id === "twist" && h.mm >= 10))) h.crack = true;
-        if (grow > 0) {
-          R.cutting = Math.min(1, grow / dt / 8 + 0.3);
-          emitChips(dt, b, 60 + 90 * R.cutting);
-          R.shake = Math.max(R.shake, 0.5 + 0.5 * R.cutting);
-          if (!S.clamp && !hintedClamp && pen > 2) { hintedClamp = true; say("Tip: clamp the board to hold it still", "clamp"); }
-        }
-        if (b.id === "holesaw" && h.d - leadMM("holesaw", h.mm) >= m.t && !h.slugOut) {
-          h.slugOut = true;
-          R.sawSlug = { mm: h.mm - 2, mat: S.mat, h: matT(S.mat), bx: h.x + (h.x > BW / 2 ? -1 : 1) * (h.mm * DS * 0.5 + 14), by: h.y };
-          blip(380, 0.1, 0.07, "sine", 620);
-        }
-      } else if (R.q > cq) {
-        R.cutting = 0.15; // spinning in an existing hole
-      }
-    }
-    if (R.curHole && R.q < cq - 2) {
-      // Bit came back out of the hole
-      var ch = R.curHole;
-      R.curHole = null;
-      if (ch.bit === "plug" && !ch.plugOut && ch.d >= 3) {
-        ch.plugOut = true;
-        boardDirty = true;
-        var ph = Math.min(ch.d, m.t) * zS(S.mat);
-        addPart({ type: "plug", x: X0, y: boardTopW() - ph / 2, vx: rnd(-90, 90), vy: -380, w: ch.mm * DS, h: ph, col: m.col, mm: ch.mm, mat: S.mat,
-          bx: ch.x + (ch.x > BW / 2 ? -1 : 1) * (ch.mm * DS + 12), by: ch.y + rnd(-10, 10), vr: rnd(-9, 9) });
-        blip(600, 0.12, 0.08, "sine", 1100);
-        say("Pop! A plug — drag it into a hole");
-      }
-      save();
-    }
-    // Board jiggles a little when it isn't clamped
-    R.jig = (!S.clamp && R.cutting > 0.2 && !reduce) ? Math.sin(now * 55) * 1.6 : 0;
-  }
-
-  function updateMachine(dt) {
-    var target = R.running ? RPMS[R.belt] : 0;
-    if (R.running) R.rpm += (target - R.rpm) * Math.min(1, dt * 2.2);
-    else R.rpm = Math.max(0, R.rpm - (R.rpm * 0.8 + 160) * dt); // spins down over a couple of seconds
-    var vis = R.rpm > 0 ? (reduce ? 1 + R.rpm / 900 : 2 + R.rpm / 230) : 0; // visual revolutions per second
-    R.phase = (R.phase + vis * 2 * Math.PI * dt) % (Math.PI * 200);
-    R.shake = Math.max(R.running ? 0.35 : 0, R.shake - dt * 2);
-    // Table follows its target and turns the crank
-    var dy = R.tableTarget - R.tableY;
-    if (Math.abs(dy) > 0.2) {
-      var stp = clamp(dy, -320 * dt, 320 * dt);
-      R.tableY += stp;
-      R.crank += stp * 0.12;
-    }
-    R.lid += (R.lidTarget - R.lid) * Math.min(1, dt * 8);
-    R.clampT += ((S.clamp ? 1 : 0) - R.clampT) * Math.min(1, dt * 10);
-    if (!S.clamp && R.clampT < 0.05) R.clampSide = S.py > BH / 2 ? -1 : 1;
-    R.boardSlide *= Math.pow(0.002, dt);
-    if (Math.abs(R.boardSlide) < 0.5) R.boardSlide = 0;
-    if (R.flyBit) {
-      R.flyBit.t += dt;
-      if (R.flyBit.t >= R.flyBit.dur && !R.flyBit.into) R.flyBit = null;
-    }
-  }
 
   // ---------- Rendering ----------
-  var hits = []; // screen-space tap/drag zones rebuilt every frame (board view, case, overlay)
-  function zone(kind, x, y, w, h, data) { hits.push({ kind: kind, x: x, y: y, w: w, h: h, data: data }); }
-  function flashOn(k) { return R.flash[k] && R.flash[k] > now; }
-  function pulse(c, x, y, w, h, r) {
-    c.save();
-    c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-    rr(c, x, y, w, h, r); c.lineWidth = 6; c.strokeStyle = "#FF6B2C"; c.stroke();
-    c.restore();
-  }
-
   function drawMachine(c) {
-    worldXf();
+    viewXf();
     var jx = 0, jy = 0;
     if (R.rpm > 30 && !reduce) {
       var a = R.shake * Math.min(1, R.rpm / 800);
       jx = (Math.random() - 0.5) * 1.6 * a; jy = (Math.random() - 0.5) * 1.6 * a;
     }
-    drawBase(c);
+    c.save(); c.translate(jx, jy); drawMotor(c); c.restore();
     drawColumn(c);
     drawTable(c);
-    // Workpiece: its top face (with every hole and plug on it) seen a little from above, its front edge, and its clamp
-    var bl = boardLeftW() + (R.jig || 0), top = boardTopW();
-    drawBoardMain(c, bl, top);
-    drawClamp(c, bl, bl + BH, top);
+    drawBoard(c);
+    drawParts(c, true);
     c.save();
     c.translate(jx, jy);
-    drawMotor(c, now);
-    drawHead(c);
-    drawLid(c);
-    drawSwitch(c);
-    drawKeyHolder(c);
-    if (R.key === "holder") {
-      var wig = now - R.keyWiggle < 0.8 ? Math.sin((now - R.keyWiggle) * 30) * 0.25 : 0;
-      drawKeySide(c, KEY_HOME.x, KEY_HOME.y, wig);
-    }
-    drawLamp(c);
+    // Quill, chuck and bit first: the head's rounded front hides the top of the quill.
     drawQuill(c);
     var b = curBit();
-    if (b && !(R.flyBit && R.flyBit.into)) {
-      // the part of the bit that has gone into the board is hidden by the board
+    if (b) {
+      var top = boardTopW(), hc = P(0, top, 0), r = bitW(b.id) / 2 + 3, i, pts = [];
       c.save();
-      c.beginPath(); c.rect(-2000, -2000, 5000, 5000); c.rect(bl, top, BH, matT(S.mat) + (BW - S.px) * BOARD_F + 2); c.clip("evenodd");
-      drawBit(c, b.id, b.mm, X0, bitTop() - bitDrop(), b.len, R.phase, Math.min(1, R.rpm / 1200));
+      // the part of the bit that has gone into the board is hidden by the wood in front of it
+      c.beginPath(); c.rect(-5000, -5000, 10000, hc.y + 5000);
+      for (i = 0; i < 24; i++) { var an = i / 24 * Math.PI * 2; pts.push(P(Math.cos(an) * r, top, Math.sin(an) * r)); }
+      var area = 0;
+      for (i = 0; i < pts.length; i++) { var p1 = pts[i], p2 = pts[(i + 1) % pts.length]; area += p1.x * p2.y - p2.x * p1.y; }
+      if (area < 0) pts.reverse();
+      pts.forEach(function (p, k) { if (k) c.lineTo(p.x, p.y); else c.moveTo(p.x, p.y); });
+      c.closePath();
+      c.clip();
+      var bt = bitTop() - bitDrop();
+      axisXf(c, bt, bt + b.len);
+      drawBit(c, b.id, b.mm, 0, bt, b.len, R.phase, Math.min(1, R.rpm / 1200));
       c.restore();
     }
     drawChuck(c);
-    if (R.key === "chuck") drawKeyInChuck(c);
-    drawFeed(c, penMM());
+    drawHead(c);
+    drawCover(c);
+    drawLamp(c);
+    drawSwitch(c);
+    drawFeed(c);
     c.restore();
-    drawLightCone(c);
-    drawParts(c);
-    // Highlights and little callouts
-    if (flashOn("key")) {
-      var kp = R.key === "chuck" ? keyhole() : (R.key === "holder" ? { x: KEY_HOME.x, y: KEY_HOME.y + 20 } : R.keyPos);
+    drawLight(c);
+    drawParts(c, false);
+    if (R.flash.chuck && R.flash.chuck > now) {
+      var cc = P(0, chuckTop() + 36, 0);
       c.save(); c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      c.beginPath(); c.arc(kp.x, kp.y, 58, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
+      c.beginPath(); c.arc(cc.x, cc.y, 58, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
       c.restore();
     }
-    if (flashOn("chuck")) {
-      c.save(); c.globalAlpha = 0.5 + 0.5 * Math.sin(now * 12);
-      c.beginPath(); c.arc(X0, chuckTop() + 40, 62, 0, Math.PI * 2); c.lineWidth = 8; c.strokeStyle = "#FF6B2C"; c.stroke();
+    if (now - R.thruAt < 2.2) {
+      var f = (now - R.thruAt) / 2.2, hp = P(0, boardTopW(), 0);
+      c.save(); c.globalAlpha = f < 0.8 ? 1 : (1 - f) / 0.2;
+      pill(c, "Through!", hp.x + 120, hp.y - 30 - f * 20, 24, "#5BE37A");
       c.restore();
     }
-    if (now - R.tightAt < 1.0) {
-      var f = (now - R.tightAt) / 1.0;
-      c.save(); c.globalAlpha = 1 - f;
-      pill(c, "Tight!", X0 - 110, chuckTop() + 30 - f * 30, 26, "#5BE37A");
-      c.restore();
-    }
-    if (R.key === "chuck" && !R.auto && !R.dragKey) {
-      // Turn hint arrows around the key
-      var kh = keyhole();
-      c.save(); c.globalAlpha = 0.85;
-      c.strokeStyle = S.chuck && R.jaw > 0.5 ? "#2E9E5B" : "#FF6B2C"; c.lineWidth = 6; c.lineCap = "round";
-      var open = R.jaw < 0.6;
-      c.beginPath(); c.arc(kh.x, kh.y, 64, -0.4, 1.1); c.stroke();
-      var ea = open ? -0.4 : 1.1, ex = kh.x + Math.cos(ea) * 64, ey = kh.y + Math.sin(ea) * 64;
-      c.beginPath(); c.arc(ex, ey, 7, 0, Math.PI * 2); c.fillStyle = c.strokeStyle; c.fill();
-      c.restore();
-      if (R.jaw >= 0.6) R.cycled = true;
-      var hintTxt = R.jaw === 0 && R.cycled && S.chuck ? "Tight! Take the key out" : (open ? "Turn ↺ to open" : (S.chuck ? "Turn ↻ to tighten" : "Now drag a bit up"));
-      pill(c, hintTxt, kh.x + 40, kh.y + 92, 20, open && !(R.jaw === 0 && R.cycled) ? "#FFC93C" : "#5BE37A");
-    }
-    if (R.sawSlug && S.chuck && S.chuck.id === "holesaw" && R.q < 4) {
-      pill(c, "Tap: pop the plug out", X0 - 60, tipY() + 30, 18, "#FFFFFF");
-    }
+    drawSwapBits(c);
   }
 
   // Timer ring in the corner of the machine area
@@ -2293,8 +1761,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (TI.phase !== "running" && TI.phase !== "ending") return;
     screenXf();
     var f = TI.fraction;
-    var r = Math.max(18, Math.min(30, M.w * 0.06));
-    var x = M.x + r + 8, y = M.y + r + 8;
+    var r = Math.max(18, Math.min(30, CW * 0.05));
+    var x = CW - r - 10, y = r + 10;
     c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); fs(c, "#FFFFFF", 3);
     if (f > 0.002) {
       c.beginPath(); c.arc(x, y, r - 6, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2);
@@ -2303,388 +1771,19 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (TI.showMinutes && TI.phase === "running") label(c, String(TI.minutes), x, y + 1, r * 0.8, OUT);
   }
 
-  // ---------- The board in the main view ----------
-  // The machine is drawn from the side; the board's top face is shown tipped toward you (board x runs
-  // into the picture, squashed by BOARD_F), so every hole and plug on it shows. The drilling point
-  // (S.px, S.py) sits right under the bit, on the line y = top. A red laser cross marks it.
-  var BOARD_F = typeof BOARD_F === "number" ? BOARD_F : 0.36;   // layout() tips it further on small screens
-  function boardFromMain(bl, top, wx, wy) { return { x: S.px + (wy - top) / BOARD_F, y: wx - bl }; }
-  function drawBoardMain(c, bl, top) {
-    var T = matT(S.mat), yFar = top - S.px * BOARD_F, yNear = top + (BW - S.px) * BOARD_F;
-    c.save();
-    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.clip();
-    c.transform(0, BOARD_F, 1, 0, bl, yFar);
-    if (S.mat === "acrylic") c.globalAlpha = 0.85;
-    c.drawImage(topTex, 0, 0, BW, BH);
-    c.globalAlpha = 1;
-    S.holes.forEach(function (hh) { drawHoleTop(c, hh); });
-    S.plugs.forEach(function (pl) { drawPlugTop(c, pl); });
-    c.restore();
-    // small holes would be thin slits from this angle: give each one a clear dark mark
-    S.holes.forEach(function (hh) {
-      var r = holeDia(hh) * DS / 2;
-      if (r * BOARD_F * M.s >= 5 || hh.plugged) return;
-      var hx = bl + hh.y, hy = top + (hh.x - S.px) * BOARD_F;
-      if (hy < yFar || hy > yNear) return;
-      c.beginPath(); c.ellipse(hx, hy, Math.max(r, 6, 7 / M.s), Math.max(r * BOARD_F, 4, 5 / M.s), 0, 0, Math.PI * 2);
-      c.fillStyle = holeThrough(hh) ? "#1D2028" : "#3A3F4A"; c.fill();
-      c.lineWidth = 1.5; c.strokeStyle = "rgba(255,255,255,0.55)"; c.stroke();
-    });
-    c.save();
-    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
-    // laser cross over the drilling point
-    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.clip();
-    c.strokeStyle = "rgba(255,40,40,0.8)"; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(bl, top); c.lineTo(bl + BH, top); c.moveTo(X0, yFar); c.lineTo(X0, yNear); c.stroke();
-    c.beginPath(); c.arc(X0, top, 4, 0, Math.PI * 2); c.fillStyle = "#FF2828"; c.fill();
-    c.restore();
-    // the front edge: the board's near side, with any holes that come out through it
-    drawSection(c, bl, yNear, 1, "y", BH, BW - 0.5);
-    zone("boardMain", bl - 10, yFar - 10, BH + 20, yNear + T - yFar + 20);
-  }
-
   // ---------- Holes counter (the only number on the page) ----------
-  // Shown in the stage's counter pill (top-left, the standard spot).
   var holesShown = -1;
   function drawHolesPill() {
     if (S.holes.length === holesShown) return;
     holesShown = S.holes.length;
-    var el = $("holesCount");
-    if (el) el.textContent = "Holes: " + holesShown;
-  }
-
-  // ---------- Board view (top / side): no longer drawn; the main view shows the board's top ----------
-  var BV = { x: 0, y: 0, w: 0, h: 0, sc: 1, bx: 0, by: 0 };
-  function drawBoardView(c) {
-    screenXf();
-    var x = B.x, y = B.y, w = B.w, h = B.h;
-    rr(c, x, y, w, h, 18); fs(c, "#F4FAFF", 3);
-    var small = w < 260 || h < 220;
-    var hdr = small ? 34 : 46;
-    var fsz = small ? 15 : 20;
-    // Tabs
-    var tw = Math.min(90, (w - 24) / (small && w < 200 ? 2 : 3.2));
-    ["top", "side"].forEach(function (v, i) {
-      var tx = x + 8 + i * (tw + 6), ty = y + 7;
-      rr(c, tx, ty, tw, hdr - 12, 10);
-      fs(c, S.view === v ? "#FFC93C" : "#FFFFFF", 3);
-      label(c, v === "top" ? "Top" : "Side", tx + tw / 2, ty + (hdr - 12) / 2 + 1, fsz, OUT);
-      zone("view", tx, ty - 4, tw, hdr - 4, v);
-    });
-    var tall = h > w * 1.2;
-    var hc = "Holes: " + S.holes.length;
-    var vx = x + 8, vy, vw = w - 16, vh;
-    if (!tall) {
-      // Holes counter and a status line
-      // Holes counter (the only number on the page)
-      if (w - 2 * (tw + 6) - 16 > fsz * 5) label(c, hc, x + w - 10, y + hdr / 2 + 2, fsz * 1.15, OUT, "right");
-      vy = y + hdr + 2; vh = h - (vy - y) - 8;
-    } else {
-      // Tall column: picture on top, one Holes counter tile below
-      vy = y + hdr + 2;
-      vh = Math.min(vw * 1.5, h - hdr - 10 - Math.min(h * 0.25, 110));
-      var tiles = [["Holes", String(S.holes.length)]];
-      var ty0 = vy + vh + 8, th = Math.min(150, y + h - 8 - ty0);
-      tiles.forEach(function (tl, i) {
-        var tyy = ty0 + i * th;
-        rr(c, x + 8, tyy + 2, w - 16, th - 6, 12);
-        fs(c, i === 0 ? "#FFC93C" : "#FFFFFF", 3);
-        var lsz = clamp(Math.min(th * 0.2, w * 0.14), 12, 22), vsz = clamp(Math.min(th * 0.42, w * 0.3), 16, 48);
-        label(c, tl[0], x + w / 2, tyy + 2 + (th - 6) * 0.28, lsz, "#4A5578", "center", 700);
-        var vt = tl[1];
-        c.font = "800 " + vsz + "px \"Baloo 2\", sans-serif";
-        while (vsz > 10 && c.measureText(vt).width > w - 28) { vsz -= 1; c.font = "800 " + vsz + "px \"Baloo 2\", sans-serif"; }
-        label(c, vt, x + w / 2, tyy + 2 + (th - 6) * 0.66, vsz, OUT);
-      });
-    }
-    BV = { x: vx, y: vy, w: vw, h: vh };
-    c.save();
-    rr(c, vx, vy, vw, vh, 12); c.clip();
-    c.fillStyle = "#3A3F4A"; c.fillRect(vx, vy, vw, vh);
-    if (S.view === "top") drawTopView(c, vx, vy, vw, vh); else drawSideView(c, vx, vy, vw, vh);
-    c.restore();
-    rr(c, vx, vy, vw, vh, 12); fs(c, null, 3);
-  }
-  function drawTopView(c, vx, vy, vw, vh) {
-    var sc = Math.min(vw / (BW * 1.15), vh / (BH * 1.3));
-    var cx = vx + vw / 2, cy = vy + vh / 2;
-    BV.sc = sc;
-    // Round cast-iron table with slots
-    var tr = Math.max(vw, vh) * 0.62;
-    c.beginPath(); c.arc(cx, cy, tr, 0, Math.PI * 2); c.fillStyle = "#8E96A2"; c.fill();
-    c.fillStyle = "#4E5560";
-    [-0.5, 0.5].forEach(function (k) { c.fillRect(cx + k * tr * 0.7 - 6, vy, 12, vh); c.fillRect(vx, cy + k * tr * 0.55 - 6, vw, 12); });
-    c.beginPath(); c.arc(cx, cy, 30 * sc, 0, Math.PI * 2); c.fillStyle = "#2E333C"; c.fill();
-    // Board under the laser cross
-    var bx = cx - (S.px - R.boardSlide * 0) * sc + (R.jig || 0) * sc, by = cy - S.py * sc + R.boardSlide * sc;
-    BV.bx = bx; BV.by = by;
-    c.save();
-    c.translate(bx + 6, by + 8); c.fillStyle = "rgba(0,0,0,0.3)"; c.fillRect(0, 0, BW * sc, BH * sc);
-    c.restore();
-    c.save();
-    c.translate(bx, by); c.scale(sc, sc);
-    if (S.mat === "acrylic") c.globalAlpha = 0.82;
-    c.drawImage(topTex, 0, 0, BW, BH);
-    c.globalAlpha = 1;
-    c.beginPath(); c.rect(0, 0, BW, BH); c.save(); c.clip();
-    S.holes.forEach(function (hh) { drawHoleTop(c, hh); });
-    c.restore();
-    c.lineWidth = 3 / sc; c.strokeStyle = OUT; c.strokeRect(0, 0, BW, BH);
-    S.plugs.forEach(function (p) { drawPlugTop(c, p); });
-    // Clamp jaw on the far edge
-    var ey = R.clampSide > 0 ? BH : 0, dir = R.clampSide > 0 ? 1 : -1;
-    c.fillStyle = "#FF8A3D"; c.strokeStyle = OUT; c.lineWidth = 2.5 / sc;
-    c.beginPath(); c.rect(S.px - 14, ey - dir * 22, 28, dir * 34); c.fill(); c.stroke();
-    c.beginPath(); c.rect(S.px - 5, ey + dir * 12, 10, dir * 14); c.fillStyle = "#C3C9D2"; c.fill(); c.stroke();
-    if (R.clampT > 0.5) { c.beginPath(); c.arc(S.px, ey - dir * 10, 6, 0, Math.PI * 2); c.fillStyle = "#2E9E5B"; c.fill(); }
-    c.restore();
-    zone("boardTop", bx, by, BW * sc, BH * sc);
-    // Red laser cross and the bit's outline
-    var b = curBit();
-    c.strokeStyle = "rgba(255,40,40,0.85)"; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(vx, cy); c.lineTo(vx + vw, cy); c.moveTo(cx, vy); c.lineTo(cx, vy + vh); c.stroke();
-    if (b) {
-      var br = bitBox(b.id, b.mm).w / 2 * sc;
-      if (b.id === "step") br = stepDia(Math.max(penMM(), 0)) * DS / 2 * sc;
-      if (b.id === "countersink") br = Math.max(3, Math.min(16, 2 * penMM())) * DS / 2 * sc;
-      c.setLineDash([6, 5]); c.strokeStyle = "#FFFFFF"; c.lineWidth = 2.5;
-      c.beginPath(); c.arc(cx, cy, Math.max(4, br), 0, Math.PI * 2); c.stroke();
-      c.setLineDash([]);
-    }
-    c.beginPath(); c.arc(cx, cy, 3.5, 0, Math.PI * 2); c.fillStyle = "#FF2828"; c.fill();
-    if (S.clamp && flashOn("clamp")) pulse(c, vx + 2, vy + 2, vw - 4, vh - 4, 10);
-  }
-  function drawSideView(c, vx, vy, vw, vh) {
-    var T = matT(S.mat);
-    var b = curBit();
-    var sc = Math.min(vw / 150, vh / (T + 125)); // zoomed in round the bit
-    BV.sc = sc;
-    var cx = vx + vw / 2;
-    var ox = cx - S.px * sc + (R.jig || 0) * sc;
-    var topY = vy + vh - (T + 40) * sc;
-    // backdrop + table
-    c.fillStyle = "#59606C"; c.fillRect(vx, vy, vw, vh);
-    c.fillStyle = "#8E96A2"; c.fillRect(vx, topY + T * sc, vw, 30 * sc);
-    c.fillStyle = "#2E333C"; c.fillRect(cx - 30 * sc, topY + T * sc, 60 * sc, 30 * sc);
-    drawSection(c, ox, topY, sc, "x", BW);
-    zone("boardSide", ox, topY - 20, BW * sc, T * sc + 40);
-    // the bit, at its real depth
-    if (b) {
-      var tipRel = tipY() - boardTopW(); // world units (negative = above the board)
-      var bitTopY = topY + (tipRel - b.len) * sc;
-      c.save();
-      c.translate(cx, bitTopY); c.scale(sc, sc);
-      drawBit(c, b.id, b.mm, 0, 0, b.len, R.phase, Math.min(1, R.rpm / 1200));
-      c.restore();
-      var pen = penMM();
-      var tmm = MATS[S.mat].t;
-      if (pen >= tmm) pill(c, "Through!", Math.min(vx + vw - 70, cx + bitBox(b.id, b.mm).w / 2 * sc + 70), topY - 18, 15, pen >= tmm ? "#5BE37A" : "#FFFFFF");
-    }
-    // cut line label
-    label(c, "Cut view", vx + 10, vy + 14, 14, "#FFFFFF", "left", 700);
-  }
-
-  // ---------- Bit case ----------
-  var CS = { cols: 5, rows: 2, cells: [] };
-  function caseGeom() {
-    var x = C.x, y = C.y, w = C.w, h = C.h;
-    var lid = Math.max(30, Math.min(48, h * 0.12));
-    var inner = { x: x + 10, y: y + lid + 6, w: w - 20, h: h - lid - 16 };
-    var cols = 5, rows = 2;
-    if (inner.w / inner.h > 2.6) { cols = 10; rows = 1; }
-    var cw = inner.w / cols, ch = inner.h / rows;
-    var cells = [];
-    BIT_ORDER.forEach(function (id, i) {
-      var col = i % cols, row = Math.floor(i / cols);
-      cells.push({ id: id, x: inner.x + col * cw, y: inner.y + row * ch, w: cw, h: ch });
-    });
-    var nameSz = clamp(Math.min(cw * 0.15, ch * 0.11), 11, 21);
-    var sizeSz = clamp(nameSz * 0.82, 10, 17);
-    var narrow = cw < 78;
-    if (narrow) { nameSz = clamp(cw * 0.25, 10, 14); sizeSz = clamp(cw * 0.2, 9, 12); }
-    var labelH = nameSz * (narrow ? 2.3 : 1.25) + sizeSz * 1.8 + 6;
-    var scale = Math.max(0.1, (ch - labelH - 14) / 186);
-    CS = { x: x, y: y, w: w, h: h, lid: lid, inner: inner, cols: cols, rows: rows, cells: cells, nameSz: nameSz, sizeSz: sizeSz, narrow: narrow, labelH: labelH, scale: scale };
-  }
-  function slotScale(cell, id, mm) {
-    var hs = (cell.h - CS.labelH - 14) / Math.max(BITS[id].len, 125);
-    return Math.max(0.1, Math.min(hs, (cell.w - 14) / bitBox(id, mm).w));
-  }
-  function slotPos(id) {
-    var cell = CS.cells[BIT_ORDER.indexOf(id)];
-    if (!cell) return { x: C.x + C.w / 2, y: C.y + C.h / 2, s: 0.5 };
-    var mm = bitMM(id, S.sizes[id]);
-    var s = slotScale(cell, id, mm);
-    var bh = BITS[id].len * s;
-    var areaH = cell.h - CS.labelH - 6;
-    return { x: cell.x + cell.w / 2, y: cell.y + 6 + (areaH - bh) / 2, s: s };
-  }
-  function drawCase(c) {
-    screenXf();
-    caseGeom();
-    var x = C.x, y = C.y, w = C.w, h = C.h;
-    // Shell
-    rr(c, x, y, w, h, 18); fs(c, "#30353F", 3);
-    rr(c, x + 4, y + 4, w - 8, CS.lid - 4, 14); fs(c, "#FFC93C", 3);
-    var tsz = clamp(CS.lid * 0.48, 13, 22);
-    label(c, "Bit case", x + 16, y + CS.lid / 2 + 3, tsz, OUT, "left");
-    // Big screens have room for the how-to line; phones keep just the title.
-    if (w > 560) label(c, "Tap a bit, or drag it by hand", x + w - 16, y + CS.lid / 2 + 3, Math.max(11, tsz * 0.72), OUT, "right", 700);
-    rr(c, CS.inner.x, CS.inner.y, CS.inner.w, CS.inner.h, 12); fs(c, "#22262E", 0);
-    if (flashOn("case")) pulse(c, x + 3, y + 3, w - 6, h - 6, 16);
-    CS.cells.forEach(function (cell) {
-      var id = cell.id, si = S.sizes[id], mm = bitMM(id, si);
-      var inChuck = S.chuck && S.chuck.id === id;
-      var flying = (R.flyBit && R.flyBit.id === id) || (R.dragBit && R.dragBit.id === id);
-      var pos = slotPos(id);
-      var areaH = cell.h - CS.labelH - 6;
-      // Foam cut-out
-      var bw = bitBox(id, mm).w * pos.s;
-      rr(c, cell.x + cell.w / 2 - bw / 2 - 5, cell.y + 4, bw + 10, areaH + 2, 8);
-      c.fillStyle = "#151820"; c.fill();
-      if (inChuck || flying) {
-        c.setLineDash([5, 4]); c.strokeStyle = "rgba(255,255,255,0.5)"; c.lineWidth = 2; c.stroke(); c.setLineDash([]);
-        if (inChuck && !flying) label(c, "In chuck", cell.x + cell.w / 2, cell.y + 4 + areaH / 2, clamp(CS.sizeSz, 10, 15), "#7CF29A", "center", 700);
-      } else {
-        c.save(); c.translate(pos.x, pos.y); c.scale(pos.s, pos.s);
-        drawBit(c, id, mm, 0, 0, BITS[id].len, 0.6, 0);
-        c.restore();
-      }
-      zone("slot", cell.x + 2, cell.y + 2, cell.w - 4, areaH + 6, id);
-      // Labels: real name and size
-      var ny = cell.y + areaH + 8 + CS.nameSz * 0.62;
-      var nm = BITS[id].name;
-      c.font = "800 " + CS.nameSz + "px \"Baloo 2\", sans-serif";
-      var nsz = CS.nameSz;
-      if (CS.narrow) {
-        // Two short lines in tiny cells: "Plug / cutter", "Counter- / sink"
-        var parts2 = nm.indexOf(" ") > 0 ? nm.split(" ") : (nm.indexOf("-") > 0 ? [nm.slice(0, nm.indexOf("-") + 1), nm.slice(nm.indexOf("-") + 1)] : (nm.length > 8 ? [nm.slice(0, 7) + "-", nm.slice(7)] : [nm]));
-        var lw = 0;
-        parts2.forEach(function (s2) { lw = Math.max(lw, c.measureText(s2).width); });
-        while (nsz > 8 && lw > cell.w - 2) { nsz -= 1; c.font = "800 " + nsz + "px \"Baloo 2\", sans-serif"; lw = 0; parts2.forEach(function (s2) { lw = Math.max(lw, c.measureText(s2).width); }); }
-        parts2.forEach(function (s2, k2) { label(c, s2, cell.x + cell.w / 2, ny + k2 * nsz * 1.05, nsz, "#FFFFFF"); });
-        ny += nsz * 1.05;
-      } else {
-        while (nsz > 9 && c.measureText(nm).width > cell.w - 4) { nsz -= 1; c.font = "800 " + nsz + "px \"Baloo 2\", sans-serif"; }
-        label(c, nm, cell.x + cell.w / 2, ny, nsz, "#FFFFFF");
-      }
-      // Size: small, bigger, biggest dots (no numbers); tap to switch.
-      var sizes = BITS[id].sizes;
-      if (sizes.length > 1) {
-        var sidx = inChuck ? S.chuck.si : si;
-        var ssz = CS.sizeSz, dr = clamp(ssz * 0.45, 4, 8), gapD = dr * 1.2, k3, tot = 0;
-        for (k3 = 0; k3 < sizes.length; k3++) tot += 2 * dr * (0.6 + 0.4 * k3) + (k3 ? gapD : 0);
-        var py = CS.narrow ? cell.y + cell.h - ssz * 0.95 - 3 : ny + nsz * 0.62 + ssz * 0.9;
-        var dx = cell.x + cell.w / 2 - tot / 2;
-        for (k3 = 0; k3 < sizes.length; k3++) {
-          var rk = dr * (0.6 + 0.4 * k3);
-          c.beginPath(); c.arc(dx + rk, py, rk, 0, Math.PI * 2);
-          fs(c, k3 === sidx ? "#FFC93C" : "#5A6070", k3 === sidx ? 2 : 1.5);
-          dx += 2 * rk + gapD;
-        }
-        zone("size", cell.x + 2, py - ssz * 1.2, cell.w - 4, ssz * 2.4, id);
-      }
-    });
-  }
-
-  // ---------- Belt & pulley overlay ----------
-  var OV = null;
-  function drawBeltOverlay(c) {
-    if (R.lid < 0.5) { OV = null; return; }
-    screenXf();
-    var x = Math.min(B.x, C.x), y = Math.min(B.y, C.y);
-    var x2 = Math.max(B.x + B.w, C.x + C.w), y2 = Math.max(B.y + B.h, C.y + C.h);
-    if (CW / CH < 1) { x = 6; y = 6; x2 = CW - 6; y2 = CH - 6; }
-    var w = x2 - x, h = y2 - y;
-    c.save();
-    c.globalAlpha = Math.min(1, (R.lid - 0.5) * 3);
-    rr(c, x, y, w, h, 20); fs(c, "#F4FAFF", 4);
-    var tsz = clamp(w * 0.045, 16, 28);
-    label(c, "Belt & pulleys", x + w / 2, y + tsz * 1.1, tsz, OUT);
-    label(c, "Drag the belt up or down", x + w / 2, y + tsz * 2.3, tsz * 0.7, "#4A5578", "center", 700);
-    var btnH = Math.max(48, tsz * 2), btnW = Math.min(w * 0.6, 260);
-    var top = y + tsz * 3.2, bot = y + h - btnH - 24;
-    var stepH = Math.min((bot - top) / 5, 70);
-    var mid = top + ((bot - top) - stepH * 5) / 2;
-    var mx = x + w * 0.22, sx = x + w * 0.6;
-    var unit = Math.min(stepH / 7, (sx - mx) * 0.8 / 48);
-    var i, by, rM, rS;
-    var beltPos = R.beltDrag !== null ? R.beltDrag : R.belt;
-    for (i = 0; i < 5; i++) {
-      by = mid + i * stepH;
-      rM = pulleyR(true, i) * unit; rS = pulleyR(false, i) * unit;
-      c.beginPath(); c.rect(mx - rM, by + 2, rM * 2, stepH - 4); fs(c, hgrad(c, mx - rM, mx + rM, [[0, "#7D848F"], [0.4, "#E1E5EB"], [1, "#6E7683"]]), 3);
-      c.beginPath(); c.rect(sx - rS, by + 2, rS * 2, stepH - 4); fs(c, hgrad(c, sx - rS, sx + rS, [[0, "#7D848F"], [0.4, "#E1E5EB"], [1, "#6E7683"]]), 3);
-      var on = i === R.belt;
-      var psz = clamp(Math.min(stepH * 0.32, w * 0.035), 11, 22);
-      pill(c, SPEED_WORDS[i], x + w - psz * 3.6, by + stepH / 2, psz, on ? "#FFC93C" : "#FFFFFF");
-      zone("beltStep", x, by, w, stepH, i);
-    }
-    label(c, "Motor", mx, mid - 12, clamp(tsz * 0.62, 12, 18), OUT);
-    label(c, "Spindle", sx, mid - 12, clamp(tsz * 0.62, 12, 18), OUT);
-    // Belt
-    by = mid + beltPos * stepH + stepH / 2;
-    var bi = Math.round(beltPos);
-    rM = pulleyR(true, bi) * unit; rS = pulleyR(false, bi) * unit;
-    // V-belt wrapped round both pulleys at this step
-    rr(c, mx - rM - 4, by - stepH * 0.26, sx + rS - mx + rM + 8, stepH * 0.52, stepH * 0.2);
-    fs(c, "#2B2B2B", 3);
-    c.strokeStyle = "rgba(255,255,255,0.25)"; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(mx - rM + 6, by - stepH * 0.12); c.lineTo(sx + rS - 6, by - stepH * 0.12); c.stroke();
-    var gx = (mx + rM + sx - rS) / 2;
-    c.beginPath(); c.arc(gx, by, stepH * 0.42, 0, Math.PI * 2); fs(c, "#FFC93C", 3);
-    label(c, "⇕", gx, by + 1, stepH * 0.5, OUT);
-    OV = { x: x, y: y, w: w, h: h, mid: mid, stepH: stepH };
-    // Close button
-    var bx = x + w / 2 - btnW / 2, byy = y + h - btnH - 14;
-    rr(c, bx, byy, btnW, btnH, 16); fs(c, "#FFC93C", 3);
-    label(c, "Close the cover", x + w / 2, byy + btnH / 2 + 1, clamp(btnH * 0.4, 16, 24), OUT);
-    zone("lidClose", bx, byy, btnW, btnH);
-    c.restore();
-  }
-
-  // Bits in flight or being dragged (screen space)
-  function drawFloating(c) {
-    screenXf();
-    var fb = R.flyBit;
-    if (fb) {
-      var f = clamp(fb.t / fb.dur, 0, 1), e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
-      var x = lerp(fb.fx, fb.tx, e), y = lerp(fb.fy, fb.ty, e) - Math.sin(f * Math.PI) * 50, s = lerp(fb.fs, fb.ts, e);
-      c.save(); c.translate(x, y); c.scale(s, s);
-      c.rotate(Math.sin(f * Math.PI) * 0.25);
-      drawBit(c, fb.id, bitMM(fb.id, fb.si), 0, 0, BITS[fb.id].len, 0, 0);
-      c.restore();
-    }
-    var db = R.dragBit;
-    if (db) {
-      c.save(); c.translate(db.x, db.y - 30 * M.s); c.scale(M.s, M.s);
-      c.shadowColor = "rgba(0,0,0,0.35)"; c.shadowBlur = 12; c.shadowOffsetY = 8;
-      drawBit(c, db.id, bitMM(db.id, db.si), 0, 0, BITS[db.id].len, 0, 0);
-      c.restore();
-    }
-    if (R.key === "drag" || R.key === "fly") {
-      worldXf();
-      drawKeySide(ctx, R.keyPos.x, R.keyPos.y, 0);
-    }
-    if (R.dragPlug) {
-      // drawn in the board view already
-    }
+    $("holesCount").textContent = "Holes: " + holesShown;
   }
 
   function draw() {
-    hits = [];
     screenXf();
     ctx.drawImage(bgCanvas, 0, 0, CW, CH);
-    // The machine is cut off at the bottom of its area (the lower column runs on out of view).
-    ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, CW, M.y + M.h); ctx.clip();
     drawMachine(ctx);
-    ctx.restore();
-    screenXf();
-    drawHolesPill(ctx);
-    drawCase(ctx);
-    drawBeltOverlay(ctx);
-    drawFloating(ctx);
+    drawHolesPill();
     drawTimerBadge(ctx);
   }
 
@@ -2694,408 +1793,146 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var r = cv.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
-  function inZone(z, p) { return p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h; }
-  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-  function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
-  function chuckDropDist(p) {
-    // Distance (world units) from a dragged bit's shank to the chuck jaws
-    var w = toWorld(p.x, p.y);
-    return Math.hypot(w.x - X0, w.y - (chuckTop() + 60));
+  function segDist(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy || 1;
+    var t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0, 1);
+    return Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
   }
-  function keyBusy() { for (var k in drags) { if (drags[k].type === "keyTurn" || drags[k].type === "keyDrag") return true; } return false; }
-
   function onDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
     ensureAudio();
-    if (busy() || R.auto) return;
-    var p = localPt(e), w = toWorld(p.x, p.y), d = null, i, z;
-    // Belt overlay first
-    if (OV && inZone(OV, p)) {
-      for (i = hits.length - 1; i >= 0; i--) {
-        z = hits[i];
-        if (!inZone(z, p)) continue;
-        if (z.kind === "lidClose") { closeLid(); return; }
-        if (z.kind === "beltStep") { d = { type: "belt" }; R.beltDrag = z.data; break; }
-      }
-      if (!d) return;
-    }
-    if (!d) {
-      for (i = hits.length - 1; i >= 0 && !d; i--) {
-        z = hits[i];
-        if (!inZone(z, p)) continue;
-        if (z.kind === "view") { S.view = z.data; save(); blip(700, 0.05, 0.05, "triangle"); return; }
-        if (z.kind === "size") { cycleSize(z.data); return; }
-        if (z.kind === "slot") { d = { type: "caseBit", id: z.data, sx: p.x, sy: p.y, moved: false }; }
-        if (z.kind === "boardTop") {
-          var bxu = (p.x - BV.bx) / BV.sc, byu = (p.y - BV.by) / BV.sc;
-          for (var k = S.plugs.length - 1; k >= 0; k--) {
-            var pl = S.plugs[k];
-            if (Math.hypot(pl.x - bxu, pl.y - byu) < pl.mm * DS / 2 + 8) { d = { type: "plug", plug: pl, sx: p.x, sy: p.y, x0: pl.x, y0: pl.y }; pl.grab = true; break; }
-          }
-          if (!d) d = boardDrag("boardT", p);
-        }
-        if (z.kind === "boardSide") d = boardDrag("boardS", p);
-      }
-    }
-    if (!d && p.x >= M.x && p.x <= M.x + M.w && p.y >= M.y && p.y <= M.y + M.h + 40) d = machineDown(p, w);
+    if (busy()) return;
+    var p = localPt(e), w = toView(p.x, p.y), d = machineDown(w);
     if (!d) return;
-    d.t0 = now; d.sx = d.sx === undefined ? p.x : d.sx; d.sy = d.sy === undefined ? p.y : d.sy;
     drags[e.pointerId] = d;
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
   }
-  function boardDrag(type, p) {
-    if (penMM() > 0) return { type: "none" };
-    if (S.clamp) { say("Open the clamp to move the board", "clamp"); return { type: "none" }; }
-    return { type: type, sx: p.x, sy: p.y, px0: S.px, py0: S.py };
-  }
-
-  function machineDown(p, w) {
-    var kh = keyhole();
-    if (R.key === "chuck" && Math.hypot(w.x - kh.x, w.y - kh.y) < 62) {
-      return { type: "keyTurn", last: Math.atan2(w.y - kh.y, w.x - kh.x), turned: 0 };
-    }
-    if (R.key === "holder" && Math.hypot(w.x - KEY_HOME.x, w.y - (KEY_HOME.y + 22)) < 52) {
-      if (R.running) { say("Switch off to change the bit", "sw"); return { type: "none" }; }
-      R.key = "drag"; R.keyPos = { x: w.x, y: w.y - 20 };
-      return { type: "keyDrag" };
-    }
-    if (w.x >= 486 && w.x <= 575 && w.y >= 122 && w.y <= 256) { toggleSwitch(); return { type: "none" }; }
-    var b = curBit();
-    if (b) {
-      var bw = Math.max(36, bitBox(b.id, b.mm).w / 2 + 10);
-      var bt = bitTop() - bitDrop();
-      if (Math.abs(w.x - X0) < bw && w.y > chuckTop() + 62 && w.y < bt + b.len + 10) {
-        if (R.sawSlug && b.id === "holesaw") { dropSawSlug(); return { type: "none" }; }
-        if (!R.running && R.jaw >= 0.6) {
-          R.dragBit = { id: S.chuck.id, si: S.chuck.si, x: p.x, y: p.y, from: "chuck" };
-          dropSawSlug();
-          S.chuck = null;
-          blip(400, 0.06, 0.06, "triangle");
-          return { type: "chuckBit" };
-        }
-        if (!R.running && penMM() <= 0 && R.q < 4) {
-          say(R.key === "chuck" ? "Turn the key ↺ to open the jaws" : "Use the chuck key to open the jaws", "key");
-          return { type: "none" };
-        }
-      }
-    } else if (Math.abs(w.x - X0) < 40 && w.y > chuckTop() + 50 && w.y < chuckTop() + 110 && !R.running) {
-      if (R.jaw < 0.6) say("Open the jaws, then drag a bit up here", "key");
-      else say("Drag a bit from the case up here", "case");
+  function startFeed() { if (!anyFeedHeld()) R.qWant = R.q; R.feedHeld = true; }
+  function machineDown(w) {
+    var ui = R.ui, tol = 14 / M.s, i;
+    if (ui.sw && w.x >= ui.sw.x0 - tol && w.x <= ui.sw.x1 + tol && w.y >= ui.sw.y0 - tol && w.y <= ui.sw.y1 + tol) {
+      toggleSwitch();
       return { type: "none" };
     }
-    if (w.x >= 36 && w.x <= 506 && w.y >= 50 && w.y <= 128) {
-      if (R.lid > 0.5) { closeLid(); return { type: "none" }; }
-      if (R.running) { say("Switch off to change the speed", "sw"); return { type: "none" }; }
-      R.lidTarget = 1; blip(300, 0.08, 0.06, "triangle", 450);
-      return { type: "none" };
-    }
-    var dh = Math.hypot(w.x - HUB.x, w.y - HUB.y);
-    if (dh < 74) return { type: "dial" };
-    if (dh < SPOKE_L + 34) {
-      R.feedHeld = true; R.qWant = R.q; R.spokeHeld = true;
-      return { type: "feed", last: Math.atan2(w.y - HUB.y, w.x - HUB.x), lastY: w.y };
-    }
-    if (Math.hypot(w.x - 566, w.y - 398) < 42) { S.light = !S.light; save(); blip(S.light ? 900 : 600, 0.05, 0.05, "triangle"); return { type: "none" }; }
-    if (R.clampHandle && Math.hypot(w.x - R.clampHandle.x, w.y - R.clampHandle.y) < 46) return { type: "clamp", wy0: w.y, done: false };
-    if (Math.hypot(w.x - 124, w.y - (R.tableY + 58)) < 58) return { type: "crank", last: Math.atan2(w.y - (R.tableY + 58), w.x - 124) };
-    var bl = boardLeftW(), tp = boardTopW();
-    if (w.x >= bl - 10 && w.x <= bl + BH + 10 && w.y >= tp - S.px * BOARD_F - 30 && w.y <= tp + (BW - S.px) * BOARD_F + matT(S.mat) + 8) {
-      // a plug lying on the board can be picked up and dropped into a hole
-      var bp = boardFromMain(bl, tp, w.x, w.y);
-      for (var k = S.plugs.length - 1; k >= 0; k--) {
-        var pl = S.plugs[k];
-        if (Math.abs(pl.y - bp.y) < pl.mm * DS / 2 + 14 && Math.abs(pl.x - bp.x) * BOARD_F < pl.mm * DS / 2 * BOARD_F + 14) {
-          pl.grab = true;
-          return { type: "plug", plug: pl, sx: p.x, sy: p.y, x0: pl.x, y0: pl.y };
-        }
+    // The feed handles: a knob, a spoke or the hub
+    var onFeed = false;
+    if (ui.knobs) {
+      for (i = 0; i < ui.knobs.length; i++) {
+        var kp = ui.knobs[i].p;
+        if (Math.hypot(w.x - kp.x, w.y - kp.y) < Math.max(46 * kp.k, 30 / M.s)) onFeed = true;
+        if (segDist(w, ui.root, kp) < Math.max(20, 16 / M.s)) onFeed = true;
       }
-      return boardDrag("boardM", p);
+      if (Math.hypot(w.x - ui.root.x, w.y - ui.root.y) < 42) onFeed = true;
     }
+    if (onFeed && !R.swap) { startFeed(); return { type: "feed", lastY: w.y, y0: w.y }; }
+    // The board: drag it to move where the next hole goes
+    var top = boardTopW(), wp = onPlane(w.x, w.y, top), u = wp.x + S.px - R.boardSlide, v = wp.z + S.py;
+    if (u >= -14 && u <= BW + 14 && v >= -14 && v <= BH + boardT() * 2) {
+      if (penMM() > 0 || R.q > contactQ() + 1) { say("Let the handle go up first", "feed"); return { type: "none" }; }
+      return { type: "board", x0: wp.x, z0: wp.z, px0: S.px, py0: S.py };
+    }
+    if (R.swap) return { type: "none" };
     // Anywhere else on the machine: drag down to pull the feed
-    R.feedHeld = true; R.qWant = R.q;
+    startFeed();
     return { type: "feedV", q0: R.q, y0: w.y };
   }
-
   function onMove(e) {
     var d = drags[e.pointerId];
     if (!d) return;
     e.preventDefault();
-    var p = localPt(e), w = toWorld(p.x, p.y), a, dA;
-    if (busy()) { endDrag(e.pointerId, p); return; }
+    var p = localPt(e), w = toView(p.x, p.y);
+    if (busy()) { endDrag(e.pointerId); return; }
     switch (d.type) {
-      case "caseBit":
-        if (!d.moved && Math.hypot(p.x - d.sx, p.y - d.sy) > 10) {
-          d.moved = true;
-          if (S.chuck && S.chuck.id === d.id) { d.type = "none"; say("That bit is in the chuck"); R.flash.chuck = now + 1.2; return; }
-          R.dragBit = { id: d.id, si: S.sizes[d.id], x: p.x, y: p.y, from: "case" };
-          blip(500, 0.05, 0.05, "triangle");
-        }
-        if (R.dragBit) { R.dragBit.x = p.x; R.dragBit.y = p.y; }
-        break;
-      case "chuckBit":
-        if (R.dragBit) { R.dragBit.x = p.x; R.dragBit.y = p.y; }
-        break;
-      case "keyDrag":
-        R.keyPos = { x: w.x, y: w.y - 20 };
-        break;
-      case "keyTurn":
-        var kh = keyhole();
-        if (Math.hypot(w.x - kh.x, w.y - kh.y) > 125) {
-          d.type = "keyDrag"; R.key = "drag"; R.keyPos = { x: w.x, y: w.y - 20 };
-          blip(800, 0.04, 0.05, "triangle");
-          break;
-        }
-        a = Math.atan2(w.y - kh.y, w.x - kh.x);
-        dA = wrapA(a - d.last); d.last = a;
-        if (Math.hypot(w.x - kh.x, w.y - kh.y) > 12) { turnKey(dA); d.turned += Math.abs(dA); }
-        break;
       case "feed":
-        // Pulling any spoke DOWN lowers the bit (and up raises it), whichever side of the hub it is on;
-        // the spokes turn with the finger so the grabbed handle stays under it.
-        a = Math.atan2(w.y - HUB.y, w.x - HUB.x);
-        dA = wrapA(a - d.last); d.last = a;
-        R.spokeOff += dA;
-        R.qWant = clamp(R.qWant + (w.y - d.lastY) * 0.9, 0, Math.min(TRAVEL + 10, R.q + 28));
+        // Pulling any spoke DOWN lowers the bit (and up raises it), whichever side of the hub it is on.
+        R.qWant = clamp(R.qWant + (w.y - d.lastY) * 0.8, 0, Math.min(TRAVEL + 10, R.q + 28));
         d.lastY = w.y;
+        if (!d.pulled && w.y - d.y0 > 14) { d.pulled = true; offPull(); }
         break;
       case "feedV":
         R.qWant = clamp(d.q0 + (w.y - d.y0) * 0.9, 0, Math.min(TRAVEL + 10, R.q + 28));
+        if (!d.pulled && w.y - d.y0 > 14) { d.pulled = true; offPull(); }
         break;
-      case "dial":
-        a = Math.atan2(w.x - HUB.x, -(w.y - HUB.y));
-        var v = Math.round(((a - DIAL_A0 + 4 * Math.PI) % (2 * Math.PI)) / DIAL_RANGE * DIAL_MAX);
-        if (v > DIAL_MAX + 5) v = 1; // past the end of the scale: snap to the start
-        v = clamp(v, 1, DIAL_MAX);
-        if (v !== S.depth) { S.depth = v; blip(1200, 0.02, 0.03, "triangle"); save(); }
-        break;
-      case "clamp":
-        if (!d.done && Math.abs(w.y - d.wy0) > 18) {
-          d.done = true;
-          setClamp(w.y < d.wy0);
-        }
-        break;
-      case "crank":
-        a = Math.atan2(w.y - (R.tableY + 58), w.x - 124);
-        dA = wrapA(a - d.last); d.last = a;
-        var minT = tipY() + 3 + matT(S.mat);
-        R.tableTarget = clamp(R.tableTarget - dA * 16, Math.max(440, minT), 700);
-        break;
-      case "boardM":
-        // sideways slides the board along under the bit; up and down moves it away from you or toward you
-        S.py = clamp(d.py0 - (p.x - d.sx) / M.s, 8, BH - 8);
-        S.px = clamp(d.px0 - (p.y - d.sy) / M.s / BOARD_F, 8, BW - 8);
-        break;
-      case "boardT":
-        S.px = clamp(d.px0 - (p.x - d.sx) / BV.sc, 8, BW - 8);
-        S.py = clamp(d.py0 - (p.y - d.sy) / BV.sc, 8, BH - 8);
-        break;
-      case "boardS":
-        S.px = clamp(d.px0 - (p.x - d.sx) / BV.sc, 8, BW - 8);
-        break;
-      case "plug":
-        d.plug.y = clamp(d.y0 + (p.x - d.sx) / M.s, 0, BH);
-        d.plug.x = clamp(d.x0 + (p.y - d.sy) / M.s / BOARD_F, 0, BW);
-        break;
-      case "belt":
-        if (OV) R.beltDrag = clamp((p.y - OV.mid) / OV.stepH - 0.5, 0, 4);
+      case "board":
+        var wp = onPlane(w.x, w.y, boardTopW());
+        S.px = clamp(d.px0 - (wp.x - d.x0), 40, BW - 40);
+        S.py = clamp(d.py0 - (wp.z - d.z0), 20, BH - 20);
+        if (!d.moved && Math.hypot(S.px - d.px0, S.py - d.py0) > 12) { d.moved = true; if (S.holes.length) S.slid = true; }
         break;
     }
   }
-
-  function onUp(e) {
-    var d = drags[e.pointerId];
-    if (!d) return;
-    endDrag(e.pointerId, localPt(e));
-  }
-  function flyBack(id, si, x, y, s) {
-    var slot = slotPos(id);
-    R.flyBit = { id: id, si: si, fx: x, fy: y, fs: s, tx: slot.x, ty: slot.y, ts: slot.s, t: 0, dur: 0.4 };
-  }
-  function endDrag(pid, p) {
+  function onUp(e) { if (drags[e.pointerId]) endDrag(e.pointerId); }
+  function anyFeedHeld() { for (var k in drags) { if (drags[k].type === "feed" || drags[k].type === "feedV") return true; } return false; }
+  function endDrag(pid) {
     var d = drags[pid];
     delete drags[pid];
     if (!d) return;
-    var db;
-    switch (d.type) {
-      case "caseBit":
-        if (!d.moved) { autoChange(d.id, S.sizes[d.id]); break; }
-        db = R.dragBit; R.dragBit = null;
-        if (!db) break;
-        if (chuckDropDist(p) < 110 && tryInsert(db.id, db.si)) break;
-        flyBack(db.id, db.si, p.x, p.y - 30 * M.s, M.s);
-        break;
-      case "chuckBit":
-        db = R.dragBit; R.dragBit = null;
-        if (!db) break;
-        if (chuckDropDist(p) < 90 && R.jaw >= 0.6 && !R.running) { S.chuck = { id: db.id, si: db.si }; blip(520, 0.06, 0.07, "triangle"); save(); break; }
-        flyBack(db.id, db.si, p.x, p.y - 30 * M.s, M.s);
-        blip(330, 0.08, 0.06, "triangle", 500);
-        save();
-        break;
-      case "keyDrag":
-        var kh = keyhole();
-        if (Math.hypot(R.keyPos.x - kh.x, R.keyPos.y + 20 - kh.y) < 80 && !R.running) {
-          R.key = "chuck"; R.keyAng = 0; R.cycled = false; blip(900, 0.04, 0.05, "triangle");
-        } else {
-          R.keyFly = { fx: R.keyPos.x, fy: R.keyPos.y, t: 0 };
-          R.key = "fly";
-        }
-        break;
-      case "keyTurn":
-        if (d.turned < 0.15 && now - d.t0 < 0.35 && R.jaw === 0) {
-          // A quick tap on a tight key takes it out
-          var k2 = keyhole();
-          R.keyFly = { fx: k2.x, fy: k2.y, t: 0 }; R.key = "fly";
-          blip(800, 0.04, 0.05, "triangle");
-        }
-        break;
-      case "feed":
-      case "feedV":
-        if (!anyFeedHeld()) R.feedHeld = false;
-        if (!anyFeedHeld()) R.spokeHeld = false;
-        break;
-      case "clamp":
-        if (!d.done) setClamp(!S.clamp);
-        break;
-      case "boardM": case "boardT": case "boardS":
-        save();
-        break;
-      case "plug":
-        d.plug.grab = false;
-        tryPlug(d.plug);
-        save();
-        break;
-      case "belt":
-        if (R.beltDrag !== null) {
-          var nb = Math.round(R.beltDrag);
-          if (nb !== R.belt) blip(500 + nb * 150, 0.08, 0.07, "triangle");
-          R.belt = nb; S.belt = nb; R.beltDrag = null; save();
-        }
-        break;
-    }
+    if ((d.type === "feed" || d.type === "feedV") && !anyFeedHeld()) R.feedHeld = false;
+    if (d.type === "board") save();
   }
-  function anyFeedHeld() { for (var k in drags) { if (drags[k].type === "feed" || drags[k].type === "feedV") return true; } return false; }
-  function setClamp(on) {
-    if (on === S.clamp) return;
-    S.clamp = on; save();
-    blip(on ? 520 : 380, 0.1, 0.07, "triangle", on ? 780 : 260);
-  }
-  function closeLid() {
-    R.lidTarget = 0; blip(450, 0.08, 0.06, "triangle", 300);
-  }
-  function cycleSize(id) {
-    var n = BITS[id].sizes.length;
-    if (n < 2) { R.flash.case = 0; say(BITS[id].name + ": one size"); return; }
-    var inChuck = S.chuck && S.chuck.id === id;
-    var cur = inChuck ? S.chuck.si : S.sizes[id];
-    var nx = (cur + 1) % n;
-    S.sizes[id] = nx;
-    blip(800 + nx * 200, 0.05, 0.05, "triangle");
-    if (inChuck) autoChange(id, nx);
-    save();
-  }
-  function tryPlug(pl) {
-    for (var i = S.holes.length - 1; i >= 0; i--) {
-      var h = S.holes[i], hd = holeDia(h);
-      if (h.plugged) continue;
-      if (h.bit === "plug" && !h.plugOut) continue;
-      if (Math.hypot(h.x - pl.x, h.y - pl.y) < hd * DS / 2 + 4 && pl.mm <= hd + 1.5 && pl.mm >= hd - 4) {
-        h.plugged = pl.mat;
-        S.plugs.splice(S.plugs.indexOf(pl), 1);
-        say("It fits! Hole plugged");
-        blip(660, 0.1, 0.08, "sine", 990);
-        return;
-      }
-    }
-  }
-  function updateKeyFly(dt) {
-    if (R.key !== "fly" || !R.keyFly || R.auto) return;
-    var k = R.keyFly;
-    k.t += dt / 0.4;
-    var f = Math.min(1, k.t);
-    R.keyPos = { x: lerp(k.fx, KEY_HOME.x, f), y: lerp(k.fy, KEY_HOME.y, f) - Math.sin(f * Math.PI) * 50 };
-    if (f >= 1) { R.key = "holder"; R.keyFly = null; blip(700, 0.04, 0.04, "triangle"); }
-  }
-
   cv.addEventListener("pointerdown", onDown);
   cv.addEventListener("pointermove", onMove);
   cv.addEventListener("pointerup", onUp);
   cv.addEventListener("pointercancel", onUp);
-  cv.addEventListener("lostpointercapture", function (e) { if (drags[e.pointerId]) endDrag(e.pointerId, localPt(e)); });
+  cv.addEventListener("lostpointercapture", function (e) { if (drags[e.pointerId]) endDrag(e.pointerId); });
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
 
-  // ---------- Materials and new boards ----------
-  if (!S.boards || typeof S.boards !== "object") S.boards = {};
-  function stashBoard() { S.boards[S.mat] = { holes: S.holes, plugs: S.plugs, seed: S.seed }; }
-  function clearBoardChips() { parts = parts.filter(function (p) { return !(p.settled && p.on === "board"); }); }
-  function setMaterial(m) {
-    if (busy() || m === S.mat) return;
-    if (penMM() > 0) { say("Lift the bit out first", "feed"); return; }
-    stashBoard();
-    var b = S.boards[m];
-    S.mat = m;
-    if (b && Array.isArray(b.holes)) { S.holes = b.holes; S.plugs = Array.isArray(b.plugs) ? b.plugs : []; S.seed = b.seed || S.seed; }
-    else { S.holes = []; S.plugs = []; S.seed = 1 + Math.floor(Math.random() * 1e6); }
-    R.curHole = null;
-    clearBoardChips();
-    buildBoardTex();
-    autoTable();
-    R.boardSlide = 200;
-    blip(400, 0.1, 0.06, "triangle", 600);
-    if (m === "brick" && (!S.chuck || S.chuck.id !== "masonry")) say("Brick? Try the masonry bit!");
-    else if (m === "metal" && (!S.chuck || (S.chuck.id !== "step" && S.chuck.id !== "twist"))) say("Metal? Try the step bit!");
-    updateToolbar();
-    save();
-  }
-  function newBoard() {
-    if (busy()) return;
-    if (penMM() > 0) { say("Lift the bit out first", "feed"); return; }
-    S.holes = []; S.plugs = []; S.seed = 1 + Math.floor(Math.random() * 1e6);
-    R.curHole = null; R.sawSlug = null;
-    clearBoardChips();
-    buildBoardTex();
-    R.boardSlide = 200;
-    blip(350, 0.12, 0.06, "triangle", 700);
-    save();
-  }
-  function buildToolbar() {
-    var tb = $("toolbar");
-    MAT_ORDER.forEach(function (m) {
+  // ---------- Panel: the bit case and New board ----------
+  function buildPanel() {
+    var box = $("bits");
+    BIT_ORDER.forEach(function (id) {
       var b = document.createElement("button");
-      b.className = "btn tb-tile mat";
-      b.dataset.mat = m;
-      b.setAttribute("aria-label", MATS[m].name);
-      var nm = MATS[m].name, sh = MATS[m].short || nm;
-      b.innerHTML = '<span class="chip" style="background:' + MATS[m].col + '"></span>' +
-        (sh !== nm ? '<span class="long">' + nm + '</span><span class="short">' + sh + "</span>" : "<span>" + nm + "</span>");
-      $("mats").appendChild(b);
+      b.className = "btn tb-tile bit";
+      b.dataset.bit = id;
+      b.setAttribute("aria-label", BITS[id].name + " bit");
+      var cvs = document.createElement("canvas");
+      cvs.width = 128; cvs.height = 128;
+      var c = cvs.getContext("2d"), len = BITS[id].len, wd = bitW(id);
+      // Laid across the tile at a slant so even the long bits show big
+      c.translate(64, 64); c.rotate(-0.62);
+      var s = Math.min(150 / len, 64 / wd);
+      c.scale(Math.min(s * 2, 84 / wd), s);
+      drawBit(c, id, BITS[id].mm, 0, -len / 2, len, 0.6, 0);
+      b.appendChild(cvs);
+      var sp = document.createElement("span");
+      sp.textContent = BITS[id].name;
+      b.appendChild(sp);
+      box.appendChild(b);
     });
-    var nb = document.createElement("button");
-    nb.className = "btn tb-new newbtn";
-    nb.id = "newBoard";
-    nb.setAttribute("aria-label", "New board");
-    nb.innerHTML = "New board";
-    $("tabsRow").appendChild(nb);
-    tb.addEventListener("click", function (e) {
+    $("toolbar").addEventListener("click", function (e) {
       var t = e.target.closest("button");
       if (!t) return;
       ensureAudio();
-      if (t.dataset.mat) setMaterial(t.dataset.mat);
+      if (t.dataset.bit) startSwap(t.dataset.bit);
       else if (t.id === "newBoard") newBoard();
     });
   }
-  function updateToolbar() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-mat]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.mat === S.mat));
+  function updateTiles() {
+    var cur = R.swap ? (R.swap.next || R.swap.target) : (S.chuck && S.chuck.id);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-bit]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.bit === cur));
     });
   }
+  function newBoard() {
+    if (busy()) return;
+    releaseFeed();
+    R.q = Math.min(R.q, Math.max(0, contactQ() - 2));
+    R.curHole = null;
+    S.holes = []; S.seed = 1 + Math.floor(Math.random() * 1e6);
+    S.px = BW / 2; S.py = BH / 2;
+    parts = parts.filter(function (p) { return !(p.settled && p.on === "board"); });
+    buildBoardTex();
+    R.boardSlide = 420;
+    blip(350, 0.12, 0.06, "triangle", 700);
+    save();
+  }
 
-  // ---------- Tilt and shake (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
+  // ---------- Shake (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
   var tilt = { on: false, x: 0, lastShake: 0 };
-  var tiltAllowed = false;  // the setting is on (and on iOS, motion access was granted)
+  var tiltAllowed = false;
   function onOrient(e) {
     var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
     var v = ang === 90 ? e.beta : (ang === -90 || ang === 270 ? -e.beta : (ang === 180 ? -e.gamma : e.gamma));
@@ -3126,20 +1963,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
   // Ending: the drill press switches off ("Switch off" button, or by itself) and the chuck spins down.
   var endingDone = null;
-  // Whether the grown-up chose the goodbye button (read-only peek at the shared timer settings).
   function goodbyeOn() {
     try { var t = JSON.parse(localStorage.getItem("toybox-timer-v1") || "null"); return !t || t.goodbye !== false; } catch (e) { return true; }
   }
-  function releaseAll() {
-    drags = {};
-    R.feedHeld = false; R.spokeHeld = false;
-    if (R.dragBit) { flyBack(R.dragBit.id, R.dragBit.si, R.dragBit.x, R.dragBit.y, M.s); R.dragBit = null; }
-    if (R.key === "drag") { R.keyFly = { fx: R.keyPos.x, fy: R.keyPos.y, t: 0 }; R.key = "fly"; }
-    R.lidTarget = 0;
-  }
   function onEnding(done) {
     endingDone = done;
-    releaseAll();
+    drags = {};
+    R.feedHeld = false;
+    if (R.swap) R.swap.turnOn = false;
     if (!goodbyeOn()) R.running = false;
     else if (!R.running) {
       // Nothing to switch off: count the button as pressed.
@@ -3150,39 +1981,39 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (R.running) blip(120, 0.1, 0.1, "sine", 70);
     R.running = false;
   }
-  // Every frame while ending: done once the chuck has spun down.
   function endingFrame() {
-    if (endingDone && !R.running && R.rpm < 5 && R.q < 1) { endingDone(); endingDone = null; }
+    if (endingDone && !R.running && !R.swap && R.rpm < 5 && R.q < 1) { endingDone(); endingDone = null; }
   }
   function onRest() { endingDone = null; R.running = false; R.rpm = 0; }
   function onWake() { endingDone = null; }
   function restArt() {
-    // A small drill press on a workbench, switched off
+    // A small drill press seen from the front, switched off
     return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' +
-      '<rect x="10" y="168" width="220" height="16" rx="4" fill="#D99A55" stroke="#1D2340" stroke-width="4"/>' +
-      '<rect x="22" y="184" width="14" height="14" fill="#B7793F" stroke="#1D2340" stroke-width="3"/><rect x="204" y="184" width="14" height="14" fill="#B7793F" stroke="#1D2340" stroke-width="3"/>' +
-      '<path d="M70 168 L170 168 L176 156 L64 156 Z" fill="#F6B92B" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
-      '<rect x="88" y="44" width="14" height="114" fill="#C8CDD6" stroke="#1D2340" stroke-width="4"/>' +
-      '<rect x="100" y="112" width="74" height="9" fill="#8E96A2" stroke="#1D2340" stroke-width="3.5"/>' +
-      '<path d="M78 30 L170 30 Q182 30 182 42 L182 64 Q182 72 174 72 L78 72 Z" fill="#F6B92B" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
-      '<rect x="60" y="34" width="22" height="34" rx="6" fill="#4A505B" stroke="#1D2340" stroke-width="4"/>' +
-      '<rect x="146" y="72" width="12" height="12" fill="#C8CDD6" stroke="#1D2340" stroke-width="3"/>' +
-      '<path d="M144 84 L160 84 L156 96 L148 96 Z" fill="#C8CDD6" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
-      '<path d="M151 96 L152 110" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/>' +
-      '<circle cx="128" cy="56" r="7" fill="#B6BDC7" stroke="#1D2340" stroke-width="3"/>' +
-      '<path d="M128 56 L108 84 M128 56 L156 50" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/>' +
-      '<circle cx="108" cy="84" r="5" fill="#26282E"/><circle cx="156" cy="50" r="5" fill="#26282E"/>' +
-      '<path d="M190 24 q8 -8 16 0 M196 12 q6 -6 12 0" fill="none" stroke="#2D5BD7" stroke-width="3" stroke-linecap="round"/>' +
-      '<text x="200" y="40" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#2D5BD7">z</text>' +
-      '<text x="214" y="26" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#2D5BD7">z</text></svg>';
+      '<rect x="10" y="176" width="220" height="14" rx="4" fill="#D99A55" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="112" y="80" width="16" height="96" fill="#C8CDD6" stroke="#1D2340" stroke-width="4"/>' +
+      '<path d="M50 140 L190 140 L200 154 L40 154 Z" fill="#A7AFBA" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<path d="M86 132 L154 132 L160 140 L80 140 Z" fill="#F3D69C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      '<rect x="66" y="22" width="108" height="20" rx="10" fill="#FFC93C" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="72" y="40" width="96" height="48" rx="10" fill="#F6B92B" stroke="#1D2340" stroke-width="4"/>' +
+      '<path d="M102 88 L102 72 Q120 60 138 72 L138 96 L102 96 Z" fill="#F6B92B" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<rect x="80" y="50" width="16" height="24" rx="3" fill="#3A3F4A" stroke="#1D2340" stroke-width="3"/>' +
+      '<circle cx="88" cy="56" r="4" fill="#2E9E5B"/><rect x="83" y="63" width="10" height="7" rx="2" fill="#D7263D"/>' +
+      '<path d="M108 96 L132 96 L128 110 L112 110 Z" fill="#C8CDD6" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      '<path d="M120 110 L120 126" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/>' +
+      '<circle cx="174" cy="66" r="7" fill="#B6BDC7" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M174 66 L196 50 M174 66 L192 90 M174 66 L180 40" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/>' +
+      '<circle cx="196" cy="50" r="6" fill="#26282E"/><circle cx="192" cy="90" r="6" fill="#26282E"/><circle cx="180" cy="40" r="6" fill="#26282E"/>' +
+      '<path d="M200 22 q8 -8 16 0 M206 10 q6 -6 12 0" fill="none" stroke="#2D5BD7" stroke-width="3" stroke-linecap="round"/>' +
+      '<text x="18" y="40" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#2D5BD7">z</text>' +
+      '<text x="32" y="26" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#2D5BD7">z</text></svg>';
   }
   document.addEventListener("keydown", function (e) {
     if ((e.key === " " || e.key === "Enter") && e.target === document.body && !busy() && !Toybox.sheetOpen()) { e.preventDefault(); toggleSwitch(); }
   });
 
   // ---------- Start up ----------
-  buildToolbar();
-  updateToolbar();
+  buildPanel();
+  updateTiles();
   buildBoardTex();
   resize();
   autoTable();
@@ -3190,7 +2021,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { /* canvas text redraws every frame */ });
 
   // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
   try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
@@ -3219,9 +2049,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var lastLabel = "";
   function updateAria() {
     var b = curBit();
-    var t = "Drill press, " + (R.running ? "running, speed " + SPEED_WORDS[R.belt].toLowerCase() : "switched off") + ", " +
-      (b ? BITS[b.id].name + " bit" : "no bit") + ". " +
-      MATS[S.mat].name + " board with " + S.holes.length + (S.holes.length === 1 ? " hole." : " holes.");
+    var t = "Drill press, " + (R.running ? "running" : "switched off") + ", " +
+      (b ? BITS[b.id].name + " bit" : "changing the bit") + ". Pine board with " + S.holes.length + (S.holes.length === 1 ? " hole." : " holes.");
     if (t !== lastLabel) { lastLabel = t; cv.setAttribute("aria-label", t); }
   }
   var lastT = performance.now(), ariaAt = 0;
@@ -3231,10 +2060,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     now = t / 1000;
     if (Toybox.timer.phase() !== "resting") {
       // Calmer pace: what plays by itself (bit changes, spin, chips, new board) runs at three quarters speed;
-      // the feed the child turns stays direct.
+      // the handle he pulls stays direct.
       var sdt = dt * 0.75;
-      runAuto(sdt);
-      updateKeyFly(sdt);
+      runSwap(sdt);
       updateMachine(sdt);
       updateDrill(dt);
       updateParts(sdt);
@@ -3245,7 +2073,16 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     updateSound();
     requestAnimationFrame(frame);
   }
-  if (params.debug === "1") window.__dp = { S: function () { return S; }, R: R, toScreen: toScreen, M: function () { return M; }, slotPos: slotPos, keyhole: keyhole, HUB: HUB, BV: function () { return BV; }, C: function () { return C; }, penMM: penMM };
+  if (params.debug === "1") {
+    window.__dp = {
+      S: function () { return S; }, R: R, M: function () { return M; }, penMM: penMM,
+      page: function (x, y, z) { return pagePt(P(x, y, z)); },
+      sw: function () { return pagePt(R.ui.sw.btn); },
+      knob: function () { var i = pullKnob(); return pagePt(knobPts(spokeBase())[i].p); },
+      board: function (u, v) { return pagePt(P(bxw(u), boardTopW(), bzw(v))); },
+      hole: function () { return pagePt(P(0, boardTopW(), 0)); }
+    };
+  }
   requestAnimationFrame(frame);
 })();
 </script>
