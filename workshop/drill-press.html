@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../common/toybox.css">
 <script src="../common/toybox.js"></script>
+<script src="projects.js"></script>
 <style>
 :root {
   --bg: #CDE9FF;
@@ -153,6 +154,29 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
 .ghosthand > svg { position: relative; }
 .ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
 .ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+/* ---------- Project mode (drill-press.html?project=..&step=..): one step of a Workshop project ---------- */
+body.project .tb-panel,
+body.project #holesCount { display: none; }
+.pj-banner { top: 10px; bottom: auto; white-space: nowrap; overflow: hidden; max-width: calc(100% - 20px); }
+body.project .coach { top: 66px; }
+body.project .prompt { top: 66px; }
+.pj-banner[hidden], .pj-done[hidden] { display: none; }
+.pj-done { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(29, 35, 64, 0.3); pointer-events: none; }
+.pj-card { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: min(92%, 460px); padding: 14px 22px 18px; text-align: center;
+  background: var(--panel); color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 6px 6px 0 var(--edge);
+  animation: pj-in 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.pj-card h2 { margin: 0; font-size: clamp(1.8rem, 6vw, 2.8rem); line-height: 1.05; font-weight: 800; }
+.pj-card p { margin: 0; font-size: clamp(1.05rem, 3.6vw, 1.5rem); font-weight: 700; line-height: 1.2; }
+.pj-card .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0.3rem 1.4rem; font-size: 1.35rem; text-decoration: none; }
+@keyframes pj-in { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .pj-banner { top: 8px; bottom: auto; font-size: 1rem; }
+  body.project .coach { top: auto; bottom: 10px; }
+  body.project .prompt { top: auto; bottom: 10px; }
+  .pj-card { padding: 10px 16px 14px; gap: 8px; }
+  .pj-card .btn { min-height: 50px; font-size: 1.15rem; }
+}
+@media (prefers-reduced-motion: reduce) { .pj-card { animation: none; } }
 </style>
 </head>
 <body>
@@ -167,8 +191,16 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A drill press seen from the front"></canvas>
       <div class="tb-counter" id="holesCount">Holes: 0</div>
+      <div class="tb-coach pj-banner" id="pjBanner" hidden></div>
       <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
       <div class="tb-coach coach" id="coach" role="status" aria-live="polite">Turn it on!</div>
+      <div class="pj-done" id="pjDone" role="dialog" aria-labelledby="pjDoneTitle" hidden>
+        <div class="pj-card">
+          <h2 id="pjDoneTitle">Done! ✓</h2>
+          <p id="pjDoneLine"></p>
+          <a class="btn tb-go" id="pjBack" href="project.html">Back to the plan</a>
+        </div>
+      </div>
     </main>
     <section class="tb-panel toolbar" id="toolbar">
       <div class="tb-choices bits" id="bits" role="group" aria-label="Bit case"></div>
@@ -205,10 +237,18 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     return;
   }
 
+  var PSTEP = null;
+  try { PSTEP = window.ToyboxProjects ? ToyboxProjects.fromQuery() : null; } catch (e) { PSTEP = null; }
+  if (PSTEP && (PSTEP.station !== "drill-press" || !PSTEP.job || PSTEP.job.kind !== "hole")) PSTEP = null;
+
   var OUT = "#1D2340";
   var SKEY = "workshop-drill-v1";
   var DS = 1.6;            // world units per millimetre
   var BW = 250, BH = 170;  // board size in world units (across, front to back)
+  if (PSTEP) {
+    BW = PSTEP.job.board.w === PSTEP.job.board.l ? 176 : Math.round(PSTEP.job.board.w * 30);
+    BH = PSTEP.job.board.w === PSTEP.job.board.l ? 176 : Math.round(PSTEP.job.board.l * 24);
+  }
   var TRAVEL = 112;        // quill travel
   var RPM = 1500;          // one calm speed
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -289,7 +329,7 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   }
   var saveQueued = false;
   function save() {
-    if (saveQueued) return;
+    if (PSTEP || saveQueued) return;
     saveQueued = true;
     setTimeout(function () {
       saveQueued = false;
@@ -298,13 +338,68 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   }
   // Opened fresh from the Toybox home screen: a new board, the first bit, no holes. A reload, or coming
   // back from the Tool Wall, keeps the bench as it was.
-  var S = Toybox.fresh() ? freshState() : loadState();
-  if (Toybox.fresh()) save();
+  var S = PSTEP ? freshState() : (Toybox.fresh() ? freshState() : loadState());
+  if (!PSTEP && Toybox.fresh()) save();
   if (linkBit) S.chuck = { id: linkBit, si: 0 };
+
+  var PJ = null;
+  if (PSTEP) {
+    PJ = {
+      step: PSTEP,
+      job: PSTEP.job,
+      bit: PSTEP.job.bit,
+      targets: PSTEP.job.holes.map(function (h, idx) {
+        return {
+          idx: idx,
+          u: (h.x / PSTEP.job.board.w) * BW,
+          v: ((PSTEP.job.board.l - h.y) / PSTEP.job.board.l) * BH,
+          drilled: false
+        };
+      }),
+      misses: 0,
+      missPull: false,
+      slideTo: null,
+      done: false,
+      over: false
+    };
+    S.chuck = { id: PJ.bit, si: 0 };
+    if (PJ.targets.length) {
+      S.px = PJ.targets[0].u;
+      S.py = PJ.targets[0].v;
+    }
+    document.body.classList.add("project");
+    var wb = $("wallbtn");
+    if (wb) {
+      wb.setAttribute("href", ToyboxProjects.planUrl(PSTEP.project));
+      wb.setAttribute("aria-label", "Back to the plan");
+      wb.setAttribute("data-short", "Plan");
+      var wsp = wb.querySelector("span");
+      if (wsp) wsp.textContent = "Plan";
+    }
+    var pjb = $("pjBanner");
+    if (pjb) { pjb.textContent = PSTEP.title; pjb.hidden = false; }
+    $("coach").textContent = PSTEP.coach;
+  }
+  function pjNearTarget(u, v, maxD) {
+    if (!PJ) return null;
+    var best = null, bd = maxD == null ? 26 : maxD;
+    PJ.targets.forEach(function (t) {
+      if (t.drilled) return;
+      var d = Math.hypot(u - t.u, v - t.v);
+      if (d <= bd) { bd = d; best = t; }
+    });
+    return best;
+  }
+  function pjNextTarget() {
+    if (!PJ) return null;
+    for (var i = 0; i < PJ.targets.length; i++) if (!PJ.targets[i].drilled) return PJ.targets[i];
+    return null;
+  }
 
   // ---------- Live (not saved) machine state ----------
   var R = {
     running: false,
+    fastStop: false,
     rpm: 0,               // current visual rpm (spins up and down)
     phase: 0,             // spindle rotation phase (radians)
     q: 0,                 // quill travel (world units)
@@ -415,6 +510,14 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
     layout();
     buildBg();
+    if (PJ) {
+      var pjb = $("pjBanner"), px;
+      if (pjb && !pjb.hidden) {
+        pjb.style.fontSize = "";
+        px = parseFloat(getComputedStyle(pjb).fontSize) || 20;
+        while (pjb.scrollWidth > pjb.clientWidth + 1 && px > 11) { px -= 1; pjb.style.fontSize = px + "px"; }
+      }
+    }
   }
 
   // ---------- Drawing helpers ----------
@@ -1112,6 +1215,20 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     c.clearRect(0, 0, boardTop.width, boardTop.height);
     c.drawImage(topTex, 0, 0);
     c.setTransform(TEXS, 0, 0, TEXS, 0, 0);
+    if (PJ) {
+      PJ.targets.forEach(function (t) {
+        var arm = PJ.bit === "holesaw" ? 18 : 11;
+        c.save();
+        c.strokeStyle = "#1D2340";
+        c.lineWidth = 3.2;
+        c.lineCap = "round";
+        c.beginPath();
+        c.moveTo(t.u - arm, t.v - arm); c.lineTo(t.u + arm, t.v + arm);
+        c.moveTo(t.u + arm, t.v - arm); c.lineTo(t.u - arm, t.v + arm);
+        c.stroke();
+        c.restore();
+      });
+    }
     S.holes.forEach(function (h) { drawHoleTop(c, h); });
     boardDirty = false;
   }
@@ -1167,6 +1284,25 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
       c.beginPath(); c.ellipse(p.x, p.y, Math.max(r * p.k, 5 / M.s), Math.max(r * p.k * 0.55, 3 / M.s), 0, 0, Math.PI * 2);
       c.fillStyle = holeThrough(h) ? "#1D2028" : "#3A3F4A"; c.fill();
     });
+    if (PJ) {
+      var arm = PJ.bit === "holesaw" ? 18 : 11;
+      PJ.targets.forEach(function (t) {
+        if (t.drilled) return;
+        var tc = P(bxw(t.u), top, bzw(t.v));
+        if ((R.flash.x && R.flash.x > now) || (R.running && !pjNearTarget(S.px, S.py, 26))) {
+          c.save();
+          c.globalAlpha = 0.45 + 0.35 * Math.sin(now * 8);
+          c.beginPath(); c.ellipse(tc.x, tc.y, (arm + 8) * tc.k, (arm + 8) * tc.k * 0.6, 0, 0, Math.PI * 2);
+          c.lineWidth = 5; c.strokeStyle = "#FFC93C"; c.stroke();
+          c.restore();
+        }
+        c.save();
+        c.strokeStyle = OUT; c.lineWidth = 3.8; c.lineCap = "round";
+        strokePts(c, [P(bxw(t.u - arm), top, bzw(t.v - arm)), P(bxw(t.u + arm), top, bzw(t.v + arm))]);
+        strokePts(c, [P(bxw(t.u + arm), top, bzw(t.v - arm)), P(bxw(t.u - arm), top, bzw(t.v + arm))]);
+        c.restore();
+      });
+    }
     // red laser cross where the bit will come down
     c.save();
     poly(c, sd.top); c.clip();
@@ -1511,12 +1647,24 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   function updateDrill(dt) {
     var b = curBit();
     var cq = contactQ();
-    var canCut = b && R.running && R.jaw === 0 && !R.swap && R.rpm > 150;
+    var pjTarget = PJ ? pjNearTarget(S.px, S.py, 26) : null;
+    var canCut = b && R.running && R.jaw === 0 && !R.swap && R.rpm > 150 && (!PJ || !!pjTarget);
     var stopQ = cq + (WOOD.t + 12) * DS;    // a little past the bottom of the board
     var qmax = Math.min(TRAVEL, canCut ? stopQ : Math.max(0, cq));
     var want = R.feedHeld ? R.qWant : 0;
     var before = penMM();
     R.cutting = 0;
+    if (PJ && b && R.running && !R.swap && R.rpm > 150 && !pjTarget && want > cq - 0.5 && !R.pjMissLock) {
+      R.pjMissLock = true;
+      PJ.misses++;
+      var nxt = pjNextTarget();
+      if (PJ.misses >= 2 && nxt) {
+        PJ.misses = 0;
+        PJ.slideTo = { x: nxt.x, y: nxt.y };
+      }
+      say("Slide an X under the bit!", null);
+    }
+    if (want < cq - 3) R.pjMissLock = false;
     if (want > qmax) want = qmax;
     if (want > R.q) {
       var nq = want;
@@ -1534,6 +1682,7 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     R.spokeT += (st - R.spokeT) * Math.min(1, dt * 12);
     var pen = penMM();
     if (canCut && pen > 0.05) {
+      if (PJ && pjTarget) { S.px = pjTarget.x; S.py = pjTarget.y; PJ.slideTo = null; }
       var h = R.curHole && R.curHole.bit === b.id ? R.curHole : null;
       if (!h) { h = findOrMakeHole(b); R.curHole = h; }
       if (pen > h.d) {
@@ -1553,6 +1702,22 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
             // the round slug drops out under the board
             addPart({ type: "disc", x: 0, y: boardTopW() + 6, z: 0, vx: rnd(-40, 40), vy: 60, vz: 140, sz: (b.mm - 2) * DS / 2, col: WOOD.col, vr: 0, rot: 0.01 });
           }
+          if (PJ && pjTarget && !pjTarget.done) {
+            pjTarget.done = true;
+            PJ.misses = 0;
+            boardDirty = true;
+            releaseFeed();
+            var nxtAfter = pjNextTarget();
+            if (!nxtAfter && !PJ.finished) {
+              PJ.finished = true;
+              var href = window.ToyboxProjects ? ToyboxProjects.finish(PSTEP) : "index.html";
+              setTimeout(function () {
+                $("pjDoneText").textContent = PSTEP.done || "All done!";
+                $("pjBack").href = href;
+                $("pjDone").hidden = false;
+              }, 650);
+            }
+          }
         }
       } else if (R.q > cq) {
         R.cutting = 0.15; // spinning in an existing hole
@@ -1562,8 +1727,8 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   }
 
   function updateMachine(dt) {
-    if (R.running) R.rpm += (RPM - R.rpm) * Math.min(1, dt * 2.2);
-    else if (R.swap) R.rpm = Math.max(0, R.rpm - (R.rpm * 5 + 500) * dt);   // a quick brake for a bit change
+    if (R.running) { R.rpm += (RPM - R.rpm) * Math.min(1, dt * 2.2); R.fastStop = false; }
+    else if (R.swap || R.fastStop) { R.rpm = Math.max(0, R.rpm - (R.rpm * 5 + 600) * dt); if (R.rpm === 0) R.fastStop = false; } // a quick brake for a bit change or switch-off guard
     else R.rpm = Math.max(0, R.rpm - (R.rpm * 0.8 + 160) * dt);             // spins down over a couple of seconds
     var vis = R.rpm > 0 ? (reduce ? 1 + R.rpm / 900 : 2 + R.rpm / 230) : 0;  // visual revolutions per second
     R.phase = (R.phase + vis * 2 * Math.PI * dt) % (Math.PI * 200);
@@ -1572,6 +1737,16 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     if (Math.abs(dy) > 0.2) R.tableY += clamp(dy, -240 * dt, 240 * dt);
     R.boardSlide *= Math.pow(0.004, dt);
     if (Math.abs(R.boardSlide) < 0.5) R.boardSlide = 0;
+    if (PJ && PJ.slideTo && penMM() <= 0) {
+      var sdx = PJ.slideTo.x - S.px, sdz = PJ.slideTo.y - S.py, sdist = Math.hypot(sdx, sdz);
+      if (sdist < 0.8) {
+        S.px = PJ.slideTo.x; S.py = PJ.slideTo.y; PJ.slideTo = null;
+      } else {
+        var step = Math.min(sdist, (180 + sdist * 4) * dt);
+        S.px += sdx / sdist * step;
+        S.py += sdz / sdist * step;
+      }
+    }
   }
 
   // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
@@ -1667,6 +1842,12 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   // Coach line and ghost hand: turn it on, pull the handle down, then slide the board for the next hole.
   function coachStep() {
     if (busy() || R.swap) return "";
+    if (PJ) {
+      if (PJ.finished) return "";
+      if (!R.running) return (PSTEP.coach && PSTEP.coach.indexOf("Switch on") === 0) ? PSTEP.coach : "Switch on the drill press!";
+      if (!pjNearTarget(S.px, S.py, 26)) return "Slide an X under the bit!";
+      return PSTEP.id === "floor-drill" ? PSTEP.coach : "Pull the handle down!";
+    }
     if (!S.holes.length) return R.running ? "Pull the handle down!" : "Turn it on!";
     if (!S.slid) return "Slide the board!";
     return "";
@@ -1686,8 +1867,13 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   var ghost = makeGhost(function () {
     var t = coachStep(), j;
     if (!t || R.ui.sw === undefined) return null;
-    if (t === "Turn it on!") return { pts: [pagePt(R.ui.sw.btn)], tap: true };
-    if (t === "Pull the handle down!") {
+    if (!R.running) return { pts: [pagePt(R.ui.sw.btn)], tap: true };
+    if (PJ && !pjNearTarget(S.px, S.py, 26)) {
+      var nxt = pjNextTarget(), topP = boardTopW();
+      if (!nxt) return null;
+      return { pts: [pagePt(P(bxw(nxt.x), topP, bzw(nxt.y))), pagePt(P(0, topP, 0))] };
+    }
+    if (t === "Pull the handle down!" || (PJ && pjNearTarget(S.px, S.py, 26))) {
       var i = pullKnob(), pts = [];
       for (j = 0; j <= 6; j++) pts.push(pagePt(knobPts(spokeBase() + j * 0.2)[i].p));
       return { pts: pts };
@@ -1815,6 +2001,7 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
       toggleSwitch();
       return { type: "none" };
     }
+    if (PJ && PJ.finished) return { type: "none" };
     // The feed handles: a knob, a spoke or the hub
     var onFeed = false;
     if (ui.knobs) {
@@ -1830,7 +2017,8 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     var top = boardTopW(), wp = onPlane(w.x, w.y, top), u = wp.x + S.px - R.boardSlide, v = wp.z + S.py;
     if (u >= -14 && u <= BW + 14 && v >= -14 && v <= BH + boardT() * 2) {
       if (penMM() > 0 || R.q > contactQ() + 1) { say("Let the handle go up first", "feed"); return { type: "none" }; }
-      return { type: "board", x0: wp.x, z0: wp.z, px0: S.px, py0: S.py };
+      if (PJ) PJ.slideTo = null;
+      return { type: "board", x0: wp.x, z0: wp.z, px0: S.px, py0: S.py, u0: u, v0: v };
     }
     if (R.swap) return { type: "none" };
     // Anywhere else on the machine: drag down to pull the feed
@@ -1856,9 +2044,10 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
         break;
       case "board":
         var wp = onPlane(w.x, w.y, boardTopW());
-        S.px = clamp(d.px0 - (wp.x - d.x0), 40, BW - 40);
-        S.py = clamp(d.py0 - (wp.z - d.z0), 20, BH - 20);
-        if (!d.moved && Math.hypot(S.px - d.px0, S.py - d.py0) > 12) { d.moved = true; if (S.holes.length) S.slid = true; }
+        var mx = PJ ? 14 : 40, my = PJ ? 14 : 20;
+        S.px = clamp(d.px0 - (wp.x - d.x0), mx, BW - mx);
+        S.py = clamp(d.py0 - (wp.z - d.z0), my, BH - my);
+        if (!d.moved && Math.hypot(S.px - d.px0, S.py - d.py0) > 10) { d.moved = true; if (S.holes.length) S.slid = true; }
         break;
     }
   }
@@ -1869,7 +2058,18 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     delete drags[pid];
     if (!d) return;
     if ((d.type === "feed" || d.type === "feedV") && !anyFeedHeld()) R.feedHeld = false;
-    if (d.type === "board") save();
+    if (d.type === "board") {
+      if (PJ && !PJ.finished) {
+        if (!d.moved) {
+          var tapped = pjNearTarget(d.u0, d.v0, 36) || pjNextTarget();
+          if (tapped) PJ.slideTo = { x: tapped.x, y: tapped.y };
+        } else {
+          var near = pjNearTarget(S.px, S.py, 26);
+          if (near) PJ.slideTo = { x: near.x, y: near.y };
+        }
+      }
+      save();
+    }
   }
   cv.addEventListener("pointerdown", onDown);
   cv.addEventListener("pointermove", onMove);
@@ -2045,6 +2245,28 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
     onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
     onTimer: function (info) { TI = info; }
   });
+  if (Toybox.offFirst) {
+    Toybox.offFirst({
+      running: function () { return R.running; },
+      name: "drill press",
+      off: function (done) {
+        releaseFeed();
+        if (R.swap) R.swap.turnOn = false;
+        R.running = false;
+        R.fastStop = true;
+        blip(120, 0.1, 0.1, "sine", 70);
+        var t0 = Date.now();
+        var iv = setInterval(function () {
+          if (R.rpm < 8 || Date.now() - t0 > 900) {
+            clearInterval(iv);
+            R.rpm = 0;
+            done();
+          }
+        }, 30);
+      },
+      flash: function () { flash("sw"); }
+    });
+  }
 
   var lastLabel = "";
   function updateAria() {
@@ -2075,7 +2297,7 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
   }
   if (params.debug === "1") {
     window.__dp = {
-      S: function () { return S; }, R: R, M: function () { return M; }, penMM: penMM,
+      S: function () { return S; }, R: R, M: function () { return M; }, PJ: PJ, penMM: penMM,
       page: function (x, y, z) { return pagePt(P(x, y, z)); },
       sw: function () { return pagePt(R.ui.sw.btn); },
       knob: function () { var i = pullKnob(); return pagePt(knobPts(spokeBase())[i].p); },

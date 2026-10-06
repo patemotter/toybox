@@ -29,6 +29,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../common/toybox.css">
 <script src="../common/toybox.js"></script>
+<script src="projects.js"></script>
 <style>
 :root {
   --bg: #CDE9FF;
@@ -595,6 +596,43 @@ body.ending .panel,
 body.ending .trigger { pointer-events: none; opacity: 0.4; }
 body.ending .camout { display: none; }
 
+/* ---------- Project mode (guided build from the Tool Wall) ---------- */
+.pj-banner {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
+  padding: 4px 16px; border-radius: 999px;
+  background: #FFE9A8; color: #1D2340;
+  border: 3px solid #1D2340; box-shadow: 0 3px 0 #1D2340;
+  font-weight: 800; font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+  white-space: nowrap; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.pj-done {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px; background: rgba(29, 35, 64, 0.18);
+}
+.pj-done[hidden] { display: none; }
+.pj-card {
+  width: min(440px, 100%);
+  background: var(--panel); color: var(--ink);
+  border: 4px solid var(--edge); border-radius: 26px;
+  box-shadow: 0 8px 0 var(--edge);
+  padding: 16px 20px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.pj-card h2 { margin: 0; font-size: clamp(1.5rem, 4.2vw, 2.1rem); font-weight: 800; line-height: 1.05; }
+.pj-card p { margin: 0; font-weight: 800; color: var(--muted); font-size: clamp(1rem, 2.6vw, 1.25rem); }
+.pj-card .btn {
+  min-height: 56px; padding: 8px 24px; font-size: clamp(1.15rem, 3vw, 1.45rem);
+  background: #5BE37A; color: #1D2340; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 10px; border-radius: 999px;
+  font-weight: 800; border: 3px solid #1D2340; box-shadow: 0 4px 0 #1D2340;
+}
+body.project .panel,
+body.project .ov.tl,
+body.project .ov.tr .readout,
+body.project .trigger { display: none !important; }
+
 /* Rest picture size (the rest screen itself is in common/toybox.css). */
 .rest-art { width: min(70vw, 300px); }
 @media (prefers-reduced-motion: reduce) {
@@ -614,6 +652,7 @@ body.ending .camout { display: none; }
   <main class="tb-body">
     <div class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="Workbench"></canvas>
+      <div class="pj-banner" id="pjBanner" hidden></div>
       <div class="ov tl"><span class="pill toolname" id="toolName"></span></div>
       <div class="ov tr"><div class="pill readout" aria-live="polite"><b id="readBig"></b><span id="readSmall"></span></div><svg class="tring" id="tring" viewBox="-28 -28 56 56" hidden aria-hidden="true"></svg></div>
       <div class="coach" id="coach" role="status" aria-live="polite"><span class="num" id="coachNum">1</span><span class="ctext"><span id="hint"></span><small id="coachSub"></small></span></div>
@@ -622,6 +661,13 @@ body.ending .camout { display: none; }
       <div class="camout" id="camout" hidden role="status">
         <svg id="camArt" viewBox="0 0 232 116" aria-hidden="true"></svg>
         <div class="cbody"><p id="camText"></p><button class="btn" id="camFix"></button></div>
+      </div>
+      <div class="pj-done" id="pjDone" hidden role="dialog" aria-label="Step finished">
+        <div class="pj-card">
+          <h2>Done! &#10003;</h2>
+          <p id="pjDoneText"></p>
+          <a class="btn" id="pjBack" href="index.html">Back to the plan</a>
+        </div>
       </div>
     </div>
 
@@ -934,6 +980,45 @@ body.ending .camout { display: none; }
     state.bit = state.head;
   })();
 
+  // ---------- Project mode (guided build from the Tool Wall) ----------
+  var PSTEP = window.ToyboxProjects && ToyboxProjects.fromQuery();
+  if (PSTEP && (PSTEP.station !== "hammer-screws" || !PSTEP.job || PSTEP.job.kind !== "assemble")) PSTEP = null;
+  var PJ = PSTEP ? {
+    joins: PSTEP.job.joins || [
+      ["back", "side1"],
+      ["back", "side2"],
+      ["sides", "floor"],
+      ["sides", "front"],
+      ["box", "roof"]
+    ],
+    step: 0,
+    phase: "glue", // "glue" -> "slide" -> "nails" -> "pause" -> "done"
+    glueProg: 0,
+    glueHeld: false,
+    glueAuto: false,
+    slideProg: 0,
+    pauseT: 0,
+    nails: [],
+    doneNails: [],
+    finished: false
+  } : null;
+  if (PSTEP) {
+    document.body.classList.add("project");
+    state.mode = "hammer";
+    state.hammer = "claw";
+    state.act = "hit";
+    var wb = $("wallBtn");
+    if (wb) {
+      wb.href = ToyboxProjects.planUrl(PSTEP.project);
+      wb.setAttribute("aria-label", "Back to the plan");
+      wb.setAttribute("data-short", "Plan");
+      var wsp = wb.querySelector("span");
+      if (wsp) wsp.textContent = "Plan";
+    }
+    var pjb = $("pjBanner");
+    if (pjb) { pjb.textContent = PSTEP.title; pjb.hidden = false; }
+  }
+
   // ---------- Tool drawings (millimetres; hammers: striking face at 0,0 pointing down, handle to the right) ----------
   function hammerArt(id, icon) {
     var parts = [], ay, piv, top, Lh, box, flipF = 0, i, z;
@@ -1164,10 +1249,10 @@ body.ending .camout { display: none; }
   var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
   var W = 300, H = 300, DPR = 1;
   var bg = document.createElement("canvas"), bgx = bg.getContext("2d"), bgDirty = true;
-  var LB = {}, LM = {}, LJ = {}, LY = {};
+  var LB = {}, LM = {}, LJ = {}, LY = {}, LA = {};
   var OB = 0.5;
 
-  function sceneName() { return state.mode === "screw" ? "board" : HAMMERS[state.hammer].scene; }
+  function sceneName() { if (PJ) return "assemble"; return state.mode === "screw" ? "board" : HAMMERS[state.hammer].scene; }
 
   function resize() {
     var w = Math.max(80, cv.clientWidth), h = Math.max(80, cv.clientHeight);
@@ -1205,6 +1290,20 @@ body.ending .camout { display: none; }
     LY.kx = Math.min(W - 60 * k, Math.max(LY.sx + 300 * k, W * 0.8));
     LY.stumpTop = LY.ground - 240 * k;
     LY.logTop = LY.stumpTop - 300 * k;
+    // Assemble (Project Mode birdhouse):
+    k = Math.min(W * 0.88 / 360, H / 410);
+    LA = { k: k, cx: W * 0.5, cy: H * 0.58, benchY: H * 0.50 };
+    if (PSTEP) {
+      var pjb = $("pjBanner");
+      if (pjb && !pjb.hidden) {
+        pjb.style.fontSize = "";
+        var fs = parseFloat(getComputedStyle(pjb).fontSize) || 16;
+        while (pjb.scrollWidth > pjb.clientWidth + 1 && fs > 11) {
+          fs -= 0.5;
+          pjb.style.fontSize = fs + "px";
+        }
+      }
+    }
   }
 
   // ---------- Painting helpers ----------
@@ -2085,6 +2184,7 @@ body.ending .camout { display: none; }
   var ham = { theta: 0.55, phase: "rest", t: 0, from: 0, dur: 0, s: 1, g: null, tgt: null, pos: null, mir: false, slosh: 0, side: 0, peak: 0 };
   function hamScale() {
     var sc = sceneName();
+    if (sc === "assemble") return LA.k * 0.72;
     if (sc === "board") return LB.k * 0.66;
     if (sc === "metal") return LM.k * 0.5;
     if (sc === "joint") return LJ.k * 0.62;
@@ -2103,8 +2203,278 @@ body.ending .camout { display: none; }
     for (i = 0; i < 24; i++) { var m = (lo + hi) / 2; if (raiseAt(m) < raise) lo = m; else hi = m; }
     return (lo + hi) / 2;
   }
+
+  // ---------- Assemble scene (Project mode birdhouse) ----------
+  var PJ_LABELS = [
+    "Join 1: Left side to the back",
+    "Join 2: Right side to the back",
+    "Join 3: Floor on the bottom",
+    "Join 4: Front wall on the front",
+    "Join 5: Roof on the top"
+  ];
+  function pjSeamInfo(step) {
+    var k = LA.k, cx = LA.cx, cy = LA.cy + 14 * k;
+    var bw = 128 * k, bh = 136 * k;
+    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
+    if (step === 0) {
+      return {
+        x0: xL + 8 * k, y0: yT + 14 * k, x1: xL + 8 * k, y1: yB - 14 * k,
+        nx0: xL, ny0: yT + 28 * k, nx1: xL, ny1: yB - 28 * k,
+        dx: -42 * k, dy: 0
+      };
+    }
+    if (step === 1) {
+      return {
+        x0: xR - 8 * k, y0: yT + 14 * k, x1: xR - 8 * k, y1: yB - 14 * k,
+        nx0: xR, ny0: yT + 28 * k, nx1: xR, ny1: yB - 28 * k,
+        dx: 42 * k, dy: 0
+      };
+    }
+    if (step === 2) {
+      return {
+        x0: xL + 14 * k, y0: yB - 6 * k, x1: xR - 14 * k, y1: yB - 6 * k,
+        nx0: xL + 24 * k, ny0: yB, nx1: xR - 24 * k, ny1: yB,
+        dx: 0, dy: 38 * k
+      };
+    }
+    if (step === 3) {
+      return {
+        x0: xL + 10 * k, y0: yT + 20 * k, x1: xR - 10 * k, y1: yT + 20 * k,
+        nx0: xL + 20 * k, ny0: cy, nx1: xR - 20 * k, ny1: cy,
+        dx: 0, dy: -40 * k
+      };
+    }
+    var roofPeakY = yT - 54 * k;
+    return {
+      x0: cx - 44 * k, y0: (roofPeakY + yT) * 0.5, x1: cx + 44 * k, y1: (roofPeakY + yT) * 0.5,
+      nx0: cx - 36 * k, ny0: yT - 18 * k, nx1: cx + 36 * k, ny1: yT - 18 * k,
+      dx: 0, dy: -46 * k
+    };
+  }
+  function pjSpawnNails() {
+    if (!PJ) return;
+    var s = pjSeamInfo(PJ.step);
+    PJ.nails = [
+      { x: s.nx0, y: s.ny0, hits: 0, maxHits: 2, step: PJ.step },
+      { x: s.nx1, y: s.ny1, hits: 0, maxHits: 2, step: PJ.step }
+    ];
+    ham.tgt = { kind: "pjnail", idx: 0 };
+  }
+  function pjNailTop(idx) {
+    if (!PJ || !PJ.nails[idx]) return { x: LA.cx, y: LA.cy };
+    var n = PJ.nails[idx], k = LA.k;
+    var stickOut = Math.max(0, 2 - n.hits) * 14 * k;
+    return { x: n.x, y: n.y - stickOut - 3 * k };
+  }
+  function pjNextNailIdx() {
+    if (!PJ) return -1;
+    for (var i = 0; i < PJ.nails.length; i++) if (PJ.nails[i].hits < PJ.nails[i].maxHits) return i;
+    return -1;
+  }
+  function drawAssembleBg(c) {
+    var yB = LA.benchY;
+    pegboard(c, 0, 0, W, yB);
+    benchTop(c, yB, H);
+  }
+  function drawBirdhousePiece(c, kind, ox, oy) {
+    var k = LA.k, cx = LA.cx + (ox || 0), cy = LA.cy + 14 * k + (oy || 0);
+    var bw = 128 * k, bh = 136 * k;
+    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
+    var peakY = yT - 54 * k;
+    c.save();
+    c.lineJoin = "round"; c.lineCap = "round";
+    if (kind === "back") {
+      c.fillStyle = "rgba(40,20,5,0.28)";
+      c.fillRect(xL + 8 * k, yT + 8 * k, bw, bh);
+      c.fillStyle = "#D89F5B"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
+      c.fill(); c.stroke();
+    } else if (kind === "side1") {
+      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xL - 12 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
+    } else if (kind === "side2") {
+      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xR - 10 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
+    } else if (kind === "floor") {
+      c.fillStyle = "#C98D48"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xL - 12 * k, yB - 6 * k, bw + 24 * k, 18 * k); c.fill(); c.stroke();
+    } else if (kind === "front") {
+      c.fillStyle = "#F2CA92"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
+      c.fill(); c.stroke();
+      // Round entry door hole
+      c.fillStyle = "#4A2E14"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.arc(cx, cy - 12 * k, 24 * k, 0, Math.PI * 2); c.fill(); c.stroke();
+    } else if (kind === "roof") {
+      c.fillStyle = "#DE9B52"; c.strokeStyle = OUT; c.lineWidth = 3;
+      var rw = bw * 0.68;
+      c.beginPath();
+      c.moveTo(cx, peakY - 12 * k);
+      c.lineTo(cx - rw, yT + 14 * k);
+      c.lineTo(cx - rw + 10 * k, yT + 26 * k);
+      c.lineTo(cx, peakY + 4 * k);
+      c.lineTo(cx + rw - 10 * k, yT + 26 * k);
+      c.lineTo(cx + rw, yT + 14 * k);
+      c.closePath();
+      c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+  function drawGlueBottle(c, x, y, tilt) {
+    var k = LA.k * 0.9;
+    c.save();
+    c.translate(x, y);
+    c.rotate(tilt || 0);
+    // Nozzle pointing down at (0,0)
+    c.fillStyle = "#F77F00"; c.strokeStyle = OUT; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(-4 * k, -16 * k); c.lineTo(4 * k, -16 * k); c.lineTo(2 * k, 0); c.lineTo(-2 * k, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#FFFFFF";
+    c.beginPath(); c.rect(-18 * k, -72 * k, 36 * k, 56 * k); c.fill(); c.stroke();
+    c.fillStyle = "#2D5BD7";
+    c.fillRect(-15 * k, -54 * k, 30 * k, 22 * k);
+    c.restore();
+  }
+  function updateAssemble(dt) {
+    if (!PJ || PJ.finished) return;
+    if (PJ.phase === "glue") {
+      if (PJ.glueHeld || PJ.glueAuto) {
+        PJ.glueProg = Math.min(1, PJ.glueProg + dt * 1.35);
+        if (Math.random() < 0.35) {
+          var s = pjSeamInfo(PJ.step);
+          var gx = lerp(s.x0, s.x1, PJ.glueProg), gy = lerp(s.y0, s.y1, PJ.glueProg);
+          ring(gx, gy, 10 * LA.k, "255,250,230");
+        }
+        if (PJ.glueProg >= 1) {
+          PJ.glueHeld = false; PJ.glueAuto = false;
+          PJ.phase = "slide"; PJ.slideProg = 0;
+          sndPop();
+        }
+      }
+    } else if (PJ.phase === "slide") {
+      PJ.slideProg = Math.min(1, PJ.slideProg + dt * 2.5);
+      if (PJ.slideProg >= 1) {
+        PJ.phase = "nails";
+        pjSpawnNails();
+        sndPlace();
+      }
+    } else if (PJ.phase === "pause") {
+      PJ.pauseT += dt;
+      if (PJ.pauseT >= 0.55) {
+        PJ.nails.forEach(function (n) { PJ.doneNails.push({ x: n.x, y: n.y }); });
+        PJ.nails = [];
+        if (PJ.step + 1 < PJ.joins.length) {
+          PJ.step++;
+          PJ.phase = "glue";
+          PJ.glueProg = 0; PJ.slideProg = 0; PJ.pauseT = 0;
+        } else {
+          PJ.phase = "done";
+          PJ.finished = true;
+          stars(LA.cx, LA.cy, 24);
+          sndChime();
+          var href = ToyboxProjects.finish(PSTEP);
+          var pjb = $("pjBack"), pjdt = $("pjDoneText"), pjd = $("pjDone");
+          if (pjb) pjb.href = href;
+          if (pjdt) pjdt.textContent = PSTEP.done;
+          if (pjd) pjd.hidden = false;
+        }
+      }
+    }
+  }
+  function drawAssembleDyn(c, dt) {
+    if (!PJ) return;
+    updateAssemble(dt);
+    var k = LA.k, step = PJ.step, s = pjSeamInfo(step);
+    // Always draw back piece first
+    drawBirdhousePiece(c, "back", 0, 0);
+    var order = ["side1", "side2", "floor", "front", "roof"];
+    for (var i = 0; i < step; i++) {
+      drawBirdhousePiece(c, order[i], 0, 0);
+    }
+    var curKind = order[step];
+    if (curKind) {
+      if (PJ.phase === "glue") {
+        // Show the new piece waiting slightly offset
+        c.save(); c.globalAlpha = 0.85;
+        drawBirdhousePiece(c, curKind, s.dx, s.dy);
+        c.restore();
+        // Dashed seam guide
+        c.save();
+        c.strokeStyle = "rgba(255,201,60,0.85)"; c.lineWidth = 6 * k; c.lineCap = "round"; c.setLineDash([8 * k, 8 * k]);
+        c.beginPath(); c.moveTo(s.x0, s.y0); c.lineTo(s.x1, s.y1); c.stroke();
+        c.restore();
+        if (PJ.glueProg > 0) {
+          c.save();
+          c.strokeStyle = "#FFFDF6"; c.lineWidth = 9 * k; c.lineCap = "round";
+          c.beginPath(); c.moveTo(s.x0, s.y0);
+          c.lineTo(lerp(s.x0, s.x1, PJ.glueProg), lerp(s.y0, s.y1, PJ.glueProg));
+          c.stroke();
+          c.restore();
+        }
+        var bx = lerp(s.x0, s.x1, PJ.glueProg), by = lerp(s.y0, s.y1, PJ.glueProg);
+        drawGlueBottle(c, bx, by - 4 * k, 0.25);
+      } else if (PJ.phase === "slide") {
+        var f = 1 - Math.pow(1 - PJ.slideProg, 3);
+        drawBirdhousePiece(c, curKind, s.dx * (1 - f), s.dy * (1 - f));
+      } else {
+        drawBirdhousePiece(c, curKind, 0, 0);
+      }
+    }
+    // Draw previously driven nails
+    PJ.doneNails.forEach(function (dn) {
+      c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+      ellipse(c, dn.x, dn.y, 5 * k, 2.6 * k); c.fill(); c.stroke();
+    });
+    // Draw active nails for current join
+    if (PJ.phase === "nails" || PJ.phase === "pause") {
+      PJ.nails.forEach(function (n, idx) {
+        var stick = Math.max(0, n.maxHits - n.hits) * 14 * k;
+        c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+        if (stick > 1) {
+          c.beginPath(); c.rect(n.x - 2.2 * k, n.y - stick, 4.4 * k, stick); c.fill(); c.stroke();
+        }
+        ellipse(c, n.x, n.y - stick, 5.5 * k, 2.8 * k); c.fill(); c.stroke();
+        if (PJ.phase === "nails" && idx === (ham.tgt && ham.tgt.idx)) {
+          c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3;
+          ellipse(c, n.x, n.y - stick, 12 * k, 6 * k); c.stroke();
+        }
+      });
+      if (PJ.phase === "nails") drawHammerTool(c);
+    }
+  }
+  function hitPjNail(idx, s) {
+    if (!PJ || PJ.phase !== "nails") return;
+    var n = PJ.nails[idx];
+    if (!n || n.hits >= n.maxHits) {
+      var ni = pjNextNailIdx();
+      if (ni >= 0) n = PJ.nails[idx = ni]; else return;
+    }
+    n.hits++;
+    var T = pjNailTop(idx);
+    sndHit("nail", s);
+    fibers(n.x, n.y, 5, 0.7);
+    if (n.hits >= n.maxHits) {
+      stars(n.x, n.y, 10);
+      pop("In!", n.x, n.y - 36 * LA.k, 22, "#7CFF8A");
+      sndChime();
+      var nextIdx = pjNextNailIdx();
+      if (nextIdx >= 0) {
+        ham.tgt = { kind: "pjnail", idx: nextIdx };
+      } else {
+        PJ.phase = "pause";
+        PJ.pauseT = 0;
+        pop("Joined!", LA.cx, LA.cy - 90 * LA.k, 26, "#FFC93C");
+      }
+    }
+  }
+
   function defaultTarget() {
     var sc = sceneName();
+    if (sc === "assemble") {
+      var ni = pjNextNailIdx();
+      return ni >= 0 ? { kind: "pjnail", idx: ni } : { kind: "pjnail", idx: 0 };
+    }
     if (sc === "board") return activeNail ? { kind: "nail", ref: activeNail } : null;
     if (sc === "metal") return ham.tgt && (ham.tgt.kind === "plate" || ham.tgt.kind === "rivet") ? ham.tgt : { kind: "plate", u: 0.5, v: 0.4 };
     if (sc === "joint") return ham.tgt && (ham.tgt.kind === "post" || ham.tgt.kind === "chisel") ? ham.tgt : { kind: "post" };
@@ -2117,6 +2487,7 @@ body.ending .camout { display: none; }
       return { x: W / 2, y: H / 2 };
     }
     switch (tg.kind) {
+      case "pjnail": return pjNailTop(tg.idx || 0);
       case "nail": return nailTop(tg.ref);
       case "plate": var p = mpt(tg.u, tg.v); return { x: p.x, y: p.y };
       case "rivet": return rivetTop(tg.i);
@@ -2129,6 +2500,17 @@ body.ending .camout { display: none; }
   }
   function pickHammerTarget(x, y) {
     var sc = sceneName(), i, p, best = null, bd;
+    if (sc === "assemble") {
+      if (!PJ || PJ.phase !== "nails") return null;
+      bd = 1e9;
+      for (i = 0; i < PJ.nails.length; i++) {
+        if (PJ.nails[i].hits >= PJ.nails[i].maxHits) continue;
+        p = pjNailTop(i);
+        var d0 = Math.hypot(x - p.x, y - p.y);
+        if (d0 < bd) { bd = d0; best = { kind: "pjnail", idx: i }; }
+      }
+      return best;
+    }
     if (sc === "board") {
       var n = nearNail(x, y, Math.max(34, 18 * LB.k));
       return n ? { kind: "nail", ref: n } : null;
@@ -2183,6 +2565,7 @@ body.ending .camout { display: none; }
     if (s > 1.45) pop("Big hit!", T.x, T.y - 40, 22, "#FFC93C");
     if (!tg) { sndHit("wood", s); return; }
     switch (tg.kind) {
+      case "pjnail": hitPjNail(tg.idx || 0, s); break;
       case "nail": hitNail(tg.ref, s, side); break;
       case "plate": hitPlate(tg, s); break;
       case "rivet": hitRivet(tg.i, s); break;
@@ -2387,8 +2770,24 @@ body.ending .camout { display: none; }
   // Tap anywhere: the hammer lifts while the finger is down and hits when it lets go.
   // Swipe down anywhere: a big hit. With no nail yet, the first tap puts one in.
   function hamDown(g) {
-    if (ham.g) { g.extra = true; return; }
     var sc = sceneName(), tg = null;
+    if (sc === "assemble") {
+      if (!PJ || PJ.finished) { g.dead = true; return; }
+      if (PJ.phase === "glue") {
+        PJ.glueHeld = true;
+        PJ.glueAuto = true;
+        g.dead = true;
+        return;
+      }
+      if (PJ.phase !== "nails") { g.dead = true; return; }
+      if (ham.g) { g.extra = true; return; }
+      tg = pickHammerTarget(g.x, g.y) || defaultTarget();
+      ham.tgt = tg;
+      ham.g = g;
+      g.anchorY = g.y; g.minY = g.y; g.armed = true; g.struck = false; g.following = false;
+      return;
+    }
+    if (ham.g) { g.extra = true; return; }
     if (sc === "board") {
       var cur = onBoard(activeNail, state.board.nails) && !nailDone(activeNail) ? activeNail : null;
       var n = nearNail(g.x, g.y, Math.max(34, 18 * LB.k));
@@ -2435,6 +2834,7 @@ body.ending .camout { display: none; }
     }
   }
   function hamUp(g) {
+    if (PJ && PJ.glueHeld) PJ.glueHeld = false;
     if (g.dead) return;
     if (g.extra) { if (g.moved < 14) queueSwing(1); return; }
     if (g !== ham.g) return;
@@ -3035,7 +3435,8 @@ body.ending .camout { display: none; }
     bgx.setTransform(DPR, 0, 0, DPR, 0, 0);
     bgx.clearRect(0, 0, W, H);
     var sc = sceneName();
-    if (sc === "board") drawBoardBg(bgx);
+    if (sc === "assemble") drawAssembleBg(bgx);
+    else if (sc === "board") drawBoardBg(bgx);
     else if (sc === "metal") drawMetalBg(bgx);
     else if (sc === "joint") drawJointBg(bgx);
     else drawYardBg(bgx);
@@ -3046,6 +3447,12 @@ body.ending .camout { display: none; }
   // The coach always says the next thing to do, as a numbered step.
   function coachInfo() {
     var sc = sceneName(), Dv = DRIVERS[state.driver];
+    if (sc === "assemble" && PJ) {
+      if (PJ.finished) return { n: "✓", ok: true, t: "Birdhouse built!", s: "" };
+      if (PJ.phase === "glue") return { n: "1", t: "Tap to squeeze wood glue!", s: "" };
+      if (PJ.phase === "slide") return { n: "1", t: "Putting the wood together…", s: "" };
+      return { n: "2", t: "Tap to hammer the nails in!", s: "" };
+    }
     if (state.mode === "hammer") {
       if (sc === "board") {
         if (state.act === "pull") {
@@ -3123,7 +3530,10 @@ body.ending .camout { display: none; }
       Array.prototype.forEach.call(document.querySelectorAll("[data-job]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.job === jk)); });
     }
     var sc = sceneName(), Hm = HAMMERS[state.hammer], Dv = DRIVERS[state.driver];
-    if (state.mode === "hammer") {
+    if (sc === "assemble" && PJ) {
+      setName("Claw hammer", "");
+      setRead("Joined: " + (PJ.finished ? PJ.joins.length : PJ.step) + " of " + PJ.joins.length, "");
+    } else if (state.mode === "hammer") {
       setName(Hm.name, "");
       if (sc === "board") setRead("Nails: " + state.board.nails.length, "");
       else if (sc === "metal") setRead("Rivets: " + state.metal.rivets.filter(function (r) { return r.s >= 4; }).length, "");
@@ -3151,6 +3561,17 @@ body.ending .camout { display: none; }
   function ghostPlan() {
     var sc = sceneName(), alt = Math.floor((nowMs() - idleSince) / GHOST_CYC) % 2, t, p;
     var R = clamp(Math.min(W, H) * 0.05, 20, 34);
+    if (sc === "assemble" && PJ) {
+      if (PJ.finished || PJ.phase === "slide" || PJ.phase === "pause") return null;
+      if (PJ.phase === "glue") {
+        var gs = pjSeamInfo(PJ.step);
+        return { k: "tap", x: (gs.x0 + gs.x1) / 2, y: (gs.y0 + gs.y1) / 2, R: R };
+      }
+      var ni = pjNextNailIdx();
+      if (ni < 0) return null;
+      t = pjNailTop(ni);
+      return { k: "tap", x: t.x, y: t.y, R: R };
+    }
     if (state.mode === "hammer") {
       if (sc === "board") {
         if (state.act === "pull") {
@@ -3335,7 +3756,9 @@ body.ending .camout { display: none; }
     c.save();
     if (shakeAmp > 0 && !reduce) { c.drawImage(bg, 0, 0, W, H); c.translate(rnd(-1, 1) * shakeAmp, rnd(-1, 1) * shakeAmp); }
     c.drawImage(bg, 0, 0, W, H);
-    if (sc === "board") {
+    if (sc === "assemble") {
+      drawAssembleDyn(c, dt);
+    } else if (sc === "board") {
       drawSpecks(c);
       drawXray(c);
       var act = activeNail || activeScrew;
