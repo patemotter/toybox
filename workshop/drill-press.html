@@ -478,7 +478,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
     }, 300);
   }
-  var S = loadState();
+  // Opened fresh from the Toybox home screen: a new board, the first bit, no holes (nothing here is a
+  // keepsake collection). A reload, or coming back from the Tool Wall, keeps the saved bench.
+  var S = Toybox.fresh() ? freshState() : loadState();
+  if (Toybox.fresh()) save();
   if (BIT_ORDER.indexOf(linkBit) !== -1) {
     S.chuck = { id: linkBit, si: S.sizes[linkBit] };
   }
@@ -512,7 +515,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var cv = $("cv"), ctx = cv.getContext("2d");
   var DPR = 1, CW = 300, CH = 300;
   var M = { x: 0, y: 0, w: 1, h: 1, s: 1, ox: 0, oy: 0 }; // machine region; world -> screen
-  var B = { x: 0, y: 0, w: 1, h: 1 };                     // board view (top / side)
+  var B = { x: 0, y: 0, w: 0, h: 0 };                     // (the old top/side board view; kept empty)
   var C = { x: 0, y: 0, w: 1, h: 1 };                     // bit case
   var bgCanvas = document.createElement("canvas");
   // World box: x 0..620, y -40..820. The lower column and the base (down to y 1000) are left out of
@@ -521,23 +524,22 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 
   function layout() {
     var pad = CW < 520 || CH < 420 ? 6 : 10;
+    // The Big button sits top right on bigger screens (top left on phones): keep the bit case clear of it.
+    var bb = $("bigToggle").getBoundingClientRect(), cr = cv.getBoundingClientRect();
+    var bigRight = bb.width > 0 && bb.left - cr.left > CW / 2;
     if (CW / CH >= 1.0) {
-      var mw = Math.min(CW * 0.46, CH * 0.74 + 20);
+      var mw = Math.min(CW * 0.5, CH * 0.74 + 20);
       M = { x: pad, y: pad, w: mw, h: CH - 2 * pad };
-      var rx = M.x + M.w + pad, rw = CW - rx - pad;
-      var bh = Math.round((CH - 3 * pad) * 0.42);
-      B = { x: rx, y: pad, w: rw, h: bh };
-      C = { x: rx, y: 2 * pad + bh, w: rw, h: CH - 3 * pad - bh };
+      var rx = M.x + M.w + pad, ty = bigRight ? Math.round(bb.bottom - cr.top) + pad : pad;
+      C = { x: rx, y: ty, w: CW - rx - pad, h: CH - ty - pad };
     } else {
-      var mh = Math.round(CH * 0.58);
-      var mw2 = Math.min(CW * 0.66, mh * 0.74 + 20);
-      // Narrow screens: the drill is limited by width, so don't spend spare height on the lower
-      // stand; give it to the bit case instead.
+      // The machine gets the whole width; the bit case fills the rest below it.
+      var mw2 = CW - 2 * pad, mh = Math.round(CH * (CW >= 600 ? 0.64 : 0.58));
       mh = Math.max(Math.round(CH * 0.4), Math.min(mh, Math.round(WH * Math.min(mw2 / WW, mh / WH)) + 4));
       M = { x: pad, y: pad, w: mw2, h: mh };
-      B = { x: M.x + M.w + pad, y: pad, w: CW - M.w - 3 * pad, h: mh };
       C = { x: pad, y: mh + 2 * pad, w: CW - 2 * pad, h: CH - mh - 3 * pad };
     }
+    B = { x: C.x, y: C.y, w: 0, h: 0 };
     M.s = Math.min(M.w / WW, M.h / WH);
     M.ox = M.x + (M.w - WW * M.s) / 2;
     // Top-aligned: any spare height shows more of the column below the table, not empty pegboard above.
@@ -1628,7 +1630,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 
   // Board section. (ox, oy) = where board coordinate u = 0 meets the board top, sc = screen units per board unit.
   // axis "y": the cut runs along the board's y (machine side view, at x = S.px). axis "x": along x at y = S.py.
-  function drawSection(c, ox, oy, sc, axis, len) {
+  function drawSection(c, ox, oy, sc, axis, len, at) {
     var m = MATS[S.mat], T = matT(S.mat) * sc, zs = zS(S.mat) * sc;
     var L = len * sc;
     c.save();
@@ -1656,7 +1658,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     // holes crossing this cut line
     S.holes.forEach(function (h) {
       var hc = axis === "y" ? h.y : h.x;
-      var off = axis === "y" ? h.x - S.px : h.y - S.py;
+      var off = axis === "y" ? h.x - (at == null ? S.px : at) : h.y - S.py;
       var hr = holeDia(h) * DS / 2;
       if (Math.abs(off) >= hr) return;
       var f = Math.sqrt(1 - (off / hr) * (off / hr));
@@ -1767,12 +1769,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       }
       if (p.settled) {
         settled++;
-        if (p.on === "board") { p.x = boardLeftW() + p.bu; p.y = boardTopW(); }
+        if (p.on === "board") { p.x = boardLeftW() + p.bu; p.y = boardTopW() + ((p.bd == null ? S.px : p.bd) - S.px) * BOARD_F; }
         else if (p.on === "table") p.y = R.tableY;
         if (tilt.on && Math.abs(tilt.x) > 0.08) {
           p.x += tilt.x * 90 * dt;
           var s2 = surfaceAt(p.x);
-          if (s2.on !== p.on || Math.abs(s2.y - p.y) > 2) { p.settled = false; p.vy = 0; p.vx = tilt.x * 120; }
+          if (s2.on !== p.on || (p.on !== "board" && Math.abs(s2.y - p.y) > 2)) { p.settled = false; p.vy = 0; p.vx = tilt.x * 120; }
           else if (p.on === "board") p.bu = p.x - boardLeftW();
         }
         continue;
@@ -1786,9 +1788,15 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         if (p.type === "plug") { landPlug(p); parts.splice(i, 1); continue; }
         if (p.vy > 260 && Math.random() < 0.5) { p.vy *= -0.3; p.y = s.y - 0.5; continue; }
         p.y = s.y; p.settled = true; p.on = s.on; p.vr = 0;
-        if (s.on === "board") p.bu = p.x - boardLeftW();
+        // chips on the board scatter over its top face (it is seen a little from above)
+        if (s.on === "board") { p.bu = p.x - boardLeftW(); p.bd = clamp(S.px + rnd(-45, 45), 6, BW - 6); }
       }
       if (p.y > 1100) parts.splice(i, 1);
+    }
+    // only a small heap stays on the board, so the holes still show; the rest is brushed off
+    var onBoard = 0;
+    for (i = parts.length - 1; i >= 0; i--) {
+      if (parts[i].settled && parts[i].on === "board" && ++onBoard > 28) { parts.splice(i, 1); settled--; }
     }
     if (settled > MAX_SETTLED) {
       for (i = 0; i < parts.length && settled > MAX_SETTLED; i++) {
@@ -2216,9 +2224,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     drawBase(c);
     drawColumn(c);
     drawTable(c);
-    // Workpiece (shown as a cut through the drilling line) and its clamp
+    // Workpiece: its top face (with every hole and plug on it) seen a little from above, its front edge, and its clamp
     var bl = boardLeftW() + (R.jig || 0), top = boardTopW();
-    drawSection(c, bl, top, 1, "y", BH);
+    drawBoardMain(c, bl, top);
     drawClamp(c, bl, bl + BH, top);
     c.save();
     c.translate(jx, jy);
@@ -2235,7 +2243,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     drawQuill(c);
     var b = curBit();
     if (b && !(R.flyBit && R.flyBit.into)) {
+      // the part of the bit that has gone into the board is hidden by the board
+      c.save();
+      c.beginPath(); c.rect(-2000, -2000, 5000, 5000); c.rect(bl, top, BH, matT(S.mat) + (BW - S.px) * BOARD_F + 2); c.clip("evenodd");
       drawBit(c, b.id, b.mm, X0, bitTop() - bitDrop(), b.len, R.phase, Math.min(1, R.rpm / 1200));
+      c.restore();
     }
     drawChuck(c);
     if (R.key === "chuck") drawKeyInChuck(c);
@@ -2296,7 +2308,59 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (TI.showMinutes && TI.phase === "running") label(c, String(TI.minutes), x, y + 1, r * 0.8, OUT);
   }
 
-  // ---------- Board view (top / side) ----------
+  // ---------- The board in the main view ----------
+  // The machine is drawn from the side; the board's top face is shown tipped toward you (board x runs
+  // into the picture, squashed by BOARD_F), so every hole and plug on it shows. The drilling point
+  // (S.px, S.py) sits right under the bit, on the line y = top. A red laser cross marks it.
+  var BOARD_F = 0.36;
+  function boardFromMain(bl, top, wx, wy) { return { x: S.px + (wy - top) / BOARD_F, y: wx - bl }; }
+  function drawBoardMain(c, bl, top) {
+    var T = matT(S.mat), yFar = top - S.px * BOARD_F, yNear = top + (BW - S.px) * BOARD_F;
+    c.save();
+    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.clip();
+    c.transform(0, BOARD_F, 1, 0, bl, yFar);
+    if (S.mat === "acrylic") c.globalAlpha = 0.85;
+    c.drawImage(topTex, 0, 0, BW, BH);
+    c.globalAlpha = 1;
+    S.holes.forEach(function (hh) { drawHoleTop(c, hh); });
+    S.plugs.forEach(function (pl) { drawPlugTop(c, pl); });
+    c.restore();
+    // small holes would be thin slits from this angle: give each one a clear dark mark
+    S.holes.forEach(function (hh) {
+      var r = holeDia(hh) * DS / 2;
+      if (r * BOARD_F >= 4 || hh.plugged) return;
+      var hx = bl + hh.y, hy = top + (hh.x - S.px) * BOARD_F;
+      if (hy < yFar || hy > yNear) return;
+      c.beginPath(); c.ellipse(hx, hy, Math.max(r, 6), Math.max(r * BOARD_F, 4), 0, 0, Math.PI * 2);
+      c.fillStyle = holeThrough(hh) ? "#1D2028" : "#3A3F4A"; c.fill();
+      c.lineWidth = 1.5; c.strokeStyle = "rgba(255,255,255,0.55)"; c.stroke();
+    });
+    c.save();
+    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+    // laser cross over the drilling point
+    c.beginPath(); c.rect(bl, yFar, BH, yNear - yFar); c.clip();
+    c.strokeStyle = "rgba(255,40,40,0.8)"; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(bl, top); c.lineTo(bl + BH, top); c.moveTo(X0, yFar); c.lineTo(X0, yNear); c.stroke();
+    c.beginPath(); c.arc(X0, top, 4, 0, Math.PI * 2); c.fillStyle = "#FF2828"; c.fill();
+    c.restore();
+    // the front edge: the board's near side, with any holes that come out through it
+    drawSection(c, bl, yNear, 1, "y", BH, BW - 0.5);
+    zone("boardMain", bl - 10, yFar - 10, BH + 20, yNear + T - yFar + 20);
+  }
+
+  // ---------- Holes counter (the only number on the page) ----------
+  function drawHolesPill(c) {
+    screenXf();
+    var f = clamp(Math.min(CW, CH) * 0.045, 16, 26), t = "Holes: " + S.holes.length;
+    c.font = "800 " + f + "px \"Baloo 2\", sans-serif";
+    var w = c.measureText(t).width + f * 1.4, h = f * 1.9;
+    var x = M.x + M.w - w - 8, y = M.y + M.h - h - 8;
+    rr(c, x + 3, y + 4, w, h, h / 2); c.fillStyle = "rgba(29,35,64,0.35)"; c.fill();
+    rr(c, x, y, w, h, h / 2); fs(c, "#FFC93C", 3);
+    label(c, t, x + w / 2, y + h / 2 + 1, f, OUT);
+  }
+
+  // ---------- Board view (top / side): no longer drawn; the main view shows the board's top ----------
   var BV = { x: 0, y: 0, w: 0, h: 0, sc: 1, bx: 0, by: 0 };
   function drawBoardView(c) {
     screenXf();
@@ -2537,7 +2601,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     screenXf();
     var x = Math.min(B.x, C.x), y = Math.min(B.y, C.y);
     var x2 = Math.max(B.x + B.w, C.x + C.w), y2 = Math.max(B.y + B.h, C.y + C.h);
-    if (CW / CH < 1) { x = 6; y = B.y; x2 = CW - 6; y2 = CH - 6; }
+    if (CW / CH < 1) { x = 6; y = 6; x2 = CW - 6; y2 = CH - 6; }
     var w = x2 - x, h = y2 - y;
     c.save();
     c.globalAlpha = Math.min(1, (R.lid - 0.5) * 3);
@@ -2624,7 +2688,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     drawMachine(ctx);
     ctx.restore();
     screenXf();
-    drawBoardView(ctx);
+    drawHolesPill(ctx);
     drawCase(ctx);
     drawBeltOverlay(ctx);
     drawFloating(ctx);
@@ -2742,8 +2806,19 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (Math.hypot(w.x - 566, w.y - 398) < 42) { S.light = !S.light; save(); blip(S.light ? 900 : 600, 0.05, 0.05, "triangle"); return { type: "none" }; }
     if (R.clampHandle && Math.hypot(w.x - R.clampHandle.x, w.y - R.clampHandle.y) < 46) return { type: "clamp", wy0: w.y, done: false };
     if (Math.hypot(w.x - 124, w.y - (R.tableY + 58)) < 58) return { type: "crank", last: Math.atan2(w.y - (R.tableY + 58), w.x - 124) };
-    var bl = boardLeftW();
-    if (w.x >= bl - 10 && w.x <= bl + BH + 10 && w.y >= boardTopW() - 40 && w.y <= R.tableY + 4) return boardDrag("boardM", p);
+    var bl = boardLeftW(), tp = boardTopW();
+    if (w.x >= bl - 10 && w.x <= bl + BH + 10 && w.y >= tp - S.px * BOARD_F - 30 && w.y <= tp + (BW - S.px) * BOARD_F + matT(S.mat) + 8) {
+      // a plug lying on the board can be picked up and dropped into a hole
+      var bp = boardFromMain(bl, tp, w.x, w.y);
+      for (var k = S.plugs.length - 1; k >= 0; k--) {
+        var pl = S.plugs[k];
+        if (Math.abs(pl.y - bp.y) < pl.mm * DS / 2 + 14 && Math.abs(pl.x - bp.x) * BOARD_F < pl.mm * DS / 2 * BOARD_F + 14) {
+          pl.grab = true;
+          return { type: "plug", plug: pl, sx: p.x, sy: p.y, x0: pl.x, y0: pl.y };
+        }
+      }
+      return boardDrag("boardM", p);
+    }
     // Anywhere else on the machine: drag down to pull the feed
     R.feedHeld = true; R.qWant = R.q;
     return { type: "feedV", q0: R.q, y0: w.y };
@@ -2814,7 +2889,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         R.tableTarget = clamp(R.tableTarget - dA * 16, Math.max(440, minT), 700);
         break;
       case "boardM":
+        // sideways slides the board along under the bit; up and down moves it away from you or toward you
         S.py = clamp(d.py0 - (p.x - d.sx) / M.s, 8, BH - 8);
+        S.px = clamp(d.px0 - (p.y - d.sy) / M.s / BOARD_F, 8, BW - 8);
         break;
       case "boardT":
         S.px = clamp(d.px0 - (p.x - d.sx) / BV.sc, 8, BW - 8);
@@ -2824,8 +2901,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         S.px = clamp(d.px0 - (p.x - d.sx) / BV.sc, 8, BW - 8);
         break;
       case "plug":
-        d.plug.x = clamp(d.x0 + (p.x - d.sx) / BV.sc, 0, BW);
-        d.plug.y = clamp(d.y0 + (p.y - d.sy) / BV.sc, 0, BH);
+        d.plug.y = clamp(d.y0 + (p.x - d.sx) / M.s, 0, BH);
+        d.plug.x = clamp(d.x0 + (p.y - d.sy) / M.s / BOARD_F, 0, BW);
         break;
       case "belt":
         if (OV) R.beltDrag = clamp((p.y - OV.mid) / OV.stepH - 0.5, 0, 4);

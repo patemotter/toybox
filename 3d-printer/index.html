@@ -131,20 +131,6 @@ header h1 { margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1; let
 /* What the printer is doing, in the row under the picture (not over the printer's own screen). */
 .stat.phase { display: grid; place-items: center; padding: 2px 8px; font-size: clamp(1rem, 3.4vw, 1.45rem); font-weight: 800; line-height: 1.1; white-space: nowrap; text-overflow: ellipsis; }
 .stat.phase.hot { background: var(--accent); color: #1D2340; }
-.cam {
-  position: absolute;
-  z-index: 2;
-  border: 3px solid #1D2340;
-  border-radius: 14px;
-  box-shadow: 3px 3px 0 #1D2340;
-  background: #111;
-  overflow: hidden;
-  pointer-events: none;
-}
-.cam[hidden] { display: none; }
-.cam canvas { width: 100%; height: 100%; display: block; }
-.cam span { position: absolute; left: 8px; top: 2px; color: #FFFFFF; font-weight: 800; font-size: 0.95rem; text-shadow: 1px 1px 0 #000; }
-.cam span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #FF4D4D; margin-right: 5px; vertical-align: 0; }
 .stats { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 6px; }
 .stat.progress { display: grid; align-items: center; padding: 2px 12px; }
 .pbar { display: block; height: 16px; border: 3px solid #1D2340; border-radius: 999px; background: #FFFFFF; overflow: hidden; }
@@ -420,7 +406,6 @@ body.ending .printbar { visibility: hidden; }
       <div class="stage-inner">
         <div class="scene" id="scene">
           <canvas id="cv" role="img" aria-label="A 3D printer with a filament box on top"></canvas>
-          <div class="cam" id="cam" hidden><canvas id="camcv"></canvas><span>Camera</span></div>
           <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
           <button class="btn bigtoggle" id="bigToggle" aria-pressed="false">Big</button>
           <div class="pop" id="pop" hidden>
@@ -436,7 +421,6 @@ body.ending .printbar { visibility: hidden; }
         <div class="printbar">
           <button class="btn print" id="printBtn">Print!</button>
           <button class="btn toggle" id="fastBtn" aria-pressed="false">Faster</button>
-          <button class="btn toggle" id="camBtn" aria-pressed="false">Camera</button>
         </div>
       </div>
     </div>
@@ -555,7 +539,7 @@ body.ending .printbar { visibility: hidden; }
 
   // ---------- Saved settings ----------
   function freshState() {
-    return { model: "benchy", multi: false, slots: ["orange", "white", "blue", "black"], sel: 0, name: "TOYBOX", faster: false, cam: false };
+    return { model: "benchy", multi: false, slots: ["orange", "white", "blue", "black"], sel: 0, name: "TOYBOX", faster: false };
   }
   function cleanName(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 8); }
   function loadState() {
@@ -569,7 +553,6 @@ body.ending .printbar { visibility: hidden; }
         if (o.sel >= 0 && o.sel < 4) s.sel = o.sel | 0;
         if (typeof o.name === "string" && cleanName(o.name)) s.name = cleanName(o.name);
         if (typeof o.faster === "boolean") s.faster = o.faster;
-        if (typeof o.cam === "boolean") s.cam = o.cam;
       }
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
     return s;
@@ -857,6 +840,15 @@ body.ending .printbar { visibility: hidden; }
   MODELS.forEach(function (m) { MODEL_BY[m.id] = m; });
 
   var state = loadState();
+  // Opened fresh from the Toybox home screen: the first model, the first spool, no print running.
+  // The spool colors he set and the shelf of finished prints stay.
+  if (Toybox.fresh()) {
+    (function () {
+      var f = freshState();
+      state.model = f.model; state.multi = f.multi; state.sel = f.sel; state.name = f.name; state.faster = f.faster;
+      save();
+    })();
+  }
 
   // ---------- Slicing and drawing prints ----------
   var K = 0.42; // how much depth shows when looking down a little (also used for the build plate)
@@ -1120,20 +1112,7 @@ body.ending .printbar { visibility: hidden; }
     LY.oy = LY.H - VBOT * LY.sc;
     var top = (78 - LY.oy) / LY.sc; // clear of the Big button
     LY.shelf = wide ? { x: COL, w: colW } : null;
-    if (wide) {
-      LY.cam = { x: COL, y: top, w: colW, h: colW * 0.75 };
-      LY.shelf.top = (state.cam ? LY.cam.y + LY.cam.h + 26 : top) + 40;
-    } else {
-      var w = LY.W * 0.36 / LY.sc;
-      LY.cam = { x: (LY.W / LY.sc) - w - 20 - LY.ox / LY.sc, y: 560, w: w, h: w * 0.75 };
-    }
-    var cam = $("cam");
-    cam.style.left = (LY.ox + LY.cam.x * LY.sc) + "px";
-    cam.style.top = (LY.oy + LY.cam.y * LY.sc) + "px";
-    cam.style.width = (LY.cam.w * LY.sc) + "px";
-    cam.style.height = (LY.cam.h * LY.sc) + "px";
-    var cc = $("camcv");
-    cc.width = Math.round(LY.cam.w * LY.sc * dpr); cc.height = Math.round(LY.cam.h * LY.sc * dpr);
+    if (wide) LY.shelf.top = top + 40;
     if (job && job.pic) rebuildPic();
     shelfThumbs = {};
   }
@@ -1600,19 +1579,6 @@ body.ending .printbar { visibility: hidden; }
       g.save(); g.translate(x, y); g.rotate(Math.sin(t * Math.PI) * 0.4); f.pic.draw(g, 0, 0, k / picK(), 3); g.restore();
     }
   }
-  function drawCam() {
-    if (!state.cam) return;
-    var cc = $("camcv"), g = cc.getContext("2d"), z = 2.6, w = cc.width, h = cc.height;
-    var s = Math.min(w / LY.cam.w, h / LY.cam.h) * 0.62 * z;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = "#111"; g.fillRect(0, 0, w, h);
-    g.setTransform(s, 0, 0, s, w / 2 - tipX() * s, h * 0.42 - (tipY() - 20) * s);
-    drawChamber(g, true);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.fillStyle = "rgba(0,0,0,0.12)";
-    for (var y = 0; y < h; y += 4 * LY.dpr) g.fillRect(0, y, w, LY.dpr);
-  }
-
   // ---------- Printing ----------
   var FONTF = '"Baloo 2", "Trebuchet MS", sans-serif';
   var job = null;
@@ -2012,8 +1978,6 @@ body.ending .printbar { visibility: hidden; }
     else if (job.done) { pb.textContent = "Done!"; pb.classList.add("skip"); pb.disabled = true; }
     else { pb.textContent = (job.skip || job.hurry) ? "Zoom!" : "Skip ⏩"; pb.classList.add("skip"); pb.disabled = false; }
     $("fastBtn").setAttribute("aria-pressed", String(state.faster));
-    $("camBtn").setAttribute("aria-pressed", String(state.cam));
-    $("cam").hidden = !state.cam;
     renderModelThumbs();
     save();
   }
@@ -2159,7 +2123,6 @@ body.ending .printbar { visibility: hidden; }
     if (Toybox.timer.locked()) return;
     if (t.id === "printBtn") { if (job && job.showcase) job.showcase = false; else if (job && !job.paused) skip(); else startPrint(); updateUI(); return; }
     if (t.id === "fastBtn") { state.faster = !state.faster; updateUI(); return; }
-    if (t.id === "camBtn") { state.cam = !state.cam; needLayout = true; updateUI(); return; }
     if (t.dataset.pfil) { setSlotColor(popSlot, t.dataset.pfil); setTimeout(closePop, 350); return; }
     if (t.dataset.model) { state.model = t.dataset.model; if (job && job.showcase) job.showcase = false; blip(); }
     else if (t.id === "oneBtn") state.multi = false;
@@ -2293,7 +2256,6 @@ body.ending .printbar { visibility: hidden; }
     if (needLayout) { needLayout = false; layout(); if (view) sizeViewer(); }
     step(dt);
     drawScene();
-    drawCam();
     if (view) drawViewer(dt);
     updateStats();
     if (Toybox.timer.phase() === "ending") endingFrame();
