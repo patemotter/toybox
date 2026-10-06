@@ -448,19 +448,19 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       tip: -328, heel: -8, engage: -170, len: 460, spine: 88 },
     { id: "dovetail", heelClear: 34, name: "Dovetail saw", group: "hand", scene: "end", cut: "push", mats: ["strip", "dowel"], strokes: 4, kerf: 0.8,
       tip: -220, heel: -8, engage: -110, len: 300, spine: 42 },
-    { id: "coping", name: "Coping saw", group: "hand", scene: "curve", cut: "pull", mats: ["pine", "plywood"], kerf: 1.6, speed: 120,
-      designs: ["wave", "corner", "circle", "heart"], knob: true },
-    { id: "fret", name: "Fret saw", group: "hand", scene: "curve", cut: "pull", mats: ["plywood", "pine"], kerf: 1.0, speed: 130,
-      designs: ["heart", "star", "circle", "wave"], knob: true },
+    { id: "coping", name: "Coping saw", group: "hand", scene: "curve", cut: "pull", mats: ["pine"], kerf: 1.6, speed: 120,
+      designs: ["wave", "corner", "circle", "heart"] },
+    { id: "fret", name: "Fret saw", group: "hand", scene: "curve", cut: "pull", mats: ["plywood"], kerf: 1.0, speed: 130,
+      designs: ["heart", "star", "circle", "wave"] },
     { id: "hacksaw", heelClear: 64, tipClear: 34, name: "Hacksaw", group: "hand", scene: "end", cut: "push", mats: ["pipe", "bar"], strokes: 6, kerf: 1.2,
       tip: -328, heel: -42, engage: -185, len: 420, metal: true },
     { id: "bow", heelClear: 80, tipClear: 34, name: "Bow saw", group: "hand", scene: "end", cut: "both", mats: ["log"], strokes: 6, kerf: 2.2,
       tip: -552, heel: -32, engage: -290, len: 580 },
-    { id: "keyhole", name: "Keyhole saw", group: "hand", scene: "curve", cut: "push", mats: ["drywall", "plywood"], kerf: 2.4, speed: 125,
-      designs: ["outlet", "round", "outlet2"] },
+    { id: "keyhole", name: "Keyhole saw", group: "hand", scene: "curve", cut: "push", mats: ["drywall"], kerf: 2.4, speed: 125,
+      designs: ["outlet", "round", "outlet2", "heart"] },
     { id: "circular", name: "Circular saw", group: "power", scene: "end", power: true, mats: ["plywood", "pine"], kerf: 2.4, len: 340, depth: true },
-    { id: "jigsaw", name: "Jigsaw", group: "power", scene: "curve", power: true, mats: ["pine", "plywood"], kerf: 1.8, speed: 150,
-      designs: ["wave", "circle", "corner", "star"] },
+    { id: "jigsaw", name: "Jigsaw", group: "power", scene: "curve", power: true, mats: ["pine"], kerf: 1.8, speed: 150,
+      designs: ["circle", "heart", "star", "wave"] },
     { id: "bandsaw", name: "Band saw", group: "power", scene: "band", power: true, mats: ["pine", "oak"], kerf: 1.8, speed: 140,
       designs: ["wave", "corner", "circleIn", "sCurve"] },
     { id: "scrollsaw", name: "Scroll saw", group: "power", scene: "scroll", power: true, mats: ["plywood", "pine"], kerf: 1.0, speed: 95,
@@ -479,7 +479,6 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
     if (!p || typeof p !== "object") p = app.per[id] = {};
     if (s.mats.indexOf(p.mat) === -1) p.mat = s.mats[0];
     if (id === "ryoba" && p.edge !== "rip" && p.edge !== "cross") p.edge = "cross";
-    if (s.knob && (typeof p.knob !== "number" || Math.abs(p.knob) > 90)) p.knob = 0;
     if (s.depth) {
       var DEPTHS = id === "tracksaw" ? TRACK_DEPTHS : CIRC_DEPTHS;
       if (DEPTHS.indexOf(p.depth) === -1) p.depth = DEPTHS[2];
@@ -2440,7 +2439,7 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
   var BW = 360, BH = 260;
   function arcPts(cx, cy, r, a0, a1, n) {
     var pts = [], i;
-    for (i = 0; i <= n; i++) { var a = a0 + (a1 - a0) * i / n; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    for (i = 0; i <= n; i++) { var a = n ? a0 + (a1 - a0) * i / n : a0; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
     return pts;
   }
   function design(name) {
@@ -2879,27 +2878,65 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
 
   // ===================================================================
   // Handheld curve saws: coping saw, fret saw, keyhole saw, jigsaw.
-  // The board lies on the bench (seen from above); the saw stands in it.
+  // The board lies on the bench, seen from above; you stand at the bottom of the screen. The saw is
+  // held the way you'd really use it: the coping and fret saws with the blade upright through the board,
+  // the handle under the board toward you and the frame going straight back (always the same size);
+  // the keyhole saw upright with its handle up; the jigsaw flat on the board, turning with the cut.
+  // Tool mm: x to the right, y away from you, z up; the origin is where the blade meets the board top.
+  // The blade follows the finger's own path (not a straight line to it), with a gentle sawing pace in
+  // the wood that catches up when the finger runs ahead, and a soft pull onto the drawn line.
   // ===================================================================
-  var CZ = 0.62;
+  var CZ = 0.62, CDY = 0.36;
+  var CURVE_TOOL = {
+    fret:    { depth: 300, dy: 0.36, dx: 0.2, top: 75, bot: -55, grip: 125, rod: 5.5, blade: 1.6, hw: 22, color: C.chrome, hi: "rgba(255,255,255,0.7)" },
+    coping:  { depth: 140, dy: 0.5, dx: 0.26, top: 85, bot: -80, grip: 112, rod: 7.5, blade: 2.2, hw: 26, color: C.blue, hi: "rgba(255,255,255,0.45)" },
+    keyhole: { lean: 0.26, tip: -70, ferrule: 126, end: 280 },
+    jigsaw:  {}
+  };
+  // How far the tool reaches up the screen above the blade point (tool mm, after the projection).
+  function curveReach(id) {
+    var t = CURVE_TOOL[id];
+    if (t.depth) return (t.top + 14) * CZ + t.depth * t.dy + 10;
+    if (id === "keyhole") return (t.end + 14) * (Math.cos(t.lean) * CZ - Math.sin(t.lean) * CDY) + 14;
+    return 120;
+  }
+  // A stadium (rounded bar) between two screen points.
+  function capsule(g, a, b, w) {
+    var ang = Math.atan2(b[1] - a[1], b[0] - a[0]), r = w / 2;
+    g.beginPath();
+    g.arc(b[0], b[1], r, ang - Math.PI / 2, ang + Math.PI / 2);
+    g.arc(a[0], a[1], r, ang + Math.PI / 2, ang + Math.PI * 1.5);
+    g.closePath();
+  }
   var Curve = {
     enter: function (saw, set) {
       this.saw = saw; this.set = set; this.di = null;
-      this.speed = 0; this.phase = 0; this.dir = -Math.PI / 2; this.slide = 0;
+      this.speed = 0; this.phase = 0; this.strokeZ = 0; this.slide = 0;
+      this.pid = null; this.held = false;
       this.newWork(true);
     },
     newWork: function (instant) {
       this.startWork();
       var s = this.d.start;
-      this.B = [s[0], s[1]]; this.T = [s[0], s[1]];
-      this.dir = this.d.closed && !this.d.lead ? 0 : (this.d.start[1] < 0 ? Math.PI / 2 : (this.d.start[0] < 0 ? 0 : -Math.PI / 2));
+      this.B = [s[0], s[1]]; this.path = [];
+      this.dir = this.d.closed && !this.d.lead ? 0 : (s[1] < 0 ? Math.PI / 2 : (s[0] < 0 ? 0 : -Math.PI / 2));
       this.slide = instant ? 0 : 1;
       this.layout();
     },
     layout: function () {
-      var top = this.saw.id === "fret" ? 0.34 : 0.26;
-      this.S = Math.min((W - 70) / BW, (H * (1 - top) - 24) / BH, 2.4);
-      this.ox = (W - BW * this.S) / 2; this.oy = H - 18 - BH * this.S;
+      var saw = this.saw;
+      if (saw.minY == null) {
+        saw.minY = Math.min.apply(null, saw.designs.map(function (n) {
+          var d = design(n);
+          return d.pts.reduce(function (a, p) { return Math.min(a, p[1]); }, d.start[1]);
+        }));
+      }
+      // room above the board for the saw standing up at the highest point of the line
+      var reach = curveReach(saw.id) * 0.9;
+      this.S = Math.min((W - (H > W * 1.2 ? 30 : 70)) / BW, (H * 0.8 - 24) / BH, (H - 26) / (BH - saw.minY + reach), 2.4);
+      this.ox = (W - BW * this.S) / 2;
+      // the board and the saw standing up in it, centred in the height (on a tall phone: no empty sky)
+      this.oy = Math.min(H - 18 - BH * this.S, Math.max(0, H / 2 - (BH + saw.minY - reach) * this.S / 2));
       bin.place(10, H - 10);
       if (this.ox < bin.w + 20 && W > H) this.ox = Math.min(W - 14 - BW * this.S, bin.w + 24);
       this.dustOnTop = true;
@@ -2925,16 +2962,39 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.pid = pt.id; this.held = true;
       var b = this.toScreen(this.B[0], this.B[1]);
       this.gx = b[0] - pt.x; this.gy = b[1] - pt.y;
+      this.path = [];
     },
+    // The finger's path (board mm), in steps of about 2 mm, for the blade to follow.
     move: function (pt) {
       if (pt.id !== this.pid) return;
-      this.T = [(pt.x + this.gx - this.ox) / this.S, (pt.y + this.gy - this.oy) / this.S];
+      var x = (pt.x + this.gx - this.ox - this.slide * W) / this.S, y = (pt.y + this.gy - this.oy) / this.S;
+      var m = this.magnet(x, y), q = this.path, l = q.length ? q[q.length - 1] : this.B;
+      var d = dist(l[0], l[1], m[0], m[1]), n, i;
+      if (d < 0.4) return;
+      n = Math.min(400, Math.ceil(d / 2));
+      for (i = 1; i <= n; i++) q.push([lerp(l[0], m[0], i / n), lerp(l[1], m[1], i / n)]);
+      if (q.length > 600) q.splice(0, q.length - 600);
     },
     up: function (pt) {
       if (pt.id !== this.pid) return;
       this.pid = null; this.held = false;
-      this.T = this.B.slice();
+      if (this.saw.power) this.path = []; // the motor stops; a hand saw finishes the last bit of the stroke
       Sound.setRasp(0);
+    },
+    // Forgiving steering: near the drawn line, the blade is drawn onto it.
+    magnet: function (x, y) {
+      var d = this.d, best = 1e9, nx = x, ny = y, p = d.pts, i;
+      function seg(a, b) {
+        var dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9;
+        var t = clamp(((x - a[0]) * dx + (y - a[1]) * dy) / L2, 0, 1), px = a[0] + dx * t, py = a[1] + dy * t, dd = dist(x, y, px, py);
+        if (dd < best) { best = dd; nx = px; ny = py; }
+      }
+      for (i = 0; i < p.length - 1; i++) seg(p[i], p[i + 1]);
+      if (d.closed) seg(p[p.length - 1], p[0]);
+      if (d.lead) seg(d.lead[0], d.lead[1]);
+      if (best >= 12) return [x, y];
+      var t = best <= 4 ? 1 : (12 - best) / 8;
+      return [lerp(x, nx, t), lerp(y, ny, t)];
     },
     update: function (dt) {
       var saw = this.saw, power = !!saw.power;
@@ -2942,80 +3002,208 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (this.waitNew > 0) { this.waitNew -= dt; if (this.waitNew <= 0) { this.waitNew = 0; this.newWork(false); } }
       var running = power && this.held && !endingNow();
       this.speed = clamp(this.speed + (running ? dt * 4 : -dt * 2), 0, 1);
-      var B = this.B, T = this.T, dx = T[0] - B[0], dy = T[1] - B[1], d = Math.sqrt(dx * dx + dy * dy);
-      var moved = 0, cutting = false;
-      if (d > 0.05 && !this.slide) {
-        var nx = B[0] + dx / d * Math.min(d, 2), ny = B[1] + dy / d * Math.min(d, 2);
-        var wood = this.inWood(nx, ny) || this.inWood(B[0], B[1]);
-        var v = wood ? saw.speed / this.mat.mult : 2500;
-        if (wood && power && this.speed < 0.5) v = 0;
-        var step = Math.min(d, v * dt);
-        if (step > 0) {
-          var px = B[0], py = B[1];
+      var B = this.B, q = this.path, moved = 0, cutting = false, i;
+      if (endingNow()) q.length = 0;
+      if (q.length && !this.slide) {
+        // how far behind the finger the blade is
+        var back = 0, l = B;
+        for (i = 0; i < q.length; i++) { back += dist(l[0], l[1], q[i][0], q[i][1]); l = q[i]; }
+        // in the wood: a gentle sawing pace, faster the further the finger runs ahead; in the air: right away
+        var base = saw.speed * 1.25 / this.mat.mult;
+        if (power && this.speed < 0.5) base = 0;
+        var lim = base ? (base + Math.max(0, back - 8) * 9) * dt : 0;
+        var wood = this.inWood(B[0], B[1]) || this.inWood(q[0][0], q[0][1]);
+        var budget = wood ? lim : 1e9, guard = 0;
+        while (q.length && budget > 1e-6 && guard++ < 1000) {
+          var tg = q[0], dx = tg[0] - B[0], dy = tg[1] - B[1], d = Math.sqrt(dx * dx + dy * dy);
+          if (d < 1e-6) { q.shift(); continue; }
+          var step = Math.min(d, budget, 2), px = B[0], py = B[1];
           B[0] += dx / d * step; B[1] += dy / d * step;
-          moved = step;
-          if (step > 0.3) {
-            var nd = Math.atan2(dy, dx), diff = Math.atan2(Math.sin(nd - this.dir), Math.cos(nd - this.dir));
-            this.dir += diff * Math.min(1, dt * 6);
-          }
-          if (this.inWood(B[0], B[1]) && !this.done) {
+          moved += step; budget -= step;
+          if (step >= d - 1e-6) q.shift();
+          // the jigsaw (and the keyhole blade) turn smoothly toward the way the cut goes
+          var nd = Math.atan2(dy, dx), diff = Math.atan2(Math.sin(nd - this.dir), Math.cos(nd - this.dir));
+          this.dir += diff * Math.min(1, step / 14);
+          var inNow = this.inWood(B[0], B[1]);
+          if (inNow && !this.done) {
             cutting = true;
             if (this.cutAt(B[0], B[1], px, py)) this.releaseShape();
           } else if (this.inWood(px, py)) this.cutOut(px, py, B[0], B[1]);
+          // coming into the wood from the air (or the drilled hole): from here on the sawing pace
+          if (inNow && !wood) { wood = true; budget = Math.min(budget, lim); }
         }
       }
       this.splitCheck(dt);
       // stroke: hand saws go up and down as they move; the jigsaw blade runs on its own
-      var prevX = this.strokeX || 0;
+      var prev = this.strokeZ || 0;
       if (power) this.phase += this.speed * dt * 45;
-      else this.phase += moved * 0.32;
-      this.strokeX = Math.sin(this.phase) * (power ? 7 : 14);
-      var dz = this.strokeX - prevX;
-      var cutStroke = power ? true : (saw.cut === "pull" ? dz < 0 : dz > 0);
+      else this.phase += Math.min(0.9, moved * 0.32);
+      this.strokeZ = Math.sin(this.phase) * (power ? 7 : 12);
+      var dz = this.strokeZ - prev;
+      // the hand saws here cut on the down stroke (pulled down toward the handle, or pushed down)
+      var cutStroke = power ? true : dz < 0;
       this.cutting = cutting && cutStroke;
       if (cutting && (cutStroke || power)) {
         var s = this.toScreen(B[0], B[1]);
-        emitPlan(s[0], s[1], power ? 1.2 : moved * 0.9, this.mat, 0, 0, power);
+        emitPlan(s[0], s[1], power ? 1.2 : Math.min(4, moved * 0.9), this.mat, 0, 0, power);
       }
       if (power) Sound.setMotor(this.speed, cutting ? 1 : 0, 1.6);
       else Sound.setRasp(this.cutting ? clamp(moved * 2, 0, 1) : 0, this.mat.kind);
     },
     boardM: function () { return [this.S, 0, 0, this.S, this.ox + this.slide * W, this.oy]; },
+    // What hangs under the board (the handle, the lower blade) is drawn before the board, so it shows
+    // past its edges and through the holes, then again faintly through it; then the part above it.
     draw: function (g) {
-      var self = this;
+      var self = this, b = this.toScreen(this.B[0], this.B[1]), anchor = [b[0], b[1] - 80];
+      withAway(g, anchor, function () { self.drawSaw(g, b, false); });
       this.drawBoard(g, this.boardM());
-      var b = this.toScreen(this.B[0], this.B[1]);
-      withAway(g, [b[0], b[1] - 80], function () { self.drawTool(g, b); });
+      withAway(g, anchor, function () { g.save(); g.globalAlpha *= 0.4; self.drawSaw(g, b, false); g.restore(); });
+      withAway(g, anchor, function () { self.drawSaw(g, b, true); });
       this.drawHints(g);
     },
-    // Stand the saw's profile drawing up at the blade point, turned toward dir.
-    drawTool: function (g, b) {
-      var saw = this.saw, S = this.S * 0.92, id = saw.id;
-      var face = this.dir + (saw.knob ? this.set.knob * Math.PI / 180 : 0);
-      var cx = Math.cos(face), sy = Math.sin(face);
-      if (Math.abs(cx) < 0.38) cx = cx < 0 ? -0.38 : 0.38;
-      var ux = cx * S, uy = sy * S * 0.45;
-      PX = 1 / S;
-      // shadow on the board
-      g.save(); g.globalAlpha = 0.18; g.fillStyle = "#1D2340";
-      g.beginPath(); g.ellipse(b[0] - ux * 40, b[1] + 6, Math.abs(ux) * 70 + 20, 12, 0, 0, 7); g.fill(); g.restore();
-      if (id === "jigsaw") {
-        g.save();
-        g.transform(ux, uy, 0, CZ * S, b[0], b[1]);
-        g.beginPath(); g.rect(-400, -400, 800, 400); g.clip();
-        drawJigsaw(g, { stroke: this.strokeX, trig: this.held });
-        g.restore();
-      } else {
-        // blade along local x (handle at +x), teeth toward +y: stand it up with the board at local x = xb
-        var xb = (id === "keyhole" ? -110 : (id === "fret" ? -70 : -85)) + this.strokeX;
-        // local x -> up the screen, local y -> the facing direction
-        g.save();
-        g.transform(0, -CZ * S, ux, uy, b[0], b[1] + CZ * S * xb);
-        g.beginPath(); g.rect(xb, -500, 900, 1000); g.clip();
-        SPRITES[id].fn(g, {});
-        g.restore();
+    drawSaw: function (g, b, over) {
+      var id = this.saw.id, k = this.S * 0.9;
+      g.save();
+      g.lineJoin = "round"; g.lineCap = "round";
+      if (id === "jigsaw") this.drawJig(g, b, k, over);
+      else if (id === "keyhole") this.drawKeyholeUp(g, b, k, over);
+      else this.drawFrameSaw(g, b, k, over);
+      g.restore();
+    },
+    // Where the blade goes in: a small dark mark on the board.
+    drawContact: function (g, b, k) {
+      g.save(); g.globalAlpha *= 0.3; g.fillStyle = OUT;
+      g.beginPath(); g.ellipse(b[0], b[1], clamp(7 * k, 4, 12), clamp(3 * k, 2, 5), 0, 0, 7); g.fill(); g.restore();
+    },
+    // Coping saw and fret saw: blade upright, frame straight back (seen a little from the left, so the
+    // C shows), handle in line under the board. Only the stroke moves it up and down.
+    drawFrameSaw: function (g, b, k, over) {
+      var t = CURVE_TOOL[this.saw.id], s = this.strokeZ, D = t.depth, zt = t.top + s, zb = t.bot + s, r = 16;
+      var fret = this.saw.id === "fret", DX = t.dx - 0.08 * clamp(this.B[0] / BW, 0, 1), DY = t.dy;
+      function P(x, y, z) { return [b[0] + (x + y * DX) * k, b[1] - (z * CZ + y * DY) * k]; }
+      var rw = clamp(t.rod * k, 4, 13), bw = clamp(t.blade * k, 2, 4.5);
+      function blade(z0, z1) {
+        var a = P(0, 0, z0), c = P(0, 0, z1);
+        line(g, a[0], a[1], c[0], c[1], OUT, bw + 2.6);
+        line(g, a[0], a[1], c[0], c[1], C.steelD, bw);
       }
-      PX = 1;
+      function clampAt(z) {
+        var p = P(0, 0, z), w = clamp(13 * k, 9, 24), h = clamp(10 * k, 7, 18);
+        if (fret) {
+          // thumbscrew
+          g.beginPath();
+          g.moveTo(p[0] - w / 2, p[1] - h * 0.25); g.lineTo(p[0] - w * 1.25, p[1] - h * 0.75);
+          g.lineTo(p[0] - w * 1.25, p[1] + h * 0.75); g.lineTo(p[0] - w / 2, p[1] + h * 0.25); g.closePath();
+          fs(g, C.brass, 2);
+        }
+        rrect(g, p[0] - w / 2, p[1] - h / 2, w, h, 3); fs(g, C.steelD, 2.2);
+      }
+      function frame(pts) {
+        rod(g, function () {
+          g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]);
+          g.quadraticCurveTo(pts[2][0], pts[2][1], pts[3][0], pts[3][1]); g.lineTo(pts[4][0], pts[4][1]);
+        }, rw, t.color, t.hi);
+      }
+      if (!over) {
+        frame([P(0, D, 0), P(0, D, zb + r), P(0, D, zb), P(0, D - r, zb), P(0, 0, zb)]);
+        blade(zb, 0);
+        clampAt(zb);
+        // the handle, in line with the blade, toward you
+        var h0 = P(0, 0, zb - 7), h1 = P(0, 0, zb - 7 - t.grip), hw = clamp(t.hw * k, 13, 44);
+        capsule(g, h0, P(0, 0, zb - 14), hw * 0.62); fs(g, C.steelD, 2.2);
+        capsule(g, P(0, 0, zb - 14), h1, hw); fs(g, C.beech, 3);
+        line(g, h0[0] - hw * 0.2, h0[1] + hw * 0.6, h1[0] - hw * 0.2, h1[1] - hw * 0.35, C.beechL, Math.max(2, hw * 0.16));
+        return;
+      }
+      this.drawContact(g, b, k);
+      frame([P(0, 0, zt), P(0, D - r, zt), P(0, D, zt), P(0, D, zt - r), P(0, D, 0)]);
+      blade(0, zt);
+      // fine teeth on the front of the blade, pointing down to the handle
+      var a = P(0, 0, 0), c = P(0, 0, zt), n = Math.max(3, Math.round((a[1] - c[1]) / 5)), i;
+      g.beginPath();
+      for (i = 0; i <= n; i++) { var yy = lerp(a[1], c[1], i / n); g.moveTo(a[0] - bw / 2, yy); g.lineTo(a[0] - bw / 2 - 2, yy + 2.5); }
+      g.strokeStyle = OUT; g.lineWidth = 1.2; g.stroke();
+      clampAt(zt);
+    },
+    // Keyhole saw: upright, leaning a little toward you, handle up; the flat blade turns with the cut.
+    drawKeyholeUp: function (g, b, k, over) {
+      var t = CURVE_TOOL.keyhole, s = this.strokeZ, L = t.lean, DX = 0.2 - 0.08 * clamp(this.B[0] / BW, 0, 1);
+      var sl = Math.sin(L), cl = Math.cos(L);
+      function A(u) { var y = -(u + s) * sl, z = (u + s) * cl; return [b[0] + y * DX * k, b[1] - (z * CZ + y * CDY) * k]; }
+      var wx = Math.cos(this.dir) * k, wy = Math.sin(this.dir) * CDY * k;
+      function wid(u) { return lerp(3, 24, clamp((u - t.tip) / (t.ferrule - t.tip), 0, 1)); }
+      function bladePoly(u0, u1) {
+        var lead = [], trail = [], i, n = 8;
+        for (i = 0; i <= n; i++) {
+          var u = lerp(u0, u1, i / n), p = A(u), w = u <= t.tip + 0.01 ? 0 : wid(u) / 2;
+          lead.push([p[0] + wx * w, p[1] + wy * w]); trail.unshift([p[0] - wx * w, p[1] - wy * w]);
+        }
+        polyPath(g, lead.concat(trail)); fs(g, C.steel, 2);
+        return lead;
+      }
+      var cutU = -s; // the board top, in saw coordinates
+      if (!over) { bladePoly(t.tip, Math.max(t.tip, cutU)); return; }
+      this.drawContact(g, b, k);
+      var lead = bladePoly(Math.max(t.tip, cutU), t.ferrule), i;
+      // teeth on the leading edge
+      g.beginPath();
+      for (i = 0; i < lead.length; i++) { g.moveTo(lead[i][0], lead[i][1]); g.lineTo(lead[i][0] + wx * 2.5, lead[i][1] + wy * 2.5 + 2); }
+      g.strokeStyle = OUT; g.lineWidth = 1.2; g.stroke();
+      var hw = clamp(32 * k, 18, 60);
+      capsule(g, A(t.ferrule - 4), A(t.ferrule + 14), hw * 0.8); fs(g, C.grip, 2.6);
+      capsule(g, A(t.ferrule + 12), A(t.end), hw); fs(g, C.yellow, 3);
+      capsule(g, A(t.ferrule + 30), A(t.end - 22), hw * 0.42); fs(g, C.grip, 2);
+      var e = A(t.end);
+      g.beginPath(); g.ellipse(e[0], e[1], hw * 0.42, hw * 0.2, 0, 0, 7); fs(g, "#FFE08A", 2);
+    },
+    // Jigsaw: flat on the board, front at the blade, turning smoothly with the cut. Its own mm: u forward,
+    // v across, z up; the footprint turns in the board plane and only z lifts it, so it never skews.
+    drawJig: function (g, b, k, over) {
+      // a little smaller than life and seen more from above, so it stays a compact shape on the board
+      var c = Math.cos(this.dir), sn = Math.sin(this.dir), s = this.strokeZ, JZ = 0.46;
+      k *= 0.78;
+      var jx = this.speed > 0.05 ? Math.sin(this.phase * 1.7) * 0.7 * this.speed : 0;
+      function J(u, v, z) { return [b[0] + jx + (u * c - v * sn) * k, b[1] + (u * sn + v * c - z * JZ) * k]; }
+      function bladeQuad(z0, z1) { polyPath(g, [J(2, 0, z0), J(10, 0, z0), J(10, 0, z1), J(2, 0, z1)]); fs(g, C.steel, 2); }
+      if (!over) { bladeQuad(-38 + s, 0); return; }
+      function rr(u0, u1, v0, v1, r) {
+        var pts = [], cs = [[u1 - r, v1 - r, 0], [u0 + r, v1 - r, Math.PI / 2], [u0 + r, v0 + r, Math.PI], [u1 - r, v0 + r, Math.PI * 1.5]];
+        cs.forEach(function (q) { for (var i = 0; i <= 3; i++) { var a = q[2] + i * Math.PI / 6; pts.push([q[0] + Math.cos(a) * r, q[1] + Math.sin(a) * r]); } });
+        return pts;
+      }
+      function at(foot, z) { return foot.map(function (p) { return J(p[0], p[1], z); }); }
+      function prism(foot, z0, z1, side, top) {
+        var hi = at(foot, z1);
+        polyPath(g, convexHull(at(foot, z0).concat(hi))); fs(g, side, 2.6);
+        polyPath(g, hi); fs(g, top, 2.6);
+      }
+      var shoe = at(rr(-150, 24, -34, 34, 10), 0);
+      g.save(); g.globalAlpha *= 0.22; g.fillStyle = OUT;
+      polyPath(g, shoe.map(function (p) { return [p[0] + 5, p[1] + 7]; })); g.fill(); g.restore();
+      polyPath(g, shoe); fs(g, C.alu, 2.6);
+      var s0 = J(0, 0, 0), s1 = J(24, 0, 0);
+      line(g, s0[0], s0[1], s1[0], s1[1], OUT, clamp(3 * k, 2, 5));
+      // the blade and its clamp sit in front of the body: drawn after it when the saw comes toward you
+      var front = sn > 0;
+      function bladeBits() { bladeQuad(0, 46 + s); prism(rr(0, 14, -9, 9, 3), 10, 58, C.steelD, C.steel); }
+      if (!front) bladeBits();
+      prism(rr(-140, 0, -27, 27, 13), 8, 80, C.yellowD, C.yellow);
+      for (var i = 0; i < 4; i++) { var v0 = J(-126 + i * 9, -15, 80), v1 = J(-126 + i * 9, 15, 80); line(g, v0[0], v0[1], v1[0], v1[1], "rgba(29,35,64,0.5)", clamp(3 * k, 2, 5)); }
+      if (front) bladeBits();
+      // the closed handle on top: a thick D, built up from its far side to its near side
+      var OUTER = [[-134, 76], [-130, 138], [-108, 158], [-26, 158], [-2, 138], [0, 76]];
+      var HOLE = [[-114, 86], [-112, 128], [-98, 142], [-40, 142], [-26, 128], [-24, 86]];
+      var vn = c >= 0 ? 1 : -1, n = clamp(Math.ceil(22 * k / 2.5), 2, 16), j;
+      function prof(pts, v) { return pts.map(function (p) { return J(p[0], v, p[1]); }); }
+      for (j = 0; j <= n; j++) {
+        var v = -vn * 11 + vn * 22 * j / n, last = j === n;
+        smooth(g, prof(OUTER, v)); smooth(g, prof(HOLE, v), true);
+        g.fillStyle = last ? C.yellow : C.yellowD; g.fill("evenodd");
+        if (j === 0 || last) { g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke(); }
+      }
+      polyPath(g, prof([[-100, 146], [-34, 146], [-34, 155], [-100, 155]], vn * 11)); fs(g, C.grip, 2);
+      var tq = this.held ? 3 : 0;
+      polyPath(g, prof([[-74, 142], [-62, 142], [-60, 132 - tq], [-72, 130 - tq]], vn * 11)); fs(g, this.held ? C.red : C.grip, 2);
     },
     drawHints: function (g) {
       var saw = this.saw;
@@ -3026,8 +3214,8 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       if (!this.done && !this.trail.length) gAim = { pts: gp, dur: 3800 };
       if (saw.power) strokeHint(g, W / 2, 30, "Hold to run", 0, this.held && this.speed > 0.5, "Steer along the line");
       else {
-        var txt = saw.cut === "pull" ? "Pull!" : "Push!";
-        strokeHint(g, W / 2, 30, txt, saw.cut === "pull" ? 3 : 2, this.cutting, saw.cut === "pull" ? "Teeth point to the handle: it cuts on the pull" : "It cuts on the push");
+        var pull = saw.cut === "pull";
+        strokeHint(g, W / 2, 30, pull ? "Pull!" : "Push!", 2, this.cutting, pull ? "Teeth point down to the handle: it cuts on the pull" : "It cuts on the push");
       }
       if (this.d.hole && !this.trail.length && !this.done && W > 600) smallTag(g, W / 2, H * 0.3 + 40, saw.id === "keyhole" ? "Start in the drilled hole" : "The blade goes through the drilled hole");
     }
@@ -5600,12 +5788,6 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
         '<button class="btn" data-act="edge" data-v="cross" aria-pressed="' + (set.edge === "cross") + '">Crosscut</button>' +
         '<button class="btn" data-act="edge" data-v="rip" aria-pressed="' + (set.edge === "rip") + '">Rip</button></span>';
     }
-    if (s.knob) {
-      h += '<span class="grp">' +
-        '<button class="btn step" data-act="knob" data-v="-45" aria-label="Turn the blade left">↺</button>' +
-        '<span class="val">Blade</span>' +
-        '<button class="btn step" data-act="knob" data-v="45" aria-label="Turn the blade right">↻</button></span>';
-    }
     if (s.depth) {
       h += '<span class="grp">' +
         '<button class="btn step" data-act="depth" data-v="-1" aria-label="Shallower">−</button>' +
@@ -5659,7 +5841,6 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       scene.enter(s, set); changed(); return;
     }
     if (act === "edge") { set.edge = v; if (scene === End) scene.newWork(false); changed(); return; }
-    if (act === "knob") { set.knob = clamp(set.knob + Number(v), -90, 90); changed(); return; }
     if (act === "depth") {
       list = s.id === "tracksaw" ? TRACK_DEPTHS : CIRC_DEPTHS;
       i = clamp(list.indexOf(set.depth) + Number(v), 0, list.length - 1); set.depth = list[i]; changed(); return;
