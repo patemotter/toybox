@@ -314,6 +314,9 @@ body.ending .coach, body.big .coach { visibility: hidden; }
   // World units: pitch radius = teeth / 4, so any two gears mesh when their centers are
   // (teethA + teethB) / 4 pegs apart. Pegs sit on every whole unit.
   var WW = 44, WH = 36;
+  // On a tall screen the plate stands up (36 x 44): the layout is mirrored across the diagonal, which
+  // keeps every mesh. Saves always use the wide plate's coordinates.
+  var tall = false;
   var SIZES = [8, 12, 16, 20, 24, 32, 40];
   var COLORS = { 8: "#E63946", 12: "#F77F00", 16: "#FFC93C", 20: "#2E9E5B", 24: "#3A86FF", 32: "#8338EC", 40: "#FF5DA2" };
   var MESH_TOL = 0.36;
@@ -373,7 +376,7 @@ body.ending .coach, body.big .coach { visibility: hidden; }
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        gears: gears.map(function (g) { return { T: g.T, x: g.x, y: g.y }; }),
+        gears: gears.map(function (g) { return tall ? { T: g.T, x: g.y, y: g.x } : { T: g.T, x: g.x, y: g.y }; }),
         driver: Math.max(0, gears.indexOf(byId(driverId))), mode: mode, rpm: motorRpm
       }));
     } catch (e) { /* ignore */ }
@@ -486,6 +489,14 @@ body.ending .coach, body.big .coach { visibility: hidden; }
     CW = Math.max(1, r.width - 6); CH = Math.max(1, r.height - 6);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    var t = CH > CW * 1.12;
+    if (t !== tall) {
+      tall = t;
+      var ww = WW; WW = WH; WH = ww;
+      gears.forEach(function (g) { var x = g.x; g.x = g.y; g.y = x; });
+      selected = [];
+      if (gears.length) rebuild();
+    }
     S = Math.min(CW / (WW + 1), CH / (WH + 1));
     OX = (CW - WW * S) / 2; OY = (CH - WH * S) / 2;
   }
@@ -1127,7 +1138,7 @@ body.ending .coach, body.big .coach { visibility: hidden; }
   // ---------- Examples ----------
   function example(name) {
     gears = []; selected = []; driverId = 0;
-    function add(T, x, y) { var g = mkGear(T, x, y); gears.push(g); return g; }
+    function add(T, x, y) { var g = tall ? mkGear(T, y, x) : mkGear(T, x, y); gears.push(g); return g; }
     if (name === "long") {
       // Seven gears in one chain (each pair exactly (Ta + Tb) / 4 pegs apart, no loops, so nothing jams).
       add(16, 5, 12); add(12, 12, 12); add(20, 20, 12); add(8, 27, 12); add(24, 35, 12);
