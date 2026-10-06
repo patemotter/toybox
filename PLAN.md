@@ -235,8 +235,7 @@ scenes on upright phones.
   drawn small in phone landscape (hit areas are big); one iPad drag may not finish a rip pass; the crosscut
   off-cut can cover the "Angle" tag; the fence stays locked if a board is pushed into a stopped blade; the
   circular saw guard grey is close to the blade grey.
-- **Drill Press:** small machine in phone landscape; the board's near edge can hang below the flat-drawn table;
-  empty pegboard at the sides on iPad portrait; the speed/belt overlay covers the whole canvas in portrait.
+- **Drill Press:** still fairly small in phone landscape; Forstner and auger curls can pile up beside the board.
 - **Construction Site:** Excavator controls take about a quarter of the screen; Concrete only slightly bigger on
   upright phones; wrecking-ball bricks can land on the crane; a ball resting on rubble delays the rest screen to
   ~14 s; goodbye banners sit at the bottom over the panel.
