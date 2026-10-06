@@ -2307,6 +2307,8 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
   var dStage = $("dStage"), dSvg = $("dSvg"), dTool = $("dTool"), dLines = $("dLines"), dLabels = $("dLabels");
   var jSvg = $("jSvg"), jWorld = $("jWorld"), jBack = $("jBack"), jWork = $("jWork"), jToolG = $("jToolG"), jArt = $("jArt"), jFront = $("jFront"), jUI = $("jUI");
   var POWER = { circular: 1, jigsaw: 1, recip: 1, tracksaw: 1, drilldriver: 1, hammerdrill: 1, impact: 1, orbital: 1, belt: 1, detail: 1, router: 1 };
+  // Set when the gear-up finishes on this page: the first power tool opened right after it skips the safety check.
+  var checkSkipOnce = false;
   function kindName(t) {
     if (t.bit) return "Drill bit";
     if (t.sec === "machines" && t.id !== "router") return "Machine";
@@ -2458,6 +2460,12 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     $("detail").hidden = false;
     setView("use");
     startJob(t);
+    // Power tools and the big machines get the quick "Safety check!" card (the block at the end of the page), once
+    // per tool: the stations share the same "last power tool checked" key. Not right after the gear-up here.
+    if (POWER[t.id] || t.sec === "machines") {
+      if (checkSkipOnce) checkSkipOnce = false;
+      else setTimeout(function () { if (D && D.t === t && window.workshopSafetyCheck) window.workshopSafetyCheck(t.id); }, reduce ? 0 : 380);
+    }
     if (card) {
       card.classList.add("out");
       wake(cards[t.id], 0);
@@ -2534,6 +2542,7 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     $("dAgain").hidden = true;
     jBack.innerHTML = ""; jWork.innerHTML = ""; jFront.innerHTML = ""; jUI.innerHTML = "";
     if (K.init) K.init(J, cfg);
+    if (K.sw) armSwitch(J);
     jBack.innerHTML = K.back ? K.back(J, cfg) : sceneBack(220);
     renderJob();
   }
@@ -2599,7 +2608,8 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       };
     }
     jWork.innerHTML = K.work ? K.work(J) : "";
-    jFront.innerHTML = K.front ? K.front(J) : "";
+    // The machine's power switch sits on top of everything in the scene (a board can slide under it).
+    jFront.innerHTML = (K.front ? K.front(J) : "") + (K.sw ? switchArt(J) : "");
     jToolG.setAttribute("transform", toolXform(J.tl));
     jToolG.style.display = J.hideTool ? "none" : "";
     J.dirty = false;
@@ -2693,6 +2703,8 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     J.hintShown = true;
     J.hintT = 0;
     if (J.done) { if (J.K.doneTap) J.K.doneTap(J, p); return; }
+    // Machines with a power switch: a tap on the switch, or a push while it is off, ends here (and is not a hold).
+    if (J.K.sw && switchDown(J, p)) { delete J.ptrs[e.pointerId]; J.holds = Math.max(0, J.holds - 1); J.dirty = true; return; }
     if (J.K.down) J.K.down(J, p, e);
     J.dirty = true;
   });
@@ -3523,7 +3535,9 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
 
   // ================= Job kinds (2): planes, files, sanders, wrenches, clamps, measuring, machines =================
   function runMotor(J, dt, snd, shake, rate) {
-    var on = J.holds > 0 && !J.done;
+    // Hand-held power tools run while held; the big machines with a power switch run while it is on.
+    if (J.K.sw) switchFrame(J, dt);
+    var on = (J.K.sw ? J.on : J.holds > 0) && !J.done;
     J.run += ((on ? 1 : 0) - J.run) * Math.min(1, dt * (on ? 6 : 2));
     if (J.run < 0.01 && !on) J.run = 0;
     if (J.run > 0) { spinArt(dt, J.run, rate); shakeBy(J.run * (shake == null ? 0.5 : shake)); J.dirty = true; }
@@ -3532,6 +3546,84 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     return J.run;
   }
   function pct(f) { return Math.round(clamp(f, 0, 1) * 100) + "%"; }
+
+  // ----- Power switch on the stationary machines (table saw, band and scroll saw, lathe, planer, jointer, drill press) -----
+  // A kind with `sw: [cx, cy, size]` (scene units, or a function of J) gets a switch drawn on its machine, the same
+  // look as the stations' switch: a dark box with a green ON button over a red OFF paddle, and a yellow ring that
+  // pulses round ON while the machine is off. The machine runs only while J.on (see runMotor). A push while it is
+  // off only says "Switch it on!" and flashes the ring; the second push switches it on for him. The touch areas
+  // are kept on J.sw by switchArt (renderJob draws it on top of the scene) and tested by switchDown.
+  function swPos(J) { var s = J.K.sw; return typeof s === "function" ? s(J) : s; }
+  function swOnPt(J) { var q = swPos(J); return [q[0], q[1] - q[2] * 0.276]; }
+  function switchArt(J) {
+    var q = swPos(J), cx = q[0], cy = q[1], s = q[2], w = s * 0.9, h = s * 1.2, x = cx - w / 2, y = cy - h / 2;
+    var on = J.on && !J.done, str = "";
+    var bx = cx, by = y + h * 0.27, br = s * 0.17;
+    var pw = w * 0.8, ph = h * 0.36, px = cx - pw / 2, py = y + h * 0.54 - (on ? 3 : 0);
+    J.sw = { on: [bx, by, Math.max(14, br * 2.2)], box: [x - 10, y - 10, x + w + 10, y + h + 10] };
+    str += R(x + 3, y + 4, w, h, "rgba(29,35,64,0.35)", 8, 0) + R(x, y, w, h, "#2E3440", 8);
+    if (!J.on && !J.done && !locked()) {
+      var fl = J.swFlash > 0, pr = reduce ? br * 1.9 : br * (fl ? 2.3 + 0.5 * Math.sin(J.swT * 22) : 1.75 + 0.3 * Math.sin(J.swT * 5));
+      str += '<circle cx="' + n2(bx) + '" cy="' + n2(by) + '" r="' + n2(pr) + '" fill="none" stroke="' + (fl && Math.sin(J.swT * 22) > 0 ? "#FFFFFF" : "rgba(255,201,60,0.95)") + '" stroke-width="' + (fl ? 5 : 4) + '"/>';
+    }
+    if (on) str += Cf(bx, by, br * 1.7, "rgba(90,255,150,0.3)");
+    str += C(bx, by, br, on ? "#4BE38A" : "#2C8C55", 2.5);
+    str += R(px, py + (on ? 6 : 3), pw, ph, "#B32D38", 6, 2.5) + R(px, py, pw, ph, on ? "#FF6B6B" : RED, 6, 2.5);
+    str += T(cx, py + ph / 2 + 1, "OFF", clamp(s * 0.2, 9, 16), "#FFFFFF");
+    return str;
+  }
+  // Forgiving: while the machine is off, a tap anywhere on the switch turns it on; while it is on, the green
+  // button keeps it on and the red paddle (or anywhere else on the box) turns it off.
+  function switchHit(J, p) {
+    var sw = J.sw, b;
+    if (!sw) return null;
+    b = sw.box;
+    if (!(p[0] > b[0] && p[0] < b[2] && p[1] > b[1] && p[1] < b[3])) return null;
+    if (!J.on) return "on";
+    return Math.hypot(p[0] - sw.on[0], p[1] - sw.on[1]) < sw.on[2] ? "on" : "off";
+  }
+  function switchOn(J) {
+    J.on = true; J.swMiss = 0; J.swFlash = 0; J.dirty = true;
+    SND.click();
+    if (J.swNext) { coach(J.swNext.coach); hint(J.swNext.hint); }
+  }
+  function switchOff(J) {
+    var q = swOnPt(J);
+    J.on = false; J.swMiss = 0; J.dirty = true;
+    SND.click();
+    coach("Off. Tap the green button to run it again.");
+    hint({ k: "tap", x: q[0], y: q[1] });
+  }
+  // Called once per job after the kind's init: the machine starts off, and the first coach line points at the switch.
+  // The kind's own coach line and idle hint come back when the switch goes on.
+  function armSwitch(J) {
+    var q = swOnPt(J);
+    J.on = false; J.swMiss = 0; J.swT = 0; J.swFlash = 0;
+    J.swNext = { coach: J.coach, hint: J.hint };
+    coach("Switch on the " + J.t.n.toLowerCase() + "!");
+    hint({ k: "tap", x: q[0], y: q[1] });
+  }
+  function switchFrame(J, dt) {
+    J.swT += dt;
+    if (J.swFlash > 0) J.swFlash -= dt;
+    if (!J.on && !J.done && !reduce) J.dirty = true; // the ring pulses
+  }
+  // A finger down on the stage of a machine with a switch, before the kind's own down logic.
+  // True when it was handled here: a tap on the switch, or a push while off that only nudges.
+  function switchDown(J, p) {
+    var hit = switchHit(J, p), q;
+    if (hit === "on") { if (!J.on) switchOn(J); return true; }
+    if (hit === "off") { if (J.on) switchOff(J); return true; }
+    if (J.on) return false;
+    J.swMiss = (J.swMiss || 0) + 1;
+    if (J.swMiss >= 2) { switchOn(J); return false; } // the second try: switch it on for him and let the push go on
+    coach("Switch it on!");
+    J.swFlash = 1.3;
+    q = swOnPt(J);
+    hint({ k: "tap", x: q[0], y: q[1] });
+    J.hintShown = false; // the ghost hand points at the switch as soon as his finger lifts
+    return true;
+  }
 
   // ----- Planes: push along a rough board; shavings curl out; the top turns smooth stroke by stroke -----
   KINDS.plane = {
@@ -4329,16 +4421,19 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
   };
 
   // ----- Machines -----
-  // Table saw (top view): feed the board along the fence past the blade.
+  // Table saw (top view): switch it on, then feed the board along the fence past the blade.
   KINDS.tablesaw = {
+    sw: [58, 272, 44], // on the front rail of the cabinet, at the left
     init: function (J) {
       J.hideTool = true; J.by = 280; J.cut = 0;
       coach("Push the board along the fence, past the blade.");
       hint({ k: "drag", x: 230, y: 260, dx: 0, dy: -110 });
-      readout("Rip 0%");
+      readout("");
     },
     back: function (J) {
-      var s = '<rect x="-600" y="-600" width="1600" height="1600" fill="#9AA8B8"/>' + R(10, -200, 380, 700, "#D3DAE2", 6);
+      var s = '<rect x="-600" y="-600" width="1600" height="1600" fill="#9AA8B8"/>' + R(10, -200, 380, 438, "#D3DAE2", 6);
+      // The front of the cabinet below the table's front edge, with the fence rail along the edge.
+      s += R(10, 238, 380, 400, MCH, 6) + R(-20, 232, 440, 14, STL, 4) + L(-20, 238, 420, 238, STD, 2);
       return s + R(196, 80, 8, 120, "#4A5160", 3, 2) + T(120, 40, "TABLE SAW", 14, "#8E9BAA");
     },
     down: function (J, p, e) { grab(J, p, e, [0, J.by]); },
@@ -4350,7 +4445,7 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
         var front = J.by - 120; // the board is 240 long; its far end is at by - 120
         J.cut = clamp((142 - front) / 240, 0, 1);
         if (J.cut > 0 && J.cut < 1) { J.dd = (J.dd || 0) + 1; if (J.dd > 2) { J.dd = 0; puff(200, 140, "dust", 3, (Math.random() - 0.5) * 80, 120); } }
-        readout("Rip " + pct(J.cut));
+        readout(J.cut > 0 ? "Ripping…" : "");
         if (J.cut >= 1) finish("Ripped into two long strips!");
       }
     },
@@ -4361,13 +4456,14 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       s += '<g transform="translate(' + n2(-sep * 30) + ' 0)">' + bdh(110, top, 88, h, WOOD.pine, 2) + "</g>" + bdh(202, top, 54, h, WOOD.pine, 3);
       if (top < 142 && !J.done) s += L(200, top, 200, Math.min(142, top + h), "#2A1E12", 4);
       s += R(197, 128, 6, 28, "#5E6878", 2, 2) + R(198, 156, 4, 26, "#AEB8C4", 1, 2);
-      s += R(258, -300, 22, 800, "#E8EEF4", 3) + L(262, -300, 262, 500, "#B9C3CE", 2) + T(269, 240, "FENCE", 10, "#8E9BAA", "middle", -90);
+      s += R(258, -300, 22, 538, "#E8EEF4", 3) + L(262, -300, 262, 238, "#B9C3CE", 2) + T(269, 208, "FENCE", 10, "#8E9BAA", "middle", -90);
       if (J.run > 0.2) s += C(200, 142, 18 + 6 * Math.sin(J.ph * 30), "none", 2, "#FFFFFF") + '<circle cx="200" cy="142" r="22" fill="none" stroke="#FFC93C" stroke-width="2" stroke-dasharray="3 5" opacity="0.8"/>';
       return s;
     }
   };
-  // Band saw and scroll saw (top view): slide the board so the blade follows the line.
+  // Band saw and scroll saw (top view): switch it on, then slide the board so the blade follows the line.
   KINDS.feed = {
+    sw: [56, 274, 42], // on the front of the base, below the table's front edge
     init: function (J, c) {
       var uv = SHAPES[c.shape](), g = { B: [200, 120] };
       // Board-local points (top view, 1:1 scale).
@@ -4380,7 +4476,7 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       coach(c.coach || "Slide the board so the blade follows the line.");
       var d0 = g.pts[0], d1 = g.pts[Math.min(20, g.pts.length - 1)];
       hint({ k: "drag", x: g.B[0] + 40, y: g.B[1] + 60, dx: d0[0] - d1[0], dy: d0[1] - d1[1] });
-      readout("0%");
+      readout("");
     },
     at: function (J) {
       var g = J.g, i = 0;
@@ -4391,7 +4487,8 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     place: function (J) { var q = KINDS.feed.at(J); J.cut = q; J.off = [J.g.B[0] - q.x, J.g.B[1] - q.y]; },
     back: function (J) {
       var c = J.cfg, s = '<rect x="-600" y="-600" width="1600" height="1600" fill="' + (c.machine === "band" ? "#3C7DD9" : "#4D5A6A") + '"/>';
-      return s + R(-20, -40, 440, 380, "#D3DAE2", 10) + T(80, 286, c.machine === "band" ? "BAND SAW" : "SCROLL SAW", 14, "#8E9BAA");
+      // The table ends at its front edge; the machine's base shows below it, with the switch on it.
+      return s + R(-20, -40, 440, 284, "#D3DAE2", 10) + T(330, 276, c.machine === "band" ? "BAND SAW" : "SCROLL SAW", 14, "#DCE6F2");
     },
     down: function (J, p, e) { grab(J, p, e, J.off.slice()); },
     move: function (J, p, e) {
@@ -4408,7 +4505,7 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
         J.si = ns;
         while (J.dd > 6) { J.dd -= 6; puff(g.B[0], g.B[1], "dust", 2, (Math.random() - 0.5) * 100, 60); }
         KINDS.feed.place(J);
-        readout(Math.round(100 * J.si / g.total) + "%");
+        readout(J.si > g.total * 0.6 ? "Nearly there…" : "Cutting…");
         if (J.si >= g.total - 0.5) finish(J.cfg.done);
       }
     },
@@ -4438,13 +4535,15 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
     else if (x < 0.85) r = 12 + 8 * Math.sin((x - 0.3) / 0.55 * Math.PI * 0.5 + 0.2); else if (x < 0.9) r = 15; else r = 22;
     return r;
   }
+  // Lathe: switch it on (the wood spins), then hold to press the gouge to the wood; it turns a square blank into a table leg.
   KINDS.lathe = {
-    init: function (J) { J.hideTool = true; J.p = 0; coach("Hold to spin the lathe. The gouge shapes the wood."); hint({ k: "hold", x: 200, y: 250 }); readout("0 rpm"); },
+    sw: [47, 122, 42], // on the headstock
+    init: function (J) { J.hideTool = true; J.p = 0; coach("Now hold to press the gouge on the spinning wood."); hint({ k: "hold", x: 200, y: 250 }); readout(""); },
     back: function () { return sceneBack(232); },
     frame: function (J, dt) {
       var run = runMotor(J, dt, "machine", 0.2, 5);
-      readout(fmtNum(Math.round(1200 * run / 10) * 10) + " rpm");
-      if (run > 0.5 && !J.done) {
+      if (!J.done) readout(run > 0.5 ? (J.holds > 0 ? "Shaping…" : "Spinning") : "");
+      if (run > 0.5 && J.holds > 0 && !J.done) {
         J.p = Math.min(1, J.p + dt / 5);
         var gx = KINDS.lathe.gx(J);
         if (Math.random() < 0.6) puff(gx, 168, "curls", 1, -40 + Math.random() * 80, -120);
@@ -4476,17 +4575,18 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       return s;
     }
   };
-  // Thickness planer (side view): hold to run; the board feeds through and comes out flat and thinner.
+  // Thickness planer (side view): switch it on, then hold to feed the board through; it comes out flat and thinner.
   KINDS.planer = {
-    init: function (J) { J.hideTool = true; J.bx = 30; coach("Hold to run the planer. It pulls the board through."); hint({ k: "hold", x: 200, y: 90 }); readout("25 mm thick"); },
+    sw: [143, 120, 42], // on the front of the body, at the infeed side
+    init: function (J) { J.hideTool = true; J.bx = 30; coach("Now hold to feed the board through."); hint({ k: "hold", x: 200, y: 90 }); readout(""); },
     back: function () { return sceneBack(250); },
     frame: function (J, dt) {
       var run = runMotor(J, dt, "machine", 0.3, 5);
-      if (run > 0.5 && !J.done) {
+      if (run > 0.5 && J.holds > 0 && !J.done) {
         J.bx += dt * 70 * run;
         var cut = clamp((200 - J.bx) / 220, 0, 1), out = 200 - J.bx;
         if (out > 0 && out < 220 && Math.random() < 0.8) puff(268, 64, "chips", 2, 160, -200);
-        readout(out > 0 ? "25 mm → 22 mm" : "25 mm thick");
+        readout(out > 0 ? "Shaving it smooth…" : "Feeding in…");
         if (J.bx > 300) { J.bx = 300; finish("Flat, smooth, and the same thickness all along!"); }
       }
       if (J.run > 0 || J.done) J.dirty = true;
@@ -4507,9 +4607,10 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       return s;
     }
   };
-  // Jointer (side view): push the bowed board over the spinning cutterhead; its bottom comes out straight.
+  // Jointer (side view): switch it on, then push the bowed board over the spinning cutterhead; its bottom comes out straight.
   KINDS.jointer = {
-    init: function (J) { J.hideTool = true; J.bx = -40; J.maxx = -40; coach("Hold the board and push it over the cutterhead."); hint({ k: "drag", x: 60, y: 150, dx: 150, dy: 0 }); readout("Straight 0%"); },
+    sw: [80, 228, 44], // on the front of the stand, under the infeed table
+    init: function (J) { J.hideTool = true; J.bx = -40; J.maxx = -40; coach("Hold the board and push it over the cutterhead."); hint({ k: "drag", x: 60, y: 150, dx: 150, dy: 0 }); readout(""); },
     back: function () { return sceneBack(262); },
     down: function (J, p, e) { grab(J, p, e, [J.bx, 0]); },
     move: function (J, p, e) {
@@ -4519,14 +4620,14 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
         J.bx = nx;
         if (nx > J.maxx) { J.maxx = nx; if (nx + 220 > 200 && nx < 200) { puff(204, 172, "chips", 2, 40, -200); } }
         var f = clamp((200 - J.bx) / 220, 0, 1); f = 1 - f;
-        readout("Straight " + pct((J.maxx + 20) / 210));
+        readout(J.maxx > 100 ? "Nearly straight…" : J.maxx > -20 ? "Straightening…" : "");
         if (J.maxx >= 190) finish("The edge is perfectly straight and flat!");
       }
     },
     frame: function (J, dt) { runMotor(J, dt, "machine", 0.3, 5); },
     work: function (J) {
       var s = "", bx = J.bx, i, top = 120, bot = [], cut = 200 - bx;
-      s += R(-60, 178, 254, 14, STL, 2) + R(206, 174, 254, 14, STL, 2) + R(40, 192, 320, 70, MCH, 4) + T(120, 228, "JOINTER", 16, "#FFFFFF");
+      s += R(-60, 178, 254, 14, STL, 2) + R(206, 174, 254, 14, STL, 2) + R(40, 192, 320, 70, MCH, 4) + T(250, 228, "JOINTER", 16, "#FFFFFF");
       s += R(-60, 84, 520, 94, "#C9D2DC", 4) + T(300, 100, "FENCE", 11, "#8E9BAA");
       for (i = 0; i <= 22; i++) {
         var lx = i * 10, x = bx + lx, bow = 7 * Math.sin(lx / 220 * Math.PI), y = 174 - bow;
@@ -4573,14 +4674,15 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       }
     }
   };
-  // Drill press: pull the feed handle down; the quill and bit come down straight.
+  // Drill press: switch it on, then pull the feed handle down; the quill and bit come down straight.
   KINDS.dpress = {
+    sw: function () { var q = toolPt(55, 57); return [q[0], q[1], 42]; }, // on the head, at the left (the drawing's switch plate)
     init: function (J) {
       J.tl.s = 1.85; J.tl.ax = 100; J.tl.ay = 100; J.tl.x = 196; J.tl.y = 140; J.k = 0; J.dmax = 0;
       KINDS.dpress.redraw(J);
       coach("Pull the feed handle down to drill straight down.");
       var h = toolPt(130, 72); hint({ k: "drag", x: h[0], y: h[1], dx: 0, dy: 50 });
-      readout("0 mm deep");
+      readout("");
     },
     redraw: function (J) {
       // The board on the table, cut away to show the hole.
@@ -4602,7 +4704,7 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
       if (d > J.dmax && J.run > 0.3) {
         J.dmax = d; KINDS.dpress.redraw(J);
         var q = toolPt(72, 104); puff(q[0], q[1], "curls", 1, (Math.random() - 0.5) * 160, -80);
-        readout(Math.round(clamp(d, 0, 14) / 14 * 19) + " mm deep");
+        readout(d > 10 ? "Nearly through…" : "Drilling…");
         if (d >= 15) finish("Straight through! Every hole comes out perfectly straight.");
       }
       if (J.anim) {
@@ -4968,6 +5070,8 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
         try { sessionStorage.setItem("workshop-check-skip", "1"); } catch (e) { /* ignore */ }
         location.replace(NEXT); return;
       }
+      // He just put the gear on: the first power tool he lifts off the wall skips the safety check.
+      checkSkipOnce = true;
       swings.forEach(function (s, i) { wake(s, (i % 2 ? 1 : -1) * (40 + Math.random() * 60)); });
     }, reduce ? 500 : 2000);
   });
@@ -5186,7 +5290,187 @@ body.ending .homebtn, body.ending .station, body.ending .board, body.ending .tab
   requestAnimationFrame(frame);
 })();
 </script>
-<!-- No safety check on the Tool Wall: the stations remind about eye and ear protection when you go back to a tool. -->
+<!-- Safety check: the stations' quick gear re-check, shown here when a power tool or a big machine is lifted off the
+     wall (once per tool; the main script calls window.workshopSafetyCheck(toolId) when the "Use it" view opens).
+     The card, timing and tap handling are identical to the stations'; "workshop-check-tool" (the last power tool
+     checked) is shared with them, so the same tool is never checked twice in a row. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "toybox-timer-v1", GEAR_KEY = "workshop-gear", SKIP_KEY = "workshop-check-skip", TOOL_KEY = "workshop-check-tool";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["gog", "Eye protection?"], ["muf", "Ear protection?"]];
+
+  function gearOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return false; } }
+  // A full gear-up just happened (the Tool Wall sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  // The last power tool checked, here or at a station.
+  function lastTool() { try { return sessionStorage.getItem(TOOL_KEY) || ""; } catch (e) { return ""; } }
+  function remember(id) { try { sessionStorage.setItem(TOOL_KEY, id); } catch (e) { /* ignore */ } }
+  // The shared timer is winding down or resting (or has just run out and not caught up yet).
+  function timerBusy() {
+    try { if (window.Toybox && Toybox.timer && Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+    try {
+      var t = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (!t) return false;
+      if (t.phase === "ending" || t.phase === "resting") return true;
+      return t.phase === "running" && typeof t.endAt === "number" && t.endAt > 0 && t.endAt <= Date.now();
+    } catch (e) { return false; }
+  }
+
+  // ---------- The worker, wearing the gear (same drawing as the gear-up) ----------
+  var O = "#1D2340", YEL = "#FFC93C", ORG = "#F77F00", RED = "#E63946", BLU = "#2D5BD7", BLK = "#343944", SKIN = "#F5C9A0", HAIR = "#7A4A2A";
+  function n2(v) { return Math.round(v * 10) / 10; }
+  function P(d, f, w, x) { return '<path d="' + d + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (w == null ? 3 : w) + '" stroke-linejoin="round" stroke-linecap="round"' + (x || "") + "/>"; }
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    if (!r) return "M" + n2(x) + " " + n2(y) + "h" + n2(w) + "v" + n2(h) + "h" + n2(-w) + "Z";
+    return "M" + n2(x + r) + " " + n2(y) + "H" + n2(x + w - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w) + " " + n2(y + r) +
+      "V" + n2(y + h - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w - r) + " " + n2(y + h) +
+      "H" + n2(x + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x) + " " + n2(y + h - r) +
+      "V" + n2(y + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + r) + " " + n2(y) + "Z";
+  }
+  function R(x, y, w, h, f, r, sw) { return P(rr(x, y, w, h, r), f, sw); }
+  function C(cx, cy, r, f, sw) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (sw == null ? 3 : sw) + '"/>'; }
+  function Cf(cx, cy, r, f) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + f + '"/>'; }
+  function L(x1, y1, x2, y2, c, w) { return '<path d="M' + n2(x1) + " " + n2(y1) + "L" + n2(x2) + " " + n2(y2) + '" stroke="' + (c || O) + '" stroke-width="' + (w || 3) + '" stroke-linecap="round" fill="none"/>'; }
+  function bar(d, c, w) {
+    return '<path d="' + d + '" fill="none" stroke="' + O + '" stroke-width="' + (w + 6) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  function G(t, inner, x) { return "<g" + (t ? ' transform="' + t + '"' : "") + (x || "") + ">" + inner + "</g>"; }
+  function gogglesArt() {
+    return R(-96, -8, 192, 16, BLK, 7) +
+      P(rr(-68, -30, 136, 60, 27), YEL, 4) + P(rr(-60, -22, 54, 44, 19), "#B9E4FF", 3) + P(rr(6, -22, 54, 44, 19), "#B9E4FF", 3) +
+      L(-48, -10, -36, -15, "#FFFFFF", 5) + L(18, -10, 30, -15, "#FFFFFF", 5) + P("M-10 30 Q0 16 10 30", SKIN, 3);
+  }
+  function muffsArt() {
+    return bar("M-88 -2 C-88 -150 88 -150 88 -2", BLK, 10) +
+      R(-112, -32, 40, 66, ORG, 18) + R(-80, -26, 10, 54, BLK, 5) + L(-104, -18, -104, 20, "#FFC37A", 4) +
+      R(72, -32, 40, 66, ORG, 18) + R(70, -26, 10, 54, BLK, 5) + L(104, -18, 104, 20, "#FFC37A", 4);
+  }
+  function workerSVG() {
+    var o = P("M26 330 Q34 248 150 238 Q266 248 274 330 Z", "#F77F00") +
+      P("M92 330 L98 268 L202 268 L208 330 Z", BLU) + L(104, 270, 84, 246, BLU, 12) + L(196, 270, 216, 246, BLU, 12) +
+      C(104, 272, 5, YEL, 2) + C(196, 272, 5, YEL, 2) + R(128, 284, 44, 30, "#4A73DF", 6) + R(148, 270, 8, 22, RED, 2, 2.5) +
+      R(128, 210, 44, 40, SKIN, 12) + C(60, 142, 17, SKIN) + C(240, 142, 17, SKIN) + C(150, 138, 92, SKIN) +
+      P("M60 128 Q56 46 150 42 Q244 46 240 128 Q228 92 198 84 Q172 102 142 86 Q100 78 60 128 Z", HAIR) +
+      L(98, 106, 128, 100, HAIR, 7) + L(172, 100, 202, 106, HAIR, 7) +
+      C(114, 134, 11, O, 0) + Cf(118, 130, 4, "#FFFFFF") + C(186, 134, 11, O, 0) + Cf(190, 130, 4, "#FFFFFF") +
+      P("M146 148 Q150 160 158 152", "none", 4) + Cf(92, 168, 14, "rgba(242,108,167,0.35)") + Cf(208, 168, 14, "rgba(242,108,167,0.35)") +
+      P("M116 176 Q150 210 184 176 Q150 192 116 176 Z", "#C2405A", 4) +
+      G("", G("translate(150 134)", gogglesArt()), ' class="sc-g" data-k="gog"') +
+      G("", G("translate(150 142)", muffsArt()), ' class="sc-g" data-k="muf"');
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(600px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,320px);aspect-ratio:280/326;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#F6DDB0;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0}.sc.out:not(.held){pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-10%)}}" +
+    "@media (max-height:600px){.sc-man-wrap{height:26vh}.sc ul{gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], held = null, swallowUntil = 0;
+  // A soft rising pop per tick, only when the shared Toybox sound is on and the audio engine is running.
+  function pop(n) {
+    try {
+      var actx = window.Toybox && Toybox.sound && Toybox.sound.ready();
+      if (!actx) return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 140;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = [];
+    var node = el;
+    node.classList.add("out");
+    // A finger still down on the (now invisible) card keeps it in place until lifted, so the lift and
+    // its click never land on a button underneath.
+    function gone() { if (held !== null && el === node) { timers.push(setTimeout(gone, 120)); return; } if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }
+    setTimeout(gone, reduce ? 160 : (fast ? 260 : 420));
+  }
+  // Show the check for a power tool or big machine lifted off the wall; the same tool twice in a row is not checked again.
+  function show(toolId) {
+    if (el) return;
+    if (!gearOn() || timerBusy()) return;
+    if (toolId && lastTool() === toolId) return;
+    if (takeSkip()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    if (toolId) remember(toolId);
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Safety check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Safety check!</h2><div class="sc-man-wrap"><svg viewBox="10 4 280 326" aria-hidden="true">' + workerSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      held = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      close(true);
+    });
+    function release(e) { if (held === null) return; e.stopPropagation(); held = null; swallowUntil = Date.now() + 450; if (el) el.classList.remove("held"); }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1500);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
+      later(function () { close(false); }, 1600);
+    }
+  }
+  // The click that follows the skipping tap is swallowed (it must not press what is underneath).
+  document.addEventListener("click", function (e) { if (held !== null || Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function (e) { if (el && !el.classList.contains("out") && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); close(true); } }, true);
+  // The timer ended on another page: get out of the way of the rest screen.
+  window.addEventListener("storage", function (e) { if ((e.key === TKEY || e.key === null) && el && timerBusy()) close(true); });
+  if (navigator.webdriver) window.__safetyCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  window.workshopSafetyCheck = show;
+})();
+</script>
 <script>
   // Offline support: register the service worker when served over http(s).
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {

@@ -343,9 +343,29 @@ angle values, bit sizes and nail lengths are no longer shown).
 
 ---
 
-## On hold: Workshop Projects
+## In progress: Workshop Projects
 
-Build something step by step across the stations (cut, drill, nail, sand, paint), such as a birdhouse or a toy car. Revisit after the new Workshop stations exist.
+An end-to-end build with the real methods: plane, measure, mark, square, cut, rip, drill, nail, sand. First
+project: **a birdhouse** from one long pine board (a nominal 1x6). Units: inches with decimals ("7.5"), never
+fractions; numbers appear only inside project steps that measure or set a machine.
+
+- `workshop/projects.js`: the shared data and progress API (read its header: step shape, job kinds, deep links,
+  `localStorage["workshop-projects-v1"]`, kept across launches like a collection; only New on the project page
+  clears it).
+- `workshop/project.html`: the plan. The bench with the parts accumulating as steps complete, one green Go
+  ("Go measure!", "Go cut!") that deep-links the next station visit `<station>?project=birdhouse&step=<id>`,
+  the step list, a Shelf of finished houses, hold-to-reset New.
+- Each station in project mode: locks to the step's tool and the project board, shows the step banner and coach,
+  hides unrelated choices, and when the job is done shows "Done! ✓" with one **Back to the plan** button
+  (`ToyboxProjects.finish(step)`), never automatic.
+- Steps (22 visits): plane (Tool Wall) → Back 12 / Front 9 / Roof 7.5 / Side blank 26: measure + square (Measuring),
+  crosscut on the line (miter saw) → rip the blank to 4 (table saw, draggable fence with the only numeric readout)
+  → Side 10, Side 10, Floor 4 → roof angle on both Sides (miter saw pre-swung, "roof angle", no degrees) → mark the
+  door 6 up (X) → hole saw (Drill Press) → four drain holes → glue + two nails per join (Hammer & Screws) → sand
+  (Tool Wall) → the house on the shelf, a bird lands.
+- Status: project page + data done; Saw Bench and Measuring project modes in progress; then Drill Press,
+  Hammer & Screws (the house grows join by join), Tool Wall planer/sander deep links, a Projects card on the Tool
+  Wall (`?next=project` in the gear-up list). Project two candidates: a tool tote, a wooden toy train engine.
 
 ---
 
