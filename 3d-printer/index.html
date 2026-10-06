@@ -240,7 +240,11 @@ body.big .app { margin-top: 0; padding-bottom: max(10px, env(safe-area-inset-bot
 .model { display: flex; flex-direction: column; align-items: center; padding: 3px 2px 2px; min-height: 0; font-size: clamp(0.72rem, 3.2vw, 1rem); line-height: 1.1; white-space: nowrap; min-width: 0; }
 .model canvas { width: 52px; height: 52px; display: block; }
 .mode2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.mode2 .btn { min-height: 40px; padding: 0.1rem 0.3rem; font-size: clamp(0.8rem, 3.4vw, 1.05rem); }
+.mode2 .btn { min-height: 40px; padding: 0.1rem 0.3rem; font-size: clamp(0.8rem, 3.4vw, 1.05rem); display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* Each mode button shows the chosen model in that mode's colors, so switching shows its effect at once. */
+.mode2 .mpic { width: 2.6em; height: 2.6em; flex: none; }
+/* Many colors: every spool the model uses gets a dashed ring. */
+.slot.used { outline: 3px dashed #1D2340; outline-offset: -7px; }
 .slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
 .slot { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 2px 3px; font-size: clamp(0.66rem, 2.8vw, 0.95rem); white-space: nowrap; overflow: hidden; min-width: 0; }
 .slot b { font-size: 1.35em; font-weight: 800; }
@@ -438,8 +442,8 @@ body.ending .printbar { visibility: hidden; }
         </div>
         <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
           <div class="mode2">
-            <button class="btn" id="oneBtn">One color</button>
-            <button class="btn" id="manyBtn">Many colors</button>
+            <button class="btn" id="oneBtn"><canvas class="mpic" aria-hidden="true"></canvas><span>One color</span></button>
+            <button class="btn" id="manyBtn"><canvas class="mpic" aria-hidden="true"></canvas><span>Many colors</span></button>
           </div>
           <div class="slots" id="slots"></div>
           <div class="swatches" id="swatches"></div>
@@ -1933,8 +1937,22 @@ body.ending .printbar { visibility: hidden; }
     $("prints").appendChild(pb);
   }
 
-  var thumbKey = "";
+  var thumbKey = "", modeKey = "";
+  // The One color / Many colors buttons show the chosen model printed each way.
+  function renderModePics() {
+    var key = JSON.stringify([state.model, state.slots, state.sel, state.name]);
+    if (key === modeKey) return;
+    modeKey = key;
+    var m = MODEL_BY[state.model], P = prep(m.id, state.name);
+    [["oneBtn", false], ["manyBtn", true]].forEach(function (it) {
+      var c = $(it[0]).querySelector("canvas"), r = c.getBoundingClientRect();
+      var px = Math.max(36, Math.round((r.width || 40) * Math.min(2, window.devicePixelRatio || 1)));
+      c.width = px; c.height = px;
+      c.getContext("2d").drawImage(fitPic(P, colsFor(m, it[1], state.slots, state.sel), P.yaw, px, px), 0, 0);
+    });
+  }
   function renderModelThumbs() {
+    renderModePics();
     var key = JSON.stringify([state.slots, state.multi, state.sel, state.name]);
     if (key === thumbKey) return;
     thumbKey = key;
@@ -1968,6 +1986,7 @@ body.ending .printbar { visibility: hidden; }
     Array.prototype.forEach.call(document.querySelectorAll("[data-slot]"), function (b) {
       var i = Number(b.dataset.slot), f = fil(state.slots[i]);
       b.setAttribute("aria-pressed", String(i === state.sel));
+      b.classList.toggle("used", state.multi && slotsFor(m, true, state.sel).indexOf(i) !== -1);
       b.setAttribute("aria-label", "Spool " + (i + 1) + ": " + f.name);
       b.innerHTML = '<span class="dot" style="background:' + swatchCss(f) + '"></span>';
     });
@@ -2117,6 +2136,7 @@ body.ending .printbar { visibility: hidden; }
     document.querySelector(".panel").setAttribute("data-tab", name);
     Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
     if (name === "prints") renderPrints();
+    if (name === "colors") { modeKey = ""; renderModePics(); }
   }
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
@@ -2131,8 +2151,8 @@ body.ending .printbar { visibility: hidden; }
     if (t.id === "fastBtn") { state.faster = !state.faster; updateUI(); return; }
     if (t.dataset.pfil) { setSlotColor(popSlot, t.dataset.pfil); setTimeout(closePop, 350); return; }
     if (t.dataset.model) { state.model = t.dataset.model; if (job && job.showcase) job.showcase = false; blip(); }
-    else if (t.id === "oneBtn") state.multi = false;
-    else if (t.id === "manyBtn") state.multi = true;
+    else if (t.id === "oneBtn") { if (state.multi) Toybox.toast("All one color!"); state.multi = false; blip(); }
+    else if (t.id === "manyBtn") { if (!state.multi) Toybox.toast("Each part a new color!"); state.multi = true; blip(); }
     else if (t.dataset.slot) { selectBay(Number(t.dataset.slot)); return; }
     else if (t.dataset.fil) setSlotColor(state.sel, t.dataset.fil);
     else return;
@@ -2269,7 +2289,7 @@ body.ending .printbar { visibility: hidden; }
     requestAnimationFrame(frame);
   }
   if (window.ResizeObserver) new ResizeObserver(function () { needLayout = true; }).observe($("scene"));
-  window.addEventListener("resize", function () { needLayout = true; thumbKey = ""; setTimeout(function () { renderModelThumbs(); if (tab === "prints") renderPrints(); }, 60); });
+  window.addEventListener("resize", function () { needLayout = true; thumbKey = ""; modeKey = ""; setTimeout(function () { renderModelThumbs(); if (tab === "prints") renderPrints(); }, 60); });
 
   showTab(tab);
   layout();
