@@ -596,6 +596,7 @@
     window.addEventListener("storage", function (e) {
       if (e.key === TKEY || e.key === null) { timer = parseTimer(get(TKEY)); sync(); }
       if (e.key === SKEY || e.key === null) { var on = get(SKEY) === "1"; if (on !== soundOn) setSound(on, true); }
+      if (opts.big && (e.key === bigKey() || e.key === null)) { var big = get(bigKey()) === "1"; if (big !== isBig()) setBig(big, false); }
     });
   }
 
