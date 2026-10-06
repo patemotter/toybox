@@ -148,7 +148,7 @@ body {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.count.pop { animation: pop 0.45s ease; }
+.count.pop { animation: pop 0.6s ease; }
 @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.28); } 100% { transform: scale(1); } }
 
 .bottombar {
@@ -386,6 +386,32 @@ body.ending .firsthint { display: none; }
   .swatch { font-size: 1.5rem; }
 }
 
+/* Phones: icon-only Home, Grown-ups (a clock) and Big, all in one row with the fish count. */
+@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .rightcol { flex-direction: row; align-items: center; gap: 8px; }
+  .homebtn { width: 48px; min-height: 48px; padding: 0; justify-content: center; }
+  .homebtn span { display: none; }
+  #grownbtn { font-size: 0; width: 48px; min-height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  #grownbtn::before {
+    content: ""; width: 24px; height: 24px; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .bigtoggle span { display: none; }
+  .bigtoggle { width: 48px; min-height: 48px; padding: 0; justify-content: center; }
+}
+/* Phones in portrait: the four shop buttons share one row, so the Add fish panel is shorter. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .shop-actions { gap: 6px; flex-wrap: nowrap; margin-top: 12px; }
+  .shop-actions .btn { flex: 1 1 0; min-width: 0; min-height: 56px; font-size: 0.95rem; line-height: 1.05; padding: 0.15rem 0.3rem; white-space: normal; }
+  .shop-actions .addbtn { flex: 1.25 1 0; min-height: 56px; font-size: 1.15rem; }
+  .shop-actions .btn:not(.addbtn) { font-size: 0.9rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .shop .swatch { max-width: 40px; }
+  .shop-head .btn { min-height: 44px; }
+}
+
 body.ending .bottombar,
 body.ending .shop,
 body.ending .homebtn { pointer-events: none; opacity: 0.4; }
@@ -403,7 +429,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 <div class="topbar">
   <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
   <div class="rightcol">
-    <button class="btn grownbtn" id="grownbtn">Grown-ups</button>
+    <button class="btn grownbtn" id="grownbtn" aria-label="Grown-ups">Grown-ups</button>
     <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </div>
 </div>
@@ -502,6 +528,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---------- Creature kinds ----------
+  var SWIM_CALM = 0.68;
   // size: body length in px at U=1. cruise/max: speeds (px/s at U=1). hx/hy: tap area (fractions of size).
   // icon: [scale as a fraction of icon width, x offset, y offset] for the picker pictures.
   var KINDS = {
@@ -1447,7 +1474,8 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       }
       if (f.sleep > 0) f.sleep = Math.max(0, f.sleep - dt);
     }
-    spd *= slow;
+    // Calmer swimming: fish cruise and chase food about a third slower (a held finger still pulls them along briskly).
+    spd *= slow * (f.lure ? 0.9 : SWIM_CALM);
     var b = yBounds(f);
     if (!f.leaving) ty = clamp(ty, b[0], b[1]);
     var dx = tx - f.x, dy = ty - f.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -1621,7 +1649,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
       if (p.life <= 0) currents.splice(i, 1);
     }
     for (i = texts.length - 1; i >= 0; i--) {
-      p = texts[i]; p.life -= dt * 0.8; p.y -= 40 * U * dt;
+      p = texts[i]; p.life -= dt * 0.6; p.y -= 30 * U * dt;
       if (p.life <= 0) texts.splice(i, 1);
     }
     for (i = sparkles.length - 1; i >= 0; i--) {
@@ -2051,12 +2079,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     $("removeBtn").disabled = n === 0;
     $("emptyBtn").disabled = n === 0;
     document.body.classList.toggle("empty", n === 0);
-    var counts = {};
-    activeFish().forEach(function (f) { counts[f.kind] = (counts[f.kind] || 0) + 1; });
-    Array.prototype.forEach.call(document.querySelectorAll(".kind"), function (b) {
-      var c = counts[b.dataset.kind] || 0, bd = b.querySelector(".badge");
-      bd.textContent = c; bd.hidden = c === 0;
-    });
+    // No per-kind count badges: "Fish: N" at the top is the one counter.
   }
 
   function drawIcon(cv, kind, color) {
@@ -2114,7 +2137,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     resort();
     var ex = clamp(f.x, 30 * U, W - 30 * U);
     burst(ex, f.y, 10, 30 * U);
-    popText("+1", ex + (f.x < 0 ? 40 : -40) * U, f.y - f.size * 0.4, true);
+    popText("Hi!", ex + (f.x < 0 ? 40 : -40) * U, f.y - f.size * 0.4, true);
     updateCount(true);
     save();
     blip(520, 0, 0.9); blip(780, 0.09, 0.9);
