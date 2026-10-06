@@ -68,7 +68,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 ## 3. Product rules (the dad's decisions; follow all of them)
 
 ### Sound and plane-safety
-- **Sound is OFF by default**, toggled only by a 2-second hold in the grown-up sheet (shared across all apps).
+- **Sound is OFF by default**, toggled only by a 2-second hold in the Grown-ups sheet on the home screen.
   All sound is synthesized with Web Audio, soft, never harsh. Create/resume audio only in a user gesture.
 - With sound off, every app must be just as fun: every action has a strong visual response.
 - Everything works with zero network after the first load: no CDN scripts, no runtime images or audio files.
@@ -96,8 +96,18 @@ Keep only:
 ### Layout (iPhone first, iPad must stay good)
 - One screen, **no page scroll**. Test at 390x844, 844x390 and 820x1180 (also 1180x820 and 1024x1366 for iPad).
 - **Phone header**: Back (stations only, e.g. "‹ Tool Wall", "‹ All machines"), Home as an icon, a short title
-  that fits without "…" (drop it rather than truncate), Grown-ups as a **clock icon** (aria-label "Grown-ups"),
-  Big as an icon. Decorative badges ("Gear on", "Hard hat on") are hidden on phones. iPad may show words.
+  that fits without "…" (drop it rather than truncate), Big as an icon. Decorative badges ("Gear on", "Hard hat
+  on") are hidden on phones. iPad may show words.
+- **Grown-ups lives only on the home screen** (the launcher): timer, sound and an "App settings" section for every
+  app's grown-up options. Apps have no Grown-ups button or sheet. A new app setting goes in the `SETTINGS` list in
+  `common/toybox.js` and is read with `Toybox.settings.get(id)`.
+- **Standard layout (every app looks the same):** see `tools/shell-demo.html` and the "App shell" classes at the
+  end of `common/toybox.css`. Header: [‹ Back (stations)] [Home] [Title] … [Big at the right edge]. Stage: the play
+  area, with only the counter (top-left), one coach line (top-center on tablets, bottom-center on phones), the
+  time-left badge and the ghost hand on top; no floating buttons. Panel (under the stage in portrait, right column
+  in landscape), top to bottom: the one green **Go** button (main action, if any), the **choices** as picture
+  tiles, then the **tab bar** last: sections, an orange **New** (start over), and **Surprise** with the sparkly
+  rainbow outline (`tb-surprise`, never a dashed line).
 - Controls under the play area: **at most about two rows** of big buttons on a phone. More goes behind tabs or a
   switcher row. No duplicate controls. No label cut off: shorten it. Button text ≥ ~14px, targets ≥ 44px.
 - The **Big** button hides the controls for full-screen play (per app, remembered).
@@ -157,6 +167,8 @@ Keep only:
   animations (Rocket Builder uses ~36000).
 - `Toybox.timer.locked()` (ignore play input while ending/resting), `Toybox.sound.ready()` (AudioContext or null;
   play sound only through it), `Toybox.makeHold(btn, ms, onDone)`, `Toybox.toast(msg)`, `Toybox.setBig(on)`.
+- `Toybox.settings.get(id)` / `.onChange(fn)` / `.action(id, fn)`: app settings chosen on the home screen (stored in
+  `toybox-settings-v1`); `Toybox.tiltReady(cb)` for tilt. `home: true` in `Toybox.init` is for the launcher only.
 - `Toybox.fresh()`: true on the first load of a page under a new launch id. The launcher stores
   `sessionStorage["toybox-launch"]` when a tile is tapped; each page records `toybox-seen:<path>`.
 - The module swallows the click that follows a finished hold, syncs timer/sound/Big across open tabs, and
@@ -170,8 +182,9 @@ Keep only:
 - Canvas: scale by devicePixelRatio capped at 2; aim for 60fps on iPad.
 - Don't paint a pattern with `background-attachment: local` on a scrolling box: it lags on iOS (the Tool Wall's
   pegboard holes now live on the scrolling content element).
-- Tilt/shake needs `DeviceMotionEvent.requestPermission()` from a tap, behind a "Turn on tilt" control in the
-  grown-up sheet. Never prompt on load. The app must work fully without it. No vibration API on iOS.
+- Tilt/shake: one "Tilt and shake" switch in the home screen's App settings. Apps call `Toybox.tiltReady(cb)`; on
+  iOS it asks `requestPermission()` on his first tap in the app (it needs a user gesture). Never prompt on load.
+  The app must work fully without tilt. No vibration API on iOS.
 - Respect `prefers-reduced-motion` and safe-area insets. Light/dark theming via `:root` tokens.
 - Test hooks only behind `?debug` (read-only `navigator.webdriver` hooks exist in a few Workshop pages).
 

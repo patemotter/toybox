@@ -18,7 +18,9 @@
  * 3. At the end of the app's script, once its scene is ready, call Toybox.init({...}):
  *      Toybox.init({
  *        app: "fish-tank",                        // folder name; used for the Big key
- *        grownButton: el,                         // opens the sheet; label shows "⏱" while a timer is on
+ *        grownButton: el,                         // home screen only: opens the sheet. In apps it is hidden:
+ *                                                 // the Grown-ups sheet lives only on the Toybox home screen.
+ *        home: true,                              // only the launcher passes this (sheet + App settings)
  *        grownLabel: ["Grown-ups", "⏱ Grown-ups"],// optional [idle, timer on]
  *        badge: svgEl,                            // optional: module draws the time-left badge into it
  *        timerIntro: "When time is up, ...",      // line at the top of the timer setup
@@ -53,6 +55,11 @@
  *      Toybox.sound.unlock()   create/resume the AudioContext; call inside a user gesture. The module
  *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
+ *      Toybox.settings.get(id) an app setting chosen on the home screen (ids in SETTINGS below:
+ *                              "tilt", "mathgrid-voice", "bulldozer-drive", "printer-name", ...).
+ *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
+ *                              home-screen press, e.g. "printer-clear").
+ *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
@@ -85,6 +92,73 @@
     var fn = opts[name];
     if (typeof fn !== "function") return;
     try { fn.apply(null, Array.prototype.slice.call(arguments, 1)); } catch (e) { setTimeout(function () { throw e; }); }
+  }
+
+  // ---------- Grown-up settings (kept on the home screen) ----------
+  // The Grown-ups sheet lives only on the Toybox home screen. App-specific grown-up options are listed
+  // here and shown there under "App settings"; apps read them with Toybox.settings.get(id).
+  var SETKEY = "toybox-settings-v1", DONEKEY = "toybox-settings-done-v1";
+  var SETTINGS = [
+    { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
+      note: "Apps that use tilt or shake ask for motion access when he first touches them." },
+    { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
+      note: "Uses the device's voice, so it only speaks when sound is on." },
+    { id: "bulldozer-drive", app: "Bulldozer", label: "How to drive", type: "choice", def: "finger",
+      choices: [["finger", "Drag"], ["levers", "Levers"]], note: "Levers: one lever for each track." },
+    { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
+    { id: "printer-clear", app: "3D Printer", label: "Hold to clear My prints", type: "action" },
+    { id: "colors-clear", app: "Color Mixing", label: "Hold to clear My colors", type: "action" }
+  ];
+  var SET_BY = {};
+  SETTINGS.forEach(function (d) { SET_BY[d.id] = d; });
+  var setListeners = [];
+  function readJSON(k) { try { var o = JSON.parse(get(k) || "null"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } }
+  function settingGet(id) {
+    var d = SET_BY[id], all = readJSON(SETKEY);
+    return Object.prototype.hasOwnProperty.call(all, id) ? all[id] : (d ? d.def : undefined);
+  }
+  function settingSet(id, v) {
+    var all = readJSON(SETKEY);
+    all[id] = v;
+    put(SETKEY, JSON.stringify(all));
+    setListeners.forEach(function (fn) { try { fn(id, v); } catch (e) { setTimeout(function () { throw e; }); } });
+  }
+  // An action (e.g. "clear My prints") pressed on the home screen: run fn once in the app.
+  function settingAction(id, fn) {
+    function check() {
+      var req = Number(settingGet(id)) || 0, done = readJSON(DONEKEY);
+      if (req > (Number(done[id]) || 0)) { done[id] = req; put(DONEKEY, JSON.stringify(done)); fn(); }
+    }
+    check();
+    setListeners.push(function (sid) { if (sid === id) check(); });
+  }
+  // Tilt and shake: call cb() once motion events may be used (the grown-up turned tilt on). On iOS the
+  // permission prompt needs a tap, so it is asked on his first tap in the app.
+  function tiltReady(cb) {
+    var fired = false, asking = false;
+    function go() { if (!fired) { fired = true; cb(); } }
+    function attempt() {
+      if (fired || !settingGet("tilt")) return;
+      var DM = window.DeviceMotionEvent, DO = window.DeviceOrientationEvent;
+      var asks = [];
+      if (DM && typeof DM.requestPermission === "function") asks.push(DM);
+      if (DO && typeof DO.requestPermission === "function" && DO !== DM) asks.push(DO);
+      if (!asks.length) { go(); return; }
+      if (asking) return;
+      asking = true;
+      function onTap() {
+        document.removeEventListener("touchend", onTap, true);
+        document.removeEventListener("click", onTap, true);
+        Promise.all(asks.map(function (X) { return X.requestPermission(); })).then(function (r) {
+          asking = false;
+          if (r.every(function (x) { return x === "granted"; })) go();
+        }).catch(function () { asking = false; });
+      }
+      document.addEventListener("touchend", onTap, true);
+      document.addEventListener("click", onTap, true);
+    }
+    attempt();
+    setListeners.push(function (id) { if (id === "tilt") attempt(); });
   }
 
   // ---------- Timer state ----------
@@ -263,11 +337,17 @@
       b.addEventListener("click", function () { timer.minutes = m; saveTimer(); updateTimerUI(); });
       $("tb-minutes").appendChild(b);
     });
-    (opts.sections || []).forEach(function (el) {
-      if (!el) return;
-      el.hidden = false;
-      $("tb-closeRow").parentNode.insertBefore(el, $("tb-closeRow"));
-    });
+    if (opts.home) {
+      (opts.sections || []).forEach(function (el) {
+        if (!el) return;
+        el.hidden = false;
+        $("tb-closeRow").parentNode.insertBefore(el, $("tb-closeRow"));
+      });
+      $("tb-closeRow").parentNode.insertBefore(buildAppSettings(), $("tb-closeRow"));
+    } else {
+      // Apps have no grown-up sheet: the Grown-ups button and its extra sections stay hidden.
+      (opts.sections || []).forEach(function (el) { if (el) el.hidden = true; });
+    }
 
     $("tb-next").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
     $("tb-optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); redraw(true); });
@@ -283,7 +363,10 @@
     // Pressing the sound button is a user gesture, so the audio engine can be started then.
     makeHold($("tb-holdSound"), HOLD_MS, function () { setSound(!soundOn); }, audioContext);
 
-    if (opts.grownButton) opts.grownButton.addEventListener("click", openSheet);
+    if (opts.grownButton) {
+      if (opts.home) opts.grownButton.addEventListener("click", openSheet);
+      else { opts.grownButton.hidden = true; opts.grownButton.style.display = "none"; opts.grownButton.setAttribute("aria-hidden", "true"); }
+    }
 
     var big = opts.big;
     if (big) {
@@ -299,9 +382,57 @@
     }
   }
 
+  // The home screen's "App settings" section, built from SETTINGS.
+  function buildAppSettings() {
+    var sec = document.createElement("section");
+    sec.id = "tb-appSettings";
+    var html = "<h3>App settings</h3>", lastApp = "";
+    SETTINGS.forEach(function (d) {
+      if (d.app && d.app !== lastApp) { html += '<h4 class="tb-app">' + esc(d.app) + "</h4>"; lastApp = d.app; }
+      html += '<div class="tb-set" data-set="' + d.id + '">';
+      if (d.type === "bool" && d.hold) html += '<div class="sheet-actions" style="margin-top:0">' + holdBtn("tb-set-" + d.id, d.label, "tb-setl-" + d.id) + "</div>";
+      else if (d.type === "bool") html += '<label class="check"><input type="checkbox" id="tb-set-' + d.id + '"> ' + esc(d.label) + "</label>";
+      else if (d.type === "choice") html += '<p class="sub">' + esc(d.label) + '</p><div class="row">' + d.choices.map(function (c) {
+        return '<button class="btn" data-choice="' + c[0] + '">' + esc(c[1]) + "</button>"; }).join("") + "</div>";
+      else if (d.type === "text") html += '<p class="sub">' + esc(d.label) + '</p><input class="textin" id="tb-set-' + d.id + '" type="text" maxlength="' + (d.max || 20) + '" autocomplete="off" spellcheck="false" aria-label="' + esc(d.label) + '">';
+      else if (d.type === "action") html += '<div class="sheet-actions" style="margin-top:0">' + holdBtn("tb-set-" + d.id, d.label) + "</div>";
+      if (d.note) html += '<p class="sub">' + esc(d.note) + "</p>";
+      html += "</div>";
+    });
+    sec.innerHTML = html;
+    SETTINGS.forEach(function (d) {
+      var row = sec.querySelector('[data-set="' + d.id + '"]'), el = row.querySelector("#tb-set-" + d.id);
+      if (d.type === "bool" && d.hold) makeHold(el, HOLD_MS, function () { settingSet(d.id, !settingGet(d.id)); refreshAppSettings(); });
+      else if (d.type === "bool") el.addEventListener("change", function () { settingSet(d.id, this.checked); });
+      else if (d.type === "choice") Array.prototype.forEach.call(row.querySelectorAll("[data-choice]"), function (b) {
+        b.addEventListener("click", function () { settingSet(d.id, b.getAttribute("data-choice")); refreshAppSettings(); });
+      });
+      else if (d.type === "text") el.addEventListener("input", function () {
+        var v = this.value.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, d.max || 20);
+        if (v !== this.value) this.value = v;
+        if (v.trim()) settingSet(d.id, v.trim());
+      });
+      else if (d.type === "action") makeHold(el, HOLD_MS, function () { settingSet(d.id, Date.now()); toast("Done"); });
+    });
+    return sec;
+  }
+  function refreshAppSettings() {
+    var sec = $("tb-appSettings");
+    if (!sec) return;
+    SETTINGS.forEach(function (d) {
+      var row = sec.querySelector('[data-set="' + d.id + '"]'), v = settingGet(d.id), el = row.querySelector("#tb-set-" + d.id);
+      if (d.type === "bool" && d.hold) $("tb-setl-" + d.id).textContent = (v ? "Hold to turn off: " : "Hold to turn on: ") + d.label.toLowerCase();
+      else if (d.type === "bool") el.checked = !!v;
+      else if (d.type === "choice") Array.prototype.forEach.call(row.querySelectorAll("[data-choice]"), function (b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-choice") === v));
+      });
+      else if (d.type === "text" && document.activeElement !== el) el.value = v;
+    });
+  }
+
   // ---------- Sheet ----------
   function sheetOpen() { return !!$("tb-modal") && !$("tb-modal").hidden; }
-  function openSheet() { updateTimerUI(); updateSoundUI(); hook("onOpen"); $("tb-modal").hidden = false; }
+  function openSheet() { updateTimerUI(); updateSoundUI(); refreshAppSettings(); hook("onOpen"); $("tb-modal").hidden = false; }
   function closeSheet() { if ($("tb-modal")) $("tb-modal").hidden = true; }
 
   function updateTimerUI() {
@@ -593,11 +724,14 @@
       var on = get(SKEY) === "1";
       if (on !== soundOn) setSound(on, true);
       sync();
+      // Settings may have changed on the home screen while this page was frozen.
+      SETTINGS.forEach(function (d) { setListeners.forEach(function (fn) { try { fn(d.id, settingGet(d.id)); } catch (er) { /* ignore */ } }); });
     });
     // Another open Toybox page changed the shared timer or sound.
     window.addEventListener("storage", function (e) {
       if (e.key === TKEY || e.key === null) { timer = parseTimer(get(TKEY)); sync(); }
       if (e.key === SKEY || e.key === null) { var on = get(SKEY) === "1"; if (on !== soundOn) setSound(on, true); }
+      if (e.key === SETKEY || e.key === null) SETTINGS.forEach(function (d) { setListeners.forEach(function (fn) { try { fn(d.id, settingGet(d.id)); } catch (er) { /* ignore */ } }); });
       if (opts.big && (e.key === bigKey() || e.key === null)) { var big = get(bigKey()) === "1"; if (big !== isBig()) setBig(big, false); }
     });
   }
@@ -622,6 +756,14 @@
   window.Toybox = {
     init: init,
     fresh: function () { return freshVisit; },
+    settings: {
+      get: settingGet,
+      set: settingSet,
+      onChange: function (fn) { if (typeof fn === "function") setListeners.push(fn); },
+      action: settingAction,
+      list: function () { return SETTINGS.slice(); }
+    },
+    tiltReady: tiltReady,
     timer: {
       phase: function () { return timer.phase; },
       locked: function () { return timer.phase === "ending" || timer.phase === "resting"; },

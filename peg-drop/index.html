@@ -467,12 +467,11 @@ img.rest-art {
   .swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
   .swatch { border-width: 2px; font-size: 0.9rem; }
   .sizes .sizebtn { min-height: 40px; font-size: 0.95rem; }
-  .minibar { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; }
+  .minibar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .minibar .bigtoggle { padding: 0.15rem 0.5rem; }
   .backbtn { min-height: 40px; top: 6px; left: 6px; }
   body.big .mins { top: 54px; }
-  .minibar .homebtn { min-height: 40px; }
-  .minibar .gbtn { min-height: 40px; }
+  .minibar .homebtn, .minibar .gbtn { min-height: 40px; }
   .total { font-size: 1rem; top: 6px; right: 6px; padding: 0 10px; }
   .mins { font-size: 0.95rem; top: 6px; left: 6px; }
 }
@@ -501,16 +500,10 @@ img.rest-art {
   .sizes .sizebtn { min-width: 0; min-height: 0; height: 46px; font-size: 1.05rem; }
 }
 
-/* Phone header: icon-only Home, Grown-ups (a clock) and Big. */
+/* Phone header: icon-only Home and Big. */
 @media (max-width: 600px) and (orientation: portrait) {
   header .bigtoggle span { display: none; }
   header .bigtoggle { padding: 0; width: 46px; min-height: 44px; justify-content: center; }
-  #timerbtn { font-size: 0; width: 46px; min-height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-  #timerbtn::before {
-    content: ""; width: 24px; height: 24px; background: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
-  }
   header h1 { font-size: 1.4rem; }
 }
 
@@ -533,7 +526,6 @@ img.rest-art {
   <header>
     <h1>Peg Drop</h1>
     <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    <button class="btn gbtn" id="timerbtn" aria-label="Grown-ups">Grown-ups</button>
     <button class="btn gbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
 
@@ -574,20 +566,11 @@ img.rest-art {
       </div>
       <div class="minibar">
         <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
-        <button class="btn gbtn" id="timerbtn2">Grown-ups</button>
         <button class="btn gbtn bigtoggle" data-action="big" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
       </div>
     </div>
   </main>
 
-  <!-- Tilt: an extra section that the shared grown-up sheet (common/toybox.js) moves into itself -->
-  <section id="tiltSection" hidden>
-    <h3>Tilt and shake</h3>
-    <p class="sub" id="tiltNote">Tip the device to steer the balls. Shake it to bounce them.</p>
-    <div class="sheet-actions">
-      <button class="btn" id="tiltBtn">Turn on tilt</button>
-    </div>
-  </section>
 </div>
 
 <script>
@@ -2508,7 +2491,7 @@ img.rest-art {
     whoosh();
   }
 
-  // ---------- Tilt and shake (optional, behind the grown-up sheet) ----------
+  // ---------- Tilt and shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
   var tiltOn = false;
   function screenAngle() {
     if (typeof window.orientation === "number") return window.orientation;
@@ -2573,21 +2556,6 @@ img.rest-art {
       window.removeEventListener("devicemotion", onMotion);
       tiltX = 0; tiltY = 1;
     }
-    updateTiltUI();
-  }
-  function requestTilt() {
-    if (tiltOn) { setTilt(false); return; }
-    var DOE = window.DeviceOrientationEvent, DME = window.DeviceMotionEvent;
-    var asks = [];
-    try {
-      if (DME && typeof DME.requestPermission === "function") asks.push(DME.requestPermission());
-      if (DOE && typeof DOE.requestPermission === "function") asks.push(DOE.requestPermission());
-    } catch (e) { /* ignore */ }
-    if (!asks.length) { setTilt(true); return; }
-    Promise.all(asks).then(function (res) {
-      if (res.every(function (r) { return r === "granted"; })) setTilt(true);
-      else { $("tiltNote").textContent = "Tilt was not allowed. You can allow it in Settings."; }
-    }).catch(function () { $("tiltNote").textContent = "Tilt is not available here."; });
   }
 
   // ---------- Controls ----------
@@ -2665,11 +2633,9 @@ img.rest-art {
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    if (t.id === "tiltBtn") { requestTilt(); return; }
-    // The second Grown-ups button and the extra Big/Back buttons use the shared module (common/toybox.js).
-    if (t.id === "timerbtn2") { Toybox.openSheet(); return; }
+    // The extra Big/Back buttons use the shared module (common/toybox.js).
     if (t.dataset.action === "big") { Toybox.setBig(!Toybox.isBig()); return; }
-    if (t.id === "timerbtn" || t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
+    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
     // Phone tabs (Play / Board / Balls): show one group of controls at a time.
     if (t.classList.contains("tab")) {
       $("panel").dataset.tab = t.dataset.tab;
@@ -2736,8 +2702,6 @@ img.rest-art {
   // ---------- Play timer (shared, common/toybox.js) ----------
   // A bar along the top of the board shows the time left; an optional chip shows the minutes.
   function drawTimer(info) {
-    var on = info.phase !== "idle";
-    $("timerbtn2").textContent = on ? "⏱ Grown-ups" : "Grown-ups";
     if (info.phase !== "running" && info.phase !== "ending") { $("timebar").hidden = true; $("mins").hidden = true; return; }
     var f = info.fraction;
     var col = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
@@ -2747,12 +2711,6 @@ img.rest-art {
     var showM = info.showMinutes && info.phase === "running";
     $("mins").hidden = !showM;
     if (showM) $("mins").textContent = "⏱ " + info.minutes + " min";
-  }
-  function updateTiltUI() {
-    var canTilt = "DeviceOrientationEvent" in window;
-    $("tiltBtn").disabled = !canTilt;
-    $("tiltBtn").textContent = !canTilt ? "Tilt not available" : (tiltOn ? "Turn off tilt" : "Turn on tilt");
-    $("tiltBtn").setAttribute("aria-pressed", String(tiltOn));
   }
   // Ending: the balls stop dropping and settle into the bins (frame() calls endingDone once they have).
   var endingDone = null;
@@ -2835,9 +2793,7 @@ img.rest-art {
   // (a timer that ran out while away), so the board is built first.
   Toybox.init({
     app: "peg-drop",
-    grownButton: $("timerbtn"),
     big: { button: $("bigToggle") },
-    sections: [$("tiltSection")],
     timerIntro: "When time is up, the balls stop dropping and settle into the bins, and the controls lock.",
     goodbyeOption: "End with a Last drop button to press",
     farewellText: "Time to say goodbye",
@@ -2856,12 +2812,19 @@ img.rest-art {
       Array.prototype.forEach.call(document.querySelectorAll(".minibar .bigtoggle"), function (b) { b.setAttribute("aria-pressed", String(on)); });
     },
     onSound: function (on) { if (on) chime(); },
-    onOpen: updateTiltUI,
     onTimer: drawTimer
   });
   $("stage").appendChild($("tb-toast"));
   $("stage").appendChild($("tb-farewell"));
-  updateTiltUI();
+  // Tilt and shake is a grown-up setting on the home screen: the shared module calls back once
+  // motion may be used (on iOS it asks on his first tap). Turning it off stops the steering.
+  var tiltAllowed = false;
+  Toybox.tiltReady(function () { tiltAllowed = true; setTilt(true); });
+  Toybox.settings.onChange(function (id, on) {
+    if (id !== "tilt") return;
+    if (!on) { if (tiltOn) setTilt(false); }
+    else if (tiltAllowed && !tiltOn) setTilt(true);
+  });
   requestAnimationFrame(frame);
 
   // Test hook for automated checks, only with ?debug in the address.

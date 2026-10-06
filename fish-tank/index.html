@@ -119,7 +119,6 @@ body {
 .homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
 .homebtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
 .homebtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.grownbtn { min-height: 48px; font-size: 1rem; padding: 0.3rem 0.75rem; }
 .countwrap {
   position: fixed;
   z-index: 5;
@@ -329,7 +328,6 @@ body.ending .firsthint { display: none; }
   }
   .shop[hidden] { display: none; }
   body.shopping .countwrap { left: max(calc((100% - var(--shopw)) / 2), 215px); }
-  body.shopping .grownbtn,
   body.shopping .bigtoggle { visibility: hidden; }
 }
 /* Short landscape phones: smaller pieces so the whole panel fits. */
@@ -364,7 +362,6 @@ body.ending .firsthint { display: none; }
   .shop-actions .addbtn { font-size: 1.35rem; }
   .count { font-size: 1.3rem; padding: 0 0.6em; }
   .homebtn { font-size: 0.95rem; padding: 2px 10px 2px 8px; }
-  .grownbtn { font-size: 0.88rem; padding: 0.2rem 0.5rem; }
   .kind { padding: 5px 1px 2px; font-size: 0.82rem; }
   .bigbtn { font-size: 1.25rem; min-height: 58px; }
   .bigbtn svg { width: 34px; height: 34px; }
@@ -374,7 +371,6 @@ body.ending .firsthint { display: none; }
 @media (min-width: 744px) and (min-height: 640px) {
   .homebtn { min-height: 56px; font-size: 1.2rem; padding: 2px 16px 2px 12px; }
   .homebtn svg { width: 28px; height: 28px; }
-  .grownbtn { min-height: 56px; font-size: 1.15rem; padding: 0.3rem 1rem; }
   .count { min-height: 60px; font-size: 2.1rem; }
   .bigbtn { min-height: 76px; font-size: 1.7rem; padding: 0.3rem 1.3rem 0.3rem 1rem; }
   .bigbtn svg { width: 48px; height: 48px; }
@@ -386,17 +382,11 @@ body.ending .firsthint { display: none; }
   .swatch { font-size: 1.5rem; }
 }
 
-/* Phones: icon-only Home, Grown-ups (a clock) and Big, all in one row with the fish count. */
+/* Phones: icon-only Home and Big, all in one row with the fish count. */
 @media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
   .rightcol { flex-direction: row; align-items: center; gap: 8px; }
   .homebtn { width: 48px; min-height: 48px; padding: 0; justify-content: center; }
   .homebtn span { display: none; }
-  #grownbtn { font-size: 0; width: 48px; min-height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-  #grownbtn::before {
-    content: ""; width: 24px; height: 24px; background: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
-  }
   .bigtoggle span { display: none; }
   .bigtoggle { width: 48px; min-height: 48px; padding: 0; justify-content: center; }
 }
@@ -450,7 +440,6 @@ body.empty .coach, body.shopping .coach { display: none; }
 <div class="topbar">
   <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
   <div class="rightcol">
-    <button class="btn grownbtn" id="grownbtn" aria-label="Grown-ups">Grown-ups</button>
     <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </div>
 </div>
@@ -489,15 +478,6 @@ body.empty .coach, body.shopping .coach { display: none; }
   </div>
 </div>
 
-<!-- Tilt: an extra section that the shared grown-up sheet (common/toybox.js) moves into itself -->
-<section id="tiltSection" hidden>
-  <h3>Tilt and shake</h3>
-  <p class="sub">Tilt the device to slosh the water. Shake it for bubbles.</p>
-  <div class="sheet-actions">
-    <button class="btn" id="tiltBtn">Turn on tilt</button>
-  </div>
-  <p class="sub" id="tiltNote" style="margin-top:6px" hidden></p>
-</section>
 
 <script>
 (function () {
@@ -604,17 +584,6 @@ body.empty .coach, body.shopping .coach { display: none; }
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
 
-  function loadPrefs() {
-    // Sound is not here any more: it is the shared Toybox setting (common/toybox.js).
-    var p = { tilt: false };
-    try {
-      var o = JSON.parse(localStorage.getItem(PKEY) || "null");
-      if (o && typeof o.tilt === "boolean") p.tilt = o.tilt;
-    } catch (e) { /* ignore */ }
-    return p;
-  }
-  var prefs = loadPrefs();
-  function savePrefs() { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
 
   // ---------- Drawing helpers (creature space: 1 unit = body length) ----------
   function fillStroke(ctx, fill) { ctx.fillStyle = fill; ctx.fill(); ctx.stroke(); }
@@ -2148,8 +2117,8 @@ body.empty .coach, body.shopping .coach { display: none; }
     } catch (e) { /* ignore */ }
   }
 
-  // ---------- Tilt and shake (optional, turned on by a grown-up) ----------
-  var tiltOn = false, tiltX = 0, upSign = 1, upAvg = 0, lastShake = 0, gotMotion = false;
+  // ---------- Tilt and shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
+  var tiltOn = false, tiltX = 0, upSign = 1, upAvg = 0, lastShake = 0;
   function screenAngle() {
     var a = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
     return a * Math.PI / 180;
@@ -2157,7 +2126,6 @@ body.empty .coach, body.shopping .coach { display: none; }
   function onMotion(e) {
     var g = e.accelerationIncludingGravity;
     if (!g || g.x === null) return;
-    gotMotion = true;
     var th = screenAngle(), c = Math.cos(th), s = Math.sin(th);
     var sx = g.x * c - g.y * s, sy = g.x * s + g.y * c;
     // Platforms disagree on the sign; learn it from which way is usually "up" while held.
@@ -2179,35 +2147,11 @@ body.empty .coach, body.shopping .coach { display: none; }
     if (tiltOn) return;
     tiltOn = true;
     window.addEventListener("devicemotion", onMotion);
-    prefs.tilt = true; savePrefs();
-    updateTiltUI();
-    setTimeout(function () {
-      if (tiltOn && !gotMotion) { $("tiltNote").hidden = false; $("tiltNote").textContent = "No tilt sensor found on this device."; }
-    }, 1500);
   }
   function stopTilt() {
+    if (!tiltOn) return;
     tiltOn = false; tiltX = 0;
     window.removeEventListener("devicemotion", onMotion);
-    prefs.tilt = false; savePrefs();
-    updateTiltUI();
-  }
-  function needsPermission() { return window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === "function"; }
-  function toggleTilt() {
-    if (tiltOn) { stopTilt(); return; }
-    if (!("DeviceMotionEvent" in window)) { $("tiltNote").hidden = false; $("tiltNote").textContent = "This device has no tilt sensor."; return; }
-    if (needsPermission()) {
-      window.DeviceMotionEvent.requestPermission().then(function (res) {
-        if (res === "granted") startTilt();
-        else { $("tiltNote").hidden = false; $("tiltNote").textContent = "Tilt was not allowed. The tank works fine without it."; }
-      }).catch(function () { $("tiltNote").hidden = false; $("tiltNote").textContent = "Tilt is not available here."; });
-    } else {
-      startTilt();
-    }
-  }
-  function updateTiltUI() {
-    $("tiltBtn").textContent = tiltOn ? "Turn off tilt" : "Turn on tilt";
-    $("tiltBtn").setAttribute("aria-pressed", String(tiltOn));
-    if (!tiltOn) $("tiltNote").hidden = true;
   }
 
   // ---------- Tank controls: counter, add panel, night ----------
@@ -2431,7 +2375,6 @@ body.empty .coach, body.shopping .coach { display: none; }
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    if (t.id === "tiltBtn") { toggleTilt(); return; }
     if (t.classList.contains("hold")) return;
     if (locked()) return;
     if (t.id === "addOpen") { openShop(); blip(600, 0, 0.6); return; }
@@ -2482,10 +2425,8 @@ body.empty .coach, body.shopping .coach { display: none; }
   // (a timer that ran out while away), so the tank is set up first.
   Toybox.init({
     app: "fish-tank",
-    grownButton: $("grownbtn"),
     badge: $("tbadge"),
     big: { button: $("bigToggle") },
-    sections: [$("tiltSection")],
     timerIntro: "When time is up, the lights dim, the fish settle down to sleep, and the tank locks.",
     goodbyeOption: "End with a Goodnight button to press",
     farewellText: "Time to say goodnight",
@@ -2500,12 +2441,17 @@ body.empty .coach, body.shopping .coach { display: none; }
     onGoodbye: goodbyeWave,
     onWake: onWake,
     onBig: function (on) { if (on) closeShop(); },
-    onSound: function (on) { if (on) { blip(520, 0.02, 1); blip(780, 0.12, 1); } },
-    onOpen: updateTiltUI
+    onSound: function (on) { if (on) { blip(520, 0.02, 1); blip(780, 0.12, 1); } }
   });
-  if (prefs.tilt && !needsPermission() && "DeviceMotionEvent" in window) startTilt();
-  else if (prefs.tilt) { prefs.tilt = false; savePrefs(); }
-  updateTiltUI();
+  // Tilt and shake is a grown-up setting on the home screen: the shared module calls back once
+  // motion may be used (on iOS it asks on his first tap). Turning it off stops the sloshing.
+  var tiltAllowed = false;
+  Toybox.tiltReady(function () { tiltAllowed = true; startTilt(); });
+  Toybox.settings.onChange(function (id, on) {
+    if (id !== "tilt") return;
+    if (!on) stopTilt();
+    else if (tiltAllowed) startTilt();
+  });
   var resizeT = null;
   window.addEventListener("resize", function () { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); });
   window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });

@@ -2,7 +2,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file, bump CACHE so old copies are discarded.
-const CACHE = "engine-room-v7";
+const CACHE = "engine-room-v8";
 const CORE = [
   "./",
   "./index.html",
