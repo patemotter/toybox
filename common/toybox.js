@@ -53,6 +53,8 @@
  *      Toybox.sound.unlock()   create/resume the AudioContext; call inside a user gesture. The module
  *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
+ *      Toybox.fresh()          true when the page was just opened from the home screen: start the
+ *                              play fresh (keep collections and grown-up settings). Works before init.
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
  * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
  * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode.
@@ -600,8 +602,26 @@
     });
   }
 
+  // ---------- Fresh visits ----------
+  // Opening an app from the Toybox home screen starts it fresh. The home screen stores a new launch
+  // id ("toybox-launch") in sessionStorage when a tile is tapped. The first time a page loads under a
+  // launch id is a fresh visit; reloading it, or coming back to it from another page of the same app
+  // (a Workshop station and the Tool Wall), is not. Apps reset their play state on a fresh visit and
+  // keep the child's collections and the grown-up settings.
+  var freshVisit = (function () {
+    try {
+      var id = sessionStorage.getItem("toybox-launch");
+      if (!id) return false;
+      var key = "toybox-seen:" + location.pathname.replace(/index\.html$/, "");
+      if (sessionStorage.getItem(key) === id) return false;
+      sessionStorage.setItem(key, id);
+      return true;
+    } catch (e) { return false; }
+  })();
+
   window.Toybox = {
     init: init,
+    fresh: function () { return freshVisit; },
     timer: {
       phase: function () { return timer.phase; },
       locked: function () { return timer.phase === "ending" || timer.phase === "resting"; },
