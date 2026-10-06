@@ -698,18 +698,21 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     POTS.forEach(function (p) { counts[p.id] = 0; });
     return { counts: counts, order: [], blended: false, colors: [] };
   }
+  // Opening Color Mixing from the Toybox home screen (Toybox.fresh) starts with an empty bowl;
+  // "My colors" is the child's collection and is always kept. A reload keeps the bowl too.
+  var freshVisit = !!(window.Toybox && Toybox.fresh());
   function loadState() {
     var s = freshState();
     try {
       var o = JSON.parse(localStorage.getItem(KEY) || "null");
       if (o && typeof o === "object") {
-        if (o.counts) POTS.forEach(function (p) {
+        if (o.counts && !freshVisit) POTS.forEach(function (p) {
           var v = o.counts[p.id];
           if (typeof v === "number" && v >= 0 && v <= MAX_PARTS && Math.floor(v) === v) s.counts[p.id] = v;
         });
         if (Array.isArray(o.order)) o.order.forEach(function (id) { if (POT[id] && s.counts[id] > 0 && s.order.indexOf(id) === -1) s.order.push(id); });
         POTS.forEach(function (p) { if (s.counts[p.id] > 0 && s.order.indexOf(p.id) === -1) s.order.push(p.id); });
-        s.blended = o.blended === true;
+        s.blended = !freshVisit && o.blended === true;
         if (Array.isArray(o.colors)) o.colors.slice(0, MAX_COLORS).forEach(function (c) {
           if (c && /^#[0-9A-F]{6}$/i.test(c.hex) && typeof c.name === "string" && typeof c.recipe === "string") {
             s.colors.push({ hex: c.hex.toUpperCase(), name: c.name.slice(0, 30), recipe: c.recipe.slice(0, 160), seed: typeof c.seed === "number" ? c.seed : Math.random() });
@@ -723,6 +726,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
   var state = loadState();
+  if (freshVisit) save();
   function totalParts() { var t = 0; POTS.forEach(function (p) { t += state.counts[p.id]; }); return t; }
   function recipePig() {
     var t = totalParts(), out = [0, 0, 0, 0, 0];

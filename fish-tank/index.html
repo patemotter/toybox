@@ -542,25 +542,34 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     shark:    { label: "Shark",    size: 290, cruise: 70, max: 250, agile: 1.3, layer: 0, hx: 0.5,  hy: 0.2,  mouth: [0.46, 0.06],  pitch: 0.2, beat: 0.7, amp: 0.07, mass: 2.5, icon: [0.84, 0.03, 0.04] }
   };
   var KIND_ORDER = ["round", "long", "puffer", "jelly", "seahorse", "octopus", "whale", "shark"];
+  // The tank a first visit starts with (and what "Starter fish" brings back): a varied, colorful mix.
   var STARTER = [
     { k: "round", c: "Orange" }, { k: "long", c: "Teal" }, { k: "puffer", c: "Yellow" },
     { k: "jelly", c: "Pink" }, { k: "seahorse", c: "Purple" }, { k: "octopus", c: "Red" },
-    { k: "whale", c: "Blue" }
+    { k: "whale", c: "Blue" }, { k: "round", c: "Lime" }, { k: "long", c: "Sky" }
   ];
 
   // ---------- Saved state ----------
   function validFish(o) { return o && KINDS[o.k] && HEX[o.c]; }
+  function starterList() { return STARTER.map(function (f) { return { k: f.k, c: f.c }; }); }
   function freshState() {
-    // A first visit starts with an empty tank; "Starter fish" in the Add fish panel brings the starter set.
-    return { fish: [], night: false, pickKind: "round", pickColor: "Orange" };
+    // A first visit starts with a populated tank. "Empty tank" in the Add fish panel empties it,
+    // and "Starter fish" brings the starter set back.
+    return { fish: starterList(), night: false, pickKind: "round", pickColor: "Orange" };
   }
+  // The fish are the child's collection and are always kept. Opening the tank from the Toybox home
+  // screen (Toybox.fresh) resets the rest (day/night, the picked kind and color), and a tank left
+  // empty is filled with the starter fish again. A reload keeps everything, an empty tank too.
   function loadState() {
     var s = freshState();
+    var fresh = window.Toybox && Toybox.fresh();
     try {
       var raw = localStorage.getItem(KEY);
       if (!raw) return s;
       var o = JSON.parse(raw);
       if (o && Array.isArray(o.fish)) s.fish = o.fish.filter(validFish).slice(0, MAX_FISH).map(function (f) { return { k: f.k, c: f.c }; });
+      if (fresh && !s.fish.length) s.fish = starterList();
+      if (fresh) return s;
       if (typeof o.night === "boolean") s.night = o.night;
       if (KINDS[o.pickKind]) s.pickKind = o.pickKind;
       if (HEX[o.pickColor]) s.pickColor = o.pickColor;
@@ -2078,7 +2087,8 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     $("addBtn").textContent = n >= MAX_FISH ? "Tank is full!" : "+ Add fish";
     $("removeBtn").disabled = n === 0;
     $("emptyBtn").disabled = n === 0;
-    document.body.classList.toggle("empty", n === 0);
+    // The "Add your first fish!" hint only shows when the tank is really empty (not while starter fish swim in).
+    document.body.classList.toggle("empty", n === 0 && !arriving);
     // No per-kind count badges: "Fish: N" at the top is the one counter.
   }
 
@@ -2172,12 +2182,15 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
     save();
     for (var i = 0; i < 4; i++) blip(780 - i * 80, i * 0.1, 0.7);
   }
+  var arriving = 0;   // starter fish still on their way in
   function starterFish() {
     if (locked()) return;
     activeFish().forEach(sendAway);
     STARTER.forEach(function (s, i) {
+      arriving++;
       setTimeout(function () {
-        if (locked()) return;
+        arriving--;
+        if (locked()) { updateCount(false); return; }
         fishes.push(makeFish(s.k, s.c, true));
         resort(); updateCount(true); save();
       }, 500 + i * 220);
@@ -2328,6 +2341,7 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   layout();
   fishes = state.fish.map(function (s) { return makeFish(s.k, s.c, false); });
   resort();
+  save();
   setNight(state.night);
   updateCount(false);
   renderShop();
