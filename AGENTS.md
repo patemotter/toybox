@@ -42,8 +42,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `bulldozer`, `excavator`, `concrete`, `wrecking-ball`).
-- Apps: workshop, spin-shop, kaleidoscope, fish-tank, peg-drop, rocket-builder, color-mixing, gear-box,
+- Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, color-mixing, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, engine-room, water-works, construction-site, train-builder.
+  `fish-tank/` is kept in the repo but has no tile on the home screen (the dad shelved it); don't delete it.
 - `tools/`: `smoke.js` (load + drag + error/scroll check), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 

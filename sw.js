@@ -5,7 +5,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v78";
+const CACHE = "toybox-v79";
 const CORE = [
   "./",
   "./index.html",
@@ -36,15 +36,6 @@ const CORE = [
   "./kaleidoscope/icons/icon-192.png",
   "./kaleidoscope/icons/icon-512.png",
   "./kaleidoscope/icons/icon-maskable-512.png",
-
-  // Fish Tank
-  "./fish-tank/",
-  "./fish-tank/index.html",
-  "./fish-tank/manifest.webmanifest",
-  "./fish-tank/icons/icon-180.png",
-  "./fish-tank/icons/icon-192.png",
-  "./fish-tank/icons/icon-512.png",
-  "./fish-tank/icons/icon-maskable-512.png",
 
   // Peg Drop
   "./peg-drop/",
