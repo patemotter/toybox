@@ -261,6 +261,29 @@ body.big .app { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   .count.pop, .pick.hop { animation: none; }
 }
+/* Declutter */
+#nums { display: none !important; }
+#grownbtn::before {
+  content: ""; display: none; width: 26px; height: 26px; margin: 0 auto; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 480px), (orientation: landscape) and (max-height: 520px) {
+  .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)) 48px; gap: 5px; }
+  .tab { font-size: 0.875rem; padding: 0; }
+  #grownbtn { font-size: 0; display: flex; align-items: center; justify-content: center; }
+  #grownbtn::before { display: block; }
+}
+@media (max-width: 480px) { header .homebtn { min-height: 44px; min-width: 48px; justify-content: center; padding: 2px 8px; } header .homebtn span { display: none; } }
+@media (max-width: 480px) { .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)) 46px; gap: 4px; } }
+@media (orientation: landscape) and (max-height: 520px) {
+  .panel { flex-basis: min(45%, 520px); }
+  .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)) 44px; gap: 4px; padding: 4px 5px 6px; }
+  .tab { min-height: 44px; }
+  #carPicks { --cols: 3; }
+  .pick { font-size: 0.875rem; min-height: 54px; }
+  .pick canvas { height: 30px; }
+}
 </style>
 </head>
 <body>
@@ -294,7 +317,7 @@ body.big .app { margin-top: 0; }
           <p class="hint" id="paintHint">Tap a train car to paint it.</p>
           <div class="prow" id="swatches"></div>
           <div class="prow" id="styles"></div>
-          <div class="prow" id="nums"></div>
+          <div class="prow" id="nums" hidden></div>
         </div>
         <div data-pane="track"><div class="picks" id="trackPicks"></div></div>
       </div>
@@ -303,7 +326,7 @@ body.big .app { margin-top: 0; }
         <button class="tab" role="tab" data-tab="cars">Cars</button>
         <button class="tab" role="tab" data-tab="paint">Paint</button>
         <button class="tab" role="tab" data-tab="track">Track</button>
-        <button class="tab" id="grownbtn">Grown-ups</button>
+        <button class="tab" id="grownbtn" aria-label="Grown-ups">Grown-ups</button>
       </nav>
     </div>
   </main>
@@ -462,11 +485,8 @@ body.big .app { margin-top: 0; }
     c.moveTo(x, y); c.lineTo(x + Math.cos(spin) * r * 0.8, y + Math.sin(spin) * r * 0.8); c.stroke();
     c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fillStyle = OUT; c.fill();
   }
-  function decal(c, x, y, r, n) {
-    c.beginPath(); c.arc(x, y, r, 0, TAU); trim(c, "#FFFFFF", 4);
-    c.fillStyle = OUT; c.font = "800 " + Math.round(r * 1.5) + "px " + "'Baloo 2', 'Trebuchet MS', sans-serif";
-    c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(n), x, y + r * 0.1);
-  }
+  // Car numbers are no longer drawn (declutter: no numbers on the trains). p.num stays in saves.
+  function decal() {}
   function win(c, x, y, w, h, lit) { rr(c, x, y, w, h, 5); trim(c, lit ? "#FFE680" : "#BEE9FF", 4); }
   function truck(c, x0, len, y, spin, r) {
     r = r || 15;
@@ -699,13 +719,14 @@ body.big .app { margin-top: 0; }
     bscale += (target - bscale) * Math.min(1, dt * 4);
     var len = trainLen();
     bview.ox = (W - len * bscale) / 2;
-    bview.gy = H - Math.max(88, H * 0.16);
+    // Tall (phone portrait) stages: set the track higher so the train is not lost under a big empty sky.
+    bview.gy = H > W * 1.2 ? Math.round(H * 0.66) : H - Math.max(88, H * 0.16);
     var xs = layoutX();
     anim.forEach(function (a, i) {
       if (a.drag) return;
       var tx = xs[i];
       if (a.roll) {
-        a.vx = Math.max(a.vx - 1400 * dt, -900);
+        a.vx = Math.max(a.vx - 930 * dt, -600);
         a.x += a.vx * dt;
         a.spin += a.vx * dt / 15;
         if (a.x <= tx) {
@@ -954,7 +975,8 @@ body.big .app { margin-top: 0; }
     var a = tr[lo], b = tr[hi], f = (d - a.d) / ((b.d - a.d) || 1);
     return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f };
   }
-  var VMAX = 300;
+  var TOOT_T = 2;
+  var VMAX = 200; // calmer: about a third slower than before (Fast is less frantic too)
   function stepRun(dt) {
     if (!run) return;
     var lay = run.lay;
@@ -974,7 +996,7 @@ body.big .app { margin-top: 0; }
     } else if (dAhead >= 0 && !run.stLeft && want > 0) {
       var vmax = Math.sqrt(2 * 160 * Math.max(0, dAhead));
       if (dAhead < 1.5 && run.v < 30) {
-        run.v = 0; run.atStation = true; run.dwell = 3.2; sChime();
+        run.v = 0; run.atStation = true; run.dwell = 4.5; sChime();
         if (run.ending && run.endDone) { var dn = run.endDone; run.endDone = null; setTimeout(dn, 800); }
       }
       want = Math.min(want, Math.max(vmax, 12));
@@ -1051,8 +1073,11 @@ body.big .app { margin-top: 0; }
   var vs = 1, vox = 0, voy = 0; // world -> screen
   function runFit() {
     var sw = WW, sh = WH * TILT + 40;
-    vs = Math.min(W / sw, (H - 10) / sh);
-    vox = (W - WW * vs) / 2; voy = (H - WH * TILT * vs) / 2 + 20 * vs;
+    // Wide stages (phone landscape): keep the track clear of the speed lever on the left.
+    var gl = 0;
+    if (W > H) { var lcs = getComputedStyle($("lever")); gl = (parseFloat(lcs.left) || 0) + (parseFloat(lcs.width) || 0) + 6; }
+    vs = Math.min((W - gl) / sw, (H - 10) / sh);
+    vox = gl + (W - gl - WW * vs) / 2; voy = (H - WH * TILT * vs) / 2 + 20 * vs;
   }
   function SX(x) { return vox + x * vs; }
   function SY(y, z) { return voy + (y * TILT - (z || 0) * HT) * vs; }
@@ -1250,13 +1275,6 @@ body.big .app { margin-top: 0; }
       else if (t === "boxes") { rr(c, -L / 2 + 4, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#F77F00", 2); rr(c, 2, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#5BC0EB", 2); }
       else if (t === "passenger") { c.fillStyle = night ? "#FFE680" : "rgba(255,255,255,0.45)"; for (var wx = -L / 2 + 8; wx < L / 2 - 8; wx += 12) { c.fillRect(wx, -Wd / 2 + 1, 7, 3); c.fillRect(wx, Wd / 2 - 4, 7, 3); } }
       else if (t === "caboose") { rr(c, -10, -Wd / 2 + 4, 20, Wd - 8, 3); trim(c, shade(col, 0.2), 2); }
-      // number decal on the roof
-      if (t !== "logs" && t !== "pipes" && t !== "boxes" && t !== "coal" && t !== "hopper") {
-        c.save(); c.translate(t === "diesel" || t === "electric" ? L / 4 : -L / 4 + 4, 0); c.rotate(-Math.PI / 2 * 0);
-        c.beginPath(); c.arc(0, 0, 8, 0, TAU); trim(c, "#FFFFFF", 2);
-        c.fillStyle = OUT; c.font = "800 12px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(p.num), 0, 1);
-        c.restore();
-      }
       c.restore();
     }
   }
@@ -1355,7 +1373,7 @@ body.big .app { margin-top: 0; }
       c.restore();
     }
     if (run.toot > 0 && poses.length) {
-      var h1 = poses[0], k2 = 1 - run.toot / 1.4;
+      var h1 = poses[0], k2 = 1 - run.toot / TOOT_T;
       var X1 = SX(h1.x), Y1 = SY(h1.y, h1.z + 60) - 30 - k2 * 30;
       c.globalAlpha = k2 > 0.8 ? (1 - k2) / 0.2 : 1;
       c.font = "800 " + Math.round(Math.max(28, 44 * vs)) + "px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
@@ -1448,7 +1466,7 @@ body.big .app { margin-top: 0; }
   }
   function toot() {
     if (!run || Toybox.timer.locked()) return;
-    run.toot = 1.4; sWhistle();
+    run.toot = TOOT_T; sWhistle();
     var poses = carPoses();
     if (poses.length) for (var i = 0; i < 6; i++) { var cp = poses[0]; puff(cp, 0.3, 1.6); run.puffs[run.puffs.length - 1].vz = 60 + i * 12; run.puffs[run.puffs.length - 1].vx = rand(-30, 30); }
     var b = $("toot"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
@@ -1457,7 +1475,7 @@ body.big .app { margin-top: 0; }
   $("daynight").addEventListener("click", function () {
     if (Toybox.timer.locked()) return;
     state.night = !state.night; save(); updateRunUI();
-    fx.push({ k: "text", x: W / 2, y: H * 0.35, t: 0, life: 1.2, text: state.night ? "Night!" : "Day!", size: 48 });
+    fx.push({ k: "text", x: W / 2, y: H * 0.35, t: 0, life: 1.8, text: state.night ? "Night!" : "Day!", size: 48 });
   });
   // Speed lever
   (function () {
@@ -1594,7 +1612,7 @@ body.big .app { margin-top: 0; }
   function refreshPaint() {
     var p = selPiece();
     if (!p && state.pieces.length && state.tab === "paint") { state.sel = state.pieces.length - 1; p = selPiece(); }
-    $("paintHint").textContent = p ? "Painting the " + TYPES[p.t].name.toLowerCase() + ". Tap a car to pick another." : "Add a train car first.";
+    $("paintHint").textContent = p ? "Painting the " + TYPES[p.t].name.toLowerCase() : "Add a train car first.";
     Array.prototype.forEach.call(document.querySelectorAll(".sw"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.color === p.color)); });
     Array.prototype.forEach.call(document.querySelectorAll(".st"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.style === p.style)); if (b.offsetParent && b._draw) b._draw(); });
     Array.prototype.forEach.call(document.querySelectorAll(".nm"), function (b) { b.setAttribute("aria-pressed", String(!!p && +b.dataset.num === p.num)); });
@@ -1655,7 +1673,7 @@ body.big .app { margin-top: 0; }
     soundNote: "Soft clunks, a whistle and a crossing bell. Hold for 2 seconds.",
     endingMaxMs: 25000,
     onEnding: onEnding,
-    onGoodbye: function () { if (run) { run.toot = 1.4; sWhistle(); } },
+    onGoodbye: function () { if (run) { run.toot = TOOT_T; sWhistle(); } },
     onWake: function () { if (run) { run.ending = false; run.endDone = null; run.dwell = 1; } },
     onBig: function () { setTimeout(resize, 30); },
     onSound: function (on) { if (on) setTimeout(sChime, 60); }
