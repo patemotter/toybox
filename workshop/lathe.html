@@ -1,0 +1,1953 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lathe</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Workshop">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+}
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.spacer { flex: 1 1 auto; }
+.homebtn, .wallbtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 46px;
+  padding: 2px 12px 2px 9px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  box-shadow: 2px 2px 0 var(--edge);
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.wallbtn { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 2px 2px 0 #1D2340; }
+.homebtn:active, .wallbtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible, .wallbtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg, .wallbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 6px;
+  border: 3px dashed var(--edge);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.badge svg { width: 52px; height: 30px; display: block; }
+.gubtn { flex: none; min-height: 46px; font-size: 1rem; padding: 0.2rem 0.7rem; white-space: nowrap; }
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 3px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 4px 4px 0 var(--edge);
+  overflow: hidden;
+  background: #E9D3A8;
+}
+#cv {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.toolbar {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.tools, .acts { display: grid; gap: 8px; min-width: 0; }
+.tools { flex: 4 1 0; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.acts { flex: 3 1 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 66px;
+  padding: 2px 4px;
+  font-size: 0.95rem;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tool svg { width: 100%; max-width: 116px; height: 32px; display: block; }
+.act {
+  min-height: 66px;
+  font-size: 1.2rem;
+  padding: 0.2rem 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  color: #1D2340;
+  border-color: #1D2340;
+  box-shadow: 3px 3px 0 #1D2340;
+}
+.act.newb { background: #FF8A3D; }
+.act.sand { background: #F2C46B; }
+.act.done { background: #5FD08A; }
+.short { display: none; }
+/* Wood picker for a new blank */
+.picker {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(29, 35, 64, 0.45);
+}
+.picker[hidden] { display: none; }
+.pcard {
+  background: var(--panel);
+  color: var(--ink);
+  border: 4px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 5px 5px 0 var(--edge);
+  padding: 14px 16px 16px;
+  max-width: calc(100% - 24px);
+  text-align: center;
+}
+.pcard h2 { margin: 0 0 10px; font-size: 1.6rem; line-height: 1.1; }
+.woods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wood { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 120px; min-width: 100px; font-size: 1.2rem; padding: 6px; }
+.wood svg { width: 70px; height: 70px; display: block; }
+.pcancel { margin-top: 12px; min-height: 48px; }
+/* Friendly prompt ("Switch on to cut") */
+.prompt {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 3;
+  transform: translate(-50%, -12px) scale(0.92);
+  max-width: calc(100% - 24px);
+  background: #FFC93C;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  padding: 0.35rem 1.1rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  box-shadow: 4px 4px 0 #1D2340;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(.3,1.6,.5,1);
+}
+.prompt.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+/* Big: hide the header so the lathe fills the screen (the tools stay: they are the play). */
+.stage .bigtoggle { position: absolute; top: 10px; right: 10px; z-index: 4; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+.stage .bigtoggle[aria-pressed="true"] { background: var(--accent); }
+body.big header { display: none; }
+body.big .app { margin-top: 0; }
+body.ending .toolbar,
+body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(60vw, 240px); }
+
+@media (max-width: 960px) and (orientation: portrait) {
+  .toolbar { flex-direction: column; gap: 8px; }
+}
+@media (max-width: 700px) {
+  header h1 { font-size: 1.25rem; }
+  .badge span, .homebtn span { display: none; }
+  .badge { padding: 0 6px; }
+  .badge svg { width: 40px; height: 24px; }
+  .homebtn { padding: 2px 8px; }
+  .toolbar { flex-direction: column; gap: 6px; }
+  .tools, .acts { gap: 6px; }
+  .tool { min-height: 54px; font-size: 0.85rem; }
+  .tool svg { height: 26px; }
+  .act { min-height: 48px; font-size: 1.05rem; }
+  .long { display: none; }
+  .short { display: inline; }
+  .prompt { font-size: 1.15rem; }
+  .woods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wood { min-height: 100px; }
+}
+@media (max-width: 480px) {
+  header h1 { display: none; }
+  .gubtn { font-size: 0.9rem; padding: 0.2rem 0.5rem; }
+  .wallbtn { padding: 2px 10px 2px 6px; }
+}
+/* Short landscape phones: the tools go in a column beside the lathe. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .wrap { padding-top: 4px; padding-bottom: 4px; }
+  header h1 { font-size: 1.15rem; }
+  .homebtn, .wallbtn, .gubtn { min-height: 38px; font-size: 0.9rem; }
+  .badge span { display: none; }
+  .app { flex-direction: row; margin-top: 4px; gap: 6px; }
+  .toolbar { flex-direction: column; width: 200px; gap: 4px; }
+  .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; flex: 2 1 0; }
+  .acts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; flex: 1 1 0; }
+  .tool, .act { min-height: 0; font-size: 0.8rem; }
+  .tool svg { height: 22px; }
+  .long { display: none; }
+  .short { display: inline; }
+  .woods { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .wood { min-height: 90px; min-width: 80px; }
+  .wood svg { width: 50px; height: 50px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prompt { transition: opacity 0.2s ease; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="wallbtn" id="wallbtn" href="./" aria-label="Back to the Tool Wall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Tool Wall</span></a>
+    <h1>Lathe</h1>
+    <span class="spacer"></span>
+    <span class="badge" title="Eye protection and ear protection are on"><svg viewBox="0 0 52 30" aria-hidden="true"><rect x="2" y="9" width="21" height="13" rx="6" fill="#5BC0EB" stroke="#1D2340" stroke-width="2.5"/><path d="M8 13 l4 -2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23 15 h3" stroke="#1D2340" stroke-width="2.5"/><path d="M33 22 C33 4 49 4 49 22" fill="none" stroke="#1D2340" stroke-width="3"/><rect x="29" y="16" width="8" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/><rect x="45" y="16" width="6" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/></svg><span>Gear on</span></span>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn gubtn" id="gubtn">Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A wood lathe with a square blank"></canvas>
+      <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the top bar">Big</button>
+      <div class="picker" id="picker" hidden>
+        <div class="pcard" role="dialog" aria-label="Pick the wood">
+          <h2>Pick the wood</h2>
+          <div class="woods" id="woods"></div>
+          <button class="btn pcancel" id="pcancel">Keep this one</button>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar" id="toolbar">
+      <div class="tools" id="tools"></div>
+      <div class="acts">
+        <button class="btn act newb" id="newBtn">New blank</button>
+        <button class="btn act sand" id="sandBtn">Sand</button>
+        <button class="btn act done" id="doneBtn">Done</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Deep links and the safety-gear check ----------
+  var params = {};
+  try {
+    location.search.replace(/^\?/, "").split("&").forEach(function (kv) {
+      if (!kv) return;
+      var i = kv.indexOf("=");
+      var k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i));
+      params[k] = i < 0 ? "" : decodeURIComponent(kv.slice(i + 1).replace(/\+/g, " "));
+    });
+  } catch (e) { /* ignore bad query */ }
+  var gearOn = true;
+  try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
+  if (!gearOn) {
+    location.replace("./?next=lathe");
+    return;
+  }
+
+  var OUT = "#1D2340";
+  var SKEY = "workshop-lathe-v1";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var TAU = Math.PI * 2;
+
+  // ---------- The lathe in world units (x 0..1000, y 0..540) ----------
+  var WW = 1000, WH = 540;
+  var N = 150;                       // slices along the blank
+  var WX0 = 300, WX1 = 790;          // blank ends (between the centers)
+  var DX = (WX1 - WX0) / N;
+  var AXY = 190;                     // spindle axis height
+  var R0 = 60;                       // half the side of the square blank
+  var RC = R0 * Math.SQRT2;          // corner radius of the square
+  var REST_Y = Math.round(AXY + RC + 12);   // top of the tool rest
+  var BED_Y = 345, BED_H = 42, FLOOR = 522;
+  var TIP_MAX = REST_Y - 5 - AXY;    // tool tip fully pulled back (distance below the axis)
+  var SPEEDS = [0, 2.2, 4.6, 8.5];   // spin (turns per second, visual only)
+  var SPEED_NAMES = ["Off", "Slow", "Medium", "Fast"];
+  var DIAL_ANG = [-110, -38, 38, 110].map(function (d) { return d * Math.PI / 180; });
+
+  var WOODS = {
+    pine: { name: "Pine", base: "#EFCB8A", dark: "#B9844A", light: "#FBE6BD" },
+    oak: { name: "Oak", base: "#CC9A5A", dark: "#86592B", light: "#E8C48E" },
+    walnut: { name: "Walnut", base: "#7E5536", dark: "#3E2514", light: "#A87C58" },
+    cherry: { name: "Cherry", base: "#BE6A40", dark: "#7A341A", light: "#DE9670" }
+  };
+  var WOOD_ORDER = ["pine", "oak", "walnut", "cherry"];
+  // Tools: half-width of the cutting edge (world units), how round the edge is, how fast it cuts,
+  // how deep it may go (distance from the axis it never passes), finish it leaves, cut rate on square parts.
+  var TOOLS = {
+    rough: { name: "Roughing gouge", short: "Roughing", hw: 18, round: 0.55, rate: 230, minR: 24, fin: 0.15, sq: 1, handle: "#E63946", curl: "chunk" },
+    spindle: { name: "Spindle gouge", short: "Spindle", hw: 10, round: 1, rate: 120, minR: 17, fin: 0.5, sq: 0.35, handle: "#2D5BD7", curl: "long" },
+    skew: { name: "Skew chisel", short: "Skew", hw: 15, round: 0, rate: 90, minR: 19, fin: 1, sq: 0.3, handle: "#2E9E5B", curl: "ribbon" },
+    parting: { name: "Parting tool", short: "Parting", hw: 3.5, round: 0, rate: 140, minR: 11, fin: 0.35, sq: 0.6, handle: "#F77F00", curl: "small" }
+  };
+  var TOOL_ORDER = ["rough", "spindle", "skew", "parting"];
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function fill(n, v) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- Saved state: the piece on the lathe, the shelf, the counter ----------
+  function freshState() {
+    return { wood: "pine", tool: "rough", speed: 2, pieces: 0, shelf: [], r: fill(N, RC), fin: fill(N, 0), gloss: fill(N, 0) };
+  }
+  function numArr(a, lo, hi) {
+    if (!Array.isArray(a) || a.length !== N) return null;
+    var out = [];
+    for (var i = 0; i < N; i++) {
+      var v = a[i];
+      if (typeof v !== "number" || !isFinite(v)) return null;
+      out.push(clamp(v, lo, hi));
+    }
+    return out;
+  }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(SKEY) || "null");
+      if (o && typeof o === "object") {
+        if (WOODS[o.wood]) s.wood = o.wood;
+        if (TOOLS[o.tool]) s.tool = o.tool;
+        if (o.speed === 0 || o.speed === 1 || o.speed === 2 || o.speed === 3) s.speed = o.speed;
+        if (typeof o.pieces === "number" && o.pieces >= 0 && isFinite(o.pieces)) s.pieces = Math.floor(o.pieces);
+        var r = numArr(o.r, 8, RC), f = numArr(o.fin, 0, 1), g = numArr(o.gloss, 0, 1);
+        if (r && f && g) { s.r = r; s.fin = f; s.gloss = g; }
+        if (Array.isArray(o.shelf)) {
+          o.shelf.forEach(function (p) {
+            var pr = p && WOODS[p.wood] ? numArr(p.r, 8, RC) : null;
+            if (pr) s.shelf.push({ wood: p.wood, r: pr, fin: clamp(+p.fin || 0, 0, 1), gloss: clamp(+p.gloss || 0, 0, 1) });
+          });
+          s.shelf = s.shelf.slice(-8);
+        }
+      }
+    } catch (e) { /* ignore bad storage */ }
+    return s;
+  }
+  function r1(v) { return Math.round(v * 10) / 10; }
+  function r2(v) { return Math.round(v * 100) / 100; }
+  var saveTimer = null;
+  function save() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(function () { saveTimer = null; writeNow(); }, 400);
+  }
+  function writeNow() {
+      try {
+        localStorage.setItem(SKEY, JSON.stringify({
+          wood: S.wood, tool: S.tool, speed: S.speed, pieces: S.pieces,
+          r: S.r.map(r1), fin: S.fin.map(r2), gloss: S.gloss.map(r2),
+          shelf: S.shelf.map(function (p) { return { wood: p.wood, r: p.r.map(r1), fin: r2(p.fin), gloss: r2(p.gloss) }; })
+        }));
+      } catch (e) { /* ignore */ }
+  }
+  var S = loadState();
+  function flushSave() { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } writeNow(); }
+  window.addEventListener("pagehide", flushSave);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) flushSave(); });
+
+  // ---------- Live (not saved) machine state ----------
+  var R = {
+    on: false,            // the big switch
+    sw: 0,                // switch paddle animation 0 = off, 1 = on
+    spin: 0,              // turns per second (spins up and down)
+    phase: 0,             // rotation angle of the work
+    dialA: DIAL_ANG[S.speed],
+    toolHeld: false,
+    tipX: (WX0 + WX1) / 2, wantX: (WX0 + WX1) / 2,
+    tipD: TIP_MAX,        // tool tip distance below the axis
+    wantD: TIP_MAX,
+    cutting: 0,
+    sand: null, sandX: 0,
+    seq: null,            // new blank / done sequence
+    fastStop: false,
+    hintAt: -10, savedAt: 0,
+    toolPop: 0,
+    shake: 0,
+    shine: 0,
+    flash: {},
+    everCut: false
+  };
+  var fresh = new Float32Array(N);
+  var parts = [];
+
+  // ---------- Canvas and layout ----------
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var DPR = 1, CW = 300, CH = 300;
+  var M = { x: 0, y: 0, w: 1, h: 1, s: 1, ox: 0, oy: 0 };   // lathe region; world -> screen
+  var P = { x: 0, y: 0, w: 1, h: 1, s: 1, ox: 0, oy: 0, vert: false }; // control panel
+  var SH = { x: 0, y: 0, w: 1, h: 1 };                      // the shelf
+  var bgCanvas = document.createElement("canvas");
+  var PW_H = 490, PH_H = 200, PW_V = 290, PH_V = 350;      // panel sizes (panel units)
+
+  function layout() {
+    var pad = CW < 520 || CH < 420 ? 6 : 10;
+    var land = CW / CH >= 1.2;
+    var shH = Math.round(clamp(CH * 0.16, 62, 150));
+    SH = { x: pad, y: pad, w: CW - 2 * pad, h: shH };
+    var top = SH.y + SH.h + pad;
+    var s;
+    if (land) {
+      var pw = Math.round(clamp(CW * 0.2, 130, 250));
+      var lw = CW - pw - 3 * pad, lh = CH - top - pad;
+      s = Math.min(lw / WW, lh / WH);
+      M = { x: pad, y: top, w: lw, h: lh, s: s };
+      P = { x: CW - pad - pw, y: top, w: pw, h: lh, vert: true };
+    } else {
+      var lw2 = CW - 2 * pad;
+      var avail = CH - top - 2 * pad;
+      // Narrow screens: zoom in on the work (the outer ends of the headstock are cropped)
+      var crop = lw2 < 700;
+      s = Math.min(lw2 / (crop ? 770 : WW), (avail - 120) / WH);
+      var lh2 = Math.max(WH * s, avail - 330);
+      M = { x: pad, y: top, w: lw2, h: lh2, s: s, cx: crop ? 555 : WW / 2 };
+      P = { x: pad, y: top + lh2 + pad, w: lw2, h: CH - (top + lh2 + pad) - pad, vert: false };
+    }
+    M.ox = M.x + M.w / 2 - (M.cx || WW / 2) * M.s;
+    M.oy = M.y + (M.h - WH * M.s) / 2;
+    var pW = P.vert ? PW_V : PW_H, pH = P.vert ? PH_V : PH_H;
+    P.s = Math.max(0.2, Math.min(P.w / pW, P.h / pH, 1.5));
+    P.ox = P.x + (P.w - pW * P.s) / 2;
+    P.oy = P.y + (P.h - pH * P.s) / 2;
+  }
+  function toWorld(px, py) { return { x: (px - M.ox) / M.s, y: (py - M.oy) / M.s }; }
+  function worldXf() { ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.ox, DPR * M.oy); }
+  function screenXf() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  function panelXf() { ctx.setTransform(DPR * P.s, 0, 0, DPR * P.s, DPR * P.ox, DPR * P.oy); }
+
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    CW = Math.max(100, r.width); CH = Math.max(100, r.height);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    shadeGrad = null;
+    layout();
+    buildBg();
+  }
+
+  // ---------- Drawing helpers ----------
+  function rr(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+  function fs(c, fill, lw, stroke) {
+    if (fill) { c.fillStyle = fill; c.fill(); }
+    if (lw) { c.lineWidth = lw; c.strokeStyle = stroke || OUT; c.lineJoin = "round"; c.lineCap = "round"; c.stroke(); }
+  }
+  function hgrad(c, x0, x1, stops) {
+    var g = c.createLinearGradient(x0, 0, x1, 0);
+    stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
+    return g;
+  }
+  function vgrad(c, y0, y1, stops) {
+    var g = c.createLinearGradient(0, y0, 0, y1);
+    stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
+    return g;
+  }
+  function steelV(c, y0, y1) { return vgrad(c, y0, y1, [[0, "#6E7683"], [0.3, "#E9EDF2"], [0.55, "#B6BDC7"], [1, "#5D6470"]]); }
+  function steelH(c, x0, x1) { return hgrad(c, x0, x1, [[0, "#6E7683"], [0.3, "#E9EDF2"], [0.55, "#B6BDC7"], [1, "#5D6470"]]); }
+  function label(c, text, x, y, size, color, align, weight) {
+    c.font = (weight || 800) + " " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
+    c.textAlign = align || "center";
+    c.textBaseline = "middle";
+    c.fillStyle = color;
+    c.fillText(text, x, y);
+  }
+  function line(c, x0, y0, x1, y1, w, col) {
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1);
+    c.lineWidth = w; c.strokeStyle = col || OUT; c.lineCap = "round"; c.stroke();
+  }
+
+  // Wall, pegboard and floor behind everything (pre-rendered on resize)
+  function buildBg() {
+    bgCanvas.width = cv.width; bgCanvas.height = cv.height;
+    var c = bgCanvas.getContext("2d");
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.fillStyle = vgrad(c, 0, CH, [[0, "#F1DDB4"], [1, "#E2C796"]]);
+    c.fillRect(0, 0, CW, CH);
+    // pegboard holes
+    c.fillStyle = "rgba(120, 82, 40, 0.22)";
+    var step = Math.max(16, Math.min(26, CW / 40));
+    for (var y = step / 2; y < CH; y += step) for (var x = step / 2; x < CW; x += step) { c.beginPath(); c.arc(x, y, 1.8, 0, TAU); c.fill(); }
+    // floor under the lathe
+    var fy = M.oy + (FLOOR - 4) * M.s;
+    c.fillStyle = vgrad(c, fy, CH, [[0, "#9C8466"], [1, "#7D6850"]]);
+    c.fillRect(0, fy, CW, CH - fy);
+    c.fillStyle = "rgba(29,35,64,0.35)"; c.fillRect(0, fy, CW, 3);
+    // panel backing plate
+    c.setTransform(DPR * P.s, 0, 0, DPR * P.s, DPR * P.ox, DPR * P.oy);
+    var pw = P.vert ? PW_V : PW_H, ph = P.vert ? PH_V : PH_H;
+    rr(c, 0, 0, pw, ph, 22);
+    fs(c, vgrad(c, 0, ph, [[0, "#4D93E0"], [1, "#2F6DB8"]]), 4);
+    c.fillStyle = "#1D2340";
+    [[14, 14], [pw - 14, 14], [14, ph - 14], [pw - 14, ph - 14]].forEach(function (q) { c.beginPath(); c.arc(q[0], q[1], 4, 0, TAU); c.fill(); });
+  }
+
+  // ---------- Sound (only when the grown-up turned it on) ----------
+  var AC = null, master = null, humG = null, humO1 = null, humO2 = null, grindG = null, grindF = null;
+  function ensureAudio() {
+    var a = Toybox.sound.ready();
+    if (!a || a === AC) return;
+    try {
+      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
+      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
+      humG = a.createGain(); humG.gain.value = 0;
+      humO1 = a.createOscillator(); humO1.type = "sawtooth"; humO1.frequency.value = 50;
+      humO2 = a.createOscillator(); humO2.type = "triangle"; humO2.frequency.value = 100;
+      humO1.connect(lp); humO2.connect(lp); lp.connect(humG); humG.connect(master);
+      humO1.start(); humO2.start();
+      var buf = a.createBuffer(1, a.sampleRate, a.sampleRate), data = buf.getChannelData(0);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      var noise = a.createBufferSource(); noise.buffer = buf; noise.loop = true;
+      grindF = a.createBiquadFilter(); grindF.type = "bandpass"; grindF.frequency.value = 900; grindF.Q.value = 1.4;
+      grindG = a.createGain(); grindG.gain.value = 0;
+      noise.connect(grindF); grindF.connect(grindG); grindG.connect(master);
+      noise.start();
+      AC = a;
+    } catch (e) { /* audio unavailable */ }
+  }
+  function updateSound() {
+    ensureAudio();
+    if (!AC) return;
+    var t = AC.currentTime;
+    var on = Toybox.sound.on() && Toybox.timer.phase() !== "resting";
+    var f = Math.min(1, R.spin / SPEEDS[3]);
+    humG.gain.setTargetAtTime(on && R.spin > 0.1 ? 0.03 + 0.04 * f : 0, t, 0.08);
+    humO1.frequency.setTargetAtTime(38 + f * 30, t, 0.1);
+    humO2.frequency.setTargetAtTime(80 + f * 120, t, 0.1);
+    grindG.gain.setTargetAtTime(on ? R.cutting * 0.06 + (R.sand ? 0.03 : 0) : 0, t, 0.05);
+    grindF.frequency.setTargetAtTime(R.sand ? 2600 : (S.tool === "parting" ? 1500 : (S.tool === "skew" ? 1900 : 900 + 400 * f)), t, 0.1);
+  }
+  function blip(freq, dur, vol, type, freq2) {
+    ensureAudio();
+    if (!Toybox.sound.on() || !AC) return;
+    try {
+      var t = AC.currentTime;
+      var o = AC.createOscillator(), g = AC.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(freq, t);
+      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Prompts ----------
+  var now = 0;
+  var promptTimer = null;
+  function say(msg, flashKey) {
+    var el = $("prompt");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(promptTimer);
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
+    if (flashKey) R.flash[flashKey] = now + 2.4;
+  }
+  function busy() { return Toybox.timer.locked(); }
+  function flashOn(k) { return R.flash[k] && R.flash[k] > now; }
+
+  // ---------- Machine logic ----------
+  function spinTarget() { return R.on && S.speed > 0 ? SPEEDS[S.speed] : 0; }
+  function updateMachine(dt) {
+    R.sw += ((R.on ? 1 : 0) - R.sw) * Math.min(1, dt * 14);
+    var target = spinTarget();
+    if (R.spin < target) R.spin = Math.min(target, R.spin + 5 * dt);
+    else R.spin = Math.max(target, R.spin - (R.fastStop ? 9 : 2.6) * dt);
+    R.phase = (R.phase + R.spin * TAU * dt) % (TAU * 64);
+    var da = DIAL_ANG[S.speed] - R.dialA;
+    R.dialA += da * Math.min(1, dt * 12);
+    if (!R.toolHeld) R.wantD = Math.min(TIP_MAX, R.wantD + 150 * dt);
+    // The tool slides along the rest (no teleporting), so a quick sweep still cuts all the way
+    var dxw = R.wantX - R.tipX, mx = 1100 * dt;
+    R.tipX += clamp(dxw, -mx, mx);
+    for (var i = 0; i < N; i++) if (fresh[i] > 0) fresh[i] = Math.max(0, fresh[i] - dt * 0.7);
+    R.shake *= Math.pow(0.02, dt);
+    R.toolPop = Math.max(0, R.toolPop - dt * 3);
+    R.shine = Math.max(0, R.shine - dt * 0.6);
+    R.cutting *= Math.pow(0.03, dt);
+  }
+  function kernel(T, dx) {
+    var a = Math.abs(dx);
+    if (a > T.hw) return -1;
+    if (T.round > 0) return T.round * (T.hw - Math.sqrt(T.hw * T.hw - a * a));
+    return a > T.hw - 2 ? (a - (T.hw - 2)) * 1.5 : 0;
+  }
+  function sliceX(i) { return WX0 + (i + 0.5) * DX; }
+  function toolRange(T) { return [WX0 + T.hw + 3, WX1 - T.hw - 3]; }
+  function updateTool(dt) {
+    var T = TOOLS[S.tool];
+    var spinning = R.spin > 0.5;
+    var bite = spinning ? 6 : 0;
+    var i0 = Math.max(0, Math.floor((R.tipX - T.hw - WX0) / DX) - 1);
+    var i1 = Math.min(N - 1, Math.ceil((R.tipX + T.hw - WX0) / DX) + 1);
+    var block = T.minR, i, add;
+    for (i = i0; i <= i1; i++) {
+      add = kernel(T, sliceX(i) - R.tipX);
+      if (add < 0) continue;
+      block = Math.max(block, S.r[i] - add - bite);
+    }
+    var want = clamp(R.wantD, T.minR, TIP_MAX);
+    var d = Math.max(want, block);
+    R.tipD += (d - R.tipD) * Math.min(1, dt * 22);
+    if (R.tipD < block) R.tipD = block;
+    if (!R.toolHeld || R.seq) return;
+    if (!spinning) {
+      if (want < block - 4 && now - R.hintAt > 3.5) {
+        R.hintAt = now;
+        if (R.on && S.speed === 0) say("Turn the dial to spin", "dial");
+        else if (!R.on) say("Switch on to cut", "switch");
+      }
+      return;
+    }
+    var removed = 0, sq = false, spdF = R.spin / SPEEDS[2];
+    for (i = i0; i <= i1; i++) {
+      add = kernel(T, sliceX(i) - R.tipX);
+      if (add < 0) continue;
+      var target = Math.max(T.minR, R.tipD + add);
+      if (S.r[i] > target + 0.01) {
+        var isSq = S.r[i] > R0 + 1;
+        if (isSq) sq = true;
+        var rate = T.rate * (0.45 + 0.55 * spdF) * (isSq ? T.sq : 1);
+        var cut = Math.min(S.r[i] - target, rate * dt);
+        S.r[i] -= cut;
+        removed += cut;
+        S.fin[i] += (T.fin - S.fin[i]) * Math.min(1, cut * 0.5);
+        S.gloss[i] = Math.max(0, S.gloss[i] - cut * 0.3);
+        fresh[i] = 1;
+      }
+    }
+    if (removed > 0.05) {
+      R.everCut = true;
+      R.cutting = Math.min(1, R.cutting + removed * 0.06);
+      if (!reduce) R.shake = Math.min(1.5, R.shake + removed * (sq ? 0.04 : 0.015));
+      emitShavings(T, removed, sq, AXY + R.tipD);
+      if (now - R.savedAt > 1) { R.savedAt = now; save(); }
+      if (sq && S.tool !== "rough" && now - R.hintAt > 5) { R.hintAt = now; say("Round it first with the roughing gouge", "rough"); }
+    }
+  }
+
+  // ---------- Shavings, chips, dust and sparkles ----------
+  var emitAcc = 0;
+  function spawn(type, x, y, W) {
+    if (parts.length > (reduce ? 160 : 320)) {
+      for (var k = 0; k < parts.length; k++) if (parts[k].settled) { parts.splice(k, 1); break; }
+      if (parts.length > (reduce ? 160 : 320)) return;
+    }
+    var p = {
+      type: type, x: x, y: y, vx: rnd(-240, 240), vy: rnd(-600, -250), a: rnd(0, TAU), va: rnd(-9, 9),
+      len: 0, lmax: 20, rad: 6, w: 4, col: Math.random() < 0.6 ? W.light : W.base, t: 0, settled: false,
+      bounces: 0, bed: Math.random() < 0.45
+    };
+    if (type === "long") { p.lmax = rnd(45, 90); p.rad = rnd(6, 10); p.w = rnd(4, 6); p.vy = rnd(-520, -240); }
+    else if (type === "ribbon") { p.lmax = rnd(60, 110); p.rad = rnd(9, 14); p.w = rnd(6, 9); p.vy = rnd(-420, -200); p.col = W.light; }
+    else if (type === "small") { p.lmax = rnd(10, 22); p.rad = rnd(3, 5); p.w = 3; }
+    else if (type === "chunk") { p.lmax = rnd(7, 13); p.w = rnd(5, 9); p.vy = rnd(-650, -300); p.vx = rnd(-300, 300); }
+    else if (type === "dust") { p.lmax = rnd(2, 4.5); p.vy = rnd(-160, -40); p.vx = rnd(-120, 120); p.col = W.light; }
+    else if (type === "star") { p.lmax = rnd(8, 16); p.vy = rnd(-80, -20); p.vx = rnd(-40, 40); p.col = "#FFFFFF"; }
+    parts.push(p);
+  }
+  function emitShavings(T, removed, sq, y) {
+    var W = WOODS[S.wood];
+    var type = sq ? "chunk" : T.curl, unit = { chunk: 9, long: 22, ribbon: 22, small: 8 }[type];
+    if (S.tool === "rough" && !sq) { type = Math.random() < 0.5 ? "long" : "chunk"; unit = 14; }
+    emitAcc += removed / unit;
+    var n = 0;
+    while (emitAcc >= 1 && n < 4) {
+      emitAcc -= 1; n++;
+      spawn(type, R.tipX + rnd(-T.hw, T.hw) * 0.6, y - 2, W);
+    }
+    if (emitAcc > 3) emitAcc = 3;
+  }
+  function updateParts(dt) {
+    var settled = 0, i, p;
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.t += dt;
+      if (p.type === "dust" || p.type === "star") {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt;
+        if (p.t > (p.type === "star" ? 0.9 : 1.2)) parts.splice(i, 1);
+        continue;
+      }
+      if (p.settled) { settled++; continue; }
+      if (p.type !== "chunk") p.len = p.lmax * Math.min(1, p.t / 0.22);
+      else p.len = p.lmax;
+      var light = p.type === "long" || p.type === "ribbon";
+      p.vy += (light ? 900 : 1300) * dt;
+      p.vx *= Math.pow(light ? 0.6 : 0.85, dt);
+      p.x += p.vx * dt; p.y += p.vy * dt; p.a += p.va * dt;
+      var floorY = (p.bed && p.x > 45 && p.x < 955 && p.y < BED_Y + 10 && p.vy > 0) ? BED_Y - 2 : FLOOR - 2;
+      if (p.x > 45 && p.x < 955 && p.y > BED_Y + 10) floorY = FLOOR - 2;
+      if (p.y >= floorY && p.vy > 0) {
+        if (p.bounces === 0 && p.vy > 250) { p.vy *= -0.3; p.vx *= 0.5; p.va *= 0.5; p.bounces = 1; p.y = floorY; }
+        else { p.y = floorY; p.settled = true; p.vx = 0; p.vy = 0; }
+      }
+      if (p.x < -60 || p.x > WW + 60) parts.splice(i, 1);
+    }
+    if (settled > 160) {
+      for (i = 0; i < parts.length && settled > 160; i++) if (parts[i].settled) { parts.splice(i, 1); i--; settled--; }
+    }
+  }
+  function drawParts(c) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.type === "dust") {
+        c.globalAlpha = Math.max(0, 1 - p.t / 1.2) * 0.8;
+        c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.lmax, 0, TAU); c.fill();
+        c.globalAlpha = 1;
+        continue;
+      }
+      if (p.type === "star") {
+        var k = Math.max(0, 1 - p.t / 0.9), sz = p.lmax * (0.5 + k);
+        c.globalAlpha = k;
+        c.save(); c.translate(p.x, p.y); c.rotate(p.t * 3);
+        c.beginPath();
+        for (var j = 0; j < 8; j++) { var rr2 = j % 2 ? sz * 0.3 : sz; c.lineTo(Math.cos(j * Math.PI / 4) * rr2, Math.sin(j * Math.PI / 4) * rr2); }
+        c.closePath(); c.fillStyle = "#FFF6B0"; c.fill(); c.lineWidth = 2; c.strokeStyle = "#E8B83A"; c.stroke();
+        c.restore(); c.globalAlpha = 1;
+        continue;
+      }
+      c.save();
+      c.translate(p.x, p.y); c.rotate(p.a);
+      if (p.type === "chunk") {
+        var s2 = p.w;
+        c.beginPath(); c.moveTo(-s2, -s2 * 0.5); c.lineTo(s2 * 0.8, -s2 * 0.7); c.lineTo(s2, s2 * 0.4); c.lineTo(-s2 * 0.6, s2 * 0.7); c.closePath();
+        fs(c, p.col, 2.2);
+      } else {
+        // A coiled shaving: a helix seen from the side
+        var L = Math.max(4, p.len), rad = p.rad, n = Math.max(8, Math.round(L / 2.5));
+        c.beginPath();
+        for (var q = 0; q <= n; q++) {
+          var t = q / n, ang = t * L / (rad * 1.2);
+          var px = t * L - L / 2 + Math.cos(ang) * rad * 0.55, py = Math.sin(ang) * rad;
+          if (q === 0) c.moveTo(px, py); else c.lineTo(px, py);
+        }
+        c.lineCap = "round"; c.lineJoin = "round";
+        c.lineWidth = p.w + 3; c.strokeStyle = "rgba(29,35,64,0.85)"; c.stroke();
+        c.lineWidth = p.w; c.strokeStyle = p.col; c.stroke();
+      }
+      c.restore();
+    }
+  }
+
+  // ---------- Sanding ----------
+  function startSand() {
+    if (busy() || R.seq) return;
+    if (R.sand) return;
+    if (R.spin < 0.5) { say(R.on && S.speed === 0 ? "Turn the dial, then sand" : "Switch on, then sand", R.on ? "dial" : "switch"); return; }
+    R.sand = { t: 0, dur: 3.2 };
+    R.toolHeld = false;
+    blip(1200, 0.08, 0.04, "triangle", 900);
+  }
+  function updateSand(dt) {
+    var q = R.sand;
+    if (!q) return;
+    if (R.spin < 0.3 || R.seq) { R.sand = null; return; }
+    q.t += dt;
+    var f = q.t / q.dur;
+    if (f >= 1) {
+      R.sand = null; R.shine = 1;
+      var W = WOODS[S.wood];
+      for (var k = 0; k < (reduce ? 6 : 16); k++) spawn("star", rnd(WX0 + 20, WX1 - 20), AXY + rnd(-50, 30), W);
+      say("Shiny!");
+      blip(880, 0.12, 0.06, "sine", 1320);
+      save();
+      return;
+    }
+    var tri = f < 0.5 ? f * 2 : 2 - f * 2;
+    R.sandX = WX0 + 24 + (WX1 - WX0 - 48) * ease(tri);
+    var i0 = Math.max(1, Math.floor((R.sandX - 30 - WX0) / DX)), i1 = Math.min(N - 2, Math.ceil((R.sandX + 30 - WX0) / DX));
+    for (var i = i0; i <= i1; i++) {
+      S.gloss[i] = Math.min(1, S.gloss[i] + dt * 2.4);
+      S.fin[i] = Math.min(1, Math.max(S.fin[i], S.fin[i] + dt * 1.5));
+      var avg = (S.r[i - 1] + S.r[i] + S.r[i + 1]) / 3;
+      if (S.r[i] > avg) S.r[i] -= (S.r[i] - avg) * Math.min(1, dt * 2);
+    }
+    if (Math.random() < dt * 40) spawn("dust", R.sandX + rnd(-20, 20), AXY + Math.min(S.r[clamp(Math.round((R.sandX - WX0) / DX), 0, N - 1)], R0) + 4, WOODS[S.wood]);
+  }
+
+  // ---------- New blank and Done ----------
+  function cutSomething() { for (var i = 0; i < N; i++) if (S.r[i] < RC - 2) return true; return false; }
+  function releaseTool() {
+    for (var k in drags) if (drags[k].type === "tool") delete drags[k];
+    R.toolHeld = false;
+  }
+  function startSeq(kind, wood) {
+    R.seq = { kind: kind, wood: wood, stage: "stop", t: 0 };
+    if (R.on) blip(140, 0.12, 0.08, "sine", 80);
+    R.on = false; R.fastStop = true; R.sand = null;
+    releaseTool();
+  }
+  function doneBtn() {
+    if (busy() || R.seq) return;
+    if (!cutSomething()) { say("Turn a shape first!"); return; }
+    startSeq("done");
+  }
+  function newBlank(wood) {
+    hidePicker();
+    if (busy() || R.seq || !WOODS[wood]) return;
+    startSeq("new", wood);
+  }
+  function resetBlank(wood) {
+    S.wood = wood;
+    S.r = fill(N, RC); S.fin = fill(N, 0); S.gloss = fill(N, 0);
+    for (var i = 0; i < N; i++) fresh[i] = 0;
+    R.phase = 0; R.everCut = false;
+    save();
+  }
+  function updateSeq(dt) {
+    var q = R.seq;
+    if (!q) return;
+    q.t += dt;
+    if (q.stage === "stop") {
+      if (R.spin < 0.05 || q.t > 2.5) {
+        R.spin = 0;
+        q.piece = { wood: S.wood, r: S.r.slice(), fin: avg(S.fin), gloss: avg(S.gloss) };
+        q.from = { ox: M.ox, oy: M.oy, s: M.s };
+        q.slot = Math.min(S.shelf.length, shelfGeom().K - 1);
+        if (S.shelf.length >= shelfGeom().K) q.slot = shelfGeom().K - 1;
+        q.stage = "away"; q.t = 0;
+        resetBlank(q.kind === "new" ? q.wood : S.wood);
+        blip(q.kind === "done" ? 520 : 300, 0.12, 0.06, "triangle", q.kind === "done" ? 780 : 200);
+      }
+    } else if (q.stage === "away") {
+      if (q.t >= 0.95) {
+        if (q.kind === "done") {
+          S.pieces++;
+          S.shelf.push(q.piece);
+          S.shelf = S.shelf.slice(-8);
+          R.flash.shelf = now + 1.2;
+          blip(990, 0.1, 0.06, "sine", 1480);
+          for (var k = 0; k < (reduce ? 4 : 10); k++) spawnScreenStar();
+        }
+        q.stage = "in"; q.t = 0;
+      }
+    } else if (q.stage === "in") {
+      if (q.t >= 0.55) { R.seq = null; R.fastStop = false; save(); blip(220, 0.08, 0.06, "triangle", 330); }
+    }
+  }
+  function avg(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  var screenStars = [];
+  function spawnScreenStar() {
+    var g = shelfGeom(), vis = Math.min(S.shelf.length, g.K), sx = g.slotX(vis - 1);
+    screenStars.push({ x: sx + rnd(-g.slotW / 2, g.slotW / 2), y: g.axisY + rnd(-20, 10), vx: rnd(-60, 60), vy: rnd(-90, -20), t: 0, s: rnd(6, 12) });
+  }
+
+  // ---------- Pieces (the live blank, the flying one and the shelf ones) ----------
+  var HB = new Float32Array(N);
+  var shadeGrad = null;
+  var GRAIN = [0.25, 0.9, 1.45, 2.05, 2.6, 3.3, 3.9, 4.5, 5.15, 5.8];
+  function getShade(c) {
+    if (!shadeGrad) {
+      shadeGrad = c.createLinearGradient(0, -1, 0, 1);
+      shadeGrad.addColorStop(0, "rgba(0,0,0,0.30)");
+      shadeGrad.addColorStop(0.12, "rgba(255,255,255,0.10)");
+      shadeGrad.addColorStop(0.3, "rgba(255,255,255,0.32)");
+      shadeGrad.addColorStop(0.5, "rgba(255,255,255,0.06)");
+      shadeGrad.addColorStop(0.78, "rgba(0,0,0,0.16)");
+      shadeGrad.addColorStop(1, "rgba(0,0,0,0.42)");
+    }
+    return shadeGrad;
+  }
+  function profilePath(c, h, ox, ax, s) {
+    var i;
+    c.beginPath();
+    c.moveTo(ox + WX0 * s, ax - h[0] * s);
+    for (i = 0; i < N; i++) c.lineTo(ox + sliceX(i) * s, ax - h[i] * s);
+    c.lineTo(ox + WX1 * s, ax - h[N - 1] * s);
+    c.lineTo(ox + WX1 * s, ax + h[N - 1] * s);
+    for (i = N - 1; i >= 0; i--) c.lineTo(ox + sliceX(i) * s, ax + h[i] * s);
+    c.lineTo(ox + WX0 * s, ax + h[0] * s);
+    c.closePath();
+  }
+  // p = {wood, r[], fin (array or number), gloss (array or number)}; screen mapping x' = ox + x*s, y' = oy + y*s
+  function drawPiece(c, p, ox, oy, s, live) {
+    var W = WOODS[p.wood], r = p.r, i, k, j;
+    var spin = live ? R.spin : 0;
+    var th = live ? R.phase : 0;
+    var blurMode = spin > 1.3;
+    var sqH = R0 * (Math.abs(Math.cos(th)) + Math.abs(Math.sin(th)));
+    var anySq = false;
+    for (i = 0; i < N; i++) {
+      HB[i] = Math.min(r[i], live && !blurMode ? sqH : R0);
+      if (r[i] > R0 + 0.5) anySq = true;
+    }
+    screenXf();
+    var ax = oy + AXY * s;
+    var lw = Math.max(1.5, Math.min(3.5, 4 * s));
+    // Spinning square corners: a see-through blur out to the corners
+    if (blurMode && anySq) {
+      profilePath(c, r, ox, ax, s);
+      c.globalAlpha = 0.42; c.fillStyle = W.base; c.fill();
+      c.globalAlpha = 0.55; c.setLineDash([6, 7]); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.setLineDash([]);
+      c.globalAlpha = 1;
+    }
+    profilePath(c, HB, ox, ax, s);
+    c.fillStyle = W.base; c.fill();
+    c.save();
+    c.clip();
+    // Grain streaks along the length (they race round while spinning)
+    var adv = spin * TAU / 60;
+    var subs = blurMode ? clamp(Math.ceil(adv / 0.22), 2, 7) : 1;
+    c.strokeStyle = W.dark;
+    c.lineWidth = Math.max(1, 2.4 * s);
+    for (k = 0; k < GRAIN.length; k++) {
+      for (j = 0; j < subs; j++) {
+        var ph = th + GRAIN[k] - adv * j / subs;
+        var vis = Math.sin(ph);
+        if (vis <= 0.05) continue;
+        var cs = Math.cos(ph);
+        c.globalAlpha = (blurMode ? 0.75 : 0.5) * vis / subs + (blurMode ? 0.04 : 0);
+        c.beginPath();
+        for (i = 0; i < N; i += 2) {
+          var y = ax - HB[i] * s * cs + Math.sin(i * 0.09 + k * 1.7) * 1.4 * s;
+          if (i === 0) c.moveTo(ox + WX0 * s, y); else c.lineTo(ox + sliceX(i) * s, y);
+        }
+        c.lineTo(ox + WX1 * s, ax - HB[N - 1] * s * cs);
+        c.stroke();
+      }
+    }
+    c.globalAlpha = 1;
+    // Fast spin: soft bright speed bands
+    if (blurMode) {
+      var bf = clamp((spin - 1.3) / 5, 0, 1) * 0.35;
+      [[-0.55, 0.12, "#FFFFFF"], [0.15, 0.08, "#FFFFFF"], [0.6, 0.1, W.dark]].forEach(function (b) {
+        c.globalAlpha = bf * (b[2] === "#FFFFFF" ? 1 : 0.8);
+        c.fillStyle = b[2];
+        c.beginPath();
+        for (i = 0; i < N; i++) c.lineTo(ox + sliceX(i) * s, ax + (b[0] - b[1]) * HB[i] * s);
+        for (i = N - 1; i >= 0; i--) c.lineTo(ox + sliceX(i) * s, ax + (b[0] + b[1]) * HB[i] * s);
+        c.closePath(); c.fill();
+      });
+      c.globalAlpha = 1;
+    }
+    // Tool marks, fresh cuts, gloss
+    var finA = typeof p.fin === "number" ? null : p.fin, glA = typeof p.gloss === "number" ? null : p.gloss;
+    var sliceW = DX * s + 0.6;
+    for (i = 0; i < N; i++) {
+      var fin = finA ? finA[i] : p.fin, gl = glA ? glA[i] : p.gloss, x = ox + (WX0 + i * DX) * s, h = HB[i] * s;
+      if (fin < 0.7 && i % 3 === 0) {
+        c.globalAlpha = (0.7 - fin) * 0.5;
+        c.fillStyle = W.dark;
+        c.fillRect(x, ax - h * 0.97, Math.max(1, 1.3 * s), h * 1.94);
+      }
+      if (live && fresh[i] > 0.02) {
+        c.globalAlpha = fresh[i] * 0.5;
+        c.fillStyle = W.light;
+        c.fillRect(x, ax - h, sliceW, 2 * h);
+      }
+    }
+    // Round shading
+    c.globalAlpha = 1;
+    c.fillStyle = getShade(c);
+    for (i = 0; i < N; i++) {
+      c.setTransform(DPR * s, 0, 0, DPR * s * Math.max(0.5, HB[i]), DPR * (ox + (WX0 + i * DX) * s), DPR * ax);
+      c.fillRect(0, -1, DX + 0.5, 2);
+    }
+    screenXf();
+    // Shine: skew finish and sanding gloss
+    var extra = live ? R.shine : 0;
+    for (i = 0; i < N; i++) {
+      var fin2 = finA ? finA[i] : p.fin, gl2 = glA ? glA[i] : p.gloss;
+      var shine = gl2 * 0.6 + Math.max(0, fin2 - 0.75) * 1.1 + extra * gl2 * 0.3;
+      if (shine < 0.03) continue;
+      var x2 = ox + (WX0 + i * DX) * s, h2 = HB[i] * s;
+      c.globalAlpha = Math.min(0.85, shine);
+      c.fillStyle = "#FFFFFF";
+      c.fillRect(x2, ax - h2 * 0.68, sliceW, h2 * 0.2);
+      if (gl2 > 0.5) { c.globalAlpha = Math.min(0.9, (gl2 - 0.5) * 1.6); c.fillRect(x2, ax + h2 * 0.5, sliceW, Math.max(1, h2 * 0.06)); }
+    }
+    c.globalAlpha = 1;
+    c.restore();
+    profilePath(c, HB, ox, ax, s);
+    c.lineWidth = lw; c.strokeStyle = OUT; c.lineJoin = "round"; c.stroke();
+    // Flat faces of the still-square parts: corner edges
+    if (live && !blurMode && anySq) {
+      c.lineWidth = Math.max(1, 2 * s); c.strokeStyle = "rgba(29,35,64,0.55)";
+      for (k = 0; k < 4; k++) {
+        var ca = th + Math.PI / 4 + k * Math.PI / 2;
+        if (Math.sin(ca) <= 0.02) continue;
+        var cy0 = -RC * Math.cos(ca);
+        c.beginPath();
+        var on = false;
+        for (i = 0; i < N; i++) {
+          var sq = r[i] > R0 + 4 && Math.abs(cy0) < HB[i] - 1;
+          if (sq) { var yy = ax + cy0 * s * Math.min(1, r[i] / RC); if (!on) c.moveTo(ox + (WX0 + i * DX) * s, yy); else c.lineTo(ox + (WX0 + (i + 1) * DX) * s, yy); on = true; }
+          else on = false;
+        }
+        c.stroke();
+      }
+    }
+  }
+
+  // ---------- The lathe ----------
+  var BODY = "#3E86D8", BODY_D = "#2B63A8", BODY_L = "#6FA9EA", IRON = "#3A4150";
+  function drawLatheBack(c) {
+    // Legs
+    [[95, 205], [785, 895]].forEach(function (L) {
+      c.beginPath();
+      c.moveTo(L[0] + 18, BED_Y + BED_H); c.lineTo(L[1] - 18, BED_Y + BED_H);
+      c.lineTo(L[1], FLOOR - 12); c.lineTo(L[0], FLOOR - 12); c.closePath();
+      fs(c, vgrad(c, BED_Y, FLOOR, [[0, "#4B5465"], [1, "#2E3442"]]), 4);
+      rr(c, L[0] - 10, FLOOR - 16, L[1] - L[0] + 20, 16, 5); fs(c, "#262B36", 3.5);
+      rr(c, (L[0] + L[1]) / 2 - 22, BED_Y + 70, 44, 54, 8); fs(c, "rgba(255,255,255,0.08)", 2.5, "rgba(29,35,64,0.7)");
+    });
+    // Brace between the legs
+    rr(c, 200, 452, 590, 16, 4); fs(c, "#565E6E", 3.5);
+    // Motor and belt (behind the bed)
+    var mp = R.phase * 2.2;
+    c.save();
+    c.setLineDash([10, 8]); c.lineDashOffset = -R.phase * 40;
+    line(c, 236, 392, 228, 330, 6, "#26282E"); line(c, 268, 392, 276, 330, 6, "#26282E");
+    c.restore();
+    rr(c, 214, 382, 74, 22, 8); fs(c, steelV(c, 382, 404), 3);
+    rr(c, 230, 392, 160, 64, 26); fs(c, vgrad(c, 392, 456, [[0, "#7C8899"], [0.35, "#C9D1DC"], [1, "#4F5968"]]), 4);
+    c.strokeStyle = "rgba(29,35,64,0.45)"; c.lineWidth = 2;
+    for (var f = 0; f < 8; f++) { c.beginPath(); c.moveTo(300 + f * 10, 396); c.lineTo(300 + f * 10, 452); c.stroke(); }
+    rr(c, 290, 452, 60, 12, 4); fs(c, "#4B5465", 3);
+    // Fan cover with spinning blades (a clear "it is running" cue)
+    var fx = 258, fy = 424;
+    c.beginPath(); c.arc(fx, fy, 27, 0, TAU); fs(c, "#30363F", 3.5);
+    c.save(); c.translate(fx, fy); c.rotate(mp);
+    for (var b = 0; b < 4; b++) {
+      c.rotate(Math.PI / 2);
+      c.beginPath(); c.ellipse(0, -12, 6, 12, 0.5, 0, TAU); c.fillStyle = "#AEB7C4"; c.fill();
+    }
+    c.restore();
+    if (R.spin > 2) { c.beginPath(); c.arc(fx, fy, 22, 0, TAU); c.fillStyle = "rgba(174,183,196," + Math.min(0.7, (R.spin - 2) / 6) + ")"; c.fill(); }
+    c.strokeStyle = "rgba(255,255,255,0.35)"; c.lineWidth = 1.5;
+    for (var g = -18; g <= 18; g += 9) { c.beginPath(); c.moveTo(fx - 24, fy + g); c.lineTo(fx + 24, fy + g); c.stroke(); }
+    c.beginPath(); c.arc(fx, fy, 27, 0, TAU); fs(c, null, 3.5);
+    c.beginPath(); c.arc(fx, fy, 5, 0, TAU); fs(c, "#C8CDD6", 2);
+  }
+  function drawBed(c) {
+    rr(c, 40, BED_Y, 920, BED_H, 6);
+    fs(c, vgrad(c, BED_Y, BED_Y + BED_H, [[0, "#C9D1DC"], [0.22, "#9AA4B2"], [0.25, "#4B5465"], [1, "#363C49"]]), 4);
+    c.fillStyle = "#1F232C"; c.fillRect(44, BED_Y + 14, 912, 7);
+    c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(48, BED_Y + 3, 904, 2);
+  }
+  function drawHeadstock(c) {
+    var ph = R.phase;
+    // Outboard handwheel (edge-on, its knurl races round)
+    rr(c, 30, AXY - 52, 28, 104, 10); fs(c, steelH(c, 30, 58), 3.5);
+    c.save(); rr(c, 30, AXY - 52, 28, 104, 10); c.clip();
+    c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 2.5;
+    for (var k = 0; k < 14; k++) {
+      var a = ph + k * TAU / 14;
+      if (Math.sin(a) <= 0) continue;
+      var y = AXY - 50 * Math.cos(a);
+      c.beginPath(); c.moveTo(31, y); c.lineTo(57, y); c.stroke();
+    }
+    c.restore();
+    rr(c, 56, AXY - 16, 12, 32, 3); fs(c, "#8E96A2", 3);
+    // Body
+    c.beginPath();
+    c.moveTo(66, BED_Y); c.lineTo(66, 118); c.quadraticCurveTo(66, 98, 86, 98);
+    c.lineTo(262, 98); c.quadraticCurveTo(284, 98, 284, 118); c.lineTo(284, BED_Y); c.closePath();
+    fs(c, vgrad(c, 98, BED_Y, [[0, BODY_L], [0.35, BODY], [1, BODY_D]]), 4.5);
+    // Belt cover on top
+    c.beginPath(); c.moveTo(84, 100); c.lineTo(84, 76); c.quadraticCurveTo(84, 60, 100, 60); c.lineTo(206, 60); c.quadraticCurveTo(222, 60, 222, 76); c.lineTo(222, 100);
+    fs(c, vgrad(c, 60, 100, [[0, "#86B9F0"], [1, BODY]]), 4);
+    rr(c, 140, 52, 26, 12, 5); fs(c, "#2B2F3A", 3);
+    // Front details: speed-change door, spindle lock, nameplate stripes
+    rr(c, 86, 150, 120, 120, 12); fs(c, "rgba(255,255,255,0.12)", 3, "rgba(29,35,64,0.8)");
+    c.beginPath(); c.arc(190, 166, 6, 0, TAU); fs(c, "#C8CDD6", 2.5);
+    rr(c, 98, 286, 96, 18, 6); fs(c, "#FFC93C", 3);
+    c.fillStyle = "#1D2340"; for (var st = 0; st < 5; st++) c.fillRect(106 + st * 18, 290, 9, 10);
+    c.beginPath(); c.arc(246, 128, 10, 0, TAU); fs(c, "#E63946", 3);
+    // Bearing housing and spindle nose
+    rr(c, 248, AXY - 44, 44, 88, 12); fs(c, vgrad(c, AXY - 44, AXY + 44, [[0, BODY_L], [0.5, BODY], [1, BODY_D]]), 4);
+    rr(c, 290, AXY - 18, 10, 36, 3); fs(c, steelV(c, AXY - 18, AXY + 18), 3);
+    // Spur drive: four prongs turning with the work
+    for (var pr = 0; pr < 4; pr++) {
+      var pa = ph + pr * Math.PI / 2;
+      if (Math.sin(pa) < -0.2) continue;
+      var py = AXY - 13 * Math.cos(pa);
+      rr(c, 298, py - 3, 10, 6, 2); fs(c, "#D9DDE3", 2);
+    }
+  }
+  function drawTailstock(c) {
+    var ph = R.phase;
+    // Live center cone (its tip sits in the end of the blank)
+    c.beginPath(); c.moveTo(808, AXY - 14); c.lineTo(782, AXY); c.lineTo(808, AXY + 14); c.closePath();
+    fs(c, steelV(c, AXY - 14, AXY + 14), 3);
+    // Bearing housing: its dots turn with the work
+    rr(c, 806, AXY - 22, 20, 44, 6); fs(c, steelV(c, AXY - 22, AXY + 22), 3.5);
+    for (var k = 0; k < 3; k++) {
+      var a = ph + k * TAU / 3;
+      if (Math.sin(a) <= 0) continue;
+      c.beginPath(); c.arc(816, AXY - 17 * Math.cos(a), 3, 0, TAU); c.fillStyle = "#1D2340"; c.fill();
+    }
+    // Quill
+    rr(c, 824, AXY - 17, 26, 34, 4); fs(c, steelV(c, AXY - 17, AXY + 17), 3.5);
+    // Body and base
+    rr(c, 830, BED_Y - 40, 110, 42, 8); fs(c, vgrad(c, BED_Y - 40, BED_Y, [[0, BODY], [1, BODY_D]]), 4);
+    c.beginPath();
+    c.moveTo(846, BED_Y - 38); c.lineTo(846, 162); c.quadraticCurveTo(846, 138, 870, 138);
+    c.lineTo(902, 138); c.quadraticCurveTo(926, 138, 926, 162); c.lineTo(926, BED_Y - 38); c.closePath();
+    fs(c, vgrad(c, 138, BED_Y, [[0, BODY_L], [0.4, BODY], [1, BODY_D]]), 4.5);
+    rr(c, 860, 230, 52, 50, 10); fs(c, "rgba(255,255,255,0.12)", 3, "rgba(29,35,64,0.8)");
+    // Quill lock lever on top
+    line(c, 886, 140, 906, 108, 7, OUT); line(c, 886, 140, 906, 108, 3.5, "#C8CDD6");
+    c.beginPath(); c.arc(908, 104, 9, 0, TAU); fs(c, "#FFC93C", 3);
+    // Handwheel (edge-on) with handle
+    rr(c, 926, AXY - 50, 22, 100, 9); fs(c, steelH(c, 926, 948), 3.5);
+    rr(c, 946, AXY - 46, 26, 12, 5); fs(c, "#E63946", 3);
+    // Tailstock lock lever
+    line(c, 930, BED_Y - 18, 960, BED_Y + 18, 7, OUT); line(c, 930, BED_Y - 18, 960, BED_Y + 18, 3.5, "#C8CDD6");
+    c.beginPath(); c.arc(962, BED_Y + 22, 9, 0, TAU); fs(c, "#FFC93C", 3);
+  }
+  function drawBanjo(c) {
+    var bx = 545;
+    rr(c, bx - 18, REST_Y + 10, 36, BED_Y - REST_Y - 8, 5); fs(c, steelH(c, bx - 18, bx + 18), 3.5);
+    rr(c, bx - 60, BED_Y - 18, 120, 22, 6); fs(c, vgrad(c, BED_Y - 18, BED_Y + 4, [[0, "#5A6476"], [1, "#363C49"]]), 4);
+    line(c, bx + 50, BED_Y - 6, bx + 86, BED_Y + 26, 7, OUT); line(c, bx + 50, BED_Y - 6, bx + 86, BED_Y + 26, 3.5, "#C8CDD6");
+    c.beginPath(); c.arc(bx + 88, BED_Y + 30, 9, 0, TAU); fs(c, "#FFC93C", 3);
+  }
+  function drawRestBar(c) {
+    var bx = 545;
+    c.beginPath(); c.moveTo(bx - 40, REST_Y + 10); c.lineTo(bx + 40, REST_Y + 10); c.lineTo(bx + 16, REST_Y + 26); c.lineTo(bx - 16, REST_Y + 26); c.closePath();
+    fs(c, "#8E96A2", 3.5);
+    rr(c, WX0 - 4, REST_Y, WX1 - WX0 + 8, 12, 4); fs(c, steelV(c, REST_Y, REST_Y + 12), 3.5);
+  }
+  function drawGuard(c) {
+    // A clear swing-up shield on a rod above the work
+    line(c, 270, 46, 870, 46, 8, OUT); line(c, 270, 46, 870, 46, 4, "#C8CDD6");
+    rr(c, 250, 40, 22, 62, 5); fs(c, "#8E96A2", 3);
+    rr(c, 866, 40, 22, 102, 5); fs(c, "#8E96A2", 3);
+    rr(c, 300, 40, 18, 22, 4); fs(c, "#FFC93C", 3); rr(c, 772, 40, 18, 22, 4); fs(c, "#FFC93C", 3);
+    c.beginPath();
+    c.moveTo(296, 56); c.lineTo(794, 56); c.lineTo(794, 128); c.quadraticCurveTo(794, 146, 776, 146);
+    c.lineTo(314, 146); c.quadraticCurveTo(296, 146, 296, 128); c.closePath();
+    c.fillStyle = "rgba(190, 230, 255, 0.2)"; c.fill();
+    c.lineWidth = 3.5; c.strokeStyle = "rgba(29,35,64,0.6)"; c.stroke();
+    c.strokeStyle = "rgba(255,255,255,0.65)"; c.lineWidth = 5; c.lineCap = "round";
+    c.beginPath(); c.moveTo(340, 128); c.lineTo(380, 70); c.moveTo(372, 128); c.lineTo(400, 88); c.moveTo(690, 130); c.lineTo(728, 74); c.stroke();
+  }
+  // The turning tool: tip at (0,0), handle hanging down toward the turner
+  function drawTool(c, id, tx, ty, scale) {
+    var T = TOOLS[id], hw = T.hw;
+    c.save();
+    c.translate(tx, ty);
+    c.rotate(-0.17);
+    if (scale !== 1) c.scale(scale, scale);
+    var stl = hgrad(c, -hw - 2, hw + 2, [[0, "#6E7683"], [0.35, "#EEF1F5"], [0.6, "#B6BDC7"], [1, "#5D6470"]]);
+    var endW;
+    if (id === "rough") {
+      c.beginPath(); c.moveTo(-hw, 150); c.lineTo(-hw, 24); c.quadraticCurveTo(-hw, -2, 0, -2); c.quadraticCurveTo(hw, -2, hw, 24); c.lineTo(hw, 150); c.closePath();
+      fs(c, stl, 3.5);
+      c.beginPath(); c.moveTo(-hw + 6, 120); c.lineTo(-hw + 6, 26); c.quadraticCurveTo(-hw + 6, 8, 0, 8); c.quadraticCurveTo(hw - 6, 8, hw - 6, 26); c.lineTo(hw - 6, 120); c.closePath();
+      fs(c, "#3B4250", 2.5);
+      c.beginPath(); c.moveTo(-hw + 3, 20); c.quadraticCurveTo(0, 2, hw - 3, 20); c.lineWidth = 3; c.strokeStyle = "#FFFFFF"; c.stroke();
+      endW = hw;
+    } else if (id === "spindle") {
+      c.beginPath(); c.moveTo(-hw, 150); c.lineTo(-hw, 34); c.quadraticCurveTo(-hw, 4, 0, -1); c.quadraticCurveTo(hw, 4, hw, 34); c.lineTo(hw, 150); c.closePath();
+      fs(c, stl, 3.5);
+      c.beginPath(); c.moveTo(-3.5, 110); c.lineTo(-3.5, 18); c.quadraticCurveTo(0, 8, 3.5, 18); c.lineTo(3.5, 110); c.closePath();
+      fs(c, "#3B4250", 2);
+      endW = hw;
+    } else if (id === "skew") {
+      c.beginPath(); c.moveTo(-hw, 150); c.lineTo(-hw, 8); c.lineTo(hw, -6); c.lineTo(hw, 150); c.closePath();
+      fs(c, stl, 3.5);
+      c.beginPath(); c.moveTo(-hw, 8); c.lineTo(hw, -6); c.lineTo(hw, 16); c.lineTo(-hw, 30); c.closePath();
+      fs(c, "rgba(255,255,255,0.55)", 2);
+      endW = hw;
+    } else {
+      c.beginPath(); c.moveTo(-hw - 1.5, 150); c.lineTo(-hw - 1.5, 5); c.lineTo(0, -1); c.lineTo(hw + 1.5, 5); c.lineTo(hw + 1.5, 150); c.closePath();
+      fs(c, stl, 3);
+      line(c, 0, 4, 0, 146, 1.5, "rgba(29,35,64,0.5)");
+      endW = 9;
+    }
+    var fw = Math.max(13, endW + 3);
+    rr(c, -fw, 150, fw * 2, 16, 4); fs(c, hgrad(c, -fw, fw, [[0, "#B3841C"], [0.4, "#FFE08A"], [1, "#9A6E12"]]), 3.5);
+    c.beginPath();
+    c.moveTo(-13, 166); c.bezierCurveTo(-17, 200, -21, 250, -16, 298); c.quadraticCurveTo(0, 312, 16, 298); c.bezierCurveTo(21, 250, 17, 200, 13, 166); c.closePath();
+    fs(c, hgrad(c, -20, 20, [[0, "#A86F3A"], [0.4, "#E8B47A"], [1, "#8E5A2C"]]), 3.5);
+    c.save(); c.clip();
+    c.fillStyle = T.handle; c.fillRect(-25, 266, 50, 24);
+    c.restore();
+    c.beginPath(); c.moveTo(-13, 166); c.bezierCurveTo(-17, 200, -21, 250, -16, 298); c.quadraticCurveTo(0, 312, 16, 298); c.bezierCurveTo(21, 250, 17, 200, 13, 166); c.closePath();
+    fs(c, null, 3.5);
+    c.restore();
+  }
+  function drawSander(c) {
+    var x = R.sandX, i = clamp(Math.round((x - WX0) / DX), 0, N - 1);
+    var y = AXY + Math.min(S.r[i], R0) + 1;
+    c.save();
+    c.translate(x, y);
+    // hand pressing sandpaper up against the spinning work
+    rr(c, -30, 0, 60, 16, 4); fs(c, "#D9934A", 3);
+    c.fillStyle = "rgba(29,35,64,0.35)";
+    for (var k = 0; k < 12; k++) c.fillRect(-26 + (k * 37 % 52), 3 + (k * 7 % 10), 2.5, 2.5);
+    for (var f = 0; f < 4; f++) { rr(c, -26 + f * 13, 12, 12, 26, 6); fs(c, "#F2C094", 3); }
+    c.beginPath(); c.ellipse(0, 50, 30, 20, 0, 0, TAU); fs(c, "#F2C094", 3);
+    rr(c, -16, 64, 32, 40, 8); fs(c, "#5BC0EB", 3);
+    c.restore();
+  }
+
+  // ---------- Control panel: big switch and speed dial ----------
+  var hits = [];
+  function zone(kind, x, y, w, h, data) { hits.push({ kind: kind, x: x, y: y, w: w, h: h, data: data }); }
+  function pz(kind, x, y, w, h, data) { zone(kind, P.ox + x * P.s, P.oy + y * P.s, w * P.s, h * P.s, data); }
+  function drawSwitchBox(c, x, y) {
+    var on = R.on;
+    if (flashOn("switch")) { var pu = 0.5 + 0.5 * Math.sin(now * 10); rr(c, x - 8, y - 8, 186, 196, 24); c.lineWidth = 6; c.strokeStyle = "rgba(255,201,60," + (0.5 + pu * 0.5) + ")"; c.stroke(); }
+    rr(c, x, y, 170, 180, 18); fs(c, vgrad(c, y, y + 180, [[0, "#FFD966"], [1, "#F2B21C"]]), 4);
+    // pilot light
+    if (on) { c.beginPath(); c.arc(x + 85, y + 28, 24, 0, TAU); c.fillStyle = "rgba(90, 240, 140, 0.45)"; c.fill(); }
+    c.beginPath(); c.arc(x + 85, y + 28, 13, 0, TAU); fs(c, on ? "#5CF08E" : "#2F5A3D", 3);
+    // paddle in its recess
+    rr(c, x + 28, y + 50, 114, 120, 14); fs(c, "#2B2F3A", 3.5);
+    var py = lerp(y + 102, y + 56, R.sw);
+    var col = on ? "#2E9E5B" : "#E63946", colD = on ? "#1F6E3F" : "#A8232F";
+    rr(c, x + 36, py + 50, 98, 12, 6); fs(c, colD, 3);
+    rr(c, x + 36, py, 98, 58, 12); fs(c, vgrad(c, py, py + 58, [[0, on ? "#5FD08A" : "#FF6B76"], [1, col]]), 3.5);
+    label(c, on ? "ON" : "OFF", x + 85, py + 30, 34, "#FFFFFF");
+    pz("switch", x - 6, y - 6, 182, 192);
+  }
+  function drawDial(c, cx, cy) {
+    var i;
+    if (flashOn("dial")) { var pu = 0.5 + 0.5 * Math.sin(now * 10); c.beginPath(); c.arc(cx, cy, 70, 0, TAU); c.lineWidth = 6; c.strokeStyle = "rgba(255,201,60," + (0.5 + pu * 0.5) + ")"; c.stroke(); }
+    // colored speed arc
+    var cols = ["#9AA4B2", "#5FD08A", "#FFC93C", "#FF8A3D"];
+    for (i = 0; i < 3; i++) {
+      c.beginPath(); c.arc(cx, cy, 60, DIAL_ANG[i] - Math.PI / 2, DIAL_ANG[i + 1] - Math.PI / 2);
+      c.lineWidth = 12; c.strokeStyle = OUT; c.lineCap = "butt"; c.stroke();
+      c.lineWidth = 7; c.strokeStyle = cols[i + 1]; c.stroke();
+    }
+    for (i = 0; i < 4; i++) {
+      var a = DIAL_ANG[i], tx = cx + Math.sin(a) * 60, ty = cy - Math.cos(a) * 60;
+      c.beginPath(); c.arc(tx, ty, 7, 0, TAU); fs(c, cols[i], 3);
+    }
+    // labels
+    var L = [[cx - 74, cy + 30, "right"], [cx - 44, cy - 60, "right"], [cx + 44, cy - 60, "left"], [cx + 74, cy + 30, "left"]];
+    for (i = 0; i < 4; i++) {
+      var sel = S.speed === i;
+      c.font = "800 24px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
+      var w = c.measureText(SPEED_NAMES[i]).width, lx = L[i][2] === "right" ? L[i][0] - w : L[i][0];
+      if (sel) { rr(c, lx - 7, L[i][1] - 16, w + 14, 32, 10); fs(c, "#FFC93C", 3); }
+      label(c, SPEED_NAMES[i], lx + w / 2, L[i][1] + 1, 24, sel ? "#1D2340" : "#FFFFFF");
+      pz("speed", lx - 12, L[i][1] - 22, w + 24, 44, i);
+    }
+    // knob
+    c.beginPath(); c.arc(cx, cy, 46, 0, TAU);
+    var g = c.createRadialGradient(cx - 14, cy - 16, 4, cx, cy, 46);
+    g.addColorStop(0, "#5A6170"); g.addColorStop(1, "#22262F");
+    fs(c, g, 4);
+    for (i = 0; i < 16; i++) {
+      var ra = R.dialA + i * TAU / 16;
+      c.beginPath(); c.arc(cx + Math.sin(ra) * 41, cy - Math.cos(ra) * 41, 3, 0, TAU); c.fillStyle = "#14171D"; c.fill();
+    }
+    c.save(); c.translate(cx, cy); c.rotate(R.dialA);
+    rr(c, -6, -40, 12, 34, 5); fs(c, "#FFC93C", 3);
+    c.restore();
+    c.beginPath(); c.arc(cx, cy, 13, 0, TAU); fs(c, steelV(c, cy - 13, cy + 13), 3);
+    pz("knob", cx - 50, cy - 50, 100, 100, { cx: P.ox + cx * P.s, cy: P.oy + cy * P.s });
+  }
+  function drawPanel(c) {
+    panelXf();
+    if (P.vert) { drawSwitchBox(c, 60, 12); drawDial(c, 140, 280); }
+    else { drawSwitchBox(c, 14, 10); drawDial(c, 330, 116); }
+  }
+
+  // ---------- The shelf of finished pieces ----------
+  function shelfGeom() {
+    var K = Math.round(clamp(Math.floor(SH.w / 115), 3, 7));
+    var x0 = SH.x + 8, w = SH.w - 16;
+    var slotW = w / K;
+    var plankY = SH.y + SH.h - 18;
+    var ss = Math.min((slotW - 14) / (WX1 - WX0), (SH.h - 52) / (2 * RC));
+    return { K: K, slotW: slotW, ss: ss, plankY: plankY, axisY: plankY - 4 - RC * ss, slotX: function (i) { return x0 + slotW * (i + 0.5); } };
+  }
+  function drawShelf(c) {
+    screenXf();
+    rr(c, SH.x, SH.y, SH.w, SH.h, 16); fs(c, "rgba(255,255,255,0.35)", 3, "rgba(29,35,64,0.6)");
+    var g = shelfGeom();
+    rr(c, SH.x + 4, g.plankY, SH.w - 8, 14, 4); fs(c, vgrad(c, g.plankY, g.plankY + 14, [[0, "#E2A866"], [1, "#B7793F"]]), 3);
+    var vis = S.shelf.slice(-g.K);
+    var hidingNew = R.seq && R.seq.kind === "done" && R.seq.stage === "away";
+    for (var i = 0; i < vis.length; i++) {
+      var cx = g.slotX(i), p = vis[i];
+      [-1, 1].forEach(function (sd) {
+        var bx = cx + sd * (WX1 - WX0) * g.ss * 0.32;
+        c.beginPath(); c.moveTo(bx - 9, g.plankY); c.lineTo(bx - 9, g.plankY - 7); c.lineTo(bx - 3, g.plankY - 7); c.lineTo(bx, g.plankY - 3); c.lineTo(bx + 3, g.plankY - 7); c.lineTo(bx + 9, g.plankY - 7); c.lineTo(bx + 9, g.plankY); c.closePath();
+        fs(c, "#8E5A2C", 2);
+      });
+      var pop = (i === vis.length - 1 && flashOn("shelf")) ? 1 + 0.12 * Math.sin((R.flash.shelf - now) * 8) : 1;
+      var ss = g.ss * pop;
+      drawPiece(c, p, cx - (WX0 + WX1) / 2 * ss, g.axisY - AXY * ss, ss, false);
+    }
+    if (!vis.length && !hidingNew) {
+      label(c, "Finished pieces go here", SH.x + SH.w / 2, g.plankY - 22, Math.max(14, Math.min(22, SH.h * 0.17)), "rgba(29,35,64,0.45)", "center", 700);
+    }
+    // Counter
+    var fsz = Math.round(clamp(SH.h * 0.2, 15, 24));
+    c.font = "800 " + fsz + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
+    var txt = "Pieces: " + S.pieces, tw = c.measureText(txt).width;
+    rr(c, SH.x + 8, SH.y + 6, tw + 22, fsz + 12, 10); fs(c, flashOn("shelf") ? "#FFC93C" : "#FFFFFF", 3);
+    label(c, txt, SH.x + 19 + tw / 2, SH.y + 6 + (fsz + 12) / 2 + 1, fsz, OUT);
+    // Sparkles
+    for (var k = 0; k < screenStars.length; k++) {
+      var st = screenStars[k], a = Math.max(0, 1 - st.t / 0.9);
+      c.globalAlpha = a;
+      c.save(); c.translate(st.x, st.y); c.rotate(st.t * 4);
+      c.beginPath();
+      for (var j = 0; j < 8; j++) { var r3 = j % 2 ? st.s * 0.3 : st.s; c.lineTo(Math.cos(j * Math.PI / 4) * r3, Math.sin(j * Math.PI / 4) * r3); }
+      c.closePath(); c.fillStyle = "#FFF6B0"; c.fill(); c.lineWidth = 2; c.strokeStyle = "#E8B83A"; c.stroke();
+      c.restore();
+    }
+    c.globalAlpha = 1;
+  }
+  function updateScreenStars(dt) {
+    for (var i = screenStars.length - 1; i >= 0; i--) {
+      var s = screenStars[i];
+      s.t += dt; s.x += s.vx * dt; s.y += s.vy * dt;
+      if (s.t > 0.9) screenStars.splice(i, 1);
+    }
+  }
+
+  // Timer ring in the corner of the lathe area
+  var TI = { phase: "idle", fraction: 0, minutes: 0, showMinutes: false };
+  function drawTimerBadge(c) {
+    if (TI.phase !== "running" && TI.phase !== "ending") return;
+    screenXf();
+    var f = TI.fraction;
+    var r = Math.max(16, Math.min(28, M.w * 0.04));
+    var x = M.x + r + 6, y = M.y + r + 6;
+    c.beginPath(); c.arc(x, y, r, 0, TAU); fs(c, "#FFFFFF", 3);
+    if (f > 0.002) {
+      c.beginPath(); c.arc(x, y, r - 6, -Math.PI / 2, -Math.PI / 2 + f * TAU);
+      c.strokeStyle = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00"); c.lineWidth = 8; c.lineCap = "butt"; c.stroke();
+    }
+    if (TI.showMinutes && TI.phase === "running") label(c, String(TI.minutes), x, y + 1, r * 0.8, OUT);
+  }
+
+  function draw() {
+    hits = [];
+    screenXf();
+    ctx.drawImage(bgCanvas, 0, 0, CW, CH);
+    drawShelf(ctx);
+    drawPanel(ctx);
+    // the lathe
+    ctx.save();
+    screenXf();
+    ctx.beginPath(); ctx.rect(M.x - 4, M.y - 4, M.w + 8, M.h + 8); ctx.clip();
+    var shx = R.shake > 0.05 ? rnd(-1, 1) * R.shake : 0, shy = R.shake > 0.05 ? rnd(-1, 1) * R.shake : 0;
+    ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * (M.ox + shx), DPR * (M.oy + shy));
+    drawLatheBack(ctx);
+    drawBed(ctx);
+    drawHeadstock(ctx);
+    drawTailstock(ctx);
+    drawBanjo(ctx);
+    // the work
+    var q = R.seq, showLive = true, dropY = 0;
+    if (q && q.stage === "away") showLive = false;
+    if (q && q.stage === "in") dropY = -(1 - ease(Math.min(1, q.t / 0.55))) * 260;
+    if (showLive) drawPiece(ctx, S, M.ox + shx, M.oy + shy + dropY * M.s, M.s, !q || q.stage === "stop");
+    if (q && q.stage === "away" && q.kind === "new") {
+      var ft = Math.min(1, q.t / 0.95);
+      drawPiece(ctx, q.piece, M.ox + ft * 120 * M.s, M.oy + (ft * ft * 520) * M.s, M.s, false);
+    }
+    ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * (M.ox + shx), DPR * (M.oy + shy));
+    drawGuard(ctx);
+    drawRestBar(ctx);
+    var pop = 1 + 0.15 * Math.sin(R.toolPop * Math.PI);
+    if (!R.sand) drawTool(ctx, S.tool, R.tipX, AXY + R.tipD, pop);
+    else drawSander(ctx);
+    // "drag the tool" hint while spinning
+    if (!R.toolHeld && !R.sand && !R.seq && R.spin > 1 && !R.everCut) {
+      var hy = AXY + R.tipD + 150, pu = 0.5 + 0.5 * Math.sin(now * 6);
+      ctx.beginPath(); ctx.arc(R.tipX - 20, hy, 34 + pu * 8, 0, TAU);
+      ctx.lineWidth = 5; ctx.strokeStyle = "rgba(255,201,60," + (0.5 + 0.5 * pu) + ")"; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(R.tipX + 46, hy + 20); ctx.lineTo(R.tipX + 46, hy - 40 - pu * 10);
+      ctx.moveTo(R.tipX + 32, hy - 24 - pu * 10); ctx.lineTo(R.tipX + 46, hy - 40 - pu * 10); ctx.lineTo(R.tipX + 60, hy - 24 - pu * 10);
+      ctx.lineWidth = 7; ctx.strokeStyle = "#FFC93C"; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+    }
+    drawParts(ctx);
+    ctx.restore();
+    // a finished piece flying to the shelf
+    if (q && q.stage === "away" && q.kind === "done") {
+      var g = shelfGeom(), t = ease(Math.min(1, q.t / 0.95));
+      var ts = g.ss, tox = g.slotX(q.slot) - (WX0 + WX1) / 2 * ts, toy = g.axisY - AXY * ts;
+      var s = lerp(q.from.s, ts, t), ox = lerp(q.from.ox, tox, t), oy = lerp(q.from.oy, toy, t) - Math.sin(Math.PI * t) * 60;
+      drawPiece(ctx, q.piece, ox, oy, s, false);
+    }
+    drawTimerBadge(ctx);
+  }
+
+  // ---------- Touch input (several fingers at once) ----------
+  var drags = {};
+  function localPt(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function inZone(z, p) { return p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h; }
+  function toolDragging() { for (var k in drags) if (drags[k].type === "tool") return true; return false; }
+  function setToolX(wx, jump) { var T = TOOLS[S.tool], rg = toolRange(T); R.wantX = clamp(wx, rg[0], rg[1]); if (jump) R.tipX = R.wantX; }
+  function toggleSwitch() {
+    if (busy() || R.seq) return;
+    R.on = !R.on;
+    if (R.on && S.speed === 0) { S.speed = 1; save(); }
+    blip(R.on ? 440 : 160, 0.1, 0.08, "triangle", R.on ? 660 : 90);
+    R.flash.switch = 0;
+  }
+  function setSpeed(k) {
+    if (busy()) return;
+    if (S.speed === k) return;
+    S.speed = k; save();
+    R.flash.dial = 0;
+    blip(300 + k * 160, 0.06, 0.06, "triangle");
+  }
+  function dialAngleToSpeed(a) {
+    var best = 0, bd = 9;
+    for (var i = 0; i < 4; i++) { var d = Math.abs(a - DIAL_ANG[i]); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  function onDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    ensureAudio();
+    if (busy()) return;
+    var p = localPt(e), d = null, i, z;
+    for (i = hits.length - 1; i >= 0 && !d; i--) {
+      z = hits[i];
+      if (!inZone(z, p)) continue;
+      if (z.kind === "switch") { toggleSwitch(); d = { type: "none" }; }
+      else if (z.kind === "speed") { setSpeed(z.data); d = { type: "none" }; }
+      else if (z.kind === "knob") d = { type: "knob", c: z.data, sx: p.x, sy: p.y, moved: false };
+    }
+    if (!d && p.x >= M.x && p.x <= M.x + M.w && p.y >= M.y && p.y <= M.y + M.h) {
+      if (R.seq || R.sand || toolDragging()) d = { type: "none" };
+      else {
+        var w = toWorld(p.x, p.y);
+        d = { type: "tool", y0: p.y, d0: R.tipD };
+        R.toolHeld = true;
+        R.wantD = R.tipD;
+        setToolX(w.x, true);
+      }
+    }
+    if (!d) return;
+    drags[e.pointerId] = d;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  }
+  function onMove(e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    e.preventDefault();
+    var p = localPt(e);
+    if (busy()) { endDrag(e.pointerId); return; }
+    if (d.type === "tool") {
+      if (R.seq || R.sand) { endDrag(e.pointerId); return; }
+      var w = toWorld(p.x, p.y);
+      setToolX(w.x);
+      var gain = Math.max(1, 110 / ((TIP_MAX - 10) * M.s));
+      var T = TOOLS[S.tool];
+      R.wantD = clamp(d.d0 + (p.y - d.y0) / M.s * gain, T.minR, TIP_MAX);
+      // Pushed past the wood: keep the start point so pulling back answers at once
+      if (R.wantD <= T.minR) { d.d0 = T.minR; d.y0 = p.y; }
+      if (R.wantD >= TIP_MAX) { d.d0 = TIP_MAX; d.y0 = p.y; }
+    } else if (d.type === "knob") {
+      if (Math.hypot(p.x - d.sx, p.y - d.sy) > 10) d.moved = true;
+      if (d.moved) {
+        var a = Math.atan2(p.x - d.c.cx, -(p.y - d.c.cy));
+        setSpeed(dialAngleToSpeed(clamp(a, -2.2, 2.2)));
+      }
+    }
+  }
+  function endDrag(pid) {
+    var d = drags[pid];
+    delete drags[pid];
+    if (!d) return;
+    if (d.type === "tool") { R.toolHeld = false; save(); }
+    if (d.type === "knob" && !d.moved && !busy()) setSpeed((S.speed + 1) % 4);
+  }
+  function onUp(e) { if (drags[e.pointerId]) endDrag(e.pointerId); }
+  cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointermove", onMove);
+  cv.addEventListener("pointerup", onUp);
+  cv.addEventListener("pointercancel", onUp);
+  cv.addEventListener("lostpointercapture", function (e) { if (drags[e.pointerId]) endDrag(e.pointerId); });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+
+  // ---------- Toolbar: tools, New blank, Sand, Done ----------
+  function toolSVG(id) {
+    var T = TOOLS[id], s = '<svg viewBox="0 0 124 36" aria-hidden="true">';
+    s += '<path d="M4 12 Q2 18 4 24 L50 26 L50 10 Z" fill="#D9A066" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>';
+    s += '<path d="M4 12 Q2 18 4 24 L16 24.6 L16 11.4 Z" fill="' + T.handle + '" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>';
+    s += '<rect x="50" y="9" width="9" height="18" rx="2" fill="#E8B83A" stroke="#1D2340" stroke-width="3"/>';
+    if (id === "rough") s += '<path d="M59 8 L106 8 Q120 8 120 18 Q120 28 106 28 L59 28 Z" fill="#D9DDE3" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M66 13 L104 13 Q113 13 113 18 Q113 23 104 23 L66 23 Z" fill="#3B4250"/>';
+    else if (id === "spindle") s += '<path d="M59 12 L104 12 Q118 13 120 18 Q118 23 104 24 L59 24 Z" fill="#D9DDE3" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M66 16.5 L108 17 Q112 18 108 19 L66 19.5 Z" fill="#3B4250"/>';
+    else if (id === "skew") s += '<path d="M59 10 L110 10 L120 26 L59 26 Z" fill="#D9DDE3" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M102 10 L110 10 L120 26 L112 26 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/>';
+    else s += '<path d="M59 14 L114 14 L120 18 L114 22 L59 22 Z" fill="#D9DDE3" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>';
+    return s + "</svg>";
+  }
+  function buildToolbar() {
+    var tb = $("tools");
+    TOOL_ORDER.forEach(function (id) {
+      var b = document.createElement("button");
+      b.className = "btn tool";
+      b.setAttribute("data-tool", id);
+      b.setAttribute("aria-label", TOOLS[id].name);
+      b.innerHTML = toolSVG(id) + '<span class="long">' + TOOLS[id].name + '</span><span class="short">' + TOOLS[id].short + "</span>";
+      tb.appendChild(b);
+    });
+    var wd = $("woods");
+    WOOD_ORDER.forEach(function (w) {
+      var W = WOODS[w], b = document.createElement("button");
+      b.className = "btn wood";
+      b.setAttribute("data-wood", w);
+      b.innerHTML = '<svg viewBox="0 0 70 70" aria-hidden="true"><rect x="6" y="6" width="58" height="58" rx="6" fill="' + W.base + '" stroke="#1D2340" stroke-width="4"/>' +
+        '<path d="M14 20 Q35 14 56 22 M12 34 Q35 28 58 36 M14 48 Q35 42 56 50" fill="none" stroke="' + W.dark + '" stroke-width="3" stroke-linecap="round" opacity="0.7"/></svg><span>' + W.name + "</span>";
+      wd.appendChild(b);
+    });
+  }
+  function updateToolbar() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tool]"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-tool") === S.tool ? "true" : "false");
+    });
+  }
+  function selectTool(id) {
+    if (busy() || !TOOLS[id]) return;
+    if (S.tool !== id) { S.tool = id; R.toolPop = 1; setToolX(R.tipX, true); save(); blip(640, 0.05, 0.05, "triangle"); }
+    updateToolbar();
+  }
+  function showPicker() { if (busy() || R.seq) return; $("picker").hidden = false; }
+  function hidePicker() { $("picker").hidden = true; }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target.closest("button") : null;
+    if (!t) { if (e.target === $("picker")) hidePicker(); return; }
+    if (t.hasAttribute("data-tool")) selectTool(t.getAttribute("data-tool"));
+    else if (t.hasAttribute("data-wood")) newBlank(t.getAttribute("data-wood"));
+    else if (t.id === "newBtn") showPicker();
+    else if (t.id === "pcancel") hidePicker();
+    else if (t.id === "sandBtn") startSand();
+    else if (t.id === "doneBtn") doneBtn();
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.key === " " || e.key === "Enter") && e.target === document.body && !busy() && !Toybox.sheetOpen()) { e.preventDefault(); toggleSwitch(); }
+    if (e.key === "Escape" && !$("picker").hidden) hidePicker();
+  });
+
+  // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
+  // Ending: the lathe switches off ("Switch off" button, or by itself) and the work spins down to a stop.
+  var endingDone = null;
+  function goodbyeOn() {
+    try { var t = JSON.parse(localStorage.getItem("toybox-timer-v1") || "null"); return !t || t.goodbye !== false; } catch (e) { return true; }
+  }
+  function onEnding(done) {
+    endingDone = done;
+    drags = {};
+    R.toolHeld = false;
+    R.sand = null;
+    hidePicker();
+    if (!goodbyeOn()) R.on = false;
+    else if (!R.on) {
+      setTimeout(function () { var gb = $("tb-goodbye"); if (Toybox.timer.phase() === "ending" && gb && !gb.hidden) gb.click(); }, 0);
+    }
+  }
+  function goodbye() {
+    if (R.on) blip(140, 0.12, 0.08, "sine", 80);
+    R.on = false;
+  }
+  function endingFrame() {
+    if (endingDone && !R.on && R.spin < 0.02 && !R.seq) { endingDone(); endingDone = null; }
+  }
+  function onRest() { endingDone = null; R.on = false; R.spin = 0; save(); }
+  function onWake() { endingDone = null; }
+  function restArt() {
+    // A small lathe with a finished spindle between centers, switched off
+    return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' +
+      '<path d="M40 150 L64 150 L70 190 L34 190 Z M176 150 L200 150 L206 190 L170 190 Z" fill="#3A4150" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<rect x="12" y="136" width="216" height="16" rx="4" fill="#9AA4B2" stroke="#1D2340" stroke-width="4"/>' +
+      '<path d="M20 136 L20 76 Q20 66 30 66 L68 66 Q78 66 78 76 L78 136 Z" fill="#3E86D8" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<rect x="176" y="84" width="40" height="52" rx="10" fill="#3E86D8" stroke="#1D2340" stroke-width="4"/>' +
+      '<path d="M84 104 L96 104 Q104 92 112 104 L126 104 Q134 90 146 104 L170 104 L170 116 L146 116 Q134 130 126 116 L112 116 Q104 128 96 116 L84 116 Z" fill="#EFCB8A" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<path d="M78 104 L84 110 L78 116 Z M176 104 L170 110 L176 116 Z" fill="#C8CDD6" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      '<rect x="96" y="126" width="64" height="8" rx="3" fill="#C8CDD6" stroke="#1D2340" stroke-width="3"/>' +
+      '<circle cx="49" cy="96" r="9" fill="#E63946" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M190 34 q8 -8 16 0 M196 22 q6 -6 12 0" fill="none" stroke="#2D5BD7" stroke-width="3" stroke-linecap="round"/>' +
+      '<text x="200" y="50" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#2D5BD7">z</text>' +
+      '<text x="214" y="36" font-family="Baloo 2, sans-serif" font-weight="800" font-size="14" fill="#2D5BD7">z</text></svg>';
+  }
+
+  // ---------- Start up ----------
+  buildToolbar();
+  updateToolbar();
+  for (var i0 = 0; i0 < N; i0++) if (S.r[i0] < RC - 2) { R.everCut = true; break; }
+  resize();
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+  if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
+
+  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
+  Toybox.init({
+    app: "workshop-lathe",
+    grownButton: $("gubtn"),
+    grownLabel: ["Grown-ups", "⏱ Grown-ups"],
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the lathe switches off, spins down to a stop and rests, and the controls lock. The timer carries on across Workshop pages.",
+    goodbyeOption: "End with a “Switch off” button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Switch off",
+    farewellDone: "Bye bye!",
+    restLine: "The lathe is resting.",
+    restLine2: "Your piece will be right here next time.",
+    restArt: restArt,
+    soundNote: "Motor hum and a soft cutting sound. Hold for 2 seconds.",
+    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    onEnding: onEnding,
+    onGoodbye: goodbye,
+    onRest: onRest,
+    onWake: onWake,
+    onBig: function () { resize(); },
+    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
+    onTimer: function (info) { TI = info; }
+  });
+
+  var lastLabel = "";
+  function updateAria() {
+    var t = "Lathe, " + (R.on ? "switched on, speed " + SPEED_NAMES[S.speed] : "switched off") + ". " +
+      WOODS[S.wood].name + " blank" + (R.everCut ? ", being turned" : ", still square") + ". Tool: " + TOOLS[S.tool].name + ". Pieces: " + S.pieces + ".";
+    if (t !== lastLabel) { lastLabel = t; cv.setAttribute("aria-label", t); }
+  }
+  var lastT = performance.now(), ariaAt = 0;
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    lastT = t;
+    now = t / 1000;
+    if (Toybox.timer.phase() !== "resting") {
+      updateMachine(dt);
+      updateSeq(dt);
+      updateTool(dt);
+      updateSand(dt);
+      updateParts(dt);
+      updateScreenStars(dt);
+      if (Toybox.timer.phase() === "ending") endingFrame();
+      draw();
+      if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
+    }
+    updateSound();
+    requestAnimationFrame(frame);
+  }
+  if (params.debug === "1") window.__lathe = { S: function () { return S; }, R: R, M: function () { return M; }, P: function () { return P; }, hits: function () { return hits; }, parts: function () { return parts.length; } };
+  requestAnimationFrame(frame);
+})();
+</script>
+<!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Workshop page. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "toybox-timer-v1", GEAR_KEY = "workshop-gear", SKIP_KEY = "workshop-check-skip";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["gog", "Eye protection?"], ["muf", "Ear protection?"]];
+
+  function gearOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return false; } }
+  // A full gear-up just happened (the Tool Wall sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  // The shared timer is winding down or resting (or has just run out and not caught up yet).
+  function timerBusy() {
+    try { if (window.Toybox && Toybox.timer && Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+    try {
+      var t = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (!t) return false;
+      if (t.phase === "ending" || t.phase === "resting") return true;
+      return t.phase === "running" && typeof t.endAt === "number" && t.endAt > 0 && t.endAt <= Date.now();
+    } catch (e) { return false; }
+  }
+  // The Tool Wall with ?next= sends you straight on to that station, which does its own check.
+  function redirecting() { return /(^|[?&])next=/.test(location.search); }
+
+  // ---------- The worker, wearing the gear (same drawing as the Tool Wall gear-up) ----------
+  var O = "#1D2340", YEL = "#FFC93C", ORG = "#F77F00", RED = "#E63946", BLU = "#2D5BD7", BLK = "#343944", SKIN = "#F5C9A0", HAIR = "#7A4A2A";
+  function n2(v) { return Math.round(v * 10) / 10; }
+  function P(d, f, w, x) { return '<path d="' + d + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (w == null ? 3 : w) + '" stroke-linejoin="round" stroke-linecap="round"' + (x || "") + "/>"; }
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    if (!r) return "M" + n2(x) + " " + n2(y) + "h" + n2(w) + "v" + n2(h) + "h" + n2(-w) + "Z";
+    return "M" + n2(x + r) + " " + n2(y) + "H" + n2(x + w - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w) + " " + n2(y + r) +
+      "V" + n2(y + h - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w - r) + " " + n2(y + h) +
+      "H" + n2(x + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x) + " " + n2(y + h - r) +
+      "V" + n2(y + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + r) + " " + n2(y) + "Z";
+  }
+  function R(x, y, w, h, f, r, sw) { return P(rr(x, y, w, h, r), f, sw); }
+  function C(cx, cy, r, f, sw) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (sw == null ? 3 : sw) + '"/>'; }
+  function Cf(cx, cy, r, f) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + f + '"/>'; }
+  function L(x1, y1, x2, y2, c, w) { return '<path d="M' + n2(x1) + " " + n2(y1) + "L" + n2(x2) + " " + n2(y2) + '" stroke="' + (c || O) + '" stroke-width="' + (w || 3) + '" stroke-linecap="round" fill="none"/>'; }
+  function bar(d, c, w) {
+    return '<path d="' + d + '" fill="none" stroke="' + O + '" stroke-width="' + (w + 6) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  function G(t, inner, x) { return "<g" + (t ? ' transform="' + t + '"' : "") + (x || "") + ">" + inner + "</g>"; }
+  function gogglesArt() {
+    return R(-96, -8, 192, 16, BLK, 7) +
+      P(rr(-68, -30, 136, 60, 27), YEL, 4) + P(rr(-60, -22, 54, 44, 19), "#B9E4FF", 3) + P(rr(6, -22, 54, 44, 19), "#B9E4FF", 3) +
+      L(-48, -10, -36, -15, "#FFFFFF", 5) + L(18, -10, 30, -15, "#FFFFFF", 5) + P("M-10 30 Q0 16 10 30", SKIN, 3);
+  }
+  function muffsArt() {
+    return bar("M-88 -2 C-88 -150 88 -150 88 -2", BLK, 10) +
+      R(-112, -32, 40, 66, ORG, 18) + R(-80, -26, 10, 54, BLK, 5) + L(-104, -18, -104, 20, "#FFC37A", 4) +
+      R(72, -32, 40, 66, ORG, 18) + R(70, -26, 10, 54, BLK, 5) + L(104, -18, 104, 20, "#FFC37A", 4);
+  }
+  function workerSVG() {
+    var o = P("M26 330 Q34 248 150 238 Q266 248 274 330 Z", "#F77F00") +
+      P("M92 330 L98 268 L202 268 L208 330 Z", BLU) + L(104, 270, 84, 246, BLU, 12) + L(196, 270, 216, 246, BLU, 12) +
+      C(104, 272, 5, YEL, 2) + C(196, 272, 5, YEL, 2) + R(128, 284, 44, 30, "#4A73DF", 6) + R(148, 270, 8, 22, RED, 2, 2.5) +
+      R(128, 210, 44, 40, SKIN, 12) + C(60, 142, 17, SKIN) + C(240, 142, 17, SKIN) + C(150, 138, 92, SKIN) +
+      P("M60 128 Q56 46 150 42 Q244 46 240 128 Q228 92 198 84 Q172 102 142 86 Q100 78 60 128 Z", HAIR) +
+      L(98, 106, 128, 100, HAIR, 7) + L(172, 100, 202, 106, HAIR, 7) +
+      C(114, 134, 11, O, 0) + Cf(118, 130, 4, "#FFFFFF") + C(186, 134, 11, O, 0) + Cf(190, 130, 4, "#FFFFFF") +
+      P("M146 148 Q150 160 158 152", "none", 4) + Cf(92, 168, 14, "rgba(242,108,167,0.35)") + Cf(208, 168, 14, "rgba(242,108,167,0.35)") +
+      P("M116 176 Q150 210 184 176 Q150 192 116 176 Z", "#C2405A", 4) +
+      G("", G("translate(150 134)", gogglesArt()), ' class="sc-g" data-k="gog"') +
+      G("", G("translate(150 142)", muffsArt()), ' class="sc-g" data-k="muf"');
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(600px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,320px);aspect-ratio:280/326;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#F6DDB0;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0}.sc.out:not(.held){pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-10%)}}" +
+    "@media (max-height:600px){.sc-man-wrap{height:26vh}.sc ul{gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], held = null, swallowUntil = 0;
+  // A soft rising pop per tick, only when the shared Toybox sound is on and the audio engine is running.
+  function pop(n) {
+    try {
+      var actx = window.Toybox && Toybox.sound && Toybox.sound.ready();
+      if (!actx) return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 140;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = [];
+    var node = el;
+    node.classList.add("out");
+    // A finger still down on the (now invisible) card keeps it in place until lifted, so the lift and
+    // its click never land on a button underneath.
+    function gone() { if (held !== null && el === node) { timers.push(setTimeout(gone, 120)); return; } if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }
+    setTimeout(gone, reduce ? 160 : (fast ? 260 : 420));
+  }
+  function show() {
+    if (el) return;
+    if (!gearOn() || takeSkip() || redirecting() || timerBusy()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Safety check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Safety check!</h2><div class="sc-man-wrap"><svg viewBox="10 4 280 326" aria-hidden="true">' + workerSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      held = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      close(true);
+    });
+    function release(e) { if (held === null) return; e.stopPropagation(); held = null; swallowUntil = Date.now() + 450; if (el) el.classList.remove("held"); }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1500);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
+      later(function () { close(false); }, 1600);
+    }
+  }
+  // The click that follows the skipping tap is swallowed (it must not press what is underneath).
+  document.addEventListener("click", function (e) { if (held !== null || Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function (e) { if (el && !el.classList.contains("out") && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); close(true); } }, true);
+  // The timer ended on another page: get out of the way of the rest screen.
+  window.addEventListener("storage", function (e) { if ((e.key === TKEY || e.key === null) && el && timerBusy()) close(true); });
+  // Coming back with the Back button (page restored from memory) counts as arriving again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) show(); });
+  if (navigator.webdriver) window.__safetyCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  show();
+})();
+</script>
+<script>
+  // Offline support: register the Workshop service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
