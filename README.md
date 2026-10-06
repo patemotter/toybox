@@ -8,24 +8,26 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Kaleidoscope: finger painting mirrored into a big spinning pattern | [`kaleidoscope/`](kaleidoscope/) |
 | Fish Tank: feed fish, make them flip, and fill the tank | [`fish-tank/`](fish-tank/) |
 | Peg Drop: drop balls through glowing pegs and count them in the bins | [`peg-drop/`](peg-drop/) |
-| Rocket Builder: build a rocket, count down, and launch it into space | [`rocket-builder/`](rocket-builder/) |
+| Rocket Builder: build a rocket and fly it to the Moon, to Mars or past every planet | [`rocket-builder/`](rocket-builder/) |
 | Color Mixing: pour paints, stir with a finger, and name the new color | [`color-mixing/`](color-mixing/) |
 | Workshop: safety gear, a Tool Wall of 81 tools, and eight stations: Drill Press, Saw Bench, Hammer & Screws, Lathe, Router Table, Wrenches & Sockets, Measuring and Shadow Board | [`workshop/`](workshop/) |
-| Gear Box: build gear trains and crank them, with speeds, ratios and turns | [`gear-box/`](gear-box/) |
-| Marble Run: five marble runs with a plunger, a Drop button and a lift that loops them | [`marble-run/`](marble-run/) |
+| Gear Box: build gear trains on a pegboard and turn them with a crank or a motor | [`gear-box/`](gear-box/) |
+| Marble Run: marble runs with wheels, funnels and a conveyor or spiral lift that loops them | [`marble-run/`](marble-run/) |
 | Car Builder: build construction vehicles, fast cars and monster trucks, then drive them | [`car-builder/`](car-builder/) |
 | Math Grid: a big times and plus table to tap, drag and build blocks on | [`math-grid/`](math-grid/) |
 | 3D Printer: pick spool colors, print a Benchy layer by layer, and fill your shelf | [`3d-printer/`](3d-printer/) |
 | Engine Room: look inside a car engine, a steam engine and a gearbox, and run them | [`engine-room/`](engine-room/) |
 | Water Works: a water table to pour into funnels, turn valves and spin water wheels | [`water-works/`](water-works/) |
 | Construction Site: gear up, then bulldozer, excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
-| Train Builder: Couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station. | [`train-builder/`](train-builder/) |
+| Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 
 The top-level `index.html` is a launcher with a big button for each app.
 
+**Working on it (people or agents):** read [`AGENTS.md`](AGENTS.md) first: who it's for, the design rules, the architecture, testing and deploy. [`PLAN.md`](PLAN.md) has the backlog and plans for new apps.
+
 ## Use it offline
 
-1. Open the site on the tablet or phone while online: `https://patemotter.github.io/toybox/`.
+1. Open the site on the tablet or phone while online: `https://patemotter.com/toybox/`.
 2. Add it to the home screen (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app).
 3. Open it once from the home screen and wait a few seconds. The launcher's service worker caches the launcher and every app, so after that everything runs with no network.
 

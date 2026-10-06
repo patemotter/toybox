@@ -1,7 +1,8 @@
 # Toybox plan
 
 Living plan for the apps still to build. Each section doubles as the spec an agent gets.
-Shared rules for every app are in "Every app" at the bottom.
+**Read [`AGENTS.md`](AGENTS.md) first**: it has every rule and decision (who it is for, numbers, pace, layout,
+intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Every app" at the bottom is a summary.
 
 ## Order
 
@@ -220,116 +221,45 @@ Each is its own page in `workshop/`, linked from the Tool Wall, sharing the gear
 
 ## 8. UI polish pass
 
-After everything is in. Collect the "UI issues noticed but not polished" lists that each agent reports, then fix them across the apps.
+Done so far (see `AGENTS.md` for the resulting rules): number cleanup, iPhone declutter, slower pacing, fresh start
+from the home screen, real machine controls, no insets, idle ghost hands and coach lines in every app, bigger
+scenes on upright phones.
 
-Known so far:
-- **Hammer & Screws:**
-  - The raised hammer is cut off on iPhone.
-  - The coach line wraps on the power drivers.
-  - The drill overlaps the Turns readout on iPad.
-  - The ghost hint is a dot rather than a finger.
-- **Peg Drop:** the rest screen in Big mode hasn't been checked.
-- **Spin Shop:** Min/Max hide next to the ceiling-fan lights counter on narrow phones.
-- **Color Mixing:** the My colors area is empty on iPad portrait until colors are saved.
-- **Water Works** (redesigned as the water table):
-  - On phones the controls are small and the panel has empty space.
-  - "Meet up" layout: one sunflower gets no stream.
-  - The brush cup overlaps the toys, and the squeegee hangs over a leg.
-  - Tap-pouring has no visible pitcher.
-  - Streams are straight lines, and the squeegee needs several passes.
-- **Engine Room:**
-  - Phone landscape: the stroke names run together, and Big covers cylinder 4.
-  - The start hint covers the engine.
-  - Empty space around the landscape panel.
-  - The steam engine is small on phone portrait.
-  - The gearbox collar sits on the hub, and the 4th gear crowds the wheel.
-  - Name tags can cover parts.
-  - The tachometer is small on iPhone.
-  - The icon linkage is off.
-  - The crank has no label.
-- **All apps:** check that Grown-ups stays reachable in phone landscape. Gear Box and its copies hide the whole header there.
-- **3D Printer:**
-  - On iPad the printer is small and the shelf takes a lot of width.
-  - The shelf thumbnails are small, and phone portrait has no shelf in the scene.
-  - The camera covers the shelf label.
-  - The viewer shadow is too big.
-  - The name sign is cramped.
-  - The status label covers the screen.
-  - The open door is a flat slab.
-  - The plate stays bright on the rest screen.
-  - The icon is plain.
-- **Math Grid:**
-  - iPhone landscape: the panel has a gap and small buttons.
-  - iPhone 0–12: the squares are small.
-  - Long pattern text is cut off and "Multiples of" wraps on iPad.
-  - The empty timer bar looks like a blank pill during the ending (Gear Box too).
-  - The icon could be livelier.
-- **Car Builder:**
-  - On iPhone portrait the tab and picture labels are clipped, the action buttons stack in two rows, and the vehicle is small in the drive view.
-  - The speedometer's center number overlaps its labels, and Turbo pegs the needle.
-  - The number buttons all say "Number".
-  - Big vehicles overflow the garage roof.
-  - The arena stands are plain and the floodlight sits behind the HUD.
-  - The cranes float, and dump dirt sometimes lands in the wrong place.
-  - To add: loader, crane truck, fire truck, ambulance, police car and tractor (the drawing code exists already).
-- **Gear Box:**
-  - On iPhone portrait the plate uses only half the height, small gears are tiny, and the example buttons cut off their text.
-  - The RPM labels can overlap or be covered by attachments.
-  - Cranking small gears is fiddly.
-  - The jam triangle's teeth overlap.
-  - The speed dial has no min/max labels.
-- **Marble Run:**
-  - The second run row and the lift row shrink the board on phones.
-  - Kit: the supports and housing overlap pieces, and the base plates sit over the tray.
-  - Mix 1: the spiral post covers the squiggle end.
-  - Marbles hop about 30 px entering some tracks.
-  - Marbles can sit in the plunger lane.
-  - Run labels overflow their buttons on iPad landscape.
-  - "DROP" overflows its circle.
-  - The loop entry curves look beaded.
-  - The "Pull down!" hint overlaps the ramps, and the plunger ruler numbers are tiny.
-  - The Machine run needs tuning (wheel to seesaw vs trampoline).
-  - Marbles overlap in the funnels and the lift cups.
-  - The lift rail is too close to the Zigzag ramps.
-  - Empty panel space on iPad landscape.
-- **Construction Site:**
-  - iPhone portrait: the scenes are small, with empty sky.
-  - Map: the station buttons cover the lots.
-  - Excavator: the swing squashes the arm, and the parked bucket sits in the pile.
-  - Bulldozer: the levers crowd the phone, and long drags make it loop.
-  - Concrete: the cab is cut off in portrait, the trowel shine is blocky, and the two cars overlap on the finished road.
-  - Wrecking ball: the ball draws over the cab, and flying blocks vanish at the edge.
-  - Gate: the goggle lenses look tan on the card, and the labels wrap on the phone.
-- **Saw Bench:**
-  - Band saw: the top of its upper housing is cut off, and the hint overlaps it.
-  - Scroll saw: a grey block shows behind the table.
-  - Miter saw: the head drawing is weak, the angle numbers overlap, and the size label can cover the head.
-  - Table saw: the fence ruler numbers are hidden.
-  - Reciprocating saw: the wall view is too zoomed in.
-  - Edge-cut pieces show about 3 mm too large.
-  - "Top view" takes room on phones.
+**Still open** (reported by agents, not yet fixed; check before fixing, some may be stale):
+- **Rocket Builder:** three control rows under the trip row on phones; "Planets" label tight at 390 px; planet
+  names can overlap the planet top; faint Mars haze; engine particles look brownish against black.
+- **Train Builder:** the hill covers most of the Switches layout's top loop; Paint tab has two rows plus a hint.
+- **Engine Room:** the Gears row adds a third control row on phones; the car's start line overlaps the engine top
+  on an upright phone.
+- **Saw Bench:** the jigsaw starts mostly off the left edge on iPhone portrait; the table saw switch and wheel are
+  drawn small in phone landscape (hit areas are big); one iPad drag may not finish a rip pass; the crosscut
+  off-cut can cover the "Angle" tag; the fence stays locked if a board is pushed into a stopped blade; the
+  circular saw guard grey is close to the blade grey.
+- **Drill Press:** small machine in phone landscape; the board's near edge can hang below the flat-drawn table;
+  empty pegboard at the sides on iPad portrait; the speed/belt overlay covers the whole canvas in portrait.
+- **Construction Site:** Excavator controls take about a quarter of the screen; Concrete only slightly bigger on
+  upright phones; wrecking-ball bricks can land on the crane; a ball resting on rubble delays the rest screen to
+  ~14 s; goodbye banners sit at the bottom over the panel.
+- **Workshop stations:** Measuring objects small in phone landscape, caliper "ZERO"/"ON" labels overflow, the tape
+  case resets on rotate; Router's cut edge is only visible in the end view; Wrenches handle can swing off the
+  board; Shadow Board hooks sit oddly on the speed square and saw; Hammer & Screws keeps a fixed panel height
+  with some empty space on phones.
+- **Water Works:** Wheels layout has only 4 small wheels on iPad landscape; Zigzag rows cramped in landscape;
+  Gears runoff falls over a neighbor gear and the propeller overlaps a gear; Steps trays thin in landscape;
+  water streams draw over pipes they pass behind.
+- **Marble Run:** in the Machine run the small wheel mostly flings marbles left onto a guide; the hopper DROP
+  button is small (the big Drop button is the main one).
+- **Gear Box:** some grey space above and below the board on iPhone portrait.
+- **3D Printer:** the Colors tab has three compact rows; My prints shows 20 empty dashed boxes until filled.
+- **Car Builder / Spin Shop / Fish Tank:** Build tab rows, the Spin Shop Colors tab (chips plus 14 swatches) and
+  the Fish Tank Add fish panel are still busy on phones.
+
+### Number rules
+
+Superseded by the "Numbers" rules in `AGENTS.md` (the dad tightened them after using the apps: sizes, fence and
+angle values, bit sizes and nail lengths are no longer shown).
 
 ---
-
-### Number cleanup (part of the polish pass)
-
-Remove numbers that are clutter; keep the ones that matter. Proposed:
-- **Remove:**
-  - Gear Box: done (RPM and turn labels removed; the motor dial reads Slow/Medium/Fast).
-  - Drill Press: RPM readouts and the depth readout (the dial still sets depth); keep the hole count only if wanted.
-  - Hammer & Screws: Hits, Turns, "41 of 50 mm in", and the in-wood ruler.
-  - Saw Bench: piece-length labels on every cut, and pieces counters.
-  - Tool Wall: live readouts in tool jobs (depth, turns, rpm), except measuring tools.
-  - Car Builder: speedometer digits (keep the needle).
-  - Marble Run: plunger power numbers.
-  - Rocket Builder: altitude counter.
-- **Keep:**
-  - Measuring tools (tape, level, calipers, square).
-  - Sizes you pick: bit sizes, nail lengths, screw sizes, socket sizes, sandpaper grit.
-  - Settings you set: table-saw fence, miter angle, blade height.
-  - Math Grid.
-  - Peg Drop bin counts (counting is the play there).
-- **Counters stay** (the dad's call): Fish: N, Marbles/Laps, Pieces, Crushed: N, Holes, Nails/Screws.
 
 ## 9. Jigsaw Puzzles
 
@@ -422,11 +352,13 @@ Build something step by step across the stations (cut, drill, nail, sand, paint)
 
 ## Every app
 
-- One self-contained folder with `index.html`, `manifest.webmanifest`, `sw.js` (app-prefixed cache name) and icons. After item 4, apps also use `common/`.
-- Offline-first: no network after first load; drawing in SVG or canvas, sound from Web Audio. The only external file is the Baloo 2 font.
-- Sound off by default, changed only with a 2-second grown-up hold.
-- Grown-up timer with the "winding down" ending and a rest screen; Home button; a "Big" button to hide the controls.
-- Works with touch and with a mouse; one screen, no page scroll; iPad first, iPhone too.
-- No fail states; big visuals; real names. Numbers only where relevant: a measurement the tool takes, a size or setting you choose, or when numbers are the point (Math Grid). No live readouts (turns, depth, RPM, hits, temperatures) as decoration.
-- Pace: features first, save early, one quick test pass, report within about 20 minutes with a list of UI issues to polish later.
-- Add each finished app to the launcher (`APPS` in `index.html`) and the top-level `sw.js` `CORE` list, and bump both caches.
+Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
+- One self-contained folder (`index.html`, `manifest.webmanifest`, `sw.js`, icons) using `common/` for the timer,
+  sound, Big button and fresh start. Offline-first; the only external file is the Baloo 2 font.
+- Sound off by default (2-second grown-up hold). Just as fun with sound off.
+- One screen, no page scroll, iPhone and iPad, touch and mouse. Phone header and two-rows-of-controls rules.
+- Numbers only where they're the point; one simple counter per page.
+- Calm pace; results stay on screen. One obvious first action, a coach line, an idle ghost hand.
+- Fresh start from the home screen; collections and grown-up settings kept.
+- No fail states, real names, no brands. Never the child's name anywhere.
+- Add a finished app with `python3 tools/add-app.py ...`, bump caches, smoke-test with `node tools/smoke.js ...`.
