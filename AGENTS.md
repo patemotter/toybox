@@ -33,8 +33,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   self-contained `index.html` (inline CSS + JS in a `"use strict"` IIFE, ES5 style: `var`, `function`).
 - Every app folder: `index.html` (plus extra pages for multi-page apps), `manifest.webmanifest`, `sw.js`,
   `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
-- `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). On
-  phones the tiles are three per row with just the picture and name; tablets show a one-line description.
+- `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). It
+  fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, six on
+  phones held sideways), picture and name only; `fitGrid()` sizes the pictures to the rows. The `what` text
+  stays in `APPS` for grown-ups and tooling but isn't shown.
 - `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
@@ -217,7 +219,10 @@ Keep only:
 
 ### Testing
 - Serve: `npx http-server . -p <your port> -c-1 -s` (use a unique port per agent).
-- Playwright with Chromium is preinstalled (don't run `playwright install`). Block Google Fonts in tests:
+- Playwright: on the owner's Mac it's a global npm install (`npm root -g`), so scripts need
+  `NODE_PATH=$(npm root -g)`. Its own Chromium download may not be available; `CHANNEL=chrome` (smoke.js) or
+  `chromium.launch({ channel: "chrome" })` drives the installed Google Chrome instead. Don't run
+  `playwright install` unless the download actually works. Block Google Fonts in tests:
   `context.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort())`.
 - Workshop pages need `sessionStorage["workshop-gear"]="on"` (and `"workshop-check-skip"="1"` to skip the check);
   site pages need `"site-gear"="on"`, or they redirect to the gear-up.

@@ -2,7 +2,9 @@
 // Usage (from the repo root, with a local server running):
 //   npx http-server . -p 8120 -c-1 -s &
 //   node tools/smoke.js workshop/ workshop/drill-press.html spin-shop/
-// Options (environment): PORT (default 8120), SIZE (default 1180x820), MOBILE=1 for touch/isMobile.
+// Options (environment): PORT (default 8120), SIZE (default 1180x820), MOBILE=1 for touch/isMobile,
+// CHANNEL=chrome to drive an installed Google Chrome when Playwright's own Chromium isn't downloaded.
+// If Playwright is installed globally, run with NODE_PATH=$(npm root -g).
 // Workshop and Construction Site gear flags are set so station pages don't redirect to the gear-up.
 // Needs Playwright (Chromium). Google Fonts are blocked so pages don't wait on the network.
 const { chromium } = require('playwright');
@@ -11,7 +13,7 @@ const port = process.env.PORT || 8120;
 const [w, h] = (process.env.SIZE || '1180x820').split('x').map(Number);
 const mobile = process.env.MOBILE === '1';
 (async () => {
-  const b = await chromium.launch();
+  const b = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
   let bad = 0;
   for (const url of pages) {
     const ctx = await b.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: mobile });

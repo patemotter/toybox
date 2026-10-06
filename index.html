@@ -60,12 +60,20 @@ body {
   font-size: 18px;
   line-height: 1.4;
 }
+/* The home screen fits on one screen with no scrolling: a fixed-height column (the header, then the grid
+   of tiles filling the rest). The grid has exactly the rows the apps need, and fitGrid() below sizes the
+   pictures to the room left in a row after the names. The tile order never changes, so every app keeps
+   its place on the screen. */
 .wrap {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));
+  height: 100vh;
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  padding: 20px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
 }
-header { display: flex; align-items: center; gap: 14px; }
+header { display: flex; align-items: center; gap: 14px; flex: none; }
 header .grownbtn { margin-left: auto; min-height: 48px; font-size: 1.05rem; padding: 0.3rem 0.9rem; white-space: nowrap; flex: none; }
 @media (max-width: 600px) { header .grownbtn { font-size: 0.95rem; min-height: 44px; padding: 0.2rem 0.7rem; } h1 { font-size: 2.1rem; } }
 #tb-appSettings h4.tb-app { margin: 14px 0 4px; font-size: 1.05rem; }
@@ -79,24 +87,31 @@ h1 {
   letter-spacing: -0.01em;
 }
 .apps {
+  /* --cols is chosen per screen size below; --rows and --icon are set by fitGrid(). */
+  --cols: 4;
+  --rows: 4;
+  --gap: 14px;
+  --icon: 96px;
   list-style: none;
-  margin: 28px 0 0;
+  margin: 18px 0 0;
   padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  /* Every row as tall as the tallest tile, so all tiles match no matter how long their text is. */
-  grid-auto-rows: 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  gap: var(--gap);
 }
 /* The link fills its grid cell, so the visible tile is the full cell size. */
-.apps li { display: flex; min-width: 0; }
-.apps li > .app { flex: 1 1 auto; }
+.apps li { display: flex; min-width: 0; min-height: 0; }
+.apps li > .app { flex: 1 1 auto; min-width: 0; }
 .app {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 20px 16px 16px;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 10px 10px;
   color: var(--ink);
   text-decoration: none;
   text-align: center;
@@ -109,34 +124,42 @@ h1 {
 }
 .app:active { transform: translate(5px, 5px); box-shadow: 0 0 0 var(--edge); }
 .app:focus-visible { outline: 4px solid var(--focus); outline-offset: 4px; }
-.app img { width: 128px; height: 128px; border-radius: 28px; }
-.app .name { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
-.app .what { color: var(--muted); font-size: 1rem; }
-/* Phones: three small tiles per row (picture + name) so most apps fit on one screen. */
+.app img { width: var(--icon); height: var(--icon); border-radius: calc(var(--icon) * 0.22); flex: none; }
+.app .name {
+  flex: none;
+  font-size: clamp(1rem, 2.6vmin, 1.4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  max-width: 100%;
+  /* The slot is as tall as the tallest name (set by fitGrid), so pictures line up across a row. */
+  min-height: var(--name-h, 0px);
+  align-content: center;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+/* Just the picture and the name on every screen, so the home screen is calm and quick to scan.
+   The descriptions stay in APPS (and in the README) for grown-ups. */
+.app .what { display: none; }
+/* Upright phones: three tiles per row. */
 @media (max-width: 600px) {
-  .wrap { padding-top: 16px; }
-  header img { width: 52px; height: 52px; border-radius: 14px; }
-  .apps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
-  .app { gap: 5px; padding: 10px 4px 8px; border-radius: 16px; box-shadow: 3px 3px 0 var(--edge); }
+  .wrap { padding-top: 12px; padding-bottom: 10px; }
+  header img { width: 48px; height: 48px; border-radius: 14px; }
+  .apps { --cols: 3; --gap: 8px; margin-top: 12px; }
+  .app { gap: 4px; padding: 7px 4px 5px; border-radius: 16px; box-shadow: 3px 3px 0 var(--edge); }
   .app:active { transform: translate(3px, 3px); }
-  .app img { width: 68px; height: 68px; border-radius: 16px; }
-  .app { min-width: 0; }
-  .app .name { font-size: 0.86rem; max-width: 100%; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: break-word; }
+  .app .name { font-size: 0.86rem; }
 }
-/* Phones (portrait and landscape): just the picture and the name, so the home screen is calm
-   and quick to scan. The one-line descriptions stay on tablets. */
-@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .app .what { display: none; }
-  .app { justify-content: center; }
-}
+/* Phones held sideways: six tiles per row, and a smaller header so the tiles get the height. */
 @media (orientation: landscape) and (max-height: 520px) {
-  .wrap { padding-top: 12px; }
-  header img { width: 52px; height: 52px; border-radius: 14px; }
-  h1 { font-size: 2.3rem; }
-  .apps { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-top: 16px; }
-  .app { gap: 6px; padding: 12px 8px 10px; border-radius: 18px; }
-  .app img { width: 84px; height: 84px; border-radius: 20px; }
-  .app .name { font-size: 1.2rem; }
+  .wrap { padding-top: 8px; padding-bottom: 8px; }
+  header img { display: none; }
+  h1 { font-size: 1.9rem; }
+  header .grownbtn { min-height: 44px; font-size: 0.95rem; padding: 0.2rem 0.7rem; }
+  .apps { --cols: 6; --gap: 8px; margin-top: 8px; }
+  .app { gap: 3px; padding: 6px 4px 4px; border-radius: 16px; box-shadow: 3px 3px 0 var(--edge); }
+  .app:active { transform: translate(3px, 3px); }
+  .app .name { font-size: 0.8rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .app { transition: none; }
@@ -212,7 +235,7 @@ h1 {
     },
     {
       name: "Gear Box",
-      what: "Build gear trains and crank them. Watch the speeds, ratios and turns.",
+      what: "Build gear trains, crank them and watch every gear turn.",
       href: "gear-box/",
       icon: "gear-box/icons/icon-512.png"
     },
@@ -295,6 +318,29 @@ h1 {
     li.appendChild(a);
     list.appendChild(li);
   });
+
+  // Fit every app on one screen. The stylesheet picks the columns for the screen (--cols); this works
+  // out the rows, then sizes the pictures to the room left in a row after the tallest name, so nothing
+  // is cut off and the pictures are as big as they can be. Runs again when the screen turns or the
+  // font arrives (the names can wrap differently).
+  function fitGrid() {
+    var cols = parseInt(getComputedStyle(list).getPropertyValue("--cols"), 10) || 4;
+    list.style.setProperty("--rows", String(Math.ceil(APPS.length / cols)));
+    var tile = list.querySelector(".app");
+    if (!tile) return;
+    // Every name gets the height of the tallest one, so the pictures line up across a row.
+    list.style.removeProperty("--name-h");
+    var names = list.querySelectorAll(".name");
+    var nameH = 0;
+    for (var i = 0; i < names.length; i++) nameH = Math.max(nameH, names[i].offsetHeight);
+    list.style.setProperty("--name-h", nameH + "px");
+    var cs = getComputedStyle(tile);
+    var room = tile.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - (parseFloat(cs.rowGap) || 0) - nameH - 1;
+    list.style.setProperty("--icon", Math.max(40, Math.min(160, Math.floor(room))) + "px");
+  }
+  fitGrid();
+  window.addEventListener("resize", function () { requestAnimationFrame(fitGrid); });
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fitGrid); }
 
   // The Grown-ups sheet: play timer, sound, and the App settings for every app.
   Toybox.init({
