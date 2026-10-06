@@ -119,7 +119,7 @@ header h1 { margin: 0; white-space: nowrap; font-size: 1.35rem; font-weight: 800
   font-weight: 800; white-space: nowrap;
 }
 .hint[hidden] { display: none; }
-.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+.hint.go { animation: hintPop 0.6s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
 .ghost { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; filter: drop-shadow(6px 8px 0 rgba(29, 35, 64, 0.35)); }
 .ghost svg { display: block; width: 100%; height: 100%; }
@@ -205,16 +205,33 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   /* Keep a slim header (not display:none) so Home and Grown-ups stay reachable. */
   .wrap { padding-top: max(4px, env(safe-area-inset-top, 0px)); }
   header h1 { font-size: 1.05rem; }
-  .homebtn { min-height: 34px; }
-  #timerbtn { min-height: 34px !important; }
+  .homebtn { min-height: 44px; }
+  header .homebtn span { display: none; }
   .app { margin-top: 4px; }
   .panel { gap: 5px; padding: 6px 8px; }
   .tray { gap: 4px; }
   .tg svg { max-width: 52px; }
   .tg { font-size: 1rem; }
-  .ctrl .btn { min-height: 44px; font-size: 0.85rem; }
+  .ctrl .btn { min-height: 44px; font-size: 0.95rem; }
   .dial { width: 48px; height: 48px; }
 }
+/* Phone header: icon-only Home and Grown-ups (a clock). */
+@media (max-width: 600px) and (orientation: portrait) {
+  header .homebtn { min-height: 44px; width: 46px; padding: 0; justify-content: center; }
+  header .homebtn span { display: none; }
+  #timerbtn { font-size: 0 !important; width: 46px; min-height: 44px; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+  #timerbtn::before {
+    content: ""; width: 24px; height: 24px; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9 2.5h6'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  header h1 { font-size: 1.4rem; }
+  .bigtoggle span { display: none; }
+  .bigtoggle { padding: 0; width: 46px; min-height: 44px; justify-content: center; }
+  .tg { padding: 4px 2px; }
+  .ctrl .btn { min-height: 48px; font-size: 1.05rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hint.go { animation: none; }
 }
@@ -226,7 +243,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     <h1>Gear Box</h1>
     <div class="hdr-right">
       <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-      <button class="btn" id="timerbtn" style="min-height:44px;font-size:1rem;padding:0.1rem 0.8rem;white-space:nowrap">⏱ Grown-ups</button>
+      <button class="btn" id="timerbtn" aria-label="Grown-ups" style="min-height:44px;font-size:1rem;padding:0.1rem 0.8rem;white-space:nowrap">⏱ Grown-ups</button>
     </div>
   </header>
 
@@ -478,9 +495,8 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     var x = OX + g.x * S, y = OY + g.y * S - (lift || 0), h = hubR(g.T) * S;
     ctx.beginPath(); ctx.arc(x, y, h, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
     ctx.lineWidth = Math.max(2, S * 0.17); ctx.strokeStyle = "#1D2340"; ctx.stroke();
-    ctx.fillStyle = "#1D2340"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = "800 " + Math.round(h * 1.05) + "px " + FONT;
-    ctx.fillText(String(g.T), x, y + h * 0.06);
+    // No tooth count: the size of the gear shows it. Just the axle.
+    ctx.beginPath(); ctx.arc(x, y, h * 0.32, 0, TAU); ctx.fillStyle = "#1D2340"; ctx.fill();
   }
   var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
   function pill(text, x, y, size, bg) {
@@ -566,7 +582,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   var ending = false, coastBoost = 0, endingDone = null;
   // Calmer speeds: the motor dial's top setting turns the driver at 24 RPM (dial value x 0.4),
   // and a flicked crank coasts no faster than that.
-  var MOTOR_SCALE = 0.4, MAX_W = 24 * TAU / 60;
+  var MOTOR_SCALE = 0.28, MAX_W = 24 * TAU / 60;
 
   function step(dt) {
     var d = byId(driverId);
@@ -642,9 +658,6 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       if (selected.indexOf(g.id) !== -1) {
         ctx.beginPath(); ctx.arc(x, y, (R(g.T) + 0.9) * S, 0, TAU); ctx.lineWidth = Math.max(5, S * 0.4); ctx.strokeStyle = "#FFC93C"; ctx.stroke();
         ctx.lineWidth = 2; ctx.strokeStyle = "#1D2340"; ctx.stroke();
-        var n = selected.indexOf(g.id) + 1, bx = x + (R(g.T) + 0.4) * S * 0.72, by = y - (R(g.T) + 0.4) * S * 0.72;
-        ctx.beginPath(); ctx.arc(bx, by, Math.max(12, S * 0.9), 0, TAU); ctx.fillStyle = "#FFC93C"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
-        ctx.fillStyle = "#1D2340"; ctx.font = "800 " + Math.round(Math.max(14, S * 1.1)) + "px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(n), bx, by + 1);
       }
       if (g.flash > 0 && !reduceMotion) {
         ctx.beginPath(); ctx.arc(x, y, (R(g.T) + 0.6 + (1 - g.flash) * 1.6) * S, 0, TAU);
@@ -685,7 +698,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     el.hidden = false;
     el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
     clearTimeout(hintTimer);
-    hintTimer = setTimeout(function () { el.hidden = true; }, ms || 2600);
+    hintTimer = setTimeout(function () { el.hidden = true; }, Math.max(3200, ms || 0));
   }
   function showHintThrottled() {
     if (now - lastHint < 2600) return;
@@ -694,14 +707,12 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     bonk();
   }
 
-  var FRAC = { 2: "half as fast", 3: "a third as fast", 4: "a quarter as fast", 5: "a fifth as fast" };
-  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+  // Two gears picked: say in words how fast the second turns next to the first (no tooth counts).
+  var CNAME = { 8: "Red", 12: "Orange", 16: "Yellow", 20: "Green", 24: "Blue", 32: "Purple", 40: "Pink" };
   function ratioText(A, B) {
-    var g = gcd(A.T, B.T), a = A.T / g, b = B.T / g, how;
-    if (a === b) how = "same speed";
-    else if (a > b) how = (b === 1 ? (a === 2 ? "twice" : a + " times") : (Math.round(a / b * 100) / 100) + " times") + " as fast";
-    else how = a === 1 && FRAC[b] ? FRAC[b] : a + "/" + b + " as fast";
-    return A.T + " → " + B.T + " = " + (B.T / g) + " : " + (A.T / g) + ", " + how;
+    if (A.T === B.T) return "Same speed";
+    var how = A.T === 2 * B.T ? "twice as fast" : B.T === 2 * A.T ? "half as fast" : A.T > B.T ? "faster" : "slower";
+    return CNAME[B.T] + " goes " + how;
   }
   function sameComp(A, B) { return comps.some(function (c) { return c.order.indexOf(A) !== -1 && c.order.indexOf(B) !== -1; }); }
   var infoKey = "";
@@ -710,19 +721,18 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     if (selected.length === 1) {
       var g = byId(selected[0]);
       if (g) {
-        txt = g.T + " teeth";
         showDrive = g.id !== driverId;
-        if (!showDrive) txt += " · drives";
       }
     } else if (selected.length === 2) {
       var A = byId(selected[0]), B = byId(selected[1]);
-      if (A && B) txt = ratioText(A, B) + (sameComp(A, B) ? "" : " (not joined yet)");
+      if (A && B) txt = sameComp(A, B) ? ratioText(A, B) : "Not joined yet";
     }
     var key = txt + showDrive;
     if (!force && key === infoKey) return;
     infoKey = key;
-    el.hidden = !txt;
+    el.hidden = !txt && !showDrive;
     $("infoText").textContent = txt;
+    $("infoText").hidden = !txt;
     $("driveThis").hidden = !showDrive;
   }
   setInterval(function () { updateInfo(false); }, 200);
@@ -911,9 +921,9 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   SIZES.forEach(function (T) {
     var b = document.createElement("button");
     b.className = "btn tg";
-    b.setAttribute("aria-label", T + " teeth gear");
+    b.setAttribute("aria-label", CNAME[T] + " gear");
     var r = R(T) + 0.7, vb = r / (0.5 + 0.5 * T / 40);
-    b.innerHTML = '<svg viewBox="' + (-vb) + " " + (-vb) + " " + 2 * vb + " " + 2 * vb + '" aria-hidden="true">' + gearSVG(T, 0, 0, 1, 0, 0.3 * vb / 6) + "</svg><span>" + T + "</span>";
+    b.innerHTML = '<svg viewBox="' + (-vb) + " " + (-vb) + " " + 2 * vb + " " + 2 * vb + '" aria-hidden="true">' + gearSVG(T, 0, 0, 1, 0, 0.3 * vb / 6) + "</svg>";
     b.addEventListener("pointerdown", function (e) { startTrayDrag(e, { kind: "new", T: T }); });
     $("tray").appendChild(b);
   });
