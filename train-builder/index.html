@@ -718,13 +718,43 @@ body.big .app { margin-top: 0; }
     anim.forEach(function (b, j) { b.jig = Math.max(b.jig, 1 - Math.abs(j - idx) * 0.12); });
   }
 
+  // Phones held upright: a long train runs along the top track, round a bend and back along a lower
+  // track (the cars keep their order), so every piece can be drawn much bigger than in one long row.
+  var brows = { k: Infinity, oxR: 0, xk: 0, gy1: 0, bend: false };
+  var BEND = 105; // room for the bend at the right end (build units)
+  function twoRows() {
+    if (!(H > W * 1.15) || anim.length < 3) return null;
+    var xs = layoutX(), total = trainLen(), best = null;
+    for (var k = 1; k < anim.length; k++) {
+      var r0 = xs[k] - GAP, r1 = total - xs[k], m = Math.max(r0, r1);
+      if (!best || m < best.m) best = { k: k, m: m, r0: r0 };
+    }
+    var s2 = Math.min((W - 24) / (best.m + BEND + 20), (H - 100 - 56) / 400, 1.6);
+    if (s2 < buildMetrics() * 1.2) return null;
+    best.s = s2;
+    return best;
+  }
+  function pieceBox(i, a) {
+    var len = TYPES[a.p.t].len * bscale;
+    if (i < brows.k) { var x = bview.ox + a.x * bscale; return { x0: x, x1: x + len, gy: bview.gy, low: false }; }
+    var xr = brows.oxR - (a.x - brows.xk) * bscale;
+    return { x0: xr - len, x1: xr, gy: brows.gy1, low: true };
+  }
   function stepBuild(dt) {
-    var target = buildMetrics();
+    var tr = twoRows();
+    var target = tr ? tr.s : buildMetrics();
     bscale += (target - bscale) * Math.min(1, dt * 4);
     var len = trainLen();
     bview.ox = (W - len * bscale) / 2;
     // Tall (phone portrait) stages: set the track higher so the train is not lost under a big empty sky.
     bview.gy = H > W * 1.2 ? Math.round(H * 0.66) : H - Math.max(88, H * 0.16);
+    brows.k = Infinity; brows.bend = false;
+    if (tr) {
+      var gy1 = Math.round(H * 0.7), ox = (W - (tr.m + BEND) * bscale) / 2;
+      brows.k = tr.k; brows.bend = true; brows.gy1 = gy1; brows.oxR = ox + tr.m * bscale; brows.xk = layoutX()[tr.k];
+      bview.gy = gy1 - Math.round(215 * bscale);
+      bview.ox = brows.oxR - tr.r0 * bscale;
+    }
     var xs = layoutX();
     anim.forEach(function (a, i) {
       if (a.drag) return;
@@ -735,7 +765,8 @@ body.big .app { margin-top: 0; }
         a.spin += a.vx * dt / 15;
         if (a.x <= tx) {
           a.x = tx; a.vx = 0; a.roll = false;
-          clunk(a, bview.ox + tx * bscale - GAP * bscale / 2, bview.gy - 25 * bscale, i);
+          var cb = pieceBox(i, a);
+          clunk(a, cb.low ? cb.x1 + GAP * bscale / 2 : cb.x0 - GAP * bscale / 2, cb.gy - 25 * bscale, i);
         }
       } else {
         var d = tx - a.x;
@@ -772,6 +803,17 @@ body.big .app { margin-top: 0; }
     for (var tx = (bview.ox % tw) - tw; tx < W; tx += tw) c.fillRect(tx, bview.gy + 2, tw * 0.55, 10 * s + 4);
     c.fillStyle = "#4A5578"; c.fillRect(0, bview.gy - 3, W, 7);
     c.fillStyle = OUT; c.fillRect(0, bview.gy + 4, W, 2);
+    if (brows.bend) {
+      // the lower track and the bend that joins the two
+      var g1 = brows.gy1, bx = brows.oxR + 12 * s, br = (g1 - bview.gy) / 2;
+      c.fillStyle = "#8B5A3C";
+      for (var tx2 = (bview.ox % tw) - tw; tx2 < bx; tx2 += tw) c.fillRect(tx2, g1 + 2, tw * 0.55, 10 * s + 4);
+      c.fillStyle = night ? "#2C5A3E" : "#6BBF4E"; c.fillRect(bx, bview.gy - 3, W - bx, 10 * s + 12);
+      c.fillStyle = "#4A5578"; c.fillRect(0, g1 - 3, bx, 7);
+      c.fillStyle = OUT; c.fillRect(0, g1 + 4, bx, 2);
+      c.strokeStyle = "#4A5578"; c.lineWidth = 7;
+      c.beginPath(); c.arc(bx, bview.gy + br, br, -Math.PI / 2, Math.PI / 2); c.stroke();
+    }
     if (!anim.length) {
       c.fillStyle = night ? "#FFFFFF" : OUT; c.textAlign = "center"; c.textBaseline = "middle";
       c.font = "800 " + Math.round(Math.min(44, W / 12)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
@@ -780,8 +822,8 @@ body.big .app { margin-top: 0; }
     // pieces (the dragged ones last)
     var order = anim.slice().sort(function (a, b) { return (a.drag ? 1 : 0) - (b.drag ? 1 : 0); });
     order.forEach(function (a) {
-      var i = anim.indexOf(a);
-      var x = bview.ox + a.x * s, y = bview.gy;
+      var i = anim.indexOf(a), pb = pieceBox(i, a);
+      var x = pb.x0, y = pb.gy;
       var jy = a.jig > 0 ? -Math.abs(Math.sin(a.jig * 18)) * 10 * a.jig * s * 2 : 0;
       c.save();
       if (a.drag) { x += a.drag.dx; y += a.drag.dy; c.globalAlpha = Math.max(0.35, 1 - Math.abs(a.drag.dy) / 400); }
@@ -838,7 +880,7 @@ body.big .app { margin-top: 0; }
   }
 
   // ---------- Run scene: layouts as spline track segments ----------
-  var TILT = 0.74, HT = 0.62; // y squash for the angled view; height factor for vertical things
+  var TILT = 0.74, HT = 0.62; // (TILT is 0.92 on an upright phone) y squash for the angled view; height factor for vertical things
   var WW = 1000, WH = 760;
   function catmull(pts, closed, t0, t1) {
     // returns dense points along a Catmull-Rom spline through pts; optional end tangents for open curves
@@ -930,6 +972,22 @@ body.big .app { margin-top: 0; }
       crossing: { seg: c1, s: nearest(c1, 900, 400) }, switches: [sw1, sw2], stationWay: { sw: sw1, on: 0 } };
   })();
 
+  // Phones held upright: the layouts are turned on their side (x and y swapped) so the long way of
+  // the track runs up the tall stage, and the view is a little more top-down. Turning the phone turns them back.
+  var UPRIGHT = false;
+  function TP(x, y) { return UPRIGHT ? [y, x] : [x, y]; }
+  function orient(up) {
+    if (up === UPRIGHT) return false;
+    UPRIGHT = up;
+    Object.keys(LAYOUTS).forEach(function (k) {
+      var lay = LAYOUTS[k];
+      lay.segs.forEach(function (seg) { seg.pts.forEach(function (q) { var t = q.x; q.x = q.y; q.y = t; }); });
+      lay.switches.forEach(function (sw) { var t = sw.x; sw.x = sw.y; sw.y = t; });
+    });
+    var t = WW; WW = WH; WH = t;
+    TILT = up ? 0.92 : 0.74;
+    return true;
+  }
   // ---------- Run state ----------
   var mode = "build";
   var run = null;
@@ -1076,12 +1134,25 @@ body.big .app { margin-top: 0; }
   // ---------- Run drawing ----------
   var vs = 1, vox = 0, voy = 0; // world -> screen
   function runFit() {
-    var sw = WW, sh = WH * TILT + 40;
+    var x0 = 0, x1 = WW, y0 = 0, y1 = WH;
+    if (UPRIGHT && run) {
+      // Upright phone: frame the track itself (plus room for the station and trees), not the whole field.
+      x0 = 1e9; x1 = -1e9; y0 = 1e9; y1 = -1e9;
+      var grow = function (x, y) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
+      run.lay.segs.forEach(function (seg) { seg.pts.forEach(function (q) { grow(q.x, q.y); }); });
+      // the station building stands outside the track
+      var sp = segPoint(run.lay.station.seg, run.lay.station.s), nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
+      grow(sp.x + nx * 170, sp.y + ny * 170);
+      x0 -= 60; x1 += 60; y0 -= 70; y1 += 70;
+    }
+    var sw = x1 - x0, sh = (y1 - y0) * TILT + 40;
     // Wide stages (phone landscape): keep the track clear of the speed lever on the left.
     var gl = 0;
     if (W > H) { var lcs = getComputedStyle($("lever")); gl = (parseFloat(lcs.left) || 0) + (parseFloat(lcs.width) || 0) + 6; }
     vs = Math.min((W - gl) / sw, (H - 10) / sh);
-    vox = gl + (W - gl - WW * vs) / 2; voy = (H - WH * TILT * vs) / 2 + 20 * vs;
+    vox = gl + (W - gl - sw * vs) / 2 - x0 * vs; voy = (H - (y1 - y0) * TILT * vs) / 2 + 20 * vs - y0 * TILT * vs;
+    // Upright phone: spare room goes to the bottom, where the speed lever and Toot! sit.
+    if (UPRIGHT && run) voy = 20 * vs + 4 - y0 * TILT * vs;
   }
   function SX(x) { return vox + x * vs; }
   function SY(y, z) { return voy + (y * TILT - (z || 0) * HT) * vs; }
@@ -1131,12 +1202,14 @@ body.big .app { margin-top: 0; }
     for (var i = 0; i < 60; i++) { c.beginPath(); c.arc((i * 173) % W, (i * 97) % H, 18 + (i % 4) * 8, 0, TAU); c.fill(); }
     // pond + trees for fun
     c.fillStyle = "#5BC0EB"; c.strokeStyle = OUT; c.lineWidth = 3;
-    c.beginPath(); c.ellipse(SX(500), SY(lay === LAYOUTS.eight ? 160 : 380), 90 * vs, 50 * vs * TILT, 0, 0, TAU); c.fill(); c.stroke();
+    var pond = TP(500, lay === LAYOUTS.eight ? 160 : 380);
+    c.beginPath(); c.ellipse(SX(pond[0]), SY(pond[1]), (UPRIGHT ? 50 : 90) * vs, (UPRIGHT ? 90 : 50) * vs * TILT, 0, 0, TAU); c.fill(); c.stroke();
     // road + crossing
     var cr = segPoint(lay.crossing.seg, lay.crossing.s);
     var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang);
     // the road runs from just inside the loop out past the edge of the world
-    if (rx * (cr.x - 500) + ry * (cr.y - 380) < 0) { rx = -rx; ry = -ry; }
+    var mid = TP(500, 380);
+    if (rx * (cr.x - mid[0]) + ry * (cr.y - mid[1]) < 0) { rx = -rx; ry = -ry; }
     var r0x = cr.x - rx * 130, r0y = cr.y - ry * 130, r1x = cr.x + rx * 700, r1y = cr.y + ry * 700;
     c.strokeStyle = "#5A5F6E"; c.lineWidth = 56 * vs; c.lineCap = "round";
     c.beginPath(); c.moveTo(SX(r0x), SY(r0y)); c.lineTo(SX(r1x), SY(r1y)); c.stroke();
@@ -1187,7 +1260,8 @@ body.big .app { margin-top: 0; }
     [[60, 80], [940, 90], [60, 700], [950, 700], [500, 380], [380, 330], [640, 450]].forEach(function (t, i) {
       if (lay === LAYOUTS.eight && i >= 4) return;
       if (lay !== LAYOUTS.eight && i === 4) return;
-      tree(c, t[0], t[1]);
+      var tp = TP(t[0], t[1]);
+      tree(c, tp[0], tp[1]);
     });
     // tunnel hill (drawn over the train)
     var tn = lay.tunnel, hc = hillLayer.c;
@@ -1407,6 +1481,7 @@ body.big .app { margin-top: 0; }
     W = Math.max(50, r.width - 6); H = Math.max(50, r.height - 6);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    if (orient(H > W * 1.15) && run) startRun();
     if (run) buildLayer();
     renderPicks();
   }
@@ -1421,8 +1496,8 @@ body.big .app { margin-top: 0; }
     var p = local(e);
     if (mode === "build") {
       for (var i = anim.length - 1; i >= 0; i--) {
-        var a = anim[i], x0 = bview.ox + a.x * bscale, x1 = x0 + TYPES[a.p.t].len * bscale;
-        if (p.x >= x0 - 6 && p.x <= x1 + 6 && p.y >= bview.gy - 180 * bscale && p.y <= bview.gy + 20 && !a.drag && !a.roll) {
+        var a = anim[i], hb = pieceBox(i, a), x0 = hb.x0, x1 = hb.x1;
+        if (p.x >= x0 - 6 && p.x <= x1 + 6 && p.y >= hb.gy - 180 * bscale && p.y <= hb.gy + 20 && !a.drag && !a.roll) {
           a.drag = { dx: 0, dy: 0, sx: p.x, sy: p.y, moved: false, id: e.pointerId };
           drags[e.pointerId] = a;
           try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
@@ -1458,7 +1533,8 @@ body.big .app { margin-top: 0; }
     }
     var far = Math.abs(d.dy) > Math.max(70, H * 0.22) || Math.abs(d.dx) > W * 0.4;
     if (far && !Toybox.timer.locked()) {
-      removeAt(i, bview.ox + a.x * bscale + d.dx + TYPES[a.p.t].len * bscale / 2, bview.gy - 60 * bscale + d.dy);
+      var rb = pieceBox(i, a);
+      removeAt(i, rb.x0 + d.dx + TYPES[a.p.t].len * bscale / 2, rb.gy - 60 * bscale + d.dy);
     } else { a.jig = 0.8; }
   }
   cv.addEventListener("pointerup", endDrag);
@@ -1608,8 +1684,8 @@ body.big .app { margin-top: 0; }
     for (var k in ch) p[k] = ch[k];
     var a = anim[state.sel]; if (a) a.jig = 1;
     if (mode === "build" && a) {
-      var x = bview.ox + (a.x + TYPES[p.t].len / 2) * bscale;
-      for (var i = 0; i < 12; i++) { var ang = rand(0, TAU), sp = rand(100, 300); fx.push({ k: "bit", x: x, y: bview.gy - 80 * bscale, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 150, t: 0, life: 0.7, r: rand(5, 10), c: p.color }); }
+      var fb = pieceBox(state.sel, a), x = fb.x0 + TYPES[p.t].len / 2 * bscale;
+      for (var i = 0; i < 12; i++) { var ang = rand(0, TAU), sp = rand(100, 300); fx.push({ k: "bit", x: x, y: fb.gy - 80 * bscale, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 150, t: 0, life: 0.7, r: rand(5, 10), c: p.color }); }
     }
     sClick(); save(); refreshPaint();
   }
@@ -1774,7 +1850,7 @@ body.big .app { margin-top: 0; }
   });
   stage.appendChild($("tb-farewell"));
   if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, anim: anim, add: addPiece,
-    piecePos: function (i) { var a = anim[i], r = cv.getBoundingClientRect(); return { x: r.left + bview.ox + (a.x + TYPES[a.p.t].len / 2) * bscale, y: r.top + bview.gy - 50 * bscale }; } };
+    piecePos: function (i) { var a = anim[i], b = pieceBox(i, a), r = cv.getBoundingClientRect(); return { x: r.left + b.x0 + TYPES[a.p.t].len / 2 * bscale, y: r.top + b.gy - 50 * bscale }; } };
 })();
 </script>
 <script>

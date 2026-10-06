@@ -495,9 +495,19 @@ body.ending .panel, body.ending .acts, body.ending .homebtn, body.ending .mapbtn
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
-    S = Math.min(cw / WORLD_W, ch / (VIEW_UP + VIEW_DOWN));
-    OX = (cw - WORLD_W * S) / 2;
+    // Tall, narrow stage (phone held upright): show a 650-wide window that follows the swing
+    // (dirt side or truck side), so the machine is bigger. Wider screens show the whole site.
+    PORT = ch > cw * 1.1;
+    S = Math.min(cw / (PORT ? PORT_W : WORLD_W), ch / (VIEW_UP + VIEW_DOWN));
     OY = ch - VIEW_DOWN * S;
+    camera();
+  }
+  var PORT = false, PORT_W = 650;
+  function camera() {
+    if (!PORT) { OX = (cw - WORLD_W * S) / 2; return; }
+    var f = clamp(m.swing / Math.PI, 0, 1);
+    f = f * f * (3 - 2 * f);
+    OX = cw / 2 - lerp(CX + 165, CX - 165, f) * S;
   }
   window.addEventListener("resize", resize);
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - OX) / S, y: (OY - (cy - r.top)) / S }; }
@@ -789,6 +799,7 @@ body.ending .panel, body.ending .acts, body.ending .homebtn, body.ending .mapbtn
   }
   var fontFam = '"Baloo 2", "Trebuchet MS", sans-serif';
   function draw() {
+    camera();
     drawSky();
     drawGround();
     drawGheap();

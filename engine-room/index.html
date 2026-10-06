@@ -387,11 +387,24 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
     S = Math.min(CW / m.W, CH / m.H) * 0.97;
-    OX = (CW - m.W * S) / 2; OY = (CH - m.H * S) / 2;
+    // Phones held upright: turn the machine a quarter turn (top to the right) when that makes it much bigger.
+    var Sr = Math.min(CW / m.H, CH / m.W) * 0.97;
+    ROT = Sr > S * 1.25;
+    if (ROT) { S = Sr; OX = (CW - m.H * S) / 2; OY = (CH - m.W * S) / 2; }
+    else { OX = (CW - m.W * S) / 2; OY = (CH - m.H * S) / 2; }
+  }
+  var ROT = false;
+  // world -> screen px (inside the canvas)
+  function w2s(x, y) { var m = MACH[st.machine]; return ROT ? { x: OX + (m.H - y) * S, y: OY + x * S } : { x: OX + x * S, y: OY + y * S }; }
+  function worldXf() {
+    var m = MACH[st.machine];
+    if (ROT) ctx.setTransform(0, DPR * S, -DPR * S, 0, DPR * (OX + m.H * S), DPR * OY);
+    else ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
   }
   window.addEventListener("resize", resize);
   function toWorld(cx, cy) {
     var r = cv.getBoundingClientRect();
+    if (ROT) return { x: (cy - r.top - OY) / S, y: MACH[st.machine].H - (cx - r.left - OX) / S };
     return { x: (cx - r.left - OX) / S, y: (cy - r.top - OY) / S };
   }
 
@@ -474,7 +487,10 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   function label(text, x, y, size, col, align) {
     ctx.font = "800 " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
     ctx.textAlign = align || "center"; ctx.textBaseline = "middle";
-    ctx.fillStyle = col || INK; ctx.fillText(text, x, y);
+    ctx.fillStyle = col || INK;
+    // On a turned machine, words painted on it are turned back so they read the right way up.
+    if (ROT && ctx.getTransform().b !== 0) { ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); ctx.fillText(text, 0, 0); ctx.restore(); }
+    else ctx.fillText(text, x, y);
   }
 
   // ---------- Car engine ----------
@@ -1094,7 +1110,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     ctx.strokeStyle = "rgba(29,35,64,0.06)"; ctx.lineWidth = 1;
     for (var gx = 0; gx < CW; gx += 32) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke(); }
     for (var gy = 0; gy < CH; gy += 32) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CW, gy); ctx.stroke(); }
-    ctx.setTransform(DPR * S, 0, 0, DPR * S, DPR * OX, DPR * OY);
+    worldXf();
     ctx.lineJoin = "round";
     parts = [];
     if (st.machine === "car") drawCar(); else if (st.machine === "steam") drawSteam(); else if (st.machine === "jet") drawJet(); else drawGearbox();
@@ -1133,7 +1149,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       var size = clamp(Math.min(CW, CH) * 0.045, 18, 30);
       ctx.font = "800 " + size + "px \"Baloo 2\", \"Trebuchet MS\", sans-serif";
       var w = ctx.measureText(pk.name).width + size * 1.2, h = size * 1.6;
-      var x = clamp(OX + pk.lx * S - w / 2, 6, CW - w - 6), y = clamp(OY + pk.ly * S - h, 6, CH - h - 6);
+      var sp = w2s(pk.lx, pk.ly), x = clamp(sp.x - w / 2, 6, CW - w - 6), y = clamp(sp.y - h, 6, CH - h - 6);
       rr(x, y, w, h, h / 2); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
       label(pk.name, x + w / 2, y + h / 2 + 1, size, INK);
     });
@@ -1523,7 +1539,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__engine = {
     state: function () { return { machine: st.machine, th: eng.th, w: eng.w, running: eng.running, gear: st.gear, slow: st.slow, throttle: st.throttle, picks: picks.map(function (p) { return p.name; }), psi: psi, wOut: wOut, jet: { phase: jet.phase, flame: jet.flame, ab: jet.ab, air: jet.p.length, hot: jet.p.filter(function (q) { return q.heat > 0.05; }).length } }; },
-    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; }
+    toScreen: function (x, y) { var r = cv.getBoundingClientRect(), q = w2s(x, y); return { x: r.left + q.x, y: r.top + q.y }; }
   };
 })();
 </script>
