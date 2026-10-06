@@ -205,6 +205,7 @@ button {
 .act.sand { background: #F2C46B; }
 .act.done { background: #5FD08A; }
 .short { display: none; }
+.nbs { display: none; }
 /* Wood picker for a new blank */
 .picker {
   position: absolute;
@@ -238,6 +239,7 @@ button {
   top: 10px;
   z-index: 3;
   transform: translate(-50%, -12px) scale(0.92);
+  width: max-content;
   max-width: calc(100% - 24px);
   background: #FFC93C;
   color: #1D2340;
@@ -305,6 +307,23 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .woods { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .wood { min-height: 90px; min-width: 80px; }
   .wood svg { width: 50px; height: 50px; }
+  .nbl { display: none; }
+  .nbs { display: inline; }
+}
+/* Declutter: calm phone header (Back, Home icon, Grown-ups clock icon, Big icon) like the Drill Press. */
+.gubtn::before {
+  content: ""; display: none; width: 26px; height: 26px; flex: none; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
+  header .badge { display: none; }
+  .homebtn span { display: none; }
+  .homebtn { min-width: 48px; justify-content: center; }
+  .gubtn { min-width: 48px; padding: 0 !important; font-size: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+  .gubtn::before { display: block; }
+  .stage .bigtoggle { min-width: 48px; min-height: 46px; padding: 0; justify-content: center; }
+  .stage .bigtoggle span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prompt { transition: opacity 0.2s ease; }
@@ -319,7 +338,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     <span class="spacer"></span>
     <span class="badge" title="Eye protection and ear protection are on"><svg viewBox="0 0 52 30" aria-hidden="true"><rect x="2" y="9" width="21" height="13" rx="6" fill="#5BC0EB" stroke="#1D2340" stroke-width="2.5"/><path d="M8 13 l4 -2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23 15 h3" stroke="#1D2340" stroke-width="2.5"/><path d="M33 22 C33 4 49 4 49 22" fill="none" stroke="#1D2340" stroke-width="3"/><rect x="29" y="16" width="8" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/><rect x="45" y="16" width="6" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/></svg><span>Gear on</span></span>
     <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    <button class="btn gubtn" id="gubtn">Grown-ups</button>
+    <button class="btn gubtn" id="gubtn" aria-label="Grown-ups">Grown-ups</button>
   </header>
 
   <main class="app">
@@ -338,7 +357,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     <div class="toolbar" id="toolbar">
       <div class="tools" id="tools"></div>
       <div class="acts">
-        <button class="btn act newb" id="newBtn">New blank</button>
+        <button class="btn act newb" id="newBtn" aria-label="New blank"><span class="nbl">New blank</span><span class="nbs">New</span></button>
         <button class="btn act sand" id="sandBtn">Sand</button>
         <button class="btn act done" id="doneBtn">Done</button>
       </div>
@@ -383,7 +402,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var REST_Y = Math.round(AXY + RC + 12);   // top of the tool rest
   var BED_Y = 345, BED_H = 42, FLOOR = 522;
   var TIP_MAX = REST_Y - 5 - AXY;    // tool tip fully pulled back (distance below the axis)
-  var SPEEDS = [0, 2.2, 4.6, 8.5];   // spin (turns per second, visual only)
+  var SPEEDS = [0, 1.5, 3.1, 5.7];   // spin (turns per second, visual only)
   var SPEED_NAMES = ["Off", "Slow", "Medium", "Fast"];
   var DIAL_ANG = [-110, -38, 38, 110].map(function (d) { return d * Math.PI / 180; });
 
@@ -519,12 +538,15 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     } else {
       var lw2 = CW - 2 * pad;
       var avail = CH - top - 2 * pad;
-      // Narrow screens: zoom in on the work (the outer ends of the headstock are cropped)
-      var crop = lw2 < 700;
-      s = Math.min(lw2 / (crop ? 770 : WW), (avail - 120) / WH);
-      var lh2 = Math.max(WH * s, avail - 330);
-      M = { x: pad, y: top, w: lw2, h: lh2, s: s, cx: crop ? 555 : WW / 2 };
-      P = { x: pad, y: top + lh2 + pad, w: lw2, h: CH - (top + lh2 + pad) - pad, vert: false };
+      // Narrow screens: zoom in on the work (the outer ends of the headstock and tailstock are cropped).
+      // The switch panel stays a sensible size so the lathe gets the rest of the height.
+      var crop = lw2 < 700, view = lw2 < 480 ? 610 : (crop ? 770 : WW);
+      var ps = Math.max(0.2, Math.min(lw2 / PW_H, 1.0, avail * 0.3 / PH_H));
+      var ph = Math.round(PH_H * ps);
+      s = Math.min(lw2 / view, (avail - ph) / WH);
+      var lh2 = avail - ph;
+      M = { x: pad, y: top, w: lw2, h: lh2, s: s, cx: crop ? 548 : WW / 2 };
+      P = { x: pad, y: top + lh2 + pad, w: lw2, h: ph, vert: false };
     }
     M.ox = M.x + M.w / 2 - (M.cx || WW / 2) * M.s;
     M.oy = M.y + (M.h - WH * M.s) / 2;
@@ -672,8 +694,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(promptTimer);
-    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
-    if (flashKey) R.flash[flashKey] = now + 2.4;
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 3600);
+    if (flashKey) R.flash[flashKey] = now + 3.2;
   }
   function busy() { return Toybox.timer.locked(); }
   function flashOn(k) { return R.flash[k] && R.flash[k] > now; }
@@ -797,10 +819,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       p.t += dt;
       if (p.type === "dust" || p.type === "star") {
         p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt;
-        if (p.t > (p.type === "star" ? 0.9 : 1.2)) parts.splice(i, 1);
+        if (p.t > (p.type === "star" ? 1.2 : 1.2)) parts.splice(i, 1);
         continue;
       }
-      if (p.settled) { settled++; continue; }
+      if (p.settled) { settled++; if (p.t - p.st > 18) { parts.splice(i, 1); settled--; } continue; }
       if (p.type !== "chunk") p.len = p.lmax * Math.min(1, p.t / 0.22);
       else p.len = p.lmax;
       var light = p.type === "long" || p.type === "ribbon";
@@ -811,7 +833,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (p.x > 45 && p.x < 955 && p.y > BED_Y + 10) floorY = FLOOR - 2;
       if (p.y >= floorY && p.vy > 0) {
         if (p.bounces === 0 && p.vy > 250) { p.vy *= -0.3; p.vx *= 0.5; p.va *= 0.5; p.bounces = 1; p.y = floorY; }
-        else { p.y = floorY; p.settled = true; p.vx = 0; p.vy = 0; }
+        else { p.y = floorY; p.settled = true; p.st = p.t; p.vx = 0; p.vy = 0; }
       }
       if (p.x < -60 || p.x > WW + 60) parts.splice(i, 1);
     }
@@ -829,7 +851,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         continue;
       }
       if (p.type === "star") {
-        var k = Math.max(0, 1 - p.t / 0.9), sz = p.lmax * (0.5 + k);
+        var k = Math.max(0, 1 - p.t / 1.2), sz = p.lmax * (0.5 + k);
         c.globalAlpha = k;
         c.save(); c.translate(p.x, p.y); c.rotate(p.t * 3);
         c.beginPath();
@@ -839,6 +861,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         continue;
       }
       c.save();
+      // Settled shavings slowly fade away so they never pile up forever.
+      if (p.settled && p.t - p.st > 12) c.globalAlpha = Math.max(0, 1 - (p.t - p.st - 12) / 6);
       c.translate(p.x, p.y); c.rotate(p.a);
       if (p.type === "chunk") {
         var s2 = p.w;
@@ -866,7 +890,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (busy() || R.seq) return;
     if (R.sand) return;
     if (R.spin < 0.5) { say(R.on && S.speed === 0 ? "Turn the dial, then sand" : "Switch on, then sand", R.on ? "dial" : "switch"); return; }
-    R.sand = { t: 0, dur: 3.2 };
+    R.sand = { t: 0, dur: 4.3 };
     R.toolHeld = false;
     blip(1200, 0.08, 0.04, "triangle", 900);
   }
@@ -942,19 +966,19 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         blip(q.kind === "done" ? 520 : 300, 0.12, 0.06, "triangle", q.kind === "done" ? 780 : 200);
       }
     } else if (q.stage === "away") {
-      if (q.t >= 0.95) {
+      if (q.t >= 1.3) {
         if (q.kind === "done") {
           S.pieces++;
           S.shelf.push(q.piece);
           S.shelf = S.shelf.slice(-8);
-          R.flash.shelf = now + 1.2;
+          R.flash.shelf = now + 1.8;
           blip(990, 0.1, 0.06, "sine", 1480);
           for (var k = 0; k < (reduce ? 4 : 10); k++) spawnScreenStar();
         }
         q.stage = "in"; q.t = 0;
       }
     } else if (q.stage === "in") {
-      if (q.t >= 0.55) { R.seq = null; R.fastStop = false; save(); blip(220, 0.08, 0.06, "triangle", 330); }
+      if (q.t >= 0.75) { R.seq = null; R.fastStop = false; save(); blip(220, 0.08, 0.06, "triangle", 330); }
     }
   }
   function avg(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
@@ -1473,10 +1497,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     // the work
     var q = R.seq, showLive = true, dropY = 0;
     if (q && q.stage === "away") showLive = false;
-    if (q && q.stage === "in") dropY = -(1 - ease(Math.min(1, q.t / 0.55))) * 260;
+    if (q && q.stage === "in") dropY = -(1 - ease(Math.min(1, q.t / 0.75))) * 260;
     if (showLive) drawPiece(ctx, S, M.ox + shx, M.oy + shy + dropY * M.s, M.s, !q || q.stage === "stop");
     if (q && q.stage === "away" && q.kind === "new") {
-      var ft = Math.min(1, q.t / 0.95);
+      var ft = Math.min(1, q.t / 1.3);
       drawPiece(ctx, q.piece, M.ox + ft * 120 * M.s, M.oy + (ft * ft * 520) * M.s, M.s, false);
     }
     ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * (M.ox + shx), DPR * (M.oy + shy));
@@ -1498,7 +1522,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     ctx.restore();
     // a finished piece flying to the shelf
     if (q && q.stage === "away" && q.kind === "done") {
-      var g = shelfGeom(), t = ease(Math.min(1, q.t / 0.95));
+      var g = shelfGeom(), t = ease(Math.min(1, q.t / 1.3));
       var ts = g.ss, tox = g.slotX(q.slot) - (WX0 + WX1) / 2 * ts, toy = g.axisY - AXY * ts;
       var s = lerp(q.from.s, ts, t), ox = lerp(q.from.ox, tox, t), oy = lerp(q.from.oy, toy, t) - Math.sin(Math.PI * t) * 60;
       drawPiece(ctx, q.piece, ox, oy, s, false);
@@ -1923,11 +1947,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
     if (reduce) {
       ITEMS.forEach(function (it, i) { tick(i); });
-      later(function () { close(false); }, 1500);
+      later(function () { close(false); }, 2000);
     } else {
-      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
-      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
-      later(function () { close(false); }, 1600);
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 400 + i * 560); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1530);
+      later(function () { close(false); }, 2150);
     }
   }
   // The click that follows the skipping tap is swallowed (it must not press what is underneath).

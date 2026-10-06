@@ -233,6 +233,7 @@ button {
   top: 10px;
   z-index: 3;
   transform: translate(-50%, -12px) scale(0.92);
+  width: max-content;
   max-width: calc(100% - 150px);
   background: #FFC93C;
   color: #1D2340;
@@ -292,6 +293,53 @@ body.ending .ob { pointer-events: none; }
   .tool svg { width: 40px; height: 28px; }
   .ob { min-height: 44px; font-size: 1rem; }
 }
+/* Declutter: calm phone header (Back, Home icon, Grown-ups clock icon, Big icon) like the Drill Press. */
+.gubtn::before {
+  content: ""; display: none; width: 26px; height: 26px; flex: none; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
+  header .badge { display: none; }
+  .homebtn span { display: none; }
+  .homebtn { min-width: 48px; justify-content: center; }
+  .gubtn { min-width: 48px; padding: 0 !important; font-size: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+  .gubtn::before { display: block; }
+  .stage .bigtoggle { min-width: 48px; min-height: 46px; padding: 0; justify-content: center; }
+  .stage .bigtoggle span { display: none; }
+}
+/* Tape coach: one short line that names the next thing to measure. */
+.mcoach {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 2;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 150px);
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340;
+  padding: 0.2rem 1rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  pointer-events: none;
+  transition: background-color 0.3s ease;
+}
+.mcoach.off { visibility: hidden; }
+.mcoach.ok { background: #CDF5D0; }
+.mcoach.flash { background: #FFE9A8; }
+body.ending .mcoach { visibility: hidden; }
+@media (max-width: 700px) {
+  .mcoach { left: 10px; transform: none; max-width: calc(100% - 80px); font-size: 1.02rem; padding: 0.15rem 0.7rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .mcoach { left: 10px; transform: none; max-width: calc(100% - 80px); font-size: 1.05rem; padding: 0.1rem 0.8rem; }
+}
 @media (prefers-reduced-motion: reduce) {
   .prompt { transition: opacity 0.2s ease; }
 }
@@ -305,13 +353,14 @@ body.ending .ob { pointer-events: none; }
     <span class="spacer"></span>
     <span class="badge" title="Eye protection and ear protection are on"><svg viewBox="0 0 52 30" aria-hidden="true"><rect x="2" y="9" width="21" height="13" rx="6" fill="#5BC0EB" stroke="#1D2340" stroke-width="2.5"/><path d="M8 13 l4 -2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23 15 h3" stroke="#1D2340" stroke-width="2.5"/><path d="M33 22 C33 4 49 4 49 22" fill="none" stroke="#1D2340" stroke-width="3"/><rect x="29" y="16" width="8" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/><rect x="45" y="16" width="6" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/></svg><span>Gear on</span></span>
     <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    <button class="btn gubtn" id="gubtn">Grown-ups</button>
+    <button class="btn gubtn" id="gubtn" aria-label="Grown-ups">Grown-ups</button>
   </header>
 
   <main class="app">
     <div class="stage" id="stage">
       <canvas id="cv" role="img" aria-label="A tape measure on the workbench"></canvas>
       <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
+      <div class="mcoach off" id="mcoach" role="status" aria-live="polite">Pull the tape to the board!</div>
       <div class="opts" id="opts">
         <div class="optset" data-for="tape">
           <button class="btn ob" data-unit="in" aria-pressed="true" aria-label="Inches">in</button>
@@ -431,7 +480,9 @@ body.ending .ob { pointer-events: none; }
   // Tape measure
   var T = {
     ppi: 40, cs: 120, bw: 30, objs: [], c: { x: 0, y: 0 }, a: 0, d: 0, zip: false, zv: 0, hookHeld: false,
-    snap: null, shown: 0, live: false, bump: 0, burst: [], lastIn: 0, maxIn: 25, caseFly: null, home: null
+    snap: null, shown: 0, live: false, bump: 0, burst: [], lastIn: 0, maxIn: 25, caseFly: null, home: null,
+    // Coaching: which thing to measure next, the happy result line, the ghost hand
+    goal: 0, msg: null, moveAt: 0, needAlign: false, lastTouch: 0, ghost: null, ghostDone: false, coachKey: ""
   };
   // Spirit level
   var L = { pv: { x: 0, y: 0 }, lb: 400, tb: 24, ll: 320, hl: 70, wh: 100, amax: 12, a: S.boardA, bub: [], wasLevel: false, glow: 0, sparks: [], aT: null };
@@ -465,7 +516,8 @@ body.ending .ob { pointer-events: none; }
       { id: "block", len: 2, w: 2 }
     ];
     var F = clamp(U * 0.085, 30, 66);
-    var top = PAD + F * 1.7 + 14, bot = CH - OPTH - 8;
+    var coachH = $("mcoach").offsetHeight || 0;
+    var top = PAD + (coachH ? coachH + 8 : 0) + F * 1.7 + 14, bot = CH - OPTH - 8;
     var hs = objs.map(function (o) { return Math.max(o.w * ppi, 18); });
     var sum = hs.reduce(function (a, b) { return a + b; }, 0);
     var avail = bot - top;
@@ -481,7 +533,8 @@ body.ending .ob { pointer-events: none; }
     T.ppi = ppi; T.cs = cs; T.objs = objs; T.F = F;
     T.bw = clamp(ppi * 0.95, 24, 58);
     T.maxIn = Math.max(14, Math.floor((Math.hypot(CW, CH) - cs) / ppi));
-    T.home = { x: xL - cs / 2, y: objs[0].cy };
+    var g0 = objs[T.goal % objs.length];
+    T.home = { x: g0.x0 - cs / 2, y: g0.cy };
     T.c.x = T.home.x; T.c.y = T.home.y; T.a = 0; T.caseFly = null;
     T.d = 0; T.zip = false;
   }
@@ -689,11 +742,12 @@ body.ending .ob { pointer-events: none; }
   // ---------- Hints ----------
   var promptTimer = null;
   function say(msg) {
+    if (S.tool === "tape") { T.msg = { text: msg, until: now + 3.5, flash: true }; return; }
     var el = $("prompt");
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(promptTimer);
-    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 3500);
   }
   function busy() { return Toybox.timer.locked(); }
 
@@ -728,8 +782,16 @@ body.ending .ob { pointer-events: none; }
       }
     }
   }
+  function goalObj() { return T.objs[T.goal % T.objs.length]; }
   function releaseHook() {
     T.hookHeld = false;
+    if (T.snap && T.d > 2) {
+      // A real measurement: say it, and move on to the next thing once it has been admired.
+      T.msg = { text: "The " + T.snap.id + " is " + tapeText(tapeValue(T.d)) + " long!", until: now + 4.5, ok: true };
+      chime();
+      if (T.snap === goalObj()) T.goal = (T.goal + 1) % T.objs.length;
+      T.moveAt = now + 4.5; T.ghostDone = false;
+    }
     if (T.d > 2) {
       T.zip = true; T.zv = 200;
       T.shown = tapeValue(T.d);
@@ -758,17 +820,115 @@ body.ending .ob { pointer-events: none; }
     T.bump = Math.max(0, T.bump - dt * 3.2);
     T.burst = T.burst.filter(function (b) { b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.92; b.vy *= 0.92; return b.t < 0.45; });
     if (T.caseFly) {
-      var f = T.caseFly; f.t = Math.min(1, f.t + dt / 0.25);
+      var f = T.caseFly; f.t = Math.min(1, f.t + dt / 0.45);
       var e = 1 - Math.pow(1 - f.t, 3);
       T.c.x = lerp(f.fx, f.tx, e); T.c.y = lerp(f.fy, f.ty, e); T.a = lerp(f.fa, 0, e);
       if (f.t >= 1) T.caseFly = null;
     }
+    tapeCoach(dt);
     // A soft tick for every whole inch (or every 5 cm) pulled out
     if (T.hookHeld) {
       var step = S.unit === "cm" ? T.ppi / 2.54 * 5 : T.ppi;
       var n = Math.floor(T.d / step);
       if (n !== T.lastIn) { if (n > T.lastIn) blip(1500 + Math.min(n, 30) * 20, 0.03, 0.03, "triangle"); T.lastIn = n; }
     }
+  }
+  function tapeBusy() { return T.hookHeld || T.zip || !!T.caseFly || Object.keys(drags).length > 0; }
+  function alignedToGoal() { var g = goalObj(); return dist(T.c.x, T.c.y, g.x0 - T.cs / 2, g.cy) < 6 && Math.abs(Math.sin(T.a)) < 0.05 && Math.cos(T.a) > 0; }
+  function tapeCoach(dt) {
+    var el = $("mcoach");
+    var showing = T.msg && now < T.msg.until;
+    if (!showing) T.msg = null;
+    // After a result (or after the child moved the case), the case glides to the start of the next thing.
+    if (!tapeBusy() && !busy() && (T.moveAt || T.needAlign) && now >= T.moveAt && !T.msg) {
+      T.moveAt = 0; T.needAlign = false;
+      if (!alignedToGoal()) {
+        var g = goalObj(), fa = T.a;
+        while (fa > Math.PI) fa -= 2 * Math.PI;
+        while (fa < -Math.PI) fa += 2 * Math.PI;
+        T.caseFly = { fx: T.c.x, fy: T.c.y, fa: fa, tx: g.x0 - T.cs / 2, ty: g.cy, t: 0 };
+        T.shown = 0;
+        T.lastTouch = now;
+      }
+    }
+    // Ghost hand: after 4 s without a touch, show the pull once.
+    if (T.ghost) {
+      T.ghost.t += dt;
+      if (T.ghost.t > 2.6 || tapeBusy()) { T.ghost = null; T.ghostDone = true; }
+    } else if (!reduce && !T.ghostDone && !tapeBusy() && !busy() && !T.msg && T.d < 1 && now - T.lastTouch > 4 && alignedToGoal()) {
+      T.ghost = { t: 0 };
+    }
+    var text = T.msg ? T.msg.text : "Pull the tape to the " + goalObj().id + "!";
+    var cls = T.msg ? (T.msg.ok ? "ok" : "flash") : "";
+    var key = text + "|" + cls + "|" + (S.tool === "tape");
+    if (key !== T.coachKey) {
+      T.coachKey = key;
+      el.textContent = text;
+      el.classList.toggle("ok", cls === "ok");
+      el.classList.toggle("flash", cls === "flash");
+      el.classList.toggle("off", S.tool !== "tape");
+    }
+  }
+  function drawGoal(c) {
+    var g = goalObj();
+    if (!g || T.msg) return;
+    var len = g.x1 - g.x0, h = Math.max(g.h, 18), m = 9, k = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(now * 3);
+    c.save();
+    // dashed glow around the thing to measure
+    c.shadowColor = "rgba(255,225,77,0.9)"; c.shadowBlur = 10 + 10 * k;
+    c.setLineDash([12, 9]); c.lineDashOffset = reduce ? 0 : -now * 24;
+    c.lineWidth = 4; c.strokeStyle = "#FFE14D";
+    rr(c, g.x0 - m, g.cy - h / 2 - m, len + 2 * m, h + 2 * m, 12); c.stroke();
+    c.setLineDash([]); c.shadowBlur = 0;
+    // a soft target ring at the far end, where the hook goes
+    if (!T.hookHeld || T.snap !== g) {
+      c.lineWidth = 4; c.strokeStyle = "rgba(255,255,255," + (0.55 + 0.4 * k) + ")";
+      c.beginPath(); c.arc(g.x1, g.cy, Math.max(14, T.bw * 0.55) + k * 5, 0, Math.PI * 2); c.stroke();
+    }
+    c.restore();
+  }
+  // Pulsing arrows from the hook toward the far end of the thing to measure.
+  function drawHookArrow(c) {
+    if (T.d >= 1 || T.zip || T.hookHeld || T.caseFly || T.msg || busy()) return;
+    var g = goalObj(), h = hookPt(), tx = g.x1, ty = g.cy;
+    var dx = tx - h.x, dy = ty - h.y, L = Math.hypot(dx, dy);
+    if (L < 40) return;
+    var ux = dx / L, uy = dy / L, k = reduce ? 0.6 : (now * 0.9) % 1, sz = Math.max(12, T.bw * 0.42);
+    c.save();
+    c.lineWidth = 6; c.lineCap = "round"; c.lineJoin = "round";
+    for (var i = 0; i < 3; i++) {
+      var f = (i + k) / 3, ax = h.x + ux * (T.bw * 0.9 + f * Math.min(L * 0.55, 150)), ay = h.y + uy * (T.bw * 0.9 + f * Math.min(L * 0.55, 150));
+      var al = Math.sin(f * Math.PI);
+      c.strokeStyle = "rgba(29,35,64," + (0.7 * al) + ")";
+      c.beginPath(); c.moveTo(ax - ux * sz - uy * sz * 0.8, ay - uy * sz + ux * sz * 0.8); c.lineTo(ax, ay); c.lineTo(ax - ux * sz + uy * sz * 0.8, ay - uy * sz - ux * sz * 0.8); c.stroke();
+      c.strokeStyle = "rgba(255,225,77," + al + ")"; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(ax - ux * sz - uy * sz * 0.8, ay - uy * sz + ux * sz * 0.8); c.lineTo(ax, ay); c.lineTo(ax - ux * sz + uy * sz * 0.8, ay - uy * sz - ux * sz * 0.8); c.stroke();
+      c.lineWidth = 6;
+    }
+    c.restore();
+  }
+  function easeIO(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function drawGhost(c) {
+    if (!T.ghost) return;
+    var t = T.ghost.t, g = goalObj(), m = mouth(), h = hookPt();
+    var p = easeIO(clamp((t - 0.5) / 1.3, 0, 1));
+    var x = lerp(h.x, g.x1, p), y = lerp(h.y, g.cy, p);
+    var a = t < 0.3 ? t / 0.3 : (t > 2.1 ? Math.max(0, 1 - (t - 2.1) / 0.5) : 1);
+    c.save();
+    c.globalAlpha = a * 0.55;
+    // a see-through tape following the hand
+    var bl = Math.hypot(x - m.x, y - m.y), an = Math.atan2(y - m.y, x - m.x);
+    c.save(); c.translate(m.x, m.y); c.rotate(an); c.fillStyle = "#FFD43C"; c.fillRect(0, -T.bw / 2, bl, T.bw); c.restore();
+    c.globalAlpha = a * 0.85;
+    // the hand: one finger on the hook
+    var s = Math.max(0.8, T.bw / 34) * (t < 0.5 ? 1.12 - 0.12 * clamp(t / 0.5, 0, 1) : 1);
+    c.translate(x, y); c.scale(s, s);
+    c.lineWidth = 3; c.strokeStyle = OUT; c.fillStyle = "#FFFFFF";
+    rr(c, -9, -6, 18, 40, 9); c.fill(); c.stroke();
+    rr(c, -12, 22, 44, 40, 16); c.fill(); c.stroke();
+    rr(c, 10, 14, 14, 24, 7); c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, 2, 5, 0, Math.PI * 2); c.fillStyle = "rgba(255,201,60,0.9)"; c.fill();
+    c.restore();
   }
   function drawObject(c, o) {
     var x0 = o.x0, x1 = o.x1, cy = o.cy, h = o.h, len = x1 - x0;
@@ -899,8 +1059,8 @@ body.ending .ob { pointer-events: none; }
     if (T.d < 1 && !T.zip && !busy()) {
       var p = 0.5 + 0.5 * Math.sin(now * 4);
       c.save();
-      c.strokeStyle = "rgba(255,255,255," + (0.5 + 0.4 * p) + ")";
-      c.lineWidth = 4;
+      c.strokeStyle = "rgba(255,225,77," + (0.55 + 0.4 * p) + ")";
+      c.lineWidth = 5;
       c.beginPath(); c.arc(h.x, h.y, bw * 0.9 + p * 8, 0, Math.PI * 2); c.stroke();
       c.restore();
     }
@@ -925,9 +1085,11 @@ body.ending .ob { pointer-events: none; }
   }
   function drawTape(c) {
     T.objs.forEach(function (o) { drawObject(c, o); });
+    drawGoal(c);
     drawBlade(c);
     drawCase(c);
     drawHook(c);
+    drawHookArrow(c);
     T.burst.forEach(function (b) {
       c.strokeStyle = "rgba(255,240,150," + (1 - b.t / 0.45) + ")";
       c.lineWidth = 4; c.lineCap = "round";
@@ -938,10 +1100,12 @@ body.ending .ob { pointer-events: none; }
     var F = T.F;
     var above = T.c.y - T.cs * 0.62 - F * 0.9 > 4;
     var by = above ? T.c.y - T.cs * 0.62 - F * 0.75 : T.c.y + T.cs * 0.62 + F * 0.75;
-    readout(c, tapeText(v), T.c.x, by, F, T.snap ? 1 : 0, T.c.x, above ? T.c.y - T.cs * 0.45 : T.c.y + T.cs * 0.45);
+    readout(c, tapeText(v), T.c.x, by, F, T.snap || (T.msg && T.msg.ok) ? 1 : 0, T.c.x, above ? T.c.y - T.cs * 0.45 : T.c.y + T.cs * 0.45);
+    drawGhost(c);
   }
   // Tape pointer handling
   function tapeDown(p, id) {
+    T.lastTouch = now; T.ghost = null; T.ghostDone = false;
     var h = hookPt();
     var hr = Math.max(40, T.bw * 1.3);
     var d = tapeDir();
@@ -951,6 +1115,7 @@ body.ending .ob { pointer-events: none; }
       T.zip = false; T.zv = 0; T.hookHeld = true; T.live = true; T.caseFly = null;
       T.lastIn = Math.floor(T.d / T.ppi);
       drags[id] = { type: "hook", dx: h.x - p.x, dy: h.y - p.y };
+      T.needAlign = false; if (!T.msg) T.moveAt = 0;
       blip(900, 0.05, 0.05, "triangle");
       return true;
     }
@@ -959,10 +1124,11 @@ body.ending .ob { pointer-events: none; }
     if (Math.abs(lx) < T.cs * 0.6 && Math.abs(ly) < T.cs * 0.6) {
       T.caseFly = null;
       drags[id] = { type: "case", dx: T.c.x - p.x, dy: T.c.y - p.y };
+      T.moveAt = 0; T.needAlign = false;
       blip(500, 0.05, 0.05, "triangle");
       return true;
     }
-    say(T.d < 1 ? "Pull the hook!" : "Grab the tape case");
+    say(T.d < 1 ? "Pull the yellow hook!" : "Grab the tape case");
     return false;
   }
   function tapeMove(dr, p) {
@@ -975,7 +1141,8 @@ body.ending .ob { pointer-events: none; }
     }
   }
   function tapeUp(dr) {
-    if (dr.type === "hook") releaseHook();
+    T.lastTouch = now;
+    if (dr.type === "hook") { releaseHook(); if (!T.moveAt && !alignedToGoal()) { T.needAlign = true; T.moveAt = now + 2.5; } }
     else if (dr.type === "case") {
       // Dropped near the end of a thing on the bench: line the mouth up with it.
       var m = mouth(), best = null, bd = Math.max(60, T.cs * 0.7);
@@ -992,6 +1159,8 @@ body.ending .ob { pointer-events: none; }
         T.caseFly = { fx: T.c.x, fy: T.c.y, fa: fa, tx: best.x0 - T.cs / 2, ty: best.cy, t: 0 };
         blip(700, 0.06, 0.05, "triangle", 900);
       }
+      // Left somewhere else for a while: it glides back to the thing the coach names.
+      T.needAlign = true; T.moveAt = now + 6;
     }
   }
 
@@ -1665,7 +1834,9 @@ body.ending .ob { pointer-events: none; }
     S.tool = t;
     Array.prototype.forEach.call(document.querySelectorAll("[data-tool]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.tool === t)); });
     Array.prototype.forEach.call(document.querySelectorAll(".optset"), function (o) { o.classList.toggle("on", o.dataset.for === t); });
-    if (!quiet) { blip(560, 0.08, 0.06, "triangle", 840); say(HINTS[t]); save(); }
+    if (!quiet) { blip(560, 0.08, 0.06, "triangle", 840); if (t !== "tape") say(HINTS[t]); save(); }
+    T.lastTouch = now; T.coachKey = "";
+    $("mcoach").classList.toggle("off", t !== "tape");
     updateOpts();
     updateAria(true);
   }
@@ -2027,11 +2198,11 @@ body.ending .ob { pointer-events: none; }
     timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
     if (reduce) {
       ITEMS.forEach(function (it, i) { tick(i); });
-      later(function () { close(false); }, 1500);
+      later(function () { close(false); }, 2000);
     } else {
-      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
-      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
-      later(function () { close(false); }, 1600);
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 400 + i * 560); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1530);
+      later(function () { close(false); }, 2150);
     }
   }
   // The click that follows the skipping tap is swallowed (it must not press what is underneath).

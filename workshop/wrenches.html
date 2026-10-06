@@ -221,6 +221,7 @@ button {
   top: 10px;
   z-index: 3;
   transform: translate(-50%, -12px) scale(0.92);
+  width: max-content;
   max-width: calc(100% - 24px);
   background: #FFC93C;
   color: #1D2340;
@@ -295,6 +296,23 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .sizebtn svg { width: 40px; height: 16px; }
   .sizebtn b { font-size: 1.1rem; padding: 0 6px; border-radius: 9px; border-width: 2px; }
 }
+/* Declutter: calm phone header (Back, Home icon, Grown-ups clock icon, Big icon) like the Drill Press. */
+.gubtn::before {
+  content: ""; display: none; width: 26px; height: 26px; flex: none; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.5' r='8'/%3E%3Cpath d='M12 9.5v4l2.8 2M9.5 2.8h5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
+  header .badge { display: none; }
+  .homebtn span { display: none; }
+  .homebtn { min-width: 48px; justify-content: center; }
+  .gubtn { min-width: 48px; padding: 0 !important; font-size: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+  .gubtn::before { display: block; }
+  .stage .bigtoggle { min-width: 48px; min-height: 46px; padding: 0; justify-content: center; }
+  .stage .bigtoggle span { display: none; }
+  /* The prompt sits between the corners, clear of the Big button. */
+  .prompt { max-width: calc(100% - 140px); }
+}
 @media (prefers-reduced-motion: reduce) {
   .prompt { transition: opacity 0.2s ease; }
 }
@@ -304,11 +322,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 <div class="wrap">
   <header>
     <a class="wallbtn" id="wallbtn" href="./" aria-label="Back to the Tool Wall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Tool Wall</span></a>
-    <h1>Wrenches &amp; Sockets</h1>
+    <h1>Wrenches</h1>
     <span class="spacer"></span>
     <span class="badge" title="Eye protection and ear protection are on"><svg viewBox="0 0 52 30" aria-hidden="true"><rect x="2" y="9" width="21" height="13" rx="6" fill="#5BC0EB" stroke="#1D2340" stroke-width="2.5"/><path d="M8 13 l4 -2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23 15 h3" stroke="#1D2340" stroke-width="2.5"/><path d="M33 22 C33 4 49 4 49 22" fill="none" stroke="#1D2340" stroke-width="3"/><rect x="29" y="16" width="8" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/><rect x="45" y="16" width="6" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/></svg><span>Gear on</span></span>
     <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    <button class="btn gubtn" id="gubtn">Grown-ups</button>
+    <button class="btn gubtn" id="gubtn" aria-label="Grown-ups">Grown-ups</button>
   </header>
 
   <main class="app">
@@ -431,7 +449,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     LY.counter = { x: t.x + t.w / 2, y: t.y + lab * 0.55, size: Math.max(17, Math.min(30, lab * 0.7)) };
     // Bolt slots: try one row of 5, rows of 3+2, or 2+2+1, keep the biggest bolts
     var m = Math.min(plate.w, plate.h) * 0.05;
-    var ix = plate.x + m, iy = plate.y + m, iw = plate.w - 2 * m, ih = plate.h - 2 * m;
+    // Narrow screens: keep a band at the top of the plate free for the prompt bubble.
+    var res = W < 600 ? Math.min(74, plate.h * 0.14) : 0;
+    var ix = plate.x + m, iy = plate.y + m + res, iw = plate.w - 2 * m, ih = plate.h - 2 * m - res;
     var opts = [[5], [3, 2], [2, 2, 1]], best = null;
     opts.forEach(function (rows) {
       var cols = rows[0], cw = iw / cols, ch = ih / rows.length;
@@ -541,15 +561,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       c.beginPath(); c.arc(q[0], q[1], cs, 0, TAU); c.fillStyle = "#D9DFE7"; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
       c.save(); c.translate(q[0], q[1]); c.rotate(0.4 + k); c.beginPath(); c.moveTo(-cs * 0.6, 0); c.lineTo(cs * 0.6, 0); c.stroke(); c.restore();
     });
-    // Painted size labels under each bolt hole
-    for (var i = 0; i < SIZES.length; i++) {
-      var s = LY.slots[i], d = dims(SIZES[i]);
-      var fs = Math.max(16, U * 0.5), lwid = fs * 1.55, lh = fs * 1.15;
-      var ly = s.y + d.rw * K + lh * 0.5 + U * 0.14;
-      c.fillStyle = SCOL[i]; rrect(c, s.x - lwid / 2, ly - lh / 2, lwid, lh, lh / 2); c.fill();
-      c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
-      outlinedText(c, String(SIZES[i]), s.x, ly + fs * 0.06, fs, "#FFFFFF", OUT);
-    }
+    var i;
     // The parts tray
     var tb = LY.trayBox, trr = Math.min(18, tb.h * 0.2);
     c.fillStyle = "rgba(40,25,10,0.35)"; rrect(c, tb.x + 5, tb.y + 6, tb.w, tb.h, trr); c.fill();
@@ -631,7 +643,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(promptTimer);
-    promptTimer = setTimeout(function () { el.classList.remove("show"); }, ms || 2600);
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, ms || 3500);
   }
   function addFx(o) { o.t0 = now; fx.push(o); if (fx.length > 80) fx.shift(); }
   function busy() { return Toybox.timer.locked(); }
@@ -779,11 +791,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var tx = x + Math.cos(ang) * along * sc, ty = y + Math.sin(ang) * along * sc * K;
     px *= sc;
     if (px < 7) return;
-    var w = px * 1.55, h = px * 1.1;
+    var w = px * 1.3, h = px * 0.75;
     c.save();
     c.fillStyle = SCOL[idx] || "#888"; rrect(c, tx - w / 2, ty - h / 2, w, h, h / 2); c.fill();
     c.lineWidth = Math.max(2, px * 0.12); c.strokeStyle = OUT; c.stroke();
-    outlinedText(c, String(mm), tx, ty + px * 0.07, px, "#FFFFFF", OUT);
     c.restore();
   }
   function plane(c, x, y, ang, sc) { c.translate(x, y); c.scale(1, K); c.rotate(ang); c.scale(sc, sc); }
@@ -1034,7 +1045,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (T.swing > 0.7) { T.swing = 0; sTurn(); var hp = headTop(i); addFx({ type: "swish", x: hp.x, y: hp.y, r: toolGeom(toolMM()).ro + U * 0.12, a0: T.ang - applied * 6, a1: T.ang, dur: 0.35 }); }
       if (d > 0 && nl <= 0 && Math.abs(applied) < Math.abs(d) * 0.5 && now - (R.snugAt || -9) > 1.2) {
         R.snugAt = now; sSnug();
-        var p = headTop(i); addFx({ type: "word", text: "Snug!", x: p.x, y: p.y - dims(SIZES[i]).r * 1.6, dur: 0.9, color: "#BFD7FF" });
+        var p = headTop(i); addFx({ type: "word", text: "Snug!", x: p.x, y: p.y - dims(SIZES[i]).r * 1.6, dur: 1.4, color: "#BFD7FF" });
       }
       if (d < 0 && nl >= MAXL - 1e-6) boltOut(i, before < MAXL - 1e-6);
     } else {
@@ -1057,7 +1068,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     liftTool(true);
     if (fresh) {
       sOut();
-      addFx({ type: "stars", x: p.x, y: p.y, r: dims(SIZES[i]).r * 1.3, dur: 0.8, seed: Math.random() * 6 });
+      addFx({ type: "stars", x: p.x, y: p.y, r: dims(SIZES[i]).r * 1.3, dur: 1.1, seed: Math.random() * 6 });
     }
     say("It's out! Drag the bolt to the tray.");
     save();
@@ -1066,7 +1077,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   // ---------- Tool moves ----------
   function flyHome() {
     T.state = "fly";
-    T.fly = { x: T.x, y: T.y, a: T.ang, sc: T.sc, t0: now, dur: 0.38, to: "ready" };
+    T.fly = { x: T.x, y: T.y, a: T.ang, sc: T.sc, t0: now, dur: 0.5, to: "ready" };
     T.slot = -1;
   }
   function liftTool(home) {
@@ -1089,7 +1100,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     } else {
       T.state = "wobble";
       T.slot = best;
-      T.wob = { t0: now, dur: reduce ? 0.5 : 0.8, big: mm > want };
+      T.wob = { t0: now, dur: reduce ? 0.6 : 1.05, big: mm > want };
       rt[best].wig = now;
       sSlip();
       say(mm > want ? "Too big! Try a smaller one." : "Too small! Try a bigger one.");
@@ -1100,7 +1111,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var p = headTop(i);
     rt[i].shake = now;
     sClunk();
-    addFx({ type: "clunk", x: p.x, y: p.y, r: toolGeom(toolMM()).ro, dur: 0.6 });
+    addFx({ type: "clunk", x: p.x, y: p.y, r: toolGeom(toolMM()).ro, dur: 0.8 });
     if (!hinted.turn) {
       hinted.turn = true;
       say("Drag the handle around! Lefty-loosey.");
@@ -1139,7 +1150,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var r = rt[i];
       if (r.fly && now - r.fly.t0 >= r.fly.dur) {
         r.fly = null;
-        if (S.bolts[i].tray) { sTray(); var tp = trayPos(i); addFx({ type: "stars", x: tp.x, y: tp.y - U * 0.3, r: U * 0.5, dur: 0.6, seed: i }); }
+        if (S.bolts[i].tray) { sTray(); var tp = trayPos(i); addFx({ type: "stars", x: tp.x, y: tp.y - U * 0.3, r: U * 0.5, dur: 0.85, seed: i }); }
         else { sPlace(); r.pop = now; }
       }
     }
@@ -1280,12 +1291,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (!c) return;
     rt[i].carry = null;
     var d = dims(SIZES[i]);
-    rt[i].fly = { x: c.x, y: c.y, z: d.Z, sc: 1, t0: now, dur: 0.35 };
+    rt[i].fly = { x: c.x, y: c.y, z: d.Z, sc: 1, t0: now, dur: 0.5 };
     if (inRect(p, LY.tray, 24) || inRect({ x: c.x, y: c.y }, LY.trayBox, 10)) {
       if (!b.tray) {
         b.tray = true; b.l = MAXL;
         S.out++; R.countAt = now;
-        addFx({ type: "word", text: "Bolts out: " + S.out, x: LY.counter.x, y: LY.counter.y + U * 0.4, dur: 0.9, color: "#FFC93C" });
+        addFx({ type: "word", text: "In the tray!", x: LY.counter.x, y: LY.counter.y + U * 0.4, dur: 1.4, color: "#FFC93C" });
       }
     } else if (inRect(p, LY.plate, 0)) {
       if (b.tray) {
@@ -1382,7 +1393,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (busy()) return;
     S.dir = S.dir === "loosen" ? "tighten" : "loosen";
     blip(S.dir === "loosen" ? 700 : 520, 0.06, 0.05, "square");
-    if (T.state === "on") { var p = headTop(T.slot); addFx({ type: "word", text: S.dir === "loosen" ? "Loosen" : "Tighten", x: p.x, y: p.y - U * 0.9, dur: 0.8, color: S.dir === "loosen" ? "#BDF0C8" : "#BFD7FF" }); }
+    if (T.state === "on") { var p = headTop(T.slot); addFx({ type: "word", text: S.dir === "loosen" ? "Loosen" : "Tighten", x: p.x, y: p.y - U * 0.9, dur: 1.2, color: S.dir === "loosen" ? "#BDF0C8" : "#BFD7FF" }); }
     updateToolbar();
     save();
   });
@@ -1407,7 +1418,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var c = rt[i].carry;
     if (!c) return;
     rt[i].carry = null;
-    rt[i].fly = { x: c.x, y: c.y, z: dims(SIZES[i]).Z, sc: 1, t0: now, dur: 0.35 };
+    rt[i].fly = { x: c.x, y: c.y, z: dims(SIZES[i]).Z, sc: 1, t0: now, dur: 0.5 };
   }
   function setDown() {
     if (T.state === "on" || T.state === "held" || T.state === "wobble") { liftTool(false); flyHome(); }
@@ -1483,7 +1494,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
   });
 
-  setTimeout(function () { if (!busy()) say("Pick a size. Drag the tool onto a bolt!", 3200); }, 700);
+  setTimeout(function () { if (!busy()) say("Drag the tool onto a bolt!", 4200); }, 700);
 
   var lastLabel = "";
   function updateAria() {
@@ -1668,11 +1679,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
     if (reduce) {
       ITEMS.forEach(function (it, i) { tick(i); });
-      later(function () { close(false); }, 1500);
+      later(function () { close(false); }, 2000);
     } else {
-      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
-      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
-      later(function () { close(false); }, 1600);
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 400 + i * 560); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1530);
+      later(function () { close(false); }, 2150);
     }
   }
   // The click that follows the skipping tap is swallowed (it must not press what is underneath).
