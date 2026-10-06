@@ -10,7 +10,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Peg Drop: drop balls through glowing pegs and count them in the bins | [`peg-drop/`](peg-drop/) |
 | Rocket Builder: build a rocket, count down, and launch it into space | [`rocket-builder/`](rocket-builder/) |
 | Color Mixing: pour paints, stir with a finger, and name the new color | [`color-mixing/`](color-mixing/) |
-| Workshop: safety gear, a Tool Wall of 81 tools, and Drill Press, Saw Bench and Hammer & Screws stations | [`workshop/`](workshop/) |
+| Workshop: safety gear, a Tool Wall of 81 tools, and eight stations: Drill Press, Saw Bench, Hammer & Screws, Lathe, Router Table, Wrenches & Sockets, Measuring and Shadow Board | [`workshop/`](workshop/) |
 | Gear Box: build gear trains and crank them, with speeds, ratios and turns | [`gear-box/`](gear-box/) |
 | Marble Run: five marble runs with a plunger, a Drop button and a lift that loops them | [`marble-run/`](marble-run/) |
 | Car Builder: build construction vehicles, fast cars and monster trucks, then drive them | [`car-builder/`](car-builder/) |

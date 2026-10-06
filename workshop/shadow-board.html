@@ -1,0 +1,1793 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shadow Board</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Workshop">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+}
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.spacer { flex: 1 1 auto; }
+.homebtn, .wallbtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 46px;
+  padding: 2px 12px 2px 9px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  background: var(--panel);
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  box-shadow: 2px 2px 0 var(--edge);
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.wallbtn { background: var(--accent); color: #1D2340; border-color: #1D2340; box-shadow: 2px 2px 0 #1D2340; }
+.homebtn:active, .wallbtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--edge); }
+.homebtn:focus-visible, .wallbtn:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.homebtn svg, .wallbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 6px;
+  border: 3px dashed var(--edge);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.badge svg { width: 52px; height: 30px; display: block; }
+.gubtn { flex: none; min-height: 46px; font-size: 1rem; padding: 0.2rem 0.7rem; white-space: nowrap; }
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.app {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 3px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 4px 4px 0 var(--edge);
+  overflow: hidden;
+  background: #C9D7E3;
+}
+#cv {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* "Put away: N of 12" (sits on the bench corner) */
+.count {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.1rem 0.9rem;
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 3px solid #1D2340;
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 #1D2340;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.count b { font-weight: 800; color: #2E9E5B; }
+.count.full { background: #FFC93C; }
+.count.bump { animation: bump 0.4s cubic-bezier(.3,1.6,.5,1); }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+/* All put away: the cheer and the "Mess it up!" button over the bench */
+.done {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.done[hidden] { display: none; }
+.done .cheer {
+  background: #FFFFFF;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340;
+  padding: 0.1rem 1.2rem;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  animation: popin 0.5s cubic-bezier(.3,1.6,.5,1) both;
+}
+.messbig {
+  pointer-events: auto;
+  min-height: 64px;
+  font-size: clamp(1.4rem, 4.4vw, 2.1rem);
+  padding: 0.2rem 1.4rem;
+  background: #FF8A3D;
+  color: #1D2340;
+  border-color: #1D2340;
+  box-shadow: 4px 4px 0 #1D2340;
+  animation: popin 0.5s 0.25s cubic-bezier(.3,1.6,.5,1) both, wob 1.8s 1s ease-in-out infinite;
+}
+@keyframes popin { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes wob { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+.toolbar {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 8px;
+}
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 56px;
+  padding: 0.2rem 0.4rem;
+  font-size: 1.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pick svg { flex: none; width: 34px; height: 34px; display: block; }
+.messbtn { min-height: 56px; font-size: 1.15rem; padding: 0.2rem 0.4rem; white-space: nowrap; overflow: hidden; background: #FF8A3D; color: #1D2340; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+.short { display: none; }
+/* Big: hide the header and the toolbar so the board fills the screen. */
+.stage .bigtoggle { position: absolute; top: 10px; right: 10px; z-index: 4; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+.stage .bigtoggle[aria-pressed="true"] { background: var(--accent); }
+body.big header, body.big .toolbar { display: none; }
+body.big .app { margin-top: 0; }
+body.ending .toolbar,
+body.ending .wallbtn,
+body.ending .messbig { pointer-events: none; opacity: 0.4; }
+
+/* Rest picture size (the rest screen itself is in common/toybox.css). */
+.rest-art { width: min(60vw, 240px); }
+
+/* Phones and narrow screens */
+@media (max-width: 700px) {
+  header h1 { font-size: 1.25rem; }
+  .badge span, .homebtn span { display: none; }
+  .badge { padding: 0 6px; }
+  .badge svg { width: 40px; height: 24px; }
+  .homebtn { padding: 2px 8px; }
+  .toolbar { gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr); }
+  .pick, .messbtn { min-height: 50px; font-size: 0.9rem; gap: 2px; padding: 0.1rem 0.15rem; flex-direction: column; line-height: 1.05; }
+  .pick svg { width: 26px; height: 24px; }
+  .long { display: none; }
+  .short { display: inline; }
+  .count { font-size: 1.05rem; padding: 0 0.7rem; }
+}
+@media (max-width: 480px) {
+  header h1 { display: none; }
+  .gubtn { font-size: 0.9rem; padding: 0.2rem 0.5rem; }
+  .wallbtn { padding: 2px 10px 2px 6px; }
+  .pick, .messbtn { font-size: 0.82rem; }
+}
+/* Short landscape phones: compact chrome so the play area gets the height. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .wrap { padding-top: 4px; padding-bottom: 4px; }
+  header h1 { font-size: 1.15rem; }
+  .homebtn, .wallbtn, .gubtn { min-height: 38px; font-size: 0.9rem; }
+  .badge span { display: none; }
+  .app { flex-direction: row; margin-top: 4px; gap: 6px; }
+  .toolbar { grid-template-columns: 1fr; grid-auto-rows: minmax(0, 1fr); width: 104px; gap: 4px; }
+  .pick, .messbtn { min-height: 0; font-size: 0.85rem; padding: 0 0.2rem; flex-direction: row; }
+  .pick svg { display: none; }
+  .long { display: none; }
+  .short { display: inline; }
+  .count { font-size: 1rem; padding: 0 0.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .count.bump, .done .cheer, .messbig { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="wallbtn" id="wallbtn" href="./" aria-label="Back to the Tool Wall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Tool Wall</span></a>
+    <h1>Shadow Board</h1>
+    <span class="spacer"></span>
+    <span class="badge" title="Eye protection and ear protection are on"><svg viewBox="0 0 52 30" aria-hidden="true"><rect x="2" y="9" width="21" height="13" rx="6" fill="#5BC0EB" stroke="#1D2340" stroke-width="2.5"/><path d="M8 13 l4 -2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23 15 h3" stroke="#1D2340" stroke-width="2.5"/><path d="M33 22 C33 4 49 4 49 22" fill="none" stroke="#1D2340" stroke-width="3"/><rect x="29" y="16" width="8" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/><rect x="45" y="16" width="6" height="12" rx="3" fill="#E63946" stroke="#1D2340" stroke-width="2.5"/></svg><span>Gear on</span></span>
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+    <button class="btn gubtn" id="gubtn">Grown-ups</button>
+  </header>
+
+  <main class="app">
+    <div class="stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A pegboard shadow board above a workbench with tools"></canvas>
+      <div class="count" id="count" role="status" aria-live="polite">Put away: <b id="countN">0</b> of <span id="countT">12</span></div>
+      <div class="done" id="doneBox" hidden>
+        <div class="cheer">All put away!</div>
+        <button class="btn messbig" id="messBig">Mess it up!</button>
+      </div>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+    </div>
+    <div class="toolbar" id="toolbar" role="group" aria-label="Pick a board"></div>
+  </main>
+</div>
+<svg id="measure" width="1" height="1" aria-hidden="true" style="position:absolute;left:-9999px;top:0;visibility:hidden"><g id="measureG"></g></svg>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- The safety-gear check ----------
+  var gearOn = true;
+  try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
+  if (!gearOn) {
+    location.replace("./?next=shadow-board");
+    return;
+  }
+
+  var SKEY = "workshop-shadow-v1";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function wrapD(a) { a = a % 360; if (a > 180) a -= 360; if (a <= -180) a += 360; return a; }
+  function easeOut(t) { t = clamp(t, 0, 1); return 1 - Math.pow(1 - t, 3); }
+  function seeded(seed) {
+    var s = (seed >>> 0) || 1;
+    return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
+
+  // ================= Tool drawings (the Tool Wall's SVG style and helpers) =================
+  var O = "#1D2340";
+  var STL = "#CBD4DE", STD = "#8E9BAA", STK = "#5D6878", SHN = "#F2F6FA";
+  var WD = "#DDA060", WDD = "#A9692E", WDL = "#F1C890";
+  var YEL = "#FFC93C", ORG = "#F77F00", RED = "#E63946", BLU = "#2D5BD7", BLK = "#343944", GRN = "#2E9E5B";
+  var BRS = "#E0B44C", RUB = "#3B404C";
+  var FONT = "Baloo 2, Trebuchet MS, sans-serif";
+  var CFONT = '"Baloo 2", "Trebuchet MS", sans-serif';   // canvas font (quoted family names)
+
+  function n2(v) { return Math.round(v * 10) / 10; }
+  function P(d, f, w, x) {
+    return '<path d="' + d + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (w == null ? 3 : w) +
+      '" stroke-linejoin="round" stroke-linecap="round"' + (x || "") + "/>";
+  }
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    if (!r) return "M" + n2(x) + " " + n2(y) + "h" + n2(w) + "v" + n2(h) + "h" + n2(-w) + "Z";
+    return "M" + n2(x + r) + " " + n2(y) + "H" + n2(x + w - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w) + " " + n2(y + r) +
+      "V" + n2(y + h - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w - r) + " " + n2(y + h) +
+      "H" + n2(x + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x) + " " + n2(y + h - r) +
+      "V" + n2(y + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + r) + " " + n2(y) + "Z";
+  }
+  function R(x, y, w, h, f, r, sw) { return P(rr(x, y, w, h, r), f, sw); }
+  function C(cx, cy, r, f, sw) {
+    return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (sw == null ? 3 : sw) + '"/>';
+  }
+  function Cf(cx, cy, r, f) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + f + '"/>'; }
+  function L(x1, y1, x2, y2, c, w, x) {
+    return '<path d="M' + n2(x1) + " " + n2(y1) + "L" + n2(x2) + " " + n2(y2) + '" stroke="' + (c || O) + '" stroke-width="' + (w || 3) + '" stroke-linecap="round" fill="none"' + (x || "") + "/>";
+  }
+  function T(x, y, t, sz, f, anc, rot) {
+    return '<text x="' + n2(x) + '" y="' + n2(y) + '" font-size="' + sz + '" font-weight="800" text-anchor="' + (anc || "middle") +
+      '" dominant-baseline="central" fill="' + (f || O) + '" font-family="' + FONT + '"' + (rot ? ' transform="rotate(' + rot + " " + n2(x) + " " + n2(y) + ')"' : "") + ">" + t + "</text>";
+  }
+  function G(t, inner) { return "<g" + (t ? ' transform="' + t + '"' : "") + ">" + inner + "</g>"; }
+  function poly(a) {
+    var s = "M" + n2(a[0]) + " " + n2(a[1]), i;
+    for (i = 2; i < a.length; i += 2) s += " L" + n2(a[i]) + " " + n2(a[i + 1]);
+    return s + " Z";
+  }
+  // Saw teeth from (x1,y1) to (x2,y2). Teeth point to the right of the travel direction by h.
+  function zig(x1, y1, x2, y2, n, h, rake) {
+    var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy), ux = dx / len, uy = dy / len;
+    var nx = -uy, ny = ux, seg = len / n, s = "", i, bx, by, f = 0.5 + (rake || 0) * 0.42;
+    for (i = 0; i < n; i++) {
+      bx = x1 + ux * seg * i; by = y1 + uy * seg * i;
+      s += " L" + n2(bx) + " " + n2(by) + " L" + n2(bx + ux * seg * f + nx * h) + " " + n2(by + uy * seg * f + ny * h);
+    }
+    return s + " L" + n2(x2) + " " + n2(y2);
+  }
+  function star(cx, cy, r1, r2, n, rot) {
+    var a = [], i, r, ang;
+    for (i = 0; i < n * 2; i++) {
+      r = i % 2 ? r2 : r1; ang = (rot || -90) * Math.PI / 180 + i * Math.PI / n;
+      a.push(cx + r * Math.cos(ang), cy + r * Math.sin(ang));
+    }
+    return poly(a);
+  }
+  function circ(cx, cy, r) { return "M" + n2(cx + r) + " " + n2(cy) + " A" + n2(r) + " " + n2(r) + " 0 1 0 " + n2(cx - r) + " " + n2(cy) + " A" + n2(r) + " " + n2(r) + " 0 1 0 " + n2(cx + r) + " " + n2(cy) + " Z"; }
+  function shine(x1, y1, x2, y2, w) { return L(x1, y1, x2, y2, "#FFFFFF", w || 3, ' opacity="0.7"'); }
+  // Closed "D" handle of a Western saw; (x, y) is where the top of the handle meets the blade.
+  function dHandle(x, y, k) {
+    k = k || 1;
+    function p(a, b) { return n2(x + a * k) + " " + n2(y + b * k); }
+    var outer = "M" + p(0, -8) + " C" + p(26, -22) + " " + p(58, -18) + " " + p(70, -2) + " L" + p(66, 18) + " C" + p(58, 40) + " " + p(64, 62) + " " + p(76, 80) +
+      " C" + p(60, 92) + " " + p(28, 90) + " " + p(12, 82) + " C" + p(4, 64) + " " + p(0, 50) + " " + p(-2, 40) + " Z";
+    var hole = "M" + p(24, 8) + " C" + p(40, 2) + " " + p(50, 6) + " " + p(50, 16) + " C" + p(44, 34) + " " + p(46, 52) + " " + p(52, 66) +
+      " C" + p(42, 72) + " " + p(32, 70) + " " + p(28, 62) + " C" + p(30, 42) + " " + p(26, 24) + " " + p(24, 8) + " Z";
+    return P(outer + " " + hole, WD, 3, ' fill-rule="evenodd"') + L(x + 6 * k, y + 2 * k, x + 18 * k, y - 8 * k, WDL, 3) +
+      C(x + 10 * k, y + 10 * k, 4.5 * k, BRS, 2) + C(x + 12 * k, y + 34 * k, 4.5 * k, BRS, 2);
+  }
+  // Classic fluted screwdriver handle (vertical) centered on cx.
+  function sdHandle(cx, top, col) {
+    var s = R(cx - 19, top, 38, 70, col, 16), i;
+    for (i = -10; i <= 10; i += 10) s += L(cx + i, top + 12, cx + i, top + 58, "rgba(29,35,64,0.35)", 4);
+    s += R(cx - 19, top, 38, 70, "none", 16);
+    s += R(cx - 11, top + 68, 22, 10, STL, 3);
+    return s;
+  }
+  function fgHandle(top, col, grip) {
+    return P("M92 " + top + " L108 " + top + " L111 186 Q111 194 100 194 Q89 194 89 186 Z", col) +
+      (grip ? P("M90 128 L110 128 L111 186 Q111 194 100 194 Q89 194 89 186 Z", grip) + L(93, 140, 107, 140, "#5A6070", 2.5) + L(93, 152, 107, 152, "#5A6070", 2.5) + L(93, 164, 107, 164, "#5A6070", 2.5) : "");
+  }
+
+  // ART[id] = { name, k: world units per drawing unit, f: drawing, turn: degrees (how it hangs on the board), label }
+  var ART = {};
+  function art(id, name, k, f, turn, label) { ART[id] = { id: id, name: name, k: k, f: f, turn: turn || 0, label: label || "" }; }
+  function variant(id, base, turn) { var b = ART[base]; ART[id] = { id: id, name: b.name, k: b.k, f: b.f, turn: turn, label: b.label }; }
+
+  art("hammer", "Claw hammer", 1.2, function () {
+    return fgHandle(56, YEL, BLK) + P("M84 28 L116 28 L116 70 L84 70 Z", STL) +
+      P("M86 36 L52 38 L48 34 L48 64 L52 60 L86 62 Z", STL) + R(34, 28, 16, 42, STL, 5) + shine(38, 34, 38, 62, 2.5) +
+      P("M114 34 C140 34 162 44 178 76 L170 82 C156 62 140 56 114 60 Z", STL);
+  });
+  art("mallet", "Wooden mallet", 1.1, function () {
+    return P("M92 70 L108 70 L110 190 Q110 196 100 196 Q90 196 90 190 Z", WD) + L(96, 80, 97, 188, WDL, 3) +
+      P("M40 24 L160 18 L160 84 L40 78 Z", WDL) + L(52, 34, 150, 30, WD, 2.5) + L(52, 50, 150, 48, WD, 2.5) + L(52, 66, 150, 66, WD, 2.5) +
+      R(92, 18, 16, 66, "none", 2, 2.5);
+  });
+  function sdArt(col, tip) {
+    return function () { return sdHandle(100, 8, col) + R(95, 86, 10, 76, STL, 3) + shine(98, 92, 98, 156, 2) + tip; };
+  }
+  art("flat", "Flathead screwdriver", 1.05, sdArt(YEL, P("M95 160 L105 160 L109 180 L109 190 L91 190 L91 180 Z", STL)));
+  art("phillips", "Phillips screwdriver", 1.05, sdArt(BLU, P("M95 160 L105 160 L104 182 L100 192 L96 182 Z", STL) + L(100, 166, 100, 188, O, 2)));
+  art("chisel", "Chisel", 1.05, function () {
+    return R(88, 8, 24, 66, WD, 10) + L(95, 16, 95, 66, "#FFFFFF", 2.5, ' opacity="0.45"') +
+      R(91, 72, 18, 9, BRS, 2, 2.5) + R(96, 80, 8, 8, STL, 2, 2.5) + R(91, 88, 18, 90, STL, 1.5, 2.5) + R(91, 162, 18, 16, SHN, 1, 2.5);
+  });
+  art("adj", "Adjustable wrench", 1.2, function () {
+    var k = "", i;
+    for (i = 0; i < 5; i++) k += L(53 + i * 3, 96, 53 + i * 3, 114, O, 1.5);
+    return P("M62 92 L186 96 Q198 100 186 106 L62 112 Z " + circ(178, 101, 4.5), STL, 3, ' fill-rule="evenodd"') +
+      P("M30 58 Q30 48 42 48 L72 54 Q82 58 82 70 L82 120 Q82 130 70 130 L46 130 Q34 128 34 116 L34 80 Z", STL) +
+      P("M12 82 L12 68 Q14 50 36 50 Q50 50 56 60 L56 82 Z", STL) + shine(20, 64, 40, 58) +
+      P(rr(12, 96, 42, 16, 6), STL) + R(48, 92, 18, 26, STD, 4) + k;
+  });
+  art("pipe", "Pipe wrench", 1.15, function () {
+    var g = 10, y = 50 - g, i, k = "";
+    for (i = 0; i < 6; i++) k += L(40 + i * 4, 64, 40 + i * 4, 80, O, 1.5);
+    return R(62, 54 - g, 12, 60 + g, STL, 2, 2.5) +
+      P("M14 " + y + " L74 " + y + " L74 " + (y + 14) + " L28 " + (y + 14) + zig(28, y + 14, 14, y + 14, 4, -4, 0) + " Z", STL) +
+      R(36, 62, 30, 20, STD, 4) + k +
+      P("M14 104 L66 96 L66 120 L20 122 Z", RED) + P("M14 104" + zig(14, 104, 60, 97, 6, -4, 0), "none", 2.5) +
+      P("M64 96 L184 100 Q196 106 184 114 L64 122 Z " + circ(176, 107, 4.5), RED, 3, ' fill-rule="evenodd"');
+  });
+  function comboArt(mm) {
+    return function () {
+      return P("M56 92 L150 94 L150 106 L56 108 Z", STL) + shine(64, 96, 144, 97) +
+        P("M62 90 L42 76 Q16 72 10 90 L24 96 L24 104 L10 110 Q16 128 42 124 L62 110 Z", STL) +
+        P(circ(166, 100, 22) + " " + star(166, 100, 12, 10, 12, 0), STL, 3, ' fill-rule="evenodd"') + T(104, 100, String(mm), 9, STK);
+    };
+  }
+  [8, 10, 13, 17, 19].forEach(function (mm) { art("c" + mm, mm + " mm wrench", 0.5 + mm * 0.045, comboArt(mm), -90, String(mm)); });
+  art("ratchet", "Socket wrench", 1.15, function () {
+    return P("M58 92 L184 94 Q196 100 184 106 L58 108 Z", STL) + P("M118 93 L184 94 Q196 100 184 106 L118 107 Z", RUB) +
+      C(40, 100, 24, STL) + R(32, 92, 16, 16, "#5E6878", 2, 2.5) + P("M16 112 L28 118 L24 126 L12 120 Z", RED, 2.5) + shine(28, 84, 50, 80);
+  }, 90);
+  // Pliers: two handles from the pivot (py), jaws on top.
+  function pliersArt(jaw, py, grip) {
+    return function () {
+      function y(v) { return n2(py + v); }
+      var hd = "M34 " + y(-4) + " L46 " + y(4) + " L33 " + y(114) + " Q31 " + y(124) + " 22 " + y(124) + " Q13 " + y(123) + " 14 " + y(112) + " Z";
+      var gr = "M24 " + y(40) + " L41 " + y(40) + " L35 " + y(116) + " Q32 " + y(127) + " 21 " + y(127) + " Q11 " + y(125) + " 12 " + y(112) + " Z";
+      var side = P(hd, STL) + P(gr, grip) + L(20, py + 52, 36, py + 52, "rgba(29,35,64,0.35)", 3) + L(18, py + 66, 34, py + 66, "rgba(29,35,64,0.35)", 3);
+      return side + G("translate(80 0) scale(-1 1)", side) + jaw + C(40, py, 10, STL) + C(40, py, 4, STK, 2);
+    };
+  }
+  (function () {
+    var teeth = "", yy;
+    for (yy = 22; yy <= 46; yy += 6) teeth += L(29, yy, 37, yy + 2, O, 1.4) + L(43, yy + 2, 51, yy, O, 1.4);
+    art("pliers", "Pliers", 1.0, pliersArt(P("M40 4 Q25 10 24 34 L27 66 L53 66 L56 34 Q55 10 40 4 Z", STL) + L(40, 10, 40, 64, O, 2) + teeth, 74, RED));
+  })();
+  art("needle", "Needle-nose pliers", 1.0, pliersArt(P("M40 0 Q36 2 35 16 L30 76 L50 76 L45 16 Q44 2 40 0 Z", STL) + L(40, 4, 40, 74, O, 1.8) + shine(37, 14, 34, 60, 2), 84, BLU));
+  art("cutters", "Wire cutters", 1.0, pliersArt(P("M40 22 Q25 26 24 46 L28 64 L52 64 L56 46 Q55 26 40 22 Z", STL) + L(40, 25, 40, 62, O, 2) + shine(30, 36, 32, 54, 2), 72, ORG));
+  art("locking", "Locking pliers", 1.05, function () {
+    var knurl = "", i;
+    for (i = 0; i < 4; i++) knurl += L(25 + i * 4.5, 191, 25 + i * 4.5, 197, O, 1.2);
+    return P("M50 62 Q74 120 70 186 Q69 197 60 197 Q53 196 54 186 Q56 128 40 70 Z", STL) +
+      P("M58 146 L80 164 L76 172 L53 158 Z", RED, 2.5) +
+      P("M28 60 L20 176 L42 176 L48 64 Z", STL) + L(31, 74, 27, 168, STK, 2) +
+      R(25, 176, 12, 12, BRS, 2, 2.5) + R(20, 188, 22, 12, BRS, 3, 3) + knurl +
+      P("M40 2 Q22 8 24 30 L30 66 L54 66 Q62 40 56 22 Q52 6 40 2 Z", STL) + L(40, 8, 41, 62, O, 2) +
+      C(42, 68, 8, STL) + C(42, 68, 3, STK, 2) + C(44, 104, 4, STK, 2);
+  });
+  art("tape", "Tape measure", 1.25, function () {
+    return P(rr(104, 62, 86, 88, 18), YEL) + R(112, 70, 70, 72, BLK, 14) + C(147, 106, 22, YEL) + C(147, 106, 6, STL, 2.5) +
+      R(122, 54, 26, 10, RED, 4) + R(186, 74, 8, 56, STK, 3) + T(147, 128, "5 m", 9, "#FFFFFF") +
+      R(98, 132, 12, 12, "#FFE45C", 0, 2.5) + R(94, 128, 5, 20, STL, 1, 2);
+  });
+  function sqPoint(t, deg) { var a = deg * Math.PI / 180; return [24 + t * Math.cos(a), 176 - t * Math.sin(a)]; }
+  function sqT(deg) { var a = deg * Math.PI / 180; return 160 / (Math.cos(a) + Math.sin(a)); }
+  art("square", "Speed square", 0.95, function () {
+    var out = P("M24 176 L184 176 L24 16 Z M44 158 L120 158 L44 82 Z", "#C7D3DF", 3, ' fill-rule="evenodd"') + R(16, 176, 172, 12, "#9DB0C3", 2), d, t, p1, p2;
+    for (d = 0; d <= 90; d += 5) {
+      t = sqT(d); p1 = sqPoint(t - (d % 10 ? 4 : 7), d); p2 = sqPoint(t - 1.5, d);
+      out += L(p1[0], p1[1], p2[0], p2[1], O, 1.4);
+      if (d % 10 === 0) { p1 = sqPoint(t - 14, d); out += T(p1[0], p1[1], d, 7, O); }
+    }
+    for (d = 1; d <= 6; d++) out += L(24, 176 - d * 20, 32, 176 - d * 20, O, 1.4) + T(36, 176 - d * 20, d, 6.5, O, "start");
+    return out + C(24, 176, 5, RED, 2);
+  });
+  art("level", "Spirit level", 1.0, function () {
+    var s = P(rr(12, 0, 416, 66, 8) + " " + rr(300, 18, 84, 30, 15), YEL, 3, ' fill-rule="evenodd"'), i;
+    for (i = 0; i < 10; i++) s += L(110 + i * 7, 66, 110 + i * 7, i % 5 ? 61 : 57, O, 1.5);
+    s += L(30, 8, 170, 8, "#FFFFFF", 3, ' opacity="0.6"');
+    s += R(0, -3, 22, 72, BLK, 8) + R(418, -3, 22, 72, BLK, 8);
+    s += R(178, 9, 84, 48, BLK, 9) + R(186, 17, 68, 32, "#C6F07A", 14, 2.5) + L(210, 17, 210, 49, O, 2) + L(230, 17, 230, 49, O, 2) + C(220, 33, 9, "#F7FFE8", 2);
+    s += R(42, 9, 34, 48, BLK, 7) + R(48, 15, 22, 36, "#C6F07A", 9, 2) + Cf(59, 33, 6, "#F7FFE8");
+    return s;
+  });
+  art("saw", "Hand saw", 1.6, function () {
+    return P("M126 56 L-84 100 L-84 136" + zig(-84, 136, 126, 136, 42, 6, -0.75) + " Z " + circ(-66, 116, 6), STL, 3, ' fill-rule="evenodd"') +
+      shine(-50, 120, 112, 120) + dHandle(118, 66);
+  });
+  art("knife", "Utility knife", 1.25, function () {
+    return P("M48 88 L14 97 L10 104 L50 107 Z", SHN, 2.5) + L(20, 99, 44, 93, STD, 1.5) +
+      P("M44 84 L170 78 Q190 80 190 100 Q190 120 170 122 L60 116 Q46 114 44 104 Z", YEL) +
+      P("M112 80 L170 78 Q190 80 190 100 Q190 120 170 122 L112 119 Z", BLK) +
+      L(124, 88, 124, 112, "#5A6070", 2.5) + L(136, 87, 136, 113, "#5A6070", 2.5) + L(148, 86, 148, 114, "#5A6070", 2.5) +
+      R(68, 72, 28, 11, BLK, 4) + C(100, 102, 4, STL, 2);
+  });
+  art("clamp", "F-clamp", 1.05, function () {
+    var xm = 80, xa = 116, i, th = "";
+    for (i = xm + 10; i < xa; i += 5) th += L(i, 127, i + 3, 135, O, 1.2);
+    return R(6, 36, 192, 12, STL, 2) + P("M8 34 L32 34 L32 134 L24 144 L8 144 Z", RED) + R(32, 118, 8, 26, BLK, 2) +
+      R(xm + 8, 127, xa - xm - 8, 8, STL, 1, 2) + th + R(xm, 118, 8, 26, BLK, 2) +
+      P("M" + xa + " 30 L" + (xa + 18) + " 30 L" + (xa + 18) + " 142 Q" + (xa + 18) + " 148 " + (xa + 12) + " 148 L" + (xa + 6) + " 148 Q" + xa + " 148 " + xa + " 142 Z", RED) +
+      R(xa + 18, 120, 36, 22, WD, 10) + L(xa + 26, 126, xa + 46, 126, WDL, 2.5);
+  });
+  variant("adjV", "adj", 90);
+  variant("pipeV", "pipe", 90);
+
+  // ================= The boards =================
+  // Rows of tools, top to bottom, as they hang on the pegboard.
+  var BOARDS = {
+    hand: { name: "Hand tools", short: "Hand", icon: "hammer",
+      rows: [["saw", "level"], ["hammer", "mallet", "flat", "chisel", "pliers", "knife"], ["tape", "square", "adj", "clamp"]] },
+    wrench: { name: "Wrenches & pliers", short: "Wrenches", icon: "adj",
+      rows: [["c19", "c17", "c13", "c10", "c8", "adjV", "pipeV"], ["ratchet", "pliers", "needle", "locking", "cutters"]] },
+    mixed: { name: "Mixed", short: "Mixed", icon: "tape",
+      rows: [["level", "adj"], ["hammer", "phillips", "flat", "needle", "cutters", "c13"], ["tape", "square", "knife", "clamp"]] }
+  };
+  var BOARD_ORDER = ["hand", "wrench", "mixed"];
+  var BW = 1000, BH = 720, FR = 26, HG = 30, HOOK = 26;   // board world size, frame, peg-hole grid, hook room above a tool
+  var RES = 2;          // sprite pixels per world unit
+  var EDGE = 5;         // white paint edge around each outline (world units)
+  var GLOW = 13;        // highlight around an outline while its tool is carried
+
+  // ---------- Saved state ----------
+  function loadState() {
+    var s = { board: "hand", boards: {} };
+    try {
+      var o = JSON.parse(localStorage.getItem(SKEY) || "null");
+      if (o && typeof o === "object") {
+        if (BOARDS[o.board]) s.board = o.board;
+        if (o.boards && typeof o.boards === "object") {
+          BOARD_ORDER.forEach(function (k) { var b = o.boards[k]; if (b && typeof b === "object") s.boards[k] = b; });
+        }
+      }
+    } catch (e) { /* bad data: fresh */ }
+    return s;
+  }
+  var S = loadState();
+  var saveQueued = false;
+  function save() {
+    if (saveQueued) return;
+    saveQueued = true;
+    setTimeout(function () {
+      saveQueued = false;
+      stash();
+      try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
+    }, 250);
+  }
+
+  // ---------- Measuring the drawings ----------
+  var measureG = $("measureG");
+  function measure(id) {
+    var a = ART[id], b;
+    measureG.innerHTML = G(a.turn ? "rotate(" + a.turn + ")" : "", a.f());
+    try { b = measureG.getBBox(); } catch (e) { b = null; }
+    if (!b || (!b.width && !b.height)) b = { x: 0, y: 0, width: 200, height: 200 };
+    measureG.innerHTML = "";
+    return { x: b.x - 4, y: b.y - 4, w: b.width + 8, h: b.height + 8 };
+  }
+
+  // ---------- Canvas, layout ----------
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var DPR = 1, CW = 300, CH = 300;
+  var V = { s: 0.5, bx: 0, by: 0, mode: "stack" };            // world -> screen: x * s + bx
+  var BENCH = { x: 0, y: 760, w: 1000, h: 600 };             // bench top in world units
+  var BENCHPX = { x: 0, y: 0, w: 100, h: 100 };
+  var bgCanvas = document.createElement("canvas");
+  var bgDirty = true;
+
+  function layout() {
+    var pad = CW < 520 || CH < 420 ? 6 : 10, best = null, f, s, c;
+    function consider(c) {
+      var bw = c.bench.w / c.s, bh = c.bench.h / c.s;
+      c.ok = bw >= 520 && bh >= 330 && bw * bh >= 560000;
+      if (!best || (c.ok && !best.ok) || (c.ok === best.ok && c.s > best.s)) best = c;
+    }
+    for (f = 0.36; f <= 0.761; f += 0.02) {
+      s = Math.min((CW - 2 * pad) / BW, (CH * f - pad) / BH);
+      c = { mode: "stack", s: s, bx: (CW - BW * s) / 2, by: pad };
+      c.bench = { x: 0, y: pad + BH * s + pad, w: CW, h: CH - (2 * pad + BH * s) };
+      consider(c);
+      s = Math.min((CW * f - pad) / BW, (CH - 2 * pad) / BH);
+      c = { mode: "side", s: s, bx: pad, by: (CH - BH * s) / 2 };
+      c.bench = { x: 2 * pad + BW * s, y: 0, w: CW - (2 * pad + BW * s), h: CH };
+      consider(c);
+    }
+    V = best;
+    BENCHPX = best.bench;
+    BENCH = { x: (BENCHPX.x - V.bx) / V.s, y: (BENCHPX.y - V.by) / V.s, w: BENCHPX.w / V.s, h: BENCHPX.h / V.s };
+    // The counter sits on the bench corner; the cheer sits over the middle of the bench.
+    var cnt = $("count"), dn = $("doneBox");
+    var big = $("bigToggle"), edge = Math.max(10, 26 * V.s);
+    cnt.style.left = Math.round(BENCHPX.x + 10) + "px";
+    // Side by side, the Big button has the bench's top corner, so the counter goes to the bottom.
+    cnt.style.top = V.mode === "stack" ? Math.round(BENCHPX.y + 10) + "px" : Math.round(BENCHPX.y + BENCHPX.h - edge - 10 - cnt.offsetHeight) + "px";
+    big.style.top = Math.round(BENCHPX.y + 10) + "px";
+    dn.style.left = Math.round(BENCHPX.x + BENCHPX.w / 2) + "px";
+    dn.style.top = Math.round(BENCHPX.y + BENCHPX.h / 2) + "px";
+  }
+  function toWorld(px, py) { return { x: (px - V.bx) / V.s, y: (py - V.by) / V.s }; }
+  function worldXf() { ctx.setTransform(DPR * V.s, 0, 0, DPR * V.s, DPR * V.bx, DPR * V.by); }
+  function screenXf() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  function resize() {
+    var r = cv.getBoundingClientRect();
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    CW = Math.max(100, r.width); CH = Math.max(100, r.height);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    layout();
+    bgDirty = true;
+  }
+
+  // ================= The current board =================
+  var BD = null;        // { key, tools: [...], total }
+  var SPR = {};         // sprite cache by board:item
+  function newCanvas(w, h) { var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+  // Grow a shape by r pixels and paint it one color.
+  function dilate(src, r, col) {
+    var c = newCanvas(src.width + 2 * r, src.height + 2 * r), x = c.getContext("2d"), i, a, k;
+    for (k = 0; k < 2; k++) {
+      var rad = k ? r * 0.55 : r;
+      for (i = 0; i < 16; i++) { a = i * Math.PI / 8; x.drawImage(src, r + Math.cos(a) * rad, r + Math.sin(a) * rad); }
+    }
+    x.drawImage(src, r, r);
+    x.globalCompositeOperation = "source-in";
+    x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "source-over";
+    return c;
+  }
+  function tint(src, col) {
+    var c = newCanvas(src.width, src.height), x = c.getContext("2d");
+    x.drawImage(src, 0, 0);
+    x.globalCompositeOperation = "source-in";
+    x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "source-over";
+    return c;
+  }
+  function buildSprite(t) {
+    var key = BD.key + ":" + t.id;
+    if (SPR[key]) { t.sp = SPR[key]; return; }
+    var a = t.art, bb = t.bb, pw = Math.round(t.w * RES), ph = Math.round(t.h * RES);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + pw + '" height="' + ph + '" viewBox="' + [bb.x, bb.y, bb.w, bb.h].map(n2).join(" ") + '">' +
+      G(a.turn ? "rotate(" + a.turn + ")" : "", a.f()) + "</svg>";
+    var img = new Image(), board = BD.key;
+    img.onload = function () {
+      var sp = newCanvas(pw, ph), x = sp.getContext("2d");
+      x.drawImage(img, 0, 0, pw, ph);
+      var ePx = Math.round(EDGE * RES), gPx = Math.round(GLOW * RES);
+      var sil = dilate(sp, ePx, "#FFFFFF"), sx = sil.getContext("2d");
+      sx.drawImage(tint(sp, "#2B303D"), ePx, ePx);
+      if (a.label) {
+        sx.save();
+        sx.translate(sil.width / 2, sil.height / 2);
+        sx.rotate(a.turn * Math.PI / 180);
+        sx.fillStyle = "#FFFFFF";
+        sx.font = "800 " + Math.round(13 * a.k * (t.w / t.bw) * RES) + "px " + CFONT;
+        sx.textAlign = "center"; sx.textBaseline = "middle";
+        sx.fillText(a.label, 0, 0);
+        sx.restore();
+      }
+      var o = { img: sp, sil: sil, glow: dilate(sp, gPx, "#FFE14D"), shadow: tint(sp, "#1D2340"), e: EDGE, g: GLOW, mask: null, mw: 0, mh: 0 };
+      // Hit mask: one cell per 2 world units.
+      try {
+        var data = x.getImageData(0, 0, pw, ph).data, mw = Math.ceil(t.w / 2), mh = Math.ceil(t.h / 2), m = new Uint8Array(mw * mh), i, j, px, py;
+        for (j = 0; j < mh; j++) for (i = 0; i < mw; i++) {
+          px = Math.min(pw - 1, Math.round((i * 2 + 1) * RES)); py = Math.min(ph - 1, Math.round((j * 2 + 1) * RES));
+          m[j * mw + i] = data[(py * pw + px) * 4 + 3] > 40 ? 1 : 0;
+        }
+        o.mask = m; o.mw = mw; o.mh = mh;
+      } catch (e) { o.mask = null; }
+      SPR[key] = o;
+      if (BD && BD.key === board) { BD.tools.forEach(function (tt) { if (BD.key + ":" + tt.id === key) tt.sp = o; }); bgDirty = true; }
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  // Lay the tools out on the pegboard in rows, sized to fit.
+  function layoutBoard(def, tools) {
+    var byId = {}, F = 1.3, inner = { x: FR + 22, y: FR + 8, w: BW - 2 * FR - 44, h: BH - 2 * FR - 20 };
+    tools.forEach(function (t) { byId[t.id] = t; });
+    var rows = def.rows.map(function (r) { return r.map(function (id) { return byId[id]; }); });
+    var sumH = 0, minGap = 16;
+    rows.forEach(function (r) {
+      var sw = 0, mh = 0;
+      r.forEach(function (t) { sw += t.bw; mh = Math.max(mh, t.bh); });
+      F = Math.min(F, (inner.w - minGap * (r.length + 1)) / sw);
+      sumH += mh;
+    });
+    F = Math.min(F, (inner.h - rows.length * HOOK - minGap * (rows.length + 1)) / sumH);
+    var used = 0;
+    rows.forEach(function (r) { var mh = 0; r.forEach(function (t) { mh = Math.max(mh, t.bh * F); }); r.mh = mh; used += mh + HOOK; });
+    var gy = (inner.h - used) / (rows.length + 1), y = inner.y + gy;
+    rows.forEach(function (r) {
+      var sw = 0;
+      r.forEach(function (t) { t.w = t.bw * F; t.h = t.bh * F; sw += t.w; });
+      var gx = (inner.w - sw) / (r.length + 1), x = inner.x + gx;
+      r.forEach(function (t) {
+        var top = y + HOOK + (r.mh - t.h) * 0.15;
+        t.tx = x + t.w / 2; t.ty = top + t.h / 2;
+        // Pegboard hooks above the tool, in real holes of the grid.
+        t.hookXs = t.w > 150 ? [t.tx - t.w * 0.3, t.tx + t.w * 0.3] : [t.tx];
+        t.top = top;
+        x += t.w + gx;
+      });
+      y += r.mh + HOOK + gy;
+    });
+  }
+
+  function benchRange(t, a) {
+    var r = a * Math.PI / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r)), m = 16;
+    var ex = (c * t.w + s * t.h) / 2, ey = (s * t.w + c * t.h) / 2;
+    var x0 = BENCH.x + m + ex, x1 = BENCH.x + BENCH.w - m - ex, y0 = BENCH.y + m + ey, y1 = BENCH.y + BENCH.h - m - ey;
+    if (x1 < x0) { x0 = x1 = BENCH.x + BENCH.w / 2; }
+    if (y1 < y0) { y0 = y1 = BENCH.y + BENCH.h / 2; }
+    return { x0: x0, x1: x1, y0: y0, y1: y1 };
+  }
+  function homePos(t) {
+    var g = benchRange(t, t.home.a);
+    return { x: lerp(g.x0, g.x1, t.home.u), y: lerp(g.y0, g.y1, t.home.v) };
+  }
+  function setHomeAt(t, x, y, a) {
+    t.home.a = wrapD(a);
+    var g = benchRange(t, t.home.a);
+    t.home.u = g.x1 > g.x0 ? clamp((x - g.x0) / (g.x1 - g.x0), 0, 1) : 0.5;
+    t.home.v = g.y1 > g.y0 ? clamp((y - g.y0) / (g.y1 - g.y0), 0, 1) : 0.5;
+  }
+  // Pick messy bench spots that do not pile everything in one place.
+  function scatter(list) {
+    var taken = [];
+    BD.tools.forEach(function (t) { if (t.mode !== "placed" && list.indexOf(t) === -1) { var p = homePos(t); taken.push(p); } });
+    list.forEach(function (t) {
+      var best = null, bestD = -1, k, cand, p, d;
+      for (k = 0; k < 28; k++) {
+        cand = { u: Math.random(), v: Math.random(), a: Math.round(rnd(-180, 180)) };
+        t.home = cand;
+        p = homePos(t);
+        d = 1e9;
+        taken.forEach(function (q) { d = Math.min(d, Math.hypot(p.x - q.x, (p.y - q.y) * 1.4)); });
+        if (d > bestD) { bestD = d; best = cand; }
+      }
+      t.home = best;
+      taken.push(homePos(t));
+    });
+  }
+
+  function buildBoard(key, intro) {
+    var def = BOARDS[key], ids = [];
+    def.rows.forEach(function (r) { r.forEach(function (id) { ids.push(id); }); });
+    var tools = ids.map(function (id, i) {
+      var a = ART[id], bb = measure(id);
+      return { i: i, id: id, art: a, name: a.name, bb: bb, bw: bb.w * a.k, bh: bb.h * a.k, w: 0, h: 0, tx: 0, ty: 0, hookXs: [], top: 0,
+        sp: null, mode: "bench", home: { u: 0.5, v: 0.5, a: 0 }, x: 0, y: 0, a: 0, va: 0, lift: 0, bt: 1, wig: 0 };
+    });
+    layoutBoard(def, tools);
+    BD = { key: key, tools: tools, total: tools.length, order: tools.slice() };
+    var saved = S.boards[key] || {}, placed = Array.isArray(saved.placed) ? saved.placed : [], bench = saved.bench && typeof saved.bench === "object" ? saved.bench : {};
+    var fresh = [];
+    tools.forEach(function (t) {
+      if (placed.indexOf(t.id) !== -1) { t.mode = "placed"; t.x = t.tx; t.y = t.ty; t.a = 0; return; }
+      var h = bench[t.id];
+      if (Array.isArray(h) && h.length === 3 && h.every(function (v) { return typeof v === "number" && isFinite(v); })) {
+        t.home = { u: clamp(h[0], 0, 1), v: clamp(h[1], 0, 1), a: wrapD(h[2]) };
+      } else fresh.push(t);
+    });
+    if (fresh.length) scatter(fresh);
+    tools.forEach(function (t) {
+      if (t.mode === "placed") return;
+      var p = homePos(t);
+      t.x = p.x; t.y = p.y; t.a = t.home.a;
+      if (intro && fresh.indexOf(t) !== -1 && !reduce) {
+        startTumble(t, p.x + rnd(-120, 120), BENCH.y - rnd(260, 520), rnd(-180, 180), rnd(0, 0.5));
+      }
+    });
+    BD.order = tools.filter(function (t) { return t.mode !== "placed"; });
+    tools.forEach(buildSprite);
+    bgDirty = true;
+    full = countPlaced() === BD.total;
+    updateCount(false);
+    $("doneBox").hidden = !full;
+    if (fresh.length) save();
+  }
+  function stash() {
+    if (!BD) return;
+    var b = { placed: [], bench: {} };
+    BD.tools.forEach(function (t) {
+      if (t.mode === "placed" || t.mode === "snap") b.placed.push(t.id);
+      else b.bench[t.id] = [Math.round(t.home.u * 1000) / 1000, Math.round(t.home.v * 1000) / 1000, Math.round(t.home.a)];
+    });
+    S.boards[BD.key] = b;
+    S.board = BD.key;
+  }
+  function countPlaced() { var n = 0; BD.tools.forEach(function (t) { if (t.mode === "placed") n++; }); return n; }
+
+  // ================= Drawing =================
+  var hookCol = "#B8C2CE";
+  function buildBg() {
+    bgDirty = false;
+    bgCanvas.width = cv.width; bgCanvas.height = cv.height;
+    var c = bgCanvas.getContext("2d"), s = V.s, i, j;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // Wall
+    var g = c.createLinearGradient(0, 0, 0, CH);
+    g.addColorStop(0, "#D3DFEA"); g.addColorStop(1, "#BCCBD9");
+    c.fillStyle = g; c.fillRect(0, 0, CW, CH);
+    c.strokeStyle = "rgba(29,35,64,0.07)"; c.lineWidth = 2;
+    for (i = 40; i < CW; i += 80) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, CH); c.stroke(); }
+    // Bench top
+    drawBench(c);
+    // Board (world units)
+    c.setTransform(DPR * s, 0, 0, DPR * s, DPR * V.bx, DPR * V.by);
+    c.fillStyle = "rgba(29,35,64,0.9)";
+    rrPath(c, 8, 8, BW, BH, 22); c.fill();                                   // offset shadow
+    rrPath(c, 0, 0, BW, BH, 22); c.fillStyle = "#B07A45"; c.fill();
+    c.lineWidth = 3.5 / s; c.strokeStyle = O; c.stroke();
+    // Frame grain
+    c.save(); rrPath(c, 0, 0, BW, BH, 22); c.clip();
+    var rnd2 = seeded(7);
+    c.strokeStyle = "rgba(110,62,20,0.35)"; c.lineWidth = 2;
+    for (i = 0; i < 26; i++) {
+      var yy = rnd2() * BH;
+      c.beginPath(); c.moveTo(0, yy); c.bezierCurveTo(BW * 0.3, yy + rnd2() * 10 - 5, BW * 0.6, yy + rnd2() * 10 - 5, BW, yy + rnd2() * 8 - 4); c.stroke();
+    }
+    c.restore();
+    // Pegboard panel
+    c.fillStyle = "#C98F55";
+    c.fillRect(FR, FR, BW - 2 * FR, BH - 2 * FR);
+    c.lineWidth = 2.5 / s; c.strokeStyle = O; c.strokeRect(FR, FR, BW - 2 * FR, BH - 2 * FR);
+    c.fillStyle = "#6A4220";
+    for (j = FR + HG / 2; j < BH - FR; j += HG) {
+      for (i = FR + HG / 2; i < BW - FR; i += HG) { c.beginPath(); c.arc(i, j, 4.6, 0, Math.PI * 2); c.fill(); }
+    }
+    c.fillStyle = "rgba(255,230,190,0.35)";
+    for (j = FR + HG / 2; j < BH - FR; j += HG) {
+      for (i = FR + HG / 2; i < BW - FR; i += HG) { c.beginPath(); c.arc(i + 1.2, j + 3.6, 2.4, 0, Math.PI); c.fill(); }
+    }
+    // Painted outlines
+    BD.tools.forEach(function (t) {
+      if (!t.sp) return;
+      var sp = t.sp;
+      c.drawImage(sp.sil, t.tx - t.w / 2 - sp.e, t.ty - t.h / 2 - sp.e, t.w + 2 * sp.e, t.h + 2 * sp.e);
+    });
+    // Hooks
+    BD.tools.forEach(function (t) { hooksFor(t).forEach(function (h) { drawHook(c, h[0], h[1], h[2]); }); });
+  }
+  // Where the drawing really starts at column x (from the hit mask), so a hook ends inside the tool.
+  function shapeTop(t, x) {
+    var sp = t.sp, i, j, lim;
+    if (!sp || !sp.mask) return null;
+    i = Math.floor((x - (t.tx - t.w / 2)) / 2); lim = Math.floor(sp.mh * 0.6);
+    if (i < 0 || i >= sp.mw) return null;
+    for (j = 0; j < lim; j++) if (sp.mask[j * sp.mw + i]) return t.ty - t.h / 2 + j * 2;
+    return null;
+  }
+  // Pegboard hooks come out of real holes of the grid when they can.
+  function hooksFor(t) {
+    var h0 = FR + HG / 2;
+    var out = t.hookXs.map(function (cx) {
+      var x = h0 + Math.round((cx - h0) / HG) * HG, top = shapeTop(t, x);
+      if (top === null) { x = cx; top = shapeTop(t, cx); }
+      if (top === null) return null;
+      return [x, Math.max(h0, h0 + Math.floor((top - 4 - h0) / HG) * HG), top];
+    }).filter(function (h) { return h; });
+    if (!out.length) out = [[t.tx, Math.max(h0, h0 + Math.floor((t.top - 4 - h0) / HG) * HG), t.top]];
+    return out;
+  }
+  function rrPath(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+  }
+  function drawHook(c, hx, hy, top) {
+    var len = Math.max(14, top - hy + 12);
+    c.fillStyle = "#3A2410"; c.beginPath(); c.arc(hx, hy, 5.5, 0, Math.PI * 2); c.fill();
+    c.lineCap = "round";
+    c.strokeStyle = O; c.lineWidth = 10; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx, hy + len); c.stroke();
+    c.strokeStyle = hookCol; c.lineWidth = 5; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx, hy + len); c.stroke();
+    c.strokeStyle = "rgba(255,255,255,0.8)"; c.lineWidth = 1.6; c.beginPath(); c.moveTo(hx - 1, hy + 2); c.lineTo(hx - 1, hy + len - 3); c.stroke();
+    c.beginPath(); c.arc(hx, hy + len, 5, 0, Math.PI * 2); c.fillStyle = hookCol; c.fill(); c.lineWidth = 2.5; c.strokeStyle = O; c.stroke();
+  }
+  function drawBench(c) {
+    var b = BENCHPX, s = V.s, i, edge = Math.max(10, 26 * s);
+    c.save();
+    c.fillStyle = "#D99A55";
+    c.fillRect(b.x, b.y, b.w, b.h);
+    // Planks
+    var plank = Math.max(40, 120 * s), rnd2 = seeded(11);
+    c.strokeStyle = "rgba(122,74,30,0.55)"; c.lineWidth = 2;
+    for (i = b.y + plank; i < b.y + b.h - edge; i += plank) { c.beginPath(); c.moveTo(b.x, i); c.lineTo(b.x + b.w, i); c.stroke(); }
+    c.strokeStyle = "rgba(150,92,40,0.28)"; c.lineWidth = 1.5;
+    for (i = 0; i < 40; i++) {
+      var yy = b.y + rnd2() * (b.h - edge), xx = b.x + rnd2() * b.w, ll = 60 + rnd2() * 200;
+      c.beginPath(); c.moveTo(xx, yy); c.quadraticCurveTo(xx + ll / 2, yy + rnd2() * 6 - 3, xx + ll, yy + rnd2() * 4 - 2); c.stroke();
+    }
+    // A highlight along the back, the front edge at the bottom
+    c.fillStyle = "rgba(255,240,210,0.35)"; c.fillRect(b.x, b.y, b.w, 5);
+    c.fillStyle = "#B7793F"; c.fillRect(b.x, b.y + b.h - edge, b.w, edge);
+    c.fillStyle = "rgba(0,0,0,0.12)"; c.fillRect(b.x, b.y + b.h - edge, b.w, 3);
+    c.strokeStyle = O; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(b.x, b.y + b.h - edge); c.lineTo(b.x + b.w, b.y + b.h - edge); c.stroke();
+    c.beginPath(); c.moveTo(b.x, b.y + 1.5); c.lineTo(b.x + b.w, b.y + 1.5); c.stroke();
+    if (V.mode === "side") { c.beginPath(); c.moveTo(b.x + 1.5, b.y); c.lineTo(b.x + 1.5, b.y + b.h); c.stroke(); }
+    c.restore();
+  }
+
+  function drawTool(c, t, sc, ang, lift) {
+    var sp = t.sp;
+    if (!sp) return;
+    var off = 3 + 16 * lift;
+    c.save();
+    c.translate(t.x + off, t.y + off * 1.2);
+    c.rotate(ang * Math.PI / 180); c.scale(sc, sc);
+    c.globalAlpha = 0.26 - 0.08 * lift;
+    c.drawImage(sp.shadow, -t.w / 2, -t.h / 2, t.w, t.h);
+    c.restore();
+    c.save();
+    c.translate(t.x, t.y);
+    c.rotate(ang * Math.PI / 180); c.scale(sc, sc);
+    c.drawImage(sp.img, -t.w / 2, -t.h / 2, t.w, t.h);
+    c.restore();
+  }
+  function drawGlow(c, t, k) {
+    var sp = t.sp;
+    if (!sp) return;
+    c.save();
+    c.globalAlpha = clamp(k, 0, 1);
+    c.drawImage(sp.glow, t.tx - t.w / 2 - sp.g, t.ty - t.h / 2 - sp.g, t.w + 2 * sp.g, t.h + 2 * sp.g);
+    c.globalAlpha = 1;
+    c.drawImage(sp.sil, t.tx - t.w / 2 - sp.e, t.ty - t.h / 2 - sp.e, t.w + 2 * sp.e, t.h + 2 * sp.e);
+    c.restore();
+  }
+
+  // ---------- Particles ----------
+  var parts = [];
+  var STAR_COLS = ["#FFC93C", "#FFFFFF", "#FF8A3D", "#7CD1F7", "#FF7AB6", "#9BEA5A"];
+  function addStars(x, y, n, speed, big) {
+    if (reduce) n = Math.ceil(n / 3);
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, v = speed * rnd(0.35, 1);
+      parts.push({ k: "star", x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * 0.2, life: 0, max: rnd(0.6, 1.2), r: rnd(7, 15) * (big || 1),
+        rot: rnd(0, 6), vr: rnd(-6, 6), col: pick(STAR_COLS), g: 300 });
+    }
+  }
+  function addRing(x, y, r) { parts.push({ k: "ring", x: x, y: y, life: 0, max: 0.55, r: r }); }
+  function addDust(x, y, n) {
+    for (var i = 0; i < n; i++) parts.push({ k: "dust", x: x + rnd(-30, 30), y: y + rnd(-6, 6), vx: rnd(-80, 80), vy: rnd(-50, -10), life: 0, max: rnd(0.4, 0.7), r: rnd(6, 13), g: 0 });
+  }
+  function addConfetti(n) {
+    if (reduce) n = Math.ceil(n / 3);
+    for (var i = 0; i < n; i++) {
+      parts.push({ k: "conf", x: rnd(0, BW), y: rnd(-120, -10), vx: rnd(-60, 60), vy: rnd(80, 260), life: 0, max: rnd(2.2, 3.4), w: rnd(10, 18), h: rnd(5, 9),
+        rot: rnd(0, 6), vr: rnd(-8, 8), col: pick(STAR_COLS.concat(["#2D5BD7", "#E63946", "#2E9E5B"])), g: 120 });
+    }
+  }
+  function updateParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i];
+      p.life += dt;
+      if (p.life >= p.max) { parts.splice(i, 1); continue; }
+      if (p.vx !== undefined) {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt;
+        if (p.k === "star") { p.vx *= 0.97; p.vy *= 0.97; }
+        if (p.k === "conf") p.vx += Math.sin(p.life * 5 + p.rot) * 30 * dt;
+      }
+      if (p.rot !== undefined) p.rot += (p.vr || 0) * dt;
+    }
+  }
+  function starPath(c, r) {
+    c.beginPath();
+    for (var i = 0; i < 10; i++) { var rr2 = i % 2 ? r * 0.45 : r, a = -Math.PI / 2 + i * Math.PI / 5; c[i ? "lineTo" : "moveTo"](Math.cos(a) * rr2, Math.sin(a) * rr2); }
+    c.closePath();
+  }
+  function drawParts(c) {
+    parts.forEach(function (p) {
+      var f = p.life / p.max;
+      c.save();
+      if (p.k === "star") {
+        c.globalAlpha = 1 - f * f;
+        c.translate(p.x, p.y); c.rotate(p.rot);
+        starPath(c, p.r * (1 - f * 0.4));
+        c.fillStyle = p.col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = O; c.stroke();
+      } else if (p.k === "ring") {
+        c.globalAlpha = 1 - f;
+        c.beginPath(); c.arc(p.x, p.y, p.r * (0.4 + f * 0.9), 0, Math.PI * 2);
+        c.lineWidth = 10 * (1 - f) + 2; c.strokeStyle = "#FFE14D"; c.stroke();
+      } else if (p.k === "dust") {
+        c.globalAlpha = 0.5 * (1 - f);
+        c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + f), 0, Math.PI * 2); c.fillStyle = "#F3E3C6"; c.fill();
+      } else if (p.k === "conf") {
+        c.globalAlpha = f > 0.8 ? (1 - f) * 5 : 1;
+        c.translate(p.x, p.y); c.rotate(p.rot); c.scale(1, Math.cos(p.life * 7 + p.rot));
+        c.fillStyle = p.col; c.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        c.lineWidth = 1.5; c.strokeStyle = O; c.strokeRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      c.restore();
+    });
+  }
+
+  var TI = { phase: "idle" };
+  function drawTimerBadge(c) {
+    if (TI.phase !== "running" && TI.phase !== "ending") return;
+    screenXf();
+    var f = TI.fraction;
+    var r = Math.max(18, Math.min(28, CW * 0.035));
+    var x = r + 10, y = r + 10;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = "#FFFFFF"; c.fill(); c.lineWidth = 3; c.strokeStyle = O; c.stroke();
+    if (f > 0.002) {
+      c.beginPath(); c.arc(x, y, r - 6, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2);
+      c.strokeStyle = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00"); c.lineWidth = 8; c.lineCap = "butt"; c.stroke();
+    }
+    if (TI.showMinutes && TI.phase === "running") {
+      c.fillStyle = O; c.font = "800 " + Math.round(r * 0.8) + "px " + CFONT; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText(String(TI.minutes), x, y + 1);
+    }
+  }
+
+  var now = 0, full = false, cheerT = -10;
+  function draw() {
+    if (bgDirty) buildBg();
+    screenXf();
+    ctx.drawImage(bgCanvas, 0, 0, CW, CH);
+    worldXf();
+    // Celebration: the board frame shines.
+    if (full && now - cheerT < 4 && !reduce) {
+      var k = 1 - (now - cheerT) / 4;
+      ctx.save(); ctx.globalAlpha = 0.55 * k * (0.6 + 0.4 * Math.sin(now * 12));
+      ctx.lineWidth = 22; ctx.strokeStyle = "#FFE14D"; rrPath(ctx, -4, -4, BW + 8, BH + 8, 24); ctx.stroke(); ctx.restore();
+    }
+    // Outlines light up while their tool is carried.
+    var k2;
+    for (var pid in drags) {
+      var d = drags[pid];
+      if (d.kind === "bench" && d.lifted && d.t.mode === "drag") {
+        var dd = Math.hypot(d.t.x - d.t.tx, d.t.y - d.t.ty);
+        k2 = 0.45 + 0.55 * clamp(1 - (dd - snapR(d.t)) / 320, 0, 1);
+        drawGlow(ctx, d.t, k2 * (0.75 + 0.25 * Math.sin(now * 9)));
+      }
+    }
+    // Placed tools hang on the board.
+    BD.tools.forEach(function (t) {
+      if (t.mode !== "placed") return;
+      var sc = 1, a = 0;
+      if (t.bt < 1) sc = 1 + 0.2 * (1 - t.bt) * Math.cos(t.bt * Math.PI * 3);
+      if (t.wig > 0.01) a = Math.sin(now * 32) * 5 * t.wig;
+      drawTool(ctx, t, sc, a, 0);
+    });
+    // Tools lying on the bench, then the ones that are moving, on top.
+    BD.order.forEach(function (t) { if (t.mode === "bench") drawTool(ctx, t, 1 + 0.06 * t.lift, t.a, t.lift * 0.5); });
+    BD.order.forEach(function (t) { if (t.mode !== "bench" && t.mode !== "placed") drawTool(ctx, t, 1 + 0.07 * t.lift, t.a, t.lift); });
+    drawParts(ctx);
+    drawTimerBadge(ctx);
+  }
+
+  // ================= Sound (off by default; soft and synthesized) =================
+  var AC = null, master = null, noiseBuf = null;
+  function ensureAudio() {
+    var a = Toybox.sound.ready();
+    if (!a || a === AC) return;
+    try {
+      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
+      noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.3), a.sampleRate);
+      var data = noiseBuf.getChannelData(0);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      AC = a;
+    } catch (e) { AC = null; }
+  }
+  function blip(freq, dur, vol, type, freq2, delay) {
+    ensureAudio();
+    if (!Toybox.sound.on() || !AC) return;
+    try {
+      var t = AC.currentTime + (delay || 0);
+      var o = AC.createOscillator(), g = AC.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(freq, t);
+      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* ignore */ }
+  }
+  function clack(vol, freq, delay) {
+    ensureAudio();
+    if (!Toybox.sound.on() || !AC || !noiseBuf) return;
+    try {
+      var t = AC.currentTime + (delay || 0);
+      var n = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+      n.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+      n.connect(f); f.connect(g); g.connect(master);
+      n.start(t); n.stop(t + 0.1);
+    } catch (e) { /* ignore */ }
+  }
+  function sndLift() { blip(520, 0.08, 0.04, "triangle", 700); }
+  function sndSnap() { clack(0.35, 3200); blip(440, 0.14, 0.08, "sine", 990, 0.03); }
+  function sndBack() { blip(330, 0.35, 0.035, "sine", 200); }
+  function sndDown() { clack(0.18, 900); }
+  function sndTurn() { clack(0.12, 1400); blip(600, 0.06, 0.03, "triangle"); }
+  function sndCheer() { [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) { blip(f, 0.3, 0.06, "triangle", null, i * 0.1); }); }
+
+  // ================= Play =================
+  function snapR(t) { return 85 + 0.18 * Math.max(t.w, t.h); }
+  function inBench(x, y) { return x >= BENCH.x && x <= BENCH.x + BENCH.w && y >= BENCH.y - 10 && y <= BENCH.y + BENCH.h; }
+  function toTop(t) { var i = BD.order.indexOf(t); if (i !== -1) BD.order.splice(i, 1); BD.order.push(t); }
+  function startSlide(t) {
+    t.mode = "slide";
+    t.sl = { x0: t.x, y0: t.y, a0: t.a, l0: t.lift, p: 0 };
+    sndBack();
+  }
+  function startSnap(t) {
+    t.mode = "snap";
+    t.sn = { x0: t.x, y0: t.y, a0: t.a, p: 0 };
+  }
+  function startTumble(t, x0, y0, a0, delay) {
+    t.mode = "tumble";
+    t.x = x0; t.y = y0; t.a = a0;
+    t.tm = { x0: x0, y0: y0, a0: a0, p: 0, delay: delay || 0, spin: (Math.random() < 0.5 ? -1 : 1) * (reduce ? 0 : 360), hop: reduce ? 0 : rnd(60, 140), dur: reduce ? 0.35 : rnd(0.75, 1.0) };
+    if (BD.order.indexOf(t) === -1) BD.order.push(t);
+  }
+  function landed(t) {
+    t.mode = "bench"; t.va = 0;
+    var p = homePos(t);
+    t.x = p.x; t.y = p.y; t.a = t.home.a;
+    addDust(t.x, t.y + t.h * 0.2, 5);
+    sndDown();
+  }
+  function placedNow(t) {
+    t.mode = "placed"; t.x = t.tx; t.y = t.ty; t.a = 0; t.lift = 0; t.bt = 0;
+    var i = BD.order.indexOf(t); if (i !== -1) BD.order.splice(i, 1);
+    addRing(t.tx, t.ty, Math.max(t.w, t.h) * 0.75);
+    addStars(t.tx, t.ty, 16, 420);
+    sndSnap();
+    updateCount(true);
+    save();
+    if (countPlaced() === BD.total && !full) celebrate();
+  }
+  function celebrate() {
+    full = true; cheerT = now;
+    BD.tools.forEach(function (t, i) { addStars(t.tx, t.ty, 8, 520, 1.3); t.wig = 1; });
+    addConfetti(140);
+    sndCheer();
+    setTimeout(function () { if (full) { $("doneBox").hidden = false; } }, reduce ? 100 : 700);
+  }
+  function messUp() {
+    if (busy()) return;
+    var list = BD.tools.filter(function (t) { return t.mode === "placed"; });
+    if (!list.length) return;
+    full = false;
+    $("doneBox").hidden = true;
+    // Shuffle the order they fall in.
+    list.sort(function () { return Math.random() - 0.5; });
+    list.forEach(function (t) { t.mode = "bench"; });   // count them as on the bench for spacing
+    scatter(list);
+    list.forEach(function (t, i) { startTumble(t, t.tx, t.ty, 0, i * (reduce ? 0.02 : 0.08)); t.tm.hop = reduce ? 0 : rnd(40, 160); });
+    for (var k = 0; k < list.length; k++) clack(0.15, rnd(700, 1800), k * 0.08 + 0.5);
+    updateCount(false);
+    save();
+  }
+  function updateCount(bump) {
+    var n = countPlaced(), el = $("count");
+    $("countN").textContent = n;
+    $("countT").textContent = BD.total;
+    el.classList.toggle("full", n === BD.total);
+    if (bump && !reduce) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+    $("messBtn").disabled = n === 0;
+    cv.setAttribute("aria-label", "Shadow board, " + BOARDS[BD.key].name + ": " + n + " of " + BD.total + " tools put away.");
+  }
+
+  function updateTools(dt) {
+    BD.tools.forEach(function (t) {
+      if (t.mode === "placed") {
+        if (t.bt < 1) t.bt = Math.min(1, t.bt + dt / 0.45);
+        if (t.wig > 0) t.wig = Math.max(0, t.wig - dt * 1.6);
+        return;
+      }
+      if (t.mode === "bench") {
+        var p = homePos(t), k = 1 - Math.exp(-dt * 14);
+        t.x += (p.x - t.x) * k; t.y += (p.y - t.y) * k;
+        // A springy turn (taps turn a tool by 45 degrees)
+        var diff = wrapD(t.home.a - t.a);
+        t.va += (diff * 260 - t.va * 20) * dt;
+        t.a = wrapD(t.a + t.va * dt);
+        if (Math.abs(diff) < 0.05 && Math.abs(t.va) < 0.5) { t.a = t.home.a; t.va = 0; }
+        t.lift = Math.max(0, t.lift - dt * 4);
+        return;
+      }
+      if (t.mode === "drag") {
+        var d = t.drag;
+        t.lift = Math.min(1, t.lift + dt * 6);
+        t.a = wrapD(t.a + wrapD(0 - t.a) * (1 - Math.exp(-dt * 11)));
+        var sc = 1 + 0.07 * t.lift, r = t.a * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+        // Keep the grabbed spot under the finger while the tool turns upright (and pull the grip toward the middle a little).
+        var lx = d.lx * d.pull, ly = d.ly * d.pull;
+        d.pull = Math.max(0.55, d.pull - dt * 0.8);
+        t.x = d.wx - (cs * lx - sn * ly) * sc;
+        t.y = d.wy - (sn * lx + cs * ly) * sc;
+        return;
+      }
+      if (t.mode === "slide") {
+        var s = t.sl, hp = homePos(t);
+        s.p = Math.min(1, s.p + dt / 0.6);
+        var e = easeOut(s.p);
+        t.x = lerp(s.x0, hp.x, e); t.y = lerp(s.y0, hp.y, e);
+        t.a = s.a0 + wrapD(t.home.a - s.a0) * e;
+        t.lift = s.l0 * (1 - e);
+        if (s.p >= 1) { t.mode = "bench"; t.a = t.home.a; t.va = 0; t.lift = 0; addDust(t.x, t.y, 3); }
+        return;
+      }
+      if (t.mode === "snap") {
+        var n = t.sn;
+        n.p = Math.min(1, n.p + dt / 0.14);
+        var e2 = easeOut(n.p);
+        t.x = lerp(n.x0, t.tx, e2); t.y = lerp(n.y0, t.ty, e2);
+        t.a = n.a0 * (1 - e2);
+        if (n.p >= 1) placedNow(t);
+        return;
+      }
+      if (t.mode === "tumble") {
+        var m = t.tm, hp2 = homePos(t);
+        if (m.delay > 0) { m.delay -= dt; return; }
+        m.p = Math.min(1, m.p + dt / m.dur);
+        var q = m.p;
+        t.x = lerp(m.x0, hp2.x, easeOut(q));
+        t.y = m.y0 + (hp2.y - m.y0) * q * q - m.hop * Math.sin(Math.PI * q);
+        t.a = m.a0 + (wrapD(t.home.a - m.a0) + m.spin) * easeOut(q);
+        t.lift = 0.7 * Math.sin(Math.PI * q);
+        if (m.p >= 1) landed(t);
+      }
+    });
+  }
+
+  // ================= Touch input (several fingers at once) =================
+  var drags = {};
+  function busy() { return Toybox.timer.locked(); }
+  function localPt(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function maskAt(t, lx, ly) {
+    var sp = t.sp;
+    if (Math.abs(lx) > t.w / 2 || Math.abs(ly) > t.h / 2) return false;
+    if (!sp || !sp.mask) return true;
+    var i = Math.floor((lx + t.w / 2) / 2), j = Math.floor((ly + t.h / 2) / 2);
+    if (i < 0 || j < 0 || i >= sp.mw || j >= sp.mh) return false;
+    return sp.mask[j * sp.mw + i] === 1;
+  }
+  function hits(t, w, tol) {
+    var sc = t.mode === "placed" ? 1 : 1 + 0.06 * t.lift, r = -t.a * Math.PI / 180, dx = w.x - t.x, dy = w.y - t.y;
+    var lx = (dx * Math.cos(r) - dy * Math.sin(r)) / sc, ly = (dx * Math.sin(r) + dy * Math.cos(r)) / sc, k;
+    if (maskAt(t, lx, ly)) return true;
+    if (!tol) return false;
+    for (k = 0; k < 8; k++) { var a = k * Math.PI / 4; if (maskAt(t, lx + Math.cos(a) * tol, ly + Math.sin(a) * tol)) return true; }
+    for (k = 0; k < 8; k++) { var a2 = (k + 0.5) * Math.PI / 4; if (maskAt(t, lx + Math.cos(a2) * tol * 0.5, ly + Math.sin(a2) * tol * 0.5)) return true; }
+    return false;
+  }
+  function hitTool(w) {
+    var tol = 18 / V.s, pass, i, t, list = BD.order.slice().reverse().concat(BD.tools.filter(function (x) { return x.mode === "placed"; }));
+    for (pass = 0; pass < 2; pass++) {
+      for (i = 0; i < list.length; i++) {
+        t = list[i];
+        if (t.mode !== "bench" && t.mode !== "slide" && t.mode !== "placed") continue;
+        if (hits(t, w, pass ? tol : 0)) return t;
+      }
+    }
+    return null;
+  }
+  function dragOf(t) { for (var k in drags) { if (drags[k].t === t && drags[k].kind === "bench") return { pid: k, d: drags[k] }; } return null; }
+
+  function onDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    ensureAudio();
+    if (busy() || !BD) return;
+    var p = localPt(e), w = toWorld(p.x, p.y), t = hitTool(w), d;
+    if (!t) { addDust(w.x, w.y, 2); return; }
+    var other = dragOf(t);
+    if (other) {
+      // A second finger on a tool that is pressed but not lifted: twist it round on the bench.
+      var od = other.d;
+      if (!od.lifted && !od.twist && t.mode === "bench") {
+        od.twist = { a0: t.home.a, ang0: Math.atan2(w.y - od.wy, w.x - od.wx), p2: w, pid2: e.pointerId };
+        drags[e.pointerId] = { kind: "twin", t: t, main: other.pid };
+        try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      }
+      return;
+    }
+    if (t.mode === "placed") {
+      t.wig = 1;
+      addStars(w.x, w.y, 5, 260);
+      clack(0.1, 2400);
+      return;
+    }
+    toTop(t);
+    d = { kind: "bench", t: t, sx: p.x, sy: p.y, wx: w.x, wy: w.y, lifted: false, pull: 1 };
+    var sc = 1 + 0.06 * t.lift, r = -t.a * Math.PI / 180, dx = w.x - t.x, dy = w.y - t.y;
+    d.lx = (dx * Math.cos(r) - dy * Math.sin(r)) / sc;
+    d.ly = (dx * Math.sin(r) + dy * Math.cos(r)) / sc;
+    if (t.mode === "slide") { liftUp(t, d); }
+    drags[e.pointerId] = d;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  }
+  function liftUp(t, d) {
+    d.lifted = true;
+    t.mode = "drag"; t.drag = d; t.va = 0;
+    sndLift();
+  }
+  function onMove(e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    e.preventDefault();
+    var p = localPt(e), w = toWorld(p.x, p.y);
+    if (d.kind === "twin") {
+      var m = drags[d.main];
+      if (m && m.twist) twistTo(m, null, w);
+      return;
+    }
+    d.wx = w.x; d.wy = w.y;
+    if (d.twist) { twistTo(d, w, null); return; }
+    if (!d.lifted && Math.hypot(p.x - d.sx, p.y - d.sy) > 8) liftUp(d.t, d);
+  }
+  function twistTo(d, p1, p2) {
+    var tw = d.twist, t = d.t;
+    if (p1) { d.wx = p1.x; d.wy = p1.y; }
+    if (p2) tw.p2 = p2;
+    var ang = Math.atan2(tw.p2.y - d.wy, tw.p2.x - d.wx);
+    var na = wrapD(tw.a0 + (ang - tw.ang0) * 180 / Math.PI);
+    if (Math.abs(wrapD(na - t.home.a)) > 12) { clack(0.06, 1600); }
+    var pos = { x: t.x, y: t.y };
+    setHomeAt(t, pos.x, pos.y, na);
+    t.a = na; t.va = 0;
+  }
+  function endTwist(d) {
+    var t = d.t;
+    var pid2 = d.twist.pid2;
+    delete drags[pid2];
+    d.twist = null;
+    var p = homePos(t);
+    setHomeAt(t, p.x, p.y, t.home.a);
+    sndTurn();
+    save();
+  }
+  function onUp(e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    delete drags[e.pointerId];
+    if (d.kind === "twin") {
+      var m = drags[d.main];
+      if (m && m.twist) { endTwist(m); delete drags[d.main]; }
+      return;
+    }
+    if (d.twist) { endTwist(d); return; }
+    var t = d.t;
+    if (!d.lifted) {
+      // A tap turns the tool on the bench.
+      if (t.mode === "bench") {
+        t.home.a = wrapD(t.home.a + 45);
+        t.va += 120;
+        sndTurn();
+        save();
+      }
+      return;
+    }
+    drop(t);
+  }
+  function drop(t) {
+    t.drag = null;
+    if (Math.hypot(t.x - t.tx, t.y - t.ty) < snapR(t)) { startSnap(t); return; }
+    if (inBench(t.x, t.y)) {
+      setHomeAt(t, t.x, t.y, Math.round(t.a));
+      t.mode = "bench"; t.va = 0;
+      addDust(t.x, t.y + t.h * 0.2, 4);
+      sndDown();
+      save();
+      return;
+    }
+    startSlide(t);
+  }
+  // Every carried tool drops (it slides back to the bench) and twists end.
+  function releaseAll() {
+    for (var k in drags) {
+      var d = drags[k];
+      if (d.kind === "bench") {
+        if (d.twist) { d.twist = null; save(); }
+        if (d.lifted && d.t.mode === "drag") { d.t.drag = null; startSlide(d.t); }
+      }
+    }
+    drags = {};
+  }
+
+  cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointermove", onMove);
+  cv.addEventListener("pointerup", onUp);
+  cv.addEventListener("pointercancel", onUp);
+  cv.addEventListener("lostpointercapture", function (e) { if (drags[e.pointerId]) onUp(e); });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+
+  // ================= Toolbar: pick a board, mess it up =================
+  function iconSVG(id) {
+    var bb = measure(id), a = ART[id];
+    var side = Math.max(bb.w, bb.h), cx = bb.x + bb.w / 2, cy = bb.y + bb.h / 2;
+    return '<svg viewBox="' + [cx - side / 2, cy - side / 2, side, side].map(n2).join(" ") + '" aria-hidden="true">' + G(a.turn ? "rotate(" + a.turn + ")" : "", a.f()) + "</svg>";
+  }
+  function buildToolbar() {
+    var tb = $("toolbar"), html = "";
+    BOARD_ORDER.forEach(function (k) {
+      var b = BOARDS[k];
+      html += '<button class="btn pick" data-board="' + k + '" aria-pressed="false">' + iconSVG(b.icon) +
+        '<span class="long">' + b.name + '</span><span class="short">' + b.short + "</span></button>";
+    });
+    html += '<button class="btn messbtn" id="messBtn">Mess it up!</button>';
+    tb.innerHTML = html;
+    tb.addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (!b || busy()) return;
+      if (b.id === "messBtn") { messUp(); return; }
+      if (b.getAttribute("data-board")) setBoard(b.getAttribute("data-board"));
+    });
+    $("messBig").addEventListener("click", function () { messUp(); });
+  }
+  function updateToolbar() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-board]"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-board") === S.board ? "true" : "false");
+    });
+  }
+  function setBoard(k) {
+    if (!BOARDS[k] || (BD && BD.key === k)) return;
+    releaseAll();
+    stash();
+    parts = [];
+    S.board = k;
+    buildBoard(k, true);
+    updateToolbar();
+    blip(700, 0.06, 0.05, "triangle");
+    save();
+  }
+
+  // ================= Play timer hooks (the shared Toybox timer) =================
+  // Ending: every carried tool drops and slides back to the bench, then done().
+  var endingDone = null;
+  function moving() { return BD.tools.some(function (t) { return t.mode === "drag" || t.mode === "slide" || t.mode === "snap" || t.mode === "tumble"; }); }
+  function onEnding(done) {
+    endingDone = done;
+    releaseAll();
+  }
+  function endingFrame() {
+    if (endingDone && !moving()) { var d = endingDone; endingDone = null; d(); }
+  }
+  function goodbye() {
+    BD.tools.forEach(function (t) { if (t.mode === "placed") t.wig = 1; });
+    blip(660, 0.2, 0.05, "sine", 440);
+  }
+  function onRest() { endingDone = null; drags = {}; parts = []; }
+  function onWake() { endingDone = null; }
+  function restArt() {
+    var holes = "", x, y;
+    for (y = 34; y < 132; y += 14) for (x = 34; x < 210; x += 14) holes += '<circle cx="' + x + '" cy="' + y + '" r="2.2" fill="#6A4220"/>';
+    return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' +
+      '<rect x="14" y="14" width="212" height="132" rx="10" fill="#B07A45" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="24" y="24" width="192" height="112" fill="#C98F55" stroke="#1D2340" stroke-width="3"/>' + holes +
+      // a hammer
+      '<path d="M66 50 L72 50 L73 120 Q73 124 69 124 Q65 124 65 120 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      '<path d="M48 40 L84 40 L84 54 L48 54 Z" fill="#CBD4DE" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      '<path d="M84 42 Q96 44 100 58 L96 60 Q92 52 84 52 Z" fill="#CBD4DE" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      // a screwdriver
+      '<rect x="112" y="40" width="14" height="30" rx="6" fill="#2D5BD7" stroke="#1D2340" stroke-width="3"/>' +
+      '<rect x="116.5" y="70" width="5" height="44" fill="#CBD4DE" stroke="#1D2340" stroke-width="2.5"/>' +
+      // a wrench
+      '<path d="M156 46 L162 46 L162 110 L156 110 Z" fill="#CBD4DE" stroke="#1D2340" stroke-width="3"/>' +
+      '<circle cx="159" cy="116" r="9" fill="#CBD4DE" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M150 34 L168 34 L166 48 L152 48 Z M155 34 L155 41 L163 41 L163 34" fill="#CBD4DE" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
+      // a saw outline (painted)
+      '<path d="M182 44 L204 50 L204 116 L182 116 Z" fill="#2B303D" stroke="#FFFFFF" stroke-width="2"/>' +
+      '<rect x="6" y="168" width="228" height="16" rx="4" fill="#D99A55" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="20" y="184" width="14" height="14" fill="#B7793F" stroke="#1D2340" stroke-width="3"/><rect x="206" y="184" width="14" height="14" fill="#B7793F" stroke="#1D2340" stroke-width="3"/>' +
+      '<text x="196" y="164" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#2D5BD7">z</text>' +
+      '<text x="212" y="160" font-family="Baloo 2, sans-serif" font-weight="800" font-size="13" fill="#2D5BD7">z</text></svg>';
+  }
+
+  // ================= Start up =================
+  buildToolbar();
+  resize();
+  buildBoard(S.board, true);
+  updateToolbar();
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
+  if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
+  window.addEventListener("pagehide", function () { stash(); try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ } });
+
+  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
+  Toybox.init({
+    app: "workshop-shadow",
+    grownButton: $("gubtn"),
+    grownLabel: ["Grown-ups", "⏱ Grown-ups"],
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, any tool being carried drops back onto the bench, the board rests, and the controls lock. The timer carries on across Workshop pages.",
+    goodbyeOption: "End with a “Bye bye, tools” button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Bye bye, tools",
+    farewellDone: "Bye bye!",
+    restLine: "Every tool is put away.",
+    restLine2: "The shadow board will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft clicks and pops. Hold for 2 seconds.",
+    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    onEnding: onEnding,
+    onGoodbye: goodbye,
+    onRest: onRest,
+    onWake: onWake,
+    onBig: function () { resize(); },
+    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
+    onTimer: function (info) { TI = info; }
+  });
+
+  var lastT = performance.now(), twinkleAt = 0;
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    lastT = t;
+    now = t / 1000;
+    if (Toybox.timer.phase() !== "resting") {
+      updateTools(dt);
+      // A full board keeps twinkling.
+      if (full && !reduce && now - twinkleAt > 0.35) {
+        twinkleAt = now;
+        var tt = pick(BD.tools);
+        parts.push({ k: "star", x: tt.tx + rnd(-tt.w / 2, tt.w / 2), y: tt.ty + rnd(-tt.h / 2, tt.h / 2), vx: 0, vy: -20, life: 0, max: 0.9, r: rnd(8, 14), rot: 0, vr: 3, col: pick(STAR_COLS), g: 0 });
+      }
+      updateParts(dt);
+      if (Toybox.timer.phase() === "ending") endingFrame();
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  if (navigator.webdriver) window.__sb = {
+    tools: function () { return BD.tools.map(function (t) { return { id: t.id, mode: t.mode, x: t.x, y: t.y, a: t.a, tx: t.tx, ty: t.ty, w: t.w, h: t.h, ready: !!t.sp }; }); },
+    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + V.bx + x * V.s, y: r.top + V.by + y * V.s }; },
+    view: function () { return { V: V, BENCH: BENCH }; },
+    board: function () { return BD.key; }
+  };
+  requestAnimationFrame(frame);
+})();
+</script>
+<!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Workshop page. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "toybox-timer-v1", GEAR_KEY = "workshop-gear", SKIP_KEY = "workshop-check-skip";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["gog", "Eye protection?"], ["muf", "Ear protection?"]];
+
+  function gearOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return false; } }
+  // A full gear-up just happened (the Tool Wall sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  // The shared timer is winding down or resting (or has just run out and not caught up yet).
+  function timerBusy() {
+    try { if (window.Toybox && Toybox.timer && Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+    try {
+      var t = JSON.parse(localStorage.getItem(TKEY) || "null");
+      if (!t) return false;
+      if (t.phase === "ending" || t.phase === "resting") return true;
+      return t.phase === "running" && typeof t.endAt === "number" && t.endAt > 0 && t.endAt <= Date.now();
+    } catch (e) { return false; }
+  }
+  // The Tool Wall with ?next= sends you straight on to that station, which does its own check.
+  function redirecting() { return /(^|[?&])next=/.test(location.search); }
+
+  // ---------- The worker, wearing the gear (same drawing as the Tool Wall gear-up) ----------
+  var O = "#1D2340", YEL = "#FFC93C", ORG = "#F77F00", RED = "#E63946", BLU = "#2D5BD7", BLK = "#343944", SKIN = "#F5C9A0", HAIR = "#7A4A2A";
+  function n2(v) { return Math.round(v * 10) / 10; }
+  function P(d, f, w, x) { return '<path d="' + d + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (w == null ? 3 : w) + '" stroke-linejoin="round" stroke-linecap="round"' + (x || "") + "/>"; }
+  function rr(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+    if (!r) return "M" + n2(x) + " " + n2(y) + "h" + n2(w) + "v" + n2(h) + "h" + n2(-w) + "Z";
+    return "M" + n2(x + r) + " " + n2(y) + "H" + n2(x + w - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w) + " " + n2(y + r) +
+      "V" + n2(y + h - r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + w - r) + " " + n2(y + h) +
+      "H" + n2(x + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x) + " " + n2(y + h - r) +
+      "V" + n2(y + r) + "A" + n2(r) + " " + n2(r) + " 0 0 1 " + n2(x + r) + " " + n2(y) + "Z";
+  }
+  function R(x, y, w, h, f, r, sw) { return P(rr(x, y, w, h, r), f, sw); }
+  function C(cx, cy, r, f, sw) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + (f || "none") + '" stroke="' + O + '" stroke-width="' + (sw == null ? 3 : sw) + '"/>'; }
+  function Cf(cx, cy, r, f) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(r) + '" fill="' + f + '"/>'; }
+  function L(x1, y1, x2, y2, c, w) { return '<path d="M' + n2(x1) + " " + n2(y1) + "L" + n2(x2) + " " + n2(y2) + '" stroke="' + (c || O) + '" stroke-width="' + (w || 3) + '" stroke-linecap="round" fill="none"/>'; }
+  function bar(d, c, w) {
+    return '<path d="' + d + '" fill="none" stroke="' + O + '" stroke-width="' + (w + 6) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  function G(t, inner, x) { return "<g" + (t ? ' transform="' + t + '"' : "") + (x || "") + ">" + inner + "</g>"; }
+  function gogglesArt() {
+    return R(-96, -8, 192, 16, BLK, 7) +
+      P(rr(-68, -30, 136, 60, 27), YEL, 4) + P(rr(-60, -22, 54, 44, 19), "#B9E4FF", 3) + P(rr(6, -22, 54, 44, 19), "#B9E4FF", 3) +
+      L(-48, -10, -36, -15, "#FFFFFF", 5) + L(18, -10, 30, -15, "#FFFFFF", 5) + P("M-10 30 Q0 16 10 30", SKIN, 3);
+  }
+  function muffsArt() {
+    return bar("M-88 -2 C-88 -150 88 -150 88 -2", BLK, 10) +
+      R(-112, -32, 40, 66, ORG, 18) + R(-80, -26, 10, 54, BLK, 5) + L(-104, -18, -104, 20, "#FFC37A", 4) +
+      R(72, -32, 40, 66, ORG, 18) + R(70, -26, 10, 54, BLK, 5) + L(104, -18, 104, 20, "#FFC37A", 4);
+  }
+  function workerSVG() {
+    var o = P("M26 330 Q34 248 150 238 Q266 248 274 330 Z", "#F77F00") +
+      P("M92 330 L98 268 L202 268 L208 330 Z", BLU) + L(104, 270, 84, 246, BLU, 12) + L(196, 270, 216, 246, BLU, 12) +
+      C(104, 272, 5, YEL, 2) + C(196, 272, 5, YEL, 2) + R(128, 284, 44, 30, "#4A73DF", 6) + R(148, 270, 8, 22, RED, 2, 2.5) +
+      R(128, 210, 44, 40, SKIN, 12) + C(60, 142, 17, SKIN) + C(240, 142, 17, SKIN) + C(150, 138, 92, SKIN) +
+      P("M60 128 Q56 46 150 42 Q244 46 240 128 Q228 92 198 84 Q172 102 142 86 Q100 78 60 128 Z", HAIR) +
+      L(98, 106, 128, 100, HAIR, 7) + L(172, 100, 202, 106, HAIR, 7) +
+      C(114, 134, 11, O, 0) + Cf(118, 130, 4, "#FFFFFF") + C(186, 134, 11, O, 0) + Cf(190, 130, 4, "#FFFFFF") +
+      P("M146 148 Q150 160 158 152", "none", 4) + Cf(92, 168, 14, "rgba(242,108,167,0.35)") + Cf(208, 168, 14, "rgba(242,108,167,0.35)") +
+      P("M116 176 Q150 210 184 176 Q150 192 116 176 Z", "#C2405A", 4) +
+      G("", G("translate(150 134)", gogglesArt()), ' class="sc-g" data-k="gog"') +
+      G("", G("translate(150 142)", muffsArt()), ' class="sc-g" data-k="muf"');
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(600px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,320px);aspect-ratio:280/326;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#F6DDB0;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0}.sc.out:not(.held){pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-10%)}}" +
+    "@media (max-height:600px){.sc-man-wrap{height:26vh}.sc ul{gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], held = null, swallowUntil = 0;
+  // A soft rising pop per tick, only when the shared Toybox sound is on and the audio engine is running.
+  function pop(n) {
+    try {
+      var actx = window.Toybox && Toybox.sound && Toybox.sound.ready();
+      if (!actx) return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 140;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = [];
+    var node = el;
+    node.classList.add("out");
+    // A finger still down on the (now invisible) card keeps it in place until lifted, so the lift and
+    // its click never land on a button underneath.
+    function gone() { if (held !== null && el === node) { timers.push(setTimeout(gone, 120)); return; } if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }
+    setTimeout(gone, reduce ? 160 : (fast ? 260 : 420));
+  }
+  function show() {
+    if (el) return;
+    if (!gearOn() || takeSkip() || redirecting() || timerBusy()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Safety check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Safety check!</h2><div class="sc-man-wrap"><svg viewBox="10 4 280 326" aria-hidden="true">' + workerSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      held = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      close(true);
+    });
+    function release(e) { if (held === null) return; e.stopPropagation(); held = null; swallowUntil = Date.now() + 450; if (el) el.classList.remove("held"); }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1500);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 300 + i * 420); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1150);
+      later(function () { close(false); }, 1600);
+    }
+  }
+  // The click that follows the skipping tap is swallowed (it must not press what is underneath).
+  document.addEventListener("click", function (e) { if (held !== null || Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function (e) { if (el && !el.classList.contains("out") && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); close(true); } }, true);
+  // The timer ended on another page: get out of the way of the rest screen.
+  window.addEventListener("storage", function (e) { if ((e.key === TKEY || e.key === null) && el && timerBusy()) close(true); });
+  // Coming back with the Back button (page restored from memory) counts as arriving again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) show(); });
+  if (navigator.webdriver) window.__safetyCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  show();
+})();
+</script>
+<script>
+  // Offline support: register the Workshop service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

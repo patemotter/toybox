@@ -11,10 +11,10 @@ Shared rules for every app are in "Every app" at the bottom.
 | 1 | Water Works | Done |
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Done |
-| 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Queued |
+| 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Done |
 | 5 | Construction Site | Done (v1 stations) |
-| 6 | Train Builder | Queued |
-| 7 | New Workshop stations | Queued |
+| 6 | Train Builder | Done |
+| 7 | New Workshop stations | Done |
 | 8 | UI polish pass | After everything is in |
 | – | Workshop Projects | On hold |
 
