@@ -15,6 +15,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
 <style>
 :root {
   --bg: #CDE9FF;
@@ -121,32 +123,6 @@ header h1 {
 .homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .gbtn { flex: none; min-height: 40px; font-size: 1rem; padding: 0.2rem 0.75rem; box-shadow: 2px 2px 0 var(--edge); border-radius: 12px; }
 
-.btn {
-  font: inherit;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--ink);
-  background: var(--panel);
-  border: 3px solid var(--edge);
-  border-radius: 16px;
-  padding: 0.45rem 0.8rem;
-  min-height: 52px;
-  cursor: pointer;
-  box-shadow: 3px 3px 0 var(--edge);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
-}
-.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
-.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
-button {
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
 /* ---------- Layout: picture plus controls, never scrolls ---------- */
 .app {
   flex: 1 1 auto;
@@ -182,11 +158,12 @@ button {
   cursor: crosshair;
 }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ---------- Control panel: labeled groups (tabs on phones), Clear picture at the end ---------- */
 .panel {
   flex: none;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 8px;
   min-height: 0;
   background: var(--panel);
@@ -196,11 +173,39 @@ button {
   padding: 8px;
   overflow: hidden;
 }
-.panel h2 { display: none; margin: 0 0 -2px; font-size: 1.05rem; font-weight: 800; text-align: center; color: var(--muted); }
-.minitop { display: none; gap: 8px; }
-.minitop .homebtn, .minitop .gbtn { flex: 1 1 0; min-height: 40px; }
+.grp h2 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--muted);
+}
+/* Phones: one group of controls at a time, picked with the tabs (like Spin Shop). */
+.tabbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.tab {
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--ink);
+  background: transparent;
+  border: 3px solid var(--edge);
+  border-radius: 14px;
+  min-height: 42px;
+  padding: 2px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.tab[aria-selected="true"] { background: var(--accent); color: #1D2340; opacity: 1; }
+.tab:active { transform: translate(1px, 1px); }
+.tab:focus-visible { outline: 4px solid var(--focus); outline-offset: 1px; }
+.panes { display: grid; min-height: 0; }
+.pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.panel[data-tab="draw"] [data-pane="draw"],
+.panel[data-tab="colors"] [data-pane="colors"],
+.panel[data-tab="effects"] [data-pane="effects"] { visibility: visible; }
 
-/* Mirror counts: big numbers with that many dots around them. */
+/* How many: big numbers with that many dots around them. */
 .counts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .count {
   min-height: var(--bh);
@@ -215,7 +220,7 @@ button {
 .count .d { fill: currentColor; opacity: 0.55; }
 .count[aria-pressed="true"] .d { fill: #E63946; opacity: 1; }
 
-/* Paint: rainbow plus color chips. */
+/* Color: rainbow plus color chips. */
 .paints { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; justify-items: center; align-items: center; }
 .swatch {
   width: var(--chip);
@@ -250,10 +255,9 @@ button {
   line-height: 1;
 }
 
-/* Brush sizes, toggles and Clear. Phone: 20-column grid so 4 + 5 buttons fill two rows. */
-.tools { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 6px; }
-.tool {
-  grid-column: span 4;
+/* Brush: three sizes, a dot of each size above its name. */
+.sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.size {
   min-width: 0;
   min-height: var(--bh);
   height: var(--bh);
@@ -262,47 +266,92 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  font-size: 0.9rem;
+  gap: 8px;
+  font-size: 1rem;
   line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
 }
-.tool.size, .tool.t-mirror { grid-column: span 5; }
-/* Phones: icon above a small label so every word fits. */
+.size .szw { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.size .sz { flex: none; border-radius: 50%; background: currentColor; display: block; }
+
+/* Effects: on/off switches. ON is a green switch with the word "On" (not the yellow "picked" fill). */
+.fxs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.fxs .fx { grid-column: span 2; }
+.fxs .fx:nth-child(4) { grid-column: 2 / span 2; }
+.btn.fx {
+  min-width: 0;
+  min-height: 56px;
+  padding: 4px 2px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.btn.fx[aria-pressed="true"] { background: #DDF5E5; color: #1D2340; }
+.fx .top { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.fx svg { width: 20px; height: 20px; flex: none; display: block; }
+.fx .state { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 800; }
+.fx .sw {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: #C3CBDD;
+  border: 2.5px solid #1D2340;
+}
+.fx .sw::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 2px solid #1D2340;
+  box-sizing: border-box;
+  transition: left 0.15s ease;
+}
+.fx[aria-pressed="true"] .sw { background: #2E9E5B; }
+.fx[aria-pressed="true"] .sw::after { left: 15px; }
+
+/* Clear picture: its own big pink button, apart from everything else, at the end. */
+.clearbtn {
+  flex: none;
+  width: 100%;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 50px;
+  background: #FF9EB5;
+  color: #1D2340;
+  font-size: 1.15rem;
+  font-weight: 800;
+  border-radius: 18px;
+}
+.clearbtn svg { width: 28px; height: 28px; flex: none; }
+.clearbtn:active { background: #FFC93C; }
+
+/* Phones: a smaller header. */
 @media (max-width: 743px), (max-height: 639px) {
   header h1 { font-size: 1.3rem; }
   header .homebtn, header .gbtn { min-height: 38px; font-size: 0.92rem; padding: 0 9px; }
-  .tool { flex-direction: column; gap: 0; font-size: 0.78rem; padding-top: 2px; }
-  .tool svg { width: 20px; height: 20px; }
-  .tool .szw { height: 20px; }
 }
 @media (max-width: 430px) {
   header .homebtn span { display: none; }
   header .homebtn { padding: 0 8px; }
 }
-.tool svg { width: 22px; height: 22px; flex: none; display: block; }
-.tool .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.tool .szw { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-.tool .sz { flex: none; border-radius: 50%; background: currentColor; display: block; }
-.tool.clear { background: #F26CA7; color: #1D2340; }
-.tool.clear:active { background: #FFC93C; }
 
 /* ---------- Big mode: controls hidden, the picture fills the screen ---------- */
-.bigtoggle {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0.1rem 0.85rem 0.1rem 0.6rem;
-  font-size: 1rem;
-  border-radius: 999px;
-}
-.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.bigtoggle { position: absolute; top: 12px; left: 12px; z-index: 3; }
 body.big header,
 body.big .panel { display: none; }
 body.big .wrap {
@@ -311,206 +360,43 @@ body.big .wrap {
 }
 body.big .app { margin-top: 0; }
 
-/* ---------- Timer bits on the picture ---------- */
-.toast {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  background: var(--accent);
-  color: #1D2340;
-  border: 3px solid #1D2340;
-  border-radius: 999px;
-  padding: 0.3rem 1rem;
-  font-size: 1.3rem;
-  font-weight: 800;
-  white-space: nowrap;
-  box-shadow: 3px 3px 0 #1D2340;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-}
-.toast.show { opacity: 1; }
-.farewell {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  background: #FFFFFF;
-  color: #1D2340;
-  border: 3px solid #1D2340;
-  border-radius: 22px;
-  padding: 10px 16px 12px;
-  box-shadow: 4px 4px 0 #1D2340;
-  text-align: center;
-}
-.farewell[hidden] { display: none; }
-.farewell p { margin: 0; font-size: 1.25rem; font-weight: 800; white-space: nowrap; }
-.goodbye {
-  background: var(--accent);
-  color: #1D2340;
-  border-color: #1D2340;
-  box-shadow: 3px 3px 0 #1D2340;
-  font-size: 1.3rem;
-  min-height: 56px;
-  padding: 0.4rem 1.2rem;
-}
-.goodbye[hidden] { display: none; }
-body.ending .panel > *:not(.minitop),
+/* ---------- Timer bits on the picture (the shared toast and banner are moved into the stage) ---------- */
+.stage .toast { position: absolute; top: 14px; z-index: 2; font-size: 1.3rem; }
+.stage .farewell { position: absolute; bottom: 16px; z-index: 2; }
+.stage .farewell p { font-size: 1.25rem; }
+body.ending .panel,
 body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 body.ending #view { cursor: default; }
-
-/* ---------- Grown-up sheet ---------- */
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
-  background: rgba(13, 20, 38, 0.55);
-}
-.modal[hidden] { display: none; }
-.sheet {
-  width: 100%;
-  max-width: 480px;
-  max-height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-user-select: text;
-  user-select: text;
-  background: var(--panel);
-  color: var(--ink);
-  border: 4px solid var(--edge);
-  border-radius: 24px;
-  box-shadow: 6px 6px 0 var(--edge);
-  padding: 18px 18px 20px;
-}
-.sheet h2 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; text-align: center; }
-.sheet h3 { margin: 16px 0 8px; font-size: 1.1rem; font-weight: 800; text-align: center; }
-.sheet .opt { color: var(--muted); font-weight: 500; }
-.sheet hr { border: 0; border-top: 3px dashed var(--edge); opacity: 0.35; margin: 18px 0 4px; }
-.sub { margin: 0; color: var(--muted); text-align: center; font-size: 1rem; }
-.row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.row .btn { min-height: 48px; font-size: 1rem; padding: 0.3rem 0.7rem; }
-.textin {
-  display: block;
-  width: 100%;
-  font: inherit;
-  font-size: 1.1rem;
-  color: var(--ink);
-  background: var(--bg);
-  border: 3px solid var(--edge);
-  border-radius: 14px;
-  padding: 0.45rem 0.8rem;
-}
-.textin:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
-.check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  font-size: 1.05rem;
-  cursor: pointer;
-}
-.check input { width: 24px; height: 24px; accent-color: #2D5BD7; flex: none; }
-.sheet-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-.btn.primary { background: var(--accent); color: #1D2340; }
-.time-left { margin: 6px 0 8px; text-align: center; font-size: 1.6rem; font-weight: 800; }
-.status { margin: 6px 0 0; text-align: center; font-weight: 700; }
-.hold {
-  position: relative;
-  overflow: hidden;
-  -webkit-touch-callout: none;
-}
-.hold .fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  background: rgba(255, 201, 60, 0.75);
-}
-.hold .label { position: relative; }
-
-/* ---------- Rest screen ---------- */
-.rest {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
-  background: var(--bg);
-}
-.rest[hidden] { display: none; }
-.rest-card {
-  width: 100%;
-  max-width: 420px;
-  max-height: 100%;
-  overflow: hidden;
-  background: var(--plate);
-  color: #1D2340;
-  border: 4px solid var(--edge);
-  border-radius: 28px;
-  box-shadow: 6px 6px 0 var(--edge);
-  padding: 20px 20px 24px;
-  text-align: center;
-}
-.rest-art { display: block; width: min(52vw, 210px, 34vh); height: auto; aspect-ratio: 1; margin: 0 auto 6px; }
-.rest-card h2 { margin: 4px 0 6px; font-size: 2.2rem; font-weight: 800; line-height: 1.1; }
-.rest-line { margin: 2px 0; font-size: 1.25rem; font-weight: 700; }
-.rest-next {
-  margin: 16px auto 0;
-  display: inline-block;
-  background: var(--accent);
-  border: 3px solid #1D2340;
-  border-radius: 16px;
-  padding: 0.4rem 1.1rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-.rest-next[hidden] { display: none; }
-.lock {
-  position: fixed;
-  right: max(14px, env(safe-area-inset-right, 0px));
-  bottom: max(14px, env(safe-area-inset-bottom, 0px));
-  width: 64px;
-  height: 48px;
-  border: 3px solid var(--edge);
-  border-radius: 14px;
-  background: var(--panel);
-  font-size: 1.3rem;
-  cursor: pointer;
-  opacity: 0.7;
-  touch-action: none;
-}
-.lock:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.rest-art { aspect-ratio: 1; }
 
 /* ---------- Landscape: picture on the left, controls on the right ---------- */
 @media (orientation: landscape) {
   .app { flex-direction: row; }
-  .panel { flex: 0 0 min(48%, 400px); }
+  .panel { flex: 0 0 min(48%, 400px); justify-content: center; }
 }
 
-/* Short landscape phones: no header; Home and Grown-ups move into the panel. */
+/* Short landscape phones: the picture takes the full height on the left; the header
+   (Home and Grown-ups) sits above the controls on the right. */
 @media (orientation: landscape) and (max-height: 520px) {
-  header { display: none; }
-  .app { margin-top: 0; }
-  .wrap { padding-top: 6px; padding-bottom: 6px; }
-  .minitop { display: flex; }
-  .panel { gap: 6px; padding: 6px 8px; }
-  :root { --bh: 50px; --chip: 46px; }
+  .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) min(48%, 400px);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 6px;
+    padding-top: max(6px, env(safe-area-inset-top, 0px));
+    padding-bottom: 6px;
+  }
+  header { grid-column: 2; grid-row: 1; }
+  header h1 { font-size: 1.15rem; }
+  .app { display: contents; }
+  .stage { grid-column: 1; grid-row: 1 / span 2; margin-bottom: 4px; }
+  .panel { grid-column: 2; grid-row: 2; gap: 6px; padding: 6px 8px; margin: 0 4px 4px 0; }
+  body.big .stage { grid-column: 1 / span 2; }
+  :root { --bh: 46px; --chip: 40px; }
 }
 
-/* Tablets and desktop: bigger everything. */
+/* Tablets and desktop: bigger everything, every group shown with its heading (no tabs). */
 @media (min-width: 744px) and (min-height: 640px) {
   :root { --bh: 66px; --chip: 58px; }
   .wrap { padding-top: 12px; padding-bottom: 14px; }
@@ -519,38 +405,49 @@ body.ending #view { cursor: default; }
   .app { gap: 14px; margin-top: 12px; }
   .stage { border-width: 4px; border-radius: 30px; box-shadow: 6px 6px 0 var(--edge); }
   .panel { border-width: 4px; border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 12px 14px; gap: 12px; }
-  .counts, .paints, .tools { gap: 10px; }
+  .tabbar { display: none; }
+  .panes { display: flex; flex-direction: column; gap: 12px; }
+  .pane { visibility: visible; gap: 12px; }
+  .grp h2 { font-size: 1.1rem; margin-bottom: 6px; }
+  .counts, .paints, .sizes { gap: 10px; }
   .count { border-radius: 16px; }
-  .tool { font-size: 1.05rem; gap: 6px; border-radius: 16px; }
-  .tool svg { width: 28px; height: 28px; }
+  .size { font-size: 1.1rem; border-radius: 16px; }
+  .size .szw { width: 30px; height: 30px; }
+  .fxs { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .fxs .fx, .fxs .fx:nth-child(4) { grid-column: auto; }
+  .btn.fx { min-height: 72px; font-size: 1.1rem; gap: 6px; border-radius: 16px; }
+  .fx svg { width: 26px; height: 26px; }
+  .fx .state { font-size: 0.9rem; }
+  .fx .sw { width: 42px; height: 24px; }
+  .fx .sw::after { width: 16px; height: 16px; }
+  .fx[aria-pressed="true"] .sw::after { left: 19px; }
   .swatch .tick { font-size: 1.4rem; }
-  .bigtoggle { top: 18px; left: 18px; min-height: 52px; font-size: 1.15rem; padding: 0.15rem 1rem 0.15rem 0.75rem; }
-  .bigtoggle svg { width: 26px; height: 26px; }
+  .clearbtn { min-height: 60px; font-size: 1.3rem; margin-top: 4px; }
+  .clearbtn svg { width: 32px; height: 32px; }
+  .bigtoggle { top: 18px; left: 18px; }
 }
-/* Tablet portrait: one row each for numbers, colors, and tools. */
+/* Tablet portrait: How many and Brush share a row, then a row of colors, a row of effects, then Clear. */
 @media (min-width: 744px) and (min-height: 640px) and (orientation: portrait) {
+  .pane[data-pane="draw"] { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.25fr); gap: 14px; }
   .paints { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-  .tools { grid-template-columns: repeat(9, minmax(0, 1fr)); }
-  .tool, .tool.size, .tool.t-mirror { grid-column: span 1; flex-direction: column; gap: 2px; padding: 4px 2px 2px; font-size: 0.9rem; }
-  :root { --bh: 72px; }
+  .size { flex-direction: column; gap: 4px; font-size: 1rem; }
+  :root { --bh: 68px; }
 }
-/* Tablet landscape: labeled sections in a tall side panel. */
+/* Tablet landscape: the groups stacked in a tall side panel. */
 @media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
-  .panel { flex-basis: min(40%, 470px); padding: 14px 18px; gap: 10px; }
-  .panel h2 { display: block; }
-  .panel h2 + * { margin-top: 0; }
-  .tools { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .tool, .tool.size, .tool.t-mirror { grid-column: span 2; }
-  :root { --bh: 78px; --chip: 62px; }
-  .panel { gap: 12px; }
+  .panel { flex-basis: min(40%, 470px); padding: 14px 18px; }
+  :root { --bh: 70px; --chip: 56px; }
+  /* Effects: three on top, two below, so each label has room. */
+  .fxs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .fxs .fx { grid-column: span 2; }
+  .fxs .fx:nth-child(4) { grid-column: 2 / span 2; }
 }
 @media (min-width: 1300px) and (min-height: 900px) {
-  :root { --bh: 84px; --chip: 68px; }
-  .tool { font-size: 1.15rem; }
+  :root { --bh: 80px; --chip: 66px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn, .swatch { transition: none; }
+  .swatch, .fx .sw::after { transition: none; }
 }
 </style>
 </head>
@@ -559,101 +456,69 @@ body.ending #view { cursor: default; }
   <header>
     <h1>Kaleidoscope</h1>
     <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-    <button class="btn gbtn" data-action="grownups">⏱ Grown-ups</button>
+    <button class="btn gbtn" id="grownbtn">Grown-ups</button>
   </header>
 
   <main class="app">
     <div class="stage" id="stage">
       <canvas id="view" role="img" aria-label="Drawing space. Draw with your fingers and every line is copied around the middle."></canvas>
       <svg class="ring" id="ring" aria-hidden="true"></svg>
-      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true" id="bigIcon"></svg><span id="bigLabel">Big</span></button>
-      <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-      <div class="farewell" id="farewell" hidden>
-        <p id="farewellText">Time to say goodbye</p>
-        <button class="btn goodbye" id="goodbyeBtn">Goodbye spin</button>
-      </div>
+      <button class="btn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
     </div>
 
-    <div class="panel" id="panel">
-      <div class="minitop">
-        <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
-        <button class="btn gbtn" data-action="grownups">⏱ Grown-ups</button>
+    <div class="panel" id="panel" data-tab="draw">
+      <nav class="tabbar" role="tablist" aria-label="Controls">
+        <button class="tab" role="tab" id="tab-draw" data-tab="draw" aria-controls="pane-draw">Draw</button>
+        <button class="tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
+        <button class="tab" role="tab" id="tab-effects" data-tab="effects" aria-controls="pane-effects">Effects</button>
+      </nav>
+      <div class="panes">
+        <div class="pane" data-pane="draw" id="pane-draw" role="tabpanel" aria-labelledby="tab-draw">
+          <section class="grp">
+            <h2>How many</h2>
+            <div class="counts" id="counts"></div>
+          </section>
+          <section class="grp">
+            <h2>Brush</h2>
+            <div class="sizes">
+              <button class="btn size" data-size="small" aria-label="Small brush"><span class="szw"><span class="sz" style="width:8px;height:8px"></span></span><span class="lbl">Small</span></button>
+              <button class="btn size" data-size="medium" aria-label="Medium brush"><span class="szw"><span class="sz" style="width:14px;height:14px"></span></span><span class="lbl">Medium</span></button>
+              <button class="btn size" data-size="big" aria-label="Big brush"><span class="szw"><span class="sz" style="width:22px;height:22px"></span></span><span class="lbl">Big</span></button>
+            </div>
+          </section>
+        </div>
+        <div class="pane" data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
+          <section class="grp">
+            <h2>Color</h2>
+            <div class="paints" id="paints"></div>
+          </section>
+        </div>
+        <div class="pane" data-pane="effects" id="pane-effects" role="tabpanel" aria-labelledby="tab-effects">
+          <section class="grp">
+            <h2>Effects</h2>
+            <div class="fxs">
+            <button class="btn fx" data-toggle="mirror"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2v24" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 3"/><path d="M11 6 3 14l8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/><path d="M17 6l8 8-8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Mirror</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="glow"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="#FFC93C" opacity="0.35"/><path d="M14 3l2.6 8.4L25 14l-8.4 2.6L14 25l-2.6-8.4L3 14l8.4-2.6z" fill="#FFF3B0" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Glow</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="spin"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 14a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg><span class="lbl">Spin</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="guides"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="2.5 3"><path d="M14 2v24M3.6 8l20.8 12M3.6 20 24.4 8"/></svg><span class="lbl">Lines</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="dark"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M19 4.5A10 10 0 1 0 23.5 19 8 8 0 0 1 19 4.5z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Dark</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            </div>
+          </section>
+        </div>
       </div>
-      <h2>How many</h2>
-      <div class="counts" id="counts"></div>
-      <h2>Paint</h2>
-      <div class="paints" id="paints"></div>
-      <h2>Brush</h2>
-      <div class="tools" id="tools">
-        <button class="btn tool size" data-size="small" aria-label="Small brush"><span class="szw"><span class="sz" style="width:8px;height:8px"></span></span><span class="lbl">Small</span></button>
-        <button class="btn tool size" data-size="medium" aria-label="Medium brush"><span class="szw"><span class="sz" style="width:14px;height:14px"></span></span><span class="lbl">Medium</span></button>
-        <button class="btn tool size" data-size="big" aria-label="Big brush"><span class="szw"><span class="sz" style="width:22px;height:22px"></span></span><span class="lbl">Big</span></button>
-        <button class="btn tool t-mirror" data-toggle="mirror"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2v24" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 3"/><path d="M11 6 3 14l8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/><path d="M17 6l8 8-8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Mirror</span></button>
-        <button class="btn tool" data-toggle="glow"><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="#FFC93C" opacity="0.35"/><path d="M14 3l2.6 8.4L25 14l-8.4 2.6L14 25l-2.6-8.4L3 14l8.4-2.6z" fill="#FFF3B0" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Glow</span></button>
-        <button class="btn tool" data-toggle="spin"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 14a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg><span class="lbl">Spin</span></button>
-        <button class="btn tool" data-toggle="guides"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="2.5 3"><path d="M14 2v24M3.6 8l20.8 12M3.6 20 24.4 8"/></svg><span class="lbl">Lines</span></button>
-        <button class="btn tool" data-toggle="dark"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M19 4.5A10 10 0 1 0 23.5 19 8 8 0 0 1 19 4.5z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Dark</span></button>
-        <button class="btn tool clear" id="clearBtn"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="#1D2340" stroke-width="2.6" stroke-linecap="round"><path d="M5 20c4-1 8-5 9-11M10 23c5-1 11-6 13-14M4 12c2-1 4-3 5-6"/></svg><span class="lbl">Clear</span></button>
-      </div>
+      <button class="btn clearbtn" id="clearBtn"><svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="#1D2340" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h22" /><path d="M12 9V5.5h8V9" /><path d="M8 9l1.6 18h12.8L24 9z" fill="#FFFFFF"/><path d="M13.5 14v9M18.5 14v9"/></svg><span>Clear picture</span></button>
     </div>
   </main>
 
-  <!-- Grown-up sheet: play timer, sound, shake -->
-  <div class="modal" id="timerModal" hidden>
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="timerTitle">
-      <h2 id="timerTitle">Grown-ups</h2>
-      <h3>Play timer</h3>
-      <div id="timerSetup">
-        <p class="sub">When time is up, the spinning slows, the picture fades, and the controls lock.</p>
-        <h3>How long</h3>
-        <div class="row" id="minuteRow"></div>
-        <h3>Next activity <span class="opt">(optional)</span></h3>
-        <input id="nextInput" class="textin" type="text" maxlength="40" placeholder="dinner, bath, park…" autocomplete="off">
-        <label class="check"><input type="checkbox" id="optMinutes"> Show minutes left on the picture</label>
-        <label class="check"><input type="checkbox" id="optWarnings"> Show “5 more minutes” and “1 more minute”</label>
-        <label class="check"><input type="checkbox" id="optGoodbye"> End with a Goodbye spin button to press</label>
-        <div class="sheet-actions">
-          <button class="btn primary" id="timerStart">Start timer</button>
-        </div>
-      </div>
-      <div id="timerRunning" hidden>
-        <p class="time-left" id="timerLeft"></p>
-        <p class="sub">Hold a button for 2 seconds.</p>
-        <div class="sheet-actions">
-          <button class="btn hold" id="holdAdd"><span class="fill"></span><span class="label">Add 5 minutes</span></button>
-          <button class="btn hold" id="holdStop"><span class="fill"></span><span class="label">Stop timer</span></button>
-        </div>
-      </div>
-      <hr>
-      <h3>Sound</h3>
-      <p class="sub">Soft tones that go higher as a finger moves away from the middle. Hold for 2 seconds to change.</p>
-      <div class="sheet-actions">
-        <button class="btn hold" id="holdSound"><span class="fill"></span><span class="label" id="soundLabel">Sound is off</span></button>
-      </div>
-      <hr>
-      <h3>Shake to clear <span class="opt">(optional)</span></h3>
-      <p class="sub">Shaking the device wipes the picture. Asks for motion access.</p>
-      <div class="sheet-actions">
-        <button class="btn" id="shakeBtn">Turn on shake</button>
-      </div>
-      <p class="status" id="shakeStatus" hidden></p>
-      <div class="sheet-actions">
-        <button class="btn" data-action="timerclose">Close</button>
-      </div>
+  <!-- Shake: an extra section that the shared grown-up sheet (common/toybox.js) moves into itself -->
+  <section id="shakeSection" hidden>
+    <h3>Shake to clear <span class="opt">(optional)</span></h3>
+    <p class="sub">Shaking the device wipes the picture. Asks for motion access.</p>
+    <div class="sheet-actions">
+      <button class="btn" id="shakeBtn">Turn on shake</button>
     </div>
-  </div>
-
-  <!-- Rest screen shown when play time is over -->
-  <div class="rest" id="rest" hidden role="dialog" aria-modal="true" aria-labelledby="restTitle">
-    <div class="rest-card">
-      <canvas class="rest-art" id="restArt" width="420" height="420" aria-hidden="true"></canvas>
-      <h2 id="restTitle">All done!</h2>
-      <p class="rest-line">The kaleidoscope is resting.</p>
-      <p class="rest-line">It will be right here next time.</p>
-      <div class="rest-next" id="restNext" hidden>Next: <strong id="restNextText"></strong></div>
-    </div>
-    <button class="lock hold" id="unlockBtn" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>
-  </div>
+    <p class="status" id="shakeStatus" style="margin-top:8px" hidden></p>
+  </section>
 </div>
 
 <script>
@@ -662,8 +527,8 @@ body.ending #view { cursor: default; }
 
   var KEY = "kaleido-v1";          // settings
   var AKEY = "kaleido-art-v1";     // saved drawing (downscaled PNG data URL)
-  var SKEY = "kaleido-sound-v1";   // sound on/off
-  var BKEY = "kaleido-big-v1";     // Big mode (controls hidden)
+  // Timer, sound and Big are shared Toybox-wide (common/toybox.js); these old keys carry over once.
+  var OLD_TKEY = "kaleido-timer-v1", OLD_SKEY = "kaleido-sound-v1", OLD_BKEY = "kaleido-big-v1";
   var OUT = "#1D2340";
   var COUNTS = [2, 3, 4, 6, 8, 12];
   var PALETTE = [
@@ -757,7 +622,9 @@ body.ending #view { cursor: default; }
       b.setAttribute("aria-pressed", String(b.dataset.size === state.size));
     });
     Array.prototype.forEach.call(document.querySelectorAll("[data-toggle]"), function (b) {
-      b.setAttribute("aria-pressed", String(!!state[b.dataset.toggle]));
+      var on = !!state[b.dataset.toggle];
+      b.setAttribute("aria-pressed", String(on));
+      b.querySelector(".st").textContent = on ? "On" : "Off";
     });
     $("stage").style.background = state.dark ? BG.dark : BG.light;
     dirty = true;
@@ -873,7 +740,7 @@ body.ending #view { cursor: default; }
 
   function localXY(e) { return { x: e.clientX - viewRect.left, y: e.clientY - viewRect.top }; }
 
-  function playing() { return timer.phase !== "ending" && timer.phase !== "resting"; }
+  function playing() { return !Toybox.timer.locked(); }
 
   view.addEventListener("pointerdown", function (e) {
     if (!playing()) return;
@@ -895,7 +762,6 @@ body.ending #view { cursor: default; }
     path.lineTo(pt.x + 0.01, pt.y);
     strokeAll(path, baseWidth() * p.pr, p);
     addRipple(q.x, q.y, p);
-    ensureAudio();
     toneFor(p, q.x, q.y);
     dirty = true;
   });
@@ -1156,29 +1022,25 @@ body.ending #view { cursor: default; }
   window.addEventListener("pagehide", function () { if (saveId) saveArt(); });
 
   // ---------- Sound (off by default; soft synthesized tones) ----------
-  var soundOn = false;
-  try { soundOn = localStorage.getItem(SKEY) === "on"; } catch (e) { soundOn = false; }
-  var ac = null, master = null, lastNoteAt = 0;
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js);
+  // the module starts/resumes audio on every touch while sound is on.
+  var ac = null, master = null, masterCtx = null, lastNoteAt = 0;
   var SCALE = [0, 2, 4, 7, 9];
-
-  // Only called from inside a user gesture (pointerdown / click).
-  function ensureAudio() {
-    if (!soundOn) return;
-    try {
-      if (!ac) {
-        var AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        ac = new AC();
+  function canPlay() {
+    ac = Toybox.sound.ready();
+    if (!ac) return false;
+    if (masterCtx !== ac) {
+      try {
         var comp = ac.createDynamicsCompressor();
         master = ac.createGain();
         master.gain.value = 0.6;
         master.connect(comp);
         comp.connect(ac.destination);
-      }
-      if (ac.state === "suspended") ac.resume();
-    } catch (e) { ac = null; }
+        masterCtx = ac;
+      } catch (e) { return false; }
+    }
+    return true;
   }
-  function canPlay() { return soundOn && ac && ac.state === "running"; }
 
   function bell(freq, when, vol, len) {
     var t = ac.currentTime + (when || 0);
@@ -1213,15 +1075,6 @@ body.ending #view { cursor: default; }
       var st = SCALE[idx % 5] + 12 * Math.floor(idx / 5);
       bell(196 * Math.pow(2, st / 12), i * 0.07, 0.05, 0.6);
     });
-  }
-
-  function updateSoundUI() {
-    $("soundLabel").textContent = soundOn ? "Sound is on · hold to turn off" : "Sound is off · hold to turn on";
-  }
-  function toggleSound() {
-    soundOn = !soundOn;
-    try { localStorage.setItem(SKEY, soundOn ? "on" : "off"); } catch (e) { /* ignore */ }
-    updateSoundUI();
   }
 
   // ---------- Shake to clear (optional; needs a grown-up tap on iOS) ----------
@@ -1281,16 +1134,11 @@ body.ending #view { cursor: default; }
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    if (t.dataset.action === "grownups") { openTimer(); return; }
-    if (t.dataset.action === "timerclose") { closeTimer(); return; }
-    if (t.id === "bigToggle") { setBig(!document.body.classList.contains("big"), true); return; }
-    if (t.id === "timerStart") { startTimer(); return; }
-    if (t.id === "goodbyeBtn") { goodbyeSpin(); return; }
     if (t.id === "shakeBtn") { turnOnShake(); return; }
-    if (t.dataset.minutes) { timer.minutes = Number(t.dataset.minutes); saveTimer(); updateTimerUI(); return; }
-    if (t.classList.contains("hold")) return;
+    // Grown-ups, Big, the sheet, the banner and the rest screen belong to the shared module (common/toybox.js).
+    if (t.id === "grownbtn" || t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
     if (!playing()) return;
-    ensureAudio();
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
     if (t.dataset.count) { state.count = Number(t.dataset.count); }
     else if (t.dataset.paint) { state.paint = t.dataset.paint; }
     else if (t.dataset.size) { state.size = t.dataset.size; }
@@ -1309,7 +1157,7 @@ body.ending #view { cursor: default; }
   function frame(t) {
     var dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
     last = t;
-    var ending = timer.phase === "ending";
+    var ending = Toybox.timer.phase() === "ending";
     var target = ending ? 0 : (state.spin ? SPIN_SPEED : 0);
     spinVel += (target - spinVel) * Math.min(1, dt * (ending ? 0.55 : 1.6));
     if (Math.abs(spinVel) < 0.0005 && target === 0) spinVel = 0;
@@ -1325,61 +1173,24 @@ body.ending #view { cursor: default; }
     if (dirty && art) {
       dirty = render(t);
     }
-    if (ending) checkEndingDone();
+    // Ending: tell the shared timer once the spinning has stopped.
+    if (ending && endingDone && Math.abs(spinVel) < 0.03 && performance.now() - endingStartedAt > 1500) { endingDone(); endingDone = null; }
     requestAnimationFrame(frame);
   }
 
-  // ---------- Play timer (grown-up controlled) ----------
-  // Phases: idle -> running -> ending (spin winds down, picture fades, optional Goodbye spin) -> resting (locked) -> idle.
-  // The end time is stored as a wall-clock timestamp, so the timer keeps counting through reloads
-  // and while the tab is in the background.
-  var TKEY = "kaleido-timer-v1";
-  var MINUTE_CHOICES = [5, 10, 15, 20, 30];
-  var HOLD_MS = 2000;
-  var UNLOCK_MS = 4000;
-
-  function freshTimer() {
-    return { minutes: 15, next: "", showMinutes: true, warnings: true, goodbye: true,
-      phase: "idle", endAt: 0, total: 0, warned5: false, warned1: false };
-  }
-  function loadTimer() {
-    var t = freshTimer();
-    try {
-      var o = JSON.parse(localStorage.getItem(TKEY) || "null");
-      if (o && typeof o === "object") {
-        if (MINUTE_CHOICES.indexOf(o.minutes) !== -1) t.minutes = o.minutes;
-        if (typeof o.next === "string") t.next = o.next.slice(0, 40);
-        ["showMinutes", "warnings", "goodbye", "warned5", "warned1"].forEach(function (k) {
-          if (typeof o[k] === "boolean") t[k] = o[k];
-        });
-        if (["idle", "running", "ending", "resting"].indexOf(o.phase) !== -1) t.phase = o.phase;
-        if (typeof o.endAt === "number") t.endAt = o.endAt;
-        if (typeof o.total === "number" && o.total > 0) t.total = o.total;
-      }
-    } catch (e) { /* storage unavailable or bad data: use defaults */ }
-    return t;
-  }
-  function saveTimer() {
-    try { localStorage.setItem(TKEY, JSON.stringify(timer)); } catch (e) { /* ignore */ }
-  }
-  var timer = loadTimer();
-
-  function remainingMs() { return Math.max(0, timer.endAt - Date.now()); }
-
+  // ---------- Play timer (shared, common/toybox.js) ----------
   // Border around the picture: the colored part is the time left, shrinking back toward the top middle.
-  var lastTimerKey = "";
+  var timerInfo = null, lastTimerKey = "";
   function layoutRing() { lastTimerKey = ""; drawTimer(); }
   function drawTimer() {
-    var g = $("ring");
-    var active = timer.phase === "running" || timer.phase === "ending";
+    var g = $("ring"), info = timerInfo;
+    var active = info && (info.phase === "running" || info.phase === "ending");
     if (!active || !W) {
       if (lastTimerKey !== "off") { g.innerHTML = ""; lastTimerKey = "off"; }
       return;
     }
-    var rem = timer.phase === "running" ? remainingMs() : 0;
-    var f = timer.total > 0 ? rem / timer.total : 0;
-    var mins = Math.ceil(rem / 60000);
-    var key = Math.round(f * 1000) + "|" + mins + "|" + timer.showMinutes + "|" + timer.phase + "|" + W + "x" + H + "|" + state.dark;
+    var f = info.fraction, mins = info.minutes;
+    var key = Math.round(f * 1000) + "|" + mins + "|" + info.showMinutes + "|" + info.phase + "|" + W + "x" + H + "|" + state.dark;
     if (key === lastTimerKey) return;
     lastTimerKey = key;
     var sw = W > 600 ? 12 : 9, inset = sw / 2 + 3, x = inset, y = inset, w = W - 2 * inset, h = H - 2 * inset;
@@ -1395,7 +1206,7 @@ body.ending #view { cursor: default; }
       sv += '<path d="' + d + '" pathLength="1000" fill="none" stroke="' + col + '" stroke-width="' + sw +
         '" stroke-linecap="round" stroke-dasharray="' + (f * 1000).toFixed(1) + ' 1000"/>';
     }
-    if (timer.showMinutes && timer.phase === "running") {
+    if (info.showMinutes && info.phase === "running") {
       var br = W > 600 ? 30 : 24, bx = W - br - sw - 10, by = br + sw + 10;
       sv += '<circle cx="' + bx + '" cy="' + by + '" r="' + br + '" fill="#FFFFFF" stroke="' + OUT + '" stroke-width="4"/>' +
         '<text x="' + bx + '" y="' + (by + 1) + '" text-anchor="middle" dominant-baseline="central" font-size="' + Math.round(br * (mins > 9 ? 0.95 : 1.15)) +
@@ -1405,140 +1216,28 @@ body.ending #view { cursor: default; }
     g.innerHTML = sv;
   }
 
-  var toastTimer = null;
-  function toast(msg) {
-    var el = $("toast");
-    el.textContent = msg;
-    el.hidden = false;
-    requestAnimationFrame(function () { el.classList.add("show"); });
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () {
-      el.classList.remove("show");
-      setTimeout(function () { el.hidden = true; }, 450);
-    }, 7000);
-  }
-
-  function minutesText(ms) {
-    var m = Math.ceil(ms / 60000);
-    return m === 1 ? "1 minute" : m + " minutes";
-  }
-
-  function updateTimerUI() {
-    var on = timer.phase !== "idle";
-    $("timerSetup").hidden = on;
-    $("timerRunning").hidden = !on;
-    if (on) {
-      $("timerLeft").textContent = timer.phase === "running" ? minutesText(remainingMs()) + " left" : "Time is up";
-      $("holdAdd").hidden = timer.phase !== "running";
-    }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-minutes]"), function (b) {
-      b.setAttribute("aria-pressed", String(Number(b.dataset.minutes) === timer.minutes));
-    });
-    $("nextInput").value = timer.next;
-    $("optMinutes").checked = timer.showMinutes;
-    $("optWarnings").checked = timer.warnings;
-    $("optGoodbye").checked = timer.goodbye;
-    updateSoundUI();
-  }
-
-  function openTimer() { updateTimerUI(); $("timerModal").hidden = false; }
-  function closeTimer() { $("timerModal").hidden = true; }
-
-  function startTimer() {
-    timer.total = timer.minutes * 60000;
-    timer.endAt = Date.now() + timer.total;
-    timer.phase = "running";
-    // Skip a warning the timer is already shorter than (a 5-minute timer gets no "5 more minutes").
-    timer.warned5 = timer.total <= 5 * 60000;
-    timer.warned1 = timer.total <= 60000;
-    saveTimer();
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
-    closeTimer();
-  }
-
-  function addFive() {
-    if (timer.phase !== "running") return;
-    timer.endAt += 5 * 60000;
-    timer.total += 5 * 60000;
-    var rem = remainingMs();
-    if (rem > 5 * 60000) timer.warned5 = false;
-    if (rem > 60000) timer.warned1 = false;
-    saveTimer();
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
-  }
-
-  // Ending bookkeeping (performance.now() timestamps; not persisted).
-  var endingStartedAt = 0, farewellAt = 0, restScheduled = false;
-
-  function stopTimer() {
-    timer.phase = "idle";
-    saveTimer();
-    document.body.classList.remove("ending");
-    $("farewell").hidden = true;
-    restScheduled = false;
-    farewellAt = 0;
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
-    closeTimer();
-    dirty = true;
-  }
-
-  function beginEnding() {
-    // Clear any warning still on screen so the goodbye message is the only one.
-    clearTimeout(toastTimer);
-    $("toast").classList.remove("show");
-    $("toast").hidden = true;
-    timer.phase = "ending";
-    saveTimer();
+  // Ending: the spin winds down and the picture fades in frame(); endingDone is called once it has stopped.
+  var endingDone = null, endingStartedAt = 0;
+  function onEnding(done) {
     // Fingers stop painting; whatever they drew is kept.
     Object.keys(pointers).forEach(function (id) { flushPointer(pointers[id], true); delete pointers[id]; });
     scheduleSave();
     endingStartedAt = performance.now();
-    farewellAt = 0;
-    restScheduled = false;
-    document.body.classList.add("ending");
-    $("farewellText").textContent = "Time to say goodbye";
-    $("goodbyeBtn").hidden = !timer.goodbye;
-    $("farewell").hidden = false;
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
+    endingDone = done;
     dirty = true;
   }
-
   function goodbyeSpin() {
-    if (timer.phase !== "ending" || farewellAt) return;
-    farewellAt = performance.now();
     spinVel += reduce ? 0.6 : 4.5;
-    $("goodbyeBtn").hidden = true;
-    $("farewellText").textContent = "Bye bye!";
-    ensureAudio();
     whooshSound();
-  }
-
-  // Called every frame while ending: rest once the picture has slowed to a stop.
-  function checkEndingDone() {
-    if (restScheduled) return;
-    var now = performance.now();
-    if (timer.goodbye) {
-      if (!farewellAt || now - farewellAt < 1500) return;
-    } else if (now - endingStartedAt < 5000) {
-      return;
-    }
-    if (Math.abs(spinVel) < 0.03) {
-      restScheduled = true;
-      setTimeout(goRest, 1200);
-    }
   }
 
   // Small round picture for the rest screen: the child's own drawing, or a calm pattern if it is empty.
   function drawRestArt() {
-    var c = $("restArt"), x = c.getContext("2d"), S = c.width, h = S / 2, i, a, n = state.count;
+    var c = document.createElement("canvas");
+    c.width = c.height = 420;
+    c.className = "rest-art";
+    c.setAttribute("aria-hidden", "true");
+    var x = c.getContext("2d"), S = c.width, h = S / 2, i, a, n = state.count;
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.clearRect(0, 0, S, S);
     x.save();
@@ -1581,110 +1280,20 @@ body.ending #view { cursor: default; }
     x.lineWidth = 10;
     x.strokeStyle = OUT;
     x.stroke();
+    return c;
   }
 
-  function showRest() {
-    drawRestArt();
-    var next = timer.next.trim();
-    $("restNext").hidden = !next;
-    $("restNextText").textContent = next;
-    $("rest").hidden = false;
-  }
-
-  function goRest() {
-    timer.phase = "resting";
-    saveTimer();
-    document.body.classList.remove("ending");
-    $("farewell").hidden = true;
-    spinVel = 0;
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
-    showRest();
-  }
-
-  function unlock() {
-    timer.phase = "idle";
-    saveTimer();
-    $("rest").hidden = true;
-    restScheduled = false;
-    farewellAt = 0;
-    lastTimerKey = "";
-    drawTimer();
-    updateTimerUI();
-    dirty = true;
-  }
-
-  function tick() {
-    if (timer.phase !== "running") return;
-    var rem = remainingMs();
-    if (timer.warnings) {
-      if (!timer.warned5 && rem <= 5 * 60000 && rem > 60000) { timer.warned5 = true; saveTimer(); toast("5 more minutes"); }
-      if (!timer.warned1 && rem <= 60000 && rem > 0) { timer.warned1 = true; timer.warned5 = true; saveTimer(); toast("1 more minute"); }
-    }
-    if (rem <= 0) { beginEnding(); return; }
-    drawTimer();
-    if (!$("timerModal").hidden) $("timerLeft").textContent = minutesText(rem) + " left";
-  }
-
-  // Press-and-hold buttons for grown-up actions, so a quick tap does nothing.
-  function makeHold(btn, ms, onDone) {
-    var fill = btn.querySelector(".fill"), id = null;
-    function reset() { fill.style.transition = "none"; fill.style.width = "0"; }
-    function start(e) {
-      if (e.type === "keydown") {
-        if ((e.key !== "Enter" && e.key !== " ") || e.repeat) return;
-        e.preventDefault();
-      }
-      if (id) return;
-      fill.style.transition = "width " + ms + "ms linear";
-      fill.style.width = "100%";
-      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
-    }
-    function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
-    btn.addEventListener("pointerdown", start);
-    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { btn.addEventListener(ev, cancel); });
-    btn.addEventListener("keydown", start);
-    btn.addEventListener("keyup", cancel);
-    btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-  }
-
-  MINUTE_CHOICES.forEach(function (m) {
-    var b = document.createElement("button");
-    b.className = "btn";
-    b.dataset.minutes = String(m);
-    b.textContent = m + " min";
-    $("minuteRow").appendChild(b);
-  });
-  $("nextInput").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
-  $("optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); lastTimerKey = ""; drawTimer(); });
-  $("optWarnings").addEventListener("change", function () { timer.warnings = this.checked; saveTimer(); });
-  $("optGoodbye").addEventListener("change", function () { timer.goodbye = this.checked; saveTimer(); });
-  makeHold($("holdAdd"), HOLD_MS, addFive);
-  makeHold($("holdStop"), HOLD_MS, stopTimer);
-  makeHold($("holdSound"), HOLD_MS, toggleSound);
-  makeHold($("unlockBtn"), UNLOCK_MS, unlock);
-  $("timerModal").addEventListener("click", function (e) { if (e.target === this) closeTimer(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("timerModal").hidden) closeTimer(); });
-
-  // ---------- Big mode: hide the title and controls so the picture fills the screen ----------
-  var ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
-  var ICON_SHRINK = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
-  function setBig(on, remember) {
-    on = !!on;
-    document.body.classList.toggle("big", on);
-    var b = $("bigToggle");
-    b.setAttribute("aria-pressed", String(on));
-    b.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
-    $("bigLabel").textContent = on ? "Back" : "Big";
-    $("bigIcon").innerHTML = on ? ICON_SHRINK : ICON_EXPAND;
-    if (remember) { try { localStorage.setItem(BKEY, on ? "1" : "0"); } catch (e) { /* ignore */ } }
-    if (W) resize();
+  // Phones: one group of controls at a time (on tablets every group shows and the tabs are hidden).
+  function showTab(name) {
+    $("panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    });
   }
 
   // ---------- Start ----------
   if (reduce && state.spin) state.spin = false;
-  (function () { var on = false; try { on = localStorage.getItem(BKEY) === "1"; } catch (e) { /* ignore */ } setBig(on, false); })();
+  showTab("draw");
   resize();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
   window.addEventListener("resize", resize);
@@ -1692,13 +1301,35 @@ body.ending #view { cursor: default; }
   loadArt();
   renderControls();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { dirty = true; });
-  // Resume whatever the timer was doing before a reload.
-  if (timer.phase === "running" && remainingMs() <= 0) beginEnding();
-  else if (timer.phase === "ending") beginEnding();
-  else if (timer.phase === "resting") showRest();
-  drawTimer();
-  updateTimerUI();
-  setInterval(tick, 250);
+  // The old sound key said "on"/"off"; the shared module reads "1" for on.
+  try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
+  // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
+  // (a timer that ran out while away), so the picture is set up first.
+  Toybox.init({
+    app: "kaleidoscope",
+    grownButton: $("grownbtn"),
+    big: { button: $("bigToggle") },
+    sections: [$("shakeSection")],
+    timerIntro: "When time is up, the spinning slows, the picture fades, and the controls lock.",
+    goodbyeOption: "End with a Goodbye spin button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Goodbye spin",
+    farewellDone: "Bye bye!",
+    restLine: "The kaleidoscope is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: drawRestArt,
+    soundNote: "Soft tones that go higher as a finger moves away from the middle. Hold for 2 seconds.",
+    legacy: { timer: OLD_TKEY, sound: OLD_SKEY, big: OLD_BKEY },
+    onEnding: onEnding,
+    onGoodbye: goodbyeSpin,
+    onRest: function () { endingDone = null; spinVel = 0; },
+    onWake: function () { endingDone = null; dirty = true; },
+    onBig: function () { if (W) resize(); },
+    onSound: function (on) { if (on) whooshSound(); },
+    onTimer: function (info) { timerInfo = info; drawTimer(); }
+  });
+  $("stage").appendChild($("tb-toast"));
+  $("stage").appendChild($("tb-farewell"));
   requestAnimationFrame(frame);
 })();
 </script>
