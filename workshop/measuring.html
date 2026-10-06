@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../common/toybox.css">
 <script src="../common/toybox.js"></script>
+<script src="projects.js"></script>
 <style>
 :root {
   --bg: #CDE9FF;
@@ -202,6 +203,73 @@ body.ending .mcoach { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .prompt { transition: opacity 0.2s ease; }
 }
+/* ---------- Project mode (opened from a Workshop project plan with ?project=&step=) ----------
+   No choices: the panel is gone, the stage fills the screen. A yellow step banner sits at the top with the
+   coach pill centred under it. The Done! card covers only the lower part, the marked board stays in view. */
+body.pj .tb-panel { display: none; }
+.pjstep {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 3;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  background: #FFC93C;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  box-shadow: 4px 4px 0 #1D2340;
+  padding: 0.2rem 1rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  pointer-events: none;
+}
+.pjstep[hidden] { display: none; }
+body.pj .mcoach { left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); }
+body.ending .pjstep { visibility: hidden; }
+@media (max-width: 700px), (orientation: landscape) and (max-height: 520px) {
+  .pjstep { font-size: 1.1rem; padding: 0.15rem 0.8rem; border-width: 3px; box-shadow: 3px 3px 0 #1D2340; }
+}
+.pjdone {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 4;
+  transform: translateX(-50%);
+  width: min(calc(100% - 24px), 460px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 4px solid var(--edge);
+  border-radius: 24px;
+  box-shadow: 5px 5px 0 var(--edge);
+  padding: 12px 14px 14px;
+  text-align: center;
+  animation: pj-in 0.5s cubic-bezier(.3,1.4,.5,1) both;
+}
+.pjdone .pjdone-t { font-size: 2rem; font-weight: 800; line-height: 1.05; color: #2EA05A; }
+.pjdone .pjdone-l { font-size: 1.25rem; font-weight: 800; line-height: 1.15; }
+.pjdone .tb-go { width: 100%; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+@keyframes pj-in { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Short screens: the board fills the height, so the card takes the coach pill's place under the banner
+     (the coach line is off once the step is done) and stays off the board. */
+  .pjdone { top: var(--pj-top, 56px); bottom: auto; flex-direction: row; justify-content: space-between; width: min(calc(100% - 24px), 640px); padding: 6px 10px; gap: 10px; text-align: left; animation-name: pj-in-top; }
+  .pjdone .pjdone-txt { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+  .pjdone .pjdone-t { font-size: 1.4rem; }
+  .pjdone .pjdone-l { font-size: 1.05rem; }
+  .pjdone .tb-go { width: auto; flex: none; min-height: 46px; font-size: 1.25rem; padding: 0 16px; }
+}
+@keyframes pj-in-top { from { transform: translate(-50%, -24px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pjdone { animation: none; } }
 </style>
 </head>
 <body>
@@ -215,6 +283,7 @@ body.ending .mcoach { visibility: hidden; }
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A tape measure on the workbench"></canvas>
+      <div class="pjstep" id="pjstep" role="status" hidden></div>
       <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
       <div class="mcoach off" id="mcoach" role="status" aria-live="polite">Pull the tape to the board!</div>
     </main>
@@ -254,6 +323,9 @@ body.ending .mcoach { visibility: hidden; }
   var gearOn = true;
   try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
   if (!gearOn) {
+    // A project step (a plan sent us here): gear up through the plan page, which keeps the step.
+    var projArg = (location.search.match(/[?&]project=([a-z0-9-]+)/) || [])[1];
+    if (projArg) { location.replace("project.html?project=" + projArg); return; }
     var toolArg = (location.search.match(/[?&]tool=([a-z]+)/) || [])[1];
     location.replace("./?next=measuring" + (toolArg ? "&tool=" + toolArg : ""));
     return;
@@ -265,6 +337,25 @@ body.ending .mcoach { visibility: hidden; }
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var FONT = "\"Baloo 2\", \"Trebuchet MS\", sans-serif";
   var DEG = Math.PI / 180;
+
+  // ---------- Project mode: one "mark" step of a Workshop project (see projects.js) ----------
+  // Opened as measuring.html?project=<id>&step=<stepId>. The bench holds only the project board, the tape
+  // reads inches in halves, and the step ends with a "Done!" card that leads back to the plan. Nothing here
+  // touches the saved free-play state. PJ is null in normal play.
+  var PSTEP = window.ToyboxProjects ? ToyboxProjects.fromQuery() : null;
+  if (PSTEP && !(PSTEP.job && PSTEP.job.kind === "mark" && PSTEP.job.board)) PSTEP = null;
+  var PJ = PSTEP ? {
+    phase: "tape",            // tape -> tick (the tick draws, the tape zips home) -> square | x -> done
+    target: PSTEP.job.target, // inches from the board's left end
+    mark: PSTEP.job.mark,     // "line": a square line across the board; "x": an X for the entrance hole
+    board: null,              // the one thing on the bench (also T.objs[0])
+    tickX: 0, tick: 0,        // the pencil tick: x in px, draw progress 0..1
+    onTarget: false, misses: 0,
+    onTick: false, cover: null, lineT: 0, sqIn: 0, sqOff: 1.2, sqAway: 0,  // the square phase (sqAway: glide off the line once drawn)
+    xT: 0,                    // the X: two strokes, 0..2
+    wait: 0, msg: null, card: null, href: null, finished: false
+  } : null;
+  if (PJ) document.body.classList.add("pj");
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -301,6 +392,7 @@ body.ending .mcoach { visibility: hidden; }
   }
   var saveTimer = null;
   function save() {
+    if (PJ) return;  // project mode: fresh state in memory only, the saved free-play state is left alone
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () {
       try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
@@ -318,9 +410,10 @@ body.ending .mcoach { visibility: hidden; }
   var GMAX = 54; // widest caliper opening (mm)
 
   // Opened from the Toybox home screen: first-visit tool and a clean board (nothing here is a collection).
+  // A project step always starts from the fresh state (tape, inches) and is never saved.
   var startFresh = !!(window.Toybox && Toybox.fresh());
-  var S = startFresh ? freshState() : loadState();
-  if (startFresh) save();
+  var S = PJ || startFresh ? freshState() : loadState();
+  if (startFresh && !PJ) save();
 
   // ---------- Canvas and layout ----------
   var cv = $("cv"), ctx = cv.getContext("2d");
@@ -354,7 +447,51 @@ body.ending .mcoach { visibility: hidden; }
     layoutCaliper();
   }
 
+  // The step banner: one line that must fit the stage width (shrink the font rather than wrap or cut).
+  function fitBanner() {
+    var el = $("pjstep");
+    if (!PJ || el.hidden) return;
+    var small = window.matchMedia && (matchMedia("(max-width: 700px)").matches || matchMedia("(orientation: landscape) and (max-height: 520px)").matches);
+    var size = small ? 17.6 : 22.4;
+    el.style.fontSize = size + "px";
+    while (el.scrollWidth > el.clientWidth + 1 && size > 11) { size -= 1; el.style.fontSize = size + "px"; }
+  }
+  // Project mode: the project board alone, lying with its left end at the tape hook. It may run off the
+  // right side; about max(target * 1.35, target + 5, 10) inches are visible so the target sits well inside
+  // and the speed square has room to the right of the tick. The board sits high enough that the square's
+  // leg fits above it, and low enough to stay clear of the banner and the coach line.
+  function layoutProject() {
+    fitBanner();
+    var cs = clamp(U * 0.2, 74, 150);
+    var xL = PAD + cs + 12;
+    var bannerH = $("pjstep").offsetHeight || 0;
+    $("mcoach").style.top = (10 + bannerH + 8) + "px";
+    $("stage").style.setProperty("--pj-top", (10 + bannerH + 6) + "px");  // short screens: the Done card goes here
+    var top = 10 + bannerH + 8 + ($("mcoach").offsetHeight || 0) + 12;
+    var w = PSTEP.job.board.w, l = PSTEP.job.board.l;
+    var visIn = Math.max(PJ.target * 1.35, PJ.target + 6, 10);
+    var ppi = Math.max(3, Math.min((CW - xL - 6) / visIn, (CH - top - 50) / (w * 1.25)));
+    var h = Math.max(w * ppi, 40);
+    var sl = Math.max(h * 1.15, 64);
+    var lip = clamp(sl * 0.09, 10, 26);
+    var cyMin = top + (sl - h) + h / 2 + 8, cyMax = CH - 22 - lip - h / 2;
+    var cy = cyMax < cyMin ? cyMin : clamp(CH * 0.44, cyMin, cyMax);
+    var o = { id: "board", len: l, w: w, x0: xL, x1: xL + l * ppi, h: h, cy: cy };
+    T.ppi = ppi; T.cs = cs; T.objs = [o]; T.F = clamp(U * 0.085, 30, 66);
+    T.bw = clamp(ppi * 0.95, 24, 58);
+    T.maxIn = l;
+    T.home = { x: o.x0 - cs / 2, y: o.cy };
+    T.c.x = T.home.x; T.c.y = T.home.y; T.a = 0; T.caseFly = null;
+    T.d = 0; T.zip = false;
+    PJ.board = o; PJ.tickX = o.x0 + PJ.target * ppi;
+    // The speed square rides the project board's near (bottom) edge.
+    Q.bx = o.x0; Q.by = o.cy - h / 2; Q.bw = o.x1 - o.x0; Q.bh = h; Q.sl = sl; Q.lip = lip; Q.flipT = 1;
+    if (PJ.lineT > 0) Q.xd = PJ.tickX + easeIO(PJ.sqAway) * 1.5 * ppi;
+    else Q.xd = PJ.onTick ? PJ.tickX : clamp(PJ.tickX + PJ.sqOff * ppi, o.x0, Math.min(o.x1 - ppi * 0.3, CW - sl * 0.3));
+  }
+
   function layoutTape() {
+    if (PJ) { layoutProject(); return; }
     var cs = clamp(U * 0.2, 74, 170);
     var availW = CW - 2 * PAD - cs - 12;
     var boardIn = availW / 12.6 >= 30 ? 12 : 9;
@@ -401,6 +538,7 @@ body.ending .mcoach { visibility: hidden; }
     if (!L.bub.length) for (var i = 0; i < 3; i++) L.bub.push({ p: 0, v: 0 });
   }
   function layoutSquare() {
+    if (PJ) return;  // the square rides the project board (layoutProject)
     Q.bx = PAD + 16; Q.bw = CW - 2 * Q.bx;
     var maxH = (CH - OPTH - 2 * PAD - 20) / 1.25;
     Q.bh = clamp(Math.min(maxH, U * 0.55), 110, 420);
@@ -592,6 +730,7 @@ body.ending .mcoach { visibility: hidden; }
   // ---------- Hints ----------
   var promptTimer = null;
   function say(msg) {
+    if (PJ) { pjSay(msg, "flash", 3); return; }
     if (S.tool === "tape") { T.msg = { text: msg, until: now + 3.5, flash: true }; return; }
     var el = $("prompt");
     el.textContent = msg;
@@ -607,10 +746,28 @@ body.ending .mcoach { visibility: hidden; }
   function tapeDir() { return { x: Math.cos(T.a), y: Math.sin(T.a) }; }
   function mouth() { var d = tapeDir(); return { x: T.c.x + d.x * T.cs / 2, y: T.c.y + d.y * T.cs / 2 }; }
   function hookPt() { var m = mouth(), d = tapeDir(); return { x: m.x + d.x * T.d, y: m.y + d.y * T.d }; }
-  function tapeValue(len) { return S.unit === "cm" ? Math.round(len / T.ppi * 2.54) : Math.round(len / T.ppi); }
-  function tapeText(v) { return v + (S.unit === "cm" ? " cm" : " in"); }
+  // Whole inches (or cm) in free play; a project step reads inches in halves ("7.5").
+  function tapeValue(len) {
+    if (PJ) return Math.round(len / T.ppi * 2) / 2;
+    return S.unit === "cm" ? Math.round(len / T.ppi * 2.54) : Math.round(len / T.ppi);
+  }
+  function tapeText(v) { return (PJ ? ToyboxProjects.fmt(v) : v) + (S.unit === "cm" ? " cm" : " in"); }
+  // Project mode: the tape runs straight along the board. Near the target the hook sticks softly (it eases
+  // onto the exact number in updateTape); after two misses the magnet reaches a whole inch.
+  function setHookPJ(hx) {
+    var m = mouth();
+    var maxD = Math.min(PJ.board.x1 - m.x, CW - 6 - m.x);
+    var d = clamp(hx - m.x, 0, maxD), tx = PJ.target * T.ppi;
+    var zone = PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14);
+    var was = PJ.onTarget;
+    PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
+    T.a = 0;
+    if (!PJ.onTarget) T.d = d;
+    else if (!was) { PJ.msg = null; blip(1200, 0.06, 0.05, "triangle", 1500); }  // the coach says "Let go!" now
+  }
   // Put the hook at (hx, hy): the case turns to face it and the blade runs out.
   function setHook(hx, hy) {
+    if (PJ) { setHookPJ(hx); return; }
     hx = clamp(hx, 4, CW - 4); hy = clamp(hy, 4, CH - 4);
     var dx = hx - T.c.x, dy = hy - T.c.y, r = Math.hypot(dx, dy);
     if (r < T.cs / 2 + 2) { T.d = 0; return; }
@@ -633,7 +790,26 @@ body.ending .mcoach { visibility: hidden; }
     }
   }
   function goalObj() { return T.objs[T.goal % T.objs.length]; }
+  // Project mode: letting go on the target makes the pencil tick and zips the tape home (calmly); letting go
+  // anywhere else is a gentle hint, and the tape stays out so he can pull a bit more or less.
+  function releaseHookPJ() {
+    T.hookHeld = false; T.live = false; T.snap = null;
+    if (PJ.phase !== "tape") return;
+    if (PJ.onTarget) {
+      T.d = PJ.target * T.ppi; T.shown = PJ.target;
+      PJ.phase = "tick"; PJ.tick = 0.001; PJ.wait = 1.0;
+      pjSay("Right on " + ToyboxProjects.fmt(PJ.target) + "!", "ok", 60);
+      chime();
+      T.zip = true; T.zv = 120;
+      whoosh(0.6, 2000, 500, 0.05);
+    } else if (T.d > 2) {
+      PJ.misses++;
+      pjSay(T.d < PJ.target * T.ppi ? "A bit more!" : "A bit less!", "flash", 3);
+      blip(520, 0.08, 0.04, "sine", 440);
+    }
+  }
   function releaseHook() {
+    if (PJ) { releaseHookPJ(); return; }
     T.hookHeld = false;
     if (T.snap && T.d > 2) {
       // A real measurement: say it, and move on to the next thing once it has been admired.
@@ -652,7 +828,7 @@ body.ending .mcoach { visibility: hidden; }
   }
   function updateTape(dt) {
     if (T.zip) {
-      T.zv += (reduce ? 9000 : 5200) * dt;
+      T.zv += (reduce ? 9000 : (PJ ? 3400 : 5200)) * dt;
       T.d -= T.zv * dt;
       if (T.d <= 0) {
         T.d = 0; T.zip = false; T.bump = 1;
@@ -675,7 +851,8 @@ body.ending .mcoach { visibility: hidden; }
       T.c.x = lerp(f.fx, f.tx, e); T.c.y = lerp(f.fy, f.ty, e); T.a = lerp(f.fa, 0, e);
       if (f.t >= 1) T.caseFly = null;
     }
-    tapeCoach(dt);
+    if (PJ) { if (T.hookHeld && PJ.onTarget) T.d = lerp(T.d, PJ.target * T.ppi, Math.min(1, dt * 14)); }
+    else tapeCoach(dt);
     // A soft tick for every whole inch (or every 5 cm) pulled out
     if (T.hookHeld) {
       var step = S.unit === "cm" ? T.ppi / 2.54 * 5 : T.ppi;
@@ -737,10 +914,17 @@ body.ending .mcoach { visibility: hidden; }
     }
     c.restore();
   }
-  // Pulsing arrows from the hook toward the far end of the thing to measure.
+  // Pulsing arrows from the hook toward the far end of the thing to measure (project mode: toward the target).
   function drawHookArrow(c) {
-    if (T.d >= 1 || T.zip || T.hookHeld || T.caseFly || T.msg || busy()) return;
-    var g = goalObj(), h = hookPt(), tx = g.x1, ty = g.cy;
+    if (T.zip || T.hookHeld || T.caseFly || busy()) return;
+    var h = hookPt(), tx, ty;
+    if (PJ) {
+      if (PJ.phase !== "tape" || Math.abs(T.d - PJ.target * T.ppi) < T.ppi * 0.5) return;
+      tx = PJ.tickX; ty = h.y;
+    } else {
+      if (T.d >= 1 || T.msg) return;
+      var g = goalObj(); tx = g.x1; ty = g.cy;
+    }
     var dx = tx - h.x, dy = ty - h.y, L = Math.hypot(dx, dy);
     if (L < 40) return;
     var ux = dx / L, uy = dy / L, k = reduce ? 0.6 : (now * 0.9) % 1, sz = Math.max(12, T.bw * 0.42);
@@ -906,7 +1090,7 @@ body.ending .mcoach { visibility: hidden; }
     c.beginPath(); c.arc(-th * 0.9, -bw * 0.22, 2.6, 0, Math.PI * 2); c.arc(-th * 0.9, bw * 0.22, 2.6, 0, Math.PI * 2); c.fillStyle = OUT; c.fill();
     c.restore();
     // "pull me" pulse while the tape is in
-    if (T.d < 1 && !T.zip && !busy()) {
+    if (T.d < 1 && !T.zip && !busy() && (!PJ || PJ.phase === "tape")) {
       var p = 0.5 + 0.5 * Math.sin(now * 4);
       c.save();
       c.strokeStyle = "rgba(255,225,77," + (0.55 + 0.4 * p) + ")";
@@ -933,18 +1117,91 @@ body.ending .mcoach { visibility: hidden; }
     rr(c, -cs * 0.18, -cs * 0.56, cs * 0.36, cs * 0.14, cs * 0.06); fs(c, "#E63946", 3);
     c.restore();
   }
+  function drawBurst(c) {
+    T.burst.forEach(function (b) {
+      c.strokeStyle = "rgba(255,240,150," + (1 - b.t / 0.45) + ")";
+      c.lineWidth = 4; c.lineCap = "round";
+      c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x - b.vx * 0.05, b.y - b.vy * 0.05); c.stroke();
+    });
+  }
+  // The pencil marks on the project board: the tick under the hook, the strokes along the square, the line
+  // that finishes itself, the X. Returns where the pencil tip is while a mark draws itself (or null).
+  // The pencil line is drawn just left of the square's edge: the square's dark outline is painted after the
+  // marks, so a line exactly on the edge would be hidden under it.
+  function pjLineOff() { return -(clamp(U * 0.006, 3, 5) / 2 + 4); }
+  function drawMarks(c) {
+    var b = PJ.board, bot = b.cy + b.h / 2, topY = b.cy - b.h / 2, pen = null;
+    var lw = clamp(U * 0.006, 3, 5), lx = PJ.tickX + pjLineOff();
+    c.save();
+    c.beginPath(); c.rect(b.x0, topY, Math.min(b.x1, CW + 10) - b.x0, b.h); c.clip();
+    c.strokeStyle = "rgba(52,56,66,0.9)"; c.lineCap = "round"; c.lineWidth = lw;
+    if (PJ.tick > 0) {
+      var th = Math.min(b.h * 0.4, Math.max(28, T.ppi * 1.1)), y1 = bot - th * PJ.tick;
+      c.lineWidth = lw * 1.3;
+      c.beginPath(); c.moveTo(PJ.tickX, bot); c.lineTo(PJ.tickX, y1); c.stroke();
+      c.lineWidth = lw;
+      if (PJ.tick < 1) pen = { x: PJ.tickX, y: y1 };
+    }
+    if (PJ.phase === "square") drawPencilLines(c);
+    if (PJ.lineT > 0) {
+      var y2 = bot - b.h * PJ.lineT;
+      c.beginPath(); c.moveTo(lx, bot); c.lineTo(lx, y2); c.stroke();
+      if (PJ.lineT < 1) pen = { x: lx, y: y2 };
+    }
+    if (PJ.xT > 0) {
+      var s = Math.min(b.h * 0.3, T.ppi * 0.9), p1 = clamp(PJ.xT, 0, 1), p2 = clamp(PJ.xT - 1, 0, 1);
+      var x1 = lerp(PJ.tickX - s, PJ.tickX + s, p1), yy1 = lerp(b.cy - s, b.cy + s, p1);
+      c.beginPath(); c.moveTo(PJ.tickX - s, b.cy - s); c.lineTo(x1, yy1); c.stroke();
+      if (p1 < 1) pen = { x: x1, y: yy1 };
+      if (p2 > 0) {
+        var x2 = lerp(PJ.tickX + s, PJ.tickX - s, p2), yy2 = lerp(b.cy - s, b.cy + s, p2);
+        c.beginPath(); c.moveTo(PJ.tickX + s, b.cy - s); c.lineTo(x2, yy2); c.stroke();
+        if (p2 < 1) pen = { x: x2, y: yy2 };
+      }
+    }
+    c.restore();
+    return pen;
+  }
+  // Project mode scene: the board with its marks, the tape (while measuring), then the square.
+  function drawProject(c) {
+    drawObject(c, PJ.board);
+    var pen = drawMarks(c);
+    var measuring = PJ.phase === "tape" || PJ.phase === "tick";
+    if (measuring) drawBlade(c);
+    drawCase(c);
+    drawHook(c);
+    if (measuring) {
+      drawHookArrow(c);
+      drawBurst(c);
+      var v = T.hookHeld || T.d > 0.5 ? tapeValue(T.d) : T.shown;
+      var F = T.F, clear = parseFloat($("mcoach").style.top || "10") + ($("mcoach").offsetHeight || 0) + 6;
+      var above = T.c.y - T.cs * 0.62 - F * 1.4 > clear;
+      var by = above ? T.c.y - T.cs * 0.62 - F * 0.75 : T.c.y + T.cs * 0.62 + F * 0.75;
+      readout(c, tapeText(v), T.c.x, by, F, PJ.onTarget || PJ.phase === "tick" ? 1 : 0, T.c.x, above ? T.c.y - T.cs * 0.45 : T.c.y + T.cs * 0.45);
+    }
+    // the square stays on the bench once the line is drawn (it glides aside to show the line off)
+    if (PJ.phase === "square" || (PJ.phase === "done" && PJ.mark === "line")) {
+      drawSquareTool(c, PJ.sqIn);
+      if (Q.clack > 0) {
+        // the soft clack: a ring spreading from the corner that just landed on the tick
+        var G = sqGeom(), k = 1 - Q.clack;
+        c.save();
+        c.strokeStyle = "rgba(255,255,255," + (0.9 * Q.clack) + ")"; c.lineWidth = 5;
+        c.beginPath(); c.arc(G.corner.x, G.ey, 14 + k * 46, 0, Math.PI * 2); c.stroke();
+        c.restore();
+      }
+    }
+    if (pen) drawPencil(c, pen.x, pen.y, clamp(U * 0.2, 80, 170));
+  }
   function drawTape(c) {
+    if (PJ) { drawProject(c); return; }
     T.objs.forEach(function (o) { drawObject(c, o); });
     drawGoal(c);
     drawBlade(c);
     drawCase(c);
     drawHook(c);
     drawHookArrow(c);
-    T.burst.forEach(function (b) {
-      c.strokeStyle = "rgba(255,240,150," + (1 - b.t / 0.45) + ")";
-      c.lineWidth = 4; c.lineCap = "round";
-      c.beginPath(); c.moveTo(b.x, b.y); c.lineTo(b.x - b.vx * 0.05, b.y - b.vy * 0.05); c.stroke();
-    });
+    drawBurst(c);
     // Readout bubble on the case
     var v = T.hookHeld ? tapeValue(T.d) : T.shown;
     var F = T.F;
@@ -954,7 +1211,25 @@ body.ending .mcoach { visibility: hidden; }
     drawGhost(c);
   }
   // Tape pointer handling
+  // Project mode: the hook, or anywhere along the board in front of the case, grabs the hook (the case stays
+  // hooked on the board's left end). Nothing else to grab here.
+  function tapeDownPJ(p, id) {
+    if (PJ.phase !== "tape" || T.zip || T.hookHeld) return false;
+    var h = hookPt(), b = PJ.board;
+    var hr = Math.max(44, T.bw * 1.5);
+    var onBand = Math.abs(p.y - b.cy) < Math.max(b.h / 2 + 24, 60) && p.x > T.c.x + T.cs * 0.3;
+    if (dist(p.x, p.y, h.x, h.y) < hr || onBand) {
+      T.hookHeld = true; T.live = true;
+      T.lastIn = Math.floor(T.d / T.ppi);
+      drags[id] = { type: "hook", dx: h.x - p.x, dy: 0 };
+      blip(900, 0.05, 0.05, "triangle");
+      return true;
+    }
+    pjSay("Pull the yellow hook!", "flash", 2.5);
+    return false;
+  }
   function tapeDown(p, id) {
+    if (PJ) return tapeDownPJ(p, id);
     T.lastTouch = now; T.ghost = null; T.ghostDone = false;
     var h = hookPt();
     var hr = Math.max(40, T.bw * 1.3);
@@ -992,6 +1267,7 @@ body.ending .mcoach { visibility: hidden; }
   }
   function tapeUp(dr) {
     T.lastTouch = now;
+    if (PJ) { if (dr.type === "hook") releaseHook(); return; }
     if (dr.type === "hook") { releaseHook(); if (!T.moveAt && !alignedToGoal()) { T.needAlign = true; T.moveAt = now + 2.5; } }
     else if (dr.type === "case") {
       // Dropped near the end of a thing on the bench: line the mouth up with it.
@@ -1201,7 +1477,13 @@ body.ending .mcoach { visibility: hidden; }
       for (var x = bx; x <= bx + bw + 30; x += 30) c.lineTo(x, gy + Math.sin(x / 70 + g * 1.3) * bh * 0.025 + (r() - 0.5) * 1.5);
       c.stroke();
     }
-    // pencil lines
+    drawPencilLines(c);
+    c.restore();
+    rr(c, bx, by, bw, bh, 6); fs(c, null, 3.5);
+    drawSquareTool(c, 1);
+  }
+  // The pencil lines on the board (the saved lines, then the stroke being drawn), in board coordinates.
+  function drawPencilLines(c) {
     var fade = Q.clearT > 0 ? Q.clearT : 1;
     c.strokeStyle = "rgba(52,56,66," + (0.9 * fade) + ")";
     c.lineCap = "round";
@@ -1211,19 +1493,20 @@ body.ending .mcoach { visibility: hidden; }
       c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
     });
     if (Q.live) {
-      var e = sqEdge();
-      var p0 = { x: lerp(e.a.x, e.b.x, Q.live.t0), y: lerp(e.a.y, e.b.y, Q.live.t0) };
-      var p1 = { x: lerp(e.a.x, e.b.x, Q.live.t1), y: lerp(e.a.y, e.b.y, Q.live.t1) };
+      var e = sqEdge(), ox = PJ ? pjLineOff() : 0;  // project mode: keep the stroke clear of the square's outline
+      var p0 = { x: lerp(e.a.x, e.b.x, Q.live.t0) + ox, y: lerp(e.a.y, e.b.y, Q.live.t0) };
+      var p1 = { x: lerp(e.a.x, e.b.x, Q.live.t1) + ox, y: lerp(e.a.y, e.b.y, Q.live.t1) };
       c.strokeStyle = "rgba(52,56,66,0.95)";
       c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(p1.x, p1.y); c.stroke();
     }
-    c.restore();
-    rr(c, bx, by, bw, bh, 6); fs(c, null, 3.5);
-
-    // the square itself
+  }
+  // The speed square itself: the triangle with its lip on the board edge, the ticks, the active marking
+  // edge and the pencil while a line is being drawn. alpha < 1 fades it in (project mode).
+  function drawSquareTool(c, alpha) {
     var G = sqGeom(), sl = Q.sl, dir = G.dir, lip = Q.lip;
     var t = Math.max(14, sl * 0.15);
     c.save();
+    if (alpha < 1) c.globalAlpha = Math.max(0, alpha);
     c.fillStyle = "rgba(30,20,10,0.25)";
     poly(c, [[G.corner.x + 6, G.corner.y + 8], [G.leg.x + 6, G.leg.y + 8], [G.tip.x + 6, G.tip.y + 8]]); c.fill();
     // outer triangle with the inner cut-out (even-odd)
@@ -1251,21 +1534,26 @@ body.ending .mcoach { visibility: hidden; }
       var yy = G.corner.y + dir * sl * m / 12;
       c.beginPath(); c.moveTo(G.corner.x, yy); c.lineTo(G.corner.x + (m % 2 === 0 ? t * 0.5 : t * 0.3), yy); c.stroke();
     }
-    var lab = Math.max(14, t * 0.62);
-    text(c, "90°", G.corner.x + t * 1.25, G.corner.y + dir * t * 3.2, lab, S.sq === 90 ? "#E63946" : OUT);
-    text(c, "45°", G.tip.x - sl * 0.32, G.corner.y + dir * sl * 0.18, lab, S.sq === 45 ? "#E63946" : OUT);
+    if (!PJ) {
+      // the angle labels (free play has the 90/45 choice; a project step shows no other numbers)
+      var lab = Math.max(14, t * 0.62);
+      text(c, "90°", G.corner.x + t * 1.25, G.corner.y + dir * t * 3.2, lab, S.sq === 90 ? "#E63946" : OUT);
+      text(c, "45°", G.tip.x - sl * 0.32, G.corner.y + dir * sl * 0.18, lab, S.sq === 45 ? "#E63946" : OUT);
+    }
     // pivot hole
     c.beginPath(); c.arc(G.corner.x + t * 0.5, G.corner.y + dir * t * 0.55, Math.max(3, t * 0.16), 0, Math.PI * 2); fs(c, "#C9A877", 2);
     c.restore();
-    // the active marking edge
+    // the active marking edge (project mode: only once the square sits on the tick)
     var e2 = sqEdge();
-    var pulse = Q.live ? 0 : (0.35 + 0.35 * Math.sin(now * 4)) + Q.edgeFlash;
+    var showEdge = !PJ || (PJ.onTick && PJ.lineT === 0);
+    var pulse = Q.live || !showEdge ? 0 : (0.35 + 0.35 * Math.sin(now * 4)) + Q.edgeFlash;
     if (pulse > 0.02) {
       c.save();
       c.strokeStyle = "rgba(255,90,60," + Math.min(1, pulse) + ")";
       c.lineWidth = 6; c.lineCap = "round"; c.setLineDash([12, 10]);
       var ox = S.sq === 90 ? -6 : 4, oy = S.sq === 90 ? 0 : 4 * dir;
-      c.beginPath(); c.moveTo(e2.a.x + ox, e2.a.y + oy); c.lineTo(e2.b.x + ox, e2.b.y + oy); c.stroke();
+      var eb = PJ ? { x: lerp(e2.a.x, e2.b.x, Q.bh / Q.sl), y: lerp(e2.a.y, e2.b.y, Q.bh / Q.sl) } : e2.b;
+      c.beginPath(); c.moveTo(e2.a.x + ox, e2.a.y + oy); c.lineTo(eb.x + ox, eb.y + oy); c.stroke();
       c.restore();
     }
     // pencil
@@ -1298,7 +1586,66 @@ body.ending .mcoach { visibility: hidden; }
     var t = clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0, 1);
     return { t: t, d: dist(p.x, p.y, a.x + dx * t, a.y + dy * t) };
   }
+  // Project mode: slide the square along the near edge until its blade edge sits on the tick (a magnet
+  // within ~0.3 in); once there it stays put and every touch near it draws along the edge. Big hit areas.
+  function squareDownPJ(p, id) {
+    if (PJ.phase !== "square" || PJ.lineT > 0 || PJ.sqIn < 1) return false;
+    var G = sqGeom(), pad = 30;
+    var near = p.x > G.corner.x - pad && p.x < G.corner.x + Q.sl + pad && p.y > G.leg.y - pad && p.y < G.ey + Q.lip + pad;
+    if (PJ.onTick) {
+      var e = sqEdge(), sp = segParam(p, e.a, e.b), pr = Math.max(70, Q.sl * 0.4);
+      if (sp.d < pr || near) {
+        var t0 = Math.min(sp.t, Q.bh / Q.sl);
+        Q.live = { t0: t0, t1: t0 };
+        drags[id] = { type: "pencil" };
+        blip(1200, 0.04, 0.03, "triangle");
+        return true;
+      }
+      Q.edgeFlash = 1;
+      pjSay("Draw along the square!", "flash", 2.5);
+      return false;
+    }
+    if (near || inSquare(p)) {
+      drags[id] = { type: "square", dx: Q.xd - p.x };
+      blip(480, 0.05, 0.05, "triangle");
+      return true;
+    }
+    pjSay("Slide the square to the mark!", "flash", 2.5);
+    return false;
+  }
+  function squareSlidePJ(x) {
+    var b = PJ.board;
+    x = clamp(x, b.x0, Math.min(b.x1 - T.ppi * 0.3, CW - Q.sl * 0.3));
+    var zone = Math.max(0.3 * T.ppi, 14);
+    var near = Math.abs(x - PJ.tickX) < (PJ.onTick ? zone * 2 : zone);
+    if (near && !PJ.onTick) {
+      PJ.onTick = true; Q.clack = 1; Q.edgeFlash = 1;
+      blip(380, 0.08, 0.06, "triangle", 260);
+    } else if (!near && PJ.onTick) PJ.onTick = false;
+    if (!PJ.onTick) Q.xd = x;   // on the tick it eases onto it (updateProject)
+    PJ.sqOff = (Q.xd - PJ.tickX) / T.ppi;
+  }
+  function squareStrokePJ() {
+    var e = sqEdge(), lv = Q.live, tb = Q.bh / Q.sl;
+    var t0 = clamp(Math.min(lv.t0, lv.t1), 0, tb), t1 = clamp(Math.max(lv.t0, lv.t1), 0, tb);
+    Q.live = null;
+    if ((t1 - t0) * Q.sl > 8) {
+      var ox = pjLineOff();
+      var a = toBoard(lerp(e.a.x, e.b.x, t0) + ox, lerp(e.a.y, e.b.y, t0)), b = toBoard(lerp(e.a.x, e.b.x, t1) + ox, lerp(e.a.y, e.b.y, t1));
+      S.lines.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
+      PJ.cover = PJ.cover ? [Math.min(PJ.cover[0], t0), Math.max(PJ.cover[1], t1)] : [t0, t1];
+      blip(880, 0.08, 0.04, "sine", 1100);
+      if (PJ.cover[1] - PJ.cover[0] >= 0.7 * tb) {
+        // close enough: the line finishes itself, from the near edge to the far edge
+        S.lines = [];
+        PJ.lineT = 0.001; PJ.wait = 1.2;
+        pjSay("A straight line!", "ok", 60);
+        chime();
+      } else pjSay("All the way across!", "flash", 3);
+    }
+  }
   function squareDown(p, id) {
+    if (PJ) return squareDownPJ(p, id);
     var e = sqEdge(), sp = segParam(p, e.a, e.b);
     var pr = Math.max(56, Q.sl * 0.28);
     if (!Q.live && sp.d < pr && !(inSquare(p) && sp.d > 30)) {
@@ -1318,6 +1665,7 @@ body.ending .mcoach { visibility: hidden; }
   }
   function squareMove(dr, p) {
     if (dr.type === "square") {
+      if (PJ) { squareSlidePJ(p.x + dr.dx); return; }
       Q.xd = clamp(p.x + dr.dx, Q.bx, Q.bx + Q.bw - Q.sl);
       S.sqF = (Q.xd - Q.bx) / Math.max(1, Q.bw - Q.sl);
       var mid = Q.by + Q.bh / 2;
@@ -1326,6 +1674,7 @@ body.ending .mcoach { visibility: hidden; }
     } else if (dr.type === "pencil" && Q.live) {
       var e = sqEdge();
       var t = segParam(p, e.a, e.b).t;
+      if (PJ) t = Math.min(t, Q.bh / Q.sl);  // the pencil stays on the wood
       if (Math.abs(t - Q.live.t1) * Q.sl > 14) blip(1800 + rnd(-200, 200), 0.02, 0.015, "triangle");
       Q.live.t1 = t;
     }
@@ -1333,6 +1682,7 @@ body.ending .mcoach { visibility: hidden; }
   function squareUp(dr) {
     if (dr.type === "square") { blip(300, 0.08, 0.06, "triangle", 200); save(); }
     else if (dr.type === "pencil" && Q.live) {
+      if (PJ) { squareStrokePJ(); return; }
       var e = sqEdge(), lv = Q.live;
       var len = Math.abs(lv.t1 - lv.t0) * dist(e.a.x, e.a.y, e.b.x, e.b.y);
       if (len > 8) {
@@ -1639,12 +1989,17 @@ body.ending .mcoach { visibility: hidden; }
     e.preventDefault();
     ensureAudio();
     if (busy()) return;
-    var p = localPt(e), ok = false;
-    if (S.tool === "tape") ok = tapeDown(p, e.pointerId);
-    else if (S.tool === "level") ok = levelDown(p, e.pointerId);
-    else if (S.tool === "square") ok = squareDown(p, e.pointerId);
+    var p = localPt(e), ok = false, tool = S.tool;
+    if (PJ) {
+      // the tool in hand follows the step: the tape, then the square; nothing once the card is up
+      if (PJ.card) return;
+      tool = PJ.phase === "square" ? "square" : "tape";
+    }
+    if (tool === "tape") ok = tapeDown(p, e.pointerId);
+    else if (tool === "level") ok = levelDown(p, e.pointerId);
+    else if (tool === "square") ok = squareDown(p, e.pointerId);
     else ok = caliperDown(p, e.pointerId);
-    if (ok && drags[e.pointerId]) { drags[e.pointerId].tool = S.tool; try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ } }
+    if (ok && drags[e.pointerId]) { drags[e.pointerId].tool = tool; try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ } }
   }
   function onMove(e) {
     var dr = drags[e.pointerId];
@@ -1784,6 +2139,107 @@ body.ending .mcoach { visibility: hidden; }
     return null;
   });
 
+  // =====================================================================
+  // PROJECT MODE: the coach line, the phase clock, the Done! card, the idle hand
+  // =====================================================================
+  // A short hint on top of the phase's coach line, for a few seconds ("A bit more!", "Right on 12!").
+  function pjSay(text, cls, secs) {
+    if (!PJ) return;
+    PJ.msg = { text: text, cls: cls || "flash", until: now + (secs || 3) };
+  }
+  function pjBaseCoach() {
+    if (PJ.phase === "tape") return PJ.onTarget && T.hookHeld ? "Let go!" : PSTEP.coach;
+    if (PJ.phase === "square") return PJ.lineT > 0 ? "A straight line!" : (PJ.onTick ? "Draw along the square!" : "Slide the square to the mark!");
+    if (PJ.phase === "x") return "X marks the door!";
+    return "";
+  }
+  function pjCoach() {
+    var el = $("mcoach");
+    if (PJ.msg && now >= PJ.msg.until) PJ.msg = null;
+    var text = PJ.msg ? PJ.msg.text : pjBaseCoach();
+    var happy = PJ.lineT > 0 || PJ.xT >= 2 || (PJ.phase === "tape" && PJ.onTarget && T.hookHeld);
+    var cls = PJ.msg ? PJ.msg.cls : (happy ? "ok" : "");
+    var off = PJ.phase === "done" || !text;
+    var key = text + "|" + cls + "|" + off;
+    if (key !== T.coachKey) {
+      T.coachKey = key;
+      el.textContent = text;
+      el.classList.toggle("ok", cls === "ok");
+      el.classList.toggle("flash", cls === "flash");
+      el.classList.toggle("off", off);
+    }
+  }
+  // After the tick: the square slides in to the right of the tick (a "line" step) or the X draws itself.
+  function startPhaseB() {
+    PJ.msg = null; T.coachKey = "";
+    if (PJ.mark === "x") { PJ.phase = "x"; PJ.xT = reduce ? 2 : 0.001; PJ.wait = 1.0; return; }
+    PJ.phase = "square"; PJ.sqIn = reduce ? 1 : 0.001; PJ.onTick = false; PJ.cover = null; PJ.lineT = 0; PJ.sqAway = 0;
+    S.sq = 90; S.flip = true; S.lines = []; Q.flipT = 1; Q.live = null; Q.clearT = 0;
+    PJ.sqOff = 1.2;
+    Q.xd = clamp(PJ.tickX + PJ.sqOff * T.ppi, PJ.board.x0, Math.min(PJ.board.x1 - T.ppi * 0.3, CW - Q.sl * 0.3));
+    blip(600, 0.08, 0.05, "triangle", 420);
+  }
+  // The job is done: record it, then the card with the one way on (a real link, never automatic).
+  function finishJob() {
+    if (PJ.finished) return;
+    PJ.finished = true; PJ.phase = "done"; PJ.msg = null;
+    PJ.href = ToyboxProjects.finish(PSTEP);
+    var card = document.createElement("div");
+    card.className = "pjdone";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", "Done");
+    card.innerHTML = '<div class="pjdone-txt"><div class="pjdone-t">Done! ✓</div><div class="pjdone-l"></div></div><a class="btn tb-go" id="pjback"></a>';
+    card.querySelector(".pjdone-l").textContent = PSTEP.done;
+    var a = card.querySelector("a");
+    a.textContent = "Back to the plan";
+    a.href = PJ.href;
+    $("stage").appendChild(card);
+    PJ.card = card;
+    chime();
+    updateAria(true);
+  }
+  // Called every frame in project mode: the marks that draw themselves and the calm pauses between phases.
+  function updateProject(dt) {
+    if (PJ.tick > 0 && PJ.tick < 1) PJ.tick = reduce ? 1 : Math.min(1, PJ.tick + dt / 0.6);
+    if (PJ.phase === "tick") {
+      if (!T.zip && T.d <= 0 && PJ.tick >= 1 && !busy()) { PJ.wait -= dt; if (PJ.wait <= 0) startPhaseB(); }
+    } else if (PJ.phase === "square") {
+      if (PJ.sqIn < 1) PJ.sqIn = Math.min(1, PJ.sqIn + dt / 0.5);
+      if (PJ.lineT === 0 && PJ.onTick && Math.abs(Q.xd - PJ.tickX) > 0.1) Q.xd = lerp(Q.xd, PJ.tickX, Math.min(1, dt * 12));
+      if (PJ.lineT > 0 && PJ.lineT < 1) PJ.lineT = reduce ? 1 : Math.min(1, PJ.lineT + dt / 0.8);
+      else if (PJ.lineT >= 1 && !busy()) { PJ.wait -= dt; if (PJ.wait <= 0) finishJob(); }
+    } else if (PJ.phase === "x") {
+      if (PJ.xT < 2) PJ.xT = Math.min(2, PJ.xT + dt / 0.7);
+      else if (!busy()) { PJ.wait -= dt; if (PJ.wait <= 0) finishJob(); }
+    }
+    // once the line is drawn the square glides a little to the right, so the line shows (also under the card)
+    if (PJ.mark === "line" && PJ.lineT >= 1 && PJ.sqAway < 1) {
+      PJ.sqAway = reduce ? 1 : Math.min(1, PJ.sqAway + dt / 0.9);
+      Q.xd = PJ.tickX + easeIO(PJ.sqAway) * 1.5 * T.ppi;
+    }
+    pjCoach();
+  }
+  // The idle hand shows the current move: pull the hook, slide the square, draw along its edge.
+  if (PJ) makeIdleGhost(function () {
+    if (busy() || Object.keys(drags).length || PJ.card || T.zip) return null;
+    var cr = cv.getBoundingClientRect();
+    function scr(x, y) { return [cr.left + x, cr.top + y]; }
+    if (PJ.phase === "tape") {
+      var h = hookPt();
+      return { pts: [scr(h.x, h.y), scr(PJ.tickX, h.y)], duration: 3800 };
+    }
+    if (PJ.phase === "square" && PJ.lineT === 0 && PJ.sqIn >= 1) {
+      var G = sqGeom();
+      if (!PJ.onTick) {
+        var gx = G.corner.x + Q.sl * 0.3, gy = G.ey - Q.sl * 0.2;
+        return { pts: [scr(gx, gy), scr(gx - (Q.xd - PJ.tickX), gy)] };
+      }
+      var e = sqEdge(), tb = Q.bh / Q.sl;
+      return { pts: [scr(e.a.x - 4, e.a.y), scr(lerp(e.a.x, e.b.x, tb) - 4, lerp(e.a.y, e.b.y, tb))] };
+    }
+    return null;
+  }, { max: 3 });
+
   var HINTS = { tape: "Pull the hook out!", level: "Make the bubble sit in the middle", square: "Draw along the red edge", caliper: "Put a part in the jaws" };
   function setTool(t, quiet) {
     if (TOOLS.indexOf(t) === -1) return;
@@ -1897,7 +2353,8 @@ body.ending .mcoach { visibility: hidden; }
   var lastLabel = "";
   function updateAria(force) {
     var t;
-    if (S.tool === "tape") t = "Tape measure. Reading " + tapeText(T.hookHeld ? tapeValue(T.d) : T.shown) + ". A board, a pencil, a toy car and a block are on the bench.";
+    if (PJ) t = PSTEP.title + ". " + (PJ.phase === "done" ? PSTEP.done + " Done." : "Tape measure reading " + tapeText(T.hookHeld ? tapeValue(T.d) : T.shown) + ".");
+    else if (S.tool === "tape") t = "Tape measure. Reading " + tapeText(T.hookHeld ? tapeValue(T.d) : T.shown) + ". A board, a pencil, a toy car and a block are on the bench.";
     else if (S.tool === "level") { var phi = effTilt(); t = "Spirit level on a board. " + (Math.abs(phi) < 0.5 ? "It is level." : Math.round(Math.abs(phi)) + " degrees off level."); }
     else if (S.tool === "square") t = "Speed square on a board, marking the " + S.sq + " degree edge. " + S.lines.length + " pencil lines.";
     else t = "Digital caliper reading " + calText() + (S.item ? ", with a " + ITEMS[S.item].name.toLowerCase() + " in the jaws." : ".");
@@ -1917,10 +2374,24 @@ body.ending .mcoach { visibility: hidden; }
   }
   // Opened from the Tool Wall's "Try it" button: start on that tool.
   (function () {
+    if (PJ) return;  // a project step is always the tape
     var m = location.search.match(/[?&]tool=([a-z]+)/);
     var WALL = { tape: "tape", level: "level", speedsquare: "square", calipers: "caliper" };
     if (m && WALL[m[1]]) S.tool = WALL[m[1]];
   })();
+  if (PJ) {
+    // Project mode chrome: Back leads to the plan, the step banner and the first coach line are shown
+    // before the first layout (the board is placed under them).
+    var wallBtn = $("wallbtn");
+    wallBtn.href = ToyboxProjects.planUrl(PSTEP.project);
+    wallBtn.setAttribute("aria-label", "Back to the plan");
+    wallBtn.querySelector("span").textContent = "Plan";
+    var banner = $("pjstep");
+    banner.textContent = PSTEP.title;
+    banner.hidden = false;
+    $("mcoach").textContent = PSTEP.coach;
+    document.title = "Measuring: " + PSTEP.title;
+  }
   setTool(S.tool, true);
   resize();
   window.addEventListener("resize", resize);
@@ -1959,13 +2430,14 @@ body.ending .mcoach { visibility: hidden; }
       updateLevel(dt);
       updateSquare(dt);
       updateCaliper(dt);
+      if (PJ) updateProject(dt);
       if (Toybox.timer.phase() === "ending") endingFrame();
       draw();
       if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
     }
     requestAnimationFrame(frame);
   }
-  if (/[?&]debug=1/.test(location.search)) window.__ms = { S: S, T: T, L: L, Q: Q, K: K, hookPt: hookPt, km: km, sqEdge: sqEdge, levelEnds: levelEnds, itemPos: itemPos, setDev: function (v) { devTilt = v; } };
+  if (/[?&]debug=1/.test(location.search)) window.__ms = { S: S, T: T, L: L, Q: Q, K: K, PJ: PJ, PSTEP: PSTEP, hookPt: hookPt, km: km, sqEdge: sqEdge, sqGeom: sqGeom, levelEnds: levelEnds, itemPos: itemPos, setDev: function (v) { devTilt = v; } };
   requestAnimationFrame(frame);
 })();
 </script>
