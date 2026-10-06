@@ -147,6 +147,8 @@ body {
   transition: opacity 0.25s ease, transform 0.25s cubic-bezier(.3,1.6,.5,1);
 }
 .prompt.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.tb-counter.pop { animation: cpop 0.4s cubic-bezier(.3,1.6,.5,1); }
+@keyframes cpop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
 /* Big: the size row is the play, so it stays; the header shrinks to the Big button. */
 body.big .tb-head > :not(.bigtoggle), body.big .modes { display: none; }
 body.ending .toolbar,
@@ -203,6 +205,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A bolt board with five hex bolts"></canvas>
+      <div class="tb-counter" id="boltsCount">Bolts out: 0</div>
       <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
     </main>
     <section class="tb-panel toolbar" id="toolbar">
@@ -843,19 +846,21 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Frame draw ----------
+  var shownOut = -1;
   function draw() {
     var c = ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.drawImage(bg, 0, 0);
     c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // Counter above the tray
-    var cp = 1 + Math.max(0, 0.35 - (now - (R.countAt || -9))) * 1.4;
-    c.font = font(LY.counter.size);
-    var cw = c.measureText("Bolts out: " + S.out).width + LY.counter.size * 0.4;
-    cp *= Math.min(1, (LY.tray.w - 6) / cw);
-    c.save(); c.translate(LY.counter.x, LY.counter.y); c.scale(cp, cp);
-    outlinedText(c, "Bolts out: " + S.out, 0, 0, LY.counter.size, "#FFFFFF", OUT);
-    c.restore();
+    // Counter: the stage's counter pill (top-left, the standard spot)
+    if (S.out !== shownOut) {
+      shownOut = S.out;
+      var ce = document.getElementById("boltsCount");
+      if (ce) {
+        ce.textContent = "Bolts out: " + S.out;
+        if (!reduce) { ce.classList.remove("pop"); void ce.offsetWidth; ce.classList.add("pop"); }
+      }
+    }
     var i, order = [];
     for (i = 0; i < SIZES.length; i++) drawWasher(i);
     for (i = 0; i < SIZES.length; i++) order.push(i);
