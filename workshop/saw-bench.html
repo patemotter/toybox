@@ -641,27 +641,27 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
   // band/scroll (the board moves under a fixed blade), table, miter.
   // ===================================================================
   var SAWS = [
-    { id: "ryoba", name: "Ryoba", group: "hand", scene: "end", cut: "pull", mats: ["pine", "oak", "plywood"], strokes: 7, kerf: 1.4,
+    { id: "ryoba", name: "Ryoba", group: "hand", scene: "end", cut: "pull", mats: ["pine", "oak", "plywood"], strokes: 4, kerf: 1.4,
       tip: -250, heel: -52, engage: -150, len: 570, jp: true, about: "Japanese pull saw. Rip teeth on one edge, crosscut teeth on the other." },
-    { id: "dozuki", name: "Dozuki", group: "hand", scene: "end", cut: "pull", mats: ["strip", "dowel"], strokes: 6, kerf: 0.9,
+    { id: "dozuki", name: "Dozuki", group: "hand", scene: "end", cut: "pull", mats: ["strip", "dowel"], strokes: 4, kerf: 0.9,
       tip: -237, heel: -16, engage: -120, len: 545, spine: 46, jp: true },
-    { id: "kataba", name: "Kataba", group: "hand", scene: "end", cut: "pull", mats: ["pine", "oak", "plywood"], strokes: 7, kerf: 1.3,
+    { id: "kataba", name: "Kataba", group: "hand", scene: "end", cut: "pull", mats: ["pine", "oak", "plywood"], strokes: 4, kerf: 1.3,
       tip: -250, heel: -44, engage: -150, len: 545, jp: true },
-    { id: "panel", name: "Panel saw", group: "hand", scene: "end", cut: "push", mats: ["pine", "oak", "plywood"], strokes: 5, kerf: 1.8,
+    { id: "panel", name: "Panel saw", group: "hand", scene: "end", cut: "push", mats: ["pine", "oak", "plywood"], strokes: 4, kerf: 1.8,
       tip: -518, heel: -12, engage: -230, len: 640 },
-    { id: "backsaw", name: "Backsaw", group: "hand", scene: "end", cut: "push", mats: ["stud", "strip", "dowel"], strokes: 6, kerf: 1.2,
+    { id: "backsaw", name: "Backsaw", group: "hand", scene: "end", cut: "push", mats: ["stud", "strip", "dowel"], strokes: 4, kerf: 1.2,
       tip: -328, heel: -8, engage: -170, len: 460, spine: 88 },
-    { id: "dovetail", name: "Dovetail saw", group: "hand", scene: "end", cut: "push", mats: ["strip", "dowel"], strokes: 5, kerf: 0.8,
+    { id: "dovetail", name: "Dovetail saw", group: "hand", scene: "end", cut: "push", mats: ["strip", "dowel"], strokes: 4, kerf: 0.8,
       tip: -220, heel: -8, engage: -110, len: 300, spine: 42 },
-    { id: "coping", name: "Coping saw", group: "hand", scene: "curve", cut: "pull", mats: ["pine", "plywood"], kerf: 1.6, speed: 85,
+    { id: "coping", name: "Coping saw", group: "hand", scene: "curve", cut: "pull", mats: ["pine", "plywood"], kerf: 1.6, speed: 120,
       designs: ["wave", "corner", "circle", "heart"], knob: true },
-    { id: "fret", name: "Fret saw", group: "hand", scene: "curve", cut: "pull", mats: ["plywood", "pine"], kerf: 1.0, speed: 95,
+    { id: "fret", name: "Fret saw", group: "hand", scene: "curve", cut: "pull", mats: ["plywood", "pine"], kerf: 1.0, speed: 130,
       designs: ["heart", "star", "circle", "wave"], knob: true },
-    { id: "hacksaw", name: "Hacksaw", group: "hand", scene: "end", cut: "push", mats: ["pipe", "bar"], strokes: 11, kerf: 1.2,
+    { id: "hacksaw", name: "Hacksaw", group: "hand", scene: "end", cut: "push", mats: ["pipe", "bar"], strokes: 6, kerf: 1.2,
       tip: -328, heel: -42, engage: -185, len: 420, metal: true },
-    { id: "bow", name: "Bow saw", group: "hand", scene: "end", cut: "both", mats: ["log"], strokes: 9, kerf: 2.2,
+    { id: "bow", name: "Bow saw", group: "hand", scene: "end", cut: "both", mats: ["log"], strokes: 6, kerf: 2.2,
       tip: -552, heel: -32, engage: -290, len: 580 },
-    { id: "keyhole", name: "Keyhole saw", group: "hand", scene: "curve", cut: "push", mats: ["drywall", "plywood"], kerf: 2.4, speed: 90,
+    { id: "keyhole", name: "Keyhole saw", group: "hand", scene: "curve", cut: "push", mats: ["drywall", "plywood"], kerf: 2.4, speed: 125,
       designs: ["outlet", "round", "outlet2"] },
     { id: "circular", name: "Circular saw", group: "power", scene: "end", power: true, mats: ["plywood", "pine"], kerf: 2.4, len: 340, depth: true },
     { id: "jigsaw", name: "Jigsaw", group: "power", scene: "curve", power: true, mats: ["pine", "plywood"], kerf: 1.8, speed: 150,
@@ -1958,8 +1958,12 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
       this.cutting = cutting;
       if (!cutting || this.depth >= wk.h) { this.lastStroke = 0; return; }
       var hpx = wk.h * this.sideS;
-      // cutting travel needed to get through: strokes x 280 px of tooth travel (was 125; it felt too fast)
-      var rate = hpx / ((saw.strokes || 7) * this.mat.mult * 280);
+      // Cutting travel needed to get through: about saw.strokes full strokes. A full stroke is the
+      // saw's travel across the board (capped at 280 px), so short phone strokes count fully too.
+      // Hard materials take only a little longer, so no board needs a long slog.
+      var strokeLen = Math.min(280, Math.max(80, (rg[1] - rg[0]) * 0.6));
+      var hard = 1 + (this.mat.mult - 1) * 0.5;
+      var rate = hpx / ((saw.strokes || 5) * hard * strokeLen);
       var add = Math.abs(real) * rate / this.sideS;
       if (saw.spine) add = Math.min(add, Math.max(0, saw.spine * Ss / this.sideS - this.depth));
       this.depth = Math.min(wk.h, this.depth + add);
