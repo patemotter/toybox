@@ -442,7 +442,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   var TR = 8;                  // rail radius
   var G = 1150;                // gravity (world units / s^2)
   var STEP = 1 / 240;          // fixed physics timestep
-  var SIM_SPEED = 0.4;         // slow motion, as in Peg Drop (calm pacing)
+  var SIM_SPEED = 0.62;        // a bit slower than real time: lively but calm (the physics step stays fixed)
   var CAP = 30;                // most marbles on the toy
   var TRAIL = 8;
   var OUT = "#1D2340";
@@ -826,7 +826,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   BUILD.mix2 = function () {
     var i;
     addSeg(345, 335, 560, 380, { col: "#5B7CFF", band: true });
-    bodies.push(makeWheel(644, 474, 82, 6, -1.5));
+    bodies.push(makeWheel(644, 474, 82, 6, 1, 0.3));
     polySeg(bezPts([775, 585], [640, 800], [470, 800]), { col: "#3EC8FF", band: false });
     loopPath(470, 689, 80, -1, 46);
     boosters.push({ x0: 458, x1: 570, y0: 734, y1: 781, dir: -1, v: 960, glow: 0 });
@@ -872,11 +872,12 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     ], { minV: 170, enter: { x0: 176, x1: 222, y: 672, dy: 30, dir: 1, any: true } });
     // Pinwheel hanging over the squiggle, low enough that the marbles push its blades round.
     addSpinner(330, 836, 30, JEWEL.purple);
-    // Paddle wheel inside a clear tube.
-    bodies.push(makeWheel(560, 930, 50, 6, -1.6));
-    decor.push({ k: "housing", x: 560, y: 930, r: 72 });
+    // Paddle wheel inside a clear case: the squiggle feeds its top left, a pocket carries the marble over
+    // the top, and it falls out on the right into the swirl bowl.
+    bodies.push(makeWheel(560, 958, 68, 5, 1, -0.6));
+    decor.push({ k: "housing", x: 560, y: 958, r: 94, gaps: [[-2.42, 0.5], [0.55, 0.6]] });
     // Blue swirl bowl with a yellow spinner, dropping into the tray.
-    var sb = makeFunnel(705, 985, 110, 55, -1, JEWEL.blue);
+    var sb = makeFunnel(728, 1000, 104, 50, -1, JEWEL.blue);
     sb.spinner = JEWEL.yellow;
     funnels.push(sb);
   };
@@ -894,7 +895,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       addSeg(x0, y0, x0 + 36, y0 + 9, { kind: "bar", bar: i, col: COLORS[i % NC][1], e: 0.15 });
     }
     // Big paddle wheel.
-    bodies.push(makeWheel(780, 520, 82, 6, -1.5));
+    bodies.push(makeWheel(780, 520, 82, 6, 1, 0.45));
     // Catch from the right side of the wheel back toward the trampoline.
     addSeg(872, 640, 800, 690, { col: "#FF9F1C", band: false });
     // Trampoline: bounces marbles up and to the left.
@@ -905,7 +906,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     bodies.push({ kind: "seesaw", cx: 500, cy: 715, a: 0.26, w: 0, half: 150, rest: 0.26, min: -0.3, max: 0.3,
       K: 12, k: 1 / 9000, cr: 9, R: 160, segs: [], flash: 0 });
     // Small wheel.
-    bodies.push(makeWheel(222, 778, 66, 6, -1.5));   // leaves a marble-wide gap to the seesaw
+    bodies.push(makeWheel(222, 778, 66, 5, -1, 2.4));   // turns the other way; leaves a marble-wide gap to the seesaw
     // Guide from the left wall: marbles the small wheel throws left roll back onto the bell row.
     addSeg(14, 770, 92, 840, { kind: "glass", col: "#BFE6FF" });
     // Bell row.
@@ -921,10 +922,15 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       R: Math.sqrt((hw + fl) * (hw + fl) + hh * hh) + 8,
       local: [[-hw - fl, -hh, -hw, hh], [-hw, hh, hw, hh], [hw, hh, hw + fl, -hh]], segs: [], flash: 0 });
   };
-  function makeWheel(cx, cy, L, n, w0) {
-    // w0 only says which way a tap spins it (the way arriving marbles push it); it starts still.
-    return { kind: "wheel", cx: cx, cy: cy, a: Math.random() * 3, w: 0, w0: w0, L: L, n: n, cr: 7, hub: 16,
-      k: 1 / 22000, R: L + 8, segs: [], flash: 0 };
+  // A paddle wheel. dir is the way arriving marbles turn it (1 = clockwise on screen); relA is the angle
+  // (0 = right, PI/2 = down) where a carried marble's pocket opens and the marble falls out.
+  // Marbles that reach the wheel from the feeding side drop into a pocket between two paddles and ride
+  // it round; their weight turns the wheel (see updateBodies / wheelStep).
+  function makeWheel(cx, cy, L, n, dir, relA) {
+    var cr = 7;
+    return { kind: "wheel", cx: cx, cy: cy, a: Math.random() * 3, w: 0, w0: dir, dir: dir, relA: relA, L: L, n: n, cr: cr, hub: 16,
+      k: 1 / 22000, R: L + 8, segs: [], flash: 0, I: 1.5 * L * L,
+      rp: (RM + cr + 1) / Math.sin(Math.PI / n), pocket: [] };
   }
 
   function newPath(kind) {
@@ -1204,17 +1210,24 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     f2.beginPath(); f2.moveTo(170, 160); f2.lineTo(220, 205); f2.stroke();
     decor.forEach(function (d) {
       if (d.k === "housing") {
-        // A clear tube piece around a spinner: glassy disc with a bright rim.
+        // A clear case around a paddle wheel: glassy disc with a bright rim, open where marbles go in and out.
         f2.fillStyle = "rgba(255,255,255,0.18)";
         f2.beginPath(); f2.arc(d.x, d.y, d.r, 0, Math.PI * 2); f2.fill();
-        f2.lineWidth = 5; f2.strokeStyle = "rgba(29,35,64,0.55)"; f2.stroke();
+        var gaps = (d.gaps || []).slice().sort(function (p, q) { return p[0] - q[0]; }), arcs = [];
+        if (!gaps.length) arcs.push([0, Math.PI * 2]);
+        gaps.forEach(function (gp, gi) {
+          var nx = gaps[(gi + 1) % gaps.length], a0 = gp[0] + gp[1] / 2, a1 = nx[0] - nx[1] / 2;
+          if (a1 <= a0) a1 += Math.PI * 2;
+          arcs.push([a0, a1]);
+        });
+        f2.lineCap = "round";
+        arcs.forEach(function (ar) {
+          f2.beginPath(); f2.arc(d.x, d.y, d.r, ar[0], ar[1]);
+          f2.lineWidth = 11; f2.strokeStyle = "rgba(29,35,64,0.55)"; f2.stroke();
+          f2.lineWidth = 5; f2.strokeStyle = "rgba(220,240,255,0.95)"; f2.stroke();
+        });
         f2.lineWidth = 6; f2.strokeStyle = "rgba(255,255,255,0.7)";
-        f2.beginPath(); f2.arc(d.x, d.y, d.r - 8, Math.PI * 1.1, Math.PI * 1.45); f2.stroke();
-        f2.fillStyle = "rgba(255,255,255,0.22)";
-        f2.fillRect(d.x - 32, d.y - d.r - 60, 64, 60 - d.r * 0.2 + 12);
-        f2.lineWidth = 4; f2.strokeStyle = "rgba(29,35,64,0.5)";
-        f2.beginPath(); f2.moveTo(d.x - 32, d.y - d.r - 60); f2.lineTo(d.x - 32, d.y - d.r + 12);
-        f2.moveTo(d.x + 32, d.y - d.r - 60); f2.lineTo(d.x + 32, d.y - d.r + 12); f2.stroke();
+        f2.beginPath(); f2.arc(d.x, d.y, d.r - 12, Math.PI * 1.05, Math.PI * 1.3); f2.stroke();
       } else if (d.k === "ring") {
         f2.beginPath(); f2.ellipse(d.x, d.y, d.r, d.r * 0.32, 0, 0, Math.PI);
         f2.lineWidth = 16; f2.strokeStyle = OUT; f2.stroke();
@@ -1267,10 +1280,23 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     for (i = 0; i < bodies.length; i++) {
       b = bodies[i];
       if (b.kind === "wheel") {
-        // No motor: the wheel only turns when marbles push its paddles (collideCapsule adds r x impulse),
-        // and it slows down by itself.
+        // No motor: the wheel only turns when marbles push its paddles (collideCapsule adds r x impulse)
+        // or ride in its pockets (their weight: torque r x g), and it slows down by itself.
+        var tq = 0, inr = b.I, nc = 0;
+        for (k = 0; k < balls.length; k++) {
+          var cb = balls[k];
+          if (cb.mode !== "wheel" || cb.wb !== b) continue;
+          tq += G * ((cb.x - b.cx) * gravY - (cb.y - b.cy) * gravX);
+          inr += cb.wr * cb.wr;
+          nc++;
+        }
+        b.w += tq / inr * h;
         b.w *= Math.exp(-h * 0.5);
-        b.w = clamp(b.w, -7, 7);
+        if (nc) {
+          // A loaded wheel never stalls with a marble in it (no stuck marbles), and never flings them.
+          if (b.w * b.dir < 1.3) b.w = 1.3 * b.dir;
+          b.w = clamp(b.w, -3, 3);
+        } else b.w = clamp(b.w, -7, 7);
         b.a += b.w * h;
         b.segs.length = 0;
         for (k = 0; k < b.n; k++) {
@@ -1354,7 +1380,8 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     var b = { id: nextId++, x: x, y: y, vx: vx || 0, vy: vy || 0, c: c == null ? nextColor() : c, ang: Math.random() * 6, spin: 0,
       mode: "free", path: null, s: 0, v: 0, pi: 0, f: null, th: 0, rho: 0, om: 0, t: 0, cup: -1, z: 1,
       stillT: 0, nudges: 0, age: 0, boostT: 0, lastBar: -1, hop: 0,
-      tx: new Float32Array(TRAIL), ty: new Float32Array(TRAIL), cnx: 0, cny: -1, touch: false };
+      tx: new Float32Array(TRAIL), ty: new Float32Array(TRAIL), cnx: 0, cny: -1, touch: false,
+      wb: null, wk: -1, wr: 0, wgo: 0, wout: false, wvr: 0, wox: 0, woy: 0, wcool: 0 };
     for (var k = 0; k < TRAIL; k++) { b.tx[k] = x; b.ty[k] = y; }
     balls.push(b);
     return b;
@@ -1528,6 +1555,9 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       if (s.tramp) {
         var tr = s.tramp, nx = b.cnx, ny = b.cny, vn = b.vx * nx + b.vy * ny;
         if (vn < tr.v) { b.vx += (tr.v - vn) * nx; b.vy += (tr.v - vn) * ny; }
+        // Always launch toward the seesaw and the small wheel, so a marble that rolls back off the
+        // seesaw can't bounce straight up and down here forever.
+        if (b.vx > -480) b.vx = -480;
         if (tr.flash < 0.5) { boing(); burst(b.x, b.y + RM, b.c, 6, 220, 0.4); }
         tr.flex = 1; tr.flash = 1;
       } else if (s.bar >= 0) {
@@ -1582,7 +1612,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     bgrid.fill(-1, 0, bgw * bgh);
     for (i = 0; i < n; i++) {
       a = balls[i];
-      if (a.mode !== "free") { a.gc = -1; continue; }
+      if (a.mode !== "free" && a.mode !== "wheel") { a.gc = -1; continue; }
       cx = clamp(Math.floor(a.x / bcs) + 1, 0, bgw - 1);
       cy = clamp(Math.floor(a.y / bcs) + 1, 0, bgh - 1);
       a.gc = cy * bgw + cx;
@@ -1608,20 +1638,23 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
   }
   var lastClackSpark = 0;
   function pair(a, b) {
+    // A marble riding a wheel pocket is held by the wheel: it pushes free marbles but does not move.
+    var fa = a.mode === "wheel", fb = b.mode === "wheel";
+    if (fa && fb) return;
     var dx = b.x - a.x, dy = b.y - a.y, rr = 2 * RM;
     var d2 = dx * dx + dy * dy;
     if (d2 >= rr * rr) return;
     var d = Math.sqrt(d2) || 1e-4, nx = dx / d, ny = dy / d;
     if (d2 === 0) { nx = 1; ny = 0; }
-    var corr = (rr - d) * 0.5 * 0.85;
-    a.x -= nx * corr; a.y -= ny * corr;
-    b.x += nx * corr; b.y += ny * corr;
+    var corr = (rr - d) * 0.5 * 0.85, wa = fa ? 0 : (fb ? 2 : 1), wb = fb ? 0 : (fa ? 2 : 1);
+    a.x -= nx * corr * wa; a.y -= ny * corr * wa;
+    b.x += nx * corr * wb; b.y += ny * corr * wb;
     var rvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
     if (rvn < 0) {
       var e = rvn < -110 ? 0.35 : 0;
       var jn = -(1 + e) * rvn / 2;
-      a.vx -= jn * nx; a.vy -= jn * ny;
-      b.vx += jn * nx; b.vy += jn * ny;
+      a.vx -= jn * nx * wa; a.vy -= jn * ny * wa;
+      b.vx += jn * nx * wb; b.vy += jn * ny * wb;
       if (rvn < -140) {
         clack(Math.min(1, -rvn / 900));
         var now = performance.now();
@@ -1695,7 +1728,6 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       if (!e.any && b.vx * e.dir <= 0) continue;
       b.mode = "path"; b.path = p; b.s = 2; b.pi = 0;
       b.v = Math.max(Math.sqrt(b.vx * b.vx + b.vy * b.vy), p.kind === "helix" || p.kind === "track" ? 160 : 0);
-      if (b.v * e.dir < 0) b.v = 0;
       return;
     }
   }
@@ -1744,6 +1776,68 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     }
   }
 
+  // Paddle wheels: a marble reaching a wheel on its feeding side settles into the nearest empty pocket
+  // between two paddles, rides round with the wheel (its weight turns it), and when its pocket reaches
+  // relA it rolls out of the pocket and falls free with the pocket's speed.
+  var TAU = Math.PI * 2;
+  function angTo(a) { a %= TAU; return a < 0 ? a + TAU : a; }
+  function tryWheel(b) {
+    if (b.wcool > 0) return false;
+    for (var i = 0; i < bodies.length; i++) {
+      var bd = bodies[i];
+      if (bd.kind !== "wheel") continue;
+      var dx = b.x - bd.cx, dy = b.y - bd.cy, d2 = dx * dx + dy * dy, reach = bd.L + bd.cr + RM + 2;   // as soon as it touches the paddle tips
+      if (d2 > reach * reach) continue;
+      var d = Math.sqrt(d2) || 1;
+      if ((b.vx * dx + b.vy * dy) / d > 260) continue;          // flying away from the wheel
+      var th = Math.atan2(dy, dx);
+      var go = angTo(bd.dir * (bd.relA - th));
+      if (go < 0.45 || go > 3.9) continue;                      // not on the feeding side
+      var sp = TAU / bd.n, best = -1, bestD = 9;
+      for (var k = 0; k < bd.n; k++) {
+        if (bd.pocket[k]) continue;
+        var pa = bd.a + (k + 0.5) * sp, pd = Math.abs(Math.atan2(Math.sin(pa - th), Math.cos(pa - th)));
+        var pgo = angTo(bd.dir * (bd.relA - pa));
+        if (pd > sp * 1.1 || pgo < 0.2 || pgo > 4.3) continue;
+        if (pd < bestD) { bestD = pd; best = k; }
+      }
+      if (best < 0) continue;
+      var pa2 = bd.a + (best + 0.5) * sp;
+      bd.pocket[best] = b;
+      b.mode = "wheel"; b.wb = bd; b.wk = best; b.wr = bd.rp; b.wout = false; b.wvr = 0;
+      b.wgo = angTo(bd.dir * (bd.relA - pa2));
+      b.wox = b.x - (bd.cx + Math.cos(pa2) * bd.rp); b.woy = b.y - (bd.cy + Math.sin(pa2) * bd.rp);
+      // The marble's momentum about the hub goes into the wheel (it pushes the paddle it lands on).
+      var lm = dx * b.vy - dy * b.vx;
+      bd.w = (bd.w * bd.I + lm) / (bd.I + bd.rp * bd.rp);
+      bd.flash = 1;
+      tick();
+      return true;
+    }
+    return false;
+  }
+  function wheelStep(b, h) {
+    var bd = b.wb, pa = bd.a + (b.wk + 0.5) * TAU / bd.n, c = Math.cos(pa), s = Math.sin(pa);
+    b.wgo -= bd.w * bd.dir * h;
+    if (!b.wout && b.wgo <= 0) { b.wout = true; b.wvr = 150; }
+    if (b.wout) { b.wvr += 1800 * h; b.wr += b.wvr * h; }
+    var e = Math.exp(-h * 16);
+    b.wox *= e; b.woy *= e;
+    var nx = bd.cx + c * b.wr + b.wox, ny = bd.cy + s * b.wr + b.woy;
+    b.vx = (nx - b.x) / h; b.vy = (ny - b.y) / h;
+    b.x = nx; b.y = ny;
+    b.spin = bd.w;
+    if (b.wr > bd.L + bd.cr + RM + 3) {
+      // Out of the pocket: free, moving with the pocket plus the roll outward.
+      bd.pocket[b.wk] = null;
+      b.mode = "free"; b.wb = null;
+      b.vx = -s * bd.w * b.wr + c * b.wvr;
+      b.vy = c * bd.w * b.wr + s * b.wvr;
+      b.wcool = 0.6; b.cool = 0.1;
+      b.stillT = 0;
+    }
+  }
+
   function step(h) {
     var i, b, vmax = 1500, sp2;
     var gx = G * gravX, gy = G * gravY;
@@ -1764,9 +1858,11 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
         b.x += b.vx * h;
         b.y += b.vy * h;
         if (b.cool > 0) b.cool -= h;
+        if (b.wcool > 0) b.wcool -= h;
       } else if (b.mode === "path") pathStep(b, h);
       else if (b.mode === "orbit") orbitStep(b, h);
       else if (b.mode === "spout") spoutStep(b, h);
+      else if (b.mode === "wheel") wheelStep(b, h);
       else if (b.mode === "lift") {
         if (spiralLift()) liftSpiralPos(b, h);
         else {
@@ -1781,6 +1877,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
       if (b.mode !== "free") continue;
+      if (tryWheel(b)) continue;
       collideStatic(b);
       if (b.touch) b.spin = (b.vx * -b.cny + b.vy * b.cnx) / RM;
       else b.spin *= 0.999;
@@ -2607,6 +2704,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
     if (b.mode === "free") { b.vy = Math.min(b.vy, 0) - 420; b.vx += rand(-60, 60); b.stillT = 0; }
     else if (b.mode === "path") b.v += (b.v >= 0 ? 1 : -1) * 220;
     else if (b.mode === "orbit") b.f.boost = Math.min(2, b.f.boost + 0.6);
+    else if (b.mode === "wheel") { b.wb.w += b.wb.dir * 2; b.wb.flash = 1; }
     tick();
   }
   function release(e) { stopDropHold(e.pointerId); }
@@ -2920,7 +3018,7 @@ body.ending .panel { pointer-events: none; opacity: 0.4; }
       wheels: function () { return bodies.filter(function (b) { return b.kind === "wheel"; }).map(function (b) { return { x: b.cx, y: b.cy, w: +b.w.toFixed(2) }; }); },
       spinners: function () { return spinners.map(function (s) { return { x: s.x, y: s.y, w: +s.w.toFixed(2) }; }); },
       funnels: function () { return funnels.map(function (f) { return { x: f.cx, y: f.cy, w: +f.w.toFixed(2) }; }); },
-      balls: function () { return balls.map(function (b) { return { m: b.mode, x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy) }; }); },
+      balls: function () { return balls.map(function (b) { return { id: b.id, m: b.mode, x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy) }; }); },
       lift: function (id) { switchLift(id); renderControls(); },
       setRun: function (id) { switchRun(id); renderControls(); },
       toScreen: function (x, y) { var r = canvas.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; }
