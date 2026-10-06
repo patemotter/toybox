@@ -34,7 +34,8 @@
  *        big: { button: el } or { into: el },     // wire an existing .bigtoggle, or create one in `into`
  *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1", big: "fishtank-big-v1" },
  *        // Hooks (all optional):
- *        onEnding: function (done) {},  // time is up: wind the app's motion down, call done() once settled
+ *        onEnding: function (done, info) {},  // time is up: wind the app's motion down, call done() once
+ *                                       // settled; info.goodbye is true when the Goodbye button will show
  *        endingMaxMs: 15000,            // optional: longest wait for done() (a long goodbye animation)
  *        onGoodbye: function () {},     // the goodbye button was pressed: a little farewell animation
  *        onRest: function () {},        // the rest screen is up (pause the loop if you like)
@@ -160,6 +161,21 @@
   function isBig() { return document.body.classList.contains("big"); }
 
   // ---------- Press-and-hold buttons (a quick tap does nothing) ----------
+  // A finished hold often closes the sheet or rest screen while the finger is still down; the
+  // release would then click whatever is underneath. Swallow that one click.
+  var swallowArmed = false, swallowUntil = 0, swallowWired = false;
+  function swallowNextClick() {
+    swallowArmed = true;
+    setTimeout(function () { swallowArmed = false; }, 10000);
+    if (swallowWired) return;
+    swallowWired = true;
+    document.addEventListener("pointerup", function () {
+      if (swallowArmed) { swallowArmed = false; swallowUntil = now() + 400; }
+    }, true);
+    document.addEventListener("click", function (e) {
+      if (now() < swallowUntil) { swallowUntil = 0; e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  }
   // btn needs <span class="fill"></span><span class="label">..</span> inside and class "hold".
   function makeHold(btn, ms, onDone, onPress) {
     var fill = btn.querySelector(".fill"), id = null;
@@ -172,7 +188,7 @@
       if (onPress) onPress();
       if (id) return;
       if (fill) { fill.style.transition = "width " + ms + "ms linear"; fill.style.width = "100%"; }
-      id = setTimeout(function () { id = null; reset(); onDone(); }, ms);
+      id = setTimeout(function () { id = null; reset(); swallowNextClick(); onDone(); }, ms);
     }
     function cancel() { if (id) { clearTimeout(id); id = null; } reset(); }
     btn.addEventListener("pointerdown", start);
@@ -414,7 +430,7 @@
     $("tb-farewell").hidden = false;
     redraw(true);
     updateTimerUI();
-    if (typeof opts.onEnding === "function") hook("onEnding", function () { settled = true; });
+    if (typeof opts.onEnding === "function") hook("onEnding", function () { settled = true; }, { goodbye: !!timer.goodbye });
     else settled = true;
   }
   function goodbye() {
@@ -537,7 +553,7 @@
     }
     if (legacy.sound && get(SKEY) === null) {
       var s = get(legacy.sound), on = false;
-      if (s === "1" || s === "true") on = true;
+      if (s === "1" || s === "true" || s === "on") on = true;
       else { try { var o = JSON.parse(s || "null"); on = !!(o && o[legacy.soundField || "sound"] === true); } catch (e) { /* ignore */ } }
       if (on) put(SKEY, "1");
     }
@@ -567,6 +583,14 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && sheetOpen()) { e.preventDefault(); closeSheet(); }
+    });
+    // Restored by the Back button: the timer may have moved on while the page was frozen.
+    window.addEventListener("pageshow", function (e) {
+      if (!e.persisted) return;
+      timer = parseTimer(get(TKEY));
+      var on = get(SKEY) === "1";
+      if (on !== soundOn) setSound(on, true);
+      sync();
     });
     // Another open Toybox page changed the shared timer or sound.
     window.addEventListener("storage", function (e) {
