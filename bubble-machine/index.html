@@ -344,7 +344,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var W = 0, H = 0, DPR = 1, rect = { left: 0, top: 0 };
   var G = 40, groundY = 0;           // grass height and the line where the grass starts
   var M = { x: 0, y: 0, s: 1 };       // machine: bottom-left corner and scale (base drawing is 200 x 235)
-  var J = { x: 0, y: 0, s: 1 };       // the soap jar the wand stands in
+  var J = { x: 0, y: 0, s: 1, stand: 0 };       // the soap jar the wand stands in
   var BS = 1;                         // bubble size scale
   var MAXB = 70, lowQ = 0;
   var bg = null;
@@ -359,15 +359,30 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     view.height = Math.round(H * DPR);
     var r = view.getBoundingClientRect();
     rect = { left: r.left, top: r.top };
-    G = clamp(H * 0.085, 24, 64);
-    groundY = H - G;
-    M.s = Math.min(W * 0.58 / 200, (H - G) * 0.68 / 235, 1.75);
-    M.x = Math.max(8, W * 0.035);
-    // Standing on the grass, clear of the coach line (bottom-center on phones).
-    M.y = groundY + G * 0.2;
-    J.s = clamp(Math.min(W, H) / 390, 0.85, 1.5);
-    J.x = W - Math.max(46 * J.s, W * 0.11);
-    J.y = groundY + G * 0.25;
+    if (H > W && W < 600) {
+      // Upright phone: a smaller machine at the left (its switch and dial stay big), the soap jar on its own
+      // little stool at the right, both standing above the coach line, and open sky above.
+      G = clamp(H * 0.1, 40, 64);
+      groundY = H - G;
+      M.s = Math.min(W * 0.47 / 200, (H - G) * 0.5 / 235);
+      M.x = Math.max(6, W * 0.02);
+      M.y = groundY + 3;
+      J.s = clamp(W / 390, 0.82, 1.1);
+      J.stand = clamp(H * 0.1, 34, 66);
+      J.x = W - 42 * J.s - 8;
+      J.y = groundY + 3 - J.stand;
+    } else {
+      G = clamp(H * 0.085, 24, 64);
+      groundY = H - G;
+      M.s = Math.min(W * 0.58 / 200, (H - G) * 0.68 / 235, 1.75);
+      M.x = Math.max(8, W * 0.035);
+      // Standing on the grass, clear of the coach line (bottom-center on phones).
+      M.y = groundY + G * 0.2;
+      J.s = clamp(Math.min(W, H) / 390, 0.85, 1.5);
+      J.stand = 0;
+      J.x = W - Math.max(46 * J.s, W * 0.11);
+      J.y = groundY + G * 0.25;
+    }
     BS = clamp(Math.min(W, H) / 470, 0.85, 1.7);
     MAXB = Math.round((W * H > 450000 ? 90 : 64) * (lowQ === 2 ? 0.6 : (lowQ === 1 ? 0.8 : 1)));
     layoutWand();
@@ -812,7 +827,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Wand ----------
   var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, stick: 96, tilt: 0, held: null, ox: 0, oy: 0,
     v: 0, dx: 0, dy: -1, pend: 0, lastMove: 0, back: null, used: false, filmAt: 0,
-    home: true, soap: 1, emptyAt: 0, moved: 0 };
+    home: true, soap: 1, emptyAt: 0, moved: 0, touchedAt: 0 };
   // The wand starts in the jar (its spot in the sky is not saved). Dropped anywhere else, it stays there.
   function layoutWand() {
     wand.ring = 30 * J.s;
@@ -827,21 +842,36 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function placeInSky() {
     wand.x = clamp(wand.x, wand.ring + 4, W - wand.ring - 4);
     wand.y = clamp(wand.y, wand.ring + 4, Math.max(wand.ring + 4, groundY + G * 0.2 - wand.ring - wand.stick));
+    clearOfControls();
+  }
+  // Never leave the wand over the machine's switch and dial: nudge it above the control panel or past its
+  // right side, whichever is the shorter move.
+  function clearOfControls() {
+    var L = mx(14), R = mx(188), T = my(-96), B = my(-10), r = wand.ring + 6;
+    var top = wand.y - r, bot = wand.y + wand.ring + wand.stick;
+    if (!(wand.x + r > L && wand.x - r < R && bot > T && top < B)) return;
+    var upY = T - 8 - wand.ring - wand.stick, rightX = R + r + 4;
+    var canUp = upY >= wand.ring + 4, canRight = rightX <= W - wand.ring - 4;
+    if (canUp && (!canRight || wand.y - upY <= rightX - wand.x)) wand.y = upY;
+    else if (canRight) wand.x = rightX;
+    else { wand.home = false; sendHome(false); }
   }
   function jarBox() { var w = 64 * J.s, h = 54 * J.s; return { x: J.x - w / 2, y: J.y - h, w: w, h: h }; }
   function hitJar(px, py) {
     var b = jarBox(), pad = Math.max(12, (52 - b.w) / 2);
-    return px > b.x - pad && px < b.x + b.w + pad && py > b.y - pad && py < b.y + b.h + pad;
+    return px > b.x - pad && px < b.x + b.w + pad && py > b.y - pad && py < b.y + b.h + J.stand + pad;
   }
   // The ring dipped into the jar's mouth.
   function ringInJar() {
     var b = jarBox();
     return Math.abs(wand.x - J.x) < b.w * 0.55 && wand.y > b.y - wand.ring * 1.2 && wand.y < J.y;
   }
-  function sendHome() {
+  // slow: the calm glide home after the wand has been left alone for a while.
+  function sendHome(slow) {
     if (wand.held !== null || (wand.home && !wand.back)) return;
     wand.home = true;
-    wand.back = { t0: performance.now(), x0: wand.x, y0: wand.y, tilt0: wand.tilt };
+    wand.drop = null;
+    wand.back = { t0: performance.now(), x0: wand.x, y0: wand.y, tilt0: wand.tilt, dur: slow ? 2100 : 900, slow: !!slow };
   }
   function refill(splash) {
     var was = wand.soap;
@@ -915,11 +945,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (wand.pend > wand.ring * 0.6 && wand.soap > 0) releaseWandBubble(wand.pend, 0);
     wand.pend = 0;
     wand.held = null;
+    wand.touchedAt = performance.now();
     // Let go over the jar (or a tap without moving it out): it goes back in. Anywhere else: it stays there.
     if (ringInJar() || (wand.home && wand.moved < 12)) { wand.home = false; sendHome(); return; }
     wand.home = false;
     wand.drop = { t0: performance.now(), x0: wand.x, y0: wand.y, tilt0: wand.tilt };
     placeInSky();
+    if (!wand.drop) return;   // no room beside the controls: it went home instead
     wand.drop.x1 = wand.x; wand.drop.y1 = wand.y;
     wand.x = wand.drop.x0; wand.y = wand.drop.y0;
   }
@@ -933,9 +965,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var target = clamp(wand.dx * Math.min(1, wand.v / 900) * 0.45, -0.5, 0.5);
       wand.tilt += (target - wand.tilt) * Math.min(1, dt * 8);
     } else if (wand.back) {
-      var t = Math.min(1, (now - wand.back.t0) / 900), e = 1 - Math.pow(1 - t, 3);
+      var t = Math.min(1, (now - wand.back.t0) / wand.back.dur);
+      var e = wand.back.slow ? (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2) : 1 - Math.pow(1 - t, 3);
       wand.x = lerp(wand.back.x0, wand.rx, e);
-      wand.y = lerp(wand.back.y0, wand.ry, e) - Math.sin(t * Math.PI) * 20 * J.s;
+      wand.y = lerp(wand.back.y0, wand.ry, e) - Math.sin(t * Math.PI) * (wand.back.slow ? 40 : 20) * J.s;
       wand.tilt = lerp(wand.back.tilt0, 0, e);
       if (t >= 1) { wand.back = null; refill(true); }
     } else if (wand.home) {
@@ -951,6 +984,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         wand.tilt = lerp(dr.tilt0, 0, k);
         if (u >= 1) wand.drop = null;
       } else wand.tilt = Math.sin(now / 1100) * 0.05;
+      // Left alone for a while: it glides calmly back into the jar by itself.
+      if (now - wand.touchedAt > 8000 && !Toybox.timer.locked()) sendHome(true);
     }
     if (wand.soap <= 0 && wand.emptyAt && now - wand.emptyAt > 1000) refill(false);
     else if (wand.soap > 0 && wand.soap < 1 && (wand.held === null || now - wand.lastMove > 600)) wand.soap = Math.min(1, wand.soap + dt * 0.5);
@@ -990,6 +1025,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var x = ctx, s = J.s, soap = SOAP_BY[S.soap];
     var w = 64 * s, h = 54 * s, X = J.x - w / 2, Y = J.y - h;
     if (!front) {
+      if (J.stand > 0) {
+        // A little wooden stool for the jar (upright phones).
+        var sw2 = 92 * s, gy = J.y + J.stand, lx = J.x - sw2 * 0.36, rx2 = J.x + sw2 * 0.36;
+        x.fillStyle = "rgba(29,35,64,0.18)";
+        x.beginPath(); x.ellipse(J.x, gy, sw2 * 0.55, 6 * s, 0, 0, TAU); x.fill();
+        x.lineJoin = "round";
+        rr(x, J.x - sw2 * 0.4, J.y + J.stand * 0.55, sw2 * 0.8, 7 * s, 3 * s); fillStroke(x, "#C98A4B", 3);
+        rr(x, lx - 6 * s, J.y + 6 * s, 12 * s, J.stand - 6 * s, 4 * s); fillStroke(x, "#D99A5B", 3);
+        rr(x, rx2 - 6 * s, J.y + 6 * s, 12 * s, J.stand - 6 * s, 4 * s); fillStroke(x, "#D99A5B", 3);
+        rr(x, J.x - sw2 / 2, J.y - 2 * s, sw2, 12 * s, 5 * s); fillStroke(x, "#E8A866", 3.5);
+      }
       x.fillStyle = "rgba(29,35,64,0.18)";
       x.beginPath(); x.ellipse(J.x, J.y, w * 0.62, 6 * s, 0, 0, TAU); x.fill();
       // back rim
@@ -1392,7 +1438,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (wand.back) { wand.home = false; wand.back = null; }
       wand.drop = null;
       wand.ox = wand.x - p.x; wand.oy = wand.y - p.y;
-      wand.lastMove = now; wand.v = 0; wand.pend = 0; wand.moved = 0;
+      wand.lastMove = now; wand.v = 0; wand.pend = 0; wand.moved = 0; wand.touchedAt = now;
       return;
     }
     if (b) { tapPop(b); return; }
@@ -1613,7 +1659,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     drawMachine(now);
     drawJar(false);
-    var inJar = wand.held === null && (wand.home || (wand.back && now - wand.back.t0 > 600));
+    var inJar = wand.held === null && (wand.home && (!wand.back || (now - wand.back.t0) / wand.back.dur > 0.7));
     if (inJar) { drawWand(now); drawJar(true); }
     else drawJar(true);
     drawDucks();
@@ -1795,7 +1841,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       bubbles: function () { return bubbles.filter(function (b) { return !b.dead; }).map(function (b) { return { x: b.x, y: b.y, r: b.r, kind: b.kind }; }); },
       points: function () {
         return { sw: [rect.left + mx(SW.x + SW.w / 2), rect.top + my(SW.y + 20)], dial: [rect.left + mx(DIAL.x), rect.top + my(DIAL.y)],
-          wand: [rect.left + wand.x, rect.top + wand.y], wandHome: wand.home && !wand.back, wandSoap: wand.soap,
+          wand: [rect.left + wand.x, rect.top + wand.y], wandHome: wand.home && !wand.back && wand.held === null, wandHeld: wand.held !== null, wandGlide: !!wand.back, wandSoap: wand.soap,
           jar: [rect.left + J.x, rect.top + J.y - 20 * J.s], machine: [rect.left + mx(WC.x), rect.top + my(WC.y)] };
       },
       perf: function () {
@@ -1806,6 +1852,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         return r;
       },
       ghost: function () { return ghost.show(); },
+      // true when the wand (ring and handle) is clear of the switch and dial panel, or in the jar
+      wandClear: function () {
+        if (wand.home) return true;
+        var L = mx(14), R = mx(188), T = my(-96), B = my(-10), r = wand.ring + 6;
+        return !(wand.x + r > L && wand.x - r < R && wand.y + wand.ring + wand.stick > T && wand.y - r < B);
+      },
       surprise: surprise
     };
   }
