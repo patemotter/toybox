@@ -78,6 +78,9 @@ header .grownbtn { margin-left: auto; min-height: 48px; font-size: 1.05rem; padd
 @media (max-width: 600px) { header .grownbtn { font-size: 0.95rem; min-height: 44px; padding: 0.2rem 0.7rem; } h1 { font-size: 2.1rem; } }
 #tb-appSettings h4.tb-app { margin: 14px 0 4px; font-size: 1.05rem; }
 #tb-appSettings .tb-set + .tb-set { margin-top: 8px; }
+#offline .status { margin: 0 auto; max-width: 30em; text-align: center; font-weight: 700; }
+#offline .status.ok { color: #2E9E5B; }
+#offline .status.warn { color: #B35C00; }
 header img { width: 72px; height: 72px; border-radius: 18px; border: 3px solid var(--edge); flex: none; }
 h1 {
   margin: 0;
@@ -177,6 +180,16 @@ h1 {
   <ul class="apps" id="apps"></ul>
 </div>
 
+<!-- Grown-ups sheet: is every app saved on this device for use with no network (e.g. on a plane)? -->
+<section id="offline" hidden>
+  <h3>Offline (for the plane)</h3>
+  <p class="status" id="offStatus" role="status" aria-live="polite">Not checked yet.</p>
+  <div class="sheet-actions">
+    <button class="btn" id="offCheck">Check again</button>
+    <button class="btn primary" id="offFill" hidden>Save everything now</button>
+  </div>
+</section>
+
 <script>
 (function () {
   "use strict";
@@ -220,12 +233,6 @@ h1 {
       what: "Build a rocket from parts, then count down and launch it into space.",
       href: "rocket-builder/",
       icon: "rocket-builder/icons/icon-512.png"
-    },
-    {
-      name: "Color Mixing",
-      what: "Pour paints into a big bowl, stir with your finger, and see what new color you made.",
-      href: "color-mixing/",
-      icon: "color-mixing/icons/icon-512.png"
     },
     {
       name: "Gear Box",
@@ -330,10 +337,93 @@ h1 {
   window.addEventListener("resize", function () { requestAnimationFrame(fitGrid); });
   if (document.fonts && document.fonts.ready) { document.fonts.ready.then(fitGrid); }
 
+  // ---------- Offline check (Grown-ups sheet) ----------
+  // Asks the home screen's service worker (sw.js) which of its files are saved on this device. When
+  // online it first looks for a newer Toybox and waits for it to download, so the answer covers the
+  // newest apps. "Save everything now" asks the worker to fetch whatever is missing.
+  var NAMES = {};
+  APPS.forEach(function (a) { NAMES[a.href.replace(/\/$/, "")] = a.name; });
+  var offBusy = false, offUpdated = false;
+  function offSay(text, cls) {
+    var el = document.getElementById("offStatus");
+    el.textContent = text;
+    el.className = "status" + (cls ? " " + cls : "");
+  }
+  function askWorker(sw, type) {
+    return new Promise(function (resolve, reject) {
+      var ch = new MessageChannel(), t = setTimeout(function () { reject(new Error("timeout")); }, 120000);
+      ch.port1.onmessage = function (e) { clearTimeout(t); resolve(e.data); };
+      sw.postMessage({ type: type }, [ch.port2]);
+    });
+  }
+  function waitInstalled(reg) {
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function poll() {
+        if (!reg.installing && !reg.waiting) { resolve(); return; }
+        if (Date.now() - t0 > 120000) { resolve(); return; }
+        setTimeout(poll, 400);
+      })();
+    });
+  }
+  function missingApps(missing) {
+    var seen = {}, out = [];
+    missing.forEach(function (u) {
+      var m = /^\.\/([^\/]+)\//.exec(u), key = m ? m[1] : "";
+      var name = key ? (NAMES[key] || null) : "The home screen";
+      if (key === "common") name = "The home screen";
+      if (name && !seen[name]) { seen[name] = 1; out.push(name); }
+    });
+    return out;
+  }
+  function offCheck(fill) {
+    if (offBusy) return;
+    var fillBtn = document.getElementById("offFill");
+    if (!("serviceWorker" in navigator) || !window.caches || !/^https?:$/.test(location.protocol)) {
+      offSay("This browser can't save the Toybox for offline use.", "warn"); fillBtn.hidden = true; return;
+    }
+    offBusy = true;
+    offSay(fill ? "Saving everything…" : "Checking…");
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg) throw new Error("none");
+      var online = navigator.onLine !== false;
+      var upd = online && !fill ? reg.update().catch(function () {}) : Promise.resolve();
+      return upd.then(function () {
+        if (reg.installing || reg.waiting) { offUpdated = true; offSay("Downloading the newest Toybox…"); }
+        return waitInstalled(reg);
+      }).then(function () {
+        var sw = reg.active || navigator.serviceWorker.controller;
+        if (!sw) throw new Error("none");
+        return askWorker(sw, fill ? "toybox-offline-fill" : "toybox-offline-check");
+      }).then(function (r) {
+        offBusy = false;
+        var miss = r && r.missing ? r.missing : [];
+        if (!miss.length) {
+          offSay("Ready for the plane ✓ All " + APPS.length + " apps are saved on this device." +
+            (offUpdated ? " New apps were downloaded: close the Toybox and open it again to see them." : ""), "ok");
+          fillBtn.hidden = true;
+        } else {
+          var names = missingApps(miss);
+          offSay("Not ready yet: " + (names.length ? names.join(", ") : miss.length + " files") + (names.length === 1 ? " is" : " are") +
+            " not saved. " + (online ? "Tap \"Save everything now\"." : "Connect to the internet, then tap \"Save everything now\"."), "warn");
+          fillBtn.hidden = !online;
+        }
+      });
+    }).catch(function () {
+      offBusy = false;
+      offSay("Not saved for offline yet. Open the Toybox once while online, close it, and open it again.", "warn");
+      fillBtn.hidden = true;
+    });
+  }
+  document.getElementById("offCheck").addEventListener("click", function () { offCheck(false); });
+  document.getElementById("offFill").addEventListener("click", function () { offCheck(true); });
+
   // The Grown-ups sheet: play timer, sound, and the App settings for every app.
   Toybox.init({
     app: "launcher",
     home: true,
+    sections: [document.getElementById("offline")],
+    onOpen: function () { offCheck(false); },
     grownButton: document.getElementById("grownbtn"),
     grownLabel: ["Grown-ups", "⏱ Grown-ups"],
     timerIntro: "When time is up, the app he is playing winds down and rests, and the controls lock.",

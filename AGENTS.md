@@ -42,9 +42,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `excavator`, `concrete`, `wrecking-ball`).
-- Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, color-mixing, gear-box,
+- Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works, construction-site, train-builder.
-  `fish-tank/` is kept in the repo but has no tile on the home screen (the dad shelved it); don't delete it.
+  `fish-tank/` and `color-mixing/` are kept in the repo but have no tile on the home screen (the dad shelved
+  them); don't delete them.
 - `tools/`: `smoke.js` (load + drag + error/scroll check), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 
@@ -54,7 +55,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Its `CORE` lists every page in the folder, the manifest, the icons and `../common/toybox.css` +
   `../common/toybox.js`.
 - The top-level `sw.js` (`CACHE = "toybox-vN"`) caches the launcher and **every page of every app** so one visit
-  to the launcher makes everything work offline. A new page must be added to both lists.
+  to the launcher makes everything work offline. A new page must be added to both lists. The Grown-ups sheet's
+  "Offline (for the plane)" section asks this worker which files are saved (`toybox-offline-check` /
+  `toybox-offline-fill` messages) and names any app that isn't ready.
 - **Bump the cache on every change**: the app's `sw.js` once per change set, and the top-level `toybox-vN` for
   every commit that changes anything it caches. On the device: open online, close, open again to update.
 

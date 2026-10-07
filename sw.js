@@ -5,7 +5,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v90";
+const CACHE = "toybox-v91";
 const CORE = [
   "./",
   "./index.html",
@@ -54,15 +54,6 @@ const CORE = [
   "./rocket-builder/icons/icon-192.png",
   "./rocket-builder/icons/icon-512.png",
   "./rocket-builder/icons/icon-maskable-512.png",
-
-  // Color Mixing
-  "./color-mixing/",
-  "./color-mixing/index.html",
-  "./color-mixing/manifest.webmanifest",
-  "./color-mixing/icons/icon-180.png",
-  "./color-mixing/icons/icon-192.png",
-  "./color-mixing/icons/icon-512.png",
-  "./color-mixing/icons/icon-maskable-512.png",
 
   // Workshop
   "./workshop/",
@@ -195,4 +186,23 @@ self.addEventListener("fetch", (event) => {
       return cached || network;
     })
   );
+});
+
+// The Grown-ups sheet asks which of CORE is saved on this device ("toybox-offline-check"), or asks to
+// fetch whatever is missing first ("toybox-offline-fill"). The answer goes back on the message port.
+self.addEventListener("message", (event) => {
+  const type = event.data && event.data.type;
+  const port = event.ports && event.ports[0];
+  if (!port || (type !== "toybox-offline-check" && type !== "toybox-offline-fill")) return;
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    if (type === "toybox-offline-fill") {
+      await Promise.all(CORE.map(async (u) => {
+        if (!(await cache.match(u))) { try { await cache.add(u); } catch (e) { /* still offline: stays missing */ } }
+      }));
+    }
+    const missing = [];
+    for (const u of CORE) if (!(await cache.match(u))) missing.push(u);
+    port.postMessage({ cache: CACHE, total: CORE.length, missing: missing });
+  })());
 });

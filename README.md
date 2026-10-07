@@ -8,7 +8,6 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Kaleidoscope: finger painting mirrored into a big spinning pattern | [`kaleidoscope/`](kaleidoscope/) |
 | Peg Drop: drop balls through glowing pegs and count them in the bins | [`peg-drop/`](peg-drop/) |
 | Rocket Builder: build a rocket and fly it to the Moon, to Mars or past every planet | [`rocket-builder/`](rocket-builder/) |
-| Color Mixing: pour paints, stir with a finger, and name the new color | [`color-mixing/`](color-mixing/) |
 | Workshop: safety gear, a Tool Wall of 81 tools, and eight stations: Drill Press, Saw Bench, Hammer & Screws, Lathe, Router Table, Wrenches & Sockets, Measuring and Shadow Board | [`workshop/`](workshop/) |
 | Gear Box: build gear trains on a pegboard and turn them with a crank or a motor | [`gear-box/`](gear-box/) |
 | Marble Run: marble runs with wheels, funnels and a conveyor or spiral lift that loops them | [`marble-run/`](marble-run/) |
@@ -19,7 +18,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Construction Site: gear up, then excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
 | Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 
-On the shelf (folder kept, no tile on the home screen): [`fish-tank/`](fish-tank/).
+On the shelf (folder kept, no tile on the home screen): [`fish-tank/`](fish-tank/), [`color-mixing/`](color-mixing/).
 
 The top-level `index.html` is a launcher with a big button for each app.
 
