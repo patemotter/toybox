@@ -68,6 +68,8 @@
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
  *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
+ *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card ("You did it!");
+ *                              type "love" picks a loving line. Automatic ones also show every few minutes.
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
  *      Toybox.turning()        true while the "turn the device" card covers the app.
@@ -127,6 +129,10 @@
   var SETTINGS = [
     { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
       note: "Apps that use tilt or shake ask for motion access when he first touches them." },
+    { id: "kind-words", app: "Kind words", label: "Show kind words now and then", type: "bool", def: true,
+      note: "Every few minutes of play, a little heart card says something like \"Dad loves you!\" or \"You did it!\"" },
+    { id: "kind-own", app: "Kind words", label: "Add your own kind words", type: "text", free: true, def: "", max: 40,
+      note: "Shown now and then with the others. Leave empty for none." },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
       note: "Uses the device's voice, so it only speaks when sound is on." },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
@@ -471,6 +477,11 @@
       else if (d.type === "bool") el.addEventListener("change", function () { settingSet(d.id, this.checked); });
       else if (d.type === "choice") Array.prototype.forEach.call(row.querySelectorAll("[data-choice]"), function (b) {
         b.addEventListener("click", function () { settingSet(d.id, b.getAttribute("data-choice")); refreshAppSettings(); });
+      });
+      else if (d.type === "text" && d.free) el.addEventListener("input", function () {
+        var v = this.value.slice(0, d.max || 20);
+        if (v !== this.value) this.value = v;
+        settingSet(d.id, v.trim());
       });
       else if (d.type === "text") el.addEventListener("input", function () {
         var v = this.value.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, d.max || 20);
@@ -872,6 +883,103 @@
     try { offCfg.off(go); } catch (e) { go(); }
   }
 
+  // ---------- Kind words ----------
+  // Now and then a little card with a beating heart and a kind line ("Dad loves you!", "You did it!")
+  // floats in at the top for a few seconds, while he plays and when he comes back to the home screen.
+  // It never takes a touch (pointer-events: none) and never shows while the timer is ending or resting,
+  // the sheet is open or a card covers the app. Shared by every page: "toybox-kind-v1" remembers when
+  // the last one showed and when the next may, so it stays special (one every few minutes of play).
+  // Apps call Toybox.kind() when he finishes something; that shows a "You did it!" line only sometimes.
+  // Grown-ups can switch it off or add their own line on the home screen ("kind-words", "kind-own").
+  var KKEY = "toybox-kind-v1";
+  var KIND_LOVE = ["Dad loves you!", "I'm so proud of you!", "You are wonderful!", "You are so smart!", "Big hug!",
+    "You make me smile!", "You are so kind!", "I love playing with you!", "You are awesome!", "Dad loves you so much!"];
+  var KIND_DONE = ["You did it!", "Great job!", "Wow, look at that!", "Amazing work!", "You worked so hard!",
+    "High five!", "Way to go!", "You figured it out!", "Super job!", "You are a great helper!"];
+  var KIND_GAP = [4 * 60000, 7 * 60000];  // between automatic ones, while he is playing
+  var KIND_SOON = 75000;                   // no two kind cards closer than this
+  var kindTouch = 0, kindPlay = 0, kindTimer = null, kindLastLine = "";
+  function kindState() { return readJSON(KKEY); }
+  function kindReady() {
+    return inited && settingGet("kind-words") !== false && timer.phase !== "ending" && timer.phase !== "resting" &&
+      !sheetOpen() && !turning() && !($("tb-off") && !$("tb-off").hidden) && !document.hidden;
+  }
+  function kindPick(list) {
+    var own = String(settingGet("kind-own") || "").trim(), line;
+    if (own && Math.random() < 0.34) return own;
+    do { line = list[Math.floor(Math.random() * list.length)]; } while (line === kindLastLine && list.length > 1);
+    return line;
+  }
+  function kindShow(line) {
+    var st = kindState(), t = now();
+    st.last = t;
+    st.next = t + KIND_GAP[0] + Math.random() * (KIND_GAP[1] - KIND_GAP[0]);
+    put(KKEY, JSON.stringify(st));
+    kindLastLine = line;
+    var el = $("tb-kind");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "tb-kind";
+      el.className = "tb-kind";
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      el.innerHTML = '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M20 33 C6 23 2 16 2 10.5 C2 5.5 6 2 10.5 2 C14.5 2 17.5 4.5 20 8 C22.5 4.5 25.5 2 29.5 2 C34 2 38 5.5 38 10.5 C38 16 34 23 20 33 Z" fill="#FF5D8F" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M9 9.5 Q10 6.5 13 6" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg><span></span>';
+      document.body.appendChild(el);
+    }
+    el.querySelector("span").textContent = line;
+    el.classList.remove("show", "hide");
+    void el.offsetWidth;
+    el.classList.add("show");
+    clearTimeout(kindTimer);
+    kindTimer = setTimeout(function () { el.classList.add("hide"); kindTimer = setTimeout(function () { el.classList.remove("show", "hide"); }, 700); }, 4600);
+    // A soft two-note chime, only when the shared sound is on and running.
+    try {
+      var a = soundOn && actx && actx.state === "running" ? actx : null;
+      if (a) [659, 880].forEach(function (f, i) {
+        var o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + i * 0.14;
+        o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.03, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+        o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0 + 0.55);
+      });
+    } catch (e) { /* no sound */ }
+  }
+  function kindHide() {
+    var el = $("tb-kind");
+    if (el && el.classList.contains("show")) { clearTimeout(kindTimer); el.classList.remove("show", "hide"); }
+  }
+  // Called by apps when he finishes something (a build, a puzzle, a job). Shows only sometimes.
+  function kind(type) {
+    if (!kindReady()) return false;
+    var st = kindState(), t = now();
+    if (st.last && t - st.last < KIND_SOON) return false;
+    if (Math.random() < 0.5) return false;
+    kindShow(kindPick(type === "love" ? KIND_LOVE : (Math.random() < 0.7 ? KIND_DONE : KIND_LOVE)));
+    return true;
+  }
+  // Every second: count play time (a touch in the last 30 s), and show one when it's time.
+  function kindTick() {
+    if (!kindReady()) { kindHide(); return; }
+    var t = now();
+    if (t - kindTouch < 30000) kindPlay += 1000;
+    var st = kindState();
+    if (!st.next) { st.next = t + KIND_GAP[0] * 0.5; put(KKEY, JSON.stringify(st)); return; }
+    // Wait for some play on this page and a touch just now, so it lands while he is there and happy.
+    if (t >= st.next && kindPlay >= 40000 && t - kindTouch < 8000) kindShow(kindPick(Math.random() < 0.6 ? KIND_LOVE : KIND_DONE));
+  }
+  function kindStart() {
+    document.addEventListener("pointerdown", function () { kindTouch = now(); }, true);
+    setInterval(kindTick, 1000);
+    // Back on the home screen after playing in an app: sometimes a warm "between activities" line.
+    if (opts.home) {
+      var been = false;
+      try { been = !!sessionStorage.getItem("toybox-launch"); } catch (e) { /* ignore */ }
+      setTimeout(function () {
+        var st = kindState();
+        if (been && kindReady() && (!st.last || now() - st.last > KIND_SOON) && Math.random() < 0.6) kindShow(kindPick(Math.random() < 0.5 ? KIND_DONE : KIND_LOVE));
+      }, 1400);
+    }
+  }
+
   // ---------- Init ----------
   function init(o) {
     if (inited) return;
@@ -886,6 +994,7 @@
     sync();
     wireTurn();
     setInterval(tick, 250);
+    kindStart();
 
     // While sound is on, any touch, click or key press starts/resumes audio (iOS needs a gesture).
     ["pointerdown", "click", "keydown"].forEach(function (ev) {
@@ -957,6 +1066,7 @@
     isBig: isBig,
     makeHold: makeHold,
     toast: toast,
+    kind: kind,
     openSheet: openSheet,
     closeSheet: closeSheet,
     sheetOpen: sheetOpen,

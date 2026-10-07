@@ -147,6 +147,10 @@ Keep only:
   per visit, never again once he has done it, never while the sheet is open or the timer is ending/resting.
   Use `tools/snippets/ghost-hand.js` / `.css` (same look everywhere). Coach pill: `tools/snippets/coach-pill.css`.
 - Nothing traps him: always a visible way to start over ("New", "Clear"), no dead-end overlays.
+- **Kind words** (the dad's idea): the shared layer shows a heart card with a kind line ("Dad loves you!", "You did
+  it!") every few minutes of play and sometimes on returning to the home screen. When he finishes something real
+  (a build, a puzzle, a floor, a print), call `Toybox.kind()`; it shows only sometimes. Grown-ups can switch it off
+  or add their own line on the home screen. Never invent family members in the lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
 - Real names, no brand names or logos.
 
