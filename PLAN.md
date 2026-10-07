@@ -18,7 +18,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
 | 9 | Jigsaw Puzzles | Done |
-| 10 | Kitchen Helper | Phase 1 done (kitchen, hand washing, Blender); stations next |
+| 10 | Kitchen Helper | Done (getting ready, Blender, Cutting board, Stand mixer, Stove) |
 | 11 | Music Room | Planned |
 | 12 | Hamster | Done |
 | 13 | Garden | Done |
