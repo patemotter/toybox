@@ -22,7 +22,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 11 | Music Room | Planned |
 | 12 | Hamster | In progress |
 | 13 | Garden | Next (the dad picked it) |
-| 14 | Bubble Machine | Next (the dad picked it) |
+| 14 | Bubble Machine | Done |
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
@@ -387,6 +387,10 @@ directs it where to go by tapping the wheel or the bed or the food."
   visits** (kept like a collection, not reset on a fresh visit; localStorage, try/catch). No fail states.
 - Timer ending: the machine winds down, the last bubbles float away and pop softly. Rest line: "The bubbles are
   resting."
+
+Built (folder `bubble-machine/`, tile "Bubbles"). Open questions for the dad: is Fast (about 4 bubbles a
+second) calm enough; should the wand stay where he drops it instead of gliding back to the jar; should Surprise
+ducks collect on the grass across visits; picture-only soap tiles on an upright phone (names don't fit).
 
 **Agents:** 1.
 
