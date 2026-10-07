@@ -30,7 +30,11 @@ movement rolls the gear, the curve is always perfect; questions: keep his chosen
 special rings (oval, flower) as their own tiles instead of only via Surprise? should a tap roll the wheel a
 little?), **Sand
 Table** (done; the dad: Draw! never smooths by itself, finished patterns stay and new ones draw on top; Smooth is his
-tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (in progress: the family's real espresso routine, standalone app).
+tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (done: the family's real routine, warm up, weigh 18.0 g, grind, whisk, tamp, lock in,
+10 s soak then the shot to about 36 g in about 28 s, steam, pour; latte for Mom, cappuccino for Dad, steamer for
+him. Questions: is a coffee drink too long (about 17 actions; should the funnel or knock-out happen by itself)?
+flush only once per switch-on? tray of three, oldest delivered? should he pour the milk into the jug? latte art
+choice?).
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.

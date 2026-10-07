@@ -1,0 +1,2489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Espresso Machine</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Espresso">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #F3E3CC; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.stage .tbadge { position: absolute; top: 52px; right: 10px; z-index: 3; }
+/* The coach line sits at the bottom of the stage everywhere: the step pictures use the top. */
+.tb-coach { top: auto; bottom: 10px; }
+/* Where he is in the routine: small step pictures, the current one glows. */
+.steps { position: absolute; top: 9px; right: 10px; z-index: 3; display: flex; gap: 3px; padding: 3px 6px;
+  background: #FFFFFF; border: 3px solid #1D2340; border-radius: 999px; box-shadow: 3px 3px 0 #1D2340; pointer-events: none; }
+.steps[hidden] { display: none; }
+.steps i { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; opacity: 0.35; transition: opacity 0.4s ease, background 0.4s ease; }
+.steps i.done { opacity: 0.75; }
+.steps i.now { opacity: 1; background: #FFC93C; box-shadow: 0 0 0 2px #1D2340; }
+.steps svg { width: 26px; height: 26px; display: block; overflow: visible; }
+@media (prefers-reduced-motion: no-preference) {
+  .steps i.now { animation: glow 1.6s ease-in-out infinite; }
+}
+@keyframes glow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+.tb-counter { white-space: nowrap; }
+/* Choices: drinks to pick, or the drink being made plus its toppings. */
+.tb-choices.pick { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tb-choices.drink { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tb-tile { position: relative; min-width: 0; }
+.tb-tile svg { pointer-events: none; overflow: visible; }
+.tb-tile span { pointer-events: none; white-space: nowrap; }
+.tb-tile small { display: block; font-size: 0.78em; font-weight: 700; color: var(--muted); line-height: 1; pointer-events: none; }
+.tb-tile[aria-pressed="true"] small { color: #1D2340; }
+.tb-choices.pick .tb-tile { min-height: 96px; }
+.tb-choices.pick .tb-tile svg { width: 56px; height: 56px; }
+.tb-tile.this { cursor: default; }
+.tb-tile:disabled { opacity: 0.4; }
+.tb-tabs .btn[aria-disabled="true"] { opacity: 0.45; }
+.btn.tb-go:disabled { opacity: 0.55; }
+@media (max-width: 600px) {
+  .tb-tile { font-size: 0.86rem; min-height: 66px; }
+  .tb-tile svg { width: 40px; height: 40px; }
+  .tb-choices.pick .tb-tile { min-height: 88px; }
+  .tb-choices.pick .tb-tile svg { width: 50px; height: 50px; }
+  .steps i { width: 26px; height: 26px; }
+  .steps svg { width: 21px; height: 21px; }
+  .steps { gap: 1px; padding: 2px 4px; top: 8px; right: 8px; }
+  .stage .tbadge { top: 44px; right: 8px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-choices { gap: 6px; }
+  .tb-tile { min-height: 58px; font-size: 0.8rem; }
+  .tb-tile svg { width: 32px; height: 32px; }
+  .tb-choices.pick { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tb-choices.pick .tb-tile { min-height: 84px; }
+  .tb-choices.pick .tb-tile svg { width: 44px; height: 44px; }
+  .tb-choices.drink { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps i { width: 24px; height: 24px; }
+  .steps svg { width: 19px; height: 19px; }
+  .steps { gap: 1px; padding: 2px 4px; top: 6px; right: 6px; }
+  .stage .tbadge { top: 40px; right: 6px; }
+}
+@media (orientation: landscape) and (min-height: 521px) {
+  .tb-choices.drink { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tb-choices.pick { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  .tb-choices.pick .tb-tile { flex-direction: row; gap: 14px; justify-content: flex-start; padding-left: 18px; min-height: 92px; }
+  .tb-choices.pick .tb-tile span { text-align: left; }
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  .steps i { width: 38px; height: 38px; }
+  .steps svg { width: 30px; height: 30px; }
+  .stage .tbadge { top: 60px; }
+}
+body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
+body.ending .tb-panel { opacity: 0.5; }
+body.ending .steps, body.big .steps { visibility: hidden; }
+.rest-art { width: min(70vw, 300px, 42vh); aspect-ratio: 1; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Espresso Machine</h1>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A coffee cart with an espresso machine, a grinder, a scale and a tray for the drinks"></canvas>
+      <div class="tb-counter" id="counter">Drinks: 0</div>
+      <div class="steps" id="steps" aria-hidden="true" hidden></div>
+      <div class="tb-coach" id="coach">Pick a drink!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <button class="btn tb-go" id="goBtn" hidden>Do it!</button>
+      <div class="tb-choices pick" id="choices"></div>
+      <nav class="tb-tabs">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var TAU = Math.PI * 2, INK = "#1D2340";
+  var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
+  // Everything that plays by itself runs about a third slower than real life (AGENTS.md "Pace").
+  // The scale's seconds still tick in real seconds.
+  var PACE = 1.35;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { t = clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function easeOut(t) { t = clamp(t, 0, 1); return 1 - (1 - t) * (1 - t); }
+  function now() { return performance.now() / 1000; }
+  function dist(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function srand(seed) {
+    var s = (seed | 0) % 2147483647; if (s <= 0) s += 2147483646;
+    return function () { s = s * 16807 % 2147483647; return (s - 1) / 2147483646; };
+  }
+  function val(v) { return typeof v === "function" ? v() : v; }
+  function mix(c1, c2, t) {
+    var a = parseInt(c1.slice(1), 16), b = parseInt(c2.slice(1), 16);
+    var r = Math.round(lerp(a >> 16, b >> 16, t)), g = Math.round(lerp((a >> 8) & 255, (b >> 8) & 255, t)), bl = Math.round(lerp(a & 255, b & 255, t));
+    return "#" + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+  }
+
+  // ---------- The cart: world units, x to the right, y down; the cart top's front edge is y = 0 ----------
+  // Left to right: bag of beans, scale, grinder, funnel spot, portafilter stand, tamper, the espresso
+  // machine (needle tool on its side, syrups and milk jug on top), knock box, the tray for finished drinks.
+  var BASE = -0.3;                     // where things stand on the cart
+  var XB = 1.4, XSW = 4.25, XG = 7.35, XFP = 9.75, XST = 11.1, XTA = 12.95, XHK = 13.5;
+  var ML = 13.85, MR = 20.25, MT = -8.0, XGR = 16.45;
+  var BY = -6.8, BR = 0.36;
+  var BTN = { power: 14.6, one: 15.6, two: 16.45, milk: 17.3 };
+  var DRIP = -1.0;                     // the drip tray grate
+  var GROUP_RIM = -5.05;               // portafilter rim when locked in
+  var STAND_TOP = -1.9, STAND_RING = -1.55;
+  var GRB = -0.6;                      // grinder base plate
+  var SCALE_H = 0.8, DC_H = 1.15;
+  var XW = 20.95, WAND_TIP = -1.05, JUG_H = 1.75, JUG_HX = 18.85;
+  var XK = 23.0;
+  var TRAY_L = 24.4, TRAY_R = 30.0, TRAY_Y = -0.62, SLOTS = [25.4, 27.2, 29.0];
+  var WORLD_L = -0.6, WORLD_R = 30.6;
+  var WDT_Y = -3.75;                   // needle tips when it hangs on its hook
+
+  // Camera regions [x0, x1, top, bottom]: the stage frames the area of the current step.
+  var REG = {
+    choose: [13.0, 30.3, -10.7, 0.9],
+    mach: [12.9, 22.0, -8.4, 0.6],
+    tip: [9.7, 22.0, -8.0, 0.6],
+    weigh: [-0.3, 6.0, -5.7, 0.9],
+    hopper: [2.4, 9.4, -11.0, 0.9],
+    grind: [4.4, 9.8, -9.8, 0.6],
+    dump: [5.6, 13.0, -6.6, 0.6],
+    puck: [8.6, 14.4, -6.0, 0.6],
+    lock: [9.0, 18.4, -7.6, 0.6],
+    shot: [13.3, 19.6, -7.6, 0.6],
+    jug: [13.3, 22.8, -10.2, 0.6],
+    steam: [13.3, 22.8, -7.8, 0.6],
+    pour: [13.3, 22.8, -9.9, 0.6],
+    serve: [14.4, 30.3, -7.4, 0.6],
+    knock: [13.4, 24.4, -6.4, 0.6],
+    trayTall: [20.6, 30.4, -10.7, 0.9],
+    serveTall: [15.6, 30.4, -10.7, 0.9]
+  };
+
+
+  // ---------- Drinks ----------
+  var CUPS = {
+    latte: { rx: 0.9, brx: 0.56, h: 1.2, col: "#F79BB6", dark: "#D46F8F", esp: 0.3, name: "Latte", who: "for Mom", art: "heart", fun: ["tulip", "rosetta", "bear"], foam: 0.45, gpm: 210 },
+    cappuccino: { rx: 0.8, brx: 0.5, h: 1.0, col: "#78AEEB", dark: "#4A80C4", esp: 0.38, name: "Cappuccino", who: "for Dad", art: "cloud", fun: ["cocoaheart", "cocoastar"], foam: 1, gpm: 140 },
+    steamer: { rx: 0.68, brx: 0.62, h: 1.35, col: "#FFD34D", dark: "#E0A91C", esp: 0, name: "Steamer", who: "for me", art: "plain", fun: ["bear", "heart"], foam: 0.35, gpm: 200 }
+  };
+  var DRINKS = ["latte", "cappuccino", "steamer"];
+  var ORDER = {
+    coffee: ["power", "flush", "tip", "weigh", "hopper", "grind", "dump", "whisk", "funnel", "tamp", "lock", "shot", "jug", "steam", "pour", "serve", "knock", "rinse"],
+    steamer: ["power", "jug", "steam", "pour", "serve"]
+  };
+  // Progress pictures: which group each step belongs to.
+  var PHASE = { power: "warm", flush: "warm", tip: "warm", weigh: "weigh", hopper: "grind", grind: "grind", dump: "puck", whisk: "puck",
+    funnel: "puck", tamp: "puck", lock: "shot", shot: "shot", jug: "milk", steam: "milk", pour: "pour", serve: "pour", knock: "clean", rinse: "clean" };
+  var PHASES = { coffee: ["warm", "weigh", "grind", "puck", "shot", "milk", "pour", "clean"], steamer: ["warm", "milk", "pour"] };
+  function isCoffee() { return S.drink && S.drink !== "steamer"; }
+  function seq() { return S.drink === "steamer" ? ORDER.steamer : ORDER.coffee; }
+
+  // ---------- Saved state ----------
+  // localStorage "espresso-machine-v1": { v, drink, step, art, syr, cocoa, flushed, on, tray: [{d, art, cocoa}], count, pucks }
+  var KEY = "espresso-machine-v1";
+  var S = { drink: null, step: "choose", art: "", syr: [], cocoa: false, flushed: false, on: false, tray: [], count: 0, pucks: 0 };
+  function load() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { o = null; }
+    if (!o || typeof o !== "object") return;
+    if (CUPS[o.drink]) S.drink = o.drink;
+    var list = seq();
+    S.step = S.drink && list.indexOf(o.step) >= 0 ? o.step : "choose";
+    if (S.step === "choose") S.drink = null;
+    S.art = typeof o.art === "string" ? o.art : "";
+    S.syr = Array.isArray(o.syr) ? o.syr.filter(function (s) { return s === "vanilla" || s === "caramel"; }).slice(0, 3) : [];
+    S.cocoa = !!o.cocoa;
+    S.flushed = !!o.flushed;
+    S.on = !!o.on;
+    S.tray = Array.isArray(o.tray) ? o.tray.filter(function (t) { return t && CUPS[t.d]; }).slice(-3).map(function (t) { return { d: t.d, art: String(t.art || ""), cocoa: !!t.cocoa }; }) : [];
+    S.count = Math.max(0, Math.floor(+o.count || 0));
+    S.pucks = clamp(Math.floor(+o.pucks || 0), 0, 99);
+  }
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, drink: S.drink, step: S.step, art: S.art, syr: S.syr, cocoa: S.cocoa, flushed: S.flushed,
+        on: S.on, tray: tray.map(function (t) { return { d: t.d, art: t.art, cocoa: t.cocoa }; }), count: S.count, pucks: S.pucks }));
+    } catch (e) { /* ignore */ }
+  }
+  // Opened from the home screen: a fresh start (machine off, no drink, empty tray).
+  if (Toybox.fresh()) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } } else load();
+
+  // ---------- Things on the cart ----------
+  var scale = { x: XSW, y: BASE, up: false, shown: 0, ok: 0 };
+  var dcup = { x: XG, y: GRB, rot: 0, beans: 0, grounds: 0, up: false };
+  var scoop = { x: XB + 0.3, y: -3.55, rot: 0, load: 0, inBag: true, up: false };
+  var pf = { x: XGR, y: GROUP_RIM, rot: 0, twist: 1, at: "group", grounds: 0, fluff: 0, tamped: 0, spent: false, wet: 0, up: false };
+  var funnel = { x: XST, y: STAND_RING, at: "stand", up: false };
+  var wdt = { x: XHK, y: WDT_Y, at: "hook", up: false };
+  var tamper = { x: XTA, y: BASE, press: 0, at: "home", up: false };
+  var cup = null;
+  var jug = { x: JUG_HX, y: MT, rot: 0, milk: 0, foam: 0, swirl: 0, lift: 0, at: "top", pouring: 0, up: false };
+  var hopper = { beans: 0 };
+  var tray = [], leaving = [];
+  var syrups = [
+    { id: "vanilla", name: "Vanilla", hx: 14.6, x: 14.6, y: MT, rot: 0, liq: "#F1DDAE", up: false, pump: 0 },
+    { id: "caramel", name: "Caramel", hx: 15.55, x: 15.55, y: MT, rot: 0, liq: "#C2702A", up: false, pump: 0 }
+  ];
+  var carton = null, shaker = null, puckFall = null;
+  var M = { on: false, heat: 0, pump: null, flash: {}, pending: null, offTries: 0 };
+  var G = null;                                       // grinding: { t, dur }
+  var SH = { ph: "ready", timer: null, stop: null, w: 0, held: false, letGo: false, soakT: 0, pourT: 0, pourDur: 20, finalW: 35, w0: 0, autoLet: 0 };
+  var STM = null;                                     // steaming: { t, dur, mode, target }
+  var WG = { g: 0, done: false };                     // grams of beans in the dosing cup
+  var whisk = { on: false, trail: [], n: 0, auto: 0 };
+  var parts = [];
+  var learnedSteps = {};
+
+  // ---------- Animation queue ----------
+  // MAIN runs one action at a time (the routine); FX runs little side shows in parallel (syrup pumps).
+  var MAIN = [], FX = [], cur = MAIN;
+  function q(fn) { cur.push(fn); }
+  function tw(ms, f) { var e = 0, d = ms * PACE / 1000; q(function (dt) { e += dt; var k = d > 0 ? Math.min(1, e / d) : 1; f(ease(k), k); return k >= 1; }); }
+  function wait(ms) { var e = 0; q(function (dt) { e += dt; return e >= ms * PACE / 1000; }); }
+  function call(f) { q(function () { f(); return true; }); }
+  function until(c) { q(function () { return !!c(); }); }
+  function move(o, x, y, ms, lift, rot) {
+    var x0, y0, r0, e = 0, d = ms * PACE / 1000, tx, ty;
+    q(function (dt) {
+      if (x0 === undefined) { x0 = o.x; y0 = o.y; r0 = o.rot || 0; tx = val(x); ty = val(y); o.up = true; }
+      e += dt;
+      var k = Math.min(1, e / d), s = ease(k);
+      o.x = lerp(x0, tx, s);
+      o.y = lerp(y0, ty, s) - (lift || 0) * Math.sin(Math.PI * s);
+      if (rot !== undefined) o.rot = lerp(r0, rot, s);
+      if (k >= 1) { o.up = false; return true; }
+      return false;
+    });
+  }
+  function spawn(build) { var s = [], keep = cur; cur = s; build(); cur = keep; FX.push(s); }
+  function runSeq(list, dt) {
+    var n = 0;
+    while (list.length && n < 30) { if (list[0](dt)) { list.shift(); dt = 0; n++; } else break; }
+  }
+  function busy() { return MAIN.length > 0; }
+
+  // ---------- Canvas, camera ----------
+  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var W = 300, H = 300, dpr = 1, LW = 0.05, phone = true, padT = 40, padB = 8;
+  var cam = { cx: 16, cy: -5, s: 30, sy: 150 }, camInit = false;
+  var SMAX = 92;
+  function layout() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    phone = Math.min(innerWidth, innerHeight) < 560;
+    padT = phone ? 34 : 50;
+    padB = 6;
+    if (!camInit) { var t = fit(region()); cam.cx = t.cx; cam.cy = t.cy; cam.s = t.s; cam.sy = t.sy; camInit = true; }
+  }
+  function region() {
+    var st = S.step, tall = H > W * 1.1;
+    if (st === "choose") return tall ? REG.trayTall : REG.choose;
+    if (st === "power" || st === "flush") return REG.mach;
+    if (st === "serve") return tall ? REG.serveTall : REG.serve;
+    if (st === "whisk" || st === "funnel" || st === "tamp") return REG.puck;
+    if (st === "rinse") return REG.knock;
+    return REG[st] || REG.mach;
+  }
+  function fit(reg) {
+    var aw = W - 12, ah = Math.max(40, H - padT - padB);
+    var rw = reg[1] - reg[0], rh = reg[3] - reg[2];
+    var s = Math.min(aw / rw, ah / rh, SMAX);
+    var cx = (reg[0] + reg[1]) / 2, cy = (reg[2] + reg[3]) / 2;
+    var vw = W / s, lo = WORLD_L + vw / 2, hi = WORLD_R - vw / 2;
+    cx = lo > hi ? (WORLD_L + WORLD_R) / 2 : clamp(cx, lo, hi);
+    var sy = padT + ah / 2;
+    var bottom = cy + (H - sy) / s;
+    if (bottom > 3.2) cy -= bottom - 3.2;
+    return { cx: cx, cy: cy, s: s, sy: sy };
+  }
+  function toWorld(px, py) {
+    var r = cv.getBoundingClientRect();
+    return { x: cam.cx + (px - r.left - W / 2) / cam.s, y: cam.cy + (py - r.top - cam.sy) / cam.s };
+  }
+  function toPage(x, y) {
+    var r = cv.getBoundingClientRect();
+    return [r.left + W / 2 + (x - cam.cx) * cam.s, r.top + cam.sy + (y - cam.cy) * cam.s];
+  }
+
+  // ---------- Drawing helpers ----------
+  function P() { ctx.beginPath(); }
+  function rrect(x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2));
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function ell(cx, cy, rx, ry) { ctx.ellipse(cx, cy, Math.max(0.001, rx), Math.max(0.001, ry), 0, 0, TAU); }
+  function fs(fill, lw) {
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    ctx.lineWidth = (lw === undefined ? 1 : lw) * LW; ctx.strokeStyle = INK; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.stroke();
+  }
+  function hg(x0, x1, cols) {
+    var g = ctx.createLinearGradient(x0, 0, x1, 0);
+    for (var i = 0; i < cols.length; i++) g.addColorStop(i / (cols.length - 1), cols[i]);
+    return g;
+  }
+  function vg(y0, y1, cols) {
+    var g = ctx.createLinearGradient(0, y0, 0, y1);
+    for (var i = 0; i < cols.length; i++) g.addColorStop(i / (cols.length - 1), cols[i]);
+    return g;
+  }
+  var STEEL = ["#8C95A7", "#E9EDF4", "#C2C9D6", "#F8FAFD", "#ADB5C4", "#868FA2"];
+  function steel(x0, x1) { return hg(x0, x1, STEEL); }
+  function line(x0, y0, x1, y1, w, col) { P(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineWidth = w; ctx.strokeStyle = col; ctx.lineCap = "round"; ctx.stroke(); }
+  function tube(pts, w, col) {
+    P(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.lineWidth = w + 2 * LW; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = w; ctx.strokeStyle = col; ctx.stroke();
+  }
+  function bean(x, y, r, rot, col) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    P(); ell(0, 0, r, r * 0.68); ctx.fillStyle = col || "#5B331B"; ctx.fill();
+    P(); ctx.moveTo(-r * 0.7, 0); ctx.quadraticCurveTo(0, r * 0.25, r * 0.7, 0); ctx.lineWidth = r * 0.22; ctx.strokeStyle = "#2B160A"; ctx.stroke();
+    ctx.restore();
+  }
+  // Text in screen pixels (fonts at world sizes render badly).
+  function text(str, x, y, size, col, align, weight) {
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var sx = W / 2 + (x - cam.cx) * cam.s, sy = cam.sy + (y - cam.cy) * cam.s;
+    ctx.font = (weight || 800) + " " + Math.max(6, size * cam.s).toFixed(1) + "px " + FONT;
+    ctx.textAlign = align || "center"; ctx.textBaseline = "middle"; ctx.fillStyle = col;
+    ctx.fillText(str, sx, sy);
+    ctx.restore();
+  }
+  function check(x, y, r, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = Math.min(1, a); ctx.translate(x, y); var k = 0.6 + 0.4 * easeOut(a); ctx.scale(k, k);
+    P(); ctx.arc(0, 0, r, 0, TAU); fs("#2EA05A", 1.2);
+    P(); ctx.moveTo(-r * 0.45, 0); ctx.lineTo(-r * 0.1, r * 0.35); ctx.lineTo(r * 0.5, -r * 0.35);
+    ctx.lineWidth = r * 0.28; ctx.strokeStyle = "#FFFFFF"; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Scene: wall and cart ----------
+  function drawRoom() {
+    ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#F3E3CC"; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    // Tiled backsplash behind the cart.
+    var x0 = Math.max(-2, cam.cx - W / cam.s / 2 - 1), x1 = Math.min(33, cam.cx + W / cam.s / 2 + 1);
+    var y0 = Math.max(-16, cam.cy - H / cam.s - 1);
+    P(); ctx.rect(x0, -11.5, x1 - x0, 10.6); ctx.fillStyle = "#FFF7EC"; ctx.fill();
+    P();
+    var row = 0;
+    for (var y = -11.5; y < -0.9; y += 0.62, row++) {
+      ctx.moveTo(x0, y); ctx.lineTo(x1, y);
+      var off = row % 2 ? 0.62 : 0;
+      for (var x = Math.floor((x0 - off) / 1.24) * 1.24 + off; x < x1; x += 1.24) { ctx.moveTo(x, y); ctx.lineTo(x, Math.min(-0.9, y + 0.62)); }
+    }
+    ctx.lineWidth = 1.5 / cam.s; ctx.strokeStyle = "rgba(160,130,100,0.35)"; ctx.stroke();
+    if (y0 < -11.5) { P(); ctx.rect(x0, y0, x1 - x0, -11.5 - y0); ctx.fillStyle = "#F3E3CC"; ctx.fill(); }
+    line(x0, -11.5, x1, -11.5, 2 / cam.s, "rgba(160,130,100,0.5)");
+    // A wall shelf with cups and plants (seen on tall screens).
+    if (y0 < -12.9) drawShelf();
+    // Floor.
+    P(); ctx.rect(x0, 1.9, x1 - x0, 6); ctx.fillStyle = "#D9C3A5"; ctx.fill();
+    // Cart: legs and lower shelf, the front with drawers, the top.
+    var L = -0.5, R = 30.5;
+    [L + 0.3, R - 0.9, 10.5, 20.5].forEach(function (lx) { P(); rrect(lx, 1.5, 0.6, 2.4, 0.1); fs("#9C6436"); });
+    P(); rrect(L, 3.0, R - L, 0.45, 0.12); fs("#B57A45");
+    P(); rrect(L, 0, R - L, 1.75, 0.2); fs(vg(0, 1.75, ["#BF8250", "#A86D3D"]));
+    [[L + 0.4, 9.8], [10.6, 20.2], [21.0, R - 0.4]].forEach(function (d) {
+      P(); rrect(d[0], 0.3, d[1] - d[0], 1.15, 0.15); fs(null, 0.7);
+      P(); rrect((d[0] + d[1]) / 2 - 0.6, 0.72, 1.2, 0.26, 0.13); fs("#E7D6C0", 0.8);
+    });
+    P(); rrect(L, -1.05, R - L, 1.1, 0.25); fs(vg(-1.05, 0.05, ["#D69A62", "#C78A52"]));
+    // Wood grain.
+    P();
+    for (var g = 0; g < 3; g++) { ctx.moveTo(L + 0.5, -0.8 + g * 0.27); ctx.bezierCurveTo(8, -0.75 + g * 0.27, 18, -0.85 + g * 0.27, R - 0.5, -0.8 + g * 0.27); }
+    ctx.lineWidth = 1.2 / cam.s; ctx.strokeStyle = "rgba(120,70,30,0.25)"; ctx.stroke();
+    // The black silicone mat.
+    P(); rrect(2.75, -0.98, 21.8, 0.9, 0.2); ctx.fillStyle = "#26282E"; ctx.fill();
+    ctx.lineWidth = 1.5 / cam.s; ctx.strokeStyle = "#111318"; ctx.stroke();
+  }
+
+  function drawShelf() {
+    var y = -12.7;
+    for (var bx = 1; bx < 31; bx += 7) { P(); ctx.moveTo(bx, y + 0.3); ctx.lineTo(bx, y + 1.0); ctx.lineTo(bx + 0.7, y + 0.3); ctx.closePath(); fs("#8E5A30", 0.7); }
+    function plant(x) {
+      P(); ctx.moveTo(x - 0.55, y - 0.9); ctx.lineTo(x + 0.55, y - 0.9); ctx.lineTo(x + 0.42, y); ctx.lineTo(x - 0.42, y); ctx.closePath(); fs("#E07A4F");
+      [[-0.7, -1.9, -0.6], [0.0, -2.3, 0], [0.7, -1.9, 0.6], [-0.35, -1.6, -0.3], [0.4, -1.6, 0.3]].forEach(function (l) {
+        P(); ctx.ellipse(x + l[0] * 0.75, y + l[1] * 0.75, 0.22, 0.55, l[2], 0, TAU); fs("#4CB060", 0.7);
+      });
+    }
+    function mug(x, col) {
+      P(); rrect(x - 0.4, y - 0.85, 0.8, 0.85, 0.12); fs(col, 0.8);
+      P(); ctx.arc(x + 0.45, y - 0.45, 0.22, -1.3, 1.3); ctx.lineWidth = 0.12; ctx.strokeStyle = INK; ctx.stroke();
+    }
+    plant(2.6);
+    mug(7.6, "#F79BB6"); mug(8.8, "#78AEEB"); mug(10.0, "#FFD34D");
+    P(); rrect(14.3, y - 1.5, 1.2, 1.5, 0.25); fs("rgba(225,242,255,0.7)", 0.8);
+    var r = srand(19); for (var i = 0; i < 8; i++) bean(14.5 + r() * 0.8, y - 0.2 - r() * 0.9, 0.13, r() * 3, "#6A3D20");
+    P(); rrect(14.2, y - 1.75, 1.4, 0.3, 0.12); fs("#B97C46", 0.8);
+    for (var k = 0; k < 3; k++) { P(); ctx.ellipse(20.5, y - 0.12 - k * 0.24, 0.7 - k * 0.04, 0.16, 0, 0, TAU); fs("#FFFFFF", 0.7); }
+    plant(26.2);
+    mug(29.0, "#9BE7A0");
+    P(); rrect(-0.6, y, 31.3, 0.32, 0.1); fs("#B57A45");
+  }
+
+  // ---------- Bag of beans and the copper scoop ----------
+  function drawBag() {
+    var x = XB, top = -3.9;
+    P(); ctx.ellipse(x, BASE + 0.05, 1.3, 0.16, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fill();
+    P(); ctx.moveTo(x - 1.05, top); ctx.lineTo(x + 1.05, top); ctx.lineTo(x + 1.2, BASE); ctx.lineTo(x - 1.2, BASE); ctx.closePath();
+    fs(hg(x - 1.2, x + 1.2, ["#B6864C", "#DDB77F", "#C99C60", "#B07D45"]));
+    P(); ell(x, top, 1.05, 0.3); fs("#3E2312");
+    var r = srand(7);
+    for (var i = 0; i < 14; i++) bean(x + (r() - 0.5) * 1.6, top + (r() - 0.5) * 0.3, 0.13, r() * 3, r() < 0.5 ? "#6A3D20" : "#56301A");
+    if (scoop.inBag && !scoop.up) drawScoopHandleInBag();
+    P(); rrect(x - 1.13, top + 0.05, 2.26, 0.42, 0.14); fs("#E3C38E");
+    P(); ctx.moveTo(x - 1.0, top + 0.26); ctx.lineTo(x + 1.0, top + 0.26); ctx.lineWidth = 1.2 / cam.s; ctx.strokeStyle = "rgba(120,70,30,0.4)"; ctx.stroke();
+    // Plain label with a big bean (no brand).
+    P(); rrect(x - 0.72, -2.85, 1.44, 1.6, 0.18); fs("#FFF6E3", 0.8);
+    bean(x, -2.05, 0.46, -0.5, "#6A3D20");
+  }
+  function drawScoopHandleInBag() {
+    var x = XB + 0.35, y = -3.95;
+    tube([[x, y], [x + 0.55, y - 1.05]], 0.2, "#D9874A");
+    P(); ctx.arc(x + 0.58, y - 1.1, 0.12, 0, TAU); fs("#C06A32", 0.8);
+  }
+  function drawScoop() {
+    if (scoop.inBag && !scoop.up) return;
+    ctx.save(); ctx.translate(scoop.x, scoop.y); ctx.rotate(scoop.rot);
+    tube([[0.36, -0.08], [1.05, -1.2]], 0.2, "#D9874A");
+    P(); ctx.arc(1.08, -1.25, 0.12, 0, TAU); fs("#C06A32", 0.8);
+    P(); ctx.ellipse(0, 0, 0.46, 0.44, 0, 0, Math.PI); ctx.closePath(); fs(hg(-0.46, 0.46, ["#A9551F", "#F0A266", "#C7652A"]));
+    P(); ell(0, 0, 0.46, 0.14); fs("#7A3A12");
+    if (scoop.load > 0) {
+      var r = srand(3);
+      for (var i = 0; i < 6; i++) bean((r() - 0.5) * 0.6, -0.04 - r() * 0.16, 0.11, r() * 3, i % 2 ? "#6A3D20" : "#56301A");
+    }
+    ctx.restore();
+  }
+
+  // ---------- Scale (TIME on the left, WEIGHT on the right) ----------
+  function drawScale() {
+    var x = scale.x, y = scale.y, top = y - SCALE_H;
+    P(); ctx.ellipse(x, y + 0.04, 1.6, 0.12, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill();
+    P(); rrect(x - 1.5, top, 3.0, SCALE_H, 0.18); fs(vg(top, y, ["#3B3E48", "#22242B"]));
+    P(); rrect(x - 1.5, top, 3.0, 0.2, 0.1); fs("#4A4E5A", 0.8);
+    P(); rrect(x - 1.12, top + 0.27, 2.24, 0.44, 0.08); fs("#0E1A16", 0.7);
+    // Buttons: timer on the left, tare on the right.
+    var lit = S.step === "shot" && SH.ph === "ready" && SH.timer === null;
+    P(); ctx.arc(x - 1.3, top + 0.49, 0.13, 0, TAU); fs(lit ? (Math.sin(now() * 6) > 0 ? "#FFC93C" : "#8C93A6") : "#8C93A6", 0.6);
+    P(); ctx.arc(x + 1.3, top + 0.49, 0.13, 0, TAU); fs("#8C93A6", 0.6);
+    var secs = 0;
+    if (SH.timer !== null) secs = Math.floor((SH.stop !== null ? SH.stop : now()) - SH.timer);
+    var w = Math.max(0, scale.shown);
+    var col = scale.ok > 0 ? "#7CF0A0" : "#9EE8FF";
+    text(String(secs) + "s", x - 0.62, top + 0.5, 0.34, "#9EE8FF");
+    text(w.toFixed(1) + "g", x + 0.5, top + 0.5, 0.34, col);
+    P(); ctx.moveTo(x - 0.1, top + 0.33); ctx.lineTo(x - 0.1, top + 0.66); ctx.lineWidth = 1 / cam.s; ctx.strokeStyle = "rgba(160,220,255,0.35)"; ctx.stroke();
+  }
+
+  // ---------- Grinder ----------
+  function drawGrinder() {
+    var x = XG, j = G ? Math.sin(now() * 70) * 0.018 : 0;
+    P(); ctx.ellipse(x, BASE + 0.05, 1.55, 0.14, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill();
+    P(); rrect(x - 1.4, GRB, 2.8, BASE - GRB, 0.12); fs("#2B2E36");
+    ctx.save(); ctx.translate(j, 0);
+    // Clear bean hopper with its lid.
+    P(); ctx.moveTo(x - 0.55, -6.15); ctx.lineTo(x - 1.15, -7.25); ctx.lineTo(x - 1.15, -9.0); ctx.lineTo(x + 1.15, -9.0); ctx.lineTo(x + 1.15, -7.25); ctx.lineTo(x + 0.55, -6.15); ctx.closePath();
+    ctx.fillStyle = "rgba(225,242,255,0.55)"; ctx.fill();
+    if (hopper.beans > 0.01) {
+      ctx.save(); ctx.clip();
+      var lv = -6.15 - 2.3 * hopper.beans, spin = G ? now() * 2.2 : 0;
+      P(); ctx.rect(x - 1.2, lv, 2.4, 4); ctx.fillStyle = "#4A2A16"; ctx.fill();
+      var r = srand(11);
+      for (var i = 0; i < 40; i++) {
+        var bx = x + (r() - 0.5) * 2.2, by = lv + 0.05 + r() * 2.6;
+        var sw = G ? Math.sin(spin + i) * 0.08 : 0;
+        bean(bx + sw, by + (G ? (now() * 0.6 + i * 0.13) % 0.3 : 0), 0.15, r() * 3 + spin * 0.3, i % 3 ? "#6A3D20" : "#54301A");
+      }
+      ctx.restore();
+    }
+    P(); ctx.moveTo(x - 0.55, -6.15); ctx.lineTo(x - 1.15, -7.25); ctx.lineTo(x - 1.15, -9.0); ctx.lineTo(x + 1.15, -9.0); ctx.lineTo(x + 1.15, -7.25); ctx.lineTo(x + 0.55, -6.15); ctx.closePath(); fs(null);
+    line(x - 0.85, -8.7, x - 0.85, -7.4, 3 / cam.s, "rgba(255,255,255,0.75)");
+    if (S.step !== "hopper") {
+      P(); rrect(x - 1.27, -9.32, 2.54, 0.34, 0.13); fs("#2B2E36");
+      P(); rrect(x - 0.28, -9.55, 0.56, 0.26, 0.1); fs("#3D414C", 0.8);
+    } else { P(); ell(x, -9.0, 1.15, 0.3); fs("rgba(225,242,255,0.6)"); }
+    // Body.
+    P(); rrect(x - 1.15, -6.3, 2.3, 5.7, 0.35); fs(hg(x - 1.15, x + 1.15, ["#1B1D24", "#3E424E", "#2A2D36", "#1B1D24"]));
+    P(); rrect(x - 0.95, -6.15, 1.9, 0.3, 0.12); fs("#3A3E49", 0.6);
+    // Grind button.
+    var lit = G ? 1 : (S.step === "grind" && !busy() ? 0.5 + 0.5 * Math.sin(now() * 5) : 0);
+    P(); ctx.arc(x, -5.0, 0.5, 0, TAU); fs(lit ? "rgba(255,201,60," + (0.35 + 0.65 * lit).toFixed(2) + ")" : "#30333D", 0.8);
+    P(); ctx.arc(x, -5.0 + (G ? 0.03 : 0), 0.36, 0, TAU); fs(steel(x - 0.36, x + 0.36));
+    // A little gear on the button (a grinder sign without words).
+    ctx.save(); ctx.translate(x, -5.0); ctx.rotate(G ? now() * 4 : 0);
+    P(); for (var k = 0; k < 8; k++) { var a = k / 8 * TAU; ctx.moveTo(Math.cos(a) * 0.12, Math.sin(a) * 0.12); ctx.lineTo(Math.cos(a) * 0.22, Math.sin(a) * 0.22); }
+    ctx.lineWidth = 0.06; ctx.strokeStyle = INK; ctx.stroke();
+    P(); ctx.arc(0, 0, 0.12, 0, TAU); fs("#FFFFFF", 0.6);
+    ctx.restore();
+    // Spout.
+    P(); rrect(x - 0.34, -3.7, 0.68, 0.8, 0.14); fs("#3A3E49");
+    P(); ell(x, -2.92, 0.26, 0.08); fs("#111", 0.6);
+    // Motion lines while it whirrs.
+    if (G && !reduce) {
+      var ph = (now() * 3) % 1;
+      [-1, 1].forEach(function (s) {
+        P(); ctx.arc(x + s * (1.45 + ph * 0.3), -4.4, 0.35 + ph * 0.2, s > 0 ? -0.7 : Math.PI - 0.7, s > 0 ? 0.7 : Math.PI + 0.7);
+        ctx.lineWidth = 2.5 / cam.s; ctx.strokeStyle = "rgba(29,35,64," + (0.6 * (1 - ph)).toFixed(2) + ")"; ctx.stroke();
+      });
+    }
+    ctx.restore();
+    // Grounds pouring from the spout.
+    if (G) {
+      var top = -2.9, bot = dcup.y - DC_H + 0.3 - dcup.grounds * 0.5;
+      ctx.save();
+      for (var yy = top; yy < bot; yy += 0.07) {
+        var w = 0.12 + Math.sin(yy * 20 + now() * 30) * 0.03;
+        ctx.fillStyle = (Math.floor((yy - now() * 3) / 0.07) % 2) ? "#6B4426" : "#4E2E17";
+        ctx.fillRect(x - w / 2 + Math.sin(yy * 9 + now() * 12) * 0.02, yy, w, 0.075);
+      }
+      ctx.restore();
+    }
+  }
+
+  // ---------- Dosing cup ----------
+  function drawDcup() {
+    var o = dcup;
+    ctx.save(); ctx.translate(o.x, o.y - DC_H / 2); ctx.rotate(o.rot); ctx.translate(0, DC_H / 2);
+    var top = -DC_H;
+    P(); ctx.moveTo(-0.5, top); ctx.lineTo(0.5, top); ctx.lineTo(0.44, 0); ctx.lineTo(-0.44, 0); ctx.closePath(); fs(steel(-0.5, 0.5));
+    P(); ell(0, top, 0.5, 0.15); fs("#5A6070");
+    if (o.beans > 0.01) {
+      ctx.save(); P(); ell(0, top, 0.47, 0.14); ctx.rect(-0.6, top - 0.6, 1.2, 0.6); ctx.clip();
+      var r = srand(5), n = Math.round(12 * Math.min(1, o.beans));
+      for (var i = 0; i < n; i++) bean((r() - 0.5) * 0.75, top + 0.05 - r() * 0.25 * o.beans, 0.12, r() * 3, i % 2 ? "#6A3D20" : "#56301A");
+      ctx.restore();
+    }
+    if (o.grounds > 0.01) {
+      var h = 0.35 * o.grounds;
+      P(); ctx.moveTo(-0.46, top + 0.02); ctx.bezierCurveTo(-0.35, top - h, 0.35, top - h, 0.46, top + 0.02); ctx.ellipse(0, top + 0.02, 0.46, 0.13, 0, 0, Math.PI); ctx.closePath();
+      ctx.fillStyle = "#6B4426"; ctx.fill();
+      var r2 = srand(9);
+      for (var k = 0; k < 10; k++) { P(); ctx.arc((r2() - 0.5) * 0.6, top - r2() * h * 0.7, 0.025, 0, TAU); ctx.fillStyle = "#3E2312"; ctx.fill(); }
+    }
+    P(); ctx.moveTo(-0.5, top); ctx.lineTo(0.5, top); ctx.lineTo(0.44, 0); ctx.lineTo(-0.44, 0); ctx.closePath(); fs(null);
+    ctx.restore();
+  }
+
+  // ---------- Portafilter (rim centre x, y; handle to the right) ----------
+  function drawBed(open) {
+    if (pf.spent) {
+      P(); ell(0, 0.05, 0.7, 0.19); ctx.fillStyle = "#38220F"; ctx.fill();
+      P(); ctx.ellipse(-0.18, 0.02, 0.35, 0.07, 0, Math.PI * 1.1, Math.PI * 1.85); ctx.lineWidth = 0.04; ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.stroke();
+      return;
+    }
+    if (pf.wet > 0.02 && pf.grounds <= 0.01) {
+      P(); ell(0, 0.06, 0.66, 0.17); ctx.fillStyle = "rgba(160,200,230," + (0.5 * pf.wet).toFixed(2) + ")"; ctx.fill();
+    }
+    if (pf.grounds <= 0.01) return;
+    if (pf.tamped >= 1) {
+      P(); ell(0, 0.04, 0.7, 0.19); ctx.fillStyle = "#5E3C21"; ctx.fill();
+      P(); ell(0, 0.04, 0.7, 0.19); ctx.lineWidth = 0.035; ctx.strokeStyle = "#3A2312"; ctx.stroke();
+      P(); ctx.ellipse(-0.12, 0.01, 0.42, 0.09, 0, Math.PI * 1.08, Math.PI * 1.9); ctx.lineWidth = 0.05; ctx.strokeStyle = "rgba(255,255,255,0.42)"; ctx.stroke();
+      return;
+    }
+    var a = pf.grounds, h = (0.42 - 0.22 * pf.fluff) * a * (1 - pf.tamped);
+    ctx.save();
+    P(); ctx.moveTo(-0.7, 0.03); ctx.bezierCurveTo(-0.55, -h * 1.15, 0.55, -h * 1.15, 0.7, 0.03); ctx.ellipse(0, 0.03, 0.7, 0.19, 0, 0, Math.PI); ctx.closePath();
+    ctx.fillStyle = mix("#4C2E18", "#7B5232", pf.fluff); ctx.fill();
+    ctx.clip();
+    var r = srand(21), n = Math.round(18 * (1 - pf.fluff));
+    for (var i = 0; i < n; i++) { P(); ctx.arc((r() - 0.5) * 1.2, -r() * h * 0.9 + 0.08, 0.05 + r() * 0.05, 0, TAU); ctx.fillStyle = "#2F1B0C"; ctx.fill(); }
+    if (pf.fluff > 0.2) {
+      var r3 = srand(31);
+      for (var k = 0; k < 26; k++) { P(); ctx.arc((r3() - 0.5) * 1.3, -r3() * h + 0.1, 0.018, 0, TAU); ctx.fillStyle = "rgba(255,230,200," + (0.5 * pf.fluff).toFixed(2) + ")"; ctx.fill(); }
+    }
+    // Swirl lines where the needles went.
+    var tr = whisk.trail, t = now();
+    if (tr.length > 1) {
+      P();
+      for (var m = 1; m < tr.length; m++) {
+        if (t - tr[m].t > 1.6) continue;
+        ctx.moveTo(tr[m - 1].x * 0.6, tr[m - 1].y * 0.16 - h * 0.45);
+        ctx.lineTo(tr[m].x * 0.6, tr[m].y * 0.16 - h * 0.45);
+      }
+      ctx.lineWidth = 0.04; ctx.strokeStyle = "rgba(255,225,190,0.7)"; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawPF() {
+    ctx.save(); ctx.translate(pf.x, pf.y); ctx.rotate(pf.rot);
+    // Handle: long when it points to the side, shorter once twisted to point at you.
+    var len = 2.25 * (1 - 0.4 * pf.twist), ang = 0.16 + 0.42 * pf.twist;
+    ctx.save(); ctx.rotate(ang);
+    P(); rrect(0.68, -0.02, len, 0.4, 0.2); fs(hg(0, 1, ["#2A2D35", "#2A2D35"]));
+    P(); rrect(0.84, 0.06, len - 0.4, 0.09, 0.05); ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fill();
+    P(); rrect(0.6, -0.05, 0.38, 0.46, 0.08); fs(steel(0.6, 0.98), 0.8);
+    ctx.restore();
+    // Spouts.
+    P(); rrect(-0.24, 0.55, 0.48, 0.24, 0.06); fs(steel(-0.24, 0.24), 0.8);
+    tube([[-0.12, 0.76], [-0.3, 1.02]], 0.1, "#C9CFDA");
+    tube([[0.12, 0.76], [0.3, 1.02]], 0.1, "#C9CFDA");
+    // Lugs and basket.
+    P(); rrect(-1.02, -0.06, 0.24, 0.16, 0.05); fs("#B9C0CC", 0.7);
+    P(); rrect(0.78, -0.06, 0.24, 0.16, 0.05); fs("#B9C0CC", 0.7);
+    P(); ctx.moveTo(-0.86, 0); ctx.lineTo(0.86, 0); ctx.lineTo(0.72, 0.52); ctx.quadraticCurveTo(0, 0.7, -0.72, 0.52); ctx.closePath(); fs(steel(-0.86, 0.86));
+    P(); ell(0, 0, 0.86, 0.26); fs("#D7DCE5");
+    P(); ell(0, 0.02, 0.73, 0.2); ctx.fillStyle = "#4C5262"; ctx.fill();
+    if (!(pf.at === "group" && !pf.up)) drawBed();
+    ctx.restore();
+  }
+  function drawStandBack() {
+    var x = XST;
+    P(); ctx.ellipse(x, BASE + 0.05, 1.1, 0.13, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill();
+    P(); rrect(x - 0.95, STAND_RING, 1.9, BASE - STAND_RING, 0.2); fs("#26282F");
+    P(); ell(x, STAND_RING, 0.95, 0.26); fs("#3A3D47");
+    P(); ell(x, STAND_RING, 0.72, 0.18); ctx.fillStyle = "#121318"; ctx.fill();
+  }
+  function drawStandFront() {
+    var x = XST;
+    P(); ctx.moveTo(x - 0.95, STAND_RING); ctx.ellipse(x, STAND_RING, 0.95, 0.26, 0, Math.PI, 0, true);
+    ctx.lineTo(x + 0.95, BASE - 0.2); ctx.quadraticCurveTo(x + 0.95, BASE, x + 0.75, BASE); ctx.lineTo(x - 0.75, BASE); ctx.quadraticCurveTo(x - 0.95, BASE, x - 0.95, BASE - 0.2); ctx.closePath();
+    fs(hg(x - 0.95, x + 0.95, ["#1F2128", "#3A3D47", "#26282F"]));
+  }
+
+  // ---------- Funnel, needle tool, tamper ----------
+  function drawFunnel() {
+    var x = funnel.x, y = funnel.y;
+    P(); ctx.moveTo(x - 0.9, y); ctx.lineTo(x - 1.1, y - 0.55); ctx.lineTo(x + 1.1, y - 0.55); ctx.lineTo(x + 0.9, y); ctx.closePath(); fs(steel(x - 1.1, x + 1.1));
+    P(); ell(x, y - 0.55, 1.1, 0.3); fs("#474C5B");
+    var onPf = funnel.at === "stand" && pf.at === "stand" && !pf.up && Math.abs(funnel.y - pf.y) < 0.02;
+    if (onPf && pf.grounds > 0.01) {
+      ctx.save(); P(); ell(x, y - 0.55, 1.0, 0.27); ctx.clip();
+      ctx.translate(pf.x, pf.y); ctx.scale(1.15, 1.15); drawBed(); ctx.restore();
+    }
+    P(); ell(x, y - 0.55, 1.1, 0.3); fs(null);
+    line(x - 0.75, y - 0.45, x - 0.62, y - 0.08, 2.5 / cam.s, "rgba(255,255,255,0.7)");
+  }
+  function drawWdt() {
+    var x = wdt.x, y = wdt.y;
+    if (wdt.at === "hook" && !wdt.up) { P(); rrect(ML - 0.12, y - 2.15, 0.2, 0.2, 0.06); fs("#9AA2B2", 0.7); }
+    P();
+    for (var i = 0; i < 7; i++) { var dx = (i - 3) * 0.075; ctx.moveTo(x + dx, y); ctx.lineTo(x + (i - 3) * 0.03, y - 0.95); }
+    ctx.lineWidth = 0.075; ctx.strokeStyle = INK; ctx.lineCap = "round"; ctx.stroke();
+    ctx.lineWidth = 0.035; ctx.strokeStyle = "#E3E7EE"; ctx.stroke();
+    P(); rrect(x - 0.17, y - 1.12, 0.34, 0.2, 0.05); fs(steel(x - 0.17, x + 0.17), 0.7);
+    P(); rrect(x - 0.21, y - 2.12, 0.42, 1.02, 0.16); fs(hg(x - 0.21, x + 0.21, ["#2A2D35", "#4A4E5A", "#2A2D35"]));
+    if (wdt.at === "hook" && !wdt.up) { P(); ctx.arc(x, y - 2.2, 0.1, Math.PI, 0); ctx.lineWidth = 0.05; ctx.strokeStyle = "#9AA2B2"; ctx.stroke(); }
+  }
+  function drawTamper() {
+    var x = tamper.x, y = tamper.y;
+    if (tamper.at === "home" && !tamper.up) { P(); ctx.ellipse(x, BASE + 0.05, 0.95, 0.12, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill(); }
+    P(); ctx.moveTo(x - 0.8, y - 0.36); ctx.lineTo(x - 0.8, y); ctx.ellipse(x, y, 0.8, 0.2, 0, Math.PI, 0, true); ctx.lineTo(x + 0.8, y - 0.36); ctx.closePath(); fs(steel(x - 0.8, x + 0.8));
+    P(); ell(x, y - 0.36, 0.8, 0.2); fs("#E6EAF1");
+    P(); rrect(x - 0.18, y - 0.82, 0.36, 0.48, 0.08); fs(steel(x - 0.18, x + 0.18), 0.8);
+    P(); ctx.moveTo(x - 0.3, y - 0.8); ctx.bezierCurveTo(x - 0.45, y - 1.2, x - 0.3, y - 1.55, x - 0.42, y - 1.85);
+    ctx.bezierCurveTo(x - 0.3, y - 2.15, x + 0.3, y - 2.15, x + 0.42, y - 1.85); ctx.bezierCurveTo(x + 0.3, y - 1.55, x + 0.45, y - 1.2, x + 0.3, y - 0.8); ctx.closePath();
+    fs(hg(x - 0.45, x + 0.45, ["#8A5329", "#C98A52", "#9A6033"]));
+  }
+
+  // ---------- Espresso machine ----------
+  function btnLight(name) {
+    var t = now();
+    if (M.flash[name] && t < M.flash[name]) return { c: "#FFC93C", glow: 0.5 + 0.5 * Math.sin(t * 9) };
+    if (!M.on) return { c: "#3A4050", glow: 0 };
+    if (M.heat < 1) return { c: Math.sin(t * 5) > 0 ? "#F4F7FF" : "#3A4050", glow: 0 };
+    var p = M.pump;
+    if (p && ((p.k === "flush" && name === "one") || ((p.k === "soak" || p.k === "shot") && name === "two") || (p.k === "steam" && name === "milk") || (p.k === "rinse" && name === "one"))) return { c: "#7CF09A", glow: 0.6 };
+    var hint = !busy() && !p && ((S.step === "flush" && name === "one") || (S.step === "shot" && SH.ph === "ready" && name === "two") || (S.step === "steam" && !STM && name === "milk"));
+    if (hint) return { c: "#FFC93C", glow: 0.35 + 0.35 * Math.sin(t * 5) };
+    return { c: name === "power" ? "#9BE7FF" : "#F4F7FF", glow: 0 };
+  }
+  function drawButton(name) {
+    var x = BTN[name], y = BY, L = btnLight(name);
+    if (L.glow > 0) { P(); ctx.arc(x, y, BR + 0.18, 0, TAU); ctx.fillStyle = "rgba(255,220,90," + (0.5 * L.glow).toFixed(2) + ")"; ctx.fill(); }
+    P(); ctx.arc(x, y, BR, 0, TAU); fs(L.c, 0.9);
+    var pressed = (name === "two" && SH.held) || (name === "power" && M.press > now());
+    P(); ctx.arc(x, y + (pressed ? 0.03 : 0), BR * 0.74, 0, TAU); fs(steel(x - BR, x + BR), 0.8);
+    ctx.save(); ctx.translate(x, y + (pressed ? 0.03 : 0)); ctx.lineWidth = 0.06; ctx.strokeStyle = INK; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (name === "power") { P(); ctx.arc(0, 0.02, 0.14, -Math.PI * 0.3, Math.PI * 1.3); ctx.stroke(); P(); ctx.moveTo(0, -0.17); ctx.lineTo(0, 0.0); ctx.stroke(); }
+    else if (name === "one") { P(); rrect(-0.09, -0.08, 0.18, 0.18, 0.04); ctx.stroke(); }
+    else if (name === "two") { P(); rrect(-0.2, -0.08, 0.16, 0.18, 0.04); ctx.stroke(); P(); rrect(0.04, -0.08, 0.16, 0.18, 0.04); ctx.stroke(); }
+    else { P(); ctx.moveTo(-0.1, -0.06); ctx.lineTo(0.1, -0.06); ctx.lineTo(0.08, 0.13); ctx.lineTo(-0.08, 0.13); ctx.closePath(); ctx.stroke(); P(); ctx.moveTo(-0.03, -0.12); ctx.quadraticCurveTo(0.03, -0.17, -0.01, -0.22); ctx.stroke(); }
+    ctx.restore();
+    // The soak ring: fills while the button is held (about ten seconds).
+    if (name === "two" && SH.ph === "soak") {
+      var f = clamp(SH.soakT / 10, 0, 1);
+      P(); ctx.arc(x, y, BR + 0.12, -Math.PI / 2, -Math.PI / 2 + f * TAU); ctx.lineWidth = 0.12; ctx.strokeStyle = f >= 1 ? "#2EA05A" : "#FFC93C"; ctx.lineCap = "round"; ctx.stroke();
+    }
+  }
+  function drawMachine() {
+    var L = ML, R = MR;
+    P(); ctx.ellipse((L + R) / 2, BASE + 0.05, (R - L) / 2 + 0.3, 0.17, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fill();
+    P(); rrect(L, MT, R - L, BASE - MT, 0.42); fs(steel(L, R));
+    P(); rrect(L + 0.18, MT - 0.1, R - L - 0.36, 0.26, 0.1); fs("#DCE1E9", 0.8);
+    // Control panel with the four buttons.
+    P(); rrect(L + 0.3, -7.45, 4.0, 1.3, 0.3); fs("#2C3140");
+    ["power", "one", "two", "milk"].forEach(drawButton);
+    // Brew area.
+    P(); rrect(14.35, -5.95, 4.8, 5.0, 0.38); fs(hg(14.35, 19.15, ["#5E6678", "#8F98AA", "#737B8E", "#5E6678"]));
+    if (pf.at === "group" && !pf.up) drawPF();
+    // Group head.
+    P(); rrect(15.5, -5.95, 1.9, 0.5, 0.06); fs(steel(15.5, 17.4));
+    P(); rrect(15.3, -5.5, 2.3, 0.46, 0.14); fs(steel(15.3, 17.6));
+    // Water from the group (flush and rinse) falls even with no cup.
+    // Drip tray with its grate.
+    P(); rrect(14.3, -1.26, 4.9, BASE + 1.26 + 0.02, 0.16); fs(steel(14.3, 19.2));
+    P(); rrect(14.45, -1.24, 4.6, 0.3, 0.1); fs("#3A3F4C", 0.7);
+    P(); for (var gx = 14.75; gx < 19.0; gx += 0.3) { ctx.moveTo(gx, -1.18); ctx.lineTo(gx, -1.0); }
+    ctx.lineWidth = 2 / cam.s; ctx.strokeStyle = "#9AA2B2"; ctx.stroke();
+    // Steam wand on the right.
+    P(); ctx.arc(20.05, -6.35, 0.27, 0, TAU); fs(steel(19.8, 20.3));
+    var tipY = WAND_TIP;
+    tube([[20.2, -6.35], [20.7, -6.25], [XW, -5.85], [XW, tipY]], 0.17, "#D5DAE3");
+    line(XW - 0.03, -5.6, XW - 0.03, tipY + 0.2, 1.5 / cam.s, "rgba(255,255,255,0.8)");
+    // Side hook for the needle tool.
+    if (wdt.at === "hook" && !wdt.up) drawWdt();
+  }
+  // Water or espresso falling from the portafilter spouts.
+  function drawStreams() {
+    var p = M.pump;
+    if (!p || pf.at !== "group" || pf.up) return;
+    var t = now();
+    var y0 = pf.y + 1.02, yEnd;
+    var target = cup && !cup.up && Math.abs(cup.x - XGR) < 0.4 ? cupSurface(cup) : null;
+    yEnd = target ? target.y : DRIP - 0.1;
+    if (p.k === "flush" || p.k === "rinse") {
+      [-0.3, 0.3].forEach(function (dx) {
+        var x = pf.x + dx;
+        P(); ctx.rect(x - 0.07, y0, 0.14, yEnd - y0); ctx.fillStyle = "rgba(170,215,245,0.9)"; ctx.fill();
+        for (var y = y0 + ((t * 4) % 0.3); y < yEnd; y += 0.3) { P(); ctx.rect(x - 0.03, y, 0.04, 0.12); ctx.fillStyle = "#FFFFFF"; ctx.fill(); }
+      });
+      return;
+    }
+    if (p.k === "soak") return;
+    if (p.k === "shot") {
+      var f = clamp((SH.pourT - 1.4) / 2.0, 0, 1);
+      if (f <= 0) return;
+      var late = clamp((SH.pourT - SH.pourDur * 0.75) / (SH.pourDur * 0.25), 0, 1);
+      var w = 0.045 + 0.04 * f * (1 - 0.4 * late);
+      [-0.3, 0.3].forEach(function (dx, i) {
+        var xs = pf.x + dx, xe = pf.x + dx * 0.3;
+        var stepY = 0.11;
+        for (var y = y0; y < yEnd; y += stepY) {
+          var k = (y - y0) / Math.max(0.1, yEnd - y0);
+          var x = lerp(xs, xe, k * k) + Math.sin(y * 7 + t * 8 + i) * 0.01;
+          var band = Math.floor((y - t * 2.2) / 0.13) % 2 === 0;
+          ctx.fillStyle = band ? mix("#4A220C", "#8A5226", late) : mix("#B5682C", "#D9A066", late);
+          ctx.fillRect(x - w / 2, y, w, stepY + 0.01);
+        }
+      });
+    }
+  }
+
+  // ---------- Cups and what's in them ----------
+  function cupLevel(c) {
+    var C = CUPS[c.k], espL = c.esp * C.esp;
+    if (c.water > 0) return c.water;
+    return espL + c.milk * (0.9 - espL);
+  }
+  function surfDepth(c) { return Math.pow(1 - clamp(cupLevel(c), 0, 1), 1.4) * CUPS[c.k].rx * 0.3 * 1.5; }
+  function cupSurface(c) {
+    var C = CUPS[c.k], lv = cupLevel(c), top = c.y - C.h, ry = C.rx * 0.3;
+    var d = surfDepth(c);
+    return { x: c.x, y: top + Math.min(d, ry * 0.7), depth: d };
+  }
+  function drawSurface(c, rx) {
+    var C = CUPS[c.k], R = rx, t = now();
+    P(); ctx.arc(0, 0, R, 0, TAU);
+    if (c.water > 0 && c.milk <= 0) { ctx.fillStyle = "#CFE4F0"; ctx.fill(); P(); ctx.ellipse(-R * 0.3, -R * 0.2, R * 0.35, R * 0.12, 0, 0, TAU); ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fill(); return; }
+    if (c.k === "steamer") {
+      ctx.fillStyle = c.syrup ? "#FFF1D8" : "#FFFAF2"; ctx.fill();
+    } else if (c.milk <= 0.01) {
+      var g = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R);
+      g.addColorStop(0, "#D9A05C"); g.addColorStop(0.7, "#C07B3C"); g.addColorStop(1, "#7E4518");
+      ctx.fillStyle = g; ctx.fill();
+      var r = srand(41);
+      for (var i = 0; i < 12; i++) { P(); ctx.arc((r() - 0.5) * R * 1.4, (r() - 0.5) * R * 1.4, R * (0.05 + r() * 0.08), 0, TAU); ctx.fillStyle = "rgba(110,55,20,0.35)"; ctx.fill(); }
+      return;
+    } else if (c.k === "cappuccino") {
+      var g2 = ctx.createRadialGradient(0, 0, R * 0.5, 0, 0, R);
+      g2.addColorStop(0, "#FFFBF3"); g2.addColorStop(0.85, "#F4E2C8"); g2.addColorStop(1, "#B9773F");
+      ctx.fillStyle = c.milk < 0.4 ? mix("#C07B3C", "#F6E9D6", c.milk / 0.4) : g2; ctx.fill();
+    } else {
+      ctx.fillStyle = mix("#C07B3C", "#C9925B", clamp(c.milk * 2, 0, 1)); ctx.fill();
+    }
+    drawArt(c, R);
+    if (c.cocoaP > 0) {
+      var rr = srand(57), n = Math.round(60 * c.cocoaP);
+      ctx.fillStyle = "rgba(92,52,24,0.85)";
+      for (var k = 0; k < n; k++) { var a = rr() * TAU, d = Math.sqrt(rr()) * R * 0.85; P(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d, R * 0.025, 0, TAU); ctx.fill(); }
+    }
+  }
+  function heartPath(s, cy) {
+    ctx.moveTo(0, cy + s * 0.8);
+    ctx.bezierCurveTo(-s * 1.15, cy + s * 0.05, -s * 0.85, cy - s * 0.9, 0, cy - s * 0.35);
+    ctx.bezierCurveTo(s * 0.85, cy - s * 0.9, s * 1.15, cy + s * 0.05, 0, cy + s * 0.8);
+  }
+  function starPath(s) {
+    for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? s * 0.45 : s; if (i) ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.closePath();
+  }
+  function drawArt(c, R) {
+    var p = c.artP, art = c.art, WH = "#FFFDF7";
+    if (p <= 0) return;
+    if (art === "heart") {
+      if (p < 0.7) { P(); ctx.arc(0, R * 0.05, R * 0.62 * easeOut(p / 0.7), 0, TAU); ctx.fillStyle = WH; ctx.fill(); }
+      else {
+        var k = (p - 0.7) / 0.3;
+        P(); ctx.arc(0, R * 0.05, R * 0.62, 0, TAU); ctx.fillStyle = "rgba(255,253,247," + (1 - k).toFixed(2) + ")"; ctx.fill();
+        P(); heartPath(R * 0.62, R * 0.02); ctx.fillStyle = WH; ctx.globalAlpha = k; ctx.fill(); ctx.globalAlpha = 1;
+      }
+    } else if (art === "tulip") {
+      var layers = [[R * 0.32, R * 0.42], [R * -0.05, R * 0.34], [R * -0.36, R * 0.24]];
+      layers.forEach(function (L, i) {
+        var a = clamp(p * 3.2 - i * 0.9, 0, 1); if (a <= 0) return;
+        P(); ctx.arc(0, L[0], L[1] * easeOut(a), 0, TAU); ctx.fillStyle = WH; ctx.fill();
+        if (i < 2) { P(); ctx.arc(0, L[0] - L[1] * 0.55, L[1] * 0.8 * easeOut(a), 0, TAU); ctx.fillStyle = "#C9925B"; ctx.fill(); }
+      });
+      if (p > 0.85) line(0, -R * 0.55, 0, R * 0.7, R * 0.05, "#C9925B");
+    } else if (art === "rosetta") {
+      var n = Math.floor(p * 7);
+      for (var i = 0; i < n; i++) {
+        var y = R * (0.6 - i * 0.17), w = R * (0.62 - i * 0.06);
+        P(); ctx.ellipse(0, y, w, R * 0.11, 0, 0, TAU); ctx.fillStyle = WH; ctx.fill();
+        P(); ctx.ellipse(0, y - R * 0.06, w * 0.8, R * 0.06, 0, 0, TAU); ctx.fillStyle = "#C9925B"; ctx.fill();
+      }
+      if (p > 0.9) { P(); heartPath(R * 0.16, -R * 0.62); ctx.fillStyle = WH; ctx.fill(); line(0, -R * 0.6, 0, R * 0.75, R * 0.05, "#C9925B"); }
+    } else if (art === "bear") {
+      var s = easeOut(clamp(p / 0.8, 0, 1)), face = c.k === "steamer" ? "#F3DFC0" : WH, ink = "#5C3418";
+      P(); ctx.arc(-R * 0.4, -R * 0.3, R * 0.2 * s, 0, TAU); ctx.arc(R * 0.4, -R * 0.3, R * 0.2 * s, 0, TAU); ctx.fillStyle = face; ctx.fill();
+      P(); ctx.arc(0, R * 0.08, R * 0.52 * s, 0, TAU); ctx.fillStyle = face; ctx.fill();
+      if (p > 0.85) {
+        P(); ctx.arc(-R * 0.18, 0, R * 0.065, 0, TAU); ctx.arc(R * 0.18, 0, R * 0.065, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+        P(); ctx.ellipse(0, R * 0.17, R * 0.09, R * 0.065, 0, 0, TAU); ctx.fill();
+        P(); ctx.arc(0, R * 0.22, R * 0.12, 0.2, Math.PI - 0.2); ctx.lineWidth = R * 0.035; ctx.strokeStyle = ink; ctx.stroke();
+      }
+    } else if (art === "plain" || art === "cloud") {
+      var r = srand(77);
+      for (var b = 0; b < 10; b++) { P(); ctx.arc((r() - 0.5) * R * 1.3, (r() - 0.5) * R * 1.3, R * 0.04, 0, TAU); ctx.strokeStyle = "rgba(200,170,130,0.5)"; ctx.lineWidth = R * 0.015; ctx.stroke(); }
+    } else if (art === "cocoaheart" || art === "cocoastar") {
+      if (p < 0.95) return;
+      P(); if (art === "cocoaheart") heartPath(R * 0.5, 0); else starPath(R * 0.6);
+      ctx.fillStyle = "rgba(100,56,26,0.85)"; ctx.fill();
+    }
+    if (c.k === "steamer" && art === "heart") { /* drawn above in white on cream */ }
+  }
+  function drawCup(c, x, y, rot, alpha) {
+    var C = CUPS[c.k];
+    ctx.save();
+    if (alpha !== undefined && alpha < 1) ctx.globalAlpha = Math.max(0, alpha);
+    ctx.translate(x, y - C.h / 2); if (rot) ctx.rotate(rot); if (c.pop !== undefined && c.pop < 1) { var k = easeOut(c.pop) * 1.08 - 0.08 * Math.max(0, c.pop - 0.7) / 0.3; ctx.scale(k, k); }
+    ctx.translate(0, C.h / 2);
+    var top = -C.h, ry = C.rx * 0.3;
+    if (!rot) { P(); ctx.ellipse(0, 0.04, C.brx + 0.15, 0.1, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill(); }
+    // Handle.
+    P(); ctx.moveTo(C.rx * 0.9, top + 0.2); ctx.bezierCurveTo(C.rx + 0.6, top + 0.12, C.rx + 0.5, top + C.h * 0.78, (C.rx + C.brx) / 2 + 0.05, top + C.h * 0.72);
+    ctx.lineCap = "round"; ctx.lineWidth = 0.17 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.17; ctx.strokeStyle = C.col; ctx.stroke();
+    // Body.
+    P(); ctx.moveTo(-C.rx, top); ctx.lineTo(C.rx, top); ctx.bezierCurveTo(C.rx, top + C.h * 0.62, C.brx + 0.08, 0, C.brx, 0);
+    ctx.lineTo(-C.brx, 0); ctx.bezierCurveTo(-C.brx - 0.08, 0, -C.rx, top + C.h * 0.62, -C.rx, top); ctx.closePath();
+    fs(hg(-C.rx, C.rx, [C.dark, C.col, mix(C.col, "#FFFFFF", 0.45), C.col, C.dark]));
+    if (c.k === "steamer") { ctx.save(); ctx.translate(-0.05, top + C.h * 0.52); P(); starPath(0.26); fs("#FFFFFF", 0.7); ctx.restore(); }
+    if (c.k === "latte") { ctx.save(); P(); heartPath(0.2, top + C.h * 0.5); fs("#FFFFFF", 0.7); ctx.restore(); }
+    // Rim and inside.
+    P(); ell(0, top, C.rx, ry); fs("#FBF6EF");
+    var lv = cupLevel(c);
+    if (lv > 0.01) {
+      ctx.save(); P(); ell(0, top, C.rx * 0.93, ry * 0.88); ctx.clip();
+      var d = surfDepth(c), srx = lerp(C.brx, C.rx, Math.max(0.45, lv)) * 0.93;
+      ctx.translate(0, top + d); ctx.scale(1, 0.3);
+      drawSurface(c, srx);
+      ctx.restore();
+    }
+    // Cappuccino: a tall cloud of foam.
+    if (c.foam > 0.01) {
+      var dh = 0.45 * c.foam;
+      ctx.save();
+      P(); ctx.moveTo(-C.rx * 0.93, top); ctx.bezierCurveTo(-C.rx * 0.9, top - dh * 1.35, C.rx * 0.9, top - dh * 1.35, C.rx * 0.93, top);
+      ctx.ellipse(0, top, C.rx * 0.93, ry * 0.88, 0, 0, Math.PI); ctx.closePath();
+      var g = ctx.createLinearGradient(0, top - dh, 0, top + ry);
+      g.addColorStop(0, "#FFFFFF"); g.addColorStop(1, "#F1E2CC");
+      ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = LW * 0.7; ctx.strokeStyle = "rgba(29,35,64,0.5)"; ctx.stroke();
+      ctx.clip();
+      if (c.cocoaP > 0) {
+        var rr = srand(57), n = Math.round(70 * c.cocoaP);
+        ctx.fillStyle = "rgba(92,52,24,0.85)";
+        for (var k2 = 0; k2 < n; k2++) { P(); ctx.arc((rr() - 0.5) * C.rx * 1.7, top - rr() * dh * 1.05 + ry * 0.3, 0.025, 0, TAU); ctx.fill(); }
+      }
+      if ((c.art === "cocoaheart" || c.art === "cocoastar") && c.artP >= 0.95) {
+        ctx.translate(0, top - dh * 0.55); ctx.scale(1, 0.45); P();
+        if (c.art === "cocoaheart") heartPath(C.rx * 0.45, 0); else starPath(C.rx * 0.55);
+        ctx.fillStyle = "rgba(100,56,26,0.85)"; ctx.fill();
+      }
+      ctx.restore();
+    }
+    P(); ell(0, top, C.rx, ry); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Milk jug, syrups, carton, cocoa shaker ----------
+  function jugSpout() {
+    var lx = -0.98, ly = -JUG_H / 2 - 0.02, c = Math.cos(jug.rot), s = Math.sin(jug.rot);
+    var cx = jug.x, cy = jug.y - jug.lift - JUG_H / 2;
+    return { x: cx + lx * c - ly * s, y: cy + lx * s + ly * c };
+  }
+  function drawJug() {
+    ctx.save(); ctx.translate(jug.x, jug.y - jug.lift - JUG_H / 2); ctx.rotate(jug.rot); ctx.translate(0, JUG_H / 2);
+    var top = -JUG_H;
+    if (!jug.rot && jug.at !== "top") { P(); ctx.ellipse(0, 0.04 + jug.lift, 0.95, 0.1, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fill(); }
+    // Handle.
+    P(); ctx.moveTo(0.66, top + 0.3); ctx.bezierCurveTo(1.35, top + 0.25, 1.3, top + 1.2, 0.74, top + 1.25);
+    ctx.lineCap = "round"; ctx.lineWidth = 0.2 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.2; ctx.strokeStyle = "#C9D0DB"; ctx.stroke();
+    // Body with the spout.
+    P(); ctx.moveTo(-0.66, top + 0.08); ctx.lineTo(-1.0, top - 0.02); ctx.lineTo(-0.62, top + 0.3); ctx.bezierCurveTo(-0.7, top + 0.9, -0.8, -0.3, -0.78, 0);
+    ctx.lineTo(0.78, 0); ctx.bezierCurveTo(0.8, -0.3, 0.7, top + 0.9, 0.66, top); ctx.lineTo(-0.66, top + 0.08); ctx.closePath();
+    fs(steel(-0.8, 0.8));
+    P(); ell(0.0, top + 0.04, 0.66, 0.18); fs("#7D8596");
+    if (jug.milk > 0.01) {
+      ctx.save(); P(); ell(0.0, top + 0.04, 0.6, 0.16); ctx.clip();
+      var lv = top + 0.04 + (1 - Math.min(1, jug.milk + jug.foam * 0.35)) * 0.5;
+      P(); ell(0, lv, 0.62, 0.17); ctx.fillStyle = mix("#F7F3EA", "#FFFFFF", clamp(jug.foam, 0, 1)); ctx.fill();
+      // The whirlpool while it steams.
+      if (STM || jug.swirlA > 0.02) {
+        ctx.translate(0, lv); ctx.scale(1, 0.28);
+        var a0 = jug.swirl;
+        P(); for (var i = 0; i < 3; i++) { ctx.moveTo(Math.cos(a0 + i * 2.1) * 0.5, Math.sin(a0 + i * 2.1) * 0.5); ctx.arc(0, 0, 0.5, a0 + i * 2.1, a0 + i * 2.1 + 1.2); }
+        ctx.lineWidth = 0.05; ctx.strokeStyle = "rgba(190,175,150," + (0.7 * (jug.swirlA || 1)).toFixed(2) + ")"; ctx.stroke();
+      }
+      ctx.restore();
+    }
+    P(); ell(0.0, top + 0.04, 0.66, 0.18); fs(null, 0.8);
+    line(-0.5, top + 0.45, -0.55, -0.25, 2.5 / cam.s, "rgba(255,255,255,0.7)");
+    ctx.restore();
+  }
+  function drawWandInJug() {
+    // The part of the wand that goes into the jug's opening.
+    if (jug.at !== "wand" || jug.up) return;
+    var top = jug.y - jug.lift - JUG_H + 0.04;
+    ctx.save(); P(); ell(jug.x, top, 0.6, 0.16); ctx.clip();
+    tube([[XW, top - 0.4], [XW, top + 0.3]], 0.17, "#D5DAE3");
+    ctx.restore();
+  }
+  function drawSyrup(b) {
+    var x = b.x, y = b.y;
+    ctx.save(); ctx.translate(x, y - 0.8); ctx.rotate(b.rot); ctx.translate(0, 0.8);
+    P(); rrect(-0.36, -1.55, 0.72, 1.55, 0.16); fs("rgba(235,245,255,0.55)");
+    P(); rrect(-0.3, -1.25, 0.6, 1.2, 0.12); ctx.fillStyle = b.liq; ctx.fill();
+    P(); rrect(-0.27, -1.0, 0.54, 0.55, 0.06); fs("#FFF8E8", 0.6);
+    if (b.id === "vanilla") { P(); ctx.ellipse(0, -0.72, 0.1, 0.2, 0.5, 0, TAU); ctx.fillStyle = "#F4E7B5"; ctx.fill(); line(-0.1, -0.6, 0.12, -0.86, 0.04, "#5C3A1E"); }
+    else { P(); rrect(-0.15, -0.83, 0.3, 0.22, 0.05); fs("#D98C3C", 0.5); }
+    P(); rrect(-0.36, -1.55, 0.72, 1.55, 0.16); fs(null);
+    P(); rrect(-0.14, -1.85 + b.pump * 0.1, 0.28, 0.32, 0.05); fs("#2B2E36", 0.8);
+    P(); rrect(-0.24, -2.05 + b.pump * 0.12, 0.48, 0.2, 0.06); fs("#2B2E36", 0.8);
+    tube([[-0.2, -1.97 + b.pump * 0.12], [-0.55, -1.97 + b.pump * 0.12]], 0.07, "#2B2E36");
+    ctx.restore();
+  }
+  function drawCarton() {
+    if (!carton) return;
+    ctx.save(); ctx.globalAlpha = carton.a; ctx.translate(carton.x, carton.y); ctx.rotate(carton.rot);
+    P(); ctx.moveTo(-0.5, 0); ctx.lineTo(-0.5, -1.4); ctx.lineTo(0, -1.85); ctx.lineTo(0.5, -1.4); ctx.lineTo(0.5, 0); ctx.closePath(); fs("#FFFFFF");
+    P(); rrect(-0.5, -1.0, 1.0, 0.55, 0.02); ctx.fillStyle = "#6FB3F2"; ctx.fill();
+    P(); ctx.moveTo(-0.5, 0); ctx.lineTo(-0.5, -1.4); ctx.lineTo(0, -1.85); ctx.lineTo(0.5, -1.4); ctx.lineTo(0.5, 0); ctx.closePath(); fs(null);
+    P(); rrect(-0.12, -2.05, 0.24, 0.24, 0.04); fs("#2D7BE5", 0.7);
+    ctx.restore();
+  }
+  function drawShaker() {
+    if (!shaker) return;
+    ctx.save(); ctx.translate(shaker.x, shaker.y); ctx.rotate(shaker.rot);
+    P(); rrect(-0.32, -0.9, 0.64, 0.9, 0.12); fs(hg(-0.32, 0.32, ["#7A4A26", "#A86C3C", "#7A4A26"]));
+    P(); rrect(-0.36, 0.0, 0.72, 0.22, 0.08); fs(steel(-0.36, 0.36), 0.8);
+    ctx.restore();
+  }
+
+  // ---------- Knock box and tray ----------
+  function drawKnock() {
+    var x = XK;
+    P(); ctx.ellipse(x, BASE + 0.05, 1.15, 0.14, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fill();
+    P(); ctx.moveTo(x - 1.0, -1.65); ctx.lineTo(x - 0.92, BASE); ctx.lineTo(x + 0.92, BASE); ctx.lineTo(x + 1.0, -1.65); ctx.closePath(); fs(hg(x - 1, x + 1, ["#1F2128", "#40444F", "#26282F"]));
+    P(); ell(x, -1.65, 1.0, 0.3); fs("#121318");
+    var n = Math.min(6, S.pucks);
+    var r = srand(3);
+    for (var i = 0; i < n; i++) { P(); ctx.ellipse(x + (r() - 0.5) * 1.0, -1.6 - i * 0.012, 0.36, 0.1, (r() - 0.5) * 0.4, 0, TAU); ctx.fillStyle = i % 2 ? "#4A2E18" : "#3A2312"; ctx.fill(); }
+    // The bar across the box.
+    P(); rrect(x - 0.98, -1.78, 1.96, 0.2, 0.1); fs("#8C93A6", 0.9);
+  }
+  function drawTray() {
+    P(); ctx.ellipse((TRAY_L + TRAY_R) / 2, BASE + 0.05, (TRAY_R - TRAY_L) / 2 + 0.1, 0.13, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fill();
+    P(); ctx.moveTo(TRAY_L - 0.15, TRAY_Y - 0.25); ctx.lineTo(TRAY_R + 0.15, TRAY_Y - 0.25); ctx.lineTo(TRAY_R, BASE); ctx.lineTo(TRAY_L, BASE); ctx.closePath();
+    fs(hg(TRAY_L, TRAY_R, ["#B97C46", "#D99E66", "#B97C46"]));
+    P(); rrect(TRAY_L + 0.12, TRAY_Y - 0.12, TRAY_R - TRAY_L - 0.24, 0.16, 0.06); ctx.fillStyle = "#9A6233"; ctx.fill();
+    [TRAY_L + 0.35, TRAY_R - 0.35].forEach(function (hx) { P(); rrect(hx - 0.22, TRAY_Y - 0.1, 0.44, 0.17, 0.08); fs("#5E3A1C", 0.6); });
+    var all = tray.concat(leaving), t = now();
+    all.forEach(function (d) {
+      var c = { k: d.d, water: 0, esp: d.d === "steamer" ? 0 : 1, milk: 1, foam: d.d === "cappuccino" ? 1 : 0, art: d.art, artP: 1, cocoaP: d.cocoa ? 1 : 0, syrup: false };
+      drawCup(c, d.x, TRAY_Y, 0, d.a);
+      // A little steam rising.
+      if (!reduce && d.a > 0.5) {
+        for (var i = 0; i < 2; i++) {
+          var ph = (t * 0.35 + i * 0.5 + d.x * 0.13) % 1, y0 = TRAY_Y - CUPS[d.d].h - 0.3;
+          P(); ctx.moveTo(d.x + (i - 0.5) * 0.4, y0 - ph * 0.9);
+          ctx.bezierCurveTo(d.x + (i - 0.5) * 0.4 + 0.2, y0 - ph * 0.9 - 0.3, d.x + (i - 0.5) * 0.4 - 0.2, y0 - ph * 0.9 - 0.5, d.x + (i - 0.5) * 0.4, y0 - ph * 0.9 - 0.8);
+          ctx.lineWidth = 0.09; ctx.lineCap = "round"; ctx.strokeStyle = "rgba(255,255,255," + (0.85 * Math.sin(ph * Math.PI)).toFixed(2) + ")"; ctx.stroke();
+        }
+      }
+    });
+  }
+
+  // ---------- Particles ----------
+  function addPart(o) { if (parts.length < 400) parts.push(o); }
+  function updParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i];
+      p.life += dt;
+      p.vy += (p.g || 0) * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.vr) p.rot += p.vr * dt;
+      if ((p.floor !== undefined && p.y >= p.floor) || p.life >= p.max) parts.splice(i, 1);
+    }
+  }
+  function drawParts() {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], k = p.life / p.max;
+      if (p.k === "bean") bean(p.x, p.y, 0.12, p.rot, p.col);
+      else if (p.k === "ground") { P(); ctx.arc(p.x, p.y, 0.035, 0, TAU); ctx.fillStyle = "#5A371C"; ctx.fill(); }
+      else if (p.k === "drop") { P(); ctx.arc(p.x, p.y, p.r || 0.05, 0, TAU); ctx.fillStyle = p.col || "rgba(170,215,245,0.95)"; ctx.fill(); }
+      else if (p.k === "puff") { P(); ctx.arc(p.x, p.y, p.r * (0.6 + k * 1.2), 0, TAU); ctx.fillStyle = "rgba(255,255,255," + (0.75 * (1 - k)).toFixed(2) + ")"; ctx.fill(); }
+      else if (p.k === "dust") { P(); ctx.arc(p.x, p.y, 0.025, 0, TAU); ctx.fillStyle = "#5C3418"; ctx.fill(); }
+      else if (p.k === "spark") {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); var s = 0.18 * (1 - k * 0.6); ctx.globalAlpha = 1 - k;
+        P(); for (var j = 0; j < 8; j++) { var a = j * Math.PI / 4, r = j % 2 ? s * 0.4 : s; if (j) ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); else ctx.moveTo(r, 0); }
+        ctx.closePath(); ctx.fillStyle = p.col; ctx.fill(); ctx.restore();
+      }
+    }
+  }
+  function sparkle(x, y, n) {
+    var cols = ["#FFC93C", "#FF6FB5", "#4CD964", "#3DB4FF", "#FFFFFF"];
+    for (var i = 0; i < (n || 14); i++) { var a = rand(0, TAU), v = rand(0.8, 2.2); addPart({ k: "spark", x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.8, g: 2.2, life: 0, max: rand(0.9, 1.5), rot: rand(0, 3), vr: rand(-4, 4), col: cols[i % cols.length] }); }
+  }
+  function puff(x, y, r) { addPart({ k: "puff", x: x + rand(-0.2, 0.2), y: y, vx: rand(-0.25, 0.25), vy: rand(-0.9, -0.5), life: 0, max: rand(1.2, 1.9), r: r || rand(0.2, 0.35) }); }
+
+  // ---------- Sound (only when the shared sound is on; soft) ----------
+  function A() { return Toybox.sound.ready(); }
+  var nbuf = null;
+  function noiseBuf(a) {
+    if (!nbuf || nbuf.sampleRate !== a.sampleRate) {
+      nbuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
+      var d = nbuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return nbuf;
+  }
+  function blip(f, dur, vol, type, f2) {
+    var a = A(); if (!a) return;
+    var t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function burst(dur, vol, type, freq, qv) {
+    var a = A(); if (!a) return;
+    var t = a.currentTime, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = noiseBuf(a); f.type = type; f.frequency.value = freq; f.Q.value = qv || 1;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+  }
+  function beep() { blip(1900, 0.11, 0.025); }
+  function click() { blip(1100, 0.05, 0.035, "triangle", 500); }
+  function clunk() { blip(160, 0.25, 0.1, "sine", 55); burst(0.08, 0.04, "lowpass", 900); }
+  function thunk() { blip(110, 0.35, 0.14, "sine", 40); burst(0.15, 0.06, "lowpass", 500); }
+  function rattle() { for (var i = 0; i < 5; i++) setTimeout(function () { burst(0.04, 0.025, "bandpass", 2500 + Math.random() * 1500, 3); }, i * 60 + Math.random() * 30); }
+  function chime() { blip(784, 0.5, 0.035); setTimeout(function () { blip(1047, 0.6, 0.035); }, 150); }
+  var loops = {};
+  function startLoop(name) {
+    var a = A(); if (!a) return null;
+    var t = a.currentTime, out = a.createGain(), nodes = [], vol = 0.04;
+    out.gain.setValueAtTime(0.0001, t); out.connect(a.destination);
+    if (name !== "pump") {
+      var s = a.createBufferSource(); s.buffer = noiseBuf(a); s.loop = true;
+      var f = a.createBiquadFilter();
+      if (name === "grind") { f.type = "bandpass"; f.frequency.value = 650; f.Q.value = 0.8; vol = 0.05; }
+      else if (name === "steam") { f.type = "highpass"; f.frequency.value = 2600; vol = 0.025; }
+      else { f.type = "lowpass"; f.frequency.value = 700; vol = 0.02; }
+      s.connect(f); f.connect(out); s.start(); nodes.push(s);
+    }
+    if (name === "grind" || name === "pump") {
+      var o = a.createOscillator(); o.type = name === "grind" ? "sawtooth" : "triangle"; o.frequency.value = name === "grind" ? 95 : 64;
+      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 300;
+      var og = a.createGain(); og.gain.value = name === "grind" ? 0.4 : 1;
+      o.connect(lp); lp.connect(og); og.connect(out); o.start(); nodes.push(o);
+    }
+    out.gain.exponentialRampToValueAtTime(vol, t + 0.2);
+    return function () {
+      var t2 = a.currentTime;
+      try { out.gain.cancelScheduledValues(t2); out.gain.setValueAtTime(Math.max(0.0001, out.gain.value), t2); out.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.25); } catch (e) { /* ignore */ }
+      nodes.forEach(function (n) { try { n.stop(t2 + 0.3); } catch (e) { /* ignore */ } });
+    };
+  }
+  function setLoop(name, on) {
+    if (on) { if (!loops[name]) { var st = startLoop(name); if (st) loops[name] = st; } }
+    else if (loops[name]) { loops[name](); delete loops[name]; }
+  }
+  function stopLoops() { Object.keys(loops).forEach(function (k) { setLoop(k, false); }); }
+
+  // ---------- Coach line, counter, progress pictures, panel ----------
+  var coachEl = $("coach"), coachText = "", say = { text: "", until: 0 };
+  function sayNow(t, secs) { say.text = t; say.until = now() + (secs || 3); }
+  function coachLine() {
+    if (say.text && now() < say.until) return say.text;
+    var st = S.step, d = S.drink;
+    if (M.pending && M.on && M.heat < 1) return "Warming up…";
+    switch (st) {
+      case "choose": return "Pick a drink!";
+      case "power": return M.on ? "Warming up…" : "Switch it on!";
+      case "flush": return M.pump ? "Hot water!" : "Press for water!";
+      case "tip": return "Tip it out!";
+      case "weigh": return WG.right ? "Just right!" : "Scoop 18 grams!";
+      case "hopper": return "Pour in the beans!";
+      case "grind": return G ? "Grinding!" : "Press grind!";
+      case "dump": return "Tip it in!";
+      case "whisk": return pf.fluff >= 1 ? "Fluffy!" : "Whisk it!";
+      case "funnel": return "Funnel off!";
+      case "tamp": return pf.tamped >= 1 ? "Flat and firm!" : "Tamp it down!";
+      case "lock": return pf.at === "group" ? "Locked in!" : "Lock it in!";
+      case "shot":
+        if (SH.ph === "ready") return "Hold the button!";
+        if (SH.ph === "soak") return SH.soakT >= 10 || SH.letGo ? "Let go!" : (SH.held ? "Hold it…" : "Soaking…");
+        if (SH.ph === "pour") return "Watch the scale!";
+        return "Done!";
+      case "jug": return "Jug under the wand!";
+      case "steam": return STM ? "Steaming!" : "Steam the milk!";
+      case "pour": return jug.pouring ? (d === "steamer" ? "Pouring!" : "Pouring the art!") : "Pour it in!";
+      case "serve": return d === "latte" ? "For Mom!" : (d === "cappuccino" ? "For Dad!" : "For you!");
+      case "knock": return "Knock it out!";
+      case "rinse": return "Rinse it!";
+    }
+    return "";
+  }
+  function updCoach() {
+    var t = coachLine();
+    if (t !== coachText) { coachText = t; coachEl.textContent = t; }
+  }
+  var counterEl = $("counter");
+  function updCounter() { counterEl.textContent = "Drinks: " + S.count; }
+
+  function sv(inner, vb) { return '<svg viewBox="' + (vb || "0 0 60 60") + '" aria-hidden="true">' + inner + "</svg>"; }
+  var SK = ' stroke="#1D2340" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+  var PIC = {
+    latte: sv('<path d="M10 22 H50 Q49 46 38 52 H22 Q11 46 10 22 Z" fill="#F79BB6"' + SK + '/><path d="M49 28 Q60 28 57 38 Q55 44 46 43" fill="none"' + SK + '/><ellipse cx="30" cy="22" rx="20" ry="6" fill="#C9925B"' + SK + '/><path d="M30 26 C22 21 23 16 27 16 C29 16 30 18 30 19 C30 18 31 16 33 16 C37 16 38 21 30 26 Z" fill="#FFFDF7"/>'),
+    cappuccino: sv('<path d="M12 26 H48 Q47 46 37 51 H23 Q13 46 12 26 Z" fill="#78AEEB"' + SK + '/><path d="M47 31 Q58 31 55 40 Q53 45 45 44" fill="none"' + SK + '/><path d="M12 26 Q14 10 30 10 Q46 10 48 26 Z" fill="#FFFBF3"' + SK + '/><g fill="#6B3F20"><circle cx="24" cy="17" r="1.6"/><circle cx="31" cy="14" r="1.6"/><circle cx="36" cy="19" r="1.6"/><circle cx="28" cy="21" r="1.6"/><circle cx="40" cy="23" r="1.4"/><circle cx="20" cy="22" r="1.4"/></g>'),
+    steamer: sv('<path d="M15 24 H45 V48 Q45 53 40 53 H20 Q15 53 15 48 Z" fill="#FFD34D"' + SK + '/><path d="M45 30 Q56 30 54 39 Q52 45 45 44" fill="none"' + SK + '/><ellipse cx="30" cy="24" rx="15" ry="4.5" fill="#FFFAF2"' + SK + '/><path d="M30 33 L32 38 L37 38 L33 41 L35 46 L30 43 L25 46 L27 41 L23 38 L28 38 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/><path d="M24 17 Q21 13 24 9 M32 17 Q29 13 32 8" fill="none" stroke="#9AA9C8" stroke-width="3" stroke-linecap="round"/>'),
+    vanilla: sv('<rect x="20" y="20" width="20" height="34" rx="5" fill="#F1DDAE"' + SK + '/><rect x="22" y="30" width="16" height="13" rx="2" fill="#FFF8E8" stroke="#1D2340" stroke-width="2"/><ellipse cx="30" cy="36.5" rx="2.5" ry="5" fill="#F4E7B5" transform="rotate(25 30 36.5)"/><rect x="26" y="12" width="8" height="9" fill="#2B2E36"' + SK + '/><path d="M24 11 H36 M24 11 H14" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/>'),
+    caramel: sv('<rect x="20" y="20" width="20" height="34" rx="5" fill="#C2702A"' + SK + '/><rect x="22" y="30" width="16" height="13" rx="2" fill="#FFF8E8" stroke="#1D2340" stroke-width="2"/><rect x="26" y="34" width="8" height="6" rx="1.5" fill="#D98C3C" stroke="#1D2340" stroke-width="1.5"/><rect x="26" y="12" width="8" height="9" fill="#2B2E36"' + SK + '/><path d="M24 11 H36 M24 11 H14" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/>'),
+    cocoa: sv('<rect x="19" y="18" width="22" height="34" rx="6" fill="#A86C3C"' + SK + '/><rect x="17" y="12" width="26" height="8" rx="3" fill="#D5DAE3"' + SK + '/><g fill="#5C3418"><circle cx="25" cy="6" r="1.8"/><circle cx="31" cy="4" r="1.8"/><circle cx="36" cy="7" r="1.8"/></g><path d="M23 30 h14 M23 38 h14" stroke="#7A4A26" stroke-width="3" stroke-linecap="round"/>')
+  };
+  var SKS = ' stroke="#1D2340" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"';
+  var STEP_PIC = {
+    warm: sv('<path d="M12 3.5v7" fill="none"' + SKS + '/><path d="M7 6.8a7.5 7.5 0 1 0 10 0" fill="none"' + SKS + '/>', "0 0 24 24"),
+    weigh: sv('<rect x="3" y="15" width="18" height="6" rx="2" fill="#2B2E36"' + SKS + '/><ellipse cx="9" cy="11" rx="3.4" ry="2.3" fill="#6A3D20"' + SKS + ' transform="rotate(-25 9 11)"/><ellipse cx="15" cy="10" rx="3.4" ry="2.3" fill="#6A3D20"' + SKS + ' transform="rotate(20 15 10)"/>', "0 0 24 24"),
+    grind: sv('<path d="M8 2 H16 L15 8 H9 Z" fill="#E1F2FF"' + SKS + '/><rect x="7" y="8" width="10" height="13" rx="2" fill="#2B2E36"' + SKS + '/><circle cx="12" cy="12.5" r="1.8" fill="#C9D0DB"/>', "0 0 24 24"),
+    puck: sv('<path d="M9 13 Q8 8 9.5 5 Q12 2 14.5 5 Q16 8 15 13 Z" fill="#C98A52"' + SKS + '/><rect x="10.5" y="13" width="3" height="3" fill="#C9D0DB"' + SKS + '/><rect x="5" y="16" width="14" height="4" rx="1.5" fill="#D5DAE3"' + SKS + '/>', "0 0 24 24"),
+    shot: sv('<path d="M5 11 H17 Q16.5 19 13 20 H9 Q5.5 19 5 11 Z" fill="#FFFFFF"' + SKS + '/><path d="M17 13 Q21 13 19.5 16.5 Q18.5 18 16 17.5" fill="none"' + SKS + '/><ellipse cx="11" cy="11" rx="6" ry="1.6" fill="#B5682C"' + SKS + '/><path d="M9 2.5 V7 M13 2.5 V7" stroke="#6A3D20" stroke-width="2.4" stroke-linecap="round"/>', "0 0 24 24"),
+    milk: sv('<path d="M6 7 L4 5.5 L6.5 6 H17 V20 H7 Z" fill="#D5DAE3"' + SKS + '/><path d="M17 9 Q21 9 20.5 13 Q20 16 17 16" fill="none"' + SKS + '/><path d="M9 4 Q7.5 2.5 9 1 M13 4 Q11.5 2.5 13 1" fill="none" stroke="#9AA9C8" stroke-width="1.8" stroke-linecap="round"/>', "0 0 24 24"),
+    pour: sv('<path d="M5 13 H17 Q16.5 20 13 21 H9 Q5.5 20 5 13 Z" fill="#F79BB6"' + SKS + '/><ellipse cx="11" cy="13" rx="6" ry="1.7" fill="#C9925B"' + SKS + '/><path d="M11 15.3 C8.8 13.9 9.2 12.4 10.2 12.4 C10.7 12.4 11 12.8 11 13 C11 12.8 11.3 12.4 11.8 12.4 C12.8 12.4 13.2 13.9 11 15.3 Z" fill="#FFFFFF"/><path d="M14 3 Q19 4 17 9" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/><path d="M14 3 Q19 4 17 9" fill="none" stroke="#1D2340" stroke-width="0.8" stroke-linecap="round"/>', "0 0 24 24"),
+    clean: sv('<path d="M5 9 L6 20 H18 L19 9 Z" fill="#2B2E36"' + SKS + '/><rect x="4" y="7.5" width="16" height="3" rx="1.5" fill="#9AA2B2"' + SKS + '/><ellipse cx="12" cy="5" rx="3.5" ry="1.4" fill="#4A2E18"' + SKS + '/>', "0 0 24 24")
+  };
+  var stepsEl = $("steps"), stepsKey = "";
+  function updSteps() {
+    var st = S.step;
+    if (st === "choose" || !S.drink) { stepsEl.hidden = true; stepsKey = ""; return; }
+    var list = PHASES[S.drink === "steamer" ? "steamer" : "coffee"], ph = PHASE[st], idx = list.indexOf(ph);
+    var key = S.drink + ":" + ph;
+    if (key === stepsKey) return;
+    stepsKey = key;
+    stepsEl.innerHTML = list.map(function (p, i) { return '<i class="' + (i < idx ? "done" : (i === idx ? "now" : "")) + '">' + STEP_PIC[p] + "</i>"; }).join("");
+    stepsEl.hidden = false;
+  }
+
+  var goBtn = $("goBtn"), choicesEl = $("choices"), panelKey = "";
+  function cupHere() { return !!cup && ["serve", "knock", "rinse", "choose"].indexOf(S.step) < 0; }
+  function updPanel(force) {
+    var choosing = S.step === "choose";
+    var key = choosing ? "pick" : ("drink:" + S.drink + ":" + S.cocoa + ":" + cupHere() + ":" + (S.step === "pour" && jug.pouring ? 1 : 0));
+    if (key !== panelKey || force) {
+      panelKey = key;
+      if (choosing) {
+        choicesEl.className = "tb-choices pick";
+        choicesEl.innerHTML = DRINKS.map(function (d) {
+          return '<button class="btn tb-tile" data-drink="' + d + '">' + PIC[d] + '<span>' + CUPS[d].name + '<small>' + CUPS[d].who + "</small></span></button>";
+        }).join("");
+      } else {
+        var ok = cupHere(), late = S.step === "pour" && jug.pouring;
+        choicesEl.className = "tb-choices drink";
+        choicesEl.innerHTML = '<button class="btn tb-tile this" aria-pressed="true" data-this="1">' + PIC[S.drink] + "<span>" + CUPS[S.drink].name + "</span></button>" +
+          ["vanilla", "caramel"].map(function (s) { return '<button class="btn tb-tile" data-syrup="' + s + '"' + (ok && !late ? "" : " disabled") + ">" + PIC[s] + "<span>" + (s === "vanilla" ? "Vanilla" : "Caramel") + "</span></button>"; }).join("") +
+          '<button class="btn tb-tile" data-cocoa="1" aria-pressed="' + (S.cocoa ? "true" : "false") + '"' + (ok ? "" : " disabled") + ">" + PIC.cocoa + "<span>Cocoa</span></button>";
+      }
+    }
+    goBtn.hidden = choosing;
+    var can = !choosing && canGo();
+    if (goBtn.disabled === can) goBtn.disabled = !can;
+    var gl = S.step === "shot" && SH.ph === "soak" && !SH.letGo ? "Let go!" : "Do it!";
+    if (goBtn.textContent !== gl) goBtn.textContent = gl;
+    var sOff = ["serve", "knock", "rinse"].indexOf(S.step) >= 0 || (S.step === "pour" && jug.pouring);
+    $("surpriseBtn").setAttribute("aria-disabled", sOff ? "true" : "false");
+  }
+  function canGo() {
+    if (busy() || drag || Toybox.timer.locked()) return false;
+    var st = S.step;
+    if (st === "power") return !M.on;
+    if (M.pending) return false;
+    if (st === "flush") return !M.pump;
+    if (st === "grind") return !G;
+    if (st === "shot") return SH.ph === "ready" || (SH.ph === "soak" && !SH.letGo);
+    if (st === "steam") return !STM;
+    if (st === "weigh") return !WG.done;
+    if (st === "serve" || st === "rinse") return false;
+    return true;
+  }
+
+  // ---------- The machine ----------
+  function powerOn() {
+    if (M.on) return;
+    M.on = true; S.on = true; M.heat = 0; M.offTries = 0; M.press = now() + 0.2; S.flushed = false;
+    click(); save();
+  }
+  function powerOff(quiet) {
+    if (!M.on) return;
+    M.on = false; S.on = false; M.heat = 0; M.press = now() + 0.2; M.pending = null;
+    if (M.pump) M.pump = null;
+    if (SH.ph === "soak" || SH.ph === "pour") finishShot();
+    if (STM) finishSteam(false);
+    if (!quiet) click();
+    save();
+  }
+  // Two-step machines: pressing while off says "Switch it on!"; the second time it switches on for him.
+  function needHot(fn) {
+    if (M.on && M.heat >= 1) return true;
+    if (!M.on) {
+      if (M.offTries >= 1) { powerOn(); M.pending = fn; }
+      else { M.offTries++; sayNow("Switch it on!", 3); M.flash.power = now() + 3; }
+      return false;
+    }
+    M.pending = fn;
+    return false;
+  }
+
+  // ---------- Steps ----------
+  function enter(step, restoring) {
+    S.step = step;
+    save();
+    if (!restoring) {
+      var E = ENTER[step];
+      if (E) E();
+    }
+    if (learnedSteps[step]) ghost.learned(); else ghost.again();
+    updSteps(); updPanel(true);
+  }
+  function nextStep() {
+    var list = seq(), i = list.indexOf(S.step) + 1;
+    while (i < list.length && skipStep(list[i])) i++;
+    if (i >= list.length) { endDrink(); return; }
+    enter(list[i]);
+  }
+  // A queued "next step" only advances from the step that queued it (never twice).
+  function adv() { var from = S.step; return function () { if (S.step === from) nextStep(); }; }
+  function skipStep(id) {
+    if (id === "power") return M.on && M.heat >= 1;
+    if (id === "flush" || id === "tip") return S.flushed;
+    return false;
+  }
+  function endDrink() {
+    S.drink = null; S.syr = []; S.cocoa = false; S.art = "";
+    enter("choose");
+  }
+  function learned(step) { learnedSteps[step] = true; if (S.step === step) ghost.learned(); }
+
+  var ENTER = {
+    weigh: function () {
+      WG.g = 0; WG.done = false; WG.right = false; scale.ok = 0;
+      move(dcup, XSW, function () { return scale.y - SCALE_H; }, 1000, 1.0);
+      call(function () { beep(); });
+    },
+    hopper: function () { },
+    whisk: function () {
+      whisk.n = 0; whisk.trail = [];
+      move(wdt, function () { return pf.x + 0.1; }, function () { return pf.y - 0.22; }, 900, 1.2);
+      call(function () { wdt.at = "basket"; });
+    },
+    tamp: function () {
+      tamper.press = 0;
+      move(tamper, function () { return pf.x; }, function () { return pf.y - 0.06; }, 900, 1.4);
+      call(function () { tamper.at = "bed"; click(); });
+    },
+    shot: function () {
+      SH.ph = "ready"; SH.timer = null; SH.stop = null; SH.w = 0; SH.held = false; SH.letGo = false; SH.soakT = 0; SH.pourT = 0; SH.autoLet = 0; scale.ok = 0;
+    },
+    jug: function () {
+      carton = { x: JUG_HX - 1.2, y: MT - 2.6, rot: 0, a: 0 };
+      tw(300, function (e) { carton.a = e; });
+      tw(400, function (e) { carton.rot = 1.9 * e; });
+      tw(1300, function (e) { jug.milk = 0.55 * e; if (Math.random() < 0.5) addPart({ k: "drop", x: JUG_HX - 0.2 + rand(-0.05, 0.05), y: MT - 2.3, vx: 0, vy: 2, life: 0, max: 0.3, r: 0.06, col: "#FFFFFF" }); });
+      tw(400, function (e) { carton.rot = 1.9 * (1 - e); });
+      tw(300, function (e) { carton.a = 1 - e; });
+      call(function () { carton = null; });
+    },
+    serve: function () { serve(); },
+    rinse: function () { rinse(); },
+    choose: function () { }
+  };
+
+  // Pick a drink: the cup pops onto the drip tray under the group head.
+  function startDrink(d, surprise) {
+    if (busy() || S.step !== "choose") return;
+    S.drink = d;
+    var C = CUPS[d];
+    S.art = surprise ? C.fun[Math.floor(Math.random() * C.fun.length)] : C.art;
+    S.syr = []; S.cocoa = false;
+    SH.w = 0; SH.timer = null; SH.stop = null; SH.ph = "ready"; WG.g = 0; WG.done = false; WG.right = false; scale.ok = 0;
+    cup = newCup(d);
+    cup.x = XGR; cup.y = DRIP; cup.pop = 0;
+    tw(500, function (e, k) { cup.pop = k; });
+    call(function () { cup.pop = 1; click(); });
+    var list = seq(), i = 0;
+    while (i < list.length && skipStep(list[i])) i++;
+    enter(list[i]);
+    if (surprise) sayNow("A surprise on top!", 3);
+  }
+  function newCup(d) { return { k: d, x: XGR, y: DRIP, rot: 0, water: 0, esp: 0, milk: 0, foam: 0, art: S.art, artP: 0, cocoaP: 0, syrup: false, pop: 1, up: false }; }
+
+  // Flush: hot water through the empty portafilter into the cup.
+  function flush(byHand) {
+    if (S.step !== "flush" || M.pump || busy()) return;
+    if (!needHot(function () { flush(false); })) return;
+    if (byHand) learned("flush");
+    M.pump = { k: "flush" }; click();
+    tw(3200, function (e) { if (cup) cup.water = 0.42 * e; });
+    call(function () { M.pump = null; });
+    wait(500);
+    call(adv());
+  }
+  function tipOut() {
+    if (S.step !== "tip" || busy() || !cup) return;
+    var y0 = cup.y;
+    tw(600, function (e) { cup.y = y0 - 0.5 * e; cup.rot = 1.75 * e; });
+    tw(1000, function (e) {
+      cup.water = 0.42 * (1 - e);
+      var a = cup.rot, C = CUPS[cup.k];
+      var lx = C.rx * Math.cos(a) + (-C.h / 2) * -Math.sin(a), ly = C.rx * Math.sin(a) + (-C.h / 2) * Math.cos(a);
+      for (var i = 0; i < 2; i++) addPart({ k: "drop", x: cup.x + lx, y: cup.y - C.h / 2 + ly, vx: rand(0.2, 0.6), vy: rand(0, 0.5), g: 9, life: 0, max: 1, floor: DRIP - 0.05, r: rand(0.04, 0.07) });
+    });
+    tw(600, function (e) { cup.rot = 1.75 * (1 - e); cup.y = y0 - 0.5 * (1 - e); });
+    call(function () { cup.water = 0; click(); S.flushed = true; save(); });
+    // The portafilter comes out and goes into its stand, under the funnel.
+    tw(500, function (e) { pf.twist = 1 - e; });
+    call(function () { clunk(); pf.at = "free"; });
+    move(pf, XGR, GROUP_RIM + 0.7, 400);
+    move(funnel, XST, STAND_RING - 1.1, 400, 0);
+    move(pf, XST, STAND_TOP, 1400, 1.0);
+    call(function () { pf.at = "stand"; pf.wet = 1; });
+    tw(400, function (e) { pf.twist = e; });
+    move(funnel, XST, STAND_TOP, 450);
+    call(function () { click(); });
+    wait(300);
+    call(adv());
+  }
+
+  // Weigh: scoops of beans into the dosing cup on the scale. Close to 18.0 lands on 18.0; over hops back.
+  function scoopDrop() { return { x: scale.x - 0.2, y: scale.y - SCALE_H - DC_H - 0.75 }; }
+  function dumpScoop() {
+    var amt = rand(6.4, 9.6);
+    var d = scoopDrop();
+    move(scoop, d.x, d.y, 280);
+    tw(450, function (e) { scoop.rot = -2.0 * e; });
+    call(function () {
+      rattle();
+      for (var i = 0; i < 9; i++) addPart({ k: "bean", x: scoop.x - 0.2 + rand(-0.15, 0.15), y: scoop.y + rand(-0.1, 0.1), vx: rand(-0.3, 0.4), vy: rand(0, 1), g: 12, life: 0, max: 2, floor: scale.y - SCALE_H - DC_H + 0.05, rot: rand(0, 3), vr: rand(-6, 6), col: i % 2 ? "#6A3D20" : "#56301A" });
+      scoop.load = 0;
+    });
+    wait(350);
+    call(function () { landBeans(amt); });
+    tw(300, function (e) { scoop.rot = -2.0 * (1 - e); });
+    move(scoop, XB + 0.3, -3.55, 700, 0.6);
+    call(function () { scoop.inBag = true; });
+  }
+  function landBeans(a) {
+    var ng = WG.g + a;
+    if (ng >= 15.2 && ng <= 18.0001) { WG.g = 18; justRight(); return; }
+    if (ng > 18) {
+      WG.g = ng; WG.done = true;
+      // The extra beans hop back into the bag.
+      wait(900);
+      call(function () {
+        for (var i = 0; i < 4; i++) addPart({ k: "bean", x: scale.x + rand(-0.2, 0.2), y: scale.y - SCALE_H - DC_H, vx: (XB - scale.x) * rand(0.75, 0.9), vy: -4.2 - rand(0, 0.4), g: 6.5, life: 0, max: 1.1, rot: 0, vr: 8, col: "#6A3D20" });
+        rattle();
+      });
+      var g0 = ng;
+      tw(1100, function (e) { WG.g = lerp(g0, 18, e); });
+      call(function () { WG.g = 18; justRight(); });
+      return;
+    }
+    WG.g = ng;
+  }
+  function justRight() {
+    if (WG.right) return;
+    WG.right = true; WG.done = true; scale.ok = 0.01; chime();
+    sparkle(scale.x, scale.y - SCALE_H - DC_H - 0.3, 16);
+    sayNow("Just right!", 3);
+    wait(1500);
+    call(adv());
+  }
+  function autoScoop() {
+    if (S.step !== "weigh" || WG.done) return;
+    scoop.inBag = false;
+    move(scoop, XB + 0.2, -4.6, 450, 0);
+    call(function () { scoop.load = 1; rattle(); });
+    dumpScoop();
+  }
+  function goWeigh() {
+    autoScoop();
+    call(function () { if (!WG.done && S.step === "weigh") goWeigh(); });
+  }
+
+  function dcupLip() { var h = DC_H / 2 + 0.05; return { x: dcup.x + Math.sin(dcup.rot) * h, y: dcup.y - DC_H / 2 - Math.cos(dcup.rot) * h }; }
+  // Pour the beans into the grinder's hopper.
+  function pourBeans() {
+    move(dcup, XG - 0.75, -10.5, 700, 0.3);
+    tw(450, function (e) { dcup.rot = 1.9 * e; });
+    call(function () { rattle(); });
+    tw(900, function (e) {
+      dcup.beans = 1 - e; hopper.beans = 0.35 * e;
+      if (Math.random() < 0.6) { var lp = dcupLip(); addPart({ k: "bean", x: lp.x + rand(-0.1, 0.1), y: lp.y, vx: rand(-0.3, 0.3), vy: 1, g: 10, life: 0, max: 2, floor: -6.2 - 0.8 * hopper.beans, rot: rand(0, 3), vr: rand(-6, 6), col: "#6A3D20" }); }
+    });
+    call(function () { WG.g = 0; scale.ok = 0; });
+    tw(350, function (e) { dcup.rot = 1.9 * (1 - e); });
+    move(dcup, XG, GRB, 1000, 0.6);
+    call(function () { click(); });
+    wait(200);
+    call(adv());
+  }
+  function startGrind(byHand) {
+    if (S.step !== "grind" || G || busy()) return;
+    if (byHand) learned("grind");
+    G = { t: 0, dur: 4.6 * PACE };
+    click();
+  }
+  // Tip the grounds into the funnel.
+  function pourGrounds() {
+    move(dcup, XST - 0.7, STAND_TOP - 1.9, 650, 0.5);
+    tw(450, function (e) { dcup.rot = 1.9 * e; });
+    tw(1000, function (e) {
+      dcup.grounds = 1 - e; pf.grounds = e;
+      var lp = dcupLip(); for (var i = 0; i < 3; i++) addPart({ k: "ground", x: lp.x + rand(-0.15, 0.15), y: lp.y, vx: rand(-0.2, 0.2), vy: 1, g: 9, life: 0, max: 1.5, floor: STAND_TOP - 0.25 });
+    });
+    tw(350, function (e) { dcup.rot = 1.9 * (1 - e); });
+    move(dcup, XG, GRB, 900, 0.6);
+    wait(150);
+    call(adv());
+  }
+  // Whisk: the needle tool in the grounds; any wiggle counts.
+  var WHISK_N = 11;
+  function whiskAt(w) {
+    var nx = (w.x - pf.x) / 0.8, ny = (w.y - (pf.y - 0.2)) / 0.6, l = Math.hypot(nx, ny);
+    if (l > 1) { nx /= l; ny /= l; }
+    var last = whisk.trail.length ? whisk.trail[whisk.trail.length - 1] : null;
+    if (last) whisk.n += Math.hypot(nx - last.x, ny - last.y);
+    whisk.trail.push({ x: nx, y: ny, t: now() });
+    if (whisk.trail.length > 60) whisk.trail.shift();
+    wdt.x = pf.x + nx * 0.55; wdt.y = pf.y - 0.22 + ny * 0.13;
+    pf.fluff = clamp(whisk.n / WHISK_N, 0, 1);
+    if (pf.fluff >= 1) whiskDone();
+  }
+  function whiskDone() {
+    if (S.step !== "whisk" || busy()) return;
+    whisk.on = false; whisk.auto = 0;
+    pf.fluff = 1; chime(); sparkle(pf.x, pf.y - 0.6, 12);
+    sayNow("Fluffy!", 3);
+    wait(500);
+    call(function () { wdt.at = "free"; });
+    move(wdt, XHK, WDT_Y, 1000, 1.0);
+    call(function () { wdt.at = "hook"; click(); });
+    call(adv());
+  }
+  function autoWhisk() { if (S.step === "whisk" && !busy()) { whisk.auto = 3.2 * PACE; whisk.a = 0; } }
+  function funnelOff() {
+    if (S.step !== "funnel" || busy()) return;
+    funnel.at = "free";
+    move(funnel, XFP, BASE, 900, 0.9);
+    call(function () { funnel.at = "park"; click(); });
+    wait(200);
+    call(adv());
+  }
+  function tampDone(force) {
+    if (S.step !== "tamp" || (busy() && !force)) return;
+    tamper.press = 1; pf.tamped = 1; clunk(); sparkle(pf.x, pf.y - 0.3, 10);
+    sayNow("Flat and firm!", 3);
+    wait(500);
+    call(function () { tamper.at = "free"; tamper.y = pf.y - 0.06 + 0.2; });
+    tw(400, function (e) { tamper.press = 1 - e; tamper.y = pf.y + 0.14 - 0.6 * e; });
+    move(tamper, XTA, BASE, 1000, 1.0);
+    call(function () { tamper.at = "home"; tamper.press = 0; });
+    call(adv());
+  }
+  function autoTamp() {
+    if (S.step !== "tamp" || busy() || tamper.at !== "bed") return;
+    var p0 = tamper.press;
+    tw(700, function (e) { tamper.press = lerp(p0, 1, e); });
+    call(function () { tampDone(true); });
+  }
+  // Lock the portafilter into the group head; then the scale goes under the cup.
+  function lockIn() {
+    if (S.step !== "lock" || busy()) return;
+    pf.at = "free";
+    var tw0 = pf.twist;
+    tw(300, function (e) { pf.twist = tw0 * (1 - e); });
+    move(pf, XGR, GROUP_RIM + 0.45, 600, 0.8);
+    move(pf, XGR, GROUP_RIM, 300);
+    tw(550, function (e) { pf.twist = e; });
+    call(function () { pf.at = "group"; clunk(); sayNow("Locked in!", 2.5); });
+    call(function () { funnel.at = "free"; });
+    move(funnel, XST, STAND_RING, 900, 0.8);
+    call(function () { funnel.at = "stand"; });
+    if (isCoffee() && cup) {
+      var cy = cup.y;
+      tw(450, function (e) { cup.y = cy - 0.95 * e; });
+      move(scale, XGR, DRIP, 1700, 0.25);
+      tw(450, function (e) { cup.y = lerp(cy - 0.95, DRIP - SCALE_H, e); });
+      call(function () { beep(); SH.w = 0; });
+    }
+    wait(250);
+    call(adv());
+  }
+
+  // The shot: hold the two-cup button for the soak, let go to pour.
+  function shotPress(byHand) {
+    if (S.step !== "shot" || SH.ph !== "ready" || busy()) return;
+    if (!needHot(function () { shotPress(false); SH.letGo = true; })) return;
+    if (byHand) learned("shot");
+    SH.ph = "soak"; SH.soakT = 0; SH.held = !!byHand; SH.letGo = false; SH.autoLet = byHand ? 0 : 6;
+    if (SH.timer === null || now() - SH.timer > 3) { SH.timer = now(); beep(); }
+    SH.stop = null;
+    M.pump = { k: "soak" };
+    click();
+  }
+  function shotRelease() { if (SH.ph === "soak") SH.letGo = true; SH.held = false; }
+  function startPouring() {
+    SH.ph = "pour"; SH.pourT = 0; SH.w0 = SH.w; SH.held = false;
+    if (SH.timer === null) SH.timer = now();
+    var tn = now() - SH.timer;
+    SH.pourDur = clamp(28.2 - tn, 15, 26);
+    SH.finalW = rand(34.8, 36.0);
+    M.pump = { k: "shot" };
+  }
+  // Always a good shot: if the machine was switched off in the middle, it still ends right.
+  function finishShot() {
+    SH.ph = "done"; SH.stop = now(); SH.held = false; M.pump = null;
+    if (!(SH.finalW > 30)) SH.finalW = 35.4;
+    SH.w = SH.finalW; scale.ok = 0.01; chime(); sparkle(scale.x + 0.4, scale.y - SCALE_H - 1.5, 10);
+    if (cup) cup.esp = Math.min(1, SH.w / 36);
+    wait(1700);
+    call(function () { if (S.step === "shot") nextStep(); });
+  }
+
+  // Milk: the jug goes under the wand; the milk button steams it by itself.
+  function jugToWand() {
+    if (S.step !== "jug" || busy()) return;
+    jug.at = "free";
+    move(jug, XW + 0.1, BASE, 1100, 0.9);
+    call(function () { jug.at = "wand"; click(); });
+    wait(150);
+    call(adv());
+  }
+  function startSteam(mode, byHand) {
+    if (S.step !== "steam" || busy()) return;
+    if (STM) { if (mode === "hand") STM.mode = "hand"; return; }
+    if (!needHot(function () { startSteam("auto"); })) return;
+    if (byHand) learned("steam");
+    STM = { t: 0, dur: 8.5 * PACE, mode: mode, target: CUPS[S.drink].foam, hand: 0 };
+    M.pump = { k: "steam" };
+    click();
+  }
+  function finishSteam(cut) {
+    var tgt = CUPS[S.drink || "latte"].foam;
+    STM = null; M.pump = null; jug.foam = tgt; jug.milk = 0.62;
+    jug.swirlA = 1;
+    for (var i = 0; i < 4; i++) puff(XW, jug.y - JUG_H - 0.2, 0.3);
+    if (!cut) {
+      sayNow("Milk is ready!", 2.5);
+      tw(300, function (e) { jug.lift = jug.lift * (1 - e); });
+      wait(600);
+      call(function () { if (S.step === "steam") nextStep(); });
+    }
+  }
+  // Pour: the jug tilts over the cup and the art appears.
+  function pourPos(th) {
+    var c = cup, C = CUPS[c.k];
+    var sx = c.x + 0.05, sy = c.y - C.h - 0.4;
+    var lx = -0.98, ly = -JUG_H / 2 - 0.02, co = Math.cos(th), si = Math.sin(th);
+    var cx = sx - (lx * co - ly * si), cy = sy - (lx * si + ly * co);
+    return { x: cx, y: cy + JUG_H / 2 };
+  }
+  function pourSeq() {
+    if (S.step !== "pour" || busy() || !cup) return;
+    var th = -1.05, pp = pourPos(th);
+    jug.at = "free"; jug.lift = 0;
+    move(jug, pp.x, pp.y, 900, 0.5, th);
+    call(function () { jug.pouring = 1; jug.up = true; });
+    var m0 = jug.milk, f0 = jug.foam;
+    tw(4800, function (e, k) {
+      cup.milk = k; cup.artP = k; jug.up = true;
+      if (cup.k === "cappuccino") cup.foam = clamp((k - 0.45) / 0.55, 0, 1);
+      jug.milk = m0 * (1 - k * 0.9); jug.foam = f0 * (1 - k * 0.8);
+    });
+    call(function () { jug.pouring = 0; cup.artP = 1; cup.milk = 1; chime(); sparkle(cup.x, cup.y - CUPS[cup.k].h - 0.3, 12); });
+    move(jug, pp.x + 0.3, pp.y - 0.3, 500, 0, 0);
+    if (S.cocoa) sprinkle();
+    call(function () { jug.at = "free"; });
+    move(jug, JUG_HX, MT, 1200, 0.8, 0);
+    call(function () { jug.at = "top"; jug.milk = 0; jug.foam = 0; jug.swirlA = 0; click(); });
+    call(adv());
+  }
+  function sprinkle() {
+    call(function () { shaker = { x: cup.x + 0.2, y: cup.y - CUPS[cup.k].h - 2.4, rot: 0 }; });
+    tw(400, function (e) { shaker.rot = Math.PI * 0.85 * e; });
+    tw(1300, function (e) {
+      shaker.x = cup.x + 0.2 + Math.sin(e * 30) * 0.12; cup.cocoaP = e;
+      if (Math.random() < 0.8) addPart({ k: "dust", x: shaker.x + rand(-0.15, 0.15), y: shaker.y + 0.6, vx: rand(-0.2, 0.2), vy: 1, g: 3, life: 0, max: 1, floor: cup.y - CUPS[cup.k].h - (cup.foam > 0 ? 0.3 : 0) });
+    });
+    tw(400, function (e) { shaker.rot = Math.PI * 0.85 * (1 - e); shaker.y -= 0; });
+    call(function () { shaker = null; cup.cocoaP = 1; });
+  }
+  // Serve: the drink goes onto the tray (it stays there); the oldest of three is delivered.
+  function serve() {
+    if (!cup) { call(adv()); return; }
+    var rec = { d: cup.k, art: cup.art, cocoa: cup.cocoaP > 0, x: 0, a: 1 };
+    if (tray.length >= 3) {
+      var old = tray.shift(); leaving.push(old);
+      var x0s = tray.map(function (t) { return t.x; }), ox = old.x;
+      tw(1300, function (e) {
+        old.x = lerp(ox, WORLD_R + 1.5, e); old.a = 1 - e;
+        tray.forEach(function (t, i) { t.x = lerp(x0s[i], SLOTS[i], e); });
+      });
+      call(function () { leaving.splice(leaving.indexOf(old), 1); });
+    }
+    var slot = function () { return SLOTS[tray.length]; };
+    var cx0, cy0;
+    call(function () { cx0 = cup.x; cy0 = cup.y; cup.up = true; });
+    tw(2000, function (e, k) { var sx = slot(); cup.x = lerp(cx0, sx, e); cup.y = lerp(cy0, TRAY_Y, e) - 1.3 * Math.sin(Math.PI * k); });
+    call(function () {
+      rec.x = cup.x; tray.push(rec); cup = null;
+      S.count++; updCounter(); save();
+      clunk(); chime(); sparkle(rec.x, TRAY_Y - 1.6, 16);
+      Toybox.kind();
+      if (isCoffee() && Math.abs(scale.x - XSW) > 0.1) spawn(function () { move(scale, XSW, BASE, 1600, 0.25); call(function () { scale.ok = 0; SH.w = 0; }); });
+    });
+    wait(1300);
+    call(adv());
+  }
+  // Knock: bang the portafilter on the bar; the puck drops in.
+  function knockPos() { return { x: XK - 0.1, y: -3.0 }; }
+  function knockSeq() {
+    if (S.step !== "knock" || busy()) return;
+    if (pf.at === "group") { tw(450, function (e) { pf.twist = 1 - e; }); call(function () { pf.at = "free"; click(); }); move(pf, XGR, GROUP_RIM + 0.6, 350); }
+    var kp = knockPos();
+    call(function () { pf.at = "free"; });
+    move(pf, kp.x, kp.y, 900, 0.6, 2.6);
+    move(pf, kp.x, kp.y + 0.55, 180);
+    call(function () {
+      thunk();
+      pf.spent = false; pf.grounds = 0; pf.tamped = 0; pf.fluff = 0; pf.wet = 0.6;
+      puckFall = { x: kp.x - 0.05, y: kp.y + 0.55 - 0.1, vy: 0 };
+      S.pucks++; save();
+    });
+    move(pf, kp.x, kp.y - 0.1, 260);
+    wait(500);
+    move(pf, kp.x, kp.y - 0.4, 500, 0, 0);
+    call(adv());
+  }
+  function rinse() {
+    move(pf, XGR, GROUP_RIM + 0.45, 1000, 0.6, 0);
+    move(pf, XGR, GROUP_RIM, 300);
+    tw(500, function (e) { pf.twist = e; });
+    call(function () { pf.at = "group"; clunk(); if (M.on) M.pump = { k: "rinse" }; });
+    wait(M.on ? 2200 : 300);
+    call(function () { M.pump = null; pf.wet = 0; sayNow("All clean!", 3); chime(); });
+    wait(900);
+    call(adv());
+  }
+
+  // ---------- Syrup pumps and cocoa (choices in the panel, or tap a bottle) ----------
+  function addSyrup(id) {
+    if (!cupHere() || (S.step === "pour" && jug.pouring)) return;
+    var b = syrups[id === "vanilla" ? 0 : 1];
+    if (b.up) return;
+    if (S.syr.length >= 3) { Toybox.toast("Three pumps is plenty!"); return; }
+    S.syr.push(id); save();
+    if (cup) cup.syrup = true;
+    var target = function () { return { x: cup ? cup.x + 0.78 : XGR, y: cup ? cup.y - CUPS[cup.k].h - 0.15 : -4 }; };
+    spawn(function () {
+      call(function () { b.up = true; });
+      move(b, function () { return target().x; }, function () { return target().y; }, 800, 1.2, 0);
+      tw(260, function (e) { b.pump = e; });
+      call(function () {
+        click();
+        for (var i = 0; i < 5; i++) addPart({ k: "drop", x: b.x - 0.55 + rand(-0.03, 0.03), y: b.y - 1.9, vx: rand(-0.1, 0.1), vy: rand(0.5, 1), g: 8, life: 0, max: 1, floor: cup ? cupSurface(cup).y : 0, r: 0.06, col: b.liq });
+      });
+      tw(260, function (e) { b.pump = 1 - e; });
+      move(b, b.hx, MT, 900, 1.0, 0);
+      call(function () { b.up = false; });
+    });
+  }
+  function toggleCocoa() {
+    if (!cupHere()) return;
+    S.cocoa = !S.cocoa; save();
+    Toybox.toast(S.cocoa ? "Cocoa on top!" : "No cocoa this time.");
+    updPanel(true);
+  }
+
+  // ---------- New, Surprise ----------
+  function newDrink() {
+    MAIN.length = 0; FX.length = 0; drag = null;
+    G = null; STM = null; whisk.on = false; whisk.auto = 0; M.pending = null;
+    if (M.pump) M.pump = null;
+    SH.ph = "ready"; SH.held = false; SH.timer = null; SH.stop = null; SH.w = 0;
+    carton = null; shaker = null; puckFall = null; parts.length = 0;
+    S.drink = null; S.syr = []; S.cocoa = false; S.art = "";
+    S.step = "choose";
+    canon();
+    syrups.forEach(function (b) { b.x = b.hx; b.y = MT; b.rot = 0; b.up = false; b.pump = 0; });
+    enter("choose", true);
+    save();
+  }
+  function surprise() {
+    if (S.step === "choose") { startDrink(DRINKS[Math.floor(Math.random() * 3)], true); return; }
+    if (["serve", "knock", "rinse"].indexOf(S.step) >= 0 || (S.step === "pour" && jug.pouring)) return;
+    var C = CUPS[S.drink], list = C.fun.filter(function (a) { return a !== S.art; });
+    S.art = list[Math.floor(Math.random() * list.length)];
+    if (cup) cup.art = S.art;
+    save();
+    Toybox.toast(S.drink === "steamer" ? "A surprise in the milk!" : "Surprise art on top!");
+  }
+
+  // ---------- Where everything is at the start of a step (reload, New) ----------
+  function canon() {
+    var list = S.drink ? seq() : [], i = list.indexOf(S.step);
+    if (i < 0) i = list.length;
+    var coffee = isCoffee();
+    function past(id) { var j = list.indexOf(id); return j >= 0 && i > j; }
+    function at(id) { return S.step === id; }
+    M.on = S.on; M.heat = S.on ? 1 : 0; M.pump = null;
+    // Portafilter.
+    var inStand = coffee && past("tip") && !past("lock");
+    pf.at = inStand ? "stand" : "group"; pf.x = inStand ? XST : XGR; pf.y = inStand ? STAND_TOP : GROUP_RIM; pf.rot = 0; pf.twist = 1; pf.up = false;
+    pf.grounds = coffee && past("dump") && !past("knock") ? 1 : 0;
+    pf.fluff = coffee && past("whisk") ? 1 : 0;
+    pf.tamped = coffee && past("tamp") ? 1 : 0;
+    pf.spent = coffee && past("shot") && !past("knock");
+    pf.wet = 0;
+    // Funnel, needle tool, tamper.
+    var parked = coffee && past("funnel") && !past("lock");
+    funnel.at = parked ? "park" : "stand"; funnel.x = parked ? XFP : XST; funnel.y = parked ? BASE : (inStand ? STAND_TOP : STAND_RING); funnel.up = false;
+    wdt.at = at("whisk") ? "basket" : "hook"; wdt.x = at("whisk") ? pf.x + 0.1 : XHK; wdt.y = at("whisk") ? pf.y - 0.22 : WDT_Y; wdt.up = false;
+    tamper.at = at("tamp") ? "bed" : "home"; tamper.x = at("tamp") ? pf.x : XTA; tamper.y = at("tamp") ? pf.y - 0.06 : BASE; tamper.press = 0; tamper.up = false;
+    // Scale and dosing cup.
+    var scaleIn = coffee && past("lock") && !past("serve");
+    scale.x = scaleIn ? XGR : XSW; scale.y = scaleIn ? DRIP : BASE; scale.ok = 0; scale.up = false;
+    var onScale = coffee && (at("weigh") || at("hopper"));
+    dcup.x = onScale ? XSW : XG; dcup.y = onScale ? BASE - SCALE_H : GRB; dcup.rot = 0; dcup.up = false;
+    WG.g = coffee && at("hopper") ? 18 : 0; WG.done = coffee && at("hopper");
+    dcup.beans = WG.g / 18; dcup.grounds = coffee && at("dump") ? 1 : 0;
+    hopper.beans = coffee && at("grind") ? 0.35 : 0;
+    scoop.inBag = true; scoop.up = false; scoop.load = 0; scoop.rot = 0;
+    // The cup.
+    cup = null;
+    if (S.drink && !past("serve")) {
+      {
+        cup = newCup(S.drink);
+        cup.art = S.art;
+        cup.x = XGR; cup.y = scaleIn || (coffee && at("serve")) ? DRIP - SCALE_H : DRIP;
+        if (coffee && at("serve")) { scale.x = XGR; scale.y = DRIP; }
+        cup.water = at("tip") ? 0.42 : 0;
+        cup.esp = coffee && past("shot") ? 1 : 0;
+        var poured = past("pour");
+        cup.milk = poured ? 1 : 0; cup.artP = poured ? 1 : 0; cup.foam = poured && S.drink === "cappuccino" ? 1 : 0;
+        cup.cocoaP = poured && S.cocoa ? 1 : 0; cup.syrup = S.syr.length > 0;
+      }
+    }
+    SH.w = cup && cup.esp ? 35.4 : 0;
+    // Milk jug.
+    var atWand = at("steam") || at("pour");
+    jug.at = atWand ? "wand" : "top"; jug.x = atWand ? XW + 0.1 : JUG_HX; jug.y = atWand ? BASE : MT; jug.rot = 0; jug.lift = 0; jug.pouring = 0; jug.up = false;
+    jug.milk = at("jug") || atWand ? (at("pour") ? 0.62 : 0.55) : 0;
+    jug.foam = at("pour") ? CUPS[S.drink].foam : 0; jug.swirlA = 0;
+    tray = S.tray.map(function (t, k) { return { d: t.d, art: t.art, cocoa: t.cocoa, x: SLOTS[k], a: 1 }; });
+    leaving = [];
+  }
+
+  // ---------- Touch ----------
+  var drag = null;
+  function near(w, x, y, r) { return dist(w.x, w.y, x, y) <= r; }
+  function inBox(w, x0, y0, x1, y1, pad) { pad = pad || 0; return w.x >= x0 - pad && w.x <= x1 + pad && w.y >= y0 - pad && w.y <= y1 + pad; }
+  // A thing he drags to a target: it follows his finger; close to the target it does the job by itself.
+  function dragTo(o, target, r, arrive, tapFn, back) {
+    return {
+      down: function (d, w) { d.gx = o.x - w.x; d.gy = o.y - w.y; o.up = true; },
+      move: function (d, w) {
+        if (d.done) return;
+        if (d.moved < 0.2) return;
+        o.x = w.x + d.gx; o.y = w.y + d.gy;
+        var t = target();
+        if (dist(o.x, o.y, t.x, t.y) < r) { d.done = true; arrive(true); }
+      },
+      up: function (d, tap) {
+        if (d.done) return;
+        if (tap) { o.up = false; tapFn(); return; }
+        back();
+      }
+    };
+  }
+  function hit(w) {
+    var st = S.step;
+    if (busy()) return null;
+    // The power button works any time (switch on, or off between drinks).
+    if (near(w, BTN.power, BY, st === "power" ? 0.9 : 0.5)) return HD.power;
+    // Syrup bottles on top of the machine.
+    for (var i = 0; i < 2; i++) { var b = syrups[i]; if (!b.up && cupHere() && inBox(w, b.x - 0.4, MT - 2.1, b.x + 0.4, MT, 0.15)) return { up: function (bb) { return function () { addSyrup(bb.id); }; }(b) }; }
+    switch (st) {
+      case "power": if (inBox(w, ML, MT, MR, BASE)) return HD.power; break;
+      case "flush": if (near(w, BTN.one, BY, 0.7) || near(w, BTN.two, BY, 0.5) || near(w, XGR, GROUP_RIM, 1.2)) return HD.flush; break;
+      case "tip": if (cup && inBox(w, cup.x - 1.1, cup.y - 1.6, cup.x + 1.3, cup.y + 0.2)) return HD.tip; break;
+      case "weigh": if (!WG.done && (inBox(w, XB - 1.3, -5.3, XB + 1.4, BASE + 0.2))) return HD.scoop; break;
+      case "hopper": if (inBox(w, dcup.x - 0.9, dcup.y - DC_H - 0.6, dcup.x + 0.9, dcup.y + 0.3) || inBox(w, scale.x - 1.5, scale.y - SCALE_H, scale.x + 1.5, scale.y)) return HD.dcupHopper; break;
+      case "grind": if (!G && (near(w, XG, -5.0, 0.9) || inBox(w, XG - 1.2, -6.3, XG + 1.2, -3.0))) return HD.grind; break;
+      case "dump": if (inBox(w, dcup.x - 0.9, dcup.y - DC_H - 0.6, dcup.x + 0.9, dcup.y + 0.3)) return HD.dcupFunnel; break;
+      case "whisk": if (wdt.at === "basket" && (near(w, pf.x, pf.y - 0.5, 1.6) || inBox(w, wdt.x - 0.5, wdt.y - 2.3, wdt.x + 0.5, wdt.y))) return HD.whisk; break;
+      case "funnel": if (inBox(w, funnel.x - 1.3, funnel.y - 1.0, funnel.x + 1.3, funnel.y + 0.5)) return HD.funnel; break;
+      case "tamp": if (tamper.at === "bed" && inBox(w, tamper.x - 1.1, tamper.y - 2.4, tamper.x + 1.1, tamper.y + 0.9)) return HD.tamp; break;
+      case "lock": if (pf.at === "stand" && (inBox(w, pf.x - 1.1, pf.y - 0.9, pf.x + 2.8, pf.y + 1.2))) return HD.lock; break;
+      case "shot":
+        if (SH.ph === "ready" && near(w, scale.x - 1.3, scale.y - SCALE_H + 0.49, 0.5)) return HD.timerBtn;
+        if (SH.ph === "ready" && (near(w, BTN.two, BY, 0.75) || near(w, BTN.one, BY, 0.45))) return HD.shot;
+        break;
+      case "jug": if (jug.at === "top" && inBox(w, jug.x - 1.2, jug.y - JUG_H - 0.4, jug.x + 1.4, jug.y + 0.2)) return HD.jug; break;
+      case "steam":
+        if (!STM && near(w, BTN.milk, BY, 0.7)) return HD.milkBtn;
+        if (jug.at === "wand" && inBox(w, jug.x - 1.2, jug.y - JUG_H - 0.4, jug.x + 1.4, jug.y + 0.2)) return HD.hand;
+        break;
+      case "pour": if (jug.at === "wand" && inBox(w, jug.x - 1.2, jug.y - JUG_H - 0.4, jug.x + 1.4, jug.y + 0.2)) return HD.pour; break;
+      case "knock": if (pf.at === "group" && inBox(w, pf.x - 1.2, pf.y - 1.0, pf.x + 2.4, pf.y + 1.3)) return HD.knock; break;
+    }
+    return null;
+  }
+  var HD = {
+    power: { up: function (d, tap) {
+      if (!M.on) { powerOn(); if (S.step === "power") learned("power"); }
+      else if (S.step !== "power" && !M.pump && !G && !STM) powerOff();
+    } },
+    flush: { down: function () { flush(true); } },
+    tip: { move: function (d) { if (d.moved > 0.3 && !d.done) { d.done = true; learned("tip"); tipOut(); } }, up: function (d) { if (!d.done) tipOut(); } },
+    scoop: {
+      down: function (d, w) { scoop.inBag = false; scoop.up = true; scoop.load = 1; scoop.x = w.x; scoop.y = w.y; scoop.rot = 0; rattle(); },
+      move: function (d, w) {
+        if (d.done) return;
+        scoop.x = w.x; scoop.y = w.y - 0.2;
+        var t = scoopDrop();
+        if (dist(scoop.x, scoop.y, t.x, t.y) < 1.2) { d.done = true; learned("weigh"); dumpScoop(); }
+      },
+      up: function (d, tap) {
+        if (d.done) return;
+        if (tap) { scoop.up = false; autoScoop(); return; }
+        move(scoop, XB + 0.3, -3.55, 500, 0.3, 0);
+        call(function () { scoop.inBag = true; scoop.load = 0; });
+      }
+    },
+    timerBtn: { up: function () { if (SH.timer === null) { SH.timer = now(); beep(); } } },
+    shot: { down: function () { shotPress(true); }, up: function () { shotRelease(); } },
+    grind: { down: function () { startGrind(true); } },
+    milkBtn: { down: function () { startSteam("auto", true); } },
+    whisk: {
+      down: function (d, w) { whisk.on = true; whisk.auto = 0; whisk.trail.push({ x: (w.x - pf.x) / 0.8, y: (w.y - pf.y + 0.2) / 0.6, t: now() }); },
+      move: function (d, w) { if (!d.done && S.step === "whisk") { whiskAt(w); if (pf.fluff >= 1) { d.done = true; learned("whisk"); } } },
+      up: function (d, tap) { whisk.on = false; if (tap && !d.done) autoWhisk(); }
+    },
+    tamp: {
+      down: function (d) { d.t0 = now(); d.p0 = tamper.press; },
+      move: function (d, w) { if (d.done) return; tamper.press = clamp(Math.max(tamper.press, d.p0 + (w.y - d.sy) / 0.6), 0, 1); if (tamper.press >= 1) { d.done = true; learned("tamp"); tampDone(); } },
+      frame: function (d) { if (d.done) return; tamper.press = clamp(tamper.press + 0.03, 0, 1); if (tamper.press >= 1) { d.done = true; learned("tamp"); tampDone(); } },
+      up: function (d) { if (!d.done) autoTamp(); }
+    },
+    hand: {
+      down: function (d) { startSteam("hand", true); d.l0 = jug.lift; },
+      move: function (d, w) {
+        if (!STM) return;
+        var nl = clamp(d.l0 + (d.sy - w.y), 0, 0.7), dl = Math.abs(nl - jug.lift);
+        jug.lift = nl; STM.hand += dl;
+        STM.mode = "hand";
+      },
+      up: function () { }
+    }
+  };
+  HD.dcupHopper = dragTo(dcup, function () { return { x: XG - 0.75, y: -10.0 }; }, 1.6,
+    function () { learned("hopper"); pourBeans(); }, function () { pourBeans(); },
+    function () { move(dcup, XSW, function () { return scale.y - SCALE_H; }, 500, 0.2); });
+  HD.dcupFunnel = dragTo(dcup, function () { return { x: XST - 0.7, y: STAND_TOP - 1.9 }; }, 1.5,
+    function () { learned("dump"); pourGrounds(); }, function () { pourGrounds(); },
+    function () { move(dcup, XG, GRB, 500, 0.2); });
+  HD.funnel = {
+    down: function (d, w) { d.gx = funnel.x - w.x; d.gy = funnel.y - w.y; },
+    move: function (d, w) { if (d.done || d.moved < 0.15) return; funnel.at = "free"; funnel.up = true; funnel.x = w.x + d.gx; funnel.y = w.y + d.gy; if (d.moved > 0.9) { d.done = true; learned("funnel"); funnelOff(); } },
+    up: function (d) { if (!d.done) funnelOff(); }
+  };
+  HD.lock = dragTo(pf, function () { return { x: XGR, y: GROUP_RIM + 0.4 }; }, 1.7,
+    function () { learned("lock"); lockIn(); }, function () { lockIn(); },
+    function () { move(pf, XST, STAND_TOP, 600, 0.2); call(function () { pf.at = "stand"; }); });
+  HD.jug = dragTo(jug, function () { return { x: XW + 0.1, y: BASE }; }, 1.9,
+    function () { learned("jug"); jugToWand(); }, function () { jugToWand(); },
+    function () { move(jug, JUG_HX, MT, 700, 0.3); call(function () { jug.at = "top"; }); });
+  HD.pour = dragTo(jug, function () { var p = pourPos(-1.05); return { x: p.x, y: p.y }; }, 2.2,
+    function () { learned("pour"); pourSeq(); }, function () { pourSeq(); },
+    function () { move(jug, XW + 0.1, BASE, 600, 0.2); call(function () { jug.at = "wand"; }); });
+  HD.knock = {
+    down: function (d, w) { d.gx = pf.x - w.x; d.gy = pf.y - w.y; },
+    move: function (d, w) {
+      if (d.done || d.moved < 0.25) return;
+      if (pf.at === "group") { pf.at = "free"; click(); }
+      pf.up = true; pf.twist = Math.max(0, pf.twist - 0.12);
+      pf.x = w.x + d.gx; pf.y = Math.max(GROUP_RIM, w.y + d.gy);
+      var k = knockPos();
+      pf.rot = clamp((pf.x - XGR) / (k.x - XGR), 0, 1) * 1.2;
+      if (dist(pf.x, pf.y, k.x, k.y) < 1.9) { d.done = true; learned("knock"); pf.up = false; knockSeq(); }
+    },
+    up: function (d, tap) {
+      if (d.done) return;
+      pf.up = false;
+      if (tap || pf.at === "group") { knockSeq(); return; }
+      knockSeq();
+    }
+  };
+
+  cv.addEventListener("pointerdown", function (e) {
+    if (Toybox.timer.locked() || drag) return;
+    e.preventDefault();
+    var w = toWorld(e.clientX, e.clientY), h = hit(w);
+    if (!h) return;
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    drag = { id: e.pointerId, h: h, sx: w.x, sy: w.y, px: e.clientX, py: e.clientY, moved: 0, t0: now(), done: false };
+    if (h.down) h.down(drag, w);
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.px = e.clientX; drag.py = e.clientY;
+    var w = toWorld(e.clientX, e.clientY);
+    drag.moved = Math.max(drag.moved, dist(w.x, w.y, drag.sx, drag.sy));
+    if (drag.h.move) drag.h.move(drag, w);
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var d = drag; drag = null;
+    var tap = d.moved < 0.3 && now() - d.t0 < 0.8;
+    if (d.h.up) d.h.up(d, tap);
+  }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  // Panel.
+  choicesEl.addEventListener("click", function (e) {
+    if (Toybox.timer.locked()) return;
+    var b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    if (b.dataset.drink) { learned("choose"); startDrink(b.dataset.drink, false); }
+    else if (b.dataset.syrup) addSyrup(b.dataset.syrup);
+    else if (b.dataset.cocoa) toggleCocoa();
+  });
+  goBtn.addEventListener("click", function () {
+    if (Toybox.timer.locked() || !canGo()) return;
+    var st = S.step;
+    if (st === "power") powerOn();
+    else if (st === "flush") flush(false);
+    else if (st === "tip") tipOut();
+    else if (st === "weigh") goWeigh();
+    else if (st === "hopper") pourBeans();
+    else if (st === "grind") startGrind(false);
+    else if (st === "dump") pourGrounds();
+    else if (st === "whisk") autoWhisk();
+    else if (st === "funnel") funnelOff();
+    else if (st === "tamp") autoTamp();
+    else if (st === "lock") lockIn();
+    else if (st === "shot") { if (SH.ph === "ready") shotPress(false); else shotRelease(); }
+    else if (st === "jug") jugToWand();
+    else if (st === "steam") startSteam("auto", false);
+    else if (st === "pour") pourSeq();
+    else if (st === "knock") knockSeq();
+    updPanel();
+  });
+  $("newBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) { newDrink(); click(); } });
+  $("surpriseBtn").addEventListener("click", function () { if (!Toybox.timer.locked() && $("surpriseBtn").getAttribute("aria-disabled") !== "true") surprise(); });
+
+  // ---------- Every frame ----------
+  var last = now();
+  function update(dt) {
+    var t = now();
+    runSeq(MAIN, dt);
+    for (var i = FX.length - 1; i >= 0; i--) { runSeq(FX[i], dt); if (!FX[i].length) FX.splice(i, 1); }
+    // Heating: the lights blink, then go steady.
+    if (M.on && M.heat < 1) { M.heat = Math.min(1, M.heat + dt / (3.2 * PACE)); if (M.heat >= 1) { beep(); } }
+    if (M.pending && M.on && M.heat >= 1 && !busy()) { var f = M.pending; M.pending = null; f(); }
+    if (S.step === "power" && M.on && M.heat >= 1 && !busy()) nextStep();
+    // Grinding.
+    if (G) {
+      G.t += dt; var gf = clamp(G.t / G.dur, 0, 1);
+      hopper.beans = 0.35 * (1 - gf); dcup.grounds = gf;
+      if (Math.random() < 0.5) addPart({ k: "ground", x: XG + rand(-0.12, 0.12), y: -2.9, vx: rand(-0.3, 0.3), vy: 1.5, g: 6, life: 0, max: 0.6, floor: dcup.y - DC_H });
+      if (gf >= 1) { G = null; click(); wait(500); call(function () { if (S.step === "grind") nextStep(); }); }
+    }
+    // Whisking by itself (tap or Go).
+    if (whisk.auto > 0 && S.step === "whisk") {
+      whisk.a += dt * 4.2;
+      whiskAt({ x: pf.x + Math.cos(whisk.a) * 0.6 * 0.8, y: pf.y - 0.2 + Math.sin(whisk.a) * 0.55 * 0.6 });
+    }
+    // The shot.
+    if (S.step === "shot") {
+      if (SH.ph === "soak") {
+        SH.soakT += dt;
+        if (SH.autoLet && SH.soakT >= SH.autoLet) SH.letGo = true;
+        if (SH.soakT > 2.5 && Math.random() < dt * 1.2 && pf.at === "group") {
+          addPart({ k: "drop", x: pf.x + (Math.random() < 0.5 ? -0.3 : 0.3), y: pf.y + 1.05, vx: 0, vy: 0.5, g: 9, life: 0, max: 1.5, floor: cup ? cupSurface(cup).y : DRIP, r: 0.05, col: "#5A2E12" });
+          SH.w = Math.min(0.6, SH.w + 0.1);
+        }
+        if ((SH.letGo && SH.soakT >= 3) || SH.soakT >= 11.5) startPouring();
+      } else if (SH.ph === "pour") {
+        SH.pourT += dt;
+        var pf2 = clamp((SH.pourT - 1.6) / (SH.pourDur - 1.6), 0, 1);
+        SH.w = SH.w0 + (SH.finalW - SH.w0) * pf2 * pf2 * (1.6 - 0.6 * pf2);
+        if (cup) cup.esp = Math.min(1, SH.w / 36);
+        if (SH.pourT >= SH.pourDur) finishShot(false);
+      }
+    }
+    // Steaming.
+    if (STM) {
+      STM.t += dt;
+      var k = clamp(STM.t / STM.dur, 0, 1);
+      var handF = clamp(STM.hand / 2.2, 0, 1);
+      jug.foam = STM.target * Math.max(easeOut(k), STM.mode === "hand" ? handF : 0);
+      jug.milk = 0.55 + 0.07 * k;
+      jug.swirl += dt * 7;
+      if (Math.random() < dt * 9) puff(XW + rand(-0.3, 0.4), jug.y - jug.lift - JUG_H - 0.1, rand(0.18, 0.34));
+      if (STM.t >= STM.dur || (STM.mode === "hand" && handF >= 1 && STM.t > STM.dur * 0.6)) finishSteam(false);
+    } else if (jug.swirlA > 0) { jug.swirlA = Math.max(0, jug.swirlA - dt * 0.7); jug.swirl += dt * 7 * jug.swirlA; }
+    if (!STM && jug.lift > 0 && !(drag && drag.h === HD.hand) && jug.at === "wand") jug.lift = Math.max(0, jug.lift - dt * 1.5);
+    // Flush/rinse water splashes on the grate.
+    if (M.pump && (M.pump.k === "flush" || M.pump.k === "rinse") && Math.random() < dt * 14) {
+      var sy = cup && Math.abs(cup.x - XGR) < 0.4 ? cupSurface(cup).y : DRIP - 0.1;
+      addPart({ k: "drop", x: XGR + rand(-0.5, 0.5), y: sy, vx: rand(-0.8, 0.8), vy: rand(-1.2, -0.4), g: 9, life: 0, max: 0.4, r: 0.04 });
+    }
+    // Falling puck.
+    if (puckFall) { puckFall.vy += 14 * dt; puckFall.y += puckFall.vy * dt; if (puckFall.y >= -1.65) puckFall = null; }
+    // Scale reading.
+    var target = scaleTarget();
+    if (Math.abs(target - scale.shown) < 0.05) scale.shown = target; else scale.shown += (target - scale.shown) * Math.min(1, dt * 6);
+    if (WG.right && S.step === "weigh") scale.shown = 18;
+    if (scale.ok > 0) scale.ok = Math.min(1, scale.ok + dt * 3);
+    updParts(dt);
+    // Sounds.
+    setLoop("grind", !!G);
+    setLoop("pump", !!(M.pump && M.pump.k !== "steam"));
+    setLoop("steam", !!STM);
+    setLoop("pour", !!jug.pouring);
+    // Camera.
+    var tg = fit(region()), kk = 1 - Math.exp(-dt * (reduce ? 20 : 2.6));
+    cam.cx += (tg.cx - cam.cx) * kk; cam.cy += (tg.cy - cam.cy) * kk; cam.s += (tg.s - cam.s) * kk; cam.sy += (tg.sy - cam.sy) * kk;
+    if (drag && drag.h.frame) drag.h.frame(drag, toWorld(drag.px, drag.py));
+    if (drag && (drag.h.move) && !drag.done) {
+      // Keep a held thing under the finger while the camera settles.
+      var w = toWorld(drag.px, drag.py);
+      if (drag.h === HD.scoop) { scoop.x = w.x; scoop.y = w.y - 0.2; }
+    }
+    updCoach(); updPanel();
+  }
+  function scaleTarget() {
+    var top = scale.y - SCALE_H;
+    if (!dcup.up && Math.abs(dcup.x - scale.x) < 0.3 && Math.abs(dcup.y - top) < 0.08) return WG.g;
+    if (cup && !cup.up && Math.abs(cup.x - scale.x) < 0.3 && Math.abs(cup.y - top) < 0.08) return SH.w + (cup.milk || 0) * CUPS[cup.k].gpm;
+    return 0;
+  }
+  function draw() {
+    ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (W / 2 - cam.cx * cam.s), dpr * (cam.sy - cam.cy * cam.s));
+    LW = 3 / cam.s;
+    drawRoom();
+    drawBag();
+    drawGrinder();
+    drawStandBack();
+    if (pf.at === "stand" && !pf.up) { drawPF(); }
+    drawStandFront();
+    drawMachine();
+    syrups.forEach(function (b) { if (!b.up) drawSyrup(b); });
+    drawKnock();
+    if (puckFall) { P(); ctx.ellipse(puckFall.x, puckFall.y, 0.6, 0.18, 0, 0, TAU); fs("#3A2312"); }
+    drawTray();
+    if (tamper.at === "home" && !tamper.up) drawTamper();
+    if (funnel.at === "park" && !funnel.up) drawFunnel();
+    if (funnel.at === "stand" && !funnel.up && !(pf.at === "stand" && pf.up)) drawFunnel();
+    if (!scale.up) drawScale();
+    if (!dcup.up) drawDcup();
+    if (cup && !cup.up) drawCup(cup, cup.x, cup.y, cup.rot);
+    drawStreams();
+    if (jug.at !== "top" || jug.up || jug.rot) { /* drawn below */ } else drawJug();
+    if (jug.at === "wand" && !jug.up) { drawJug(); drawWandInJug(); }
+    // Things in the air or in his hand, on top.
+    if (scale.up) drawScale();
+    if (dcup.up) drawDcup();
+    if (pf.up || pf.at === "free") drawPF();
+    if (funnel.up || funnel.at === "free") drawFunnel();
+    if (wdt.at === "basket" || wdt.at === "free" || wdt.up) drawWdt();
+    if (tamper.at !== "home" || tamper.up) {
+      var ty = tamper.y; if (tamper.at === "bed") tamper.y = pf.y - 0.06 + 0.2 * tamper.press;
+      drawTamper(); if (tamper.at === "bed") tamper.y = ty;
+    }
+    if (cup && cup.up) drawCup(cup, cup.x, cup.y, cup.rot);
+    if ((jug.at === "free" || jug.up) && !(jug.at === "wand" && !jug.up)) drawJug();
+    if (jug.pouring) drawMilkStream();
+    syrups.forEach(function (b) { if (b.up) drawSyrup(b); });
+    drawScoop();
+    drawCarton();
+    drawShaker();
+    drawParts();
+    // Green checks: "Just right!" over the scale.
+    if (scale.ok > 0) check(scale.x + 1.25, scale.y - SCALE_H - 0.55, 0.32, scale.ok);
+  }
+  function drawMilkStream() {
+    if (!cup) return;
+    var s = jugSpout(), surf = cupSurface(cup), t = now();
+    var ex = cup.x + Math.sin(t * 3) * 0.12 * (cup.k === "latte" ? 1 : 0.3), ey = Math.max(s.y + 0.1, surf.y);
+    P(); ctx.moveTo(s.x, s.y); ctx.quadraticCurveTo(s.x + 0.05, (s.y + ey) / 2, ex, ey);
+    ctx.lineCap = "round"; ctx.lineWidth = 0.13 + 2 * LW * 0.6; ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.stroke();
+    ctx.lineWidth = 0.13; ctx.strokeStyle = "#FFFDF7"; ctx.stroke();
+  }
+  function frame() {
+    requestAnimationFrame(frame);
+    var t = now(), dt = Math.min(0.05, t - last); last = t;
+    if (!Toybox.timer.locked() || ending) update(dt);
+    else updParts(dt);
+    draw();
+  }
+
+  // ---------- Timer ending: the machine winds down and switches off ----------
+  var ending = false;
+  function onEnding(done) {
+    ending = true;
+    drag = null;
+    MAIN.length = 0; FX.length = 0;
+    G = null; whisk.on = false; whisk.auto = 0;
+    if (SH.ph === "soak" || SH.ph === "pour") { SH.ph = "done"; SH.stop = now(); }
+    if (STM) { STM = null; jug.foam = CUPS[S.drink || "latte"].foam; }
+    M.pump = null; M.pending = null;
+    jug.pouring = 0;
+    stopLoops();
+    canon();
+    setTimeout(function () { powerOff(true); }, 900);
+    setTimeout(function () { ending = false; done(); }, 2200);
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 120 120" aria-hidden="true">' +
+      '<rect width="120" height="120" fill="#2B3A67"/><circle cx="96" cy="22" r="10" fill="#FFE9A8"/><circle cx="101" cy="18" r="9" fill="#2B3A67"/>' +
+      '<rect x="0" y="96" width="120" height="24" fill="#8E5A30"/>' +
+      '<rect x="26" y="36" width="58" height="62" rx="7" fill="#AEB6C5" stroke="#1D2340" stroke-width="3"/>' +
+      '<rect x="31" y="41" width="40" height="12" rx="4" fill="#2C3140" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<circle cx="38" cy="47" r="3" fill="#3A4050"/><circle cx="47" cy="47" r="3" fill="#3A4050"/><circle cx="56" cy="47" r="3" fill="#3A4050"/><circle cx="65" cy="47" r="3" fill="#3A4050"/>' +
+      '<rect x="34" y="58" width="42" height="34" rx="4" fill="#737B8E" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<rect x="44" y="58" width="22" height="6" fill="#D5DAE3" stroke="#1D2340" stroke-width="2"/>' +
+      '<path d="M50 80 H62 Q61 90 56 91 Q51 90 50 80 Z" fill="#F79BB6" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<rect x="33" y="90" width="44" height="6" rx="2" fill="#C2C9D6" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<text x="90" y="44" font-family="sans-serif" font-weight="800" font-size="12" fill="#FFFFFF">z</text><text x="98" y="36" font-family="sans-serif" font-weight="800" font-size="9" fill="#FFFFFF">z</text>' +
+      "</svg>";
+  }
+
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var lastT = Date.now(), shown = 0, armed = true, isLearned = false, run = null, el = null;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { lastT = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var tt = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * tt, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * tt]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function gframe() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        if (p.hold) press = t > 0.3 && t < 0.8;
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var qq = at(p.pts, f); x = qq[0]; y = qq[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(gframe);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(gframe);
+    }
+    setInterval(function () {
+      if (run || isLearned || !armed || shown >= MAX || Date.now() - lastT < IDLE) return;
+      if (blocked()) { lastT = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { isLearned = true; stop(); },
+      again: function () { isLearned = false; shown = 0; armed = true; lastT = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  function tp(x, y) { return toPage(x, y); }
+  var ghost = makeGhost(function () {
+    var st = S.step;
+    if (st === "choose") { var tile = choicesEl.querySelector("[data-drink]"); return tile && tile.offsetWidth ? { pts: [ghostPt(tile, 0.5, 0.45)], tap: true } : null; }
+    if (st === "power" && !M.on) return { pts: [tp(BTN.power, BY)], tap: true };
+    if (st === "flush" && !M.pump) return { pts: [tp(BTN.one, BY)], tap: true };
+    if (st === "tip" && cup) return { pts: [tp(cup.x, cup.y - 0.6), tp(cup.x + 0.9, cup.y - 1.6)] };
+    if (st === "weigh" && !WG.done) { var d = scoopDrop(); return { pts: [tp(XB + 0.4, -3.9), tp(XB + 0.6, -5.0), tp(d.x, d.y)] }; }
+    if (st === "hopper") return { pts: [tp(dcup.x, dcup.y - 0.6), tp(XG - 0.75, -10.0)] };
+    if (st === "grind" && !G) return { pts: [tp(XG, -5.0)], tap: true };
+    if (st === "dump") return { pts: [tp(dcup.x, dcup.y - 0.6), tp(XST - 0.7, STAND_TOP - 1.9)] };
+    if (st === "whisk") { var pts = []; for (var i = 0; i <= 16; i++) { var a = i / 8 * TAU; pts.push(tp(pf.x + Math.cos(a) * 0.55, pf.y - 0.25 + Math.sin(a) * 0.3)); } return { pts: pts, dur: 3600 }; }
+    if (st === "funnel") return { pts: [tp(funnel.x, funnel.y - 0.4), tp(XFP, BASE - 0.6)] };
+    if (st === "tamp" && tamper.at === "bed") return { pts: [tp(tamper.x, tamper.y - 1.6), tp(tamper.x, tamper.y - 0.9)] };
+    if (st === "lock") return { pts: [tp(pf.x + 1.4, pf.y + 0.4), tp(XGR + 1.4, GROUP_RIM + 0.6)] };
+    if (st === "shot" && SH.ph === "ready") return { pts: [tp(BTN.two, BY)], tap: true, hold: true, dur: 3000 };
+    if (st === "jug" && jug.at === "top") return { pts: [tp(jug.x, jug.y - 0.8), tp(XW + 0.1, BASE - 0.8)] };
+    if (st === "steam" && !STM) return { pts: [tp(BTN.milk, BY)], tap: true };
+    if (st === "pour" && cup && !jug.pouring) return { pts: [tp(jug.x, jug.y - 0.8), tp(cup.x + 1.4, cup.y - CUPS[cup.k].h - 0.6)] };
+    if (st === "knock" && pf.at === "group") return { pts: [tp(pf.x + 1.2, pf.y + 0.5), tp(XK, -2.4)] };
+    return null;
+  }, { ok: function () { return !busy() && !drag && !G && !STM && !(M.pump) && !M.pending && !Toybox.turning(); } });
+
+  // ---------- Start ----------
+  canon();
+  updCounter();
+  layout();
+  if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe(stage);
+  window.addEventListener("resize", layout);
+  enter(S.step, true);
+  if (S.step === "serve") { ENTER.serve(); }
+  else if (S.step === "rinse") { S.step = "choose"; endDrink(); }
+  Toybox.init({
+    app: "espresso-machine",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the espresso machine winds down and switches off, and the controls lock.",
+    goodbyeOption: "End with a “Switch off” button to press",
+    farewellText: "Time to switch off the machine",
+    goodbyeLabel: "Switch off",
+    farewellDone: "Bye bye, espresso machine!",
+    restLine: "The espresso machine is resting.",
+    restLine2: "The drinks will be on the tray next time.",
+    restArt: restArt,
+    soundNote: "Soft grinder whirrs, pump hums, steam hisses and clunks. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: function () { stopLoops(); },
+    onWake: function () { last = now(); },
+    onBig: function () { setTimeout(layout, 30); },
+    onSound: function (on) { if (on) chime(); else stopLoops(); }
+  });
+  Toybox.offFirst({
+    running: function () { return M.on; },
+    name: "espresso machine",
+    off: function (done) { powerOff(); setTimeout(done, 700); },
+    flash: function () { M.flash.power = now() + 3; }
+  });
+  requestAnimationFrame(frame);
+
+  // Test hooks, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) {
+    window.__espresso = {
+      state: function () {
+        return { step: S.step, drink: S.drink, on: M.on, heat: M.heat, busy: busy(), g: WG.g, shown: +scale.shown.toFixed(1), sh: SH.ph, shotW: +SH.w.toFixed(1),
+          secs: SH.timer === null ? 0 : Math.floor((SH.stop !== null ? SH.stop : now()) - SH.timer), fluff: pf.fluff, tamped: pf.tamped, pfAt: pf.at,
+          jug: jug.at, foam: +jug.foam.toFixed(2), cup: cup ? { esp: +cup.esp.toFixed(2), milk: +cup.milk.toFixed(2), art: cup.art } : null,
+          tray: tray.map(function (t) { return t.d; }), count: S.count, pucks: S.pucks, coach: coachEl.textContent, go: goBtn.hidden ? "" : (goBtn.disabled ? "(off)" : goBtn.textContent) };
+      },
+      pt: function (x, y) { return toPage(x, y); },
+      at: function (name) {
+        if (name === "power" || name === "one" || name === "two" || name === "milk") return toPage(BTN[name], BY);
+        if (name === "cup") return cup ? toPage(cup.x, cup.y - 0.6) : null;
+        if (name === "bag") return toPage(XB, -3.4);
+        if (name === "drop") { var d = scoopDrop(); return toPage(d.x, d.y); }
+        if (name === "dcup") return toPage(dcup.x, dcup.y - 0.6);
+        if (name === "hopper") return toPage(XG - 0.75, -10.0);
+        if (name === "grind") return toPage(XG, -5.0);
+        if (name === "funnelTarget") return toPage(XST - 0.7, STAND_TOP - 1.9);
+        if (name === "basket") return toPage(pf.x, pf.y - 0.3);
+        if (name === "funnel") return toPage(funnel.x, funnel.y - 0.4);
+        if (name === "tamper") return toPage(tamper.x, tamper.y - 1.4);
+        if (name === "pf") return toPage(pf.x + 1.4, pf.y + 0.4);
+        if (name === "group") return toPage(XGR + 1.4, GROUP_RIM + 0.8);
+        if (name === "timer") return toPage(scale.x - 1.3, scale.y - SCALE_H + 0.49);
+        if (name === "jug") return toPage(jug.x, jug.y - jug.lift - 0.8);
+        if (name === "wand") return toPage(XW + 0.1, BASE - 0.8);
+        if (name === "cupTop") return cup ? toPage(cup.x + 1.4, cup.y - CUPS[cup.k].h - 0.6) : null;
+        if (name === "knock") return toPage(XK, -2.6);
+        if (name === "vanilla") return toPage(syrups[0].x, MT - 0.8);
+        return null;
+      },
+      ghost: function () { return ghost.show(); },
+      hit: function (px, py) { var w = toWorld(px, py), h = hit(w); var n = null; for (var k in HD) if (HD[k] === h) n = k; return { w: w, h: n || (h ? "other" : null), busy: busy(), drag: !!drag }; },
+      cam: function () { return { cx: cam.cx, cy: cam.cy, s: cam.s }; },
+      q: function () { return { main: MAIN.length, fx: FX.length, wg: WG, head: MAIN[0] ? String(MAIN[0]).slice(0, 160) : "" }; }
+    };
+  }
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

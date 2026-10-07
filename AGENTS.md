@@ -91,6 +91,8 @@ Keep only:
 - **Simple counters, one per page, never duplicated** ("Nails: 3", "Loads: 2", "Cars: 4", "Put away: 5 of 12").
 - The **Measuring** station's readings and **Math Grid** (numbers are the point).
 - **Wrenches**: the size is the matching game, so once per bolt head and once per size button.
+- **Espresso Machine**: the coffee scale's display (seconds and grams, e.g. "18.0 g") is the real tool and the
+  family's real targets (18.0 g of beans, about 36 g in about 28 s), so it stays.
 - Counts the child chooses or watches: Kaleidoscope "How many", Spin Shop spokes, Peg Drop per-bin counts and
   Total, the Jigsaw piece count. If unsure, remove it.
 
