@@ -117,6 +117,11 @@ body.big .tb-panel { display: none; }
 }
 .tg svg { width: 100%; max-width: 92px; aspect-ratio: 1; display: block; pointer-events: none; }
 .tg span { pointer-events: none; }
+/* The tooth count, big and readable over the middle of each gear picture. */
+.tg { position: relative; }
+.tg .tgn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 1.7em; height: 1.7em; padding: 0 0.15em;
+  display: grid; place-items: center; border-radius: 999px; background: #FFFFFF; border: 2.5px solid #1D2340;
+  font-size: clamp(0.85rem, 3.4vw, 1.25rem); font-weight: 800; line-height: 1; color: #1D2340; }
 .ctrl { display: flex; gap: 8px; align-items: stretch; flex-wrap: nowrap; }
 .ctrl .btn { min-width: 0; min-height: 48px; padding: 0.2rem 0.4rem; font-size: clamp(0.95rem, 2.8vw, 1.15rem); white-space: nowrap; }
 .seg { display: flex; gap: 6px; flex: 1 1 0; min-width: 0; }
@@ -145,6 +150,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .tray { gap: 4px; }
   .tg svg { max-width: 50px; }
   .tg { font-size: 1rem; }
+  .tg .tgn { font-size: 0.85rem; }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .tg .tgn { font-size: 0.8rem; min-width: 1.45em; height: 1.45em; border-width: 2px; }
   .ctrl .btn { min-height: 44px; font-size: 0.95rem; }
   .dial { width: 46px; height: 46px; }
 }
@@ -243,7 +252,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function hubR(T) { return clamp(R(T) * 0.42, 1.05, 2.3); }
 
   // SVG version (tray buttons, ghost, rest picture).
-  function gearSVG(T, cx, cy, sc, rot, sw) {
+  function gearSVG(T, cx, cy, sc, rot, sw, noNum) {
     var pts = gearPts(T), d = "", ca = Math.cos(rot || 0), sa = Math.sin(rot || 0);
     pts.forEach(function (p, i) {
       var x = cx + (p[0] * ca - p[1] * sa) * sc, y = cy + (p[0] * sa + p[1] * ca) * sc;
@@ -256,6 +265,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       o += '<circle cx="' + (cx + Math.cos(a) * hr * sc).toFixed(2) + '" cy="' + (cy + Math.sin(a) * hr * sc).toFixed(2) + '" r="' + (Math.min(0.32 * (r - 0.62 - hubR(T)), 0.55 * hr * Math.PI / hc) * sc).toFixed(2) + '" fill="' + mix(col, "#1D2340", 0.45) + '"/>';
     }
     o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (hubR(T) * sc).toFixed(2) + '" fill="#FFFFFF" stroke="#1D2340" stroke-width="' + sw * 0.8 + '"/>';
+    var fs = hubR(T) * sc * (T < 10 ? 1.35 : 1.15);
+    if (!noNum) o += '<text x="' + cx + '" y="' + (cy + fs * 0.36).toFixed(2) + '" text-anchor="middle" font-size="' + fs.toFixed(2) + '" font-weight="800" font-family="Baloo 2, Trebuchet MS, sans-serif" fill="#1D2340">' + T + '</text>';
     return o;
   }
 
@@ -429,8 +440,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var x = OX + g.x * S, y = OY + g.y * S - (lift || 0), h = hubR(g.T) * S;
     ctx.beginPath(); ctx.arc(x, y, h, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
     ctx.lineWidth = Math.max(2, S * 0.17); ctx.strokeStyle = "#1D2340"; ctx.stroke();
-    // No tooth count: the size of the gear shows it. Just the axle.
-    ctx.beginPath(); ctx.arc(x, y, h * 0.32, 0, TAU); ctx.fillStyle = "#1D2340"; ctx.fill();
+    // The tooth count, big in the hub (the dad wants it; a deliberate exception to the numbers rule). The hub
+    // doesn't turn, so the number stays upright and readable while the gear spins.
+    teethNum(g.T, x, y, h);
+  }
+  function teethNum(T, x, y, h) {
+    var fs = Math.max(13, h * (T < 10 ? 1.35 : 1.15));
+    ctx.font = "800 " + Math.round(fs) + "px " + FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#1D2340";
+    ctx.fillText(String(T), x, y + fs * 0.07);
   }
   var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
   function pill(text, x, y, size, bg) {
@@ -598,7 +617,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         ctx.lineWidth = 4 * g.flash; ctx.strokeStyle = "rgba(255,255,255," + g.flash.toFixed(2) + ")"; ctx.stroke();
       }
     });
-    if (d) drawCrank(d, d.drawA);
+    if (d) {
+      drawCrank(d, d.drawA);
+      // The driving gear's tooth count stays readable on top of the crank (or just under the motor).
+      var dx0 = OX + d.x * S, dy0 = OY + d.y * S, dh = hubR(d.T) * S;
+      if (mode === "motor") pill(String(d.T), dx0, dy0 + dh * 1.25 + Math.max(11, dh * 0.5), Math.max(13, dh * 0.75), "#FFFFFF");
+      else { ctx.beginPath(); ctx.arc(dx0, dy0, dh * 0.8, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#1D2340"; ctx.stroke(); teethNum(d.T, dx0, dy0, dh * 0.8); }
+    }
     // No live RPM / turn readouts on the gears (they were clutter); tap a pair for their ratio.
     rings.forEach(function (r) {
       var t = r.life / 0.6;
@@ -986,7 +1011,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     b.className = "btn tg";
     b.setAttribute("aria-label", CNAME[T] + " gear");
     var r = R(T) + 0.7, vb = r / (0.5 + 0.5 * T / 40);
-    b.innerHTML = '<svg viewBox="' + (-vb) + " " + (-vb) + " " + 2 * vb + " " + 2 * vb + '" aria-hidden="true">' + gearSVG(T, 0, 0, 1, 0, 0.3 * vb / 6) + "</svg>";
+    b.innerHTML = '<svg viewBox="' + (-vb) + " " + (-vb) + " " + 2 * vb + " " + 2 * vb + '" aria-hidden="true">' + gearSVG(T, 0, 0, 1, 0, 0.3 * vb / 6, true) + '</svg><span class="tgn" aria-hidden="true">' + T + "</span>";
     b.addEventListener("pointerdown", function (e) { startTrayDrag(e, { kind: "new", T: T }); });
     $("tray").appendChild(b);
   });

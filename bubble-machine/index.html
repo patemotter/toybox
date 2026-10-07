@@ -85,34 +85,46 @@ body.big .tb-panel { display: none; }
 .stage .farewell p { font-size: 1.25rem; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
-/* ---------- Panel: soap picture tiles, then New and Surprise ---------- */
-.soaps.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.soap { min-width: 0; padding: 3px 2px; white-space: nowrap; }
-.soap svg { width: 44px; height: 44px; overflow: visible; }
-.soap .nm { font-weight: 800; }
-.soap[aria-pressed="true"] { border-width: 4px; }
+/* ---------- Panel: wand and soap picture tiles, then the tab bar (Wands / Colors on phones, New, Surprise) ---------- */
+.tb-choices.bm-choices { display: flex; flex-direction: column; gap: 8px; }
+.wands, .soaps { display: grid; gap: 6px; }
+.wands { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.soaps { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.soap, .wandt { min-width: 0; padding: 3px 2px; white-space: nowrap; }
+.soap svg, .wandt svg { width: 44px; height: 44px; overflow: visible; }
+.soap .nm, .wandt .nm { font-weight: 800; }
+.soap[aria-pressed="true"], .wandt[aria-pressed="true"] { border-width: 4px; }
+.tb-tabs .tab { display: none; }
 @media (orientation: landscape) {
   .tb-body .tb-panel { width: min(30%, 260px); justify-content: space-between; }
-  .soaps.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; overflow: hidden; }
-  .soaps .soap:last-child { grid-column: 1 / span 2; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-body .tb-panel { width: 184px; }
-  .soaps.tb-choices { gap: 5px; }
-  .soap { min-height: 62px; font-size: 0.9rem; }
-  .soap svg { width: 34px; height: 34px; }
-}
-/* Upright phones: five soaps in one row, pictures only (the names would have to be squeezed tiny). */
-@media (max-width: 600px) and (orientation: portrait) {
-  .soap { min-height: 62px; }
-  .soap .nm { display: none; }
-  .soap svg { width: 46px; height: 46px; }
-}
-@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
-  .soaps.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tb-body .tb-panel .tb-choices.bm-choices { overflow: hidden; }
+  .wands, .soaps { grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; }
 }
 @media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
   .tb-body .tb-panel { width: min(30%, 300px); }
+  .wandt, .soap { min-height: 76px; font-size: 0.95rem; }
+  .wandt svg, .soap svg { width: 40px; height: 40px; }
+}
+/* Phones: one group at a time (Wands or Colors), picked in the tab bar, pictures only. Both groups take the
+   same height, so switching never resizes the stage. */
+@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .tb-tabs .tab { display: block; }
+  .tb-panel[data-tab="wands"] .soaps, .tb-panel[data-tab="soaps"] .wands { display: none; }
+  .soap .nm, .wandt .nm { display: none; }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .soap, .wandt { min-height: 62px; }
+  .soap svg { width: 46px; height: 46px; }
+  .wandt svg { width: 40px; height: 40px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 184px; }
+  .wands, .soaps { gap: 5px; grid-template-rows: repeat(3, 50px); }
+  .soap, .wandt { min-height: 0; }
+  .soap svg, .wandt svg { width: 38px; height: 38px; }
+  .tb-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .tb-tabs .btn { min-height: 44px; }
+}
   .soaps.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -141,9 +153,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
-    <section class="tb-panel" id="panel">
-      <div class="tb-choices soaps" id="soaps" role="group" aria-label="Bubble soap"></div>
+    <section class="tb-panel" id="panel" data-tab="wands">
+      <div class="tb-choices bm-choices">
+        <div class="wands" id="wands" role="group" aria-label="Bubble wand"></div>
+        <div class="soaps" id="soaps" role="group" aria-label="Bubble soap"></div>
+      </div>
       <nav class="tb-tabs" aria-label="More">
+        <button class="btn tab" data-tab="wands" aria-pressed="true">Wands</button>
+        <button class="btn tab" data-tab="soaps" aria-pressed="false">Colors</button>
         <button class="btn tb-new" id="newBtn">New</button>
         <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
@@ -156,7 +173,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   "use strict";
 
   // ---------- Constants ----------
-  var KEY = "bubble-machine-v1";      // { count, soap, speed, on }: count is kept across visits
+  var KEY = "bubble-machine-v1";      // { count, soap, speed, on, wand }: count is kept across visits
   var OUT = "#1D2340";
   var TAU = Math.PI * 2;
   var DEBUG = /[?&]debug\b/.test(location.search);
@@ -184,6 +201,55 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var SOAP_BY = {};
   SOAPS.forEach(function (s) { SOAP_BY[s.id] = s; });
 
+  // Wands: the loop's shape is the shape of the bubbles it blows (the dad's idea). Shape wands spin their bubbles
+  // slowly; animal bubbles stay upright and just wobble. The machine always blows round bubbles.
+  var WANDS = [
+    { id: "round", label: "Round" }, { id: "hexagon", label: "Hexagon" }, { id: "star", label: "Star" },
+    { id: "heart", label: "Heart" }, { id: "bunny", label: "Bunny", animal: true }, { id: "cat", label: "Cat", animal: true },
+    { id: "fish", label: "Fish", animal: true }
+  ];
+  var WAND_BY = {};
+  WANDS.forEach(function (w) { WAND_BY[w.id] = w; });
+  // Traces a wand/bubble shape centered on (cx, cy), fitting inside a circle of radius R (y down).
+  function shapePath(x, cx, cy, R, id) {
+    var i, a;
+    x.beginPath();
+    if (id === "hexagon") {
+      for (i = 0; i < 6; i++) { a = i * TAU / 6 - Math.PI / 2; x[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
+    } else if (id === "star") {
+      for (i = 0; i < 10; i++) { a = i * TAU / 10 - Math.PI / 2; var rr2 = i % 2 ? R * 0.52 : R; x[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2 + R * 0.08); }
+    } else if (id === "heart") {
+      var hy = cy + R * 0.08;
+      x.moveTo(cx, hy + R * 0.86);
+      x.bezierCurveTo(cx - R * 1.22, hy + R * 0.05, cx - R * 0.82, hy - R * 1.02, cx, hy - R * 0.5);
+      x.bezierCurveTo(cx + R * 0.82, hy - R * 1.02, cx + R * 1.22, hy + R * 0.05, cx, hy + R * 0.86);
+    } else if (id === "bunny") {
+      var by = cy + R * 0.3, br = R * 0.66, d = Math.PI / 180;
+      x.arc(cx, by, br, -65 * d, 245 * d);
+      x.bezierCurveTo(cx - R * 0.56, cy - R * 0.62, cx - R * 0.6, cy - R * 0.98, cx - R * 0.37, cy - R * 0.98);
+      x.bezierCurveTo(cx - R * 0.16, cy - R * 0.98, cx - R * 0.1, cy - R * 0.6, cx + Math.cos(-100 * d) * br, by + Math.sin(-100 * d) * br);
+      x.arc(cx, by, br, -100 * d, -80 * d);
+      x.bezierCurveTo(cx + R * 0.1, cy - R * 0.6, cx + R * 0.16, cy - R * 0.98, cx + R * 0.37, cy - R * 0.98);
+      x.bezierCurveTo(cx + R * 0.6, cy - R * 0.98, cx + R * 0.56, cy - R * 0.62, cx + Math.cos(-65 * d) * br, by + Math.sin(-65 * d) * br);
+    } else if (id === "cat") {
+      var ky = cy + R * 0.18, kr = R * 0.76, e = Math.PI / 180;
+      x.arc(cx, ky, kr, -20 * e, 200 * e);
+      x.lineTo(cx - R * 0.66, cy - R * 0.92);
+      x.lineTo(cx + Math.cos(-108 * e) * kr, ky + Math.sin(-108 * e) * kr);
+      x.arc(cx, ky, kr, -108 * e, -72 * e);
+      x.lineTo(cx + R * 0.66, cy - R * 0.92);
+    } else if (id === "fish") {
+      var fx = cx + R * 0.14, f = Math.PI / 180;
+      x.ellipse(fx, cy, R * 0.78, R * 0.6, 0, -158 * f, 158 * f);
+      x.lineTo(cx - R * 0.98, cy + R * 0.56);
+      x.lineTo(cx - R * 0.74, cy);
+      x.lineTo(cx - R * 0.98, cy - R * 0.56);
+    } else {
+      x.arc(cx, cy, R, 0, TAU);
+    }
+    x.closePath();
+  }
+
   function $(id) { return document.getElementById(id); }
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -194,7 +260,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Saved state ----------
   // Fresh visit from the home screen: the machine starts switched off with the first-visit soap and speed;
   // the Bubbles counter is kept (the dad wants it to keep counting across visits).
-  function defaults() { return { count: 0, soap: "rainbow", speed: 1, on: false }; }
+  function defaults() { return { count: 0, soap: "rainbow", speed: 1, on: false, wand: "round" }; }
   function load() {
     var s = defaults();
     try {
@@ -202,6 +268,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (o && typeof o === "object") {
         if (typeof o.count === "number" && o.count >= 0 && isFinite(o.count)) s.count = Math.floor(o.count);
         if (SOAP_BY[o.soap]) s.soap = o.soap;
+        if (WAND_BY[o.wand]) s.wand = o.wand;
         if (o.speed === 0 || o.speed === 1 || o.speed === 2) s.speed = o.speed;
         if (typeof o.on === "boolean") s.on = o.on;
       }
@@ -233,8 +300,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!soap.hues) return f * 360;
     return soap.hues[0] + (soap.hues[1] - soap.hues[0]) * (0.5 - 0.5 * Math.cos(f * TAU));
   }
-  function buildSprites(soap, size) {
+  function buildSprites(soap, size, shape) {
     var c = size / 2, R = size * 0.47, i;
+    shape = shape || "round";
+    var round = shape === "round";
+    // The outline at a given radius: a circle for round bubbles, the wand's shape for the others.
+    function outline(z, rad) { if (round) { z.beginPath(); z.arc(c, c, rad, 0, TAU); } else shapePath(z, c, c, rad, shape); }
     var t = soap.tint;
     function tc(a) { return "rgba(" + t[0] + "," + t[1] + "," + t[2] + "," + a.toFixed(3) + ")"; }
     var film = mkCanvas(size), x = film.getContext("2d");
@@ -245,9 +316,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     g.addColorStop(0.975, tc(0.55));
     g.addColorStop(1, tc(0));
     x.fillStyle = g;
-    x.beginPath(); x.arc(c, c, R, 0, TAU); x.fill();
+    outline(x, R); x.fill();
+    if (!round) {
+      // Shaped films get an even tint near the edge too (the radial glow above is round).
+      x.lineJoin = "round"; x.lineWidth = R * 0.16; x.strokeStyle = tc(Math.min(0.4, soap.a0 * 3)); x.stroke();
+    }
     x.save();
-    x.beginPath(); x.arc(c, c, R, 0, TAU); x.clip();
+    outline(x, R); x.clip();
     // Swirling bands of thin-film color.
     soap.bands.forEach(function (h, k) {
       var a = k * TAU / soap.bands.length + 0.4, d = R * (k % 2 ? 0.52 : 0.66);
@@ -271,9 +346,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var cg = x.createConicGradient(0, c, c);
         for (var q = 0; q <= N; q++) cg.addColorStop(q / N, hsl(rimHue(soap, ((q / N) + shift) % 1) + dh, 95, light, alpha));
         x.strokeStyle = cg;
-        x.beginPath(); x.arc(c, c, rad, 0, TAU); x.stroke();
+        x.lineJoin = "round";
+        outline(x, rad); x.stroke();
         return;
       }
+      if (!round) { x.strokeStyle = hsl(rimHue(soap, shift) + dh, 95, light, alpha); outline(x, rad); x.stroke(); return; }
       // Older browsers: abutting arcs (no overlap, so no darker seams).
       var M2 = Math.max(96, Math.round(size / 3));
       for (var q2 = 0; q2 < M2; q2++) {
@@ -287,9 +364,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // A thin edge so bubbles read against the light sky.
     x.lineWidth = Math.max(1.4, R * 0.022);
     x.strokeStyle = "rgba(29,50,110,0.32)";
-    x.beginPath(); x.arc(c, c, R - x.lineWidth / 2, 0, TAU); x.stroke();
+    x.lineJoin = "round";
+    outline(x, R - x.lineWidth / 2); x.stroke();
 
     var hl = mkCanvas(size), y = hl.getContext("2d");
+    if (!round) { y.save(); outline(y, R * 0.97); y.clip(); }
     y.save();
     y.translate(c - R * 0.4, c - R * 0.44);
     y.rotate(-Math.PI / 4);
@@ -307,11 +386,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     y.lineCap = "round";
     y.lineWidth = R * 0.065;
     y.beginPath(); y.arc(c, c, R * 0.78, 0.3, 1.2); y.stroke();
+    if (!round) y.restore();
 
     var gl = null;
     if (soap.glitter) {
       gl = mkCanvas(size);
       var z = gl.getContext("2d"), cols = ["#FFC93C", "#FFFFFF", "#FF6FD8", "#3DB4FF", "#FFE14D"];
+      if (!round) { outline(z, R * 0.95); z.clip(); }
       for (i = 0; i < 34; i++) {
         var a2 = Math.random() * TAU, d2 = Math.sqrt(Math.random()) * R * 0.86;
         z.fillStyle = cols[i % cols.length];
@@ -331,11 +412,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     z.quadraticCurveTo(x, y, x - s, y); z.quadraticCurveTo(x, y, x, y - s);
     z.fill();
   }
-  function sprites(soapId, devR) {
+  function sprites(soapId, devR, shape) {
     // The sprite closest above the drawn size: little scaling work per bubble.
     var need = devR * 2.15, lod = need <= 64 ? 64 : (need <= 128 ? 128 : (need <= 256 ? 256 : (need <= 512 ? 512 : 768)));
-    var k = soapId + lod;
-    if (!spriteCache[k]) spriteCache[k] = buildSprites(SOAP_BY[soapId], lod);
+    shape = shape || "round";
+    var k = soapId + lod + shape;
+    if (!spriteCache[k]) spriteCache[k] = buildSprites(SOAP_BY[soapId], lod, shape);
     return spriteCache[k];
   }
 
@@ -344,7 +426,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var W = 0, H = 0, DPR = 1, rect = { left: 0, top: 0 };
   var G = 40, groundY = 0;           // grass height and the line where the grass starts
   var M = { x: 0, y: 0, s: 1 };       // machine: bottom-left corner and scale (base drawing is 200 x 235)
-  var J = { x: 0, y: 0, s: 1, stand: 0 };       // the soap jar the wand stands in
+  var J = { x: 0, y: 0, s: 1, b: 1, stand: 0 }; // the soap jar the wand stands in (b: bubble size scale for the wand)
   var BS = 1;                         // bubble size scale
   var CAP = 20, lowQ = 0;   // room in the sky (big bubbles take more of it, see weight())
   var bg = null;
@@ -359,28 +441,31 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     view.height = Math.round(H * DPR);
     var r = view.getBoundingClientRect();
     rect = { left: r.left, top: r.top };
+    // The machine and the wand jar are small and tucked into the bottom corners, so most of the stage is open
+    // sky for bubbles (the dad: they were far too big). The switch, dial, jar and wand keep big touch areas.
     if (H > W && W < 600) {
-      // Upright phone: a smaller machine at the left (its switch and dial stay big), the soap jar on its own
-      // little stool at the right, both standing above the coach line, and open sky above.
+      // Upright phone: both stand on the grass line, above the coach line.
       G = clamp(H * 0.1, 40, 64);
       groundY = H - G;
-      M.s = Math.min(W * 0.47 / 200, (H - G) * 0.5 / 235);
+      M.s = Math.min(W * 0.3 / 200, (H - G) * 0.22 / 235);
       M.x = Math.max(6, W * 0.02);
       M.y = groundY + 3;
-      J.s = clamp(W / 390, 0.82, 1.1);
-      J.stand = clamp(H * 0.1, 34, 66);
-      J.x = W - 42 * J.s - 8;
-      J.y = groundY + 3 - J.stand;
+      J.s = clamp(W / 390, 0.82, 1.1) * 0.62;
+      J.b = clamp(W / 390, 0.82, 1.1);
+      J.stand = 0;
+      J.x = W - 34 * J.s - 10;
+      J.y = groundY + 3;
     } else {
       G = clamp(H * 0.085, 24, 64);
       groundY = H - G;
-      M.s = Math.min(W * 0.58 / 200, (H - G) * 0.68 / 235, 1.75);
-      M.x = Math.max(8, W * 0.035);
+      M.s = Math.min(W * 0.22 / 200, (H - G) * 0.36 / 235, 0.95);
+      M.x = Math.max(8, W * 0.02);
       // Standing on the grass, clear of the coach line (bottom-center on phones).
       M.y = groundY + G * 0.2;
-      J.s = clamp(Math.min(W, H) / 390, 0.85, 1.5);
+      J.s = clamp(Math.min(W, H) / 560, 0.6, 0.95);
+      J.b = clamp(Math.min(W, H) / 390, 0.85, 1.5);
       J.stand = 0;
-      J.x = W - Math.max(46 * J.s, W * 0.11);
+      J.x = W - Math.max(40 * J.s, W * 0.04) - 6;
       J.y = groundY + G * 0.25;
     }
     BS = clamp(Math.min(W, H) / 470, 0.85, 1.7);
@@ -653,9 +738,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var bubbles = [], parts = [], ducks = [];
   var clock = 0;
   // A soap film (wand rings, machine wands): the bubble sprite drawn flat and a little see-through.
-  function drawFilm(cx, cy, r, soap, now, scale) {
-    var sp = sprites(soap.id, r * DPR * scale);
-    var k = r / sp.R, rot = now / 1300;
+  function drawFilm(cx, cy, r, soap, now, scale, shape) {
+    var sp = sprites(soap.id, r * DPR * scale, shape);
+    var k = r / sp.R, rot = shape && shape !== "round" ? 0 : now / 1300;
     var c = Math.cos(rot) * k, s = Math.sin(rot) * k;
     var t = ctx.getTransform();
     ctx.globalAlpha = 0.85;
@@ -669,7 +754,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function drawBubbleAt(b, sc, ox, oy) {
     var g = b.grow < 1 ? 0.35 + 0.65 * easeOut(b.grow) : 1;
     var r = b.r * g * sc, px = ox + b.x * sc, py = oy + b.y * sc;
-    var sp = sprites(b.soap, r * DPR);
+    var shaped = b.shape && b.shape !== "round";
+    var sp = sprites(b.soap, r * DPR, b.shape);
     var k = r / sp.R * DPR;
     var w = Math.sin(b.wp) * b.wa, sx = 1 + w, sy = 1 - w;
     var ct = Math.cos(b.ax), st = Math.sin(b.ax);
@@ -678,11 +764,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.drawImage(sp.film, -sp.half, -sp.half);
     if (sp.gl) {
       ctx.globalAlpha = 0.65 + 0.35 * Math.sin(clock * 3 + b.seed);
-      setM(ct, st, sx, sy, -b.sw * 0.7 - b.ax, k, px, py);
+      setM(ct, st, sx, sy, shaped ? b.sw - b.ax : -b.sw * 0.7 - b.ax, k, px, py);
       ctx.drawImage(sp.gl, -sp.half, -sp.half);
       ctx.globalAlpha = 1;
     }
-    setM(ct, st, sx, sy, -b.ax, k, px, py);
+    // A shaped bubble's highlight turns with its shape (it is cut to the outline).
+    if (!shaped) setM(ct, st, sx, sy, -b.ax, k, px, py);
     ctx.drawImage(sp.hl, -sp.half, -sp.half);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
@@ -706,7 +793,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       rise: rnd(20, 34) * BS * (r < 18 * BS ? 1.15 : 0.9),
       sw: Math.random() * TAU, ss: rnd(0.35, 0.8) * (Math.random() < 0.5 ? -1 : 1),
       ax: Math.random() * TAU, wa: 0.1, wb: 0.025 + Math.min(0.05, r / 1500), wp: Math.random() * TAU, wf: rnd(5, 7.5),
-      kind: "n", dead: false
+      kind: "n", dead: false, shape: "round"
     };
   }
   function addBubble(b) {
@@ -838,12 +925,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Wand ----------
-  var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, stick: 96, lean: 0, held: null, ox: 0, oy: 0,
+  var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, bub: 30, stick: 96, lean: 0, held: null, ox: 0, oy: 0,
     v: 0, dx: 0, dy: -1, pend: 0, lastMove: 0, back: null, used: false, filmAt: 0,
     home: true, soap: 1, emptyAt: 0, moved: 0, touchedAt: 0 };
   // The wand starts in the jar (its spot in the sky is not saved). Dropped anywhere else, it stays there.
   function layoutWand() {
     wand.ring = 30 * J.s;
+    wand.bub = 30 * J.b;      // bubble sizes stay as big as before the wand got smaller
     wand.stick = 92 * J.s;
     wand.rx = J.x;
     wand.ry = J.y - 50 * J.s - wand.stick * 0.55 - wand.ring;
@@ -898,7 +986,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Each bubble uses some of the soap film; when it is used up the ring is empty for a moment, then the film
   // comes back by itself (or at once with a dip in the jar).
   function useSoap(r) {
-    wand.soap -= 0.05 + 0.25 * Math.min(1, r / (wand.ring * 2.9));
+    wand.soap -= 0.05 + 0.25 * Math.min(1, r / (wand.bub * 2.9));
     if (wand.soap <= 0.001) {
       wand.soap = 0; wand.emptyAt = performance.now(); wand.pend = 0;
       parts.push({ t: "ring", x: wand.x, y: wand.y, r: wand.ring * 0.8, life: 0, max: 0.4, col: SOAP_BY[S.soap].liquid, soft: true });
@@ -929,11 +1017,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (wand.soap <= 0) return;
     // Slow drags grow one big bubble; fast drags let go of a stream of small ones.
     wand.pend += d * 0.17;
-    var f = clamp((wand.v - 260 * J.s) / (1000 * J.s), 0, 1);
-    var rel = lerp(wand.ring * 2.7, wand.ring * 0.4, f);
+    var f = clamp((wand.v - 260 * J.b) / (1000 * J.b), 0, 1);
+    var rel = lerp(wand.bub * 2.7, wand.bub * 0.4, f);
     var guard = 0;
     while (wand.pend >= rel && guard++ < 4 && wand.soap > 0) {
-      releaseWandBubble(Math.min(wand.pend, wand.ring * 2.9), f);
+      releaseWandBubble(Math.min(wand.pend, wand.bub * 2.9), f);
       wand.pend = Math.max(0, wand.pend - rel);
       if (f > 0.5) wand.pend = 0;
     }
@@ -945,17 +1033,30 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var sp = Math.min(260, wand.v * 0.16);
     var b = makeBubble(bx, by, r, wand.dx * sp + rnd(-30, 30), wand.dy * sp + rnd(-30, 20), S.soap);
     b.grow = 0.8;
-    b.wa = r > wand.ring * 1.3 ? 0.16 : 0.08;
-    b.wb = r > wand.ring * 1.3 ? 0.05 : b.wb;
-    b.wf = r > wand.ring * 1.3 ? rnd(3.5, 4.5) : b.wf;
-    b.life = r > wand.ring * 1.3 ? rnd(10, 14) : b.life;
+    setShape(b, S.wand);
+    b.wa = r > wand.bub * 1.3 ? 0.16 : 0.08;
+    b.wb = r > wand.bub * 1.3 ? 0.05 : b.wb;
+    b.wf = r > wand.bub * 1.3 ? rnd(3.5, 4.5) : b.wf;
+    b.life = r > wand.bub * 1.3 ? rnd(10, 14) : b.life;
     addBubble(b);
     useSoap(r);
     if (!fast || fast < 0.5) blowSound(r);
     if (!learned.wand) { learned.wand = true; coachUpdate(); }
   }
+  // Where the handle meets the loop (the fish's belly is higher than the others' bottoms).
+  function loopBottom(id) { return id === "fish" ? 0.58 : (id === "round" || id === "hexagon" ? 1 : 0.92); }
+  // Shaped bubbles: shapes turn slowly; animals stay upright and just wobble.
+  function setShape(b, id) {
+    b.shape = id;
+    if (id === "round") return;
+    var wd = WAND_BY[id];
+    b.ax = 0;
+    // (the drawn turn of a bubble is its sw: the wobble axis ax and the film's own turn cancel out)
+    if (wd.animal) { b.sw = rnd(-0.12, 0.12); b.ss = 0; }
+    else { b.sw = Math.random() * TAU; b.ss = rnd(0.12, 0.25) * (Math.random() < 0.5 ? -1 : 1); }
+  }
   function wandRelease() {
-    if (wand.pend > wand.ring * 0.6 && wand.soap > 0) releaseWandBubble(wand.pend, 0);
+    if (wand.pend > wand.bub * 0.6 && wand.soap > 0) releaseWandBubble(wand.pend, 0);
     wand.pend = 0;
     wand.held = null;
     wand.touchedAt = performance.now();
@@ -973,7 +1074,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       // Standing still: a big bubble lets go by itself.
       if (now - wand.lastMove > 260) {
         wand.v *= Math.max(0, 1 - dt * 6);
-        if (wand.pend > wand.ring * 0.75) { releaseWandBubble(wand.pend, 0); wand.pend = 0; }
+        if (wand.pend > wand.bub * 0.75) { releaseWandBubble(wand.pend, 0); wand.pend = 0; }
       }
       var target = clamp(wand.dx * Math.min(1, wand.v / 900) * 0.45, -0.5, 0.5);
       wand.lean += (target - wand.lean) * Math.min(1, dt * 8);
@@ -1005,8 +1106,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function drawWand(now) {
     var x = ctx, soap = SOAP_BY[S.soap], s = J.s;
-    var ax = wand.x - Math.sin(wand.lean) * wand.ring, ay = wand.y + Math.cos(wand.lean) * wand.ring;
-    var bx = ax - Math.sin(wand.lean) * wand.stick, by = ay + Math.cos(wand.lean) * wand.stick;
+    var rb = loopBottom(S.wand) * wand.ring;
+    var ax = wand.x - Math.sin(wand.lean) * rb, ay = wand.y + Math.cos(wand.lean) * rb;
+    var bx = ax - Math.sin(wand.lean) * (wand.stick + wand.ring - rb), by = ay + Math.cos(wand.lean) * (wand.stick + wand.ring - rb);
     x.lineCap = "round";
     x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by);
     x.lineWidth = 15 * s; x.strokeStyle = OUT; x.stroke();
@@ -1016,23 +1118,28 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     x.beginPath(); x.moveTo(lerp(ax, bx, 0.45), lerp(ay, by, 0.45)); x.lineTo(lerp(ax, bx, 0.52), lerp(ay, by, 0.52)); x.stroke();
     // the pending bubble trails behind the ring
     if (wand.held !== null && wand.pend > 4) {
-      var pr = Math.min(wand.pend, wand.ring * 2.9);
-      drawBubbleAt({ x: wand.x - wand.dx * pr * 0.85, y: wand.y - wand.dy * pr * 0.85, r: pr, soap: S.soap,
-        sw: now / 700, ax: Math.atan2(wand.dy, wand.dx), wa: 0.08 + 0.05 * Math.sin(now / 90), wp: Math.PI / 2, grow: 1 }, 1, 0, 0);
+      var pr = Math.min(wand.pend, wand.bub * 2.9);
+      var pax = Math.atan2(wand.dy, wand.dx), shp = S.wand !== "round";
+      drawBubbleAt({ x: wand.x - wand.dx * pr * 0.85, y: wand.y - wand.dy * pr * 0.85, r: pr, soap: S.soap, shape: S.wand,
+        sw: shp ? 0 : now / 700, ax: pax, wa: 0.08 + 0.05 * Math.sin(now / 90), wp: Math.PI / 2, grow: 1 }, 1, 0, 0);
     }
     // the film in the ring (it shimmers in fresh after a dip)
     var fresh = wand.soap <= 0 ? 0 : (wand.filmAt ? clamp((now - wand.filmAt) / 500, 0, 1) : 1);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     if (fresh > 0.05) {
       ctx.globalAlpha = fresh;
-      drawFilm(wand.x, wand.y, wand.ring - 3 * s, soap, now, 1);
+      drawFilm(wand.x, wand.y, wand.ring - 3 * s, soap, now, 1, S.wand);
       ctx.globalAlpha = 1;
     }
-    x.beginPath(); x.arc(wand.x, wand.y, wand.ring, 0, TAU);
+    // The loop, in the wand's shape (the shape its bubbles will have).
+    x.lineJoin = "round";
+    shapePath(x, wand.x, wand.y, wand.ring, S.wand);
     x.lineWidth = 13 * s; x.strokeStyle = OUT; x.stroke();
     x.lineWidth = 7 * s; x.strokeStyle = "#FF9A4D"; x.stroke();
-    x.beginPath(); x.arc(wand.x, wand.y, wand.ring, -2.4, -1.6);
-    x.lineWidth = 2.5 * s; x.strokeStyle = "rgba(255,255,255,0.8)"; x.stroke();
+    if (S.wand === "round") {
+      x.beginPath(); x.arc(wand.x, wand.y, wand.ring, -2.4, -1.6);
+      x.lineWidth = 2.5 * s; x.strokeStyle = "rgba(255,255,255,0.8)"; x.stroke();
+    }
   }
   function drawJar(front) {
     var x = ctx, s = J.s, soap = SOAP_BY[S.soap];
@@ -1082,7 +1189,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var kind = surpriseNext;
     var hasGiant = bubbles.some(function (b) { return b.kind === "giant" && !b.dead; });
     if (kind === "giant" && hasGiant) kind = "duck";
-    surpriseNext = kind === "giant" ? "duck" : "giant";
+    surpriseNext = kind === "giant" ? "duck" : (kind === "duck" ? "shapes" : "giant");
+    if (kind === "shapes") { surpriseShapes(); return; }
     var r = kind === "giant" ? clamp(Math.min(W, H) * 0.25, 70, 240) : clamp(Math.min(W, H) * 0.12, 44, 110);
     var b = makeBubble(mx(WC.x), my(WC.y - WC.arm), r, 0, 0, S.soap);
     b.kind = kind;
@@ -1092,6 +1200,21 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (kind === "duck") b.duck = { c: DUCK_COLORS[Math.floor(Math.random() * DUCK_COLORS.length)] };
     growing = { b: b, t0: performance.now(), dur: kind === "giant" ? 2200 : 1500 };
     inflateSound(kind === "giant");
+  }
+  // Surprise: a new shape wand, and a little puff of its bubbles from the wand.
+  function surpriseShapes() {
+    var pool = WANDS.filter(function (w) { return w.id !== "round" && w.id !== S.wand; });
+    var w = pool[Math.floor(Math.random() * pool.length)];
+    pickWand(w.id, true);
+    inflateSound(false);
+    for (var i = 0; i < 5; i++) {
+      var r = rnd(26, 46) * BS;
+      var b = makeBubble(wand.x + rnd(-10, 10), wand.y - wand.ring - r * 0.6 - i * 6, r, rnd(-60, 30), rnd(-90, -40), S.soap);
+      b.grow = 0.3 + i * 0.05;
+      setShape(b, w.id);
+      b.wa = 0.12;
+      addBubble(b);
+    }
   }
   function updateGrowing(now) {
     if (!growing) return;
@@ -1734,6 +1857,60 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       '<ellipse cx="20" cy="19" rx="7" ry="3.6" transform="rotate(-40 20 19)" fill="#FFFFFF" opacity="0.95"/>' +
       '<circle cx="27" cy="12.5" r="1.8" fill="#FFFFFF"/></svg>';
   }
+  // Wand tiles: each shows its loop, so he can see what it will blow. The SVG outline is traced with the same
+  // shapePath() the canvas uses (a tiny recorder turns its moves, lines, curves and arcs into an SVG path).
+  function svgPath(id, cx, cy, R) {
+    var d = "", px = 0, py = 0;
+    function P(v) { return v.toFixed(2); }
+    function pt(cmd, x2, y2) { d += (d && cmd === "M" ? "L" : cmd) + P(x2) + " " + P(y2); px = x2; py = y2; }
+    function arcPts(ex, ey, rx, ry, a0, a1, ccw) {
+      if (ccw) { while (a1 > a0) a1 -= TAU; } else { while (a1 < a0) a1 += TAU; }
+      var n = Math.max(4, Math.ceil(Math.abs(a1 - a0) / 0.2));
+      for (var i = 0; i <= n; i++) { var a = a0 + (a1 - a0) * i / n; pt(i || d ? "L" : "M", ex + Math.cos(a) * rx, ey + Math.sin(a) * ry); }
+    }
+    var rec = {
+      beginPath: function () { d = ""; },
+      moveTo: function (x2, y2) { d += "M" + P(x2) + " " + P(y2); px = x2; py = y2; },
+      lineTo: function (x2, y2) { pt("L", x2, y2); },
+      bezierCurveTo: function (a, b2, c2, e, x2, y2) { d += "C" + [a, b2, c2, e, x2, y2].map(P).join(" "); px = x2; py = y2; },
+      arc: function (ex, ey, r, a0, a1, ccw) { arcPts(ex, ey, r, r, a0, a1, ccw); },
+      ellipse: function (ex, ey, rx, ry, rot, a0, a1, ccw) { arcPts(ex, ey, rx, ry, a0, a1, ccw); },
+      closePath: function () { d += "Z"; }
+    };
+    shapePath(rec, cx, cy, R, id);
+    return d;
+  }
+  function wandIcon(w) {
+    var R = 17, cy = 23, d = svgPath(w.id, 30, cy, R), y0 = cy + R * loopBottom(w.id);
+    return '<svg viewBox="0 0 60 60" aria-hidden="true">' +
+      '<path d="M30 ' + y0.toFixed(1) + 'V57" stroke="#1D2340" stroke-width="8" stroke-linecap="round"/>' +
+      '<path d="M30 ' + y0.toFixed(1) + 'V57" stroke="#8E6CFF" stroke-width="4" stroke-linecap="round"/>' +
+      '<path d="' + d + '" fill="rgba(160,215,255,0.55)" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="#FF9A4D" stroke-width="3" stroke-linejoin="round"/></svg>';
+  }
+  WANDS.forEach(function (w) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile wandt";
+    b.dataset.wand = w.id;
+    b.setAttribute("aria-label", w.label + " wand");
+    b.innerHTML = wandIcon(w) + '<span class="nm">' + w.label + "</span>";
+    $("wands").appendChild(b);
+  });
+  function renderWands() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wand]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.wand === S.wand));
+    });
+  }
+  function pickWand(id, quiet) {
+    if (!WAND_BY[id]) return;
+    S.wand = id;
+    saveNow();
+    renderWands();
+    wand.filmAt = performance.now();
+    wand.pend = 0;
+    if (!quiet) tickSound(1);
+  }
+  renderWands();
   SOAPS.forEach(function (s) {
     var b = document.createElement("button");
     b.className = "btn tb-tile soap";
@@ -1773,7 +1950,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!t) return;
     if (t.id === "bigbtn" || t.closest(".modal, .farewell, .rest")) return;
     if (Toybox.timer.locked()) return;
-    if (t.dataset.soap) pickSoap(t.dataset.soap);
+    if (t.classList.contains("tab")) {
+      $("panel").dataset.tab = t.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll(".tb-tabs .tab"), function (b) { b.setAttribute("aria-pressed", String(b === t)); });
+      tickSound(0);
+    }
+    else if (t.dataset.wand) pickWand(t.dataset.wand);
+    else if (t.dataset.soap) pickSoap(t.dataset.soap);
     else if (t.id === "newBtn") newSky();
     else if (t.id === "surpriseBtn") surprise();
   });
@@ -1841,7 +2024,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var L = mx(14), R = mx(188), T = my(-96), B = my(-10), r = wand.ring + 6;
         return !(wand.x + r > L && wand.x - r < R && wand.y + wand.ring + wand.stick > T && wand.y - r < B);
       },
-      surprise: surprise
+      surprise: surprise,
+      wand: function (id) { pickWand(id); return S.wand; },
+      shapes: function () { var m = {}; bubbles.forEach(function (b) { if (!b.dead) m[b.shape] = (m[b.shape] || 0) + 1; }); return m; }
     };
   }
 

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Water Works</title>
+<title>Water Table</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#CDE9FF">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Water Works">
+<meta name="apple-mobile-web-app-title" content="Water Table">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -170,7 +170,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 <div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
-    <h1 class="tb-title">Water Works</h1>
+    <h1 class="tb-title">Water Table</h1>
     <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
@@ -208,7 +208,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* ignore */ }
 
   var KEY = "waterworks-v3";
-  // Opening Water Works from the Toybox home screen (Toybox.fresh) starts the first-visit layout with
+  // Opening Water Table from the Toybox home screen (Toybox.fresh) starts the first-visit layout with
   // its valves as they come; a reload keeps them. (Tilt is a grown-up setting on the Toybox home screen.)
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
@@ -952,13 +952,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   // Scoop shape in its own frame: centre at 0,0; the pouring lip is on the left.
   function scoopDims(sc) { return sc.kind === "cup" ? { tw: 46, bw: 36, h: 44 } : { tw: 50, bw: 44, h: 58 }; }
+  var SK = 1.3;   // the cup and the pitcher are drawn a bit bigger than the toys, so they're easy to grab
   function lipPoint(sc) {
-    var d = scoopDims(sc), a = -sc.tilt * 1.85, s = U * (sc.state === "float" ? depthScale(sc.y) : 1.1);
+    var d = scoopDims(sc), a = -sc.tilt * 1.85, s = U * SK * (sc.state === "float" ? depthScale(sc.y) : 1.1);
     var lx = (-d.tw / 2 - (sc.kind === "pitcher" ? 10 : 2)) * s, ly = (-d.h / 2) * s;
     return { x: sc.x + lx * Math.cos(a) - ly * Math.sin(a), y: sc.y + lx * Math.sin(a) + ly * Math.cos(a) };
   }
   function drawScoop(sc) {
-    var d = scoopDims(sc), fl = sc.state === "float", s = U * (fl ? depthScale(sc.y) : 1.1);
+    var d = scoopDims(sc), fl = sc.state === "float", s = U * SK * (fl ? depthScale(sc.y) : 1.1);
     var x = sc.x, y = sc.y + (fl ? bob(sc) - 6 * U : 0);
     ctx.save();
     ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(-sc.tilt * 1.85);
@@ -990,13 +991,22 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function updateScoops(dt) {
     scoops.forEach(function (sc) {
       var want = false;
-      if (sc.state === "drag") want = sc.y < g.rimBack - 24 * U && sc.w > 0.02;
+      if (sc.state === "drag") {
+        // Carried up, the cup keeps its water on the way (it used to pour all the way up and arrive empty).
+        // Near a bowl it slides onto the bowl's pouring spot by itself and pours in: a generous magnet.
+        var bf = snapFunnel(sc.rx, sc.ry), tx = sc.rx, ty = sc.ry;
+        sc.snap = bf;
+        if (bf) { var ps = pourSpot(sc, bf); tx = ps.x; ty = ps.y; }
+        var kk = Math.min(1, dt * (bf ? 12 : 30));
+        sc.x += (tx - sc.x) * kk; sc.y += (ty - sc.y) * kk;
+        want = !!bf && sc.w > 0.02 && Math.hypot(tx - sc.x, ty - sc.y) < 20 * U;
+      }
       else if (sc.state === "auto") {
         var A = sc.auto;
         A.t += dt;
         if (A.phase === "up") {
           var k = clamp(A.t / 0.7, 0, 1), e = k * k * (3 - 2 * k);
-          sc.x = lerp(A.x0, A.x1, e); sc.y = lerp(A.y0, A.y1, e) - Math.sin(k * Math.PI) * 40 * U;
+          sc.x = lerp(A.xs, A.x1, e); sc.y = lerp(A.ys, A.y1, e) - Math.sin(k * Math.PI) * 40 * U;
           if (k >= 1) { A.phase = "pour"; A.t = 0; }
         } else if (A.phase === "pour") {
           want = sc.w > 0.02;
@@ -1022,6 +1032,26 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var lp = lipPoint(sc);
       stepStream(sc.st, lp.x, lp.y, pouring ? 1 : 0, dt, true);
     });
+  }
+  // Where a cup sits to pour into a bowl (its lip, on the left, over the bowl's middle).
+  function pourSpot(sc, f) {
+    var d = scoopDims(sc), off = (d.tw / 2 + (sc.kind === "pitcher" ? 14 : 6)) * 1.1 * SK * U;
+    // Kept on screen: where the stage is short (phones held sideways) the bowls sit near its top edge.
+    var vis = -view.y / view.s + (d.h * 0.5 * 1.1 * SK + 8) * U;
+    // (the tipped cup's lip is its lowest point, well under its middle, and must stay over the bowl)
+    var lipDown = ((d.tw / 2 + (sc.kind === "pitcher" ? 10 : 2)) * Math.sin(1.85) - d.h / 2 * Math.cos(1.85)) * 1.1 * SK * U;
+    var base = f.top - 46 * SK * U - (sc.kind === "pitcher" ? 14 * U : 0);
+    return { x: f.x + off * 0.55, y: Math.max(base, Math.min(vis, f.top - 4 * U - lipDown)) };
+  }
+  // The bowl a carried cup is close enough to (a big area around each bowl, from the top of the panel down
+  // to well below the bowl), or null.
+  function snapFunnel(x, y) {
+    var best = null, bd = 1e9;
+    W.funnels.forEach(function (f) {
+      var dx = Math.abs(x - f.x), top = Math.min(g.py0, f.top - 120 * U), bot = f.bot + 110 * U;
+      if (dx < f.R + 95 * U && y > top && y < bot && dx < bd) { bd = dx; best = f; }
+    });
+    return best;
   }
   function splashAt(x, y, n) {
     for (var i = 0; i < n; i++) addPart(x + rand(-10, 10) * U, y, rand(-150, 150), rand(-380, -120), rand(2, 4.5) * U, y + rand(-3, 12));
@@ -1712,7 +1742,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var sc = scoops[i];
       if (sc.state === "auto" || sc.held) continue;
       var d = Math.hypot(w.x - sc.x, w.y - (sc.y - 8 * U));
-      if (d < hitR(42 * U) && d < bd) { bd = d; best = { type: "scoop", o: sc }; }
+      if (d < hitR(56 * U) && d < bd) { bd = d; best = { type: "scoop", o: sc }; }
     }
     if (best) return best;
     if (!sq.held && Math.abs(w.x - sq.x) < hitR(60 * U) && w.y > sq.y - 34 * U && w.y < sq.y + 40 * U) return { type: "sq" };
@@ -1766,7 +1796,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (++touches > 8) $("coach").classList.add("off");
     if (h.type === "scoop") {
       $("coach").classList.add("off"); ghost.learned();
-      var sc = h.o; sc.held = true; sc.state = "drag"; p.ox = w.x - sc.x; p.oy = w.y - sc.y;
+      var sc = h.o; sc.held = true; sc.state = "drag"; p.ox = w.x - sc.x; p.oy = w.y - sc.y; sc.rx = sc.x; sc.ry = sc.y; sc.snap = null;
       if (inWater(sc.x, sc.y)) { sc.w = 1; ring(sc.x, sc.y, 0.7); }
       plip();
     } else if (h.type === "sq") { sq.held = true; p.ox = w.x - sq.x; p.oy = w.y - sq.y; sq.px = sq.x; sq.py = sq.y; blip(); }
@@ -1786,7 +1816,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var o = cvOff(), w = toWorld(e.clientX - o.x, e.clientY - o.y);
     p.moved += Math.hypot(w.x - p.x, w.y - p.y);
     var ending = Toybox.timer.phase() === "ending";
-    if (p.type === "scoop") { p.o.x = w.x - p.ox; p.o.y = w.y - p.oy; }
+    if (p.type === "scoop") { p.o.rx = w.x - p.ox; p.o.ry = w.y - p.oy; }
     else if (p.type === "sq") { var x0 = sq.x, y0 = sq.y; sq.x = w.x - p.ox; sq.y = w.y - p.oy; squeegeeWipe(x0, y0, sq.x, sq.y); }
     else if (p.type === "spray") { spr.x = w.x - p.ox; spr.y = w.y - p.oy; }
     else if (p.type === "valve" && !ending) {
@@ -1829,6 +1859,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var sc = p.o; sc.held = false;
       if (quick && Toybox.timer.phase() !== "ending") { autoPour(sc); return; }
       if (inWater(sc.x, sc.y, 4 * U)) { sc.state = "float"; sc.vx = 0; sc.vy = 0; ring(sc.x, sc.y, 0.8); return; }
+      // Let go up high with water still in it: the cup finishes the job by itself (goes to the nearest bowl,
+      // pours, and floats back home), so a lift that ends a bit off still fills a bowl.
+      if (sc.w > 0.02 && sc.y < g.rimBack && Toybox.timer.phase() !== "ending") { autoPour(sc, sc.snap || nearFunnel(sc.x)); return; }
       sc.state = "fall"; sc.fallV = 0;
       sc.hy = clamp(lerp(g.yb, g.yf, 0.55), g.yb + 12 * U, g.yf - 8 * U);
       if (sc.y > sc.hy) sc.hy = Math.min(sc.y, g.yf - 8 * U);
@@ -1951,15 +1984,25 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var p0 = [o.x + view.x + sc.x * view.s, o.y + view.y + (sc.y - 8 * U) * view.s], p1 = [o.x + view.x + f.x * view.s, o.y + view.y + (f.top - 40 * U) * view.s];
     return { pts: [p0, [p0[0], p1[1] + (p0[1] - p1[1]) * 0.35], p1] };
   });
-  function autoPour(sc) {
-    // Scoop, lift to the bowl with the most room, pour, and float back.
+  function nearFunnel(x) {
+    var best = W.funnels[0];
+    W.funnels.forEach(function (f) { if (Math.abs(f.x - x) < Math.abs(best.x - x)) best = f; });
+    return best;
+  }
+  function autoPour(sc, to) {
+    // Scoop, lift to the bowl with the most room (or the bowl it was carried to), pour, and float back.
     var best = W.funnels[0];
     W.funnels.forEach(function (f) { if (f.level < best.level - 0.05) best = f; });
     if (W.funnels.length > 1 && Math.abs(W.funnels[0].level - W.funnels[1].level) < 0.05) best = sc.x < g.VW / 2 ? W.funnels[0] : W.funnels[1];
-    sc.state = "auto"; sc.w = 1;
-    var d = scoopDims(sc), off = (d.tw / 2 + (sc.kind === "pitcher" ? 14 : 6)) * 1.1 * U;
-    sc.auto = { phase: "up", t: 0, x0: sc.x, y0: sc.y, x1: best.x + off * 0.55, y1: best.top - 46 * U };
-    splashAt(sc.x, sc.y, 6); ring(sc.x, sc.y, 0.8); plip();
+    if (to) best = to;
+    var air = !inWater(sc.x, sc.y, 4 * U), ps = pourSpot(sc, best);
+    // From the air, it floats back to the water below where it was let go.
+    var hy = clamp(lerp(g.yb, g.yf, 0.55), g.yb + 12 * U, g.yf - 8 * U), hx = clamp(sc.x, edgeL(hy) + 26 * U, edgeR(hy) - 26 * U);
+    sc.state = "auto";
+    if (!air) sc.w = 1;
+    sc.auto = { phase: "up", t: 0, x0: air ? hx : sc.x, y0: air ? hy : sc.y, xs: sc.x, ys: sc.y, x1: ps.x, y1: ps.y };
+    if (!air) { splashAt(sc.x, sc.y, 6); ring(sc.x, sc.y, 0.8); }
+    plip();
   }
   cv.addEventListener("pointerup", ptrEnd);
   cv.addEventListener("pointercancel", ptrEnd);
