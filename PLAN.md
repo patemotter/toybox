@@ -397,9 +397,9 @@ directs it where to go by tapping the wheel or the bed or the food."
 - Timer ending: the machine winds down, the last bubbles float away and pop softly. Rest line: "The bubbles are
   resting."
 
-Built (folder `bubble-machine/`, tile "Bubbles"). Open questions for the dad: is Fast (about 4 bubbles a
-second) calm enough; should the wand stay where he drops it instead of gliding back to the jar; should Surprise
-ducks collect on the grass across visits; picture-only soap tiles on an upright phone (names don't fit).
+Built (folder `bubble-machine/`, tile "Bubbles"). The dad: Fast stays; the wand stays where he lets go (its
+soap film runs out after a few bubbles and refills by itself; a tap on the jar or New brings it home); ducks are
+not kept across visits.
 
 **Agents:** 1.
 
