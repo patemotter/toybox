@@ -17,9 +17,17 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 6 | Train Builder | Done |
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
-| 9 | Jigsaw Puzzles | Planned |
-| 10 | Kitchen Helper | Planned |
+| 9 | Jigsaw Puzzles | Next (the dad picked it) |
+| 10 | Kitchen Helper | Next (the dad picked it) |
 | 11 | Music Room | Planned |
+| 12 | Hamster | In progress |
+| 13 | Garden | Next (the dad picked it) |
+| 14 | Bubble Machine | Next (the dad picked it) |
+
+Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
+Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
+Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain
+reaction, fire station.
 | – | Workshop Projects | On hold |
 
 ---
@@ -309,6 +317,74 @@ angle values, bit sizes and nail lengths are no longer shown).
 **Fresh visit:** back to the xylophone; saved Beat Grid patterns are kept (his collection). **Timer ending:** the instruments play a soft last chord and the lights dim. Rest line: "The instruments are resting."
 
 **Agents:** 1 (2 if the Beat Grid and play-along songs are split from the instruments).
+
+---
+
+## 12. Hamster
+
+**Folder:** `hamster/`. The dad: "He loves watching hamsters run on wheels... a little pet hamster app that has a
+wheel and food and water and a bed that he can help take care of. Very simple; the hamster cute and happy. He
+directs it where to go by tapping the wheel or the bed or the food."
+
+- One cozy cage scene: exercise wheel, food bowl (with a food bag to refill it), water bottle (tap to refill), a
+  little wooden house as the bed, maybe a tunnel. The hamster is always happy: no meters, no sad states.
+- Tap a thing: the hamster scurries there and runs on the wheel (it spins fast), nibbles (cheeks puff), drinks
+  (bubbles rise), or curls up and sleeps (z z z). Tap or rub the hamster: wiggle and hearts.
+- When nobody taps it lives on its own: wanders, grooms, sometimes runs on the wheel.
+- Panel: a green "Treat!" (sunflower seed, carrot, blueberry) and Surprise (somersault, tunnel, ball, wave).
+- Timer ending: it yawns and goes to sleep in its house. Rest line: "The hamster is sleeping."
+
+---
+
+## 13. Garden
+
+**Folder:** `garden/`.
+
+**Goal:** plant, water and watch things grow, with bugs and birds visiting; calm and colorful.
+
+- A side view of a garden bed: soil with a few planting spots, a sky with the sun, a fence, a watering can, a
+  trowel and seed packets (pictures: sunflower, carrot, tomato, strawberry, pumpkin, tulip).
+- Drag a seed packet to a spot (or tap the packet, then the spot): the seed drops into a little hole and the soil
+  covers it. Tip the watering can over it (drag the can; it tilts and pours drops): the sprout pops up and grows in
+  visible stages (sprout, leaves, bud, flower or fruit). The sun helps: tapping the sun makes it shine brighter
+  and plants grow a stage (no waiting required; everything grows with his actions, not with clock time).
+- Ripe carrots, tomatoes, strawberries and pumpkins can be picked by pulling them (a carrot pops out of the soil
+  with a wiggle) and go into a basket that stays on screen. Sunflowers and tulips stay and sway.
+- Visitors: a bee buzzes between flowers, a butterfly lands, a ladybug crawls up a stem, a bird hops on the fence,
+  a worm pokes out when he digs. Tap them for a little reaction.
+- Optional rain: a cloud he drags over the garden rains on everything.
+- No fail states: nothing wilts or dies. Counter: "Picked: 5" (the one counter).
+- Panel: the seed packets as picture tiles; the tab bar with New (a fresh, empty bed) and Surprise (a rainbow and
+  everything grows a stage, or a visitor parade).
+- Fresh visit: an empty bed; the basket of picked things could be kept as a collection (ask the dad).
+- Timer ending: the sun sets, flowers close, the garden sleeps. Rest line: "The garden is sleeping."
+
+**Agents:** 1.
+
+---
+
+## 14. Bubble Machine
+
+**Folder:** `bubble-machine/`.
+
+**Goal:** a very simple, very sensory bubble toy.
+
+- A colorful bubble machine (a fan behind a turning wheel of bubble wands dipping in soap) on the ground; a
+  big bubble wand he can drag through the air to blow his own bubbles (slow drags make big wobbly bubbles, fast
+  drags a stream of small ones).
+- Bubbles are drawn with real-looking shimmer (rainbow sheen that swirls, a highlight, a soft wobble), float up and
+  drift, bump each other gently, and pop with a little splash ring and droplets when tapped or when they hit the
+  top. Several fingers can pop at once.
+- A switch on the machine turns it on and off (the machine's own switch is the control; no duplicate button).
+  The machine's speed dial: Slow / Medium / Fast (child-picked Fast is still calm).
+- Bubble colors/soap: picture tiles in the panel (clear rainbow, pink, blue, green, glitter). Surprise: a giant
+  bubble that wobbles across the screen, or a bubble with a little rubber duck inside it.
+- Optional tilt: with "Tilt and shake" on, bubbles drift the way the device leans; shaking blows a gust.
+- No counter needed (or "Popped: N" if the dad wants one; ask). No fail states.
+- Timer ending: the machine winds down, the last bubbles float away and pop softly. Rest line: "The bubbles are
+  resting."
+
+**Agents:** 1.
 
 ---
 
