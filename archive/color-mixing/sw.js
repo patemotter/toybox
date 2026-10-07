@@ -1,56 +1,63 @@
-// Service worker for offline use.
-// Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
-// and refresh the cache from the network in the background when online.
-// After changing any file, bump CACHE so old copies are discarded.
-const CACHE = "color-mixing-v10";
-const CORE = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
-  "./icons/icon-180.png",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-maskable-512.png",
-  // Shared Toybox grown-up layer (timer, sound, Big)
-  "../../common/toybox.css",
-  "../../common/toybox.js"
-];
+// Retired. The whole Toybox now uses one service worker (the sw.js in the Toybox's top folder,
+// registered by common/toybox.js). Older versions installed this per-app worker; inside this folder
+// it won over the Toybox-wide one and kept serving an old copy of the app.
+// Devices that still have it download this stub on their next visit. The stub:
+// - deletes this app's old caches and reloads the open page once, so it shows the newest version;
+// - until the new Toybox-wide worker (toybox-v119 or later) runs, serves this folder network first,
+//   falling back to the Toybox's cache when offline or when the network takes over NET_WAIT_MS;
+// - unregisters itself as soon as that worker runs, so this folder comes under it.
+// Keep this file: a device that hasn't opened this app since the change still needs it.
+const PREFIX = "color-mixing-";
+const NET_WAIT_MS = 3000;
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
-  );
-});
+async function toyboxReady() {
+  // The new Toybox-wide worker is running when its cache is the only "toybox-v" cache left.
+  const keys = (await caches.keys()).filter((k) => /^toybox-v\d+$/.test(k));
+  return keys.length === 1 && Number(keys[0].slice(8)) >= 119;
+}
+
+self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
-  // Only delete this app's old caches: every app in Toybox shares the same origin's cache storage.
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("color-mixing-") && k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k.startsWith(PREFIX)).map((k) => caches.delete(k)));
+    await self.clients.claim();
+    if (await toyboxReady()) await self.registration.unregister();
+    // The page on screen came from the old worker's cache: load it again (from the network, or
+    // through the Toybox-wide worker). This runs once: the reloaded page never brings the old worker back.
+    const pages = await self.clients.matchAll({ type: "window" });
+    pages.forEach((c) => { c.navigate(c.url).catch(() => { /* the next visit is fresh anyway */ }); });
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  if (req.method !== "GET") return;
-  const url = new URL(req.url);
-  const sameOrigin = url.origin === self.location.origin;
-  // The page's font comes from Google Fonts; cache it too so the look is the same offline.
-  const isFont = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
-  if (!sameOrigin && !isFont) return;
-
-  event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: sameOrigin });
-      const network = fetch(req)
-        .then((res) => {
-          // Opaque responses (cross-origin, no-cors) can't be inspected but are safe to cache.
-          if (res && (res.ok || res.type === "opaque")) cache.put(req, res.clone());
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  event.respondWith((async () => {
+    if (req.mode === "navigate" && (await toyboxReady())) event.waitUntil(self.registration.unregister());
+    // "no-cache" asks the server every time. A page load is fetched by its address (a redirected answer,
+    // e.g. a folder without its trailing slash, is left to the browser to follow).
+    const network = req.mode === "navigate"
+      ? fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then((res) => (res.redirected ? fetch(req) : res))
+      : fetch(req, { cache: "no-cache" });
+    const fallback = () => caches.match(req, { ignoreSearch: true });
+    return new Promise((resolve) => {
+      let done = false;
+      const useCache = async () => {
+        if (done) return;
+        const cached = await fallback();
+        if (done) return;
+        if (cached) { done = true; resolve(cached); }
+      };
+      const timer = setTimeout(useCache, NET_WAIT_MS);
+      network.then((res) => { clearTimeout(timer); if (!done) { done = true; resolve(res); } },
+        async () => {
+          clearTimeout(timer);
+          if (done) return;
+          const cached = await fallback();
+          if (!done) { done = true; resolve(cached || Response.error()); }
+        });
+    });
+  })());
 });

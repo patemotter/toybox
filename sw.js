@@ -1,11 +1,15 @@
-// Service worker for the Toybox launcher.
-// It pre-caches the launcher AND every app's files, so installing Toybox alone
-// makes every app available offline. Each app also has its own sw.js for when
-// it is installed on its own; inside an app's folder, that app's worker wins.
-// Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
-// and refresh the cache from the network in the background when online.
+// The one service worker for the whole Toybox (every page registers it through common/toybox.js).
+// It pre-caches the launcher AND every app's files, so one visit to the launcher makes every app
+// available offline. The apps' own sw.js files are retired stubs (they remove the per-app workers
+// that older versions installed); don't add a worker to an app.
+// Strategy:
+// - Pages, scripts, styles and manifests: network first, so an app opened online is always the newest
+//   version. If the network doesn't answer within NET_WAIT_MS (slow plane wifi) or fails (offline),
+//   the cached copy is served at once; a late answer still refreshes the cache for next time.
+// - Everything else (icons, the font): stale-while-revalidate.
+// Install downloads every CORE file fresh (bypassing the browser's HTTP cache).
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v118";
+const CACHE = "toybox-v119";
 const CORE = [
   "./",
   "./index.html",
@@ -238,7 +242,9 @@ const CORE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(CORE.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -250,14 +256,50 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+const NET_WAIT_MS = 3000;
+const FRESH_TYPES = ["document", "script", "style", "manifest"];
+
+function isFresh(req, url) {
+  if (FRESH_TYPES.indexOf(req.destination) >= 0) return true;
+  return /(\/|\.html|\.js|\.css|\.webmanifest)$/.test(url.pathname);
+}
+
+// Cache entries are stored without the query string (pages are matched with ignoreSearch), so
+// "?tool=..." links don't pile up copies of the same page.
+function cacheKey(url) { return url.origin + url.pathname; }
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   const sameOrigin = url.origin === self.location.origin;
-  // Pages use Google Fonts; cache them too so the look is the same offline.
+  // The pages' font comes from Google Fonts; cache it too so the look is the same offline.
   const isFont = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
   if (!sameOrigin && !isFont) return;
+
+  if (sameOrigin && isFresh(req, url)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      // "no-cache" asks the server every time (a cheap "not modified" when nothing changed).
+      const network = fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then((res) => {
+        // A redirect (e.g. a folder without its trailing slash) can't answer a page load from here;
+        // let the browser follow it itself.
+        if (res.redirected) return fetch(req);
+        if (res.ok && res.type === "basic") cache.put(cacheKey(url), res.clone());
+        return res;
+      });
+      const cached = await cache.match(req, { ignoreSearch: true });
+      if (!cached) return network;
+      // Keep the late answer alive so it still refreshes the cache.
+      event.waitUntil(network.catch(() => {}));
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(cached), NET_WAIT_MS);
+        network.then((res) => { clearTimeout(timer); resolve(res.ok ? res : cached); },
+          () => { clearTimeout(timer); resolve(cached); });
+      });
+    })());
+    return;
+  }
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
@@ -265,10 +307,11 @@ self.addEventListener("fetch", (event) => {
       const network = fetch(req)
         .then((res) => {
           // Opaque responses (cross-origin, no-cors) can't be inspected but are safe to cache.
-          if (res && (res.ok || res.type === "opaque")) cache.put(req, res.clone());
+          if (res && (res.ok || res.type === "opaque")) cache.put(sameOrigin ? cacheKey(url) : req, res.clone());
           return res;
         })
         .catch(() => cached);
+      if (cached) event.waitUntil(network);
       return cached || network;
     })
   );

@@ -32,9 +32,10 @@ Surprise only shuffles the setup and never draws), **Sand
 Table** (done; the dad: Draw! never smooths by itself, finished patterns stay and new ones draw on top; Smooth is his
 tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (done: the family's real routine, warm up, weigh 18.0 g, grind, whisk, tamp, lock in,
 10 s soak then the shot to about 36 g in about 28 s, steam, pour; latte for Mom, cappuccino for Dad, steamer for
-him. Questions: is a coffee drink too long (about 17 actions; should the funnel or knock-out happen by itself)?
-flush only once per switch-on? tray of three, oldest delivered? should he pour the milk into the jug? latte art
-choice?).
+him. v2: switching on warms up, purges and flushes by itself; funnel and knock-out are automatic; he pours the milk
+from a carton; close-ups for grinding, top-down whisking and frothing; a latte takes about 85 s. Questions: short
+enough, or should more happen by itself (moving the jug under the wand)? tray of three, oldest delivered? latte art
+choice? Not polished: close-ups small on phones held sideways; small serve view on upright phones).
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
@@ -314,7 +315,7 @@ done) OK; the fire truck sprays water with no fire drawn (not scary) OK.
 
 **Phase 1 built:** `kitchen/index.html` (kitchen page, getting-ready gate, the table kept as a collection in
 `kitchen-table-v1`, entries `{k, c, s, t}`) and `kitchen/blender.html` (counter "Smoothies"). To add a station: set
-`ready: true` in the kitchen page's `STATIONS` with an `ICONBOX`, add the page to `kitchen/sw.js` and the top-level
+`ready: true` in the kitchen page's `STATIONS` with an `ICONBOX`, add the page to the top-level
 `sw.js`, copy the ready-flag redirect and the kitchen-check script from `blender.html`, append food to the table.
 Questions for the dad: is "switch it off before lifting the jar" a step too many; Pulse hold-to-run; should the
 finished cup go to the table by itself; keep the table across visits (now) or clear it; more ingredients (mango,
@@ -467,7 +468,7 @@ fractions; numbers appear only inside project steps that measure or set a machin
 ## Every app
 
 Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
-- One self-contained folder (`index.html`, `manifest.webmanifest`, `sw.js`, icons) using `common/` for the timer,
+- One self-contained folder (`index.html`, `manifest.webmanifest`, icons; no `sw.js`) using `common/` for the timer,
   sound, Big button and fresh start. Offline-first; the only external file is the Baloo 2 font.
 - Sound off by default (2-second grown-up hold). Just as fun with sound off.
 - One screen, no page scroll, iPhone and iPad, touch and mouse. Phone header and two-rows-of-controls rules.

@@ -37,27 +37,25 @@ The top-level `index.html` is a launcher with a big button for each app.
 
 1. Open the site on the tablet or phone while online: `https://patemotter.com/toybox/`.
 2. Add it to the home screen (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app).
-3. Open it once from the home screen and wait a few seconds. The launcher's service worker caches the launcher and every app, so after that everything runs with no network.
+3. Open it once from the home screen and wait a few seconds. The Toybox's one service worker caches the launcher and every app, so after that everything runs with no network. Opened online, every app always loads its newest version.
 
 You can also install a single app on its own by opening its folder (for example `.../toybox/spin-shop/`) and adding that to the home screen.
 
 ## Adding an app
 
-1. Put the app in its own folder with its own `index.html`, `manifest.webmanifest`, `sw.js` and `icons/`.
-2. In the app's `sw.js`, give `CACHE` a name with an app-specific prefix (for example `my-app-v1`) and only delete caches with that prefix in `activate`. All apps share one origin, so they share cache storage.
-3. Give the app a Home button that links to `../` so there is a way back to the launcher (see the `homebtn` in `spin-shop/index.html`).
-4. Use the shared grown-up layer in `common/`: one play timer, one sound setting and the "Big" button for the whole Toybox. Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `peg-drop/` is a good example):
+1. Put the app in its own folder with its own `index.html`, `manifest.webmanifest` and `icons/`. No `sw.js`: the whole Toybox shares the top-level service worker, which `common/toybox.js` registers. (The `sw.js` files in older app folders are stubs that retire the per-app workers earlier versions installed; keep them.)
+2. Give the app a Home button that links to `../` so there is a way back to the launcher (see the `homebtn` in `spin-shop/index.html`).
+3. Use the shared grown-up layer in `common/`: one play timer, one sound setting and the "Big" button for the whole Toybox. Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `peg-drop/` is a good example):
    ```html
    <link rel="stylesheet" href="../common/toybox.css">
    <script src="../common/toybox.js"></script>
    ```
-   Also list `../common/toybox.css` and `../common/toybox.js` in the app's own `sw.js` `CORE`.
-5. Add the app to `APPS` in the top-level `index.html`.
-6. Add the app's files to `CORE` in the top-level `sw.js` and bump its `CACHE`.
+4. Add the app to `APPS` in the top-level `index.html`.
+5. Add the app's files to `CORE` in the top-level `sw.js` and bump its `CACHE` (`tools/add-app.py` does 4 and 5).
 
 ## Updating an app
 
-After changing any file, bump `CACHE` in that app's `sw.js` and in the top-level `sw.js`, so devices drop their old cached copies. After changing a file in `common/`, also bump `CACHE` in every app that uses it.
+After changing any file, bump `CACHE` in the top-level `sw.js`, so devices download a fresh offline copy. (Opened online, pages are fetched from the network first anyway.)
 
 ## Publishing
 

@@ -4,7 +4,7 @@ Usage (from anywhere):
   python3 tools/add-app.py <folder> "<Name>" "<what: one line for the tile>" "<README description>" [extra files...]
 
 Extra files are additional pages in the folder to cache offline (e.g. "drill-press.html").
-It bumps the top-level "toybox-vN" cache. The app's own sw.js, manifest and icons must already exist.
+It bumps the top-level "toybox-vN" cache. The app's manifest and icons must already exist (an app has no sw.js of its own: the top-level one serves everything).
 """
 import os
 import re

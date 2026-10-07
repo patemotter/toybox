@@ -31,8 +31,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 
 - Repo `patemotter/toybox`. No build step, no frameworks, no modules: each app is one folder with a
   self-contained `index.html` (inline CSS + JS in a `"use strict"` IIFE, ES5 style: `var`, `function`).
-- Every app folder: `index.html` (plus extra pages for multi-page apps), `manifest.webmanifest`, `sw.js`,
-  `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
+- Every app folder: `index.html` (plus extra pages for multi-page apps), `manifest.webmanifest`,
+  `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Older apps also have a `sw.js`:
+  a retired stub (see Offline below); keep it, but a new app gets none.
 - `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). It
   fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, six on
   phones held sideways), picture and name only; `fitGrid()` sizes the pictures to the rows. The `what` text
@@ -52,16 +53,23 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 
 ### Offline (service workers)
-- Each app's `sw.js`: stale-while-revalidate, `CACHE = "<folder>-vN"`, deletes only caches starting with
-  `"<folder>-"`, matches with `ignoreSearch` (so `?tool=` links work offline), caches the Baloo 2 Google Font.
-  Its `CORE` lists every page in the folder, the manifest, the icons and `../common/toybox.css` +
-  `../common/toybox.js`.
-- The top-level `sw.js` (`CACHE = "toybox-vN"`) caches the launcher and **every page of every app** so one visit
-  to the launcher makes everything work offline. A new page must be added to both lists. The Grown-ups sheet's
-  "Offline (for the plane)" section asks this worker which files are saved (`toybox-offline-check` /
-  `toybox-offline-fill` messages) and names any app that isn't ready.
-- **Bump the cache on every change**: the app's `sw.js` once per change set, and the top-level `toybox-vN` for
-  every commit that changes anything it caches. On the device: open online, close, open again to update.
+- **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-vN"`). `common/toybox.js`
+  registers it from every page (scope = the Toybox root) and unregisters any narrower worker it finds; pages have
+  no registration code of their own. It caches the launcher and **every page of every app**, so one visit makes
+  everything work offline. A new page must be added to its `CORE`.
+- Strategy: pages, scripts, styles and manifests are **network first** (`cache: "no-cache"`, so a deploy shows on
+  the next open), falling back to the cached copy if the network fails or takes over 3 s (plane wifi); icons and
+  the Baloo 2 font are stale-while-revalidate. Install fetches `CORE` with `cache: "reload"`. Pages also call
+  `update()` when they come back to the front (the home-screen app can stay open for days). Cache entries are
+  keyed without the query string and matched with `ignoreSearch` (so `?tool=` links work offline).
+- **Why** (don't undo it): each app used to have its own worker; inside its folder that worker won over the
+  launcher's and kept serving its own stale copy, so an app showed an old version until it was opened twice.
+  Those `<folder>/sw.js` files are now **retire stubs** (all identical except `PREFIX`): they delete their
+  `"<folder>-"` caches, reload the open page once, serve the folder network-first until the Toybox-wide worker
+  (v119 or later) runs, then unregister. Keep the stubs; never give an app a worker again.
+- The Grown-ups sheet's "Offline (for the plane)" section asks the worker which files are saved
+  (`toybox-offline-check` / `toybox-offline-fill` messages) and names any app that isn't ready.
+- **Bump `toybox-vN` on every commit** that changes anything it caches (a new version re-downloads every file).
 
 ### Deploy
 - GitHub Pages is published by `.github/workflows/pages.yml` (GitHub Actions, on every push to `main`, plus
@@ -69,7 +77,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   triggering after a history rewrite; that's why the workflow exists.)
 - The owner asked for direct pushes: commit to the working branch and push the same commit to `main`
   (`git push origin HEAD:<branch> HEAD:main`). No PR needed. Never force-push unless the owner explicitly asks.
-- Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/<app>/sw.js`.
+- Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/sw.js | grep CACHE`.
 
 ---
 
@@ -244,7 +252,7 @@ Keep only:
 - At most **three agents at a time** (the owner cares about not overloading the machine).
 - Each agent owns specific files. Don't edit files outside your assignment. Shared files (`common/`, the
   launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are edited by the coordinator only, unless assigned.
-- A folder's `sw.js` may be shared by agents on different pages of the same app: re-read it right before bumping.
+- The top-level `sw.js` is the coordinator's: agents don't bump caches; the coordinator bumps `toybox-vN` per commit.
 - **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
   tree**: other agents' uncommitted work lives there. To compare with an older version, export it with
   `git show HEAD:<path> > <scratch file>` instead.

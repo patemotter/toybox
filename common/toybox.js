@@ -98,6 +98,9 @@
 (function () {
   "use strict";
 
+  // This file's own address: the Toybox root (where the one service worker lives) is the folder above it.
+  var SCRIPT_SRC = document.currentScript && document.currentScript.src;
+
   var TKEY = "toybox-timer-v1";
   var SKEY = "toybox-sound-v1";
   var MINUTE_CHOICES = [5, 10, 15, 20, 30];
@@ -1041,6 +1044,43 @@
       if (opts.big && (e.key === bigKey() || e.key === null)) { var big = get(bigKey()) === "1"; if (big !== isBig()) setBig(big, false); }
     });
   }
+
+  // ---------- Offline (one service worker for the whole Toybox) ----------
+  // Every page registers the same worker, <root>/sw.js, scoped to the whole Toybox, so one cache serves
+  // every app and an update reaches every app at once. Older versions gave each app its own worker; a
+  // narrower worker wins inside its folder and kept serving that app's old copy, so any registration
+  // still found below the root is removed (its sw.js is now a stub that retires itself too, see marble-run/sw.js).
+  // The home-screen app can sit in the background for days without a page load, so the worker is also
+  // asked to check for an update whenever the page comes back to the front.
+  (function () {
+    if (!SCRIPT_SRC || !("serviceWorker" in navigator) || !/^https?:$/.test(location.protocol)) return;
+    var root;
+    try { root = new URL("../", SCRIPT_SRC).href; } catch (e) { return; }
+    var reg = null;
+    function start() {
+      // register() alone doesn't look for a newer sw.js when this page belongs to another worker (an
+      // app's retired stub), so ask for an update check every time.
+      navigator.serviceWorker.register(root + "sw.js", { scope: root }).then(function (r) {
+        reg = r;
+        if (navigator.onLine !== false) r.update().catch(function () {});
+      })
+        .catch(function () { /* offline install unavailable */ });
+      if (navigator.serviceWorker.getRegistrations) {
+        navigator.serviceWorker.getRegistrations().then(function (list) {
+          list.forEach(function (r) {
+            // A retired stub that serves this very page unregisters itself once the Toybox-wide worker runs.
+            var ctl = navigator.serviceWorker.controller;
+            if (ctl && r.active && r.active.scriptURL === ctl.scriptURL) return;
+            if (r.scope !== root && r.scope.indexOf(root) === 0) r.unregister().catch(function () {});
+          });
+        }).catch(function () {});
+      }
+    }
+    if (document.readyState === "complete") start(); else window.addEventListener("load", start);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && reg && navigator.onLine !== false) reg.update().catch(function () {});
+    });
+  })();
 
   // ---------- Fresh visits ----------
   // Opening an app from the Toybox home screen starts it fresh. The home screen stores a new launch
