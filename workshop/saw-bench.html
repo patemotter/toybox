@@ -249,7 +249,9 @@ body.ending .navlink { pointer-events: none; opacity: 0.4; }
 /* ---------- Project mode (saw-bench.html?project=..&step=..): one step of a Workshop project ----------
    The panel is gone (the step needs nothing from it), a step banner sits at the top of the stage, the
    coach pill under it (bottom on phones), and a "Done!" card covers the stage when the job is finished. */
-body.project .tb-panel { display: none; }
+body.project-locked .tb-panel,
+body.project .ctrlbar,
+body.project .newbtn { display: none; }
 .pj-banner { top: 10px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); white-space: nowrap; overflow: hidden; max-width: calc(100% - 20px); }
 .pj-coach { top: 66px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); white-space: nowrap; overflow: hidden; max-width: calc(100% - 20px); }
 .pj-banner[hidden], .pj-coach[hidden], .pj-done[hidden] { display: none; }
@@ -542,14 +544,21 @@ body.project .tb-panel { display: none; }
     if (id === "mitersaw" && ANGLES.indexOf(p.angle) === -1) p.angle = 0;
     if (id === "scrollsaw" && [0, 1, 2].indexOf(p.spd) === -1) p.spd = 1;
     if (id === "mitersaw" && p.view !== "side") p.view = "front";
-    // Project mode: the step sets the saw up (pine project board, the step's angle, rip mode).
-    if (PJ && id === PJ.sawId) {
+    // Project mode: the step sets the saw up (pine project board, the step's angle, rip or crosscut mode).
+    if (PJ) {
       p.mat = "pine";
       if (id === "mitersaw") { p.angle = PJ.kind === "angle" ? PJ.job.angle : 0; p.view = "front"; }
+      if (id === "ryoba" && PJ.kind === "crosscut") p.edge = "cross";
+      if ((id === "circular" || id === "tracksaw") && PJ.kind === "crosscut" && p.depth < 25) p.depth = id === "tracksaw" ? 25 : 30;
       if (id === "tablesaw") {
-        p.mode = "rip"; p.gauge = 0;
-        if (p.height < 30) p.height = 30;
-        if (!PJ.fenceInit) { PJ.fenceInit = true; p.fence = TBL.fMin; }
+        if (PJ.kind === "crosscut") {
+          p.mode = "cross"; p.gauge = 0;
+          if (p.height < 30) p.height = TBL.hMax;
+        } else {
+          p.mode = "rip"; p.gauge = 0;
+          if (p.height < 30) p.height = 30;
+          if (!PJ.fenceInit) { PJ.fenceInit = true; p.fence = TBL.fMin; }
+        }
       }
     }
     return p;
@@ -1466,6 +1475,14 @@ body.project .tb-panel { display: none; }
     },
     newWork: function (instant) {
       var wk = endWork(this.saw, this.set);
+      if (PJ && PJ.kind === "crosscut") {
+        wk.mat = "pine"; wk.shape = "rect";
+        wk.w = Math.round(PJ.job.board.w * 20); wk.h = 19; wk.ease = 2; wk.grain = "y";
+        wk.pith = [-wk.w / 2 - 90, wk.h * 0.25];
+        wk.pts = sectionPts(wk);
+        wk.L = Math.round(PJ.job.board.l * 20);
+        wk.cuts = [Math.round(PJ.job.line * 20)];
+      }
       this.wk = wk; this.mat = MATS[wk.mat];
       this.L = wk.L; this.cuts = wk.cuts.slice();
       this.c = this.cuts.shift();
@@ -1818,12 +1835,13 @@ body.project .tb-panel { display: none; }
       if (this.pid != null) { puff(pt.x, pt.y); return; }
       this.pid = pt.id; this.lx = pt.x; this.ly = pt.y;
       this.held = true;
+      if (PJ) pjCoachDone();
     },
     move: function (pt) {
       if (pt.id !== this.pid) return;
       var dx = pt.x - this.lx, dy = pt.y - this.ly;
       this.lx = pt.x; this.ly = pt.y;
-      if (this.slideT < 1 || this.waitNew) return;
+      if (this.slideT < 1 || this.waitNew || (PJ && PJ.done)) return;
       if (this.op) { this.opMove(dx, dy); return; }
       if (this.kind === "hand") this.handMove(dx, dy);
       else if (this.kind === "slide") { this.tx += dx / this.S; if (this.saw.id === "circular") this.wob = clamp(this.wob + dy * 0.03, -5, 5); }
@@ -1893,6 +1911,14 @@ body.project .tb-panel { display: none; }
       // re-base the board: what's left starts at the cut
       this.L -= c + this.saw.kerf;
       this.cView = 0;
+      if (PJ && PJ.kind === "crosscut") {
+        this.c = 0; this.waitNew = 0;
+        this.depth = 0; this.groove = false;
+        this.resetTool();
+        this.lift = 40;
+        if (!PJ.done) { PJ.cuts++; if (PJ.cuts >= PJ.count) pjComplete(2000); }
+        return;
+      }
       var next = this.cuts.shift();
       if (!next || this.L - next < 15) {
         this.waitNew = 1.6; this.c = 0; this.L = Math.max(this.L, 0);
@@ -3986,18 +4012,18 @@ body.project .tb-panel { display: none; }
       this.saw = saw; this.set = set;
       this.speed = 0; this.spin = 0; this.spinA = 0; this.on = false;
       this.hD = set.height; this.fD = this.fenceTarget(); this.wheelA = -this.hD / TBL.wheelK;
-      this.ptrs = {}; this.held = false; this.vel = 0; this.needOn = 0; this.angleTag = 0; this.turning = false;
+      this.ptrs = {}; this.held = false; this.vel = 0; this.needOn = 0; this.angleTag = 0; this.lockTag = 0; this.turning = false;
       this.theta = set.gauge * Math.PI / 180;
       this.newWork(true);
     },
     cross: function () { return this.set.mode === "cross"; },
-    fenceTarget: function () { return this.cross() ? 470 : this.set.fence; },
-    setMode: function () { this.ptrs = {}; this.held = false; this.theta = this.set.gauge * Math.PI / 180; this.newWork(false); },
+    fenceTarget: function () { return this.cross() ? (TBL.right - 76) : this.set.fence; },
+    setMode: function () { this.ptrs = {}; this.held = false; this.theta = this.set.gauge * Math.PI / 180; this.newWork(true); },
     newWork: function (instant) {
       this.mat = MATS[this.set.mat];
       this.thick = TBL.thick[this.set.mat] || 19;
       this.bw = TBL.w0; this.len = TBL.len; this.grooves = []; this.kerfLen = 0; this.kerfTop = 0;
-      this.hint = 0; this.xOff = 0; this.strips = 0;
+      this.hint = 0; this.xOff = 0; this.strips = 0; this.lockTag = 0;
       this.grainSeed = rnd(0, 200);
       // Project rip job: the Side blank, drawn at the project scale (PJ.S mm per inch)
       this.pj = PJ && PJ.kind === "rip" ? PJ : null;
@@ -4007,13 +4033,14 @@ body.project .tb-panel { display: none; }
         this.bw = this.pj.job.board.w * S; this.len = this.pj.job.board.l * S;
         this.pjMissed = false;
       }
+      this.fenceLocked = this.pj ? this.pjFenceOk() : true;
       // the crosscut board, in the gauge's frame: u along the gauge fence, v away from it
       this.cpoly = [[-190, 0], [240, 0], [240, TBL.xw], [-190, TBL.xw]];
       this.uOff = 0; this.cSlide = instant ? 0 : -600; this.slice = rnd(60, 80);
       this.cspan = [0, 0];
       if (this.cross()) this.placeCross();
       this.layout();
-      this.y0 = this.startY() - (instant ? 0 : 700);
+      this.y0 = this.startY() - (instant || this.cross() ? 0 : 700);
       this.target = this.y0;
       this.state = instant ? "ready" : "return";
     },
@@ -4021,7 +4048,7 @@ body.project .tb-panel { display: none; }
       var T = TBL;
       this.cam = new Cam3([-520, -1330, 1000], [10, 0, -40]);
       var pts = [[-260, T.front, 0], [250, T.front, 0], [-260, T.back - 60, 0], [250, T.back - 60, 0], [0, 0, 120],
-        [-220, T.front - 60, -175], [220, T.front - 60, -175]];
+        [-220, T.front - 60, -175], [220, T.front - 60, -175], [T.slot, T.front - 45, 130]];
       // the long project board starts well in front of the table: keep its near end in view
       if (this.pj) pts.push([0, -this.chord(0, TBL.hMax) - 16 - this.len - 10, 0]);
       this.cam.fit(pts, 8, Math.min(70, H * 0.1), W - 8, H - 6);
@@ -4066,7 +4093,10 @@ body.project .tb-panel { display: none; }
       this.cspan = this.crossSpan();
     },
     span: function () { return this.cross() ? this.cspan : [0, this.len]; },
-    startY: function () { return -this.chord(0, this.set.height) - 16 - this.span()[1]; },
+    startY: function () {
+      var y = -this.chord(0, this.set.height) - 16 - this.span()[1];
+      return this.cross() ? Math.min(y, TBL.front + 24) : y;
+    },
     endY: function () { return this.chord(0, this.hD) + 2 - this.span()[0]; },
     setFence: function () {
       // moving the fence starts a fresh pass
@@ -4134,7 +4164,8 @@ body.project .tb-panel { display: none; }
       if ((h = this.hitOff) && pt.x > h[0] - 10 && pt.x < h[2] + 10 && pt.y > h[1] - 8 && pt.y < h[3] + 10) return "off";
       if ((h = this.hitSw) && pt.x > h[0] - 8 && pt.x < h[2] + 8 && pt.y > h[1] - 8 && pt.y < h[3] + 8) return this.on ? "off" : "on";
       if ((h = this.hitWheel) && dist(pt.x, pt.y, h[0], h[1]) < Math.max(54, h[2] * 1.35)) return "wheel";
-      if (!this.cross() && (h = this.hitFence) && this.state !== "feed" && pt.x > h[0] - 12 && pt.x < h[2] + 12 && pt.y > h[1] - 12 && pt.y < h[3] + 12) return "fence";
+      if (!this.cross() && (h = this.hitFenceLock) && this.state !== "feed" && dist(pt.x, pt.y, h[0], h[1]) < h[2]) return "fencelock";
+      if (!this.cross() && !this.fenceLocked && (h = this.hitFence) && this.state !== "feed" && pt.x > h[0] && pt.x < h[2] + 12 && pt.y > h[1] - 8 && pt.y < h[3] + 8) return "fence";
       if (this.cross() && (h = this.hitGauge) && dist(pt.x, pt.y, h[0], h[1]) < h[2]) return "gauge";
       return "push";
     },
@@ -4146,6 +4177,7 @@ body.project .tb-panel { display: none; }
     setOn: function (v) {
       if (endingNow() || v === this.on) return;
       this.on = v; this.needOn = 0;
+      if (PJ && PJ.kind === "crosscut") pjCoachDone();
       Sound.click();
     },
     down: function (pt) {
@@ -4153,18 +4185,20 @@ body.project .tb-panel { display: none; }
       for (k in this.ptrs) if (!downIds[k]) delete this.ptrs[k];
       k = this.hitTest(pt);
       if (k === "on" || k === "off") { this.setOn(k === "on"); return; }
+      if (k === "fencelock") { this.fenceLocked = !this.fenceLocked; this.lockTag = 1.8; Sound.click(); return; }
       var p = { kind: k, x0: pt.x, y0: pt.y, mode: null };
       if (k === "wheel") p.a = Math.atan2(pt.y - this.hitWheel[1], pt.x - this.hitWheel[0]);
-      else if (k === "fence") { var wf = this.cam.onZ(pt.x, pt.y, 0); p.wx = wf ? wf[0] : null; if (this.pj) pjCoachDone(); }
+      else if (k === "fence") { var wf = this.cam.onZ(pt.x, pt.y, 0); p.wx = wf ? wf[0] : null; }
       else {
         var w = this.cam.onZ(pt.x, pt.y, this.thick);
         p.wy = w ? w[1] : null; this.lt = performance.now(); this.vel = 0;
         if (this.state !== "return" && (this.target == null || this.target < this.y0)) this.target = this.y0;
+        if (PJ && PJ.kind === "crosscut") pjCoachDone();
       }
       this.ptrs[pt.id] = p;
       this.held = this.pushers() > 0;
     },
-    canTurn: function () { return this.cross() && this.kerfTop === 0 && this.kerfLen === 0 && this.state !== "feed"; },
+    canTurn: function () { return !(PJ && PJ.kind === "crosscut") && this.cross() && this.kerfTop === 0 && this.kerfLen === 0 && this.state !== "feed"; },
     move: function (pt) {
       var p = this.ptrs[pt.id], set = this.set, T = TBL;
       if (!p) return;
@@ -4174,6 +4208,20 @@ body.project .tb-panel { display: none; }
         d = Math.atan2(Math.sin(d), Math.cos(d)); p.a = a;
         set.height = clamp(set.height + d * T.wheelK, T.hMin, T.hMax);
         return;
+      }
+      if (p.kind === "fence" && !p.mode) {
+        var fmx = pt.x - p.x0, fmy = pt.y - p.y0;
+        if (fmx * fmx + fmy * fmy < 100) return;
+        if (Math.abs(fmy) > Math.abs(fmx) * 1.1) {
+          p.kind = "push";
+          var w0 = this.cam.onZ(pt.x, pt.y, this.thick);
+          p.wy = w0 ? w0[1] : null; this.lt = performance.now(); this.vel = 0;
+          if (this.state !== "return" && (this.target == null || this.target < this.y0)) this.target = this.y0;
+          this.held = this.pushers() > 0;
+        } else {
+          p.mode = "slide";
+          if (this.pj) pjCoachDone();
+        }
       }
       if (p.kind === "fence") {
         var wf = this.cam.onZ(pt.x, pt.y, 0);
@@ -4207,8 +4255,8 @@ body.project .tb-panel { display: none; }
       this.lt = now;
       this.vel = this.vel * 0.5 + (dd / dtm * 1000) * 0.5;
       if (this.state === "return") return;
-      // project: once the Strip is cut the job is done; what is left of the blank stays put
-      if (this.pj && this.pj.done) return;
+      // project: once the Strip (or crosscut piece) is cut the job is done; what is left stays put
+      if (PJ && PJ.done) return;
       this.target = clamp(this.target + dd, this.startY() - 80, this.endY() + 60);
     },
     up: function (pt) {
@@ -4218,12 +4266,13 @@ body.project .tb-panel { display: none; }
       this.held = this.pushers() > 0;
       if (p.kind === "wheel") { set.height = Math.round(set.height * 2) / 2; saveApp(); return; }
       if (p.kind === "fence") {
+        if (!p.mode) return;
         if (this.pj) {
           // project: a soft snap onto the step's width when close, else the nearest quarter inch
           var fin = set.fence / this.pj.S, want = this.pj.job.fence;
           fin = Math.abs(fin - want) < 0.5 ? want : Math.round(fin * 4) / 4;
           set.fence = clamp(fin * this.pj.S, TBL.fMin, TBL.fMax);
-          if (this.pjFenceOk()) Sound.click();
+          if (this.pjFenceOk()) { this.fenceLocked = true; this.lockTag = 1.8; Sound.click(); }
           this.pjFenceMoved = true;
           return;
         }
@@ -4238,7 +4287,7 @@ body.project .tb-panel { display: none; }
         return;
       }
       // a flick keeps the board going through the cut
-      if (!this.held && this.state !== "return" && !(this.pj && this.pj.done) && this.vel > 120 && performance.now() - this.lt < 150) {
+      if (!this.held && this.state !== "return" && !(PJ && PJ.done) && this.vel > 120 && performance.now() - this.lt < 150) {
         this.target = clamp(this.target + this.vel * 0.35, this.startY() - 80, this.endY() + 60);
       }
     },
@@ -4260,6 +4309,7 @@ body.project .tb-panel { display: none; }
       if (this.needOn) this.needOn = Math.max(0, this.needOn - dt);
       if (this.flashOff) this.flashOff = Math.max(0, this.flashOff - dt);
       if (this.angleTag) this.angleTag = Math.max(0, this.angleTag - dt);
+      if (this.lockTag) this.lockTag = Math.max(0, this.lockTag - dt);
       // the gauge head swings to its stop
       if (cross && !this.turning) {
         var tt = set.gauge * Math.PI / 180;
@@ -4296,7 +4346,7 @@ body.project .tb-panel { display: none; }
             this.pjMissed = true; this.pj.misses++;
             pjSay("Slide the fence to " + ToyboxProjects.fmt(this.pj.job.fence) + "!", 3500);
             // the third try: the fence slides itself to the width
-            if (this.pj.misses > 2) { set.fence = this.pj.job.fence * this.pj.S; this.pjFenceMoved = true; Sound.click(); }
+            if (this.pj.misses > 2) { set.fence = this.pj.job.fence * this.pj.S; this.pjFenceMoved = true; this.fenceLocked = true; this.lockTag = 1.8; Sound.click(); }
           }
         } else if (gap > free) {
           // in the wood: the blade sets the pace; a stopped blade stops the board
@@ -4362,6 +4412,13 @@ body.project .tb-panel { display: none; }
           dropPiece(spr, -rnd(160, 260), -rnd(320, 420), -rnd(1.5, 3));
         }
         this.strips++;
+        if (PJ && PJ.kind === "crosscut") {
+          this.cpoly = left;
+          this.kerfLen = 0; this.kerfTop = 0;
+          this.state = "return";
+          if (!PJ.done) { PJ.cuts++; if (PJ.cuts >= PJ.count) pjComplete(2200); }
+          return;
+        }
         var us = left.map(function (p) { return p[0]; });
         if (left.length < 3 || Math.max.apply(null, us) - Math.min.apply(null, us) < 150) {
           this.cpoly = [[-190, 0], [240, 0], [240, TBL.xw], [-190, TBL.xw]];
@@ -4625,11 +4682,11 @@ body.project .tb-panel { display: none; }
       this.hitSw = [Math.min(s0[0], s1[0]), Math.min(s0[1], s1[1]), Math.max(s0[0], s1[0]), Math.max(s0[1], s1[1])];
     },
     drawFence: function (g, fx) {
-      var c = this.cam, T = TBL;
-      // the head clamps onto the front rail (drag it to move the fence)
+      var c = this.cam, T = TBL, lck = this.fenceLocked;
+      // the head clamps onto the front rail (drag it to move the fence when unlocked)
       c.box(g, fx, fx + 76, T.front - 74, T.front - 4, -78, 70, "#5A6272", "#3D4452", "#4C5566", 3);
       var hb = [1e9, 1e9, -1e9, -1e9];
-      [[fx, T.front - 74, -78], [fx + 76, T.front - 4, 70], [fx, T.front - 4, 70], [fx + 76, T.front - 74, -78], [fx + 38, T.front - 120, 112]].forEach(function (p) {
+      [[fx + 6, T.front - 74, -78], [fx + 76, T.front - 6, 70], [fx + 6, T.front - 6, 70], [fx + 76, T.front - 74, -78]].forEach(function (p) {
         var q = c.P(p[0], p[1], p[2]); hb[0] = Math.min(hb[0], q[0]); hb[1] = Math.min(hb[1], q[1]); hb[2] = Math.max(hb[2], q[0]); hb[3] = Math.max(hb[3], q[1]);
       });
       this.hitFence = hb;
@@ -4637,10 +4694,21 @@ body.project .tb-panel { display: none; }
       c.box(g, fx, fx + 48, T.front - 4, T.back + 20, 0, 66, "#FFA94D", "#D96A00", C.orange, 3);
       var s0 = c.P(fx, T.front, 50), s1 = c.P(fx, T.back + 10, 50);
       line(g, s0[0], s0[1], s1[0], s1[1], "rgba(255,255,255,0.45)", 3);
-      // lock handle
-      var h0 = c.P(fx + 38, T.front - 40, 70), h1 = c.P(fx + 38, T.front - 120, 112);
-      line(g, h0[0], h0[1], h1[0], h1[1], OUT, 13); line(g, h0[0], h0[1], h1[0], h1[1], C.grip, 8);
-      g.beginPath(); g.arc(h1[0], h1[1], 8, 0, 7); fs(g, C.red, 2.5);
+      // cam-lock lever on the front of the clamp head: up when unlocked, flipped down when locked
+      var h0 = c.P(fx + 38, T.front - 36, lck ? 56 : 68);
+      var h1 = c.P(fx + 38, lck ? (T.front - 118) : (T.front - 105), lck ? 12 : 126);
+      var lk = c.k(fx + 38, T.front - 110, lck ? 12 : 126), lr = Math.max(11, 14 * lk);
+      line(g, h0[0], h0[1], h1[0], h1[1], OUT, 14); line(g, h0[0], h0[1], h1[0], h1[1], C.grip, 8);
+      if (this.pj && this.pjFenceOk() && !lck && !endingNow()) {
+        var pr = lr * (1.7 + 0.3 * Math.sin(hintPulse * 5));
+        g.beginPath(); g.arc(h1[0], h1[1], pr, 0, 7); g.lineWidth = 3.5; g.strokeStyle = "rgba(255,201,60,0.95)"; g.stroke();
+      }
+      g.beginPath(); g.arc(h1[0], h1[1], lr, 0, 7); fs(g, lck ? C.red : C.yellow, 2.5);
+      g.beginPath(); g.arc(h1[0] - lr * 0.28, h1[1] - lr * 0.28, lr * 0.3, 0, 7); g.fillStyle = "rgba(255,255,255,0.55)"; g.fill();
+      this.hitFenceLock = [h1[0], h1[1], Math.max(28, 22 * lk)];
+      if (this.lockTag > 0 && !this.cross()) {
+        smallTag(g, h1[0], Math.min(H - 22, h1[1] + lr + 20), lck ? "Locked" : "Unlocked");
+      }
       // cursor window over the tape, with the red hairline at the fence face
       var rf = T.front - 62, rb = T.front - 14;
       c.poly(g, [[fx - 22, rf + 4, -18], [fx, rf + 4, -18], [fx, rb - 4, -18], [fx - 22, rb - 4, -18]], "rgba(190,230,255,0.45)", 2.5);
@@ -4650,7 +4718,9 @@ body.project .tb-panel { display: none; }
     // The miter gauge: its bar runs in the left slot; the head (fence, protractor, handle) turns.
     drawGaugeBar: function (g) {
       var c = this.cam, s = TBL.slot, y = this.y0;
-      c.poly(g, [[s - 8, y - 40, 0], [s + 8, y - 40, 0], [s + 8, y + 430, 0], [s - 8, y + 430, 0]], "#C9CFD8", 2);
+      var y0 = Math.max(TBL.front, y - 40), y1 = Math.min(TBL.back, y + 430);
+      if (y1 <= y0) return;
+      c.poly(g, [[s - 8, y0, 0], [s + 8, y0, 0], [s + 8, y1, 0], [s - 8, y1, 0]], "#C9CFD8", 2);
     },
     drawGauge: function (g) {
       var c = this.cam, self = this, i, a, toW = function (p) { return self.gw(p[0], p[1]); };
@@ -4927,6 +4997,7 @@ body.project .tb-panel { display: none; }
       c.box(g, -310, -152, -150, 125, -22, 0, C.alu, C.aluD, C.aluD);
       c.box(g, 152, 310, -150, 125, -22, 0, C.alu, C.aluD, C.aluD);
     },
+    canTurn: function () { return !this.pj && this.alpha > MITER.up - 0.08 && this.shift < 0.5 && !this.cut; },
     down: function (pt) {
       if (this.pid != null && !downIds[this.pid]) { this.pid = null; this.held = false; }
       if (this.tid != null && !downIds[this.tid]) this.tid = null;
@@ -4943,7 +5014,7 @@ body.project .tb-panel { display: none; }
       } else {
         // the turntable's front handle: drag it sideways to swing the table (head up only)
         var kn = this.hitKnob;
-        if (this.tid == null && kn && dist(pt.x, pt.y, kn[0], kn[1]) < kn[2] && this.alpha > MITER.up - 0.08 && this.shift < 0.5) {
+        if (this.tid == null && kn && dist(pt.x, pt.y, kn[0], kn[1]) < kn[2] && this.canTurn()) {
           this.tid = pt.id; this.tx0 = pt.x; this.th0 = this.theta; this.turning = true;
           return;
         }
@@ -5112,14 +5183,40 @@ body.project .tb-panel { display: none; }
       c.poly(g, win.map(function (p) { return self.bp(p[0], p[1], 0.5); }), "rgba(190,230,255,0.5)", 2);
       var h0 = c.P.apply(c, this.bp(-208, 0, 1)), h1 = c.P.apply(c, this.bp(-240, 0, 1));
       line(g, h0[0], h0[1], h1[0], h1[1], C.red, 3);
-      // lock knob under the front of the arm
-      var kn = this.bp(-282, 0, -40), kr = 17 * c.k(kn[0], kn[1], kn[2]), kp = c.P(kn[0], kn[1], kn[2]);
+      // curved left/right swing arrows on the front scale plate flanking the arm
+      if (this.canTurn()) {
+        [-1, 1].forEach(function (sgn) {
+          var a0 = clamp(self.theta + sgn * 8, -52, 52), a1 = clamp(self.theta + sgn * 24, -54, 54);
+          if (Math.abs(a1 - a0) < 6) return;
+          var arc = [], s, rA = 247, zA = -20;
+          for (s = 0; s <= 6; s++) {
+            var rad = (a0 + (a1 - a0) * s / 6) * Math.PI / 180;
+            arc.push(c.P(Math.sin(rad) * rA, MF.cy - Math.cos(rad) * rA, zA));
+          }
+          g.lineCap = "round"; g.lineJoin = "round";
+          g.beginPath(); g.moveTo(arc[0][0], arc[0][1]);
+          for (s = 1; s < arc.length; s++) g.lineTo(arc[s][0], arc[s][1]);
+          g.strokeStyle = OUT; g.lineWidth = 7; g.stroke();
+          g.strokeStyle = C.yellow; g.lineWidth = 3.5; g.stroke();
+          var tipRad = (a1 + sgn * 4) * Math.PI / 180, baseRad = a1 * Math.PI / 180;
+          var tp = c.P(Math.sin(tipRad) * rA, MF.cy - Math.cos(tipRad) * rA, zA);
+          var bIn = c.P(Math.sin(baseRad) * (rA - 9), MF.cy - Math.cos(baseRad) * (rA - 9), zA);
+          var bOut = c.P(Math.sin(baseRad) * (rA + 9), MF.cy - Math.cos(baseRad) * (rA + 9), zA);
+          polyPath(g, [tp, bIn, bOut]); fs(g, C.yellow, 2);
+        });
+      }
+      // lock knob under the front of the arm (bright yellow, matching the miter gauge handle)
+      var kn = this.bp(-282, 0, -40), k = c.k(kn[0], kn[1], kn[2]), kr = Math.max(13, 22 * k), kp = c.P(kn[0], kn[1], kn[2]);
       var kb = c.P.apply(c, this.bp(-258, 0, -10));
-      line(g, kb[0], kb[1], kp[0], kp[1], OUT, 12); line(g, kb[0], kb[1], kp[0], kp[1], C.grip, 7);
-      g.beginPath(); g.ellipse(kp[0], kp[1], kr, kr * 0.8, 0, 0, 7); fs(g, C.grip, 2.5);
-      g.beginPath(); g.ellipse(kp[0] - kr * 0.3, kp[1] - kr * 0.3, kr * 0.3, kr * 0.2, 0, 0, 7); g.fillStyle = "rgba(255,255,255,0.35)"; g.fill();
-      this.hitKnob = [kp[0], kp[1], Math.max(40, kr * 2.4)];
-      if (this.angleTag > 0 || this.turning) smallTag(g, kp[0], Math.min(H - 22, kp[1] + kr + 24), Math.abs(this.theta) < 8 ? "Straight" : "Angle");
+      line(g, kb[0], kb[1], kp[0], kp[1], OUT, 13); line(g, kb[0], kb[1], kp[0], kp[1], C.grip, 8);
+      g.beginPath(); g.ellipse(kp[0], kp[1], kr * 1.12, kr * 0.9, 0, 0, 7); fs(g, C.yellow, 3);
+      g.beginPath(); g.ellipse(kp[0] - kr * 0.3, kp[1] - kr * 0.28, kr * 0.35, kr * 0.25, 0, 0, 7); g.fillStyle = "rgba(255,255,255,0.65)"; g.fill();
+      this.hitKnob = [kp[0], kp[1], Math.max(42, kr * 2.4)];
+      if (!(this.pj && this.pj.kind === "angle") && (this.canTurn() || this.angleTag > 0 || this.turning)) {
+        var deg = this.turning ? this.theta : this.set.angle;
+        var tagTxt = (this.turning || this.angleTag > 0) ? (Math.abs(deg) < 8 ? "Straight" : "Angle") : (Math.abs(deg) < 3 ? "Turn" : "Angle");
+        smallTag(g, kp[0], Math.min(H - 22, kp[1] + kr + 22), tagTxt);
+      }
       // kerf slot through the turntable
       var slot = [[-150, -5], [150, -5], [150, 5], [-150, 5]];
       c.poly(g, slot.map(function (p) { return self.bp(p[0], p[1], 0.5); }), "#2A2F3A", 1.5);
@@ -6098,6 +6195,7 @@ body.project .tb-panel { display: none; }
   });
   var SCENES = { end: End, curve: Curve, band: Machine, scroll: Machine, table: Table, miter: Miter, miterSide: MiterSide };
   function selectSaw(id, fromLoad) {
+    if (PJ && PJ.saws && PJ.saws.indexOf(id) === -1) id = PJ.sawId;
     if (!SAW[id]) id = "ryoba";
     var s = SAW[id];
     if (scene && scene.leave) scene.leave();
@@ -6114,6 +6212,12 @@ body.project .tb-panel { display: none; }
     buildControls();
     markRack();
     canvas.setAttribute("aria-label", s.name + " at the saw bench");
+    if (!fromLoad && PJ && PJ.kind === "crosscut" && !PJ.done) {
+      if (id === "mitersaw") pjSay(PSTEP.coach, 3500);
+      else if (id === "tablesaw") pjSay("Turn on the saw, then push the yellow handle!", 3500);
+      else if (id === "circular" || id === "tracksaw") pjSay("Hold and push the saw across the line!", 3500);
+      else pjSay("Saw back and forth on the pencil line!", 3500);
+    }
     // Changing to a different power tool: the quick "Safety check!" again (the card script listens).
     if (!fromLoad && s.group === "power" && checkedTool() !== id) {
       rememberCheckedTool(id);
@@ -6131,6 +6235,7 @@ body.project .tb-panel { display: none; }
     grid.innerHTML = "";
     SAWS.forEach(function (s) {
       if (s.group !== app.group) return;
+      if (PJ && PJ.saws && PJ.saws.indexOf(s.id) === -1) return;
       var b = document.createElement("button");
       b.className = "btn sawcard";
       b.dataset.saw = s.id;
@@ -6312,7 +6417,12 @@ body.project .tb-panel { display: none; }
       list = s.id === "tracksaw" ? TRACK_DEPTHS : CIRC_DEPTHS;
       i = clamp(list.indexOf(set.depth) + Number(v), 0, list.length - 1); set.depth = list[i]; changed(); return;
     }
-    if (act === "tmode") { if (set.mode !== v) { set.mode = v; if (scene.setMode) scene.setMode(); } changed(); return; }
+    if (act === "tmode") {
+      if (set.mode !== v) {
+        Toybox.beforeLeave(function () { set.mode = v; if (scene.setMode) scene.setMode(); changed(); });
+      }
+      return;
+    }
     if (act === "angle") { set.angle = Number(v); if (scene.setAngle) scene.setAngle(); changed(); return; }
     if (act === "view") { set.view = set.view === "side" ? "front" : "side"; selectSaw(s.id); return; }
     if (act === "turn") { if (scene.turn) scene.turn(Number(v) * Math.PI / 12); return; }
@@ -6383,7 +6493,13 @@ body.project .tb-panel { display: none; }
     if (!t) return;
     if (endingNow()) return;
     if (t.dataset.group) { app.group = t.dataset.group; saveApp(); buildRack(); return; }
-    if (t.dataset.saw) { Sound.unlock(); Sound.click(); selectSaw(t.dataset.saw); return; }
+    if (t.dataset.saw) {
+      Sound.unlock(); Sound.click();
+      var sid = t.dataset.saw;
+      if (curSaw && curSaw.id === sid) return;
+      Toybox.beforeLeave(function () { selectSaw(sid); });
+      return;
+    }
   });
 
   // ===================================================================
@@ -6521,13 +6637,15 @@ body.project .tb-panel { display: none; }
   var want = (/[?&]tool=([a-z]+)/.exec(location.search) || [])[1];
   if (want && SAW[want]) { app.saw = want; app.group = SAW[want].group; }
   if (!SAW[app.saw]) app.saw = "ryoba";
-  // Project step: lock the bench to the step's saw; the board, angle and fence come from the step.
+  // Project step: crosscut steps let the child pick any crosscut saw; angle and rip lock to the step's saw.
   if (PSTEP && (PSTEP.job.kind === "crosscut" || PSTEP.job.kind === "angle" || PSTEP.job.kind === "rip")) {
+    var xSaws = PSTEP.job.kind === "crosscut" ? ["ryoba", "kataba", "panel", "backsaw", "mitersaw", "tablesaw", "circular", "tracksaw"] : null;
     PJ = { step: PSTEP, job: PSTEP.job, kind: PSTEP.job.kind, sawId: PSTEP.tool === "table" ? "tablesaw" : "mitersaw",
-      S: PSTEP.tool === "table" ? 16 : 20, count: PSTEP.job.count || 1, cuts: 0, misses: 0,
+      saws: xSaws, S: PSTEP.tool === "table" ? 16 : 20, count: PSTEP.job.count || 1, cuts: 0, misses: 0,
       done: false, over: false, intro: true, coachOn: false, sayT: 0, topPad: 0, fenceInit: false };
-    app.saw = PJ.sawId;
+    app.saw = (xSaws && want && xSaws.indexOf(want) !== -1) ? want : PJ.sawId;
     document.body.classList.add("project");
+    if (!xSaws) document.body.classList.add("project-locked");
     var planLink = document.querySelector(".tb-back");
     if (planLink) {
       planLink.setAttribute("href", ToyboxProjects.planUrl(PSTEP.project));

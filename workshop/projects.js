@@ -87,8 +87,9 @@
     steps: []
   };
 
-  function mark(id, part, l, w, target, how, title, coach, done) {
-    return { id: id, part: part, station: "measuring", tool: "tape", title: title, coach: coach, done: done,
+  function mark(id, part, l, w, target, how, title, coach, done, tool) {
+    var tl = tool || (target <= 10 ? "combosquare" : "tape");
+    return { id: id, part: part, station: "measuring", tool: tl, title: title, coach: coach, done: done,
       job: { kind: "mark", board: { l: l, w: w }, target: target, mark: how } };
   }
   function cut(id, part, l, w, line, title, coach, done) {
@@ -102,39 +103,39 @@
       title: "Plane the board flat", coach: "Switch on the planer, then feed the board!",
       done: "The board is flat and smooth.", job: { kind: "plane", board: { l: STOCK, w: BW } } },
 
-    mark("back-mark", "back", STOCK, BW, 12, "line", "Measure the Back: 12 inches", "Pull the tape to 12!", "The Back is marked."),
+    mark("back-mark", "back", STOCK, BW, 12, "line", "Measure the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
     cut("back-cut", "back", STOCK, BW, 12, "Cut the Back on the line", CUT_COACH, "The Back is cut!"),
 
-    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Pull the tape to 9!", "The Front is marked."),
+    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Slide the square to 9!", "The Front is marked.", "combosquare"),
     cut("front-cut", "front", 48, BW, 9, "Cut the Front on the line", CUT_COACH, "The Front is cut!"),
 
-    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Pull the tape to 7.5!", "The Roof is marked."),
+    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Slide the square to 7.5!", "The Roof is marked.", "combosquare"),
     cut("roof-cut", "roof", 39, BW, 7.5, "Cut the Roof on the line", CUT_COACH, "The Roof is cut!"),
 
-    mark("blank-mark", "blank", 31.5, BW, 26, "line", "Measure the Side blank: 26 inches", "Pull the tape to 26!", "The Side blank is marked."),
+    mark("blank-mark", "blank", 31.5, BW, 26, "line", "Measure the Side blank: 26 inches", "Pull the tape to 26!", "The Side blank is marked.", "tape"),
     cut("blank-cut", "blank", 31.5, BW, 26, "Cut the Side blank on the line", CUT_COACH, "The Side blank is cut!"),
 
     { id: "strip-rip", part: "strip", station: "saw-bench", tool: "table",
       title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4, switch on, push it through!",
       done: "A long strip, 4 inches wide!", job: { kind: "rip", board: { l: 26, w: BW }, fence: 4, part: "strip" } },
 
-    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Pull the tape to 10!", "The Side is marked."),
+    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Slide the square to 10!", "The Side is marked.", "combosquare"),
     cut("side1-cut", "side1", 26, 4, 10, "Cut the Side on the line", CUT_COACH, "One Side is cut!"),
 
-    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Pull the tape to 10!", "The other Side is marked."),
+    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Slide the square to 10!", "The other Side is marked.", "combosquare"),
     cut("side2-cut", "side2", 16, 4, 10, "Cut the other Side on the line", CUT_COACH, "Both Sides are cut!"),
 
-    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Pull the tape to 4!", "The Floor is marked."),
+    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Slide the square to 4!", "The Floor is marked.", "combosquare"),
     cut("floor-cut", "floor", 6, 4, 4, "Cut the Floor on the line", CUT_COACH, "The Floor is cut!"),
 
     { id: "side-angle", part: "side1", station: "saw-bench", tool: "miter",
       title: "Cut the roof angle on both Sides", coach: "The saw is swung to the roof angle. Line up, then pull it down!",
       done: "Both Sides have a sloped top.", job: { kind: "angle", board: { l: 10, w: 4 }, angle: 15, count: 2 } },
 
-    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Pull the tape to 6, then make an X!", "The door is marked."),
+    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the square to 6, then make an X!", "The door is marked.", "combosquare"),
 
     { id: "hole-drill", part: "front", station: "drill-press", tool: "holesaw",
-      title: "Drill the door with the hole saw", coach: "Switch on the drill press, then pull the handle!",
+      title: "Drill the door hole", coach: "Switch on the drill press, then pull the handle!",
       done: "The door is drilled!", job: { kind: "hole", board: { l: 9, w: BW }, bit: "holesaw", d: 1.5, holes: [{ x: BW / 2, y: 6 }] } },
 
     { id: "floor-drill", part: "floor", station: "drill-press", tool: "twist",
@@ -143,7 +144,7 @@
         holes: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }] } },
 
     { id: "build", part: "", station: "hammer-screws", tool: "hammer",
-      title: "Nail the birdhouse together", coach: "Glue, then two nails for each piece!",
+      title: "Put the birdhouse together", coach: "Glue, then fasten each piece!",
       done: "The birdhouse stands!", job: { kind: "assemble", glue: true, nails: 2,
         joins: [["back", "side1"], ["back", "side2"], ["sides", "floor"], ["sides", "front"], ["box", "roof"]] } },
 

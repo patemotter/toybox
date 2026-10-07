@@ -155,8 +155,8 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
 .ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
 .ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 /* ---------- Project mode (drill-press.html?project=..&step=..): one step of a Workshop project ---------- */
-body.project .tb-panel,
-body.project #holesCount { display: none; }
+body.project #holesCount,
+body.project #tabsRow { display: none; }
 .pj-banner { top: 10px; bottom: auto; white-space: nowrap; overflow: hidden; max-width: calc(100% - 20px); }
 body.project .coach { top: 66px; }
 body.project .prompt { top: 66px; }
@@ -348,12 +348,18 @@ body.project .prompt { top: 66px; }
       step: PSTEP,
       job: PSTEP.job,
       bit: PSTEP.job.bit,
+      bits: PSTEP.job.bit === "holesaw" ? ["holesaw", "forstner", "spade"] : ["twist", "spade", "auger", "step"],
       targets: PSTEP.job.holes.map(function (h, idx) {
+        var u = (h.x / PSTEP.job.board.w) * BW;
+        var v = ((PSTEP.job.board.l - h.y) / PSTEP.job.board.l) * BH;
         return {
           idx: idx,
-          u: (h.x / PSTEP.job.board.w) * BW,
-          v: ((PSTEP.job.board.l - h.y) / PSTEP.job.board.l) * BH,
-          drilled: false
+          u: u,
+          v: v,
+          x: u,
+          y: v,
+          drilled: false,
+          done: false
         };
       }),
       misses: 0,
@@ -1660,7 +1666,7 @@ body.project .prompt { top: 66px; }
       var nxt = pjNextTarget();
       if (PJ.misses >= 2 && nxt) {
         PJ.misses = 0;
-        PJ.slideTo = { x: nxt.x, y: nxt.y };
+        PJ.slideTo = { x: nxt.u, y: nxt.v };
       }
       say("Slide an X under the bit!", null);
     }
@@ -1682,7 +1688,7 @@ body.project .prompt { top: 66px; }
     R.spokeT += (st - R.spokeT) * Math.min(1, dt * 12);
     var pen = penMM();
     if (canCut && pen > 0.05) {
-      if (PJ && pjTarget) { S.px = pjTarget.x; S.py = pjTarget.y; PJ.slideTo = null; }
+      if (PJ && pjTarget) { S.px = pjTarget.u; S.py = pjTarget.v; PJ.slideTo = null; }
       var h = R.curHole && R.curHole.bit === b.id ? R.curHole : null;
       if (!h) { h = findOrMakeHole(b); R.curHole = h; }
       if (pen > h.d) {
@@ -1702,7 +1708,8 @@ body.project .prompt { top: 66px; }
             // the round slug drops out under the board
             addPart({ type: "disc", x: 0, y: boardTopW() + 6, z: 0, vx: rnd(-40, 40), vy: 60, vz: 140, sz: (b.mm - 2) * DS / 2, col: WOOD.col, vr: 0, rot: 0.01 });
           }
-          if (PJ && pjTarget && !pjTarget.done) {
+          if (PJ && pjTarget && !pjTarget.drilled) {
+            pjTarget.drilled = true;
             pjTarget.done = true;
             PJ.misses = 0;
             boardDirty = true;
@@ -1712,7 +1719,8 @@ body.project .prompt { top: 66px; }
               PJ.finished = true;
               var href = window.ToyboxProjects ? ToyboxProjects.finish(PSTEP) : "index.html";
               setTimeout(function () {
-                $("pjDoneText").textContent = PSTEP.done || "All done!";
+                var dLine = $("pjDoneLine") || $("pjDoneText");
+                if (dLine) dLine.textContent = PSTEP.done || "All done!";
                 $("pjBack").href = href;
                 $("pjDone").hidden = false;
               }, 650);
@@ -1871,7 +1879,7 @@ body.project .prompt { top: 66px; }
     if (PJ && !pjNearTarget(S.px, S.py, 26)) {
       var nxt = pjNextTarget(), topP = boardTopW();
       if (!nxt) return null;
-      return { pts: [pagePt(P(bxw(nxt.x), topP, bzw(nxt.y))), pagePt(P(0, topP, 0))] };
+      return { pts: [pagePt(P(bxw(nxt.u), topP, bzw(nxt.v))), pagePt(P(0, topP, 0))] };
     }
     if (t === "Pull the handle down!" || (PJ && pjNearTarget(S.px, S.py, 26))) {
       var i = pullKnob(), pts = [];
@@ -2062,10 +2070,10 @@ body.project .prompt { top: 66px; }
       if (PJ && !PJ.finished) {
         if (!d.moved) {
           var tapped = pjNearTarget(d.u0, d.v0, 36) || pjNextTarget();
-          if (tapped) PJ.slideTo = { x: tapped.x, y: tapped.y };
+          if (tapped) PJ.slideTo = { x: tapped.u, y: tapped.v };
         } else {
           var near = pjNearTarget(S.px, S.py, 26);
-          if (near) PJ.slideTo = { x: near.x, y: near.y };
+          if (near) PJ.slideTo = { x: near.u, y: near.v };
         }
       }
       save();
@@ -2083,7 +2091,8 @@ body.project .prompt { top: 66px; }
   // ---------- Panel: the bit case and New board ----------
   function buildPanel() {
     var box = $("bits");
-    BIT_ORDER.forEach(function (id) {
+    var list = (PJ && PJ.bits) ? PJ.bits : BIT_ORDER;
+    list.forEach(function (id) {
       var b = document.createElement("button");
       b.className = "btn tb-tile bit";
       b.dataset.bit = id;
