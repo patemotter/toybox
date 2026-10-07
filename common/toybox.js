@@ -74,26 +74,19 @@
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
  *      Toybox.turning()        true while the "turn the device" card covers the app.
- * 5. "Switch it off first" (pages with a powered machine: the Workshop's big machines). A real workshop
- *    rule: you switch the machine off before you walk away. Register once, after init:
+ * 5. Leaving a page with a powered machine (the Workshop's big machines). Register once, after init:
  *      Toybox.offFirst({
  *        running: function () { return S.on; },            // is a machine running right now?
- *        name: function () { return "table saw"; },        // for "Switch off the table saw first!" (or a string)
- *        off: function (done) { stopMotor(done); },        // switch it off with the usual wind-down, then done()
- *        flash: function () { flashSwitch(); }             // optional: draw attention to the machine's own switch
+ *        off: function (done) { stopMotor(done); }         // switch it off
  *      });
- *    While running() is true, a tap on any link that leaves the page (Home, Back, "Try it!", "Back to the
- *    plan"; anchors with an href other than "#...") is held back and a card slides up: "Switch off the
- *    table saw first!" with one big switch drawn like the machines' own (green ON lit, red OFF paddle).
- *    A tap on it calls off(done); the page navigates when done() is called (or after 3.5 s regardless,
- *    so he is never stuck). A tap outside the card cancels and stays. Links with data-tb-noguard are
- *    never held back. Scripts that navigate themselves call Toybox.beforeLeave(function () { go(); }):
- *    it runs the function at once when nothing is running (returns true), else after the switch-off.
- *    Nothing is held back while the timer is ending or resting (the app winds down on its own then).
+ *    A tap on a link that leaves the page (anchors with an href other than "#...") while running() is
+ *    true calls off() and goes at once; nothing is held back (the dad found the "switch it off first"
+ *    card got in the way). Scripts that navigate themselves call Toybox.beforeLeave(function () { go(); }):
+ *    it switches the machine off quietly and runs the function at once. name and flash are ignored now.
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
  * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
  * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode,
- * "turn" while the turn-the-device card shows, "offask" while the switch-off card shows.
+ * "turn" while the turn-the-device card shows.
  */
 (function () {
   "use strict";
@@ -372,24 +365,6 @@
           '<div class="tb-turn-text"><h2 id="tb-turnTitle"></h2>' +
           '<button class="btn" id="tb-turnSkip">Play like this</button></div>' +
         "</div>" +
-      "</div>" +
-      // "Switch it off first" card (Toybox.offFirst): the machines' own switch, big; the paddle is the way out.
-      '<div class="tb-off" id="tb-off" hidden role="dialog" aria-modal="true" aria-labelledby="tb-offTitle">' +
-        '<div class="tb-off-card">' +
-          '<div class="tb-off-text"><h2 id="tb-offTitle"></h2><p class="tb-off-sub" id="tb-offSub"></p></div>' +
-          '<button class="tb-off-switch" id="tb-offBtn" aria-label="Switch it off">' +
-            '<svg viewBox="0 0 120 152" aria-hidden="true">' +
-              '<rect x="9" y="11" width="104" height="134" rx="14" fill="rgba(29,35,64,0.35)"/>' +
-              '<rect x="4" y="6" width="104" height="134" rx="14" fill="#2E3440" stroke="#1D2340" stroke-width="4"/>' +
-              '<circle cx="56" cy="44" r="27" fill="rgba(90,255,150,0.3)"/>' +
-              '<circle cx="56" cy="44" r="17" fill="#4BE38A" stroke="#1D2340" stroke-width="3"/>' +
-              '<rect class="tb-off-ring" x="12" y="76" width="88" height="54" rx="12" fill="none" stroke="#FFC93C" stroke-width="5"/>' +
-              '<rect x="20" y="88" width="72" height="36" rx="8" fill="#B32D38" stroke="#1D2340" stroke-width="3"/>' +
-              '<rect x="20" y="82" width="72" height="36" rx="8" fill="#E63946" stroke="#1D2340" stroke-width="3"/>' +
-              '<text x="56" y="101" text-anchor="middle" dominant-baseline="central" font-size="20" font-weight="800" font-family="Baloo 2, Trebuchet MS, sans-serif" fill="#FFFFFF">OFF</text>' +
-            "</svg>" +
-          "</button>" +
-        "</div>" +
       "</div>";
     while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
 
@@ -420,8 +395,6 @@
       try { sessionStorage.setItem(turnKey(), "1"); } catch (e) { /* ignore */ }
       checkTurn();
     });
-    $("tb-offBtn").addEventListener("click", doOff);
-    $("tb-off").addEventListener("click", function (e) { if (e.target === this) cancelOff(); });
 
     $("tb-next").addEventListener("input", function () { timer.next = this.value.slice(0, 40); saveTimer(); });
     $("tb-optMinutes").addEventListener("change", function () { timer.showMinutes = this.checked; saveTimer(); redraw(true); });
@@ -814,78 +787,32 @@
     checkTurn();
   }
 
-  // ---------- "Switch it off first": leaving a page while a machine runs (Toybox.offFirst) ----------
-  var offCfg = null, offWired = false, offPending = null, offBusy = false, offFallback = null;
-  function needOff() {
-    if (!offCfg || timer.phase === "ending" || timer.phase === "resting") return false;
-    try { return !!offCfg.running(); } catch (e) { return false; }
+  // ---------- Leaving a page while a machine runs (Toybox.offFirst) ----------
+  // The dad: no "switch it off first" step on the way out; it only got in the way. Leaving a page (a link
+  // or Toybox.beforeLeave) while a machine runs switches it off quietly and goes at once.
+  var offCfg = null, offWired = false;
+  function quietOff() {
+    if (!offCfg) return;
+    try { if (offCfg.running()) offCfg.off(function () {}); } catch (e) { /* leaving anyway */ }
   }
   function offFirst(cfg) {
     offCfg = cfg && typeof cfg.running === "function" && typeof cfg.off === "function" ? cfg : null;
     if (!offCfg || offWired) return;
     offWired = true;
-    // Capture phase: runs before the page's own handlers, so a held-back link does nothing else either.
     document.addEventListener("click", function (e) {
       if (!offCfg || e.defaultPrevented || e.button) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
-      if (!a || a.hasAttribute("data-tb-noguard") || a.target === "_blank") return;
+      if (!a || a.target === "_blank") return;
       var href = a.getAttribute("href") || "";
       if (!href || href.charAt(0) === "#" || /^javascript:/i.test(href)) return;
-      if (!needOff()) return;
-      e.preventDefault();
-      e.stopPropagation();
-      var to = a.href;
-      askOff(function () { location.href = to; });
+      quietOff();
     }, true);
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") cancelOff(); });
   }
-  // Scripts that navigate themselves: proceed() runs at once when nothing is running (returns true),
-  // otherwise after the switch-off.
+  // Scripts that navigate themselves: proceed() runs at once (always returns true).
   function beforeLeave(proceed) {
-    if (!needOff()) { proceed(); return true; }
-    askOff(proceed);
-    return false;
-  }
-  function askOff(proceed) {
-    var el = $("tb-off");
-    if (!el) { proceed(); return; }
-    offPending = proceed;
-    offBusy = false;
-    var name = typeof offCfg.name === "function" ? offCfg.name() : offCfg.name;
-    $("tb-offTitle").textContent = "Switch off the " + (name || "machine") + " first!";
-    $("tb-offSub").textContent = "Tap the switch.";
-    el.classList.remove("busy");
-    el.hidden = false;
-    document.body.classList.add("offask");
-    if (typeof offCfg.flash === "function") { try { offCfg.flash(); } catch (e) { /* ignore */ } }
-  }
-  function cancelOff() {
-    var el = $("tb-off");
-    if (!el || el.hidden || offBusy) return;
-    el.hidden = true;
-    document.body.classList.remove("offask");
-    offPending = null;
-  }
-  function doOff() {
-    if (offBusy || !offPending) return;
-    offBusy = true;
-    var el = $("tb-off"), went = false;
-    el.classList.add("busy");
-    $("tb-offSub").textContent = "Switching off…";
-    function go() {
-      if (went) return;
-      went = true;
-      clearTimeout(offFallback);
-      var p = offPending;
-      offPending = null;
-      offBusy = false;
-      el.hidden = true;
-      document.body.classList.remove("offask");
-      if (p) p();
-    }
-    offFallback = setTimeout(go, 3500); // never stuck: leave even if the page forgets to call done()
-    try { offCfg.off(go); } catch (e) { go(); }
+    quietOff();
+    proceed();
+    return true;
   }
 
   // ---------- Kind words ----------
@@ -957,7 +884,7 @@
   }
   function kindReady() {
     return inited && settingGet("kind-words") !== false && timer.phase !== "ending" && timer.phase !== "resting" &&
-      !sheetOpen() && !turning() && !($("tb-off") && !$("tb-off").hidden) && !document.hidden;
+      !sheetOpen() && !turning() && !document.hidden;
   }
   // Pick a line of one kind ("gentle", "done" or "love"), or null when every line of it is off.
   // The grown-up's own lines come up half the time (all the time when the usual ones are all off).
@@ -1295,6 +1222,28 @@
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "visible" && reg && navigator.onLine !== false) reg.update().catch(function () {});
     });
+  })();
+
+  // ---------- Safety gear ----------
+  // The Workshop, the Construction Site and the Kitchen ask for their gear (getting ready) on the first
+  // visit; their pages read the sessionStorage flags below and send him to the gear-up when the flag is off.
+  // The dad: gear up when you first start, then again only every 10 minutes. So the flag is remembered with
+  // the time it was put on ("toybox-gear-v1" in localStorage): it comes back when he leaves and returns (the
+  // home screen, or closing and reopening the Toybox), and is taken off once it is 10 minutes old. That
+  // happens as a page loads, so the gear-up comes on his next page, never in the middle of a job.
+  var GEAR_FLAGS = ["workshop-gear", "site-gear", "kitchen-ready"], GEAR_KEY = "toybox-gear-v1", GEAR_MS = 10 * 60000;
+  (function () {
+    try {
+      var on = readJSON(GEAR_KEY), t = now(), changed = false;
+      GEAR_FLAGS.forEach(function (k) {
+        var flag = sessionStorage.getItem(k) === "on", at = Number(on[k]) || 0;
+        if (flag && !at) { on[k] = at = t; changed = true; }          // just put on: start its 10 minutes
+        if (at && (t - at > GEAR_MS || at > t)) {                      // 10 minutes up: off, gear up again
+          sessionStorage.removeItem(k); delete on[k]; changed = true;
+        } else if (at && !flag) sessionStorage.setItem(k, "on");       // still on from before: keep it on
+      });
+      if (changed) put(GEAR_KEY, JSON.stringify(on));
+    } catch (e) { /* storage blocked: the pages treat the gear as on */ }
   })();
 
   // ---------- Fresh visits ----------

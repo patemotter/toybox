@@ -45,7 +45,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `excavator`, `concrete`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
-  marble-run, car-builder, math-grid, 3d-printer, water-works, construction-site, train-builder.
+  marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
+  train-builder.
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
@@ -99,6 +100,7 @@ Keep only:
 - **Simple counters, one per page, never duplicated** ("Nails: 3", "Loads: 2", "Cars: 4", "Put away: 5 of 12").
 - The **Measuring** station's readings and **Math Grid** (numbers are the point).
 - **Wrenches**: the size is the matching game, so once per bolt head and once per size button.
+- **Gear Box**: each gear shows its number of teeth (the dad asked for it), on the gear and on its picker tile.
 - **Espresso Machine**: the coffee scale's display (seconds and grams, e.g. "18.0 g") is the real tool and the
   family's real targets (18.0 g of beans, about 36 g in about 28 s), so it stays.
 - Counts the child chooses or watches: Kaleidoscope "How many", Spin Shop spokes, Peg Drop per-bin counts and
@@ -180,26 +182,20 @@ Keep only:
 - Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.
 
 ### Safety rituals
-- **Workshop**: once per visit (sessionStorage `workshop-gear`), the child puts **"Eye protection"** and
-  **"Ear protection"** on a worker (use exactly those names; they're the words used at home). Opening a station
-  with the gear already on shows a quick "Safety check!" ("Eye protection? ✓ CHECK!", "Ear protection? ✓ CHECK!")
-  that slides away; a tap only skips it (it must not tap what's underneath). **No check when going back to the
-  Tool Wall.** Not right after the gear-up either (`workshop-check-skip`).
-- **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`), the same quick
-  check on each station. **No check on the site map** (going back to it from a station).
-- **Kitchen**: one getting-ready screen once per visit (`kitchen-ready`): Wash hands (one tap plays a short wash),
-  Apron and Chef hat, in any order (the dad didn't want a whole interactive hand-washing scene); a quick "Kitchen check!" on each station, none on the kitchen page or right after the gate.
-- The launcher clears the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) on load and on `pageshow`, so
-  leaving the app means gearing up again.
-- **Power tools**: the safety check also runs whenever he changes to a different power tool on the same page
-  (sessionStorage `workshop-check-tool` remembers which tools were checked this visit).
+- **The dad toned these down** (they got in the way): gear up when he first starts, then again only every
+  **10 minutes**. No quick "Safety check!" cards on stations or tool changes, and no "switch it off first" card.
+- **Workshop**: the child puts **"Eye protection"** and **"Ear protection"** on a worker (use exactly those names;
+  they're the words used at home); flag sessionStorage `workshop-gear`.
+- **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`).
+- **Kitchen**: one getting-ready screen (`kitchen-ready`): Wash hands (one tap plays a short wash), Apron and Chef
+  hat, in any order (the dad didn't want a whole interactive hand-washing scene).
+- `common/toybox.js` ("Safety gear") remembers when each flag was put on (`toybox-gear-v1` in localStorage): the
+  flag comes back after leaving the app or reopening the Toybox, and is taken off on the first page load after
+  10 minutes, so the gear-up comes on his next page, never mid-job. The launcher no longer clears the flags.
 - **Machines keep running** between goes on the same screen: a finished job ("Done!", "Again") does not switch the
   machine off; only his tap on the red paddle, the timer, or leaving the page does.
-- **"Switch it off first"**: leaving a page (Home, Back, "Try it!", "Back to the plan") while a switched machine
-  runs shows the shared card from `Toybox.offFirst(...)` (see `common/toybox.js` header, section 5): "Switch off
-  the table saw first!" with one big switch; a tap on it winds the machine down, then the link goes. A tap outside
-  stays. Pages with a switched machine register it; closing a card on the same page (the wall's "Hang it back")
-  just switches off quietly.
+- **Leaving with a machine on**: pages register their machine with `Toybox.offFirst({ running, off })`; leaving the
+  page (a link or `Toybox.beforeLeave(fn)`) switches it off quietly and goes at once.
 
 ### Timer (shared)
 - The grown-up sets a play timer (shared across all apps, `toybox-timer-v1`). When time is up the app winds its

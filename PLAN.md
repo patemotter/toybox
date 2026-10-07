@@ -9,7 +9,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | # | Item | Status |
 | --- | --- | --- |
 | – | 3D Printer, Water Works, Car Builder builder rows, shared timer (phase 1) | In progress |
-| 1 | Water Works | Done |
+| 1 | Water Works (now Water Table) | Done |
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Removed |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Done |
@@ -45,7 +45,7 @@ reaction, fire station.
 
 ---
 
-## 1. Water Works
+## 1. Water Works (renamed Water Table)
 
 **Folder:** `water-works/` (a cancelled attempt left a partial `index.html`; start fresh or salvage).
 
@@ -240,7 +240,7 @@ scenes on upright phones.
   case resets on rotate; Router's cut edge is only visible in the end view; Wrenches handle can swing off the
   board; Shadow Board hooks sit oddly on the speed square and saw; Hammer & Screws keeps a fixed panel height
   with some empty space on phones.
-- **Water Works:** Wheels layout has only 4 small wheels on iPad landscape; Zigzag rows cramped in landscape;
+- **Water Table:** Wheels layout has only 4 small wheels on iPad landscape; Zigzag rows cramped in landscape;
   Gears runoff falls over a neighbor gear and the propeller overlaps a gear; Steps trays thin in landscape;
   water streams draw over pipes they pass behind.
 - **Marble Run:** in the Machine run the small wheel mostly flings marbles left onto a guide; the hopper DROP

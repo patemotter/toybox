@@ -9,7 +9,7 @@
 // - Everything else (icons, the font): stale-while-revalidate.
 // Install downloads every CORE file fresh (bypassing the browser's HTTP cache).
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v120";
+const CACHE = "toybox-v121";
 const CORE = [
   "./",
   "./index.html",
@@ -123,7 +123,7 @@ const CORE = [
   "./3d-printer/icons/icon-512.png",
   "./3d-printer/icons/icon-maskable-512.png",
 
-  // Water Works
+  // Water Table
   "./water-works/",
   "./water-works/index.html",
   "./water-works/manifest.webmanifest",
