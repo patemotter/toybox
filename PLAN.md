@@ -8,10 +8,10 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Water Works, Engine Room, Car Builder builder rows, shared timer (phase 1) | In progress |
+| – | 3D Printer, Water Works, Car Builder builder rows, shared timer (phase 1) | In progress |
 | 1 | Water Works | Done |
 | 2 | Math Grid | Done |
-| 3 | Engine Room | Done |
+| 3 | Engine Room | Removed |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Done |
 | 5 | Construction Site | Done (v1 stations) |
 | 6 | Train Builder | Done |
@@ -89,27 +89,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 
 ## 3. Engine Room
 
-**Folder:** `engine-room/`.
-
-**Goal:** see inside machines and how the parts move together.
-
-**v1 machines** (big buttons):
-- **Car engine cutaway:** 4 cylinders with pistons, connecting rods, a crankshaft, cam, valves, spark flashes, and a fan belt to the alternator.
-- **Steam engine:** boiler, piston, crosshead, flywheel and governor balls.
-- **Gearbox:** shift through gears with a lever; the output speed changes.
-
-**Controls:**
-- A big crank to turn it by hand, or a starter button plus a throttle lever.
-- Speed in RPM; a slow-motion button so every part can be followed.
-- Tapping a part highlights it and shows its name.
-
-**Numbers:** RPM, gear ratio, a cycle counter ("Spark: 1-3-4-2").
-
-**Timer ending:** the engine winds down. Rest line: "The engine is resting."
-
-**Risk:** getting the linkages right (crank → rod → piston). The math is standard and deterministic.
-
-**Agents:** 1.
+Removed: the dad didn't like it, so the app and its folder were deleted (it is still in git history).
 
 ---
 
@@ -229,8 +209,6 @@ scenes on upright phones.
 - **Rocket Builder:** three control rows under the trip row on phones; "Planets" label tight at 390 px; planet
   names can overlap the planet top; faint Mars haze; engine particles look brownish against black.
 - **Train Builder:** the hill covers most of the Switches layout's top loop; Paint tab has two rows plus a hint.
-- **Engine Room:** the Gears row adds a third control row on phones; the car's start line overlaps the engine top
-  on an upright phone.
 - **Saw Bench:** the jigsaw starts mostly off the left edge on iPhone portrait; the table saw switch and wheel are
   drawn small in phone landscape (hit areas are big); one iPad drag may not finish a rip pass; the crosscut
   off-cut can cover the "Angle" tag; the fence stays locked if a board is pushed into a stopped blade; the
@@ -370,7 +348,6 @@ fractions; numbers appear only inside project steps that measure or set a machin
 ## In progress: two shared cards (common/toybox.js)
 
 - **Turn the device**: `Toybox.init({ orientation })`. Adopted: Train Builder (landscape), Concrete (portrait).
-  To do: Engine Room → landscape and delete its quarter-turn layout for upright phones.
 - **Switch it off first**: `Toybox.offFirst(...)` guards the way out while a machine runs. To wire (each page
   provides `running / name / off(done) / flash`): Tool Wall mini-plays (in progress), then Saw Bench (table,
   band, scroll, miter saws), Drill Press, Lathe, Router Table. Machines keep running between goes on the same

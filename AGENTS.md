@@ -43,7 +43,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `bulldozer`, `excavator`, `concrete`, `wrecking-ball`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, color-mixing, gear-box,
-  marble-run, car-builder, math-grid, 3d-printer, engine-room, water-works, construction-site, train-builder.
+  marble-run, car-builder, math-grid, 3d-printer, water-works, construction-site, train-builder.
   `fish-tank/` is kept in the repo but has no tile on the home screen (the dad shelved it); don't delete it.
 - `tools/`: `smoke.js` (load + drag + error/scroll check), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
@@ -122,7 +122,7 @@ Keep only:
   other way, the shared layer covers the app with a "Turn it sideways!" / "Turn it upright!" card (a turning
   tablet picture and a small "Play like this" button, so rotation lock never traps him; remembered for the session).
   The app must still work in the other orientation behind that button; it just needn't be framed as carefully.
-  Current users: Train Builder (landscape), Engine Room (landscape), Concrete (portrait). Everything else is both ways.
+  Current users: Train Builder (landscape), Concrete (portrait). Everything else is both ways.
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
@@ -263,6 +263,5 @@ Keep only:
 - Spin Shop's "Zoom" speed label might read as camera zoom.
 
 Decided (kept here so nobody reopens them): the two-step machines (switch on, then push/feed/press; the second
-push while off switches on for him) stay as they are everywhere, lathe and planer included. Engine Room's
-quarter-turn on upright phones is replaced by `orientation: "landscape"`; Concrete uses `orientation: "portrait"`
-instead of a bigger landscape scene.
+push while off switches on for him) stay as they are everywhere, lathe and planer included. Concrete uses `orientation: "portrait"`
+instead of a bigger landscape scene. Engine Room was deleted (the dad didn't like it); don't rebuild it unasked.
