@@ -22,6 +22,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Garden: plant seeds, water them, tap the sun to grow them, pick the vegetables; bees, butterflies and a worm visit | [`garden/`](garden/) |
 | Spinning Tops: pull the ripcord to launch tops into a bowl; they spin, wobble, bump and fall; flick them around | [`spinning-tops/`](spinning-tops/) |
 | Kitchen: wash hands and put on an apron and chef hat, then make smoothies in the blender; finished food goes on the table | [`kitchen/`](kitchen/) |
+| Spirograph: roll the gear around the ring with any finger movement and draw perfect patterns; Draw! draws by itself; My drawings shelf | [`spirograph/`](spirograph/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 

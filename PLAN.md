@@ -25,7 +25,10 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 14 | Bubble Machine | Done |
 
 Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
-should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** and **Sand
+should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** (done; can't go wrong: any finger
+movement rolls the gear, the curve is always perfect; questions: keep his chosen pen color after a pattern closes?
+special rings (oval, flower) as their own tiles instead of only via Surprise? should a tap roll the wheel a
+little?), **Sand
 Table** (in progress), **Espresso Machine** (in progress: the family's real espresso routine, standalone app).
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,

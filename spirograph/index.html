@@ -1,0 +1,1469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spirograph</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Spirograph">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --tile: 62px;
+  --pic: 38px;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* ---------- Stage: a sheet of paper ---------- */
+.stage { background: #FFFFFF; touch-action: none; }
+#view {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: pointer;
+}
+.stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; pointer-events: none; }
+.stage .toast { position: absolute; top: 12px; z-index: 4; font-size: 1.3rem; }
+.stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
+.stage .farewell p { font-size: 1.25rem; }
+body.big .tb-panel { display: none; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+body.ending #view { cursor: default; }
+.rest-art { aspect-ratio: 1; }
+/* The old sheet flying into the Mine tab when New is pressed. */
+.flyaway { position: fixed; z-index: 30; pointer-events: none; border-radius: 18px; border: 3px solid #1D2340; background: #FFFFFF;
+  transform-origin: 0 0; transition: transform 0.9s cubic-bezier(.45,.05,.4,1), opacity 0.9s ease; }
+
+/* ---------- Panel: Go, the picked tab's choices, then the tab bar ---------- */
+.tb-tabs .tab[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.panes.tb-choices { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
+.pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+#panel[data-tab="gears"] [data-pane="gears"],
+#panel[data-tab="pens"] [data-pane="pens"],
+#panel[data-tab="mine"] [data-pane="mine"] { visibility: visible; }
+.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.btn.opt {
+  min-width: 0; min-height: var(--tile); height: var(--tile); padding: 2px 4px; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  font-size: 0.95rem; line-height: 1; white-space: nowrap;
+}
+.opt canvas { width: var(--pic); height: var(--pic); display: block; flex: none; }
+.opt .nm { font-weight: 800; }
+.pens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.btn.pen { min-width: 0; height: var(--tile); min-height: 44px; padding: 0 2px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; }
+.pen svg { width: 100%; max-width: 76px; height: 100%; max-height: 40px; display: block; overflow: visible; }
+.shelf { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 4px 6px 2px; height: calc(var(--tile) * 2 + 6px);
+  align-items: center; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: thin; }
+.btn.thumb { flex: none; height: calc(var(--tile) * 2 - 6px); aspect-ratio: 1; min-height: 0; padding: 3px; border-radius: 16px; background: #FFFFFF; }
+.thumb canvas { width: 100%; height: 100%; display: block; }
+.btn.thumb[aria-pressed="true"] { background: var(--accent); }
+.shelf .empty { margin: auto; font-weight: 800; color: var(--muted); text-align: center; font-size: 1.05rem; line-height: 1.2; padding: 0 8px; }
+
+/* Tabs: short words share the room, Surprise gets a little more. */
+.tb-tabs .btn { flex: 1 1 auto; padding-left: 0.3rem; padding-right: 0.3rem; }
+.tb-tabs .btn.tb-surprise { flex: 1.5 1 auto; }
+/* Upright phones: the round ring leaves spare height, so the picture tiles can be bigger. */
+@media (orientation: portrait) and (max-width: 600px) { :root { --tile: 82px; --pic: 50px; } }
+@media (orientation: portrait) and (max-width: 600px) and (max-height: 760px) { :root { --tile: 66px; --pic: 40px; } }
+/* Landscape: panel on the right (the ring is limited by the height, so the panel can be wide). */
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(40%, 420px); justify-content: space-between; }
+  .tb-body .tb-panel .tb-choices { overflow: visible; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: min(44%, 360px); }
+  :root { --tile: 84px; --pic: 50px; }
+  .tb-tabs .btn { font-size: 0.88rem; }
+}
+/* Tablets: bigger tiles. */
+@media (min-width: 700px) and (min-height: 700px) {
+  :root { --tile: 100px; --pic: 64px; }
+  .row, .pens { gap: 10px; }
+  .pane { gap: 10px; }
+  .btn.opt { font-size: 1.1rem; gap: 2px; border-radius: 16px; }
+  .btn.pen { height: 100px; }
+  .pen svg { max-width: 110px; max-height: 60px; }
+  .shelf { height: 210px; gap: 12px; }
+  .btn.thumb { height: 190px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(36%, 420px); }
+  :root { --tile: 150px; --pic: 96px; }
+  .btn.pen { height: 150px; }
+  .pen svg { max-height: 80px; }
+  .shelf { height: 310px; }
+  .btn.thumb { height: 140px; }
+  .shelf { flex-wrap: wrap; align-content: flex-start; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; }
+  .tb-tabs .btn { font-size: 1.05rem; }
+}
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+@media (prefers-reduced-motion: reduce) { .flyaway { transition: opacity 0.4s ease; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Spirograph</h1>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="view" role="img" aria-label="A sheet of paper with a gear ring and a wheel gear holding a pen. Move a finger round and round to draw a pattern."></canvas>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Move your finger round and round!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+
+    <section class="tb-panel" id="panel" data-tab="gears">
+      <button class="btn tb-go" id="goBtn">Draw!</button>
+      <div class="panes tb-choices">
+        <div class="pane" data-pane="gears" role="tabpanel" aria-label="Wheels and pen holes">
+          <div class="row" id="wheelRow"></div>
+          <div class="row" id="holeRow"></div>
+        </div>
+        <div class="pane" data-pane="pens" role="tabpanel" aria-label="Pens">
+          <div class="pens" id="penRow"></div>
+        </div>
+        <div class="pane" data-pane="mine" role="tabpanel" aria-label="My drawings">
+          <div class="shelf" id="shelf"></div>
+        </div>
+      </div>
+      <nav class="tb-tabs" aria-label="Controls">
+        <button class="btn tab" data-tab="gears">Gears</button>
+        <button class="btn tab" data-tab="pens">Pens</button>
+        <button class="btn tab" data-tab="mine">Mine</button>
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Spirograph: a fixed ring gear with a wheel gear rolling inside it; a pen in one of the wheel's holes
+  // draws the pattern. Unlike the real toy nothing can go wrong: the wheel is always meshed, any finger
+  // movement rolls it smoothly along the ring, and the pen always draws the exact curve.
+  //
+  // Geometry: each ring is a closed "pitch curve" sampled at equal arc length (unit coordinates, about
+  // radius 1). The wheel's position is the arc length u along that curve (unwrapped, so it can go past a
+  // lap or below zero). For a ring with N teeth and a wheel with n teeth the wheel radius is
+  // r = P n / (2 pi N) (P = the ring's perimeter), so teeth of both gears have the same pitch and the
+  // pattern closes after n / gcd(N, n) laps. Wheel centre c = p(u) + r * inwardNormal(u); wheel turn
+  // psi = beta(u) - u / r (beta = the outward normal's angle, unwrapped); pen = c + d * (cos, sin)(psi + a).
+  //
+  // A drawing is data, not pixels: a list of patterns, each with its gears and the arc-length ranges that
+  // were inked in each pen. That keeps every line a perfect curve, redraws crisply after a rotation, and
+  // makes the My drawings shelf tiny in localStorage.
+
+  var KEY = "spirograph-v1";
+  var OUT = "#1D2340";
+  var TAU = Math.PI * 2;
+  var DEBUG = /[?&]debug\b/.test(location.search);
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+  function now() { return performance.now(); }
+
+  // ---------- Rings, wheels, holes, pens ----------
+  var BAND = 0.17;                 // width of the plastic ring outside its teeth (unit coordinates)
+  var SHAPES = {
+    round:  { kind: "circle", R: 1, teeth: 56, wheels: { small: 16, medium: 35, big: 42 } },
+    oval:   { kind: "stadium", Rc: 0.66, h: 0.36, teeth: 70, wheels: { small: 20, medium: 28, big: 30 } },
+    flower: { kind: "flower", A: 0.93, k: 5, e: 0.05, teeth: 60, wheels: { small: 15, medium: 20, big: 24 } }
+  };
+  var SHAPE_IDS = ["round", "oval", "flower"];
+  var WHEELS = ["small", "medium", "big"];
+  var WHEEL_NAME = { small: "Small", medium: "Medium", big: "Big" };
+  var WHEEL_TINT = { small: "rgba(255,154,77,0.55)", medium: "rgba(76,217,100,0.5)", big: "rgba(255,111,216,0.45)" };
+  var HOLES = ["edge", "middle", "center"];
+  var HOLE = { edge: { f: 0.78, a: 0 }, middle: { f: 0.52, a: 2.3 }, center: { f: 0.26, a: 4.3 } };
+  var HOLE_NAME = { edge: "Edge", middle: "Middle", center: "Center" };
+  var PENS = [
+    { id: "red", name: "Red", c: "#E63946" }, { id: "orange", name: "Orange", c: "#F77F00" },
+    { id: "green", name: "Green", c: "#2E9E5B" }, { id: "blue", name: "Blue", c: "#2D5BD7" },
+    { id: "purple", name: "Purple", c: "#7B4FC9" }, { id: "pink", name: "Pink", c: "#F26CA7" },
+    { id: "rainbow", name: "Rainbow" }, { id: "glitter", name: "Glitter", c: "#E0A100" }
+  ];
+  var PEN = {};
+  PENS.forEach(function (p) { PEN[p.id] = p; });
+  var SOLID = PENS.filter(function (p) { return p.id !== "rainbow" && p.id !== "glitter"; }).map(function (p) { return p.id; });
+  var GLINTS = ["#FFFFFF", "#FFE14D", "#FF6FD8", "#3DB4FF", "#4CD964", "#FF9A4D"];
+
+  // Arc-length tables for each ring (built once).
+  var M = 2048;
+  function shapePoint(S, t) {   // t in [0, 1): a point on the pitch curve, going round with increasing angle
+    var a = t * TAU;
+    if (S.kind === "circle") return [S.R * Math.cos(a), S.R * Math.sin(a)];
+    if (S.kind === "flower") { var rr = S.A * (1 + S.e * Math.cos(S.k * a)); return [rr * Math.cos(a), rr * Math.sin(a)]; }
+    // stadium: right half circle, top straight, left half circle, bottom straight (by length)
+    var Rc = S.Rc, h = S.h, arc = Math.PI * Rc, L = 2 * arc + 4 * h, s = t * L;
+    if (s < arc) { a = -Math.PI / 2 + s / Rc; return [h + Rc * Math.cos(a), Rc * Math.sin(a)]; }
+    s -= arc;
+    if (s < 2 * h) return [h - s, Rc];
+    s -= 2 * h;
+    if (s < arc) { a = Math.PI / 2 + s / Rc; return [-h + Rc * Math.cos(a), Rc * Math.sin(a)]; }
+    s -= arc;
+    return [-h + s, -Rc];
+  }
+  function buildShape(id) {
+    var S = SHAPES[id];
+    if (S.px) return S;
+    var F = 16384, fx = new Float64Array(F + 1), fy = new Float64Array(F + 1), cum = new Float64Array(F + 1), i, p;
+    for (i = 0; i <= F; i++) { p = shapePoint(S, (i % F) / F); fx[i] = p[0]; fy[i] = p[1]; }
+    for (i = 1; i <= F; i++) cum[i] = cum[i - 1] + Math.hypot(fx[i] - fx[i - 1], fy[i] - fy[i - 1]);
+    var P = cum[F];
+    var px = new Float64Array(M + 1), py = new Float64Array(M + 1), j = 0;
+    for (i = 0; i < M; i++) {
+      var s = i / M * P;
+      while (j < F - 1 && cum[j + 1] < s) j++;
+      var w = (s - cum[j]) / Math.max(1e-12, cum[j + 1] - cum[j]);
+      px[i] = fx[j] + (fx[j + 1] - fx[j]) * w;
+      py[i] = fy[j] + (fy[j + 1] - fy[j]) * w;
+    }
+    px[M] = px[0]; py[M] = py[0];
+    var nx = new Float64Array(M + 1), ny = new Float64Array(M + 1), bt = new Float64Array(M + 1), prev = 0;
+    for (i = 0; i < M; i++) {
+      var a = (i + M - 1) % M, b = (i + 1) % M, tx = px[b] - px[a], ty = py[b] - py[a], tl = Math.hypot(tx, ty) || 1;
+      tx /= tl; ty /= tl;
+      nx[i] = -ty; ny[i] = tx;                      // inward normal
+      var ang = Math.atan2(-ny[i], -nx[i]);        // outward normal's angle, unwrapped
+      if (i > 0) { while (ang - prev > Math.PI) ang -= TAU; while (ang - prev < -Math.PI) ang += TAU; }
+      bt[i] = ang; prev = ang;
+    }
+    nx[M] = nx[0]; ny[M] = ny[0]; bt[M] = bt[0] + TAU;
+    // Smallest radius of curvature where the ring bulges outward (the wheel must fit there).
+    var minRad = Infinity;
+    for (i = 0; i < M; i++) {
+      var db = bt[i + 1] - bt[i];
+      if (db > 1e-9) minRad = Math.min(minRad, (P / M) / db);
+    }
+    var ext = [0, 0];
+    for (i = 0; i < M; i++) { ext[0] = Math.max(ext[0], Math.abs(px[i])); ext[1] = Math.max(ext[1], Math.abs(py[i])); }
+    S.P = P; S.px = px; S.py = py; S.nx = nx; S.ny = ny; S.bt = bt; S.minRad = minRad;
+    S.ext = [ext[0] + BAND + 0.03, ext[1] + BAND + 0.03];
+    return S;
+  }
+  SHAPE_IDS.forEach(buildShape);
+
+  // The geometry of one setup ("rig"): ring, wheel, hole and how many wheel teeth it was turned (ph).
+  function rigGeo(shape, wheel, hole, ph) {
+    var S = SHAPES[shape], n = S.wheels[wheel], N = S.teeth, g = gcd(N, n);
+    var r = S.P * n / (TAU * N), H = HOLE[hole];
+    return { S: S, n: n, N: N, r: r, d: H.f * r, ha: H.a, ph: ph || 0, laps: n / g, Lp: S.P * n / g, petals: N / g, g: g,
+      off: (ph || 0) * TAU / n + H.a };
+  }
+  var tmp = { x: 0, y: 0, nx: 0, ny: 0, b: 0 };
+  function ringAt(S, u, o) {
+    var P = S.P, lap = Math.floor(u / P), s = u - lap * P, f = s / P * M, i = Math.floor(f), w = f - i;
+    if (i >= M) { i = M - 1; w = 1; }
+    o.x = S.px[i] + (S.px[i + 1] - S.px[i]) * w;
+    o.y = S.py[i] + (S.py[i + 1] - S.py[i]) * w;
+    o.nx = S.nx[i] + (S.nx[i + 1] - S.nx[i]) * w;
+    o.ny = S.ny[i] + (S.ny[i + 1] - S.ny[i]) * w;
+    var l = Math.hypot(o.nx, o.ny) || 1;
+    o.nx /= l; o.ny /= l;
+    o.b = S.bt[i] + (S.bt[i + 1] - S.bt[i]) * w + lap * TAU;
+    return o;
+  }
+  // Pen point for arc length u (writes into out[0], out[1]); returns the wheel's turn angle.
+  function penAt(G, u, out) {
+    ringAt(G.S, u, tmp);
+    var cx = tmp.x + G.r * tmp.nx, cy = tmp.y + G.r * tmp.ny, psi = tmp.b - u / G.r;
+    out[0] = cx + G.d * Math.cos(psi + G.off);
+    out[1] = cy + G.d * Math.sin(psi + G.off);
+    out[2] = cx; out[3] = cy; out[4] = psi;
+    return out;
+  }
+
+  // ---------- State ----------
+  // st.rig: the gears on the paper now. st.pats: the drawing. st.cur: the pattern being drawn (index) or -1.
+  function freshRig() { return { shape: "round", wheel: "small", hole: "edge", pen: "red", ph: 0 }; }
+  var st = { rig: freshRig(), u: 0, pats: [], cur: -1, from: null, shelf: [], tab: "gears" };
+
+  function loadAll() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { o = null; }
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o.shelf)) st.shelf = o.shelf.filter(function (d) { return d && Array.isArray(d.pats); }).slice(0, 16);
+    if (window.Toybox && Toybox.fresh()) {
+      // Opened from the home screen: blank paper. The last drawing goes onto his My drawings shelf.
+      var old = Array.isArray(o.pats) ? o.pats.map(unpackPat).filter(function (p) { return p && p.hi - p.lo > 0.01; }) : [];
+      if (old.length) {
+        var d = null;
+        for (var i = 0; i < st.shelf.length; i++) if (st.shelf[i].id === o.from) d = st.shelf.splice(i, 1)[0];
+        d = d || { id: "d" + Date.now().toString(36) + Math.floor(Math.random() * 1000) };
+        d.pats = old.map(packPat); d.t = Date.now();
+        st.shelf.unshift(d);
+        if (st.shelf.length > 16) st.shelf.length = 16;
+        saveNow();
+      }
+      return;
+    }
+    if (o.rig && typeof o.rig === "object") {
+      var r = o.rig;
+      if (SHAPES[r.shape]) st.rig.shape = r.shape;
+      if (WHEELS.indexOf(r.wheel) !== -1) st.rig.wheel = r.wheel;
+      if (HOLES.indexOf(r.hole) !== -1) st.rig.hole = r.hole;
+      if (PEN[r.pen]) st.rig.pen = r.pen;
+      if (typeof r.ph === "number" && isFinite(r.ph)) st.rig.ph = Math.round(r.ph);
+    }
+    if (typeof o.u === "number" && isFinite(o.u)) st.u = o.u;
+    if (Array.isArray(o.pats)) st.pats = o.pats.map(unpackPat).filter(Boolean);
+    if (typeof o.from === "string") st.from = o.from;
+    if (typeof o.tab === "string" && /^(gears|pens|mine)$/.test(o.tab)) st.tab = o.tab;
+  }
+  // Pattern: { s, w, h, ph, lo, hi, done, segs: [{ c, a, b }] }. Packed as arrays to keep the shelf small.
+  function r4(v) { return Math.round(v * 10000) / 10000; }
+  function packPat(p) { return [p.s, p.w, p.h, p.ph, r4(p.lo), r4(p.hi), p.done ? 1 : 0, p.segs.map(function (g) { return [g.c, r4(g.a), r4(g.b)]; })]; }
+  function unpackPat(a) {
+    if (!Array.isArray(a) || !SHAPES[a[0]] || WHEELS.indexOf(a[1]) === -1 || HOLES.indexOf(a[2]) === -1) return null;
+    var segs = Array.isArray(a[7]) ? a[7].filter(function (g) { return Array.isArray(g) && PEN[g[0]] && isFinite(g[1]) && isFinite(g[2]); })
+      .map(function (g) { return { c: g[0], a: +g[1], b: +g[2] }; }) : [];
+    if (!segs.length || !isFinite(a[4]) || !isFinite(a[5])) return null;
+    return { s: a[0], w: a[1], h: a[2], ph: Math.round(+a[3]) || 0, lo: +a[4], hi: +a[5], done: !!a[6], segs: segs };
+  }
+  var saveTimer = 0;
+  function saveNow() {
+    clearTimeout(saveTimer); saveTimer = 0;
+    var o = { v: 1, rig: st.rig, u: r4(st.u), pats: st.pats.map(packPat), from: st.from, shelf: st.shelf, tab: st.tab };
+    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {
+      // Storage full: drop the oldest shelf drawings and try once more.
+      try { o.shelf = st.shelf = st.shelf.slice(0, 6); localStorage.setItem(KEY, JSON.stringify(o)); } catch (e2) { /* ignore */ }
+    }
+  }
+  function scheduleSave() { if (!saveTimer) saveTimer = setTimeout(saveNow, 900); }
+  window.addEventListener("pagehide", saveNow);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveNow(); });
+
+  loadAll();
+
+  // ---------- Canvas ----------
+  var stage = $("stage"), view = $("view"), ctx = view.getContext("2d");
+  var paper = document.createElement("canvas"), pctx = paper.getContext("2d");      // the ink
+  var ringLayer = document.createElement("canvas"), rctx = ringLayer.getContext("2d"); // the fixed ring
+  var W = 0, H = 0, DPR = 1, view0 = { cx: 0, cy: 0, sc: 1, rot: 0 };
+  var dirty = true;
+
+  // Unit -> screen: a rotation by a quarter turn on upright screens, so long rings run along the long side.
+  function fitView() {
+    var rot = H > W * 1.04 ? 1 : 0, ex = 0, ey = 0;
+    function take(id) { var e = SHAPES[id].ext; ex = Math.max(ex, e[0]); ey = Math.max(ey, e[1]); }
+    take(st.rig.shape);
+    st.pats.forEach(function (p) { take(p.s); });
+    var m = W < 600 || H < 520 ? 6 : 14;
+    var aw = W / 2 - m, ah = H / 2 - m;
+    var sc = rot ? Math.min(aw / ey, ah / ex) : Math.min(aw / ex, ah / ey);
+    view0 = { cx: W / 2, cy: H / 2, sc: Math.max(10, sc), rot: rot };
+  }
+  function toScreen(x, y, o) {
+    var v = view0;
+    if (v.rot) { o[0] = v.cx - y * v.sc; o[1] = v.cy + x * v.sc; }
+    else { o[0] = v.cx + x * v.sc; o[1] = v.cy + y * v.sc; }
+    return o;
+  }
+  function unitTransform(c, scale) {
+    var v = view0, k = DPR * v.sc * (scale || 1);
+    if (v.rot) c.setTransform(0, k, -k, 0, DPR * v.cx, DPR * v.cy);
+    else c.setTransform(k, 0, 0, k, DPR * v.cx, DPR * v.cy);
+  }
+  function lineW() { return clamp(view0.sc * 0.02, 2.6, 7.5); }   // pen line width in CSS px
+
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    var w = Math.max(10, Math.round(r.width - 8)), h = Math.max(10, Math.round(r.height - 8));
+    // the stage has a 4px (3px on phones) border; use the canvas's own box
+    var vr = view.getBoundingClientRect();
+    w = Math.max(10, Math.round(vr.width)); h = Math.max(10, Math.round(vr.height));
+    var d = Math.min(2, window.devicePixelRatio || 1);
+    if (w === W && h === H && d === DPR) return;
+    W = w; H = h; DPR = d;
+    [view, paper, ringLayer].forEach(function (c) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); });
+    relayout();
+  }
+  function relayout() {
+    fitView();
+    drawRing();
+    redrawPaper();
+    dirty = true;
+  }
+
+  // ---------- Drawing the ring ----------
+  function ringPath(c, S, which) {
+    // which: "outer" = the outside edge of the plastic; "teeth" = the toothed inner edge
+    var i, o = { x: 0, y: 0, nx: 0, ny: 0, b: 0 };
+    if (which === "outer") {
+      for (i = 0; i <= 360; i++) {
+        ringAt(S, i / 360 * S.P, o);
+        var x = o.x - o.nx * BAND, y = o.y - o.ny * BAND;
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.closePath();
+      return;
+    }
+    var N = S.teeth, pitch = S.P / N, ad = pitch * 0.3, k, f, pts = [[0.0, 1], [0.2, 1], [0.36, -1], [0.64, -1], [0.8, 1], [1.0, 1]];
+    // a tooth (points inward, -1 = tip) centred half a pitch along, so the wheel's teeth fit the gaps at u = k * pitch
+    var first = true;
+    for (k = 0; k < N; k++) {
+      for (f = 0; f < pts.length; f++) {
+        if (f === pts.length - 1 && k < N - 1) continue;
+        ringAt(S, (k + pts[f][0]) * pitch, o);
+        var off = pts[f][1] > 0 ? -ad : ad * 0.9;   // root sits outside the pitch line, tip inside
+        var px = o.x + o.nx * off, py = o.y + o.ny * off;
+        if (first) { c.moveTo(px, py); first = false; } else c.lineTo(px, py);
+      }
+    }
+    c.closePath();
+  }
+  function drawRing() {
+    var c = rctx, S = SHAPES[st.rig.shape];
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, ringLayer.width, ringLayer.height);
+    unitTransform(c);
+    var px = 1 / view0.sc;
+    c.lineJoin = "round"; c.lineCap = "round";
+    // soft shadow on the paper
+    c.save();
+    c.translate(3 * px, 4 * px);
+    c.beginPath(); ringPath(c, S, "outer"); ringPath(c, S, "teeth");
+    c.fillStyle = "rgba(29,35,64,0.12)"; c.fill("evenodd");
+    c.restore();
+    c.beginPath(); ringPath(c, S, "outer"); ringPath(c, S, "teeth");
+    c.fillStyle = "rgba(61,180,255,0.42)"; c.fill("evenodd");
+    // a lighter stripe, like light catching the plastic
+    c.save();
+    c.beginPath(); ringPath(c, S, "outer"); ringPath(c, S, "teeth"); c.clip("evenodd");
+    c.beginPath();
+    var o = { x: 0, y: 0, nx: 0, ny: 0, b: 0 };
+    for (var i = 0; i <= 240; i++) {
+      ringAt(S, i / 240 * S.P, o);
+      var x = o.x - o.nx * BAND * 0.62, y = o.y - o.ny * BAND * 0.62;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.strokeStyle = "rgba(255,255,255,0.55)"; c.lineWidth = BAND * 0.22; c.stroke();
+    c.restore();
+    c.beginPath(); ringPath(c, S, "outer"); ringPath(c, S, "teeth");
+    c.strokeStyle = OUT; c.lineWidth = clamp(view0.sc * 0.012, 2.5, 4) * px; c.stroke();
+  }
+
+  // ---------- Drawing ink ----------
+  var pbuf = [0, 0, 0, 0, 0];
+  function penColor(c, u, G, P) {
+    if (c === "rainbow") return "hsl(" + Math.round(((u / P) * 150 + G.ph * 47) % 360 + 360) % 360 + ",88%,52%)";
+    return PEN[c].c;
+  }
+  function hash(n) { var x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+  // Ink the range [a, b] of pattern p in pen c, in unit coordinates (the context has the unit transform).
+  function inkRange(c2, p, G, pen, a, b, lwUnit) {
+    if (b < a) { var t = a; a = b; b = t; }
+    if (b - a < 1e-7) return;
+    var span = b - a, step = Math.min(0.006, Math.max(0.0012, 1.1 / (view0.sc * 2.2)));
+    var n = Math.max(1, Math.ceil(span / step)), du = span / n, i, u;
+    c2.lineWidth = lwUnit; c2.lineCap = "round"; c2.lineJoin = "round";
+    if (pen === "rainbow") {
+      var chunk = Math.max(1, Math.round(0.05 / du));
+      for (i = 0; i < n; i += chunk) {
+        c2.beginPath();
+        var e = Math.min(n, i + chunk);
+        for (var k = i; k <= e; k++) {
+          u = a + k * du; penAt(G, u, pbuf);
+          if (k === i) c2.moveTo(pbuf[0], pbuf[1]); else c2.lineTo(pbuf[0], pbuf[1]);
+        }
+        c2.strokeStyle = penColor("rainbow", a + (i + e) / 2 * du, G, G.S.P);
+        c2.stroke();
+      }
+      return;
+    }
+    c2.beginPath();
+    for (i = 0; i <= n; i++) {
+      u = a + i * du; penAt(G, u, pbuf);
+      if (i === 0) c2.moveTo(pbuf[0], pbuf[1]); else c2.lineTo(pbuf[0], pbuf[1]);
+    }
+    c2.strokeStyle = PEN[pen].c;
+    c2.stroke();
+    if (pen === "glitter" && !plainInk) {
+      // little glints along the line, the same ones every time the line is drawn
+      var gs = 0.045, j0 = Math.ceil(a / gs), j1 = Math.floor(b / gs), seed = G.ph * 13.7 + G.n * 3.1 + G.d * 17;
+      for (var j = j0; j <= j1; j++) {
+        var hh = hash(j + seed);
+        if (hh > 0.62) continue;
+        penAt(G, j * gs, pbuf);
+        var ang = hash(j * 1.7 + seed) * TAU, off = (hash(j * 2.3 + seed) - 0.5) * lwUnit * 2.2;
+        var sz = lwUnit * (0.45 + hash(j * 3.1 + seed) * 0.6);
+        c2.fillStyle = GLINTS[Math.floor(hash(j * 5.3 + seed) * GLINTS.length)];
+        star(c2, pbuf[0] + Math.cos(ang) * off, pbuf[1] + Math.sin(ang) * off, sz, hh * 3);
+      }
+    }
+  }
+  function star(c2, x, y, s, rot) {
+    c2.beginPath();
+    for (var i = 0; i < 8; i++) {
+      var a = rot + i * Math.PI / 4, rr = i % 2 ? s * 0.38 : s;
+      if (i === 0) c2.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); else c2.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    c2.closePath(); c2.fill();
+  }
+  var geoCache = {}, plainInk = false;   // plainInk: small previews skip the glitter glints
+  function patGeo(p) {
+    var k = p.s + "|" + p.w + "|" + p.h + "|" + p.ph;
+    return geoCache[k] || (geoCache[k] = rigGeo(p.s, p.w, p.h, p.ph));
+  }
+  function drawPats(c2, pats, lwUnit) {
+    pats.forEach(function (p) {
+      var G = patGeo(p);
+      p.segs.forEach(function (g) { inkRange(c2, p, G, g.c, g.a, g.b, lwUnit); });
+    });
+  }
+  function redrawPaper() {
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.clearRect(0, 0, paper.width, paper.height);
+    unitTransform(pctx);
+    drawPats(pctx, st.pats, lineW() / view0.sc);
+    dirty = true;
+  }
+
+  // ---------- Motion ----------
+  // u: where the wheel is (arc length). uT: where the finger (or Draw!) wants it. v: its speed.
+  var mo = { uT: st.u, v: 0, auto: false, dir: 1, reseat: null, lift: 0, liftT: 0, ending: false, endDone: null,
+    endAt: 0, closedAt: 0, fingerLaps: 0, lastTooth: null, lastClick: 0 };
+  function geoNow() { var r = st.rig; return patGeo({ s: r.shape, w: r.wheel, h: r.hole, ph: r.ph }); }
+  function curPat() { return st.cur >= 0 ? st.pats[st.cur] : null; }
+  var AUTO_LAP_S = 5.2;            // Draw!: one lap round the ring in about five seconds (calm)
+  var MAX_LAPS_S = 1.4;            // the fastest the wheel ever rolls
+
+  function locked() { return Toybox.timer.locked(); }
+
+  function startPattern() {
+    var r = st.rig;
+    st.pats.push({ s: r.shape, w: r.wheel, h: r.hole, ph: r.ph, lo: st.u, hi: st.u, done: false, segs: [{ c: r.pen, a: st.u, b: st.u }] });
+    st.cur = st.pats.length - 1;
+  }
+  // Move the wheel from st.u by du, inking as it goes; stops exactly where a pattern closes.
+  function advance(du) {
+    if (!du) return;
+    if (mo.reseat || mo.lift > 0.02) { return; }
+    var p = curPat();
+    if (p && p.done) {
+      // let the finished pattern shine for a moment before the wheel is lifted for the next one
+      if (now() - mo.closedAt > 900) beginReseat();
+      return;
+    }
+    if (!p) { startPattern(); p = curPat(); }
+    var G = patGeo(p), u0 = st.u, u1 = u0 + du, closed = false;
+    if (u1 > p.hi && u1 - p.lo >= G.Lp) { u1 = p.lo + G.Lp; closed = true; }
+    else if (u1 < p.lo && p.hi - u1 >= G.Lp) { u1 = p.hi - G.Lp; closed = true; }
+    var seg = p.segs[p.segs.length - 1];
+    if (seg.c !== st.rig.pen) { seg = { c: st.rig.pen, a: u0, b: u0 }; p.segs.push(seg); }
+    unitTransform(pctx);
+    inkRange(pctx, p, G, seg.c, u0, u1, lineW() / view0.sc);
+    seg.a = Math.min(seg.a, u0, u1); seg.b = Math.max(seg.b, u0, u1);
+    p.lo = Math.min(p.lo, u1); p.hi = Math.max(p.hi, u1);
+    st.u = u1;
+    tick(G);
+    if (closed) {
+      p.done = true;
+      mo.uT = st.u; mo.v = 0; mo.closedAt = now();
+      celebrate(p);
+    }
+    dirty = true;
+    scheduleSave();
+  }
+  // A gear click each time a tooth passes the contact point.
+  function tick(G) {
+    var t = Math.floor(st.u / (G.S.P / G.N));
+    if (mo.lastTooth !== null && t !== mo.lastTooth) {
+      var n = now();
+      if (n - mo.lastClick > 45) { mo.lastClick = n; clickSound(); }
+    }
+    mo.lastTooth = t;
+  }
+
+  // After a pattern closes the next move lifts the wheel, turns it a few teeth and sets it down with the
+  // next pen, so the new pattern sits between the petals of the last one (like the real thing).
+  function beginReseat() {
+    if (mo.reseat) return;
+    var G = geoNow();
+    var k = Math.max(1, Math.round(G.g / 3));
+    if (G.g <= 1) k = 1;
+    var nextPen = st.rig.pen;
+    var si = SOLID.indexOf(st.rig.pen);
+    if (si !== -1) nextPen = SOLID[(si + 1) % SOLID.length];
+    mo.reseat = { t0: now(), dur: reduce ? 500 : 1100, k: k, pen: nextPen, swapped: false, keepAuto: mo.auto };
+    mo.v = 0; mo.uT = st.u;
+    liftSound();
+  }
+  function stepReseat() {
+    var R = mo.reseat, t = (now() - R.t0) / R.dur;
+    if (!R.swapped && t >= 0.5) { R.swapped = true; st.rig.pen = R.pen; renderPens(); renderPreviews(); }
+    if (t >= 1) {
+      st.rig.ph += R.k;
+      st.cur = -1;
+      mo.reseat = null;
+      mo.uT = st.u; mo.v = 0;
+      scheduleSave();
+    }
+    dirty = true;
+  }
+
+  function update(dt) {
+    if (mo.reseat) { stepReseat(); return; }
+    var P = geoNow().S.P;
+    if (mo.ending) {
+      // Time is up: the wheel rolls to a stop, then the pen lifts.
+      mo.v *= Math.exp(-dt * 1.6);
+      if (Math.abs(mo.v) < P * 0.01) mo.v = 0;
+      if (mo.v) { var p = curPat(); if (p && p.done) mo.v = 0; else advance(mo.v * dt); }
+      mo.uT = st.u;
+      if (!mo.v) { mo.lift = Math.min(1, mo.lift + dt / 0.8); dirty = true; }
+      if (!mo.v && mo.lift >= 1 && mo.endDone && now() - mo.endAt > 1500) { var d = mo.endDone; mo.endDone = null; d(); }
+      return;
+    }
+    if (mo.lift > 0 && !mo.goodbye) { mo.lift = Math.max(0, mo.lift - dt / 0.5); dirty = true; }
+    if (mo.goodbye) { stepGoodbye(dt); return; }
+    if (mo.auto) {
+      mo.uT += mo.dir * P / AUTO_LAP_S * dt;
+      var cp = curPat();
+      if (cp && cp.done) { mo.auto = false; renderGo(); }
+    }
+    var lead = mo.uT - st.u, maxLead = P * 0.45;
+    if (lead > maxLead) { mo.uT = st.u + maxLead; lead = maxLead; }
+    if (lead < -maxLead) { mo.uT = st.u - maxLead; lead = -maxLead; }
+    var vmax = P * MAX_LAPS_S;
+    var vdes = clamp(lead * 7, -vmax, vmax);
+    mo.v += (vdes - mo.v) * Math.min(1, dt * 12);
+    var step = mo.v * dt;
+    if ((lead >= 0 && step > lead) || (lead <= 0 && step < lead)) step = lead;
+    if (Math.abs(step) > 1e-6) advance(step);
+    else mo.v = 0;
+    scratchSound(Math.abs(mo.v) / P);
+  }
+
+  // ---------- Finger input ----------
+  // Any movement rolls the wheel: going round the ring's centre turns it with the finger (one circle of the
+  // finger = one lap), and every other wiggle or scribble rolls it forward too. Nothing can make it slip.
+  var ptrs = {};
+  function ringCenterRadius() { return { x: view0.cx, y: view0.cy, R: view0.sc * 0.9 }; }
+  function onDown(e) {
+    if (locked() || Toybox.turning && Toybox.turning()) return;
+    e.preventDefault();
+    try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var r = view.getBoundingClientRect();
+    ptrs[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top, moved: 0, t: now() };
+    if (mo.auto) { mo.auto = false; renderGo(); }   // a finger takes over
+    ripple(e.clientX - r.left, e.clientY - r.top);
+  }
+  function onMove(e) {
+    var p = ptrs[e.pointerId];
+    if (!p) return;
+    e.preventDefault();
+    if (locked()) { delete ptrs[e.pointerId]; return; }
+    var r = view.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    var C = ringCenterRadius(), P = geoNow().S.P;
+    var ax = p.x - C.x, ay = p.y - C.y, bx = x - C.x, by = y - C.y;
+    var da = Math.atan2(by, bx) - Math.atan2(ay, ax);
+    while (da > Math.PI) da -= TAU;
+    while (da < -Math.PI) da += TAU;
+    var rho = (Math.hypot(ax, ay) + Math.hypot(bx, by)) / 2;
+    var w = clamp((rho / C.R - 0.12) / 0.25, 0, 1);         // near the middle the angle is jumpy: treat as scribble
+    var m = Math.hypot(x - p.x, y - p.y);
+    if (m < 0.01) return;
+    var ang = da * w;
+    if (Math.abs(ang) > 0.002) mo.dir = ang > 0 ? 1 : -1;
+    var resid = Math.max(0, m - Math.abs(ang) * rho);
+    var du = ang * P / TAU + mo.dir * resid / C.R * 0.55 * P / TAU;
+    mo.uT += du;
+    p.moved += m; p.x = x; p.y = y;
+    mo.fingerLaps += Math.abs(du) / P;
+    if (mo.fingerLaps > 0.2) learnedDrawing();
+  }
+  function onUp(e) {
+    var p = ptrs[e.pointerId];
+    if (!p) return;
+    delete ptrs[e.pointerId];
+    if (locked()) return;
+    // A tap rolls the wheel a little way, so every touch draws something.
+    if (p.moved < 8 && now() - p.t < 600) { mo.uT += mo.dir * geoNow().S.P * 0.06; }
+  }
+  view.addEventListener("pointerdown", onDown);
+  view.addEventListener("pointermove", onMove);
+  view.addEventListener("pointerup", onUp);
+  view.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; });
+  view.addEventListener("lostpointercapture", function (e) { delete ptrs[e.pointerId]; });
+  ["gesturestart", "gesturechange", "contextmenu"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
+
+  // ---------- Effects: ripples, the closing sparkle, glitter twinkles ----------
+  var fx = { ripples: [], sparkle: null, stars: [] };
+  function ripple(x, y) { fx.ripples.push({ x: x, y: y, t0: now() }); dirty = true; }
+  function celebrate(p) {
+    fx.sparkle = { p: p, G: patGeo(p), t0: now(), dur: reduce ? 1200 : 3000 };
+    chimeSound();
+    coachSay("Round again for a new color!", 4200);
+    if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
+    if (mo.auto) { mo.auto = false; renderGo(); }
+    dirty = true;
+  }
+  function drawFx(t) {
+    var c = ctx, i, busy = false, sp = [0, 0];
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    for (i = fx.ripples.length - 1; i >= 0; i--) {
+      var rp = fx.ripples[i], k = (t - rp.t0) / 650;
+      if (k >= 1) { fx.ripples.splice(i, 1); continue; }
+      busy = true;
+      c.beginPath(); c.arc(rp.x, rp.y, 10 + k * 38, 0, TAU);
+      c.strokeStyle = "rgba(61,180,255," + (0.6 * (1 - k)).toFixed(3) + ")"; c.lineWidth = 5 * (1 - k) + 1; c.stroke();
+    }
+    if (fx.sparkle) {
+      var S = fx.sparkle, f = (t - S.t0) / S.dur;
+      if (f >= 1.25) fx.sparkle = null;
+      else {
+        busy = true;
+        var G = S.G, lw = lineW();
+        // a bright comet runs once along the whole pattern, leaving twinkles behind
+        var head = Math.min(1, f) * G.Lp, tail = Math.max(0, head - G.Lp * 0.08), steps = 26;
+        for (i = 0; i <= steps && f < 1; i++) {
+          var u = S.p.lo + tail + (head - tail) * i / steps;
+          var pp = penAt(G, u, pbuf);
+          toScreen(pp[0], pp[1], sp);
+          var a = i / steps;
+          c.beginPath(); c.arc(sp[0], sp[1], lw * (0.8 + 1.6 * a), 0, TAU);
+          c.fillStyle = "rgba(255,255,255," + (0.35 + 0.6 * a).toFixed(3) + ")"; c.fill();
+        }
+        if (f < 1) {
+          penAt(G, S.p.lo + head, pbuf); toScreen(pbuf[0], pbuf[1], sp);
+          c.fillStyle = "#FFE14D"; c.strokeStyle = OUT; c.lineWidth = 2;
+          star(c, sp[0], sp[1], lw * 3.4 + 6, t / 300); c.stroke();
+          if (Math.random() < 0.6) fx.stars.push({ x: sp[0] + (Math.random() - 0.5) * 18, y: sp[1] + (Math.random() - 0.5) * 18, t0: t,
+            c: GLINTS[Math.floor(Math.random() * GLINTS.length)], s: 3 + Math.random() * 5 });
+        }
+      }
+    }
+    for (i = fx.stars.length - 1; i >= 0; i--) {
+      var s = fx.stars[i], k2 = (t - s.t0) / 1100;
+      if (k2 >= 1) { fx.stars.splice(i, 1); continue; }
+      busy = true;
+      c.globalAlpha = 1 - k2;
+      c.fillStyle = s.c;
+      star(c, s.x, s.y - k2 * 10, s.s * (1 - k2 * 0.4), k2 * 3);
+      c.globalAlpha = 1;
+    }
+    return busy;
+  }
+
+  // ---------- Wheel and pen ----------
+  function drawWheel(t) {
+    var G = geoNow(), c = ctx, px = 1 / view0.sc, R = mo.reseat, lift = mo.lift;
+    penAt(G, st.u, pbuf);
+    var cx = pbuf[2], cy = pbuf[3], psi = pbuf[4], extra = 0, up = lift;
+    if (R) {
+      var k = clamp((now() - R.t0) / R.dur, 0, 1), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      extra = e * R.k * TAU / G.n;
+      up = Math.max(up, Math.sin(Math.PI * k));
+    }
+    var wturn = psi + G.ph * TAU / G.n + extra;   // the wheel's teeth turn with the pen
+    unitTransform(c);
+    c.lineJoin = "round"; c.lineCap = "round";
+    var r = G.r, pitch = TAU * r / G.n, ad = pitch * 0.3, i;
+    var liftScale = 1 + 0.06 * up, sh = (3 + 9 * up) * px;
+    // shadow
+    c.save();
+    c.translate(cx + sh * 0.7, cy + sh);
+    c.beginPath(); c.arc(0, 0, (r + ad * 0.5) * liftScale, 0, TAU);
+    c.fillStyle = "rgba(29,35,64," + (0.13 + 0.07 * up).toFixed(3) + ")"; c.fill();
+    c.restore();
+    c.save();
+    c.translate(cx, cy);
+    c.scale(liftScale, liftScale);
+    c.rotate(wturn);
+    // toothed outline: teeth at j * (2 pi / n) in the wheel's own frame
+    c.beginPath();
+    var prof = [[-0.5, -1], [-0.3, -1], [-0.14, 1], [0.14, 1], [0.3, -1]];
+    for (i = 0; i < G.n; i++) {
+      for (var q = 0; q < prof.length; q++) {
+        var a = (i + prof[q][0]) * TAU / G.n, rr = prof[q][1] > 0 ? r + ad * 0.88 : r - ad;
+        if (i === 0 && q === 0) c.moveTo(rr * Math.cos(a), rr * Math.sin(a)); else c.lineTo(rr * Math.cos(a), rr * Math.sin(a));
+      }
+    }
+    c.closePath();
+    // holes cut through (even-odd)
+    HOLES.forEach(function (h) {
+      var H2 = HOLE[h], hx = H2.f * r * Math.cos(H2.a), hy = H2.f * r * Math.sin(H2.a);
+      var hr = Math.max(0.028, r * 0.07);
+      c.moveTo(hx + hr, hy); c.arc(hx, hy, hr, 0, TAU, true);
+    });
+    c.fillStyle = WHEEL_TINT[st.rig.wheel];
+    c.fill("evenodd");
+    c.strokeStyle = OUT; c.lineWidth = clamp(view0.sc * 0.011, 2.2, 3.5) * px; c.stroke();
+    // centre mark
+    c.beginPath(); c.arc(0, 0, Math.max(0.02, r * 0.05), 0, TAU);
+    c.fillStyle = "rgba(255,255,255,0.7)"; c.fill(); c.lineWidth = 2 * px; c.stroke();
+    c.restore();
+    // the pen standing in its hole (seen from above), lifted when resting
+    penAt(G, st.u, pbuf);
+    var ppx = pbuf[0], ppy = pbuf[1];
+    if (R) {
+      // during the reseat the pen turns with the wheel
+      var H3 = HOLE[st.rig.hole], ang = wturn + H3.a;
+      ppx = cx + G.d * Math.cos(ang); ppy = cy + G.d * Math.sin(ang);
+    }
+    var pr = clamp(0.055, 9 * px, 22 * px), pen = st.rig.pen, lu = up * 6 * px;
+    c.beginPath(); c.arc(ppx + 2 * px + lu, ppy + 3 * px + lu * 1.4, pr, 0, TAU);
+    c.fillStyle = "rgba(29,35,64,0.25)"; c.fill();
+    c.save();
+    c.translate(ppx - lu * 0.3, ppy - lu * 0.6);
+    c.beginPath(); c.arc(0, 0, pr, 0, TAU);
+    if (pen === "rainbow") {
+      var gr = c.createLinearGradient(-pr, -pr, pr, pr);
+      ["#E63946", "#F77F00", "#FFC93C", "#2E9E5B", "#2D5BD7", "#7B4FC9"].forEach(function (col, j) { gr.addColorStop(j / 5, col); });
+      c.fillStyle = gr;
+    } else c.fillStyle = PEN[pen].c;
+    c.fill();
+    c.lineWidth = 3 * px; c.strokeStyle = OUT; c.stroke();
+    c.beginPath(); c.arc(0, 0, pr * 0.42, 0, TAU);
+    c.fillStyle = "rgba(255,255,255,0.85)"; c.fill(); c.lineWidth = 2 * px; c.stroke();
+    if (pen === "glitter") {
+      c.fillStyle = "#FFFFFF";
+      star(c, pr * 0.55, -pr * 0.55, pr * 0.5, t / 400);
+    }
+    c.restore();
+  }
+
+  // ---------- Frame loop ----------
+  var last = now();
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
+    last = t;
+    var u0 = st.u;
+    update(dt);
+    if (st.u !== u0 || mo.v) dirty = true;
+    var busy = fx.ripples.length || fx.sparkle || fx.stars.length;
+    if (dirty || busy) {
+      dirty = false;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, view.width, view.height);
+      ctx.drawImage(paper, 0, 0);
+      ctx.drawImage(ringLayer, 0, 0);
+      drawWheel(t);
+      drawFx(t);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Panel ----------
+  // Picture tiles: each wheel and each hole shows the pattern it makes with the current pen.
+  function tileCanvas() { var c = document.createElement("canvas"); c.setAttribute("aria-hidden", "true"); return c; }
+  function buildTiles() {
+    var wr = $("wheelRow"), hr = $("holeRow");
+    wr.innerHTML = ""; hr.innerHTML = "";
+    WHEELS.forEach(function (w) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.wheel = w; b.setAttribute("aria-label", WHEEL_NAME[w] + " wheel");
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = WHEEL_NAME[w]; b.appendChild(s);
+      wr.appendChild(b);
+    });
+    HOLES.forEach(function (h) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.hole = h; b.setAttribute("aria-label", "Pen hole: " + HOLE_NAME[h]);
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = HOLE_NAME[h]; b.appendChild(s);
+      hr.appendChild(b);
+    });
+    var pr = $("penRow");
+    pr.innerHTML = "";
+    PENS.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "btn pen"; b.dataset.pen = p.id; b.setAttribute("aria-label", p.name + " pen");
+      b.innerHTML = penSVG(p);
+      pr.appendChild(b);
+    });
+  }
+  function penSVG(p) {
+    var id = "pg" + p.id, fill = p.c || "url(#" + id + ")", defs = "";
+    if (p.id === "rainbow") {
+      defs = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E63946"/><stop offset=".25" stop-color="#FFC93C"/>' +
+        '<stop offset=".5" stop-color="#2E9E5B"/><stop offset=".75" stop-color="#2D5BD7"/><stop offset="1" stop-color="#7B4FC9"/></linearGradient></defs>';
+    }
+    var sparkles = p.id === "glitter" ? '<path d="M30 9l1.6 3.4 3.4 1.6-3.4 1.6L30 19l-1.6-3.4L25 14l3.4-1.6z" fill="#FFFFFF" stroke="#1D2340" stroke-width="1.2"/>' +
+      '<path d="M44 26l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#FFF7C2"/><circle cx="38" cy="12" r="1.6" fill="#FFFFFF"/>' : "";
+    return '<svg viewBox="0 0 80 40" aria-hidden="true">' + defs +
+      '<g transform="rotate(-14 40 20)" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round">' +
+      '<path d="M5 20 L14 15 L14 25 Z" fill="' + fill + '"/>' +
+      '<path d="M14 13 H22 V27 H14 Z" fill="#E7ECF6"/>' +
+      '<rect x="22" y="10" width="34" height="20" rx="4" fill="' + fill + '"/>' +
+      '<rect x="54" y="9" width="21" height="22" rx="7" fill="' + fill + '"/>' +
+      '<path d="M26 14 H50" stroke="rgba(255,255,255,0.75)" stroke-width="3" stroke-linecap="round"/>' +
+      '</g>' + sparkles + '</svg>';
+  }
+  // Draw a pattern (or a whole drawing) into a small canvas, fitted to it.
+  function drawThumb(cv, pats, opts) {
+    opts = opts || {};
+    var css = cv.getBoundingClientRect(), size = Math.round(Math.max(css.width, css.height) || opts.size || 64);
+    var d = Math.min(2, window.devicePixelRatio || 1), px = Math.round(size * d);
+    if (cv.width !== px) { cv.width = px; cv.height = px; }
+    var c = cv.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, px, px);
+    if (opts.bg) { c.fillStyle = opts.bg; c.fillRect(0, 0, px, px); }
+    var ext = 0.2;
+    pats.forEach(function (p) {
+      var G = patGeo(p), e = G.S.ext;
+      ext = Math.max(ext, Math.max(e[0], e[1]) - BAND - 0.03 + 0.04);
+    });
+    var sc = px / 2 / ext * (opts.zoom || 0.96), save = view0;
+    // turned the same way as the paper on screen
+    if (opts.rot !== undefined ? opts.rot : save.rot) c.setTransform(0, sc, -sc, 0, px / 2, px / 2);
+    else c.setTransform(sc, 0, 0, sc, px / 2, px / 2);
+    view0 = { cx: 0, cy: 0, sc: sc / d, rot: 0 };
+    plainInk = !!opts.plain;
+    drawPats(c, pats, Math.max(1.4, size * (opts.lw || 0.022)) * d / sc);
+    plainInk = false;
+    view0 = save;
+  }
+  function previewPat(shape, wheel, hole, pen) {
+    var G = patGeo({ s: shape, w: wheel, h: hole, ph: 0 });
+    return { s: shape, w: wheel, h: hole, ph: 0, lo: 0, hi: G.Lp, done: true, segs: [{ c: pen, a: 0, b: G.Lp }] };
+  }
+  function renderPreviews() {
+    var r = st.rig;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wheel]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.wheel === r.wheel));
+      drawThumb(b.querySelector("canvas"), [previewPat(r.shape, b.dataset.wheel, r.hole, r.pen)], { lw: 0.03, plain: true });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-hole]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.hole === r.hole));
+      drawThumb(b.querySelector("canvas"), [previewPat(r.shape, r.wheel, b.dataset.hole, r.pen)], { lw: 0.03, plain: true });
+    });
+  }
+  function renderPens() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pen]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.pen === st.rig.pen));
+    });
+  }
+  function renderShelf() {
+    var sh = $("shelf");
+    sh.innerHTML = "";
+    if (!st.shelf.length) {
+      var e = document.createElement("p"); e.className = "empty"; e.textContent = "Tap New to put your drawing here.";
+      sh.appendChild(e);
+      return;
+    }
+    st.shelf.forEach(function (d) {
+      var b = document.createElement("button");
+      b.className = "btn thumb"; b.dataset.shelf = d.id; b.setAttribute("aria-label", "A saved drawing");
+      b.setAttribute("aria-pressed", String(d.id === st.from));
+      b.appendChild(tileCanvas());
+      sh.appendChild(b);
+    });
+    // draw after layout so the canvases have their size
+    requestAnimationFrame(function () {
+      Array.prototype.forEach.call(sh.querySelectorAll("[data-shelf]"), function (b) {
+        var d = shelfById(b.dataset.shelf);
+        if (d) drawThumb(b.querySelector("canvas"), d.pats.map(unpackPat).filter(Boolean), { lw: 0.012, size: 110 });
+      });
+    });
+  }
+  function shelfById(id) { for (var i = 0; i < st.shelf.length; i++) if (st.shelf[i].id === id) return st.shelf[i]; return null; }
+  function renderGo() {
+    var b = $("goBtn");
+    b.textContent = mo.auto ? "Stop" : "Draw!";
+    b.setAttribute("aria-pressed", "false");
+  }
+  function showTab(name) {
+    st.tab = name;
+    $("panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.tab === name));
+    });
+    if (name === "mine") renderShelf();
+    if (name === "gears") renderPreviews();
+    scheduleSave();
+  }
+
+  // ---------- Choices ----------
+  function setRig(changes) {
+    var r = st.rig, oldShape = r.shape, oldP = SHAPES[oldShape].P;
+    Object.keys(changes).forEach(function (k) { r[k] = changes[k]; });
+    if (changes.shape && changes.shape !== oldShape) {
+      st.u = st.u / oldP * SHAPES[r.shape].P;
+      mo.uT = st.u;
+      fitView(); drawRing(); redrawPaper();
+    }
+    if (changes.shape || changes.wheel || changes.hole || typeof changes.ph === "number") {
+      // different gears: the next movement starts a new pattern (what is drawn stays)
+      st.cur = -1;
+    }
+    mo.lastTooth = null;
+    renderPreviews(); renderPens();
+    dirty = true;
+    scheduleSave();
+  }
+  function hasInk() { return st.pats.some(function (p) { return p.hi - p.lo > 0.01; }); }
+  function shelveCurrent() {
+    if (!hasInk()) return null;
+    var pats = st.pats.filter(function (p) { return p.hi - p.lo > 0.01; }).map(packPat);
+    var d = st.from ? shelfById(st.from) : null;
+    if (d) { d.pats = pats; d.t = Date.now(); st.shelf.splice(st.shelf.indexOf(d), 1); }
+    else d = { id: "d" + Date.now().toString(36) + Math.floor(Math.random() * 1000), pats: pats, t: Date.now() };
+    st.shelf.unshift(d);
+    if (st.shelf.length > 16) st.shelf.length = 16;
+    return d;
+  }
+  function flyToShelf() {
+    var r = view.getBoundingClientRect(), tab = document.querySelector('.tab[data-tab="mine"]');
+    var img = document.createElement("canvas");
+    img.width = view.width; img.height = view.height;
+    img.getContext("2d").drawImage(view, 0, 0);
+    img.className = "flyaway";
+    img.style.left = r.left + "px"; img.style.top = r.top + "px";
+    img.style.width = r.width + "px"; img.style.height = r.height + "px";
+    document.body.appendChild(img);
+    var tr = tab && tab.getClientRects().length && !document.body.classList.contains("big") ? tab.getBoundingClientRect() : { left: r.left + r.width / 2, top: r.bottom, width: 10, height: 10 };
+    var s = Math.max(0.05, Math.min(tr.width / r.width, tr.height / r.height));
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        img.style.transform = "translate(" + (tr.left + tr.width / 2 - r.left - r.width * s / 2) + "px," + (tr.top + tr.height / 2 - r.top - r.height * s / 2) + "px) scale(" + s + ")";
+        img.style.opacity = "0.2";
+      });
+    });
+    setTimeout(function () { if (img.parentNode) img.parentNode.removeChild(img); }, 1000);
+  }
+  function newPaper() {
+    var had = hasInk();
+    if (had) { flyToShelf(); shelveCurrent(); }
+    st.pats = []; st.cur = -1; st.from = null;
+    mo.auto = false; mo.reseat = null; fx.sparkle = null; mo.uT = st.u; mo.v = 0;
+    var r = st.rig;
+    r.ph = 0;
+    if (r.shape !== "round") { st.u = st.u / SHAPES[r.shape].P * SHAPES.round.P; mo.uT = st.u; r.shape = "round"; }
+    relayout();
+    renderGo(); renderPreviews(); renderPens();
+    if (st.tab === "mine") renderShelf();
+    if (had) pulseTab("mine");
+    coachSay(had ? "Fresh paper!" : "Move your finger round and round!", 3000);
+    saveNow();
+  }
+  function pulseTab(name) {
+    var t = document.querySelector('.tab[data-tab="' + name + '"]');
+    if (!t || !t.animate || reduce) return;
+    setTimeout(function () {
+      t.animate([{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 600, easing: "ease-out" });
+    }, 850);
+  }
+  function loadShelf(id) {
+    if (id === st.from) return;
+    var d = shelfById(id);
+    if (!d) return;
+    shelveCurrent();
+    st.pats = d.pats.map(unpackPat).filter(Boolean);
+    st.from = d.id; st.cur = -1;
+    mo.auto = false; mo.reseat = null; fx.sparkle = null; mo.v = 0;
+    var lastP = st.pats[st.pats.length - 1];
+    if (lastP) {
+      var oldP = SHAPES[st.rig.shape].P;
+      st.rig.shape = lastP.s; st.u = st.u / oldP * SHAPES[lastP.s].P;
+      st.rig.ph = lastP.ph + Math.max(1, Math.round(patGeo(lastP).g / 3));
+    }
+    mo.uT = st.u;
+    relayout();
+    renderGo(); renderPreviews(); renderShelf();
+    saveNow();
+  }
+  function goDraw() {
+    if (mo.auto) { mo.auto = false; renderGo(); return; }
+    var p = curPat();
+    if (p && p.done) beginReseat();
+    mo.auto = true; mo.dir = 1;
+    learnedDrawing(true);
+    coachSay("Watch it draw!", 3000);
+    renderGo();
+  }
+  var surprises = 0;
+  function pick(list, not) { var l = list.filter(function (x) { return x !== not; }); return l[Math.floor(Math.random() * l.length)]; }
+  function surprise() {
+    surprises++;
+    var r = st.rig, shape = "round";
+    // every third surprise brings out a special ring (the oval track or the flower)
+    if (surprises % 3 === 2) shape = surprises % 2 ? "oval" : "flower";
+    else if (r.shape !== "round" && Math.random() < 0.3) shape = r.shape;
+    var pen = Math.random() < 0.3 ? pick(["rainbow", "glitter"], r.pen) : pick(SOLID, r.pen);
+    var wheel = shape === r.shape ? pick(WHEELS, r.wheel) : WHEELS[Math.floor(Math.random() * 3)];
+    mo.reseat = null; fx.sparkle = null;
+    setRig({ shape: shape, wheel: wheel, hole: HOLES[Math.floor(Math.random() * 3)], pen: pen, ph: Math.floor(Math.random() * 6) });
+    mo.auto = true; mo.dir = 1;
+    coachSay("Surprise! Watch it draw!", 3000);
+    renderGo();
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest, .tb-turn, .tb-off")) return;
+    if (locked()) return;
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.dataset.wheel) { if (t.dataset.wheel !== st.rig.wheel) setRig({ wheel: t.dataset.wheel }); wiggle(); return; }
+    if (t.dataset.hole) { if (t.dataset.hole !== st.rig.hole) setRig({ hole: t.dataset.hole }); wiggle(); return; }
+    if (t.dataset.pen) { st.rig.pen = t.dataset.pen; renderPens(); renderPreviews(); dirty = true; scheduleSave(); wiggle(); return; }
+    if (t.dataset.shelf) { loadShelf(t.dataset.shelf); return; }
+    if (t.id === "goBtn") { goDraw(); return; }
+    if (t.id === "newBtn") { newPaper(); return; }
+    if (t.id === "surpriseBtn") { surprise(); return; }
+  });
+  // A choice answers with a little hop of the wheel.
+  function wiggle() { mo.lift = Math.max(mo.lift, 0.6); dirty = true; clickSound(); }
+
+  // ---------- Coach ----------
+  var coachEl = $("coach"), coachT = 0, learned = false;
+  function coachSay(text, ms) {
+    coachEl.textContent = text;
+    coachEl.classList.remove("off");
+    clearTimeout(coachT);
+    if (ms) coachT = setTimeout(function () { coachEl.classList.add("off"); }, ms);
+  }
+  function learnedDrawing(quiet) {
+    if (learned) return;
+    learned = true;
+    ghost.learned();
+    if (!quiet) coachT = setTimeout(function () { coachEl.classList.add("off"); }, 2500);
+  }
+
+  // ---------- Sound (only when the grown-up turned it on) ----------
+  var noiseBuf = null, scr = null;
+  function audio() { return Toybox.sound.ready(); }
+  function noise(ac) {
+    if (noiseBuf && noiseBuf.sampleRate === ac.sampleRate) return noiseBuf;
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function clickSound() {
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noise(ac); f.type = "bandpass"; f.frequency.value = 2600 + Math.random() * 500; f.Q.value = 4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    s.connect(f); f.connect(g); g.connect(ac.destination);
+    s.start(t, Math.random() * 0.5, 0.06);
+  }
+  function scratchSound(lapsPerS) {
+    var ac = audio();
+    var level = ac && !mo.ending ? clamp(lapsPerS * 0.05, 0, 0.035) : 0;
+    if (!ac) { if (scr) { try { scr.s.stop(); } catch (e) { /* ignore */ } scr = null; } return; }
+    if (!scr && level > 0.002) {
+      var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      s.buffer = noise(ac); s.loop = true; f.type = "bandpass"; f.frequency.value = 1500; f.Q.value = 0.8; g.gain.value = 0;
+      s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
+      scr = { s: s, g: g, idle: 0 };
+    }
+    if (scr) {
+      scr.g.gain.setTargetAtTime(level, ac.currentTime, 0.05);
+      if (level < 0.002) { scr.idle++; if (scr.idle > 90) { try { scr.s.stop(ac.currentTime + 0.2); } catch (e) { /* ignore */ } scr = null; } }
+      else scr.idle = 0;
+    }
+  }
+  function tone(ac, f, t, dur, vol) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function chimeSound() {
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime + 0.02;
+    [1046.5, 1318.5, 1568, 2093].forEach(function (f, i) { tone(ac, f, t + i * 0.16, 1.4, 0.07); tone(ac, f * 2.01, t + i * 0.16, 0.5, 0.015); });
+  }
+  function liftSound() {
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime;
+    tone(ac, 660, t, 0.25, 0.05); tone(ac, 880, t + 0.5, 0.3, 0.05);
+  }
+
+  // ---------- Ghost hand (same look in every app; master copy in tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var lastT = Date.now(), shown = 0, armed = true, isLearned = false, run = null, el = null;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { lastT = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function gframe() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(gframe);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(gframe);
+    }
+    setInterval(function () {
+      if (run || isLearned || !armed || shown >= MAX || Date.now() - lastT < IDLE) return;
+      if (blocked()) { lastT = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { isLearned = true; stop(); },
+      again: function () { isLearned = false; shown = 0; armed = true; lastT = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // The hand circles a finger round the paper, the way the wheel goes.
+  var ghost = makeGhost(function () {
+    if (mo.auto || Toybox.turning && Toybox.turning()) return null;
+    var r = view.getBoundingClientRect(), pts = [], rad = view0.sc * 0.55;
+    for (var i = 0; i <= 40; i++) {
+      var a = -Math.PI / 2 + i / 40 * TAU * 1.15;
+      pts.push([r.left + view0.cx + Math.cos(a) * rad, r.top + view0.cy + Math.sin(a) * rad]);
+    }
+    return { pts: pts, dur: 4600 };
+  }, { ok: function () { return !document.body.classList.contains("resting"); } });
+
+  // ---------- Timer ending, goodbye, rest ----------
+  function onEnding(done) {
+    ptrs = {};
+    mo.auto = false; renderGo();
+    if (mo.reseat) { mo.reseat = null; st.cur = -1; }
+    mo.ending = true; mo.endDone = done; mo.endAt = now();
+    saveNow();
+  }
+  // Goodbye: the wheel rolls once round the ring with the pen lifted (no ink) and settles.
+  function onGoodbye() {
+    mo.goodbye = { left: geoNow().S.P };
+    mo.ending = false;
+    mo.lift = 1;
+  }
+  function stepGoodbye(dt) {
+    var g = mo.goodbye, P = geoNow().S.P, v = P / (reduce ? 3 : 4.5), d = Math.min(g.left, v * dt);
+    st.u += d; g.left -= d;
+    dirty = true;
+    if (g.left <= 0) { mo.goodbye = null; mo.ending = true; st.cur = -1; mo.uT = st.u; }
+  }
+  function drawRestArt() {
+    var c = document.createElement("canvas");
+    c.className = "rest-art";
+    c.setAttribute("aria-hidden", "true");
+    c.style.width = "210px"; c.style.height = "210px";
+    document.body.appendChild(c);
+    var pats = hasInk() ? st.pats : [previewPat("round", "small", "edge", "rainbow")];
+    drawThumb(c, pats, { size: 210, lw: 0.012, bg: "#FFFFFF" });
+    document.body.removeChild(c);
+    c.style.width = ""; c.style.height = "";
+    var x = c.getContext("2d"), s = c.width;
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.globalCompositeOperation = "destination-in";
+    x.beginPath(); x.arc(s / 2, s / 2, s / 2 - 4, 0, TAU); x.fill();
+    x.globalCompositeOperation = "source-over";
+    x.beginPath(); x.arc(s / 2, s / 2, s / 2 - 6, 0, TAU); x.lineWidth = 8; x.strokeStyle = OUT; x.stroke();
+    return c;
+  }
+
+  // ---------- Debug hooks (?debug) ----------
+  if (DEBUG) {
+    window.__spiro = {
+      st: st, mo: mo, shapes: SHAPES,
+      geo: function () { var G = geoNow(); return { r: G.r, n: G.n, N: G.N, laps: G.laps, petals: G.petals, Lp: G.Lp, P: G.S.P, minRad: G.S.minRad }; },
+      fit: function () {
+        var out = {};
+        SHAPE_IDS.forEach(function (s) {
+          WHEELS.forEach(function (w) { var G = rigGeo(s, w, "edge", 0); out[s + "/" + w] = { r: +G.r.toFixed(3), minRad: +G.S.minRad.toFixed(3), laps: G.laps, petals: G.petals }; });
+        });
+        return out;
+      },
+      roll: function (du) { mo.uT += du; },
+      center: function () { var r = view.getBoundingClientRect(); return { x: r.left + view0.cx, y: r.top + view0.cy, R: view0.sc }; },
+      penScreen: function () { var G = geoNow(); penAt(G, st.u, pbuf); var o = [0, 0]; toScreen(pbuf[0], pbuf[1], o); var r = view.getBoundingClientRect(); return { x: r.left + o[0], y: r.top + o[1] }; },
+      // every inked range lies on its pattern's exact curve and inside its coverage
+      check: function () {
+        var bad = 0;
+        st.pats.forEach(function (p) {
+          var G = patGeo(p);
+          if (p.hi - p.lo > G.Lp + 1e-3) bad++;
+          p.segs.forEach(function (g) { if (g.a < p.lo - 1e-3 || g.b > p.hi + 1e-3) bad++; });
+        });
+        return { pats: st.pats.length, done: st.pats.filter(function (p) { return p.done; }).length, bad: bad };
+      },
+      ghost: function () { return ghost.show(); },
+      surprise: surprise, newPaper: newPaper, setRig: setRig
+    };
+  }
+
+  // ---------- Start ----------
+  buildTiles();
+  showTab(st.tab);
+  renderPens();
+  renderGo();
+  resize();
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); renderPreviews(); }).observe(stage);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+  if (hasInk()) { learned = true; coachSay("Move your finger round and round!", 3500); }
+  Toybox.init({
+    app: "spirograph",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the wheel rolls to a stop and the pen lifts.",
+    goodbyeOption: "End with a Goodbye button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Goodbye, gears",
+    farewellDone: "Bye bye, gears!",
+    restLine: "The gears are resting.",
+    restLine2: "They will be right here next time.",
+    restArt: drawRestArt,
+    soundNote: "Soft gear clicks, a quiet pen and a chime. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onGoodbye: onGoodbye,
+    onRest: function () { mo.endDone = null; mo.v = 0; },
+    onWake: function () { mo.ending = false; mo.goodbye = null; mo.endDone = null; st.cur = -1; mo.uT = st.u; dirty = true; },
+    onBig: function () { setTimeout(resize, 30); },
+    onSound: function (on) { if (on) clickSound(); }
+  });
+  $("stage").appendChild($("tb-toast"));
+  $("stage").appendChild($("tb-farewell"));
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
