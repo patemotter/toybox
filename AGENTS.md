@@ -41,7 +41,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
-  `excavator`, `concrete`, `wrecking-ball`, `tower-crane`).
+  `excavator`, `concrete`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
+  and the table + `blender`; cutting board, stand mixer and stove to come).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works, construction-site, train-builder.
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
@@ -173,7 +174,10 @@ Keep only:
   Tool Wall.** Not right after the gear-up either (`workshop-check-skip`).
 - **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`), the same quick
   check on each station. **No check on the site map** (going back to it from a station).
-- The launcher clears both gear flags on load and on `pageshow`, so leaving the app means gearing up again.
+- **Kitchen**: wash hands (soap, scrub, rinse, dry) and put on an apron and chef hat once per visit
+  (`kitchen-ready`); a quick "Kitchen check!" on each station, none on the kitchen page or right after the gate.
+- The launcher clears the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) on load and on `pageshow`, so
+  leaving the app means gearing up again.
 - **Power tools**: the safety check also runs whenever he changes to a different power tool on the same page
   (sessionStorage `workshop-check-tool` remembers which tools were checked this visit).
 - **Machines keep running** between goes on the same screen: a finished job ("Done!", "Again") does not switch the

@@ -18,7 +18,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
 | 9 | Jigsaw Puzzles | Next (the dad picked it) |
-| 10 | Kitchen Helper | Next (the dad picked it) |
+| 10 | Kitchen Helper | Phase 1 done (kitchen, hand washing, Blender); stations next |
 | 11 | Music Room | Planned |
 | 12 | Hamster | Done |
 | 13 | Garden | Done |
@@ -298,6 +298,14 @@ angle values, bit sizes and nail lengths are no longer shown).
 **Rules:** no fail states, nothing burns or breaks; real names for tools and foods. Counters where natural ("Pancakes: 4", "Smoothies: 2"). Food finished at a station goes onto a **table** shown on the kitchen home page (his collection for the visit; kept across visits).
 
 **Timer ending:** appliances switch off and spin down; rest line "The kitchen is resting."
+
+**Phase 1 built:** `kitchen/index.html` (kitchen page, getting-ready gate, the table kept as a collection in
+`kitchen-table-v1`, entries `{k, c, s, t}`) and `kitchen/blender.html` (counter "Smoothies"). To add a station: set
+`ready: true` in the kitchen page's `STATIONS` with an `ICONBOX`, add the page to `kitchen/sw.js` and the top-level
+`sw.js`, copy the ready-flag redirect and the kitchen-check script from `blender.html`, append food to the table.
+Questions for the dad: is "switch it off before lifting the jar" a step too many; Pulse hold-to-run; should the
+finished cup go to the table by itself; keep the table across visits (now) or clear it; more ingredients (mango,
+peanut butter)?
 
 **Agents:** 1 for the kitchen home page and hand washing, then 1 per station (4 in v1), each owning its own page, like the Workshop.
 

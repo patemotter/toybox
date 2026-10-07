@@ -1,0 +1,1305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitchen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kitchen">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
+
+/* ---------- The kitchen ---------- */
+.scene { background: #FFF3DC; touch-action: none; }
+#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#map [data-go], #map [data-food] { cursor: pointer; }
+.stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
+.sbtn {
+  position: absolute; left: 0; top: 0; z-index: 2; transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; text-decoration: none;
+  color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 4px 4px 0 #1D2340;
+  font-size: clamp(1.05rem, 2.6vw, 1.6rem); font-weight: 800; line-height: 1; min-height: 56px;
+  padding: 0.25rem 1rem 0.25rem 0.5rem; border-width: 4px; border-radius: 20px;
+}
+.sbtn:active { transform: translate(-50%, -50%) translate(3px, 3px); box-shadow: 0 0 0 #1D2340; }
+.sbtn svg { width: 1.7em; height: 1.9em; flex: none; display: block; overflow: visible; pointer-events: none; }
+.sbtn span { pointer-events: none; padding-top: 0.12em; }
+.sbtn.small { min-height: 46px; font-size: 1rem; padding: 0.15rem 0.7rem 0.15rem 0.35rem; border-width: 3px; box-shadow: 3px 3px 0 #1D2340; }
+.food { transform-box: fill-box; transform-origin: 50% 100%; }
+.food.wig { animation: wig 0.7s ease-in-out; }
+@keyframes wig { 20% { transform: rotate(-8deg) scale(1.06); } 45% { transform: rotate(7deg) scale(1.06); } 70% { transform: rotate(-4deg); } 100% { transform: none; } }
+.food.newpop { animation: newpop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes newpop { 0% { transform: translateY(-40px) scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.mach.hop { animation: hop2 0.55s ease-out; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes hop2 { 40% { transform: translateY(-18px); } 100% { transform: none; } }
+.puff { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; border-radius: 50%; border: 2px solid rgba(29, 35, 64, 0.35); }
+body.big .tb-head > :not(.bigtoggle) { display: none; }
+body.ending .homebtn, body.ending .sbtn, body.ending #map [data-go] { pointer-events: none; }
+body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
+
+/* ---------- Getting ready: wash hands, apron and chef hat ---------- */
+.gate {
+  position: fixed; inset: 0; z-index: 40; overflow: hidden;
+  background-color: #DDEFFC;
+  background-image: linear-gradient(#BFD9EC 3px, transparent 3px), linear-gradient(90deg, #BFD9EC 3px, transparent 3px);
+  background-size: 64px 64px; transition: opacity 0.7s ease;
+}
+.gate[hidden] { display: none; }
+.gate.open { opacity: 0; pointer-events: none; }
+.gtop {
+  position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px));
+}
+.gtop .homebtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px;
+  padding: 2px 12px 2px 9px; font-weight: 700; font-size: 1rem; color: #1D2340; text-decoration: none;
+  background: #FFFFFF; border: 3px solid #1D2340; border-radius: 12px; box-shadow: 2px 2px 0 #1D2340;
+}
+.gtop .homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 #1D2340; }
+.gtop .homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.gcard {
+  position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, calc(100% - 28px)); height: min(900px, calc(100% - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  margin-top: 26px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px;
+  background: var(--panel); color: var(--ink); border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 12px 14px 16px;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.gcard.leaving { opacity: 0; transform: translate(-50%, -40%) scale(0.95); pointer-events: none; }
+.gtitle { text-align: center; }
+.gtitle h2 { margin: 0; font-size: clamp(1.9rem, 6.5vw, 3.2rem); font-weight: 800; line-height: 1; }
+.gtitle p { margin: 4px 0 0; font-size: clamp(1.2rem, 3.6vw, 1.7rem); font-weight: 800; color: #2D5BD7; line-height: 1.2; min-height: 1.2em; }
+.gscene { position: relative; min-height: 0; touch-action: none; overflow: hidden; }
+#washWrap { border: 3px solid #1D2340; border-radius: 20px; background: #E3F1FB; }
+.gscene[hidden] { display: none; }
+.gscene svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; touch-action: none; }
+#wash [data-hit] { cursor: pointer; }
+#wash .water { stroke-dasharray: 10 14; animation: flow 0.5s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -24; } }
+.glow { animation: glow 1.3s ease-in-out infinite; }
+@keyframes glow { 50% { opacity: 0.2; } }
+.gsteps { display: flex; justify-content: center; gap: clamp(8px, 3vw, 20px); padding: 2px 0 4px; }
+.gsteps[hidden], .gtray[hidden] { display: none; }
+.gstep { position: relative; width: clamp(54px, 13vw, 88px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  border: 3px dashed #9AA8C6; background: #F4FAFF; }
+.gstep svg { width: 70%; height: 70%; }
+.gstep.now { border: 4px solid #FFC93C; background: #FFF6D6; }
+.gstep.ok { border: 3px solid #1D2340; background: #BDF0C8; }
+.gstep .tick { position: absolute; right: -6px; top: -6px; width: 26px; height: 26px; border-radius: 50%; background: #2E9E5B; color: #FFFFFF;
+  border: 3px solid #1D2340; font-size: 0.9rem; font-weight: 800; line-height: 20px; text-align: center; display: none; }
+.gstep.ok .tick { display: block; }
+.gtray { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.gslot { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #FFE3C2; color: #1D2340;
+  border: 3px solid #1D2340; border-radius: 20px; padding: 6px 6px 8px; }
+.gslot.on { background: #BDF0C8; }
+.gitem { width: min(220px, 100%); height: clamp(60px, 11vh, 120px); touch-action: none; cursor: grab; position: relative; z-index: 2; }
+.gitem svg { width: 100%; height: 100%; overflow: visible; display: block; pointer-events: none; }
+.gitem.drag { z-index: 45; transition: none; }
+.gitem.back { transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.gitem.gone { transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0; }
+.glabel { font-weight: 800; font-size: clamp(1.1rem, 3.2vw, 1.5rem); line-height: 1.1; text-align: center; }
+.glabel .ok { display: none; color: #1E7A43; }
+.gslot.on .ok { display: inline; }
+.tgt { animation: tgtpulse 1.4s ease-in-out infinite; }
+@keyframes tgtpulse { 50% { opacity: 0.25; } }
+.popin { transform-box: fill-box; transform-origin: 50% 50%; animation: popin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes popin { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+.hop { animation: hop 0.6s ease-out 2; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes hop { 30% { transform: translateY(-16px); } 60% { transform: translateY(0); } }
+.confetti { position: fixed; left: 0; top: 0; z-index: 70; width: 12px; height: 12px; border: 2px solid #1D2340; border-radius: 3px; pointer-events: none; }
+
+/* Timer pieces above the gate (z-index 40). */
+.toast { top: max(70px, calc(env(safe-area-inset-top, 0px) + 70px)); z-index: 46; }
+.farewell { z-index: 45; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+
+@media (min-width: 744px) and (min-height: 640px) {
+  .sbtn.small { min-height: 56px; font-size: 1.15rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .gcard { grid-template-columns: 1.55fr 1fr; grid-template-rows: auto minmax(0, 1fr); margin-top: 22px; height: calc(100% - 70px); column-gap: 14px; }
+  .gtitle { grid-column: 1 / 3; }
+  .gtitle h2 { font-size: 1.7rem; display: inline; }
+  .gtitle p { font-size: 1.15rem; display: inline; margin-left: 12px; }
+  .gscene { grid-column: 1; grid-row: 2; }
+  .gsteps, .gtray { grid-column: 2; grid-row: 2; align-content: center; align-self: center; }
+  .gsteps { display: grid; grid-template-columns: 1fr 1fr; justify-items: center; gap: 10px; }
+  .gstep { width: min(72px, 16vh); }
+  .gtray { grid-template-columns: 1fr; gap: 6px; }
+  .gslot { padding: 3px 4px 4px; border-radius: 16px; }
+  .gitem { height: clamp(40px, 15vh, 64px); }
+  .glabel { font-size: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tgt, .hop, .glow, #wash .water { animation: none; }
+}
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Kitchen</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage stage scene" id="scene">
+      <svg id="map" role="img" aria-label="A sunny kitchen with a blender, a stand mixer, a cutting board, a stove and a table"></svg>
+      <div id="sbtns"></div>
+      <div class="tb-coach" id="coach">Tap the blender!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+  </div>
+</div>
+
+<!-- Getting ready: wash hands, then apron and chef hat. -->
+<div class="gate" id="gate" hidden>
+  <div class="gtop">
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+  </div>
+  <div class="gcard" id="gcard">
+    <div class="gtitle"><h2 id="gTitle">Wash your hands!</h2><p id="gSub">Press the soap!</p></div>
+    <div class="gscene" id="washWrap"><svg id="wash" viewBox="0 0 400 320" role="img" aria-label="Hands over a sink with soap, a tap and a towel"></svg></div>
+    <div class="gscene" id="dressWrap" hidden><svg id="gChar" viewBox="0 -24 200 316" role="img" aria-label="A little chef getting ready"></svg></div>
+    <div class="gsteps" id="gsteps" aria-hidden="true"></div>
+    <div class="gtray" id="gtray" hidden>
+      <div class="gslot" id="slotApron">
+        <div class="gitem" id="itApron" data-item="apron" role="button" tabindex="0" aria-label="Apron"><svg viewBox="54 84 92 176" aria-hidden="true"></svg></div>
+        <div class="glabel">Apron <span class="ok">✓</span></div>
+      </div>
+      <div class="gslot" id="slotHat">
+        <div class="gitem" id="itHat" data-item="hat" role="button" tabindex="0" aria-label="Chef hat"><svg viewBox="44 -28 112 80" aria-hidden="true"></svg></div>
+        <div class="glabel">Chef hat <span class="ok">✓</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ANIM = !reduceMotion;
+
+  // ---------- Keys shared by every kitchen page ----------
+  var READY_KEY = "kitchen-ready";
+  // The table: food finished at the stations (his collection, kept across visits).
+  // Each entry: { k: "smoothie", c: "#rrggbb", s: "#rrggbb" straw, t: ms }. Stations append; oldest drop off.
+  var TABLEKEY = "kitchen-table-v1", TABLE_MAX = 12, SEENKEY = "kitchen-table-seen";
+  // Stations: only the ones that exist are tappable; the others are drawn as part of the kitchen.
+  var STATIONS = [
+    { id: "blender", label: "Blender", ready: true },
+    { id: "board", label: "Cutting board", ready: false },
+    { id: "mixer", label: "Stand mixer", ready: false },
+    { id: "stove", label: "Stove", ready: false }
+  ];
+  function readyOn() { try { return sessionStorage.getItem(READY_KEY) === "on"; } catch (e) { return true; } }
+  function setReady() { try { sessionStorage.setItem(READY_KEY, "on"); } catch (e) { /* ignore */ } }
+  var NEXT = (function () {
+    var m = /[?&]next=([a-z-]+)/.exec(location.search);
+    if (!m) return "";
+    for (var i = 0; i < STATIONS.length; i++) if (STATIONS[i].ready && STATIONS[i].id === m[1]) return m[1] + ".html";
+    return "";
+  })();
+
+  // ---------- SVG helpers ----------
+  var INK = "#1D2340", SKIN = "#F2C49B";
+  function P(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + (fill || "none") + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '" stroke-linejoin="round" stroke-linecap="round"' + (extra || "") + "/>"; }
+  function S(d, col, w) { return '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + w + '" stroke-linejoin="round" stroke-linecap="round"/>'; }
+  function Rc(x, y, w, h, rx, fill, sw, extra) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 0) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"' + (extra || "") + "/>"; }
+  function C(cx, cy, r, fill, sw, extra) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"' + (extra || "") + "/>"; }
+  function E(cx, cy, rx, ry, fill, sw, extra) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"' + (extra || "") + "/>"; }
+  function Ln(x1, y1, x2, y2, col, w) { return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"/>'; }
+  function shadow(cx, cy, rx, ry) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="rgba(70,40,10,0.18)"/>'; }
+  function star(x, y, r, fill) { var d = ""; for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4, rr = i % 2 ? r * 0.4 : r; d += (i ? "L" : "M") + (x + Math.cos(a) * rr).toFixed(1) + " " + (y + Math.sin(a) * rr).toFixed(1); } return P(d + "Z", fill || "#FFE14D", 2.5); }
+
+  // ---------- Stations (each drawn in a 300 x 340 tile; the counter top is at y = 250) ----------
+  function blenderArt(icon) {
+    var o = "";
+    if (!icon) {
+      // A bunch of bananas and a cup waiting.
+      o += shadow(70, 250, 34, 5) + P("M40 246 Q44 214 78 206 Q66 222 66 246 Z", "#FFD84D", 3.5) + P("M56 248 Q62 216 96 214 Q82 228 84 248 Z", "#FFE16B", 3.5) + Rc(72, 200, 10, 10, 3, "#8A5A2B", 3);
+      o += shadow(242, 250, 22, 4) + P("M224 196 L260 196 L255 250 L229 250 Z", "rgba(214,238,255,0.7)", 3.5) + P("M227 218 L257 218 L255 250 L229 250 Z", "#F07A9A", 0) + P("M224 196 L260 196 L255 250 L229 250 Z", "none", 3.5);
+      o += Ln(248, 244, 262, 176, INK, 8) + Ln(248, 244, 262, 176, "#FFC93C", 4);
+    }
+    o += shadow(150, 250, 54, 6);
+    o += P("M104 248 L196 248 L188 196 L112 196 Z", "#E63946", 4);
+    o += Rc(116, 186, 68, 12, 3, "#3B4256", 3.5);
+    o += Rc(116, 208, 68, 26, 6, "#2B3045", 3);
+    o += C(128, 220, 6, "#7ED957", 2.5) + C(150, 220, 6, "#FFB627", 2.5) + C(172, 220, 6, "#5AC8FA", 2.5);
+    o += P("M106 82 Q78 82 84 116 L90 156 Q92 170 112 168", "none", 11) + S("M106 82 Q78 82 84 116 L90 156 Q92 170 112 168", "#5B6276", 5);
+    o += P("M114 186 L186 186 L196 70 L104 70 Z", "rgba(214,238,255,0.65)", 0);
+    o += P("M109 124 L191 124 L186 184 L114 184 Z", "#F07A9A", 0);
+    o += '<ellipse cx="150" cy="124" rx="40" ry="5" fill="#F7A9BE"/>';
+    o += P("M114 186 L186 186 L196 70 L104 70 Z", "none", 4);
+    o += S("M176 82 L170 172", "rgba(255,255,255,0.9)", 5);
+    o += Rc(98, 58, 104, 14, 6, "#3B4256", 4) + Rc(138, 47, 24, 12, 4, "#5B6276", 3);
+    return o;
+  }
+  function mixerArt() {
+    var o = shadow(150, 250, 84, 6);
+    o += Rc(66, 234, 166, 16, 7, "#4DB6AC", 4);
+    o += P("M190 236 L190 128 Q190 116 202 116 L218 116 Q230 116 230 128 L230 236 Z", "#4DB6AC", 4);
+    o += P("M78 176 L170 176 Q168 236 124 240 Q80 236 78 176 Z", "#C9D3E0", 4) + E(124, 176, 46, 8, "#E6ECF3", 3.5);
+    o += S("M96 196 Q100 226 124 230", "rgba(255,255,255,0.85)", 4);
+    o += Rc(118, 136, 12, 40, 4, "#9AA5B8", 3);
+    o += P("M112 168 Q124 196 136 168", "#E8EEF5", 3);
+    o += P("M76 104 Q76 82 100 82 L212 82 Q236 82 236 106 L236 126 Q236 140 220 140 L94 140 Q76 140 76 124 Z", "#4DB6AC", 4);
+    o += S("M92 92 L200 92", "rgba(255,255,255,0.5)", 5);
+    o += Rc(236, 98, 16, 8, 3, "#3B4256", 3) + C(96, 112, 7, "#3B4256", 3);
+    return o;
+  }
+  function boardArt() {
+    var o = "";
+    // Fruit bowl behind.
+    o += shadow(206, 250, 54, 5);
+    o += C(188, 188, 17, "#E63946", 3.5) + C(220, 186, 17, "#FF9A1F", 3.5) + C(204, 172, 16, "#7ED957", 3.5) + Ln(204, 157, 207, 150, INK, 3);
+    o += P("M156 196 L256 196 Q252 244 206 248 Q160 244 156 196 Z", "#3DB4FF", 4);
+    // Cutting board with a carrot, cucumber slices and a kid's nylon knife.
+    o += shadow(140, 254, 110, 5);
+    o += P("M30 232 L246 232 L256 250 L22 250 Z", "#E7B77A", 4) + Rc(22, 248, 234, 10, 3, "#C98B4F", 3.5);
+    o += P("M44 236 L120 240 L48 246 Z", "#FF8A1F", 3) + P("M44 236 L34 230 M44 241 L32 242 M46 246 L36 252", "none", 3, ' stroke="#2EA05A"');
+    o += E(150, 240, 11, 5, "#8BD17C", 3) + E(172, 242, 11, 5, "#8BD17C", 3) + E(194, 240, 11, 5, "#8BD17C", 3);
+    o += Rc(206, 236, 44, 8, 4, "#FFFFFF", 3) + Rc(176, 235, 32, 10, 4, "#2D7BE5", 3);
+    return o;
+  }
+  function stoveArt() {
+    var o = "";
+    // The range: oven below the counter line, cooktop on top.
+    o += Rc(18, 250, 264, 90, 4, "#E9EEF4", 4);
+    o += Rc(18, 250, 264, 24, 4, "#C9D3E0", 4);
+    for (var i = 0; i < 4; i++) o += C(54 + i * 64, 262, 7, "#3B4256", 3);
+    o += Rc(40, 282, 220, 52, 8, "#3B4256", 4) + Rc(56, 292, 188, 32, 6, "#1F2638", 3) + S("M70 300 L110 300", "rgba(255,255,255,0.35)", 4);
+    o += Rc(60, 276, 180, 8, 4, "#9AA5B8", 3);
+    o += Rc(14, 232, 272, 20, 5, "#2B3045", 4);
+    o += E(84, 240, 44, 7, "#4A5066", 3) + E(216, 240, 44, 7, "#4A5066", 3);
+    // Pot with a lid on the left, frying pan with a pancake on the right.
+    o += P("M50 176 L118 176 L114 236 Q84 242 54 236 Z", "#E63946", 4) + Rc(42, 166, 84, 12, 6, "#B8323E", 4) + Rc(76, 154, 16, 12, 5, "#3B4256", 3);
+    o += Rc(36, 186, 16, 8, 4, "#3B4256", 3) + Rc(116, 186, 16, 8, 4, "#3B4256", 3);
+    o += E(212, 230, 44, 10, "#3B4256", 4) + E(212, 227, 30, 6, "#F2B45A", 3) + Rc(254, 224, 38, 9, 4, "#3B4256", 3);
+    return o;
+  }
+  var ART = { blender: blenderArt, mixer: mixerArt, board: boardArt, stove: stoveArt };
+
+  // ---------- Food on the table ----------
+  function readTable() {
+    var a = [];
+    try { a = JSON.parse(localStorage.getItem(TABLEKEY) || "[]"); } catch (e) { a = []; }
+    if (!Array.isArray(a)) return [];
+    return a.filter(function (x) { return x && typeof x === "object"; }).slice(-TABLE_MAX);
+  }
+  function okCol(c, d) { return /^#[0-9a-fA-F]{6}$/.test(c || "") ? c : d; }
+  // Each food is drawn standing on (0, 0), about 60 wide and 100 tall.
+  function foodArt(f) {
+    var c = okCol(f.c, "#F07A9A");
+    if (f.k === "smoothie") {
+      var s = okCol(f.s, "#FFC93C");
+      var o = shadow(0, 0, 24, 4);
+      o += '<g transform="rotate(14 4 -4)">' + Rc(-4, -100, 9, 96, 4, "#FFFFFF", 3);
+      for (var y = -94; y < -10; y += 16) o += '<rect x="-2.5" y="' + y + '" width="6" height="8" fill="' + s + '"/>';
+      o += Rc(-4, -100, 9, 96, 4, "none", 3) + "</g>";
+      o += P("M-22 -66 L22 -66 L17 0 L-17 0 Z", "rgba(214,238,255,0.7)", 0);
+      o += P("M-20.5 -54 L20.5 -54 L17 0 L-17 0 Z", c, 0) + '<ellipse cx="0" cy="-54" rx="20" ry="4" fill="rgba(255,255,255,0.35)"/>';
+      o += P("M-22 -66 L22 -66 L17 0 L-17 0 Z", "none", 3.5) + S("M12 -58 L9 -8", "rgba(255,255,255,0.85)", 3.5);
+      return o;
+    }
+    // Something else from a station: a plate with the food's color on it.
+    return shadow(0, 0, 30, 4) + E(0, -8, 30, 8, "#FFFFFF", 3.5) + P("M-18 -10 Q-16 -34 0 -34 Q16 -34 18 -10 Z", c, 3.5);
+  }
+  function emptyTableArt() {
+    // A little vase with a flower while the table waits for food.
+    return shadow(0, 0, 16, 3) + P("M-12 0 L-14 -30 Q0 -36 14 -30 L12 0 Z", "#3DB4FF", 3.5) + S("M0 -32 L0 -66", "#2EA05A", 4) +
+      P("M0 -66 Q10 -76 0 -86 Q-10 -76 0 -66 Z", "#FF6FB5", 3) + P("M0 -66 Q12 -60 20 -70 Q10 -78 0 -66 Z", "#FF6FB5", 3) + P("M0 -66 Q-12 -60 -20 -70 Q-10 -78 0 -66 Z", "#FF6FB5", 3) + C(0, -70, 5, "#FFC93C", 2.5);
+  }
+
+  // ---------- Map layout ----------
+  var mapSvg = $("map"), scene = $("scene"), sbtns = $("sbtns");
+  var TW = 300, TH = 340, TOP = 150, TBH = 300, TRW = 440;
+  var L = null;
+  function chooseLayout(cw, ch) {
+    var best = null, n = STATIONS.length;
+    [[n, 1], [Math.ceil(n / 2), 2]].forEach(function (g) {
+      var kw = g[0] * TW, kh = TOP + g[1] * TH;
+      // Table below the counters, or beside them.
+      [["below", kw, kh + TBH], ["right", kw + TRW, kh]].forEach(function (t) {
+        var s = Math.min(cw / t[1], ch / t[2]);
+        if (!best || s > best.s + 0.0001) best = { cols: g[0], rows: g[1], table: t[0], s: s, w: t[1], h: t[2] };
+      });
+    });
+    best.VW = cw / best.s; best.VH = ch / best.s;
+    best.gx = (best.VW - best.w) / 2;
+    best.gy = (best.VH - best.h) * 0.5;
+    return best;
+  }
+  var tableItems = [], foodBox = null;
+  function buildMap() {
+    var cw = scene.clientWidth, ch = scene.clientHeight;
+    if (cw < 10 || ch < 10) return;
+    L = chooseLayout(cw, ch);
+    var VW = L.VW, VH = L.VH, gx = L.gx, gy = L.gy;
+    var kw = L.cols * TW, kBottom = gy + TOP + L.rows * TH;
+    var o = "<defs>" +
+      '<pattern id="tiles" width="34" height="34" patternUnits="userSpaceOnUse"><rect width="34" height="34" fill="#E3F1FB"/><path d="M0 0.5H34M0.5 0V34" stroke="#BFD9EC" stroke-width="2"/></pattern>' +
+      '<pattern id="planks" width="120" height="40" patternUnits="userSpaceOnUse"><rect width="120" height="40" fill="#E2B07A"/><path d="M0 1H120M60 0V20M0 21H120M20 20V40" stroke="#C98B4F" stroke-width="2.5"/></pattern>' +
+      '<pattern id="check" width="36" height="36" patternUnits="userSpaceOnUse"><rect width="36" height="36" fill="#FFFFFF"/><rect width="18" height="18" fill="#FF8FA3"/><rect x="18" y="18" width="18" height="18" fill="#FF8FA3"/></pattern>' +
+      "</defs>";
+    // Wall, floor.
+    var floorY = L.table === "right" ? kBottom : kBottom;
+    o += '<rect x="0" y="0" width="' + VW + '" height="' + floorY + '" fill="#FFF3DC"/>';
+    o += '<rect x="0" y="' + floorY + '" width="' + VW + '" height="' + (VH - floorY + 2) + '" fill="url(#planks)"/>' + Ln(0, floorY, VW, floorY, INK, 4);
+    // Window with the sun, and a rail of utensils, on the wall above the counters.
+    var wy = gy + 14, wh = Math.min(TOP - 30, 120), wx = gx + kw / 2 - 110;
+    if (gy + TOP > 90) {
+      var top0 = Math.max(10, gy + TOP - 30 - Math.min(gy + TOP - 30, 220));
+      // Keep the window clear of the coach line when it sits at the top (tablets).
+      var ce = $("coach"), cr = ce.getBoundingClientRect(), sr = scene.getBoundingClientRect();
+      if (cr.height && cr.top - sr.top < sr.height / 2) top0 = Math.max(top0, (cr.bottom - sr.top + 10) / L.s);
+      wy = top0; wh = gy + TOP - 26 - top0;
+    }
+    if (wh > 50) {
+      o += Rc(wx, wy, 220, wh, 10, "#9ED8FF", 5);
+      o += C(wx + 160, wy + wh * 0.38, Math.min(26, wh * 0.22), "#FFD84D", 3.5);
+      o += P("M" + (wx + 20) + " " + (wy + wh * 0.62) + " q16 -14 32 0 q12 -10 26 0 z", "#FFFFFF", 3);
+      o += Ln(wx + 110, wy, wx + 110, wy + wh, INK, 4) + Ln(wx, wy + wh / 2, wx + 220, wy + wh / 2, INK, 4);
+      o += P("M" + (wx - 10) + " " + (wy - 4) + " L" + (wx + 40) + " " + (wy - 4) + " Q" + (wx + 30) + " " + (wy + wh * 0.5) + " " + (wx + 4) + " " + (wy + wh * 0.7) + " L" + (wx - 10) + " " + (wy + wh * 0.7) + " Z", "#FF8FA3", 3.5);
+      o += P("M" + (wx + 230) + " " + (wy - 4) + " L" + (wx + 180) + " " + (wy - 4) + " Q" + (wx + 190) + " " + (wy + wh * 0.5) + " " + (wx + 216) + " " + (wy + wh * 0.7) + " L" + (wx + 230) + " " + (wy + wh * 0.7) + " Z", "#FF8FA3", 3.5);
+      o += Rc(wx - 14, wy + wh - 6, 248, 12, 5, "#F6D7A7", 3.5);
+    }
+    // Utensil rail beside the window.
+    var rx = gx + 20, ry = gy + TOP - 112;
+    if (kw >= 560 && ry > 6) {
+      o += Rc(rx, ry, 150, 8, 4, "#9AA5B8", 3);
+      o += Ln(rx + 30, ry + 8, rx + 30, ry + 22, INK, 3) + P("M" + (rx + 22) + " " + (ry + 22) + " L" + (rx + 38) + " " + (ry + 22) + " L" + (rx + 36) + " " + (ry + 64) + " L" + (rx + 24) + " " + (ry + 64) + " Z", "#FFC93C", 3) + P("M" + (rx + 18) + " " + (ry + 64) + " Q" + (rx + 30) + " " + (ry + 92) + " " + (rx + 42) + " " + (ry + 64) + " Z", "#9AA5B8", 3);
+      o += Ln(rx + 75, ry + 8, rx + 75, ry + 22, INK, 3) + Rc(rx + 71, ry + 22, 8, 40, 3, "#E63946", 3) + Rc(rx + 62, ry + 60, 26, 30, 6, "#3B4256", 3);
+      o += Ln(rx + 120, ry + 8, rx + 120, ry + 22, INK, 3) + Rc(rx + 116, ry + 22, 8, 34, 3, "#2D7BE5", 3) + P("M" + (rx + 120) + " " + (ry + 56) + " Q" + (rx + 104) + " " + (ry + 80) + " " + (rx + 120) + " " + (ry + 92) + " Q" + (rx + 136) + " " + (ry + 80) + " " + (rx + 120) + " " + (ry + 56) + " Z", "none", 3);
+    }
+    // Counter rows.
+    var places = [];
+    for (var r = 0; r < L.rows; r++) {
+      var y0 = gy + TOP + r * TH;
+      o += '<rect x="' + gx + '" y="' + (y0 + 150) + '" width="' + kw + '" height="100" fill="url(#tiles)"/>';
+      o += Rc(gx - 6, y0 + 244, kw + 12, 16, 5, "#F1C98E", 4);
+      o += Rc(gx, y0 + 260, kw, TH - 260, 0, "#6FB1E8", 4);
+    }
+    STATIONS.forEach(function (st, i) {
+      var c = i % L.cols, r2 = Math.floor(i / L.cols), tx = gx + c * TW, ty = gy + TOP + r2 * TH;
+      places.push({ st: st, x: tx, y: ty });
+      var g = '<g transform="translate(' + tx.toFixed(1) + " " + ty.toFixed(1) + ')"' + (st.ready ? ' data-go="' + st.id + '"' : "") + ">";
+      if (st.id !== "stove") {
+        g += Rc(10, 268, 135, 64, 8, "#86C1F0", 3) + Rc(155, 268, 135, 64, 8, "#86C1F0", 3) + Rc(116, 276, 22, 7, 3, "#FFFFFF", 2.5) + Rc(162, 276, 22, 7, 3, "#FFFFFF", 2.5);
+      }
+      g += '<g class="mach" id="m-' + st.id + '">' + ART[st.id](false) + "</g>";
+      if (st.ready) g += '<rect x="0" y="20" width="300" height="320" fill="transparent"/>';
+      g += "</g>";
+      o += g;
+    });
+    // The table with his food.
+    var items = readTable(), tb;
+    if (L.table === "below") tb = { x: gx + 10, y: kBottom, w: kw - 20, h: VH - kBottom };
+    else tb = { x: gx + kw + 20, y: gy, w: TRW - 30, h: L.h };
+    o += tableSVG(tb, items);
+    mapSvg.setAttribute("viewBox", "0 0 " + VW.toFixed(2) + " " + VH.toFixed(2));
+    mapSvg.innerHTML = o;
+    // Station buttons sit on the cupboards in front of each ready station.
+    var small = L.s < 0.6;
+    places.forEach(function (p) {
+      var b = btnEls[p.st.id];
+      if (!b) return;
+      b.classList.toggle("small", small);
+      b.style.left = ((p.x + 150) * L.s).toFixed(1) + "px";
+      b.style.top = ((p.y + 300) * L.s).toFixed(1) + "px";
+    });
+    popNew(items);
+  }
+  function tableSVG(tb, items) {
+    var n = Math.max(1, items.length);
+    var cell = 74, usable = tb.w - 40;
+    var perRow = Math.max(1, Math.floor(usable / cell));
+    var rows = Math.min(3, Math.ceil(n / perRow));
+    if (rows * perRow < n) perRow = Math.ceil(n / rows);
+    var depth = 26 + rows * 32;
+    var legH = 60;
+    var topY;
+    if (L.table === "below") topY = tb.y + Math.max(110, Math.min(tb.h - legH - depth - 30, 150));
+    else topY = tb.y + tb.h - legH - depth - 40 - Math.max(0, (tb.h - 520) * 0.2);
+    var x0 = tb.x, x1 = tb.x + tb.w;
+    var o = shadow((x0 + x1) / 2, topY + depth + 18 + legH, tb.w / 2, 10);
+    // Legs, tabletop (seen a little from above) with a checked cloth.
+    o += Rc(x0 + 20, topY + depth + 10, 18, legH + 8, 4, "#A8693A", 4) + Rc(x1 - 38, topY + depth + 10, 18, legH + 8, 4, "#A8693A", 4);
+    o += P("M" + (x0 + 14) + " " + topY + " L" + (x1 - 14) + " " + topY + " L" + x1 + " " + (topY + depth) + " L" + x0 + " " + (topY + depth) + " Z", "url(#check)", 4);
+    o += Rc(x0 - 2, topY + depth, tb.w + 4, 20, 6, "#FF8FA3", 4);
+    o += S("M" + (x0 + 6) + " " + (topY + depth + 10) + " L" + (x1 - 6) + " " + (topY + depth + 10), "#FFFFFF", 3);
+    tableItems = [];
+    if (!items.length) {
+      o += '<g transform="translate(' + ((x0 + x1) / 2) + " " + (topY + depth * 0.6) + ')">' + emptyTableArt() + "</g>";
+      return o;
+    }
+    // Back rows first so the front rows stand in front of them. Newest food at the front.
+    var order = items.slice().reverse();
+    var idx = 0, groups = [];
+    for (var r = 0; r < rows; r++) {
+      var inRow = Math.min(perRow, order.length - r * perRow);
+      var by = topY + depth - 14 - r * 32, sc = 1 - r * 0.1;
+      var span = usable - r * 10, step = Math.min(cell * 1.2, span / Math.max(1, inRow));
+      var start = (x0 + x1) / 2 - step * (inRow - 1) / 2;
+      for (var k = 0; k < inRow; k++) {
+        var it = order[idx], ox = start + k * step + (r % 2 ? step * 0.25 : 0) * (inRow < perRow ? 0 : 1) * 0;
+        groups.push({ r: r, html: '<g transform="translate(' + ox.toFixed(1) + " " + by.toFixed(1) + ") scale(" + sc.toFixed(2) + ')"><g class="food" data-food="' + (items.length - 1 - idx) + '">' + foodArt(it) +
+          '<rect x="-30" y="-104" width="60" height="108" fill="transparent"/></g></g>' });
+        idx++;
+      }
+    }
+    groups.sort(function (a, b) { return b.r - a.r; });
+    groups.forEach(function (g) { o += g.html; });
+    return o;
+  }
+  // Food that arrived since he last looked pops onto the table.
+  function popNew(items) {
+    var seen = 0;
+    try { seen = Number(sessionStorage.getItem(SEENKEY)) || 0; } catch (e) { seen = 0; }
+    var maxT = seen, k = 0;
+    items.forEach(function (it, i) {
+      var t = Number(it.t) || 0;
+      if (t > maxT) maxT = t;
+      if (t > seen && ANIM) {
+        var g = mapSvg.querySelector('[data-food="' + i + '"]');
+        if (g) { g.style.animationDelay = (0.25 + k * 0.18) + "s"; g.classList.add("newpop"); k++; }
+      }
+    });
+    try { sessionStorage.setItem(SEENKEY, String(maxT)); } catch (e) { /* ignore */ }
+  }
+  var btnEls = {};
+  var ICONBOX = { blender: "80 40 140 216" };
+  STATIONS.forEach(function (st) {
+    if (!st.ready) return;
+    var a = document.createElement("a");
+    a.className = "btn sbtn";
+    a.href = st.id + ".html";
+    a.dataset.go = st.id;
+    a.innerHTML = '<svg viewBox="' + (ICONBOX[st.id] || "0 0 300 260") + '" aria-hidden="true">' + ART[st.id](true) + "</svg><span>" + st.label + "</span>";
+    sbtns.appendChild(a);
+    btnEls[st.id] = a;
+  });
+
+  // ---------- Going to a station; touching food ----------
+  var going = false;
+  function goStation(id) {
+    if (going || locked()) return;
+    going = true;
+    whir();
+    var m = $("m-" + id);
+    if (m) {
+      var r = m.getBoundingClientRect();
+      for (var i = 0; i < 12; i++) puff(r.left + r.width * rand(0.25, 0.75), r.top + r.height * rand(0.2, 0.6), i);
+      m.classList.remove("hop"); void m.getBoundingClientRect(); if (ANIM) m.classList.add("hop");
+    }
+    setTimeout(function () { location.href = id + ".html"; }, reduceMotion ? 0 : 520);
+  }
+  function puff(x, y, i) {
+    var d = document.createElement("div"), s = rand(14, 30);
+    d.className = "puff";
+    d.style.width = d.style.height = s + "px";
+    d.style.background = ["#F07A9A", "#FFD84D", "#FFFFFF", "#7ED957"][i % 4];
+    document.body.appendChild(d);
+    var dx = rand(-90, 90), dy = rand(-90, -10);
+    if (!d.animate || reduceMotion) { setTimeout(function () { d.remove(); }, 300); return; }
+    d.animate([{ transform: "translate(" + (x - s / 2) + "px," + (y - s / 2) + "px) scale(0.4)", opacity: 0.95 },
+      { transform: "translate(" + (x - s / 2 + dx) + "px," + (y - s / 2 + dy) + "px) scale(1.3)", opacity: 0 }], { duration: rand(500, 800), easing: "ease-out" }).onfinish = function () { d.remove(); };
+  }
+  mapSvg.addEventListener("click", function (e) {
+    if (locked()) return;
+    var g = e.target.closest && e.target.closest("[data-go]");
+    if (g) { goStation(g.getAttribute("data-go")); return; }
+    var f = e.target.closest && e.target.closest("[data-food]");
+    if (f) {
+      f.classList.remove("wig", "newpop"); void f.getBoundingClientRect(); f.classList.add("wig");
+      var r = f.getBoundingClientRect();
+      for (var i = 0; i < 6; i++) puff(r.left + r.width * 0.6, r.top + r.height * 0.1, i);
+      tone(rand(600, 760), 0.14, 0.04, "sine", 900);
+    }
+  });
+  sbtns.addEventListener("click", function (e) {
+    var a = e.target.closest("a[data-go]");
+    if (!a) return;
+    e.preventDefault();
+    goStation(a.dataset.go);
+  });
+  window.addEventListener("pageshow", function (e) {
+    going = false;
+    if (e.persisted) { lastSize = ""; scheduleBuild(); }
+  });
+
+  // ---------- The chef and the getting-ready ----------
+  var APRON_D = "M80 112 L120 112 L122 146 Q138 150 138 162 L136 246 Q100 254 64 246 L62 162 Q62 150 78 146 Z";
+  var HAT_D = "M70 34 Q50 20 62 2 Q70 -14 88 -8 Q100 -22 114 -8 Q132 -14 138 2 Q150 20 130 34 Z";
+  function apronSVG(fill, sw, extra) {
+    var on = fill !== "none";
+    var o = P("M82 112 Q100 88 118 112", "none", on ? 5 : sw, extra) + P(APRON_D, fill, sw, extra);
+    if (on) o += Rc(84, 182, 32, 24, 6, "#FFFFFF", 3) + S("M66 168 L134 168", "#FFFFFF", 3);
+    return o;
+  }
+  function hatSVG(fill, sw, extra) { return P(HAT_D, fill, sw, extra) + Rc(68, 28, 64, 20, 6, fill, sw, extra) + (fill === "none" ? "" : S("M86 12 L86 26 M100 6 L100 26 M114 12 L114 26", "#E3E9F2", 3)); }
+  var DASH = ' stroke-dasharray="7 6" stroke="#2D5BD7"';
+  function tgtG(id, svg) { return '<g id="' + id + '" class="tgt">' + svg.replace(/stroke="#1D2340" /g, "") + "</g>"; }
+  function chefSVG() {
+    var o = shadow(100, 284, 64, 8);
+    o += P("M62 258 L96 258 L98 282 L54 282 Q54 266 62 258 Z", "#7A4B1E", 4) + P("M138 258 L104 258 L102 282 L146 282 Q146 266 138 258 Z", "#7A4B1E", 4);
+    o += P("M64 198 L136 198 L134 262 L106 262 L100 222 L94 262 L66 262 Z", "#34508F", 4);
+    o += Rc(40, 108, 24, 76, 12, "#FFC93C", 4) + Rc(136, 108, 24, 76, 12, "#FFC93C", 4);
+    o += C(52, 188, 11, SKIN, 4) + C(148, 188, 11, SKIN, 4) + star(36, 176, 9) + star(164, 176, 9);
+    o += Rc(92, 96, 16, 12, 2, SKIN, 3);
+    o += P("M62 198 L62 120 Q62 104 80 104 L120 104 Q138 104 138 120 L138 198 Z", "#FFC93C", 4);
+    o += tgtG("apronTgt", apronSVG("none", 3, DASH));
+    o += '<g id="apronOn" style="display:none">' + apronSVG("#E63946", 4) + "</g>";
+    o += C(100, 70, 33, SKIN, 4);
+    o += P("M67 64 Q66 36 100 36 Q134 36 133 64 Q118 50 100 52 Q82 50 67 64 Z", "#6B3E1E", 4);
+    o += C(88, 72, 4.5, INK, 0) + C(112, 72, 4.5, INK, 0) + C(80, 84, 5, "#F59BA0", 0) + C(120, 84, 5, "#F59BA0", 0);
+    o += P("M88 86 Q100 97 112 86", "none", 4);
+    o += tgtG("hatTgt", hatSVG("none", 3, DASH));
+    o += '<g id="hatOn" style="display:none">' + hatSVG("#FFFFFF", 4) + "</g>";
+    return '<g id="charAll">' + o + "</g>";
+  }
+  $("gChar").innerHTML = chefSVG();
+  document.querySelector("#itApron svg").innerHTML = apronSVG("#E63946", 4);
+  document.querySelector("#itHat svg").innerHTML = hatSVG("#FFFFFF", 4);
+
+  // ----- Washing hands (a first-person view of his hands over the sink) -----
+  var washSvg = $("wash");
+  var STEP_ICONS = [
+    P("M20 26 L44 26 L44 54 Q44 58 40 58 L24 58 Q20 58 20 54 Z", "#FF9EC8", 3) + Rc(28, 14, 8, 12, 2, "#FFFFFF", 3) + Rc(22, 8, 26, 8, 3, "#FFFFFF", 3),
+    C(24, 36, 12, "#FFFFFF", 3) + C(42, 26, 9, "#FFFFFF", 3) + C(42, 46, 7, "#FFFFFF", 3) + C(20, 34, 3, "rgba(126,200,255,0.8)", 0),
+    P("M32 8 Q14 32 14 42 Q14 58 32 58 Q50 58 50 42 Q50 32 32 8 Z", "#7EC8FF", 3) + S("M24 40 Q24 50 32 52", "#FFFFFF", 3),
+    Rc(14, 10, 36, 46, 6, "#4DB6AC", 3) + S("M14 42 L50 42 M14 48 L50 48", "#FFFFFF", 3)
+  ];
+  var stepsEl = $("gsteps");
+  stepsEl.innerHTML = STEP_ICONS.map(function (s) { return '<div class="gstep"><svg viewBox="0 0 64 64">' + s + '</svg><span class="tick">✓</span></div>'; }).join("");
+  function handSVG(cx, cy, flip) {
+    // Back of a hand, fingers away from him, from the sleeve at the bottom.
+    var f = flip ? -1 : 1, o = "";
+    o += Rc(cx - 25, cy + 40, 50, 110, 12, "#FFC93C", 4) + Rc(cx - 27, cy + 40, 54, 16, 7, "#FFE07A", 4);
+    o += Rc(cx - 17, cy + 10, 34, 36, 10, SKIN, 4);
+    for (var i = 0; i < 4; i++) { var fx = cx + f * (-24 + i * 12.5) - 5.5, fh = [30, 36, 34, 28][flip ? 3 - i : i]; o += Rc(fx.toFixed(1), cy - 22 - fh, 11, fh + 10, 5.5, SKIN, 3.5); }
+    o += '<g transform="rotate(' + (-38 * f) + " " + (cx + 24 * f) + " " + (cy + 4) + ')">' + Rc(cx + 24 * f - 7, cy - 24, 14, 32, 7, SKIN, 3.5) + "</g>";
+    o += Rc(cx - 29, cy - 28, 58, 52, 20, SKIN, 4);
+    o += S("M" + (cx - 12) + " " + (cy - 12) + " Q" + cx + " " + (cy - 16) + " " + (cx + 12) + " " + (cy - 12), "rgba(29,35,64,0.18)", 3);
+    return o;
+  }
+  var HX = 250, HY = 206; // where the hands meet, under the tap
+  function buildWash() {
+    var o = '<defs><clipPath id="basinClip"><ellipse cx="226" cy="236" rx="128" ry="58"/></clipPath></defs>';
+    // Wall tiles, counter, sink.
+    o += '<rect x="-400" y="-500" width="1200" height="650" fill="#E3F1FB"/>';
+    var t = "";
+    for (var x = -400; x <= 800; x += 40) t += "M" + x + " -500 V150 ";
+    for (var y = -490; y <= 150; y += 40) t += "M-400 " + y + " H800 ";
+    o += S(t, "#BFD9EC", 3);
+    o += '<rect x="-400" y="150" width="1200" height="600" fill="#F4F7FA"/>' + Ln(-400, 150, 800, 150, INK, 4);
+    o += E(226, 236, 134, 62, "#FFFFFF", 4) + E(226, 236, 122, 54, "#C9DCEA", 3.5) + E(232, 258, 11, 5, "#8A94A6", 3);
+    // Towel on a ring (left).
+    o += '<g id="towelHome">' + C(52, 30, 14, "none", 4) + "</g>";
+    // Soap pump (right).
+    o += '<g id="soap" data-hit="soap"><rect x="296" y="40" width="96" height="124" fill="transparent"/>' +
+      shadow(344, 160, 30, 5) + Rc(318, 84, 52, 76, 16, "#FF9EC8", 4) + C(344, 122, 13, "#FFFFFF", 3) + C(340, 120, 4, "#7EC8FF", 0) + C(348, 126, 3, "#7EC8FF", 0) + S("M328 98 L328 140", "rgba(255,255,255,0.7)", 4) +
+      Rc(336, 70, 16, 16, 3, "#FFFFFF", 3.5) +
+      '<g id="pumpHead">' + Rc(339, 54, 10, 18, 3, "#FFFFFF", 3) + Rc(322, 46, 46, 12, 5, "#FFFFFF", 3.5) + Rc(300, 48, 26, 8, 3, "#FFFFFF", 3) + "</g>" +
+      '<g id="soapGlow" class="glow">' + C(344, 52, 30, "none", 4, ' stroke="#FFC93C"') + "</g></g>";
+    // Tap: a lever on the left of the base, a curved spout to the right.
+    o += '<g id="tap" data-hit="tap"><rect x="110" y="40" width="120" height="114" fill="transparent"/>' +
+      shadow(196, 152, 24, 4) + P("M196 128 L196 86 Q196 56 224 56 Q250 56 250 84 L250 96", "none", 22) + S("M196 128 L196 86 Q196 56 224 56 Q250 56 250 84 L250 96", "#DDE4EE", 14) +
+      S("M200 120 L200 90", "rgba(255,255,255,0.9)", 4) + Rc(238, 94, 24, 12, 4, "#C9D3E0", 3.5) + Rc(178, 122, 36, 30, 9, "#DDE4EE", 4) +
+      '<g id="lever">' + P("M190 126 L148 108", "none", 12) + S("M190 126 L148 108", "#DDE4EE", 6) + C(146, 107, 14, "#3DB4FF", 4) + "</g>" +
+      '<g id="tapGlow" class="glow" style="display:none">' + C(148, 108, 30, "none", 4, ' stroke="#FFC93C"') + "</g></g>";
+    // Water.
+    o += '<g id="water" style="display:none">' + S("M250 106 L250 236", "#7EC8FF", 16) + '<path class="water" d="M250 106 L250 236" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>' +
+      E(250, 240, 34, 8, "rgba(126,200,255,0.6)", 0) + "</g>";
+    // Hands (the hit area for rubbing covers them).
+    o += '<rect id="rubArea" data-hit="hands" x="162" y="148" width="160" height="182" fill="transparent"/>';
+    o += '<g id="hands" pointer-events="none"><g id="handL">' + handSVG(HX - 36, HY, false) + '</g><g id="handR">' + handSVG(HX + 36, HY, true) + "</g></g>";
+    o += '<g id="splash" pointer-events="none" style="display:none">' + E(HX, HY - 40, 26, 7, "rgba(158,216,255,0.85)", 2.5) +
+      P("M" + (HX - 30) + " " + (HY - 46) + " q-10 -12 -18 -4 M" + (HX + 30) + " " + (HY - 46) + " q10 -12 18 -4", "none", 3, ' stroke="#7EC8FF"') + C(HX - 44, HY - 58, 4, "#9ED8FF", 2) + C(HX + 46, HY - 60, 4, "#9ED8FF", 2) + "</g>";
+    o += '<g id="soapBlob" style="display:none" pointer-events="none">' + P("M" + (HX - 16) + " " + (HY - 2) + " Q" + (HX - 18) + " " + (HY - 20) + " " + HX + " " + (HY - 22) + " Q" + (HX + 18) + " " + (HY - 20) + " " + (HX + 16) + " " + (HY - 2) + " Q" + HX + " " + (HY + 6) + " " + (HX - 16) + " " + (HY - 2) + " Z", "#FF9EC8", 3) + "</g>";
+    o += '<g id="drops" pointer-events="none" style="opacity:0"></g>';
+    o += '<g id="bubbles" pointer-events="none"></g>';
+    o += '<g id="flyBlob" pointer-events="none" style="display:none">' + C(0, 0, 9, "#FF9EC8", 3) + "</g>";
+    // Towel (draggable).
+    o += '<g id="towel" data-hit="towel"><rect x="-6" y="-4" width="76" height="110" fill="transparent"/>' +
+      P("M2 8 L58 8 L62 100 L-2 100 Z", "#4DB6AC", 4) + S("M0 80 L60 80 M0 88 L61 88", "#FFFFFF", 4) + S("M8 14 L10 70", "rgba(255,255,255,0.35)", 5) + "</g>";
+    o += '<g id="sparks" pointer-events="none"></g>';
+    washSvg.innerHTML = o;
+    var dr = "";
+    [[HX - 50, HY - 34], [HX - 24, HY + 6], [HX + 20, HY - 44], [HX + 48, HY - 6], [HX - 40, HY + 30], [HX + 36, HY + 28], [HX - 8, HY - 52], [HX + 4, HY - 10]].forEach(function (d) {
+      dr += P("M" + d[0] + " " + (d[1] - 9) + " Q" + (d[0] - 6) + " " + d[1] + " " + d[0] + " " + (d[1] + 4) + " Q" + (d[0] + 6) + " " + d[1] + " " + d[0] + " " + (d[1] - 9) + " Z", "#9ED8FF", 2.5);
+    });
+    $("drops").innerHTML = dr;
+  }
+  buildWash();
+  var TOWEL_HOME = { x: 22, y: 36 };
+  var W = null;
+  function resetWash() {
+    W = { step: 0, foam: 0, wet: 0, dry: 0, water: false, rub: 0, bubbles: [], towel: { x: TOWEL_HOME.x, y: TOWEL_HOME.y }, auto: null, done: false, busy: false };
+    $("bubbles").innerHTML = ""; $("sparks").innerHTML = "";
+    $("soapBlob").style.display = "none"; $("soapBlob").style.opacity = "1"; $("drops").style.opacity = "0"; $("water").style.display = "none"; $("splash").style.display = "none";
+    $("lever").setAttribute("transform", ""); $("pumpHead").setAttribute("transform", "");
+    placeTowel(); placeHands(0);
+    showStep();
+  }
+  var STEP_TEXT = ["Press the soap!", "Rub, rub, rub!", "Turn on the water!", "Dry with the towel!", "Clean hands!"];
+  function showStep() {
+    $("gSub").textContent = STEP_TEXT[Math.min(W.step, 4)];
+    Array.prototype.forEach.call(stepsEl.children, function (el, i) { el.classList.toggle("ok", i < W.step); el.classList.toggle("now", i === W.step); });
+    $("soapGlow").style.display = W.step === 0 ? "" : "none";
+    $("tapGlow").style.display = W.step === 2 ? "" : "none";
+    if (ghost) ghost.again();
+  }
+  function svgPt(e) {
+    var pt = washSvg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    var m = washSvg.getScreenCTM();
+    return m ? pt.matrixTransform(m.inverse()) : { x: 0, y: 0 };
+  }
+  function svgToPage(x, y) {
+    var pt = washSvg.createSVGPoint(); pt.x = x; pt.y = y;
+    var m = washSvg.getScreenCTM();
+    var q = m ? pt.matrixTransform(m) : { x: 0, y: 0 };
+    return [q.x, q.y];
+  }
+  function placeHands(ph) {
+    // Under the running water the hands come together into the stream.
+    var dx = Math.sin(ph) * 12 + (W && W.water ? 14 : 0), dy = Math.cos(ph * 2) * 4;
+    $("handL").setAttribute("transform", "translate(" + dx.toFixed(1) + " " + dy.toFixed(1) + ")");
+    $("handR").setAttribute("transform", "translate(" + (-dx).toFixed(1) + " " + (-dy).toFixed(1) + ")");
+  }
+  function placeTowel() { $("towel").setAttribute("transform", "translate(" + W.towel.x.toFixed(1) + " " + W.towel.y.toFixed(1) + ")"); }
+  function addBubble() {
+    if (W.bubbles.length > 46) return;
+    var a = rand(0, Math.PI * 2), d = Math.sqrt(Math.random());
+    var b = { x: HX + Math.cos(a) * 62 * d, y: HY - 10 + Math.sin(a) * 54 * d, r: rand(6, 14), vy: 0, el: null, fall: false };
+    var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.innerHTML = C(0, 0, b.r, "rgba(255,255,255,0.85)", 2.5) + C(-b.r * 0.35, -b.r * 0.35, b.r * 0.25, "#FFFFFF", 0) + '<circle cx="' + (b.r * 0.3) + '" cy="' + (b.r * 0.3) + '" r="' + (b.r * 0.5) + '" fill="rgba(126,200,255,0.35)"/>';
+    g.setAttribute("transform", "translate(" + b.x.toFixed(1) + " " + b.y.toFixed(1) + ") scale(0.2)");
+    $("bubbles").appendChild(g);
+    b.el = g; b.s = 0.2;
+    W.bubbles.push(b);
+  }
+  function sparkle(x, y, n) {
+    var sp = $("sparks");
+    for (var i = 0; i < n; i++) {
+      var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      var a = rand(0, Math.PI * 2), d = rand(30, 90);
+      g.innerHTML = star(0, 0, rand(7, 12), ["#FFE14D", "#FF9EC8", "#9ED8FF", "#FFFFFF"][i % 4]);
+      sp.appendChild(g);
+      (function (g, a, d) {
+        var t0 = performance.now(), dur = reduceMotion ? 300 : rand(700, 1100);
+        (function step(t) {
+          var k = Math.min(1, (t - t0) / dur);
+          g.setAttribute("transform", "translate(" + (x + Math.cos(a) * d * k).toFixed(1) + " " + (y + Math.sin(a) * d * k).toFixed(1) + ") scale(" + (1 - k * 0.6).toFixed(2) + ")");
+          g.setAttribute("opacity", (1 - k).toFixed(2));
+          if (k < 1) requestAnimationFrame(step); else if (g.parentNode) g.parentNode.removeChild(g);
+        })(t0);
+      })(g, a, d);
+    }
+  }
+  function nextStep() {
+    W.step++;
+    chime();
+    sparkle(HX, HY - 20, 10);
+    showStep();
+    if (W.step === 4) {
+      // Clean hands!
+      W.done = true;
+      setTimeout(function () { sparkle(HX - 40, HY - 30, 8); sparkle(HX + 40, HY - 30, 8); }, 250);
+      setTimeout(startDress, reduceMotion ? 600 : 2000);
+    }
+  }
+  // Soap: press the pump.
+  function pump() {
+    var head = $("pumpHead");
+    head.setAttribute("transform", "translate(0 10)");
+    setTimeout(function () { head.setAttribute("transform", ""); }, 260);
+    tone(300, 0.15, 0.05, "sine", 180);
+    if (W.step !== 0) { if (W.step === 1) { W.foam = Math.min(1, W.foam + 0.05); addBubble(); } return; }
+    W.busy = true;
+    var fb = $("flyBlob"), t0 = performance.now(), dur = reduceMotion ? 50 : 650, x0 = 302, y0 = 54;
+    fb.style.display = "";
+    (function step(t) {
+      var k = Math.min(1, (t - t0) / dur), x = x0 + (HX - x0) * k, y = y0 + (HY - 12 - y0) * k - Math.sin(k * Math.PI) * 40;
+      fb.setAttribute("transform", "translate(" + x.toFixed(1) + " " + y.toFixed(1) + ")");
+      if (k < 1) requestAnimationFrame(step);
+      else { fb.style.display = "none"; $("soapBlob").style.display = ""; W.busy = false; plop(); nextStep(); }
+    })(t0);
+  }
+  // Rubbing: the hands slide against each other and the bubbles grow.
+  function rub(dist) {
+    W.rub += dist * 0.07;
+    placeHands(W.rub);
+    if (W.step !== 1) return;
+    var before = W.foam;
+    W.foam = Math.min(1, W.foam + dist / 900);
+    var want = Math.floor(W.foam * 46);
+    while (W.bubbles.length < want) addBubble();
+    $("soapBlob").style.opacity = String(Math.max(0, 1 - W.foam * 2.2));
+    if (Math.floor(before * 10) !== Math.floor(W.foam * 10)) tone(rand(700, 1000), 0.08, 0.02, "sine", 1300);
+    if (W.foam >= 1 && before < 1) { $("soapBlob").style.display = "none"; learnedStep(); nextStep(); }
+  }
+  // Water: lift the lever; the water runs, then the tap turns itself off.
+  function water() {
+    if (W.water) return;
+    W.water = true;
+    $("lever").setAttribute("transform", "rotate(28 190 126)");
+    $("water").style.display = "";
+    $("splash").style.display = "";
+    placeHands(W.rub);
+    tone(220, 0.3, 0.03, "triangle", 260);
+    var rinse = W.step === 2;
+    if (rinse) learnedStep();
+    var dur = reduceMotion ? 900 : (rinse ? 2800 : 1600);
+    W.bubbles.forEach(function (b) { b.fall = true; b.vy = rand(10, 60); });
+    setTimeout(function () {
+      W.water = false;
+      $("water").style.display = "none";
+      $("splash").style.display = "none";
+      $("lever").setAttribute("transform", "");
+      placeHands(W.rub);
+      W.wet = 1; W.dry = 0;
+      $("drops").style.opacity = "1";
+      if (rinse && W.step === 2) nextStep();
+    }, dur);
+    if (rinse) W.foam = 0;
+  }
+  // Towel: rub the hands dry.
+  function dryBy(dist) {
+    if (W.wet <= 0) return;
+    W.dry = Math.min(1, W.dry + dist / 650);
+    $("drops").style.opacity = String(Math.max(0, 1 - W.dry));
+    if (W.dry >= 1) {
+      W.wet = 0;
+      if (W.step === 3) { learnedStep(); towelHome(); nextStep(); }
+    }
+  }
+  function towelOverHands() { var cx = W.towel.x + 30, cy = W.towel.y + 54; return Math.abs(cx - HX) < 90 && Math.abs(cy - HY) < 80; }
+  function towelHome() {
+    var t0 = performance.now(), fx = W.towel.x, fy = W.towel.y, dur = reduceMotion ? 50 : 500;
+    W.auto = "home";
+    (function step(t) {
+      var k = Math.min(1, (t - t0) / dur), e = k * (2 - k);
+      W.towel.x = fx + (TOWEL_HOME.x - fx) * e; W.towel.y = fy + (TOWEL_HOME.y - fy) * e;
+      placeTowel();
+      if (k < 1) requestAnimationFrame(step); else W.auto = null;
+    })(t0);
+  }
+  function towelAuto() {
+    // A tap on the towel: it comes over and dries the hands by itself.
+    if (W.auto) return;
+    W.auto = "dry";
+    var t0 = performance.now(), fx = W.towel.x, fy = W.towel.y, tx = HX - 30, ty = HY - 60, last = 0;
+    (function step(t) {
+      var k = (t - t0) / (reduceMotion ? 200 : 450);
+      if (k < 1) { W.towel.x = fx + (tx - fx) * k; W.towel.y = fy + (ty - fy) * k; placeTowel(); requestAnimationFrame(step); return; }
+      var k2 = (t - t0 - 450) / 1500;
+      W.towel.x = tx + Math.sin(k2 * Math.PI * 6) * 26; placeTowel();
+      var d = Math.abs(W.towel.x - last); last = W.towel.x;
+      if (W.wet > 0) dryBy(d * 1.4); else { W.dry = 1; }
+      if (k2 < 1 && W.wet > 0) requestAnimationFrame(step);
+      else { W.auto = null; if (W.step === 3 && W.wet > 0) { W.wet = 0; $("drops").style.opacity = "0"; learnedStep(); nextStep(); } towelHome(); }
+    })(t0);
+  }
+  // Bubbles grow in, and wash down the drain under the water.
+  function bubbleLoop() {
+    if (W) {
+      for (var i = W.bubbles.length - 1; i >= 0; i--) {
+        var b = W.bubbles[i];
+        if (b.fall) {
+          b.vy += 6; b.y += b.vy * 0.016;
+          var gone = b.y > 270;
+          b.el.setAttribute("transform", "translate(" + b.x.toFixed(1) + " " + b.y.toFixed(1) + ") scale(" + Math.max(0.2, b.s).toFixed(2) + ")");
+          b.el.setAttribute("opacity", String(Math.max(0, 1 - (b.y - HY) / 80)));
+          if (gone) { if (b.el.parentNode) b.el.parentNode.removeChild(b.el); W.bubbles.splice(i, 1); }
+        } else if (b.s < 1) {
+          b.s = Math.min(1, b.s + 0.08);
+          b.el.setAttribute("transform", "translate(" + b.x.toFixed(1) + " " + b.y.toFixed(1) + ") scale(" + b.s.toFixed(2) + ")");
+        }
+      }
+    }
+    requestAnimationFrame(bubbleLoop);
+  }
+  requestAnimationFrame(bubbleLoop);
+  var washDrag = null;
+  washSvg.addEventListener("pointerdown", function (e) {
+    if (locked() || !W || W.done || W.busy) return;
+    var h = e.target.closest && e.target.closest("[data-hit]");
+    if (!h) return;
+    e.preventDefault();
+    try { washSvg.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var p = svgPt(e), kind = h.getAttribute("data-hit");
+    washDrag = { id: e.pointerId, kind: kind, x: p.x, y: p.y, sx: p.x, sy: p.y, moved: 0, ox: W.towel.x - p.x, oy: W.towel.y - p.y };
+    if (kind === "soap") { pump(); washDrag = null; }
+    else if (kind === "tap") { water(); washDrag = null; }
+    else if (kind === "towel") { if (W.auto) { washDrag = null; return; } tone(520, 0.08, 0.03, "sine", 640); }
+    else if (kind === "hands") { blip(); }
+  });
+  washSvg.addEventListener("pointermove", function (e) {
+    if (!washDrag || washDrag.id !== e.pointerId) return;
+    var p = svgPt(e), d = Math.hypot(p.x - washDrag.x, p.y - washDrag.y);
+    washDrag.moved += d;
+    washDrag.x = p.x; washDrag.y = p.y;
+    if (washDrag.kind === "hands") rub(d);
+    else if (washDrag.kind === "towel") {
+      W.towel.x = p.x + washDrag.ox; W.towel.y = p.y + washDrag.oy; placeTowel();
+      if (towelOverHands()) { dryBy(d); placeHands(W.rub += d * 0.03); }
+    }
+  });
+  function washUp(e) {
+    if (!washDrag || washDrag.id !== e.pointerId) return;
+    var d = washDrag;
+    washDrag = null;
+    if (d.kind === "hands" && d.moved < 8 && W.step === 1) {
+      // A tap still helps: a few more bubbles and a wiggle.
+      rub(110);
+    }
+    if (d.kind === "towel") {
+      if (d.moved < 8) towelAuto();
+      else if (!W.auto && !(W.step === 3 && W.wet > 0 && towelOverHands())) towelHome();
+      else if (!W.auto && W.step === 3 && W.wet > 0) towelAuto();
+    }
+  }
+  washSvg.addEventListener("pointerup", washUp);
+  washSvg.addEventListener("pointercancel", washUp);
+
+  // ----- Apron and chef hat (drag onto the chef, or tap) -----
+  var DRESS = { apron: false, hat: false }, dressDrags = {};
+  var DRESS_IDS = { apron: "Apron", hat: "Hat" };
+  function itemParts(el) { var k = el.dataset.item; return { on: $(k + "On"), t: $(k + "Tgt"), slot: $("slot" + DRESS_IDS[k]) }; }
+  function overChef(x, y) { var r = $("gChar").getBoundingClientRect(); return x > r.left - 20 && x < r.right + 20 && y > r.top - 20 && y < r.bottom + 20; }
+  function dressDown(e) {
+    var el = e.currentTarget;
+    if (DRESS[el.dataset.item] || dressDrags[el.id] || locked()) return;
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    dressDrags[el.id] = { id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
+    el.classList.remove("back"); el.classList.add("drag");
+    el.style.transform = "scale(1.12)";
+    blip();
+  }
+  function dressMove(e) {
+    var el = e.currentTarget, d = dressDrags[el.id];
+    if (!d || d.id !== e.pointerId) return;
+    var dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 10) d.moved = true;
+    el.style.transform = "translate(" + dx + "px," + dy + "px) scale(1.12)";
+    itemParts(el).t.style.opacity = overChef(e.clientX, e.clientY) ? "1" : "";
+  }
+  function dressUp(e) {
+    var el = e.currentTarget, d = dressDrags[el.id];
+    if (!d || d.id !== e.pointerId) return;
+    delete dressDrags[el.id];
+    el.classList.remove("drag");
+    itemParts(el).t.style.opacity = "";
+    if (e.type === "pointercancel" && d.moved) { el.classList.add("back"); el.style.transform = ""; return; }
+    if (!d.moved || overChef(e.clientX, e.clientY)) putOn(el);
+    else { el.classList.add("back"); el.style.transform = ""; }
+  }
+  function putOn(el) {
+    if (DRESS[el.dataset.item]) return;
+    var p = itemParts(el);
+    DRESS[el.dataset.item] = true;
+    el.classList.add("gone");
+    el.style.transform = (el.style.transform || "") + " scale(0.4)";
+    p.t.style.display = "none";
+    p.on.style.display = "";
+    p.on.classList.remove("popin"); void p.on.getBoundingClientRect(); p.on.classList.add("popin");
+    p.slot.classList.add("on");
+    var r = p.on.getBoundingClientRect();
+    confetti(r.left + r.width / 2, r.top + r.height / 2, 20);
+    plop();
+    if (ghost) ghost.again();
+    if (DRESS.apron && DRESS.hat) dressDone();
+  }
+  ["itApron", "itHat"].forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("pointerdown", dressDown);
+    el.addEventListener("pointermove", dressMove);
+    el.addEventListener("pointerup", dressUp);
+    el.addEventListener("pointercancel", dressUp);
+    el.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && !DRESS[el.dataset.item]) { e.preventDefault(); putOn(el); } });
+  });
+  function resetDress() {
+    Object.keys(DRESS_IDS).forEach(function (k) {
+      DRESS[k] = false;
+      var el = $("it" + DRESS_IDS[k]); el.className = "gitem"; el.style.transform = "";
+      $(k + "On").style.display = "none"; $(k + "Tgt").style.display = "";
+      $("slot" + DRESS_IDS[k]).classList.remove("on");
+    });
+    $("charAll").classList.remove("hop");
+  }
+  var stage2 = "wash";
+  function startDress() {
+    if (locked()) return;
+    stage2 = "dress";
+    $("gTitle").textContent = "Apron and chef hat!";
+    $("gSub").textContent = "Put them on the chef!";
+    $("washWrap").hidden = true; $("gsteps").hidden = true;
+    $("dressWrap").hidden = false; $("gtray").hidden = false;
+    resetDress();
+    if (ghost) ghost.again();
+  }
+  function dressDone() {
+    stage2 = "done";
+    setTimeout(function () {
+      chime();
+      $("gTitle").textContent = "Ready to cook!";
+      $("gSub").textContent = "Let's go!";
+      var c = $("charAll");
+      c.classList.remove("hop"); void c.getBoundingClientRect(); if (!reduceMotion) c.classList.add("hop");
+      var r = $("gChar").getBoundingClientRect();
+      confetti(r.left + r.width / 2, r.top + r.height * 0.3, 40);
+      setTimeout(openKitchen, reduceMotion ? 400 : 2200);
+    }, 250);
+  }
+  function confetti(x, y, n) {
+    if (reduceMotion) n = Math.min(n, 6);
+    var cols = ["#FFC93C", "#FF6FB5", "#3A86FF", "#2E9E5B", "#E63946"];
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement("div");
+      d.className = "confetti";
+      d.style.background = cols[i % cols.length];
+      document.body.appendChild(d);
+      var a = rand(0, Math.PI * 2), sp = rand(80, 260), dx = Math.cos(a) * sp, dy = Math.sin(a) * sp - 60;
+      if (!d.animate) { d.remove(); continue; }
+      d.animate([{ transform: "translate(" + (x - 6) + "px," + (y - 6) + "px) rotate(0deg)", opacity: 1 },
+        { transform: "translate(" + (x - 6 + dx) + "px," + (y - 6 + dy + 140) + "px) rotate(" + rand(-400, 400) + "deg)", opacity: 0 }],
+        { duration: rand(800, 1300), easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = (function (el) { return function () { el.remove(); }; })(d);
+    }
+  }
+
+  // ----- The gate as a whole -----
+  var gateEl = $("gate"), gcard = $("gcard"), gateTimer = null, opening = false;
+  function showGate() {
+    clearTimeout(gateTimer); opening = false;
+    stage2 = "wash";
+    $("gTitle").textContent = "Wash your hands!";
+    $("washWrap").hidden = false; $("gsteps").hidden = false;
+    $("dressWrap").hidden = true; $("gtray").hidden = true;
+    gateEl.hidden = false;
+    gateEl.classList.remove("open");
+    gcard.classList.remove("leaving");
+    resetWash();
+    resetDress();
+  }
+  function openKitchen() {
+    if (opening || locked()) return;
+    opening = true;
+    setReady();
+    gcard.classList.add("leaving");
+    // The full getting-ready was just shown: the first station he opens skips its quick check.
+    try { sessionStorage.setItem("kitchen-check-skip", "1"); } catch (e) { /* ignore */ }
+    gateTimer = setTimeout(function () {
+      if (NEXT && !locked()) { location.replace(NEXT); return; }
+      gateEl.classList.add("open");
+      gateTimer = setTimeout(function () { gateEl.hidden = true; opening = false; if (ghost) ghost.again(); }, reduceMotion ? 200 : 750);
+    }, reduceMotion ? 50 : 450);
+  }
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var master = null, masterCtx = null;
+  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; } return master; }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function blip() { tone(rand(520, 720), 0.12, 0.035, "sine", 880); }
+  function plop() { tone(360, 0.14, 0.05, "sine", 180); }
+  function whir() { tone(140, 0.4, 0.03, "sawtooth", 260); }
+  function chime() { tone(523, 0.4, 0.04); tone(784, 0.6, 0.04, "sine", null, 0.12); }
+
+  // ---------- Play timer hooks ----------
+  function locked() { return Toybox.timer.locked(); }
+  function onEnding(done, info) {
+    try { mapSvg.pauseAnimations(); } catch (e) { /* ignore */ }
+    if (info.goodbye) { done(); return; }
+    setTimeout(done, 3000);
+  }
+  function onWake() {
+    try { mapSvg.unpauseAnimations(); } catch (e) { /* ignore */ }
+    if (!readyOn() && gateEl.hidden) showGate();
+  }
+  function restArt() {
+    var o = '<rect width="400" height="300" fill="#2B3A67"/>';
+    o += '<rect x="130" y="26" width="140" height="96" rx="8" fill="#1B2550" stroke="#1D2340" stroke-width="4"/><circle cx="226" cy="60" r="18" fill="#FFF4CC"/><circle cx="236" cy="54" r="16" fill="#1B2550"/>';
+    [[150, 46], [170, 100], [250, 104], [196, 40]].forEach(function (s) { o += '<circle cx="' + s[0] + '" cy="' + s[1] + '" r="2.5" fill="#FFF4CC"/>'; });
+    o += '<rect y="196" width="400" height="104" fill="#4C77A6"/><rect y="188" width="400" height="14" fill="#C9A06A" stroke="#1D2340" stroke-width="4"/>';
+    o += '<g transform="translate(-10 -62)">' + stoveArt() + "</g>";
+    o += '<g transform="translate(180 -62) scale(0.9)">' + blenderArt(true) + "</g>";
+    o += '<g transform="translate(330 188)">' + foodArt({ k: "smoothie", c: "#E56B8A", s: "#FFC93C" }) + "</g>";
+    o += '<text x="300" y="100" font-family="Baloo 2, sans-serif" font-weight="800" font-size="30" fill="#FFFFFF">z</text><text x="324" y="76" font-family="Baloo 2, sans-serif" font-weight="800" font-size="22" fill="#FFFFFF">z</text><text x="344" y="56" font-family="Baloo 2, sans-serif" font-weight="800" font-size="15" fill="#FFFFFF">z</text>';
+    return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
+  }
+
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest || !e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  var buildPending = false, lastSize = "";
+  function scheduleBuild() {
+    if (buildPending) return;
+    buildPending = true;
+    requestAnimationFrame(function () {
+      buildPending = false;
+      var key = scene.clientWidth + "x" + scene.clientHeight;
+      if (key === lastSize) return;
+      lastSize = key;
+      buildMap();
+    });
+  }
+  window.addEventListener("resize", scheduleBuild);
+  window.addEventListener("orientationchange", function () { setTimeout(scheduleBuild, 200); });
+  // The table changes when a station adds food in another tab.
+  window.addEventListener("storage", function (e) { if (e.key === TABLEKEY || e.key === null) { lastSize = ""; scheduleBuild(); } });
+
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedF = true; stop(); },
+      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function midOf(el) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+  var ghost = null;
+  function learnedStep() { if (ghost) ghost.learned(); }
+  ghost = makeGhost(function () {
+    if (!gateEl.hidden) {
+      if (opening || washDrag || Object.keys(dressDrags).length) return null;
+      if (stage2 === "wash" && W && !W.done && !W.busy && !W.auto) {
+        if (W.step === 0) return { pts: [svgToPage(344, 56)], tap: true };
+        if (W.step === 1) { var a = svgToPage(HX - 50, HY), b = svgToPage(HX + 50, HY); return { pts: [a, b, a, b, a], dur: 3600 }; }
+        if (W.step === 2 && !W.water) return { pts: [svgToPage(146, 107)], tap: true };
+        if (W.step === 3) return { pts: [svgToPage(W.towel.x + 30, W.towel.y + 50), svgToPage(HX - 40, HY - 10), svgToPage(HX + 40, HY - 10), svgToPage(HX - 30, HY - 10)], dur: 3800 };
+        return null;
+      }
+      if (stage2 === "dress") {
+        if (!DRESS.apron) return { pts: [midOf($("itApron")), midOf($("apronTgt"))] };
+        if (!DRESS.hat) return { pts: [midOf($("itHat")), midOf($("hatTgt"))] };
+      }
+      return null;
+    }
+    var go = btnEls.blender || mapSvg.querySelector("[data-go]");
+    return go ? { pts: [midOf(go)], tap: true } : null;
+  });
+
+  // ---------- Start ----------
+  Toybox.init({
+    app: "kitchen",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the kitchen switches off and the controls lock. The timer carries on across the kitchen pages.",
+    goodbyeOption: "End with a “Clean up” button to press",
+    farewellText: "Time to finish cooking",
+    goodbyeLabel: "Clean up",
+    farewellDone: "Bye bye, kitchen!",
+    restLine: "The kitchen is resting.",
+    restLine2: "Your food will be on the table next time.",
+    restArt: restArt,
+    soundNote: "Soft whirs, plops and chimes. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: function () { try { mapSvg.pauseAnimations(); } catch (e) { /* ignore */ } },
+    onWake: onWake,
+    onBig: function () { lastSize = ""; scheduleBuild(); },
+    onSound: function (on) { if (on) chime(); }
+  });
+  scheduleBuild();
+  if (readyOn()) {
+    if (NEXT && Toybox.timer.phase() !== "resting") { location.replace(NEXT); }
+  } else if (!locked()) {
+    showGate();
+  }
+  // Tapping a station on the map is "the move"; once done the hand stops for the map.
+  sbtns.addEventListener("pointerdown", function () { if (gateEl.hidden && ghost) ghost.learned(); });
+
+  // Test hooks, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) {
+    window.__kitchen = {
+      layout: function () { return L && { cols: L.cols, rows: L.rows, table: L.table, s: L.s }; },
+      gate: function () { return { hidden: gateEl.hidden, stage: stage2, step: W && W.step, foam: W && W.foam, wet: W && W.wet, dry: W && W.dry, dress: { apron: DRESS.apron, hat: DRESS.hat }, ready: readyOn(), sub: $("gSub").textContent }; },
+      wash: function (x, y) { return svgToPage(x, y); },
+      spots: { soap: [344, 56], lever: [146, 107], hands: [HX, HY], towel: function () { return [W.towel.x + 30, W.towel.y + 50]; } },
+      table: function () { return mapSvg.querySelectorAll("[data-food]").length; },
+      ghost: function () { return ghost.show(); }
+    };
+  }
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
