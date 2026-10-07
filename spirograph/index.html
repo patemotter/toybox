@@ -615,12 +615,18 @@ body.ending #view { cursor: default; }
     if (mo.reseat || mo.lift > 0.02) { return; }
     var p = curPat();
     if (p && p.done) {
-      // let the finished pattern shine for a moment before the wheel is lifted for the next one
-      if (now() - mo.closedAt > 900) beginReseat();
+      if (mo.auto) { beginReseat(); return; }
+      // Finished, but his finger is still going: the wheel keeps rolling round the finished curve (the pen
+      // runs along the line already drawn, so nothing new is inked and it stays one clean curve). The
+      // next pen comes with his next new touch (onDown) or Draw!.
+      st.u += du;
+      tick(patGeo(p));
+      dirty = true;
+      scheduleSave();
       return;
     }
     if (!p) { startPattern(); p = curPat(); }
-    var G = patGeo(p), u0 = st.u, u1 = u0 + du, closed = false;
+    var G = patGeo(p), u0 = st.u, u1 = u0 + du, want = u1, closed = false;
     if (u1 > p.hi && u1 - p.lo >= G.Lp) { u1 = p.lo + G.Lp; closed = true; }
     else if (u1 < p.lo && p.hi - u1 >= G.Lp) { u1 = p.hi - G.Lp; closed = true; }
     var seg = p.segs[p.segs.length - 1];
@@ -633,7 +639,10 @@ body.ending #view { cursor: default; }
     tick(G);
     if (closed) {
       p.done = true;
-      mo.uT = st.u; mo.v = 0; mo.closedAt = now();
+      mo.closedAt = now();
+      // Draw! stops where the pattern closes; a finger never gets stopped: the wheel rolls on.
+      if (mo.auto) { mo.uT = st.u; mo.v = 0; }
+      else st.u = want;
       celebrate(p);
     }
     dirty = true;
@@ -670,7 +679,10 @@ body.ending #view { cursor: default; }
       st.rig.ph += R.k;
       st.cur = -1;
       mo.reseat = null;
-      mo.uT = st.u; mo.v = 0;
+      mo.v = 0;
+      // keep what his finger did meanwhile (a little of it), so the new pattern starts right away
+      var P = geoNow().S.P;
+      mo.uT = st.u + clamp(mo.uT - st.u, -P * 0.25, P * 0.25);
       scheduleSave();
     }
     dirty = true;
@@ -719,6 +731,9 @@ body.ending #view { cursor: default; }
     e.preventDefault();
     try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var r = view.getBoundingClientRect();
+    // A new touch after all fingers were lifted from a finished pattern: next pen, wheel turned a few teeth.
+    var cp = curPat();
+    if (!fingerDown() && cp && cp.done && !mo.reseat) { mo.coachLater = false; beginReseat(); }
     ptrs[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top, moved: 0, t: now() };
     if (mo.auto) { mo.auto = false; renderGo(); }   // a finger takes over
     ripple(e.clientX - r.left, e.clientY - r.top);
@@ -752,14 +767,23 @@ body.ending #view { cursor: default; }
     if (!p) return;
     delete ptrs[e.pointerId];
     if (locked()) return;
+    afterLift();
     // A tap rolls the wheel a little way, so every touch draws something.
     if (p.moved < 8 && now() - p.t < 600) { mo.uT += mo.dir * geoNow().S.P * 0.06; }
   }
   view.addEventListener("pointerdown", onDown);
   view.addEventListener("pointermove", onMove);
   view.addEventListener("pointerup", onUp);
-  view.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; });
-  view.addEventListener("lostpointercapture", function (e) { delete ptrs[e.pointerId]; });
+  view.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; afterLift(); });
+  view.addEventListener("lostpointercapture", function (e) { delete ptrs[e.pointerId]; afterLift(); });
+  function fingerDown() { return Object.keys(ptrs).length > 0; }
+  // All fingers up after he finished a pattern: now say how to get the next color.
+  function afterLift() {
+    if (fingerDown() || !mo.coachLater || locked()) return;
+    mo.coachLater = false;
+    var cp = curPat();
+    if (cp && cp.done) coachSay("Round again for a new color!", 4200);
+  }
   ["gesturestart", "gesturechange", "contextmenu"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
 
   // ---------- Effects: ripples, the closing sparkle, glitter twinkles ----------
@@ -768,7 +792,9 @@ body.ending #view { cursor: default; }
   function celebrate(p) {
     fx.sparkle = { p: p, G: patGeo(p), t0: now(), dur: reduce ? 1200 : 3000 };
     chimeSound();
-    coachSay("Round again for a new color!", 4200);
+    // with a finger down the line waits until he lifts it (afterLift)
+    if (fingerDown()) mo.coachLater = true;
+    else coachSay("Round again for a new color!", 4200);
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
     if (mo.auto) { mo.auto = false; renderGo(); }
     dirty = true;
