@@ -30,29 +30,15 @@
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
+    --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
+  --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C;
   color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: inherit; }
@@ -72,79 +58,105 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 /* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
-.stage { background: #9ED8F5; touch-action: none; }
+.stage { background: #7CC95A; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #count { transition: transform 0.1s ease; }
 #count.pop { animation: pop 0.35s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
-.btn.tb-go[hidden] { display: none; }
-
-/* ---------- Panel: Go!, the Paint choices, then the tab bar ----------
-   Engines and Cars have no panel choices: the pieces wait in the yard on the stage and he drags them on. */
-[data-pane] { display: none; }
-.tb-panel[data-tab="paint"] [data-pane="paint"] { display: block; }
-.tb-panel .panel-body.tb-choices { display: block; min-height: 0; }
-.tb-panel:not([data-tab="paint"]) .panel-body { display: none; }
-.tb-tabs { margin-top: auto; }
-.prow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.prow:first-child { margin-top: 0; }
-.sw { flex: 1 0 34px; height: 44px; min-height: 44px; padding: 0; border-radius: 12px; }
-.sw[aria-pressed="true"] { outline: 4px solid var(--focus); outline-offset: 1px; }
-.st { flex: 1 0 40px; min-height: 46px; padding: 2px; font-size: 1.15rem; font-weight: 800; background: var(--plate); color: #1D2340; }
-.st canvas { width: 100%; height: 34px; display: block; pointer-events: none; }
-.st[aria-pressed="true"] { outline: 4px solid var(--focus); outline-offset: 1px; }
-.hint { margin: 0 0 6px; font-weight: 700; color: var(--muted); font-size: 1rem; line-height: 1.2; }
-.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
-.prow#swatches { flex-wrap: nowrap; }
-#swatches .sw { flex: 1 1 0; min-width: 0; }
 .tbadge { position: absolute; top: 10px; right: 10px; z-index: 2; }
 
-/* Big mode: the panel goes away, the header stays. */
+/* Go row: the green Go! (it reads Stop while the train runs) and Toot!. Hidden until there is an engine. */
+.gorow { display: flex; gap: 8px; }
+.gorow[hidden] { display: none; }
+.gorow .tb-go { flex: 1 1 auto; min-width: 0; }
+.btn.tb-go.stop { background: #E63946; }
+.btn.toot { flex: 0 0 auto; min-width: 96px; background: #FFC93C; color: #1D2340; font-weight: 800; font-size: 1.35rem; }
+.btn.toot.pop { animation: pop 0.35s cubic-bezier(.3, 1.6, .5, 1); }
+
+/* Choices: one pane at a time (the picked tab, or the tapped car's colors). */
+.tb-panel .panel-body.tb-choices { display: block; min-height: 0; }
+[data-pane] { display: none; }
+.tb-panel[data-tab="engines"] [data-pane="engines"],
+.tb-panel[data-tab="cars"] [data-pane="cars"],
+.tb-panel[data-tab="track"] [data-pane="track"] { display: grid; }
+.tb-panel[data-tab="sel"] [data-pane="sel"] { display: flex; }
+.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+.picks { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 8px; }
+#engPicks { --cols: 4; }
+#carPicks { --cols: 5; }
+#trackPicks { --cols: 3; }
+.pick {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  padding: 4px 2px 2px; min-height: 70px; font-size: 0.95rem; line-height: 1.05;
+  background: var(--plate); color: #1D2340;
+}
+.pick canvas { width: 100%; height: 44px; display: block; pointer-events: none; }
+.pick span { white-space: nowrap; overflow: hidden; max-width: 100%; }
+.pick.hop { animation: hop 0.3s ease; }
+@keyframes hop { 0% { transform: translateY(0); } 40% { transform: translateY(-8px); } 100% { transform: translateY(0); } }
+.pick[aria-pressed="true"] { background: var(--accent); }
+/* The tapped car: its picture, Take off, Done, then its colors. */
+#selPane { flex-direction: column; gap: 8px; }
+.selhead { display: flex; gap: 8px; align-items: stretch; }
+.selpic { flex: 1 1 auto; min-width: 0; height: 52px; border: 3px solid #1D2340; border-radius: 14px; background: #FFF4C2; position: relative; }
+.selpic canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.selhead .btn { flex: 0 0 auto; min-height: 52px; font-size: 1.05rem; padding: 0 0.7rem; }
+.btn.takeoff { background: #FFFFFF; color: #1D2340; }
+.btn.seldone { background: #2EA05A; color: #FFFFFF; }
+.swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.sw { height: 44px; min-height: 44px; padding: 0; border-radius: 12px; }
+.sw[aria-pressed="true"] { outline: 4px solid var(--focus); outline-offset: 1px; }
+
+/* Big mode: the panel goes away. */
 body.big .tb-panel { display: none; }
 
-/* Small phones */
-@media (max-width: 480px) {
-  .sw { height: 38px; min-height: 38px; flex-basis: 26px; }
-  .st { min-height: 40px; flex-basis: 28px; }
-}
 /* Tablets */
-@media (min-width: 744px) and (min-height: 640px) {
-  .tb-panel { gap: 12px; }
-  .sw { height: 54px; min-height: 54px; }
-  .st { min-height: 56px; font-size: 1.4rem; }
-  .st canvas { height: 42px; }
+@media (min-width: 700px) and (min-height: 700px) {
+  .pick { min-height: 96px; font-size: 1.1rem; }
+  .pick canvas { height: 62px; }
+  .sw { height: 56px; min-height: 56px; }
+  .selpic { height: 64px; }
+  .selhead .btn { min-height: 64px; font-size: 1.2rem; }
+  .btn.toot { min-width: 130px; font-size: 1.6rem; }
 }
-/* Landscape: the panel is a slim column on the right: Go on top, the paint choices in a scrolling block when
-   Paint is picked, and the tab buttons stacked one per row at the bottom. The stage takes the rest. */
+@media (orientation: landscape) and (min-width: 1000px) and (min-height: 700px) {
+  .tb-body .tb-panel { width: min(36%, 420px); }
+  .picks { grid-auto-rows: minmax(118px, auto); }
+  .tb-tabs .btn { font-size: 1rem; padding: 0.15rem 0.2rem; }
+}
+@media (orientation: portrait) and (min-width: 700px) {
+  #trackPicks { --cols: 6; }
+}
+/* Landscape: the panel is a column on the right. */
 @media (orientation: landscape) {
-  .tb-body .tb-panel { width: 170px; flex: none; gap: 8px; align-self: flex-start; max-height: 100%; }
-  .tb-panel .panel-body.tb-choices { flex: 1 1 auto; overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
-  .tb-tabs { flex-direction: column; flex-wrap: nowrap; gap: 6px; margin-top: 0; }
-  .tb-tabs .btn { flex: none; width: 100%; min-height: 48px; font-size: 1.05rem; }
-  .btn.tb-go { flex: none; min-height: 56px; font-size: 1.45rem; padding: 0 4px; }
-  .prow#swatches { flex-wrap: wrap; }
-  #swatches .sw { flex: 1 0 36px; height: 40px; min-height: 40px; }
-  .st { flex: 1 0 44px; min-height: 44px; font-size: 1rem; }
-  .st canvas { height: 30px; }
+  #engPicks { --cols: 2; }
+  #carPicks { --cols: 3; }
+  .tb-tabs .btn { padding: 0.15rem 0.2rem; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  .tb-body .tb-panel { width: 130px; padding: 6px; gap: 4px; }
+  .tb-body .tb-panel { width: 316px; padding: 6px; gap: 6px; }
   .tb-tabs { gap: 4px; }
-  .tb-tabs .btn { min-height: 44px; font-size: 0.95rem; padding: 0.1rem 0.2rem; }
-  .btn.tb-go { min-height: 44px; font-size: 1.2rem; }
-  /* Five 44px tabs plus Go fill the column: while Paint is picked, Go steps aside for the paint block. */
-  .tb-panel[data-tab="paint"] .btn.tb-go { display: none; }
-  .sw { height: 32px; min-height: 32px; flex-basis: 22px; }
-  #swatches .sw { flex: 1 0 30px; height: 32px; min-height: 32px; }
-  .st { min-height: 34px; font-size: 0.9rem; flex-basis: 24px; }
-  .st canvas { height: 22px; }
-  .prow { margin-top: 4px; gap: 4px; }
-  .hint { display: none; }
+  .tb-tabs .btn { flex: 1 1 auto; min-height: 44px; font-size: 0.86rem; padding: 0.1rem 0.15rem; }
+  .btn.tb-go { min-height: 48px; font-size: 1.25rem; }
+  .btn.toot { min-height: 48px; min-width: 84px; font-size: 1.15rem; }
+  .picks { gap: 6px; }
+  .pick { min-height: 56px; font-size: 0.85rem; padding: 2px; }
+  .pick canvas { height: 30px; }
+  #engPicks .pick { min-height: 66px; }
+  #engPicks .pick canvas { height: 40px; }
+  .selpic { height: 46px; }
+  .selhead .btn { min-height: 46px; font-size: 0.95rem; padding: 0 0.5rem; }
+  .sw { height: 40px; min-height: 40px; }
+}
+@media (max-width: 480px) {
+  .pick { min-height: 62px; font-size: 0.8rem; }
+  .pick canvas { height: 36px; }
+  .selhead .btn { font-size: 0.95rem; padding: 0 0.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #count.pop { animation: none; }
+  #count.pop, .pick.hop, .btn.toot.pop { animation: none; }
 }
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
 .ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ghosthand > svg { position: relative; }
@@ -162,25 +174,34 @@ body.big .tb-panel { display: none; }
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" aria-label="The train"></canvas>
+      <canvas id="cv" aria-label="The train set"></canvas>
       <div class="tb-counter" id="count">Cars: 0</div>
-      <div class="tb-coach" id="coach">Drag an engine onto the track!</div>
+      <div class="tb-coach" id="coach">Tap an engine!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" hidden></svg>
     </main>
 
     <section class="tb-panel" id="panel" data-tab="engines">
-      <button class="btn tb-go" id="go" hidden>Go!</button>
+      <div class="gorow" id="gorow" hidden>
+        <button class="btn tb-go" id="go">Go!</button>
+        <button class="btn toot" id="toot">Toot!</button>
+      </div>
       <div class="tb-choices panel-body">
-        <div data-pane="paint">
-          <p class="hint" id="paintHint">Tap a train car to paint it.</p>
-          <div class="prow" id="swatches"></div>
-          <div class="prow" id="styles"></div>
+        <div data-pane="engines" class="picks" id="engPicks"></div>
+        <div data-pane="cars" class="picks" id="carPicks"></div>
+        <div data-pane="track" class="picks" id="trackPicks"></div>
+        <div data-pane="sel" id="selPane">
+          <div class="selhead">
+            <div class="selpic"><canvas id="selPic"></canvas></div>
+            <button class="btn takeoff" id="takeOff">Take off</button>
+            <button class="btn seldone" id="selDone">Done</button>
+          </div>
+          <div class="swatches" id="swatches"></div>
         </div>
       </div>
       <nav class="tb-tabs" role="tablist" aria-label="Controls">
         <button class="btn tab" role="tab" data-tab="engines">Engines</button>
         <button class="btn tab" role="tab" data-tab="cars">Cars</button>
-        <button class="btn tab" role="tab" data-tab="paint">Paint</button>
+        <button class="btn tab" role="tab" data-tab="track">Track</button>
         <button class="btn tb-new" id="newBtn">New</button>
         <button class="btn tb-surprise" id="surprise">Surprise</button>
       </nav>
@@ -198,12 +219,11 @@ body.big .tb-panel { display: none; }
   function $(id) { return document.getElementById(id); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function rand(a, b) { return a + Math.random() * (b - a); }
-  function lerp(a, b, k) { return a + (b - a) * k; }
-  // Repeatable pseudo-random number for scenery item n (0..1).
-  function hsh(n) { var x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-  var COLORS = ["#E63946", "#F77F00", "#FFC93C", "#A7D129", "#2E9E5B", "#1FA6A0",
-    "#5BC0EB", "#2D5BD7", "#7B4FC9", "#F26CA7", "#8B5A3C", "#26282E"];
+  // Paint colors for the tapped car (ten swatches). Older saves may hold a few more; they still load.
+  var COLORS = ["#E63946", "#F77F00", "#FFC93C", "#A7D129", "#2E9E5B", "#1FA6A0", "#5BC0EB", "#2D5BD7", "#7B4FC9", "#F26CA7"];
+  var OKCOLORS = COLORS.concat(["#8B5A3C", "#26282E", "#FFFFFF", "#9AA3AF"]);
   function rgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
   function shade(h, f) {
     var c = rgb(h);
@@ -213,7 +233,7 @@ body.big .tb-panel { display: none; }
   function isDark(h) { var c = rgb(h); return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 120; }
 
   // ---------- Piece catalog ----------
-  // len: side-view length in build units. eng: an engine. Every piece is about 185 units tall.
+  // len: side-view length in picture units (the run uses RSC of it). eng: an engine.
   var TYPES = {
     steam:    { name: "Steam", len: 250, eng: true, color: "#26282E" },
     diesel:   { name: "Diesel", len: 180, eng: true, color: "#FFC93C" },
@@ -229,28 +249,19 @@ body.big .tb-panel { display: none; }
     coal:     { name: "Coal", len: 130, color: "#F77F00" },
     caboose:  { name: "Caboose", len: 125, color: "#E63946" }
   };
-  // Where the driver's controls sit on each engine (units from the front end / above the rail):
-  // the throttle in the cab is a quadrant lever: it pivots at (x, y) near the cab floor, its arm is r long,
-  // it lies flat pointing forward at Stop and stands straight up at Fast. The whistle (or horn) has a pull
-  // handle at (hx, hy); the headlight is the lamp.
-  var CTRL = {
-    steam:    { lever: { x: 158, y: -56, r: 38 }, whistle: { x: 98, y: -128, hx: 96, hy: -90, cord: true }, lamp: { x: 10, y: -92, r: 9 }, stack: { x: 33, y: -142 } },
-    diesel:   { lever: { x: 54, y: -56, r: 30 }, whistle: { x: 36, y: -146, hx: 36, hy: -140 }, lamp: { x: 8, y: -60, r: 8 }, stack: { x: 70, y: -106, diesel: true } },
-    electric: { lever: { x: 70, y: -56, r: 34 }, whistle: { x: 30, y: -144, hx: 30, hy: -138 }, lamp: { x: 10, y: -56, r: 7 } },
-    fast:     { lever: { x: 92, y: -60, r: 28 }, whistle: { x: 112, y: -138, hx: 112, hy: -132 }, lamp: { x: 16, y: -74, r: 8 } }
-  };
   var ENGINES = ["steam", "diesel", "electric", "fast"];
   var CARS = ["boxcar", "tanker", "hopper", "logs", "pipes", "boxes", "passenger", "coal", "caboose"];
   var STYLES = ["plain", "stripe", "dots", "zigzag"];
   var MAXP = 12;
-  var GAP = 14; // coupler gap between pieces (build units)
-  var PH = 185; // piece height (units) used for framing and hit boxes
 
   // ---------- Saved state ----------
-  // speed is the lever (0 = Stop). ran: he has moved the train once (the coach line and ghost hand move on).
-  var state = { pieces: [], night: false, speed: 0, tab: "engines", sel: -1, ran: false };
+  // pieces: front to back. go: he pressed Go (the train runs its loop and stops at the station each time round).
+  var state = { pieces: [], layout: "oval", night: false, fast: false, tab: "engines", go: false };
   // Opened from the Toybox home screen: an empty track and first-visit choices (nothing here is a collection).
   var startFresh = !!(window.Toybox && Toybox.fresh());
+  function mkPiece(t, color, style, num) {
+    return { t: t, color: color || TYPES[t].color, style: style || "plain", num: num || 1, extra: 0, lead: 0, jig: 0 };
+  }
   (function load() {
     if (startFresh) return;
     try {
@@ -259,24 +270,23 @@ body.big .tb-panel { display: none; }
         if (Array.isArray(o.pieces)) {
           o.pieces.forEach(function (p) {
             if (p && TYPES[p.t] && state.pieces.length < MAXP) {
-              state.pieces.push({ t: p.t, color: COLORS.indexOf(p.color) >= 0 || p.color === "#FFFFFF" || p.color === "#9AA3AF" ? p.color : TYPES[p.t].color,
-                style: STYLES.indexOf(p.style) >= 0 ? p.style : "plain", num: (p.num | 0) >= 1 && (p.num | 0) <= 9 ? p.num | 0 : 1 });
+              state.pieces.push(mkPiece(p.t, OKCOLORS.indexOf(p.color) >= 0 ? p.color : TYPES[p.t].color,
+                STYLES.indexOf(p.style) >= 0 ? p.style : "plain", (p.num | 0) >= 1 && (p.num | 0) <= 9 ? p.num | 0 : 1));
             }
           });
         }
+        if (["oval", "eight", "switch"].indexOf(o.layout) >= 0) state.layout = o.layout;
         state.night = !!o.night;
-        if (typeof o.speed === "number") state.speed = clamp(o.speed, 0, 1);
-        var tab = o.tab === "track" ? "cars" : o.tab; // older saves had a Track tab (the map view, gone now)
-        if (["engines", "cars", "paint"].indexOf(tab) >= 0) state.tab = tab;
-        if (typeof o.sel === "number" && o.sel >= 0 && o.sel < state.pieces.length) state.sel = o.sel;
-        state.ran = !!o.ran;
+        state.fast = o.fast === true;
+        if (["engines", "cars", "track"].indexOf(o.tab) >= 0) state.tab = o.tab;
+        state.go = o.v === 3 && !!o.go;
       }
     } catch (e) { /* defaults */ }
   })();
   function save() {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ v: 2, pieces: state.pieces.map(function (p) { return { t: p.t, color: p.color, style: p.style, num: p.num }; }),
-        night: state.night, speed: state.speed, tab: state.tab, sel: state.sel, ran: state.ran }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 3, pieces: state.pieces.map(function (p) { return { t: p.t, color: p.color, style: p.style, num: p.num }; }),
+        layout: state.layout, night: state.night, fast: state.fast, tab: state.tab, go: state.go }));
     } catch (e) { /* ignore */ }
   }
   if (startFresh) save();
@@ -314,11 +324,6 @@ body.big .tb-panel { display: none; }
       o.start(t); lfo.start(t); o.stop(t + d + 0.05); lfo.stop(t + d + 0.05);
     });
   }
-  function sHorn() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime;
-    [311, 392].forEach(function (f) { tone(ctx, "triangle", f, f, t, 0.8, 0.05); });
-  }
   function sPoof() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 700, 200, ctx.currentTime, 0.25, 0.08); }
   function sClick() { var ctx = ac(); if (!ctx) return; tone(ctx, "square", 900, 600, ctx.currentTime, 0.05, 0.03); }
   function sDing() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 988, 980, ctx.currentTime, 0.35, 0.04); }
@@ -342,6 +347,7 @@ body.big .tb-panel { display: none; }
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
     src.connect(bp); bp.connect(g); g.connect(ctx.destination); src.start(t);
   }
+
 
   // ---------- Drawing helpers ----------
   function rr(c, x, y, w, h, r) {
@@ -382,7 +388,7 @@ body.big .tb-panel { display: none; }
     c.moveTo(x, y); c.lineTo(x + Math.cos(spin) * r * 0.8, y + Math.sin(spin) * r * 0.8); c.stroke();
     c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fillStyle = OUT; c.fill();
   }
-  // Car numbers are not drawn (no numbers on the trains). p.num stays in saves.
+  // Car numbers are no longer drawn (declutter: no numbers on the trains). p.num stays in saves.
   function decal() {}
   function win(c, x, y, w, h, lit) { rr(c, x, y, w, h, 5); trim(c, lit ? "#FFE680" : "#BEE9FF", 4); }
   function truck(c, x0, len, y, spin, r) {
@@ -416,8 +422,8 @@ body.big .tb-panel { display: none; }
       // cab
       rr(c, x0 + 112, gy - 140, 52, 96, 6); body(c, p, x0 + 112, gy - 140, 52, 96);
       rr(c, x0 + 104, gy - 150, 68, 14, 6); trim(c, "#26282E", 4);
-      win(c, x0 + 122, gy - 132, 32, 24, lit);
-      decal(c, x0 + 128, gy - 72, 16, p.num);
+      win(c, x0 + 122, gy - 128, 32, 26, lit);
+      decal(c, x0 + 138, gy - 72, 18, p.num);
       // headlight
       c.beginPath(); c.arc(x0 + 10, gy - 92, 9, 0, TAU); trim(c, lit ? "#FFF3A0" : "#FFE680", 3);
       // cowcatcher
@@ -433,7 +439,7 @@ body.big .tb-panel { display: none; }
       rr(c, x0 + 4, gy - 42, L - 8, 14, 4); trim(c, "#4A5578", 4);
       rr(c, x0 + 46, gy - 104, L - 56, 64, 8); body(c, p, x0 + 46, gy - 104, L - 56, 64);
       rr(c, x0 + 8, gy - 128, 50, 88, 10); body(c, p, x0 + 8, gy - 128, 50, 88);
-      win(c, x0 + 16, gy - 120, 34, 22, lit);
+      win(c, x0 + 16, gy - 118, 34, 26, lit);
       for (var g = 0; g < 4; g++) { c.fillStyle = OUT; c.fillRect(x0 + 120 + g * 12, gy - 96, 5, 24); }
       decal(c, x0 + 86, gy - 72, 18, p.num);
       c.beginPath(); c.arc(x0 + 8, gy - 60, 8, 0, TAU); trim(c, "#FFE680", 3);
@@ -446,7 +452,7 @@ body.big .tb-panel { display: none; }
       c.strokeStyle = OUT; c.lineWidth = 4; c.beginPath();
       c.moveTo(x0 + 70, gy - 124); c.lineTo(x0 + 100, gy - 150); c.lineTo(x0 + 80, gy - 170); c.moveTo(x0 + 60, gy - 172); c.lineTo(x0 + 110, gy - 172); c.stroke();
       rr(c, x0 + 6, gy - 126, L - 12, 86, 14); body(c, p, x0 + 6, gy - 126, L - 12, 86);
-      win(c, x0 + 14, gy - 116, 30, 26, lit); win(c, x0 + L - 44, gy - 114, 30, 28, lit);
+      win(c, x0 + 14, gy - 114, 30, 28, lit); win(c, x0 + L - 44, gy - 114, 30, 28, lit);
       decal(c, x0 + L / 2, gy - 82, 20, p.num);
       c.beginPath(); c.arc(x0 + 10, gy - 56, 7, 0, TAU); trim(c, "#FFE680", 3);
       truck(c, x0, L, gy, spin, 14);
@@ -458,7 +464,7 @@ body.big .tb-panel { display: none; }
       c.lineTo(x0 + L - 6, gy - 118); c.quadraticCurveTo(x0 + L, gy - 118, x0 + L, gy - 110); c.lineTo(x0 + L, gy - 44); c.closePath();
       body(c, p, x0, gy - 118, L, 74);
       c.beginPath(); c.moveTo(x0 + 26, gy - 92); c.quadraticCurveTo(x0 + 44, gy - 110, x0 + 74, gy - 110); c.lineTo(x0 + 76, gy - 92); c.closePath(); trim(c, lit ? "#FFE680" : "#26282E", 4);
-      for (var w = 0; w < 4; w++) win(c, x0 + 104 + w * 28, gy - 104, 20, 22, lit);
+      for (var w = 0; w < 4; w++) win(c, x0 + 96 + w * 28, gy - 104, 20, 22, lit);
       rr(c, x0 + 4, gy - 62, L - 8, 8, 4); trim(c, "#E63946", 3);
       decal(c, x0 + 160, gy - 74, 15, p.num);
       truck(c, x0 + 6, L - 6, gy, spin, 13);
@@ -530,59 +536,8 @@ body.big .tb-panel { display: none; }
     }
     truck(c, x0, L, gy, spin, 13);
   }
-  // The driver's controls on the engine (drawn after the engine, in piece units).
-  // k: lever position 0..1; pull: whistle cord pulled (0..1); lit: night (headlight on).
-  // Knob position of the quadrant throttle for lever L at position k (0 = flat forward, 1 = straight up).
-  function knobAt(L, k) { var th = k * Math.PI / 2; return { x: L.x - Math.cos(th) * L.r, y: L.y - Math.sin(th) * L.r }; }
-  function drawCtrls(c, t, k, pull, lit) {
-    var C = CTRL[t], L = C.lever;
-    // whistle or horn, with its pull handle (drawn big: it is a thing to pull)
-    var w = C.whistle;
-    if (w.cord) {
-      // brass whistle on the boiler top, a cord down to a chunky wooden T-handle
-      rr(c, w.x - 7, w.y, 14, 24, 4); trim(c, "#FFC93C", 3);
-      c.beginPath(); c.moveTo(w.x - 11, w.y + 2); c.lineTo(w.x + 11, w.y + 2); c.lineWidth = 5; c.strokeStyle = OUT; c.stroke();
-      var hy = w.hy + pull * 12;
-      c.beginPath(); c.moveTo(w.x + 2, w.y + 20); c.lineTo(w.hx, hy - 6); c.lineWidth = 3.5; c.strokeStyle = OUT; c.stroke();
-      rr(c, w.hx - 15, hy - 7, 30, 14, 7); trim(c, "#A27B5C", 3);
-      c.fillStyle = "rgba(255,255,255,0.35)"; rr(c, w.hx - 10, hy - 4, 12, 4, 2); c.fill();
-    } else {
-      // a big air horn on the roof, facing forward, on a short base
-      rr(c, w.x - 4, w.y + 10, 12, 8, 3); trim(c, "#4A5578", 3);
-      c.beginPath(); c.moveTo(w.x + 12, w.y + 10); c.lineTo(w.x - 16, w.y - 4); c.lineTo(w.x - 16, w.y + 20); c.closePath(); trim(c, "#C9D3E6", 3);
-      c.beginPath(); c.moveTo(w.x - 16, w.y - 4); c.lineTo(w.x - 16, w.y + 20); c.lineWidth = 4; c.strokeStyle = "#4A5578"; c.stroke();
-    }
-    // headlight: a round lamp with a chunky rim; bright with rays at night
-    var lp = C.lamp;
-    c.beginPath(); c.arc(lp.x, lp.y, lp.r + 4, 0, TAU); trim(c, "#4A5578", 3);
-    c.beginPath(); c.arc(lp.x, lp.y, lp.r, 0, TAU); trim(c, lit ? "#FFF3A0" : "#FFE680", 2.5);
-    if (lit) {
-      c.strokeStyle = "#FFF3A0"; c.lineWidth = 3; c.beginPath();
-      for (var i = 0; i < 5; i++) { var an = Math.PI * 0.6 + i * Math.PI * 0.2; c.moveTo(lp.x + Math.cos(an) * (lp.r + 7), lp.y + Math.sin(an) * (lp.r + 7)); c.lineTo(lp.x + Math.cos(an) * (lp.r + 14), lp.y + Math.sin(an) * (lp.r + 14)); }
-      c.stroke();
-    } else {
-      c.fillStyle = "rgba(255,255,255,0.7)"; c.beginPath(); c.arc(lp.x - lp.r * 0.3, lp.y - lp.r * 0.3, lp.r * 0.3, 0, TAU); c.fill();
-    }
-    // quadrant throttle on the cab wall: a light steel quarter plate, a dark steel arc with notches,
-    // the swept part tinted green, a lever bar pivoting at the bottom and a round red knob.
-    var px = L.x, py = L.y, R = L.r, A0 = Math.PI, A1 = Math.PI * 1.5, Ak = A0 + k * Math.PI / 2;
-    c.beginPath(); c.moveTo(px, py); c.arc(px, py, R + 8, A0, A1); c.closePath(); trim(c, "#C9D3E6", 3);
-    if (k > 0) { c.beginPath(); c.moveTo(px, py); c.arc(px, py, R + 5, A0, Ak); c.closePath(); c.fillStyle = "rgba(46,160,90,0.55)"; c.fill(); }
-    c.beginPath(); c.arc(px, py, R - 1, A0, A1); c.lineWidth = 12; c.strokeStyle = OUT; c.lineCap = "butt"; c.stroke();
-    c.beginPath(); c.arc(px, py, R - 1, A0, A1); c.lineWidth = 7; c.strokeStyle = "#4A5578"; c.stroke();
-    c.lineCap = "round";
-    c.strokeStyle = "#EEF3FF"; c.lineWidth = 2.5; c.beginPath();
-    for (var m = 0; m <= 4; m++) { var ma = A0 + m * Math.PI / 8; c.moveTo(px + Math.cos(ma) * (R - 5), py + Math.sin(ma) * (R - 5)); c.lineTo(px + Math.cos(ma) * (R + 3), py + Math.sin(ma) * (R + 3)); }
-    c.stroke();
-    var kn = knobAt(L, k);
-    c.beginPath(); c.moveTo(px, py); c.lineTo(kn.x, kn.y); c.lineWidth = 11; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.moveTo(px, py); c.lineTo(kn.x, kn.y); c.lineWidth = 6; c.strokeStyle = "#8C97B5"; c.stroke();
-    c.beginPath(); c.arc(px, py, 6, 0, TAU); trim(c, "#4A5578", 3);
-    c.beginPath(); c.arc(kn.x, kn.y, 11, 0, TAU); trim(c, "#E63946", 3);
-    c.fillStyle = "rgba(255,255,255,0.55)"; c.beginPath(); c.arc(kn.x - 3, kn.y - 3, 4, 0, TAU); c.fill();
-  }
 
-  // ---------- Thumbnails for the style buttons ----------
+  // ---------- Thumbnails for the picture buttons ----------
   function thumb(cv, fn) {
     var r = Math.min(2, window.devicePixelRatio || 1);
     var w = cv.clientWidth || 120, h = cv.clientHeight || 60;
@@ -591,516 +546,9 @@ body.big .tb-panel { display: none; }
     c.setTransform(r, 0, 0, r, 0, 0); c.clearRect(0, 0, w, h);
     fn(c, w, h);
   }
-  // A square picture of one piece (its catalog color) as an <img>, for the ghost hand to carry.
-  function pieceHTML(t, size) {
-    var r = Math.min(2, window.devicePixelRatio || 1), off = document.createElement("canvas");
-    off.width = off.height = Math.round(size * r);
-    var c = off.getContext("2d"), L = TYPES[t].len, sc = (size - 12) / Math.max(L, 170);
-    c.setTransform(r * sc, 0, 0, r * sc, r * (size - L * sc) / 2, r * size * 0.82);
-    drawSide(c, { t: t, color: TYPES[t].color, style: "plain", num: 1 }, 0, 0, 0, false);
-    return '<img src="' + off.toDataURL() + '" alt="" style="display:block;width:100%;height:100%">';
-  }
 
-  // ---------- The train ----------
-  var cv = $("cv"), cx = cv.getContext("2d"), DPR = 1, W = 300, H = 200;
-  var stage = $("stage");
-  // Pieces in order: {p, x (front, units from the train's origin), vx, roll, pend, jig, id, drag, spin}
-  var anim = [];
-  var nextId = 1;
-  state.pieces.forEach(function (p) { anim.push({ p: p, x: 0, vx: 0, roll: false, pend: false, jig: 0, id: nextId++, drag: null, spin: 0 }); });
-  function layoutX() { // target x of each piece (front end), units
-    var x = 0, out = [];
-    anim.forEach(function (a) { out.push(x); x += TYPES[a.p.t].len + GAP; });
-    return out;
-  }
-  function trainLen() { var t = 0; anim.forEach(function (a) { t += TYPES[a.p.t].len + GAP; }); return Math.max(0, t - GAP); }
-  (function () { var xs = layoutX(); anim.forEach(function (a, i) { a.x = xs[i]; }); })();
-  function engIdx() { for (var i = 0; i < anim.length; i++) if (TYPES[anim[i].p.t].eng) return i; return -1; }
-  function carCount() { var n = 0; state.pieces.forEach(function (p) { if (!TYPES[p.t].eng) n++; }); return n; }
-
-  // Motion: the train's origin in world units (it travels toward -x, i.e. to the left), its speed, wheel spin.
-  var VMAX = 380;  // units per second at Fast: calm, about a third slower than "natural"
-  var ACC = 95, DEC = 150;
-  var train = { x: 0, v: 0, spin: 0, dist: 0, toot: 0, pull: 0, smokeT: 0, chuff: 0, chuffT: 0, lastBell: 0 };
-  var TOOT_T = 2;
-  var moving = false;
-  var ending = { on: false, dim: 0, done: null, t: 0 };
-
-  // ---------- View: metrics, camera ----------
-  // The yard strip (the siding where the waiting pieces sit) is along the bottom; the main track above it.
-  var view = { ys: 0.6, stripH: 120, gy: 300, gyT: 300, sMin: 0.8, sMax: 1.3, first: true };
-  var cam = { rel: 0, relT: 0, s: 1, sT: 1, mode: "rear" };
-  var yard = { v: 1, scroll: 0, scrollV: 0, hop: 0, items: null, xs: null, total: 0 };
-  var fx = []; // effects: {k, x, y, t, ...} in screen px
-  var carry = null; // a piece lifted out of the yard: {t, x, y, ox, oy, grow}
-  function metrics() {
-    view.ys = clamp(Math.min(W / 820, (H * 0.3) / 190), 0.4, 0.9);
-    view.stripH = Math.round(PH * view.ys + 30);
-    var pad = Math.round(14 + 16 * view.ys);
-    // Upright phones frame the engine tightly (about one piece per screen) with the track low in the frame;
-    // tablets fit more of the train. While the yard strip is up, the track stays above it.
-    var phone = W < 520 && H > W;
-    var low = Math.round(H * (phone ? 0.8 : 0.68));
-    view.gyT = Math.min(H - view.stripH * yard.v - pad, low);
-    if (view.first) { view.gy = view.gyT; view.first = false; }
-    view.sMin = clamp(low * (phone ? 0.55 : 0.46) / PH, 0.55, phone ? 1.45 : 1.3);
-    view.sMax = phone ? 1.5 : 1.35;
-  }
-  function fitScale() {
-    var L = Math.max(trainLen(), 420), cap = Math.max(0.5, (view.gyT - 8) / PH); // room above the track
-    return clamp((W - 36) / L, Math.min(view.sMin, cap), Math.min(view.sMax, cap));
-  }
-  // Camera: screen x of a train point = (x - cam.rel) * s. rel is clamped between "engine front near the
-  // left edge" and "rear coupler at about 2/3 of the width"; a short train is centered.
-  function relBounds(s) {
-    var L = trainLen();
-    if (L * s <= W - 36) { var cen = -(W - L * s) / (2 * s); return { lo: cen, hi: cen, fits: true }; }
-    return { lo: -(0.1 * W + 12) / s, hi: L - 0.64 * W / s, fits: false };
-  }
-  function pieceSX(a) { return (a.x - cam.rel) * cam.s; }
-  function focus(mode) { cam.mode = mode; cam.sT = fitScale(); var b = relBounds(cam.sT); cam.relT = mode === "front" ? b.lo : b.hi; }
-  function stripY() { return H - view.stripH * yard.v; }
-  function yardRail() { return stripY() + view.stripH - 12; }
-
-  function counterText() { return "Cars: " + carCount(); }
-  function bumpCount() {
-    var el = $("count"); el.textContent = counterText();
-    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
-  }
-
-  // ---------- Adding, removing, coupling ----------
-  // fromX: where the piece starts (units from the train's origin); it rolls or eases to the coupler.
-  function addPiece(t, fromX, quiet) {
-    if (Toybox.timer.locked()) return false;
-    if (state.pieces.length >= MAXP) { Toybox.toast("The train is full!"); return false; }
-    var p = { t: t, color: TYPES[t].color, style: "plain", num: 1 };
-    var a = { p: p, x: 0, vx: 0, roll: false, pend: true, jig: 0, id: nextId++, drag: null, spin: 0 };
-    var front = TYPES[t].eng && engIdx() < 0 && anim.length > 0; // no engine yet: the engine goes to the front
-    if (front) {
-      anim.unshift(a); state.pieces.unshift(p); state.sel = 0;
-      a.x = -(TYPES[t].len + GAP) - 260 / cam.s; // eases in from the left
-    } else {
-      anim.push(a); state.pieces.push(p); state.sel = anim.length - 1;
-      var tx = layoutX()[anim.length - 1];
-      if (fromX === undefined) fromX = cam.rel + (W + 40) / cam.s; // from just off the right edge
-      a.x = fromX;
-      if (a.x > tx + 6) { a.roll = true; a.vx = -40; }
-    }
-    if (!quiet) focus("rear");
-    save(); bumpCount(); refreshPaint(); updateCoach();
-    return true;
-  }
-  function removeAt(i, sx, sy) {
-    var a = anim[i];
-    anim.splice(i, 1); state.pieces.splice(i, 1);
-    if (state.sel === i) state.sel = -1; else if (state.sel > i) state.sel--;
-    for (var k = 0; k < 18; k++) {
-      var ang = rand(0, TAU), sp = rand(120, 420);
-      fx.push({ k: "bit", x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 120, t: 0, life: rand(0.5, 0.9), r: rand(6, 14), c: k % 3 ? a.p.color : "#FFFFFF" });
-    }
-    // the piece shrinks back down into the yard
-    fx.push({ k: "fly", p: a.p, x: sx, y: sy, tx: W / 2, ty: yardRail() - 60 * view.ys, s0: cam.s, s1: view.ys, t: 0, life: 0.7 });
-    sPoof();
-    yard.hop = 1;
-    // Pieces behind roll forward and couple again.
-    var xs = layoutX();
-    anim.forEach(function (b, j) { if (j >= i && b.x - xs[j] > 2) { b.roll = true; b.pend = true; } });
-    save(); bumpCount(); refreshPaint(); updateCoach();
-  }
-  var backT = 0;
-  function clunk(sx, sy, idx) {
-    sClunk();
-    fx.push({ k: "clunk", x: sx, y: sy, t: 0, life: 0.7 });
-    for (var k = 0; k < 8; k++) {
-      var ang = rand(-Math.PI, 0), sp = rand(120, 300);
-      fx.push({ k: "bit", x: sx, y: sy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, t: 0, life: 0.5, r: rand(4, 8), c: "#FFC93C" });
-    }
-    anim.forEach(function (b, j) { b.jig = Math.max(b.jig, 1 - Math.abs(j - idx) * 0.12); });
-    // A moment after the coupling the view slides back to the engine, where the lever is.
-    clearTimeout(backT);
-    backT = setTimeout(function () { if (!carry && !moving) focus("front"); }, 1400);
-  }
-  function clearTrain() {
-    anim.forEach(function (a, i) {
-      var px = pieceSX(a) + TYPES[a.p.t].len * cam.s / 2;
-      for (var k = 0; k < 10; k++) { var ang = rand(0, TAU), sp = rand(100, 360); fx.push({ k: "bit", x: px, y: view.gy - 80 * cam.s, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 100, t: 0, life: rand(0.5, 0.9), r: rand(6, 14), c: a.p.color }); }
-      fx.push({ k: "fly", p: a.p, x: px - TYPES[a.p.t].len * cam.s / 2, y: view.gy, tx: W / 2 + (i - anim.length / 2) * 30, ty: yardRail() - 60 * view.ys, s0: cam.s, s1: view.ys, t: 0, life: 0.7 });
-    });
-    anim.length = 0; state.pieces.length = 0; state.sel = -1; state.speed = 0; train.v = 0;
-    sPoof(); save(); bumpCount(); refreshPaint(); updateCoach(); updateGo();
-  }
-
-  // ---------- The yard (the siding with the pieces he can add) ----------
-  function yardItems() { return state.tab === "engines" ? ENGINES : CARS; }
-  function yardLayout() {
-    var items = yardItems(), xs = [], x = 18, ys = view.ys, gap = 16 * ys + 12;
-    items.forEach(function (t) { xs.push(x); x += TYPES[t].len * ys + gap; });
-    yard.items = items; yard.xs = xs; yard.total = x + 6;
-    yard.scroll = clamp(yard.scroll, 0, Math.max(0, yard.total - W));
-    return yard;
-  }
-  function yardHit(px) {
-    var y = yardLayout(), ys = view.ys;
-    for (var i = 0; i < y.items.length; i++) {
-      var x0 = y.xs[i] - y.scroll, x1 = x0 + TYPES[y.items[i]].len * ys;
-      if (px >= x0 - 8 && px <= x1 + 8) return i;
-    }
-    return -1;
-  }
-
-  // ---------- Step ----------
-  function step(dt) {
-    metrics();
-    view.gy += (view.gyT - view.gy) * Math.min(1, dt * 6);
-    var gy = view.gy;
-    var hasEng = engIdx() >= 0;
-    // ending: the lever eases down by itself and the lights dim
-    if (ending.on) {
-      state.speed = Math.max(0, state.speed - dt * 0.3);
-      ending.dim = Math.min(0.55, ending.dim + dt * 0.12);
-      ending.t += dt;
-      if (ending.done && train.v <= 0 && ending.t > 1.5) { var dn = ending.done; ending.done = null; setTimeout(dn, 400); }
-    }
-    // speed
-    var vT = (hasEng ? state.speed : 0) * VMAX;
-    if (train.v < vT) train.v = Math.min(vT, train.v + ACC * dt); else train.v = Math.max(vT, train.v - DEC * dt);
-    if (train.v < 0.5 && vT === 0) train.v = 0;
-    var wasMoving = moving;
-    moving = train.v > 0;
-    train.x -= train.v * dt;
-    train.spin -= train.v * dt / 22;
-    train.dist += train.v * dt;
-    if (moving && !wasMoving) { state.ran = true; focus("front"); updateCoach(); }
-    if (!moving && wasMoving && state.speed === 0) { updateCoach(); }
-    // chuff once per half turn of the driving wheels (steam only)
-    train.chuffT -= dt;
-    if (moving && hasEng && anim[engIdx()].p.t === "steam") {
-      train.chuff += train.v * dt / 22;
-      if (train.chuff >= Math.PI && train.chuffT <= 0) { train.chuff -= Math.PI; train.chuffT = 0.1; sChuff(0.02 + 0.05 * train.v / VMAX); }
-    }
-    // the station bell as the engine passes the station
-    var SP = 5200, stationAt = 1600 + 210;
-    if (moving && Math.floor((train.x + train.v * dt - stationAt) / SP) !== Math.floor((train.x - stationAt) / SP)) sDing();
-    // yard: visible only while the train is stopped with the lever at Stop
-    var yT = (!moving && state.speed === 0 && !ending.on) ? 1 : 0;
-    yard.v += (yT - yard.v) * Math.min(1, dt * 3);
-    if (Math.abs(yard.v - yT) < 0.01) yard.v = yT;
-    yard.hop = Math.max(0, yard.hop - dt * 2.5);
-    if (yard.scrollV) { yard.scroll += yard.scrollV * dt; yard.scrollV *= Math.pow(0.02, dt); if (Math.abs(yard.scrollV) < 4) yard.scrollV = 0; yardLayout(); }
-    // camera
-    cam.sT = fitScale();
-    var b = relBounds(cam.sT);
-    cam.relT = clamp(cam.relT, b.lo, b.hi);
-    cam.s += (cam.sT - cam.s) * Math.min(1, dt * 4);
-    cam.rel += (cam.relT - cam.rel) * Math.min(1, dt * 4);
-    // pieces roll to their couplers
-    var xs = layoutX();
-    anim.forEach(function (a, i) {
-      if (a.drag) return;
-      var tx = xs[i];
-      if (a.roll) {
-        a.vx = Math.max(a.vx - 760 * dt, -520);
-        a.x += a.vx * dt;
-        a.spin += a.vx * dt / 15;
-        if (a.x <= tx) {
-          a.x = tx; a.vx = 0; a.roll = false; a.pend = false;
-          clunk(pieceSX(a) - GAP * cam.s / 2, gy - 25 * cam.s, i);
-        }
-      } else {
-        var d = tx - a.x;
-        if (Math.abs(d) > 0.5) { a.x += d * Math.min(1, dt * 7); a.spin += d * dt * 0.5; }
-        else {
-          a.x = tx;
-          if (a.pend) { a.pend = false; clunk(i === 0 ? pieceSX(a) + (TYPES[a.p.t].len + GAP / 2) * cam.s : pieceSX(a) - GAP * cam.s / 2, gy - 25 * cam.s, i); }
-        }
-        if (d < -3) a.roll = true;
-      }
-      a.jig = Math.max(0, a.jig - dt * 2.2);
-    });
-    // smoke
-    train.smokeT -= dt;
-    var ei = engIdx();
-    if (ei >= 0 && CTRL[anim[ei].p.t].stack) {
-      var st = CTRL[anim[ei].p.t].stack, k = train.v / VMAX;
-      if (train.smokeT <= 0) {
-        train.smokeT = moving ? (st.diesel ? 0.5 : 0.75) - 0.5 * k : 2.4;
-        var a0 = anim[ei], sx = pieceSX(a0) + st.x * cam.s, sy = gy + st.y * cam.s;
-        puff(sx, sy, (moving ? 0.7 + k * 0.9 : 0.5) * cam.s, st.diesel);
-      }
-    }
-    for (var i = smoke.length - 1; i >= 0; i--) {
-      var f = smoke[i]; f.t += dt;
-      if (f.t > f.life) { smoke.splice(i, 1); continue; }
-      f.x += (f.vx + train.v * cam.s * 0.85) * dt; f.y += f.vy * dt; f.vy *= Math.pow(0.5, dt); f.r += f.gr * dt;
-    }
-    train.toot = Math.max(0, train.toot - dt);
-    train.pull += ((pulling() ? 1 : 0) - train.pull) * Math.min(1, dt * 12);
-    if (carry) carry.grow = Math.min(1, carry.grow + dt * 5);
-    updateGo();
-  }
-  var smoke = [];
-  function puff(x, y, size, dark) {
-    smoke.push({ x: x, y: y, r: 9 * size, gr: 16 * size, vx: rand(-6, 10), vy: -rand(40, 70) * (0.6 + size * 0.4), t: 0, life: reduce ? 0.9 : rand(1.6, 2.3), dark: !!dark });
-  }
-  function pulling() { for (var id in drags) if (drags[id].kind === "whistle") return true; return false; }
-
-  // ---------- Drawing the scene ----------
-  var clouds = [[0.12, 0.18, 1.1], [0.5, 0.1, 1.4], [0.82, 0.24, 0.9]];
-  function cloud(c, x, y, s) {
-    c.beginPath(); c.arc(x, y, 22 * s, 0, TAU); c.arc(x + 26 * s, y - 10 * s, 28 * s, 0, TAU); c.arc(x + 54 * s, y, 22 * s, 0, TAU); c.fill();
-  }
-  function nc(col, night) { return night ? shade(col, -0.45) : col; }
-  function hills(c, camX, f, base, amp, col, s, gy) {
-    c.fillStyle = col; c.beginPath(); c.moveTo(-10, gy + 6);
-    for (var px = -10; px <= W + 30; px += 22) {
-      var wx = camX * f + px / s;
-      var y = gy - (base + amp * (0.6 * Math.sin(wx * 0.0023) + 0.3 * Math.sin(wx * 0.0061 + 1.7) + 0.1 * Math.sin(wx * 0.017))) * s;
-      c.lineTo(px, y);
-    }
-    c.lineTo(W + 30, gy + 6); c.closePath(); c.fill();
-  }
-  function tree(c, X, Y, hgt, s, seed, night) {
-    var col = nc(["#2E9E5B", "#3DB36A", "#4FBF6E", "#2A8F50"][seed % 4], night), r = hgt * 0.32 * s;
-    c.fillStyle = nc("#8B5A3C", night); c.fillRect(X - 7 * s, Y - hgt * 0.5 * s, 14 * s, hgt * 0.5 * s);
-    c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(X - 7 * s, Y - hgt * 0.5 * s, 14 * s, hgt * 0.5 * s);
-    c.beginPath(); c.arc(X, Y - hgt * 0.7 * s, r, 0, TAU); c.arc(X - r * 0.85, Y - hgt * 0.5 * s, r * 0.8, 0, TAU); c.arc(X + r * 0.85, Y - hgt * 0.5 * s, r * 0.8, 0, TAU);
-    trim(c, col, 3);
-  }
-  // Items along the track (parallax factor 1, repeating every SP units).
-  function trackside(c, camX, s, gy, night, t) {
-    var SP = 5200, lo = Math.floor(camX / SP) - 1, hi = Math.floor((camX + W / s) / SP) + 1;
-    for (var k = lo; k <= hi; k++) {
-      var base = k * SP;
-      // telegraph poles with sagging wires
-      var poles = [];
-      for (var q = 0; q < 13; q++) poles.push(base + 60 + q * 400);
-      c.strokeStyle = OUT; c.lineWidth = 2;
-      for (var pi = 0; pi < poles.length; pi++) {
-        var X = (poles[pi] - camX) * s, top = gy - 170 * s;
-        if (X < -60 || X > W + 460 * s) continue;
-        c.fillStyle = nc("#8B5A3C", night); c.fillRect(X - 4 * s, top, 8 * s, 164 * s); c.strokeRect(X - 4 * s, top, 8 * s, 164 * s);
-        c.fillRect(X - 22 * s, top + 14 * s, 44 * s, 6 * s); c.strokeRect(X - 22 * s, top + 14 * s, 44 * s, 6 * s);
-        if (pi < poles.length - 1) {
-          var X2 = X + 400 * s;
-          c.beginPath(); c.moveTo(X - 18 * s, top + 16 * s); c.quadraticCurveTo((X + X2) / 2, top + 50 * s, X2 - 18 * s, top + 16 * s); c.stroke();
-          c.beginPath(); c.moveTo(X + 18 * s, top + 16 * s); c.quadraticCurveTo((X + X2) / 2, top + 50 * s, X2 + 18 * s, top + 16 * s); c.stroke();
-        }
-      }
-      // the station: platform behind the rails, building with a sign, lamp post
-      var SX0 = (base + 1600 - camX) * s;
-      if (SX0 > -460 * s && SX0 < W + 40) {
-        var bw = 240 * s, bh = 130 * s, bx = SX0 + 90 * s, by = gy - 20 * s - bh;
-        rr(c, bx - 14 * s, by - 6 * s, bw + 28 * s, 22 * s, 6 * s); trim(c, nc("#4A5578", night), 3);
-        rr(c, bx, by, bw, bh, 6 * s); trim(c, nc("#E63946", night), 3);
-        rr(c, bx + bw / 2 - 20 * s, by + 50 * s, 40 * s, bh - 50 * s, 4 * s); trim(c, nc("#8B5A3C", night), 3);
-        win(c, bx + 24 * s, by + 40 * s, 40 * s, 40 * s, night); win(c, bx + bw - 64 * s, by + 40 * s, 40 * s, 40 * s, night);
-        rr(c, bx + bw / 2 - 58 * s, by + 10 * s, 116 * s, 30 * s, 8 * s); trim(c, "#FFFFFF", 3);
-        c.fillStyle = OUT; c.font = "800 " + Math.round(20 * s) + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
-        c.fillText("Station", bx + bw / 2, by + 26 * s);
-        // platform slab, bench, lamp
-        rr(c, SX0, gy - 22 * s, 420 * s, 22 * s, 5 * s); trim(c, nc("#D9C9A8", night), 3);
-        rr(c, SX0 + 20 * s, gy - 50 * s, 50 * s, 12 * s, 3 * s); trim(c, nc("#8B5A3C", night), 3);
-        c.fillStyle = nc("#8B5A3C", night); c.fillRect(SX0 + 24 * s, gy - 38 * s, 6 * s, 16 * s); c.fillRect(SX0 + 60 * s, gy - 38 * s, 6 * s, 16 * s);
-        var lx = SX0 + 380 * s;
-        c.fillStyle = "#4A5578"; c.fillRect(lx - 3 * s, gy - 120 * s, 6 * s, 98 * s); c.strokeRect(lx - 3 * s, gy - 120 * s, 6 * s, 98 * s);
-        c.beginPath(); c.arc(lx, gy - 126 * s, 10 * s, 0, TAU); trim(c, night ? "#FFF3A0" : "#C9D3E6", 3);
-      }
-      // a signal: green while the train moves, red when it stands still
-      var sgx = (base + 3300 - camX) * s;
-      if (sgx > -40 && sgx < W + 40) {
-        c.fillStyle = "#4A5578"; c.fillRect(sgx - 4 * s, gy - 150 * s, 8 * s, 144 * s); c.strokeRect(sgx - 4 * s, gy - 150 * s, 8 * s, 144 * s);
-        rr(c, sgx - 14 * s, gy - 190 * s, 28 * s, 56 * s, 8 * s); trim(c, "#26282E", 3);
-        c.beginPath(); c.arc(sgx, gy - 176 * s, 8 * s, 0, TAU); trim(c, moving ? "#5A2A2A" : "#FF4A4A", 2);
-        c.beginPath(); c.arc(sgx, gy - 148 * s, 8 * s, 0, TAU); trim(c, moving ? "#4CD964" : "#1E4A3A", 2);
-      }
-      // a fence
-      var fx0 = (base + 3800 - camX) * s;
-      if (fx0 > -900 * s && fx0 < W + 40) {
-        c.fillStyle = nc("#E8C08F", night); c.strokeStyle = OUT; c.lineWidth = 2;
-        for (var pk = 0; pk < 26; pk++) { var fxp = fx0 + pk * 32 * s; if (fxp < -20 || fxp > W + 20) continue; rr(c, fxp, gy - 54 * s, 12 * s, 50 * s, 3 * s); c.fill(); c.stroke(); }
-        c.fillRect(fx0, gy - 44 * s, 26 * 32 * s - 20 * s, 6 * s); c.fillRect(fx0, gy - 24 * s, 26 * 32 * s - 20 * s, 6 * s);
-      }
-      // a water tower (just scenery for now)
-      var wx = (base + 4700 - camX) * s;
-      if (wx > -120 * s && wx < W + 120 * s) {
-        c.fillStyle = nc("#8B5A3C", night); c.strokeStyle = OUT; c.lineWidth = 3;
-        c.fillRect(wx - 30 * s, gy - 130 * s, 8 * s, 124 * s); c.strokeRect(wx - 30 * s, gy - 130 * s, 8 * s, 124 * s);
-        c.fillRect(wx + 22 * s, gy - 130 * s, 8 * s, 124 * s); c.strokeRect(wx + 22 * s, gy - 130 * s, 8 * s, 124 * s);
-        rr(c, wx - 46 * s, gy - 210 * s, 92 * s, 84 * s, 10 * s); trim(c, nc("#A27B5C", night), 3);
-        c.beginPath(); c.moveTo(wx - 54 * s, gy - 210 * s); c.lineTo(wx, gy - 246 * s); c.lineTo(wx + 54 * s, gy - 210 * s); c.closePath(); trim(c, nc("#4A5578", night), 3);
-      }
-    }
-  }
-  function drawScene(t) {
-    var c = cx, s = cam.s, gy = view.gy, night = state.night, camX = train.x + cam.rel;
-    // sky
-    var g = c.createLinearGradient(0, 0, 0, gy);
-    g.addColorStop(0, night ? "#14204A" : "#6FC3F2"); g.addColorStop(1, night ? "#2B3B78" : "#CDEBFF");
-    c.fillStyle = g; c.fillRect(0, 0, W, gy + 2);
-    if (night) {
-      c.fillStyle = "#FFF6C8";
-      for (var si = 0; si < 40; si++) { var sxx = ((si * 137.5) - camX * 0.02 * s) % (W + 20); if (sxx < 0) sxx += W + 20; c.beginPath(); c.arc(sxx - 10, ((si * 71) % Math.max(40, gy * 0.6)) + 8, 1.4 + (si % 3) * 0.8, 0, TAU); c.fill(); }
-      c.beginPath(); c.arc(W * 0.8, gy * 0.2, 26 * s, 0, TAU); c.fillStyle = "#FFF3A0"; c.fill();
-      c.beginPath(); c.arc(W * 0.8 + 12 * s, gy * 0.2 - 8 * s, 24 * s, 0, TAU); c.fillStyle = "#1A2756"; c.fill();
-    } else {
-      c.beginPath(); c.arc(W * 0.82, gy * 0.18, 28 * s, 0, TAU); trim(c, "#FFE14D", 3);
-    }
-    // clouds (slowest layer)
-    c.fillStyle = night ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.92)";
-    var CP = 1400 * s;
-    clouds.forEach(function (q, i) {
-      var cxp = ((q[0] * CP - camX * 0.06 * s + t * 6 * (i + 1)) % (CP + 160));
-      if (cxp < 0) cxp += CP + 160;
-      for (var rep = cxp - CP - 160; rep < W + 160; rep += CP + 160) cloud(c, rep - 80, q[1] * gy + 20, q[2] * Math.min(1.4, W / 700));
-    });
-    // far and middle hills, then the tree line (each scrolls slower than the track)
-    // Hills reach higher on tall stages so the sky does not take over the frame.
-    var tall = clamp((gy / s - 320) / 300, 0, 1);
-    hills(c, camX, 0.12, 220 + 160 * tall, 110 + 60 * tall, night ? "#1B2E55" : "#BFE3D0", s, gy);
-    hills(c, camX, 0.2, 150 + 90 * tall, 90 + 30 * tall, night ? "#20395E" : "#A9D9A0", s, gy);
-    hills(c, camX, 0.4, 70 + 30 * tall, 55, night ? "#1E4A3A" : "#8FD06A", s, gy);
-    var TP = 260, f = 0.6, lo = Math.floor(camX * f / TP) - 1, hi = Math.floor((camX * f + W / s) / TP) + 1;
-    for (var k = lo; k <= hi; k++) {
-      var h0 = hsh(k);
-      if (h0 < 0.3) continue;
-      var X = (k * TP + h0 * 120 - camX * f) * s;
-      tree(c, X, gy - 26 * s, 100 + hsh(k + 7) * 60, s, Math.floor(h0 * 40), night);
-    }
-    // ground behind the rails, then the trackside things
-    c.fillStyle = night ? "#2C5A3E" : "#7CC95A"; c.fillRect(0, gy - 30 * s, W, 30 * s + 4);
-    trackside(c, camX, s, gy, night, t);
-    // ballast, ties, rails
-    c.fillStyle = night ? "#6E6256" : "#B7A58C"; c.fillRect(0, gy - 4, W, 16 * s + 6);
-    var tw = 34 * s, off = ((camX * s) % tw + tw) % tw;
-    c.fillStyle = "#8B5A3C";
-    for (var tx = -off - tw; tx < W; tx += tw) c.fillRect(tx, gy + 2, tw * 0.55, 10 * s + 4);
-    c.fillStyle = "#4A5578"; c.fillRect(0, gy - 3, W, 7);
-    c.fillStyle = OUT; c.fillRect(0, gy + 4, W, 2);
-    // foreground grass down to the yard: flowers, and bushes when there is room (they pass by fastest)
-    c.fillStyle = night ? "#24502F" : "#6BBF4E"; c.fillRect(0, gy + 16 * s + 2, W, H);
-    var fgTop = gy + 16 * s + 2, fgH = H - fgTop;
-    if (fgH > 26) {
-      var FP = 90, ff = 1.25, flo = Math.floor(camX * ff / FP) - 1, fhi = Math.floor((camX * ff + W / s) / FP) + 1;
-      for (var fk = flo; fk <= fhi; fk++) {
-        var fh = hsh(fk * 3 + 1);
-        var FX = (fk * FP + fh * 60 - camX * ff) * s, FY = gy + 22 * s + hsh(fk) * Math.max(0, fgH - 26 * s);
-        c.strokeStyle = night ? "#1E4A3A" : "#2E9E5B"; c.lineWidth = 3; c.beginPath(); c.moveTo(FX, FY + 14 * s); c.lineTo(FX, FY); c.stroke();
-        c.beginPath(); c.arc(FX, FY, 6 * s, 0, TAU); c.fillStyle = nc(["#FFC93C", "#F26CA7", "#FFFFFF", "#F77F00"][fk & 3], night); c.fill();
-      }
-    }
-    if (fgH > 44 * s) {
-      var BP = 300, bf = 1.4, blo = Math.floor(camX * bf / BP) - 1, bhi = Math.floor((camX * bf + W / s) / BP) + 1;
-      for (var bk = blo; bk <= bhi; bk++) {
-        var bh = hsh(bk * 5 + 2);
-        if (bh < 0.12) continue;
-        var BX = (bk * BP + bh * 180 - camX * bf) * s, BY = fgTop + 24 * s + hsh(bk + 11) * Math.max(0, fgH - 48 * s), br = (18 + bh * 12) * s;
-        var bcol = nc(bh > 0.6 ? "#3DB36A" : "#2E9E5B", night), lob = [[BX, BY, br], [BX - br * 0.9, BY + br * 0.25, br * 0.75], [BX + br * 0.9, BY + br * 0.25, br * 0.75]];
-        // outline pass (thick stroke) then a fill pass on top, so the overlapping lobes read as one bush
-        c.fillStyle = OUT;
-        lob.forEach(function (l) { c.beginPath(); c.arc(l[0], l[1], l[2] + 3, 0, TAU); c.fill(); });
-        c.fillStyle = bcol;
-        lob.forEach(function (l) { c.beginPath(); c.arc(l[0], l[1], l[2], 0, TAU); c.fill(); });
-      }
-    }
-  }
-  function drawTrain(t) {
-    var c = cx, s = cam.s, gy = view.gy, night = state.night, ei = engIdx();
-    var order = anim.slice().sort(function (a, b) { return (a.drag ? 1 : 0) - (b.drag ? 1 : 0); });
-    order.forEach(function (a) {
-      var i = anim.indexOf(a), L = TYPES[a.p.t].len;
-      var x = pieceSX(a), y = gy;
-      if (!a.drag && (x + L * s < -40 || x > W + 40)) return;
-      var jy = a.jig > 0 ? -Math.abs(Math.sin(a.jig * 18)) * 10 * a.jig * s * 2 : 0;
-      c.save();
-      if (a.drag) { x += a.drag.dx; y += a.drag.dy; c.globalAlpha = a.drag.far ? 0.5 : 1; }
-      c.translate(x, y + jy); c.scale(s, s);
-      if (a.drag) c.rotate(clamp(a.drag.dx / 900, -0.2, 0.2));
-      drawSide(c, a.p, 0, 0, train.spin + a.spin, night);
-      if (i === ei) drawCtrls(c, a.p.t, state.speed, train.pull, night);
-      c.restore();
-      if (i === state.sel && state.tab === "paint" && !a.drag) {
-        var ax = x + L * s / 2, ay = y - 200 * s - 14 + Math.sin(t * 6) * 6;
-        c.beginPath(); c.moveTo(ax, ay + 22); c.lineTo(ax - 18, ay); c.lineTo(ax - 7, ay); c.lineTo(ax - 7, ay - 18); c.lineTo(ax + 7, ay - 18); c.lineTo(ax + 7, ay); c.lineTo(ax + 18, ay); c.closePath();
-        trim(c, "#FFC93C", 4);
-      }
-    });
-    // smoke
-    smoke.forEach(function (f) {
-      var k = f.t / f.life;
-      c.globalAlpha = (1 - k) * 0.9;
-      c.beginPath(); c.arc(f.x, f.y, f.r, 0, TAU);
-      c.fillStyle = f.dark ? "#B4BCCB" : "#FFFFFF"; c.fill(); c.lineWidth = 2; c.strokeStyle = "rgba(29,35,64,0.45)"; c.stroke();
-    });
-    c.globalAlpha = 1;
-    // steam jet from the whistle while the cord is pulled
-    if (ei >= 0 && train.pull > 0.05) {
-      var a0 = anim[ei], Cw = CTRL[a0.p.t].whistle, wx = pieceSX(a0) + Cw.x * s, wy = gy + Cw.y * s;
-      c.globalAlpha = 0.85 * train.pull;
-      for (var j = 0; j < 4; j++) { c.beginPath(); c.arc(wx + (j * 6 - 4) * s + Math.sin(t * 20 + j) * 3, wy - (10 + j * 14) * s, (6 + j * 4) * s, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill(); }
-      c.globalAlpha = 1;
-    }
-  }
-  function drawNight() {
-    var c = cx, s = cam.s, gy = view.gy, night = state.night, ei = engIdx();
-    var alpha = (night ? 0.4 : 0) + ending.dim;
-    if (alpha <= 0) return;
-    c.fillStyle = "rgba(10,16,50," + alpha.toFixed(3) + ")"; c.fillRect(0, 0, W, H);
-    if (!night || ei < 0) return;
-    c.save(); c.globalCompositeOperation = "lighter";
-    var a0 = anim[ei], lp = CTRL[a0.p.t].lamp, hx0 = pieceSX(a0) + lp.x * s, hy0 = gy + lp.y * s;
-    var hg = c.createRadialGradient(hx0, hy0, 4, hx0, hy0, 320 * s);
-    hg.addColorStop(0, "rgba(255,240,150,0.8)"); hg.addColorStop(1, "rgba(255,240,150,0)");
-    c.fillStyle = hg; c.beginPath(); c.moveTo(hx0, hy0); c.lineTo(hx0 - 360 * s, hy0 - 90 * s); c.lineTo(hx0 - 360 * s, hy0 + 110 * s); c.closePath(); c.fill();
-    c.beginPath(); c.arc(hx0, hy0, lp.r * s + 4, 0, TAU); c.fillStyle = "rgba(255,250,200,0.9)"; c.fill();
-    anim.forEach(function (a) {
-      if (a.p.t === "passenger" || a.p.t === "caboose" || a.p.t === "fast") {
-        var L = TYPES[a.p.t].len, X = pieceSX(a) + L * s / 2, Y = gy - 100 * s;
-        if (X < -200 || X > W + 200) return;
-        var g3 = c.createRadialGradient(X, Y, 1, X, Y, L * s * 0.7);
-        g3.addColorStop(0, "rgba(255,220,120,0.4)"); g3.addColorStop(1, "rgba(255,220,120,0)");
-        c.fillStyle = g3; c.beginPath(); c.arc(X, Y, L * s * 0.7, 0, TAU); c.fill();
-      }
-    });
-    c.restore();
-  }
-  function drawYard(t) {
-    var c = cx, ys = view.ys, sy = stripY();
-    if (yard.v <= 0.001) return;
-    var y = yardLayout(), rail = yardRail();
-    c.fillStyle = "#C9B79E"; c.fillRect(0, sy, W, view.stripH + 4);
-    c.fillStyle = OUT; c.fillRect(0, sy, W, 3);
-    var tw = 34 * ys, off = ((y.scroll) % tw + tw) % tw;
-    c.fillStyle = "#8B5A3C";
-    for (var tx = -off - tw; tx < W; tx += tw) c.fillRect(tx, rail + 2, tw * 0.55, 8 * ys + 3);
-    c.fillStyle = "#4A5578"; c.fillRect(0, rail - 3, W, 6);
-    c.fillStyle = OUT; c.fillRect(0, rail + 3, W, 2);
-    var hop = yard.hop > 0 ? Math.sin(yard.hop * Math.PI) * 10 : 0;
-    for (var i = 0; i < y.items.length; i++) {
-      var tt = y.items[i], X = y.xs[i] - y.scroll, Lw = TYPES[tt].len * ys;
-      if (X + Lw < -10 || X > W + 10) continue;
-      if (carry && carry.item === i && carry.lifted) continue;
-      c.save(); c.translate(X, rail - hop * (1 + (i % 3) * 0.3)); c.scale(ys, ys);
-      drawSide(c, { t: tt, color: TYPES[tt].color, style: "plain", num: 1 }, 0, 0, 0.6, false);
-      c.restore();
-    }
-    // shadows at the ends when there is more to swipe to
-    var maxS = Math.max(0, y.total - W);
-    if (y.scroll > 2) { var g1 = c.createLinearGradient(0, 0, 36, 0); g1.addColorStop(0, "rgba(29,35,64,0.35)"); g1.addColorStop(1, "rgba(29,35,64,0)"); c.fillStyle = g1; c.fillRect(0, sy, 36, view.stripH); }
-    if (y.scroll < maxS - 2) { var g2 = c.createLinearGradient(W - 36, 0, W, 0); g2.addColorStop(0, "rgba(29,35,64,0)"); g2.addColorStop(1, "rgba(29,35,64,0.35)"); c.fillStyle = g2; c.fillRect(W - 36, sy, 36, view.stripH); }
-    // the lifted piece grows to train size under the finger; the coupler it will snap to glows
-    if (carry && carry.lifted) {
-      var s = cam.s, gy = view.gy, sc = lerp(ys, s, carry.grow);
-      var tx2, ty2;
-      if (anim.length) { var last = anim[anim.length - 1]; tx2 = pieceSX(last) + (TYPES[last.p.t].len + GAP / 2) * s; ty2 = gy - 28 * s; }
-      else { tx2 = W / 2; ty2 = gy - 70 * s; }
-      c.globalAlpha = 0.9; c.lineWidth = 6; c.strokeStyle = "#FFC93C";
-      c.beginPath(); c.arc(tx2, ty2, (18 + Math.sin(t * 7) * 5) * Math.max(0.7, s * 0.8), 0, TAU); c.stroke();
-      c.globalAlpha = 1;
-      c.save(); c.translate(carry.x - carry.ox * sc, carry.y - carry.oy * sc); c.scale(sc, sc); c.rotate(-0.05);
-      drawSide(c, { t: carry.t, color: TYPES[carry.t].color, style: "plain", num: 1 }, 0, 0, 0.6, false);
-      c.restore();
-    }
-  }
+  // ---------- Effects in screen px (bits, rings, "Clunk!", words) ----------
+  var fx = [];
   function drawFx(dt) {
     var c = cx;
     for (var i = fx.length - 1; i >= 0; i--) {
@@ -1112,15 +560,10 @@ body.big .tb-panel { display: none; }
         c.globalAlpha = 1 - k; c.beginPath(); c.arc(f.x, f.y, f.r * (1 - k * 0.5), 0, TAU); c.fillStyle = f.c; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
       } else if (f.k === "ring") {
         c.globalAlpha = 1 - k; c.lineWidth = 8; c.strokeStyle = "#FFFFFF"; c.beginPath(); c.arc(f.x, f.y, 20 + k * 160, 0, TAU); c.stroke();
-      } else if (f.k === "fly") {
-        var e = 1 - Math.pow(1 - k, 2), sc = lerp(f.s0, f.s1, e);
-        c.globalAlpha = 1 - k * 0.5;
-        c.save(); c.translate(lerp(f.x, f.tx, e), lerp(f.y, f.ty, e)); c.scale(sc, sc);
-        drawSide(c, f.p, 0, 0, 0.6, false); c.restore();
       } else if (f.k === "clunk") {
-        var sc2 = 1 + Math.sin(Math.min(1, k * 3) * Math.PI) * 0.4;
+        var sc = 1 + Math.sin(Math.min(1, k * 3) * Math.PI) * 0.4;
         c.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3;
-        c.save(); c.translate(clamp(f.x, 60, W - 60), f.y - 40 - k * 30); c.scale(sc2, sc2);
+        c.save(); c.translate(f.x, f.y - 40 - k * 30); c.scale(sc, sc);
         c.beginPath();
         for (var j = 0; j < 16; j++) { var rr2 = j % 2 ? 22 : 44; c.lineTo(Math.cos(j / 16 * TAU) * rr2, Math.sin(j / 16 * TAU) * rr2 * 0.8); }
         c.closePath(); trim(c, "#FFC93C", 4);
@@ -1139,42 +582,877 @@ body.big .tb-panel { display: none; }
       c.globalAlpha = 1;
     }
   }
-  function drawToot() {
-    var c = cx, ei = engIdx();
-    if (train.toot <= 0 || ei < 0) return;
-    var a0 = anim[ei], s = cam.s, k2 = 1 - train.toot / TOOT_T;
-    var X1 = pieceSX(a0) + 100 * s, Y1 = view.gy - 200 * s - 30 - k2 * 30;
-    c.globalAlpha = k2 > 0.8 ? (1 - k2) / 0.2 : 1;
-    c.font = "800 " + Math.round(clamp(36 * s, 26, 48)) + "px 'Baloo 2', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
-    var txt = CTRL[a0.p.t].whistle.cord ? "TOOT TOOT!" : "HONK!";
-    var tw = c.measureText(txt).width;
-    var bxx = clamp(X1, tw / 2 + 20, W - tw / 2 - 20), byy = clamp(Y1, 50, view.gy - 40);
-    rr(c, bxx - tw / 2 - 16, byy - 30, tw + 32, 58, 22); trim(c, "#FFFFFF", 4);
-    c.fillStyle = OUT; c.fillText(txt, bxx, byy + 2);
-    c.globalAlpha = 1;
+
+  // ---------- Run scene: layouts as spline track segments ----------
+  var TILT = 0.74, HT = 0.62; // (TILT is 0.92 on an upright phone) y squash for the angled view; height factor for vertical things
+  var WW = 1000, WH = 760;
+  function catmull(pts, closed, t0, t1) {
+    // returns dense points along a Catmull-Rom spline through pts; optional end tangents for open curves
+    var out = [], n = pts.length;
+    function P(i) {
+      if (closed) return pts[(i + n) % n];
+      if (i < 0) return [pts[0][0] - t0[0], pts[0][1] - t0[1]];
+      if (i >= n) return [pts[n - 1][0] + t1[0], pts[n - 1][1] + t1[1]];
+      return pts[i];
+    }
+    var segs = closed ? n : n - 1;
+    for (var i = 0; i < segs; i++) {
+      var p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+      for (var k = 0; k < 24; k++) {
+        var t = k / 24, t2 = t * t, t3 = t2 * t;
+        out.push([
+          0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+          0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+        ]);
+      }
+    }
+    out.push(closed ? out[0].slice() : pts[n - 1].slice());
+    return out;
   }
-  function drawEmptyHint() {
-    if (anim.length || carry) return;
-    var c = cx;
-    c.fillStyle = state.night ? "#FFFFFF" : OUT; c.textAlign = "center"; c.textBaseline = "middle";
-    c.font = "800 " + Math.round(Math.min(40, W / 12)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
-    c.globalAlpha = 0.85; c.fillText("Your train goes here", W / 2, view.gy - 90 * cam.s); c.globalAlpha = 1;
+  // Resample a polyline evenly by arc length (step 4 units). Points carry z (height).
+  function resample(raw, zf) {
+    var cum = [0];
+    for (var i = 1; i < raw.length; i++) cum.push(cum[i - 1] + Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]));
+    var len = cum[cum.length - 1], n = Math.max(2, Math.round(len / 4)), pts = [], j = 0;
+    for (var k = 0; k <= n; k++) {
+      var d = len * k / n;
+      while (j < cum.length - 2 && cum[j + 1] < d) j++;
+      var f = (d - cum[j]) / ((cum[j + 1] - cum[j]) || 1);
+      var x = raw[j][0] + (raw[j + 1][0] - raw[j][0]) * f, y = raw[j][1] + (raw[j + 1][1] - raw[j][1]) * f;
+      pts.push({ x: x, y: y, z: zf ? zf(k / n) : 0 });
+    }
+    return { pts: pts, len: len, step: len / n };
+  }
+  function segPoint(seg, s) {
+    s = clamp(s, 0, seg.len);
+    var f = s / seg.step, i = Math.min(seg.pts.length - 2, Math.floor(f)), k = f - i;
+    var a = seg.pts[i], b = seg.pts[i + 1];
+    return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+  function nearest(seg, x, y) {
+    var best = 1e9, bs = 0;
+    seg.pts.forEach(function (p, i) { var d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y); if (d < best) { best = d; bs = i * seg.step; } });
+    return bs;
+  }
+
+  var LAYOUTS = {};
+  function mkSeg(id, r) { return { id: id, pts: r.pts, len: r.len, step: r.step }; }
+  (function () {
+    // Oval
+    var ov = mkSeg("ov", resample(catmull([[230, 150], [500, 135], [770, 150], [900, 380], [770, 610], [500, 625], [230, 610], [100, 380]], true)));
+    ov.next = function () { return ov; }; ov.prev = function () { return ov; };
+    LAYOUTS.oval = { segs: [ov], start: ov, station: { seg: ov, s: nearest(ov, 500, 625) },
+      tunnel: { seg: ov, a: nearest(ov, 680, 142), b: nearest(ov, 900, 330) },
+      crossing: { seg: ov, s: nearest(ov, 360, 140) }, switches: [] };
+    // Figure 8: one closed curve that crosses itself; the crossing pass near t=0 goes over a bridge.
+    var raw = [];
+    for (var i = 0; i <= 240; i++) { var t = i / 240 * TAU; raw.push([500 + 400 * Math.sin(t), 380 + 245 * Math.sin(2 * t)]); }
+    var e8 = mkSeg("e8", resample(raw, function (u) { var c = Math.cos(u * TAU); return c > 0 ? 70 * Math.pow(c, 2.2) : 0; }));
+    e8.next = function () { return e8; }; e8.prev = function () { return e8; };
+    LAYOUTS.eight = { segs: [e8], start: e8, station: { seg: e8, s: nearest(e8, 800, 140) },
+      tunnel: { seg: e8, a: nearest(e8, 140, 250), b: nearest(e8, 140, 510) },
+      crossing: { seg: e8, s: nearest(e8, 760, 625) }, bridge: true, switches: [] };
+    // Switches: a loop with two places to choose the way.
+    var R0 = [1, 0], L0 = [-1, 0];
+    var L = [300, 200], Rr = [700, 200], BR = [700, 600], BL = [300, 600];
+    var c1 = mkSeg("c1", resample(catmull([Rr, [860, 260], [900, 400], [860, 540], BR], false, [120, 0], [-120, 0])));
+    var d = mkSeg("d", resample(catmull([BR, [500, 600], BL], false, [-120, 0], [-120, 0])));
+    var e = mkSeg("e", resample(catmull([BR, [600, 690], [400, 690], BL], false, [-120, 0], [-120, 0])));
+    var c2 = mkSeg("c2", resample(catmull([BL, [140, 540], [100, 400], [140, 260], L], false, [-120, 0], [120, 0])));
+    var a = mkSeg("a", resample(catmull([L, [500, 200], Rr], false, [120, 0], [120, 0])));
+    var b = mkSeg("b", resample(catmull([L, [400, 140], [500, 70], [600, 140], Rr], false, [120, 0], [120, 0])));
+    var sw1 = { x: BR[0], y: BR[1], ways: [d, e], on: 0, seg: c1, flip: 0 };
+    var sw2 = { x: L[0], y: L[1], ways: [a, b], on: 1, seg: c2, flip: 0 };
+    c1.next = function () { return sw1.ways[sw1.on]; };
+    d.next = e.next = function () { return c2; };
+    c2.next = function () { return sw2.ways[sw2.on]; };
+    a.next = b.next = function () { return c1; };
+    c1.prev = function () { return sw2.ways[sw2.on]; };
+    d.prev = e.prev = function () { return c1; };
+    c2.prev = function () { return sw1.ways[sw1.on]; };
+    a.prev = b.prev = function () { return c2; };
+    LAYOUTS["switch"] = { segs: [c1, d, e, c2, a, b], start: d, station: { seg: d, s: d.len * 0.5 },
+      tunnel: { seg: b, a: b.len * 0.3, b: b.len * 0.7 },
+      crossing: { seg: c1, s: nearest(c1, 900, 400) }, switches: [sw1, sw2], stationWay: { sw: sw1, on: 0 } };
+  })();
+
+  // Phones held upright: the layouts are turned on their side (x and y swapped) so the long way of
+  // the track runs up the tall stage, and the view is a little more top-down. Turning the phone turns them back.
+  var UPRIGHT = false;
+  function TP(x, y) { return UPRIGHT ? [y, x] : [x, y]; }
+  function orient(up) {
+    if (up === UPRIGHT) return false;
+    UPRIGHT = up;
+    Object.keys(LAYOUTS).forEach(function (k) {
+      var lay = LAYOUTS[k];
+      lay.segs.forEach(function (seg) { seg.pts.forEach(function (q) { var t = q.x; q.x = q.y; q.y = t; }); });
+      lay.switches.forEach(function (sw) { var t = sw.x; sw.x = sw.y; sw.y = t; });
+    });
+    var t = WW; WW = WH; WH = t;
+    TILT = up ? 0.92 : 0.74;
+    return true;
+  }
+
+  // ---------- The train on the track ----------
+  // The whole train always rides on the layout, which always fits the stage, so every car is in view.
+  // run.trail is the path the head has taken (points every 3 units with d = distance travelled, plus the
+  // segment and position they came from, so it can grow forward via next() and backward via prev()).
+  // Piece i sits at run.d - (lengths in front of it) - p.extra (+ p.lead for the front piece):
+  // extra > 0 is a car still rolling in from behind, lead > 0 an engine still backing on from ahead.
+  var RSC = 0.46;  // run pieces are this much of their picture length (world units)
+  var RW = 40;     // run piece width
+  var CG = 6;      // coupler gap
+  var ROLL = 260;  // a new piece starts this far away and rolls in
+  var VSLOW = 90, VFAST = 150, BRAKE = 150;
+  var TOOT_T = 2;
+  function plen(p) { return TYPES[p.t].len * RSC; }
+  function runLen() { var t = 0; state.pieces.forEach(function (p) { t += plen(p) + CG; }); return Math.max(0, t - CG); }
+  function hasEngine() { for (var i = 0; i < state.pieces.length; i++) if (TYPES[state.pieces[i].t].eng) return true; return false; }
+  function carCount() { var n = 0; state.pieces.forEach(function (p) { if (!TYPES[p.t].eng) n++; }); return n; }
+  var run = null, queue = [], kindGiven = false, flipped = false, tooted = false, sel = -1;
+  var ROAD_IN = 200, ROAD_LEN = 640; // the road: house -> crossing -> off the edge (world units)
+
+  function advance(seg, s, dist) {
+    s += dist;
+    var guard = 0;
+    while (s > seg.len && guard++ < 40) { s -= seg.len; seg = seg.next(); }
+    return { seg: seg, s: s };
+  }
+  // Distance along the route (following the switches) from (seg, s) to a point; -1 if not within reach.
+  function distAhead(seg, s, target, maxd) {
+    var d = 0, guard = 0;
+    while (guard++ < 8) {
+      if (seg === target.seg && target.s >= s - 0.01) { var r = d + (target.s - s); return r <= maxd ? r : -1; }
+      d += seg.len - s; s = 0; seg = seg.next();
+      if (d > maxd) return -1;
+    }
+    return -1;
+  }
+  function tpt(seg, s, d) { var q = segPoint(seg, s); return { x: q.x, y: q.y, z: q.z, d: d, seg: seg, s: s }; }
+  function startRun() {
+    var lay = LAYOUTS[state.layout];
+    state.pieces.forEach(function (p) { p.extra = 0; p.lead = 0; });
+    queue.length = 0;
+    run = { lay: lay, d: 0, v: 0, trail: [], atStation: true, dwell: 0, leaving: false, puffs: [], loads: [], gate: 0, ding: 0,
+      toot: 0, ending: false, endDone: null, smokeT: 0, chuffT: 0, travel: 0, road: { u: 0, dir: 1, wait: 2 } };
+    // The train waits with its middle at the platform.
+    var st = lay.station, h = advance(st.seg, st.s, runLen() / 2);
+    var seg = h.seg, s = h.s, pts = [], back = runLen() + ROLL + 400;
+    for (var dd = 0; dd <= back; dd += 3) {
+      pts.push(tpt(seg, s, 0));
+      s -= 3; while (s < 0) { seg = seg.prev(); s += seg.len; }
+    }
+    pts.reverse();
+    pts.forEach(function (q, i) { q.d = (i - (pts.length - 1)) * 3; });
+    run.trail = pts;
+    buildLayer();
+  }
+  function tip() { return run.trail[run.trail.length - 1]; }
+  function extendTip(target) {
+    var t = tip(), seg = t.seg, s = t.s, d = t.d;
+    while (d < target) {
+      s += 3; d += 3;
+      var g = 0; while (s > seg.len && g++ < 20) { s -= seg.len; seg = seg.next(); }
+      run.trail.push(tpt(seg, s, d));
+    }
+  }
+  function extendBack(target) {
+    var f = run.trail[0], seg = f.seg, s = f.s, d = f.d, add = [];
+    while (d > target) {
+      s -= 3; d -= 3;
+      var g = 0; while (s < 0 && g++ < 20) { seg = seg.prev(); s += seg.len; }
+      add.push(tpt(seg, s, d));
+    }
+    if (add.length) run.trail = add.reverse().concat(run.trail);
+  }
+  function trailIdx(d) {
+    var tr = run.trail, lo = 0, hi = tr.length - 1;
+    if (d <= tr[0].d) return 0;
+    if (d >= tr[hi].d) return hi;
+    while (hi - lo > 1) { var m = (lo + hi) >> 1; if (tr[m].d <= d) lo = m; else hi = m; }
+    return lo;
+  }
+  function trailAt(d) {
+    var tr = run.trail, lo = trailIdx(d), hi = Math.min(tr.length - 1, lo + 1);
+    var a = tr[lo], b = tr[hi], f = clamp((d - a.d) / ((b.d - a.d) || 1), 0, 1);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f };
+  }
+  // Segment and position of the head (the front of the coupled train).
+  function headSS() {
+    var q = run.trail[trailIdx(run.d)];
+    return advance(q.seg, q.s, Math.max(0, run.d - q.d));
+  }
+  function carPoses() {
+    var out = [], off = 0;
+    if (!run) return out;
+    state.pieces.forEach(function (p, i) {
+      var len = plen(p), d0 = run.d - off - p.extra + (i === 0 ? p.lead : 0);
+      var f = trailAt(d0 - len * 0.12), b = trailAt(d0 - len * 0.88);
+      var ang = Math.atan2(f.y - b.y, f.x - b.x);
+      out.push({ p: p, i: i, x: (f.x + b.x) / 2, y: (f.y + b.y) / 2, z: (f.z + b.z) / 2, ang: ang, len: len, d: d0 - len / 2 });
+      off += len + CG;
+    });
+    return out;
+  }
+  function anyLead() { return state.pieces.length && state.pieces[0].lead > 0; }
+
+  // ---------- Adding and taking off ----------
+  function engineCount() { var n = 0; state.pieces.forEach(function (q) { if (TYPES[q.t].eng) n++; }); return n; }
+  function insertFront(p) {
+    // Two engines at most (a double-header): a third one takes the front engine's place.
+    if (engineCount() >= 2 && TYPES[state.pieces[0].t].eng) {
+      var old = state.pieces[0], cp = carPoses()[0];
+      if (cp) { var sc = screenOf(cp, 16); burst(sc.x, sc.y, old.color, 18, true); fx.push({ k: "ring", x: sc.x, y: sc.y, t: 0, life: 0.5 }); }
+      sPoof();
+      state.pieces.shift();
+      run.d -= plen(old) + CG;
+      if (sel === 0) endSel(); else if (sel > 0) sel--;
+    }
+    var had = state.pieces.length;
+    run.d += had ? plen(p) + CG : plen(p) / 2;
+    p.lead = ROLL;
+    state.pieces.unshift(p);
+    if (sel >= 0) sel++;
+    extendTip(run.d + ROLL + 6);
+    run.atStation = run.atStation && run.v < 1;
+  }
+  function addPiece(t, color) {
+    if (Toybox.timer.locked() || !run) return false;
+    if (state.pieces.length + queue.length >= MAXP) { Toybox.toast("The train is full!"); return false; }
+    var p = mkPiece(t, color);
+    if (TYPES[t].eng) {
+      if (anyLead()) queue.push(p); else insertFront(p);
+    } else {
+      p.extra = ROLL;
+      state.pieces.push(p);
+      extendBack(run.d - runLen() - ROLL - 60);
+    }
+    save(); bumpCount(); updateGo(); updateCoach();
+    return true;
+  }
+  function screenOf(cp, h) { return { x: SX(cp.x), y: SY(cp.y, cp.z + (h || 14)) }; }
+  function burst(x, y, col, n, big) {
+    for (var k = 0; k < n; k++) {
+      var ang = rand(0, TAU), sp = rand(big ? 120 : 80, big ? 420 : 260);
+      fx.push({ k: "bit", x: x, y: y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 120, t: 0, life: rand(0.6, 1.1), r: rand(5, big ? 14 : 9), c: k % 3 ? col : "#FFFFFF" });
+    }
+  }
+  function removeAt(i) {
+    var poses = carPoses(), cp = poses[i], p = state.pieces[i];
+    if (!p) return;
+    var sc = screenOf(cp, 16);
+    burst(sc.x, sc.y, p.color, 24, true);
+    fx.push({ k: "ring", x: sc.x, y: sc.y, t: 0, life: 0.5 });
+    sPoof();
+    var gap = plen(p) + CG;
+    state.pieces.splice(i, 1);
+    if (i === 0) {
+      run.d -= gap; // the rest stays where it is
+    } else {
+      // The cars behind roll up and couple again.
+      for (var j = i; j < state.pieces.length; j++) state.pieces[j].extra += gap;
+    }
+    endSel();
+    save(); bumpCount(); updateGo(); updateCoach();
+  }
+  function coupled(i) {
+    var poses = carPoses();
+    if (i <= 0 || i >= poses.length) { if (poses[i]) poses[i].p.jig = 0.6; return; }
+    var cp = poses[i], fxp = cp.x + Math.cos(cp.ang) * cp.len / 2, fyp = cp.y + Math.sin(cp.ang) * cp.len / 2;
+    var X = SX(fxp), Y = SY(fyp, cp.z + 14);
+    sClunk();
+    fx.push({ k: "clunk", x: X, y: Y, t: 0, life: 0.9 });
+    for (var k = 0; k < 8; k++) {
+      var ang = rand(-Math.PI, 0), sp = rand(120, 300);
+      fx.push({ k: "bit", x: X, y: Y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, t: 0, life: 0.5, r: rand(4, 8), c: "#FFC93C" });
+    }
+    state.pieces.forEach(function (b, j) { b.jig = Math.max(b.jig, 1 - Math.abs(j - i) * 0.15); });
+  }
+
+  // ---------- Step ----------
+  function stepRun(dt) {
+    var lay = run.lay, P = state.pieces;
+    if (queue.length && !anyLead()) insertFront(queue.shift());
+    var maxExtra = 0;
+    for (var i = 0; i < P.length; i++) {
+      var p = P[i];
+      if (p.extra > 0) {
+        p.extra -= clamp(p.extra * 2.2, 45, 240) * dt;
+        if (p.extra <= 0) { p.extra = 0; coupled(i); }
+      }
+      if (p.lead > 0) {
+        p.lead -= clamp(p.lead * 2.2, 45, 240) * dt;
+        if (p.lead <= 0) {
+          p.lead = 0; coupled(1);
+          // Forget the bit of track he backed in from: the route ahead may change at a switch.
+          while (run.trail.length > 2 && tip().d > run.d + 3) run.trail.pop();
+          extendTip(run.d);
+          updateCoach();
+        }
+      }
+      maxExtra = Math.max(maxExtra, p.extra);
+      p.jig = Math.max(0, p.jig - dt * 2.2);
+    }
+    var lead0 = P.length ? P[0].lead : 0;
+    var eng = hasEngine();
+    var vSet = state.fast ? VFAST : VSLOW;
+    var want = 0;
+    if (eng && lead0 <= 0 && (state.go || run.ending)) want = run.ending ? Math.max(vSet, 110) : vSet;
+    // Station: brake to a stop with the train's middle at the platform.
+    var hs = headSS();
+    var stop = advance(lay.station.seg, lay.station.s, runLen() / 2);
+    var dAhead = distAhead(hs.seg, hs.s, stop, 900);
+    if (run.atStation) {
+      if (run.dwell > 0) {
+        run.dwell -= dt;
+        if (!run.ending && run.dwell > 0.8 && Math.random() < dt * 5) spawnLoad();
+      }
+      if (run.ending) {
+        want = 0;
+        if (run.endDone && run.v < 1) { var dn = run.endDone; run.endDone = null; setTimeout(dn, 900); }
+      } else if (want > 0 && run.dwell <= 0) {
+        run.atStation = false; run.leaving = true; run.travel = 0;
+      } else want = 0;
+    } else if (dAhead >= 0 && !run.leaving && want > 0) {
+      var vmax = Math.sqrt(2 * BRAKE * Math.max(0, dAhead));
+      if (dAhead < 1.5 && run.v < 30) { arrive(); want = 0; }
+      else want = Math.min(want, Math.max(vmax, 10));
+    }
+    if (run.leaving && (dAhead < 0 || dAhead > 300)) run.leaving = false;
+    var acc = want > run.v ? 60 : 190;
+    if (run.v < want) run.v = Math.min(want, run.v + acc * dt); else run.v = Math.max(want, run.v - acc * dt);
+    var go = run.v * dt;
+    run.d += go; run.travel += go;
+    extendTip(run.d + Math.max(0, lead0));
+    // Keep enough trail behind for the whole train plus anything still rolling in.
+    var keep = run.d - runLen() - maxExtra - ROLL - 500;
+    var cut = 0; while (cut < run.trail.length - 2 && run.trail[cut + 1].d < keep) cut++;
+    if (cut > 40) run.trail.splice(0, cut);
+    extendBack(run.d - runLen() - maxExtra - 80);
+    // Crossing gates: down while any part of the train is near the crossing.
+    var cr = lay.crossing, near = false;
+    var hp = segPoint(cr.seg, cr.s);
+    var poses = carPoses();
+    if (P.length) {
+      if (eng && run.v > 1 && distAhead(hs.seg, hs.s, cr, 260) >= 0) near = true;
+      poses.forEach(function (cp) { if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < cp.len / 2 + 60) near = true; });
+    }
+    run.gate += ((near ? 1 : 0) - run.gate) * Math.min(1, dt * 2.5);
+    if (near) { run.ding -= dt; if (run.ding <= 0) { run.ding = 0.8; sDing(); } } else run.ding = 0;
+    stepRoad(dt);
+    // Smoke from steam engines, a little exhaust from diesels.
+    run.smokeT -= dt;
+    if (run.smokeT <= 0) {
+      run.smokeT = run.v > 5 ? 0.42 - (run.v / VFAST) * 0.18 : 1.2;
+      poses.forEach(function (cp) {
+        if (cp.p.t === "steam") puff(cp, 0.32, run.v > 5 ? 1 : 0.6);
+        else if (cp.p.t === "diesel" && run.v > 5 && Math.random() < 0.5) { puff(cp, 0.1, 0.5); run.puffs[run.puffs.length - 1].dark = true; }
+      });
+    }
+    if (run.v > 5 && P.length && P[0].t === "steam") {
+      run.chuffT -= dt * run.v / 60;
+      if (run.chuffT <= 0) { run.chuffT = 1; sChuff(0.05); }
+    }
+    for (var k = run.puffs.length - 1; k >= 0; k--) {
+      var f = run.puffs[k]; f.t += dt;
+      if (f.t > f.life) { run.puffs.splice(k, 1); continue; }
+      f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt; f.r += f.gr * dt;
+    }
+    for (var j = run.loads.length - 1; j >= 0; j--) { var L = run.loads[j]; L.t += dt; if (L.t > L.life) run.loads.splice(j, 1); }
+    run.toot = Math.max(0, run.toot - dt);
+    for (var s = 0; s < lay.switches.length; s++) lay.switches[s].flip = Math.max(0, lay.switches[s].flip - dt * 2.5);
+  }
+  function arrive() {
+    run.v = 0; run.atStation = true; run.dwell = 5.5; sChime();
+    // A real trip round the loop with a proper train: sometimes a kind word.
+    if (run.travel > 600 && carCount() >= 3 && !kindGiven && !run.ending) {
+      kindGiven = true;
+      setTimeout(function () { try { Toybox.kind(); } catch (e) { /* ignore */ } }, 1500);
+    }
+    fx.push({ k: "text", x: SX(segPoint(run.lay.station.seg, run.lay.station.s).x), y: SY(segPoint(run.lay.station.seg, run.lay.station.s).y, 90), t: 0, life: 3, text: "Station!", size: 30 });
+  }
+  // The little car on the road: drives out of its house, waits at the gates while they are down, drives
+  // over the crossing and away, then comes back.
+  function stepRoad(dt) {
+    var rd = run.road, uc = ROAD_IN, spd = 55, gap = 46;
+    if (rd.wait > 0) { rd.wait -= dt; return; }
+    var nx = rd.u + rd.dir * spd * dt;
+    var before = rd.dir > 0 ? rd.u <= uc - gap + 0.5 : rd.u >= uc + gap - 0.5;
+    if (run.gate > 0.12 && before) nx = rd.dir > 0 ? Math.min(nx, uc - gap) : Math.max(nx, uc + gap);
+    rd.u = nx;
+    if (rd.u >= ROAD_LEN) { rd.u = ROAD_LEN; rd.dir = -1; rd.wait = 1.5; }
+    if (rd.u <= 0) { rd.u = 0; rd.dir = 1; rd.wait = 3.5; }
+  }
+  function puff(cp, at, size) {
+    var x = cp.x + Math.cos(cp.ang) * cp.len * at, y = cp.y + Math.sin(cp.ang) * cp.len * at;
+    run.puffs.push({ x: x, y: y, z: cp.z + 34, vx: rand(-8, 8), vy: rand(-8, 8), vz: rand(30, 50) * size, r: 8 * size, gr: 14 * size, t: 0, life: reduce ? 0.8 : 1.8 * size });
+  }
+  function spawnLoad() {
+    var poses = carPoses();
+    var cars = poses.filter(function (cp) { return !TYPES[cp.p.t].eng; });
+    if (!cars.length) return;
+    var cp = cars[Math.floor(Math.random() * cars.length)];
+    var lay = run.lay, sp = segPoint(lay.station.seg, lay.station.s);
+    var nx = Math.cos(sp.ang + Math.PI / 2), ny = Math.sin(sp.ang + Math.PI / 2);
+    var plat = { x: cp.x + nx * 46, y: cp.y + ny * 46 };
+    var onload = Math.random() < 0.5;
+    var kind = cp.p.t === "passenger" || cp.p.t === "caboose" ? "person" : (cp.p.t === "tanker" ? "drop" : (cp.p.t === "logs" ? "log" : (cp.p.t === "coal" || cp.p.t === "hopper" ? "lump" : "box")));
+    run.loads.push({ a: onload ? plat : { x: cp.x, y: cp.y }, b: onload ? { x: cp.x, y: cp.y } : plat, z: cp.z, t: 0, life: 1.1,
+      c: kind === "drop" ? "#5BC0EB" : (kind === "log" ? "#8B5A3C" : (kind === "lump" ? "#26282E" : pick(["#F77F00", "#FFC93C", "#E63946", "#5BC0EB", "#A7D129", "#F26CA7"]))), kind: kind });
+  }
+
+  // ---------- Run drawing: world -> screen ----------
+  var vs = 1, vox = 0, voy = 0;
+  function runFit() {
+    var lay = run.lay, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    function grow(x, y) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    lay.segs.forEach(function (seg) { seg.pts.forEach(function (q) { grow(q.x, q.y); }); });
+    var sp = segPoint(lay.station.seg, lay.station.s), nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
+    var tx = Math.cos(sp.ang), ty = Math.sin(sp.ang);
+    grow(sp.x + nx * 130 + tx * 70, sp.y + ny * 130 + ty * 70);
+    grow(sp.x + nx * 130 - tx * 70, sp.y + ny * 130 - ty * 70);
+    grow(sp.x + nx * 70 + tx * 152, sp.y + ny * 70 + ty * 152);
+    grow(sp.x + nx * 70 - tx * 152, sp.y + ny * 70 - ty * 152);
+    // the tunnel hill is wider than the track
+    var tn = lay.tunnel, ta = Math.min(tn.a, tn.b), tb = Math.max(tn.a, tn.b);
+    for (var s = ta; s <= tb; s += 20) {
+      var q = segPoint(tn.seg, s), qx = -Math.sin(q.ang) * 66, qy = Math.cos(q.ang) * 66;
+      grow(q.x + qx, q.y + qy); grow(q.x - qx, q.y - qy);
+    }
+    x0 -= 30; x1 += 30; y0 -= 30; y1 += 34;
+    var sw = x1 - x0, top = y0 * TILT - 70 * HT, bot = y1 * TILT, sh = bot - top;
+    // Room for the coach line: at the bottom on phones, at the top on tablets.
+    var phone = W < 600 || H < 500, padT = phone ? 4 : 52, padB = phone ? 34 : 4;
+    vs = Math.min((W - 8) / sw, (H - padT - padB) / sh);
+    vox = (W - sw * vs) / 2 - x0 * vs;
+    voy = padT + (H - padT - padB - sh * vs) / 2 - top * vs;
+  }
+  function SX(x) { return vox + x * vs; }
+  function SY(y, z) { return voy + (y * TILT - (z || 0) * HT) * vs; }
+  var layer = null, bridgeLayer = null, hillLayer = null;
+  function mkLayer() { var l = document.createElement("canvas"); l.width = cv.width; l.height = cv.height; var c = l.getContext("2d"); c.setTransform(DPR, 0, 0, DPR, 0, 0); return { cv: l, c: c }; }
+  function trackPath(c, seg, a, b, lift) {
+    c.beginPath();
+    var i0 = Math.floor(a / seg.step), i1 = Math.ceil(b / seg.step);
+    for (var i = Math.max(0, i0); i <= Math.min(seg.pts.length - 1, i1); i++) {
+      var p = seg.pts[i]; var X = SX(p.x), Y = SY(p.y, lift ? p.z : 0);
+      if (i === Math.max(0, i0)) c.moveTo(X, Y); else c.lineTo(X, Y);
+    }
+  }
+  function drawRails(c, seg, a, b, dim, elevated) {
+    c.lineCap = "round"; c.lineJoin = "round";
+    trackPath(c, seg, a, b, elevated); c.strokeStyle = dim ? "rgba(120,110,100,0.5)" : "#B7A58C"; c.lineWidth = 48 * vs; c.stroke();
+    // ties
+    c.strokeStyle = dim ? "rgba(110,80,60,0.45)" : "#7A5236"; c.lineWidth = 6 * vs;
+    c.beginPath();
+    var i0 = Math.max(0, Math.floor(a / seg.step)), i1 = Math.min(seg.pts.length - 2, Math.ceil(b / seg.step));
+    for (var i = i0; i <= i1; i += 3) {
+      var p = seg.pts[i], q = seg.pts[i + 1], ang = Math.atan2(q.y - p.y, q.x - p.x);
+      var nx = -Math.sin(ang) * 22, ny = Math.cos(ang) * 22, z = elevated ? p.z : 0;
+      c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); c.lineTo(SX(p.x - nx), SY(p.y - ny, z));
+    }
+    c.stroke();
+    // rails: two offset lines
+    [-13, 13].forEach(function (o) {
+      c.beginPath();
+      for (var i = i0; i <= i1 + 1; i++) {
+        var p = seg.pts[i], q = seg.pts[Math.min(seg.pts.length - 1, i + 1)], pp = seg.pts[Math.max(0, i - 1)];
+        var ang = Math.atan2(q.y - pp.y, q.x - pp.x), nx = -Math.sin(ang) * o, ny = Math.cos(ang) * o, z = elevated ? p.z : 0;
+        if (i === i0) c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); else c.lineTo(SX(p.x + nx), SY(p.y + ny, z));
+      }
+      c.strokeStyle = dim ? "rgba(90,95,110,0.5)" : "#5B6478"; c.lineWidth = 4 * vs; c.stroke();
+    });
+  }
+  // The road through the crossing: from a little house inside the loop, over the rails, out past the edge.
+  function roadGeom(lay) {
+    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
+    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang);
+    var mid = TP(500, 380);
+    if (rx * (cr.x - mid[0]) + ry * (cr.y - mid[1]) < 0) { rx = -rx; ry = -ry; } // points out of the loop
+    return { hx: cr.x - rx * ROAD_IN, hy: cr.y - ry * ROAD_IN, ux: rx, uy: ry, cr: cr };
+  }
+  function buildLayer() {
+    if (!run) return;
+    runFit();
+    var lay = run.lay;
+    layer = mkLayer(); bridgeLayer = null; hillLayer = mkLayer();
+    var c = layer.c, night = state.night;
+    // grass
+    c.fillStyle = "#7CC95A"; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#6DBA4C";
+    for (var i = 0; i < 70; i++) { c.beginPath(); c.arc((i * 173) % W, (i * 97) % H, (18 + (i % 4) * 8) * Math.max(0.6, vs), 0, TAU); c.fill(); }
+    // flowers
+    for (var fl = 0; fl < 40; fl++) {
+      c.fillStyle = ["#FFFFFF", "#FFE14D", "#F26CA7"][fl % 3];
+      c.beginPath(); c.arc((fl * 211 + 37) % W, (fl * 131 + 53) % H, 3, 0, TAU); c.fill();
+    }
+    // pond
+    c.fillStyle = "#5BC0EB"; c.strokeStyle = OUT; c.lineWidth = 3;
+    var pond = TP(500, lay === LAYOUTS.eight ? 150 : 380);
+    c.beginPath(); c.ellipse(SX(pond[0]), SY(pond[1]), (UPRIGHT ? 50 : 90) * vs, (UPRIGHT ? 90 : 50) * vs * TILT, 0, 0, TAU); c.fill(); c.stroke();
+    c.fillStyle = "rgba(255,255,255,0.6)";
+    c.beginPath(); c.ellipse(SX(pond[0]) - 20 * vs, SY(pond[1]) - 10 * vs, 22 * vs, 5 * vs, 0, 0, TAU); c.fill();
+    // road, house at its inner end
+    var rg = roadGeom(lay), far = ROAD_LEN + 200;
+    c.strokeStyle = OUT; c.lineWidth = 50 * vs + 6; c.lineCap = "round";
+    c.beginPath(); c.moveTo(SX(rg.hx), SY(rg.hy)); c.lineTo(SX(rg.hx + rg.ux * far), SY(rg.hy + rg.uy * far)); c.stroke();
+    c.strokeStyle = "#6A6F7E"; c.lineWidth = 50 * vs;
+    c.beginPath(); c.moveTo(SX(rg.hx), SY(rg.hy)); c.lineTo(SX(rg.hx + rg.ux * far), SY(rg.hy + rg.uy * far)); c.stroke();
+    c.strokeStyle = "#FFE680"; c.lineWidth = 4 * vs; c.setLineDash([16 * vs, 14 * vs]); c.lineCap = "butt";
+    c.beginPath(); c.moveTo(SX(rg.hx + rg.ux * 30), SY(rg.hy + rg.uy * 30)); c.lineTo(SX(rg.hx + rg.ux * far), SY(rg.hy + rg.uy * far)); c.stroke();
+    c.setLineDash([]);
+    // station platform
+    var sp = segPoint(lay.station.seg, lay.station.s);
+    c.save(); c.translate(SX(sp.x), SY(sp.y)); c.transform(1, 0, 0, TILT, 0, 0); c.rotate(sp.ang);
+    rr(c, -150 * vs, 24 * vs, 300 * vs, 44 * vs, 6 * vs); trim(c, "#D9C9A8", 3);
+    c.fillStyle = "#FFE14D"; c.fillRect(-146 * vs, 26 * vs, 292 * vs, 5 * vs);
+    c.restore();
+    // track
+    lay.segs.forEach(function (seg) {
+      var dim = false;
+      lay.switches.forEach(function (sw) { if (sw.ways.indexOf(seg) >= 0 && sw.ways[sw.on] !== seg) dim = true; });
+      if (lay.bridge) {
+        // ground part only; the raised part is drawn later over the lower pass
+        var a = -1, k;
+        for (k = 0; k < seg.pts.length; k++) {
+          var up = seg.pts[k].z > 2;
+          if (!up && a < 0) a = k;
+          if ((up || k === seg.pts.length - 1) && a >= 0) { drawRails(c, seg, a * seg.step, k * seg.step, false, false); a = -1; }
+        }
+        bridgeLayer = mkLayer();
+        var bc = bridgeLayer.c, i0 = -1;
+        for (k = 0; k < seg.pts.length; k++) {
+          var u2 = seg.pts[k].z > 2;
+          if (u2 && i0 < 0) i0 = k;
+          if ((!u2 || k === seg.pts.length - 1) && i0 >= 0) {
+            for (var m = i0; m < k; m += 14) {
+              var pp = seg.pts[m];
+              if (pp.z < 18) continue;
+              bc.fillStyle = "#B4A08A"; bc.strokeStyle = OUT; bc.lineWidth = 2.5;
+              bc.beginPath(); bc.rect(SX(pp.x) - 6 * vs, SY(pp.y, pp.z), 12 * vs, pp.z * HT * vs); bc.fill(); bc.stroke();
+            }
+            trackPath(bc, seg, i0 * seg.step, k * seg.step, true); bc.strokeStyle = OUT; bc.lineWidth = 58 * vs; bc.lineCap = "round"; bc.stroke();
+            trackPath(bc, seg, i0 * seg.step, k * seg.step, true); bc.strokeStyle = "#C9B79E"; bc.lineWidth = 52 * vs; bc.stroke();
+            drawRails(bc, seg, i0 * seg.step, k * seg.step, false, true);
+            i0 = -1;
+          }
+        }
+      } else drawRails(c, seg, 0, seg.len, dim, false);
+    });
+    // trees (not on the road or the house)
+    [[60, 80], [940, 90], [60, 700], [950, 700], [500, 380], [380, 330], [640, 450], [40, 390], [960, 390]].forEach(function (t, k) {
+      if (lay === LAYOUTS.eight && k >= 4 && k <= 6) return;
+      if (lay !== LAYOUTS.eight && k === 4) return;
+      var tp = TP(t[0], t[1]);
+      if (Math.hypot(tp[0] - rg.hx, tp[1] - rg.hy) < 110) return;
+      // distance from the road line
+      var vx = tp[0] - rg.hx, vy = tp[1] - rg.hy, along = vx * rg.ux + vy * rg.uy, across = Math.abs(vx * rg.uy - vy * rg.ux);
+      if (along > -40 && across < 60) return;
+      var onTrack = lay.segs.some(function (seg) { return seg.pts.some(function (q, n) { return n % 4 === 0 && Math.hypot(q.x - tp[0], q.y - tp[1]) < 56; }); });
+      if (onTrack) return;
+      tree(c, tp[0], tp[1]);
+    });
+    // tunnel hill (drawn over the train)
+    var tn = lay.tunnel, hc = hillLayer.c;
+    if (tn.a > tn.b) { var tmp = tn.a; tn.a = tn.b; tn.b = tmp; }
+    var pa = segPoint(tn.seg, tn.a), pb = segPoint(tn.seg, tn.b);
+    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.lineCap = "butt"; hc.lineJoin = "round";
+    hc.strokeStyle = OUT; hc.lineWidth = 126 * vs; hc.stroke();
+    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.strokeStyle = "#5FA641"; hc.lineWidth = 118 * vs; hc.stroke();
+    trackPath(hc, tn.seg, tn.a + 30, tn.b - 30, false); hc.strokeStyle = "#76BF55"; hc.lineWidth = 74 * vs; hc.lineCap = "round"; hc.stroke();
+    trackPath(hc, tn.seg, tn.a + 60, tn.b - 60, false); hc.strokeStyle = "#8ED06B"; hc.lineWidth = 34 * vs; hc.stroke();
+    [pa, pb].forEach(function (p, k) {
+      hc.save(); hc.translate(SX(p.x), SY(p.y)); hc.transform(1, 0, 0, TILT, 0, 0); hc.rotate(p.ang);
+      rr(hc, (k ? -18 : -2) * vs, -44 * vs, 20 * vs, 88 * vs, 6 * vs); trim(hc, "#B4A08A", 3);
+      hc.fillStyle = "#26282E"; rr(hc, (k ? -14 : 2) * vs, -26 * vs, 12 * vs, 52 * vs, 5 * vs); hc.fill();
+      hc.restore();
+    });
+    var tm = segPoint(tn.seg, (tn.a + tn.b) / 2);
+    tree(hc, tm.x + 6, tm.y - 6);
+    // night: everything a little darker (the overlay in drawRun does the rest)
+    if (night) { c.fillStyle = "rgba(20,30,80,0.15)"; c.fillRect(0, 0, W, H); }
+  }
+  // A house with a garage at the inner end of the road.
+  function drawHouse(c, lay) {
+    var rg = roadGeom(lay), ang = Math.atan2(rg.uy, rg.ux);
+    var hx = rg.hx - rg.ux * 30, hy = rg.hy - rg.uy * 30;
+    box(c, hx, hy, 0, ang, 60, 70, 34, "#FFE6B0", "#E8C890");
+    // roof
+    var ca = Math.cos(ang), sa = Math.sin(ang);
+    var pts = [[30, 35], [-30, 35], [-30, -35], [30, -35]].map(function (q) { return [hx + q[0] * ca - q[1] * sa, hy + q[0] * sa + q[1] * ca]; });
+    c.beginPath();
+    c.moveTo(SX(pts[0][0]), SY(pts[0][1], 34)); c.lineTo(SX(pts[1][0]), SY(pts[1][1], 34));
+    c.lineTo(SX((pts[1][0] + pts[2][0]) / 2), SY((pts[1][1] + pts[2][1]) / 2, 62));
+    c.lineTo(SX((pts[0][0] + pts[3][0]) / 2), SY((pts[0][1] + pts[3][1]) / 2, 62)); c.closePath();
+    trim(c, "#E63946", 3);
+    c.beginPath();
+    c.moveTo(SX(pts[3][0]), SY(pts[3][1], 34)); c.lineTo(SX(pts[2][0]), SY(pts[2][1], 34));
+    c.lineTo(SX((pts[1][0] + pts[2][0]) / 2), SY((pts[1][1] + pts[2][1]) / 2, 62));
+    c.lineTo(SX((pts[0][0] + pts[3][0]) / 2), SY((pts[0][1] + pts[3][1]) / 2, 62)); c.closePath();
+    trim(c, "#C42F3B", 3);
+  }
+  // The little road car.
+  function drawRoadCar(c, t) {
+    var rg = roadGeom(run.lay), rd = run.road;
+    if (rd.u <= 2) return; // parked in the garage
+    var x = rg.hx + rg.ux * rd.u, y = rg.hy + rg.uy * rd.u, ang = Math.atan2(rg.uy, rg.ux) + (rd.dir < 0 ? Math.PI : 0);
+    // keep to the right-hand lane
+    x += -Math.sin(ang) * 11; y += Math.cos(ang) * 11;
+    box(c, x, y, 0, ang, 44, 24, 12, "#2D5BD7", "#1F43A8");
+    box(c, x - Math.cos(ang) * 4, y - Math.sin(ang) * 4, 12, ang, 22, 20, 9, "#BEE9FF", "#8FC7E8");
+  }
+  function tree(c, x, y) {
+    var X = SX(x), Y = SY(y);
+    c.fillStyle = "rgba(0,0,0,0.15)"; c.beginPath(); c.ellipse(X + 8 * vs, Y + 4 * vs, 30 * vs, 14 * vs, 0, 0, TAU); c.fill();
+    c.fillStyle = "#8B5A3C"; c.fillRect(X - 5 * vs, Y - 30 * vs, 10 * vs, 30 * vs);
+    c.beginPath(); c.arc(X, Y - 46 * vs, 30 * vs, 0, TAU); trim(c, "#2E9E5B", 3);
+    c.beginPath(); c.arc(X - 8 * vs, Y - 54 * vs, 10 * vs, 0, TAU); c.fillStyle = "#4FBF6E"; c.fill();
+  }
+  // An oriented box in the angled view.
+  function box(c, cx0, cy0, z, ang, L, Wd, Hh, top, side) {
+    var ca = Math.cos(ang), sa = Math.sin(ang), hl = L / 2, hw = Wd / 2;
+    var corners = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]].map(function (q) { return [cx0 + q[0] * ca - q[1] * sa, cy0 + q[0] * sa + q[1] * ca]; });
+    for (var i = 0; i < 4; i++) {
+      var a = corners[i], b = corners[(i + 1) % 4];
+      var mx = (a[0] + b[0]) / 2 - cx0, my = (a[1] + b[1]) / 2 - cy0;
+      if (my <= 0.01) continue; // faces away from the viewer
+      c.beginPath();
+      c.moveTo(SX(a[0]), SY(a[1], z)); c.lineTo(SX(b[0]), SY(b[1], z)); c.lineTo(SX(b[0]), SY(b[1], z + Hh)); c.lineTo(SX(a[0]), SY(a[1], z + Hh)); c.closePath();
+      c.fillStyle = side; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+    }
+    c.beginPath();
+    corners.forEach(function (q, i) { if (i) c.lineTo(SX(q[0]), SY(q[1], z + Hh)); else c.moveTo(SX(q[0]), SY(q[1], z + Hh)); });
+    c.closePath(); c.fillStyle = top; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+  }
+  // Local transform for drawing on top of a car (u along, v across), at height h.
+  function topT(c, cp, h) {
+    var ca = Math.cos(cp.ang), sa = Math.sin(cp.ang);
+    c.setTransform(DPR * vs * ca, DPR * vs * sa * TILT, -DPR * vs * sa, DPR * vs * ca * TILT, DPR * SX(cp.x), DPR * SY(cp.y, cp.z + h));
+  }
+  function drawCarTop(c, cp, night) {
+    var p = cp.p, t = p.t, L = cp.len, Wd = RW, col = p.color;
+    var side = shade(col, -0.3);
+    // shadow
+    c.save(); topT(c, cp, 0); c.fillStyle = "rgba(0,0,0,0.2)"; c.fillRect(-L / 2 + 4, -Wd / 2 + 6, L, Wd); c.restore();
+    var h = 22;
+    if (t === "logs" || t === "pipes" || t === "boxes") h = 8;
+    if (t === "coal" || t === "hopper") h = 18;
+    if (t === "steam") {
+      // engine part forward, tender behind
+      var eL = L * 0.64, tL = L - eL - 2;
+      var fxp = cp.x + Math.cos(cp.ang) * (L / 2 - eL / 2), fyp = cp.y + Math.sin(cp.ang) * (L / 2 - eL / 2);
+      var bxp = cp.x - Math.cos(cp.ang) * (L / 2 - tL / 2), byp = cp.y - Math.sin(cp.ang) * (L / 2 - tL / 2);
+      box(c, bxp, byp, cp.z, cp.ang, tL, Wd, 20, col, side);
+      c.save(); topT(c, { x: bxp, y: byp, z: cp.z, ang: cp.ang }, 20);
+      c.fillStyle = "#26282E"; rr(c, -tL / 2 + 4, -Wd / 2 + 5, tL - 8, Wd - 10, 6); c.fill(); c.restore();
+      box(c, fxp, fyp, cp.z, cp.ang, eL, Wd - 4, 24, col, side);
+      c.save(); topT(c, { x: fxp, y: fyp, z: cp.z, ang: cp.ang }, 24);
+      rr(c, -eL / 2 + 2, -Wd / 2 + 6, eL * 0.62, Wd - 16, 8); trim(c, shade(col, 0.15), 2);
+      c.beginPath(); c.arc(eL / 2 - 14, 0, 7, 0, TAU); trim(c, "#26282E", 2);
+      rr(c, -eL / 2 + 2, -Wd / 2 + 2, eL * 0.32, Wd - 8, 3); trim(c, "#26282E", 2);
+      c.restore();
+    } else if (t === "fast") {
+      box(c, cp.x - Math.cos(cp.ang) * 8, cp.y - Math.sin(cp.ang) * 8, cp.z, cp.ang, L - 16, Wd, 20, col, side);
+      c.save(); topT(c, cp, 20);
+      c.beginPath(); c.moveTo(L / 2 - 16, -Wd / 2); c.quadraticCurveTo(L / 2 + 10, 0, L / 2 - 16, Wd / 2); c.closePath(); trim(c, col, 2.5);
+      c.fillStyle = "#26282E"; rr(c, L / 2 - 22, -Wd / 2 + 6, 14, Wd - 12, 5); c.fill();
+      c.fillStyle = "#E63946"; c.fillRect(-L / 2 + 8, -2, L - 30, 4);
+      c.restore();
+    } else {
+      box(c, cp.x, cp.y, cp.z, cp.ang, L, Wd, h, col, side);
+      c.save(); topT(c, cp, h);
+      if (p.style === "stripe") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; c.fillRect(-L / 2 + 2, -3, L - 4, 6); }
+      else if (p.style === "dots") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; for (var dx = -L / 2 + 8; dx < L / 2 - 4; dx += 12) { c.beginPath(); c.arc(dx, (dx % 24 ? -5 : 5), 3, 0, TAU); c.fill(); } }
+      else if (p.style === "zigzag") { c.strokeStyle = isDark(col) ? "#FFFFFF" : OUT; c.lineWidth = 3; c.beginPath(); for (var zx = -L / 2 + 4, zi = 0; zx < L / 2 - 2; zx += 8, zi++) c.lineTo(zx, zi % 2 ? -6 : 6); c.stroke(); }
+      if (t === "diesel") { c.beginPath(); c.arc(-L / 4, 0, 6, 0, TAU); c.arc(0, 0, 6, 0, TAU); trim(c, "#4A5578", 2); rr(c, L / 2 - 20, -Wd / 2 + 3, 16, Wd - 6, 3); trim(c, shade(col, 0.2), 2); }
+      else if (t === "electric") { c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-10, -10); c.lineTo(6, 0); c.lineTo(-10, 10); c.moveTo(-14, -12); c.lineTo(-14, 12); c.stroke(); }
+      else if (t === "boxcar") { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(-L / 2 + 4, 0); c.lineTo(L / 2 - 4, 0); c.stroke(); }
+      else if (t === "tanker") { c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-L / 2 + 6, -Wd / 2 + 4, L - 12, 5); c.beginPath(); c.arc(0, 0, 7, 0, TAU); trim(c, shade(col, -0.15), 2); }
+      else if (t === "hopper") { c.fillStyle = "#A27B5C"; rr(c, -L / 2 + 5, -Wd / 2 + 5, L - 10, Wd - 10, 6); c.fill(); }
+      else if (t === "coal") { c.fillStyle = "#26282E"; rr(c, -L / 2 + 4, -Wd / 2 + 4, L - 8, Wd - 8, 6); c.fill(); }
+      else if (t === "logs") { for (var li = -1; li <= 1; li++) { rr(c, -L / 2 + 6, li * 9 - 4, L - 12, 9, 4); trim(c, "#8B5A3C", 2); } }
+      else if (t === "pipes") { for (var pi = -1; pi <= 1; pi++) { rr(c, -L / 2 + 6, pi * 9 - 4, L - 12, 8, 4); trim(c, "#9AA3AF", 2); } }
+      else if (t === "boxes") { rr(c, -L / 2 + 4, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#F77F00", 2); rr(c, 2, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#5BC0EB", 2); }
+      else if (t === "passenger") { c.fillStyle = night ? "#FFE680" : "rgba(255,255,255,0.45)"; for (var wx = -L / 2 + 8; wx < L / 2 - 8; wx += 12) { c.fillRect(wx, -Wd / 2 + 1, 7, 3); c.fillRect(wx, Wd / 2 - 4, 7, 3); } }
+      else if (t === "caboose") { rr(c, -10, -Wd / 2 + 4, 20, Wd - 8, 3); trim(c, shade(col, 0.2), 2); }
+      c.restore();
+    }
+  }
+  function drawRun(t) {
+    var c = cx, lay = run.lay;
+    c.drawImage(layer.cv, 0, 0, W, H);
+    var poses = carPoses();
+    var night = state.night;
+    var sp = segPoint(lay.station.seg, lay.station.s);
+    var nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
+    // things on the ground: the house, the road car, people waiting on the platform
+    drawHouse(c, lay);
+    drawRoadCar(c, t);
+    if (!run.atStation || run.dwell <= 0) {
+      [-90, -30, 40, 100].forEach(function (o, k) {
+        var px = sp.x + Math.cos(sp.ang) * o + nx * 54, py = sp.y + Math.sin(sp.ang) * o + ny * 54;
+        var hop = Math.max(0, Math.sin(t * 3 + k * 1.7)) * 4;
+        person(c, px, py, hop, ["#E63946", "#2D5BD7", "#F77F00", "#7B4FC9"][k]);
+      });
+    }
+    var low = poses.filter(function (q) { return q.z <= 2; }), high = poses.filter(function (q) { return q.z > 2; });
+    low.sort(function (a, b) { return a.y - b.y; }); high.sort(function (a, b) { return a.y - b.y; });
+    function drawOne(q) {
+      if (q.i === sel) halo(c, q, t);
+      var jy = q.p.jig > 0 ? Math.abs(Math.sin(q.p.jig * 16)) * 6 * q.p.jig : 0;
+      drawCarTop(c, jy ? { p: q.p, x: q.x, y: q.y, z: q.z + jy, ang: q.ang, len: q.len } : q, night);
+    }
+    low.forEach(drawOne);
+    if (bridgeLayer) c.drawImage(bridgeLayer.cv, 0, 0, W, H);
+    high.forEach(drawOne);
+    c.drawImage(hillLayer.cv, 0, 0, W, H);
+    // station building + sign
+    var bx = sp.x + nx * 100, by = sp.y + ny * 100;
+    box(c, bx, by, 0, sp.ang, 120, 50, 40, "#E63946", "#B02A35");
+    var rx0 = SX(bx), ry0 = SY(by, 40);
+    c.font = "800 " + Math.max(12, Math.round(22 * vs)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+    var sw0 = c.measureText("Station").width + 16;
+    rr(c, rx0 - sw0 / 2, ry0 - 18 - 30 * vs, sw0, Math.max(20, 30 * vs), 8); trim(c, "#FFFFFF", 3);
+    c.fillStyle = OUT; c.fillText("Station", rx0, ry0 - 18 - 30 * vs + Math.max(20, 30 * vs) / 2 + 1);
+    // station bell glows while the train waits
+    if (run.atStation && run.dwell > 0) {
+      c.fillStyle = "rgba(255,230,120," + (0.35 + 0.25 * Math.sin(t * 6)) + ")";
+      c.beginPath(); c.arc(rx0, ry0 - 18 - 30 * vs - 14, 10 + 4 * Math.sin(t * 6), 0, TAU); c.fill();
+    }
+    // loads moving between platform and cars
+    run.loads.forEach(function (L) {
+      var k = L.t / L.life, x = L.a.x + (L.b.x - L.a.x) * k, y = L.a.y + (L.b.y - L.a.y) * k, z = L.z + 24 + Math.sin(k * Math.PI) * 50;
+      var X = SX(x), Y = SY(y, z), r = Math.max(6, 10 * vs);
+      if (L.kind === "person") person(c, x, y, z - 4, L.c);
+      else if (L.kind === "drop") { c.beginPath(); c.moveTo(X, Y - r * 1.4); c.quadraticCurveTo(X + r, Y, X, Y + r * 0.8); c.quadraticCurveTo(X - r, Y, X, Y - r * 1.4); trim(c, L.c, 2.5); }
+      else if (L.kind === "log") { rr(c, X - r * 1.4, Y - r * 0.5, r * 2.8, r, r * 0.5); trim(c, L.c, 2.5); }
+      else if (L.kind === "lump") { c.beginPath(); c.arc(X, Y, r * 0.8, 0, TAU); trim(c, L.c, 2.5); }
+      else { rr(c, X - r, Y - r, r * 2, r * 2, 3); trim(c, L.c, 2.5); }
+    });
+    // crossing gates with flashing lights
+    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
+    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang), tx = Math.cos(cr.ang), ty = Math.sin(cr.ang);
+    var down = run.gate;
+    [-1, 1].forEach(function (sd) {
+      var px = cr.x + rx * sd * 50 + tx * sd * 36, py = cr.y + ry * sd * 50 + ty * sd * 36;
+      var len = 60;
+      var ex = px - tx * sd * len * down, ey = py - ty * sd * len * down, ez = 22 + (1 - down) * len;
+      c.strokeStyle = OUT; c.lineWidth = Math.max(4, 9 * vs); c.lineCap = "round";
+      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.strokeStyle = "#FFFFFF"; c.lineWidth = Math.max(2.5, 5 * vs); c.setLineDash([8 * vs, 8 * vs]);
+      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.strokeStyle = "#E63946"; c.lineDashOffset = 8 * vs; c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+      c.setLineDash([]); c.lineDashOffset = 0;
+      c.fillStyle = "#4A5578"; c.fillRect(SX(px) - 3 * vs, SY(py, 34), 6 * vs, 34 * HT * vs);
+      var on = down > 0.3 && Math.floor(t * 2.5) % 2 === (sd > 0 ? 0 : 1);
+      c.beginPath(); c.arc(SX(px), SY(py, 38), Math.max(4, 8 * vs), 0, TAU); trim(c, on ? "#FF4A4A" : "#5A2A2A", 2.5);
+      if (on) { c.fillStyle = "rgba(255,80,80,0.4)"; c.beginPath(); c.arc(SX(px), SY(py, 38), 24 * vs, 0, TAU); c.fill(); }
+    });
+    // switches: big yellow buttons with an arrow showing the way the train will go
+    lay.switches.forEach(function (sw) {
+      var way = sw.ways[sw.on], p0 = segPoint(way, 0), p1 = segPoint(way, 80);
+      var X = SX(p0.x), Y = SY(p0.y) - 6, r = Math.max(22, 34 * vs) * (1 + sw.flip * 0.3);
+      var pulse = (!flipped && !reduce) ? 1 + 0.08 * Math.sin(t * 5) : 1;
+      r *= pulse;
+      c.beginPath(); c.arc(X, Y, r, 0, TAU); trim(c, "#FFC93C", 4);
+      var ang = Math.atan2(SY(p1.y) - SY(p0.y), SX(p1.x) - SX(p0.x));
+      c.save(); c.translate(X, Y); c.rotate(ang);
+      c.beginPath(); c.moveTo(r * 0.6, 0); c.lineTo(-r * 0.1, -r * 0.5); c.lineTo(-r * 0.1, -r * 0.2); c.lineTo(-r * 0.6, -r * 0.2); c.lineTo(-r * 0.6, r * 0.2); c.lineTo(-r * 0.1, r * 0.2); c.lineTo(-r * 0.1, r * 0.5); c.closePath();
+      trim(c, "#FFFFFF", 3); c.restore();
+      sw.sx = X; sw.sy = Y; sw.sr = r;
+    });
+    // smoke puffs
+    run.puffs.forEach(function (f) {
+      var k = f.t / f.life;
+      c.globalAlpha = (1 - k) * 0.9;
+      c.beginPath(); c.arc(SX(f.x), SY(f.y, f.z), f.r * vs * 1.4, 0, TAU);
+      c.fillStyle = f.dark ? "#C9D3E6" : "#FFFFFF"; c.fill(); c.lineWidth = 2; c.strokeStyle = "rgba(29,35,64,0.5)"; c.stroke();
+    });
+    c.globalAlpha = 1;
+    if (night) drawNight(c, poses, sp, nx, ny);
+    // the tapped car: a bouncing arrow above it
+    if (sel >= 0 && poses[sel]) {
+      var q = poses[sel], ax = SX(q.x), ay = SY(q.y, q.z + 40) - 26 - (reduce ? 0 : Math.abs(Math.sin(t * 4)) * 10);
+      c.beginPath(); c.moveTo(ax, ay + 22); c.lineTo(ax - 18, ay); c.lineTo(ax - 7, ay); c.lineTo(ax - 7, ay - 18); c.lineTo(ax + 7, ay - 18); c.lineTo(ax + 7, ay); c.lineTo(ax + 18, ay); c.closePath();
+      trim(c, "#FFC93C", 4);
+    }
+    if (run.toot > 0 && poses.length) {
+      var h1 = poses[0], k2 = 1 - run.toot / TOOT_T;
+      var X1 = SX(h1.x), Y1 = SY(h1.y, h1.z + 60) - 30 - k2 * 30;
+      c.globalAlpha = k2 > 0.8 ? (1 - k2) / 0.2 : 1;
+      var fs = Math.round(clamp(40 * vs, 22, 44));
+      c.font = "800 " + fs + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+      var word = h1.p.t === "steam" ? "TOOT TOOT!" : "HONK HONK!";
+      var tw = c.measureText(word).width;
+      var bxx = clamp(X1, tw / 2 + 20, W - tw / 2 - 20), byy = clamp(Y1, fs + 10, H - fs - 10);
+      rr(c, bxx - tw / 2 - 14, byy - fs * 0.75, tw + 28, fs * 1.5, 18); trim(c, "#FFFFFF", 4);
+      c.fillStyle = OUT; c.fillText(word, bxx, byy + 2);
+      c.globalAlpha = 1;
+    }
+  }
+  function person(c, x, y, z, col) {
+    var X = SX(x), Y = SY(y, z || 0), s = Math.max(0.55, vs);
+    c.beginPath(); c.ellipse(X, Y - 9 * s, 6 * s, 9 * s, 0, 0, TAU); trim(c, col, 2);
+    c.beginPath(); c.arc(X, Y - 22 * s, 5.5 * s, 0, TAU); trim(c, "#F2C9A0", 2);
+  }
+  // The tapped car glows: a yellow outline on the ground around it.
+  function halo(c, q, t) {
+    var pulse = reduce ? 1 : 1 + 0.12 * Math.sin(t * 6);
+    c.save(); topT(c, q, 0);
+    c.lineJoin = "round";
+    rr(c, -q.len / 2 - 9 * pulse, -RW / 2 - 9 * pulse, q.len + 18 * pulse, RW + 18 * pulse, 14);
+    c.fillStyle = "rgba(255,201,60,0.85)"; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+    c.restore();
+  }
+  function drawNight(c, poses, sp, nx, ny) {
+    c.fillStyle = "rgba(12,20,60,0.55)"; c.fillRect(0, 0, W, H);
+    c.save(); c.globalCompositeOperation = "lighter";
+    var h0 = poses[0];
+    if (h0 && TYPES[h0.p.t].eng) {
+      var hx = h0.x + Math.cos(h0.ang) * h0.len / 2, hy = h0.y + Math.sin(h0.ang) * h0.len / 2;
+      var sx = SX(hx), sy = SY(hy, h0.z + 14);
+      var ex2 = SX(hx + Math.cos(h0.ang) * 220), ey2 = SY(hy + Math.sin(h0.ang) * 220, h0.z);
+      var g = c.createRadialGradient(sx, sy, 2, sx, sy, 220 * vs);
+      g.addColorStop(0, "rgba(255,240,160,0.75)"); g.addColorStop(1, "rgba(255,240,160,0)");
+      c.fillStyle = g;
+      var px2 = -Math.sin(h0.ang) * 70, py2 = Math.cos(h0.ang) * 70;
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex2 + px2 * vs, ey2 + py2 * TILT * vs); c.lineTo(ex2 - px2 * vs, ey2 - py2 * TILT * vs); c.closePath(); c.fill();
+      c.beginPath(); c.arc(sx, sy, 7 * vs + 3, 0, TAU); c.fillStyle = "rgba(255,250,200,0.9)"; c.fill();
+    }
+    [-120, 0, 120].forEach(function (o) {
+      var lx = sp.x + Math.cos(sp.ang) * o + nx * 50, ly = sp.y + Math.sin(sp.ang) * o + ny * 50;
+      var g2 = c.createRadialGradient(SX(lx), SY(ly, 20), 1, SX(lx), SY(ly, 20), 50 * vs);
+      g2.addColorStop(0, "rgba(255,220,120,0.7)"); g2.addColorStop(1, "rgba(255,220,120,0)");
+      c.fillStyle = g2; c.beginPath(); c.arc(SX(lx), SY(ly, 20), 50 * vs, 0, TAU); c.fill();
+    });
+    // the house windows and the road car's lamps
+    var rg = roadGeom(run.lay);
+    var g4 = c.createRadialGradient(SX(rg.hx), SY(rg.hy, 20), 1, SX(rg.hx), SY(rg.hy, 20), 60 * vs);
+    g4.addColorStop(0, "rgba(255,220,120,0.6)"); g4.addColorStop(1, "rgba(255,220,120,0)");
+    c.fillStyle = g4; c.beginPath(); c.arc(SX(rg.hx), SY(rg.hy, 20), 60 * vs, 0, TAU); c.fill();
+    poses.forEach(function (q) {
+      if (q.p.t === "passenger" || q.p.t === "caboose" || q.p.t === "fast") {
+        var g3 = c.createRadialGradient(SX(q.x), SY(q.y, q.z + 20), 1, SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7);
+        g3.addColorStop(0, "rgba(255,220,120,0.45)"); g3.addColorStop(1, "rgba(255,220,120,0)");
+        c.fillStyle = g3; c.beginPath(); c.arc(SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7, 0, TAU); c.fill();
+      }
+    });
+    c.restore();
+    // stars
+    c.fillStyle = "rgba(255,246,200,0.8)";
+    for (var si = 0; si < 24; si++) { c.beginPath(); c.arc((si * 137.5) % W, (si * 71) % H, 1.2 + (si % 3) * 0.6, 0, TAU); c.fill(); }
   }
 
   // ---------- Loop ----------
+  var cv = $("cv"), cx = cv.getContext("2d"), DPR = 1, W = 300, H = 200;
+  var stage = $("stage");
   var last = 0;
   function frame(ts) {
     var dt = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts;
     var t = ts / 1000;
     cx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    if (Toybox.timer.phase() !== "resting") {
-      step(dt);
-      drawScene(t);
-      drawEmptyHint();
-      drawTrain(t);
-      drawNight();
-      drawToot();
-      drawYard(t);
+    if (Toybox.timer.phase() !== "resting" && run && layer) {
+      stepRun(dt); drawRun(t);
       drawFx(dt);
     }
     requestAnimationFrame(frame);
@@ -1183,283 +1461,297 @@ body.big .tb-panel { display: none; }
     W = Math.max(50, stage.clientWidth); H = Math.max(50, stage.clientHeight);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    metrics();
-    cam.sT = fitScale(); var b = relBounds(cam.sT); cam.relT = clamp(cam.mode === "front" ? b.lo : b.hi, b.lo, b.hi);
-    renderStyles();
-    updateCoach();
+    var turned = orient(H > W * 1.15);
+    // Very wide stages (a phone held sideways in Big mode): look down a little more steeply so the layout fills the width.
+    if (!UPRIGHT) TILT = W / H > 2.1 ? 0.6 : 0.74;
+    if (turned || !run) startRun(); else buildLayer();
+    renderPicks();
+    if (sel >= 0) drawSelPic();
   }
   window.addEventListener("resize", function () { setTimeout(resize, 30); });
-  // The stage also changes size when the Go! row comes and goes.
   var roT = 0;
   if ("ResizeObserver" in window) new ResizeObserver(function () { clearTimeout(roT); roT = setTimeout(resize, 30); }).observe(stage);
 
   // ---------- Input on the stage ----------
-  var drags = {};
   function local(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-  // Screen positions of the engine's controls (null without an engine).
-  // lever: the knob (x, ky), the pivot (px, py) and the arm length r, all in canvas px.
-  function ctrlPos() {
-    var i = engIdx(); if (i < 0) return null;
-    var a = anim[i], C = CTRL[a.p.t], s = cam.s, px = pieceSX(a) + (a.drag ? a.drag.dx : 0), py = view.gy + (a.drag ? a.drag.dy : 0);
-    var kn = knobAt(C.lever, state.speed);
-    return { lever: { x: px + kn.x * s, ky: py + kn.y * s, px: px + C.lever.x * s, py: py + C.lever.y * s, r: C.lever.r * s,
-        y0: py + (C.lever.y - C.lever.r) * s, y1: py + C.lever.y * s },
-      whistle: { x: px + C.whistle.hx * s, y: py + C.whistle.hy * s },
-      lamp: { x: px + C.lamp.x * s, y: py + C.lamp.y * s } };
+  function inTunnel(q) {
+    var tn = run.lay.tunnel;
+    var best = 1e9, s0 = 0;
+    for (var s = tn.a + 30; s <= tn.b - 30; s += 12) {
+      var p = segPoint(tn.seg, s), d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < best) { best = d; s0 = s; }
+    }
+    return best < 22 && q.z < 2 && s0 > 0;
   }
-  function setSpeed(k, fromGo) {
-    k = clamp(k, 0, 1); if (k < 0.07) k = 0;
-    if (k === state.speed) return;
-    state.speed = k;
-    if (k > 0 && engIdx() >= 0) { focus("front"); }
-    if (fromGo && engIdx() >= 0) { var a = anim[engIdx()]; a.jig = Math.max(a.jig, 0.6); }
-    updateGo();
-  }
-  // The lever follows the finger around its pivot: flat (finger level with or below the pivot) = Stop,
-  // straight up (finger above or behind the pivot) = Fast.
-  function leverFromPt(p) {
-    var cp = ctrlPos(); if (!cp) return;
-    var lv = cp.lever, dx = lv.px - p.x, dy = lv.py - p.y;
-    if (dx <= 0 && dy > 0) { setSpeed(1); return; }
-    if (dy <= 0) { setSpeed(0); return; }
-    setSpeed(Math.atan2(dy, dx) / (Math.PI / 2));
-  }
-  function toot() {
-    if (engIdx() < 0 || Toybox.timer.locked()) return;
-    train.toot = TOOT_T;
-    if (CTRL[anim[engIdx()].p.t].whistle.cord) sWhistle(); else sHorn();
-  }
-  var nightT = 0;
-  function toggleNight() {
-    if (Toybox.timer.locked() || Date.now() - nightT < 350) return;
-    nightT = Date.now();
-    state.night = !state.night; save(); sClick();
-    fx.push({ k: "text", x: W / 2, y: view.gy * 0.4, t: 0, life: 1.8, text: state.night ? "Night!" : "Day!", size: 44 });
+  function hitPiece(p) {
+    var poses = carPoses(), best = -1, bd = 1e9;
+    poses.forEach(function (q, i) {
+      if (inTunnel(q)) return;
+      var X = SX(q.x), Y = SY(q.y, q.z + 12), d = Math.hypot(p.x - X, p.y - Y);
+      var r = Math.max(26, q.len * vs * 0.6);
+      if (d < r && d < bd) { bd = d; best = i; }
+    });
+    return best;
   }
   cv.addEventListener("pointerdown", function (e) {
     e.preventDefault();
-    if (Toybox.timer.locked()) return;
-    var p = local(e), d = null, s = cam.s;
-    var HIT = Math.max(28, 26 * s);
-    // 1. the driver's controls on the engine
-    var cp = ctrlPos();
-    if (cp) {
-      var lv = cp.lever;
-      var onKnob = Math.hypot(p.x - lv.x, p.y - lv.ky) < HIT;
-      // the quadrant plate itself (anywhere in the quarter the lever sweeps)
-      var onPlate = p.x > lv.px - lv.r - HIT * 0.8 && p.x < lv.px + HIT * 0.6 && p.y > lv.py - lv.r - HIT * 0.8 && p.y < lv.py + HIT * 0.5;
-      var dWh = Math.hypot(p.x - cp.whistle.x, p.y - cp.whistle.y), dLp = Math.hypot(p.x - cp.lamp.x, p.y - cp.lamp.y);
-      if (onKnob) { d = { kind: "lever" }; leverFromPt(p); }
-      else if (dWh < HIT) { d = { kind: "whistle" }; toot(); }
-      else if (dLp < HIT) { d = { kind: "none" }; toggleNight(); }
-      else if (onPlate) { d = { kind: "lever" }; leverFromPt(p); }
+    if (Toybox.timer.locked() || !run) return;
+    var p = local(e), lay = run.lay;
+    for (var k = 0; k < lay.switches.length; k++) {
+      var sw = lay.switches[k];
+      if (sw.sx !== undefined && Math.hypot(p.x - sw.sx, p.y - sw.sy) < sw.sr + 16) { flipSwitch(sw); return; }
     }
-    // 2. the yard: lift a piece, swipe the strip, or tap a piece to send it over
-    if (!d && yard.v > 0.9 && p.y >= stripY() && !carry) {
-      var it = yardHit(p.x);
-      if (it >= 0) {
-        var Lw = yard.xs[it] - yard.scroll;
-        d = { kind: "yard", item: it, t: yard.items[it], sx: p.x, sy: p.y, moved: false, lifted: false, scroll0: yard.scroll,
-          ox: (p.x - Lw) / view.ys, oy: (p.y - yardRail()) / view.ys };
-      } else d = { kind: "yscroll", sx: p.x, scroll0: yard.scroll, lastX: p.x, lastT: performance.now(), vx: 0 };
+    var i = hitPiece(p);
+    if (i >= 0) {
+      var pc = state.pieces[i];
+      if (TYPES[pc.t].eng) { toot(); return; }
+      if (sel === i) endSel(); else showSel(i);
+      return;
     }
-    // 3. a piece of the train: drag it off (when stopped) or tap it to paint
-    if (!d) {
-      for (var i = anim.length - 1; i >= 0; i--) {
-        var a = anim[i], x0 = pieceSX(a), x1 = x0 + TYPES[a.p.t].len * s;
-        if (p.x >= x0 - 6 && p.x <= x1 + 6 && p.y >= view.gy - PH * s && p.y <= view.gy + 16 && !a.drag && !a.roll) {
-          a.drag = { dx: 0, dy: 0, sx: p.x, sy: p.y, moved: false, far: false };
-          d = { kind: "piece", a: a };
-          break;
-        }
-      }
-    }
-    // 4. the scenery: pan along a long train while it stands still
-    if (!d) d = { kind: "pan", sx: p.x, rel0: cam.relT, moved: false };
-    drags[e.pointerId] = d;
-    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    if (sel >= 0) endSel();
+    fx.push({ k: "ring", x: p.x, y: p.y, t: 0, life: 0.45 });
   });
-  cv.addEventListener("pointermove", function (e) {
-    var d = drags[e.pointerId]; if (!d) return;
-    var p = local(e);
-    if (d.kind === "lever") { leverFromPt(p); return; }
-    if (d.kind === "piece") {
-      var a = d.a; if (!a.drag) return;
-      a.drag.dx = p.x - a.drag.sx; a.drag.dy = p.y - a.drag.sy;
-      if (Math.hypot(a.drag.dx, a.drag.dy) > 12) a.drag.moved = true;
-      a.drag.far = !moving && (Math.abs(a.drag.dy) > Math.max(70, view.gy * 0.25) || p.y > stripY() || Math.abs(a.drag.dx) > W * 0.45);
-      return;
-    }
-    if (d.kind === "yard") {
-      var dx = p.x - d.sx, dy = p.y - d.sy;
-      if (!d.lifted && !d.moved) {
-        // Pulling up (even on a slant) lifts the piece; a mostly sideways swipe scrolls the yard.
-        if (dy < -8 || (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx))) {
-          d.lifted = true; d.moved = true;
-          carry = { t: d.t, item: d.item, x: p.x, y: p.y, ox: d.ox, oy: d.oy, grow: 0, lifted: true };
-          clearTimeout(backT); focus("rear");
-        } else if (Math.abs(dx) > 10) { d.moved = true; d.kind = "yscroll"; d.scroll0 = yard.scroll; d.sx = p.x; d.lastX = p.x; d.lastT = performance.now(); d.vx = 0; }
-      }
-      if (carry && d.lifted) { carry.x = p.x; carry.y = p.y; }
-      return;
-    }
-    if (d.kind === "yscroll") {
-      yard.scroll = d.scroll0 - (p.x - d.sx); yardLayout();
-      var now = performance.now(), dt = Math.max(1, now - d.lastT);
-      d.vx = -(p.x - d.lastX) / dt * 1000; d.lastX = p.x; d.lastT = now;
-      return;
-    }
-    if (d.kind === "pan") {
-      if (Math.abs(p.x - d.sx) > 8) d.moved = true;
-      var b = relBounds(cam.sT);
-      if (!b.fits && !moving) cam.relT = clamp(d.rel0 - (p.x - d.sx) / cam.s, b.lo, b.hi);
-    }
-  });
-  function endDrag(e) {
-    var d = drags[e.pointerId]; if (!d) return;
-    delete drags[e.pointerId];
-    var p = local(e);
-    if (d.kind === "lever") { save(); return; }
-    if (d.kind === "yscroll") { if (Math.abs(d.vx) > 80) yard.scrollV = clamp(d.vx, -2400, 2400); return; }
-    if (d.kind === "yard") {
-      if (d.lifted && carry) {
-        var c0 = carry; carry = null;
-        if (p.y < stripY() - 4 && !Toybox.timer.locked()) {
-          // dropped on the line: it rolls to the coupler
-          var fromX = (p.x - c0.ox * cam.s) / cam.s + cam.rel;
-          if (!addPiece(d.t, fromX)) return;
-          ghostDone("add");
-        } else yard.hop = 0.6;
-      } else if (!d.moved) {
-        // a tap sends the piece over by itself
-        if (addPiece(d.t)) ghostDone("add");
-      }
-      return;
-    }
-    if (d.kind === "piece") {
-      var a = d.a, dr = a.drag; a.drag = null;
-      var i = anim.indexOf(a); if (i < 0 || !dr) return;
-      if (!dr.moved) { state.sel = i; a.jig = 1; setTab("paint"); refreshPaint(); return; }
-      if (dr.far && !Toybox.timer.locked()) removeAt(i, pieceSX(a) + dr.dx + TYPES[a.p.t].len * cam.s / 2, view.gy - 60 * cam.s + dr.dy);
-      else a.jig = 0.8;
-      return;
-    }
-    if (d.kind === "pan" && !d.moved) fx.push({ k: "ring", x: p.x, y: p.y, t: 0, life: 0.45 });
+
+  function flipSwitch(sw) {
+    sw.on = 1 - sw.on; sw.flip = 1; sClick();
+    flipped = true; ghostDone();
+    buildLayer(); updateCoach();
   }
-  cv.addEventListener("pointerup", endDrag);
-  cv.addEventListener("pointercancel", endDrag);
+  function toot() {
+    if (!run || Toybox.timer.locked() || !hasEngine()) return;
+    run.toot = TOOT_T;
+    var poses = carPoses(), h = poses[0];
+    if (h && h.p.t === "steam") sWhistle(); else sHorn();
+    if (h) for (var i = 0; i < 6; i++) { puff(h, 0.3, 1.5); var f = run.puffs[run.puffs.length - 1]; f.vz = 60 + i * 12; f.vx = rand(-30, 30); }
+    var b = $("toot"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+    tooted = true; updateCoach();
+  }
+  function sHorn() {
+    var ctx = ac(); if (!ctx) return;
+    var t = ctx.currentTime;
+    [311, 392].forEach(function (f) { tone(ctx, "triangle", f, f, t, 0.8, 0.05); });
+  }
 
   // ---------- Panel ----------
   var panel = $("panel");
   function setTab(tab) {
-    if (state.tab !== tab) yard.hop = 1;
-    state.tab = tab;
+    state.tab = tab; sel = -1;
     panel.dataset.tab = tab;
     Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === tab)); });
-    yard.scroll = 0; yard.scrollV = 0;
-    if (tab === "paint") refreshPaint();
-    renderStyles();
-    updateCoach();
+    renderPicks();
     save();
   }
   Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
     b.addEventListener("click", function () { if (!Toybox.timer.locked()) setTab(b.dataset.tab); });
   });
-  var goShown = null;
   function updateGo() {
-    var show = engIdx() >= 0 && state.speed === 0 && !moving && !ending.on;
-    if (show !== goShown) { goShown = show; $("go").hidden = !show; }
+    var eng = hasEngine();
+    $("gorow").hidden = !eng;
+    var g = $("go");
+    g.textContent = state.go ? "Stop" : "Go!";
+    g.classList.toggle("stop", state.go);
   }
-  $("go").addEventListener("click", function () { if (!Toybox.timer.locked() && engIdx() >= 0) { setSpeed(0.5, true); save(); ghostDone("run"); } });
+  $("go").addEventListener("click", function () {
+    if (Toybox.timer.locked() || !hasEngine()) return;
+    state.go = !state.go;
+    if (state.go && run && run.atStation) run.dwell = 0;
+    if (state.go) { sWhistleSoft(); ghostDone(); }
+    save(); updateGo(); updateCoach();
+  });
+  function sWhistleSoft() { var h = state.pieces[0]; if (h && h.t === "steam") sWhistle(); else sHorn(); }
+  $("toot").addEventListener("click", toot);
   $("newBtn").addEventListener("click", function () {
     if (Toybox.timer.locked()) return;
-    clearTrain(); setTab("engines"); focus("rear");
+    clearSurprise();
+    var poses = carPoses();
+    poses.forEach(function (q, k) {
+      setTimeout(function () { var X = SX(q.x), Y = SY(q.y, q.z + 14); burst(X, Y, q.p.color, 10, false); }, k * 40);
+    });
+    if (poses.length) sPoof();
+    state.pieces = []; state.go = false; kindGiven = false; sel = -1;
+    startRun();
+    setTab("engines");
+    save(); bumpCount(); updateGo(); updateCoach();
   });
-  // Surprise: a random train rolls in, one piece after another.
+  // Surprise: a whole surprise train rolls in (an engine if there is none, then a mix of cars in
+  // surprise colors). If the train is already full, every car gets a surprise color.
   var surpriseT = [];
+  function clearSurprise() { surpriseT.forEach(clearTimeout); surpriseT = []; }
   $("surprise").addEventListener("click", function () {
-    if (Toybox.timer.locked()) return;
-    surpriseT.forEach(clearTimeout); surpriseT = [];
-    state.speed = 0; clearTrain();
-    var picks = [ENGINES[Math.floor(Math.random() * ENGINES.length)]];
-    var n = 3 + Math.floor(Math.random() * 3);
-    for (var i = 0; i < n; i++) picks.push(CARS[Math.floor(Math.random() * (CARS.length - 1))]);
-    if (Math.random() < 0.7) picks.push("caboose");
-    setTab("cars");
-    picks.forEach(function (t, i) {
-      surpriseT.push(setTimeout(function () {
-        if (Toybox.timer.locked()) return;
-        if (addPiece(t, undefined, false)) {
-          var a = anim[anim.length - 1];
-          a.p.color = COLORS[Math.floor(Math.random() * COLORS.length)];
-          if (TYPES[t].eng && t === "fast") a.p.color = "#FFFFFF";
-          a.p.style = STYLES[Math.floor(Math.random() * STYLES.length)];
-          save();
-        }
-      }, 200 + i * 650));
+    if (Toybox.timer.locked() || !run) return;
+    clearSurprise();
+    var adds = [];
+    if (!hasEngine()) adds.push({ t: pick(ENGINES) });
+    var room = MAXP - state.pieces.length - queue.length - adds.length;
+    var n = Math.min(room, 3 + Math.floor(Math.random() * 3));
+    for (var i = 0; i < n; i++) adds.push({ t: pick(CARS), c: pick(COLORS) });
+    if (!adds.length) {
+      carPoses().forEach(function (q, k) {
+        if (TYPES[q.p.t].eng) return;
+        surpriseT.push(setTimeout(function () {
+          q.p.color = pick(COLORS); q.p.jig = 1;
+          burst(SX(q.x), SY(q.y, q.z + 14), q.p.color, 10, false); sClick(); save();
+        }, k * 220));
+      });
+      return;
+    }
+    adds.forEach(function (a, k) {
+      surpriseT.push(setTimeout(function () { addPiece(a.t, a.c); }, k * 700));
     });
   });
 
-  // Paint pane
-  COLORS.concat(["#FFFFFF"]).forEach(function (col) {
+  function pickBtn(label, draw, onTap) {
     var b = document.createElement("button");
-    b.className = "btn sw"; b.style.background = col; b.dataset.color = col; b.setAttribute("aria-label", "Color");
-    b.addEventListener("click", function () { paint({ color: col }); });
+    b.className = "btn pick";
+    var c = document.createElement("canvas");
+    var s = document.createElement("span"); s.textContent = label;
+    b.appendChild(c); b.appendChild(s);
+    b.addEventListener("click", function () {
+      if (Toybox.timer.locked()) return;
+      b.classList.remove("hop"); void b.offsetWidth; b.classList.add("hop");
+      onTap();
+    });
+    b._draw = function () { thumb(c, draw); };
+    b._label = s;
+    return b;
+  }
+  function pieceThumbDraw(c, w, h, p) {
+    var L = TYPES[p.t].len + 30, Hh = 180, s = Math.min(w / L, h / Hh) * 0.95;
+    c.translate(w / 2 - (TYPES[p.t].len / 2) * s, h - 3); c.scale(s, s);
+    drawSide(c, p, 0, 0, 0.6, false);
+  }
+  ENGINES.forEach(function (t) {
+    $("engPicks").appendChild(pickBtn(TYPES[t].name, function (c, w, h) { pieceThumbDraw(c, w, h, mkPiece(t)); }, function () {
+      var first = !hasEngine();
+      if (addPiece(t) && first && !carCount()) setTimeout(function () { if (state.tab === "engines" && sel < 0) setTab("cars"); }, 1200);
+    }));
+  });
+  CARS.forEach(function (t) {
+    $("carPicks").appendChild(pickBtn(TYPES[t].name, function (c, w, h) { pieceThumbDraw(c, w, h, mkPiece(t)); }, function () { addPiece(t); }));
+  });
+  var trackNames = { oval: "Oval", eight: "Figure 8", "switch": "Switches" };
+  ["oval", "eight", "switch"].forEach(function (k) {
+    var b = pickBtn(trackNames[k], function (c, w, h) {
+      var lay = LAYOUTS[k], s = Math.min(w / WW, h / (WH * TILT)) * 0.9;
+      c.translate((w - WW * s) / 2, (h - WH * TILT * s) / 2);
+      lay.segs.forEach(function (seg) {
+        c.beginPath();
+        seg.pts.forEach(function (p, i) { if (i % 3 && i !== seg.pts.length - 1) return; var X = p.x * s, Y = (p.y * TILT - p.z * HT) * s; if (i) c.lineTo(X, Y); else c.moveTo(X, Y); });
+        c.strokeStyle = OUT; c.lineWidth = 7; c.lineJoin = "round"; c.lineCap = "round"; c.stroke();
+        c.strokeStyle = "#B7A58C"; c.lineWidth = 3; c.stroke();
+      });
+    }, function () {
+      if (state.layout === k) return;
+      state.layout = k; endSel(); save(); startRun(); renderPicks(); updateCoach();
+      fx.push({ k: "text", x: W / 2, y: H * 0.4, t: 0, life: 2.4, text: trackNames[k] + "!", size: 40 });
+    });
+    b.dataset.layout = k;
+    $("trackPicks").appendChild(b);
+  });
+  function chevrons(c, w, h, n, col) {
+    var s = Math.min(w, h * 1.6) / 60, cxm = w / 2, cym = h / 2;
+    for (var i = 0; i < n; i++) {
+      var x = cxm + (i - (n - 1) / 2) * 14 * s;
+      c.beginPath(); c.moveTo(x - 6 * s, cym - 12 * s); c.lineTo(x + 6 * s, cym); c.lineTo(x - 6 * s, cym + 12 * s);
+      c.strokeStyle = OUT; c.lineWidth = 9 * s; c.lineCap = "round"; c.lineJoin = "round"; c.stroke();
+      c.strokeStyle = col; c.lineWidth = 4.5 * s; c.stroke();
+    }
+  }
+  var slowB = pickBtn("Slow", function (c, w, h) { chevrons(c, w, h, 1, "#2EA05A"); }, function () { setSpeed(false); });
+  var fastB = pickBtn("Fast", function (c, w, h) { chevrons(c, w, h, 3, "#FF9A4D"); }, function () { setSpeed(true); });
+  slowB.dataset.speed = "slow"; fastB.dataset.speed = "fast";
+  var nightB = pickBtn("Night", function (c, w, h) {
+    var r = Math.min(w, h) * 0.36, X = w / 2, Y = h / 2;
+    if (!state.night) {
+      c.beginPath(); c.arc(X, Y, r, 0, TAU); c.fillStyle = "#2B3B78"; c.fill();
+      c.beginPath(); c.arc(X, Y, r * 0.8, 0, TAU); c.fillStyle = "#FFF3A0"; c.fill(); c.strokeStyle = OUT; c.lineWidth = 2.5; c.stroke();
+      c.beginPath(); c.arc(X + r * 0.35, Y - r * 0.2, r * 0.7, 0, TAU); c.fillStyle = "#2B3B78"; c.fill();
+    } else {
+      c.strokeStyle = "#FFB627"; c.lineWidth = 3; c.lineCap = "round";
+      for (var i = 0; i < 8; i++) { var a = i / 8 * TAU; c.beginPath(); c.moveTo(X + Math.cos(a) * r * 0.7, Y + Math.sin(a) * r * 0.7); c.lineTo(X + Math.cos(a) * r, Y + Math.sin(a) * r); c.stroke(); }
+      c.beginPath(); c.arc(X, Y, r * 0.55, 0, TAU); c.fillStyle = "#FFE14D"; c.fill(); c.strokeStyle = OUT; c.lineWidth = 2.5; c.stroke();
+    }
+  }, function () {
+    state.night = !state.night; save(); buildLayer(); renderPicks();
+    fx.push({ k: "text", x: W / 2, y: H * 0.4, t: 0, life: 2.4, text: state.night ? "Night!" : "Day!", size: 44 });
+  });
+  [slowB, fastB, nightB].forEach(function (b) { $("trackPicks").appendChild(b); });
+  function setSpeed(f) {
+    state.fast = f; save(); renderPicks();
+  }
+  function renderPicks() {
+    Array.prototype.forEach.call(document.querySelectorAll(".pick"), function (b) {
+      if (b.dataset.layout) b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout));
+      if (b.dataset.speed) b.setAttribute("aria-pressed", String((b.dataset.speed === "fast") === state.fast));
+      if (b.offsetParent) b._draw();
+    });
+    nightB._label.textContent = state.night ? "Day" : "Night";
+  }
+
+  // The tapped car: highlighted on the track, with its own colors (and Take off) in the panel.
+  COLORS.forEach(function (col) {
+    var b = document.createElement("button");
+    b.className = "btn sw"; b.style.background = col; b.dataset.color = col; b.setAttribute("aria-label", "Paint it");
+    b.addEventListener("click", function () { paintSel(col); });
     $("swatches").appendChild(b);
   });
-  STYLES.forEach(function (st) {
-    var b = document.createElement("button");
-    b.className = "btn st"; b.dataset.style = st; b.setAttribute("aria-label", st);
-    var c = document.createElement("canvas"); b.appendChild(c);
-    b._draw = function () {
-      thumb(c, function (cc, w, h) {
-        var col = selPiece() ? selPiece().color : "#E63946";
-        rr(cc, 4, 4, w - 8, h - 8, 6);
-        body(cc, { color: col, style: st }, 4, 4, w - 8, h - 8);
-      });
-    };
-    b.addEventListener("click", function () { paint({ style: st }); });
-    $("styles").appendChild(b);
-  });
-  function renderStyles() {
-    Array.prototype.forEach.call(document.querySelectorAll(".st"), function (b) { if (b.offsetParent && b._draw) b._draw(); });
+  function showSel(i) {
+    sel = i;
+    var p = state.pieces[i]; p.jig = 1; sClick();
+    panel.dataset.tab = "sel";
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", "false"); });
+    refreshSel();
   }
-  function selPiece() { return state.sel >= 0 && state.sel < state.pieces.length ? state.pieces[state.sel] : null; }
-  function paint(ch) {
+  function endSel() {
+    if (sel < 0 && panel.dataset.tab !== "sel") return;
+    sel = -1;
+    setTab(state.tab);
+  }
+  function refreshSel() {
+    var p = state.pieces[sel];
+    if (!p) { endSel(); return; }
+    Array.prototype.forEach.call(document.querySelectorAll(".sw"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.color === p.color)); });
+    drawSelPic();
+  }
+  function drawSelPic() {
+    var p = state.pieces[sel]; if (!p) return;
+    thumb($("selPic"), function (c, w, h) { pieceThumbDraw(c, w, h, p); });
+  }
+  function paintSel(col) {
     if (Toybox.timer.locked()) return;
-    if (!selPiece()) { if (!state.pieces.length) return; state.sel = state.pieces.length - 1; }
-    var p = selPiece();
-    for (var k in ch) p[k] = ch[k];
-    var a = anim[state.sel]; if (a) a.jig = 1;
-    if (a) {
-      var x = pieceSX(a) + TYPES[p.t].len / 2 * cam.s;
-      for (var i = 0; i < 12; i++) { var ang = rand(0, TAU), sp = rand(100, 300); fx.push({ k: "bit", x: x, y: view.gy - 80 * cam.s, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 150, t: 0, life: 0.7, r: rand(5, 10), c: p.color }); }
-    }
-    sClick(); save(); refreshPaint();
+    var p = state.pieces[sel]; if (!p) return;
+    p.color = col; p.jig = 1;
+    var q = carPoses()[sel];
+    if (q) burst(SX(q.x), SY(q.y, q.z + 16), col, 14, false);
+    sClick(); save(); refreshSel();
   }
-  function refreshPaint() {
-    var p = selPiece();
-    if (!p && state.pieces.length && state.tab === "paint") { state.sel = state.pieces.length - 1; p = selPiece(); }
-    $("paintHint").textContent = p ? "Painting the " + TYPES[p.t].name.toLowerCase() : "Add a train car first.";
-    Array.prototype.forEach.call(document.querySelectorAll(".sw"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.color === p.color)); });
-    Array.prototype.forEach.call(document.querySelectorAll(".st"), function (b) { b.setAttribute("aria-pressed", String(!!p && b.dataset.style === p.style)); if (b.offsetParent && b._draw) b._draw(); });
+  $("takeOff").addEventListener("click", function () { if (!Toybox.timer.locked() && sel >= 0) removeAt(sel); });
+  $("selDone").addEventListener("click", function () { endSel(); });
+
+  function counterText() { return "Cars: " + carCount(); }
+  function bumpCount() {
+    var el = $("count"), txt = counterText();
+    if (el.textContent === txt) return;
+    el.textContent = txt;
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
   }
 
   // ---------- Coach line ----------
   function coachText() {
-    if (moving || state.speed > 0) return "";
-    if (engIdx() < 0) return "Drag an engine onto the track!";
-    if (!carCount()) return "Drag a car onto the train!";
-    if (!state.ran) return "Push the lever up!";
+    if (!state.pieces.length) return "Tap an engine!";
+    if (!hasEngine()) return "Add an engine!";
+    if (!carCount()) return "Now add cars!";
+    if (!state.go) return "Tap Go!";
+    if (state.layout === "switch" && !flipped) return "Tap a yellow arrow!";
+    if (!tooted) return "Tap the engine!";
     return "";
   }
-  var phoneCoach = window.matchMedia ? window.matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
+  var coachT = 0;
   function updateCoach() {
     var el = $("coach"), txt = coachText();
-    if (txt) el.textContent = txt;
-    el.classList.toggle("off", !txt);
-    // Phones put the pill at the bottom of the stage: keep it just above the yard strip, not over the cars.
-    el.style.bottom = phoneCoach && phoneCoach.matches ? (view.stripH + 8) + "px" : "";
+    clearTimeout(coachT);
+    if (txt) { el.textContent = txt; el.classList.remove("off"); }
+    else el.classList.add("off");
   }
 
   // ---------- iOS zoom guards ----------
@@ -1467,30 +1759,17 @@ body.big .tb-panel { display: none; }
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
-  // ---------- Timer ending: the train slows to a stop and the lights dim ----------
+  // ---------- Timer ending: the train pulls into the station and stops ----------
   function onEnding(done) {
-    ending.on = true; ending.dim = 0; ending.t = 0; ending.done = done;
-    if (!state.pieces.length || !moving) { ending.done = null; setTimeout(done, 1800); }
-    updateGo();
+    clearSurprise(); endSel();
+    if (!run || !hasEngine()) { setTimeout(done, 1500); return; }
+    var lay = run.lay;
+    if (lay.stationWay) { var sw = lay.stationWay.sw; if (sw.on !== lay.stationWay.on) flipSwitch(sw); }
+    run.ending = true;
+    if (run.atStation && run.v < 1) { setTimeout(done, 1500); return; }
+    run.endDone = done;
   }
-  function restArt() {
-    return '<svg class="rest-art" viewBox="0 0 300 200" aria-hidden="true">' +
-      '<rect x="0" y="0" width="300" height="200" rx="24" fill="#2B3B78"/>' +
-      '<circle cx="240" cy="44" r="22" fill="#FFF3A0"/><circle cx="250" cy="38" r="20" fill="#2B3B78"/>' +
-      '<rect x="0" y="150" width="300" height="50" fill="#2C5A3E"/>' +
-      '<rect x="150" y="70" width="120" height="58" rx="6" fill="#E63946" stroke="#1D2340" stroke-width="5"/>' +
-      '<rect x="140" y="58" width="140" height="18" rx="6" fill="#8B5A3C" stroke="#1D2340" stroke-width="5"/>' +
-      '<rect x="196" y="96" width="28" height="32" fill="#FFE680" stroke="#1D2340" stroke-width="4"/>' +
-      '<rect x="0" y="146" width="300" height="8" fill="#5B6478"/>' +
-      '<rect x="30" y="92" width="80" height="44" rx="18" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
-      '<rect x="92" y="78" width="40" height="58" rx="5" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
-      '<rect x="100" y="86" width="24" height="18" rx="3" fill="#FFE680" stroke="#1D2340" stroke-width="3"/>' +
-      '<rect x="38" y="70" width="18" height="24" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
-      '<circle cx="54" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="88" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="118" cy="142" r="10" fill="#4A5578" stroke="#1D2340" stroke-width="4"/>' +
-      '<text x="62" y="52" font-size="26" font-weight="800" fill="#FFFFFF" font-family="sans-serif">z z</text></svg>';
-  }
-
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // ---------- Ghost hand (same look in every app) ----------
   // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
   // at most twice per visit, and never again once the child has done the move (ghost.learned()).
   // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
@@ -1595,53 +1874,58 @@ body.big .tb-panel { display: none; }
     var r = elm.getBoundingClientRect();
     return [r.left + r.width * fx, r.top + r.height * fy];
   }
-  // What the hand shows depends on where he is: an engine first, then a car, then the lever.
+  // Idle help: tap an engine, then a car, then Go!, then (on Switches) a yellow arrow.
+  function vis(el) { return el && el.offsetParent && !document.body.classList.contains("big"); }
   function ghostPhase() {
-    if (engIdx() < 0) return "engine";
+    if (!state.pieces.length) return "engine";
     if (!carCount()) return "car";
-    if (!state.ran) return "run";
-    return "done";
+    if (!state.go) return "go";
+    if (state.layout === "switch" && !flipped) return "switch";
+    return "";
   }
-  var ghostSeen = ghostPhase();
-  function tabBtn(name) { return document.querySelector('.tab[data-tab="' + name + '"]'); }
   var ghost = makeGhost(function () {
-    if (Toybox.timer.locked() || moving || yard.v < 0.95 || carry) return null;
-    var ph = ghostPhase(), r = cv.getBoundingClientRect();
-    function P(x, y) { return [r.left + x, r.top + y]; }
-    if (ph === "done") return null;
-    if (ph === "run") {
-      var cp = ctrlPos(); if (!cp) return null;
-      if (cp.lever.x < 10 || cp.lever.x > W - 10) return { pts: [ghostPt($("go"), 0.5, 0.5)], tap: true };
-      var lv = cp.lever, arc = [P(lv.x, lv.ky)];
-      for (var q = 1; q <= 3; q++) { var th = Math.max(state.speed, q * 0.27) * Math.PI / 2; arc.push(P(lv.px - Math.cos(th) * lv.r, lv.py - Math.sin(th) * lv.r)); }
-      return { pts: arc, dur: 3000 };
-    }
-    var wantTab = ph === "engine" ? "engines" : "cars";
-    if (state.tab !== wantTab && !(ph === "car" && state.tab === "paint")) return { pts: [ghostPt(tabBtn(wantTab), 0.5, 0.5)], tap: true };
-    if (state.tab === "paint") return { pts: [ghostPt(tabBtn("cars"), 0.5, 0.5)], tap: true };
-    var y = yardLayout(), i = 0;
-    while (i < y.items.length - 1 && y.xs[i] - y.scroll + TYPES[y.items[i]].len * view.ys > W - 10) i++;
-    var X = y.xs[i] - y.scroll + TYPES[y.items[i]].len * view.ys / 2, Y = yardRail() - 70 * view.ys;
-    var tx, ty;
-    if (anim.length) { var lastA = anim[anim.length - 1]; tx = clamp(pieceSX(lastA) + (TYPES[lastA.p.t].len + 60) * cam.s, 40, W - 40); ty = view.gy - 70 * cam.s; }
-    else { tx = W / 2; ty = view.gy - 70 * cam.s; }
-    var size = Math.round(clamp(TYPES[y.items[i]].len * view.ys * 1.1, 70, 170));
-    return { pts: [P(X, Y), P(tx, ty)], dur: 3400, carry: { html: pieceHTML(y.items[i], size), size: size } };
-  }, { max: 2 });
-  function ghostDone(what) {
-    // He did the move: the hand may show the next one after a quiet spell.
+    if (Toybox.timer.locked() || !run) return null;
     var ph = ghostPhase();
-    if (ph !== ghostSeen) { ghostSeen = ph; ghost.again(); }
-    if (what === "run") ghost.poke();
+    if (ph === "engine" || ph === "car") {
+      var tile = document.querySelector((ph === "engine" ? "#engPicks" : "#carPicks") + " button");
+      if (vis(tile)) return { pts: [ghostPt(tile, 0.5, 0.5)], tap: true };
+      var tab = document.querySelector('.tab[data-tab="' + (ph === "engine" ? "engines" : "cars") + '"]');
+      if (vis(tab)) return { pts: [ghostPt(tab, 0.5, 0.5)], tap: true };
+      return null;
+    }
+    if (ph === "go") { var g = $("go"); return vis(g) && !$("gorow").hidden ? { pts: [ghostPt(g, 0.5, 0.5)], tap: true } : null; }
+    if (ph === "switch") {
+      var sw = run.lay.switches[0], r = cv.getBoundingClientRect();
+      if (sw && sw.sx !== undefined) return { pts: [[r.left + sw.sx, r.top + sw.sy]], tap: true };
+    }
+    return null;
+  });
+  var ghostSeen = ghostPhase();
+  function ghostDone() { var ph = ghostPhase(); if (ph !== ghostSeen) { ghostSeen = ph; ghost.again(); } }
+  setInterval(ghostDone, 1000);
+
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 300 200" aria-hidden="true">' +
+      '<rect x="0" y="0" width="300" height="200" rx="24" fill="#2B3B78"/>' +
+      '<circle cx="240" cy="44" r="22" fill="#FFF3A0"/><circle cx="250" cy="38" r="20" fill="#2B3B78"/>' +
+      '<rect x="0" y="150" width="300" height="50" fill="#2C5A3E"/>' +
+      '<rect x="150" y="70" width="120" height="58" rx="6" fill="#E63946" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="140" y="58" width="140" height="18" rx="6" fill="#8B5A3C" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="196" y="96" width="28" height="32" fill="#FFE680" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="0" y="146" width="300" height="8" fill="#5B6478"/>' +
+      '<rect x="30" y="92" width="80" height="44" rx="18" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="92" y="78" width="40" height="58" rx="5" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<rect x="100" y="86" width="24" height="18" rx="3" fill="#FFE680" stroke="#1D2340" stroke-width="3"/>' +
+      '<rect x="38" y="70" width="18" height="24" fill="#26282E" stroke="#1D2340" stroke-width="5"/>' +
+      '<circle cx="54" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="88" cy="142" r="12" fill="#4A5578" stroke="#1D2340" stroke-width="4"/><circle cx="118" cy="142" r="10" fill="#4A5578" stroke="#1D2340" stroke-width="4"/>' +
+      '<text x="62" y="52" font-size="26" font-weight="800" fill="#FFFFFF" font-family="sans-serif">z z</text></svg>';
   }
-  setInterval(function () { var ph = ghostPhase(); if (ph !== ghostSeen) { ghostSeen = ph; ghost.again(); } }, 1000);
 
   // ---------- Start ----------
   $("count").textContent = counterText();
-  setTab(state.tab === "paint" && !state.pieces.length ? "engines" : state.tab);
+  setTab(state.tab);
   resize();
-  cam.s = cam.sT; cam.rel = cam.relT;
-  updateCoach(); updateGo();
+  updateGo(); updateCoach();
   requestAnimationFrame(frame);
 
   Toybox.init({
@@ -1649,7 +1933,7 @@ body.big .tb-panel { display: none; }
     orientation: "landscape",
     badge: $("tbadge"),
     big: { button: $("bigToggle") },
-    timerIntro: "When time is up, the train slows to a stop and rests, and the controls lock.",
+    timerIntro: "When time is up, the train pulls into the station and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye toot button to press",
     farewellText: "Last stop!",
     goodbyeLabel: "Goodbye toot",
@@ -1657,20 +1941,21 @@ body.big .tb-panel { display: none; }
     restLine: "The train is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft chuffs, clunks, a whistle and a station bell. Hold for 2 seconds.",
-    endingMaxMs: 20000,
+    soundNote: "Soft clunks, a whistle, a crossing bell and a station chime. Hold for 2 seconds.",
+    endingMaxMs: 30000,
     onEnding: onEnding,
-    onGoodbye: function () { train.toot = TOOT_T; sWhistle(); },
-    onWake: function () { ending.on = false; ending.dim = 0; ending.done = null; updateGo(); updateCoach(); },
+    onGoodbye: function () { if (run && hasEngine()) { run.toot = TOOT_T; sWhistleSoft(); } },
+    onWake: function () {
+      if (run) { run.ending = false; run.endDone = null; run.dwell = 1; }
+      state.go = false; save(); updateGo(); updateCoach();
+    },
     onBig: function () { setTimeout(resize, 30); },
     onSound: function (on) { if (on) setTimeout(sChime, 60); }
   });
-  stage.appendChild($("tb-farewell"));
-  if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, train: train, cam: cam, view: view, anim: anim, add: addPiece, ghost: ghost,
-    ctrl: function () { var cp = ctrlPos(), r = cv.getBoundingClientRect(); if (!cp) return null; return { lever: { x: r.left + cp.lever.x, ky: r.top + cp.lever.ky, y0: r.top + cp.lever.y0, y1: r.top + cp.lever.y1, px: r.left + cp.lever.px, py: r.top + cp.lever.py, r: cp.lever.r }, whistle: { x: r.left + cp.whistle.x, y: r.top + cp.whistle.y }, lamp: { x: r.left + cp.lamp.x, y: r.top + cp.lamp.y } }; },
-    yardItem: function (i) { var y = yardLayout(), r = cv.getBoundingClientRect(); return { x: r.left + y.xs[i] - y.scroll + TYPES[y.items[i]].len * view.ys / 2, y: r.top + yardRail() - 60 * view.ys }; },
-    rail: function () { var r = cv.getBoundingClientRect(); return { y: r.top + view.gy, x: r.left + W / 2 }; },
-    piecePos: function (i) { var a = anim[i], r = cv.getBoundingClientRect(); return { x: r.left + pieceSX(a) + TYPES[a.p.t].len / 2 * cam.s, y: r.top + view.gy - 50 * cam.s }; } };
+  if ($("tb-farewell")) stage.appendChild($("tb-farewell"));
+  if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, add: addPiece, ghost: ghost,
+    pieces: function () { var r = cv.getBoundingClientRect(); return carPoses().map(function (q) { return { t: q.p.t, x: r.left + SX(q.x), y: r.top + SY(q.y, q.z + 12), sx: SX(q.x), sy: SY(q.y, q.z) }; }); },
+    switches: function () { var r = cv.getBoundingClientRect(); return run.lay.switches.map(function (s) { return { x: r.left + s.sx, y: r.top + s.sy, on: s.on }; }); } };
 })();
 </script>
 </body>
