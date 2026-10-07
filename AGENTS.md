@@ -196,6 +196,9 @@ Keep only:
   machine off; only his tap on the red paddle, the timer, or leaving the page does.
 - **Leaving with a machine on**: pages register their machine with `Toybox.offFirst({ running, off })`; leaving the
   page (a link or `Toybox.beforeLeave(fn)`) switches it off quietly and goes at once.
+- **No "switch it off first" step inside a station either**: an action that needs the machine stopped (pouring
+  from the Blender, lifting the Stand Mixer head, changing its beater, taking the bowl) switches it off by itself
+  and carries on. (Switching ON for him on the second try stays, see "Two-step machines".)
 
 ### Timer (shared)
 - The grown-up sets a play timer (shared across all apps, `toybox-timer-v1`). When time is up the app winds its

@@ -391,7 +391,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (!S.recipe) return S.food ? "done" : "recipe";
     if (eggWait) return "crack";
     var R = recipe();
-    if (mixed()) return running() ? "off" : "bowl";
+    if (mixed()) return "bowl";  // still running: taking the bowl switches it off by itself
     if (S.beater !== R.beater) return head.a > UP * 0.5 ? "beater" : "up";
     if (missing().length) return "add";
     if (busy()) return "wait";
@@ -412,7 +412,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       case "lower": return "Lower the head!";
       case "run": return "Push the lever!";
       case "mix": return R.mix;
-      case "off": return "All mixed! Switch it off!";
       case "bowl": return "Tap the bowl!";
     }
     return "";
@@ -591,12 +590,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     else learned("up");
     save();
   }
-  // Two-step machine rules (AGENTS.md): first try a hint and a flash, second try done for him.
+  // The dad: no "switch it off first" step. Lifting the head, changing the beater or taking the bowl
+  // while it runs switches it off by itself and carries on.
   function needOff(then) {
-    M.tries++;
-    if (M.tries >= 2) { M.tries = 0; stopMotor(); click(); if (then) then(); return; }
-    say("Switch it off first!");
-    M.flashUntil = now() + 3;
+    stopMotor(); click();
+    if (then) then();
   }
   function needHeadDown(then) {
     head.tries++;
@@ -638,7 +636,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function dropBeater(id, f, x0, y0, tile) {
     if (take) { backToTile(f, x0, y0, tile); return; }
     if (S.beater === id) { say("The " + BEATERS[id].name.toLowerCase() + " is on!"); backToTile(f, x0, y0, tile); return; }
-    if (running()) { needOff(null); backToTile(f, x0, y0, tile); return; }
+    if (running()) needOff(null);
     // Beaters click on with the head up; tilt it up for him if it is down.
     var go = function () {
       var sp = h2s(0, SHAFT_Y + 0.36, UP), pg = toPage(sp.x, sp.y);
@@ -718,8 +716,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   // ---------- Taking the finished bowl ----------
   function tapBowl() {
     var ph = phase();
-    if (ph === "bowl") { startTake(); return; }
-    if (ph === "off") { needOff(startTake); return; }
+    if (ph === "bowl") { if (running()) needOff(startTake); else startTake(); return; }
     if (eggWait) { crackEgg(); return; }
     bowl.wig = 1;
     if (ph === "recipe" || ph === "done") say("Pick what to make!");

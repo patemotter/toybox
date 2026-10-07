@@ -280,7 +280,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var dollops = [];  // yogurt blobs falling: { k, x, y, vy, amt }
   var parts = [];    // sparkles and drips (scene coords): { x, y, vx, vy, life, max, col, r, star }
   var sayMsg = "", sayUntil = 0;
-  var notReadyTries = 0;
 
   function makePieces(k, startX, startY) {
     var it = S.items[k], g = ING[it.id];
@@ -352,11 +351,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (!S.lid) return "lid";
       return running() ? "blend" : "run";
     }
-    return running() ? "off" : "pour";
+    return "pour";  // still running: pouring switches it off by itself
   }
   var COACH = {
     add: "Drag fruit into the jar!", done: "Yum! Make another one!", lid: "Put the lid on!", run: "Press Low or High!",
-    blend: "Watch it blend!", off: "Smooth! Switch it off!", pour: "Pour it in the cup!", straw: "Add a straw!"
+    blend: "Watch it blend!", pour: "Pour it in the cup!", straw: "Add a straw!"
   };
 
   // ---------- Sound (off by default; soft and synthesized) ----------
@@ -567,7 +566,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   // ---------- Pouring ----------
   function canPour() { return blended() && jar.state === "base" && !(S.cup.fill > 0); }
   function startPour(fromDrag) {
-    if (running()) { offFirstHint(); return; }
+    if (running()) switchOffForHim();
     if (S.lid) takeLidOff();
     jar.state = "go";
     jar.t0 = now();
@@ -576,15 +575,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     jar.dur = fromDrag ? 0.5 : 1.0;
     learned("pour");
   }
-  function offFirstHint() {
-    // Switch it off before lifting the jar. Second try: switched off for him.
-    notReadyTries++;
-    if (notReadyTries >= 2) { stopMotor(); notReadyTries = 0; click(); return; }
-    say("Switch it off first!");
-    M.flashBtn = M.mode === 2 ? 1 : (M.mode === 1 ? 0 : 2);
-    M.flashUntil = now() + 3;
-    jar.wig = 1;
-  }
+  // The dad: no "switch it off first" step. Lifting the jar while it runs switches it off by itself.
+  function switchOffForHim() { stopMotor(); click(); }
   function sendCupAway() {
     // The finished smoothie slides off to the table; a clean cup slides in.
     if (cup.anim) return;
@@ -629,7 +621,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (jar.state !== "base") { jar.state = "back"; jar.t0 = now(); jar.from = { x: jar.x, y: jar.y, a: jar.a }; jar.dur = 0.5; }
     if (S.lid) takeLidOff();
     if (S.cup.fill > 0) sendCupAway();
-    lid.tries = 0; notReadyTries = 0; sayUntil = 0;
+    lid.tries = 0; sayUntil = 0;
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }
@@ -691,18 +683,17 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
         // Pull the lid off the top of the jar.
         S.lid = false; var sp = lidSpot(); lid.x = sp.x; lid.y = sp.y;
         d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId; click(); save();
-      } else if (canPour() && !running()) {
+      } else if (canPour()) {
+        if (running()) switchOffForHim();
         d.kind = "jar"; d.dx = jar.x - p.x; d.dy = jar.y - p.y;
         if (S.lid) takeLidOff();
         jar.state = "drag"; jar.drag = e.pointerId; tone(420, 0.1, 0.03, "sine", 520);
-      } else if (canPour() && running()) {
-        offFirstHint();
       } else {
         jar.wig = 1;
         if (!S.items.length) say("Drag fruit into the jar!");
       }
     } else if (onCup(p)) {
-      if (canPour()) { if (running()) offFirstHint(); else startPour(false); }
+      if (canPour()) startPour(false);
       else { cup.wig = 1; if (S.cup.done) burst(CUP_X + cup.off, -CUP_H * 0.8, 6, null, true); }
     } else if (!S.lid && lid.anim == null && S.items.length && Math.hypot(p.x - lid.x, p.y - lid.y) < 0.75) {
       d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId;
