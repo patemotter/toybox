@@ -9,7 +9,7 @@
 // - Everything else (icons, the font): stale-while-revalidate.
 // Install downloads every CORE file fresh (bypassing the browser's HTTP cache).
 // After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v122";
+const CACHE = "toybox-v123";
 const CORE = [
   "./",
   "./index.html",

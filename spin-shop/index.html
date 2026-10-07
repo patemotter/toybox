@@ -107,8 +107,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
 .tb-panel .panel-body.tb-choices { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .panel-body h2 { display: none; }
 .panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="make"] [data-pane="make"],
-.tb-panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
+.tb-panel[data-tab="make"] [data-pane="make"] { visibility: visible; }
 .panel-body section + section { margin-top: 10px; }
 .panel-body section.sec-swatches { margin-top: 0; }
 .note { display: none; }
@@ -298,8 +297,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   .sec-modes, .sec-styles, .sec-parts { grid-area: 1 / 1; }
   .sec-count, .sec-pattern, .sec-swatches { grid-area: 2 / 1; }
   .tb-panel[data-tab="make"] .sec-modes, .tb-panel[data-tab="make"] .sec-count,
-  .tb-panel[data-tab="style"] .sec-styles, .tb-panel[data-tab="style"] .sec-pattern,
-  .tb-panel[data-tab="colors"] .sec-parts, .tb-panel[data-tab="colors"] .sec-swatches { visibility: visible; }
+  .tb-panel[data-tab="style"] .sec-styles, .tb-panel[data-tab="style"] .sec-pattern { visibility: visible; }
+
   /* Just - and + on phones; Min and Max stay on bigger screens. */
   .counter .btn.minmax { display: none; }
   /* Picture buttons are just pictures on a phone: the names would have to be squeezed tiny. */
@@ -315,6 +314,46 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   .btn { transition: none; }
   #over .glow { animation: none; }
 }
+/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
+.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
+.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
+.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
+.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
+.pickpic {
+  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
+  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
+  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
+}
+.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
+.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
+.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
+@media (min-width: 700px) and (min-height: 700px) {
+  .pick { gap: 16px; }
+  .pickswatches { gap: 14px; }
+  .pickswatches .swatch { max-width: 92px; }
+  .pickpic { font-size: 1.2rem; width: 150px; }
+}
+.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
+/* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
+.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
+/* Its color runs yellow, pink, blue, so it shows on every paint color. */
+.halo * { animation: halocol 1.8s linear infinite; }
+@keyframes halocol {
+  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
+  33% { fill: #FF5FB0; stroke: #FF5FB0; }
+  66% { fill: #3FC4FF; stroke: #3FC4FF; }
+}
+.pickpic .dim { opacity: 0.25; }
+@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
+/* On phones the sections sit in a shared grid; the picked part's colors take both rows. */
+@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .pick { grid-area: 1 / 1 / 3 / 2; align-self: center; }
+  .panel-body > [data-pane="pick"] { display: contents; }
+  .tb-panel.picking .panel-body section { visibility: hidden !important; }
+}
+/* Things drawn over the spinning part (grilles, shine, the light glow) let taps through to it. */
+#over > :not([data-c]) { pointer-events: none; }
 /* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
 .ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -361,6 +400,11 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
             <div class="styles" id="styles"></div>
           </section>
 
+          <section class="sec-pattern">
+            <h2>Pattern</h2>
+            <div class="row" id="patterns"></div>
+          </section>
+
           <section class="sec-count">
             <h2>How many</h2>
             <div class="counter" id="counter">
@@ -380,31 +424,17 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
           </section>
         </div>
 
-        <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
-          <section class="sec-pattern">
-            <h2>Pattern</h2>
-            <div class="row" id="patterns"></div>
-          </section>
-
-          <section class="sec-parts">
-            <h2>Colors</h2>
-            <div class="row" id="parts"></div>
-          </section>
-          <section class="sec-swatches">
-            <div class="swatchbox" id="swatchbox">
-              <div class="swatches" id="swatches"></div>
-              <div class="swatches" id="lightSwatches"></div>
-            </div>
-            <p class="readout" id="readout"></p>
-            <p class="note" id="rainbowNote" hidden>Rainbow picks a different color for each one.</p>
-          </section>
+        <div data-pane="pick" id="pane-pick" aria-live="polite">
+          <div class="pick">
+            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="-250 -250 500 500" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Spokes</span></div>
+            <div class="pickswatches" id="pickSw"></div>
+          </div>
         </div>
       </div>
 
       <nav class="tb-tabs" role="tablist" aria-label="Controls">
         <button class="btn tab" role="tab" id="tab-make" data-tab="make" aria-controls="pane-make">Make</button>
         <button class="btn tab tab-style" role="tab" id="tab-style" data-tab="style" aria-controls="pane-make">Style</button>
-        <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
         <button class="btn tb-surprise" data-action="surprise">Surprise</button>
       </nav>
     </section>
@@ -593,6 +623,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   // dark=true returns a deeper shade of the same color (used for back-layer petals).
+  // Which color a blade uses ("main", or "main2" for every other one when they take turns): tags it for tapping.
+  function mc(cfg, i) { return cfg.pattern === "turns" && i % 2 === 1 ? "main2" : "main"; }
   function colorFor(cfg, i, n, dark) {
     if (cfg.pattern === "rainbow") return "hsl(" + Math.round(i * 360 / n) + ", 85%, " + (dark ? "42%" : "58%") + ")";
     var base = (cfg.pattern === "turns" && i % 2 === 1) ? hex(cfg.colors.main2) : hex(cfg.colors.main);
@@ -603,10 +635,10 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function strokes(items, outlineWidth, colorWidth) {
     var s = "";
     items.forEach(function (it) {
-      s += '<path d="' + it.d + '" fill="none" stroke="' + OUT + '" stroke-width="' + outlineWidth + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      s += '<path' + (it.c ? ' data-c="' + it.c + '"' : "") + ' d="' + it.d + '" fill="none" stroke="' + OUT + '" stroke-width="' + outlineWidth + '" stroke-linecap="round" stroke-linejoin="round"/>';
     });
     items.forEach(function (it) {
-      s += '<path d="' + it.d + '" fill="none" stroke="' + it.col + '" stroke-width="' + colorWidth + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      s += '<path' + (it.c ? ' data-c="' + it.c + '" data-nohalo="1"' : "") + ' d="' + it.d + '" fill="none" stroke="' + it.col + '" stroke-width="' + colorWidth + '" stroke-linecap="round" stroke-linejoin="round"/>';
     });
     return s;
   }
@@ -619,14 +651,14 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       a = i * slot;
       if (style === "split") {
         d = Math.min(slot * 0.18, 0.2);
-        items.push({ d: "M " + pt(40, a) + " L " + pt(92, a) + " L " + pt(164, a - d) + " M " + pt(92, a) + " L " + pt(164, a + d), col: colorFor(cfg, i, n) });
+        items.push({ d: "M " + pt(40, a) + " L " + pt(92, a) + " L " + pt(164, a - d) + " M " + pt(92, a) + " L " + pt(164, a + d), col: colorFor(cfg, i, n), c: mc(cfg, i) });
       } else if (style === "swirl") {
-        items.push({ d: "M " + pt(40, a) + " C " + pt(85, a + 0.05) + " " + pt(130, a + 0.18) + " " + pt(164, a + 0.55), col: colorFor(cfg, i, n) });
+        items.push({ d: "M " + pt(40, a) + " C " + pt(85, a + 0.05) + " " + pt(130, a + 0.18) + " " + pt(164, a + 0.55), col: colorFor(cfg, i, n), c: mc(cfg, i) });
       } else if (style === "mesh") {
         d = Math.min(slot * 0.5, Math.PI / 3);
-        items.push({ d: "M " + pt(50, a) + " L " + pt(164, a + d) + " M " + pt(50, a) + " L " + pt(164, a - d), col: colorFor(cfg, i, n) });
+        items.push({ d: "M " + pt(50, a) + " L " + pt(164, a + d) + " M " + pt(50, a) + " L " + pt(164, a - d), col: colorFor(cfg, i, n), c: mc(cfg, i) });
       } else {
-        items.push({ d: "M " + pt(40, a) + " L " + pt(164, a), col: colorFor(cfg, i, n) });
+        items.push({ d: "M " + pt(40, a) + " L " + pt(164, a), col: colorFor(cfg, i, n), c: mc(cfg, i) });
       }
     }
     if (style === "split") return strokes(items, 22, 12);
@@ -642,15 +674,15 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     for (i = 0; i < n; i++) {
       a = i * slot;
       if (n === 1) {
-        s += '<circle r="' + R + '" fill="' + colorFor(cfg, i, n) + '"/>';
+        s += '<circle r="' + R + '" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '"/>';
       } else {
-        s += '<path d="M 0 0 L ' + pt(R, a - slot / 2) + " A " + R + " " + R + " 0 " + (slot > Math.PI ? 1 : 0) + " 1 " + pt(R, a + slot / 2) + ' Z" fill="' + colorFor(cfg, i, n) + '"/>';
+        s += '<path d="M 0 0 L ' + pt(R, a - slot / 2) + " A " + R + " " + R + " 0 " + (slot > Math.PI ? 1 : 0) + " 1 " + pt(R, a + slot / 2) + ' Z" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '"/>';
       }
     }
     s += '<circle r="' + R + '" fill="none" stroke="' + OUT + '" stroke-width="5"/>';
     var rx = n === 1 ? 42 : clamp(106 * halfSin(slot) * 0.62, 8, 42);
     for (i = 0; i < n; i++) {
-      s += '<ellipse cx="0" cy="-106" rx="' + rx.toFixed(2) + '" ry="38" transform="rotate(' + ((i + 0.5) * 360 / n).toFixed(3) + ')" style="fill:var(--plate)" stroke="' + OUT + '" stroke-width="5"/>';
+      s += '<ellipse cx="0" cy="-106" rx="' + rx.toFixed(2) + '" ry="38" transform="rotate(' + ((i + 0.5) * 360 / n).toFixed(3) + ')" style="fill:var(--plate)" stroke="' + OUT + '" stroke-width="5" pointer-events="none"/>';
     }
     return s;
   }
@@ -658,22 +690,23 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function drawWheel(cfg) {
     var c = cfg.colors, s = "", i, a, p1, p2;
     var tire = hex(c.tire);
-    s += '<circle r="222" fill="' + tire + '" stroke="' + OUT + '" stroke-width="6"/>';
+    s += '<g data-c="tire"><circle r="222" fill="' + tire + '" stroke="' + OUT + '" stroke-width="6"/>';
     var tread = isDark(tire) ? "rgba(255,255,255,0.3)" : "rgba(29,35,64,0.35)";
     for (i = 0; i < 36; i++) {
       a = i * 2 * Math.PI / 36;
       p1 = xy(196, a); p2 = xy(217, a);
       s += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + tread + '" stroke-width="6" stroke-linecap="round"/>';
     }
+    s += "</g>";
     s += '<circle r="182" fill="' + hex(c.rim) + '" stroke="' + OUT + '" stroke-width="5"/>';
     s += '<circle r="160" style="fill:var(--plate)" stroke="' + OUT + '" stroke-width="5"/>';
     s += cfg.style === "windows" ? wheelWindows(cfg) : wheelSpokes(cfg);
-    s += '<circle r="54" fill="' + hex(c.hub) + '" stroke="' + OUT + '" stroke-width="6"/>';
+    s += '<g data-c="hub"><circle r="54" fill="' + hex(c.hub) + '" stroke="' + OUT + '" stroke-width="6"/>';
     for (i = 0; i < 5; i++) {
       p1 = xy(32, i * 2 * Math.PI / 5);
       s += '<circle cx="' + p1.x + '" cy="' + p1.y + '" r="7" fill="#FFFFFF" stroke="' + OUT + '" stroke-width="3"/>';
     }
-    s += '<circle r="12" fill="' + OUT + '"/>';
+    s += '<circle r="12" fill="' + OUT + '"/></g>';
     return { still: "", spin: s, head: "" };
   }
 
@@ -700,7 +733,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       " Q " + pt(rt * 1.06, sk) + " " + pt(rt, w * 0.75 + sk) +
       " Q " + pt(rt * 0.55, w * 1.05 + sk * 0.4) + " " + pt(r0, w * 0.5) + " Z";
     for (i = 0; i < n; i++) {
-      s += '<path d="' + d + '" transform="rotate(' + (i * 360 / n).toFixed(3) + ')" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
+      s += '<path d="' + d + '" transform="rotate(' + (i * 360 / n).toFixed(3) + ')" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
     }
     return s;
   }
@@ -738,7 +771,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       s += '<circle r="40" fill="rgba(255,255,255,0.55)"/>';
       s += '<ellipse cx="-38" cy="-44" rx="22" ry="11" transform="rotate(-40 -38 -44)" fill="rgba(255,255,255,0.9)"/>';
       s += '<circle r="13" fill="' + hub + '" stroke="' + OUT + '" stroke-width="4"/>';
-      return '<g class="glow">' + glows + "</g>" + s;
+      return '<g data-c="light"><g class="glow" pointer-events="none">' + glows + "</g>" + s + "</g>";
     }
     if (n === 1) {
       // One round globe hanging in the middle.
@@ -747,7 +780,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       s += '<circle r="48" fill="' + lightHex(cfg, 0) + '" stroke="' + OUT + '" stroke-width="5"/>';
       s += '<circle r="28" fill="rgba(255,255,255,0.75)"/>';
       s += '<ellipse cx="-18" cy="-22" rx="11" ry="6" transform="rotate(-40 -18 -22)" fill="#FFFFFF"/>';
-      return '<g class="glow">' + glows + "</g>" + s;
+      return '<g data-c="light"><g class="glow" pointer-events="none">' + glows + "</g>" + s + "</g>";
     }
     // Several bulbs on short arms around a fitter plate.
     var Rb = 90, arms = [];
@@ -767,7 +800,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       s += '<circle cx="' + p.x + '" cy="' + p.y + '" r="19" fill="rgba(255,255,255,0.75)"/>';
     }
     s += '<circle r="12" fill="' + hub + '" stroke="' + OUT + '" stroke-width="4"/>';
-    return '<g class="glow">' + glows + "</g>" + s;
+    return '<g data-c="light"><g class="glow" pointer-events="none">' + glows + "</g>" + s + "</g>";
   }
 
   // Wire grille in front of the blades: rim, rings and spokes (desk fan).
@@ -799,7 +832,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       var rr = Math.min(W / 2, 16);
       for (i = 0; i < n; i++) {
         rot = 'transform="rotate(' + (i * 360 / n).toFixed(3) + ')"';
-        s += '<rect x="' + (-W / 2).toFixed(2) + '" y="-214" width="' + W.toFixed(2) + '" height="124" rx="' + rr.toFixed(2) + '" ' + rot + ' fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5"/>';
+        s += '<rect x="' + (-W / 2).toFixed(2) + '" y="-214" width="' + W.toFixed(2) + '" height="124" rx="' + rr.toFixed(2) + '" ' + rot + ' data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5"/>';
         s += '<rect x="-8" y="-106" width="16" height="66" rx="4" ' + rot + ' fill="' + hex(c.hub) + '" stroke="' + OUT + '" stroke-width="4"/>';
         s += '<circle cx="0" cy="-96" r="3.5" ' + rot + ' fill="' + OUT + '"/>';
       }
@@ -852,11 +885,11 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       var veins = [[-95, 0.55], [-125, 0.75], [-155, 0.65], [-185, 0.35]];
       for (i = 0; i < n; i++) {
         s += '<g transform="rotate(' + (i * 360 / n).toFixed(3) + ')">';
-        s += '<path d="M 0 -55 Q ' + (2 * hw).toFixed(2) + ' -110 0 -215 Q ' + (-2 * hw).toFixed(2) + ' -145 0 -55 Z" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
-        s += '<path d="M 0 -58 Q ' + (hw * 0.15).toFixed(2) + ' -135 0 -210" fill="none" stroke="rgba(29,35,64,0.5)" stroke-width="3" stroke-linecap="round"/>';
+        s += '<path d="M 0 -55 Q ' + (2 * hw).toFixed(2) + ' -110 0 -215 Q ' + (-2 * hw).toFixed(2) + ' -145 0 -55 Z" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
+        s += '<path d="M 0 -58 Q ' + (hw * 0.15).toFixed(2) + ' -135 0 -210" fill="none" stroke="rgba(29,35,64,0.5)" stroke-width="3" stroke-linecap="round" pointer-events="none"/>';
         veins.forEach(function (v) {
           var vx = (hw * v[1]).toFixed(2);
-          s += '<path d="M 0 ' + v[0] + " L " + vx + " " + (v[0] - 16) + " M 0 " + v[0] + " L " + (-vx) + " " + (v[0] - 16) + '" fill="none" stroke="rgba(29,35,64,0.35)" stroke-width="3" stroke-linecap="round"/>';
+          s += '<path d="M 0 ' + v[0] + " L " + vx + " " + (v[0] - 16) + " M 0 " + v[0] + " L " + (-vx) + " " + (v[0] - 16) + '" fill="none" stroke="rgba(29,35,64,0.35)" stroke-width="3" stroke-linecap="round" pointer-events="none"/>';
         });
         s += "</g>";
       }
@@ -872,8 +905,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       var tip = profilePath(188, 215, hwL, hwR);
       for (i = 0; i < n; i++) {
         rot = 'transform="rotate(' + (i * 360 / n).toFixed(3) + ')"';
-        s += '<path d="' + blade + '" ' + rot + ' fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
-        s += '<path d="' + tip + '" ' + rot + ' fill="' + hex(c.tips) + '" stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round"/>';
+        s += '<path d="' + blade + '" ' + rot + ' data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
+        s += '<path d="' + tip + '" ' + rot + ' fill="' + hex(c.tips) + '" stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round" pointer-events="none"/>';
       }
     } else {
       // Swoosh: swept blades inside a guard ring.
@@ -912,10 +945,10 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       var body = "M " + T.join(" L ") + " A " + o.r1 + " " + o.r1 + " 0 0 1 " + L[steps] + " L " + L.slice(0, steps).reverse().join(" L ") + " Z";
       var col = colorFor(cfg, i, n);
       if (o.dark) col = shade(col, o.dark);
-      s += '<path d="' + body + '" fill="' + col + '"/>';
+      s += '<g data-c="' + mc(cfg, i) + '"><path d="' + body + '" fill="' + col + '"/>';
       s += '<path d="M ' + L.join(" L ") + " L " + HL.reverse().join(" L ") + ' Z" fill="rgba(255,255,255,0.38)"/>';
       s += '<path d="M ' + T.join(" L ") + " L " + ST.reverse().join(" L ") + ' Z" fill="rgba(29,35,64,0.22)"/>';
-      s += '<path d="' + body + '" fill="none" stroke="' + OUT + '" stroke-width="' + o.sw + '" stroke-linejoin="round"/>';
+      s += '<path d="' + body + '" fill="none" stroke="' + OUT + '" stroke-width="' + o.sw + '" stroke-linejoin="round"/></g>';
     }
     return s;
   }
@@ -950,7 +983,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   }
 
   function jetCowling(c, Rc, Rl, Rd, pylon) {
-    var cowl = hex(c.cowl), lip = hex(c.lip), s = "";
+    var cowl = hex(c.cowl), lip = hex(c.lip), s = '<g data-c="cowl">';
     if (pylon) s += '<path d="M -34 -262 L 34 -262 L 30 -' + (Rc - 12) + ' L -30 -' + (Rc - 12) + ' Z" fill="' + shade(cowl, 0.18) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
     s += '<circle r="' + Rc + '" fill="' + cowl + '" stroke="' + OUT + '" stroke-width="6"/>';
     s += '<circle r="' + (Rc - 3) + '" fill="url(#sscowl)"/>';
@@ -961,7 +994,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     });
     s += '<circle r="' + Rl + '" fill="' + lip + '" stroke="' + OUT + '" stroke-width="5"/>';
     s += '<path d="' + arc((Rl + Rd) / 2, -1.5, -0.2) + '" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="' + Math.max(3, (Rl - Rd) * 0.3).toFixed(1) + '" stroke-linecap="round"/>';
-    s += '<circle r="' + Rd + '" fill="url(#ssjet-duct)" stroke="' + OUT + '" stroke-width="5"/>';
+    s += '<circle r="' + Rd + '" fill="url(#ssjet-duct)" stroke="' + OUT + '" stroke-width="5" pointer-events="none"/></g>';
     return s;
   }
 
@@ -987,12 +1020,12 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       var hi = profilePath(70, 192, hiL, hiR);
       for (j = 0; j < cfg.count; j++) {
         var rot = 'transform="rotate(' + (j * 360 / cfg.count).toFixed(3) + ')"';
-        s += '<path d="' + blade + '" ' + rot + ' fill="' + colorFor(cfg, j, cfg.count) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
-        s += '<path d="' + hi + '" ' + rot + ' fill="rgba(255,255,255,0.3)"/>';
+        s += '<path d="' + blade + '" ' + rot + ' data-c="' + mc(cfg, j) + '" fill="' + colorFor(cfg, j, cfg.count) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
+        s += '<path d="' + hi + '" ' + rot + ' fill="rgba(255,255,255,0.3)" pointer-events="none"/>';
       }
       s += jetSpinner(cfg, 62, 1);
       top = jetShine(62);
-      return { still: still, spin: s, head: "", top: top };
+      return { still: '<g data-c="cowl">' + still + "</g>", spin: s, head: "", top: top };
     }
 
     if (style === "fighter") {
@@ -1038,10 +1071,10 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     var slot = 2 * Math.PI / n;
     var style = cfg.style;
     var stem = hex(c.stem);
-    var still = '<line x1="0" y1="-45" x2="0" y2="252" stroke="' + OUT + '" stroke-width="30"/>' +
+    var still = '<g data-c="stem"><line x1="0" y1="-45" x2="0" y2="252" stroke="' + OUT + '" stroke-width="30"/>' +
       '<line x1="0" y1="-45" x2="0" y2="252" stroke="' + stem + '" stroke-width="18"/>' +
       '<ellipse cx="42" cy="165" rx="22" ry="50" transform="rotate(55 42 165)" fill="' + stem + '" stroke="' + OUT + '" stroke-width="5"/>' +
-      '<ellipse cx="-42" cy="210" rx="22" ry="50" transform="rotate(-55 -42 210)" fill="' + stem + '" stroke="' + OUT + '" stroke-width="5"/>';
+      '<ellipse cx="-42" cy="210" rx="22" ry="50" transform="rotate(-55 -42 210)" fill="' + stem + '" stroke="' + OUT + '" stroke-width="5"/></g>';
     var rx = Math.max(10, Math.min(105 * Math.sin(Math.PI / n) * 1.1, 48));
     var line = '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
 
@@ -1049,34 +1082,34 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       // Back ring: deeper shade, offset half a step so it peeks between the front petals.
       for (i = 0; i < n; i++) {
         rot = ((i + 0.5) * 360 / n).toFixed(3);
-        s += '<ellipse cx="0" cy="-118" rx="' + rx.toFixed(2) + '" ry="62" transform="rotate(' + rot + ')" fill="' + colorFor(cfg, i, n, true) + line;
+        s += '<ellipse cx="0" cy="-118" rx="' + rx.toFixed(2) + '" ry="62" transform="rotate(' + rot + ')" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n, true) + line;
       }
       for (i = 0; i < n; i++) {
         rot = (i * 360 / n).toFixed(3);
-        s += '<ellipse cx="0" cy="-92" rx="' + (rx * 0.85).toFixed(2) + '" ry="55" transform="rotate(' + rot + ')" fill="' + colorFor(cfg, i, n) + line;
+        s += '<ellipse cx="0" cy="-92" rx="' + (rx * 0.85).toFixed(2) + '" ry="55" transform="rotate(' + rot + ')" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + line;
       }
     } else {
       for (i = 0; i < n; i++) {
         rot = 'transform="rotate(' + (i * 360 / n).toFixed(3) + ')"';
         if (style === "pointy") {
-          s += '<path d="M 0 -38 Q ' + (2 * rx).toFixed(2) + ' -105 0 -180 Q ' + (-2 * rx).toFixed(2) + ' -105 0 -38 Z" ' + rot + ' fill="' + colorFor(cfg, i, n) + line;
+          s += '<path d="M 0 -38 Q ' + (2 * rx).toFixed(2) + ' -105 0 -180 Q ' + (-2 * rx).toFixed(2) + ' -105 0 -38 Z" ' + rot + ' data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + line;
         } else if (style === "heart") {
           var w = rx;
           s += '<path d="M 0 -38 C ' + (1.6 * w).toFixed(2) + " -60 " + (1.5 * w).toFixed(2) + " -178 " + (0.5 * w).toFixed(2) + " -178" +
             " Q " + (0.12 * w).toFixed(2) + " -178 0 -160" +
             " Q " + (-0.12 * w).toFixed(2) + " -178 " + (-0.5 * w).toFixed(2) + " -178" +
-            " C " + (-1.5 * w).toFixed(2) + " -178 " + (-1.6 * w).toFixed(2) + ' -60 0 -38 Z" ' + rot + ' fill="' + colorFor(cfg, i, n) + line;
+            " C " + (-1.5 * w).toFixed(2) + " -178 " + (-1.6 * w).toFixed(2) + ' -60 0 -38 Z" ' + rot + ' data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + line;
         } else {
-          s += '<ellipse cx="0" cy="-105" rx="' + rx.toFixed(2) + '" ry="70" ' + rot + ' fill="' + colorFor(cfg, i, n) + line;
+          s += '<ellipse cx="0" cy="-105" rx="' + rx.toFixed(2) + '" ry="70" ' + rot + ' data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + line;
         }
       }
     }
-    s += '<circle r="55" fill="' + hex(c.middle) + '" stroke="' + OUT + '" stroke-width="6"/>';
+    s += '<g data-c="middle"><circle r="55" fill="' + hex(c.middle) + '" stroke="' + OUT + '" stroke-width="6"/>';
     for (i = 0; i < 8; i++) {
       p = xy(30, i * 2 * Math.PI / 8);
       s += '<circle cx="' + p.x + '" cy="' + p.y + '" r="5" fill="rgba(29,35,64,0.4)"/>';
     }
-    s += '<circle r="6" fill="rgba(29,35,64,0.4)"/>';
+    s += '<circle r="6" fill="rgba(29,35,64,0.4)"/></g>';
     return { still: still, spin: s, head: "translate(0 -45) scale(0.82)" };
   }
 
@@ -1087,8 +1120,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     // Angle given to each vane; capped so 1-2 vanes still look like paper sails.
     var slot = Math.min(2 * Math.PI / n, 2 * Math.PI / 3);
     var stick = hex(c.stick);
-    var still = '<line x1="0" y1="-45" x2="0" y2="252" stroke="' + OUT + '" stroke-width="26" stroke-linecap="round"/>' +
-      '<line x1="0" y1="-45" x2="0" y2="252" stroke="' + stick + '" stroke-width="14" stroke-linecap="round"/>';
+    var still = '<g data-c="stick"><line x1="0" y1="-45" x2="0" y2="252" stroke="' + OUT + '" stroke-width="26" stroke-linecap="round"/>' +
+      '<line x1="0" y1="-45" x2="0" y2="252" stroke="' + stick + '" stroke-width="14" stroke-linecap="round"/></g>';
     var sail, flap;
     if (cfg.style === "pointy") {
       // Sharp origami triangles.
@@ -1107,8 +1140,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     }
     for (i = 0; i < n; i++) {
       rot = (i * 360 / n).toFixed(3);
-      s += '<path d="' + sail + '" transform="rotate(' + rot + ')" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
-      s += '<path d="' + flap + '" transform="rotate(' + rot + ')" fill="' + hex(c.fold) + '" stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round"/>';
+      s += '<path d="' + sail + '" transform="rotate(' + rot + ')" data-c="' + mc(cfg, i) + '" fill="' + colorFor(cfg, i, n) + '" stroke="' + OUT + '" stroke-width="5" stroke-linejoin="round"/>';
+      s += '<path d="' + flap + '" transform="rotate(' + rot + ')" fill="' + hex(c.fold) + '" stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round" pointer-events="none"/>';
     }
     s += '<circle r="20" fill="' + hex(c.pin) + '" stroke="' + OUT + '" stroke-width="5"/>';
     s += '<circle cx="-6" cy="-6" r="6" fill="rgba(255,255,255,0.6)"/>';
@@ -1178,25 +1211,96 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     return l[0] === "rainbow" ? "conic-gradient(" + RAINBOW_LIGHTS.concat(RAINBOW_LIGHTS[0]).join(", ") + ")"
       : "radial-gradient(circle at 50% 45%, #FFFFFF 0 22%, " + l[2] + " 62%)";
   }
-  LIGHTS.forEach(function (l) {
-    var b = document.createElement("button");
-    b.className = "swatch lightswatch";
-    b.dataset.light = l[0];
-    b.style.background = lightCss(l);
-    b.setAttribute("aria-label", l[1] + " light");
-    b.title = l[1];
-    $("lightSwatches").appendChild(b);
-  });
-  PALETTE.forEach(function (p) {
-    var b = document.createElement("button");
-    b.className = "swatch";
-    b.dataset.color = p[0];
-    b.style.background = p[1];
-    b.style.color = isDark(p[1]) ? "#FFFFFF" : "#1D2340";
-    b.setAttribute("aria-label", p[0]);
-    b.title = p[0];
-    $("swatches").appendChild(b);
-  });
+  // ---- coloring: tap a big part of the picture (blades, tire, hub, middle, stem, stick, cowling, lights);
+  // it glows and its colors show in the panel. Small details keep their colors.
+  var PICKS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink"];
+  var PAINT = { wheel: ["main", "main2", "tire", "hub"], fan: ["main", "main2", "light"], flower: ["main", "main2", "middle", "stem"],
+    pinwheel: ["main", "main2", "stick"], jet: ["main", "main2", "cowl"] };
+  var picking = ""; // the part being colored, or "" when none is picked
+  function partName(m, id) {
+    var p = MODES[m].parts.filter(function (q) { return q[0] === (id === "main2" ? "main" : id); })[0];
+    return p ? p[1] : "";
+  }
+  // Seven bright colors plus the part's usual one (a black tire, a brown stick), so it can always go back.
+  function swatchesFor(m, id) {
+    var d = MODES[m].defaults.colors[id === "main2" ? "main2" : id], list = PICKS.slice();
+    if (d && list.indexOf(d) === -1) list.push(d);
+    else list.push(id === "main" || id === "main2" ? "Sky" : "White");
+    return list;
+  }
+  var pickSwFor = "";
+  function buildPickSwatches(m, id) {
+    var key = m + ":" + id, el = $("pickSw");
+    if (pickSwFor === key) return;
+    pickSwFor = key;
+    el.innerHTML = "";
+    if (id === "light") {
+      LIGHTS.forEach(function (l) {
+        var b = document.createElement("button");
+        b.className = "swatch lightswatch";
+        b.dataset.light = l[0];
+        b.style.background = lightCss(l);
+        b.setAttribute("aria-label", l[1] + " light");
+        el.appendChild(b);
+      });
+      return;
+    }
+    swatchesFor(m, id).forEach(function (name) {
+      var b = document.createElement("button");
+      b.className = "swatch";
+      b.dataset.color = name;
+      b.style.background = hex(name);
+      b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
+      b.setAttribute("aria-label", name);
+      el.appendChild(b);
+    });
+  }
+  function pickable(m, cfg, id) {
+    if (PAINT[m].indexOf(id) === -1) return false;
+    if (id === "light") return m === "fan" && cfg.style === "paddle" && !!cfg.lights;
+    if (id === "main2") return cfg.pattern === "turns";
+    return true;
+  }
+  function setPicking(id) {
+    picking = id || "";
+    if (picking) coachDone();
+    $("tab-make").closest(".tb-panel").classList.toggle("picking", !!picking);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
+    });
+    showPick();
+  }
+  // The glow on the picture and the panel's picture + swatches for the picked part.
+  function showPick() {
+    Array.prototype.forEach.call(art.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (!picking) return;
+    var m = state.mode, cfg = state.per[m];
+    if (!pickable(m, cfg, picking)) { setPicking(""); return; }
+    Array.prototype.forEach.call(art.querySelectorAll('[data-c="' + picking + '"]:not([data-nohalo])'), function (el) {
+      var h = el.cloneNode(true);
+      h.removeAttribute("data-c");
+      h.setAttribute("class", "halo");
+      Array.prototype.forEach.call(h.querySelectorAll(".glow"), function (g) { g.parentNode.removeChild(g); });
+      [h].concat(Array.prototype.slice.call(h.querySelectorAll("*"))).forEach(function (x) {
+        x.removeAttribute("data-c");
+        x.style.strokeWidth = ((parseFloat(x.getAttribute("stroke-width")) || 0) + 22) + "px";
+      });
+      el.parentNode.insertBefore(h, el);
+    });
+    var svg = $("pickSvg");
+    svg.innerHTML = svgInner(DRAW[m](cfg));
+    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, text"), function (el) {
+      if (!el.closest('[data-c="' + picking + '"]')) el.setAttribute("class", "dim");
+    });
+    $("pickName").textContent = partName(m, picking);
+    buildPickSwatches(m, picking);
+    var lit = picking === "light", cur = lit ? cfg.lightColor : (cfg.pattern === "rainbow" && picking === "main" ? "" : cfg.colors[picking]);
+    Array.prototype.forEach.call($("pickSw").children, function (b) {
+      var on = (lit ? b.dataset.light : b.dataset.color) === cur;
+      b.setAttribute("aria-pressed", String(on));
+      b.textContent = on ? "\u2713" : "";
+    });
+  }
 
   // Style buttons are rebuilt only when the mode changes, so keyboard focus survives style clicks.
   var styleButtonsFor = null;
@@ -1215,16 +1319,6 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     styleButtonsFor = m;
   }
 
-  function visibleParts(m, cfg) {
-    var hidden = styleOf(m, cfg.style).hide;
-    return MODES[m].parts.filter(function (p) {
-      if (hidden.indexOf(p[0]) !== -1) return false;
-      if (p[0] === "main2" && cfg.pattern !== "turns") return false;
-      if (p[0] === "main" && cfg.pattern === "rainbow") return false;
-      if (p[0] === "light" && !cfg.lights) return false;
-      return true;
-    });
-  }
 
   function render() {
     var m = state.mode, mode = MODES[m], cfg = state.per[m], n = cfg.count;
@@ -1284,38 +1378,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       b.setAttribute("aria-pressed", String(b.dataset.speed === state.speed));
     });
 
-    var parts = visibleParts(m, cfg);
-    if (!parts.some(function (p) { return p[0] === state.part[m]; })) state.part[m] = parts[0][0];
-    var partsEl = $("parts");
-    partsEl.innerHTML = "";
-    parts.forEach(function (p) {
-      var b = document.createElement("button");
-      b.className = "btn";
-      b.dataset.part = p[0];
-      b.setAttribute("aria-pressed", String(p[0] === state.part[m]));
-      var dot = p[0] === "light" ? lightCss(lightEntry(cfg)) : hex(cfg.colors[p[0]]);
-      b.innerHTML = '<span class="dot" style="background:' + dot + '"></span>' + p[1];
-      partsEl.appendChild(b);
-    });
-    $("rainbowNote").hidden = cfg.pattern !== "rainbow";
-
-    // The Lights part picks from bulb colors instead of paint colors.
-    var lit = state.part[m] === "light";
-    $("swatchbox").classList.toggle("lit", lit);
-    var current = lit ? lightName(cfg) : cfg.colors[state.part[m]];
-    Array.prototype.forEach.call(document.querySelectorAll("[data-color]"), function (b) {
-      var on = !lit && b.dataset.color === current;
-      b.setAttribute("aria-pressed", String(on));
-      b.textContent = on ? "✓" : "";
-    });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-light]"), function (b) {
-      var on = lit && b.dataset.light === cfg.lightColor;
-      b.setAttribute("aria-pressed", String(on));
-      b.textContent = on ? "✓" : "";
-    });
-    var partLabel = mode.parts.filter(function (p) { return p[0] === state.part[m]; })[0][1];
-    $("readout").textContent = partLabel + ": " + current;
-
+    showPick();
     save();
   }
 
@@ -1348,9 +1411,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function showTab(name) {
     tab = name;
     $("tab-make").closest(".tb-panel").setAttribute("data-tab", name);
-    Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
-      if (b.classList.contains("tab")) b.setAttribute("aria-selected", String(b.dataset.tab === name));
-    });
+    setPicking("");
   }
 
   document.addEventListener("click", function (e) {
@@ -1361,13 +1422,21 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     if (t.id === "bigbtn" || t.closest(".modal, .farewell, .rest")) return;
     if (Toybox.timer.locked()) return;
     var cfg = state.per[state.mode];
+    // Another action puts the colors away (a speed change does not: it is just how fast it turns).
+    if (picking && !t.dataset.color && !t.dataset.light && !t.dataset.speed) setPicking("");
     if (t.dataset.mode) { state.mode = t.dataset.mode; }
     else if (t.dataset.style) { cfg.style = t.dataset.style; cfg.count = fitCount(state.mode, cfg.style, cfg.count); }
     else if (t.dataset.pattern) { cfg.pattern = t.dataset.pattern; }
     else if (t.dataset.speed) { state.speed = t.dataset.speed; }
-    else if (t.dataset.part) { state.part[state.mode] = t.dataset.part; }
-    else if (t.dataset.color) { cfg.colors[state.part[state.mode]] = t.dataset.color; }
-    else if (t.dataset.light) { if ("lights" in cfg) cfg.lightColor = t.dataset.light; }
+    else if (t.dataset.color) {
+      if (!picking) return;
+      cfg.colors[picking] = t.dataset.color;
+      // a color for rainbow blades makes them all that color
+      if (picking === "main" && cfg.pattern === "rainbow") cfg.pattern = "one";
+      state.part[state.mode] = picking;
+      restartPop(t);
+    }
+    else if (t.dataset.light) { if ("lights" in cfg) { cfg.lightColor = t.dataset.light; restartPop(t); } }
     else if (t.id === "minus") { cfg.count = Math.max(MIN, cfg.count - 1); }
     else if (t.id === "plus") { cfg.count = Math.min(MAX, cfg.count + 1); }
     else if (t.id === "minBtn") { cfg.count = MIN; }
@@ -1379,17 +1448,27 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     render();
   });
 
+  function restartPop(el) {
+    if (reduce) return;
+    el.classList.remove("pop");
+    void el.getBoundingClientRect();
+    el.classList.add("pop");
+  }
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function surprise(cfg) {
-    var names = PALETTE.map(function (p) { return p[0]; });
     var range = MODES[state.mode].surprise || [3, 12];
     cfg.count = range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
     cfg.pattern = pick(["one", "turns", "turns", "rainbow"]);
     cfg.style = pick(styleIds(state.mode));
     var f = styleOf(state.mode, cfg.style).fit;
     if (f) cfg.count = f[0] + Math.floor(Math.random() * (Math.min(f[1], 26) - f[0] + 1));
-    Object.keys(cfg.colors).forEach(function (k) { cfg.colors[k] = pick(names); });
-    while (cfg.colors.main2 === cfg.colors.main) cfg.colors.main2 = pick(names);
+    // New colors for the parts he can color; the small details go back to their usual colors.
+    var d = MODES[state.mode].defaults.colors;
+    Object.keys(cfg.colors).forEach(function (k) {
+      var paint = PAINT[state.mode].indexOf(k) !== -1, blade = k === "main" || k === "main2";
+      cfg.colors[k] = paint && (blade || Math.random() < 0.5) ? pick(PICKS) : d[k];
+    });
+    while (cfg.colors.main2 === cfg.colors.main) cfg.colors.main2 = pick(PICKS);
     if ("lights" in cfg) {
       cfg.lights = Math.floor(Math.random() * (LDOME + 1));
       cfg.lightColor = pick(LIGHT_IDS);
@@ -1509,13 +1588,36 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   // Grab the picture and turn it with a finger; let go to fling it. A tap still gives it a push.
   var grab = null;
   function ptrAng(e, c) { return Math.atan2(e.clientY - c[1], e.clientX - c[0]) * 180 / Math.PI; }
-  function spun() { $("coach").classList.add("off"); ghost.learned(); }
+  // Coach: "Spin it!" until the first spin, then (once) "Tap a part to color it!" until he picks a part.
+  var paintHint = 0, pickedOnce = false;
+  function spun() {
+    $("coach").classList.add("off");
+    ghost.learned();
+    if (paintHint) return;
+    paintHint = setTimeout(function () {
+      if (pickedOnce || Toybox.timer.locked()) return;
+      $("coach").textContent = "Tap a part to color it!";
+      $("coach").classList.remove("off");
+      setTimeout(function () { $("coach").classList.add("off"); }, 10000);
+    }, 3500);
+  }
+  function coachDone() {
+    pickedOnce = true;
+    if (paintHint) $("coach").classList.add("off");
+  }
+  // A tap (not a turn) on a big part picks it for coloring; a tap on the background puts the colors away.
+  function tapPick(el) {
+    var c = el && el.closest ? el.closest("[data-c]") : null, id = c ? c.getAttribute("data-c") : "";
+    var m = state.mode, cfg = state.per[m];
+    if (id && pickable(m, cfg, id) && !document.body.classList.contains("big")) { if (id !== picking) setPicking(id); }
+    else if (picking) setPicking("");
+  }
   art.addEventListener("pointerdown", function (e) {
     if (Toybox.timer.locked() || grab) return;
     kick();
     spun();
     var r = art.getBoundingClientRect(), c = [r.left + r.width / 2, r.top + r.height / 2];
-    grab = { id: e.pointerId, c: c, a: ptrAng(e, c), t: performance.now(), x: e.clientX, y: e.clientY, moved: 0, v: 0,
+    grab = { id: e.pointerId, c: c, a: ptrAng(e, c), t: performance.now(), x: e.clientX, y: e.clientY, moved: 0, v: 0, el: e.target,
       far: Math.hypot(e.clientX - c[0], e.clientY - c[1]) > r.width * 0.1, turning: false };
     try { art.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
   });
@@ -1538,8 +1640,13 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     if (!grab || e.pointerId !== grab.id) return;
     // A fling keeps going; a finger that stopped before letting go leaves it still.
     if (grab.turning) vel = performance.now() - grab.t > 140 ? 0 : grab.v;
+    else if (e.type === "pointerup" && grab.moved < 14 && !Toybox.timer.locked()) tapPick(grab.el);
     grab = null;
   }
+  // A tap on the stage around the picture puts the colors away too.
+  $("stage").addEventListener("pointerdown", function (e) {
+    if (picking && !(e.target.closest && e.target.closest("#art, button"))) setPicking("");
+  });
   art.addEventListener("pointerup", letGo);
   art.addEventListener("pointercancel", letGo);
   art.addEventListener("keydown", function (e) {
@@ -1624,7 +1731,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       $("tb-restLine").textContent = "The " + MODES[state.mode].label.toLowerCase() + " is resting.";
     },
     onWake: function () { endingDone = null; },
-    onBig: function (on) { if (!on) queueFit(); },
+    onBig: function (on) { if (!on) queueFit(); else if (picking) setPicking(""); },
     onTimer: drawTimer
   });
   $("stage").appendChild($("tb-toast"));

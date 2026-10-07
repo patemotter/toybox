@@ -176,8 +176,7 @@ body.big .tb-panel { display: none; }
   overflow: hidden;
 }
 .panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="build"] [data-pane="build"],
-.tb-panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
+.tb-panel[data-tab="build"] [data-pane="build"] { visibility: visible; }
 .panel-body section + section { margin-top: 10px; }
 .row {
   display: flex;
@@ -597,15 +596,45 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
 [data-pane="vehicle"] .picrow + .picrow { margin-top: 0; }
 [data-pane="vehicle"] .fams .pic svg { height: min(30cqh, 20cqw); }
 [data-pane="vehicle"] #kinds .pic svg { height: min(24cqh, 15cqw); }
-[data-pane="colors"] > section { height: 100%; display: flex; flex-direction: column; justify-content: center; }
-@media (min-width: 744px) and (min-height: 640px) {
-  .swatches { gap: 14px; margin-top: 20px; }
-}
 /* Tablet landscape: the panel column is narrower, so the full names get a little smaller. */
 @media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
   .tb-panel .picrow .pic { font-size: 0.85rem; }
   .tb-panel .picrow.k4 .pic { font-size: 0.78rem; padding-left: 1px; padding-right: 1px; }
 }
+/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
+.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
+.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
+.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
+.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
+.pickpic {
+  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
+  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
+  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
+}
+.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
+.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
+.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
+@media (min-width: 744px) and (min-height: 640px) {
+  .pick { gap: 16px; }
+  .pickswatches { gap: 14px; }
+  .pickswatches .swatch { max-width: 92px; }
+  .pickpic { font-size: 1.2rem; width: 150px; }
+}
+.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
+/* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
+.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
+/* Its color runs yellow, pink, blue, so it shows on every paint color. */
+.halo * { animation: halocol 1.8s linear infinite; }
+@keyframes halocol {
+  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
+  33% { fill: #FF5FB0; stroke: #FF5FB0; }
+  66% { fill: #3FC4FF; stroke: #3FC4FF; }
+}
+.pickpic .dim { opacity: 0.25; }
+/* Sparkles and puffs never catch a tap meant for the picture. */
+#fxG { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
 /* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
 .ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -630,6 +659,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
           <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
         </div>
       </div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap a part to color it!</div>
     </main>
 
     <section class="tb-panel" data-tab="vehicle">
@@ -645,17 +675,16 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
           <div class="pager" id="pager"></div>
           <div class="prows" id="prows"></div>
         </div>
-        <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
-          <section>
-            <div class="row" id="colorParts"></div>
-            <div class="swatches" id="swatches"></div>
-          </section>
+        <div data-pane="pick" id="pane-pick" aria-live="polite">
+          <div class="pick">
+            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="0 0 10 10" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Body</span></div>
+            <div class="pickswatches" id="pickSw"></div>
+          </div>
         </div>
       </div>
       <nav class="tb-tabs" role="tablist" aria-label="Controls">
         <button class="btn tab" role="tab" id="tab-vehicle" data-tab="vehicle" aria-controls="pane-vehicle">Vehicle</button>
         <button class="btn tab" role="tab" id="tab-build" data-tab="build" aria-controls="pane-build">Build</button>
-        <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
         <button class="btn tb-surprise" data-action="surprise">Surprise</button>
       </nav>
     </section>
@@ -1796,7 +1825,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
         if (typeof o.buildPart === "string") s.buildPart = o.buildPart;
         if (typeof o.buildPage === "number") s.buildPage = o.buildPage;
         if (typeof o.colorPart === "string") s.colorPart = o.colorPart;
-        if (["vehicle", "build", "colors"].indexOf(o.tab) !== -1) s.tab = o.tab;
+        if (["vehicle", "build"].indexOf(o.tab) !== -1) s.tab = o.tab;
+        else if (o.tab === "colors") s.tab = "build"; // the old Colors tab is gone: coloring is done by tapping a part
       }
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
     return s;
@@ -1904,23 +1934,97 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     b.dataset.fam = f.id;
     $("fams").appendChild(b);
   });
-  PALETTE.forEach(function (p) {
+  // ---- coloring: only the big parts can be colored (the body, and a builder's arm, blade, bed or drum).
+  // Tap one on the picture: it glows and its colors show in the panel. Small details keep their colors.
+  var PICKS = ["Red", "Orange", "Yellow", "Green", "Sky", "Blue", "Purple", "Pink"];
+  PICKS.forEach(function (name) {
     var b = document.createElement("button");
     b.className = "swatch";
-    b.dataset.color = p[0];
-    b.style.background = p[1];
-    b.style.color = isDark(p[1]) ? "#FFFFFF" : "#1D2340";
-    b.setAttribute("aria-label", p[0]);
-    b.title = p[0];
-    $("swatches").appendChild(b);
+    b.dataset.color = name;
+    b.style.background = hex(name);
+    b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
+    b.setAttribute("aria-label", name);
+    $("pickSw").appendChild(b);
   });
-
-  function colorParts() {
-    var k = state.kind, c = cfg(), names = KINDS[k].names, list = [];
-    ["body", "trim", "tool", "rims"].forEach(function (id) { if (names[id] && c.colors[id]) list.push([id, names[id]]); });
-    if (c.paint !== "none" && c.colors.stripes) list.push(["stripes", c.paint === "flames" ? "Flames" : "Stripes"]);
-    if (c.number && c.colors.number) list.push(["number", "Number"]);
+  var picking = ""; // the part being colored ("body" or "tool"), or "" when none is picked
+  function colorable(k) {
+    var names = KINDS[k].names, c = state.cfgs[k], list = [["body", names.body]];
+    if (KINDS[k].fam === "build" && names.tool && c.colors.tool) list.push(["tool", names.tool]);
     return list;
+  }
+  // The drawing groups that wear a color: a truck's body color is its cab; a car's roof joins the body when
+  // it is usually the same color.
+  function glowSel(k, id) {
+    var names = [id];
+    if (id === "body") {
+      var d = KINDS[k].def.colors;
+      if (k === "dump" || k === "mixer") names = ["cab"];
+      else if (KINDS[k].fam !== "build" && d.trim === d.body) names.push("cab");
+    }
+    return names.map(function (n) { return '[data-part="' + n + '"]'; }).join(", ");
+  }
+  function pickLabel(id) {
+    var l = colorable(state.kind).filter(function (p) { return p[0] === id; })[0];
+    return l ? l[1] : "";
+  }
+  // Details that sat on the old body color follow it, so nothing vanishes into the new color.
+  function fixDetails(k, c) {
+    var d = KINDS[k].def.colors, body = c.colors.body;
+    if (c.colors.trim && d.trim === d.body) c.colors.trim = body;
+    var contrast = isDark(hex(body)) ? "White" : "Black";
+    if (c.colors.stripes === body) c.colors.stripes = d.stripes !== body ? d.stripes : contrast;
+    if (c.colors.number === body) c.colors.number = d.number !== body ? d.number : contrast;
+  }
+  function setPicking(id) {
+    picking = id || "";
+    if (picking) { state.colorPart = picking; $("coach").classList.add("off"); }
+    $("tab-build").closest(".tb-panel").classList.toggle("picking", !!picking);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
+    });
+    showPick();
+  }
+  // The glow on the picture and the panel's picture + swatches for the picked part.
+  function showPick() {
+    var g = $("rocketG");
+    if (g) Array.prototype.forEach.call(g.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (!picking) return;
+    var k = state.kind, c = cfg();
+    if (!colorable(k).some(function (p) { return p[0] === picking; })) { setPicking(""); return; }
+    var sel = glowSel(k, picking);
+    if (g) Array.prototype.forEach.call(g.querySelectorAll(sel), function (el) {
+      if (el.parentNode.closest && el.parentNode.closest(sel)) return;
+      var h = el.cloneNode(true);
+      h.removeAttribute("data-part");
+      Array.prototype.forEach.call(h.querySelectorAll("[id], [data-part]"), function (x) { x.removeAttribute("id"); x.removeAttribute("data-part"); });
+      h.setAttribute("class", "halo");
+      [h].concat(Array.prototype.slice.call(h.querySelectorAll("*"))).forEach(function (x) {
+        x.style.strokeWidth = ((parseFloat(x.getAttribute("stroke-width")) || 0) + 22) + "px";
+      });
+      el.parentNode.insertBefore(h, el);
+    });
+    // panel picture: the vehicle with everything but the picked part faded, framed on that part
+    var t = vehicleOf(k, c), svg = $("pickSvg"), Z = null;
+    sel.replace(/data-part="(\w+)"/g, function (m0, n) {
+      var b = partBoxes(t.svg, n);
+      if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
+      return m0;
+    });
+    if (!Z) Z = { x0: t.bb.x, y0: t.bb.y, x1: t.bb.x + t.bb.w, y1: t.bb.y + t.bb.h };
+    var pad = 18, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2, w = Z.x1 - Z.x0 + 2 * pad, hh = Z.y1 - Z.y0 + 2 * pad;
+    if (w / hh < 1.3) w = hh * 1.3; else hh = w / 1.3;
+    svg.setAttribute("viewBox", [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" "));
+    svg.innerHTML = t.svg;
+    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, polyline, text"), function (el) {
+      if (!el.closest(sel) && !el.closest("clipPath")) el.setAttribute("class", "dim");
+    });
+    $("pickName").textContent = pickLabel(picking);
+    var cur = c.colors[picking];
+    Array.prototype.forEach.call($("pickSw").querySelectorAll("[data-color]"), function (bt) {
+      var on = bt.dataset.color === cur;
+      bt.setAttribute("aria-pressed", String(on));
+      bt.textContent = on ? "\u2713" : "";
+    });
   }
 
 
@@ -2060,25 +2164,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     if (rh && pages.length > 1) rows.style.minHeight = Math.ceil(rh * per + gap * (per - 1)) + "px";
     lastPer = per;
 
-    // Colors tab
-    var cps = colorParts();
-    if (!cps.some(function (p) { return p[0] === state.colorPart; })) state.colorPart = cps[0][0];
-    var cp = $("colorParts");
-    cp.innerHTML = "";
-    cps.forEach(function (p) {
-      var bt = document.createElement("button");
-      bt.className = "btn";
-      bt.dataset.part = p[0];
-      bt.setAttribute("aria-pressed", String(p[0] === state.colorPart));
-      bt.innerHTML = '<span class="dot" style="background:' + hex(c.colors[p[0]]) + '"></span>' + p[1];
-      cp.appendChild(bt);
-    });
-    var cur = c.colors[state.colorPart];
-    Array.prototype.forEach.call(document.querySelectorAll("[data-color]"), function (bt) {
-      var on = bt.dataset.color === cur;
-      bt.setAttribute("aria-pressed", String(on));
-      bt.textContent = on ? "✓" : "";
-    });
+    showPick();
     save();
     vbKey = ""; // drive pictures are rebuilt from the new design
   }
@@ -2135,6 +2221,14 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     var p = svgPoint(e);
     sparkles(p.x, p.y, 8, 60);
     if (Toybox.timer.phase() === "ending") return;
+    // A tap on the vehicle picks the part to color (the arm, blade, bed or drum, else the body);
+    // a tap on the sky or the ground puts the colors away.
+    var onV = e.target.closest && e.target.closest("#rocketG");
+    if (onV && !Toybox.timer.locked() && !document.body.classList.contains("big")) {
+      var tl = e.target.closest('[data-part="tool"]');
+      var id = tl && colorable(state.kind).length > 1 ? "tool" : "body";
+      if (id !== picking) { setPicking(id); blip(); }
+    } else if (picking) setPicking("");
     restartAnim($("rocketG"), "hop");
     if (lastBB) puffs(lastBB.x + lastBB.w * 0.15, 0, 5);
     honk();
@@ -2145,9 +2239,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     tab = name;
     state.tab = name;
     $("tab-build").closest(".tb-panel").setAttribute("data-tab", name);
-    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
-      b.setAttribute("aria-selected", String(b.dataset.tab === name));
-    });
+    setPicking("");
     save();
   }
 
@@ -2157,11 +2249,15 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     var c = state.cfgs[k];
     kindParts(k).forEach(function (p) { c[p[0]] = pick(p[2])[0]; });
     if (c.number === 0 && Math.random() < 0.6) c.number = 1 + Math.floor(Math.random() * 9);
-    Object.keys(c.colors).forEach(function (ck) { c.colors[ck] = pick(NAMES); });
-    while (c.colors.stripes === c.colors.body) c.colors.stripes = pick(NAMES);
-    if (c.colors.trim) while (c.colors.trim === c.colors.body && KINDS[k].fam === "build") c.colors.trim = pick(NAMES);
-    if (c.colors.tool) while (c.colors.tool === c.colors.body && k !== "excavator" && k !== "bulldozer") c.colors.tool = pick(NAMES);
-    if (c.colors.number) while (c.colors.number === "White" || c.colors.number === "Black") c.colors.number = pick(NAMES);
+    // New colors only for the parts he can color; the small details go back to their usual colors.
+    var d = KINDS[k].def.colors;
+    Object.keys(d).forEach(function (ck) { c.colors[ck] = d[ck]; });
+    c.colors.body = pick(PICKS);
+    if (c.colors.tool && KINDS[k].fam === "build") {
+      if (k === "excavator" || k === "bulldozer") c.colors.tool = c.colors.body;
+      else while (c.colors.tool === c.colors.body) c.colors.tool = pick(PICKS);
+    }
+    fixDetails(k, c);
   }
 
   document.addEventListener("click", function (e) {
@@ -2171,8 +2267,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     if (t.id === "fback") { if (!dv || !dv.park) closeDrive(); return; }
     if (t.classList.contains("hold") || t.id === "bigToggle" || t.closest(".tb-layer, .sheet, .rest, .farewell")) return;
     if (Toybox.timer.locked()) return;
-    if (t.id === "launch") { openDrive(false); return; }
-    var changed = false, c = cfg();
+    if (t.id === "launch") { if (picking) setPicking(""); openDrive(false); return; }
+    var changed = false, c = cfg(), kind0 = state.kind;
     if (t.dataset.fam) {
       if (t.dataset.fam !== state.fam) { state.kind = FAM_BY[t.dataset.fam].kinds[0]; changed = true; }
     }
@@ -2184,14 +2280,21 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
       c[t.dataset.ppart] = spec[2].filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
       changed = true;
     }
-    else if (t.dataset.part) { state.colorPart = t.dataset.part; }
-    else if (t.dataset.color) { c.colors[state.colorPart] = t.dataset.color; changed = true; }
+    else if (t.dataset.color) {
+      if (!picking) return;
+      c.colors[picking] = t.dataset.color;
+      if (picking === "body") fixDetails(state.kind, c);
+      changed = true;
+    }
     else if (t.dataset.action === "surprise") { surprise(); changed = true; }
     else return;
+    // Another action puts the colors away; picking a color keeps them out.
+    if (!t.dataset.color && (picking && (t.dataset.action || state.kind !== kind0 || t.dataset.ppart))) setPicking("");
     render();
     if (changed) {
       celebrate();
       blip();
+      if (t.dataset.color) restartAnim(t, "pop");
     }
   });
 
@@ -3467,6 +3570,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   Toybox.init({
     app: "car-builder",
     big: { button: $("bigToggle") },
+    onBig: function (on) { if (on && picking) setPicking(""); },
     timerIntro: "When time is up, the vehicle drives into its garage and rests, and the controls lock.",
     goodbyeOption: "End with a “Park it” button to press",
     farewellText: "Time to park",

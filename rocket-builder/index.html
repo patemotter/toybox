@@ -200,8 +200,7 @@ body.big .tb-panel { display: none; }
   overflow: hidden;
 }
 .panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="build"] [data-pane="build"],
-.tb-panel[data-tab="colors"] [data-pane="colors"] { visibility: visible; }
+.tb-panel[data-tab="build"] [data-pane="build"] { visibility: visible; }
 .panel-body section + section { margin-top: 10px; }
 .row {
   display: flex;
@@ -514,6 +513,40 @@ body.resting .flight { z-index: 55; }
 /* Tapping a part of the rocket opens its choices: the panel flashes. */
 .tb-panel.flash { animation: panelflash 0.9s ease-out; }
 @keyframes panelflash { 0% { outline: 6px solid #FFC93C; outline-offset: 2px; } 100% { outline: 6px solid rgba(255, 201, 60, 0); outline-offset: 2px; } }
+/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
+.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
+.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
+.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
+.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
+.pickpic {
+  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
+  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
+  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
+}
+.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
+.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
+.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
+@media (min-width: 744px) and (min-height: 640px) {
+  .pick { gap: 16px; }
+  .pickswatches { gap: 14px; }
+  .pickswatches .swatch { max-width: 92px; }
+  .pickpic { font-size: 1.2rem; width: 150px; }
+}
+.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
+/* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
+.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
+/* Its color runs yellow, pink, blue, so it shows on every paint color. */
+.halo * { animation: halocol 1.8s linear infinite; }
+@keyframes halocol {
+  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
+  33% { fill: #FF5FB0; stroke: #FF5FB0; }
+  66% { fill: #3FC4FF; stroke: #3FC4FF; }
+}
+.pickpic .dim { opacity: 0.25; }
+/* Sparkles and puffs never catch a tap meant for the picture. */
+#fxG { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
 /* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
 .ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -538,6 +571,7 @@ body.resting .flight { z-index: 55; }
           <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
         </div>
       </div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap a part to color it!</div>
     </main>
 
     <section class="tb-panel" data-tab="build">
@@ -559,17 +593,15 @@ body.resting .flight { z-index: 55; }
             <div class="options" id="options"></div>
           </section>
         </div>
-        <div data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
-          <section>
-            <div class="row four" id="colorParts"></div>
-            <div class="stepper" id="colorStep"><button class="btn sbtn" data-step="color" data-dir="-1" aria-label="Previous part">&lsaquo;</button><button class="btn slabel" data-step="color" data-dir="1" id="colorStepLabel">Nose</button><button class="btn sbtn" data-step="color" data-dir="1" aria-label="Next part">&rsaquo;</button></div>
-            <div class="swatches" id="swatches"></div>
-          </section>
+        <div data-pane="pick" id="pane-pick" aria-live="polite">
+          <div class="pick">
+            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="0 0 10 10" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Nose</span></div>
+            <div class="pickswatches" id="pickSw"></div>
+          </div>
         </div>
       </div>
       <nav class="tb-tabs" role="tablist" aria-label="Controls">
         <button class="btn tab" role="tab" id="tab-build" data-tab="build" aria-controls="pane-build">Build</button>
-        <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
         <button class="btn tb-surprise" data-action="surprise">Surprise</button>
       </nav>
     </section>
@@ -751,7 +783,7 @@ body.resting .flight { z-index: 55; }
       o += '<path d="M ' + n2(-0.3 * w) + " " + n2(y0 - 6) + " Q " + n2(-0.28 * w) + " " + n2(y0 - 0.5 * h) + " " + n2(-0.08 * w) + " " + n2(y0 - 0.82 * h) + '" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="' + n2(0.07 * w) + '" stroke-linecap="round"/>';
       top = y0 - h;
     }
-    return { svg: o, top: top };
+    return { svg: '<g data-c="nose">' + o + "</g>", top: top };
   }
 
   function starD(cx, cy, R, r, n) {
@@ -824,8 +856,8 @@ body.resting .flight { z-index: 55; }
         var finTop = s0.yb - (cfg.fins === "big" ? 1.25 : 1) * L;
         layers.push({
           group: "0",
-          svg: '<path d="' + fd + '" transform="scale(-1 1)" fill="' + hex(c.fins) + '"' + STROKE5 + "/>" +
-            '<path d="' + fd + '" fill="' + hex(c.fins) + '"' + STROKE5 + "/>",
+          svg: '<g data-c="fins"><path d="' + fd + '" transform="scale(-1 1)" fill="' + hex(c.fins) + '"' + STROKE5 + "/>" +
+            '<path d="' + fd + '" fill="' + hex(c.fins) + '"' + STROKE5 + "/></g>",
           bbox: [-(x0 + reach) - 8, finTop - 8, x0 + reach + 8, 8]
         });
         if (cfg.boosters) {
@@ -833,7 +865,7 @@ body.resting .flight { z-index: 55; }
             var cx = side * bcx, btop = s0.yb - bh, ch = bw * 1.25, o = "";
             o += bellS(cx, s0.yb, bw * 1.4, NOZ * 0.75);
             o += tubeS(cx, btop, bw, bh, hex(c.boosters), btop + 14, hex(c.bands));
-            o += '<path d="M ' + n2(cx - bw / 2) + " " + n2(btop) + " Q " + n2(cx - bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx) + " " + n2(btop - ch) +
+            o += '<path data-c="nose" d="M ' + n2(cx - bw / 2) + " " + n2(btop) + " Q " + n2(cx - bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx) + " " + n2(btop - ch) +
               " Q " + n2(cx + bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx + bw / 2) + " " + n2(btop) + ' Z" fill="' + hex(c.nose) + '"' + STROKE5 + "/>";
             layers.push({
               group: side < 0 ? "bL" : "bR",
@@ -844,7 +876,7 @@ body.resting .flight { z-index: 55; }
         }
       }
       var o2 = bellS(0, s.yb, s.w, NOZ);
-      o2 += tubeS(0, s.bodyTop, s.w, s.yb - s.bodyTop, hex(c.body), s.yb - 28, hex(c.bands));
+      o2 += '<g data-c="body">' + tubeS(0, s.bodyTop, s.w, s.yb - s.bodyTop, hex(c.body), s.yb - 28, hex(c.bands)) + "</g>";
       if (!s.top) {
         var wu = st[i + 1].w;
         o2 += '<path d="M ' + n2(-s.w / 2) + " " + n2(s.bodyTop) + " L " + n2(-wu / 2) + " " + n2(s.yt) + " L " + n2(wu / 2) + " " + n2(s.yt) + " L " + n2(s.w / 2) + " " + n2(s.bodyTop) +
@@ -941,16 +973,66 @@ body.resting .flight { z-index: 55; }
     el.textContent = b.label;
     $("buildParts").appendChild(el);
   });
-  PALETTE.forEach(function (p) {
+  // ---- coloring: only the big parts can be colored (nose, body, fins). Tap one on the picture: it glows and
+  // its colors show in the panel. Stripes, windows, boosters and the flame keep their colors.
+  var PICKS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "White"];
+  var PICK_NAMES = { nose: "Nose", body: "Body", fins: "Fins" };
+  PICKS.forEach(function (name) {
     var b = document.createElement("button");
     b.className = "swatch";
-    b.dataset.color = p[0];
-    b.style.background = p[1];
-    b.style.color = isDark(p[1]) ? "#FFFFFF" : "#1D2340";
-    b.setAttribute("aria-label", p[0]);
-    b.title = p[0];
-    $("swatches").appendChild(b);
+    b.dataset.color = name;
+    b.style.background = hex(name);
+    b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
+    b.setAttribute("aria-label", name);
+    $("pickSw").appendChild(b);
   });
+  var picking = ""; // "nose", "body", "fins", or "" when no part is picked
+  // The stripes follow a body color that would hide them.
+  function fixDetails() {
+    var c = state.colors, d = freshState().colors;
+    c.bands = d.bands;
+    if (c.bands === c.body) c.bands = c.body === "White" ? "Red" : "White";
+  }
+  function setPicking(id) {
+    picking = id || "";
+    if (picking) { state.colorPart = picking; $("coach").classList.add("off"); }
+    $("tab-build").closest(".tb-panel").classList.toggle("picking", !!picking);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
+    });
+    showPick();
+  }
+  // The glow on the picture and the panel's picture + swatches for the picked part.
+  function showPick() {
+    var rg = $("rocketG");
+    if (rg) Array.prototype.forEach.call(rg.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (!picking) return;
+    if (rg) Array.prototype.forEach.call(rg.querySelectorAll('[data-c="' + picking + '"]'), function (el) {
+      var h = el.cloneNode(true);
+      h.removeAttribute("data-c");
+      h.setAttribute("class", "halo");
+      [h].concat(Array.prototype.slice.call(h.querySelectorAll("*"))).forEach(function (x) {
+        x.style.strokeWidth = ((parseFloat(x.getAttribute("stroke-width")) || 0) + 22) + "px";
+      });
+      el.parentNode.insertBefore(h, el);
+    });
+    var g = geo(state), svg = $("pickSvg"), vb;
+    if (picking === "body") { var b = g.bbox, w = b[2] - b[0], hh = b[3] - b[1]; vb = [b[0] - (hh * 0.8 - w) / 2, b[1], hh * 0.8, hh]; if (w > hh * 0.8) vb = b.slice(0, 2).concat([w, hh]); }
+    else vb = miniView(g, picking);
+    svg.setAttribute("viewBox", vb.map(n2).join(" "));
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.innerHTML = rocketSVG(g);
+    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, text"), function (el) {
+      if (!el.closest('[data-c="' + picking + '"]')) el.setAttribute("class", "dim");
+    });
+    $("pickName").textContent = PICK_NAMES[picking];
+    var cur = state.colors[picking];
+    Array.prototype.forEach.call($("pickSw").querySelectorAll("[data-color]"), function (bt) {
+      var on = bt.dataset.color === cur;
+      bt.setAttribute("aria-pressed", String(on));
+      bt.textContent = on ? "\u2713" : "";
+    });
+  }
 
   // Mini rocket for an option button, cropped to show the part being picked.
   function miniView(g, part) {
@@ -982,14 +1064,6 @@ body.resting .flight { z-index: 55; }
     optionsFor = part;
   }
 
-  function colorPartsVisible() {
-    return CPARTS.filter(function (p) {
-      if (p[0] === "boosters" && !state.boosters) return false;
-      if (p[0] === "windows" && !state.windows && state.nose !== "dome") return false;
-      return true;
-    });
-  }
-
   function render() {
     var g = geo(state);
     art.innerHTML = sceneSVG(state, false);
@@ -1011,28 +1085,9 @@ body.resting .flight { z-index: 55; }
       svg.innerHTML = rocketSVG(mg);
     });
 
-    var parts = colorPartsVisible();
-    if (!parts.some(function (p) { return p[0] === state.colorPart; })) state.colorPart = parts[0][0];
-    var partsEl = $("colorParts");
-    partsEl.innerHTML = "";
-    parts.forEach(function (p) {
-      var b = document.createElement("button");
-      b.className = "btn";
-      b.dataset.part = p[0];
-      b.setAttribute("aria-pressed", String(p[0] === state.colorPart));
-      b.innerHTML = '<span class="dot" style="background:' + hex(state.colors[p[0]]) + '"></span>' + p[1];
-      partsEl.appendChild(b);
-    });
     $("buildStepLabel").textContent = BUILD_BY[state.buildPart].label;
-    var cpart = parts.filter(function (p) { return p[0] === state.colorPart; })[0];
-    $("colorStepLabel").innerHTML = '<span class="dot" style="background:' + hex(state.colors[state.colorPart]) + '"></span>' + cpart[1];
     updateTrips();
-    var current = state.colors[state.colorPart];
-    Array.prototype.forEach.call(document.querySelectorAll("[data-color]"), function (b) {
-      var on = b.dataset.color === current;
-      b.setAttribute("aria-pressed", String(on));
-      b.textContent = on ? "✓" : "";
-    });
+    showPick();
     art.setAttribute("aria-label", "A " + state.size + " rocket with " + state.stages + (state.stages === 1 ? " stage" : " stages") + " on its launch pad");
     save();
     layerKey = ""; // flight pictures are rebuilt from the new design
@@ -1100,23 +1155,17 @@ body.resting .flight { z-index: 55; }
     restartAnim($("rocketG"), "hop");
     puffs(0, 0, 6);
     blip();
-    tapPart(p);
+    tapPart(e.target);
   });
-  // Tapping a part of the rocket (nose, body, fins) opens that part's choices below.
-  function tapPart(p) {
-    var g = geo(state), T = g.top, s0 = g.stages[0], half = Math.max(T.w, s0.w) / 2 + 40, part = null;
-    if (p.y < g.noseTop - 30 || p.y > s0.exit + 20 || Math.abs(p.x) > half + 60) return;
-    if (p.y < T.bodyTop) part = "nose";
-    else if (p.y > s0.yb - (s0.yb - s0.bodyTop) * 0.4 || Math.abs(p.x) > s0.w / 2 + 6) part = state.boosters && Math.abs(p.x) > s0.w / 2 + 40 && p.y < s0.yb - 40 ? "boosters" : "fins";
-    else part = "body";
-    if (tab === "colors") {
-      if (!colorPartsVisible().some(function (c) { return c[0] === part; })) return;
-      state.colorPart = part;
-    } else {
-      state.buildPart = part === "body" ? (state.windows ? "windows" : "stages") : part;
-    }
+  // Tapping the rocket picks the part to color (nose, body or fins; anything else on it counts as the body),
+  // and lines up that part's shapes in Build. A tap on the sky or the ground puts the colors away.
+  function tapPart(el) {
+    var onR = el.closest && el.closest("#rocketG");
+    if (!onR || document.body.classList.contains("big")) { if (picking) setPicking(""); return; }
+    var c = el.closest("[data-c]"), part = c ? c.getAttribute("data-c") : "body";
+    state.buildPart = part === "body" ? (state.windows ? "windows" : "stages") : part;
+    if (part !== picking) setPicking(part);
     render();
-    restartAnim(document.querySelector(".tb-panel"), "flash");
   }
 
   // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
@@ -1235,20 +1284,19 @@ body.resting .flight { z-index: 55; }
   function showTab(name) {
     tab = name;
     $("tab-build").closest(".tb-panel").setAttribute("data-tab", name);
-    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
-      b.setAttribute("aria-selected", String(b.dataset.tab === name));
-    });
+    setPicking("");
   }
 
   function surprise() {
     BUILD.forEach(function (b) { state[b.id] = pick(b.opts)[0]; });
     if (Math.random() < 0.6 && state.windows === 0) state.windows = 1 + Math.floor(Math.random() * 3);
-    Object.keys(state.colors).forEach(function (k) { state.colors[k] = pick(NAMES); });
-    // Keep neighbouring parts from vanishing into each other.
-    while (state.colors.bands === state.colors.body) state.colors.bands = pick(NAMES);
-    while (state.colors.fins === state.colors.body) state.colors.fins = pick(NAMES);
-    while (state.colors.nose === state.colors.body) state.colors.nose = pick(NAMES);
-    if (state.colors.flame === "Black" || state.colors.flame === "Brown" || state.colors.flame === "Gray") state.colors.flame = pick(["Orange", "Red", "Yellow", "Pink", "Purple", "Sky", "Lime"]);
+    // New colors for the parts he can color (kept apart from the body); the details go back to their usual colors.
+    var d = freshState().colors;
+    Object.keys(d).forEach(function (k) { state.colors[k] = d[k]; });
+    state.colors.body = pick(PICKS);
+    do { state.colors.nose = pick(PICKS); } while (state.colors.nose === state.colors.body);
+    do { state.colors.fins = pick(PICKS); } while (state.colors.fins === state.colors.body);
+    fixDetails();
   }
 
   document.addEventListener("click", function (e) {
@@ -1264,18 +1312,13 @@ body.resting .flight { z-index: 55; }
       return;
     }
     if (Toybox.timer.locked()) return;
-    if (t.id === "launch") { ghost.learned(); openFlight(false); return; }
+    if (t.id === "launch") { ghost.learned(); if (picking) setPicking(""); openFlight(false); return; }
     if (t.dataset.trip) { state.trip = t.dataset.trip; updateTrips(); save(); blip(); return; }
     var changed = false;
     if (t.dataset.step) {
       var dir = Number(t.dataset.dir) || 1;
-      if (t.dataset.step === "build") {
-        var bi = BUILD.map(function (b) { return b.id; }), k = bi.indexOf(state.buildPart);
-        state.buildPart = bi[(k + dir + bi.length) % bi.length];
-      } else {
-        var cp = colorPartsVisible().map(function (p) { return p[0]; }), j = cp.indexOf(state.colorPart);
-        state.colorPart = cp[(j + dir + cp.length) % cp.length];
-      }
+      var bi = BUILD.map(function (b) { return b.id; }), k = bi.indexOf(state.buildPart);
+      state.buildPart = bi[(k + dir + bi.length) % bi.length];
     }
     else if (t.dataset.bpart) { state.buildPart = t.dataset.bpart; }
     else if (t.dataset.opt !== undefined) {
@@ -1284,14 +1327,19 @@ body.resting .flight { z-index: 55; }
       state[state.buildPart] = val;
       changed = true;
     }
-    else if (t.dataset.part) { state.colorPart = t.dataset.part; }
-    else if (t.dataset.color) { state.colors[state.colorPart] = t.dataset.color; changed = true; }
-    else if (t.dataset.action === "surprise") { surprise(); changed = true; }
+    else if (t.dataset.color) {
+      if (!picking) return;
+      state.colors[picking] = t.dataset.color;
+      if (picking === "body") fixDetails();
+      changed = true;
+    }
+    else if (t.dataset.action === "surprise") { surprise(); changed = true; if (picking) setPicking(""); }
     else return;
     var g = render();
     if (changed) {
       celebrate(g);
       blip();
+      if (t.dataset.color) restartAnim(t, "pop");
     }
   });
 
@@ -3234,6 +3282,7 @@ body.resting .flight { z-index: 55; }
   Toybox.init({
     app: "rocket-builder",
     big: { button: $("bigToggle") },
+    onBig: function (on) { if (on && picking) setPicking(""); },
     timerIntro: "When time is up, the rocket flies home, lands and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye launch button to press",
     farewellText: "Time to say goodbye",
