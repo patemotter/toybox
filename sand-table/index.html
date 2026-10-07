@@ -1,0 +1,1284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sand Table</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sand Table">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #EAF5FF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #22385F;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #22385F;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* ---------- Stage: the sand table, seen from above ---------- */
+.stage { touch-action: none; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; pointer-events: none; }
+.stage .toast { position: absolute; top: 14px; z-index: 4; font-size: 1.3rem; }
+.stage .farewell { position: absolute; top: 14px; bottom: auto; z-index: 4; }
+.stage .farewell p { font-size: 1.25rem; }
+
+/* ---------- Panel: Draw!/Stop, the pattern tiles, then Light / Smooth / Surprise ---------- */
+.pats { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.btn.pat { min-height: 58px; padding: 4px 2px; border-radius: 14px; }
+.btn.pat svg { width: 40px; height: 40px; }
+.pat .lbl { display: none; }
+.btn.pat[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn.pat.drawing svg { animation: pat-turn 6s linear infinite; }
+@keyframes pat-turn { to { transform: rotate(360deg); } }
+.btn.tb-go .goicon { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.35em; vertical-align: -0.08em; }
+.ldot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1D2340; margin-right: 6px;
+  vertical-align: -3px; box-shadow: 0 0 8px 2px var(--ld, #FFC86B); background: var(--ld, #FFC86B); }
+body.big .tb-panel { display: none; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+
+/* Phones held sideways: two rows of four tiles in the side column. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .btn.pat { min-height: 70px; }
+  .btn.pat svg { width: 44px; height: 44px; }
+  .tb-body .tb-panel { width: min(40%, 330px); }
+}
+/* Tablets: bigger tiles with their names. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .btn.pat { min-height: 96px; font-size: 1.05rem; gap: 2px; }
+  .btn.pat svg { width: 60px; height: 60px; }
+  .pat .lbl { display: block; }
+  .stage .tbadge { width: 56px; height: 56px; top: 12px; right: 12px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .pats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tb-body .tb-panel { width: min(36%, 400px); }
+}
+@media (prefers-reduced-motion: reduce) { .btn.pat.drawing svg { animation: none; } }
+/* Ghost hand: a see-through hand that shows the main move once (tools/snippets/ghost-hand.css). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+.rest-art { aspect-ratio: 1; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Sand Table</h1>
+    <button class="btn tb-iconbtn" id="bigBtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="view" role="img" aria-label="A round sand table seen from above. A steel ball rolls through the sand and draws grooves. Drag anywhere to steer the ball."></canvas>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Drag the ball!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <button class="btn tb-go" id="goBtn">Draw!</button>
+      <div class="tb-choices pats" id="pats" role="group" aria-label="Patterns"></div>
+      <nav class="tb-tabs" aria-label="More">
+        <button class="btn" id="lightBtn" aria-label="Change the light color"><span class="ldot" id="ldot"></span>Light</button>
+        <button class="btn tb-new" id="smoothBtn">Smooth</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  var KEY = "sand-table-v1";          // { ball:[x,y], pat, light }
+  var SKEY = "sand-table-sand-v1";    // the sand itself: the heightmap as a grey PNG (1/32 of a cell per step)
+  var OUT = "#1D2340";
+  var TAU = Math.PI * 2;
+  var DEBUG = /[?&]debug\b/.test(location.search);
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Everything on the table is in "table units": the sand is a circle of radius 1 around (0, 0), y down.
+  var N = 560;                 // heightmap cells across the sand (fixed, so a resize never redraws it)
+  var HALF = N / 2;
+  var RB = 0.06;               // ball radius
+  var RG = 0.042;              // groove half width
+  var RR = 0.078;              // ridge outer edge (sand pushed up on both sides)
+  var LIM = 1 - RB - 0.012;    // how far out the ball's middle may go
+  var DEPTH = RG * HALF * 0.3;           // groove depth in cells
+  var RIDGE = DEPTH * 0.75;              // ridge height in cells (the slopes meet smoothly)
+  var RECENT = RR * 2.6;                 // path length behind the ball that its own ridges must not fill back in
+  var STEP = 0.008;            // pattern points are this far apart
+  var V_FINGER = 1.7;          // table radii per second: the ball's top speed behind a finger (calm, catches up)
+  var V_PAT = 0.62;            // drawing a pattern by itself (calm)
+  var WIPE_SECS = 7.5;         // the spiral smoothing takes about this long
+  var HOLD_MS = 8000;          // a finished pattern stays this long before the next one (Draw! mode only)
+  var RESUME_MS = 2600;        // after a finger lets go in Draw! mode, the pattern carries on
+  var SAND = [242, 222, 184];
+  var LIGHTS = ["#FFC86B", "#56C2FF", "#B07CFF", "#FF7DC0", "#5FE08A", "#FF9248", "#FFFFFF"];
+  // Light from the top left, a little above.
+  var LX = -0.52, LY = -0.62, LZ = 0.59;
+  (function () { var l = Math.hypot(LX, LY, LZ); LX /= l; LY /= l; LZ /= l; })();
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function now() { return performance.now(); }
+
+  // ---------- Patterns (each a list of [x, y] points in table units) ----------
+  function polar(r, a) { return [r * Math.cos(a), r * Math.sin(a)]; }
+  function curve(f, t0, t1, n, out) {
+    out = out || [];
+    for (var i = 0; i <= n; i++) out.push(f(t0 + (t1 - t0) * i / n));
+    return out;
+  }
+  function gcd(a, b) { while (b) { var t = b; b = a % b; a = t; } return a; }
+  var HEART = (function () {
+    var raw = curve(function (t) {
+      var s = Math.sin(t);
+      return [16 * s * s * s, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))];
+    }, 0, TAU, 400);
+    var y0 = 1e9, y1 = -1e9, m = 0;
+    raw.forEach(function (p) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    var cy = (y0 + y1) / 2;
+    raw.forEach(function (p) { p[1] -= cy; m = Math.max(m, Math.hypot(p[0], p[1])); });
+    return raw.map(function (p) { return [p[0] / m, p[1] / m]; });
+  })();
+  function heartAt(cx, cy, s, out) {
+    HEART.forEach(function (p) { out.push([cx + p[0] * s, cy + p[1] * s]); });
+    return out;
+  }
+  var PATS = [
+    { id: "spiral", name: "Spiral", vars: 3, make: function (v) {
+      var turns = [5.5, 4.2, 6.5][v];
+      return curve(function (t) { return polar(0.9 * t, -Math.PI / 2 + turns * TAU * t); }, 0, 1, 2000);
+    } },
+    { id: "flower", name: "Flower", vars: 4, make: function (v) {
+      var k = [5, 4, 3, 7][v], per = k % 2 ? Math.PI : TAU, a0 = Math.PI / (2 * k), out = [];
+      curve(function (t) { return polar(0.9 * Math.cos(k * t), t); }, a0, a0 + per, 1400, out);
+      curve(function (t) { return polar(0.5 * Math.cos(k * t), t + a0); }, a0, a0 + per, 900, out);
+      return out;
+    } },
+    { id: "star", name: "Star", vars: 4, make: function (v) {
+      var nm = [[7, 3], [5, 2], [8, 3], [9, 4]][v], n = nm[0], m = nm[1], out = [], i;
+      for (i = 0; i <= n; i++) out.push(polar(0.9, -Math.PI / 2 + TAU * i * m / n));
+      for (i = 0; i <= n; i++) out.push(polar(0.46, -Math.PI / 2 + Math.PI / n + TAU * i * m / n));
+      for (i = 0; i <= 60; i++) out.push(polar(0.16, -Math.PI / 2 + Math.PI / n + TAU * i / 60));
+      return out;
+    } },
+    { id: "heart", name: "Heart", vars: 2, make: function (v) {
+      var sc = [[0.9, 0.62, 0.34], [0.9, 0.7, 0.5, 0.3]][v], out = [];
+      sc.forEach(function (s) { heartAt(0, 0, s, out); });
+      return out;
+    } },
+    { id: "waves", name: "Waves", vars: 3, make: function (v) {
+      var rows = [7, 6, 8][v], A = [0.065, 0.08, 0.05][v], f = [5, 4, 6][v], out = [], i, j;
+      for (j = 0; j < rows; j++) {
+        var y = -0.8 + 1.6 * j / (rows - 1), c = Math.sqrt(Math.max(0, 0.9 * 0.9 - y * y)) - 0.03;
+        for (i = 0; i <= 160; i++) {
+          var x = -c + 2 * c * i / 160;
+          if (j % 2) x = -x;
+          out.push([x, y + A * Math.sin(x * f * Math.PI)]);
+        }
+      }
+      return out;
+    } },
+    { id: "swirl", name: "Swirl", vars: 4, make: function (v) {
+      var p = [[6, 1, 3], [9, 2, 3], [7, 3, 2], [7, 2, 4]][v], R = p[0], r = p[1], d = p[2];
+      var k = (R - r) / r, T = TAU * r / gcd(R, r), sc = 0.9 / ((R - r) + d);
+      return curve(function (t) {
+        return [sc * ((R - r) * Math.cos(t) + d * Math.cos(k * t)), sc * ((R - r) * Math.sin(t) - d * Math.sin(k * t))];
+      }, 0, T, 4000);
+    } },
+    { id: "rings", name: "Rings", vars: 2, make: function (v) {
+      var step = [0.15, 0.2][v], out = [], r, i;
+      for (r = 0.9; r > 0.1; r -= step) {
+        for (i = 0; i <= 160; i++) out.push(polar(r, -Math.PI / 2 + TAU * i / 160));
+      }
+      return out;
+    } }
+  ];
+  var PAT_BY = {};
+  PATS.forEach(function (p) { PAT_BY[p.id] = p; });
+
+  // Even spacing (STEP) so the ball moves along a pattern at a steady speed.
+  function resample(pts) {
+    var out = [pts[0][0], pts[0][1]], need = STEP, ax = pts[0][0], ay = pts[0][1];
+    for (var i = 1; i < pts.length; i++) {
+      var bx = pts[i][0], by = pts[i][1], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), pos = 0;
+      while (pos + need <= L) { pos += need; out.push(ax + dx * pos / L, ay + dy * pos / L); need = STEP; }
+      need -= (L - pos);
+      ax = bx; ay = by;
+    }
+    return new Float32Array(out);
+  }
+  var patCache = {};
+  function patPoints(id, v) {
+    var k = id + ":" + v;
+    if (!patCache[k]) patCache[k] = resample(PAT_BY[id].make(v));
+    return patCache[k];
+  }
+
+  // ---------- Saved state ----------
+  // Opening Sand Table from the Toybox home screen starts with smooth sand; a reload keeps the sand.
+  if (window.Toybox && Toybox.fresh()) {
+    try { localStorage.removeItem(KEY); localStorage.removeItem(SKEY); } catch (e) { /* ignore */ }
+  }
+  var prefs = { ball: [0, 0], pat: "spiral", light: 0 };
+  try {
+    var o = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (o && typeof o === "object") {
+      if (o.ball && o.ball.length === 2 && isFinite(o.ball[0]) && isFinite(o.ball[1])) prefs.ball = [Number(o.ball[0]), Number(o.ball[1])];
+      if (PAT_BY[o.pat]) prefs.pat = o.pat;
+      if (typeof o.light === "number" && o.light >= 0 && o.light < LIGHTS.length) prefs.light = Math.floor(o.light);
+    }
+  } catch (e) { /* bad data: defaults */ }
+  function savePrefs() {
+    prefs.ball = [Math.round(ball.x * 1000) / 1000, Math.round(ball.y * 1000) / 1000];
+    try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- The sand: a heightmap, shaded into a small canvas ----------
+  var H = new Float32Array(N * N);        // height in cells: 0 is smooth sand, below is a groove, above a ridge
+  var CARVE = new Float32Array(N * N);    // path length when the ball last carved this cell
+  var GR = new Float32Array(N * N);       // fixed sand grain (a tiny brightness change per cell)
+  var cum = 0;                            // path length the ball has rolled (table units)
+  (function () {
+    for (var i = 0; i < N * N; i++) { GR[i] = 1 + (Math.random() - 0.5) * 0.055; CARVE[i] = -1e9; }
+  })();
+  var sandC = document.createElement("canvas");
+  sandC.width = sandC.height = N;
+  var sctx = sandC.getContext("2d");
+  var IMG = sctx.createImageData(N, N);
+  var dx0 = N, dy0 = N, dx1 = -1, dy1 = -1;  // dirty cells to shade
+  function markDirty(x0, y0, x1, y1) {
+    if (x0 < dx0) dx0 = x0; if (y0 < dy0) dy0 = y0; if (x1 > dx1) dx1 = x1; if (y1 > dy1) dy1 = y1;
+  }
+  var sandChanged = 0;   // time of the last change (for saving)
+  function cellX(x) { return (x + 1) * HALF - 0.5; }
+
+  // Roll the ball from A to B: carve the groove (newest wins), push ridges up on both sides.
+  function stampSeg(ax, ay, bx, by, c0, c1) {
+    var Ax = cellX(ax), Ay = cellX(ay), Bx = cellX(bx), By = cellX(by);
+    var rg = RG * HALF, rr = RR * HALF, rr2 = rr * rr;
+    var x0 = Math.max(1, Math.floor(Math.min(Ax, Bx) - rr)), x1 = Math.min(N - 2, Math.ceil(Math.max(Ax, Bx) + rr));
+    var y0 = Math.max(1, Math.floor(Math.min(Ay, By) - rr)), y1 = Math.min(N - 2, Math.ceil(Math.max(Ay, By) + rr));
+    if (x1 < x0 || y1 < y0) return;
+    var vx = Bx - Ax, vy = By - Ay, L2 = vx * vx + vy * vy, L = Math.sqrt(L2), x, y, i;
+    // Ridges use the distance to the segment's line, a little past both ends, so the joins between
+    // segments stay smooth (round caps would leave a bump at every join).
+    var ext = L > 0 ? Math.max(0.5, 3 / L) : 0;
+    for (y = y0; y <= y1; y++) {
+      var py = y - Ay;
+      i = y * N + x0;
+      for (x = x0; x <= x1; x++, i++) {
+        var px = x - Ax, tu = L2 > 0 ? (px * vx + py * vy) / L2 : 0;
+        var t = tu < 0 ? 0 : (tu > 1 ? 1 : tu);
+        var qx = px - t * vx, qy = py - t * vy, d2 = qx * qx + qy * qy, c = c0 + (c1 - c0) * t;
+        if (d2 < rg * rg) {
+          // The newest groove wins: it reshapes old grooves and ridges it crosses (over its own fresh
+          // path it only deepens, so the line stays smooth).
+          var q2 = d2 / (rg * rg), g = -DEPTH * (1 - q2);
+          if (c - CARVE[i] > RECENT || g < H[i]) H[i] = g;
+          CARVE[i] = c;
+          continue;
+        }
+        if (L2 <= 0 || tu < -ext || tu > 1 + ext) continue;
+        var ux = px - tu * vx, uy = py - tu * vy, dp2 = ux * ux + uy * uy;
+        if (dp2 >= rr2 || dp2 < rg * rg) continue;
+        if (c - CARVE[i] > RECENT) {
+          // pushed-up sand: blends into what is there, fading out at the ridge's outer edge (no cliffs)
+          var u = (Math.sqrt(dp2) - rg) / (rr - rg), r = RIDGE * Math.sin(Math.PI * u);
+          if (r > H[i]) H[i] += (1 - u) * (r - H[i]);
+        }
+      }
+    }
+    markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
+    sandChanged = now();
+  }
+  // Smooth a round patch flat (the spiral wipe). k = how much (1 = fully flat in the middle).
+  function flatten(cx, cy, rad, soft, k) {
+    var X = cellX(cx), Y = cellX(cy), r0 = rad * HALF, r1 = (rad + soft) * HALF;
+    var x0 = Math.max(0, Math.floor(X - r1)), x1 = Math.min(N - 1, Math.ceil(X + r1));
+    var y0 = Math.max(0, Math.floor(Y - r1)), y1 = Math.min(N - 1, Math.ceil(Y + r1));
+    if (x1 < x0 || y1 < y0) return;
+    var x, y, i;
+    for (y = y0; y <= y1; y++) {
+      i = y * N + x0;
+      for (x = x0; x <= x1; x++, i++) {
+        var d = Math.hypot(x - X, y - Y);
+        if (d >= r1) continue;
+        var w = d <= r0 ? 1 : 1 - (d - r0) / (r1 - r0);
+        w = w * w * (3 - 2 * w) * k;
+        H[i] *= (1 - w);
+        if (Math.abs(H[i]) < 0.02) H[i] = 0;
+      }
+    }
+    markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
+    sandChanged = now();
+  }
+  // Light the dirty cells into the sand canvas.
+  var KS = 1.0, AO = 0.03;
+  function shade(x0, y0, x1, y1) {
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(N - 1, x1); y1 = Math.min(N - 1, y1);
+    if (x1 < x0 || y1 < y0) return;
+    var D = IMG.data, x, y, i;
+    for (y = y0; y <= y1; y++) {
+      var up = y > 0 ? -N : 0, dn = y < N - 1 ? N : 0;
+      i = y * N + x0;
+      for (x = x0; x <= x1; x++, i++) {
+        var h = H[i];
+        var gx = ((x < N - 1 ? H[i + 1] : h) - (x > 0 ? H[i - 1] : h)) * 0.5 * KS;
+        var gy = (H[i + dn] - H[i + up]) * 0.5 * KS;
+        var dot = (-gx * LX - gy * LY + LZ) / Math.sqrt(gx * gx + gy * gy + 1);
+        var f = (1 + (dot / LZ - 1) * 0.6) * (1 + h * AO) * GR[i];
+        var j = i * 4;
+        var r = SAND[0] * f, g = SAND[1] * f, b = SAND[2] * f;
+        D[j] = r > 255 ? 255 : r; D[j + 1] = g > 255 ? 255 : g; D[j + 2] = b > 255 ? 255 : b; D[j + 3] = 255;
+      }
+    }
+    sctx.putImageData(IMG, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+  }
+  function shadeDirty() {
+    if (dx1 < dx0) return null;
+    var r = [dx0, dy0, dx1, dy1];
+    shade(dx0, dy0, dx1, dy1);
+    dx0 = dy0 = N; dx1 = dy1 = -1;
+    return r;
+  }
+  function smoothAll() {
+    for (var i = 0; i < N * N; i++) { H[i] = 0; CARVE[i] = -1e9; }
+    markDirty(0, 0, N - 1, N - 1);
+  }
+
+  // Save the sand as a PNG (a few times at most: when it has been still for a moment, and on leaving).
+  var savedAt = 0;
+  function saveSand() {
+    savedAt = now();
+    savePrefs();
+    try {
+      var c = document.createElement("canvas");
+      c.width = c.height = N;
+      var x = c.getContext("2d"), im = x.createImageData(N, N), d = im.data, flat = true;
+      for (var i = 0; i < N * N; i++) {
+        var v = Math.round((H[i] + 4) * 32);
+        if (v < 0) v = 0; else if (v > 255) v = 255;
+        if (H[i] !== 0) flat = false;
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+      }
+      if (flat) { localStorage.removeItem(SKEY); return; }
+      x.putImageData(im, 0, 0);
+      // half size is plenty: the grooves are smooth, and it keeps the saved picture small
+      var c2 = document.createElement("canvas");
+      c2.width = c2.height = N / 2;
+      c2.getContext("2d").drawImage(c, 0, 0, N / 2, N / 2);
+      localStorage.setItem(SKEY, c2.toDataURL("image/png"));
+    } catch (e) { /* storage full or unavailable: the sand just won't come back after a reload */ }
+  }
+  function loadSand() {
+    var url = null;
+    try { url = localStorage.getItem(SKEY); } catch (e) { url = null; }
+    if (!url || url.indexOf("data:image/png") !== 0) return;
+    var img = new Image();
+    img.onload = function () {
+      try {
+        if ((img.width !== N && img.width !== N / 2) || img.height !== img.width) return;
+        var c = document.createElement("canvas");
+        c.width = c.height = N;
+        var x = c.getContext("2d");
+        x.imageSmoothingEnabled = true;
+        x.drawImage(img, 0, 0, N, N);
+        var d = x.getImageData(0, 0, N, N).data;
+        for (var i = 0; i < N * N; i++) {
+          if (H[i] !== 0) continue;   // he already started drawing: keep his new lines on top
+          H[i] = d[i * 4 + 1] === 128 ? 0 : d[i * 4 + 1] / 32 - 4;
+        }
+        markDirty(0, 0, N - 1, N - 1);
+        dirty = true;
+      } catch (e) { /* ignore */ }
+    };
+    img.src = url;
+  }
+
+  // ---------- Ball, finger, routes ----------
+  var ball = { x: clamp(prefs.ball[0], -LIM, LIM), y: clamp(prefs.ball[1], -LIM, LIM), vx: 0, vy: 0 };
+  (function () { var r = Math.hypot(ball.x, ball.y); if (r > LIM) { ball.x *= LIM / r; ball.y *= LIM / r; } })();
+  var lastStamp = { x: ball.x, y: ball.y };
+  var steer = null;      // { tx, ty, down }: the ball follows a finger
+  var route = null;      // the ball follows a path by itself: a pattern, the smoothing spiral, or the goodbye heart
+  // Draw! mode: W.on keeps patterns coming; W.k is how far the current pattern got.
+  var W = { on: false, pat: prefs.pat, v: 0, k: 0, done: false, holdUntil: 0, resumeAt: 0 };
+  var learnedDrag = false, watched = false, fingerPath = 0;
+  var ending = false, endDone = null, endT0 = 0;
+  var dim = 1, dimTarget = 1;
+  var lightWave = null;
+  var dirty = true;
+
+  // A route: a straight approach from the ball to point k0 of pts, then along pts to the end.
+  function makeRoute(kind, pts, k0, vmax, opt) {
+    opt = opt || {};
+    var n = pts.length / 2, tx = pts[2 * k0], ty = pts[2 * k0 + 1];
+    var la = Math.hypot(tx - ball.x, ty - ball.y);
+    var R = { kind: kind, pts: pts, n: n, k0: k0, ax: ball.x, ay: ball.y, bx: tx, by: ty, la: la,
+      len: la + Math.max(0, n - 1 - k0) * STEP, s: 0, v: opt.v || 0, vmax: vmax, acc: opt.acc || vmax * 1.6,
+      dec: opt.dec || vmax * 1.3, stopping: false, then: opt.then || null };
+    return R;
+  }
+  function routePos(R, s) {
+    if (s < R.la) { var f = s / R.la; return [R.ax + (R.bx - R.ax) * f, R.ay + (R.by - R.ay) * f]; }
+    var u = R.k0 + (s - R.la) / STEP, i = Math.floor(u), n = R.n;
+    if (i >= n - 1) return [R.pts[2 * n - 2], R.pts[2 * n - 1]];
+    var f2 = u - i, p = R.pts;
+    return [p[2 * i] + (p[2 * i + 2] - p[2 * i]) * f2, p[2 * i + 1] + (p[2 * i + 3] - p[2 * i + 1]) * f2];
+  }
+  function routeIndex(R) {
+    if (R.s < R.la) return R.k0;
+    return Math.min(R.n - 1, Math.floor(R.k0 + (R.s - R.la) / STEP));
+  }
+  function speed() { return Math.hypot(ball.vx, ball.vy); }
+
+  // ---------- Draw! mode ----------
+  function startPattern(id, v, fromK) {
+    if (W.on && route && route.kind === "pattern" && W.pat === id && W.v === v && !fromK) return;
+    W.pat = id; W.v = v || 0; W.k = fromK || 0; W.done = false; W.on = true; watched = true;
+    prefs.pat = id; savePrefs();
+    if (route && route.kind === "wipe") { route.then = "pattern"; renderPanel(); return; }   // after the smoothing
+    if (!steer) beginPatternRoute();
+    else W.resumeAt = 0;
+    renderPanel();
+  }
+  function beginPatternRoute() {
+    var pts = patPoints(W.pat, W.v);
+    var keep = route && route.kind === "pattern" ? route.v : 0;
+    route = makeRoute("pattern", pts, Math.min(W.k, pts.length / 2 - 1), V_PAT, { v: keep });
+    W.resumeAt = 0;
+  }
+  function stopDrawing() {
+    W.on = false;
+    if (route && route.kind !== "wipe") route.stopping = true;
+    if (route && route.kind === "wipe" && route.then === "pattern") route.then = null;
+    renderPanel();
+  }
+  function nextPatternId() {
+    var i = 0;
+    for (var j = 0; j < PATS.length; j++) if (PATS[j].id === W.pat) i = j;
+    return PATS[(i + 1) % PATS.length].id;
+  }
+  function startWipe(then) {
+    if (route && route.kind === "wipe") return;
+    // The ball goes out to the edge, then spirals in; the sand behind it is smoothed flat.
+    var a = Math.atan2(ball.y, ball.x), r0 = 0.9, sp = 0.2, turns = r0 / sp, pts = [];
+    if (Math.hypot(ball.x, ball.y) < 0.05) a = -Math.PI / 2;
+    curve(function (t) { return polar(r0 * (1 - t), a + turns * TAU * t); }, 0, 1, 1600, pts);
+    var rs = resample(pts);
+    var len = Math.hypot(rs[0] - ball.x, rs[1] - ball.y) + (rs.length / 2 - 1) * STEP;
+    var v = Math.max(V_PAT, len / WIPE_SECS);
+    route = makeRoute("wipe", rs, 0, v, { acc: v * 1.5, dec: v * 2.2, then: then || null });
+    route.settle = 0;
+    W.done = false;
+    renderPanel();
+  }
+
+  // ---------- Moving the ball (each frame) ----------
+  function moveBallTo(x, y, dt) {
+    var r = Math.hypot(x, y);
+    if (r > LIM) { x *= LIM / r; y *= LIM / r; }
+    var mx = x - ball.x, my = y - ball.y;
+    if (dt > 0) { ball.vx = mx / dt; ball.vy = my / dt; }
+    ball.x = x; ball.y = y;
+    carve();
+  }
+  function carve() {
+    var dx = ball.x - lastStamp.x, dy = ball.y - lastStamp.y, d = Math.hypot(dx, dy);
+    if (d < 0.006) return;
+    var n = Math.ceil(d / 0.02);
+    for (var i = 0; i < n; i++) {
+      var ax = lastStamp.x + dx * i / n, ay = lastStamp.y + dy * i / n;
+      var bx = lastStamp.x + dx * (i + 1) / n, by = lastStamp.y + dy * (i + 1) / n;
+      stampSeg(ax, ay, bx, by, cum + d * i / n, cum + d * (i + 1) / n);
+      if (route && route.kind === "wipe") wipeBand(bx, by);
+    }
+    cum += d;
+    lastStamp.x = ball.x; lastStamp.y = ball.y;
+  }
+  // The band just outside the ball's spiral is smoothed (it holds the last turn's groove).
+  function wipeBand(x, y) {
+    if (route.s < route.la) return;
+    var r = Math.hypot(x, y), a = Math.atan2(y, x), c = r + 0.185;
+    flatten(c * Math.cos(a), c * Math.sin(a), 0.1, 0.025, 1);
+  }
+
+  var tilt = { x: 0, y: 0, bx: 0, by: 0, on: false, has: false };
+  function update(dt) {
+    var t = now();
+    if (steer) {
+      var dx = steer.tx - ball.x, dy = steer.ty - ball.y, d = Math.hypot(dx, dy);
+      var sp = Math.min(V_FINGER, d * 4.2);
+      var wx = d > 1e-6 ? dx / d * sp : 0, wy = d > 1e-6 ? dy / d * sp : 0;
+      var k = 1 - Math.exp(-dt * 8);
+      var vx = ball.vx + (wx - ball.vx) * k, vy = ball.vy + (wy - ball.vy) * k;
+      var ox = ball.x, oy = ball.y;
+      moveBallTo(ball.x + vx * dt, ball.y + vy * dt, dt);
+      if (steer && steer.down) fingerPath += Math.hypot(ball.x - ox, ball.y - oy);
+      if (!learnedDrag && fingerPath > 0.5) { learnedDrag = true; ghost.learned(); updateCoach(); }
+      if (!steer.down && d < 0.004 && speed() < 0.05) {
+        steer = null; ball.vx = ball.vy = 0;
+        if (W.on) W.resumeAt = t + RESUME_MS;
+        updateCoach();
+      }
+    } else if (route && route.settle > 0) {
+      // the smoothing spiral reached the middle: settling (below)
+    } else if (route) {
+      var R = route, vt = R.stopping ? 0 : R.vmax;
+      if (R.v < vt) R.v = Math.min(vt, R.v + R.acc * dt); else R.v = Math.max(vt, R.v - R.dec * dt);
+      var rem = R.len - R.s;
+      R.v = Math.min(R.v, Math.sqrt(2 * R.dec * Math.max(0, rem)) + 0.03);
+      R.s = Math.min(R.len, R.s + R.v * dt);
+      var p = routePos(R, R.s);
+      moveBallTo(p[0], p[1], dt);
+      if (R.kind === "pattern") W.k = routeIndex(R);
+      if (R.s >= R.len || (R.stopping && R.v <= 0.001)) finishRoute(R);
+    } else {
+      // Free: tilt nudges the ball (when the grown-up turned tilt on); otherwise it stays put.
+      var ax = 0, ay = 0;
+      if (tilt.on && tilt.has && !ending && !Toybox.timer.locked()) {
+        var e = 1 - Math.exp(-dt / 2.5);
+        tilt.bx += (tilt.x - tilt.bx) * e; tilt.by += (tilt.y - tilt.by) * e;
+        var gx = tilt.x - tilt.bx, gy = tilt.y - tilt.by, gm = Math.hypot(gx, gy);
+        if (gm > 0.06) { ax = gx / gm * (gm - 0.06) * 6; ay = gy / gm * (gm - 0.06) * 6; }
+      }
+      var damp = Math.exp(-dt * 2.4);
+      var nvx = (ball.vx + ax * dt) * damp, nvy = (ball.vy + ay * dt) * damp, ns = Math.hypot(nvx, nvy);
+      if (ns > 0.9) { nvx *= 0.9 / ns; nvy *= 0.9 / ns; }
+      if (ns < 0.004 && !ax && !ay) { ball.vx = ball.vy = 0; }
+      else moveBallTo(ball.x + nvx * dt, ball.y + nvy * dt, dt);
+      // Draw! mode carries on after a finger let go, or after a finished pattern has been admired.
+      if (W.on && !ending) {
+        if (W.done) { if (t >= W.holdUntil) startWipe("next"); }
+        else if (W.resumeAt && t >= W.resumeAt) beginPatternRoute();
+        else if (!W.resumeAt) beginPatternRoute();
+      }
+    }
+    if (route && route.kind === "wipe" && route.settle > 0) {
+      // the very middle smooths out softly at the end of the spiral
+      flatten(0, 0, 0.26, 0.1, 0.25);
+      route.settle -= dt;
+      if (route.settle <= 0) endWipe();
+    }
+    if (dim !== dimTarget) {
+      dim += clamp(dimTarget - dim, -dt / 3, dt / 1.2);
+      if (Math.abs(dim - dimTarget) < 0.005) dim = dimTarget;
+      dirty = true;
+    }
+    if (lightWave) dirty = true;
+    hissTick(speed());
+  }
+  function finishRoute(R) {
+    ball.vx = ball.vy = 0;
+    if (R.kind === "wipe") {
+      if (R.stopping) { route = null; updateCoach(); renderPanel(); return; }
+      R.settle = 0.7; R.s = R.len; R.v = 0;   // update() runs the settle, then endWipe()
+      return;
+    }
+    route = null;
+    if (R.kind === "pattern" && !R.stopping && W.on) {
+      W.done = true; W.holdUntil = now() + HOLD_MS; W.k = 0;
+    } else if (R.kind === "pattern" && !R.stopping) {
+      W.k = 0;
+    }
+    updateCoach();
+    renderPanel();
+  }
+  function endWipe() {
+    var then = route ? route.then : null;
+    route = null;
+    smoothAll();
+    lastStamp.x = ball.x; lastStamp.y = ball.y;
+    W.k = 0; W.done = false;
+    if (then === "next" && W.on) { W.pat = nextPatternId(); W.v = 0; prefs.pat = W.pat; savePrefs(); beginPatternRoute(); }
+    else if (then === "pattern" && W.on) beginPatternRoute();
+    else if (then === "surprise" && W.on) beginPatternRoute();
+    updateCoach();
+    renderPanel();
+    saveSand();
+  }
+
+  // ---------- Drawing the table ----------
+  var stage = $("stage"), view = $("view"), ctx = view.getContext("2d");
+  var dpr = 1, cw = 0, ch = 0, cx = 0, cy = 0, Rs = 0, Ro = 0, cssW = 0, cssH = 0;
+  var rimC = document.createElement("canvas"), lightC = document.createElement("canvas"), shadeC = document.createElement("canvas");
+  var lightKey = "";
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    if (r.width < 10 || r.height < 10) return;
+    cssW = r.width; cssH = r.height;
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cw = Math.round(cssW * dpr); ch = Math.round(cssH * dpr);
+    view.width = cw; view.height = ch;
+    var pad = (cssW < 600 || cssH < 600 ? 10 : 18) + 6;
+    Ro = (Math.min(cssW, cssH) / 2 - pad) * dpr;
+    Rs = Ro / 1.13;
+    cx = cw / 2 - 3 * dpr; cy = ch / 2 - 3 * dpr;
+    // Upright phones: keep the table clear of the coach line at the bottom when there is room.
+    if (cssH > cssW * 1.12) cy = Math.max(Ro + 10 * dpr, ch / 2 - Math.min(26 * dpr, (ch - 2 * Ro) / 2 - 10 * dpr));
+    buildRim();
+    lightKey = "";
+    dirty = true;
+  }
+  function circle(x, px, py, r) { x.beginPath(); x.arc(px, py, r, 0, TAU); }
+  function buildRim() {
+    [rimC, shadeC, lightC].forEach(function (c) { c.width = cw; c.height = ch; });
+    var x = rimC.getContext("2d"), lw = 4 * dpr, led = Ro * 0.035;
+    // offset shadow (the Toybox look), then the wooden frame
+    x.fillStyle = OUT; circle(x, cx + 5 * dpr, cy + 5 * dpr, Ro); x.fill();
+    var g = x.createRadialGradient(cx - Ro * 0.35, cy - Ro * 0.4, Ro * 0.1, cx, cy, Ro * 1.05);
+    g.addColorStop(0, "#E9B176"); g.addColorStop(0.7, "#CF8E4F"); g.addColorStop(1, "#B57336");
+    x.fillStyle = g; circle(x, cx, cy, Ro); x.fill();
+    // wood grain: soft arcs around the frame
+    x.save();
+    circle(x, cx, cy, Ro); x.clip();
+    var seed = 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    x.lineCap = "round";
+    for (var i = 0; i < 22; i++) {
+      var rr = Rs + led + (Ro - Rs - led) * (0.12 + 0.8 * rnd()), a0 = rnd() * TAU, al = 0.5 + rnd() * 1.6;
+      x.strokeStyle = rnd() < 0.5 ? "rgba(122, 70, 28, 0.28)" : "rgba(255, 226, 180, 0.35)";
+      x.lineWidth = (1 + rnd() * 1.6) * dpr;
+      x.beginPath(); x.arc(cx, cy, rr, a0, a0 + al); x.stroke();
+    }
+    // a soft shine on the top-left of the frame
+    x.strokeStyle = "rgba(255, 240, 214, 0.55)"; x.lineWidth = 3 * dpr;
+    x.beginPath(); x.arc(cx, cy, Ro - lw * 1.4, Math.PI * 1.05, Math.PI * 1.55); x.stroke();
+    x.restore();
+    // the light strip channel (unlit), then the outlines
+    x.fillStyle = "#6B5242"; circle(x, cx, cy, Rs + led); x.fill();
+    x.fillStyle = "#E8D9C2";
+    x.beginPath(); x.arc(cx, cy, Rs + led * 0.55, 0, TAU); x.lineWidth = led * 0.45; x.strokeStyle = "rgba(255,255,255,0.35)"; x.stroke();
+    x.fillStyle = "rgb(" + SAND.join(",") + ")"; circle(x, cx, cy, Rs); x.fill();
+    x.lineWidth = lw; x.strokeStyle = OUT;
+    circle(x, cx, cy, Ro - lw / 2); x.stroke();
+    x.lineWidth = 3 * dpr;
+    circle(x, cx, cy, Rs + led); x.stroke();
+    // The frame's shadow on the sand (light from the top left) and a faint glass sheen.
+    var s = shadeC.getContext("2d");
+    s.save();
+    circle(s, cx, cy, Rs); s.clip();
+    var sg = s.createRadialGradient(cx + Rs * 0.06, cy + Rs * 0.07, Rs * 0.86, cx + Rs * 0.06, cy + Rs * 0.07, Rs * 1.1);
+    sg.addColorStop(0, "rgba(90, 60, 30, 0)"); sg.addColorStop(1, "rgba(90, 60, 30, 0.34)");
+    s.fillStyle = sg; s.fillRect(cx - Rs, cy - Rs, 2 * Rs, 2 * Rs);
+    var gl = s.createLinearGradient(cx - Rs, cy - Rs, cx + Rs * 0.2, cy + Rs * 0.2);
+    gl.addColorStop(0, "rgba(255,255,255,0)"); gl.addColorStop(0.42, "rgba(255,255,255,0)");
+    gl.addColorStop(0.5, "rgba(255,255,255,0.12)"); gl.addColorStop(0.62, "rgba(255,255,255,0)");
+    s.fillStyle = gl; s.fillRect(cx - Rs, cy - Rs, 2 * Rs, 2 * Rs);
+    s.restore();
+  }
+  function buildLight() {
+    var col = LIGHTS[prefs.light], x = lightC.getContext("2d"), led = Ro * 0.035;
+    x.clearRect(0, 0, cw, ch);
+    x.save();
+    circle(x, cx, cy, Rs); x.clip();
+    var g = x.createRadialGradient(cx, cy, Rs * 0.72, cx, cy, Rs * 1.01);
+    g.addColorStop(0, hexA(col, 0)); g.addColorStop(0.7, hexA(col, 0.16)); g.addColorStop(1, hexA(col, 0.5));
+    x.fillStyle = g; x.fillRect(cx - Rs, cy - Rs, 2 * Rs, 2 * Rs);
+    x.restore();
+    x.save();
+    x.shadowColor = col; x.shadowBlur = 14 * dpr;
+    x.strokeStyle = col; x.lineWidth = led * 0.7;
+    circle(x, cx, cy, Rs + led * 0.5); x.stroke();
+    x.shadowBlur = 0;
+    x.strokeStyle = "rgba(255,255,255,0.7)"; x.lineWidth = led * 0.22;
+    circle(x, cx, cy, Rs + led * 0.5); x.stroke();
+    x.restore();
+    lightKey = prefs.light + "|" + cw + "x" + ch;
+  }
+  function hexA(h, a) {
+    return "rgba(" + parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16) + "," + a + ")";
+  }
+  function drawBall(x, px, py, r, lightCol, lightA) {
+    var sx = px + r * 0.38, sy = py + r * 0.48;
+    var sg = x.createRadialGradient(sx, sy, r * 0.15, sx, sy, r * 1.4);
+    sg.addColorStop(0, "rgba(70, 45, 20, 0.5)"); sg.addColorStop(1, "rgba(70, 45, 20, 0)");
+    x.fillStyle = sg; circle(x, sx, sy, r * 1.4); x.fill();
+    var g = x.createRadialGradient(px - r * 0.38, py - r * 0.42, r * 0.04, px, py, r);
+    g.addColorStop(0, "#FFFFFF"); g.addColorStop(0.2, "#E8ECF4"); g.addColorStop(0.55, "#9CA5B9");
+    g.addColorStop(0.85, "#5B647B"); g.addColorStop(1, "#3B4358");
+    x.fillStyle = g; circle(x, px, py, r); x.fill();
+    if (lightA > 0.02) {
+      x.strokeStyle = hexA(lightCol, 0.6 * lightA); x.lineWidth = r * 0.22;
+      x.beginPath(); x.arc(px, py, r * 0.74, Math.PI * 0.05, Math.PI * 0.7); x.stroke();
+    }
+    x.fillStyle = "rgba(255,255,255,0.95)"; circle(x, px - r * 0.36, py - r * 0.4, r * 0.17); x.fill();
+    x.lineWidth = Math.max(1.5 * dpr, r * 0.13); x.strokeStyle = OUT; circle(x, px, py, r); x.stroke();
+  }
+  // Only the part of the picture that changed is painted again (the ball, the marker under a finger and
+  // the freshly carved sand); a full paint after a resize, a light change or while the light dims.
+  var renderMs = 0, dmg = null, lastBallBox = null;
+  function addDamage(x0, y0, x1, y1) {
+    if (!dmg) dmg = [x0, y0, x1, y1];
+    else { dmg[0] = Math.min(dmg[0], x0); dmg[1] = Math.min(dmg[1], y0); dmg[2] = Math.max(dmg[2], x1); dmg[3] = Math.max(dmg[3], y1); }
+  }
+  function ballBox() {
+    var r = RB * Rs, bx = cx + ball.x * Rs, by = cy + ball.y * Rs, m = 3 * dpr;
+    var b = [bx - r - m, by - r - m, bx + r * 1.9 + m, by + r * 2 + m];
+    if (steer && steer.down) {
+      var mx = cx + steer.tx * Rs, my = cy + steer.ty * Rs, mr = r * 1.9 + 3 * dpr;
+      b = [Math.min(b[0], mx - mr), Math.min(b[1], my - mr), Math.max(b[2], mx + mr), Math.max(b[3], my + mr)];
+    }
+    return b;
+  }
+  function trackDamage(cells) {
+    if (cells) {
+      var k = 2 * Rs / N, m = 2 * k + 2;
+      addDamage(cx - Rs + cells[0] * k - m, cy - Rs + cells[1] * k - m, cx - Rs + (cells[2] + 1) * k + m, cy - Rs + (cells[3] + 1) * k + m);
+    }
+    var b = ballBox();
+    if (!lastBallBox || b[0] !== lastBallBox[0] || b[1] !== lastBallBox[1] || b[2] !== lastBallBox[2] || b[3] !== lastBallBox[3]) {
+      if (lastBallBox) addDamage(lastBallBox[0], lastBallBox[1], lastBallBox[2], lastBallBox[3]);
+      addDamage(b[0], b[1], b[2], b[3]);
+      lastBallBox = b;
+    }
+  }
+  function render(rect) {
+    var t0 = now();
+    if (!cw) return;
+    if (lightKey !== prefs.light + "|" + cw + "x" + ch) buildLight();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var x = 0, y = 0, w = cw, h = ch;
+    if (rect) {
+      x = Math.max(0, Math.floor(rect[0])); y = Math.max(0, Math.floor(rect[1]));
+      w = Math.min(cw, Math.ceil(rect[2])) - x; h = Math.min(ch, Math.ceil(rect[3])) - y;
+      if (w <= 0 || h <= 0) return;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    }
+    ctx.clearRect(x, y, w, h);
+    ctx.drawImage(rimC, x, y, w, h, x, y, w, h);
+    ctx.save();
+    circle(ctx, cx, cy, Rs); ctx.clip();
+    ctx.imageSmoothingEnabled = true;
+    try { ctx.imageSmoothingQuality = "high"; } catch (e) { /* older Safari */ }
+    ctx.drawImage(sandC, cx - Rs, cy - Rs, 2 * Rs, 2 * Rs);
+    ctx.drawImage(shadeC, x, y, w, h, x, y, w, h);
+    ctx.restore();
+    if (dim > 0.01) { ctx.globalAlpha = dim; ctx.drawImage(lightC, x, y, w, h, x, y, w, h); ctx.globalAlpha = 1; }
+    if (lightWave) {
+      var k = (now() - lightWave.t0) / 1600;
+      if (k >= 1) lightWave = null;
+      else {
+        ctx.save(); circle(ctx, cx, cy, Rs); ctx.clip();
+        ctx.strokeStyle = hexA(LIGHTS[prefs.light], 0.55 * (1 - k)); ctx.lineWidth = Rs * 0.06 * (1 - k * 0.5);
+        circle(ctx, cx, cy, Rs * (1 - 0.92 * (1 - Math.pow(1 - k, 2)))); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    var bx = cx + ball.x * Rs, by = cy + ball.y * Rs;
+    if (steer && steer.down) {
+      ctx.strokeStyle = "rgba(29,35,64,0.28)"; ctx.lineWidth = 2.5 * dpr;
+      circle(ctx, cx + steer.tx * Rs, cy + steer.ty * Rs, RB * Rs * 1.9); ctx.stroke();
+    }
+    drawBall(ctx, bx, by, RB * Rs, LIGHTS[prefs.light], dim);
+    if (rect) ctx.restore();
+    renderMs = now() - t0;
+  }
+
+  // ---------- Fingers ----------
+  var pointers = {}, activeId = null;
+  function toTable(e) {
+    var r = view.getBoundingClientRect();
+    return [((e.clientX - r.left) * dpr - cx) / Rs, ((e.clientY - r.top) * dpr - cy) / Rs];
+  }
+  function clampLim(p) {
+    var r = Math.hypot(p[0], p[1]);
+    return r > LIM ? [p[0] * LIM / r, p[1] * LIM / r] : p;
+  }
+  function canSteer() { return !Toybox.timer.locked() && !ending && !(route && route.kind === "wipe"); }
+  function takeOver(p) {
+    var q = clampLim(p);
+    if (route && route.kind !== "wipe") {
+      // a finger takes over from a pattern: the ball keeps its speed and turns toward the finger
+      if (route.kind === "pattern") W.k = routeIndex(route);
+      route = null;
+    }
+    if (W.done) W.done = false;
+    if (!steer) steer = { tx: q[0], ty: q[1], down: true };
+    steer.tx = q[0]; steer.ty = q[1]; steer.down = true;
+    W.resumeAt = 0;
+    updateCoach();
+  }
+  view.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var p = toTable(e), r = Math.hypot(p[0], p[1]);
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY, rim: r > 1, moved: false, t: now() };
+    if (!canSteer()) return;
+    if (r <= 1) { activeId = e.pointerId; takeOver(p); }
+  });
+  view.addEventListener("pointermove", function (e) {
+    var P = pointers[e.pointerId];
+    if (!P) return;
+    if (!P.moved && Math.hypot(e.clientX - P.x, e.clientY - P.y) > 10) P.moved = true;
+    if (!canSteer()) return;
+    if (activeId !== e.pointerId && P.rim && P.moved) activeId = e.pointerId;
+    if (activeId === e.pointerId) takeOver(toTable(e));
+  });
+  function lift(e) {
+    var P = pointers[e.pointerId];
+    delete pointers[e.pointerId];
+    if (P && P.rim && !P.moved && e.type === "pointerup" && now() - P.t < 700 && !Toybox.timer.locked() && !ending) {
+      var p = toTable(e), r = Math.hypot(p[0], p[1]);
+      if (r > 0.98 && r < 1.16) nextLight();   // a tap on the wooden frame changes the light
+    }
+    if (activeId === e.pointerId) {
+      activeId = null;
+      var ids = Object.keys(pointers);
+      if (ids.length && canSteer()) { activeId = Number(ids[ids.length - 1]); return; }
+      if (steer) steer.down = false;
+    }
+  }
+  view.addEventListener("pointerup", lift);
+  view.addEventListener("pointercancel", lift);
+  view.addEventListener("lostpointercapture", function (e) { if (pointers[e.pointerId]) lift(e); });
+  ["gesturestart", "gesturechange"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
+  view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  // ---------- Tilt (grown-up setting on the home screen) ----------
+  function onOrient(e) {
+    if (e.beta == null || e.gamma == null) return;
+    var gx = Math.sin(e.gamma * Math.PI / 180), gy = Math.sin(e.beta * Math.PI / 180);
+    var a = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
+    var x = gx * Math.cos(a) + gy * Math.sin(a), y = -gx * Math.sin(a) + gy * Math.cos(a);
+    if (!tilt.has) { tilt.bx = x; tilt.by = y; }
+    tilt.x = x; tilt.y = y; tilt.has = true;
+  }
+  function startTilt() { if (tilt.on) return; tilt.on = true; tilt.has = false; window.addEventListener("deviceorientation", onOrient); }
+  function stopTilt() { tilt.on = false; window.removeEventListener("deviceorientation", onOrient); }
+  var tiltAllowed = false;
+  Toybox.tiltReady(function () { tiltAllowed = true; startTilt(); });
+  Toybox.settings.onChange(function (id, on) {
+    if (id !== "tilt") return;
+    if (!on) stopTilt(); else if (tiltAllowed) startTilt();
+  });
+
+  // ---------- Sound: a soft sandy hiss that follows the ball's speed (only when sound is on) ----------
+  var hiss = null;
+  function makeHiss(ac) {
+    killHiss();
+    try {
+      var len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), b = 0;
+      for (var i = 0; i < len; i++) { b = 0.85 * b + 0.15 * (Math.random() * 2 - 1); d[i] = b * 2.2; }
+      var src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+      var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1600; bp.Q.value = 0.6;
+      var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4200;
+      var g = ac.createGain(); g.gain.value = 0;
+      src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(ac.destination);
+      src.start();
+      hiss = { ac: ac, src: src, bp: bp, g: g, t: 0, last: -1 };
+    } catch (e) { hiss = null; }
+  }
+  function killHiss() {
+    if (!hiss) return;
+    try { hiss.g.gain.cancelScheduledValues(0); hiss.g.gain.value = 0; hiss.src.stop(); hiss.g.disconnect(); } catch (e) { /* ignore */ }
+    hiss = null;
+  }
+  function hissTick(sp) {
+    var ac = Toybox.sound.ready();
+    if (!ac) { if (hiss) killHiss(); return; }
+    if (!hiss || hiss.ac !== ac) { if (sp < 0.01) return; makeHiss(ac); if (!hiss) return; }
+    var t = now();
+    if (t - hiss.t < 70) return;
+    hiss.t = t;
+    var f = document.hidden ? 0 : Math.min(1, sp / 1.6);
+    var target = 0.05 * f;
+    if (Math.abs(target - hiss.last) < 0.001) return;
+    hiss.last = target;
+    try {
+      hiss.g.gain.setTargetAtTime(target, ac.currentTime, 0.12);
+      hiss.bp.frequency.setTargetAtTime(1200 + 1800 * f, ac.currentTime, 0.15);
+    } catch (e) { /* ignore */ }
+  }
+  function ping(freq) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    try {
+      var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 1);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Panel ----------
+  function patSvg(id) {
+    var pts = PAT_BY[id].make(0), step = Math.max(1, Math.floor(pts.length / 260)), d = "";
+    for (var i = 0; i < pts.length; i += step) d += (i ? "L" : "M") + pts[i][0].toFixed(2) + " " + pts[i][1].toFixed(2);
+    var last = pts[pts.length - 1];
+    d += "L" + last[0].toFixed(2) + " " + last[1].toFixed(2);
+    return '<svg viewBox="-1.25 -1.25 2.5 2.5" aria-hidden="true">' +
+      '<circle r="1.17" fill="#D99A5B" stroke="#1D2340" stroke-width="0.11"/>' +
+      '<circle r="0.98" fill="#F2DEB8" stroke="#1D2340" stroke-width="0.06"/>' +
+      '<path d="' + d + '" fill="none" stroke="#B48850" stroke-width="0.075" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+  (function () {
+    var box = $("pats"), html = "";
+    PATS.forEach(function (p) {
+      html += '<button class="btn tb-tile pat" data-pat="' + p.id + '" aria-label="' + p.name + '" aria-pressed="false">' +
+        patSvg(p.id) + '<span class="lbl">' + p.name + "</span></button>";
+    });
+    box.innerHTML = html;
+  })();
+  function renderPanel() {
+    var drawing = W.on;
+    $("goBtn").innerHTML = drawing
+      ? '<svg class="goicon" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg>Stop'
+      : '<svg class="goicon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg>Draw!';
+    Array.prototype.forEach.call(document.querySelectorAll(".pat"), function (b) {
+      var on = b.dataset.pat === W.pat;
+      b.setAttribute("aria-pressed", String(on));
+      b.classList.toggle("drawing", on && drawing && !!route && route.kind === "pattern");
+    });
+    $("ldot").style.setProperty("--ld", LIGHTS[prefs.light]);
+    updateCoach();
+  }
+  var coachText = "";
+  function updateCoach() {
+    var t = "", el = $("coach");
+    if (ending) t = "";
+    else if (route && route.kind === "wipe") t = "Smoothing the sand…";
+    else if (W.on && W.done && !steer) t = "Ta-da!";
+    else if (W.on && !steer) t = "Watch it draw!";
+    else if (!learnedDrag) t = "Drag the ball!";
+    else if (!watched) t = "Tap Draw! to watch";
+    if (t === coachText) return;
+    coachText = t;
+    if (t) { el.textContent = t; el.classList.remove("off"); }
+    else el.classList.add("off");
+  }
+  function nextLight(to) {
+    prefs.light = typeof to === "number" ? to : (prefs.light + 1) % LIGHTS.length;
+    lightWave = { t0: now() };
+    savePrefs();
+    renderPanel();
+    ping(660 + prefs.light * 60);
+    dirty = true;
+  }
+  function surprise() {
+    var ids = PATS.map(function (p) { return p.id; }).filter(function (id) { return id !== W.pat; });
+    var id = ids[Math.floor(Math.random() * ids.length)], p = PAT_BY[id];
+    var v = Math.floor(Math.random() * p.vars);
+    var l = prefs.light;
+    while (l === prefs.light) l = Math.floor(Math.random() * LIGHTS.length);
+    nextLight(l);
+    if (steer) { steer.down = false; }
+    startPattern(id, v, 0);
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.id === "bigBtn" || b.closest(".modal, .farewell, .rest")) return;
+    if (Toybox.timer.locked() || ending) return;
+    if (b.dataset.pat) {
+      if (W.on && W.pat === b.dataset.pat && !W.done) return;
+      startPattern(b.dataset.pat, 0, 0);
+    } else if (b.id === "goBtn") {
+      if (W.on) stopDrawing();
+      else startPattern(W.pat, W.v, W.k);
+    } else if (b.id === "smoothBtn") {
+      W.on = false;
+      if (route && route.kind === "wipe") { route.then = null; renderPanel(); return; }
+      if (steer) steer = null;
+      startWipe(null);
+    } else if (b.id === "surpriseBtn") {
+      surprise();
+    } else if (b.id === "lightBtn") {
+      nextLight();
+    }
+  });
+
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // The hand drags the ball along a gentle curve.
+  var ghost = makeGhost(function () {
+    if (!cw) return null;
+    var r = view.getBoundingClientRect(), pts = [];
+    var dir = ball.x > 0.2 ? -1 : 1;
+    for (var i = 0; i <= 12; i++) {
+      var t = i / 12, x = ball.x + dir * 0.55 * t, y = ball.y + 0.22 * Math.sin(t * TAU * 0.9);
+      var q = clampLim([x, y]);
+      pts.push([r.left + (cx + q[0] * Rs) / dpr, r.top + (cy + q[1] * Rs) / dpr]);
+    }
+    return { pts: pts, dur: 3600 };
+  }, { ok: function () { return !W.on && !route && !steer && !ending; } });
+
+  // ---------- Timer ending, goodbye, rest ----------
+  function onEnding(done) {
+    ending = true;
+    endDone = done; endT0 = now();
+    W.on = false;
+    if (steer) { steer.down = false; steer.tx = clamp(ball.x + ball.vx * 0.25, -LIM, LIM); steer.ty = clamp(ball.y + ball.vy * 0.25, -LIM, LIM); }
+    activeId = null; pointers = {};
+    if (route) route.stopping = true;
+    dimTarget = 0.12;
+    renderPanel();
+    updateCoach();
+  }
+  function onGoodbye() {
+    // the ball draws a little heart to say goodbye
+    var s = 0.26, hx = clamp(ball.x, -LIM + s, LIM - s), hy = clamp(ball.y, -LIM + s, LIM - s);
+    var rr = Math.hypot(hx, hy);
+    if (rr > LIM - s) { hx *= (LIM - s) / rr; hy *= (LIM - s) / rr; }
+    steer = null;
+    route = makeRoute("heart", resample(heartAt(hx, hy, s, [])), 0, 0.55);
+  }
+  function checkEnding() {
+    if (!ending || !endDone) return;
+    if (!route && !steer && speed() < 0.01 && now() - endT0 > 2500) { var d = endDone; endDone = null; d(); }
+  }
+  function restArt() {
+    var c = document.createElement("canvas"), S = 420, h = S / 2, rs = h * 0.8;
+    c.width = c.height = S;
+    c.className = "rest-art";
+    c.setAttribute("aria-hidden", "true");
+    var x = c.getContext("2d");
+    x.fillStyle = "#C88A4D"; circle(x, h, h, h - 8); x.fill();
+    x.lineWidth = 10; x.strokeStyle = OUT; x.stroke();
+    x.save(); circle(x, h, h, rs); x.clip();
+    x.drawImage(sandC, h - rs, h - rs, 2 * rs, 2 * rs);
+    x.fillStyle = "rgba(20, 30, 70, 0.08)"; x.fillRect(0, 0, S, S);
+    x.restore();
+    x.lineWidth = 6; x.strokeStyle = OUT; circle(x, h, h, rs); x.stroke();
+    drawBall(x, h + ball.x * rs, h + ball.y * rs, RB * rs * 1.4, LIGHTS[prefs.light], 0);
+    return c;
+  }
+
+  // ---------- Frame loop ----------
+  var last = now(), frameTimes = [];
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
+    if (DEBUG) { frameTimes.push(t - last); if (frameTimes.length > 240) frameTimes.shift(); }
+    last = t;
+    update(dt);
+    checkEnding();
+    trackDamage(shadeDirty());
+    if (dirty) { dirty = false; dmg = null; var e = Ro + 8 * dpr; render([cx - e, cy - e, cx + e + 6 * dpr, cy + e + 6 * dpr]); }
+    else if (dmg) { var d = dmg; dmg = null; render(d); }
+    // save once things have been still for a moment
+    if (sandChanged > savedAt && t - sandChanged > 2500 && !route && !steer) saveSand();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Start ----------
+  smoothAll();
+  shadeDirty();
+  loadSand();
+  W.pat = prefs.pat;
+  resize();
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+  window.addEventListener("pagehide", function () { if (sandChanged > savedAt) saveSand(); else savePrefs(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && sandChanged > savedAt) saveSand(); });
+  renderPanel();
+  Toybox.init({
+    app: "sand-table",
+    big: { button: $("bigBtn") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the ball finishes its line and stops, and the light dims.",
+    goodbyeOption: "End with a Goodbye button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Goodbye, sand",
+    farewellDone: "Bye bye, sand!",
+    restLine: "The sand is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArt,
+    soundNote: "A soft sandy hiss while the ball rolls. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onGoodbye: onGoodbye,
+    onRest: function () { endDone = null; route = null; steer = null; ball.vx = ball.vy = 0; killHiss(); },
+    onWake: function () { ending = false; endDone = null; dimTarget = 1; renderPanel(); updateCoach(); },
+    onBig: function () { setTimeout(resize, 30); },
+    onSound: function (on) { if (!on) killHiss(); }
+  });
+  stage.appendChild($("tb-toast"));
+  stage.appendChild($("tb-farewell"));
+  if (Toybox.timer.locked()) { dim = dimTarget = 0.12; }
+  if (DEBUG) {
+    window.sandDebug = {
+      state: function () {
+        return { ball: [ball.x, ball.y], mode: steer ? "finger" : (route ? route.kind : "free"), on: W.on, pat: W.pat, k: W.k,
+          done: W.done, light: prefs.light, coach: coachText, renderMs: renderMs, cum: cum, Rs: Rs / dpr, cx: cx / dpr, cy: cy / dpr };
+      },
+      frames: function () { var a = frameTimes.slice().sort(function (p, q) { return p - q; }); return { n: a.length, median: a[a.length >> 1], p95: a[Math.floor(a.length * 0.95)], max: a[a.length - 1] }; },
+      start: function (id, v) { startPattern(id, v || 0, 0); },
+      smooth: function () { W.on = false; startWipe(null); },
+      surprise: surprise,
+      fast: function (f) { V_PAT = 0.62 * f; HOLD_MS = 8000 / f; },
+      height: function (x, y) { return H[Math.round(cellX(y)) * N + Math.round(cellX(x))]; },
+      shadeMs: function () { var t = now(); markDirty(0, 0, N - 1, N - 1); shadeDirty(); return now() - t; },
+      ghost: function () { return ghost.show(); },
+      sand: function () { return sandC.toDataURL(); },
+      row: function (y, x0, x1) { var o = [], j = Math.round(cellX(y)); for (var x = Math.round(cellX(x0)); x <= Math.round(cellX(x1)); x++) o.push(Math.round(H[j * N + x] * 100) / 100); return o; },
+      col: function (x, y0, y1) { var o = [], i = Math.round(cellX(x)); for (var y = Math.round(cellX(y0)); y <= Math.round(cellX(y1)); y++) o.push(Math.round(H[y * N + i] * 100) / 100); return o; },
+      tilt: function (x, y) { tilt.on = true; tilt.has = true; tilt.x = x; tilt.y = y; }
+    };
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

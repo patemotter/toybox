@@ -24,6 +24,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Kitchen: wash hands and put on an apron and chef hat, then make smoothies in the blender; finished food goes on the table | [`kitchen/`](kitchen/) |
 | Spirograph: roll the gear around the ring with any finger movement and draw perfect patterns; Draw! draws by itself; My drawings shelf | [`spirograph/`](spirograph/) |
 | Jigsaw: real jigsaw puzzles with knobbed pieces, 9 pictures from 4 to 24 pieces; finished pictures come alive and go on My puzzles shelf | [`jigsaw/`](jigsaw/) |
+| Sand Table: a kinetic sand table: drag the ball to carve lines, or tap Draw! and watch it draw spirals, flowers, stars and hearts; Smooth sweeps it flat | [`sand-table/`](sand-table/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
