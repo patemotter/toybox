@@ -586,13 +586,23 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     rrect(ctx, x + 0.58 * R, w.surf - 0.1 * L, 0.32 * R, 0.12 * L, 0.05 * L); ctx.fill(); ctx.stroke();
     // back disc and spokes
     ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fillStyle = "#D8F1FF"; ctx.fill(); ctx.stroke();
-    var spd = Math.abs(wheel.w);
-    var blur = clamp((spd - 3) / 4, 0, 1);
+    var vL = Math.abs(wheel.w) * w.Ri / L;
+    var blur = clamp((vL - 4.5) / 8, 0, 1);
     if (blur > 0) {
-      ctx.fillStyle = "rgba(124,200,255," + (0.35 * blur) + ")";
+      ctx.fillStyle = "rgba(124,200,255," + (0.18 + 0.3 * blur + 0.25 * superK) + ")";
       ctx.beginPath(); ctx.arc(x, y, w.Ri, 0, TAU); ctx.arc(x, y, 0.2 * R, 0, TAU, true); ctx.fill();
     }
-    ctx.strokeStyle = "rgba(91,170,240," + (1 - 0.6 * blur) + ")"; ctx.lineWidth = 0.08 * L;
+    if (superK > 0.02) {
+      // swirling streaks inside the disc
+      ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = "rgba(255,255,255," + (0.8 * superK) + ")"; ctx.lineWidth = Math.max(2, 0.06 * L);
+      var dirS = wheel.w > 0 ? 1 : -1, nS = reduceMotion ? 2 : 5;
+      for (var k = 0; k < nS; k++) {
+        var rr = (0.32 + 0.12 * k) * R, base = wheel.a * 0.35 + k * 2.1;
+        ctx.beginPath(); ctx.arc(x, y, Math.min(rr, w.Ri * 0.95), base, base + dirS * 1.3, dirS < 0); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.strokeStyle = "rgba(91,170,240," + (1 - 0.7 * blur - 0.25 * superK) + ")"; ctx.lineWidth = 0.08 * L;
     for (var i = 0; i < 8; i++) {
       var an = wheel.a + i * TAU / 8;
       ctx.beginPath(); ctx.moveTo(x + Math.cos(an) * 0.16 * R, y + Math.sin(an) * 0.16 * R); ctx.lineTo(x + Math.cos(an) * w.Ri, y + Math.sin(an) * w.Ri); ctx.stroke();
@@ -610,19 +620,20 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke();
     ctx.beginPath(); ctx.arc(x, y, w.Ri, 0, TAU); ctx.stroke();
     // rungs on the rim turn with the wheel
-    var spd = Math.abs(wheel.w), n = 26;
-    ctx.strokeStyle = "rgba(220,242,255," + (spd > 5 ? 0.5 : 0.95) + ")"; ctx.lineWidth = Math.max(1.5, 0.05 * L); ctx.lineCap = "round";
+    var spd = Math.abs(wheel.w), n = 26, vL = spd * w.Ri / L;
+    ctx.strokeStyle = "rgba(220,242,255," + (vL > 7 ? Math.max(0.2, 0.5 - 0.3 * superK) : 0.95) + ")"; ctx.lineWidth = Math.max(1.5, 0.05 * L); ctx.lineCap = "round";
     for (var i = 0; i < n; i++) {
       var an = wheel.a + i * TAU / n, r0 = w.Ri + (R - w.Ri) * 0.25, r1 = R - (R - w.Ri) * 0.25;
       ctx.beginPath(); ctx.moveTo(x + Math.cos(an) * r0, y + Math.sin(an) * r0); ctx.lineTo(x + Math.cos(an) * r1, y + Math.sin(an) * r1); ctx.stroke();
     }
     // motion lines when it spins fast
-    var m = clamp((spd - 2.5) / 4, 0, 1);
-    if (m > 0 && !reduceMotion) {
-      ctx.strokeStyle = "rgba(29,35,64," + (0.55 * m) + ")"; ctx.lineWidth = Math.max(2, 0.06 * L);
-      var dir = wheel.w > 0 ? 1 : -1;
-      for (var k = 0; k < 3; k++) {
-        var base = -Math.PI / 2 + (k - 1) * 1.15 + (k === 1 ? 0 : 0.2 * dir), rr = R + 0.16 * L + (k % 2) * 0.1 * L, len = 0.45 + 0.25 * m;
+    // motion lines: more and longer the faster it goes (fewer with reduced motion)
+    var m = clamp((vL - 3) / 8, 0, 1);
+    if (m > 0) {
+      ctx.strokeStyle = "rgba(29,35,64," + (0.35 + 0.3 * m) + ")"; ctx.lineWidth = Math.max(2, 0.06 * L);
+      var dir = wheel.w > 0 ? 1 : -1, nL = reduceMotion ? 2 : 3 + Math.round(3 * m + 2 * superK);
+      for (var k = 0; k < nL; k++) {
+        var base = -Math.PI / 2 + (k - (nL - 1) / 2) * (TAU / Math.max(nL, 4)) * 0.8, rr = R + 0.14 * L + (k % 2) * 0.12 * L + superK * 0.08 * L, len = 0.4 + 0.4 * m + 0.4 * superK;
         ctx.beginPath(); ctx.arc(x, y, rr, base - dir * len, base, dir < 0); ctx.stroke();
       }
     }
@@ -681,7 +692,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   };
   function basePose() {
     return { rear: 0, curl: 0, eye: "open", paws: "down", mouth: "smile", legAmp: 0, lift: 0, rot: 0, wig: 0, sx: 1, sy: 1, k: 1,
-      ears: 0, bob: 0, zoom: 0, hold: null, tongue: 0, yawn: 0, sniff: 0, chew: 0, wave: 0 };
+      ears: 0, bob: 0, zoom: 0, hold: null, tongue: 0, yawn: 0, sniff: 0, chew: 0, wave: 0, legBlur: 0, flap: 0 };
   }
   var P = basePose();
   function eye(x, y, r, kind, o) {
@@ -692,6 +703,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       ctx.beginPath(); ctx.arc(x + r * 0.36, y + r * 0.34, r * 0.17, 0, TAU); ctx.fill();
     } else if (kind === "happy") {
       ctx.strokeStyle = OUT; ctx.lineWidth = o * 1.3; ctx.beginPath(); ctx.arc(x, y + r * 0.45, r * 0.85, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    } else if (kind === "swirl") {
+      ctx.beginPath(); ctx.arc(x, y, r * 1.25, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = o * 0.8; ctx.stroke();
+      ctx.lineWidth = o * 0.85; ctx.beginPath();
+      for (var i = 0; i <= 24; i++) { var an = i / 24 * TAU * 1.5 + clock * 5, rr = r * 1.05 * i / 24; ctx.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); }
+      ctx.stroke();
     } else if (kind === "blink") {
       ctx.strokeStyle = OUT; ctx.lineWidth = o * 1.3; ctx.beginPath(); ctx.moveTo(x - r * 0.8, y + r * 0.1); ctx.lineTo(x + r * 0.8, y + r * 0.1); ctx.stroke();
     } else {
@@ -701,6 +717,20 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function paw(x, y, r, o, col) {
     ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.68, 0, 0, TAU); ctx.fillStyle = col || PINK; ctx.fill();
     ctx.strokeStyle = OUT; ctx.lineWidth = o * 0.85; ctx.stroke();
+  }
+  // Legs going so fast they turn into a pink blur (with little whirl lines).
+  function legBlur(k, o) {
+    ctx.save();
+    [[-0.22, 0.2], [0.27, 0.17]].forEach(function (q) {
+      for (var i = 0; i < 4; i++) {
+        var an = clock * 40 + i * TAU / 4;
+        ctx.globalAlpha = 0.35 * k;
+        ctx.beginPath(); ctx.ellipse(q[0] + Math.cos(an) * 0.07, -0.04 + Math.sin(an) * 0.03, 0.075, 0.05, 0, 0, TAU); ctx.fillStyle = PINK; ctx.fill();
+      }
+      ctx.globalAlpha = 0.6 * k; ctx.strokeStyle = OUT; ctx.lineWidth = o * 0.7;
+      ctx.beginPath(); ctx.ellipse(q[0], -0.04, q[1] * 0.75, 0.06, 0, Math.PI * 0.1, Math.PI * 0.9); ctx.stroke();
+    });
+    ctx.restore();
   }
   function drawHamster() {
     var L = G.L, o = G.lw / L, p = P;
@@ -718,9 +748,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       for (var i = 0; i < 3; i++) { var yy = -0.16 - 0.18 * i; ctx.beginPath(); ctx.moveTo(-0.62 - 0.06 * i, yy); ctx.lineTo(-0.95 - 0.12 * i, yy); ctx.stroke(); }
     }
     var feet = curl < 0.5;
+    if (feet && p.legBlur > 0) legBlur(p.legBlur, o);
     if (feet) {
-      paw(-0.18 + 0.08 * s * a, -0.02 - lift2, 0.075, o, "#F28FA6");
-      if (p.paws === "down") paw(0.32 - 0.08 * s * a, -0.02 - lift1, 0.07, o, "#F28FA6");
+      if (p.legBlur < 0.6) {
+        paw(-0.18 + 0.08 * s * a, -0.02 - lift2, 0.075, o, "#F28FA6");
+        if (p.paws === "down") paw(0.32 - 0.08 * s * a, -0.02 - lift1, 0.07, o, "#F28FA6");
+      }
       ctx.beginPath(); ctx.arc(-0.52, -0.2, 0.065, 0, TAU); ctx.fillStyle = PINK; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = o; ctx.stroke();
     }
     // upper body (it leans up around the hind legs for sitting, drinking and waving)
@@ -730,7 +763,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var hx = 0.3 - 0.1 * curl, hy = -0.43 + 0.17 * curl + p.bob * 1.3, hr = 0.29 - 0.015 * curl;
     // ears
     var eb = p.ears;
-    [[hx - 0.13 - 0.04 * eb, hy - 0.22 + 0.04 * eb], [hx + 0.08 - 0.05 * eb, hy - 0.26 + 0.03 * eb]].forEach(function (e, j) {
+    var fl = p.flap * Math.sin(clock * 38) * 0.025;
+    [[hx - 0.13 - 0.04 * eb - 0.05 * p.flap, hy - 0.22 + 0.04 * eb + fl], [hx + 0.08 - 0.05 * eb - 0.07 * p.flap, hy - 0.26 + 0.03 * eb - fl]].forEach(function (e, j) {
       var er = (0.1 - 0.025 * curl) * (j ? 1 : 0.92);
       ctx.beginPath(); ctx.arc(e[0], e[1], er, 0, TAU); ctx.fillStyle = FUR; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = o; ctx.stroke();
       ctx.beginPath(); ctx.arc(e[0] + 0.01, e[1] + 0.01, er * 0.58, 0, TAU); ctx.fillStyle = PINK; ctx.fill();
@@ -747,12 +781,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.beginPath(); ctx.ellipse(hx - 0.04, hy - 0.16, 0.1, 0.05, -0.3, 0, TAU); ctx.fill();
     ctx.restore();
     // cheek pouches puff up when it stuffs food in
-    var ck = Math.min(1.35, ham.cheeks);
+    var ck = Math.max(Math.min(1.35, ham.cheeks), 0.55 * p.flap), cb = -0.08 * p.flap + p.flap * Math.sin(clock * 45) * 0.015;
     if (ck > 0.04) {
       var cr = 0.06 + 0.11 * ck;
-      ctx.beginPath(); ctx.arc(hx + 0.24, hy + 0.13 + 0.02 * ck, cr * 0.75, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.lineWidth = o; ctx.strokeStyle = OUT; ctx.stroke();
-      ctx.beginPath(); ctx.arc(hx + 0.03, hy + 0.13 + 0.03 * ck, cr, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.arc(hx + 0.0, hy + 0.1, cr * 0.45, 0, TAU); ctx.fillStyle = "rgba(255,115,152,0.35)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(hx + 0.24 + cb, hy + 0.13 + 0.02 * ck, cr * 0.75, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.lineWidth = o; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx + 0.03 + cb, hy + 0.13 + 0.03 * ck, cr, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx + 0.0 + cb, hy + 0.1, cr * 0.45, 0, TAU); ctx.fillStyle = "rgba(255,115,152,0.35)"; ctx.fill();
     }
     // face
     var ek = p.eye === "open" && ham.blinkT > 0 ? "blink" : p.eye;
@@ -802,7 +836,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       paw(wx, wy, 0.07, o);
     }
     ctx.restore();
-    if (feet) {
+    if (feet && p.legBlur < 0.6) {
       paw(-0.26 - 0.08 * s * a, -0.015 - lift1, 0.08, o);
       if (p.paws === "down") paw(0.22 + 0.08 * s * a, -0.015 - lift2, 0.072, o);
     }
@@ -894,15 +928,23 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // Directed missions (taps). Each returns its list of steps.
-  function missionWheel(dur) {
+  // auto: the Surprise version that speeds itself up to super duper fast.
+  function missionWheel(dur, auto) {
     var side;
     return [
-      walkTo(function () { side = approach(G.wheel.lvl, G.wheel.x); return spotWheel(side); }, 2.4),
+      walkTo(function () { side = approach(G.wheel.lvl, G.wheel.x); return spotWheel(side); }, auto ? 3.0 : 2.4),
       function () { hopIn(); },
-      function () { lastWheel = clock; act("wheel", { dur: dur || 10, v: 0, boost: 0 }); },
+      function () { lastWheel = clock; act("wheel", { dur: dur || 10, v: 0, level: 0, quiet: 0, auto: !!auto }); },
       function () { hopOut(G.tall ? 1 : side); },
-      function () { act("happy", { dur: 1.6 }); }
+      afterWheel
     ];
+  }
+  function afterWheel() {
+    if (ham.wasSuper) {
+      ham.wasSuper = false;
+      ham.queue.unshift(function () { act("happy", { dur: 2.4, proud: true }); });
+      act("dizzy", { dur: 2.2 });
+    } else act("happy", { dur: 1.6 });
   }
   function missionFood() {
     var side = -1;
@@ -964,6 +1006,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (ending) return;
     if (ham.act && ham.act.name === "hop") { ham.pending = [name, steps, tx, tlvl]; return; }
     ham.mission = name;
+    ham.wasSuper = false;
     if (ham.where === "surf" && tx !== undefined && (!G.tall || tlvl === ham.lvl) && Math.abs(tx - ham.x) > 0.2 * G.L) turnTo(sign(tx - ham.x));
     if (ham.where === "surf" && tx !== undefined && G.tall && tlvl && tlvl !== ham.lvl) turnTo(1);
     run(leaveSteps(tx, tlvl).concat(steps));
@@ -1001,18 +1044,63 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (u >= 1) { ham.squash = 1; puff(ham.x, ham.y); return true; }
     return false;
   };
+  // Running in the wheel. Each tap on the wheel while it runs is one step faster (the steps slip back
+  // slowly when the taps stop); the fourth step is SUPER DUPER FAST: a blurred wheel, two loop-the-loops,
+  // a tiny cage shake. More taps keep it going a little longer, but it always winds down within about 10 s.
+  var LEVEL_V = [6.2, 8.2, 10.2, 12.2], SUPER_V = 17, SUPER_DUR = 4.5, SUPER_MAX = 6.5, superK = 0, superMsgUntil = -1;
+  function speedUp(a) {
+    if (a.sup) { a.sup.dur = Math.min(SUPER_MAX, a.sup.dur + 0.8); return; }
+    if (a.after) return;
+    a.level = Math.min(4, (a.level || 0) + 1); a.quiet = 0; a.dur = Math.max(a.dur, a.t + 6);
+    sWhirUp(a.level);
+    var w = G.wheel;
+    for (var i = 0; i < 2 + a.level; i++) spawn("spark", w.x + rand(-1, 1) * w.R, w.y + rand(-1, 1) * w.R, { life: 0.7 });
+    if (a.level >= 4) startSuper(a);
+  }
+  function startSuper(a) {
+    a.sup = { t: 0, dur: SUPER_DUR };
+    ham.wasSuper = true;
+    superMsgUntil = clock + 3.2;
+    sSuper();
+    updateCoach();
+  }
+  function endSuper(a) { a.sup = null; a.after = true; a.level = 0; a.dur = a.t + 3.0; }
   ACT.wheel = function (a, dt) {
     var w = G.wheel;
-    ham.where = "wheel"; ham.x = w.x; ham.y = w.y + w.Ri; ham.thT = 0;
-    a.boost -= dt;
-    var tgt = a.t > a.dur - 1.4 ? 2.5 : (a.boost > 0 ? 10 : 6.2);
-    a.v += (tgt - a.v) * Math.min(1, dt * 1.5);
+    ham.where = "wheel"; ham.lvl = w.lvl;
+    a.quiet += dt;
+    if (a.auto && !a.sup && !a.after && a.t > 1.0) { a.autoT = (a.autoT || 0) + dt; if (a.autoT > 0.7) { a.autoT = 0; speedUp(a); } }
+    if (!a.sup && !a.after && a.level > 0 && a.quiet > 2.5) { a.quiet = 1.0; a.level--; }
+    var tgt;
+    if (a.sup) { a.sup.t += dt; tgt = SUPER_V; if (a.sup.t >= a.sup.dur) endSuper(a); }
+    if (!a.sup) tgt = a.t > a.dur - 1.4 ? 2.5 : LEVEL_V[Math.min(3, a.level)];
+    a.v += (tgt - a.v) * Math.min(1, dt * (a.sup ? 2.2 : 1.5));
     wheel.w = ham.f * a.v * G.L / w.Ri; wheel.driven = true;
-    ham.legPh += dt * a.v * 5.5;
+    // super duper fast: the wheel flings it all the way round, twice (not with reduced motion)
+    var phi = 0;
+    if (a.sup && !reduceMotion) { var u = (a.sup.t - 0.9) / 2.6; if (u > 0 && u < 1) phi = TAU * 2 * ease(u); }
+    var ang = Math.PI / 2 + sign(wheel.w) * phi;
+    ham.x = w.x + Math.cos(ang) * w.Ri; ham.y = w.y + Math.sin(ang) * w.Ri;
+    if (phi) { ham.thT = angNorm(ang - Math.PI / 2); ham.th = ham.thT; } else ham.thT = 0;
+    ham.legPh += dt * Math.min(a.v, 11) * 5.5;
     P.legAmp = 1.15; P.bob = -Math.abs(Math.sin(ham.legPh)) * 0.04; P.ears = clamp(a.v / 6, 0, 1);
-    P.zoom = a.v > 7.5 ? (a.v - 7.5) / 2.5 : 0;
+    P.legBlur = clamp((a.v - 8) / 5, 0, 1);
+    P.zoom = a.v > 7.5 ? Math.min(1.4, (a.v - 7.5) / 2.5) : 0;
+    P.flap = clamp((a.v - 11) / 5, 0, 1);
     P.eye = a.v > 8 ? "happy" : "open";
-    if (a.v > 8 && Math.random() < dt * 2.5) spawn("spark", w.x - ham.f * 0.5 * G.L + rand(-0.2, 0.2) * G.L, ham.y - rand(0.3, 0.8) * G.L, { life: 0.7 });
+    if (a.v > 13) P.yawn = 0.45;
+    var sparkRate = a.sup ? (reduceMotion ? 2 : 9) : (a.v > 8 ? 2.5 : 0);
+    if (Math.random() < dt * sparkRate) {
+      var sa = rand(0, TAU), sr = a.sup ? rand(0.95, 1.25) * w.R : 0;
+      if (a.sup) spawn("spark", w.x + Math.cos(sa) * sr, w.y + Math.sin(sa) * sr, { life: 0.6 });
+      else spawn("spark", w.x - ham.f * 0.5 * G.L + rand(-0.2, 0.2) * G.L, ham.y - rand(0.3, 0.8) * G.L, { life: 0.7 });
+    }
+    return !a.sup && a.t >= a.dur;
+  };
+  // Hopping out after super duper fast: a little dizzy, stars going round its head.
+  ACT.dizzy = function (a) {
+    if (!a.snd) { a.snd = true; sSqueak(); }
+    P.eye = "swirl"; P.wig = Math.sin(a.t * 3.2) * 0.13; P.sy = 1 + 0.03 * Math.sin(a.t * 6); P.rear = 0.15;
     return a.t >= a.dur;
   };
   ACT.eat = function (a, dt) {
@@ -1099,8 +1187,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!a.snd) { a.snd = true; sSqueak(); a.h = 0; }
     P.wig = Math.sin(a.t * 15) * 0.1 * (1 - u); P.lift = a.t < 1.0 ? Math.abs(Math.sin(a.t * 8)) * 0.12 : 0;
     P.eye = "happy"; P.rear = 0.12;
+    if (a.proud) { P.lift = Math.abs(Math.sin(a.t * 6)) * 0.22 * (1 - u); P.rear = 0.35; }
     a.h -= dt;
-    if (a.h <= 0) { a.h = 0.32; heart(); }
+    if (a.h <= 0) { a.h = a.proud ? 0.22 : 0.32; heart(); }
+    if (a.t >= a.dur && a.proud && !a.k) { a.k = true; if (window.Toybox && typeof Toybox.kind === "function") Toybox.kind(); }
     return a.t >= a.dur;
   };
   ACT.groom = function (a) { P.rear = 0.55; P.paws = "rub"; P.eye = "happy"; return a.t >= a.dur; };
@@ -1358,7 +1448,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var b = upFirst ? { lvl: "floor", x: G.floorMax - 0.6 * L } : { lvl: "shelf", x: G.shelfMax - 0.6 * L };
     return [walkTo(function () { return a; }, 3.6), walkTo(function () { return b; }, 3.6), function () { act("happy", { dur: 1.6 }); }];
   }
-  var SURPRISES = ["flip", "tunnel", "ball", "wave"], lastSurprise = "";
+  var SURPRISES = ["flip", "tunnel", "ball", "wave", "super"], lastSurprise = "";
   function surprise() {
     if (ending) return;
     var opts = SURPRISES.filter(function (s) { return s !== lastSurprise; });
@@ -1366,6 +1456,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     lastSurprise = pick;
     var c = hamCenter();
     spawn("spark", c.x, c.y - 0.6 * G.L, { life: 0.8 });
+    if (pick === "super") {
+      if (ham.where === "wheel" && ham.act && ham.act.name === "wheel" && !ham.act.after) { ham.act.auto = true; ham.mission = "surprise"; return; }
+      command("surprise", missionWheel(14, true), G.wheel.x, G.wheel.lvl);
+      return;
+    }
     if (pick === "flip") command("surprise", [function () { act("flip", {}); }, function () { act("happy", { dur: 1.4 }); }]);
     else if (pick === "wave") command("surprise", [function () { act("wave", { dur: 2.8 }); }]);
     else if (pick === "tunnel") command("surprise", missionTunnel(), G.tall ? G.tubeX - 0.6 * G.L : (G.tube.x0 + G.tube.x1) / 2, G.tall ? (ham.lvl === "floor" ? "shelf" : "floor") : "floor");
@@ -1429,9 +1524,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (what === "wheel") {
       tried.wheel = true; items.wheel.b = 1; sTap();
       ghost.learned();
+      // winding down after super duper fast: the taps sparkle, and the dizzy, proud finish still plays
+      if (ham.wasSuper && ham.act && ((ham.act.name === "wheel" && ham.act.after) || ham.act.name === "hop")) {
+        for (var j = 0; j < 3; j++) spawn("spark", G.wheel.x + rand(-1, 1) * G.wheel.R, G.wheel.y + rand(-1, 1) * G.wheel.R, { life: 0.7 });
+        return;
+      }
       if (ham.where === "wheel" && ham.act && ham.act.name === "wheel") {
-        ham.act.boost = 3; ham.act.dur = Math.max(ham.act.dur, ham.act.t + 6); ham.mission = "wheel";
-        for (var i = 0; i < 3; i++) spawn("spark", G.wheel.x + rand(-1, 1) * G.wheel.R, G.wheel.y + rand(-1, 1) * G.wheel.R, { life: 0.7 });
+        if (ham.mission === "auto") ham.mission = "wheel";
+        speedUp(ham.act);
         return;
       }
       if (ham.mission === "wheel") return;
@@ -1485,6 +1585,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Coach line and ghost hand ----------
   var coachEl = $("coach"), coachShown = "";
   function coachText() {
+    if (clock < superMsgUntil) return "Super duper fast!";
     if (food < 0.04 && !pour) return "Fill the food bowl!";
     if (water < 0.06 && !jug) return "Fill the water!";
     if (ham.asleep && ham.act && ham.act.name === "sleep" && ham.act.t > 3) return "Tap to wake up!";
@@ -1653,6 +1754,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function sWater() { noise(1.4, 0.03, 900, 0.8, 0.4, "lowpass"); tone(500, 0.2, 0.02, "sine", 800, 0.5); tone(600, 0.2, 0.02, "sine", 900, 1.0); }
   var lull = [392, 330, 349, 294, 330, 262], lullI = 0;
   function sHum() { tone(lull[lullI % lull.length], 1.2, 0.016, "triangle"); lullI++; }
+  function sWhirUp(level) { tone(240 + level * 90, 0.5, 0.02, "triangle", 400 + level * 150); }
+  function sSuper() { tone(380, 1.1, 0.02, "triangle", 1250); tone(1800, 0.09, 0.024, "sine", 2600, 0.7); tone(2200, 0.13, 0.024, "sine", 3000, 0.82); }
   function sChime() { tone(523, 0.4, 0.03); tone(784, 0.6, 0.03, "sine", 0, 0.12); }
   var wheelTickAcc = 0;
 
@@ -1660,6 +1763,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var ending = false;
   function onEnding(done) {
     ending = true;
+    ham.wasSuper = false; superMsgUntil = -1;
     treats.forEach(function (t) { t.claimed = false; });
     var finish = function () { done(); };
     var cur = ham.act;
@@ -1748,6 +1852,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (ham.blinkT > 0) ham.blinkT -= dt;
     if (ham.blinkIn <= 0) { ham.blinkIn = rand(2.2, 5); ham.blinkT = 0.14; }
     // the wheel coasts when nobody runs in it
+    var supNow = ham.act && ham.act.name === "wheel" && ham.act.sup ? 1 : 0;
+    superK += (supNow - superK) * Math.min(1, dt * 3);
     if (!wheel.driven) wheel.w *= Math.exp(-dt * 0.7);
     wheel.driven = false;
     wheel.a += wheel.w * dt;
@@ -1764,6 +1870,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.clearRect(0, 0, CW, CH);
+    if (superK > 0.05 && !reduceMotion) ctx.translate(Math.sin(clock * 47) * 1.6 * superK, Math.cos(clock * 41) * 1.2 * superK);
     ctx.drawImage(bgCv, 0, 0, CW, CH);
     drawBag();
     drawWheelBack();
@@ -1777,6 +1884,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     drawTreats();
     drawBall();
     if (ham.where !== "wheel" && ham.where !== "house") drawHamster();
+    if (ham.act && ham.act.name === "dizzy") {
+      var dc = hamCenter();
+      for (var k = 0; k < 3; k++) { var an = clock * 4 + k * TAU / 3; drawStar(dc.x + Math.cos(an) * 0.4 * G.L, dc.y - 0.5 * G.L + Math.sin(an) * 0.1 * G.L, 0.1 * G.L, 1); }
+    }
     ctx.drawImage(tubeCv, 0, 0, CW, CH);
     drawParts();
     drawJug();
@@ -1844,6 +1955,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     food: function () { return food; }, water: function () { return water; },
     set: function (k, v) { if (k === "food") food = v; if (k === "water") water = v; },
     wheelW: function () { return wheel.w; },
+    run: function () { var a = ham.act; return a && a.name === "wheel" ? { level: a.level, sup: !!a.sup, supDur: a.sup ? a.sup.dur : 0, v: a.v, t: a.t, after: !!a.after } : null; },
+    superK: function () { return superK; },
     treats: function () { return treats.length; },
     ball: function () { return !!ball; },
     ghost: ghost,
