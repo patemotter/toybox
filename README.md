@@ -16,7 +16,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Math Grid: a big times and plus table to tap, drag and build blocks on | [`math-grid/`](math-grid/) |
 | 3D Printer: pick spool colors, print a Benchy layer by layer, and fill your shelf | [`3d-printer/`](3d-printer/) |
 | Water Works: a water table to pour into funnels, turn valves and spin water wheels | [`water-works/`](water-works/) |
-| Construction Site: gear up, then bulldozer, excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
+| Construction Site: gear up, then excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
 | Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 
 On the shelf (folder kept, no tile on the home screen): [`fish-tank/`](fish-tank/).

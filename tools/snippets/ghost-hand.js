@@ -3,7 +3,7 @@
 //   var ghost = makeGhost(function () { return { pts: [[x, y]], tap: true }; });
 //   ghost.learned();   // call once the child has done the move, so it never shows again this visit
 // Pages keep their own pasted copy (there is no build step); keep the look identical when you change it.
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // ---------- Ghost hand (same look in every app) ----------
   // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
   // at most twice per visit, and never again once the child has done the move (ghost.learned()).
   // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through

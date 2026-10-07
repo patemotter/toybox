@@ -64,7 +64,7 @@
  *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
  *      Toybox.settings.get(id) an app setting chosen on the home screen (ids in SETTINGS below:
- *                              "tilt", "mathgrid-voice", "bulldozer-drive", "printer-name", ...).
+ *                              "tilt", "mathgrid-voice", "printer-name", ...).
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
  *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
@@ -129,8 +129,6 @@
       note: "Apps that use tilt or shake ask for motion access when he first touches them." },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
       note: "Uses the device's voice, so it only speaks when sound is on." },
-    { id: "bulldozer-drive", app: "Bulldozer", label: "How to drive", type: "choice", def: "finger",
-      choices: [["finger", "Drag"], ["levers", "Levers"]], note: "Levers: one lever for each track." },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
     { id: "printer-clear", app: "3D Printer", label: "Hold to clear My prints", type: "action" },
     { id: "colors-clear", app: "Color Mixing", label: "Hold to clear My colors", type: "action" }

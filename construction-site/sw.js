@@ -2,11 +2,10 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file, bump CACHE so old copies are discarded.
-const CACHE = "construction-site-v14";
+const CACHE = "construction-site-v15";
 const CORE = [
   "./",
   "./index.html",
-  "./bulldozer.html",
   "./excavator.html",
   "./concrete.html",
   "./wrecking-ball.html",

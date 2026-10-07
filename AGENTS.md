@@ -41,7 +41,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
-  `bulldozer`, `excavator`, `concrete`, `wrecking-ball`).
+  `excavator`, `concrete`, `wrecking-ball`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, color-mixing, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works, construction-site, train-builder.
   `fish-tank/` is kept in the repo but has no tile on the home screen (the dad shelved it); don't delete it.
@@ -126,7 +126,7 @@ Keep only:
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
-  coach line** in a pill ("Drag the bulldozer!", "Switch on the lathe!", "Tap a paint pot!").
+  coach line** in a pill ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
 - **Direct manipulation**: drag the saw, turn the wheel, pull the tape, spin the toy with a finger. If a control
   is drawn on a machine, it must work (switches, height wheels, handles); don't draw fake controls. Remove HTML
   buttons that duplicate a working on-machine control.
@@ -151,7 +151,7 @@ Keep only:
   tool/layout/mode, scroll position and counters go back to first-visit defaults.
 - **Kept**: his **collections** (3D Printer shelf and spool colors, Lathe and Router shelves, Fish Tank fish,
   Color Mixing "My colors", My puzzles in Jigsaw) and **grown-up settings** (timer, sound, Big, tilt, sheet
-  options such as Bulldozer Drag/Levers, Math Grid spoken numbers).
+  options such as Math Grid spoken numbers).
 - Reloading, or moving between pages of the same app (Tool Wall ↔ station), keeps the state.
 - Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.
 
@@ -162,7 +162,7 @@ Keep only:
   that slides away; a tap only skips it (it must not tap what's underneath). **No check when going back to the
   Tool Wall.** Not right after the gear-up either (`workshop-check-skip`).
 - **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`), the same quick
-  check on each station.
+  check on each station. **No check on the site map** (going back to it from a station).
 - The launcher clears both gear flags on load and on `pageshow`, so leaving the app means gearing up again.
 - **Power tools**: the safety check also runs whenever he changes to a different power tool on the same page
   (sessionStorage `workshop-check-tool` remembers which tools were checked this visit).
@@ -264,4 +264,5 @@ Keep only:
 
 Decided (kept here so nobody reopens them): the two-step machines (switch on, then push/feed/press; the second
 push while off switches on for him) stay as they are everywhere, lathe and planer included. Concrete uses `orientation: "portrait"`
-instead of a bigger landscape scene. Engine Room was deleted (the dad didn't like it); don't rebuild it unasked.
+instead of a bigger landscape scene. Engine Room was deleted (the dad didn't like it); don't rebuild it unasked. The Bulldozer station was deleted too
+(it didn't fit the other stations' look); the Construction Site's new stations are listed in `PLAN.md`.

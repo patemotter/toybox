@@ -13,7 +13,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Removed |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Done |
-| 5 | Construction Site | Done (v1 stations) |
+| 5 | Construction Site | Rework: excavator, tower crane, then dump truck and auger |
 | 6 | Train Builder | Done |
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
@@ -117,37 +117,29 @@ Removed: the dad didn't like it, so the app and its folder were deleted (it is s
 ## 5. Construction Site
 
 **Folder:** `construction-site/`, organized like Workshop: `index.html` is a site map; each station is its own page, so stations can be built in parallel.
+A site gate with hard hat, safety vest, eye and ear protection once per visit; a quick check on each station (none on
+the map). Every station is a side view in the same flat style (sky, ground line, chunky outlines).
 
-**v1 stations:**
-- **Bulldozer (top-down):** push loose dirt with the blade.
-  - The dirt is a grid "sand" simulation that piles up and spills.
-  - Jobs: fill a hole, or make a pile.
-  - Numbers: a "Dirt moved" counter in cubic meters.
-- **Excavator (side view):** boom, arm and bucket as three joints.
-  - Controlled by dragging the bucket, with joint limits, or with two big joystick sliders.
-  - Dig into a pile and swing to dump into a dump truck.
-  - The truck drives off when full and a new one backs in, beeping; a load counter tracks trips.
-- **Concrete:** the mixer truck backs up and its chute swings over an empty road form.
-  - Hold to pour; the concrete spreads and rises.
-  - Drag a screed board to level it, then a trowel to smooth it.
-  - It "cures" to a finished road with cars driving by. Numbers: volume poured.
-- **Wrecking ball:** pull the ball back and let go; a pendulum swing.
-  - A block building takes damage and tumbles, using simple rigid blocks.
-  - A "New building" button; a counter of blocks knocked down.
+**Stations now:** Excavator, Concrete, Wrecking ball (the dad likes Concrete and Wrecking ball as they are).
 
-**Later stations:**
-- **Tower crane:** hook beams and place them to build a frame, with a height counter.
-- **Road crew:** the paver lays asphalt, the roller flattens it, then paint the lines.
-- **Jackhammer and pile driver:** break up concrete; drive piles with a depth readout.
-- **Dump truck:** tip the bed to dump a load, with weight in kg.
+**Removed:** Bulldozer (a top-down field with textured dirt; it didn't fit the others and the jobs were too fiddly).
 
-**Shared:** a site gate with a hard hat and safety vest put on once per visit, like Workshop's gear-up. Shared timer, sound and Big button.
+**Excavator rework (in progress):** drag the bucket as the main control (it follows the finger and never freezes),
+backup **Dig** and **Dump** buttons that each run a whole motion (Dump always clears the truck rim and empties),
+a coach line that is always true, and hidden **treasures** in the dirt pile (treasure chest, gems, gold nugget,
+dinosaur bone, coin, fossil shell) that pop out with a sparkle and stay on display in a treasure crate.
 
-**Risks:**
-- The wrecking ball needs simple block physics. Keep it to stacked rigid boxes with friction; avoid tall unstable stacks that jitter.
-- The bulldozer's sand simulation needs to stay fast on an iPad.
+**New stations (the dad's picks, in this order):**
+- **Tower crane (in progress):** drag the hook; the trolley runs along the jib and the cable follows; hook steel
+  beams and pallets of bricks, carry them to the building and it grows floor by floor until it is topped out
+  (flag and little tree). Backup "Lift!" button does the next piece. Counter "Floors".
+- **Dump truck:** drive the truck left and right; it gets loaded by an excavator at one end, then drives to the
+  other end and tips its bed to dump the load (a lever or a hold button raises the bed). Counter "Loads".
+- **Big auger:** a drill rig with a huge spinning auger that drills straight down into the ground; the spiral
+  carries dirt up and out, layers of soil and rock go by, and finds (fossils, treasure) can come up. The dad picked
+  this over a tunnel boring machine.
 
-**Agents:** 1 for the site map and gate, then 1 per station (4 in v1), each owning its own page.
+**Agents:** 1 per station, each owning its own page; the coordinator wires the site map and service workers.
 
 ---
 
@@ -214,9 +206,8 @@ scenes on upright phones.
   off-cut can cover the "Angle" tag; the fence stays locked if a board is pushed into a stopped blade; the
   circular saw guard grey is close to the blade grey.
 - **Drill Press:** still fairly small in phone landscape; Forstner and auger curls can pile up beside the board.
-- **Construction Site:** Excavator controls take about a quarter of the screen; Concrete only slightly bigger on
-  upright phones; wrecking-ball bricks can land on the crane; a ball resting on rubble delays the rest screen to
-  ~14 s; goodbye banners sit at the bottom over the panel.
+- **Construction Site:** Concrete only slightly bigger on upright phones; wrecking-ball bricks can land on the
+  crane; a ball resting on rubble delays the rest screen to ~14 s; goodbye banners sit at the bottom over the panel.
 - **Workshop stations:** Measuring objects small in phone landscape, caliper "ZERO"/"ON" labels overflow, the tape
   case resets on rotate; Router's cut edge is only visible in the end view; Wrenches handle can swing off the
   board; Shadow Board hooks sit oddly on the speed square and saw; Hammer & Screws keeps a fixed panel height
