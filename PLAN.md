@@ -37,6 +37,18 @@ from a carton; close-ups for grinding, top-down whisking and frothing; a latte t
 enough, or should more happen by itself (moving the jug under the wand)? tray of three, oldest delivered? latte art
 choice? Not polished: close-ups small on phones held sideways; small serve view on upright phones).
 
+**Decided 2026-10-07 (the dad: "do whatever you think"; keep as built unless he says otherwise):**
+- Marble Run: Lots! fills the hopper to 30 (he liked it); the cap stays 30.
+- Water Table: the cup pours only into the bowls while carried.
+- Gear Box: the tooth number may cover the small 8-tooth tile picture on phones.
+- Bubble Machine: 7 wands (Round, Hexagon, Star, Heart, Bunny, Cat, Fish); the machine keeps blowing round bubbles.
+- Car Builder / Rocket Builder / Spin Shop: the colorable parts as built; Surprise keeps details at their usual
+  colors; the selected part's glow cycles colors; "Tap a part to color it!" is the second coach line.
+- Train Builder: the whole loop fits the stage (cars stay small on phones held sideways); a 5.5 s station stop;
+  the layout is called "Figure 8"; engines toot when tapped (New clears them).
+- Open follow-up: in Train Builder's Big mode there is no Go button, so tapping the engine should start a
+  stopped train (after the button audit, which may touch the same page).
+
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
 Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain
