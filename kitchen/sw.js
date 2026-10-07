@@ -2,11 +2,12 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file, bump CACHE so old copies are discarded.
-const CACHE = "kitchen-v2";
+const CACHE = "kitchen-v3";
 const CORE = [
   "./",
   "./index.html",
   "./blender.html",
+  "./cutting-board.html",
   "./manifest.webmanifest",
   "./icons/icon-180.png",
   "./icons/icon-192.png",

@@ -1,0 +1,1637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cutting board</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kitchen">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
+.stage { background: #DCE7F1; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
+/* Choices: the foods for the board (a tap puts one on). */
+.tb-choices { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+.tb-tile { touch-action: manipulation; position: relative; }
+.tb-tile svg { pointer-events: none; overflow: visible; }
+.tb-tile span { pointer-events: none; white-space: nowrap; }
+@media (max-width: 600px) { .tb-tile { font-size: 0.84rem; min-height: 66px; } }
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-choices { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .tb-tile { font-size: 0.98rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-choices { gap: 6px; }
+  .tb-tile { min-height: 60px; font-size: 0.8rem; }
+  .tb-tile svg { width: 34px; height: 34px; }
+}
+body.big .tb-head > :not(.bigtoggle) { display: none; }
+body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Kitchen</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Cutting board</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A wooden cutting board with food to slice, a kid's nylon knife and a bowl"></canvas>
+      <div class="tb-counter" id="counter">Snacks: 0</div>
+      <div class="tb-coach" id="coach">Cut it in half!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <div class="tb-choices" id="choices"></div>
+      <nav class="tb-tabs">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Getting ready (once per visit, on the kitchen page) ----------
+  var readyOn = true;
+  try { readyOn = sessionStorage.getItem("kitchen-ready") === "on"; } catch (e) { readyOn = true; }
+  if (!readyOn) { location.replace("./?next=cutting-board"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { t = clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function backOut(t) { t = clamp(t, 0, 1) - 1; return 1 + 2.2 * t * t * t + 1.2 * t * t; }
+  function now() { return performance.now() / 1000; }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var INK = "#1D2340";
+
+  var STATEKEY = "kitchen-cut-v1";
+  // The kitchen table (his collection, kept across visits). This station adds { k: "snack", c: "#rrggbb"
+  // (the main food's color), s: "#rrggbb" (a second food's color), t: ms timestamp, f: [food ids] }.
+  var TABLEKEY = "kitchen-table-v1", TABLE_MAX = 12;
+  var BOWL_FULL = 3; // foods in a full snack bowl
+
+  // ---------- Small SVG pictures (panel tiles and the ghost hand's knife) ----------
+  function sv(inner) { return '<svg viewBox="0 0 60 60" aria-hidden="true">' + inner + "</svg>"; }
+  var ST = ' stroke="#1D2340" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+  var ICON = {
+    banana: sv('<path d="M10 20 Q14 46 38 50 Q52 52 54 44 Q40 44 30 36 Q20 28 18 16 Z" fill="#FFD84D"' + ST + '/><path d="M18 16 L14 9 L10 12 L10 20" fill="#8A5A2B"' + ST + '/><path d="M20 26 Q26 40 40 45" fill="none" stroke="#E8B820" stroke-width="2.5" stroke-linecap="round"/>'),
+    cucumber: sv('<path d="M8 44 Q4 34 16 28 L42 14 Q54 8 57 16 Q60 25 48 31 L22 46 Q12 52 8 44 Z" fill="#3E8E3A"' + ST + '/><path d="M14 38 L47 20" stroke="#7CC46A" stroke-width="3" stroke-linecap="round"/><g fill="#BDE8A8"><circle cx="22" cy="40" r="1.7"/><circle cx="33" cy="31" r="1.7"/><circle cx="44" cy="27" r="1.7"/><circle cx="27" cy="31" r="1.5"/></g>'),
+    carrot: sv('<path d="M17 15 L8 6 M20 13 L18 2 M22 15 L31 7" stroke="#2EA05A" stroke-width="4.5" stroke-linecap="round"/><path d="M14 16 Q24 8 31 18 L53 51 Q51 56 46 53 L14 28 Q7 22 14 16 Z" fill="#FF8A1F"' + ST + '/><path d="M24 26 L29 22 M32 35 L37 31 M40 43 L44 40" stroke="#D96A12" stroke-width="2.5" stroke-linecap="round"/>'),
+    strawberry: sv('<path d="M30 54 Q10 40 12 24 Q14 14 30 16 Q46 14 48 24 Q50 40 30 54 Z" fill="#E8344E"' + ST + '/><path d="M18 16 L24 10 L30 15 L36 10 L42 16 L30 20 Z" fill="#3E9B3A"' + ST + '/><g fill="#FFE68A"><circle cx="22" cy="28" r="1.8"/><circle cx="32" cy="26" r="1.8"/><circle cx="40" cy="30" r="1.8"/><circle cx="26" cy="38" r="1.8"/><circle cx="36" cy="40" r="1.8"/><circle cx="30" cy="47" r="1.6"/></g>'),
+    cheese: sv('<path d="M6 30 L22 16 L56 16 L40 30 Z" fill="#FFE07A"' + ST + '/><path d="M6 30 L40 30 L40 50 L6 50 Z" fill="#FFC93C"' + ST + '/><path d="M40 30 L56 16 L56 36 L40 50 Z" fill="#E8A41E"' + ST + '/><circle cx="17" cy="40" r="2.6" fill="#E8A41E"/><circle cx="29" cy="44" r="1.8" fill="#E8A41E"/><circle cx="30" cy="22" r="1.8" fill="#F2C440"/>'),
+    bread: sv('<path d="M12 54 L12 27 Q5 11 20 8 Q30 4 40 8 Q55 11 48 27 L48 54 Z" fill="#C98B4F"' + ST + '/><path d="M17 50 L17 28 Q12 15 22 13 Q30 10 38 13 Q48 15 43 28 L43 50 Z" fill="#FFF1D6"/><g fill="#EBD3A6"><circle cx="24" cy="30" r="2"/><circle cx="34" cy="38" r="2"/><circle cx="26" cy="44" r="1.6"/><circle cx="36" cy="24" r="1.6"/></g>'),
+    apple: sv('<circle cx="30" cy="35" r="20" fill="#E63946"' + ST + '/><path d="M30 17 Q31 11 34 6" stroke="#7A4B1E" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M33 13 Q42 4 51 10 Q42 18 33 13 Z" fill="#3E9B3A"' + ST + '/><ellipse cx="22" cy="29" rx="4" ry="6" fill="rgba(255,255,255,0.45)"/>')
+  };
+  var KNIFE_SVG = sv('<g transform="rotate(-50 30 30)"><rect x="2" y="25" width="22" height="10" rx="5" fill="#2D7BE5"' + ST + '/><path d="M24 25 L52 25 Q58 26 58 30 L56 34 L53 32 L50 35 L47 32 L44 35 L41 32 L38 35 L35 32 L32 35 L29 32 L26 35 L24 35 Z" fill="#8FE0C4"' + ST + '/></g>');
+
+  // ---------- Foods ----------
+  // Each food is drawn in its own units (about 2 wide), centred on the board. `pts` is its outline,
+  // `steps` the cuts asked for, each a list of guide lines [x1, y1, x2, y2] (any drag snaps to the nearest).
+  function longOutline(L, yc, t) {
+    var top = [], bot = [], n = 40;
+    for (var i = 0; i <= n; i++) {
+      var x = -L + 2 * L * i / n;
+      top.push([x, yc(x) - t(x)]);
+      bot.push([x, yc(x) + t(x)]);
+    }
+    return top.concat(bot.reverse());
+  }
+  function bez(out, p0, p1, p2, p3, n) {
+    for (var i = (out.length ? 1 : 0); i <= n; i++) {
+      var t = i / n, u = 1 - t;
+      out.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+                u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]);
+    }
+    return out;
+  }
+  var LH = 0.95; // half length of the long foods
+  function coinCuts(L) { return [[-L / 4, -1, -L / 4, 1], [L / 4, -1, L / 4, 1], [-3 * L / 4, -1, -3 * L / 4, 1], [3 * L / 4, -1, 3 * L / 4, 1]]; }
+  function halfQuarterCuts(L) { return [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }, { say: "Now in quarters!", cuts: [[-L / 2, -1, -L / 2, 1], [L / 2, -1, L / 2, 1]] }]; }
+
+  var bananaYc = function (x) { return 0.22 * (1 - x * x / (LH * LH)) - 0.1; };
+  var bananaT = function (x) { return 0.03 + 0.17 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(x) / LH, 2.4)), 0.5); };
+  var cucT = function (x) { return 0.255 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(x) / LH, 6)), 1 / 6); };
+  var carT = function (x) {
+    var u = (x + LH) / (2 * LH), t = 0.27 * (1 - u) + 0.035 * u;
+    if (x < -LH + 0.1) t *= Math.sqrt(Math.max(0, 1 - Math.pow((-LH + 0.1 - x) / 0.1, 2)));
+    return Math.max(0.004, t);
+  };
+  var FOODS = {
+    banana: { name: "Banana", col: "#FFD84D", pts: longOutline(LH, bananaYc, bananaT), t: bananaT, yc: bananaYc,
+      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFF7D8" },
+    cucumber: { name: "Cucumber", col: "#7CC46A", pts: longOutline(LH, function () { return 0; }, cucT), t: cucT, yc: function () { return 0; },
+      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into circles!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#DDF5C0" },
+    carrot: { name: "Carrot", col: "#FF8A1F", pts: longOutline(LH, function () { return 0; }, carT), t: carT, yc: function () { return 0; },
+      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFB86A", padL: 0.42 },
+    strawberry: { name: "Strawberry", col: "#E8344E", sep: 0.12, cut: "#FFE3E8", flipAfter: 0,
+      pts: (function () {
+        var o = [];
+        bez(o, [0, 0.86], [-0.5, 0.62], [-0.78, -0.12], [-0.6, -0.5], 14);
+        bez(o, [-0.6, -0.5], [-0.48, -0.78], [-0.16, -0.8], [0, -0.7], 10);
+        bez(o, [0, -0.7], [0.16, -0.8], [0.48, -0.78], [0.6, -0.5], 10);
+        bez(o, [0.6, -0.5], [0.78, -0.12], [0.5, 0.62], [0, 0.86], 14);
+        o.pop();
+        return o;
+      })(),
+      steps: [{ say: "Cut it in half!", cuts: [[0, -1.2, 0, 1.2]] }, { say: "Now in quarters!", cuts: [[-1, 0.06, 1, 0.06]] }] },
+    cheese: { name: "Cheese", col: "#FFC93C", pts: [[-0.9, -0.42], [0.9, -0.42], [0.9, 0.42], [-0.9, 0.42]], depth: 0.16, side: "#E8A41E", sep: 0.07, cut: "#FFE07A",
+      steps: [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }, { say: "Now in quarters!", cuts: [[-0.45, -1, -0.45, 1], [0.45, -1, 0.45, 1]] },
+        { say: "Now make cubes!", cuts: [[-1, 0, 1, 0]] }] },
+    bread: { name: "Bread", col: "#E2B07A", depth: 0.07, side: "#A8693A", sep: 0.11, cut: "#FFF1D6",
+      pts: (function () {
+        var o = [[-0.7, 0.7], [-0.72, -0.28]];
+        bez(o, [-0.72, -0.28], [-0.98, -0.66], [-0.7, -0.92], [-0.36, -0.86], 10);
+        bez(o, [-0.36, -0.86], [-0.15, -0.94], [0.15, -0.94], [0.36, -0.86], 8);
+        bez(o, [0.36, -0.86], [0.7, -0.92], [0.98, -0.66], [0.72, -0.28], 10);
+        o.push([0.7, 0.7]);
+        return o;
+      })(),
+      steps: [{ say: "Cut it in half!", cuts: [[-0.85, -0.95, 0.85, 0.75]] }, { say: "Now in quarters!", cuts: [[0.85, -0.95, -0.85, 0.75]] }] },
+    apple: { name: "Apple", col: "#E63946", apple: true, steps: [{ say: "Press the slicer down!", cuts: [] }] }
+  };
+  var ORDER = ["banana", "cucumber", "carrot", "strawberry", "cheese", "bread", "apple"];
+  var AR = 0.66, CORE_R = 0.17; // apple radius, core radius
+
+  // Guide lines, bounds and starting piece for each food.
+  ORDER.forEach(function (id) {
+    var f = FOODS[id];
+    f.id = id;
+    if (f.apple) { f.G = [[]]; f.rb = [-AR, -AR, AR, AR]; return; }
+    var x0 = 9, y0 = 9, x1 = -9, y1 = -9;
+    f.pts.forEach(function (p) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); });
+    f.rb = [x0, y0, x1, y1];
+    var pd = 0.45;
+    f.box = [[x0 - pd - (f.padL || 0), y0 - pd], [x1 + pd, y0 - pd], [x1 + pd, y1 + pd + (f.depth || 0)], [x0 - pd - (f.padL || 0), y1 + pd + (f.depth || 0)]];
+    f.G = f.steps.map(function (st, s) {
+      return st.cuts.map(function (l, j) {
+        var dx = l[2] - l[0], dy = l[3] - l[1], len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+        // The knife's tip points up the screen (or left for a level cut).
+        if (dy > 0.01 || (Math.abs(dy) <= 0.01 && dx > 0)) { dx = -dx; dy = -dy; }
+        var nx = -dy, ny = dx;
+        return { gid: s + "." + j, s: s, j: j, x: l[0], y: l[1], dx: dx, dy: dy, nx: nx, ny: ny, c: nx * l[0] + ny * l[1], a: Math.atan2(dy, dx) };
+      });
+    });
+  });
+
+  // ---------- Polygon helpers ----------
+  function clipHalf(poly, nx, ny, c) { // keep the part where nx*x + ny*y <= c
+    var out = [];
+    for (var i = 0; i < poly.length; i++) {
+      var p = poly[i], q = poly[(i + 1) % poly.length];
+      var vp = nx * p[0] + ny * p[1] - c, vq = nx * q[0] + ny * q[1] - c;
+      if (vp <= 0) out.push(p);
+      if ((vp < 0 && vq > 0) || (vp > 0 && vq < 0)) { var t = vp / (vp - vq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
+    }
+    return out;
+  }
+  function areaOf(poly) { var a = 0; for (var i = 0; i < poly.length; i++) { var p = poly[i], q = poly[(i + 1) % poly.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
+  function centroid(poly) {
+    var a = areaOf(poly), cx = 0, cy = 0;
+    if (Math.abs(a) < 1e-6) { poly.forEach(function (p) { cx += p[0]; cy += p[1]; }); return [cx / Math.max(1, poly.length), cy / Math.max(1, poly.length)]; }
+    for (var i = 0; i < poly.length; i++) { var p = poly[i], q = poly[(i + 1) % poly.length], k = p[0] * q[1] - q[0] * p[1]; cx += (p[0] + q[0]) * k; cy += (p[1] + q[1]) * k; }
+    return [cx / (6 * a), cy / (6 * a)];
+  }
+  function boundsOf(poly) { var b = [9, 9, -9, -9]; poly.forEach(function (p) { b[0] = Math.min(b[0], p[0]); b[1] = Math.min(b[1], p[1]); b[2] = Math.max(b[2], p[0]); b[3] = Math.max(b[3], p[1]); }); return b; }
+
+  // ---------- A food on the board, as pieces ----------
+  // piece: { box, shape (clip polygons), planes [[nx, ny, c]], cx, cy (centre, food units), ox, oy (offset now),
+  //          tx, ty (offset target), vx, vy, face (cut side up), coin (lying flat as a round), r, flipT, prev }
+  function mkPiece(f) {
+    var c = centroid(f.pts);
+    return { box: f.box, shape: f.pts, planes: [], cx: c[0], cy: c[1], ox: 0, oy: 0, tx: 0, ty: 0, vx: 0, vy: 0, face: false, coin: false, r: 0, flipT: -99, prev: null };
+  }
+  function buildFood(id, cuts, anim) {
+    var f = FOODS[id];
+    var c = { id: id, f: f, pieces: [], done: {}, order: [], enterT: -99, ex: 0, ey: 0, flying: false, wig: 0, pressT: -99, pressed: false };
+    if (f.apple) {
+      if (cuts.length) { c.pressed = true; c.order = ["0.0"]; makeWedges(c, false); }
+      return c;
+    }
+    c.pieces = [mkPiece(f)];
+    cuts.forEach(function (g) { doCut(c, g, !!anim); });
+    return c;
+  }
+  function guideOf(f, gid) { var a = gid.split("."), s = f.G[+a[0]]; return s ? s[+a[1]] || null : null; }
+  function stepOf(c) {
+    var f = c.f;
+    if (f.apple) return c.pressed ? 1 : 0;
+    for (var s = 0; s < f.G.length; s++) for (var j = 0; j < f.G[s].length; j++) if (!c.done[f.G[s][j].gid]) return s;
+    return f.G.length;
+  }
+  function complete(c) { return c.f.apple ? c.pressed : stepOf(c) >= c.f.G.length; }
+  function remaining(c) {
+    var s = stepOf(c);
+    if (c.f.apple || s >= c.f.G.length) return [];
+    return c.f.G[s].filter(function (g) { return !c.done[g.gid]; });
+  }
+  function doCut(c, gid, anim) {
+    var f = c.f, g = guideOf(f, gid);
+    if (!g || c.done[gid]) return false;
+    var t = now(), out = [];
+    c.pieces.forEach(function (p) {
+      if (p.coin) { out.push(p); return; }
+      var a = clipHalf(p.shape, g.nx, g.ny, g.c), b = clipHalf(p.shape, -g.nx, -g.ny, -g.c);
+      if (Math.abs(areaOf(a)) < 1e-3 || Math.abs(areaOf(b)) < 1e-3) { out.push(p); return; }
+      [[a, 1], [b, -1]].forEach(function (pr) {
+        var k = pr[1], q = {}, key;
+        for (key in p) q[key] = p[key];
+        q.shape = pr[0];
+        q.box = clipHalf(p.box, k * g.nx, k * g.ny, k * g.c);
+        q.planes = p.planes.concat([[k * g.nx, k * g.ny, k * g.c]]);
+        var cc = centroid(q.shape); q.cx = cc[0]; q.cy = cc[1];
+        out.push(q);
+      });
+    });
+    c.pieces = out;
+    // Everything on each side of the cut slides a little away from it.
+    c.pieces.forEach(function (p) {
+      var side = (g.nx * p.cx + g.ny * p.cy - g.c) > 0 ? 1 : -1;
+      p.tx += side * g.nx * f.sep / 2; p.ty += side * g.ny * f.sep / 2;
+      if (anim) { p.vx += side * g.nx * 1.2; p.vy += side * g.ny * 1.2; }
+    });
+    c.done[gid] = true;
+    c.order.push(gid);
+    // A step finished: halves flip over to show the inside; the last step lays the slices flat as rounds.
+    var s = g.s, stepDone = f.G[s].every(function (h) { return c.done[h.gid]; });
+    if (stepDone && f.flipAfter === s) {
+      c.pieces.forEach(function (p, i) {
+        p.prev = { face: p.face, coin: p.coin }; p.face = true; p.flipT = anim ? t + 0.35 + i * 0.12 : -99;
+        p.tx += (p.cx > 0 ? 1 : -1) * 0.05;
+      });
+    }
+    if (stepDone && s === f.G.length - 1 && f.coins) {
+      var sorted = c.pieces.slice().sort(function (a, b) { return a.cx - b.cx; });
+      sorted.forEach(function (p, i) {
+        p.prev = { face: p.face, coin: p.coin }; p.coin = true;
+        p.r = Math.max(0.09, f.t(p.cx) * 0.95);
+        p.flipT = anim ? t + 0.35 + i * 0.08 : -99;
+        p.ty += (i % 2 ? 0.16 : -0.16) - (f.yc(p.cx) - f.yc(0)) * 0.6;
+      });
+    }
+    if (!anim) c.pieces.forEach(function (p) { p.ox = p.tx; p.oy = p.ty; p.vx = p.vy = 0; });
+    return true;
+  }
+  // The apple slicer: eight wedges around the core.
+  function makeWedges(c, anim) {
+    c.pieces = [];
+    for (var k = 0; k < 8; k++) {
+      var a = k * Math.PI / 4 + Math.PI / 8, rc = (CORE_R + AR) / 2 + 0.04;
+      var p = { type: "wedge", a: a, cx: Math.cos(a) * rc, cy: Math.sin(a) * rc, ox: 0, oy: 0, tx: Math.cos(a) * 0.17, ty: Math.sin(a) * 0.17, vx: 0, vy: 0, face: true, coin: false, flipT: -99 };
+      if (anim) { p.vx = Math.cos(a) * 2.2; p.vy = Math.sin(a) * 2.2; } else { p.ox = p.tx; p.oy = p.ty; }
+      c.pieces.push(p);
+    }
+  }
+  function byCx(a, b) { return (a.cx - b.cx) || (a.cy - b.cy); }
+  function pieceSize(p, f) {
+    if (p.coin) return p.r * 2;
+    if (p.type === "wedge") return AR * 0.8;
+    var b = boundsOf(p.shape);
+    return Math.max(b[2] - b[0], b[3] - b[1] + (f.depth || 0));
+  }
+
+  // ---------- Saved state ----------
+  // food: what is on the board ("" for nothing); cuts: the guide ids cut so far, in order;
+  // bowl: foods slid into the bowl [{ i: id, c: cuts }]; done: the snack is finished; count: snacks this visit.
+  var S = { food: "banana", cuts: [], bowl: [], done: false, count: 0 };
+  function load() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(STATEKEY) || "null"); } catch (e) { o = null; }
+    if (!o || typeof o !== "object") return;
+    S.food = FOODS[o.food] ? o.food : "";
+    S.cuts = Array.isArray(o.cuts) ? o.cuts.filter(function (g) { return typeof g === "string"; }) : [];
+    S.bowl = Array.isArray(o.bowl) ? o.bowl.filter(function (b) { return b && FOODS[b.i]; }).map(function (b) { return { i: b.i, c: Array.isArray(b.c) ? b.c.filter(function (g) { return typeof g === "string"; }) : [] }; }).slice(0, BOWL_FULL) : [];
+    S.done = !!o.done && S.bowl.length > 0;
+    S.count = Math.max(0, Math.floor(+o.count || 0));
+  }
+  var saveT = 0;
+  function save() {
+    // Slices still on their way to the bowl are saved as still on the board.
+    S.food = cur ? cur.id : (pending || "");
+    S.cuts = cur ? cur.order.slice() : [];
+    clearTimeout(saveT);
+    saveT = setTimeout(function () {
+      try { localStorage.setItem(STATEKEY, JSON.stringify({ v: 1, food: S.food, cuts: S.cuts, bowl: S.bowl, done: S.done, count: S.count })); } catch (e) { /* ignore */ }
+    }, 200);
+  }
+  if (window.Toybox && Toybox.fresh()) { try { localStorage.removeItem(STATEKEY); } catch (e) { /* ignore */ } }
+  else load();
+  function addToTable(entry) {
+    var arr = [];
+    try { arr = JSON.parse(localStorage.getItem(TABLEKEY) || "[]"); } catch (e) { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+    arr.push(entry);
+    while (arr.length > TABLE_MAX) arr.shift();
+    try { localStorage.setItem(TABLEKEY, JSON.stringify(arr)); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Canvas and layout ----------
+  // Seen from above. Scene units: B px each, origin at the middle of the cutting board, y down.
+  // Wide stages put the bowl to the right of the board; upright ones put it below.
+  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var cw = 300, ch = 300, dpr = 1, B = 100, ox = 150, oy = 150, LW = 0.03, lwNow = 0.03, tall = false;
+  var BW = 2.8, BH = 2.04, BOWL = { x: 2.2, y: 0.2, r: 0.68 }, KR = { x: 2.05, y: -0.72, a: Math.PI };
+  var SCENES = {
+    wide: { x0: -1.48, x1: 3.0, y0: -1.1, y1: 1.16 },
+    tall: { x0: -1.38, x1: 1.38, y0: -1.12, y1: 2.72 }
+  };
+  function layout() {
+    var r = stage.getBoundingClientRect();
+    cw = Math.max(50, r.width); ch = Math.max(50, r.height);
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    var phone = Math.min(innerWidth, innerHeight) < 560 || innerWidth <= 600;
+    var big = document.body.classList.contains("big");
+    var padT = phone || big ? 8 : 62, padB = big ? 8 : (phone ? (cw < ch ? 46 : 38) : 10), padX = 8;
+    var aw = cw - 2 * padX, ah = ch - padT - padB;
+    function fit(sc) { return Math.min(aw / (sc.x1 - sc.x0), ah / (sc.y1 - sc.y0)); }
+    var bw = fit(SCENES.wide), bt = fit(SCENES.tall);
+    tall = bt > bw * 1.02;
+    var sc = tall ? SCENES.tall : SCENES.wide;
+    if (tall) { BW = 2.6; BH = 2.1; BOWL = { x: 0.42, y: 1.84, r: 0.68 }; KR = { x: -0.86, y: 1.86, a: -Math.PI / 2 - 0.22 }; }
+    else { BW = 2.8; BH = 2.04; BOWL = { x: 2.2, y: 0.24, r: 0.68 }; KR = { x: 2.08, y: -0.74, a: Math.PI + 0.08 }; }
+    B = Math.max(30, Math.min(tall ? bt : bw, 330));
+    ox = padX + (aw - B * (sc.x1 - sc.x0)) / 2 - B * sc.x0;
+    oy = padT + (ah - B * (sc.y1 - sc.y0)) / 2 - B * sc.y0;
+    LW = 3.4 / B; lwNow = LW;
+    if (knife.hold == null && !knife.anim) { knife.x = KR.x; knife.y = KR.y; knife.a = KR.a; }
+  }
+  function toLocal(px, py) { var r = cv.getBoundingClientRect(); return { x: (px - r.left - ox) / B, y: (py - r.top - oy) / B }; }
+  function toPage(x, y) { var r = cv.getBoundingClientRect(); return [r.left + ox + x * B, r.top + oy + y * B]; }
+
+  // ---------- Live state ----------
+  var cur = null;       // the food on the board
+  var leaving = null;   // a whole food lifted away when he picks another: { c, t0 }
+  var pending = "";     // the food that comes next, once the slices are in the bowl
+  var flights = [];     // pieces sliding into the bowl: { p, t0, dur, fx, fy, tx, ty, s1, rot }
+  var knife = { x: 2.05, y: -0.72, a: Math.PI, hold: null, anim: null, back: null, fx: 0, fy: 0 };
+  var bowl = { offx: 0, offy: 0, swapT: -99, swapped: true, wig: 0, forkT: -99 };
+  var parts = [];
+  var sayMsg = "", sayUntil = 0;
+  var bowlCache = null;
+  function bowlBuilt() {
+    if (!bowlCache) bowlCache = S.bowl.map(function (b) { return buildFood(b.i, b.c, false); });
+    return bowlCache;
+  }
+  function bowlCount() { var n = 0; bowlBuilt().forEach(function (c) { n += c.pieces.length; }); return n; }
+  function slotPos(i) {
+    var r = (BOWL.r - 0.2) * Math.sqrt((i + 0.5) / 24), a = i * 2.39996 + 0.6;
+    return [Math.cos(a) * r, Math.sin(a) * r * 0.92];
+  }
+  function bowlScale(p, f) { return clamp(0.5 / pieceSize(p, f), 0.2, 1.1); }
+  function slotRot(i) { return ((i * 137) % 360) * Math.PI / 180 * 0.35 - 0.6; }
+
+  function phase() {
+    if (!cur) return S.done ? "done" : "pick";
+    if (cur.flying) return "flying";
+    if (cur.f.apple) return !cur.pressed ? "press" : (now() - cur.pressT < 1.7 ? "slices" : "sweep");
+    if (!complete(cur)) return "cut";
+    return "sweep";
+  }
+  var COACH = {
+    pick: "Pick a food!", done: "Yum! Pick a food!", flying: "Into the bowl!", press: "Press the slicer down!",
+    slices: "Apple slices!", sweep: "Slide them into the bowl!"
+  };
+  function coachText() {
+    var ph = phase();
+    if (ph === "cut") return cur.f.steps[stepOf(cur)].say;
+    return COACH[ph];
+  }
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var master = null, masterCtx = null, noiseBuf = null;
+  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; noiseBuf = null; } return master; }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function hiss(dur, vol, freq, freqTo, delay) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    out(ac);
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.6), ac.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    var t = ac.currentTime + (delay || 0), s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; f.type = "bandpass"; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(freq, t);
+    if (freqTo) f.frequency.exponentialRampToValueAtTime(freqTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + 0.05);
+  }
+  function chop() { hiss(0.1, 0.06, 2600, 1500); tone(150, 0.12, 0.05, "sine", 90, 0.05); }
+  function thunk() { tone(220, 0.14, 0.05, "sine", 120); }
+  function whoosh() { hiss(0.35, 0.03, 700, 1800); }
+  function plink() { tone(rand(520, 700), 0.1, 0.03, "sine", 900); }
+  function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
+
+  // ---------- Coach and counter ----------
+  var coachEl = $("coach"), counterEl = $("counter");
+  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
+  var lastCoach = "";
+  function updateCoach() {
+    var t = Date.now() < sayUntil ? sayMsg : coachText();
+    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+  }
+  function updateCounter() { counterEl.textContent = "Snacks: " + S.count; }
+
+  // ---------- Panel: the foods ----------
+  var choicesEl = $("choices");
+  (function () {
+    var h = "";
+    ORDER.forEach(function (id) { h += '<button class="btn tb-tile" data-food="' + id + '" aria-pressed="false" aria-label="' + FOODS[id].name + '">' + ICON[id] + "<span>" + FOODS[id].name + "</span></button>"; });
+    choicesEl.innerHTML = h;
+  })();
+  var lastPicked = null;
+  function updateTiles() {
+    var id = cur && !cur.flying ? cur.id : (pending || "");
+    if (id === lastPicked) return;
+    lastPicked = id;
+    Array.prototype.forEach.call(choicesEl.querySelectorAll(".tb-tile"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-food") === id ? "true" : "false"); });
+  }
+  choicesEl.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest(".tb-tile");
+    if (!b) return;
+    e.preventDefault();
+    chooseFood(b.getAttribute("data-food"));
+  });
+
+  // ---------- Picking a food ----------
+  function arrive(id) {
+    cur = buildFood(id, []);
+    cur.enterT = reduce ? -99 : now();
+    thunk();
+    save();
+  }
+  function chooseFood(id) {
+    if (locked() || !FOODS[id]) return;
+    learned("pick");
+    sayUntil = 0;
+    if (cur && cur.flying) { pending = id; save(); return; }
+    if (cur && cur.f.apple && cur.pressed && !cur.pieces.length) return;
+    if (cur && cur.order.length) { pending = id; sweep(); return; }
+    if (cur && cur.id === id) { cur.wig = 1; return; }
+    if (S.done) swapBowl();
+    if (cur) leaving = { c: cur, t0: now() };
+    arrive(id);
+  }
+
+  // ---------- Cutting ----------
+  function foodOrigin(c) { return { x: (c ? c.ex : 0), y: -0.02 + (c ? c.ey : 0) }; }
+  // Where a guide line is drawn now: shifted with the pieces it runs through.
+  function guideShift(c, g) {
+    var sx = 0, sy = 0, n = 0;
+    c.pieces.forEach(function (p) {
+      if (p.coin || p.type) return;
+      var a = clipHalf(p.shape, g.nx, g.ny, g.c), b = clipHalf(p.shape, -g.nx, -g.ny, -g.c);
+      if (Math.abs(areaOf(a)) > 1e-3 && Math.abs(areaOf(b)) > 1e-3) { sx += p.tx; sy += p.ty; n++; }
+    });
+    return n ? [sx / n, sy / n] : [0, 0];
+  }
+  function guideSeg(c, g) {
+    // The guide's line across the food's bounds, a little longer on both ends.
+    var rb = c.f.rb, t0 = -9, t1 = 9;
+    [[g.dx, g.x, rb[0], rb[2]], [g.dy, g.y, rb[1], rb[3]]].forEach(function (a) {
+      if (Math.abs(a[0]) < 1e-6) return;
+      var ta = (a[2] - a[1]) / a[0], tb = (a[3] - a[1]) / a[0];
+      t0 = Math.max(t0, Math.min(ta, tb)); t1 = Math.min(t1, Math.max(ta, tb));
+    });
+    var o = foodOrigin(c), sh = guideShift(c, g), e = 0.16;
+    return { x1: o.x + sh[0] + g.x + g.dx * (t0 - e), y1: o.y + sh[1] + g.y + g.dy * (t0 - e), x2: o.x + sh[0] + g.x + g.dx * (t1 + e), y2: o.y + sh[1] + g.y + g.dy * (t1 + e),
+      mx: o.x + sh[0] + g.x + g.dx * (t0 + t1) / 2, my: o.y + sh[1] + g.y + g.dy * (t0 + t1) / 2, h: (t1 - t0) / 2 + e };
+  }
+  function lineDist(c, g, p) {
+    var s = guideSeg(c, g);
+    return Math.abs(g.nx * (p.x - s.mx) + g.ny * (p.y - s.my));
+  }
+  function nearestGuide(c, pts) {
+    var best = null, bd = 1e9;
+    remaining(c).forEach(function (g) {
+      var d = 0;
+      pts.forEach(function (p) { d += lineDist(c, g, p); });
+      if (d < bd) { bd = d; best = g; }
+    });
+    return best;
+  }
+  function pieceBounds(c, p) {
+    var o = foodOrigin(c), x = o.x + p.cx + p.ox, y = o.y + p.cy + p.oy;
+    if (p.coin) return [x - p.r, y - p.r, x + p.r, y + p.r];
+    if (p.type === "wedge") return [x - 0.3, y - 0.3, x + 0.3, y + 0.3];
+    var b = boundsOf(p.shape);
+    return [b[0] - p.cx + x, b[1] - p.cy + y, b[2] - p.cx + x, b[3] - p.cy + y + (c.f.depth || 0)];
+  }
+  function onFood(p, m) {
+    if (!cur || cur.flying) return false;
+    if (cur.f.apple) { var o = foodOrigin(cur); return Math.hypot(p.x - o.x, p.y - o.y) < AR + (m || 0) + 0.3; }
+    m = m || 0;
+    for (var i = 0; i < cur.pieces.length; i++) {
+      var b = pieceBounds(cur, cur.pieces[i]);
+      if (p.x > b[0] - m && p.x < b[2] + m && p.y > b[1] - m && p.y < b[3] + m) return true;
+    }
+    return false;
+  }
+  function cutGuide(g) {
+    if (!cur || !doCut(cur, g.gid, true)) return;
+    var s = guideSeg(cur, g);
+    knife.anim = { t0: now(), mx: s.mx, my: s.my, dx: g.dx, dy: g.dy, h: s.h + 0.3, a: g.a, dur: reduce ? 0.12 : 0.34 };
+    knife.back = null;
+    chop();
+    learned("cut");
+    // Juice and crumbs along the cut.
+    var col = cur.f.cut;
+    for (var i = 0; i < 9; i++) {
+      var k = rand(-s.h * 0.7, s.h * 0.7);
+      parts.push({ x: s.mx + g.dx * k, y: s.my + g.dy * k, vx: rand(-0.5, 0.5), vy: rand(-0.6, 0.2), life: 0, max: rand(0.4, 0.8), col: col, r: rand(0.015, 0.032), star: false, flat: true });
+    }
+    if (complete(cur)) {
+      setTimeout(function () { if (cur && complete(cur) && !cur.flying) { var o = foodOrigin(cur); burst(o.x, o.y, 16, null, true); chime(); } }, reduce ? 200 : 900);
+    }
+    save();
+  }
+
+  // ---------- The apple slicer ----------
+  function pressSlicer() {
+    if (!cur || !cur.f.apple || cur.pressed) return;
+    cur.pressed = true; cur.order = ["0.0"]; cur.pressT = now();
+    learned("press");
+    tone(300, 0.1, 0.04, "triangle", 200);
+    setTimeout(function () {
+      if (!cur || !cur.f.apple) return;
+      makeWedges(cur, true);
+      chop(); tone(520, 0.12, 0.04, "sine", 760, 0.05);
+      var o = foodOrigin(cur);
+      burst(o.x, o.y, 12, "#FFF3D6");
+    }, reduce ? 60 : 380);
+    save();
+  }
+  function slicerPose(c, t) {
+    // { s: scale (bigger = higher above the board), alpha, lift (moved up), core: is the core in it }
+    if (!c.pressed) { var bob = reduce ? 0 : Math.sin(t * 2.2) * 0.012; return { s: 1.13 + bob, alpha: 1, lift: 0.08, h: 1, core: false }; }
+    var k = (t - c.pressT) / (reduce ? 0.6 : 1.7);
+    if (k < 0.22) { var e = ease(k / 0.22); return { s: lerp(1.13, 1.0, e), alpha: 1, lift: lerp(0.08, 0, e), h: 1 - e, core: false }; }
+    if (k < 0.5) return { s: 1.0, alpha: 1, lift: 0, h: 0, core: true };
+    if (k < 1) { var e2 = ease((k - 0.5) / 0.5); return { s: lerp(1.0, 1.3, e2), alpha: 1 - e2, lift: e2 * 0.9, h: e2, core: true }; }
+    return null;
+  }
+
+  // ---------- Into the bowl ----------
+  function sweep() {
+    if (!cur || cur.flying || !cur.pieces.length) return;
+    cur.flying = true;
+    learned("sweep");
+    var c = cur;
+    if (S.done || S.bowl.length >= BOWL_FULL) { swapBowl(); setTimeout(function () { if (cur === c) fly(); }, reduce ? 300 : 1500); }
+    else fly();
+    save();
+  }
+  function fly() {
+    if (!cur) return;
+    var c = cur, base = bowlCount(), t = now(), o = foodOrigin(c);
+    var order = c.pieces.slice().sort(byCx);
+    order.forEach(function (p, i) {
+      var sp = slotPos(base + i);
+      flights.push({ c: c, p: p, t0: t + i * (reduce ? 0.02 : 0.09), dur: reduce ? 0.2 : 0.62, fx: o.x + p.cx + p.ox, fy: o.y + p.cy + p.oy,
+        tx: BOWL.x + sp[0], ty: BOWL.y + sp[1], s1: bowlScale(p, c.f), rot: slotRot(base + i), landed: false });
+    });
+    whoosh();
+  }
+  function flightsDone(c) {
+    // Every piece of this food has landed: it is in the bowl now.
+    flights = flights.filter(function (fl) { return fl.c !== c; });
+    S.bowl.push({ i: c.id, c: c.order.slice() });
+    bowlCache = null;
+    if (cur === c) cur = null;
+    bowl.wig = 0.6;
+    if (S.bowl.length >= BOWL_FULL) finishSnack();
+    if (pending) { var id = pending; pending = ""; setTimeout(function () { if (!cur) arrive(id); }, reduce ? 50 : 350); }
+    save();
+  }
+  function swapBowl() {
+    // The finished bowl slides off to the table; a clean one slides in.
+    if (now() - bowl.swapT < 1.5) return;
+    bowl.swapT = now(); bowl.swapped = false;
+  }
+  function finishSnack() {
+    if (S.done || !S.bowl.length) return;
+    S.done = true;
+    S.count++;
+    updateCounter();
+    var tally = {}, cols = [];
+    bowlBuilt().forEach(function (c) { tally[c.id] = (tally[c.id] || 0) + c.pieces.length; });
+    Object.keys(tally).sort(function (a, b) { return tally[b] - tally[a]; }).forEach(function (id) { cols.push(FOODS[id].col); });
+    addToTable({ k: "snack", c: cols[0], s: cols[1] || cols[0], t: Date.now(), f: S.bowl.map(function (b) { return b.i; }) });
+    if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
+    bowl.forkT = now();
+    chime();
+    for (var i = 0; i < 3; i++) setTimeout(function () { burst(BOWL.x, BOWL.y - 0.1, 14, null, true); }, i * 260);
+    save();
+  }
+  function tapBowl() {
+    bowl.wig = 1;
+    if (cur && !cur.flying && cur.order.length && complete(cur)) { sweep(); return; }
+    if (cur && cur.flying) return;
+    if (S.done) { burst(BOWL.x, BOWL.y, 8, null, true); plink(); return; }
+    if (S.bowl.length) { learned("bowl"); finishSnack(); return; }
+    if (!S.bowl.length) say(cur ? (cur.f.apple ? "Press the slicer down!" : "Cut it first!") : "Pick a food!");
+  }
+
+  // ---------- New and Surprise ----------
+  function newBoard() {
+    if (locked()) return;
+    var id = cur ? cur.id : (pending || "banana");
+    if (cur) {
+      var o = foodOrigin(cur);
+      cur.pieces.forEach(function (p) { burst(o.x + p.cx + p.ox, o.y + p.cy + p.oy, 2, cur.f.col); });
+      if (cur.f.apple && !cur.pieces.length) burst(o.x, o.y, 6, cur.f.col);
+    }
+    flights = []; pending = ""; leaving = null;
+    if (S.bowl.length) swapBowl();
+    knife.anim = null; knife.hold = null; knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a };
+    sayUntil = 0;
+    arrive(id);
+    tone(500, 0.2, 0.04, "sine", 300);
+  }
+  function surprise() {
+    if (locked()) return;
+    var have = cur && !cur.flying ? cur.id : pending;
+    var pool = ORDER.filter(function (id) { return id !== have; });
+    burst(0, 0, 10, null, true);
+    chooseFood(pool[Math.floor(Math.random() * pool.length)]);
+  }
+  $("newBtn").addEventListener("click", newBoard);
+  $("surpriseBtn").addEventListener("click", surprise);
+
+  // ---------- Touch on the stage ----------
+  var drags = {};
+  function onBowl(p) { return Math.hypot(p.x - BOWL.x - bowl.offx, p.y - BOWL.y - bowl.offy) < BOWL.r + 0.08; }
+  function onBoard(p) { return Math.abs(p.x) < BW / 2 + 0.1 && Math.abs(p.y) < BH / 2 + 0.12; }
+  cv.addEventListener("pointerdown", function (e) {
+    if (locked()) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var p = toLocal(e.clientX, e.clientY);
+    if (onBowl(p)) { tapBowl(); return; }
+    if (!cur) { if (onBoard(p)) say(S.done ? "Yum! Pick a food!" : "Pick a food!"); return; }
+    if (cur.flying) return;
+    if (cur.f.apple && !cur.pressed) { if (onFood(p, 0.3) || onBoard(p)) pressSlicer(); return; }
+    if (complete(cur)) {
+      if (cur.f.apple && now() - cur.pressT < (reduce ? 0.6 : 1.5)) return;
+      if (onBoard(p) || onFood(p, 0.2)) sweep();
+      return;
+    }
+    // Cutting: the knife follows his finger; a stroke across the food cuts on the nearest guide.
+    var d = { sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, len: 0, pts: [], t0: now() };
+    drags[e.pointerId] = d;
+    knife.hold = e.pointerId; knife.back = null;
+    knife.fx = p.x; knife.fy = p.y;
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    var p = toLocal(e.clientX, e.clientY);
+    if (Math.hypot(p.x - d.sx, p.y - d.sy) > 0.08) d.moved = true;
+    if (knife.hold === e.pointerId) { knife.fx = p.x; knife.fy = p.y; }
+    var step = Math.hypot(p.x - d.lx, p.y - d.ly);
+    var mid = { x: (p.x + d.lx) / 2, y: (p.y + d.ly) / 2 };
+    if (cur && !cur.flying && !complete(cur) && (onFood(p, 0.12) || onFood(mid, 0.12))) {
+      d.len += step;
+      d.pts.push(p);
+      if (d.pts.length > 14) d.pts.shift();
+      if (d.len > 0.34 && !knife.anim) {
+        var g = nearestGuide(cur, d.pts);
+        if (g) cutGuide(g);
+        d.len = 0; d.pts = [p];
+      }
+    }
+    d.lx = p.x; d.ly = p.y;
+  });
+  function stageUp(e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    delete drags[e.pointerId];
+    var p = toLocal(e.clientX, e.clientY);
+    // A tap on the food: the knife makes the next cut for him.
+    if (e.type !== "pointercancel" && !d.moved && cur && !cur.flying && !complete(cur) && onFood(p, 0.25) && !knife.anim) {
+      var g = nearestGuide(cur, [p]);
+      if (g) cutGuide(g);
+    }
+    if (knife.hold === e.pointerId) {
+      knife.hold = null;
+      if (!knife.anim) knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a };
+    }
+  }
+  cv.addEventListener("pointerup", stageUp);
+  cv.addEventListener("pointercancel", stageUp);
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+  // ---------- Particles ----------
+  function burst(x, y, n, col, star) {
+    if (reduce) n = Math.min(n, 4);
+    var cols = ["#FFC93C", "#FF6FB5", "#3DB4FF", "#4CD964", "#FFFFFF"];
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, Math.PI * 2), sp = rand(0.4, 1.3);
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.3, life: 0, max: rand(0.9, 1.5), col: col || cols[i % cols.length], r: rand(0.025, 0.05), star: !!star });
+    }
+  }
+
+  // ---------- Update ----------
+  var lastT = now();
+  function stepPieces(c, dt) {
+    c.pieces.forEach(function (p) {
+      // A soft spring: the pieces slide apart with a little bounce.
+      var n = 3, h = dt / n;
+      for (var i = 0; i < n; i++) {
+        p.vx += ((p.tx - p.ox) * 70 - p.vx * 11) * h; p.vy += ((p.ty - p.oy) * 70 - p.vy * 11) * h;
+        p.ox += p.vx * h; p.oy += p.vy * h;
+      }
+    });
+    if (c.enterT > 0) {
+      var k = (now() - c.enterT) / 0.75;
+      c.ey = (backOut(k) - 1) * 2.6;
+      if (k >= 1) { c.enterT = -99; c.ey = 0; }
+    }
+    c.wig = Math.max(0, c.wig - dt * 1.6);
+  }
+  function update() {
+    var t = now(), dt = Math.min(0.05, t - lastT);
+    lastT = t;
+    if (cur) stepPieces(cur, dt);
+    if (leaving && t - leaving.t0 > 0.5) leaving = null;
+    // Pieces sliding into the bowl.
+    var foods = [];
+    flights.forEach(function (fl) {
+      if (!fl.landed && t >= fl.t0 + fl.dur) { fl.landed = true; plink(); }
+      if (foods.indexOf(fl.c) < 0) foods.push(fl.c);
+    });
+    foods.forEach(function (c) { if (flights.every(function (fl) { return fl.c !== c || fl.landed; })) flightsDone(c); });
+    // The knife: follows the finger, makes its cut stroke, then goes back to rest.
+    if (knife.anim) {
+      var ka = knife.anim, kk = (t - ka.t0) / ka.dur, e = ease(kk);
+      knife.x = ka.mx + ka.dx * lerp(ka.h, -ka.h, e); knife.y = ka.my + ka.dy * lerp(ka.h, -ka.h, e);
+      knife.a = ka.a;
+      if (kk >= 1) { knife.anim = null; if (knife.hold == null) knife.back = { t0: t, fx: knife.x, fy: knife.y, fa: knife.a }; }
+    } else if (knife.hold != null) {
+      var ga = -Math.PI / 2;
+      if (cur && !cur.flying) { var gs = remaining(cur); if (gs.length) { var g = nearestGuide(cur, [{ x: knife.fx, y: knife.fy }]); if (g) ga = g.a; } }
+      knife.x += (knife.fx - knife.x) * Math.min(1, dt * 30);
+      knife.y += (knife.fy - knife.y) * Math.min(1, dt * 30);
+      var da = Math.atan2(Math.sin(ga - knife.a), Math.cos(ga - knife.a));
+      knife.a += da * Math.min(1, dt * 12);
+    } else if (knife.back) {
+      var kb = knife.back, bk = (t - kb.t0) / (reduce ? 0.1 : 0.5), be = ease(bk);
+      var dA = Math.atan2(Math.sin(KR.a - kb.fa), Math.cos(KR.a - kb.fa));
+      knife.x = lerp(kb.fx, KR.x, be); knife.y = lerp(kb.fy, KR.y, be); knife.a = kb.fa + dA * be;
+      if (bk >= 1) { knife.back = null; knife.x = KR.x; knife.y = KR.y; knife.a = KR.a; }
+    } else { knife.x = KR.x; knife.y = KR.y; knife.a = KR.a; }
+    // The bowl going to the table and a clean one coming back.
+    if (bowl.swapT > 0) {
+      var sk = (t - bowl.swapT) / (reduce ? 0.3 : 1.4), D = 3.2;
+      var off = sk < 0.5 ? ease(sk * 2) * D : (1 - ease((sk - 0.5) * 2)) * D;
+      if (sk >= 0.5 && !bowl.swapped) { bowl.swapped = true; S.bowl = []; S.done = false; bowlCache = null; bowl.forkT = -99; save(); }
+      if (sk >= 1) { bowl.swapT = -99; off = 0; }
+      if (tall) { bowl.offx = off; bowl.offy = 0; } else { bowl.offx = 0; bowl.offy = off * 0.9; }
+    }
+    bowl.wig = Math.max(0, bowl.wig - dt * 1.6);
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i];
+      q.life += dt;
+      if (q.flat) { q.vx *= 0.9; q.vy *= 0.9; } else q.vy += (q.star ? 1.2 : 3) * dt;
+      q.x += q.vx * dt; q.y += q.vy * dt;
+      if (q.life >= q.max) parts.splice(i, 1);
+    }
+    if (parts.length > 300) parts.splice(0, parts.length - 300);
+    updateTiles();
+    updateCoach();
+    updateGhostPhase();
+  }
+
+  // ---------- Drawing ----------
+  function rr(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  function fs(fill, lw) { if (fill) { ctx.fillStyle = fill; ctx.fill(); } ctx.lineWidth = (lw || 1) * lwNow; ctx.strokeStyle = INK; ctx.stroke(); }
+  function poly(pts) { ctx.beginPath(); pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }); ctx.closePath(); }
+  function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); }
+  function ell(x, y, rx, ry, a) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, a || 0, 0, Math.PI * 2); }
+  function scaled(pts, k, cx, cy) { return pts.map(function (p) { return [cx + (p[0] - cx) * k, cy + (p[1] - cy) * k]; }); }
+
+  function drawCounter() {
+    var L = -ox / B, R = (cw - ox) / B, T = -oy / B, Bt = (ch - oy) / B;
+    ctx.fillStyle = "#DCE7F1"; ctx.fillRect(L, T, R - L, Bt - T);
+    // Speckled stone counter top.
+    ctx.fillStyle = "#C8D7E5";
+    for (var i = 0; i < 90; i++) {
+      var x = L + ((i * 0.618) % 1) * (R - L), y = T + ((i * 0.377 + (i % 7) * 0.13) % 1) * (Bt - T);
+      circ(x, y, 0.018 + (i % 3) * 0.008); ctx.fill();
+    }
+  }
+  function drawBoard() {
+    var x = -BW / 2, y = -BH / 2;
+    ctx.fillStyle = "rgba(29,35,64,0.16)"; rr(x + 0.06, y + 0.1, BW, BH + 0.06, 0.16); ctx.fill();
+    rr(x, y + 0.07, BW, BH, 0.16); fs("#C98B4F");
+    rr(x, y, BW, BH, 0.16); fs("#EBBE84");
+    // Wood grain.
+    ctx.save(); rr(x, y, BW, BH, 0.16); ctx.clip();
+    ctx.strokeStyle = "#DDAA6C"; ctx.lineWidth = lwNow * 0.8;
+    for (var g = 0; g < 7; g++) {
+      var gy = y + 0.2 + g * (BH - 0.3) / 6.3;
+      ctx.beginPath(); ctx.moveTo(x, gy);
+      ctx.bezierCurveTo(x + BW * 0.3, gy + 0.05 * Math.sin(g * 1.7), x + BW * 0.65, gy - 0.05 * Math.cos(g * 1.3), x + BW, gy + 0.03 * Math.sin(g));
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Juice groove around the edge, and the hanging hole.
+    rr(x + 0.11, y + 0.11, BW - 0.22, BH - 0.22, 0.1);
+    ctx.strokeStyle = "#D29A5C"; ctx.lineWidth = 0.035; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 0.012; ctx.stroke();
+  }
+
+  // Food drawings, in food units. Each fills and outlines the food's own outline.
+  function skin(f) {
+    var id = f.id;
+    if (id === "carrot") {
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.075; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-LH + 0.04, -0.02); ctx.lineTo(-LH - 0.3, -0.22); ctx.moveTo(-LH + 0.04, 0); ctx.lineTo(-LH - 0.36, 0.02); ctx.moveTo(-LH + 0.04, 0.02); ctx.lineTo(-LH - 0.28, 0.24); ctx.stroke();
+      ctx.strokeStyle = "#2EA05A"; ctx.lineWidth = 0.045; ctx.stroke();
+    }
+    poly(f.pts);
+    ctx.fillStyle = id === "banana" ? "#FFE58A" : id === "cucumber" ? "#3E8E3A" : id === "carrot" ? "#FF8A1F" : id === "strawberry" ? "#E8344E" : id === "cheese" ? "#FFC93C" : "#C98B4F";
+    ctx.fill();
+    ctx.save(); poly(f.pts); ctx.clip();
+    if (id === "banana") {
+      ctx.strokeStyle = "#F2CC5C"; ctx.lineWidth = 0.022;
+      [-0.45, 0.1, 0.55].forEach(function (k) { ctx.beginPath(); for (var x = -LH; x <= LH; x += 0.05) { var y = f.yc(x) + f.t(x) * k; if (x === -LH) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.stroke(); });
+      ctx.fillStyle = "rgba(255,255,255,0.4)"; ell(-0.2, f.yc(-0.2) - 0.09, 0.4, 0.035, -0.12); ctx.fill();
+      ctx.fillStyle = "#8A6A2B"; circ(LH - 0.01, f.yc(LH), 0.05); ctx.fill(); circ(-LH + 0.01, f.yc(-LH), 0.035); ctx.fill();
+    } else if (id === "cucumber") {
+      ctx.strokeStyle = "#6DB65A"; ctx.lineWidth = 0.05;
+      [-0.12, 0.1].forEach(function (y) { ctx.beginPath(); ctx.moveTo(-LH, y); ctx.lineTo(LH, y * 0.9); ctx.stroke(); });
+      ctx.fillStyle = "#B9E3A0";
+      for (var i = 0; i < 16; i++) { circ(-0.85 + i * 0.113, ((i * 7) % 5 - 2) * 0.07, 0.016); ctx.fill(); }
+      ctx.fillStyle = "rgba(255,255,255,0.25)"; ell(0, -0.15, 0.7, 0.03); ctx.fill();
+    } else if (id === "carrot") {
+      ctx.strokeStyle = "#D96A12"; ctx.lineWidth = 0.022; ctx.lineCap = "round";
+      for (var j = 0; j < 9; j++) { var x0 = -0.7 + j * 0.18, t0 = f.t(x0); ctx.beginPath(); ctx.moveTo(x0, -t0 * 0.75 + (j % 2) * t0 * 0.6); ctx.lineTo(x0 + 0.03, -t0 * 0.25 + (j % 2) * t0 * 0.6); ctx.stroke(); }
+      ctx.fillStyle = "rgba(255,255,255,0.3)"; ell(-0.3, -0.12, 0.45, 0.03, 0.05); ctx.fill();
+    } else if (id === "strawberry") {
+      ctx.fillStyle = "rgba(255,255,255,0.25)"; ell(-0.28, -0.25, 0.1, 0.22, 0.4); ctx.fill();
+      ctx.fillStyle = "#FFE68A";
+      for (var sy = -0.45; sy < 0.8; sy += 0.17) for (var sx = -0.6; sx < 0.65; sx += 0.2) { circ(sx + ((sy * 10) % 2 ? 0.1 : 0), sy, 0.022); ctx.fill(); }
+    } else if (id === "cheese") {
+      ctx.fillStyle = "#F2B42C";
+      [[-0.6, -0.2, 0.06], [-0.2, 0.18, 0.045], [0.3, -0.15, 0.05], [0.65, 0.2, 0.04], [0.1, 0.05, 0.03]].forEach(function (h) { circ(h[0], h[1], h[2]); ctx.fill(); });
+      ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(-0.86, -0.38, 1.72, 0.05);
+    } else if (id === "bread") {
+      poly(scaled(f.pts, 0.85, 0, -0.06)); ctx.fillStyle = "#FFF1D6"; ctx.fill();
+      ctx.fillStyle = "#EBD3A6";
+      [[-0.3, -0.4], [0.2, -0.5], [0.35, 0.1], [-0.25, 0.25], [0.05, -0.1], [-0.45, -0.05], [0.4, 0.45], [-0.1, 0.5]].forEach(function (h, i) { circ(h[0], h[1], 0.035 + (i % 3) * 0.01); ctx.fill(); });
+    }
+    ctx.restore();
+    poly(f.pts); ctx.lineWidth = 1.2 * lwNow; ctx.strokeStyle = INK; ctx.stroke();
+    if (id === "strawberry") drawCalyx();
+  }
+  function drawCalyx() {
+    ctx.save(); ctx.translate(0, -0.7);
+    for (var i = 0; i < 5; i++) {
+      var a = -Math.PI / 2 + (i - 2) * 0.55;
+      ell(Math.cos(a) * 0.15, Math.sin(a) * 0.09 + 0.04, 0.17, 0.065, a); fs("#3E9B3A", 1.6);
+    }
+    rr(-0.035, -0.2, 0.07, 0.16, 0.03); fs("#2E7A2A", 1.4);
+    ctx.restore();
+  }
+  function face(f) {
+    // The cut side, face up (strawberry halves).
+    poly(f.pts); ctx.fillStyle = "#E8344E"; ctx.fill();
+    ctx.save(); poly(f.pts); ctx.clip();
+    poly(scaled(f.pts, 0.8, 0, 0.04)); ctx.fillStyle = "#FF8FA3"; ctx.fill();
+    poly(scaled(f.pts, 0.55, 0, 0.06)); ctx.fillStyle = "#FFD3DC"; ctx.fill();
+    ctx.fillStyle = "#FFF7F5"; ell(0, 0.0, 0.11, 0.5); ctx.fill();
+    ctx.strokeStyle = "#FFF7F5"; ctx.lineWidth = 0.03; ctx.lineCap = "round";
+    [-0.9, -0.45, 0.45, 0.9].forEach(function (a) { ctx.beginPath(); ctx.moveTo(0, a * 0.1); ctx.lineTo(Math.sin(a) * 0.38, -0.2 + a * 0.2 + Math.abs(a) * 0.3); ctx.stroke(); });
+    ctx.fillStyle = "#FFE68A";
+    for (var i = 0; i < 18; i++) { var p = f.pts[Math.floor(i * f.pts.length / 18)]; circ(p[0] * 0.92, p[1] * 0.92 + 0.02, 0.02); ctx.fill(); }
+    ctx.restore();
+    poly(f.pts); ctx.lineWidth = 1.2 * lwNow; ctx.strokeStyle = INK; ctx.stroke();
+    drawCalyx();
+  }
+  function coin(f, r) {
+    var id = f.id;
+    ctx.fillStyle = "rgba(29,35,64,0.14)"; circ(0.02, 0.04, r); ctx.fill();
+    if (id === "banana") {
+      circ(0, 0, r); fs("#FFEFA8", 1.4);
+      ctx.fillStyle = "#F6D875"; circ(0, 0, r * 0.5); ctx.fill();
+      ctx.fillStyle = "#FFF8DE"; circ(0, 0, r * 0.2); ctx.fill();
+      ctx.fillStyle = "#8A6A2B"; for (var i = 0; i < 3; i++) { var a = i * 2.094 + 0.5; circ(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3, r * 0.06); ctx.fill(); }
+    } else if (id === "cucumber") {
+      circ(0, 0, r); fs("#3E8E3A", 1.4);
+      ctx.fillStyle = "#DDF5C0"; circ(0, 0, r * 0.84); ctx.fill();
+      ctx.fillStyle = "#C4E89C"; circ(0, 0, r * 0.52); ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      for (var j = 0; j < 6; j++) { var b = j * Math.PI / 3; ell(Math.cos(b) * r * 0.32, Math.sin(b) * r * 0.32, r * 0.1, r * 0.05, b); ctx.fill(); }
+    } else {
+      circ(0, 0, r); fs("#FF8A1F", 1.4);
+      ctx.fillStyle = "#FFA548"; circ(0, 0, r * 0.78); ctx.fill();
+      ctx.fillStyle = "#FFC47E"; circ(0, 0, r * 0.4); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = r * 0.06;
+      for (var k = 0; k < 6; k++) { var c = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(Math.cos(c) * r * 0.45, Math.sin(c) * r * 0.45); ctx.lineTo(Math.cos(c) * r * 0.72, Math.sin(c) * r * 0.72); ctx.stroke(); }
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ell(-r * 0.35, -r * 0.45, r * 0.3, r * 0.1, -0.5); ctx.fill();
+  }
+  function wedgePath(a) {
+    var s = Math.PI / 8 - 0.03;
+    ctx.beginPath(); ctx.arc(0, 0, AR, a - s, a + s); ctx.arc(0, 0, CORE_R + 0.01, a + s, a - s, true); ctx.closePath();
+  }
+  function wedge(a) {
+    wedgePath(a); ctx.fillStyle = "#FFF3D6"; ctx.fill();
+    ctx.save(); wedgePath(a); ctx.clip();
+    ctx.strokeStyle = "#E63946"; ctx.lineWidth = 0.12; ctx.beginPath(); ctx.arc(0, 0, AR, a - 0.5, a + 0.5); ctx.stroke();
+    ctx.strokeStyle = "#F7E3B5"; ctx.lineWidth = 0.02; ctx.beginPath(); ctx.arc(0, 0, AR * 0.62, a - 0.4, a + 0.4); ctx.stroke();
+    ctx.restore();
+    wedgePath(a); ctx.lineWidth = lwNow * 1.4; ctx.strokeStyle = INK; ctx.stroke();
+  }
+  function wholeApple() {
+    ctx.fillStyle = "rgba(29,35,64,0.16)"; circ(0.05, 0.08, AR); ctx.fill();
+    circ(0, 0, AR); fs("#E63946", 1.4);
+    ctx.save(); circ(0, 0, AR); ctx.clip();
+    ctx.fillStyle = "#C92A3A"; circ(0.25, 0.3, AR * 0.8); ctx.fill();
+    ctx.fillStyle = "#F25C68"; circ(-0.18, -0.2, AR * 0.55); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.5)"; ell(-0.3, -0.28, 0.07, 0.16, 0.6); ctx.fill();
+    ctx.fillStyle = "#A81E2E"; circ(0, 0, 0.12); ctx.fill();
+    ell(0.2, -0.1, 0.17, 0.07, -0.5); fs("#3E9B3A", 1.2);
+    rr(-0.03, -0.1, 0.06, 0.14, 0.03); fs("#7A4B1E", 1.1);
+  }
+  function appleCore(x, y, alpha) {
+    ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y);
+    circ(0, 0, CORE_R); fs("#FFF3D6", 1.2);
+    ctx.fillStyle = "#E9D7A8"; circ(0, 0, CORE_R * 0.55); ctx.fill();
+    ctx.fillStyle = "#5B3417"; for (var i = 0; i < 5; i++) { var a = i * 1.2566; ell(Math.cos(a) * 0.06, Math.sin(a) * 0.06, 0.03, 0.017, a); ctx.fill(); }
+    ctx.restore();
+  }
+  function slicer(x, y, pose) {
+    ctx.save(); ctx.translate(x, y - pose.lift); ctx.globalAlpha *= pose.alpha;
+    // Shadow on the apple (further when it is higher).
+    ctx.save(); ctx.translate(0.07 * pose.h + 0.02, 0.1 * pose.h + 0.02 + pose.lift);
+    ctx.fillStyle = "rgba(29,35,64,0.2)"; ctx.lineWidth = 0.07; ctx.strokeStyle = "rgba(29,35,64,0.2)";
+    circ(0, 0, AR + 0.05); ctx.stroke();
+    ctx.restore();
+    ctx.scale(pose.s, pose.s);
+    if (pose.core) appleCore(0, 0, 1);
+    // Handles.
+    rr(AR + 0.06, -0.11, 0.42, 0.22, 0.1); fs("#FFC93C", 1.2);
+    rr(-AR - 0.48, -0.11, 0.42, 0.22, 0.1); fs("#FFC93C", 1.2);
+    ctx.lineCap = "round";
+    function metal(draw, w) { draw(); ctx.strokeStyle = INK; ctx.lineWidth = w + 2 * lwNow; ctx.stroke(); draw(); ctx.strokeStyle = "#DCE3EC"; ctx.lineWidth = w; ctx.stroke(); }
+    metal(function () { ctx.beginPath(); for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4; ctx.moveTo(Math.cos(a) * CORE_R, Math.sin(a) * CORE_R); ctx.lineTo(Math.cos(a) * (AR + 0.05), Math.sin(a) * (AR + 0.05)); } }, 0.03);
+    metal(function () { circ(0, 0, AR + 0.05); }, 0.07);
+    metal(function () { circ(0, 0, CORE_R); }, 0.04);
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 0.02; ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.beginPath(); ctx.arc(0, 0, AR + 0.05, Math.PI * 1.1, Math.PI * 1.4); ctx.stroke();
+    ctx.restore();
+  }
+
+  // One piece, drawn with its centre at (x, y), scale s, rotation rot; sx squeezes it for the flip.
+  function drawClip(f, p, isFace) {
+    if (f.depth) {
+      for (var k = 1; k <= 3; k++) {
+        ctx.save(); ctx.translate(0, f.depth * k / 3);
+        poly(p.box); ctx.clip(); poly(f.pts);
+        ctx.fillStyle = f.side; ctx.fill();
+        if (k === 3) { ctx.lineWidth = 1.2 * lwNow; ctx.strokeStyle = INK; ctx.stroke(); }
+        ctx.restore();
+      }
+    }
+    ctx.save(); poly(p.box); ctx.clip();
+    if (isFace && f.flipAfter != null) face(f); else skin(f);
+    if (p.planes.length) {
+      ctx.save(); poly(f.pts); ctx.clip();
+      p.planes.forEach(function (pl) {
+        var bx = pl[0] * pl[2], by = pl[1] * pl[2], dx = -pl[1], dy = pl[0];
+        ctx.beginPath(); ctx.moveTo(bx - dx * 3, by - dy * 3); ctx.lineTo(bx + dx * 3, by + dy * 3);
+        if (!isFace) { ctx.strokeStyle = f.cut; ctx.lineWidth = 0.1; ctx.stroke(); }
+        ctx.strokeStyle = INK; ctx.lineWidth = 2 * lwNow; ctx.stroke();
+      });
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  function drawPieceAt(f, p, x, y, s, rot, sx, isFace, isCoin) {
+    var keep = lwNow;
+    lwNow = LW / Math.max(0.4, s);
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot); ctx.scale(s * sx, s);
+    if (isCoin) coin(f, p.r);
+    else if (p.type === "wedge") { ctx.translate(-p.cx, -p.cy); wedge(p.a); }
+    else { ctx.translate(-p.cx, -p.cy); drawClip(f, p, isFace); }
+    ctx.restore();
+    lwNow = keep;
+  }
+  function drawPieceBoard(c, p, t) {
+    var o = foodOrigin(c), x = o.x + p.cx + p.ox, y = o.y + p.cy + p.oy;
+    var rot = c.wig ? Math.sin(t * 22) * 0.05 * c.wig : 0;
+    var isFace = p.face, isCoin = p.coin, sx = 1;
+    if (p.flipT > 0 && t < p.flipT + 0.45) {
+      var k = (t - p.flipT) / 0.45;
+      if (k < 0.5) { isFace = p.prev.face; isCoin = p.prev.coin; sx = k < 0 ? 1 : Math.max(0.04, 1 - 2 * k); }
+      else sx = Math.max(0.04, 2 * k - 1);
+      if (k > 0) y -= Math.sin(k * Math.PI) * 0.14;
+    }
+    drawPieceAt(c.f, p, x, y, 1, rot, sx, isFace, isCoin);
+  }
+  function drawFood(c, t) {
+    if (c.f.apple) {
+      var o = foodOrigin(c), pose = slicerPose(c, t);
+      if (c.flying) return;
+      if (!c.pieces.length) {
+        ctx.save(); ctx.translate(o.x, o.y);
+        if (c.wig) ctx.rotate(Math.sin(t * 22) * 0.05 * c.wig);
+        wholeApple(); ctx.restore();
+      } else {
+        c.pieces.forEach(function (p) { drawPieceBoard(c, p, t); });
+      }
+      if (pose) slicer(o.x, o.y, pose);
+      return;
+    }
+    var list = c.pieces.slice().sort(function (a, b) { return (a.cy + a.oy) - (b.cy + b.oy) || (a.cx - b.cx); });
+    if (!c.flying) list.forEach(function (p) { drawPieceBoard(c, p, t); });
+  }
+  function drawGuides(c, t) {
+    if (c.flying || c.enterT > 0) return;
+    var gs = remaining(c);
+    if (!gs.length) return;
+    var pulse = 0.65 + 0.35 * Math.sin(t * 4);
+    gs.forEach(function (g) {
+      var s = guideSeg(c, g);
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.setLineDash([0.12, 0.08]);
+      ctx.lineDashOffset = reduce ? 0 : -t * 0.12;
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2);
+      ctx.strokeStyle = "rgba(255,255,255," + (0.9 * pulse).toFixed(2) + ")"; ctx.lineWidth = 0.1; ctx.stroke();
+      ctx.strokeStyle = "rgba(29,35,64," + (0.85 * pulse).toFixed(2) + ")"; ctx.lineWidth = 0.05; ctx.stroke();
+      ctx.restore();
+    });
+  }
+  function drawBowl(t) {
+    var bx = BOWL.x + bowl.offx, by = BOWL.y + bowl.offy, R = BOWL.r;
+    ctx.save(); ctx.translate(bx, by);
+    if (bowl.wig) ctx.rotate(Math.sin(t * 20) * 0.06 * bowl.wig);
+    ctx.fillStyle = "rgba(29,35,64,0.18)"; circ(0.06, 0.1, R); ctx.fill();
+    circ(0, 0, R); fs("#3DB4FF", 1.3);
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.arc(0, 0, R - 0.04, Math.PI * 1.05, Math.PI * 1.45); ctx.lineWidth = 0.04; ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.stroke();
+    circ(0, 0, R - 0.12); fs("#D7F0FF", 1.1);
+    ctx.fillStyle = "rgba(29,35,64,0.08)"; circ(0.04, 0.05, R - 0.18); ctx.fill();
+    // What is in it.
+    ctx.save(); circ(0, 0, R - 0.13); ctx.clip();
+    var i = 0;
+    bowlBuilt().forEach(function (c) {
+      var order = c.pieces.slice().sort(byCx);
+      order.forEach(function (p) {
+        var sp = slotPos(i);
+        drawPieceAt(c.f, p, sp[0], sp[1], bowlScale(p, c.f), slotRot(i), 1, p.face, p.coin);
+        i++;
+      });
+    });
+    ctx.restore();
+    // A finished snack gets a fork.
+    if (S.done && bowl.forkT > -50) {
+      var fk = clamp((t - bowl.forkT) / 0.5, 0, 1), fe = backOut(fk);
+      ctx.save(); ctx.translate(R * 0.35, -R * 0.45 - (1 - fe) * 0.6); ctx.rotate(0.6); ctx.globalAlpha = Math.min(1, fk * 3);
+      rr(-0.045, 0.02, 0.09, 0.62, 0.045); fs("#FF6FB5", 1.2);
+      rr(-0.075, -0.2, 0.15, 0.24, 0.04); fs("#E6ECF3", 1.1);
+      ctx.strokeStyle = INK; ctx.lineWidth = lwNow; ctx.beginPath(); ctx.moveTo(-0.025, -0.2); ctx.lineTo(-0.025, -0.06); ctx.moveTo(0.025, -0.2); ctx.lineTo(0.025, -0.06); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  function drawFlights(t) {
+    flights.forEach(function (fl) {
+      var k = clamp((t - fl.t0) / fl.dur, 0, 1), e = ease(k);
+      var x = lerp(fl.fx, fl.tx + bowl.offx, e), y = lerp(fl.fy, fl.ty + bowl.offy, e) - Math.sin(k * Math.PI) * 0.45;
+      if (fl.landed) return; // drawn in the bowl from now on (once the whole food is in)
+      drawPieceAt(fl.c.f, fl.p, x, y, lerp(1, fl.s1, e), lerp(0, fl.rot, e), 1, fl.p.face, fl.p.coin);
+    });
+  }
+  function drawLanded() {
+    // Pieces that have landed but whose food is not yet counted in the bowl.
+    var base = bowlCount();
+    flights.forEach(function (fl, i) {
+      if (!fl.landed) return;
+      ctx.save(); circ(BOWL.x + bowl.offx, BOWL.y + bowl.offy, BOWL.r - 0.13); ctx.clip();
+      drawPieceAt(fl.c.f, fl.p, fl.tx + bowl.offx, fl.ty + bowl.offy, fl.s1, fl.rot, 1, fl.p.face, fl.p.coin);
+      ctx.restore();
+    });
+    return base;
+  }
+  function drawKnife(t) {
+    var lift = knife.hold != null || knife.anim ? 1 : (knife.back ? 1 - clamp((t - knife.back.t0) / 0.5, 0, 1) : 0);
+    ctx.save(); ctx.translate(knife.x, knife.y); ctx.rotate(knife.a); ctx.translate(-0.4, 0);
+    // Shadow.
+    ctx.save(); ctx.translate(0.04 + 0.08 * lift, 0.06 + 0.1 * lift);
+    ctx.fillStyle = "rgba(29,35,64," + (0.18 - 0.05 * lift).toFixed(2) + ")";
+    rr(-0.54, -0.1, 0.54, 0.2, 0.09); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-0.02, -0.08); ctx.lineTo(0.66, -0.08); ctx.quadraticCurveTo(0.84, -0.07, 0.84, 0.01); ctx.lineTo(0.8, 0.09); ctx.lineTo(-0.02, 0.09); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // Nylon blade with a serrated edge, rounded tip.
+    ctx.beginPath(); ctx.moveTo(-0.02, -0.08); ctx.lineTo(0.66, -0.08); ctx.quadraticCurveTo(0.84, -0.07, 0.84, 0.01); ctx.lineTo(0.8, 0.09);
+    for (var x = 0.8, i = 0; x > 0; x -= 0.05, i++) ctx.lineTo(x - 0.025, i % 2 ? 0.09 : 0.06);
+    ctx.lineTo(-0.02, 0.09); ctx.closePath(); fs("#8FE0C4", 1.2);
+    ctx.fillStyle = "rgba(255,255,255,0.5)"; rr(0.05, -0.055, 0.6, 0.03, 0.015); ctx.fill();
+    // Chunky handle.
+    rr(-0.54, -0.11, 0.56, 0.22, 0.1); fs("#2D7BE5", 1.2);
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; rr(-0.48, -0.075, 0.42, 0.04, 0.02); ctx.fill();
+    circ(-0.42, 0.03, 0.03); ctx.fillStyle = "#1D5BB5"; ctx.fill();
+    ctx.restore();
+  }
+  function drawParts() {
+    parts.forEach(function (q) {
+      var a = 1 - q.life / q.max;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillStyle = q.col;
+      if (q.star) {
+        ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.life * 3);
+        ctx.beginPath();
+        for (var i = 0; i < 8; i++) { var r = i % 2 ? q.r * 0.45 : q.r * 1.4, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      } else { circ(q.x, q.y, q.r); ctx.fill(); }
+    });
+    ctx.globalAlpha = 1;
+  }
+  function draw() {
+    var t = now();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.setTransform(dpr * B, 0, 0, dpr * B, dpr * ox, dpr * oy);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    lwNow = LW;
+    drawCounter();
+    drawBoard();
+    if (leaving) {
+      var lk = clamp((t - leaving.t0) / 0.5, 0, 1);
+      leaving.c.ey = -ease(lk) * 2.8;
+      ctx.save(); ctx.globalAlpha = 1 - lk; drawFood(leaving.c, t); ctx.restore();
+    }
+    if (cur) { drawFood(cur, t); drawGuides(cur, t); }
+    drawBowl(t);
+    drawLanded();
+    drawFlights(t);
+    drawKnife(t);
+    drawParts();
+  }
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Timer ----------
+  function locked() { return Toybox.timer.locked(); }
+  function onEnding(done) {
+    // The knife goes down on the board and everything settles.
+    drags = {};
+    if (knife.hold != null || knife.anim) { knife.hold = null; knife.anim = null; knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a }; }
+    setTimeout(done, reduce ? 300 : 2400);
+  }
+  function restArt() {
+    var o = '<rect width="400" height="300" fill="#2B3A67"/>';
+    o += '<rect x="40" y="30" width="120" height="100" rx="8" fill="#1B2550" stroke="#1D2340" stroke-width="4"/><circle cx="120" cy="66" r="18" fill="#FFF4CC"/><circle cx="130" cy="60" r="16" fill="#1B2550"/>';
+    o += '<circle cx="60" cy="50" r="2.5" fill="#FFF4CC"/><circle cx="80" cy="100" r="2.5" fill="#FFF4CC"/><circle cx="145" cy="110" r="2" fill="#FFF4CC"/>';
+    o += '<rect y="214" width="400" height="86" fill="#4C77A6"/><rect y="204" width="400" height="14" fill="#C9A06A" stroke="#1D2340" stroke-width="4"/>';
+    // The cutting board leaning on the wall, the knife lying down, a bowl of slices.
+    o += '<rect x="176" y="96" width="120" height="108" rx="14" fill="#EBBE84" stroke="#1D2340" stroke-width="4"/><circle cx="236" cy="116" r="8" fill="#2B3A67" stroke="#1D2340" stroke-width="3"/>';
+    o += '<path d="M190 150 Q236 144 282 152 M190 176 Q236 170 282 178" fill="none" stroke="#D29A5C" stroke-width="3"/>';
+    o += '<g transform="translate(110 198) rotate(-6)"><rect x="-44" y="-6" width="40" height="13" rx="6" fill="#2D7BE5" stroke="#1D2340" stroke-width="3"/><path d="M-4 -6 L40 -6 Q50 -5 50 0 L48 6 L-4 6 Z" fill="#8FE0C4" stroke="#1D2340" stroke-width="3"/></g>';
+    o += '<g transform="translate(320 204)"><circle cx="-16" cy="-30" r="10" fill="#FFF2C2" stroke="#1D2340" stroke-width="3"/><circle cx="4" cy="-34" r="10" fill="#FF8A1F" stroke="#1D2340" stroke-width="3"/><circle cx="20" cy="-28" r="10" fill="#7CC46A" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M-44 -26 L44 -26 Q40 0 0 2 Q-40 0 -44 -26 Z" fill="#3DB4FF" stroke="#1D2340" stroke-width="4"/></g>';
+    o += '<text x="300" y="120" font-family="Baloo 2, sans-serif" font-weight="800" font-size="30" fill="#FFFFFF">z</text><text x="324" y="96" font-family="Baloo 2, sans-serif" font-weight="800" font-size="22" fill="#FFFFFF">z</text><text x="344" y="76" font-family="Baloo 2, sans-serif" font-weight="800" font-size="15" fill="#FFFFFF">z</text>';
+    return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
+  }
+
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedF = true; stop(); },
+      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // One hint per kind of move; once he has done a move, its hint never shows again this visit.
+  var doneMoves = {}, ghostPhase = "";
+  function moveFor(ph) { return ph === "done" ? "pick" : ph; }
+  function learned(m) { doneMoves[m] = true; if (moveFor(ghostPhase) === m) ghost.learned(); }
+  function updateGhostPhase() {
+    var ph = phase();
+    if (ph === ghostPhase) return;
+    ghostPhase = ph;
+    if (ph === "flying" || ph === "slices" || doneMoves[moveFor(ph)]) ghost.learned(); else ghost.again();
+  }
+  var ghost = makeGhost(function () {
+    if (Object.keys(drags).length || document.body.classList.contains("big")) return null;
+    var ph = phase();
+    if (ph === "cut") {
+      var g = remaining(cur)[0];
+      if (!g) return null;
+      var s = guideSeg(cur, g);
+      return { pts: [toPage(s.x1 + g.dx * 0.15, s.y1 + g.dy * 0.15), toPage(s.x2 - g.dx * 0.15, s.y2 - g.dy * 0.15)].reverse(), carry: { html: KNIFE_SVG, size: 64 } };
+    }
+    if (ph === "press") { var o = foodOrigin(cur); return { pts: [toPage(o.x, o.y)], tap: true }; }
+    if (ph === "sweep") {
+      var o2 = foodOrigin(cur);
+      return { pts: [toPage(o2.x, o2.y), toPage(BOWL.x, BOWL.y)] };
+    }
+    if (ph === "pick" || ph === "done") {
+      var tile = choicesEl.querySelector('[data-food="cucumber"]');
+      if (tile) return { pts: [ghostPt(tile, 0.5, 0.45)], tap: true };
+    }
+    return null;
+  });
+
+  // ---------- Start ----------
+  if (S.food) { cur = buildFood(S.food, S.cuts, false); }
+  if (S.done) bowl.forkT = -10;
+  updateCounter();
+  layout();
+  var resizeT = 0;
+  function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); layout(); }
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
+  Toybox.init({
+    app: "kitchen",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the knife goes down and the controls lock. The timer carries on across the kitchen pages.",
+    goodbyeOption: "End with a “Clean up” button to press",
+    farewellText: "Time to finish cooking",
+    goodbyeLabel: "Clean up",
+    farewellDone: "Bye bye, kitchen!",
+    restLine: "The kitchen is resting.",
+    restLine2: "Your food will be on the table next time.",
+    restArt: restArt,
+    soundNote: "Soft chops, whooshes and plinks. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onWake: function () { lastT = now(); },
+    onBig: function () { setTimeout(layout, 30); },
+    onSound: function (on) { if (on) chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  // Test hooks, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) {
+    window.__cut = {
+      state: function () {
+        return { phase: phase(), coach: coachEl.textContent, food: cur ? cur.id : "", step: cur ? stepOf(cur) : -1, cuts: cur ? cur.order.slice() : [],
+          pieces: cur ? cur.pieces.length : 0, coins: cur ? cur.pieces.filter(function (p) { return p.coin; }).length : 0,
+          faces: cur ? cur.pieces.filter(function (p) { return p.face; }).length : 0, flying: !!(cur && cur.flying), pending: pending,
+          bowl: S.bowl.map(function (b) { return b.i; }), bowlPieces: bowlCount(), done: S.done, count: S.count, tall: tall };
+      },
+      // Page points: the guide's two ends, the food, the bowl, the knife.
+      guide: function (k) { if (!cur) return null; var g = remaining(cur)[k || 0]; if (!g) return null; var s = guideSeg(cur, g); return [toPage(s.x1, s.y1), toPage(s.x2, s.y2)]; },
+      pt: function (name) {
+        if (name === "food") { var o = foodOrigin(cur); return toPage(o.x, o.y); }
+        if (name === "bowl") return toPage(BOWL.x, BOWL.y);
+        if (name === "knife") return toPage(knife.x, knife.y);
+        if (name === "board") return toPage(BW / 2 - 0.25, BH / 2 - 0.25);
+        return null;
+      },
+      ghost: function () { return ghost.show(); },
+      table: function () { try { return JSON.parse(localStorage.getItem(TABLEKEY) || "[]"); } catch (e) { return []; } }
+    };
+  }
+})();
+</script>
+<!-- Kitchen check: a quick re-check on arrival when he is already ready. Identical on every kitchen station page. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "toybox-timer-v1", READY_KEY = "kitchen-ready", SKIP_KEY = "kitchen-check-skip";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["hands", "Clean hands?"], ["apron", "Apron?"], ["hat", "Chef hat?"]];
+
+  function readyOn() { try { return sessionStorage.getItem(READY_KEY) === "on"; } catch (e) { return false; } }
+  // The full getting-ready was just done (the kitchen sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  function timerBusy() {
+    try { return Toybox.timer.locked() || (Toybox.timer.phase() === "running" && Toybox.timer.remainingMs() <= 0); } catch (e) { return false; }
+  }
+
+  // ---------- The chef, ready to cook (same drawing as the kitchen's getting-ready) ----------
+  var INK = "#1D2340", SKIN = "#F2C49B";
+  function P(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + (fill || "none") + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '" stroke-linejoin="round" stroke-linecap="round"' + (extra || "") + "/>"; }
+  function Rc(x, y, w, h, rx, fill, sw) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 0) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"/>'; }
+  function C(cx, cy, r, fill, sw) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"/>'; }
+  function star(x, y, r) { var d = ""; for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4, rr = i % 2 ? r * 0.4 : r; d += (i ? "L" : "M") + (x + Math.cos(a) * rr).toFixed(1) + " " + (y + Math.sin(a) * rr).toFixed(1); } return P(d + "Z", "#FFE14D", 2.5); }
+  function chefSVG() {
+    var o = '<ellipse cx="100" cy="284" rx="64" ry="8" fill="rgba(70,40,10,0.22)"/>';
+    o += P("M62 258 L96 258 L98 282 L54 282 Q54 266 62 258 Z", "#7A4B1E", 4) + P("M138 258 L104 258 L102 282 L146 282 Q146 266 138 258 Z", "#7A4B1E", 4);
+    o += P("M64 198 L136 198 L134 262 L106 262 L100 222 L94 262 L66 262 Z", "#34508F", 4);
+    o += Rc(40, 108, 24, 76, 12, "#FFC93C", 4) + Rc(136, 108, 24, 76, 12, "#FFC93C", 4);
+    o += '<g class="sc-g" data-k="hands">' + C(52, 188, 11, SKIN, 4) + C(148, 188, 11, SKIN, 4) + star(36, 176, 9) + star(164, 176, 9) + "</g>";
+    o += Rc(92, 96, 16, 12, 2, SKIN, 3);
+    o += P("M62 198 L62 120 Q62 104 80 104 L120 104 Q138 104 138 120 L138 198 Z", "#FFC93C", 4);
+    o += '<g class="sc-g" data-k="apron">' + P("M82 112 Q100 88 118 112", "none", 5) + P("M80 112 L120 112 L122 146 Q138 150 138 162 L136 246 Q100 254 64 246 L62 162 Q62 150 78 146 Z", "#E63946", 4) +
+      Rc(84, 182, 32, 24, 6, "#FFFFFF", 3) + P("M64 168 L136 168", "none", 3, ' stroke="#FFFFFF"') + "</g>";
+    o += C(100, 70, 33, SKIN, 4);
+    o += P("M67 64 Q66 36 100 36 Q134 36 133 64 Q118 50 100 52 Q82 50 67 64 Z", "#6B3E1E", 4);
+    o += C(88, 72, 4.5, INK, 0) + C(112, 72, 4.5, INK, 0) + C(80, 84, 5, "#F59BA0", 0) + C(120, 84, 5, "#F59BA0", 0);
+    o += P("M88 86 Q100 97 112 86", "none", 4);
+    o += '<g class="sc-g" data-k="hat">' + P("M70 34 Q50 20 62 2 Q70 -14 88 -8 Q100 -22 114 -8 Q132 -14 138 2 Q150 20 130 34 Z", "#FFFFFF", 4) + Rc(68, 28, 64, 20, 6, "#FFFFFF", 4) + "</g>";
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,330px);aspect-ratio:200/316;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#FFE3C2;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0}.sc.out:not(.held){pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14%)}}" +
+    "@media (max-height:600px){.sc-card{flex-direction:row;flex-wrap:wrap;justify-content:center;max-width:620px;width:auto}.sc h2{width:100%}.sc-man-wrap{height:min(46vh,190px)}.sc ul{width:auto;gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], held = null, swallowUntil = 0;
+  function pop(n) {
+    try {
+      var actx = window.Toybox && Toybox.sound && Toybox.sound.ready();
+      if (!actx) return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 90;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = [];
+    var node = el;
+    node.classList.add("out");
+    function gone() { if (held !== null && el === node) { timers.push(setTimeout(gone, 120)); return; } if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }
+    setTimeout(gone, reduce ? 160 : (fast ? 260 : 420));
+  }
+  function show() {
+    if (el) return;
+    if (!readyOn() || takeSkip() || timerBusy()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Kitchen check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Kitchen check!</h2><div class="sc-man-wrap"><svg viewBox="0 -24 200 316" aria-hidden="true">' + chefSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      held = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      close(true);
+    });
+    function release(e) { if (held === null) return; e.stopPropagation(); held = null; swallowUntil = Date.now() + 450; if (el) el.classList.remove("held"); }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1700);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 400 + i * 520); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1900);
+      later(function () { close(false); }, 2600);
+    }
+  }
+  // The click that follows the skipping tap is swallowed (it must not press what is underneath).
+  document.addEventListener("click", function (e) { if (held !== null || Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function (e) { if (el && !el.classList.contains("out") && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); close(true); } }, true);
+  window.addEventListener("storage", function (e) { if ((e.key === TKEY || e.key === null) && el && timerBusy()) close(true); });
+  // Coming back with the Back button (page restored from memory) counts as arriving again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) show(); });
+  if (/[?&]debug\b/.test(location.search)) window.__kitchenCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  show();
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
