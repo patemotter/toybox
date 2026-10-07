@@ -971,15 +971,16 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     rubber: { belt: DARK, inner: "#454B5C", lug: "#1F2129", spike: false },
     spiky: { belt: DARK, inner: "#454B5C", lug: "#C9D2E3", spike: true }
   };
-  // Positions around the track's outside: [x, y, angle] for lug k, shifted by offset (units).
+  // Positions around the track's outside: [x, y, angle] for lug k, shifted by offset (units). A growing offset
+  // runs the belt anticlockwise (forward along the bottom), so driving forward passes a falling offset.
   function trackLugs(t, offset) {
     var x0 = t.x0, x1 = t.x1, r = t.r, L1 = x1 - x0, arc = Math.PI * r, per = 2 * L1 + 2 * arc;
     var n = Math.round(per / t.gap), step = per / n, out = [];
     for (var k = 0; k < n; k++) {
       var s = ((k * step + offset) % per + per) % per, p;
-      if (s < L1) p = [x0 + s, 0, 0];                                     // bottom, moving forward
+      if (s < L1) p = [x0 + s, 0, 0];                                     // bottom
       else if (s < L1 + arc) { var a = (s - L1) / r; p = [x1 + Math.sin(a) * r, -r + Math.cos(a) * r, -a]; }
-      else if (s < 2 * L1 + arc) p = [x1 - (s - L1 - arc), -2 * r, Math.PI]; // top, moving back
+      else if (s < 2 * L1 + arc) p = [x1 - (s - L1 - arc), -2 * r, Math.PI]; // top
       else { var b = (s - 2 * L1 - arc) / r; p = [x0 - Math.sin(b) * r, -r - Math.cos(b) * r, Math.PI - b]; }
       out.push(p);
     }
@@ -2934,7 +2935,9 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
       if (L.type === "track") {
         drawBM(L.bm);
         var t = v.track, st = TRACK[t.style];
-        trackLugs(t, spin).forEach(function (p) {
+        // Driving forward, the belt turns clockwise like its wheels: back along the bottom (where it grips the
+        // ground), forward over the top.
+        trackLugs(t, -spin).forEach(function (p) {
           ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(-p[2]);
           ctx.beginPath();
           if (st.spike) { ctx.moveTo(-9, 0); ctx.lineTo(0, 9); ctx.lineTo(9, 0); ctx.closePath(); }
