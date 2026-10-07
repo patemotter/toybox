@@ -68,8 +68,9 @@
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
  *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
- *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card ("You did it!");
- *                              type "love" picks a loving line. Automatic ones also show every few minutes.
+ *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card, mostly a star
+ *                              ("You did it!"); type "love" asks for "Dad loves you!". Automatic gentle ones
+ *                              ("You are doing great!") also show every few minutes of play.
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
  *      Toybox.turning()        true while the "turn the device" card covers the app.
@@ -130,7 +131,7 @@
     { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
       note: "Apps that use tilt or shake ask for motion access when he first touches them." },
     { id: "kind-words", app: "Kind words", label: "Show kind words now and then", type: "bool", def: true,
-      note: "Every few minutes of play, a little heart card says something like \"Dad loves you!\" or \"You did it!\"" },
+      note: "Every few minutes of play, a little card says something like \"You are doing great!\", \"You did it!\" or \"Dad loves you!\"" },
     { id: "kind-own", app: "Kind words", label: "Add your own kind words", type: "text", free: true, def: "", max: 40,
       note: "Shown now and then with the others. Leave empty for none." },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
@@ -884,18 +885,27 @@
   }
 
   // ---------- Kind words ----------
-  // Now and then a little card with a beating heart and a kind line ("Dad loves you!", "You did it!")
-  // floats in at the top for a few seconds, while he plays and when he comes back to the home screen.
+  // Now and then a little card with a kind line floats in at the top for a few seconds, while he plays
+  // and when he comes back to the home screen. Three kinds, each with its own picture: gentle reminders
+  // (a smiling sun), congratulations (a star) and love from Dad (a heart; also the grown-up's own line).
+  // No line speaks as "I": the device isn't the one talking.
   // It never takes a touch (pointer-events: none) and never shows while the timer is ending or resting,
   // the sheet is open or a card covers the app. Shared by every page: "toybox-kind-v1" remembers when
   // the last one showed and when the next may, so it stays special (one every few minutes of play).
   // Apps call Toybox.kind() when he finishes something; that shows a "You did it!" line only sometimes.
   // Grown-ups can switch it off or add their own line on the home screen ("kind-words", "kind-own").
   var KKEY = "toybox-kind-v1";
-  var KIND_LOVE = ["Dad loves you!", "I'm so proud of you!", "You are wonderful!", "You are so smart!", "Big hug!",
-    "You make me smile!", "You are so kind!", "I love playing with you!", "You are awesome!", "Dad loves you so much!"];
+  var KIND_GENTLE = ["You are doing great!", "Keep going!", "You are so smart!", "You are wonderful!", "You are so kind!",
+    "You are awesome!", "You can do it!", "You are a great helper!", "You are so creative!", "You are a great builder!",
+    "Take your time!", "You are learning so much!"];
   var KIND_DONE = ["You did it!", "Great job!", "Wow, look at that!", "Amazing work!", "You worked so hard!",
-    "High five!", "Way to go!", "You figured it out!", "Super job!", "You are a great helper!"];
+    "High five!", "Way to go!", "You figured it out!", "Super job!"];
+  var KIND_LOVE = ["Dad loves you!", "Dad loves you so much!"];
+  var KIND_ART = {
+    love: '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M20 33 C6 23 2 16 2 10.5 C2 5.5 6 2 10.5 2 C14.5 2 17.5 4.5 20 8 C22.5 4.5 25.5 2 29.5 2 C34 2 38 5.5 38 10.5 C38 16 34 23 20 33 Z" fill="#FF5D8F" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M9 9.5 Q10 6.5 13 6" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    done: '<svg viewBox="0 0 40 38" aria-hidden="true"><path d="M20 2.5 L25 13.5 L37 14.8 L28 23 L30.6 35 L20 28.8 L9.4 35 L12 23 L3 14.8 L15 13.5 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M15.5 17 Q16 15 18 14.5" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    gentle: '<svg viewBox="0 0 40 40" aria-hidden="true"><g stroke="#1D2340" stroke-width="3" stroke-linecap="round"><path d="M20 2.5 V7 M20 33 V37.5 M2.5 20 H7 M33 20 H37.5 M7.6 7.6 L10.8 10.8 M29.2 29.2 L32.4 32.4 M7.6 32.4 L10.8 29.2 M29.2 10.8 L32.4 7.6"/></g><circle cx="20" cy="20" r="10.5" fill="#FFD84D" stroke="#1D2340" stroke-width="3"/><circle cx="16.5" cy="18.5" r="1.6" fill="#1D2340"/><circle cx="23.5" cy="18.5" r="1.6" fill="#1D2340"/><path d="M15.5 22.5 Q20 26.5 24.5 22.5" fill="none" stroke="#1D2340" stroke-width="2.2" stroke-linecap="round"/></svg>'
+  };
   var KIND_GAP = [4 * 60000, 7 * 60000];  // between automatic ones, while he is playing
   var KIND_SOON = 75000;                   // no two kind cards closer than this
   var kindTouch = 0, kindPlay = 0, kindTimer = null, kindLastLine = "";
@@ -904,13 +914,21 @@
     return inited && settingGet("kind-words") !== false && timer.phase !== "ending" && timer.phase !== "resting" &&
       !sheetOpen() && !turning() && !($("tb-off") && !$("tb-off").hidden) && !document.hidden;
   }
-  function kindPick(list) {
-    var own = String(settingGet("kind-own") || "").trim(), line;
-    if (own && Math.random() < 0.34) return own;
+  // Pick a line of one kind ("gentle", "done" or "love"). The grown-up's own line counts as love.
+  function kindPick(kindOf) {
+    var own = String(settingGet("kind-own") || "").trim(), list = kindOf === "done" ? KIND_DONE : (kindOf === "love" ? KIND_LOVE : KIND_GENTLE), line;
+    if (kindOf === "love" && own && Math.random() < 0.5) return { line: own, art: "love" };
     do { line = list[Math.floor(Math.random() * list.length)]; } while (line === kindLastLine && list.length > 1);
-    return line;
+    return { line: line, art: kindOf };
   }
-  function kindShow(line) {
+  // A kind at random, by weights { gentle, done, love } (the love share goes up when there is an own line).
+  function kindMix(w) {
+    var own = String(settingGet("kind-own") || "").trim(), love = (w.love || 0) * (own ? 1.5 : 1);
+    var r = Math.random() * ((w.gentle || 0) + (w.done || 0) + love);
+    return r < (w.gentle || 0) ? "gentle" : (r < (w.gentle || 0) + (w.done || 0) ? "done" : "love");
+  }
+  function kindShow(pick) {
+    var line = pick.line;
     var st = kindState(), t = now();
     st.last = t;
     st.next = t + KIND_GAP[0] + Math.random() * (KIND_GAP[1] - KIND_GAP[0]);
@@ -923,9 +941,10 @@
       el.className = "tb-kind";
       el.setAttribute("role", "status");
       el.setAttribute("aria-live", "polite");
-      el.innerHTML = '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M20 33 C6 23 2 16 2 10.5 C2 5.5 6 2 10.5 2 C14.5 2 17.5 4.5 20 8 C22.5 4.5 25.5 2 29.5 2 C34 2 38 5.5 38 10.5 C38 16 34 23 20 33 Z" fill="#FF5D8F" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M9 9.5 Q10 6.5 13 6" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg><span></span>';
+      el.innerHTML = '<i class="tb-kind-art"></i><span></span>';
       document.body.appendChild(el);
     }
+    el.querySelector(".tb-kind-art").innerHTML = KIND_ART[pick.art] || KIND_ART.gentle;
     el.querySelector("span").textContent = line;
     el.classList.remove("show", "hide");
     void el.offsetWidth;
@@ -947,13 +966,14 @@
     var el = $("tb-kind");
     if (el && el.classList.contains("show")) { clearTimeout(kindTimer); el.classList.remove("show", "hide"); }
   }
-  // Called by apps when he finishes something (a build, a puzzle, a job). Shows only sometimes.
+  // Called by apps when he finishes something (a build, a puzzle, a job). Shows only sometimes, mostly a
+  // congratulation (a star). type "love" asks for a love line instead.
   function kind(type) {
     if (!kindReady()) return false;
     var st = kindState(), t = now();
     if (st.last && t - st.last < KIND_SOON) return false;
     if (Math.random() < 0.5) return false;
-    kindShow(kindPick(type === "love" ? KIND_LOVE : (Math.random() < 0.7 ? KIND_DONE : KIND_LOVE)));
+    kindShow(kindPick(type === "love" ? "love" : kindMix({ done: 8, gentle: 2 })));
     return true;
   }
   // Every second: count play time (a touch in the last 30 s), and show one when it's time.
@@ -964,7 +984,7 @@
     var st = kindState();
     if (!st.next) { st.next = t + KIND_GAP[0] * 0.5; put(KKEY, JSON.stringify(st)); return; }
     // Wait for some play on this page and a touch just now, so it lands while he is there and happy.
-    if (t >= st.next && kindPlay >= 40000 && t - kindTouch < 8000) kindShow(kindPick(Math.random() < 0.6 ? KIND_LOVE : KIND_DONE));
+    if (t >= st.next && kindPlay >= 40000 && t - kindTouch < 8000) kindShow(kindPick(kindMix({ gentle: 7, love: 3 })));
   }
   function kindStart() {
     document.addEventListener("pointerdown", function () { kindTouch = now(); }, true);
@@ -975,7 +995,7 @@
       try { been = !!sessionStorage.getItem("toybox-launch"); } catch (e) { /* ignore */ }
       setTimeout(function () {
         var st = kindState();
-        if (been && kindReady() && (!st.last || now() - st.last > KIND_SOON) && Math.random() < 0.6) kindShow(kindPick(Math.random() < 0.5 ? KIND_DONE : KIND_LOVE));
+        if (been && kindReady() && (!st.last || now() - st.last > KIND_SOON) && Math.random() < 0.6) kindShow(kindPick(kindMix({ gentle: 4, done: 4, love: 2 })));
       }, 1400);
     }
   }
