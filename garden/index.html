@@ -179,8 +179,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var LEAF = "#5CC83B", LEAF2 = "#3E9E2E", STEM = "#47A934";
   var NSPOT = 5, NEED = 18, KEY = "garden-v1";
   function fruitsOf(k) { return FRUITS[k] ? FRUITS[k].length : 0; }
+  // A giant strawberry: about half the fence high, resting on the soil beside its plant (one per bed).
+  var GIANT = [[6, -14, 13]];
+  function fl(p) { return p.g ? GIANT : FRUITS[p.k]; }
+  function nF(p) { var f = fl(p); return f ? f.length : 0; }
+  function hasGiant() { return S.spots.some(function (q) { return q && q.g; }); }
 
-  var S = { spots: [], picked: 0, basket: [] };
+  var S = { spots: [], picked: 0, basket: [], giants: 0 };
   for (var si = 0; si < NSPOT; si++) S.spots.push(null);
 
   function mkSpot(k, s) {
@@ -190,8 +195,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        spots: S.spots.map(function (p) { return p ? { k: p.k, s: p.s, m: p.m, c: p.c } : null; }),
-        picked: S.picked, basket: S.basket.slice(-30)
+        spots: S.spots.map(function (p) { return p ? { k: p.k, s: p.s, m: p.m, c: p.c, g: p.g ? 1 : 0 } : null; }),
+        picked: S.picked, basket: S.basket.slice(-30), giants: S.giants
       }));
     } catch (e) { /* ignore */ }
   }
@@ -204,11 +209,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         if (q && NAMES[q.k]) {
           var p = mkSpot(q.k, clamp(q.s | 0, 0, 4));
           p.m = q.m | 0; p.c = clamp(q.c | 0, 0, TULIPS.length - 1);
-          if (p.s === 4 && fruitsOf(p.k) && !p.m) p.m = (1 << fruitsOf(p.k)) - 1;
+          if (q.g && q.k === "strawberry" && !hasGiant()) { p.g = true; p.m &= 1; }
+          if (p.s === 4 && nF(p) && !p.m) p.m = (1 << nF(p)) - 1;
           S.spots[i] = p;
         }
       }
       S.picked = Math.max(0, o.picked | 0);
+      S.giants = clamp(o.giants | 0, 0, 99);
       if (Array.isArray(o.basket)) S.basket = o.basket.filter(function (k) { return !!FRUITS[k]; }).slice(-30);
     } catch (e) { /* ignore */ }
   }
@@ -219,7 +226,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Canvas and layout ----------
   var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
   var W = 0, H = 0, DPR = 1, L = {};
-  var can = { x: 0, y: 0, tilt: 0, held: null, auto: null, acc: 0 };
+  var can = { x: 0, y: 0, tilt: 0, held: null, auto: null, acc: 0, face: 1, fs: 1, px: 0, py: 0, ox: 0, oy: 0 };
   var trowel = { x: 0, y: 0, a: 0, held: null, auto: null, dig: 0 };
   var cloud = { x: 0, y: 0, held: null, rainUntil: 0, acc: 0, moved: false };
   function resize() {
@@ -274,11 +281,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return { x: L.spots[i] + (lx + p.sh * ly) * p.sc, y: L.soilTop + ly * p.sc };
   }
   function fruitPt(i, j) {
-    var p = S.spots[i], f = FRUITS[p.k][j], pt = plantPt(i, f[0], f[1]);
+    var p = S.spots[i], f = fl(p)[j], pt = plantPt(i, f[0], f[1]);
     if (p.pull && p.pull.j === j) { pt.x += p.pull.dx; pt.y += p.pull.dy; }
     return pt;
   }
-  function ripe(p) { return p && p.pa >= 1 && p.s === 4 && fruitsOf(p.k) > 0 && p.m; }
+  function ripe(p) { return p && p.pa >= 1 && p.s === 4 && nF(p) > 0 && p.m; }
   function flowerSpots(p) {
     // Open flowers a bee or butterfly can visit (plant units).
     if (!p || p.pa < 1) return [];
@@ -322,6 +329,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var i = nearestEmpty(x);
     if (i < 0) { say("The bed is full! Tap New."); bonk(); return false; }
     var p = mkSpot(kind, 0);
+    if (kind === "strawberry" && !hasGiant() && Math.random() < 0.5) p.g = true;
     p.pa = 0; p.from = { x: x, y: Math.min(y, L.soilTop - 10) };
     S.spots[i] = p;
     learned.plant = true;
@@ -334,7 +342,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var p = S.spots[i];
     if (!p || p.s >= 4 || p.pa < 1) return false;
     p.s++; p.pop = 1; p.w = 0; p.next = now() + 900;
-    if (p.s === 4 && fruitsOf(p.k)) p.m = (1 << fruitsOf(p.k)) - 1;
+    if (p.s === 4 && nF(p)) p.m = (1 << nF(p)) - 1;
+    if (p.s === 4 && p.g) { var gp = fruitPt(i, 0); sparkle(gp.x, gp.y, 18); say("A giant strawberry!"); }
     var top = plantPt(i, 0, -TOPS[p.k][p.s] * 0.7);
     sparkle(top.x, top.y, p.s === 4 ? 14 : 7, p.s === 4 ? null : "#9BF07A");
     if (!quiet) growSnd(p.s);
@@ -368,7 +377,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var pt = fruitPt(i, j);
     p.m &= ~(1 << j); p.pull = null; p.taps = 0;
     learned.pick = true;
-    flyers.push({ k: p.k, x0: pt.x, y0: pt.y, t: 0, r: FRUITS[p.k][j][2] * p.sc, rot: 0 });
+    if (p.g) { flyers.push({ k: p.k, big: true, x0: pt.x, y0: pt.y, t: 0, r: GIANT[0][2] * L.k, rot: 0 }); sparkle(pt.x, pt.y, 22); boing(); }
+    else flyers.push({ k: p.k, x0: pt.x, y0: pt.y, t: 0, r: FRUITS[p.k][j][2] * p.sc, rot: 0 });
     popSnd();
     sparkle(pt.x, pt.y, 6);
     if (p.k === "carrot") { dirt(L.spots[i], L.soilTop, 10); S.spots[i] = null; }
@@ -398,6 +408,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (kind === "rainbow" || !any) { rainbowUntil = now() + 12000; gliss(); }
     if (kind === "rainbow") {
       var j = 0;
+      var berries = [];
+      S.spots.forEach(function (p, i) { if (p && p.pa >= 1 && p.k === "strawberry") berries.push(i); });
+      if (berries.length && !hasGiant() && Math.random() < 0.5) {
+        var gi = berries[Math.floor(Math.random() * berries.length)], gq = S.spots[gi];
+        gq.g = true;
+        if (gq.s === 4) { gq.m = 1; gq.pop = 1; setTimeout(function () { if (S.spots[gi] === gq) { var gp = fruitPt(gi, 0); sparkle(gp.x, gp.y, 18); say("A giant strawberry!"); } }, 400); }
+        save();
+      }
       S.spots.forEach(function (p, i) {
         if (!p || p.pa < 1) return;
         if (p.s < 4) { var q = p, d = 700 + j++ * 300; setTimeout(function () { if (!ending && S.spots[i] === q) { q.next = 0; grow(i, true); } }, d); }
@@ -641,9 +659,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Input on the garden ----------
   var ptrs = {};
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  // The can faces the way it pours: spout to the left over the left of the garden, to the right over
+  // the right (can.fs is the drawn facing, turning smoothly between -1 and 1).
+  function spoutOff(a) { var c = L.cs; return Math.cos(a) * 0.64 * c + Math.sin(a) * 0.24 * c; }
   function spoutTip() {
     var c = L.cs, a = can.tilt, lx = 0.64 * c, ly = -0.24 * c;
-    return { x: can.x + Math.cos(a) * lx - Math.sin(a) * ly, y: can.y + Math.sin(a) * lx + Math.cos(a) * ly };
+    return { x: can.x + can.fs * (Math.cos(a) * lx - Math.sin(a) * ly), y: can.y + Math.sin(a) * lx + Math.cos(a) * ly };
   }
   function trowelTip() { return { x: trowel.x - Math.sin(trowel.a) * L.tl * 0.8, y: trowel.y + Math.cos(trowel.a) * L.tl * 0.8 }; }
   function segDist(px, py, ax, ay, bx, by) {
@@ -654,7 +675,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var best = null, bd = 1e9;
     S.spots.forEach(function (p, i) {
       if (!ripe(p)) return;
-      FRUITS[p.k].forEach(function (f, j) {
+      fl(p).forEach(function (f, j) {
         if (!(p.m & (1 << j))) return;
         var pt = fruitPt(i, j), d = Math.hypot(pt.x - x, pt.y - y), r = Math.max(28, f[2] * p.sc * 1.5);
         if (p.k === "carrot") { pt = plantPt(i, 0, -10); d = Math.min(d, Math.hypot(pt.x - x, pt.y - y)); r = Math.max(34, 16 * p.sc); }
@@ -680,7 +701,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var f = hitFruit(x, y);
     if (tapVisitor(x, y, f ? f.d : 1e9)) return;
     if (!can.held && !can.auto && Math.hypot(x - can.x, y - can.y) < Math.max(44, L.cs * 0.55)) {
-      can.held = id; ptrs[id] = { type: "can", ox: x - can.x, oy: y - can.y, x0: x, y0: y, moved: 0 }; return;
+      can.held = id; can.px = x; can.py = y; can.ox = x - can.x; can.oy = y - can.y;
+      ptrs[id] = { type: "can", x0: x, y0: y, moved: 0 }; return;
     }
     var tt = trowelTip();
     if (!trowel.held && !trowel.auto && segDist(x, y, trowel.x, trowel.y, tt.x, tt.y) < Math.max(28, L.tl * 0.18)) {
@@ -702,7 +724,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var p = pos(e);
     q.moved = Math.max(q.moved, Math.hypot(p.x - q.x0, p.y - q.y0));
     if (q.type === "can") {
-      can.x = clamp(p.x - q.ox, 10, W - 10); can.y = clamp(p.y - q.oy, L.cs * 0.4, L.canHome.y + 4);
+      can.px = p.x; can.py = p.y;
     } else if (q.type === "trowel") {
       trowel.x = clamp(p.x - q.ox, 10, W - 10); trowel.y = clamp(p.y - q.oy, 10, H - L.tl * 0.5);
       var tip = trowelTip();
@@ -718,11 +740,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     } else if (q.type === "pick") {
       var sp = S.spots[q.i];
       if (!sp || !sp.pull) { delete ptrs[e.pointerId]; return; }
-      var dx = p.x - q.x0, dy = p.y - q.y0, dd = Math.hypot(dx, dy), lim = 26;
+      var dx = p.x - q.x0, dy = p.y - q.y0, dd = Math.hypot(dx, dy), lim = sp.g ? 60 : 26;
       var sc = dd > lim ? lim / dd : 1;
       sp.pull.dx = dx * sc * (sp.k === "carrot" ? 0.3 : 1); sp.pull.dy = dy * sc;
       if (sp.k === "carrot") sp.pull.dy = Math.min(0, dy) * sc;
-      var pulled = sp.k === "carrot" ? -dy > 40 : dd > 44;
+      var pulled = sp.k === "carrot" ? -dy > 40 : dd > (sp.g ? 80 : 44);
       if (pulled) { delete ptrs[e.pointerId]; pick(q.i, q.j); }
     }
   });
@@ -768,8 +790,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (k = 0; k < NSPOT && i < 0; k++) if (S.spots[k] && S.spots[k].s < 4) i = k;
     for (k = 0; k < NSPOT && i < 0; k++) if (S.spots[k]) i = k;
     if (i < 0) i = 2;
-    var p = S.spots[i], h = p ? TOPS[p.k][p.s] * p.sc : 0;
-    var tx = L.spots[i] - L.cs * 0.6, ty = Math.max(L.cs * 0.6, L.soilTop - h - L.cs * 0.55);
+    var p = S.spots[i], h = p ? TOPS[p.k][p.s] * p.sc : 0, face = L.spots[i] < W / 2 ? -1 : 1;
+    var tx = L.spots[i] - face * spoutOff(0.75), ty = Math.max(L.cs * 0.6, L.soilTop - h - L.cs * 0.55);
+    can.face = face;
     can.auto = { t: 0, x0: can.x, y0: can.y, x1: tx, y1: ty };
   }
   function autoDig() {
@@ -898,13 +921,30 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (a.t < 0.9) { var f = ease(a.t / 0.9); can.x = lerp(a.x0, a.x1, f); can.y = lerp(a.y0, a.y1, f) - Math.sin(f * PI) * 20; }
       else if (a.t > 2.6) { can.auto = null; }
     }
+    if (can.held !== null) {
+      // Held: the finger says where the water goes. Lifted up, the can turns to face the near edge and
+      // slides so its spout is over the plant under the finger (snapped to a spot within half a spot).
+      var c = L.cs, bx = can.px - can.ox;
+      can.y = clamp(can.py - can.oy, c * 0.45, L.canHome.y + 4);
+      if (can.px < W * 0.45) can.face = -1; else if (can.px > W * 0.55) can.face = 1;
+      var aim = can.px, near = -1, nd = L.sp * 0.5;
+      for (i = 0; i < NSPOT; i++) { var dd = Math.abs(L.spots[i] - can.px); if (dd < nd) { nd = dd; near = i; } }
+      if (near >= 0) aim = L.spots[near];
+      var pf = clamp(can.tilt / 0.75, 0, 1);
+      var tx = lerp(bx, aim - can.fs * spoutOff(can.tilt), pf);
+      can.x += (tx - can.x) * Math.min(1, dt * 14);
+    } else if (!can.auto) can.face = 1;
+    can.fs += (can.face - can.fs) * Math.min(1, dt * 9);
     var lifted = can.held !== null ? can.y < L.canHome.y - L.cs * 0.3 : (can.auto && can.auto.t > 0.8);
     can.tilt += ((lifted ? 0.75 : 0) - can.tilt) * Math.min(1, dt * 6);
     if (can.held === null && !can.auto) { can.x += (L.canHome.x - can.x) * Math.min(1, dt * 5); can.y += (L.canHome.y - can.y) * Math.min(1, dt * 5); }
-    if (can.tilt > 0.45) {
+    // never past the stage edge: the body, and the spout on whichever side it points
+    var half = L.cs * 0.42 + 4, sOff = Math.abs(can.fs) * spoutOff(can.tilt) + L.cs * 0.06 + 4;
+    can.x = clamp(can.x, can.fs < 0 ? Math.max(half, sOff) : half, can.fs > 0 ? W - Math.max(half, sOff) : W - half);
+    if (can.tilt > 0.45 && Math.abs(can.fs) > 0.85) {
       can.acc += dt * 16;
       var tip = spoutTip();
-      while (can.acc >= 1) { can.acc--; part({ t: "drop", x: tip.x + rand(-4, 4), y: tip.y + rand(-2, 2), vx: Math.cos(can.tilt) * 28 + rand(-12, 12), vy: rand(20, 60), life: 3, max: 3, r: rand(2.5, 3.6) }); }
+      while (can.acc >= 1) { can.acc--; part({ t: "drop", x: tip.x + rand(-3, 3), y: tip.y + rand(-2, 2), vx: 0, vy: rand(20, 60), life: 3, max: 3, r: rand(2.5, 3.6) }); }
       if (Math.random() < dt * 5) plink();
     }
     // Cloud: rains while he holds it (or for a moment after a tap), then drifts gently.
@@ -948,6 +988,20 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     });
     // Picked fruit flies into the basket.
     flyers = flyers.filter(function (f) {
+      if (f.big) {
+        // a big bounce, then it rolls over beside the basket
+        f.t += dt / 2.4;
+        if (f.t >= 1) {
+          S.giants++; S.picked++;
+          $("count").textContent = "Picked: " + S.picked;
+          if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1200);
+          var gr = giantRest(Math.min(S.giants, 2) - 1);
+          sparkle(gr.x, gr.y, 16); thud();
+          save();
+          return false;
+        }
+        return true;
+      }
       f.t += dt / 0.95;
       f.rot += dt * 6;
       if (f.t >= 1) {
@@ -1016,6 +1070,43 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     [[-0.4, -0.2], [0.35, -0.25], [0, 0.2], [-0.3, 0.55], [0.3, 0.5]].forEach(function (d) { ctx.beginPath(); ctx.ellipse(x + d[0] * r, y + d[1] * r, r * 0.09, r * 0.14, 0, 0, TAU); ctx.fill(); });
     star(x, y - r * 0.85, r * 0.6, 5, "#3E9E2E");
   }
+  function giantShape(x, y, r) {
+    // A very big shiny strawberry with big seeds and a leafy green cap.
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 1.2);
+    ctx.bezierCurveTo(x - r * 1.45, y + r * 0.35, x - r * 1.25, y - r * 0.95, x, y - r * 0.8);
+    ctx.bezierCurveTo(x + r * 1.25, y - r * 0.95, x + r * 1.45, y + r * 0.35, x, y + r * 1.2);
+    fillStroke("#F0384F");
+    ctx.save(); ctx.clip();
+    ctx.beginPath(); ctx.ellipse(x + r * 0.35, y + r * 0.35, r * 0.95, r * 1.0, 0, 0, TAU); ctx.fillStyle = "rgba(160,10,40,0.22)"; ctx.fill();
+    ctx.restore();
+    var rows = [[-0.45, 4], [-0.12, 5], [0.2, 4], [0.5, 3], [0.8, 2]];
+    rows.forEach(function (rw, ri) {
+      var n = rw[1], hw = r * (0.95 - Math.max(0, rw[0]) * 0.75);
+      for (var c = 0; c < n; c++) {
+        var sx = x + (n > 1 ? -hw * 0.75 + c * (hw * 1.5 / (n - 1)) : 0) + (ri % 2 ? r * 0.08 : 0), sy = y + rw[0] * r;
+        ctx.beginPath(); ctx.ellipse(sx, sy, r * 0.075, r * 0.12, 0, 0, TAU); ctx.fillStyle = "#FFE14D"; ctx.fill(); ctx.lineWidth = lw * 0.45; ctx.strokeStyle = "#B8862B"; ctx.stroke();
+      }
+    });
+    ctx.beginPath(); ctx.ellipse(x - r * 0.5, y - r * 0.2, r * 0.16, r * 0.36, 0.45, 0, TAU); ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(x - r * 0.42, y + r * 0.3, r * 0.07, 0, TAU); ctx.fill();
+    [0.92, 0.72, 0.5, 0.28, 0.08].forEach(function (a) { leaf(x, y - r * 0.8, r * 0.62, PI * a, r * 0.2, LEAF); });
+    ln(x, y - r * 0.82, x + r * 0.12, y - r * 1.18, r * 0.12, STEM);
+  }
+  function giantAt(x, y, r, rot) {
+    // screen px: (x, y) is the middle, r the size
+    var u = r / 13;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0); ctx.scale(u, u);
+    lw = L.lw / u;
+    giantShape(0, 0, 13);
+    ctx.restore();
+    lw = L.lw;
+  }
+  function giantRest(n) {
+    // where picked giant strawberries sit: on the ground beside the basket (too big to fit in)
+    var r = GIANT[0][2] * L.k;
+    return { x: L.bx - L.bw * 0.5 - r * 1.15 - n * r * 1.5, y: L.base - r * 1.2, r: r };
+  }
   function pumpkinShape(x, y, rx, ry) {
     ln(x, y - ry * 0.8, x + rx * 0.15, y - ry * 1.25, rx * 0.16, "#6B4A1E");
     ell(x - rx * 0.45, y, rx * 0.6, ry, 0, "#FF8C1A");
@@ -1082,7 +1173,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     lw = L.lw / sc;
     if (s === 0) { if (p.pa >= 1) ell(0, 0, 7, 2.6, 0, "#7B4A24"); ctx.restore(); return; }
     var pull = p.pull;
-    function fpos(j) { var f = FRUITS[p.k][j], dx = 0, dy = 0; if (pull && pull.j === j) { dx = pull.dx / sc; dy = pull.dy / sc; } return [f[0] + dx - p.sh * dy, f[1] + dy, f[2]]; }
+    function fpos(j) { var f = fl(p)[j], dx = 0, dy = 0, k = p.g ? 0.35 : 1; if (pull && pull.j === j) { dx = pull.dx / sc * k; dy = pull.dy / sc * k; } return [f[0] + dx - p.sh * dy, f[1] + dy, f[2]]; }
     if (p.k === "sunflower") {
       if (s === 1) sprout(14);
       else if (s === 2) {
@@ -1160,7 +1251,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           ln(0, 0, ex, ey, 1.4, STEM);
           for (var lf = -1; lf <= 1; lf++) { var la = -PI / 2 + lf * 0.75 + st[0] * 0.02; ell(ex + Math.cos(la) * 3.6 * ksc, ey + Math.sin(la) * 3.6 * ksc, 2.8 * ksc, 4 * ksc, la + PI / 2, LEAF); }
         });
-        if (s >= 3) FRUITS.strawberry.forEach(function (fr, j) {
+        if (s === 4 && p.g) {
+          if (p.m & 1) {
+            var gp = fpos(0), gr = gp[2], st = pull ? Math.min(1, Math.hypot(pull.dx, pull.dy) / 60) : 0;
+            ln(0, -2, gp[0] - 1, gp[1] - gr * 0.85, 1.6, STEM);
+            ctx.save(); ctx.translate(gp[0], gp[1] + gr * 1.2);
+            ctx.rotate(Math.sin(now() / 1000 * 2.3 + p.ph) * (0.05 + st * 0.1) + (pull ? pull.dx / 600 : 0));
+            ctx.scale(1 - st * 0.08, 1 + st * 0.22);
+            giantShape(0, -gr * 1.2, gr);
+            ctx.restore();
+          } else FRUITS.strawberry.forEach(function (fr) { ln(0, -2, fr[0], fr[1] - 6, 1, STEM); flower5(fr[0], fr[1] - 6, 4 * (1 - cl * 0.4), "#FFFFFF", "#FFC93C"); });
+        } else if (s >= 3) FRUITS.strawberry.forEach(function (fr, j) {
           if (s === 3) { ln(0, -2, fr[0], fr[1] - 6, 1, STEM); flower5(fr[0], fr[1] - 6, 4 * (1 - cl * 0.4), "#FFFFFF", "#FFC93C"); }
           else if (p.m & (1 << j)) { var fp = fpos(j); ln(0, -2, fp[0], fp[1] - fp[2], 1, STEM); berryShape(fp[0], fp[1], fp[2]); }
         });
@@ -1311,7 +1412,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function drawCan() {
     var c = L.cs;
     lw = L.lw;
-    ctx.save(); ctx.translate(can.x, can.y); ctx.rotate(can.tilt);
+    ctx.save(); ctx.translate(can.x, can.y); ctx.scale(can.fs, 1); ctx.rotate(can.tilt);
     // spout
     ctx.beginPath(); ctx.moveTo(0.2 * c, 0.2 * c); ctx.lineTo(0.62 * c, -0.2 * c); ctx.lineTo(0.66 * c, -0.15 * c); ctx.lineTo(0.24 * c, 0.3 * c); ctx.closePath(); fillStroke("#2E9BE0");
     ctx.save(); ctx.translate(0.64 * c, -0.21 * c); ctx.rotate(-0.8); ctx.beginPath(); ctx.ellipse(0, 0, 0.05 * c, 0.1 * c, 0, 0, TAU); fillStroke("#FFC93C"); ctx.restore();
@@ -1493,12 +1594,24 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (V.fly) drawButterfly(V.fly);
     if (V.bee) drawBee(V.bee);
     drawBasket();
+    for (var gi = Math.min(S.giants, 2) - 1; gi >= 0; gi--) { var gr = giantRest(gi); giantAt(gr.x, gr.y, gr.r, gi ? -0.12 : 0.08); }
     drawCloud();
     if (trowel.held || trowel.auto) drawTrowel();
     drawCan();
     drawParts();
     lw = L.lw;
     flyers.forEach(function (f) {
+      if (f.big) {
+        var to = giantRest(Math.min(S.giants, 1)), x, y, rot;
+        if (f.t < 0.25) { var b = f.t / 0.25; x = f.x0; y = f.y0 - Math.sin(b * PI) * Math.max(50, H * 0.12); rot = 0; }
+        else {
+          var e2 = ease((f.t - 0.25) / 0.75);
+          x = lerp(f.x0, to.x, e2); y = lerp(f.y0, to.y, e2) - Math.abs(Math.sin(e2 * PI * 2)) * 14 * (1 - e2);
+          rot = (x - f.x0) / f.r;
+        }
+        giantAt(x, y, f.r, rot);
+        return;
+      }
       var e = ease(f.t), x = lerp(f.x0, L.bx, e), y = lerp(f.y0, L.base - L.bw * 0.55, e) - Math.sin(f.t * PI) * Math.max(60, H * 0.18);
       produce(f.k, x, y, f.k === "carrot" ? f.r * 1.3 : f.r * (1 - f.t * 0.3), f.rot);
     });
@@ -1512,7 +1625,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (now() < sayUntil) return sayText;
     if (sel) return "Tap a spot!";
     var i, p;
-    for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (ripe(p)) return p.k === "carrot" ? "Pull the carrot!" : p.k === "pumpkin" ? "Pick the pumpkin!" : p.k === "tomato" ? "Pick a tomato!" : "Pick a strawberry!"; }
+    for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (ripe(p) && p.g) return "Pull the big strawberry!"; if (ripe(p)) return p.k === "carrot" ? "Pull the carrot!" : p.k === "pumpkin" ? "Pick the pumpkin!" : p.k === "tomato" ? "Pick a tomato!" : "Pick a strawberry!"; }
     for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (p && p.s === 0) return "Water the seed!"; }
     for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (p && p.s < 4) return "Tap the sun!"; }
     if (S.spots.indexOf(null) >= 0 && !document.body.classList.contains("big")) return "Plant a seed!";
@@ -1635,7 +1748,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (i = 0; i < NSPOT && !plan; i++) {
       p = S.spots[i];
       if (ripe(p) && !learned.pick) {
-        for (var j = 0; j < FRUITS[p.k].length; j++) if (p.m & (1 << j)) {
+        for (var j = 0; j < nF(p); j++) if (p.m & (1 << j)) {
           var f = p.k === "carrot" ? plantPt(i, 0, -8) : fruitPt(i, j);
           move = "pick"; plan = { pts: [[rc.left + f.x, rc.top + f.y], [rc.left + f.x, rc.top + f.y - 80]], dur: 2800 }; break;
         }
@@ -1645,7 +1758,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       p = S.spots[i];
       if (p && p.s === 0 && p.pa >= 1 && !learned.water) {
         move = "water";
-        plan = { pts: [[rc.left + can.x, rc.top + can.y - L.cs * 0.3], [rc.left + L.spots[i] - L.cs * 0.55, rc.top + Math.max(L.cs * 0.6, L.soilTop - L.cs * 0.9)]], dur: 3400 };
+        plan = { pts: [[rc.left + can.x, rc.top + can.y - L.cs * 0.3], [rc.left + L.spots[i], rc.top + Math.max(L.cs * 0.6, L.soilTop - L.cs * 0.9)]], dur: 3400 };
       }
     }
     if (!plan && !learned.sun && S.spots.some(function (q) { return q && q.pa >= 1 && q.s >= 1 && q.s < 4; })) {
@@ -1776,7 +1889,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       return p ? { x: r.left + p.x, y: r.top + p.y } : null;
     },
     grow: function (i) { var p = S.spots[i]; if (p) { p.pa = 1; p.next = 0; } return grow(i); },
-    plant: function (k, i) { S.spots[i] = mkSpot(k, 0); save(); },
+    plant: function (k, i, g) { S.spots[i] = mkSpot(k, 0); if (k === "strawberry" && g !== undefined) S.spots[i].g = !!g && !hasGiant(); save(); },
     ghost: function () { return ghost.show(); }
   };
 })();
