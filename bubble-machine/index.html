@@ -346,7 +346,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var M = { x: 0, y: 0, s: 1 };       // machine: bottom-left corner and scale (base drawing is 200 x 235)
   var J = { x: 0, y: 0, s: 1, stand: 0 };       // the soap jar the wand stands in
   var BS = 1;                         // bubble size scale
-  var MAXB = 70, lowQ = 0;
+  var CAP = 20, lowQ = 0;   // room in the sky (big bubbles take more of it, see weight())
   var bg = null;
 
   function resize() {
@@ -384,7 +384,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       J.y = groundY + G * 0.25;
     }
     BS = clamp(Math.min(W, H) / 470, 0.85, 1.7);
-    MAXB = Math.round((W * H > 450000 ? 90 : 64) * (lowQ === 2 ? 0.6 : (lowQ === 1 ? 0.8 : 1)));
+    CAP = Math.round((W * H > 450000 ? 30 : 20) * (lowQ === 2 ? 0.7 : (lowQ === 1 ? 0.85 : 1)));
     layoutWand();
     buildBackground();
     if (changed) {
@@ -702,7 +702,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function makeBubble(x, y, r, vx, vy, soap) {
     return {
       x: x, y: y, r: r, vx: vx, vy: vy, soap: soap || S.soap,
-      grow: 0, age: 0, life: rnd(16, 30), seed: Math.random() * 100,
+      grow: 0, age: 0, life: rnd(9, 14), seed: Math.random() * 100,
       rise: rnd(20, 34) * BS * (r < 18 * BS ? 1.15 : 0.9),
       sw: Math.random() * TAU, ss: rnd(0.35, 0.8) * (Math.random() < 0.5 ? -1 : 1),
       ax: Math.random() * TAU, wa: 0.1, wb: 0.025 + Math.min(0.05, r / 1500), wp: Math.random() * TAU, wf: rnd(5, 7.5),
@@ -714,16 +714,29 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     S.count++;
     countDirty = true;
     saveSoon();
-    // Keep the sky light: the oldest everyday bubble pops softly when there are too many.
-    var n = 0, oldest = null;
-    for (var i = 0; i < bubbles.length; i++) {
-      var o = bubbles[i];
-      if (o.dead) continue;
-      n++;
-      if (o.kind === "n" && (!oldest || o.age > oldest.age)) oldest = o;
+    // Keep the sky calm: while there is too much, the oldest everyday bubble pops softly to make room.
+    var guard = 0;
+    while (skyLoad() > CAP && guard++ < 12) {
+      var oldest = null;
+      for (var i = 0; i < bubbles.length; i++) {
+        var o = bubbles[i];
+        if (!o.dead && o !== b && o.kind === "n" && (!oldest || o.age > oldest.age)) oldest = o;
+      }
+      if (!oldest) break;
+      popBubble(oldest, true);
     }
-    if (n > MAXB && oldest) popBubble(oldest, true);
     return b;
+  }
+  // How much room a bubble takes: a small one counts 1, a big wand bubble up to 3.5, the giant 4, a duck 2.
+  function weight(b) {
+    if (b.kind === "giant") return 4;
+    if (b.kind === "duck") return 2;
+    return clamp(b.r / (20 * BS), 1, 3.5);
+  }
+  function skyLoad() {
+    var t = 0;
+    for (var i = 0; i < bubbles.length; i++) if (!bubbles[i].dead) t += weight(bubbles[i]);
+    return t;
   }
 
   // ---------- Pops: a splash ring and droplets ----------
@@ -825,7 +838,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Wand ----------
-  var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, stick: 96, tilt: 0, held: null, ox: 0, oy: 0,
+  var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, stick: 96, lean: 0, held: null, ox: 0, oy: 0,
     v: 0, dx: 0, dy: -1, pend: 0, lastMove: 0, back: null, used: false, filmAt: 0,
     home: true, soap: 1, emptyAt: 0, moved: 0, touchedAt: 0 };
   // The wand starts in the jar (its spot in the sky is not saved). Dropped anywhere else, it stays there.
@@ -871,7 +884,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (wand.held !== null || (wand.home && !wand.back)) return;
     wand.home = true;
     wand.drop = null;
-    wand.back = { t0: performance.now(), x0: wand.x, y0: wand.y, tilt0: wand.tilt, dur: slow ? 2100 : 900, slow: !!slow };
+    wand.back = { t0: performance.now(), x0: wand.x, y0: wand.y, lean0: wand.lean, dur: slow ? 2100 : 900, slow: !!slow };
   }
   function refill(splash) {
     var was = wand.soap;
@@ -894,8 +907,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function hitWand(px, py) {
     if (Math.hypot(px - wand.x, py - wand.y) < wand.ring + 24) return true;
     // the handle: a segment below the ring
-    var ax = wand.x - Math.sin(wand.tilt) * wand.ring, ay = wand.y + Math.cos(wand.tilt) * wand.ring;
-    var bx = ax - Math.sin(wand.tilt) * wand.stick, by = ay + Math.cos(wand.tilt) * wand.stick;
+    var ax = wand.x - Math.sin(wand.lean) * wand.ring, ay = wand.y + Math.cos(wand.lean) * wand.ring;
+    var bx = ax - Math.sin(wand.lean) * wand.stick, by = ay + Math.cos(wand.lean) * wand.stick;
     var vx = bx - ax, vy = by - ay, t = clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy), 0, 1);
     return Math.hypot(px - (ax + vx * t), py - (ay + vy * t)) < 24;
   }
@@ -935,7 +948,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     b.wa = r > wand.ring * 1.3 ? 0.16 : 0.08;
     b.wb = r > wand.ring * 1.3 ? 0.05 : b.wb;
     b.wf = r > wand.ring * 1.3 ? rnd(3.5, 4.5) : b.wf;
-    b.life = r > wand.ring * 1.3 ? rnd(18, 26) : b.life;
+    b.life = r > wand.ring * 1.3 ? rnd(10, 14) : b.life;
     addBubble(b);
     useSoap(r);
     if (!fast || fast < 0.5) blowSound(r);
@@ -949,7 +962,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // Let go over the jar (or a tap without moving it out): it goes back in. Anywhere else: it stays there.
     if (ringInJar() || (wand.home && wand.moved < 12)) { wand.home = false; sendHome(); return; }
     wand.home = false;
-    wand.drop = { t0: performance.now(), x0: wand.x, y0: wand.y, tilt0: wand.tilt };
+    wand.drop = { t0: performance.now(), x0: wand.x, y0: wand.y, lean0: wand.lean };
     placeInSky();
     if (!wand.drop) return;   // no room beside the controls: it went home instead
     wand.drop.x1 = wand.x; wand.drop.y1 = wand.y;
@@ -963,17 +976,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         if (wand.pend > wand.ring * 0.75) { releaseWandBubble(wand.pend, 0); wand.pend = 0; }
       }
       var target = clamp(wand.dx * Math.min(1, wand.v / 900) * 0.45, -0.5, 0.5);
-      wand.tilt += (target - wand.tilt) * Math.min(1, dt * 8);
+      wand.lean += (target - wand.lean) * Math.min(1, dt * 8);
     } else if (wand.back) {
       var t = Math.min(1, (now - wand.back.t0) / wand.back.dur);
       var e = wand.back.slow ? (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2) : 1 - Math.pow(1 - t, 3);
       wand.x = lerp(wand.back.x0, wand.rx, e);
       wand.y = lerp(wand.back.y0, wand.ry, e) - Math.sin(t * Math.PI) * (wand.back.slow ? 40 : 20) * J.s;
-      wand.tilt = lerp(wand.back.tilt0, 0, e);
+      wand.lean = lerp(wand.back.lean0, 0, e);
       if (t >= 1) { wand.back = null; refill(true); }
     } else if (wand.home) {
       wand.x = wand.rx; wand.y = wand.ry;
-      wand.tilt = Math.sin(now / 900) * 0.04;
+      wand.lean = Math.sin(now / 900) * 0.04;
     } else {
       // Left in the sky: it settles where he let go (nudged up if the handle would sink into the grass)
       // and sways a little.
@@ -981,9 +994,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (dr) {
         var u = Math.min(1, (now - dr.t0) / 400), k = 1 - Math.pow(1 - u, 3);
         wand.x = lerp(dr.x0, dr.x1, k); wand.y = lerp(dr.y0, dr.y1, k);
-        wand.tilt = lerp(dr.tilt0, 0, k);
+        wand.lean = lerp(dr.lean0, 0, k);
         if (u >= 1) wand.drop = null;
-      } else wand.tilt = Math.sin(now / 1100) * 0.05;
+      } else wand.lean = Math.sin(now / 1100) * 0.05;
       // Left alone for a while: it glides calmly back into the jar by itself.
       if (now - wand.touchedAt > 8000 && !Toybox.timer.locked()) sendHome(true);
     }
@@ -992,8 +1005,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function drawWand(now) {
     var x = ctx, soap = SOAP_BY[S.soap], s = J.s;
-    var ax = wand.x - Math.sin(wand.tilt) * wand.ring, ay = wand.y + Math.cos(wand.tilt) * wand.ring;
-    var bx = ax - Math.sin(wand.tilt) * wand.stick, by = ay + Math.cos(wand.tilt) * wand.stick;
+    var ax = wand.x - Math.sin(wand.lean) * wand.ring, ay = wand.y + Math.cos(wand.lean) * wand.ring;
+    var bx = ax - Math.sin(wand.lean) * wand.stick, by = ay + Math.cos(wand.lean) * wand.stick;
     x.lineCap = "round";
     x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by);
     x.lineWidth = 15 * s; x.strokeStyle = OUT; x.stroke();
@@ -1075,7 +1088,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     b.kind = kind;
     b.grow = 0;
     b.wa = 0.04; b.wb = kind === "giant" ? 0.06 : 0.04; b.wf = kind === "giant" ? 2.6 : 4;
-    b.life = kind === "giant" ? 60 : 40;
+    b.life = kind === "giant" ? 60 : 22;
     if (kind === "duck") b.duck = { c: DUCK_COLORS[Math.floor(Math.random() * DUCK_COLORS.length)] };
     growing = { b: b, t0: performance.now(), dur: kind === "giant" ? 2200 : 1500 };
     inflateSound(kind === "giant");
@@ -1235,7 +1248,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var tx = mx(WC.x), ty = my(WC.y - WC.arm) - WC.ring * M.s;
     var big = Math.random() < 0.15 ? 1.5 : 1;
     var r = (11 + Math.random() * 13) * BS * big;
-    var b = makeBubble(tx + rnd(-6, 6), ty - r * 0.6, r, rnd(30, 120) * BS * (boost || 1), -rnd(80, 150) * BS * (boost || 1), S.soap);
+    // A wide fan of directions, so the bubbles spread across the sky instead of queueing in one column.
+    var ang = rnd(-1.45, -0.25), sp = rnd(110, 210) * BS * (boost || 1);
+    var b = makeBubble(tx + rnd(-6, 6), ty - r * 0.6, r, Math.cos(ang) * sp, Math.sin(ang) * sp, S.soap);
     addBubble(b);
   }
 
@@ -1500,35 +1515,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
 
-  // ---------- Tilt and shake (only when a grown-up turned it on at home) ----------
-  var tiltX = 0, tiltT = 0, gust = { x: 0, y: 0 }, lastMag = null, lastGust = 0, tiltOn = false;
-  function onOrient(e) {
-    if (e.gamma == null) return;
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var v;
-    if (ang === 90) v = e.beta; else if (ang === -90 || ang === 270) v = -e.beta; else if (ang === 180) v = -e.gamma; else v = e.gamma;
-    tiltT = clamp((v || 0) / 30, -1, 1);
-  }
-  function onMotion(e) {
-    var a = e.accelerationIncludingGravity;
-    if (!a || a.x == null) return;
-    var m = Math.hypot(a.x, a.y, a.z || 0), now = performance.now();
-    if (lastMag !== null && Math.abs(m - lastMag) > 8 && now - lastGust > 700 && !Toybox.timer.locked()) {
-      lastGust = now;
-      var ang = Math.random() * TAU;
-      gust.x = Math.cos(ang) * 200 * BS; gust.y = -Math.abs(Math.sin(ang)) * 120 * BS;
-      bubbles.forEach(function (b) { b.wa += 0.08; });
-    }
-    lastMag = m;
-  }
-  function listenTilt(on) {
-    if (on && !tiltOn) { window.addEventListener("deviceorientation", onOrient); window.addEventListener("devicemotion", onMotion); tiltOn = true; }
-    if (!on && tiltOn) { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("devicemotion", onMotion); tiltOn = false; tiltT = 0; }
-  }
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; listenTilt(true); });
-  Toybox.settings.onChange(function (id, on) { if (id === "tilt") listenTilt(!!on && tiltAllowed); });
-
   // ---------- Simulation ----------
   var ending = false, endingDone = null, endingT0 = 0, lastSoftPop = 0;
   var countDirty = true, countEl = $("counter");
@@ -1565,9 +1551,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     updateWand(now, dt);
     updateGrowing(now);
 
-    // Wind, tilt and gusts.
-    tiltX += (tiltT - tiltX) * Math.min(1, dt * 3);
-    gust.x *= Math.max(0, 1 - dt * 1.5); gust.y *= Math.max(0, 1 - dt * 1.5);
 
     var n2 = bubbles.length, b, j;
     for (i = 0; i < n2; i++) {
@@ -1578,32 +1561,30 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var tvx, tvy, k2 = 0.9;
       if (b.kind === "giant") {
         // Wobbles slowly across the sky.
-        tvx = 26 * BS + tiltX * 30 * BS;
+        tvx = 26 * BS;
         tvy = (H * 0.38 + Math.sin(b.age * 0.6) * H * 0.06 - b.y) * 0.5;
         k2 = 0.6;
       } else {
-        var wind = Math.sin(clock * 0.23 + b.seed) * 10 * BS + Math.sin(clock * 0.071 + b.seed * 2) * 7 * BS;
-        tvx = wind + tiltX * 80 * BS;
+        // Their own gentle breeze.
+        tvx = Math.sin(clock * 0.23 + b.seed) * 10 * BS + Math.sin(clock * 0.071 + b.seed * 2) * 7 * BS;
         tvy = -b.rise * (ending ? 3.2 : 1);
         if (b.kind === "duck") { tvy *= 0.65; tvx += (W * 0.5 - b.x) * 0.05; }
       }
-      b.vx += (tvx + gust.x - b.vx) * Math.min(1, dt * k2);
-      b.vy += (tvy + gust.y - b.vy) * Math.min(1, dt * k2);
+      b.vx += (tvx - b.vx) * Math.min(1, dt * k2);
+      b.vy += (tvy - b.vy) * Math.min(1, dt * k2);
       b.x += b.vx * dt; b.y += b.vy * dt;
       b.wa += (b.wb - b.wa) * Math.min(1, dt * 1.1);
       b.wp += b.wf * dt;
       b.ax += 0.35 * dt;
       b.sw += b.ss * dt;
-      // walls: soft bounces at the sides and the grass
-      if (b.x < b.r * 0.9 && b.kind !== "giant") { b.x = b.r * 0.9; b.vx = Math.abs(b.vx) * 0.5; b.wa += 0.04; }
-      if (b.x > W - b.r * 0.9 && b.kind !== "giant") { b.x = W - b.r * 0.9; b.vx = -Math.abs(b.vx) * 0.5; b.wa += 0.04; }
+      // the grass: a soft bounce
       if (b.y > groundY - b.r * 0.6) { b.y = groundY - b.r * 0.6; b.vy = -Math.abs(b.vy) * 0.4; }
-      // pops: at the top of the sky, at the far side (giant), or after a long float
-      if (b.kind === "giant") {
-        if (b.x - b.r * 0.35 > W - b.r || b.x < -b.r) popBubble(b, false);
-        else if (b.y - b.r < 0) b.y = b.r;
-      } else if (b.y - b.r * 0.75 < 0) popBubble(b, ending);
-      else if (b.age > b.life && b.kind === "n") popBubble(b, true);
+      // pops: touching the left or right side or the top of the sky, or softly after a calm drift
+      var re = b.r * (b.grow < 1 ? 0.35 + 0.65 * b.grow : 1) * 0.85;
+      if (b.x - re < 0 || b.x + re > W) popBubble(b, false);
+      else if (b.kind === "giant") { if (b.y - b.r < 0) b.y = b.r; }
+      else if (b.y - b.r * 0.75 < 0) popBubble(b, ending);
+      else if (b.age > b.life && b.kind !== "giant") popBubble(b, true);
     }
     // Gentle bumps between bubbles (big ones push small ones more).
     for (i = 0; i < n2; i++) {
@@ -1836,7 +1817,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Debug hooks (?debug only) ----------
   if (DEBUG) {
     window.BM = {
-      state: function () { return { lowQ: lowQ, count: S.count, soap: S.soap, speed: S.speed, on: S.on, bubbles: liveCount(), ducks: ducks.length, wheelV: mach.wheelV, coach: lastCoach, learned: learned, W: W, H: H, MAXB: MAXB }; },
+      state: function () { return { lowQ: lowQ, count: S.count, soap: S.soap, speed: S.speed, on: S.on, bubbles: liveCount(), ducks: ducks.length, wheelV: mach.wheelV, coach: lastCoach, learned: learned, W: W, H: H, CAP: CAP, load: skyLoad() }; },
       spawn: function (n) { for (var i = 0; i < n; i++) addBubble(makeBubble(rnd(40, W - 40), rnd(H * 0.2, groundY - 30), (11 + Math.random() * 13) * BS, rnd(-40, 40), rnd(-40, 0))); },
       bubbles: function () { return bubbles.filter(function (b) { return !b.dead; }).map(function (b) { return { x: b.x, y: b.y, r: b.r, kind: b.kind }; }); },
       points: function () {
@@ -1852,6 +1833,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         return r;
       },
       ghost: function () { return ghost.show(); },
+      spawnAt: function (x, y, vx, vy, r) { var b = makeBubble(x, y, r || 20 * BS, vx, vy); b.grow = 1; addBubble(b); return true; },
+      rings: function () { return parts.filter(function (q) { return q.t === "ring"; }).map(function (q) { return [Math.round(q.x), Math.round(q.y), q.soft]; }); },
       // true when the wand (ring and handle) is clear of the switch and dial panel, or in the jar
       wandClear: function () {
         if (wand.home) return true;

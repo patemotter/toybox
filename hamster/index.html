@@ -197,7 +197,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return !(w <= 600 || (w > h && h <= 520));
   }
   function layout(W, H) {
-    var Lt = Math.min(W / 5.3, H / 8.0), Lw = Math.min(W / 9.2, H / 4.75);
+    var Lt = Math.min(W / 5.5, H / 8.0), Lw = Math.min(W / 9.2, H / 4.75);
     // prefer the tall layout (it fills the height) unless the wide one gives a clearly bigger hamster
     var tall = Lt * 1.15 > Lw;
     var L = Math.max(22, Math.min(tall ? Lt : Lw, 150));
@@ -208,14 +208,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var a = g.cageX0 + 0.12 * L, b = g.cageX1 - 0.12 * L, R, p;
     if (!tall) {
       R = Math.max(1.0 * L, Math.min(1.6 * L, (g.floorY - H * 0.05) / 2.2));
-      p = pack([["bed", 1.6 * L], ["tube", 1.4 * L], ["bowl", 1.15 * L], ["bottle", 0.75 * L], ["wheel", 2 * R + 0.2 * L]], a, b, L);
+      p = pack([["bed", 1.6 * L], ["tube", 1.4 * L], ["bowl", 1.3 * L], ["bottle", 0.75 * L], ["wheel", 2 * R + 0.2 * L]], a, b, L);
       g.wheel = { x: p.wheel, lvl: "floor", R: R };
       g.tube = { x0: p.tube - 0.7 * L, x1: p.tube + 0.7 * L };
       g.floorMin = a + 0.4 * L; g.floorMax = b - 0.4 * L;
     } else {
       g.tubeX = b - 0.5 * L;
       var fb = g.tubeX - 1.05 * L;
-      p = pack([["bed", 1.6 * L], ["bowl", 1.15 * L], ["bottle", 0.75 * L]], a, fb, L);
+      p = pack([["bed", 1.6 * L], ["bowl", 1.3 * L], ["bottle", 0.65 * L]], a, fb, L);
       var top0 = H * 0.03 + (coachOnTop() ? 46 : 0);
       g.shelfTop = g.floorY - Math.max(3.1 * L, 0.47 * (g.floorY - top0));
       g.shelfX0 = g.cageX0; g.shelfX1 = g.tubeX - g.tr - g.lw;
@@ -236,8 +236,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     g.bottle.capY = g.bottle.tipY - 0.42 * L;
     g.bottle.bodyB = g.bottle.capY - 0.12 * L;
     g.bottle.bodyT = g.bottle.bodyB - 1.25 * L;
-    if (tall) g.bag = { x: g.tubeX - 0.05 * L, y: g.topY + Math.max(0.35 * L, 54) };
-    else g.bag = { x: g.bed.x, y: Math.max(g.topY + 0.3 * L, g.floorY - 3.05 * L) };
+    // the food tub stands on a little wooden ledge on the cage wall; g.bag.y is the top of the tub
+    if (tall) g.bag = { x: g.tubeX - 0.08 * L, y: g.topY + Math.max(0.5 * L, 60) };
+    else g.bag = { x: g.bed.x, y: Math.max(g.topY + 0.45 * L, g.floorY - 3.2 * L) };
+    g.bag.w = 1.0 * L; g.bag.h = 1.1 * L; g.bag.ledge = g.bag.y + g.bag.h;
     return g;
   }
   function surfY(lvl) { return lvl === "shelf" ? G.shelfTop : G.floorY; }
@@ -367,13 +369,21 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Things in the cage ----------
   var items = { wheel: { b: 0 }, bowl: { b: 0 }, bottle: { b: 0 }, bed: { b: 0 }, bag: { b: 0 } };
   var wheel = { a: 0, w: 0, driven: false };
+  // The hamster mix in the bowl: positions on the heap (u across, w front to back), drawn back to front.
   var bowlSeeds = [];
   (function () {
-    var kinds = ["sun", "sun", "pellet", "corn", "carrot", "sun", "pea"];
-    for (var i = 0; i < 30; i++) bowlSeeds.push({ u: rand(-1, 1), v: Math.pow(Math.random(), 0.8), k: kinds[i % kinds.length], r: rand(0, TAU) });
-    bowlSeeds.sort(function (p, q) { return q.v - p.v; });
+    var kinds = ["sun", "sun", "pellet", "sun", "corn", "pellet", "pea", "sun", "carrot", "pellet", "sun", "corn"];
+    var n = 22, i = 0, tries = 0;
+    while (bowlSeeds.length < n && tries < 2000) {
+      tries++;
+      var u = rand(-0.95, 0.95), w = rand(-0.9, 0.9);
+      if (u * u + w * w > 0.92) continue;
+      if (bowlSeeds.some(function (q) { return Math.hypot(q.u - u, (q.w - w) * 1.6) < 0.32; })) continue;
+      bowlSeeds.push({ u: u, w: w, k: kinds[i++ % kinds.length], r: rand(-0.6, 0.6) + (Math.random() < 0.5 ? 0 : Math.PI) });
+    }
+    bowlSeeds.sort(function (p, q) { return p.w - q.w; });
   })();
-  var treats = [], ball = null, pour = null, jug = null, parts = [], bubbles = [], trail = null;
+  var treats = [], ball = null, pour = null, jug = null, scoop = { state: "home", x: 0, y: 0, t: 0, tilt: 0, full: true }, parts = [], bubbles = [], trail = null;
   var TREATS = ["seed", "carrot", "berry"], treatIdx = 0;
 
   function bounceScale(it) { return 1 + 0.13 * Math.sin(Math.PI * (1 - it.b)) * it.b * 1.6; }
@@ -393,10 +403,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       ctx.ellipse(0, 0, s, s * 0.55, 0, 0, TAU); ctx.fillStyle = "#454A5C"; ctx.fill(); ctx.stroke();
       ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = unit ? s * 0.16 : Math.max(0.8, s * 0.16);
       ctx.beginPath(); ctx.moveTo(-s * 0.6, -s * 0.12); ctx.lineTo(s * 0.6, -s * 0.12); ctx.stroke();
-    } else if (k === "pellet") { ctx.ellipse(0, 0, s * 0.75, s * 0.5, 0, 0, TAU); ctx.fillStyle = "#86C96B"; ctx.fill(); ctx.stroke(); }
+    } else if (k === "pellet") { ctx.arc(0, 0, s * 0.55, 0, TAU); ctx.fillStyle = "#B87A45"; ctx.fill(); ctx.stroke(); }
     else if (k === "corn") { ctx.ellipse(0, 0, s * 0.6, s * 0.55, 0, 0, TAU); ctx.fillStyle = "#FFD447"; ctx.fill(); ctx.stroke(); }
     else if (k === "carrot") { ctx.ellipse(0, 0, s * 0.62, s * 0.45, 0, 0, TAU); ctx.fillStyle = "#FF8A2B"; ctx.fill(); ctx.stroke(); }
-    else { ctx.arc(0, 0, s * 0.48, 0, TAU); ctx.fillStyle = "#E9524F"; ctx.fill(); ctx.stroke(); }
+    else if (k === "crumb") { ctx.arc(0, 0, s * 0.6, 0, TAU); ctx.fillStyle = "#D9A957"; ctx.fill(); ctx.stroke(); }
+    else { ctx.arc(0, 0, s * 0.48, 0, TAU); ctx.fillStyle = "#7BC96F"; ctx.fill(); ctx.stroke(); }
     ctx.restore();
   }
   function drawTreatShape(c, k, x, y, s, rot) {
@@ -479,27 +490,58 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.fillStyle = "#7FCB6B"; rrect(ctx, h.x - 0.42 * L, h.y - 0.04 * L, 0.84 * L, 0.09 * L, 0.04 * L); ctx.fill(); ctx.lineWidth = lw * 0.6; ctx.stroke();
     ctx.restore();
   }
+  // A classic heavy ceramic hamster bowl: low and wide, thick rim, seen a little from above.
+  function bowlGeom() {
+    var L = G.L, x = G.bowl.x, w = 1.3 * L, h = 0.3 * L;
+    return { x: x, rx: w / 2, ry: 0.2 * L, top: G.floorY - h, bot: G.floorY, irx: w / 2 - 0.11 * L, iry: 0.2 * L - 0.065 * L };
+  }
   function drawBowl() {
-    var L = G.L, lw = G.lw, x = G.bowl.x, y = G.floorY, w = 1.15 * L, h = 0.36 * L, top = y - h, s = bounceScale(items.bowl);
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-x, -y);
-    glow(x, top, 1.1 * L, items.bowl.b);
-    ctx.lineJoin = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, 0, TAU); ctx.fillStyle = "#C93F63"; ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, Math.PI, TAU); ctx.stroke();
-    if (food > 0.005) {
-      var mh = 0.36 * L * Math.pow(food, 0.7), mw = w / 2 * (0.6 + 0.35 * food);
-      ctx.beginPath(); ctx.ellipse(x, top + 0.02 * L, mw, mh, 0, Math.PI, TAU); ctx.closePath();
-      ctx.fillStyle = "#F5C86A"; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.stroke();
+    var L = G.L, lw = G.lw, g = bowlGeom(), x = g.x, s = bounceScale(items.bowl);
+    ctx.save(); ctx.translate(x, g.bot); ctx.scale(s, s); ctx.translate(-x, -g.bot);
+    glow(x, g.top, 1.2 * L, items.bowl.b);
+    ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    // the thick wall (slightly wider at the foot)
+    ctx.beginPath(); ctx.moveTo(x - g.rx, g.top); ctx.lineTo(x - g.rx - 0.04 * L, g.bot - 0.06 * L);
+    ctx.quadraticCurveTo(x - g.rx - 0.04 * L, g.bot + 0.03 * L, x - g.rx + 0.12 * L, g.bot + 0.03 * L);
+    ctx.lineTo(x + g.rx - 0.12 * L, g.bot + 0.03 * L); ctx.quadraticCurveTo(x + g.rx + 0.04 * L, g.bot + 0.03 * L, x + g.rx + 0.04 * L, g.bot - 0.06 * L);
+    ctx.lineTo(x + g.rx, g.top); ctx.closePath();
+    ctx.fillStyle = "#2F86D0"; ctx.fill(); ctx.stroke();
+    // a white paw print on the front
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    var px = x, py = g.top + 0.17 * L + g.ry * 0.5;
+    ctx.beginPath(); ctx.ellipse(px, py + 0.02 * L, 0.06 * L, 0.045 * L, 0, 0, TAU); ctx.fill();
+    [[-0.07, -0.045], [-0.025, -0.075], [0.025, -0.075], [0.07, -0.045]].forEach(function (t) { ctx.beginPath(); ctx.arc(px + t[0] * L, py + t[1] * L, 0.022 * L, 0, TAU); ctx.fill(); });
+    // the rim (top surface) and the inside
+    ctx.beginPath(); ctx.ellipse(x, g.top, g.rx, g.ry, 0, 0, TAU); ctx.fillStyle = "#6BB8F2"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, g.top + 0.01 * L, g.irx, g.iry, 0, 0, TAU); ctx.fillStyle = "#E4F3FF"; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.stroke();
+    ctx.fillStyle = "rgba(47,134,208,0.25)"; ctx.beginPath(); ctx.ellipse(x, g.top + 0.01 * L - g.iry * 0.35, g.irx * 0.92, g.iry * 0.6, 0, Math.PI, TAU); ctx.fill();
+    // the food heap: it shrinks and sinks as he eats
+    if (food > 0.004) {
+      var f = food, sp = 0.5 + 0.5 * Math.min(1, f * 1.4), mrx = g.irx * 0.96 * sp, mry = g.iry * 0.9 * sp, mh = 0.42 * L * Math.pow(f, 0.8), cy = g.top + 0.02 * L;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x - g.rx, g.top - 2 * L, 2 * g.rx, 2 * L); ctx.ellipse(x, g.top + 0.01 * L, g.irx, g.iry, 0, 0, TAU); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(x - mrx, cy); ctx.bezierCurveTo(x - mrx * 0.7, cy - mh * 1.25, x + mrx * 0.7, cy - mh * 1.25, x + mrx, cy);
+      ctx.ellipse(x, cy, mrx, mry, 0, 0, Math.PI); ctx.closePath();
+      ctx.fillStyle = "#E8C27A"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.7; ctx.stroke();
       bowlSeeds.forEach(function (sd) {
-        var u = sd.u * 0.85, py = top + 0.02 * L - sd.v * mh * Math.sqrt(Math.max(0, 1 - u * u)) * 0.88;
-        drawSeed(sd.k, x + u * mw, py, 0.075 * L, sd.r);
+        var r2 = sd.u * sd.u + sd.w * sd.w;
+        if (r2 > Math.min(0.92, 0.25 + f * 0.9)) return;
+        var hh = mh * Math.max(0, 1 - r2) * 0.95;
+        drawSeed(sd.k, x + sd.u * mrx * 0.82, cy + sd.w * mry * 0.6 - hh, 0.11 * L, sd.r);
       });
+      ctx.restore();
+    } else {
+      drawSeed("crumb", x - 0.15 * L, g.top + 0.05 * L, 0.05 * L, 0.3);
+      drawSeed("crumb", x + 0.12 * L, g.top + 0.03 * L, 0.04 * L, 1.2);
     }
-    ctx.beginPath(); ctx.moveTo(x - w / 2, top); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, Math.PI, 0, true);
-    ctx.lineTo(x + w * 0.38, y); ctx.quadraticCurveTo(x, y + 0.07 * L, x - w * 0.38, y); ctx.closePath();
-    ctx.fillStyle = "#FF6F93"; ctx.fill(); ctx.lineWidth = lw; ctx.stroke();
-    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = lw * 0.9; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x - w * 0.36, top + 0.17 * L); ctx.lineTo(x - w * 0.12, top + 0.2 * L); ctx.stroke();
+    // the front of the rim goes over the food
+    ctx.beginPath(); ctx.ellipse(x, g.top, g.rx, g.ry, 0, 0, Math.PI); ctx.ellipse(x, g.top + 0.01 * L, g.irx, g.iry, 0, Math.PI, 0, true); ctx.closePath();
+    ctx.fillStyle = "#6BB8F2"; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.ellipse(x, g.top, g.rx, g.ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.lineWidth = lw * 0.8; ctx.beginPath(); ctx.ellipse(x, g.top + 0.01 * L, g.irx, g.iry, 0, 0, Math.PI); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = lw * 0.9;
+    ctx.beginPath(); ctx.ellipse(x, g.top, g.rx - 0.05 * L, g.ry - 0.03 * L, 0, Math.PI * 0.62, Math.PI * 0.85); ctx.stroke();
     ctx.restore();
   }
   function drawBottle() {
@@ -546,27 +588,58 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.stroke();
     ctx.restore();
   }
+  // The food tub: a clear jar of hamster mix with a big seed label and a scoop, on a little wall ledge.
+  function scoopHome() { var g = G.bag; return { x: g.x + 0.12 * G.L, y: g.y + 0.04 * G.L, tilt: -0.3 }; }
   function drawBag() {
-    var L = G.L, lw = G.lw, g = G.bag, w = 0.8 * L, h = 1.0 * L, s = bounceScale(items.bag);
-    var empty = food < 0.04 && !pour;
-    var tilt = 0;
-    if (pour) { var pt = pour.t; tilt = pour.dir * 0.55 * (pt < 0.3 ? ease(pt / 0.3) : pt > 1.6 ? Math.max(0, 1 - (pt - 1.6) / 0.4) : 1); }
-    else if (empty) tilt = Math.sin(clock * 5) * 0.06;
-    ctx.save();
-    ctx.lineJoin = "round"; ctx.lineCap = "round";
-    // string up to the top of the cage
-    ctx.strokeStyle = OUT; ctx.lineWidth = Math.max(1.5, lw * 0.55);
-    ctx.beginPath(); ctx.moveTo(g.x, G.topY); ctx.lineTo(g.x, g.y + 0.04 * L); ctx.stroke();
-    glow(g.x, g.y + h * 0.55, 1.25 * L, Math.max(items.bag.b, empty ? 0.6 + 0.4 * Math.sin(clock * 4) : 0));
-    ctx.translate(g.x, g.y + h * 0.5); ctx.rotate(tilt); ctx.scale(s, s); ctx.translate(-g.x, -(g.y + h * 0.5));
-    ctx.strokeStyle = OUT; ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.moveTo(g.x - w * 0.42, g.y + 0.15 * L); ctx.lineTo(g.x + w * 0.42, g.y + 0.15 * L);
-    ctx.lineTo(g.x + w * 0.5, g.y + h); ctx.lineTo(g.x - w * 0.5, g.y + h); ctx.closePath();
-    ctx.fillStyle = "#E3A963"; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#C98B48"; rrect(ctx, g.x - w * 0.46, g.y, w * 0.92, 0.2 * L, 0.05 * L); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(g.x, g.y + 0.06 * L, 0.05 * L, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = lw * 0.6; ctx.stroke();
-    ctx.beginPath(); ctx.arc(g.x, g.y + 0.6 * L, 0.25 * L, 0, TAU); ctx.fillStyle = "#FFF6DF"; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.stroke();
-    drawTreatShape(ctx, "seed", g.x, g.y + 0.72 * L, 0.42 * L, -0.25);
+    var L = G.L, lw = G.lw, g = G.bag, w = g.w, h = g.h, s = bounceScale(items.bag);
+    var empty = food < 0.04 && scoop.state === "home" && !pour;
+    var wig = empty ? Math.sin(clock * 5) * 0.05 : 0;
+    ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    // ledge and bracket
+    ctx.fillStyle = "#E9A95B"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(g.x + 0.45 * L, g.ledge + 0.14 * L); ctx.lineTo(g.x + 0.45 * L, g.ledge + 0.5 * L); ctx.lineTo(g.x + 0.05 * L, g.ledge + 0.14 * L); ctx.closePath();
+    ctx.fillStyle = "#D08E45"; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#E9A95B"; rrect(ctx, g.x - 0.75 * L, g.ledge, 1.5 * L, 0.15 * L, 0.05 * L); ctx.fill(); ctx.stroke();
+    glow(g.x, g.y + h * 0.5, 1.3 * L, Math.max(items.bag.b, empty ? 0.6 + 0.4 * Math.sin(clock * 4) : 0));
+    ctx.translate(g.x, g.ledge); ctx.rotate(wig); ctx.scale(s, s); ctx.translate(-g.x, -g.ledge);
+    var x0 = g.x - w / 2, top = g.y, bot = g.ledge;
+    // jar body (clear plastic) with the mix inside
+    function jar() { ctx.beginPath(); ctx.moveTo(x0, top + 0.1 * L); ctx.lineTo(x0 + 0.03 * L, bot - 0.12 * L); ctx.quadraticCurveTo(x0 + 0.04 * L, bot, x0 + 0.16 * L, bot); ctx.lineTo(x0 + w - 0.16 * L, bot); ctx.quadraticCurveTo(x0 + w - 0.04 * L, bot, x0 + w - 0.03 * L, bot - 0.12 * L); ctx.lineTo(x0 + w, top + 0.1 * L); ctx.closePath(); }
+    jar(); ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.fill();
+    ctx.save(); jar(); ctx.clip();
+    var fy = top + 0.3 * L;
+    ctx.fillStyle = "#E8C27A"; ctx.fillRect(x0, fy, w, bot - fy);
+    for (var i = 0; i < 16; i++) {
+      var sx = x0 + 0.1 * L + ((i * 37) % 9) / 8 * (w - 0.2 * L), sy = fy + 0.08 * L + ((i * 53) % 7) / 6 * (bot - fy - 0.15 * L);
+      drawSeed(["sun", "pellet", "corn", "sun", "pea", "carrot"][i % 6], sx, sy, 0.08 * L, i * 1.3);
+    }
+    ctx.restore();
+    // the scoop sits in the jar (behind the label)
+    if (scoop.state === "home") drawScoop(scoopHome().x, scoopHome().y - Math.abs(Math.sin(clock * 5)) * (empty ? 0.06 * L : 0), scoopHome().tilt, false);
+    // big label with a sunflower seed
+    ctx.beginPath(); ctx.arc(g.x, top + 0.68 * L, 0.3 * L, 0, TAU); ctx.fillStyle = "#FFF6DF"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.8; ctx.stroke();
+    drawTreatShape(ctx, "seed", g.x - 0.02 * L, top + 0.84 * L, 0.5 * L, -0.25);
+    jar(); ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; rrect(ctx, x0 + 0.09 * L, top + 0.2 * L, 0.07 * L, h - 0.42 * L, 0.035 * L); ctx.fill();
+    // open rim
+    ctx.beginPath(); ctx.ellipse(g.x, top + 0.1 * L, w / 2 + 0.02 * L, 0.07 * L, 0, 0, TAU); ctx.fillStyle = "#FF8A5B"; ctx.fill(); ctx.lineWidth = lw; ctx.stroke();
+    ctx.restore();
+  }
+  // A red measuring scoop: a round cup with a long handle; full of mix when it comes out of the jar.
+  function drawScoop(x, y, tilt, inJar, mirror) {
+    var L = G.L, lw = G.lw;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt); if (mirror) ctx.scale(-1, 1); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.strokeStyle = OUT; ctx.lineWidth = 0.13 * L; ctx.beginPath(); ctx.moveTo(0.2 * L, -0.02 * L); ctx.lineTo(0.62 * L, -0.26 * L); ctx.stroke();
+    ctx.strokeStyle = "#FF5A4E"; ctx.lineWidth = 0.13 * L - 2 * lw; ctx.stroke();
+    if (!inJar) {
+      ctx.beginPath(); ctx.moveTo(-0.27 * L, -0.03 * L); ctx.quadraticCurveTo(-0.27 * L, 0.27 * L, 0, 0.27 * L); ctx.quadraticCurveTo(0.27 * L, 0.27 * L, 0.27 * L, -0.03 * L); ctx.closePath();
+      ctx.fillStyle = "#FF5A4E"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, -0.03 * L, 0.27 * L, 0.08 * L, 0, 0, TAU); ctx.fillStyle = scoop.full ? "#E8C27A" : "#C8433A"; ctx.fill(); ctx.stroke();
+      if (scoop.full) {
+        ctx.beginPath(); ctx.ellipse(0, -0.05 * L, 0.24 * L, 0.12 * L, 0, Math.PI, TAU); ctx.fillStyle = "#E8C27A"; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.stroke();
+        drawSeed("sun", -0.1 * L, -0.08 * L, 0.08 * L, 0.3); drawSeed("pellet", 0.06 * L, -0.12 * L, 0.08 * L, 0); drawSeed("corn", 0.14 * L, -0.05 * L, 0.07 * L, 0); drawSeed("sun", 0.0, -0.03 * L, 0.08 * L, 2.8);
+      }
+    }
     ctx.restore();
   }
   function drawWheelBack() {
@@ -894,7 +967,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     };
   }
   function spotWheel(side) { return { lvl: G.wheel.lvl, x: clampX(G.wheel.lvl, G.wheel.x + side * 0.62 * G.wheel.R), f: -side }; }
-  function spotBowl(side) { return { lvl: "floor", x: clampX("floor", G.bowl.x + side * 0.98 * G.L), f: -side }; }
+  function spotBowl(side) { return { lvl: "floor", x: clampX("floor", G.bowl.x + side * 1.08 * G.L), f: -side }; }
   function spotWater(side) { var f = -side, n = localNose(DRINK_REAR); return { lvl: "floor", x: clampX("floor", G.bottle.tipX - f * n.x * G.L), f: f }; }
   function spotBed() { return { lvl: "floor", x: clampX("floor", G.bed.x) }; }
   function anchorOf(spotFn) { return function () { var s = spotFn(); return { x: s.x, y: surfY(s.lvl), f: s.f, lvl: s.lvl }; }; }
@@ -1323,29 +1396,62 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Care: fill the bowl from the bag, fill the bottle from a jug ----------
+  // Filling the bowl: the scoop comes out of the jar full, goes over the bowl (by itself after a tap, or
+  // carried by his finger), tips, the mix pours in, and the scoop goes back into the jar.
+  function pourSpot() { var g = bowlGeom(), d = sign(G.bag.x - G.bowl.x); return { x: g.x + d * 0.42 * G.L, y: g.top - 0.85 * G.L, d: d }; }
+  function grabScoop(x, y) {
+    if (scoop.state !== "home" || ending) return false;
+    tried.bag = true; items.bag.b = 1; sTap();
+    scoop.state = "drag"; scoop.full = true; scoop.x = x; scoop.y = y; scoop.tilt = 0; scoop.t = 0; scoop.moved = 0; scoop.gx = x; scoop.gy = y;
+    return true;
+  }
+  function dragScoop(x, y) { if (scoop.state !== "drag") return; scoop.moved = Math.max(scoop.moved, Math.hypot(x - scoop.gx, y - scoop.gy)); scoop.x = x - 0.1 * G.L; scoop.y = y - 0.45 * G.L; }
+  function releaseScoop() {
+    if (scoop.state !== "drag") return;
+    if (scoop.moved < 0.3 * G.L) { var h = scoopHome(); scoop.x = h.x; scoop.y = h.y - 0.5 * G.L; }
+    flyScoop("pour");
+  }
+  function flyScoop(then) {
+    var to = then === "pour" ? pourSpot() : scoopHome();
+    scoop.fx = scoop.x; scoop.fy = scoop.y; scoop.ft = scoop.tilt; scoop.tx = to.x; scoop.ty = to.y; scoop.tt = then === "pour" ? 0 : to.tilt;
+    scoop.dur = clamp(Math.hypot(to.x - scoop.x, to.y - scoop.y) / (5 * G.L), 0.35, 0.9);
+    scoop.state = then === "pour" ? "fly" : "back"; scoop.t = 0;
+  }
   function refillFood() {
-    if (pour || ending) return;
-    tried.bag = true; items.bag.b = 1;
-    pour = { t: 0, n: 22, spawned: 0, landed: 0, f0: food, dir: sign(G.bowl.x - G.bag.x) };
+    // a tap on the jar (or Surprise-free paths): the scoop does it all by itself
+    if (grabScoop(scoopHome().x, scoopHome().y)) { scoop.moved = 0; releaseScoop(); }
   }
   function updatePour(dt) {
-    if (!pour) return;
-    pour.t += dt;
     var L = G.L;
-    while (pour.spawned < pour.n && pour.t > 0.25 + pour.spawned * (1.15 / pour.n)) {
-      pour.spawned++;
-      var sx = G.bag.x + pour.dir * 0.32 * L, sy = G.bag.y + 0.15 * L, tx = G.bowl.x + rand(-0.32, 0.32) * L, ty = G.floorY - 0.4 * L, T = rand(0.8, 1.0), g = 7 * L;
-      var kinds = ["sun", "sun", "pellet", "corn", "carrot", "pea"];
-      spawn("seed", sx, sy, { vx: (tx - sx) / T, vy: (ty - sy - 0.5 * g * T * T) / T, ty: ty, k: kinds[pour.spawned % kinds.length], life: 3,
-        land: function () { pour && pour.landed++; food = Math.min(1, food + (1 - (pour ? pour.f0 : 0)) / 22); dirty = true; items.bowl.b = Math.max(items.bowl.b, 0.4); if (Math.random() < 0.5) sPing(); } });
-      if (pour.spawned % 3 === 0) sTick(0.012);
+    if (scoop.state === "fly" || scoop.state === "back") {
+      scoop.t += dt;
+      var u = Math.min(1, scoop.t / scoop.dur), e = ease(u);
+      scoop.x = lerp(scoop.fx, scoop.tx, e); scoop.y = lerp(scoop.fy, scoop.ty, e) - Math.sin(Math.PI * u) * 0.5 * L; scoop.tilt = lerp(scoop.ft, scoop.tt, e);
+      if (u >= 1) {
+        if (scoop.state === "fly") { scoop.state = "pour"; scoop.t = 0; pour = { n: 20, spawned: 0, landed: 0, f0: food }; }
+        else { scoop.state = "home"; scoop.full = true; finishPour(); }
+      }
+    } else if (scoop.state === "pour") {
+      scoop.t += dt;
+      var ps = pourSpot(), k = ease(clamp(scoop.t / 0.35, 0, 1)) * (1 - ease(clamp((scoop.t - 1.45) / 0.3, 0, 1)));
+      scoop.x = ps.x; scoop.y = ps.y; scoop.tilt = -ps.d * 1.35 * k;
+      while (pour && pour.spawned < pour.n && scoop.t > 0.3 + pour.spawned * (1.1 / pour.n)) {
+        pour.spawned++;
+        var g = bowlGeom(), lipX = ps.x - ps.d * 0.3 * L, lipY = ps.y - 0.02 * L;
+        var kinds = ["sun", "sun", "pellet", "corn", "pellet", "pea", "carrot"];
+        spawn("seed", lipX + rand(-0.06, 0.06) * L, lipY, { vx: rand(-0.5, 0.5) * L - ps.d * 0.3 * L, vy: rand(0, 0.4) * L, ty: g.top - 0.05 * L + rand(-0.04, 0.04) * L, k: kinds[pour.spawned % kinds.length], life: 3,
+          land: function () { if (pour) pour.landed++; food = Math.min(1, food + (1 - (pour ? pour.f0 : 0)) / 20); dirty = true; items.bowl.b = Math.max(items.bowl.b, 0.35); if (Math.random() < 0.5) sPing(); } });
+        if (pour.spawned % 3 === 0) sTick(0.012);
+      }
+      if (scoop.t > 1.3) scoop.full = false;
+      if (scoop.t > 1.8) flyScoop("back");
     }
-    if (pour.t > 2.6) {
-      pour = null; food = 1; dirty = true; items.bowl.b = 1;
-      var a = ham.act && ham.act.name;
-      if (a === "hungry") run(missionFood());
-      else if (!ending && (ham.mission === "auto" || !ham.mission) && ham.where === "surf" && a !== "walk") command("food", missionFood(), G.bowl.x, "floor");
-    }
+  }
+  function finishPour() {
+    pour = null; food = 1; dirty = true; items.bowl.b = 1;
+    var a = ham.act && ham.act.name;
+    if (a === "hungry") run(missionFood());
+    else if (!ending && (ham.mission === "auto" || !ham.mission) && ham.where === "surf" && a !== "walk") command("food", missionFood(), G.bowl.x, "floor");
   }
   function refillWater() {
     if (jug || ending) return;
@@ -1474,10 +1580,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var L = G.L, c = hamCenter(), pad = 0.2 * L;
     if (Math.hypot(x - c.x, y - c.y) < 0.62 * L && ham.where !== "house") return "pet";
     var g = G.bag;
-    if (inRect(x, y, g.x - 0.55 * L, g.y - 0.2 * L, g.x + 0.55 * L, g.y + 1.15 * L)) return "bag";
+    if (inRect(x, y, g.x - 0.75 * L, g.y - 0.45 * L, g.x + 0.85 * L, g.ledge + 0.3 * L)) return "bag";
     var b = G.bottle;
     if (inRect(x, y, b.x - 0.42 * L, b.bodyT - 0.3 * L, b.x + 0.42 * L, b.tipY + 0.15 * L)) return "bottle";
-    if (inRect(x, y, G.bowl.x - 0.58 * L - pad, G.floorY - 0.75 * L, G.bowl.x + 0.58 * L + pad, G.floorY + 0.3 * L)) return "bowl";
+    if (inRect(x, y, G.bowl.x - 0.65 * L - pad, G.floorY - 0.85 * L, G.bowl.x + 0.65 * L + pad, G.floorY + 0.3 * L)) return "bowl";
     var h = houseGeom();
     if (inRect(x, y, h.x - 0.98 * L, h.top - 0.65 * L, h.x + 0.98 * L, G.floorY + 0.3 * L)) return "bed";
     var w = G.wheel;
@@ -1551,12 +1657,18 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     ptrs[e.pointerId] = { x: x, y: y, last: 0 };
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    if (G && !ending && !(window.Toybox && Toybox.timer.locked()) && hitTest(x, y) === "bag") {
+      if (grabScoop(x, y)) { ptrs[e.pointerId].scoop = true; dragScoop(x, y); }
+      else items.bag.b = 1;
+      return;
+    }
     tap(x, y);
   });
   cv.addEventListener("pointermove", function (e) {
     var p = ptrs[e.pointerId];
     if (!p || !G || ending) return;
     var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, c = hamCenter();
+    if (p.scoop) { dragScoop(x, y); return; }
     var moved = Math.hypot(x - p.x, y - p.y);
     if (moved > 0.15 * G.L && Math.hypot(x - c.x, y - c.y) < 0.75 * G.L && ham.where !== "house") {
       p.x = x; p.y = y;
@@ -1564,7 +1676,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (ham.act && ham.act.name === "happy") ham.act.dur = Math.max(ham.act.dur, ham.act.t + 0.8);
     }
   });
-  function up(e) { delete ptrs[e.pointerId]; }
+  function up(e) { var p = ptrs[e.pointerId]; if (p && p.scoop) releaseScoop(); delete ptrs[e.pointerId]; }
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
   $("treatBtn").addEventListener("click", function () { if (!(window.Toybox && Toybox.timer.locked())) dropTreat(); });
@@ -1586,7 +1698,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var coachEl = $("coach"), coachShown = "";
   function coachText() {
     if (clock < superMsgUntil) return "Super duper fast!";
-    if (food < 0.04 && !pour) return "Fill the food bowl!";
+    if (food < 0.04 && scoop.state === "home" && !pour) return "Fill the food bowl!";
     if (water < 0.06 && !jug) return "Fill the water!";
     if (ham.asleep && ham.act && ham.act.name === "sleep" && ham.act.t > 3) return "Tap to wake up!";
     if (!tried.wheel) return "Tap the wheel!";
@@ -1701,7 +1813,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // The hand shows the wheel; while the bowl is empty (and he has never filled it) it shows the food bag.
   var ghost = makeGhost(function () {
     if (!G) return null;
-    if (food < 0.04 && !tried.bag && !pour) return { pts: [pagePt(G.bag.x, G.bag.y + 0.6 * G.L)], tap: true };
+    if (food < 0.04 && !tried.bag && scoop.state === "home") { var sh = scoopHome(), pp = pourSpot(); return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L), pagePt(pp.x, pp.y + 0.45 * G.L)], dur: 3400 }; }
     if (!tried.wheel) return { pts: [pagePt(G.wheel.x + 0.3 * G.wheel.R, G.wheel.y - 0.45 * G.wheel.R)], tap: true };
     return null;
   }, { max: 3, ok: function () { return !ending; } });
@@ -1764,6 +1876,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function onEnding(done) {
     ending = true;
     ham.wasSuper = false; superMsgUntil = -1;
+    if (scoop.state === "drag") flyScoop("pour");
     treats.forEach(function (t) { t.claimed = false; });
     var finish = function () { done(); };
     var cur = ham.act;
@@ -1810,6 +1923,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Resize: keep the hamster where it was ----------
   function reanchor(old) {
     parts = []; trail = null;
+    if (scoop.state !== "home") { scoop.state = "home"; scoop.full = true; if (pour) finishPour(); }
     if (ham.where === "surf") {
       var lvl = ham.lvl === "shelf" && G.tall ? "shelf" : "floor";
       var r0 = ham.lvl === "shelf" && old.tall ? [old.shelfMin, old.shelfMax] : [old.floorMin, old.floorMax];
@@ -1890,6 +2004,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
     ctx.drawImage(tubeCv, 0, 0, CW, CH);
     drawParts();
+    if (scoop.state !== "home") drawScoop(scoop.x, scoop.y, scoop.tilt, false, scoop.state !== "back" && pourSpot().d < 0);
     drawJug();
     drawTrail();
   }
@@ -1957,6 +2072,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     wheelW: function () { return wheel.w; },
     run: function () { var a = ham.act; return a && a.name === "wheel" ? { level: a.level, sup: !!a.sup, supDur: a.sup ? a.sup.dur : 0, v: a.v, t: a.t, after: !!a.after } : null; },
     superK: function () { return superK; },
+    scoop: function () { return scoop.state; },
     treats: function () { return treats.length; },
     ball: function () { return !!ball; },
     ghost: ghost,
