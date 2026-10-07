@@ -21,7 +21,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 10 | Kitchen Helper | Next (the dad picked it) |
 | 11 | Music Room | Planned |
 | 12 | Hamster | Done |
-| 13 | Garden | Next (the dad picked it) |
+| 13 | Garden | Done |
 | 14 | Bubble Machine | Done |
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
@@ -368,6 +368,8 @@ directs it where to go by tapping the wheel or the bed or the food."
   everything grows a stage, or a visitor parade).
 - Fresh visit: an empty bed and an empty basket (the dad's choice).
 - Timer ending: the sun sets, flowers close, the garden sleeps. Rest line: "The garden is sleeping."
+- Built. Questions for the dad: should New also empty the basket; is the sun growing a stage per tap too fast;
+  should flowers be pickable as a bouquet (the bed fills up with flowers); picture-only packets on upright phones.
 
 **Agents:** 1.
 
