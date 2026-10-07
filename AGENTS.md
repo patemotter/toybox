@@ -174,8 +174,8 @@ Keep only:
   Tool Wall.** Not right after the gear-up either (`workshop-check-skip`).
 - **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`), the same quick
   check on each station. **No check on the site map** (going back to it from a station).
-- **Kitchen**: wash hands (soap, scrub, rinse, dry) and put on an apron and chef hat once per visit
-  (`kitchen-ready`); a quick "Kitchen check!" on each station, none on the kitchen page or right after the gate.
+- **Kitchen**: one getting-ready screen once per visit (`kitchen-ready`): Wash hands (one tap plays a short wash),
+  Apron and Chef hat, in any order (the dad didn't want a whole interactive hand-washing scene); a quick "Kitchen check!" on each station, none on the kitchen page or right after the gate.
 - The launcher clears the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) on load and on `pageshow`, so
   leaving the app means gearing up again.
 - **Power tools**: the safety check also runs whenever he changes to a different power tool on the same page
