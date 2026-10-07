@@ -128,8 +128,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="view" role="img" aria-label="A spinning top arena. Pull the cord on the launcher to spin a top into the bowl, then flick the tops with a finger."></canvas>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Pull the cord!</div>
+      <canvas id="view" role="img" aria-label="A spinning top arena. Press the button on the launcher to spin a top into the bowl, then flick the tops with a finger."></canvas>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Press the button!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
@@ -154,7 +154,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var DEBUG = /[?&]debug\b/.test(location.search);
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   var DEPTH = 0.14;                 // how deep the bowl is (bowl radius = 1)
-  var TOP_R = 0.165;                // a top's radius in bowl units
+  var TOP_R = 0.18;                // a top's radius in bowl units
   var GIANT_R = 0.3;
   var MAXW = 5;                     // at most this many tops in the bowl (a giant counts as two)
   var VMAX = 1.7;                   // fastest a top slides (bowl radii per second)
@@ -162,19 +162,49 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // The five tops. h: height of the top face above the tip; rim: thickness of the rim band; bandR: the
   // band's radius (the gear's teeth stick out past it); stem: the knob on top. All in units of the radius.
   var DES = [
+    { id: "lights", label: "Lights", h: 1.05, rim: 0.15, bandR: 1, stemR: 0.14, stemH: 0.2, dome: true,
+      body: "rgba(176,214,250,0.8)", bodyDark: "rgba(96,140,205,0.85)", rimC: "rgba(222,240,255,0.92)", stemC: "#FFFFFF",
+      trail: "lights", spark: ["#FFFFFF", "#FFF6C9", "#D9F2FF"], lights: true },
     { id: "wood", label: "Wood", h: 1.3, rim: 0.16, bandR: 1, stemR: 0.15, stemH: 0.4, knob: true,
       body: "#D79A5A", bodyDark: "#9A6232", rimC: "#E8453C", stemC: "#E8453C", trail: "#E8453C", spark: ["#FFD27A", "#FFFFFF"] },
     { id: "metal", label: "Metal", h: 0.85, rim: 0.22, bandR: 1, stemR: 0.13, stemH: 0.16,
       body: "#9AA6BA", bodyDark: "#56627A", rimC: "#3D7BFF", stemC: "#FFC93C", trail: "#3D7BFF", spark: ["#FFB627", "#FFE14D", "#FFFFFF"], sparky: true },
     { id: "rainbow", label: "Rainbow", h: 1.1, rim: 0.13, bandR: 1, stemR: 0.1, stemH: 0.55, knob: true,
       body: "#8E6CFF", bodyDark: "#5B3FC9", rimC: "#FFFFFF", stemC: "#FF4D6D", trail: "rainbow", spark: ["#FF4D6D", "#FFB627", "#4CD964", "#3DB4FF", "#8E6CFF"] },
-    { id: "glow", label: "Glow", h: 1.05, rim: 0.15, bandR: 1, stemR: 0.14, stemH: 0.2, dome: true,
-      body: "#2A2F6B", bodyDark: "#161A44", rimC: "#3DF5FF", stemC: "#FF6FD8", trail: "#3DF5FF", spark: ["#B8FFF9", "#FF9FE8", "#D7FF6B"], glow: true },
     { id: "gear", label: "Gear", h: 1.0, rim: 0.2, bandR: 0.86, stemR: 0.14, stemH: 0.36,
       body: "#FF9A2E", bodyDark: "#C0620E", rimC: "#FFC93C", stemC: "#4A5578", trail: "#FF9A2E", spark: ["#FFC93C", "#FFFFFF"], gear: true }
   ];
   var DES_BY = {};
   DES.forEach(function (d, i) { DES_BY[d.id] = i; d.down = Math.max(0.95, Math.min(1.2, Math.atan2(d.h, 1) + 0.4)); });
+  DES_BY.glow = DES_BY.lights;      // the old Glow top became the light-up top
+
+  // ---------- The light-up top's lights ----------
+  // While it spins the lights change color every 2 s with a half-second fade: red, orange, yellow, green, blue,
+  // purple, rainbow, then around again. Even steps are one solid color, odd steps alternate two colors.
+  // With reduced motion each top keeps one color for its whole spin.
+  var LC = [[255, 64, 96], [255, 150, 40], [255, 224, 60], [60, 220, 100], [50, 170, 255], [160, 100, 255]];
+  var NLED = 12;
+  function ledColor(stage, i) {
+    if (stage === 6) return LC[i % 6];
+    if (stage % 2 === 1) return i % 2 ? LC[(stage + 2) % 6] : LC[stage];
+    return LC[stage];
+  }
+  function lightCols(t) {
+    var lt = t.lt || 0, stage, f;
+    if (reduce) { stage = t.fix == null ? 6 : t.fix; f = 1; }
+    else { stage = Math.floor(lt / 2) % 7; f = clamp((lt % 2) / 0.5, 0, 1); f = f * f * (3 - 2 * f); }
+    var prev = (stage + 6) % 7, out = [], ar = 0, ag = 0, ab = 0;
+    if (lt < 2) f = 1;
+    for (var i = 0; i < NLED; i++) {
+      var a = ledColor(prev, i), b = ledColor(stage, i);
+      var c = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+      out.push(c); ar += c[0]; ag += c[1]; ab += c[2];
+    }
+    var mx = Math.max(ar, ag, ab) / NLED || 1;
+    t.lavg = [ar / NLED * 255 / mx, ag / NLED * 255 / mx, ab / NLED * 255 / mx];
+    return out;
+  }
+  function rgba(c, a) { return "rgba(" + (c[0] | 0) + "," + (c[1] | 0) + "," + (c[2] | 0) + "," + clamp(a, 0, 1).toFixed(3) + ")"; }
   var RAINBOW = ["#FF4D6D", "#FF9A2E", "#FFE14D", "#4CD964", "#3DB4FF", "#8E6CFF", "#FF6FD8"];
 
   function $(id) { return document.getElementById(id); }
@@ -206,7 +236,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           t.s = num(q.s, 0, 1, 0.5); t.psi = num(q.ps, -100, 100, 0);
           t.state = q.st === "down" || q.st === "fall" ? "down" : "spin";
           t.zr = 0;
-          if (t.state === "down") { t.phi = DES[t.d].down; t.s = 0; t.omega = 0; t.vx = t.vy = 0; }
+          if (t.state === "down") { t.phi = DES[t.d].down; t.s = 0; t.omega = 0; t.vx = t.vy = 0; t.lit = 0; }
           tops.push(t);
         });
       }
@@ -234,7 +264,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       x: 0, y: 0, vx: 0, vy: 0, zr: 0, vz: 0, z: 0,
       s: 1, life: (giant ? 30 : 9) + 38 * p, omega0: 12 + 40 * p, omega: 0, theta: Math.random() * TAU,
       phi: 0.03, psi: Math.random() * TAU, bump: 0, state: "spin", ft: 0, psiRate: 0,
-      trail: [], hum: null, sc: 1, alpha: 1, grab: null, pushT: 0, hop: 0, tick: 0, born: performance.now() };
+      trail: [], hum: null, sc: 1, alpha: 1, grab: null, pushT: 0, hop: 0, tick: 0, born: performance.now(),
+      lt: 0, lit: 1, fix: Math.floor(Math.random() * 7) };
   }
   function weight() {
     var w = 0;
@@ -337,22 +368,19 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
       g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(0, 0, R * 0.16, 0, TAU); g.fill();
       g.strokeStyle = OUT; g.lineWidth = 4; g.stroke();
-    } else if (d.id === "glow") {
-      g.fillStyle = "#20265A"; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
-      g.strokeStyle = "rgba(61,245,255,0.5)"; g.lineWidth = 3;
-      g.beginPath(); g.arc(0, 0, R * 0.62, 0, TAU); g.stroke();
-      var neon = ["#3DF5FF", "#FF6FD8", "#D7FF6B", "#FFE14D"];
-      g.shadowBlur = 14;
-      for (i = 0; i < 10; i++) {
-        a = i * TAU / 10; g.fillStyle = neon[i % 4]; g.shadowColor = neon[i % 4];
-        g.beginPath(); g.arc(Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8, R * 0.09, 0, TAU); g.fill();
+    } else if (d.id === "lights") {
+      var lg = g.createRadialGradient(-R * 0.3, -R * 0.35, R * 0.05, 0, 0, R);
+      lg.addColorStop(0, "rgba(150,186,236,0.95)"); lg.addColorStop(1, "rgba(70,100,165,0.95)");
+      g.fillStyle = lg; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.35)"; g.lineWidth = 3;
+      [0.52, 0.92].forEach(function (f) { g.beginPath(); g.arc(0, 0, R * f, 0, TAU); g.stroke(); });
+      for (i = 0; i < NLED; i++) {
+        a = i * TAU / NLED;
+        g.fillStyle = "#D5E2F4"; g.beginPath(); g.arc(Math.cos(a) * R * 0.74, Math.sin(a) * R * 0.74, R * 0.085, 0, TAU); g.fill();
+        g.strokeStyle = "rgba(29,35,64,0.55)"; g.lineWidth = 2.5; g.stroke();
       }
-      for (i = 0; i < 5; i++) {
-        a = i * TAU / 5 + 0.3; g.fillStyle = neon[(i + 1) % 4]; g.shadowColor = g.fillStyle;
-        g.beginPath(); g.arc(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45, R * 0.07, 0, TAU); g.fill();
-      }
-      g.fillStyle = "#FFE14D"; g.shadowColor = "#FFE14D"; star(g, R * 0.3, 5, 0.45); g.fill();
-      g.shadowBlur = 0;
+      g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 6;
+      g.beginPath(); g.arc(0, 0, R * 0.86, 3.6, 4.4); g.stroke();
     } else if (d.id === "gear") {
       facePath(g, d, R); g.fillStyle = "#FF9A2E"; g.fill();
       g.fillStyle = "#FFB55C"; g.beginPath(); g.arc(0, 0, R * 0.74, 0, TAU); g.fill();
@@ -455,7 +483,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (d.dome) {
         p = ring(d.h, 0.38, 14, []); ring(d.h + 0.14, 0.3, 12, p); ring(d.h + 0.22, 0.15, 10, p);
         h = hull(p); polyPath(g, p, h);
-        g.fillStyle = "rgba(255,111,216,0.85)"; g.fill(); g.stroke();
+        if (d.lights) {
+          var lit2 = t.lit == null ? 1 : t.lit, av = t.lavg || [255, 255, 255];
+          g.fillStyle = rgba([210 + (av[0] - 210) * lit2 * 0.7, 225 + (av[1] - 225) * lit2 * 0.7, 245 + (av[2] - 245) * lit2 * 0.7], 0.9);
+        } else g.fillStyle = "rgba(255,111,216,0.85)";
+        g.fill(); g.stroke();
         g.fillStyle = "rgba(255,255,255,0.75)";
         g.beginPath(); g.arc(Tx + Ax * (d.h + 0.16) - rs * 0.1, Ty + Ay * (d.h + 0.16) - rs * 0.04, rs * 0.07, 0, TAU); g.fill();
         return;
@@ -482,10 +514,47 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       p = ring(hb, d.bandR, 22, []); ring(d.h, d.bandR, 22, p);
       h = hull(p); polyPath(g, p, h);
       g.fillStyle = d.rimC; g.fill(); g.stroke();
-      if (d.glow && t.blur > 0.05) { g.strokeStyle = "rgba(255,255,255," + (0.5 * t.blur).toFixed(2) + ")"; g.lineWidth = lw * 0.8; g.stroke(); g.strokeStyle = OUT; g.lineWidth = lw; }
+      if (d.lights) {
+        g.fillStyle = "rgba(255,255,255,0.45)";
+        var hx0 = Tx + Ax * hb * 0.5 - rs * 0.45, hy0 = Ty + Ay * hb * 0.5;
+        g.beginPath(); g.ellipse(hx0, hy0, rs * 0.07, rs * 0.28, -0.35, 0, TAU); g.fill();
+      }
+    }
+    function lightsFace(Fx, Fy, b) {
+      var lit = t.lit == null ? 1 : t.lit, cols = lightCols(t), seg = TAU / NLED, i, a, c;
+      g.save();
+      g.transform(Ux, Uy, Vx, Vy, Fx, Fy);
+      g.rotate(t.theta);
+      g.drawImage(d.face, -1, -1, 2, 2);
+      if (lit > 0.02) {
+        // fast: every light draws a trail behind it, and the trails join into glowing rings
+        var arcLen = Math.min(seg * 1.02, b * 1.7 * seg);
+        g.lineCap = "round";
+        for (i = 0; i < NLED; i++) {
+          a = i * seg; c = cols[i];
+          if (arcLen > 0.04) {
+            for (var k = 0; k < 3; k++) {
+              g.strokeStyle = rgba(c, lit * (1 - k * 0.22)); g.lineWidth = 0.2 - k * 0.035;
+              g.beginPath(); g.arc(0, 0, 0.74, a + arcLen * k / 3, a + arcLen * (k + 1) / 3); g.stroke();
+            }
+          }
+          var lx = Math.cos(a) * 0.74, ly = Math.sin(a) * 0.74;
+          var dotA = 1 - 0.55 * Math.max(0, b - 0.3) / 0.6;      // at full speed the rings take over from the dots
+          g.fillStyle = rgba(c, lit * 0.35 * dotA); g.beginPath(); g.arc(lx, ly, 0.2, 0, TAU); g.fill();
+          g.fillStyle = rgba(c, lit); g.beginPath(); g.arc(lx, ly, 0.11, 0, TAU); g.fill();
+          g.fillStyle = "rgba(255,255,255," + (lit * 0.85 * dotA).toFixed(3) + ")"; g.beginPath(); g.arc(lx, ly, 0.04, 0, TAU); g.fill();
+        }
+        // the inner ring glows in the mixed color
+        g.strokeStyle = rgba(cols[1], lit * (0.4 + 0.5 * b)); g.lineWidth = 0.09;
+        g.beginPath(); g.arc(0, 0, 0.42, 0, TAU); g.stroke();
+      }
+      g.restore();
+      g.save(); g.transform(Ux, Uy, Vx, Vy, Fx, Fy); facePath(g, d, 1); g.restore();
+      g.stroke();
     }
     function face() {
       var Fx = Tx + Ax * d.h, Fy = Ty + Ay * d.h, b = t.blur || 0;
+      if (d.lights) { lightsFace(Fx, Fy, b); return; }
       g.save();
       g.transform(Ux, Uy, Vx, Vy, Fx, Fy);
       g.rotate(t.theta);
@@ -505,13 +574,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       facePath(g, d, 1);
       g.restore();
       g.stroke();
-      if (d.glow && b > 0.05) {
-        g.save(); g.globalCompositeOperation = "lighter";
-        var gr = g.createRadialGradient(Fx, Fy, rs * 0.3, Fx, Fy, rs * 1.7);
-        gr.addColorStop(0, "rgba(61,245,255," + (0.35 * b).toFixed(2) + ")"); gr.addColorStop(1, "rgba(61,245,255,0)");
-        g.fillStyle = gr; g.beginPath(); g.arc(Fx, Fy, rs * 1.7, 0, TAU); g.fill();
-        g.restore();
-      }
     }
     if (facing >= 0) { body(); face(); stem(); }
     else { stem(); body(); }
@@ -537,14 +599,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var portrait = H > W * 1.08;
     var pad = 10;
     L.s = clamp(Math.min(W, H) / (portrait ? 260 : 330), 0.7, 1.5);
-    L.w = 112 * L.s; L.h = 44 * L.s;
-    L.D = { x: portrait ? -0.3 : -0.36, y: -0.42 };
+    // the launcher: a body that holds the top from above, with one big button on top (at least 68 px across)
+    L.bR = Math.max(34, 28 * L.s); L.h = 40 * L.s; L.w = Math.max(2 * L.bR + 36 * L.s, 104 * L.s);
+    L.bH = 14 * L.s;                   // how far the button sticks up
+    L.D = { x: 0, y: -0.42 };
     var tallest = 0;
     DES.forEach(function (d) { tallest = Math.max(tallest, d.h + d.stemH + 0.25); });
     // keep clear of the coach line when it sits at the top of the stage (tablets)
     var ce = $("coach"), coachBottom = 0;
     if (ce && ce.offsetHeight && ce.offsetTop < H / 2) coachBottom = ce.offsetTop + ce.offsetHeight + 4;
-    var wall = 0.13, k, cz, S0, Dx, Dy, hangPx, lbottom = Math.max(pad + 6 * L.s, coachBottom) + L.h;
+    var wall = 0.13, k, cz, S0, Dx, Dy, hangPx, lbottom = Math.max(pad, coachBottom) + L.bR * 0.55 + L.bH + 10 * L.s + L.h;
     var topRes = Math.max(L.s * 66, H * (portrait ? 0.24 : 0.14));
     for (var pass = 0; pass < 2; pass++) {
       var Wa = W - 2 * pad, Hb = H - topRes - pad;
@@ -571,10 +635,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
     L.x = Dx; L.y = lbottom - L.h / 2;
     L.hangTopY = lbottom;
-    L.exitX = L.x + L.w / 2; L.exitY = L.y + 3 * L.s;
-    L.restX = L.exitX + 30 * L.s; L.restY = L.exitY;
-    L.max = clamp(Math.min(W, H) * 0.5, 110, 300);
-    if (!cord.ptr && !cord.auto) { cord.hx = L.restX; cord.hy = L.restY; }
+    L.btnX = L.x; L.btnY = L.y - L.h / 2 + 2 * L.s;   // where the button meets the body
     buildBg();
   }
   function proj(x, y, z) { return [Vw.ox + x * Vw.S, Vw.oy + (y * Vw.k - z * Vw.cz) * Vw.S]; }
@@ -704,6 +765,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     noise(ac, t0, 0.22 + 0.1 * p, "bandpass", 700, 2600 + 1800 * p, 2.5, 0.22);
     tone(ac, t0 + 0.05, 0.3, "triangle", 300, 700 + 500 * p, 0.05);
   }
+  function sClick() {
+    var ac = audio(); if (!ac) return;
+    var t0 = ac.currentTime;
+    tone(ac, t0, 0.05, "square", 1400, 900, 0.035);
+    tone(ac, t0, 0.12, "sine", 420, 300, 0.07);
+  }
   function sClack(v) {
     var now = performance.now();
     if (now - lastClack < 45) return;
@@ -763,78 +830,76 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function stopHums() { tops.forEach(function (t) { humUpdate(t, null); }); }
 
-  // ---------- The launcher and its ripcord ----------
-  var cord = { hx: 0, hy: 0, ptr: null, offX: 0, offY: 0, maxPull: 0, peak: 0, lastPull: 0, lastT: 0, auto: null, back: null, spin: 0 };
-  var hang = { theta: 0, pop: 1, popT: 1, design: 0, wind: 0 };
-  function pullLen() { var dx = cord.hx - L.restX, dy = cord.hy - L.restY; return Math.sqrt(dx * dx + dy * dy); }
-  function powerNow() {
-    var lenF = Math.min(1, cord.maxPull / L.max), spdF = clamp((cord.peak / L.max - 0.8) / 5, 0, 1);
-    return clamp(0.22 + 0.4 * lenF + 0.45 * spdF, 0.22, 1);
-  }
+  // ---------- The launcher: one big button ----------
+  // A tap on the button (or anywhere on the launcher or the top in it) launches with a good long spin. Holding
+  // it a little longer fills a glow ring round the button for an extra-strong spin (it goes by itself when full).
+  var press = null;                  // { ptr, t } while the button is held down
+  var hang = { theta: 0, pop: 1, popT: 1, design: 0, wind: 0, lt: 0, since: 1, btn: 0, flash: 0 };
+  var HOLD_FULL = 1.2;
+  function holdF() { return press ? clamp((press.t - 0.2) / HOLD_FULL, 0, 1) : 0; }
   function launch(p, dirX) {
     if (Toybox.timer.locked()) return;
     makeRoom(1);
     var t = makeTop(hang.design, false, p);
     t.x = L.D.x + rnd(-0.03, 0.03); t.y = L.D.y + rnd(-0.03, 0.03);
-    t.state = "drop"; t.zr = L.hL; t.vz = 0; t.theta = hang.theta;
+    t.state = "drop"; t.zr = L.hL; t.vz = 0; t.theta = hang.theta; t.lt = hang.lt % 14; t.fix = t.id % 7;
     // it lands with a swirl round the bowl
     var m = Math.sqrt(t.x * t.x + t.y * t.y) || 1, sgn = dirX < 0 ? -1 : 1, sp = 0.4 + 0.35 * p;
     t.vx = -t.y / m * sp * sgn + rnd(-0.08, 0.08); t.vy = t.x / m * sp * sgn + rnd(-0.08, 0.08);
     tops.push(t);
     sZip(p);
-    learned.pull = true;
-    hang.pop = 0; hang.popT = 0;
-    // the top drops away: a puff of air rings under the launcher
+    learned.press = true;
+    hang.pop = 0; hang.popT = 0; hang.since = 0; hang.flash = 1;
+    // the top drops away: a puff of sparkles under the launcher
     var hx = L.x, hy = L.hangTopY + 10;
     for (var i = 0; i < 6 + p * 8; i++) addPart(hx + rnd(-10, 10), hy + rnd(0, 20), rnd(-90, 90) * p, rnd(-20, 40), DES[t.d].spark[i % DES[t.d].spark.length], rnd(0.3, 0.6), rnd(2, 4), 1);
     dirty = true;
     coachUpdate();
-    if (learned.pull && learned.flick) ghost.learned();
+    if (learned.press && learned.flick) ghost.learned();
     return t;
   }
-  function cordRelease(doLaunch) {
-    var p = powerNow(), dx = cord.hx - L.restX;
-    cord.ptr = null;
-    if (doLaunch) launch(p, dx);
-    cord.back = { t: 0, fx: cord.hx, fy: cord.hy };
+  function pressDown(id) {
+    if (press || Toybox.timer.locked()) return false;
+    press = { ptr: id, t: 0 };
+    sClick();
+    return true;
   }
-  function autoPull() {
-    if (cord.auto || cord.ptr !== null) return;
-    cord.back = null;
-    cord.auto = { t: 0, dur: 0.34, tx: L.restX + L.max * 0.62, ty: L.restY + L.max * 0.16 };
-    if (cord.auto.tx > W - 20) { cord.auto.tx = W - 20; cord.auto.ty = L.restY + L.max * 0.45; }
+  // Let go: every launch is a strong spin; a longer hold makes it the strongest.
+  function pressUp(doLaunch) {
+    if (!press) return;
+    var f = holdF();
+    press = null;
+    if (doLaunch) launch(0.8 + 0.2 * f, 1);
   }
-  function cordStep(dt) {
-    if (cord.auto) {
-      var a = cord.auto; a.t += dt;
-      var f = Math.min(1, a.t / a.dur), e = 1 - Math.pow(1 - f, 2);
-      cord.hx = L.restX + (a.tx - L.restX) * e; cord.hy = L.restY + (a.ty - L.restY) * e;
-      hang.wind = e * 0.55;
-      if (f >= 1) { cord.auto = null; launch(0.55, 1); cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; }
-    } else if (cord.back) {
-      var b = cord.back; b.t += dt;
-      var g = Math.min(1, b.t / 0.32), e2 = 1 - Math.pow(1 - g, 3);
-      cord.hx = b.fx + (L.restX - b.fx) * e2; cord.hy = b.fy + (L.restY - b.fy) * e2;
-      if (g >= 1) cord.back = null;
-      hang.wind *= Math.exp(-6 * dt);
-    } else if (cord.ptr !== null) {
-      hang.wind = powerNow() * Math.min(1, cord.maxPull / (L.max * 0.3));
+  function launcherStep(dt) {
+    if (press) {
+      press.t += dt;
+      hang.wind = 0.35 + 0.65 * holdF();
+      if (press.t - 0.2 >= HOLD_FULL + 0.25) {
+        // held all the way: off it goes by itself (the finger can stay down)
+        var P = ptrs[press.ptr];
+        if (P) P.role = "none";
+        pressUp(true);
+      }
     } else hang.wind *= Math.exp(-4 * dt);
+    hang.btn += ((press ? 1 : 0) - hang.btn) * Math.min(1, dt * (press ? 30 : 14));
+    hang.flash = Math.max(0, hang.flash - dt * 2.2);
     if (hang.popT < 1) { hang.popT = Math.min(1, hang.popT + dt / 0.45); }
     hang.pop = hang.popT < 0.25 ? 0 : backOut((hang.popT - 0.25) / 0.75);
-    hang.theta += (1.1 + hang.wind * 16) * dt;
+    hang.theta += (1.6 + hang.wind * 14) * dt;
+    hang.lt += dt; hang.since += dt;
   }
   function backOut(x) { var c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
 
   function drawLauncher(g) {
-    var s = L.s, x = L.x, y = L.y, w = L.w, h = L.h, locked = ending || resting;
+    var s = L.s, x = L.x, y = L.y, w = L.w, h = L.h, locked = ending || resting, i;
     g.save();
     if (locked) g.globalAlpha = 0.55;
-    // the top hanging under the launcher (spins up while the cord is pulled)
+    // the top waiting under the launcher: it turns slowly, its lights fade on, and it spins up while held
     var ht = { d: hang.design, r: TOP_R, x: L.D.x, y: L.D.y, z: zB(L.D.x, L.D.y) + L.hL, phi: 0, psi: 0, theta: hang.theta,
-      blur: clamp(hang.wind * 1.1 - 0.1, 0, 0.85), sc: hang.pop };
+      blur: clamp(hang.wind * 1.1 - 0.15, 0, 0.85), sc: hang.pop, lt: hang.lt,
+      lit: locked ? 0.25 : Math.min(1, hang.since / 0.7) * (0.6 + 0.4 * Math.min(1, hang.wind * 1.5)), fix: 0 };
     if (hang.pop > 0.02 && L.hL < 0.7) {
-      // its shadow on the bowl
       var sp = proj(L.D.x, L.D.y, zB(L.D.x, L.D.y));
       var shf = clamp(1 - L.hL * 0.45, 0.35, 1);
       g.fillStyle = "rgba(29,35,64," + (0.13 * shf).toFixed(3) + ")"; ell(g, sp[0], sp[1], TOP_R * Vw.S * 0.8 * shf, TOP_R * Vw.S * Vw.k * 0.8 * shf); g.fill();
@@ -843,49 +908,54 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       drawTop(g, ht, Vw);
       hang.sx = ht.sx; hang.sy = ht.sy; hang.srad = ht.srad;
     }
-    // the cord
-    var ex = L.exitX, ey = L.exitY, hx = cord.hx, hy = cord.hy;
-    var dx = hx - ex, dy = hy - ey, len = Math.sqrt(dx * dx + dy * dy), sag = Math.min(18 * s, len * 0.08);
-    g.lineCap = "round";
-    g.beginPath(); g.moveTo(ex, ey); g.quadraticCurveTo((ex + hx) / 2, (ey + hy) / 2 + sag, hx, hy);
-    g.strokeStyle = OUT; g.lineWidth = 9 * s; g.stroke();
-    g.strokeStyle = "#FFFFFF"; g.lineWidth = 4.5 * s; g.stroke();
-    g.setLineDash([3 * s, 5 * s]); g.strokeStyle = "#FF4D6D"; g.lineWidth = 2 * s; g.stroke(); g.setLineDash([]);
-    // the body
     g.lineJoin = "round"; g.strokeStyle = OUT; g.lineWidth = 3.5 * s;
-    // claw that holds the top
+    // the claw that holds the top's stem
     g.fillStyle = "#9AA6BA";
     g.beginPath(); g.moveTo(x - 16 * s, y + h / 2 - 2); g.lineTo(x + 16 * s, y + h / 2 - 2); g.lineTo(x + 11 * s, y + h / 2 + 8 * s); g.lineTo(x - 11 * s, y + h / 2 + 8 * s); g.closePath(); g.fill(); g.stroke();
-    // grip on the left
+    // the body, with handles on both sides
     g.fillStyle = "#3D7BFF";
-    rr(g, x - w / 2 - 6 * s, y - h * 0.35, 26 * s, h * 0.9, 8 * s); g.fill(); g.stroke();
-    g.fillStyle = "#FF4D6D";
-    rr(g, x - w / 2, y - h / 2, w, h, 14 * s); g.fill(); g.stroke();
-    g.fillStyle = "rgba(255,255,255,0.35)"; rr(g, x - w / 2 + 8 * s, y - h / 2 + 5 * s, w - 16 * s, 7 * s, 4 * s); g.fill();
-    // gear window: the gear spins while the cord runs
-    g.fillStyle = "#FFF6DD"; g.beginPath(); g.arc(x, y + 2 * s, h * 0.34, 0, TAU); g.fill(); g.stroke();
-    g.save(); g.translate(x, y + 2 * s); g.rotate(hang.theta * 0.6);
-    g.fillStyle = "#FFC93C"; g.beginPath();
-    for (var i = 0; i < 24; i++) { var a = i / 24 * TAU, r0 = (i % 3 === 0) ? h * 0.27 : h * 0.21; if (i === 0) g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); else g.lineTo(Math.cos(a) * r0, Math.sin(a) * r0); }
-    g.closePath(); g.fill(); g.lineWidth = 2 * s; g.stroke();
-    g.fillStyle = OUT; g.beginPath(); g.arc(0, 0, h * 0.06, 0, TAU); g.fill();
-    g.restore();
-    // cord slot on the right
-    g.fillStyle = OUT; rr(g, ex - 7 * s, ey - 6 * s, 9 * s, 12 * s, 3 * s); g.fill();
-    // the handle: a big yellow T-grip
-    var grabbing = cord.ptr !== null, hs = s * (grabbing ? 1.12 : 1);
-    var ang = len > 4 ? Math.atan2(dy, dx) : 0;
-    g.save(); g.translate(hx, hy); g.rotate(ang);
-    g.lineWidth = 3.5 * s; g.strokeStyle = OUT;
-    g.fillStyle = "#FFC93C"; rr(g, -2 * hs, -9 * hs, 16 * hs, 18 * hs, 5 * hs); g.fill(); g.stroke();
-    rr(g, 10 * hs, -28 * hs, 20 * hs, 56 * hs, 10 * hs); g.fill(); g.stroke();
-    g.fillStyle = "rgba(255,255,255,0.55)"; rr(g, 14 * hs, -22 * hs, 5 * hs, 30 * hs, 3 * hs); g.fill();
-    g.restore();
-    // a pulse ring round the handle until he has pulled it once
-    if (!learned.pull && !locked) {
-      var ph = (performance.now() / 1400) % 1;
-      g.strokeStyle = "rgba(255,201,60," + (0.85 * (1 - ph)).toFixed(2) + ")"; g.lineWidth = 4 * s;
-      g.beginPath(); g.arc(hx + 20 * s, hy, (26 + 22 * ph) * s, 0, TAU); g.stroke();
+    rr(g, x - w / 2 - 10 * s, y - h * 0.3, 22 * s, h * 0.75, 8 * s); g.fill(); g.stroke();
+    rr(g, x + w / 2 - 12 * s, y - h * 0.3, 22 * s, h * 0.75, 8 * s); g.fill(); g.stroke();
+    g.fillStyle = "#FFC93C";
+    rr(g, x - w / 2, y - h / 2, w, h, 16 * s); g.fill(); g.stroke();
+    g.fillStyle = "rgba(255,255,255,0.45)"; rr(g, x - w / 2 + 10 * s, y + h * 0.05, w - 20 * s, 6 * s, 3 * s); g.fill();
+    // little lights along the front, in the waiting top's color
+    var lc = ht.lavg || [255, 77, 109];
+    for (i = 0; i < 5; i++) {
+      var lx = x - w * 0.3 + i * w * 0.15, on = DES[hang.design].lights ? rgba(lc, 0.95) : RAINBOW[i];
+      g.fillStyle = on; g.beginPath(); g.arc(lx, y + h * 0.3, 3.2 * s, 0, TAU); g.fill();
+    }
+    // the button: a big red cylinder that presses down
+    var bR = L.bR, ry = bR * 0.52, bx = L.btnX, by0 = L.btnY, up = L.bH * (1 - 0.75 * hang.btn), by = by0 - up;
+    // collar
+    g.fillStyle = "#1D2340"; ell(g, bx, by0, bR * 1.12, ry * 1.12); g.fill();
+    // side
+    g.beginPath(); g.moveTo(bx - bR, by); g.lineTo(bx - bR, by0); g.ellipse(bx, by0, bR, ry, 0, Math.PI, 0, true); g.lineTo(bx + bR, by);
+    g.closePath(); g.fillStyle = "#C9203F"; g.fill(); g.stroke();
+    // top
+    ell(g, bx, by, bR, ry);
+    var bg2 = g.createRadialGradient(bx - bR * 0.3, by - ry * 0.4, bR * 0.1, bx, by, bR);
+    bg2.addColorStop(0, "#FF8FA5"); bg2.addColorStop(0.6, "#FF4D6D"); bg2.addColorStop(1, "#E5304F");
+    g.fillStyle = bg2; g.fill(); g.stroke();
+    g.fillStyle = "rgba(255,255,255,0.6)"; g.beginPath(); g.ellipse(bx - bR * 0.35, by - ry * 0.3, bR * 0.22, ry * 0.18, -0.3, 0, TAU); g.fill();
+    // glow ring that fills while it is held, and a burst when the top goes
+    var hf = holdF();
+    if (hf > 0) {
+      g.lineCap = "round"; g.lineWidth = 7 * s;
+      g.strokeStyle = "rgba(255,201,60,0.35)"; ell(g, bx, by0 - L.bH * 0.5, bR * 1.3, ry * 1.4); g.stroke();
+      g.strokeStyle = hf >= 1 ? "#FFF2A8" : "#FFC93C";
+      g.beginPath(); g.ellipse(bx, by0 - L.bH * 0.5, bR * 1.3, ry * 1.4, 0, -Math.PI / 2, -Math.PI / 2 + hf * TAU); g.stroke();
+    }
+    if (hang.flash > 0) {
+      g.strokeStyle = "rgba(255,225,77," + (hang.flash * 0.9).toFixed(3) + ")"; g.lineWidth = 5 * s;
+      var fr = 1.2 + (1 - hang.flash) * 0.8;
+      ell(g, bx, by0 - L.bH * 0.5, bR * fr, ry * fr * 1.15); g.stroke();
+    }
+    // a soft pulse round the button until he has pressed it once
+    if (!learned.press && !locked && !press) {
+      var ph = (performance.now() / 1600) % 1;
+      g.strokeStyle = "rgba(255,201,60," + (0.8 * (1 - ph)).toFixed(2) + ")"; g.lineWidth = 4 * s;
+      ell(g, bx, by0 - L.bH * 0.5, bR * (1.2 + 0.5 * ph), ry * (1.3 + 0.6 * ph)); g.stroke();
     }
     g.restore();
   }
@@ -897,7 +967,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Physics ----------
   var tiltX = 0, tiltY = 0, tiltOn = false;
   var ending = false, resting = false, endingDone = null, endingT = 0;
-  var learned = { pull: false, flick: false };
+  var learned = { press: false, flick: false };
   function update(dt) {
     var i, j, t;
     for (i = 0; i < tops.length; i++) {
@@ -925,6 +995,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           if (t.vz < -1.2 && !t.bounced) { t.vz = -t.vz * 0.22; t.bounced = true; sThump(); landPuff(t); }
           else { t.vz = 0; t.state = "spin"; if (!t.bounced) { sThump(); landPuff(t); } }
         }
+      }
+      // the lights: on while it spins (colors step every 2 s), fading off softly as it falls
+      if (d.lights) {
+        if (t.state === "spin" || t.state === "drop") { t.lt += dt; t.lit = Math.min(1, t.lit + dt * 3); }
+        else if (t.state === "fall") t.lit = Math.max(0, t.lit - dt / 1.6);
+        else if (t.state === "down") t.lit = Math.max(0, t.lit - dt / 0.8);
       }
       // spin
       if (t.state === "spin" || t.state === "drop") {
@@ -997,11 +1073,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       } else if (t.trail.length) { if (Math.random() < dt * 30) t.trail.shift(); }
       // rim sparks while spinning fast
       if (t.state === "spin" && t.blur > 0.2 && t.sx != null && !reduce) {
-        var rateS = (d.sparky ? 9 : (d.glow ? 6 : 3)) * t.blur * (t.giant ? 1.6 : 1);
+        var rateS = (d.sparky ? 9 : (d.lights ? 5 : 3)) * t.blur * (t.giant ? 1.6 : 1);
         if (Math.random() < rateS * dt) {
           var a = rnd(0, TAU), R = t.srad;
           var px = t.sx + Math.cos(a) * R, py = t.sy + Math.sin(a) * R * Vw.k;
-          addPart(px, py, -Math.sin(a) * 150, Math.cos(a) * 150 * Vw.k - 20, d.spark[(Math.random() * d.spark.length) | 0], rnd(0.25, 0.5), rnd(2, 3.5), 0);
+          addPart(px, py, -Math.sin(a) * 150, Math.cos(a) * 150 * Vw.k - 20, d.lights && t.lavg ? rgba(t.lavg, 1) : d.spark[(Math.random() * d.spark.length) | 0], rnd(0.25, 0.5), rnd(2, 3.5), 0);
         }
       }
     }
@@ -1087,13 +1163,24 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var w = t.r * S * (t.giant ? 0.3 : 0.38);
       for (var j = 1; j < tr.length; j++) {
         var f = j / tr.length, p0 = proj(tr[j - 1][0], tr[j - 1][1], zB(tr[j - 1][0], tr[j - 1][1])), p1 = proj(tr[j][0], tr[j][1], zB(tr[j][0], tr[j][1]));
-        g.strokeStyle = d.trail === "rainbow" ? RAINBOW[(j + ((t.id * 3) | 0)) % RAINBOW.length] : d.trail;
-        g.globalAlpha = f * (d.glow ? 0.6 : 0.42) * (t.alpha == null ? 1 : t.alpha) * Math.min(1, t.s * 3);
+        g.strokeStyle = d.trail === "rainbow" ? RAINBOW[(j + ((t.id * 3) | 0)) % RAINBOW.length] : (d.lights ? rgba(t.lavg || [255, 255, 255], 1) : d.trail);
+        g.globalAlpha = f * (d.lights ? 0.6 * (t.lit == null ? 1 : t.lit) : 0.42) * (t.alpha == null ? 1 : t.alpha) * Math.min(1, t.s * 3);
         g.lineWidth = w * (0.4 + 0.6 * f);
         g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke();
       }
     }
     g.globalAlpha = 1;
+    // the light-up tops cast a soft colored glow on the bowl
+    for (i = 0; i < tops.length; i++) {
+      t = tops[i];
+      if (!DES[t.d].lights || !t.lavg || !(t.lit > 0.03)) continue;
+      var hp = proj(t.x, t.y, zB(t.x, t.y)), hr = t.r * S * 2.4, ha = t.lit * (0.2 + 0.3 * (t.blur || 0)) * (t.alpha == null ? 1 : t.alpha);
+      g.save(); g.translate(hp[0], hp[1]); g.scale(1, k);
+      var hg = g.createRadialGradient(0, 0, 0, 0, 0, hr);
+      hg.addColorStop(0, rgba(t.lavg, ha)); hg.addColorStop(1, rgba(t.lavg, 0));
+      g.fillStyle = hg; g.beginPath(); g.arc(0, 0, hr, 0, TAU); g.fill();
+      g.restore();
+    }
     // shadows
     for (i = 0; i < tops.length; i++) {
       t = tops[i];
@@ -1127,10 +1214,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var ptrs = {};
   function local(e) { return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
   function hitLauncher(p) {
-    var s = L.s;
-    var dx = p.x - (cord.hx + 18 * s), dy = p.y - cord.hy;
-    if (dx * dx + dy * dy < Math.pow(46 * s, 2)) return "handle";
-    if (p.x > L.x - L.w / 2 - 14 * s && p.x < L.x + L.w / 2 + 10 * s && p.y > L.y - L.h / 2 - 12 * s && p.y < L.y + L.h / 2 + 8 * s) return "body";
+    var s = L.s, dx = p.x - L.btnX, dy = (p.y - (L.btnY - L.bH * 0.5)) / 0.75;
+    if (dx * dx + dy * dy < Math.pow(L.bR * 1.35, 2)) return "button";
+    if (p.x > L.x - L.w / 2 - 14 * s && p.x < L.x + L.w / 2 + 14 * s && p.y > L.y - L.h / 2 - 8 * s && p.y < L.y + L.h / 2 + 10 * s) return "body";
     if (hang.sx != null) {
       var hx = p.x - hang.sx, hy = p.y - hang.sy, hr = Math.max(34, hang.srad * 1.25);
       if (hx * hx + hy * hy < hr * hr) return "body";
@@ -1158,14 +1244,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     var p = local(e), now = performance.now();
     var P = { x0: p.x, y0: p.y, x: p.x, y: p.y, t0: now, lt: now, fvx: 0, fvy: 0, moved: 0, role: "push", top: null };
-    var hl = cord.ptr === null && !cord.auto ? hitLauncher(p) : null;
-    var t = hitTop(p);
+    var hl = hitLauncher(p);
+    var t = hl ? null : hitTop(p);
     if (hl) {
-      P.role = "cord";
-      cord.ptr = e.pointerId; cord.back = null;
-      cord.offX = cord.hx - p.x; cord.offY = cord.hy - p.y;
-      cord.maxPull = pullLen(); cord.peak = 0; cord.lastPull = cord.maxPull; cord.lastT = now;
-      if (hl === "handle") P.handle = true;
+      P.role = pressDown(e.pointerId) ? "press" : "none";
     } else if (t) {
       P.role = "grab"; P.top = t;
       var fp = toFloor(p.x, p.y);
@@ -1182,20 +1264,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     P.moved = Math.max(P.moved, Math.sqrt(Math.pow(p.x - P.x0, 2) + Math.pow(p.y - P.y0, 2)));
     P.x = p.x; P.y = p.y; P.lt = now;
     if (Toybox.timer.locked()) return;
-    if (P.role === "cord" && cord.ptr === e.pointerId) {
-      cord.hx = clamp(p.x + cord.offX, 8, W - 8); cord.hy = clamp(p.y + cord.offY, 8, H - 8);
-      var len = pullLen(), cdt = Math.max(0.004, (now - cord.lastT) / 1000);
-      var v = (len - cord.lastPull) / cdt;
-      cord.lastPull = len; cord.lastT = now;
-      if (len > cord.maxPull) cord.maxPull = len;
-      if (v > 0) cord.peak = Math.max(cord.peak * 0.97, Math.min(v, L.max * 12));
-      if (len >= L.max) { P.role = "none"; cordRelease(true); }
+    if (P.role === "press") {
+      // nothing to do while the button is held
     } else if (P.role === "grab" && P.top && P.top.grab) {
       var t = P.top, fp = toFloor(p.x, p.y);
       t.grab.tx = fp.x + t.grab.ox; t.grab.ty = fp.y + t.grab.oy;
       var m = Math.sqrt(t.grab.tx * t.grab.tx + t.grab.ty * t.grab.ty), lim = 1 - t.r * 0.95;
       if (m > lim) { t.grab.tx *= lim / m; t.grab.ty *= lim / m; }
-      if (P.moved > 18 && t.state === "spin") { learned.flick = true; coachUpdate(); if (learned.pull) ghost.learned(); }
+      if (P.moved > 18 && t.state === "spin") { learned.flick = true; coachUpdate(); if (learned.press) ghost.learned(); }
     } else if (P.role === "push") {
       // a finger sweeping through the bowl bumps the tops it meets
       for (var i = 0; i < tops.length; i++) {
@@ -1209,7 +1285,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var push = clamp(0.35 + fs * 0.5, 0.35, 1.8) * (q.giant ? 0.6 : 1);
         q.vx += nx * push * 0.6 + fvx * 0.25; q.vy += ny * push * 0.6 + fvy * 0.25;
         q.pushT = 0.18;
-        if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); if (learned.pull) ghost.learned(); }
+        if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); if (learned.press) ghost.learned(); }
         else q.hop = 1;
         sClack(0.35);
       }
@@ -1220,11 +1296,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!P) return;
     delete ptrs[e.pointerId];
     var quick = P.moved < 12 && performance.now() - P.t0 < 600;
-    if (P.role === "cord" && cord.ptr === e.pointerId) {
-      if (Toybox.timer.locked()) { cord.ptr = null; cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; return; }
-      var len = pullLen();
-      if (quick && len < 12) { cord.ptr = null; autoPull(); }
-      else cordRelease(cord.maxPull > 5);
+    if (P.role === "press" && press && press.ptr === e.pointerId) {
+      pressUp(!Toybox.timer.locked());
     } else if (P.role === "grab" && P.top) {
       var t = P.top;
       if (t.grab) {
@@ -1258,7 +1331,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var V = { ox: 64, oy: 0, S: 44, k: 0.6, cz: 0.8 };
     var top = Math.max(d.h * V.S * V.cz + V.S * V.k, (d.h + d.stemH) * V.S * V.cz + 0.3 * V.S * V.k);
     V.oy = 64 + top / 2 + 2;
-    drawTop(g, { d: di, r: 1, x: 0, y: 0, z: 0, phi: 0.12, psi: -2.2, theta: 0.3, blur: 0, sc: 1 }, V);
+    drawTop(g, { d: di, r: 1, x: 0, y: 0, z: 0, phi: 0.12, psi: -2.2, theta: 0.3, blur: 0, sc: 1, lt: 12.9, lit: 1, fix: 6 }, V);
     return c;
   }
   var tilesEl = $("tiles");
@@ -1339,7 +1412,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var live = tops.filter(function (t) { return t.state !== "leave" && t.state !== "home"; });
     var spinning = live.some(function (t) { return t.state === "spin" || t.state === "drop"; });
     var txt = "";
-    if (!live.length || !learned.pull) txt = "Pull the cord!";
+    if (!live.length || !learned.press) txt = "Press the button!";
     else if (spinning && !learned.flick) txt = "Flick the tops!";
     if (txt !== coachText) {
       coachText = txt;
@@ -1448,14 +1521,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       show: function () { var p = plan(); if (p) show(p); return !!p; }
     };
   }
-  // The hand pulls the ripcord out; once he has done that, it flicks a spinning top.
+  // The hand taps the launcher's button; once he has done that, it flicks a spinning top.
   var ghost = makeGhost(function () {
-    if (cord.ptr !== null) return null;
-    if (!learned.pull) {
-      var hx = rect.left + L.restX + 20 * L.s, hy = rect.top + L.restY;
-      var tx = Math.min(rect.left + W - 30, hx + L.max * 0.75), ty = hy + L.max * 0.35;
-      return { pts: [[hx, hy], [tx, ty]], dur: 3000 };
-    }
+    if (press) return null;
+    if (!learned.press) return { pts: [[rect.left + L.btnX, rect.top + L.btnY - L.bH * 0.6]], tap: true };
     if (!learned.flick) {
       var t = tops.filter(function (q) { return q.state === "spin" && q.sx != null; })[0];
       if (!t) return null;
@@ -1507,7 +1576,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function onEnding(done) {
     ending = true; endingT = 0; endingDone = done;
     Object.keys(ptrs).forEach(function (id) { var P = ptrs[id]; if (P.top && P.top.grab) P.top.grab = null; delete ptrs[id]; });
-    if (cord.ptr !== null || cord.auto) { cord.ptr = null; cord.auto = null; cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; }
+    press = null;
   }
   function onGoodbye() {
     // the fallen tops give a little hop goodbye
@@ -1543,7 +1612,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     lastT = now;
     var w0 = performance.now();
     if (!resting) {
-      cordStep(dt);
+      launcherStep(dt);
       update(dt);
     }
     if (ending && endingDone) {
@@ -1567,10 +1636,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     window.__tops = {
       state: function () {
         return { design: DES[hang.design].id, tops: tops.map(function (t) { return { id: t.id, d: DES[t.d].id, st: t.state, s: +t.s.toFixed(3), x: +t.x.toFixed(3), y: +t.y.toFixed(3), giant: t.giant, p: +t.p.toFixed(2) }; }),
-          learned: { pull: learned.pull, flick: learned.flick }, coach: coachText, W: W, H: H, k: Vw.k, S: Vw.S, ending: ending };
+          learned: { press: learned.press, flick: learned.flick }, coach: coachText, W: W, H: H, k: Vw.k, S: Vw.S, ending: ending };
       },
       points: function () {
-        var o = { handle: [rect.left + L.restX + 20 * L.s, rect.top + L.restY], launcher: [rect.left + L.x, rect.top + L.y], max: L.max, tops: [] };
+        var o = { button: [rect.left + L.btnX, rect.top + L.btnY - L.bH * 0.6], bR: L.bR, launcher: [rect.left + L.x, rect.top + L.y], tops: [] };
         tops.forEach(function (t) { if (t.sx != null) o.tops.push({ id: t.id, st: t.state, x: rect.left + t.sx, y: rect.top + t.sy }); });
         return o;
       },
@@ -1581,6 +1650,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         return r;
       },
       launch: function (p) { return !!launch(p == null ? 0.6 : p, 1); },
+      lights: function () { return tops.filter(function (t) { return DES[t.d].lights; }).map(function (t) { return { st: t.state, lt: +t.lt.toFixed(2), stage: Math.floor(t.lt / 2) % 7, lit: +t.lit.toFixed(2), avg: (t.lavg || []).map(function (v) { return v | 0; }) }; }); },
+      setS: function (v) { tops.forEach(function (t) { if (t.state === "spin") t.s = v; }); },
       fallAll: function () { tops.forEach(function (t) { if (t.state === "spin") t.s = 0.0001; }); },
       fast: function (k) { tops.forEach(function (t) { t.life = Math.min(t.life, k || 3); }); },
       ghost: function () { return ghost.show(); },
@@ -1592,7 +1663,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Start ----------
   loadState();
   hang.design = S.design;
-  if (tops.length) learned.pull = true;
+  if (tops.length) learned.press = true;
   renderTiles();
   resize();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
