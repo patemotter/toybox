@@ -135,10 +135,14 @@ forced order (bricks and window before the beam), the topping-out tree.
 
 **Removed:** Bulldozer (a top-down field with textured dirt; it didn't fit the others and the jobs were too fiddly).
 
-**Excavator rework (in progress):** drag the bucket as the main control (it follows the finger and never freezes),
+**Excavator rework (done):** drag the bucket as the main control (it follows the finger and never freezes),
 backup **Dig** and **Dump** buttons that each run a whole motion (Dump always clears the truck rim and empties),
 a coach line that is always true, and hidden **treasures** in the dirt pile (treasure chest, gems, gold nugget,
 dinosaur bone, coin, fossil shell) that pop out with a sparkle and stay on display in a treasure crate.
+
+Excavator open points: the arm can't bring the bucket close to the cab; dirt lands mostly in the cab end of the
+bed; the crate is small on landscape phones. Questions for the dad: keep Dig/Dump visible in Big mode; more or
+fewer treasures; after a swing on a phone the finger can end up over the bed and tip the load straight in.
 
 **New stations (the dad's picks, in this order):**
 - **Tower crane (done):** drag the hook; the trolley runs along the jib and the cable follows; hook steel

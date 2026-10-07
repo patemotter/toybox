@@ -27,6 +27,7 @@
   --accent: #FFC93C;
   --plate: #F4FAFF;
   --focus: #2D5BD7;
+  --tile: #E8F4FF;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
   box-sizing: border-box;
@@ -42,6 +43,7 @@
     --edge: #9FB8E8;
     --plate: #E6F2FF;
     --focus: #FFC93C;
+    --tile: #E6F2FF;
     color-scheme: dark;
   }
 }
@@ -53,6 +55,7 @@
   --edge: #9FB8E8;
   --plate: #E6F2FF;
   --focus: #FFC93C;
+  --tile: #E6F2FF;
   color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: inherit; }
@@ -76,7 +79,8 @@ body {
 .tb-head a { text-decoration: none; }
 .tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
-#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#cv.held { cursor: grabbing; }
 /* "Loads" is the counter (tb-counter); the hint is the coach line (tb-coach). */
 .loads { font-variant-numeric: tabular-nums; }
 .loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
@@ -85,6 +89,8 @@ body {
 .hint[hidden] { display: none; }
 .hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+/* Long coach lines wrap on phones instead of being cut off. */
+@media (max-width: 600px) { .hint { white-space: normal; line-height: 1.15; } }
 
 /* Play-timer gauge */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
@@ -94,107 +100,49 @@ body {
 .fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
 
-/* Big: the header shrinks to the Big button and the joysticks hide; Swing and Scoop stay in the panel. */
-body.big .tb-head > :not(.bigtoggle), body.big .stick { display: none; }
-body.big .panel { height: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 64px; grid-template-areas: "swing curl"; }
-/* ---------- Controls panel: two joysticks, swing, scoop/dump ---------- */
-.panel {
-  flex: 0 0 auto; display: grid; gap: 10px; padding: 10px; height: clamp(200px, 27vh, 330px); box-sizing: border-box;
-  grid-template-columns: 116px minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "boom arm bucket" "boom swing curl";
-  background: var(--panel); border: 3px solid var(--edge); border-radius: 24px; box-shadow: 4px 4px 0 var(--edge);
+/* ---------- Panel: the two backup buttons, Dig and Dump (picture tiles) ---------- */
+.acts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.tb-tile.act {
+  flex-direction: row; gap: 10px; min-height: 78px; padding: 4px 10px;
+  background: var(--tile); color: #1D2340; font-size: 1.45rem; font-weight: 800; line-height: 1;
 }
-.stick {
-  position: relative; touch-action: none; cursor: grab; border-radius: 20px; min-width: 0; min-height: 0;
-  background: repeating-linear-gradient(135deg, #FFC72C 0 14px, #1D2340 14px 28px); border: 3px solid #1D2340;
-}
-.stick .slot { position: absolute; background: #2B2F3A; border-radius: 999px; border: 3px solid #1D2340; box-shadow: inset 0 3px 0 rgba(0,0,0,0.35); }
-.stick.v .slot { left: 50%; top: 14px; bottom: 14px; width: 22px; transform: translateX(-50%); }
-.stick.h .slot { top: 50%; left: 14px; right: 14px; height: 22px; transform: translateY(-50%); }
-.stick .knob {
-  position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #FF8A70 0 18%, #E63946 45%, #B5262F 100%);
-  border: 4px solid #1D2340; box-shadow: 3px 4px 0 #1D2340; pointer-events: none;
-  transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1);
-}
-.stick.held .knob { transition: none; }
-.stick .lbl {
-  position: absolute; pointer-events: none; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 12px;
-  padding: 0 8px; font-weight: 800; font-size: 1rem; line-height: 1.35;
-}
-.stick.v .lbl { left: 50%; bottom: 4px; transform: translateX(-50%); }
-.stick.h .lbl { left: 6px; top: 4px; }
-.stick .arr { position: absolute; pointer-events: none; width: 30px; height: 30px; }
-.stick .arr path { fill: #FFFFFF; stroke: #1D2340; stroke-width: 3; stroke-linejoin: round; }
-.stick.v .arr.a1 { left: 50%; top: 2px; transform: translateX(-50%); }
-.stick.v .arr.a2 { display: none; }
-.stick.h .arr.a1 { left: 2px; top: 50%; transform: translateY(-50%); }
-.stick.h .arr.a2 { right: 2px; top: 50%; transform: translateY(-50%); }
-#boomStick { grid-area: boom; }
-#armStick { grid-area: arm; }
-#bucketStick { grid-area: bucket; background: repeating-linear-gradient(135deg, #FFC72C 0 14px, #F77F00 14px 28px); }
-#bucketStick .bk { position: absolute; z-index: 1; top: 50%; width: 38px; height: 38px; transform: translateY(-50%); pointer-events: none; background: #FFFFFF; border: 3px solid #1D2340; border-radius: 12px; padding: 2px; }
-#bucketStick .slot { left: 50px; right: 50px; }
-#bucketStick .knob { z-index: 2; }
-@media (max-width: 700px) {
-  #bucketStick .bk { width: 30px; height: 30px; border-width: 2px; border-radius: 9px; padding: 1px; }
-  #bucketStick .slot { left: 36px; right: 36px; }
-  #bucketStick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
-}
-#bucketStick .bk.b1 { left: 4px; }
-#bucketStick .bk.b2 { right: 4px; }
-#bucketStick .lbl { left: 50%; top: 4px; transform: translateX(-50%); }
-.acts { display: contents; }
-.act { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; font-size: clamp(1rem, 2.6vw, 1.4rem); padding: 0.2rem 0.4rem; white-space: nowrap; }
-.act svg { width: 34px; height: 34px; flex: none; pointer-events: none; }
-.act span { pointer-events: none; }
-#swingBtn { grid-area: swing; }
-#curlBtn { grid-area: curl; background: var(--accent); color: #1D2340; }
-body.ending .panel, body.ending .acts, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.tb-tile.act svg { width: 70px; height: 52px; flex: none; pointer-events: none; overflow: visible; }
+.tb-tile.act span { pointer-events: none; }
+.tb-tile.act.on { background: var(--accent); transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* Big: the header shrinks to the Big button and the panel hides; the bucket is dragged on the picture. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 
 /* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 
-/* Landscape: stage on the left, controls on the right. */
-@media (orientation: landscape) {
-  .tb-body .panel {
-    height: auto; width: min(32%, 330px); flex: 0 0 auto;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) 110px 110px;
-    grid-template-areas: "boom swing" "boom curl" "arm arm" "bucket bucket";
-  }
-  .act { flex-direction: column; gap: 2px; }
-  .act svg { width: 44px; height: 44px; }
+/* Tablets: bigger tiles. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-tile.act { min-height: 104px; font-size: 1.8rem; gap: 14px; }
+  .tb-tile.act svg { width: 96px; height: 72px; }
 }
-@media (max-width: 700px) {
-  .panel { height: clamp(190px, 27vh, 260px); grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px; }
-  .stick .knob { width: 58px; height: 58px; margin: -29px 0 0 -29px; }
-  .act svg { width: 28px; height: 28px; }
+/* Landscape: the stage on the left, Dig and Dump stacked in a slim column on the right. */
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(20%, 210px); }
+  .tb-body .tb-panel .acts { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, 1fr); overflow: visible; }
+  .tb-tile.act { flex-direction: column; gap: 4px; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  .tb-body .panel { height: auto; width: 250px; gap: 6px; padding: 6px; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) 70px 70px; }
-  .stick .knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
-  .act { font-size: 1rem; min-height: 0; }
-  .act svg { width: 30px; height: 30px; }
-  .stick .lbl { font-size: 0.85rem; }
+  .tb-body .tb-panel { width: 132px; padding: 6px; }
+  .acts { gap: 8px; }
+  .tb-tile.act { min-height: 0; font-size: 1.2rem; }
+  .tb-tile.act svg { width: 64px; height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hint.go, .loads.pop { animation: none; }
 }
-/* Declutter: a slightly shorter control panel on phones so the dig site gets more room. */
-@media (max-width: 480px) and (orientation: portrait) {
-  .panel { height: clamp(180px, 25vh, 220px); }
-  /* Labels sit above the knobs instead of on top of them. */
-  .stick.h .lbl { font-size: 0.9rem; line-height: 1.25; }
-  .stick.h .slot, .stick.h .arr, #bucketStick .bk { margin-top: 11px; }
-  #armStick .knob { margin-top: -18px; }
-  #bucketStick .knob { margin-top: -12px; }
-}
-/* Declutter: long hint lines wrap on phones instead of being cut off with "...". */
-@media (max-width: 600px) { .hint { white-space: normal; line-height: 1.15; } }
-body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 64px; grid-template-areas: "swing curl"; }
-@media (orientation: landscape) { body.big .tb-body .panel { width: 180px; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "swing" "curl"; } }
+/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
@@ -207,29 +155,50 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck"></canvas>
+      <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck. Drag the bucket to dig."></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter loads" id="loads">Loads: 0</div>
       <div class="tb-coach hint" id="hint" hidden></div>
     </main>
     <section class="tb-panel panel" id="panel">
-      <div class="stick v" id="boomStick" role="slider" aria-label="Boom up and down" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
-        <svg class="arr a1" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 L27 19 H19 V27 H11 V19 H3 Z"/></svg>
-        <div class="slot"></div><div class="knob"></div><span class="lbl">Boom</span>
-      </div>
-      <div class="stick h" id="armStick" role="slider" aria-label="Arm in and out" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
-        <svg class="arr a1" viewBox="0 0 30 30" aria-hidden="true"><path d="M3 15 L19 3 V11 H27 V19 H19 V27 Z"/></svg>
-        <svg class="arr a2" viewBox="0 0 30 30" aria-hidden="true"><path d="M27 15 L11 3 V11 H3 V19 H11 V27 Z"/></svg>
-        <div class="slot"></div><div class="knob"></div><span class="lbl">Arm</span>
-      </div>
-      <div class="stick h" id="bucketStick" role="slider" aria-label="Bucket: left to curl in, right to tip out" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" tabindex="0">
-        <svg class="bk b1" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 12 C6 32 34 34 34 14 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M10 13 C14 6 26 6 30 13 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/></svg>
-        <svg class="bk b2" viewBox="0 0 40 40" aria-hidden="true"><g transform="rotate(140 20 18)"><path d="M6 10 C6 30 34 32 34 12 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/></g><circle cx="14" cy="32" r="3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/><circle cx="22" cy="37" r="2.5" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/></svg>
-        <div class="slot"></div><div class="knob"></div><span class="lbl">Bucket</span>
-      </div>
-      <div class="acts" id="acts">
-        <button class="btn act" id="swingBtn"><svg viewBox="0 0 40 40" aria-hidden="true" id="swingIcon"></svg><span id="swingLabel">To truck</span></button>
-        <button class="btn act" id="curlBtn"><svg viewBox="0 0 40 40" aria-hidden="true" id="curlIcon"></svg><span id="curlLabel">Scoop</span></button>
+      <div class="tb-choices acts" id="acts">
+        <button class="btn tb-tile act" id="digBtn" aria-label="Dig: scoop up a bucket of dirt">
+          <svg viewBox="0 0 64 48" aria-hidden="true">
+            <path d="M1 46 C8 29 21 23 34 24 C48 25 58 33 63 46 Z" fill="#8B5A2B" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round"/>
+            <circle cx="12" cy="40" r="2" fill="#5E3A1B"/><circle cx="50" cy="39" r="2.2" fill="#5E3A1B"/><circle cx="42" cy="43" r="1.8" fill="#5E3A1B"/>
+            <path d="M0 3 L22 13" stroke="#1D2340" stroke-width="9" stroke-linecap="round"/>
+            <path d="M0 3 L22 13" stroke="#FFC72C" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40 L25 32 Z" fill="#3A4150"/>
+            <path d="M25 32 C30 28 37 28 41 30 L34 37 L28 40 Z" fill="#7A4B22"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#1D2340" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#FFC72C" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M27 39 L32 38 L27 45 Z" fill="#C9CED6" stroke="#1D2340" stroke-width="1.8" stroke-linejoin="round"/>
+            <circle cx="22" cy="13" r="2.6" fill="#9AA3B2" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="49" cy="13" r="3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="55" cy="21" r="2.5" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="50" cy="5" r="2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+          </svg><span>Dig</span></button>
+        <button class="btn tb-tile act" id="dumpBtn" aria-label="Dump: pour the dirt into the truck">
+          <svg viewBox="0 0 64 48" aria-hidden="true">
+            <path d="M22 32 C27 22 49 21 56 32 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M19 32 H61 L59 41 H20 Z" fill="#E63946" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M3 41 V32 L7 26 H17 V41 Z" fill="#F77F00" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M8.5 28 H14.5 V32.5 H6 Z" fill="#9FD6F5" stroke="#1D2340" stroke-width="1.6" stroke-linejoin="round"/>
+            <circle cx="11" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <circle cx="43" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <circle cx="53" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <path d="M64 1 L50 7" stroke="#1D2340" stroke-width="8" stroke-linecap="round"/>
+            <path d="M64 1 L50 7" stroke="#FFC72C" stroke-width="4" stroke-linecap="round"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15 Z" fill="#3A4150"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#1D2340" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M27 14 L30 16 L26 20 Z" fill="#C9CED6" stroke="#1D2340" stroke-width="1.5" stroke-linejoin="round"/>
+            <circle cx="50" cy="7" r="2.4" fill="#9AA3B2" stroke="#1D2340" stroke-width="1.4"/>
+            <circle cx="35" cy="15" r="2.6" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="40" cy="19" r="2.3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="35" cy="23" r="2.2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="42" cy="12" r="2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.2"/>
+          </svg><span>Dump</span></button>
       </div>
     </section>
   </div>
@@ -248,6 +217,7 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function rand(a, b) { return a + Math.random() * (b - a); }
   function lerp(a, b, t) { return a + (b - a) * t; }
+  function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
   var DEG = Math.PI / 180;
   var OUT = "#1D2340";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -255,14 +225,18 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   var STATEKEY = "site-excavator-v1";
 
   // ---------- World (units; y is up, ground at y = 0) ----------
-  var WORLD_W = 1000, VIEW_UP = 590, VIEW_DOWN = 56;
+  var WORLD_W = 1000, VIEW_UP = 560, VIEW_DOWN = 70;
   var CX = 480;                       // swing centre of the excavator
   var FOOT = { x: 62, y: 168 };       // boom foot (machine coords: x forward, y up)
   var L1 = 280, L2 = 215;             // boom and arm lengths
-  var LIM1 = [-28 * DEG, 72 * DEG];   // boom angle (from horizontal)
-  var LIM2 = [-158 * DEG, -28 * DEG]; // arm angle relative to the boom
-  var LIM3 = [-125 * DEG, 40 * DEG];  // bucket angle relative to the arm
-  var CURL = -110 * DEG, OPEN = 36 * DEG;
+  var LIM1 = [-28 * DEG, 80 * DEG];   // boom angle (from horizontal)
+  var LIM2 = [-164 * DEG, -28 * DEG]; // arm angle relative to the boom
+  var LIM3 = [-132 * DEG, 56 * DEG];  // bucket angle relative to the arm
+  // The bucket's own angle in the machine's frame for each job. The bucket keeps its angle while it is
+  // dragged (it moves the way the finger moves) and only turns for a job: teeth down to dig, curled up
+  // to carry, mouth down to dump.
+  var PH_READY = -95 * DEG, PH_CARRY = -165 * DEG, PH_DUMP = -25 * DEG, PH_PARK = -60 * DEG;
+  var GROUND = 16;                    // nothing on the arm goes lower than this (except into the pile)
   var CAP = 2600;                     // bucket holds this much dirt
   var TRUCK_CAP = 6400;               // a truck is full after about 3 buckets
   var PV = 26;                        // dirt in one pour grain
@@ -271,8 +245,8 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   var BUCKET = [[-8, 12], [-8, -14], [10, -40], [46, -52], [80, -40], [98, -14], [104, -2], [120, 3], [100, 9]];
   var TEETH = [120, 3], LIP = [100, 9], TOPLIP = [-8, 12], BUCKET_MID = [48, -18], BUCKET_LOW = [46, -40];
 
-  // Machine state
-  var m = { a1: 60 * DEG, a2: -115 * DEG, a3: OPEN, curlTarget: OPEN, fill: 0, swing: 0, swingFrom: 0, swingTo: 0, swingT: 1, swingPhase: "", liftT: 0 };
+  // Machine state. ph: the bucket angle it is turning to right now; phGoal/phRate: where to and how fast.
+  var m = { a1: 0, a2: 0, a3: 0, ph: PH_READY, phGoal: PH_READY, phRate: 90 * DEG, fill: 0, swing: 0, swingFrom: 0, swingTo: 0, swingT: 1, swingPhase: "", liftT: 0, carry: null, pouring: false };
   var parking = false;
 
   // Dirt pile heightmap
@@ -308,15 +282,28 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     return { dx: -700, v: 0, state: "gone", t: 0, bed: new Float32Array(BEDN), load: 0, colors: TRUCK_COLORS[n % TRUCK_COLORS.length], wheel: 0, beepT: 0, lastPour: 0, bounce: 0 };
   }
 
-  var loads = 0;
-  // Opened from the Toybox home screen: the counter starts at 0 again.
+  // ---------- Treasures: hidden in the pile, found by digging, kept in the crate ----------
+  var NAMES = { chest: "A treasure chest!", gemRed: "A red gem!", gemBlue: "A blue gem!", gemGreen: "A green gem!",
+    nugget: "A gold nugget!", bone: "A dinosaur bone!", coin: "An old coin!", shell: "A fossil shell!" };
+  var KIND_BAG = ["chest", "chest", "gemRed", "gemBlue", "gemGreen", "nugget", "bone", "coin", "shell"];
+  var hidden = [];   // { kind, x, y, tw } inside the pile
+  var flyers = [];   // found treasures on their way to the crate
+  var sparks = [];   // sparkle stars
+
+  var loads = 0, found = [];
+  // Opened from the Toybox home screen: the counter starts at 0 again and the crate is empty.
   var startFresh = !!(window.Toybox && Toybox.fresh());
-  if (!startFresh) try { var so = JSON.parse(localStorage.getItem(STATEKEY) || "null"); if (so && typeof so.loads === "number" && so.loads >= 0) loads = Math.floor(so.loads); } catch (e) { /* ignore */ }
-  function saveState() { try { localStorage.setItem(STATEKEY, JSON.stringify({ loads: loads })); } catch (e) { /* ignore */ } }
+  if (!startFresh) try {
+    var so = JSON.parse(localStorage.getItem(STATEKEY) || "null");
+    if (so && typeof so.loads === "number" && so.loads >= 0) loads = Math.floor(so.loads);
+    if (so && Object.prototype.toString.call(so.treasures) === "[object Array]") found = so.treasures.filter(function (k) { return Object.prototype.hasOwnProperty.call(NAMES, k); }).slice(-200);
+  } catch (e) { /* ignore */ }
+  function saveState() { try { localStorage.setItem(STATEKEY, JSON.stringify({ loads: loads, treasures: found })); } catch (e) { /* ignore */ } }
   if (startFresh) saveState();
+  var crate = { items: found.slice(), bounce: 0 };
 
   var grains = [], puffs = [], crumbs = [], beeps = [];
-  var clouds = [{ x: 140, y: 500, s: 1 }, { x: 560, y: 545, s: 0.8 }, { x: 900, y: 470, s: 1.15 }];
+  var clouds = [{ x: 140, y: 500, s: 1 }, { x: 560, y: 545, s: 0.8 }, { x: 900, y: 470, s: 1.15 }, { x: 330, y: 690, s: 0.9 }, { x: 760, y: 760, s: 1 }];
 
   // ---------- Kinematics ----------
   function facing() { return Math.cos(m.swing); }
@@ -328,15 +315,14 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     return { t1: t1, t2: t2, b: b, ph: ph, U: { x: Math.cos(ph), y: Math.sin(ph) }, V: { x: Math.sin(ph), y: -Math.cos(ph) } };
   }
   function bpt(k, p) { return { x: k.t2.x + p[0] * k.U.x + p[1] * k.V.x, y: k.t2.y + p[0] * k.U.y + p[1] * k.V.y }; }
-  function toWorldX(lx) { return CX + lx * facing(); }
-  // How far the arm and bucket poke into something solid (0 = fine).
+  // How far the arm and bucket poke into something solid (0 = fine). The pile is not solid: it is dug.
   function penetration(a1, a2, a3) {
     var k = fk(a1, a2, a3), sd = side(), pen = 0;
     var pts = BUCKET.map(function (p) { return bpt(k, p); });
     pts.push(k.t2, k.t1);
     var truckIn = truck.state !== "gone";
     for (var i = 0; i < pts.length; i++) {
-      var lx = pts[i].x, y = pts[i].y, X = CX + lx * sd, need = 0;
+      var lx = pts[i].x, y = pts[i].y, X = CX + lx * sd, need = GROUND;
       if (Math.abs(lx) < 165) need = 76;
       if (lx < 20) need = Math.max(need, 300);
       if (truckIn) {
@@ -348,13 +334,6 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
       pen = Math.max(pen, need - y);
     }
     return pen;
-  }
-  var curPen = 0;
-  function trySet(a1, a2, a3) {
-    a1 = clamp(a1, LIM1[0], LIM1[1]); a2 = clamp(a2, LIM2[0], LIM2[1]); a3 = clamp(a3, LIM3[0], LIM3[1]);
-    var p = penetration(a1, a2, a3);
-    if (p <= 0.5 || p <= curPen + 0.01) { m.a1 = a1; m.a2 = a2; m.a3 = a3; curPen = p; return true; }
-    return false;
   }
   function angDiff(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
   // Two-joint IK for the arm tip with joint limits (analytic elbow-up, then clamped coordinate descent).
@@ -371,6 +350,43 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     }
     return [a1, a2];
   }
+  function poseFor(tx, ty, ph) { var s = solveIK(tx, ty); return [s[0], s[1], clamp(ph - s[0] - s[1], LIM3[0], LIM3[1])]; }
+  // Put the arm tip at (tx, ty) with the bucket at angle ph. Never refuses a move: when the bucket would
+  // poke into the ground, the truck or the machine, it slides up to the nearest spot above it instead.
+  var curPen = 0;
+  function placeTip(tx, ty, ph) {
+    var y = ty, P = null, pen = 0;
+    for (var i = 0; i < 8; i++) {
+      P = poseFor(tx, y, ph); pen = penetration(P[0], P[1], P[2]);
+      if (pen <= 0.5) break;
+      y += pen + 2;
+    }
+    if (pen > 0.5 && pen > curPen + 0.01) {
+      // The arm cannot lift any higher right here (too close to the machine): take the nearest spot a
+      // little further out and up that is clear.
+      var best = null, bestD = 1e9;
+      for (var dx = 0; dx <= 160; dx += 20) for (var dy = 0; dy <= 200; dy += 25) {
+        var Q = poseFor(tx + dx, ty + dy, ph);
+        if (penetration(Q[0], Q[1], Q[2]) > 0.5) continue;
+        var q = fk(Q[0], Q[1], Q[2]).t2, dd = Math.hypot(q.x - tx, q.y - ty);
+        if (dd < bestD) { bestD = dd; best = Q; }
+      }
+      if (!best) return false;
+      P = best; pen = 0;
+    }
+    m.a1 = P[0]; m.a2 = P[1]; m.a3 = P[2]; curPen = Math.max(0, pen);
+    return true;
+  }
+  function tipNow() { return fk(m.a1, m.a2, m.a3).t2; }
+  // Move the tip toward (tx, ty) by at most maxD, in small steps so it climbs over a rim instead of jumping through it.
+  function moveTip(tx, ty, maxD) {
+    var c = tipNow(), dx = tx - c.x, dy = ty - c.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > maxD) { dx *= maxD / d; dy *= maxD / d; d = maxD; }
+    var n = Math.max(1, Math.ceil(d / 14));
+    for (var i = 1; i <= n; i++) if (!placeTip(c.x + dx * i / n, c.y + dy * i / n, m.ph)) break;
+  }
+  // Start pose: bucket up over the pile, teeth down, ready to dig.
+  (function () { var s = solveIK(295, 265); m.a1 = s[0]; m.a2 = s[1]; m.a3 = clamp(PH_READY - s[0] - s[1], LIM3[0], LIM3[1]); })();
 
   // ---------- Heightmaps ----------
   function pileCol(X) { return Math.floor((X - PX0) / PCW); }
@@ -386,42 +402,60 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     }
   }
   function pileTotal() { var s = 0; for (var i = 0; i < PN; i++) s += pile[i] * PCW; return s; }
+  // How much of the dirt the bucket can reach is left (0..1).
+  var REACH0 = pileCol(CX + 190), REACH1 = pileCol(CX + 470), reachInit = 0;
+  for (var ri0 = REACH0; ri0 <= REACH1; ri0++) reachInit += pileInit[ri0];
+  function reachLeft() { var s = 0; for (var i = REACH0; i <= REACH1; i++) s += pile[i]; return s / reachInit; }
   var BEDW = (BED1 - BED0) / BEDN;
   function bedHeightAt(X) { var i = Math.floor((X - truck.dx - BED0) / BEDW); return i >= 0 && i < BEDN ? truck.bed[i] : 0; }
   function relaxBed(t) {
-    var maxd = BEDW * 1.15;
+    var maxd = BEDW * 0.7;
     for (var pass = 0; pass < 2; pass++) for (var i = 0; i < BEDN - 1; i++) {
       var d = t.bed[i] - t.bed[i + 1];
       if (Math.abs(d) > maxd) { var mv = (Math.abs(d) - maxd) * 0.25 * (d > 0 ? 1 : -1); t.bed[i] -= mv; t.bed[i + 1] += mv; }
     }
   }
 
-  // ---------- Canvas ----------
-  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0;
+  // ---------- Canvas and camera ----------
+  // Wide stages show the whole site. Tall stages (an upright phone or iPad) zoom in on the machine and pan
+  // between the dirt side and the truck side as it swings; the extra height goes to sky and a strip of
+  // ground in front, where the treasure crate sits clear of the coach line.
+  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0, WIN = WORLD_W, PAN = false;
+  function coachAtBottom() { return innerWidth <= 600 || (innerWidth > innerHeight && innerHeight <= 520); }
   function resize() {
-    var r = $("stage").getBoundingClientRect();
+    var st = $("stage");
     dpr = Math.min(2, window.devicePixelRatio || 1);
-    cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
+    cw = Math.max(1, st.clientWidth); ch = Math.max(1, st.clientHeight);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
-    // Tall, narrow stage (phone held upright): show a 650-wide window that follows the swing
-    // (dirt side or truck side), so the machine is bigger. Wider screens show the whole site.
-    PORT = ch > cw * 1.1;
-    S = Math.min(cw / (PORT ? PORT_W : WORLD_W), ch / (VIEW_UP + VIEW_DOWN));
-    OY = ch - VIEW_DOWN * S;
+    PAN = ch > cw * 0.95;
+    if (PAN) {
+      S = Math.min(ch / 640, cw / (cw > 600 ? 640 : 480));
+      OY = ch - (VIEW_DOWN + (coachAtBottom() ? 56 / S : 0)) * S;
+    } else {
+      S = Math.min(cw / WORLD_W, ch / (VIEW_UP + VIEW_DOWN));
+      OY = ch - VIEW_DOWN * S;
+    }
+    WIN = cw / S;
     camera();
   }
-  var PORT = false, PORT_W = 650;
-  function camera() {
-    if (!PORT) { OX = (cw - WORLD_W * S) / 2; return; }
-    var f = clamp(m.swing / Math.PI, 0, 1);
-    f = f * f * (3 - 2 * f);
-    OX = cw / 2 - lerp(CX + 165, CX - 165, f) * S;
+  // Left edge of the view: f = 0 on the dirt side, 1 on the truck side.
+  function camLeft(f) {
+    if (WIN >= WORLD_W) return WORLD_W / 2 - WIN / 2;
+    var back = clamp((WIN - 480) * 0.4, 0, 60); // a wider window also shows the back of the machine
+    return lerp(CX - 95 - back, CX + 95 + back - WIN, f);
   }
+  function camera() { OX = -camLeft(smooth(m.swing / Math.PI)) * S; }
   window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe($("stage"));
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - OX) / S, y: (OY - (cy - r.top)) / S }; }
   function worldT() { ctx.setTransform(dpr * S, 0, 0, -dpr * S, dpr * OX, dpr * OY); }
   function visLeft() { return -OX / S; }
   function visRight() { return (cw - OX) / S; }
+  function visTop() { return OY / S; }
+  // The treasure crate: in the strip of ground in front, at the left edge of a wide view, or (when the view
+  // pans) under the excavator, where both the dirt side and the truck side can see it.
+  function crateX() { return WIN >= WORLD_W ? visLeft() + 82 : CX; }
+  var CRATE_TOP = -4;
 
   function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
   function shape(pts, fill, lw) { path(pts); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw || 5; ctx.strokeStyle = OUT; ctx.stroke(); }
@@ -450,6 +484,7 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     circle(90, 520, 38, "#FFE066", 0);
     ctx.globalAlpha = 0.35; circle(90, 520, 56, "#FFF3B0", 0); ctx.globalAlpha = 1;
     clouds.forEach(function (c) {
+      if (c.y > visTop() + 60) return;
       ctx.fillStyle = "#FFFFFF";
       [[0, 0, 26], [30, 12, 32], [64, 0, 24], [32, -6, 26]].forEach(function (q) { ctx.beginPath(); ctx.arc(c.x + q[0] * c.s, c.y + q[1] * c.s, q[2] * c.s, 0, Math.PI * 2); ctx.fill(); });
     });
@@ -471,14 +506,21 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     ctx.fillStyle = OUT; ctx.fillRect(x + 8, y - 2, 6, 24); ctx.fillRect(x + 76, y - 2, 6, 24);
   }
   function drawGround() {
-    var L = visLeft() - 10, R = visRight() + 10;
-    ctx.fillStyle = "#B07A45"; ctx.fillRect(L, -VIEW_DOWN - 400, R - L, VIEW_DOWN + 400 + 22);
+    var L = visLeft() - 10, R = visRight() + 10, D = (ch - OY) / S + 20;
+    ctx.fillStyle = "#B07A45"; ctx.fillRect(L, -D, R - L, D + 22);
     ctx.fillStyle = "#C48A52"; ctx.fillRect(L, 0, R - L, 22);
     ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(L, 22); ctx.lineTo(R, 22); ctx.stroke();
     ctx.fillStyle = "#8C5A2E";
-    for (var x = Math.floor(L / 70) * 70; x < R; x += 70) { ctx.beginPath(); ctx.ellipse(x + 20, -18, 9, 5, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 52, -38, 6, 4, 0, 0, 7); ctx.fill(); }
+    for (var row = 0; row * 60 < D; row++) {
+      for (var x = Math.floor(L / 70) * 70; x < R; x += 70) {
+        var ox = (row % 2) * 35;
+        ctx.beginPath(); ctx.ellipse(x + 20 + ox, -18 - row * 60, 9, 5, 0, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + 52 + ox, -38 - row * 60, 6, 4, 0, 0, 7); ctx.fill();
+      }
+    }
     // traffic cones at the edges
-    drawCone(L + 40, 4); drawCone(R - 40, 4);
+    if (WIN < WORLD_W) drawCone(L + 40, 4); // (a wide view has the treasure crate there)
+    drawCone(R - 40, 4);
   }
   function drawCone(x, y) {
     shape([[x - 22, y], [x + 22, y], [x + 22, y + 7], [x - 22, y + 7]], "#3A4150", 3);
@@ -549,6 +591,146 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     circle(x, y, r * 0.5, "#C9CED6", 3.5);
     ctx.strokeStyle = OUT; ctx.lineWidth = 3;
     for (var k = 0; k < 4; k++) { var aa = a + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(aa) * r * 0.18, y + Math.sin(aa) * r * 0.18); ctx.lineTo(x + Math.cos(aa) * r * 0.45, y + Math.sin(aa) * r * 0.45); ctx.stroke(); }
+  }
+
+  // ---------- Drawing: treasures, sparkles and the crate ----------
+  function tStroke(lw) { ctx.lineWidth = lw || 3.5; ctx.strokeStyle = OUT; ctx.stroke(); }
+  // One treasure at world (x, y), s world units per drawing unit (the drawing is about 46 units across).
+  function drawTreasure(kind, x, y, s, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, -s); if (rot) ctx.rotate(rot);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    if (kind === "chest") {
+      rrect(-22, -3, 44, 23, 3); ctx.fillStyle = "#A65E1E"; ctx.fill(); tStroke();
+      ctx.beginPath(); ctx.moveTo(-22, -3); ctx.lineTo(-22, -11); ctx.quadraticCurveTo(-22, -23, 0, -23); ctx.quadraticCurveTo(22, -23, 22, -11); ctx.lineTo(22, -3); ctx.closePath();
+      ctx.fillStyle = "#C97A2B"; ctx.fill(); tStroke();
+      ctx.fillStyle = "#FFC93C";
+      rrect(-16, -20, 6, 40, 1); ctx.fill(); tStroke(2.5);
+      rrect(10, -20, 6, 40, 1); ctx.fill(); tStroke(2.5);
+      rrect(-5, -8, 10, 11, 2); ctx.fillStyle = "#FFE066"; ctx.fill(); tStroke(2.5);
+      ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(0, -3.5, 1.8, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.65)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-6, -19.5); ctx.lineTo(5, -19.5); ctx.stroke();
+    } else if (kind === "gemRed" || kind === "gemBlue" || kind === "gemGreen") {
+      var col = kind === "gemRed" ? "#E63946" : (kind === "gemBlue" ? "#2D7FF9" : "#2EB35B");
+      var gem = function () { ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-11, -17); ctx.lineTo(11, -17); ctx.lineTo(20, -5); ctx.lineTo(0, 20); ctx.closePath(); };
+      gem(); ctx.fillStyle = col; ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.38)"; ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-11, -17); ctx.lineTo(11, -17); ctx.lineTo(20, -5); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(29,35,64,0.18)"; ctx.beginPath(); ctx.moveTo(6, -5); ctx.lineTo(20, -5); ctx.lineTo(0, 20); ctx.closePath(); ctx.fill();
+      gem(); tStroke();
+      ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(20, -5); ctx.moveTo(-11, -17); ctx.lineTo(-6, -5); ctx.lineTo(0, 20); ctx.lineTo(6, -5); ctx.lineTo(11, -17);
+      ctx.moveTo(-6, -5); ctx.lineTo(0, -17); ctx.lineTo(6, -5); tStroke(2);
+      ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.moveTo(-14, -8); ctx.lineTo(-10, -14); ctx.lineTo(-7, -8); ctx.closePath(); ctx.fill();
+    } else if (kind === "nugget") {
+      path([[-19, 6], [-17, -6], [-9, -14], [3, -12], [13, -17], [21, -5], [17, 8], [5, 14], [-9, 13]]);
+      ctx.fillStyle = "#FFC93C"; ctx.fill(); tStroke();
+      ctx.fillStyle = "#E0A100"; ctx.beginPath(); ctx.arc(7, 3, 3.5, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(-7, 6, 2.6, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(12, -7, 2, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(-8, -5, 3, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(-2, -9, 1.6, 0, 7); ctx.fill();
+    } else if (kind === "bone") {
+      var bone = function () {
+        rrect(-17, -5, 34, 10, 3); ctx.fill(); ctx.stroke();
+        [[-18, -6], [-18, 6], [18, -6], [18, 6]].forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], 7, 0, 7); ctx.fill(); ctx.stroke(); });
+      };
+      ctx.save(); ctx.rotate(-0.3);
+      ctx.fillStyle = OUT; ctx.strokeStyle = OUT; ctx.lineWidth = 7; bone();
+      ctx.fillStyle = "#F5ECD7"; ctx.strokeStyle = "#F5ECD7"; ctx.lineWidth = 0.01; bone();
+      ctx.strokeStyle = "rgba(29,35,64,0.25)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-10, 2.5); ctx.lineTo(10, 2.5); ctx.stroke();
+      ctx.restore();
+    } else if (kind === "coin") {
+      ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.fillStyle = "#FFC93C"; ctx.fill(); tStroke();
+      ctx.beginPath(); ctx.arc(0, 0, 11.5, 0, 7); ctx.lineWidth = 2.5; ctx.strokeStyle = "#C98F00"; ctx.stroke();
+      ctx.beginPath();
+      for (var q = 0; q < 10; q++) { var ra = q % 2 ? 3 : 7, an = -Math.PI / 2 + q * Math.PI / 5; ctx.lineTo(Math.cos(an) * ra, Math.sin(an) * ra); }
+      ctx.closePath(); ctx.fillStyle = "#D99A00"; ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 14, 3.6, 4.4); ctx.stroke();
+    } else if (kind === "shell") {
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, 7); ctx.fillStyle = "#E3CFA8"; ctx.fill(); tStroke();
+      ctx.beginPath();
+      for (var t = 0; t <= 4 * Math.PI; t += 0.2) { var rr = 1.5 + t * 1.22; ctx.lineTo(Math.cos(t) * rr, Math.sin(t) * rr); }
+      tStroke(2.5);
+      ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.lineWidth = 1.8;
+      for (var a = 0; a < 7; a++) { var an2 = a * 0.9; ctx.beginPath(); ctx.moveTo(Math.cos(an2) * 11, Math.sin(an2) * 11); ctx.lineTo(Math.cos(an2) * 16, Math.sin(an2) * 16); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
+  function star4(x, y, r, rot, fill, lw) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
+    ctx.beginPath(); ctx.moveTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.quadraticCurveTo(0, 0, 0, -r); ctx.quadraticCurveTo(0, 0, -r, 0); ctx.quadraticCurveTo(0, 0, 0, r); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.stroke(); }
+    ctx.restore();
+  }
+  // Hidden treasures that the digging has uncovered poke out of the dirt (drawn before the pile, so the dirt covers the rest).
+  function drawTreasuresUnder() {
+    hidden.forEach(function (h) { if (pileAt(h.x) - h.y < 16) drawTreasure(h.kind, h.x, h.y, 0.9, 0); });
+  }
+  // A glint where the dirt above a treasure is getting thin.
+  function drawGlints(now) {
+    hidden.forEach(function (h) {
+      var top = pileAt(h.x), depth = top - h.y;
+      if (depth > 46) return;
+      var tw = 0.5 + 0.5 * Math.sin(now / 260 + h.tw);
+      star4(h.x + 6, Math.max(top, h.y + 12) + 8, 7 + 7 * tw, tw * 0.6, "#FFF6C2", 2.5);
+      if (tw > 0.6) star4(h.x - 10, Math.max(top, h.y + 12) + 20, 5, 0, "#FFFFFF", 2);
+    });
+  }
+  function drawSparks() {
+    sparks.forEach(function (p) { ctx.globalAlpha = clamp(1 - p.life / p.max, 0, 1); star4(p.x, p.y, p.r, p.rot, p.col, 2.5); });
+    ctx.globalAlpha = 1;
+  }
+  // The crate's slots for the treasures it holds (offsets from the top of its front, y up), lowest row first.
+  var SLOTS = [];
+  (function () {
+    var rows = [[[-14, 14, -40, 40], 6], [[0, -27, 27], 21], [[-14, 14, -40, 40], 35], [[0, -27, 27], 49]];
+    rows.forEach(function (r) { r[0].forEach(function (x) { SLOTS.push([x, r[1]]); }); });
+  })();
+  var SLOT_S = 0.85;
+  function slotPos(i) { var s = SLOTS[Math.min(i, SLOTS.length - 1)]; return { x: crateX() + s[0], y: CRATE_TOP + s[1] }; }
+  function drawCrate() {
+    var x = crateX(), b = crate.bounce;
+    ctx.save(); ctx.translate(x, CRATE_TOP - 56); ctx.scale(1 + 0.06 * b, 1 - 0.06 * b); ctx.translate(-x, -(CRATE_TOP - 56));
+    // the open lid leaning back behind
+    shape([[x - 56, CRATE_TOP], [x + 56, CRATE_TOP], [x + 50, CRATE_TOP + 26], [x - 50, CRATE_TOP + 26]], "#A86F38", 4);
+    // treasures, top rows first so the lower ones sit in front
+    var items = crate.items.slice(-SLOTS.length), n = items.length;
+    for (var i = n - 1; i >= 0; i--) {
+      var p = slotPos(i);
+      drawTreasure(items[i], p.x, p.y + 4, SLOT_S, ((i * 37) % 7 - 3) * 0.06);
+    }
+    // the front of the box
+    rrect(x - 60, CRATE_TOP - 56, 120, 56, 7); ctx.fillStyle = "#C98B4F"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x - 46, CRATE_TOP - 19); ctx.lineTo(x + 46, CRATE_TOP - 19); ctx.moveTo(x - 46, CRATE_TOP - 38); ctx.lineTo(x + 46, CRATE_TOP - 38); ctx.stroke();
+    rrect(x - 60, CRATE_TOP - 56, 14, 56, 5); ctx.fillStyle = "#A86F38"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    rrect(x + 46, CRATE_TOP - 56, 14, 56, 5); ctx.fill(); ctx.stroke();
+    star4(x, CRATE_TOP - 28, 11, 0, "#FFC93C", 2.5);
+    ctx.restore();
+  }
+  // Found treasures: pop up out of the bucket, show off, then fly into the crate.
+  var POP_T = 0.7, SHOW_T = 2.6, FLY_T = 3.8;
+  function easeBack(t) { var c = 1.7; t -= 1; return 1 + (c + 1) * t * t * t + c * t * t; }
+  function flyerPos(f) {
+    if (f.t < POP_T) { var e = easeBack(f.t / POP_T); return { x: lerp(f.x0, f.hx, e), y: lerp(f.y0, f.hy, e), s: lerp(0.6, 2.1, clamp(e, 0, 1.2)) }; }
+    if (f.t < SHOW_T) return { x: f.hx, y: f.hy + Math.sin((f.t - POP_T) * 3.2) * 8, s: 2.1 };
+    var u = smooth((f.t - SHOW_T) / (FLY_T - SHOW_T)), sp = slotPos(f.slot), cx = (f.hx + sp.x) / 2, cy = Math.max(f.hy, sp.y) + 90;
+    var x = (1 - u) * (1 - u) * f.hx + 2 * (1 - u) * u * cx + u * u * sp.x, y = (1 - u) * (1 - u) * f.hy + 2 * (1 - u) * u * cy + u * u * (sp.y + 4);
+    return { x: x, y: y, s: lerp(2.1, SLOT_S, u) };
+  }
+  function drawFlyers(now) {
+    flyers.forEach(function (f) {
+      var p = flyerPos(f);
+      if (f.t > POP_T * 0.6 && f.t < SHOW_T + 0.3) {
+        // sunburst rays behind it
+        var a0 = now / 1400, R = 26 * p.s + 30, fade = clamp((SHOW_T + 0.3 - f.t) / 0.5, 0, 1);
+        ctx.globalAlpha = 0.45 * fade;
+        ctx.fillStyle = "#FFE066";
+        for (var i = 0; i < 10; i++) {
+          var a = a0 + i * Math.PI / 5;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a - 0.14) * R, p.y + Math.sin(a - 0.14) * R); ctx.lineTo(p.x + Math.cos(a + 0.14) * R, p.y + Math.sin(a + 0.14) * R); ctx.closePath(); ctx.fill();
+        }
+        ctx.globalAlpha = 0.6 * fade; circle(p.x, p.y, 20 * p.s, "#FFFFFF", 0);
+        ctx.globalAlpha = 1;
+      }
+      drawTreasure(f.kind, p.x, p.y, p.s, Math.sin(f.t * 4) * 0.12 * (f.t < SHOW_T ? 1 : 0));
+    });
   }
 
   // ---------- Drawing: excavator ----------
@@ -707,104 +889,224 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   }
   var fontFam = '"Baloo 2", "Trebuchet MS", sans-serif';
   function draw() {
+    var now = performance.now();
     camera();
     drawSky();
     drawGround();
     drawGheap();
+    drawTreasuresUnder();
     drawPile();
+    drawGlints(now);
     if (truck.state !== "gone") drawTruck(truck);
     drawExcavator();
     worldT();
+    drawCrate();
     drawParticles();
+    drawSparks();
+    drawFlyers(now);
     drawBeeps();
   }
 
   // ---------- Simulation ----------
-  var drag = null; // { id, off: {x,y}, goal: {x,y}, want: {x,y} }
-  var sticks = { boom: 0, arm: 0, bucket: 0 };
-  var bucketHeld = false; // the bucket stick or the bucket's teeth are being moved by hand
-  var lastTeeth = null, digSndT = 0, pourSndT = 0, smokeT = 0, motion = 0, hintState = "", lastPourAt = 0, pourAcc = 0;
+  // drag: the finger moving the bucket. mode "grab" (finger on the bucket: it follows with the same offset)
+  // or "reach" (finger elsewhere: the bucket glides to it first). pending: waiting for a swing to finish.
+  var drag = null, glide = null;
+  // auto: the Dig or Dump motion running by itself; queued: the other button, pressed while it runs.
+  var auto = null, queued = null;
+  var lastTeeth = null, digSndT = 0, pourSndT = 0, smokeT = 0, motion = 0, lastPourAt = 0, pourAcc = 0;
+  var inDirtLast = false, pourEndT = 0, emptyT = 0, parkT = 0;
   var ending = false;
+  var learned = { dig: false, swing: false, dump: false };
 
   function startSwing(to) {
     if (ending && !parking) return;
     if (m.swingPhase) return;
     var target = to === "truck" ? Math.PI : 0;
     if (Math.abs(m.swing - target) < 0.01) return;
-    drag = null;
+    glide = null;
     m.swingFrom = m.swing; m.swingTo = target; m.swingT = 0; m.swingPhase = "lift"; m.liftT = 0; m.carry = null;
-    if (m.fill > 0.05) setCurl(CURL);
+    if (m.pouring) m.pouring = false;
+    setGoal(m.fill > 0.05 ? PH_CARRY : PH_READY, 90);
     whoosh();
+  }
+  function setGoal(ph, degPerSec) { m.phGoal = ph; m.phRate = degPerSec * DEG; }
+  function startPour() {
+    if (m.pouring) return;
+    m.pouring = true; pourEndT = 0;
+    clunk();
+  }
+  function bucketWorld(p) { var k = fk(m.a1, m.a2, m.a3), b = bpt(k, p || BUCKET_MID); return { x: CX + b.x * facing(), y: b.y }; }
+  // Is the bucket over the truck bed (with a little slack)?
+  function overBed(slack) {
+    if (truck.state !== "in" || side() > 0) return false;
+    var x = CX + (tipNow().x + 60) * facing(), s = slack || 0;
+    return x > truck.dx + BED0 - s && x < truck.dx + BED1 + s;
+  }
+
+  // ----- Dig and Dump: whole motions that run by themselves (calm) -----
+  function digSpot() {
+    var lo = CX + 215, hi = CX + 470;
+    if (WIN < WORLD_W) hi = Math.min(hi, camLeft(0) + WIN - 70);
+    var best = lo, bestV = -1e9;
+    for (var x = lo; x <= hi; x += 6) { var v = pileAt(x) - (x - lo) * 0.12; if (v > bestV) { bestV = v; best = x; } }
+    return { lx: best - CX + 13, top: pileAt(best) };
+  }
+  // Can the arm tip get to (x, y)?
+  function reachable(x, y) { var s = solveIK(x, y), k = fk(s[0], s[1], 0); return Math.hypot(k.t2.x - x, k.t2.y - y) < 3; }
+  // Where to hold the tip so the dirt pours into the lowest part of the bed (the dirt comes out ahead of the tip).
+  function pourSpot() {
+    var mx = 0, j;
+    for (j = 0; j < BEDN; j++) mx = Math.max(mx, truck.bed[j]);
+    var y = Math.max(255, BED_FLOOR + mx + 140), best = null, bestH = 1e9;
+    for (var i = 2; i < BEDN - 2; i++) {
+      var X = truck.dx + BED0 + (i + 0.5) * BEDW, lx = (CX - X) - 68;
+      if (!reachable(lx, y)) continue;
+      var h = truck.bed[i] + Math.abs(i - (BEDN - 1) / 2) * 1.2;
+      if (h < bestH) { bestH = h; best = lx; }
+    }
+    if (best === null) { best = 250; while (best < 420 && !reachable(best, y)) best += 10; }
+    return { lx: best, y: y };
+  }
+  function digPlan() {
+    return [
+      function () { return side() < 0 ? { swing: "pile" } : null; },
+      function () { auto.spot = digSpot(); var s = auto.spot; return { tip: [s.lx, s.top + 165], ph: PH_READY, v: 380, rate: 90 }; },
+      function () { var s = auto.spot; return { tip: [s.lx, Math.max(s.top - 66, GROUND) + 119], ph: PH_READY, v: 210, rate: 90 }; },
+      function () { var s = auto.spot; return { tip: [s.lx - 105, Math.max(s.top - 66, GROUND) + 150], ph: PH_CARRY, v: 120, rate: 72, minT: 1.1 }; },
+      function () { var s = auto.spot; return { tip: [s.lx - 120, Math.max(s.top + 220, 330)], ph: PH_CARRY, v: 300, rate: 72 }; }
+    ];
+  }
+  function dumpPlan() {
+    return [
+      function () { return side() > 0 ? { swing: "truck" } : null; },
+      function () { return truck.state !== "in" ? { waitTruck: true } : null; },
+      function () { var p = pourSpot(); return { tip: [p.lx, p.y], ph: m.fill > 0.03 ? PH_CARRY : PH_READY, v: 300, rate: 90 }; },
+      function () { return { pour: true }; },
+      function () { return { wait: 0.7 }; }
+    ];
+  }
+  function startAuto(kind) {
+    if (ending) return;
+    if (auto) { if (auto.kind !== kind) queued = kind; updateButtons(); return; }
+    if (kind === "dump" && m.pouring) return; // it is already tipping out
+    drag = null; glide = null; cv.classList.remove("held");
+    if (kind === "dump" && m.fill < 0.03) say("Dig some dirt first!");
+    auto = { kind: kind, steps: kind === "dig" ? digPlan() : dumpPlan(), i: -1, cur: null, t: 0, best: 1e9, bestT: 0 };
+    nextStep();
     updateButtons();
   }
-  function setCurl(t) { m.curlTarget = t; updateButtons(); }
-  function bucketMinY() {
-    var k = fk(m.a1, m.a2, m.a3), mn = 1e9;
-    BUCKET.forEach(function (p) { mn = Math.min(mn, bpt(k, p).y); });
-    return mn;
+  function stopAuto() { auto = null; queued = null; updateButtons(); }
+  function nextStep() {
+    var a = auto;
+    a.cur = null;
+    while (++a.i < a.steps.length) { a.cur = a.steps[a.i](); if (a.cur) break; }
+    if (!a.cur) {
+      auto = null;
+      if (queued) { var q = queued; queued = null; startAuto(q); }
+      updateButtons();
+      return;
+    }
+    a.t = 0; a.best = 1e9; a.bestT = 0;
+    if (a.cur.swing) startSwing(a.cur.swing);
+    if (a.cur.pour) startPour();
+    if (a.cur.ph !== undefined) setGoal(a.cur.ph, a.cur.rate || 80);
+  }
+  // One frame of the auto motion; returns where the tip should go, or null to hold still.
+  function autoTick(dt) {
+    var a = auto, s = a.cur;
+    a.t += dt;
+    // Safety net: no step may hold things up for long (waiting for a new truck is the only long one).
+    if (a.t > 10 && !s.waitTruck && !m.swingPhase) { m.pouring = false; nextStep(); return null; }
+    if (s.swing) {
+      if (!m.swingPhase) { if ((s.swing === "truck") === (side() < 0)) nextStep(); else startSwing(s.swing); }
+      return null;
+    }
+    if (s.wait) { if (a.t >= s.wait) nextStep(); return null; }
+    if (s.waitTruck) { if (truck.state === "in") nextStep(); return null; }
+    if (s.pour) { if (!m.pouring || a.t > 7) { m.pouring = false; nextStep(); } return null; }
+    var tip = tipNow(), d = Math.hypot(s.tip[0] - tip.x, s.tip[1] - tip.y);
+    if (d < a.best - 1) { a.best = d; a.bestT = a.t; }
+    var there = d < 5 || a.t - a.bestT > 0.6 || a.t > 7;
+    if (there && (Math.abs(m.ph - s.ph) < 0.04 || a.t > 7) && a.t >= (s.minT || 0)) { nextStep(); return null; }
+    setGoal(s.ph, s.rate || 80);
+    return { x: s.tip[0], y: s.tip[1], v: s.v };
+  }
+
+  // ----- The finger on the picture -----
+  function fingerWorld(d) {
+    var w = screenToWorld(d.cx, d.cy);
+    w.x = clamp(w.x, visLeft() + 8, visRight() - 8);
+    w.y = Math.min(w.y, visTop() - 24);
+    return w;
+  }
+  function dragGoal() {
+    var w = fingerWorld(drag), sd = side(), lx = (w.x - CX) * sd;
+    // Behind the cab: swing round to the other side; afterwards the bucket comes to the finger again.
+    if (lx < -30 && !ending) {
+      if (sd > 0) learned.swing = true;
+      drag.pending = true; drag.mode = "reach"; drag.dwell = 0;
+      startSwing(sd > 0 ? "truck" : "pile");
+      return null;
+    }
+    var k = fk(m.a1, m.a2, m.a3), tip = k.t2;
+    if (drag.mode === "reach") {
+      var bm = bpt(k, BUCKET_MID), g = { x: lx + tip.x - bm.x, y: w.y + tip.y - bm.y, v: 1300 };
+      if (Math.hypot(g.x - tip.x, g.y - tip.y) < 24) { drag.mode = "grab"; drag.off = { x: tip.x - lx, y: tip.y - w.y }; }
+      drag.last = g;
+      return g;
+    }
+    var gy = w.y + drag.off.y;
+    // pushing down into the dirt is slower: the dirt pushes back
+    return { x: lx + drag.off.x, y: gy, v: inDirtLast && gy < tip.y ? 700 : 3200, follow: true };
   }
 
   function step(dt) {
-    var oldA = [m.a1, m.a2, m.a3];
-    // Swing: lift the bucket clear, then turn.
+    var oldA = [m.a1, m.a2, m.a3], oldFill = m.fill;
+    // the bucket turns toward the angle its job needs
+    m.ph += clamp(m.phGoal - m.ph, -m.phRate * dt, m.phRate * dt);
     if (m.swingPhase === "lift") {
-      // Glide the arm tip to a carry spot that lands the bucket over the truck bed (or the pile).
+      // Glide the arm tip up to a carry spot over the truck bed (or the pile), then turn.
       m.liftT += dt;
       if (!m.carry) { var k0 = fk(m.a1, m.a2, m.a3); m.carry = { x: k0.t2.x, y: k0.t2.y }; }
-      var cxT = 252, cyT = 250, cdx = cxT - m.carry.x, cdy = cyT - m.carry.y, cd = Math.sqrt(cdx * cdx + cdy * cdy), cmx = 350 * dt; // calmer automatic lift
-      // rise first, then move across
-      if (m.carry.y < cyT - 40) { cdx *= 0.25; }
+      var cxT = 262, cyT = 300, cdx = cxT - m.carry.x, cdy = cyT - m.carry.y, cd = Math.sqrt(cdx * cdx + cdy * cdy), cmx = 350 * dt; // calm
+      if (m.carry.y < cyT - 40) { cdx *= 0.25; } // rise first, then move across
       if (cd > cmx) { cdx *= cmx / cd; cdy *= cmx / cd; }
       m.carry.x += cdx; m.carry.y += cdy;
       var cs = solveIK(m.carry.x, m.carry.y);
-      m.a1 = cs[0]; m.a2 = cs[1];
-      m.a3 += clamp(m.curlTarget - m.a3, -95 * DEG * dt, 95 * DEG * dt);
-      if ((cd < 4 && Math.abs(m.curlTarget - m.a3) < 0.05) || m.liftT > 3.3) { m.swingPhase = "turn"; m.swingT = 0; m.carry = null; }
+      m.a1 = cs[0]; m.a2 = cs[1]; m.a3 = clamp(m.ph - m.a1 - m.a2, LIM3[0], LIM3[1]);
+      if ((cd < 4 && Math.abs(m.phGoal - m.ph) < 0.05) || m.liftT > 3.3) { m.swingPhase = "turn"; m.swingT = 0; m.carry = null; }
     } else if (m.swingPhase === "turn") {
       m.swingT = Math.min(1, m.swingT + dt / (reduce ? 0.8 : 2.1));
-      var e = m.swingT * m.swingT * (3 - 2 * m.swingT);
-      m.swing = lerp(m.swingFrom, m.swingTo, e);
-      if (m.swingT >= 1) { m.swing = m.swingTo; m.swingPhase = ""; curPen = penetration(m.a1, m.a2, m.a3); updateButtons(); }
+      m.swing = lerp(m.swingFrom, m.swingTo, smooth(m.swingT));
+      m.a3 = clamp(m.ph - m.a1 - m.a2, LIM3[0], LIM3[1]);
+      if (m.swingT >= 1) {
+        m.swing = m.swingTo; m.swingPhase = ""; curPen = penetration(m.a1, m.a2, m.a3);
+        if (drag && drag.pending) drag.pending = false;
+        if (!auto && !drag && queued) { var q0 = queued; queued = null; startAuto(q0); }
+      }
     } else {
       curPen = penetration(m.a1, m.a2, m.a3);
+      var goal = null;
       if (parking) {
-        var P = [-6 * DEG, -100 * DEG, -40 * DEG];
         if (side() < 0) startSwing("pile");
-        else {
-          trySet(m.a1 + clamp(P[0] - m.a1, -40 * DEG * dt, 40 * DEG * dt), m.a2, m.a3);
-          trySet(m.a1, m.a2 + clamp(P[1] - m.a2, -40 * DEG * dt, 40 * DEG * dt), m.a3);
-          trySet(m.a1, m.a2, m.a3 + clamp(P[2] - m.a3, -60 * DEG * dt, 60 * DEG * dt));
-        }
-      } else if (drag && drag.want) {
-        // Glide the goal toward the finger, then solve.
-        var dx = drag.want.x - drag.goal.x, dy = drag.want.y - drag.goal.y, dd = Math.sqrt(dx * dx + dy * dy), mx = 900 * dt;
-        if (dd > mx) { dx *= mx / dd; dy *= mx / dd; }
-        drag.goal.x += dx; drag.goal.y += dy;
-        var gy = drag.goal.y, sol, pass;
-        for (pass = 0; pass < 3; pass++) {
-          sol = solveIK(drag.goal.x, gy);
-          var pen = penetration(sol[0], sol[1], m.a3);
-          if (pen <= 0.5) break;
-          gy += pen + 1;
-        }
-        if (!trySet(sol[0], sol[1], m.a3)) {
-          // move each joint alone if the pair is blocked
-          trySet(sol[0], m.a2, m.a3); trySet(m.a1, sol[1], m.a3);
-        }
-      } else if (sticks.boom || sticks.arm) {
-        if (sticks.boom) trySet(m.a1 + sticks.boom * 55 * DEG * dt, m.a2, m.a3);
-        if (sticks.arm) trySet(m.a1, m.a2 + sticks.arm * side() * 70 * DEG * dt, m.a3);
+        else { goal = { x: 300, y: 70, v: 200 }; setGoal(PH_PARK, 60); parkT += dt; }
+      } else if (drag && !drag.pending) goal = dragGoal();
+      else if (auto) goal = autoTick(dt);
+      else if (glide) {
+        glide.t += dt; goal = glide;
+        var tg = tipNow();
+        if (Math.hypot(glide.x - tg.x, glide.y - tg.y) < 6 || glide.t > 1.6) glide = null;
       }
-      // Bucket by hand: the Bucket stick (right = open/dump, left = curl in), or dragging the teeth round.
-      if (!parking && sticks.bucket) {
-        m.curlTarget = clamp(m.a3 + sticks.bucket * 110 * DEG * dt, LIM3[0], LIM3[1]);
-      } else if (!parking && tipDrag && tipDrag.want !== undefined) {
-        m.curlTarget = tipDrag.want;
-      }
-      // bucket curl toward its target
-      if (!parking && Math.abs(m.curlTarget - m.a3) > 0.001) {
-        var da = clamp(m.curlTarget - m.a3, -150 * DEG * dt, (bucketHeld ? 120 : 95) * DEG * dt);
-        if (!trySet(m.a1, m.a2, m.a3 + da)) trySet(m.a1, m.a2, m.a3 + da * 0.3);
+      if (!m.swingPhase) {
+        if (goal) {
+          var c = tipNow(), d = Math.hypot(goal.x - c.x, goal.y - c.y), mv = goal.v * dt;
+          // a held bucket follows the finger closely (a quick ease, no lag you can feel)
+          if (goal.follow) mv = Math.min(mv, Math.max(d * (1 - Math.exp(-dt * 26)), Math.min(d, 60 * dt)));
+          moveTip(goal.x, goal.y, mv);
+        } else {
+          var t0 = tipNow();
+          placeTip(t0.x, t0.y, m.ph); // turn the bucket in place, or lift it clear of a truck that backs in under it
+        }
       }
     }
     motion = Math.abs(m.a1 - oldA[0]) + Math.abs(m.a2 - oldA[1]) + Math.abs(m.a3 - oldA[2]) + (m.swingPhase === "turn" ? 0.02 : 0);
@@ -814,13 +1116,14 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     var vel = lastTeeth ? { x: (teeth.x - lastTeeth.x) / Math.max(dt, 0.001), y: (teeth.y - lastTeeth.y) / Math.max(dt, 0.001) } : { x: 0, y: 0 };
     lastTeeth = teeth;
     var inDirt = false;
+    var mid = bpt(k, BUCKET_MID), midW = { x: CX + mid.x * sd, y: mid.y };
 
     // Dig: the teeth bite into the pile.
     if (!m.swingPhase && side() > 0 && !parking) {
       var surf = pileAt(teeth.x);
       if (teeth.y < surf - 2) {
         inDirt = true;
-        var mid = bpt(k, BUCKET_MID), cx = (CX + mid.x * sd + teeth.x) / 2, cy = (mid.y + teeth.y) / 2, R = 40;
+        var cx = (midW.x + teeth.x) / 2, cy = (mid.y + teeth.y) / 2, R = 40;
         var removed = 0, cut = [], i;
         for (i = Math.max(0, pileCol(cx - R)); i <= Math.min(PN - 1, pileCol(cx + R)); i++) {
           var x = PX0 + (i + 0.5) * PCW, ddx = x - cx;
@@ -838,9 +1141,38 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
           var spill = take - into;
           while (spill > 1) { var v = Math.min(spill, PV * 2); spill -= v; grains.push({ x: cx + rand(-20, 20), y: cy + rand(10, 40), vx: rand(-60, 60), vy: rand(60, 160), r: rand(6, 10), col: "#6B421E", vol: v, big: true }); }
           if (Math.random() < 0.4) puffs.push({ x: teeth.x + rand(-20, 20), y: Math.max(teeth.y, surf - 10), r: rand(10, 20), vr: 30, vx: rand(-30, 30), vy: rand(20, 60), life: 0, max: 0.8, col: "#C8A06A", a: 0.6 });
-          if (m.fill > 0.4 && m.curlTarget !== CURL && !bucketHeld) setCurl(CURL);
           digSndT -= dt; if (digSndT <= 0 && take > 30) { digSnd(); digSndT = 0.16; }
         }
+        // a treasure in the scoop comes up with the bucket
+        for (var hi = hidden.length - 1; hi >= 0; hi--) {
+          var h = hidden[hi];
+          if (Math.hypot(h.x - cx, h.y - cy) < R + 16 || Math.hypot(h.x - teeth.x, h.y - teeth.y) < 34) findTreasure(hi, midW);
+        }
+      }
+      // an uncovered treasure the bucket touches
+      for (var hj = hidden.length - 1; hj >= 0; hj--) if (Math.hypot(hidden[hj].x - midW.x, hidden[hj].y - midW.y) < 48) findTreasure(hj, midW);
+    }
+    inDirtLast = inDirt;
+    if (drag && !auto && m.fill > oldFill + 0.001 && inDirt) learned.dig = true;
+
+    // Bucket jobs: pour while tipped out; curl up when full in the dirt; turn back to digging when empty.
+    if (!m.swingPhase && !parking) {
+      if (m.pouring && (!auto || (auto.cur && auto.cur.pour))) {
+        setGoal(PH_DUMP, auto ? 70 : 100);
+        if (m.fill < 0.004 && Math.abs(m.ph - PH_DUMP) < 0.06) {
+          pourEndT += dt;
+          if (pourEndT > 0.5) { m.pouring = false; pourEndT = 0; setGoal(PH_READY, 80); }
+        } else pourEndT = 0;
+      } else if (!auto) {
+        if (inDirt && m.fill > 0.4) setGoal(PH_CARRY, 120);
+        else if (m.fill < 0.03 && m.phGoal !== PH_READY && !inDirt) { emptyT += dt; if (emptyT > 0.6) setGoal(PH_READY, 80); }
+        else emptyT = 0;
+      }
+      // Held over the truck bed with dirt in it: tip it out. Dragged away mid-pour: curl back up.
+      if (drag && !drag.pending) {
+        if (!m.pouring && m.fill > 0.05 && overBed(0)) { drag.dwell = (drag.dwell || 0) + dt; if (drag.dwell > 0.5) { learned.dump = true; startPour(); } }
+        else drag.dwell = 0;
+        if (m.pouring && m.fill > 0.1 && !overBed(40)) { m.pouring = false; setGoal(PH_CARRY, 120); }
       }
     }
 
@@ -863,10 +1195,10 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
         pourAcc += amt;
         var lip1 = bpt(k, LIP), lip2 = bpt(k, TOPLIP);
         // Pour mostly from the lower edge of the mouth.
-        var lo = lip1.y <= lip2.y ? lip1 : lip2, hi = lo === lip1 ? lip2 : lip1;
+        var lo = lip1.y <= lip2.y ? lip1 : lip2, hi2 = lo === lip1 ? lip2 : lip1;
         while (pourAcc > 11) {
           var gv = Math.min(pourAcc, rand(11, 20)); pourAcc -= gv;
-          var t = Math.pow(Math.random(), 1.8) * 0.7, lx = lerp(lo.x, hi.x, t), ly = lerp(lo.y, hi.y, t);
+          var t = Math.pow(Math.random(), 1.8) * 0.7, lx = lerp(lo.x, hi2.x, t), ly = lerp(lo.y, hi2.y, t);
           var big = Math.random() < 0.18;
           grains.push({ x: CX + lx * sd + rand(-4, 4), y: ly, vx: k.V.x * sd * 55 + vel.x * 0.5 + rand(-18, 18), vy: k.V.y * 55 + Math.min(0, vel.y * 0.3) + rand(-25, 5),
             r: big ? rand(9, 13) : rand(5, 9), col: Math.random() < 0.3 ? "#5E3A1B" : (Math.random() < 0.5 ? "#7A4B22" : "#8B5A2B"), vol: gv, big: big });
@@ -910,12 +1242,14 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     relaxGheap();
     if (truck.state !== "gone") relaxBed(truck);
 
-    // Refill the pile when it gets small.
-    if (!regrow && pileTotal() < pileTotal0 * 0.28 && !inDirt) { regrow = 2.5; hint("More dirt!", 2200); }
+    // Refill the pile when it gets small; new treasures get hidden in the new dirt.
+    if (!regrow && (pileTotal() < pileTotal0 * 0.28 || reachLeft() < 0.3) && !inDirt) { regrow = 2.5; say("More dirt!", 3000); }
     if (regrow > 0) {
       regrow = Math.max(0, regrow - dt);
       for (var ri = 0; ri < PN; ri++) if (pile[ri] < pileInit[ri]) pile[ri] += (pileInit[ri] - pile[ri]) * Math.min(1, dt * 1.6);
+      if (regrow === 0) hideTreasures();
     }
+    stepTreasures(dt);
 
     stepTruck(dt);
 
@@ -931,8 +1265,49 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     puffs = puffs.filter(function (q) { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.r += q.vr * dt; return q.life < q.max; });
     beeps = beeps.filter(function (b) { b.life += dt; b.y += 40 * dt; return b.life < 1.1; });
     clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > visRight() + 40) c.x = visLeft() - 140; });
+  }
 
-    updateHint(inDirt);
+  // ---------- Treasures ----------
+  function hideTreasures() {
+    var want = Math.random() < 0.5 ? 1 : 2, tries = 0;
+    while (hidden.length < want && tries++ < 60) {
+      var x = rand(CX + 205, CX + 355), top = pileAt(x);
+      if (top < 80) continue;
+      if (hidden.some(function (h) { return Math.abs(h.x - x) < 50; })) continue;
+      hidden.push({ kind: KIND_BAG[Math.floor(Math.random() * KIND_BAG.length)], x: x, y: rand(28, top - 34), tw: rand(0, 6) });
+    }
+  }
+  function findTreasure(i, at) {
+    var h = hidden.splice(i, 1)[0];
+    var hx = clamp(at.x, visLeft() + 90, visRight() - 90), hy = Math.min(at.y + 170, visTop() - 100);
+    flyers.push({ kind: h.kind, t: 0, x0: at.x, y0: at.y + 10, hx: hx, hy: hy, slot: Math.min(crate.items.length + flyers.length, SLOTS.length - 1) });
+    burst(at.x, at.y + 20, 22);
+    found.push(h.kind); saveState();
+    if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
+    say(NAMES[h.kind], 3600);
+    sparkleSnd();
+  }
+  function burst(x, y, n) {
+    var cols = ["#FFE066", "#FFFFFF", "#FF8FB1", "#7FE3FF", "#FFC93C"];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, sp = rand(120, 320);
+      sparks.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 60, r: rand(7, 15), rot: rand(0, 1), vr: rand(-4, 4), life: 0, max: rand(0.9, 1.5), col: cols[i % cols.length] });
+    }
+  }
+  function stepTreasures(dt) {
+    // uncovered treasures settle down into the hole under them
+    hidden.forEach(function (h) { var s = Math.max(pileAt(h.x), GROUND) + 10; if (h.y > s) h.y = Math.max(s, h.y - 300 * dt); });
+    sparks = sparks.filter(function (p) { p.life += dt; p.vy -= 160 * dt; p.vx *= Math.pow(0.4, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; return p.life < p.max; });
+    flyers = flyers.filter(function (f) {
+      f.t += dt;
+      if (f.t < FLY_T) return true;
+      crate.items.push(f.kind); crate.bounce = 1;
+      var sp = slotPos(Math.min(crate.items.length - 1, SLOTS.length - 1));
+      burst(sp.x, sp.y + 10, 8);
+      plink();
+      return false;
+    });
+    crate.bounce *= Math.pow(0.02, dt);
   }
 
   function stepTruck(dt) {
@@ -940,18 +1315,18 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     t.bounce *= Math.pow(0.02, dt);
     if (t.state === "in") {
       if (t.load >= TRUCK_CAP && performance.now() - t.lastPour > 900 && performance.now() - lastPourAt > 900) {
-        t.state = "full"; t.t = 0; hint("Full! Bye bye, truck!", 2600); honk();
+        t.state = "full"; t.t = 0; say("Full! Bye bye, truck!", 3200); honk();
       }
     } else if (t.state === "full") {
       t.t += dt; t.bounce = Math.sin(t.t * 30) * 2 * Math.max(0, 1 - t.t);
-      if (t.t > 1.6) { t.state = "leaving"; t.v = 0; loads++; saveState(); showLoads(true); chime(); }
+      if (t.t > 1.6) { t.state = "leaving"; t.v = 0; loads++; saveState(); showLoads(true); chime(); if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1800); }
     } else if (t.state === "leaving") {
       t.v = Math.min(350, t.v + 200 * dt); t.dx -= t.v * dt; t.wheel -= t.v * dt / 27;
       if (Math.random() < 0.3) puffs.push({ x: t.dx + 300, y: 30, r: 10, vr: 30, vx: 40, vy: 30, life: 0, max: 0.9, col: "#C8A06A", a: 0.5 });
-      if (t.dx + 330 < visLeft() - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
+      if (t.dx + 330 < Math.min(visLeft(), camLeft(1)) - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
     } else if (t.state === "gone") {
       t.t += dt;
-      if (t.t > 1.2) { t.state = "arriving"; t.dx = visLeft() - 360; t.startDx = t.dx; t.t = 0; t.beepT = 0; hint("Beep beep! New truck!", 2600); }
+      if (t.t > 1.2) { t.state = "arriving"; t.dx = Math.min(visLeft(), camLeft(1)) - 360; t.t = 0; t.beepT = 0; say("Beep beep! New truck!", 3200); }
     } else if (t.state === "arriving") {
       var dist = -t.dx;
       t.v = clamp(dist * 1.1, 30, 200); t.dx = Math.min(0, t.dx + t.v * dt); t.wheel += t.v * dt / 27;
@@ -961,142 +1336,92 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     }
   }
 
-  // ---------- Hints ----------
-  var hintTimer = null;
-  function hint(text, ms) {
-    var el = $("hint");
-    if (ending) { el.hidden = true; return; }
-    el.textContent = text; el.hidden = false;
-    el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(function () { el.hidden = true; }, Math.max(3000, (ms || 2600) * 1.4));
+  // ---------- Coach line: always says what he can do right now ----------
+  var coachEl = $("hint"), coachText = null, announce = null, loaded = false;
+  function say(text, ms) { if (!ending) announce = { text: text, until: performance.now() + Math.max(3000, ms || 3000) }; }
+  function stateLine() {
+    if (ending || m.swingPhase || m.pouring || parking) return "";
+    if (side() < 0) {
+      if (m.fill > 0.05) return truck.state === "in" ? (auto ? "" : "Dump it in the truck!") : "Wait for the truck!";
+      return auto ? "" : "Back to the dirt!";
+    }
+    if (auto) return "";
+    // a little stickiness so the line does not flicker while dirt spills
+    if (m.fill >= 0.6) loaded = true; else if (m.fill < 0.3) loaded = false;
+    return loaded ? "Take it to the truck!" : "Drag the bucket into the dirt!";
   }
-  var hintCooldown = 0;
-  function updateHint(inDirt) {
-    if (ending || m.swingPhase) return;
-    var s;
-    if (side() > 0) s = m.fill >= 0.75 ? "full" : (m.fill < 0.05 ? "dig" : "");
-    else s = m.fill > 0.1 ? "dump" : (truck.state === "in" ? "back" : "");
-    if (!s || s === hintState) return;
-    if (performance.now() < hintCooldown) return;
-    hintState = s; hintCooldown = performance.now() + 1500;
-    if (s === "dig") hint("Dig into the dirt!");
-    else if (s === "full") hint("Full bucket! Swing to the truck");
-    else if (s === "dump") hint("Tap Dump!");
-    else if (s === "back") hint("Swing back to dig more");
+  function coachTick() {
+    var now = performance.now();
+    if (announce && now > announce.until) announce = null;
+    var locked = false;
+    try { locked = Toybox.timer.locked(); } catch (e) { /* ignore */ }
+    var want = ending || locked ? "" : (announce ? announce.text : stateLine());
+    if (want === coachText) return;
+    coachText = want;
+    if (!want) { coachEl.classList.add("off"); return; }
+    coachEl.textContent = want; coachEl.hidden = false; coachEl.classList.remove("off");
+    coachEl.classList.remove("go"); void coachEl.offsetWidth; coachEl.classList.add("go");
   }
 
-  // ---------- Buttons and icons ----------
+  // ---------- Buttons ----------
   function updateButtons() {
-    var toTruck = (m.swingPhase ? m.swingTo : m.swing) < Math.PI / 2;
-    $("swingLabel").textContent = toTruck ? "To truck" : "To dirt";
-    $("swingIcon").innerHTML = toTruck
-      ? '<path d="M30 12 C22 4 8 8 7 22" fill="none" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M1 18 L7 30 L14 19 Z" fill="#1D2340"/><rect x="15" y="22" width="22" height="10" rx="2" fill="#F77F00" stroke="#1D2340" stroke-width="2.5"/><circle cx="20" cy="34" r="3.5" fill="#1D2340"/><circle cx="32" cy="34" r="3.5" fill="#1D2340"/>'
-      : '<path d="M10 12 C18 4 32 8 33 22" fill="none" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M39 18 L33 30 L26 19 Z" fill="#1D2340"/><path d="M2 36 C6 22 20 22 26 36 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/>';
-    var curled = m.curlTarget < (CURL + OPEN) / 2;
-    $("curlLabel").textContent = curled ? "Dump" : "Scoop";
-    $("curlIcon").innerHTML = curled
-      ? '<g transform="rotate(150 20 18)"><path d="M6 10 C6 30 34 32 34 12 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/></g><circle cx="16" cy="32" r="3" fill="#7A4B22"/><circle cx="23" cy="36" r="2.5" fill="#7A4B22"/>'
-      : '<path d="M6 14 C6 34 34 36 34 16 Z" fill="#FFC72C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M10 15 C14 8 26 8 30 15 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/>';
+    $("digBtn").classList.toggle("on", !!(auto && auto.kind === "dig") || queued === "dig");
+    $("dumpBtn").classList.toggle("on", !!(auto && auto.kind === "dump") || queued === "dump");
   }
   function showLoads(pop) {
     var el = $("loads");
     el.textContent = "Loads: " + loads;
     if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
+  $("digBtn").addEventListener("click", function () { if (!ending) { clunk(); startAuto("dig"); } });
+  $("dumpBtn").addEventListener("click", function () { if (!ending) { clunk(); startAuto("dump"); } });
 
-  // ---------- Input: drag the bucket, tap to swing ----------
+  // ---------- Input: drag the bucket; tap behind the machine to swing ----------
   cv.addEventListener("pointerdown", function (e) {
     e.preventDefault();
-    if (ending) return;
-    var w = screenToWorld(e.clientX, e.clientY);
-    var sd = side();
-    var lx = (w.x - CX) * sd;
-    if (m.swingPhase) return;
-    if (drag && drag.id !== e.pointerId) return;
-    if (lx < -40) { startSwing(w.x < CX ? "truck" : "pile"); return; }
-    var k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID), tp = bpt(k, TEETH);
-    if (!tipDrag && Math.hypot(lx - tp.x, w.y - tp.y) < 46) {
-      tipDrag = { id: e.pointerId, want: m.a3 };
-      bucketHeld = true;
-      try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      return;
-    }
-    var bx = CX + bm.x * sd, dist = Math.hypot(w.x - bx, w.y - bm.y);
-    var off = dist < 90 ? { x: k.t2.x - lx, y: k.t2.y - w.y } : { x: k.t2.x - bm.x, y: k.t2.y - bm.y };
-    drag = { id: e.pointerId, off: off, goal: { x: k.t2.x, y: k.t2.y }, want: { x: lx + off.x, y: w.y + off.y } };
+    if (ending || drag) return;
+    var w = screenToWorld(e.clientX, e.clientY), sd = side(), lx = (w.x - CX) * sd;
+    // A finger takes over from Dig and Dump at once.
+    if (auto) stopAuto();
+    glide = null;
+    if (m.swingPhase === "lift") { m.swingPhase = ""; m.carry = null; } // not turning yet: stay on this side
+    drag = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), mode: "reach", off: null, pending: !!m.swingPhase, dwell: 0, last: null };
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    cv.classList.add("held");
+    if (m.swingPhase) return;
+    var k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID);
+    // Generous grab: anywhere on or near the bucket, or on the arm near it.
+    var grabR = Math.max(88, 46 / S), near = Math.hypot(lx - bm.x, w.y - bm.y) < grabR;
+    if (!near) BUCKET.forEach(function (p) { var q = bpt(k, p); if (Math.hypot(lx - q.x, w.y - q.y) < Math.max(40, 28 / S)) near = true; });
+    if (!near) {
+      var ax = k.t2.x - k.t1.x, ay = k.t2.y - k.t1.y, al = ax * ax + ay * ay, u = clamp(((lx - k.t1.x) * ax + (w.y - k.t1.y) * ay) / al, 0, 1);
+      if (u > 0.35 && Math.hypot(lx - (k.t1.x + ax * u), w.y - (k.t1.y + ay * u)) < Math.max(36, 26 / S)) near = true;
+    }
+    if (near) { drag.mode = "grab"; drag.off = { x: k.t2.x - lx, y: k.t2.y - w.y }; return; }
+    // Behind the machine (the truck, or the pile when at the truck): swing round there.
+    if (lx < -40) {
+      if (sd > 0) learned.swing = true;
+      drag.pending = true;
+      startSwing(sd > 0 ? "truck" : "pile");
+    }
   });
   cv.addEventListener("pointermove", function (e) {
-    if (tipDrag && tipDrag.id === e.pointerId && !m.swingPhase) {
-      var tw = screenToWorld(e.clientX, e.clientY);
-      tipDrag.want = tipAngle((tw.x - CX) * side(), tw.y);
-      updateButtons();
-      return;
-    }
-    if (!drag || drag.id !== e.pointerId || m.swingPhase) return;
-    var w = screenToWorld(e.clientX, e.clientY);
-    var lx = (w.x - CX) * side();
-    drag.want = { x: lx + drag.off.x, y: w.y + drag.off.y };
+    if (!drag || drag.id !== e.pointerId) return;
+    drag.cx = e.clientX; drag.cy = e.clientY;
   });
   function endDrag(e) {
-    if (drag && drag.id === e.pointerId) drag = null;
-    if (tipDrag && tipDrag.id === e.pointerId) { tipDrag = null; bucketHeld = !!sticks.bucket; updateButtons(); }
-  }
-  // Grab the bucket's teeth to turn the bucket on its pin.
-  var tipDrag = null;
-  function tipAngle(lx, wy) {
-    var k = fk(m.a1, m.a2, m.a3), off = Math.atan2(-TEETH[1], TEETH[0]);
-    var ph = Math.atan2(wy - k.t2.y, lx - k.t2.x) - off;
-    return clamp(angDiff(ph - k.b), LIM3[0], LIM3[1]);
+    if (!drag || drag.id !== e.pointerId) return;
+    var d = drag;
+    drag = null; cv.classList.remove("held");
+    if (ending) return;
+    // Let go over the truck bed with dirt in the bucket: tip it out.
+    if (!d.pending && !m.swingPhase && !m.pouring && m.fill > 0.05 && overBed(0)) { learned.dump = true; startPour(); }
+    // A quick tap away from the bucket: the bucket keeps going to where he tapped.
+    else if (!d.pending && d.mode === "reach" && d.last && performance.now() - d.t0 < 450 && Math.hypot(d.cx - d.x0, d.cy - d.y0) < 24) glide = { x: d.last.x, y: d.last.y, v: 1100, t: 0 };
   }
   cv.addEventListener("pointerup", endDrag);
   cv.addEventListener("pointercancel", endDrag);
-
-  // Joysticks: spring back to the middle when let go.
-  function makeStick(el, axis, key) {
-    var knob = el.querySelector(".knob"), id = null;
-    function set(e) {
-      var r = el.getBoundingClientRect(), v;
-      if (axis === "v") { var hy = (r.height - 28) / 2 - 30; v = clamp(((r.top + r.height / 2) - e.clientY) / Math.max(20, hy), -1, 1); knob.style.transform = "translateY(" + (-v * Math.max(20, hy)) + "px)"; }
-      else { var hx = (r.width - 28) / 2 - 30; v = clamp((e.clientX - (r.left + r.width / 2)) / Math.max(20, hx), -1, 1); knob.style.transform = "translateX(" + (v * Math.max(20, hx)) + "px)"; }
-      if (Math.abs(v) < 0.12) v = 0;
-      sticks[key] = ending ? 0 : v;
-      el.setAttribute("aria-valuenow", v.toFixed(2));
-    }
-    function release() { id = null; el.classList.remove("held"); knob.style.transform = ""; sticks[key] = 0; el.setAttribute("aria-valuenow", "0"); }
-    el.addEventListener("pointerdown", function (e) {
-      e.preventDefault(); if (ending) return;
-      id = e.pointerId; el.classList.add("held");
-      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      set(e);
-    });
-    el.addEventListener("pointermove", function (e) { if (id === e.pointerId) set(e); });
-    el.addEventListener("pointerup", function (e) { if (id === e.pointerId) release(); });
-    el.addEventListener("pointercancel", function (e) { if (id === e.pointerId) release(); });
-    el.addEventListener("lostpointercapture", function (e) { if (id === e.pointerId) release(); });
-    el.addEventListener("keydown", function (e) {
-      var v = 0;
-      if (axis === "v") v = e.key === "ArrowUp" ? 1 : e.key === "ArrowDown" ? -1 : 0;
-      else v = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-      if (v && !ending) { e.preventDefault(); sticks[key] = v; }
-    });
-    el.addEventListener("keyup", function () { sticks[key] = 0; });
-    return release;
-  }
-  var relBoom = makeStick($("boomStick"), "v", "boom");
-  var relArm = makeStick($("armStick"), "h", "arm");
-  var relBucket = makeStick($("bucketStick"), "h", "bucket");
-  ["pointerdown", "pointerup", "pointercancel", "lostpointercapture", "keydown", "keyup"].forEach(function (ev) {
-    $("bucketStick").addEventListener(ev, function () { setTimeout(function () { bucketHeld = !!sticks.bucket || !!tipDrag; updateButtons(); }, 0); });
-  });
-
-  document.addEventListener("click", function (e) {
-    var t = e.target.closest("button");
-    if (!t) return;
-    if (t.id === "swingBtn" && !ending) { startSwing(side() > 0 ? "truck" : "pile"); }
-    else if (t.id === "curlBtn" && !ending) { setCurl(m.curlTarget < (CURL + OPEN) / 2 ? OPEN : CURL); clunk(); }
-  });
+  cv.addEventListener("lostpointercapture", endDrag);
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
@@ -1127,6 +1452,8 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   function beepSnd() { tone(1000, 0.16, 0.022, "sine"); }
   function honk() { tone(392, 0.22, 0.03, "triangle"); setTimeout(function () { tone(330, 0.3, 0.03, "triangle"); }, 260); }
   function chime() { tone(523, 0.4, 0.035); setTimeout(function () { tone(784, 0.6, 0.035); }, 120); }
+  function sparkleSnd() { [784, 988, 1175, 1568].forEach(function (f, i) { setTimeout(function () { tone(f, 0.5, 0.022); }, i * 110); }); }
+  function plink() { tone(1319, 0.25, 0.018); }
 
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   // The timer is the shared Toybox one, so it keeps going on every Construction Site page (and every app).
@@ -1145,17 +1472,18 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
   }
   function onEnding(done, info) {
     endingDone = done;
-    ending = true; drag = null; tipDrag = null; relBoom(); relArm(); relBucket();
-    $("hint").hidden = true;
+    ending = true; drag = null; glide = null; auto = null; queued = null; announce = null; parkT = 0;
+    cv.classList.remove("held");
+    updateButtons();
     if (!info.goodbye) parking = true;
   }
   function goodbyePark() {
     parking = true;
     chime();
   }
-  // Every frame while ending: done once the excavator is parking and no swing is under way.
+  // Every frame while ending: done once the excavator has swung back and set its bucket down.
   function endingFrame() {
-    if (endingDone && parking && !m.swingPhase) { endingDone(); endingDone = null; }
+    if (endingDone && parking && !m.swingPhase && side() > 0 && parkT > 1.5) { endingDone(); endingDone = null; }
   }
   function restSVG() {
     var o = '<rect width="240" height="200" fill="#2B3A67"/>';
@@ -1172,12 +1500,10 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     return o;
   }
   function restArt() { return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' + restSVG() + "</svg>"; }
-  function onWake() { ending = false; parking = false; endingDone = null; }
+  function onWake() { ending = false; parking = false; endingDone = null; parkT = 0; setGoal(PH_READY, 80); }
 
-  // Big mode: the header and the joysticks hide; Swing and Scoop stay in the panel.
-  function onBig(on) {
-    resize();
-  }
+  // Big mode: the header shrinks to the Big button and Dig/Dump hide; the bucket is dragged on the picture.
+  function onBig() { resize(); }
 
   // ---------- Loop ----------
   var lastT = 0;
@@ -1187,104 +1513,140 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
     var phase = Toybox.timer.phase();
     if (phase !== "resting") step(dt);
     if (phase === "ending") endingFrame();
+    coachTick();
     draw();
     requestAnimationFrame(loop);
   }
 
   // ---------- Start ----------
   resize();
+  hideTreasures();
   updateButtons();
   showLoads(false);
-  // ---------- Idle help: the Toybox ghost hand ----------
-  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
-  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
-  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
-  function makeIdleGhost(plan, opts) {
-    opts = opts || {};
-    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
-    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
-    el.setAttribute("aria-hidden", "true");
-    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
-      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
-    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
-      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
-      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
-      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
-      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
-    document.body.appendChild(el);
-    var dot = el.querySelector(".gh-dot");
+
+  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
-    var down = {};
-    function poke() { last = Date.now(); armed = true; stop(); }
-    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
-    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
-    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
-    document.addEventListener("keydown", poke, true);
-    function busy() {
-      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
-      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
-      return false;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
-    function play(p) {
-      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
-      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
-      el.style.transformOrigin = "16px 14px";
-      if (reduce) {
-        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
-          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
-        anim = el.animate(frames, { duration: 2600, fill: "both" });
-      } else if (p.hold) {
-        // Press and keep holding (a hold-to-pour button).
-        var hq = pts[0];
-        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
-          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
-          { opacity: 0, transform: at(hq, s * 1.05) }];
-        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
-      } else if (p.tap || pts.length === 1) {
-        var q = pts[0];
-        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
-          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
-          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
-          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
-        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
-      } else {
-        // Fade in, press down, slide along the points, hold, lift and fade.
-        var n = pts.length - 1;
-        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
-        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
-        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
-        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
-        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
       }
-      dot.style.opacity = "1";
-      anim.onfinish = function () { stop(); };
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
     }
     setInterval(function () {
-      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
-      var p = null;
-      try { p = plan(); } catch (e) { p = null; }
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
       if (!p || !p.pts || !p.pts.length) return;
       armed = false; shown++;
-      play(p);
-    }, 400);
-    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
   }
-  // Idle help: drag the bucket into the dirt and back; when full, tap the swing button; at the truck, tap Dump.
-  function midOf(el) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
-  makeIdleGhost(function () {
-    if (ending || m.swingPhase || drag || tipDrag) return null;
+  // Page px of a world point.
+  function pagePt(x, y) { var r = cv.getBoundingClientRect(); return [r.left + OX + x * S, r.top + OY - y * S]; }
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // The idle hand shows the next move: drag the bucket into the dirt, over behind the cab, or over the truck bed.
+  var ghost = makeGhost(function () {
+    if (ending || drag || auto || glide || m.swingPhase || m.pouring) return null;
+    var b = bucketWorld();
     if (side() > 0) {
-      if (m.fill >= 0.75) { hint("Full bucket! Swing to the truck"); return { pts: [midOf($("swingBtn"))], tap: true }; }
-      var r = cv.getBoundingClientRect(), k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID);
-      var sc = function (x, y) { return [r.left + OX + x * S, r.top + OY - y * S]; };
-      hint("Dig into the dirt!");
-      return { pts: [sc(CX + bm.x, bm.y), sc(790, pileAt(790) * 0.45), sc(720, pileAt(720) + 70)], duration: 4000 };
+      if (m.fill < 0.6) {
+        if (learned.dig) return null;
+        var s = digSpot(), x = s.lx + CX - 13;
+        return { pts: [pagePt(b.x, b.y), pagePt(x, Math.max(s.top - 40, GROUND + 20))], dur: 3400 };
+      }
+      if (learned.swing) return null;
+      return { pts: [pagePt(b.x, b.y), pagePt(b.x - 120, b.y + 60), pagePt(Math.max(CX - 75, visLeft() + 30), Math.max(b.y, 340))], dur: 3400 };
     }
-    if (m.fill > 0.1) { hint("Tap Dump!"); return { pts: [midOf($("curlBtn"))], tap: true }; }
-    return { pts: [midOf($("swingBtn"))], tap: true };
+    if (m.fill > 0.05 && truck.state === "in") {
+      if (learned.dump) return null;
+      return { pts: [pagePt(b.x, b.y), pagePt(truck.dx + 200, 280)], dur: 3000 };
+    }
+    if (m.fill <= 0.05 && !$("panel").offsetParent) return null;
+    if (m.fill <= 0.05) return { pts: [ghostPt($("digBtn"), 0.5, 0.5)], tap: true };
+    return null;
   });
 
   Toybox.init({
@@ -1312,13 +1674,27 @@ body.big .tb-body .panel { height: auto; width: auto; grid-template-columns: min
 
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__exc = {
-    state: function () { return { a1: m.a1 / DEG, a2: m.a2 / DEG, a3: m.a3 / DEG, fill: m.fill, swing: m.swing, phase: m.swingPhase, truck: truck.state, load: truck.load, loads: loads, pile: pileTotal(), pile0: pileTotal0, grains: grains.length }; },
-    toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY - y * S }; },
-    bucket: function () { var k = fk(m.a1, m.a2, m.a3), b = bpt(k, BUCKET_MID), r = cv.getBoundingClientRect(); return { x: r.left + OX + (CX + b.x * facing()) * S, y: r.top + OY - b.y * S }; },
+    state: function () {
+      return { a1: m.a1 / DEG, a2: m.a2 / DEG, a3: m.a3 / DEG, ph: m.ph / DEG, phGoal: m.phGoal / DEG, fill: m.fill, swing: m.swing, phase: m.swingPhase, side: side(),
+        auto: auto ? auto.kind + ":" + auto.i : "", queued: queued || "", pouring: m.pouring, drag: drag ? drag.mode + (drag.pending ? "/pending" : "") : "",
+        truck: truck.state, load: truck.load, loads: loads, pile: pileTotal(), pile0: pileTotal0, grains: grains.length, pen: curPen,
+        hidden: hidden.map(function (h) { return h.kind; }), reachLeft: reachLeft(), crate: crate.items.slice(), flyers: flyers.length, found: found.slice(),
+        coach: coachEl.hidden || coachEl.classList.contains("off") ? "" : coachEl.textContent, pan: PAN, S: S, win: WIN };
+    },
+    toScreen: function (x, y) { var p = pagePt(x, y); return { x: p[0], y: p[1] }; },
+    bucket: function () { var b = bucketWorld(); var p = pagePt(b.x, b.y); return { x: p[0], y: p[1], wx: b.x, wy: b.y }; },
+    teeth: function () { var b = bucketWorld(TEETH); var p = pagePt(b.x, b.y); return { x: p[0], y: p[1], wx: b.x, wy: b.y }; },
+    tip: function () { var t = tipNow(); return { lx: t.x, y: t.y }; },
+    pileAt: function (x) { return pileAt(x); },
+    view: function () { return { left: visLeft(), right: visRight(), top: visTop() }; },
     fillTruck: function () { truck.load = TRUCK_CAP; truck.lastPour = 0; lastPourAt = 0; },
-    fillBucket: function (f) { m.fill = f; setCurl(CURL); m.a3 = CURL; },
-    teeth: function () { var k = fk(m.a1, m.a2, m.a3), b = bpt(k, TEETH), r = cv.getBoundingClientRect(); return { x: r.left + OX + (CX + b.x * facing()) * S, y: r.top + OY - b.y * S }; },
-    bed: function () { var s = 0; for (var i = 0; i < BEDN; i++) s += truck.bed[i]; return s; }
+    fillBucket: function (f) { m.fill = f; setGoal(PH_CARRY, 400); },
+    bed: function () { var s = 0; for (var i = 0; i < BEDN; i++) s += truck.bed[i]; return s; },
+    bedCenter: function () { var p = pagePt(truck.dx + (BED0 + BED1) / 2, BED_RIM); return { x: p[0], y: p[1] }; },
+    // put a treasure just under the surface at world x (default: where Dig will dig next)
+    plant: function (kind, x) { if (x === undefined) x = digSpot().lx + CX - 13; var top = pileAt(x); hidden.push({ kind: kind || "chest", x: x, y: Math.max(GROUND + 12, top - 22), tw: 0 }); return x; },
+    clearHidden: function () { hidden.length = 0; },
+    ghost: function () { return ghost.show(); }
   };
 })();
 </script>
