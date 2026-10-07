@@ -150,7 +150,7 @@ Keep only:
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
   tool/layout/mode, scroll position and counters go back to first-visit defaults.
 - **Kept**: his **collections** (3D Printer shelf and spool colors, Lathe and Router shelves, Fish Tank fish,
-  Color Mixing "My colors", My puzzles in Jigsaw) and **grown-up settings** (timer, sound, Big, tilt, sheet
+  Color Mixing "My colors", My puzzles in Jigsaw, the Bubble Machine's "Bubbles" counter) and **grown-up settings** (timer, sound, Big, tilt, sheet
   options such as Math Grid spoken numbers).
 - Reloading, or moving between pages of the same app (Tool Wall ↔ station), keeps the state.
 - Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.

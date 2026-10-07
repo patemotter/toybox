@@ -356,7 +356,7 @@ directs it where to go by tapping the wheel or the bed or the food."
 - No fail states: nothing wilts or dies. Counter: "Picked: 5" (the one counter).
 - Panel: the seed packets as picture tiles; the tab bar with New (a fresh, empty bed) and Surprise (a rainbow and
   everything grows a stage, or a visitor parade).
-- Fresh visit: an empty bed; the basket of picked things could be kept as a collection (ask the dad).
+- Fresh visit: an empty bed and an empty basket (the dad's choice).
 - Timer ending: the sun sets, flowers close, the garden sleeps. Rest line: "The garden is sleeping."
 
 **Agents:** 1.
@@ -380,7 +380,8 @@ directs it where to go by tapping the wheel or the bed or the food."
 - Bubble colors/soap: picture tiles in the panel (clear rainbow, pink, blue, green, glitter). Surprise: a giant
   bubble that wobbles across the screen, or a bubble with a little rubber duck inside it.
 - Optional tilt: with "Tilt and shake" on, bubbles drift the way the device leans; shaking blows a gust.
-- No counter needed (or "Popped: N" if the dad wants one; ask). No fail states.
+- Counter: **"Bubbles: N"**, every bubble blown (by the machine or the wand). The dad wants it to **persist across
+  visits** (kept like a collection, not reset on a fresh visit; localStorage, try/catch). No fail states.
 - Timer ending: the machine winds down, the last bubbles float away and pop softly. Rest line: "The bubbles are
   resting."
 
