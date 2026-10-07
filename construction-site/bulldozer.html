@@ -570,32 +570,29 @@ body.ending .lever { pointer-events: none; opacity: 0.5; }
       }
     return v;
   }
+  var HOLE_DONE = 0.7, FLAT_DONE = 0.5;   // share of the work that finishes a job (the old strict checks were too hard)
   function checkJobs() {
     jobs.forEach(function (z) {
       if (z.done) return;
       var ok = false;
       if (z.type === "hole") {
-        var cnt = 0, good = 0, sum = 0;
+        var cnt = 0, good = 0;
         for (var j = Math.max(0, Math.floor(z.y - z.R)); j <= Math.min(GH - 1, Math.ceil(z.y + z.R)); j++)
           for (var i = Math.max(0, Math.floor(z.x - z.R)); i <= Math.min(GW - 1, Math.ceil(z.x + z.R)); i++) {
             var k = j * GW + i;
-            if (base[k] < -0.3) { cnt++; var s = base[k] + dirt[k]; sum += s; if (s >= -0.35) good++; }
+            if (base[k] < -0.3) { cnt++; if (base[k] + dirt[k] >= -0.5) good++; }
           }
-        z.frac = cnt ? good / cnt : 1;
-        ok = cnt > 0 && good >= cnt * 0.92 && sum / cnt >= -0.25;
+        // Done once most of the hole has dirt in it; finishJobs fills in the rest.
+        z.frac = cnt ? clamp(good / cnt / HOLE_DONE, 0, 1) : 1;
+        ok = z.frac >= 1;
       } else if (z.type === "pile") {
         z.frac = clamp((zoneVolume(z) - z.init) / (z.target - z.init), 0, 1);
         ok = z.frac >= 1;
       } else if (z.type === "flat") {
-        var mx = -99, mn = 99;
-        for (var jj = Math.max(0, Math.floor(z.y - z.h / 2)); jj <= Math.min(GH - 1, Math.floor(z.y + z.h / 2)); jj++)
-          for (var ii = Math.max(0, Math.floor(z.x - z.w / 2)); ii <= Math.min(GW - 1, Math.floor(z.x + z.w / 2)); ii++) {
-            var ss = base[jj * GW + ii] + dirt[jj * GW + ii];
-            if (ss > mx) mx = ss; if (ss < mn) mn = ss;
-          }
-        ok = mx <= 0.9 && mx - mn <= 1.1;
+        // Done once most of the bumps are pushed away; finishJobs smooths the rest.
         if (!(z.initEx > 0)) z.initEx = Math.max(1, flatExcess(z));
-        z.frac = ok ? 1 : Math.min(0.95, clamp(1 - flatExcess(z) / z.initEx, 0, 1));
+        z.frac = clamp((1 - flatExcess(z) / z.initEx) / FLAT_DONE, 0, 1);
+        ok = z.frac >= 1;
       }
       if (ok) jobDone(z);
     });
@@ -609,6 +606,27 @@ body.ending .lever { pointer-events: none; opacity: 0.5; }
         if (s > 0.5) e += s - 0.5;
       }
     return e;
+  }
+  // A finished job tidies itself up over about two seconds: the rest of the hole fills in level, the bumps
+  // left in the flat box smooth down. Jobs saved before this (no fin) count as tidy.
+  function finishJobs(dt) {
+    jobs.forEach(function (z) {
+      if (!z.done || !(z.fin < 1) || z.type === "pile") return;
+      z.fin = Math.min(1, z.fin + dt / 2);
+      var k1 = z.fin >= 1 ? 1 : Math.min(1, dt * 2.5);
+      var x0, y0, x1, y1, i, j, k, sf;
+      if (z.type === "hole") { x0 = Math.floor(z.x - z.R); y0 = Math.floor(z.y - z.R); x1 = Math.ceil(z.x + z.R); y1 = Math.ceil(z.y + z.R); }
+      else { x0 = Math.floor(z.x - z.w / 2); y0 = Math.floor(z.y - z.h / 2); x1 = Math.floor(z.x + z.w / 2); y1 = Math.floor(z.y + z.h / 2); }
+      x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(GW - 1, x1); y1 = Math.min(GH - 1, y1);
+      for (j = y0; j <= y1; j++) for (i = x0; i <= x1; i++) {
+        k = j * GW + i; sf = base[k] + dirt[k];
+        if (z.type === "hole") { if (base[k] < 0 && sf < 0) dirt[k] += -sf * k1; }
+        else if (sf > 0.35) dirt[k] -= (sf - 0.35) * k1;
+      }
+      dirtyBox = addBox(dirtyBox, x0, y0, x1, y1);
+      settleBox = addBox(settleBox, x0 - 2, y0 - 2, x1 + 2, y1 + 2);
+      fieldChanged = true;
+    });
   }
   var CHEERS = { hole: "Hole filled!", pile: "Big pile!", flat: "Nice and flat!" };
   var NEXT_TXT = { hole: "Now fill the hole", pile: "Now make a pile", flat: "Now make it flat" };
@@ -625,6 +643,7 @@ body.ending .lever { pointer-events: none; opacity: 0.5; }
   }
   function jobDone(z) {
     z.done = true; z.doneAt = performance.now();
+    z.fin = 0;   // the last bits settle in by themselves (finishJobs)
     jobsDone++;
     saveState();
     $("countNum").textContent = String(jobsDone);
@@ -1197,6 +1216,7 @@ body.ending .lever { pointer-events: none; opacity: 0.5; }
     stepParticles(dt);
     checkAcc += dt;
     if (checkAcc > 0.3) { checkAcc = 0; checkJobs(); }
+    finishJobs(dt);
     saveAcc += dt;
     if (saveAcc > 4) { saveAcc = 0; if (fieldChanged) saveState(); }
     engineUpdate(spd);
