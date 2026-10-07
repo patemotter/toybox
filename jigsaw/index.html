@@ -1,0 +1,2155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jigsaw</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Jigsaw">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tb-stage .tbadge { position: absolute; right: 10px; top: 10px; z-index: 3; pointer-events: none; }
+.tb-counter[hidden] { display: none; }
+
+/* Picture chooser and My puzzles shelf: grids of big picture cards over the stage. */
+.cards { position: absolute; inset: 0; display: grid; justify-content: center; align-content: center; gap: 12px;
+  padding: 62px 12px 12px; touch-action: manipulation; }
+.cards[hidden] { display: none; }
+.card { font: inherit; color: #1D2340; background: #FFFFFF; border: 4px solid #1D2340; border-radius: 18px;
+  box-shadow: 4px 4px 0 #1D2340; padding: 5px 5px 2px; display: flex; flex-direction: column; align-items: stretch;
+  gap: 2px; cursor: pointer; min-width: 0; transition: transform 0.08s ease, box-shadow 0.08s ease; position: relative; }
+.card:active { transform: translate(3px, 3px); box-shadow: 0 0 0 #1D2340; }
+.card canvas { display: block; width: 100%; aspect-ratio: 4 / 3; height: auto; border-radius: 10px; border: 3px solid #1D2340; background: #E6F2FF; }
+.card span { font-weight: 800; font-size: 1.05rem; line-height: 1.15; text-align: center; white-space: nowrap; overflow: hidden; }
+.card.now { background: var(--accent); }
+.card .mark { position: absolute; right: -8px; top: -10px; width: 40px; height: 40px; pointer-events: none; }
+.card.pop { animation: cardpop 0.5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes cardpop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
+/* The shelf: finished puzzles stand on wooden planks; the others wait as faint pictures. */
+.shelf .card { background: #FFF6E0; box-shadow: 0 9px 0 -1px #B9773A, 4px 13px 0 -1px #1D2340; }
+.shelf .card.empty { background: rgba(255, 255, 255, 0.45); border-style: dashed; border-color: rgba(29, 35, 64, 0.35); box-shadow: 0 9px 0 -1px rgba(185, 119, 58, 0.45); cursor: default; }
+.shelf .card.empty canvas { filter: grayscale(1) opacity(0.28); border-color: rgba(29, 35, 64, 0.25); }
+.shelf .card.empty span { color: rgba(29, 35, 64, 0.4); }
+.chip { position: absolute; left: 50%; top: -12px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px;
+  background: #FFFFFF; border: 3px solid #1D2340; border-radius: 999px; padding: 0 8px 0 5px; font-weight: 800; font-size: 0.95rem;
+  line-height: 1.4; box-shadow: 2px 2px 0 #1D2340; pointer-events: none; white-space: nowrap; }
+.chip svg { width: 22px; height: 17px; }
+
+/* Panel: the green Go (Peek / Next puzzle), the size choices, then the tabs. */
+.btn.tb-go { display: inline-flex; align-items: center; justify-content: center; gap: 10px; white-space: nowrap; }
+.btn.tb-go svg { width: 38px; height: 30px; flex: none; }
+.btn.tb-go[hidden] { display: none; }
+.sizes { grid-template-columns: repeat(3, 1fr); }
+.sizes[hidden] { display: none; }
+.sizes .tb-tile { min-height: 64px; gap: 0; }
+.sizes .tb-tile svg { width: 46px; height: 35px; }
+.sizes .tb-tile b { font-size: 1.25rem; line-height: 1; font-weight: 800; }
+.tb-tabs .btn[hidden] { display: none; }
+.tb-tabs .btn.news { animation: newsglow 1s ease-in-out 3; }
+@keyframes newsglow { 50% { transform: scale(1.08); background: var(--accent); } }
+
+/* Phones held upright: everything in one row so the board stays big. */
+@media (orientation: portrait) and (max-width: 600px) {
+  .sizes { grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .sizes .tb-tile { min-height: 58px; padding: 2px; }
+  .sizes .tb-tile svg { width: 36px; height: 27px; }
+  .sizes .tb-tile b { font-size: 1.1rem; }
+  body.m-play .sizes { display: none; }
+  .cards { padding: 12px 10px 52px; gap: 10px; }
+  .card { border-width: 3px; border-radius: 14px; box-shadow: 3px 3px 0 #1D2340; padding: 4px 4px 1px; }
+  .card canvas { border-width: 2px; border-radius: 8px; }
+  .card span { font-size: 0.95rem; }
+}
+/* Phones held sideways: a narrower panel, so the play area gets the room. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: min(36%, 300px); }
+  .sizes { gap: 5px; }
+  .sizes .tb-tile { min-height: 50px; padding: 2px; }
+  .sizes .tb-tile svg { width: 34px; height: 26px; }
+  .sizes .tb-tile b { font-size: 1.05rem; }
+  .tb-tabs { flex-wrap: wrap; }
+  .tb-tabs .btn { flex: 1 1 40%; min-height: 44px; }
+  .cards { padding: 10px 10px 50px; gap: 8px; }
+  .card { border-width: 3px; border-radius: 14px; box-shadow: 3px 3px 0 #1D2340; padding: 3px 3px 0; }
+  .card canvas { border-width: 2px; border-radius: 8px; }
+  .card span { font-size: 0.9rem; }
+  .btn.tb-go svg { width: 30px; height: 24px; }
+}
+/* Tablets: bigger size tiles. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .sizes .tb-tile { min-height: 92px; }
+  .sizes .tb-tile svg { width: 60px; height: 45px; }
+  .sizes .tb-tile b { font-size: 1.5rem; }
+  .card span { font-size: 1.25rem; }
+  .cards { gap: 16px; padding: 74px 18px 18px; }
+}
+@media (orientation: landscape) {
+  .tb-body .tb-panel .sizes { flex: 0 0 auto; }
+  .tb-panel .tb-tabs { margin-top: auto; flex-wrap: wrap; }
+  .tb-panel .tb-tabs .btn { flex: 1 1 40%; }
+}
+/* Phones held sideways, while puzzling: a slim panel (Peek and the tabs), so the board gets the room. */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.m-play .sizes { display: none; }
+  body.m-play .tb-body .tb-panel { width: 216px; }
+}
+
+/* Big: the controls go away. */
+body.big .tb-panel { display: none; }
+/* Time is up: the board dims and the controls rest. */
+#cv, .cards { transition: filter 1.8s ease; }
+body.ending #cv, body.ending .cards, body.resting #cv { filter: brightness(0.62) saturate(0.8); }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+.tb-stage .toast { position: absolute; top: 10px; z-index: 6; max-width: calc(100% - 20px); font-size: 1.25rem; }
+.tb-stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 6; }
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-carry img { display: block; width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .card, .btn { transition: none; }
+  .card.pop, .tb-tabs .btn.news { animation: none; }
+}
+</style>
+</head>
+<body class="m-choose">
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Jigsaw</h1>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A jigsaw puzzle. Drag the pieces onto the board."></canvas>
+      <div class="cards chooser" id="chooser" aria-label="Pick a picture"></div>
+      <div class="cards shelf" id="shelf" aria-label="My puzzles" hidden></div>
+      <div class="tb-counter" id="counter" hidden>Pieces: 0 of 6</div>
+      <div class="tb-coach" id="coach">Pick a picture!</div>
+      <svg class="tbadge" id="badge" viewBox="0 0 60 60" hidden aria-hidden="true"></svg>
+    </main>
+    <section class="tb-panel">
+      <button class="btn tb-go" id="goBtn" hidden></button>
+      <div class="tb-choices sizes" id="sizes" aria-label="How many pieces"></div>
+      <nav class="tb-tabs">
+        <button class="btn" id="tabPics" aria-pressed="true">Pictures</button>
+        <button class="btn" id="tabShelf" aria-pressed="false" aria-label="My puzzles">My shelf</button>
+        <button class="btn tb-new" id="newBtn" hidden>New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var OUT = "#1D2340";
+  var TAU = Math.PI * 2;
+  var KEY = "jigsaw-v1";
+  var SIZES = [4, 6, 9, 12, 16, 24];
+  var GRIDS = { 4: [2, 2], 6: [3, 2], 9: [3, 3], 12: [4, 3], 16: [4, 4], 24: [6, 4] };
+  var DEFAULT_SIZE = 6;
+  var IW = 1200, IH = 900;            // every picture is drawn in a 1200 x 900 box (4:3)
+  var DEBUG = /[?&]debug\b/.test(location.search);
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (id) { return document.getElementById(id); };
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  // Stop iOS pinch / double-tap zoom and the long-press menu.
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturechange", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  // ---------- Small helpers ----------
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function smooth(u) { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); }
+  function easeOut(u) { u = clamp(u, 0, 1); return 1 - Math.pow(1 - u, 3); }
+  function rng(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Keyframes [[t, v1, v2, ...], ...] with a smooth step between them.
+  function kf(frames, t) {
+    if (t <= frames[0][0]) return frames[0].slice(1);
+    for (var i = 1; i < frames.length; i++) {
+      if (t <= frames[i][0]) {
+        var a = frames[i - 1], b = frames[i], u = smooth((t - a[0]) / (b[0] - a[0])), out = [];
+        for (var j = 1; j < a.length; j++) out.push(a[j] + (b[j] - a[j]) * u);
+        return out;
+      }
+    }
+    return frames[frames.length - 1].slice(1);
+  }
+  function now() { return performance.now(); }
+
+  // ---------- SVG helpers for the pictures (static parts) ----------
+  function f1(v) { return Math.round(v * 10) / 10; }
+  function R(x, y, w, h, rx, fill, ex) { return '<rect x="' + f1(x) + '" y="' + f1(y) + '" width="' + f1(w) + '" height="' + f1(h) + '" rx="' + (rx || 0) + '" fill="' + fill + '"' + (ex || "") + "/>"; }
+  function C(cx, cy, r, fill, ex) { return '<circle cx="' + f1(cx) + '" cy="' + f1(cy) + '" r="' + f1(r) + '" fill="' + fill + '"' + (ex || "") + "/>"; }
+  function E(cx, cy, rx, ry, fill, ex) { return '<ellipse cx="' + f1(cx) + '" cy="' + f1(cy) + '" rx="' + f1(rx) + '" ry="' + f1(ry) + '" fill="' + fill + '"' + (ex || "") + "/>"; }
+  function P(d, fill, ex) { return '<path d="' + d + '" fill="' + fill + '"' + (ex || "") + "/>"; }
+  function L(x1, y1, x2, y2, col, w) { return '<line x1="' + f1(x1) + '" y1="' + f1(y1) + '" x2="' + f1(x2) + '" y2="' + f1(y2) + '" stroke="' + (col || OUT) + '" stroke-width="' + (w || 7) + '"/>'; }
+  var NS = ' stroke="none"';
+  function SW(w) { return ' stroke-width="' + w + '"'; }
+  function grad(id, stops) {
+    return '<linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' + stops.map(function (s) {
+      return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>';
+    }).join("") + "</linearGradient>";
+  }
+  function cloud(x, y, s, fill) {
+    return P("M" + f1(x - 80 * s) + " " + f1(y + 20 * s) + " A" + f1(32 * s) + " " + f1(32 * s) + " 0 0 1 " + f1(x - 45 * s) + " " + f1(y - 25 * s) +
+      " A" + f1(48 * s) + " " + f1(48 * s) + " 0 0 1 " + f1(x + 35 * s) + " " + f1(y - 38 * s) +
+      " A" + f1(40 * s) + " " + f1(40 * s) + " 0 0 1 " + f1(x + 85 * s) + " " + f1(y + 20 * s) + " Z", fill || "#FFFFFF", SW(6));
+  }
+  function sun(x, y, r) {
+    var s = "";
+    for (var i = 0; i < 10; i++) {
+      var a = i * Math.PI / 5;
+      s += L(x + Math.cos(a) * (r + 16), y + Math.sin(a) * (r + 16), x + Math.cos(a) * (r + 42), y + Math.sin(a) * (r + 42), "#FFB000", 12);
+    }
+    return s + C(x, y, r, "#FFD23F");
+  }
+  function tree(x, y, s) {
+    return R(x - 10 * s, y - 10 * s, 20 * s, 70 * s, 6, "#9A5F2C", SW(6)) + C(x, y - 40 * s, 46 * s, "#3FAE4F", SW(6)) +
+      C(x - 26 * s, y - 14 * s, 30 * s, "#4CC25E", SW(6)) + C(x + 26 * s, y - 16 * s, 30 * s, "#4CC25E", SW(6));
+  }
+  function svgDoc(pxW, defs, body) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + pxW + '" height="' + Math.round(pxW * IH / IW) + '" viewBox="0 0 ' + IW + " " + IH + '">' +
+      "<defs>" + defs + "</defs>" +
+      '<g stroke="' + OUT + '" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">' + body + "</g></svg>";
+  }
+
+  // ---------- Canvas helpers for the moving parts ----------
+  var P2D = {};
+  function pd(c, d, fill, lw) {
+    var p = P2D[d] || (P2D[d] = new Path2D(d));
+    if (fill) { c.fillStyle = fill; c.fill(p); }
+    if (lw !== 0) { c.strokeStyle = OUT; c.lineWidth = lw || 7; c.stroke(p); }
+  }
+  function fs(c, fill, lw) {
+    if (fill) { c.fillStyle = fill; c.fill(); }
+    if (lw !== 0) { c.strokeStyle = OUT; c.lineWidth = lw || 7; c.stroke(); }
+  }
+  function rr(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+  function circ(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, TAU); }
+  function tube(c, x1, y1, x2, y2, w, fill) {
+    c.lineCap = "round";
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2);
+    c.strokeStyle = OUT; c.lineWidth = w + 14; c.stroke();
+    c.strokeStyle = fill; c.lineWidth = w; c.stroke();
+  }
+  function star(c, x, y, r, rot, fill) {
+    c.beginPath();
+    for (var i = 0; i < 10; i++) {
+      var a = rot + i * Math.PI / 5 - Math.PI / 2, rad = i % 2 ? r * 0.45 : r;
+      if (i) c.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); else c.moveTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+    }
+    c.closePath();
+    fs(c, fill, Math.max(2, r * 0.16));
+  }
+  // Deterministic bursts of stars (no state, so an animation can replay exactly).
+  function burst(c, x, y, age, life, n, spread, seed) {
+    if (age < 0 || age > life) return;
+    var u = age / life, r = rng(seed);
+    c.globalAlpha = 1 - u * u;
+    for (var i = 0; i < n; i++) {
+      var a = r() * TAU, d = spread * (0.4 + 0.6 * r()) * easeOut(u);
+      star(c, x + Math.cos(a) * d, y + Math.sin(a) * d - 20 * u, 12 + 8 * r(), u * 3, ["#FFD23F", "#FF6FD8", "#3DB4FF", "#FFFFFF"][i % 4]);
+    }
+    c.globalAlpha = 1;
+  }
+
+  // ======================================================================
+  // The pictures. Each has a static SVG (base) and a draw(c, t) for its moving parts, in 1200 x 900
+  // units. t = 0 is the resting pose (the puzzle picture); t in (0, dur) is the "comes alive" show,
+  // which ends back on the resting pose so the finished picture stays the same.
+  // ======================================================================
+  var PICS = [];
+
+  // ---- 1. Excavator digging ----
+  (function () {
+    function base() {
+      var s = "";
+      s += R(0, 0, IW, IH, 0, "url(#skyA)", NS);
+      s += sun(1060, 130, 60);
+      s += cloud(230, 140, 1.1) + cloud(640, 95, 0.8) + cloud(860, 230, 0.6);
+      s += P("M0 520 Q 180 400 380 500 Q 560 410 760 490 Q 980 400 1200 470 V 720 H 0 Z", "#9AD975");
+      s += tree(1110, 470, 0.8) + tree(90, 500, 0.7);
+      s += P("M0 600 Q 300 530 620 590 Q 900 540 1200 585 V 900 H 0 Z", "#5DB04E");
+      s += P("M0 665 Q 400 625 760 650 Q 1000 668 1200 642 V 900 H 0 Z", "#D99B5C");
+      [[120, 790, 60], [330, 830, 44], [620, 800, 70], [980, 840, 50], [1120, 780, 36]].forEach(function (q) { s += E(q[0], q[1], q[2], q[2] * 0.3, "#C2834A", NS); });
+      s += P("M690 725 Q 760 600 860 560 Q 940 525 1010 582 Q 1100 650 1165 740 Z", "#A8652E");
+      s += C(900, 640, 16, "#9AA3B5", SW(5)) + C(1010, 690, 12, "#C9D3E0", SW(5)) + C(810, 690, 10, "#9AA3B5", SW(5));
+      // traffic cones
+      [[70, 760], [150, 800]].forEach(function (q) {
+        var x = q[0], y = q[1];
+        s += R(x - 34, y, 68, 14, 4, "#FF7A1A", SW(6)) + P("M" + (x - 22) + " " + y + " L" + (x - 6) + " " + (y - 70) + " L" + (x + 6) + " " + (y - 70) + " L" + (x + 22) + " " + y + " Z", "#FF7A1A", SW(6)) +
+          P("M" + (x - 15) + " " + (y - 28) + " L" + (x + 15) + " " + (y - 28) + " L" + (x + 11) + " " + (y - 44) + " L" + (x - 11) + " " + (y - 44) + " Z", "#FFFFFF", SW(4));
+      });
+      // tracks and wheels
+      s += R(190, 640, 420, 92, 46, "#3A3F55");
+      [240, 320, 400, 480, 560].forEach(function (x) { s += C(x, 686, 26, "#9AA3B5", SW(6)) + C(x, 686, 8, "#4A5578", NS); });
+      s += R(270, 616, 280, 30, 8, "#4A5578");
+      // body, counterweight, cab
+      s += R(166, 515, 64, 100, 18, "#E0A800");
+      s += P("M172 540 L224 540 M172 570 L224 570", "none", SW(5));
+      s += R(205, 500, 365, 125, 20, "#FFC21A");
+      s += R(272, 448, 22, 56, 6, "#4A5578");
+      s += R(380, 356, 150, 152, 16, "#FFC21A");
+      s += R(400, 376, 110, 82, 10, "#BFE8FF");
+      s += P("M412 446 L452 388 L470 388 L430 446 Z", "#FFFFFF", NS);
+      s += R(225, 562, 140, 22, 10, "#3A3F55", SW(5));
+      return { defs: grad("skyA", [[0, "#6EC3FF"], [1, "#D6EFFF"]]), body: s };
+    }
+    var KF = [[0, -0.75, 1.25, 0, 0], [1.3, -0.68, 1.55, 1.0, 1], [2.7, -1.15, 1.0, 1.0, 1], [3.5, -1.15, 0.72, -0.75, 0],
+      [4.3, -1.15, 0.72, -0.75, 0], [5.8, -0.75, 1.25, 0, 0]];
+    var PX = 540, PY = 540, LB = 300, LS = 230;
+    function arm(c, t) {
+      var k = kf(KF, t), a1 = k[0], a2 = k[1], a3 = k[2], load = k[3];
+      var ex = PX + LB * Math.cos(a1), ey = PY + LB * Math.sin(a1);
+      var sx = ex + LS * Math.cos(a2), sy = ey + LS * Math.sin(a2);
+      // boom cylinder
+      tube(c, 470, 600, PX + 140 * Math.cos(a1), PY + 140 * Math.sin(a1), 14, "#C9D3E0");
+      tube(c, PX, PY, ex, ey, 46, "#FFC21A");
+      // stick cylinder
+      tube(c, PX + 210 * Math.cos(a1) - 20 * Math.sin(a1), PY + 210 * Math.sin(a1) - 30, ex + 70 * Math.cos(a2), ey + 70 * Math.sin(a2) - 26, 10, "#C9D3E0");
+      tube(c, ex, ey, sx, sy, 32, "#FFC21A");
+      // bucket
+      c.save();
+      c.translate(sx, sy);
+      c.rotate(a2 + a3);
+      if (load > 0.5) pd(c, "M4 -24 Q 30 -62 70 -30 Q 66 -10 40 -20 Z", "#A8652E", 5);
+      pd(c, "M-14 -24 L62 -30 Q 98 -24 94 18 L 86 62 L 50 70 L 6 28 Z", "#FFC21A", 7);
+      pd(c, "M86 62 L 98 74 L 80 70 M 72 66 L 82 80 L 64 72 M 58 69 L 66 84 L 50 72", "#C9D3E0", 4);
+      c.restore();
+      [[PX, PY], [ex, ey], [sx, sy]].forEach(function (q) { circ(c, q[0], q[1], 12); fs(c, "#9AA3B5", 5); });
+      // dirt falling out when it dumps
+      if (t > 3.2 && t < 4.8) {
+        var r = rng(7);
+        for (var i = 0; i < 14; i++) {
+          var tb = 3.2 + i * 0.07, age = t - tb;
+          if (age < 0) continue;
+          var bx = sx + 40 + (r() - 0.5) * 40, by = sy + 20 + 500 * age * age;
+          if (by > 700) continue;
+          circ(c, bx, by, 9 + r() * 6); fs(c, "#A8652E", 4);
+        }
+      }
+    }
+    PICS.push({ id: "excavator", name: "Excavator", base: base, draw: arm, dur: 6.2 });
+  })();
+
+  // ---- 2. Rocket on the pad ----
+  (function () {
+    var STARS = (function () { var r = rng(42), a = []; for (var i = 0; i < 34; i++) a.push([r() * IW, r() * 440, 2.5 + r() * 3.5]); return a; })();
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "url(#skyB)", NS);
+      STARS.forEach(function (q) { s += C(q[0], q[1], q[2], "#FFF6C8", NS); });
+      [[330, 90], [880, 70], [1100, 330], [470, 300]].forEach(function (q) {
+        var x = q[0], y = q[1];
+        s += P("M" + x + " " + (y - 20) + " L" + (x + 6) + " " + (y - 6) + " L" + (x + 20) + " " + y + " L" + (x + 6) + " " + (y + 6) + " L" + x + " " + (y + 20) + " L" + (x - 6) + " " + (y + 6) + " L" + (x - 20) + " " + y + " L" + (x - 6) + " " + (y - 6) + " Z", "#FFE45C", SW(4));
+      });
+      s += P("M200 95 A60 60 0 1 0 232 200 A48 48 0 1 1 200 95 Z", "#FFF2B0");
+      s += E(1010, 205, 95, 22, "none", ' stroke="#FFD23F" stroke-width="10"') + C(1010, 205, 46, "#FF8FB1") +
+        P("M917 205 A95 22 0 0 0 1103 205", "none", ' stroke="#FFD23F" stroke-width="10"');
+      s += P("M0 640 Q 200 560 420 620 Q 700 545 900 610 Q 1060 570 1200 600 V 900 H 0 Z", "#2E3D7A");
+      s += P("M0 720 Q 600 690 1200 720 V 900 H 0 Z", "#3E6B57");
+      // fuel tanks and a hangar
+      s += R(30, 520, 140, 200, 10, "#E6E9F0") + R(30, 560, 140, 20, 0, "#3DB4FF", SW(5)) + R(70, 640, 60, 80, 6, "#9AA3B5", SW(5));
+      s += R(200, 660, 12, 60, 0, "#9AA3B5", SW(5)) + R(280, 660, 12, 60, 0, "#9AA3B5", SW(5)) + C(246, 640, 56, "#FFFFFF");
+      s += R(330, 690, 12, 40, 0, "#9AA3B5", SW(5)) + C(336, 668, 30, "#FFFFFF");
+      // pad and tower
+      s += R(360, 692, 490, 42, 8, "#9AA3B5");
+      s += R(520, 728, 170, 40, 4, "#2B3145");
+      s += R(420, 668, 330, 28, 6, "#C9D3E0");
+      s += R(740, 250, 62, 420, 4, "#E8433A");
+      var br = "";
+      for (var y = 250; y < 670; y += 42) br += "M740 " + y + " L802 " + (y + 42) + " M802 " + y + " L740 " + (y + 42) + " ";
+      s += P(br, "none", SW(4));
+      s += R(728, 228, 86, 26, 6, "#E8433A");
+      s += R(650, 352, 92, 18, 4, "#C9D3E0", SW(5)) + R(650, 520, 92, 18, 4, "#C9D3E0", SW(5));
+      s += C(771, 220, 10, "#FF5A5F", SW(4));
+      return { defs: grad("skyB", [[0, "#14205A"], [0.5, "#4B3A9A"], [0.75, "#C9659A"], [0.86, "#FFA36B"], [1, "#FFC48A"]]), body: s };
+    }
+    function draw(c, t) {
+      var dy = 0, sh = 0, flame = 0;
+      if (t > 0) {
+        var k = kf([[0, 0], [1.3, 0], [3.7, -340], [4.5, -330], [6.6, 0]], t)[0];
+        dy = k;
+        sh = t < 1.4 ? Math.sin(t * 60) * 2.5 * (t / 1.4) : (t < 6.6 ? Math.sin(t * 47) * 1.2 : 0);
+        flame = t > 0.9 && t < 6.75 ? Math.min(1, (t - 0.9) * 3, (6.75 - t) * 4) : 0;
+      }
+      c.save();
+      c.translate(sh, dy);
+      if (flame > 0) {
+        var fl = (90 + 40 * Math.sin(t * 31) + 20 * Math.sin(t * 17)) * flame;
+        pd(c, "M538 664 Q 575 " + (664 + fl * 1.6) + " 612 664 Z", "#FF7A1A", 5);
+        pd(c, "M552 664 Q 575 " + (664 + fl) + " 598 664 Z", "#FFE45C", 0);
+      }
+      pd(c, "M530 612 L620 612 L632 664 L518 664 Z", "#9AA3B5", 7);
+      pd(c, "M510 520 L452 616 L452 640 L512 606 Z", "#E8433A", 7);
+      pd(c, "M640 520 L698 616 L698 640 L638 606 Z", "#E8433A", 7);
+      pd(c, "M510 300 L640 300 L640 612 L510 612 Z", "#F4F6FF", 7);
+      pd(c, "M510 300 Q 512 210 575 160 Q 638 210 640 300 Z", "#E8433A", 7);
+      pd(c, "M510 470 L640 470 L640 498 L510 498 Z", "#2D5BD7", 6);
+      circ(c, 575, 382, 32); fs(c, "#C9D3E0", 7);
+      circ(c, 575, 382, 20); fs(c, "#7FD3FF", 5);
+      pd(c, "M568 372 A10 10 0 0 1 580 368", null, 4);
+      pd(c, "M575 520 L575 600", null, 5);
+      c.restore();
+      // smoke clouds on the pad
+      if (t > 0.8 && t < 7) {
+        var u = clamp((t - 0.8) / 1.6, 0, 1), fade = clamp((7 - t) / 1.2, 0, 1);
+        c.globalAlpha = fade;
+        for (var i = 0; i < 9; i++) {
+          var side = i % 2 ? 1 : -1, d = (40 + 52 * (i >> 1)) * u;
+          circ(c, 575 + side * d, 690 - (i % 3) * 22 * u, (34 + 22 * (i % 3)) * (0.4 + 0.6 * u));
+          fs(c, i % 3 ? "#F4F6FF" : "#DDE3EE", 5);
+        }
+        c.globalAlpha = 1;
+      }
+    }
+    PICS.push({ id: "rocket", name: "Rocket", base: base, draw: draw, dur: 7 });
+  })();
+
+  // ---- 3. Marble run ----
+  (function () {
+    // The track: the marbles roll along it. Segments: ["M"|"L", x, y] or ["Q", cx, cy, x, y].
+    var SEG = [["M", 235, 168], ["L", 900, 262], ["Q", 985, 275, 965, 335], ["Q", 950, 375, 885, 380], ["L", 290, 472],
+      ["Q", 205, 485, 225, 545], ["Q", 240, 580, 305, 584], ["L", 905, 672], ["Q", 990, 685, 965, 745], ["Q", 950, 775, 890, 778], ["L", 520, 812]];
+    var COLS = ["#FF5A5F", "#3DB4FF", "#4CD964", "#FFB627"];
+    // Sample the path into points with lengths.
+    var PTS = [], LEN = 0;
+    (function () {
+      var x = SEG[0][1], y = SEG[0][2];
+      PTS.push([x, y, 0]);
+      for (var i = 1; i < SEG.length; i++) {
+        var s = SEG[i], n = s[0] === "L" ? 30 : 16;
+        for (var k = 1; k <= n; k++) {
+          var u = k / n, nx, ny;
+          if (s[0] === "L") { nx = x + (s[1] - x) * u; ny = y + (s[2] - y) * u; }
+          else { nx = (1 - u) * (1 - u) * x + 2 * (1 - u) * u * s[1] + u * u * s[3]; ny = (1 - u) * (1 - u) * y + 2 * (1 - u) * u * s[2] + u * u * s[4]; }
+          var p = PTS[PTS.length - 1];
+          LEN += Math.hypot(nx - p[0], ny - p[1]);
+          PTS.push([nx, ny, LEN]);
+        }
+        if (s[0] === "L") { x = s[1]; y = s[2]; } else { x = s[3]; y = s[4]; }
+      }
+    })();
+    function at(d) {
+      d = ((d % LEN) + LEN) % LEN;
+      var lo = 0, hi = PTS.length - 1;
+      while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (PTS[mid][2] < d) lo = mid; else hi = mid; }
+      var a = PTS[lo], b = PTS[hi], u = (d - a[2]) / ((b[2] - a[2]) || 1);
+      return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    }
+    function segD(i) {
+      var prev = SEG[i - 1], s = SEG[i];
+      var x = prev[0] === "Q" ? prev[3] : prev[1], y = prev[0] === "Q" ? prev[4] : prev[2];
+      return "M" + x + " " + y + (s[0] === "L" ? " L" + s[1] + " " + s[2] : " Q" + s[1] + " " + s[2] + " " + s[3] + " " + s[4]);
+    }
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "#FFE3B3", NS);
+      s += R(26, 26, 1148, 848, 30, "#FFEFD1", SW(8));
+      for (var y = 80; y < 860; y += 60) for (var x = 80; x < 1140; x += 60) s += C(x, y, 6, "#E8C88E", NS);
+      s += R(140, 70, 30, 790, 8, "#D9A25F") + R(1032, 70, 30, 790, 8, "#D9A25F");
+      var all = SEG.map(function (q) { return q[0] + q.slice(1).join(" "); }).join(" ");
+      s += P(all, "none", SW(54));
+      for (var i = 1; i < SEG.length; i++) {
+        var col = SEG[i][0] === "L" ? COLS[((i - 1) / 2 | 0) % 4] : "#C9D3E0";
+        s += P(segD(i), "none", ' stroke="' + col + '" stroke-width="38"');
+      }
+      for (var j = 1; j < SEG.length; j += 2) s += P(segD(j), "none", ' stroke="rgba(255,255,255,0.55)" stroke-width="8" transform="translate(0 -9)"');
+      // funnel and the bin
+      s += P("M150 64 L330 64 L268 150 L210 150 Z", "#FF6FD8");
+      s += R(205, 146, 66, 18, 4, "#FF6FD8", SW(6));
+      s += R(330, 790, 230, 76, 14, "#8E6CFF");
+      [[370, 790, "#FFD23F"], [412, 784, "#3DB4FF"], [455, 790, "#FF5A5F"]].forEach(function (q) { s += C(q[0], q[1], 20, q[2], SW(5)); });
+      s += R(330, 790, 230, 76, 14, "#8E6CFF", ' fill-opacity="0"');
+      // a little bell at the end
+      s += P("M640 760 Q 640 720 670 716 Q 700 720 700 760 L 708 772 L 632 772 Z", "#FFC93C") + C(670, 782, 8, "#FFC93C", SW(5));
+      return { defs: "", body: s };
+    }
+    var MCOL = ["#FF5A5F", "#3DB4FF", "#FFD23F", "#4CD964", "#FF6FD8", "#FF9A4D"];
+    function draw(c, t) {
+      var travel = t > 0 ? LEN / 3 * smooth(t / 6.5) : 0;
+      for (var i = 0; i < 6; i++) {
+        var p = at(LEN * (i / 6 + 0.03) + travel);
+        circ(c, p[0], p[1], 21); fs(c, MCOL[i], 6);
+        circ(c, p[0] - 7, p[1] - 7, 6); fs(c, "rgba(255,255,255,0.85)", 0);
+      }
+      if (t > 0 && t < 6.5) {
+        // the bell rings each time a marble lands in the bin
+        var ring = Math.sin(t * 22) * Math.max(0, 1 - ((t * 0.92) % 1.08) * 2.4);
+        c.save(); c.translate(670, 716); c.rotate(ring * 0.25); c.translate(-670, -716);
+        pd(c, "M640 760 Q 640 720 670 716 Q 700 720 700 760 L 708 772 L 632 772 Z", "#FFC93C", 7);
+        c.restore();
+      }
+    }
+    PICS.push({ id: "marbles", name: "Marble run", base: base, draw: draw, dur: 6.8 });
+  })();
+
+  // ---- 4. Gear train ----
+  (function () {
+    var M = 12;
+    var G = [
+      { n: 24, col: "#FF5A5F" }, { n: 12, col: "#FFD23F", from: 0, ang: 0 }, { n: 24, col: "#3DB4FF", from: 1, ang: -60 },
+      { n: 12, col: "#4CD964", from: 0, ang: 120 }, { n: 8, col: "#FF9A4D", from: 2, ang: 0 }, { n: 24, col: "#8E6CFF", from: 1, ang: 60 },
+      { n: 12, col: "#2EC4B6", from: 5, ang: 0 }
+    ];
+    G[0].x = 438; G[0].y = 450; G[0].ph = 0;
+    G.forEach(function (g, i) {
+      g.r = g.n * M / 2;
+      if (!i) return;
+      var f = G[g.from], phi = g.ang * Math.PI / 180, d = f.r + g.r;
+      g.x = f.x + Math.cos(phi) * d; g.y = f.y + Math.sin(phi) * d;
+      // Teeth mesh: the phase sums along the contact line add up to half a tooth.
+      var ui = (phi - f.ph) * f.n / TAU;
+      g.ph = phi + Math.PI - (TAU / g.n) * (0.5 - ui);
+      g.ratio = -f.n / g.n * (f.ratio || 1);
+    });
+    G[0].ratio = 1;
+    // center the whole gear train on the board
+    (function () {
+      var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      G.forEach(function (g) { x0 = Math.min(x0, g.x - g.r); x1 = Math.max(x1, g.x + g.r); y0 = Math.min(y0, g.y - g.r); y1 = Math.max(y1, g.y + g.r); });
+      var dx = 600 - (x0 + x1) / 2, dy = 452 - (y0 + y1) / 2;
+      G.forEach(function (g) { g.x += dx; g.y += dy; });
+    })();
+    var paths = {};
+    function gearPath(n) {
+      if (paths[n]) return paths[n];
+      var r = n * M / 2, ro = r + M, rt = r - M * 1.15, p = TAU / n, path = new Path2D(), first = true;
+      for (var k = 0; k < n; k++) {
+        var a = k * p;
+        [[rt, a - 0.5 * p], [rt, a - 0.27 * p], [ro, a - 0.13 * p], [ro, a + 0.13 * p], [rt, a + 0.27 * p]].forEach(function (q) {
+          var x = Math.cos(q[1]) * q[0], y = Math.sin(q[1]) * q[0];
+          if (first) { path.moveTo(x, y); first = false; } else path.lineTo(x, y);
+        });
+      }
+      path.closePath();
+      return (paths[n] = path);
+    }
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "#7FC4F5", NS);
+      for (var y = 40; y < IH; y += 56) for (var x = 40; x < IW; x += 56) s += C(x, y, 5, "#62A9DE", NS);
+      s += R(90, 110, 1020, 700, 34, "#FFF1D6", SW(8));
+      for (var yy = 150; yy < 800; yy += 50) for (var xx = 130; xx < 1090; xx += 50) s += C(xx, yy, 4, "#F0D9AE", NS);
+      [[130, 150], [1070, 150], [130, 770], [1070, 770]].forEach(function (q) { s += C(q[0], q[1], 14, "#C9D3E0", SW(5)) + P("M" + (q[0] - 7) + " " + q[1] + " L" + (q[0] + 7) + " " + q[1], "none", SW(4)); });
+      s += P("M110 810 L190 760 L1010 760 L1090 810 Z", "#F2DDB4", SW(6));
+      // colored pegs and little stars on the board: landmarks for the pieces
+      var pr = rng(5), pc = ["#FF5A5F", "#FFD23F", "#3DB4FF", "#4CD964", "#FF9A4D", "#8E6CFF", "#FF6FD8"];
+      for (var k = 0; k < 26; k++) {
+        var px = 150 + pr() * 900, py = 160 + pr() * 580;
+        s += k % 3 ? C(px, py, 11, pc[k % 7], SW(5)) : P("M" + f1(px) + " " + f1(py - 18) + " L" + f1(px + 6) + " " + f1(py - 6) + " L" + f1(px + 18) + " " + f1(py) + " L" + f1(px + 6) + " " + f1(py + 6) + " L" + f1(px) + " " + f1(py + 18) + " L" + f1(px - 6) + " " + f1(py + 6) + " L" + f1(px - 18) + " " + f1(py) + " L" + f1(px - 6) + " " + f1(py - 6) + " Z", pc[k % 7], SW(4));
+      }
+      return { defs: "", body: s };
+    }
+    function lighter(hex) {
+      var n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      return "rgb(" + Math.round(r + (255 - r) * 0.45) + "," + Math.round(g + (255 - g) * 0.45) + "," + Math.round(b + (255 - b) * 0.45) + ")";
+    }
+    function draw(c, t) {
+      var th = t > 0 ? TAU * smooth(t / 6) : 0;
+      G.forEach(function (g, i) {
+        var a = g.ph + th * g.ratio;
+        c.save();
+        c.translate(g.x, g.y);
+        c.rotate(a);
+        var p = gearPath(g.n);
+        c.fillStyle = g.col; c.fill(p); c.strokeStyle = OUT; c.lineWidth = 6; c.stroke(p);
+        circ(c, 0, 0, g.r * 0.68); fs(c, lighter(g.col), 5);
+        if (g.n >= 12) {
+          var holes = g.n === 24 ? 6 : 4;
+          for (var h = 0; h < holes; h++) {
+            var ha = h * TAU / holes;
+            circ(c, Math.cos(ha) * g.r * 0.45, Math.sin(ha) * g.r * 0.45, g.r * 0.13); fs(c, "#FFF1D6", 5);
+          }
+        }
+        circ(c, 0, 0, Math.max(14, g.r * 0.2)); fs(c, g.col, 5);
+        if (i === 0) {
+          tube(c, 0, 0, g.r * 0.78, 0, 16, "#C9D3E0");
+          circ(c, g.r * 0.78, 0, 22); fs(c, "#FFD23F", 6);
+        }
+        circ(c, 0, 0, 8); fs(c, "#4A5578", 4);
+        c.restore();
+      });
+    }
+    PICS.push({ id: "gears", name: "Gears", base: base, draw: draw, dur: 6.3 });
+  })();
+
+  // ---- 5. Steam train on a bridge ----
+  (function () {
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "url(#skyC)", NS);
+      s += sun(150, 130, 52);
+      s += cloud(520, 120, 0.9) + cloud(930, 170, 0.75);
+      s += P("M0 430 L180 250 L330 400 L520 210 L720 420 L900 260 L1080 410 L1200 330 V 640 H 0 Z", "#A9B8E8");
+      [[180, 250], [520, 210], [900, 260]].forEach(function (q) {
+        var x = q[0], y = q[1];
+        s += P("M" + x + " " + y + " L" + (x + 40) + " " + (y + 40) + " L" + (x + 18) + " " + (y + 32) + " L" + x + " " + (y + 48) + " L" + (x - 18) + " " + (y + 32) + " L" + (x - 40) + " " + (y + 40) + " Z", "#FFFFFF", SW(5));
+      });
+      s += P("M0 600 Q 600 520 1200 600 V 900 H 0 Z", "#8FD16F");
+      s += P("M360 900 Q 440 760 600 740 Q 770 760 850 900 Z", "#3DA5F4");
+      s += P("M470 820 q 20 -12 40 0 M 600 790 q 20 -12 40 0 M 690 850 q 20 -12 40 0 M 540 870 q 20 -12 40 0", "none", ' stroke="#FFFFFF" stroke-width="6"');
+      s += P("M0 480 Q 220 470 330 560 Q 420 640 430 900 H 0 Z", "#5DB04E");
+      s += P("M1200 470 Q 990 470 880 560 Q 790 640 780 900 H 1200 Z", "#5DB04E");
+      // the viaduct with three arches
+      s += P("M0 500 H1200 V 900 H 0 Z M360 900 V 640 A70 70 0 0 1 500 640 V 900 Z M560 900 V 640 A70 70 0 0 1 700 640 V 900 Z M760 900 V 640 A70 70 0 0 1 900 640 V 900 Z" +
+        " M0 900 V 660 Q 120 640 250 700 L300 720 V 900 Z M960 900 V 720 Q 1080 650 1200 660 V 900 Z", "#D8735B", ' fill-rule="evenodd"');
+      var bricks = "";
+      for (var y = 560; y < 900; y += 44) for (var x = (y / 44 % 2) * 30 + 300; x < 960; x += 60) {
+        if ((x > 360 && x < 500) || (x > 560 && x < 700) || (x > 760 && x < 900)) continue;
+        bricks += "M" + x + " " + y + " h24 ";
+      }
+      s += P(bricks, "none", ' stroke="rgba(29,35,64,0.35)" stroke-width="5"');
+      s += R(-10, 496, 1220, 40, 0, "#C8553D");
+      s += R(-10, 486, 1220, 14, 0, "#8A93A6", SW(5));
+      var sl = "";
+      for (var xs = 10; xs < IW; xs += 40) sl += "M" + xs + " 490 v8 ";
+      s += P(sl, "none", SW(5));
+      s += tree(110, 720, 0.9) + tree(1090, 720, 0.85) + tree(1150, 600, 0.6) + tree(40, 610, 0.6);
+      return { defs: grad("skyC", [[0, "#72C4FF"], [1, "#E2F4FF"]]), body: s };
+    }
+    var P0 = 2100;
+    function wheel(c, x, y, r, ang) {
+      circ(c, x, y, r); fs(c, "#E8433A", 6);
+      c.beginPath();
+      for (var k = 0; k < 4; k++) {
+        var a = ang + k * Math.PI / 4;
+        c.moveTo(x - Math.cos(a) * r * 0.75, y - Math.sin(a) * r * 0.75);
+        c.lineTo(x + Math.cos(a) * r * 0.75, y + Math.sin(a) * r * 0.75);
+      }
+      c.strokeStyle = OUT; c.lineWidth = 4; c.stroke();
+      circ(c, x, y, r * 0.25); fs(c, "#FFD23F", 4);
+    }
+    function train(c, X, ang) {
+      if (X < -60 || X - 830 > IW + 60) return;
+      // car 2: green boxcar
+      rr(c, X - 810, 366, 195, 92, 8); fs(c, "#4CD964");
+      rr(c, X - 745, 382, 66, 64, 4); fs(c, "#35B852", 5);
+      c.beginPath(); c.moveTo(X - 745, 382); c.lineTo(X - 679, 446); c.moveTo(X - 679, 382); c.lineTo(X - 745, 446); c.lineWidth = 4; c.stroke();
+      wheel(c, X - 780, 468, 20, ang * 1.5); wheel(c, X - 645, 468, 20, ang * 1.5);
+      rr(c, X - 618, 430, 20, 12, 3); fs(c, "#4A5578", 4);
+      // car 1: yellow passenger car
+      rr(c, X - 608, 346, 211, 22, 10); fs(c, "#E8433A");
+      rr(c, X - 600, 362, 195, 96, 10); fs(c, "#FFC21A");
+      for (var w = 0; w < 3; w++) { rr(c, X - 585 + w * 62, 378, 44, 40, 8); fs(c, "#BFE8FF", 5); }
+      wheel(c, X - 570, 468, 20, ang * 1.5); wheel(c, X - 435, 468, 20, ang * 1.5);
+      rr(c, X - 405, 430, 20, 12, 3); fs(c, "#4A5578", 4);
+      // tender
+      rr(c, X - 390, 380, 115, 78, 8); fs(c, "#2D6CDF");
+      pd(c, "M" + (X - 384) + " 382 q 18 -30 36 -6 q 18 -26 36 -4 q 18 -26 32 4 Z", "#3A3F55", 5);
+      wheel(c, X - 362, 468, 20, ang * 1.5); wheel(c, X - 302, 468, 20, ang * 1.5);
+      // engine
+      rr(c, X - 268, 446, 266, 16, 5); fs(c, "#3A3F55", 5);
+      pd(c, "M" + (X - 8) + " 488 L" + (X + 18) + " 488 L" + (X - 8) + " 446 Z", "#E8433A", 6);
+      rr(c, X - 182, 380, 172, 70, 22); fs(c, "#2D6CDF");
+      c.beginPath(); c.moveTo(X - 140, 382); c.lineTo(X - 140, 448); c.moveTo(X - 80, 382); c.lineTo(X - 80, 448); c.strokeStyle = "#FFD23F"; c.lineWidth = 6; c.stroke();
+      rr(c, X - 30, 372, 26, 86, 8); fs(c, "#3A3F55");
+      circ(c, X - 6, 366, 11); fs(c, "#FFE45C", 5);
+      pd(c, "M" + (X - 82) + " 382 L" + (X - 88) + " 326 L" + (X - 46) + " 326 L" + (X - 54) + " 382 Z", "#3A3F55", 6);
+      rr(c, X - 96, 312, 58, 18, 6); fs(c, "#3A3F55", 6);
+      pd(c, "M" + (X - 146) + " 382 A22 22 0 0 1 " + (X - 102) + " 382 Z", "#FFC93C", 6);
+      rr(c, X - 262, 330, 92, 128, 8); fs(c, "#E8433A");
+      rr(c, X - 272, 316, 112, 20, 8); fs(c, "#3A3F55");
+      rr(c, X - 246, 348, 56, 44, 8); fs(c, "#BFE8FF", 5);
+      wheel(c, X - 220, 458, 30, ang); wheel(c, X - 150, 458, 30, ang); wheel(c, X - 60, 468, 20, ang * 1.5);
+      var px = Math.cos(ang) * 14, py = Math.sin(ang) * 14;
+      tube(c, X - 220 + px, 458 + py, X - 150 + px, 458 + py, 7, "#C9D3E0");
+    }
+    function draw(c, t) {
+      var o = t > 0 ? P0 * smooth(t / 8) : 0, X = 1060 + o;
+      train(c, X, o / 30);
+      train(c, X - P0, o / 30);
+      // steam: resting puffs over the chimney, then puffs left behind as it rolls
+      var rest = t > 0 ? Math.max(clamp(1 - t / 0.6, 0, 1), clamp((t - 7.2) / 0.8, 0, 1)) : 1;
+      if (rest > 0) {
+        c.globalAlpha = rest;
+        [[995, 290, 24], [1020, 245, 30], [1055, 196, 36]].forEach(function (q) { circ(c, q[0], q[1], q[2]); fs(c, "#FFFFFF", 6); });
+        c.globalAlpha = 1;
+      }
+      if (t > 0.3 && t < 8) {
+        for (var k = 0; k < 40; k++) {
+          var tb = 0.3 + k * 0.18, age = t - tb;
+          if (age < 0 || age > 1.6 || tb > 7) continue;
+          var xb = 1060 + P0 * smooth(tb / 8) - 70;
+          xb = ((xb + 100) % P0) - 100;
+          c.globalAlpha = 1 - age / 1.6;
+          circ(c, xb - 30 * age, 300 - 80 * age, 18 + 24 * age); fs(c, "#FFFFFF", 5);
+        }
+        c.globalAlpha = 1;
+      }
+    }
+    PICS.push({ id: "train", name: "Train", base: base, draw: draw, dur: 8 });
+  })();
+
+  // ---- 6. A workbench of tools ----
+  (function () {
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "#BFD7EA", NS);
+      s += R(60, 46, 1080, 520, 18, "#E3B278", SW(8));
+      for (var y = 80; y < 550; y += 45) for (var x = 95; x < 1120; x += 45) s += C(x, y, 5, "#B98349", NS);
+      // hand saw
+      s += P("M120 150 L470 150 L470 214 L150 262 Z", "#D5DEEA");
+      var teeth = "M150 262";
+      for (var k = 0; k < 16; k++) { var tx = 150 + k * 20, ty = 262 - k * 3; teeth += " L" + (tx + 10) + " " + (ty + 10) + " L" + (tx + 20) + " " + (ty - 3); }
+      s += P(teeth, "none", SW(5));
+      s += P("M462 128 L560 128 Q 584 128 584 152 L 584 222 Q 584 246 560 246 L 462 246 Z", "#E8433A");
+      s += R(500, 158, 52, 58, 18, "#E3B278", SW(6));
+      // wrench
+      s += '<g transform="translate(784 130) rotate(14)">' + R(-14, 20, 28, 210, 12, "#C9D3E0") +
+        P("M-34 30 A36 36 0 1 1 34 30 L 16 30 L 16 0 L -16 0 L -16 30 Z", "#C9D3E0") + C(0, 250, 30, "#C9D3E0") + C(0, 250, 14, "#E3B278", SW(5)) + "</g>";
+      // screwdriver
+      s += R(828, 100, 40, 110, 16, "#FFC21A") + R(828, 130, 40, 16, 0, "#2D5BD7", SW(5)) + R(841, 208, 14, 140, 4, "#C9D3E0") + P("M841 346 L855 346 L852 372 L844 372 Z", "#9AA3B5", SW(5));
+      // pliers
+      s += P("M960 110 Q 930 220 945 330 L 970 330 Q 965 230 990 160 Z", "#E8433A") + P("M1040 110 Q 1060 220 1050 330 L 1025 330 Q 1022 230 1006 160 Z", "#E8433A") +
+        P("M985 150 L 998 60 L 1012 150 Z", "#9AA3B5") + C(998, 158, 12, "#C9D3E0", SW(5));
+      // level
+      s += R(140, 330, 380, 56, 12, "#4CD964") + R(300, 343, 60, 30, 8, "#FFF6A0", SW(5)) + C(330, 358, 8, "#FFFFFF", SW(4)) + C(190, 358, 9, "#2EA05A", SW(4)) + C(470, 358, 9, "#2EA05A", SW(4));
+      // clamp
+      s += P("M596 110 h110 v34 h-76 v120 h76 v34 h-110 Z", "#FF8A3D") + R(688, 140, 18, 140, 4, "#C9D3E0", SW(5)) + R(670, 280, 54, 20, 6, "#3A3F55", SW(5));
+      // pegs
+      [[517, 120], [848, 92], [998, 102], [330, 322], [640, 98]].forEach(function (q) { s += R(q[0] - 8, q[1] - 10, 16, 16, 4, "#3A3F55", SW(4)); });
+      // bench
+      s += R(30, 660, 1140, 260, 0, "#A86A35");
+      s += R(80, 700, 300, 84, 10, "#C98A4B") + R(190, 730, 80, 18, 9, "#3A3F55", SW(5));
+      s += R(820, 700, 300, 84, 10, "#C98A4B") + R(930, 730, 80, 18, 9, "#3A3F55", SW(5));
+      s += R(-10, 598, 1220, 64, 0, "#D99A55");
+      s += P("M60 618 h220 M 420 640 h300 M 820 620 h250", "none", ' stroke="rgba(29,35,64,0.25)" stroke-width="5"');
+      // tape measure
+      s += C(150, 560, 40, "#FFD23F") + C(150, 560, 16, "#3A3F55", SW(5)) + R(186, 584, 90, 14, 3, "#FFE97A", SW(5)) + R(270, 578, 10, 24, 3, "#3A3F55", SW(4));
+      // wood block, nails
+      s += R(330, 520, 230, 80, 6, "#F2C98A");
+      s += P("M345 545 q 60 -10 120 4 q 40 8 80 -2 M 350 575 q 70 8 140 -4 q 30 -4 56 2", "none", ' stroke="#D9A25F" stroke-width="5"');
+      s += C(395, 534, 9, "#9AA3B5", SW(5)) + C(530, 538, 9, "#9AA3B5", SW(5));
+      s += R(484, 478, 12, 44, 2, "#C9D3E0", SW(5)) + R(472, 470, 36, 12, 4, "#9AA3B5", SW(5));
+      // eye protection
+      s += P("M600 576 q 40 -16 80 0 q 40 -16 80 0", "none", ' stroke="#FF8A3D" stroke-width="10"');
+      s += E(640, 582, 38, 26, "#BFE8FF") + E(720, 582, 38, 26, "#BFE8FF") + P("M626 572 l 14 -8 M 706 572 l 14 -8", "none", ' stroke="#FFFFFF" stroke-width="6"');
+      // cordless drill
+      s += R(812, 562, 110, 38, 10, "#3A3F55");
+      s += R(834, 510, 58, 58, 12, "#3A3F55");
+      s += R(782, 444, 170, 76, 28, "#FFC21A");
+      s += R(800, 462, 40, 18, 8, "#3A3F55", SW(5));
+      s += R(950, 464, 36, 36, 6, "#4A5578");
+      return { defs: "", body: s };
+    }
+    function hammer(c, a) {
+      c.save();
+      c.translate(660, 438);
+      c.rotate(a);
+      rr(c, -152, -11, 152, 22, 10); fs(c, "#C98A4B", 6);
+      rr(c, -62, -14, 66, 28, 12); fs(c, "#E8433A", 6);
+      pd(c, "M-160 -46 Q -150 -82 -116 -88 L -118 -74 Q -140 -66 -144 -46 Z", "#9AA3B5", 6);
+      rr(c, -195, -48, 52, 80, 8); fs(c, "#9AA3B5", 7);
+      rr(c, -198, 22, 58, 12, 4); fs(c, "#C9D3E0", 5);
+      c.restore();
+    }
+    function draw(c, t) {
+      var a = 0;
+      if (t > 0 && t < 2.6) a = kf([[0, 0], [0.5, 0.55], [0.75, 0], [1.25, 0.55], [1.5, 0], [2.0, 0.55], [2.25, 0], [2.6, 0]], t)[0];
+      hammer(c, a);
+      [0.75, 1.5, 2.25].forEach(function (ti, i) { burst(c, 490, 466, t - ti, 0.6, 6, 70, 11 + i); });
+      // the drill bit (it spins on the show)
+      var spin = t > 2.6 && t < 5.2 ? (t - 2.6) * 9 * Math.min(1, (5.2 - t) * 2, (t - 2.6) * 2) : 0;
+      c.save();
+      rr(c, 984, 474, 100, 16, 6); fs(c, "#C9D3E0", 6);
+      c.beginPath(); c.rect(984, 474, 100, 16); c.clip();
+      c.beginPath();
+      var off = (spin * 40) % 18;
+      for (var x = 970 + off; x < 1090; x += 18) { c.moveTo(x, 474); c.lineTo(x + 10, 490); }
+      c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 4; c.stroke();
+      c.restore();
+      pd(c, "M1084 474 L1100 482 L1084 490 Z", "#9AA3B5", 5);
+      if (spin > 0.3) {
+        c.globalAlpha = 0.6;
+        c.beginPath(); c.arc(1034, 482, 26, -0.6 + spin, 0.6 + spin); c.strokeStyle = "#FFFFFF"; c.lineWidth = 5; c.stroke();
+        c.globalAlpha = 1;
+      }
+    }
+    PICS.push({ id: "tools", name: "Tools", base: base, draw: draw, dur: 5.4 });
+  })();
+
+  // ---- 7. Fire truck ----
+  (function () {
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "url(#skyD)", NS);
+      s += cloud(180, 120, 0.9) + cloud(560, 80, 0.7);
+      [[30, 300, 160, 360, "#F7B2C4"], [205, 240, 140, 420, "#B8A6F2"], [360, 330, 150, 330, "#9FE0C8"], [525, 270, 150, 390, "#FFD98A"]].forEach(function (b) {
+        s += R(b[0], b[1], b[2], b[3], 6, b[4]);
+        for (var y = b[1] + 24; y < 620; y += 58) for (var x = b[0] + 20; x < b[0] + b[2] - 30; x += 44) s += R(x, y, 26, 34, 4, "#FFFFFF", SW(4));
+      });
+      // the big brick building
+      s += R(820, 150, 360, 520, 6, "#D9634C");
+      s += R(806, 130, 388, 30, 6, "#B84A36");
+      for (var r = 0; r < 4; r++) for (var c2 = 0; c2 < 3; c2++) {
+        var wx = 850 + c2 * 110, wy = 190 + r * 105;
+        s += R(wx, wy, 76, 70, 6, "#BFE8FF") + P("M" + (wx + 38) + " " + wy + " v70 M" + wx + " " + (wy + 35) + " h76", "none", SW(5)) + R(wx - 6, wy + 66, 88, 12, 4, "#FFFFFF", SW(5));
+      }
+      s += R(940, 600, 100, 70, 6, "#4CD964");
+      s += R(0, 642, IW, 44, 0, "#C9D3E0");
+      s += R(0, 684, IW, 216, 0, "#5A6177");
+      for (var lx = 20; lx < IW; lx += 180) s += R(lx, 786, 100, 16, 6, "#FFFFFF", SW(5));
+      s += tree(60, 560, 0.9);
+      // hydrant
+      s += R(790, 592, 40, 52, 8, "#E8352E") + R(782, 584, 56, 14, 6, "#E8352E", SW(5)) + P("M795 584 a15 15 0 0 1 30 0 Z", "#E8352E", SW(5)) + R(776, 606, 68, 16, 6, "#FFD23F", SW(5));
+      // the truck
+      s += R(116, 466, 530, 176, 18, "#E8352E");
+      s += P("M640 640 V 450 Q 640 420 670 420 H 735 Q 760 420 772 445 L 805 530 Q 812 545 812 560 V 640 Z", "#E8352E");
+      s += P("M688 440 H 735 Q 750 440 758 458 L 784 528 H 688 Z", "#BFE8FF");
+      s += P("M700 500 L 740 446 L 752 446 L 712 500 Z", "#FFFFFF", NS);
+      s += R(116, 560, 696, 22, 0, "#FFFFFF", SW(5));
+      [[140, 486, 112], [266, 486, 112], [392, 486, 112], [518, 486, 104]].forEach(function (q) { s += R(q[0], q[1], q[2], 60, 8, "#C9D3E0", SW(5)) + R(q[0] + q[2] / 2 - 16, q[1] + 26, 32, 10, 4, "#9AA3B5", SW(4)); });
+      s += R(790, 608, 46, 28, 8, "#C9D3E0");
+      s += C(796, 582, 12, "#FFE45C", SW(5));
+      s += C(600, 610, 22, "#FFD23F", SW(6)) + C(600, 610, 8, "#3A3F55", SW(4));
+      s += R(150, 430, 90, 40, 8, "#9AA3B5");
+      [[220, 652], [362, 652], [720, 652]].forEach(function (q) { s += C(q[0], q[1], 46, "#2B3145") + C(q[0], q[1], 18, "#C9D3E0", SW(6)); });
+      return { defs: grad("skyD", [[0, "#7CC8FF"], [1, "#DBF1FF"]]), body: s };
+    }
+    function draw(c, t) {
+      var ang = t > 0 ? kf([[0, 0], [0.4, 0], [1.8, -0.42], [5.6, -0.42], [6.9, 0]], t)[0] : 0;
+      // ladder
+      c.save();
+      c.translate(196, 430);
+      c.rotate(ang);
+      rr(c, -10, -34, 530, 28, 8); fs(c, "#C9D3E0", 7);
+      c.beginPath();
+      for (var x = 20; x < 520; x += 38) { c.moveTo(x, -32); c.lineTo(x, -8); }
+      c.strokeStyle = OUT; c.lineWidth = 5; c.stroke();
+      rr(c, 508, -40, 34, 40, 8); fs(c, "#FFD23F", 6);
+      c.restore();
+      circ(c, 196, 430, 14); fs(c, "#4A5578", 5);
+      // lights on the cab roof
+      var fl = t > 0 && t < 6.9 ? Math.floor(t * 3.2) % 2 : -1;
+      [[682, "#FF3B3B", 0], [726, "#3D7BFF", 1]].forEach(function (q) {
+        var on = fl === -1 || fl === q[2];
+        if (fl !== -1 && on) { circ(c, q[0] + 13, 410, 40); c.fillStyle = q[2] ? "rgba(61,123,255,0.35)" : "rgba(255,59,59,0.35)"; c.fill(); }
+        rr(c, q[0], 402, 26, 18, 5); fs(c, on ? q[1] : (q[2] ? "#9DB8F0" : "#F0A0A0"), 5);
+      });
+      // water
+      if (t > 1.9 && t < 5.5) {
+        var nx = 196 + Math.cos(ang) * 545 + 20 * Math.sin(ang), ny = 430 + Math.sin(ang) * 545 - 20 * Math.cos(ang);
+        var tx = 880, ty = 330, cx = nx + 170, cy = ny - 170;
+        var grow = clamp((t - 1.9) * 1.4, 0, 1), stop = clamp((t - 5.0) * 2, 0, 1);
+        for (var k = 0; k < 30; k++) {
+          var u = ((k / 30) + t * 0.8) % 1;
+          if (u > grow || u < stop) continue;
+          var px = (1 - u) * (1 - u) * nx + 2 * (1 - u) * u * cx + u * u * tx, py = (1 - u) * (1 - u) * ny + 2 * (1 - u) * u * cy + u * u * ty;
+          circ(c, px, py, 9 + 5 * Math.sin(k * 1.7)); fs(c, k % 3 ? "#7FD3FF" : "#FFFFFF", 3);
+        }
+        if (grow >= 1 && stop < 1) {
+          for (var j = 0; j < 7; j++) {
+            var a = -Math.PI / 2 + (j - 3) * 0.45, d = 20 + ((t * 90 + j * 13) % 50);
+            circ(c, tx + Math.cos(a) * d, ty + Math.sin(a) * d + d * 0.6, 7); fs(c, "#BFE8FF", 3);
+          }
+        }
+      }
+    }
+    PICS.push({ id: "firetruck", name: "Fire truck", base: base, draw: draw, dur: 7.1 });
+  })();
+
+  // ---- 8. Tower crane at sunset ----
+  (function () {
+    var WIN = (function () { var r = rng(9), a = []; for (var i = 0; i < 40; i++) a.push([r(), r()]); return a; })();
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "url(#skyE)", NS);
+      s += C(300, 640, 168, "rgba(255,228,92,0.35)", NS) + C(300, 640, 130, "#FFE45C", SW(6));
+      s += R(680, 230, 280, 26, 13, "#FF9EBB", NS) + R(800, 290, 220, 22, 11, "#FF9EBB", NS) + R(80, 330, 240, 24, 12, "#FFB2A0", NS) + R(400, 180, 160, 20, 10, "#E58BB8", NS);
+      // city skyline
+      var sky = "M0 900 V 560 H 70 V 500 H 150 V 580 H 210 V 470 H 270 V 540 H 360 V 600 H 430 V 520 H 500 V 570 H 560 V 900 Z";
+      s += P(sky, "#4B2B6B");
+      WIN.forEach(function (w, i) { if (i % 2) return; var x = 20 + w[0] * 520, y = 520 + w[1] * 120; s += R(x, y, 12, 16, 2, "#FFD23F", NS); });
+      s += R(0, 690, IW, 210, 0, "#3A2350");
+      // building frame
+      [760, 860, 960, 1060].forEach(function (x) { s += R(x, 430, 24, 270, 2, "#FF7A3D"); });
+      [430, 520, 610].forEach(function (y) { s += R(750, y, 344, 22, 2, "#FF7A3D"); });
+      s += R(750, 690, 344, 20, 0, "#9AA3B5");
+      s += P("M784 452 L 860 520 M 884 452 L 960 520 M 984 542 L 1060 610", "none", ' stroke="#FFB27A" stroke-width="10"');
+      // the crane
+      s += R(540, 688, 120, 34, 6, "#9AA3B5");
+      s += R(575, 196, 50, 500, 2, "#FFC21A");
+      var lace = "";
+      for (var y = 196; y < 690; y += 50) lace += "M575 " + y + " L625 " + (y + 50) + " M625 " + y + " L575 " + (y + 50) + " ";
+      s += P(lace, "none", SW(5));
+      s += P("M600 60 L1000 152 M600 60 L380 152", "none", SW(5));
+      s += P("M575 150 L600 60 L625 150 Z", "#FFC21A");
+      s += R(360, 150, 790, 30, 2, "#FFC21A");
+      var jl = "";
+      for (var x = 360; x < 1150; x += 40) jl += "M" + x + " 150 L" + (x + 20) + " 180 L" + (x + 40) + " 150 ";
+      s += P(jl, "none", SW(4));
+      s += R(380, 180, 74, 66, 4, "#9AA3B5") + P("M380 202 h74 M 380 224 h74", "none", SW(4));
+      s += R(616, 182, 62, 50, 8, "#FFC21A") + R(632, 192, 36, 26, 5, "#BFE8FF", SW(5));
+      return { defs: grad("skyE", [[0, "#2E2366"], [0.4, "#9C3D8A"], [0.62, "#FF6B5A"], [0.75, "#FFB34D"], [0.8, "#FFE08A"]]), body: s };
+    }
+    function draw(c, t) {
+      var k = t > 0 ? kf([[0, 960, 330], [0.6, 960, 330], [2.6, 790, 330], [3.4, 790, 392], [4.3, 790, 392], [5.1, 790, 330], [6.6, 960, 330]], t) : [960, 330];
+      var X = k[0], Y = k[1], sw = t > 0 ? 0.06 * Math.sin(t * 2.4) * Math.sin(Math.PI * clamp(t / 6.8, 0, 1)) : 0;
+      rr(c, X - 36, 180, 72, 22, 6); fs(c, "#4A5578", 5);
+      circ(c, X - 20, 204, 7); fs(c, "#C9D3E0", 4); circ(c, X + 20, 204, 7); fs(c, "#C9D3E0", 4);
+      c.save();
+      c.translate(X, 204);
+      c.rotate(sw);
+      c.translate(-X, -204);
+      c.beginPath(); c.moveTo(X - 7, 208); c.lineTo(X - 7, Y); c.moveTo(X + 7, 208); c.lineTo(X + 7, Y);
+      c.strokeStyle = OUT; c.lineWidth = 4; c.stroke();
+      rr(c, X - 22, Y - 6, 44, 34, 8); fs(c, "#FFC21A", 6);
+      c.beginPath(); c.moveTo(X, Y + 28); c.lineTo(X, Y + 40); c.arc(X - 10, Y + 40, 10, 0, Math.PI, false); c.lineWidth = 6; c.stroke();
+      c.beginPath(); c.moveTo(X - 2, Y + 44); c.lineTo(X - 112, Y + 80); c.moveTo(X + 2, Y + 44); c.lineTo(X + 112, Y + 80); c.lineWidth = 4; c.stroke();
+      rr(c, X - 140, Y + 78, 280, 28, 3); fs(c, "#FF7A3D", 6);
+      c.beginPath(); c.moveTo(X - 132, Y + 92); c.lineTo(X + 132, Y + 92); c.strokeStyle = "rgba(29,35,64,0.4)"; c.lineWidth = 4; c.stroke();
+      c.restore();
+      // birds flying home
+      if (t > 0 && t < 6.8) {
+        for (var b = 0; b < 3; b++) {
+          var bx = -80 + (t / 6.8) * 1400 - b * 70, by = 280 + b * 34 + 10 * Math.sin(t * 3 + b), fl = Math.sin(t * 12 + b) * 12;
+          c.beginPath(); c.moveTo(bx - 22, by - fl); c.quadraticCurveTo(bx - 10, by - 10, bx, by); c.quadraticCurveTo(bx + 10, by - 10, bx + 22, by - fl);
+          c.strokeStyle = OUT; c.lineWidth = 6; c.stroke();
+        }
+      }
+    }
+    PICS.push({ id: "crane", name: "Crane", base: base, draw: draw, dur: 6.9 });
+  })();
+
+  // ---- 9. 3D printer printing a little boat ----
+  (function () {
+    function base() {
+      var s = R(0, 0, IW, IH, 0, "#A8E0D2", NS);
+      for (var x = 0; x < IW; x += 80) s += R(x, 0, 40, 760, 0, "#9ED8C9", NS);
+      // shelf with prints
+      s += R(40, 300, 220, 20, 6, "#C98A4B");
+      s += R(60, 250, 50, 50, 6, "#FF8A3D", SW(6)) + P("M150 300 L 175 230 L 200 300 Z", "#E8433A", SW(6)) + C(232, 276, 22, "#3DB4FF", SW(6)) + C(232, 276, 7, "#A8E0D2", SW(4));
+      s += R(940, 360, 220, 20, 6, "#C98A4B");
+      s += C(1000, 320, 38, "#8E6CFF", SW(6)) + C(1000, 320, 14, "#E6E9F0", SW(5)) + R(1060, 300, 70, 60, 10, "#4CD964", SW(6));
+      // desk
+      s += R(0, 760, IW, 140, 0, "#C98A4B") + R(0, 760, IW, 24, 0, "#E0A867");
+      s += C(1060, 700, 58, "#FF6FD8") + C(1060, 700, 20, "#E6E9F0", SW(6));
+      s += R(90, 690, 90, 70, 10, "#FFD23F") + P("M100 690 L 135 650 L 170 690", "#FFD23F", SW(6));
+      // the printer
+      s += R(292, 206, 616, 570, 28, "#3B4152");
+      s += R(330, 86, 540, 132, 18, "#E6E9F0");
+      s += R(356, 104, 488, 94, 12, "#2B3145");
+      s += R(340, 248, 520, 440, 16, "#2E3448");
+      s += R(358, 260, 484, 10, 4, "#FFF6C8", NS);
+      s += R(372, 640, 456, 26, 6, "#23262F");
+      s += P("M372 652 h456", "none", ' stroke="#4A5578" stroke-width="4"');
+      // the boat
+      s += P("M470 640 L 730 640 L 774 566 L 426 566 Z", "#FF8A3D");
+      s += R(520, 486, 140, 80, 10, "#FF8A3D");
+      s += R(612, 434, 38, 54, 6, "#FF8A3D");
+      s += C(560, 524, 14, "#FFB87A", SW(5)) + C(612, 524, 14, "#FFB87A", SW(5));
+      var lines = "";
+      for (var y = 584; y < 640; y += 14) lines += "M" + (436 + (y - 566) * 0.6) + " " + y + " H" + (764 - (y - 566) * 0.6) + " ";
+      s += P(lines, "none", ' stroke="rgba(29,35,64,0.25)" stroke-width="3"');
+      s += R(330, 708, 140, 46, 10, "#7FD3FF") + P("M352 740 l 18 -14 l 18 10 l 22 -18 l 20 12", "none", SW(5));
+      s += C(512, 731, 13, "#4CD964", SW(5)) + C(552, 731, 13, "#FFD23F", SW(5));
+      s += R(320, 770, 60, 14, 4, "#2B3145") + R(820, 770, 60, 14, 4, "#2B3145");
+      return { defs: "", body: s };
+    }
+    var SP = ["#FF5A5F", "#FFD23F", "#3DB4FF", "#4CD964"];
+    function draw(c, t) {
+      var on = t > 0 && t < 6.2, env = on ? Math.sin(Math.PI * clamp(t / 6.2, 0, 1)) : 0;
+      // spools turn while it prints
+      SP.forEach(function (col, i) {
+        var x = 420 + i * 120, y = 151, a = on ? t * 1.6 * (i % 2 ? 1 : 0.6) : 0;
+        circ(c, x, y, 36); fs(c, col, 6);
+        circ(c, x, y, 13); fs(c, "#E6E9F0", 5);
+        c.beginPath();
+        for (var k = 0; k < 3; k++) { var q = a + k * TAU / 3; c.moveTo(x + Math.cos(q) * 16, y + Math.sin(q) * 16); c.lineTo(x + Math.cos(q) * 30, y + Math.sin(q) * 30); }
+        c.strokeStyle = OUT; c.lineWidth = 5; c.stroke();
+      });
+      var hx = 600 + 160 * Math.sin(t * 2.4) * env, hy = 270 + 6 * Math.sin(t * 7) * env;
+      rr(c, 348, 296, 504, 16, 8); fs(c, "#9AA3B5", 5);
+      c.beginPath(); c.moveTo(hx + 20, hy); c.quadraticCurveTo(hx + 30, 222, 620, 210);
+      c.strokeStyle = OUT; c.lineWidth = 12; c.stroke(); c.strokeStyle = "#FFFFFF"; c.lineWidth = 5; c.stroke();
+      rr(c, hx - 56, hy - 8, 112, 92, 14); fs(c, "#C9D3E0", 7);
+      circ(c, hx, hy + 36, 26); fs(c, "#4A5578", 5);
+      c.beginPath();
+      var fa = on ? t * 18 : 0;
+      for (var b = 0; b < 4; b++) { var q2 = fa + b * Math.PI / 2; c.moveTo(hx, hy + 36); c.lineTo(hx + Math.cos(q2) * 20, hy + 36 + Math.sin(q2) * 20); }
+      c.strokeStyle = "#C9D3E0"; c.lineWidth = 6; c.stroke();
+      pd(c, "M" + (hx - 14) + " " + (hy + 84) + " L" + (hx + 14) + " " + (hy + 84) + " L" + (hx + 5) + " " + (hy + 108) + " L" + (hx - 5) + " " + (hy + 108) + " Z", "#FFC93C", 5);
+      if (on) { circ(c, hx, hy + 112, 7 + 2 * Math.sin(t * 20)); c.fillStyle = "rgba(255,138,61,0.9)"; c.fill(); }
+      // the glass door's shine
+      c.fillStyle = "rgba(255,255,255,0.12)";
+      c.beginPath(); c.moveTo(380, 688); c.lineTo(500, 248); c.lineTo(560, 248); c.lineTo(440, 688); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(470, 688); c.lineTo(590, 248); c.lineTo(610, 248); c.lineTo(490, 688); c.closePath(); c.fill();
+      if (on) [1.6, 3.4, 5.0].forEach(function (ti, i) { burst(c, 600, 540, t - ti, 0.9, 5, 120, 30 + i); });
+    }
+    PICS.push({ id: "printer", name: "3D printer", base: base, draw: draw, dur: 6.4 });
+  })();
+
+  var PIC_BY = {};
+  PICS.forEach(function (p, i) { p.index = i; PIC_BY[p.id] = p; });
+
+  // ---------- Rendering pictures (SVG -> canvas) ----------
+  function picSVG(pic, pxW) {
+    var b = pic.base();
+    if (typeof b === "string") b = { defs: "", body: b };
+    return svgDoc(pxW, b.defs, b.body);
+  }
+  // Renders base (static) and comp (static + moving parts at rest) canvases of a picture at pxW wide.
+  function renderPic(pic, pxW, cb) {
+    var pxH = Math.round(pxW * IH / IW);
+    var img = new Image();
+    var baseCv = document.createElement("canvas"), comp = document.createElement("canvas");
+    baseCv.width = comp.width = pxW; baseCv.height = comp.height = pxH;
+    function finish(ok) {
+      var bc = baseCv.getContext("2d");
+      if (ok) bc.drawImage(img, 0, 0, pxW, pxH); else { bc.fillStyle = "#CDE9FF"; bc.fillRect(0, 0, pxW, pxH); }
+      var cc = comp.getContext("2d");
+      cc.drawImage(baseCv, 0, 0);
+      cc.save();
+      cc.scale(pxW / IW, pxH / IH);
+      cc.lineJoin = "round"; cc.lineCap = "round";
+      try { pic.draw(cc, 0); } catch (e) { setTimeout(function () { throw e; }); }
+      cc.restore();
+      cb({ base: baseCv, comp: comp });
+    }
+    img.onload = function () { finish(true); };
+    img.onerror = function () { finish(false); };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(picSVG(pic, pxW));
+  }
+  // The big picture used for the puzzle pieces: rendered once per picture at about screen resolution.
+  var BIG_PX = Math.round(clamp(Math.max(screen.width || 1024, screen.height || 768) * DPR * 0.8, 1200, 2000));
+  var bigCache = {}, bigOrder = [];
+  function bigPic(pic, cb) {
+    if (bigCache[pic.id]) { cb(bigCache[pic.id]); return; }
+    renderPic(pic, BIG_PX, function (r) {
+      bigCache[pic.id] = r;
+      bigOrder.push(pic.id);
+      while (bigOrder.length > 3) delete bigCache[bigOrder.shift()];
+      cb(r);
+    });
+  }
+  var thumbs = {};
+  var thumbWaiters = {};
+  function thumb(pic, cb) {
+    if (thumbs[pic.id]) { cb(thumbs[pic.id]); return; }
+    if (thumbWaiters[pic.id]) { thumbWaiters[pic.id].push(cb); return; }
+    thumbWaiters[pic.id] = [cb];
+    renderPic(pic, Math.round(240 * DPR), function (r) {
+      thumbs[pic.id] = r.comp;
+      thumbWaiters[pic.id].forEach(function (f) { f(r.comp); });
+      delete thumbWaiters[pic.id];
+    });
+  }
+  function paintThumb(canvas, pic) {
+    thumb(pic, function (src) {
+      canvas.width = src.width; canvas.height = src.height;
+      canvas.getContext("2d").drawImage(src, 0, 0);
+    });
+  }
+
+  // ======================================================================
+  // Puzzle pieces: real tab-and-blank edges, seeded per puzzle (so a saved puzzle rebuilds the same).
+  // ======================================================================
+  var TAB = 0.105, JIT = 0.035;
+  // One shared edge from A to B: three cubic curves (or a straight border line).
+  function makeEdge(ax, ay, bx, by, s, r) {
+    var len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len, nx = -uy, ny = ux;
+    var flip = r() < 0.5 ? 1 : -1;
+    var a = (r() * 2 - 1) * JIT, b = (r() * 2 - 1) * JIT, c = (r() * 2 - 1) * JIT, d = (r() * 2 - 1) * JIT, e = (r() * 2 - 1) * JIT, t = TAB;
+    var half = len / 2;
+    var pts = [
+      [0.2 * len, a * s], [half + (b + d) * s, (-t + c) * s], [half + (b - t) * s, (t + c) * s],
+      [half + (b - 2 * t - d) * s, (3 * t + c) * s], [half + (b + 2 * t - d) * s, (3 * t + c) * s], [half + (b + t) * s, (t + c) * s],
+      [half + (b + d) * s, (-t + c) * s], [0.8 * len, e * s], [len, 0]
+    ].map(function (q) { return [ax + ux * q[0] + nx * q[1] * flip, ay + uy * q[0] + ny * q[1] * flip]; });
+    return { a: [ax, ay], p: pts };
+  }
+  // Add an edge to a path (forward or reversed), offset by (ox, oy).
+  function addEdge(path, edge, rev, ox, oy, straightTo) {
+    if (!edge) { path.lineTo(straightTo[0] - ox, straightTo[1] - oy); return; }
+    var p = edge.p, q;
+    if (!rev) {
+      for (var i = 0; i < 9; i += 3) path.bezierCurveTo(p[i][0] - ox, p[i][1] - oy, p[i + 1][0] - ox, p[i + 1][1] - oy, p[i + 2][0] - ox, p[i + 2][1] - oy);
+    } else {
+      q = [edge.a].concat(p.slice(0, 8)); // points in reverse order: p7 p6 p5 ... back to a
+      path.bezierCurveTo(p[7][0] - ox, p[7][1] - oy, p[6][0] - ox, p[6][1] - oy, p[5][0] - ox, p[5][1] - oy);
+      path.bezierCurveTo(p[4][0] - ox, p[4][1] - oy, p[3][0] - ox, p[3][1] - oy, p[2][0] - ox, p[2][1] - oy);
+      path.bezierCurveTo(p[1][0] - ox, p[1][1] - oy, p[0][0] - ox, p[0][1] - oy, q[0][0] - ox, q[0][1] - oy);
+    }
+  }
+  function buildPuzzle(picId, n, seed) {
+    var g = GRIDS[n], C = g[0], Rw = g[1], cw = IW / C, ch = IH / Rw, s = Math.min(cw, ch), r = rng(seed);
+    var H = [], V = [], rr2, cc;
+    for (rr2 = 1; rr2 < Rw; rr2++) { H[rr2] = []; for (cc = 0; cc < C; cc++) H[rr2][cc] = makeEdge(cc * cw, rr2 * ch, (cc + 1) * cw, rr2 * ch, s, r); }
+    for (rr2 = 0; rr2 < Rw; rr2++) { V[rr2] = []; for (cc = 1; cc < C; cc++) V[rr2][cc] = makeEdge(cc * cw, rr2 * ch, cc * cw, (rr2 + 1) * ch, s, r); }
+    var pieces = [], grid = new Path2D();
+    for (rr2 = 0; rr2 < Rw; rr2++) for (cc = 0; cc < C; cc++) {
+      var x0 = cc * cw, y0 = rr2 * ch, x1 = x0 + cw, y1 = y0 + ch, ox = x0 + cw / 2, oy = y0 + ch / 2;
+      var path = new Path2D();
+      path.moveTo(x0 - ox, y0 - oy);
+      addEdge(path, rr2 > 0 ? H[rr2][cc] : null, false, ox, oy, [x1, y0]);
+      addEdge(path, cc < C - 1 ? V[rr2][cc + 1] : null, false, ox, oy, [x1, y1]);
+      addEdge(path, rr2 < Rw - 1 ? H[rr2 + 1][cc] : null, true, ox, oy, [x0, y1]);
+      addEdge(path, cc > 0 ? V[rr2][cc] : null, true, ox, oy, [x0, y0]);
+      path.closePath();
+      pieces.push({ i: pieces.length, r: rr2, c: cc, hx: ox, hy: oy, path: path });
+    }
+    // The faint outline on the board: every inner edge once.
+    function edgeLine(e) { grid.moveTo(e.a[0], e.a[1]); for (var i = 0; i < 9; i += 3) grid.bezierCurveTo(e.p[i][0], e.p[i][1], e.p[i + 1][0], e.p[i + 1][1], e.p[i + 2][0], e.p[i + 2][1]); }
+    for (rr2 = 1; rr2 < Rw; rr2++) H[rr2].forEach(edgeLine);
+    for (rr2 = 0; rr2 < Rw; rr2++) for (cc = 1; cc < C; cc++) edgeLine(V[rr2][cc]);
+    return { pic: picId, n: n, seed: seed, C: C, R: Rw, cw: cw, ch: ch, m: s * 0.42, pieces: pieces, grid: grid };
+  }
+
+  // ======================================================================
+  // State
+  // ======================================================================
+  var st = { size: DEFAULT_SIZE, mode: "choose", cur: null, shelf: [] };
+  // cur: { pic, n, seed, placed: [0/1...], done: bool }
+  function load() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (SIZES.indexOf(o.size) !== -1) st.size = o.size;
+        if (o.mode === "play" || o.mode === "shelf" || o.mode === "choose") st.mode = o.mode;
+        if (o.cur && PIC_BY[o.cur.pic] && GRIDS[o.cur.n] && typeof o.cur.seed === "number") {
+          st.cur = { pic: o.cur.pic, n: o.cur.n, seed: o.cur.seed, placed: [], done: !!o.cur.done };
+          for (var i = 0; i < o.cur.n; i++) st.cur.placed.push(o.cur.placed && o.cur.placed[i] ? 1 : 0);
+        }
+        if (Array.isArray(o.shelf)) st.shelf = o.shelf.filter(function (e) { return e && PIC_BY[e.p] && Array.isArray(e.n); }).map(function (e) {
+          return { p: e.p, n: e.n.filter(function (k) { return SIZES.indexOf(k) !== -1; }), t: Number(e.t) || 0 };
+        });
+      }
+    } catch (e) { /* keep defaults */ }
+    if (st.mode === "play" && !st.cur) st.mode = "choose";
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* ignore */ }
+  }
+  function freshStart() {
+    // A fresh visit from the home screen: back to the picture chooser. My puzzles (his collection) stays.
+    st.size = DEFAULT_SIZE; st.mode = "choose"; st.cur = null;
+    save();
+  }
+
+  // ======================================================================
+  // Stage, layout and drawing
+  // ======================================================================
+  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var W = 0, H = 0;
+  var puz = null;           // the built puzzle (pieces with their caches)
+  var big = null;           // { base, comp } of the current picture
+  var LY = null;            // layout: board rect, scale, trays, tray scale
+  var order = [];           // loose pieces, bottom to top
+  var held = {};            // pointerId -> { p, dx, dy }
+  var boardCv = document.createElement("canvas"), boardDirty = true;
+  var dirty = true;
+  var peekT0 = -1e9, PEEK_MS = 3800;
+  var aliveT0 = -1e9, finishT0 = -1e9;
+  var startT0 = -1e9;
+  var glowCoach = false;
+  var view = null;          // shelf view: { pic, big }
+  var viewT0 = -1e9;
+
+  function isPhone() { return innerWidth <= 600 || (innerWidth > innerHeight && innerHeight <= 520); }
+
+  function resizeCanvas() {
+    var w = Math.max(1, Math.round(stage.clientWidth)), h = Math.max(1, Math.round(stage.clientHeight));
+    if (w === W && h === H && cv.width === Math.round(w * DPR)) return false;
+    W = w; H = h;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    boardCv.width = cv.width; boardCv.height = cv.height;
+    return true;
+  }
+
+  // Board and trays: try the tray below the board and trays on both sides; pick the one that keeps
+  // both the board and the loose pieces biggest.
+  function computeLayout() {
+    var C = puz.C, Rw = puz.R, n = C * Rw, A = IW / IH, phone = isPhone();
+    var top = phone ? 56 : 64, bot = phone ? 44 : 12, side = 10, gap = 10;
+    var availW = W - 2 * side, availH = H - top - bot, best = null;
+    function fit(trays, cw, ch) {
+      for (var t = 1; t >= 0.34; t -= 0.02) {
+        var sw = cw * t * 1.2, sh = ch * t * 1.2, cap = 0;
+        trays.forEach(function (q) { cap += Math.max(0, Math.floor(q.w / sw)) * Math.max(0, Math.floor(q.h / sh)); });
+        if (cap >= n) return t;
+      }
+      return 0;
+    }
+    // trays on both sides only on a wide stage; a tall stage keeps its tray below the board
+    (W > H * 1.1 ? ["below", "sides"] : ["below"]).forEach(function (kind) {
+      var maxBw = Math.min(availW, availH * A);
+      for (var f = 1; f >= 0.36; f -= 0.02) {
+        var bw = maxBw * f, bh = bw / A, cw = bw / C, ch = bh / Rw, cs = Math.min(cw, ch), trays = [], bx, by;
+        if (kind === "below") {
+          bx = (W - bw) / 2; by = top;
+          var ty = by + bh + gap;
+          if (H - bot - ty < cs * 0.5) continue;
+          trays.push({ x: side, y: ty, w: W - 2 * side, h: H - bot - ty });
+        } else {
+          bx = (W - bw) / 2; by = top + (availH - bh) / 2;
+          var tw = bx - side - gap;
+          if (tw < cs * 0.5) continue;
+          trays.push({ x: side, y: top, w: tw, h: availH });
+          trays.push({ x: bx + bw + gap, y: top, w: tw, h: availH });
+        }
+        var t = fit(trays, cw, ch);
+        if (!t) continue;
+        var score = 0.62 * Math.log(cs) + 0.38 * Math.log(cs * t) - (t < 0.62 ? (0.62 - t) * 2.5 : 0);
+        if (!best || score > best.score) best = { score: score, kind: kind, bx: bx, by: by, bw: bw, bh: bh, s: bw / IW, trays: trays, slotT: t, t: t > 0.9 ? 1 : t };
+      }
+    });
+    if (!best) {
+      var bw2 = Math.min(availW, availH * A) * 0.6;
+      best = { kind: "below", bx: (W - bw2) / 2, by: top, bw: bw2, bh: bw2 / A, s: bw2 / IW, trays: [{ x: side, y: top + bw2 / A + gap, w: W - 2 * side, h: Math.max(40, H - bot - top - bw2 / A - gap) }], t: 0.34, slotT: 0.34 };
+    }
+    return best;
+  }
+  // Slots for the loose pieces inside the trays (a loose, jittered grid).
+  function traySlots(seed) {
+    var r = rng(seed + 77), cw = puz.cw * LY.s * LY.slotT, ch = puz.ch * LY.s * LY.slotT, out = [];
+    var sw = cw * 1.2, sh = ch * 1.2;
+    LY.trays.forEach(function (q) {
+      var cols = Math.max(1, Math.floor(q.w / sw)), rows = Math.max(1, Math.floor(q.h / sh));
+      var gx = q.w / cols, gy = q.h / rows;
+      for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) out.push([q.x + gx * (x + 0.5), q.y + gy * (y + 0.5), gx, gy, q]);
+    });
+    for (var i = out.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)), tmp = out[i]; out[i] = out[j]; out[j] = tmp; }
+    var n = puz.pieces.length;
+    // Many free slots: keep the ones nearest the board so the pieces stay close at hand.
+    if (out.length > n) {
+      var bcx = LY.bx + LY.bw / 2, bcy = LY.by + LY.bh / 2;
+      out.sort(function (a, b) { return Math.hypot(a[0] - bcx, (a[1] - bcy) * 1.4) - Math.hypot(b[0] - bcx, (b[1] - bcy) * 1.4); });
+      out = out.slice(0, n);
+      for (var k = out.length - 1; k > 0; k--) { var j2 = Math.floor(r() * (k + 1)), t2 = out[k]; out[k] = out[j2]; out[j2] = t2; }
+    }
+    // keep every piece, knobs and all, inside the stage
+    var hw = (puz.cw / 2 + puz.m * 0.8) * LY.s * LY.t, hh = (puz.ch / 2 + puz.m * 0.8) * LY.s * LY.t;
+    return out.map(function (q) {
+      var jx = Math.max(0, (q[2] - cw) / 2) * 0.6 + q[2] * 0.06, jy = Math.max(0, (q[3] - ch) / 2) * 0.6 + q[3] * 0.06;
+      var tr = q[4], x = q[0] + (r() * 2 - 1) * jx, y = q[1] + (r() * 2 - 1) * jy;
+      x = clamp(x, tr.x + cw * 0.55, tr.x + tr.w - cw * 0.55); y = clamp(y, tr.y + ch * 0.6, tr.y + tr.h - ch * 0.55);
+      return [clamp(x, hw, W - hw), clamp(y, hh, H - hh)];
+    });
+  }
+  // Piece canvases: the picture clipped to the piece, with a chunky outline and a little bevel; and its shadow.
+  function cachePieces() {
+    var s = LY.s, m = puz.m;
+    puz.pieces.forEach(function (p) {
+      var w = puz.cw + 2 * m, h = puz.ch + 2 * m;
+      var pw = Math.ceil(w * s * DPR), ph = Math.ceil(h * s * DPR);
+      var img = p.img || document.createElement("canvas"), sil = p.sil || document.createElement("canvas");
+      img.width = sil.width = pw; img.height = sil.height = ph;
+      var c = img.getContext("2d");
+      c.setTransform(s * DPR, 0, 0, s * DPR, (m + puz.cw / 2) * s * DPR, (m + puz.ch / 2) * s * DPR);
+      c.save();
+      c.clip(p.path);
+      c.drawImage(big.comp, -p.hx, -p.hy, IW, IH);
+      c.lineJoin = "round";
+      c.strokeStyle = "rgba(255,255,255,0.55)"; c.lineWidth = 5 / s;
+      c.translate(1.6 / s, 1.6 / s); c.stroke(p.path);
+      c.strokeStyle = "rgba(29,35,64,0.28)";
+      c.translate(-3.2 / s, -3.2 / s); c.stroke(p.path);
+      c.restore();
+      c.strokeStyle = OUT; c.lineWidth = 2.6 / s; c.lineJoin = "round";
+      c.stroke(p.path);
+      var c2 = sil.getContext("2d");
+      c2.setTransform(s * DPR, 0, 0, s * DPR, (m + puz.cw / 2) * s * DPR, (m + puz.ch / 2) * s * DPR);
+      c2.fillStyle = OUT; c2.fill(p.path);
+      p.img = img; p.sil = sil; p.w = w * s; p.h = h * s;
+      p.dataURL = null;
+    });
+  }
+
+  // Lay out the board and trays for the current stage size; loose pieces go to tray slots.
+  function relayout(scatter) {
+    if (!puz || !big) return;
+    LY = computeLayout();
+    cachePieces();
+    var slots = traySlots(puz.seed);
+    var k = 0;
+    puz.pieces.forEach(function (p) {
+      var hx = LY.bx + p.hx * LY.s, hy = LY.by + p.hy * LY.s;
+      p.homeX = hx; p.homeY = hy;
+      if (p.placed) { p.x = hx; p.y = hy; p.sc = 1; p.tsc = 1; p.anim = null; return; }
+      var q = slots[k++] || [W / 2, H / 2];
+      p.slotX = q[0]; p.slotY = q[1];
+      if (p.anim && p.anim.kind === "move" && !scatter) {
+        // still spreading out from the opening picture: keep going, to the new spots
+        p.anim.fx = hx; p.anim.fy = hy; p.anim.tx = q[0]; p.anim.ty = q[1]; p.anim.ts = LY.t;
+        if (now() < p.anim.t0) { p.x = hx; p.y = hy; }
+      } else if (scatter === "assemble") {
+        p.x = hx; p.y = hy; p.sc = 1; p.tsc = 1;
+        p.anim = { kind: "move", t0: now() + 1100 + p.i * (700 / puz.pieces.length), dur: 1000, fx: hx, fy: hy, tx: q[0], ty: q[1], fs: 1, ts: LY.t };
+      } else {
+        p.x = q[0]; p.y = q[1]; p.sc = p.tsc = LY.t; p.anim = null;
+      }
+    });
+    held = {};
+    boardDirty = true; dirty = true;
+  }
+
+  function onResize() {
+    var changed = resizeCanvas();
+    if (changed && st.mode === "play" && puz && big) relayout(false);
+    if (st.mode === "choose" || st.mode === "shelf") fitCards();
+    dirty = true; boardDirty = true;
+  }
+
+  function drawBoard() {
+    var b = boardCv.getContext("2d");
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    b.clearRect(0, 0, boardCv.width, boardCv.height);
+    if (!LY || !puz) return;
+    b.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // trays: a soft table area for the loose pieces
+    LY.trays.forEach(function (q) {
+      rr(b, q.x, q.y, q.w, q.h, 18);
+      b.fillStyle = "rgba(29,35,64,0.06)"; b.fill();
+    });
+    // the board: a cardboard frame
+    var pad = 8;
+    rr(b, LY.bx - pad, LY.by - pad, LY.bw + pad * 2, LY.bh + pad * 2, 14);
+    b.fillStyle = OUT; b.save(); b.translate(4, 4); b.fill(); b.restore();
+    b.fillStyle = "#FFE7B8"; b.fill();
+    b.strokeStyle = OUT; b.lineWidth = 4; b.stroke();
+    b.fillStyle = "#F3DDB0"; b.fillRect(LY.bx, LY.by, LY.bw, LY.bh);
+    b.save();
+    b.translate(LY.bx, LY.by); b.scale(LY.s, LY.s);
+    b.lineWidth = 2.2 / LY.s; b.strokeStyle = "rgba(29,35,64,0.2)";
+    b.stroke(puz.grid);
+    b.restore();
+    b.strokeStyle = "rgba(29,35,64,0.35)"; b.lineWidth = 2; b.strokeRect(LY.bx, LY.by, LY.bw, LY.bh);
+    // placed pieces
+    puz.pieces.forEach(function (p) { if (p.placed && !p.anim) drawPiece(b, p, false); });
+    boardDirty = false;
+  }
+  function drawPiece(c, p, shadow) {
+    var w = p.w * p.sc, h = p.h * p.sc, x = p.x - w / 2, y = p.y - h / 2;
+    if (shadow) {
+      var lift = p.heldBy != null ? 9 : 3.5;
+      c.globalAlpha = p.heldBy != null ? 0.22 : 0.3;
+      c.drawImage(p.sil, x + lift * 0.7, y + lift, w, h);
+      c.globalAlpha = 1;
+    }
+    c.drawImage(p.img, x, y, w, h);
+  }
+
+  function picDraw(c, bx, by, bw, bh, src, t, pic) {
+    c.save();
+    c.beginPath(); c.rect(bx, by, bw, bh); c.clip();
+    c.drawImage(src, bx, by, bw, bh);
+    if (t !== null) {
+      c.translate(bx, by); c.scale(bw / IW, bh / IH);
+      c.lineJoin = "round"; c.lineCap = "round";
+      pic.draw(c, t);
+    }
+    c.restore();
+  }
+
+  // Sparkles for a snap: a ring and a few stars at the spot.
+  var fx = [];
+  function addSnapFx(x, y, size) { fx.push({ kind: "snap", x: x, y: y, s: size, t0: now(), dur: 700, seed: (Math.random() * 1e9) | 0 }); }
+
+  function draw(t) {
+    var c = ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cv.width, cv.height);
+    if (st.mode === "shelf" && view) { drawView(c, t); return; }
+    if (st.mode !== "play" || !puz || !LY) return;
+    var pic = PIC_BY[puz.pic];
+    if (!(st.cur && st.cur.done && big)) {
+      if (boardDirty) drawBoard();
+      c.drawImage(boardCv, 0, 0);
+      c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    } else {
+      // finished: the picture grows to fill the stage, comes alive for a few seconds, then rests with faint seams
+      c.setTransform(DPR, 0, 0, DPR, 0, 0);
+      var r = doneRect(t);
+      frameAt(c, r);
+      var at = (t - aliveT0) / 1000, alive = at >= 0 && at < pic.dur;
+      picDraw(c, r.x, r.y, r.w, r.h, alive ? big.base : big.comp, alive ? at : null, pic);
+      if (!alive) {
+        c.save(); c.translate(r.x, r.y); c.scale(r.w / IW, r.w / IW);
+        c.lineWidth = 2 / (r.w / IW); c.strokeStyle = "rgba(29,35,64,0.16)"; c.stroke(puz.grid);
+        c.restore();
+      }
+      // a shine sweeps across
+      var sw = (t - shineT0) / 1300;
+      if (sw >= 0 && sw <= 1) {
+        c.save(); c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip();
+        var x0 = r.x - r.h + (r.w + r.h * 2) * sw;
+        var gr = c.createLinearGradient(x0 - 80, 0, x0 + 80, 0);
+        gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.5, "rgba(255,255,255,0.75)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+        c.fillStyle = gr;
+        c.beginPath(); c.moveTo(x0 - 80, r.y + r.h); c.lineTo(x0 - 80 + r.h * 0.5, r.y); c.lineTo(x0 + 80 + r.h * 0.5, r.y); c.lineTo(x0 + 80, r.y + r.h); c.fill();
+        c.restore();
+      }
+      var ca = (t - finishT0) / 1000;
+      if (ca >= 0 && ca < 3.5) {
+        for (var b = 0; b < 6; b++) {
+          var bxp = r.x + r.w * ((b * 0.37 + 0.12) % 1), byp = r.y + r.h * ((b * 0.53 + 0.2) % 1);
+          burst(c, bxp, byp, ca - b * 0.3, 1.2, 6, Math.min(r.w, r.h) * 0.28, 300 + b);
+        }
+      }
+    }
+    // glowing spot for a piece that has been tried a few times
+    var anyGlow = false;
+    puz.pieces.forEach(function (p) {
+      if (p.placed) return;
+      if (!(p.misses >= 2 && (p.heldBy != null || t < p.glowUntil))) return;
+      anyGlow = true;
+      var k = 0.5 + 0.5 * Math.sin(t / 260);
+      c.save();
+      c.translate(p.homeX, p.homeY); c.scale(LY.s, LY.s);
+      c.fillStyle = "rgba(255,201,60," + (0.3 + 0.3 * k).toFixed(3) + ")"; c.fill(p.path);
+      c.lineWidth = (4 + 3 * k) / LY.s; c.strokeStyle = "#FFB000"; c.stroke(p.path);
+      c.restore();
+    });
+    if (anyGlow !== glowCoach) { glowCoach = anyGlow; updateCoach(); }
+    // Peek: the whole picture fades in over the board for a few seconds
+    var pk = t - peekT0;
+    if (pk >= 0 && pk < PEEK_MS && big) {
+      var a = pk < 400 ? pk / 400 : (pk > PEEK_MS - 800 ? (PEEK_MS - pk) / 800 : 1);
+      c.globalAlpha = 0.9 * clamp(a, 0, 1);
+      c.drawImage(big.comp, LY.bx, LY.by, LY.bw, LY.bh);
+      c.globalAlpha = 1;
+    }
+    // pieces that are moving to their spot on the board
+    puz.pieces.forEach(function (p) { if (p.placed && p.anim) drawPiece(c, p, true); });
+    // loose pieces, bottom to top; the held ones last
+    order.forEach(function (p) { if (p.heldBy == null) drawPiece(c, p, true); });
+    order.forEach(function (p) { if (p.heldBy != null) drawPiece(c, p, true); });
+    // effects
+    fx.forEach(function (e) {
+      var u = (t - e.t0) / e.dur;
+      if (u < 0 || u > 1) return;
+      c.globalAlpha = 1 - u;
+      c.beginPath(); c.arc(e.x, e.y, e.s * (0.3 + 0.5 * easeOut(u)), 0, TAU);
+      c.strokeStyle = "#FFC93C"; c.lineWidth = 6 * (1 - u) + 1; c.stroke();
+      c.globalAlpha = 1;
+      burst(c, e.x, e.y, (t - e.t0) / 1000, e.dur / 1000, 5, e.s * 0.7, e.seed);
+    });
+  }
+
+  function viewRect(top, bot) {
+    if (top == null) { top = isPhone() ? 16 : 64; bot = isPhone() ? 50 : 16; }
+    var bw = Math.min(W - 24, (H - top - bot) * IW / IH), bh = bw * IH / IW;
+    return { x: (W - bw) / 2, y: top + (H - top - bot - bh) / 2, w: bw, h: bh };
+  }
+  // The finished puzzle: from the board's place to as big as the stage allows.
+  var growT0 = -1e9, shineT0 = -1e9, GROW_MS = 900;
+  function doneRect(t) {
+    var to = !isPhone() ? viewRect(70, 16) : (W > H ? viewRect(48, 42) : viewRect(56, 50)), u = smooth((t - growT0) / GROW_MS);
+    if (u >= 1) return to;
+    var from = { x: LY.bx, y: LY.by, w: LY.bw, h: LY.bh };
+    return { x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u, w: from.w + (to.w - from.w) * u, h: from.h + (to.h - from.h) * u };
+  }
+  function frameAt(c, r) {
+    rr(c, r.x - 10, r.y - 10, r.w + 20, r.h + 20, 16);
+    c.fillStyle = OUT; c.save(); c.translate(5, 5); c.fill(); c.restore();
+    c.fillStyle = "#FFE7B8"; c.fill(); c.strokeStyle = OUT; c.lineWidth = 4; c.stroke();
+  }
+  function drawView(c, t) {
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var r = viewRect(), pic = view.pic;
+    frameAt(c, r);
+    if (!view.big) return;
+    var at = (t - viewT0) / 1000, alive = at >= 0 && at < pic.dur;
+    picDraw(c, r.x, r.y, r.w, r.h, alive ? view.big.base : view.big.comp, alive ? at : null, pic);
+  }
+
+  // ======================================================================
+  // Sound (soft, synthesized; only when the grown-up turned it on)
+  // ======================================================================
+  function tone(ac, f0, f1, dur, vol, type, when) {
+    var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + (when || 0);
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(f0, t);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function click(ac, vol) {
+    var len = Math.floor(ac.sampleRate * 0.04), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    f.type = "bandpass"; f.frequency.value = 1700; f.Q.value = 2.5;
+    g.gain.value = vol;
+    src.buffer = buf; src.connect(f); f.connect(g); g.connect(ac.destination);
+    src.start();
+  }
+  function snd(kind) {
+    var ac = window.Toybox && Toybox.sound.ready();
+    if (!ac) return;
+    try {
+      if (kind === "pick") tone(ac, 520, 600, 0.08, 0.05);
+      else if (kind === "drop") tone(ac, 260, 220, 0.1, 0.05);
+      else if (kind === "snap") { click(ac, 0.35); tone(ac, 660, 660, 0.25, 0.07, "triangle", 0.03); tone(ac, 990, 990, 0.3, 0.04, "sine", 0.07); }
+      else if (kind === "peek") { tone(ac, 440, 660, 0.35, 0.04, "sine"); tone(ac, 660, 880, 0.35, 0.03, "sine", 0.12); }
+      else if (kind === "tap") tone(ac, 600, 700, 0.09, 0.05);
+      else if (kind === "done") [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(ac, f, f, 0.5, 0.06, "triangle", i * 0.16); });
+    } catch (e) { /* ignore */ }
+  }
+
+  // ======================================================================
+  // Play
+  // ======================================================================
+  var counter = $("counter"), coach = $("coach"), goBtn = $("goBtn");
+  function placedCount() { return puz ? puz.pieces.filter(function (p) { return p.placed; }).length : 0; }
+  function updateCounter() {
+    counter.hidden = st.mode !== "play" || !puz;
+    if (puz) counter.textContent = "Pieces: " + placedCount() + " of " + puz.pieces.length;
+  }
+  var coachText = "";
+  function setCoach(text) {
+    if (text) { if (text !== coachText) coach.textContent = text; coach.classList.remove("off"); }
+    else coach.classList.add("off");
+    coachText = text || coachText;
+  }
+  function updateCoach() {
+    if (st.mode === "choose") setCoach("Pick a picture!");
+    else if (st.mode === "shelf") setCoach(view ? "Tap to put it back!" : (st.shelf.length ? "Tap a puzzle!" : "Finish a puzzle!"));
+    else if (st.cur && st.cur.done) setCoach("You did it!");
+    else if (glowCoach) setCoach("It goes where it glows!");
+    else if (puz && placedCount() === 0) setCoach("Drag a piece to its spot!");
+    else setCoach("");
+  }
+
+  // Start (or resume) a puzzle.
+  var buildToken = 0;
+  function startPuzzle(picId, n, seed, placed, done, animate) {
+    var pic = PIC_BY[picId];
+    st.cur = { pic: picId, n: n, seed: seed, placed: placed || [], done: !!done };
+    for (var i = st.cur.placed.length; i < n; i++) st.cur.placed.push(0);
+    st.mode = "play";
+    save();
+    var token = ++buildToken;
+    puz = buildPuzzle(picId, n, seed);
+    puz.pieces.forEach(function (p) { p.placed = !!st.cur.placed[p.i]; p.misses = 0; p.glowUntil = 0; p.heldBy = null; });
+    order = puz.pieces.filter(function (p) { return !p.placed; });
+    big = null; LY = null;
+    peekT0 = -1e9; finishT0 = -1e9; aliveT0 = -1e9; growT0 = -1e9; shineT0 = -1e9; fx = [];
+    glowCoach = false;
+    setMode("play");
+    bigPic(pic, function (r) {
+      if (token !== buildToken) return;
+      big = r;
+      resizeCanvas();
+      relayout(animate ? "assemble" : false);
+      startT0 = now();
+      dirty = true;
+      updateCounter(); updateCoach(); updateGo();
+    });
+  }
+  function newSeed() { return (Math.random() * 2147483647) | 0; }
+
+  function pieceAt(x, y) {
+    // topmost loose piece under the finger (its real shape first, then the nearest one close by)
+    for (var i = order.length - 1; i >= 0; i--) {
+      var p = order[i];
+      if (p.heldBy != null) continue;
+      var sc = LY.s * p.sc, lx = (x - p.x) / sc, ly = (y - p.y) / sc;
+      if (Math.abs(lx) > puz.cw && Math.abs(ly) > puz.ch) continue;
+      if (ctx.isPointInPath(p.path, lx, ly)) return p;
+    }
+    var best = null, bd = 1e9;
+    order.forEach(function (p) {
+      if (p.heldBy != null) return;
+      var d = Math.hypot(x - p.x, y - p.y), lim = Math.max(30, Math.min(puz.cw, puz.ch) * LY.s * p.sc * 0.62);
+      if (d < lim && d < bd) { bd = d; best = p; }
+    });
+    return best;
+  }
+  function stagePt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+
+  cv.addEventListener("pointerdown", function (e) {
+    if (window.Toybox && Toybox.timer.locked()) return;
+    var pt = stagePt(e);
+    if (st.mode === "shelf" && view) { closeView(); snd("tap"); return; }
+    if (st.mode !== "play" || !puz || !LY) return;
+    if (st.cur.done) {
+      var dr = doneRect(now());
+      if (pt[0] > dr.x && pt[0] < dr.x + dr.w && pt[1] > dr.y && pt[1] < dr.y + dr.h && now() - aliveT0 > 600) { aliveT0 = now(); snd("tap"); }
+      return;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var p = pieceAt(pt[0], pt[1]);
+    if (!p) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    p.anim = null;
+    p.heldBy = e.pointerId;
+    p.tsc = 1;
+    var lift = e.pointerType === "mouse" ? 0 : Math.min(26, puz.ch * LY.s * 0.28);
+    held[e.pointerId] = { p: p, dx: p.x - pt[0], dy: p.y - pt[1], lift: lift, t0: now() };
+    order.splice(order.indexOf(p), 1); order.push(p);
+    snd("pick");
+    dirty = true;
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var h = held[e.pointerId];
+    if (!h) return;
+    var pt = stagePt(e), k = clamp((now() - h.t0) / 140, 0, 1);
+    h.p.x = clamp(pt[0] + h.dx * (1 - k * 0.5), 0, W);
+    h.p.y = clamp(pt[1] + h.dy * (1 - k * 0.5) - h.lift * k, 0, H);
+    dirty = true;
+  });
+  function release(e) {
+    var h = held[e.pointerId];
+    if (!h) return;
+    delete held[e.pointerId];
+    dropPiece(h.p);
+  }
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+  cv.addEventListener("lostpointercapture", release);
+
+  function inBoard(x, y) { return x > LY.bx && x < LY.bx + LY.bw && y > LY.by && y < LY.by + LY.bh; }
+  function dropPiece(p) {
+    p.heldBy = null;
+    var cell = Math.min(puz.cw, puz.ch) * LY.s;
+    var R0 = Math.max(cell * 0.45, 34) * (p.misses >= 2 ? 1.6 : 1);
+    var d = Math.hypot(p.x - p.homeX, p.y - p.homeY);
+    if (d <= R0 && !(window.Toybox && Toybox.timer.locked())) { snapPiece(p); return; }
+    // anywhere else it stays where it was dropped (kept on screen)
+    var hw = p.w * 0.3, hh = p.h * 0.3;
+    p.x = clamp(p.x, hw, W - hw); p.y = clamp(p.y, hh, H - hh);
+    p.tsc = inBoard(p.x, p.y) ? 1 : LY.t;
+    if (inBoard(p.x, p.y) || d < Math.max(cell * 1.4, 90)) {
+      p.misses = (p.misses || 0) + 1;
+      if (p.misses >= 2) p.glowUntil = now() + 3200;
+    }
+    snd("drop");
+    dirty = true;
+  }
+  function snapPiece(p) {
+    p.placed = true;
+    order.splice(order.indexOf(p), 1);
+    p.anim = { kind: "snap", t0: now(), dur: 260, fx: p.x, fy: p.y, tx: p.homeX, ty: p.homeY, fs: p.sc, ts: 1 };
+    p.tsc = 1;
+    st.cur.placed[p.i] = 1;
+    save();
+    snd("snap");
+    ghost.learned();
+    updateCounter();
+    if (placedCount() === puz.pieces.length) finishPuzzle();
+    updateCoach();
+    dirty = true;
+  }
+  function finishPuzzle() {
+    if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 2500);
+    st.cur.done = true;
+    finishT0 = now() + 300;
+    growT0 = finishT0 + 300;
+    shineT0 = growT0 + GROW_MS;
+    aliveT0 = shineT0 + 1100;
+    setTimeout(function () { snd("done"); }, 300);
+    // My puzzles: one spot per picture, remembering every size he finished
+    var e = null;
+    st.shelf.forEach(function (x) { if (x.p === st.cur.pic) e = x; });
+    if (!e) { e = { p: st.cur.pic, n: [], t: 0 }; st.shelf.push(e); }
+    if (e.n.indexOf(st.cur.n) === -1) e.n.push(st.cur.n);
+    e.t = Date.now();
+    save();
+    var tab = $("tabShelf");
+    tab.classList.remove("news"); void tab.offsetWidth; tab.classList.add("news");
+    updateGo();
+  }
+
+  // ---------- Animation loop ----------
+  var lastT = now();
+  function frame() {
+    requestAnimationFrame(frame);
+    var t = now(), dt = Math.min(0.05, (t - lastT) / 1000);
+    lastT = t;
+    var busy = false;
+    if (st.mode === "play" && puz && LY) {
+      puz.pieces.forEach(function (p) {
+        if (p.anim) {
+          var a = p.anim, u = (t - a.t0) / a.dur;
+          busy = true;
+          if (u < 0) return;
+          var e = a.kind === "snap" ? easeOut(u) : smooth(u);
+          p.x = a.fx + (a.tx - a.fx) * e; p.y = a.fy + (a.ty - a.fy) * e;
+          p.sc = a.fs + (a.ts - a.fs) * e;
+          if (a.kind === "snap" && u > 0.6) p.sc = 1 + 0.06 * Math.sin((u - 0.6) / 0.4 * Math.PI);
+          if (u >= 1) {
+            p.anim = null; p.x = a.tx; p.y = a.ty; p.sc = a.ts; p.tsc = a.ts;
+            if (a.kind === "snap") { p.sc = 1; boardDirty = true; addSnapFx(p.homeX, p.homeY, Math.min(puz.cw, puz.ch) * LY.s); }
+          }
+        } else if (Math.abs(p.sc - p.tsc) > 0.002) {
+          p.sc += (p.tsc - p.sc) * Math.min(1, dt * 12);
+          busy = true;
+        }
+      });
+      if (t - peekT0 < PEEK_MS + 50) busy = true;
+      else if (goBtn.getAttribute("aria-pressed") === "true") goBtn.setAttribute("aria-pressed", "false");
+      if (st.cur && st.cur.done && t - finishT0 < 4000) busy = true;
+      if (st.cur && st.cur.done && t - aliveT0 < PIC_BY[puz.pic].dur * 1000 + 100) busy = true;
+      if (glowCoach || puz.pieces.some(function (p) { return !p.placed && p.misses >= 2 && t < p.glowUntil + 100; })) busy = true;
+      fx = fx.filter(function (e) { return t - e.t0 < e.dur; });
+      if (fx.length) busy = true;
+    }
+    if (st.mode === "shelf" && view && t - viewT0 < view.pic.dur * 1000 + 100) busy = true;
+    if (busy || dirty) { draw(t); dirty = false; }
+    if (endingDone && !busy) { var f = endingDone; endingDone = null; f(); }
+  }
+
+  // ======================================================================
+  // Chooser, shelf, panel
+  // ======================================================================
+  var chooser = $("chooser"), shelfEl = $("shelf"), sizesEl = $("sizes");
+  function gridSVG(n) {
+    var g = GRIDS[n], C = g[0], Rw = g[1], w = 40, h = 30, s = '<svg viewBox="-2 -2 44 34" aria-hidden="true">';
+    s += '<rect x="0" y="0" width="' + w + '" height="' + h + '" rx="3" fill="#FFD23F" stroke="#1D2340" stroke-width="2.5"/>';
+    for (var i = 1; i < C; i++) s += '<line x1="' + (w * i / C) + '" y1="0" x2="' + (w * i / C) + '" y2="' + h + '" stroke="#1D2340" stroke-width="2"/>';
+    for (var j = 1; j < Rw; j++) s += '<line x1="0" y1="' + (h * j / Rw) + '" x2="' + w + '" y2="' + (h * j / Rw) + '" stroke="#1D2340" stroke-width="2"/>';
+    return s + "</svg>";
+  }
+  SIZES.forEach(function (n) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile";
+    b.dataset.size = n;
+    b.setAttribute("aria-label", n + " pieces");
+    b.innerHTML = gridSVG(n) + "<b>" + n + "</b>";
+    sizesEl.appendChild(b);
+  });
+  function syncSizes() {
+    Array.prototype.forEach.call(sizesEl.children, function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === st.size)); });
+  }
+  var MARK = '<svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="#FFFFFF" stroke="#1D2340" stroke-width="3"/>' +
+    '<path d="M12 14h6a3 3 0 1 1 4 0h6v6a3 3 0 1 0 0 4v4H12v-4a3 3 0 1 0 0-4z" fill="#3DB4FF" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+  function buildChooser() {
+    chooser.innerHTML = "";
+    PICS.forEach(function (pic) {
+      var b = document.createElement("button");
+      b.className = "card";
+      b.dataset.pic = pic.id;
+      b.setAttribute("aria-label", pic.name);
+      var c = document.createElement("canvas");
+      b.appendChild(c);
+      var sp = document.createElement("span"); sp.textContent = pic.name; b.appendChild(sp);
+      chooser.appendChild(b);
+      paintThumb(c, pic);
+    });
+    syncChooser();
+  }
+  function syncChooser() {
+    Array.prototype.forEach.call(chooser.children, function (b) {
+      var on = !!(st.cur && !st.cur.done && st.cur.pic === b.dataset.pic && st.cur.placed.some(function (x) { return x; }));
+      b.classList.toggle("now", on);
+      var m = b.querySelector(".mark");
+      if (on && !m) b.insertAdjacentHTML("beforeend", MARK);
+      if (!on && m) m.parentNode.removeChild(m);
+    });
+  }
+  function buildShelf() {
+    shelfEl.innerHTML = "";
+    var done = {};
+    st.shelf.forEach(function (e) { done[e.p] = e; });
+    var list = PICS.slice().sort(function (a, b) {
+      var ea = done[a.id], eb = done[b.id];
+      if (ea && eb) return eb.t - ea.t;
+      if (ea || eb) return ea ? -1 : 1;
+      return a.index - b.index;
+    });
+    list.forEach(function (pic) {
+      var e = done[pic.id];
+      var b = document.createElement(e ? "button" : "div");
+      b.className = "card" + (e ? "" : " empty");
+      b.dataset.pic = pic.id;
+      var c = document.createElement("canvas");
+      b.appendChild(c);
+      var sp = document.createElement("span"); sp.textContent = pic.name; b.appendChild(sp);
+      if (e) {
+        var most = Math.max.apply(null, e.n);
+        b.setAttribute("aria-label", pic.name + ", " + most + " pieces");
+        b.insertAdjacentHTML("beforeend", '<span class="chip">' + gridSVG(most) + most + "</span>");
+      } else b.setAttribute("aria-hidden", "true");
+      shelfEl.appendChild(b);
+      paintThumb(c, pic);
+    });
+  }
+  // Size the cards so all nine pictures fit the stage without scrolling.
+  function fitCards() {
+    [chooser, shelfEl].forEach(function (el) {
+      if (el.hidden) return;
+      var cs = getComputedStyle(el);
+      var aw = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      var ah = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      var gap = parseFloat(cs.columnGap) || 10, n = el.children.length || 9, best = 0, bestC = 3;
+      var label = isPhone() ? 24 : 32;
+      for (var cols = 2; cols <= 5; cols++) {
+        var rows = Math.ceil(n / cols);
+        var wByW = (aw - gap * (cols - 1)) / cols;
+        var hEach = (ah - gap * (rows - 1)) / rows;
+        var wByH = (hEach - label - 12) * 4 / 3 + 12;
+        var w = Math.min(wByW, wByH, 300);
+        if (w > best) { best = w; bestC = cols; }
+      }
+      el.style.gridTemplateColumns = "repeat(" + bestC + ", " + Math.floor(best) + "px)";
+    });
+  }
+
+  var tabPics = $("tabPics"), tabShelf = $("tabShelf"), newBtn = $("newBtn"), surpriseBtn = $("surpriseBtn");
+  var EYE = '<svg viewBox="0 0 48 36" aria-hidden="true"><path d="M3 18 Q 24 -4 45 18 Q 24 40 3 18 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><circle cx="24" cy="18" r="8.5" fill="#3DB4FF" stroke="#1D2340" stroke-width="3"/><circle cx="24" cy="18" r="3.5" fill="#1D2340"/></svg>';
+  var NEXT = '<svg viewBox="0 0 48 36" aria-hidden="true"><path d="M8 10h12a5 5 0 1 1 8 0h12v9a5 5 0 1 0 0 8v5H8v-5a5 5 0 1 0 0-8z" fill="#FFD23F" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/></svg>';
+  function updateGo() {
+    if (st.mode !== "play") { goBtn.hidden = true; return; }
+    goBtn.hidden = false;
+    var done = !!(st.cur && st.cur.done), key = done ? "next" : "peek";
+    if (goBtn.dataset.k !== key) {
+      goBtn.dataset.k = key;
+      goBtn.innerHTML = done ? NEXT + "<span>Next puzzle!</span>" : EYE + "<span>Peek</span>";
+      goBtn.setAttribute("aria-pressed", "false");
+    }
+  }
+  function setMode(m) {
+    st.mode = m;
+    if (m !== "shelf") view = null;
+    document.body.classList.toggle("m-choose", m === "choose");
+    document.body.classList.toggle("m-play", m === "play");
+    document.body.classList.toggle("m-shelf", m === "shelf");
+    chooser.hidden = m !== "choose";
+    shelfEl.hidden = m !== "shelf" || !!view;
+    sizesEl.hidden = m === "shelf";
+    tabPics.setAttribute("aria-pressed", String(m === "choose"));
+    tabShelf.setAttribute("aria-pressed", String(m === "shelf"));
+    newBtn.hidden = m !== "play";
+    if (m === "choose") syncChooser();
+    if (m === "shelf") buildShelf();
+    syncSizes();
+    updateGo(); updateCounter(); updateCoach();
+    save();
+    // the panel may change height: lay the stage out again after the browser has
+    requestAnimationFrame(function () { onResize(); dirty = true; });
+  }
+  function choosePicture(id, n) {
+    n = n || st.size;
+    if (st.cur && st.cur.pic === id && st.cur.n === n && !st.cur.done) {
+      // back to the puzzle he was doing
+      startPuzzle(id, n, st.cur.seed, st.cur.placed, false, false);
+    } else startPuzzle(id, n, newSeed(), null, false, true);
+  }
+  function openView(id) {
+    var pic = PIC_BY[id];
+    view = { pic: pic, big: null };
+    shelfEl.hidden = true;
+    viewT0 = now() + 500;
+    bigPic(pic, function (r) { if (view && view.pic === pic) { view.big = r; dirty = true; } });
+    updateCoach();
+    dirty = true;
+  }
+  function closeView() {
+    view = null;
+    shelfEl.hidden = false;
+    buildShelf(); fitCards();
+    updateCoach();
+    dirty = true;
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t || t.id === "bigToggle" || t.closest(".modal, .farewell, .rest, .sheet")) return;
+    if (window.Toybox && Toybox.timer.locked()) return;
+    if (t.classList.contains("card") && t.parentNode === chooser) { snd("tap"); choosePicture(t.dataset.pic); return; }
+    if (t.classList.contains("card") && t.parentNode === shelfEl) { snd("tap"); openView(t.dataset.pic); return; }
+    if (t.dataset.size) {
+      var n = Number(t.dataset.size);
+      st.size = n; syncSizes(); save(); snd("tap");
+      if (st.mode === "play" && st.cur && (st.cur.n !== n || st.cur.done)) startPuzzle(st.cur.pic, n, newSeed(), null, false, true);
+      return;
+    }
+    if (t === goBtn) {
+      if (st.cur && st.cur.done) { snd("tap"); setMode("choose"); return; }
+      peekT0 = now(); goBtn.setAttribute("aria-pressed", "true"); snd("peek"); dirty = true;
+      return;
+    }
+    if (t === tabPics) { snd("tap"); setMode("choose"); return; }
+    if (t === tabShelf) { snd("tap"); if (st.mode === "shelf" && view) closeView(); else setMode("shelf"); return; }
+    if (t === newBtn) {
+      // start over: the same picture and size, newly cut
+      if (st.cur) { snd("tap"); startPuzzle(st.cur.pic, st.cur.n, newSeed(), null, false, true); }
+      return;
+    }
+    if (t === surpriseBtn) {
+      var ids = PICS.map(function (p) { return p.id; }).filter(function (id) { return !st.cur || id !== st.cur.pic; });
+      snd("tap");
+      startPuzzle(ids[Math.floor(Math.random() * ids.length)], st.size, newSeed(), null, false, true);
+    }
+  });
+
+  // ======================================================================
+  // Ghost hand (master copy: tools/snippets/ghost-hand.js)
+  // ======================================================================
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function ghostPt(elm, fx2, fy2) {
+    var r = elm.getBoundingClientRect();
+    return [r.left + r.width * fx2, r.top + r.height * fy2];
+  }
+  // The best piece to show: one that fits next to pieces already down (or a corner), nearest its spot.
+  function bestPiece() {
+    if (!puz || !LY) return null;
+    var placed = {};
+    puz.pieces.forEach(function (p) { if (p.placed) placed[p.r + "," + p.c] = 1; });
+    var best = null, bs = -1e9;
+    order.forEach(function (p) {
+      if (p.heldBy != null || p.anim) return;
+      var nb = (placed[(p.r - 1) + "," + p.c] || 0) + (placed[(p.r + 1) + "," + p.c] || 0) + (placed[p.r + "," + (p.c - 1)] || 0) + (placed[p.r + "," + (p.c + 1)] || 0);
+      var corner = (p.r === 0 || p.r === puz.R - 1) && (p.c === 0 || p.c === puz.C - 1) ? 1 : 0;
+      var score = nb * 3 + corner * 2 - Math.hypot(p.x - p.homeX, p.y - p.homeY) / 400;
+      if (score > bs) { bs = score; best = p; }
+    });
+    return best;
+  }
+  var ghost = makeGhost(function () {
+    if (st.mode === "choose") {
+      var card = chooser.children[0];
+      return card ? { pts: [ghostPt(card, 0.5, 0.45)], tap: true } : null;
+    }
+    if (st.mode !== "play" || !st.cur || st.cur.done || !LY) return null;
+    var p = bestPiece();
+    if (!p) return null;
+    if (!p.dataURL) { try { p.dataURL = p.img.toDataURL(); } catch (e) { p.dataURL = ""; } }
+    var r = cv.getBoundingClientRect(), size = Math.max(p.w, p.h);
+    return {
+      pts: [[r.left + p.x, r.top + p.y], [r.left + p.homeX, r.top + p.homeY]],
+      carry: p.dataURL ? { html: '<img alt="" src="' + p.dataURL + '">', size: size } : null,
+      dur: 3600
+    };
+  }, { max: 3 });
+
+  // ======================================================================
+  // Timer ending, rest art, Big
+  // ======================================================================
+  var endingDone = null;
+  function onEnding(done) {
+    // hands let go; pieces settle where they are, moving pieces finish their move, the board dims
+    Object.keys(held).forEach(function (id) { var h = held[id]; delete held[id]; h.p.heldBy = null; h.p.tsc = inBoard(h.p.x, h.p.y) ? 1 : (LY ? LY.t : 1); });
+    peekT0 = -1e9; aliveT0 = -1e9;
+    if (view) viewT0 = -1e9;
+    endingDone = function () { setTimeout(done, 1800); };
+    dirty = true;
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 260 220" aria-hidden="true">' +
+      '<g stroke="#1D2340" stroke-width="7" stroke-linejoin="round">' +
+      '<path d="M30 80 H62 a18 18 0 1 1 36 0 H130 V112 a18 18 0 1 1 0 36 V180 H30 Z" fill="#3DB4FF"/>' +
+      '<path d="M130 80 H162 a18 18 0 1 1 36 0 H230 V180 H130 V148 a18 18 0 1 0 0 -36 Z" fill="#FFD23F"/>' +
+      "</g>" +
+      '<g font-family="Baloo 2, Trebuchet MS, sans-serif" font-weight="800" fill="#1D2340" stroke="#FFFFFF" stroke-width="4" paint-order="stroke">' +
+      '<text x="196" y="52" font-size="34">z</text><text x="220" y="30" font-size="26">z</text><text x="238" y="14" font-size="20">z</text></g></svg>';
+  }
+
+  // ======================================================================
+  // Start
+  // ======================================================================
+  load();
+  if (window.Toybox && Toybox.fresh()) freshStart();
+  buildChooser();
+  resizeCanvas();
+  if (st.mode === "play" && st.cur) startPuzzle(st.cur.pic, st.cur.n, st.cur.seed, st.cur.placed, st.cur.done, false);
+  else setMode(st.mode === "shelf" ? "shelf" : "choose");
+  if (st.cur && st.cur.done) { finishT0 = -1e9; aliveT0 = -1e9; }
+  if ("ResizeObserver" in window) new ResizeObserver(function () { onResize(); }).observe(stage);
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", function () { setTimeout(onResize, 250); });
+
+  Toybox.init({
+    app: "jigsaw",
+    big: { button: $("bigToggle") },
+    badge: $("badge"),
+    timerIntro: "When time is up, the pieces settle, the board dims and the controls lock.",
+    goodbyeOption: "End with a Goodnight button to press",
+    farewellText: "Time to say goodnight",
+    goodbyeLabel: "Goodnight, puzzle",
+    farewellDone: "Night night, puzzle!",
+    restLine: "The puzzle is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft clicks when a piece fits. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onGoodbye: function () {
+      if (LY && st.mode === "play") for (var i = 0; i < 4; i++) fx.push({ kind: "snap", x: LY.bx + LY.bw * (0.2 + 0.2 * i), y: LY.by + LY.bh * 0.5, s: Math.min(LY.bw, LY.bh) * 0.4, t0: now() + i * 250, dur: 900, seed: i + 5 });
+      dirty = true;
+    },
+    onRest: function () { dirty = true; },
+    onWake: function () { endingDone = null; dirty = true; },
+    onBig: function () { requestAnimationFrame(onResize); }
+  });
+  stage.appendChild($("tb-toast"));
+  stage.appendChild($("tb-farewell"));
+  requestAnimationFrame(frame);
+
+  // Test hook (only with ?debug in the address).
+  if (DEBUG) window.__jig = {
+    state: function () {
+      return { mode: st.mode, size: st.size, cur: st.cur && { pic: st.cur.pic, n: st.cur.n, done: st.cur.done, placed: st.cur.placed.filter(function (x) { return x; }).length },
+        shelf: st.shelf.map(function (e) { return e.p + ":" + e.n.join("/"); }), layout: LY && { kind: LY.kind, t: LY.t, s: LY.s, bx: LY.bx, by: LY.by, bw: LY.bw, bh: LY.bh },
+        coach: coach.classList.contains("off") ? "" : coach.textContent, counter: counter.hidden ? "" : counter.textContent, ready: !!(puz && big && LY), view: !!view };
+    },
+    // page coordinates of a loose piece's center and of its spot
+    piece: function (i) { var p = puz.pieces[i], r = cv.getBoundingClientRect(); return { x: r.left + p.x, y: r.top + p.y, hx: r.left + p.homeX, hy: r.top + p.homeY, placed: p.placed, misses: p.misses, anim: !!p.anim, sc: p.sc }; },
+    loose: function () { return order.map(function (p) { return p.i; }); },
+    // put every piece but `leave` in place
+    solveAllBut: function (leave) {
+      leave = leave == null ? 1 : leave;
+      var left = order.slice(0, Math.max(0, order.length - leave));
+      left.forEach(function (p) { p.x = p.homeX; p.y = p.homeY; snapPiece(p); p.anim = null; p.sc = 1; });
+      boardDirty = true; dirty = true;
+    },
+    ghost: function () { return ghost.show(); },
+    pics: PICS.map(function (p) { return p.id; }),
+    alive: function () { aliveT0 = now(); dirty = true; }
+  };
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

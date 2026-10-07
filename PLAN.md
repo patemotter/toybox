@@ -17,7 +17,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 6 | Train Builder | Done |
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
-| 9 | Jigsaw Puzzles | Next (the dad picked it) |
+| 9 | Jigsaw Puzzles | Done |
 | 10 | Kitchen Helper | Phase 1 done (kitchen, hand washing, Blender); stations next |
 | 11 | Music Room | Planned |
 | 12 | Hamster | Done |
@@ -279,6 +279,11 @@ angle values, bit sizes and nail lengths are no longer shown).
 **Tech:** render the chosen SVG to an offscreen canvas once; each piece is a `Path2D` clip of that image, cached to its own small canvas for fast dragging. Seeded edge shapes so a puzzle can be rebuilt from saved state.
 
 **Fresh visit:** back to the picture chooser; the My puzzles shelf is kept. **Timer ending:** pieces settle, the board dims. Rest line: "The puzzle is resting."
+
+**Built** (9 pictures; the iPhone tray shows every piece loose at once instead of a scrolling strip). Follow-ups:
+the grown-up "photo from the device" option (needs a home-screen setting and local image storage); a rotation
+option. Questions for the dad: default size 6 or 4 on a fresh visit; one shelf spot per picture (biggest size
+done) OK; the fire truck sprays water with no fire drawn (not scary) OK.
 
 **Agents:** 1.
 
