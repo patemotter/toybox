@@ -20,7 +20,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 9 | Jigsaw Puzzles | Next (the dad picked it) |
 | 10 | Kitchen Helper | Next (the dad picked it) |
 | 11 | Music Room | Planned |
-| 12 | Hamster | In progress |
+| 12 | Hamster | Done |
 | 13 | Garden | Next (the dad picked it) |
 | 14 | Bubble Machine | Done |
 
@@ -340,6 +340,9 @@ directs it where to go by tapping the wheel or the bed or the food."
 - When nobody taps it lives on its own: wanders, grooms, sometimes runs on the wheel.
 - Panel: a green "Treat!" (sunflower seed, carrot, blueberry) and Surprise (somersault, tunnel, ball, wave).
 - Timer ending: it yawns and goes to sleep in its house. Rest line: "The hamster is sleeping."
+- Built. Open points: on upright phones the hamster is small (about 70 px long); it walks in front of the bowl.
+  Questions for the dad: how often it runs or naps by itself; sleep length (about 40 s, or tap to wake); a
+  "Treats" counter or none.
 
 ---
 

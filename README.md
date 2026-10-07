@@ -18,6 +18,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Construction Site: gear up, then excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
 | Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 | Bubbles: a bubble machine with a switch and speed dial, a wand to blow your own bubbles, and a Bubbles counter that keeps counting | [`bubble-machine/`](bubble-machine/) |
+| Hamster: a happy pet hamster: tap the wheel, food, water or bed and it goes there; fill the bowl and the bottle; give treats | [`hamster/`](hamster/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 

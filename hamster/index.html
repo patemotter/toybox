@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hamster</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Hamster">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #FFE3BD;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+.scene { background: #FFE3BD; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.scene .tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; pointer-events: none; }
+
+/* Panel: the green Treat! button, then the tab bar with Surprise. */
+.btn.tb-go { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.tb-go svg { width: 40px; height: 40px; flex: none; overflow: visible; }
+.tb-tabs .btn.tb-surprise { font-size: 1.15rem; }
+body.big .tb-panel { display: none; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+.tb-go.pop svg { animation: treatPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes treatPop { 0% { transform: scale(0.4) rotate(-30deg); } 100% { transform: none; } }
+
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: clamp(150px, 20vw, 240px); }
+  .btn.tb-go { flex: 1 1 auto; max-height: 230px; flex-direction: column; gap: 2px; }
+  .tb-go svg { width: clamp(40px, 11vh, 84px); height: clamp(40px, 11vh, 84px); }
+  .tb-tabs { margin-top: auto; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .btn.tb-go { max-height: 160px; }
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-tabs .btn.tb-surprise { font-size: 1.3rem; }
+  .tb-go svg { width: 52px; height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-go.pop svg { animation: none; }
+}
+
+/* Rest picture: the hamster asleep in its little house (the rest screen itself is in common/toybox.css). */
+.rest-art { border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+
+/* Ghost hand: a see-through hand that shows the main move once (tools/snippets/ghost-hand.css). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Hamster</h1>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+
+  <div class="tb-body">
+    <main class="tb-stage scene" id="scene">
+      <canvas id="cv" aria-label="A hamster in its cage with a wheel, a food bowl, a water bottle and a little house"></canvas>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" hidden></svg>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap the wheel!</div>
+    </main>
+
+    <section class="tb-panel">
+      <button class="btn tb-go" id="treatBtn"><svg id="treatPic" viewBox="-30 -30 60 60" aria-hidden="true"></svg><span>Treat!</span></button>
+      <nav class="tb-tabs">
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var TAU = Math.PI * 2, OUT = "#1D2340";
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function angNorm(a) { while (a > Math.PI) a -= TAU; while (a <= -Math.PI) a += TAU; return a; }
+  function sign(v) { return v < 0 ? -1 : 1; }
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Colors of the hamster (a golden hamster: orange back, cream belly, pink paws and ears).
+  var FUR = "#F6A445", FUR2 = "#E58A2E", CREAM = "#FFF4E2", PINK = "#FFA5BA", PINK2 = "#FF7398";
+
+  // ---------- Saved state ----------
+  // Food and water levels and where the hamster stands. A reload keeps them; opening Hamster from the
+  // Toybox home screen (Toybox.fresh) starts with a full bowl and bottle. Nothing here is a collection.
+  var KEY = "hamster-v1";
+  if (window.Toybox && Toybox.fresh()) {
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+  }
+  var food = 1, water = 1, savedPos = null, dirty = false;
+  (function () {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (typeof o.food === "number" && isFinite(o.food)) food = clamp(o.food, 0, 1);
+        if (typeof o.water === "number" && isFinite(o.water)) water = clamp(o.water, 0, 1);
+        if (o.lvl === "floor" || o.lvl === "shelf") savedPos = { lvl: o.lvl, u: clamp(Number(o.u) || 0.5, 0, 1) };
+      }
+    } catch (e) { /* ignore */ }
+  })();
+
+  // ---------- Canvas ----------
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("scene");
+  var bgCv = document.createElement("canvas"), bgCtx = bgCv.getContext("2d");
+  var tubeCv = document.createElement("canvas"), tubeCtx = tubeCv.getContext("2d");
+  var CW = 1, CH = 1, DPR = 1, G = null;
+
+  // The standing (drinking) pose leans the body up this far; the bottle's spout is placed at its nose.
+  var DRINK_REAR = 0.95;
+  function localNose(rear) {
+    var px = -0.22, py = -0.05, dx = 0.57 - px, dy = -0.41 - py, c = Math.cos(-rear), s = Math.sin(-rear);
+    return { x: px + dx * c - dy * s, y: py + dx * s + dy * c };
+  }
+  // Spread zones [name, width] evenly between a and b (gaps at most one hamster long, centered).
+  function pack(zones, a, b, L) {
+    var tot = 0, n = zones.length, out = {};
+    zones.forEach(function (z) { tot += z[1]; });
+    var gap = Math.max(0.05 * L, Math.min(1.0 * L, (b - a - tot) / (n + 1)));
+    var x = a + (b - a - tot - gap * (n - 1)) / 2;
+    zones.forEach(function (z) { out[z[0]] = x + z[1] / 2; x += z[1] + gap; });
+    return out;
+  }
+  // Two layouts, chosen by which gives the bigger hamster: "wide" (everything on one floor) and "tall"
+  // (the wheel up on a shelf, reached through a clear tube; for upright phones and iPads).
+  function coachOnTop() {
+    // matches common/toybox.css: the coach pill sits at the top of the stage on tablets, at the bottom on phones
+    var w = window.innerWidth, h = window.innerHeight;
+    return !(w <= 600 || (w > h && h <= 520));
+  }
+  function layout(W, H) {
+    var Lt = Math.min(W / 5.3, H / 8.0), Lw = Math.min(W / 9.2, H / 4.75);
+    // prefer the tall layout (it fills the height) unless the wide one gives a clearly bigger hamster
+    var tall = Lt * 1.15 > Lw;
+    var L = Math.max(22, Math.min(tall ? Lt : Lw, 150));
+    var g = { W: W, H: H, L: L, tall: tall, lw: Math.max(2, Math.min(5, L * 0.045)) };
+    g.tr = 0.46 * L;
+    g.floorY = H - 0.85 * L;
+    g.cageX0 = Math.max(6, W * 0.012); g.cageX1 = W - g.cageX0;
+    var a = g.cageX0 + 0.12 * L, b = g.cageX1 - 0.12 * L, R, p;
+    if (!tall) {
+      R = Math.max(1.0 * L, Math.min(1.6 * L, (g.floorY - H * 0.05) / 2.2));
+      p = pack([["bed", 1.6 * L], ["tube", 1.4 * L], ["bowl", 1.15 * L], ["bottle", 0.75 * L], ["wheel", 2 * R + 0.2 * L]], a, b, L);
+      g.wheel = { x: p.wheel, lvl: "floor", R: R };
+      g.tube = { x0: p.tube - 0.7 * L, x1: p.tube + 0.7 * L };
+      g.floorMin = a + 0.4 * L; g.floorMax = b - 0.4 * L;
+    } else {
+      g.tubeX = b - 0.5 * L;
+      var fb = g.tubeX - 1.05 * L;
+      p = pack([["bed", 1.6 * L], ["bowl", 1.15 * L], ["bottle", 0.75 * L]], a, fb, L);
+      var top0 = H * 0.03 + (coachOnTop() ? 46 : 0);
+      g.shelfTop = g.floorY - Math.max(3.1 * L, 0.47 * (g.floorY - top0));
+      g.shelfX0 = g.cageX0; g.shelfX1 = g.tubeX - g.tr - g.lw;
+      R = Math.max(0.9 * L, Math.min(1.6 * L, (fb - a - 0.2 * L) / 2.05, (g.shelfTop - top0 - 0.1 * L) / 2.2));
+      g.wheel = { x: (a + fb) / 2, lvl: "shelf", R: R };
+      g.floorMin = a + 0.4 * L; g.floorMax = fb + 0.05 * L;
+      g.shelfMin = a + 0.4 * L; g.shelfMax = fb + 0.05 * L;
+      g.tubeUpX = g.tubeX + 0.27 * L; g.tubeDownX = g.tubeX - 0.27 * L;
+    }
+    g.bed = { x: p.bed }; g.bowl = { x: p.bowl }; g.bottle = { x: p.bottle };
+    var w = g.wheel;
+    w.surf = w.lvl === "shelf" ? g.shelfTop : g.floorY;
+    w.Ri = R * 0.86; w.y = w.surf - 0.16 * R - R;
+    g.topY = tall ? H * 0.03 : Math.max(H * 0.03, w.y - R - 0.45 * L);
+    var n = localNose(DRINK_REAR);
+    g.bottle.tipX = g.bottle.x + 0.07 * L;
+    g.bottle.tipY = g.floorY + n.y * L - 0.03 * L;
+    g.bottle.capY = g.bottle.tipY - 0.42 * L;
+    g.bottle.bodyB = g.bottle.capY - 0.12 * L;
+    g.bottle.bodyT = g.bottle.bodyB - 1.25 * L;
+    if (tall) g.bag = { x: g.tubeX - 0.05 * L, y: g.topY + Math.max(0.35 * L, 54) };
+    else g.bag = { x: g.bed.x, y: Math.max(g.topY + 0.3 * L, g.floorY - 3.05 * L) };
+    return g;
+  }
+  function surfY(lvl) { return lvl === "shelf" ? G.shelfTop : G.floorY; }
+  function rangeOf(lvl) { return lvl === "shelf" ? [G.shelfMin, G.shelfMax] : [G.floorMin, G.floorMax]; }
+  function clampX(lvl, x) { var r = rangeOf(lvl); return clamp(x, r[0], r[1]); }
+  function uToX(lvl, u) { var r = rangeOf(lvl); return lerp(r[0], r[1], u); }
+  function xToU(lvl, x) { var r = rangeOf(lvl); return clamp((x - r[0]) / Math.max(1, r[1] - r[0]), 0, 1); }
+
+  function resize() {
+    var oldG = G;
+    CW = Math.max(1, stage.clientWidth); CH = Math.max(1, stage.clientHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    bgCv.width = tubeCv.width = cv.width; bgCv.height = tubeCv.height = cv.height;
+    G = layout(CW, CH);
+    bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); drawBg(bgCtx);
+    tubeCtx.setTransform(DPR, 0, 0, DPR, 0, 0); drawTubeFront(tubeCtx);
+    if (oldG) reanchor(oldG);
+  }
+
+  // ---------- Background: the room, the cage bars, the shelf, the bedding and the tray (cached) ----------
+  var shavings = [];
+  for (var si = 0; si < 90; si++) shavings.push({ u: Math.random(), v: Math.random(), a: rand(-0.6, 0.6), l: rand(0.08, 0.16) });
+  function rrect(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  function tubePath(c) {
+    var L = G.L, tr = G.tr;
+    c.beginPath();
+    if (!G.tall) { c.moveTo(G.tube.x0, G.floorY - tr); c.lineTo(G.tube.x1, G.floorY - tr); }
+    else {
+      c.moveTo(G.tubeX - 0.95 * L, G.floorY - tr); c.lineTo(G.tubeX, G.floorY - tr);
+      c.lineTo(G.tubeX, G.shelfTop - tr); c.lineTo(G.tubeX - 0.95 * L, G.shelfTop - tr);
+    }
+  }
+  function drawBg(c) {
+    var W = G.W, H = G.H, L = G.L, lw = G.lw, x, y;
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = "#FFE3BD"; c.fillRect(0, 0, W, H);
+    // soft wallpaper dots
+    c.fillStyle = "rgba(255,255,255,0.5)";
+    var step = 0.95 * L;
+    for (y = step * 0.5, x = 0; y < H; y += step) {
+      for (x = ((y / step) % 2 < 1 ? 0.25 : 0.72) * step; x < W; x += step) { c.beginPath(); c.arc(x, y, 0.07 * L, 0, TAU); c.fill(); }
+    }
+    // table
+    var tableY = G.floorY + 0.48 * L;
+    c.fillStyle = "#C98A4E"; c.fillRect(0, tableY, W, H - tableY);
+    c.fillStyle = "#DDA266"; c.fillRect(0, tableY, W, 0.1 * L);
+    c.strokeStyle = OUT; c.lineWidth = lw; c.beginPath(); c.moveTo(0, tableY); c.lineTo(W, tableY); c.stroke();
+    // cage inside: a lighter panel
+    var x0 = G.cageX0, x1 = G.cageX1, top = G.topY;
+    c.fillStyle = "rgba(255,255,255,0.38)"; rrect(c, x0, top, x1 - x0, G.floorY - top, 0.5 * L); c.fill();
+    // bars
+    var n = Math.max(6, Math.round((x1 - x0) / (0.42 * L))), dx = (x1 - x0) / n;
+    c.strokeStyle = "#A9B1D2"; c.lineWidth = Math.max(1.5, lw * 0.55);
+    for (var i = 1; i < n; i++) { c.beginPath(); c.moveTo(x0 + i * dx, top + 0.2 * L); c.lineTo(x0 + i * dx, G.floorY); c.stroke(); }
+    // frame
+    c.strokeStyle = "#7B85B5"; c.lineWidth = lw * 1.6; c.lineJoin = "round";
+    rrect(c, x0, top, x1 - x0, G.floorY - top + 0.1 * L, 0.5 * L); c.stroke();
+    c.strokeStyle = OUT; c.lineWidth = Math.max(1, lw * 0.5);
+    rrect(c, x0 - lw * 0.8, top - lw * 0.8, x1 - x0 + lw * 1.6, G.floorY - top + 0.1 * L + lw * 1.6, 0.5 * L + lw); c.stroke();
+    // tube: the back of the clear plastic (the front is drawn over the hamster)
+    if (G.tube || G.tall) {
+      tubePath(c); c.lineJoin = "round"; c.lineCap = "butt";
+      c.strokeStyle = "rgba(205,240,255,0.55)"; c.lineWidth = 2 * G.tr; c.stroke();
+    }
+    // shelf (tall layout)
+    if (G.tall) {
+      var sy = G.shelfTop;
+      c.fillStyle = "#E9A95B"; c.strokeStyle = OUT; c.lineWidth = lw;
+      c.beginPath(); c.moveTo(G.shelfX0 + 0.1 * L, sy + 0.2 * L); c.lineTo(G.shelfX0 + 0.1 * L, sy + 0.75 * L); c.lineTo(G.shelfX0 + 0.75 * L, sy + 0.2 * L); c.closePath();
+      c.fillStyle = "#D08E45"; c.fill(); c.stroke();
+      c.fillStyle = "#E9A95B"; rrect(c, G.shelfX0, sy, G.shelfX1 - G.shelfX0, 0.22 * L, 0.08 * L); c.fill(); c.stroke();
+      c.strokeStyle = "rgba(255,255,255,0.45)"; c.lineWidth = lw * 0.6;
+      c.beginPath(); c.moveTo(G.shelfX0 + 0.2 * L, sy + 0.07 * L); c.lineTo(G.shelfX1 - 0.2 * L, sy + 0.07 * L); c.stroke();
+    }
+    // bedding (wood shavings) the hamster walks on
+    var by = G.floorY - 0.09 * L;
+    c.fillStyle = "#FFE7A3"; c.strokeStyle = OUT; c.lineWidth = lw * 0.6;
+    c.beginPath(); c.moveTo(x0, G.floorY + 0.12 * L);
+    for (x = x0; x <= x1; x += 0.3 * L) c.quadraticCurveTo(x + 0.15 * L, by - 0.05 * L, Math.min(x1, x + 0.3 * L), by + 0.02 * L);
+    c.lineTo(x1, G.floorY + 0.12 * L); c.closePath(); c.fill();
+    c.strokeStyle = "#E3BF6A"; c.lineWidth = Math.max(1.2, lw * 0.5); c.lineCap = "round";
+    shavings.forEach(function (s) {
+      var sx = lerp(x0 + 0.1 * L, x1 - 0.1 * L, s.u), sy2 = by + 0.02 * L + s.v * 0.14 * L;
+      c.beginPath(); c.moveTo(sx, sy2); c.quadraticCurveTo(sx + s.l * L * 0.5, sy2 - 0.04 * L + s.a * 0.03 * L, sx + s.l * L, sy2 + s.a * 0.04 * L); c.stroke();
+    });
+    // tray (blue plastic base)
+    c.fillStyle = "#45B7F2"; c.strokeStyle = OUT; c.lineWidth = lw;
+    rrect(c, x0 - 0.04 * L, G.floorY + 0.08 * L, x1 - x0 + 0.08 * L, 0.4 * L, 0.14 * L); c.fill(); c.stroke();
+    c.strokeStyle = "rgba(255,255,255,0.55)"; c.lineWidth = lw * 0.8;
+    c.beginPath(); c.moveTo(x0 + 0.25 * L, G.floorY + 0.19 * L); c.lineTo(x1 - 0.25 * L, G.floorY + 0.19 * L); c.stroke();
+  }
+  function drawTubeFront(c) {
+    var L = G.L, tr = G.tr, lw = G.lw;
+    c.clearRect(0, 0, G.W, G.H);
+    if (!G.tube && !G.tall) return;
+    c.lineJoin = "round"; c.lineCap = "butt";
+    tubePath(c); c.strokeStyle = OUT; c.lineWidth = 2 * tr + 2 * lw; c.stroke();
+    c.globalCompositeOperation = "destination-out"; c.lineWidth = 2 * tr; c.stroke();
+    c.globalCompositeOperation = "source-over";
+    c.strokeStyle = "rgba(170,225,255,0.28)"; c.lineWidth = 2 * tr; c.stroke();
+    // shine and ribs
+    c.strokeStyle = "rgba(255,255,255,0.75)"; c.lineWidth = Math.max(2, 0.07 * L); c.lineCap = "round";
+    var ends = [];
+    if (!G.tall) {
+      var y = G.floorY - tr;
+      c.beginPath(); c.moveTo(G.tube.x0 + 0.25 * L, y - tr * 0.6); c.lineTo(G.tube.x1 - 0.25 * L, y - tr * 0.6); c.stroke();
+      ends.push([G.tube.x0, y], [G.tube.x1, y]);
+    } else {
+      var yf = G.floorY - tr, ys = G.shelfTop - tr;
+      c.beginPath(); c.moveTo(G.tubeX + tr * 0.6, yf - 0.2 * L); c.lineTo(G.tubeX + tr * 0.6, ys + 0.2 * L); c.stroke();
+      c.beginPath(); c.moveTo(G.tubeX - 0.75 * L, ys - tr * 0.6); c.lineTo(G.tubeX - 0.2 * L, ys - tr * 0.6); c.stroke();
+      c.beginPath(); c.moveTo(G.tubeX - 0.75 * L, yf - tr * 0.6); c.lineTo(G.tubeX - 0.2 * L, yf - tr * 0.6); c.stroke();
+      ends.push([G.tubeX - 0.95 * L, yf], [G.tubeX - 0.95 * L, ys]);
+    }
+    ends.forEach(function (e) {
+      c.beginPath(); c.ellipse(e[0], e[1], 0.13 * L, tr + lw * 0.5, 0, 0, TAU);
+      c.fillStyle = "rgba(170,225,255,0.35)"; c.fill();
+      c.strokeStyle = OUT; c.lineWidth = lw; c.stroke();
+    });
+  }
+
+  // ---------- Things in the cage ----------
+  var items = { wheel: { b: 0 }, bowl: { b: 0 }, bottle: { b: 0 }, bed: { b: 0 }, bag: { b: 0 } };
+  var wheel = { a: 0, w: 0, driven: false };
+  var bowlSeeds = [];
+  (function () {
+    var kinds = ["sun", "sun", "pellet", "corn", "carrot", "sun", "pea"];
+    for (var i = 0; i < 30; i++) bowlSeeds.push({ u: rand(-1, 1), v: Math.pow(Math.random(), 0.8), k: kinds[i % kinds.length], r: rand(0, TAU) });
+    bowlSeeds.sort(function (p, q) { return q.v - p.v; });
+  })();
+  var treats = [], ball = null, pour = null, jug = null, parts = [], bubbles = [], trail = null;
+  var TREATS = ["seed", "carrot", "berry"], treatIdx = 0;
+
+  function bounceScale(it) { return 1 + 0.13 * Math.sin(Math.PI * (1 - it.b)) * it.b * 1.6; }
+  function glow(x, y, r, a, col) {
+    if (a <= 0.01) return;
+    var gr = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    gr.addColorStop(0, "rgba(" + (col || "255,214,80") + "," + (0.75 * a) + ")");
+    gr.addColorStop(1, "rgba(" + (col || "255,214,80") + ",0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  }
+  function drawSeed(k, x, y, s, rot, unit) {
+    // unit: drawn inside the hamster's own scaled drawing (no pixel minimum for the outline)
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.lineWidth = unit ? s * 0.22 : Math.max(1, s * 0.22); ctx.strokeStyle = OUT;
+    ctx.beginPath();
+    if (k === "sun") {
+      ctx.ellipse(0, 0, s, s * 0.55, 0, 0, TAU); ctx.fillStyle = "#454A5C"; ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = unit ? s * 0.16 : Math.max(0.8, s * 0.16);
+      ctx.beginPath(); ctx.moveTo(-s * 0.6, -s * 0.12); ctx.lineTo(s * 0.6, -s * 0.12); ctx.stroke();
+    } else if (k === "pellet") { ctx.ellipse(0, 0, s * 0.75, s * 0.5, 0, 0, TAU); ctx.fillStyle = "#86C96B"; ctx.fill(); ctx.stroke(); }
+    else if (k === "corn") { ctx.ellipse(0, 0, s * 0.6, s * 0.55, 0, 0, TAU); ctx.fillStyle = "#FFD447"; ctx.fill(); ctx.stroke(); }
+    else if (k === "carrot") { ctx.ellipse(0, 0, s * 0.62, s * 0.45, 0, 0, TAU); ctx.fillStyle = "#FF8A2B"; ctx.fill(); ctx.stroke(); }
+    else { ctx.arc(0, 0, s * 0.48, 0, TAU); ctx.fillStyle = "#E9524F"; ctx.fill(); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawTreatShape(c, k, x, y, s, rot) {
+    // s: about the size of a hamster's head (in px); drawn standing on y
+    c.save(); c.translate(x, y); c.rotate(rot || 0);
+    c.strokeStyle = OUT; c.lineWidth = Math.max(1.5, s * 0.09); c.lineJoin = "round"; c.lineCap = "round";
+    if (k === "seed") {
+      c.beginPath(); c.moveTo(-s * 0.55, -s * 0.3);
+      c.quadraticCurveTo(-s * 0.1, -s * 0.78, s * 0.6, -s * 0.36); c.quadraticCurveTo(-s * 0.05, s * 0.06, -s * 0.55, -s * 0.3);
+      c.fillStyle = "#3F4456"; c.fill(); c.stroke();
+      c.strokeStyle = "#FFFFFF"; c.lineWidth = Math.max(1, s * 0.07);
+      c.beginPath(); c.moveTo(-s * 0.35, -s * 0.33); c.quadraticCurveTo(0, -s * 0.5, s * 0.42, -s * 0.37); c.stroke();
+    } else if (k === "carrot") {
+      c.fillStyle = "#4CC76A";
+      c.beginPath(); c.ellipse(-s * 0.42, -s * 0.5, s * 0.1, s * 0.22, -0.6, 0, TAU); c.fill(); c.stroke();
+      c.beginPath(); c.ellipse(-s * 0.3, -s * 0.58, s * 0.09, s * 0.2, 0.1, 0, TAU); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(-s * 0.5, -s * 0.48); c.lineTo(-s * 0.2, -s * 0.05); c.lineTo(s * 0.55, -s * 0.06); c.closePath();
+      c.beginPath(); c.moveTo(-s * 0.45, -s * 0.42); c.quadraticCurveTo(-s * 0.4, -s * 0.02, -s * 0.15, 0); c.lineTo(s * 0.6, -s * 0.12); c.quadraticCurveTo(0, -s * 0.5, -s * 0.45, -s * 0.42);
+      c.fillStyle = "#FF8A2B"; c.fill(); c.stroke();
+      c.strokeStyle = "#D96A12"; c.lineWidth = Math.max(1, s * 0.06);
+      c.beginPath(); c.moveTo(-s * 0.05, -s * 0.24); c.lineTo(s * 0.1, -s * 0.15); c.moveTo(s * 0.22, -s * 0.2); c.lineTo(s * 0.32, -s * 0.13); c.stroke();
+    } else {
+      c.beginPath(); c.arc(0, -s * 0.36, s * 0.36, 0, TAU); c.fillStyle = "#4F6BDE"; c.fill(); c.stroke();
+      c.fillStyle = "#2B3A8F"; c.beginPath();
+      for (var i = 0; i < 5; i++) { var an = -Math.PI / 2 + i * TAU / 5; c.lineTo(Math.cos(an) * s * 0.12, -s * 0.62 + Math.sin(an) * s * 0.12); c.lineTo(Math.cos(an + 0.63) * s * 0.05, -s * 0.62 + Math.sin(an + 0.63) * s * 0.05); }
+      c.closePath(); c.fill();
+      c.fillStyle = "rgba(255,255,255,0.7)"; c.beginPath(); c.arc(-s * 0.13, -s * 0.44, s * 0.07, 0, TAU); c.fill();
+    }
+    c.restore();
+  }
+  function drawHeart(x, y, s, a, col) {
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 0.35);
+    ctx.bezierCurveTo(-0.55, -0.05, -0.5, -0.55, -0.12, -0.5); ctx.bezierCurveTo(0, -0.48, 0, -0.35, 0, -0.3);
+    ctx.bezierCurveTo(0, -0.35, 0, -0.48, 0.12, -0.5); ctx.bezierCurveTo(0.5, -0.55, 0.55, -0.05, 0, 0.35); ctx.closePath();
+    ctx.fillStyle = col || "#FF5C8A"; ctx.fill(); ctx.lineWidth = 0.09; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.ellipse(-0.22, -0.28, 0.09, 0.06, -0.6, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawStar(x, y, r, a, col) {
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y);
+    ctx.beginPath();
+    for (var i = 0; i < 8; i++) { var rr2 = i % 2 ? r * 0.35 : r, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * rr2, Math.sin(an) * rr2); }
+    ctx.closePath(); ctx.fillStyle = col || "#FFD23F"; ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.12); ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.restore();
+  }
+
+  // House: the back (seen through the round door) and the front wall with the door.
+  function houseGeom() { var L = G.L; return { x: G.bed.x, y: G.floorY, dr: 0.47 * L, dy: G.floorY - 0.5 * L, top: G.floorY - 1.15 * L, hw: 0.8 * L }; }
+  function drawHouseBack() {
+    var h = houseGeom(), L = G.L, s = bounceScale(items.bed);
+    ctx.save(); ctx.translate(h.x, h.y); ctx.scale(s, s); ctx.translate(-h.x, -h.y);
+    ctx.fillStyle = "#8A5530"; ctx.beginPath(); ctx.arc(h.x, h.dy, h.dr, 0, TAU); ctx.fill();
+    // a soft nest of bedding inside
+    ctx.save(); ctx.beginPath(); ctx.arc(h.x, h.dy, h.dr, 0, TAU); ctx.clip();
+    ctx.fillStyle = "#FFF1C9"; ctx.beginPath(); ctx.ellipse(h.x, h.y - 0.02 * L, 0.6 * L, 0.2 * L, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#E8C77A"; ctx.lineWidth = Math.max(1.2, G.lw * 0.5); ctx.lineCap = "round";
+    for (var i = 0; i < 7; i++) { var qx = h.x + (i - 3) * 0.13 * L; ctx.beginPath(); ctx.moveTo(qx - 0.06 * L, h.y - 0.1 * L + (i % 2) * 0.04 * L); ctx.quadraticCurveTo(qx, h.y - 0.17 * L, qx + 0.07 * L, h.y - 0.08 * L); ctx.stroke(); }
+    ctx.restore();
+    ctx.restore();
+  }
+  function drawHouseFront() {
+    var h = houseGeom(), L = G.L, lw = G.lw, s = bounceScale(items.bed);
+    ctx.save(); ctx.translate(h.x, h.y); ctx.scale(s, s); ctx.translate(-h.x, -h.y);
+    glow(h.x, h.y - 0.8 * L, 1.4 * L, items.bed.b);
+    ctx.beginPath(); ctx.rect(h.x - h.hw, h.top, 2 * h.hw, h.y - h.top);
+    ctx.moveTo(h.x + h.dr, h.dy); ctx.arc(h.x, h.dy, h.dr, 0, TAU);
+    ctx.fillStyle = "#F7BE6A"; ctx.fill("evenodd");
+    ctx.save(); ctx.clip("evenodd");
+    ctx.strokeStyle = "rgba(160,95,40,0.35)"; ctx.lineWidth = lw * 0.6;
+    for (var yy = h.top + 0.28 * L; yy < h.y; yy += 0.28 * L) { ctx.beginPath(); ctx.moveTo(h.x - h.hw, yy); ctx.lineTo(h.x + h.hw, yy); ctx.stroke(); }
+    ctx.restore();
+    ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.stroke();
+    // roof with a little round window
+    ctx.beginPath(); ctx.moveTo(h.x - 0.98 * L, h.top + 0.1 * L); ctx.lineTo(h.x, h.top - 0.62 * L); ctx.lineTo(h.x + 0.98 * L, h.top + 0.1 * L); ctx.closePath();
+    ctx.fillStyle = "#EF5B5B"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(h.x, h.top - 0.2 * L, 0.11 * L, 0, TAU); ctx.fillStyle = ham.asleep ? "#FFE27A" : "#FFF4D6"; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.stroke();
+    // a doormat
+    ctx.fillStyle = "#7FCB6B"; rrect(ctx, h.x - 0.42 * L, h.y - 0.04 * L, 0.84 * L, 0.09 * L, 0.04 * L); ctx.fill(); ctx.lineWidth = lw * 0.6; ctx.stroke();
+    ctx.restore();
+  }
+  function drawBowl() {
+    var L = G.L, lw = G.lw, x = G.bowl.x, y = G.floorY, w = 1.15 * L, h = 0.36 * L, top = y - h, s = bounceScale(items.bowl);
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-x, -y);
+    glow(x, top, 1.1 * L, items.bowl.b);
+    ctx.lineJoin = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, 0, TAU); ctx.fillStyle = "#C93F63"; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, Math.PI, TAU); ctx.stroke();
+    if (food > 0.005) {
+      var mh = 0.36 * L * Math.pow(food, 0.7), mw = w / 2 * (0.6 + 0.35 * food);
+      ctx.beginPath(); ctx.ellipse(x, top + 0.02 * L, mw, mh, 0, Math.PI, TAU); ctx.closePath();
+      ctx.fillStyle = "#F5C86A"; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.stroke();
+      bowlSeeds.forEach(function (sd) {
+        var u = sd.u * 0.85, py = top + 0.02 * L - sd.v * mh * Math.sqrt(Math.max(0, 1 - u * u)) * 0.88;
+        drawSeed(sd.k, x + u * mw, py, 0.075 * L, sd.r);
+      });
+    }
+    ctx.beginPath(); ctx.moveTo(x - w / 2, top); ctx.ellipse(x, top, w / 2, 0.11 * L, 0, Math.PI, 0, true);
+    ctx.lineTo(x + w * 0.38, y); ctx.quadraticCurveTo(x, y + 0.07 * L, x - w * 0.38, y); ctx.closePath();
+    ctx.fillStyle = "#FF6F93"; ctx.fill(); ctx.lineWidth = lw; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = lw * 0.9; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x - w * 0.36, top + 0.17 * L); ctx.lineTo(x - w * 0.12, top + 0.2 * L); ctx.stroke();
+    ctx.restore();
+  }
+  function drawBottle() {
+    var L = G.L, lw = G.lw, b = G.bottle, x = b.x, s = bounceScale(items.bottle), bw = 0.5 * L;
+    ctx.save(); ctx.translate(x, b.bodyT); ctx.scale(s, s); ctx.translate(-x, -b.bodyT);
+    var low = water < 0.08 && !jug;
+    glow(x, (b.bodyT + b.bodyB) / 2, 1.2 * L, Math.max(items.bottle.b, low ? 0.55 + 0.35 * Math.sin(clock * 4) : 0), low ? "120,200,255" : null);
+    ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = OUT;
+    // hanger wire up to the top of the cage
+    ctx.lineWidth = Math.max(1.5, lw * 0.6);
+    ctx.beginPath(); ctx.moveTo(x - 0.12 * L, b.bodyT + 0.3 * L); ctx.lineTo(x - 0.12 * L, b.bodyT - 0.18 * L); ctx.quadraticCurveTo(x, b.bodyT - 0.32 * L, x + 0.12 * L, b.bodyT - 0.18 * L); ctx.lineTo(x + 0.12 * L, b.bodyT + 0.3 * L); ctx.stroke();
+    // spout
+    ctx.lineWidth = 0.12 * L; ctx.strokeStyle = OUT;
+    ctx.beginPath(); ctx.moveTo(x, b.capY); ctx.lineTo(b.tipX, b.tipY - 0.03 * L); ctx.stroke();
+    ctx.lineWidth = 0.07 * L; ctx.strokeStyle = "#CBD4E6";
+    ctx.beginPath(); ctx.moveTo(x, b.capY); ctx.lineTo(b.tipX, b.tipY - 0.03 * L); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.tipX, b.tipY, 0.05 * L, 0, TAU); ctx.fillStyle = "#CBD4E6"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = lw * 0.6; ctx.stroke();
+    // cap
+    ctx.fillStyle = "#4CC76A"; ctx.lineWidth = lw; rrect(ctx, x - 0.18 * L, b.bodyB - 0.02 * L, 0.36 * L, 0.16 * L, 0.05 * L); ctx.fill(); ctx.stroke();
+    // body with the water inside
+    rrect(ctx, x - bw / 2, b.bodyT, bw, b.bodyB - b.bodyT, 0.18 * L);
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
+    ctx.save(); ctx.clip();
+    var bh = b.bodyB - b.bodyT, wl = b.bodyB - bh * 0.94 * water;
+    if (water > 0.003) {
+      ctx.fillStyle = "#5BBDF6"; ctx.beginPath(); ctx.moveTo(x - bw, b.bodyB + 2);
+      for (var xx = -bw / 2; xx <= bw / 2 + 1; xx += bw / 8) ctx.lineTo(x + xx, wl + Math.sin(clock * 3 + xx * 0.2) * 0.02 * L);
+      ctx.lineTo(x + bw, b.bodyB + 2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = lw * 0.6;
+      ctx.beginPath(); ctx.moveTo(x - bw / 2, wl + 0.02 * L); ctx.lineTo(x + bw / 2, wl + 0.02 * L); ctx.stroke();
+    }
+    bubbles.forEach(function (q) {
+      var by = b.bodyB - q.h * L;
+      if (by < wl) return;
+      ctx.beginPath(); ctx.arc(x + q.u * L, by, q.r * L, 0, TAU); ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = Math.max(1, lw * 0.45); ctx.stroke();
+    });
+    ctx.fillStyle = "rgba(255,255,255,0.65)"; rrect(ctx, x - bw * 0.32, b.bodyT + 0.15 * L, 0.07 * L, bh - 0.35 * L, 0.035 * L); ctx.fill();
+    ctx.restore();
+    rrect(ctx, x - bw / 2, b.bodyT, bw, b.bodyB - b.bodyT, 0.18 * L); ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
+    // a little water drop picture on the bottle
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath();
+    var dx2 = x + 0.04 * L, dy2 = b.bodyT + 0.38 * L;
+    ctx.moveTo(dx2, dy2 - 0.12 * L); ctx.quadraticCurveTo(dx2 + 0.1 * L, dy2, dx2, dy2 + 0.06 * L); ctx.quadraticCurveTo(dx2 - 0.1 * L, dy2, dx2, dy2 - 0.12 * L);
+    ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.stroke();
+    ctx.restore();
+  }
+  function drawBag() {
+    var L = G.L, lw = G.lw, g = G.bag, w = 0.8 * L, h = 1.0 * L, s = bounceScale(items.bag);
+    var empty = food < 0.04 && !pour;
+    var tilt = 0;
+    if (pour) { var pt = pour.t; tilt = pour.dir * 0.55 * (pt < 0.3 ? ease(pt / 0.3) : pt > 1.6 ? Math.max(0, 1 - (pt - 1.6) / 0.4) : 1); }
+    else if (empty) tilt = Math.sin(clock * 5) * 0.06;
+    ctx.save();
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    // string up to the top of the cage
+    ctx.strokeStyle = OUT; ctx.lineWidth = Math.max(1.5, lw * 0.55);
+    ctx.beginPath(); ctx.moveTo(g.x, G.topY); ctx.lineTo(g.x, g.y + 0.04 * L); ctx.stroke();
+    glow(g.x, g.y + h * 0.55, 1.25 * L, Math.max(items.bag.b, empty ? 0.6 + 0.4 * Math.sin(clock * 4) : 0));
+    ctx.translate(g.x, g.y + h * 0.5); ctx.rotate(tilt); ctx.scale(s, s); ctx.translate(-g.x, -(g.y + h * 0.5));
+    ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(g.x - w * 0.42, g.y + 0.15 * L); ctx.lineTo(g.x + w * 0.42, g.y + 0.15 * L);
+    ctx.lineTo(g.x + w * 0.5, g.y + h); ctx.lineTo(g.x - w * 0.5, g.y + h); ctx.closePath();
+    ctx.fillStyle = "#E3A963"; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#C98B48"; rrect(ctx, g.x - w * 0.46, g.y, w * 0.92, 0.2 * L, 0.05 * L); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(g.x, g.y + 0.06 * L, 0.05 * L, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = lw * 0.6; ctx.stroke();
+    ctx.beginPath(); ctx.arc(g.x, g.y + 0.6 * L, 0.25 * L, 0, TAU); ctx.fillStyle = "#FFF6DF"; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.stroke();
+    drawTreatShape(ctx, "seed", g.x, g.y + 0.72 * L, 0.42 * L, -0.25);
+    ctx.restore();
+  }
+  function drawWheelBack() {
+    var L = G.L, lw = G.lw, w = G.wheel, x = w.x, y = w.y, R = w.R, s = bounceScale(items.wheel);
+    ctx.save(); ctx.translate(x, w.surf); ctx.scale(s, s); ctx.translate(-x, -w.surf);
+    glow(x, y, R * 1.3, items.wheel.b);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    // stand
+    [[-1, 0], [1, 0]].forEach(function (d) {
+      ctx.strokeStyle = OUT; ctx.lineWidth = 0.17 * L;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + d[0] * 0.74 * R, w.surf - 0.04 * L); ctx.stroke();
+      ctx.strokeStyle = "#8E6CFF"; ctx.lineWidth = 0.17 * L - 2 * lw;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + d[0] * 0.74 * R, w.surf - 0.04 * L); ctx.stroke();
+    });
+    ctx.fillStyle = "#8E6CFF"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    rrect(ctx, x - 0.9 * R, w.surf - 0.1 * L, 0.32 * R, 0.12 * L, 0.05 * L); ctx.fill(); ctx.stroke();
+    rrect(ctx, x + 0.58 * R, w.surf - 0.1 * L, 0.32 * R, 0.12 * L, 0.05 * L); ctx.fill(); ctx.stroke();
+    // back disc and spokes
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fillStyle = "#D8F1FF"; ctx.fill(); ctx.stroke();
+    var spd = Math.abs(wheel.w);
+    var blur = clamp((spd - 3) / 4, 0, 1);
+    if (blur > 0) {
+      ctx.fillStyle = "rgba(124,200,255," + (0.35 * blur) + ")";
+      ctx.beginPath(); ctx.arc(x, y, w.Ri, 0, TAU); ctx.arc(x, y, 0.2 * R, 0, TAU, true); ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(91,170,240," + (1 - 0.6 * blur) + ")"; ctx.lineWidth = 0.08 * L;
+    for (var i = 0; i < 8; i++) {
+      var an = wheel.a + i * TAU / 8;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(an) * 0.16 * R, y + Math.sin(an) * 0.16 * R); ctx.lineTo(x + Math.cos(an) * w.Ri, y + Math.sin(an) * w.Ri); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x, y, 0.15 * R, 0, TAU); ctx.fillStyle = "#FFC93C"; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = lw; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 0.05 * R, 0, TAU); ctx.fillStyle = OUT; ctx.fill();
+    ctx.restore();
+  }
+  function drawWheelFront() {
+    var L = G.L, lw = G.lw, w = G.wheel, x = w.x, y = w.y, R = w.R, s = bounceScale(items.wheel);
+    ctx.save(); ctx.translate(x, w.surf); ctx.scale(s, s); ctx.translate(-x, -w.surf);
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.arc(x, y, w.Ri, 0, TAU, true);
+    ctx.fillStyle = "#3DA5F5"; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, w.Ri, 0, TAU); ctx.stroke();
+    // rungs on the rim turn with the wheel
+    var spd = Math.abs(wheel.w), n = 26;
+    ctx.strokeStyle = "rgba(220,242,255," + (spd > 5 ? 0.5 : 0.95) + ")"; ctx.lineWidth = Math.max(1.5, 0.05 * L); ctx.lineCap = "round";
+    for (var i = 0; i < n; i++) {
+      var an = wheel.a + i * TAU / n, r0 = w.Ri + (R - w.Ri) * 0.25, r1 = R - (R - w.Ri) * 0.25;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(an) * r0, y + Math.sin(an) * r0); ctx.lineTo(x + Math.cos(an) * r1, y + Math.sin(an) * r1); ctx.stroke();
+    }
+    // motion lines when it spins fast
+    var m = clamp((spd - 2.5) / 4, 0, 1);
+    if (m > 0 && !reduceMotion) {
+      ctx.strokeStyle = "rgba(29,35,64," + (0.55 * m) + ")"; ctx.lineWidth = Math.max(2, 0.06 * L);
+      var dir = wheel.w > 0 ? 1 : -1;
+      for (var k = 0; k < 3; k++) {
+        var base = -Math.PI / 2 + (k - 1) * 1.15 + (k === 1 ? 0 : 0.2 * dir), rr = R + 0.16 * L + (k % 2) * 0.1 * L, len = 0.45 + 0.25 * m;
+        ctx.beginPath(); ctx.arc(x, y, rr, base - dir * len, base, dir < 0); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function treatX(t) { return uToX(t.lvl, t.u); }
+  function drawTreats() {
+    var L = G.L;
+    treats.forEach(function (t) {
+      if (t.gone) return;
+      var y = surfY(t.lvl) - t.h * L;
+      if (t.landed) glow(treatX(t), y - 0.15 * L, 0.55 * L, 0.35 + 0.2 * Math.sin(clock * 5 + t.id));
+      drawTreatShape(ctx, t.kind, treatX(t), y, 0.5 * L, t.rot);
+    });
+  }
+  function drawBall() {
+    if (!ball) return;
+    var L = G.L, r = 0.27 * L, x = uToX("floor", ball.u), y = G.floorY - r - ball.h * L;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ball.rot);
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = "#FFD23F"; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = "#FF5C8A"; ctx.fillRect(-r, -r * 0.3, 2 * r, r * 0.6);
+    ctx.fillStyle = "#3DB4FF"; ctx.beginPath(); ctx.arc(0, 0, r * 0.22, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.strokeStyle = OUT; ctx.lineWidth = G.lw; ctx.stroke();
+    ctx.restore();
+  }
+  function drawJug() {
+    if (!jug) return;
+    var L = G.L, lw = G.lw, b = G.bottle, t = jug.t;
+    var inA = clamp(t / 0.4, 0, 1), outA = clamp((t - 1.9) / 0.4, 0, 1), a = inA * (1 - outA);
+    var side = b.x - G.cageX0 > 1.5 * L ? -1 : 1;
+    var jx = b.x + side * 0.55 * L, jy = b.bodyT - 0.3 * L - (1 - inA) * 0.4 * L;
+    var tilt = -side * 0.9 * ease(clamp((t - 0.25) / 0.3, 0, 1)) * (1 - ease(clamp((t - 1.7) / 0.3, 0, 1)));
+    ctx.save(); ctx.globalAlpha = a;
+    // stream into the bottle
+    if (t > 0.45 && t < 1.8) {
+      ctx.strokeStyle = "#5BBDF6"; ctx.lineWidth = 0.11 * L; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(jx - side * 0.32 * L, jy - 0.05 * L); ctx.quadraticCurveTo(b.x - side * 0.05 * L, jy - 0.1 * L, b.x, b.bodyT + 0.25 * L); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 0.03 * L; ctx.stroke();
+    }
+    ctx.translate(jx, jy); ctx.rotate(tilt);
+    ctx.lineJoin = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(-0.22 * L, -0.25 * L); ctx.lineTo(0.22 * L, -0.25 * L); ctx.lineTo(0.26 * L, 0.25 * L); ctx.lineTo(-0.26 * L, 0.25 * L); ctx.closePath();
+    ctx.fillStyle = "#7FD0FF"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(side * 0.22 * L, -0.25 * L); ctx.lineTo(side * 0.36 * L, -0.33 * L); ctx.lineTo(side * 0.24 * L, -0.12 * L); ctx.fillStyle = "#7FD0FF"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-side * 0.3 * L, 0, 0.13 * L, -Math.PI / 2, Math.PI / 2, side > 0); ctx.lineWidth = lw * 1.4; ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- The hamster ----------
+  var clock = 0;
+  var ham = {
+    x: 0, y: 0, lvl: "floor", f: 1, th: 0, thT: 0, where: "surf", act: null, queue: [], mission: null,
+    legPh: 0, cheeks: 0, blinkIn: 2.5, blinkT: 0, squash: 0, turn: 0, asleep: false, rearS: 0, curlS: 0, pending: null
+  };
+  function basePose() {
+    return { rear: 0, curl: 0, eye: "open", paws: "down", mouth: "smile", legAmp: 0, lift: 0, rot: 0, wig: 0, sx: 1, sy: 1, k: 1,
+      ears: 0, bob: 0, zoom: 0, hold: null, tongue: 0, yawn: 0, sniff: 0, chew: 0, wave: 0 };
+  }
+  var P = basePose();
+  function eye(x, y, r, kind, o) {
+    ctx.lineCap = "round";
+    if (kind === "open") {
+      ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(x, y, r, r * 1.08, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(x - r * 0.28, y - r * 0.36, r * 0.42, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + r * 0.36, y + r * 0.34, r * 0.17, 0, TAU); ctx.fill();
+    } else if (kind === "happy") {
+      ctx.strokeStyle = OUT; ctx.lineWidth = o * 1.3; ctx.beginPath(); ctx.arc(x, y + r * 0.45, r * 0.85, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    } else if (kind === "blink") {
+      ctx.strokeStyle = OUT; ctx.lineWidth = o * 1.3; ctx.beginPath(); ctx.moveTo(x - r * 0.8, y + r * 0.1); ctx.lineTo(x + r * 0.8, y + r * 0.1); ctx.stroke();
+    } else {
+      ctx.strokeStyle = OUT; ctx.lineWidth = o * 1.3; ctx.beginPath(); ctx.arc(x, y - r * 0.2, r * 0.8, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    }
+  }
+  function paw(x, y, r, o, col) {
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.68, 0, 0, TAU); ctx.fillStyle = col || PINK; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = o * 0.85; ctx.stroke();
+  }
+  function drawHamster() {
+    var L = G.L, o = G.lw / L, p = P;
+    var rear = ham.rearS, curl = ham.curlS;
+    ctx.save();
+    ctx.translate(ham.x, ham.y - p.lift * L);
+    ctx.rotate(ham.th + p.wig);
+    ctx.scale(L * ham.f * p.sx * p.k, L * p.sy * p.k);
+    if (p.rot) { ctx.translate(0, -0.34); ctx.rotate(p.rot); ctx.translate(0, 0.34); }
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    var a = p.legAmp, s = Math.sin(ham.legPh), lift1 = Math.max(0, s) * 0.06 * a, lift2 = Math.max(0, -s) * 0.06 * a;
+    // speed lines
+    if (p.zoom > 0.05 && !reduceMotion) {
+      ctx.strokeStyle = "rgba(29,35,64," + (0.4 * p.zoom) + ")"; ctx.lineWidth = o * 1.2;
+      for (var i = 0; i < 3; i++) { var yy = -0.16 - 0.18 * i; ctx.beginPath(); ctx.moveTo(-0.62 - 0.06 * i, yy); ctx.lineTo(-0.95 - 0.12 * i, yy); ctx.stroke(); }
+    }
+    var feet = curl < 0.5;
+    if (feet) {
+      paw(-0.18 + 0.08 * s * a, -0.02 - lift2, 0.075, o, "#F28FA6");
+      if (p.paws === "down") paw(0.32 - 0.08 * s * a, -0.02 - lift1, 0.07, o, "#F28FA6");
+      ctx.beginPath(); ctx.arc(-0.52, -0.2, 0.065, 0, TAU); ctx.fillStyle = PINK; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = o; ctx.stroke();
+    }
+    // upper body (it leans up around the hind legs for sitting, drinking and waving)
+    ctx.save();
+    if (rear) { ctx.translate(-0.22, -0.05); ctx.rotate(-rear); ctx.translate(0.22, 0.05); }
+    var bx = -0.02 + 0.02 * curl, by = -0.32 + 0.02 * curl + p.bob, rx = 0.5 - 0.07 * curl, ry = 0.32 + 0.04 * curl;
+    var hx = 0.3 - 0.1 * curl, hy = -0.43 + 0.17 * curl + p.bob * 1.3, hr = 0.29 - 0.015 * curl;
+    // ears
+    var eb = p.ears;
+    [[hx - 0.13 - 0.04 * eb, hy - 0.22 + 0.04 * eb], [hx + 0.08 - 0.05 * eb, hy - 0.26 + 0.03 * eb]].forEach(function (e, j) {
+      var er = (0.1 - 0.025 * curl) * (j ? 1 : 0.92);
+      ctx.beginPath(); ctx.arc(e[0], e[1], er, 0, TAU); ctx.fillStyle = FUR; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = o; ctx.stroke();
+      ctx.beginPath(); ctx.arc(e[0] + 0.01, e[1] + 0.01, er * 0.58, 0, TAU); ctx.fillStyle = PINK; ctx.fill();
+    });
+    // body + head as one fluffy shape
+    ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, 0, 0, TAU); ctx.moveTo(hx + hr, hy); ctx.arc(hx, hy, hr, 0, TAU);
+    ctx.lineWidth = o * 2; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = FUR; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = FUR2; ctx.beginPath(); ctx.ellipse(bx - 0.18, by - 0.2, 0.3, 0.12, -0.15, 0, TAU); ctx.fill();
+    ctx.fillStyle = CREAM;
+    ctx.beginPath(); ctx.ellipse(bx + 0.08, by + 0.27, 0.46, 0.2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx + 0.16, hy + 0.11, 0.18, 0.14, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.beginPath(); ctx.ellipse(hx - 0.04, hy - 0.16, 0.1, 0.05, -0.3, 0, TAU); ctx.fill();
+    ctx.restore();
+    // cheek pouches puff up when it stuffs food in
+    var ck = Math.min(1.35, ham.cheeks);
+    if (ck > 0.04) {
+      var cr = 0.06 + 0.11 * ck;
+      ctx.beginPath(); ctx.arc(hx + 0.24, hy + 0.13 + 0.02 * ck, cr * 0.75, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.lineWidth = o; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx + 0.03, hy + 0.13 + 0.03 * ck, cr, 0, TAU); ctx.fillStyle = CREAM; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx + 0.0, hy + 0.1, cr * 0.45, 0, TAU); ctx.fillStyle = "rgba(255,115,152,0.35)"; ctx.fill();
+    }
+    // face
+    var ek = p.eye === "open" && ham.blinkT > 0 ? "blink" : p.eye;
+    eye(hx + 0.03, hy - 0.06, 0.075, ek, o);
+    eye(hx + 0.19, hy - 0.075, 0.062, ek, o);
+    ctx.fillStyle = "rgba(255,115,152,0.45)";
+    ctx.beginPath(); ctx.ellipse(hx - 0.02, hy + 0.05, 0.06, 0.036, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx + 0.2, hy + 0.045, 0.045, 0.03, 0, 0, TAU); ctx.fill();
+    var nx = hx + 0.27, ny = hy + 0.02 + p.sniff * 0.012 * Math.sin(clock * 30);
+    ctx.beginPath(); ctx.ellipse(nx, ny, 0.04, 0.032, 0, 0, TAU); ctx.fillStyle = PINK2; ctx.fill(); ctx.lineWidth = o * 0.7; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = o * 0.75; ctx.strokeStyle = OUT;
+    if (p.yawn > 0.05) {
+      ctx.beginPath(); ctx.ellipse(hx + 0.23, hy + 0.12, 0.045, 0.02 + 0.05 * p.yawn, 0, 0, TAU); ctx.fillStyle = "#B8405E"; ctx.fill(); ctx.stroke();
+    } else if (p.chew > 0) {
+      var cm = Math.abs(Math.sin(clock * 14));
+      ctx.beginPath(); ctx.ellipse(hx + 0.24, hy + 0.1, 0.035, 0.01 + 0.025 * cm, 0, 0, TAU); ctx.fillStyle = "#B8405E"; ctx.fill(); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(nx, ny + 0.03); ctx.lineTo(nx, ny + 0.06);
+      ctx.moveTo(nx - 0.06, ny + 0.06); ctx.quadraticCurveTo(nx - 0.03, ny + 0.1, nx, ny + 0.06); ctx.quadraticCurveTo(nx + 0.03, ny + 0.1, nx + 0.055, ny + 0.055); ctx.stroke();
+    }
+    if (p.tongue > 0.05) {
+      ctx.beginPath(); ctx.ellipse(nx + 0.02, ny + 0.07 - 0.04 * p.tongue, 0.03, 0.02 + 0.03 * p.tongue, -0.4, 0, TAU); ctx.fillStyle = PINK2; ctx.fill(); ctx.lineWidth = o * 0.6; ctx.stroke();
+    }
+    // whiskers
+    var tw = p.sniff * 0.03 * Math.sin(clock * 26);
+    ctx.strokeStyle = "rgba(29,35,64,0.55)"; ctx.lineWidth = o * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(nx - 0.01, ny + 0.03); ctx.lineTo(nx + 0.21, ny - 0.04 + tw);
+    ctx.moveTo(nx - 0.01, ny + 0.04); ctx.lineTo(nx + 0.23, ny + 0.04);
+    ctx.moveTo(nx - 0.01, ny + 0.05); ctx.lineTo(nx + 0.2, ny + 0.12 - tw);
+    ctx.stroke();
+    // front paws when they are up (eating, drinking, washing, waving)
+    if (p.paws === "mouth") {
+      if (p.hold) drawSeed(p.hold, hx + 0.2, hy + 0.2, 0.08, 0.4, true);
+      paw(hx + 0.12, hy + 0.23, 0.06, o); paw(hx + 0.25, hy + 0.21, 0.055, o);
+    } else if (p.paws === "up") {
+      paw(hx + 0.1, hy + 0.27, 0.06, o); paw(hx + 0.24, hy + 0.24, 0.055, o);
+    } else if (p.paws === "rub") {
+      var ra = clock * 11;
+      paw(hx + 0.18 + 0.06 * Math.cos(ra), hy + 0.07 + 0.06 * Math.sin(ra), 0.06, o);
+      paw(hx + 0.28 + 0.05 * Math.cos(ra + 2), hy + 0.1 + 0.05 * Math.sin(ra + 2), 0.055, o);
+    } else if (p.paws === "wave") {
+      paw(hx + 0.1, hy + 0.28, 0.06, o);
+      var wx = hx - 0.12 + 0.12 * Math.sin(clock * 9), wy = hy - 0.36;
+      ctx.strokeStyle = OUT; ctx.lineWidth = 0.13; ctx.beginPath(); ctx.moveTo(bx + 0.12, by - 0.12); ctx.lineTo(wx, wy + 0.06); ctx.stroke();
+      ctx.strokeStyle = FUR; ctx.lineWidth = 0.13 - o * 2; ctx.stroke();
+      paw(wx, wy, 0.07, o);
+    }
+    ctx.restore();
+    if (feet) {
+      paw(-0.26 - 0.08 * s * a, -0.015 - lift1, 0.08, o);
+      if (p.paws === "down") paw(0.22 + 0.08 * s * a, -0.015 - lift2, 0.072, o);
+    }
+    ctx.restore();
+  }
+  // The middle of the hamster's body in stage px (for taps, hearts and the trail).
+  function hamCenter() {
+    var L = G.L, k = ham.where === "house" ? 0.94 : 1, lx = 0.05, ly = -(0.36 + 0.15 * ham.rearS) * k;
+    var c = Math.cos(ham.th), s = Math.sin(ham.th), wx = ham.f * L * lx, wy = L * ly;
+    return { x: ham.x + wx * c - wy * s, y: ham.y + wx * s + wy * c - P.lift * L };
+  }
+
+  // ---------- Behavior ----------
+  // The hamster does one "act" at a time (walk, hop, eat, sleep...). A tap builds a list of steps
+  // (get out of the wheel or the house, walk there, do the thing); anything new replaces the list.
+  var ACT = {};
+  function act(name, o) { o = o || {}; o.name = name; o.t = 0; ham.act = o; }
+  function run(steps) { ham.queue = steps.slice(); next(); }
+  function next() {
+    var fn = ham.queue.shift();
+    if (fn) { fn(); return; }
+    var was = ham.act && ham.act.name;
+    ham.mission = null;
+    if (was === "idle" && !ending) autonomy();
+    else act("idle", { dur: rand(2.4, 4.4) });
+  }
+  function face(dx, dy) {
+    if (Math.abs(dx) > Math.abs(dy) * 0.2 && Math.abs(dx) > 0.01) {
+      var nf = dx > 0 ? 1 : -1;
+      if (nf !== ham.f) { ham.f = nf; ham.turn = 1; }
+    }
+    if (Math.abs(dy) < 0.01) { ham.thT = 0; return; }
+    var al = Math.atan2(dy, dx);
+    ham.thT = angNorm(ham.f > 0 ? al : al - Math.PI);
+  }
+  function turnTo(f) { if (f && f !== ham.f) { ham.f = f; ham.turn = 1; } }
+  function pathTo(d) {
+    var pts = [];
+    if (G.tall && ham.lvl !== d.lvl) {
+      if (ham.lvl === "floor") pts.push({ x: G.tubeUpX, y: G.floorY, lvl: "floor" }, { x: G.tubeUpX, y: G.shelfTop, lvl: "shelf" });
+      else pts.push({ x: G.tubeDownX, y: G.shelfTop, lvl: "shelf" }, { x: G.tubeDownX, y: G.floorY, lvl: "floor" });
+    }
+    pts.push({ x: d.x, y: surfY(d.lvl), lvl: d.lvl });
+    return pts;
+  }
+  // The side of x the hamster will come from (-1: from the left).
+  function approach(lvl, x) {
+    if (G.tall && ham.lvl !== lvl) return 1;
+    return ham.x < x ? -1 : 1;
+  }
+  function walkTo(destFn, speed) {
+    return function () {
+      var d = destFn();
+      act("walk", { path: pathTo(d), i: 0, speed: speed, destFn: destFn, faceEnd: d.f });
+    };
+  }
+  function spotWheel(side) { return { lvl: G.wheel.lvl, x: clampX(G.wheel.lvl, G.wheel.x + side * 0.62 * G.wheel.R), f: -side }; }
+  function spotBowl(side) { return { lvl: "floor", x: clampX("floor", G.bowl.x + side * 0.98 * G.L), f: -side }; }
+  function spotWater(side) { var f = -side, n = localNose(DRINK_REAR); return { lvl: "floor", x: clampX("floor", G.bottle.tipX - f * n.x * G.L), f: f }; }
+  function spotBed() { return { lvl: "floor", x: clampX("floor", G.bed.x) }; }
+  function anchorOf(spotFn) { return function () { var s = spotFn(); return { x: s.x, y: surfY(s.lvl), f: s.f, lvl: s.lvl }; }; }
+
+  // Leaving the wheel or the house first. tx/tlvl: where it is heading next (for the hop-out side).
+  function leaveSteps(tx, tlvl) {
+    if (ham.where === "wheel") {
+      var side = (G.tall && tlvl && tlvl !== G.wheel.lvl) ? 1 : (tx === undefined ? 1 : sign(tx - G.wheel.x));
+      return [function () { hopOut(side); }];
+    }
+    if (ham.where === "house") {
+      var dir = tx === undefined ? 1 : sign(tx - G.bed.x);
+      var s = [];
+      if (ham.asleep) s.push(function () { act("wake", {}); });
+      s.push(function () { act("exitHouse", { dir: dir }); });
+      return s;
+    }
+    return [];
+  }
+  function hopIn() {
+    var w = G.wheel;
+    sHop();
+    act("hop", { x0: ham.x, y0: ham.y, x1: w.x, y1: w.y + w.Ri, h: 0.6 * w.R, dur: 0.62, where: "wheel", lvl: w.lvl });
+    turnTo(sign(w.x - ham.x));
+  }
+  function hopOut(side) {
+    var w = G.wheel, s = spotWheel(side);
+    sHop();
+    turnTo(side);
+    act("hop", { x0: ham.x, y0: ham.y, x1: s.x, y1: w.surf, h: 0.45 * w.R, dur: 0.62, where: "surf", lvl: w.lvl });
+  }
+
+  // Directed missions (taps). Each returns its list of steps.
+  function missionWheel(dur) {
+    var side;
+    return [
+      walkTo(function () { side = approach(G.wheel.lvl, G.wheel.x); return spotWheel(side); }, 2.4),
+      function () { hopIn(); },
+      function () { lastWheel = clock; act("wheel", { dur: dur || 10, v: 0, boost: 0 }); },
+      function () { hopOut(G.tall ? 1 : side); },
+      function () { act("happy", { dur: 1.6 }); }
+    ];
+  }
+  function missionFood() {
+    var side = -1;
+    return [
+      walkTo(function () { side = approach("floor", G.bowl.x); return spotBowl(side); }, 2.4),
+      function () {
+        var an = anchorOf(function () { return spotBowl(side); });
+        if (food < 0.04) act("hungry", { anchor: an, dur: 9 }); else act("eat", { anchor: an, dur: 4.4, eaten: 0, n: 0 });
+      }
+    ];
+  }
+  function missionWater() {
+    var side = -1;
+    return [
+      walkTo(function () { side = approach("floor", G.bottle.x); return spotWater(side); }, 2.4),
+      function () {
+        var an = anchorOf(function () { return spotWater(side); });
+        if (water < 0.04) act("thirsty", { anchor: an, dur: 9 }); else act("drink", { anchor: an, dur: 4.2, drunk: 0, n: 0.2 });
+      }
+    ];
+  }
+  function missionBed(dur) {
+    return [
+      walkTo(spotBed, 2.4),
+      function () { act("enterHouse", {}); },
+      function () { act("sleep", { dur: dur === undefined ? 40 : dur, z: 0.6, hum: 1.5 }); },
+      function () { act("wake", {}); },
+      function () { act("exitHouse", { dir: 1 }); }
+    ];
+  }
+  function nearestTreat() {
+    var best = null, bd = 1e9;
+    treats.forEach(function (t) {
+      if (t.gone || t.claimed) return;
+      var d = Math.abs(treatX(t) - ham.x) + (t.lvl !== ham.lvl ? 3 * G.L : 0);
+      if (d < bd) { bd = d; best = t; }
+    });
+    return best;
+  }
+  function missionTreat() {
+    var t = nearestTreat();
+    if (!t) return [function () { act("happy", { dur: 1.6 }); }];
+    var side = -1;
+    function spot() { return { lvl: t.lvl, x: clampX(t.lvl, treatX(t) + side * 0.55 * G.L), f: -side }; }
+    return [
+      walkTo(function () { side = approach(t.lvl, treatX(t)); return spot(); }, 3.0),
+      function () { t.claimed = true; act("treatEat", { treat: t, anchor: anchorOf(spot), dur: 1.9 }); },
+      function () { ham.queue = missionTreat(); next(); }
+    ];
+  }
+  function missionPet() { return [function () { act("happy", { dur: 2.2, hearts: true }); }]; }
+  function missionSpot(lvl, x) {
+    return [walkTo(function () { return { lvl: lvl, x: clampX(lvl, x) }; }, 2.2), function () { act("sniff", { dur: 1.8 }); }];
+  }
+
+  // A tap: get out of whatever it is doing, turn toward the target at once, and go.
+  var lastWheel = -100;
+  function command(name, steps, tx, tlvl) {
+    if (ending) return;
+    if (ham.act && ham.act.name === "hop") { ham.pending = [name, steps, tx, tlvl]; return; }
+    ham.mission = name;
+    if (ham.where === "surf" && tx !== undefined && (!G.tall || tlvl === ham.lvl) && Math.abs(tx - ham.x) > 0.2 * G.L) turnTo(sign(tx - ham.x));
+    if (ham.where === "surf" && tx !== undefined && G.tall && tlvl && tlvl !== ham.lvl) turnTo(1);
+    run(leaveSteps(tx, tlvl).concat(steps));
+    if (tx !== undefined) showTrail(tx, tlvl);
+  }
+
+  // ---------- Acts ----------
+  ACT.idle = function (a, dt) {
+    P.sy = 1 + 0.018 * Math.sin(clock * 3);
+    if (a.t > 1.2 && a.t < 1.9) P.sniff = 1;
+    return a.t >= a.dur;
+  };
+  ACT.walk = function (a, dt) {
+    var sp = a.speed * G.L, left = sp * dt;
+    while (left > 0 && a.i < a.path.length) {
+      var q = a.path[a.i], dx = q.x - ham.x, dy = q.y - ham.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 0.5) face(dx, dy);
+      if (d <= left) { ham.x = q.x; ham.y = q.y; ham.lvl = q.lvl; a.i++; left -= d; }
+      else { ham.x += dx / d * left; ham.y += dy / d * left; left = 0; }
+    }
+    P.legAmp = 1; ham.legPh += dt * a.speed * 6.5;
+    var bs = Math.abs(Math.sin(ham.legPh));
+    P.bob = -bs * 0.03; P.lift = bs * 0.035;
+    if (a.speed > 2.9) { P.zoom = 1; P.ears = 1; }
+    if (a.push) a.push(dt);
+    if (a.i >= a.path.length) { ham.thT = 0; if (a.faceEnd) turnTo(a.faceEnd); return true; }
+    return false;
+  };
+  ACT.hop = function (a) {
+    var u = Math.min(1, a.t / a.dur);
+    ham.x = lerp(a.x0, a.x1, u); ham.y = lerp(a.y0, a.y1, u) - Math.sin(Math.PI * u) * a.h;
+    if (u >= 0.5 && !a.sw) { a.sw = true; ham.where = a.where; ham.lvl = a.lvl; }
+    P.sy = 1 + 0.12 * Math.sin(Math.PI * u); P.sx = 1 - 0.08 * Math.sin(Math.PI * u); P.ears = 0.6;
+    ham.thT = 0;
+    if (u >= 1) { ham.squash = 1; puff(ham.x, ham.y); return true; }
+    return false;
+  };
+  ACT.wheel = function (a, dt) {
+    var w = G.wheel;
+    ham.where = "wheel"; ham.x = w.x; ham.y = w.y + w.Ri; ham.thT = 0;
+    a.boost -= dt;
+    var tgt = a.t > a.dur - 1.4 ? 2.5 : (a.boost > 0 ? 10 : 6.2);
+    a.v += (tgt - a.v) * Math.min(1, dt * 1.5);
+    wheel.w = ham.f * a.v * G.L / w.Ri; wheel.driven = true;
+    ham.legPh += dt * a.v * 5.5;
+    P.legAmp = 1.15; P.bob = -Math.abs(Math.sin(ham.legPh)) * 0.04; P.ears = clamp(a.v / 6, 0, 1);
+    P.zoom = a.v > 7.5 ? (a.v - 7.5) / 2.5 : 0;
+    P.eye = a.v > 8 ? "happy" : "open";
+    if (a.v > 8 && Math.random() < dt * 2.5) spawn("spark", w.x - ham.f * 0.5 * G.L + rand(-0.2, 0.2) * G.L, ham.y - rand(0.3, 0.8) * G.L, { life: 0.7 });
+    return a.t >= a.dur;
+  };
+  ACT.eat = function (a, dt) {
+    P.rear = 0.32; P.paws = "mouth"; P.chew = 1; P.hold = "sun"; P.eye = (a.t % 2.4) > 1.6 ? "happy" : "open";
+    if (a.eaten < 0.34 && food > 0) { var d = Math.min(food, dt * 0.34 / (a.dur - 0.4)); food -= d; a.eaten += d; dirty = true; }
+    ham.cheeks = Math.min(1, ham.cheeks + dt * 0.24);
+    a.n -= dt;
+    if (a.n <= 0) { a.n = 0.32; sNibble(); spawn("crumb", ham.x + ham.f * 0.45 * G.L, ham.y - 0.45 * G.L, { vx: ham.f * rand(-0.5, 0.5) * G.L, vy: -rand(0.3, 0.8) * G.L, life: 0.7 }); }
+    if (food <= 0) { food = 0; if (a.t > 1) return true; }
+    return a.t >= a.dur;
+  };
+  ACT.hungry = function (a, dt) {
+    // An empty bowl: it sniffs it, then looks over at the food bag (no sadness, just waiting).
+    if (a.t < 1.8) { P.sniff = 1; P.rear = -0.06; }
+    else {
+      var bf = sign(G.bag.x - ham.x);
+      if (!a.turned) { a.turned = true; turnTo(bf); }
+      ham.f = bf;
+      P.rear = 0.45 + 0.05 * Math.sin(clock * 2); P.sniff = (a.t % 2) < 0.8 ? 1 : 0;
+    }
+    return a.t >= a.dur;
+  };
+  ACT.drink = function (a, dt) {
+    P.rear = DRINK_REAR; P.paws = "up";
+    var lick = (a.t % 0.45) / 0.45;
+    P.tongue = a.t > 0.4 ? Math.sin(lick * Math.PI) : 0;
+    if (a.t > 0.4) {
+      a.n -= dt;
+      if (a.n <= 0 && water > 0.01) {
+        a.n = 0.45; sBlip();
+        bubbles.push({ u: rand(-0.12, 0.12), h: 0.1, r: rand(0.035, 0.06), v: rand(0.5, 0.8) });
+      }
+      if (a.drunk < 0.34 && water > 0) { var d = Math.min(water, dt * 0.34 / (a.dur - 0.5)); water -= d; a.drunk += d; dirty = true; }
+    }
+    if (water <= 0) { water = 0; if (a.t > 1) return true; }
+    return a.t >= a.dur;
+  };
+  ACT.thirsty = function (a) {
+    P.rear = DRINK_REAR; P.paws = "up"; P.sniff = 1;
+    if (a.t > 1.8) P.rear = DRINK_REAR + 0.08 * Math.sin(clock * 2);
+    return a.t >= a.dur;
+  };
+  ACT.enterHouse = function (a) {
+    var u = Math.min(1, a.t / 0.8);
+    ham.x = G.bed.x; ham.y = G.floorY;
+    P.lift = Math.sin(Math.PI * Math.min(1, u * 1.6)) * 0.15;
+    if (u > 0.3) ham.where = "house";
+    P.k = 1 - 0.06 * u; P.legAmp = 1 - u; ham.legPh += 0.2;
+    ham.lvl = "floor";
+    return u >= 1;
+  };
+  ACT.sleep = function (a, dt) {
+    ham.where = "house"; ham.x = G.bed.x; ham.y = G.floorY - 0.02 * G.L; ham.lvl = "floor";
+    ham.asleep = true;
+    P.curl = 1; P.eye = "closed"; P.paws = "tuck"; P.k = 0.94; P.sy = 1 + 0.035 * Math.sin(clock * 2.1); P.sx = 1 - 0.015 * Math.sin(clock * 2.1);
+    ham.cheeks = Math.max(0, ham.cheeks - dt * 0.3);
+    a.z -= dt;
+    if (a.z <= 0) { a.z = 1.9; spawn("z", G.bed.x + 0.25 * G.L, G.floorY - 0.85 * G.L, { vx: 0.25 * G.L, vy: -0.45 * G.L, life: 2.6 }); }
+    a.hum -= dt;
+    if (a.hum <= 0) { a.hum = 3.4; sHum(); }
+    if (a.onAsleep && !a.told && a.t > 1.4) { a.told = true; a.onAsleep(); }
+    return !!a.dur && a.t >= a.dur;
+  };
+  ACT.wake = function (a) {
+    ham.where = "house"; ham.x = G.bed.x; ham.y = G.floorY; ham.asleep = false;
+    if (!a.snd) { a.snd = true; sSqueak(); }
+    var t = a.t;
+    if (t < 0.9) { P.curl = 1 - t / 0.9; P.eye = "closed"; P.sx = 1 + 0.16 * Math.sin(Math.PI * t / 0.9); P.sy = 1 - 0.1 * Math.sin(Math.PI * t / 0.9); P.paws = "down"; }
+    else { P.rear = 0.3; P.yawn = Math.sin(Math.PI * clamp((t - 0.9) / 1.0, 0, 1)); P.eye = P.yawn > 0.3 ? "closed" : "open"; P.paws = "mouth"; if (!a.y && t > 1) { a.y = true; sYawn(); } }
+    P.k = 0.94;
+    return t >= 2.0;
+  };
+  ACT.exitHouse = function (a, dt) {
+    var u = Math.min(1, a.t / 0.7);
+    if (!a.f) { a.f = true; turnTo(a.dir || 1); }
+    ham.x = G.bed.x + (a.dir || 1) * 0.85 * G.L * u; ham.y = G.floorY; ham.lvl = "floor";
+    ham.x = clampX("floor", ham.x);
+    if (u > 0.3) ham.where = "surf";
+    P.legAmp = 1; ham.legPh += dt * 14; P.k = 0.94 + 0.06 * u;
+    return u >= 1;
+  };
+  ACT.happy = function (a, dt) {
+    var u = a.t / a.dur;
+    if (!a.snd) { a.snd = true; sSqueak(); a.h = 0; }
+    P.wig = Math.sin(a.t * 15) * 0.1 * (1 - u); P.lift = a.t < 1.0 ? Math.abs(Math.sin(a.t * 8)) * 0.12 : 0;
+    P.eye = "happy"; P.rear = 0.12;
+    a.h -= dt;
+    if (a.h <= 0) { a.h = 0.32; heart(); }
+    return a.t >= a.dur;
+  };
+  ACT.groom = function (a) { P.rear = 0.55; P.paws = "rub"; P.eye = "happy"; return a.t >= a.dur; };
+  ACT.sniff = function (a) { P.sniff = 1; P.rear = (a.t % 1.6) < 0.8 ? -0.05 : 0.2; return a.t >= a.dur; };
+  ACT.treatEat = function (a, dt) {
+    var t = a.treat;
+    if (!t.landed) { P.rear = 0.3; P.sniff = 1; a.t = Math.min(a.t, 0.01); return false; }
+    P.rear = 0.32; P.paws = "mouth"; P.chew = 1;
+    if (a.t < 0.6) P.hold = t.kind === "berry" ? "pea" : t.kind === "carrot" ? "carrot" : "sun";
+    if (a.t > 0.25 && !t.gone) { t.gone = true; sTreat(); dirty = true; }
+    if (a.t > 0.6) { ham.cheeks = Math.min(1.35, ham.cheeks + dt * 1.4); P.eye = "happy"; }
+    if (a.t > 0.9 && !a.hh) { a.hh = true; heart(); heart(); }
+    return a.t >= a.dur;
+  };
+  ACT.flip = function (a) {
+    var t = a.t;
+    if (t < 0.3) { P.sy = 1 - 0.15 * Math.sin(Math.PI * t / 0.3); P.sx = 1 + 0.1 * Math.sin(Math.PI * t / 0.3); }
+    else if (t < 1.3) {
+      var u = (t - 0.3) / 1.0;
+      if (!a.snd) { a.snd = true; sBoing(); }
+      P.lift = Math.sin(Math.PI * u) * 1.0; P.rot = TAU * ease(u); P.ears = 1; P.eye = "happy";
+    } else if (!a.land) { a.land = true; ham.squash = 1; puff(ham.x, ham.y); spawn("spark", ham.x, ham.y - 0.9 * G.L, { life: 0.8 }); }
+    return t >= 1.5;
+  };
+  ACT.wave = function (a, dt) {
+    P.rear = 1.0; P.paws = "wave"; P.eye = (a.t % 1.4) < 0.9 ? "happy" : "open";
+    if (!a.snd) { a.snd = true; sSqueak(); a.h = 0.4; }
+    a.h -= dt;
+    if (a.h <= 0) { a.h = 0.6; heart(); }
+    return a.t >= a.dur;
+  };
+  ACT.yawn = function (a) {
+    if (!a.snd) { a.snd = true; sYawn(); }
+    P.rear = 0.25; P.yawn = Math.sin(Math.PI * clamp(a.t / 1.6, 0, 1)); P.eye = "closed"; P.paws = "mouth";
+    return a.t >= 1.8;
+  };
+
+  // The hamster's own little life when nobody taps: wander, sniff, wash its face, sometimes a run.
+  function autonomy() {
+    ham.mission = "auto";
+    var r = Math.random();
+    if (clock > 25 && clock - lastWheel > 22 && r < 0.25) { run(missionWheel(6.5)); return; }
+    if (r < 0.6) {
+      var lvl = ham.lvl;
+      if (G.tall && Math.random() < 0.25) lvl = lvl === "floor" ? "shelf" : "floor";
+      var rg = rangeOf(lvl), x = rand(rg[0], rg[1]);
+      if (lvl === ham.lvl && Math.abs(x - ham.x) < 1.2 * G.L) x = clamp(ham.x + (ham.x - rg[0] > rg[1] - ham.x ? -1.8 : 1.8) * G.L, rg[0], rg[1]);
+      var steps = [walkTo(function () { return { lvl: lvl, x: x }; }, 1.6)];
+      if (Math.random() < 0.5) steps.push(function () { act("sniff", { dur: 1.6 }); });
+      run(steps);
+      return;
+    }
+    if (r < 0.8) act("groom", { dur: 2.8 });
+    else act("sniff", { dur: 1.8 });
+  }
+
+  // ---------- Particles ----------
+  function spawn(kind, x, y, o) {
+    o = o || {};
+    var q = { kind: kind, x: x, y: y, vx: o.vx || 0, vy: o.vy || 0, t: 0, life: o.life || 1, rot: o.rot || rand(0, TAU), k: o.k, s: o.s || 1, land: o.land, ty: o.ty };
+    parts.push(q);
+    if (parts.length > 160) parts.shift();
+    return q;
+  }
+  function heart() { var c = hamCenter(); spawn("heart", c.x + rand(-0.3, 0.3) * G.L, c.y - 0.3 * G.L, { vx: rand(-0.2, 0.2) * G.L, vy: -0.55 * G.L, life: 1.8, s: rand(0.8, 1.15) }); }
+  function puff(x, y) { for (var i = 0; i < 4; i++) spawn("puff", x + rand(-0.3, 0.3) * G.L, y - 0.05 * G.L, { vx: rand(-0.4, 0.4) * G.L, vy: -rand(0.05, 0.25) * G.L, life: 0.6 }); }
+  function updateParts(dt) {
+    var L = G.L;
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i];
+      q.t += dt;
+      if (q.kind === "seed") {
+        q.vy += 7 * L * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += dt * 8;
+        if (q.vy > 0 && q.y >= q.ty) { parts.splice(i, 1); if (q.land) q.land(); continue; }
+      } else if (q.kind === "drop" || q.kind === "crumb") {
+        q.vy += 6 * L * dt; q.x += q.vx * dt; q.y += q.vy * dt;
+      } else if (q.kind === "heart" || q.kind === "z") {
+        q.x += (q.vx + Math.sin(q.t * 3 + q.rot) * 0.15 * L) * dt; q.y += q.vy * dt;
+      } else { q.x += q.vx * dt; q.y += q.vy * dt; }
+      if (q.t >= q.life) parts.splice(i, 1);
+    }
+    for (var j = bubbles.length - 1; j >= 0; j--) {
+      var bq = bubbles[j]; bq.h += bq.v * dt; bq.u += Math.sin(clock * 6 + j) * 0.02 * dt;
+      var top = (G.bottle.bodyB - G.bottle.bodyT) / L * 0.94 * water;
+      if (bq.h > top) bubbles.splice(j, 1);
+    }
+  }
+  function drawParts() {
+    var L = G.L;
+    parts.forEach(function (q) {
+      var u = q.t / q.life, a = u > 0.7 ? (1 - u) / 0.3 : 1;
+      if (q.kind === "heart") drawHeart(q.x, q.y, 0.36 * L * q.s * (0.6 + 0.4 * Math.min(1, q.t * 4)), a);
+      else if (q.kind === "z") {
+        ctx.save(); ctx.globalAlpha = a; ctx.font = "800 " + Math.round(L * (0.3 + 0.2 * u)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+        ctx.lineWidth = G.lw * 1.2; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.strokeText("z", q.x, q.y); ctx.fillStyle = "#FFFFFF"; ctx.fillText("z", q.x, q.y); ctx.restore();
+      } else if (q.kind === "spark") drawStar(q.x, q.y, 0.16 * L * Math.sin(Math.PI * u), 1);
+      else if (q.kind === "puff") { ctx.save(); ctx.globalAlpha = 0.8 * (1 - u); ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(q.x, q.y, (0.06 + 0.12 * u) * L, 0, TAU); ctx.fill(); ctx.restore(); }
+      else if (q.kind === "seed" || q.kind === "crumb") { ctx.save(); ctx.globalAlpha = a; drawSeed(q.k || "sun", q.x, q.y, 0.08 * L, q.rot); ctx.restore(); }
+      else if (q.kind === "drop") { ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = "#5BBDF6"; ctx.strokeStyle = OUT; ctx.lineWidth = Math.max(1, G.lw * 0.4); ctx.beginPath(); ctx.arc(q.x, q.y, 0.05 * L, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    });
+  }
+  // A dotted trail from the hamster to where it is going, and a twinkle on the target.
+  function showTrail(tx, tlvl) {
+    var c = hamCenter(), lvl = tlvl || ham.lvl, ty = surfY(lvl) - 0.3 * G.L;
+    var pts = [{ x: c.x, y: ham.where === "surf" ? ham.y - 0.3 * G.L : c.y }];
+    if (G.tall && lvl !== ham.lvl && ham.where !== "wheel") {
+      var x = ham.lvl === "floor" ? G.tubeUpX - 0.27 * G.L : G.tubeDownX;
+      pts.push({ x: x, y: surfY(ham.lvl) - 0.3 * G.L }, { x: x, y: surfY(lvl) - 0.3 * G.L });
+    }
+    pts.push({ x: tx, y: ty });
+    trail = { pts: pts, t: 0 };
+  }
+  function drawTrail() {
+    if (!trail) return;
+    var L = G.L, u = trail.t / 1.8;
+    if (u >= 1) { trail = null; return; }
+    var a = u < 0.15 ? u / 0.15 : (u > 0.6 ? (1 - u) / 0.4 : 1), pts = trail.pts, gap = 0.3 * L, off = (trail.t * 1.2 * L) % gap;
+    ctx.save(); ctx.globalAlpha = a;
+    var segs = [], tot = 0, i;
+    for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); segs.push(l); tot += l; }
+    for (var d = off; d < tot - 0.2 * L; d += gap) {
+      var dd = d, k = 0;
+      while (k < segs.length - 1 && dd > segs[k]) { dd -= segs[k]; k++; }
+      var f = segs[k] ? dd / segs[k] : 0, x = lerp(pts[k].x, pts[k + 1].x, f), y = lerp(pts[k].y, pts[k + 1].y, f);
+      ctx.beginPath(); ctx.arc(x, y, 0.06 * L, 0, TAU); ctx.fillStyle = "#FFD23F"; ctx.fill(); ctx.lineWidth = Math.max(1, G.lw * 0.5); ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    var e = pts[pts.length - 1];
+    drawStar(e.x, e.y - 0.1 * L, 0.22 * L * (0.8 + 0.25 * Math.sin(trail.t * 9)), 1);
+    ctx.restore();
+  }
+
+  // ---------- Care: fill the bowl from the bag, fill the bottle from a jug ----------
+  function refillFood() {
+    if (pour || ending) return;
+    tried.bag = true; items.bag.b = 1;
+    pour = { t: 0, n: 22, spawned: 0, landed: 0, f0: food, dir: sign(G.bowl.x - G.bag.x) };
+  }
+  function updatePour(dt) {
+    if (!pour) return;
+    pour.t += dt;
+    var L = G.L;
+    while (pour.spawned < pour.n && pour.t > 0.25 + pour.spawned * (1.15 / pour.n)) {
+      pour.spawned++;
+      var sx = G.bag.x + pour.dir * 0.32 * L, sy = G.bag.y + 0.15 * L, tx = G.bowl.x + rand(-0.32, 0.32) * L, ty = G.floorY - 0.4 * L, T = rand(0.8, 1.0), g = 7 * L;
+      var kinds = ["sun", "sun", "pellet", "corn", "carrot", "pea"];
+      spawn("seed", sx, sy, { vx: (tx - sx) / T, vy: (ty - sy - 0.5 * g * T * T) / T, ty: ty, k: kinds[pour.spawned % kinds.length], life: 3,
+        land: function () { pour && pour.landed++; food = Math.min(1, food + (1 - (pour ? pour.f0 : 0)) / 22); dirty = true; items.bowl.b = Math.max(items.bowl.b, 0.4); if (Math.random() < 0.5) sPing(); } });
+      if (pour.spawned % 3 === 0) sTick(0.012);
+    }
+    if (pour.t > 2.6) {
+      pour = null; food = 1; dirty = true; items.bowl.b = 1;
+      var a = ham.act && ham.act.name;
+      if (a === "hungry") run(missionFood());
+      else if (!ending && (ham.mission === "auto" || !ham.mission) && ham.where === "surf" && a !== "walk") command("food", missionFood(), G.bowl.x, "floor");
+    }
+  }
+  function refillWater() {
+    if (jug || ending) return;
+    tried.fill = true; items.bottle.b = 1;
+    jug = { t: 0, w0: water };
+    sWater();
+  }
+  function updateJug(dt) {
+    if (!jug) return;
+    jug.t += dt;
+    if (jug.t > 0.5 && jug.t < 1.8) {
+      water = Math.max(water, lerp(jug.w0, 1, clamp((jug.t - 0.5) / 1.25, 0, 1))); dirty = true;
+      if (Math.random() < dt * 10) spawn("drop", G.bottle.x + rand(-0.15, 0.15) * G.L, G.bottle.bodyT + 0.2 * G.L, { vx: rand(-0.6, 0.6) * G.L, vy: -rand(0.6, 1.2) * G.L, life: 0.5 });
+    }
+    if (jug.t > 2.4) {
+      jug = null; water = 1; dirty = true; items.bottle.b = 1;
+      if (ham.act && ham.act.name === "thirsty") run(missionWater());
+    }
+  }
+
+  // ---------- Treats, the ball, Surprise ----------
+  var treatId = 0;
+  function dropTreat() {
+    if (ending) return;
+    tried.treat = true;
+    var live = treats.filter(function (t) { return !t.gone; });
+    if (live.length >= 6) { items.bowl.b = 0.3; return; }
+    var kind = TREATS[treatIdx % TREATS.length]; treatIdx++;
+    drawTreatPic();
+    var btn = $("treatBtn"); btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop");
+    var u, tries = 0;
+    do {
+      u = rand(0.05, 0.95); tries++;
+    } while (tries < 12 && (Math.abs(uToX("floor", u) - ham.x) < 1.4 * G.L || live.some(function (t) { return Math.abs(treatX(t) - uToX("floor", u)) < 0.6 * G.L; })));
+    var drop = (G.floorY - G.topY) / G.L - 0.5;
+    if (G.tall) drop = Math.min(drop, (G.floorY - G.shelfTop) / G.L - 0.6);
+    var t = { id: treatId++, kind: kind, lvl: "floor", u: u, h: drop, vh: 0, landed: false, rot: rand(-0.3, 0.3), gone: false, claimed: false };
+    treats.push(t);
+    sDrop();
+    spawn("spark", uToX("floor", u), G.floorY - drop * G.L, { life: 0.7 });
+    var a = ham.mission;
+    if (a !== "treat") command("treat", missionTreat(), treatX(t), "floor");
+  }
+  function updateTreats(dt) {
+    for (var i = treats.length - 1; i >= 0; i--) {
+      var t = treats[i];
+      if (t.gone) { treats.splice(i, 1); continue; }
+      if (t.landed) continue;
+      t.vh -= 9 * dt; t.h += t.vh * dt;
+      if (t.h <= 0) {
+        t.h = 0;
+        if (t.vh < -1.5) { t.vh = -t.vh * 0.32; sLand(); } else { t.vh = 0; t.landed = true; }
+      }
+    }
+    if (ball) {
+      if (ball.h > 0 || ball.vh > 0) { ball.vh -= 9 * dt; ball.h += ball.vh * dt; if (ball.h <= 0) { ball.h = 0; ball.vh = ball.vh < -1.2 ? -ball.vh * 0.4 : 0; } }
+      if (ball.v) {
+        var r = rangeOf("floor"), x = uToX("floor", ball.u) + ball.v * G.L * dt;
+        if (x < r[0] || x > r[1]) { ball.v = -ball.v * 0.5; x = clamp(x, r[0], r[1]); }
+        ball.u = xToU("floor", x); ball.rot += ball.v * dt / 0.27; ball.v *= Math.exp(-dt * 1.6);
+        if (Math.abs(ball.v) < 0.03) ball.v = 0;
+      }
+    }
+  }
+  function missionBall() {
+    var dir = 1, bx;
+    if (!ball) {
+      var r = rangeOf("floor"), hx = ham.lvl === "floor" && ham.where !== "wheel" ? ham.x : (r[0] + r[1]) / 2;
+      dir = (r[1] - hx > hx - r[0]) ? 1 : -1;
+      bx = clamp(hx + dir * 1.4 * G.L, r[0] + 0.5 * G.L, r[1] - 0.5 * G.L);
+      ball = { u: xToU("floor", bx), h: (G.floorY - G.topY) / G.L * (G.tall ? 0.3 : 0.6), vh: 0, rot: 0, v: 0 };
+      if (G.tall) ball.h = Math.min(ball.h, (G.floorY - G.shelfTop) / G.L - 0.8);
+    }
+    function behind() {
+      var r = rangeOf("floor"), x = uToX("floor", ball.u);
+      dir = (r[1] - x > x - r[0]) ? 1 : -1;
+      return { lvl: "floor", x: clampX("floor", x - dir * 0.75 * G.L), f: dir };
+    }
+    return [
+      walkTo(behind, 2.4),
+      function () {
+        var r = rangeOf("floor"), x0 = uToX("floor", ball.u), x1 = clamp(x0 + dir * 2.6 * G.L, r[0] + 0.3 * G.L, r[1] - 0.3 * G.L);
+        turnTo(dir);
+        act("walk", { path: [{ x: clampX("floor", x1 - dir * 0.75 * G.L), y: G.floorY, lvl: "floor" }], i: 0, speed: 1.5, faceEnd: dir,
+          push: function () { var bx2 = ham.x + dir * 0.75 * G.L; ball.u = xToU("floor", bx2); ball.rot += dir * 1.5 * 0.016 / 0.27 * 6; } });
+      },
+      function () { ball.v = dir * 1.6; act("happy", { dur: 1.8 }); }
+    ];
+  }
+  function missionTunnel() {
+    var L = G.L;
+    if (!G.tall) {
+      var e0 = clampX("floor", G.tube.x0 - 0.6 * L), e1 = clampX("floor", G.tube.x1 + 0.6 * L);
+      var near = Math.abs(ham.x - e0) < Math.abs(ham.x - e1) ? e0 : e1, far = near === e0 ? e1 : e0;
+      return [walkTo(function () { return { lvl: "floor", x: near }; }, 2.6), walkTo(function () { return { lvl: "floor", x: far }; }, 3.6),
+        walkTo(function () { return { lvl: "floor", x: near }; }, 3.6), function () { act("happy", { dur: 1.6 }); }];
+    }
+    var upFirst = ham.lvl === "floor" || ham.where === "house";
+    var a = upFirst ? { lvl: "shelf", x: G.shelfMax - 0.2 * L } : { lvl: "floor", x: G.floorMax - 0.3 * L };
+    var b = upFirst ? { lvl: "floor", x: G.floorMax - 0.6 * L } : { lvl: "shelf", x: G.shelfMax - 0.6 * L };
+    return [walkTo(function () { return a; }, 3.6), walkTo(function () { return b; }, 3.6), function () { act("happy", { dur: 1.6 }); }];
+  }
+  var SURPRISES = ["flip", "tunnel", "ball", "wave"], lastSurprise = "";
+  function surprise() {
+    if (ending) return;
+    var opts = SURPRISES.filter(function (s) { return s !== lastSurprise; });
+    var pick = opts[Math.floor(Math.random() * opts.length)];
+    lastSurprise = pick;
+    var c = hamCenter();
+    spawn("spark", c.x, c.y - 0.6 * G.L, { life: 0.8 });
+    if (pick === "flip") command("surprise", [function () { act("flip", {}); }, function () { act("happy", { dur: 1.4 }); }]);
+    else if (pick === "wave") command("surprise", [function () { act("wave", { dur: 2.8 }); }]);
+    else if (pick === "tunnel") command("surprise", missionTunnel(), G.tall ? G.tubeX - 0.6 * G.L : (G.tube.x0 + G.tube.x1) / 2, G.tall ? (ham.lvl === "floor" ? "shelf" : "floor") : "floor");
+    else { var steps = missionBall(); command("surprise", steps, uToX("floor", ball.u), "floor"); }
+  }
+
+  // ---------- Taps ----------
+  var tried = { wheel: false, food: false, water: false, bed: false, pet: false, treat: false, bag: false, fill: false };
+  function inRect(x, y, x0, y0, x1, y1) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
+  function hitTest(x, y) {
+    var L = G.L, c = hamCenter(), pad = 0.2 * L;
+    if (Math.hypot(x - c.x, y - c.y) < 0.62 * L && ham.where !== "house") return "pet";
+    var g = G.bag;
+    if (inRect(x, y, g.x - 0.55 * L, g.y - 0.2 * L, g.x + 0.55 * L, g.y + 1.15 * L)) return "bag";
+    var b = G.bottle;
+    if (inRect(x, y, b.x - 0.42 * L, b.bodyT - 0.3 * L, b.x + 0.42 * L, b.tipY + 0.15 * L)) return "bottle";
+    if (inRect(x, y, G.bowl.x - 0.58 * L - pad, G.floorY - 0.75 * L, G.bowl.x + 0.58 * L + pad, G.floorY + 0.3 * L)) return "bowl";
+    var h = houseGeom();
+    if (inRect(x, y, h.x - 0.98 * L, h.top - 0.65 * L, h.x + 0.98 * L, G.floorY + 0.3 * L)) return "bed";
+    var w = G.wheel;
+    if (Math.hypot(x - w.x, y - w.y) < w.R * 1.08 || inRect(x, y, w.x - 0.9 * w.R, w.y, w.x + 0.9 * w.R, w.surf + 0.2 * L)) return "wheel";
+    for (var i = 0; i < treats.length; i++) {
+      var t = treats[i];
+      if (!t.gone && Math.hypot(x - treatX(t), y - (surfY(t.lvl) - t.h * L - 0.2 * L)) < 0.5 * L) return "treat";
+    }
+    if (ball && Math.hypot(x - uToX("floor", ball.u), y - (G.floorY - 0.27 * L)) < 0.55 * L) return "ball";
+    return "spot";
+  }
+  function tap(x, y) {
+    if (!G || ending || (window.Toybox && Toybox.timer.locked())) return;
+    var what = hitTest(x, y), L = G.L;
+    if (what === "pet") {
+      tried.pet = true;
+      if (ham.act && ham.act.name === "happy") { ham.act.dur = Math.max(ham.act.dur, ham.act.t + 1.2); heart(); sSqueak(); return; }
+      if (ham.where === "wheel") { command("pet", missionPet(), G.wheel.x + (G.tall ? 1 : -1) * G.wheel.R, G.wheel.lvl); return; }
+      command("pet", missionPet());
+      return;
+    }
+    if (what === "bag") { refillFood(); return; }
+    if (what === "bottle") {
+      tried.water = true;
+      if (water < 0.3) refillWater();
+      items.bottle.b = 1; sBlip();
+      if (ham.mission === "water" && ham.act && (ham.act.name === "drink" || ham.act.name === "walk")) return;
+      command("water", missionWater(), G.bottle.x, "floor");
+      return;
+    }
+    if (what === "bowl") {
+      tried.food = true; items.bowl.b = 1; sTap();
+      if (ham.mission === "food" && ham.act && ham.act.name === "eat") { ham.act.dur = Math.max(ham.act.dur, ham.act.t + 2); return; }
+      command("food", missionFood(), G.bowl.x, "floor");
+      return;
+    }
+    if (what === "bed") {
+      tried.bed = true; items.bed.b = 1; sTap();
+      if (ham.where === "house" && ham.asleep) { command("wake", [function () { act("happy", { dur: 1.6 }); }], G.bed.x + L, "floor"); return; }
+      if (ham.mission === "bed") return;
+      command("bed", missionBed(), G.bed.x, "floor");
+      return;
+    }
+    if (what === "wheel") {
+      tried.wheel = true; items.wheel.b = 1; sTap();
+      ghost.learned();
+      if (ham.where === "wheel" && ham.act && ham.act.name === "wheel") {
+        ham.act.boost = 3; ham.act.dur = Math.max(ham.act.dur, ham.act.t + 6); ham.mission = "wheel";
+        for (var i = 0; i < 3; i++) spawn("spark", G.wheel.x + rand(-1, 1) * G.wheel.R, G.wheel.y + rand(-1, 1) * G.wheel.R, { life: 0.7 });
+        return;
+      }
+      if (ham.mission === "wheel") return;
+      command("wheel", missionWheel(10), G.wheel.x, G.wheel.lvl);
+      return;
+    }
+    if (what === "treat") { if (ham.mission !== "treat") command("treat", missionTreat(), x, "floor"); return; }
+    if (what === "ball") { command("surprise", missionBall(), x, "floor"); return; }
+    // empty space: walk over there and sniff around
+    var lvl = (G.tall && y < G.shelfTop + 0.4 * L) ? "shelf" : "floor";
+    spawn("spark", x, y, { life: 0.6 });
+    command("spot", missionSpot(lvl, x), clampX(lvl, x), lvl);
+  }
+  var ptrs = {};
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    ptrs[e.pointerId] = { x: x, y: y, last: 0 };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    tap(x, y);
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var p = ptrs[e.pointerId];
+    if (!p || !G || ending) return;
+    var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, c = hamCenter();
+    var moved = Math.hypot(x - p.x, y - p.y);
+    if (moved > 0.15 * G.L && Math.hypot(x - c.x, y - c.y) < 0.75 * G.L && ham.where !== "house") {
+      p.x = x; p.y = y;
+      if (clock - p.last > 0.22) { p.last = clock; heart(); tried.pet = true; }
+      if (ham.act && ham.act.name === "happy") ham.act.dur = Math.max(ham.act.dur, ham.act.t + 0.8);
+    }
+  });
+  function up(e) { delete ptrs[e.pointerId]; }
+  cv.addEventListener("pointerup", up);
+  cv.addEventListener("pointercancel", up);
+  $("treatBtn").addEventListener("click", function () { if (!(window.Toybox && Toybox.timer.locked())) dropTreat(); });
+  $("surpriseBtn").addEventListener("click", function () { if (!(window.Toybox && Toybox.timer.locked())) surprise(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".tb-sheet, .sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Treat picture in the Treat! button (shows the next treat) ----------
+  function treatSVG(k) {
+    if (k === "seed") return '<g stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"><path d="M-20 4 Q-6 -24 22 -8 Q-2 18 -20 4Z" fill="#3F4456"/></g><path d="M-12 0 Q2 -12 16 -6" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round"/>';
+    if (k === "carrot") return '<g stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"><ellipse cx="-17" cy="-14" rx="4" ry="9" transform="rotate(-35 -17 -14)" fill="#4CC76A"/><ellipse cx="-11" cy="-18" rx="4" ry="8" fill="#4CC76A"/><path d="M-18 -10 Q-16 10 -4 12 L22 4 Q2 -18 -18 -10Z" fill="#FF8A2B"/></g>';
+    return '<circle cx="0" cy="2" r="17" fill="#4F6BDE" stroke="#1D2340" stroke-width="3.5"/><path d="M0 -15 L3 -10 L8 -11 L5 -7 L7 -3 L0 -6 L-7 -3 L-5 -7 L-8 -11 L-3 -10Z" fill="#2B3A8F"/><circle cx="-6" cy="-3" r="3.5" fill="#FFFFFF" opacity="0.75"/>';
+  }
+  function drawTreatPic() { $("treatPic").innerHTML = treatSVG(TREATS[treatIdx % TREATS.length]); }
+
+  // ---------- Coach line and ghost hand ----------
+  var coachEl = $("coach"), coachShown = "";
+  function coachText() {
+    if (food < 0.04 && !pour) return "Fill the food bowl!";
+    if (water < 0.06 && !jug) return "Fill the water!";
+    if (ham.asleep && ham.act && ham.act.name === "sleep" && ham.act.t > 3) return "Tap to wake up!";
+    if (!tried.wheel) return "Tap the wheel!";
+    if (!tried.food) return "Tap the food!";
+    if (!tried.water) return "Tap the water!";
+    if (!tried.bed) return "Tap the bed!";
+    if (!tried.pet) return "Pet the hamster!";
+    if (!tried.treat && !document.body.classList.contains("big")) return "Tap Treat!";
+    return "";
+  }
+  function updateCoach() {
+    var t = coachText();
+    if (t) { if (t !== coachShown) coachEl.textContent = t; coachEl.classList.remove("off"); }
+    else coachEl.classList.add("off");
+    coachShown = t;
+  }
+  // ---------- Ghost hand (same look in every app; tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function pagePt(x, y) { var r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; }
+  // The hand shows the wheel; while the bowl is empty (and he has never filled it) it shows the food bag.
+  var ghost = makeGhost(function () {
+    if (!G) return null;
+    if (food < 0.04 && !tried.bag && !pour) return { pts: [pagePt(G.bag.x, G.bag.y + 0.6 * G.L)], tap: true };
+    if (!tried.wheel) return { pts: [pagePt(G.wheel.x + 0.3 * G.wheel.R, G.wheel.y - 0.45 * G.wheel.R)], tap: true };
+    return null;
+  }, { max: 3, ok: function () { return !ending; } });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var master = null, masterCtx = null, noiseBuf = null;
+  function out(ac) {
+    if (masterCtx !== ac) {
+      master = ac.createGain(); master.gain.value = 0.75; master.connect(ac.destination); masterCtx = ac;
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 1.2), ac.sampleRate);
+      var d = noiseBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return master;
+  }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    var ac = window.Toybox && Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.03, dur * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(dur, vol, freq, q, delay, type) {
+    var ac = window.Toybox && Toybox.sound.ready();
+    if (!ac) return;
+    var dest = out(ac), t = ac.currentTime + (delay || 0), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = noiseBuf; f.type = type || "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.15, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(dest);
+    src.start(t, rand(0, 0.1)); src.stop(t + dur + 0.05);
+  }
+  function sSqueak() { tone(1500, 0.08, 0.025, "sine", 2100); tone(1900, 0.1, 0.022, "sine", 2500, 0.1); }
+  function sNibble() { noise(0.04, 0.05, rand(2600, 4200), 3); }
+  function sBlip() { tone(rand(620, 760), 0.1, 0.03, "sine", 1150); }
+  function sTick(v) { tone(rand(1100, 1300), 0.025, v || 0.01, "triangle"); }
+  function sPing() { tone(rand(1800, 2500), 0.03, 0.01, "triangle"); }
+  function sHop() { tone(330, 0.18, 0.025, "sine", 620); }
+  function sLand() { tone(260, 0.08, 0.02, "sine", 180); }
+  function sTap() { tone(520, 0.1, 0.025, "sine", 700); }
+  function sTreat() { tone(660, 0.12, 0.03, "sine", 990); tone(990, 0.16, 0.025, "sine", 1320, 0.1); }
+  function sDrop() { tone(1100, 0.35, 0.02, "sine", 500); }
+  function sBoing() { tone(300, 0.35, 0.03, "sine", 820); }
+  function sYawn() { tone(520, 0.7, 0.018, "sine", 300); }
+  function sWater() { noise(1.4, 0.03, 900, 0.8, 0.4, "lowpass"); tone(500, 0.2, 0.02, "sine", 800, 0.5); tone(600, 0.2, 0.02, "sine", 900, 1.0); }
+  var lull = [392, 330, 349, 294, 330, 262], lullI = 0;
+  function sHum() { tone(lull[lullI % lull.length], 1.2, 0.016, "triangle"); lullI++; }
+  function sChime() { tone(523, 0.4, 0.03); tone(784, 0.6, 0.03, "sine", 0, 0.12); }
+  var wheelTickAcc = 0;
+
+  // ---------- Timer ending: a yawn, a walk to the house, and to sleep ----------
+  var ending = false;
+  function onEnding(done) {
+    ending = true;
+    treats.forEach(function (t) { t.claimed = false; });
+    var finish = function () { done(); };
+    var cur = ham.act;
+    if (cur && cur.name === "hop") { ham.x = cur.x1; ham.y = cur.y1; ham.where = cur.where; ham.lvl = cur.lvl; }
+    if (ham.where === "house" && ham.asleep && cur && cur.name === "sleep") { cur.dur = 0; ham.queue = []; ham.mission = "ending"; setTimeout(finish, 600); return; }
+    var sleepStep = function () { act("sleep", { dur: 0, z: 0.4, hum: 1.5, onAsleep: finish }); };
+    var steps;
+    if (ham.where === "house") steps = [sleepStep];
+    else steps = leaveSteps(G.bed.x, "floor").concat([
+      function () { act("yawn", {}); },
+      walkTo(spotBed, 1.8),
+      function () { act("enterHouse", {}); },
+      sleepStep
+    ]);
+    ham.pending = null;
+    ham.mission = "ending";
+    run(steps);
+  }
+  function onWake() {
+    ending = false;
+    ham.mission = null;
+    if (ham.where === "house") setTimeout(function () { if (!ending) run([function () { act("wake", {}); }, function () { act("exitHouse", { dir: 1 }); }, function () { act("happy", { dur: 1.6 }); }]); }, 500);
+  }
+  function restSVG() {
+    return '<svg class="rest-art" viewBox="0 0 120 100" aria-hidden="true">' +
+      '<circle cx="98" cy="18" r="9" fill="#FFF4CC" stroke="#1D2340" stroke-width="2"/><circle cx="102" cy="15" r="8" fill="#2B3A67"/>' +
+      '<g fill="#FFF4CC"><circle cx="16" cy="14" r="1.6"/><circle cx="30" cy="26" r="1.2"/><circle cx="80" cy="34" r="1.3"/><circle cx="110" cy="44" r="1.2"/></g>' +
+      '<rect x="0" y="88" width="120" height="12" fill="#FFE7A3"/>' +
+      '<defs><clipPath id="hdoor"><circle cx="60" cy="72" r="15"/></clipPath></defs>' +
+      '<rect x="34" y="52" width="52" height="38" fill="#F7BE6A" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<circle cx="60" cy="72" r="15" fill="#8A5530" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<g clip-path="url(#hdoor)"><ellipse cx="60" cy="80" rx="13" ry="10" fill="#F6A445" stroke="#1D2340" stroke-width="2"/>' +
+      '<ellipse cx="62" cy="86" rx="10" ry="4" fill="#FFF4E2"/><circle cx="52" cy="72" r="3.4" fill="#F6A445" stroke="#1D2340" stroke-width="1.6"/><circle cx="52" cy="72" r="1.8" fill="#FFA5BA"/>' +
+      '<path d="M56 79 q2 2 4 0 M63 79 q2 2 4 0" fill="none" stroke="#1D2340" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<ellipse cx="57" cy="83" rx="2.2" ry="1.3" fill="#FF7398" opacity="0.5"/><ellipse cx="68" cy="83" rx="2.2" ry="1.3" fill="#FF7398" opacity="0.5"/><circle cx="70" cy="80" r="1.4" fill="#FF7398"/></g>' +
+      '<g clip-path="url(#hdoor)"><ellipse cx="60" cy="88" rx="17" ry="4" fill="#FFF1C9"/></g>' +
+      '<rect x="48" y="88.5" width="24" height="3" rx="1.5" fill="#7FCB6B" stroke="#1D2340" stroke-width="1.2"/>' +
+      '<path d="M28 54 L60 30 L92 54 Z" fill="#EF5B5B" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="60" cy="44" r="3.6" fill="#FFE27A" stroke="#1D2340" stroke-width="1.6"/>' +
+      '<g font-family="Baloo 2, Trebuchet MS, sans-serif" font-weight="800" fill="#FFFFFF" stroke="#1D2340" stroke-width="0.8"><text x="78" y="62" font-size="11">z</text><text x="86" y="52" font-size="9">z</text><text x="93" y="44" font-size="7">z</text></g>' +
+      '</svg>';
+  }
+
+  // ---------- Resize: keep the hamster where it was ----------
+  function reanchor(old) {
+    parts = []; trail = null;
+    if (ham.where === "surf") {
+      var lvl = ham.lvl === "shelf" && G.tall ? "shelf" : "floor";
+      var r0 = ham.lvl === "shelf" && old.tall ? [old.shelfMin, old.shelfMax] : [old.floorMin, old.floorMax];
+      var u = clamp((ham.x - r0[0]) / Math.max(1, r0[1] - r0[0]), 0, 1);
+      ham.lvl = lvl; ham.x = uToX(lvl, u); ham.y = surfY(lvl); ham.th = ham.thT = 0;
+    } else if (ham.where === "wheel") { ham.lvl = G.wheel.lvl; ham.x = G.wheel.x; ham.y = G.wheel.y + G.wheel.Ri; }
+    else if (ham.where === "house") { ham.lvl = "floor"; ham.x = G.bed.x; ham.y = G.floorY; }
+    var a = ham.act;
+    if (a && a.name === "walk" && a.destFn) { a.path = pathTo(a.destFn()); a.i = 0; }
+    else if (a && a.name === "walk") { ham.queue = []; act("idle", { dur: 1 }); }
+    else if (a && a.name === "hop") { ham.where = a.where; ham.lvl = a.lvl; act("idle", { dur: 0.1 }); if (a.where === "wheel") { ham.x = G.wheel.x; ham.y = G.wheel.y + G.wheel.Ri; } }
+    treats.forEach(function (t) { if (t.lvl === "shelf" && !G.tall) t.lvl = "floor"; });
+  }
+
+  // ---------- Main loop ----------
+  var lastT = 0, saveT = 0;
+  function update(dt) {
+    clock += dt;
+    P = basePose();
+    var a = ham.act;
+    if (a) {
+      a.t += dt;
+      if (a.anchor) { var s = a.anchor(); ham.x = s.x; ham.y = s.y; ham.lvl = s.lvl || ham.lvl; if (s.f && ham.act.name !== "hungry") turnTo(s.f); ham.thT = 0; }
+      var fn = ACT[a.name];
+      var done = fn ? fn(a, dt) : true;
+      if (done && ham.act === a) {
+        if (a.name === "hop" && ham.pending) { var pd = ham.pending; ham.pending = null; next(); command(pd[0], pd[1], pd[2], pd[3]); }
+        else next();
+      }
+    } else next();
+    // smooth pose values
+    var k = Math.min(1, dt * 7);
+    ham.rearS += (P.rear - ham.rearS) * k;
+    ham.curlS += (P.curl - ham.curlS) * Math.min(1, dt * 4);
+    ham.th += angNorm(ham.thT - ham.th) * Math.min(1, dt * 12);
+    if (ham.squash > 0) { P.sx *= 1 + 0.16 * ham.squash; P.sy *= 1 - 0.16 * ham.squash; ham.squash = Math.max(0, ham.squash - dt * 5); }
+    if (ham.turn > 0) { P.sx *= 1 - 0.35 * Math.sin(Math.PI * ham.turn); ham.turn = Math.max(0, ham.turn - dt * 6); }
+    if (!(ham.act && (ham.act.name === "eat" || ham.act.name === "treatEat" || ham.act.name === "sleep"))) ham.cheeks = Math.max(0, ham.cheeks - dt * 0.06);
+    ham.blinkIn -= dt;
+    if (ham.blinkT > 0) ham.blinkT -= dt;
+    if (ham.blinkIn <= 0) { ham.blinkIn = rand(2.2, 5); ham.blinkT = 0.14; }
+    // the wheel coasts when nobody runs in it
+    if (!wheel.driven) wheel.w *= Math.exp(-dt * 0.7);
+    wheel.driven = false;
+    wheel.a += wheel.w * dt;
+    if (Math.abs(wheel.w) > 0.6) {
+      wheelTickAcc += Math.abs(wheel.w) * dt;
+      if (wheelTickAcc > 0.9) { wheelTickAcc = 0; sTick(0.004 + 0.002 * Math.min(4, Math.abs(wheel.w))); }
+    }
+    for (var n in items) if (items[n].b > 0) items[n].b = Math.max(0, items[n].b - dt * 1.7);
+    if (trail) trail.t += dt;
+    updatePour(dt); updateJug(dt); updateTreats(dt); updateParts(dt);
+    saveT += dt;
+    if (dirty && saveT > 2) { saveT = 0; save(); }
+  }
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, CW, CH);
+    ctx.drawImage(bgCv, 0, 0, CW, CH);
+    drawBag();
+    drawWheelBack();
+    if (ham.where === "wheel") drawHamster();
+    drawWheelFront();
+    drawHouseBack();
+    if (ham.where === "house") drawHamster();
+    drawHouseFront();
+    drawBowl();
+    drawBottle();
+    drawTreats();
+    drawBall();
+    if (ham.where !== "wheel" && ham.where !== "house") drawHamster();
+    ctx.drawImage(tubeCv, 0, 0, CW, CH);
+    drawParts();
+    drawJug();
+    drawTrail();
+  }
+  function frame(ts) {
+    var dt = lastT ? Math.min(0.05, (ts - lastT) / 1000) : 0.016;
+    lastT = ts;
+    if (G) { update(dt); draw(); }
+    requestAnimationFrame(frame);
+  }
+  function save() {
+    dirty = false;
+    var lvl = ham.lvl === "shelf" ? "shelf" : "floor", x = ham.where === "wheel" ? spotWheel(-1).x : ham.x;
+    if (ham.where === "wheel") lvl = G.wheel.lvl;
+    try { localStorage.setItem(KEY, JSON.stringify({ v: 1, food: Math.round(food * 1000) / 1000, water: Math.round(water * 1000) / 1000, lvl: lvl, u: Math.round(xToU(lvl, x) * 1000) / 1000 })); } catch (e) { /* ignore */ }
+  }
+  window.addEventListener("pagehide", function () { if (G) save(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && G) save(); });
+  setInterval(function () { if (G) updateCoach(); }, 400);
+  window.addEventListener("resize", function () { resize(); });
+
+  // ---------- Start ----------
+  drawTreatPic();
+  resize();
+  (function place() {
+    var lvl = savedPos && (savedPos.lvl === "floor" || G.tall) ? savedPos.lvl : "floor";
+    var u = savedPos ? savedPos.u : 0.5;
+    if (!savedPos) { lvl = "floor"; ham.x = clampX("floor", (G.bowl.x + G.bottle.x) / 2 + 0.2 * G.L); }
+    else ham.x = uToX(lvl, u);
+    ham.lvl = lvl; ham.y = surfY(lvl); ham.f = 1;
+    act("idle", { dur: 1.5 });
+  })();
+  updateCoach();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { /* z letters use the font when it arrives */ });
+  requestAnimationFrame(frame);
+
+  Toybox.init({
+    app: "hamster",
+    badge: $("tbadge"),
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the hamster yawns, goes to its little house and falls asleep, and the cage rests.",
+    goodbyeOption: "End with a Goodnight button to press",
+    farewellText: "Time for a nap",
+    goodbyeLabel: "Goodnight, hamster",
+    farewellDone: "Night night, hamster!",
+    restLine: "The hamster is sleeping.",
+    restLine2: "It will be right here next time.",
+    restArt: restSVG,
+    soundNote: "Soft squeaks, nibbles, a wheel whir and a sleepy hum. Hold for 2 seconds.",
+    endingMaxMs: 20000,
+    onEnding: onEnding,
+    onGoodbye: function () { heart(); heart(); spawn("z", G.bed.x + 0.25 * G.L, G.floorY - 0.85 * G.L, { vx: 0.25 * G.L, vy: -0.45 * G.L, life: 2.6 }); sSqueak(); },
+    onWake: onWake,
+    onBig: function () { setTimeout(resize, 30); },
+    onSound: function (on) { if (on) setTimeout(sChime, 60); }
+  });
+
+  // Test hook, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) window.__hamster = {
+    G: function () { return G; },
+    ham: ham,
+    act: function () { return ham.act && ham.act.name; },
+    mission: function () { return ham.mission; },
+    food: function () { return food; }, water: function () { return water; },
+    set: function (k, v) { if (k === "food") food = v; if (k === "water") water = v; },
+    wheelW: function () { return wheel.w; },
+    treats: function () { return treats.length; },
+    ball: function () { return !!ball; },
+    ghost: ghost,
+    pt: function (name) {
+      var L = G.L, p;
+      if (name === "wheel") p = { x: G.wheel.x + 0.3 * G.wheel.R, y: G.wheel.y - 0.5 * G.wheel.R };
+      else if (name === "bowl") p = { x: G.bowl.x, y: G.floorY - 0.25 * L };
+      else if (name === "bottle") p = { x: G.bottle.x, y: (G.bottle.bodyT + G.bottle.bodyB) / 2 };
+      else if (name === "bed") p = { x: G.bed.x + 0.5 * L, y: G.floorY - 1.0 * L };
+      else if (name === "bag") p = { x: G.bag.x, y: G.bag.y + 0.6 * L };
+      else if (name === "hamster") p = hamCenter();
+      else if (name === "floor") p = { x: lerp(G.floorMin, G.floorMax, 0.5), y: G.floorY - 0.1 * L };
+      var r = cv.getBoundingClientRect();
+      return { x: r.left + p.x, y: r.top + p.y };
+    }
+  };
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>
