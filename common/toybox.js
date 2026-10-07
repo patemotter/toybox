@@ -17,7 +17,7 @@
  *    Do NOT add the sheet, toast, farewell or rest markup: the module builds them.
  * 3. At the end of the app's script, once its scene is ready, call Toybox.init({...}):
  *      Toybox.init({
- *        app: "fish-tank",                        // folder name; used for the Big key
+ *        app: "peg-drop",                         // folder name; used for the Big key
  *        grownButton: el,                         // home screen only: opens the sheet. In apps it is hidden:
  *                                                 // the Grown-ups sheet lives only on the Toybox home screen.
  *        home: true,                              // only the launcher passes this (sheet + App settings)

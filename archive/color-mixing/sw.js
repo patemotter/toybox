@@ -2,7 +2,7 @@
 // Strategy: stale-while-revalidate. Serve the cached copy immediately (works offline),
 // and refresh the cache from the network in the background when online.
 // After changing any file, bump CACHE so old copies are discarded.
-const CACHE = "color-mixing-v9";
+const CACHE = "color-mixing-v10";
 const CORE = [
   "./",
   "./index.html",
@@ -12,8 +12,8 @@ const CORE = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   // Shared Toybox grown-up layer (timer, sound, Big)
-  "../common/toybox.css",
-  "../common/toybox.js"
+  "../../common/toybox.css",
+  "../../common/toybox.js"
 ];
 
 self.addEventListener("install", (event) => {

@@ -18,7 +18,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Construction Site: gear up, then excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
 | Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 
-On the shelf (folder kept, no tile on the home screen): [`fish-tank/`](fish-tank/), [`color-mixing/`](color-mixing/).
+Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
 The top-level `index.html` is a launcher with a big button for each app.
 
@@ -37,7 +37,7 @@ You can also install a single app on its own by opening its folder (for example 
 1. Put the app in its own folder with its own `index.html`, `manifest.webmanifest`, `sw.js` and `icons/`.
 2. In the app's `sw.js`, give `CACHE` a name with an app-specific prefix (for example `my-app-v1`) and only delete caches with that prefix in `activate`. All apps share one origin, so they share cache storage.
 3. Give the app a Home button that links to `../` so there is a way back to the launcher (see the `homebtn` in `spin-shop/index.html`).
-4. Use the shared grown-up layer in `common/`: one play timer, one sound setting and the "Big" button for the whole Toybox. Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `fish-tank/` is the example):
+4. Use the shared grown-up layer in `common/`: one play timer, one sound setting and the "Big" button for the whole Toybox. Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `peg-drop/` is a good example):
    ```html
    <link rel="stylesheet" href="../common/toybox.css">
    <script src="../common/toybox.js"></script>
