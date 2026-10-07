@@ -26,9 +26,9 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 
 Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
 should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** (done; can't go wrong: any finger
-movement rolls the gear, the curve is always perfect; questions: keep his chosen pen color after a pattern closes?
-special rings (oval, flower) as their own tiles instead of only via Surprise? should a tap roll the wheel a
-little?), **Sand
+movement rolls the gear, the curve is always perfect. The dad: finger drawing never stops or reseats by itself,
+a new layer only when he picks a new pen/wheel/hole/ring; every ring is a tile (round, oval, flower, triangle);
+Surprise only shuffles the setup and never draws), **Sand
 Table** (done; the dad: Draw! never smooths by itself, finished patterns stay and new ones draw on top; Smooth is his
 tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (done: the family's real routine, warm up, weigh 18.0 g, grind, whisk, tamp, lock in,
 10 s soak then the shot to about 36 g in about 28 s, steam, pour; latte for Mom, cappuccino for Dad, steamer for

@@ -99,6 +99,7 @@ body.ending #view { cursor: default; }
 .panes.tb-choices { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
 .pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 #panel[data-tab="gears"] [data-pane="gears"],
+#panel[data-tab="rings"] [data-pane="rings"],
 #panel[data-tab="pens"] [data-pane="pens"],
 #panel[data-tab="mine"] [data-pane="mine"] { visibility: visible; }
 .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -108,6 +109,16 @@ body.ending #view { cursor: default; }
   font-size: 0.95rem; line-height: 1; white-space: nowrap;
 }
 .opt canvas { width: var(--pic); height: var(--pic); display: block; flex: none; }
+/* Rings: one row of four tall tiles (as tall as the two rows of the Gears tab). */
+.row.ringrow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ringrow .btn.opt { height: calc(var(--tile) * 2 + 6px); gap: 4px; }
+.ringrow .opt canvas { width: calc(var(--pic) * 1.45); height: calc(var(--pic) * 1.45); max-width: 100%; }
+/* Surprise: the tiles that changed give a little sparkly hop. */
+.btn.pop { animation: tb-pop 0.9s ease-out; }
+@keyframes tb-pop { 0% { transform: scale(1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 0 rgba(255,201,60,0.9); }
+  35% { transform: scale(1.1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 8px rgba(255,201,60,0.55); }
+  100% { transform: scale(1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 14px rgba(255,201,60,0); } }
+@media (prefers-reduced-motion: reduce) { .btn.pop { animation: none; } }
 .opt .nm { font-weight: 800; }
 .pens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .btn.pen { min-width: 0; height: var(--tile); min-height: 44px; padding: 0 2px; border-radius: 14px;
@@ -121,7 +132,11 @@ body.ending #view { cursor: default; }
 .shelf .empty { margin: auto; font-weight: 800; color: var(--muted); text-align: center; font-size: 1.05rem; line-height: 1.2; padding: 0 8px; }
 
 /* Tabs: short words share the room, Surprise gets a little more. */
-.tb-tabs .btn { flex: 1 1 auto; padding-left: 0.3rem; padding-right: 0.3rem; }
+.tb-tabs .btn { flex: 1 1 auto; padding-left: 0.2rem; padding-right: 0.2rem; }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .tb-tabs { gap: 4px; }
+  .tb-tabs .btn { font-size: 0.86rem; padding-left: 0.1rem; padding-right: 0.1rem; }
+}
 .tb-tabs .btn.tb-surprise { flex: 1.5 1 auto; }
 /* Upright phones: the round ring leaves spare height, so the picture tiles can be bigger. */
 @media (orientation: portrait) and (max-width: 600px) { :root { --tile: 82px; --pic: 50px; } }
@@ -145,6 +160,7 @@ body.ending #view { cursor: default; }
   .btn.pen { height: 100px; }
   .pen svg { max-width: 110px; max-height: 60px; }
   .shelf { height: 210px; gap: 12px; }
+  .ringrow .btn.opt { height: calc(var(--tile) * 2 + 10px); }
   .btn.thumb { height: 190px; }
 }
 @media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
@@ -154,6 +170,7 @@ body.ending #view { cursor: default; }
   .pen svg { max-height: 80px; }
   .shelf { height: 310px; }
   .btn.thumb { height: 140px; }
+  .ringrow .btn.opt { height: calc(var(--tile) * 2 + 10px); }
   .shelf { flex-wrap: wrap; align-content: flex-start; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; }
   .tb-tabs .btn { font-size: 1.05rem; }
 }
@@ -189,6 +206,9 @@ body.ending #view { cursor: default; }
           <div class="row" id="wheelRow"></div>
           <div class="row" id="holeRow"></div>
         </div>
+        <div class="pane" data-pane="rings" role="tabpanel" aria-label="Rings">
+          <div class="row ringrow" id="ringRow"></div>
+        </div>
         <div class="pane" data-pane="pens" role="tabpanel" aria-label="Pens">
           <div class="pens" id="penRow"></div>
         </div>
@@ -198,6 +218,7 @@ body.ending #view { cursor: default; }
       </div>
       <nav class="tb-tabs" aria-label="Controls">
         <button class="btn tab" data-tab="gears">Gears</button>
+        <button class="btn tab" data-tab="rings">Rings</button>
         <button class="btn tab" data-tab="pens">Pens</button>
         <button class="btn tab" data-tab="mine">Mine</button>
         <button class="btn tb-new" id="newBtn">New</button>
@@ -241,9 +262,11 @@ body.ending #view { cursor: default; }
   var SHAPES = {
     round:  { kind: "circle", R: 1, teeth: 56, wheels: { small: 16, medium: 35, big: 42 } },
     oval:   { kind: "stadium", Rc: 0.66, h: 0.36, teeth: 70, wheels: { small: 20, medium: 28, big: 30 } },
-    flower: { kind: "flower", A: 0.93, k: 5, e: 0.05, teeth: 60, wheels: { small: 15, medium: 20, big: 24 } }
+    flower: { kind: "flower", A: 0.93, k: 5, e: 0.05, teeth: 60, wheels: { small: 15, medium: 20, big: 24 } },
+    triangle: { kind: "flower", A: 0.93, k: 3, e: 0.08, teeth: 63, wheels: { small: 14, medium: 18, big: 27 } }
   };
-  var SHAPE_IDS = ["round", "oval", "flower"];
+  var SHAPE_IDS = ["round", "oval", "flower", "triangle"];
+  var SHAPE_NAME = { round: "Round", oval: "Oval", flower: "Flower", triangle: "Triangle" };
   var WHEELS = ["small", "medium", "big"];
   var WHEEL_NAME = { small: "Small", medium: "Medium", big: "Big" };
   var WHEEL_TINT = { small: "rgba(255,154,77,0.55)", medium: "rgba(76,217,100,0.5)", big: "rgba(255,111,216,0.45)" };
@@ -382,7 +405,7 @@ body.ending #view { cursor: default; }
     if (typeof o.u === "number" && isFinite(o.u)) st.u = o.u;
     if (Array.isArray(o.pats)) st.pats = o.pats.map(unpackPat).filter(Boolean);
     if (typeof o.from === "string") st.from = o.from;
-    if (typeof o.tab === "string" && /^(gears|pens|mine)$/.test(o.tab)) st.tab = o.tab;
+    if (typeof o.tab === "string" && /^(gears|rings|pens|mine)$/.test(o.tab)) st.tab = o.tab;
   }
   // Pattern: { s, w, h, ph, lo, hi, done, segs: [{ c, a, b }] }. Packed as arrays to keep the shelf small.
   function r4(v) { return Math.round(v * 10000) / 10000; }
@@ -612,13 +635,12 @@ body.ending #view { cursor: default; }
   // Move the wheel from st.u by du, inking as it goes; stops exactly where a pattern closes.
   function advance(du) {
     if (!du) return;
-    if (mo.reseat || mo.lift > 0.02) { return; }
+    mo.reseat = null;          // the wheel is already set: any re-seat picture snaps to its end
     var p = curPat();
     if (p && p.done) {
-      if (mo.auto) { beginReseat(); return; }
-      // Finished, but his finger is still going: the wheel keeps rolling round the finished curve (the pen
-      // runs along the line already drawn, so nothing new is inked and it stays one clean curve). The
-      // next pen comes with his next new touch (onDown) or Draw!.
+      // Finished, and he keeps going (same touch or a new one): the wheel keeps rolling round the finished
+      // curve. The pen runs along the line already drawn, so nothing new is inked and it stays one clean
+      // curve. A new layer comes only when he changes something (pen, wheel, hole, ring) or presses Draw!.
       st.u += du;
       tick(patGeo(p));
       dirty = true;
@@ -658,38 +680,27 @@ body.ending #view { cursor: default; }
     mo.lastTooth = t;
   }
 
-  // After a pattern closes the next move lifts the wheel, turns it a few teeth and sets it down with the
-  // next pen, so the new pattern sits between the petals of the last one (like the real thing).
-  function beginReseat() {
-    if (mo.reseat) return;
-    var G = geoNow();
-    var k = Math.max(1, Math.round(G.g / 3));
-    if (G.g <= 1) k = 1;
-    var nextPen = st.rig.pen;
-    var si = SOLID.indexOf(st.rig.pen);
-    if (si !== -1) nextPen = SOLID[(si + 1) % SOLID.length];
-    mo.reseat = { t0: now(), dur: reduce ? 500 : 1100, k: k, pen: nextPen, swapped: false, keepAuto: mo.auto };
-    mo.v = 0; mo.uT = st.u;
-    liftSound();
-  }
-  function stepReseat() {
-    var R = mo.reseat, t = (now() - R.t0) / R.dur;
-    if (!R.swapped && t >= 0.5) { R.swapped = true; st.rig.pen = R.pen; renderPens(); renderPreviews(); }
-    if (t >= 1) {
-      st.rig.ph += R.k;
-      st.cur = -1;
-      mo.reseat = null;
-      mo.v = 0;
-      // keep what his finger did meanwhile (a little of it), so the new pattern starts right away
-      var P = geoNow().S.P;
-      mo.uT = st.u + clamp(mo.uT - st.u, -P * 0.25, P * 0.25);
-      scheduleSave();
+  // A new layer: the wheel lifts, turns a few teeth and sets down, so the next pattern sits between the
+  // petals of the last one (like re-seating the real gear). It happens only when he changes the pen after a
+  // pattern is finished, or presses Draw! on a finished one. It is only a picture: the gears are set at
+  // once, and the moment his finger moves the animation snaps to its end, so nothing ever waits.
+  function newLayer(nextPen) {
+    var G = geoNow(), k = Math.max(1, Math.round(G.g / 3));
+    if (nextPen) {
+      var si = SOLID.indexOf(st.rig.pen);
+      if (si !== -1) st.rig.pen = SOLID[(si + 1) % SOLID.length];
+      renderPens(); renderPreviews();
     }
+    st.rig.ph += k;
+    st.cur = -1;
+    mo.reseat = { t0: now(), dur: reduce ? 400 : 900, k: k };
+    liftSound();
     dirty = true;
+    scheduleSave();
   }
 
   function update(dt) {
-    if (mo.reseat) { stepReseat(); return; }
+    if (mo.reseat) { if (now() - mo.reseat.t0 >= mo.reseat.dur) mo.reseat = null; dirty = true; }
     var P = geoNow().S.P;
     if (mo.ending) {
       // Time is up: the wheel rolls to a stop, then the pen lifts.
@@ -703,7 +714,7 @@ body.ending #view { cursor: default; }
     }
     if (mo.lift > 0 && !mo.goodbye) { mo.lift = Math.max(0, mo.lift - dt / 0.5); dirty = true; }
     if (mo.goodbye) { stepGoodbye(dt); return; }
-    if (mo.auto) {
+    if (mo.auto && !mo.reseat) {
       mo.uT += mo.dir * P / AUTO_LAP_S * dt;
       var cp = curPat();
       if (cp && cp.done) { mo.auto = false; renderGo(); }
@@ -731,9 +742,6 @@ body.ending #view { cursor: default; }
     e.preventDefault();
     try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var r = view.getBoundingClientRect();
-    // A new touch after all fingers were lifted from a finished pattern: next pen, wheel turned a few teeth.
-    var cp = curPat();
-    if (!fingerDown() && cp && cp.done && !mo.reseat) { mo.coachLater = false; beginReseat(); }
     ptrs[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top, moved: 0, t: now() };
     if (mo.auto) { mo.auto = false; renderGo(); }   // a finger takes over
     ripple(e.clientX - r.left, e.clientY - r.top);
@@ -777,13 +785,7 @@ body.ending #view { cursor: default; }
   view.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; afterLift(); });
   view.addEventListener("lostpointercapture", function (e) { delete ptrs[e.pointerId]; afterLift(); });
   function fingerDown() { return Object.keys(ptrs).length > 0; }
-  // All fingers up after he finished a pattern: now say how to get the next color.
-  function afterLift() {
-    if (fingerDown() || !mo.coachLater || locked()) return;
-    mo.coachLater = false;
-    var cp = curPat();
-    if (cp && cp.done) coachSay("Round again for a new color!", 4200);
-  }
+  function afterLift() { /* nothing waits for a lift any more */ }
   ["gesturestart", "gesturechange", "contextmenu"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
 
   // ---------- Effects: ripples, the closing sparkle, glitter twinkles ----------
@@ -792,9 +794,8 @@ body.ending #view { cursor: default; }
   function celebrate(p) {
     fx.sparkle = { p: p, G: patGeo(p), t0: now(), dur: reduce ? 1200 : 3000 };
     chimeSound();
-    // with a finger down the line waits until he lifts it (afterLift)
-    if (fingerDown()) mo.coachLater = true;
-    else coachSay("Round again for a new color!", 4200);
+    // once a visit, a soft hint that a new pen makes a new layer (nothing stops: the wheel keeps going)
+    if (!mo.saidPen) { mo.saidPen = true; coachSay("Pick a new pen!", 3500); }
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
     if (mo.auto) { mo.auto = false; renderGo(); }
     dirty = true;
@@ -853,7 +854,7 @@ body.ending #view { cursor: default; }
     var cx = pbuf[2], cy = pbuf[3], psi = pbuf[4], extra = 0, up = lift;
     if (R) {
       var k = clamp((now() - R.t0) / R.dur, 0, 1), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      extra = e * R.k * TAU / G.n;
+      extra = (e - 1) * R.k * TAU / G.n;
       up = Math.max(up, Math.sin(Math.PI * k));
     }
     var wturn = psi + G.ph * TAU / G.n + extra;   // the wheel's teeth turn with the pen
@@ -966,6 +967,15 @@ body.ending #view { cursor: default; }
       var s = document.createElement("span"); s.className = "nm"; s.textContent = HOLE_NAME[h]; b.appendChild(s);
       hr.appendChild(b);
     });
+    var rr = $("ringRow");
+    rr.innerHTML = "";
+    SHAPE_IDS.forEach(function (id) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.ring = id; b.setAttribute("aria-label", SHAPE_NAME[id] + " ring");
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = SHAPE_NAME[id]; b.appendChild(s);
+      rr.appendChild(b);
+    });
     var pr = $("penRow");
     pr.innerHTML = "";
     PENS.forEach(function (p) {
@@ -1007,11 +1017,25 @@ body.ending #view { cursor: default; }
       var G = patGeo(p), e = G.S.ext;
       ext = Math.max(ext, Math.max(e[0], e[1]) - BAND - 0.03 + 0.04);
     });
+    if (opts.ring) ext = Math.max(ext, Math.max(SHAPES[opts.ring].ext[0], SHAPES[opts.ring].ext[1]) - BAND + 0.04);
     var sc = px / 2 / ext * (opts.zoom || 0.96), save = view0;
     // turned the same way as the paper on screen
     if (opts.rot !== undefined ? opts.rot : save.rot) c.setTransform(0, sc, -sc, 0, px / 2, px / 2);
     else c.setTransform(sc, 0, 0, sc, px / 2, px / 2);
     view0 = { cx: 0, cy: 0, sc: sc / d, rot: 0 };
+    if (opts.ring) {
+      // the ring's shape, so each ring tile shows which ring it is
+      var RS = SHAPES[opts.ring], ro = { x: 0, y: 0, nx: 0, ny: 0, b: 0 };
+      c.beginPath();
+      for (var ri = 0; ri <= 180; ri++) {
+        ringAt(RS, ri / 180 * RS.P, ro);
+        var qx = ro.x - ro.nx * 0.05, qy = ro.y - ro.ny * 0.05;
+        if (ri === 0) c.moveTo(qx, qy); else c.lineTo(qx, qy);
+      }
+      c.closePath();
+      c.lineWidth = Math.max(3, size * 0.07) * d / sc; c.strokeStyle = "rgba(61,180,255,0.55)"; c.stroke();
+      c.lineWidth = Math.max(1.2, size * 0.02) * d / sc; c.strokeStyle = OUT; c.stroke();
+    }
     plainInk = !!opts.plain;
     drawPats(c, pats, Math.max(1.4, size * (opts.lw || 0.022)) * d / sc);
     plainInk = false;
@@ -1030,6 +1054,14 @@ body.ending #view { cursor: default; }
     Array.prototype.forEach.call(document.querySelectorAll("[data-hole]"), function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.hole === r.hole));
       drawThumb(b.querySelector("canvas"), [previewPat(r.shape, r.wheel, b.dataset.hole, r.pen)], { lw: 0.03, plain: true });
+    });
+    renderRings();
+  }
+  function renderRings() {
+    var r = st.rig;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-ring]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.ring === r.shape));
+      drawThumb(b.querySelector("canvas"), [previewPat(b.dataset.ring, r.wheel, r.hole, r.pen)], { lw: 0.022, plain: true, ring: b.dataset.ring });
     });
   }
   function renderPens() {
@@ -1073,7 +1105,7 @@ body.ending #view { cursor: default; }
       b.setAttribute("aria-pressed", String(b.dataset.tab === name));
     });
     if (name === "mine") renderShelf();
-    if (name === "gears") renderPreviews();
+    if (name === "gears" || name === "rings") renderPreviews();
     scheduleSave();
   }
 
@@ -1169,27 +1201,50 @@ body.ending #view { cursor: default; }
   function goDraw() {
     if (mo.auto) { mo.auto = false; renderGo(); return; }
     var p = curPat();
-    if (p && p.done) beginReseat();
+    if (p && p.done) newLayer(true);
     mo.auto = true; mo.dir = 1;
     learnedDrawing(true);
     coachSay("Watch it draw!", 3000);
     renderGo();
   }
-  var surprises = 0;
+  // Surprise: a random ring, wheel, hole and pen, with a sparkle on the gear and the tiles that changed.
+  // It never draws by itself: the wheel sits ready for his finger.
   function pick(list, not) { var l = list.filter(function (x) { return x !== not; }); return l[Math.floor(Math.random() * l.length)]; }
   function surprise() {
-    surprises++;
-    var r = st.rig, shape = "round";
-    // every third surprise brings out a special ring (the oval track or the flower)
-    if (surprises % 3 === 2) shape = surprises % 2 ? "oval" : "flower";
-    else if (r.shape !== "round" && Math.random() < 0.3) shape = r.shape;
-    var pen = Math.random() < 0.3 ? pick(["rainbow", "glitter"], r.pen) : pick(SOLID, r.pen);
-    var wheel = shape === r.shape ? pick(WHEELS, r.wheel) : WHEELS[Math.floor(Math.random() * 3)];
-    mo.reseat = null; fx.sparkle = null;
-    setRig({ shape: shape, wheel: wheel, hole: HOLES[Math.floor(Math.random() * 3)], pen: pen, ph: Math.floor(Math.random() * 6) });
-    mo.auto = true; mo.dir = 1;
-    coachSay("Surprise! Watch it draw!", 3000);
+    var r = st.rig, old = { shape: r.shape, wheel: r.wheel, hole: r.hole, pen: r.pen };
+    var ch = {
+      shape: Math.random() < 0.6 ? pick(SHAPE_IDS, r.shape) : r.shape,
+      wheel: pick(WHEELS, r.wheel),
+      hole: Math.random() < 0.7 ? pick(HOLES, r.hole) : r.hole,
+      pen: Math.random() < 0.3 ? pick(["rainbow", "glitter"], r.pen) : pick(SOLID, r.pen)
+    };
+    mo.auto = false; mo.reseat = null; mo.uT = st.u; mo.v = 0;
+    setRig(ch);
     renderGo();
+    wiggle();
+    // stars around the wheel
+    var G = geoNow(); penAt(G, st.u, pbuf);
+    var cpt = [0, 0]; toScreen(pbuf[2], pbuf[3], cpt);
+    var rad = G.r * view0.sc, t0 = now();
+    for (var i = 0; i < 18; i++) {
+      var a = i / 18 * TAU;
+      fx.stars.push({ x: cpt[0] + Math.cos(a) * rad * 1.15, y: cpt[1] + Math.sin(a) * rad * 1.15, t0: t0 + i * 25,
+        c: GLINTS[i % GLINTS.length], s: 5 + (i % 3) * 2.5 });
+    }
+    // the tiles that changed hop
+    var sel = [];
+    if (ch.shape !== old.shape) sel.push('[data-ring="' + ch.shape + '"]');
+    if (ch.wheel !== old.wheel) sel.push('[data-wheel="' + ch.wheel + '"]');
+    if (ch.hole !== old.hole) sel.push('[data-hole="' + ch.hole + '"]');
+    if (ch.pen !== old.pen) sel.push('[data-pen="' + ch.pen + '"]');
+    sel.forEach(function (q) {
+      var b = document.querySelector(q);
+      if (!b) return;
+      b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+      setTimeout(function () { b.classList.remove("pop"); }, 1000);
+    });
+    coachSay("Surprise! Move your finger round!", 3200);
+    dirty = true;
   }
 
   document.addEventListener("click", function (e) {
@@ -1200,7 +1255,14 @@ body.ending #view { cursor: default; }
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
     if (t.dataset.wheel) { if (t.dataset.wheel !== st.rig.wheel) setRig({ wheel: t.dataset.wheel }); wiggle(); return; }
     if (t.dataset.hole) { if (t.dataset.hole !== st.rig.hole) setRig({ hole: t.dataset.hole }); wiggle(); return; }
-    if (t.dataset.pen) { st.rig.pen = t.dataset.pen; renderPens(); renderPreviews(); dirty = true; scheduleSave(); wiggle(); return; }
+    if (t.dataset.ring) { if (t.dataset.ring !== st.rig.shape) setRig({ shape: t.dataset.ring }); wiggle(); return; }
+    if (t.dataset.pen) {
+      var changed = t.dataset.pen !== st.rig.pen, cp = curPat();
+      st.rig.pen = t.dataset.pen; renderPens(); renderPreviews(); dirty = true; scheduleSave();
+      // a new pen on a finished pattern starts a new layer; on an unfinished one the same curve goes on in the new color
+      if (changed && cp && cp.done) newLayer(false); else wiggle();
+      return;
+    }
     if (t.dataset.shelf) { loadShelf(t.dataset.shelf); return; }
     if (t.id === "goBtn") { goDraw(); return; }
     if (t.id === "newBtn") { newPaper(); return; }
