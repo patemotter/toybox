@@ -29,8 +29,8 @@ should Surprise keep the tops already spinning? should fallen tops clear themsel
 movement rolls the gear, the curve is always perfect; questions: keep his chosen pen color after a pattern closes?
 special rings (oval, flower) as their own tiles instead of only via Surprise? should a tap roll the wheel a
 little?), **Sand
-Table** (done; questions: in Draw! mode a finished pattern stays 8 s, then is smoothed for the next one, or stop
-after one / draw on top? should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (in progress: the family's real espresso routine, standalone app).
+Table** (done; the dad: Draw! never smooths by itself, finished patterns stay and new ones draw on top; Smooth is his
+tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (in progress: the family's real espresso routine, standalone app).
 
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.

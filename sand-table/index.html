@@ -85,6 +85,11 @@ body {
 .btn.pat[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
 .btn.pat.drawing svg { animation: pat-turn 6s linear infinite; }
 @keyframes pat-turn { to { transform: rotate(360deg); } }
+.btn.tb-new .rake { width: 30px; height: 26px; margin-right: 4px; vertical-align: -6px; flex: none; }
+.btn.tb-new.full { animation: smooth-glow 2.4s ease-in-out infinite; }
+@keyframes smooth-glow { 0%, 100% { box-shadow: 3px 3px 0 var(--edge), 0 0 4px 1px rgba(255, 154, 77, 0.35); }
+  50% { box-shadow: 3px 3px 0 var(--edge), 0 0 18px 7px rgba(255, 180, 90, 0.9); } }
+@media (prefers-reduced-motion: reduce) { .btn.tb-new.full { animation: none; box-shadow: 3px 3px 0 var(--edge), 0 0 12px 4px rgba(255, 180, 90, 0.8); } }
 .btn.tb-go .goicon { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.35em; vertical-align: -0.08em; }
 .ldot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1D2340; margin-right: 6px;
   vertical-align: -3px; box-shadow: 0 0 8px 2px var(--ld, #FFC86B); background: var(--ld, #FFC86B); }
@@ -137,7 +142,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <div class="tb-choices pats" id="pats" role="group" aria-label="Patterns"></div>
       <nav class="tb-tabs" aria-label="More">
         <button class="btn" id="lightBtn" aria-label="Change the light color"><span class="ldot" id="ldot"></span>Light</button>
-        <button class="btn tb-new" id="smoothBtn">Smooth</button>
+        <button class="btn tb-new" id="smoothBtn" aria-label="Smooth the sand"><svg class="rake" viewBox="0 0 32 28" aria-hidden="true"><path d="M2 24c3-2.2 6-2.2 9 0M2 18.5c2.4-1.8 4.8-1.8 7.2 0" fill="none" stroke="#8A5A2B" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/><path d="M27 2 19.5 12.5" stroke="#1D2340" stroke-width="3.6" stroke-linecap="round"/><path d="M12.5 9.5 25.5 17" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M13.5 12.5l-1.6 3.4M17.2 14.6l-1.6 3.4M20.9 16.7l-1.6 3.4M24.6 18.8 23 22.2" stroke="#1D2340" stroke-width="2.4" stroke-linecap="round"/></svg>Smooth</button>
         <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
@@ -169,7 +174,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var V_FINGER = 1.7;          // table radii per second: the ball's top speed behind a finger (calm, catches up)
   var V_PAT = 0.62;            // drawing a pattern by itself (calm)
   var WIPE_SECS = 7.5;         // the spiral smoothing takes about this long
-  var HOLD_MS = 8000;          // a finished pattern stays this long before the next one (Draw! mode only)
   var RESUME_MS = 2600;        // after a finger lets go in Draw! mode, the pattern carries on
   var SAND = [242, 222, 184];
   var LIGHTS = ["#FFC86B", "#56C2FF", "#B07CFF", "#FF7DC0", "#5FE08A", "#FF9248", "#FFFFFF"];
@@ -405,6 +409,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function smoothAll() {
     for (var i = 0; i < N * N; i++) { H[i] = 0; CARVE[i] = -1e9; }
     markDirty(0, 0, N - 1, N - 1);
+    sandChanged = now();
+    cumAtSmooth = cum;
   }
 
   // Save the sand as a PNG (a few times at most: when it has been still for a moment, and on leaving).
@@ -463,7 +469,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var steer = null;      // { tx, ty, down }: the ball follows a finger
   var route = null;      // the ball follows a path by itself: a pattern, the smoothing spiral, or the goodbye heart
   // Draw! mode: W.on keeps patterns coming; W.k is how far the current pattern got.
-  var W = { on: false, pat: prefs.pat, v: 0, k: 0, done: false, holdUntil: 0, resumeAt: 0 };
+  // W.done: the last pattern finished ("Ta-da!"); it stays on the sand until he smooths it (never automatically).
+  var W = { on: false, pat: prefs.pat, v: 0, k: 0, done: false, finished: false, resumeAt: 0 };
   var learnedDrag = false, watched = false, fingerPath = 0;
   var ending = false, endDone = null, endT0 = 0;
   var dim = 1, dimTarget = 1;
@@ -496,7 +503,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Draw! mode ----------
   function startPattern(id, v, fromK) {
     if (W.on && route && route.kind === "pattern" && W.pat === id && W.v === v && !fromK) return;
-    W.pat = id; W.v = v || 0; W.k = fromK || 0; W.done = false; W.on = true; watched = true;
+    W.pat = id; W.v = v || 0; W.k = fromK || 0; W.done = false; W.finished = false; W.on = true; watched = true;
     prefs.pat = id; savePrefs();
     if (route && route.kind === "wipe") { route.then = "pattern"; renderPanel(); return; }   // after the smoothing
     if (!steer) beginPatternRoute();
@@ -610,8 +617,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       else moveBallTo(ball.x + nvx * dt, ball.y + nvy * dt, dt);
       // Draw! mode carries on after a finger let go, or after a finished pattern has been admired.
       if (W.on && !ending) {
-        if (W.done) { if (t >= W.holdUntil) startWipe("next"); }
-        else if (W.resumeAt && t >= W.resumeAt) beginPatternRoute();
+        if (W.resumeAt && t >= W.resumeAt) beginPatternRoute();
         else if (!W.resumeAt) beginPatternRoute();
       }
     }
@@ -637,10 +643,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       return;
     }
     route = null;
-    if (R.kind === "pattern" && !R.stopping && W.on) {
-      W.done = true; W.holdUntil = now() + HOLD_MS; W.k = 0;
-    } else if (R.kind === "pattern" && !R.stopping) {
-      W.k = 0;
+    if (R.kind === "pattern" && !R.stopping) {
+      // finished: the ball rests, the pattern stays; Draw! again draws the next one on top
+      W.on = false; W.done = true; W.finished = true; W.k = 0;
     }
     updateCoach();
     renderPanel();
@@ -1001,7 +1006,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var t = "", el = $("coach");
     if (ending) t = "";
     else if (route && route.kind === "wipe") t = "Smoothing the sand…";
-    else if (W.on && W.done && !steer) t = "Ta-da!";
+    else if (W.done && !W.on && !steer) t = "Ta-da!";
     else if (W.on && !steer) t = "Watch it draw!";
     else if (!learnedDrag) t = "Drag the ball!";
     else if (!watched) t = "Tap Draw! to watch";
@@ -1038,9 +1043,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       startPattern(b.dataset.pat, 0, 0);
     } else if (b.id === "goBtn") {
       if (W.on) stopDrawing();
+      else if (W.finished) startPattern(nextPatternId(), 0, 0);   // the next pattern, on top of the last
       else startPattern(W.pat, W.v, W.k);
     } else if (b.id === "smoothBtn") {
       W.on = false;
+      $("smoothBtn").classList.remove("full");
       if (route && route.kind === "wipe") { route.then = null; renderPanel(); return; }
       if (steer) steer = null;
       startWipe(null);
@@ -1198,6 +1205,24 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return c;
   }
 
+  // How much of the sand is grooved (sampled every 4th cell inside the circle).
+  // "Very full": lots of line since the last smoothing (about three patterns) and most of the sand grooved.
+  var fullness = 0, fullAt = 0, FULL = 0.6, FULL_LINE = 42, cumAtSmooth = 0;
+  function measureFull() {
+    var n = 0, hit = 0, x, y;
+    for (y = 2; y < N; y += 4) {
+      var v = (y + 0.5) / HALF - 1;
+      for (x = 2; x < N; x += 4) {
+        var u = (x + 0.5) / HALF - 1;
+        if (u * u + v * v > 0.85) continue;
+        n++;
+        if (Math.abs(H[y * N + x]) > 0.6) hit++;
+      }
+    }
+    fullness = n ? hit / n : 0;
+    $("smoothBtn").classList.toggle("full", fullness > FULL && cum - cumAtSmooth > FULL_LINE && !(route && route.kind === "wipe"));
+  }
+
   // ---------- Frame loop ----------
   var last = now(), frameTimes = [];
   function frame(t) {
@@ -1209,6 +1234,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     trackDamage(shadeDirty());
     if (dirty) { dirty = false; dmg = null; var e = Ro + 8 * dpr; render([cx - e, cy - e, cx + e + 6 * dpr, cy + e + 6 * dpr]); }
     else if (dmg) { var d = dmg; dmg = null; render(d); }
+    // a gentle glow on Smooth once the sand is very full of lines (a hint; the coach never nags)
+    if (t - fullAt > 1500 && sandChanged > fullAt) { fullAt = t; measureFull(); }
     // save once things have been still for a moment
     if (sandChanged > savedAt && t - sandChanged > 2500 && !route && !steer) saveSand();
     requestAnimationFrame(frame);
@@ -1259,7 +1286,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       start: function (id, v) { startPattern(id, v || 0, 0); },
       smooth: function () { W.on = false; startWipe(null); },
       surprise: surprise,
-      fast: function (f) { V_PAT = 0.62 * f; HOLD_MS = 8000 / f; },
+      fast: function (f) { V_PAT = 0.62 * f; },
+      fullness: function () { return fullness; },
       height: function (x, y) { return H[Math.round(cellX(y)) * N + Math.round(cellX(x))]; },
       shadeMs: function () { var t = now(); markDirty(0, 0, N - 1, N - 1); shadeDirty(); return now() - t; },
       ghost: function () { return ghost.show(); },
