@@ -133,10 +133,9 @@
   var SETTINGS = [
     { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
       note: "Apps that use tilt or shake ask for motion access when he first touches them." },
-    { id: "kind-words", app: "Kind words", label: "Show kind words now and then", type: "bool", def: true,
-      note: "Every few minutes of play, a little card says something like \"You are doing great!\", \"You did it!\" or \"Dad loves you!\"" },
-    { id: "kind-own", app: "Kind words", label: "Add your own kind words", type: "text", free: true, def: "", max: 40,
-      note: "Shown now and then with the others. Leave empty for none." },
+    // Kind words has its own controls (kindBuildSettings below); its other ids are listed in KIND_SET.
+    { id: "kind-words", app: "Kind words", type: "custom", def: true,
+      build: function (row) { kindBuildSettings(row); }, refresh: function (row) { kindRefreshSettings(row); } },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
       note: "Uses the device's voice, so it only speaks when sound is on." },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
@@ -477,7 +476,8 @@
     sec.innerHTML = html;
     SETTINGS.forEach(function (d) {
       var row = sec.querySelector('[data-set="' + d.id + '"]'), el = row.querySelector("#tb-set-" + d.id);
-      if (d.type === "bool" && d.hold) makeHold(el, HOLD_MS, function () { settingSet(d.id, !settingGet(d.id)); refreshAppSettings(); });
+      if (d.type === "custom") d.build(row);
+      else if (d.type === "bool" && d.hold) makeHold(el, HOLD_MS, function () { settingSet(d.id, !settingGet(d.id)); refreshAppSettings(); });
       else if (d.type === "bool") el.addEventListener("change", function () { settingSet(d.id, this.checked); });
       else if (d.type === "choice") Array.prototype.forEach.call(row.querySelectorAll("[data-choice]"), function (b) {
         b.addEventListener("click", function () { settingSet(d.id, b.getAttribute("data-choice")); refreshAppSettings(); });
@@ -501,7 +501,8 @@
     if (!sec) return;
     SETTINGS.forEach(function (d) {
       var row = sec.querySelector('[data-set="' + d.id + '"]'), v = settingGet(d.id), el = row.querySelector("#tb-set-" + d.id);
-      if (d.type === "bool" && d.hold) $("tb-setl-" + d.id).textContent = (v ? "Hold to turn off: " : "Hold to turn on: ") + d.label.toLowerCase();
+      if (d.type === "custom") d.refresh(row);
+      else if (d.type === "bool" && d.hold) $("tb-setl-" + d.id).textContent = (v ? "Hold to turn off: " : "Hold to turn on: ") + d.label.toLowerCase();
       else if (d.type === "bool") el.checked = !!v;
       else if (d.type === "choice") Array.prototype.forEach.call(row.querySelectorAll("[data-choice]"), function (b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-choice") === v));
@@ -890,13 +891,15 @@
   // ---------- Kind words ----------
   // Now and then a little card with a kind line floats in at the top for a few seconds, while he plays
   // and when he comes back to the home screen. Three kinds, each with its own picture: gentle reminders
-  // (a smiling sun), congratulations (a star) and love from Dad (a heart; also the grown-up's own line).
-  // No line speaks as "I": the device isn't the one talking.
+  // (a smiling sun), congratulations (a star) and love from Dad (a heart).
+  // No built-in line speaks as "I": the device isn't the one talking.
   // It never takes a touch (pointer-events: none) and never shows while the timer is ending or resting,
   // the sheet is open or a card covers the app. Shared by every page: "toybox-kind-v1" remembers when
   // the last one showed and when the next may, so it stays special (one every few minutes of play).
   // Apps call Toybox.kind() when he finishes something; that shows a "You did it!" line only sometimes.
-  // Grown-ups can switch it off or add their own line on the home screen ("kind-words", "kind-own").
+  // Grown-ups control all of it in the home screen's Grown-ups sheet (settings in KIND_SET): on/off, how
+  // often, when (while playing, after finishing something, back on the home screen), how long a card
+  // stays, which of the usual lines are used, and their own lines with a picture each.
   var KKEY = "toybox-kind-v1";
   var KIND_GENTLE = ["You are doing great!", "Keep going!", "You are so smart!", "You are wonderful!", "You are so kind!",
     "You are awesome!", "You can do it!", "You are a great helper!", "You are so creative!", "You are a great builder!",
@@ -904,38 +907,91 @@
   var KIND_DONE = ["You did it!", "Great job!", "Wow, look at that!", "Amazing work!", "You worked so hard!",
     "High five!", "Way to go!", "You figured it out!", "Super job!"];
   var KIND_LOVE = ["Dad loves you!", "Dad loves you so much!"];
+  var KIND_LISTS = { gentle: KIND_GENTLE, done: KIND_DONE, love: KIND_LOVE };
+  var KIND_KINDS = ["gentle", "done", "love"];
+  var KIND_NAME = { gentle: "Kind reminders", done: "Well done", love: "Love" };
+  var KIND_PIC = { gentle: "Sun", done: "Star", love: "Heart" };
   var KIND_ART = {
     love: '<svg viewBox="0 0 40 36" aria-hidden="true"><path d="M20 33 C6 23 2 16 2 10.5 C2 5.5 6 2 10.5 2 C14.5 2 17.5 4.5 20 8 C22.5 4.5 25.5 2 29.5 2 C34 2 38 5.5 38 10.5 C38 16 34 23 20 33 Z" fill="#FF5D8F" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M9 9.5 Q10 6.5 13 6" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg>',
     done: '<svg viewBox="0 0 40 38" aria-hidden="true"><path d="M20 2.5 L25 13.5 L37 14.8 L28 23 L30.6 35 L20 28.8 L9.4 35 L12 23 L3 14.8 L15 13.5 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M15.5 17 Q16 15 18 14.5" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/></svg>',
     gentle: '<svg viewBox="0 0 40 40" aria-hidden="true"><g stroke="#1D2340" stroke-width="3" stroke-linecap="round"><path d="M20 2.5 V7 M20 33 V37.5 M2.5 20 H7 M33 20 H37.5 M7.6 7.6 L10.8 10.8 M29.2 29.2 L32.4 32.4 M7.6 32.4 L10.8 29.2 M29.2 10.8 L32.4 7.6"/></g><circle cx="20" cy="20" r="10.5" fill="#FFD84D" stroke="#1D2340" stroke-width="3"/><circle cx="16.5" cy="18.5" r="1.6" fill="#1D2340"/><circle cx="23.5" cy="18.5" r="1.6" fill="#1D2340"/><path d="M15.5 22.5 Q20 26.5 24.5 22.5" fill="none" stroke="#1D2340" stroke-width="2.2" stroke-linecap="round"/></svg>'
   };
-  var KIND_GAP = [4 * 60000, 7 * 60000];  // between automatic ones, while he is playing
+  // The grown-up's choices (in toybox-settings-v1, next to "kind-words" on/off) and their defaults.
+  var KIND_SET = {
+    "kind-often": "some",   // how often automatic ones come: "rare", "some", "often" (KIND_GAPS)
+    "kind-play": true,      // now and then while he plays
+    "kind-finish": true,    // sometimes when he finishes something (Toybox.kind())
+    "kind-home": true,      // sometimes when he comes back to the home screen
+    "kind-stay": "medium",  // how long a card stays: "short", "medium", "long" (KIND_STAYS)
+    "kind-off": [],         // the usual lines switched off (by their text)
+    "kind-mine": null       // the grown-up's own lines: [{ t: text, k: "gentle" | "done" | "love" }]
+  };
+  var KIND_GAPS = { rare: [8, 12], some: [4, 7], often: [2, 4] };  // minutes of play between automatic ones
+  var KIND_STAYS = { short: 3200, medium: 4600, long: 7000 };       // ms on screen
+  var KIND_MAX = 40, KIND_MINE_MAX = 20;
   var KIND_SOON = 75000;                   // no two kind cards closer than this
   var kindTouch = 0, kindPlay = 0, kindTimer = null, kindLastLine = "";
-  function kindState() { return readJSON(KKEY); }
+  function kset(id) {
+    var v = settingGet(id);
+    return v === undefined || v === null ? KIND_SET[id] : v;
+  }
+  function kindGap() { var g = KIND_GAPS[kset("kind-often")] || KIND_GAPS.some; return [g[0] * 60000, g[1] * 60000]; }
+  function kindOffList() { var a = kset("kind-off"); return Array.isArray(a) ? a : []; }
+  // The grown-up's own lines. Older versions kept one line in "kind-own"; it becomes a love line.
+  function kindMine() {
+    var a = settingGet("kind-mine");
+    if (!Array.isArray(a)) {
+      var own = String(settingGet("kind-own") || "").trim();
+      a = own ? [{ t: own, k: "love" }] : [];
+    }
+    return a.filter(function (m) { return m && typeof m.t === "string" && m.t.trim() && KIND_LISTS[m.k]; });
+  }
+  function kindSetMine(a) { settingSet("kind-mine", a.slice(0, KIND_MINE_MAX)); }
+  // Every line of one kind that may show: the usual ones still on, and the grown-up's own.
+  function kindPool(k) {
+    var off = kindOffList();
+    return {
+      usual: KIND_LISTS[k].filter(function (l) { return off.indexOf(l) < 0; }),
+      mine: kindMine().filter(function (m) { return m.k === k; }).map(function (m) { return m.t.trim(); })
+    };
+  }
   function kindReady() {
     return inited && settingGet("kind-words") !== false && timer.phase !== "ending" && timer.phase !== "resting" &&
       !sheetOpen() && !turning() && !($("tb-off") && !$("tb-off").hidden) && !document.hidden;
   }
-  // Pick a line of one kind ("gentle", "done" or "love"). The grown-up's own line counts as love.
+  // Pick a line of one kind ("gentle", "done" or "love"), or null when every line of it is off.
+  // The grown-up's own lines come up half the time (all the time when the usual ones are all off).
   function kindPick(kindOf) {
-    var own = String(settingGet("kind-own") || "").trim(), list = kindOf === "done" ? KIND_DONE : (kindOf === "love" ? KIND_LOVE : KIND_GENTLE), line;
-    if (kindOf === "love" && own && Math.random() < 0.5) return { line: own, art: "love" };
-    do { line = list[Math.floor(Math.random() * list.length)]; } while (line === kindLastLine && list.length > 1);
+    if (!kindOf) return null;
+    var pool = kindPool(kindOf), list, line, n = 0;
+    if (!pool.usual.length && !pool.mine.length) return null;
+    list = pool.mine.length && (!pool.usual.length || Math.random() < 0.5) ? pool.mine : pool.usual;
+    do { line = list[Math.floor(Math.random() * list.length)]; n++; } while (line === kindLastLine && list.length > 1 && n < 8);
     return { line: line, art: kindOf };
   }
-  // A kind at random, by weights { gentle, done, love } (the love share goes up when there is an own line).
+  // A kind at random, by weights { gentle, done, love }. A kind with no line on is left out; one with
+  // the grown-up's own lines comes up a little more often. null when nothing is left.
   function kindMix(w) {
-    var own = String(settingGet("kind-own") || "").trim(), love = (w.love || 0) * (own ? 1.5 : 1);
-    var r = Math.random() * ((w.gentle || 0) + (w.done || 0) + love);
-    return r < (w.gentle || 0) ? "gentle" : (r < (w.gentle || 0) + (w.done || 0) ? "done" : "love");
+    var weights = {}, total = 0;
+    KIND_KINDS.forEach(function (k) {
+      var pool = kindPool(k), x = (w[k] || 0) * (pool.usual.length || pool.mine.length ? 1 : 0) * (pool.mine.length ? 1.5 : 1);
+      weights[k] = x; total += x;
+    });
+    if (!total) return null;
+    var r = Math.random() * total, acc = 0, pick = null;
+    KIND_KINDS.forEach(function (k) { if (pick) return; acc += weights[k]; if (r < acc && weights[k]) pick = k; });
+    return pick;
   }
-  function kindShow(pick) {
+  // Show a card. A preview (from the Grown-ups sheet) shows above the sheet and doesn't count as one.
+  function kindShow(pick, preview) {
+    if (!pick) return false;
     var line = pick.line;
-    var st = kindState(), t = now();
-    st.last = t;
-    st.next = t + KIND_GAP[0] + Math.random() * (KIND_GAP[1] - KIND_GAP[0]);
-    put(KKEY, JSON.stringify(st));
+    if (!preview) {
+      var st = kindState(), t = now(), gap = kindGap();
+      st.last = t;
+      st.next = t + gap[0] + Math.random() * (gap[1] - gap[0]);
+      put(KKEY, JSON.stringify(st));
+    }
     kindLastLine = line;
     var el = $("tb-kind");
     if (!el) {
@@ -950,10 +1006,12 @@
     el.querySelector(".tb-kind-art").innerHTML = KIND_ART[pick.art] || KIND_ART.gentle;
     el.querySelector("span").textContent = line;
     el.classList.remove("show", "hide");
+    el.classList.toggle("preview", !!preview);
     void el.offsetWidth;
     el.classList.add("show");
     clearTimeout(kindTimer);
-    kindTimer = setTimeout(function () { el.classList.add("hide"); kindTimer = setTimeout(function () { el.classList.remove("show", "hide"); }, 700); }, 4600);
+    kindTimer = setTimeout(function () { el.classList.add("hide"); kindTimer = setTimeout(function () { el.classList.remove("show", "hide"); }, 700); },
+      KIND_STAYS[kset("kind-stay")] || KIND_STAYS.medium);
     // A soft two-note chime, only when the shared sound is on and running.
     try {
       var a = soundOn && actx && actx.state === "running" ? actx : null;
@@ -964,30 +1022,36 @@
         o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0 + 0.55);
       });
     } catch (e) { /* no sound */ }
+    return true;
   }
+  function kindState() { return readJSON(KKEY); }
   function kindHide() {
     var el = $("tb-kind");
-    if (el && el.classList.contains("show")) { clearTimeout(kindTimer); el.classList.remove("show", "hide"); }
+    if (el && el.classList.contains("show") && !el.classList.contains("preview")) { clearTimeout(kindTimer); el.classList.remove("show", "hide"); }
   }
   // Called by apps when he finishes something (a build, a puzzle, a job). Shows only sometimes, mostly a
   // congratulation (a star). type "love" asks for a love line instead.
   function kind(type) {
-    if (!kindReady()) return false;
+    if (!kindReady() || kset("kind-finish") === false) return false;
     var st = kindState(), t = now();
     if (st.last && t - st.last < KIND_SOON) return false;
     if (Math.random() < 0.5) return false;
-    kindShow(kindPick(type === "love" ? "love" : kindMix({ done: 8, gentle: 2 })));
-    return true;
+    return kindShow(kindPick(type === "love" && kindPick("love") ? "love" : kindMix({ done: 8, gentle: 2 })));
   }
   // Every second: count play time (a touch in the last 30 s), and show one when it's time.
   function kindTick() {
     if (!kindReady()) { kindHide(); return; }
     var t = now();
     if (t - kindTouch < 30000) kindPlay += 1000;
+    if (kset("kind-play") === false) return;
     var st = kindState();
-    if (!st.next) { st.next = t + KIND_GAP[0] * 0.5; put(KKEY, JSON.stringify(st)); return; }
+    if (!st.next) { st.next = t + kindGap()[0] * 0.5; put(KKEY, JSON.stringify(st)); return; }
+    // Never wait longer than the grown-up's choice (it may have been shortened since).
+    if (st.next - t > kindGap()[1]) { st.next = t + kindGap()[0]; put(KKEY, JSON.stringify(st)); }
     // Wait for some play on this page and a touch just now, so it lands while he is there and happy.
-    if (t >= st.next && kindPlay >= 40000 && t - kindTouch < 8000) kindShow(kindPick(kindMix({ gentle: 7, love: 3 })));
+    if (t >= st.next && kindPlay >= 40000 && t - kindTouch < 8000 && !kindShow(kindPick(kindMix({ gentle: 7, love: 3 })))) {
+      st.next = t + kindGap()[0]; put(KKEY, JSON.stringify(st));  // nothing on to show: try again later
+    }
   }
   function kindStart() {
     document.addEventListener("pointerdown", function () { kindTouch = now(); }, true);
@@ -998,9 +1062,160 @@
       try { been = !!sessionStorage.getItem("toybox-launch"); } catch (e) { /* ignore */ }
       setTimeout(function () {
         var st = kindState();
-        if (been && kindReady() && (!st.last || now() - st.last > KIND_SOON) && Math.random() < 0.6) kindShow(kindPick(kindMix({ gentle: 4, done: 4, love: 2 })));
+        if (been && kset("kind-home") !== false && kindReady() && (!st.last || now() - st.last > KIND_SOON) && Math.random() < 0.6) {
+          kindShow(kindPick(kindMix({ gentle: 4, done: 4, love: 2 })));
+        }
       }, 1400);
     }
+  }
+
+  // The Kind words controls in the home screen's Grown-ups sheet ("App settings").
+  function kindArt(k) { return '<i class="tb-kd-pic" aria-hidden="true">' + KIND_ART[k] + "</i>"; }
+  function kindChoiceRow(id, choices) {
+    return '<div class="row" data-kd-choice="' + id + '">' + choices.map(function (c) {
+      return '<button class="btn" type="button" data-v="' + c[0] + '">' + esc(c[1]) + "</button>"; }).join("") + "</div>";
+  }
+  function kindCheck(id, label) {
+    return '<label class="check"><input type="checkbox" data-kd-bool="' + id + '"> ' + esc(label) + "</label>";
+  }
+  function kindBuildSettings(row) {
+    var newKind = "love";
+    var html = '<label class="check"><input type="checkbox" id="tb-set-kind-words"> Show kind words now and then</label>' +
+      '<p class="sub">A little card with a picture floats in at the top for a few seconds, like "You are doing great!", "You did it!" or "Dad loves you!"</p>' +
+      '<div class="tb-kd" id="tb-kd">' +
+        '<p class="tb-kd-h">How often</p>' +
+        kindChoiceRow("kind-often", [["rare", "Rarely"], ["some", "Sometimes"], ["often", "Often"]]) +
+        '<p class="sub" id="tb-kd-oftenNote"></p>' +
+        '<p class="tb-kd-h">When</p>' +
+        kindCheck("kind-play", "While he plays") +
+        kindCheck("kind-finish", "Sometimes when he finishes something") +
+        kindCheck("kind-home", "Sometimes when he comes back to the home screen") +
+        '<p class="tb-kd-h">How long a card stays</p>' +
+        kindChoiceRow("kind-stay", [["short", "Short"], ["medium", "Medium"], ["long", "Long"]]) +
+        '<p class="tb-kd-h">Your own words</p>' +
+        '<div class="tb-kd-mine" id="tb-kd-mine"></div>' +
+        '<div class="tb-kd-add">' +
+          '<input class="textin" id="tb-kd-new" type="text" maxlength="' + KIND_MAX + '" autocomplete="off" placeholder="Type a kind line" aria-label="A new kind line">' +
+          '<div class="row" id="tb-kd-newKind">' + KIND_KINDS.map(function (k) {
+            return '<button class="btn tb-kd-kindbtn" type="button" data-k="' + k + '" aria-label="' + KIND_PIC[k] + ": " + KIND_NAME[k] + '">' + kindArt(k) + esc(KIND_PIC[k]) + "</button>"; }).join("") +
+            '<button class="btn" type="button" id="tb-kd-addBtn">＋ Add</button></div>' +
+        '</div>' +
+        '<p class="sub">The picture goes with the line: a sun for a kind reminder, a star for well done, a heart for love. ' +
+          'Words show just as typed. Write "Dad loves you!" rather than "I love you!": the card isn\'t the one talking.</p>' +
+        '<details class="tb-kd-usual"><summary id="tb-kd-usualSum">The usual lines</summary>' +
+          KIND_KINDS.map(function (k) {
+            return '<div class="tb-kd-group"><p class="tb-kd-gh">' + kindArt(k) + esc(KIND_NAME[k]) +
+              '<button class="btn small" type="button" data-kd-all="' + k + '">All</button>' +
+              '<button class="btn small" type="button" data-kd-none="' + k + '">None</button></p>' +
+              KIND_LISTS[k].map(function (l) {
+                return '<label class="check"><input type="checkbox" data-kd-line="' + esc(l) + '"> ' + esc(l) + "</label>"; }).join("") +
+              "</div>";
+          }).join("") +
+        "</details>" +
+        '<div class="sheet-actions"><button class="btn" type="button" id="tb-kd-show">Show one now</button></div>' +
+        '<p class="sub" id="tb-kd-showNote" hidden></p>' +
+      "</div>";
+    row.innerHTML = html;
+    function q(sel) { return row.querySelector(sel); }
+    function each(sel, fn) { Array.prototype.forEach.call(row.querySelectorAll(sel), fn); }
+    q("#tb-set-kind-words").addEventListener("change", function () { settingSet("kind-words", this.checked); kindRefreshSettings(row); });
+    each("[data-kd-choice]", function (r) {
+      each('[data-kd-choice="' + r.getAttribute("data-kd-choice") + '"] [data-v]', function (b) {
+        b.addEventListener("click", function () { settingSet(r.getAttribute("data-kd-choice"), b.getAttribute("data-v")); kindRefreshSettings(row); });
+      });
+    });
+    each("[data-kd-bool]", function (c) { c.addEventListener("change", function () { settingSet(c.getAttribute("data-kd-bool"), c.checked); }); });
+    each("[data-kd-line]", function (c) {
+      c.addEventListener("change", function () {
+        var l = c.getAttribute("data-kd-line"), off = kindOffList().filter(function (x) { return x !== l; });
+        if (!c.checked) off.push(l);
+        settingSet("kind-off", off); kindRefreshSettings(row);
+      });
+    });
+    function setGroup(k, on) {
+      var off = kindOffList().filter(function (x) { return KIND_LISTS[k].indexOf(x) < 0; });
+      if (!on) off = off.concat(KIND_LISTS[k]);
+      settingSet("kind-off", off); kindRefreshSettings(row);
+    }
+    each("[data-kd-all]", function (b) { b.addEventListener("click", function () { setGroup(b.getAttribute("data-kd-all"), true); }); });
+    each("[data-kd-none]", function (b) { b.addEventListener("click", function () { setGroup(b.getAttribute("data-kd-none"), false); }); });
+    // A new line of your own: type it, pick its picture, Add (or Enter). It shows once right away.
+    each("#tb-kd-newKind [data-k]", function (b) {
+      b.addEventListener("click", function () { newKind = b.getAttribute("data-k"); paintNewKind(); });
+    });
+    function paintNewKind() { each("#tb-kd-newKind [data-k]", function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-k") === newKind)); }); }
+    paintNewKind();
+    function add() {
+      var inp = q("#tb-kd-new"), t = inp.value.trim().slice(0, KIND_MAX), mine = kindMine();
+      if (!t) { inp.focus(); return; }
+      if (mine.length >= KIND_MINE_MAX) { toast("That's the most lines: remove one first"); return; }
+      mine.push({ t: t, k: newKind });
+      kindSetMine(mine);
+      inp.value = "";
+      kindRefreshSettings(row);
+      kindShow({ line: t, art: newKind }, true);
+    }
+    q("#tb-kd-addBtn").addEventListener("click", add);
+    q("#tb-kd-new").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); add(); } });
+    // Your own lines: edit the words in place, tap the picture to change it, ✕ to remove.
+    var mineBox = q("#tb-kd-mine");
+    mineBox.addEventListener("input", function (e) {
+      var i = Number(e.target.getAttribute("data-i")), mine = kindMine();
+      if (!e.target.classList.contains("textin") || !mine[i]) return;
+      mine[i].t = e.target.value.slice(0, KIND_MAX);
+      if (mine[i].t.trim()) kindSetMine(mine);
+    });
+    mineBox.addEventListener("focusout", function (e) {
+      // Emptied words remove the line.
+      if (e.target.classList.contains("textin") && !e.target.value.trim()) {
+        var i = Number(e.target.getAttribute("data-i")), mine = kindMine();
+        mine.splice(i, 1); kindSetMine(mine);
+        setTimeout(function () { kindRefreshSettings(row, true); }, 0);
+      }
+    });
+    mineBox.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("button") : null;
+      if (!b) return;
+      var i = Number(b.getAttribute("data-i")), mine = kindMine();
+      if (!mine[i]) return;
+      if (b.hasAttribute("data-kd-del")) mine.splice(i, 1);
+      else if (b.hasAttribute("data-kd-pic")) mine[i].k = KIND_KINDS[(KIND_KINDS.indexOf(mine[i].k) + 1) % KIND_KINDS.length];
+      kindSetMine(mine);
+      kindRefreshSettings(row, true);
+    });
+    q("#tb-kd-show").addEventListener("click", function () {
+      var note = q("#tb-kd-showNote");
+      var ok = kindShow(kindPick(kindMix({ gentle: 1, done: 1, love: 1 })), true);
+      note.hidden = ok;
+      note.textContent = "Every line is switched off: turn some on, or add your own.";
+    });
+    kindRefreshSettings(row);
+  }
+  function kindRefreshSettings(row, force) {
+    if (!row || !row.querySelector("#tb-kd")) return;
+    function each(sel, fn) { Array.prototype.forEach.call(row.querySelectorAll(sel), fn); }
+    var on = settingGet("kind-words") !== false;
+    row.querySelector("#tb-set-kind-words").checked = on;
+    row.querySelector("#tb-kd").hidden = !on;
+    each("[data-kd-choice]", function (r) {
+      var v = kset(r.getAttribute("data-kd-choice"));
+      each('[data-kd-choice="' + r.getAttribute("data-kd-choice") + '"] [data-v]', function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-v") === v)); });
+    });
+    var g = KIND_GAPS[kset("kind-often")] || KIND_GAPS.some;
+    row.querySelector("#tb-kd-oftenNote").textContent = "About one every " + g[0] + " to " + g[1] + " minutes of play.";
+    each("[data-kd-bool]", function (c) { c.checked = kset(c.getAttribute("data-kd-bool")) !== false; });
+    var off = kindOffList(), total = 0, onCount = 0;
+    each("[data-kd-line]", function (c) { total++; c.checked = off.indexOf(c.getAttribute("data-kd-line")) < 0; if (c.checked) onCount++; });
+    row.querySelector("#tb-kd-usualSum").textContent = "The usual lines (" + onCount + " of " + total + " on)";
+    // Don't rebuild the list under a finger that is typing in it.
+    var box = row.querySelector("#tb-kd-mine");
+    if (!force && box.contains(document.activeElement)) return;
+    var mine = kindMine();
+    box.innerHTML = mine.length ? mine.map(function (m, i) {
+      return '<div class="tb-kd-line"><button class="btn tb-kd-picbtn" type="button" data-kd-pic data-i="' + i + '" aria-label="Picture: ' + KIND_PIC[m.k] + ' (tap to change)">' + kindArt(m.k) + "</button>" +
+        '<input class="textin" type="text" data-i="' + i + '" maxlength="' + KIND_MAX + '" value="' + esc(m.t) + '" aria-label="Your kind line">' +
+        '<button class="btn tb-kd-del" type="button" data-kd-del data-i="' + i + '" aria-label="Remove this line">✕</button></div>';
+    }).join("") : '<p class="sub">None yet.</p>';
   }
 
   // ---------- Init ----------

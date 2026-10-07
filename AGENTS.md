@@ -162,8 +162,11 @@ Keep only:
   smiling sun), a congratulation ("You did it!", a star) or love from Dad ("Dad loves you!", a heart) every few
   minutes of play and sometimes on returning to the home screen. Never first person ("I'm proud..."): the device
   isn't the one talking; hearts only for love lines. When he finishes something real
-  (a build, a puzzle, a floor, a print), call `Toybox.kind()`; it shows only sometimes. Grown-ups can switch it off
-  or add their own line on the home screen. Never invent family members in the lines.
+  (a build, a puzzle, a floor, a print), call `Toybox.kind()`; it shows only sometimes. Grown-ups have **full
+  control** in the home screen's Grown-ups sheet (`KIND_SET` in `common/toybox.js`): on/off, how often
+  (Rarely/Sometimes/Often), when (while playing, after finishing something, back on the home screen), how long a
+  card stays, every usual line on or off, and their own lines, each with a sun, star or heart ("Show one now"
+  previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
 - Real names, no brand names or logos.
 
