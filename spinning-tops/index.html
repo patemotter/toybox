@@ -1,0 +1,1643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spinning Tops</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tops">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #C9F0D6;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+.stage { background: #C9F0D6; touch-action: none; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
+.stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; pointer-events: none; }
+body.big .tb-panel { display: none; }
+.stage .toast { position: absolute; top: 12px; z-index: 4; font-size: 1.3rem; }
+.stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
+.stage .farewell p { font-size: 1.25rem; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Panel: the five tops as picture tiles, then New and Surprise ---------- */
+.tops.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.toptile { min-width: 0; padding: 3px 2px; white-space: nowrap; }
+.toptile canvas { width: 46px; height: 46px; }
+.toptile .nm { font-weight: 800; }
+.toptile[aria-pressed="true"] { border-width: 4px; }
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 260px); justify-content: space-between; }
+  .tops.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; overflow: hidden; }
+  .tops .toptile:last-child { grid-column: 1 / span 2; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 184px; }
+  .tops.tb-choices { gap: 5px; }
+  .toptile { min-height: 62px; font-size: 0.88rem; gap: 0; }
+  .toptile canvas { width: 34px; height: 34px; }
+}
+/* Upright phones: five tops in one row, pictures only (the names would have to be squeezed tiny). */
+@media (max-width: 600px) and (orientation: portrait) {
+  .toptile { min-height: 64px; }
+  .toptile .nm { display: none; }
+  .toptile canvas { width: 54px; height: 54px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
+  .tops.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .toptile canvas { width: 66px; height: 66px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 300px); }
+  .tops.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toptile canvas { width: 62px; height: 62px; }
+}
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+</style>
+</head>
+<body>
+<div class="tb-app-shell">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Spinning Tops</h1>
+    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+  </header>
+
+  <div class="tb-body">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="view" role="img" aria-label="A spinning top arena. Pull the cord on the launcher to spin a top into the bowl, then flick the tops with a finger."></canvas>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Pull the cord!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+
+    <section class="tb-panel" id="panel">
+      <div class="tb-choices tops" id="tiles" role="group" aria-label="Pick a top"></div>
+      <nav class="tb-tabs" aria-label="More">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  var KEY = "spinning-tops-v1";     // { design, surprise, tops: [...] }: the bowl is kept on reload
+  var OUT = "#1D2340";
+  var TAU = Math.PI * 2;
+  var DEBUG = /[?&]debug\b/.test(location.search);
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DEPTH = 0.14;                 // how deep the bowl is (bowl radius = 1)
+  var TOP_R = 0.165;                // a top's radius in bowl units
+  var GIANT_R = 0.3;
+  var MAXW = 5;                     // at most this many tops in the bowl (a giant counts as two)
+  var VMAX = 1.7;                   // fastest a top slides (bowl radii per second)
+
+  // The five tops. h: height of the top face above the tip; rim: thickness of the rim band; bandR: the
+  // band's radius (the gear's teeth stick out past it); stem: the knob on top. All in units of the radius.
+  var DES = [
+    { id: "wood", label: "Wood", h: 1.3, rim: 0.16, bandR: 1, stemR: 0.15, stemH: 0.4, knob: true,
+      body: "#D79A5A", bodyDark: "#9A6232", rimC: "#E8453C", stemC: "#E8453C", trail: "#E8453C", spark: ["#FFD27A", "#FFFFFF"] },
+    { id: "metal", label: "Metal", h: 0.85, rim: 0.22, bandR: 1, stemR: 0.13, stemH: 0.16,
+      body: "#9AA6BA", bodyDark: "#56627A", rimC: "#3D7BFF", stemC: "#FFC93C", trail: "#3D7BFF", spark: ["#FFB627", "#FFE14D", "#FFFFFF"], sparky: true },
+    { id: "rainbow", label: "Rainbow", h: 1.1, rim: 0.13, bandR: 1, stemR: 0.1, stemH: 0.55, knob: true,
+      body: "#8E6CFF", bodyDark: "#5B3FC9", rimC: "#FFFFFF", stemC: "#FF4D6D", trail: "rainbow", spark: ["#FF4D6D", "#FFB627", "#4CD964", "#3DB4FF", "#8E6CFF"] },
+    { id: "glow", label: "Glow", h: 1.05, rim: 0.15, bandR: 1, stemR: 0.14, stemH: 0.2, dome: true,
+      body: "#2A2F6B", bodyDark: "#161A44", rimC: "#3DF5FF", stemC: "#FF6FD8", trail: "#3DF5FF", spark: ["#B8FFF9", "#FF9FE8", "#D7FF6B"], glow: true },
+    { id: "gear", label: "Gear", h: 1.0, rim: 0.2, bandR: 0.86, stemR: 0.14, stemH: 0.36,
+      body: "#FF9A2E", bodyDark: "#C0620E", rimC: "#FFC93C", stemC: "#4A5578", trail: "#FF9A2E", spark: ["#FFC93C", "#FFFFFF"], gear: true }
+  ];
+  var DES_BY = {};
+  DES.forEach(function (d, i) { DES_BY[d.id] = i; d.down = Math.max(0.95, Math.min(1.2, Math.atan2(d.h, 1) + 0.4)); });
+  var RAINBOW = ["#FF4D6D", "#FF9A2E", "#FFE14D", "#4CD964", "#3DB4FF", "#8E6CFF", "#FF6FD8"];
+
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function mkCanvas(w, h) { var c = document.createElement("canvas"); c.width = w; c.height = h || w; return c; }
+  function zB(x, y) { return DEPTH * (x * x + y * y - 1); }   // the bowl surface (rim at 0, middle lowest)
+
+  // ---------- Saved state ----------
+  // A fresh visit from the home screen empties the bowl and loads the first top; a reload keeps the bowl.
+  if (window.Toybox && Toybox.fresh()) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } }
+  var S = { design: 0, surprise: 0 };
+  var tops = [];
+  var nextId = 1;
+  function loadState() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!o || typeof o !== "object") return;
+      if (typeof o.design === "string" && DES_BY.hasOwnProperty(o.design)) S.design = DES_BY[o.design];
+      if (o.surprise === 1) S.surprise = 1;
+      if (Array.isArray(o.tops)) {
+        o.tops.slice(0, MAXW).forEach(function (q) {
+          if (!q || typeof q !== "object" || !DES_BY.hasOwnProperty(q.d)) return;
+          var t = makeTop(DES_BY[q.d], !!q.g, num(q.p, 0.2, 1, 0.5));
+          t.x = num(q.x, -1, 1, 0); t.y = num(q.y, -1, 1, 0);
+          var lim = 1 - t.r; var m = Math.sqrt(t.x * t.x + t.y * t.y);
+          if (m > lim) { t.x *= lim / m; t.y *= lim / m; }
+          t.vx = num(q.vx, -2, 2, 0); t.vy = num(q.vy, -2, 2, 0);
+          t.s = num(q.s, 0, 1, 0.5); t.psi = num(q.ps, -100, 100, 0);
+          t.state = q.st === "down" || q.st === "fall" ? "down" : "spin";
+          t.zr = 0;
+          if (t.state === "down") { t.phi = DES[t.d].down; t.s = 0; t.omega = 0; t.vx = t.vy = 0; }
+          tops.push(t);
+        });
+      }
+    } catch (e) { /* bad data: start empty */ }
+  }
+  function num(v, lo, hi, def) { return typeof v === "number" && isFinite(v) ? clamp(v, lo, hi) : def; }
+  var dirty = false, saveT = 0;
+  function saveNow() {
+    dirty = false;
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        design: DES[S.design].id, surprise: S.surprise,
+        tops: tops.filter(function (t) { return t.state !== "leave" && t.state !== "home"; }).map(function (t) {
+          return { d: DES[t.d].id, g: t.giant ? 1 : 0, p: +t.p.toFixed(3), x: +t.x.toFixed(3), y: +t.y.toFixed(3),
+            vx: +t.vx.toFixed(3), vy: +t.vy.toFixed(3), s: +t.s.toFixed(3), ps: +(t.psi % 100).toFixed(2),
+            st: t.state === "down" || t.state === "fall" ? "down" : "spin" };
+        })
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Tops ----------
+  function makeTop(d, giant, p) {
+    return { id: nextId++, d: d, giant: giant, r: giant ? GIANT_R : TOP_R, p: p,
+      x: 0, y: 0, vx: 0, vy: 0, zr: 0, vz: 0, z: 0,
+      s: 1, life: (giant ? 30 : 9) + 38 * p, omega0: 12 + 40 * p, omega: 0, theta: Math.random() * TAU,
+      phi: 0.03, psi: Math.random() * TAU, bump: 0, state: "spin", ft: 0, psiRate: 0,
+      trail: [], hum: null, sc: 1, alpha: 1, grab: null, pushT: 0, hop: 0, tick: 0, born: performance.now() };
+  }
+  function weight() {
+    var w = 0;
+    tops.forEach(function (t) { if (t.state !== "leave" && t.state !== "home") w += t.giant ? 2 : 1; });
+    return w;
+  }
+  // Keep the bowl to MAXW: the oldest top that has fallen floats away first, else the oldest spinner.
+  function makeRoom(need) {
+    var guard = 10;
+    while (weight() + need > MAXW && guard-- > 0) {
+      var live = tops.filter(function (t) { return t.state !== "leave" && t.state !== "home"; });
+      if (!live.length) break;
+      var down = live.filter(function (t) { return t.state === "down" || t.state === "fall"; });
+      var pick = (down.length ? down : live).sort(function (a, b) { return a.born - b.born; })[0];
+      leave(pick);
+    }
+  }
+  function leave(t) {
+    if (t.grab !== null) releaseGrab(t);
+    t.state = "leave"; t.ft = 0;
+    sparkle(t, 8);
+  }
+
+  // ---------- Patterns: each top's face, drawn once (crisp) plus a "spinning fast" version (rings) ----------
+  var PS = 256;
+  function facePath(g, d, R) {
+    g.beginPath();
+    if (d.gear) {
+      var n = 10;
+      for (var i = 0; i < n * 4; i++) {
+        var a = i / (n * 4) * TAU - TAU / (n * 8), rr = (i % 4 === 1 || i % 4 === 2) ? R : R * 0.86;
+        if (i === 0) g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      g.closePath();
+    } else g.arc(0, 0, R, 0, TAU);
+  }
+  function wedge(g, r0, r1, a0, a1) {
+    g.beginPath(); g.arc(0, 0, r1, a0, a1); g.arc(0, 0, r0, a1, a0, true); g.closePath();
+  }
+  function star(g, R, n, inner) {
+    g.beginPath();
+    for (var i = 0; i < n * 2; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? R * inner : R;
+      if (i === 0) g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    g.closePath();
+  }
+  function drawFace(g, d) {
+    var R = PS / 2 - 1, i, a;
+    g.save(); g.translate(PS / 2, PS / 2);
+    g.lineJoin = "round";
+    if (d.id === "wood") {
+      g.fillStyle = "#EDB679"; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+      g.strokeStyle = "rgba(160,100,50,0.35)"; g.lineWidth = 2;
+      [0.38, 0.66, 0.7].forEach(function (f) { g.beginPath(); g.arc(R * 0.05, 0, R * f, 0, TAU); g.stroke(); });
+      g.fillStyle = "#E8453C"; wedge(g, R * 0.76, R * 0.93, 0, TAU); g.fill();
+      g.fillStyle = "#2F6BFF"; wedge(g, R * 0.46, R * 0.6, 0, TAU); g.fill();
+      for (i = 0; i < 4; i++) { a = i * TAU / 4; g.fillStyle = i % 2 ? "#2F6BFF" : "#E8453C"; wedge(g, R * 0.6, R * 0.76, a, a + 0.42); g.fill(); }
+      for (i = 0; i < 4; i++) { a = i * TAU / 4 + 0.8; g.fillStyle = "#FFC93C"; wedge(g, R * 0.24, R * 0.46, a, a + 0.5); g.fill(); }
+      g.fillStyle = "#FFC93C"; g.beginPath(); g.arc(0, 0, R * 0.24, 0, TAU); g.fill();
+      g.strokeStyle = OUT; g.lineWidth = 4;
+      [0.24, 0.46, 0.6, 0.76, 0.93].forEach(function (f) { g.beginPath(); g.arc(0, 0, R * f, 0, TAU); g.stroke(); });
+    } else if (d.id === "metal") {
+      var gr = g.createRadialGradient(-R * 0.3, -R * 0.3, R * 0.1, 0, 0, R);
+      gr.addColorStop(0, "#F2F5FA"); gr.addColorStop(0.6, "#B7C1D1"); gr.addColorStop(1, "#7D8AA0");
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+      for (i = 0; i < 3; i++) {
+        a = i * TAU / 3;
+        g.beginPath();
+        g.moveTo(Math.cos(a - 0.3) * R * 0.34, Math.sin(a - 0.3) * R * 0.34);
+        g.quadraticCurveTo(Math.cos(a - 0.15) * R * 0.9, Math.sin(a - 0.15) * R * 0.9, Math.cos(a + 0.55) * R * 0.99, Math.sin(a + 0.55) * R * 0.99);
+        g.lineTo(Math.cos(a + 0.75) * R * 0.8, Math.sin(a + 0.75) * R * 0.8);
+        g.quadraticCurveTo(Math.cos(a + 0.5) * R * 0.5, Math.sin(a + 0.5) * R * 0.5, Math.cos(a + 0.45) * R * 0.34, Math.sin(a + 0.45) * R * 0.34);
+        g.closePath();
+        g.fillStyle = i === 0 ? "#3D7BFF" : (i === 1 ? "#FF4D6D" : "#3D7BFF");
+        g.fill(); g.strokeStyle = OUT; g.lineWidth = 4; g.stroke();
+        g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = 5;
+        g.beginPath(); g.arc(0, 0, R * 0.62, a + 0.05, a + 0.35); g.stroke();
+      }
+      g.fillStyle = "#4A5578"; g.beginPath(); g.arc(0, 0, R * 0.34, 0, TAU); g.fill();
+      g.strokeStyle = OUT; g.lineWidth = 4; g.stroke();
+      g.fillStyle = "#FFC93C"; star(g, R * 0.28, 5, 0.45); g.fill(); g.lineWidth = 3; g.stroke();
+    } else if (d.id === "rainbow") {
+      var arms = RAINBOW.length;
+      for (i = 0; i < arms; i++) {
+        g.beginPath();
+        var a0 = i * TAU / arms, a1 = (i + 1) * TAU / arms, st, f;
+        g.moveTo(0, 0);
+        for (st = 0; st <= 16; st++) { f = st / 16; g.lineTo(Math.cos(a0 + f * 2.2) * R * f, Math.sin(a0 + f * 2.2) * R * f); }
+        g.arc(0, 0, R, a0 + 2.2, a1 + 2.2);
+        for (st = 16; st >= 0; st--) { f = st / 16; g.lineTo(Math.cos(a1 + f * 2.2) * R * f, Math.sin(a1 + f * 2.2) * R * f); }
+        g.closePath();
+        g.fillStyle = RAINBOW[i]; g.fill();
+      }
+      g.strokeStyle = "rgba(29,35,64,0.55)"; g.lineWidth = 3;
+      for (i = 0; i < arms; i++) {
+        g.beginPath(); g.moveTo(0, 0);
+        for (var s2 = 1; s2 <= 16; s2++) { var f2 = s2 / 16, a2 = i * TAU / arms + f2 * 2.2; g.lineTo(Math.cos(a2) * R * f2, Math.sin(a2) * R * f2); }
+        g.stroke();
+      }
+      g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(0, 0, R * 0.16, 0, TAU); g.fill();
+      g.strokeStyle = OUT; g.lineWidth = 4; g.stroke();
+    } else if (d.id === "glow") {
+      g.fillStyle = "#20265A"; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+      g.strokeStyle = "rgba(61,245,255,0.5)"; g.lineWidth = 3;
+      g.beginPath(); g.arc(0, 0, R * 0.62, 0, TAU); g.stroke();
+      var neon = ["#3DF5FF", "#FF6FD8", "#D7FF6B", "#FFE14D"];
+      g.shadowBlur = 14;
+      for (i = 0; i < 10; i++) {
+        a = i * TAU / 10; g.fillStyle = neon[i % 4]; g.shadowColor = neon[i % 4];
+        g.beginPath(); g.arc(Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8, R * 0.09, 0, TAU); g.fill();
+      }
+      for (i = 0; i < 5; i++) {
+        a = i * TAU / 5 + 0.3; g.fillStyle = neon[(i + 1) % 4]; g.shadowColor = g.fillStyle;
+        g.beginPath(); g.arc(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45, R * 0.07, 0, TAU); g.fill();
+      }
+      g.fillStyle = "#FFE14D"; g.shadowColor = "#FFE14D"; star(g, R * 0.3, 5, 0.45); g.fill();
+      g.shadowBlur = 0;
+    } else if (d.id === "gear") {
+      facePath(g, d, R); g.fillStyle = "#FF9A2E"; g.fill();
+      g.fillStyle = "#FFB55C"; g.beginPath(); g.arc(0, 0, R * 0.74, 0, TAU); g.fill();
+      g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+      for (i = 0; i < 5; i++) {
+        a = i * TAU / 5;
+        g.fillStyle = "#7A3B05"; g.beginPath(); g.arc(Math.cos(a) * R * 0.48, Math.sin(a) * R * 0.48, R * 0.14, 0, TAU); g.fill();
+        g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+      }
+      g.fillStyle = "#FFE14D"; g.beginPath(); g.arc(0, 0, R * 0.22, 0, TAU); g.fill(); g.stroke();
+      g.fillStyle = "#4A5578"; g.beginPath(); g.arc(0, 0, R * 0.08, 0, TAU); g.fill();
+    }
+    g.restore();
+  }
+  // The blurred version: every ring of the face gets the average color around it (the glow top keeps its
+  // brightest color, so its lights turn into neon circles).
+  function ringsOf(src, useMax) {
+    var c = mkCanvas(PS), g = c.getContext("2d");
+    var sd = src.getContext("2d").getImageData(0, 0, PS, PS).data;
+    var half = PS / 2, nb = Math.ceil(half), prof = [], b, i;
+    for (b = 0; b < nb; b++) {
+      var rr = b + 0.5, sr = 0, sg = 0, sb = 0, sa = 0, mx = [0, 0, 0, 0], sat = [0, 0, 0, -1], n = Math.max(24, Math.round(rr * 3));
+      for (i = 0; i < n; i++) {
+        var a = i / n * TAU, x = Math.round(half + Math.cos(a) * rr - 0.5), y = Math.round(half + Math.sin(a) * rr - 0.5);
+        if (x < 0 || y < 0 || x >= PS || y >= PS) continue;
+        var o = (y * PS + x) * 4, al = sd[o + 3] / 255;
+        sr += sd[o] * al; sg += sd[o + 1] * al; sb += sd[o + 2] * al; sa += al;
+        var lum = sd[o] + sd[o + 1] + sd[o + 2];
+        if (al > 0.5 && lum > mx[3]) mx = [sd[o], sd[o + 1], sd[o + 2], lum];
+        var chroma = Math.max(sd[o], sd[o + 1], sd[o + 2]) - Math.min(sd[o], sd[o + 1], sd[o + 2]);
+        if (al > 0.5 && chroma > sat[3]) sat = [sd[o], sd[o + 1], sd[o + 2], chroma];
+      }
+      if (useMax && mx[3] > 300) prof.push([mx[0], mx[1], mx[2], sa / n]);
+      else if (sa > 0 && sat[3] > 60) prof.push([sr / sa * 0.35 + sat[0] * 0.65, sg / sa * 0.35 + sat[1] * 0.65, sb / sa * 0.35 + sat[2] * 0.65, sa / n]);
+      else prof.push(sa > 0 ? [sr / sa, sg / sa, sb / sa, sa / n] : [0, 0, 0, 0]);
+    }
+    var img = g.createImageData(PS, PS), dd = img.data;
+    for (var y2 = 0; y2 < PS; y2++) for (var x2 = 0; x2 < PS; x2++) {
+      var dx = x2 + 0.5 - half, dy = y2 + 0.5 - half, rb = Math.sqrt(dx * dx + dy * dy), bi = Math.floor(rb);
+      if (bi >= nb) continue;
+      var p = prof[bi], q = (y2 * PS + x2) * 4;
+      dd[q] = p[0]; dd[q + 1] = p[1]; dd[q + 2] = p[2]; dd[q + 3] = Math.round(p[3] * 255);
+    }
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+  DES.forEach(function (d) {
+    d.face = mkCanvas(PS);
+    drawFace(d.face.getContext("2d"), d);
+    try { d.rings = ringsOf(d.face, !!d.glow); } catch (e) { d.rings = d.face; }
+  });
+
+  // ---------- Drawing one top (seen from slightly above) ----------
+  // t: { d, r, x, y, z (tip height), phi (lean), psi (lean direction), theta (spin angle), blur, sc, alpha }
+  // V: { ox, oy, S (px per bowl unit), k (how much we look down), cz }
+  function hull(p) {
+    var n = p.length / 2, idx = [], i;
+    for (i = 0; i < n; i++) idx.push(i);
+    idx.sort(function (a, b) { return p[a * 2] - p[b * 2] || p[a * 2 + 1] - p[b * 2 + 1]; });
+    function cr(o, a, b) { return (p[a * 2] - p[o * 2]) * (p[b * 2 + 1] - p[o * 2 + 1]) - (p[a * 2 + 1] - p[o * 2 + 1]) * (p[b * 2] - p[o * 2]); }
+    var lo = [], up = [];
+    for (i = 0; i < n; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], idx[i]) <= 0) lo.pop(); lo.push(idx[i]); }
+    for (i = n - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], idx[i]) <= 0) up.pop(); up.push(idx[i]); }
+    lo.pop(); up.pop();
+    return lo.concat(up);
+  }
+  function polyPath(g, p, h) {
+    g.beginPath();
+    for (var i = 0; i < h.length; i++) { var j = h[i] * 2; if (i === 0) g.moveTo(p[j], p[j + 1]); else g.lineTo(p[j], p[j + 1]); }
+    g.closePath();
+  }
+  function drawTop(g, t, V) {
+    var d = DES[t.d], r = t.r * (t.sc == null ? 1 : t.sc);
+    if (r < 0.004) return;
+    var k = V.kt || V.k, cz = V.czt || V.cz, rs = r * V.S;
+    var sp = Math.sin(t.phi), cp = Math.cos(t.phi), ss = Math.sin(t.psi), cs = Math.cos(t.psi), om = 1 - cp;
+    var ax = sp * cs, ay = sp * ss, az = cp;
+    var ux = cp + ss * ss * om, uy = -ss * cs * om, uz = -cs * sp;
+    var vx = -ss * cs * om, vy = cp + cs * cs * om, vz = -ss * sp;
+    var Ax = ax * rs, Ay = (ay * k - az * cz) * rs;
+    var Ux = ux * rs, Uy = (uy * k - uz * cz) * rs;
+    var Vx = vx * rs, Vy = (vy * k - vz * cz) * rs;
+    var Tx = V.ox + t.x * V.S, Ty = V.oy + (t.y * V.k - t.z * V.cz) * V.S;
+    var facing = ay * cz + az * k;
+    var lw = clamp(rs * 0.07, 1.5, 4);
+    function ring(h, rad, n, out) {
+      for (var i = 0; i < n; i++) {
+        var a = i / n * TAU, c = Math.cos(a) * rad, s = Math.sin(a) * rad;
+        out.push(Tx + Ax * h + c * Ux + s * Vx, Ty + Ay * h + c * Uy + s * Vy);
+      }
+      return out;
+    }
+    g.save();
+    if (t.alpha != null && t.alpha < 1) g.globalAlpha = Math.max(0, t.alpha);
+    g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = OUT; g.lineWidth = lw;
+    var hb = d.h - d.rim;
+    // Stem (behind the body when the face looks away from us)
+    function stem() {
+      var p, h;
+      if (d.dome) {
+        p = ring(d.h, 0.38, 14, []); ring(d.h + 0.14, 0.3, 12, p); ring(d.h + 0.22, 0.15, 10, p);
+        h = hull(p); polyPath(g, p, h);
+        g.fillStyle = "rgba(255,111,216,0.85)"; g.fill(); g.stroke();
+        g.fillStyle = "rgba(255,255,255,0.75)";
+        g.beginPath(); g.arc(Tx + Ax * (d.h + 0.16) - rs * 0.1, Ty + Ay * (d.h + 0.16) - rs * 0.04, rs * 0.07, 0, TAU); g.fill();
+        return;
+      }
+      p = ring(d.h, d.stemR, 10, []); ring(d.h + d.stemH, d.stemR, 10, p);
+      h = hull(p); polyPath(g, p, h);
+      g.fillStyle = d.stemC; g.fill(); g.stroke();
+      if (d.knob) {
+        var kx = Tx + Ax * (d.h + d.stemH), ky = Ty + Ay * (d.h + d.stemH);
+        g.beginPath(); g.arc(kx, ky, rs * d.stemR * 1.45, 0, TAU); g.fillStyle = d.stemC; g.fill(); g.stroke();
+        g.fillStyle = "rgba(255,255,255,0.7)"; g.beginPath(); g.arc(kx - rs * 0.06, ky - rs * 0.06, rs * 0.06, 0, TAU); g.fill();
+      } else {
+        p = ring(d.h + d.stemH, d.stemR, 14, []);
+        g.beginPath(); for (var i = 0; i < p.length; i += 2) { if (i === 0) g.moveTo(p[i], p[i + 1]); else g.lineTo(p[i], p[i + 1]); }
+        g.closePath(); g.fillStyle = "rgba(255,255,255,0.45)"; g.fill();
+      }
+    }
+    function body() {
+      var p = [Tx, Ty]; ring(hb * 0.45, 0.6, 14, p); ring(hb, d.bandR, 20, p);
+      var h = hull(p); polyPath(g, p, h);
+      var gr = g.createLinearGradient(Tx - rs, 0, Tx + rs, 0);
+      gr.addColorStop(0, d.body); gr.addColorStop(0.55, d.body); gr.addColorStop(1, d.bodyDark);
+      g.fillStyle = gr; g.fill(); g.stroke();
+      p = ring(hb, d.bandR, 22, []); ring(d.h, d.bandR, 22, p);
+      h = hull(p); polyPath(g, p, h);
+      g.fillStyle = d.rimC; g.fill(); g.stroke();
+      if (d.glow && t.blur > 0.05) { g.strokeStyle = "rgba(255,255,255," + (0.5 * t.blur).toFixed(2) + ")"; g.lineWidth = lw * 0.8; g.stroke(); g.strokeStyle = OUT; g.lineWidth = lw; }
+    }
+    function face() {
+      var Fx = Tx + Ax * d.h, Fy = Ty + Ay * d.h, b = t.blur || 0;
+      g.save();
+      g.transform(Ux, Uy, Vx, Vy, Fx, Fy);
+      g.rotate(t.theta);
+      if (b > 0.02) g.drawImage(d.rings, -1, -1, 2, 2);
+      if (b < 0.98) { g.globalAlpha *= (1 - b); g.drawImage(d.face, -1, -1, 2, 2); }
+      g.restore();
+      if (b > 0.3) {
+        // bright motion arcs that sweep round with the spin
+        g.save(); g.transform(Ux, Uy, Vx, Vy, Fx, Fy); g.rotate(t.theta * 1.0);
+        g.strokeStyle = "rgba(255,255,255," + ((b - 0.3) * 1.1).toFixed(2) + ")"; g.lineWidth = 0.08; g.lineCap = "round";
+        g.beginPath(); g.arc(0, 0, 0.7, 0, 1.3); g.stroke();
+        g.beginPath(); g.arc(0, 0, 0.7, Math.PI, Math.PI + 1.3); g.stroke();
+        g.beginPath(); g.arc(0, 0, 0.42, 1.6, 2.6); g.stroke();
+        g.restore();
+      }
+      g.save(); g.transform(Ux, Uy, Vx, Vy, Fx, Fy); g.rotate(t.theta);
+      facePath(g, d, 1);
+      g.restore();
+      g.stroke();
+      if (d.glow && b > 0.05) {
+        g.save(); g.globalCompositeOperation = "lighter";
+        var gr = g.createRadialGradient(Fx, Fy, rs * 0.3, Fx, Fy, rs * 1.7);
+        gr.addColorStop(0, "rgba(61,245,255," + (0.35 * b).toFixed(2) + ")"); gr.addColorStop(1, "rgba(61,245,255,0)");
+        g.fillStyle = gr; g.beginPath(); g.arc(Fx, Fy, rs * 1.7, 0, TAU); g.fill();
+        g.restore();
+      }
+    }
+    if (facing >= 0) { body(); face(); stem(); }
+    else { stem(); body(); }
+    g.restore();
+    t.sx = Tx + Ax * d.h * 0.6; t.sy = Ty + Ay * d.h * 0.6; t.srad = rs;    // for touch hit tests
+  }
+
+  // ---------- Layout ----------
+  var stage = $("stage"), view = $("view"), ctx = view.getContext("2d");
+  var W = 0, H = 0, DPR = 1, rect = { left: 0, top: 0 };
+  var Vw = { ox: 0, oy: 0, S: 100, k: 0.6, cz: 0.8 };
+  var bg = null;
+  var L = { x: 0, y: 0, w: 100, h: 44, s: 1, D: { x: -0.32, y: -0.4 }, hL: 0.3, exitX: 0, exitY: 0, restX: 0, restY: 0, max: 160 };
+  function resize() {
+    var w = view.clientWidth, h = view.clientHeight;
+    if (w < 20 || h < 20) return;
+    var r = view.getBoundingClientRect();
+    rect = { left: r.left, top: r.top };
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    if (w === W && h === H && view.width === Math.round(w * DPR)) return;
+    W = w; H = h;
+    view.width = Math.round(W * DPR); view.height = Math.round(H * DPR);
+    var portrait = H > W * 1.08;
+    var pad = 10;
+    L.s = clamp(Math.min(W, H) / (portrait ? 260 : 330), 0.7, 1.5);
+    L.w = 112 * L.s; L.h = 44 * L.s;
+    L.D = { x: portrait ? -0.3 : -0.36, y: -0.42 };
+    var tallest = 0;
+    DES.forEach(function (d) { tallest = Math.max(tallest, d.h + d.stemH + 0.25); });
+    // keep clear of the coach line when it sits at the top of the stage (tablets)
+    var ce = $("coach"), coachBottom = 0;
+    if (ce && ce.offsetHeight && ce.offsetTop < H / 2) coachBottom = ce.offsetTop + ce.offsetHeight + 4;
+    var wall = 0.13, k, cz, S0, Dx, Dy, hangPx, lbottom = Math.max(pad + 6 * L.s, coachBottom) + L.h;
+    var topRes = Math.max(L.s * 66, H * (portrait ? 0.24 : 0.14));
+    for (var pass = 0; pass < 2; pass++) {
+      var Wa = W - 2 * pad, Hb = H - topRes - pad;
+      k = clamp(Hb / Wa * 0.8, 0.5, portrait ? 0.86 : 0.68); cz = Math.sqrt(1 - k * k);
+      S0 = Math.min(Wa / 2 / 1.07, Hb / (2 * k * 1.07 + wall));
+      Vw.S = S0; Vw.k = k; Vw.cz = cz; Vw.ox = W / 2;
+      // the tops themselves are always seen a little lower, so their bodies show under the spinning face
+      Vw.kt = Math.min(k, 0.64); Vw.czt = Math.sqrt(1 - Vw.kt * Vw.kt);
+      // upright: the bowl sits at the bottom and the top has a long way to drop; sideways: centered
+      var spare = Math.max(0, Hb - (2 * k * 1.07 + wall) * S0);
+      Vw.oy = H - pad - wall * S0 - k * S0 * 1.07 - (portrait ? 0 : spare * 0.5);
+      Dx = Vw.ox + L.D.x * S0; Dy = Vw.oy + (L.D.y * k - zB(L.D.x, L.D.y) * cz) * S0;
+      hangPx = tallest * TOP_R * S0 * Vw.czt;
+      var need = lbottom + hangPx + 0.15 * cz * S0 - Dy;      // too little room to hang the top: make some
+      if (need <= 0) break;
+      topRes += need + 2;
+    }
+    L.hL = Math.max(0.1, (Dy - (lbottom + hangPx)) / (cz * S0));
+    // a tall stage: no more than a short drop; the launcher and the bowl move together toward the middle
+    var extra = (L.hL - 1.1) * cz * S0;
+    if (extra > 0) {
+      lbottom += extra * 0.5; Vw.oy -= extra * 0.5; Dy -= extra * 0.5;
+      L.hL = Math.max(0.1, (Dy - (lbottom + hangPx)) / (cz * S0));
+    }
+    L.x = Dx; L.y = lbottom - L.h / 2;
+    L.hangTopY = lbottom;
+    L.exitX = L.x + L.w / 2; L.exitY = L.y + 3 * L.s;
+    L.restX = L.exitX + 30 * L.s; L.restY = L.exitY;
+    L.max = clamp(Math.min(W, H) * 0.5, 110, 300);
+    if (!cord.ptr && !cord.auto) { cord.hx = L.restX; cord.hy = L.restY; }
+    buildBg();
+  }
+  function proj(x, y, z) { return [Vw.ox + x * Vw.S, Vw.oy + (y * Vw.k - z * Vw.cz) * Vw.S]; }
+  // Screen point -> a point on the bowl floor (bowl units)
+  function toFloor(px, py) {
+    var X = (px - Vw.ox) / Vw.S, Y = (py - Vw.oy) / Vw.S / Vw.k, i;
+    for (i = 0; i < 3; i++) Y = ((py - Vw.oy) / Vw.S + zB(X, Y) * Vw.cz) / Vw.k;
+    return { x: X, y: Y };
+  }
+
+  function ell(g, cx, cy, rx, ry) { g.beginPath(); g.ellipse(cx, cy, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, TAU); }
+  function buildBg() {
+    bg = mkCanvas(view.width, view.height);
+    var g = bg.getContext("2d");
+    g.scale(DPR, DPR);
+    var S = Vw.S, k = Vw.k, cz = Vw.cz, ox = Vw.ox, oy = Vw.oy, wallPx = 0.13 * S;
+    // the play mat
+    g.fillStyle = "#C9F0D6"; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#B4E6C4";
+    var step = Math.max(26, S * 0.16);
+    for (var yy = step / 2, row = 0; yy < H + step; yy += step * 0.8, row++) {
+      for (var xx = (row % 2) * step / 2; xx < W + step; xx += step) { g.beginPath(); g.arc(xx, yy, step * 0.13, 0, TAU); g.fill(); }
+    }
+    // shadow
+    g.fillStyle = "rgba(29,35,64,0.16)"; ell(g, ox + 8, oy + wallPx + 8, S * 1.08, S * k * 1.08); g.fill();
+    // outer wall (the bowl's side, seen at the front)
+    g.lineJoin = "round"; g.strokeStyle = OUT; g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(ox - S * 1.07, oy);
+    g.lineTo(ox - S * 0.98, oy + wallPx);
+    g.ellipse(ox, oy + wallPx, S * 0.98, S * k * 0.98, 0, Math.PI, 0, true);
+    g.lineTo(ox + S * 1.07, oy);
+    g.closePath();
+    var wg = g.createLinearGradient(ox - S, 0, ox + S, 0);
+    wg.addColorStop(0, "#5B95FF"); wg.addColorStop(0.5, "#3D7BFF"); wg.addColorStop(1, "#2A5BC9");
+    g.fillStyle = wg; g.fill(); g.stroke();
+    // little stars round the side
+    g.fillStyle = "#FFE14D";
+    for (var i = 0; i < 9; i++) {
+      var a = Math.PI * (0.12 + i * 0.095), sx = ox - Math.cos(a) * S * 1.02, sy = oy + Math.sin(a) * S * k * 1.02 + wallPx * 0.5;
+      g.save(); g.translate(sx, sy); g.scale(1, 0.85); star(g, wallPx * 0.26, 5, 0.45); g.fill(); g.restore();
+    }
+    // the rim
+    ell(g, ox, oy, S * 1.07, S * k * 1.07); g.fillStyle = "#FFC93C"; g.fill(); g.stroke();
+    // inside of the bowl
+    ell(g, ox, oy, S, S * k);
+    var ig = g.createRadialGradient(ox, oy + DEPTH * cz * S - S * k * 0.2, S * 0.1, ox, oy, S * 1.05);
+    ig.addColorStop(0, "#F4FBFF"); ig.addColorStop(0.65, "#D7ECFF"); ig.addColorStop(1, "#A9CFF5");
+    g.fillStyle = ig; g.fill();
+    g.save(); g.clip();
+    // the near wall is in shade, the far wall catches the light
+    var sh = g.createLinearGradient(0, oy - S * k, 0, oy + S * k);
+    sh.addColorStop(0, "rgba(255,255,255,0.35)"); sh.addColorStop(0.55, "rgba(255,255,255,0)"); sh.addColorStop(1, "rgba(40,90,170,0.22)");
+    g.fillStyle = sh; g.fillRect(ox - S, oy - S * k, S * 2, S * k * 2);
+    [0.28, 0.56, 0.84].forEach(function (f, j) {
+      var cy = oy - zB(f, 0) * cz * S;
+      ell(g, ox, cy, S * f, S * k * f);
+      g.strokeStyle = j === 1 ? "rgba(255,111,216,0.55)" : "rgba(255,255,255,0.9)"; g.lineWidth = j === 1 ? 4 : 3; g.stroke();
+    });
+    var cy0 = oy - zB(0, 0) * cz * S;
+    ell(g, ox, cy0, S * 0.07, S * k * 0.07); g.fillStyle = "rgba(255,111,216,0.6)"; g.fill();
+    g.restore();
+    ell(g, ox, oy, S, S * k); g.strokeStyle = OUT; g.lineWidth = 3; g.stroke();
+  }
+
+  // ---------- Particles and trails ----------
+  var parts = [];
+  function addPart(x, y, vx, vy, col, life, size, kind) {
+    if (parts.length > 220) parts.shift();
+    parts.push({ x: x, y: y, vx: vx, vy: vy, c: col, life: life, max: life, s: size, k: kind || 0 });
+  }
+  function sparkle(t, n) {
+    if (t.sx == null) return;
+    var d = DES[t.d];
+    for (var i = 0; i < n; i++) {
+      var a = rnd(0, TAU), sp = rnd(40, 140);
+      addPart(t.sx, t.sy, Math.cos(a) * sp, Math.sin(a) * sp - 40, d.spark[i % d.spark.length], rnd(0.5, 0.9), rnd(3, 6), 1);
+    }
+  }
+  function sparksAt(x, y, nx, ny, cols, n, power) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.atan2(ny, nx) + rnd(-1.2, 1.2), sp = rnd(80, 240) * power;
+      addPart(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 30, cols[i % cols.length], rnd(0.3, 0.6), rnd(2, 4), 0);
+    }
+  }
+
+  // ---------- Sound (only when the shared sound is on) ----------
+  var AC = null, master = null, noiseBuf = null;
+  function audio() {
+    var ac = window.Toybox ? Toybox.sound.ready() : null;
+    if (!ac) return null;
+    if (AC !== ac) {
+      try {
+        AC = ac;
+        var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5000;
+        master = ac.createGain(); master.gain.value = 0.55;
+        master.connect(lp); lp.connect(ac.destination);
+        var len = Math.floor(ac.sampleRate * 0.5);
+        noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+        var dd = noiseBuf.getChannelData(0);
+        for (var i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
+        tops.forEach(function (t) { t.hum = null; });
+      } catch (e) { AC = null; return null; }
+    }
+    return ac;
+  }
+  var lastClack = 0;
+  function noise(ac, t0, dur, type, f0, f1, q, vol) {
+    var src = ac.createBufferSource(); src.buffer = noiseBuf;
+    var f = ac.createBiquadFilter(); f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    var g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.02, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t0, Math.random() * 0.2); src.stop(t0 + dur + 0.05);
+  }
+  function tone(ac, t0, dur, type, f0, f1, vol) {
+    var o = ac.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    var g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function sZip(p) {
+    var ac = audio(); if (!ac) return;
+    var t0 = ac.currentTime;
+    noise(ac, t0, 0.22 + 0.1 * p, "bandpass", 700, 2600 + 1800 * p, 2.5, 0.22);
+    tone(ac, t0 + 0.05, 0.3, "triangle", 300, 700 + 500 * p, 0.05);
+  }
+  function sClack(v) {
+    var now = performance.now();
+    if (now - lastClack < 45) return;
+    lastClack = now;
+    var ac = audio(); if (!ac) return;
+    var t0 = ac.currentTime, vol = clamp(v, 0.15, 1);
+    noise(ac, t0, 0.06, "bandpass", 2600, 1800, 3, 0.22 * vol);
+    tone(ac, t0, 0.09, "sine", 1500 + Math.random() * 400, 1100, 0.07 * vol);
+  }
+  function sTick(v) {
+    var ac = audio(); if (!ac) return;
+    tone(ac, ac.currentTime, 0.04, "triangle", 900 + Math.random() * 300, 600, 0.05 * v);
+  }
+  function sThump() {
+    var ac = audio(); if (!ac) return;
+    tone(ac, ac.currentTime, 0.12, "sine", 220, 110, 0.12);
+  }
+  function sWhoosh() {
+    var ac = audio(); if (!ac) return;
+    var t0 = ac.currentTime;
+    noise(ac, t0, 0.7, "bandpass", 400, 3000, 1.2, 0.16);
+    [523, 659, 784, 1047].forEach(function (f, i) { tone(ac, t0 + 0.1 + i * 0.09, 0.35, "sine", f, f, 0.05); });
+  }
+  function sPop() {
+    var ac = audio(); if (!ac) return;
+    tone(ac, ac.currentTime, 0.18, "sine", 500, 1100, 0.06);
+  }
+  // One soft humming whir per spinning top; the pitch follows its speed.
+  function humUpdate(t, ac) {
+    var spinning = (t.state === "spin" || t.state === "drop") && !document.hidden;
+    if (!ac || !spinning) {
+      if (t.hum) {
+        try {
+          var c = t.hum.g.context;
+          t.hum.g.gain.setTargetAtTime(0, c.currentTime, 0.08);
+          t.hum.o.stop(c.currentTime + 0.4); t.hum.o2.stop(c.currentTime + 0.4);
+        } catch (e) { /* ignore */ }
+        t.hum = null;
+      }
+      return;
+    }
+    if (!t.hum) {
+      try {
+        var o = ac.createOscillator(), o2 = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+        o.type = "triangle"; o2.type = "sine"; f.type = "lowpass"; f.frequency.value = 900;
+        g.gain.value = 0;
+        o.connect(f); o2.connect(f); f.connect(g); g.connect(master);
+        o.start(); o2.start();
+        t.hum = { o: o, o2: o2, g: g };
+      } catch (e) { return; }
+    }
+    var sp = t.omega / 52, fr = (t.giant ? 70 : 110) + 230 * sp + 6 * Math.sin(t.psi);
+    var now = ac.currentTime;
+    t.hum.o.frequency.setTargetAtTime(fr, now, 0.05);
+    t.hum.o2.frequency.setTargetAtTime(fr * 1.5, now, 0.05);
+    t.hum.g.gain.setTargetAtTime(0.028 * Math.min(1, t.s * 4 + 0.2) * (ending ? 0.6 : 1), now, 0.08);
+  }
+  function stopHums() { tops.forEach(function (t) { humUpdate(t, null); }); }
+
+  // ---------- The launcher and its ripcord ----------
+  var cord = { hx: 0, hy: 0, ptr: null, offX: 0, offY: 0, maxPull: 0, peak: 0, lastPull: 0, lastT: 0, auto: null, back: null, spin: 0 };
+  var hang = { theta: 0, pop: 1, popT: 1, design: 0, wind: 0 };
+  function pullLen() { var dx = cord.hx - L.restX, dy = cord.hy - L.restY; return Math.sqrt(dx * dx + dy * dy); }
+  function powerNow() {
+    var lenF = Math.min(1, cord.maxPull / L.max), spdF = clamp((cord.peak / L.max - 0.8) / 5, 0, 1);
+    return clamp(0.22 + 0.4 * lenF + 0.45 * spdF, 0.22, 1);
+  }
+  function launch(p, dirX) {
+    if (Toybox.timer.locked()) return;
+    makeRoom(1);
+    var t = makeTop(hang.design, false, p);
+    t.x = L.D.x + rnd(-0.03, 0.03); t.y = L.D.y + rnd(-0.03, 0.03);
+    t.state = "drop"; t.zr = L.hL; t.vz = 0; t.theta = hang.theta;
+    // it lands with a swirl round the bowl
+    var m = Math.sqrt(t.x * t.x + t.y * t.y) || 1, sgn = dirX < 0 ? -1 : 1, sp = 0.4 + 0.35 * p;
+    t.vx = -t.y / m * sp * sgn + rnd(-0.08, 0.08); t.vy = t.x / m * sp * sgn + rnd(-0.08, 0.08);
+    tops.push(t);
+    sZip(p);
+    learned.pull = true;
+    hang.pop = 0; hang.popT = 0;
+    // the top drops away: a puff of air rings under the launcher
+    var hx = L.x, hy = L.hangTopY + 10;
+    for (var i = 0; i < 6 + p * 8; i++) addPart(hx + rnd(-10, 10), hy + rnd(0, 20), rnd(-90, 90) * p, rnd(-20, 40), DES[t.d].spark[i % DES[t.d].spark.length], rnd(0.3, 0.6), rnd(2, 4), 1);
+    dirty = true;
+    coachUpdate();
+    if (learned.pull && learned.flick) ghost.learned();
+    return t;
+  }
+  function cordRelease(doLaunch) {
+    var p = powerNow(), dx = cord.hx - L.restX;
+    cord.ptr = null;
+    if (doLaunch) launch(p, dx);
+    cord.back = { t: 0, fx: cord.hx, fy: cord.hy };
+  }
+  function autoPull() {
+    if (cord.auto || cord.ptr !== null) return;
+    cord.back = null;
+    cord.auto = { t: 0, dur: 0.34, tx: L.restX + L.max * 0.62, ty: L.restY + L.max * 0.16 };
+    if (cord.auto.tx > W - 20) { cord.auto.tx = W - 20; cord.auto.ty = L.restY + L.max * 0.45; }
+  }
+  function cordStep(dt) {
+    if (cord.auto) {
+      var a = cord.auto; a.t += dt;
+      var f = Math.min(1, a.t / a.dur), e = 1 - Math.pow(1 - f, 2);
+      cord.hx = L.restX + (a.tx - L.restX) * e; cord.hy = L.restY + (a.ty - L.restY) * e;
+      hang.wind = e * 0.55;
+      if (f >= 1) { cord.auto = null; launch(0.55, 1); cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; }
+    } else if (cord.back) {
+      var b = cord.back; b.t += dt;
+      var g = Math.min(1, b.t / 0.32), e2 = 1 - Math.pow(1 - g, 3);
+      cord.hx = b.fx + (L.restX - b.fx) * e2; cord.hy = b.fy + (L.restY - b.fy) * e2;
+      if (g >= 1) cord.back = null;
+      hang.wind *= Math.exp(-6 * dt);
+    } else if (cord.ptr !== null) {
+      hang.wind = powerNow() * Math.min(1, cord.maxPull / (L.max * 0.3));
+    } else hang.wind *= Math.exp(-4 * dt);
+    if (hang.popT < 1) { hang.popT = Math.min(1, hang.popT + dt / 0.45); }
+    hang.pop = hang.popT < 0.25 ? 0 : backOut((hang.popT - 0.25) / 0.75);
+    hang.theta += (1.1 + hang.wind * 16) * dt;
+  }
+  function backOut(x) { var c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+
+  function drawLauncher(g) {
+    var s = L.s, x = L.x, y = L.y, w = L.w, h = L.h, locked = ending || resting;
+    g.save();
+    if (locked) g.globalAlpha = 0.55;
+    // the top hanging under the launcher (spins up while the cord is pulled)
+    var ht = { d: hang.design, r: TOP_R, x: L.D.x, y: L.D.y, z: zB(L.D.x, L.D.y) + L.hL, phi: 0, psi: 0, theta: hang.theta,
+      blur: clamp(hang.wind * 1.1 - 0.1, 0, 0.85), sc: hang.pop };
+    if (hang.pop > 0.02 && L.hL < 0.7) {
+      // its shadow on the bowl
+      var sp = proj(L.D.x, L.D.y, zB(L.D.x, L.D.y));
+      var shf = clamp(1 - L.hL * 0.45, 0.35, 1);
+      g.fillStyle = "rgba(29,35,64," + (0.13 * shf).toFixed(3) + ")"; ell(g, sp[0], sp[1], TOP_R * Vw.S * 0.8 * shf, TOP_R * Vw.S * Vw.k * 0.8 * shf); g.fill();
+    }
+    if (hang.pop > 0.02) {
+      drawTop(g, ht, Vw);
+      hang.sx = ht.sx; hang.sy = ht.sy; hang.srad = ht.srad;
+    }
+    // the cord
+    var ex = L.exitX, ey = L.exitY, hx = cord.hx, hy = cord.hy;
+    var dx = hx - ex, dy = hy - ey, len = Math.sqrt(dx * dx + dy * dy), sag = Math.min(18 * s, len * 0.08);
+    g.lineCap = "round";
+    g.beginPath(); g.moveTo(ex, ey); g.quadraticCurveTo((ex + hx) / 2, (ey + hy) / 2 + sag, hx, hy);
+    g.strokeStyle = OUT; g.lineWidth = 9 * s; g.stroke();
+    g.strokeStyle = "#FFFFFF"; g.lineWidth = 4.5 * s; g.stroke();
+    g.setLineDash([3 * s, 5 * s]); g.strokeStyle = "#FF4D6D"; g.lineWidth = 2 * s; g.stroke(); g.setLineDash([]);
+    // the body
+    g.lineJoin = "round"; g.strokeStyle = OUT; g.lineWidth = 3.5 * s;
+    // claw that holds the top
+    g.fillStyle = "#9AA6BA";
+    g.beginPath(); g.moveTo(x - 16 * s, y + h / 2 - 2); g.lineTo(x + 16 * s, y + h / 2 - 2); g.lineTo(x + 11 * s, y + h / 2 + 8 * s); g.lineTo(x - 11 * s, y + h / 2 + 8 * s); g.closePath(); g.fill(); g.stroke();
+    // grip on the left
+    g.fillStyle = "#3D7BFF";
+    rr(g, x - w / 2 - 6 * s, y - h * 0.35, 26 * s, h * 0.9, 8 * s); g.fill(); g.stroke();
+    g.fillStyle = "#FF4D6D";
+    rr(g, x - w / 2, y - h / 2, w, h, 14 * s); g.fill(); g.stroke();
+    g.fillStyle = "rgba(255,255,255,0.35)"; rr(g, x - w / 2 + 8 * s, y - h / 2 + 5 * s, w - 16 * s, 7 * s, 4 * s); g.fill();
+    // gear window: the gear spins while the cord runs
+    g.fillStyle = "#FFF6DD"; g.beginPath(); g.arc(x, y + 2 * s, h * 0.34, 0, TAU); g.fill(); g.stroke();
+    g.save(); g.translate(x, y + 2 * s); g.rotate(hang.theta * 0.6);
+    g.fillStyle = "#FFC93C"; g.beginPath();
+    for (var i = 0; i < 24; i++) { var a = i / 24 * TAU, r0 = (i % 3 === 0) ? h * 0.27 : h * 0.21; if (i === 0) g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); else g.lineTo(Math.cos(a) * r0, Math.sin(a) * r0); }
+    g.closePath(); g.fill(); g.lineWidth = 2 * s; g.stroke();
+    g.fillStyle = OUT; g.beginPath(); g.arc(0, 0, h * 0.06, 0, TAU); g.fill();
+    g.restore();
+    // cord slot on the right
+    g.fillStyle = OUT; rr(g, ex - 7 * s, ey - 6 * s, 9 * s, 12 * s, 3 * s); g.fill();
+    // the handle: a big yellow T-grip
+    var grabbing = cord.ptr !== null, hs = s * (grabbing ? 1.12 : 1);
+    var ang = len > 4 ? Math.atan2(dy, dx) : 0;
+    g.save(); g.translate(hx, hy); g.rotate(ang);
+    g.lineWidth = 3.5 * s; g.strokeStyle = OUT;
+    g.fillStyle = "#FFC93C"; rr(g, -2 * hs, -9 * hs, 16 * hs, 18 * hs, 5 * hs); g.fill(); g.stroke();
+    rr(g, 10 * hs, -28 * hs, 20 * hs, 56 * hs, 10 * hs); g.fill(); g.stroke();
+    g.fillStyle = "rgba(255,255,255,0.55)"; rr(g, 14 * hs, -22 * hs, 5 * hs, 30 * hs, 3 * hs); g.fill();
+    g.restore();
+    // a pulse ring round the handle until he has pulled it once
+    if (!learned.pull && !locked) {
+      var ph = (performance.now() / 1400) % 1;
+      g.strokeStyle = "rgba(255,201,60," + (0.85 * (1 - ph)).toFixed(2) + ")"; g.lineWidth = 4 * s;
+      g.beginPath(); g.arc(hx + 20 * s, hy, (26 + 22 * ph) * s, 0, TAU); g.stroke();
+    }
+    g.restore();
+  }
+  function rr(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+
+  // ---------- Physics ----------
+  var tiltX = 0, tiltY = 0, tiltOn = false;
+  var ending = false, resting = false, endingDone = null, endingT = 0;
+  var learned = { pull: false, flick: false };
+  function update(dt) {
+    var i, j, t;
+    for (i = 0; i < tops.length; i++) {
+      t = tops[i];
+      var d = DES[t.d];
+      t.ft += dt;
+      if (t.state === "leave") {
+        t.zr += dt * 1.6; t.alpha = Math.max(0, 1 - t.ft / 0.6); t.sc = 1 + t.ft * 0.4;
+        t.theta += 6 * dt;
+        continue;
+      }
+      if (t.state === "home") {
+        var f = Math.min(1, t.ft / 0.6);
+        t.x = t.hx0 + (L.D.x - t.hx0) * f; t.y = t.hy0 + (L.D.y - t.hy0) * f;
+        t.zr = (L.hL) * f + Math.sin(f * Math.PI) * 0.5;
+        t.phi = t.phi0 * (1 - f); t.sc = 1 - 0.15 * Math.sin(f * Math.PI);
+        t.theta += 8 * dt;
+        if (f >= 1) { t.dead = true; hang.design = t.d; hang.popT = 0.25; renderTiles(); sPop(); }
+        continue;
+      }
+      if (t.state === "drop") {
+        t.vz -= 7 * dt; t.zr += t.vz * dt;
+        if (t.zr <= 0) {
+          t.zr = 0;
+          if (t.vz < -1.2 && !t.bounced) { t.vz = -t.vz * 0.22; t.bounced = true; sThump(); landPuff(t); }
+          else { t.vz = 0; t.state = "spin"; if (!t.bounced) { sThump(); landPuff(t); } }
+        }
+      }
+      // spin
+      if (t.state === "spin" || t.state === "drop") {
+        var rate = 1 / t.life;
+        if (ending) rate = Math.max(rate, 0.24);
+        if (t.state === "spin") t.s = Math.max(0, t.s - rate * dt);
+        t.omega = t.omega0 * (0.22 + 0.78 * t.s);
+        var wob = 0.035 + 0.32 * Math.pow(1 - t.s, 2.6) + (t.s < 0.1 ? (0.1 - t.s) * 3 : 0);
+        t.phi = wob + t.bump + 0.015 * Math.sin(t.ft * 13);
+        t.psi += (1.6 + 7 * Math.pow(1 - t.s, 2)) * dt;
+        t.bump *= Math.exp(-2.5 * dt);
+        if (t.s <= 0 && t.state === "spin") {
+          t.state = "fall"; t.ft = 0; t.phi0 = t.phi; t.psiRate = 5.5; t.tick = 0;
+          if (t.grab !== null) releaseGrab(t);
+          dirty = true;
+        }
+      } else if (t.state === "fall") {
+        var ff = Math.min(1, t.ft / 0.7);
+        t.phi = d.down - (d.down - t.phi0) * Math.pow(1 - ff, 2) + 0.1 * Math.sin(t.ft * 16) * Math.exp(-t.ft * 2.6);
+        t.psiRate *= Math.exp(-1.25 * dt);
+        t.psi += t.psiRate * dt;
+        t.tick += t.psiRate * dt;
+        if (t.tick > 0.75) { t.tick = 0; sTick(Math.min(1, t.psiRate / 3)); }
+        t.omega *= Math.exp(-2.2 * dt);
+        if (t.ft > 2.6 && t.psiRate < 0.35) { t.state = "down"; t.omega = 0; dirty = true; }
+      } else if (t.state === "down") {
+        t.omega = 0;
+        if (t.hop > 0) { t.hop = Math.max(0, t.hop - dt * 1.6); }
+      }
+      t.theta -= Math.min(t.omega, 15) * dt;
+      t.blur = clamp((t.omega - 9) / 24, 0, 0.88);
+      if (t.state === "drop") continue;
+      // move: the bowl pulls toward the middle; a leaning top drifts the way it leans
+      var ax = 0, ay = 0;
+      if (t.grab !== null) {
+        var gx = t.grab.tx - t.x, gy = t.grab.ty - t.y;
+        t.vx = clamp(gx * 12, -3, 3); t.vy = clamp(gy * 12, -3, 3);
+      } else {
+        ax = -1.25 * t.x + tiltX * 0.9; ay = -1.25 * t.y + tiltY * 0.9;
+        var fr;
+        if (t.state === "spin") {
+          ax += Math.cos(t.psi) * t.phi * 1.1; ay += Math.sin(t.psi) * t.phi * 1.1;
+          fr = 0.28;
+        } else if (t.state === "fall") fr = 1.6;
+        else fr = 3.2;
+        t.vx += ax * dt; t.vy += ay * dt;
+        var damp = Math.exp(-fr * dt);
+        t.vx *= damp; t.vy *= damp;
+        if (t.state === "down" && t.vx * t.vx + t.vy * t.vy < 0.0004) { t.vx *= 0.5; t.vy *= 0.5; }
+      }
+      var sp = Math.sqrt(t.vx * t.vx + t.vy * t.vy);
+      if (sp > VMAX && t.grab === null) { t.vx *= VMAX / sp; t.vy *= VMAX / sp; }
+      t.x += t.vx * dt; t.y += t.vy * dt;
+      // the rim
+      var m = Math.sqrt(t.x * t.x + t.y * t.y), lim = 1 - t.r * 0.95;
+      if (m > lim) {
+        var nx = t.x / m, ny = t.y / m;
+        t.x = nx * lim; t.y = ny * lim;
+        var vn = t.vx * nx + t.vy * ny;
+        if (vn > 0) {
+          t.vx -= vn * nx * 1.6; t.vy -= vn * ny * 1.6;
+          if (vn > 0.35) { sClack(vn * 0.6); var pp = proj(t.x + nx * t.r, t.y + ny * t.r, 0); sparksAt(pp[0], pp[1], -nx, -ny * Vw.k, DES[t.d].spark, 4, 0.7); }
+        }
+      }
+      if (t.pushT > 0) t.pushT -= dt;
+      // trail on the bowl
+      if (t.state === "spin" && !reduce) {
+        var last = t.trail[t.trail.length - 1];
+        if (!last || Math.abs(last[0] - t.x) + Math.abs(last[1] - t.y) > 0.012) { t.trail.push([t.x, t.y]); if (t.trail.length > 22) t.trail.shift(); }
+      } else if (t.trail.length) { if (Math.random() < dt * 30) t.trail.shift(); }
+      // rim sparks while spinning fast
+      if (t.state === "spin" && t.blur > 0.2 && t.sx != null && !reduce) {
+        var rateS = (d.sparky ? 9 : (d.glow ? 6 : 3)) * t.blur * (t.giant ? 1.6 : 1);
+        if (Math.random() < rateS * dt) {
+          var a = rnd(0, TAU), R = t.srad;
+          var px = t.sx + Math.cos(a) * R, py = t.sy + Math.sin(a) * R * Vw.k;
+          addPart(px, py, -Math.sin(a) * 150, Math.cos(a) * 150 * Vw.k - 20, d.spark[(Math.random() * d.spark.length) | 0], rnd(0.25, 0.5), rnd(2, 3.5), 0);
+        }
+      }
+    }
+    // bumps between tops
+    for (i = 0; i < tops.length; i++) {
+      var a1 = tops[i];
+      if (!solid(a1)) continue;
+      for (j = i + 1; j < tops.length; j++) {
+        var b1 = tops[j];
+        if (!solid(b1)) continue;
+        var dx = a1.x - b1.x, dy = a1.y - b1.y, dist = Math.sqrt(dx * dx + dy * dy), minD = (a1.r + b1.r) * 0.92;
+        if (dist >= minD || dist < 1e-6) continue;
+        var nx2 = dx / dist, ny2 = dy / dist, ma = a1.r * a1.r, mb = b1.r * b1.r, tot = ma + mb;
+        var over = minD - dist;
+        if (a1.grab === null) { a1.x += nx2 * over * mb / tot; a1.y += ny2 * over * mb / tot; }
+        if (b1.grab === null) { b1.x -= nx2 * over * ma / tot; b1.y -= ny2 * over * ma / tot; }
+        var rv = (a1.vx - b1.vx) * nx2 + (a1.vy - b1.vy) * ny2;
+        var spinA = a1.state === "spin", spinB = b1.state === "spin";
+        if (rv < 0) {
+          var e = spinA && spinB ? 1.0 : 0.5;
+          var jimp = -(1 + e) * rv / tot;
+          a1.vx += jimp * mb * nx2; a1.vy += jimp * mb * ny2;
+          b1.vx -= jimp * ma * nx2; b1.vy -= jimp * ma * ny2;
+          // two spinning tops kick each other apart (their edges rub the same way)
+          if (spinA && spinB) {
+            var kick = 0.18 + 0.25 * Math.min(a1.s, b1.s);
+            a1.vx += (nx2 * 0.5 - ny2) * kick * mb / tot; a1.vy += (ny2 * 0.5 + nx2) * kick * mb / tot;
+            b1.vx -= (nx2 * 0.5 - ny2) * kick * ma / tot; b1.vy -= (ny2 * 0.5 + nx2) * kick * ma / tot;
+            a1.s = Math.max(0.002, a1.s - 0.006 * mb / tot); b1.s = Math.max(0.002, b1.s - 0.006 * ma / tot);
+          }
+          var imp = Math.min(1.5, -rv);
+          if (spinA) a1.bump = Math.min(0.35, a1.bump + imp * 0.22 * mb / tot);
+          if (spinB) b1.bump = Math.min(0.35, b1.bump + imp * 0.22 * ma / tot);
+          if (b1.state === "down") { b1.hop = Math.max(b1.hop, Math.min(1, imp)); }
+          if (a1.state === "down") { a1.hop = Math.max(a1.hop, Math.min(1, imp)); }
+          if (imp > 0.08) {
+            sClack(imp);
+            var cx = b1.x + nx2 * b1.r, cy = b1.y + ny2 * b1.r;
+            var cp = proj(cx, cy, zB(cx, cy) + 0.5 * (DES[b1.d].h - DES[b1.d].rim) * b1.r);
+            var cols = (spinA ? DES[a1.d].spark : []).concat(spinB ? DES[b1.d].spark : []);
+            if (!cols.length) cols = ["#FFFFFF"];
+            sparksAt(cp[0], cp[1], 0, -1, cols, reduce ? 3 : Math.round(5 + imp * 8), 0.6 + imp * 0.5);
+            addPart(cp[0], cp[1], 0, 0, "#FFFFFF", 0.25, 10 + imp * 12, 2);
+          }
+        }
+      }
+    }
+    for (i = tops.length - 1; i >= 0; i--) {
+      t = tops[i];
+      t.z = zB(t.x, t.y) + t.zr + (t.hop > 0 ? Math.sin(t.hop * Math.PI) * 0.06 : 0);
+      if (t.dead || (t.state === "leave" && t.ft > 0.6)) { humUpdate(t, null); tops.splice(i, 1); }
+    }
+    // particles
+    for (i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i];
+      q.life -= dt;
+      if (q.life <= 0) { parts.splice(i, 1); continue; }
+      q.x += q.vx * dt; q.y += q.vy * dt;
+      if (q.k !== 2) { q.vy += 260 * dt; q.vx *= Math.exp(-1.5 * dt); }
+    }
+  }
+  function solid(t) { return t.state === "spin" || t.state === "fall" || t.state === "down"; }
+  function landPuff(t) {
+    var p = proj(t.x, t.y, zB(t.x, t.y));
+    for (var i = 0; i < 10; i++) {
+      var a = i / 10 * TAU;
+      addPart(p[0] + Math.cos(a) * 6, p[1] + Math.sin(a) * 3, Math.cos(a) * 70, Math.sin(a) * 30 - 10, "rgba(255,255,255,0.9)", 0.35, 3, 1);
+    }
+  }
+
+  // ---------- Drawing the frame ----------
+  function draw() {
+    var g = ctx;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (bg) { g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bg, 0, 0); g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+    var i, t, S = Vw.S, k = Vw.k;
+    // trails
+    g.lineCap = "round";
+    for (i = 0; i < tops.length; i++) {
+      t = tops[i];
+      var tr = t.trail, d = DES[t.d];
+      if (tr.length < 2) continue;
+      var w = t.r * S * (t.giant ? 0.3 : 0.38);
+      for (var j = 1; j < tr.length; j++) {
+        var f = j / tr.length, p0 = proj(tr[j - 1][0], tr[j - 1][1], zB(tr[j - 1][0], tr[j - 1][1])), p1 = proj(tr[j][0], tr[j][1], zB(tr[j][0], tr[j][1]));
+        g.strokeStyle = d.trail === "rainbow" ? RAINBOW[(j + ((t.id * 3) | 0)) % RAINBOW.length] : d.trail;
+        g.globalAlpha = f * (d.glow ? 0.6 : 0.42) * (t.alpha == null ? 1 : t.alpha) * Math.min(1, t.s * 3);
+        g.lineWidth = w * (0.4 + 0.6 * f);
+        g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke();
+      }
+    }
+    g.globalAlpha = 1;
+    // shadows
+    for (i = 0; i < tops.length; i++) {
+      t = tops[i];
+      var sp = proj(t.x, t.y, zB(t.x, t.y)), hf = clamp(1 - t.zr * 1.5, 0.3, 1);
+      g.fillStyle = "rgba(29,35,64," + (0.18 * hf * (t.alpha == null ? 1 : t.alpha)).toFixed(3) + ")";
+      var lean = t.state === "fall" || t.state === "down" ? 0.5 : 0;
+      ell(g, sp[0] + Math.cos(t.psi) * t.r * S * lean, sp[1] + Math.sin(t.psi) * t.r * S * k * lean, t.r * S * 0.85 * hf, t.r * S * k * 0.85 * hf);
+      g.fill();
+    }
+    // tops, back to front
+    var order = tops.slice().sort(function (a, b) { return a.y - b.y; });
+    for (i = 0; i < order.length; i++) drawTop(g, order[i], Vw);
+    // particles
+    for (i = 0; i < parts.length; i++) {
+      var q = parts[i], al = Math.min(1, q.life / q.max * 1.6);
+      g.globalAlpha = al;
+      if (q.k === 2) {
+        g.strokeStyle = q.c; g.lineWidth = 3; g.beginPath(); g.arc(q.x, q.y, q.s * (1.6 - q.life / q.max), 0, TAU); g.stroke();
+      } else if (q.k === 1) {
+        g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.s, 0, TAU); g.fill();
+      } else {
+        g.strokeStyle = q.c; g.lineWidth = q.s;
+        g.beginPath(); g.moveTo(q.x, q.y); g.lineTo(q.x - q.vx * 0.03, q.y - q.vy * 0.03); g.stroke();
+      }
+    }
+    g.globalAlpha = 1;
+    drawLauncher(g);
+  }
+
+  // ---------- Touch ----------
+  var ptrs = {};
+  function local(e) { return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+  function hitLauncher(p) {
+    var s = L.s;
+    var dx = p.x - (cord.hx + 18 * s), dy = p.y - cord.hy;
+    if (dx * dx + dy * dy < Math.pow(46 * s, 2)) return "handle";
+    if (p.x > L.x - L.w / 2 - 14 * s && p.x < L.x + L.w / 2 + 10 * s && p.y > L.y - L.h / 2 - 12 * s && p.y < L.y + L.h / 2 + 8 * s) return "body";
+    if (hang.sx != null) {
+      var hx = p.x - hang.sx, hy = p.y - hang.sy, hr = Math.max(34, hang.srad * 1.25);
+      if (hx * hx + hy * hy < hr * hr) return "body";
+    }
+    return null;
+  }
+  function hitTop(p) {
+    var best = null, bd = 1e9;
+    for (var i = 0; i < tops.length; i++) {
+      var t = tops[i];
+      if (!solid(t) || t.sx == null) continue;
+      var dx = p.x - t.sx, dy = p.y - t.sy, rr2 = Math.max(32, t.srad * 1.3);
+      var dd = dx * dx + dy * dy;
+      if (dd < rr2 * rr2 && dd < bd) { bd = dd; best = t; }
+    }
+    return best;
+  }
+  function releaseGrab(t) {
+    Object.keys(ptrs).forEach(function (id) { if (ptrs[id].top === t) ptrs[id].role = "none"; });
+    t.grab = null;
+  }
+  view.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (Toybox.timer.locked() || resting) return;
+    try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var p = local(e), now = performance.now();
+    var P = { x0: p.x, y0: p.y, x: p.x, y: p.y, t0: now, lt: now, fvx: 0, fvy: 0, moved: 0, role: "push", top: null };
+    var hl = cord.ptr === null && !cord.auto ? hitLauncher(p) : null;
+    var t = hitTop(p);
+    if (hl) {
+      P.role = "cord";
+      cord.ptr = e.pointerId; cord.back = null;
+      cord.offX = cord.hx - p.x; cord.offY = cord.hy - p.y;
+      cord.maxPull = pullLen(); cord.peak = 0; cord.lastPull = cord.maxPull; cord.lastT = now;
+      if (hl === "handle") P.handle = true;
+    } else if (t) {
+      P.role = "grab"; P.top = t;
+      var fp = toFloor(p.x, p.y);
+      t.grab = { tx: t.x, ty: t.y, ox: t.x - fp.x, oy: t.y - fp.y };
+    }
+    ptrs[e.pointerId] = P;
+  });
+  window.addEventListener("pointermove", function (e) {
+    var P = ptrs[e.pointerId];
+    if (!P) return;
+    var p = local(e), now = performance.now(), dt = Math.max(0.004, (now - P.lt) / 1000);
+    var vx = (p.x - P.x) / dt, vy = (p.y - P.y) / dt;
+    P.fvx = P.fvx * 0.5 + vx * 0.5; P.fvy = P.fvy * 0.5 + vy * 0.5;
+    P.moved = Math.max(P.moved, Math.sqrt(Math.pow(p.x - P.x0, 2) + Math.pow(p.y - P.y0, 2)));
+    P.x = p.x; P.y = p.y; P.lt = now;
+    if (Toybox.timer.locked()) return;
+    if (P.role === "cord" && cord.ptr === e.pointerId) {
+      cord.hx = clamp(p.x + cord.offX, 8, W - 8); cord.hy = clamp(p.y + cord.offY, 8, H - 8);
+      var len = pullLen(), cdt = Math.max(0.004, (now - cord.lastT) / 1000);
+      var v = (len - cord.lastPull) / cdt;
+      cord.lastPull = len; cord.lastT = now;
+      if (len > cord.maxPull) cord.maxPull = len;
+      if (v > 0) cord.peak = Math.max(cord.peak * 0.97, Math.min(v, L.max * 12));
+      if (len >= L.max) { P.role = "none"; cordRelease(true); }
+    } else if (P.role === "grab" && P.top && P.top.grab) {
+      var t = P.top, fp = toFloor(p.x, p.y);
+      t.grab.tx = fp.x + t.grab.ox; t.grab.ty = fp.y + t.grab.oy;
+      var m = Math.sqrt(t.grab.tx * t.grab.tx + t.grab.ty * t.grab.ty), lim = 1 - t.r * 0.95;
+      if (m > lim) { t.grab.tx *= lim / m; t.grab.ty *= lim / m; }
+      if (P.moved > 18 && t.state === "spin") { learned.flick = true; coachUpdate(); if (learned.pull) ghost.learned(); }
+    } else if (P.role === "push") {
+      // a finger sweeping through the bowl bumps the tops it meets
+      for (var i = 0; i < tops.length; i++) {
+        var q = tops[i];
+        if (!solid(q) || q.sx == null || q.pushT > 0 || q.grab !== null) continue;
+        var dx = q.sx - p.x, dy = q.sy - p.y, d = Math.sqrt(dx * dx + dy * dy), reach = q.srad + 22;
+        if (d > reach) continue;
+        var fvx = P.fvx / Vw.S, fvy = P.fvy / Vw.S / Vw.k, fs = Math.sqrt(fvx * fvx + fvy * fvy);
+        var nx = dx / (d || 1), ny = dy / Vw.k / (d || 1), nm = Math.sqrt(nx * nx + ny * ny) || 1;
+        nx /= nm; ny /= nm;
+        var push = clamp(0.35 + fs * 0.5, 0.35, 1.8) * (q.giant ? 0.6 : 1);
+        q.vx += nx * push * 0.6 + fvx * 0.25; q.vy += ny * push * 0.6 + fvy * 0.25;
+        q.pushT = 0.18;
+        if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); if (learned.pull) ghost.learned(); }
+        else q.hop = 1;
+        sClack(0.35);
+      }
+    }
+  });
+  function endPtr(e) {
+    var P = ptrs[e.pointerId];
+    if (!P) return;
+    delete ptrs[e.pointerId];
+    var quick = P.moved < 12 && performance.now() - P.t0 < 600;
+    if (P.role === "cord" && cord.ptr === e.pointerId) {
+      if (Toybox.timer.locked()) { cord.ptr = null; cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; return; }
+      var len = pullLen();
+      if (quick && len < 12) { cord.ptr = null; autoPull(); }
+      else cordRelease(cord.maxPull > 5);
+    } else if (P.role === "grab" && P.top) {
+      var t = P.top;
+      if (t.grab) {
+        t.grab = null;
+        var fvx = P.fvx / Vw.S, fvy = P.fvy / Vw.S / Vw.k;
+        if (performance.now() - P.lt > 120) { fvx = 0; fvy = 0; }
+        var sp = Math.sqrt(fvx * fvx + fvy * fvy);
+        if (sp > 1.8) { fvx *= 1.8 / sp; fvy *= 1.8 / sp; }
+        t.vx = fvx * 0.9; t.vy = fvy * 0.9;
+        if (t.state === "spin" && sp > 0.4) t.bump = Math.min(0.3, t.bump + 0.08);
+      }
+      // a tap on a top that has fallen over puts it back in the launcher
+      if (quick && (t.state === "down" || t.state === "fall") && !Toybox.timer.locked()) goHome(t);
+    }
+  }
+  window.addEventListener("pointerup", endPtr);
+  window.addEventListener("pointercancel", endPtr);
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function goHome(t) {
+    t.state = "home"; t.ft = 0; t.hx0 = t.x; t.hy0 = t.y; t.phi0 = t.phi; t.vx = t.vy = 0;
+    hang.popT = 0; hang.pop = 0;
+    sPop();
+    dirty = true;
+  }
+
+  // ---------- Panel ----------
+  function tilePic(di) {
+    var c = mkCanvas(128), g = c.getContext("2d"), d = DES[di];
+    var V = { ox: 64, oy: 0, S: 44, k: 0.6, cz: 0.8 };
+    var top = Math.max(d.h * V.S * V.cz + V.S * V.k, (d.h + d.stemH) * V.S * V.cz + 0.3 * V.S * V.k);
+    V.oy = 64 + top / 2 + 2;
+    drawTop(g, { d: di, r: 1, x: 0, y: 0, z: 0, phi: 0.12, psi: -2.2, theta: 0.3, blur: 0, sc: 1 }, V);
+    return c;
+  }
+  var tilesEl = $("tiles");
+  DES.forEach(function (d, i) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile toptile";
+    b.setAttribute("data-design", String(i));
+    b.setAttribute("aria-label", d.label + " top");
+    b.appendChild(tilePic(i));
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.label;
+    b.appendChild(nm);
+    tilesEl.appendChild(b);
+  });
+  function renderTiles() {
+    S.design = hang.design;
+    Array.prototype.forEach.call(tilesEl.children, function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.getAttribute("data-design")) === hang.design));
+    });
+    dirty = true;
+  }
+  function pick(i) {
+    if (hang.design === i && hang.pop > 0.9) { hang.popT = 0.25; return; }
+    hang.design = i; hang.popT = 0; hang.pop = 0;
+    renderTiles();
+    sPop();
+  }
+  // New: every top hops out of the bowl.
+  function newBowl() {
+    var n = 0;
+    tops.forEach(function (t) { if (t.state !== "leave") { (function (tt, k) { setTimeout(function () { if (tops.indexOf(tt) !== -1 && tt.state !== "leave") leave(tt); }, k * 90); })(t, n++); } });
+    dirty = true;
+    setTimeout(coachUpdate, 700);
+  }
+  // Surprise: a rainbow burst of five tops, or one giant top (they take turns).
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    tops.forEach(function (t) { if (t.state !== "leave" && t.state !== "home") leave(t); });
+    var cx = Vw.ox, cy = Vw.oy, i;
+    if (S.surprise === 0) {
+      for (i = 0; i < 5; i++) {
+        var a = -Math.PI / 2 + i * TAU / 5, t = makeTop(i, false, rnd(0.85, 1));
+        t.x = Math.cos(a) * 0.5; t.y = Math.sin(a) * 0.5;
+        t.state = "drop"; t.zr = 1.1 + i * 0.12; t.vz = 0;
+        t.vx = -Math.sin(a) * 0.65; t.vy = Math.cos(a) * 0.65;
+        tops.push(t);
+      }
+      for (i = 0; i < 70; i++) {
+        var b = rnd(0, TAU), sp = rnd(120, 340);
+        addPart(cx, cy - Vw.S * Vw.k * 0.3, Math.cos(b) * sp, Math.sin(b) * sp * 0.7 - 120, RAINBOW[i % RAINBOW.length], rnd(0.8, 1.4), rnd(3, 6), 1);
+      }
+    } else {
+      var g = makeTop(hang.design, true, 1);
+      g.x = 0.02; g.y = 0.02; g.state = "drop"; g.zr = 1.3; g.vz = 0; g.vx = 0.2; g.vy = -0.1;
+      tops.push(g);
+      for (i = 0; i < 40; i++) {
+        var c = i / 40 * TAU;
+        addPart(cx + Math.cos(c) * Vw.S * 0.4, cy + Math.sin(c) * Vw.S * Vw.k * 0.4, Math.cos(c) * 160, Math.sin(c) * 110 - 80, RAINBOW[i % RAINBOW.length], rnd(0.8, 1.3), rnd(3, 6), 1);
+      }
+    }
+    S.surprise = 1 - S.surprise;
+    sWhoosh();
+    dirty = true;
+    coachUpdate();
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.id === "bigbtn" || b.closest(".modal, .farewell, .rest")) return;
+    if (Toybox.timer.locked()) return;
+    if (b.hasAttribute("data-design")) pick(Number(b.getAttribute("data-design")));
+    else if (b.id === "newBtn") newBowl();
+    else if (b.id === "surpriseBtn") surprise();
+  });
+
+  // ---------- Coach line and ghost hand ----------
+  var coachEl = $("coach"), coachText = "";
+  function coachUpdate() {
+    var live = tops.filter(function (t) { return t.state !== "leave" && t.state !== "home"; });
+    var spinning = live.some(function (t) { return t.state === "spin" || t.state === "drop"; });
+    var txt = "";
+    if (!live.length || !learned.pull) txt = "Pull the cord!";
+    else if (spinning && !learned.flick) txt = "Flick the tops!";
+    if (txt !== coachText) {
+      coachText = txt;
+      if (txt) coachEl.textContent = txt;
+      coachEl.classList.toggle("off", !txt);
+    }
+  }
+
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // The hand pulls the ripcord out; once he has done that, it flicks a spinning top.
+  var ghost = makeGhost(function () {
+    if (cord.ptr !== null) return null;
+    if (!learned.pull) {
+      var hx = rect.left + L.restX + 20 * L.s, hy = rect.top + L.restY;
+      var tx = Math.min(rect.left + W - 30, hx + L.max * 0.75), ty = hy + L.max * 0.35;
+      return { pts: [[hx, hy], [tx, ty]], dur: 3000 };
+    }
+    if (!learned.flick) {
+      var t = tops.filter(function (q) { return q.state === "spin" && q.sx != null; })[0];
+      if (!t) return null;
+      var x0 = rect.left + t.sx, y0 = rect.top + t.sy;
+      return { pts: [[x0 - 50, y0 + 10], [x0 + 40, y0 - 12]], dur: 2600 };
+    }
+    return null;
+  });
+
+  // ---------- Tilt and shake (a grown-up setting on the home screen) ----------
+  function screenAngle() {
+    if (screen.orientation && typeof screen.orientation.angle === "number") return screen.orientation.angle;
+    return typeof window.orientation === "number" ? window.orientation : 0;
+  }
+  function onOrient(e) {
+    if (e.beta == null || e.gamma == null) return;
+    var be = e.beta * Math.PI / 180, ga = e.gamma * Math.PI / 180;
+    var dx = Math.cos(be) * Math.sin(ga), dy = Math.sin(be);
+    var th = screenAngle() * Math.PI / 180;
+    var sx = dx * Math.cos(th) + dy * Math.sin(th), sy = -dx * Math.sin(th) + dy * Math.cos(th);
+    // Held about flat is "level"; a device held upright in the hand leans the bowl only a little.
+    sy -= 0.6;
+    tiltX = clamp(sx, -0.7, 0.7); tiltY = clamp(sy, -0.7, 0.7);
+    if (Math.abs(tiltX) < 0.08) tiltX = 0;
+    if (Math.abs(tiltY) < 0.08) tiltY = 0;
+  }
+  var lastShake = 0;
+  function onMotion(e) {
+    var a = e.acceleration, m = 0;
+    if (a && a.x != null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    var now = performance.now();
+    if (m > 15 && now - lastShake > 800) { lastShake = now; shake(); }
+  }
+  function shake() {
+    if (Toybox.timer.locked()) return;
+    tops.forEach(function (t) {
+      if (!solid(t)) return;
+      t.vx += rnd(-0.6, 0.6); t.vy += rnd(-0.6, 0.6);
+      if (t.state === "spin") t.bump = Math.min(0.35, t.bump + 0.15); else t.hop = 1;
+    });
+    sClack(0.6);
+  }
+  function setTilt(on) {
+    if (on && !tiltOn) { window.addEventListener("deviceorientation", onOrient); window.addEventListener("devicemotion", onMotion); tiltOn = true; }
+    if (!on && tiltOn) { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("devicemotion", onMotion); tiltOn = false; tiltX = tiltY = 0; }
+  }
+
+  // ---------- Timer ending, goodbye and rest ----------
+  function onEnding(done) {
+    ending = true; endingT = 0; endingDone = done;
+    Object.keys(ptrs).forEach(function (id) { var P = ptrs[id]; if (P.top && P.top.grab) P.top.grab = null; delete ptrs[id]; });
+    if (cord.ptr !== null || cord.auto) { cord.ptr = null; cord.auto = null; cord.back = { t: 0, fx: cord.hx, fy: cord.hy }; }
+  }
+  function onGoodbye() {
+    // the fallen tops give a little hop goodbye
+    tops.forEach(function (t, i) { setTimeout(function () { if (t.state === "down") t.hop = 1; sTick(0.6); }, i * 160); });
+  }
+  function settled() {
+    return tops.every(function (t) { return t.state === "down" && t.vx * t.vx + t.vy * t.vy < 0.002; });
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' +
+      '<rect x="0" y="0" width="240" height="200" rx="20" fill="#2B3A6B"/>' +
+      '<circle cx="204" cy="34" r="16" fill="#FFE8A3"/><circle cx="196" cy="29" r="15" fill="#2B3A6B"/>' +
+      '<g stroke="#1D2340" stroke-width="4" stroke-linejoin="round">' +
+      '<path d="M22 122 L32 150 A88 30 0 0 0 208 150 L218 122 Z" fill="#3D7BFF"/>' +
+      '<ellipse cx="120" cy="122" rx="98" ry="40" fill="#FFC93C"/>' +
+      '<ellipse cx="120" cy="122" rx="88" ry="33" fill="#D7ECFF"/>' +
+      '<g transform="translate(96 126) rotate(-62)">' +
+      '<path d="M0 0 L-20 -22 L-24 -30 L24 -30 L20 -22 Z" fill="#D79A5A"/>' +
+      '<rect x="-24" y="-38" width="48" height="8" rx="2" fill="#E8453C"/>' +
+      '<rect x="-5" y="-50" width="10" height="12" fill="#E8453C"/><circle cx="0" cy="-52" r="7" fill="#E8453C"/></g>' +
+      '<g transform="translate(150 130) rotate(70)">' +
+      '<path d="M0 0 L-16 -16 L-22 -22 L22 -22 L16 -16 Z" fill="#9AA6BA"/>' +
+      '<rect x="-23" y="-30" width="46" height="8" rx="2" fill="#3D7BFF"/></g></g>' +
+      '<text x="168" y="86" font-size="26" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text>' +
+      '<text x="184" y="66" font-size="18" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text></svg>';
+  }
+
+  // ---------- Main loop ----------
+  var lastT = performance.now(), perf = { n: 0, work: 0, workMax: 0, frames: [] };
+  function frame(now) {
+    var dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
+    if (perf.frames.length < 600) perf.frames.push(now - lastT);
+    lastT = now;
+    var w0 = performance.now();
+    if (!resting) {
+      cordStep(dt);
+      update(dt);
+    }
+    if (ending && endingDone) {
+      endingT += dt;
+      if (settled() || endingT > 13) { var dn = endingDone; endingDone = null; dn(); }
+    }
+    var ac = resting ? null : audio();
+    for (var i = 0; i < tops.length; i++) humUpdate(tops[i], ac);
+    draw();
+    var wk = performance.now() - w0;
+    perf.n++; perf.work += wk; perf.workMax = Math.max(perf.workMax, wk);
+    saveT += dt;
+    if (saveT > 1.5) { saveT = 0; if (dirty || tops.some(function (t) { return t.state === "spin"; })) saveNow(); coachUpdate(); }
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { saveNow(); stopHums(); } });
+  window.addEventListener("pagehide", saveNow);
+
+  // ---------- Debug hooks (?debug only) ----------
+  if (DEBUG) {
+    window.__tops = {
+      state: function () {
+        return { design: DES[hang.design].id, tops: tops.map(function (t) { return { id: t.id, d: DES[t.d].id, st: t.state, s: +t.s.toFixed(3), x: +t.x.toFixed(3), y: +t.y.toFixed(3), giant: t.giant, p: +t.p.toFixed(2) }; }),
+          learned: { pull: learned.pull, flick: learned.flick }, coach: coachText, W: W, H: H, k: Vw.k, S: Vw.S, ending: ending };
+      },
+      points: function () {
+        var o = { handle: [rect.left + L.restX + 20 * L.s, rect.top + L.restY], launcher: [rect.left + L.x, rect.top + L.y], max: L.max, tops: [] };
+        tops.forEach(function (t) { if (t.sx != null) o.tops.push({ id: t.id, st: t.state, x: rect.left + t.sx, y: rect.top + t.sy }); });
+        return o;
+      },
+      perf: function () {
+        var f = perf.frames.slice().sort(function (a, b) { return a - b; });
+        var r = { avgWork: perf.n ? perf.work / perf.n : 0, maxWork: perf.workMax, frames: f.length, medFrame: f[Math.floor(f.length / 2)], p95Frame: f[Math.floor(f.length * 0.95)] };
+        perf.n = 0; perf.work = 0; perf.workMax = 0; perf.frames = [];
+        return r;
+      },
+      launch: function (p) { return !!launch(p == null ? 0.6 : p, 1); },
+      fallAll: function () { tops.forEach(function (t) { if (t.state === "spin") t.s = 0.0001; }); },
+      fast: function (k) { tops.forEach(function (t) { t.life = Math.min(t.life, k || 3); }); },
+      ghost: function () { return ghost.show(); },
+      surprise: surprise,
+      newBowl: newBowl
+    };
+  }
+
+  // ---------- Start ----------
+  loadState();
+  hang.design = S.design;
+  if (tops.length) learned.pull = true;
+  renderTiles();
+  resize();
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+  coachUpdate();
+  Toybox.init({
+    app: "spinning-tops",
+    big: { button: $("bigbtn") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the launcher locks and the tops slow down, tip over and rest.",
+    goodbyeOption: "End with a Goodbye button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Goodbye, tops",
+    farewellDone: "Bye bye, tops!",
+    restLine: "The tops are resting.",
+    restLine2: "They will be right here next time.",
+    restArt: restArt,
+    soundNote: "A soft whir while the tops spin and a click when they bump. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onGoodbye: onGoodbye,
+    onRest: function () { resting = true; endingDone = null; stopHums(); saveNow(); },
+    onWake: function () { ending = false; resting = false; endingDone = null; coachUpdate(); },
+    onBig: function () { setTimeout(resize, 30); },
+    onSound: function (on) { if (!on) stopHums(); }
+  });
+  stage.appendChild($("tb-toast"));
+  stage.appendChild($("tb-farewell"));
+  var tiltAllowed = false;
+  Toybox.tiltReady(function () { tiltAllowed = true; setTilt(true); });
+  Toybox.settings.onChange(function (id, on) {
+    if (id !== "tilt") return;
+    if (!on) setTilt(false);
+    else if (tiltAllowed) setTilt(true);
+  });
+  requestAnimationFrame(function (t) { lastT = t; frame(t); });
+})();
+</script>
+<script>
+  // Offline support: register the service worker when served over http(s).
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

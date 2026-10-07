@@ -24,6 +24,10 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 13 | Garden | Done |
 | 14 | Bubble Machine | Done |
 
+Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
+should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** and **Sand
+Table** (in progress), **Espresso Machine** (in progress: the family's real espresso routine, standalone app).
+
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
 Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain

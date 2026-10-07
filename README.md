@@ -20,6 +20,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Bubbles: a bubble machine with a switch and speed dial, a wand to blow your own bubbles, and a Bubbles counter that keeps counting | [`bubble-machine/`](bubble-machine/) |
 | Hamster: a happy pet hamster: tap the wheel, food, water or bed and it goes there; fill the bowl and the bottle; give treats | [`hamster/`](hamster/) |
 | Garden: plant seeds, water them, tap the sun to grow them, pick the vegetables; bees, butterflies and a worm visit | [`garden/`](garden/) |
+| Spinning Tops: pull the ripcord to launch tops into a bowl; they spin, wobble, bump and fall; flick them around | [`spinning-tops/`](spinning-tops/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
