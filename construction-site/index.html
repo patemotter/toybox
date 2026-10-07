@@ -214,7 +214,7 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
   </header>
   <div class="tb-body app">
     <main class="tb-stage scene" id="scene">
-      <svg id="map" role="img" aria-label="A sunny construction site with an excavator, a concrete mixer truck and a crane with a wrecking ball"></svg>
+      <svg id="map" role="img" aria-label="A sunny construction site with an excavator, a concrete mixer truck, a crane with a wrecking ball and a tower crane"></svg>
       <div id="sbtns"></div>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
     </main>
@@ -266,7 +266,8 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
   var STATIONS = [
     { id: "excavator", label: "Excavator" },
     { id: "concrete", label: "Concrete" },
-    { id: "wrecking-ball", label: "Wrecking ball" }
+    { id: "wrecking-ball", label: "Wrecking ball" },
+    { id: "tower-crane", label: "Tower crane" }
   ];
   // If sessionStorage is blocked, treat the gear as on so nobody gets stuck in a redirect loop.
   function gearIsOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return true; } }
@@ -435,10 +436,69 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     if (anim) o += beacon(166, 166, 0.9);
     return o;
   }
-  var ART = { "excavator": excavator, "concrete": mixer, "wrecking-ball": crane };
+  // Drop-in for construction-site/index.html (next to crane(anim)); uses only the existing helpers
+  // P, S, Rc, C, Ln, shadow, swing, spline and the constants INK, YEL, YEL2, GLASS, STEEL, ANIM.
+  // Tower crane: lattice mast, slewing unit, cab, long jib with a trolley, counter-jib with concrete
+  // counterweights. On the map (anim) the trolley rolls along the jib with a steel beam swinging on the
+  // hook, next to a building going up floor by floor; the station button (no anim) shows the crane alone.
+  function towerCrane(anim) {
+    var o = "", i;
+    if (anim) {
+      // The building going up: foundation, two finished floors, the third with its walls.
+      o += shadow(410, 300, 70, 7);
+      o += Rc(348, 286, 124, 14, 2, "#C9D3E0", 4);
+      [[246, true], [206, true], [166, false]].forEach(function (f) {
+        var y = f[0];
+        o += Rc(358, y, 26, 40, 0, "#C8553D", 3) + Rc(436, y, 26, 40, 0, "#C8553D", 3);
+        o += Ln(360, y + 13, 382, y + 13, "#E9B9A8", 2) + Ln(360, y + 27, 382, y + 27, "#E9B9A8", 2) + Ln(438, y + 13, 460, y + 13, "#E9B9A8", 2) + Ln(438, y + 27, 460, y + 27, "#E9B9A8", 2);
+        if (f[1]) o += Rc(384, y, 52, 40, 0, "#F4FAFF", 3) + Rc(389, y + 5, 19, 30, 0, GLASS, 2.5) + Rc(412, y + 5, 19, 30, 0, GLASS, 2.5);
+        if (f[1]) o += Rc(354, y - 8, 112, 9, 1, "#5B6B8C", 3);
+      });
+    }
+    // Footing, mast and its lattice.
+    o += shadow(126, 304, 52, 7);
+    o += Rc(98, 290, 56, 14, 3, "#C9D3E0", 4);
+    var lace = "";
+    for (i = 0; i < 7; i++) {
+      var y0 = 290 - i * 30, y1 = y0 - 30;
+      lace += "M112 " + y0 + " L140 " + y1 + " M140 " + y0 + " L112 " + y1 + " M112 " + y1 + " L140 " + y1 + " ";
+    }
+    o += P(lace, "none", 6) + S(lace, YEL2, 2.5);
+    o += Ln(112, 292, 112, 80, INK, 9) + Ln(140, 292, 140, 80, INK, 9) + Ln(112, 292, 112, 80, YEL, 4.5) + Ln(140, 292, 140, 80, YEL, 4.5);
+    // Tower top (A-frame) and the tie bars to both jibs.
+    o += Ln(126, 18, 360, 48, INK, 2.5) + Ln(126, 18, 34, 54, INK, 2.5);
+    o += P("M112 50 L126 18 L140 50", "none", 9) + S("M112 50 L126 18 L140 50", YEL, 4);
+    // Counter-jib with concrete counterweights and the hoist winch.
+    o += Rc(28, 56, 92, 9, 2, "#5B6476", 3.5);
+    o += Rc(32, 38, 13, 44, 2, "#C9D3E0", 3) + Rc(45, 38, 13, 44, 2, "#C9D3E0", 3) + Rc(58, 38, 13, 44, 2, "#C9D3E0", 3);
+    o += C(88, 50, 7, STEEL, 3);
+    // Jib: two chords, zigzag lacing and the nose at the tip.
+    var jl = "M120 68";
+    for (i = 0; i < 17; i++) jl += " L" + (134 + i * 20) + " " + (i % 2 ? 68 : 50);
+    o += P(jl, "none", 6) + S(jl, YEL2, 2.5);
+    o += Ln(104, 50, 444, 50, INK, 8) + Ln(104, 68, 474, 68, INK, 8) + Ln(444, 50, 474, 66, INK, 8);
+    o += Ln(104, 50, 444, 50, YEL, 4) + Ln(104, 68, 474, 68, YEL, 4) + Ln(444, 50, 474, 66, YEL, 4);
+    // Slewing unit and the cab with its window.
+    o += Rc(102, 68, 48, 14, 4, "#5B6476", 4);
+    o += P("M150 72 L178 72 L182 100 L176 112 L150 112 Z", YEL, 4) + P("M160 78 L176 78 L178 100 L174 106 L160 106 Z", GLASS, 3);
+    // Trolley, cable and hook with a steel beam; on the map the trolley rolls and the beam swings.
+    o += "<g>";
+    if (anim && ANIM) o += '<animateTransform attributeName="transform" type="translate" values="0 0;56 0;0 0" keyTimes="0;.5;1" calcMode="spline" keySplines="' + spline(2) + '" dur="9s" repeatCount="indefinite"/>';
+    o += Rc(262, 68, 30, 10, 3, "#5B6476", 3) + C(269, 68, 3.5, STEEL, 2) + C(285, 68, 3.5, STEEL, 2);
+    o += "<g>" + (anim ? swing(277, 78, 3, 3.4, 0) : "");
+    o += Ln(273, 78, 273, 176, INK, 2.5) + Ln(281, 78, 281, 176, INK, 2.5);
+    o += Rc(268, 174, 18, 16, 4, YEL, 3);
+    o += P("M277 190 L277 197 Q277 203 283 203 Q288 202 288 197", "none", 6) + S("M277 190 L277 197 Q277 203 283 203 Q288 202 288 197", "#E63946", 3);
+    o += Ln(279, 202, 236, 222, INK, 3) + Ln(279, 202, 322, 222, INK, 3);
+    o += Rc(226, 222, 106, 12, 1, "#5B6B8C", 3.5) + Ln(229, 228, 329, 228, "#8494B5", 3);
+    o += "</g></g>";
+    o += C(474, 62, 4, "#E63946", 2.5);
+    return o;
+  }
+  var ART = { "excavator": excavator, "concrete": mixer, "wrecking-ball": crane, "tower-crane": towerCrane };
   // Crop boxes for the small machine pictures on the station buttons.
-  var ICONBOX = { "excavator": "60 92 330 216", "concrete": "0 150 300 160", "wrecking-ball": "20 0 340 304" };
-  var LOT = { "excavator": "#D9AC70", "concrete": "#DCC7A0", "wrecking-ball": "#D6AE7A" };
+  var ICONBOX = { "excavator": "60 92 330 216", "concrete": "0 150 300 160", "wrecking-ball": "20 0 340 304", "tower-crane": "16 6 470 304" };
+  var LOT = { "excavator": "#D9AC70", "concrete": "#DCC7A0", "wrecking-ball": "#D6AE7A", "tower-crane": "#DDBB84" };
 
   function lotDecor(id) {
     var o = "";

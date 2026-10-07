@@ -1,0 +1,1568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tower Crane</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Construction">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --plate: #F4FAFF;
+  --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #13233F;
+    --panel: #1C3157;
+    --ink: #EEF3FF;
+    --muted: #B4C1DE;
+    --edge: #9FB8E8;
+    --plate: #E6F2FF;
+    --focus: #FFC93C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #13233F;
+  --panel: #1C3157;
+  --ink: #EEF3FF;
+  --muted: #B4C1DE;
+  --edge: #9FB8E8;
+  --plate: #E6F2FF;
+  --focus: #FFC93C;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+.tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#cv.grabbing { cursor: grabbing; }
+.count { font-variant-numeric: tabular-nums; }
+.count.pop { animation: pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+/* The hint is the coach line (tb-coach). */
+.hint { background: var(--accent); }
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+
+/* Play-timer gauge: the time-left badge, top-right of the stage. */
+.fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.fuel[hidden] { display: none; }
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num[hidden] { display: none; }
+
+/* Big: full-screen play. Dragging the hook is the play, so the panel goes too. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+
+/* ---------- Panel: Lift! (Go row), New building (tab bar) ---------- */
+.act { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.act svg { width: 40px; height: 40px; flex: none; pointer-events: none; }
+.act span { pointer-events: none; }
+.tb-go.act svg { width: 46px; height: 46px; }
+.tb-tabs .act svg { width: 30px; height: 30px; }
+.tb-new.wiggle { animation: wiggle 0.7s ease-in-out 2; }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg) scale(1.05); } 75% { transform: rotate(4deg) scale(1.05); } }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
+.rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+
+@media (max-width: 600px) {
+  .tb-go.act svg { width: 38px; height: 38px; }
+  .hint { white-space: normal; line-height: 1.15; }
+}
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(22%, 220px); }
+  .tb-go.act { flex: 0 1 200px; min-height: 120px; flex-direction: column; gap: 2px; }
+  .tb-go.act svg { width: 70px; height: 70px; }
+  .tb-tabs { margin-top: auto; }
+  .tb-tabs .btn { min-height: 64px; white-space: normal; line-height: 1.05; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 150px; padding: 6px; gap: 6px; }
+  .tb-go.act { flex: 1 1 auto; min-height: 0; max-height: 150px; }
+  .tb-go.act svg { width: 48px; height: 48px; }
+  .tb-tabs .btn { min-height: 54px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint.go, .count.pop, .tb-new.wiggle { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="tb-app-shell wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Tower Crane</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+  </header>
+  <div class="tb-body app">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A tower crane next to a building that grows floor by floor"></canvas>
+      <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+      <div class="tb-counter count" id="count">Floors: 0</div>
+      <div class="tb-coach hint" id="hint" hidden></div>
+    </main>
+    <section class="tb-panel" id="panel">
+      <button class="btn tb-go act" id="liftBtn" aria-label="Lift! The crane does the next piece"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M2 7 H46" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M2 7 H46" stroke="#FFC72C" stroke-width="3" stroke-linecap="round"/><rect x="17" y="9" width="14" height="6" rx="2" fill="#6B7385" stroke="#1D2340" stroke-width="2.5"/><path d="M24 15 V21" stroke="#1D2340" stroke-width="2.5"/><rect x="18" y="20" width="12" height="9" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5"/><path d="M24 29 V32 M24 32 L10 38 M24 32 L38 38" stroke="#1D2340" stroke-width="2.5" stroke-linecap="round" fill="none"/><rect x="5" y="37" width="38" height="7" rx="1.5" fill="#5B6B8C" stroke="#1D2340" stroke-width="2.5"/><path d="M7 40.5 H41" stroke="#8C9BBA" stroke-width="2"/></svg><span>Lift!</span></button>
+      <nav class="tb-tabs" id="acts">
+        <button class="btn tb-new act" id="newBtn"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="12" width="28" height="32" fill="#C8553D" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><rect x="7" y="8" width="34" height="6" fill="#5B6B8C" stroke="#1D2340" stroke-width="3"/><rect x="14" y="18" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="26" y="18" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="14" y="30" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="26" y="32" width="8" height="12" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/></svg><span>New building</span></button>
+      </nav>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Safety gear check (once per visit, on the site map) ----------
+  var gearOn = true;
+  try { gearOn = sessionStorage.getItem("site-gear") === "on"; } catch (e) { gearOn = true; }
+  if (!gearOn) { location.replace("./?next=tower-crane"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function sgn(v) { return v < 0 ? -1 : (v > 0 ? 1 : 0); }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  var OUT = "#1D2340";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var STATEKEY = "site-crane-v1";
+
+  // ---------- World (units; y is up, ground at y = 0) ----------
+  var WORLD_L = -175, WORLD_R = 925, VIEW_UP = 690, VIEW_DOWN = 34, MINW = 480;
+  var MAST_L = 62, MAST_R = 118, MAST_C = 90, MAST_TOP = 512;
+  var JIB_B = 540, JIB_T = 578, JIB_TIP = 880, CJ_END = -150, APEX_Y = 664;
+  var TY = 518;                           // the hoist cable leaves the trolley here
+  var TMIN = 214, TMAX = 852;             // trolley travel along the jib
+  var LMIN = 60, HOOK_MAX = TY - LMIN;    // shortest cable: hook block just under the trolley
+  var SLING = 40;                         // hook to the top of a hanging load
+  var BX = 620, BW = 200, BC = 720;       // the building
+  var FOUND = 16, FLOOR_H = 64, WALL_H = 50, PIER = 50, FLOORS = 5;
+  var DUN = [[422, 444], [556, 578]];     // timber blocks the steel beam lies on
+  var DUN_H = 8;
+  var G = 900, SWING_K = 0.22;            // pendulum: gravity and how much the trolley's pull swings it
+
+  var KIND = {
+    bricks: { w: 64, h: 46, home: 235, name: "bricks", c: 24 },
+    window: { w: 100, h: 50, home: 335, name: "window", c: 40 },
+    beam: { w: 200, h: 14, home: 500, name: "steel beam", c: 62 },
+    tree: { w: 44, h: 64, home: 335, name: "tree", c: 0 }
+  };
+  var STYLES = [
+    { brick: "#C8553D", mortar: "#E9B9A8", dark: "#8E3B2A" },
+    { brick: "#D9A066", mortar: "#F3D9B5", dark: "#9C6B38" },
+    { brick: "#7E9CC7", mortar: "#C9D8EE", dark: "#4F6E9C" }
+  ];
+
+  // ---------- Saved building (a reload keeps it; a fresh visit from the home screen starts empty) ----------
+  var floors = 0, cur = { bricks: false, window: false }, topped = false, styleIdx = 0;
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  if (!startFresh) try {
+    var so = JSON.parse(localStorage.getItem(STATEKEY) || "null");
+    if (so && typeof so === "object") {
+      if (typeof so.floors === "number") floors = clamp(Math.floor(so.floors), 0, FLOORS);
+      cur.bricks = !!so.bricks && floors < FLOORS;
+      cur.window = !!so.window && floors < FLOORS;
+      topped = !!so.topped && floors === FLOORS;
+      if (typeof so.style === "number") styleIdx = Math.abs(Math.floor(so.style)) % STYLES.length;
+    }
+  } catch (e) { /* ignore */ }
+  function saveState() {
+    try { localStorage.setItem(STATEKEY, JSON.stringify({ floors: floors, bricks: cur.bricks, window: cur.window, topped: topped, style: styleIdx })); } catch (e) { /* ignore */ }
+  }
+  if (startFresh) saveState();
+  function style() { return STYLES[styleIdx]; }
+
+  // ---------- Loads in the yard ----------
+  var loads = [], carried = null, clock = 0;
+  function makeLoad(kind, delay) {
+    var k = KIND[kind];
+    return { kind: kind, x: k.home, y: kind === "beam" ? DUN_H : 0, w: k.w, h: k.h, born: clock + (delay || 0) };
+  }
+  function spawnLoads(quick) {
+    loads = [];
+    if (topped) return;
+    if (floors >= FLOORS) { loads.push(makeLoad("tree", quick ? 0 : 0.1)); }
+    else {
+      var d = quick ? 0 : 0.1, n = 0;
+      if (!cur.bricks) loads.push(makeLoad("bricks", d + 0.3 * n++));
+      if (!cur.window) loads.push(makeLoad("window", d + 0.3 * n++));
+      loads.push(makeLoad("beam", d + 0.3 * n++));
+    }
+    loads.forEach(function (l) { if (!quick) puff(l.x, 6, 0.8, 2); });
+  }
+  function baseY() { return FOUND + floors * FLOOR_H; }
+  function roofY() { return FOUND + FLOORS * FLOOR_H; }
+  // Can this piece go into the building now? Bricks and window in any order; the beam goes on last.
+  function allowed(kind) {
+    if (topped) return false;
+    if (kind === "tree") return floors >= FLOORS;
+    if (floors >= FLOORS) return false;
+    if (kind === "bricks") return !cur.bricks;
+    if (kind === "window") return !cur.window;
+    return cur.bricks && cur.window;
+  }
+  function targetBottom(kind) {
+    if (kind === "tree") return roofY();
+    if (kind === "beam") return baseY() + WALL_H;
+    return baseY();
+  }
+  function nextKind() {
+    if (topped) return null;
+    if (floors >= FLOORS) return "tree";
+    if (!cur.bricks) return "bricks";
+    if (!cur.window) return "window";
+    return "beam";
+  }
+  function findLoad(kind) { for (var i = 0; i < loads.length; i++) if (loads[i].kind === kind && loads[i] !== carried) return loads[i]; return null; }
+  function ringOf(l) { return { x: l.x, y: l.y + l.h + SLING }; }
+
+  // The highest thing under [x0, x1]: ground, the timber blocks, the building, loads lying there.
+  function groundAt(x0, x1, skip) {
+    var g = 0, i;
+    for (i = 0; i < DUN.length; i++) if (x1 > DUN[i][0] && x0 < DUN[i][1]) g = Math.max(g, DUN_H);
+    if (x1 > BX - 12 && x0 < BX + BW + 12) {
+      var b = baseY();
+      g = Math.max(g, floors >= FLOORS ? roofY() : b);
+      if (floors < FLOORS) {
+        if (cur.bricks && ((x0 < BX + PIER && x1 > BX) || (x0 < BX + BW && x1 > BX + BW - PIER))) g = Math.max(g, b + WALL_H);
+        if (cur.window && x1 > BX + PIER && x0 < BX + BW - PIER) g = Math.max(g, b + WALL_H);
+      }
+      if (topped && x1 > BC - 22 && x0 < BC + 22) g = Math.max(g, roofY() + KIND.tree.h);
+    }
+    for (i = 0; i < loads.length; i++) {
+      var l = loads[i];
+      if (l === skip || l === carried) continue;
+      if (x1 > l.x - l.w / 2 && x0 < l.x + l.w / 2) g = Math.max(g, l.y + l.h);
+    }
+    return g;
+  }
+  function overBuilding(x, w) { return x + w / 2 > BX - 10 && x - w / 2 < BX + BW + 10; }
+
+  // ---------- The crane: trolley, cable and a gently swinging hook ----------
+  var cr = { x: 300, vx: 0, L: 300, vL: 0, th: 0, om: 0, wheel: 0, drum: 0 };
+  function hookX() { return cr.x + cr.L * Math.sin(cr.th); }
+  function hookY() { return TY - cr.L * Math.cos(cr.th); }
+  var tgt = { x: 300, y: 218 };
+  var DRAG = { v: 900, a: 3500, lv: 800, la: 3500 };
+  var AUTO = { v: 170, a: 150, lv: 125, la: 150 };
+  var spd = DRAG;
+  var drag = null;            // { id, wx, wy, ox, oy, paused }
+  var jobs = [], jobsLocked = false, auto = false, freeMove = false, dragged = false, byHand = false;
+  var ending = false, parking = false, parked = false, endingDone = null;
+  var lastMove = 0;
+
+  function minHookY(hx) {
+    if (carried) return groundAt(hx - carried.w / 2, hx + carried.w / 2, carried) + carried.h + SLING;
+    return groundAt(hx - 8, hx + 8, null) + 6;
+  }
+  // The hanging thing's bottom and half width (for bumping into the building).
+  function hangBox(x) {
+    var hy = TY - cr.L * Math.cos(cr.th);
+    if (carried) return { x0: x - carried.w / 2, x1: x + carried.w / 2, y: hy - SLING - carried.h };
+    return { x0: x - 10, x1: x + 10, y: hy - 4 };
+  }
+  function blocked(x) {
+    var b = hangBox(x);
+    return b.y < groundAt(b.x0, b.x1, carried) - 0.5;
+  }
+  function approach(pos, vel, target, vmax, amax, h) {
+    var d = target - pos;
+    if (Math.abs(d) < 0.4 && Math.abs(vel) < amax * h * 3) return [target, 0];
+    var vd = sgn(d) * Math.min(vmax, Math.sqrt(2 * amax * Math.abs(d)) * 0.92);
+    var nv = vel + clamp(vd - vel, -amax * h, amax * h);
+    var np = pos + nv * h;
+    if ((target - np) * d < 0 && Math.abs(nv) < amax * h * 3) { np = target; nv = 0; }
+    return [np, nv];
+  }
+  function physics(h) {
+    var tx = clamp(tgt.x, TMIN, TMAX);
+    var ty = Math.min(HOOK_MAX, tgt.y);
+    if (!freeMove) ty = Math.max(ty, minHookY(hookX()));
+    var tL = clamp(TY - ty, LMIN, TY - 2);
+    var r = approach(cr.x, cr.vx, tx, spd.v, spd.a, h);
+    var nx = clamp(r[0], TMIN, TMAX), nvx = r[1];
+    // Bump into the building or a load lying in the way instead of passing through it.
+    if (!freeMove && nx !== cr.x) {
+      var off = cr.L * Math.sin(cr.th);
+      if (blocked(nx + off) && !blocked(cr.x + off)) { nx = cr.x; nvx = 0; }
+    }
+    var ax = (nvx - cr.vx) / h;
+    cr.wheel += (nx - cr.x) / 6;
+    cr.x = nx; cr.vx = nvx;
+    var rl = approach(cr.L, cr.vL, tL, spd.lv, spd.la, h);
+    cr.drum += (rl[0] - cr.L) / 14;
+    cr.L = rl[0]; cr.vL = rl[1];
+    // Never through the ground or the building: lift out quickly if something is underneath.
+    if (!freeMove) {
+      var minY = minHookY(hookX()), maxL = TY - minY;
+      if (cr.L > maxL + 0.5) { cr.L = Math.max(maxL, cr.L - 700 * h); if (cr.vL > 0) cr.vL = 0; }
+    }
+    // Pendulum (calm, damped): the trolley's pull swings the hook a little.
+    var Lc = Math.max(70, cr.L);
+    var resting = carried && (hookY() - SLING - carried.h) <= groundAt(hookX() - carried.w / 2, hookX() + carried.w / 2, carried) + 1.5;
+    var damp = resting ? 9 : (freeMove ? 5 : 1.6);
+    cr.om += (-(G / Lc) * Math.sin(cr.th) - SWING_K * ax / Lc * Math.cos(cr.th) - damp * cr.om) * h;
+    cr.th += cr.om * h;
+    if (cr.th > 0.28) { cr.th = 0.28; if (cr.om > 0) cr.om = 0; }
+    if (cr.th < -0.28) { cr.th = -0.28; if (cr.om < 0) cr.om = 0; }
+  }
+
+  // ---------- Jobs: short scripted moves (hook on, put in place, set down, Lift!) ----------
+  function setJobs(list, lock) { jobs = list; jobsLocked = !!lock; }
+  function mv(x, y, s, free) { return { t: "move", x: x, y: y, s: s || AUTO, free: !!free }; }
+  function fn(f) { return { t: "fn", fn: f }; }
+  function wait(s) { return { t: "wait", s: s }; }
+  function runJobs(dt) {
+    var guard = 0;
+    while (jobs.length && guard++ < 8) {
+      var j = jobs[0];
+      if (j.t === "fn") { jobs.shift(); j.fn(); continue; }
+      if (j.t === "wait") { j.s -= dt; if (j.s <= 0) jobs.shift(); return; }
+      if (!j.go) {
+        j.go = true;
+        if (j.x === null) j.x = cr.x;
+        if (j.y === null) j.y = hookY();
+      }
+      tgt.x = j.x; tgt.y = j.y; spd = j.s; freeMove = j.free;
+      var tL = clamp(TY - Math.min(HOOK_MAX, j.y), LMIN, TY - 2);
+      if (!j.free) tL = Math.min(tL, TY - minHookY(hookX()));
+      if (Math.abs(cr.x - clamp(j.x, TMIN, TMAX)) < 0.8 && Math.abs(cr.vx) < 3 && Math.abs(cr.L - tL) < 0.8 && Math.abs(cr.vL) < 3) { jobs.shift(); continue; }
+      return;
+    }
+    if (!jobs.length) { jobsLocked = false; freeMove = false; }
+  }
+  var SNAP = { v: 600, a: 5000, lv: 600, la: 5000 };
+  var PLACE = { v: 260, a: 700, lv: 190, la: 650 };
+  var SET = { v: 200, a: 800, lv: 230, la: 800 };
+
+  function startAttach(l) {
+    var r = ringOf(l);
+    setJobs([mv(l.x, r.y, SNAP, true), fn(function () { attach(l); })], true);
+  }
+  function attach(l) {
+    if (carried || loads.indexOf(l) < 0) return;
+    carried = l;
+    var r = ringOf(l);
+    rings.push({ x: r.x, y: r.y, t: 0 });
+    clunk(0.8);
+    if (drag) { drag.ox = 0; drag.oy = 0; }
+    tgt.x = cr.x; tgt.y = hookY();
+  }
+  function startPlace() {
+    var l = carried, ty = targetBottom(l.kind) + l.h + SLING;
+    if (drag) drag.paused = true;
+    setJobs([
+      mv(BC, Math.max(ty, Math.min(hookY(), ty + 30)), PLACE, true),
+      mv(BC, ty, PLACE, true),
+      fn(placeCarried), wait(0.3),
+      mv(null, Math.min(HOOK_MAX, ty + 60), PLACE)
+    ], true);
+  }
+  function startSetDown() {
+    var l = carried, hx = hookX(), g = groundAt(hx - l.w / 2, hx + l.w / 2, l);
+    setJobs([mv(null, g + l.h + SLING, SET), fn(releaseCarried), mv(null, Math.min(HOOK_MAX, g + l.h + SLING + 40), SET)], true);
+  }
+  function releaseCarried() {
+    var l = carried;
+    if (!l) return;
+    carried = null;
+    l.x = hookX();
+    l.y = groundAt(l.x - l.w / 2, l.x + l.w / 2, l);
+    puff(l.x, l.y + 4, 0.6, 1);
+    clunk(0.4);
+  }
+
+  // ---------- The building grows ----------
+  var anim = { bricks: -9, window: -9, floor: -9, top: -9 };
+  function placeCarried() {
+    var l = carried;
+    if (!l) return;
+    carried = null;
+    var i = loads.indexOf(l); if (i >= 0) loads.splice(i, 1);
+    var k = l.kind, b = targetBottom(k);
+    if (!allowed(k)) { loads.push(l); l.x = l.x || KIND[k].home; return; }
+    clunk(1);
+    puff(BC - 90, b + 4, 0.8, 2); puff(BC + 90, b + 4, 0.8, 2);
+    if (k === "bricks") { cur.bricks = true; anim.bricks = clock; }
+    else if (k === "window") { cur.window = true; anim.window = clock; }
+    else if (k === "beam") floorDone();
+    else if (k === "tree") topOut();
+    sparkles(BC, b + 30, 6);
+    if (byHand && ghost) ghost.learned();
+    saveState();
+  }
+  var spawnIn = 0;
+  function floorDone() {
+    floors++;
+    cur.bricks = false; cur.window = false;
+    anim.floor = clock;
+    showCount(true);
+    flashCoach("Floor done!", 3200);
+    setTimeout(chime, 250);
+    sparkles(BC, baseY() - 6, 12);
+    spawnIn = 1.8;
+    if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
+  }
+  function topOut() {
+    topped = true;
+    anim.top = clock;
+    flashCoach("Topped out!", 6000);
+    fanfare();
+    confetti(BC, roofY() + 70, reduce ? 20 : 90);
+    loads = [];
+    if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 2500);
+  }
+  function newBuilding() {
+    if (ending) return;
+    for (var f = 0; f <= Math.min(floors, FLOORS - 1); f++) puff(BC + rand(-80, 80), FOUND + f * FLOOR_H + 30, 1.3, 2);
+    floors = 0; cur.bricks = false; cur.window = false; topped = false;
+    styleIdx = (styleIdx + 1) % STYLES.length;
+    carried = null; auto = false; setJobs([], false); freeMove = false;
+    if (drag) drag.paused = false;
+    spawnIn = 0;
+    spawnLoads(false);
+    tgt.y = Math.max(tgt.y, 200); tgt.x = cr.x;
+    showCount(true);
+    saveState();
+    chime();
+    coachAgain();
+  }
+
+  // ---------- Lift!: one tap does the next piece, calmly ----------
+  function planAuto() {
+    if (!auto) return;
+    var hx = hookX(), l = carried, cy, lo, hi;
+    if (l) {
+      if (allowed(l.kind)) {
+        var ty = targetBottom(l.kind) + l.h + SLING;
+        lo = Math.min(hx, BC); hi = Math.max(hx, BC);
+        cy = Math.min(HOOK_MAX, Math.max(ty + 10, groundAt(lo - l.w / 2, hi + l.w / 2, l) + l.h + SLING + 24));
+        setJobs([
+          mv(null, Math.max(hookY(), cy)),
+          mv(BC, null),
+          mv(BC, ty, AUTO, true),
+          fn(placeCarried), wait(0.4),
+          mv(null, Math.min(HOOK_MAX, ty + 60)),
+          fn(function () { auto = false; })
+        ], false);
+      } else {
+        // Not its turn yet: put it back in the yard first.
+        var home = KIND[l.kind].home;
+        lo = Math.min(hx, home); hi = Math.max(hx, home);
+        cy = Math.min(HOOK_MAX, groundAt(lo - l.w / 2, hi + l.w / 2, l) + l.h + SLING + 24);
+        setJobs([
+          mv(null, Math.max(hookY(), cy)),
+          mv(home, null),
+          fn(function () { var g = groundAt(home - l.w / 2, home + l.w / 2, l); jobs.splice(1, 0, mv(home, g + l.h + SLING)); }),
+          fn(releaseCarried),
+          mv(null, null)
+        ], false);
+      }
+      return;
+    }
+    var k = nextKind(), t = k && findLoad(k);
+    if (!k) { auto = false; return; }
+    if (!t || t.born > clock) { setJobs([wait(0.4)], false); return; }
+    var r = ringOf(t);
+    lo = Math.min(hx, t.x); hi = Math.max(hx, t.x);
+    cy = Math.min(HOOK_MAX, Math.max(r.y, groundAt(lo - 12, hi + 12, null) + SLING + 20));
+    var list = [];
+    if (Math.abs(hx - t.x) > 3) { list.push(mv(null, Math.max(hookY(), cy))); list.push(mv(t.x, null)); }
+    list.push(mv(t.x, r.y, AUTO, true));
+    list.push(fn(function () { attach(t); }));
+    setJobs(list, false);
+  }
+  function lift() {
+    if (ending || Toybox.timer.locked()) return;
+    if (topped) { flashCoach("Tap New building!", 3500); wiggleNew(); return; }
+    drag = null; $("cv").classList.remove("grabbing");
+    byHand = false;
+    auto = true;
+    if (!jobs.length) planAuto();
+    whirr();
+  }
+  function wiggleNew() {
+    var b = $("newBtn");
+    b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle");
+  }
+
+  // ---------- Timer ending: the hook rises, the trolley runs in, the crane stops ----------
+  function parkPlan() {
+    if (carried) {
+      var hx = hookX();
+      if (overBuilding(hx, carried.w)) {
+        if (allowed(carried.kind)) { byHand = false; startPlace(); return; }
+        var l = carried, home = KIND[l.kind].home;
+        setJobs([mv(null, HOOK_MAX), mv(home, null), fn(function () { startSetDown(); })], true);
+        return;
+      }
+      startSetDown();
+      return;
+    }
+    setJobs([mv(null, HOOK_MAX, AUTO), mv(TMIN, null, AUTO), fn(function () { parked = true; if (endingDone) { endingDone(); endingDone = null; } })], true);
+  }
+
+  // ---------- Particles: dust, sparkles, confetti, hook-on rings ----------
+  var dust = [], stars = [], conf = [], rings = [];
+  function puff(x, y, size, n) {
+    if (reduce) n = Math.min(n, 1);
+    for (var i = 0; i < n * 4 && dust.length < 140; i++) {
+      dust.push({ x: x + rand(-14, 14) * size, y: y + rand(-4, 10) * size, vx: rand(-50, 50) * size, vy: rand(10, 50) * size,
+        r: rand(10, 20) * size, life: 0, max: rand(0.9, 1.6), c: Math.random() < 0.5 ? "#E3D3BD" : "#CDBA9C" });
+    }
+  }
+  function sparkles(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, Math.PI * 2), d = rand(50, 130);
+      stars.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.5, s: rand(9, 16), life: 0, max: rand(1.1, 1.8), d: rand(0, 0.5) });
+    }
+  }
+  var CONF = ["#E63946", "#FFC93C", "#2E9E5B", "#3A86FF", "#FF6FD8", "#F77F00"];
+  function confetti(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      conf.push({ x: x + rand(-20, 20), y: y, vx: rand(-260, 260), vy: rand(160, 520), a: rand(0, 6), w: rand(-6, 6),
+        s: rand(7, 12), c: CONF[i % CONF.length], life: 0, max: rand(3.5, 5.5) });
+    }
+  }
+  function stepParticles(dt) {
+    var i;
+    for (i = dust.length - 1; i >= 0; i--) {
+      var d = dust[i]; d.life += dt;
+      if (d.life > d.max) { dust.splice(i, 1); continue; }
+      d.x += d.vx * dt; d.y += d.vy * dt; d.vx *= 1 - 1.5 * dt; d.vy *= 1 - 1.2 * dt; d.r += 14 * dt;
+    }
+    for (i = stars.length - 1; i >= 0; i--) { stars[i].life += dt; if (stars[i].life > stars[i].max + stars[i].d) stars.splice(i, 1); }
+    for (i = conf.length - 1; i >= 0; i--) {
+      var c = conf[i]; c.life += dt;
+      if (c.life > c.max) { conf.splice(i, 1); continue; }
+      c.vy -= 380 * dt; if (c.vy < -90) c.vy = -90;
+      c.vx *= 1 - 1.4 * dt;
+      c.x += (c.vx + Math.sin(c.life * 3 + c.a) * 30) * dt; c.y += c.vy * dt; c.a += c.w * dt;
+      if (c.y < 3) { c.y = 3; c.vy = 0; c.vx = 0; c.w = 0; }
+    }
+    for (i = rings.length - 1; i >= 0; i--) { rings[i].t += dt; if (rings[i].t > 0.6) rings.splice(i, 1); }
+  }
+
+  // ---------- Canvas and camera ----------
+  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0, camC = 300, camSet = false;
+  function resize() {
+    var r = $("stage").getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    // Fit the crane's height; on a narrow (upright) stage show a window at least MINW wide that pans with the hook.
+    // Tablets show more of the site (the mast and the building together); phones zoom in on the hook.
+    var wantW = Math.max(MINW, Math.min(860, cw * 0.9));
+    S = Math.min(ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
+    OY = ch - VIEW_DOWN * S;
+    camSet = false;
+    camera(0);
+  }
+  function camera(dt) {
+    var visW = cw / S, full = WORLD_R - WORLD_L, c;
+    if (visW >= full) c = (WORLD_L + WORLD_R) / 2;
+    else {
+      // Follow the hook; carrying, look ahead to the building; wider stages lean toward the whole site.
+      var hx = hookX(), focus = carried && allowed(carried.kind) ? (hx + BC) / 2 : hx;
+      focus = clamp(focus, hx - visW / 2 + 60, hx + visW / 2 - 60);
+      var wide = clamp((visW - MINW) / 300, 0, 1) * 0.75;
+      focus += (470 - focus) * wide;
+      c = clamp(focus, WORLD_L + visW / 2, WORLD_R - visW / 2);
+    }
+    if (!camSet || dt === 0) { camC = c; camSet = true; }
+    else camC += (c - camC) * (1 - Math.exp(-2.6 * dt));
+    OX = cw / 2 - camC * S;
+  }
+  window.addEventListener("resize", resize);
+  function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - 3 - OX) / S, y: (OY - (cy - r.top - 3)) / S }; }
+  function worldToScreen(x, y) { var r = cv.getBoundingClientRect(); return [r.left + 3 + OX + x * S, r.top + 3 + OY - y * S]; }
+  function worldT() { ctx.setTransform(dpr * S, 0, 0, -dpr * S, dpr * OX, dpr * OY); }
+  function visLeft() { return -OX / S; }
+  function visRight() { return (cw - OX) / S; }
+
+  function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
+  function shape(pts, fill, lw) { path(pts); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw || 5; ctx.strokeStyle = OUT; ctx.stroke(); }
+  function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath(); }
+  function box(x, y, w, h, r, fill, lw) { rrect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw || 4; ctx.strokeStyle = OUT; ctx.stroke(); }
+  function circle(x, y, r, fill, lw) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); if (lw !== 0) { ctx.lineWidth = lw || 5; ctx.strokeStyle = OUT; ctx.stroke(); } }
+  function line(x1, y1, x2, y2, w, col) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineWidth = w; ctx.strokeStyle = col || OUT; ctx.stroke(); }
+  function fatLine(x1, y1, x2, y2, w, col, ow) { ctx.lineCap = "round"; line(x1, y1, x2, y2, w + 2 * ow, OUT); line(x1, y1, x2, y2, w, col); }
+
+  // ---------- Drawing: sky, ground ----------
+  var clouds = [{ x: -60, y: 470, s: 0.9 }, { x: 380, y: 640, s: 0.8 }, { x: 760, y: 450, s: 1.1 }];
+  var skyline = [];
+  (function () { var x = -700; while (x < 1700) { var w = rand(40, 90); skyline.push([x, w, rand(50, 150)]); x += w + rand(4, 20); } })();
+  function drawSky() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var g = ctx.createLinearGradient(0, 0, 0, OY);
+    g.addColorStop(0, "#6EC3FF"); g.addColorStop(1, "#D7F1FF");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+    worldT();
+    circle(560, 650, 30, "#FFE066", 0);
+    ctx.globalAlpha = 0.35; circle(560, 650, 48, "#FFF3B0", 0); ctx.globalAlpha = 1;
+    clouds.forEach(function (c) {
+      ctx.fillStyle = "#FFFFFF";
+      [[0, 0, 26], [30, 12, 32], [64, 0, 24], [32, -6, 26]].forEach(function (q) { ctx.beginPath(); ctx.arc(c.x + q[0] * c.s, c.y + q[1] * c.s, q[2] * c.s, 0, Math.PI * 2); ctx.fill(); });
+    });
+    var L = visLeft() - 10, R = visRight() + 10;
+    ctx.fillStyle = "#A7CBE8";
+    skyline.forEach(function (s) { if (s[0] + s[1] > L && s[0] < R) ctx.fillRect(s[0], 20, s[1], s[2]); });
+    ctx.fillStyle = "#9CCB7A";
+    ctx.beginPath(); ctx.moveTo(L, 0);
+    for (var x = L; x <= R; x += 20) ctx.lineTo(x, 46 + 16 * Math.sin(x * 0.007) + 9 * Math.sin(x * 0.019 + 1));
+    ctx.lineTo(R, 0); ctx.closePath(); ctx.fill();
+    // Site fence only at the sides, so the yard and the building stay clear.
+    for (var bx = Math.floor(L / 160) * 160; bx < R; bx += 160) if (bx + 130 < 30 || bx + 40 > 860) drawBarrier(bx + 40, 18);
+  }
+  function drawBarrier(x, y) {
+    ctx.save();
+    rrect(x, y + 22, 90, 18, 4); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.clip();
+    ctx.fillStyle = "#F77F00";
+    for (var s = -20; s < 110; s += 22) { ctx.beginPath(); ctx.moveTo(x + s, y + 22); ctx.lineTo(x + s + 11, y + 22); ctx.lineTo(x + s + 29, y + 40); ctx.lineTo(x + s + 18, y + 40); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    rrect(x, y + 22, 90, 18, 4); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = OUT; ctx.fillRect(x + 8, y - 2, 6, 24); ctx.fillRect(x + 76, y - 2, 6, 24);
+  }
+  function drawGround() {
+    var L = visLeft() - 30, R = visRight() + 30;
+    ctx.fillStyle = "#B07A45"; ctx.fillRect(L, -VIEW_DOWN - 400, R - L, VIEW_DOWN + 400);
+    ctx.fillStyle = "#C48A52"; ctx.fillRect(L, -14, R - L, 14);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(L, 0); ctx.lineTo(R, 0); ctx.stroke();
+    ctx.fillStyle = "#8C5A2E";
+    for (var x = Math.floor(L / 70) * 70; x < R; x += 70) { ctx.beginPath(); ctx.ellipse(x + 20, -24, 9, 5, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 52, -36, 6, 4, 0, 0, 7); ctx.fill(); }
+  }
+  function drawCone(x) {
+    shape([[x - 18, 2], [x + 18, 2], [x + 5, 44], [x - 5, 44]], "#F77F00", 3.5);
+    ctx.fillStyle = "#FFFFFF"; path([[x - 12, 16], [x + 12, 16], [x + 9, 26], [x - 9, 26]]); ctx.fill();
+    rrect(x - 23, -2, 46, 7, 3); ctx.fillStyle = "#F77F00"; ctx.fill(); ctx.lineWidth = 3.5; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+
+  // ---------- Drawing: the tower crane ----------
+  var YEL = "#FFC72C", YEL_D = "#E0A800";
+  function lace(x1, y1, x2, y2) { line(x1, y1, x2, y2, 7, OUT); line(x1, y1, x2, y2, 3.5, YEL_D); }
+  function drawMast() {
+    // Concrete footing with anchor bolts.
+    box(34, -6, 112, 24, 3, "#B8BEC8", 4);
+    for (var b = 44; b < 140; b += 22) circle(b + 2, 10, 3, "#6B7385", 0);
+    ctx.lineCap = "round";
+    var step = 64, y;
+    for (y = 18; y < MAST_TOP; y += step) {
+      var y2 = Math.min(MAST_TOP, y + step);
+      lace(MAST_L, y, MAST_R, y2);
+      lace(MAST_R, y, MAST_L, y2);
+      lace(MAST_L, y2, MAST_R, y2);
+    }
+    fatLine(MAST_L, 18, MAST_L, MAST_TOP, 8, YEL, 3);
+    fatLine(MAST_R, 18, MAST_R, MAST_TOP, 8, YEL, 3);
+    // Ladder inside the mast.
+    ctx.globalAlpha = 0.55;
+    line(84, 18, 84, MAST_TOP, 2, OUT); line(96, 18, 96, MAST_TOP, 2, OUT);
+    for (y = 30; y < MAST_TOP; y += 14) line(84, y, 96, y, 2, OUT);
+    ctx.globalAlpha = 1;
+  }
+  function drawTop(t) {
+    ctx.lineCap = "round";
+    // Tie bars from the tower top to the jib and the counter-jib.
+    line(MAST_C, APEX_Y, 600, JIB_T + 2, 4, "#3A4150");
+    line(MAST_C, APEX_Y, CJ_END + 16, 566, 4, "#3A4150");
+    // Counter-jib: walkway, rail, counterweights, hoist winch.
+    box(CJ_END, JIB_B, MAST_L - CJ_END + 4, 12, 3, "#6B7385", 4);
+    for (var x = CJ_END + 10; x < MAST_L; x += 18) line(x, JIB_B + 3, x + 9, JIB_B + 9, 2, "#9AA3B2");
+    line(CJ_END + 4, 568, MAST_L, 568, 3.5, OUT);
+    for (x = CJ_END + 30; x < MAST_L; x += 40) line(x, JIB_B + 12, x, 568, 3.5, OUT);
+    for (var k = 0; k < 3; k++) {
+      var cx = CJ_END + 4 + k * 23;
+      box(cx, 482, 22, 92, 3, "#B8BEC8", 4);
+      line(cx + 4, 492, cx + 18, 492, 2.5, "#8A93A6");
+    }
+    // Hoist winch: the drum turns as the cable reels in and out.
+    box(-62, 552, 26, 26, 4, "#3A4150", 3.5);
+    circle(-12, 568, 15, "#6B7385", 4);
+    for (var sp = 0; sp < 4; sp++) { var da = cr.drum + sp * Math.PI / 2; line(-12, 568, -12 + Math.cos(da) * 13, 568 + Math.sin(da) * 13, 4, YEL); }
+    circle(-12, 568, 5, "#C9CED6", 3);
+    line(3, 566, MAST_L, 556, 2.5, "#555D6E");
+    // Slewing unit (turntable) on top of the mast.
+    box(50, MAST_TOP - 4, 80, 32, 6, "#6B7385", 4);
+    line(54, MAST_TOP + 12, 126, MAST_TOP + 12, 3, "#9AA3B2");
+    // Tower top (A-frame).
+    fatLine(64, JIB_T - 4, MAST_C, APEX_Y, 7, YEL, 3);
+    fatLine(116, JIB_T - 4, MAST_C, APEX_Y, 7, YEL, 3);
+    lace(72, 600, 108, 600); lace(80, 628, 100, 628);
+    circle(MAST_C, APEX_Y, 8, "#9AA3B2", 3.5);
+    // Red warning lights blink at the top and the jib tip.
+    var on = Math.sin(t * 3) > 0;
+    circle(MAST_C, APEX_Y + 14, 6, on ? "#FF4D4D" : "#9A2B2B", 3);
+    circle(JIB_TIP - 10, JIB_T - 4, 5, on ? "#FF4D4D" : "#9A2B2B", 3);
+    if (on && !reduce) { ctx.globalAlpha = 0.3; circle(MAST_C, APEX_Y + 14, 14, "#FF6B6B", 0); circle(JIB_TIP - 10, JIB_T - 4, 12, "#FF6B6B", 0); ctx.globalAlpha = 1; }
+  }
+  function drawJib() {
+    ctx.lineCap = "round";
+    var x, n = 0;
+    for (x = MAST_L; x < JIB_TIP - 40; x += 40) {
+      var x2 = Math.min(x + 40, JIB_TIP - 40);
+      if (n++ % 2 === 0) lace(x, JIB_B, x2, JIB_T); else lace(x, JIB_T, x2, JIB_B);
+    }
+    lace(JIB_TIP - 40, JIB_T, JIB_TIP, JIB_B + 10);
+    fatLine(MAST_L - 6, JIB_B, JIB_TIP, JIB_B, 7, YEL, 3);
+    fatLine(MAST_L - 6, JIB_T, JIB_TIP - 40, JIB_T, 7, YEL, 3);
+    fatLine(JIB_TIP - 40, JIB_T, JIB_TIP, JIB_B + 10, 7, YEL, 3);
+    // Tip end with the trolley rope sheave.
+    box(JIB_TIP - 8, JIB_B - 6, 16, 20, 4, YEL_D, 3.5);
+  }
+  function drawCab() {
+    shape([[120, 540], [192, 540], [196, 500], [186, 470], [126, 470], [120, 480]], YEL, 5);
+    shape([[150, 532], [186, 532], [189, 502], [181, 480], [150, 480]], "#9FD6F5", 4);
+    ctx.fillStyle = "rgba(255,255,255,0.75)"; path([[156, 486], [164, 486], [158, 526], [154, 526]]); ctx.fill();
+    // The operator, in a hard hat, looking out at the hook.
+    circle(170, 504, 11, "#F2C094", 3);
+    ctx.beginPath(); ctx.arc(170, 507, 13, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineTo(157, 507); ctx.closePath(); ctx.fillStyle = YEL; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    circle(174, 503, 1.8, OUT, 0);
+    line(132, 486, 132, 520, 3.5, OUT);
+  }
+  function drawTrolley() {
+    var x = cr.x;
+    line(JIB_TIP - 8, JIB_B + 4, x + 22, JIB_B - 6, 2, "#555D6E");
+    line(MAST_R, JIB_B + 4, x - 22, JIB_B - 6, 2, "#555D6E");
+    box(x - 26, TY, 52, 20, 5, "#6B7385", 4);
+    [-14, 14].forEach(function (o) {
+      circle(x + o, JIB_B + 4, 7, "#3A4150", 3);
+      line(x + o, JIB_B + 4, x + o + Math.cos(cr.wheel) * 6, JIB_B + 4 + Math.sin(cr.wheel) * 6, 2.5, "#C9CED6");
+    });
+    circle(x - 8, TY + 6, 5, "#C9CED6", 2.5); circle(x + 8, TY + 6, 5, "#C9CED6", 2.5);
+  }
+  // Local coordinates of the hook (origin at the bottom of the hook's bowl, y up) to world.
+  function hookPt(lx, ly) {
+    var c = Math.cos(cr.th), s = Math.sin(cr.th), hx = hookX(), hy = hookY();
+    return [hx + lx * c - ly * s, hy + lx * s + ly * c];
+  }
+  function drawCableAndHook(t) {
+    var a = hookPt(-7, 46), b = hookPt(7, 46);
+    ctx.lineCap = "round";
+    [[cr.x - 8, a], [cr.x + 8, b]].forEach(function (p) {
+      line(p[0], TY + 2, p[1][0], p[1][1], 5, OUT); line(p[0], TY + 2, p[1][0], p[1][1], 2, "#B9C1CE");
+    });
+    ctx.save();
+    ctx.translate(hookX(), hookY()); ctx.rotate(cr.th);
+    if (carried) drawHanging(carried, t);
+    // Hook block: yellow with a sheave, then the red hook with its latch.
+    box(-17, 18, 34, 30, 7, YEL, 4);
+    circle(0, 36, 7, "#6B7385", 3);
+    ctx.save(); rrect(-17, 18, 34, 10, 4); ctx.clip();
+    ctx.fillStyle = OUT; for (var s = -24; s < 24; s += 10) { ctx.beginPath(); ctx.moveTo(s, 18); ctx.lineTo(s + 5, 18); ctx.lineTo(s + 15, 28); ctx.lineTo(s + 10, 28); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    rrect(-17, 18, 34, 30, 7); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(-6, 18); ctx.lineTo(-6, 7); ctx.arc(0, 7, 6, Math.PI, 2 * Math.PI, false); ctx.lineTo(6, 11);
+    ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = 4.5; ctx.strokeStyle = "#E63946"; ctx.stroke();
+    line(6, 11, -4, 15, 2.5, "#C9CED6");
+    ctx.restore();
+    if (drag && !drag.paused) {
+      var p = hookPt(0, 22);
+      ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(p[0], p[1], 40, 0, Math.PI * 2); ctx.lineWidth = 5; ctx.strokeStyle = "#FFC93C"; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---------- Drawing: loads and the building ----------
+  function drawBricks(x, y, w, h) {
+    var st = style();
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fillStyle = st.brick; ctx.fill(); ctx.clip();
+    ctx.strokeStyle = st.mortar; ctx.lineWidth = 2; ctx.beginPath();
+    var rh = 10, r = 0;
+    for (var yy = y; yy < y + h; yy += rh, r++) {
+      ctx.moveTo(x, yy); ctx.lineTo(x + w, yy);
+      for (var xx = x + (r % 2 ? 10 : 0); xx < x + w; xx += 20) { ctx.moveTo(xx, yy); ctx.lineTo(xx, yy + rh); }
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.lineWidth = 3.5; ctx.strokeStyle = OUT; ctx.strokeRect(x, y, w, h);
+  }
+  function drawWindowAt(x, y, glint) {
+    box(x, y, 100, 50, 2, "#F4FAFF", 3.5);
+    box(x + 6, y + 6, 41, 38, 1, "#9FD6F5", 3);
+    box(x + 53, y + 6, 41, 38, 1, "#9FD6F5", 3);
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    path([[x + 10, y + 40], [x + 20, y + 40], [x + 12, y + 10], [x + 10, y + 10]]); ctx.fill();
+    path([[x + 57, y + 40], [x + 67, y + 40], [x + 59, y + 10], [x + 57, y + 10]]); ctx.fill();
+    if (glint > 0 && glint < 1) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x + 4, y + 4, 92, 42); ctx.clip();
+      var gx = x - 30 + glint * 160;
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; path([[gx, y + 2], [gx + 18, y + 2], [gx + 2, y + 48], [gx - 16, y + 48]]); ctx.fill();
+      ctx.restore();
+    }
+  }
+  function drawBeamAt(x, y, w) {
+    box(x, y, w, 14, 1.5, "#5B6B8C", 3.5);
+    ctx.fillStyle = "#8494B5"; ctx.fillRect(x + 3, y + 4, w - 6, 6);
+    line(x + 3, y + 4, x + w - 3, y + 4, 1.5, "#3E4A66"); line(x + 3, y + 10, x + w - 3, y + 10, 1.5, "#3E4A66");
+    for (var i = 0; i < 2; i++) { circle(x + 9 + i * 8, y + 7, 2, OUT, 0); circle(x + w - 9 - i * 8, y + 7, 2, OUT, 0); }
+  }
+  function drawTreeAt(x, y, t) {
+    shape([[x - 14, y], [x + 14, y], [x + 17, y + 14], [x - 17, y + 14]], "#B5793A", 3.5);
+    box(x - 3, y + 14, 6, 8, 1, "#7A4B22", 2.5);
+    shape([[x - 20, y + 20], [x + 20, y + 20], [x, y + 44]], "#2E9E5B", 3.5);
+    shape([[x - 16, y + 34], [x + 16, y + 34], [x, y + 54]], "#38B26A", 3.5);
+    shape([[x - 11, y + 46], [x + 11, y + 46], [x, y + 64]], "#43C276", 3.5);
+    // A little flag on top.
+    line(x, y + 60, x, y + 84, 3, OUT);
+    var wv = reduce ? 0 : Math.sin(t * 4) * 3;
+    ctx.beginPath(); ctx.moveTo(x + 1, y + 84); ctx.quadraticCurveTo(x + 10, y + 86 + wv, x + 22, y + 82); ctx.lineTo(x + 22, y + 72); ctx.quadraticCurveTo(x + 10, y + 74 + wv, x + 1, y + 72); ctx.closePath();
+    ctx.fillStyle = "#E63946"; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  // A load drawn with its bottom-center at the origin (y up).
+  function drawLoad(kind, t) {
+    if (kind === "bricks") {
+      box(-32, 0, 64, 8, 1.5, "#B5793A", 3);
+      line(-20, 1, -20, 7, 2, "#7A4B22"); line(0, 1, 0, 7, 2, "#7A4B22"); line(20, 1, 20, 7, 2, "#7A4B22");
+      drawBricks(-29, 8, 58, 38);
+      ctx.fillStyle = "rgba(255,255,255,0.28)"; ctx.fillRect(-29, 8, 58, 38);
+    } else if (kind === "window") drawWindowAt(-50, 0, 0);
+    else if (kind === "beam") drawBeamAt(-100, 0, 200);
+    else if (kind === "tree") drawTreeAt(0, 0, t);
+  }
+  function drawSlings(l, glow) {
+    var k = KIND[l.kind], top = l.h, ry = l.h + SLING;
+    ctx.lineCap = "round";
+    if (k.c) { line(0, ry, -k.c, top, 3.5, "#3A4150"); line(0, ry, k.c, top, 3.5, "#3A4150"); }
+    else line(0, ry, 0, top - 4, 3.5, "#3A4150");
+    if (glow) {
+      ctx.globalAlpha = glow; circle(0, ry, 16, "#FFE14D", 0); ctx.globalAlpha = 1;
+    }
+    ctx.beginPath(); ctx.arc(0, ry, 7, 0, Math.PI * 2); ctx.lineWidth = 7; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = 3.5; ctx.strokeStyle = "#C9CED6"; ctx.stroke();
+  }
+  function drawHanging(l, t) {
+    ctx.save();
+    ctx.translate(0, -SLING - l.h);
+    drawSlings(l, 0);
+    drawLoad(l.kind, t);
+    ctx.restore();
+  }
+  function drawLoose(t) {
+    var nk = nextKind();
+    loads.forEach(function (l) {
+      if (l === carried) return;
+      var age = clock - l.born;
+      if (age < 0) return;
+      var sc = reduce ? 1 : (age < 0.5 ? ease(age / 0.5) * 1.08 : (age < 0.7 ? 1.08 - 0.08 * (age - 0.5) / 0.2 : 1));
+      ctx.save(); ctx.translate(l.x, l.y); ctx.scale(sc, sc);
+      var glow = l.kind === nk && !carried && !ending ? 0.35 + 0.3 * Math.sin(t * 4) : 0;
+      drawSlings(l, glow);
+      drawLoad(l.kind, t);
+      ctx.restore();
+    });
+  }
+  function drawTimbers() { DUN.forEach(function (d) { box(d[0], 0, d[1] - d[0], DUN_H, 1, "#B5793A", 3); }); }
+  function drawFloor(b, bricksP, win, beam, winGlint) {
+    if (win) drawWindowAt(BX + PIER, b, winGlint);
+    if (bricksP > 0) {
+      var h = WALL_H * bricksP;
+      drawBricks(BX, b, PIER, h);
+      drawBricks(BX + BW - PIER, b, PIER, h);
+    }
+    if (beam) drawBeamAt(BX - 4, b + WALL_H, BW + 8);
+  }
+  function drawBuilding(t) {
+    // Foundation.
+    box(BX - 12, -4, BW + 24, FOUND + 4, 2, "#B8BEC8", 4);
+    for (var f = 0; f < floors; f++) {
+      var b = FOUND + f * FLOOR_H;
+      drawFloor(b, 1, true, true, f === floors - 1 ? (clock - anim.floor) / 1.2 : 0);
+    }
+    if (floors < FLOORS) {
+      var b0 = baseY(), p = cur.bricks ? clamp((clock - anim.bricks) / 1.3, 0, 1) : 0;
+      if (reduce && cur.bricks) p = 1;
+      drawFloor(b0, cur.bricks ? ease(p) : 0, cur.window, false, cur.window ? (clock - anim.window) / 1.2 : 0);
+      if (cur.bricks && p < 1) {
+        // The pallet unpacks into the two walls.
+        ctx.save(); ctx.translate(BC, b0); ctx.scale(1 - p, 1 - p); drawLoad("bricks", t); ctx.restore();
+      }
+    }
+    if (topped) {
+      var ry = roofY();
+      // Bunting from the tree to the roof corners.
+      [[BX + 4, ry + 2], [BX + BW - 4, ry + 2]].forEach(function (e, i) {
+        var x0 = BC, y0 = ry + 56, n = 6;
+        line(x0, y0, e[0], e[1], 2, OUT);
+        for (var k = 1; k < n; k++) {
+          var u = k / n, px = x0 + (e[0] - x0) * u, py = y0 + (e[1] - y0) * u - Math.sin(u * Math.PI) * 6;
+          path([[px - 6, py], [px + 6, py], [px, py - 12]]); ctx.fillStyle = CONF[(k + i * 3) % CONF.length]; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = OUT; ctx.stroke();
+        }
+      });
+      drawTreeAt(BC, ry, t);
+    }
+  }
+  // Where the carried piece will go: a soft dashed outline that pulses.
+  function drawTargetGhost(t) {
+    if (!carried || !allowed(carried.kind) || ending) return;
+    var k = carried.kind, b = targetBottom(k), a = 0.45 + 0.25 * Math.sin(t * 4);
+    ctx.save(); ctx.globalAlpha = a; ctx.setLineDash([10, 8]); ctx.lineWidth = 4; ctx.strokeStyle = "#FFFFFF";
+    if (k === "bricks") { ctx.strokeRect(BX, b, PIER, WALL_H); ctx.strokeRect(BX + BW - PIER, b, PIER, WALL_H); }
+    else if (k === "window") ctx.strokeRect(BX + PIER, b, 100, WALL_H);
+    else if (k === "beam") ctx.strokeRect(BX - 4, b, BW + 8, 14);
+    else ctx.strokeRect(BC - 22, b, 44, 64);
+    ctx.restore();
+  }
+  function drawParticles() {
+    var i;
+    for (i = 0; i < dust.length; i++) {
+      var d = dust[i], f = d.life / d.max;
+      ctx.globalAlpha = 0.75 * (1 - f) * Math.min(1, d.life * 8);
+      circle(d.x, d.y, d.r, d.c, 0);
+    }
+    ctx.globalAlpha = 1;
+    for (i = 0; i < stars.length; i++) {
+      var s = stars[i], u = (s.life - s.d) / s.max;
+      if (u < 0) continue;
+      var r = s.s * Math.sin(Math.PI * u);
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(u * 2);
+      ctx.beginPath();
+      for (var k = 0; k < 8; k++) { var rr = k % 2 ? r * 0.4 : r, aa = k * Math.PI / 4; ctx.lineTo(Math.cos(aa) * rr, Math.sin(aa) * rr); }
+      ctx.closePath(); ctx.fillStyle = "#FFE14D"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.restore();
+    }
+    for (i = 0; i < conf.length; i++) {
+      var c = conf[i];
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a);
+      ctx.globalAlpha = clamp((c.max - c.life) * 1.5, 0, 1);
+      ctx.fillStyle = c.c; ctx.fillRect(-c.s / 2, -c.s / 4, c.s, c.s / 2);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    for (i = 0; i < rings.length; i++) {
+      var g = rings[i], q = g.t / 0.6;
+      ctx.globalAlpha = 1 - q; ctx.beginPath(); ctx.arc(g.x, g.y, 10 + q * 40, 0, Math.PI * 2); ctx.lineWidth = 6; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function draw(t) {
+    drawSky();
+    drawGround();
+    drawCone(-110); drawCone(880);
+    drawTimbers();
+    drawBuilding(t);
+    drawLoose(t);
+    drawTargetGhost(t);
+    drawMast();
+    drawTop(t);
+    drawJib();
+    drawTrolley();
+    drawCab();
+    drawCableAndHook(t);
+    drawParticles();
+  }
+
+  // ---------- Simulation ----------
+  var acc = 0, H = 1 / 120;
+  function step(dt) {
+    clock += dt;
+    if (spawnIn > 0) { spawnIn -= dt; if (spawnIn <= 0) { spawnIn = 0; spawnLoads(false); } }
+    if (jobs.length) runJobs(dt);
+    if (!jobs.length) {
+      freeMove = false;
+      if (ending) { if (parking && !parked) parkPlan(); }
+      else if (auto) planAuto();
+    }
+    if (!jobs.length) {
+      spd = DRAG;
+      if (drag && !drag.paused) { tgt.x = drag.wx + drag.ox; tgt.y = drag.wy + drag.oy; }
+    }
+    acc = Math.min(acc + dt, 6 * H);
+    while (acc >= H) { physics(H); acc -= H; }
+    if (drag && !drag.paused && !jobs.length && !ending) handsOnChecks();
+    stepParticles(dt);
+    clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > WORLD_R + 200) c.x = WORLD_L - 260; });
+    if (Math.abs(cr.vx) > 4 || Math.abs(cr.vL) > 4) lastMove = clock;
+  }
+  // While his finger drives the hook: hook on near a load, put a piece in when it reaches its spot.
+  function handsOnChecks() {
+    var hx = hookX(), hy = hookY();
+    if (!carried) {
+      for (var i = 0; i < loads.length; i++) {
+        var l = loads[i];
+        if (l.born > clock) continue;
+        var r = ringOf(l), dx = hx - r.x, dy = hy - r.y;
+        if (dx * dx + dy * dy < 54 * 54 || (Math.abs(dx) < l.w / 2 && hy < r.y && hy > l.y)) { byHand = true; startAttach(l); return; }
+      }
+      return;
+    }
+    var k = carried.kind, bottom = hy - SLING - carried.h;
+    if (allowed(k) && hx > BX - 30 && hx < BX + BW + 30 && bottom < targetBottom(k) + 150) { byHand = true; startPlace(); }
+  }
+
+  // ---------- Input: drag the hook anywhere on the picture ----------
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (ending || Toybox.timer.locked()) return;
+    if (drag && drag.id !== e.pointerId) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    var p = hookPt(0, 22), dx = p[0] - w.x, dy = p[1] - w.y;
+    // Grabbing the hook itself keeps it under the finger; a touch anywhere else calls the hook over.
+    var near = dx * dx + dy * dy < Math.pow(Math.max(60, 46 / S), 2);
+    drag = { id: e.pointerId, wx: w.x, wy: w.y, ox: near ? hookX() - w.x : 0, oy: near ? hookY() - w.y : 0, paused: false };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    cv.classList.add("grabbing");
+    if (!jobsLocked) { setJobs([], false); }
+    auto = false; dragged = true;
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    drag.wx = w.x; drag.wy = w.y;
+  });
+  function endDrag(e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var was = drag;
+    drag = null;
+    cv.classList.remove("grabbing");
+    if (was.paused || ending) return;
+    if (jobsLocked) return;
+    tgt.x = cr.x; tgt.y = hookY();
+    if (carried) {
+      var hx = hookX();
+      if (overBuilding(hx, carried.w)) {
+        if (allowed(carried.kind)) { byHand = true; startPlace(); }
+        else coachAgain();
+      } else startSetDown();
+    }
+  }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "liftBtn") lift();
+    else if (t.id === "newBtn") newBuilding();
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
+
+  // ---------- Counter and coach line ----------
+  function showCount(pop) {
+    var el = $("count");
+    el.textContent = "Floors: " + floors;
+    if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  }
+  var coachShown = "", coachUntil = 0, flashText = "", flashUntil = 0, nowMs = 0;
+  function coachWanted() {
+    if (topped) return "Topped out!";
+    if (!dragged) return "Drag the hook!";
+    if (carried) {
+      if (allowed(carried.kind)) return carried.kind === "tree" ? "Put it on the top!" : "Take it to the building!";
+      return !cur.bricks ? "Bricks first!" : "Window first!";
+    }
+    var k = nextKind();
+    if (!k || !findLoad(k)) return "";
+    return "Hook the " + KIND[k].name + "!";
+  }
+  function flashCoach(text, ms) { flashText = text; flashUntil = Date.now() + ms; coachShown = ""; }
+  function coachAgain() { coachShown = ""; }
+  function coachTick() {
+    var now = Date.now(), el = $("hint");
+    var t = now < flashUntil ? flashText : coachWanted();
+    if (ending || !t) { if (!el.hidden) el.hidden = true; coachShown = t ? "" : coachShown; return; }
+    if (t !== coachShown) {
+      coachShown = t; el.textContent = t; el.hidden = false; el.classList.remove("off");
+      if (!reduce) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
+      coachUntil = now + Math.max(6000, now < flashUntil ? flashUntil - now : 0);
+    } else if (now > coachUntil && !el.classList.contains("off")) el.classList.add("off");
+  }
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var master = null, masterCtx = null;
+  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; hum = null; } return master; }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function clunk(p) { tone(150, 0.2, 0.05 * p + 0.01, "triangle", 70); tone(620, 0.06, 0.012 * p, "square", 420); }
+  function whirr() { tone(200, 0.35, 0.015, "sine", 320); }
+  function chime() { tone(523, 0.4, 0.035); tone(659, 0.4, 0.035, "sine", 0, 0.14); tone(784, 0.6, 0.035, "sine", 0, 0.28); }
+  function fanfare() { [523, 659, 784, 1047, 784, 1047].forEach(function (f, i) { tone(f, i === 5 ? 0.9 : 0.3, 0.035, "triangle", 0, i * 0.17); }); }
+  // The motor hum follows how fast the trolley and the winch move.
+  var hum = null;
+  function humTick() {
+    var ac = Toybox.sound.ready();
+    var level = clamp(Math.abs(cr.vx) / 260 + Math.abs(cr.vL) / 260, 0, 1);
+    if (!ac) { if (hum) { try { hum.o.stop(); } catch (e) { /* ignore */ } hum = null; } return; }
+    if (!hum) {
+      if (level < 0.05) return;
+      var dest = out(ac), o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = "sawtooth"; o.frequency.value = 55; f.type = "lowpass"; f.frequency.value = 240; g.gain.value = 0;
+      o.connect(f); f.connect(g); g.connect(dest); o.start();
+      hum = { o: o, g: g };
+    }
+    hum.g.gain.setTargetAtTime(level * 0.022, ac.currentTime, 0.08);
+    hum.o.frequency.setTargetAtTime(52 + level * 30, ac.currentTime, 0.1);
+  }
+
+  // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
+  function drawTimer(info) {
+    var active = info.phase === "running" || info.phase === "ending";
+    $("fuel").hidden = !active;
+    if (!active) return;
+    var f = info.fraction, fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(info.showMinutes && info.phase === "running");
+    $("fuelNum").textContent = String(info.minutes);
+  }
+  function onEnding(done, info) {
+    endingDone = done;
+    ending = true; drag = null; auto = false; parked = false;
+    cv.classList.remove("grabbing");
+    if (!jobsLocked) setJobs([], false);
+    $("hint").hidden = true;
+    if (!info.goodbye) parking = true;
+  }
+  function goodbyePark() { parking = true; chime(); }
+  function restSVG() {
+    var o = '<rect width="240" height="200" fill="#2B3A67"/>';
+    o += '<circle cx="206" cy="30" r="14" fill="#FFF4CC" stroke="#1D2340" stroke-width="2.5"/><circle cx="212" cy="26" r="12" fill="#2B3A67"/>';
+    o += '<circle cx="150" cy="16" r="2" fill="#FFF"/><circle cx="20" cy="22" r="1.6" fill="#FFF"/><circle cx="226" cy="70" r="1.6" fill="#FFF"/><circle cx="118" cy="62" r="2" fill="#FFF"/>';
+    o += '<rect y="168" width="240" height="32" fill="#8C5A2E"/><path d="M0 168 H240" stroke="#1D2340" stroke-width="3"/>';
+    o += '<g stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">';
+    // the building with its tree on top
+    o += '<rect x="150" y="98" width="70" height="70" fill="#C8553D"/><path d="M150 120 H220 M150 144 H220" stroke="#5B6B8C" stroke-width="5"/>';
+    o += '<rect x="168" y="102" width="34" height="14" fill="#FFE58A"/><rect x="168" y="126" width="34" height="14" fill="#9FD6F5"/><rect x="168" y="150" width="34" height="14" fill="#FFE58A"/>';
+    o += '<path d="M178 98 L185 78 L192 98 Z" fill="#2E9E5B"/>';
+    // tower crane: mast, jib, counter-jib, cab, hook pulled in
+    o += '<path d="M48 160 L62 140 L48 120 L62 100 L48 80 L62 60" fill="none" stroke-width="5"/><path d="M48 160 L62 140 L48 120 L62 100 L48 80 L62 60" fill="none" stroke="#FFC72C" stroke-width="2"/>';
+    o += '<path d="M48 168 V54 M62 168 V54" stroke-width="6"/><path d="M48 168 V54 M62 168 V54" stroke="#FFC72C" stroke-width="2.5"/><rect x="40" y="164" width="30" height="6" fill="#B8BEC8"/>';
+    o += '<path d="M12 46 H232 M40 54 H226" stroke="#1D2340" stroke-width="5"/><path d="M12 46 H232 M40 54 H226" stroke="#FFC72C" stroke-width="2.5"/>';
+    o += '<path d="M55 46 L55 26 M55 26 L140 46 M55 26 L16 46" fill="none" stroke-width="1.6"/>';
+    o += '<rect x="12" y="50" width="16" height="22" fill="#B8BEC8"/><rect x="62" y="56" width="18" height="16" rx="3" fill="#FFC72C"/><rect x="68" y="59" width="10" height="9" fill="#9FD6F5"/>';
+    o += '<rect x="86" y="54" width="14" height="6" fill="#6B7385"/><path d="M93 60 V70" stroke-width="2"/><rect x="88" y="70" width="10" height="8" rx="2" fill="#FFC72C"/>';
+    o += '<circle cx="55" cy="26" r="3" fill="#FF4D4D"/></g>';
+    o += '<text x="84" y="104" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#FFFFFF">z</text><text x="96" y="90" font-family="Baloo 2, sans-serif" font-weight="800" font-size="13" fill="#FFFFFF">z</text><text x="106" y="78" font-family="Baloo 2, sans-serif" font-weight="800" font-size="9" fill="#FFFFFF">z</text>';
+    return o;
+  }
+  function restArt() { return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' + restSVG() + "</svg>"; }
+  function onRest() {
+    if (carried) { var l = carried; carried = null; l.x = KIND[l.kind].home; l.y = groundAt(l.x - l.w / 2, l.x + l.w / 2, l); }
+    setJobs([], false); auto = false;
+    cr.x = TMIN; cr.vx = 0; cr.L = LMIN; cr.vL = 0; cr.th = 0; cr.om = 0;
+    tgt.x = TMIN; tgt.y = HOOK_MAX;
+    parked = true; parking = false; endingDone = null;
+  }
+  function onWake() { ending = false; parking = false; parked = false; endingDone = null; coachAgain(); }
+  function onBig() { resize(); requestAnimationFrame(resize); }
+
+  // ---------- Loop ----------
+  var lastT = 0, humT = 0;
+  function loop(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t;
+    var phase = Toybox.timer.phase();
+    if (phase !== "resting") step(dt);
+    camera(dt);
+    draw(clock);
+    coachTick();
+    humT += dt; if (humT > 0.1) { humT = 0; humTick(); }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Idle help: the Toybox ghost hand (master copy: tools/snippets/ghost-hand.js) ----------
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // The ghost hand drags the hook to the next load (or, carrying, to the building).
+  function inStage(p) {
+    var r = $("stage").getBoundingClientRect();
+    return [clamp(p[0], r.left + 34, r.right - 34), clamp(p[1], r.top + 34, r.bottom - 34)];
+  }
+  var ghost = makeGhost(function () {
+    if (ending || drag || jobs.length || auto) return null;
+    if (topped) {
+      if (Toybox.isBig()) return null;
+      flashCoach("Tap New building!", 3500);
+      var nb = $("newBtn").getBoundingClientRect();
+      return { pts: [[nb.left + nb.width / 2, nb.top + nb.height / 2]], tap: true };
+    }
+    var h = inStage(worldToScreen(hookX(), hookY() + 22));
+    if (carried) {
+      if (!allowed(carried.kind)) return null;
+      coachAgain();
+      return { pts: [h, inStage(worldToScreen(BC, targetBottom(carried.kind) + carried.h + SLING + 40))] };
+    }
+    var k = nextKind(), l = k && findLoad(k);
+    if (!l || l.born > clock) return null;
+    coachAgain();
+    var r = ringOf(l);
+    return { pts: [h, inStage(worldToScreen(r.x, r.y))] };
+  }, { max: 3 });
+
+  // ---------- Start ----------
+  spawnLoads(true);
+  var startLoad = findLoad(nextKind() || "bricks");
+  cr.x = startLoad ? clamp(startLoad.x + 70, TMIN, TMAX) : 300;
+  cr.L = TY - 230; tgt.x = cr.x; tgt.y = 230;
+  resize();
+  showCount(false);
+  Toybox.init({
+    app: "construction-site",
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the crane pulls its hook up and rests, and the buttons lock. The timer carries on across the site pages.",
+    goodbyeOption: "End with a “Park it” button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Park it",
+    farewellDone: "Bye bye, crane!",
+    restLine: "The crane is resting.",
+    restLine2: "The crane will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft motor hums and clunks. Hold for 2 seconds.",
+    legacy: { timer: "site-timer-v1", sound: "site-sound-v1", big: "site-big-v1" },
+    onEnding: onEnding,
+    onGoodbye: goodbyePark,
+    onRest: onRest,
+    onWake: onWake,
+    onBig: onBig,
+    onSound: function (on) { if (on) chime(); },
+    onTimer: drawTimer
+  });
+  requestAnimationFrame(loop);
+
+  // Test hook, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) window.__crane = {
+    state: function () {
+      return { floors: floors, bricks: cur.bricks, window: cur.window, topped: topped, carried: carried ? carried.kind : null,
+        hook: { x: Math.round(hookX()), y: Math.round(hookY()) }, trolley: Math.round(cr.x), th: +cr.th.toFixed(3), jobs: jobs.length, locked: jobsLocked, auto: auto,
+        loads: loads.map(function (l) { return { kind: l.kind, x: Math.round(l.x), y: Math.round(l.y) }; }), coach: $("hint").hidden ? "" : $("hint").textContent, parked: parked };
+    },
+    toScreen: function (x, y) { var p = worldToScreen(x, y); return { x: p[0], y: p[1] }; },
+    hookScreen: function () { var p = worldToScreen(hookX(), hookY() + 22); return { x: p[0], y: p[1] }; },
+    ringScreen: function (kind) { var l = findLoad(kind); if (!l) return null; var r = ringOf(l), p = worldToScreen(r.x, r.y); return { x: p[0], y: p[1] }; },
+    targetScreen: function () { var k = carried ? carried.kind : nextKind(); var p = worldToScreen(BC, targetBottom(k) + KIND[k].h + SLING + 20); return { x: p[0], y: p[1] }; },
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+<!-- Safety check: a quick gear re-check when the gear is already on. Identical on every Construction Site page. -->
+<script>
+(function () {
+  "use strict";
+  var TKEY = "toybox-timer-v1", GEAR_KEY = "site-gear", SKIP_KEY = "site-check-skip";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var ITEMS = [["hat", "Hard hat?"], ["vest", "Safety vest?"], ["gog", "Eye protection?"], ["muf", "Ear protection?"]];
+
+  function gearOn() { try { return sessionStorage.getItem(GEAR_KEY) === "on"; } catch (e) { return false; } }
+  // A full gear-up just happened (the gate sends you on to a station): skip one check.
+  function takeSkip() {
+    try { if (sessionStorage.getItem(SKIP_KEY) === "1") { sessionStorage.removeItem(SKIP_KEY); return true; } } catch (e) { /* ignore */ }
+    return false;
+  }
+  // The shared Toybox timer is winding down or resting (or has just run out and not caught up yet).
+  function timerBusy() {
+    try { return Toybox.timer.locked() || (Toybox.timer.phase() === "running" && Toybox.timer.remainingMs() <= 0); } catch (e) { return false; }
+  }
+  // The site map with ?next= sends you straight on to that station, which does its own check.
+  function redirecting() { return /(^|[?&])next=/.test(location.search); }
+
+  // ---------- The worker, wearing all the gear (same drawing as the site gate) ----------
+  var INK = "#1D2340", YEL = "#FFC93C", YEL2 = "#F2AE1C", GLASS = "#BFE6FF", SKIN = "#F2C49B";
+  function P(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + (fill || "none") + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '" stroke-linejoin="round" stroke-linecap="round"' + (extra || "") + "/>"; }
+  function Rc(x, y, w, h, rx, fill, sw, extra) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 0) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"' + (extra || "") + "/>"; }
+  function C(cx, cy, r, fill, sw) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (sw == null ? 4 : sw) + '"/>'; }
+  function hatSVG() { return P("M64 62 Q64 20 100 20 Q136 20 136 62 Z", YEL, 4) + Rc(54, 56, 92, 12, 6, YEL, 4) + Rc(95, 22, 10, 36, 4, YEL2, 3); }
+  function vestSVG() {
+    var f = "#FF7A1A";
+    return P("M62 118 Q62 106 76 104 L86 104 L98 150 L98 198 L62 198 Z", f, 4) + P("M138 118 Q138 106 124 104 L114 104 L102 150 L102 198 L138 198 Z", f, 4) +
+      Rc(62, 164, 36, 9, 0, "#E6EEF7", 3) + Rc(102, 164, 36, 9, 0, "#E6EEF7", 3) + Rc(74, 106, 7, 58, 0, "#E6EEF7", 3) + Rc(119, 106, 7, 58, 0, "#E6EEF7", 3);
+  }
+  function gogSVG() {
+    return Rc(63, 69, 74, 8, 3, "#2E9E5B", 4) + Rc(74, 63, 52, 22, 10, "#FF7A1A", 4) +
+      Rc(79, 67, 19, 14, 6, GLASS, 3, ' fill-opacity="0.55"') + Rc(102, 67, 19, 14, 6, GLASS, 3, ' fill-opacity="0.55"') +
+      P("M82 70 L88 70", "none", 2.5, ' stroke="#FFFFFF"') + P("M105 70 L111 70", "none", 2.5, ' stroke="#FFFFFF"');
+  }
+  function mufSVG() {
+    var arc = "M60 66 Q60 26 100 26 Q140 26 140 66";
+    return P(arc, "none", 9) + P(arc, "none", 4, ' stroke="#E63946"') + Rc(50, 58, 20, 32, 9, "#E63946", 4) + Rc(130, 58, 20, 32, 9, "#E63946", 4) +
+      Rc(66, 63, 6, 22, 3, INK, 0) + Rc(128, 63, 6, 22, 3, INK, 0);
+  }
+  function workerSVG() {
+    var o = '<ellipse cx="100" cy="284" rx="64" ry="8" fill="rgba(70,40,10,0.22)"/>';
+    o += P("M62 258 L96 258 L98 282 L54 282 Q54 266 62 258 Z", "#7A4B1E", 4) + P("M138 258 L104 258 L102 282 L146 282 Q146 266 138 258 Z", "#7A4B1E", 4);
+    o += P("M64 198 L136 198 L134 262 L106 262 L100 222 L94 262 L66 262 Z", "#34508F", 4);
+    o += Rc(40, 108, 24, 76, 12, "#3A86FF", 4) + Rc(136, 108, 24, 76, 12, "#3A86FF", 4);
+    o += C(52, 188, 11, SKIN, 4) + C(148, 188, 11, SKIN, 4);
+    o += Rc(92, 96, 16, 12, 2, SKIN, 3);
+    o += P("M62 198 L62 120 Q62 104 80 104 L120 104 Q138 104 138 120 L138 198 Z", "#3A86FF", 4);
+    o += Rc(62, 190, 76, 10, 2, "#4A3420", 3);
+    o += '<g class="sc-g" data-k="vest">' + vestSVG() + "</g>";
+    o += C(100, 70, 33, SKIN, 4);
+    o += P("M67 64 Q66 36 100 36 Q134 36 133 64 Q118 50 100 52 Q82 50 67 64 Z", "#6B3E1E", 4);
+    o += C(88, 72, 4.5, INK, 0) + C(112, 72, 4.5, INK, 0) + C(80, 84, 5, "#F59BA0", 0) + C(120, 84, 5, "#F59BA0", 0);
+    o += P("M88 86 Q100 97 112 86", "none", 4);
+    o += '<g class="sc-g" data-k="gog">' + gogSVG() + "</g>";
+    o += '<g class="sc-g" data-k="muf">' + mufSVG() + "</g>";
+    o += '<g class="sc-g" data-k="hat">' + hatSVG() + "</g>";
+    return '<g class="sc-man">' + o + "</g>";
+  }
+
+  var CSS =
+    ".sc{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top,0px)) 16px max(14px,env(safe-area-inset-bottom,0px));" +
+    "background:rgba(205,233,255,.88);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;transition:opacity .35s ease}" +
+    "@media (prefers-color-scheme:dark){.sc{background:rgba(16,22,44,.86)}}" +
+    ".sc-card{width:min(560px,100%);max-height:100%;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--panel,#fff);color:var(--ink,#1D2340);" +
+    "border:4px solid var(--edge,#1D2340);border-radius:28px;box-shadow:6px 6px 0 var(--edge,#1D2340);padding:12px 16px 16px;font-family:var(--font,sans-serif);" +
+    "animation:sc-in .3s cubic-bezier(.3,1.5,.5,1) both;transition:transform .4s cubic-bezier(.5,0,.8,.3)}" +
+    ".sc h2{margin:0;font-size:clamp(2rem,7vw,3.2rem);font-weight:800;line-height:1.05;text-align:center}" +
+    ".sc-man-wrap{height:min(34vh,330px);aspect-ratio:200/296;flex:0 1 auto;min-height:120px}" +
+    ".sc-man-wrap svg{width:100%;height:100%;display:block;overflow:visible}" +
+    ".sc-g{transform-box:fill-box;transform-origin:50% 50%}" +
+    ".sc-g.pop{animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc-man{transform-box:fill-box;transform-origin:50% 100%}" +
+    ".sc-man.hop{animation:sc-hop .45s ease-out}" +
+    ".sc ul{list-style:none;margin:0;padding:0;width:100%;display:grid;gap:8px}" +
+    ".sc li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px 4px 16px;border:3px solid var(--edge,#1D2340);border-radius:18px;" +
+    "background:#F6DDB0;color:#1D2340;font-size:clamp(1.05rem,4.4vw,1.9rem);font-weight:800;line-height:1.15;white-space:nowrap;opacity:.55;transition:opacity .2s,background-color .2s}" +
+    ".sc li.ok{opacity:1;background:#BDF0C8}" +
+    ".sc-ok{font-size:.85em;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:2px 12px 0;border-radius:14px;background:#2E9E5B;color:#fff;border:3px solid #1D2340;visibility:hidden}" +
+    ".sc li.ok .sc-ok{visibility:visible;animation:sc-pop .38s cubic-bezier(.3,1.6,.5,1)}" +
+    ".sc.out{opacity:0}.sc.out:not(.held){pointer-events:none}" +
+    ".sc.out .sc-card{transform:translateY(-120vh)}" +
+    "@keyframes sc-in{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}" +
+    "@keyframes sc-pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}" +
+    "@keyframes sc-hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-14%)}}" +
+    "@media (max-height:600px){.sc-man-wrap{height:26vh}.sc ul{gap:4px}.sc li{font-size:1.15rem}}" +
+    "@media (prefers-reduced-motion:reduce){.sc{transition:opacity .15s linear}.sc-card,.sc li.ok .sc-ok,.sc-g.pop,.sc-man.hop{animation:none}.sc.out .sc-card{transform:none}}";
+
+  var el = null, timers = [], held = null, swallowUntil = 0;
+  // A soft rising pop per tick, only when the shared Toybox sound is on and the audio engine is running.
+  function pop(n) {
+    try {
+      var actx = window.Toybox && Toybox.sound && Toybox.sound.ready();
+      if (!actx) return;
+      var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = 440 + n * 90;
+      o.type = "sine"; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.6, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.2);
+    } catch (e) { /* no sound */ }
+  }
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function tick(i) {
+    if (!el) return;
+    var li = el.querySelectorAll("li")[i], k = ITEMS[i][0], g = el.querySelector('.sc-g[data-k="' + k + '"]');
+    li.classList.add("ok");
+    if (!reduce && g) { g.classList.remove("pop"); void g.getBoundingClientRect(); g.classList.add("pop"); }
+    pop(i);
+  }
+  function close(fast) {
+    if (!el || el.classList.contains("out")) return;
+    timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = [];
+    var node = el;
+    node.classList.add("out");
+    // A finger still down on the (now invisible) card keeps it in place until lifted, so the lift and
+    // its click never land on a button underneath.
+    function gone() { if (held !== null && el === node) { timers.push(setTimeout(gone, 120)); return; } if (node.parentNode) node.parentNode.removeChild(node); if (el === node) el = null; }
+    setTimeout(gone, reduce ? 160 : (fast ? 260 : 420));
+  }
+  function show() {
+    if (el) return;
+    if (!gearOn() || takeSkip() || redirecting() || timerBusy()) return;
+    if (!document.getElementById("sc-style")) {
+      var st = document.createElement("style"); st.id = "sc-style"; st.textContent = CSS; document.head.appendChild(st);
+    }
+    el = document.createElement("div");
+    el.className = "sc";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Safety check");
+    var rows = ITEMS.map(function (it) { return "<li><span>" + it[1] + '</span><span class="sc-ok" aria-hidden="true">✓ CHECK!</span></li>'; }).join("");
+    el.innerHTML = '<div class="sc-card"><h2>Safety check!</h2><div class="sc-man-wrap"><svg viewBox="0 0 200 296" aria-hidden="true">' + workerSVG() + "</svg></div><ul>" + rows + "</ul></div>";
+    document.body.appendChild(el);
+    el.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      held = e.pointerId; el.classList.add("held");
+      try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      close(true);
+    });
+    function release(e) { if (held === null) return; e.stopPropagation(); held = null; swallowUntil = Date.now() + 450; if (el) el.classList.remove("held"); }
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+    el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); close(true); });
+    timers.push(setInterval(function () { if (timerBusy()) close(true); }, 250));
+    if (reduce) {
+      ITEMS.forEach(function (it, i) { tick(i); });
+      later(function () { close(false); }, 1700);
+    } else {
+      ITEMS.forEach(function (it, i) { later(function () { tick(i); }, 400 + i * 460); });
+      later(function () { var m = el && el.querySelector(".sc-man"); if (m) m.classList.add("hop"); }, 1900);
+      later(function () { close(false); }, 2500);
+    }
+  }
+  // The click that follows the skipping tap is swallowed (it must not press what is underneath).
+  document.addEventListener("click", function (e) { if (held !== null || Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener("keydown", function (e) { if (el && !el.classList.contains("out") && (e.key === "Enter" || e.key === " " || e.key === "Escape")) { e.preventDefault(); e.stopPropagation(); close(true); } }, true);
+  // The timer ended on another page: get out of the way of the rest screen.
+  window.addEventListener("storage", function (e) { if ((e.key === TKEY || e.key === null) && el && timerBusy()) close(true); });
+  // Coming back with the Back button (page restored from memory) counts as arriving again.
+  window.addEventListener("pageshow", function (e) { if (e.persisted) show(); });
+  if (/[?&]debug\b/.test(location.search)) window.__safetyCheck = { showing: function () { return !!el && !el.classList.contains("out"); }, ticked: function () { return el ? el.querySelectorAll("li.ok").length : 0; } };
+  show();
+})();
+</script>
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* offline install unavailable */ });
+    });
+  }
+</script>
+</body>
+</html>

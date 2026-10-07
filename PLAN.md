@@ -129,6 +129,9 @@ A site gate with hard hat, safety vest, eye and ear protection once per visit; a
 the map). Every station is a side view in the same flat style (sky, ground line, chunky outlines).
 
 **Stations now:** Excavator, Concrete, Wrecking ball (the dad likes Concrete and Wrecking ball as they are).
+Tower crane open points: on an upright phone the mast can start off-screen (the camera follows the hook); on the
+upright-phone map its jib touches the lot above; questions for the dad: Lift! pace (~15 s a piece), 5 floors,
+forced order (bricks and window before the beam), the topping-out tree.
 
 **Removed:** Bulldozer (a top-down field with textured dirt; it didn't fit the others and the jobs were too fiddly).
 
@@ -138,7 +141,7 @@ a coach line that is always true, and hidden **treasures** in the dirt pile (tre
 dinosaur bone, coin, fossil shell) that pop out with a sparkle and stay on display in a treasure crate.
 
 **New stations (the dad's picks, in this order):**
-- **Tower crane (in progress):** drag the hook; the trolley runs along the jib and the cable follows; hook steel
+- **Tower crane (done):** drag the hook; the trolley runs along the jib and the cable follows; hook steel
   beams and pallets of bricks, carry them to the building and it grows floor by floor until it is topped out
   (flag and little tree). Backup "Lift!" button does the next piece. Counter "Floors".
 - **Dump truck:** drive the truck left and right; it gets loaded by an excavator at one end, then drives to the
