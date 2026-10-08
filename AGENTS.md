@@ -50,7 +50,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
-- `tools/`: `smoke.js` (load + drag + error/scroll check), `add-app.py` (add an app to launcher, top-level
+- `tools/`: `smoke.js` (load + drag + error/scroll check), `buttons.js` (taps every button on every page and
+  flags any whose tap changes nothing on screen; run it after UI changes, see its header), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 
 ### Offline (service workers)
@@ -153,6 +154,10 @@ Keep only:
   material pickers, size pickers, chuck keys, waiting for a spindle to stop, setup sequences. If something like
   that stays, it happens automatically or with one tap.
 - Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
+- **No dead buttons** (the dad: "lots of buttons look pressed but don't do anything"): every tap gives a visible
+  answer, also when there is nothing to do (a hint like "Draw a line first!", a sparkle). Empty slots that do
+  nothing are disabled, holds show their fill, quick taps on hold-to-move controls still move visibly. Re-tapping
+  the tile already picked gets a shared wiggle from `common/` (mark picked tiles with `aria-pressed`/`aria-selected`).
 - Forgiving input: big hit areas, snapping, auto-assist after a few misses. Two-step machines (switch on, then
   work): if he pushes while it's off, say "Switch it on!" and flash the switch; on the second try switch it on
   for him.

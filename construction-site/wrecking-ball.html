@@ -1013,23 +1013,43 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     driveDir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
     winch = (held.down ? 1 : 0) - (held.up ? 1 : 0);
   }
+  // A quick tap still moves a good step (the press keeps going for at least MV_MIN ms), and a press at a
+  // limit says so, so a tap never looks like it did nothing.
+  var MV_MIN = 550;
+  var MV_LIMIT = { left: "The crane is all the way back!", right: "The crane is close to the building!",
+    up: "The ball is all the way up!", down: "The ball is all the way down!" };
+  function atLimit(k) {
+    if (k === "left") return craneX <= CRANE_MIN + 1;
+    if (k === "right") return craneX >= CRANE_MAX - 1;
+    if (k === "up") return ropeTarget <= ROPE_MIN + 1;
+    return ropeTarget >= ROPE_MAX - 1;
+  }
   Array.prototype.forEach.call(document.querySelectorAll(".mv"), function (b) {
-    var k = b.dataset.move, pid = null;
+    var k = b.dataset.move, pid = null, downAt = 0, lateT = null;
     function press(e) {
       e.preventDefault();
       if (ending) return;
       pid = e.pointerId; try { b.setPointerCapture(pid); } catch (er) { /* ignore */ }
+      clearTimeout(lateT); downAt = Date.now();
       held[k] = true; b.classList.add("on"); applyHeld();
+      if (atLimit(k)) hint(MV_LIMIT[k], 2600);
       if (k === "left" || k === "right") rumble(); else reel();
     }
-    function release(e) { if (e && e.pointerId !== undefined && pid !== null && e.pointerId !== pid) return; pid = null; held[k] = false; b.classList.remove("on"); applyHeld(); }
+    function stop() { held[k] = false; b.classList.remove("on"); applyHeld(); }
+    function release(e) {
+      if (e && e.pointerId !== undefined && pid !== null && e.pointerId !== pid) return;
+      if (pid === null) return;
+      pid = null;
+      var left = MV_MIN - (Date.now() - downAt);
+      if (left > 0 && !ending) lateT = setTimeout(stop, left); else stop();
+    }
     b.addEventListener("pointerdown", press);
     b.addEventListener("pointerup", release);
     b.addEventListener("pointercancel", release);
     b.addEventListener("lostpointercapture", release);
     b.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     b.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && !e.repeat && !ending) { e.preventDefault(); held[k] = true; b.classList.add("on"); applyHeld(); } });
-    b.addEventListener("keyup", function (e) { if (e.key === "Enter" || e.key === " ") release(); });
+    b.addEventListener("keyup", function (e) { if (e.key === "Enter" || e.key === " ") stop(); });
   });
   function releaseAllMoves() { held = {}; applyHeld(); Array.prototype.forEach.call(document.querySelectorAll(".mv"), function (b) { b.classList.remove("on"); }); }
 

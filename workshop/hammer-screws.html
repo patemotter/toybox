@@ -3411,10 +3411,19 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
-  var trigBtn = $("trigger");
+  var trigBtn = $("trigger"), trigAt = 0, trigLate = null;
+  var TRIG_MIN = 650;  // a quick tap still drives the screw a visible bit (the trigger stays in this long)
+  function trigRelease() {
+    if (trig.src !== "btn") return;
+    var left = TRIG_MIN - (Date.now() - trigAt);
+    clearTimeout(trigLate);
+    if (left > 0) trigLate = setTimeout(function () { if (trig.src === "btn") setTrigger(false, null); }, left);
+    else setTrigger(false, null);
+  }
   function trigPress() {
     if (locked()) return;
     acted(); ensureAudio();
+    clearTimeout(trigLate); trigAt = Date.now();
     if (trig.on) return;
     ensureScrew(null, null);
     if (activeScrew) activeScrew.stopped = false;
@@ -3426,7 +3435,7 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
     trigPress();
   });
   ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (ev) {
-    trigBtn.addEventListener(ev, function () { if (trig.src === "btn") setTrigger(false, null); });
+    trigBtn.addEventListener(ev, trigRelease);
   });
   trigBtn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   trigBtn.addEventListener("keydown", function (e) { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); trigPress(); } });

@@ -1246,6 +1246,20 @@
     } catch (e) { /* storage blocked: the pages treat the gear as on */ }
   })();
 
+  // ---------- Re-tapping the choice already picked ----------
+  // A tile or tab already marked picked (aria-pressed / aria-selected "true") usually does nothing when
+  // tapped again, which reads as a dead button (the dad's feedback). It gives a small wiggle instead.
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest && e.target.closest("button, [role=button], [role=tab]");
+    if (!b || b.classList.contains("bigtoggle") || b.classList.contains("hold")) return;
+    function picked() { return b.getAttribute("aria-pressed") === "true" || b.getAttribute("aria-selected") === "true"; }
+    if (!picked()) return;                    // capture phase: the state before the app's own handler
+    requestAnimationFrame(function () {
+      if (!picked()) return;                  // a toggle that switched off: the app answered
+      b.classList.remove("tb-again"); void b.offsetWidth; b.classList.add("tb-again");
+    });
+  }, true);
+
   // ---------- Fresh visits ----------
   // Opening an app from the Toybox home screen starts it fresh. The home screen stores a new launch
   // id ("toybox-launch") in sessionStorage when a tile is tapped. The first time a page loads under a
