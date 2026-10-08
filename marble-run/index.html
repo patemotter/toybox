@@ -112,7 +112,9 @@ body.big .tb-panel { display: none; }
 @media (prefers-reduced-motion: reduce) { .lotsbtn.pour svg { animation: none; } }
 .dropbtn svg { width: 34px; height: 34px; flex: none; }
 .mr-choices { display: flex; flex-direction: column; gap: 10px; }
-.tb-tabs.mr-tabs { display: none; }
+/* The tab bar always holds Surprise; the section tabs (Runs / Lift / Colors) only show on phones. */
+.tb-tabs.mr-tabs { display: flex; }
+.mr-tabs .tab { display: none; }
 .runs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .runbtn {
   display: flex;
@@ -181,6 +183,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .lotsbtn svg { width: 50px; height: 50px; }
   .liftbtn { min-height: 58px; font-size: 1.2rem; }
   .liftbtn svg { width: 38px; height: 38px; }
+  .mr-tabs .btn.tb-surprise { min-height: 58px; font-size: 1.35rem; }
 }
 @media (min-width: 744px) and (min-height: 640px) and (orientation: portrait) {
   .runs { grid-template-columns: repeat(8, minmax(0, 1fr)); }
@@ -192,7 +195,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
 /* ---------- Phones: tabs (Runs / Lift / Colors) show one group of controls at a time ---------- */
 @media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
-  .tb-tabs.mr-tabs { display: flex; }
+  .mr-tabs .tab { display: inline-flex; align-items: center; justify-content: center; }
+  .tb-tabs.mr-tabs .btn.tb-surprise { flex: 1.25 1 0; font-size: 1rem; }
   .tb-panel[data-tab="runs"] [data-pane]:not([data-pane="runs"]),
   .tb-panel[data-tab="lift"] [data-pane]:not([data-pane="lift"]),
   .tb-panel[data-tab="marbles"] [data-pane]:not([data-pane="marbles"]) { display: none; }
@@ -272,6 +276,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         <button class="btn tab" data-tab="runs" aria-pressed="true">Runs</button>
         <button class="btn tab" data-tab="lift" aria-pressed="false">Lift</button>
         <button class="btn tab" data-tab="marbles" aria-pressed="false">Colors</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
   </div>
@@ -1244,7 +1249,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     balls.push(b);
     return b;
   }
-  function total() { return balls.length + hopper.queue.length; }
+  // The Surprise toy car rides along with the marbles but is not one of them (not counted, not saved).
+  function total() {
+    var n = balls.length + hopper.queue.length, i;
+    for (i = 0; i < balls.length; i++) if (balls[i].car) n--;
+    for (i = 0; i < hopper.queue.length; i++) if (hopper.queue[i].car) n--;
+    return n;
+  }
   // Room for one more marble: under the cap, or recycle one from the tray (or the oldest one).
   function makeRoom() {
     if (total() < CAP) return true;
@@ -1274,6 +1285,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var q = hopper.queue.shift();
     var b = newBall(HOP_X, HOP_OUT_Y, rand(-10, 10), 60, q.c);
     b.ang = q.ang || 0;
+    if (q.car) { b.car = true; b.carPh = "run"; b.carF = 1; b.carA = 0; b.carW = q.carW || 0; }
     hopper.wait = 0;
     tick();
   }
@@ -1761,7 +1773,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (b.y < 118 || b.y > 214 || b.x < 140 || b.x > 320 || b.vy < -20) return;
     var xl = b.y < 150 ? 150 : 150 + (b.y - 150), xr = b.y < 150 ? 310 : 310 - (b.y - 150);
     if (b.x < xl - 6 || b.x > xr + 6) return;
-    hopper.queue.push({ c: b.c, x: b.x, y: b.y, ang: b.ang });
+    if (b.car) hopper.queue.unshift({ c: b.c, x: b.x, y: b.y, ang: 0, car: true, carF: b.carF, carA: 0, carW: b.carW });   // the car goes first
+    else hopper.queue.push({ c: b.c, x: b.x, y: b.y, ang: b.ang });
     balls.splice(balls.indexOf(b), 1);
     b.mode = "gone";
   }
@@ -1794,10 +1807,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var shownM = -1;
   function perFrame(dt, sdt) {
     var i, b, k, p;
+    faceT = Math.max(0, faceT - dt);
+    var faceTarget = faceT > 0 ? 1 : 0;
+    faceK += (faceTarget - faceK) * Math.min(1, dt * (faceTarget ? 6 : 3));
+    if (faceK < 0.01 && !faceTarget) faceK = 0;
+    for (i = 0; i < balls.length; i++) if (balls[i].car) updateCarPose(balls[i], dt);
     for (i = balls.length - 1; i >= 0; i--) {
       b = balls[i];
       b.age += sdt;
       b.hop = Math.max(0, b.hop - dt * 3);
+      if (b.car && carFrame(b, dt, i)) continue;
       if (b.mode === "free") {
         // Out of the board: back into the tray.
         if (b.x < -60 || b.x > W + 60 || b.y > H + 60 || b.y < -200) { toTray(b); continue; }
@@ -1907,6 +1926,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // ---------- Drawing ----------
   function drawMarble(b, x, y, sc) {
+    if (b.car) { drawCar(b, x, y, sc); return; }
     var spr = sprites[b.c] || sprites[0], d = RM * 2.2 * sc, r = RM * sc;
     ctx.drawImage(spr.base, x - d / 2, y - d / 2, d, d);
     ctx.save();
@@ -1920,6 +1940,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.lineWidth = 3.2;
     ctx.strokeStyle = OUT;
     ctx.stroke();
+    if (faceK > 0.01) drawFace(b, x, y, r);
   }
   function marbleScale(b) {
     var s = 1 + 0.25 * Math.sin(b.hop * Math.PI);
@@ -1967,7 +1988,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var trailN = reduce ? 3 : TRAIL;
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "lift" || b.mode === "spout" || (b.mode === "path" && b.z < 0)) continue;
+      if (b.car || b.mode === "lift" || b.mode === "spout" || (b.mode === "path" && b.z < 0)) continue;
       var vx = b.x - b.tx[TRAIL - 1], vy = b.y - b.ty[TRAIL - 1];
       if (vx * vx + vy * vy < 400) continue;
       for (k = trailN - 1; k >= 1; k--) {
@@ -2558,6 +2579,189 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     tick();
   }
   function release(e) { stopDropHold(e.pointerId); }
+  // Where his finger is (the marbles' happy faces look at it).
+  canvas.addEventListener("pointermove", function (e) { var pt = worldPoint(e); finger = { x: pt.x, y: pt.y, t: performance.now() }; });
+  canvas.addEventListener("pointerdown", function (e) { var pt = worldPoint(e); finger = { x: pt.x, y: pt.y, t: performance.now() }; });
+
+  // ---------- Surprise: a fun moment on the run right now ----------
+  // Takes turns: (1) a little toy car rides the whole run instead of a marble: it drives in along the tray,
+  // rides up the lift in a bucket, rolls into the hopper, down every track and ramp, and drives out at the
+  // bottom, parks for a moment and drives off; (2) the marbles get happy cartoon faces for a few seconds
+  // (they blink, smile and look at his finger or where they roll). Nothing about his run changes.
+  var surpriseTurn = 0, faceT = 0, faceK = 0, finger = null;
+  var FACE_S = reduce ? 4.5 : 8;
+  function carActive() {
+    var i;
+    for (i = 0; i < balls.length; i++) if (balls[i].car) return true;
+    for (i = 0; i < hopper.queue.length; i++) if (hopper.queue[i].car) return true;
+    return false;
+  }
+  function floorY(x) { return 1118 + clamp(x - 12, 0, 873) * (22 / 873) - TR - RM; }
+  function startCar() {
+    var b;
+    if (reduce) {
+      // Calmer: the car starts in the hopper, rolls the run once and parks.
+      hopper.queue.unshift({ c: 0, x: HOP_X, y: 120, ang: 0, car: true, carF: 1, carA: 0, carW: 0 });
+      ring(HOP_X, 170, 4, 26, 0.6);
+    } else {
+      b = newBall(-70, floorY(0), 0, 0, 0);
+      b.car = true; b.carPh = "in"; b.mode = "drive"; b.carF = 1; b.carA = 0; b.carW = 0; b.carT = 0; b.carV = 170;
+      for (var k = 0; k < TRAIL; k++) { b.tx[k] = b.x; b.ty[k] = b.y; }
+      ring(60, floorY(60), 4, 30, 0.7);
+    }
+    honk();
+  }
+  // The car's own little drives along the tray (in at the start, out at the end). True: skip the marble rules.
+  function carFrame(b, dt, i) {
+    var k, yT;
+    if (b.mode === "free" && b.carPh === "run" && b.y > TRAY_Y + 14) {
+      b.mode = "drive"; b.carPh = "out"; b.carV = Math.max(80, Math.min(260, Math.abs(b.vx))); b.carT = 0;
+      b.carF = -1; burst(b.x, b.y + RM, 2, 6, 150, 0.5);
+    }
+    if (b.mode !== "drive") return false;
+    b.carT += dt;
+    var vx = 0;
+    if (b.carPh === "in") {
+      vx = b.carV;
+      if (b.x > 640) { b.mode = "free"; b.carPh = "ride"; b.vx = 190; b.vy = 0; }
+    } else if (b.carPh === "out") {
+      // Roll back along the tray to the left end and park there.
+      var want = clamp((b.x - 110) * 1.6, 0, 240);
+      b.carV += (want - b.carV) * Math.min(1, dt * 3);
+      vx = -Math.max(b.carV, b.x > 112 ? 24 : 0);
+      if (b.x <= 112) { b.carPh = "park"; b.carT = 0; ring(b.x, b.y, 2, 34, 0.7); honk(); }
+    } else if (b.carPh === "park") {
+      b.hop = Math.max(b.hop, b.carT > 0.5 && b.carT < 0.9 ? 0.6 : 0);
+      if (b.carT > (reduce ? 2.4 : 3.2)) { b.carPh = "off"; b.carV = 0; }
+    } else if (b.carPh === "off") {
+      b.carV = Math.min(260, b.carV + dt * 260);
+      vx = -b.carV;
+      if (b.x < -90) { balls.splice(i, 1); return true; }
+    }
+    b.x += vx * dt * 0.8;
+    yT = floorY(b.x);
+    b.y += (yT - b.y) * Math.min(1, dt * 8);
+    b.vx = vx; b.vy = 0;
+    if (vx) b.carF = vx < 0 ? -1 : 1;
+    for (k = TRAIL - 1; k > 0; k--) { b.tx[k] = b.tx[k - 1]; b.ty[k] = b.ty[k - 1]; }
+    b.tx[0] = b.x; b.ty[0] = b.y;
+    b.carW += vx * dt * 0.8 / 9;
+    var ta = Math.atan2(22, 873) * b.carF;
+    b.carA += (ta - b.carA) * Math.min(1, dt * 6);
+    return true;
+  }
+  // The timer is ending: the car leaves at once (quietly, with a little sparkle).
+  function carAway() {
+    var i;
+    for (i = balls.length - 1; i >= 0; i--) if (balls[i].car) { burst(balls[i].x, balls[i].y, 2, 8, 160, 0.5); balls.splice(i, 1); }
+    for (i = hopper.queue.length - 1; i >= 0; i--) if (hopper.queue[i].car) hopper.queue.splice(i, 1);
+  }
+  function honk() { if (live() && takeToken()) { tone(523, 0.12, 0.04, "triangle"); tone(659, 0.16, 0.04, "triangle", 0, 0.14); } }
+  function startFaces() {
+    faceT = FACE_S;
+    for (var i = 0; i < balls.length; i++) if (!balls[i].car) { balls[i].hop = Math.max(balls[i].hop, 0.7); ring(balls[i].x, balls[i].y, balls[i].c, RM, 0.5); }
+    chime();
+  }
+  function surprise() {
+    if (Toybox.timer.locked() || !built) return;
+    started = true;
+    var marbles = total() > 0, pick = surpriseTurn % 2 === 0 ? "car" : "faces";
+    if (pick === "car" && carActive()) pick = "faces";
+    if (pick === "faces" && !marbles && !carActive()) pick = "car";
+    surpriseTurn = pick === "car" ? 1 : 0;
+    if (pick === "car") startCar(); else startFaces();
+  }
+  $("surpriseBtn").addEventListener("click", surprise);
+
+  // The car: a little red toy car drawn from the side, tilted along the track it rolls on.
+  function updateCarPose(b, dt) {
+    if (b.mode === "drive" || b.tx == null) return;
+    var dx = b.x - b.tx[3], dy = b.y - b.ty[3], d = Math.sqrt(dx * dx + dy * dy);
+    b.carW += (b.mode === "lift" ? 0 : d / 3 / 9) * (b.carF || 1);
+    if (b.mode === "lift") { b.carA += (0 - b.carA) * Math.min(1, dt * 6); return; }
+    if (d < 2.5) return;
+    if (Math.abs(dx) > 1.5) b.carF = dx < 0 ? -1 : 1;
+    var ta = b.carF > 0 ? Math.atan2(dy, dx) : Math.atan2(-dy, -dx);
+    var da = ta - b.carA;
+    while (da > Math.PI) da -= TAU;
+    while (da < -Math.PI) da += TAU;
+    b.carA += da * Math.min(1, dt * 10);
+  }
+  function drawCar(b, x, y, sc) {
+    var f = b.carF || 1, s = sc || 1;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(b.carA || 0);
+    ctx.scale(f * s, s);
+    ctx.lineWidth = 3.2; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    // Body and cabin.
+    ctx.fillStyle = "#FF4D6D";
+    ctx.beginPath();
+    ctx.moveTo(-34, 12); ctx.lineTo(-34, -2); ctx.quadraticCurveTo(-33, -8, -24, -9);
+    ctx.lineTo(-15, -10); ctx.lineTo(-8, -24); ctx.quadraticCurveTo(-6, -27, -1, -27);
+    ctx.lineTo(12, -27); ctx.quadraticCurveTo(16, -27, 19, -22); ctx.lineTo(24, -10);
+    ctx.quadraticCurveTo(34, -9, 35, 0); ctx.lineTo(35, 12); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // Windows.
+    ctx.fillStyle = "#BFE6FF";
+    ctx.beginPath(); ctx.moveTo(-10, -11); ctx.lineTo(-4, -22); ctx.lineTo(3, -22); ctx.lineTo(3, -11); ctx.closePath(); ctx.fill(); ctx.lineWidth = 2.4; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, -11); ctx.lineTo(8, -22); ctx.lineTo(13, -22); ctx.lineTo(19, -11); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Headlight and stripe.
+    ctx.fillStyle = "#FFD23F"; ctx.beginPath(); ctx.arc(31, -2, 3.6, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(-30, 1, 56, 4);
+    // Wheels (they turn as it rolls).
+    var wx = [-20, 20];
+    for (var k = 0; k < 2; k++) {
+      ctx.save(); ctx.translate(wx[k], 13); ctx.rotate(b.carW || 0);
+      ctx.fillStyle = "#3B3F52"; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#E7EAF5"; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#1D2340"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-4.5, 0); ctx.lineTo(4.5, 0); ctx.stroke();
+      ctx.restore();
+    }
+    // With happy faces on, the car smiles too (eyes in the windshield).
+    if (faceK > 0.01) {
+      ctx.globalAlpha = faceK;
+      ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(11, -16, 3.6, 4.6, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(12.2, -15.5, 1.9, 0, TAU); ctx.fill();
+      ctx.lineWidth = 2.6; ctx.beginPath(); ctx.arc(24, -3, 6, 0.3, 1.5); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  // A happy face on a marble: eyes that look at his finger (or where it rolls), a smile and a blink.
+  function drawFace(b, x, y, r) {
+    var now = performance.now(), lx = 0, ly = 0.25;
+    if (finger && now - finger.t < 2500) { lx = finger.x - x; ly = finger.y - y; }
+    else if (b.tx) { lx = b.x - b.tx[3]; ly = b.y - b.ty[3]; if (lx * lx + ly * ly < 4) { lx = 0; ly = 0.25; } }
+    var ll = Math.sqrt(lx * lx + ly * ly) || 1;
+    lx /= ll; ly /= ll;
+    var pop = Math.min(1, faceK * 1.6), rr = r * (0.85 + 0.15 * pop);
+    var seed = ((b.id || 7) * 0.618) % 1;
+    var blink = ((now / 1000 + seed * 3.1) % 3.1) < 0.14;
+    var ex = rr * 0.36, ey = -rr * 0.18, ew = rr * 0.26, eh = rr * 0.32;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, faceK * 1.5);
+    ctx.strokeStyle = OUT; ctx.lineCap = "round";
+    for (var k = -1; k <= 1; k += 2) {
+      if (blink) {
+        ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(x + k * ex - ew, y + ey); ctx.lineTo(x + k * ex + ew, y + ey); ctx.stroke();
+        continue;
+      }
+      ctx.fillStyle = "#FFFFFF"; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.ellipse(x + k * ex, y + ey, ew, eh, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = OUT;
+      ctx.beginPath(); ctx.arc(x + k * ex + lx * ew * 0.45, y + ey + ly * eh * 0.45, ew * 0.55, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath(); ctx.arc(x + k * ex + lx * ew * 0.45 - ew * 0.2, y + ey + ly * eh * 0.45 - ew * 0.25, ew * 0.18, 0, TAU); ctx.fill();
+    }
+    // Smile, with rosy cheeks.
+    ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.arc(x, y + rr * 0.12, rr * 0.42, 0.18 * Math.PI, 0.82 * Math.PI); ctx.stroke();
+    ctx.fillStyle = "rgba(255,111,160,0.55)";
+    ctx.beginPath(); ctx.arc(x - rr * 0.62, y + rr * 0.2, rr * 0.14, 0, TAU); ctx.arc(x + rr * 0.62, y + rr * 0.2, rr * 0.14, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
   ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (ev) { canvas.addEventListener(ev, release); });
   canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
@@ -2735,6 +2939,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function onEnding(done) {
     ending = true;
     endingDone = done;
+    carAway();
+    faceT = Math.min(faceT, 0.8);
     Object.keys(dropHolds).forEach(stopDropHold);
     hopper.pending = 0;
   }
@@ -2807,6 +3013,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       drop: dropPress,
       lots: lotsPress,
       total: total,
+      surprise: surprise,
+      car: function () { for (var i = 0; i < balls.length; i++) if (balls[i].car) return { ph: balls[i].carPh, m: balls[i].mode, x: Math.round(balls[i].x), y: Math.round(balls[i].y) }; return carActive() ? { ph: "hopper" } : null; },
+      faces: function () { return faceK; },
       run: function () { return state.run; },
       cost: function () { return frameCost; },
       recycles: function () { return recycles; },

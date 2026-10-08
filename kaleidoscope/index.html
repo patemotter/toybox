@@ -103,6 +103,8 @@ body {
 }
 /* Phones: one group of controls at a time, picked with the tabs. */
 .tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+/* Five buttons share the phone tab bar: Surprise gets a little more room for its longer word. */
+.tb-tabs .btn.tb-surprise { flex: 1.3 1 0; }
 .panes.tb-choices { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
 .pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 #panel[data-tab="draw"] [data-pane="draw"],
@@ -356,6 +358,7 @@ body.ending #view { cursor: default; }
         <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
         <button class="btn tab" role="tab" id="tab-effects" data-tab="effects" aria-controls="pane-effects">Effects</button>
         <button class="btn tb-new" id="clearBtn">Clear</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
   </div>
@@ -702,6 +705,7 @@ body.ending #view { cursor: default; }
   view.addEventListener("pointerdown", function (e) {
     if (!playing()) return;
     e.preventDefault();
+    if (moment) finishMoment();
     ghost.learned();
     try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     var r = view.getBoundingClientRect();
@@ -910,12 +914,13 @@ body.ending #view { cursor: default; }
     if (state.guides && playing()) drawGuides();
     vctx.globalAlpha = pictureAlpha;
     vctx.imageSmoothingEnabled = true;
-    vctx.drawImage(art, -A, -A, 2 * A, 2 * A);
+    if (moment) { drawMoment(now); busy = true; }
+    else vctx.drawImage(art, -A, -A, 2 * A, 2 * A);
     vctx.globalAlpha = 1;
     if (drawWipe(now)) busy = true;
     if (drawRipples(now)) busy = true;
     vctx.restore();
-    if (!hasInk && !wipe && playing()) {
+    if (!hasInk && !wipe && !moment && playing()) {
       // Empty picture: a little hint in the middle.
       vctx.fillStyle = state.dark ? "rgba(255,255,255,0.45)" : "rgba(29,35,64,0.38)";
       vctx.textAlign = "center";
@@ -1123,6 +1128,7 @@ body.ending #view { cursor: default; }
   // Ending: the spin winds down and the picture fades in frame(); endingDone is called once it has stopped.
   var endingDone = null, endingStartedAt = 0;
   function onEnding(done) {
+    if (moment) finishMoment();
     // Fingers stop painting; whatever they drew is kept.
     Object.keys(pointers).forEach(function (id) { flushPointer(pointers[id], true); delete pointers[id]; });
     scheduleSave();
@@ -1188,6 +1194,108 @@ body.ending #view { cursor: default; }
   }
 
   // Phones: one group of controls at a time (on tablets every group shows and the tabs are hidden).
+  // ---------- Surprise: a fun moment with his picture right now ----------
+  // Takes turns: (1) fractal zoom: the picture zooms in forever, copies of it nested inside itself, then zooms
+  // back out to just his picture; (2) bloom: the picture's slices open outward like the petals of a flower and
+  // fold back. An empty picture borrows a gentle example pattern for the moment only (never kept or saved).
+  // His drawing is never changed; touching the picture ends the moment at once and draws as usual.
+  var moment = null, surpriseTurn = 0;
+  function surprise() {
+    if (!playing()) return;
+    var kind = surpriseTurn % 2 === 0 ? "zoom" : "bloom";
+    surpriseTurn++;
+    moment = { kind: kind, t0: performance.now(), dur: kind === "zoom" ? (reduce ? 4200 : 9500) : (reduce ? 3600 : 6500), src: hasInk ? null : examplePic(), end: 0 };
+    whooshSound();
+    dirty = true;
+  }
+  // A touch (or the timer) ends the moment: it fades straight back to his picture.
+  function finishMoment() { if (moment) { if (moment.src) { moment.src.width = 0; moment.src.height = 0; } moment = null; dirty = true; } }
+  $("surpriseBtn").addEventListener("click", surprise);
+  // A gentle rainbow flower in the picture's own symmetry, drawn on a canvas of its own.
+  function examplePic() {
+    var c = makeCanvas(artSide), g = c.getContext("2d"), n = state.count, k = artSide / (2 * A), cx = artSide / 2, i, j;
+    g.lineCap = "round"; g.lineJoin = "round";
+    for (i = 0; i < n; i++) {
+      g.save(); g.translate(cx, cx); g.rotate(i * 2 * Math.PI / n);
+      for (j = 0; j < 3; j++) {
+        var rr = (0.25 + j * 0.24) * k, w = (0.1 + j * 0.05) * k;
+        g.strokeStyle = "hsl(" + Math.round((j * 70 + i * 360 / n) % 360) + ",90%,58%)";
+        g.lineWidth = (10 - j * 2) * sizeScale() * k / R * 1.0;
+        g.beginPath(); g.moveTo(0, -0.06 * k); g.quadraticCurveTo(w, -rr * 0.6, 0, -rr); g.quadraticCurveTo(-w, -rr * 0.6, 0, -0.06 * k); g.stroke();
+      }
+      g.fillStyle = "hsl(" + Math.round(i * 360 / n) + ",90%,62%)";
+      g.beginPath(); g.arc(0, -0.86 * k, 0.05 * k, 0, 2 * Math.PI); g.fill();
+      g.restore();
+    }
+    return c;
+  }
+  function drawMoment(now) {
+    var m = moment, src = m.src || art, u = (now - m.t0) / m.dur;
+    if (u >= 1) { finishMoment(); vctx.drawImage(art, -A, -A, 2 * A, 2 * A); return; }
+    var bg = state.dark ? BG.dark : BG.light;
+    // An example pattern fades in and out (it is only borrowed for the moment).
+    var fadeEx = m.src ? Math.min(1, u * 8, (1 - u) * 8) : 1, base = vctx.globalAlpha;
+    if (m.kind === "zoom") {
+      // tau: how many levels we have zoomed in. In for most of the time, then gently back out.
+      var levels = reduce ? 1 : 3, ui = 0.62, tau;
+      if (u < ui) { var a = u / ui; tau = levels * a * a * (3 - 2 * a); }
+      else { var b = (u - ui) / (1 - ui); tau = levels * (1 - b * b * (3 - 2 * b)); }
+      var f = 0.34, kmin = Math.floor(tau) - 2, kmax = Math.floor(tau) + 7, k2;
+      for (k2 = kmin; k2 <= kmax; k2++) {
+        var sc = Math.pow(f, k2 - tau);
+        if (sc > 3.2 * A || sc < 0.004) continue;
+        vctx.save();
+        vctx.scale(sc, sc);
+        vctx.rotate(reduce ? 0 : (k2 - tau) * 0.35);
+        if (k2 > kmin && sc < 2.6 * A) {
+          // Each copy sits in its own round window, framed by a thin rainbow ring.
+          vctx.beginPath(); vctx.arc(0, 0, 1, 0, 2 * Math.PI);
+          vctx.fillStyle = bg; vctx.globalAlpha = base; vctx.fill();
+          vctx.save(); vctx.clip();
+          vctx.globalAlpha = base * fadeEx;
+          vctx.drawImage(src, -A, -A, 2 * A, 2 * A);
+          vctx.restore();
+          vctx.globalAlpha = base * 0.85;
+          vctx.lineWidth = 5 / R / sc;
+          for (var q = 0; q < 6; q++) {
+            vctx.strokeStyle = "hsl(" + Math.round(q * 60 + now / 30) % 360 + ",90%,60%)";
+            vctx.beginPath(); vctx.arc(0, 0, 1, q * Math.PI / 3, (q + 1) * Math.PI / 3); vctx.stroke();
+          }
+        } else {
+          vctx.globalAlpha = base * fadeEx;
+          vctx.drawImage(src, -A, -A, 2 * A, 2 * A);
+        }
+        vctx.restore();
+      }
+      vctx.globalAlpha = base;
+      return;
+    }
+    // Bloom: every slice of the pattern moves out from the middle and tilts open like a petal, then folds back.
+    var n = state.mirror ? state.count * 2 : state.count, open = Math.sin(Math.PI * Math.min(1, u)), i;
+    open = open * open * (3 - 2 * open);
+    var d = (reduce ? 0.08 : 0.22) * open, tilt = (reduce ? 0.05 : 0.22) * open, grow = 1 + 0.12 * open;
+    if (n < 2) n = 2;
+    // A glowing heart of the flower shows in the gap.
+    if (d > 0.01) {
+      var gl = vctx.createRadialGradient(0, 0, 0, 0, 0, d * 2.2 + 0.05);
+      gl.addColorStop(0, "rgba(255,236,140," + (0.9 * open).toFixed(3) + ")"); gl.addColorStop(1, "rgba(255,236,140,0)");
+      vctx.fillStyle = gl; vctx.beginPath(); vctx.arc(0, 0, d * 2.2 + 0.05, 0, 2 * Math.PI); vctx.fill();
+    }
+    vctx.globalAlpha = base * fadeEx;
+    for (i = 0; i < n; i++) {
+      var a0 = -Math.PI / 2 + i * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n, mid = (a0 + a1) / 2;
+      vctx.save();
+      vctx.translate(Math.cos(mid) * d, Math.sin(mid) * d);
+      vctx.rotate(tilt * (i % 2 ? -0.4 : 0.4));
+      vctx.scale(grow, grow);
+      vctx.beginPath(); vctx.moveTo(0, 0); vctx.arc(0, 0, A * 1.5, a0 - 0.002, a1 + 0.002); vctx.closePath();
+      vctx.clip();
+      vctx.drawImage(src, -A, -A, 2 * A, 2 * A);
+      vctx.restore();
+    }
+    vctx.globalAlpha = base;
+  }
+
   function showTab(name) {
     $("panel").setAttribute("data-tab", name);
     Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {

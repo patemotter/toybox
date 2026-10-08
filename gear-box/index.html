@@ -202,6 +202,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <nav class="tb-tabs">
         <button class="btn" data-ex="long">Long train</button>
         <button class="btn tb-new" data-ex="clear">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
   </div>
@@ -543,6 +544,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var w = d.w;
       if (ending) { w *= Math.exp(-dt * 1.6); if (coastBoost > 0) { coastBoost -= dt; w = Math.max(Math.abs(w), 9) * (w < 0 ? -1 : 1); } if (Math.abs(w) < 0.03) w = 0; }
       else if (cranking) { if (performance.now() - cranking.t > 60) crankW *= Math.exp(-dt * 10); w = crankW; }
+      else if (superT > 0) w = superW(dt, w);
       else if (mode === "motor") { var tgt = motorRpm * MOTOR_SCALE * TAU / 60; w += (tgt - w) * Math.min(1, dt * 3); }
       else { w *= Math.exp(-dt * 2); if (Math.abs(w) < 0.02) w = 0; }
       if (jammed) {
@@ -579,6 +581,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
       g.flash = Math.max(0, g.flash - dt * 2.2);
     });
+    stepSurprise(dt);
     fx = fx.filter(function (p) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 500 * dt; return p.life < p.max; });
     rings = rings.filter(function (r) { r.life += dt; return r.life < 0.6; });
   }
@@ -617,6 +620,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         ctx.lineWidth = 4 * g.flash; ctx.strokeStyle = "rgba(255,255,255," + g.flash.toFixed(2) + ")"; ctx.stroke();
       }
     });
+    drawSurprise();
     if (d) {
       drawCrank(d, d.drawA);
       // The driving gear's tooth count stays readable on top of the crank (or just under the motor).
@@ -1087,6 +1091,148 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
   document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
 
+  // ---------- Surprise: a fun moment on the plate right now ----------
+  // Takes turns: (1) happy faces: every gear gets a cartoon face (eyes above the hub, a smile below it, staying
+  // upright while the gear turns; the tooth number stays in the hub) that grins wider the faster it spins;
+  // (2) super spin: the train spins up to super fast, then coasts back down to how it was. With no train
+  // turning (no gears, one gear, or a jam), a little gear rolls across the plate like a wheel and back instead.
+  // His gears never move or change.
+  var surpriseTurn = 0, faceT = 0, faceK = 0, superT = 0, superDir = 1, roller = null, finger = null;
+  var FACE_S = reduceMotion ? 5 : 8, SUPER_S = reduceMotion ? 4 : 8;
+  var SUPER_W = 52 * TAU / 60;
+  function trainReady() { var d = byId(driverId); return !!(d && driverComp && driverComp.order.length >= 2 && !jammed); }
+  // Driver speed during the super spin: up over 1.6 s, hold, then coast down (gentler with reduced motion).
+  function superW(dt, w) {
+    superT -= dt;
+    var t = SUPER_S - superT, top = reduceMotion ? SUPER_W * 0.6 : SUPER_W, base = mode === "motor" ? motorRpm * MOTOR_SCALE * TAU / 60 : 0;
+    var up = Math.min(1, t / 1.6), down = clamp(superT / 3.4, 0, 1);
+    var k = Math.min(up * up * (3 - 2 * up), down * down * (3 - 2 * down) + (superT > 3.4 ? 1 : 0));
+    var tgt = superDir * (Math.abs(base) + (top - Math.abs(base)) * Math.min(1, k));
+    if (superT <= 0) { superT = 0; return mode === "motor" ? w : tgt; }
+    return tgt;
+  }
+  function stepSurprise(dt) {
+    faceT = Math.max(0, faceT - dt);
+    var ft = faceT > 0 ? 1 : 0;
+    faceK += (ft - faceK) * Math.min(1, dt * (ft ? 6 : 3));
+    if (!ft && faceK < 0.01) faceK = 0;
+    if (roller) {
+      roller.t += dt;
+      var half = roller.dur / 2, u = roller.t < half ? roller.t / half : 2 - roller.t / half;
+      u = u * u * (3 - 2 * u);
+      var r = R(roller.T), nx = -r - 1 + (WW + 2 * r + 2) * u;
+      roller.a += (nx - roller.x) / r;   // rolls without slipping, like a wheel
+      roller.w = (nx - roller.x) / Math.max(dt, 1e-3) / r;
+      roller.x = nx;
+      if (roller.t >= roller.dur) roller = null;
+    }
+  }
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    var pick = surpriseTurn % 2 === 0 ? "faces" : "spin";
+    surpriseTurn = pick === "faces" ? 1 : 0;
+    if (pick === "faces") {
+      faceT = FACE_S;
+      if (!gears.length && !roller) startRoller();
+      gears.forEach(function (g) { ring(OX + g.x * S, OY + g.y * S, R(g.T) * S, "#FFFFFF"); });
+      chime();
+      return;
+    }
+    if (trainReady()) {
+      var d = byId(driverId);
+      superDir = d.w < 0 ? -1 : 1;
+      superT = SUPER_S;
+      driverComp.order.forEach(function (g) { burst(OX + g.x * S, OY + g.y * S, 5, COLORS[g.T]); });
+      hint("Super fast!", 3200);
+      whooshSnd();
+    } else startRoller();
+  }
+  function startRoller() {
+    roller = { T: 20, x: -R(20) - 1, a: 0, w: 0, t: 0, dur: reduceMotion ? 6 : 8 };
+    blip();
+  }
+  $("surpriseBtn").addEventListener("click", surprise);
+  cv.addEventListener("pointermove", function (e) { finger = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  cv.addEventListener("pointerdown", function (e) { finger = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+
+  function drawSurprise() {
+    var spinning = superT > 0 && driverComp;
+    if (spinning && !reduceMotion) {
+      // Whoosh lines round the spinning gears.
+      var al = clamp(Math.min(SUPER_S - superT, superT) / 1.2, 0, 1) * 0.75;
+      driverComp.order.forEach(function (g) {
+        var x = OX + g.x * S, y = OY + g.y * S, rr = (R(g.T) + 0.9) * S, base = g.a * (g.w < 0 ? 1 : 1);
+        ctx.lineCap = "round";
+        for (var k = 0; k < 3; k++) {
+          var a0 = base + k * TAU / 3;
+          ctx.beginPath(); ctx.arc(x, y, rr, a0, a0 + (g.w < 0 ? -0.9 : 0.9), g.w < 0);
+          ctx.lineWidth = Math.max(3, S * 0.3); ctx.strokeStyle = "rgba(255,255,255," + al.toFixed(2) + ")"; ctx.stroke();
+        }
+      });
+    }
+    if (faceK > 0.01) gears.forEach(function (g) { drawFace(OX + g.x * S, OY + g.y * S, g.T, g.w, g.id); });
+    if (roller) {
+      var ry = OY + (WH - R(roller.T) - 0.4) * S, rx = OX + roller.x * S;
+      drawGear({ T: roller.T, x: roller.x, y: WH - R(roller.T) - 0.4 }, roller.a);
+      var h = hubR(roller.T) * S;
+      ctx.beginPath(); ctx.arc(rx, ry, h, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+      ctx.lineWidth = Math.max(2, S * 0.17); ctx.strokeStyle = "#1D2340"; ctx.stroke();
+      teethNum(roller.T, rx, ry, h);
+      drawFace(rx, ry, roller.T, roller.w, 99, 1);
+    }
+  }
+  // A face round the hub: eyes above it, a smile below it (upright while the gear turns). The faster it
+  // spins, the wider the grin, up to a big open laugh.
+  function drawFace(x, y, T, w, id, force) {
+    var k = force || faceK;
+    var h = hubR(T) * S, r = R(T) * S, room = r - h;
+    var sp = clamp(Math.abs(w || 0) / (MAX_W * 1.4), 0, 1);
+    var ew = clamp(room * 0.3, 3.5, h * 0.62), eh = ew * 1.2;
+    var ey = y - h - Math.min(room * 0.42, eh * 1.15), ex = Math.min(h * 0.7, room * 0.9);
+    var now2 = performance.now();
+    var blink = ((now2 / 1000 + (id * 0.37) % 1 * 3) % 3.4) < 0.14;
+    var lx = Math.sin(now2 / 1400 + id) * 0.4, ly = 0.15;
+    if (finger && now2 - finger.t < 2500) {
+      var rb = cv.getBoundingClientRect(), dx = finger.x - rb.left - x, dy = finger.y - rb.top - y, dl = Math.hypot(dx, dy) || 1;
+      lx = dx / dl; ly = dy / dl;
+    }
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, k * 1.5);
+    ctx.lineCap = "round"; ctx.strokeStyle = "#1D2340";
+    for (var s2 = -1; s2 <= 1; s2 += 2) {
+      var cx = x + s2 * ex;
+      if (blink) {
+        ctx.lineWidth = Math.max(2.5, ew * 0.4);
+        ctx.beginPath(); ctx.moveTo(cx - ew, ey); ctx.quadraticCurveTo(cx, ey + ew * 0.6, cx + ew, ey); ctx.stroke();
+        continue;
+      }
+      ctx.beginPath(); ctx.ellipse(cx, ey, ew, eh, 0, 0, TAU);
+      ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = Math.max(2, ew * 0.28); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + lx * ew * 0.4, ey + ly * eh * 0.4, ew * 0.52, 0, TAU); ctx.fillStyle = "#1D2340"; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + lx * ew * 0.4 - ew * 0.18, ey + ly * eh * 0.4 - ew * 0.22, ew * 0.17, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+    }
+    // The smile hugs the bottom of the hub; it widens (and opens) with speed.
+    var span = 0.32 + 0.5 * sp, mr = h * 1.02 + Math.min(room * 0.25, ew * 0.8), my = y + h * 0.15;
+    var a0 = Math.PI / 2 - span, a1 = Math.PI / 2 + span;
+    if (sp > 0.35) {
+      ctx.beginPath(); ctx.arc(x, my, mr, a0, a1);
+      ctx.arc(x, my, h * 1.04, a1, a0, true); ctx.closePath();
+      ctx.fillStyle = "#1D2340"; ctx.fill();
+      ctx.lineWidth = Math.max(2, ew * 0.3); ctx.stroke();
+      ctx.save(); ctx.clip();
+      ctx.beginPath(); ctx.arc(x, my + mr, mr * 0.45, 0, TAU); ctx.fillStyle = "#FF6F91"; ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(x, my, mr, a0, a1);
+      ctx.lineWidth = Math.max(4.5, ew * 0.75); ctx.strokeStyle = "#FFFFFF"; ctx.stroke();
+      ctx.lineWidth = Math.max(2.5, ew * 0.42); ctx.strokeStyle = "#1D2340"; ctx.stroke();
+    }
+    // Rosy cheeks beside the hub.
+    ctx.fillStyle = "rgba(255,111,160,0.6)";
+    ctx.beginPath(); ctx.arc(x - h - ew * 0.6, y + h * 0.35, ew * 0.55, 0, TAU); ctx.arc(x + h + ew * 0.6, y + h * 0.35, ew * 0.55, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
   // ---------- Sound (off by default; soft and synthesized) ----------
   // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
   // starts/resumes audio on every touch while sound is on. Gear Box keeps its own master gain.
@@ -1131,6 +1277,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Ending: let go of any crank or drag in progress; the gears coast to a stop.
   function onEnding(done) {
     ending = true;
+    superT = 0; roller = null; faceT = Math.min(faceT, 0.8);
     endingDone = done;
     Object.keys(ptrs).forEach(function (k) { if (ptrs[k].kind === "drag") { gears.push(ptrs[k].gear); } delete ptrs[k]; });
     ghost.hidden = true;
@@ -1191,7 +1338,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__gears = {
     gears: function () { return gears.map(function (g) { return { id: g.id, T: g.T, x: g.x, y: g.y, rpm: rpmOf(g), w: g.w, turns: g.turns }; }); },
-    jammed: function () { return jammed; }, driver: function () { return driverId; },
+    jammed: function () { return jammed; }, surprise: surprise,
+    state: function () { return { faceK: faceK, superT: superT, roller: !!roller, n: gears.length }; },
+    driver: function () { return driverId; },
     toScreen: function (x, y) { var r = cv.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; },
     knob: function () { var d = byId(driverId); if (!d) return null; var k = knobPos(d, d.a), r = cv.getBoundingClientRect(); return { x: r.left + k.x, y: r.top + k.y, cx: r.left + OX + d.x * S, cy: r.top + OY + d.y * S }; },
     load: function (list) { gears = []; selected = []; list.forEach(function (s) { gears.push(mkGear(s[0], s[1], s[2])); }); driverId = gears.length ? gears[0].id : 0; rebuild(); save(); }

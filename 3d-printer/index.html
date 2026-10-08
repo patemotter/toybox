@@ -350,6 +350,7 @@ body.ending .printbar { visibility: hidden; }
         <button class="btn tab" role="tab" id="tab-models" data-tab="models" aria-controls="pane-models">Models</button>
         <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
         <button class="btn tab" role="tab" id="tab-prints" data-tab="prints" aria-controls="pane-prints">My prints</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
   </div>
@@ -1288,8 +1289,10 @@ body.ending .printbar { visibility: hidden; }
     rr(g, chx - 17, 392, 34, 486, 6); fillStroke(g, "#6B7280", 3);
     g.fillStyle = "#3F444D"; g.fillRect(chx - 10, 398, 20, 470);
     rr(g, chx - 32, 876, 64, 50, 6); fillStroke(g, "#454A53", 3);
-    hw.pile.forEach(function (p) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.75, p.a || 0, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); });
+    hw.pile.forEach(function (p) { if (Math.abs(p.x - chx) < 30 && p.y > 880) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.75, p.a || 0, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); } });
     g.fillStyle = "#555B65"; g.fillRect(chx - 32, 906, 64, 20); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(chx - 32, 906, 64, 20);
+    // Blobs heaped up on the floor beside the bin (a purge party spills over), drawn in front of it.
+    hw.pile.forEach(function (p) { if (!(Math.abs(p.x - chx) < 30 && p.y > 880)) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.75, p.a || 0, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); } });
     // Bed (moves down one layer at a time) and the build plate.
     var py = plateY();
     g.beginPath(); g.moveTo(PCX - PW - 4, py - PD - 4); g.lineTo(PCX + PW + 4, py - PD - 4); g.lineTo(PCX + PW + 4, py + PD + 22); g.lineTo(PCX - PW - 4, py + PD + 22); g.closePath();
@@ -1322,6 +1325,7 @@ body.ending .printbar { visibility: hidden; }
       g.beginPath(); g.arc(tx + 30, ty - 120, 10 + 14 * (1 - hw.cut), 0, Math.PI * 2); g.fill();
     }
     hw.poops.forEach(function (p) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.8, p.a, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); });
+    drawTumble(g);
     // With the light off it is dark inside: plate and print too.
     if (lt < 0.98) { g.fillStyle = "rgba(6,9,18," + (0.62 * (1 - lt)) + ")"; g.fillRect(CX0 - 40, CY0 - 40, CX1 - CX0 + 80, CY1 - CY0 + 80); }
     // Light strip and its glow.
@@ -1345,7 +1349,10 @@ body.ending .printbar { visibility: hidden; }
       sg.addColorStop(0, "rgba(255,244,200," + (0.55 * pulse) + ")"); sg.addColorStop(1, "rgba(255,244,200,0)");
       g.fillStyle = sg; g.fillRect(cx - 200 * k, hy2 - 200 * k, 400 * k, 400 * k);
     }
-    if (pic && !(hw.fly && hw.fly.started)) pic.draw(g, cx, cy - flex * 26 * k - (popY || 0), k / picK(), 3 * k);
+    if (pic && !(hw.fly && hw.fly.started)) {
+      if (alive && alive.pic === pic) drawAlive(g, pic, cx, cy - flex * 26 * k - (popY || 0), k);
+      else pic.draw(g, cx, cy - flex * 26 * k - (popY || 0), k / picK(), 3 * k);
+    }
     if (job && job.trace.length && hw.plateOut <= 0) {
       var L = job.P.layers[job.L], zt = L ? L.z1 : 0;
       // Where the print picture itself puts the top of the current layer under the nozzle.
@@ -1729,7 +1736,7 @@ body.ending .printbar { visibility: hidden; }
     // The finished print turns slowly on the plate while it is shown off.
     if (job && job.showcase && job.pic) {
       job.showT = (job.showT || 0) + dt;
-      if (!reduce) {
+      if (!reduce && !alive) {
         job.yaw += dt * 0.4;
         job.turnAcc = (job.turnAcc || 0) + dt;
         if (job.turnAcc >= 0.033) { job.turnAcc = 0; job.pic.yaw = job.yaw; job.pic.clear(); job.pic.bake(job.P.layers.length); }
@@ -1774,6 +1781,7 @@ body.ending .printbar { visibility: hidden; }
       savePile(); plop();
       return false;
     });
+    stepSurprise(dt);
     if (hw.ripple) { hw.ripple.t += dt * 2.5; if (hw.ripple.t >= 1) hw.ripple = null; }
     hw.dryT += (65 - hw.dryT) * Math.min(1, dt * 0.25);
     hw.hum += (9 - hw.hum) * Math.min(1, dt * 0.01);
@@ -2059,6 +2067,212 @@ body.ending .printbar { visibility: hidden; }
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
 
+  // ---------- Surprise: a fun moment on the printer right now ----------
+  // Takes turns: (1) purge party: like a real color change, the toolhead goes to the chute at the back and
+  // purges a blob of every loaded color, then a whole pile of colorful blobs tumbles out of the chute into the
+  // waste bin, plop plop plop (while a print runs, only the tumble, so the print is never disturbed);
+  // (2) the print on the plate comes alive for a few seconds: the boat sails off and back, the rocket hops on
+  // its flames, the dinosaur waddles, the gear and the star spin, anything else hops and twirls. Nothing on
+  // the plate yet: the purge party instead. His print, colors and shelf never change.
+  var surpriseTurn = 0, party = null, alive = null;
+  function canAlive() { return !!(job && job.pic && job.pic.done && (job.paused || (job.done && job.showcase))); }
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    var pick = surpriseTurn % 2 === 0 ? "purge" : "alive";
+    if (pick === "alive" && (!canAlive() || alive)) pick = "purge";
+    if (pick === "purge" && party) {
+      if (canAlive() && !alive) pick = "alive";
+      else { party.extra += 4; blip(); return; }   // a party is already going: a few more blobs
+    }
+    surpriseTurn = pick === "purge" ? 1 : 0;
+    if (pick === "purge") startParty(); else startAlive();
+  }
+  $("surpriseBtn").addEventListener("click", surprise);
+
+  // ----- Purge party -----
+  function startParty() {
+    var head = !job || job.paused || (job.done && job.showcase), cols = [], i;
+    for (i = 0; i < 4; i++) { var f = state.slots[i]; if (f && cols.indexOf(f) === -1) cols.push(f); }
+    if (!cols.length) cols = ["orange"];
+    if (reduce) cols = cols.slice(0, 2);
+    party = { t: 0, head: head, cols: cols, step: -1, blob: 0, tumble: [], nT: 0, extra: 0, done: false };
+    if (head && (!job || job.paused)) hw.jog = { x: CHUTE.x, y: CHUTE.y };
+    hw.lidUntil = performance.now() + 1500;
+    blip();
+  }
+  var COL_T = reduce ? 1.2 : 1.5;
+  function stepSurprise(dt) {
+    var i;
+    if (party) {
+      var pt = party;
+      pt.t += dt;
+      if (pt.head && job && !job.paused && !job.done) { pt.head = false; hw.blob = null; pt.t = Math.max(pt.t, 0.3); }   // he started a print: only the tumble
+      if (pt.head) {
+        // One color after another: the box feeds it, the nozzle pushes out a blob, the blob drops in the chute.
+        var t1 = pt.t - 0.9, k = Math.floor(t1 / COL_T);
+        if (t1 >= 0 && k < pt.cols.length) {
+          var slot = state.slots.indexOf(pt.cols[k]), f2 = (t1 - k * COL_T) / COL_T;
+          if (k !== pt.step) { pt.step = k; tick1(); }
+          if (slot >= 0 && !hw.idleFeed) hw.spoolAng[slot] += dt * 6;
+          if (f2 < 0.7) hw.blob = { f: pt.cols[k], r: 3 + f2 / 0.7 * 15 };
+          else if (hw.blob) { dropPoop(); plop(); }
+        }
+      }
+      // Then the tumble: a pile of blobs comes down the chute and spills into the bin.
+      var tumbleAt = pt.head ? 0.9 + pt.cols.length * COL_T + 0.2 : 0.3, nMax = (reduce ? 6 : 12) + pt.extra;
+      if (pt.t >= tumbleAt && pt.nT < nMax && pt.t - tumbleAt >= pt.nT * (reduce ? 0.4 : 0.32)) {
+        var chx = tipXAt(CHUTE.x);
+        pt.tumble.push({ x: chx + rand(-4, 4), y: 404, vx: 0, vy: rand(60, 140), r: rand(11, 15), f: pt.cols[pt.nT % pt.cols.length], a: rand(0, 6), out: false, b: 0 });
+        pt.nT++;
+      }
+      pt.tumble = pt.tumble.filter(function (p) {
+        p.vy += 1500 * dt; p.y += p.vy * dt; p.x += p.vx * dt; p.a += dt * (p.out ? 6 : 2);
+        var cx = tipXAt(CHUTE.x);
+        // Out of the chute mouth: they pop out, bounce, and tumble onto a heap on the floor beside the bin.
+        if (!p.out && p.y > 868) { p.out = true; p.slot = nextSlot(); p.vy = -rand(240, 320); }
+        if (p.out) {
+          var sp2 = HEAP[p.slot], tx = cx + sp2[0];
+          p.x += (tx - p.x) * Math.min(1, dt * 3.2);
+          if (p.y > 914 + sp2[1] - p.r * 0.5 && p.vy > 0) {
+            if (p.b < (reduce ? 0 : 1)) { p.b++; p.vy = -p.vy * 0.38; plop(); sparks.push({ x: p.x, y: p.y + p.r * 0.5, t: 0, c: fil(p.f).hex }); return true; }
+            hw.pile = hw.pile.filter(function (q) { return q.s !== p.slot; });
+            hw.pile.push({ x: tx, y: 914 + sp2[1] - p.r * 0.3, r: p.r * 0.9, f: p.f, a: rand(-1, 1), s: p.slot });
+            if (hw.pile.length > 40) hw.pile.shift();
+            savePile(); plop();
+            return false;
+          }
+        }
+        return true;
+      });
+      if (pt.nT >= nMax && !pt.tumble.length && !hw.blob && pt.t > tumbleAt) party = null;
+    }
+    sparks = sparks.filter(function (sp) { sp.t += dt * 1.6; return sp.t < 1; });
+    if (alive) {
+      if (!canAlive() || alive.pic !== job.pic) { endAlive(); return; }
+      alive.t += dt;
+      var tf = aliveTf(alive);
+      if (tf.yaw !== alive.yawNow) {
+        alive.acc += dt;
+        if (alive.acc >= 0.04 || alive.t >= alive.dur) { alive.acc = 0; alive.yawNow = tf.yaw; rebakeYaw(alive.pic, alive.yaw0 + tf.yaw); }
+      }
+      if (alive.t >= alive.dur) endAlive();
+    }
+  }
+  var sparks = [];
+  // Spots on the heap beside the bin, bottom row first (x from the chute, y up from the floor).
+  var HEAP = (function () {
+    var out = [], rows = [6, 5, 4, 3, 2], r, i;
+    for (r = 0; r < rows.length; r++) for (i = 0; i < rows[r]; i++) out.push([-44 - r * 11 - i * 22, -r * 15]);
+    return out;
+  })();
+  var heapN = -1;
+  function nextSlot() {
+    if (heapN < 0) { heapN = 0; hw.pile.forEach(function (q) { if (q.s != null) heapN = Math.max(heapN, q.s + 1); }); }
+    var s2 = heapN % HEAP.length; heapN++;
+    return s2;
+  }
+  function drawTumble(g) {
+    if (party) party.tumble.forEach(function (p) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.8, p.a, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2.5); });
+    sparks.forEach(function (sp) {
+      g.strokeStyle = sp.c; g.globalAlpha = 1 - sp.t; g.lineWidth = 3;
+      for (var i = 0; i < 5; i++) {
+        var a = -Math.PI * (0.1 + 0.8 * i / 4), r0 = 6 + sp.t * 10, r1 = 12 + sp.t * 22;
+        g.beginPath(); g.moveTo(sp.x + Math.cos(a) * r0, sp.y + Math.sin(a) * r0); g.lineTo(sp.x + Math.cos(a) * r1, sp.y + Math.sin(a) * r1); g.stroke();
+      }
+      g.globalAlpha = 1;
+    });
+  }
+
+  // ----- The print comes alive -----
+  function rebakeYaw(pic, yaw) { pic.yaw = yaw; pic.clear(); pic.bake(job.done ? job.P.layers.length : job.baked); }
+  function startAlive() {
+    var id = job.m.id;
+    var kind = { benchy: "sail", rocket: "hop", dino: "waddle", gear: "spin", star: "twirl" }[id] || "bounce";
+    var dur = { sail: 10, hop: 7, waddle: 8, spin: 6, twirl: 6.5, bounce: 6 }[kind];
+    if (reduce) { dur = Math.min(dur, 5); if (kind === "sail") kind = "bounce"; }
+    alive = { t: 0, dur: dur, kind: kind, pic: job.pic, yaw0: job.pic.yaw, yawNow: 0, acc: 0 };
+    chime();
+  }
+  function endAlive() {
+    if (!alive) return;
+    var a = alive;
+    alive = null;
+    if (job && job.pic === a.pic && a.yawNow) rebakeYaw(a.pic, job.yaw);
+  }
+  // How the print moves at time t: offset (design px at plate scale), tilt, squash, and extra turn (yaw).
+  function aliveTf(a) {
+    var t = a.t, D = a.dur, u = clamp(t / D, 0, 1), r = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, yaw: 0, flame: 0, wake: 0 };
+    var calm = reduce ? 0.5 : 1;
+    if (a.kind === "sail") {
+      // Off to the right (past the side of the printer), a moment away, then back, bobbing on little waves.
+      var out = ease(clamp(t / 4.6, 0, 1)), back = ease(clamp((t - 5.2) / 4.6, 0, 1));
+      r.dx = 330 * out * (1 - back);
+      r.sx = t > 4.8 && t < 9.85 ? -1 : 1;
+      r.dy = -6 - Math.sin(t * 3.2) * 4; r.rot = Math.sin(t * 2.6) * 0.07; r.wake = 1;
+    } else if (a.kind === "hop") {
+      // A little hop, then a big one on its flames, and a gentle landing.
+      var h1 = t < 1.6 ? Math.sin(t / 1.6 * Math.PI) * 45 : 0;
+      var h2 = t > 2.2 && t < 6.4 ? Math.sin((t - 2.2) / 4.2 * Math.PI) * 130 : 0;
+      r.dy = -(h1 + h2) * calm; r.flame = (h1 > 1 || h2 > 1) ? 1 : 0; r.rot = Math.sin(t * 5) * 0.03;
+    } else if (a.kind === "waddle") {
+      // Waddles over to the right on little steps, turns round and waddles back.
+      var go = ease(clamp(t / 3.6, 0, 1)), ret = ease(clamp((t - 4.2) / 3.6, 0, 1));
+      r.dx = 110 * go * (1 - ret) * calm;
+      r.sx = t > 3.9 && t < 7.8 ? -1 : 1;
+      var stepK = (t < 3.6 || (t > 4.2 && t < 7.8)) ? 1 : 0;
+      r.dy = -Math.abs(Math.sin(t * 5.2)) * 10 * stepK; r.rot = Math.sin(t * 5.2) * 0.08 * stepK;
+    } else if (a.kind === "spin") {
+      // Spins like a top, a bit faster in the middle, with a little hop.
+      r.yaw = Math.PI * 4 * ease(u) * calm; r.dy = -Math.sin(u * Math.PI) * 30 * calm;
+    } else if (a.kind === "twirl") {
+      // Rises a little, twirls round twice and floats back down.
+      r.yaw = Math.PI * 4 * ease(u) * calm; r.dy = -Math.sin(u * Math.PI) * 70 * calm; r.wake = 0;
+    } else {
+      // Three happy hops, a twirl on the middle one, a squash on each landing.
+      var ph = t / (D / 3), n = Math.floor(ph), f = ph - n, hgt = [40, 70, 40][Math.min(2, n)] * calm;
+      r.dy = -Math.sin(f * Math.PI) * hgt;
+      if (n === 1) r.yaw = Math.PI * 2 * ease(f) * calm;
+      if (f < 0.12 || f > 0.9) { r.sy = 0.88; r.sx = 1.08; }
+    }
+    return r;
+  }
+  function drawAlive(g, pic, x, y, k) {
+    var tf = aliveTf(alive), now = performance.now() / 1000;
+    if (tf.flame) {
+      // Puffy flames and smoke under the rocket.
+      var fx = x + tf.dx * k, fy = y + tf.dy * k + 6 * k;
+      for (var j = 0; j < 5; j++) {
+        var fr = (14 + 8 * Math.sin(now * 18 + j)) * k, ox = (j - 2) * 9 * k;
+        g.beginPath(); g.arc(fx + ox, fy + 12 * k + Math.abs(j - 2) * 4 * k, fr, 0, Math.PI * 2);
+        g.fillStyle = j % 2 ? "#FFB627" : "#FF6B3D"; g.fill();
+      }
+      g.beginPath(); g.arc(fx, fy + 6 * k, 10 * k, 0, Math.PI * 2); g.fillStyle = "#FFF3B0"; g.fill();
+    }
+    g.save();
+    g.translate(x + tf.dx * k, y + tf.dy * k);
+    g.rotate(tf.rot);
+    g.scale(tf.sx, tf.sy);
+    pic.draw(g, 0, 0, k / picK(), 3 * k);
+    g.restore();
+    if (tf.wake) {
+      // Little waves under the boat.
+      g.strokeStyle = "#5EC8FF"; g.lineWidth = 4 * k; g.lineCap = "round";
+      g.lineWidth = 6 * k;
+      for (var i = -3; i <= 3; i++) {
+        var wx = x + tf.dx * k + i * 32 * k + Math.sin(now * 2 + i) * 6 * k, wy = y + 2 * k + Math.sin(now * 3 + i) * 4 * k;
+        g.beginPath(); g.moveTo(wx - 16 * k, wy); g.quadraticCurveTo(wx, wy - 12 * k, wx + 16 * k, wy); g.stroke();
+      }
+    }
+    if (alive.kind === "twirl" || alive.kind === "spin") {
+      for (var s2 = 0; s2 < 6; s2++) {
+        var a2 = now * 2 + s2 * Math.PI / 3, rr2 = 90 * k;
+        var sx = x + tf.dx * k + Math.cos(a2) * rr2, sy = y + tf.dy * k - 60 * k + Math.sin(a2) * rr2 * 0.5;
+        g.fillStyle = s2 % 2 ? "#FFE14D" : "#FFFFFF"; g.globalAlpha = 0.85;
+        g.beginPath(); g.arc(sx, sy, 5 * k, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+      }
+    }
+  }
+
   // ---------- Sound (off by default; soft and synthesized) ----------
   // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
   // starts the audio on a tap while sound is on. This page builds its own master gain and noise per context.
@@ -2130,6 +2344,7 @@ body.ending .printbar { visibility: hidden; }
   }
   function onEnding(done) {
     endingDone = done;
+    endAlive(); party = null;
     lightsOut = false;
     closePop(); closeViewer();
     // A print more than half done finishes quickly; otherwise it pauses safely.
@@ -2323,7 +2538,7 @@ body.ending .printbar { visibility: hidden; }
   requestAnimationFrame(frame);
 
   // Test hook, only with ?debug in the address: lets automated checks peek at the printer.
-  if (/[?&]debug\b/.test(location.search)) window.__printer = { job: function () { return job; }, hw: hw, state: state, ly: LY, timer: function () { return { phase: Toybox.timer.phase() }; }, shelf: function () { return shelf; }, probe: probe };
+  if (/[?&]debug\b/.test(location.search)) window.__printer = { job: function () { return job; }, surprise: surprise, sstate: function () { return { party: !!party, alive: alive ? alive.kind : null, pile: hw.pile.length }; }, hw: hw, state: state, ly: LY, timer: function () { return { phase: Toybox.timer.phase() }; }, shelf: function () { return shelf; }, probe: probe };
 })();
 </script>
 </body>
