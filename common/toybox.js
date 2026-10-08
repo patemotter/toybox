@@ -125,7 +125,29 @@
   var SETKEY = "toybox-settings-v1", DONEKEY = "toybox-settings-done-v1";
   var SETTINGS = [
     { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
-      note: "Apps that use tilt or shake ask for motion access when he first touches them." },
+      note: "Off by default; every app works fully without it. Apps that use it ask for motion access when he first touches them.",
+      listTitle: "Which apps use tilt and shake",
+      list: [
+        "Marble Run: tilting the device changes which way the marbles roll",
+        "Peg Drop: tilt steers the balls, a shake jostles them",
+        "Spinning Tops: tilt leans the bowl so the tops drift, a shake knocks them",
+        "Sand Table: tilt nudges the free ball",
+        "Water Table: tilt and shake slosh the water",
+        "Rocket Builder: tilt leans the rocket view",
+        "Math Grid: a shake tumbles the blocks, then they snap back",
+        "Kaleidoscope: a shake clears the picture",
+        "Workshop Tool Wall: the tools swing on their hooks",
+        "Measuring: the spirit level reads the device's real tilt",
+        "Drill Press, Saw Bench, Hammer & Screws: a shake clears the shavings and sawdust (Hammer & Screws: tilt slides it)"
+      ] },
+    { id: "uses-info", app: "Good to know", type: "info",
+      listTitle: "Which apps ask for something special",
+      list: [
+        "Turn the device: Train Builder prefers sideways, Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
+        "Sound: every app has soft sound effects, all off until you turn sound on above",
+        "Motion (tilt and shake): only the apps listed under Tilt and shake, and only when it's on",
+        "Nothing uses the camera, the microphone or location; after the first visit nothing needs the internet (it only checks for updates when online)"
+      ] },
     // Kind words has its own controls (kindBuildSettings below); its other ids are listed in KIND_SET.
     { id: "kind-words", app: "Kind words", type: "custom", def: true,
       build: function (row) { kindBuildSettings(row); }, refresh: function (row) { kindRefreshSettings(row); } },
@@ -444,6 +466,8 @@
       else if (d.type === "text") html += '<p class="sub">' + esc(d.label) + '</p><input class="textin" id="tb-set-' + d.id + '" type="text" maxlength="' + (d.max || 20) + '" autocomplete="off" spellcheck="false" aria-label="' + esc(d.label) + '">';
       else if (d.type === "action") html += '<div class="sheet-actions" style="margin-top:0">' + holdBtn("tb-set-" + d.id, d.label) + "</div>";
       if (d.note) html += '<p class="sub">' + esc(d.note) + "</p>";
+      if (d.list) html += '<details class="tb-uses"><summary>' + esc(d.listTitle || "More") + "</summary><ul>" +
+        d.list.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul></details>";
       html += "</div>";
     });
     sec.innerHTML = html;

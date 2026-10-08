@@ -242,6 +242,9 @@ Keep only:
 - Canvas: scale by devicePixelRatio capped at 2; aim for 60fps on iPad.
 - Don't paint a pattern with `background-attachment: local` on a scrolling box: it lags on iOS (the Tool Wall's
   pegboard holes now live on the scrolling content element).
+- **Keep the Grown-ups lists current:** the "Tilt and shake" setting and "Good to know" in `SETTINGS` (common/toybox.js)
+  list every app that uses motion, turning the device or anything special. Update them when an app starts or
+  stops using one (the dad wants it very clear).
 - Tilt/shake: one "Tilt and shake" switch in the home screen's App settings. Apps call `Toybox.tiltReady(cb)`; on
   iOS it asks `requestPermission()` on his first tap in the app (it needs a user gesture). Never prompt on load.
   The app must work fully without tilt. No vibration API on iOS.
