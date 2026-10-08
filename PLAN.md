@@ -49,6 +49,43 @@ choice? Not polished: close-ups small on phones held sideways; small serve view 
 - Open follow-up: in Train Builder's Big mode there is no Go button, so tapping the engine should start a
   stopped train (after the button audit, which may touch the same page).
 
+**Surprise rework (the dad, 2026-10-08; rule in AGENTS.md "Surprise = a fun moment"):** each Surprise takes turns
+between a few in-the-moment events on the current scene, no randomizing, no unlocking, not just glitter. One moment in
+most apps: the main objects get happy cartoon faces for a few seconds (blink, smile, look at his finger).
+- Car Builder: car wash with spinning brushes and suds; a jump over a row of cones; a tow truck gives it a little ride.
+- Rocket Builder: a comet streaks past; a satellite waves; a flying saucer loops around (and beams up a cow, then puts it back).
+- Spin Shop: per toy: the wheel rolls off and back, the fan blows streamers, the pinwheel lifts off like a helicopter
+  seed, the jet's afterburner kicks on.
+- Jigsaw: the finished part of the picture comes alive (the excavator digs, the rocket puffs); loose pieces hop aside and back.
+- Blender: the blender dances on the counter with the lid bouncing; whipped cream and a cherry on the current smoothie.
+- Cutting Board: a little mouse peeks out, sniffs and scurries off; the cut pieces hop into a smiley face and back.
+- Stand Mixer: sprinkles/chips rain (kept); the batter climbs the beater and plops back.
+- Stove: the magic flip (kept); the pot lid rattles and pops up with a puff of steam.
+- Sand Table: (building now) a sea turtle's flipper tracks; a toy dump truck's tire tracks; a gust ripples the sand.
+- Spirograph: the gear wheel pops off and rolls around the page like a toy car, then clicks back (never draws).
+- Bubble Machine: a bubble train snakes across the sky and pops end to end; plus the giant bubble and the duck.
+- Train Builder: a cow on the crossing and the train waits; a hot-air balloon drifts over; birds lift off as it passes.
+- Espresso Machine: keep the fun latte art; on the drink chooser use his last drink instead of a random one.
+- Hamster, Spinning Tops, Garden: keep as they are.
+- New Surprise buttons:
+  - Marble Run: a toy car rides the whole run (tracks, the lift, out the bottom); marbles get faces.
+  - Gear Box: every gear gets a face that grins faster the faster it spins.
+  - Kaleidoscope: the current picture zooms in forever like a fractal, then back out.
+  - 3D Printer: a purge party (colorful filament blobs tumble out of the chute into a bin, like the real printer's color
+    change); the print on the bed comes alive (a boat sails off and back, a car drives a lap, a rocket hops).
+  - Tool Wall: the tools do "the wave" on their hooks; the tools get faces and wink.
+  - Drill Press: the bit goes through and a little worm pokes out of the hole and waves.
+  - Saw Bench: the cut pieces hop up and fall like dominoes; one long curl of sawdust flies off.
+  - Hammer & Screws: whack-a-nail, nails pop up all over the board for him to hammer down.
+  - Lathe: one huge ribbon of shaving spirals off and curls around the screen.
+  - Router Table: a long curly shaving shoots out and drapes over the fence.
+  - Wrenches: all the bolts spin out at once and hop into a jar like popcorn.
+  - Measuring: the tape zips back with a big snap and the case spins like a top.
+  - Shadow Board: every tool jumps off the wall and marches back into its outline.
+  - Peg Drop, Math Grid, Water Table, Construction Site stations: still to propose to the dad.
+- Ideas that would be real options (not Surprises), for later: Sand Table picture patterns, Spirograph special pens,
+  Cutting Board new foods, special trains, shaped pasta and pancakes, a Jigsaw mystery picture.
+
 Build queue (at most three agents at a time): Excavator rework, Tower crane, Hamster (running), then Garden,
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
 Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain
