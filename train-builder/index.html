@@ -765,6 +765,7 @@ body.big .tb-panel { display: none; }
   }
   function tpt(seg, s, d) { var q = segPoint(seg, s); return { x: q.x, y: q.y, z: q.z, d: d, seg: seg, s: s }; }
   function startRun() {
+    TM = null;
     var lay = LAYOUTS[state.layout];
     state.pieces.forEach(function (p) { p.extra = 0; p.lead = 0; });
     queue.length = 0;
@@ -954,6 +955,7 @@ body.big .tb-panel { display: none; }
       else want = Math.min(want, Math.max(vmax, 10));
     }
     if (run.leaving && (dAhead < 0 || dAhead > 300)) run.leaving = false;
+    want = cowLimit(want, hs);
     var acc = want > run.v ? 60 : 190;
     if (run.v < want) run.v = Math.min(want, run.v + acc * dt); else run.v = Math.max(want, run.v - acc * dt);
     var go = run.v * dt;
@@ -972,6 +974,8 @@ body.big .tb-panel { display: none; }
       if (eng && run.v > 1 && distAhead(hs.seg, hs.s, cr, 260) >= 0) near = true;
       poses.forEach(function (cp) { if (Math.hypot(cp.x - hp.x, cp.y - hp.y) < cp.len / 2 + 60) near = true; });
     }
+    if (cowNear()) near = true;
+    stepMoment(dt, poses, hs);
     run.gate += ((near ? 1 : 0) - run.gate) * Math.min(1, dt * 2.5);
     if (near) { run.ding -= dt; if (run.ding <= 0) { run.ding = 0.8; sDing(); } } else run.ding = 0;
     stepRoad(dt);
@@ -1678,6 +1682,7 @@ body.big .tb-panel { display: none; }
   function drawRun(t) {
     var c = cx, lay = run.lay;
     c.drawImage(layer.cv, 0, 0, W, H);
+    momentGround(c, t);
     var poses = carPoses();
     var night = state.night;
     var sp = segPoint(lay.station.seg, lay.station.s);
@@ -1721,6 +1726,7 @@ body.big .tb-panel { display: none; }
       faceT(c, G, [-hq.len / 2 - 9 * pulse, -RW / 2 - 9 * pulse, 0], [1, 0, 0], [0, 1, 0]);
       rr(c, 0, 0, hq.len + 18 * pulse, RW + 18 * pulse, 14); ink(c, "rgba(255,201,60,0.9)", LW); flat(c);
     }
+    momentPut(c, put, poses, t);
     D.sort(function (a, b) { return a.k - b.k; });
     D.forEach(function (d) { d.f(); });
     flat(c);
@@ -1755,6 +1761,7 @@ body.big .tb-panel { display: none; }
       c.fillStyle = f.dark ? "#C9D3E6" : "#FFFFFF"; c.fill(); c.lineWidth = 2; c.strokeStyle = "rgba(29,35,64,0.5)"; c.stroke();
     });
     c.globalAlpha = 1;
+    momentSky(c, t);
     if (night) drawNight(c, poses, sp, nx, ny);
     // the tapped car: a bouncing arrow above it
     if (sel >= 0 && poses[sel]) {
@@ -1959,7 +1966,7 @@ body.big .tb-panel { display: none; }
   $("toot").addEventListener("click", function () { if (!hasEngine()) { needEngine(); return; } toot(); });
   $("newBtn").addEventListener("click", function () {
     if (Toybox.timer.locked()) return;
-    clearSurprise();
+    TM = null;
     var poses = carPoses();
     poses.forEach(function (q, k) {
       setTimeout(function () { var X = SX(q.x), Y = SY(q.y, q.z + 14); burst(X, Y, q.p.color, 10, false); }, k * 40);
@@ -1970,32 +1977,328 @@ body.big .tb-panel { display: none; }
     setTab("engines");
     save(); bumpCount(); updateGo(); updateCoach();
   });
-  // Surprise: a whole surprise train rolls in (an engine if there is none, then a mix of cars in
-  // surprise colors). If the train is already full, every car gets a surprise color.
-  var surpriseT = [];
-  function clearSurprise() { surpriseT.forEach(clearTimeout); surpriseT = []; }
+  // ---------- Surprise: a fun moment on the train set, right now (his train and layout never change) ----------
+  // They take turns, never the same twice in a row (starting at a random one): (1) a cow wanders onto the
+  // crossing: the gates come down, a running train waits for it, it moos and ambles off; (2) a hot-air
+  // balloon drifts slowly over the whole layout with its shadow on the ground; (3) birds perched in a tree
+  // lift off as the train passes (or a flock flies across when the train is stopped); (4) the engine gets a
+  // happy face that looks at his finger and blinks. Pressed again during a moment: a few sparkles.
+  var MOMENTS = ["cow", "balloon", "birds", "face"];
+  var momentAt = Math.floor(Math.random() * MOMENTS.length), lastMoment = "", TM = null, lastPtr = null;
+  function trainRunning() { return !!(run && hasEngine() && (state.go || run.v > 5)); }
   $("surprise").addEventListener("click", function () {
     if (Toybox.timer.locked() || !run) return;
-    clearSurprise();
-    var adds = [];
-    if (!hasEngine()) adds.push({ t: pick(ENGINES) });
-    var room = MAXP - state.pieces.length - queue.length - adds.length;
-    var n = Math.min(room, 3 + Math.floor(Math.random() * 3));
-    for (var i = 0; i < n; i++) adds.push({ t: pick(CARS), c: pick(COLORS) });
-    if (!adds.length) {
-      carPoses().forEach(function (q, k) {
-        if (TYPES[q.p.t].eng) return;
-        surpriseT.push(setTimeout(function () {
-          q.p.color = pick(COLORS); q.p.jig = 1;
-          burst(SX(q.x), SY(q.y, q.z + 14), q.p.color, 10, false); sClick(); save();
-        }, k * 220));
-      });
+    if (TM) { var f = momentFocus(); burst(f.x, f.y, "#FFC93C", 6, false); sClick(); return; }
+    for (var i = 0; i < MOMENTS.length; i++) {
+      var k = MOMENTS[(momentAt + i) % MOMENTS.length];
+      if (k === lastMoment) continue;
+      momentAt += i + 1; lastMoment = k;
+      startMoment(k);
       return;
     }
-    adds.forEach(function (a, k) {
-      surpriseT.push(setTimeout(function () { addPiece(a.t, a.c); }, k * 700));
-    });
   });
+  cv.addEventListener("pointermove", function (e) { var p = local(e); lastPtr = { x: p.x, y: p.y, at: performance.now() }; });
+  cv.addEventListener("pointerdown", function (e) { var p = local(e); lastPtr = { x: p.x, y: p.y, at: performance.now() }; }, true);
+  // The visible ground, in world units.
+  function viewBox() { return { x0: -vox / vs, x1: (W - vox) / vs, y0: -voy / (TILT * vs), y1: (H - voy) / (TILT * vs) }; }
+  function lerpP(a, b, k) { return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }; }
+  function sm01(v) { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); }
+  function startMoment(k) {
+    var lay = run.lay, t = performance.now() / 1000;
+    if (k === "cow") {
+      var cr = segPoint(lay.crossing.seg, lay.crossing.s), rg = roadGeom(lay);
+      var rx = rg.ux, ry = rg.uy, tx = Math.cos(cr.ang), ty = Math.sin(cr.ang);
+      // keep to the side of the road away from the right-hand lane the little car uses
+      var P = function (a, b) { return { x: cr.x + rx * a + tx * b, y: cr.y + ry * a + ty * b }; };
+      TM = { kind: "cow", t0: t, ph: "in", pt: P(230, 34), A: P(230, 34), Wt: P(104, 30), C: P(0, 0), E: P(-120, -30), O: P(-215, -34),
+        pk: 0, waitT: 0, standT: 0, alpha: 0, step: 0, face: 1 };
+      return;
+    }
+    if (k === "balloon") {
+      var vb = viewBox(), zb = 240;
+      // fly at a height that sits about a third of the way down the stage
+      var gy = ((H * 0.36 - voy) / vs + zb * HT) / TILT;
+      var R = 52;
+      TM = { kind: "balloon", t0: t, dur: reduce ? 14 : 17, z: zb, y: gy, xa: vb.x0 - R * 1.6, xb: vb.x1 + R * 1.6, col: 0 };
+      return;
+    }
+    if (k === "birds") {
+      var running = trainRunning();
+      if (running && trees.length) {
+        // the tree the train will pass soonest
+        var hs = headSS(), best = null, bd = 1e9;
+        for (var d = 140; d < 1500; d += 30) {
+          var a = advance(hs.seg, hs.s, d), q = segPoint(a.seg, a.s);
+          for (var i = 0; i < trees.length; i++) {
+            var tp = trees[i], dd = Math.hypot(tp[0] - q.x, tp[1] - q.y);
+            if (dd < 150 && d < bd) { bd = d; best = tp; }
+          }
+          if (best) break;
+        }
+        if (!best) best = trees[0];
+        TM = { kind: "birds", t0: t, ph: "perch", tree: best, d0: run.d, ahead: bd < 1e9 ? bd : 0, birds: [], up: 0 };
+        for (var b = 0; b < 6; b++) TM.birds.push({ ox: (b - 2.5) * 11, oz: 84 + (b % 2) * 5, col: ["#E63946", "#2D5BD7", "#F77F00", "#7B4FC9", "#2E9E5B", "#F26CA7"][b], ph: b * 0.7 });
+      } else {
+        var v2 = viewBox();
+        TM = { kind: "birds", t0: t, ph: "fly", birds: [], up: t, fly: true };
+        for (var j = 0; j < 7; j++) {
+          var row = Math.floor((j + 1) / 2), side = j % 2 ? 1 : -1;
+          TM.birds.push({ x: v2.x0 - 60 - row * 36, y: (v2.y0 + v2.y1) / 2 + side * row * 26, z: 170 + row * 6, vx: 95, vy: 0, vz: 0, ph: j * 0.9, col: ["#E63946", "#2D5BD7", "#F77F00", "#7B4FC9", "#2E9E5B", "#F26CA7", "#1FA6A0"][j] });
+        }
+        TM.end = (v2.x1 - v2.x0 + 260) / 95;
+      }
+      return;
+    }
+    TM = { kind: "face", t0: t, dur: 6.2 };
+    var poses = carPoses();
+    if (poses.length) poses[0].p.jig = 1;
+  }
+  // Where a few sparkles go when Surprise is pressed during a moment.
+  function momentFocus() {
+    if (TM && TM.kind === "cow" && TM.pt) return { x: SX(TM.pt.x), y: SY(TM.pt.y, 40) };
+    if (TM && TM.kind === "balloon" && TM.x !== undefined) return { x: SX(TM.x), y: SY(TM.y, TM.z + 60) };
+    var poses = carPoses();
+    if (poses.length) return { x: SX(poses[0].x), y: SY(poses[0].y, poses[0].z + 40) };
+    return { x: W / 2, y: H / 2 };
+  }
+  // ---- the cow and the crossing ----
+  function cowOn() { return TM && TM.kind === "cow" && (TM.ph === "on" || TM.ph === "stand" || (TM.ph === "off" && TM.pk < 0.55)); }
+  function cowNear() { return !!(TM && TM.kind === "cow" && (TM.ph === "wait" || cowOn())); }
+  // A running train waits before the crossing while the cow is on it.
+  function cowLimit(want, hs) {
+    if (!cowOn() || want <= 0) return want;
+    var dc = distAhead(hs.seg, hs.s, run.lay.crossing, 900);
+    if (dc < 0) return want;
+    var room = dc - 95;
+    if (room <= 2) return 0;
+    return Math.min(want, Math.max(12, Math.sqrt(2 * BRAKE * room)));
+  }
+  function crossingClear(poses, hs) {
+    var cr = segPoint(run.lay.crossing.seg, run.lay.crossing.s);
+    for (var i = 0; i < poses.length; i++) if (Math.hypot(poses[i].x - cr.x, poses[i].y - cr.y) < poses[i].len / 2 + 70) return false;
+    if (hasEngine() && run.v > 1) {
+      var dc = distAhead(hs.seg, hs.s, run.lay.crossing, 900);
+      if (dc >= 0 && dc < run.v * run.v / (2 * BRAKE) + 120) return false;
+    }
+    return true;
+  }
+  function sMoo() {
+    var ctx = ac(); if (!ctx) return;
+    var t = ctx.currentTime;
+    tone(ctx, "sawtooth", 150, 118, t, 0.9, 0.03);
+    tone(ctx, "sine", 300, 236, t, 0.9, 0.03);
+  }
+  function stepMoment(dt, poses, hs) {
+    if (!TM) return;
+    var now = performance.now() / 1000, el = now - TM.t0, SPD = 34;
+    if (TM.kind === "cow") {
+      var walk = function (a, b) { var L = Math.hypot(b.x - a.x, b.y - a.y); TM.pk = Math.min(1, TM.pk + dt * SPD / L); TM.pt = lerpP(a, b, sm01(TM.pk)); TM.step += dt; TM.face = (b.x - a.x) >= 0 ? 1 : -1; return TM.pk >= 1; };
+      TM.alpha = Math.min(1, TM.alpha + dt * 1.5);
+      if (TM.ph === "in") { if (walk(TM.A, TM.Wt)) { TM.ph = "wait"; TM.pk = 0; TM.waitT = 0; } }
+      else if (TM.ph === "wait") {
+        TM.waitT += dt;
+        if (run.gate > 0.85 && crossingClear(poses, hs)) { TM.ph = "on"; TM.pk = 0; }
+        else if (TM.waitT > 9) {
+          // the train is in the way for a long time: it moos from the side and goes back
+          fx.push({ k: "text", x: SX(TM.pt.x), y: SY(TM.pt.y, 90), t: 0, life: 3, text: "Moo!", size: 30 }); sMoo();
+          TM.ph = "back"; TM.pk = 0;
+        }
+      } else if (TM.ph === "on") { if (walk(TM.Wt, TM.C)) { TM.ph = "stand"; TM.standT = 0; fx.push({ k: "text", x: SX(TM.C.x), y: SY(TM.C.y, 90), t: 0, life: 3.2, text: "Moo!", size: 34 }); sMoo(); } }
+      else if (TM.ph === "stand") { TM.standT += dt; if (TM.standT > 3.6) { TM.ph = "off"; TM.pk = 0; } }
+      else if (TM.ph === "off") { if (walk(TM.C, TM.E)) { TM.ph = "out"; TM.pk = 0; } }
+      else if (TM.ph === "out" || TM.ph === "back") {
+        var done = TM.ph === "out" ? walk(TM.E, TM.O) : walk(TM.Wt, TM.A);
+        if (TM.pk > 0.55) TM.alpha = Math.max(0, 1 - (TM.pk - 0.55) / 0.45);
+        if (done) TM = null;
+      }
+      return;
+    }
+    if (TM.kind === "balloon") {
+      var u = el / TM.dur;
+      if (u >= 1) { TM = null; return; }
+      TM.x = TM.xa + (TM.xb - TM.xa) * u;
+      return;
+    }
+    if (TM.kind === "birds") {
+      if (TM.ph === "perch") {
+        // lift off when the engine comes by (or after a while)
+        var hp = poses[0], tp = TM.tree, close = hp && Math.hypot(hp.x - tp[0], hp.y - tp[1]) < 190;
+        if (close || el > 9 || !trainRunning()) {
+          TM.ph = "fly"; TM.up = now;
+          var away = hp ? Math.atan2(tp[1] - hp.y, tp[0] - hp.x) : -Math.PI / 2;
+          TM.birds.forEach(function (b, i) {
+            var a = away + (i - 2.5) * 0.22;
+            b.x = tp[0] + b.ox; b.y = tp[1]; b.z = b.oz;
+            b.vx = Math.cos(a) * (70 + i * 6); b.vy = Math.sin(a) * (70 + i * 6); b.vz = 55 + (i % 3) * 12;
+          });
+          TM.end = 7;
+          var ctx = ac(); if (ctx) [0, 0.12, 0.24].forEach(function (d) { tone(ctx, "sine", 2400, 3000, ctx.currentTime + d, 0.08, 0.02); });
+        }
+        return;
+      }
+      var fl = now - TM.up;
+      if (fl > TM.end) { TM = null; return; }
+      TM.birds.forEach(function (b) { b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; if (!TM.fly) b.vz *= Math.exp(-dt * 0.4); });
+      return;
+    }
+    if (TM.kind === "face" && el > TM.dur) TM = null;
+  }
+  // The balloon's shadow lies on the grass, under everything that stands up.
+  function momentGround(c, t) {
+    if (!TM || TM.kind !== "balloon" || TM.x === undefined) return;
+    var X = SX(TM.x + 30), Y = SY(TM.y + 30, 0), r = Math.max(34, 62 * vs);
+    c.fillStyle = "rgba(29,35,64,0.16)";
+    c.beginPath(); c.ellipse(X, Y, r, r * TILT * 0.9, 0, 0, TAU); c.fill();
+  }
+  // Things that stand on the ground sort with the trains: the cow, the birds perched in a tree.
+  function momentPut(c, put, poses, t) {
+    if (!TM) return;
+    if (TM.kind === "cow" && TM.pt) {
+      var cp = TM.pt;
+      put(cp.y + 0.5, function () { drawCow(c, cp.x, cp.y, TM.face, TM.step, TM.alpha, TM.ph === "stand" ? TM.standT : -1); });
+    } else if (TM.kind === "birds" && TM.ph === "perch") {
+      var tp = TM.tree, el = performance.now() / 1000 - TM.t0;
+      put(tp[1] + 0.01, function () {
+        TM.birds.forEach(function (b, i) {
+          var pop = sm01((el - i * 0.12) / 0.4);
+          if (pop <= 0) return;
+          var X = SX(tp[0] + b.ox), Y = SY(tp[1], b.oz) - Math.abs(Math.sin(el * 3 + b.ph)) * 3 * (reduce ? 0 : 1);
+          drawBirdSit(c, X, Y, Math.max(6, 10 * vs) * pop, b.col);
+        });
+      });
+    }
+  }
+  // A point on the engine's body toward its front, a little up, on the screen.
+  function frontOf(q) {
+    var u = q.len * 0.18, x = q.x + Math.cos(q.ang) * u, y = q.y + Math.sin(q.ang) * u;
+    return { x: SX(x), y: SY(y, q.z + 30) };
+  }
+  // On top: flying birds, the balloon, the happy face.
+  function momentSky(c, t) {
+    if (!TM) return;
+    if (TM.kind === "birds" && TM.ph === "fly") {
+      TM.birds.forEach(function (b) {
+        drawBirdFly(c, SX(b.x), SY(b.y, b.z), Math.max(11, 16 * vs), t * 9 + b.ph, b.col);
+      });
+    } else if (TM.kind === "balloon" && TM.x !== undefined) {
+      var bob = reduce ? 0 : Math.sin(t * 1.2) * 6;
+      drawBalloon(c, SX(TM.x), SY(TM.y, TM.z + bob), Math.max(40, 72 * vs), t);
+    } else if (TM.kind === "face") {
+      // drawn on top (over the smoke), so the face is always clear
+      var poses = carPoses(), q = null, i;
+      for (i = 0; i < poses.length; i++) if (TYPES[poses[i].p.t].eng) { q = poses[i]; break; }
+      if (!q && poses.length) q = poses[0];
+      if (q && tunnelCut(q) !== "hide") { var o = frontOf(q); drawFace(c, o.x, o.y, clamp(19 * vs, 12, 26), t); }
+      else if (!q) {
+        var sp = segPoint(run.lay.station.seg, run.lay.station.s), bx = sp.x - Math.sin(sp.ang) * 118, by = sp.y + Math.cos(sp.ang) * 118;
+        drawFace(c, SX(bx), SY(by, 26), clamp(20 * vs, 13, 28), t);
+      }
+    }
+  }
+  function drawCow(c, x, y, face, step, alpha, standT) {
+    var X = SX(x), Y = SY(y, 0), s = Math.max(0.8, vs * 1.35);
+    c.save(); c.globalAlpha = alpha;
+    c.fillStyle = "rgba(0,0,0,0.15)"; c.beginPath(); c.ellipse(X, Y + 2 * s, 34 * s, 8 * s, 0, 0, TAU); c.fill();
+    c.translate(X, Y); c.scale(face, 1);
+    var sw = standT < 0 && !reduce ? Math.sin(step * 7) : 0, lw = Math.max(2, 2.6 * s);
+    // legs
+    [[-17, 1], [-9, -1], [12, 1], [19, -1]].forEach(function (L) {
+      var a = L[1] * sw * 0.35;
+      c.save(); c.translate(L[0] * s, -14 * s); c.rotate(a);
+      c.beginPath(); c.rect(-3 * s, 0, 6 * s, 15 * s); c.fillStyle = "#FFFFFF"; c.fill(); c.lineWidth = lw; c.strokeStyle = OUT; c.stroke();
+      c.beginPath(); c.rect(-3 * s, 11 * s, 6 * s, 4 * s); c.fillStyle = "#3A3F55"; c.fill();
+      c.restore();
+    });
+    // tail
+    c.beginPath(); c.moveTo(-26 * s, -30 * s); c.quadraticCurveTo(-36 * s, -22 * s + Math.sin(step * 4) * 4 * s, -32 * s, -12 * s);
+    c.lineWidth = lw; c.strokeStyle = OUT; c.stroke();
+    // body with spots
+    rr(c, -28 * s, -38 * s, 52 * s, 26 * s, 12 * s); c.fillStyle = "#FFFFFF"; c.fill();
+    c.save(); c.clip();
+    c.fillStyle = "#26282E";
+    c.beginPath(); c.ellipse(-12 * s, -30 * s, 9 * s, 7 * s, 0.4, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(9 * s, -20 * s, 8 * s, 6 * s, -0.3, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(-22 * s, -16 * s, 6 * s, 5 * s, 0, 0, TAU); c.fill();
+    c.restore();
+    c.lineWidth = lw; c.strokeStyle = OUT; rr(c, -28 * s, -38 * s, 52 * s, 26 * s, 12 * s); c.stroke();
+    // head: nods while it stands and moos
+    var nod = standT >= 0 && !reduce ? Math.sin(standT * 3) * 0.12 : 0;
+    c.save(); c.translate(26 * s, -34 * s); c.rotate(nod);
+    c.beginPath(); c.ellipse(-4 * s, -9 * s, 5 * s, 3 * s, -0.5, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill(); c.lineWidth = lw * 0.8; c.stroke(); // ear
+    rr(c, -6 * s, -10 * s, 18 * s, 20 * s, 7 * s); c.fillStyle = "#FFFFFF"; c.fill(); c.lineWidth = lw; c.stroke();
+    rr(c, -2 * s, 2 * s, 16 * s, 11 * s, 5 * s); c.fillStyle = "#F7A8C0"; c.fill(); c.stroke(); // nose
+    c.fillStyle = OUT; c.beginPath(); c.arc(3 * s, 7 * s, 1.4 * s, 0, TAU); c.arc(9 * s, 7 * s, 1.4 * s, 0, TAU); c.fill();
+    c.beginPath(); c.arc(4 * s, -4 * s, 2.2 * s, 0, TAU); c.fill(); // eye
+    c.beginPath(); c.moveTo(-3 * s, -10 * s); c.lineTo(-6 * s, -16 * s); c.moveTo(5 * s, -10 * s); c.lineTo(7 * s, -16 * s); c.lineWidth = lw; c.strokeStyle = "#C9A26B"; c.stroke(); // horns
+    c.restore();
+    c.restore();
+  }
+  function drawBirdSit(c, X, Y, r, col) {
+    c.beginPath(); c.ellipse(X, Y - r * 0.7, r, r * 0.75, 0, 0, TAU); trim(c, col, 2);
+    c.beginPath(); c.arc(X + r * 0.75, Y - r * 1.35, r * 0.55, 0, TAU); trim(c, col, 2);
+    c.beginPath(); c.moveTo(X + r * 1.25, Y - r * 1.45); c.lineTo(X + r * 1.75, Y - r * 1.3); c.lineTo(X + r * 1.25, Y - r * 1.15); c.closePath(); trim(c, "#FFC93C", 1.5);
+    c.fillStyle = OUT; c.beginPath(); c.arc(X + r * 0.9, Y - r * 1.45, Math.max(1, r * 0.12), 0, TAU); c.fill();
+  }
+  function drawBirdFly(c, X, Y, w, ph, col) {
+    if (X < -40 || X > W + 40 || Y < -40) return;
+    var f = reduce ? 0.3 : Math.sin(ph);
+    c.beginPath(); c.ellipse(X, Y, w * 0.4, w * 0.25, 0, 0, TAU); trim(c, col, 2);
+    c.beginPath();
+    c.moveTo(X - w * 0.2, Y); c.quadraticCurveTo(X - w * 0.6, Y - w * (0.2 + 0.6 * f), X - w * 1.1, Y - w * 0.7 * f);
+    c.moveTo(X + w * 0.2, Y); c.quadraticCurveTo(X + w * 0.6, Y - w * (0.2 + 0.6 * f), X + w * 1.1, Y - w * 0.7 * f);
+    c.lineWidth = Math.max(2.5, w * 0.22); c.strokeStyle = OUT; c.lineCap = "round"; c.stroke();
+  }
+  function drawBalloon(c, X, Y, R, t) {
+    var cols = ["#E63946", "#FFC93C", "#2D5BD7", "#FFC93C", "#2EA05A", "#FFC93C"];
+    // basket ropes
+    c.lineWidth = Math.max(1.5, R * 0.04); c.strokeStyle = OUT;
+    c.beginPath(); c.moveTo(X - R * 0.42, Y + R * 0.72); c.lineTo(X - R * 0.2, Y + R * 1.25); c.moveTo(X + R * 0.42, Y + R * 0.72); c.lineTo(X + R * 0.2, Y + R * 1.25); c.stroke();
+    rr(c, X - R * 0.24, Y + R * 1.2, R * 0.48, R * 0.34, R * 0.06); trim(c, "#B07D45", Math.max(2, R * 0.06));
+    // the burner's little flame now and then
+    if (!reduce && Math.sin(t * 1.3) > 0.6) { c.beginPath(); c.moveTo(X - R * 0.08, Y + R * 1.12); c.quadraticCurveTo(X, Y + R * 0.75, X + R * 0.08, Y + R * 1.12); c.closePath(); c.fillStyle = "#FF9A4D"; c.fill(); }
+    // envelope: a round top that narrows to the mouth, in stripes
+    var env = function () {
+      c.beginPath();
+      c.moveTo(X - R * 0.3, Y + R * 0.85);
+      c.bezierCurveTo(X - R * 1.15, Y + R * 0.2, X - R * 1.1, Y - R * 1.0, X, Y - R * 1.0);
+      c.bezierCurveTo(X + R * 1.1, Y - R * 1.0, X + R * 1.15, Y + R * 0.2, X + R * 0.3, Y + R * 0.85);
+      c.closePath();
+    };
+    env(); c.save(); c.clip();
+    for (var i = 0; i < 6; i++) { c.fillStyle = cols[i]; c.fillRect(X - R * 1.2 + i * R * 0.4, Y - R * 1.1, R * 0.4, R * 2.1); }
+    c.fillStyle = "rgba(255,255,255,0.3)"; c.beginPath(); c.ellipse(X - R * 0.4, Y - R * 0.45, R * 0.18, R * 0.38, 0.3, 0, TAU); c.fill();
+    c.restore();
+    env(); c.lineWidth = Math.max(2.5, R * 0.07); c.strokeStyle = OUT; c.stroke();
+    rr(c, X - R * 0.32, Y + R * 0.8, R * 0.64, R * 0.12, R * 0.05); trim(c, "#8B5A3C", Math.max(1.5, R * 0.05));
+  }
+  // A happy face (screen pixels): big eyes that look at his finger and blink, rosy cheeks, a smile.
+  function drawFace(c, cx0, cy0, er, t) {
+    var ft = performance.now() / 1000 - TM.t0, D = TM.dur;
+    var k = Math.min(sm01(ft / 0.45), 1 - sm01((ft - (D - 0.5)) / 0.5));
+    if (k <= 0) return;
+    var pop = ft < 0.6 ? 1 + Math.sin(clamp(ft / 0.6, 0, 1) * Math.PI) * 0.18 : 1;
+    var look = lastPtr && performance.now() - lastPtr.at < 8000 ? lastPtr : { x: W / 2, y: H * 0.8 };
+    var bl = 1, sep = er * 1.3;
+    [1.4, 3.0, 3.3, 4.8].forEach(function (b) { var d = Math.abs(ft - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
+    c.save();
+    c.translate(cx0, cy0); c.rotate(reduce ? 0 : Math.sin(ft * 3) * 0.06); c.scale(k * pop, k * pop);
+    c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = Math.max(2, er * 0.14);
+    [-1, 1].forEach(function (sg) {
+      var ex = sg * sep, ey = -er * 0.45;
+      c.save(); c.translate(ex, ey); c.scale(1, Math.max(0.08, bl));
+      c.beginPath(); c.ellipse(0, 0, er, er * 1.12, 0, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill(); c.stroke();
+      var dx = look.x - (cx0 + ex), dy = look.y - (cy0 + ey), d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
+      c.beginPath(); c.arc(dx / d * m, dy / d * m, er * 0.5, 0, TAU); c.fillStyle = OUT; c.fill();
+      c.beginPath(); c.arc(dx / d * m - er * 0.17, dy / d * m - er * 0.2, er * 0.17, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill();
+      c.restore();
+      c.beginPath(); c.ellipse(sg * sep * 1.6, er * 0.8, er * 0.4, er * 0.25, 0, 0, TAU); c.fillStyle = "rgba(255,143,184,0.9)"; c.fill();
+    });
+    c.beginPath(); c.moveTo(-er * 0.95, er * 0.7); c.quadraticCurveTo(0, er * 1.95, er * 0.95, er * 0.7); c.closePath();
+    c.fillStyle = "#E8505B"; c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-er * 0.5, er * 1.2); c.quadraticCurveTo(0, er * 0.98, er * 0.5, er * 1.2); c.quadraticCurveTo(0, er * 1.62, -er * 0.5, er * 1.2);
+    c.fillStyle = "#FF8FB8"; c.fill();
+    c.restore();
+  }
 
   function pickBtn(label, draw, onTap) {
     var b = document.createElement("button");
@@ -2165,7 +2468,7 @@ body.big .tb-panel { display: none; }
 
   // ---------- Timer ending: the train pulls into the station and stops ----------
   function onEnding(done) {
-    clearSurprise(); endSel();
+    TM = null; endSel();
     if (!run || !hasEngine()) { setTimeout(done, 1500); return; }
     var lay = run.lay;
     if (lay.stationWay) { var sw = lay.stationWay.sw; if (sw.on !== lay.stationWay.on) flipSwitch(sw); }
@@ -2365,6 +2668,8 @@ body.big .tb-panel { display: none; }
   if ($("tb-farewell")) stage.appendChild($("tb-farewell"));
   if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, upright: function () { return UPRIGHT; }, view: function () { return { vs: vs, tilt: TILT, W: W, H: H }; }, add: addPiece, ghost: ghost,
     pieces: function () { var r = cv.getBoundingClientRect(); return carPoses().map(function (q) { return { t: q.p.t, x: r.left + SX(q.x), y: r.top + SY(q.y, q.z + 26), sx: SX(q.x), sy: SY(q.y, q.z), hidden: tunnelCut(q) === "hide" }; }); },
+    moment: function (k) { if (k) { TM = null; startMoment(k); } return TM ? TM.kind + ":" + (TM.ph || "") : ""; },
+    trainV: function () { return run ? run.v : 0; }, gate: function () { return run ? run.gate : 0; },
     switches: function () { var r = cv.getBoundingClientRect(); return run.lay.switches.map(function (s) { return { x: r.left + s.sx, y: r.top + s.sy, on: s.on }; }); } };
 })();
 </script>

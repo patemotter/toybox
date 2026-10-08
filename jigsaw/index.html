@@ -121,6 +121,17 @@ body {
   body.m-play .tb-body .tb-panel { width: 216px; }
 }
 
+/* Surprise on the picture chooser: the cards hop like popcorn, or rise in a wave. */
+@keyframes jgHop { 0%,100% { transform: translate(0,0) rotate(0); } 25% { transform: translate(var(--hx), -26px) rotate(var(--hr)); } 50% { transform: translate(calc(var(--hx) * 1.4), 0) rotate(0); } 75% { transform: translate(calc(var(--hx) * 0.6), -18px) rotate(calc(var(--hr) * -1)); } }
+@keyframes jgWave { 0%,100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-22px) rotate(-5deg) scale(1.05); } 70% { transform: translateY(4px) rotate(2deg); } }
+.cards .card.jg-hop { animation: jgHop 1.5s ease-in-out both; animation-delay: var(--d); }
+.cards .card.jg-wave { animation: jgWave 1.2s ease-in-out both; animation-delay: var(--d); }
+.jg-spark { position: absolute; z-index: 7; width: 22px; height: 22px; margin: -11px 0 0 -11px; pointer-events: none; animation: jgSpark 0.9s ease-out both; }
+@keyframes jgSpark { 0% { transform: translate(0,0) scale(0.3) rotate(0); opacity: 1; } 100% { transform: translate(var(--sx), var(--sy)) scale(1) rotate(160deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .cards .card.jg-hop, .cards .card.jg-wave { animation-duration: 0.8s; animation-name: jgGlow; }
+  @keyframes jgGlow { 0%,100% { filter: none; } 50% { filter: brightness(1.18) saturate(1.2); } }
+}
 /* Big: the controls go away. */
 body.big .tb-panel { display: none; }
 /* Time is up: the board dims and the controls rest. */
@@ -1369,6 +1380,15 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function drawPiece(c, p, shadow) {
     var w = p.w * p.sc, h = p.h * p.sc, x = p.x - w / 2, y = p.y - h / 2;
+    if (p.hop) {
+      // Surprise "popcorn": a hop to one side and a hop back, landing exactly where it was
+      var hu = (now() - p.hop.t0) / p.hop.dur;
+      if (hu >= 1) p.hop = null;
+      else if (hu > 0) {
+        var side = Math.sin(Math.PI * hu), up = Math.abs(Math.sin(2 * Math.PI * hu));
+        x += p.hop.dx * side; y -= p.hop.up * up;
+      }
+    }
     if (shadow) {
       var lift = p.heldBy != null ? 9 : 3.5;
       c.globalAlpha = p.heldBy != null ? 0.22 : 0.3;
@@ -1450,6 +1470,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       c.restore();
     });
     if (anyGlow !== glowCoach) { glowCoach = anyGlow; updateCoach(); }
+    drawMoment(c, t, pic);
     // Peek: the whole picture fades in over the board for a few seconds
     var pk = t - peekT0;
     if (pk >= 0 && pk < PEEK_MS && big) {
@@ -1576,6 +1597,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     order = puz.pieces.filter(function (p) { return !p.placed; });
     big = null; LY = null;
     peekT0 = -1e9; finishT0 = -1e9; aliveT0 = -1e9; growT0 = -1e9; shineT0 = -1e9; fx = [];
+    mo = null;
     glowCoach = false;
     setMode("play");
     bigPic(pic, function (r) {
@@ -1624,7 +1646,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!p) return;
     e.preventDefault();
     try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
-    p.anim = null;
+    p.anim = null; p.hop = null;
     p.heldBy = e.pointerId;
     p.tsc = 1;
     var lift = e.pointerType === "mouse" ? 0 : Math.min(26, puz.ch * LY.s * 0.28);
@@ -1633,6 +1655,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     snd("pick");
     dirty = true;
   });
+  stage.addEventListener("pointermove", function (e) { var q = stagePt(e); lastPtr = { x: q[0], y: q[1], at: now() }; });
+  stage.addEventListener("pointerdown", function (e) { var q = stagePt(e); lastPtr = { x: q[0], y: q[1], at: now() }; }, true);
   cv.addEventListener("pointermove", function (e) {
     var h = held[e.pointerId];
     if (!h) return;
@@ -1703,6 +1727,166 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     updateGo();
   }
 
+  // ---------- Surprise: a fun moment on the puzzle, right now ----------
+  // They take turns (never the same twice in a row, starting at a random one); his pieces never move for
+  // good and nothing is cut again: (1) the part of the picture he has put together comes alive, (2) the
+  // loose pieces hop aside and back like popcorn, (3) the board gets a happy face that looks at his finger.
+  // On the picture chooser and the shelf the cards hop or wave. Pressed again during a moment: a few sparkles.
+  var MOMENTS = ["alive", "hop", "face"];
+  var momentAt = Math.floor(Math.random() * MOMENTS.length), lastMoment = "";
+  var mo = null, lastPtr = null, cardMoment = 0, cardBusyUntil = 0;
+  function momentOk(k) {
+    if (!puz || !LY || !big) return false;
+    var done = !!(st.cur && st.cur.done);
+    if (k === "alive") return done || placedCount() > 0;
+    if (k === "hop") return !done && order.some(function (p) { return p.heldBy == null && !p.anim; });
+    return true;
+  }
+  function surprise() {
+    if (window.Toybox && Toybox.timer.locked()) return;
+    snd("tap");
+    if (st.mode !== "play") { cardSurprise(); return; }
+    if (!puz || !LY || !big) { domSparkles(stage.clientWidth / 2, stage.clientHeight / 2, 6); return; }
+    var t = now();
+    var aliveBusy = st.cur.done && t - aliveT0 < PIC_BY[puz.pic].dur * 1000;
+    if (mo || aliveBusy) { smallSparkles(); return; }
+    for (var i = 0; i < MOMENTS.length; i++) {
+      var k = MOMENTS[(momentAt + i) % MOMENTS.length];
+      if (k === lastMoment || !momentOk(k)) continue;
+      momentAt += i + 1; lastMoment = k;
+      startMoment(k);
+      return;
+    }
+    smallSparkles();
+  }
+  function smallSparkles() {
+    var r = st.cur && st.cur.done ? doneRect(now()) : { x: LY.bx, y: LY.by, w: LY.bw, h: LY.bh };
+    var s = Math.min(r.w, r.h);
+    for (var i = 0; i < 3; i++) fx.push({ kind: "snap", x: r.x + r.w * (0.3 + 0.2 * i), y: r.y + r.h * (0.35 + 0.15 * (i % 2)), s: s * 0.22, t0: now() + i * 120, dur: 700, seed: (Math.random() * 1e9) | 0 });
+    dirty = true;
+  }
+  function startMoment(k) {
+    var t = now();
+    if (k === "alive") {
+      if (st.cur.done) { aliveT0 = t; dirty = true; return; }   // the finished picture: the whole thing comes alive
+      mo = { kind: "alive", t0: t, dur: PIC_BY[puz.pic].dur * 1000 };
+      smallSparkles();
+    } else if (k === "hop") {
+      var list = order.filter(function (p) { return p.heldBy == null && !p.anim; });
+      var cell = Math.min(puz.cw, puz.ch) * LY.s;
+      list.forEach(function (p, i) {
+        // hop away from the board (not over his work), never off the stage
+        var dir = p.x < LY.bx + LY.bw / 2 ? -1 : 1, dx = dir * Math.min(cell * 0.55, 60), hw = p.w * p.sc * 0.4;
+        if (p.x + dx < hw || p.x + dx > W - hw) dx = clamp(p.x + dx, hw, W - hw) - p.x;
+        p.hop = reduce ? { t0: t + i * 40, dur: 700, dx: 0, up: 6 } : { t0: t + i * 70, dur: 1300, dx: dx, up: Math.min(cell * 0.5, 46) };
+      });
+      mo = { kind: "hop", t0: t, dur: 1400 + list.length * 70 };
+    } else {
+      mo = { kind: "face", t0: t, dur: 5600 };
+    }
+    dirty = true;
+  }
+  // Drawn on top of the board (inside draw()).
+  function drawMoment(c, t, pic) {
+    if (!mo) return;
+    var u = t - mo.t0;
+    if (mo.kind === "alive" && !st.cur.done && big) {
+      var at = u / 1000;
+      if (at < 0 || at >= pic.dur) return;
+      c.save();
+      var clip = new Path2D(), any = false;
+      puz.pieces.forEach(function (p) {
+        if (!p.placed || p.anim) return;
+        any = true;
+        var m = new DOMMatrix([LY.s, 0, 0, LY.s, p.homeX, p.homeY]);
+        clip.addPath(p.path, m);
+      });
+      if (!any) { c.restore(); return; }
+      c.clip(clip);
+      picDraw(c, LY.bx, LY.by, LY.bw, LY.bh, big.base, at, pic);
+      c.restore();
+      // the piece outlines stay on top, so it still reads as his puzzle
+      c.save();
+      c.lineJoin = "round"; c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 1.6;
+      puz.pieces.forEach(function (p) {
+        if (!p.placed || p.anim) return;
+        c.setTransform(DPR * LY.s, 0, 0, DPR * LY.s, DPR * p.homeX, DPR * p.homeY);
+        c.lineWidth = 1.6 / LY.s; c.stroke(p.path);
+      });
+      c.restore();
+      c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    } else if (mo.kind === "face") {
+      var r = st.cur && st.cur.done ? doneRect(t) : { x: LY.bx, y: LY.by, w: LY.bw, h: LY.bh };
+      var D = mo.dur / 1000, ft = u / 1000;
+      var k = Math.min(smooth(ft / 0.5), 1 - smooth((ft - (D - 0.5)) / 0.5));
+      if (k <= 0) return;
+      var pop = ft < 0.6 ? 1 + Math.sin(clamp(ft / 0.6, 0, 1) * Math.PI) * 0.15 : 1;
+      var cx = r.x + r.w / 2, cy = r.y + r.h * 0.46, er = Math.min(r.w, r.h) * 0.13;
+      happyFace(c, cx, cy, er, k * pop, ft, reduce ? 0 : Math.sin(ft * 3) * 0.05);
+    }
+  }
+  // A cartoon face: two big eyes that look at his finger and blink, rosy cheeks, a happy open smile.
+  function happyFace(c, cx, cy, er, sc, ft, rot) {
+    var look = lastPtr && now() - lastPtr.at < 8000 ? lastPtr : { x: cx + er * 3, y: cy + er * 2 };
+    var bl = 1;
+    [1.3, 2.9, 3.2, 4.6].forEach(function (b) { var d = Math.abs(ft - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
+    var sep = er * 1.35;
+    c.save();
+    c.translate(cx, cy); c.rotate(rot || 0); c.scale(sc, sc);
+    c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = Math.max(3, er * 0.12);
+    [-1, 1].forEach(function (sgn) {
+      var ex = sgn * sep, ey = -er * 0.4;
+      c.save(); c.translate(ex, ey); c.scale(1, Math.max(0.08, bl));
+      c.beginPath(); c.ellipse(0, 0, er, er * 1.12, 0, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill(); c.stroke();
+      var dx = look.x - (cx + ex), dy = look.y - (cy + ey), d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
+      c.beginPath(); c.arc(dx / d * m, dy / d * m, er * 0.5, 0, TAU); c.fillStyle = OUT; c.fill();
+      c.beginPath(); c.arc(dx / d * m - er * 0.17, dy / d * m - er * 0.2, er * 0.17, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill();
+      c.restore();
+      c.beginPath(); c.ellipse(sgn * sep * 1.75, er * 0.85, er * 0.42, er * 0.26, 0, 0, TAU); c.fillStyle = "rgba(255,143,184,0.85)"; c.fill();
+    });
+    c.beginPath(); c.moveTo(-er * 1.05, er * 0.75); c.quadraticCurveTo(0, er * 2.05, er * 1.05, er * 0.75); c.closePath();
+    c.fillStyle = "#E8505B"; c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-er * 0.55, er * 1.28); c.quadraticCurveTo(0, er * 1.05, er * 0.55, er * 1.28); c.quadraticCurveTo(0, er * 1.75, -er * 0.55, er * 1.28);
+    c.fillStyle = "#FF8FB8"; c.fill();
+    c.restore();
+  }
+  // Picture chooser and shelf: the cards hop like popcorn or rise in a wave (taking turns).
+  function cardSurprise() {
+    var el = st.mode === "shelf" && !view ? shelfEl : (st.mode === "choose" ? chooser : null);
+    var t = now();
+    if (!el) {
+      // a puzzle on the shelf, opened big: it comes alive again
+      if (view && view.big && t - viewT0 > view.pic.dur * 1000) { viewT0 = t; dirty = true; }
+      else domSparkles(stage.clientWidth / 2, stage.clientHeight / 2, 5);
+      return;
+    }
+    if (t < cardBusyUntil) { domSparkles(stage.clientWidth / 2, stage.clientHeight * 0.4, 5); return; }
+    var kind = cardMoment++ % 2 ? "jg-wave" : "jg-hop";
+    var cards = Array.prototype.slice.call(el.children);
+    cards.forEach(function (b, i) {
+      b.classList.remove("jg-hop", "jg-wave");
+      b.style.setProperty("--d", (kind === "jg-hop" ? (i * 37 % 9) * 70 : i * 90) + "ms");
+      b.style.setProperty("--hx", (i % 2 ? -14 : 14) + "px");
+      b.style.setProperty("--hr", (i % 2 ? -6 : 6) + "deg");
+      void b.offsetWidth;
+      b.classList.add(kind);
+    });
+    cardBusyUntil = t + (kind === "jg-hop" ? 1500 + 8 * 70 : 1200 + cards.length * 90);
+    setTimeout(function () { cards.forEach(function (b) { b.classList.remove("jg-hop", "jg-wave"); }); }, cardBusyUntil - t + 50);
+  }
+  var SPARK = '<svg viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0 -11 L3 -3 L11 0 L3 3 L0 11 L-3 3 L-11 0 L-3 -3 Z" fill="#FFD23F" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg>';
+  function domSparkles(x, y, n) {
+    for (var i = 0; i < n; i++) {
+      var sEl = document.createElement("div");
+      sEl.className = "jg-spark"; sEl.innerHTML = SPARK;
+      var a = i / n * TAU + 0.4, d = 50 + (i % 2) * 24;
+      sEl.style.left = x + "px"; sEl.style.top = y + "px";
+      sEl.style.setProperty("--sx", Math.cos(a) * d + "px"); sEl.style.setProperty("--sy", Math.sin(a) * d + "px");
+      stage.appendChild(sEl);
+      setTimeout((function (q) { return function () { if (q.parentNode) q.parentNode.removeChild(q); }; })(sEl), 1000);
+    }
+  }
+
   // ---------- Animation loop ----------
   var lastT = now();
   function frame() {
@@ -1738,6 +1922,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (fx.length) busy = true;
     }
     if (st.mode === "shelf" && view && t - viewT0 < view.pic.dur * 1000 + 100) busy = true;
+    if (mo && t - mo.t0 > mo.dur) { mo = null; dirty = true; }
+    if (mo) busy = true;
     if (busy || dirty) { draw(t); dirty = false; }
     if (endingDone && !busy) { var f = endingDone; endingDone = null; f(); }
   }
@@ -1919,11 +2105,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (st.cur) { snd("tap"); startPuzzle(st.cur.pic, st.cur.n, newSeed(), null, false, true); }
       return;
     }
-    if (t === surpriseBtn) {
-      var ids = PICS.map(function (p) { return p.id; }).filter(function (id) { return !st.cur || id !== st.cur.pic; });
-      snd("tap");
-      startPuzzle(ids[Math.floor(Math.random() * ids.length)], st.size, newSeed(), null, false, true);
-    }
+    if (t === surpriseBtn) { surprise(); return; }
   });
 
   // ======================================================================
@@ -2065,7 +2247,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function onEnding(done) {
     // hands let go; pieces settle where they are, moving pieces finish their move, the board dims
     Object.keys(held).forEach(function (id) { var h = held[id]; delete held[id]; h.p.heldBy = null; h.p.tsc = inBoard(h.p.x, h.p.y) ? 1 : (LY ? LY.t : 1); });
-    peekT0 = -1e9; aliveT0 = -1e9;
+    peekT0 = -1e9; aliveT0 = -1e9; mo = null;
+    if (puz) puz.pieces.forEach(function (p) { p.hop = null; });
     if (view) viewT0 = -1e9;
     endingDone = function () { setTimeout(done, 1800); };
     dirty = true;
@@ -2139,7 +2322,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     },
     ghost: function () { return ghost.show(); },
     pics: PICS.map(function (p) { return p.id; }),
-    alive: function () { aliveT0 = now(); dirty = true; }
+    alive: function () { aliveT0 = now(); dirty = true; },
+    surprise: function (k) { if (k) { mo = null; if (momentOk(k)) startMoment(k); return momentOk(k); } surprise(); },
+    moment: function () { return mo ? mo.kind : ""; },
+    snapshot: function () { return { placed: st.cur && st.cur.placed.join(""), loose: order.map(function (p) { return p.i + ":" + Math.round(p.x) + "," + Math.round(p.y); }).join(" "), pic: st.cur && st.cur.pic, seed: st.cur && st.cur.seed }; }
   };
 })();
 </script>

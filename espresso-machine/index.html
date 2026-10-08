@@ -594,8 +594,8 @@ body.ending .steps, body.big .steps { visibility: hidden; }
       var r = srand(11);
       for (var i = 0; i < 40; i++) {
         var bx = x + (r() - 0.5) * 2.2, by = lv + 0.05 + r() * 2.6;
-        var sw = G ? Math.sin(spin + i) * 0.08 : 0;
-        bean(bx + sw, by + (G ? (now() * 0.6 + i * 0.13) % 0.3 : 0), 0.15, r() * 3 + spin * 0.3, i % 3 ? "#6A3D20" : "#54301A");
+        var sw = G ? Math.sin(spin + i) * 0.08 : 0, jg = beanJiggle(i);
+        bean(bx + sw + jg[0], by + (G ? (now() * 0.6 + i * 0.13) % 0.3 : 0) + jg[1], 0.15, r() * 3 + spin * 0.3 + jg[2], i % 3 ? "#6A3D20" : "#54301A");
       }
       ctx.restore();
     }
@@ -1345,8 +1345,6 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     if (goBtn.disabled === can) goBtn.disabled = !can;
     var gl = S.step === "shot" && SH.ph === "soak" && !SH.letGo ? "Let go!" : "Do it!";
     if (goBtn.textContent !== gl) goBtn.textContent = gl;
-    var sOff = ["serve", "knock", "rinse"].indexOf(S.step) >= 0 || (S.step === "pour" && jug.pouring);
-    $("surpriseBtn").setAttribute("aria-disabled", sOff ? "true" : "false");
   }
   function canGo() {
     if (drag || Toybox.timer.locked()) return false;
@@ -1444,11 +1442,11 @@ body.ending .steps, body.big .steps { visibility: hidden; }
   function resetShot() { SH.ph = "ready"; SH.disp = 0; SH.tOn = false; SH.w = 0; SH.held = false; SH.letGo = false; SH.soakT = 0; SH.pourT = 0; SH.autoLet = 0; }
 
   // Pick a drink: the cup pops onto the drip tray (or, for a steamer, onto its spot on the cart).
-  function startDrink(d, surprise) {
+  function startDrink(d) {
     if (busy() || S.step !== "choose") return;
     S.drink = d;
     var C = CUPS[d];
-    S.art = surprise ? C.fun[Math.floor(Math.random() * C.fun.length)] : C.art;
+    S.art = C.art;
     S.syr = []; S.cocoa = false;
     resetShot(); WG.g = 0; WG.done = false; WG.right = false; scale.ok = 0;
     cup = newCup(d);
@@ -1459,7 +1457,6 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     var list = seq(), i = 0;
     while (i < list.length && skipStep(list[i])) i++;
     enter(list[i]);
-    if (surprise) sayNow("A surprise on top!", 3);
   }
   function newCup(d) { return { k: d, x: XGR, y: DRIP, rot: 0, water: 0, esp: 0, milk: 0, foam: 0, art: S.art, artP: 0, cocoaP: 0, syrup: false, pop: 1, up: false }; }
 
@@ -1949,14 +1946,154 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     enter("choose", true);
     save();
   }
+  // ---------- Surprise: a fun moment, right now (his steps are never skipped or redone) ----------
+  // They take turns, never the same twice in a row (starting at a random one): (1) latte art: the next fun
+  // pattern for the drink he is making (tulip, rosetta, bear; cocoa heart, cocoa star), drawn again in the
+  // cup if it is already poured; (2) the machine gets a happy face (two of its dials become eyes that look at
+  // his finger) and gives a little steam toot; (3) coffee beans dance: in the hopper when it has beans,
+  // otherwise a few hop out of the bag, dance and hop back in. The camera looks over and then comes back.
+  // While a close-up is showing only the latte art can happen. Pressed again during a moment: a few sparkles.
+  var MOMENTS = ["art", "face", "beans"];
+  var momentAt = Math.floor(Math.random() * MOMENTS.length), lastMoment = "", SM = null, camHold = null, lastPtr = null, artTurn = 0;
+  var BAG_REG = [-0.6, 6.4, -7.4, 0.9];
+  function regHas(reg, box) { return reg[0] <= box[0] && reg[1] >= box[1] && reg[2] <= box[2] && reg[3] >= box[3]; }
+  function momentOk(k) {
+    if (k === "art") return !!(S.drink && cup && cupHere() && !(S.step === "pour" && jug.pouring) && CUPS[S.drink].fun.length);
+    return !cuTarget() && CU.a < 0.05;
+  }
   function surprise() {
-    if (S.step === "choose") { startDrink(DRINKS[Math.floor(Math.random() * 3)], true); return; }
-    if (["serve", "knock", "rinse"].indexOf(S.step) >= 0 || (S.step === "pour" && jug.pouring)) return;
-    var C = CUPS[S.drink], list = C.fun.filter(function (a) { return a !== S.art; });
-    S.art = list[Math.floor(Math.random() * list.length)];
-    if (cup) cup.art = S.art;
-    save();
-    Toybox.toast(S.drink === "steamer" ? "A surprise in the milk!" : "Surprise art on top!");
+    if (Toybox.timer.locked()) return;
+    if (SM) { var w = SM.kind === "face" ? { x: (ML + MR) / 2, y: -7.2 } : (SM.where === "hopper" ? { x: XG, y: -8.2 } : { x: XB, y: -5.4 }); sparkle(w.x, w.y, 6); click(); return; }
+    for (var i = 0; i < MOMENTS.length; i++) {
+      var k = MOMENTS[(momentAt + i) % MOMENTS.length];
+      if (k === lastMoment || !momentOk(k)) continue;
+      momentAt += i + 1; lastMoment = k;
+      startMoment(k);
+      return;
+    }
+    // nothing fits right now (a close-up is showing): a little sparkle
+    var c = cup ? { x: cup.x, y: cup.y - 1.4 } : { x: cam.cx, y: cam.cy };
+    sparkle(c.x, c.y, 8); click();
+  }
+  function startMoment(k) {
+    var t = now();
+    if (k === "art") {
+      var fun = CUPS[S.drink].fun, i = fun.indexOf(S.art);
+      var next = i >= 0 ? fun[(i + 1) % fun.length] : fun[artTurn++ % fun.length];
+      if (next === S.art) next = fun[(fun.indexOf(next) + 1) % fun.length];
+      S.art = next; cup.art = next; save();
+      var C = CUPS[cup.k];
+      if (cup.artP >= 1) {
+        // already poured: the new picture forms in the cup
+        cup.artP = 0;
+        spawn(function () { tw(reduce ? 300 : 1500, function (e) { if (cup) cup.artP = e; }); call(function () { if (cup) { cup.artP = 1; sparkle(cup.x, cup.y - C.h - 0.2, 12); chime(); } }); });
+      }
+      sparkle(cup.x, cup.y - C.h - 0.2, 10);
+      Toybox.toast(S.drink === "steamer" ? "A surprise in the milk!" : "Surprise art on top!");
+      return;
+    }
+    if (k === "face") {
+      SM = { kind: "face", t0: t, dur: 6.2, toots: [1.1, 3.6] };
+      camHold = regHas(region(), [ML, MR, MT, -4]) ? null : REG.mach;
+      return;
+    }
+    var where = hopper.beans > 0.01 ? "hopper" : "bag";
+    SM = { kind: "beans", t0: t, dur: 6.6, where: where, n: where === "hopper" ? 3 : 5, hops: {} };
+    camHold = where === "hopper" ? (regHas(region(), [XG - 1.3, XG + 1.3, -9.6, -5]) ? null : REG.grind) : (regHas(region(), [XB - 1.6, XB + 1.6, -6.4, BASE]) ? null : BAG_REG);
+  }
+  // Called from update(): steam toots and the hop sounds.
+  function stepMoment() {
+    if (!SM) return;
+    var ts = now() - SM.t0;
+    if (SM.kind === "face") {
+      SM.toots.forEach(function (tt, j) {
+        if (ts >= tt && !SM["toot" + j]) {
+          SM["toot" + j] = true;
+          for (var q = 0; q < 6; q++) puff(WTIP.x + rand(-0.1, 0.1), WTIP.y + 0.1, rand(0.22, 0.38));
+          for (q = 0; q < 4; q++) puff(rand(ML + 1, MR - 1), MT - 0.1, rand(0.25, 0.4));
+          blip(523, 0.18, 0.04, "triangle", 587); setTimeout(function () { blip(659, 0.28, 0.04, "triangle", 698); }, 170);
+        }
+      });
+    }
+  }
+  function sm01(v) { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); }
+  // Hopper beans jiggle in a little dance (offset x, y, turn).
+  function beanJiggle(i) {
+    if (!SM || SM.kind !== "beans" || SM.where !== "hopper") return [0, 0, 0];
+    var ts = now() - SM.t0, k = Math.min(sm01(ts / 0.5), 1 - sm01((ts - (SM.dur - 0.6)) / 0.6)), a = reduce ? 0.3 : 1;
+    return [Math.sin(ts * 7 + i * 1.7) * 0.06 * k * a, -Math.abs(Math.sin(ts * 6 + i * 0.8)) * 0.14 * k * a, Math.sin(ts * 5 + i) * 0.6 * k * a];
+  }
+  // Dancing beans with little faces.
+  function drawDanceBeans() {
+    if (!SM || SM.kind !== "beans") return;
+    var ts = now() - SM.t0, D = SM.dur, n = SM.n, hop = SM.where === "hopper";
+    var lv = -6.15 - 2.3 * hopper.beans;
+    for (var i = 0; i < n; i++) {
+      var hx = hop ? XG + (i - 1) * 0.5 : XB + (i - 2) * 0.32, hy = hop ? lv - 0.05 : -3.9;
+      var dx = hop ? XG + (i - 1) * 0.62 : XB + (i - 2) * 0.76, dy = hop ? lv - 0.75 : -5.2;
+      var t0 = 0.25 + i * 0.16, t1 = D - 1.5 + i * 0.12, x, y, rot = 0, r = hop ? 0.24 : 0.34, al = 1;
+      if (ts < t0) continue;
+      if (ts < t0 + 0.6) {
+        var u = sm01((ts - t0) / 0.6);
+        x = hx + (dx - hx) * u; y = hy + (dy - hy) * u - Math.sin(u * Math.PI) * 0.7; rot = u * TAU * (i % 2 ? 1 : -1);
+        if (ts - t0 < 0.05 && !SM.hops["o" + i]) { SM.hops["o" + i] = 1; blip(560 + i * 70, 0.08, 0.03, "sine", 760 + i * 70); }
+      } else if (ts < t1) {
+        var td = ts - t0 - 0.6, amp = reduce ? 0.12 : 0.42;
+        x = dx + Math.sin(td * 2.6 + i) * 0.08;
+        y = dy - Math.abs(Math.sin(td * 4.2 + i * 0.9)) * amp;
+        rot = Math.sin(td * 4.2 + i * 0.9) * 0.45;
+        var spin = sm01((ts - (D * 0.5)) / 0.7);
+        if (!reduce) rot += spin * TAU;
+      } else if (ts < t1 + 0.6) {
+        var v = sm01((ts - t1) / 0.6);
+        x = dx + (hx - dx) * v; y = dy + (hy - dy) * v - Math.sin(v * Math.PI) * 0.6; rot = v * TAU * (i % 2 ? -1 : 1);
+        al = 1 - Math.max(0, (v - 0.75) / 0.25);
+        if (!SM.hops["b" + i]) { SM.hops["b" + i] = 1; blip(760 - i * 60, 0.08, 0.03, "sine", 520 - i * 40); }
+      } else continue;
+      ctx.save(); ctx.globalAlpha = al;
+      // a soft shadow under the dancers
+      if (!hop) { P(); ctx.ellipse(x, -3.85, r * 0.8, r * 0.18, 0, 0, TAU); ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fill(); }
+      ctx.translate(x, y); ctx.rotate(rot);
+      P(); ell(0, 0, r, r * 0.7); ctx.fillStyle = i % 2 ? "#6A3D20" : "#7A4626"; ctx.fill(); ctx.lineWidth = LW * 0.8; ctx.strokeStyle = INK; ctx.stroke();
+      P(); ctx.moveTo(-r * 0.75, r * 0.18); ctx.quadraticCurveTo(0, r * 0.4, r * 0.75, r * 0.18); ctx.lineWidth = r * 0.14; ctx.strokeStyle = "#2B160A"; ctx.stroke();
+      [-1, 1].forEach(function (sg) {
+        P(); ctx.arc(sg * r * 0.33, -r * 0.2, r * 0.2, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = LW * 0.5; ctx.strokeStyle = INK; ctx.stroke();
+        P(); ctx.arc(sg * r * 0.33 + r * 0.04, -r * 0.18, r * 0.1, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+      });
+      P(); ctx.arc(0, -r * 0.02, r * 0.16, 0.25, Math.PI - 0.25); ctx.lineWidth = r * 0.07; ctx.strokeStyle = "#FFD9B0"; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // The machine's happy face: two dials pop out as big eyes over the button panel, rosy cheeks and a smile.
+  function drawMachineFace() {
+    if (!SM || SM.kind !== "face") return;
+    var ts = now() - SM.t0, D = SM.dur;
+    var k = Math.min(sm01(ts / 0.45), 1 - sm01((ts - (D - 0.5)) / 0.5));
+    if (k <= 0) return;
+    var pop = ts < 0.6 ? 1 + Math.sin(clamp(ts / 0.6, 0, 1) * Math.PI) * 0.15 : 1;
+    var cx = (BTN.one + BTN.two) / 2, cy = -6.75, er = 0.6, sep = 0.78;
+    var look = lastPtr && now() - lastPtr.at < 8 ? lastPtr : { x: cx - 2, y: 0 };
+    var bl = 1;
+    [1.6, 3.0, 3.3, 4.8].forEach(function (b) { var d = Math.abs(ts - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(reduce ? 0 : Math.sin(ts * 3) * 0.04); ctx.scale(k * pop, k * pop);
+    [-1, 1].forEach(function (sg) {
+      var ex = sg * sep;
+      // the dial's steel bezel, then the eye inside it
+      P(); ctx.arc(ex, 0, er + 0.12, 0, TAU); ctx.fillStyle = steel(ex - er, ex + er); ctx.fill(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.save(); ctx.translate(ex, 0); ctx.scale(1, Math.max(0.08, bl));
+      P(); ctx.arc(0, 0, er, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = LW; ctx.stroke();
+      var dx = look.x - (cx + ex), dy = look.y - cy, d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
+      P(); ctx.arc(dx / d * m, dy / d * m, er * 0.5, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+      P(); ctx.arc(dx / d * m - er * 0.17, dy / d * m - er * 0.2, er * 0.17, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+      ctx.restore();
+      P(); ctx.ellipse(sg * (sep + er + 0.35), er * 0.55, 0.3, 0.18, 0, 0, TAU); ctx.fillStyle = "rgba(255,143,184,0.9)"; ctx.fill();
+    });
+    // the smile, just under the panel
+    P(); ctx.moveTo(-0.55, 0.62); ctx.quadraticCurveTo(0, 1.35, 0.55, 0.62); ctx.closePath();
+    ctx.fillStyle = "#E8505B"; ctx.fill(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.lineJoin = "round"; ctx.stroke();
+    P(); ctx.moveTo(-0.28, 0.92); ctx.quadraticCurveTo(0, 0.8, 0.28, 0.92); ctx.quadraticCurveTo(0, 1.15, -0.28, 0.92); ctx.fillStyle = "#FF8FB8"; ctx.fill();
+    ctx.restore();
   }
 
   // ---------- Where everything is at the start of a step (reload, New) ----------
@@ -2423,7 +2560,9 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     updPanel();
   });
   $("newBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) { newDrink(); click(); } });
-  $("surpriseBtn").addEventListener("click", function () { if (!Toybox.timer.locked() && $("surpriseBtn").getAttribute("aria-disabled") !== "true") surprise(); });
+  $("surpriseBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) surprise(); });
+  cv.addEventListener("pointermove", function (e) { var w = toWorld(e.clientX, e.clientY); lastPtr = { x: w.x, y: w.y, at: now() }; });
+  cv.addEventListener("pointerdown", function (e) { var w = toWorld(e.clientX, e.clientY); lastPtr = { x: w.x, y: w.y, at: now() }; }, true);
 
   // ---------- Every frame ----------
   var last = now();
@@ -2495,6 +2634,7 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     if (Math.abs(target - scale.shown) < 0.05) scale.shown = target; else scale.shown += (target - scale.shown) * Math.min(1, dt * 6);
     if (WG.right && S.step === "weigh") scale.shown = 18;
     if (scale.ok > 0) scale.ok = Math.min(1, scale.ok + dt * 3);
+    stepMoment();
     updParts(dt);
     // Close-ups fade in and out.
     var ct = cuTarget();
@@ -2508,7 +2648,8 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     setLoop("steam", !!STM || M.purging);
     setLoop("pour", !!jug.pouring || !!carton.pouring);
     // Camera.
-    var tg = fit(region()), kk = 1 - Math.exp(-dt * (reduce ? 20 : 2.8));
+    if (SM && now() - SM.t0 > SM.dur) { SM = null; camHold = null; }
+    var tg = fit(camHold || region()), kk = 1 - Math.exp(-dt * (reduce ? 20 : 2.8));
     cam.cx += (tg.cx - cam.cx) * kk; cam.cy += (tg.cy - cam.cy) * kk; cam.s += (tg.s - cam.s) * kk; cam.sy += (tg.sy - cam.sy) * kk;
     if (drag && drag.h.frame) drag.h.frame(drag, toWorld(drag.px, drag.py));
     if (drag && drag.h === HD.scoop && !drag.done) { var w = toWorld(drag.px, drag.py); scoop.x = w.x; scoop.y = w.y - 0.2; }
@@ -2530,10 +2671,12 @@ body.ending .steps, body.big .steps { visibility: hidden; }
     drawRoom();
     drawBag();
     drawGrinder();
+    drawDanceBeans();
     drawStandBack();
     if (pf.at === "stand" && !pf.up) drawPF();
     drawStandFront();
     drawMachine();
+    drawMachineFace();
     syrups.forEach(function (b) { if (!b.up) drawSyrup(b); });
     if (!carton.up) drawCarton();
     drawKnock();
@@ -2595,6 +2738,7 @@ body.ending .steps, body.big .steps { visibility: hidden; }
   var ending = false;
   function onEnding(done) {
     ending = true;
+    SM = null; camHold = null;
     drag = null;
     MAIN.length = 0; FX.length = 0;
     G = null; WH.auto = false; CU.gUntil = 0; CU.fUntil = 0;
@@ -2807,6 +2951,8 @@ body.ending .steps, body.big .steps { visibility: hidden; }
         return null;
       },
       ghost: function () { return ghost.show(); },
+      poured: function () { if (cup) { cup.milk = 1; cup.artP = 1; cup.foam = CUPS[cup.k].foam; } },
+      moment: function (k) { if (k) { SM = null; camHold = null; if (!momentOk(k)) return "no"; startMoment(k); } return SM ? SM.kind + ":" + (SM.where || "") : ""; },
       cam: function () { return { cx: cam.cx, cy: cam.cy, s: cam.s }; },
       q: function () { return { main: MAIN.length, fx: FX.length, head: MAIN[0] ? String(MAIN[0]).slice(0, 160) : "" }; }
     };
