@@ -256,8 +256,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- State ----------
   var KEY = "mathgrid-state-v1";
   // Opening Math Grid from the Toybox home screen (Toybox.fresh) starts the first-visit grid (Times,
-  // 0 to 10, nothing picked, no pattern or blocks); a reload keeps it. The grown-up settings
-  // (spoken numbers, shake) live on the Toybox home screen and are kept.
+  // 0 to 10, nothing picked, no pattern or blocks); a reload keeps it. The grown-up setting
+  // (spoken numbers) lives on the Toybox home screen and is kept.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
   }
@@ -368,7 +368,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // ---------- Blocks ----------
   // Each block lives in a grid cell. x/y are in cell units (grid index, top-left corner).
-  var blocks = [], build = null, tumbleUntil = 0, settling = false;
+  var blocks = [], build = null, settling = false;
   function blockPlan(r, c) {
     var list = [], i, j, k;
     if (mode === "times") {
@@ -446,26 +446,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
   }
 
-  // Shake: blocks tumble, then snap back.
-  function shake(power) {
-    if (ending) return;
-    power = power || 1;
-    if (!blocks.length) { jiggle = 1; blip(); return; }
-    build = null;
-    var minX = -OX / cs, minY = -OY / cs;
-    blocks.forEach(function (b) {
-      if (b.st === "drop") { b.y = b.hy; }
-      if (b.st !== "tumble") { b.vx = 0; b.vy = 0; }
-      b.st = "tumble";
-      b.vx += rand(-14, 14) * power; b.vy += rand(-24, -6) * power;
-      b.vr += rand(-10, 10);
-      b.x = Math.max(b.x, minX);
-      b.y = Math.max(b.y, minY);
-    });
-    tumbleUntil = now + 2300;
-    whoosh();
-  }
-
   function stepBlocks(dt) {
     var minX = -OX / cs, minY = -OY / cs, maxX = (CW - OX) / cs - 1, maxY = (CH - OY) / cs - 1;
     blocks.forEach(function (b) {
@@ -475,14 +455,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var y0 = -OY / cs - 1.2;
         b.x = b.hx; b.y = y0 + (b.hy - y0) * easeOutBounce(t);
         if (t >= 1) { b.st = "home"; b.y = b.hy; }
-      } else if (b.st === "tumble") {
-        b.vy += 60 * dt;
-        b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vr * dt;
-        if (b.x < minX) { b.x = minX; b.vx = Math.abs(b.vx) * 0.6; }
-        if (b.x > maxX) { b.x = maxX; b.vx = -Math.abs(b.vx) * 0.6; }
-        if (b.y < minY) { b.y = minY; b.vy = Math.abs(b.vy) * 0.5; }
-        if (b.y > maxY) { b.y = maxY; b.vy = -Math.abs(b.vy) * 0.45; b.vx *= 0.85; b.vr *= 0.8; if (Math.abs(b.vy) < 1.5) b.vy = 0; }
-        if (now > tumbleUntil) { b.st = "return"; b.fx = b.x; b.fy = b.y; b.t0 = now + rand(0, 300); b.fr = b.rot; }
       } else if (b.st === "return") {
         t = clamp((now - b.t0) / 870, 0, 1);
         var e = easeOutBack(t);
@@ -964,26 +936,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     } catch (e) { /* ignore */ }
   }
 
-  // ---------- Shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tiltListening = false, lastShake = 0, lastAcc = null;
-  function onMotion(e) {
-    var a = e.accelerationIncludingGravity;
-    if (!a || a.x == null) return;
-    var mag = 0;
-    if (lastAcc) mag = Math.abs(a.x - lastAcc.x) + Math.abs(a.y - lastAcc.y) + Math.abs(a.z - lastAcc.z);
-    lastAcc = { x: a.x, y: a.y, z: a.z };
-    var t = performance.now();
-    if (mag > 22 && t - lastShake > 350) { lastShake = t; shake(clamp(mag / 30, 0.8, 1.8)); }
-  }
-  function listenTilt(on) {
-    if (on && !tiltListening) { window.addEventListener("devicemotion", onMotion); tiltListening = true; }
-    if (!on && tiltListening) { window.removeEventListener("devicemotion", onMotion); tiltListening = false; lastAcc = null; }
-  }
-  // The shared module calls back once motion may be used (on iOS it asks on his first tap).
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; listenTilt(true); });
-  Toybox.settings.onChange(function (id, on) { if (id === "tilt") listenTilt(!!on && tiltAllowed); });
-
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   var ending = false, endingStartedAt = 0, endingDone = null;
   // The fuel gauge above the grid shows the time left.
@@ -1076,9 +1028,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__math = {
-    state: function () { return { mode: mode, N: N, sel: sel, pat: pat, multN: multN, sameV: sameV, blocks: blocks.length, building: !!build, eq: eqEl.textContent, ending: ending, tumbling: blocks.some(function (b) { return b.st === "tumble"; }) }; },
-    cell: function (r, c) { var rc = cv.getBoundingClientRect(), p = cellCenter(r + 1, c + 1); return { x: rc.left + p.x, y: rc.top + p.y }; },
-    shake: function () { shake(1.2); }
+    state: function () { return { mode: mode, N: N, sel: sel, pat: pat, multN: multN, sameV: sameV, blocks: blocks.length, building: !!build, eq: eqEl.textContent, ending: ending }; },
+    cell: function (r, c) { var rc = cv.getBoundingClientRect(), p = cellCenter(r + 1, c + 1); return { x: rc.left + p.x, y: rc.top + p.y }; }
   };
 })();
 </script>

@@ -688,7 +688,7 @@ body.resting .flight { z-index: 55; }
     return BUILD_BY[id].opts.some(function (o) { return o[0] === v; });
   }
   // Opening Rocket Builder from the Toybox home screen (Toybox.fresh) starts the first-visit rocket,
-  // parts tab and trip again; a reload keeps the current build. (Tilt is a grown-up setting, kept.)
+  // parts tab and trip again; a reload keeps the current build.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
   }
@@ -1426,31 +1426,6 @@ body.resting .flight { z-index: 55; }
     if (document.hidden) stopRumble();
   });
 
-  // ---------- Tilt (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tiltOn = false, tiltX = 0, tiltListening = false;
-  function onOrient(e) {
-    if (e.gamma == null) return;
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var v;
-    if (ang === 90) v = e.beta;
-    else if (ang === -90 || ang === 270) v = -e.beta;
-    else if (ang === 180) v = -e.gamma;
-    else v = e.gamma;
-    tiltX = clamp((v || 0) / 25, -1, 1);
-  }
-  function listenTilt(on) {
-    if (on && !tiltListening) { window.addEventListener("deviceorientation", onOrient); tiltListening = true; }
-    if (!on && tiltListening) { window.removeEventListener("deviceorientation", onOrient); tiltListening = false; tiltX = 0; }
-  }
-  // The shared module calls back once motion may be used (on iOS it asks on his first tap).
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; tiltOn = true; listenTilt(true); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    tiltOn = !!on && tiltAllowed;
-    listenTilt(tiltOn);
-  });
-
   // ---------- Flight ----------
   // A trip: countdown, a calm climb through the clouds into space, then the trip the child picked
   // (land on the Moon or Mars, or tour the planets), then home with a parachute onto the pad.
@@ -1685,7 +1660,7 @@ body.resting .flight { z-index: 55; }
     }
   }
 
-  // Rocket point (units) -> screen position (px), honoring the current tilt.
+  // Rocket point (units) -> screen position (px), honoring the rocket's current lean.
   // On the ground and climbing, the rocket's origin is the bottom of the pad stack; out in space
   // it turns around its middle (fl.cy is that middle on screen).
   function rocketOrigin() {
@@ -2000,11 +1975,11 @@ body.resting .flight { z-index: 55; }
     var prevCam = f.cam;
     var ph = f.phase;
 
-    // Steering: tilt and dragging fingers nudge the rocket sideways while it flies.
+    // Steering: dragging fingers nudge the rocket sideways while it flies.
     var free = ph === "ascent" || ph === "coast" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward" || (ph === "descent" && f.t < DESCENT_T * 0.65);
     var drag = 0, nd = 0;
     Object.keys(f.ptrs).forEach(function (k) { drag += f.ptrs[k] - W / 2; nd++; });
-    var target = free ? (tiltOn ? tiltX * W * 0.3 : 0) + (nd ? clamp(drag / nd, -W * 0.3, W * 0.3) * 0.5 : 0) : 0;
+    var target = free ? (nd ? clamp(drag / nd, -W * 0.3, W * 0.3) * 0.5 : 0) : 0;
     if (ph === "tour") target += f.dodge;
     target = clamp(target, -W * 0.32, W * 0.32);
     f.vx += ((target - f.x) * 5 - f.vx * 3.2) * dt;

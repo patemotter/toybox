@@ -1573,53 +1573,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   var stirSpeed = 0;
 
-  // ---------- Tilt (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tilt = { on: false, gx: 0, gy: 0, bx: null, by: null, lastGx: 0, lastGy: 0 };
-  function onOrient(e) {
-    if (e.beta == null || e.gamma == null) return;
-    var b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var sx = Math.sin(g), sy = Math.sin(b), gx, gy;
-    if (ang === 90) { gx = sy; gy = -sx; }
-    else if (ang === -90 || ang === 270) { gx = -sy; gy = sx; }
-    else if (ang === 180) { gx = -sx; gy = -sy; }
-    else { gx = sx; gy = sy; }
-    if (tilt.bx === null) { tilt.bx = gx; tilt.by = gy; }
-    tilt.gx = gx; tilt.gy = gy;
-  }
-  function setTilt(on) {
-    if (on === tilt.on) return;
-    tilt.on = on;
-    if (on) window.addEventListener("deviceorientation", onOrient);
-    else { window.removeEventListener("deviceorientation", onOrient); tilt.bx = null; tilt.by = null; }
-  }
-  // The shared module calls back once motion may be used (on iOS it asks on his first tap).
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; setTilt(true); });
-  Toybox.settings.onChange(function (id, on) { if (id === "tilt") setTilt(!!on && tiltAllowed); });
-  function applyTilt(dt) {
-    if (!tilt.on || tilt.bx === null) return;
-    // The baseline slowly follows how the device is held, so only changes slosh the paint.
-    var k = Math.min(1, dt * 0.35);
-    tilt.bx += (tilt.gx - tilt.bx) * k; tilt.by += (tilt.gy - tilt.by) * k;
-    var dx = tilt.gx - tilt.bx, dy = tilt.gy - tilt.by;
-    var ddx = tilt.gx - tilt.lastGx, ddy = tilt.gy - tilt.lastGy;
-    tilt.lastGx = tilt.gx; tilt.lastGy = tilt.gy;
-    if (locked() || !totalParts()) return;
-    pool.vx += dx * L.Rin * 0.12 * dt * 60 * 0.15;
-    pool.vy += dy * L.Rin * 0.12 * dt * 60 * 0.15;
-    var jolt = Math.sqrt(ddx * ddx + ddy * ddy);
-    if (jolt > 0.004) {
-      // Paint runs downhill and swirls back along the walls.
-      var x = dx > 0 ? 0.5 : -0.5, y = dy > 0 ? 0.5 : -0.5;
-      addVelocity(x * Math.min(1, Math.abs(dx) * 4), y * Math.min(1, Math.abs(dy) * 4), ddx * 60, ddy * 60, 0.45, Math.min(0.6, jolt * 20));
-      var cross = tilt.lastCx !== undefined ? (ddx * tilt.lastCy - ddy * tilt.lastCx) : 0;
-      if (Math.abs(cross) > 1e-5) addVortex(0, 0, Math.max(-3, Math.min(3, cross * 4000)), 0.6);
-      stirSpeed += Math.min(4, jolt * 120);
-    }
-    tilt.lastCx = ddx; tilt.lastCy = ddy;
-  }
-
   // ---------- Wash bowl ----------
   var washing = null;
   function startWash() {
@@ -1810,7 +1763,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       pool.angle = 0;
     }
     stirSpeed = 0;
-    applyTilt(dt);
     pool.vx += -pool.offX * 40 * dt; pool.vy += -pool.offY * 40 * dt;
     pool.vx *= Math.exp(-3 * dt); pool.vy *= Math.exp(-3 * dt);
     pool.offX += pool.vx * dt; pool.offY += pool.vy * dt;

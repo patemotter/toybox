@@ -965,7 +965,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Physics ----------
-  var tiltX = 0, tiltY = 0, tiltOn = false;
   var ending = false, resting = false, endingDone = null, endingT = 0;
   var learned = { press: false, flick: false };
   function update(dt) {
@@ -1039,7 +1038,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var gx = t.grab.tx - t.x, gy = t.grab.ty - t.y;
         t.vx = clamp(gx * 12, -3, 3); t.vy = clamp(gy * 12, -3, 3);
       } else {
-        ax = -1.25 * t.x + tiltX * 0.9; ay = -1.25 * t.y + tiltY * 0.9;
+        ax = -1.25 * t.x; ay = -1.25 * t.y;
         var fr;
         if (t.state === "spin") {
           ax += Math.cos(t.psi) * t.phi * 1.1; ay += Math.sin(t.psi) * t.phi * 1.1;
@@ -1542,44 +1541,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return null;
   });
 
-  // ---------- Tilt and shake (a grown-up setting on the home screen) ----------
-  function screenAngle() {
-    if (screen.orientation && typeof screen.orientation.angle === "number") return screen.orientation.angle;
-    return typeof window.orientation === "number" ? window.orientation : 0;
-  }
-  function onOrient(e) {
-    if (e.beta == null || e.gamma == null) return;
-    var be = e.beta * Math.PI / 180, ga = e.gamma * Math.PI / 180;
-    var dx = Math.cos(be) * Math.sin(ga), dy = Math.sin(be);
-    var th = screenAngle() * Math.PI / 180;
-    var sx = dx * Math.cos(th) + dy * Math.sin(th), sy = -dx * Math.sin(th) + dy * Math.cos(th);
-    // Held about flat is "level"; a device held upright in the hand leans the bowl only a little.
-    sy -= 0.6;
-    tiltX = clamp(sx, -0.7, 0.7); tiltY = clamp(sy, -0.7, 0.7);
-    if (Math.abs(tiltX) < 0.08) tiltX = 0;
-    if (Math.abs(tiltY) < 0.08) tiltY = 0;
-  }
-  var lastShake = 0;
-  function onMotion(e) {
-    var a = e.acceleration, m = 0;
-    if (a && a.x != null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-    var now = performance.now();
-    if (m > 15 && now - lastShake > 800) { lastShake = now; shake(); }
-  }
-  function shake() {
-    if (Toybox.timer.locked()) return;
-    tops.forEach(function (t) {
-      if (!solid(t)) return;
-      t.vx += rnd(-0.6, 0.6); t.vy += rnd(-0.6, 0.6);
-      if (t.state === "spin") t.bump = Math.min(0.35, t.bump + 0.15); else t.hop = 1;
-    });
-    sClack(0.6);
-  }
-  function setTilt(on) {
-    if (on && !tiltOn) { window.addEventListener("deviceorientation", onOrient); window.addEventListener("devicemotion", onMotion); tiltOn = true; }
-    if (!on && tiltOn) { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("devicemotion", onMotion); tiltOn = false; tiltX = tiltY = 0; }
-  }
-
   // ---------- Timer ending, goodbye and rest ----------
   function onEnding(done) {
     ending = true; endingT = 0; endingDone = done;
@@ -1700,13 +1661,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   });
   stage.appendChild($("tb-toast"));
   stage.appendChild($("tb-farewell"));
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; setTilt(true); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    if (!on) setTilt(false);
-    else if (tiltAllowed) setTilt(true);
-  });
   requestAnimationFrame(function (t) { lastT = t; frame(t); });
 })();
 </script>

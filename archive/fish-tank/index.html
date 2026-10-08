@@ -2006,43 +2006,6 @@ body.empty .tb-coach, body.shopping .tb-coach { display: none; }
     } catch (e) { /* ignore */ }
   }
 
-  // ---------- Tilt and shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tiltOn = false, tiltX = 0, upSign = 1, upAvg = 0, lastShake = 0;
-  function screenAngle() {
-    var a = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    return a * Math.PI / 180;
-  }
-  function onMotion(e) {
-    var g = e.accelerationIncludingGravity;
-    if (!g || g.x === null) return;
-    var th = screenAngle(), c = Math.cos(th), s = Math.sin(th);
-    var sx = g.x * c - g.y * s, sy = g.x * s + g.y * c;
-    // Platforms disagree on the sign; learn it from which way is usually "up" while held.
-    upAvg = upAvg * 0.98 + sy * 0.02;
-    if (Math.abs(upAvg) > 3) upSign = upAvg > 0 ? 1 : -1;
-    tiltX = clamp(-upSign * sx / 9.8, -1, 1);
-    var a = e.acceleration, mag = 0;
-    if (a && a.x !== null) mag = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-    var now = performance.now();
-    if (mag > 15 && now - lastShake > 700 && !locked()) { lastShake = now; shakeBurst(); }
-  }
-  function shakeBurst() {
-    for (var i = 0; i < 44; i++) addBubble(rand(0, W), sandY - rand(0, 40) * U, rand(4, 15) * U, rand(-40, 40) * U);
-    activeFish().forEach(function (f) { f.vx += rand(-1, 1) * 300 * U / KINDS[f.kind].mass; f.vy += rand(-1, 1) * 200 * U / KINDS[f.kind].mass; });
-    waveBoost = 3;
-    for (i = 0; i < 4; i++) blip(rand(350, 800), i * 0.06, 0.8);
-  }
-  function startTilt() {
-    if (tiltOn) return;
-    tiltOn = true;
-    window.addEventListener("devicemotion", onMotion);
-  }
-  function stopTilt() {
-    if (!tiltOn) return;
-    tiltOn = false; tiltX = 0;
-    window.removeEventListener("devicemotion", onMotion);
-  }
-
   // ---------- Tank controls: counter, add panel, night ----------
   function updateCount(bump) {
     var n = activeFish().length;
@@ -2196,9 +2159,8 @@ body.empty .tb-coach, body.shopping .tb-coach { display: none; }
       }
     }
     T += dt;
-    // Water sloshes on a spring toward the tilt.
-    var target = tiltOn ? tiltX : 0;
-    sloshV += ((target - slosh) * 14 - sloshV * 3.2) * dt;
+    // Water sloshes on a spring back to level.
+    sloshV += ((0 - slosh) * 14 - sloshV * 3.2) * dt;
     slosh = clamp(slosh + sloshV * dt, -1.2, 1.2);
     var wantDim = Toybox.timer.phase() === "ending" ? 0.5 : 0;
     dim += (wantDim - dim) * Math.min(1, dt * (wantDim > dim ? 0.45 : 2));
@@ -2331,15 +2293,6 @@ body.empty .tb-coach, body.shopping .tb-coach { display: none; }
     onWake: onWake,
     onBig: function (on) { if (on) closeShop(); },
     onSound: function (on) { if (on) { blip(520, 0.02, 1); blip(780, 0.12, 1); } }
-  });
-  // Tilt and shake is a grown-up setting on the home screen: the shared module calls back once
-  // motion may be used (on iOS it asks on his first tap). Turning it off stops the sloshing.
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; startTilt(); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    if (!on) stopTilt();
-    else if (tiltAllowed) startTilt();
   });
   var resizeT = null;
   window.addEventListener("resize", function () { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); });

@@ -76,14 +76,6 @@ button { -webkit-touch-callout: none; }
 /* Big mode: the panel goes away, the header stays (Big turns into Back). */
 body.big .tb-panel { display: none; }
 .stage { background: #121633; }
-.stage.shake { animation: shake 0.45s ease; }
-@keyframes shake {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(-8px, 3px); }
-  40% { transform: translate(7px, -4px); }
-  60% { transform: translate(-5px, 2px); }
-  80% { transform: translate(3px, -1px); }
-}
 #board {
   position: absolute;
   inset: 0;
@@ -355,7 +347,6 @@ img.rest-art {
 
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: none; }
-  .stage.shake { animation: none; }
   #rain[aria-pressed="true"], #shootBtn[aria-pressed="true"] { animation: none; }
   #total { transition: none; }
 }
@@ -565,7 +556,7 @@ img.rest-art {
   var pegs = [], pegGrid = [], pgw = 1, pgh = 1, pcs = 40, pegRows = 1;
   var segs = [], bumpers = [], bodies = [], bins = [], balls = [], parts = [];
   var activePegs = [];
-  var gravX = 0, gravY = 1, tiltX = 0, tiltY = 1;
+  var gravX = 0, gravY = 1;    // gravity points straight down the screen
   var rainbowI = 0;
   var built = false;
   // The cannon hangs from the top middle of the board. LS is its size; the barrel turns to the aim angle.
@@ -2333,72 +2324,7 @@ img.rest-art {
     whoosh();
   }
 
-  // ---------- Tilt and shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tiltOn = false;
-  function screenAngle() {
-    if (typeof window.orientation === "number") return window.orientation;
-    if (screen.orientation && typeof screen.orientation.angle === "number") return screen.orientation.angle;
-    return 0;
-  }
-  function onOrient(e) {
-    if (e.beta == null || e.gamma == null) return;
-    var be = e.beta * Math.PI / 180, ga = e.gamma * Math.PI / 180;
-    // Gravity in device coordinates (x right, y down the screen in portrait).
-    var dx = Math.cos(be) * Math.sin(ga), dy = Math.sin(be);
-    var th = screenAngle() * Math.PI / 180;
-    var sx = dx * Math.cos(th) + dy * Math.sin(th);
-    var sy = -dx * Math.sin(th) + dy * Math.cos(th);
-    var len = Math.sqrt(sx * sx + sy * sy);
-    if (len < 0.12) { tiltX = 0; tiltY = 1; return; }
-    sx /= len; sy /= len;
-    // Balls always fall downward a bit, so they still reach the bins.
-    sy = Math.max(sy, 0.45);
-    len = Math.sqrt(sx * sx + sy * sy);
-    tiltX = sx / len; tiltY = sy / len;
-  }
-  var lastShake = 0;
-  function onMotion(e) {
-    var a = e.acceleration, m = 0;
-    if (a && a.x != null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-    else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x != null) {
-      var g = e.accelerationIncludingGravity;
-      m = Math.abs(Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) - 9.8);
-    }
-    var now = performance.now();
-    if (m > 15 && now - lastShake > 700) { lastShake = now; shakeBalls(); }
-  }
-  function shakeBalls() {
-    if (playLocked()) return;
-    wakeAll();
-    balls.forEach(function (b) {
-      b.vy -= rand(380, 720) * su;
-      b.vx += rand(-220, 220) * su;
-    });
-    // Light up lots of pegs.
-    pegs.forEach(function (p) {
-      if (Math.random() < 0.5) {
-        p.lit = 1; p.tint = 1; p.c = (Math.random() * NC) | 0;
-        if (!p.active) { p.active = true; activePegs.push(p); }
-      }
-    });
-    if (!reduce) {
-      stage.classList.remove("shake");
-      void stage.offsetWidth;
-      stage.classList.add("shake");
-    }
-    chime();
-  }
-  function setTilt(on) {
-    tiltOn = on;
-    if (on) {
-      window.addEventListener("deviceorientation", onOrient);
-      window.addEventListener("devicemotion", onMotion);
-    } else {
-      window.removeEventListener("deviceorientation", onOrient);
-      window.removeEventListener("devicemotion", onMotion);
-      tiltX = 0; tiltY = 1;
-    }
-  }
+
 
   // ---------- Controls ----------
   var BOARD_ICONS = {
@@ -2502,11 +2428,6 @@ img.rest-art {
     var dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     if (built) {
-      // Steering gravity (tilt) eases toward the device's direction.
-      var ease = Math.min(1, dt * 6);
-      gravX += ((tiltOn ? tiltX : 0) - gravX) * ease;
-      gravY += ((tiltOn ? tiltY : 1) - gravY) * ease;
-      if (tiltOn && Math.abs(gravX) > 0.05) for (var w = 0; w < balls.length; w++) if (balls[w].sleep && Math.abs(gravX) > 0.25) balls[w].sleep = false;
 
       if (!playLocked()) {
         var fk;
@@ -2655,15 +2576,6 @@ img.rest-art {
   });
   $("stage").appendChild($("tb-toast"));
   $("stage").appendChild($("tb-farewell"));
-  // Tilt and shake is a grown-up setting on the home screen: the shared module calls back once
-  // motion may be used (on iOS it asks on his first tap). Turning it off stops the steering.
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; setTilt(true); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    if (!on) { if (tiltOn) setTilt(false); }
-    else if (tiltAllowed && !tiltOn) setTilt(true);
-  });
   requestAnimationFrame(frame);
 
   // Test hook for automated checks, only with ?debug in the address.
@@ -2681,8 +2593,7 @@ img.rest-art {
         var r = canvas.getBoundingClientRect();
         return { x: r.left + OX + LX, y: r.top + LY, a: launcher.a, W: W, H: H, binTop: binTop, left: r.left + OX, top: r.top };
       },
-      ballsInfo: function () { return balls.map(function (b) { return [Math.round(b.x), Math.round(b.y), b.bin]; }); },
-      shake: shakeBalls
+      ballsInfo: function () { return balls.map(function (b) { return [Math.round(b.x), Math.round(b.y), b.bin]; }); }
     };
   }
 })();

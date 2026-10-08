@@ -209,12 +209,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   var KEY = "waterworks-v3";
   // Opening Water Table from the Toybox home screen (Toybox.fresh) starts the first-visit layout with
-  // its valves as they come; a reload keeps them. (Tilt is a grown-up setting on the Toybox home screen.)
+  // its valves as they come; a reload keeps them.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
   }
   var now = 0;
-  var tiltTarget = 0, tiltLevel = 0;
   var flowOn = true;
 
   // ---------- Canvas and view ----------
@@ -804,7 +803,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         if (d.pause <= 0) {
           d.v = (d.r / U - 3.6) * 34 * U;
           d.y += d.v * dt;
-          d.x += tiltLevel * 20 * dt;
           d.r -= dt * 0.35 * U;
           if (Math.random() < dt * 0.6) d.pause = rand(0.1, 0.8);
         }
@@ -884,7 +882,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var a = floaters(), i, j;
     for (i = 0; i < a.length; i++) {
       var t = a[i];
-      t.vx += (Math.sin(now * 0.31 + t.ph * 3) * 5 + tiltLevel * 70) * U * dt;
+      t.vx += Math.sin(now * 0.31 + t.ph * 3) * 5 * U * dt;
       t.vy += Math.cos(now * 0.23 + t.ph) * 2 * U * dt;
       for (j = i + 1; j < a.length; j++) {
         var o = a[j], dx = o.x - t.x, dy = (o.y - t.y) * 2.2, d = Math.hypot(dx, dy), md = 52 * U;
@@ -1625,16 +1623,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     W.trays.forEach(function (f) { if (f.st.act) q += f.st.q * 0.5; });
     return Math.min(1.5, q * 0.5);
   }
-  function slosh() {
-    if (!flowOn || !g) return;
-    for (var i = 0; i < 6; i++) {
-      var y = rand(g.yb + 8, g.yf - 4), x = rand(edgeL(y) + 20, edgeR(y) - 20);
-      ring(x, y, 1.2); splashAt(x, y, 5);
-    }
-    floaters().forEach(function (t) { t.vx += rand(-80, 80) * U; t.vy += rand(-20, 20) * U; });
-    for (var k = 0; k < 8; k++) addDrop(rand(g.px0, g.px1), rand(g.rimBack - 120 * U, g.rimBack - 10), rand(3, 6) * U);
-    plip();
-  }
   function bigSplash() {
     for (var i = 0; i < 9; i++) {
       var y = lerp(g.yb, g.yf, 0.5), x = lerp(edgeL(y) + 20, edgeR(y) - 20, (i + 0.5) / 9);
@@ -2101,33 +2089,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   });
   window.addEventListener("pagehide", save);
 
-  // ---------- Tilt and shake (optional: the grown-up's Tilt and shake setting on the home screen) ----------
-  var tiltListening = false, lastMag = null;
-  function onOrient(e) {
-    if (e.gamma == null) return;
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var v;
-    if (ang === 90) v = e.beta; else if (ang === -90 || ang === 270) v = -e.beta; else if (ang === 180) v = -e.gamma; else v = e.gamma;
-    tiltTarget = clamp((v || 0) / 30, -1, 1);
-  }
-  function onMotion(e) {
-    var a = e.accelerationIncludingGravity;
-    if (!a || a.x == null) return;
-    var m = Math.hypot(a.x, a.y, a.z || 0);
-    if (lastMag !== null && Math.abs(m - lastMag) > 7) {
-      slosh();
-    }
-    lastMag = m;
-  }
-  function listenTilt(on) {
-    if (on && !tiltListening) { window.addEventListener("deviceorientation", onOrient); window.addEventListener("devicemotion", onMotion); tiltListening = true; }
-    if (!on && tiltListening) { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("devicemotion", onMotion); tiltListening = false; tiltTarget = 0; }
-  }
-  // The shared module calls back once motion may be used (on iOS it asks on his first tap).
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; listenTilt(true); });
-  Toybox.settings.onChange(function (id, on) { if (id === "tilt") listenTilt(!!on && tiltAllowed); });
-
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   // A little pie clock at the top: the blue wedge is the time left.
   function drawTimer(info) {
@@ -2194,7 +2155,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     requestAnimationFrame(frame);
     var dt = last ? Math.min(0.05, (t - last) / 1000) : 0.016;
     last = t; now = t / 1000;
-    tiltLevel += (tiltTarget - tiltLevel) * Math.min(1, dt * 4);
     var phase = Toybox.timer.phase();
     flowOn = !Toybox.timer.locked();
     if (phase !== "resting") update(dt);

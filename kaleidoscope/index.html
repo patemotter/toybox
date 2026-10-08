@@ -393,7 +393,7 @@ body.ending #view { cursor: default; }
 
   // ---------- Settings ----------
   // Opening Kaleidoscope from the Toybox home screen (Toybox.fresh) starts a new picture with the
-  // first-visit tools; a reload keeps both. (Shake to clear is a grown-up setting on the Toybox home screen.)
+  // first-visit tools; a reload keeps both.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); localStorage.removeItem(AKEY); } catch (e) { /* ignore */ }
   }
@@ -1034,48 +1034,6 @@ body.ending #view { cursor: default; }
       bell(196 * Math.pow(2, st / 12), i * 0.07, 0.05, 0.6);
     });
   }
-
-  // ---------- Shake to clear (when a grown-up turned on Tilt and shake on the home screen) ----------
-  var shakeOn = false, shakeHits = [], lastShakeClear = 0;
-  function onMotion(e) {
-    if (!playing()) return;
-    var a = e.acceleration, mag;
-    if (a && a.x !== null && a.x !== undefined) {
-      mag = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-    } else {
-      a = e.accelerationIncludingGravity;
-      if (!a || a.x === null) return;
-      mag = Math.abs(Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) - 9.81);
-    }
-    var now = performance.now();
-    if (mag > 14) {
-      shakeHits = shakeHits.filter(function (t) { return now - t < 900; });
-      if (!shakeHits.length || now - shakeHits[shakeHits.length - 1] > 120) shakeHits.push(now);
-      if (shakeHits.length >= 3 && now - lastShakeClear > 1800 && hasInk) {
-        lastShakeClear = now;
-        shakeHits = [];
-        clearPicture();
-      }
-    }
-  }
-  function startShake() {
-    if (shakeOn) return;
-    window.addEventListener("devicemotion", onMotion);
-    shakeOn = true;
-  }
-  function stopShake() {
-    if (!shakeOn) return;
-    window.removeEventListener("devicemotion", onMotion);
-    shakeOn = false;
-  }
-  // The shared module calls back once motion may be used (on iOS it asks on his first tap).
-  var shakeAllowed = false;
-  Toybox.tiltReady(function () { shakeAllowed = true; startShake(); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    if (!on) stopShake();
-    else if (shakeAllowed) startShake();
-  });
 
   // ---------- Buttons ----------
   document.addEventListener("click", function (e) {

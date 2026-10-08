@@ -32,7 +32,7 @@
  *        restLine2: "They will be right here next time.",
  *        restArt: function () { return '<svg class="rest-art" viewBox="..">..</svg>'; },
  *        soundNote: "Soft bubble sounds. Hold for 2 seconds.",
- *        sections: [el],                          // extra sheet sections (e.g. tilt); moved in, unhidden
+ *        sections: [el],                          // extra sheet sections (e.g. offline); moved in, unhidden
  *        big: { button: el } or { into: el },     // wire an existing .bigtoggle, or create one in `into`
  *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1", big: "fishtank-big-v1" },
  *        orientation: "landscape",                // optional: "landscape" or "portrait". Held the other way,
@@ -67,7 +67,6 @@
  *                              "mathgrid-voice", "printer-name", ...).
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
- *      Toybox.tiltReady(cb)    kept for old callers; never calls back (tilt and shake were removed).
  *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card, mostly a star
  *                              ("You did it!"); type "love" asks for "Dad loves you!". Automatic gentle ones
  *                              ("You are doing great!") also show every few minutes of play.
@@ -145,8 +144,6 @@
   var setListeners = [];
   function readJSON(k) { try { var o = JSON.parse(get(k) || "null"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } }
   function settingGet(id) {
-    // Tilt and shake was removed (the dad: none of the uses were good). Always off, even if an older version saved it on.
-    if (id === "tilt") return false;
     var d = SET_BY[id], all = readJSON(SETKEY);
     return Object.prototype.hasOwnProperty.call(all, id) ? all[id] : (d ? d.def : undefined);
   }
@@ -165,9 +162,6 @@
     check();
     setListeners.push(function (sid) { if (sid === id) check(); });
   }
-  // Tilt and shake is removed across the Toybox (the dad's decision): apps still call Toybox.tiltReady(cb), but it
-  // never calls back, so no app listens to motion or asks for motion access.
-  function tiltReady(cb) { /* never: motion is off everywhere */ }
 
   // ---------- Timer state ----------
   // Phases: idle -> running -> ending (app winds down, optional goodbye button) -> resting (locked) -> idle.
@@ -1272,7 +1266,6 @@
       action: settingAction,
       list: function () { return SETTINGS.slice(); }
     },
-    tiltReady: tiltReady,
     timer: {
       phase: function () { return timer.phase; },
       locked: function () { return timer.phase === "ending" || timer.phase === "resting"; },
@@ -1294,6 +1287,8 @@
     closeSheet: closeSheet,
     sheetOpen: sheetOpen,
     turning: turning,
+    // Temporary no-op for pages not yet cleaned of tilt code (Workshop, Sand Table); delete once they are committed.
+    tiltReady: function () {},
     offFirst: offFirst,
     beforeLeave: beforeLeave
   };

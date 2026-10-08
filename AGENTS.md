@@ -251,9 +251,8 @@ Keep only:
   pegboard holes now live on the scrolling content element).
 - **Keep the Grown-ups list current:** "Good to know" in `SETTINGS` (common/toybox.js) lists every app that asks for
   something special (turning the device, sound). Update it when an app starts or stops (the dad wants it very clear).
-- **No tilt or shake anywhere** (the dad removed it: none of the uses were good). There is no Tilt and shake setting;
-  `Toybox.tiltReady(cb)` never calls back and `settings.get("tilt")` is always false, so old tilt code in apps is
-  inert. Don't add motion features; remove leftover tilt code when touching an app.
+- **No tilt or shake anywhere** (the dad removed it: none of the uses were good). The setting, `Toybox.tiltReady` and every
+  app's motion code are gone; don't add motion features.
 - Respect `prefers-reduced-motion` and safe-area insets. Light/dark theming via `:root` tokens.
 - Test hooks only behind `?debug` (read-only `navigator.webdriver` hooks exist in a few Workshop pages).
 
