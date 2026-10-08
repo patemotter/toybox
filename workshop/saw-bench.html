@@ -3644,6 +3644,7 @@ body.project .newbtn { display: none; }
     flat: function (pt) { var p = this.unview(pt.x, pt.y); return { id: pt.id, x: p[0], y: p[1] }; },
     down: function (pt) {
       var vb = this.vbtn;
+      this.offCounted = false;
       // a finger or mouse that went away without an "up" must not lock the board
       if (this.pid != null && !downIds[this.pid]) { this.pid = null; this.held = false; this.pid2 = null; }
       if (this.pid2 != null && !downIds[this.pid2]) this.pid2 = null;
@@ -3723,7 +3724,7 @@ body.project .newbtn { display: none; }
         // free: slide the board anywhere, but stop it at the blade if the motor is not up to speed
         this.tx += dx; this.ty += dy;
         var nb = this.tBoard(this.Pb[0], this.Pb[1]);
-        if (this.inWood(nb[0], nb[1]) && this.speed < 0.5) { this.tx -= dx; this.ty -= dy; if (!this.on) this.needOn = 2.5; }
+        if (this.inWood(nb[0], nb[1]) && this.speed < 0.5) { this.tx -= dx; this.ty -= dy; if (!this.on) offPush(this); }
         else if (this.inWood(nb[0], nb[1])) this.cutAt(nb[0], nb[1], B[0], B[1]);
         return;
       }
@@ -3750,7 +3751,7 @@ body.project .newbtn { display: none; }
         var mx = q[0], my = q[1];
         if (feedIn) {
           var lim = this.speed < 0.5 ? 0 : v * dt;
-          if (!this.on && this.held) this.needOn = 2.5;
+          if (!this.on && this.held) offPush(this);
           var len = Math.sqrt(mx * mx + my * my);
           if (len > lim) { mx *= lim / len; my *= lim / len; }
         }
@@ -4211,6 +4212,7 @@ body.project .newbtn { display: none; }
     },
     down: function (pt) {
       var k;
+      this.offCounted = false;
       for (k in this.ptrs) if (!downIds[k]) delete this.ptrs[k];
       k = this.hitTest(pt);
       if (k === "on" || k === "off") { this.setOn(k === "on"); return; }
@@ -4392,7 +4394,7 @@ body.project .newbtn { display: none; }
           cutting = step > free + 0.01;
           if (this.speed < 0.15) {
             this.target = this.y0 + free + 1;
-            if (this.held && gap > free + 8) this.needOn = 2.5;
+            if (this.held && gap > free + 8 && !this.on) offPush(this);   // on but still spinning up: just wait
           }
         }
         this.y0 = Math.max(this.y0 + step, this.startY() - 80);
@@ -4829,7 +4831,7 @@ body.project .newbtn { display: none; }
       }
       else {
         // ghost hand: push the blocks (or the gauge handle) up the table, past the blade
-        var gs = cross ? (this.hitGauge ? [this.hitGauge[0], this.hitGauge[1] - this.hitGauge[2] * 0.3] : null) : c.P(xb - 51, by0 + 60, th + 92), ge = cross ? c.P(0, this.y0 - 260, 110) : c.P(xb - 51, by0 - 220, th + 92);
+        var gs = cross ? (this.hitGauge ? [this.hitGauge[0], this.hitGauge[1] - this.hitGauge[2] * 0.3] : null) : c.P(xb - 51, by0 + 60, th + 92), ge = cross ? c.P(0, this.y0 - 260, 110) : c.P(xb - 51, by0 + 60 + Math.max(60, this.endY() - this.y0), th + 92);   // up the table (+y), toward the blade
         var gk = 1 / this.pushGain();   // the geared-up push: the hand shows the short finger move
         if (gs && this.state !== "return") gAim = { pts: [gs, cross ? [gs[0] + (ge[0] - gs[0]) * 0.3 * gk, gs[1] - Math.abs(ge[1] - gs[1]) * gk] : [gs[0] + (ge[0] - gs[0]) * gk, gs[1] + (ge[1] - gs[1]) * gk]] };
         strokeHint(g, W * 0.6, 30, cross ? "Push the gauge" : "Push the blocks", 3, this.cutting, cross ? "Drag the yellow handle up" : "Drag the board up past the blade");
@@ -5643,7 +5645,6 @@ body.project .newbtn { display: none; }
   var COL = 4, floorH = [], pileColor = "#F7E0AE";
   var particles = [], falling = [], dropsN = 0;   // dropsN: pieces cut off (read by the ?debug hook)
   var scene = null, curSaw = null;
-  var tiltX = 0, tiltY = 0;
   var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
 
   function clearDust() {
@@ -5696,21 +5697,6 @@ body.project .newbtn { display: none; }
       else particles.push({ x: x + rnd(-8, 8), y: y + rnd(-8, 8), z: 2, vx: rnd(-90, 90), vy: rnd(-90, 90), vz: rnd(80, 220), life: 3, size: rnd(1.6, 3.4), col: mat.dust, type: "dust", mode: "plan" });
     }
   }
-  // Shake: the piles on the floor puff up into the air.
-  function shakePuff() {
-    if (!scene) return;
-    var i, n = 0;
-    if (scene.floorY) {
-      for (i = 0; i < floorH.length && n < 90; i++) {
-        if (floorH[i] > 3 && Math.random() < 0.5) {
-          var take = floorH[i] * 0.35; floorH[i] -= take; n++;
-          particles.push({ x: i * COL + 2, y: scene.floorY - floorH[i], vx: rnd(-160, 160), vy: rnd(-420, -150), life: 3, size: rnd(1.8, 3.6), col: pileColor, type: "dust", mode: "floor" });
-        }
-      }
-    } else {
-      for (i = 0; i < 40; i++) puff(rnd(0, W), rnd(0, H));
-    }
-  }
   function settle(col) {
     var k;
     for (k = 0; k < 8; k++) {
@@ -5725,7 +5711,7 @@ body.project .newbtn { display: none; }
       p = particles[i];
       p.life -= dt;
       if (p.mode === "floor") {
-        p.vy += 980 * dt; p.vx += tiltX * 700 * dt;
+        p.vy += 980 * dt;
         p.vx *= p.type === "dust" ? Math.pow(0.5, dt) : 1;
         p.x += p.vx * dt; p.y += p.vy * dt;
         if (floorY) {
@@ -5749,7 +5735,6 @@ body.project .newbtn { display: none; }
         }
       } else {
         p.vz -= 900 * dt; p.z += p.vz * dt;
-        p.vx += tiltX * 300 * dt; p.vy += tiltY * 300 * dt;
         p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.z <= 0) {
           if (p.type !== "spark") {
@@ -5891,7 +5876,7 @@ body.project .newbtn { display: none; }
       f = falling[i];
       f.t += dt;
       if (f.phase === "fall") {
-        f.vy += 1500 * dt; f.vx += tiltX * 300 * dt;
+        f.vy += 1500 * dt;
         f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
         if (f.t > 0.75 || f.y + Math.min(f.spr.h, f.spr.w) * 0.4 > floorY) {
           f.phase = "fly"; f.t = 0; f.x0 = f.x; f.y0 = f.y; f.r0 = f.rot;
@@ -6236,6 +6221,18 @@ body.project .newbtn { display: none; }
     var r = canvas.getBoundingClientRect();
     return { pts: gAim.pts.map(function (q) { return [r.left + q[0], r.top + q[1]]; }), tap: gAim.tap, dur: gAim.dur };
   });
+  // Two-step machines (table, band and scroll saws): pushing while the switch is off says "Press the green
+  // button!" and flashes the switch; the second push (a new press) switches it on for him.
+  function offPush(sc) {
+    sc.needOn = 2.5;
+    if (sc.offCounted || endingNow()) return;
+    sc.offCounted = true;
+    sc.offTries = (sc.offTries || 0) + 1;
+    if (sc.offTries >= 2) {
+      sc.offTries = 0; sc.needOn = 0;
+      if (sc.setOn) sc.setOn(true); else { sc.on = true; Sound.click(); }
+    }
+  }
   var SCENES = { end: End, curve: Curve, band: Machine, scroll: Machine, table: Table, miter: Miter, miterSide: MiterSide };
   function selectSaw(id, fromLoad) {
     if (PJ && PJ.saws && PJ.saws.indexOf(id) === -1) id = PJ.sawId;
@@ -6628,40 +6625,6 @@ body.project .newbtn { display: none; }
   }
 
 
-  // ---------- Tilt (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
-  // Sawdust slides with the tilt, a shake puffs it up.
-  var tiltOn = false, tiltAllowed = false;
-  var lastShake = 0;
-  function onOrient(e) {
-    if (e.gamma == null) return;
-    var ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
-    var gx = clamp(e.gamma / 45, -1, 1), gy = clamp((e.beta - 35) / 45, -1, 1);
-    if (ang === 90) { var t = gx; gx = gy; gy = -t; } else if (ang === -90 || ang === 270) { var t2 = gx; gx = -gy; gy = t2; } else if (ang === 180) { gx = -gx; gy = -gy; }
-    tiltX = Math.abs(gx) < 0.08 ? 0 : gx;
-    tiltY = Math.abs(gy) < 0.08 ? 0 : gy;
-  }
-  function onMotion(e) {
-    var a = e.acceleration || e.accelerationIncludingGravity;
-    if (!a) return;
-    var m = Math.sqrt((a.x || 0) * (a.x || 0) + (a.y || 0) * (a.y || 0) + (a.z || 0) * (a.z || 0));
-    var limit = e.acceleration ? 16 : 26;
-    var now = performance.now();
-    if (m > limit && now - lastShake > 700 && !endingNow()) { lastShake = now; shakePuff(); }
-  }
-  function listenTilt() {
-    if (tiltOn || !tiltAllowed || !Toybox.settings.get("tilt")) return;
-    tiltOn = true;
-    window.addEventListener("deviceorientation", onOrient);
-    window.addEventListener("devicemotion", onMotion);
-  }
-  function stopTilt() {
-    if (!tiltOn) return;
-    tiltOn = false; tiltX = 0; tiltY = 0;
-    window.removeEventListener("deviceorientation", onOrient);
-    window.removeEventListener("devicemotion", onMotion);
-  }
-  Toybox.tiltReady(function () { tiltAllowed = true; listenTilt(); });
-  Toybox.settings.onChange(function (id, v) { if (id === "tilt") { if (v) listenTilt(); else stopTilt(); } });
   document.addEventListener("visibilitychange", function () { if (document.hidden) Sound.quiet(); });
 
   // ===================================================================

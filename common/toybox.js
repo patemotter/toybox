@@ -1287,8 +1287,6 @@
     closeSheet: closeSheet,
     sheetOpen: sheetOpen,
     turning: turning,
-    // Temporary no-op for pages not yet cleaned of tilt code (Workshop, Sand Table); delete once they are committed.
-    tiltReady: function () {},
     offFirst: offFirst,
     beforeLeave: beforeLeave
   };

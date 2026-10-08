@@ -1541,7 +1541,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
         R(26, 88, 16, 24, BLK, 4) + R(29, 91, 10, 18, "#C6F07A", 5, 2) + Cf(34, 100, 3.5, "#F7FFE8"));
     },
     st0: { ang: 0 },
-    pl: { k: "angle", key: "ang", c: [100, 100], min: -14, max: 14, sym: 1, tilt: 1, open: 5, hi: "Tilt the level (or turn on tilt and tip the screen)",
+    pl: { k: "angle", key: "ang", c: [100, 100], min: -14, max: 14, sym: 1, open: 5, hi: "Tilt the level",
       rd: function (v) { return Math.abs(v) < 0.6 ? "Level!" : Math.round(Math.abs(v)) + "° tilt"; } } });
   add("measure", { id: "calipers", st: "measuring", n: "Digital calipers",
     d: "Calipers measure tiny things very exactly, like a bolt or a drill bit. Slide the jaw and read the screen.",
@@ -2204,41 +2204,6 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
     parts = keep;
   }
 
-  // ---------- Tilt (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
-  var tiltAllowed = false, tiltLive = false, tiltListening = false, tiltAng = 0, tiltLevel = 0, tiltLastWake = 0;
-  function screenAngle() {
-    var a = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    return ((a % 360) + 360) % 360;
-  }
-  function onOrient(e) {
-    if (e.beta == null || e.gamma == null) return;
-    tiltLive = true;
-    var b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
-    // Gravity in device coordinates (x right, y up), then turned to match the screen.
-    var gx = Math.sin(g) * Math.cos(b), gy = -Math.sin(b), sx, sy, a = screenAngle();
-    if (a === 90) { sx = -gy; sy = gx; } else if (a === 270) { sx = gy; sy = -gx; } else if (a === 180) { sx = -gx; sy = -gy; } else { sx = gx; sy = gy; }
-    var m = Math.sqrt(sx * sx + sy * sy), target = -Math.atan2(sx, -sy) * 180 / Math.PI;
-    target = clamp(target * clamp((m - 0.12) / 0.3, 0, 1), -40, 40);
-    tiltAng += (target - tiltAng) * 0.3;
-    tiltLevel += (clamp(Math.asin(clamp(sx, -1, 1)) * 180 / Math.PI, -14, 14) - tiltLevel) * 0.3;
-    var t = now();
-    if (t - tiltLastWake > 120) { tiltLastWake = t; swings.forEach(function (s) { wake(s, 0); }); }
-  }
-  function listenTilt() {
-    if (tiltListening || !tiltAllowed || !Toybox.settings.get("tilt") || typeof window.DeviceOrientationEvent === "undefined") return;
-    window.addEventListener("deviceorientation", onOrient);
-    tiltListening = true;
-  }
-  function stopTilt() {
-    if (!tiltListening) return;
-    window.removeEventListener("deviceorientation", onOrient);
-    tiltListening = false; tiltLive = false; tiltAng = 0; tiltLevel = 0;
-    swings.forEach(function (s) { wake(s, 0); });
-  }
-  function tiltUsable() { return tiltListening && tiltLive; }
-  Toybox.tiltReady(function () { tiltAllowed = true; listenTilt(); });
-  Toybox.settings.onChange(function (id, v) { if (id === "tilt") { if (v) listenTilt(); else stopTilt(); } });
-
   // ---------- Swinging tools on the wall ----------
   var awake = [];
   function wake(s, imp) {
@@ -2250,7 +2215,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
     var ending = Toybox.timer.phase() === "ending", keep = [], i, s, target, acc;
     for (i = 0; i < awake.length; i++) {
       s = awake[i];
-      target = tiltUsable() && !ending ? tiltAng * s.k : 0;
+      target = 0;
       acc = -38 * (s.a - target) - (ending ? 7 : 2.4) * s.v;
       s.v += acc * dt; s.a += s.v * dt;
       s.a = clamp(s.a, -55, 55);
@@ -2725,11 +2690,12 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
     if (h.k === "drag") {
       k = (t % 1.6) / 1.2; if (k > 1) k = 1;
       var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      x = h.x + h.dx * e; y = h.y + h.dy * e;
-      s += '<path d="M' + n2(h.x) + " " + n2(h.y) + " L" + n2(h.x + h.dx) + " " + n2(h.y + h.dy) + '" stroke="#2D5BD7" stroke-width="5" stroke-dasharray="2 10" stroke-linecap="round" fill="none" opacity="' + (0.85 * fade).toFixed(2) + '"/>';
+      var hk = noGear(J) ? 1 : 1 / gearK(), hdx = h.dx * hk, hdy = h.dy * hk;   // the geared drag: a shorter move
+      x = h.x + hdx * e; y = h.y + hdy * e;
+      s += '<path d="M' + n2(h.x) + " " + n2(h.y) + " L" + n2(h.x + hdx) + " " + n2(h.y + hdy) + '" stroke="#2D5BD7" stroke-width="5" stroke-dasharray="2 10" stroke-linecap="round" fill="none" opacity="' + (0.85 * fade).toFixed(2) + '"/>';
       if (h.back) {
         var k2 = (t % 2.4) / 2.4, e2 = 0.5 - 0.5 * Math.cos(k2 * Math.PI * 2);
-        x = h.x + h.dx * e2; y = h.y + h.dy * e2;
+        x = h.x + hdx * e2; y = h.y + hdy * e2;
       }
       s += hand(x, y);
     } else if (h.k === "tap") {
@@ -2756,6 +2722,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
     try { dStage.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var p = sceneXY(e.clientX, e.clientY);
     J.ptrs[e.pointerId] = 1;
+    (J.gAnchor = J.gAnchor || {})[e.pointerId] = p;
     J.holds += 1;
     J.idle = 0;
     J.hintShown = true;
@@ -2778,7 +2745,12 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
       // Use every sample the browser collected since the last event, so fast strokes are not skipped.
       var list = e.getCoalescedEvents ? e.getCoalescedEvents() : null, i;
       if (!list || !list.length) list = [e];
-      for (i = 0; i < list.length; i++) J.K.move(J, sceneXY(list[i].clientX, list[i].clientY), e);
+      var a = J.gAnchor && J.gAnchor[e.pointerId], k = noGear(J) || !a ? 1 : gearK();
+      for (i = 0; i < list.length; i++) {
+        var q = sceneXY(list[i].clientX, list[i].clientY);
+        if (k !== 1) q = [a[0] + (q[0] - a[0]) * k, a[1] + (q[1] - a[1]) * k];
+        J.K.move(J, q, e);
+      }
     }
     J.dirty = true;
   });
@@ -2793,6 +2765,16 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
   dStage.addEventListener("pointerup", endPtr);
   dStage.addEventListener("pointercancel", endPtr);
   dStage.addEventListener("lostpointercapture", endPtr);
+
+  // Gesture gearing: the scene scales up on the iPad (about 2-2.4 screen px per scene unit, phones about 0.8-1),
+  // so a drag would need two or three times the reach there. Finger travel from where it touched down is
+  // multiplied by gearK(), so a full action takes about the same short move as on a phone; the tool moves
+  // further than the finger. Turning (angle) inputs and follow-the-line traces keep the plain mapping (noGear).
+  function gearK() {
+    var m = jWorld.getScreenCTM();
+    return m ? clamp(m.a / 0.8, 1, 2.6) : 1;
+  }
+  function noGear(J) { var n = J.K && J.K.noGear; return n === true || (typeof n === "function" && !!n(J)); }
 
   // Common drag helper: the first finger grabs; the tool keeps its offset from the finger (no jump).
   function grab(J, p, e, pos) {
@@ -3191,6 +3173,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
       L(cx - 22, top - 40, cx + 22, top - 40, STD, 3) + L(cx - 21, top - 30, cx + 21, top - 30, STD, 3) + shine(cx - 14, top - 50, cx - 12, top, 3);
   }
   KINDS.bore = {
+    noGear: true,   // the crank and brace turn by angle (geared in move: each turn counts gearK() times)
     init: function (J, c) {
       var mat = c.mat || "pine", T = c.T || 64;
       var g = { mat: mat, x0: 70, W: 250, yT: c.yT || 200 - (T > 60 ? 20 : 0), T: T, hx: 190, w: c.w, tipH: c.tip == null ? c.w * 0.3 : c.tip, type: c.type || "point" };
@@ -3274,7 +3257,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
       var a = Math.atan2(p[1] - J.cc[1], p[0] - J.cc[0]), da = a - J.lastA;
       if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
       J.lastA = a;
-      da *= 180 / Math.PI;
+      da *= 180 / Math.PI * gearK();   // the big iPad crank: fewer, shorter turns
       J.cr += da;
       if (da > 0) {
         J.tick = (J.tick || 0) + da;
@@ -3979,6 +3962,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
   // ----- Wrenches: turn the matching nut (top view) -----
   var SOCK = [8, 10, 12, 13, 14, 17, 19];
   KINDS.wrench = {
+    noGear: function (J) { return J.step === 1; },   // turning the nut goes by angle (geared in move)
     init: function (J, c) {
       var g = { nx: 160, ny: 156, nr: c.nr || 21, goal: c.goal || 540 };
       J.g = g; J.na = 0; J.ta = c.ta0 || -150; J.p = 0; J.step = c.adj ? 0 : c.pick ? 0 : 1;
@@ -4033,7 +4017,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
       if (Math.hypot(p[0] - g.nx, p[1] - g.ny) < 14) return;
       var a = Math.atan2(p[1] - g.ny, p[0] - g.nx), da = a - J.pa;
       if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
-      J.pa = a; da *= 180 / Math.PI;
+      J.pa = a; da *= 180 / Math.PI * gearK();   // the big iPad nut: a shorter turn
       J.ta += da;
       if (c.ratchet && da < 0) {
         J.back = (J.back || 0) + da;
@@ -4446,6 +4430,7 @@ body.project .tb-panel, body.project .vtabs, body.project #dTry, body.project #d
     }
   };
   KINDS.bevel = {
+    noGear: function (J) { return J.step === 0; },   // the blade swings by angle
     init: function (J) {
       var g = { e1: 180, px1: 150, e2: 180, px2: 320 };
       J.g = g; J.step = 0;

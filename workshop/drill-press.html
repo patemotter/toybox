@@ -1384,15 +1384,6 @@ body.project .prompt { top: 66px; }
       p.age += dt;
       if (p.settled) {
         settled++;
-        if (p.on === "board") {
-          if (tilt.on && Math.abs(tilt.x) > 0.08) {
-            p.u += tilt.x * 90 * dt;
-            if (p.u < 0 || p.u > BW) { p.settled = false; p.x = bxw(p.u); p.z = bzw(p.v); p.y = boardTopW(); p.vy = 0; p.vx = tilt.x * 120; p.vz = 0; }
-          }
-        } else if (tilt.on && Math.abs(tilt.x) > 0.08) {
-          p.x += tilt.x * 90 * dt;
-          if (Math.abs(p.x) > TBL.hw) { p.settled = false; p.vy = 0; p.vx = tilt.x * 120; p.vz = 0; }
-        }
         continue;
       }
       p.vy += 820 * dt;
@@ -1466,14 +1457,6 @@ body.project .prompt { top: 66px; }
       }
       c.restore();
     }
-  }
-  function shakeChips() {
-    parts.forEach(function (p) {
-      if (!p.settled) return;
-      if (p.on === "board") { p.x = bxw(p.u); p.z = bzw(p.v); p.y = boardTopW(); }
-      else p.y = R.tableY;
-      p.settled = false; p.vy = -rnd(150, 420); p.vx = rnd(-120, 120); p.vz = rnd(-60, 60); p.vr = rnd(-10, 10);
-    });
   }
 
   // ---------- Sound (off by default; soft synthesized) ----------
@@ -2143,36 +2126,6 @@ body.project .prompt { top: 66px; }
     blip(350, 0.12, 0.06, "triangle", 700);
     save();
   }
-
-  // ---------- Shake (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
-  var tilt = { on: false, x: 0, lastShake: 0 };
-  var tiltAllowed = false;
-  function onOrient(e) {
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var v = ang === 90 ? e.beta : (ang === -90 || ang === 270 ? -e.beta : (ang === 180 ? -e.gamma : e.gamma));
-    if (typeof v === "number") tilt.x = clamp(v / 40, -1, 1);
-  }
-  function onMotion(e) {
-    var a = e.acceleration || e.accelerationIncludingGravity;
-    if (!a) return;
-    var mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
-    var lim = e.acceleration ? 14 : 24;
-    if (mag > lim && now - tilt.lastShake > 0.6) { tilt.lastShake = now; if (!busy()) shakeChips(); }
-  }
-  function attachTilt() {
-    if (tilt.on || !tiltAllowed || !Toybox.settings.get("tilt")) return;
-    tilt.on = true;
-    window.addEventListener("deviceorientation", onOrient);
-    window.addEventListener("devicemotion", onMotion);
-  }
-  function detachTilt() {
-    if (!tilt.on) return;
-    tilt.on = false; tilt.x = 0;
-    window.removeEventListener("deviceorientation", onOrient);
-    window.removeEventListener("devicemotion", onMotion);
-  }
-  Toybox.tiltReady(function () { tiltAllowed = true; attachTilt(); });
-  Toybox.settings.onChange(function (id, v) { if (id === "tilt") { if (v) attachTilt(); else detachTilt(); } });
 
   // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
   // Ending: the drill press switches off ("Switch off" button, or by itself) and the chuck spins down.

@@ -107,17 +107,6 @@ body {
 }
 .ob[aria-pressed="true"] { background: var(--accent); }
 .ob.zero { background: #8FD694; min-width: 90px; }
-.tiltchip {
-  align-self: center;
-  padding: 0.25rem 0.8rem;
-  border: 3px solid #1D2340;
-  border-radius: 999px;
-  background: #CDF5D0;
-  color: #1D2340;
-  font-weight: 800;
-  font-size: 1.05rem;
-}
-.tiltchip[hidden] { display: none; }
 /* Friendly hint at the top of the bench */
 .prompt {
   position: absolute;
@@ -311,7 +300,6 @@ body.ending .pjstep { visibility: hidden; }
         <button class="btn ob clear tb-new">Clear</button>
       </div>
       <div class="optset" data-for="level">
-        <span class="tiltchip" id="tiltChip" hidden>Tilt is on</span>
       </div>
       <div class="optset" data-for="square">
         <button class="btn ob" data-sq="90" aria-pressed="true" aria-label="Mark along the 90 degree edge">90°</button>
@@ -461,8 +449,7 @@ body.ending .pjstep { visibility: hidden; }
   // Caliper
   var K = { k: 4, ox: 0, oy: 0, gd: S.gap, contact: 0, zeroFlash: 0, trayY: 0, trayH: 0, slots: {}, fly: {}, bubble: false, wasTouch: false };
 
-  var devTilt = 0, now = 0;
-  var tilt = { on: false };
+  var now = 0;
 
   function layout() {
     U = Math.min(CW, CH);
@@ -796,11 +783,17 @@ body.ending .pjstep { visibility: hidden; }
   function tapeText(v) { return (PJ ? ToyboxProjects.fmt(v) : v) + (S.unit === "cm" ? " cm" : " in"); }
   // Project mode: the tape runs straight along the board. Near the target the hook sticks softly (it eases
   // onto the exact number in updateTape); after two misses the magnet reaches a whole inch.
+  // Gesture gain for the project tape: the step's length takes at most about 170 px of finger.
+  function pjTapeGain() { return PJ ? Math.max(1, PJ.target * T.ppi / 170) : 1; }
   function setHookPJ(hx) {
     var m = mouth();
     var maxD = Math.min(PJ.board.x1 - m.x, CW - 6 - m.x);
-    var d = clamp(hx - m.x, 0, maxD), tx = PJ.target * T.ppi;
-    var zone = PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14);
+    var tx = PJ.target * T.ppi;
+    // The finger is geared (pjTapeGain, in tapeMove), so the magnet zone grows with it; the hook still eases
+    // onto the exact number, so the reading stays exact.
+    var gk = pjTapeGain();
+    var d = clamp(hx - m.x, 0, maxD);
+    var zone = (PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14)) * Math.max(1, gk * 0.6);
     var was = PJ.onTarget;
     PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
     T.a = 0;
@@ -815,21 +808,26 @@ body.ending .pjstep { visibility: hidden; }
     if (r < T.cs / 2 + 2) { T.d = 0; return; }
     T.a = Math.atan2(dy, dx);
     T.d = Math.min(r - T.cs / 2, T.maxIn * T.ppi);
-    // Snap the hook onto the far end of an object when the tape runs along it.
+    // Snap the hook onto the far end of an object when the tape runs along it: near the end, or (so the big
+    // iPad bench needs no long reach) as soon as the tape has been pulled a short way along the object.
+    // The reading is the object's exact length either way.
     T.snap = null;
-    var sr = Math.max(26, T.ppi * 0.45);
+    var sr = Math.max(26, T.ppi * 0.45), h = hookPt();
     for (var i = 0; i < T.objs.length; i++) {
       var o = T.objs[i];
-      var h = hookPt();
-      if (dist(h.x, h.y, o.x1, o.cy) < sr) {
-        var a2 = Math.atan2(o.cy - T.c.y, o.x1 - T.c.x);
-        var m2 = { x: T.c.x + Math.cos(a2) * T.cs / 2, y: T.c.y + Math.sin(a2) * T.cs / 2 };
-        if (dist(m2.x, m2.y, o.x0, o.cy) < sr) {
-          T.a = a2; T.d = dist(m2.x, m2.y, o.x1, o.cy); T.snap = o;
-          break;
-        }
+      var a2 = Math.atan2(o.cy - T.c.y, o.x1 - T.c.x);
+      var m2 = { x: T.c.x + Math.cos(a2) * T.cs / 2, y: T.c.y + Math.sin(a2) * T.cs / 2 };
+      if (dist(m2.x, m2.y, o.x0, o.cy) >= sr) continue;
+      var L = dist(m2.x, m2.y, o.x1, o.cy), ux = Math.cos(a2), uy = Math.sin(a2);
+      var along = (h.x - m2.x) * ux + (h.y - m2.y) * uy, off = Math.abs(-(h.x - m2.x) * uy + (h.y - m2.y) * ux);
+      var pulled = along > Math.min(70, L * 0.4) && along < L + sr && off < Math.max(34, along * 0.45);
+      if (dist(h.x, h.y, o.x1, o.cy) < sr || pulled) {
+        if (T.snap !== o && !T.snapWas) blip(1500, 0.05, 0.05, "triangle", 1900);
+        T.a = a2; T.d = L; T.snap = o;
+        break;
       }
     }
+    T.snapWas = T.snap;
   }
   function goalObj() { return T.objs[T.goal % T.objs.length]; }
   // Project mode: letting go on the target makes the pencil tick and zips the tape home (calmly); letting go
@@ -988,12 +986,15 @@ body.ending .pjstep { visibility: hidden; }
     if (!T.ghost) return;
     var t = T.ghost.t, g = goalObj(), m = mouth(), h = hookPt();
     var p = easeIO(clamp((t - 0.5) / 1.3, 0, 1));
-    var x = lerp(h.x, g.x1, p), y = lerp(h.y, g.cy, p);
+    // a short pull is enough: the hook then snaps onto the far end (setHook)
+    var gx = h.x + Math.min(g.x1 - h.x, Math.max(90, (g.x1 - h.x) * 0.45)), gy = lerp(h.y, g.cy, (gx - h.x) / Math.max(1, g.x1 - h.x));
+    var x = lerp(h.x, gx, p), y = lerp(h.y, gy, p);
     var a = t < 0.3 ? t / 0.3 : (t > 2.1 ? Math.max(0, 1 - (t - 2.1) / 0.5) : 1);
     c.save();
     c.globalAlpha = a * 0.55;
     // a see-through tape following the hand
-    var bl = Math.hypot(x - m.x, y - m.y), an = Math.atan2(y - m.y, x - m.x);
+    var tx = p >= 1 ? g.x1 : x, ty = p >= 1 ? g.cy : y;
+    var bl = Math.hypot(tx - m.x, ty - m.y), an = Math.atan2(ty - m.y, tx - m.x);
     c.save(); c.translate(m.x, m.y); c.rotate(an); c.fillStyle = "#FFD43C"; c.fillRect(0, -T.bw / 2, bl, T.bw); c.restore();
     c.globalAlpha = a * 0.85;
     // the hand: one finger on the hook
@@ -1355,7 +1356,7 @@ body.ending .pjstep { visibility: hidden; }
     var b = PJ.board;
     var maxD = Math.min(12 * T.ppi, b.x1 - b.x0);
     var d = clamp(hx - b.x0, 0, maxD), tx = PJ.target * T.ppi;
-    var zone = PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14);
+    var zone = (PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14)) * Math.max(1, pjTapeGain() * 0.6);
     var was = PJ.onTarget;
     PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
     if (!PJ.onTarget) { PJ.comboD = d; PJ.comboIn = d / T.ppi; }
@@ -1500,7 +1501,9 @@ body.ending .pjstep { visibility: hidden; }
   }
   function comboMove(dr, p) {
     if (dr.type === "comboPJ") {
-      setComboPJ(p.x + dr.dx);
+      // geared like the project tape: the head slides up to pjTapeGain() times the finger
+      if (dr.bx == null) { dr.bx = p.x; dr.d0 = PJ.comboD || 0; }
+      setComboPJ(PJ.board.x0 + dr.d0 + (p.x - dr.bx) * pjTapeGain());
       return;
     }
     syncComboBoard();
@@ -1661,7 +1664,11 @@ body.ending .pjstep { visibility: hidden; }
     return false;
   }
   function tapeMove(dr, p) {
-    if (dr.type === "hook") setHook(p.x + dr.dx, p.y + dr.dy);
+    if (dr.type === "hook" && PJ) {
+      // Project tape: the hook runs out up to pjTapeGain() times the finger, from where it was grabbed.
+      if (dr.bx == null) { dr.bx = p.x; dr.d0 = T.d; }
+      setHook(mouth().x + dr.d0 + (p.x - dr.bx) * pjTapeGain(), p.y + dr.dy);
+    } else if (dr.type === "hook") setHook(p.x + dr.dx, p.y + dr.dy);
     else if (dr.type === "case") {
       var h = hookPt(), held = T.hookHeld;
       T.c.x = clamp(p.x + dr.dx, T.cs / 2, CW - T.cs / 2);
@@ -1702,7 +1709,7 @@ body.ending .pjstep { visibility: hidden; }
     { x: -0.37, beta: 90 },   // plumb vial
     { x: 0.37, beta: 45 }     // 45 degree vial
   ];
-  function effTilt() { return -L.a + devTilt; } // degrees, positive = right end up
+  function effTilt() { return -L.a; } // degrees, positive = right end up
   function updateLevel(dt) {
     if (L.aT !== null) {
       L.a = lerp(L.a, L.aT, Math.min(1, dt * 4));
@@ -1790,11 +1797,10 @@ body.ending .pjstep { visibility: hidden; }
     c.restore();
     // drag handles at the board ends
     var e = levelEnds(), hr = clamp(U * 0.05, 22, 36);
-    var lock = tilt.on ? 0.55 : 1;
     [[e.lx, e.ly, "l"], [e.rx, e.ry, "r"]].forEach(function (q) {
       var held = false;
       for (var k in drags) if (drags[k].type === "lvl" + q[2]) held = true;
-      c.save(); c.globalAlpha = lock;
+      c.save(); c.globalAlpha = 1;
       c.beginPath(); c.arc(q[0], q[1] - L.tb / 2, hr * (held ? 1.15 : 1), 0, Math.PI * 2); fs(c, held ? "#FFC93C" : "#FFFFFF", 4);
       c.fillStyle = OUT;
       var cx = q[0], cy = q[1] - L.tb / 2, s = hr * 0.5;
@@ -1837,7 +1843,7 @@ body.ending .pjstep { visibility: hidden; }
     var s = clamp((p.y - L.pv.y) / (L.lb / 2), -Math.sin(L.amax * DEG), Math.sin(L.amax * DEG));
     var a = Math.asin(s) / DEG;
     if (dr.type === "lvll") a = -a;
-    if (Math.abs(a - devTilt) < 1.2) a = devTilt; // snap to level (the bubble sits in the middle)
+    if (Math.abs(a) < 1.2) a = 0; // snap to level (the bubble sits in the middle)
     L.a = clamp(a, -L.amax, L.amax);
   }
   function levelUp() { S.boardA = Math.round(L.a * 10) / 10; save(); }
@@ -2348,8 +2354,13 @@ body.ending .pjstep { visibility: hidden; }
     if (dr.type === "slider") {
       var mm = toMM(p);
       var minG = S.item && !K.fly[S.item] ? ITEMS[S.item].w : (S.item ? ITEMS[S.item].w : 0);
-      var want = mm.x + dr.dx;
+      // Gesture gain: the whole opening takes about 150 px of finger on any screen (the jaw moves further
+      // than the finger on the big iPad caliper); it still stops exactly on the part, so the reading is exact.
+      var kc = Math.max(1, GMAX * K.k / 150);
+      if (dr.ax == null) { dr.ax = mm.x; dr.g0 = mm.x + dr.dx; }
+      var want = dr.g0 + (mm.x - dr.ax) * kc;
       var ng = clamp(want, minG, GMAX);
+      if (ng !== want) { dr.g0 = ng; dr.ax = mm.x; }   // at a stop: turning back answers at once
       if (S.item && ng <= minG + 0.01 && S.gap > minG + 0.3) {
         K.contact = 1; blip(1100, 0.05, 0.06, "square", 900); blip(400, 0.08, 0.05, "triangle");
       }
@@ -2533,10 +2544,10 @@ body.ending .pjstep { visibility: hidden; }
       return { pts: [scr({ x: hx - 4, y: C.by + C.rw * 0.9 }), scr({ x: hx - 4, y: C.by + C.bh - 8 })] };
     }
     if (S.tool === "level") {
-      if (Math.abs(L.a - devTilt) < 1.2) return null;
+      if (Math.abs(L.a) < 1.2) return null;
       var rx = L.pv.x + L.lb * 0.42, ry2 = L.pv.y + Math.sin(L.a * DEG) * L.lb * 0.42;
       say(HINTS.level);
-      return { pts: [scr({ x: rx, y: ry2 }), scr({ x: rx, y: L.pv.y + Math.sin(devTilt * DEG) * L.lb * 0.42 })] };
+      return { pts: [scr({ x: rx, y: ry2 }), scr({ x: rx, y: L.pv.y })] };
     }
     if (S.tool === "square") {
       if (Q.live) return null;
@@ -2548,7 +2559,8 @@ body.ending .pjstep { visibility: hidden; }
       if (S.item) {
         if (S.gap - ITEMS[S.item].w < 0.3) return null;
         say("Slide the jaw to close it");
-        return { pts: [scr(km(S.gap + 20, 12)), scr(km(ITEMS[S.item].w + 20, 12))] };
+        var kc = Math.max(1, GMAX * K.k / 150);   // the geared jaw: a shorter finger move
+        return { pts: [scr(km(S.gap + 20, 12)), scr(km(S.gap + 20 - (S.gap - ITEMS[S.item].w) / kc, 12))] };
       }
       var it = ITEM_ORDER[0], b = itemBox(it), o = itemPos(it);
       say(HINTS.caliper);
@@ -2656,11 +2668,12 @@ body.ending .pjstep { visibility: hidden; }
     function scr(x, y) { return [cr.left + x, cr.top + y]; }
     if (PJ.phase === "combo") {
       var ry = pjRuleY(), hx = PJ.board.x0 + PJ.comboD;
-      return { pts: [scr(hx + 20, ry), scr(PJ.tickX + 20, ry)], duration: 3800 };
+      return { pts: [scr(hx + 20, ry), scr(hx + 20 + (PJ.tickX - hx) / pjTapeGain(), ry)], duration: 3800 };
     }
     if (PJ.phase === "tape") {
       var h = hookPt();
-      return { pts: [scr(h.x, h.y), scr(PJ.tickX, h.y)], duration: 3800 };
+      var tk = pjTapeGain();   // the geared tape: a shorter finger move
+      return { pts: [scr(h.x, h.y), scr(h.x + (PJ.tickX - h.x) / tk, h.y)], duration: 3800 };
     }
     if (PJ.phase === "square" && PJ.lineT === 0 && PJ.sqIn >= 1) {
       var G = sqGeom();
@@ -2711,7 +2724,6 @@ body.ending .pjstep { visibility: hidden; }
   function updateOpts() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-unit]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.unit === S.unit)); });
     Array.prototype.forEach.call(document.querySelectorAll("[data-sq]"), function (b) { b.setAttribute("aria-pressed", String(+b.dataset.sq === S.sq)); });
-    $("tiltChip").hidden = !tilt.on;
   }
   $("toolbar").addEventListener("click", function (e) {
     var b = e.target.closest("button");
@@ -2733,34 +2745,6 @@ body.ending .pjstep { visibility: hidden; }
     save();
   });
 
-  // ---------- Tilt (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
-  var tiltAllowed = false;  // the setting is on (and on iOS, motion access was granted)
-  // How far the screen's left-right line is from level, in degrees (positive = right side up).
-  function onOrient(e) {
-    if (typeof e.beta !== "number" || typeof e.gamma !== "number") return;
-    var b = e.beta * DEG, g = e.gamma * DEG;
-    var ux = -Math.sin(g) * Math.cos(b), uy = Math.sin(b); // "up" in device coordinates
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    ang = ((ang % 360) + 360) % 360;
-    var v = ang === 90 ? -uy : (ang === 180 ? -ux : (ang === 270 ? uy : ux));
-    var raw = Math.asin(clamp(v, -1, 1)) / DEG;
-    devTilt = lerp(devTilt, raw, 0.25);
-  }
-  function attachTilt() {
-    if (tilt.on || !tiltAllowed || !Toybox.settings.get("tilt")) return;
-    tilt.on = true;
-    window.addEventListener("deviceorientation", onOrient);
-    $("tiltChip").hidden = false;
-  }
-  function detachTilt() {
-    if (!tilt.on) return;
-    tilt.on = false; devTilt = 0;
-    window.removeEventListener("deviceorientation", onOrient);
-    $("tiltChip").hidden = true;
-  }
-  Toybox.tiltReady(function () { tiltAllowed = true; attachTilt(); });
-  Toybox.settings.onChange(function (id, v) { if (id === "tilt") { if (v) attachTilt(); else detachTilt(); } });
-
   // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
   // Ending: the tape zips back, the board on the level settles flat, then done().
   var endingDone = null;
@@ -2779,7 +2763,7 @@ body.ending .pjstep { visibility: hidden; }
     chime();
   }
   function settled() {
-    var bubOk = tilt.on || L.bub.every(function (b) { return Math.abs(b.v) < 0.05; });
+    var bubOk = L.bub.every(function (b) { return Math.abs(b.v) < 0.05; });
     var flying = Object.keys(K.fly).length > 0;
     return !T.zip && T.d < 1 && L.aT === null && Math.abs(L.a) < 0.1 && bubOk && !flying && T.bump < 0.05;
   }
@@ -2901,7 +2885,7 @@ body.ending .pjstep { visibility: hidden; }
     }
     requestAnimationFrame(frame);
   }
-  if (/[?&]debug=1/.test(location.search)) window.__ms = { S: S, T: T, C: C, L: L, Q: Q, K: K, PJ: PJ, PSTEP: PSTEP, hookPt: hookPt, km: km, sqEdge: sqEdge, sqGeom: sqGeom, levelEnds: levelEnds, itemPos: itemPos, setDev: function (v) { devTilt = v; } };
+  if (/[?&]debug=1/.test(location.search)) window.__ms = { S: S, T: T, C: C, L: L, Q: Q, K: K, PJ: PJ, PSTEP: PSTEP, hookPt: hookPt, km: km, sqEdge: sqEdge, sqGeom: sqGeom, levelEnds: levelEnds, itemPos: itemPos };
   requestAnimationFrame(frame);
 })();
 </script>

@@ -1799,7 +1799,7 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
 
   // ---------- Particles ----------
   var parts = [], MAXP = reduce ? 120 : 420;
-  var grav = { x: 0, y: 1 };
+  var grav = { x: 0, y: 1 };   // gravity for flying bits: straight down
   function addP(o) { if (parts.length >= MAXP) parts.shift(); o.life = 0; parts.push(o); }
   function fibers(x, y, n, s, cols) {
     if (reduce) n = Math.ceil(n / 3);
@@ -1896,7 +1896,7 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
     c.globalAlpha = 1;
   }
 
-  // Sawdust that settles on the board (tilt slides it, shake clears it).
+  // Sawdust that settles on the board.
   var specks = [];
   function addSpecks(u, v, n) {
     for (var i = 0; i < n; i++) {
@@ -1904,33 +1904,11 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
       specks.push({ u: clamp(u + rnd(-0.05, 0.05), 0.005, 0.995), v: clamp(v + rnd(-0.12, 0.12), 0.01, 0.99), r: rnd(1.2, 2.6), c: pick(["#FFF2D8", "#F7DDB0", "#EBC58E"]) });
     }
   }
-  function updateSpecks(dt) {
-    if (!tiltOn || sceneName() !== "board") return;
-    var gx = grav.x, gy = grav.y - 0.75;
-    if (Math.abs(gx) < 0.15 && Math.abs(gy) < 0.15) return;
-    for (var i = specks.length - 1; i >= 0; i--) {
-      var s = specks[i];
-      s.u += gx * dt * 0.35 * (0.6 + s.r * 0.2); s.v += gy * dt * 0.7 * (0.6 + s.r * 0.2);
-      if (s.u < 0 || s.u > 1 || s.v < 0 || s.v > 1) {
-        var p = bpt(clamp(s.u, 0, 1), clamp(s.v, 0, 1));
-        addP({ t: "dust", x: p.x, y: p.y, vx: gx * 120, vy: 40, g: 0, max: 0.8, r: 3, c: "245,225,190" });
-        specks.splice(i, 1);
-      }
-    }
-  }
   function drawSpecks(c) {
     for (var i = 0; i < specks.length; i++) {
       var s = specks[i], p = bpt(s.u, s.v);
       c.fillStyle = s.c; c.fillRect(p.x - s.r, p.y - s.r * 0.6, s.r * 2, s.r * 1.2);
     }
-  }
-  function shakeOff() {
-    if (sceneName() === "board") {
-      specks.forEach(function (s) { var p = bpt(s.u, s.v); addP({ t: "dust", x: p.x, y: p.y, vx: rnd(-200, 200), vy: rnd(-300, -100), g: 0, max: rnd(0.6, 1.1), r: rnd(3, 8), c: "245,225,190" }); });
-      specks = [];
-    }
-    shakeAmp = Math.max(shakeAmp, 8);
-    sndRattle();
   }
 
   // ---------- Sound (off by default; soft synth only) ----------
@@ -1989,7 +1967,7 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
   function sndSlip() { tone(720, 0.14, "triangle", 0.05, 260); noise(0.05, "highpass", 2500, 0.04); }
   function sndChime() { tone(660, 0.26, "triangle", 0.05); tone(990, 0.36, "triangle", 0.045, null, 0.09); }
   function sndCrack() { noise(0.28, "bandpass", 900, 0.22, 0, 0.8); tone(80, 0.22, "sine", 0.2, 50); }
-  function sndRattle() { for (var i = 0; i < 6; i++) noise(0.012, "bandpass", 3000 + Math.random() * 1500, 0.06, i * 0.045, 3); }
+
   function sndPlace() { tone(900, 0.05, "sine", 0.03, 1300); noise(0.015, "bandpass", 4000, 0.03); }
   var motor = null;
   function motorSet(level, kind) {
@@ -3954,7 +3932,6 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
     if (newJointAt && nowMs() > newJointAt) { newJointAt = 0; state.joint.gap = 32; state.joint.hits = 0; jointDrop = 220; saveSoon(); }
     if (jointDrop > 0) jointDrop = Math.max(0, jointDrop - dt * 700);
     updateParts(dt);
-    updateSpecks(dt);
     shakeAmp *= Math.pow(0.0015, dt);
     if (shakeAmp < 0.05) shakeAmp = 0;
 
@@ -4175,42 +4152,6 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
     sndPlace();
     bgDirty = true; saveSoon();
   }
-
-  // ---------- Tilt and shake (optional: the "Tilt and shake" setting on the Toybox home screen) ----------
-  var tiltOn = false, tiltAllowed = false, lastShake = 0, lastAcc = null;
-  function onOrient(e) {
-    if (e.beta === null && e.gamma === null) return;
-    var b = (e.beta || 0) * Math.PI / 180, g = (e.gamma || 0) * Math.PI / 180;
-    var x = Math.sin(g), y = Math.sin(b);
-    var ang = (screen.orientation && typeof screen.orientation.angle === "number") ? screen.orientation.angle : (window.orientation || 0);
-    var gx = x, gy = y;
-    if (ang === 90) { gx = y; gy = -x; } else if (ang === -90 || ang === 270) { gx = -y; gy = x; } else if (ang === 180) { gx = -x; gy = -y; }
-    grav.x = clamp(gx, -1, 1); grav.y = clamp(gy, -0.3, 1);
-  }
-  function onMotion(e) {
-    var a = e.accelerationIncludingGravity;
-    if (!a || a.x === null) return;
-    if (lastAcc) {
-      var d = Math.abs(a.x - lastAcc.x) + Math.abs(a.y - lastAcc.y) + Math.abs(a.z - lastAcc.z);
-      if (d > 26 && nowMs() - lastShake > 700 && !locked()) { lastShake = nowMs(); shakeOff(); }
-    }
-    lastAcc = { x: a.x, y: a.y, z: a.z };
-  }
-  function startTilt() {
-    if (tiltOn || !tiltAllowed || !Toybox.settings.get("tilt")) return;
-    tiltOn = true;
-    window.addEventListener("deviceorientation", onOrient);
-    window.addEventListener("devicemotion", onMotion);
-  }
-  function stopTilt() {
-    if (!tiltOn) return;
-    tiltOn = false; lastAcc = null;
-    window.removeEventListener("deviceorientation", onOrient);
-    window.removeEventListener("devicemotion", onMotion);
-    grav.x = 0; grav.y = 1;
-  }
-  Toybox.tiltReady(function () { tiltAllowed = true; startTilt(); });
-  Toybox.settings.onChange(function (id, v) { if (id === "tilt") { if (v) startTilt(); else stopTilt(); } });
 
   // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
   // Ending: the tools are put down on the bench (optional Goodbye tap), then the workshop rests.
