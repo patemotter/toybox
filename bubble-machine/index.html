@@ -84,6 +84,10 @@ body.big .tb-panel { display: none; }
 .stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
 .stage .farewell p { font-size: 1.25rem; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+/* iOS: a drag that starts on the header or on the panel's empty background never pans the page; the buttons
+   still tap. (The page itself is pinned by common/toybox.css.) */
+.tb-head, .tb-panel { touch-action: none; overscroll-behavior: none; }
+.tb-head .btn, .tb-panel .btn { touch-action: manipulation; }
 
 /* ---------- Panel: wand and soap picture tiles, then the tab bar (Wands / Colors on phones, New, Surprise) ---------- */
 .tb-choices.bm-choices { display: flex; flex-direction: column; gap: 8px; }
@@ -115,7 +119,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 @media (max-width: 600px) and (orientation: portrait) {
   .soap, .wandt { min-height: 62px; }
   .soap svg { width: 46px; height: 46px; }
-  .wandt svg { width: 40px; height: 40px; }
+  /* Seven wands across a narrow phone (375 px and less): the picture shrinks to the tile instead of spilling out. */
+  .wandt svg { width: 100%; max-width: 40px; height: auto; aspect-ratio: 1 / 1; }
+  .wands { gap: 5px; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .tb-body .tb-panel { width: 184px; }
@@ -124,8 +130,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .soap svg, .wandt svg { width: 38px; height: 38px; }
   .tb-tabs { display: grid; grid-template-columns: 1fr 1fr; }
   .tb-tabs .btn { min-height: 44px; }
-}
-  .soaps.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
@@ -202,7 +206,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   SOAPS.forEach(function (s) { SOAP_BY[s.id] = s; });
 
   // Wands: the loop's shape is the shape of the bubbles it blows (the dad's idea). Shape wands spin their bubbles
-  // slowly; animal bubbles stay upright and just wobble. The machine always blows round bubbles.
+  // slowly; animal bubbles stay upright and just wobble. The machine's wand wheel takes the picked shape too, so
+  // its rings and the bubbles it blows match the hand wand.
   var WANDS = [
     { id: "round", label: "Round" }, { id: "hexagon", label: "Hexagon" }, { id: "star", label: "Star" },
     { id: "heart", label: "Heart" }, { id: "bunny", label: "Bunny", animal: true }, { id: "cat", label: "Cat", animal: true },
@@ -248,6 +253,27 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       x.arc(cx, cy, R, 0, TAU);
     }
     x.closePath();
+  }
+  // How far the outline of a shape (R = 1) reaches from its center in a direction (y down): the machine's arms
+  // end on the loop. Sampled once per shape with isPointInPath.
+  var reachCache = {};
+  function shapeReach(id, ang) {
+    if (id === "round") return 1;
+    var p = reachCache[id], i, k;
+    if (!p) {
+      p = reachCache[id] = [];
+      var z = mkCanvas(4).getContext("2d");
+      shapePath(z, 0, 0, 100, id);
+      for (i = 0; i < 72; i++) {
+        var a = i * TAU / 72, lo = 0, hi = 1.2;
+        for (k = 0; k < 12; k++) {
+          var m = (lo + hi) / 2;
+          if (z.isPointInPath(Math.cos(a) * m * 100, Math.sin(a) * m * 100)) lo = m; else hi = m;
+        }
+        p.push(lo);
+      }
+    }
+    return p[Math.round((((ang % TAU) + TAU) % TAU) / TAU * 72) % 72];
   }
 
   function $(id) { return document.getElementById(id); }
@@ -612,12 +638,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     rr(x, 18, -10, 32, 12, 5); fillStroke(x, "#3A3F63", 3);
     rr(x, 150, -10, 32, 12, 5); fillStroke(x, "#3A3F63", 3);
 
-    // Wand wheel: arms, then the wands (rings with soap film), then the hub.
-    var top = 1.5 * Math.PI;
+    // Wand wheel: arms, then the wands (loops with soap film, in the picked wand's shape, always upright like
+    // the seats of a big wheel), then the hub.
+    var top = 1.5 * Math.PI, shape = S.wand, ringR = ringSize();
     for (i = 0; i < 6; i++) {
       a = mach.wheel + i * TAU / 6;
-      var wx = WC.x + Math.cos(a) * WC.arm, wy = WC.y + Math.sin(a) * WC.arm;
-      x.beginPath(); x.moveTo(WC.x, WC.y); x.lineTo(wx - Math.cos(a) * WC.ring, wy - Math.sin(a) * WC.ring);
+      var wx = WC.x + Math.cos(a) * WC.arm, wy = WC.y + Math.sin(a) * WC.arm, rch = ringR * shapeReach(shape, a + Math.PI);
+      x.beginPath(); x.moveTo(WC.x, WC.y); x.lineTo(wx - Math.cos(a) * rch, wy - Math.sin(a) * rch);
       x.lineWidth = 9; x.strokeStyle = OUT; x.stroke();
       x.lineWidth = 4.5; x.strokeStyle = "#FFFFFF"; x.stroke();
     }
@@ -629,17 +656,18 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var rel = ((a - top) % TAU + TAU) % TAU;   // 0 at the top, growing clockwise
         var toTop = TAU - rel;                     // how far before the top
         var grow = toTop < 1.2 ? (1 - toTop / 1.2) * Math.min(1, Math.abs(mach.wheelV) / WHEEL[0]) : 0;
-        drawFilm(cx, cy, WC.ring - 2, soap, now, M.s);
+        drawFilm(cx, cy, ringR - 2, soap, now, M.s, shape);
         if (grow > 0.05) {
-          var pr = WC.ring * (0.6 + 0.9 * grow);
-          var pb = { x: cx, y: cy - pr * 0.75, r: pr, soap: S.soap, sw: now / 900 + i, ax: 0, wa: 0.06 * grow, wp: now / 140, grow: 1 };
+          var pr = ringR * (0.6 + 0.9 * grow);
+          var pb = { x: cx, y: cy - pr * 0.75, r: pr, soap: S.soap, shape: shape, sw: shape === "round" ? now / 900 + i : 0, ax: 0,
+            wa: 0.06 * grow, wp: now / 140, grow: 1 };
           ctx.save();
           drawBubbleAt(pb, M.s, M.x, M.y);
           ctx.restore();
           x.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.x, DPR * M.y);
         }
       }
-      x.beginPath(); x.arc(cx, cy, WC.ring, 0, TAU);
+      shapePath(x, cx, cy, ringR, shape);
       x.lineWidth = 8; x.strokeStyle = OUT; x.stroke();
       x.lineWidth = 4; x.strokeStyle = WAND_COLORS[i]; x.stroke();
     }
@@ -714,6 +742,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     x.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   var dialAngle = DIAL_ANG[S.speed];
+  // The machine's loops: shapes are drawn a little bigger than the round ring so a bunny or a fish reads clearly.
+  function ringSize() { return S.wand === "round" ? WC.ring : 18; }
 
   // The word for the speed floats over the dial for a few seconds after a change.
   function drawSpeedLabel(now) {
@@ -1368,12 +1398,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
   }
   function machineBubble(boost) {
-    var tx = mx(WC.x), ty = my(WC.y - WC.arm) - WC.ring * M.s;
+    var tx = mx(WC.x), ty = my(WC.y - WC.arm) - ringSize() * M.s;
     var big = Math.random() < 0.15 ? 1.5 : 1;
     var r = (11 + Math.random() * 13) * BS * big;
     // A wide fan of directions, so the bubbles spread across the sky instead of queueing in one column.
     var ang = rnd(-1.45, -0.25), sp = rnd(110, 210) * BS * (boost || 1);
     var b = makeBubble(tx + rnd(-6, 6), ty - r * 0.6, r, Math.cos(ang) * sp, Math.sin(ang) * sp, S.soap);
+    // The bubbles take the shape of the machine's loops (the picked wand), like the hand wand's.
+    setShape(b, S.wand);
     addBubble(b);
   }
 
@@ -1908,6 +1940,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     renderWands();
     wand.filmAt = performance.now();
     wand.pend = 0;
+    // The machine's loops change shape too and dip in fresh soap.
+    mach.film = [true, true, true, true, true, true];
+    mach.spill = 1;
     if (!quiet) tickSound(1);
   }
   renderWands();
