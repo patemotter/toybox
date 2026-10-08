@@ -573,9 +573,9 @@ body.big .tb-panel { display: none; }
       } else if (f.k === "text") {
         c.globalAlpha = k < 0.75 ? 1 : (1 - k) / 0.25;
         var s2 = 0.6 + Math.min(1, k * 5) * 0.4;
-        c.save(); c.translate(f.x, f.y - k * 40); c.scale(s2, s2);
         c.font = "800 " + f.size + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
         var tw = c.measureText(f.text).width;
+        c.save(); c.translate(clamp(f.x, tw / 2 + 22, W - tw / 2 - 22), Math.max(f.y - k * 40, f.size)); c.scale(s2, s2);
         rr(c, -tw / 2 - 18, -f.size * 0.7, tw + 36, f.size * 1.4, 20); trim(c, "#FFFFFF", 4);
         c.fillStyle = OUT; c.fillText(f.text, 0, 3); c.restore();
       }
@@ -584,7 +584,8 @@ body.big .tb-panel { display: none; }
   }
 
   // ---------- Run scene: layouts as spline track segments ----------
-  var TILT = 0.74, HT = 0.62; // (TILT is 0.92 on an upright phone) y squash for the angled view; height factor for vertical things
+  // The angled camera: TILT squashes ground y, HT lifts heights (set in runFit, about 0.62 / 0.78).
+  var TILT = 0.62, HT = 0.78;
   var WW = 1000, WH = 760;
   function catmull(pts, closed, t0, t1) {
     // returns dense points along a Catmull-Rom spline through pts; optional end tangents for open curves
@@ -647,7 +648,7 @@ body.big .tb-panel { display: none; }
     // Figure 8: one closed curve that crosses itself; the crossing pass near t=0 goes over a bridge.
     var raw = [];
     for (var i = 0; i <= 240; i++) { var t = i / 240 * TAU; raw.push([500 + 400 * Math.sin(t), 380 + 245 * Math.sin(2 * t)]); }
-    var e8 = mkSeg("e8", resample(raw, function (u) { var c = Math.cos(u * TAU); return c > 0 ? 70 * Math.pow(c, 2.2) : 0; }));
+    var e8 = mkSeg("e8", resample(raw, function (u) { var c = Math.cos(u * TAU); return c > 0 ? 86 * Math.pow(c, 2.2) : 0; }));
     e8.next = function () { return e8; }; e8.prev = function () { return e8; };
     LAYOUTS.eight = { segs: [e8], start: e8, station: { seg: e8, s: nearest(e8, 800, 140) },
       tunnel: { seg: e8, a: nearest(e8, 140, 250), b: nearest(e8, 140, 510) },
@@ -689,7 +690,6 @@ body.big .tb-panel { display: none; }
       lay.switches.forEach(function (sw) { var t = sw.x; sw.x = sw.y; sw.y = t; });
     });
     var t = WW; WW = WH; WH = t;
-    TILT = up ? 0.92 : 0.74;
     return true;
   }
 
@@ -699,10 +699,10 @@ body.big .tb-panel { display: none; }
   // segment and position they came from, so it can grow forward via next() and backward via prev()).
   // Piece i sits at run.d - (lengths in front of it) - p.extra (+ p.lead for the front piece):
   // extra > 0 is a car still rolling in from behind, lead > 0 an engine still backing on from ahead.
-  var RSC = 0.46;  // run pieces are this much of their picture length (world units)
-  var RW = 40;     // run piece width
-  var CG = 6;      // coupler gap
-  var ROLL = 260;  // a new piece starts this far away and rolls in
+  var RSC = 0.58;  // run pieces are this much of their picture length (world units)
+  var RW = 46;     // run piece width
+  var CG = 7;      // coupler gap
+  var ROLL = 300;  // a new piece starts this far away and rolls in
   var VSLOW = 90, VFAST = 150, BRAKE = 150;
   var TOOT_T = 2;
   function plen(p) { return TYPES[p.t].len * RSC; }
@@ -830,7 +830,7 @@ body.big .tb-panel { display: none; }
     save(); bumpCount(); updateGo(); updateCoach();
     return true;
   }
-  function screenOf(cp, h) { return { x: SX(cp.x), y: SY(cp.y, cp.z + (h || 14)) }; }
+  function screenOf(cp, h) { return { x: SX(cp.x), y: SY(cp.y, cp.z + (h || 26)) }; }
   function burst(x, y, col, n, big) {
     for (var k = 0; k < n; k++) {
       var ang = rand(0, TAU), sp = rand(big ? 120 : 80, big ? 420 : 260);
@@ -859,7 +859,7 @@ body.big .tb-panel { display: none; }
     var poses = carPoses();
     if (i <= 0 || i >= poses.length) { if (poses[i]) poses[i].p.jig = 0.6; return; }
     var cp = poses[i], fxp = cp.x + Math.cos(cp.ang) * cp.len / 2, fyp = cp.y + Math.sin(cp.ang) * cp.len / 2;
-    var X = SX(fxp), Y = SY(fyp, cp.z + 14);
+    var X = SX(fxp), Y = SY(fyp, cp.z + 30);
     sClunk();
     fx.push({ k: "clunk", x: X, y: Y, t: 0, life: 0.9 });
     for (var k = 0; k < 8; k++) {
@@ -945,7 +945,7 @@ body.big .tb-panel { display: none; }
     if (run.smokeT <= 0) {
       run.smokeT = run.v > 5 ? 0.42 - (run.v / VFAST) * 0.18 : 1.2;
       poses.forEach(function (cp) {
-        if (cp.p.t === "steam") puff(cp, 0.32, run.v > 5 ? 1 : 0.6);
+        if (cp.p.t === "steam") puff(cp, 0.39, run.v > 5 ? 1 : 0.6);
         else if (cp.p.t === "diesel" && run.v > 5 && Math.random() < 0.5) { puff(cp, 0.1, 0.5); run.puffs[run.puffs.length - 1].dark = true; }
       });
     }
@@ -969,7 +969,7 @@ body.big .tb-panel { display: none; }
       kindGiven = true;
       setTimeout(function () { try { Toybox.kind(); } catch (e) { /* ignore */ } }, 1500);
     }
-    fx.push({ k: "text", x: SX(segPoint(run.lay.station.seg, run.lay.station.s).x), y: SY(segPoint(run.lay.station.seg, run.lay.station.s).y, 90), t: 0, life: 3, text: "Station!", size: 30 });
+    fx.push({ k: "text", x: SX(segPoint(run.lay.station.seg, run.lay.station.s).x), y: SY(segPoint(run.lay.station.seg, run.lay.station.s).y, 110), t: 0, life: 3, text: "Station!", size: 30 });
   }
   // The little car on the road: drives out of its house, waits at the gates while they are down, drives
   // over the crossing and away, then comes back.
@@ -985,7 +985,7 @@ body.big .tb-panel { display: none; }
   }
   function puff(cp, at, size) {
     var x = cp.x + Math.cos(cp.ang) * cp.len * at, y = cp.y + Math.sin(cp.ang) * cp.len * at;
-    run.puffs.push({ x: x, y: y, z: cp.z + 34, vx: rand(-8, 8), vy: rand(-8, 8), vz: rand(30, 50) * size, r: 8 * size, gr: 14 * size, t: 0, life: reduce ? 0.8 : 1.8 * size });
+    run.puffs.push({ x: x, y: y, z: cp.z + 60, vx: rand(-8, 8), vy: rand(-8, 8), vz: rand(30, 50) * size, r: 8 * size, gr: 14 * size, t: 0, life: reduce ? 0.8 : 1.8 * size });
   }
   function spawnLoad() {
     var poses = carPoses();
@@ -994,7 +994,7 @@ body.big .tb-panel { display: none; }
     var cp = cars[Math.floor(Math.random() * cars.length)];
     var lay = run.lay, sp = segPoint(lay.station.seg, lay.station.s);
     var nx = Math.cos(sp.ang + Math.PI / 2), ny = Math.sin(sp.ang + Math.PI / 2);
-    var plat = { x: cp.x + nx * 46, y: cp.y + ny * 46 };
+    var plat = { x: cp.x + nx * 60, y: cp.y + ny * 60 };
     var onload = Math.random() < 0.5;
     var kind = cp.p.t === "passenger" || cp.p.t === "caboose" ? "person" : (cp.p.t === "tanker" ? "drop" : (cp.p.t === "logs" ? "log" : (cp.p.t === "coal" || cp.p.t === "hopper" ? "lump" : "box")));
     run.loads.push({ a: onload ? plat : { x: cp.x, y: cp.y }, b: onload ? { x: cp.x, y: cp.y } : plat, z: cp.z, t: 0, life: 1.1,
@@ -1002,34 +1002,361 @@ body.big .tb-panel { display: none; }
   }
 
   // ---------- Run drawing: world -> screen ----------
-  var vs = 1, vox = 0, voy = 0;
+  // The camera looks down at the train set at an angle, like a child sitting by a toy train on the floor:
+  // ground y is squashed by TILT and heights rise by HT (TILT = sin, HT = cos of the camera's elevation), so
+  // the sides of the engine and cars show. Everything that stands up is drawn back to front (painter's order,
+  // key = ground y + height * KZ).
+  var vs = 1, vox = 0, voy = 0, KZ = 1, LW = 2.5;
+  function setTilt(t) { TILT = t; HT = Math.sqrt(1 - t * t); KZ = TILT / HT; }
+  setTilt(TILT);
+  var TOPZ = 86; // the tallest things (trees, the station roof) rise about this high
   function runFit() {
     var lay = run.lay, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
     function grow(x, y) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     lay.segs.forEach(function (seg) { seg.pts.forEach(function (q) { grow(q.x, q.y); }); });
     var sp = segPoint(lay.station.seg, lay.station.s), nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
     var tx = Math.cos(sp.ang), ty = Math.sin(sp.ang);
-    grow(sp.x + nx * 130 + tx * 70, sp.y + ny * 130 + ty * 70);
-    grow(sp.x + nx * 130 - tx * 70, sp.y + ny * 130 - ty * 70);
-    grow(sp.x + nx * 70 + tx * 152, sp.y + ny * 70 + ty * 152);
-    grow(sp.x + nx * 70 - tx * 152, sp.y + ny * 70 - ty * 152);
+    grow(sp.x + nx * 150 + tx * 72, sp.y + ny * 150 + ty * 72);
+    grow(sp.x + nx * 150 - tx * 72, sp.y + ny * 150 - ty * 72);
+    grow(sp.x + nx * 80 + tx * 152, sp.y + ny * 80 + ty * 152);
+    grow(sp.x + nx * 80 - tx * 152, sp.y + ny * 80 - ty * 152);
     // the tunnel hill is wider than the track
     var tn = lay.tunnel, ta = Math.min(tn.a, tn.b), tb = Math.max(tn.a, tn.b);
     for (var s = ta; s <= tb; s += 20) {
-      var q = segPoint(tn.seg, s), qx = -Math.sin(q.ang) * 66, qy = Math.cos(q.ang) * 66;
+      var q = segPoint(tn.seg, s), qx = -Math.sin(q.ang) * 64, qy = Math.cos(q.ang) * 64;
       grow(q.x + qx, q.y + qy); grow(q.x - qx, q.y - qy);
     }
-    x0 -= 30; x1 += 30; y0 -= 30; y1 += 34;
-    var sw = x1 - x0, top = y0 * TILT - 70 * HT, bot = y1 * TILT, sh = bot - top;
+    x0 -= 30; x1 += 30; y0 -= 16; y1 += 36;
+    var sw = x1 - x0;
     // Room for the coach line: at the bottom on phones, at the top on tablets.
-    var phone = W < 600 || H < 500, padT = phone ? 4 : 52, padB = phone ? 34 : 4;
-    vs = Math.min((W - 8) / sw, (H - padT - padB) / sh);
+    var phone = W < 600 || H < 500, padT = phone ? 4 : 52, padB = phone ? 34 : 4, ah = H - padT - padB;
+    // A lower camera on very wide stages (a phone held sideways in Big mode), so the layout fills the width.
+    var vsW = (W - 8) / sw, base = UPRIGHT ? 36 : 31;
+    for (var k = base; k >= 25; k--) {
+      setTilt(k / 50);
+      if (ah / ((y1 - y0) * TILT + TOPZ * HT) >= vsW) break;
+    }
+    var top = y0 * TILT - TOPZ * HT, sh = (y1 - y0) * TILT + TOPZ * HT;
+    vs = Math.min(vsW, ah / sh);
     vox = (W - sw * vs) / 2 - x0 * vs;
-    voy = padT + (H - padT - padB - sh * vs) / 2 - top * vs;
+    voy = padT + (ah - sh * vs) / 2 - top * vs;
+    LW = clamp(vs * 3.4, 1.6, 3.2);
   }
   function SX(x) { return vox + x * vs; }
   function SY(y, z) { return voy + (y * TILT - (z || 0) * HT) * vs; }
-  var layer = null, bridgeLayer = null, hillLayer = null;
+
+  // ---------- Little 3D kit: a local frame (u along, v across, z up) projected to the screen ----------
+  function frameOf(q, zoff) {
+    var ca = Math.cos(q.ang), sa = Math.sin(q.ang);
+    return { ox: SX(q.x), oy: SY(q.y, (q.z || 0) + (zoff || 0)), ux: ca * vs, uy: sa * TILT * vs, vx: -sa * vs, vy: ca * TILT * vs, zy: -HT * vs,
+      cu: sa * HT, cv: ca * HT, cz: TILT }; // (cu, cv, cz): toward the camera, in local terms
+  }
+  function P3(F, u, v, z) { return [F.ox + u * F.ux + v * F.vx, F.oy + u * F.uy + v * F.vy + z * F.zy]; }
+  var FT = null; // the face transform in use
+  function faceT(c, F, o, A, B) {
+    var p = P3(F, o[0], o[1], o[2]);
+    FT = [DPR * (A[0] * F.ux + A[1] * F.vx), DPR * (A[0] * F.uy + A[1] * F.vy + A[2] * F.zy),
+      DPR * (B[0] * F.ux + B[1] * F.vx), DPR * (B[0] * F.uy + B[1] * F.vy + B[2] * F.zy), DPR * p[0], DPR * p[1]];
+    c.setTransform(FT[0], FT[1], FT[2], FT[3], FT[4], FT[5]);
+  }
+  function flat(c) { FT = null; c.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  // Fill / outline the path just built in face coordinates, with screen-sized lines.
+  function ink(c, fill, lw, stroke) {
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (fill) { c.fillStyle = fill; c.fill(); }
+    if (lw) { c.lineWidth = lw; c.strokeStyle = stroke || OUT; c.stroke(); }
+    if (FT) c.setTransform(FT[0], FT[1], FT[2], FT[3], FT[4], FT[5]);
+  }
+  function face(c, F, o, A, B, w, h, fill, deco, arg) {
+    faceT(c, F, o, A, B);
+    c.beginPath(); c.rect(0, 0, w, h); ink(c, fill, 0);
+    if (deco) { c.save(); c.beginPath(); c.rect(0, 0, w, h); c.clip(); deco(c, w, h, arg); c.restore(); faceT(c, F, o, A, B); }
+    c.beginPath(); c.rect(0, 0, w, h); ink(c, null, LW);
+    flat(c);
+  }
+  // A box from u0 to u1, half-width hw (around vc), from z0 to z1. Only the faces toward the camera are drawn.
+  // Decorations get face coordinates: sides x along u (back to front), y down from the top edge.
+  function boxP(c, F, u0, u1, hw, z0, z1, o) {
+    var vc = o.vc || 0, L = u1 - u0, Hh = z1 - z0;
+    if (Math.abs(F.cv) > 0.03) face(c, F, [u0, vc + (F.cv > 0 ? hw : -hw), z1], [1, 0, 0], [0, 0, -1], L, Hh, o.side, o.dside);
+    if (Math.abs(F.cu) > 0.03) face(c, F, [F.cu > 0 ? u1 : u0, vc - hw, z1], [0, 1, 0], [0, 0, -1], hw * 2, Hh, o.end || o.side, o.dend, F.cu > 0);
+    face(c, F, [u0, vc - hw, z1], [1, 0, 0], [0, 1, 0], L, hw * 2, o.top || o.side, o.dtop);
+  }
+  // A flat polygon (local points), drawn when it faces the camera (outward from center).
+  function poly(c, F, pts, fill, center) {
+    var a = pts[0], b = pts[1], d = pts[pts.length - 1];
+    var e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+    var n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    var m = [0, 0, 0];
+    pts.forEach(function (p) { m[0] += p[0] / pts.length; m[1] += p[1] / pts.length; m[2] += p[2] / pts.length; });
+    if (n[0] * (m[0] - center[0]) + n[1] * (m[1] - center[1]) + n[2] * (m[2] - center[2]) < 0) { n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2]; }
+    if (n[0] * F.cu + n[1] * F.cv + n[2] * F.cz <= 0.001) return false;
+    c.beginPath();
+    pts.forEach(function (p, i) { var s = P3(F, p[0], p[1], p[2]); if (i) c.lineTo(s[0], s[1]); else c.moveTo(s[0], s[1]); });
+    c.closePath(); c.fillStyle = fill; c.fill(); c.lineWidth = LW; c.strokeStyle = OUT; c.stroke();
+    return true;
+  }
+  // A gable roof: eaves at zE (half-length L2 along u, half-width hw), the ridge along u at zR.
+  function gable(c, F, L2, hw, zE, zR, roof, wall) {
+    var ctr = [0, 0, (zE + zR) / 2];
+    poly(c, F, [[-L2, hw, zE], [L2, hw, zE], [L2, 0, zR], [-L2, 0, zR]], roof, ctr);
+    poly(c, F, [[-L2, -hw, zE], [L2, -hw, zE], [L2, 0, zR], [-L2, 0, zR]], shade(roof, -0.15), ctr);
+    poly(c, F, [[L2, hw, zE], [L2, -hw, zE], [L2, 0, zR]], wall, ctr);
+    poly(c, F, [[-L2, hw, zE], [-L2, -hw, zE], [-L2, 0, zR]], wall, ctr);
+  }
+  function hull(P) {
+    P.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    function cr(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+    var lo = [], up = [], i;
+    for (i = 0; i < P.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], P[i]) <= 0) lo.pop(); lo.push(P[i]); }
+    for (i = P.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], P[i]) <= 0) up.pop(); up.push(P[i]); }
+    up.pop(); lo.pop();
+    return lo.concat(up);
+  }
+  function hullPath(c, pts) { var h = hull(pts); c.beginPath(); h.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.closePath(); }
+  // A round tank / boiler / log lying along u.
+  function cylU(c, F, u0, u1, vc, zc, r, fill, cap, o) {
+    o = o || {};
+    var pts = [];
+    for (var k = 0; k < 16; k++) { var a = k / 16 * TAU, v = vc + Math.cos(a) * r, z = zc + Math.sin(a) * r; pts.push(P3(F, u0, v, z)); pts.push(P3(F, u1, v, z)); }
+    hullPath(c, pts); c.fillStyle = fill; c.fill(); c.lineWidth = LW; c.strokeStyle = OUT; c.stroke();
+    var af = Math.atan2(F.cz, F.cv);
+    (o.bands || []).forEach(function (ub) {
+      faceT(c, F, [ub, vc, zc], [0, 1, 0], [0, 0, 1]);
+      c.beginPath(); c.arc(0, 0, r, af - Math.PI / 2, af + Math.PI / 2); ink(c, null, Math.max(2, 3.5 * vs), o.bandCol || OUT);
+      flat(c);
+    });
+    var ah = af + (Math.PI / 2 - af) * 0.45, hv = vc + Math.cos(ah) * r * 0.72, hz = zc + Math.sin(ah) * r * 0.72;
+    var h0 = P3(F, u0 + 4, hv, hz), h1 = P3(F, u1 - 4, hv, hz);
+    c.beginPath(); c.moveTo(h0[0], h0[1]); c.lineTo(h1[0], h1[1]); c.lineCap = "round";
+    c.strokeStyle = "rgba(255,255,255,0.4)"; c.lineWidth = Math.max(1.5, r * vs * 0.32); c.stroke();
+    if (Math.abs(F.cu) > 0.03) {
+      faceT(c, F, [F.cu > 0 ? u1 : u0, vc, zc], [0, 1, 0], [0, 0, -1]);
+      c.beginPath(); c.arc(0, 0, r, 0, TAU); ink(c, cap, LW);
+      if (o.capDeco) o.capDeco(c, r, F.cu > 0);
+      flat(c);
+    }
+  }
+  // A short upright cylinder (smokestack, dome).
+  function vcyl(c, F, u, v, z0, z1, r, fill) {
+    var b = P3(F, u, v, z0), t = P3(F, u, v, z1), rx = r * vs, ry = r * vs * TILT;
+    c.beginPath(); c.moveTo(t[0] + rx, t[1]); c.lineTo(b[0] + rx, b[1]); c.ellipse(b[0], b[1], rx, ry, 0, 0, Math.PI); c.lineTo(t[0] - rx, t[1]); c.closePath();
+    c.fillStyle = fill; c.fill(); c.lineWidth = LW; c.strokeStyle = OUT; c.stroke();
+    c.beginPath(); c.ellipse(t[0], t[1], rx, ry, 0, 0, TAU); c.fillStyle = shade(fill, 0.25); c.fill(); c.stroke();
+  }
+  function styleDeco(c, w, h, p) {
+    if (p.style === "plain") return;
+    var alt = isDark(p.color) ? "#FFFFFF" : (p.color === "#FFFFFF" ? "#E63946" : OUT);
+    if (p.style === "stripe") { c.beginPath(); c.rect(-2, h * 0.58, w + 4, h * 0.14); ink(c, alt, 0); }
+    else if (p.style === "dots") { c.beginPath(); for (var i = 5; i < w; i += 10) for (var j = 6; j < h; j += 10) { c.moveTo(i + (j % 20 ? 5 : 0) + 2.2, j); c.arc(i + (j % 20 ? 5 : 0), j, 2.2, 0, TAU); } ink(c, alt, 0); }
+    else if (p.style === "zigzag") { c.beginPath(); for (var k = 0; k * 6 <= w + 6; k++) c.lineTo(k * 6, h * 0.6 + (k % 2 ? -3 : 3)); ink(c, null, Math.max(1.5, 2.5 * vs), alt); }
+  }
+  function winRect(c, x, y, w, h, glass) { c.beginPath(); c.rect(x, y, w, h); ink(c, glass, LW * 0.7); }
+
+  // One engine or car, built from boxes and cylinders, its parts drawn back to front.
+  function drawCar(c, q, night, cut) {
+    var p = q.p, t = p.t, L = q.len, hw = RW / 2, col = p.color, u0 = -L / 2, u1 = L / 2;
+    var jig = p.jig > 0 ? Math.abs(Math.sin(p.jig * 16)) * 7 * p.jig : 0;
+    var F = frameOf(q, jig), G = frameOf(q, 0);
+    var top = shade(col, 0.25), end = shade(col, -0.2), frameCol = "#3A4360";
+    var glass = night ? "#FFE680" : "#BEE9FF";
+    if (cut) {
+      var ua = Math.max(cut.u0, u0 - 14), ub = Math.min(cut.u1, u1 + 14), cs = [];
+      [ua, ub].forEach(function (u) { [-hw - 6, hw + 6].forEach(function (v) { [-8, 84].forEach(function (z) { cs.push(P3(F, u, v, z)); }); }); });
+      c.save(); hullPath(c, cs); c.clip();
+    }
+    // shadow
+    faceT(c, G, [u0 + 3, -hw + 4, 0], [1, 0, 0], [0, 1, 0]); c.beginPath(); c.rect(0, 0, L, RW); ink(c, "rgba(0,0,0,0.18)", 0); flat(c);
+    var parts = [], wheels = [];
+    function part(uc, vc, zc, f) { parts.push({ d: uc * F.cu + vc * F.cv + zc * F.cz, f: f }); }
+    function trucks(r) { var ax = L * 0.32; wheels.push([-ax - 6.5, r], [-ax + 6.5, r], [ax - 6.5, r], [ax + 6.5, r]); }
+    function under(a, b) { part(0, 0, 8, function () { boxP(c, F, a, b, hw - 5, 5, 12, { side: frameCol, top: "#4A5578" }); }); }
+    if (t === "steam") {
+      var cu0 = u0 + 0.34 * L, cu1 = u0 + 0.54 * L, bm = (cu1 + u1 - 22) / 2;
+      under(u0 + 3, u1 - 8);
+      part(u0 + 0.16 * L, 0, 26, function () {
+        boxP(c, F, u0 + 1, u0 + 0.32 * L, hw, 12, 38, { side: col, top: top, end: end, dside: function (c, w, h) { styleDeco(c, w, h, p); },
+          dtop: function (c, w, h) { rr(c, 4, 5, w - 8, h - 10, 6); ink(c, "#26282E", 0); c.beginPath(); for (var i = 9; i < w - 6; i += 9) { c.moveTo(i + 3, h / 2 - 4); c.arc(i, h / 2 - 4, 3, 0, TAU); c.moveTo(i + 7, h / 2 + 5); c.arc(i + 4, h / 2 + 5, 3, 0, TAU); } ink(c, "#4A4D58", 0); } });
+      });
+      part((cu0 + cu1) / 2, 0, 35, function () {
+        boxP(c, F, cu0, cu1, hw, 12, 58, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); winRect(c, w * 0.2, 6, w * 0.6, 15, glass); },
+          dend: function (c, w, h) { winRect(c, 6, 6, w * 0.32, 13, glass); winRect(c, w - 6 - w * 0.32, 6, w * 0.32, 13, glass); } });
+      });
+      part((cu0 + cu1) / 2, 0, 60, function () { boxP(c, F, cu0 - 3, cu1 + 3, hw + 2, 58, 62, { side: "#26282E", top: "#3B3E48" }); });
+      part(bm, 0, 30, function () { cylU(c, F, cu1, u1 - 21, 0, 30, 15, col, end, { bands: [cu1 + 10, bm + 8], bandCol: "#FFC93C" }); });
+      part(u1 - 15, 0, 30, function () {
+        cylU(c, F, u1 - 22, u1 - 8, 0, 30, 16, "#26282E", "#3B3E48", { capDeco: function (c, r, front) { if (!front) return; c.beginPath(); c.arc(0, -9, 4.5, 0, TAU); ink(c, night ? "#FFF6B0" : "#FFE680", LW * 0.7); } });
+      });
+      part(u1 - 16, 0, 54, function () { vcyl(c, F, u1 - 16, 0, 40, 62, 5.5, "#26282E"); });
+      part(bm, 0, 48, function () { vcyl(c, F, bm, 0, 40, 51, 6, "#FFC93C"); });
+      part(u1 - 1, 0, 6, function () {
+        var a = hw - 6;
+        var ctr = [u1 - 2, 0, 5];
+        poly(c, F, [[u1 - 8, -a, 12], [u1 - 8, a, 12], [u1 + 5, a, 2], [u1 + 5, -a, 2]], "#E63946", ctr);
+        poly(c, F, [[u1 - 8, a, 12], [u1 - 8, a, 2], [u1 + 5, a, 2]], "#B02A35", ctr);
+        poly(c, F, [[u1 - 8, -a, 12], [u1 - 8, -a, 2], [u1 + 5, -a, 2]], "#B02A35", ctr);
+      });
+      wheels.push([u0 + 10, 6], [u0 + 34, 6], [u1 - 14, 6]);
+      wheels.push([cu0 + 15, 10, "#E63946"], [cu0 + 37, 10, "#E63946"], [cu0 + 59, 10, "#E63946"]);
+    } else if (t === "diesel") {
+      part(0, 0, 9, function () { boxP(c, F, u0 + 2, u1 - 2, hw - 1, 6, 13, { side: frameCol, top: "#4A5578" }); });
+      part((u0 + u1 - 27) / 2, 0, 28, function () {
+        boxP(c, F, u0 + 3, u1 - 30, hw - 6, 13, 42, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); c.beginPath(); for (var i = w * 0.45; i < w - 6; i += 5) { c.moveTo(i, 6); c.lineTo(i, h * 0.55); } ink(c, null, Math.max(1, 1.6 * vs)); },
+          dtop: function (c, w, h) { c.beginPath(); c.arc(w * 0.28, h / 2, h * 0.3, 0, TAU); c.moveTo(w * 0.62 + h * 0.3, h / 2); c.arc(w * 0.62, h / 2, h * 0.3, 0, TAU); ink(c, "#4A5578", LW * 0.7); } });
+      });
+      part(u1 - 17, 0, 33, function () {
+        boxP(c, F, u1 - 30, u1 - 4, hw - 1, 13, 54, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); winRect(c, w * 0.3, 6, w * 0.55, 13, glass); },
+          dend: function (c, w, h, front) { winRect(c, 5, 6, w / 2 - 8, 13, glass); winRect(c, w / 2 + 3, 6, w / 2 - 8, 13, glass); if (front) { c.beginPath(); c.arc(w / 2, h - 10, 4, 0, TAU); ink(c, "#FFE680", LW * 0.7); } } });
+      });
+      part(u1 - 17, 0, 56, function () { boxP(c, F, u1 - 31, u1 - 3, hw, 54, 57, { side: "#26282E", top: "#3B3E48" }); });
+      trucks(6);
+    } else if (t === "electric") {
+      under(u0 + 3, u1 - 3);
+      part(0, 0, 30, function () {
+        boxP(c, F, u0 + 2, u1 - 2, hw, 12, 48, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); winRect(c, 5, 6, 13, 13, glass); winRect(c, w - 18, 6, 13, 13, glass);
+            c.beginPath(); for (var i = w * 0.32; i < w * 0.68; i += 6) { c.moveTo(i, 8); c.lineTo(i, 18); } ink(c, null, Math.max(1, 1.6 * vs)); },
+          dend: function (c, w, h, front) { winRect(c, 5, 6, w / 2 - 8, 13, glass); winRect(c, w / 2 + 3, 6, w / 2 - 8, 13, glass); c.beginPath(); c.arc(w / 2, h - 9, 3.5, 0, TAU); ink(c, front ? "#FFE680" : "#E63946", LW * 0.6); } });
+      });
+      part(0, 0, 50, function () { boxP(c, F, -18, 18, hw - 10, 48, 51, { side: "#4A5578", top: "#5B6478" }); });
+      part(0, 0, 64, function () {
+        var a = P3(F, -12, -6, 51), b = P3(F, 3, 0, 61), d = P3(F, -8, 0, 71), e = P3(F, -8, -11, 71), f = P3(F, -8, 11, 71);
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.moveTo(e[0], e[1]); c.lineTo(f[0], f[1]);
+        c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = OUT; c.lineWidth = Math.max(2, 3 * vs); c.stroke();
+      });
+      trucks(6);
+    } else if (t === "fast") {
+      var ur = u1 - 30;
+      part(0, 0, 7, function () { boxP(c, F, u0 + 4, u1 - 12, hw - 4, 4, 10, { side: frameCol, top: "#4A5578" }); });
+      part((u0 + ur) / 2, 0, 25, function () {
+        boxP(c, F, u0 + 2, ur, hw, 10, 40, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); for (var i = 7; i < w - 10; i += 14) winRect(c, i, 6, 9, 10, glass); c.beginPath(); c.rect(-2, h - 10, w + 4, 4); ink(c, "#E63946", 0); } });
+      });
+      part(u1 - 15, 0, 20, function () {
+        var ctr = [ur + 14, 0, 22], a = hw * 0.5;
+        poly(c, F, [[ur, hw, 40], [ur, hw, 10], [u1, a, 10], [u1, a, 19]], col, ctr);
+        poly(c, F, [[ur, -hw, 40], [ur, -hw, 10], [u1, -a, 10], [u1, -a, 19]], col, ctr);
+        poly(c, F, [[u1, -a, 19], [u1, a, 19], [u1, a, 10], [u1, -a, 10]], end, ctr);
+        poly(c, F, [[ur, -hw, 40], [ur, hw, 40], [u1, a, 19], [u1, -a, 19]], top, ctr);
+        function on(f, k) { var w0 = hw + (a - hw) * f; return [ur + 30 * f, w0 * k, 40 - 21 * f]; }
+        var w1 = on(0.12, 0.82), w2 = on(0.12, -0.82), w3 = on(0.48, -0.8), w4 = on(0.48, 0.8);
+        c.beginPath(); [w1, w2, w3, w4].forEach(function (pt, i) { var s = P3(F, pt[0], pt[1], pt[2]); if (i) c.lineTo(s[0], s[1]); else c.moveTo(s[0], s[1]); });
+        c.closePath(); c.fillStyle = night ? "#FFE680" : "#26282E"; c.fill(); c.lineWidth = LW * 0.7; c.strokeStyle = OUT; c.stroke();
+      });
+      trucks(6);
+    } else if (t === "tanker") {
+      part(0, 0, 9, function () { boxP(c, F, u0 + 3, u1 - 3, hw - 3, 6, 13, { side: frameCol, top: "#4A5578" }); });
+      part(0, 0, 30, function () { cylU(c, F, u0 + 4, u1 - 4, 0, 30, 16.5, col, end, { bands: [-L * 0.27, L * 0.27] }); });
+      part(0, 0, 49, function () { vcyl(c, F, 0, 0, 42, 51, 6.5, col); });
+      trucks(6);
+    } else if (t === "logs" || t === "pipes" || t === "boxes") {
+      part(0, 0, 10, function () { boxP(c, F, u0 + 2, u1 - 2, hw, 8, 16, { side: col, top: top, end: end }); });
+      if (t === "logs") {
+        var ring = function (c, r) { c.beginPath(); c.arc(0, 0, r * 0.55, 0, TAU); c.moveTo(r * 0.22, 0); c.arc(0, 0, r * 0.22, 0, TAU); ink(c, null, Math.max(1, 1.5 * vs), "#A27B5C"); };
+        [[-9, 25, 0], [9, 25, 0], [0, 40, 6]].forEach(function (g) {
+          part(0, g[0], g[1], function () { cylU(c, F, u0 + 5 + g[2], u1 - 5 - g[2], g[0], g[1], 9, "#8B5A3C", "#E8C08F", { capDeco: ring }); });
+        });
+      } else if (t === "pipes") {
+        var hole = function (c, r) { c.beginPath(); c.arc(0, 0, r * 0.55, 0, TAU); ink(c, "#4A5578", 0); };
+        [[-13, 22.5, 0], [0, 22.5, 0], [13, 22.5, 0], [-6.5, 35, 4], [6.5, 35, 4]].forEach(function (g) {
+          part(0, g[0], g[1], function () { cylU(c, F, u0 + 4 + g[2], u1 - 4 - g[2], g[0], g[1], 6.5, "#9AA3AF", "#C9D3E6", { capDeco: hole }); });
+        });
+      } else {
+        var ribs = function (c, w, h) { c.beginPath(); for (var i = 4; i < w - 2; i += 5) { c.moveTo(i, 3); c.lineTo(i, h - 3); } ink(c, null, Math.max(1, 1.3 * vs), "rgba(29,35,64,0.45)"); };
+        var bx = function (a, b, z0, z1, cc) { return function () { boxP(c, F, a, b, hw - 2, z0, z1, { side: cc, top: shade(cc, 0.25), end: shade(cc, -0.2), dside: ribs, dend: ribs }); }; };
+        part((u0 + 4) / 2, 0, 28, bx(u0 + 4, -1, 16, 40, "#F77F00"));
+        part((u1 - 4) / 2, 0, 28, bx(1, u1 - 4, 16, 40, "#5BC0EB"));
+        part(0, 0, 50, bx(u0 + 14, u1 - 14, 40, 60, "#A7D129"));
+      }
+      trucks(6);
+    } else if (t === "passenger") {
+      under(u0 + 3, u1 - 3);
+      part(0, 0, 28, function () {
+        boxP(c, F, u0 + 2, u1 - 2, hw - 1, 12, 44, { side: col, top: top, end: end,
+          dside: function (c, w, h) {
+            styleDeco(c, w, h, p);
+            c.beginPath(); c.rect(3, 4, 8, h - 6); c.rect(w - 11, 4, 8, h - 6); ink(c, shade(col, -0.2), LW * 0.6);
+            for (var i = 15; i <= w - 24; i += 13) winRect(c, i, 6, 9, 11, glass);
+          },
+          dend: function (c, w, h) { c.beginPath(); c.rect(w / 2 - 6, 4, 12, h - 6); ink(c, shade(col, -0.2), LW * 0.6); winRect(c, w / 2 - 4, 7, 8, 8, glass); } });
+      });
+      part(0, 0, 47, function () { boxP(c, F, u0 + 4, u1 - 4, hw - 4, 44, 49, { side: "#4A5578", top: "#5B6478" }); });
+      trucks(6);
+    } else if (t === "caboose") {
+      under(u0 + 3, u1 - 3);
+      [u0 + 3.5, u1 - 3.5].forEach(function (pu) { part(pu, 0, 13, function () { boxP(c, F, pu - 3, pu + 3, hw - 2, 10, 14, { side: "#26282E", top: "#4A5578" }); }); });
+      part(0, 0, 27, function () {
+        boxP(c, F, u0 + 6, u1 - 6, hw - 1, 12, 42, { side: col, top: top, end: end,
+          dside: function (c, w, h) { styleDeco(c, w, h, p); winRect(c, 6, 6, 11, 11, glass); winRect(c, w - 17, 6, 11, 11, glass); },
+          dend: function (c, w, h) { c.beginPath(); c.rect(w / 2 - 6, 4, 12, h - 6); ink(c, shade(col, -0.2), LW * 0.6); } });
+      });
+      part(0, 0, 49, function () {
+        boxP(c, F, -11, 11, hw - 7, 42, 55, { side: col, top: top, end: end, dside: function (c, w, h) { winRect(c, 3, 3, w / 2 - 5, 7, glass); winRect(c, w / 2 + 2, 3, w / 2 - 5, 7, glass); } });
+      });
+      part(0, 0, 57, function () { boxP(c, F, -13, 13, hw - 5, 55, 58, { side: "#26282E", top: "#3B3E48" }); });
+      trucks(6);
+    } else {
+      // boxcar, hopper, coal
+      under(u0 + 3, u1 - 3);
+      if (t === "hopper") {
+        [-L * 0.18, L * 0.18].forEach(function (cu) { part(cu, 0, 9, function () { boxP(c, F, cu - 8, cu + 8, hw - 6, 5, 14, { side: end, top: end }); }); });
+      }
+      var zt = t === "boxcar" ? 46 : (t === "hopper" ? 44 : 36);
+      part(0, 0, (12 + zt) / 2, function () {
+        boxP(c, F, u0 + 2, u1 - 2, hw, t === "hopper" ? 14 : 12, zt, { side: col, top: top, end: end,
+          dside: function (c, w, h) {
+            styleDeco(c, w, h, p);
+            if (t === "boxcar") {
+              c.beginPath(); c.rect(w / 2 - 13, 3, 26, h - 5); ink(c, shade(col, -0.18), LW * 0.8);
+              c.beginPath(); c.moveTo(w / 2 - 13, 3); c.lineTo(w / 2 + 13, h - 2); c.moveTo(w / 2 + 13, 3); c.lineTo(w / 2 - 13, h - 2); ink(c, null, LW * 0.6);
+            } else { c.beginPath(); for (var i = 1; i < 4; i++) { c.moveTo(w * i / 4, 0); c.lineTo(w * i / 4, h); } ink(c, null, LW * 0.6); }
+          },
+          dtop: function (c, w, h) {
+            if (t === "boxcar") { c.beginPath(); c.rect(3, h / 2 - 3, w - 6, 6); ink(c, shade(col, -0.35), 0); return; }
+            rr(c, 4, 4, w - 8, h - 8, 5); ink(c, "#26282E", LW * 0.6);
+            if (t === "hopper") { c.beginPath(); c.ellipse(w / 2, h / 2, w / 2 - 8, h / 2 - 7, 0, 0, TAU); ink(c, "#A27B5C", 0); }
+            else { c.beginPath(); for (var j = 9; j < w - 6; j += 9) { c.moveTo(j + 3, h / 2 - 5); c.arc(j, h / 2 - 5, 3.2, 0, TAU); c.moveTo(j + 7, h / 2 + 5); c.arc(j + 4, h / 2 + 5, 3.2, 0, TAU); } ink(c, "#4A4D58", 0); }
+          } });
+      });
+      if (t === "coal") {
+        part(0, 0, 40, function () {
+          c.beginPath();
+          [[-0.3, -6], [-0.12, 5], [0.05, -4], [0.22, 6], [0.32, -3], [-0.2, 0], [0.12, 1]].forEach(function (g) {
+            var s = P3(F, g[0] * L, g[1], 38 + (g[1] === 0 || g[1] === 1 ? 3 : 0)), r = 5.5 * vs; c.moveTo(s[0] + r, s[1]); c.arc(s[0], s[1], r, 0, TAU);
+          });
+          c.fillStyle = "#26282E"; c.fill(); c.lineWidth = LW * 0.6; c.strokeStyle = OUT; c.stroke();
+        });
+      }
+      trucks(6);
+    }
+    parts.sort(function (a, b) { return a.d - b.d; });
+    parts.forEach(function (pt) { pt.f(); });
+    // wheels on the side we can see
+    if (Math.abs(F.cv) > 0.04) {
+      var sv = F.cv > 0 ? hw - 1 : -(hw - 1);
+      wheels.forEach(function (w) {
+        var r = w[1], a = q.d / r;
+        faceT(c, F, [w[0], sv, r], [1, 0, 0], [0, 0, -1]);
+        c.beginPath(); c.arc(0, 0, r, 0, TAU); ink(c, w[2] || "#4A5578", LW * 0.8);
+        c.beginPath(); c.arc(0, 0, r * 0.45, 0, TAU); ink(c, "#C9D3E6", 0);
+        c.beginPath(); c.moveTo(-Math.cos(a) * r * 0.8, -Math.sin(a) * r * 0.8); c.lineTo(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8); ink(c, null, LW * 0.7);
+      });
+      if (t === "steam") {
+        var a2 = q.d / 10, cu = u0 + 0.34 * L;
+        faceT(c, F, [0, sv + (sv > 0 ? 1 : -1), 0], [1, 0, 0], [0, 0, -1]);
+        c.beginPath(); c.moveTo(cu + 15 + Math.cos(a2) * 6, -10 + Math.sin(a2) * 6); c.lineTo(cu + 59 + Math.cos(a2) * 6, -10 + Math.sin(a2) * 6);
+        ink(c, null, Math.max(3, 5 * vs)); ink(c, null, Math.max(1.5, 2.8 * vs), "#C9D3E6");
+      }
+      flat(c);
+    }
+    if (cut) c.restore();
+  }
+
+  // ---------- The ground: grass, pond, road, platform and the track (cached) ----------
+  var layer = null, hillLayer = null, hillKey = 0, bridge = [], trees = [], portals = [];
   function mkLayer() { var l = document.createElement("canvas"); l.width = cv.width; l.height = cv.height; var c = l.getContext("2d"); c.setTransform(DPR, 0, 0, DPR, 0, 0); return { cv: l, c: c }; }
   function trackPath(c, seg, a, b, lift) {
     c.beginPath();
@@ -1039,28 +1366,29 @@ body.big .tb-panel { display: none; }
       if (i === Math.max(0, i0)) c.moveTo(X, Y); else c.lineTo(X, Y);
     }
   }
-  function drawRails(c, seg, a, b, dim, elevated) {
+  function drawRails(c, seg, a, b, dim) {
     c.lineCap = "round"; c.lineJoin = "round";
-    trackPath(c, seg, a, b, elevated); c.strokeStyle = dim ? "rgba(120,110,100,0.5)" : "#B7A58C"; c.lineWidth = 48 * vs; c.stroke();
+    trackPath(c, seg, a, b, false); c.strokeStyle = dim ? "rgba(120,110,100,0.5)" : "#9C8A72"; c.lineWidth = 62 * vs * (0.5 + TILT * 0.5) + 2; c.stroke();
+    trackPath(c, seg, a, b, false); c.strokeStyle = dim ? "rgba(120,110,100,0.5)" : "#B7A58C"; c.lineWidth = 58 * vs * (0.5 + TILT * 0.5); c.stroke();
     // ties
-    c.strokeStyle = dim ? "rgba(110,80,60,0.45)" : "#7A5236"; c.lineWidth = 6 * vs;
+    c.strokeStyle = dim ? "rgba(110,80,60,0.45)" : "#7A5236"; c.lineWidth = Math.max(2, 7 * vs);
     c.beginPath();
     var i0 = Math.max(0, Math.floor(a / seg.step)), i1 = Math.min(seg.pts.length - 2, Math.ceil(b / seg.step));
     for (var i = i0; i <= i1; i += 3) {
       var p = seg.pts[i], q = seg.pts[i + 1], ang = Math.atan2(q.y - p.y, q.x - p.x);
-      var nx = -Math.sin(ang) * 22, ny = Math.cos(ang) * 22, z = elevated ? p.z : 0;
-      c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); c.lineTo(SX(p.x - nx), SY(p.y - ny, z));
+      var nx = -Math.sin(ang) * 27, ny = Math.cos(ang) * 27;
+      c.moveTo(SX(p.x + nx), SY(p.y + ny)); c.lineTo(SX(p.x - nx), SY(p.y - ny));
     }
     c.stroke();
     // rails: two offset lines
-    [-13, 13].forEach(function (o) {
+    [-16, 16].forEach(function (o) {
       c.beginPath();
       for (var i = i0; i <= i1 + 1; i++) {
         var p = seg.pts[i], q = seg.pts[Math.min(seg.pts.length - 1, i + 1)], pp = seg.pts[Math.max(0, i - 1)];
-        var ang = Math.atan2(q.y - pp.y, q.x - pp.x), nx = -Math.sin(ang) * o, ny = Math.cos(ang) * o, z = elevated ? p.z : 0;
-        if (i === i0) c.moveTo(SX(p.x + nx), SY(p.y + ny, z)); else c.lineTo(SX(p.x + nx), SY(p.y + ny, z));
+        var ang = Math.atan2(q.y - pp.y, q.x - pp.x), nx = -Math.sin(ang) * o, ny = Math.cos(ang) * o;
+        if (i === i0) c.moveTo(SX(p.x + nx), SY(p.y + ny)); else c.lineTo(SX(p.x + nx), SY(p.y + ny));
       }
-      c.strokeStyle = dim ? "rgba(90,95,110,0.5)" : "#5B6478"; c.lineWidth = 4 * vs; c.stroke();
+      c.strokeStyle = dim ? "rgba(90,95,110,0.5)" : "#5B6478"; c.lineWidth = Math.max(2, 4.5 * vs); c.stroke();
     });
   }
   // The road through the crossing: from a little house inside the loop, over the rails, out past the edge.
@@ -1075,12 +1403,12 @@ body.big .tb-panel { display: none; }
     if (!run) return;
     runFit();
     var lay = run.lay;
-    layer = mkLayer(); bridgeLayer = null; hillLayer = mkLayer();
+    layer = mkLayer(); hillLayer = mkLayer(); bridge = []; trees = [];
     var c = layer.c, night = state.night;
     // grass
     c.fillStyle = "#7CC95A"; c.fillRect(0, 0, W, H);
     c.fillStyle = "#6DBA4C";
-    for (var i = 0; i < 70; i++) { c.beginPath(); c.arc((i * 173) % W, (i * 97) % H, (18 + (i % 4) * 8) * Math.max(0.6, vs), 0, TAU); c.fill(); }
+    for (var i = 0; i < 70; i++) { c.beginPath(); c.ellipse((i * 173) % W, (i * 97) % H, (18 + (i % 4) * 8) * Math.max(0.6, vs), (18 + (i % 4) * 8) * Math.max(0.6, vs) * TILT, 0, 0, TAU); c.fill(); }
     // flowers
     for (var fl = 0; fl < 40; fl++) {
       c.fillStyle = ["#FFFFFF", "#FFE14D", "#F26CA7"][fl % 3];
@@ -1088,11 +1416,11 @@ body.big .tb-panel { display: none; }
     }
     // pond
     c.fillStyle = "#5BC0EB"; c.strokeStyle = OUT; c.lineWidth = 3;
-    var pond = TP(500, lay === LAYOUTS.eight ? 150 : 380);
+    var pond = TP(500, lay === LAYOUTS.eight ? 150 : 330);
     c.beginPath(); c.ellipse(SX(pond[0]), SY(pond[1]), (UPRIGHT ? 50 : 90) * vs, (UPRIGHT ? 90 : 50) * vs * TILT, 0, 0, TAU); c.fill(); c.stroke();
     c.fillStyle = "rgba(255,255,255,0.6)";
-    c.beginPath(); c.ellipse(SX(pond[0]) - 20 * vs, SY(pond[1]) - 10 * vs, 22 * vs, 5 * vs, 0, 0, TAU); c.fill();
-    // road, house at its inner end
+    c.beginPath(); c.ellipse(SX(pond[0]) - 20 * vs, SY(pond[1]) - 10 * vs * TILT, 22 * vs, 5 * vs, 0, 0, TAU); c.fill();
+    // road
     var rg = roadGeom(lay), far = ROAD_LEN + 200;
     c.strokeStyle = OUT; c.lineWidth = 50 * vs + 6; c.lineCap = "round";
     c.beginPath(); c.moveTo(SX(rg.hx), SY(rg.hy)); c.lineTo(SX(rg.hx + rg.ux * far), SY(rg.hy + rg.uy * far)); c.stroke();
@@ -1101,182 +1429,208 @@ body.big .tb-panel { display: none; }
     c.strokeStyle = "#FFE680"; c.lineWidth = 4 * vs; c.setLineDash([16 * vs, 14 * vs]); c.lineCap = "butt";
     c.beginPath(); c.moveTo(SX(rg.hx + rg.ux * 30), SY(rg.hy + rg.uy * 30)); c.lineTo(SX(rg.hx + rg.ux * far), SY(rg.hy + rg.uy * far)); c.stroke();
     c.setLineDash([]);
-    // station platform
-    var sp = segPoint(lay.station.seg, lay.station.s);
-    c.save(); c.translate(SX(sp.x), SY(sp.y)); c.transform(1, 0, 0, TILT, 0, 0); c.rotate(sp.ang);
-    rr(c, -150 * vs, 24 * vs, 300 * vs, 44 * vs, 6 * vs); trim(c, "#D9C9A8", 3);
-    c.fillStyle = "#FFE14D"; c.fillRect(-146 * vs, 26 * vs, 292 * vs, 5 * vs);
-    c.restore();
-    // track
+    // station platform (a low slab beside the track)
+    var sp = segPoint(lay.station.seg, lay.station.s), PF = frameOf({ x: sp.x, y: sp.y, z: 0, ang: sp.ang }, 0);
+    LW = clamp(vs * 3.4, 1.6, 3.2);
+    boxP(c, PF, -150, 150, 24, 0, 6, { vc: 56, side: "#B8A684", top: "#D9C9A8", end: "#A8977A",
+      dtop: function (c, w, h) { c.beginPath(); c.rect(0, 2, w, 4); ink(c, "#FFE14D", 0); } });
+    // track (on a bridge layout only the parts on the ground; the bridge is drawn with the trains)
     lay.segs.forEach(function (seg) {
       var dim = false;
       lay.switches.forEach(function (sw) { if (sw.ways.indexOf(seg) >= 0 && sw.ways[sw.on] !== seg) dim = true; });
       if (lay.bridge) {
-        // ground part only; the raised part is drawn later over the lower pass
         var a = -1, k;
         for (k = 0; k < seg.pts.length; k++) {
           var up = seg.pts[k].z > 2;
           if (!up && a < 0) a = k;
-          if ((up || k === seg.pts.length - 1) && a >= 0) { drawRails(c, seg, a * seg.step, k * seg.step, false, false); a = -1; }
+          if ((up || k === seg.pts.length - 1) && a >= 0) { drawRails(c, seg, a * seg.step, k * seg.step, false); a = -1; }
         }
-        bridgeLayer = mkLayer();
-        var bc = bridgeLayer.c, i0 = -1;
-        for (k = 0; k < seg.pts.length; k++) {
-          var u2 = seg.pts[k].z > 2;
-          if (u2 && i0 < 0) i0 = k;
-          if ((!u2 || k === seg.pts.length - 1) && i0 >= 0) {
-            for (var m = i0; m < k; m += 14) {
-              var pp = seg.pts[m];
-              if (pp.z < 18) continue;
-              bc.fillStyle = "#B4A08A"; bc.strokeStyle = OUT; bc.lineWidth = 2.5;
-              bc.beginPath(); bc.rect(SX(pp.x) - 6 * vs, SY(pp.y, pp.z), 12 * vs, pp.z * HT * vs); bc.fill(); bc.stroke();
-            }
-            trackPath(bc, seg, i0 * seg.step, k * seg.step, true); bc.strokeStyle = OUT; bc.lineWidth = 58 * vs; bc.lineCap = "round"; bc.stroke();
-            trackPath(bc, seg, i0 * seg.step, k * seg.step, true); bc.strokeStyle = "#C9B79E"; bc.lineWidth = 52 * vs; bc.stroke();
-            drawRails(bc, seg, i0 * seg.step, k * seg.step, false, true);
-            i0 = -1;
-          }
-        }
-      } else drawRails(c, seg, 0, seg.len, dim, false);
+        buildBridge(seg);
+      } else drawRails(c, seg, 0, seg.len, dim);
     });
-    // trees (not on the road or the house)
+    // trees (not on the road, the house or the track)
     [[60, 80], [940, 90], [60, 700], [950, 700], [500, 380], [380, 330], [640, 450], [40, 390], [960, 390]].forEach(function (t, k) {
       if (lay === LAYOUTS.eight && k >= 4 && k <= 6) return;
       if (lay !== LAYOUTS.eight && k === 4) return;
       var tp = TP(t[0], t[1]);
       if (Math.hypot(tp[0] - rg.hx, tp[1] - rg.hy) < 110) return;
-      // distance from the road line
       var vx = tp[0] - rg.hx, vy = tp[1] - rg.hy, along = vx * rg.ux + vy * rg.uy, across = Math.abs(vx * rg.uy - vy * rg.ux);
       if (along > -40 && across < 60) return;
-      var onTrack = lay.segs.some(function (seg) { return seg.pts.some(function (q, n) { return n % 4 === 0 && Math.hypot(q.x - tp[0], q.y - tp[1]) < 56; }); });
+      var onTrack = lay.segs.some(function (seg) { return seg.pts.some(function (q, n) { return n % 4 === 0 && Math.hypot(q.x - tp[0], q.y - tp[1]) < 60; }); });
       if (onTrack) return;
-      tree(c, tp[0], tp[1]);
+      if (Math.hypot(tp[0] - (sp.x - Math.sin(sp.ang) * 110), tp[1] - (sp.y + Math.cos(sp.ang) * 110)) < 110) return;
+      trees.push(tp);
     });
-    // tunnel hill (drawn over the train)
-    var tn = lay.tunnel, hc = hillLayer.c;
-    if (tn.a > tn.b) { var tmp = tn.a; tn.a = tn.b; tn.b = tmp; }
-    var pa = segPoint(tn.seg, tn.a), pb = segPoint(tn.seg, tn.b);
-    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.lineCap = "butt"; hc.lineJoin = "round";
-    hc.strokeStyle = OUT; hc.lineWidth = 126 * vs; hc.stroke();
-    trackPath(hc, tn.seg, tn.a + 6, tn.b - 6, false); hc.strokeStyle = "#5FA641"; hc.lineWidth = 118 * vs; hc.stroke();
-    trackPath(hc, tn.seg, tn.a + 30, tn.b - 30, false); hc.strokeStyle = "#76BF55"; hc.lineWidth = 74 * vs; hc.lineCap = "round"; hc.stroke();
-    trackPath(hc, tn.seg, tn.a + 60, tn.b - 60, false); hc.strokeStyle = "#8ED06B"; hc.lineWidth = 34 * vs; hc.stroke();
-    [pa, pb].forEach(function (p, k) {
-      hc.save(); hc.translate(SX(p.x), SY(p.y)); hc.transform(1, 0, 0, TILT, 0, 0); hc.rotate(p.ang);
-      rr(hc, (k ? -18 : -2) * vs, -44 * vs, 20 * vs, 88 * vs, 6 * vs); trim(hc, "#B4A08A", 3);
-      hc.fillStyle = "#26282E"; rr(hc, (k ? -14 : 2) * vs, -26 * vs, 12 * vs, 52 * vs, 5 * vs); hc.fill();
-      hc.restore();
-    });
-    var tm = segPoint(tn.seg, (tn.a + tn.b) / 2);
-    tree(hc, tm.x + 6, tm.y - 6);
+    buildHill();
     // night: everything a little darker (the overlay in drawRun does the rest)
     if (night) { c.fillStyle = "rgba(20,30,80,0.15)"; c.fillRect(0, 0, W, H); }
+  }
+  // The Figure 8 bridge: slices of deck (with piers) that sort with the trains.
+  function buildBridge(seg) {
+    var st = 4;
+    for (var i = 0; i + st < seg.pts.length; i += st) {
+      var A = seg.pts[i], B = seg.pts[i + st];
+      if (A.z <= 2 && B.z <= 2) continue;
+      var tn = run.lay.tunnel, ts = i * seg.step;
+      if (tn.seg === seg && ts > Math.min(tn.a, tn.b) - 20 && ts < Math.max(tn.a, tn.b) + 4) continue; // under the hill
+      var ang = Math.atan2(B.y - A.y, B.x - A.x), nx = -Math.sin(ang), ny = Math.cos(ang);
+      var sg = ny >= 0 ? 1 : -1, w = 30;
+      function pt(Q, o, dz) { return [SX(Q.x + nx * o), SY(Q.y + ny * o, Q.z + dz)]; }
+      var sl = { key: (A.y + B.y) / 2 + (A.z + B.z) / 2 * KZ - 4,
+        deck: [pt(A, -w, 0), pt(B, -w, 0), pt(B, w, 0), pt(A, w, 0)],
+        side: [pt(A, sg * w, 0), pt(B, sg * w, 0), pt(B, sg * w, -9), pt(A, sg * w, -9)],
+        rails: [[pt(A, -16, 0.5), pt(B, -16, 0.5)], [pt(A, 16, 0.5), pt(B, 16, 0.5)]], tie: [pt(A, -27, 0.3), pt(A, 27, 0.3)], pier: null };
+      if (i % 20 === 0 && A.z > 24) {
+        var clear = !seg.pts.some(function (q, n) { return n % 3 === 0 && q.z <= 2 && Math.hypot(q.x - A.x, q.y - A.y) < 46; });
+        if (clear) sl.pier = { x: SX(A.x), y0: SY(A.y, 0), y1: SY(A.y, A.z - 9) };
+      }
+      bridge.push(sl);
+    }
+  }
+  function drawSlice(c, sl) {
+    function path(ps) { c.beginPath(); ps.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.closePath(); }
+    if (sl.pier) {
+      var pw = Math.max(5, 7 * vs);
+      c.fillStyle = "#B4A08A"; c.fillRect(sl.pier.x - pw, sl.pier.y1, pw * 2, sl.pier.y0 - sl.pier.y1);
+      c.lineWidth = LW; c.strokeStyle = OUT; c.strokeRect(sl.pier.x - pw, sl.pier.y1, pw * 2, sl.pier.y0 - sl.pier.y1);
+    }
+    path(sl.side); c.fillStyle = "#8E7B63"; c.fill(); c.strokeStyle = "#8E7B63"; c.lineWidth = 1; c.stroke();
+    path(sl.deck); c.fillStyle = "#C9B79E"; c.fill(); c.strokeStyle = "#C9B79E"; c.stroke();
+    c.lineCap = "round";
+    c.beginPath(); c.moveTo(sl.tie[0][0], sl.tie[0][1]); c.lineTo(sl.tie[1][0], sl.tie[1][1]); c.strokeStyle = "#7A5236"; c.lineWidth = Math.max(2, 7 * vs); c.stroke();
+    c.beginPath(); sl.rails.forEach(function (r) { c.moveTo(r[0][0], r[0][1]); c.lineTo(r[1][0], r[1][1]); }); c.strokeStyle = "#5B6478"; c.lineWidth = Math.max(2, 4.5 * vs); c.stroke();
+    c.beginPath(); c.moveTo(sl.deck[0][0], sl.deck[0][1]); c.lineTo(sl.deck[1][0], sl.deck[1][1]); c.moveTo(sl.deck[2][0], sl.deck[2][1]); c.lineTo(sl.deck[3][0], sl.deck[3][1]);
+    c.moveTo(sl.side[2][0], sl.side[2][1]); c.lineTo(sl.side[3][0], sl.side[3][1]);
+    c.strokeStyle = OUT; c.lineWidth = LW; c.stroke();
+  }
+  // The tunnel hill: a grassy mound over the track between the two portals (cached). Trains inside are cut
+  // off at the portal; trains in front of a portal are drawn after the hill, trains behind it before.
+  function buildHill() {
+    var tn = run.lay.tunnel, hc = hillLayer.c, R = 64, HM = 74, N = 10;
+    if (tn.a > tn.b) { var tmp = tn.a; tn.a = tn.b; tn.b = tmp; }
+    function prof(s, f) {
+      var q = segPoint(tn.seg, s), nx = -Math.sin(q.ang), ny = Math.cos(q.ang), out = [];
+      var e = Math.min(1, Math.min(s - tn.a, tn.b - s) / 50), hm = HM * (0.82 + 0.18 * e);
+      for (var k = 0; k <= N; k++) {
+        var v = (k / N * 2 - 1) * R * f, h = hm * Math.pow(Math.max(0, 1 - (v / R) * (v / R)), 0.55);
+        out.push([SX(q.x + nx * v), SY(q.y + ny * v, h)]);
+      }
+      return { pts: out, y: q.y };
+    }
+    var ss = [];
+    for (var s = tn.a; s < tn.b - 0.5; s += 8) ss.push([s, Math.min(tn.b, s + 8)]);
+    hillKey = 1e9;
+    ss.forEach(function (sl) { var q = segPoint(tn.seg, sl[0]); hillKey = Math.min(hillKey, q.y - Math.abs(Math.cos(q.ang)) * R); });
+    function pass(f, fill, stroke) {
+      var list = ss.map(function (sl) { var a = prof(sl[0], f), b = prof(sl[1], f); return { y: (a.y + b.y) / 2, pts: a.pts.concat(b.pts.reverse()) }; });
+      list.sort(function (a, b) { return a.y - b.y; });
+      list.forEach(function (sl) {
+        hc.beginPath(); sl.pts.forEach(function (p, i) { if (i) hc.lineTo(p[0], p[1]); else hc.moveTo(p[0], p[1]); }); hc.closePath();
+        hc.fillStyle = fill; hc.fill();
+        if (stroke) { hc.lineJoin = "round"; hc.lineWidth = 6; hc.strokeStyle = OUT; hc.stroke(); }
+      });
+    }
+    pass(1, OUT, true); pass(1, "#5FA641"); pass(0.7, "#6CB64C"); pass(0.42, "#7FC75C"); pass(0.16, "#93D670");
+    // portals: the end faces that look toward the camera get a stone wall and a dark arch
+    portals = [];
+    [[tn.a, -1], [tn.b, 1]].forEach(function (pe) {
+      var q = segPoint(tn.seg, pe[0]);
+      portals.push({ x: q.x, y: q.y });
+      if (Math.sin(q.ang) * pe[1] <= 0.05) return;
+      var F = frameOf({ x: q.x, y: q.y, z: 0, ang: q.ang }, 0);
+      var end = prof(pe[0], 1).pts;
+      hc.beginPath(); end.forEach(function (p, i) { if (i) hc.lineTo(p[0], p[1]); else hc.moveTo(p[0], p[1]); }); hc.closePath();
+      hc.fillStyle = "#4E9636"; hc.fill(); hc.lineWidth = LW; hc.strokeStyle = OUT; hc.stroke();
+      faceT(hc, F, [0, 0, 0], [0, 1, 0], [0, 0, -1]);
+      rr(hc, -34, -62, 68, 62, 6); ink(hc, "#B4A08A", LW);
+      hc.beginPath(); for (var j = -30; j <= 30; j += 12) { hc.moveTo(j, -60); hc.lineTo(j, -2); } ink(hc, null, Math.max(1, 1.2 * vs), "rgba(29,35,64,0.25)");
+      hc.beginPath(); hc.moveTo(-23, 0); hc.lineTo(-23, -30); hc.arc(0, -30, 23, Math.PI, 0); hc.lineTo(23, 0); hc.closePath(); ink(hc, "#26282E", LW);
+      flat(hc);
+    });
+    var tm = segPoint(tn.seg, (tn.a + tn.b) / 2);
+    treeAt(hc, SX(tm.x), SY(tm.y, HM - 6), 0.8);
+  }
+  // Is a point of the train (distance d along the trail) inside the tunnel?
+  function inTunnelAt(d) {
+    var tn = run.lay.tunnel, tr = run.trail[trailIdx(d)], seg = tr.seg, s = tr.s + (d - tr.d);
+    if (s > seg.len) { s -= seg.len; seg = seg.next(); }
+    return seg === tn.seg && s > tn.a && s < tn.b;
+  }
+  // How the tunnel cuts this car: null (not at all), "hide" (all inside) or the part of it still outside.
+  function tunnelCut(q) {
+    var df = q.d + q.len / 2 - 2, db = q.d - q.len / 2 + 2, fi = inTunnelAt(df), bi = inTunnelAt(db);
+    if (fi && bi) return "hide";
+    if (!fi && !bi) return null;
+    var lo = db, hi = df;
+    for (var k = 0; k < 10; k++) { var m = (lo + hi) / 2; if (inTunnelAt(m) === bi) lo = m; else hi = m; }
+    var uc = (lo + hi) / 2 - q.d, pp = trailAt((lo + hi) / 2);
+    return fi ? { u0: -q.len, u1: uc, py: pp.y, vis: (uc - q.len / 2) / 2 } : { u0: uc, u1: q.len, py: pp.y, vis: (uc + q.len / 2) / 2 };
   }
   // A house with a garage at the inner end of the road.
   function drawHouse(c, lay) {
     var rg = roadGeom(lay), ang = Math.atan2(rg.uy, rg.ux);
-    var hx = rg.hx - rg.ux * 30, hy = rg.hy - rg.uy * 30;
-    box(c, hx, hy, 0, ang, 60, 70, 34, "#FFE6B0", "#E8C890");
-    // roof
-    var ca = Math.cos(ang), sa = Math.sin(ang);
-    var pts = [[30, 35], [-30, 35], [-30, -35], [30, -35]].map(function (q) { return [hx + q[0] * ca - q[1] * sa, hy + q[0] * sa + q[1] * ca]; });
-    c.beginPath();
-    c.moveTo(SX(pts[0][0]), SY(pts[0][1], 34)); c.lineTo(SX(pts[1][0]), SY(pts[1][1], 34));
-    c.lineTo(SX((pts[1][0] + pts[2][0]) / 2), SY((pts[1][1] + pts[2][1]) / 2, 62));
-    c.lineTo(SX((pts[0][0] + pts[3][0]) / 2), SY((pts[0][1] + pts[3][1]) / 2, 62)); c.closePath();
-    trim(c, "#E63946", 3);
-    c.beginPath();
-    c.moveTo(SX(pts[3][0]), SY(pts[3][1], 34)); c.lineTo(SX(pts[2][0]), SY(pts[2][1], 34));
-    c.lineTo(SX((pts[1][0] + pts[2][0]) / 2), SY((pts[1][1] + pts[2][1]) / 2, 62));
-    c.lineTo(SX((pts[0][0] + pts[3][0]) / 2), SY((pts[0][1] + pts[3][1]) / 2, 62)); c.closePath();
-    trim(c, "#C42F3B", 3);
+    var F = frameOf({ x: rg.hx - rg.ux * 30, y: rg.hy - rg.uy * 30, z: 0, ang: ang + Math.PI / 2 }, 0);
+    var win = state.night ? "#FFE680" : "#BEE9FF";
+    boxP(c, F, -35, 35, 30, 0, 34, { side: "#FFE6B0", top: "#FFE6B0", end: "#E8C890",
+      dside: function (c, w, h) { c.beginPath(); c.rect(8, 8, 12, 11); c.rect(w - 20, 8, 12, 11); ink(c, win, LW * 0.7); c.beginPath(); c.rect(w / 2 - 6, 12, 12, h - 12); ink(c, "#8B5A3C", LW * 0.7); },
+      dend: function (c, w, h) { c.beginPath(); c.rect(w / 2 - 15, 8, 30, h - 8); ink(c, "#C9D3E6", LW * 0.7); } });
+    gable(c, F, 39, 34, 34, 60, "#E63946", "#FFE6B0");
   }
   // The little road car.
-  function drawRoadCar(c, t) {
+  function drawRoadCar(c) {
     var rg = roadGeom(run.lay), rd = run.road;
     if (rd.u <= 2) return; // parked in the garage
     var x = rg.hx + rg.ux * rd.u, y = rg.hy + rg.uy * rd.u, ang = Math.atan2(rg.uy, rg.ux) + (rd.dir < 0 ? Math.PI : 0);
-    // keep to the right-hand lane
-    x += -Math.sin(ang) * 11; y += Math.cos(ang) * 11;
-    box(c, x, y, 0, ang, 44, 24, 12, "#2D5BD7", "#1F43A8");
-    box(c, x - Math.cos(ang) * 4, y - Math.sin(ang) * 4, 12, ang, 22, 20, 9, "#BEE9FF", "#8FC7E8");
+    x += -Math.sin(ang) * 12; y += Math.cos(ang) * 12; // keep to the right-hand lane
+    var F = frameOf({ x: x, y: y, z: 0, ang: ang }, 0);
+    boxP(c, F, -24, 24, 12, 3, 15, { side: "#2D5BD7", top: "#5B83E8", end: "#1F43A8" });
+    boxP(c, F, -12, 8, 10, 15, 25, { side: state.night ? "#FFE680" : "#BEE9FF", top: "#2D5BD7", end: "#8FC7E8" });
+  }
+  function treeAt(c, X, Y, k) {
+    var s = vs * (k || 1);
+    c.fillStyle = "#8B5A3C"; c.fillRect(X - 5 * s, Y - 34 * HT * s, 10 * s, 34 * HT * s);
+    c.beginPath(); c.arc(X, Y - 56 * HT * s, 30 * s, 0, TAU); trim(c, "#2E9E5B", 3);
+    c.beginPath(); c.arc(X - 9 * s, Y - 64 * HT * s, 10 * s, 0, TAU); c.fillStyle = "#4FBF6E"; c.fill();
   }
   function tree(c, x, y) {
     var X = SX(x), Y = SY(y);
-    c.fillStyle = "rgba(0,0,0,0.15)"; c.beginPath(); c.ellipse(X + 8 * vs, Y + 4 * vs, 30 * vs, 14 * vs, 0, 0, TAU); c.fill();
-    c.fillStyle = "#8B5A3C"; c.fillRect(X - 5 * vs, Y - 30 * vs, 10 * vs, 30 * vs);
-    c.beginPath(); c.arc(X, Y - 46 * vs, 30 * vs, 0, TAU); trim(c, "#2E9E5B", 3);
-    c.beginPath(); c.arc(X - 8 * vs, Y - 54 * vs, 10 * vs, 0, TAU); c.fillStyle = "#4FBF6E"; c.fill();
+    c.fillStyle = "rgba(0,0,0,0.15)"; c.beginPath(); c.ellipse(X + 10 * vs, Y + 3 * vs, 30 * vs, 30 * vs * TILT, 0, 0, TAU); c.fill();
+    treeAt(c, X, Y, 1);
   }
-  // An oriented box in the angled view.
-  function box(c, cx0, cy0, z, ang, L, Wd, Hh, top, side) {
-    var ca = Math.cos(ang), sa = Math.sin(ang), hl = L / 2, hw = Wd / 2;
-    var corners = [[hl, hw], [-hl, hw], [-hl, -hw], [hl, -hw]].map(function (q) { return [cx0 + q[0] * ca - q[1] * sa, cy0 + q[0] * sa + q[1] * ca]; });
-    for (var i = 0; i < 4; i++) {
-      var a = corners[i], b = corners[(i + 1) % 4];
-      var mx = (a[0] + b[0]) / 2 - cx0, my = (a[1] + b[1]) / 2 - cy0;
-      if (my <= 0.01) continue; // faces away from the viewer
-      c.beginPath();
-      c.moveTo(SX(a[0]), SY(a[1], z)); c.lineTo(SX(b[0]), SY(b[1], z)); c.lineTo(SX(b[0]), SY(b[1], z + Hh)); c.lineTo(SX(a[0]), SY(a[1], z + Hh)); c.closePath();
-      c.fillStyle = side; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+  function drawStation(c, sp, t) {
+    var bx = sp.x - Math.sin(sp.ang) * 118, by = sp.y + Math.cos(sp.ang) * 118;
+    var F = frameOf({ x: bx, y: by, z: 0, ang: sp.ang }, 0), win = state.night ? "#FFE680" : "#BEE9FF";
+    boxP(c, F, -60, 60, 24, 0, 40, { side: "#E63946", top: "#E63946", end: "#B02A35",
+      dside: function (c, w, h) { c.beginPath(); c.rect(w / 2 - 9, 12, 18, h - 12); ink(c, "#8B5A3C", LW * 0.7);
+        c.beginPath(); for (var i = 12; i < w - 20; i += 24) { if (Math.abs(i + 7 - w / 2) < 20) continue; c.rect(i, 10, 14, 13); } ink(c, win, LW * 0.7); } });
+    gable(c, F, 66, 31, 40, 62, "#8B5A3C", "#E63946");
+    var top = P3(F, 0, 0, 70), rx0 = top[0], ry0 = top[1];
+    var fs = Math.max(12, Math.round(22 * vs)), bh = Math.max(20, 30 * vs);
+    c.font = "800 " + fs + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+    var sw0 = c.measureText("Station").width + 16;
+    rx0 = clamp(rx0, sw0 / 2 + 4, W - sw0 / 2 - 4); ry0 = Math.max(ry0, bh + 4);
+    rr(c, rx0 - sw0 / 2, ry0 - bh, sw0, bh, 8); trim(c, "#FFFFFF", 3);
+    c.fillStyle = OUT; c.fillText("Station", rx0, ry0 - bh / 2 + 1);
+    // the station bell glows while the train waits
+    if (run.atStation && run.dwell > 0) {
+      c.fillStyle = "rgba(255,230,120," + (0.35 + 0.25 * Math.sin(t * 6)) + ")";
+      c.beginPath(); c.arc(rx0, ry0 - bh - 14, 10 + 4 * Math.sin(t * 6), 0, TAU); c.fill();
     }
-    c.beginPath();
-    corners.forEach(function (q, i) { if (i) c.lineTo(SX(q[0]), SY(q[1], z + Hh)); else c.moveTo(SX(q[0]), SY(q[1], z + Hh)); });
-    c.closePath(); c.fillStyle = top; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
   }
-  // Local transform for drawing on top of a car (u along, v across), at height h.
-  function topT(c, cp, h) {
-    var ca = Math.cos(cp.ang), sa = Math.sin(cp.ang);
-    c.setTransform(DPR * vs * ca, DPR * vs * sa * TILT, -DPR * vs * sa, DPR * vs * ca * TILT, DPR * SX(cp.x), DPR * SY(cp.y, cp.z + h));
-  }
-  function drawCarTop(c, cp, night) {
-    var p = cp.p, t = p.t, L = cp.len, Wd = RW, col = p.color;
-    var side = shade(col, -0.3);
-    // shadow
-    c.save(); topT(c, cp, 0); c.fillStyle = "rgba(0,0,0,0.2)"; c.fillRect(-L / 2 + 4, -Wd / 2 + 6, L, Wd); c.restore();
-    var h = 22;
-    if (t === "logs" || t === "pipes" || t === "boxes") h = 8;
-    if (t === "coal" || t === "hopper") h = 18;
-    if (t === "steam") {
-      // engine part forward, tender behind
-      var eL = L * 0.64, tL = L - eL - 2;
-      var fxp = cp.x + Math.cos(cp.ang) * (L / 2 - eL / 2), fyp = cp.y + Math.sin(cp.ang) * (L / 2 - eL / 2);
-      var bxp = cp.x - Math.cos(cp.ang) * (L / 2 - tL / 2), byp = cp.y - Math.sin(cp.ang) * (L / 2 - tL / 2);
-      box(c, bxp, byp, cp.z, cp.ang, tL, Wd, 20, col, side);
-      c.save(); topT(c, { x: bxp, y: byp, z: cp.z, ang: cp.ang }, 20);
-      c.fillStyle = "#26282E"; rr(c, -tL / 2 + 4, -Wd / 2 + 5, tL - 8, Wd - 10, 6); c.fill(); c.restore();
-      box(c, fxp, fyp, cp.z, cp.ang, eL, Wd - 4, 24, col, side);
-      c.save(); topT(c, { x: fxp, y: fyp, z: cp.z, ang: cp.ang }, 24);
-      rr(c, -eL / 2 + 2, -Wd / 2 + 6, eL * 0.62, Wd - 16, 8); trim(c, shade(col, 0.15), 2);
-      c.beginPath(); c.arc(eL / 2 - 14, 0, 7, 0, TAU); trim(c, "#26282E", 2);
-      rr(c, -eL / 2 + 2, -Wd / 2 + 2, eL * 0.32, Wd - 8, 3); trim(c, "#26282E", 2);
-      c.restore();
-    } else if (t === "fast") {
-      box(c, cp.x - Math.cos(cp.ang) * 8, cp.y - Math.sin(cp.ang) * 8, cp.z, cp.ang, L - 16, Wd, 20, col, side);
-      c.save(); topT(c, cp, 20);
-      c.beginPath(); c.moveTo(L / 2 - 16, -Wd / 2); c.quadraticCurveTo(L / 2 + 10, 0, L / 2 - 16, Wd / 2); c.closePath(); trim(c, col, 2.5);
-      c.fillStyle = "#26282E"; rr(c, L / 2 - 22, -Wd / 2 + 6, 14, Wd - 12, 5); c.fill();
-      c.fillStyle = "#E63946"; c.fillRect(-L / 2 + 8, -2, L - 30, 4);
-      c.restore();
-    } else {
-      box(c, cp.x, cp.y, cp.z, cp.ang, L, Wd, h, col, side);
-      c.save(); topT(c, cp, h);
-      if (p.style === "stripe") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; c.fillRect(-L / 2 + 2, -3, L - 4, 6); }
-      else if (p.style === "dots") { c.fillStyle = isDark(col) ? "#FFFFFF" : OUT; for (var dx = -L / 2 + 8; dx < L / 2 - 4; dx += 12) { c.beginPath(); c.arc(dx, (dx % 24 ? -5 : 5), 3, 0, TAU); c.fill(); } }
-      else if (p.style === "zigzag") { c.strokeStyle = isDark(col) ? "#FFFFFF" : OUT; c.lineWidth = 3; c.beginPath(); for (var zx = -L / 2 + 4, zi = 0; zx < L / 2 - 2; zx += 8, zi++) c.lineTo(zx, zi % 2 ? -6 : 6); c.stroke(); }
-      if (t === "diesel") { c.beginPath(); c.arc(-L / 4, 0, 6, 0, TAU); c.arc(0, 0, 6, 0, TAU); trim(c, "#4A5578", 2); rr(c, L / 2 - 20, -Wd / 2 + 3, 16, Wd - 6, 3); trim(c, shade(col, 0.2), 2); }
-      else if (t === "electric") { c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-10, -10); c.lineTo(6, 0); c.lineTo(-10, 10); c.moveTo(-14, -12); c.lineTo(-14, 12); c.stroke(); }
-      else if (t === "boxcar") { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(-L / 2 + 4, 0); c.lineTo(L / 2 - 4, 0); c.stroke(); }
-      else if (t === "tanker") { c.fillStyle = "rgba(255,255,255,0.5)"; c.fillRect(-L / 2 + 6, -Wd / 2 + 4, L - 12, 5); c.beginPath(); c.arc(0, 0, 7, 0, TAU); trim(c, shade(col, -0.15), 2); }
-      else if (t === "hopper") { c.fillStyle = "#A27B5C"; rr(c, -L / 2 + 5, -Wd / 2 + 5, L - 10, Wd - 10, 6); c.fill(); }
-      else if (t === "coal") { c.fillStyle = "#26282E"; rr(c, -L / 2 + 4, -Wd / 2 + 4, L - 8, Wd - 8, 6); c.fill(); }
-      else if (t === "logs") { for (var li = -1; li <= 1; li++) { rr(c, -L / 2 + 6, li * 9 - 4, L - 12, 9, 4); trim(c, "#8B5A3C", 2); } }
-      else if (t === "pipes") { for (var pi = -1; pi <= 1; pi++) { rr(c, -L / 2 + 6, pi * 9 - 4, L - 12, 8, 4); trim(c, "#9AA3AF", 2); } }
-      else if (t === "boxes") { rr(c, -L / 2 + 4, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#F77F00", 2); rr(c, 2, -Wd / 2 + 3, L / 2 - 6, Wd - 6, 2); trim(c, "#5BC0EB", 2); }
-      else if (t === "passenger") { c.fillStyle = night ? "#FFE680" : "rgba(255,255,255,0.45)"; for (var wx = -L / 2 + 8; wx < L / 2 - 8; wx += 12) { c.fillRect(wx, -Wd / 2 + 1, 7, 3); c.fillRect(wx, Wd / 2 - 4, 7, 3); } }
-      else if (t === "caboose") { rr(c, -10, -Wd / 2 + 4, 20, Wd - 8, 3); trim(c, shade(col, 0.2), 2); }
-      c.restore();
-    }
+  function drawGate(c, cr, sd, t) {
+    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang), tx = Math.cos(cr.ang), ty = Math.sin(cr.ang);
+    var down = run.gate, px = cr.x + rx * sd * 58 + tx * sd * 40, py = cr.y + ry * sd * 58 + ty * sd * 40, len = 66;
+    var ex = px - tx * sd * len * down, ey = py - ty * sd * len * down, ez = 24 + (1 - down) * len;
+    c.fillStyle = "#4A5578"; c.fillRect(SX(px) - 3 * vs, SY(py, 44), 6 * vs, 44 * HT * vs);
+    c.strokeStyle = OUT; c.lineWidth = Math.max(4, 9 * vs); c.lineCap = "round";
+    c.beginPath(); c.moveTo(SX(px), SY(py, 24)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+    c.strokeStyle = "#FFFFFF"; c.lineWidth = Math.max(2.5, 5 * vs); c.setLineDash([8 * vs, 8 * vs]);
+    c.beginPath(); c.moveTo(SX(px), SY(py, 24)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+    c.strokeStyle = "#E63946"; c.lineDashOffset = 8 * vs; c.beginPath(); c.moveTo(SX(px), SY(py, 24)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
+    c.setLineDash([]); c.lineDashOffset = 0;
+    var on = down > 0.3 && Math.floor(t * 2.5) % 2 === (sd > 0 ? 0 : 1);
+    c.beginPath(); c.arc(SX(px), SY(py, 48), Math.max(4, 8 * vs), 0, TAU); trim(c, on ? "#FF4A4A" : "#5A2A2A", 2.5);
+    if (on) { c.fillStyle = "rgba(255,80,80,0.4)"; c.beginPath(); c.arc(SX(px), SY(py, 48), 24 * vs, 0, TAU); c.fill(); }
   }
   function drawRun(t) {
     var c = cx, lay = run.lay;
@@ -1285,68 +1639,57 @@ body.big .tb-panel { display: none; }
     var night = state.night;
     var sp = segPoint(lay.station.seg, lay.station.s);
     var nx = -Math.sin(sp.ang), ny = Math.cos(sp.ang);
-    // things on the ground: the house, the road car, people waiting on the platform
-    drawHouse(c, lay);
-    drawRoadCar(c, t);
+    // Everything that stands up, sorted back to front.
+    var D = [];
+    function put(k, f) { D.push({ k: k, f: f }); }
+    poses.forEach(function (q) {
+      var cut = tunnelCut(q);
+      if (cut === "hide") return;
+      var key = q.y + (q.z + 22) * KZ;
+      if (cut) {
+        var vy = q.y + Math.sin(q.ang) * cut.vis;
+        if (vy < cut.py) key = hillKey - 0.5;
+      } else {
+        portals.forEach(function (pt) { if (Math.hypot(pt.x - q.x, pt.y - q.y) < q.len / 2 + 30 && q.y < pt.y) key = hillKey - 0.5; });
+      }
+      put(key, function () { drawCar(c, q, night, cut); });
+    });
+    trees.forEach(function (tp) { put(tp[1], function () { tree(c, tp[0], tp[1]); }); });
+    bridge.forEach(function (sl) { put(sl.key, function () { drawSlice(c, sl); }); });
+    put(hillKey, function () { c.drawImage(hillLayer.cv, 0, 0, W, H); });
+    put(sp.y + ny * 118, function () { drawStation(c, sp, t); });
+    var rg = roadGeom(lay);
+    put(rg.hy - rg.uy * 30, function () { drawHouse(c, lay); });
+    if (run.road.u > 2) put(rg.hy + rg.uy * run.road.u, function () { drawRoadCar(c); });
     if (!run.atStation || run.dwell <= 0) {
       [-90, -30, 40, 100].forEach(function (o, k) {
-        var px = sp.x + Math.cos(sp.ang) * o + nx * 54, py = sp.y + Math.sin(sp.ang) * o + ny * 54;
-        var hop = Math.max(0, Math.sin(t * 3 + k * 1.7)) * 4;
-        person(c, px, py, hop, ["#E63946", "#2D5BD7", "#F77F00", "#7B4FC9"][k]);
+        var px = sp.x + Math.cos(sp.ang) * o + nx * 64, py = sp.y + Math.sin(sp.ang) * o + ny * 64;
+        put(py, function () { person(c, px, py, 6 + Math.max(0, Math.sin(t * 3 + k * 1.7)) * 4, ["#E63946", "#2D5BD7", "#F77F00", "#7B4FC9"][k]); });
       });
     }
-    var low = poses.filter(function (q) { return q.z <= 2; }), high = poses.filter(function (q) { return q.z > 2; });
-    low.sort(function (a, b) { return a.y - b.y; }); high.sort(function (a, b) { return a.y - b.y; });
-    function drawOne(q) {
-      if (q.i === sel) halo(c, q, t);
-      var jy = q.p.jig > 0 ? Math.abs(Math.sin(q.p.jig * 16)) * 6 * q.p.jig : 0;
-      drawCarTop(c, jy ? { p: q.p, x: q.x, y: q.y, z: q.z + jy, ang: q.ang, len: q.len } : q, night);
+    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
+    [-1, 1].forEach(function (sd) {
+      var gy = cr.y + Math.cos(cr.ang) * sd * 58 + Math.sin(cr.ang) * sd * 40;
+      put(gy, function () { drawGate(c, cr, sd, t); });
+    });
+    // the tapped car glows: a yellow outline on the ground around it (under everything that stands up)
+    if (sel >= 0 && poses[sel] && tunnelCut(poses[sel]) !== "hide") {
+      var hq = poses[sel], G = frameOf(hq, 0), pulse = reduce ? 1 : 1 + 0.12 * Math.sin(t * 6);
+      faceT(c, G, [-hq.len / 2 - 9 * pulse, -RW / 2 - 9 * pulse, 0], [1, 0, 0], [0, 1, 0]);
+      rr(c, 0, 0, hq.len + 18 * pulse, RW + 18 * pulse, 14); ink(c, "rgba(255,201,60,0.9)", LW); flat(c);
     }
-    low.forEach(drawOne);
-    if (bridgeLayer) c.drawImage(bridgeLayer.cv, 0, 0, W, H);
-    high.forEach(drawOne);
-    c.drawImage(hillLayer.cv, 0, 0, W, H);
-    // station building + sign
-    var bx = sp.x + nx * 100, by = sp.y + ny * 100;
-    box(c, bx, by, 0, sp.ang, 120, 50, 40, "#E63946", "#B02A35");
-    var rx0 = SX(bx), ry0 = SY(by, 40);
-    c.font = "800 " + Math.max(12, Math.round(22 * vs)) + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
-    var sw0 = c.measureText("Station").width + 16;
-    rr(c, rx0 - sw0 / 2, ry0 - 18 - 30 * vs, sw0, Math.max(20, 30 * vs), 8); trim(c, "#FFFFFF", 3);
-    c.fillStyle = OUT; c.fillText("Station", rx0, ry0 - 18 - 30 * vs + Math.max(20, 30 * vs) / 2 + 1);
-    // station bell glows while the train waits
-    if (run.atStation && run.dwell > 0) {
-      c.fillStyle = "rgba(255,230,120," + (0.35 + 0.25 * Math.sin(t * 6)) + ")";
-      c.beginPath(); c.arc(rx0, ry0 - 18 - 30 * vs - 14, 10 + 4 * Math.sin(t * 6), 0, TAU); c.fill();
-    }
+    D.sort(function (a, b) { return a.k - b.k; });
+    D.forEach(function (d) { d.f(); });
+    flat(c);
     // loads moving between platform and cars
     run.loads.forEach(function (L) {
-      var k = L.t / L.life, x = L.a.x + (L.b.x - L.a.x) * k, y = L.a.y + (L.b.y - L.a.y) * k, z = L.z + 24 + Math.sin(k * Math.PI) * 50;
+      var k = L.t / L.life, x = L.a.x + (L.b.x - L.a.x) * k, y = L.a.y + (L.b.y - L.a.y) * k, z = L.z + 40 + Math.sin(k * Math.PI) * 50;
       var X = SX(x), Y = SY(y, z), r = Math.max(6, 10 * vs);
       if (L.kind === "person") person(c, x, y, z - 4, L.c);
       else if (L.kind === "drop") { c.beginPath(); c.moveTo(X, Y - r * 1.4); c.quadraticCurveTo(X + r, Y, X, Y + r * 0.8); c.quadraticCurveTo(X - r, Y, X, Y - r * 1.4); trim(c, L.c, 2.5); }
       else if (L.kind === "log") { rr(c, X - r * 1.4, Y - r * 0.5, r * 2.8, r, r * 0.5); trim(c, L.c, 2.5); }
       else if (L.kind === "lump") { c.beginPath(); c.arc(X, Y, r * 0.8, 0, TAU); trim(c, L.c, 2.5); }
       else { rr(c, X - r, Y - r, r * 2, r * 2, 3); trim(c, L.c, 2.5); }
-    });
-    // crossing gates with flashing lights
-    var cr = segPoint(lay.crossing.seg, lay.crossing.s);
-    var rx = -Math.sin(cr.ang), ry = Math.cos(cr.ang), tx = Math.cos(cr.ang), ty = Math.sin(cr.ang);
-    var down = run.gate;
-    [-1, 1].forEach(function (sd) {
-      var px = cr.x + rx * sd * 50 + tx * sd * 36, py = cr.y + ry * sd * 50 + ty * sd * 36;
-      var len = 60;
-      var ex = px - tx * sd * len * down, ey = py - ty * sd * len * down, ez = 22 + (1 - down) * len;
-      c.strokeStyle = OUT; c.lineWidth = Math.max(4, 9 * vs); c.lineCap = "round";
-      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
-      c.strokeStyle = "#FFFFFF"; c.lineWidth = Math.max(2.5, 5 * vs); c.setLineDash([8 * vs, 8 * vs]);
-      c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
-      c.strokeStyle = "#E63946"; c.lineDashOffset = 8 * vs; c.beginPath(); c.moveTo(SX(px), SY(py, 22)); c.lineTo(SX(ex), SY(ey, ez)); c.stroke();
-      c.setLineDash([]); c.lineDashOffset = 0;
-      c.fillStyle = "#4A5578"; c.fillRect(SX(px) - 3 * vs, SY(py, 34), 6 * vs, 34 * HT * vs);
-      var on = down > 0.3 && Math.floor(t * 2.5) % 2 === (sd > 0 ? 0 : 1);
-      c.beginPath(); c.arc(SX(px), SY(py, 38), Math.max(4, 8 * vs), 0, TAU); trim(c, on ? "#FF4A4A" : "#5A2A2A", 2.5);
-      if (on) { c.fillStyle = "rgba(255,80,80,0.4)"; c.beginPath(); c.arc(SX(px), SY(py, 38), 24 * vs, 0, TAU); c.fill(); }
     });
     // switches: big yellow buttons with an arrow showing the way the train will go
     lay.switches.forEach(function (sw) {
@@ -1372,13 +1715,13 @@ body.big .tb-panel { display: none; }
     if (night) drawNight(c, poses, sp, nx, ny);
     // the tapped car: a bouncing arrow above it
     if (sel >= 0 && poses[sel]) {
-      var q = poses[sel], ax = SX(q.x), ay = SY(q.y, q.z + 40) - 26 - (reduce ? 0 : Math.abs(Math.sin(t * 4)) * 10);
+      var q = poses[sel], ax = SX(q.x), ay = SY(q.y, q.z + 70) - 20 - (reduce ? 0 : Math.abs(Math.sin(t * 4)) * 10);
       c.beginPath(); c.moveTo(ax, ay + 22); c.lineTo(ax - 18, ay); c.lineTo(ax - 7, ay); c.lineTo(ax - 7, ay - 18); c.lineTo(ax + 7, ay - 18); c.lineTo(ax + 7, ay); c.lineTo(ax + 18, ay); c.closePath();
       trim(c, "#FFC93C", 4);
     }
     if (run.toot > 0 && poses.length) {
       var h1 = poses[0], k2 = 1 - run.toot / TOOT_T;
-      var X1 = SX(h1.x), Y1 = SY(h1.y, h1.z + 60) - 30 - k2 * 30;
+      var X1 = SX(h1.x), Y1 = SY(h1.y, h1.z + 80) - 20 - k2 * 30;
       c.globalAlpha = k2 > 0.8 ? (1 - k2) / 0.2 : 1;
       var fs = Math.round(clamp(40 * vs, 22, 44));
       c.font = "800 " + fs + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
@@ -1391,39 +1734,30 @@ body.big .tb-panel { display: none; }
     }
   }
   function person(c, x, y, z, col) {
-    var X = SX(x), Y = SY(y, z || 0), s = Math.max(0.55, vs);
+    var X = SX(x), Y = SY(y, z || 0), s = Math.max(0.55, vs) * 1.15;
     c.beginPath(); c.ellipse(X, Y - 9 * s, 6 * s, 9 * s, 0, 0, TAU); trim(c, col, 2);
     c.beginPath(); c.arc(X, Y - 22 * s, 5.5 * s, 0, TAU); trim(c, "#F2C9A0", 2);
-  }
-  // The tapped car glows: a yellow outline on the ground around it.
-  function halo(c, q, t) {
-    var pulse = reduce ? 1 : 1 + 0.12 * Math.sin(t * 6);
-    c.save(); topT(c, q, 0);
-    c.lineJoin = "round";
-    rr(c, -q.len / 2 - 9 * pulse, -RW / 2 - 9 * pulse, q.len + 18 * pulse, RW + 18 * pulse, 14);
-    c.fillStyle = "rgba(255,201,60,0.85)"; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
-    c.restore();
   }
   function drawNight(c, poses, sp, nx, ny) {
     c.fillStyle = "rgba(12,20,60,0.55)"; c.fillRect(0, 0, W, H);
     c.save(); c.globalCompositeOperation = "lighter";
     var h0 = poses[0];
-    if (h0 && TYPES[h0.p.t].eng) {
+    if (h0 && TYPES[h0.p.t].eng && tunnelCut(h0) !== "hide") {
       var hx = h0.x + Math.cos(h0.ang) * h0.len / 2, hy = h0.y + Math.sin(h0.ang) * h0.len / 2;
-      var sx = SX(hx), sy = SY(hy, h0.z + 14);
-      var ex2 = SX(hx + Math.cos(h0.ang) * 220), ey2 = SY(hy + Math.sin(h0.ang) * 220, h0.z);
-      var g = c.createRadialGradient(sx, sy, 2, sx, sy, 220 * vs);
+      var sx = SX(hx), sy = SY(hy, h0.z + 26);
+      var ex2 = SX(hx + Math.cos(h0.ang) * 240), ey2 = SY(hy + Math.sin(h0.ang) * 240, h0.z);
+      var g = c.createRadialGradient(sx, sy, 2, sx, sy, 240 * vs);
       g.addColorStop(0, "rgba(255,240,160,0.75)"); g.addColorStop(1, "rgba(255,240,160,0)");
       c.fillStyle = g;
-      var px2 = -Math.sin(h0.ang) * 70, py2 = Math.cos(h0.ang) * 70;
+      var px2 = -Math.sin(h0.ang) * 76, py2 = Math.cos(h0.ang) * 76;
       c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex2 + px2 * vs, ey2 + py2 * TILT * vs); c.lineTo(ex2 - px2 * vs, ey2 - py2 * TILT * vs); c.closePath(); c.fill();
       c.beginPath(); c.arc(sx, sy, 7 * vs + 3, 0, TAU); c.fillStyle = "rgba(255,250,200,0.9)"; c.fill();
     }
     [-120, 0, 120].forEach(function (o) {
-      var lx = sp.x + Math.cos(sp.ang) * o + nx * 50, ly = sp.y + Math.sin(sp.ang) * o + ny * 50;
-      var g2 = c.createRadialGradient(SX(lx), SY(ly, 20), 1, SX(lx), SY(ly, 20), 50 * vs);
+      var lx = sp.x + Math.cos(sp.ang) * o + nx * 60, ly = sp.y + Math.sin(sp.ang) * o + ny * 60;
+      var g2 = c.createRadialGradient(SX(lx), SY(ly, 24), 1, SX(lx), SY(ly, 24), 54 * vs);
       g2.addColorStop(0, "rgba(255,220,120,0.7)"); g2.addColorStop(1, "rgba(255,220,120,0)");
-      c.fillStyle = g2; c.beginPath(); c.arc(SX(lx), SY(ly, 20), 50 * vs, 0, TAU); c.fill();
+      c.fillStyle = g2; c.beginPath(); c.arc(SX(lx), SY(ly, 24), 54 * vs, 0, TAU); c.fill();
     });
     // the house windows and the road car's lamps
     var rg = roadGeom(run.lay);
@@ -1431,10 +1765,10 @@ body.big .tb-panel { display: none; }
     g4.addColorStop(0, "rgba(255,220,120,0.6)"); g4.addColorStop(1, "rgba(255,220,120,0)");
     c.fillStyle = g4; c.beginPath(); c.arc(SX(rg.hx), SY(rg.hy, 20), 60 * vs, 0, TAU); c.fill();
     poses.forEach(function (q) {
-      if (q.p.t === "passenger" || q.p.t === "caboose" || q.p.t === "fast") {
-        var g3 = c.createRadialGradient(SX(q.x), SY(q.y, q.z + 20), 1, SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7);
+      if ((q.p.t === "passenger" || q.p.t === "caboose" || q.p.t === "fast") && tunnelCut(q) !== "hide") {
+        var g3 = c.createRadialGradient(SX(q.x), SY(q.y, q.z + 30), 1, SX(q.x), SY(q.y, q.z + 30), q.len * vs * 0.7);
         g3.addColorStop(0, "rgba(255,220,120,0.45)"); g3.addColorStop(1, "rgba(255,220,120,0)");
-        c.fillStyle = g3; c.beginPath(); c.arc(SX(q.x), SY(q.y, q.z + 20), q.len * vs * 0.7, 0, TAU); c.fill();
+        c.fillStyle = g3; c.beginPath(); c.arc(SX(q.x), SY(q.y, q.z + 30), q.len * vs * 0.7, 0, TAU); c.fill();
       }
     });
     c.restore();
@@ -1462,8 +1796,6 @@ body.big .tb-panel { display: none; }
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     var turned = orient(H > W * 1.15);
-    // Very wide stages (a phone held sideways in Big mode): look down a little more steeply so the layout fills the width.
-    if (!UPRIGHT) TILT = W / H > 2.1 ? 0.6 : 0.74;
     if (turned || !run) startRun(); else buildLayer();
     renderPicks();
     if (sel >= 0) drawSelPic();
@@ -1474,21 +1806,12 @@ body.big .tb-panel { display: none; }
 
   // ---------- Input on the stage ----------
   function local(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-  function inTunnel(q) {
-    var tn = run.lay.tunnel;
-    var best = 1e9, s0 = 0;
-    for (var s = tn.a + 30; s <= tn.b - 30; s += 12) {
-      var p = segPoint(tn.seg, s), d = Math.hypot(p.x - q.x, p.y - q.y);
-      if (d < best) { best = d; s0 = s; }
-    }
-    return best < 22 && q.z < 2 && s0 > 0;
-  }
   function hitPiece(p) {
     var poses = carPoses(), best = -1, bd = 1e9;
     poses.forEach(function (q, i) {
-      if (inTunnel(q)) return;
-      var X = SX(q.x), Y = SY(q.y, q.z + 12), d = Math.hypot(p.x - X, p.y - Y);
-      var r = Math.max(26, q.len * vs * 0.6);
+      if (tunnelCut(q) === "hide") return;
+      var X = SX(q.x), Y = SY(q.y, q.z + 26), d = Math.hypot(p.x - X, p.y - Y);
+      var r = Math.max(28, q.len * vs * 0.6);
       if (d < r && d < bd) { bd = d; best = i; }
     });
     return best;
@@ -1504,7 +1827,12 @@ body.big .tb-panel { display: none; }
     var i = hitPiece(p);
     if (i >= 0) {
       var pc = state.pieces[i];
-      if (TYPES[pc.t].eng) { toot(); return; }
+      if (TYPES[pc.t].eng) {
+        toot();
+        // Big mode has no Go button: a tap on the engine starts a stopped train.
+        if (document.body.classList.contains("big") && !state.go) setGo(true);
+        return;
+      }
       if (sel === i) endSel(); else showSel(i);
       return;
     }
@@ -1522,7 +1850,7 @@ body.big .tb-panel { display: none; }
     run.toot = TOOT_T;
     var poses = carPoses(), h = poses[0];
     if (h && h.p.t === "steam") sWhistle(); else sHorn();
-    if (h) for (var i = 0; i < 6; i++) { puff(h, 0.3, 1.5); var f = run.puffs[run.puffs.length - 1]; f.vz = 60 + i * 12; f.vx = rand(-30, 30); }
+    if (h) for (var i = 0; i < 6; i++) { puff(h, h.p.t === "steam" ? 0.39 : 0.3, 1.5); var f = run.puffs[run.puffs.length - 1]; f.vz = 60 + i * 12; f.vx = rand(-30, 30); }
     var b = $("toot"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
     tooted = true; updateCoach();
   }
@@ -1551,13 +1879,14 @@ body.big .tb-panel { display: none; }
     g.textContent = state.go ? "Stop" : "Go!";
     g.classList.toggle("stop", state.go);
   }
-  $("go").addEventListener("click", function () {
+  function setGo(on) {
     if (Toybox.timer.locked() || !hasEngine()) return;
-    state.go = !state.go;
+    state.go = on;
     if (state.go && run && run.atStation) run.dwell = 0;
     if (state.go) { sWhistleSoft(); ghostDone(); }
     save(); updateGo(); updateCoach();
-  });
+  }
+  $("go").addEventListener("click", function () { setGo(!state.go); });
   function sWhistleSoft() { var h = state.pieces[0]; if (h && h.t === "steam") sWhistle(); else sHorn(); }
   $("toot").addEventListener("click", toot);
   $("newBtn").addEventListener("click", function () {
@@ -1741,7 +2070,7 @@ body.big .tb-panel { display: none; }
     if (!state.pieces.length) return "Tap an engine!";
     if (!hasEngine()) return "Add an engine!";
     if (!carCount()) return "Now add cars!";
-    if (!state.go) return "Tap Go!";
+    if (!state.go) return document.body.classList.contains("big") ? "Tap the engine!" : "Tap Go!";
     if (state.layout === "switch" && !flipped) return "Tap a yellow arrow!";
     if (!tooted) return "Tap the engine!";
     return "";
@@ -1893,7 +2222,14 @@ body.big .tb-panel { display: none; }
       if (vis(tab)) return { pts: [ghostPt(tab, 0.5, 0.5)], tap: true };
       return null;
     }
-    if (ph === "go") { var g = $("go"); return vis(g) && !$("gorow").hidden ? { pts: [ghostPt(g, 0.5, 0.5)], tap: true } : null; }
+    if (ph === "go") {
+      var g = $("go");
+      if (vis(g) && !$("gorow").hidden) return { pts: [ghostPt(g, 0.5, 0.5)], tap: true };
+      // Big mode: show a tap on the engine instead
+      var e0 = carPoses()[0], rc = cv.getBoundingClientRect();
+      if (document.body.classList.contains("big") && e0 && TYPES[e0.p.t].eng) return { pts: [[rc.left + SX(e0.x), rc.top + SY(e0.y, e0.z + 26)]], tap: true };
+      return null;
+    }
     if (ph === "switch") {
       var sw = run.lay.switches[0], r = cv.getBoundingClientRect();
       if (sw && sw.sx !== undefined) return { pts: [[r.left + sw.sx, r.top + sw.sy]], tap: true };
@@ -1949,12 +2285,12 @@ body.big .tb-panel { display: none; }
       if (run) { run.ending = false; run.endDone = null; run.dwell = 1; }
       state.go = false; save(); updateGo(); updateCoach();
     },
-    onBig: function () { setTimeout(resize, 30); },
+    onBig: function () { setTimeout(resize, 30); updateCoach(); },
     onSound: function (on) { if (on) setTimeout(sChime, 60); }
   });
   if ($("tb-farewell")) stage.appendChild($("tb-farewell"));
   if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, add: addPiece, ghost: ghost,
-    pieces: function () { var r = cv.getBoundingClientRect(); return carPoses().map(function (q) { return { t: q.p.t, x: r.left + SX(q.x), y: r.top + SY(q.y, q.z + 12), sx: SX(q.x), sy: SY(q.y, q.z) }; }); },
+    pieces: function () { var r = cv.getBoundingClientRect(); return carPoses().map(function (q) { return { t: q.p.t, x: r.left + SX(q.x), y: r.top + SY(q.y, q.z + 26), sx: SX(q.x), sy: SY(q.y, q.z), hidden: tunnelCut(q) === "hide" }; }); },
     switches: function () { var r = cv.getBoundingClientRect(); return run.lay.switches.map(function (s) { return { x: r.left + s.sx, y: r.top + s.sy, on: s.on }; }); } };
 })();
 </script>
