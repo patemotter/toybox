@@ -126,7 +126,7 @@
     { id: "uses-info", app: "Good to know", type: "info",
       listTitle: "Which apps ask for something special",
       list: [
-        "Turn the device: Train Builder prefers sideways, Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
+        "Turn the device: only Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
         "Sound: every app has soft sound effects, all off until you turn sound on above",
         "Motion (tilt and shake): no app uses it; the Toybox never asks for motion access",
         "Nothing uses the camera, the microphone or location; after the first visit nothing needs the internet (it only checks for updates when online)"

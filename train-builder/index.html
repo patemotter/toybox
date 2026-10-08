@@ -67,7 +67,7 @@ body {
 
 /* Go row: the green Go! (it reads Stop while the train runs) and Toot!. Hidden until there is an engine. */
 .gorow { display: flex; gap: 8px; }
-.gorow[hidden] { display: none; }
+.gorow .btn.off { opacity: 0.55; }
 .gorow .tb-go { flex: 1 1 auto; min-width: 0; }
 .btn.tb-go.stop { background: #E63946; }
 .btn.toot { flex: 0 0 auto; min-width: 96px; background: #FFC93C; color: #1D2340; font-weight: 800; font-size: 1.35rem; }
@@ -153,6 +153,41 @@ body.big .tb-panel { display: none; }
   .pick canvas { height: 36px; }
   .selhead .btn { font-size: 0.95rem; padding: 0 0.5rem; }
 }
+/* Upright: the panel is the same height on every tab (two rows of tiles, the tapped car's colors too),
+   so switching tabs never resizes the stage or re-frames the layout. */
+@media (orientation: portrait) {
+  .tb-body .tb-panel { padding: 6px; gap: 6px; }
+  .tb-panel .panel-body.tb-choices { height: var(--ch, 124px); }
+  [data-pane] { height: 100%; }
+  .picks { grid-auto-rows: 1fr; align-content: stretch; gap: 6px; }
+  #trackPicks { --cols: 3; }
+  .pick { min-height: 0; padding: 3px 2px 1px; }
+  .pick canvas { flex: 1 1 0; min-height: 0; height: auto; }
+  #selPane { flex-direction: row; gap: 6px; }
+  .selhead { flex: 0 0 auto; flex-direction: column; gap: 6px; width: 92px; }
+  .selhead .btn { flex: 1 1 0; min-height: 0; padding: 0 0.3rem; }
+  .selpic { flex: 1 1 0; height: auto; }
+  .swatches { flex: 1 1 auto; grid-template-rows: 1fr 1fr; gap: 6px; }
+  .sw { height: auto; min-height: 0; }
+  .btn.tb-go, .btn.toot { min-height: 50px; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .selpic { display: none; }
+  .pick { font-size: 0.74rem; letter-spacing: -0.02em; }
+}
+/* Five tabs in one row: the longer words get a little more room, so no label is cut off. */
+.tb-tabs .btn { flex: 1 1 auto; padding-left: 0.15rem; padding-right: 0.15rem; }
+@media (max-width: 420px) {
+  .tb-tabs { gap: 4px; }
+  .tb-tabs .btn { font-size: 0.84rem; padding-left: 0.1rem; padding-right: 0.1rem; }
+}
+@media (orientation: portrait) and (min-width: 700px) {
+  .tb-panel .panel-body.tb-choices { --ch: 212px; }
+  .tb-body .tb-panel { padding: 8px; gap: 8px; }
+  .picks, .swatches { gap: 10px; }
+  .selhead { width: 150px; }
+  .btn.tb-go, .btn.toot { min-height: 60px; }
+}
 @media (prefers-reduced-motion: reduce) {
   #count.pop, .pick.hop, .btn.toot.pop { animation: none; }
 }
@@ -181,7 +216,7 @@ body.big .tb-panel { display: none; }
     </main>
 
     <section class="tb-panel" id="panel" data-tab="engines">
-      <div class="gorow" id="gorow" hidden>
+      <div class="gorow" id="gorow">
         <button class="btn tb-go" id="go">Go!</button>
         <button class="btn toot" id="toot">Toot!</button>
       </div>
@@ -1036,6 +1071,14 @@ body.big .tb-panel { display: none; }
       setTilt(k / 50);
       if (ah / ((y1 - y0) * TILT + TOPZ * HT) >= vsW) break;
     }
+    // Upright with height to spare (a tall phone): look a little more from above, so the loop fills the
+    // stage and the cars on the long straights show more of their length.
+    if (UPRIGHT && k === base) {
+      for (var k2 = base + 1; k2 <= 40; k2++) {
+        setTilt(k2 / 50);
+        if (ah / ((y1 - y0) * TILT + TOPZ * HT) < vsW) { setTilt((k2 - 1) / 50); break; }
+      }
+    }
     var top = y0 * TILT - TOPZ * HT, sh = (y1 - y0) * TILT + TOPZ * HT;
     vs = Math.min(vsW, ah / sh);
     vox = (W - sw * vs) / 2 - x0 * vs;
@@ -1795,10 +1838,28 @@ body.big .tb-panel { display: none; }
     W = Math.max(50, stage.clientWidth); H = Math.max(50, stage.clientHeight);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    var turned = orient(H > W * 1.15);
+    // Upright or sideways is decided only when the screen itself changes (turning the device, Big on/off),
+    // never by a small change of the stage (a tab, a toast), so the layout can't flip while he plays.
+    var big = document.body.classList.contains("big");
+    var key = innerWidth + "x" + innerHeight + (big ? "b" : "");
+    var turned = false;
+    if (key !== orientKey || !run) { orientKey = key; turned = orient(bestUpright()); }
     if (turned || !run) startRun(); else buildLayer();
     renderPicks();
     if (sel >= 0) drawSelPic();
+  }
+  // Which way round fits the stage better (bigger trains); a tie stays as it is.
+  var orientKey = "";
+  function bestUpright() {
+    var keep = UPRIGHT, fit = { "false": 0, "true": 0 }, saved = run;
+    [false, true].forEach(function (up) {
+      orient(up);
+      Object.keys(LAYOUTS).forEach(function (k) { run = { lay: LAYOUTS[k] }; runFit(); fit[up] += vs; });
+    });
+    orient(keep); run = saved;
+    if (fit[true] > fit[false] * 1.04) return true;
+    if (fit[false] > fit[true] * 1.04) return false;
+    return keep;
   }
   window.addEventListener("resize", function () { setTimeout(resize, 30); });
   var roT = 0;
@@ -1874,8 +1935,8 @@ body.big .tb-panel { display: none; }
   });
   function updateGo() {
     var eng = hasEngine();
-    $("gorow").hidden = !eng;
     var g = $("go");
+    g.classList.toggle("off", !eng); $("toot").classList.toggle("off", !eng);
     g.textContent = state.go ? "Stop" : "Go!";
     g.classList.toggle("stop", state.go);
   }
@@ -1886,9 +1947,16 @@ body.big .tb-panel { display: none; }
     if (state.go) { sWhistleSoft(); ghostDone(); }
     save(); updateGo(); updateCoach();
   }
-  $("go").addEventListener("click", function () { setGo(!state.go); });
+  // No engine yet: a gentle hint and the engine tiles hop (the Go row stays, so the stage never resizes).
+  function needEngine() {
+    if (Toybox.timer.locked()) return;
+    Toybox.toast("Tap an engine first!");
+    if (sel >= 0 || state.tab !== "engines") setTab("engines");
+    Array.prototype.forEach.call(document.querySelectorAll("#engPicks .pick"), function (b) { b.classList.remove("hop"); void b.offsetWidth; b.classList.add("hop"); });
+  }
+  $("go").addEventListener("click", function () { if (!hasEngine()) { needEngine(); return; } setGo(!state.go); });
   function sWhistleSoft() { var h = state.pieces[0]; if (h && h.t === "steam") sWhistle(); else sHorn(); }
-  $("toot").addEventListener("click", toot);
+  $("toot").addEventListener("click", function () { if (!hasEngine()) { needEngine(); return; } toot(); });
   $("newBtn").addEventListener("click", function () {
     if (Toybox.timer.locked()) return;
     clearSurprise();
@@ -2008,11 +2076,18 @@ body.big .tb-panel { display: none; }
   function setSpeed(f) {
     state.fast = f; save(); renderPicks();
   }
+  // A long name on a narrow tile ("Containers" on a phone) gets a touch smaller instead of being cut off.
+  function fitLabel(sp) {
+    if (!sp || !sp.offsetParent) return;
+    sp.style.fontSize = "";
+    var room = sp.parentNode.clientWidth - 6, w = sp.scrollWidth;
+    if (w > room && room > 0) sp.style.fontSize = Math.max(9, parseFloat(getComputedStyle(sp).fontSize) * room / w) + "px";
+  }
   function renderPicks() {
     Array.prototype.forEach.call(document.querySelectorAll(".pick"), function (b) {
       if (b.dataset.layout) b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout));
       if (b.dataset.speed) b.setAttribute("aria-pressed", String((b.dataset.speed === "fast") === state.fast));
-      if (b.offsetParent) b._draw();
+      if (b.offsetParent) { b._draw(); fitLabel(b._label); }
     });
     nightB._label.textContent = state.night ? "Day" : "Night";
   }
@@ -2224,7 +2299,7 @@ body.big .tb-panel { display: none; }
     }
     if (ph === "go") {
       var g = $("go");
-      if (vis(g) && !$("gorow").hidden) return { pts: [ghostPt(g, 0.5, 0.5)], tap: true };
+      if (vis(g)) return { pts: [ghostPt(g, 0.5, 0.5)], tap: true };
       // Big mode: show a tap on the engine instead
       var e0 = carPoses()[0], rc = cv.getBoundingClientRect();
       if (document.body.classList.contains("big") && e0 && TYPES[e0.p.t].eng) return { pts: [[rc.left + SX(e0.x), rc.top + SY(e0.y, e0.z + 26)]], tap: true };
@@ -2266,7 +2341,6 @@ body.big .tb-panel { display: none; }
 
   Toybox.init({
     app: "train-builder",
-    orientation: "landscape",
     badge: $("tbadge"),
     big: { button: $("bigToggle") },
     timerIntro: "When time is up, the train pulls into the station and rests, and the controls lock.",
@@ -2289,7 +2363,7 @@ body.big .tb-panel { display: none; }
     onSound: function (on) { if (on) setTimeout(sChime, 60); }
   });
   if ($("tb-farewell")) stage.appendChild($("tb-farewell"));
-  if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, add: addPiece, ghost: ghost,
+  if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, upright: function () { return UPRIGHT; }, view: function () { return { vs: vs, tilt: TILT, W: W, H: H }; }, add: addPiece, ghost: ghost,
     pieces: function () { var r = cv.getBoundingClientRect(); return carPoses().map(function (q) { return { t: q.p.t, x: r.left + SX(q.x), y: r.top + SY(q.y, q.z + 26), sx: SX(q.x), sy: SY(q.y, q.z), hidden: tunnelCut(q) === "hide" }; }); },
     switches: function () { var r = cv.getBoundingClientRect(); return run.lay.switches.map(function (s) { return { x: r.left + s.sx, y: r.top + s.sy, on: s.on }; }); } };
 })();
