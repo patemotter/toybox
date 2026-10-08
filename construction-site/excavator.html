@@ -225,7 +225,7 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   var STATEKEY = "site-excavator-v1";
 
   // ---------- World (units; y is up, ground at y = 0) ----------
-  var WORLD_W = 1000, VIEW_UP = 560, VIEW_DOWN = 70;
+  var WORLD_W = 1000, VIEW_UP = 560, VIEW_DOWN = 70, VIEW_X0 = -40, VIEW_X1 = 1040;
   var CX = 480;                       // swing centre of the excavator
   var FOOT = { x: 62, y: 168 };       // boom foot (machine coords: x forward, y up)
   var L1 = 280, L2 = 215;             // boom and arm lengths
@@ -432,15 +432,17 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
       S = Math.min(ch / 640, cw / (cw > 600 ? 640 : 480));
       OY = ch - (VIEW_DOWN + (coachAtBottom() ? 56 / S : 0)) * S;
     } else {
-      S = Math.min(cw / WORLD_W, ch / (VIEW_UP + VIEW_DOWN));
+      // the whole site plus a small margin, so the truck's cab and the machine never touch the edges
+      S = Math.min(cw / (VIEW_X1 - VIEW_X0), ch / (VIEW_UP + VIEW_DOWN));
       OY = ch - VIEW_DOWN * S;
     }
     WIN = cw / S;
     camera();
   }
+  function wideView() { return WIN >= WORLD_W; }
   // Left edge of the view: f = 0 on the dirt side, 1 on the truck side.
   function camLeft(f) {
-    if (WIN >= WORLD_W) return WORLD_W / 2 - WIN / 2;
+    if (wideView()) return (VIEW_X0 + VIEW_X1) / 2 - WIN / 2;
     var back = clamp((WIN - 480) * 0.4, 0, 60); // a wider window also shows the back of the machine
     return lerp(CX - 95 - back, CX + 95 + back - WIN, f);
   }
@@ -454,7 +456,7 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   function visTop() { return OY / S; }
   // The treasure crate: in the strip of ground in front, at the left edge of a wide view, or (when the view
   // pans) under the excavator, where both the dirt side and the truck side can see it.
-  function crateX() { return WIN >= WORLD_W ? visLeft() + 82 : CX; }
+  function crateX() { return wideView() ? visLeft() + 82 : CX; }
   var CRATE_TOP = -4;
 
   function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }

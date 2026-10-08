@@ -132,6 +132,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 }
 @media (orientation: landscape) {
   .tb-body .tb-panel { width: min(30%, 340px); }
+  /* the column is narrow: three tiles a row so "Roundover" fits, and "New" in the tab bar */
+  .rchoices { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); padding: 0 5px 5px 0; }
+  .tb-tabs .btn { padding-left: 0.15rem; padding-right: 0.15rem; font-size: 0.95rem; }
+  .tb-tabs .nlong { display: none; }
+  .tb-tabs .nshort { display: inline; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   .tb-body .tb-panel { width: 210px; padding: 6px; gap: 6px; }
@@ -361,6 +366,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var H = { x: 0, y: 0, w: 1, h: 1 };                        // shelf
   var bgCanvas = document.createElement("canvas");
   var VIEW_W = 700, VIEW_H = 480, VIEW_CX = 6, VIEW_CY = 85;
+  var WHOLE_W = 1080, WHOLE_CX = 26;    // the table top's ends as drawn (with the angled view's lean)
   var NARROW_W = 460, NARROW_CX = 62;   // phones held upright: a tighter frame, nudged toward the switch
   var IN_Y0 = -80, IN_Y1 = 132, IN_Z0 = -18, IN_Z1 = 96;
   function insetHead(w) { return clamp(w * 0.055, 15, 26) * 1.9 + 10; }
@@ -391,8 +397,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       TV = { x: pad, y: eh + 2 * pad, w: fw, h: CH - eh - 3 * pad };
     }
     var narrow = CW < 600 && CW / CH < 1.25;
-    TV.s = Math.min(TV.w / (narrow ? NARROW_W : VIEW_W), TV.h / VIEW_H);
-    TV.ox = TV.x + TV.w / 2 - (narrow ? NARROW_CX : VIEW_CX) * TV.s;
+    // tablets: the whole table from end to end (phones keep the tighter frame on the bit and the board)
+    var whole = !narrow && TV.w >= 560;
+    TV.s = Math.min(TV.w / (narrow ? NARROW_W : whole ? WHOLE_W : VIEW_W), TV.h / VIEW_H);
+    TV.ox = TV.x + TV.w / 2 - (narrow ? NARROW_CX : whole ? WHOLE_CX : VIEW_CX) * TV.s;
     TV.oy = TV.y + TV.h / 2 - VIEW_CY * TV.s;
   }
   function resize() {
@@ -1011,7 +1019,10 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
     var pp = R.shelfPop > 0 ? 1 + 0.25 * Math.sin(R.shelfPop * Math.PI) : 1;
     var size = clamp(H.w * 0.09, 16, 26) * pp;
-    pill(c, "Boards: " + S.count, H.x + 8, H.y + size * 0.95 + 4, size, "#FFFFFF", OUT, "left");
+    // under the coach line when the shelf sits at the top of the stage next to the end view (tablets)
+    var pillY = H.y + size * 0.95 + 4;
+    if (H.y < 40 && H.x > 40 && H.x < CW / 2 + 220) pillY = Math.max(pillY, 66 + size * 0.95);
+    pill(c, "Boards: " + S.count, H.x + 8, pillY, size, "#FFFFFF", OUT, "left");
   }
   function drawFly(c) {
     var f = R.fly;
