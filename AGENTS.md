@@ -236,6 +236,9 @@ Keep only:
 ### Browser/iOS findings
 - Play surfaces: pointer events, `touch-action: none`, prevent `gesturestart`, no text selection or long-press
   callout; support several fingers at once.
+- **No page bounce:** `common/toybox.css` pins `html, body` (`position: fixed; inset: 0; overflow: hidden;
+  overscroll-behavior: none`) because iOS rubber-bands the whole page in the home-screen app (the dad saw it in
+  Bubbles). Don't undo it; inner scroll areas (Grown-ups sheet, Tool Wall) still scroll. Chromium tests can't show it.
 - Canvas: scale by devicePixelRatio capped at 2; aim for 60fps on iPad.
 - Don't paint a pattern with `background-attachment: local` on a scrolling box: it lags on iOS (the Tool Wall's
   pegboard holes now live on the scrolling content element).
