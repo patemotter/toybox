@@ -97,6 +97,9 @@ body.ending .panel-body,
 body.ending .speeds,
 body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
 
+/* Surprise sparkles */
+.sspark { transform-box: fill-box; transform-origin: 50% 50%; animation: sspark 0.9s ease-out forwards; }
+@keyframes sspark { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 45% { transform: scale(1.25) rotate(60deg); opacity: 1; } 100% { transform: scale(0) rotate(120deg); opacity: 0; } }
 /* ---------- Panel: speeds, the picked tab's choices, then the tab bar with Surprise ---------- */
 .panel-body {
   display: grid;
@@ -1181,7 +1184,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   var angle = 0, vel = 0;
 
   function applyTransform() {
-    spinG.setAttribute("transform", (head ? head + " " : "") + "rotate(" + angle.toFixed(2) + ")");
+    spinG.setAttribute("transform", (liftT ? liftT + " " : "") + (head ? head + " " : "") + "rotate(" + angle.toFixed(2) + ")");
   }
 
   // Build static controls once.
@@ -1321,6 +1324,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
 
 
   function render() {
+    momentStop();
     var m = state.mode, mode = MODES[m], cfg = state.per[m], n = cfg.count;
     var st = styleOf(m, cfg.style);
 
@@ -1443,7 +1447,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     else if (t.id === "maxBtn") { cfg.count = MAX; }
     else if (t.id === "lminus") { if ("lights" in cfg) cfg.lights = Math.max(0, cfg.lights - 1); }
     else if (t.id === "lplus") { if ("lights" in cfg) cfg.lights = Math.min(LDOME, cfg.lights + 1); }
-    else if (t.dataset.action === "surprise") { surprise(cfg); }
+    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
     else return;
     render();
   });
@@ -1455,26 +1459,311 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     el.classList.add("pop");
   }
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-  function surprise(cfg) {
-    var range = MODES[state.mode].surprise || [3, 12];
-    cfg.count = range[0] + Math.floor(Math.random() * (range[1] - range[0] + 1));
-    cfg.pattern = pick(["one", "turns", "turns", "rainbow"]);
-    cfg.style = pick(styleIds(state.mode));
-    var f = styleOf(state.mode, cfg.style).fit;
-    if (f) cfg.count = f[0] + Math.floor(Math.random() * (Math.min(f[1], 26) - f[0] + 1));
-    // New colors for the parts he can color; the small details go back to their usual colors.
-    var d = MODES[state.mode].defaults.colors;
-    Object.keys(cfg.colors).forEach(function (k) {
-      var paint = PAINT[state.mode].indexOf(k) !== -1, blade = k === "main" || k === "main2";
-      cfg.colors[k] = paint && (blade || Math.random() < 0.5) ? pick(PICKS) : d[k];
-    });
-    while (cfg.colors.main2 === cfg.colors.main) cfg.colors.main2 = pick(PICKS);
-    if ("lights" in cfg) {
-      cfg.lights = Math.floor(Math.random() * (LDOME + 1));
-      cfg.lightColor = pick(LIGHT_IDS);
-    }
-    vel += 500;
+  // ---------- Surprise: a fun moment for the toy on screen, right now (his toy and colors never change) ----------
+  // Each toy has its own moment, taking turns with a happy face on its hub (never the same twice in a row):
+  // the wheel rolls off and back, the fan's streamers flutter, the flower's petals spin up and a few float off
+  // and grow back, the pinwheel lifts off like a helicopter seed and floats back down, the jet's afterburner
+  // glows. Reduced motion: the face and the gentler moments only.
+  var SPECIAL = { wheel: "roll", fan: "streamers", flower: "petals", pinwheel: "seed", jet: "afterburner" };
+  var NS = "http://www.w3.org/2000/svg";
+  var moTurn = {}, mo = null, moRaf = 0, lastPtr = null, liftT = "";
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    if (mo) { sparkleAt(0, 0, 6, 160); return; }
+    var m = state.mode, k = moTurn[m] || 0;
+    var kind = k % 2 === 0 ? SPECIAL[m] : "face";
+    if (reduce && (kind === "roll" || kind === "seed")) kind = k % 2 === 0 ? "face" : SPECIAL[m];
+    moTurn[m] = k + 1;
+    startMoment(kind);
   }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function n2(v) { return (Math.round(v * 100) / 100).toString(); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function easeIO(t) { t = clamp01(t); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function seg(t, a, b) { return clamp01((t - a) / (b - a)); }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function visBox() {
+    var m = art.getScreenCTM(), r = art.getBoundingClientRect();
+    if (!m || !r.width) return { x0: -250, x1: 250, y0: -250, y1: 250 };
+    var inv = m.inverse(), q = art.createSVGPoint();
+    q.x = r.left; q.y = r.top; var a = q.matrixTransform(inv);
+    q.x = r.right; q.y = r.bottom; var b = q.matrixTransform(inv);
+    return { x0: a.x, x1: b.x, y0: a.y, y1: b.y };
+  }
+  // An element's own coordinates mapped into the picture's coordinates.
+  function toArt(elm) { return art.getScreenCTM().inverse().multiply(elm.getScreenCTM()); }
+  function sparkleAt(x, y, n, spread) {
+    var f = $("surpF");
+    if (!f) { f = el("g", { id: "surpF", "pointer-events": "none" }); art.insertBefore(f, $("timerG")); }
+    var g = el("g", {}, f), cols = ["#FFC93C", "#F26CA7", "#5BC0EB", "#A7D129", "#FFFFFF", "#F77F00"];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, d = spread * (0.3 + Math.random() * 0.7), r = rnd(9, 18);
+      var px = x + Math.cos(a) * d, py = y + Math.sin(a) * d, pts = [];
+      for (var j = 0; j < 8; j++) { var rr = j % 2 ? r * 0.38 : r, aa = j * Math.PI / 4 - Math.PI / 2; pts.push(n2(px + Math.cos(aa) * rr) + " " + n2(py + Math.sin(aa) * rr)); }
+      el("path", { d: "M " + pts.join(" L ") + " Z", fill: cols[i % cols.length], stroke: OUT, "stroke-width": 2.5, "stroke-linejoin": "round", "class": reduce ? "" : "sspark" }, g);
+    }
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1000);
+  }
+  function momentStop() {
+    if (!mo) return;
+    var m = mo; mo = null;
+    cancelAnimationFrame(moRaf);
+    try { m.cleanup(); } catch (e) { /* ignore */ }
+    liftT = "";
+    $("artwrap").removeAttribute("transform");
+    applyTransform();
+    ["surpB", "surpF"].forEach(function (id) { var x = $(id); if (x) x.innerHTML = ""; });
+  }
+  function startMoment(kind) {
+    var back = $("surpB"), front = $("surpF");
+    if (!back) { back = el("g", { id: "surpB", "pointer-events": "none" }); art.insertBefore(back, $("artwrap")); }
+    if (!front) { front = el("g", { id: "surpF", "pointer-events": "none" }); art.insertBefore(front, $("timerG")); }
+    var hub = toArt(spinG), hx = hub.e, hy = hub.f, hs = Math.hypot(hub.a, hub.b);
+    var bb = spinG.getBBox(), R = Math.max(bb.width, bb.height) / 2 * hs;
+    var M = kind === "roll" ? rollMoment(R) : kind === "streamers" ? streamerMoment(R) : kind === "petals" ? petalMoment(back, front) :
+      kind === "seed" ? seedMoment(hx, hy) : kind === "afterburner" ? burnerMoment(back, front, hx, hy, R) : faceMoment(front, hx, hy, R);
+    M.kind = kind; M.t0 = performance.now();
+    mo = M;
+    function step(now) {
+      if (mo !== M) return;
+      var t = (now - M.t0) / 1000;
+      if (t >= M.dur) { M.step(M.dur); momentStop(); return; }
+      M.step(t);
+      moRaf = requestAnimationFrame(step);
+    }
+    moRaf = requestAnimationFrame(step);
+  }
+
+  // The wheel rolls off across the stage (turning as it rolls), then rolls back to its spot and wobbles still.
+  function rollMoment(R) {
+    var v = visBox(), out = v.x1 + R + 30, r = Math.max(120, R), D = 7.2;
+    return {
+      dur: D,
+      step: function (t) {
+        var x;
+        if (t < 0.6) x = -Math.sin(seg(t, 0, 0.6) * Math.PI) * 18;           // a little wind-up backwards
+        else if (t < 3.0) { var u = seg(t, 0.6, 3.0); x = out * u * u; }        // speeds up and rolls away
+        else if (t < 3.6) x = out;
+        else if (t < 6.4) x = out * (1 - easeIO(seg(t, 3.6, 6.4)));          // rolls back in and stops
+        else x = Math.sin(seg(t, 6.4, D) * Math.PI * 2) * 8 * (1 - seg(t, 6.4, D));
+        var bounce = t > 0.6 && t < 6.4 ? -Math.abs(Math.sin(t * 5)) * 6 : 0;
+        $("artwrap").setAttribute("transform", "translate(" + n2(x) + " " + n2(bounce) + ") rotate(" + n2(x / r * 180 / Math.PI) + ")");
+        if (t > 6.3 && !this.sp) { this.sp = 1; sparkleAt(0, -R * 0.8, 6, R * 0.6); }
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // Streamers on the fan: bright ribbons tied to the blade tips spin with them and flutter in the breeze.
+  function streamerMoment(R) {
+    var inv = spinG.getCTM().inverse(), tips = [];
+    Array.prototype.forEach.call(spinG.querySelectorAll('[data-c="main"], [data-c="main2"]'), function (b) {
+      if (b.parentNode.closest && b.parentNode.closest('[data-c="main"], [data-c="main2"]')) return;
+      var m = inv.multiply(b.getCTM()), bb = b.getBBox(), best = null, q = spinG.ownerSVGElement.createSVGPoint();
+      [[bb.x, bb.y], [bb.x + bb.width, bb.y], [bb.x, bb.y + bb.height], [bb.x + bb.width, bb.y + bb.height], [bb.x + bb.width / 2, bb.y], [bb.x + bb.width / 2, bb.y + bb.height], [bb.x, bb.y + bb.height / 2], [bb.x + bb.width, bb.y + bb.height / 2]].forEach(function (c) {
+        q.x = c[0]; q.y = c[1]; var w = q.matrixTransform(m), d = Math.hypot(w.x, w.y);
+        if (!best || d > best.d) best = { d: d, a: Math.atan2(w.y, w.x) };
+      });
+      if (best && best.d > 30) tips.push(best);
+    });
+    if (!tips.length) for (var j = 0; j < 4; j++) tips.push({ d: 150, a: j * Math.PI / 2 });
+    tips = tips.slice(0, 8);
+    var g = el("g", { "pointer-events": "none" }, spinG), rib = [], i;
+    var cols = ["#F26CA7", "#FFC93C", "#5BC0EB", "#A7D129", "#F77F00", "#7B4FC9", "#E63946", "#1FA6A0"];
+    for (i = 0; i < tips.length; i++) {
+      var gg = el("g", { transform: "rotate(" + n2(tips[i].a * 180 / Math.PI + 90) + ")" }, g);
+      rib.push({ o: el("path", { fill: "none", stroke: OUT, "stroke-width": 22, "stroke-linecap": "round", "stroke-linejoin": "round" }, gg),
+        p: el("path", { fill: "none", stroke: cols[i % cols.length], "stroke-width": 14, "stroke-linecap": "round", "stroke-linejoin": "round" }, gg),
+        k: el("circle", { r: 9, fill: "#FFFFFF", stroke: OUT, "stroke-width": 4, cy: n2(-tips[i].d * 0.96) }, gg),
+        r: tips[i].d * 0.96, ph: i * 1.3 });
+    }
+    var D = 8.0, dir = vel >= 0 ? 1 : -1;
+    vel = Math.max(Math.abs(vel), SPEEDS.fast * 0.8) * dir;
+    return {
+      dur: D,
+      step: function (t) {
+        var k = Math.min(easeIO(t / 1.2), 1 - easeIO(seg(t, D - 1.2, D))), len = 170 * k;
+        // each ribbon is tied at a blade tip and trails behind the turning blade, waving in the breeze
+        rib.forEach(function (r) {
+          var d = "M 0 " + n2(-r.r), N = 10;
+          for (var j = 1; j <= N; j++) {
+            var u = j / N, along = len * u, wav = Math.sin(t * 8 + r.ph - u * 5) * 18 * u;
+            d += " L " + n2(-dir * along) + " " + n2(-r.r + along * 0.2 + wav);
+          }
+          r.o.setAttribute("d", d); r.p.setAttribute("d", d);
+          r.k.setAttribute("opacity", k > 0.05 ? "1" : "0");
+        });
+        if (t > 0.5 && t < D - 1 && Math.abs(vel) < SPEEDS.fast * 0.6) vel = SPEEDS.fast * 0.6 * dir;
+      },
+      cleanup: function () { if (g.parentNode) g.parentNode.removeChild(g); }
+    };
+  }
+
+  // The flower spins up, three petals float off on the breeze, then grow back.
+  function petalMoment(back, front) {
+    var petals = Array.prototype.filter.call(spinG.children, function (c) { return /^main/.test(c.getAttribute("data-c") || ""); });
+    var n = petals.length, pick3 = [], i;
+    if (n) for (i = 0; i < 3 && i < n; i++) pick3.push(petals[Math.floor(i * n / 3 + n / 6) % n]);
+    var wraps = pick3.map(function (pe) {
+      var w = el("g", {});
+      pe.parentNode.insertBefore(w, pe); w.appendChild(pe);
+      return { w: w, pe: pe, fly: null, dx: rnd(-40, 40), rot: rnd(-200, 200) };
+    });
+    var D = 8.4, Toff = 1.8, Tregrow = 5.4;
+    vel += 600 * (vel < 0 ? -1 : 1);
+    return {
+      dur: D,
+      step: function (t) {
+        if (t > 0.3 && t < Toff + 0.5 && Math.abs(vel) < SPEEDS.fast) vel = SPEEDS.fast * (vel < 0 ? -1 : 1);
+        wraps.forEach(function (o, j) {
+          var t0 = Toff + j * 0.35;
+          if (t >= t0 && !o.fly) {
+            // a copy floats off from exactly where the petal is, and the petal itself is gone (for now)
+            var m = toArt(o.pe), bb = o.pe.getBBox(), c = art.createSVGPoint();
+            c.x = bb.x + bb.width / 2; c.y = bb.y + bb.height / 2; c = c.matrixTransform(m);
+            o.fly = { e: o.pe.cloneNode(true), m: "matrix(" + [m.a, m.b, m.c, m.d, m.e, m.f].map(n2).join(" ") + ")", c: c, t0: t };
+            o.fly.e.removeAttribute("transform"); o.fly.e.removeAttribute("data-c");
+            var holder = el("g", {}, front), inner = el("g", { transform: o.fly.m + " " + (o.pe.getAttribute("transform") || "") }, holder);
+            inner.appendChild(o.fly.e); o.fly.h = holder;
+          }
+          if (o.fly) {
+            var a = t - o.fly.t0, dx = o.dx + a * 70 + Math.sin(a * 2.4 + j) * 40, dy = a * 55 - Math.sin(a * 1.7) * 20;
+            o.fly.h.setAttribute("transform", "translate(" + n2(dx) + " " + n2(dy) + ") rotate(" + n2(o.rot * a / 3) + " " + n2(o.fly.c.x) + " " + n2(o.fly.c.y) + ")");
+            o.fly.h.setAttribute("opacity", n2(1 - seg(a, 2.6, 3.6)));
+          }
+          // the petal on the flower: gone once it flew, then grows back from the middle with a little bounce
+          var g2 = t < t0 ? 1 : (t < Tregrow + j * 0.3 ? 0 : seg(t, Tregrow + j * 0.3, Tregrow + j * 0.3 + 1.1));
+          var sc = g2 >= 1 ? 1 : g2 * (1 + Math.sin(g2 * Math.PI) * 0.25);
+          o.w.setAttribute("transform", "scale(" + n2(Math.max(0.001, sc)) + ")");
+          if (g2 > 0 && g2 < 1 && !o.sp) { o.sp = 1; }
+        });
+        if (t > Tregrow + 1.6 && !this.sp) { this.sp = 1; sparkleAt(0, -60, 6, 120); }
+      },
+      cleanup: function () {
+        wraps.forEach(function (o) {
+          if (o.w.parentNode) { o.w.parentNode.insertBefore(o.pe, o.w); o.w.parentNode.removeChild(o.w); }
+        });
+      }
+    };
+  }
+
+  // The pinwheel's sails lift off the stick like a helicopter seed, spinning fast, float up, drift and come
+  // gently back down onto the stick.
+  function seedMoment(hx, hy) {
+    var v = visBox(), D = 8.6, hb = toArt(spinG), R = Math.max(spinG.getBBox().width, spinG.getBBox().height) / 2 * Math.hypot(hb.a, hb.b);
+    var up = Math.max(110, Math.min(340, hy - (v.y0 + R * 0.75)));
+    var dir = vel < 0 ? -1 : 1;
+    return {
+      dur: D,
+      step: function (t) {
+        var rise = easeIO(seg(t, 0.4, 3.4)) * (1 - easeIO(seg(t, 4.0, 7.8)));
+        var sway = Math.sin(t * 1.4) * 40 * rise;
+        var bob = t > 7.8 ? Math.sin(seg(t, 7.8, D) * Math.PI) * -6 : 0;
+        var sc = 1 - 0.18 * rise;
+        liftT = "translate(" + n2(sway) + " " + n2(-up * rise + bob) + ") translate(" + n2(hx) + " " + n2(hy) + ") scale(" + n2(sc) + ") translate(" + n2(-hx) + " " + n2(-hy) + ")";
+        if (t < 7.6) vel = dir * Math.max(Math.abs(vel), SPEEDS.zoom * (0.5 + 0.5 * rise));
+        applyTransform();
+        if (t > 7.8 && !this.sp) { this.sp = 1; sparkleAt(hx, hy, 6, 90); }
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // The jet's afterburner kicks on: the engine spins up and a hot glow and flickering flames ring it, then cool.
+  function burnerMoment(back, front, hx, hy, R) {
+    var defs = $("artdefs");
+    if (!$("ssburnin")) {
+      defs.insertAdjacentHTML("beforeend", '<radialGradient id="ssburnin"><stop offset="0" stop-color="#FFF6C8" stop-opacity="1"/><stop offset="0.3" stop-color="#FFD23F" stop-opacity="0.9"/><stop offset="0.65" stop-color="#FF8A1F" stop-opacity="0.6"/><stop offset="1" stop-color="#FF3D6E" stop-opacity="0"/></radialGradient>');
+    }
+    var Rr = Math.max(R, 140);
+    // the fire glows through the turning blades (drawn over them, so it shows on the front view)
+    var core = el("circle", { cx: n2(hx), cy: n2(hy), r: n2(Rr * 1.02), fill: "url(#ssburnin)", opacity: "0", style: "mix-blend-mode:screen" }, front);
+    var rings = el("g", {}, front), sparks = el("g", {}, front), last = 0;
+    var D = 7.8, dir = vel < 0 ? -1 : 1;
+    return {
+      dur: D,
+      step: function (t) {
+        var k = Math.min(easeIO(seg(t, 0.4, 1.6)), 1 - easeIO(seg(t, D - 1.8, D)));
+        core.setAttribute("opacity", n2(k * (0.8 + Math.sin(t * 13) * 0.1 + Math.sin(t * 29) * 0.05)));
+        core.setAttribute("r", n2(Rr * (0.95 + 0.06 * Math.sin(t * 9))));
+        // heat rings ripple out from the middle, and little sparks fly out over the blades
+        if (k > 0.3 && t - last > 0.45) {
+          last = t;
+          var rg = el("circle", { cx: n2(hx), cy: n2(hy), r: n2(Rr * 0.2), fill: "none", stroke: "#FFE14D", "stroke-width": 8 }, rings); rg._t = t;
+        }
+        if (k > 0.3 && Math.random() < 0.5) {
+          var a = Math.random() * Math.PI * 2, sp = el("circle", { r: n2(rnd(4, 8)), fill: Math.random() < 0.5 ? "#FFF6C8" : "#FFC93C", stroke: "#FF8A1F", "stroke-width": 2 }, sparks);
+          sp._t = t; sp._a = a; sp._v = rnd(0.7, 1.2);
+        }
+        Array.prototype.slice.call(rings.childNodes).forEach(function (r) {
+          var u = (t - r._t) / 1.6; if (u >= 1) { rings.removeChild(r); return; }
+          r.setAttribute("r", n2(Rr * (0.2 + 0.85 * u))); r.setAttribute("opacity", n2((1 - u) * 0.8));
+        });
+        Array.prototype.slice.call(sparks.childNodes).forEach(function (q) {
+          var u = (t - q._t) / 1.1; if (u >= 1) { sparks.removeChild(q); return; }
+          var d = Rr * (0.15 + u * q._v);
+          q.setAttribute("cx", n2(hx + Math.cos(q._a) * d)); q.setAttribute("cy", n2(hy + Math.sin(q._a) * d));
+          q.setAttribute("opacity", n2(1 - u));
+        });
+        // a gentle rumble while it burns
+        var sh = k > 0.5 && !reduce ? (Math.random() - 0.5) * 3 : 0;
+        $("artwrap").setAttribute("transform", "translate(" + n2(sh) + " " + n2(sh * 0.6) + ")");
+        if (t > 0.4 && t < D - 1.8) vel = dir * Math.max(Math.abs(vel), SPEEDS.zoom);
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // Happy face on the toy's hub: big eyes that look at his finger and blink, and a smile. The face stays upright
+  // while the toy keeps spinning behind it.
+  function faceMoment(front, hx, hy, R) {
+    var er = Math.max(20, Math.min(40, R * 0.15)), cx = hx, cy = hy - er * 0.2, sep = er * 1.15;
+    var face = el("g", {}, front), eyes = [], i;
+    for (i = 0; i < 2; i++) {
+      var g = el("g", { transform: "translate(" + n2(cx + (i ? sep : -sep)) + " " + n2(cy - er * 0.4) + ")" }, face);
+      var lid = el("g", {}, g);
+      el("ellipse", { rx: n2(er), ry: n2(er * 1.12), fill: "#FFFFFF", stroke: OUT, "stroke-width": 5 }, lid);
+      var pu = el("g", {}, lid);
+      el("circle", { r: n2(er * 0.5), fill: OUT }, pu);
+      el("circle", { cx: n2(-er * 0.17), cy: n2(-er * 0.2), r: n2(er * 0.17), fill: "#FFFFFF" }, pu);
+      eyes.push({ lid: lid, pu: pu, x: cx + (i ? sep : -sep), y: cy - er * 0.4 });
+    }
+    el("ellipse", { cx: n2(cx - sep * 1.75), cy: n2(cy + er * 0.8), rx: n2(er * 0.4), ry: n2(er * 0.25), fill: "#FF8FB8", stroke: OUT, "stroke-width": 3 }, face);
+    el("ellipse", { cx: n2(cx + sep * 1.75), cy: n2(cy + er * 0.8), rx: n2(er * 0.4), ry: n2(er * 0.25), fill: "#FF8FB8", stroke: OUT, "stroke-width": 3 }, face);
+    el("path", { d: "M " + n2(cx - er) + " " + n2(cy + er * 0.7) + " Q " + n2(cx) + " " + n2(cy + er * 2) + " " + n2(cx + er) + " " + n2(cy + er * 0.7) + " Z", fill: "#E8505B", stroke: OUT, "stroke-width": 5, "stroke-linejoin": "round" }, face);
+    var D = 6.2, blinks = [1.4, 3.1, 3.4, 4.9], look = { x: hx + 60, y: hy + 300 };
+    return {
+      dur: D,
+      step: function (t) {
+        var k = Math.min(easeIO(t / 0.5), 1 - easeIO(seg(t, D - 0.5, D)));
+        var pop = t < 0.6 ? 1 + Math.sin(seg(t, 0, 0.6) * Math.PI) * 0.15 : 1, hop = -Math.abs(Math.sin(t * 4.5)) * 6 * k;
+        face.setAttribute("transform", "translate(" + n2(cx) + " " + n2(cy + hop) + ") scale(" + n2(k * pop) + ") translate(" + n2(-cx) + " " + n2(-cy) + ")");
+        var target = lastPtr && performance.now() - lastPtr.at < 8000 ? lastPtr : look, bl = 1;
+        blinks.forEach(function (b) { var d = Math.abs(t - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
+        eyes.forEach(function (e) {
+          var dx = target.x - e.x, dy = target.y - e.y, d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
+          e.pu.setAttribute("transform", "translate(" + n2(dx / d * m) + " " + n2(dy / d * m) + ")");
+          e.lid.setAttribute("transform", "scale(1 " + n2(Math.max(0.08, bl)) + ")");
+        });
+      },
+      cleanup: function () {}
+    };
+  }
+  function trackPtr(e) {
+    var m = art.getScreenCTM();
+    if (!m) return;
+    var q = art.createSVGPoint(); q.x = e.clientX; q.y = e.clientY; q = q.matrixTransform(m.inverse());
+    lastPtr = { x: q.x, y: q.y, at: performance.now() };
+  }
+  $("stage").addEventListener("pointerdown", trackPtr);
+  $("stage").addEventListener("pointermove", function (e) { if (mo && mo.kind === "face") trackPtr(e); });
+  if (/[?&]debug\b/.test(location.search)) window.__spinSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { var k = moTurn[state.mode] || 0; return k % 2 === 0 ? SPECIAL[state.mode] : "face"; } };
 
   // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
   // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows

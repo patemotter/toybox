@@ -545,7 +545,7 @@ body.resting .flight { z-index: 55; }
 }
 .pickpic .dim { opacity: 0.25; }
 /* Sparkles and puffs never catch a tap meant for the picture. */
-#fxG { pointer-events: none; }
+#fxG, .surp { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
 /* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
 .ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
@@ -957,7 +957,8 @@ body.resting .flight { z-index: 55; }
       o += '<path d="M ' + (-120 + k * 54) + " 3 l 18 0 l -10 14 l -18 0 Z" + '" fill="#FFC93C" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>';
     }
     o += '<rect x="-128" y="22" width="20" height="20" fill="#6C7590"' + STROKE5 + '/><rect x="108" y="22" width="20" height="20" fill="#6C7590"' + STROKE5 + "/>";
-    o += '<g class="rocket" id="' + (night ? "restRocket" : "rocketG") + '">' + rocketSVG(g) + "</g>";
+    if (night) o += '<g class="rocket" id="restRocket">' + rocketSVG(g) + "</g>";
+    else o += '<g id="rocketMove"><g class="rocket" id="rocketG">' + rocketSVG(g) + "</g></g>";
     if (!night) o += '<g id="fxG"></g>';
     return o;
   }
@@ -1066,7 +1067,10 @@ body.resting .flight { z-index: 55; }
 
   function render() {
     var g = geo(state);
+    // a Surprise moment carries on after a re-render, unless the rocket's shape changed
+    if (mo && buildKey() !== moKey) momentStop();
     art.innerHTML = sceneSVG(state, false);
+    if (mo) attachLayers();
 
     Array.prototype.forEach.call(document.querySelectorAll("[data-bpart]"), function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.bpart === state.buildPart));
@@ -1146,10 +1150,16 @@ body.resting .flight { z-index: 55; }
     p.x = e.clientX; p.y = e.clientY;
     return p.matrixTransform(m.inverse());
   }
+  $("scene").addEventListener("pointermove", function (e) {
+    if (!mo || mo.kind !== "face") return;
+    var p = svgPoint(e);
+    lastPtr = { x: p.x, y: p.y, at: performance.now() };
+  });
   $("scene").addEventListener("pointerdown", function (e) {
     if (Toybox.timer.phase() === "resting") return;
     if (e.target.closest && e.target.closest("button")) return;   // the Big/Back button sits on the picture
     var p = svgPoint(e);
+    lastPtr = { x: p.x, y: p.y, at: performance.now() };
     sparkles(p.x, p.y, 7, 50);
     if (Toybox.timer.locked()) return;
     restartAnim($("rocketG"), "hop");
@@ -1287,17 +1297,302 @@ body.resting .flight { z-index: 55; }
     setPicking("");
   }
 
+  // ---------- Surprise: a fun moment on the launch pad, right now (his rocket never changes) ----------
+  // They take turns, never the same twice in a row: a comet streaks past, a satellite drifts by and waves,
+  // a friendly flying saucer loops around the rocket (and gives a cow a little ride), a happy face.
+  var NS = "http://www.w3.org/2000/svg";
+  var MOMENTS = reduce ? ["comet", "satellite", "face"] : ["comet", "satellite", "saucer", "face"];
+  var momentAt = Math.floor(Math.random() * MOMENTS.length);
+  var mo = null, moRaf = 0, lastPtr = null, moKey = "";
+  var layers = null;   // the moment's own layers: behind the rocket, on the rocket (moves with it), in front
   function surprise() {
-    BUILD.forEach(function (b) { state[b.id] = pick(b.opts)[0]; });
-    if (Math.random() < 0.6 && state.windows === 0) state.windows = 1 + Math.floor(Math.random() * 3);
-    // New colors for the parts he can color (kept apart from the body); the details go back to their usual colors.
-    var d = freshState().colors;
-    Object.keys(d).forEach(function (k) { state.colors[k] = d[k]; });
-    state.colors.body = pick(PICKS);
-    do { state.colors.nose = pick(PICKS); } while (state.colors.nose === state.colors.body);
-    do { state.colors.fins = pick(PICKS); } while (state.colors.fins === state.colors.body);
-    fixDetails();
+    if (Toybox.timer.locked()) return;
+    if (mo) { sparkles(0, -200, 6, 120); return; }
+    var kind = MOMENTS[momentAt % MOMENTS.length];
+    momentAt++;
+    startMoment(kind);
   }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function easeIO(t) { t = clamp01(t); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function seg(t, a, b) { return clamp01((t - a) / (b - a)); }
+  function buildKey() { return JSON.stringify(BUILD.map(function (b) { return state[b.id]; })); }
+  function visBox() {
+    var m = art.getScreenCTM(), r = art.getBoundingClientRect();
+    if (!m || !r.width) return { x0: -260, x1: 260, y0: -600, y1: 60 };
+    var inv = m.inverse(), p = art.createSVGPoint();
+    p.x = r.left; p.y = r.top; var a = p.matrixTransform(inv);
+    p.x = r.right; p.y = r.bottom; var b = p.matrixTransform(inv);
+    return { x0: a.x, x1: b.x, y0: a.y, y1: b.y };
+  }
+  // After a re-render (he tapped a part or picked a color) the moment's layers go back into the new picture.
+  function attachLayers() {
+    if (!layers) return;
+    var rg = $("rocketG"), mv = $("rocketMove");
+    if (!rg || !mv) return;
+    mv.parentNode.insertBefore(layers.back, mv);
+    mv.appendChild(layers.on);
+    mv.parentNode.insertBefore(layers.front, $("fxG"));
+  }
+  function moveRocket(dx, dy, rot, sx, sy) {
+    var mv = $("rocketMove");
+    if (!mv) return;
+    var t = "translate(" + n2(dx) + " " + n2(dy) + ") rotate(" + n2(rot || 0) + " 0 0)";
+    if (sx) t += " scale(" + n2(sx) + " " + n2(sy) + ")";
+    mv.setAttribute("transform", t);
+  }
+  function dusk(v) {
+    var n = art.querySelector(".night");
+    if (!n) return;
+    if (v === null) { n.style.opacity = ""; n.style.transition = ""; return; }
+    n.style.transition = "none";
+    n.style.opacity = n2(v);
+  }
+  function momentStop() {
+    if (!mo) return;
+    $("coach").style.opacity = "";
+    mo = null;
+    cancelAnimationFrame(moRaf);
+    if (layers) { [layers.back, layers.on, layers.front].forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); }); layers = null; }
+    var mv = $("rocketMove"); if (mv) mv.removeAttribute("transform");
+    dusk(null);
+  }
+  function startMoment(kind) {
+    var rg = $("rocketG");
+    if (!rg) return;
+    var bb = rg.getBBox();
+    layers = { back: el("g", { "class": "surp" }), on: el("g", { "class": "surp" }), front: el("g", { "class": "surp" }) };
+    attachLayers();
+    var m = kind === "comet" ? cometMoment(bb) : kind === "satellite" ? satelliteMoment(bb) : kind === "saucer" ? saucerMoment(bb) : faceMoment(bb);
+    m.kind = kind; m.t0 = performance.now();
+    $("coach").style.opacity = "0";
+    mo = m; moKey = buildKey();
+    function step(now) {
+      if (mo !== m) return;
+      var t = (now - m.t0) / 1000;
+      if (t >= m.dur) { m.step(m.dur); momentStop(); return; }
+      m.step(t);
+      if (Toybox.timer.locked()) dusk(null);
+      moRaf = requestAnimationFrame(step);
+    }
+    moRaf = requestAnimationFrame(step);
+  }
+
+  // A comet: the sky turns to evening, a bright comet with a long glowing tail streaks slowly across, then day.
+  function cometMoment(bb) {
+    var v = visBox(), L = layers.back;
+    var x0 = v.x0 - 120, x1 = v.x1 + 120, yTop = Math.max(v.y0 + 60, -620), y0 = yTop + 20, y1 = yTop + (bb.y - yTop) * 0.55 + 60;
+    var defs = el("defs", {}, L);
+    var gr = el("linearGradient", { id: "cometTail", x1: "0", y1: "0", x2: "1", y2: "0" }, defs);
+    el("stop", { offset: "0", "stop-color": "#7CE8FF", "stop-opacity": "0" }, gr);
+    el("stop", { offset: "0.7", "stop-color": "#BFF3FF", "stop-opacity": "0.55" }, gr);
+    el("stop", { offset: "1", "stop-color": "#FFFFFF", "stop-opacity": "0.95" }, gr);
+    var c = el("g", {}, L), TL = Math.max(260, (v.x1 - v.x0) * 0.5);
+    el("path", { d: "M " + n2(-TL) + " -4 Q " + n2(-TL * 0.4) + " -26 0 -24 L 0 24 Q " + n2(-TL * 0.4) + " 26 " + n2(-TL) + " 4 Z", fill: "url(#cometTail)" }, c);
+    el("path", { d: "M " + n2(-TL * 0.8) + " -2 Q " + n2(-TL * 0.3) + " -12 0 -10 L 0 10 Q " + n2(-TL * 0.3) + " 12 " + n2(-TL * 0.8) + " 2 Z", fill: "#FFF6C8", opacity: "0.8" }, c);
+    el("circle", { r: 34, fill: "#BFF3FF", opacity: "0.45" }, c);
+    el("circle", { r: 22, fill: "#FFFFFF", stroke: "#7CE8FF", "stroke-width": 5 }, c);
+    el("circle", { cx: -6, cy: -6, r: 7, fill: "#FFF6C8" }, c);
+    var trail = el("g", {}, L), ang = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI, last = 0;
+    var D = 7.4, A = 1.2, Bt = 5.4;
+    return {
+      dur: D,
+      step: function (t) {
+        dusk(Math.min(easeIO(t / A), 1 - easeIO(seg(t, D - 1.2, D))));
+        var u = seg(t, A, Bt), x = lerp(x0, x1, u), y = lerp(y0, y1, u) - Math.sin(u * Math.PI) * 30;
+        c.setAttribute("transform", "translate(" + n2(x) + " " + n2(y) + ") rotate(" + n2(ang) + ")");
+        c.setAttribute("opacity", u > 0 && u < 1 ? "1" : "0");
+        if (u > 0 && u < 1 && t - last > 0.12) {
+          last = t;
+          var sp = el("path", { d: starD(x + rand(-20, 10), y + rand(-16, 16), rand(6, 11), 3, 4), fill: pick(["#FFF6C8", "#BFF3FF", "#FFFFFF", "#FFC93C"]) }, trail);
+          sp._t = t;
+        }
+        Array.prototype.slice.call(trail.childNodes).forEach(function (s2) {
+          var a2 = (t - s2._t) / 1.6;
+          if (a2 >= 1) { trail.removeChild(s2); return; }
+          s2.setAttribute("opacity", n2(1 - a2));
+        });
+        if (t > Bt && !this.pop) { this.pop = 1; restartAnim($("rocketG"), "pop"); chimeSoft(); }
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // A satellite drifts in, stops near the rocket's nose and waves one solar panel like a hand, then drifts on.
+  function satelliteMoment(bb) {
+    var v = visBox(), L = layers.front;
+    var sx = v.x1 + 120, ex = v.x0 - 140, hx = Math.min(v.x1 - 110, bb.x + bb.width + 90), hy = Math.max(v.y0 + 90, bb.y + 40);
+    var g = el("g", {}, L), body = el("g", {}, g);
+    function panel(side) {
+      var p = el("g", {}, body), w = 70, h = 34, x = side < 0 ? -26 - w : 26;
+      el("rect", { x: n2(side < 0 ? -26 - 8 : 26), y: -3, width: 8, height: 6, fill: "#9AA3AF", stroke: OUT, "stroke-width": 3 }, p);
+      el("rect", { x: n2(side < 0 ? x - 8 : x + 8), y: n2(-h / 2), width: w, height: h, rx: 4, fill: "#2D5BD7", stroke: OUT, "stroke-width": 4 }, p);
+      var ln = "";
+      for (var i = 1; i < 4; i++) ln += "M " + n2((side < 0 ? x - 8 : x + 8) + w * i / 4) + " " + n2(-h / 2) + " v " + h + " ";
+      ln += "M " + n2(side < 0 ? x - 8 : x + 8) + " 0 h " + w;
+      el("path", { d: ln, stroke: "#8EC9FF", "stroke-width": 2.5 }, p);
+      return p;
+    }
+    var left = panel(-1), right = panel(1);
+    el("rect", { x: -26, y: -24, width: 52, height: 48, rx: 8, fill: "#FFC93C", stroke: OUT, "stroke-width": 4 }, body);
+    el("path", { d: "M -26 -8 H 26 M -26 8 H 26", stroke: "#E0A21E", "stroke-width": 3 }, body);
+    el("path", { d: "M -14 -24 Q 0 -54 14 -24", fill: "#FFFFFF", stroke: OUT, "stroke-width": 4 }, body);
+    el("line", { x1: 0, y1: -36, x2: 0, y2: -52, stroke: OUT, "stroke-width": 3 }, body);
+    el("circle", { cx: 0, cy: -54, r: 5, fill: "#F26CA7", stroke: OUT, "stroke-width": 2.5 }, body);
+    var blink = el("circle", { cx: 12, cy: 15, r: 4, fill: "#A7D129" }, body);
+    var D = 9.6, A = 3.2, W0 = 3.4, W1 = 6.0, Bt = 9.0;
+    return {
+      dur: D,
+      step: function (t) {
+        dusk(Math.min(easeIO(t / 1.0), 1 - easeIO(seg(t, D - 1.0, D))));
+        var x, y;
+        if (t < A) { var u = easeIO(seg(t, 0, A)); x = lerp(sx, hx, u); y = lerp(hy - 80, hy, u); }
+        else if (t < W1 + 0.4) { x = hx; y = hy + Math.sin((t - A) * 1.6) * 6; }
+        else { var u2 = easeIO(seg(t, W1 + 0.4, Bt)); x = lerp(hx, ex, u2); y = lerp(hy, hy - 120, u2); }
+        g.setAttribute("transform", "translate(" + n2(x) + " " + n2(y) + ") rotate(" + n2(Math.sin(t * 0.8) * 8) + ")");
+        // the wave: the near panel swings up and down a few times (it pivots where it joins the body)
+        var w = t > W0 && t < W1 ? Math.sin((t - W0) / (W1 - W0) * Math.PI * 4) * 35 * Math.sin(seg(t, W0, W1) * Math.PI) : 0;
+        left.setAttribute("transform", "rotate(" + n2(w) + " -26 0)");
+        right.setAttribute("transform", "rotate(" + n2(-w * 0.15) + " 26 0)");
+        blink.setAttribute("fill", Math.floor(t * 2) % 2 ? "#A7D129" : "#F26CA7");
+        if (t > W0 && !this.hi) { this.hi = 1; sparkles(x - 70, y - 30, 5, 40); chimeSoft(); }
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // A friendly flying saucer loops around the rocket, then gives a cow in the field a gentle little ride up
+  // its beam and back down. The cow says "Moo!" and the saucer zooms off.
+  function saucerMoment(bb) {
+    var v = visBox(), back = layers.back, front = layers.front;
+    var rx = Math.max(bb.width / 2 + 90, 150), cy = bb.y + bb.height * 0.45, ry = 46;
+    var cowX = Math.min(v.x1 - 60, 200), cowY = 30, cowK = 1;
+    // the cow walks in from the right edge
+    var cow = el("g", {}, front);
+    cow.innerHTML = cowS();
+    var beam = el("path", { fill: "#FFE97A", opacity: "0" }, back);
+    var sau = el("g", {}, front);
+    sau.innerHTML = saucerS();
+    var lights = sau.querySelectorAll(".sl");
+    var moo = el("g", { opacity: "0" }, front);
+    el("path", { d: "M -46 -30 h 92 a 14 14 0 0 1 14 14 v 18 a 14 14 0 0 1 -14 14 h -40 l -10 14 l -6 -14 h -36 a 14 14 0 0 1 -14 -14 v -18 a 14 14 0 0 1 14 -14 Z", fill: "#FFFFFF", stroke: OUT, "stroke-width": 4, "stroke-linejoin": "round" }, moo);
+    el("text", { x: 0, y: 1, "text-anchor": "middle", "font-family": "'Baloo 2', sans-serif", "font-weight": 800, "font-size": 26, fill: OUT }, moo).textContent = "Moo!";
+    var T0 = 1.6, Tl = 6.4, Th = 7.6, Tu = 9.6, Tw = 10.6, Td = 12.6, Tm = 13.0, Tx = 15.4, D = 16.4;
+    var hoverY = Math.max(v.y0 + 70, -260), hX = cowX, upY = hoverY + 40;
+    var front0 = 0;
+    return {
+      dur: D,
+      step: function (t) {
+        var x, y, sc = 1, tilt = 0;
+        if (t < T0) { var u = easeIO(t / T0); x = lerp(v.x0 - 120, -rx, u); y = lerp(v.y0 + 40, cy, u); }
+        else if (t < Tl) {
+          // one and a half loops around the rocket (behind it on the way back, in front on the way out)
+          var a = Math.PI + (t - T0) / (Tl - T0) * Math.PI * 3;
+          x = Math.cos(a) * rx; y = cy + Math.sin(a) * ry - (t - T0) * 18;
+          sc = 1 + Math.sin(a) * 0.14; tilt = -Math.sin(a + Math.PI / 2) * 10;
+          var f = Math.sin(a) > 0;
+          if (f !== front0) { front0 = f; (f ? front : back).appendChild(sau); }
+        } else if (t < Th) {
+          if (sau.parentNode !== front) front.appendChild(sau);
+          var u2 = easeIO(seg(t, Tl, Th)), ax = rx, ay = cy - (Tl - T0) * 18;
+          x = lerp(ax, hX, u2); y = lerp(ay, hoverY, u2);
+        } else if (t < Tx) { x = hX; y = hoverY + Math.sin(t * 2.2) * 5; }
+        else { var u3 = easeIO(seg(t, Tx, D)); x = lerp(hX, v.x1 + 160, u3); y = lerp(hoverY, v.y0 - 80, u3); tilt = 14 * u3; }
+        sau.setAttribute("transform", "translate(" + n2(x) + " " + n2(y) + ") rotate(" + n2(tilt) + ") scale(" + n2(sc) + ")");
+        Array.prototype.forEach.call(lights, function (l, i) { l.setAttribute("fill", (Math.floor(t * 3) + i) % 3 === 0 ? "#FFF6C8" : ["#F26CA7", "#5BC0EB", "#A7D129"][i % 3]); });
+        // the cow walks in, rides up the beam into the saucer, waits, floats back down
+        var cx2 = t < T0 + 2 ? lerp(v.x1 + 80, cowX, easeIO(seg(t, 0.4, T0 + 2))) : cowX;
+        if (t > Tx + 0.3) cx2 = lerp(cowX, v.x1 + 90, easeIO(seg(t, Tx + 0.3, D)));
+        var lift = easeIO(seg(t, Th + 0.3, Tu)) * (1 - easeIO(seg(t, Tw, Td)));
+        var cyy = lerp(cowY, upY + 50, lift), inS = lift > 0.97 ? Math.max(0, 1 - (lift - 0.97) * 33) : 1;
+        var sway = lift > 0.02 && lift < 0.98 ? Math.sin(t * 3) * 10 : 0;
+        cow.setAttribute("transform", "translate(" + n2(cx2) + " " + n2(cyy) + ") rotate(" + n2(sway) + " 0 -30) scale(" + n2(cowK * (0.55 + 0.45 * inS)) + ")");
+        cow.setAttribute("opacity", n2(inS < 1 ? inS : 1));
+        var beamOn = (t > Th && t < Tu + 0.2) || (t > Tw - 0.2 && t < Td + 0.2) ? 0.55 + Math.sin(t * 8) * 0.1 : 0;
+        beam.setAttribute("opacity", n2(beamOn));
+        beam.setAttribute("d", "M " + n2(x - 22) + " " + n2(y + 14) + " L " + n2(x + 22) + " " + n2(y + 14) + " L " + n2(x + 70) + " " + n2(cowY + 8) + " L " + n2(x - 70) + " " + n2(cowY + 8) + " Z");
+        moo.setAttribute("opacity", t > Td + 0.2 && t < Tx + 1.6 ? "1" : "0");
+        moo.setAttribute("transform", "translate(" + n2(cx2 - 34) + " " + n2(cowY - 120) + ")");
+        if (t > Td && !this.m) { this.m = 1; chimeSoft(); sparkles(cowX, cowY - 40, 5, 50); }
+      },
+      cleanup: function () {}
+    };
+  }
+  function saucerS() {
+    return '<g stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round">' +
+      '<path d="M -34 -6 Q -30 -44 0 -46 Q 30 -44 34 -6 Z" fill="#BFF3FF" opacity="0.95"/>' +
+      '<circle cx="0" cy="-22" r="12" fill="#A7D129"/>' +
+      '<circle cx="-4" cy="-24" r="3" fill="' + OUT + '" stroke="none"/><circle cx="5" cy="-24" r="3" fill="' + OUT + '" stroke="none"/>' +
+      '<path d="M -5 -17 Q 0 -13 5 -17" fill="none" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<path d="M -34 -6 Q -30 -44 0 -46 Q 30 -44 34 -6" fill="none"/>' +
+      '<ellipse cx="0" cy="0" rx="70" ry="18" fill="#F26CA7"/>' +
+      '<ellipse cx="0" cy="-4" rx="50" ry="8" fill="#FF9ECF" stroke="none"/>' +
+      '<circle class="sl" cx="-44" cy="4" r="5" fill="#FFF6C8" stroke-width="2.5"/><circle class="sl" cx="-15" cy="8" r="5" fill="#FFF6C8" stroke-width="2.5"/>' +
+      '<circle class="sl" cx="15" cy="8" r="5" fill="#FFF6C8" stroke-width="2.5"/><circle class="sl" cx="44" cy="4" r="5" fill="#FFF6C8" stroke-width="2.5"/>' +
+      '</g>';
+  }
+  // A friendly black-and-white cow standing on the ground at (0, 0), facing left.
+  function cowS() {
+    return '<g stroke="' + OUT + '" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">' +
+      '<path d="M -26 -6 V 0 M -12 -6 V 0 M 14 -6 V 0 M 28 -6 V 0" stroke-width="7"/>' +
+      '<path d="M 36 -40 Q 50 -40 48 -24" fill="none"/>' +
+      '<rect x="-34" y="-50" width="72" height="44" rx="18" fill="#FFFFFF"/>' +
+      '<path d="M -10 -50 Q -2 -38 -14 -28 Q -24 -36 -20 -50 Z M 14 -24 Q 24 -32 30 -18 Q 22 -10 12 -14 Z" fill="' + OUT + '" stroke="none"/>' +
+      '<ellipse cx="6" cy="-6" rx="8" ry="5" fill="#FF9ECF" stroke-width="3"/>' +
+      '<rect x="-60" y="-64" width="34" height="32" rx="14" fill="#FFFFFF"/>' +
+      '<ellipse cx="-50" cy="-36" rx="14" ry="9" fill="#FFB7C9"/>' +
+      '<circle cx="-54" cy="-37" r="2" fill="' + OUT + '" stroke="none"/><circle cx="-46" cy="-37" r="2" fill="' + OUT + '" stroke="none"/>' +
+      '<circle cx="-46" cy="-52" r="3.5" fill="' + OUT + '" stroke="none"/>' +
+      '<path d="M -60 -60 l -10 -6 M -30 -62 l 8 -8" stroke-width="5"/>' +
+      '<path d="M -50 -64 l -4 -9 M -36 -64 l 4 -9" stroke="#F0D58C" stroke-width="5"/>' +
+      '</g>';
+  }
+
+  // Happy face: big cartoon eyes and a smile on the rocket for a few seconds. The eyes look at his finger
+  // and blink, and the rocket wiggles happily. Then it is back to normal.
+  function faceMoment(bb) {
+    var L = layers.on;
+    var bw = Math.min(bb.width * 0.7, 150), er = Math.max(13, Math.min(30, bw * 0.17)), cx = 0, cy = bb.y + bb.height * 0.58;
+    var sep = er * 1.2;
+    var face = el("g", {}, L), eyes = [], i;
+    for (i = 0; i < 2; i++) {
+      var g = el("g", { transform: "translate(" + n2(cx + (i ? sep : -sep)) + " " + n2(cy - er * 0.4) + ")" }, face);
+      var lid = el("g", {}, g);
+      el("ellipse", { rx: n2(er), ry: n2(er * 1.12), fill: "#FFFFFF", stroke: OUT, "stroke-width": 4 }, lid);
+      var pu = el("g", {}, lid);
+      el("circle", { r: n2(er * 0.5), fill: OUT }, pu);
+      el("circle", { cx: n2(-er * 0.17), cy: n2(-er * 0.2), r: n2(er * 0.17), fill: "#FFFFFF" }, pu);
+      eyes.push({ lid: lid, pu: pu, x: cx + (i ? sep : -sep), y: cy - er * 0.4 });
+    }
+    el("ellipse", { cx: n2(cx - sep * 1.7), cy: n2(cy + er * 0.8), rx: n2(er * 0.38), ry: n2(er * 0.24), fill: "#FF8FB8", opacity: "0.85" }, face);
+    el("ellipse", { cx: n2(cx + sep * 1.7), cy: n2(cy + er * 0.8), rx: n2(er * 0.38), ry: n2(er * 0.24), fill: "#FF8FB8", opacity: "0.85" }, face);
+    el("path", { d: "M " + n2(cx - er) + " " + n2(cy + er * 0.75) + " Q " + n2(cx) + " " + n2(cy + er * 2) + " " + n2(cx + er) + " " + n2(cy + er * 0.75) + " Z", fill: "#E8505B", stroke: OUT, "stroke-width": 4, "stroke-linejoin": "round" }, face);
+    var D = 6.2, blinks = [1.4, 3.1, 3.4, 4.9], look = { x: 160, y: 0 };
+    return {
+      dur: D,
+      step: function (t) {
+        var k = Math.min(easeIO(t / 0.5), 1 - easeIO(seg(t, D - 0.5, D)));
+        var pop = t < 0.6 ? 1 + Math.sin(seg(t, 0, 0.6) * Math.PI) * 0.15 : 1;
+        face.setAttribute("transform", "translate(" + n2(cx) + " " + n2(cy) + ") scale(" + n2(k * pop) + ") translate(" + n2(-cx) + " " + n2(-cy) + ")");
+        var target = lastPtr && performance.now() - lastPtr.at < 8000 ? lastPtr : look, bl = 1;
+        blinks.forEach(function (b) { var d = Math.abs(t - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
+        var rot = Math.sin(t * 4.5) * 3 * k;
+        eyes.forEach(function (e) {
+          var dx = target.x - e.x, dy = target.y - e.y, d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
+          e.pu.setAttribute("transform", "translate(" + n2(dx / d * m) + " " + n2(dy / d * m) + ")");
+          e.lid.setAttribute("transform", "scale(1 " + n2(Math.max(0.08, bl)) + ")");
+        });
+        moveRocket(0, -Math.abs(Math.sin(t * 4.5)) * 8 * k, rot);
+      },
+      cleanup: function () {}
+    };
+  }
+  if (/[?&]debug\b/.test(location.search)) window.__rocketSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { return MOMENTS[momentAt % MOMENTS.length]; } };
 
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
@@ -1333,7 +1628,7 @@ body.resting .flight { z-index: 55; }
       if (picking === "body") fixDetails();
       changed = true;
     }
-    else if (t.dataset.action === "surprise") { surprise(); changed = true; if (picking) setPicking(""); }
+    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
     else return;
     var g = render();
     if (changed) {
