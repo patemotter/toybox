@@ -165,6 +165,10 @@ Keep only:
   per visit, never again once he has done it, never while the sheet is open or the timer is ending/resting.
   Use `tools/snippets/ghost-hand.js` / `.css` (same look everywhere). Coach pill: `tools/snippets/coach-pill.css`.
 - Nothing traps him: always a visible way to start over ("New", "Clear"), no dead-end overlays.
+- **Surprise = a fun moment, right now, on the current scene** (the dad's rule): something happens to what is on
+  screen (the hamster somersaults, a giant bubble wobbles across, a cow waits at the crossing), then play goes on.
+  Not randomizing choices he could pick himself, and not unlocking content (new foods, pens, patterns, trains):
+  anything worth having becomes a real option instead. Take turns between a few moments so it stays fresh.
 - **Kind words** (the dad's idea): the shared layer shows a card with a gentle reminder ("You are doing great!", a
   smiling sun), a congratulation ("You did it!", a star) or love from Dad ("Dad loves you!", a heart) every few
   minutes of play and sometimes on returning to the home screen. Never first person ("I'm proud..."): the device
