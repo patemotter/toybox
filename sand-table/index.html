@@ -77,28 +77,38 @@ body {
 .stage .farewell { position: absolute; top: 14px; bottom: auto; z-index: 4; }
 .stage .farewell p { font-size: 1.25rem; }
 
-/* ---------- Panel: Draw!/Stop, the pattern tiles, then Light / Smooth / Surprise ---------- */
-.pats { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+/* ---------- Panel: Draw!/Stop and Smooth, the shape or sand tiles, then Shapes / Sand / New / Surprise ---------- */
+.gorow { display: flex; gap: 8px; }
+.gorow .tb-go { flex: 1.7 1 0; min-width: 0; }
+.btn.smooth { flex: 1 1 0; min-width: 0; min-height: 60px; padding: 0.2rem 0.4rem; font-size: 1.3rem; font-weight: 800;
+  background: #F6E2B8; color: #1D2340; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.btn.smooth .rake { width: 30px; height: 26px; margin-right: 4px; flex: none; }
+.btn.smooth.full { animation: smooth-glow 2.4s ease-in-out infinite; }
+@keyframes smooth-glow { 0%, 100% { box-shadow: 3px 3px 0 var(--edge), 0 0 4px 1px rgba(255, 154, 77, 0.35); }
+  50% { box-shadow: 3px 3px 0 var(--edge), 0 0 18px 7px rgba(255, 180, 90, 0.9); } }
+@media (prefers-reduced-motion: reduce) { .btn.smooth.full { animation: none; box-shadow: 3px 3px 0 var(--edge), 0 0 12px 4px rgba(255, 180, 90, 0.8); } }
+.pats, .sands { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+#panel[data-tab="shapes"] .sands, #panel[data-tab="sand"] .pats { display: none; }
 .btn.pat { min-height: 58px; padding: 4px 2px; border-radius: 14px; }
 .btn.pat svg { width: 40px; height: 40px; }
 .pat .lbl { display: none; }
 .btn.pat[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
 .btn.pat.drawing svg { animation: pat-turn 6s linear infinite; }
 @keyframes pat-turn { to { transform: rotate(360deg); } }
-.btn.tb-new .rake { width: 30px; height: 26px; margin-right: 4px; vertical-align: -6px; flex: none; }
-.btn.tb-new.full { animation: smooth-glow 2.4s ease-in-out infinite; }
-@keyframes smooth-glow { 0%, 100% { box-shadow: 3px 3px 0 var(--edge), 0 0 4px 1px rgba(255, 154, 77, 0.35); }
-  50% { box-shadow: 3px 3px 0 var(--edge), 0 0 18px 7px rgba(255, 180, 90, 0.9); } }
-@media (prefers-reduced-motion: reduce) { .btn.tb-new.full { animation: none; box-shadow: 3px 3px 0 var(--edge), 0 0 12px 4px rgba(255, 180, 90, 0.8); } }
+.tb-tabs .tab[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
 .btn.tb-go .goicon { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.35em; vertical-align: -0.08em; }
-.ldot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #1D2340; margin-right: 6px;
-  vertical-align: -3px; box-shadow: 0 0 8px 2px var(--ld, #FFC86B); background: var(--ld, #FFC86B); }
+.sdot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #1D2340; margin-right: 5px;
+  vertical-align: -3px; background: var(--sd, #F2DEB8); flex: none; }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .btn.smooth { min-height: 52px; font-size: 1.1rem; }
+  .btn.smooth .rake { width: 26px; height: 22px; }
+}
 body.big .tb-panel { display: none; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
 /* Phones held sideways: two rows of four tiles in the side column. */
 @media (orientation: landscape) and (max-height: 520px) {
-  .pats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pats, .sands { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .btn.pat { min-height: 70px; }
   .btn.pat svg { width: 44px; height: 44px; }
   .tb-body .tb-panel { width: min(40%, 330px); }
@@ -111,7 +121,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .stage .tbadge { width: 56px; height: 56px; top: 12px; right: 12px; }
 }
 @media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
-  .pats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pats, .sands { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tb-body .tb-panel { width: min(36%, 400px); }
 }
 @media (prefers-reduced-motion: reduce) { .btn.pat.drawing svg { animation: none; } }
@@ -137,12 +147,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <div class="tb-coach" id="coach" role="status" aria-live="polite">Drag the ball!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
-    <section class="tb-panel" id="panel">
-      <button class="btn tb-go" id="goBtn">Draw!</button>
-      <div class="tb-choices pats" id="pats" role="group" aria-label="Patterns"></div>
+    <section class="tb-panel" id="panel" data-tab="shapes">
+      <div class="gorow">
+        <button class="btn tb-go" id="goBtn">Draw!</button>
+        <button class="btn smooth" id="smoothBtn" aria-label="Smooth the sand"><svg class="rake" viewBox="0 0 32 28" aria-hidden="true"><path d="M2 24c3-2.2 6-2.2 9 0M2 18.5c2.4-1.8 4.8-1.8 7.2 0" fill="none" stroke="#8A5A2B" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/><path d="M27 2 19.5 12.5" stroke="#1D2340" stroke-width="3.6" stroke-linecap="round"/><path d="M12.5 9.5 25.5 17" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M13.5 12.5l-1.6 3.4M17.2 14.6l-1.6 3.4M20.9 16.7l-1.6 3.4M24.6 18.8 23 22.2" stroke="#1D2340" stroke-width="2.4" stroke-linecap="round"/></svg>Smooth</button>
+      </div>
+      <div class="tb-choices pats" id="pats" role="group" aria-label="Shapes"></div>
+      <div class="tb-choices sands" id="sands" role="group" aria-label="Sand colors"></div>
       <nav class="tb-tabs" aria-label="More">
-        <button class="btn" id="lightBtn" aria-label="Change the light color"><span class="ldot" id="ldot"></span>Light</button>
-        <button class="btn tb-new" id="smoothBtn" aria-label="Smooth the sand"><svg class="rake" viewBox="0 0 32 28" aria-hidden="true"><path d="M2 24c3-2.2 6-2.2 9 0M2 18.5c2.4-1.8 4.8-1.8 7.2 0" fill="none" stroke="#8A5A2B" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/><path d="M27 2 19.5 12.5" stroke="#1D2340" stroke-width="3.6" stroke-linecap="round"/><path d="M12.5 9.5 25.5 17" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/><path d="M13.5 12.5l-1.6 3.4M17.2 14.6l-1.6 3.4M20.9 16.7l-1.6 3.4M24.6 18.8 23 22.2" stroke="#1D2340" stroke-width="2.4" stroke-linecap="round"/></svg>Smooth</button>
+        <button class="btn tab" data-tab="shapes" aria-pressed="true">Shapes</button>
+        <button class="btn tab" data-tab="sand" aria-pressed="false"><span class="sdot" id="sdot"></span>Sand</button>
+        <button class="btn tb-new" id="newBtn" aria-label="New: start over with smooth sand">New</button>
         <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
       </nav>
     </section>
@@ -154,7 +169,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   "use strict";
 
   // ---------- Constants ----------
-  var KEY = "sand-table-v1";          // { ball:[x,y], pat, light }
+  var KEY = "sand-table-v1";          // { ball:[x,y], pat, sand } (older saves also hold "light": ignored)
   var SKEY = "sand-table-sand-v1";    // the sand itself: the heightmap as a grey PNG (1/32 of a cell per step)
   var OUT = "#1D2340";
   var TAU = Math.PI * 2;
@@ -173,10 +188,25 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var STEP = 0.008;            // pattern points are this far apart
   var V_FINGER = 1.7;          // table radii per second: the ball's top speed behind a finger (calm, catches up)
   var V_PAT = 0.62;            // drawing a pattern by itself (calm)
-  var WIPE_SECS = 7.5;         // the spiral smoothing takes about this long
+  var SMOOTH_MS = 1300;        // Smooth: the wide rake sweeps the whole table in about this long
+  var NEW_MS = 800;            // New: a really fast sweep, then the table is fresh
+  var WASH_MS = 1000;          // a new sand color washes across the table in about this long
   var RESUME_MS = 2600;        // after a finger lets go in Draw! mode, the pattern carries on
   var SAND = [242, 222, 184];
-  var LIGHTS = ["#FFC86B", "#56C2FF", "#B07CFF", "#FF7DC0", "#5FE08A", "#FF9248", "#FFFFFF"];
+  var LIGHT = "#FFC86B";       // the table's rim light: one warm glow (the sand itself changes color now)
+  // Sand colors (picture tiles). "rgb" is one color; "stripes" are soft rainbow bands across the table;
+  // "glints" sprinkles a few tiny sparkly grains (the black space sand).
+  var SANDS = [
+    { id: "beach", name: "Beach", rgb: [242, 222, 184] },
+    { id: "pink", name: "Pink", rgb: [250, 192, 212] },
+    { id: "blue", name: "Blue", rgb: [164, 206, 246] },
+    { id: "green", name: "Green", rgb: [178, 226, 170] },
+    { id: "purple", name: "Purple", rgb: [204, 182, 242] },
+    { id: "space", name: "Space", rgb: [66, 64, 92], glints: true },
+    { id: "rainbow", name: "Rainbow", stripes: [[250, 176, 176], [252, 204, 152], [248, 234, 156], [182, 228, 168], [164, 208, 246], [204, 182, 242]] }
+  ];
+  var SAND_BY = {};
+  SANDS.forEach(function (c) { SAND_BY[c.id] = c; });
   // Light from the top left, a little above.
   var LX = -0.52, LY = -0.62, LZ = 0.59;
   (function () { var l = Math.hypot(LX, LY, LZ); LX /= l; LY /= l; LZ /= l; })();
@@ -284,13 +314,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); localStorage.removeItem(SKEY); } catch (e) { /* ignore */ }
   }
-  var prefs = { ball: [0, 0], pat: "spiral", light: 0 };
+  var prefs = { ball: [0, 0], pat: "spiral", sand: "beach" };
   try {
     var o = JSON.parse(localStorage.getItem(KEY) || "null");
     if (o && typeof o === "object") {
       if (o.ball && o.ball.length === 2 && isFinite(o.ball[0]) && isFinite(o.ball[1])) prefs.ball = [Number(o.ball[0]), Number(o.ball[1])];
       if (PAT_BY[o.pat]) prefs.pat = o.pat;
-      if (typeof o.light === "number" && o.light >= 0 && o.light < LIGHTS.length) prefs.light = Math.floor(o.light);
+      if (typeof o.sand === "string" && SAND_BY[o.sand]) prefs.sand = o.sand;   // an old "light" is simply ignored
     }
   } catch (e) { /* bad data: defaults */ }
   function savePrefs() {
@@ -306,6 +336,30 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   (function () {
     for (var i = 0; i < N * N; i++) { GR[i] = 1 + (Math.random() - 0.5) * 0.055; CARVE[i] = -1e9; }
   })();
+  // The sand's color, per cell (so a new color can wash across, and rainbow sand can have stripes).
+  var CR = new Uint8Array(N * N), CG = new Uint8Array(N * N), CB = new Uint8Array(N * N);   // shown now
+  var OR = new Uint8Array(N * N), OG = new Uint8Array(N * N), OB = new Uint8Array(N * N);   // before a wash
+  var NR = new Uint8Array(N * N), NG = new Uint8Array(N * N), NB = new Uint8Array(N * N);   // after a wash
+  var GLINT = new Float32Array(N * N);
+  (function () { for (var i = 0; i < N * N; i++) GLINT[i] = Math.random() < 0.006 ? 0.5 + Math.random() * 0.5 : 0; })();
+  function fillColors(id, R, G, B) {
+    var c = SAND_BY[id] || SANDS[0], x, y, i = 0;
+    for (y = 0; y < N; y++) {
+      for (x = 0; x < N; x++, i++) {
+        var r, g, b;
+        if (c.stripes) {
+          // soft diagonal bands
+          var n = c.stripes.length, u = ((x * 0.94 + y * 0.34) / N) * (n - 0.6) + 0.15 * Math.sin(y * 0.02);
+          var k = Math.floor(u), f = u - k, a = c.stripes[((k % n) + n) % n], bb = c.stripes[(((k + 1) % n) + n) % n];
+          var w = f < 0.78 ? 0 : (f - 0.78) / 0.22; w = w * w * (3 - 2 * w);
+          r = a[0] + (bb[0] - a[0]) * w; g = a[1] + (bb[1] - a[1]) * w; b = a[2] + (bb[2] - a[2]) * w;
+        } else { r = c.rgb[0]; g = c.rgb[1]; b = c.rgb[2]; }
+        if (c.glints && GLINT[i]) { var q = GLINT[i]; r += (235 - r) * q; g += (232 - g) * q; b += (255 - b) * q; }
+        R[i] = r; G[i] = g; B[i] = b;
+      }
+    }
+  }
+  fillColors(prefs.sand, CR, CG, CB);
   var sandC = document.createElement("canvas");
   sandC.width = sandC.height = N;
   var sctx = sandC.getContext("2d");
@@ -356,27 +410,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
     sandChanged = now();
   }
-  // Smooth a round patch flat (the spiral wipe). k = how much (1 = fully flat in the middle).
-  function flatten(cx, cy, rad, soft, k) {
-    var X = cellX(cx), Y = cellX(cy), r0 = rad * HALF, r1 = (rad + soft) * HALF;
-    var x0 = Math.max(0, Math.floor(X - r1)), x1 = Math.min(N - 1, Math.ceil(X + r1));
-    var y0 = Math.max(0, Math.floor(Y - r1)), y1 = Math.min(N - 1, Math.ceil(Y + r1));
-    if (x1 < x0 || y1 < y0) return;
-    var x, y, i;
-    for (y = y0; y <= y1; y++) {
-      i = y * N + x0;
-      for (x = x0; x <= x1; x++, i++) {
-        var d = Math.hypot(x - X, y - Y);
-        if (d >= r1) continue;
-        var w = d <= r0 ? 1 : 1 - (d - r0) / (r1 - r0);
-        w = w * w * (3 - 2 * w) * k;
-        H[i] *= (1 - w);
-        if (Math.abs(H[i]) < 0.02) H[i] = 0;
-      }
-    }
-    markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
-    sandChanged = now();
-  }
   // Light the dirty cells into the sand canvas.
   var KS = 1.0, AO = 0.03;
   function shade(x0, y0, x1, y1) {
@@ -391,9 +424,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var gx = ((x < N - 1 ? H[i + 1] : h) - (x > 0 ? H[i - 1] : h)) * 0.5 * KS;
         var gy = (H[i + dn] - H[i + up]) * 0.5 * KS;
         var dot = (-gx * LX - gy * LY + LZ) / Math.sqrt(gx * gx + gy * gy + 1);
-        var f = (1 + (dot / LZ - 1) * 0.6) * (1 + h * AO) * GR[i];
+        var f = (1 + (dot / LZ - 1) * 0.6) * (1 + (h > 1.5 ? 1.5 : h) * AO) * GR[i];
         var j = i * 4;
-        var r = SAND[0] * f, g = SAND[1] * f, b = SAND[2] * f;
+        var r = CR[i] * f, g = CG[i] * f, b = CB[i] * f;
         D[j] = r > 255 ? 255 : r; D[j + 1] = g > 255 ? 255 : g; D[j + 2] = b > 255 ? 255 : b; D[j + 3] = 255;
       }
     }
@@ -474,7 +507,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var learnedDrag = false, watched = false, fingerPath = 0;
   var ending = false, endDone = null, endT0 = 0;
   var dim = 1, dimTarget = 1;
-  var lightWave = null;
   var dirty = true;
 
   // A route: a straight approach from the ball to point k0 of pts, then along pts to the end.
@@ -505,7 +537,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (W.on && route && route.kind === "pattern" && W.pat === id && W.v === v && !fromK) return;
     W.pat = id; W.v = v || 0; W.k = fromK || 0; W.done = false; W.finished = false; W.on = true; watched = true;
     prefs.pat = id; savePrefs();
-    if (route && route.kind === "wipe") { route.then = "pattern"; renderPanel(); return; }   // after the smoothing
+    if (rake) { route = null; renderPanel(); return; }   // it starts once the rake has gone by
     if (!steer) beginPatternRoute();
     else W.resumeAt = 0;
     renderPanel();
@@ -518,8 +550,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function stopDrawing() {
     W.on = false;
-    if (route && route.kind !== "wipe") route.stopping = true;
-    if (route && route.kind === "wipe" && route.then === "pattern") route.then = null;
+    if (route) route.stopping = true;
     renderPanel();
   }
   function nextPatternId() {
@@ -527,19 +558,329 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (var j = 0; j < PATS.length; j++) if (PATS[j].id === W.pat) i = j;
     return PATS[(i + 1) % PATS.length].id;
   }
-  function startWipe(then) {
-    if (route && route.kind === "wipe") return;
-    // The ball goes out to the edge, then spirals in; the sand behind it is smoothed flat.
-    var a = Math.atan2(ball.y, ball.x), r0 = 0.9, sp = 0.2, turns = r0 / sp, pts = [];
-    if (Math.hypot(ball.x, ball.y) < 0.05) a = -Math.PI / 2;
-    curve(function (t) { return polar(r0 * (1 - t), a + turns * TAU * t); }, 0, 1, 1600, pts);
-    var rs = resample(pts);
-    var len = Math.hypot(rs[0] - ball.x, rs[1] - ball.y) + (rs.length / 2 - 1) * STEP;
-    var v = Math.max(V_PAT, len / WIPE_SECS);
-    route = makeRoute("wipe", rs, 0, v, { acc: v * 1.5, dec: v * 2.2, then: then || null });
-    route.settle = 0;
-    W.done = false;
+  // ---------- Smooth and New: a wide rake sweeps across the whole table ----------
+  // It pushes the ball ahead of it (until the ball reaches the rim, then it rolls over the rake), leaves
+  // flat sand behind and a little pile of pushed sand in front. Draw! never does this by itself.
+  var rake = null, RAKE_W = 0.04, acts = [];
+  function startRake(kind) {
+    var ms = kind === "new" ? NEW_MS : SMOOTH_MS;
+    if (rake) {
+      // New during a Smooth: the rest of the sweep goes faster and the table starts over afterwards
+      if (kind === "new" && rake.kind !== "new") { var k = rakeK(); rake.kind = "new"; rake.dur = Math.max(250, (1 - k) * NEW_MS); rake.t0 = now(); rake.k0 = k; }
+      return;
+    }
+    W.on = false; route = null; steer = null; activeId = null; ball.vx = ball.vy = 0;
+    acts = acts.filter(function (a) { return a.kind !== "wind"; });   // the rake wins over a gust in the sand
+    if (kind === "new") acts = [];
+    rake = { kind: kind, t0: now(), dur: reduce ? ms * 0.6 : ms, k0: 0, y: -1.14, row: 0, passed: false };
+    lastStamp.x = ball.x; lastStamp.y = ball.y;
+    ping(kind === "new" ? 520 : 440);
     renderPanel();
+  }
+  function rakeK() {
+    var f = clamp((now() - rake.t0) / rake.dur, 0, 1);
+    return rake.k0 + (1 - rake.k0) * f;
+  }
+  function stepRake() {
+    var k = rakeK(), e = rake.k0 > 0 ? k : (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    var y = -1.14 + 2.28 * e;
+    rake.y = y;
+    // push the ball ahead
+    if (!rake.passed) {
+      var ny = y + RAKE_W + RB;
+      if (ball.y < ny) {
+        if (Math.hypot(ball.x, ny) > LIM) {
+          // at the rim: it stops there and the rake goes under it
+          rake.passed = true;
+          moveBallTo(ball.x, Math.sqrt(Math.max(0, LIM * LIM - ball.x * ball.x)), 0);
+        } else moveBallTo(ball.x, ny, 0);
+        ball.vx = ball.vy = 0;
+      }
+    }
+    // flatten the rows the rake covers, and pile a little sand in front of it
+    var rowTo = Math.min(N - 1, Math.floor(cellX(y + RAKE_W)));
+    if (rowTo >= rake.row) {
+      for (var j = rake.row; j <= rowTo; j++) {
+        var i0 = j * N;
+        for (var x = 0; x < N; x++) { H[i0 + x] = 0; CARVE[i0 + x] = -1e9; }
+      }
+      markDirty(0, Math.max(0, rake.row - 1), N - 1, rowTo + 1);
+      rake.row = rowTo + 1;
+    }
+    var p0 = Math.max(rake.row, 0), p1 = Math.min(N - 1, Math.floor(cellX(y + RAKE_W + 0.06)));
+    for (var jj = p0; jj <= p1; jj++) {
+      var d = ((jj + 0.5) / HALF - 1) - (y + RAKE_W), u = 1 - d / 0.06;
+      if (u <= 0) continue;
+      var pile = 2.4 * Math.sin(Math.PI * 0.5 * u) * (u > 0.85 ? (1 - u) / 0.15 * 0.6 + 0.4 : 1), ii = jj * N;
+      for (var xx = 0; xx < N; xx++) {
+        var v = pile * (0.82 + 0.18 * Math.sin(xx * 0.21 + jj * 0.05));
+        if (v > H[ii + xx]) H[ii + xx] = v;
+      }
+    }
+    if (p1 >= p0) markDirty(0, p0 - 1, N - 1, p1 + 1);
+    sandChanged = now();
+    dirty = true;
+    if (k >= 1) endRake();
+  }
+  function endRake() {
+    var kind = rake.kind;
+    rake = null;
+    smoothAll();
+    lastStamp.x = ball.x; lastStamp.y = ball.y;
+    W.k = 0; W.done = false; W.finished = false;
+    if (kind === "new") {
+      // New: a fresh table (the sand keeps the color he picked)
+      W.on = false; W.pat = "spiral"; W.v = 0; prefs.pat = W.pat;
+    }
+    updateCoach();
+    renderPanel();
+    saveSand();
+  }
+
+  // ---------- A new sand color washes across the table (the grooves stay) ----------
+  var wash = null, WSOFT = 70, WWOB = 14;
+  function setSand(id) {
+    if (!SAND_BY[id]) return;
+    OR.set(CR); OG.set(CG); OB.set(CB);    // what shows now (also halfway through another wash)
+    fillColors(id, NR, NG, NB);
+    prefs.sand = id;
+    savePrefs();
+    wash = { t0: now(), f: -WSOFT - WWOB, ph: Math.random() * TAU };
+    ping(560 + SANDS.indexOf(SAND_BY[id]) * 50);
+    renderPanel();
+  }
+  function stepWash() {
+    var k = clamp((now() - wash.t0) / (reduce ? WASH_MS * 0.5 : WASH_MS), 0, 1);
+    var F = -WWOB + (N + WSOFT + 2 * WWOB) * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    var a = Math.max(0, Math.floor(wash.f - WSOFT - WWOB)), b = Math.min(N - 1, Math.ceil(F + WWOB));
+    for (var y = 0; y < N; y++) {
+      var wob = WWOB * Math.sin(y * 0.022 + wash.ph), i = y * N + a;
+      for (var x = a; x <= b; x++, i++) {
+        var w = (F - (x + wob)) / WSOFT;
+        w = w <= 0 ? 0 : (w >= 1 ? 1 : w * w * (3 - 2 * w));
+        CR[i] = OR[i] + (NR[i] - OR[i]) * w; CG[i] = OG[i] + (NG[i] - OG[i]) * w; CB[i] = OB[i] + (NB[i] - OB[i]) * w;
+      }
+    }
+    if (b >= a) markDirty(a, 0, b, N - 1);
+    wash.f = F;
+    dirty = true;
+    if (k >= 1) { CR.set(NR); CG.set(NG); CB.set(NB); wash = null; markDirty(0, 0, N - 1, N - 1); }
+  }
+
+  // ---------- Pressing marks into the sand (the turtle's flippers, the truck's tires) ----------
+  // A dent along a short line with sand pushed up on both sides. tread > 0 gives tire chevrons.
+  function stampLine(ax, ay, bx, by, hw, depth, tread, s0) {
+    var Ax = cellX(ax), Ay = cellX(ay), Bx = cellX(bx), By = cellX(by);
+    var rg = hw * HALF, rr = rg * 1.9, rr2 = rr * rr, rg2 = rg * rg;
+    var x0 = Math.max(1, Math.floor(Math.min(Ax, Bx) - rr)), x1 = Math.min(N - 2, Math.ceil(Math.max(Ax, Bx) + rr));
+    var y0 = Math.max(1, Math.floor(Math.min(Ay, By) - rr)), y1 = Math.min(N - 2, Math.ceil(Math.max(Ay, By) + rr));
+    if (x1 < x0 || y1 < y0) return;
+    var vx = Bx - Ax, vy = By - Ay, L2 = vx * vx + vy * vy, L = Math.sqrt(L2), x, y, i;
+    var ext = L > 0 ? Math.max(0.5, 2 / L) : 0;
+    for (y = y0; y <= y1; y++) {
+      i = y * N + x0;
+      for (x = x0; x <= x1; x++, i++) {
+        // inside the sand circle only
+        var tx = (x + 0.5) / HALF - 1, ty = (y + 0.5) / HALF - 1;
+        if (tx * tx + ty * ty > 0.985) continue;
+        var px = x - Ax, py = y - Ay, tu = L2 > 0 ? (px * vx + py * vy) / L2 : 0;
+        var t = tu < 0 ? 0 : (tu > 1 ? 1 : tu);
+        var qx = px - t * vx, qy = py - t * vy, d2 = qx * qx + qy * qy;
+        if (d2 < rg2) {
+          var q = d2 / rg2, g = -depth * (1 - q * q);
+          if (tread) {
+            // chevrons: deeper blocks with shallow gaps between them, in a V across the tire
+            var along = (s0 + t * L / HALF) / tread + Math.sqrt(q) * 0.45;
+            g *= (along - Math.floor(along)) < 0.55 ? 1 : 0.45;
+          }
+          if (g < H[i]) H[i] = g; else H[i] = H[i] * 0.35 + g * 0.65;
+          continue;
+        }
+        if (L2 <= 0 || tu < -ext || tu > 1 + ext) continue;
+        var ux = px - tu * vx, uy = py - tu * vy, dp2 = ux * ux + uy * uy;
+        if (dp2 >= rr2 || dp2 < rg2) continue;
+        var u = (Math.sqrt(dp2) - rg) / (rr - rg), r = depth * 0.55 * Math.sin(Math.PI * u);
+        if (r > H[i]) H[i] += (1 - u) * (r - H[i]);
+      }
+    }
+    markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
+    sandChanged = now();
+  }
+  // A soft heap of sand (the dump truck's load).
+  function addHeap(cx0, cy0, rad, amt) {
+    var X = cellX(cx0), Y = cellX(cy0), r = rad * HALF;
+    var x0 = Math.max(0, Math.floor(X - r)), x1 = Math.min(N - 1, Math.ceil(X + r));
+    var y0 = Math.max(0, Math.floor(Y - r)), y1 = Math.min(N - 1, Math.ceil(Y + r));
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        var d = Math.hypot(x - X, y - Y) / r;
+        if (d >= 1) continue;
+        var i = y * N + x, w = 1 - d; w = w * (1.6 - 0.6 * w);
+        H[i] = Math.min(12, H[i] + amt * w * (1 + 0.08 * Math.sin(x * 0.23 + y * 0.17)));
+      }
+    }
+    markDirty(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
+    sandChanged = now();
+  }
+
+
+  // ---------- Surprise: little moments on the sand, taking turns ----------
+  // A sea turtle crawls across and leaves flipper tracks; a toy dump truck drives across, tips a heap of
+  // sand and drives on, leaving tire tracks; a gust of wind ripples the sand into waves that settle.
+  // Their marks stay in the sand like his drawing (until he smooths it).
+  var SURPRISES = ["turtle", "truck", "wind"], surpriseN = 0;
+  // A gentle curved path across the table, from outside the rim to outside the rim.
+  function crossPath(rOut, bend) {
+    var a = Math.random() * TAU, b = a + Math.PI + (Math.random() - 0.5) * 0.9;
+    var p0 = [rOut * Math.cos(a), rOut * Math.sin(a)], p2 = [rOut * Math.cos(b), rOut * Math.sin(b)];
+    var mx = (p0[0] + p2[0]) / 2, my = (p0[1] + p2[1]) / 2, dx = p2[0] - p0[0], dy = p2[1] - p0[1], L = Math.hypot(dx, dy);
+    var side = Math.random() < 0.5 ? -1 : 1, p1 = [mx - dy / L * bend * side, my + dx / L * bend * side];
+    var pts = [], len = [0], i;
+    for (i = 0; i <= 200; i++) {
+      var t = i / 200, u = 1 - t;
+      pts.push([u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]]);
+      if (i) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    }
+    return { pts: pts, len: len, L: len[200] };
+  }
+  function pathAt(P, s) {
+    s = clamp(s, 0, P.L);
+    var lo = 0, hi = 200;
+    while (hi - lo > 1) { var m = (lo + hi) >> 1; if (P.len[m] <= s) lo = m; else hi = m; }
+    var f = (s - P.len[lo]) / Math.max(1e-6, P.len[hi] - P.len[lo]), a = P.pts[lo], b = P.pts[hi];
+    return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, th: Math.atan2(b[1] - a[1], b[0] - a[0]) };
+  }
+  function inSand(x, y, m) { return Math.hypot(x, y) < 1 - (m || 0); }
+  // body frame: f = forward, l = to the left
+  function off(p, f, l) { var c = Math.cos(p.th), s = Math.sin(p.th); return [p.x + c * f + s * l, p.y + s * f - c * l]; }
+
+  function startSurprise() {
+    var kind = SURPRISES[surpriseN % SURPRISES.length];
+    if (kind === "wind" && acts.some(function (a) { return a.kind === "wind"; })) { surpriseN++; kind = SURPRISES[surpriseN % SURPRISES.length]; }
+    surpriseN++;
+    if (acts.length >= 3) { acts.forEach(function (a) { a.hop = now(); }); return; }   // plenty going on: they all hop
+    var a;
+    if (kind === "turtle") a = { kind: "turtle", P: crossPath(1.25, 0.32), s: 0, nextStep: 0, tail: null };
+    else if (kind === "truck") a = { kind: "truck", P: crossPath(1.32, 0.18), s: 0, v: 0, stage: 0, tipT: 0, tip: 0, heap: 0, last: null };
+    else a = { kind: "wind", t0: now(), ph: Math.random() * TAU, streaks: [], rip: null, cols: null };
+    if (a.kind !== "wind") a.P.half = a.P.L * (0.42 + Math.random() * 0.16);
+    a.t0 = a.t0 || now(); a.hop = 0;
+    acts.push(a);
+    ping(kind === "turtle" ? 620 : (kind === "truck" ? 500 : 760));
+    updateCoach();
+  }
+  function stepActs(dt) {
+    if (!acts.length) return;
+    for (var i = acts.length - 1; i >= 0; i--) {
+      var a = acts[i];
+      if (a.kind === "turtle") stepTurtle(a, dt);
+      else if (a.kind === "truck") stepTruck(a, dt);
+      else stepWind(a, dt);
+      if (a.done) acts.splice(i, 1);
+    }
+    if (!acts.length) updateCoach();
+  }
+  var TS = 0.2, TK = 0.17, STROKE = 0.11;   // turtle and truck sizes (table radii per drawing unit)
+  function stepTurtle(a, dt) {
+    // a calm crawl: each flipper stroke pushes it forward, then it glides a little
+    var ph = (a.s / STROKE) % 1, v = 0.38 * (0.35 + 0.65 * Math.sin(Math.PI * ph));
+    if (ending) v *= 1.4;
+    var s1 = Math.min(a.P.L, a.s + Math.max(0.04, v) * dt);
+    var p = pathAt(a.P, s1);
+    // tail drag: a thin wiggly line down the middle
+    var tl = off(p, -0.95 * TS, 0.008 * Math.sin(s1 * 40));
+    if (a.tail && inSand(tl[0], tl[1], 0.02) && inSand(a.tail[0], a.tail[1], 0.02)) stampLine(a.tail[0], a.tail[1], tl[0], tl[1], 0.009, 0.9, 0, 0);
+    a.tail = tl;
+    // flipper marks: one pair per stroke, on both sides, sweeping back and out
+    if (s1 >= a.nextStep) {
+      a.nextStep = s1 + STROKE;
+      [1, -1].forEach(function (sd) {
+        var m0 = off(p, 0.15 * TS, sd * 0.5 * TS), m1 = off(p, -0.25 * TS, sd * 0.9 * TS);
+        if (inSand(m0[0], m0[1], 0.02) && inSand(m1[0], m1[1], 0.02)) stampLine(m0[0], m0[1], m1[0], m1[1], 0.02, 2.2, 0, 0);
+      });
+    }
+    a.s = s1;
+    if (a.s >= a.P.L) a.done = true;
+  }
+  function stepTruck(a, dt) {
+    var vmax = ending ? 0.5 : 0.36;
+    if (a.stage === 0 || a.stage === 2) {
+      // drive (slowing to a stop in the middle, to tip its load)
+      var target = vmax;
+      if (a.stage === 0) target = Math.min(vmax, Math.sqrt(2 * 0.4 * Math.max(0, a.P.half - a.s)) + 0.02);
+      a.v += clamp(target - a.v, -0.6 * dt, 0.4 * dt);
+      var s1 = Math.min(a.P.L, a.s + a.v * dt);
+      var p = pathAt(a.P, s1);
+      if (a.last) {
+        [1, -1].forEach(function (sd) {
+          var w0 = off(a.last, -0.95 * TK, sd * 0.66 * TK), w1 = off(p, -0.95 * TK, sd * 0.66 * TK);
+          if (inSand(w0[0], w0[1], 0.03) && inSand(w1[0], w1[1], 0.03)) stampLine(w0[0], w0[1], w1[0], w1[1], 0.2 * TK, 1.8, 0.035, a.s);
+          var f0 = off(a.last, 0.8 * TK, sd * 0.66 * TK), f1 = off(p, 0.8 * TK, sd * 0.66 * TK);
+          if (inSand(f0[0], f0[1], 0.03) && inSand(f1[0], f1[1], 0.03)) stampLine(f0[0], f0[1], f1[0], f1[1], 0.2 * TK, 1.8, 0.035, a.s + 0.2);
+        });
+      }
+      a.last = p; a.s = s1;
+      if (a.stage === 0 && a.s >= a.P.half - 0.002) {
+        // only tip where the heap lands on the sand
+        var hp = off(p, -2.1 * TK, 0);
+        if (inSand(hp[0], hp[1], 0.14) && !ending) { a.stage = 1; a.tipT = 0; a.v = 0; }
+        else a.stage = 2;
+      }
+      if (a.s >= a.P.L) a.done = true;
+    } else if (a.stage === 1) {
+      // tip the bed up, pour, put it down
+      a.tipT += dt;
+      var T = a.tipT;
+      a.tip = T < 0.8 ? T / 0.8 : (T < 2.0 ? 1 : Math.max(0, 1 - (T - 2.0) / 0.8));
+      a.tip = a.tip * a.tip * (3 - 2 * a.tip);
+      if (T > 0.6 && T < 2.2) {
+        var pp = pathAt(a.P, a.s), hp2 = off(pp, -(1.75 + 0.4 * (T - 0.6) / 1.6) * TK, 0);
+        addHeap(hp2[0], hp2[1], 0.15, 7.5 * dt);
+        a.heap += dt;
+      }
+      if (T >= 2.8) { a.stage = 2; a.tip = 0; }
+    }
+  }
+  // Wind: the gust front sweeps across (left to right); behind it ripples rise, then settle into soft waves.
+  var WIND_SWEEP = 1.6, WIND_RISE = 0.35, WIND_SETTLE = 0.75, WIND_END = 2.8, RIP_PEAK = 1.7, RIP_KEEP = 0.32;
+  function windEnv(tau) {
+    if (tau <= 0) return 0;
+    if (tau < WIND_RISE) { var u = tau / WIND_RISE; return u * u * (3 - 2 * u); }
+    if (tau >= WIND_END) return RIP_KEEP;
+    return RIP_KEEP + (1 - RIP_KEEP) * Math.exp(-(tau - WIND_RISE) / WIND_SETTLE);
+  }
+  function stepWind(a) {
+    var t = (now() - a.t0) / 1000, x, y, i;
+    if (!a.rip) {
+      // ripples across the wind (wavy crests), a little different every gust
+      a.rip = new Float32Array(N * N); a.cols = new Float32Array(N); a.sf = new Float32Array(N); a.done0 = new Uint8Array(N);
+      var k = TAU / 26, ph = a.ph;
+      for (y = 0; y < N; y++) {
+        var wob = 1.3 * Math.sin(y * 0.021 + ph) + 0.5 * Math.sin(y * 0.057 + ph * 2);
+        for (x = 0; x < N; x++) {
+          var q = Math.sin(x * k + wob + 0.25 * Math.sin(x * 0.013 + y * 0.009));
+          a.rip[y * N + x] = (q > 0 ? q * q * 0.9 + q * 0.1 : q * 0.75) * RIP_PEAK;   // steeper on one side, like real ripples
+        }
+      }
+      for (i = 0; i < 18; i++) a.streaks.push({ y: -0.95 + 1.9 * Math.random(), d: Math.random() * 0.9, len: 0.2 + Math.random() * 0.25, b: (Math.random() - 0.5) * 0.12 });
+    }
+    var x0 = N, x1 = -1;
+    for (x = 0; x < N; x++) {
+      if (a.done0[x]) continue;
+      var tau = t - (x / N) * WIND_SWEEP, aN = windEnv(tau), aP = a.cols[x];
+      if (aN === aP && tau <= 0) continue;
+      // while the ripples rise, the old marks soften a little (the wind blurs them)
+      var sf = clamp(tau / WIND_RISE, 0, 1), m = sf > a.sf[x] ? Math.pow(0.7, sf - a.sf[x]) : 1;
+      a.sf[x] = sf;
+      for (y = 0, i = x; y < N; y++, i += N) H[i] = (H[i] - aP * a.rip[i]) * m + aN * a.rip[i];
+      a.cols[x] = aN;
+      if (tau >= WIND_END) a.done0[x] = 1;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+    }
+    if (x1 >= x0) { markDirty(x0 - 1, 0, x1 + 1, N - 1); sandChanged = now(); }
+    // a free ball rolls a little downwind as the gust reaches it
+    if (!a.pushed && !steer && !route && !rake && t > ((ball.x + 1) / 2) * WIND_SWEEP) { a.pushed = true; ball.vx += 0.35; ball.vy += 0.05; }
+    if (t > WIND_SWEEP + WIND_END + 0.05) a.done = true;
   }
 
   // ---------- Moving the ball (each frame) ----------
@@ -559,22 +900,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var ax = lastStamp.x + dx * i / n, ay = lastStamp.y + dy * i / n;
       var bx = lastStamp.x + dx * (i + 1) / n, by = lastStamp.y + dy * (i + 1) / n;
       stampSeg(ax, ay, bx, by, cum + d * i / n, cum + d * (i + 1) / n);
-      if (route && route.kind === "wipe") wipeBand(bx, by);
     }
     cum += d;
     lastStamp.x = ball.x; lastStamp.y = ball.y;
   }
-  // The band just outside the ball's spiral is smoothed (it holds the last turn's groove).
-  function wipeBand(x, y) {
-    if (route.s < route.la) return;
-    var r = Math.hypot(x, y), a = Math.atan2(y, x), c = r + 0.185;
-    flatten(c * Math.cos(a), c * Math.sin(a), 0.1, 0.025, 1);
-  }
-
-  var tilt = { x: 0, y: 0, bx: 0, by: 0, on: false, has: false };
   function update(dt) {
     var t = now();
-    if (steer) {
+    if (wash) stepWash();
+    stepActs(dt);
+    if (rake) {
+      stepRake();
+    } else if (steer) {
       var dx = steer.tx - ball.x, dy = steer.ty - ball.y, d = Math.hypot(dx, dy);
       var sp = Math.min(V_FINGER, d * 4.2);
       var wx = d > 1e-6 ? dx / d * sp : 0, wy = d > 1e-6 ? dy / d * sp : 0;
@@ -589,8 +925,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         if (W.on) W.resumeAt = t + RESUME_MS;
         updateCoach();
       }
-    } else if (route && route.settle > 0) {
-      // the smoothing spiral reached the middle: settling (below)
     } else if (route) {
       var R = route, vt = R.stopping ? 0 : R.vmax;
       if (R.v < vt) R.v = Math.min(vt, R.v + R.acc * dt); else R.v = Math.max(vt, R.v - R.dec * dt);
@@ -602,18 +936,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (R.kind === "pattern") W.k = routeIndex(R);
       if (R.s >= R.len || (R.stopping && R.v <= 0.001)) finishRoute(R);
     } else {
-      // Free: tilt nudges the ball (when the grown-up turned tilt on); otherwise it stays put.
-      var ax = 0, ay = 0;
-      if (tilt.on && tilt.has && !ending && !Toybox.timer.locked()) {
-        var e = 1 - Math.exp(-dt / 2.5);
-        tilt.bx += (tilt.x - tilt.bx) * e; tilt.by += (tilt.y - tilt.by) * e;
-        var gx = tilt.x - tilt.bx, gy = tilt.y - tilt.by, gm = Math.hypot(gx, gy);
-        if (gm > 0.06) { ax = gx / gm * (gm - 0.06) * 6; ay = gy / gm * (gm - 0.06) * 6; }
-      }
+      // Free: the ball rolls out whatever speed it has (a gust of wind) and stops.
       var damp = Math.exp(-dt * 2.4);
-      var nvx = (ball.vx + ax * dt) * damp, nvy = (ball.vy + ay * dt) * damp, ns = Math.hypot(nvx, nvy);
+      var nvx = ball.vx * damp, nvy = ball.vy * damp, ns = Math.hypot(nvx, nvy);
       if (ns > 0.9) { nvx *= 0.9 / ns; nvy *= 0.9 / ns; }
-      if (ns < 0.004 && !ax && !ay) { ball.vx = ball.vy = 0; }
+      if (ns < 0.004) { ball.vx = ball.vy = 0; }
       else moveBallTo(ball.x + nvx * dt, ball.y + nvy * dt, dt);
       // Draw! mode carries on after a finger let go, or after a finished pattern has been admired.
       if (W.on && !ending) {
@@ -621,27 +948,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         else if (!W.resumeAt) beginPatternRoute();
       }
     }
-    if (route && route.kind === "wipe" && route.settle > 0) {
-      // the very middle smooths out softly at the end of the spiral
-      flatten(0, 0, 0.26, 0.1, 0.25);
-      route.settle -= dt;
-      if (route.settle <= 0) endWipe();
-    }
     if (dim !== dimTarget) {
       dim += clamp(dimTarget - dim, -dt / 3, dt / 1.2);
       if (Math.abs(dim - dimTarget) < 0.005) dim = dimTarget;
       dirty = true;
     }
-    if (lightWave) dirty = true;
+    if (acts.length) dirty = true;
     hissTick(speed());
   }
   function finishRoute(R) {
     ball.vx = ball.vy = 0;
-    if (R.kind === "wipe") {
-      if (R.stopping) { route = null; updateCoach(); renderPanel(); return; }
-      R.settle = 0.7; R.s = R.len; R.v = 0;   // update() runs the settle, then endWipe()
-      return;
-    }
     route = null;
     if (R.kind === "pattern" && !R.stopping) {
       // finished: the ball rests, the pattern stays; Draw! again draws the next one on top
@@ -650,20 +966,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     updateCoach();
     renderPanel();
   }
-  function endWipe() {
-    var then = route ? route.then : null;
-    route = null;
-    smoothAll();
-    lastStamp.x = ball.x; lastStamp.y = ball.y;
-    W.k = 0; W.done = false;
-    if (then === "next" && W.on) { W.pat = nextPatternId(); W.v = 0; prefs.pat = W.pat; savePrefs(); beginPatternRoute(); }
-    else if (then === "pattern" && W.on) beginPatternRoute();
-    else if (then === "surprise" && W.on) beginPatternRoute();
-    updateCoach();
-    renderPanel();
-    saveSand();
-  }
-
   // ---------- Drawing the table ----------
   var stage = $("stage"), view = $("view"), ctx = view.getContext("2d");
   var dpr = 1, cw = 0, ch = 0, cx = 0, cy = 0, Rs = 0, Ro = 0, cssW = 0, cssH = 0;
@@ -734,7 +1036,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     s.restore();
   }
   function buildLight() {
-    var col = LIGHTS[prefs.light], x = lightC.getContext("2d"), led = Ro * 0.035;
+    var col = LIGHT, x = lightC.getContext("2d"), led = Ro * 0.035;
     x.clearRect(0, 0, cw, ch);
     x.save();
     circle(x, cx, cy, Rs); x.clip();
@@ -750,7 +1052,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     x.strokeStyle = "rgba(255,255,255,0.7)"; x.lineWidth = led * 0.22;
     circle(x, cx, cy, Rs + led * 0.5); x.stroke();
     x.restore();
-    lightKey = prefs.light + "|" + cw + "x" + ch;
+    lightKey = cw + "x" + ch;
   }
   function hexA(h, a) {
     return "rgba(" + parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16) + "," + a + ")";
@@ -802,7 +1104,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function render(rect) {
     var t0 = now();
     if (!cw) return;
-    if (lightKey !== prefs.light + "|" + cw + "x" + ch) buildLight();
+    if (lightKey !== cw + "x" + ch) buildLight();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     var x = 0, y = 0, w = cw, h = ch;
     if (rect) {
@@ -822,24 +1124,165 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.drawImage(shadeC, x, y, w, h, x, y, w, h);
     ctx.restore();
     if (dim > 0.01) { ctx.globalAlpha = dim; ctx.drawImage(lightC, x, y, w, h, x, y, w, h); ctx.globalAlpha = 1; }
-    if (lightWave) {
-      var k = (now() - lightWave.t0) / 1600;
-      if (k >= 1) lightWave = null;
-      else {
-        ctx.save(); circle(ctx, cx, cy, Rs); ctx.clip();
-        ctx.strokeStyle = hexA(LIGHTS[prefs.light], 0.55 * (1 - k)); ctx.lineWidth = Rs * 0.06 * (1 - k * 0.5);
-        circle(ctx, cx, cy, Rs * (1 - 0.92 * (1 - Math.pow(1 - k, 2)))); ctx.stroke();
-        ctx.restore();
-      }
-    }
+    if (wash) drawWashGlow(ctx);
+    if (rake) drawRake(ctx);
+    for (var ai = 0; ai < acts.length; ai++) drawAct(ctx, acts[ai]);
     var bx = cx + ball.x * Rs, by = cy + ball.y * Rs;
     if (steer && steer.down) {
       ctx.strokeStyle = "rgba(29,35,64,0.28)"; ctx.lineWidth = 2.5 * dpr;
       circle(ctx, cx + steer.tx * Rs, cy + steer.ty * Rs, RB * Rs * 1.9); ctx.stroke();
     }
-    drawBall(ctx, bx, by, RB * Rs, LIGHTS[prefs.light], dim);
+    drawBall(ctx, bx, by, RB * Rs, LIGHT, dim);
     if (rect) ctx.restore();
     renderMs = now() - t0;
+  }
+
+
+  // ---------- Drawing the rake, the color wash and the surprise visitors ----------
+  function rr(x, x0, y0, w, h, r) {
+    x.beginPath(); x.moveTo(x0 + r, y0); x.arcTo(x0 + w, y0, x0 + w, y0 + h, r); x.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+    x.arcTo(x0, y0 + h, x0, y0, r); x.arcTo(x0, y0, x0 + w, y0, r); x.closePath();
+  }
+  function drawWashGlow(x) {
+    // a soft bright band rides along the front of the new color
+    var F = wash.f, k = 2 * Rs / N, sx = cx - Rs + (F - WSOFT * 0.5) * k;
+    x.save(); circle(x, cx, cy, Rs); x.clip();
+    var g = x.createLinearGradient(sx - WSOFT * k * 0.6, 0, sx + WSOFT * k * 0.6, 0);
+    g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,0.32)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = g; x.fillRect(sx - WSOFT * k, cy - Rs, 2 * WSOFT * k, 2 * Rs);
+    x.restore();
+  }
+  function drawRake(x) {
+    var y = cy + rake.y * Rs, half = Ro * 1.02, bw = RAKE_W * Rs * 1.6, lw = 3 * dpr;
+    x.save();
+    circle(x, cx, cy, Ro + 6 * dpr); x.clip();
+    // the handle runs back (up) from the middle of the bar
+    x.fillStyle = "rgba(60,35,15,0.25)"; x.fillRect(cx - bw * 0.35 + 5 * dpr, 0, bw * 0.7, y + 5 * dpr);
+    x.fillStyle = "#B97A3F"; x.strokeStyle = OUT; x.lineWidth = lw;
+    rr(x, cx - bw * 0.35, -20 * dpr, bw * 0.7, y + 20 * dpr, bw * 0.3); x.fill(); x.stroke();
+    // shadow, tines peeking out at the front, then the bar
+    x.fillStyle = "rgba(60,35,15,0.28)"; rr(x, cx - half + 5 * dpr, y - bw / 2 + 6 * dpr, 2 * half, bw, bw / 2); x.fill();
+    x.fillStyle = "#5B647B";
+    for (var tx = cx - half + bw * 0.5; tx < cx + half; tx += bw * 0.62) { rr(x, tx - bw * 0.1, y + bw * 0.25, bw * 0.2, bw * 0.55, bw * 0.08); x.fill(); x.stroke(); }
+    var g = x.createLinearGradient(0, y - bw / 2, 0, y + bw / 2);
+    g.addColorStop(0, "#E6AE72"); g.addColorStop(1, "#C98A4B");
+    x.fillStyle = g; rr(x, cx - half, y - bw / 2, 2 * half, bw, bw / 2); x.fill(); x.stroke();
+    x.strokeStyle = "rgba(255,240,214,0.6)"; x.lineWidth = 2 * dpr;
+    x.beginPath(); x.moveTo(cx - half + bw, y - bw * 0.2); x.lineTo(cx + half - bw, y - bw * 0.2); x.stroke();
+    x.restore();
+  }
+  function drawAct(x, a) {
+    if (a.kind === "wind") { drawWind(x, a); return; }
+    var p = pathAt(a.P, a.s), hop = a.hop ? clamp((now() - a.hop) / 600, 0, 1) : 1;
+    var lift = hop < 1 ? Math.sin(Math.PI * hop) : 0;
+    x.save();
+    x.translate(cx + p.x * Rs, cy + p.y * Rs);
+    x.rotate(p.th);
+    var S = Rs * (a.kind === "turtle" ? TS : TK) * (1 + 0.12 * lift);
+    x.scale(S, S);
+    x.lineJoin = "round"; x.lineCap = "round";
+    x.lineWidth = 3 * dpr / S; x.strokeStyle = OUT;
+    if (a.kind === "turtle") drawTurtle(x, a, lift); else drawTruck(x, a, lift);
+    x.restore();
+  }
+  // Drawn facing +x, about 2 units long.
+  function drawTurtle(x, a, lift) {
+    var sw = Math.sin(TAU * a.s / STROKE), f;
+    x.fillStyle = "rgba(60,40,20," + (0.25 - 0.1 * lift) + ")"; x.beginPath(); x.ellipse(0.1 + 0.2 * lift, 0.14 + 0.2 * lift, 0.95, 0.7, 0, 0, TAU); x.fill();
+    x.fillStyle = "#7CCB7A";
+    // flippers: big front ones sweep, small back ones paddle
+    [1, -1].forEach(function (sd) {
+      x.save(); x.translate(0.35, sd * 0.45); x.rotate(sd * (0.5 + 0.45 * sw));
+      x.beginPath(); x.ellipse(-0.05, sd * 0.42, 0.2, 0.5, sd * 0.25, 0, TAU); x.fill(); x.stroke(); x.restore();
+      x.save(); x.translate(-0.6, sd * 0.38); x.rotate(sd * (-0.4 - 0.35 * sw));
+      x.beginPath(); x.ellipse(-0.1, sd * 0.18, 0.13, 0.25, 0, 0, TAU); x.fill(); x.stroke(); x.restore();
+    });
+    // tail and head
+    x.beginPath(); x.moveTo(-0.8, -0.08); x.lineTo(-1.08, 0); x.lineTo(-0.8, 0.08); x.closePath(); x.fill(); x.stroke();
+    f = 0.03 * sw;
+    x.beginPath(); x.ellipse(0.98 + f, 0, 0.3, 0.24, 0, 0, TAU); x.fill(); x.stroke();
+    x.fillStyle = OUT;
+    x.beginPath(); x.arc(1.08 + f, -0.11, 0.055, 0, TAU); x.fill();
+    x.beginPath(); x.arc(1.08 + f, 0.11, 0.055, 0, TAU); x.fill();
+    x.strokeStyle = OUT; x.lineWidth *= 0.6;
+    x.beginPath(); x.arc(1.12 + f, 0, 0.1, -0.9, 0.9); x.stroke();
+    x.lineWidth /= 0.6;
+    // the shell with its plates
+    var g = x.createRadialGradient(-0.2, -0.25, 0.1, 0, 0, 0.9);
+    g.addColorStop(0, "#5FB86A"); g.addColorStop(1, "#2F8A55");
+    x.fillStyle = g; x.beginPath(); x.ellipse(-0.05, 0, 0.82, 0.64, 0, 0, TAU); x.fill(); x.stroke();
+    x.fillStyle = "#9ED68B"; x.strokeStyle = "#1F5E3A"; x.lineWidth *= 0.6;
+    [[-0.05, 0, 0.2], [0.4, 0, 0.15], [-0.5, 0, 0.15], [0.12, 0.34, 0.14], [0.12, -0.34, 0.14], [-0.3, 0.32, 0.14], [-0.3, -0.32, 0.14]].forEach(function (q) {
+      x.beginPath();
+      for (var i = 0; i < 6; i++) { var an = i * TAU / 6; x[i ? "lineTo" : "moveTo"](q[0] + q[2] * Math.cos(an), q[1] + q[2] * Math.sin(an)); }
+      x.closePath(); x.fill(); x.stroke();
+    });
+    x.lineWidth /= 0.6; x.strokeStyle = OUT;
+    x.fillStyle = "rgba(255,255,255,0.35)"; x.beginPath(); x.ellipse(-0.25, -0.3, 0.25, 0.1, -0.4, 0, TAU); x.fill();
+  }
+  // A toy dump truck, about 2.8 units long: cab at the front (+x), the bed behind it tips back.
+  function drawTruck(x, a, lift) {
+    var tip = a.tip || 0, w;
+    x.fillStyle = "rgba(60,40,20," + (0.25 - 0.1 * lift) + ")"; rr(x, -1.35 + 0.15, -0.75 + 0.18, 2.8, 1.5, 0.3); x.fill();
+    // tires
+    x.fillStyle = "#2B2F3F";
+    [[-0.95, 1], [-0.95, -1], [0.8, 1], [0.8, -1]].forEach(function (q) { rr(x, q[0] - 0.24, q[1] * 0.66 - 0.17, 0.48, 0.34, 0.12); x.fill(); x.stroke(); });
+    // pouring sand behind the bed
+    if (tip > 0.4 && a.heap < 1.5) {
+      var pr = (tip - 0.4) / 0.6, tt = now() / 1000;
+      x.fillStyle = "rgb(" + Math.round(CR[HALF * N + HALF] * 0.92) + "," + Math.round(CG[HALF * N + HALF] * 0.92) + "," + Math.round(CB[HALF * N + HALF] * 0.92) + ")";
+      for (var i = 0; i < 10; i++) {
+        var u = (tt * 1.6 + i / 10) % 1;
+        x.beginPath(); x.arc(-1.45 - u * 0.6 * pr, (Math.sin(i * 7.3) * 0.4) * (0.4 + u), 0.1 + 0.06 * (1 - u), 0, TAU); x.fill(); x.stroke();
+      }
+    }
+    // the bed: a bright yellow tub with ribs. It hinges at its back end: tipping lifts the front, so from
+    // above it looks shorter, with the lift ram showing between the cab and the bed.
+    var bx0 = -1.4, blen = 1.85 * (1 - 0.42 * tip), bx1 = bx0 + blen;
+    if (tip > 0.05) {
+      x.fillStyle = "#8A93A8"; rr(x, bx1 - 0.1, -0.12, Math.max(0.1, 0.62 - bx1), 0.24, 0.08); x.fill(); x.stroke();
+      x.fillStyle = "rgba(40,25,10," + (0.35 * tip) + ")"; rr(x, bx0 + 0.1, -0.62 + 0.12, blen + 0.3 * tip, 1.24, 0.18); x.fill();
+    }
+    x.save();
+    x.translate(bx0, 0);
+    var sc = 1 + 0.1 * tip;
+    x.scale(1, sc);
+    x.fillStyle = "#FFC93C"; rr(x, 0, -0.62, blen, 1.24, 0.18); x.fill(); x.stroke();
+    x.fillStyle = tip > 0.05 ? "#E39A12" : "#F0A920"; rr(x, 0.14, -0.46, Math.max(0.2, blen - 0.32), 0.92, 0.12); x.fill();
+    x.strokeStyle = "rgba(29,35,64,0.45)"; x.lineWidth *= 0.7;
+    for (var r = 0.45; r < blen - 0.2; r += 0.3 * (1 - 0.42 * tip)) { x.beginPath(); x.moveTo(r, -0.46); x.lineTo(r, 0.46); x.stroke(); }
+    x.lineWidth /= 0.7; x.strokeStyle = OUT;
+    // a load of sand in the bed until it is tipped out
+    if (a.stage === 0 || (a.stage === 1 && a.heap < 0.9)) {
+      var c = HALF * N + HALF, left = a.stage === 1 ? Math.max(0.15, 1 - a.heap / 0.9) : 1;
+      x.fillStyle = "rgb(" + CR[c] + "," + CG[c] + "," + CB[c] + ")";
+      x.beginPath(); x.ellipse(blen * 0.5 - (1 - left) * 0.3, 0, 0.66 * left * (1 - 0.3 * tip), 0.36 * left, 0, 0, TAU); x.fill(); x.stroke();
+      x.fillStyle = "rgba(255,255,255,0.35)"; x.beginPath(); x.ellipse(blen * 0.5 - 0.15, -0.12 * left, 0.3 * left, 0.1 * left, 0, 0, TAU); x.fill();
+    }
+    x.restore();
+    // the cab
+    x.fillStyle = "#FF7A3D"; rr(x, 0.55, -0.6, 0.85, 1.2, 0.22); x.fill(); x.stroke();
+    x.fillStyle = "#8FD3FF"; rr(x, 1.0, -0.46, 0.28, 0.92, 0.1); x.fill(); x.stroke();
+    x.fillStyle = "#FFE14D"; x.beginPath(); x.arc(1.38, -0.42, 0.09, 0, TAU); x.fill(); x.stroke();
+    x.beginPath(); x.arc(1.38, 0.42, 0.09, 0, TAU); x.fill(); x.stroke();
+  }
+  function drawWind(x, a) {
+    var t = (now() - a.t0) / 1000;
+    if (!a.streaks.length) return;
+    x.save();
+    circle(x, cx, cy, Ro); x.clip();
+    x.lineCap = "round";
+    for (var i = 0; i < a.streaks.length; i++) {
+      var st = a.streaks[i], u = (t - st.d) / 1.1;
+      if (u <= 0 || u >= 1) continue;
+      var hx = -1.3 + 2.8 * u, al = Math.sin(Math.PI * u) * 0.75;
+      var x0 = cx + (hx - st.len) * Rs, x1 = cx + hx * Rs, y0 = cy + st.y * Rs;
+      x.strokeStyle = "rgba(255,255,255," + al.toFixed(3) + ")"; x.lineWidth = Rs * 0.016;
+      x.beginPath(); x.moveTo(x0, y0); x.quadraticCurveTo((x0 + x1) / 2, y0 + st.b * Rs, x1, y0 + st.b * Rs * 0.4); x.stroke();
+      x.fillStyle = "rgba(255,255,255," + (al * 0.9).toFixed(3) + ")";
+      x.beginPath(); x.arc(x1 + Rs * 0.03, y0 + st.b * Rs * 0.3, Rs * 0.008, 0, TAU); x.fill();
+    }
+    x.restore();
   }
 
   // ---------- Fingers ----------
@@ -852,10 +1295,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var r = Math.hypot(p[0], p[1]);
     return r > LIM ? [p[0] * LIM / r, p[1] * LIM / r] : p;
   }
-  function canSteer() { return !Toybox.timer.locked() && !ending && !(route && route.kind === "wipe"); }
+  function canSteer() { return !Toybox.timer.locked() && !ending && !rake; }
   function takeOver(p) {
     var q = clampLim(p);
-    if (route && route.kind !== "wipe") {
+    if (route) {
       // a finger takes over from a pattern: the ball keeps its speed and turns toward the finger
       if (route.kind === "pattern") W.k = routeIndex(route);
       route = null;
@@ -870,7 +1313,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     e.preventDefault();
     try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     var p = toTable(e), r = Math.hypot(p[0], p[1]);
-    pointers[e.pointerId] = { x: e.clientX, y: e.clientY, rim: r > 1, moved: false, t: now() };
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY, rim: r > 1, moved: false };
     if (!canSteer()) return;
     if (r <= 1) { activeId = e.pointerId; takeOver(p); }
   });
@@ -885,10 +1328,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function lift(e) {
     var P = pointers[e.pointerId];
     delete pointers[e.pointerId];
-    if (P && P.rim && !P.moved && e.type === "pointerup" && now() - P.t < 700 && !Toybox.timer.locked() && !ending) {
-      var p = toTable(e), r = Math.hypot(p[0], p[1]);
-      if (r > 0.98 && r < 1.16) nextLight();   // a tap on the wooden frame changes the light
-    }
     if (activeId === e.pointerId) {
       activeId = null;
       var ids = Object.keys(pointers);
@@ -901,24 +1340,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   view.addEventListener("lostpointercapture", function (e) { if (pointers[e.pointerId]) lift(e); });
   ["gesturestart", "gesturechange"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
   view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-
-  // ---------- Tilt (grown-up setting on the home screen) ----------
-  function onOrient(e) {
-    if (e.beta == null || e.gamma == null) return;
-    var gx = Math.sin(e.gamma * Math.PI / 180), gy = Math.sin(e.beta * Math.PI / 180);
-    var a = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI / 180;
-    var x = gx * Math.cos(a) + gy * Math.sin(a), y = -gx * Math.sin(a) + gy * Math.cos(a);
-    if (!tilt.has) { tilt.bx = x; tilt.by = y; }
-    tilt.x = x; tilt.y = y; tilt.has = true;
-  }
-  function startTilt() { if (tilt.on) return; tilt.on = true; tilt.has = false; window.addEventListener("deviceorientation", onOrient); }
-  function stopTilt() { tilt.on = false; window.removeEventListener("deviceorientation", onOrient); }
-  var tiltAllowed = false;
-  Toybox.tiltReady(function () { tiltAllowed = true; startTilt(); });
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "tilt") return;
-    if (!on) stopTilt(); else if (tiltAllowed) startTilt();
-  });
 
   // ---------- Sound: a soft sandy hiss that follows the ball's speed (only when sound is on) ----------
   var hiss = null;
@@ -980,6 +1401,33 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       '<circle r="0.98" fill="#F2DEB8" stroke="#1D2340" stroke-width="0.06"/>' +
       '<path d="' + d + '" fill="none" stroke="#B48850" stroke-width="0.075" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
+  function rgbS(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
+  function shadeS(c, f) { return "rgb(" + Math.round(c[0] * f) + "," + Math.round(c[1] * f) + "," + Math.round(c[2] * f) + ")"; }
+  // A little pile of sand in that color.
+  function sandSvg(c) {
+    var pile = "M-1.05 0.62C-0.85 0.05-0.5-0.66 0-0.7C0.5-0.66 0.85 0.05 1.05 0.62Z", fill, extra = "", defs = "";
+    if (c.stripes) {
+      defs = '<defs><clipPath id="sclip-' + c.id + '"><path d="' + pile + '"/></clipPath></defs>';
+      extra = '<g clip-path="url(#sclip-' + c.id + ')">';
+      c.stripes.forEach(function (st, i) { extra += '<rect x="-1.2" y="' + (-0.75 + i * 0.24).toFixed(2) + '" width="2.4" height="0.25" fill="' + rgbS(st) + '" transform="rotate(-18)"/>'; });
+      extra += "</g>";
+      fill = rgbS(c.stripes[2]);
+    } else fill = rgbS(c.rgb);
+    var dark = c.stripes ? "rgba(29,35,64,0.25)" : shadeS(c.rgb, 0.8), dots = "";
+    [[-0.45, 0.25], [0.1, -0.2], [0.5, 0.3], [-0.1, 0.42], [0.3, -0.45 + 0.1], [-0.55, -0.05]].forEach(function (d, i) {
+      dots += '<circle cx="' + d[0] + '" cy="' + d[1] + '" r="' + (c.glints && i % 2 ? 0.07 : 0.045) + '" fill="' + (c.glints ? (i % 2 ? "#FFFFFF" : "#C9C3FF") : dark) + '"/>';
+    });
+    return '<svg viewBox="-1.25 -1.25 2.5 2.5" aria-hidden="true">' + defs +
+      '<ellipse cx="0.08" cy="0.72" rx="1.12" ry="0.2" fill="rgba(29,35,64,0.22)"/>' +
+      '<path d="' + pile + '" fill="' + fill + '"/>' + extra +
+      '<path d="M-0.55-0.2C-0.4-0.48-0.2-0.6 0-0.62" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="0.1" stroke-linecap="round"/>' + dots +
+      '<path d="' + pile + '" fill="none" stroke="#1D2340" stroke-width="0.1" stroke-linejoin="round"/></svg>';
+  }
+  function swatch(id) {
+    var c = SAND_BY[id];
+    if (c.stripes) return "linear-gradient(135deg," + c.stripes.map(rgbS).join(",") + ")";
+    return rgbS(c.rgb);
+  }
   (function () {
     var box = $("pats"), html = "";
     PATS.forEach(function (p) {
@@ -987,25 +1435,41 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         patSvg(p.id) + '<span class="lbl">' + p.name + "</span></button>";
     });
     box.innerHTML = html;
+    html = "";
+    SANDS.forEach(function (c) {
+      html += '<button class="btn tb-tile pat" data-sand="' + c.id + '" aria-label="' + c.name + ' sand" aria-pressed="false">' +
+        sandSvg(c) + '<span class="lbl">' + c.name + "</span></button>";
+    });
+    $("sands").innerHTML = html;
   })();
+  var tab = "shapes", fullFlag = false;
   function renderPanel() {
     var drawing = W.on;
     $("goBtn").innerHTML = drawing
       ? '<svg class="goicon" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg>Stop'
       : '<svg class="goicon" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg>Draw!';
-    Array.prototype.forEach.call(document.querySelectorAll(".pat"), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-sand]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.sand === prefs.sand));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.tab === tab));
+    });
+    $("panel").setAttribute("data-tab", tab);
+    $("smoothBtn").classList.toggle("full", fullFlag && !rake);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pat]"), function (b) {
       var on = b.dataset.pat === W.pat;
       b.setAttribute("aria-pressed", String(on));
       b.classList.toggle("drawing", on && drawing && !!route && route.kind === "pattern");
     });
-    $("ldot").style.setProperty("--ld", LIGHTS[prefs.light]);
+    $("sdot").style.setProperty("--sd", swatch(prefs.sand));
     updateCoach();
   }
   var coachText = "";
   function updateCoach() {
     var t = "", el = $("coach");
     if (ending) t = "";
-    else if (route && route.kind === "wipe") t = "Smoothing the sand…";
+    else if (rake) t = rake.kind === "new" ? "Fresh sand!" : "Smoothing the sand…";
+    else if (acts.length) t = actLine(acts[acts.length - 1]);
     else if (W.done && !W.on && !steer) t = "Ta-da!";
     else if (W.on && !steer) t = "Watch it draw!";
     else if (!learnedDrag) t = "Drag the ball!";
@@ -1015,23 +1479,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (t) { el.textContent = t; el.classList.remove("off"); }
     else el.classList.add("off");
   }
-  function nextLight(to) {
-    prefs.light = typeof to === "number" ? to : (prefs.light + 1) % LIGHTS.length;
-    lightWave = { t0: now() };
-    savePrefs();
-    renderPanel();
-    ping(660 + prefs.light * 60);
-    dirty = true;
-  }
-  function surprise() {
-    var ids = PATS.map(function (p) { return p.id; }).filter(function (id) { return id !== W.pat; });
-    var id = ids[Math.floor(Math.random() * ids.length)], p = PAT_BY[id];
-    var v = Math.floor(Math.random() * p.vars);
-    var l = prefs.light;
-    while (l === prefs.light) l = Math.floor(Math.random() * LIGHTS.length);
-    nextLight(l);
-    if (steer) { steer.down = false; }
-    startPattern(id, v, 0);
+  function actLine(a) {
+    return a.kind === "turtle" ? "A sea turtle!" : (a.kind === "truck" ? "Beep beep! A dump truck!" : "Whoosh! Wind!");
   }
   document.addEventListener("click", function (e) {
     var b = e.target.closest("button");
@@ -1046,15 +1495,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       else if (W.finished) startPattern(nextPatternId(), 0, 0);   // the next pattern, on top of the last
       else startPattern(W.pat, W.v, W.k);
     } else if (b.id === "smoothBtn") {
-      W.on = false;
-      $("smoothBtn").classList.remove("full");
-      if (route && route.kind === "wipe") { route.then = null; renderPanel(); return; }
-      if (steer) steer = null;
-      startWipe(null);
+      startRake("smooth");
+    } else if (b.id === "newBtn") {
+      startRake("new");
     } else if (b.id === "surpriseBtn") {
-      surprise();
-    } else if (b.id === "lightBtn") {
-      nextLight();
+      startSurprise();
+    } else if (b.dataset.sand) {
+      if (b.dataset.sand !== prefs.sand) setSand(b.dataset.sand);
+    } else if (b.dataset.tab) {
+      tab = b.dataset.tab;
+      renderPanel();
     }
   });
 
@@ -1162,7 +1612,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       pts.push([r.left + (cx + q[0] * Rs) / dpr, r.top + (cy + q[1] * Rs) / dpr]);
     }
     return { pts: pts, dur: 3600 };
-  }, { ok: function () { return !W.on && !route && !steer && !ending; } });
+  }, { ok: function () { return !W.on && !route && !steer && !ending && !rake && !acts.length; } });
 
   // ---------- Timer ending, goodbye, rest ----------
   function onEnding(done) {
@@ -1186,7 +1636,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function checkEnding() {
     if (!ending || !endDone) return;
-    if (!route && !steer && speed() < 0.01 && now() - endT0 > 2500) { var d = endDone; endDone = null; d(); }
+    if (!route && !steer && !rake && !acts.length && speed() < 0.01 && now() - endT0 > 2500) { var d = endDone; endDone = null; d(); }
   }
   function restArt() {
     var c = document.createElement("canvas"), S = 420, h = S / 2, rs = h * 0.8;
@@ -1201,7 +1651,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     x.fillStyle = "rgba(20, 30, 70, 0.08)"; x.fillRect(0, 0, S, S);
     x.restore();
     x.lineWidth = 6; x.strokeStyle = OUT; circle(x, h, h, rs); x.stroke();
-    drawBall(x, h + ball.x * rs, h + ball.y * rs, RB * rs * 1.4, LIGHTS[prefs.light], 0);
+    drawBall(x, h + ball.x * rs, h + ball.y * rs, RB * rs * 1.4, LIGHT, 0);
     return c;
   }
 
@@ -1220,7 +1670,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
     }
     fullness = n ? hit / n : 0;
-    $("smoothBtn").classList.toggle("full", fullness > FULL && cum - cumAtSmooth > FULL_LINE && !(route && route.kind === "wipe"));
+    fullFlag = fullness > FULL && cum - cumAtSmooth > FULL_LINE;
+    $("smoothBtn").classList.toggle("full", fullFlag && !rake);
   }
 
   // ---------- Frame loop ----------
@@ -1237,7 +1688,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // a gentle glow on Smooth once the sand is very full of lines (a hint; the coach never nags)
     if (t - fullAt > 1500 && sandChanged > fullAt) { fullAt = t; measureFull(); }
     // save once things have been still for a moment
-    if (sandChanged > savedAt && t - sandChanged > 2500 && !route && !steer) saveSand();
+    if (sandChanged > savedAt && t - sandChanged > 2500 && !route && !steer && !rake && !acts.length) saveSand();
     requestAnimationFrame(frame);
   }
 
@@ -1257,7 +1708,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     app: "sand-table",
     big: { button: $("bigBtn") },
     badge: $("tbadge"),
-    timerIntro: "When time is up, the ball finishes its line and stops, and the light dims.",
+    timerIntro: "When time is up, the ball finishes its line and stops, and the table light dims.",
     goodbyeOption: "End with a Goodbye button to press",
     farewellText: "Time to say goodbye",
     goodbyeLabel: "Goodbye, sand",
@@ -1268,7 +1719,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     soundNote: "A soft sandy hiss while the ball rolls. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: onGoodbye,
-    onRest: function () { endDone = null; route = null; steer = null; ball.vx = ball.vy = 0; killHiss(); },
+    onRest: function () { endDone = null; route = null; steer = null; acts = []; if (rake) endRake(); ball.vx = ball.vy = 0; killHiss(); dirty = true; },
     onWake: function () { ending = false; endDone = null; dimTarget = 1; renderPanel(); updateCoach(); },
     onBig: function () { setTimeout(resize, 30); },
     onSound: function (on) { if (!on) killHiss(); }
@@ -1280,12 +1731,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     window.sandDebug = {
       state: function () {
         return { ball: [ball.x, ball.y], mode: steer ? "finger" : (route ? route.kind : "free"), on: W.on, pat: W.pat, k: W.k,
-          done: W.done, light: prefs.light, coach: coachText, renderMs: renderMs, cum: cum, Rs: Rs / dpr, cx: cx / dpr, cy: cy / dpr };
+          done: W.done, sand: prefs.sand, rake: rake ? rake.kind : null, wash: !!wash, acts: acts.map(function (a) { return a.kind; }), coach: coachText, renderMs: renderMs, cum: cum, Rs: Rs / dpr, cx: cx / dpr, cy: cy / dpr };
       },
       frames: function () { var a = frameTimes.slice().sort(function (p, q) { return p - q; }); return { n: a.length, median: a[a.length >> 1], p95: a[Math.floor(a.length * 0.95)], max: a[a.length - 1] }; },
       start: function (id, v) { startPattern(id, v || 0, 0); },
-      smooth: function () { W.on = false; startWipe(null); },
-      surprise: surprise,
+      smooth: function () { startRake("smooth"); },
+      fresh: function () { startRake("new"); },
+      sandColor: setSand,
+      surprise: function (kind) { if (kind) surpriseN = SURPRISES.indexOf(kind); startSurprise(); },
       fast: function (f) { V_PAT = 0.62 * f; },
       fullness: function () { return fullness; },
       height: function (x, y) { return H[Math.round(cellX(y)) * N + Math.round(cellX(x))]; },
@@ -1293,8 +1746,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       ghost: function () { return ghost.show(); },
       sand: function () { return sandC.toDataURL(); },
       row: function (y, x0, x1) { var o = [], j = Math.round(cellX(y)); for (var x = Math.round(cellX(x0)); x <= Math.round(cellX(x1)); x++) o.push(Math.round(H[j * N + x] * 100) / 100); return o; },
-      col: function (x, y0, y1) { var o = [], i = Math.round(cellX(x)); for (var y = Math.round(cellX(y0)); y <= Math.round(cellX(y1)); y++) o.push(Math.round(H[y * N + i] * 100) / 100); return o; },
-      tilt: function (x, y) { tilt.on = true; tilt.has = true; tilt.x = x; tilt.y = y; }
+      col: function (x, y0, y1) { var o = [], i = Math.round(cellX(x)); for (var y = Math.round(cellX(y0)); y <= Math.round(cellX(y1)); y++) o.push(Math.round(H[y * N + i] * 100) / 100); return o; }
     };
   }
   requestAnimationFrame(frame);
