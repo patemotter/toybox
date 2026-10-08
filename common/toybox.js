@@ -1239,6 +1239,79 @@
     });
   }, true);
 
+  // ---------- Labels that fit ----------
+  // A button or tile label wider than its box (a long word in a narrow tab, a panel squeezed when the iPad is
+  // held sideways) is shrunk until it fits, down to 70% of its size, instead of being cut off ("oundove").
+  // The element holding the text gets an inline font-size; the original is put back before each new fit, so a
+  // wider screen brings the full size back. Runs on load, when the font arrives, on resize and turning, and
+  // when buttons appear or tabs change. Apps need do nothing; tools/fit.js finds labels that still don't fit.
+  (function () {
+    var MIN = 0.7, timer = 0, touched = [];
+    function boxOf(b) {
+      var r = b.getBoundingClientRect(), cs = getComputedStyle(b);
+      return { l: r.left + parseFloat(cs.borderLeftWidth), r: r.right - parseFloat(cs.borderRightWidth), w: r.width };
+    }
+    // [{el, ratio}] for every text in a visible button that runs past the button's sides or ends in "…"
+    function over() {
+      var out = [], bs = document.querySelectorAll("button, .btn, .tb-tile, [role=button], [role=tab]");
+      var rg = document.createRange();
+      for (var i = 0; i < bs.length; i++) {
+        var b = bs[i], box = boxOf(b);
+        if (!box.w) continue;
+        var w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT), n;
+        while ((n = w.nextNode())) {
+          var p = n.parentElement;
+          if (!p || !/\S/.test(n.nodeValue) || p instanceof SVGElement) continue;
+          rg.selectNodeContents(n);
+          var rs = rg.getClientRects(), l = Infinity, r = -Infinity, j;
+          for (j = 0; j < rs.length; j++) if (rs[j].width) { l = Math.min(l, rs[j].left); r = Math.max(r, rs[j].right); }
+          if (r < l) continue;
+          var ratio = 1, extra = Math.max(0, box.l - l) + Math.max(0, r - box.r);
+          if (extra > 1) ratio = (r - l - extra) / (r - l);
+          if (getComputedStyle(p).textOverflow === "ellipsis" && p.scrollWidth > p.clientWidth + 1) {
+            ratio = Math.min(ratio, p.clientWidth / p.scrollWidth);
+          }
+          if (ratio < 1) out.push({ el: p, ratio: ratio });
+        }
+      }
+      return out;
+    }
+    function fit() {
+      timer = 0;
+      var i, k, list;
+      for (i = 0; i < touched.length; i++) touched[i].style.fontSize = touched[i].getAttribute("data-tbfit") || "";
+      for (i = 0; i < touched.length; i++) touched[i].removeAttribute("data-tbfit");
+      touched = [];
+      for (k = 0; k < 4; k++) {                          // padding and icons don't shrink: a few passes
+        list = over();
+        if (!list.length) break;
+        var sizes = list.map(function (o) { return parseFloat(getComputedStyle(o.el).fontSize); });
+        for (i = 0; i < list.length; i++) {
+          var el = list[i].el;
+          if (!el.hasAttribute("data-tbfit")) {
+            el.setAttribute("data-tbfit", el.style.fontSize || "");
+            el.setAttribute("data-tbfit-px", sizes[i]);
+            touched.push(el);
+          }
+          var min = MIN * parseFloat(el.getAttribute("data-tbfit-px"));
+          el.style.fontSize = Math.max(min, sizes[i] * list[i].ratio * 0.97) + "px";
+        }
+      }
+    }
+    function soon(ms) { if (!timer) timer = setTimeout(fit, ms || 120); }
+    window.addEventListener("load", function () { soon(0); });
+    window.addEventListener("resize", function () { clearTimeout(timer); timer = 0; soon(150); });
+    window.addEventListener("orientationchange", function () { soon(300); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { soon(0); });
+    if (window.MutationObserver) {
+      var start = function () {
+        new MutationObserver(function () { soon(); }).observe(document.body, { subtree: true, childList: true,
+          characterData: true, attributes: true, attributeFilter: ["hidden", "class", "aria-selected", "aria-pressed"] });
+      };
+      if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+    }
+  })();
+
   // ---------- Fresh visits ----------
   // Opening an app from the Toybox home screen starts it fresh. The home screen stores a new launch
   // id ("toybox-launch") in sessionStorage when a tile is tapped. The first time a page loads under a

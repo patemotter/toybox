@@ -51,7 +51,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
 - `tools/`: `smoke.js` (load + drag + error/scroll check), `buttons.js` (taps every button on every page and
-  flags any whose tap changes nothing on screen; run it after UI changes, see its header), `add-app.py` (add an app to launcher, top-level
+  flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
+  cut off by their button or tile at every test size, with the real font; `common/toybox.js` shrinks an overflowing
+  label down to 70% as a safety net, so fix the layout when it reports something), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 
 ### Offline (service workers)
