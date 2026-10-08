@@ -1273,7 +1273,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var onBoard = R.board && inRect(p, boardScreenRect(), 30);
     if (onBoard || inRect(p, TV)) {
       e.preventDefault();
-      drags[e.pointerId] = { grab: (p.x - TV.ox) / TV.s - R.target };
+      drags[e.pointerId] = { lx: p.x };
       try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     }
   }
@@ -1281,8 +1281,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     var d = drags[e.pointerId];
     if (!d || busy()) return;
     var p = localPt(e);
-    R.target = clamp((p.x - TV.ox) / TV.s - d.grab, BXMIN, BXMAX);
+    // Gesture gain: the whole pass past the bit takes about 170 px of finger on any screen (the board moves
+    // further than the finger on the big iPad table). Lifting keeps the board where it is, so short pushes
+    // one after another feed it through too.
+    R.target = clamp(R.target + (p.x - d.lx) / TV.s * feedGain(), BXMIN, BXMAX);
+    d.lx = p.x;
   }
+  function feedGain() { return Math.max(1, (BX0 - BXMIN) * TV.s / 170); }
   function onUp(e) {
     if (!drags[e.pointerId]) return;
     delete drags[e.pointerId];
@@ -1388,7 +1393,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
     if (R.spin < 0.45 || R.bx <= BXMIN + 20) return null;
     var br = boardScreenRect(), x0 = cr.left + br.x + br.w * 0.62, y0 = cr.top + br.y + br.h * 0.5;
-    var dx = Math.min((R.bx - BXMIN) * TV.s, cr.width * 0.55, 260);
+    var dx = Math.min((R.bx - BXMIN) * TV.s / feedGain(), cr.width * 0.55, 170);   // the geared-up push: a short move
     say("Push the board!");
     return { pts: [[x0, y0], [x0 - dx, y0]] };
   });

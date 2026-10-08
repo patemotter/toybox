@@ -1428,6 +1428,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         R.toolHeld = true;
         R.wantD = R.tipD;
         setToolX(w.x, true);
+        d.wx0 = w.x; d.tx0 = R.wantX;
       }
     }
     if (!d) return;
@@ -1443,7 +1444,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (d.type === "tool") {
       if (R.seq || R.sand) { endDrag(e.pointerId); return; }
       var w = toWorld(p.x, p.y);
-      setToolX(w.x);
+      // Sideways the tool goes where the finger first touched, then moves up to 2.7x the finger, so a whole
+      // pass along the blank is a short sweep on the big iPad lathe (phones stay about 1:1).
+      var gx = clamp((WX1 - WX0) * M.s / 180, 1, 2.7);
+      setToolX(d.tx0 + (w.x - d.wx0) * gx);
+      if (R.wantX !== d.tx0 + (w.x - d.wx0) * gx) { d.tx0 = R.wantX; d.wx0 = w.x; }   // at an end: reversing answers at once
       var gain = Math.max(1, 110 / ((TIP_MAX - 10) * M.s));
       var T = TOOLS[S.tool];
       R.wantD = clamp(d.d0 + (p.y - d.y0) / M.s * gain, T.minR, TIP_MAX);
@@ -1566,7 +1571,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (R.everCut) return null;
     var hx = cr.left + M.ox + (R.tipX + 30) * M.s, hy = cr.top + M.oy + (AXY + R.tipD + 120) * M.s;
     say("Push the tool up!");
-    return { pts: [[hx, hy], [hx, hy - Math.max(70, 120 * M.s)], [hx - 60 * M.s, hy - Math.max(70, 120 * M.s)]] };
+    var gu = clamp(120 * M.s, 70, 110), gs = Math.min(60 * M.s, 60);   // short moves: the tool is geared up
+    return { pts: [[hx, hy], [hx, hy - gu], [hx - gs, hy - gu]] };
   });
 
   // ---------- Toolbar: tools, New blank, Sand, Done ----------

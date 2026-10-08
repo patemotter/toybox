@@ -504,6 +504,10 @@ body.project .prompt { top: 66px; }
     M.oy = M.y + Math.min((M.h - (y1 - y0) * M.s) / 2, 24) - y0 * M.s;
   }
   function toView(px, py) { return { x: (px - M.ox) / M.s, y: (py - M.oy) / M.s }; }
+  // Gesture gain: a whole plunge (rest to the bottom) takes about FEED_PX of finger travel on any screen,
+  // so the big iPad scene doesn't need a big reach. Never slower than 1:1.
+  var FEED_PX = 140;
+  function feedGain() { return Math.max(1, TRAVEL / 0.85 * M.s / FEED_PX); }
   function toScreen(v) { return { x: M.ox + v.x * M.s, y: M.oy + v.y * M.s }; }
   function viewXf() { ctx.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.ox, DPR * M.oy); }
   function screenXf() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
@@ -1684,7 +1688,7 @@ body.project .prompt { top: 66px; }
       R.q = R.feedHeld ? want : Math.max(want, R.q - 300 * dt);
     }
     // The handle follows the finger while held; otherwise it turns back with the quill.
-    var st = (R.feedHeld ? Math.max(R.q, R.qWant) : R.q) / TRAVEL;
+    var st = (R.feedHeld ? Math.max(R.q, Math.min(R.qWant, R.q + 28)) : R.q) / TRAVEL;
     R.spokeT += (st - R.spokeT) * Math.min(1, dt * 12);
     var pen = penMM();
     if (canCut && pen > 0.05) {
@@ -1883,7 +1887,7 @@ body.project .prompt { top: 66px; }
     }
     if (t === "Pull the handle down!" || (PJ && pjNearTarget(S.px, S.py, 26))) {
       var i = pullKnob(), pts = [];
-      for (j = 0; j <= 6; j++) pts.push(pagePt(knobPts(spokeBase() + j * 0.2)[i].p));
+      for (j = 0; j <= 6; j++) pts.push(pagePt(knobPts(spokeBase() + j * 0.2 / feedGain())[i].p));   // the geared-up pull: a short move
       return { pts: pts };
     }
     var top = boardTopW(), u = clamp(S.px + 70, 20, BW - 20), v = clamp(S.py + 30, 10, BH - 10);
@@ -2031,7 +2035,7 @@ body.project .prompt { top: 66px; }
     if (R.swap) return { type: "none" };
     // Anywhere else on the machine: drag down to pull the feed
     startFeed();
-    return { type: "feedV", q0: R.q, y0: w.y };
+    return { type: "feedV", q0: R.q, y0: w.y, lastY: w.y };
   }
   function onMove(e) {
     var d = drags[e.pointerId];
@@ -2041,13 +2045,14 @@ body.project .prompt { top: 66px; }
     if (busy()) { endDrag(e.pointerId); return; }
     switch (d.type) {
       case "feed":
-        // Pulling any spoke DOWN lowers the bit (and up raises it), whichever side of the hub it is on.
-        R.qWant = clamp(R.qWant + (w.y - d.lastY) * 0.8, 0, Math.min(TRAVEL + 10, R.q + 28));
-        d.lastY = w.y;
-        if (!d.pulled && w.y - d.y0 > 14) { d.pulled = true; offPull(); }
-        break;
       case "feedV":
-        R.qWant = clamp(d.q0 + (w.y - d.y0) * 0.9, 0, Math.min(TRAVEL + 10, R.q + 28));
+        // Pulling any spoke (or the machine) DOWN lowers the bit, up raises it. The pull is geared up
+        // (feedGain) so a full plunge is a short finger move on every screen, and a finger held down keeps
+        // pushing while the bit cuts (no need to chase the bit with a long reach).
+        var dy = (w.y - d.lastY) * 0.85 * feedGain();
+        d.lastY = w.y;
+        if (dy < 0 && R.qWant > R.q + 28) R.qWant = R.q + 28;   // lifting backs off at once
+        R.qWant = clamp(R.qWant + dy, 0, TRAVEL + 10);
         if (!d.pulled && w.y - d.y0 > 14) { d.pulled = true; offPull(); }
         break;
       case "board":
@@ -2306,7 +2311,8 @@ body.project .prompt { top: 66px; }
   }
   if (params.debug === "1") {
     window.__dp = {
-      S: function () { return S; }, R: R, M: function () { return M; }, PJ: PJ, penMM: penMM,
+      S: function () { return S; }, R: R, M: function () { return M; }, PJ: PJ, penMM: penMM, feedGain: feedGain,
+      gest: function () { return { plungeBefore: Math.round(TRAVEL / 0.8 * M.s), plungeAfter: Math.round(TRAVEL / 0.85 * M.s / feedGain()) }; },
       page: function (x, y, z) { return pagePt(P(x, y, z)); },
       sw: function () { return pagePt(R.ui.sw.btn); },
       knob: function () { var i = pullKnob(); return pagePt(knobPts(spokeBase())[i].p); },

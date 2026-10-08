@@ -1844,13 +1844,29 @@ body.project .newbtn { display: none; }
       if (this.slideT < 1 || this.waitNew || (PJ && PJ.done)) return;
       if (this.op) { this.opMove(dx, dy); return; }
       if (this.kind === "hand") this.handMove(dx, dy);
-      else if (this.kind === "slide") { this.tx += dx / this.S; if (this.saw.id === "circular") this.wob = clamp(this.wob + dy * 0.03, -5, 5); }
-      else { this.tx = clamp((this.tx || 0) + dx / this.S, -60, 60); this.tdep = clamp(this.tdep + dy / this.S, -40, this.wk.h + 10); }
+      else if (this.kind === "slide") { this.slidePush(dx * this.slideGain() / this.S); if (this.saw.id === "circular") this.wob = clamp(this.wob + dy * 0.03, -5, 5); }
+      else { this.tx = clamp((this.tx || 0) + dx / this.S, -60, 60); this.tdep = clamp(this.tdep + dy * this.recipGain() / this.S, -40, this.wk.h + 10); }
     },
     up: function (pt) {
       if (pt.id !== this.pid) return;
-      this.pid = null; this.held = false;
+      this.pid = null; this.held = false; this.pushing = false;
       Sound.setRasp(0);
+    },
+    // Gesture gain: the whole slide through the board (or the whole plunge of the recip saw) takes about
+    // 160 px of finger travel on any screen, so the big iPad bench doesn't need a long reach.
+    slideGain: function () {
+      var full = (this.wk.w + this.R * 2 + 60) * this.S * (this.op ? -this.ey[1] : 1);
+      return Math.max(1, full / 160);
+    },
+    recipGain: function () {
+      var full = (this.wk.h + 40) * this.S * (this.op ? -this.ez[1] : 1);
+      return Math.max(1, full / 120);
+    },
+    // Slide the saw along by d (board units). A finger held still after pushing forward keeps the saw
+    // cutting (updateSlide), and lifting keeps the progress, so short pushes are enough.
+    slidePush: function (d) {
+      this.tx += d;
+      if (d > 0.5) this.pushing = true; else if (d < -0.5) this.pushing = false;
     },
     // How far the hand saw can travel (px of finger) with its teeth still across the board.
     // Uses the side-view scales in both views, so a stroke cuts the same amount either way.
@@ -1877,7 +1893,8 @@ body.project .newbtn { display: none; }
       // Cutting travel needed to get through: about saw.strokes full strokes. A full stroke is the
       // saw's travel across the board (capped at 280 px), so short phone strokes count fully too.
       // Hard materials take only a little longer, so no board needs a long slog.
-      var strokeLen = Math.min(280, Math.max(80, (rg[1] - rg[0]) * 0.6));
+      // (Capped at 150 px so the big iPad bench doesn't need more or longer strokes than a phone.)
+      var strokeLen = Math.min(150, Math.max(80, (rg[1] - rg[0]) * 0.6));
       var hard = 1 + (this.mat.mult - 1) * 0.5;
       var rate = hpx / ((saw.strokes || 5) * hard * strokeLen);
       var add = Math.abs(real) * rate / this.sideS;
@@ -1970,6 +1987,7 @@ body.project .newbtn { display: none; }
       var hcTop = D > 0 ? Math.sqrt(Math.max(0, R * R - dz * dz)) : 0;
       var hcBot = D > h ? Math.sqrt(Math.max(0, R * R - (dz + h) * (dz + h))) : -1;
       var front = this.xs + hcTop;
+      if (running && this.pushing && this.held) this.tx = Math.max(this.tx, this.xs + 40);   // held after a push: keeps cutting
       var target = clamp(this.tx, -wk.w / 2 - R - 60, wk.w / 2 + R + 80);
       var step = target - this.xs, maxFast = 1600 * dt;
       var cuttingNow = false;
@@ -2506,14 +2524,14 @@ body.project .newbtn { display: none; }
       if (k === "slide") {
         // up the screen pushes the saw forward along the line
         var ey = this.ey;
-        this.tx += -dy / (this.S * -ey[1]);
+        this.slidePush(-dy / (this.S * -ey[1]) * this.slideGain());
         if (this.saw.id === "circular") {
           var off = dx - (-dy) * ey[0] / (-ey[1]);
           this.wob = clamp(this.wob + off * 0.03, -5, 5);
         }
         return;
       }
-      this.tdep = clamp(this.tdep + dy / (this.S * -this.ez[1]), -40, this.wk.h + 10);
+      this.tdep = clamp(this.tdep + dy / (this.S * -this.ez[1]) * this.recipGain(), -40, this.wk.h + 10);
     },
     drawHints: function (g) {
       var saw = this.saw, txt, dir, an = this.toolAnchor(), amp = clamp(W * 0.16, 50, 110);
@@ -2521,8 +2539,8 @@ body.project .newbtn { display: none; }
       if (this.slideT >= 1 && !this.waitNew) {
         if (this.kind === "hand") gAim = this.op ? { pts: [an, [an[0], an[1] + amp], [an[0], an[1] - amp * 0.3], [an[0], an[1] + amp], [an[0], an[1] - amp * 0.3]], dur: 3800 }
           : { pts: [an, [an[0] + amp, an[1]], [an[0] - amp * 0.3, an[1]], [an[0] + amp, an[1]], [an[0] - amp * 0.3, an[1]]], dur: 3800 };
-        else if (this.kind === "slide") gAim = { pts: this.op ? [an, [an[0], an[1] - H * 0.3]] : [an, [an[0] + W * 0.3, an[1]]] };
-        else gAim = { pts: [an, [an[0], an[1] + H * 0.2]] };
+        else if (this.kind === "slide") gAim = { pts: this.op ? [an, [an[0], an[1] - Math.min(H * 0.3, 150)]] : [an, [an[0] + Math.min(W * 0.3, 150), an[1]]] };
+        else gAim = { pts: [an, [an[0], an[1] + Math.min(H * 0.2, 120)]] };
       }
       if (this.kind === "hand") {
         txt = saw.cut === "pull" ? "Pull!" : (saw.cut === "push" ? "Push!" : "Push + pull");
@@ -3084,12 +3102,17 @@ body.project .newbtn { display: none; }
       this.pid = pt.id; this.held = true;
       var b = this.toScreen(this.B[0], this.B[1]);
       this.gx = b[0] - pt.x; this.gy = b[1] - pt.y;
+      this.fx = pt.x; this.fy = pt.y; this.bx = b[0];
       this.path = [];
     },
+    // Gesture gain: on the big iPad bench the blade moves further than the finger (up to about 2x), so a
+    // whole curve is a short trace; the magnet keeps it on the line. Phones stay 1:1.
+    gain: function () { return clamp(BW * this.S / 340, 1, 2.2); },
     // The finger's path (board mm), in steps of about 2 mm, for the blade to follow.
     move: function (pt) {
       if (pt.id !== this.pid) return;
-      var x = (pt.x + this.gx - this.ox - this.slide * W) / this.S, y = (pt.y + this.gy - this.oy) / this.S;
+      var k = this.gain(), bx = this.bx + (pt.x - this.fx) * k, by = this.fy + this.gy + (pt.y - this.fy) * k;
+      var x = (bx - this.ox - this.slide * W) / this.S, y = (by - this.oy) / this.S;
       var m = this.magnet(x, y), q = this.path, l = q.length ? q[q.length - 1] : this.B;
       var d = dist(l[0], l[1], m[0], m[1]), n, i;
       if (d < 0.4) return;
@@ -3361,6 +3384,8 @@ body.project .newbtn { display: none; }
       // ghost hand: hold the saw and follow the start of the line
       var gp = [this.toScreen(this.B[0], this.B[1])], dp = this.d.pts, k0 = this.d.hole ? dp.indexOf(this.d.hole) : 0;
       for (var gi = 0; gi < 6 && dp.length; gi++) { var q = dp[(Math.max(0, k0) + gi * 3) % dp.length]; gp.push(this.toScreen(q[0], q[1])); }
+      var gk = 1 / this.gain();   // the finger moves less than the blade on a big bench
+      gp = gp.map(function (q) { return [gp[0][0] + (q[0] - gp[0][0]) * gk, gp[0][1] + (q[1] - gp[0][1]) * gk]; });
       if (!this.done && !this.trail.length) gAim = { pts: gp, dur: 3800 };
       if (saw.power) strokeHint(g, W / 2, 30, "Hold to run", 0, this.held && this.speed > 0.5, "Steer along the line");
       else {
@@ -3688,6 +3713,10 @@ body.project .newbtn { display: none; }
     // One-finger (or mouse) drag always slides the board, never turns it, so it behaves the same
     // everywhere. Turning is only the turn buttons or a two-finger twist.
     push: function (dx, dy) {
+      // Gesture gain: on the big iPad table the board moves up to about 2x the finger, so a whole cut is a
+      // short push (the queue below lets it cut at the blade's pace). Phones stay 1:1.
+      var k = clamp(BW * this.S / 340, 1, 2.2);
+      dx *= k; dy *= k;
       var B = this.tBoard(this.Pb[0], this.Pb[1]);
       var engaged = this.inWood(B[0], B[1]);
       if (!engaged) {
@@ -3755,7 +3784,7 @@ body.project .newbtn { display: none; }
       this.drawControls(g);
       if (this.waitNew < 0) { bigTag(g, W / 2, 34, "Tap for a new one"); gAim = { pts: [[W / 2, H * 0.5]], tap: true }; }
       else if (!this.on) { strokeHint(g, W * 0.6, 30, "Turn it on", 2, false, "Press the green button"); if (this.sw) gAim = { pts: [[this.sw.on[0], this.sw.on[1]]], tap: true }; }
-      else if (!this.slide) gAim = { pts: [[this.Pb[0], Math.min(H - 20, this.Pb[1] + H * 0.24)], [this.Pb[0], this.Pb[1] + H * 0.04]] };
+      else if (!this.slide) gAim = { pts: [[this.Pb[0], Math.min(H - 20, this.Pb[1] + Math.min(H * 0.24, 170))], [this.Pb[0], this.Pb[1] + Math.min(H * 0.04, 30)]] };
       if (this.waitNew >= 0 && this.on) strokeHint(g, this.top ? W * 0.72 : (this.band ? W * 0.74 : W * 0.6), 30, "Slide the board", 3, this.cutting, this.band ? "Follow the line" : "Turn it with ↺ ↻ for tight curves");
       if (this.needOn && this.waitNew >= 0) bigTag(g, W / 2, H * 0.45, "Press the green button!");
       this.drawViewBtn(g);
@@ -4198,6 +4227,13 @@ body.project .newbtn { display: none; }
       this.ptrs[pt.id] = p;
       this.held = this.pushers() > 0;
     },
+    // Gesture gain: a whole pass (start to the far side of the blade) takes about 130 px of finger travel on
+    // any screen, so the big iPad table needs no long reach. Lifting keeps the progress (target), so short
+    // pushes one after another feed it through too.
+    pushGain: function () {
+      var a = this.cam.P(0, this.startY(), this.thick), b = this.cam.P(0, this.endY(), this.thick);
+      return Math.max(1, Math.sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1])) / 130);
+    },
     canTurn: function () { return !(PJ && PJ.kind === "crosscut") && this.cross() && this.kerfTop === 0 && this.kerfLen === 0 && this.state !== "feed"; },
     move: function (pt) {
       var p = this.ptrs[pt.id], set = this.set, T = TBL;
@@ -4251,6 +4287,7 @@ body.project .newbtn { display: none; }
       var dd = p.wy == null ? 0 : clamp(w[1] - p.wy, -400, 400);
       p.wy = w[1];
       dd /= Math.max(1, this.pushers());
+      dd *= this.pushGain();
       var dtm = Math.max(4, now - this.lt);
       this.lt = now;
       this.vel = this.vel * 0.5 + (dd / dtm * 1000) * 0.5;
@@ -4793,7 +4830,8 @@ body.project .newbtn { display: none; }
       else {
         // ghost hand: push the blocks (or the gauge handle) up the table, past the blade
         var gs = cross ? (this.hitGauge ? [this.hitGauge[0], this.hitGauge[1] - this.hitGauge[2] * 0.3] : null) : c.P(xb - 51, by0 + 60, th + 92), ge = cross ? c.P(0, this.y0 - 260, 110) : c.P(xb - 51, by0 - 220, th + 92);
-        if (gs && this.state !== "return") gAim = { pts: [gs, cross ? [gs[0] + (ge[0] - gs[0]) * 0.3, gs[1] - Math.abs(ge[1] - gs[1])] : ge] };
+        var gk = 1 / this.pushGain();   // the geared-up push: the hand shows the short finger move
+        if (gs && this.state !== "return") gAim = { pts: [gs, cross ? [gs[0] + (ge[0] - gs[0]) * 0.3 * gk, gs[1] - Math.abs(ge[1] - gs[1]) * gk] : [gs[0] + (ge[0] - gs[0]) * gk, gs[1] + (ge[1] - gs[1]) * gk]] };
         strokeHint(g, W * 0.6, 30, cross ? "Push the gauge" : "Push the blocks", 3, this.cutting, cross ? "Drag the yellow handle up" : "Drag the board up past the blade");
       }
       if (this.on) {
@@ -5043,7 +5081,9 @@ body.project .newbtn { display: none; }
       if (this.shift > 0.5 || (this.cut && dy > 0)) return;
       var a = this.alpha, e = 0.01, k = (this.handleY(a + e) - this.handleY(a - e)) / (2 * e);
       if (k > -40) k = -40;
-      this.alpha = clamp(a + dy / k, MITER.down, MITER.up);
+      // Gesture gain: the whole chop (handle up to down) takes about 150 px of finger on any screen.
+      var full = Math.abs(this.handleY(MITER.down) - this.handleY(MITER.up)), gn = Math.max(1, full / 150);
+      this.alpha = clamp(a + dy * gn / k, MITER.down, MITER.up);
     },
     up: function (pt) {
       if (this.pj && this.pb.drag && pt.id === this.pb.drag.id) {
@@ -5382,7 +5422,7 @@ body.project .newbtn { display: none; }
       strokeHint(g, W * 0.55, 30, "Pull down!", 2, this.cutting, "Drag the handle down to chop");
       if (!this.cut && this.shift < 0.5 && armUp) {
         var hp = this.headPt(this.alpha, -205, -90), hs = this.PS(hp[0], hp[1], 0);
-        gAim = { pts: [hs, [hs[0], hs[1] + H * 0.26]] };
+        gAim = { pts: [hs, [hs[0], hs[1] + Math.min(H * 0.26, 150)]] };
       }
     }
   };
@@ -5447,7 +5487,9 @@ body.project .newbtn { display: none; }
       if (pt.id !== this.pid) return;
       var dy = pt.y - this.ly; this.ly = pt.y;
       if (this.shift > 0.5 || this.cut) return;
-      this.alpha = clamp(this.alpha - dy / (300 * this.Se), MITER.down, MITER.up);
+      // Gesture gain: the whole chop takes about 150 px of finger on any screen.
+      var gn = Math.max(1, (MITER.up - MITER.down) * 300 * this.Se / 150);
+      this.alpha = clamp(this.alpha - dy * gn / (300 * this.Se), MITER.down, MITER.up);
     },
     up: function (pt) { if (pt.id !== this.pid) return; this.pid = null; this.held = false; },
     update: function (dt) {
@@ -5538,7 +5580,7 @@ body.project .newbtn { display: none; }
       strokeHint(g, this.ew * 0.5, 30, "Pull down!", 2, this.cutting, "Hold the handle to run the blade");
       if (!this.cut && this.shift < 0.5 && this.alpha > MITER.up - 0.08) {
         var hq = Miter.headPt.call(this, this.alpha, -205, -90), hz = [this.eo[0] + hq[0] * this.Se, this.eo[1] + hq[1] * this.Se];
-        gAim = { pts: [hz, [hz[0], hz[1] + H * 0.22]] };
+        gAim = { pts: [hz, [hz[0], hz[1] + Math.min(H * 0.22, 150)]] };
       }
     },
     drawPlan: function (g) {
@@ -5599,7 +5641,7 @@ body.project .newbtn { display: none; }
   var bgC = document.createElement("canvas"), bgx = bgC.getContext("2d");
   var dustC = document.createElement("canvas"), dustx = dustC.getContext("2d");
   var COL = 4, floorH = [], pileColor = "#F7E0AE";
-  var particles = [], falling = [];
+  var particles = [], falling = [], dropsN = 0;   // dropsN: pieces cut off (read by the ?debug hook)
   var scene = null, curSaw = null;
   var tiltX = 0, tiltY = 0;
   var FONT = '"Baloo 2", "Trebuchet MS", system-ui, sans-serif';
@@ -5776,6 +5818,7 @@ body.project .newbtn { display: none; }
     // No sizes on the pieces (a shape name like "Heart" may stay); the bin counts them.
     if (l1 && /[0-9°]/.test(l1)) l1 = null;
     l2 = null;
+    dropsN++;
     falling.push({ spr: spr, x: spr.cx, y: spr.cy, vx: vx, vy: vy, rot: 0, vr: vr, t: 0, phase: "fall", l1: l1, l2: l2, scale: 1 });
   }
   var bin = {
@@ -6700,7 +6743,7 @@ body.project .newbtn { display: none; }
       if (scene && (scene === Table || scene === Machine)) scene.flashOff = 1.6;
     }
   });
-  if (/[?&]debug/.test(location.search)) window.__dbg = { End: End, get scene() { return scene; }, falling: falling, particles: function () { return String(particles.length); }, app: app, timer: function () { return Toybox.timer.phase(); } };
+  if (/[?&]debug/.test(location.search)) window.__dbg = { End: End, get scene() { return scene; }, get aim() { return gAim; }, get drops() { return dropsN; }, select: function (id) { selectSaw(id); }, falling: falling, particles: function () { return String(particles.length); }, app: app, timer: function () { return Toybox.timer.phase(); } };
   requestAnimationFrame(frame);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { drawRackIcons(); });
 })();

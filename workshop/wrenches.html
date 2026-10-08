@@ -1132,12 +1132,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var R = { countAt: -9 };
 
   // ---------- Turning ----------
+  var turnGain = 1;   // threads per finger angle (set when a turn starts)
   function applyTurn(d) {
     var i = T.slot, b = S.bolts[i];
     if (i < 0 || !b) return;
     var drive = S.mode === "wrench" || (S.dir === "loosen" ? d < 0 : d > 0);
     if (drive) {
-      var nl = clamp(b.l - d, 0, MAXL), applied = b.l - nl;
+      var nl = clamp(b.l - d * turnGain, 0, MAXL), applied = (b.l - nl) / turnGain;
       var before = b.l;
       b.l = nl;
       T.ang += applied;
@@ -1327,6 +1328,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       }
       if ((dd < g.L + U * 0.7 && hb < 0) || segDist(p.x, p.y, h.x, h.y, ex, ey) < g.hw + 20) {
         drags[e.pointerId] = { kind: "turn", last: Math.atan2((p.y - h.y) / K, p.x - h.x) };
+        // Gesture gain: the threads turn faster than the finger, so a bolt comes all the way out in about
+        // 300 px of finger arc (a third of a turn or so) instead of two whole turns; the tool still follows the finger.
+        turnGain = clamp(MAXL * Math.max(U * 0.5, dist(p.x, p.y, h.x, h.y)) / 300, 1, 6);
         return;
       }
     }
@@ -1727,7 +1731,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
     if (T.state === "on" && T.slot >= 0) {
       var h = headTop(T.slot), g = toolGeom(toolMM()), r = g.L * 0.85, sgn = S.dir === "tighten" ? -1 : 1, pts = [];
-      for (i = 0; i <= 3; i++) { var a = T.ang + sgn * i * 0.75; pts.push([clamp(cr.left + h.x + Math.cos(a) * r, cr.left + 16, cr.right - 40), cr.top + h.y + Math.sin(a) * r * K]); }
+      for (i = 0; i <= 3; i++) { var a = T.ang + sgn * i * 0.45; pts.push([clamp(cr.left + h.x + Math.cos(a) * r, cr.left + 16, cr.right - 40), cr.top + h.y + Math.sin(a) * r * K]); }
       return { pts: pts, duration: 4000 };
     }
     if (T.state !== "ready") return null;
