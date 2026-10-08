@@ -64,10 +64,10 @@
  *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
  *      Toybox.settings.get(id) an app setting chosen on the home screen (ids in SETTINGS below:
- *                              "tilt", "mathgrid-voice", "printer-name", ...).
+ *                              "mathgrid-voice", "printer-name", ...).
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
- *      Toybox.tiltReady(cb)    cb() once tilt/shake may be used (setting on; iOS asks on his first tap).
+ *      Toybox.tiltReady(cb)    kept for old callers; never calls back (tilt and shake were removed).
  *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card, mostly a star
  *                              ("You did it!"); type "love" asks for "Dad loves you!". Automatic gentle ones
  *                              ("You are doing great!") also show every few minutes of play.
@@ -124,28 +124,12 @@
   // here and shown there under "App settings"; apps read them with Toybox.settings.get(id).
   var SETKEY = "toybox-settings-v1", DONEKEY = "toybox-settings-done-v1";
   var SETTINGS = [
-    { id: "tilt", label: "Tilt and shake", type: "bool", def: false,
-      note: "Off by default; every app works fully without it. Apps that use it ask for motion access when he first touches them.",
-      listTitle: "Which apps use tilt and shake",
-      list: [
-        "Marble Run: tilting the device changes which way the marbles roll",
-        "Peg Drop: tilt steers the balls, a shake jostles them",
-        "Spinning Tops: tilt leans the bowl so the tops drift, a shake knocks them",
-        "Sand Table: tilt nudges the free ball",
-        "Water Table: tilt and shake slosh the water",
-        "Rocket Builder: tilt leans the rocket view",
-        "Math Grid: a shake tumbles the blocks, then they snap back",
-        "Kaleidoscope: a shake clears the picture",
-        "Workshop Tool Wall: the tools swing on their hooks",
-        "Measuring: the spirit level reads the device's real tilt",
-        "Drill Press, Saw Bench, Hammer & Screws: a shake clears the shavings and sawdust (Hammer & Screws: tilt slides it)"
-      ] },
     { id: "uses-info", app: "Good to know", type: "info",
       listTitle: "Which apps ask for something special",
       list: [
         "Turn the device: Train Builder prefers sideways, Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
         "Sound: every app has soft sound effects, all off until you turn sound on above",
-        "Motion (tilt and shake): only the apps listed under Tilt and shake, and only when it's on",
+        "Motion (tilt and shake): no app uses it; the Toybox never asks for motion access",
         "Nothing uses the camera, the microphone or location; after the first visit nothing needs the internet (it only checks for updates when online)"
       ] },
     // Kind words has its own controls (kindBuildSettings below); its other ids are listed in KIND_SET.
@@ -161,6 +145,8 @@
   var setListeners = [];
   function readJSON(k) { try { var o = JSON.parse(get(k) || "null"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } }
   function settingGet(id) {
+    // Tilt and shake was removed (the dad: none of the uses were good). Always off, even if an older version saved it on.
+    if (id === "tilt") return false;
     var d = SET_BY[id], all = readJSON(SETKEY);
     return Object.prototype.hasOwnProperty.call(all, id) ? all[id] : (d ? d.def : undefined);
   }
@@ -179,34 +165,9 @@
     check();
     setListeners.push(function (sid) { if (sid === id) check(); });
   }
-  // Tilt and shake: call cb() once motion events may be used (the grown-up turned tilt on). On iOS the
-  // permission prompt needs a tap, so it is asked on his first tap in the app.
-  function tiltReady(cb) {
-    var fired = false, asking = false;
-    function go() { if (!fired) { fired = true; cb(); } }
-    function attempt() {
-      if (fired || !settingGet("tilt")) return;
-      var DM = window.DeviceMotionEvent, DO = window.DeviceOrientationEvent;
-      var asks = [];
-      if (DM && typeof DM.requestPermission === "function") asks.push(DM);
-      if (DO && typeof DO.requestPermission === "function" && DO !== DM) asks.push(DO);
-      if (!asks.length) { go(); return; }
-      if (asking) return;
-      asking = true;
-      function onTap() {
-        document.removeEventListener("touchend", onTap, true);
-        document.removeEventListener("click", onTap, true);
-        Promise.all(asks.map(function (X) { return X.requestPermission(); })).then(function (r) {
-          asking = false;
-          if (r.every(function (x) { return x === "granted"; })) go();
-        }).catch(function () { asking = false; });
-      }
-      document.addEventListener("touchend", onTap, true);
-      document.addEventListener("click", onTap, true);
-    }
-    attempt();
-    setListeners.push(function (id) { if (id === "tilt") attempt(); });
-  }
+  // Tilt and shake is removed across the Toybox (the dad's decision): apps still call Toybox.tiltReady(cb), but it
+  // never calls back, so no app listens to motion or asks for motion access.
+  function tiltReady(cb) { /* never: motion is off everywhere */ }
 
   // ---------- Timer state ----------
   // Phases: idle -> running -> ending (app winds down, optional goodbye button) -> resting (locked) -> idle.

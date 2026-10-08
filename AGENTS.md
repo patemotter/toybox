@@ -140,7 +140,10 @@ Keep only:
   other way, the shared layer covers the app with a "Turn it sideways!" / "Turn it upright!" card (a turning
   tablet picture and a small "Play like this" button, so rotation lock never traps him; remembered for the session).
   The app must still work in the other orientation behind that button; it just needn't be framed as carefully.
-  Current users: Train Builder (landscape), Concrete (portrait). Everything else is both ways.
+  Use it **only when the app really needs it** (the dad prefers upright on the iPhone and doesn't want to be asked to
+  turn otherwise). Current user: Concrete (portrait). Everything else, Train Builder included, is both ways.
+- **A tab or panel change never re-lays out the stage** (Train Builder flipped its track when Cars was tapped): pick
+  layouts from the device orientation, and keep the panel the same height for every tab.
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
@@ -185,7 +188,7 @@ Keep only:
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
   tool/layout/mode, scroll position and counters go back to first-visit defaults.
 - **Kept**: his **collections** (3D Printer shelf and spool colors, Lathe and Router shelves, Fish Tank fish,
-  Color Mixing "My colors", My puzzles in Jigsaw, the Bubble Machine's "Bubbles" counter) and **grown-up settings** (timer, sound, Big, tilt, sheet
+  Color Mixing "My colors", My puzzles in Jigsaw, the Bubble Machine's "Bubbles" counter) and **grown-up settings** (timer, sound, Big, sheet
   options such as Math Grid spoken numbers).
 - Reloading, or moving between pages of the same app (Tool Wall ↔ station), keeps the state.
 - Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.
@@ -225,7 +228,7 @@ Keep only:
 - `Toybox.timer.locked()` (ignore play input while ending/resting), `Toybox.sound.ready()` (AudioContext or null;
   play sound only through it), `Toybox.makeHold(btn, ms, onDone)`, `Toybox.toast(msg)`, `Toybox.setBig(on)`.
 - `Toybox.settings.get(id)` / `.onChange(fn)` / `.action(id, fn)`: app settings chosen on the home screen (stored in
-  `toybox-settings-v1`); `Toybox.tiltReady(cb)` for tilt. `home: true` in `Toybox.init` is for the launcher only.
+  `toybox-settings-v1`). `home: true` in `Toybox.init` is for the launcher only.
 - `Toybox.fresh()`: true on the first load of a page under a new launch id. The launcher stores
   `sessionStorage["toybox-launch"]` when a tile is tapped; each page records `toybox-seen:<path>`.
 - `orientation: "landscape"|"portrait"` in `Toybox.init` shows the turn-the-device card (`Toybox.turning()`,
@@ -246,12 +249,11 @@ Keep only:
 - Canvas: scale by devicePixelRatio capped at 2; aim for 60fps on iPad.
 - Don't paint a pattern with `background-attachment: local` on a scrolling box: it lags on iOS (the Tool Wall's
   pegboard holes now live on the scrolling content element).
-- **Keep the Grown-ups lists current:** the "Tilt and shake" setting and "Good to know" in `SETTINGS` (common/toybox.js)
-  list every app that uses motion, turning the device or anything special. Update them when an app starts or
-  stops using one (the dad wants it very clear).
-- Tilt/shake: one "Tilt and shake" switch in the home screen's App settings. Apps call `Toybox.tiltReady(cb)`; on
-  iOS it asks `requestPermission()` on his first tap in the app (it needs a user gesture). Never prompt on load.
-  The app must work fully without tilt. No vibration API on iOS.
+- **Keep the Grown-ups list current:** "Good to know" in `SETTINGS` (common/toybox.js) lists every app that asks for
+  something special (turning the device, sound). Update it when an app starts or stops (the dad wants it very clear).
+- **No tilt or shake anywhere** (the dad removed it: none of the uses were good). There is no Tilt and shake setting;
+  `Toybox.tiltReady(cb)` never calls back and `settings.get("tilt")` is always false, so old tilt code in apps is
+  inert. Don't add motion features; remove leftover tilt code when touching an app.
 - Respect `prefers-reduced-motion` and safe-area insets. Light/dark theming via `:root` tokens.
 - Test hooks only behind `?debug` (read-only `navigator.webdriver` hooks exist in a few Workshop pages).
 
