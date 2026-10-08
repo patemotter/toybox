@@ -589,7 +589,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var h = 0.45 + 1.0 * s, turns = s > 0.5 ? 3 : 1, dur = 0.9 + 0.5 * s;
     if (magic) {
       // Surprise: as high as the kitchen goes, with lots of spins.
-      h = Math.max(1.1, oy / B + PAN.y - 0.45 - (pc.z || 0)); turns = 5; dur = reduce ? 1 : 2.6;
+      h = Math.max(1.1, oy / B + PAN.y - 0.45 - (pc.z || 0)); turns = 6; dur = reduce ? 1 : 2.6;
     }
     if (reduce && !magic) { dur = 0.6; }
     pc.fly = { t0: now(), dur: dur, h: h, turns: turns, z0: pc.z || 0, x0: pc.x, x1: clamp(pc.x * 0.6 + rand(-0.04, 0.04), -0.2, 0.2), magic: !!magic, wasFlipped: pc.flipped };
@@ -597,13 +597,12 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     spat.held = false; spat.until = now() + 0.7;
     puff(0.35, 0.03 + 0.03 * s, 1200);
     tone(400, 0.3 + s * 0.3, 0.03, "sine", 900);
-    learned("flip");
+    if (!magic) learned("flip");
   }
   function landPancake() {
     var pc = S.pc, f = pc.fly;
     pc.ph = "pan"; pc.z = 0; pc.th = 0; pc.x = f.x1;
-    pc.flipped = !pc.flipped;
-    if (f.magic) { pc.c1 = 1; if (f.wasFlipped) pc.c2 = 1; }
+    if (!f.magic) pc.flipped = !pc.flipped;
     pc.fly = null; pc.sqT = now();
     fitPc();
     pat();
@@ -759,6 +758,65 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     save();
   }
 
+  // ---------- Surprise: a fun moment on the scene, right now (the moments take turns) ----------
+  // FUN.cur[kind] = { t0, dur } while a moment plays. Nothing here changes his food or his progress.
+  var FUN = { cur: {}, last: "", i: 0 }, MAMP = reduce ? 0.35 : 1;
+  var finger = { x: 0, y: 0, t: -99 };
+  function trackFinger(e) { finger.x = e.clientX; finger.y = e.clientY; finger.t = now(); }
+  document.addEventListener("pointerdown", trackFinger, true);
+  document.addEventListener("pointermove", trackFinger, true);
+  function funStart(kind, dur) { FUN.cur[kind] = { t0: now(), dur: dur }; FUN.last = kind; }
+  function funK(kind) {
+    var m = FUN.cur[kind];
+    if (!m) return -1;
+    var k = (now() - m.t0) / m.dur;
+    if (k >= 1) { delete FUN.cur[kind]; return -1; }
+    return k;
+  }
+  function funEnv(k, a) { a = a || 0.12; return k < 0 ? 0 : clamp(Math.min(k / a, (1 - k) / a), 0, 1); }
+  function funPop(t) { t = clamp(t, 0, 1) - 1; return 1 + 2.2 * t * t * t + 1.2 * t * t; }
+  // The next moment in turn that can happen now, never the one just played.
+  function funPick(order, ok) {
+    for (var j = 0; j < order.length; j++) {
+      var id = order[(FUN.i + j) % order.length];
+      if (FUN.cur[id] || id === FUN.last || !ok(id)) continue;
+      FUN.i = (FUN.i + j + 1) % order.length;
+      return id;
+    }
+    return "";
+  }
+  // A cartoon face (scene units): eyes that follow his finger and blink, rosy cheeks, a big smile.
+  // k: how far through the moment (it pops in and out); s: size; sq: squash for things seen from above.
+  function happyFace(cx, cy, s, k, sq) {
+    var app = funEnv(k, 0.1);
+    if (app <= 0) return;
+    var t = now(), pop = app < 1 ? Math.max(0.01, funPop(app)) : 1, sc = s * pop;
+    var p = finger.t > t - 4 ? toLocal(finger.x, finger.y) : { x: cx + Math.sin(t * 0.8) * 3, y: cy + 0.6 };
+    var dx = p.x - cx, dy = p.y - cy, dl = Math.hypot(dx, dy) || 1;
+    var lx = dx / dl, ly = dy / dl, blink = ((t + 0.7) % 2.4) < 0.14 ? 0.12 : 1;
+    var lw = LW / sc;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc * (sq || 1));
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.fillStyle = "rgba(255,111,145,0.55)";
+    ctx.beginPath(); ctx.ellipse(-0.27, 0.12, 0.07, 0.045, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0.27, 0.12, 0.07, 0.045, 0, 0, Math.PI * 2); ctx.fill();
+    for (var side = -1; side <= 1; side += 2) {
+      var ex = side * 0.15;
+      ctx.beginPath(); ctx.ellipse(ex, 0, 0.1, 0.125 * blink, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = lw * 1.1; ctx.strokeStyle = INK; ctx.stroke();
+      if (blink > 0.5) {
+        ctx.beginPath(); ctx.arc(ex + lx * 0.04, ly * 0.055, 0.055, 0, Math.PI * 2); ctx.fillStyle = INK; ctx.fill();
+        ctx.beginPath(); ctx.arc(ex + lx * 0.04 - 0.02, ly * 0.055 - 0.022, 0.018, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+      }
+    }
+    // An open smile with a little tongue.
+    ctx.beginPath(); ctx.moveTo(-0.13, 0.13); ctx.quadraticCurveTo(0, 0.36, 0.13, 0.13); ctx.quadraticCurveTo(0, 0.18, -0.13, 0.13); ctx.closePath();
+    ctx.fillStyle = "#B8324A"; ctx.fill();
+    ctx.save(); ctx.clip(); ctx.beginPath(); ctx.ellipse(0, 0.27, 0.07, 0.05, 0, 0, Math.PI * 2); ctx.fillStyle = "#FF8FA3"; ctx.fill(); ctx.restore();
+    ctx.lineWidth = lw * 1.1; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.restore();
+  }
+
   // ---------- New and Surprise ----------
   function newCook() {
     if (locked()) return;
@@ -781,32 +839,109 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }
+  // Stove moments. The pan: the magic flip (the pancake spins way up and lands the same side up, so it
+  // changes nothing), a happy face on the pancake, the tools swing on the rail. The pot: the lid rattles
+  // and pops up with a puff of steam; big bubbles burble up and float away; a happy face on the pot.
+  var FUN_ORDER = ["flip", "lid", "bubbles", "face", "swing"];
+  function toolsHome() {
+    var pc = S.pc, h = spatHome();
+    return ladle.st === "home" && !spat.held && Math.abs(spat.x - h.x) < 0.02 && Math.abs(spat.y - h.y) < 0.02 && !(pc && (pc.ph === "lift" || pc.ph === "carry" || pc.ph === "toplate"));
+  }
+  function funOk(id) {
+    if (swap) return false;
+    if (id === "flip") return isPan() && !!S.pc && S.pc.ph === "pan";
+    if (id === "lid") return !isPan() && ladle.st === "home" && !spoon.drag;
+    if (id === "bubbles") return !isPan();
+    if (id === "swing") return toolsHome();
+    return true;
+  }
   function surprise() {
     if (locked() || swap) return;
-    if (isPan()) {
-      var pc = S.pc;
-      if (pc && pc.ph === "pan") { launch(1, true); return; }
-      if (pc || jug.st !== "home") { burst(PAN.x, PAN.y - 0.3, 14, null, true); return; }
-      if (stackFull()) { var free = TOP_ORDER.filter(function (id) { return S.stack.tops.indexOf(id) < 0; }); addTop(free[Math.floor(Math.random() * free.length)]); return; }
-      // A giant pancake.
-      if (!on()) knobTo(0.75);
-      autoPour(0.55);
-      return;
-    }
-    if (cooked()) { autoLadle(); return; }
-    var list = S.recipe === "pasta" ? PASTA_FOODS : SOUP_FOODS, n = Math.min(3, POT_MAX - S.pot.items.length);
-    if (n <= 0 || ladle.st !== "home") { potSwirl = 7; burst(POT.x, POT.ty - 0.1, 16, null, true); return; }
-    for (var i = 0; i < n; i++) (function (id, i) {
-      setTimeout(function () {
-        if (isPan() || S.pot.items.length >= POT_MAX) return;
-        var t = choicesEl.querySelector('[data-food="' + id + '"]');
-        if (!t) { putFood(id); return; }
-        var r = t.getBoundingClientRect(), f = document.createElement("div");
-        f.className = "float"; f.innerHTML = t.querySelector("svg").outerHTML; document.body.appendChild(f);
-        var top = toPage(POT.x, POT.ty - 0.3);
-        flyFloat(f, r.left + r.width / 2, r.top + r.height / 2, top[0], top[1], reduce ? 120 : 420, function () { putFood(id); });
-      }, i * 520);
-    })(list[Math.floor(Math.random() * list.length)], i);
+    var id = funPick(FUN_ORDER, funOk);
+    if (!id) { burst(isPan() ? PAN.x : POT.x, isPan() ? PAN.y - 0.3 : POT.ty - 0.1, 14, null, true); return; }
+    if (id === "flip") { funStart("flip", 3); launch(1, true); say("Magic flip!"); }
+    else if (id === "lid") { funStart("lid", reduce ? 4.5 : 5.6); FUN.popped = false; say("Pop goes the lid!"); tone(500, 0.1, 0.03, "sine", 650); }
+    else if (id === "bubbles") {
+      funStart("bubbles", reduce ? 5 : 6.5);
+      FUN.bub = [];
+      for (var i = 0; i < 7; i++) FUN.bub.push({ u: rand(-0.7, 0.7), v: rand(-0.5, 0.6), d: i * (reduce ? 0.4 : 0.42), r: rand(0.08, 0.14), w: rand(0, TAU), h: rand(0.55, 1.15), popped: false });
+      say("Big bubbles!");
+    } else if (id === "face") { funStart("face", 6); say(isPan() ? (S.pc && S.pc.ph === "pan" ? "Hello, pancake!" : "Hello, pan!") : "Hello, pot!"); tone(660, 0.12, 0.03, "sine", 880); tone(880, 0.16, 0.03, "sine", 1100, 0.15); }
+    else { funStart("swing", reduce ? 3 : 4.2); say("Swing, swing!"); tone(1500, 0.2, 0.02, "triangle", 1400); tone(1700, 0.2, 0.02, "triangle", 1600, 0.6); }
+  }
+  // The tools' swing on the rail (radians), 0 when they are still.
+  function swingA(ph) {
+    var k = funK("swing");
+    if (k < 0 || !toolsHome()) return 0;
+    return Math.sin(k * FUN.cur.swing.dur * TAU * 0.8 + ph) * 0.38 * funEnv(k, 0.15) * MAMP;
+  }
+  // The pot lid: comes down, rattles, pops up with a puff of steam, settles, then lifts away.
+  function drawLid() {
+    var k = funK("lid");
+    if (k < 0) return;
+    if (ladle.st !== "home" || spoon.drag || isPan()) { delete FUN.cur.lid; return; }
+    var T = FUN.cur.lid.dur, tt = k * T, t = now(), ty = POT.ty - 0.03, y = ty, x = POT.x, a = 0, al = 1;
+    var down = 0.8, rat = 2.6, pop = 3.3, set = 3.9, rest = T - 1.0;
+    if (tt < down) { var e = ease(tt / down); y = lerp(ty - 1.3, ty, e); al = Math.min(1, tt / 0.3); }
+    else if (tt < rat) {
+      var r = MAMP * Math.min(1, (tt - down) / 0.5);
+      x += Math.sin(t * 40) * 0.012 * r; a = Math.sin(t * 33) * 0.045 * r; y -= Math.abs(Math.sin(t * 18)) * 0.03 * r;
+      if (Math.random() < 0.25) steam(x + (Math.random() < 0.5 ? -0.45 : 0.45), ty - 0.02, 0.04, 1);
+    } else if (tt < pop) {
+      if (!FUN.popped) {
+        FUN.popped = true;
+        for (var i = 0; i < (reduce ? 4 : 16); i++) parts.push({ x: x + rand(-0.45, 0.45), y: ty - rand(0, 0.08), vx: rand(-0.25, 0.25), vy: rand(-0.7, -0.35), life: 0, max: rand(1.4, 2.2), r: rand(0.06, 0.1), steam: true });
+        puff(0.6, 0.05, 900); tone(700, 0.2, 0.03, "sine", 1100);
+      }
+      var u = (tt - rat) / (pop - rat);
+      y = ty - 4 * u * (1 - u) * 0.55 * MAMP; a = Math.sin(u * Math.PI) * 0.25 * MAMP;
+    } else if (tt < set) { var v = (tt - pop) / (set - pop); y = ty - Math.abs(Math.sin(v * Math.PI * 2)) * 0.05 * (1 - v); if (!FUN.landed) { FUN.landed = true; tone(900, 0.08, 0.03, "triangle", 700); } }
+    else if (tt > rest) { var w = ease((tt - rest) / (T - rest)); y = lerp(ty, ty - 1.4, w); al = 1 - w; FUN.landed = false; }
+    ctx.save(); ctx.globalAlpha *= al; ctx.translate(x, y); ctx.rotate(a);
+    ell(0, 0, POT.rx + 0.03, POT.ry + 0.01); fs("#AEB8C6", 1.1);
+    ctx.beginPath(); ctx.moveTo(-POT.rx - 0.03, 0); ctx.bezierCurveTo(-POT.rx + 0.02, -0.24, POT.rx - 0.02, -0.24, POT.rx + 0.03, 0);
+    ctx.ellipse(0, 0, POT.rx + 0.03, POT.ry + 0.01, 0, 0, Math.PI, false); ctx.closePath(); fs("#DCE3EC", 1.1);
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 0.025; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-0.32, -0.08); ctx.quadraticCurveTo(-0.2, -0.16, -0.05, -0.17); ctx.stroke();
+    rr(-0.08, -0.26, 0.16, 0.09, 0.04); fs("#3B4256", 1);
+    ctx.restore();
+  }
+  // Big bubbles burble up on the soup, float away and pop.
+  function drawBigBubbles() {
+    var k = funK("bubbles");
+    if (k < 0 || !FUN.bub || isPan()) return;
+    var tt = k * FUN.cur.bubbles.dur, wy = waterY(), tint = mixHex(potColor(), "#FFFFFF", 0.55), top = -oy / B + 0.2, t = now();
+    FUN.bub.forEach(function (b) {
+      var lt = tt - b.d;
+      if (lt < 0 || b.popped) return;
+      var bx = POT.x + b.u * POT.rx * 0.8, by = wy + b.v * POT.ry * 0.7, r = b.r, rise = 0;
+      if (lt < 0.6) { r = b.r * ease(lt / 0.6); }
+      else {
+        rise = (lt - 0.6) * 0.32;
+        bx += Math.sin(t * 2.2 + b.w) * 0.05 * Math.min(1, rise * 3);
+        by -= rise;
+        if (rise > b.h || by - r < top) {
+          b.popped = true; blub();
+          for (var i = 0; i < 6; i++) { var an = i * TAU / 6; parts.push({ x: bx + Math.cos(an) * r, y: by + Math.sin(an) * r, vx: Math.cos(an) * 0.6, vy: Math.sin(an) * 0.6 - 0.2, life: 0, max: 0.5, col: "#FFFFFF", r: 0.018, star: false }); }
+          burst(bx, by, 3, null, true);
+          return;
+        }
+      }
+      if (lt < 0.6) { ctx.save(); ctx.beginPath(); ctx.rect(bx - 1, by - 1, 2, 1); ctx.clip(); }
+      circ(bx, by, r); ctx.fillStyle = tint; ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineWidth = LW * 0.7; ctx.strokeStyle = "rgba(29,35,64,0.55)"; ctx.stroke();
+      ctx.lineWidth = 0.014; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(bx, by, r * 0.72, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
+      circ(bx + r * 0.35, by - r * 0.4, r * 0.12); ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fill();
+      if (lt < 0.6) ctx.restore();
+    });
+  }
+  function drawFunFace() {
+    var k = funK("face");
+    if (k < 0) return;
+    var pc = S.pc;
+    if (!isPan()) happyFace(POT.x, (POT.ty + POT.by) / 2 + 0.06, 1.05, k);
+    else if (pc && pc.ph === "pan") happyFace(PAN.x + pc.x, PAN.y - (pc.z || 0) - 0.01, Math.max(0.6, pc.r * 2), k, 0.5);
+    else if (S.stack.list.length && !away) happyFace(PLATE.x, stackTopY() - 0.01, 0.62, k, 0.5);
+    else if (!pc) happyFace(PAN.x, PAN.y, 0.95, k, 0.5);
   }
   $("newBtn").addEventListener("click", newCook);
   $("surpriseBtn").addEventListener("click", surprise);
@@ -1107,7 +1242,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       pc = S.pc;
       if (pc.ph === "pour") {
         var cap = jug.st === "auto" ? jug.auto.target : 0.46;
-        var rate = jug.st === "auto" && jug.auto.target > 0.45 ? 0.16 : 0.075;
+        var rate = 0.075;
         pc.r = Math.min(cap, Math.sqrt(pc.r * pc.r + dt * rate));
         pc.x += (lx - pc.x) * Math.min(1, dt * 0.8);
         fitPc();
@@ -1679,7 +1814,10 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     [-0.17, 0.17].forEach(function (u) { ctx.beginPath(); ctx.moveTo(x + u, y - 0.01); ctx.quadraticCurveTo(x + u + 0.04, y + 0.03, x + u, y + 0.06); ctx.lineWidth = LW * 1.4; ctx.strokeStyle = INK; ctx.stroke(); });
   }
   function drawSpatula() {
-    ctx.save(); ctx.translate(spat.x, spat.y); ctx.rotate(spat.a);
+    ctx.save();
+    var sa = swingA(0);
+    if (sa) { ctx.translate(spat.x, spat.y - 0.6); ctx.rotate(sa); ctx.translate(-spat.x, -(spat.y - 0.6)); }
+    ctx.translate(spat.x, spat.y); ctx.rotate(spat.a);
     rr(-0.032, 0.14, 0.064, 0.48, 0.03); fs("#E63946");
     circ(0, 0.56, 0.014); ctx.fillStyle = INK; ctx.fill();
     rr(-0.016, 0.06, 0.032, 0.1, 0.01); fs("#9AA5B8", 0.8);
@@ -1691,7 +1829,10 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
   function drawLadle() {
     var t = now(), wig = ladle.wig > 0 ? Math.sin(t * 26) * 0.1 * ladle.wig : 0;
-    ctx.save(); ctx.translate(ladle.x, ladle.y); ctx.rotate(ladle.a + wig);
+    ctx.save();
+    var la = swingA(2.4);
+    if (la) { ctx.translate(ladle.x, ladle.y - 0.585); ctx.rotate(la); ctx.translate(-ladle.x, -(ladle.y - 0.585)); }
+    ctx.translate(ladle.x, ladle.y); ctx.rotate(ladle.a + wig);
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(0, -0.05); ctx.quadraticCurveTo(0.02, -0.3, 0, -0.56);
     ctx.lineWidth = 0.035 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.035; ctx.strokeStyle = "#C9D3E0"; ctx.stroke();
@@ -1754,8 +1895,9 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     drawBurner();
     ctx.globalAlpha = al;
     if (w === "pan") { drawShelf(); drawPan(dy); drawPlate(); drawBatterStream(); drawJug(); }
-    else { drawPot(dy); drawBowl(); }
+    else { drawPot(dy); drawBigBubbles(); drawLid(); drawBowl(); }
     ctx.globalAlpha = 1;
+    if (!swap) drawFunFace();
     drawSpatula();
     if (w === "pan") drawLoosePancake();
     drawLadle();
@@ -1771,6 +1913,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function locked() { return Toybox.timer.locked(); }
   function onEnding(done) {
     // The burner switches off, the flames go out and the steam fades away.
+    FUN.cur = {};
     if (on() || (K.anim && K.anim.to > 0)) knobTo(0);
     K.drag = null;
     cancelDrags();
@@ -1994,6 +2137,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       },
       potPt: function (u, v) { return toPage(POT.x + u * POT.rx * 0.7, waterY() + v * POT.ry * 0.7); },
       ghost: function () { return ghost.show(); },
+      fun: function () { return { cur: Object.keys(FUN.cur), last: FUN.last }; },
       table: function () { return readTable(); }
     };
   }
