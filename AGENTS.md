@@ -176,6 +176,11 @@ Keep only:
 - **No procedural extras**: keep the fun core of each tool and drop steps that only add waiting or fiddling:
   material pickers, size pickers, chuck keys, waiting for a spindle to stop, setup sequences. If something like
   that stays, it happens automatically or with one tap.
+- **Short and direct** (the dad, 2026-10-09: "way too tedious"; "so many little things that don't really matter and
+  get in the way"): the fun payoff comes within seconds of his first touch. No repeated chores before a payoff
+  (several passes over the same field, filling twelve cups, step after step), no extra taps or choices that don't
+  change anything he cares about, no little side features that clutter the scene or the panel. Real names and real
+  mechanics stay; the number of steps and things on screen goes down. When in doubt, cut it or make it automatic.
 - Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
 - **No dead buttons** (the dad: "lots of buttons look pressed but don't do anything"): every tap gives a visible
   answer, also when there is nothing to do (a hint like "Draw a line first!", a sparkle). Empty slots that do
