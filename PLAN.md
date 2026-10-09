@@ -90,6 +90,18 @@ Build queue (at most three agents at a time): Excavator rework, Tower crane, Ham
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
 Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain
 reaction, fire station.
+**Shortlist (the dad, 2026-10-09), to look at next:**
+- **Garbage Truck:** the side-loader arm grabs a bin, tips it into the hopper, the packer squashes the load, the
+  load slides out at the depot.
+- **Forklift:** forks under a pallet, raise the mast, load a truck; could be a Construction Site station.
+- **Farm:** almost all of it: tractor and plow, planting, sprayer, combine, baler, the animals.
+- **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
+  thread, guiding the fabric, making something.
+- **Play Dough Factory:** squish, roll and cut dough, an extruder press with dies.
+Brainstormed the same day and set aside by the dad (each "won't work for one reason or another"): air tubes,
+pressure washer, magnet table, typewriter, paint wall, circuits, pinball, car garage, parking garage, canal lock,
+CNC and laser, roller coaster, toy factory, balance scale, clock shop, kite, fireworks, submarine, hot air balloon,
+light lab, flashlight cave, ice resurfacer, pottery wheel, stamps, weather, goo jar, post office, vet, blocks and more.
 | – | Workshop Projects | On hold |
 
 ---
