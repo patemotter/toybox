@@ -8,7 +8,8 @@ without the history of the conversations that built it. `PLAN.md` holds the back
 
 ## 1. Who it is for
 
-- A 3-year-old boy. He reads short words. He is autistic and **sensory seeking**: big visuals, lots of color and
+- A 3-year-old boy. He **reads well** (the dad: "he can read almost anything"): real words on buttons and in coach
+  lines are fine and useful; he is not a pre-reader. He is autistic and **sensory seeking**: big visuals, lots of color and
   motion, touching and dragging, strong responses to every touch, predictable behavior.
 - He loves real workshop tools, machines and construction vehicles, math (times and plus tables), marble runs,
   gears and anything that spins, trains, rockets, his 3D printer (a P1S with an AMS 2 Pro, drawn without logos)
