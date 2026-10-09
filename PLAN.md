@@ -90,7 +90,9 @@ Build queue (at most three agents at a time): Excavator rework, Tower crane, Ham
 Jigsaw Puzzles, Kitchen Helper, Bubble Machine, in that order as agents free up.
 Other ideas offered to the dad, not picked yet: car wash, washing machine, dinosaur dig, airport, domino chain
 reaction, fire station.
-**Shortlist (the dad, 2026-10-09), to look at next:**
+**Shortlist (the dad, 2026-10-09), to look at next:** Each has a full design and engineering plan in `plans/` (`garbage-truck.md`,
+`forklift.md` (recommended as a Construction Site station), `farm.md`, `sewing-machine.md`, `play-dough.md`), each
+ending with open questions for the dad; settle those before building.
 - **Garbage Truck:** the side-loader arm grabs a bin, tips it into the hopper, the packer squashes the load, the
   load slides out at the depot.
 - **Forklift:** forks under a pallet, raise the mast, load a truck; could be a Construction Site station.
