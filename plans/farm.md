@@ -32,16 +32,31 @@ Yard:  muck spreader out to the field; loader / telehandler stacks bales, fills 
 - Real machine names in the coach lines, the season in the sky (spring blossom, summer sun, autumn leaves), one sun
   arc for "weeks go by", one horizon farm behind every field scene. One set of sounds and one coach/ghost helper.
 
-### 0.3 Stations, in build order (two agents at a time; he plays each phase before the next)
-| Phase | Stations | Notes |
-| --- | --- | --- |
-| **1** | `farm.js` (lane engine, tractor, sky, world store, sound, ghost) + **map** + **Field** | Field tiles: Plough, Harrow, Drill, Spreader (fertiliser, spinning discs), Sprayer. 1 agent, L. |
-| **2** | **Combine** and **Hay**, in parallel | Combine with the grain trailer alongside, then to the grain store. Hay: Mower, Rake, Baler, Wrapper (the wrapper spins the bale in stretch film); the loader stacks the bales. 2 agents. |
-| **3** | **Silage** and **Muck spreader**, in parallel | Silage: the forage harvester blows chopped grass into a trailer driving alongside; trailers tip at the clamp; the loader pushes it up and rolls it. Muck: the loader fills the spreader at the heap; out in the field the beaters fling it out behind. 2 agents. |
-| **Later, if he wants** | Potato harvester, hedge cutter, telehandler yard jobs, corn (maize) as a second crop, ploughing match | Ask after phases 1-3. |
+### 0.3 Stations framed on the show's farm jobs, in build order
+The show's episodes are each one farm job with its machines (checked 2026-10-09 on TheTVDB's episode list:
+"It's Sow Time", "Combine Time", "Sunny Seeds", "Glorious Grass", "Silage Surprise", "Brilliant Baler",
+"Hey Haylage", "Mucky Muck", "Spuds in Mud", "Munchy Crunchy", "A-maizing Day", "Timberrrrr!", "Chip Chipping",
+"Caterpillar Hunt", the four season episodes). Each station is one such job, with the crops of related episodes as
+tiles. **Our own station titles, not the show's** (no brand names); the show is the inspiration only.
+
+| Phase | Station (map title) | The job and its machines | Tiles | Show episodes it follows |
+| --- | --- | --- | --- | --- |
+| **1** | **Field** ("Plow and sow") + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor) | It's Sow Time, Caterpillar Hunt, Springtime |
+| **2** | **Combine** ("Harvest") | combine harvester, grain trailer alongside, to the grain store | **Wheat / Sunflowers** | Combine Time, Sunny Seeds |
+| **2** | **Bales** ("Bale day") | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage |
+| **3** | **Silage** ("Silage") | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, A-maizing Day |
+| **3** | **Roots** ("Spuds and carrots") | potato harvester: share lifts the ridge, webs shake the soil off, elevator into a trailer; carrot harvester tops the leaves and lifts | **Potatoes / Carrots** | Spuds in Mud, Munchy Crunchy |
+| **4** | **Muck** ("Muck spreading") | loader fills the spreader at the heap; beaters fling it out on the field | none | Mucky Muck |
+| **4** | **Woods** ("Timber") | forestry harvester head grips, fells, strips and cuts the trunk to logs; forwarder loads them; chipper chips the brash | none | Timberrrrr!, Chip Chipping |
+| **Later** | if he wants | straddle fruit harvester (blackcurrants), lavender harvester, mushroom compost turners, hedge cutter | | Juicy Squeezy, Big Machines, Mighty Mushrooms |
+
+- **Seasons frame the map** (like the show's Springtime / Summertime / Autumntime / Wintertime): the map's sky and
+  trees follow the season of the job he last did (sowing = spring, bales and silage = summer, harvest, roots and
+  muck = autumn, timber = winter), so the year visibly turns as he plays.
+- Two agents at a time; he plays each phase before the next. Stations not yet built have no lot on the map.
 
 ### 0.4 Decisions taken (defaults; the dad can change any)
-- **Wheat first**; maize later. **Four lanes**, about 6-8 s per lane; three show at a time on a phone held sideways.
+- **Wheat first** (sunflowers as the Combine's second tile; maize in Silage). **Four lanes**, about 6-8 s per lane; three show at a time on a phone held sideways.
 - **Shared field and kept stores** as above. A fresh visit resets each station's scene and counter and puts the
   field back to stubble, so the Field's first action is always "Drag the tractor!". **No safety ritual.**
 - **Words**: US English for the UI by default (plow, fertilizer); if the family uses the show's British words
