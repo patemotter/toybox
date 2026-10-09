@@ -41,6 +41,10 @@
 //    was already selected (aria-pressed/selected/checked, or an on/sel/active class) and did nothing is
 //    listed separately as "already selected" rather than as dead.
 // 6. Output: one line per page, then a table of every "dead?" button (page, size, label, selector, note).
+// 7. Sizes and labels (plans/redesign.md 1.8, 1.11), on the first screen: tiles under 90% of the token size (84 px
+//    phone, 112 px iPad), text-only buttons in the panel (words but no picture) and panel targets under 44 px.
+//    Listed after the table: "PROBLEM" on pages using the new system (the shell has "tb-v2"), "warn" on the others
+//    (their panels are moved batch by batch). UI=0 skips it.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
@@ -185,6 +189,35 @@ function installHelpers() {
       return at ? { x: at[0], y: at[1], r: [r.left, r.top, r.right, r.bottom] } : { hidden: true };
     }
   };
+}
+
+// ---------- size and label checks (same rules as tools/fit.js) ----------
+function uiChecks() {
+  var out = [], v2 = !!document.querySelector('.tb-v2');
+  var ipad = innerWidth >= 700 && innerHeight >= 700, TILE = ipad ? 112 : 84, MIN = 44;
+  function vis(el) {
+    for (var a = el; a && a !== document; a = a.parentElement) {
+      if (a.hidden) return null;
+      var cs = getComputedStyle(a);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return null;
+    }
+    var r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.right < 0 || r.left > innerWidth || r.bottom < 0 || r.top > innerHeight) return null;
+    return r;
+  }
+  function name(el) { return (el.getAttribute('aria-label') || el.textContent || el.id || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 24); }
+  document.querySelectorAll('.tb-tile').forEach(function (el) {
+    var r = vis(el); if (!r || el.closest('.tb-layer, .modal')) return;
+    var m = Math.min(r.width, r.height);
+    if (m < TILE * 0.9) out.push('small tile ' + name(el) + ' ' + Math.round(m) + 'px');
+  });
+  document.querySelectorAll('.tb-panel button, .tb-panel [role=button], .tb-panel [role=tab], .tb-panel a[href], .tb-jobs button').forEach(function (el) {
+    var r = vis(el); if (!r || el.closest('.tb-chip')) return;
+    if ((el.textContent || '').trim() && !el.querySelector('svg, canvas, img, .tb-pic')) out.push('text-only ' + name(el));
+    var m = Math.min(r.width, r.height);
+    if (m < MIN) out.push('small target ' + name(el) + ' ' + Math.round(m) + 'px');
+  });
+  return { v2: v2, out: out };
 }
 
 // ---------- pixel diff (runs in a blank helper page) ----------
@@ -343,6 +376,7 @@ async function testPage(browser, helper, url) {
     }
     queue.unshift(...fresh); // depth first: what a tap reveals is tried next
   }
+  if (process.env.UI !== '0') res.ui = await P.page.evaluate(uiChecks).catch(() => null);
   add(await P.page.evaluate(() => __bt.candidates()), []);
   const history = [];
   while (queue.length && res.tapped < MAXBTN && Date.now() - t0 < PAGE_MS) {
@@ -422,6 +456,11 @@ async function testPage(browser, helper, url) {
     const fmt = r => r.map((v, k) => String(v).slice(0, wd[k]).padEnd(wd[k])).join(' | ');
     console.log(fmt(head)); console.log(wd.map(n => '-'.repeat(n)).join('-+-'));
     rows.forEach(r => console.log(fmt(r)));
+  }
+  const uiRows = results.filter(r => r.ui && r.ui.out.length);
+  if (uiRows.length) {
+    console.log('\nSizes and labels (first screen):');
+    uiRows.forEach(r => console.log(`${r.ui.v2 ? 'PROBLEM' : 'warn   '} ${r.url || '(launcher)'}  ${r.ui.out.slice(0, 10).join(', ')}${r.ui.out.length > 10 ? ', ...' : ''}`));
   }
   const sel = results.filter(r => r.selectedNoop);
   if (sel.length) console.log('\nAlready selected, tap again does nothing (fine): ' + sel.map(r => `${r.url} [${r.selectedNoop.join('] [')}]`).join(', '));

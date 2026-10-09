@@ -9,6 +9,14 @@
 //   CHANNEL=chrome (installed Chrome), SHOTS=dir (a picture of each page/size/tab with a problem).
 // The Baloo 2 font is loaded through curl (not blocked), because a fallback font measures differently. Every phone and iPad
 // size is emulated as a touch device, like the home-screen app. Always exits 0: a finder for a person to triage.
+//
+// It also checks the design system's sizes and labels (plans/redesign.md 1.8 and 1.11), on the first screen and each tab:
+//   small tile        a .tb-tile under 90% of the token size (84 px on phones, 112 px on iPads) in its smaller side
+//   text-only button  a button in the panel (or the job bar) with words but no picture (svg, canvas, img, .tb-pic)
+//   small target      a button in the panel under 44 px in its smaller side
+//   coach clipped     the coach pill (.tb-coach) not fully inside its stage
+// On pages moved to the new system (the shell has "tb-v2") these are listed as "ui PROBLEM"; on the others as
+// "ui warn" (one line per page and size, the old panels are expected to have them until their batch). UI=0 skips them.
 
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -89,6 +97,46 @@ function audit() {
   return out;
 }
 
+// Runs in the page: the design system's size and label checks (see the header).
+function uiChecks() {
+  const out = [];
+  const v2 = !!document.querySelector('.tb-v2');
+  const ipad = innerWidth >= 700 && innerHeight >= 700;
+  const TILE = ipad ? 112 : 84, MIN = 44;
+  const vis = el => {
+    for (let a = el; a && a !== document; a = a.parentElement) {
+      if (a.hidden) return null;
+      const cs = getComputedStyle(a);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return null;
+    }
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.right < 0 || r.left > innerWidth || r.bottom < 0 || r.top > innerHeight) return null;
+    return r;
+  };
+  const name = el => (el.getAttribute('aria-label') || el.textContent || el.id || el.tagName).replace(/\s+/g, ' ').trim().slice(0, 24);
+  document.querySelectorAll('.tb-tile').forEach(el => {
+    const r = vis(el); if (!r || el.closest('.tb-layer, .modal')) return;
+    const m = Math.min(r.width, r.height);
+    if (m < TILE * 0.9) out.push({ kind: 'small tile', el: name(el), by: Math.round(m) });
+  });
+  document.querySelectorAll('.tb-panel button, .tb-panel [role=button], .tb-panel [role=tab], .tb-panel a[href], .tb-jobs button').forEach(el => {
+    const r = vis(el); if (!r || el.closest('.tb-chip')) return;
+    const txt = (el.textContent || '').trim();
+    if (txt && !el.querySelector('svg, canvas, img, .tb-pic')) out.push({ kind: 'text-only button', el: name(el), by: 0 });
+    const m = Math.min(r.width, r.height);
+    if (m < MIN) out.push({ kind: 'small target', el: name(el), by: Math.round(m) });
+  });
+  // the coach pill must sit fully inside its stage (never clipped by the stage's edge)
+  document.querySelectorAll('.tb-coach').forEach(el => {
+    const r = vis(el), st = el.closest('.tb-stage');
+    if (!r || !st || el.classList.contains('off') || !(el.textContent || '').trim()) return;
+    const b = st.getBoundingClientRect(), m = 2;
+    const over = Math.max(b.left + m - r.left, r.right - (b.right - m), b.top + m - r.top, r.bottom - (b.bottom - m));
+    if (over > 0.5) out.push({ kind: 'coach clipped by the stage', el: name(el), by: Math.round(over) });
+  });
+  return { v2, out };
+}
+
 // Google Fonts through curl (it honours HTTPS_PROXY), cached on disk; blocked if curl can't reach them.
 const FONT_DIR = path.join(require('os').tmpdir(), 'toybox-fontcache');
 async function routeFonts(ctx) {
@@ -131,7 +179,14 @@ async function runPage(browser, url, size) {
   });
   await routeFonts(ctx);
   const page = await ctx.newPage();
-  const found = [];
+  const found = [], ui = { v2: false, out: [] };
+  const checkUi = async tab => {
+    if (process.env.UI === '0') return;
+    const r = await page.evaluate(uiChecks).catch(() => null);
+    if (!r) return;
+    ui.v2 = r.v2;
+    r.out.forEach(x => { if (!ui.out.some(y => y.kind === x.kind && y.el === x.el)) ui.out.push(Object.assign(x, { tab })); });
+  };
   try {
     await page.goto(BASE + url, { waitUntil: 'load', timeout: 30000 });
     await page.evaluate(() => document.fonts && document.fonts.ready);
@@ -141,6 +196,7 @@ async function runPage(browser, url, size) {
     const shot = async tab => { if (SHOTS) await page.screenshot({ path: path.join(SHOTS, (url + '-' + size + '-' + (tab || 'first')).replace(/[^\w.-]+/g, '_') + '.png') }); };
     let r = await page.evaluate(audit);
     if (r.length) { found.push(...r.map(x => Object.assign(x, { tab: '' }))); await shot(''); }
+    await checkUi('');
     for (const tab of await tabsOf(page)) {
       const b = page.locator('.tb-tabs button, .tb-tabs [role=tab], [role=tablist] [role=tab]').filter({ hasText: tab }).first();
       if (!(await b.count())) continue;
@@ -148,6 +204,7 @@ async function runPage(browser, url, size) {
       await page.waitForTimeout(600);
       r = await page.evaluate(audit);
       if (r.length) { found.push(...r.map(x => Object.assign(x, { tab }))); await shot(tab); }
+      await checkUi(tab);
     }
   } catch (e) {
     found.push({ text: '(page failed: ' + e.message.slice(0, 80) + ')', kind: 'error', el: '', by: 0, tab: '' });
@@ -155,7 +212,8 @@ async function runPage(browser, url, size) {
   await ctx.close();
   // one line per distinct problem
   const seen = new Set();
-  return found.filter(f => { const k = f.text + '|' + f.el + '|' + f.kind; if (seen.has(k)) return false; seen.add(k); return true; });
+  const fits = found.filter(f => { const k = f.text + '|' + f.el + '|' + f.kind; if (seen.has(k)) return false; seen.add(k); return true; });
+  return { fits, ui };
 }
 
 (async () => {
@@ -163,16 +221,26 @@ async function runPage(browser, url, size) {
   if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   const opts = process.env.CHANNEL ? { channel: process.env.CHANNEL } : {};
   const browser = await chromium.launch(opts);
-  let total = 0;
+  let total = 0, uiProblems = 0, uiWarnPages = 0;
   for (const url of pages) {
     for (const size of SIZES) {
-      const found = await runPage(browser, url, size);
-      for (const f of found) {
+      const { fits, ui } = await runPage(browser, url, size);
+      for (const f of fits) {
         total++;
         console.log([url, size, f.tab ? 'tab ' + f.tab : '-', f.kind, f.by + 'px', JSON.stringify(f.text), f.el].join('  '));
+      }
+      if (!ui.out.length) continue;
+      if (ui.v2) {
+        for (const f of ui.out) { uiProblems++; console.log([url, size, f.tab ? 'tab ' + f.tab : '-', 'ui PROBLEM', f.kind, f.by ? f.by + 'px' : '', JSON.stringify(f.el)].join('  ')); }
+      } else {
+        uiWarnPages++;
+        const by = {};
+        ui.out.forEach(f => { (by[f.kind] = by[f.kind] || []).push(f.el + (f.by ? ' ' + f.by + 'px' : '')); });
+        console.log([url, size, '-', 'ui warn', Object.keys(by).map(k => k + ' x' + by[k].length + ': ' + by[k].slice(0, 6).join(', ') + (by[k].length > 6 ? ', ...' : '')).join(' | ')].join('  '));
       }
     }
   }
   console.log(total ? total + ' text-fit problem(s).' : 'Every label fits.');
+  if (process.env.UI !== '0') console.log(uiProblems + ' size/label problem(s) on pages using the new system (tb-v2); ' + uiWarnPages + ' page/size(s) with warnings on pages not moved yet.');
   await browser.close();
 })();

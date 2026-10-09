@@ -117,7 +117,7 @@ works, simple machines, word crane, coin machine). The dad: he likes learning, b
 `plans/redesign.md` is the design system for every app (screen structure, step row, job bar, tiles, touch sizes for
 a 3-year-old, placement, one meaning per color, words, a cleaner chrome) and the per-page migration. The dad
 approved it as proposed ("do what you think"); **revisit it with him after he has played the redesigned apps.**
-Rollout: batch 0 (tokens + shared components in `common/`, Concrete as the pilot), then batches 1-7 of at most three
+Rollout: batch 0 (tokens + shared components in `common/`, Concrete as the pilot; **done 2026-10-09**), then batches 1-7 of at most three
 agents (see its section 4). New apps (Garbage Truck, Sewing Machine, Play Dough, more Farm stations) follow the
 system and its section 5 cuts.
 

@@ -1,11 +1,14 @@
-/* Toybox shared grown-up layer: styles for common/toybox.js.
+/* Toybox shared layer: styles for common/toybox.js.
    Include it BEFORE the app's own <style>, so the app can override anything:
      <link rel="stylesheet" href="../common/toybox.css">
-   Provides: default tokens, .btn, the Big toggle, the grown-up sheet, hold-to-confirm
-   buttons, the warning toast, the ending banner, the timer badge and the rest screen. */
+   Provides: the design tokens (plans/redesign.md 1.10, 1.13, 1.14), .btn, the Big toggle, the grown-up sheet,
+   hold-to-confirm buttons, the warning toast, the ending banner, the timer badge, the rest screen, the app shell
+   (header, stage, panel) and the shared components (Go, step row, job bar, tiles, bottom bar, coach, ghost hand,
+   name tags, gate, map places). Demo of everything: tools/shell-demo.html. */
 
 /* ---------- Tokens (apps may redefine any of these in their own :root) ---------- */
 :root {
+  /* Older names, still used by every page (keep them). */
   --bg: #CDE9FF;
   --panel: #FFFFFF;
   --ink: #1D2340;
@@ -16,6 +19,56 @@
   --focus: #2D5BD7;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
+
+  /* Color: one meaning per color (redesign 1.10). Chrome uses only these; the play scene owns every other color. */
+  --tb-ink: #1D2340;      /* outlines, text, icons */
+  --tb-ink-2: #4A5578;    /* secondary words: coming steps, job tabs */
+  --tb-bg: #CDE9FF;       /* page */
+  --tb-surface: #FFFFFF;  /* panel, tiles, header buttons, pills */
+  --tb-tile-bg: #F6F9FF;  /* tile face */
+  --tb-lip: #B9C6DE;      /* the bottom lip under white buttons and tiles */
+  --tb-go: #1E8C4E;       /* Go (main action) and done ticks only */
+  --tb-go-lip: #146638;
+  --tb-pick: #FFC93C;     /* picked tile, picked job tab underline, the coach's step dot: never color alone */
+  --tb-pick-lip: #D9A21A;
+  --tb-glow: rgba(255, 201, 60, 0.35);
+  --tb-new: #FF9A4D;      /* New (start over) only */
+  --tb-new-lip: #D9702A;
+  --tb-shelf: #3DB4FF;    /* Shelf (his collection) only */
+  --tb-shelf-lip: #1E8FD6;
+  --tb-job: #E3F1FF;      /* job tabs not picked */
+  --tb-off: #E3E8F2;      /* coming steps, lines */
+  --tb-line: var(--edge); /* 2 px chrome outlines */
+  --tb-focus: #2D5BD7;
+  --tb-card: 0 6px 18px rgba(29, 35, 64, 0.14);
+
+  /* Shape and depth (1.14) */
+  --tb-outline: 2px; --tb-frame: 3px; --tb-lip-h: 4px; --tb-lip-h-sm: 3px;
+  --tb-r-stage: 24px; --tb-r-panel: 24px; --tb-r-btn: 16px; --tb-r-tile: 18px; --tb-r-pill: 999px;
+  /* Spacing scale */
+  --tb-s1: 4px; --tb-s2: 8px; --tb-s3: 12px; --tb-s4: 16px; --tb-s5: 24px; --tb-s6: 32px;
+  /* Type scale (Baloo 2) */
+  --tb-fs-title: 24px; --tb-fs-go: 26px; --tb-fs-btn: 18px; --tb-fs-tile: 16px; --tb-fs-coach: 18px;
+  --tb-fs-count: 18px; --tb-fs-small: 14px;
+  /* Targets for a 3-year-old's finger (1.8). Phone first. */
+  --tb-key: 120px;        /* 2 cm: main targets, invisible hit areas of drawn parts */
+  --tb-go-h: 72px; --tb-tile: 84px; --tb-tab-h: 64px; --tb-bar-h: 60px; --tb-head-icon: 52px;
+  --tb-gap: 12px; --tb-gap-new: 24px; --tb-edge: 16px;
+  --tb-chip: 56px;        /* step chip */
+  /* Timing */
+  --tb-t-press: 80ms; --tb-t-pick: 160ms; --tb-t-move: 900ms; --tb-t-cheer: 1800ms;
+}
+@media (min-width: 700px) and (min-height: 700px) {   /* iPad either way */
+  :root {
+    --tb-key: 104px; --tb-go-h: 84px; --tb-tile: 112px; --tb-tab-h: 72px; --tb-bar-h: 68px; --tb-head-icon: 60px;
+    --tb-gap: 16px; --tb-chip: 68px;
+    --tb-r-stage: 28px; --tb-r-panel: 28px;
+    --tb-fs-title: 30px; --tb-fs-go: 30px; --tb-fs-btn: 20px; --tb-fs-tile: 18px; --tb-fs-coach: 22px;
+    --tb-fs-count: 20px; --tb-fs-small: 16px;
+  }
+}
+@media (max-height: 500px) {                          /* phone held sideways: the panel is a 220-260 px column */
+  :root { --tb-go-h: 60px; --tb-bar-h: 56px; --tb-chip: 48px; --tb-head-icon: 48px; --tb-fs-go: 24px; }
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -26,6 +79,9 @@
     --edge: #9FB8E8;
     --plate: #E6F2FF;
     --focus: #FFC93C;
+    --tb-ink: #EEF3FF; --tb-ink-2: #B4C1DE; --tb-bg: #13233F; --tb-surface: #1C3157; --tb-tile-bg: #22395F;
+    --tb-lip: #0B1528; --tb-job: #2A4470; --tb-off: #2B3B5C; --tb-focus: #FFC93C;
+    --tb-card: 0 6px 18px rgba(0, 0, 0, 0.35);
     color-scheme: dark;
   }
 }
@@ -37,29 +93,39 @@
   --edge: #9FB8E8;
   --plate: #E6F2FF;
   --focus: #FFC93C;
+  --tb-ink: #EEF3FF; --tb-ink-2: #B4C1DE; --tb-bg: #13233F; --tb-surface: #1C3157; --tb-tile-bg: #22395F;
+  --tb-lip: #0B1528; --tb-job: #2A4470; --tb-off: #2B3B5C; --tb-focus: #FFC93C;
+  --tb-card: 0 6px 18px rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+   The cleaner chrome (redesign 1.14): a 2 px outline and a short bottom lip, like a real push button. Pressed, it
+   moves down by the lip. Sizes stay as they were for the pages not yet moved to the new components, so their
+   panels keep their layout; the components below use the token sizes. */
 .btn {
   font: inherit;
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--ink);
   background: var(--panel);
-  border: 3px solid var(--edge);
-  border-radius: 16px;
+  border: var(--tb-outline) solid var(--edge);
+  border-radius: var(--tb-r-btn);
   padding: 0.45rem 0.8rem;
   min-height: 52px;
   cursor: pointer;
-  box-shadow: 3px 3px 0 var(--edge);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  box-shadow: 0 var(--tb-lip-h-sm) 0 var(--tb-lip);
+  transition: transform var(--tb-t-press) ease, box-shadow var(--tb-t-press) ease, filter var(--tb-t-press) ease;
 }
-.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
-.btn[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.btn:active { transform: translateY(var(--tb-lip-h-sm)); box-shadow: 0 0 0 var(--tb-lip); filter: brightness(0.94); }
+/* Picked: the pick yellow, a 3 px outline (drawn inside, so nothing moves) and its own lip. */
+.btn[aria-pressed="true"] { background: var(--tb-pick); color: #1D2340;
+  box-shadow: inset 0 0 0 1px var(--edge), 0 var(--tb-lip-h-sm) 0 var(--tb-pick-lip); }
+.btn[aria-pressed="true"]:active { box-shadow: inset 0 0 0 1px var(--edge); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
-.btn.primary { background: var(--accent); color: #1D2340; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+/* Grown-up sheet only (yellow means "picked" for children's controls). */
+.btn.primary { background: var(--accent); color: #1D2340; box-shadow: 0 var(--tb-lip-h-sm) 0 var(--tb-pick-lip); }
 .btn[hidden] { display: none; }
 button {
   touch-action: manipulation;
@@ -81,7 +147,9 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   font-size: 1rem;
   border-radius: 999px;
 }
-.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.bigtoggle svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+/* Big stays white when on (yellow means picked). */
+.btn.bigtoggle[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 var(--tb-lip-h-sm) 0 var(--tb-lip); }
 @media (max-width: 480px) {
   .bigtoggle { font-size: 0.95rem; min-height: 44px; }
 }
@@ -352,63 +420,77 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
 /* ======================================================================
    App shell: the same layout and the same pieces in every app.
-   See AGENTS.md "Standard layout". Demo: tools/shell-demo.html
+   See AGENTS.md "Standard layout" and plans/redesign.md 1.2. Demo: tools/shell-demo.html
+   Pages moved to the new system add "tb-v2" to the shell (<div class="tb-app-shell tb-v2">): that turns on the
+   token sizes (header icons, title, coach, counter, panel spacing). Pages without it keep their old sizes and get
+   only the cleaner look, so their panels keep their layout.
    ====================================================================== */
 .tb-app-shell { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px;
   padding: max(8px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px))
            max(8px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
-/* Header: Back (stations only), Home, title, then Big on the right. */
+/* Header: Back (stations only), Home, title, then Big on the right. All white with ink line icons. */
 .tb-head { flex: none; display: flex; align-items: center; gap: 8px; min-height: 48px; }
-.tb-head .tb-title { margin: 0; font-size: 1.6rem; font-weight: 800; line-height: 1; white-space: nowrap; overflow: hidden; min-width: 0; flex: 1 1 auto; }
+.tb-head .tb-title { margin: 0; font-size: 1.6rem; font-weight: 800; line-height: 1; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; min-width: 0; flex: 1 1 auto; }
 .tb-head .tb-spacer { flex: 1 1 auto; }
 .tb-iconbtn { min-width: 48px; min-height: 48px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.tb-iconbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.tb-back { background: var(--accent); color: #1D2340; font-weight: 800; }
-/* Stage: the play area. Counter top-left, coach line top-center; nothing else floats in it. */
-.tb-stage { position: relative; flex: 1 1 auto; min-height: 0; border: 4px solid var(--edge); border-radius: 24px;
-  box-shadow: 5px 5px 0 var(--edge); overflow: hidden; background: var(--plate); }
+.tb-iconbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+/* Back is white like Home and Big (yellow means picked). */
+.tb-back { background: var(--panel); color: var(--ink); font-weight: 800; }
+/* Stage: the play area, the star of the screen. A 3 px frame where it meets the drawn scene, no shadow.
+   Counter top-left, coach line top-center (bottom-center on phones); nothing else floats in it. */
+.tb-stage { position: relative; flex: 1 1 auto; min-height: 0; border: var(--tb-frame) solid var(--edge); border-radius: var(--tb-r-stage);
+  box-shadow: none; overflow: hidden; background: var(--plate); }
 .tb-counter { position: absolute; left: 10px; top: 10px; z-index: 3; background: #FFFFFF; color: #1D2340;
-  border: 3px solid #1D2340; border-radius: 999px; padding: 0.15rem 0.8rem; font-weight: 800; font-size: 1.2rem;
-  box-shadow: 3px 3px 0 #1D2340; pointer-events: none; }
-/* Panel: under the stage in portrait, a column on the right in landscape. Order inside:
-   1. the Go row (one big main action, if the app has one), 2. the choices for the picked tab,
-   3. the tab bar (last). */
+  border: var(--tb-outline) solid #1D2340; border-radius: 999px; padding: 0.15rem 0.8rem; font-weight: 800; font-size: 1.2rem;
+  box-shadow: none; pointer-events: none; }
+/* Panel: under the stage in portrait, a column on the right in landscape. A soft white card (no outline).
+   Order inside (redesign 1.2): job bar (hangs from the stage, see .tb-jobs), then EITHER the step row (Go is the
+   current step) OR Go + choice tiles, then the bottom bar (Shelf, New, Surprise). */
 .tb-panel { flex: none; display: flex; flex-direction: column; gap: 8px; background: var(--panel);
-  border: 4px solid var(--edge); border-radius: 24px; box-shadow: 5px 5px 0 var(--edge); padding: 8px; }
+  border: 0; border-radius: var(--tb-r-panel); box-shadow: var(--tb-card); padding: var(--tb-s3); }
 .tb-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
-.tb-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-height: 72px; padding: 4px; font-size: 0.95rem; line-height: 1.05; }
+.tb-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 72px; padding: 4px; font-size: 0.95rem; line-height: 1.05; background: var(--tb-tile-bg); border-radius: var(--tb-r-tile); }
 .tb-tile svg, .tb-tile canvas, .tb-tile img { width: 44px; height: 44px; flex: none; }
+/* Picked tile: a round ink tick badge in the corner (never color alone). */
+.tb-tile[aria-pressed="true"]::after {
+  content: ""; position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; pointer-events: none;
+  background: #1D2340 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-6.5' fill='none' stroke='white' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat;
+}
+/* Old text tab bar (retired in favor of .tb-bottombar and .tb-jobs; kept working for pages not yet moved). */
 .tb-tabs { display: flex; gap: 6px; }
 .tb-tabs .btn { flex: 1 1 0; min-height: 46px; min-width: 0; padding: 0.2rem 0.4rem; font-size: 1rem; white-space: nowrap; }
-/* The one big main action ("Launch!", "Drive!", "Print!", "Drop", "Go!"): always green. */
-.btn.tb-go { background: #2EA05A; color: #FFFFFF; font-size: 1.6rem; font-weight: 800; min-height: 60px;
-  text-shadow: 0 2px 0 rgba(29, 35, 64, 0.35); }
-/* Start over ("New", "New board", "Clear"): always orange. */
-.btn.tb-new { background: #FF9A4D; color: #1D2340; }
-/* Surprise: a sparkly rainbow outline with twinkling stars. */
+/* The one big main action ("Launch!", "Drive!", "Print!", "Pour!"): always green, white bold words, a deep lip. */
+.btn.tb-go { background: var(--tb-go); color: #FFFFFF; font-size: 1.6rem; font-weight: 800; min-height: 60px;
+  text-shadow: none; box-shadow: 0 var(--tb-lip-h) 0 var(--tb-go-lip); }
+.btn.tb-go:active { transform: translateY(var(--tb-lip-h)); box-shadow: 0 0 0 var(--tb-go-lip); }
+/* Start over ("New"): always orange, with the circular arrow. */
+.btn.tb-new { background: var(--tb-new); color: #1D2340; box-shadow: 0 var(--tb-lip-h) 0 var(--tb-new-lip); }
+.btn.tb-new:active { transform: translateY(var(--tb-lip-h)); box-shadow: 0 0 0 var(--tb-new-lip); }
+/* Surprise: a sparkly rainbow outline with two twinkling stars (the "magic" cue). */
 @property --tb-spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .btn.tb-surprise {
-  position: relative; border: 4px solid transparent; font-weight: 800;
+  position: relative; border: 3px solid transparent; font-weight: 800;
   background:
     linear-gradient(var(--panel), var(--panel)) padding-box,
     conic-gradient(from var(--tb-spin), #FF4D6D, #FFB627, #FFE14D, #4CD964, #3DB4FF, #8E6CFF, #FF6FD8, #FF4D6D) border-box;
-  box-shadow: 3px 3px 0 var(--edge), 0 0 10px rgba(255, 201, 60, 0.55);
+  box-shadow: 0 var(--tb-lip-h-sm) 0 var(--tb-lip), 0 0 8px rgba(255, 201, 60, 0.45);
   animation: tb-spin 3s linear infinite;
 }
+.btn.tb-surprise:active { box-shadow: 0 0 8px rgba(255, 201, 60, 0.45); }
 .btn.tb-surprise[aria-pressed="true"] {
   background:
     linear-gradient(var(--accent), var(--accent)) padding-box,
     conic-gradient(from var(--tb-spin), #FF4D6D, #FFB627, #FFE14D, #4CD964, #3DB4FF, #8E6CFF, #FF6FD8, #FF4D6D) border-box;
 }
 .btn.tb-surprise::before, .btn.tb-surprise::after {
-  content: "\2726"; position: absolute; font-size: 0.95rem; line-height: 1; color: #FFC93C;
-  text-shadow: 0 0 6px #FFFFFF, 0 0 2px #1D2340; pointer-events: none; animation: tb-twinkle 1.6s ease-in-out infinite;
+  content: "\2726"; position: absolute; font-size: 0.8rem; line-height: 1; color: #FFC93C;
+  text-shadow: 0 0 5px #FFFFFF, 0 0 2px #1D2340; pointer-events: none; animation: tb-twinkle 1.6s ease-in-out infinite;
 }
-.btn.tb-surprise::before { left: -7px; top: -9px; }
-.btn.tb-surprise::after { right: -6px; bottom: -9px; color: #FF6FD8; animation-delay: 0.8s; }
+.btn.tb-surprise::before { left: -6px; top: -8px; }
+.btn.tb-surprise::after { right: -5px; bottom: -8px; color: #FF6FD8; animation-delay: 0.8s; }
 @keyframes tb-spin { to { --tb-spin: 360deg; } }
-@keyframes tb-twinkle { 0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.5; } 50% { transform: scale(1.25) rotate(45deg); opacity: 1; } }
+@keyframes tb-twinkle { 0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.5; } 50% { transform: scale(1.2) rotate(45deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .btn.tb-surprise, .btn.tb-surprise::before, .btn.tb-surprise::after { animation: none; } }
 /* Landscape: stage on the left, panel as a column on the right. */
 @media (orientation: landscape) {
@@ -424,14 +506,14 @@ body.ending .homebtn { pointer-events: none; opacity: 0.4; }
   .tb-head .tb-title { font-size: 1.3rem; }
   .tb-iconbtn { min-width: 44px; min-height: 44px; }
   .tb-iconbtn span { display: none; }
-  .tb-stage, .tb-panel { border-radius: 18px; border-width: 3px; box-shadow: 4px 4px 0 var(--edge); }
+  .tb-stage, .tb-panel { border-radius: 20px; }
   .btn.tb-go { font-size: 1.35rem; min-height: 52px; }
   .tb-counter { font-size: 1rem; }
 }
 /* Coach line: one short line in a pill, top-center of the stage (bottom-center on phones, clear of the counter). */
 .tb-coach { position: absolute; left: 50%; top: 10px; z-index: 3; transform: translateX(-50%); width: max-content;
-  max-width: calc(100% - 24px); background: #FFFFFF; color: #1D2340; border: 4px solid #1D2340; border-radius: 22px;
-  box-shadow: 4px 4px 0 #1D2340; padding: 0.2rem 1rem; font-size: 1.35rem; font-weight: 800; line-height: 1.15;
+  max-width: calc(100% - 24px); background: #FFFFFF; color: #1D2340; border: var(--tb-outline) solid #1D2340; border-radius: 22px;
+  box-shadow: var(--tb-card); padding: 0.2rem 1rem; font-size: 1.35rem; font-weight: 800; line-height: 1.15;
   text-align: center; pointer-events: none; transition: opacity 0.6s ease; }
 .tb-coach.off { opacity: 0; }
 body.ending .tb-coach, body.big .tb-coach { visibility: hidden; }
@@ -443,7 +525,7 @@ body.ending .tb-coach, body.big .tb-coach { visibility: hidden; }
   .tb-tabs .btn { min-height: 54px; font-size: 1.15rem; }
 }
 @media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .tb-coach { top: auto; bottom: 10px; font-size: 1.05rem; border-width: 3px; box-shadow: 3px 3px 0 #1D2340; padding: 0.12rem 0.75rem; }
+  .tb-coach { top: auto; bottom: 10px; font-size: 1.05rem; padding: 0.12rem 0.75rem; }
   /* With a Back button there is no room for the title on a phone: drop it rather than cut it off. */
   .tb-head:has(.tb-back) .tb-title { display: none; }
   .tb-tabs { gap: 5px; }
@@ -452,7 +534,50 @@ body.ending .tb-coach, body.big .tb-coach { visibility: hidden; }
 /* The last header item (Big) always sits at the right edge, even when the title is dropped. */
 .tb-head > :last-child { margin-left: auto; }
 /* Big in the header matches Home's shape (the module also gives it the bigtoggle class). */
-.tb-head .bigtoggle { border-radius: 16px; }
+.tb-head .bigtoggle { border-radius: var(--tb-r-btn); }
+
+/* ---------- tb-v2: the token sizes for pages moved to the new system ---------- */
+.tb-v2.tb-app-shell { gap: 10px;
+  padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+           max(8px, calc(env(safe-area-inset-bottom, 0px) + 4px)) max(12px, env(safe-area-inset-left, 0px)); }
+.tb-v2 .tb-head { min-height: var(--tb-head-icon); gap: var(--tb-s2); }
+.tb-v2 .tb-head .tb-title { font-size: var(--tb-fs-title); }
+.tb-v2 .tb-iconbtn { min-width: var(--tb-head-icon); min-height: var(--tb-head-icon); padding: 0 12px; font-size: var(--tb-fs-btn); }
+.tb-v2 .tb-iconbtn svg { width: 26px; height: 26px; }
+.tb-v2 .tb-iconbtn .tb-mapic { width: 30px; height: 30px; stroke: none; }
+.tb-v2 .tb-body { gap: 10px; }
+.tb-v2 .tb-panel { gap: var(--tb-s3); padding: var(--tb-s3); }
+.tb-v2 .tb-counter { font-size: var(--tb-fs-count); padding: 0.1rem 0.75rem; }
+.tb-v2 .tb-coach { font-size: var(--tb-fs-coach); font-weight: 700; padding: 4px 16px; border-radius: var(--tb-r-pill); }
+/* The coach names the current step: a small pick-colored dot at its start. */
+.tb-coach .tb-coach-dot { display: none; width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--tb-pick);
+  box-shadow: 0 0 0 3px var(--tb-glow); margin-right: 0.45em; vertical-align: 0.08em; }
+.tb-coach.is-step .tb-coach-dot { display: inline-block; }
+/* Always centered and fully inside the stage: it wraps (up to two lines) rather than running off an edge. */
+.tb-v2 .tb-coach { max-width: calc(100% - 32px); white-space: normal; overflow-wrap: break-word; text-wrap: balance; }
+/* A new line pops in (the pill stays centered). */
+.tb-coach.is-new { animation: tb-coach-pop 0.35s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes tb-coach-pop { from { transform: translateX(-50%) scale(0.85); } to { transform: translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tb-coach.is-new { animation: none; } }
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-v2.tb-app-shell { gap: 16px;
+    padding: max(10px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px))
+             max(10px, calc(env(safe-area-inset-bottom, 0px) + 4px)) max(20px, env(safe-area-inset-left, 0px)); }
+  .tb-v2 .tb-body { gap: 16px; }
+  .tb-v2 .tb-panel { padding: var(--tb-s4); gap: var(--tb-s4); }
+}
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-iconbtn { padding: 0 10px; }
+  .tb-v2 .tb-counter { font-size: var(--tb-fs-count); }
+  .tb-v2 .tb-coach { font-size: var(--tb-fs-coach); padding: 3px 14px; bottom: 12px; }
+  .tb-v2 .tb-stage, .tb-v2 .tb-panel { border-radius: var(--tb-r-stage); }
+}
+@media (orientation: landscape) {
+  .tb-v2 .tb-body .tb-panel { width: min(34%, 380px); overflow: visible; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-body .tb-panel { width: 252px; padding: 10px; gap: 10px; }
+}
 
 /* ---------- Kind words (common/toybox.js): a card with a sun, star or heart that floats in at the top ---------- */
 .tb-kind {
@@ -515,3 +640,178 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .sheet .tb-uses summary { cursor: pointer; font-weight: 800; min-height: 32px; line-height: 32px; }
 .sheet .tb-uses ul { margin: 6px 0 4px; padding-left: 1.2em; }
 .sheet .tb-uses li { margin: 4px 0; font-size: 0.98rem; }
+
+
+/* ======================================================================
+   Shared components (common/toybox.js: Toybox.go, steps, jobs, tiles, bar, coach, ghost, nametag, gate, map).
+   plans/redesign.md section 2. Each renders into a container the page provides.
+   ====================================================================== */
+/* Picture inside a component: a content drawing (2 px ink outline, flat colors) given by the page as SVG. */
+.tb-pic { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.tb-pic > svg, .tb-pic > canvas, .tb-pic > img { display: block; width: 100%; height: 100%; }
+.tb-panel[hidden], .tb-steps[hidden], .tb-tilerow[hidden], .tb-bottombar[hidden], .tb-jobs[hidden], .tb-place[hidden] { display: none; }
+/* UI action icons: one family, 24 px grid, 2.5 px rounded stroke, no fill. */
+.tb-ui-ic { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- Go (Toybox.go): the green pill; also the current step inside the step row ---------- */
+.btn.tb-go.tb-gopill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  gap: 10px; width: 100%; min-width: 0; min-height: var(--tb-go-h); padding: 0 14px; border-radius: var(--tb-r-btn);
+  font-size: var(--tb-fs-go); font-weight: 800; line-height: 1.05; white-space: nowrap; touch-action: manipulation; }
+.tb-gopill .tb-pic { width: 1.35em; height: 1.35em; position: relative; }
+.tb-gopill .tb-go-word { position: relative; min-width: 0; }
+/* A motion is running: a lighter fill grows across the pill (go.busy(fraction)). */
+.tb-gopill .tb-go-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(255, 255, 255, 0.22);
+  pointer-events: none; transition: width 0.25s linear; }
+.tb-gopill.is-busy .tb-go-fill { width: var(--tb-go-p, 100%); }
+.tb-gopill.is-pulse { animation: tb-go-pulse 1.1s ease-in-out infinite; }
+@keyframes tb-go-pulse { 0%, 100% { filter: none; } 50% { filter: brightness(1.18); transform: scale(1.03); } }
+.tb-wiggle { animation: tb-wiggle 0.5s ease; }
+@keyframes tb-wiggle { 0%, 100% { transform: none; } 25% { transform: rotate(-3deg) scale(1.04); } 60% { transform: rotate(3deg) scale(1.04); } }
+.tb-pop { animation: tb-pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes tb-pop { 0% { transform: scale(0.7); } 100% { transform: scale(1); } }
+
+/* ---------- Step row (Toybox.steps): done ticks | Go (the current step) | coming steps ---------- */
+.tb-steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; min-width: 0;
+  background: linear-gradient(var(--tb-off), var(--tb-off)) 0 calc(var(--tb-chip) / 2 - 2px) / 100% 4px no-repeat; }
+.tb-steps > .tb-st-go { flex: 1 1 auto; min-width: 0; display: flex; }
+.tb-chip { flex: none; position: relative; width: var(--tb-chip); display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; align-self: flex-start; }
+.tb-chip-dot { position: relative; width: var(--tb-chip); height: var(--tb-chip); border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; background: #FFFFFF; border: var(--tb-outline) solid #9AA6C2; }
+.tb-chip-dot .tb-pic { width: 60%; height: 60%; opacity: 0.55; }
+.tb-chip-word { font-size: var(--tb-fs-small); font-weight: 700; line-height: 1.1; color: var(--tb-ink-2); white-space: nowrap; }
+.tb-chip.is-done .tb-chip-dot { background: var(--tb-go); border-color: var(--tb-line); }
+.tb-chip.is-done .tb-chip-dot .tb-pic { display: none; }
+.tb-chip .tb-tick { display: none; width: 58%; height: 58%; }
+.tb-chip.is-done .tb-tick { display: block; }
+.tb-chip.is-done .tb-chip-word { color: var(--tb-ink); }
+/* Several steps done on a narrow row: one chip for all of them. */
+.tb-chip.is-many .tb-chip-dot { box-shadow: 4px 0 0 -1px var(--tb-go), 4px 0 0 1px var(--tb-line); }
+.tb-chip.is-wiggle .tb-chip-dot { animation: tb-wiggle 0.5s ease; }
+.tb-steps.is-pulse .tb-st-go .tb-gopill { animation: tb-go-pulse 1.1s ease-in-out infinite; }
+/* A finished job: every step ticked, Go says "Again!". */
+.tb-steps.is-finished .tb-st-go .tb-gopill { animation: tb-pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@media (max-width: 520px) {
+  .tb-steps.is-crowded { --tb-chip: 48px; gap: 5px; }
+}
+/* In a side column (landscape) the row wraps: done ticks above Go, coming steps below it. */
+@media (orientation: landscape) {
+  .tb-v2 .tb-steps, .tb-steps.is-column { flex-wrap: wrap; justify-content: center; row-gap: 6px; background: none; }
+  .tb-v2 .tb-steps > .tb-st-go, .tb-steps.is-column > .tb-st-go { flex: 1 1 100%; }
+  .tb-v2 .tb-steps .tb-chip, .tb-steps.is-column .tb-chip { align-self: auto; }
+}
+
+/* ---------- Job bar (Toybox.jobs): folder tabs hanging from the stage's bottom edge ----------
+   Put the stage and the bar in a column: <div class="tb-stagecol"><main class="tb-stage">..</main><div id="jobs"></div></div> */
+.tb-stagecol { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.tb-stagecol > .tb-stage { flex: 1 1 auto; }
+.tb-jobs { flex: none; display: flex; gap: var(--tb-s2); padding: 0 var(--tb-s3); margin-top: calc(-1 * var(--tb-frame)); position: relative; z-index: 1; }
+.tb-job { flex: 1 1 0; min-width: 0; min-height: var(--tb-tab-h); display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 8px; font: inherit; font-size: var(--tb-fs-btn); font-weight: 700; line-height: 1.05; color: var(--tb-ink-2);
+  background: var(--tb-job); border: var(--tb-outline) solid var(--tb-line); border-top: 0; border-radius: 0 0 16px 16px; cursor: pointer;
+  white-space: nowrap; transition: transform var(--tb-t-press) ease; }
+.tb-job .tb-pic { width: 30px; height: 30px; }
+.tb-job:active { transform: translateY(2px); }
+.tb-job[aria-selected="true"] { background: var(--tb-surface); color: var(--tb-ink); box-shadow: inset 0 -5px 0 var(--tb-pick);
+  border-color: var(--tb-line); margin-top: 0; }
+.tb-job:focus-visible { outline: 3px solid var(--tb-focus); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .tb-jobs { gap: 6px; padding: 0 8px; }
+  .tb-job { gap: 4px; padding: 0 4px; }
+  .tb-job .tb-pic { width: 26px; height: 26px; }
+}
+
+/* ---------- Choice tiles (Toybox.tiles) ---------- */
+.tb-tilerow { display: grid; grid-template-columns: repeat(var(--tb-cols, 4), minmax(0, 1fr)); gap: var(--tb-s2); }
+.tb-tilerow .btn.tb-tile { min-height: var(--tb-tile); min-width: 0; padding: 6px 4px 4px; font-size: var(--tb-fs-tile); font-weight: 700;
+  gap: 2px; border-radius: var(--tb-r-tile); }
+.tb-tilerow .tb-tile .tb-pic { width: calc(var(--tb-tile) * 0.52); height: calc(var(--tb-tile) * 0.52); }
+.tb-tilerow .tb-tile-word { display: block; max-width: 100%; white-space: nowrap; }
+.tb-tilerow .btn.tb-tile[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--tb-line), 0 var(--tb-lip-h-sm) 0 var(--tb-pick-lip); }
+/* Action tiles (drop a fruit in): no picked state, a small "+" badge. */
+.tb-tile.is-action::after { content: "+"; position: absolute; right: 4px; top: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--tb-go); color: #FFFFFF; font-size: 17px; line-height: 19px; font-weight: 800; text-align: center; pointer-events: none; }
+.tb-tile.is-flash { animation: tb-pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+/* Color swatches: the fill is the color; picked = a thick ring + the tick. */
+.tb-tilerow .btn.tb-tile.is-swatch { background: var(--tb-sw); }
+.tb-tilerow .btn.tb-tile.is-swatch[aria-pressed="true"] { background: var(--tb-sw); box-shadow: inset 0 0 0 4px #FFFFFF, inset 0 0 0 6px var(--tb-line), 0 var(--tb-lip-h-sm) 0 var(--tb-lip); }
+@media (min-width: 700px) and (min-height: 700px) { .tb-tilerow { gap: var(--tb-s3); } }
+
+/* ---------- Bottom bar (Toybox.bar): Shelf (left) ... New, Surprise (right) ---------- */
+.tb-bottombar { display: flex; align-items: center; gap: var(--tb-s3); width: 100%; max-width: 560px; margin: 0 auto; }
+.tb-bottombar .btn { min-height: var(--tb-bar-h); min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 14px; font-size: var(--tb-fs-btn); font-weight: 700; white-space: nowrap; }
+.tb-bottombar .tb-bb-new { flex: 1 1 0; }
+.tb-bottombar .tb-bb-surprise { flex: 1.2 1 0; margin-left: calc(var(--tb-gap-new) - var(--tb-s3)); }
+.tb-bottombar .btn.tb-bb-shelf { flex: 1 1 0; background: var(--tb-shelf); color: #1D2340; box-shadow: 0 var(--tb-lip-h) 0 var(--tb-shelf-lip); }
+.tb-bottombar .btn.tb-bb-shelf:active { transform: translateY(var(--tb-lip-h)); box-shadow: none; }
+.tb-bottombar .btn.tb-bb-shelf[aria-pressed="true"] { background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--tb-line), 0 var(--tb-lip-h) 0 var(--tb-shelf-lip); }
+@media (orientation: landscape) {
+  /* Side column: Go at the top, the bottom bar at the bottom; the hanging job bar stays clear of the edge. */
+  .tb-v2 .tb-panel > .tb-bottombar { margin-top: auto; }
+  .tb-v2 .tb-stagecol { padding-bottom: 8px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-bottombar { gap: 8px; }
+  .tb-bottombar .btn { padding: 0 8px; gap: 6px; font-size: 16px; }
+  .tb-bottombar .tb-bb-surprise { margin-left: calc(var(--tb-gap-new) - 8px); }
+}
+
+/* ---------- Ghost hand (Toybox.ghost; master copy of the look, also in tools/snippets/ghost-hand.css) ---------- */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+
+/* ---------- Name tags (Toybox.nametag): a real part's name pops up for about 2 s ---------- */
+.tb-nametag { position: fixed; z-index: 35; left: 0; top: 0; transform: translate(-50%, -100%); padding: 2px 12px;
+  background: #FFFFFF; color: #1D2340; border: var(--tb-outline) solid #1D2340; border-radius: var(--tb-r-pill);
+  font-family: var(--font); font-size: var(--tb-fs-small); font-weight: 700; line-height: 1.3; white-space: nowrap;
+  pointer-events: none; animation: tb-tag-in 0.3s cubic-bezier(.3, 1.6, .5, 1); transition: opacity 0.3s ease; }
+.tb-nametag.out { opacity: 0; }
+@keyframes tb-tag-in { from { transform: translate(-50%, -100%) scale(0.6); opacity: 0; } to { transform: translate(-50%, -100%) scale(1); opacity: 1; } }
+body.big .tb-nametag, body.ending .tb-nametag { display: none; }
+
+/* ---------- Station map places (Toybox.map): the whole place is the hit area, a picture + word label ---------- */
+.tb-place { position: absolute; z-index: 2; display: block; border-radius: 18px; text-decoration: none; color: #1D2340;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.tb-place:focus-visible { outline: 3px solid var(--tb-focus); outline-offset: 2px; }
+.tb-place-label { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 12px 3px 6px; background: #FFFFFF; border: var(--tb-outline) solid #1D2340; border-radius: var(--tb-r-pill);
+  box-shadow: var(--tb-card); font-size: var(--tb-fs-btn); font-weight: 800; line-height: 1.15; white-space: nowrap; }
+.tb-place-label .tb-pic { width: 30px; height: 30px; }
+.tb-place.is-press .tb-place-label { transform: translateX(-50%) translateY(2px) scale(0.96); }
+.tb-place.is-press { background: rgba(255, 201, 60, 0.18); }
+
+/* ---------- Gear-up / getting-ready gate (Toybox.gate) ---------- */
+.tb-gate { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--tb-s3); padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  background: var(--bg); color: var(--ink); font-family: var(--font); touch-action: none; -webkit-user-select: none; user-select: none; }
+.tb-gate[hidden] { display: none; }
+.tb-gate-title { margin: 0; font-size: calc(var(--tb-fs-title) * 1.25); font-weight: 800; line-height: 1.1; text-align: center; }
+.tb-gate-row { display: flex; align-items: center; justify-content: center; gap: var(--tb-s5); min-height: 0; flex: 0 1 auto; width: 100%; }
+.tb-gate-worker { position: relative; width: min(62vw, 46vh, 360px); aspect-ratio: 3 / 4; cursor: pointer; border-radius: 24px;
+  background: var(--tb-surface); border: var(--tb-frame) solid var(--tb-line); box-shadow: var(--tb-card); flex: none; }
+.tb-gate-worker > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tb-gate-worker .tb-gate-on { opacity: 0; transform: translateY(-14%) scale(1.1); transition: opacity 0.35s ease, transform 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+.tb-gate-worker .tb-gate-on.is-on { opacity: 1; transform: none; }
+.tb-gate-items { display: grid; grid-template-columns: repeat(var(--tb-cols, 2), minmax(0, 1fr)); gap: var(--tb-gap); width: min(100%, 520px); }
+.tb-gate-items .btn.tb-tile { min-height: calc(var(--tb-tile) * 1.15); font-size: var(--tb-fs-tile); touch-action: none; }
+.tb-gate-items .tb-tile .tb-pic { width: calc(var(--tb-tile) * 0.62); height: calc(var(--tb-tile) * 0.62); }
+.tb-gate-items .btn.tb-tile.is-on { opacity: 0.45; }
+.tb-gate-hint { margin: 0; font-size: var(--tb-fs-coach); font-weight: 700; text-align: center; }
+@media (orientation: landscape) {
+  .tb-gate-worker { width: min(34vw, 58vh, 360px); }
+  .tb-gate-items { width: min(44vw, 460px); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-gate { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+  .tb-gate-title { font-size: 26px; }
+  .tb-gate-worker { width: min(30vw, 62vh); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-wiggle, .tb-pop, .tb-gopill.is-pulse, .tb-steps.is-pulse .tb-st-go .tb-gopill, .tb-chip.is-wiggle .tb-chip-dot,
+  .tb-tile.is-flash, .tb-nametag { animation: none; }
+  .tb-gate-worker .tb-gate-on { transition: opacity 0.2s linear; transform: none; }
+}

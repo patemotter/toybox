@@ -65,7 +65,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
   cut off by their button or tile at every test size, with the real font; `common/toybox.js` shrinks an overflowing
   label down to 70% as a safety net, so fix the layout when it reports something), `add-app.py` (add an app to launcher, top-level
-  `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
+  `sw.js` and README), `snippets/` (the old pasted copies of the idle ghost hand and the coach pill; the master
+  is now `Toybox.ghost` / `Toybox.coach` in `common/`), `shell-demo.html` (every shared component).
 
 ### Offline (service workers)
 - **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-v<number>"`, stamped by the deploy). `common/toybox.js`
@@ -97,7 +98,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   (`git push origin HEAD:<branch> HEAD:main`). No PR needed. Never force-push unless the owner explicitly asks.
 - Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/sw.js | grep CACHE`.
 - **The deploy checks first** (the `check` job): it builds `_site` from the tracked files minus `tools/`, `archive/`,
-  `.github/` and Markdown (those stay in the repo but aren't published, so archived apps have no live URL), stamps
+  `plans/`, `.github/` and Markdown (those stay in the repo but aren't published, so archived apps have no live URL), stamps
   the cache version, runs `tools/check-site.js`, then `tools/smoke.js` on every page at 1180x820 and at 390x844 as a
   phone. Any failure publishes nothing and the live Toybox stays as it was: fix it and push again. Pull requests
   run the same checks without publishing.
@@ -143,15 +144,40 @@ Keep only:
 - **Grown-ups lives only on the home screen** (the launcher): timer, sound and an "App settings" section for every
   app's grown-up options. Apps have no Grown-ups button or sheet. A new app setting goes in the `SETTINGS` list in
   `common/toybox.js` and is read with `Toybox.settings.get(id)`.
-- **Standard layout (every app looks the same):** see `tools/shell-demo.html` and the "App shell" classes at the
-  end of `common/toybox.css`. Header: [‹ Back (stations)] [Home] [Title] … [Big at the right edge]. Stage: the play
-  area, with only the counter (top-left), one coach line (top-center on tablets, bottom-center on phones), the
-  time-left badge and the ghost hand on top; no floating buttons. Panel (under the stage in portrait, right column
-  in landscape), top to bottom: the one green **Go** button (main action, if any), the **choices** as picture
-  tiles, then the **tab bar** last: sections, an orange **New** (start over), and **Surprise** with the sparkly
-  rainbow outline (`tb-surprise`, never a dashed line).
-- Controls under the play area: **at most about two rows** of big buttons on a phone. More goes behind tabs or a
-  switcher row. No duplicate controls. No label cut off: shorten it. Button text ≥ ~14px, targets ≥ 44px.
+- **Standard layout (every app looks the same; the design system of `plans/redesign.md` sections 1 and 2, decided
+  2026-10-09):** see `tools/shell-demo.html` (views `?view=steps|tiles|gate|map`), the "App shell" and "Shared
+  components" parts of `common/toybox.css`, and the component API in the header of `common/toybox.js`. The pilot
+  page every migration copies is `construction-site/concrete.html`. A page built from the components adds `tb-v2` to
+  its shell (`<div class="tb-app-shell tb-v2">`): that switches on the token sizes for its chrome; pages without it
+  keep their old sizes (they get only the cleaner look) until their batch moves them.
+  - Header: [‹ Back (stations: `‹` + a small picture of the map, its name on iPad)] [Home] [Title] … [Big at the
+    right edge]; all white with ink line icons.
+  - Stage: the play area, the star of the screen (keeps at least about 60% of an upright phone), with only the
+    counter (top-left), one coach line (`Toybox.coach`: top-center on tablets, bottom-center on phones), the
+    time-left badge, name tags and the ghost hand on top; no floating buttons.
+  - Panel (under the stage in portrait, the right column in landscape), top to bottom: the **job bar** if the page
+    has 2–4 jobs (`Toybox.jobs`: folder tabs hanging from the stage), then EITHER the **step row** (`Toybox.steps`:
+    done steps as green tick chips, the current step IS the green Go pill with its verb, coming steps as faded
+    chips with their word) OR the one green **Go** (`Toybox.go`) and up to two rows of **choice tiles**
+    (`Toybox.tiles`: picture + word, picked = yellow + a tick badge), then the **bottom bar** (`Toybox.bar`): Shelf
+    (blue, only apps with a collection), **New** (orange, circular arrow) and **Surprise** (rainbow outline and a
+    gift, `tb-surprise`, never a dashed line), in that order. No section tabs anywhere; no text-only buttons in
+    the panel (an icon + a real word each).
+  - Which pattern: ordered steps of one job → the step row (max 6 steps; waiting and fiddling are automatic and
+    shown happening); different jobs on one machine → the job bar; jobs with their own machine → stations on a map
+    (`Toybox.map`); building from parts → tap a part on the scene and the tiles show its options; everything else he
+    picks → tiles (max 8).
+  - Shared behavior: `Toybox.press` for every drawn control (a press under 12 px and 350 ms is a tap that plays the
+    whole motion; anything longer is the drag; 2 cm minimum hit radius), `Toybox.ghost` (tap first, the real move on
+    its second showing), the palm guard (`Toybox.palmGuard`, built into every component), `Toybox.gate` for the
+    gear-up and getting-ready screens (one tap dresses everything), `Toybox.nametag` for real part names.
+- Controls under the play area: on an upright phone the panel uses at most about 300 px of 844 (job bar 64 + step
+  row 90 + bottom bar 60, or Go 72 + one tile row 84 + bottom bar 60) and at most 12 tappable controls. If more
+  seems needed, something gets cut or moves onto the stage. No duplicate controls. No label cut off: shorten it.
+  Targets from the tokens: Go 72 px tall (84 iPad), tiles 84 px (112), bottom bar 60 (68), job tabs 64 (72), header
+  icons 52 (60); at least 12 px between controls and 24 px between New and anything he taps often; the bottom row
+  at least 16 px above the safe area. Text at least 14 px anywhere he looks. `tools/fit.js` and `tools/buttons.js`
+  report small tiles, small targets and text-only buttons (problems on `tb-v2` pages, warnings elsewhere).
 - The **Big** button hides the controls for full-screen play (per app, remembered).
 - Prefer making the play area bigger over fitting more buttons. On upright phones, frame scenes tightly (pan with
   the action, turn wide layouts upright) rather than leaving empty sky.
@@ -196,7 +222,8 @@ Keep only:
   for him.
 - **Idle ghost hand**: after ~4.5 s without a touch, a see-through hand shows the next move, at most 2–3 times
   per visit, never again once he has done it, never while the sheet is open or the timer is ending/resting.
-  Use `tools/snippets/ghost-hand.js` / `.css` (same look everywhere). Coach pill: `tools/snippets/coach-pill.css`.
+  Use `Toybox.ghost` (same look everywhere; pages not migrated yet still carry the pasted `tools/snippets` copy).
+  Coach line: `Toybox.coach` (the `.tb-coach` pill).
 - Nothing traps him: always a visible way to start over ("New", "Clear"), no dead-end overlays.
 - **Surprise = a fun moment, right now, on the current scene** (the dad's rule): something happens to what is on
   screen (the hamster somersaults, a giant bubble wobbles across, a cow waits at the crossing), then play goes on.
@@ -289,8 +316,21 @@ Keep only:
 - Test hooks only behind `?debug` (read-only `navigator.webdriver` hooks exist in a few Workshop pages).
 
 ### Look
-- Toybox chrome: Baloo 2, chunky 3–4px dark (#1D2340) outlines, offset shadows, rounded corners, bright flat
-  colors, `.btn` style from `common/toybox.css`. Machines drawn big and accurately.
+- **Chrome** (header, panel, buttons, tiles, coach, counter, map labels; `plans/redesign.md` 1.10 and 1.14, tokens at
+  the top of `common/toybox.css`): Baloo 2, the ink color #1D2340, bright flat fills, rounded shapes, and a calm,
+  tactile style: **2 px outlines** (3 px frame on the stage, where it meets the drawn scene), a short **bottom lip**
+  under pressable things (pressed = it moves down by the lip), no hard offset shadows; the panel is a white card
+  with a soft shadow and no outline; counter, coach and name tags have a 2 px outline and no lip. Type scale, spacing
+  (4/8/12/16/24/32), radii and timing come from the `--tb-*` tokens; don't set page-local outlines, shadows, cream or
+  dashed tiles or font sizes on chrome.
+- **One meaning per color** in the chrome: green `--tb-go` = Go and done ticks; yellow `--tb-pick` = picked (always
+  with a tick badge) and the coach's step dot; orange `--tb-new` = New only; blue `--tb-shelf` = Shelf only; the
+  rainbow outline = Surprise only; light blue `--tb-job` = job tabs not picked; grey `--tb-off` = coming steps.
+  Back, Home and Big are white. Red is never chrome (only on a real machine's switch or paddle). Never color alone.
+- **Machines and scenes** keep their own style: drawn big and accurately with chunky ink outlines; they are the star.
+- **Icons in the UI**: one line family (24 px grid, 2.5 px rounded stroke, no fill: Home, Back, Big, New, Surprise,
+  Shelf, close; `Toybox.icon(name)`). Content pictures (tiles, job tabs, chips, Go) are small flat drawings with a
+  2 px ink outline, one picture per thing, reused wherever it appears (the chip and the Go of a step share it).
 - Icons: flat, full-bleed #CDE9FF background, chunky outlines, one clear subject; render an SVG with Playwright
   and screenshot at each size; the maskable icon keeps the subject in the central 80%.
 

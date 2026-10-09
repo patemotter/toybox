@@ -1,4 +1,5 @@
-/* Toybox shared grown-up layer: play timer, sound setting, Big toggle.
+/* Toybox shared layer: play timer, sound setting, Big toggle, and the shared components every app is built
+ * from (Go, step row, job bar, tiles, bottom bar, coach, ghost hand, tap-or-drag, palm guard, gate, map: 6.).
  *
  * One timer and one sound setting for the whole Toybox (same origin, same localStorage):
  *   toybox-timer-v1  the play timer (wall-clock endAt, so it counts across apps and reloads)
@@ -82,6 +83,70 @@
  *    true calls off() and goes at once; nothing is held back (the dad found the "switch it off first"
  *    card got in the way). Scripts that navigate themselves call Toybox.beforeLeave(function () { go(); }):
  *    it switches the machine off quietly and runs the function at once. name and flash are ignored now.
+ * 6. Shared components (plans/redesign.md sections 1 and 2; look in toybox.css; demo: tools/shell-demo.html;
+ *    pilot page: construction-site/concrete.html). Each renders into an element the page provides; the page
+ *    keeps its own scene code. Pages that use them add "tb-v2" to the shell div (token sizes for the chrome).
+ *    Every component ignores input while the timer locks the app, and guards against palms (Toybox.palmGuard).
+ *      var go = Toybox.go(el, { label: "Drive!", icon: svg, onPress: fn(e), onIdle: fn, onBusy: fn })
+ *        The green Go pill (apps without steps). el: a <button> to take over, or a container to build one in.
+ *        onPress returning false = nothing to do: it wiggles and onIdle runs (say a hint). Never disabled.
+ *        go.set(label, icon), go.pulse(on), go.busy(true | 0..1 | false) (a fill shows the motion running;
+ *        a press then wiggles and onBusy runs), go.isBusy(), go.wiggle(), go.el.
+ *      var st = Toybox.steps(el, { steps: [{ id: "pour", name: "Pour", pic: svg, go: "Pour!", coach: "Pour the
+ *        concrete!" }, ...], coach: coachApi, ghost: ghostApi, onGo: fn(stepId, e), onAgain: fn, onBusy: fn,
+ *        onIdle: fn, onChip: fn(id) })
+ *        The step row (an <ol> or <ul>): done steps are green tick chips on the left, the current step IS the
+ *        Go pill (its go label and picture), coming steps are faded chips with their word on the right. In a
+ *        side column (landscape) the row wraps: ticks above Go, coming steps below. Max 6 steps.
+ *        st.at(id) (current; earlier steps done; the coach says its line, the ghost is poked), st.done(id)
+ *        (tick it; the next one becomes current), st.finish(label) (all ticked, Go says "Again!" and calls
+ *        onAgain), st.reset(), st.current(), st.finished(), st.busy(on | 0..1), st.pulse(on), st.go (its Go).
+ *        onGo returning false wiggles Go and repeats the step's coach line. Tapping a chip wiggles it and
+ *        repeats the current step's line (chips are progress, not buttons).
+ *      var jb = Toybox.jobs(el, { jobs: [{ id, name, pic }], value: id, onPick: fn(id) }) -> jb.set(id), jb.value()
+ *        Folder tabs hanging from the stage's bottom edge: wrap the stage and el in <div class="tb-stagecol">.
+ *        2 to 4 jobs; switching a job changes the scene. The page remembers it and resets it on Toybox.fresh().
+ *      var tl = Toybox.tiles(el, { items: [{ id, name, pic, color }], value: id, kind: "pick" | "action" |
+ *        "swatch", rows: 1 | 2, onPick: fn(id) }) -> tl.set(id), tl.items(list), tl.flash(id), tl.value(),
+ *        tl.button(id). Picture + word tiles, at most 4 a row on phones and 8 in all (warns above 8). "pick":
+ *        aria-pressed + a tick badge; "action": no picked state, a "+" badge; "swatch": the fill is the color.
+ *      var bb = Toybox.bar(el, { shelf: fn | null, onNew: fn, onSurprise: fn }) -> bb.shelfOpen(on), bb.newBtn,
+ *        bb.surprise, bb.shelf. The bottom bar: Shelf (blue, only apps with a collection), New (orange, the
+ *        circular arrow), Surprise (rainbow, a gift), with their icons and the palm-safe spacing.
+ *      var coach = Toybox.coach(el) -> coach.step(text) (the sticky line for the current step, with the step
+ *        dot), coach.say(text, sec) (a passing line, at least 3 s, then back to the step line), coach.clear(),
+ *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
+ *        home screen's App setting "coach-voice" is on and sound is on.
+ *      var ghost = Toybox.ghost({ plan: fn, max: 3, idleMs: 4500, ok: fn, onShow: fn(plan, on) })
+ *        The idle ghost hand (the master look). plan() returns null or { pts: [[x, y], ...] (viewport px),
+ *        tap: true | hold: true | (two or more points = a drag), carry: { html, size }, dur: ms, key: "pour" }.
+ *        Each key shows at most `max` times a visit. ghost.learned(key) (he did it: never again; no key = all),
+ *        ghost.again(key), ghost.shown(key) (how often it showed: show the tap first, the drag after),
+ *        ghost.poke(), ghost.stop(), ghost.show() (test hook). It waits while a finger is down, the sheet is
+ *        open, the timer is ending or resting, or the turn card shows.
+ *      var pr = Toybox.press(target, { hit: fn(x, y) -> part | null, parts: fn() -> [{ id, x, y, r }],
+ *        any: false, down: fn(part, e, s), dragStart: fn(part, e, s), move: fn(part, e, s), up: fn(part, e, s),
+ *        tap: fn(part, x, y, e), slop: 12, tapMs: 350, minHit: px })
+ *        One press is always enough: a press that moves under 12 px and lasts under 350 ms is a tap (s.tap), and
+ *        tap(part) should play the whole motion; anything longer is a drag (move after dragStart). parts are
+ *        circles in viewport px; each gets at least the 2 cm key target (--tb-key) as its hit radius, nearest
+ *        wins. any: true also takes presses that hit no part (part null). Several fingers at once; palms
+ *        ignored. s = { part, x0, y0, x, y, dx, dy, ms, drag, tap }. pr.active() = fingers down.
+ *      Toybox.palmGuard(el), Toybox.isPalm(pointerEvent)  a touch within 20 px of the bottom edge, one that
+ *        lands while another rests still for over 1 s, or a very large contact: ignored (guard) / true.
+ *      Toybox.nametag(text, x, y, ms)  a real part's name pops up above (x, y) for about 2 s ("Hopper").
+ *      var gt = Toybox.gate({ flag: "site-gear", title: "Gear up!", viewBox: "0 0 300 400", worker: svg,
+ *        items: [{ id, name: "Eye protection", art: svg, onArt: svg }], extra: { hands: fn(next, workerEl) },
+ *        hint: "Tap to put it all on!", ms: 1500, done: fn })
+ *        The gear-up / getting-ready screen. One tap on the worker or any item puts everything on in order
+ *        (each with its name tag), then done(); dragging an item onto the worker puts just that one on. onArt
+ *        layers share the worker's viewBox. Sets the sessionStorage flag and its time (the 10-minute rule).
+ *        gt.dressAll(), gt.isOn(id), gt.hide(), gt.el. The page decides whether to show it (flag off).
+ *      var mp = Toybox.map({ stage: el, places: [{ href, name, pic, rect: [x, y, w, h] as fractions of the stage
+ *        or fn(W, H) -> px rect }], onPress: fn(place, a) }) -> mp.layout(), mp.places
+ *        Station maps: the whole place is the hit area, a white picture + word label, Toybox.beforeLeave on go.
+ *      Toybox.wiggle(el), Toybox.icon(name) (UI line icons: back, home, big, new, surprise, shelf, close),
+ *      Toybox.pics.play / .again (Go pictures).
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
  * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
  * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode,
@@ -134,6 +199,8 @@
     // Kind words has its own controls (kindBuildSettings below); its other ids are listed in KIND_SET.
     { id: "kind-words", app: "Kind words", type: "custom", def: true,
       build: function (row) { kindBuildSettings(row); }, refresh: function (row) { kindRefreshSettings(row); } },
+    { id: "coach-voice", app: "Coach line", label: "Read the coach line out loud", type: "bool", def: false, hold: true,
+      note: "In the apps built from the new layout. Uses the device's voice, so it only speaks when sound is on (headphones on the plane)." },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
       note: "Uses the device's voice, so it only speaks when sound is on." },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
@@ -1329,6 +1396,717 @@
     } catch (e) { return false; }
   })();
 
+  // =====================================================================================================
+  // Shared components (plans/redesign.md section 2; API in the header above; demo: tools/shell-demo.html)
+  // =====================================================================================================
+  function elOf(x) { return typeof x === "string" ? document.querySelector(x) : x; }
+  function cssPx(name, fallback) {
+    var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+    return isFinite(v) ? v : fallback;
+  }
+  function call(fn) { if (typeof fn === "function") { try { return fn.apply(null, Array.prototype.slice.call(arguments, 1)); } catch (e) { setTimeout(function () { throw e; }); } } }
+  function locked() { return timer.phase === "ending" || timer.phase === "resting"; }
+  function wiggle(el) {
+    if (!el) return;
+    el.classList.remove("tb-wiggle"); void el.offsetWidth; el.classList.add("tb-wiggle");
+    clearTimeout(el._tbWig); el._tbWig = setTimeout(function () { el.classList.remove("tb-wiggle"); }, 560);
+  }
+  // A picture: an SVG/HTML string, or a function returning an element (a canvas).
+  function setPic(box, pic) {
+    if (box._tbPic === pic) return;
+    box._tbPic = pic;
+    box.innerHTML = "";
+    if (typeof pic === "function") { var n = pic(); if (n) box.appendChild(n); }
+    else if (pic) box.innerHTML = pic;
+    box.hidden = !pic;
+  }
+  // UI action icons (24 px grid, 2.5 px stroke, no fill), the same in every app.
+  var UI = {
+    back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
+    home: '<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/>',
+    big: ICON_EXPAND,
+    "new": '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 3.8v4.4h-4.4"/>',
+    surprise: '<rect x="4.5" y="11" width="15" height="9.5" rx="1.5"/><path d="M3.5 7.5h17V11h-17z"/><path d="M12 7.5v13"/><path d="M12 7.5C10.5 4 7 3.6 7 5.6c0 1.4 2.4 1.9 5 1.9 2.6 0 5-.5 5-1.9 0-2-3.5-1.6-5 1.9"/>',
+    shelf: '<path d="M3.5 20.5h17M4.5 20.5V4M19.5 20.5V4M4.5 12.5h15"/><path d="M7 12.5V8h3v4.5M13 12.5l1.6-4.6 2.6.9-1.3 3.7"/><path d="M7.5 20.5v-4.5h3.5v4.5"/>',
+    close: '<path d="M6 6l12 12M18 6 6 18"/>'
+  };
+  function uiIcon(name) { return '<svg class="tb-ui-ic" viewBox="0 0 24 24" aria-hidden="true">' + (UI[name] || "") + "</svg>"; }
+  // The generic Go picture: a play triangle (pages give the action's own picture when they have one).
+  var PIC_PLAY = '<svg viewBox="0 0 40 40"><path d="M13 7.5 32 20 13 32.5Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  var PIC_AGAIN = '<svg viewBox="0 0 40 40"><path d="M31 20a11 11 0 1 1-3.3-7.8" fill="none" stroke="#1D2340" stroke-width="7.5" stroke-linecap="round"/><path d="M31 20a11 11 0 1 1-3.3-7.8" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/><path d="M33.5 6.5v9h-9z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  var TICK_SVG = '<svg class="tb-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.2 4.2 8.8-9.4" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  // ---------- Palm guard ----------
+  // Preschoolers rest their wrists on the bottom edge and keep a palm on the glass. A touch is a palm when it
+  // starts within 20 px of the bottom edge, when another touch has rested still for over a second, or when the
+  // contact is very large. Used by press, go, steps, jobs, tiles and bar; pages may guard their own controls.
+  var touchesDown = {};
+  (function () {
+    function d(e) { if (e.pointerType === "touch") touchesDown[e.pointerId] = { x: e.clientX, y: e.clientY, t: now(), still: true }; }
+    function m(e) { var t = touchesDown[e.pointerId]; if (t && t.still && Math.abs(e.clientX - t.x) + Math.abs(e.clientY - t.y) > 14) t.still = false; }
+    function u(e) { delete touchesDown[e.pointerId]; }
+    document.addEventListener("pointerdown", d, true);
+    document.addEventListener("pointermove", m, true);
+    document.addEventListener("pointerup", u, true);
+    document.addEventListener("pointercancel", u, true);
+  })();
+  function isPalm(e) {
+    if (!e || e.pointerType !== "touch") return false;
+    if (e.clientY > innerHeight - 20) return true;
+    if ((e.width || 0) > 60 || (e.height || 0) > 60) return true;
+    for (var id in touchesDown) {
+      if (Number(id) === e.pointerId) continue;
+      var t = touchesDown[id];
+      if (t.still && now() - t.t > 1000) return true;
+    }
+    return false;
+  }
+  function palmGuard(el) {
+    el = elOf(el);
+    if (!el || el._tbPalm) return;
+    var block = 0;
+    el._tbPalm = true;
+    el.addEventListener("pointerdown", function (e) {
+      if (isPalm(e)) { block = now() + 1500; e.stopImmediatePropagation(); e.preventDefault(); }
+      else block = 0;
+    }, true);
+    el.addEventListener("click", function (e) {
+      if (block && now() < block && e.detail !== 0) { block = 0; e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+  }
+
+  // ---------- Go ----------
+  function goBtn(el, o) {
+    o = o || {};
+    el = elOf(el);
+    var btn = el.tagName === "BUTTON" ? el : document.createElement("button");
+    if (btn !== el) { btn.type = "button"; el.appendChild(btn); }
+    btn.classList.add("btn", "tb-go", "tb-gopill");
+    btn.innerHTML = '<span class="tb-go-fill"></span><span class="tb-pic" aria-hidden="true"></span><span class="tb-go-word"></span>';
+    var fill = btn.firstChild, picEl = fill.nextSibling, word = picEl.nextSibling, busyOn = false;
+    function set(label, pic) {
+      if (label != null) { word.textContent = label; btn.setAttribute("aria-label", label); }
+      setPic(picEl, pic === undefined ? (o.icon || PIC_PLAY) : pic);
+    }
+    btn.addEventListener("click", function (e) {
+      if (locked()) return;
+      if (busyOn) { wiggle(btn); call(o.onBusy); return; }
+      var r = call(o.onPress, e);
+      if (r === false) { wiggle(btn); call(o.onIdle); }
+    });
+    palmGuard(btn);
+    set(o.label || "Go!", o.icon);
+    return {
+      el: btn,
+      set: set,
+      label: function () { return word.textContent; },
+      pulse: function (on) { btn.classList.toggle("is-pulse", !!on); },
+      // busy(true) or busy(0..1): a motion is running (a lighter fill shows how far); a press then wiggles.
+      busy: function (on) {
+        busyOn = !!on || on === 0;
+        btn.classList.toggle("is-busy", busyOn);
+        btn.style.setProperty("--tb-go-p", typeof on === "number" ? Math.round(Math.max(0, Math.min(1, on)) * 100) + "%" : "100%");
+      },
+      isBusy: function () { return busyOn; },
+      wiggle: function () { wiggle(btn); }
+    };
+  }
+
+  // ---------- Coach line ----------
+  // The optional spoken coach (App setting "coach-voice", off by default; only while sound is on).
+  function speak(line) {
+    if (!soundOn || !settingGet("coach-voice") || !window.speechSynthesis || locked() || document.hidden) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(line);
+      u.rate = 0.95; u.pitch = 1.05;
+      speechSynthesis.speak(u);
+    } catch (e) { /* no voice */ }
+  }
+  function coachLine(el) {
+    el = elOf(el);
+    el.classList.add("tb-coach");
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.innerHTML = '<span class="tb-coach-dot" aria-hidden="true"></span><span class="tb-coach-text"></span>';
+    var txt = el.lastChild, stepText = "", sayText = "", sayUntil = 0, t = 0, shown = null, api;
+    function show() {
+      clearTimeout(t);
+      var saying = now() < sayUntil, line = saying ? sayText : stepText;
+      if (saying) t = setTimeout(show, sayUntil - now() + 20);
+      if (!line) { el.classList.add("off"); shown = ""; return; }
+      el.hidden = false;
+      el.classList.remove("off");
+      el.classList.toggle("is-step", !saying);
+      if (line !== shown) {
+        shown = line;
+        txt.textContent = line;
+        el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new");
+        speak(line);
+      }
+    }
+    api = {
+      el: el,
+      // A passing line (a hint after a mistake, a cheer), at least 3 s, then back to the step's line.
+      say: function (text, sec) { sayText = String(text || ""); sayUntil = now() + Math.max(3, sec || 3.5) * 1000; show(); },
+      // The sticky line for the current step ("Pour the batter!"), with the step dot.
+      step: function (text) { stepText = String(text || ""); sayUntil = 0; show(); },
+      clear: function () { stepText = ""; sayUntil = 0; show(); },
+      text: function () { return el.classList.contains("off") ? "" : txt.textContent; }
+    };
+    show();
+    return api;
+  }
+
+  // ---------- Step row ----------
+  function stepRow(el, o) {
+    el = elOf(el); o = o || {};
+    var list = (o.steps || []).slice(), cur = 0, doneSet = {}, finished = false, finLabel = "Again!", finPic = PIC_AGAIN;
+    var coach = o.coach || null, ghost = o.ghost || null;
+    el.innerHTML = "";
+    el.classList.add("tb-steps");
+    el.setAttribute("role", "list");
+    el.setAttribute("aria-label", o.label || "Steps");
+    var chips = list.map(function (s) {
+      var li = document.createElement("li");
+      li.className = "tb-chip";
+      li.setAttribute("role", "listitem");
+      li.innerHTML = '<span class="tb-chip-dot"><span class="tb-pic" aria-hidden="true"></span>' + TICK_SVG + '</span><span class="tb-chip-word"></span>';
+      setPic(li.firstChild.firstChild, s.pic);
+      li.lastChild.textContent = s.name;
+      li.addEventListener("click", function () { chipTap(li, s); });
+      return li;
+    });
+    var many = document.createElement("li");
+    many.className = "tb-chip is-done is-many";
+    many.setAttribute("role", "listitem");
+    many.innerHTML = '<span class="tb-chip-dot">' + TICK_SVG + '</span><span class="tb-chip-word">Done</span>';
+    many.addEventListener("click", function () { chipTap(many, null); });
+    var goLi = document.createElement("li");
+    goLi.className = "tb-st-go";
+    goLi.setAttribute("role", "listitem");
+    var g = goBtn(goLi, {
+      onPress: function (e) {
+        if (finished) return o.onAgain ? call(o.onAgain) : call(o.onGo, "again", e);
+        return call(o.onGo, list[cur] && list[cur].id, e);
+      },
+      onIdle: function () { sayStep(); call(o.onIdle, list[cur] && list[cur].id); },
+      onBusy: function () { call(o.onBusy, list[cur] && list[cur].id); }
+    });
+    palmGuard(el);
+    function sayStep() { var s = list[cur]; if (coach && s && !finished) coach.step(s.coach || s.go || s.name); }
+    function chipTap(li, s) {
+      if (locked()) return;
+      li.classList.remove("is-wiggle"); void li.offsetWidth; li.classList.add("is-wiggle");
+      setTimeout(function () { li.classList.remove("is-wiggle"); }, 560);
+      wiggle(g.el);
+      sayStep();
+      call(o.onChip, s && s.id);
+    }
+    function render(changed) {
+      var s = list[cur], i, doneIdx = [], coming = [];
+      for (i = 0; i < list.length; i++) {
+        var isDone = finished || doneSet[list[i].id];
+        chips[i].classList.toggle("is-done", !!isDone);
+        chips[i].setAttribute("aria-label", list[i].name + (isDone ? ", done" : (i === cur ? ", now" : "")));
+        if (i === cur && !finished) continue;
+        if (isDone) doneIdx.push(i); else coming.push(i);
+      }
+      // Many ticks on a narrow row: one "Done" chip for all of them, so Go keeps its room.
+      var collapse = doneIdx.length >= 2 && (list.length >= 5 || (doneIdx.length + coming.length >= 4 && innerWidth < 520));
+      var order = [];
+      if (collapse) order.push(many); else doneIdx.forEach(function (k) { order.push(chips[k]); });
+      order.push(goLi);
+      coming.forEach(function (k) { order.push(chips[k]); });
+      el.innerHTML = "";
+      order.forEach(function (n) { el.appendChild(n); });
+      goLi.setAttribute("aria-current", finished ? "false" : "step");
+      el.classList.toggle("is-crowded", order.length >= 4);
+      el.classList.toggle("is-finished", finished);
+      if (finished) g.set(finLabel, finPic);
+      else if (s) g.set(s.go || s.name + "!", s.pic);
+      if (changed) {
+        sayStep();
+        if (ghost && ghost.poke) ghost.poke();
+        g.el.classList.remove("tb-pop"); void g.el.offsetWidth; g.el.classList.add("tb-pop");
+      }
+    }
+    function idx(id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return i; return -1; }
+    var api = {
+      el: el,
+      go: g,
+      // Make a step the current one: the steps before it are done, the ones after it are coming.
+      at: function (id) {
+        var k = idx(id); if (k < 0) return;
+        var changed = k !== cur || finished;
+        cur = k; finished = false; doneSet = {};
+        for (var i = 0; i < k; i++) doneSet[list[i].id] = true;
+        render(changed);
+        if (!changed) sayStep();
+      },
+      // Tick a step; if it was the current one, the next step becomes current.
+      done: function (id) {
+        var k = idx(id); if (k < 0) return;
+        doneSet[id] = true;
+        if (k === cur && cur < list.length - 1) { cur++; render(true); } else render(false);
+      },
+      // Every step ticked, a cheer, Go becomes label ("Again!" by default; it calls onAgain or onGo("again")).
+      finish: function (label, pic) {
+        finished = true; finLabel = label || "Again!"; finPic = pic || PIC_AGAIN;
+        render(false);
+        if (coach) coach.clear();
+      },
+      reset: function () { cur = 0; doneSet = {}; finished = false; render(true); },
+      current: function () { return finished ? null : (list[cur] && list[cur].id); },
+      finished: function () { return finished; },
+      busy: function (on) { g.busy(on); },
+      pulse: function (on) { el.classList.toggle("is-pulse", !!on); },
+      sayStep: sayStep
+    };
+    render(false);
+    window.addEventListener("resize", function () { render(false); });
+    return api;
+  }
+
+  // ---------- Job bar ----------
+  function jobBar(el, o) {
+    el = elOf(el); o = o || {};
+    var value = o.value, btns = {};
+    el.innerHTML = "";
+    el.classList.add("tb-jobs");
+    el.setAttribute("role", "tablist");
+    (o.jobs || []).forEach(function (j) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tb-job";
+      b.setAttribute("role", "tab");
+      b.innerHTML = '<span class="tb-pic" aria-hidden="true"></span><span class="tb-job-word"></span>';
+      setPic(b.firstChild, j.pic);
+      b.lastChild.textContent = j.name;
+      b.addEventListener("click", function () {
+        if (locked()) return;
+        if (value === j.id) return;          // the shared re-tap wiggle answers (aria-selected)
+        set(j.id); call(o.onPick, j.id);
+      });
+      btns[j.id] = b;
+      el.appendChild(b);
+    });
+    palmGuard(el);
+    function set(id) {
+      value = id;
+      Object.keys(btns).forEach(function (k) { btns[k].setAttribute("aria-selected", String(k === id)); });
+    }
+    set(value === undefined && o.jobs && o.jobs[0] ? o.jobs[0].id : value);
+    return { el: el, set: set, value: function () { return value; } };
+  }
+
+  // ---------- Choice tiles ----------
+  function tileRow(el, o) {
+    el = elOf(el); o = o || {};
+    var kind = o.kind || "pick", value = o.value, list = [], btns = {};
+    el.classList.add("tb-tilerow");
+    palmGuard(el);
+    function cols() {
+      var n = list.length, rows = o.rows || Math.ceil(n / 4);
+      return Math.max(1, Math.min(4, Math.ceil(n / rows)));
+    }
+    function items(l) {
+      list = (l || []).slice();
+      if (list.length > 8 && window.console) console.warn("Toybox.tiles: " + list.length + " tiles; keep it to 8 (plans/redesign.md 1.4)");
+      el.innerHTML = ""; btns = {};
+      el.style.setProperty("--tb-cols", cols());
+      list.forEach(function (it) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn tb-tile" + (kind === "action" ? " is-action" : "") + (kind === "swatch" ? " is-swatch" : "");
+        b.innerHTML = '<span class="tb-pic" aria-hidden="true"></span><span class="tb-tile-word"></span>';
+        setPic(b.firstChild, it.pic);
+        b.lastChild.textContent = it.name;
+        b.setAttribute("aria-label", it.name);
+        if (it.color) b.style.setProperty("--tb-sw", it.color);
+        b.addEventListener("click", function () {
+          if (locked()) return;
+          if (kind === "action") { flash(it.id); call(o.onPick, it.id); return; }
+          if (value === it.id) return;       // the shared re-tap wiggle answers (aria-pressed)
+          set(it.id); call(o.onPick, it.id);
+        });
+        btns[it.id] = b;
+        el.appendChild(b);
+      });
+      set(value);
+    }
+    function set(id) {
+      value = id;
+      if (kind === "action") return;
+      Object.keys(btns).forEach(function (k) { btns[k].setAttribute("aria-pressed", String(k === String(id))); });
+    }
+    function flash(id) {
+      var b = btns[id]; if (!b) return;
+      b.classList.remove("is-flash"); void b.offsetWidth; b.classList.add("is-flash");
+    }
+    items(o.items);
+    return { el: el, set: set, items: items, flash: flash, value: function () { return value; }, button: function (id) { return btns[id] || null; } };
+  }
+
+  // ---------- Bottom bar ----------
+  function bottomBar(el, o) {
+    el = elOf(el); o = o || {};
+    el.innerHTML = "";
+    el.classList.add("tb-bottombar");
+    function mk(cls, icon, word, fn) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn " + cls;
+      b.innerHTML = uiIcon(icon) + "<span>" + word + "</span>";
+      b.addEventListener("click", function (e) { if (!locked()) call(fn, e); });
+      el.appendChild(b);
+      return b;
+    }
+    var shelf = o.shelf ? mk("tb-bb-shelf", "shelf", "Shelf", o.shelf) : null;
+    if (shelf) shelf.setAttribute("aria-pressed", "false");
+    var nb = o.onNew === null ? null : mk("tb-new tb-bb-new", "new", "New", o.onNew);
+    var sb = o.onSurprise === null ? null : mk("tb-surprise tb-bb-surprise", "surprise", "Surprise", o.onSurprise);
+    palmGuard(el);
+    return {
+      el: el, shelf: shelf, newBtn: nb, surprise: sb,
+      shelfOpen: function (on) { if (shelf) shelf.setAttribute("aria-pressed", String(!!on)); }
+    };
+  }
+
+  // ---------- Ghost hand ----------
+  // The see-through hand that shows the next move after a quiet spell (look: the master copy in this file's CSS,
+  // also tools/snippets/ghost-hand.css). plan() returns null or { pts: [[x, y], ...] in viewport px, tap: true |
+  // hold: true | (several points: a drag), carry: { html, size }, dur: ms, key: "pour" }. Each key shows at most
+  // `max` times per visit and never again once learned(key) (he did it himself).
+  function ghostHand(o) {
+    o = o || {};
+    var plan = o.plan, IDLE = o.idleMs || 4500, MAX = o.max || 3;
+    var last = now(), armed = true, run = null, el = null, counts = {}, learnedK = {}, learnedAll = false, down = {};
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() {
+      if (run) { var p = run.p; run = null; call(o.onShow, p, false); }
+      if (el) { el.style.display = "none"; carryEl.innerHTML = ""; }
+    }
+    function poke() { last = now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
+    ["pointerup", "pointercancel"].forEach(function (t) {
+      document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = now(); } }, true);
+    });
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden || Object.keys(down).length) return true;
+      if (sheetOpen() || locked() || turning()) return true;
+      return !!(o.ok && !o.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.hold) {
+        var hp = p.pts[0]; x = hp[0]; y = hp[1];
+        a = t < 0.12 ? t / 0.12 : (t > 0.88 ? (1 - t) / 0.12 : 1);
+        press = t > 0.22 && t < 0.85;
+        sc = press ? 0.92 : 1;
+        if (t < 0.22) { var kk = 1 - t / 0.22; x += 26 * s * kk; y += 30 * s * kk; }
+      } else if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: now(), dur: p.dur || (p.hold ? 3200 : (p.tap ? 2400 : 3200)) };
+      call(o.onShow, p, true);
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedAll || !armed || now() - last < IDLE || typeof plan !== "function") return;
+      if (blocked()) { last = now(); return; }
+      var p = null;
+      try { p = plan(); } catch (e) { p = null; }
+      if (!p || !p.pts || !p.pts.length) return;
+      var key = p.key || "*";
+      if (learnedK[key] || (counts[key] || 0) >= MAX) return;
+      armed = false; counts[key] = (counts[key] || 0) + 1;
+      show(p);
+    }, 250);
+    return {
+      // He did the move himself: never show it again this visit (one key, or every key).
+      learned: function (key) { if (key) learnedK[key] = true; else learnedAll = true; stop(); },
+      // Something new to show (a new mode): allow the hint again.
+      again: function (key) {
+        if (key) { delete learnedK[key]; counts[key] = 0; } else { learnedK = {}; counts = {}; learnedAll = false; }
+        armed = true; last = now();
+      },
+      shown: function (key) { return counts[key || "*"] || 0; },
+      poke: poke,
+      stop: stop,
+      // test hook: show it now
+      show: function () { var p = plan && plan(); if (p) show(p); return !!p; }
+    };
+  }
+
+  // ---------- Tap or drag (one press is always enough) ----------
+  function pressHelper(target, o) {
+    target = elOf(target); o = o || {};
+    var SLOP = o.slop || 12, TAP_MS = o.tapMs || 350, ptrs = {};
+    function minR() { return (o.minHit || cssPx("--tb-key", 120)) / 2; }
+    function pick(x, y) {
+      var part = o.hit ? o.hit(x, y) : null;
+      if (part != null) return part;
+      if (o.parts) {
+        var best = null, bd = Infinity;
+        (o.parts() || []).forEach(function (p) {
+          var d = Math.hypot(x - p.x, y - p.y), r = Math.max(p.r || 0, minR());
+          if (d <= r && d < bd) { bd = d; best = p.id; }
+        });
+        return best;
+      }
+      return null;
+    }
+    function info(s, e) { s.x = e.clientX; s.y = e.clientY; s.dx = s.x - s.x0; s.dy = s.y - s.y0; s.ms = now() - s.t0; return s; }
+    target.addEventListener("pointerdown", function (e) {
+      if (o.palm !== false && isPalm(e)) return;
+      if (locked()) return;
+      var part = pick(e.clientX, e.clientY);
+      if (part == null && !o.any) return;
+      e.preventDefault();
+      try { target.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      var s = ptrs[e.pointerId] = { part: part, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, dx: 0, dy: 0, t0: now(), ms: 0, drag: false, tap: false };
+      call(o.down, part, e, s);
+    });
+    target.addEventListener("pointermove", function (e) {
+      var s = ptrs[e.pointerId]; if (!s) return;
+      info(s, e);
+      if (!s.drag && (Math.hypot(s.dx, s.dy) > SLOP || s.ms > TAP_MS)) { s.drag = true; call(o.dragStart, s.part, e, s); }
+      if (s.drag) call(o.move, s.part, e, s);
+    });
+    function end(e, cancel) {
+      var s = ptrs[e.pointerId]; if (!s) return;
+      delete ptrs[e.pointerId];
+      info(s, e);
+      s.tap = !cancel && !s.drag && Math.hypot(s.dx, s.dy) <= SLOP && s.ms <= TAP_MS;
+      s.cancel = !!cancel;
+      call(o.up, s.part, e, s);
+      if (s.tap && !locked()) call(o.tap, s.part, e.clientX, e.clientY, e);
+    }
+    target.addEventListener("pointerup", function (e) { end(e, false); });
+    target.addEventListener("pointercancel", function (e) { end(e, true); });
+    return {
+      active: function () { return Object.keys(ptrs).length; },
+      cancel: function () { ptrs = {}; }
+    };
+  }
+
+  // ---------- Name tags ----------
+  var tags = {};
+  function nametag(text, x, y, ms) {
+    var key = String(text), el = tags[key];
+    if (!el) { el = document.createElement("div"); el.className = "tb-nametag"; el.setAttribute("aria-hidden", "true"); el.textContent = key; tags[key] = el; document.body.appendChild(el); }
+    el.classList.remove("out");
+    var w = el.offsetWidth || 80;
+    x = Math.max(w / 2 + 8, Math.min(innerWidth - w / 2 - 8, x));
+    y = Math.max(el.offsetHeight + 8, y);
+    el.style.left = x + "px"; el.style.top = y + "px";
+    clearTimeout(el._t1); clearTimeout(el._t2);
+    el._t1 = setTimeout(function () { el.classList.add("out"); }, ms || 2000);
+    el._t2 = setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); delete tags[key]; }, (ms || 2000) + 400);
+    return el;
+  }
+
+  // ---------- Gear-up / getting-ready gate ----------
+  function gearOn(flag) {
+    try {
+      sessionStorage.setItem(flag, "on");
+      var on = readJSON(GEAR_KEY); on[flag] = now(); put(GEAR_KEY, JSON.stringify(on));
+    } catch (e) { /* ignore */ }
+  }
+  function gate(o) {
+    o = o || {};
+    var items = o.items || [], onIds = {}, running = false, finished = false;
+    var vb = o.viewBox || "0 0 300 400";
+    var root = document.createElement("div");
+    root.className = "tb-gate";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-label", o.title || "Gear up!");
+    var layers = items.map(function (it) { return '<svg class="tb-gate-on" data-id="' + esc(it.id) + '" viewBox="' + vb + '" aria-hidden="true">' + (it.onArt || "") + "</svg>"; }).join("");
+    root.innerHTML = '<h2 class="tb-gate-title">' + esc(o.title || "Gear up!") + "</h2>" +
+      '<div class="tb-gate-row"><div class="tb-gate-worker" role="button" tabindex="0" aria-label="' + esc(o.workerLabel || "Put everything on") + '">' +
+      '<svg viewBox="' + vb + '" aria-hidden="true">' + (o.worker || "") + "</svg>" + layers + "</div>" +
+      '<div class="tb-gate-items"></div></div>' +
+      '<p class="tb-gate-hint">' + esc(o.hint || "Tap to put it all on!") + "</p>";
+    var worker = root.querySelector(".tb-gate-worker"), box = root.querySelector(".tb-gate-items");
+    var tl = tileRow(box, { kind: "action", items: items.map(function (it) { return { id: it.id, name: it.name, pic: it.art }; }), onPick: function (id) { dressAll(id); } });
+    box.classList.remove("tb-tilerow");
+    box.style.setProperty("--tb-cols", Math.min(items.length, items.length > 2 ? 2 : items.length));
+    function layer(id) { return root.querySelector('.tb-gate-on[data-id="' + id + '"]'); }
+    function putOn(id, cb) {
+      if (onIds[id]) { if (cb) cb(); return; }
+      var it = null; items.forEach(function (x) { if (x.id === id) it = x; });
+      if (!it) { if (cb) cb(); return; }
+      onIds[id] = true;
+      var b = tl.button(id); if (b) b.classList.add("is-on");
+      var L = layer(id); if (L) L.classList.add("is-on");
+      var r = worker.getBoundingClientRect();
+      nametag(it.name, r.left + r.width / 2, r.top + r.height * 0.18, 1600);
+      call(o.onPut, id);
+      var next = function () { if (cb) cb(); check(); };
+      if (o.extra && typeof o.extra[id] === "function") o.extra[id](next, worker);
+      else setTimeout(next, Math.max(450, Math.round((o.ms || 1500) / Math.max(1, items.length))));
+    }
+    function check() {
+      if (finished) return;
+      for (var i = 0; i < items.length; i++) if (!onIds[items[i].id]) return;
+      finished = true;
+      if (o.flag) gearOn(o.flag);
+      worker.classList.remove("tb-pop"); void worker.offsetWidth; worker.classList.add("tb-pop");
+      setTimeout(function () { root.hidden = true; call(o.done); }, 700);
+    }
+    // One tap dresses everything, in order, starting with what was tapped.
+    function dressAll(first) {
+      if (locked()) return;
+      if (running) { if (first) putOn(first); return; }
+      running = true;
+      var order = items.map(function (x) { return x.id; });
+      if (first && order.indexOf(first) > 0) { order.splice(order.indexOf(first), 1); order.unshift(first); }
+      (function nextOne() {
+        var id = null;
+        for (var i = 0; i < order.length; i++) if (!onIds[order[i]]) { id = order[i]; break; }
+        if (!id) { running = false; check(); return; }
+        putOn(id, nextOne);
+      })();
+    }
+    worker.addEventListener("click", function () { dressAll(null); });
+    worker.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dressAll(null); } });
+    // Dragging one item onto the worker puts just that one on.
+    items.forEach(function (it) {
+      var b = tl.button(it.id); if (!b) return;
+      var drag = null;
+      b.addEventListener("pointerdown", function (e) {
+        if (onIds[it.id] || locked()) return;
+        drag = { x: e.clientX, y: e.clientY, moved: false };
+        try { b.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+      });
+      b.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) > 12) drag.moved = true;
+        if (drag.moved) { b.style.transform = "translate(" + dx + "px," + dy + "px) scale(1.06)"; b.style.zIndex = "5"; }
+      });
+      function up(e) {
+        if (!drag) return;
+        var moved = drag.moved; drag = null;
+        b.style.transform = ""; b.style.zIndex = "";
+        if (!moved) return;                   // a tap: the click dresses everything
+        b._tbNoClick = now() + 400;
+        var r = worker.getBoundingClientRect();
+        if (e.clientX > r.left - 30 && e.clientX < r.right + 30 && e.clientY > r.top - 30 && e.clientY < r.bottom + 30) putOn(it.id);
+      }
+      b.addEventListener("pointerup", up);
+      b.addEventListener("pointercancel", up);
+      b.addEventListener("click", function (e) { if (b._tbNoClick && now() < b._tbNoClick) { e.stopImmediatePropagation(); } }, true);
+    });
+    palmGuard(root);
+    var portrait = function () { root.querySelector(".tb-gate-row").style.flexDirection = innerHeight > innerWidth ? "column" : "row"; };
+    portrait(); window.addEventListener("resize", portrait);
+    document.body.appendChild(root);
+    return {
+      el: root,
+      dressAll: function () { dressAll(null); },
+      isOn: function (id) { return !!onIds[id]; },
+      hide: function () { root.hidden = true; }
+    };
+  }
+
+  // ---------- Station map ----------
+  function stationMap(o) {
+    o = o || {};
+    var stage = elOf(o.stage), els = [];
+    (o.places || []).forEach(function (pl) {
+      var a = document.createElement("a");
+      a.className = "tb-place";
+      a.href = pl.href;
+      a.setAttribute("aria-label", pl.name);
+      a.innerHTML = '<span class="tb-place-label"><span class="tb-pic" aria-hidden="true"></span><span></span></span>';
+      setPic(a.querySelector(".tb-pic"), pl.pic);
+      a.querySelector(".tb-place-label").lastChild.textContent = pl.name;
+      a.addEventListener("pointerdown", function () { a.classList.add("is-press"); });
+      ["pointerup", "pointercancel", "pointerleave"].forEach(function (t) { a.addEventListener(t, function () { a.classList.remove("is-press"); }); });
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (locked()) return;
+        a.classList.add("is-press");
+        call(o.onPress, pl, a);
+        setTimeout(function () { beforeLeave(function () { location.href = pl.href; }); }, 180);
+      });
+      stage.appendChild(a);
+      els.push({ pl: pl, a: a });
+    });
+    function layout() {
+      var W = stage.clientWidth, H = stage.clientHeight;
+      els.forEach(function (x) {
+        var r = typeof x.pl.rect === "function" ? x.pl.rect(W, H) : [x.pl.rect[0] * W, x.pl.rect[1] * H, x.pl.rect[2] * W, x.pl.rect[3] * H];
+        if (!r) { x.a.hidden = true; return; }
+        x.a.hidden = false;
+        x.a.style.left = r[0] + "px"; x.a.style.top = r[1] + "px"; x.a.style.width = r[2] + "px"; x.a.style.height = r[3] + "px";
+      });
+    }
+    layout();
+    window.addEventListener("resize", layout);
+    return { layout: layout, places: els.map(function (x) { return x.a; }) };
+  }
+
   window.Toybox = {
     init: init,
     fresh: function () { return freshVisit; },
@@ -1361,6 +2139,23 @@
     sheetOpen: sheetOpen,
     turning: turning,
     offFirst: offFirst,
-    beforeLeave: beforeLeave
+    beforeLeave: beforeLeave,
+    // Shared components (plans/redesign.md section 2; see the header)
+    go: goBtn,
+    steps: stepRow,
+    jobs: jobBar,
+    tiles: tileRow,
+    bar: bottomBar,
+    coach: coachLine,
+    ghost: ghostHand,
+    press: pressHelper,
+    palmGuard: palmGuard,
+    isPalm: isPalm,
+    nametag: nametag,
+    gate: gate,
+    map: stationMap,
+    wiggle: wiggle,
+    icon: uiIcon,
+    pics: { play: PIC_PLAY, again: PIC_AGAIN }
   };
 })();

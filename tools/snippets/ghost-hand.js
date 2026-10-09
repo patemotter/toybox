@@ -1,8 +1,10 @@
-// Master copy of the idle "ghost hand" used across the Toybox apps.
-// Paste makeGhost() inside the page's IIFE (and tools/snippets/ghost-hand.css into its <style>), then:
-//   var ghost = makeGhost(function () { return { pts: [[x, y]], tap: true }; });
-//   ghost.learned();   // call once the child has done the move, so it never shows again this visit
-// Pages keep their own pasted copy (there is no build step); keep the look identical when you change it.
+// The ghost hand now lives in common/toybox.js: new and migrated pages call
+//   var ghost = Toybox.ghost({ plan: function () { return { pts: [[x, y]], tap: true, key: "pour" }; } });
+//   ghost.learned("pour");   // he did it himself: never again this visit
+// (API in the header of common/toybox.js; the look is in common/toybox.css, "Ghost hand"). Delete the page's pasted
+// copy when the page moves to the shared components (plans/redesign.md 2.6).
+// This file is the old pasted copy, kept for reference while pages that still carry it are migrated; keep its look
+// identical to common/ if you touch it.
   // ---------- Ghost hand (same look in every app) ----------
   // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
   // at most twice per visit, and never again once the child has done the move (ghost.learned()).
