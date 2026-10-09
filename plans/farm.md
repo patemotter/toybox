@@ -57,8 +57,18 @@ logo are never used. Choice tiles keep the real machine and crop names (Wheat, S
 - **Outside the Farm:** "Diggers & Dumpers" (a quarry), "The Big Dig" (where diggers are built) and "Down at the
   River" (a crane lifting a digger) belong to the **Construction Site**: its planned dump truck station could be
   called "Diggers & Dumpers". "Makes Bread" can link the grain store to the Kitchen (flour), later.
-- Episodes about animals, people and places only (Moooovie Time, Hello Ewe, Feathered Friends, Meets the Horses,
-  Baby Animals, cheese making, racing, shows) have no station: animals stay as life in the scenes.
+- **Animal stations, the way the episodes show them** (the dad, 2026-10-09: "do the animals as they are in the
+  episodes"): watching and helping the farmer, with the machines that look after the animals; never hands-on
+  chores like attaching a milker. After the machine stations:
+
+| Phase | Station (episode title) | What happens | Episodes |
+| --- | --- | --- | --- |
+| **5** | **"Moooovie Time"** (`cows.html`) | the feed mixer wagon: a loader drops silage and a bale in, the augers mix, he drives it down the feed alley and the side conveyor lays feed along the bunk; the cows come to the headlocks and eat; tap a cow and she moos and turns her head; the milking parlor is seen working (a rotary parlor turning, cows riding round) but he doesn't milk | Moooovie Time, Goes Milking, Tyre Trouble |
+| **5** | **"Come Bye"** (`sheep.html`) | the sheepdog: drag the dog round the flock and the sheep move away from it, through the gate into the pen (forgiving, they drift toward the gate); lambs follow their mothers; the lamb feeder machine | Come Bye, Hello Ewe, Baby Baa Day |
+| **6** | **"Feathered Friends"** (`hens.html`) | hens in the hen house and run: tap a hen and she stands and shows her egg, the egg goes into the carton; scatter feed and they peck; a tracked tractor brings the feed | Feathered Friends |
+| **Later** | **"Meets Baby Animals"** | calves, piglets, lambs, chicks in their pens: tap to see them react | Meets Baby Animals, Springtime |
+
+  Horses, racing, cheese making and shows stay out unless he asks.
 - Sources (checked 2026-10-09; community-edited, titles may vary slightly): TheTVDB lists for the 2011 series (24
   episodes) and the 2020 series (three series plus about 29 specials).
 
