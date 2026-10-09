@@ -102,6 +102,8 @@ Brainstormed the same day and set aside by the dad (each "won't work for one rea
 pressure washer, magnet table, typewriter, paint wall, circuits, pinball, car garage, parking garage, canal lock,
 CNC and laser, roller coaster, toy factory, balance scale, clock shop, kite, fireworks, submarine, hot air balloon,
 light lab, flashlight cave, ice resurfacer, pottery wheel, stamps, weather, goo jar, post office, vet, blocks and more.
+Also set aside: the "learning" round (sawmill, sheep to sweater, recycling plant, crayon factory, beekeeping, water
+works, simple machines, word crane, coin machine). The dad: he likes learning, but not these ideas.
 | – | Workshop Projects | On hold |
 
 ---
