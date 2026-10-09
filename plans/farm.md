@@ -41,16 +41,26 @@ tiles. **The dad's decision: name the stations after the episodes** (he knows th
 expect). The episode title is the station's name on the map and in its header; the show's own name, characters and
 logo are never used. Choice tiles keep the real machine and crop names (Wheat, Sunflowers, Potatoes...).
 
-| Phase | Station (episode title, page) | The job and its machines | Tiles | Show episodes it follows |
+| Phase | Station (episode title, page) | The job and its machines | Tiles | Episodes it follows |
 | --- | --- | --- | --- | --- |
-| **1** | **"It's Sow Time"** (`field.html`) + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor) | It's Sow Time, Caterpillar Hunt, Springtime |
-| **2** | **"Combine Time"** (`combine.html`) | combine harvester, grain trailer alongside, to the grain store | **Wheat / Sunflowers** | Combine Time, Sunny Seeds |
-| **2** | **"Brilliant Baler"** (`bales.html`) | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage |
-| **3** | **"Glorious Grass"** (`silage.html`) | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, A-maizing Day |
-| **3** | **"Spuds in Mud"** (`roots.html`) | potato harvester: share lifts the ridge, webs shake the soil off, elevator into a trailer; carrot harvester tops the leaves and lifts | **Potatoes / Carrots** | Spuds in Mud, Munchy Crunchy |
-| **4** | **"Mucky Muck"** (`muck.html`) | loader fills the spreader at the heap; beaters fling it out on the field | none | Mucky Muck |
-| **4** | **"Timberrrrr!"** (`woods.html`) | forestry harvester head grips, fells, strips and cuts the trunk to logs; forwarder loads them; chipper chips the brash | none | Timberrrrr!, Chip Chipping |
-| **Later** | if he wants | straddle fruit harvester (blackcurrants), lavender harvester, mushroom compost turners, hedge cutter | | Juicy Squeezy, Big Machines, Mighty Mushrooms |
+| **1** | **"It's Sow Time"** (`field.html`) + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor, huge wheels) | It's Sow Time, Caterpillar Hunt, Massive Machines, Springtime |
+| **2** | **"Combine Time"** (`combine.html`) | combine harvester, grain trailer alongside, to the grain store (a grain barn) | **Wheat / Sunflowers** | Combine Time, Sunny Seeds, Big Machines, Makes Bread |
+| **2** | **"Brilliant Baler"** (`bales.html`) | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage, Summertime |
+| **3** | **"Glorious Grass"** (`silage.html`) | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, Mighty Maize Machine, A-maizing Day |
+| **3** | **"Spuds in Mud"** (`roots.html`) | potato planter (spring), potato harvester (share lifts the ridge, webs shake the soil off, elevator into a trailer), carrot harvester tops the leaves and lifts | **Potatoes / Carrots**, Plant / Harvest | Spuds in Mud, Grows Potatoes, Goes Farming, Munchy Crunchy, Autumntime |
+| **4** | **"Mucky Muck"** (`muck.html`) | loader fills the spreader at the heap; rear beaters fling it out; a slurry tanker with a spreading boom | **Spreader / Slurry tanker** | Mucky Muck, Massive Machines |
+| **4** | **"Timberrrrr!"** (`woods.html`) | forestry harvester head grips, fells, strips and cuts the trunk to logs; forwarder loads them; chipper chips the brash | Harvester / Chipper | Timberrrrr!, Chip Chipping |
+| **Later** | **"All About Harvesters"** | pea viner, sugar beet harvester (more harvesters on the lane engine) | Peas / Sugar beet | All About Harvesters, More Big Machines |
+| **Later** | **"All About Tractors"** | the tractor shed: pick wheels or tracks, wash it, fix a flat tyre, a new tractor arrives | | All About Tractors, Let's Look at Tractors, Tyre Trouble, Wintertime |
+| **Later** | if he wants | straddle fruit harvester (blackcurrants), lavender harvester, mushroom compost turners | | Juicy Squeezy, Big Machines (2020), Mighty Mushrooms |
+
+- **Outside the Farm:** "Diggers & Dumpers" (a quarry), "The Big Dig" (where diggers are built) and "Down at the
+  River" (a crane lifting a digger) belong to the **Construction Site**: its planned dump truck station could be
+  called "Diggers & Dumpers". "Makes Bread" can link the grain store to the Kitchen (flour), later.
+- Episodes about animals, people and places only (Moooovie Time, Hello Ewe, Feathered Friends, Meets the Horses,
+  Baby Animals, cheese making, racing, shows) have no station: animals stay as life in the scenes.
+- Sources (checked 2026-10-09; community-edited, titles may vary slightly): TheTVDB lists for the 2011 series (24
+  episodes) and the 2020 series (three series plus about 29 specials).
 
 - **Seasons frame the map** (like the show's Springtime / Summertime / Autumntime / Wintertime): the map's sky and
   trees follow the season of the job he last did (sowing = spring, bales and silage = summer, harvest, roots and
