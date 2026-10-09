@@ -817,7 +817,15 @@ bottom row ≥ 16 px above the safe area, no drag starting within 24 px of an ed
   marbling stays. One press: lever pull → tap = a full extrusion; crank → tap = one sheet; cutter drag → tap the
   dough = cut there.
 
-## 6. Questions for the dad (before the batches that need them)
+## 6. Decisions (the dad, 2026-10-09: "most of these are fine; do what you think and make it something we examine
+again in the future")
+All nine questions below are decided by the coordinator as proposed: the Tool Wall becomes a station behind a
+Workshop map; Birdhouse in 6 visits; Espresso in 6 steps; Marble Run drops Mix 2 and Kit (keeps Mix 1); Saw Bench
+keeps the 8 saws the Saw Bench entry lists; a spoken coach line as an App setting, off by default; New is one tap
+everywhere (palm guard); the cleaner chrome as in the mock; Go inside the step row. **Revisit after he has played
+the redesigned apps** (each batch report lists what to look at again).
+
+### The original questions
 - OK to turn the Workshop's Tool Wall into a station behind a workshop map (1.7)?
 - Birdhouse in 6 visits instead of 22: OK?
 - Espresso in 6 strip steps (warm-up, flush, knock-out, rinse automatic): OK?
