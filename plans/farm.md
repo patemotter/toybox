@@ -37,17 +37,19 @@ The show's episodes are each one farm job with its machines (checked 2026-10-09 
 "It's Sow Time", "Combine Time", "Sunny Seeds", "Glorious Grass", "Silage Surprise", "Brilliant Baler",
 "Hey Haylage", "Mucky Muck", "Spuds in Mud", "Munchy Crunchy", "A-maizing Day", "Timberrrrr!", "Chip Chipping",
 "Caterpillar Hunt", the four season episodes). Each station is one such job, with the crops of related episodes as
-tiles. **Our own station titles, not the show's** (no brand names); the show is the inspiration only.
+tiles. **The dad's decision: name the stations after the episodes** (he knows them all, so he knows what to
+expect). The episode title is the station's name on the map and in its header; the show's own name, characters and
+logo are never used. Choice tiles keep the real machine and crop names (Wheat, Sunflowers, Potatoes...).
 
-| Phase | Station (map title) | The job and its machines | Tiles | Show episodes it follows |
+| Phase | Station (episode title, page) | The job and its machines | Tiles | Show episodes it follows |
 | --- | --- | --- | --- | --- |
-| **1** | **Field** ("Plow and sow") + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor) | It's Sow Time, Caterpillar Hunt, Springtime |
-| **2** | **Combine** ("Harvest") | combine harvester, grain trailer alongside, to the grain store | **Wheat / Sunflowers** | Combine Time, Sunny Seeds |
-| **2** | **Bales** ("Bale day") | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage |
-| **3** | **Silage** ("Silage") | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, A-maizing Day |
-| **3** | **Roots** ("Spuds and carrots") | potato harvester: share lifts the ridge, webs shake the soil off, elevator into a trailer; carrot harvester tops the leaves and lifts | **Potatoes / Carrots** | Spuds in Mud, Munchy Crunchy |
-| **4** | **Muck** ("Muck spreading") | loader fills the spreader at the heap; beaters fling it out on the field | none | Mucky Muck |
-| **4** | **Woods** ("Timber") | forestry harvester head grips, fells, strips and cuts the trunk to logs; forwarder loads them; chipper chips the brash | none | Timberrrrr!, Chip Chipping |
+| **1** | **"It's Sow Time"** (`field.html`) + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor) | It's Sow Time, Caterpillar Hunt, Springtime |
+| **2** | **"Combine Time"** (`combine.html`) | combine harvester, grain trailer alongside, to the grain store | **Wheat / Sunflowers** | Combine Time, Sunny Seeds |
+| **2** | **"Brilliant Baler"** (`bales.html`) | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage |
+| **3** | **"Glorious Grass"** (`silage.html`) | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, A-maizing Day |
+| **3** | **"Spuds in Mud"** (`roots.html`) | potato harvester: share lifts the ridge, webs shake the soil off, elevator into a trailer; carrot harvester tops the leaves and lifts | **Potatoes / Carrots** | Spuds in Mud, Munchy Crunchy |
+| **4** | **"Mucky Muck"** (`muck.html`) | loader fills the spreader at the heap; beaters fling it out on the field | none | Mucky Muck |
+| **4** | **"Timberrrrr!"** (`woods.html`) | forestry harvester head grips, fells, strips and cuts the trunk to logs; forwarder loads them; chipper chips the brash | none | Timberrrrr!, Chip Chipping |
 | **Later** | if he wants | straddle fruit harvester (blackcurrants), lavender harvester, mushroom compost turners, hedge cutter | | Juicy Squeezy, Big Machines, Mighty Mushrooms |
 
 - **Seasons frame the map** (like the show's Springtime / Summertime / Autumntime / Wintertime): the map's sky and

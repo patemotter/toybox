@@ -200,7 +200,9 @@ Keep only:
   card stays, every usual line on or off, and their own lines, each with a sun, star or heart ("Show one now"
   previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
-- Real names, no brand names or logos.
+- Real names, no brand names or logos. Exception (the dad): the Farm's stations are named after the episodes of
+  the farm-machinery show he watches ("It's Sow Time", "Combine Time"...), because he knows them; never the show's
+  own name, characters or logo.
 
 ### Fresh start
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
