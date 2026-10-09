@@ -5,8 +5,9 @@
 **The dad (2026-10-09):** no milking or animal chores. He watches a lot of *Tractor Ted* (real farm machinery
 filmed doing the farm jobs through the seasons), and that is his idea of a farm. So the Farm is **the machines and
 the jobs they do**, one connected farm through the year. Animals are there as life in the scene (sheep and cows in
-the next field, gulls behind the plow, a hare, the farm dog), not as stations. **Milking (3.4) and Eggs (3.5) are
-dropped**; their engineering notes stay below only for reference. The lane engine, the views, the tractor, the
+the next field, gulls behind the plow, a hare, the farm dog), not as hands-on chores. **Milking (3.4) and Eggs
+(3.5) as designed are dropped**; animals come back as stations framed the way the episodes show them (the animal
+table in 0.3), and the Eggs design is reused by "Feathered Friends". The lane engine, the views, the tractor, the
 combine, Hay and the map design below still apply.
 
 ### 0.1 One farm, one year, connected by what the machines make
