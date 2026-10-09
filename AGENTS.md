@@ -51,10 +51,12 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
-  and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`).
+  and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + `field` ("It's Sow
+  Time"), more stations per `plans/farm.md`; shared code in `farm/farm.js`, documented in its header, world state in
+  `farm-world-v1`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
-  train-builder.
+  train-builder, farm.
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.

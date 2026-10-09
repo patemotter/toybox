@@ -240,7 +240,18 @@ const CORE = [
   "./espresso-machine/icons/icon-180.png",
   "./espresso-machine/icons/icon-192.png",
   "./espresso-machine/icons/icon-512.png",
-  "./espresso-machine/icons/icon-maskable-512.png"
+  "./espresso-machine/icons/icon-maskable-512.png",
+
+  // Farm
+  "./farm/",
+  "./farm/index.html",
+  "./farm/field.html",
+  "./farm/farm.js",
+  "./farm/manifest.webmanifest",
+  "./farm/icons/icon-180.png",
+  "./farm/icons/icon-192.png",
+  "./farm/icons/icon-512.png",
+  "./farm/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
