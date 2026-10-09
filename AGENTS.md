@@ -15,6 +15,10 @@ without the history of the conversations that built it. `PLAN.md` holds the back
   and a water play table the family owns.
 - Don't invent other traits. Don't "dumb it down": real tool names and real mechanics are wanted. But nothing
   should be complex or unintuitive for a bright 3-year-old.
+- **Learning comes from doing the real thing** (the dad: the Workshop "is full of learning info even though it's not a
+  traditional learning thing for a 3yo"). Real tools, real names, real steps and real mechanics, done hands-on, teach
+  how the world works. Don't frame apps as lessons, quizzes or "educational" activities; make the real activity
+  accurate and let the learning come with it.
 - **New app ideas** can come from anywhere: any toy, machine, activity or game that would be fun, sensory and
   intuitive for him. His interests (the list above) are one good source, not a limit, and ideas don't have to be
   typical preschool themes either. Don't design from stereotypes about autism (e.g. assuming spinning, sorting or
