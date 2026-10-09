@@ -50,7 +50,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
-  `excavator`, `concrete`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
+  `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,

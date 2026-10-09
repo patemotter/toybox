@@ -223,6 +223,12 @@ Excavator open points: the arm can't bring the bucket close to the cab; dirt lan
 bed; the crate is small on landscape phones. Questions for the dad: keep Dig/Dump visible in Big mode; more or
 fewer treasures; after a swing on a phone the finger can end up over the bed and tip the load straight in.
 
+**Forklift (done, 2026-10-09, plan in `plans/forklift.md`):** a rough-terrain straight-mast forklift; drag the forks
+(drive + lift); a delivery truck with one stack at its back; pallets to the yard or the two-deck scaffold, where the
+bricklayer adds a wall row; empties go back on the truck. "Move it!" does a whole pallet move. Counter "Pallets".
+Open points: on upright phones a lot of empty sky, the truck and wall are off-screen at the start, the coach pill
+sits over the wheels on sideways phones. The map now lays out lots in 2 x 3 on upright screens.
+
 **New stations (the dad's picks, in this order):**
 - **Tower crane (done):** drag the hook; the trolley runs along the jib and the cable follows; hook steel
   beams and pallets of bricks, carry them to the building and it grows floor by floor until it is topped out

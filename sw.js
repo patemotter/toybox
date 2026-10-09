@@ -141,6 +141,7 @@ const CORE = [
   "./construction-site/concrete.html",
   "./construction-site/wrecking-ball.html",
   "./construction-site/tower-crane.html",
+  "./construction-site/forklift.html",
   "./construction-site/manifest.webmanifest",
   "./construction-site/icons/icon-180.png",
   "./construction-site/icons/icon-192.png",
