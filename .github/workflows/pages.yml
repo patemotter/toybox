@@ -1,33 +1,87 @@
-# Publish the Toybox to GitHub Pages.
+# Check the Toybox, then publish it to GitHub Pages.
 # Needs Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 # "Run workflow" in the Actions tab republishes on demand.
+#
+# The check job builds _site (the published files only: no tools/, archive/, .github/ or Markdown), stamps the
+# offline cache version into _site/sw.js, checks that every file is in the service worker's CORE list, and loads
+# every page in a browser (tools/smoke.js: page errors, page scroll). If any of that fails, nothing is published
+# and the live Toybox stays as it was.
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the full history: the cache version counts commits
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build _site (published files only)
+        run: |
+          mkdir _site
+          git ls-files -z | grep -zvE '^(tools|archive|\.github)/|\.md$|^\.' | xargs -0 cp --parents -t _site
+
+      # The cache version goes up by one with every commit that changes a published file, so devices download
+      # a fresh offline copy after each real change (and not after a change to the docs or tools only).
+      - name: Stamp the offline cache version
+        run: |
+          n=$(( 1000 + $(git rev-list --count HEAD -- . ':(exclude)tools' ':(exclude)archive' ':(exclude).github' ':(exclude)*.md') ))
+          sed -i 's/^const CACHE = "toybox-v0";/const CACHE = "toybox-v'"$n"'";/' _site/sw.js
+          grep -q "^const CACHE = \"toybox-v$n\";" _site/sw.js || { echo "sw.js has no 'const CACHE = \"toybox-v0\";' line to stamp"; exit 1; }
+          echo "Offline cache: toybox-v$n"
+
+      - name: Every published file is cached offline
+        run: node tools/check-site.js _site
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+
+      - name: Load every page (iPad, then iPhone)
+        run: |
+          npx --yes http-server@14.1.1 _site -p 8120 -c-1 -s &
+          for i in $(seq 1 30); do curl -sf http://localhost:8120/ >/dev/null && break; sleep 1; done
+          pages=$(grep -o '"\./[^"]*\.html"' _site/sw.js | sed 's/^"\.\///; s/"$//')
+          SIZE=1180x820 node tools/smoke.js $pages
+          SIZE=390x844 MOBILE=1 node tools/smoke.js $pages
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
       - id: deployment
         uses: actions/deploy-pages@v4

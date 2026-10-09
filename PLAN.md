@@ -525,4 +525,4 @@ Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
 - Calm pace; results stay on screen. One obvious first action, a coach line, an idle ghost hand.
 - Fresh start from the home screen; collections and grown-up settings kept.
 - No fail states, real names, no brands. Never the child's name anywhere.
-- Add a finished app with `python3 tools/add-app.py ...`, bump caches, smoke-test with `node tools/smoke.js ...`.
+- Add a finished app with `python3 tools/add-app.py ...`, check with `node tools/check-site.js`, smoke-test with `node tools/smoke.js ...`.

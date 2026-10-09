@@ -51,11 +51,14 @@ You can also install a single app on its own by opening its folder (for example 
    <script src="../common/toybox.js"></script>
    ```
 4. Add the app to `APPS` in the top-level `index.html`.
-5. Add the app's files to `CORE` in the top-level `sw.js` and bump its `CACHE` (`tools/add-app.py` does 4 and 5).
+5. Add the app's files to `CORE` in the top-level `sw.js` (`tools/add-app.py` does 4 and 5).
 
 ## Updating an app
 
-After changing any file, bump `CACHE` in the top-level `sw.js`, so devices download a fresh offline copy. (Opened online, pages are fetched from the network first anyway.)
+There is no cache version to bump: the deploy stamps `CACHE` in `sw.js` with a number that goes up with every commit
+that changes a published file, so devices download a fresh offline copy. (Opened online, pages are fetched from the
+network first anyway.) The deploy also checks the site first, and publishes nothing if a check fails: see Deploy in
+`AGENTS.md`.
 
 ## Publishing
 

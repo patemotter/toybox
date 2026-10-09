@@ -60,7 +60,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `sw.js` and README), `snippets/` (master copies of the idle ghost hand and the coach pill).
 
 ### Offline (service workers)
-- **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-vN"`). `common/toybox.js`
+- **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-v<number>"`, stamped by the deploy). `common/toybox.js`
   registers it from every page (scope = the Toybox root) and unregisters any narrower worker it finds; pages have
   no registration code of their own. It caches the launcher and **every page of every app**, so one visit makes
   everything work offline. A new page must be added to its `CORE`.
@@ -76,7 +76,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   (v119 or later) runs, then unregister. Keep the stubs; never give an app a worker again.
 - The Grown-ups sheet's "Offline (for the plane)" section asks the worker which files are saved
   (`toybox-offline-check` / `toybox-offline-fill` messages) and names any app that isn't ready.
-- **Bump `toybox-vN` on every commit** that changes anything it caches (a new version re-downloads every file).
+- **Don't bump the cache version**: the repo's `sw.js` says `"toybox-v0"` and the deploy stamps `toybox-v<1000 + the
+  number of commits that changed a published file>`, so every real change re-downloads every file and a docs-only
+  commit doesn't. Keep the `"toybox-v<digits>"` shape: the retire stubs look for it. Every published file must be
+  in `CORE`; `node tools/check-site.js` checks it (the deploy runs it).
 
 ### Deploy
 - GitHub Pages is published by `.github/workflows/pages.yml` (GitHub Actions, on every push to `main`, plus
@@ -85,6 +88,11 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - The owner asked for direct pushes: commit to the working branch and push the same commit to `main`
   (`git push origin HEAD:<branch> HEAD:main`). No PR needed. Never force-push unless the owner explicitly asks.
 - Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/sw.js | grep CACHE`.
+- **The deploy checks first** (the `check` job): it builds `_site` from the tracked files minus `tools/`, `archive/`,
+  `.github/` and Markdown (those stay in the repo but aren't published, so archived apps have no live URL), stamps
+  the cache version, runs `tools/check-site.js`, then `tools/smoke.js` on every page at 1180x820 and at 390x844 as a
+  phone. Any failure publishes nothing and the live Toybox stays as it was: fix it and push again. Pull requests
+  run the same checks without publishing.
 
 ---
 
@@ -275,7 +283,7 @@ Keep only:
 - At most **three agents at a time** (the owner cares about not overloading the machine).
 - Each agent owns specific files. Don't edit files outside your assignment. Shared files (`common/`, the
   launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are edited by the coordinator only, unless assigned.
-- The top-level `sw.js` is the coordinator's: agents don't bump caches; the coordinator bumps `toybox-vN` per commit.
+- The top-level `sw.js` is the coordinator's: agents don't edit its `CORE`; the coordinator adds new pages.
 - **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
   tree**: other agents' uncommitted work lives there. To compare with an older version, export it with
   `git show HEAD:<path> > <scratch file>` instead.
@@ -298,7 +306,7 @@ Keep only:
 ### Adding a new app
 1. Build the folder (see §2), using `common/` for the grown-up layer, following every rule in §3.
 2. `python3 tools/add-app.py <folder> "<Name>" "<tile line>" "<README line>" [extra pages]`.
-3. Bump caches, smoke-test the launcher and the app, commit, push to the branch and `main`.
+3. `node tools/check-site.js`, smoke-test the launcher and the app, commit, push to the branch and `main`.
 
 ---
 

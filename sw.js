@@ -8,8 +8,10 @@
 //   the cached copy is served at once; a late answer still refreshes the cache for next time.
 // - Everything else (icons, the font): stale-while-revalidate.
 // Install downloads every CORE file fresh (bypassing the browser's HTTP cache).
-// After changing any file (or adding an app), bump CACHE and add the app's files to CORE.
-const CACHE = "toybox-v146";
+// Adding a page or file: add it to CORE (tools/check-site.js, run by the deploy, fails if one is missing).
+// Don't edit CACHE: the deploy (.github/workflows/pages.yml) stamps "toybox-v<number>" here, a number that goes
+// up with every commit that changes a published file. "toybox-v0" is what a local server serves.
+const CACHE = "toybox-v0";
 const CORE = [
   "./",
   "./index.html",

@@ -4,7 +4,7 @@ Usage (from anywhere):
   python3 tools/add-app.py <folder> "<Name>" "<what: one line for the tile>" "<README description>" [extra files...]
 
 Extra files are additional pages in the folder to cache offline (e.g. "drill-press.html").
-It bumps the top-level "toybox-vN" cache. The app's manifest and icons must already exist (an app has no sw.js of its own: the top-level one serves everything).
+The cache version is stamped by the deploy, so there is nothing to bump. The app's manifest and icons must already exist (an app has no sw.js of its own: the top-level one serves everything).
 """
 import os
 import re
@@ -22,8 +22,6 @@ s = re.sub(r'\n    \}\n  \];', '\n    }' + entry, s, count=1)
 open("index.html", "w").write(s)
 
 s = open("sw.js").read()
-n = int(re.search(r'toybox-v(\d+)', s).group(1))
-s = s.replace('toybox-v%d"' % n, 'toybox-v%d"' % (n + 1))
 files = (["./%s/" % folder, "./%s/index.html" % folder] + ["./%s/%s" % (folder, e) for e in extra] +
          ["./%s/manifest.webmanifest" % folder] +
          ["./%s/icons/%s" % (folder, i) for i in ["icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]])
@@ -38,4 +36,4 @@ s = open("README.md").read()
 rows = re.findall(r'^\| .* \| \[`.*`\]\(.*\) \|$', s, re.M)
 s = s.replace(rows[-1], rows[-1] + "\n| %s: %s | [`%s/`](%s/) |" % (name, desc, folder, folder))
 open("README.md", "w").write(s)
-print("ok, top-level cache is now toybox-v%d" % (n + 1))
+print("ok, added %s to the launcher, sw.js CORE and README" % folder)
