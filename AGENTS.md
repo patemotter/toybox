@@ -15,10 +15,10 @@ without the history of the conversations that built it. `PLAN.md` holds the back
   and a water play table the family owns.
 - Don't invent other traits. Don't "dumb it down": real tool names and real mechanics are wanted. But nothing
   should be complex or unintuitive for a bright 3-year-old.
-- **New app ideas** come from his own interests (the list above) and real-world things like them: real machines,
-  tools, vehicles and processes. Don't fall back on typical preschool themes (the dad: his interests aren't
-  typical preschool things); suggest one only when it clearly suits him, and say why. Don't design from
-  stereotypes about autism either (e.g. assuming spinning, sorting or lining things up); ask the dad when unsure.
+- **New app ideas** can come from anywhere: any toy, machine, activity or game that would be fun, sensory and
+  intuitive for him. His interests (the list above) are one good source, not a limit, and ideas don't have to be
+  typical preschool themes either. Don't design from stereotypes about autism (e.g. assuming spinning, sorting or
+  lining things up); ask the dad when unsure.
 - Devices: an **iPad** (used offline on flights) and an **iPhone**. Both run the site as a home-screen web app.
 - The grown-up (the dad) is a software engineer; grown-up controls live behind a 2-second press-and-hold.
 
