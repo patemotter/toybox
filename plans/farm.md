@@ -27,7 +27,7 @@ Yard:  muck spreader out to the field; loader / telehandler stacks bales, fills 
   clamp, the muck heap, and the machines parked in the yard by their sheds.
 
 ### 0.2 One look, like the show
-- **The same red tractor** (`Farm.drawTractor`) pulls everything: plough, harrow, drill, spreader, sprayer, the
+- **The same green tractor** (the dad: green, like the show's tractor; generic, no logos or a maker's exact color scheme) (`Farm.drawTractor`) pulls everything: plough, harrow, drill, spreader, sprayer, the
   grain trailer beside the combine, mower, rake, baler, wrapper, silage trailers, muck spreader. Bigger machines
   (combine, forage harvester, telehandler) are their own drawings.
 - Real machine names in the coach lines, the season in the sky (spring blossom, summer sun, autumn leaves), one sun
