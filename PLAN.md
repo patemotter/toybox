@@ -96,7 +96,8 @@ ending with open questions for the dad; settle those before building.
 - **Garbage Truck:** the side-loader arm grabs a bin, tips it into the hopper, the packer squashes the load, the
   load slides out at the depot.
 - **Forklift:** forks under a pallet, raise the mast, load a truck; could be a Construction Site station.
-- **Farm:** almost all of it: tractor and plow, planting, sprayer, combine, baler, the animals.
+- **Farm:** the machines and their jobs, like *Tractor Ted* (the dad: no milking or animal chores): field work,
+  combine, hay and bales, silage, muck spreading; see `plans/farm.md` section 0.
 - **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
   thread, guiding the fabric, making something.
 - **Play Dough Factory:** squish, roll and cut dough, an extruder press with dies.

@@ -1,69 +1,60 @@
 # Farm: design and engineering plan
 
-## 0. The whole farm (coordinator's cohesive plan; overrides the sections below where they differ)
+## 0. The whole farm (coordinator's plan after the dad's direction; overrides the sections below)
 
-The dad wants "almost all aspects" of a farm. The station plan below is sound, but each station stands alone. This
-section ties them into **one farm with one year that keeps going**, so what he does in one place shows up in the
-others, the way a real farm works.
+**The dad (2026-10-09):** no milking or animal chores. He watches a lot of *Tractor Ted* (real farm machinery
+filmed doing the farm jobs through the seasons), and that is his idea of a farm. So the Farm is **the machines and
+the jobs they do**, one connected farm through the year. Animals are there as life in the scene (sheep and cows in
+the next field, gulls behind the plow, a hare, the farm dog), not as stations. **Milking (3.4) and Eggs (3.5) are
+dropped**; their engineering notes stay below only for reference. The lane engine, the views, the tractor, the
+combine, Hay and the map design below still apply.
 
-### 0.1 One farm, connected by what it makes
+### 0.1 One farm, one year, connected by what the machines make
 ```
-Field ──(golden wheat)──> Combine ──(grain truck)──> Grain bin ──┐
-  ^                          │                                    ├──> Feeding ──> Milking ──> milk truck
-  └──────(stubble)───────────┘          Hay ──(bales)──> Hay stack ┘                 Eggs ──> egg stand
+          spring                      summer                         autumn
+Field: plough → harrow → drill → (fertiliser) spreader → sprayer → golden → Combine → stubble → back to plough
+Grass: mower → rake → baler (+ bale wrapper) → bales to the stack        Silage: forage harvester → trailers → clamp
+Yard:  muck spreader out to the field; loader / telehandler stacks bales, fills the spreader, rolls the clamp
 ```
-- **One shared field** (`farm-world-v1.field`): the Field station and the Combine work the same four lanes. The
-  real cycle runs round: stubble → plow → harrow → seed drill → sprayer → golden → combine → stubble again.
-- **Never blocked**: opening the Combine before the wheat is golden plays the "weeks go by" sun arc on the spot
-  (sprouts → green → golden in a few seconds), then he harvests. Opening the Field on golden wheat offers the
-  Combine on the coach ("Ready to harvest!") and still lets him plow (the wheat is cut into stubble first by a
-  short automatic pass). Every station is always playable at once.
-- **Stores feed the next job** (all kept across visits; shown on the map): grain trucks fill the **grain bin**;
-  bales go to the **hay stack**; Feeding (later) takes hay and grain from them for the cows (they never run out:
-  an empty store refills with a delivery truck); milk goes out on the **milk truck**; cartons go to the **egg
-  stand**.
-- **The map is the farm itself**, drawn live from `farm-world-v1`: the field shows its current stage (stubble,
-  furrows, green rows, golden), the bin its level, the stack its bales, the stand its cartons, the barn its cows.
-  A glance at the map shows what he has done.
+- **One shared field** (`farm-world-v1.field`): Field and Combine work the same lanes; the real cycle runs round
+  (stubble → plough → ... → golden → combine → stubble). **Never blocked**: opening the Combine before the wheat is
+  golden plays the "weeks go by" sun arc on the spot, then he harvests.
+- **What the machines make goes somewhere** (kept across visits, shown on the map): grain trailers fill the **grain
+  store**; bales go to the **bale stack** (wrapped bales in black or green wrap); silage builds the **clamp**; the
+  muck spreader empties the **muck heap**, which slowly grows back.
+- **The map is the farm itself**, drawn live: the field's current stage, the grain store level, the bale stack, the
+  clamp, the muck heap, and the machines parked in the yard by their sheds.
 
-### 0.2 One look across the farm
-- **The same red tractor** everywhere (`Farm.drawTractor`): it pulls the plow, harrow, drill and sprayer, the grain
-  cart beside the combine, the mower, rake and baler, and later the feed mixer wagon. One machine he gets to know.
-- One sun and sky (`Farm.sky`): the "weeks go by" arc, evening on the timer ending, the same horizon farm (barn,
-  silo, bin, trees) behind every field scene.
-- One set of farm sounds and one coach/ghost helper in `farm.js`.
+### 0.2 One look, like the show
+- **The same red tractor** (`Farm.drawTractor`) pulls everything: plough, harrow, drill, spreader, sprayer, the
+  grain trailer beside the combine, mower, rake, baler, wrapper, silage trailers, muck spreader. Bigger machines
+  (combine, forage harvester, telehandler) are their own drawings.
+- Real machine names in the coach lines, the season in the sky (spring blossom, summer sun, autumn leaves), one sun
+  arc for "weeks go by", one horizon farm behind every field scene. One set of sounds and one coach/ghost helper.
 
-### 0.3 All the stations ("almost all aspects"), in build order
-| Phase | Stations | Why this order |
+### 0.3 Stations, in build order (two agents at a time; he plays each phase before the next)
+| Phase | Stations | Notes |
 | --- | --- | --- |
-| **1** | `farm.js` (lane engine, tractor, sky, world store, sound, ghost) + **map** + **Field** | Everything else builds on the engine and the world store. 1 agent, L. |
-| **2** | **Combine** and **Milking**, in parallel | Combine closes the crop loop (field → bin). Milking is the first animal job and needs only the store. 2 agents. |
-| **3** | **Hay** (mower, rake, round baler, bale spear to the stack) and **Eggs**, in parallel | Hay reuses the lane engine; Eggs is small. 2 agents. |
-| **4** | **Feeding** (feed mixer wagon: loader scoops silage, hay bale and grain from the bin; vertical augers mix; the wagon lays feed along the bunk; cows at the headlocks) | Ties hay and grain to the cows: the loop is closed. 1 agent. |
-| **Later, if he wants** | Corn as a second crop (row planter, corn head); more animals (sheep shearing, pigs, goats, a calf with a bottle); grain dryer and auger into the bin | Ask the dad after he has played phases 1-3. |
-
-After each phase he plays it before the next phase starts; the plans for later phases are adjusted to what he
-liked.
+| **1** | `farm.js` (lane engine, tractor, sky, world store, sound, ghost) + **map** + **Field** | Field tiles: Plough, Harrow, Drill, Spreader (fertiliser, spinning discs), Sprayer. 1 agent, L. |
+| **2** | **Combine** and **Hay**, in parallel | Combine with the grain trailer alongside, then to the grain store. Hay: Mower, Rake, Baler, Wrapper (the wrapper spins the bale in stretch film); the loader stacks the bales. 2 agents. |
+| **3** | **Silage** and **Muck spreader**, in parallel | Silage: the forage harvester blows chopped grass into a trailer driving alongside; trailers tip at the clamp; the loader pushes it up and rolls it. Muck: the loader fills the spreader at the heap; out in the field the beaters fling it out behind. 2 agents. |
+| **Later, if he wants** | Potato harvester, hedge cutter, telehandler yard jobs, corn (maize) as a second crop, ploughing match | Ask after phases 1-3. |
 
 ### 0.4 Decisions taken (defaults; the dad can change any)
-- **Wheat first** (golden heads, reel header, seed drill); corn later as a crop tile.
-- **Milking parlor**, the farmer attaches the unit (keeps the job in his hands); a milking robot could be a later tile.
-- **Pace**: four lanes, about 6-8 s per lane. On phones held sideways three lanes show at a time.
-- **Carry-over**: yes, one shared field (0.1), never blocking.
-- **Stores kept across visits** (grain bin, hay stack, egg stand, milk truck stars), like the Kitchen table. A
-  fresh visit resets each station's scene and counter and puts the shared field back to stubble, so the Field's
-  first action is always "Drag the tractor!".
-- **No safety ritual.**
+- **Wheat first**; maize later. **Four lanes**, about 6-8 s per lane; three show at a time on a phone held sideways.
+- **Shared field and kept stores** as above. A fresh visit resets each station's scene and counter and puts the
+  field back to stubble, so the Field's first action is always "Drag the tractor!". **No safety ritual.**
+- **Words**: US English for the UI by default (plow, fertilizer); if the family uses the show's British words
+  (plough, trailer, muck, clamp), the dad says so and every label follows.
 
 ### 0.5 Engineering changes from the sections below
-- Storage: one **`farm-world-v1`** key holds the shared field (`lanes`, `stage`), the stores (`grain`, `bales`,
-  `cartons`, `milk`) and is read by every page and the map; it replaces `farm-store-v1` and the field parts of
-  `farm-field-v1` / `farm-combine-v1`. Per-station keys keep only their own scene (tank, cart, cow, nests,
-  counters). `Farm.world.get()` / `.update(fn)` in `farm.js`, every access in try/catch, unknown fields kept.
-- `Farm.sky(ctx, t, timeOfDay)` and `Farm.drawTractor(ctx, t, attachment)` are shared, so Field, Combine (grain cart),
-  Hay and Feeding draw the same tractor.
-- `farm.js` has one owner at a time (the phase-1 agent, then the coordinator); its header documents the API; every
-  farm page is smoke-tested after any change to it.
+- Storage: one **`farm-world-v1`** key (shared field `lanes`/`stage`, stores `grain`, `bales`, `clamp`, `muck`),
+  read by every page and the map; it replaces `farm-store-v1` and the field parts of `farm-field-v1` /
+  `farm-combine-v1`. Per-station keys keep only their own scene and counter. `Farm.world.get()` / `.update(fn)`,
+  every access in try/catch, unknown fields kept.
+- Shared in `farm.js`: `Farm.lanes`, `Farm.drawTractor(ctx, t, attachment)`, `Farm.sky(ctx, t, season, timeOfDay)`,
+  `Farm.world`, `Farm.sound`, `Farm.ghost`, the coach helper. One owner at a time (the phase-1 agent, then the
+  coordinator); every farm page is smoke-tested after any change to it.
 
 ## 1. Summary
 
