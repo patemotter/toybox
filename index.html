@@ -62,8 +62,8 @@ body {
 }
 /* The home screen fits on one screen with no scrolling: a fixed-height column (the header, then the grid
    of tiles filling the rest). The grid has exactly the rows the apps need, and fitGrid() below sizes the
-   pictures to the room left in a row after the names. The tile order never changes, so every app keeps
-   its place on the screen. */
+   pictures to the room left in a row after the names. The tile order only changes when a grown-up picks
+   favorites (they come first, in the order they were picked), so every app keeps its place on the screen. */
 .wrap {
   max-width: 1000px;
   margin: 0 auto;
@@ -144,6 +144,19 @@ h1 {
 /* Just the picture and the name on every screen, so the home screen is calm and quick to scan.
    The descriptions stay in APPS (and in the README) for grown-ups. */
 .app .what { display: none; }
+/* A favorite (picked by a grown-up in the Grown-ups sheet) wears a small star; it is not a button. */
+.apps li > .app { position: relative; }
+.app .fav { position: absolute; top: 4px; right: 4px; width: clamp(20px, 4.5vmin, 34px); height: auto; pointer-events: none; }
+/* Grown-ups sheet: the Favorites picker */
+#favs .favgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+#favs .favgrid .btn { display: flex; align-items: center; gap: 6px; justify-content: flex-start; text-align: left;
+  min-height: 48px; min-width: 0; padding: 4px 6px; font-size: 0.9rem; line-height: 1.1; }
+#favs .favgrid img { width: 30px; height: 30px; border-radius: 8px; flex: none; }
+#favs .favgrid .nm { flex: 1 1 auto; min-width: 0; }
+#favs .favgrid .star { font-size: 1rem; flex: none; opacity: 0.25; }
+#favs .favgrid .btn[aria-pressed="true"] .star { opacity: 1; }
+/* Upright phones: two narrow columns; the yellow (pressed) button alone marks a favorite. */
+@media (max-width: 440px) { #favs .favgrid .star { display: none; } }
 /* Upright phones: three tiles per row. */
 @media (max-width: 600px) {
   .wrap { padding-top: 12px; padding-bottom: 10px; }
@@ -179,6 +192,14 @@ h1 {
   </header>
   <ul class="apps" id="apps"></ul>
 </div>
+
+<!-- Grown-ups sheet: favorite apps come first on the home screen. -->
+<section id="favs" hidden>
+  <h3>Favorites</h3>
+  <p class="sub">Tap an app to make it a favorite. Favorites move to the front of the home screen, in the order you pick them, and wear a small star.</p>
+  <div class="favgrid" id="favGrid"></div>
+  <div class="sheet-actions"><button class="btn" id="favClear">Clear favorites</button></div>
+</section>
 
 <!-- Grown-ups sheet: is every app saved on this device for use with no network (e.g. on a plane)? -->
 <section id="offline" hidden>
@@ -333,35 +354,89 @@ h1 {
     }
   ];
 
+  // ---------- Favorites (chosen by a grown-up in the Grown-ups sheet) ----------
+  // A list of app hrefs, in the order they were starred; they come first on the home screen.
+  var FAVKEY = "toybox-favorites-v1";
+  function readFavs() {
+    var out = [];
+    try {
+      var o = JSON.parse(localStorage.getItem(FAVKEY) || "[]");
+      if (Array.isArray(o)) o.forEach(function (h) {
+        if (out.indexOf(h) === -1 && APPS.some(function (a) { return a.href === h; })) out.push(h);
+      });
+    } catch (e) { /* storage blocked or bad data: no favorites */ }
+    return out;
+  }
+  function saveFavs(f) { try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { /* ignore */ } }
+  var STAR_SVG = '<svg class="fav" viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0 -10.5 L3 -3.6 L10.3 -3.2 L4.7 1.6 L6.4 8.8 L0 4.9 L-6.4 8.8 L-4.7 1.6 L-10.3 -3.2 L-3 -3.6 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg>';
+
   var list = document.getElementById("apps");
-  APPS.forEach(function (app) {
-    var li = document.createElement("li");
-    var a = document.createElement("a");
-    a.className = "app";
-    a.href = app.href;
-    // Opening an app from here starts it fresh (see Toybox.fresh in common/toybox.js).
-    a.addEventListener("click", function () {
-      try { sessionStorage.setItem("toybox-launch", String(Date.now())); } catch (e) { /* storage blocked: apps keep their state */ }
+  function renderApps() {
+    var favs = readFavs();
+    var order = favs.map(function (h) { return APPS.filter(function (a) { return a.href === h; })[0]; })
+      .concat(APPS.filter(function (a) { return favs.indexOf(a.href) === -1; }));
+    list.innerHTML = "";
+    order.forEach(function (app) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.className = "app";
+      a.href = app.href;
+      // Opening an app from here starts it fresh (see Toybox.fresh in common/toybox.js).
+      a.addEventListener("click", function () {
+        try { sessionStorage.setItem("toybox-launch", String(Date.now())); } catch (e) { /* storage blocked: apps keep their state */ }
+      });
+
+      var img = document.createElement("img");
+      img.src = app.icon;
+      img.alt = "";
+
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = app.name;
+
+      var what = document.createElement("span");
+      what.className = "what";
+      what.textContent = app.what;
+
+      a.appendChild(img);
+      a.appendChild(name);
+      a.appendChild(what);
+      if (favs.indexOf(app.href) !== -1) a.insertAdjacentHTML("beforeend", STAR_SVG);
+      li.appendChild(a);
+      list.appendChild(li);
     });
+  }
+  renderApps();
 
-    var img = document.createElement("img");
-    img.src = app.icon;
-    img.alt = "";
-
-    var name = document.createElement("span");
-    name.className = "name";
-    name.textContent = app.name;
-
-    var what = document.createElement("span");
-    what.className = "what";
-    what.textContent = app.what;
-
-    a.appendChild(img);
-    a.appendChild(name);
-    a.appendChild(what);
-    li.appendChild(a);
-    list.appendChild(li);
+  // The picker in the Grown-ups sheet: one button per app, in the usual order.
+  var favGrid = document.getElementById("favGrid");
+  APPS.forEach(function (app) {
+    var b = document.createElement("button");
+    b.className = "btn";
+    b.type = "button";
+    b.setAttribute("data-fav", app.href);
+    b.innerHTML = '<img src="' + app.icon + '" alt=""><span class="nm"></span><span class="star" aria-hidden="true">★</span>';
+    b.children[1].textContent = app.name;
+    b.addEventListener("click", function () {
+      var favs = readFavs(), i = favs.indexOf(app.href);
+      if (i === -1) favs.push(app.href); else favs.splice(i, 1);
+      saveFavs(favs);
+      favChanged();
+    });
+    favGrid.appendChild(b);
   });
+  function paintFavPicker() {
+    var favs = readFavs();
+    Array.prototype.forEach.call(favGrid.querySelectorAll("[data-fav]"), function (b) {
+      b.setAttribute("aria-pressed", String(favs.indexOf(b.getAttribute("data-fav")) !== -1));
+    });
+    document.getElementById("favClear").disabled = !favs.length;
+  }
+  function favChanged() { paintFavPicker(); renderApps(); fitGrid(); }
+  document.getElementById("favClear").addEventListener("click", function () { saveFavs([]); favChanged(); });
+  paintFavPicker();
+  // Another open Toybox tab changed the favorites.
+  window.addEventListener("storage", function (e) { if (e.key === FAVKEY) favChanged(); });
 
   // Fit every app on one screen. The stylesheet picks the columns for the screen (--cols); this works
   // out the rows, then sizes the pictures to the room left in a row after the tallest name, so nothing
@@ -471,7 +546,7 @@ h1 {
   Toybox.init({
     app: "launcher",
     home: true,
-    sections: [document.getElementById("offline")],
+    sections: [document.getElementById("favs"), document.getElementById("offline")],
     onOpen: function () { offCheck(false); },
     grownButton: document.getElementById("grownbtn"),
     grownLabel: ["Grown-ups", "⏱ Grown-ups"],

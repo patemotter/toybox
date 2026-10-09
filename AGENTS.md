@@ -38,6 +38,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, six on
   phones held sideways), picture and name only; `fitGrid()` sizes the pictures to the rows. The `what` text
   stays in `APPS` for grown-ups and tooling but isn't shown.
+  **Favorites**: the Grown-ups sheet's "Favorites" section (launcher only, `localStorage["toybox-favorites-v1"]`, a
+  list of app hrefs) moves starred apps to the front of the grid, in the order they were picked, with a small star
+  badge (not a button). Grown-ups only; the child can't change the order.
 - `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
