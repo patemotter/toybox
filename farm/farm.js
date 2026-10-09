@@ -12,6 +12,8 @@
  *   Farm.world                    the shared farm (localStorage "farm-world-v1"; every access in try/catch,
  *                                 unknown fields kept):
  *     .get()                      -> { v:1, field:{ lanes:[4 x {a,b,lo,hi,by}], stage }, season, grain, bales,
+ *                                    (It's Sow Time works the whole field at once and writes the same values to
+ *                                    all four lanes, so the map and later stations read it the same way.)
  *                                    clamp, muck, ... }. A lane: a = the worked look (stage index, see
  *                                    Farm.STAGES), b = the look not yet worked, lo..hi = the worked part as
  *                                    fractions of the lane (0 = left end), by = the implement of the last
@@ -20,8 +22,25 @@
  *     .resetField()               the field back to stubble (a fresh visit); the stores are kept.
  *     .fieldStage(field)          the summary name for a field.
  *   Farm.STAGES                   ["stubble","plowed","harrowed","sown","sprouts","growing","green","golden"]
- *   Farm.lanes(opts)              the lane engine (four lanes, near = 0 at the bottom, far = 3). Returns an
- *                                 engine E. opts:
+ *   Farm.strip(opts)              the one-pass field engine (It's Sow Time uses it): the whole field is one wide
+ *                                 strip and one pass of the machine across it does the whole job. Returns S. opts:
+ *       canvas, len, head, vmax, span, work(), reach(), canDrive(), locked()   as for Farm.lanes below
+ *       onWork(workX, v, dt)      each frame while the tool moves across the field
+ *       onPass(dir)               the far end is reached; S.m.phase is then "end" until the page plays its
+ *                                 next move (e.g. the next hitch) and sets it back to "work"
+ *       onGrab()                  a finger came down on the machine (it follows the finger while dragged)
+ *       onDrag()                  the machine was dragged forward (the move is learned)
+ *       onRelease(tap, info)      the finger let go of the machine (tap = a quick press without moving); the
+ *                                 page usually calls S.drive() so one press is always enough
+ *       onTap(kind, info)         "ahead" (a tap on the field ahead of the machine) or "field" (anywhere else)
+ *     S.layout(w, h), S.update(dt), S.m (as E.m; lane is always 0), S.geo() { top, h (the field strip),
+ *     ground (the machine's ground line), kk }, S.sx(wx) / S.wx(px), S.cam, S.sky / S.back / S.top / S.fh /
+ *     S.trackTop / S.track (the bands of the picture, css px), S.k (px per unit)
+ *     S.drive()                   drive calmly to the end of the pass by itself; S.stop(); S.driving()
+ *     S.hold(on), S.play(keys, done), S.place(x, dir), S.park(), S.busy(), S.machineRect()   as for Farm.lanes.
+ *     Farm.Particles' draw(ctx, S) works with it (particle lane is ignored; dy is a fraction of the strip).
+ *   Farm.lanes(opts)              the lane engine (four lanes, near = 0 at the bottom, far = 3; kept for stations
+ *                                 that want lane-by-lane work). Returns an engine E. opts:
  *       canvas                    the play surface (pointer input is bound to it)
  *       len, head, vmax, n        lane length, headland width (units), top speed (units/s), lanes (4)
  *       span                      machine length to fit (units) when choosing the scale
@@ -57,12 +76,13 @@
  *                                 tank 0..1), unfold (sprayer boom 0..1), span (lane height in units),
  *                                 driver (default true) }. attachment: an implement id or null.
  *   Farm.drawImplement(ctx, id, st)  one implement on its own, origin at its lower hitch pin.
- *   Farm.IMPLEMENTS               { plow, harrow, drill, spreader, sprayer }: { name, len, work, after }.
+ *   Farm.IMPLEMENTS               { plow, harrow, drill, spreader, sprayer }: { name, len, work, after }
+ *                                 (It's Sow Time uses plow, harrow, drill, sprayer; the spreader is kept for later).
  *                                 work = distance from the hitch pin back to where it works the soil;
  *                                 Farm.HITCH = distance from the rear axle back to the hitch pin.
  *   Farm.sky(ctx, t, season, timeOfDay)  sky, sun, clouds, hills and the farm on the horizon.
  *                                 t = { w, h (horizon y), time (s), arc (null or 0..1: "weeks go by", the sun
- *                                 runs over the sky a few times), rain (0..1 grey), rainbow (0..1), farmX (0..1) }.
+ *                                 runs over the sky `days` times, default 3), rain (0..1 grey), rainbow (0..1), farmX (0..1) }.
  *                                 season "spring"|"summer"|"autumn"|"winter"; timeOfDay 0 day .. 1 dusk.
  *   Farm.drawSheep / drawCow / drawGull / drawHare (ctx, x, y, s, phase)   the farm's life.
  *   Farm.Particles(cap)           a pooled particle list: add(p), update(dt), draw(ctx, E), clear().
@@ -858,6 +878,136 @@
   };
 
   // =====================================================================================================
+  // Strip engine: the whole field is one wide strip, worked in one pass per implement
+  // =====================================================================================================
+  function Strip(o) {
+    this.o = o;
+    this.n = 1; this.len = o.len || 900; this.head = o.head || 560; this.vmax = o.vmax || 240;
+    this.m = { lane: 0, x: 0, dir: 1, face: 1, v: 0, lift: 0, phase: "work", dist: 0 };
+    this.cam = { x: this.len / 2, y: 0 };
+    this.W = 1; this.H = 1; this.k = 0.5; this.snap = true;
+    this.inp = { drag: null, held: false, auto: false };
+    this.tw = null; this.finger = null;
+    if (o.canvas) this.bind(o.canvas);
+  }
+  ["play", "nextKey", "stepTween", "busy", "hold", "park", "reach"].forEach(function (k) { Strip.prototype[k] = Lanes.prototype[k]; });
+  Strip.prototype.layout = function (W, H) {
+    var span = this.o.span || 600;
+    this.W = W; this.H = H;
+    var k = Math.min(W * 0.62 / span, H * 0.36 / 250);
+    this.k = k;
+    this.sky = Math.max(40, H * 0.17); this.back = Math.max(18, H * 0.07); this.track = clamp(H * 0.09, 22, 90);
+    this.top = this.sky + this.back; this.fh = H - this.top - this.track;
+    this.ground = this.top + this.fh * 0.8;
+    this.trackTop = this.top + this.fh;
+    this.tops = [this.top]; this.H0 = this.fh; this.scrollY = 0;
+    this.snap = true;
+  };
+  Strip.prototype.s = function () { return 1; };
+  Strip.prototype.geo = function () { return { top: this.top, h: this.fh, s: 1, ground: this.ground, kk: this.k }; };
+  Strip.prototype.sx = function (wx) { return this.W / 2 + (wx - this.cam.x) * this.k; };
+  Strip.prototype.wx = function (px) { return this.cam.x + (px - this.W / 2) / this.k; };
+  Strip.prototype.place = function (x, dir) {
+    var m = this.m; m.lane = 0; m.x = x; m.dir = dir; m.face = dir; m.v = 0; m.lift = 0; m.phase = "work";
+    this.tw = null; this.inp.auto = false; this.snap = true;
+  };
+  Strip.prototype.drive = function () { if (this.m.phase === "work" && !this.tw) { this.inp.auto = true; return true; } return false; };
+  Strip.prototype.stop = function () { this.inp.auto = false; this.inp.held = false; this.inp.drag = null; };
+  Strip.prototype.driving = function () { return this.m.phase === "work" && !this.tw && (this.inp.auto || this.inp.held || !!this.inp.drag || this.m.v > 1); };
+  Strip.prototype.update = function (dt) {
+    var m = this.m, o = this.o, inp = this.inp;
+    dt = Math.min(dt, 0.05);
+    if (this.tw) this.stepTween(dt);
+    else if (m.phase === "work") {
+      var target = m.x, work = o.work ? o.work() : 0;
+      var can = !(o.canDrive && !o.canDrive());
+      if (can) {
+        if (inp.drag) {
+          target = this.wx(inp.drag.px) - inp.drag.off;
+          // Forgiving: still pulling forward near the end (the finger may be at the screen edge) finishes it.
+          var left = m.dir > 0 ? this.len - (m.x - work) : (m.x + work);
+          if (left < 220 && (target - m.x) * m.dir > -200 && inp.drag.fwd) target = m.x + m.dir * 1e6;
+        } else if (inp.held || inp.auto) target = m.x + m.dir * 1e6;
+      }
+      var want = can ? clamp((target - m.x) * m.dir * 2.2, 0, this.vmax) : 0;
+      m.v += (want - m.v) * Math.min(1, dt * 5);
+      if (want === 0 && m.v < 1) m.v = 0;
+      var dx = m.dir * m.v * dt;
+      m.x += dx; m.dist += Math.abs(dx);
+      var wxp = m.x - m.dir * work, end = m.dir > 0 ? this.len : 0;
+      var reached = m.dir > 0 ? wxp >= end : wxp <= end;
+      if (reached) { wxp = end; m.x = end + m.dir * work; }
+      if (m.v > 0 && o.onWork) o.onWork(wxp, m.v, dt);
+      if (reached) this.finishPass();
+    } else m.v = Math.max(0, m.v - dt * 400);
+    this.camera(dt);
+  };
+  Strip.prototype.finishPass = function () {
+    var m = this.m;
+    this.inp.drag = null; this.inp.auto = false;
+    m.v = 0; m.phase = "end";
+    if (this.o.onPass) this.o.onPass(m.dir);
+  };
+  Strip.prototype.camera = function (dt) {
+    var m = this.m, kk = this.k, r = this.reach(), fd = m.face >= 0 ? 1 : -1;
+    var target = m.x + fd * (r.front - r.back) / 2 + fd * 0.1 * this.W / kk;
+    var hw = this.W / 2 / kk, minX = -this.head + hw, maxX = this.len + this.head - hw;
+    target = minX > maxX ? this.len / 2 : clamp(target, minX, maxX);
+    if (this.snap) { this.cam.x = target; this.snap = false; }
+    else this.cam.x += (target - this.cam.x) * (reduceMotion ? 1 : Math.min(1, dt * 2.4));
+  };
+  Strip.prototype.machineRect = function () {
+    var m = this.m, r = this.reach(), fd = m.face >= 0 ? 1 : -1, g = this.geo();
+    var a = this.sx(m.x - fd * r.back), b = this.sx(m.x + fd * r.front);
+    return { left: Math.min(a, b), right: Math.max(a, b), top: g.ground - 250 * g.kk, bottom: g.ground + 8, ground: g.ground };
+  };
+  Strip.prototype.bind = function (cv) {
+    var self = this, o = this.o, inp = this.inp;
+    function pt(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    cv.addEventListener("pointerdown", function (e) {
+      var p = pt(e);
+      self.finger = p;
+      if (o.locked && o.locked()) return;
+      var m = self.m, R = self.machineRect(), pad = 36;
+      if (p[0] > R.left - pad && p[0] < R.right + pad && p[1] > R.top - pad && p[1] < R.bottom + pad && !inp.drag) {
+        var wx = self.wx(p[0]);
+        inp.drag = { id: e.pointerId, p0: p, px: p[0], t0: Date.now(), off: wx - m.x, moved: false, fwd: false };
+        inp.auto = false;
+        try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        if (o.onGrab) o.onGrab();
+        return;
+      }
+      var wxp = self.wx(p[0]);
+      if (m.phase === "work" && !self.tw && p[1] > self.top - 10 && p[1] < self.trackTop + self.track && (wxp - m.x) * m.dir > 0) {
+        if (o.onTap) o.onTap("ahead", { px: p[0], py: p[1] });
+        return;
+      }
+      if (o.onTap) o.onTap("field", { px: p[0], py: p[1] });
+    });
+    cv.addEventListener("pointermove", function (e) {
+      var p = pt(e);
+      self.finger = p;
+      var d = inp.drag;
+      if (!d || d.id !== e.pointerId) return;
+      d.px = p[0];
+      if (Math.hypot(p[0] - d.p0[0], p[1] - d.p0[1]) > 8) d.moved = true;
+      if (d.moved && (p[0] - d.p0[0]) * self.m.dir > 20) { d.fwd = true; if (o.onDrag) o.onDrag(); }
+    });
+    function end(e) {
+      var d = inp.drag;
+      if (!d || d.id !== e.pointerId) return;
+      inp.drag = null;
+      // One press is always enough: letting go (after a tap, a pull forward or a pull the wrong way) drives the
+      // rest of the pass by itself.
+      var tap = !d.moved && Date.now() - d.t0 < 450;
+      if (o.onRelease) o.onRelease(tap, { px: d.px, py: d.p0[1] });
+    }
+    cv.addEventListener("pointerup", end);
+    cv.addEventListener("pointercancel", end);
+    cv.addEventListener("lostpointercapture", end);
+  };
+
+  // =====================================================================================================
   // Particles (world coordinates on a lane: x in units, h = height above the ground in units,
   // dy = across the lane as a fraction of its height)
   // =====================================================================================================
@@ -998,7 +1148,7 @@
     tod = clamp(tod || 0, 0, 1);
     var day = 1, sunX = w * (t.sunX == null ? 0.86 : t.sunX), sunY = Math.max(22, h * 0.32);
     if (t.arc != null) {
-      var p = clamp(t.arc, 0, 1) * 3, f = p - Math.floor(p);
+      var p = clamp(t.arc, 0, 1) * (t.days || 3), f = p - Math.floor(p);
       if (t.arc >= 1) f = 0.5;
       day = Math.pow(Math.sin(Math.PI * f), 0.6);
       sunX = lerp(-w * 0.05, w * 1.05, f); sunY = h * 0.95 - Math.sin(Math.PI * f) * h * 0.8;
@@ -1271,6 +1421,7 @@
     IMPLEMENTS: IMPLEMENTS,
     world: world,
     lanes: function (o) { return new Lanes(o || {}); },
+    strip: function (o) { return new Strip(o || {}); },
     paintLane: paintLane,
     drawTractor: drawTractor,
     drawImplement: drawImplement,
