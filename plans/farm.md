@@ -64,7 +64,8 @@ logo are never used. Choice tiles keep the real machine and crop names (Wheat, S
 
 | Phase | Station (episode title) | What happens | Episodes |
 | --- | --- | --- | --- |
-| **5** | **"Moooovie Time"** (`cows.html`) | the feed mixer wagon: a loader drops silage and a bale in, the augers mix, he drives it down the feed alley and the side conveyor lays feed along the bunk; the cows come to the headlocks and eat; tap a cow and she moos and turns her head; the milking parlor is seen working (a rotary parlor turning, cows riding round) but he doesn't milk | Moooovie Time, Goes Milking, Tyre Trouble |
+| **5** | **"Moooovie Time"** (`cows.html`) | the feed mixer wagon: a loader drops silage and a bale in, the augers mix, he drives it down the feed alley and the side conveyor lays feed along the bunk; the cows come to the headlocks and eat; tap a cow and she moos and turns her head; he can open the gate and watch the cows walk into the milking parlor (the dad: he watches them go in, but never
+does any milking himself; the milking happens out of view or automatically) | Moooovie Time, Goes Milking, Tyre Trouble |
 | **5** | **"Come Bye"** (`sheep.html`) | the sheepdog: drag the dog round the flock and the sheep move away from it, through the gate into the pen (forgiving, they drift toward the gate); lambs follow their mothers; the lamb feeder machine | Come Bye, Hello Ewe, Baby Baa Day |
 | **6** | **"Feathered Friends"** (`hens.html`) | hens in the hen house and run: tap a hen and she stands and shows her egg, the egg goes into the carton; scatter feed and they peck; a tracked tractor brings the feed | Feathered Friends |
 | **Later** | **"Meets Baby Animals"** | calves, piglets, lambs, chicks in their pens: tap to see them react | Meets Baby Animals, Springtime |
