@@ -240,7 +240,7 @@ Keep only:
   previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
 - Real names, no brand names or logos. Exception (the dad): the Farm's stations are named after the episodes of
-  the farm-machinery show he watches ("It's Sow Time", "Combine Time"...), because he knows them; never the show's
+  the farm-machinery show he watches ("Combine Time", "Brilliant Baler"...), because he knows them; only titles he actually knows (the dad: "It's Sow Time" means nothing to him, so the field station is "Plowing" for now); station names live in one constant, `Farm.NAMES` in `farm/farm.js`; never the show's
   own name, characters or logo.
 
 ### Fresh start

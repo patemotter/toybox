@@ -44,7 +44,7 @@ logo are never used. Choice tiles keep the real machine and crop names (Wheat, S
 
 | Phase | Station (episode title, page) | The job and its machines | Tiles | Episodes it follows |
 | --- | --- | --- | --- | --- |
-| **1** | **"It's Sow Time"** (`field.html`) + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor, huge wheels) | It's Sow Time, Caterpillar Hunt, Massive Machines, Springtime |
+| **1** | **"Plowing"** (`field.html`; the dad: "It's Sow Time" means nothing to him, so not an episode name) + `farm.js` + map | tractor with plow, harrow, seed drill, fertilizer spreader, sprayer | the implements; **Wheels / Tracks** (a crawler tractor, huge wheels) | It's Sow Time, Caterpillar Hunt, Massive Machines, Springtime |
 | **2** | **"Combine Time"** (`combine.html`) | combine harvester, grain trailer alongside, to the grain store (a grain barn) | **Wheat / Sunflowers** | Combine Time, Sunny Seeds, Big Machines, Makes Bread |
 | **2** | **"Brilliant Baler"** (`bales.html`) | mower, rake, round baler, bale wrapper; loader stacks the bales | Hay / Haylage (wrapped) | Brilliant Baler, Hey Haylage, Summertime |
 | **3** | **"Glorious Grass"** (`silage.html`) | forage harvester blows into a trailer driving alongside; trailers tip at the clamp; loader pushes it up and rolls it | **Grass / Maize** | Glorious Grass, Silage Surprise, Mighty Maize Machine, A-maizing Day |

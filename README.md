@@ -26,7 +26,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Jigsaw: real jigsaw puzzles with knobbed pieces, 9 pictures from 4 to 24 pieces; finished pictures come alive and go on My puzzles shelf | [`jigsaw/`](jigsaw/) |
 | Sand Table: a kinetic sand table: drag the ball to carve lines, or tap Draw! and watch it draw spirals, flowers, stars and hearts; Smooth sweeps it flat | [`sand-table/`](sand-table/) |
 | Espresso Machine: the family's real espresso routine: warm up, weigh 18 grams, grind, whisk, tamp, pull the shot on the scale, steam the milk and pour; lattes, cappuccinos and steamers | [`espresso-machine/`](espresso-machine/) |
-| Farm: a farm through the year: drive the green tractor in It's Sow Time (plow, harrow, seed drill, fertilizer spreader, sprayer) until the wheat turns golden; the farm map shows the field as it is | [`farm/`](farm/) |
+| Farm: a farm through the year: drive the green tractor in Plowing (plow, harrow, seed drill, fertilizer spreader, sprayer) until the wheat turns golden; the farm map shows the field as it is | [`farm/`](farm/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
