@@ -4,13 +4,13 @@
 //
 // Usage: node tools/check-site.js [site folder]   (default: the repo root; CI runs it on the staged _site folder)
 // Not part of the site (never cached): sw.js files (the Toybox-wide worker and the apps' retire stubs), Markdown,
-// and the dev folders tools/, archive/, .github/ (the deploy leaves those out). No dependencies; exits 1 on a problem.
+// and the dev folders tools/, archive/, plans/, .github/ (the deploy leaves those out). No dependencies; exits 1 on a problem.
 
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..'));
-const SKIP_DIRS = new Set(['.git', '.github', 'tools', 'archive', 'node_modules']);
+const SKIP_DIRS = new Set(['.git', '.github', 'tools', 'archive', 'plans', 'node_modules']);
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

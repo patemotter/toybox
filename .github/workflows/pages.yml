@@ -2,7 +2,7 @@
 # Needs Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 # "Run workflow" in the Actions tab republishes on demand.
 #
-# The check job builds _site (the published files only: no tools/, archive/, .github/ or Markdown), stamps the
+# The check job builds _site (the published files only: no tools/, archive/, plans/, .github/ or Markdown), stamps the
 # offline cache version into _site/sw.js, checks that every file is in the service worker's CORE list, and loads
 # every page in a browser (tools/smoke.js: page errors, page scroll). If any of that fails, nothing is published
 # and the live Toybox stays as it was.
@@ -36,13 +36,13 @@ jobs:
       - name: Build _site (published files only)
         run: |
           mkdir _site
-          git ls-files -z | grep -zvE '^(tools|archive|\.github)/|\.md$|^\.' | xargs -0 cp --parents -t _site
+          git ls-files -z | grep -zvE '^(tools|archive|plans|\.github)/|\.md$|^\.' | xargs -0 cp --parents -t _site
 
       # The cache version goes up by one with every commit that changes a published file, so devices download
       # a fresh offline copy after each real change (and not after a change to the docs or tools only).
       - name: Stamp the offline cache version
         run: |
-          n=$(( 1000 + $(git rev-list --count HEAD -- . ':(exclude)tools' ':(exclude)archive' ':(exclude).github' ':(exclude)*.md') ))
+          n=$(( 1000 + $(git rev-list --count HEAD -- . ':(exclude)tools' ':(exclude)archive' ':(exclude)plans' ':(exclude).github' ':(exclude)*.md') ))
           sed -i 's/^const CACHE = "toybox-v0";/const CACHE = "toybox-v'"$n"'";/' _site/sw.js
           grep -q "^const CACHE = \"toybox-v$n\";" _site/sw.js || { echo "sw.js has no 'const CACHE = \"toybox-v0\";' line to stamp"; exit 1; }
           echo "Offline cache: toybox-v$n"
