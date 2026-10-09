@@ -562,6 +562,9 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
 /* Build pane: several part rows at once, each option a zoomed picture of that part */
 .pager { display: flex; gap: 6px; justify-content: center; margin: 0 0 6px; }
 .pager[hidden] { display: none; }
+/* six pages (the excavator and bulldozer): a little tighter so "Tracks" and "Engine" keep their full size */
+.pager.p6 { gap: 4px; }
+.pager.p6 .btn { padding-left: 0; padding-right: 0; }
 .pager .btn { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 0.1rem 0.3rem; font-size: clamp(0.8rem, 3.4vw, 1rem); }
 .prows { display: flex; flex-direction: column; gap: 6px; }
 .prow h4 { margin: 0 0 2px 4px; font-size: 0.85rem; line-height: 1.15; font-weight: 800; color: var(--muted); }
@@ -2032,18 +2035,24 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   // ---- build rows ----
   // Which part of the drawing each option row zooms in on.
   var ZOOM = { tool: "tool", cab: "cab", wheels: "wheels", rims: "wheels", engine: "engine", top: "top", lights: "lights", paint: "paint" };
-  var ROW_ORDER = ["tool", "wheels", "top", "paint", "rims", "engine", "cab", "lights", "number"];
-  var lastPer = 0;
-  function rowsPerPage() {
-    if (window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches) return 2;
-    // Fewer part rows per page leaves the picture more room (and keeps the other tabs from looking empty).
-    if (window.matchMedia("(min-width: 744px) and (min-height: 640px)").matches) return 3;
-    return 2;
-  }
+  // Build pages: each pager button names exactly what its page holds. Parts that belong together share a page
+  // (wheels with their rims, the cab or roof with what sits on top, stripes with the number); a page with only one
+  // of its parts takes that part's own name ("Tracks", "Wing").
+  var GROUPS = [
+    { ids: ["tool"] },
+    { ids: ["wheels", "rims"], label: "Wheels" },
+    { ids: ["cab", "top"], label: "Top" },
+    { ids: ["engine"] },
+    { ids: ["lights"] },
+    { ids: ["paint", "number"], label: "Paint" }
+  ];
   function buildPages(k) {
-    var ps = kindParts(k).slice().sort(function (a, b) { return ROW_ORDER.indexOf(a[0]) - ROW_ORDER.indexOf(b[0]); });
-    var per = rowsPerPage(), out = [];
-    for (var i = 0; i < ps.length; i += per) out.push(ps.slice(i, i + per));
+    var ps = kindParts(k), out = [];
+    GROUPS.forEach(function (g) {
+      var rows = [];
+      g.ids.forEach(function (id) { ps.forEach(function (p) { if (p[0] === id) rows.push(p); }); });
+      if (rows.length) out.push({ label: rows.length > 1 ? g.label : rows[0][1], rows: rows });
+    });
     return out;
   }
   // Union of the bounding boxes of the drawing's [data-part=name] groups (vehicle units), or null.
@@ -2142,37 +2151,37 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     });
 
     // Build tab: several part rows at once (paged), each option a zoomed picture of that part.
-    var pages = buildPages(k), per = rowsPerPage();
+    var pages = buildPages(k), per = 0;
+    pages.forEach(function (pp) { per = Math.max(per, pp.rows.length); });
     if (!(state.buildPage >= 0 && state.buildPage < pages.length)) state.buildPage = 0;
     var pg = $("pager");
     pg.hidden = pages.length < 2;
+    pg.classList.toggle("p6", pages.length > 5);
     pg.innerHTML = "";
     pages.forEach(function (pp, i) {
       var bt = document.createElement("button");
       bt.className = "btn";
       bt.dataset.page = String(i);
-      bt.textContent = pp[0][1];
-      bt.setAttribute("aria-label", pp.map(function (p) { return p[1]; }).join(", "));
+      bt.textContent = pp.label;
+      bt.setAttribute("aria-label", pp.rows.map(function (p) { return p[1]; }).join(", "));
       bt.setAttribute("aria-pressed", String(i === state.buildPage));
       pg.appendChild(bt);
     });
     var rows = $("prows");
     rows.innerHTML = "";
-    pages[state.buildPage].forEach(function (p) { rows.appendChild(partRow(k, c, p)); });
+    pages[state.buildPage].rows.forEach(function (p) { rows.appendChild(partRow(k, c, p)); });
     // keep every page the same height so the panel does not jump between pages
     rows.style.minHeight = "";
     var rh = 0;
     Array.prototype.forEach.call(rows.children, function (r) { rh = Math.max(rh, r.offsetHeight); });
     var gap = parseFloat(getComputedStyle(rows).rowGap) || 0;
     if (rh && pages.length > 1) rows.style.minHeight = Math.ceil(rh * per + gap * (per - 1)) + "px";
-    lastPer = per;
 
     showPick();
     save();
     vbKey = ""; // drive pictures are rebuilt from the new design
   }
 
-  window.addEventListener("resize", function () { if (rowsPerPage() !== lastPer) { state.buildPage = 0; render(); } });
 
   function restartAnim(el, cls) {
     if (!el || reduce) return;
