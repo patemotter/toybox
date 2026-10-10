@@ -214,6 +214,10 @@ Keep only:
   (several passes over the same field, filling twelve cups, step after step), no extra taps or choices that don't
   change anything he cares about, no little side features that clutter the scene or the panel. Real names and real
   mechanics stay; the number of steps and things on screen goes down. When in doubt, cut it or make it automatic.
+- **Never remove a feature or choice without the dad's OK** (the dad, 2026-10-10: the redesign removed things he
+  wanted, e.g. Marble Run's lift style): decluttering means rearranging, merging duplicates and making chores
+  automatic, never taking away an option, item, mode or interaction he can use. If something seems worth cutting,
+  list it as a question for the dad and keep it until he answers.
 - **One press is always enough** (the dad, 2026-10-09): every real control (a drag, a turn, a hold, a pull, a
   flick on a drawn machine part) also works with a single tap on it, and the tap does the whole motion for him (tap
   the tractor and it drives the pass; tap the crank and it turns; tap the valve and it opens). Dragging stays as
