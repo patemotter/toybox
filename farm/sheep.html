@@ -1,0 +1,1170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Come Bye</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Farm">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<script src="farm.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF; --panel: #FFFFFF; --ink: #1D2340; --muted: #4A5578; --edge: #1D2340; --accent: #FFC93C; --plate: #F4FAFF; --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.loads { font-variant-numeric: tabular-nums; }
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+/* The Go says a short phrase ("Pen them"): on a narrow row it wraps to two lines instead of being cut off. */
+.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* "Come bye" is two words: let a chip's word wrap under its dot instead of running into the next chip. */
+.tb-steps .tb-chip-word { white-space: normal; text-align: center; }
+body.big #jobs { display: none; }
+@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell tb-v2 wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the farm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Farm</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title" id="title">Come Bye</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+  </header>
+  <div class="tb-body app">
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
+        <canvas id="cv" role="img" aria-label="A hillside field with a flock of sheep, a sheepdog, the shepherd and a pen. Tap the sheep to send the dog round them."></canvas>
+        <div class="tb-counter loads" id="loads">Sheep: 0</div>
+        <div id="coach"></div>
+        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+      </main>
+      <div id="jobs"></div>
+    </div>
+    <section class="tb-panel" id="panel">
+      <ol id="stepsGather"></ol>
+      <ol id="stepsBath" hidden></ol>
+      <div id="bottom"></div>
+    </section>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  // Come Bye (and Hello Ewe): the sheepdog and the sheep, the way the episodes show it.
+  // Gather:    a flock grazes spread over the hillside. The shepherd whistles "Come bye" and the sheepdog runs
+  //            clockwise round the flock (seen from above), up the left side, along the back, down the right;
+  //            the sheep bunch up. "Away" sends it anticlockwise, back round to the left, and the sheep walk
+  //            toward the pen. "Pen them": the dog walks up behind them in its low crouch, the sheep file in
+  //            through the gate one by one, the gate swings shut and the dog lies down ("Lie down").
+  // Foot bath: the gate of the holding pen opens into the race; the sheep trot one by one down the race and
+  //            through the shallow foot bath (splashes) into the drying pen; the field gate opens and they run
+  //            out onto the green grass.
+  // The ground is a plane: x along the screen (metres), z away from us up the hill (metres), seen from a little
+  // above (own projection below; Farm.Scene draws only the sky). On an upright stage the stage is split: the whole
+  // job on top and a close-up below (the dog running, the gate, the feet splashing).
+  // Drawings live here for now in farm.js's style and function shapes (metres, y up negative, origin on the
+  // ground under the middle, facing +x) so they can move into farm.js later: sheepShape, collie, shepherd,
+  // hurdle, trough.
+  var $ = function (id) { return document.getElementById(id); };
+  var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
+  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2, PI = Math.PI;
+  var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, fs = SH.fs;
+  var NAME = (Farm.NAMES && Farm.NAMES.sheep) || "Come Bye";
+  document.title = NAME; $("title").textContent = NAME;
+  function LW() { return Farm.LW; }
+  var WOOL = "#F6F0E2", WOOLD = "#DED3BC", FACE = "#2A2C36", DOGK = "#23252F", STEEL = "#AEB8C4", WATER = "#5FB7C9";
+
+  // ---------- State ----------
+  var KEY = "farm-sheep-v1";
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  if (startFresh || typeof saved !== "object" || Array.isArray(saved)) saved = {};
+  function num(v) { return typeof v === "number" && isFinite(v) && v >= 0 ? Math.floor(v) : 0; }
+  var sheepN = num(saved.sheep);
+  var job = saved.job === "bath" ? "bath" : "gather";
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ sheep: sheepN, job: job })); } catch (e) { /* ignore */ } }
+
+  // ---------- The world (metres: x along, z up the hill) ----------
+  var NSHEEP = 8, NBATH = 7;
+  // Gather: the shepherd at the front left, the pen on the right with its gate on the left side.
+  var SHEP = { x: -8.3, z: -0.9 }, DOGHOME = { x: -7.3, z: -0.5 };
+  var PEN = { x0: 3.8, x1: 7.0, z0: 0.6, z1: 5.0, gz: 2.2 }, GATE_L = PEN.z1 - PEN.gz, MOUTH_Z = 3.6;
+  var PEN_SPOTS = [[4.7, 4.4], [6.1, 4.4], [4.7, 3.4], [6.1, 3.4], [4.7, 2.3], [6.1, 2.3], [4.7, 1.2], [6.1, 1.2]];
+  var C1 = { x: -2.0, z: 3.6 }, C2 = { x: 0.7, z: 3.6 };
+  var BUNCH = [[-1.4, -0.9], [0, -1.0], [1.4, -0.8], [-1.6, 0.3], [-0.15, 0.2], [1.3, 0.4], [-0.8, 1.3], [0.7, 1.4]];
+  // Foot bath: the holding pen on the left, the race with the foot bath, the drying pen, the field gate.
+  var HP = { x0: -9.0, x1: -5.0, z0: -0.55, z1: 3.8 }, RACE = { x0: -5.0, x1: 2.2, z: 0, w: 0.55 };
+  var TRO = { x0: -1.6, x1: 1.4 }, DP = { x0: 2.2, x1: 6.0, z0: -0.55, z1: 3.4 };
+  var HP_SPOTS = [[-5.9, 0.0], [-7.0, 0.1], [-8.1, 0.2], [-6.0, 1.3], [-7.2, 1.4], [-8.2, 1.6], [-6.6, 2.6]];
+  var DP_SPOTS = [[5.3, 0.1], [5.2, 1.2], [5.2, 2.4], [4.0, 0.0], [4.0, 1.2], [4.0, 2.4], [2.9, 1.8]];
+  var BATHDOG = { x: -10.0, z: 1.6 };
+
+  // ---------- Small drawing helpers (farm.js style) ----------
+  function eyes(c, x, y, r, f) {
+    // big friendly eyes and a smile for the faces moment (on a dark sheep face: white rims)
+    if (!f) return;
+    c.save(); c.globalAlpha = clamp(f, 0, 1);
+    var l0 = LW();
+    [0, r * 2.3].forEach(function (ox) { Cc(c, x + ox, y, r, "#FFFFFF", l0 * 0.6); Cc(c, x + ox + r * 0.25, y + r * 0.1, r * 0.5, INK, 0); Cc(c, x + ox + r * 0.4, y - r * 0.15, r * 0.17, "#FFFFFF", 0); });
+    c.beginPath(); c.arc(x + r * 1.2, y + r * 1.6, r * 1.3, 0.2 * PI, 0.8 * PI); c.strokeStyle = "#FFFFFF"; c.lineWidth = r * 0.45; c.lineCap = "round"; c.stroke();
+    c.restore();
+  }
+  // =====================================================================================================
+  // The sheep (could move into farm.js as Farm.draw.sheep): origin on the ground under the middle, facing +x.
+  // st = { ph (leg phase), gait (0..1 legs swinging), head (0..1 down to graze), baa (0..1 mouth), face, munch,
+  //        lamb (whiter wool), dip (feet in water: legs end lower) }
+  // =====================================================================================================
+  function sheepShape(c, st) {
+    var l0 = LW(), g = st.gait || 0, s = Math.sin((st.ph || 0) * TAU), hd = clamp(st.head || 0, 0, 1), dip = st.dip || 0;
+    var wool = st.lamb ? "#FFFDF6" : WOOL;
+    function leg(x, a, far) {
+      var fx = x + a * 0.22;
+      Ln(c, x, -0.44, fx, dip, INK, 0.12 + (far ? 0 : 0.01));
+      Ln(c, x, -0.44, fx, dip, far ? "#3A3D48" : FACE, 0.075);
+    }
+    leg(0.3, -s * g, true); leg(-0.3, s * g, true);
+    // the wool: a cloud of bumps round a body ellipse, outlined in ink
+    var bumps = [], n = 12, i;
+    for (i = 0; i < n; i++) { var a = i / n * TAU; bumps.push([Math.cos(a) * 0.48, -0.64 + Math.sin(a) * 0.22, 0.15 + 0.03 * hash(i, 3)]); }
+    bumps.push([-0.6, -0.68, 0.085]);
+    var nkY = lerp(-0.76, -0.58, hd);
+    bumps.push([0.5, nkY, 0.17]);
+    for (i = 0; i < bumps.length; i++) Cc(c, bumps[i][0], bumps[i][1], bumps[i][2] + l0, INK, 0);
+    c.beginPath(); c.ellipse(0, -0.64, 0.48 + l0, 0.22 + l0, 0, 0, TAU); c.fillStyle = INK; c.fill();
+    c.beginPath(); c.ellipse(0, -0.64, 0.48, 0.22, 0, 0, TAU); c.fillStyle = wool; c.fill();
+    for (i = 0; i < bumps.length; i++) Cc(c, bumps[i][0], bumps[i][1], bumps[i][2], wool, 0);
+    // curls in the fleece
+    c.strokeStyle = WOOLD; c.lineWidth = 0.025; c.lineCap = "round";
+    for (i = 0; i < 7; i++) { var cx = -0.4 + i * 0.13, cy = -0.6 + (i % 2 ? -0.1 : 0.05); c.beginPath(); c.arc(cx, cy, 0.045, 0.3, 2.6); c.stroke(); }
+    leg(0.22, s * g, false); leg(-0.36, -s * g, false);
+    // the head: black face, ears out to the side, a woolly topknot
+    var hx = lerp(0.68, 0.74, hd), hy = lerp(-0.88, -0.3, hd), rot = lerp(0.35, 1.15, hd);
+    if (st.munch) hy += Math.sin(st.munch * 18) * 0.015;
+    c.save(); c.translate(hx, hy); c.rotate(rot);
+    c.beginPath(); c.ellipse(-0.12, -0.02, 0.1, 0.045, -0.5, 0, TAU); fs(c, FACE, l0 * 0.7);
+    c.beginPath(); c.ellipse(0.02, 0, 0.17, 0.11, 0, 0, TAU); fs(c, FACE);
+    Cc(c, -0.07, -0.08, 0.075, wool, l0 * 0.6);
+    if (st.baa) { c.beginPath(); c.ellipse(0.15, 0.05, 0.035, 0.02 + 0.035 * st.baa, 0.3, 0, TAU); fs(c, "#E87A8A", l0 * 0.5); }
+    if (st.face) eyes(c, -0.02, -0.03, 0.04, st.face);
+    else { Cc(c, 0.02, -0.04, 0.028, "#FFFFFF", 0); Cc(c, 0.03, -0.04, 0.014, INK, 0); }
+    c.restore();
+  }
+  // =====================================================================================================
+  // The sheepdog (a generic black-and-white collie; could move into farm.js as Farm.draw.collie).
+  // st = { pose: "run" | "crouch" | "lie" | "stand", ph, face }
+  // =====================================================================================================
+  function collie(c, st) {
+    var l0 = LW(), pose = st.pose || "stand", ph = st.ph || 0, s = Math.sin(ph * TAU), Wt = "#FFFFFF";
+    var by = { run: 0.36, crouch: 0.25, lie: 0.13, stand: 0.4 }[pose], bob = pose === "run" ? Math.cos(ph * TAU * 2) * 0.025 : 0;
+    by += bob;
+    function leg(x0, y0, x1, y1, kx, ky) {
+      c.beginPath(); c.moveTo(x0, y0); if (kx !== undefined) c.lineTo(kx, ky); c.lineTo(x1, y1);
+      c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = INK; c.lineWidth = 0.1; c.stroke(); c.strokeStyle = Wt; c.lineWidth = 0.055; c.stroke();
+    }
+    function legs(far) {
+      var k = far ? 1 : -1;
+      if (pose === "run") {
+        leg(0.26, -by + 0.05, 0.26 + 0.3 * s * k + 0.05, 0, 0.3 + 0.1 * s * k, -by * 0.45);
+        leg(-0.27, -by + 0.05, -0.27 - 0.3 * s * k - 0.05, 0, -0.32 - 0.1 * s * k, -by * 0.4);
+      } else if (pose === "crouch") {
+        leg(0.25, -by + 0.04, 0.27 + 0.12 * s * k, 0, 0.33, -0.11);
+        leg(-0.26, -by + 0.04, -0.24 - 0.12 * s * k, 0, -0.36, -0.12);
+      } else if (pose === "lie") {
+        leg(0.25, -0.08, 0.62 + (far ? -0.04 : 0), -0.03);
+        if (!far) { c.beginPath(); c.ellipse(-0.22, -0.11, 0.17, 0.1, 0, 0, TAU); fs(c, DOGK, l0 * 0.8); leg(-0.22, -0.06, -0.02, -0.02); }
+      } else { leg(0.25, -by + 0.05, 0.25, 0); leg(-0.26, -by + 0.05, -0.26, 0); }
+    }
+    legs(true);
+    // tail
+    var tx0 = -0.38, ty0 = -by - 0.02, tx1, ty1;
+    if (pose === "run") { tx1 = -0.78; ty1 = -by + 0.02 + Math.sin(ph * TAU * 2) * 0.04; }
+    else if (pose === "lie") { tx1 = -0.75; ty1 = -0.03; }
+    else { tx1 = -0.62; ty1 = -0.07; }
+    c.beginPath(); c.moveTo(tx0, ty0); c.quadraticCurveTo((tx0 + tx1) / 2, ty0 - 0.08, tx1, ty1);
+    c.lineCap = "round"; c.strokeStyle = INK; c.lineWidth = 0.13; c.stroke(); c.strokeStyle = DOGK; c.lineWidth = 0.08; c.stroke();
+    Cc(c, tx1, ty1, 0.05, Wt, l0 * 0.6);
+    // body, the white chest and collar
+    c.beginPath(); c.ellipse(0, -by, 0.4, pose === "lie" ? 0.12 : 0.13, 0, 0, TAU); fs(c, DOGK);
+    c.beginPath(); c.ellipse(0.27, -by + 0.04, 0.1, 0.08, 0, 0, TAU); fs(c, Wt, 0);
+    // the head: low and in line with the back when running or creeping (the collie's "eye"), up when lying
+    var hx = { run: 0.52, crouch: 0.5, lie: 0.44, stand: 0.44 }[pose], hy = { run: -by - 0.08, crouch: -by - 0.03, lie: -0.4, stand: -by - 0.18 }[pose];
+    c.beginPath(); c.ellipse(0.36, (hy - by) / 2 - 0.01, 0.08, Math.abs(hy + by) / 2 + 0.07, 0.2, 0, TAU); fs(c, Wt, l0 * 0.7);
+    Pp(c, [hx - 0.07, hy - 0.08, hx - 0.11, hy - 0.22, hx + 0.0, hy - 0.11], DOGK, l0 * 0.7);
+    Cc(c, hx, hy, 0.11, DOGK);
+    Pp(c, [hx + 0.05, hy - 0.05, hx + 0.24, hy + 0.02, hx + 0.21, hy + 0.07, hx + 0.04, hy + 0.08], DOGK, l0 * 0.7);
+    Pp(c, [hx + 0.02, hy - 0.1, hx + 0.06, hy - 0.1, hx + 0.22, hy + 0.03, hx + 0.06, hy + 0.06], Wt, 0);
+    Cc(c, hx + 0.235, hy + 0.035, 0.025, INK, 0);
+    Pp(c, [hx - 0.02, hy - 0.08, hx + 0.02, hy - 0.2, hx + 0.08, hy - 0.08], DOGK, l0 * 0.7);
+    if (st.face) { c.save(); c.globalAlpha = clamp(st.face, 0, 1); Cc(c, hx + 0.03, hy - 0.02, 0.045, "#FFFFFF", l0 * 0.5); Cc(c, hx + 0.05, hy - 0.02, 0.022, INK, 0); c.beginPath(); c.arc(hx + 0.14, hy + 0.06, 0.05, 0.1, 1.6); c.strokeStyle = "#FFFFFF"; c.lineWidth = 0.02; c.stroke(); c.restore(); }
+    else Cc(c, hx + 0.04, hy - 0.025, 0.022, "#E9C46A", 0);
+    if (pose === "run" || pose === "stand") { c.beginPath(); c.ellipse(hx + 0.18, hy + 0.09, 0.04, 0.02, 0.2, 0, TAU); fs(c, "#E87A8A", 0); }
+    legs(false);
+  }
+  // The shepherd (generic: cap, wax jacket, crook). origin at the feet, facing +x. call = 0..1 (hand to mouth, whistling)
+  function shepherd(c, st) {
+    var l0 = LW(), cl = clamp(st.call || 0, 0, 1);
+    Ln(c, -0.08, -0.9, -0.1, 0, INK, 0.15); Ln(c, -0.08, -0.9, -0.1, 0, "#5B4A3A", 0.11);
+    Ln(c, 0.08, -0.9, 0.12, 0, INK, 0.15); Ln(c, 0.08, -0.9, 0.12, 0, "#6A5644", 0.11);
+    Rr(c, -0.2, -0.06, 0.18, 0.08, 0.03, "#3A2D22", l0 * 0.6); Rr(c, 0.05, -0.06, 0.2, 0.08, 0.03, "#3A2D22", l0 * 0.6);
+    // the crook in the front hand
+    Ln(c, 0.42, -1.05, 0.48, 0, "#7A5236", 0.05);
+    c.beginPath(); c.moveTo(0.42, -1.05); c.lineTo(0.4, -1.42); c.arc(0.48, -1.42, 0.08, PI, 0.1); c.strokeStyle = "#7A5236"; c.lineWidth = 0.05; c.stroke();
+    Pp(c, [-0.24, -0.86, -0.2, -1.5, 0.22, -1.5, 0.26, -0.86], "#4E6B3A");
+    Ln(c, 0.0, -1.48, 0.0, -0.9, "#3C5530", 0.03);
+    // arms: the back one to the mouth when he whistles, the front one on the crook
+    Ln(c, 0.15, -1.42, 0.42, -1.05, INK, 0.13); Ln(c, 0.15, -1.42, 0.42, -1.05, "#4E6B3A", 0.09);
+    var hx = lerp(-0.12, 0.17, cl), hy = lerp(-0.95, -1.62, cl);
+    Ln(c, -0.12, -1.42, hx, hy, INK, 0.13); Ln(c, -0.12, -1.42, hx, hy, "#4E6B3A", 0.09);
+    Cc(c, 0.03, -1.66, 0.14, "#F2C8A0", l0 * 0.8);
+    Pp(c, [-0.14, -1.72, -0.12, -1.84, 0.14, -1.84, 0.26, -1.74], "#7C6A55", l0 * 0.7);
+    Cc(c, hx, hy, 0.05, "#F2C8A0", l0 * 0.6);
+    Cc(c, 0.09, -1.68, 0.018, INK, 0);
+  }
+
+  // =====================================================================================================
+  // Views: the sky from Farm.Scene, the ground plane from our own projection
+  // =====================================================================================================
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  var W = 300, H = 300, DPR = 1, split = false;
+  var F = 14, HTOP = 1.5;
+  function fz(z) { return F / (F + Math.max(-F * 0.7, z)); }
+  function mkView() { return { sc: new Farm.Scene({ L: 20, fit: function () { return 20; } }), R: { x: 0, y: 0, w: 300, h: 300 }, k: 20, gY: 200, cam: 0, lw: 2, box: null, tgt: null, T: 0.5 }; }
+  var VW = mkView(), VC = mkView();
+  VW.T = 0.85; VC.T = 0.6;
+  function px(V, x, z) { return V.R.w / 2 + (x - V.cam) * V.k * fz(z); }
+  function py(V, z, h) { return V.gY - V.k * fz(z) * (z * V.T + (h || 0)); }
+  function ps(V, z) { return V.k * fz(z); }
+  function fitView(V) {
+    var b = V.box, w = V.R.w, h = V.R.h, fa = fz(b.za), T = V.T;
+    var vext = (b.zb * T + HTOP) * fz(b.zb) - b.za * T * fa;
+    var bot = V.bot || 0.93, top = 0.07, av = h * (bot - top);
+    V.k = Math.min(w * 0.94 / ((b.xb - b.xa) * fa), av / vext);
+    var slack = av - V.k * vext;
+    V.gY = h * bot - slack * 0.5 + V.k * fa * b.za * T;
+    V.cam = (b.xa + b.xb) / 2;
+    V.lw = clamp(V.k * 0.055, 1.4, 3.0);
+    var sc = V.sc;
+    sc.W = w; sc.H = h; sc.k = V.k; sc.cam = V.cam; sc.lw = V.lw; sc.gY = V.gY;
+    sc.hY = Math.max(h * 0.08, V.gY - V.k * T * F * 0.97); sc.B = Math.max(10, sc.gY - sc.hY);
+  }
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    split = H > W * 0.92;
+    if (split) { var hy = Math.round(H * 0.55); VW.R = { x: 0, y: 0, w: W, h: hy }; VC.R = { x: 0, y: hy, w: W, h: H - hy }; }
+    else VW.R = { x: 0, y: 0, w: W, h: H };
+    // the coach pill sits at the bottom of the stage on phones: keep the work above it
+    var phone = W < 700;
+    VC.bot = phone ? 0.76 : 0.93; VW.bot = split ? 0.95 : (phone ? 0.8 : 0.93);
+    follow(0, true);
+  }
+  function views() { return split ? [VW, VC] : [VW]; }
+  function scrPt(V, x, z, h) { var b = cv.getBoundingClientRect(); return { x: b.left + V.R.x + px(V, x, z), y: b.top + V.R.y + py(V, z, h) }; }
+  function inView(V, x, z, h) { var a = px(V, x, z), b = py(V, z, h); return a > 16 && a < V.R.w - 16 && b > 16 && b < V.R.h - 8; }
+  function bestPt(x, z, h) { if (split && inView(VC, x, z, h)) return scrPt(VC, x, z, h); return scrPt(VW, x, z, h); }
+
+  // ---------- Coach, counter, name tags ----------
+  var coach = Toybox.coach($("coach"));
+  function setCount(pop) { var el = $("loads"); el.textContent = "Sheep: " + sheepN; if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } }
+  setCount(false);
+  function tag(text, x, z, h) { var p = bestPt(x, z, h); Toybox.nametag(text, p.x, p.y, 2400); }
+
+  // ---------- Little sounds of our own (only when sound is on) ----------
+  function tones(list) {
+    var ac = window.Toybox && Toybox.sound.ready();
+    if (!ac) return;
+    list.forEach(function (q) {
+      var t = ac.currentTime + (q.at || 0), o = ac.createOscillator(), g = ac.createGain();
+      o.type = q.type || "sine"; o.frequency.setValueAtTime(q.f, t);
+      if (q.to) o.frequency.exponentialRampToValueAtTime(q.to, t + q.d);
+      if (q.vib) { var l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = q.vib; lg.gain.value = q.f * 0.04; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + q.d + 0.05); }
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(q.v || 0.03, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + q.d);
+      var f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = q.lp || 3000;
+      o.connect(f); f.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + q.d + 0.05);
+    });
+  }
+  function whistle(kind) {
+    if (kind === "bye") tones([{ f: 1400, to: 2100, d: 0.25, v: 0.02 }, { f: 2100, to: 1500, d: 0.3, v: 0.02, at: 0.28 }]);
+    else if (kind === "away") tones([{ f: 2100, to: 1400, d: 0.25, v: 0.02 }, { f: 1500, to: 2200, d: 0.3, v: 0.02, at: 0.28 }]);
+    else if (kind === "down") tones([{ f: 2000, to: 1300, d: 0.5, v: 0.02 }]);
+    else tones([{ f: 1600, d: 0.12, v: 0.02 }, { f: 1600, d: 0.12, v: 0.02, at: 0.2 }]);
+  }
+  function baa() { tones([{ f: 330, to: 290, d: 0.55, v: 0.035, type: "sawtooth", vib: 18, lp: 1200 }]); }
+  function splash() { tones([{ f: 900 + Math.random() * 500, to: 300, d: 0.12, v: 0.012, type: "triangle", lp: 2200 }]); }
+
+  // =====================================================================================================
+  // The jobs and their steps
+  // =====================================================================================================
+  var STEPS = {
+    gather: [
+      { id: "bye", name: "Come bye", go: "Come bye", coach: "Send the dog round the sheep." },
+      { id: "away", name: "Away", go: "Away", coach: "Send the dog back the other way." },
+      { id: "pen", name: "Pen", go: "Pen them", coach: "Walk the sheep into the pen." }
+    ],
+    bath: [
+      { id: "open", name: "Gate", go: "Open it", coach: "Open the gate to the race." },
+      { id: "bath", name: "Bath", go: "Send them", coach: "Send the sheep through the foot bath." },
+      { id: "out", name: "Field", go: "Let them out", coach: "Let the sheep out into the field." }
+    ]
+  };
+  var BUSY = { bye: "The dog is running round.", away: "The dog is running round.", pen: "The sheep are going in.", open: "The gate is opening.", bath: "The sheep are in the foot bath.", out: "The sheep are going out." };
+
+  // ---------- Pictures (drawn with the scene's own code) ----------
+  var picCache = {};
+  function arcArrow(x, cx, cy, rx, ry, a0, a1, lw) {
+    x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, a0, a1, a1 < a0);
+    x.lineCap = "round"; x.strokeStyle = INK; x.lineWidth = lw * 1.9; x.stroke(); x.strokeStyle = "#FFC93C"; x.lineWidth = lw; x.stroke();
+    var ex = cx + Math.cos(a1) * rx, ey = cy + Math.sin(a1) * ry, d = a1 < a0 ? -1 : 1;
+    var tx = -Math.sin(a1) * rx * d, ty = Math.cos(a1) * ry * d, tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+    x.beginPath(); x.moveTo(ex + tx * lw * 2.2, ey + ty * lw * 2.2); x.lineTo(ex - ty * lw * 1.8, ey + tx * lw * 1.8); x.lineTo(ex + ty * lw * 1.8, ey - tx * lw * 1.8); x.closePath();
+    x.fillStyle = "#FFC93C"; x.fill(); x.lineWidth = lw * 0.45; x.strokeStyle = INK; x.lineJoin = "round"; x.stroke();
+  }
+  function pic(id) {
+    if (picCache[id] !== undefined) return picCache[id];
+    var cnv = document.createElement("canvas"), PW = 168, PH = 120, x;
+    cnv.width = PW; cnv.height = PH;
+    try { x = cnv.getContext("2d"); } catch (e) { x = null; }
+    if (!x) return (picCache[id] = "");
+    function at(cx, cy, s, fn) { Farm.inUnits(x, cx, cy, s, 3.2, fn); }
+    function hurdleP(x0, x1, y, s) {
+      x.lineCap = "round";
+      [0.2, 0.5, 0.8].forEach(function (hh) { x.strokeStyle = INK; x.lineWidth = 6; x.beginPath(); x.moveTo(x0, y - hh * s); x.lineTo(x1, y - hh * s); x.stroke(); x.strokeStyle = STEEL; x.lineWidth = 3; x.stroke(); });
+      [x0, x1].forEach(function (q) { x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.moveTo(q, y); x.lineTo(q, y - 0.95 * s); x.stroke(); x.strokeStyle = STEEL; x.lineWidth = 4; x.stroke(); });
+    }
+    if (id === "gather") {
+      at(110, 104, 62, function () { sheepShape(x, { head: 0.2 }); });
+      at(44, 108, 58, function () { collie(x, { pose: "crouch", ph: 0.2 }); });
+    } else if (id === "bathjob" || id === "bath") {
+      x.fillStyle = "#3E8FA2"; x.fillRect(14, 92, 140, 22); x.strokeStyle = INK; x.lineWidth = 3; x.strokeRect(14, 92, 140, 22);
+      at(84, 104, 70, function () { sheepShape(x, { gait: 0.8, ph: 0.25, dip: 0.12 }); });
+      x.globalAlpha = 0.6; x.fillStyle = WATER; x.fillRect(16, 96, 136, 16); x.globalAlpha = 1;
+      [[30, 80], [140, 76], [128, 66]].forEach(function (q) { Cc(x, q[0], q[1], 5, "#BFE9F2", 2); });
+    } else if (id === "bye" || id === "away") {
+      at(84, 84, 56, function () { sheepShape(x, { head: 0.6 }); });
+      if (id === "bye") arcArrow(x, 84, 64, 70, 46, PI * 0.75, -PI * 0.15, 7);
+      else arcArrow(x, 84, 64, 70, 46, PI * 0.25, PI * 1.15, 7);
+      var ax = id === "bye" ? 84 + Math.cos(-PI * 0.15) * 70 : 84 + Math.cos(PI * 1.15) * 70;
+      at(id === "bye" ? 134 : 34, 116, 44, function () { if (id === "away") x.scale(-1, 1); collie(x, { pose: "run", ph: 0.1 }); });
+    } else if (id === "pen") {
+      hurdleP(14, 154, 70, 44);
+      at(60, 112, 40, function () { sheepShape(x, {}); });
+      at(112, 112, 40, function () { sheepShape(x, { head: 0.7 }); });
+      hurdleP(14, 154, 116, 40);
+    } else if (id === "open") {
+      hurdleP(10, 60, 108, 70);
+      x.save(); x.translate(64, 108); x.transform(1, -0.25, 0, 1, 0, 0); hurdleP(0, 90, 0, 70); x.restore();
+      x.beginPath(); x.arc(64, 108, 70, -PI * 0.42, -PI * 0.1); x.strokeStyle = "#FFC93C"; x.lineWidth = 6; x.lineCap = "round"; x.stroke();
+    } else if (id === "out") {
+      x.fillStyle = "#74B84C"; x.fillRect(0, 96, PW, 24);
+      [[30, 104], [150, 110], [100, 112], [60, 115]].forEach(function (q, i) { Cc(x, q[0], q[1], 4, i % 2 ? "#FFFFFF" : "#FFD84D", 1.5); });
+      at(70, 104, 58, function () { sheepShape(x, { head: 0.8 }); });
+      at(128, 98, 40, function () { sheepShape(x, { gait: 0.8, ph: 0.3 }); });
+    }
+    var url = "";
+    try { url = cnv.toDataURL("image/png"); } catch (e) { url = ""; }
+    return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
+  }
+  function stepList(j) { return STEPS[j].map(function (s) { return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.id) }; }); }
+
+  // ---------- Steps, job bar, bottom bar, ghost ----------
+  var phase = "ready", phaseT = 0, stepId = "bye", ending = false, dusk = 0, time = 0;
+  var wk = null;
+  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  function firstStep() { return job === "bath" ? "open" : "bye"; }
+  var steps = null;
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (locked()) return null;
+      if (phase === "ready") { var p = partScreen(stepId); if (!p) return null; return { pts: [[p.x, p.y]], tap: true, key: "go" }; }
+      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      return null;
+    }
+  });
+  function mkSteps(el, j) { return Toybox.steps(el, { steps: stepList(j), coach: coach, ghost: ghost, onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); } }); }
+  var stepsG = mkSteps($("stepsGather"), "gather"), stepsB = mkSteps($("stepsBath"), "bath");
+  steps = job === "bath" ? stepsB : stepsG;
+  function showSteps() {
+    steps = job === "bath" ? stepsB : stepsG;
+    $("stepsGather").hidden = job === "bath"; $("stepsBath").hidden = job !== "bath";
+  }
+  var jobs = Toybox.jobs($("jobs"), {
+    jobs: [{ id: "gather", name: "Gather", pic: pic("gather") }, { id: "bath", name: "Foot bath", pic: pic("bathjob") }],
+    value: job,
+    onPick: function (id) { switchJob(id); }
+  });
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
+
+  function doGo() {
+    if (locked()) return false;
+    if (phase === "ready") return go();
+    if (phase === "done") return again();
+    busyHint(); return true;
+  }
+  function busyHint() { if (phase === "work") coach.say(BUSY[stepId], 3); }
+
+  // =====================================================================================================
+  // The flock and the dog
+  // =====================================================================================================
+  var flock = [], dog = null, gate = 1, gate2 = 0, round = 0, lamb = null, bubbles = [], faceT = 0;
+  function mkSheep(i, x, z) { return { i: i, x: x, z: z, vx: 0, vz: 0, dir: hash(i, round + 7) > 0.5 ? 1 : -1, ph: hash(i, 9), head: 0.8, tx: x, tz: z, spd: 0.4, path: null, pi: 0, mode: "graze", munch: 0, baa: 0, hop: 0, hopV: 0, counted: false, wait: 0, s: 0, dip: 0 }; }
+  function spreadHomes() {
+    var pts = [], tries = 0, i = 0;
+    while (pts.length < NSHEEP && tries < 400) {
+      tries++;
+      var x = lerp(-6.4, 1.6, hash(tries, round * 3 + 1)), z = lerp(0.4, 7.4, hash(tries, round * 3 + 2)), ok = true;
+      for (i = 0; i < pts.length; i++) if (Math.hypot(pts[i][0] - x, (pts[i][1] - z) * 0.8) < 1.9) { ok = false; break; }
+      if (ok) pts.push([x, z]);
+    }
+    while (pts.length < NSHEEP) pts.push([lerp(-6, 1, Math.random()), lerp(0.5, 7, Math.random())]);
+    return pts;
+  }
+  function resetScene() {
+    round++; flock = []; lamb = null; bubbles = []; faceT = 0; parts.length = 0; wk = null;
+    if (job === "gather") {
+      spreadHomes().forEach(function (p, i) { flock.push(mkSheep(i, p[0], p[1])); });
+      dog = { x: DOGHOME.x, z: DOGHOME.z, dir: 1, ph: 0, pose: "lie", spd: 0, tx: DOGHOME.x, tz: DOGHOME.z, mode: "seek", nudge: null };
+      gate = 1;
+    } else {
+      HP_SPOTS.forEach(function (p, i) { var s = mkSheep(i, p[0], p[1]); s.dir = 1; s.head = 0.3; flock.push(s); });
+      dog = { x: BATHDOG.x, z: BATHDOG.z, dir: 1, ph: 0, pose: "lie", spd: 0, tx: BATHDOG.x, tz: BATHDOG.z, mode: "seek", nudge: null };
+      gate = 0; gate2 = 0;
+    }
+    shepCall = 0;
+  }
+  var shepCall = 0;
+  function flockCentre() {
+    var x = 0, z = 0, n = 0;
+    flock.forEach(function (s) { if (!s.inPen) { x += s.x; z += s.z; n++; } });
+    if (!n) flock.forEach(function (s) { x += s.x; z += s.z; n++; });
+    return { x: x / Math.max(1, n), z: z / Math.max(1, n) };
+  }
+  // a polyline path for a sheep; s.s = distance along it
+  function setPath(s, pts) { s.path = [[s.x, s.z]].concat(pts); s.seg = 0; s.mode = "path"; }
+  function pathLen(p) { var L = 0; for (var i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; }
+
+  function bubble(text, who, sec) { bubbles.push({ text: text, who: who, t: 0, life: sec || 2.6 }); }
+
+  // =====================================================================================================
+  // The flow
+  // =====================================================================================================
+  function setPhase(p) { phase = p; phaseT = 0; }
+  function bringIn(id) {
+    stepId = id; steps.at(id); wk = null;
+    setPhase("ready"); steps.busy(false);
+  }
+  function go() {
+    if (phase !== "ready") return false;
+    if (ghost) ghost.learned("go");
+    setPhase("work"); steps.busy(true);
+    wk = { t: 0, ev: {} };
+    if (stepId === "bye") { whistle("bye"); shepCall = 1.4; bubble("Come bye!", "shep"); coach.say("Come bye! The dog runs round.", 4); startRun(true); }
+    else if (stepId === "away") { whistle("away"); shepCall = 1.4; bubble("Away!", "shep"); coach.say("Away! Round the other way.", 4); startRun(false); }
+    else if (stepId === "pen") { whistle("walk"); shepCall = 1.2; bubble("Walk on!", "shep"); coach.say("The dog walks up behind them.", 3); startPen(); }
+    else if (stepId === "open") { snd.clunk(); coach.say("The gate swings open.", 3); }
+    else if (stepId === "bath") { coach.say("The sheep trot down the race.", 3); startBath(); }
+    else if (stepId === "out") { snd.clunk(); coach.say("The field gate opens.", 3); }
+    return true;
+  }
+  function stepDone(id) {
+    var list = STEPS[job], i = list.map(function (s) { return s.id; }).indexOf(id);
+    steps.done(id);
+    if (i < list.length - 1) bringIn(list[i + 1].id);
+    else finish();
+  }
+  function finish() {
+    setPhase("done"); wk = null; steps.finish("Again!"); steps.busy(false);
+    coach.say(job === "bath" ? "All the sheep are out on the grass!" : "All the sheep are in the pen!", 5);
+    save(); snd.chime(); Toybox.kind();
+    Farm.world.update(function (w) { w.sheep = (typeof w.sheep === "number" && isFinite(w.sheep) ? w.sheep : 0) + (job === "bath" ? NBATH : NSHEEP); });
+  }
+  function countOne() { sheepN++; setCount(true); snd.tick(); save(); }
+  function again() {
+    if (phase !== "done") return false;
+    if (ghost) ghost.learned("again");
+    resetScene(); steps.reset(); bringIn(firstStep()); follow(0, true);
+    coach.say(job === "bath" ? "More sheep for the foot bath." : "A new flock on the hill.", 3);
+    return true;
+  }
+  function startOver() {
+    if (locked()) return;
+    resetScene(); steps.reset(); bringIn(firstStep()); follow(0, true);
+    coach.say(job === "bath" ? "The sheep wait in the pen." : "The sheep graze on the hill.", 3);
+    save();
+  }
+  function switchJob(id) {
+    if (locked()) { jobs.set(job); return; }
+    job = id === "bath" ? "bath" : "gather";
+    resetScene(); showSteps(); steps.reset(); bringIn(firstStep()); follow(0, true);
+    coach.say(job === "bath" ? "Time for the foot bath." : "Gather the sheep.", 3);
+    $("cv").setAttribute("aria-label", job === "bath" ? "Sheep in a pen next to a race with a shallow foot bath, then a gate to the green field." : "A hillside field with a flock of sheep, a sheepdog, the shepherd and a pen.");
+    save();
+  }
+
+  // ---------- Gather: the dog's run round the flock ----------
+  // Angles on the ground seen from above: 0 = right, 90 = up the hill. Come bye = clockwise (the angle falls),
+  // Away = anticlockwise (the angle rises).
+  function ellPt(e, a) { return { x: e.cx + Math.cos(a) * e.ax, z: e.cz + Math.sin(a) * e.az }; }
+  function startRun(bye) {
+    if (bye) wk.run = { e: { cx: -2.4, cz: 3.9, ax: 5.8, az: 4.6 }, a0: PI * 1.2, a1: -PI * 0.03, dur: 5.6, from: { x: dog.x, z: dog.z }, c1: C1, c0: null };
+    else {
+      var e = { cx: C1.x, cz: C1.z, ax: 4.3, az: 3.6 }, a0 = Math.atan2((dog.z - e.cz) / e.az, (dog.x - e.cx) / e.ax);
+      wk.run = { e: e, a0: a0, a1: PI * 0.93, dur: 5.2, from: { x: dog.x, z: dog.z }, move: true };
+    }
+    dog.mode = "path";
+  }
+  function runPose(t) {
+    var r = wk.run, u = clamp(t / r.dur, 0, 1), k = ease(u), a = lerp(r.a0, r.a1, k);
+    var e = r.e;
+    if (r.move) { var m = ease(clamp((u - 0.35) / 0.65, 0, 1)); e = { cx: lerp(C1.x, C2.x, m), cz: lerp(C1.z, C2.z, m), ax: r.e.ax, az: r.e.az }; }
+    var p = ellPt(e, a), b = clamp(u / 0.14, 0, 1);
+    return { x: lerp(r.from.x, p.x, b < 1 ? ease(b) : 1), z: lerp(r.from.z, p.z, b < 1 ? ease(b) : 1) };
+  }
+  function workRun(dt) {
+    var t = wk.t, r = wk.run, u = clamp(t / r.dur, 0, 1), bye = stepId === "bye";
+    var p = runPose(t);
+    dog.x = p.x; dog.z = p.z;
+    // the sheep react: they bunch up (Come bye), then walk toward the pen (Away)
+    flock.forEach(function (s, i) {
+      var c = bye ? C1 : C2, start = bye ? 0.12 + 0.5 * clamp((s.x + 6.5) / 8, 0, 1) : 0.35 + 0.1 * hash(i, 5);
+      if (u > start && !s["go" + stepId]) {
+        s["go" + stepId] = true; s.mode = "graze"; s.path = null;
+        s.tx = c.x + BUNCH[i][0] + (hash(i, round) - 0.5) * 0.3; s.tz = c.z + BUNCH[i][1]; s.spd = bye ? 2.0 : 1.3;
+        if (bye && i % 3 === 0) baaSoft(s);
+      }
+    });
+    if (bye && t > 2.6 && once("bunch")) coach.say("The sheep bunch up.", 3);
+    if (!bye && t > 2.6 && once("walk")) coach.say("The sheep walk to the pen.", 3);
+    if (t > r.dur + 0.5) { dog.mode = "seek"; dog.tx = dog.x; dog.tz = dog.z; stepDone(stepId); }
+  }
+  function baaSoft(s) { s.baa = 1; }
+  // ---------- Gather: into the pen ----------
+  function startPen() {
+    var order = flock.slice().sort(function (a, b) { return Math.hypot(a.x - PEN.x0, a.z - MOUTH_Z) - Math.hypot(b.x - PEN.x0, b.z - MOUTH_Z); });
+    wk.order = order; wk.next = 0; wk.inT = -1;
+    order.forEach(function (s, j) { s.spot = PEN_SPOTS[j]; });
+  }
+  function workPen(dt) {
+    var t = wk.t;
+    // the dog creeps up behind the sheep that are still out
+    var out = flock.filter(function (s) { return s.x < PEN.x0 + 0.3; });
+    if (out.length) {
+      var mx = Math.min.apply(null, out.map(function (s) { return s.x; })), mz = out.reduce(function (a, s) { return a + s.z; }, 0) / out.length;
+      dog.mode = "seek"; dog.tx = Math.min(PEN.x0 - 2.4, mx - 2.2); dog.tz = mz; dog.spdMax = 1.4;
+    } else { dog.tx = PEN.x0 - 2.5; dog.tz = MOUTH_Z - 0.4; }
+    while (wk.next < wk.order.length && t > 0.3 + wk.next * 0.42) {
+      var s = wk.order[wk.next++];
+      setPath(s, [[PEN.x0 - 1.4, MOUTH_Z + (hash(s.i, 4) - 0.5) * 0.8], [PEN.x0 + 0.6, MOUTH_Z], [s.spot[0], s.spot[1]]]);
+      s.spd = 2.3;
+    }
+    flock.forEach(function (s) { if (!s.counted && s.x > PEN.x0 + 0.3) { s.counted = true; s.inPen = true; countOne(); } });
+    var allIn = flock.every(function (s) { return s.counted; });
+    if (allIn && wk.inT < 0) { wk.inT = t; coach.say("All in! The gate swings shut.", 3); }
+    if (wk.inT >= 0) {
+      var g = (t - wk.inT - 0.1) / 1.0;
+      gate = 1 - ease(clamp(g, 0, 1));
+      if (g >= 1 && once("shut")) { snd.clunk(); }
+      if (t - wk.inT > 1.3 && once("down")) { whistle("down"); shepCall = 1.4; bubble("Lie down!", "shep"); dog.mode = "lie"; coach.say("Lie down. Good dog!", 4); }
+      if (t - wk.inT > 2.9) stepDone("pen");
+    }
+    if (t > 16 && wk.inT < 0) flock.forEach(function (s) { if (!s.counted) { s.x = s.spot[0]; s.z = s.spot[1]; s.mode = "graze"; s.tx = s.x; s.tz = s.z; } });
+  }
+  // ---------- Foot bath ----------
+  function workOpen(dt) {
+    var t = wk.t;
+    gate = ease(clamp(t / 1.3, 0, 1));
+    if (t > 0.3 && once("dog")) { dog.mode = "seek"; dog.tx = HP.x0 - 0.9; dog.tz = 1.4; }
+    var s0 = flock[0];
+    if (t > 1.0 && once("first")) { s0.mode = "graze"; s0.tx = HP.x1 + 0.15; s0.tz = 0; s0.spd = 1.0; s0.baa = 1; coach.say("The first sheep looks out.", 3); }
+    flock.forEach(function (s) { if (s !== s0) s.head = Math.max(0, s.head - dt); });
+    if (t > 3.6) stepDone("open");
+  }
+  function startBath() {
+    wk.next = 0;
+    flock.forEach(function (s, j) { s.spot2 = DP_SPOTS[j]; });
+  }
+  function workBath(dt) {
+    var t = wk.t;
+    while (wk.next < flock.length && t > 0.2 + wk.next * 0.5) {
+      var s = flock[wk.next++];
+      setPath(s, [[HP.x1 - 0.6, 0], [DP.x0 + 0.5, 0], [s.spot2[0], s.spot2[1]]]); s.spd = 3.5; s.race = true;
+    }
+    var behind = flock.filter(function (s) { return s.x < HP.x1 - 0.6; });
+    dog.mode = "seek"; dog.tx = HP.x0 - 0.9; dog.tz = behind.length ? 0.6 + 0.4 * Math.sin(t * 2) : 1.2; dog.spdMax = 1.5;
+    flock.forEach(function (s) { if (!s.counted && s.x > TRO.x1 + 0.1) { s.counted = true; countOne(); } });
+    if (t > 1.6 && once("feet")) coach.say("Splash! Their feet go in the water.", 4);
+    var done = flock.every(function (s) { return s.counted; });
+    if (done && once("dried")) wk.endT = t;
+    if (wk.endT !== undefined && t > wk.endT + 1.2) stepDone("bath");
+    if (t > 22) flock.forEach(function (s) { if (s.mode === "path") { s.mode = "graze"; s.x = s.spot2[0]; s.z = s.spot2[1]; s.tx = s.x; s.tz = s.z; } if (!s.counted) { s.counted = true; countOne(); } });
+  }
+  function workOut(dt) {
+    var t = wk.t;
+    gate2 = ease(clamp(t / 1.2, 0, 1));
+    if (t > 0.3 && once("dog")) { dog.mode = "seek"; dog.tx = DP.x0 + 1.2; dog.tz = -1.4; dog.spdMax = 2.2; }
+    var order = flock.slice().sort(function (a, b) { return b.x - a.x; });
+    order.forEach(function (s, j) {
+      if (t > 0.8 + j * 0.3 && !s.out) {
+        s.out = true;
+        setPath(s, [[DP.x1 - 0.5, 1.4 + (j % 3 - 1) * 0.6], [DP.x1 + 1.5, 1.4 + (j % 3 - 1) * 0.9], [lerp(7.8, 13.2, hash(j, round + 21)), lerp(0.2, 6.8, hash(j, round + 22))]]);
+        s.spd = 2.6; s.race = false; s.hopN = 2;
+      }
+    });
+    if (t > 2.2 && once("run")) coach.say("They run out onto the green grass.", 4);
+    if (t > 6.4) stepDone("out");
+  }
+  function once(id) { if (wk.ev[id]) return false; wk.ev[id] = 1; return true; }
+
+  // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  var surpriseN = 0;
+  function visibleSheep() {
+    // the close-up's sheep first, so the moment shows big
+    var l = split ? flock.filter(function (s) { return inView(VC, s.x - 1.5, s.z, 0.8) && inView(VC, s.x + 1.5, s.z, 0.8); }) : [];
+    if (!l.length) l = flock.filter(function (s) { return inView(VW, s.x, s.z, 0.6); });
+    return l.length ? l : flock;
+  }
+  function surprise() {
+    if (locked()) return;
+    var pick = ["lamb", "baa", "munch", "faces"][surpriseN++ % 4];
+    if (pick === "munch" && (phase === "work" || dog.mode === "path" || job === "bath" && stepId !== "open" && phase !== "done")) pick = "faces";
+    var vs = visibleSheep();
+    if (pick === "lamb") {
+      var mum = vs[Math.floor(vs.length / 2)];
+      lamb = { mum: mum, t: 0, x: mum.x, z: mum.z - 0.15, h: 0, dir: mum.dir || 1 };
+      coach.say("The lamb is pronking!", 4);
+      return;
+    }
+    if (pick === "baa") {
+      var s = vs[Math.floor(Math.random() * vs.length)];
+      s.baa = 2.4; s.head = 0; bubble("Baa!", s, 2.6); baa();
+      coach.say("Baa! says the sheep.", 3);
+      return;
+    }
+    if (pick === "munch") {
+      var m = vs[vs.length - 1], dx = job === "bath" ? 0 : (m.x > 0 ? 2.2 : -2.2);
+      if (job === "bath") { faceT = 6; coach.say("Hello, sheep!", 3); return; }
+      m.tx = clamp(m.x + dx, -7, 2.5); m.tz = clamp(m.z + 1.2, 0.3, 8); m.spd = 0.9; m.mode = "graze"; m.munchT = 3.2;
+      dog.nudge = { s: m, t: 0, home: { x: dog.x, z: dog.z, pose: dog.mode }, back: { x: m.x, z: m.z } };
+      coach.say("A sheep wanders off to munch.", 3);
+      return;
+    }
+    faceT = 6; coach.say("Hello, sheep!", 3);
+  }
+
+  // =====================================================================================================
+  // Particles (world x, z, height h)
+  // =====================================================================================================
+  var parts = [];
+  function addPart(p) { if (parts.length > 120) parts.shift(); p.t = 0; parts.push(p); }
+  function updateParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i]; p.t += dt;
+      if (p.t >= p.life) { parts.splice(i, 1); continue; }
+      if (p.kind === "ring") continue;
+      p.vh -= 9 * dt; p.x += p.vx * dt; p.z += (p.vz || 0) * dt; p.h += p.vh * dt;
+      if (p.h < 0) { p.h = 0; p.vh = 0; p.vx = 0; p.vz = 0; if (p.t < p.life - 0.15) p.t = p.life - 0.15; }
+    }
+  }
+  function drawParts(V) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], s = ps(V, p.z), x = px(V, p.x, p.z), y = py(V, p.z, p.h), f = p.t / p.life;
+      if (x < -30 || x > V.R.w + 30) continue;
+      if (p.kind === "ring") {
+        ctx.globalAlpha = 0.7 * (1 - f); ctx.beginPath(); ctx.ellipse(x, y, s * (0.12 + f * 0.45), s * (0.04 + f * 0.14), 0, 0, TAU);
+        ctx.strokeStyle = "#E8FAFF"; ctx.lineWidth = Math.max(1.2, s * 0.03); ctx.stroke(); continue;
+      }
+      ctx.globalAlpha = f > 0.6 ? (1 - f) / 0.4 : 1;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(1.3, p.size * s), 0, TAU); ctx.fillStyle = p.col; ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // =====================================================================================================
+  // Input
+  // =====================================================================================================
+  function partScreen(id) {
+    if (id === "bye" || id === "away" || id === "pen") {
+      // the sheep nearest the middle of the flock that a view shows whole
+      var c = flockCentre(), best = null, bd = 1e9, V = null;
+      [split ? VC : null, VW].forEach(function (v) {
+        if (!v || best) return;
+        flock.forEach(function (s) { if (!inView(v, s.x, s.z, 0.6)) return; var d = Math.hypot(s.x - c.x, s.z - c.z); if (d < bd) { bd = d; best = s; V = v; } });
+      });
+      return best ? scrPt(V, best.x, best.z, 0.6) : bestPt(c.x, c.z, 0.6);
+    }
+    if (id === "open") return bestPt(HP.x1, 0, 0.6);
+    if (id === "bath") return bestPt(-6.6, 0.8, 0.6);
+    if (id === "out") return bestPt(DP.x1, 1.4, 0.7);
+    return null;
+  }
+  function partList() {
+    var list = [];
+    views().forEach(function (V) {
+      function add(id, x, z, h, size) { if (inView(V, x, z, h)) { var p = scrPt(V, x, z, h); list.push({ id: id, x: p.x, y: p.y, r: Math.max(26, ps(V, z) * size) }); } }
+      flock.forEach(function (s) { add("sheep", s.x, s.z, 0.55, 0.75); });
+      add("dog", dog.x, dog.z, 0.3, 0.55);
+      if (job === "gather") { add("shep", SHEP.x, SHEP.z, 1.0, 0.6); add("gate", PEN.x0, PEN.gz + 1.2, 0.5, 0.6); add("pen", (PEN.x0 + PEN.x1) / 2, PEN.z0 + 0.3, 0.5, 0.7); }
+      else { add("gate", HP.x1, 0, 0.5, 0.5); add("trough", (TRO.x0 + TRO.x1) / 2, -0.3, 0.0, 0.7); add("field", DP.x1, 1.4, 0.6, 0.6); }
+    });
+    return list;
+  }
+  Toybox.press(cv, {
+    any: true,
+    parts: partList,
+    tap: function (part) {
+      if (locked()) return;
+      var mine = false;
+      if (stepId === "bye" || stepId === "away") mine = part === "sheep" || part === "dog" || part === "shep";
+      else if (stepId === "pen") mine = part === "sheep" || part === "dog" || part === "shep" || part === "gate" || part === "pen";
+      else if (stepId === "open") mine = part === "gate" || part === "sheep" || part === "dog";
+      else if (stepId === "bath") mine = part === "sheep" || part === "trough" || part === "dog";
+      else if (stepId === "out") mine = part === "field" || part === "sheep" || part === "dog";
+      if (mine && phase === "ready") { go(); return; }
+      if (part === "sheep") { var c = flockCentre(); snd.pop(); tag("Sheep", c.x, c.z, 1.2); return; }
+      if (part === "dog") { snd.pop(); tag("Sheepdog", dog.x, dog.z, 0.9); return; }
+      if (part === "shep") { whistle("walk"); shepCall = 1; tag("Shepherd", SHEP.x, SHEP.z, 2.0); return; }
+      if (part === "gate") { snd.clunk(); tag("Gate", job === "gather" ? PEN.x0 : HP.x1, job === "gather" ? PEN.gz + 1.2 : 0, 1.2); return; }
+      if (part === "pen") { snd.clunk(); tag("Pen", (PEN.x0 + PEN.x1) / 2, PEN.z1, 1.2); return; }
+      if (part === "trough") { splash(); for (var i = 0; i < 3; i++) addPart({ kind: "ring", x: lerp(TRO.x0 + 0.3, TRO.x1 - 0.3, Math.random()), z: (Math.random() - 0.5) * 0.5, h: 0, life: 0.9 }); tag("Foot bath", (TRO.x0 + TRO.x1) / 2, 0, 0.6); return; }
+      if (part === "field") { snd.clunk(); tag("Field gate", DP.x1, 1.4, 1.2); return; }
+      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep && steps.sayStep();
+      if (ghost) ghost.poke();
+    }
+  });
+
+  // =====================================================================================================
+  // Update
+  // =====================================================================================================
+  function moveSheep(dt) {
+    var i, j, s;
+    for (i = 0; i < flock.length; i++) {
+      s = flock[i];
+      var dvx = 0, dvz = 0, spd = s.spd;
+      if (s.mode === "path") {
+        var tgt = s.path[s.seg + 1];
+        if (!tgt) { s.mode = "graze"; s.tx = s.x; s.tz = s.z; s.spd = 0.3; s.race = false; continue; }
+        var dx = tgt[0] - s.x, dz = tgt[1] - s.z, d = Math.hypot(dx, dz);
+        if (d < 0.25) { s.seg++; continue; }
+        var inTrough = s.race && s.x > TRO.x0 - 0.2 && s.x < TRO.x1 + 0.1 && Math.abs(s.z) < 0.4;
+        spd = inTrough ? 2.1 : s.spd;
+        // keep a sheep's length behind the one ahead in the race
+        if (s.race) for (j = 0; j < flock.length; j++) { var o = flock[j]; if (o !== s && Math.abs(o.z - s.z) < 0.6 && o.x > s.x && o.x - s.x < 1.8 && o.x < DP.x0 + 0.4) spd = Math.min(spd, Math.max(0, (o.x - s.x - 1.5) * 4)); }
+        dvx = dx / d * spd; dvz = dz / d * spd;
+      } else {
+        var gx = s.tx - s.x, gz = s.tz - s.z, gd = Math.hypot(gx, gz);
+        if (gd > 0.08) { var v = Math.min(spd, gd * 1.4); dvx = gx / gd * v; dvz = gz / gd * v; }
+        // keep apart
+        for (j = 0; j < flock.length; j++) {
+          if (j === i || flock[j].mode === "path") continue;
+          var ox = s.x - flock[j].x, oz = (s.z - flock[j].z) * 1.4, od = Math.hypot(ox, oz);
+          if (od < 1.25 && od > 0.001) { dvx += ox / od * (1.25 - od) * 2.2; dvz += oz / od * (1.25 - od) * 1.6; }
+        }
+        // move away from the dog (only out on the hill)
+        if (job === "gather" && !s.inPen && dog.mode !== "lie") {
+          var ax = s.x - dog.x, az = s.z - dog.z, ad = Math.hypot(ax, az);
+          if (ad < 2.8 && ad > 0.01) { dvx += ax / ad * (2.8 - ad) * 1.3; dvz += az / ad * (2.8 - ad) * 1.3; }
+        }
+      }
+      s.vx += (dvx - s.vx) * Math.min(1, dt * 5); s.vz += (dvz - s.vz) * Math.min(1, dt * 5);
+      s.x += s.vx * dt; s.z += s.vz * dt;
+      if (job === "gather") {
+        if (s.inPen) { s.x = clamp(s.x, PEN.x0 + 0.6, PEN.x1 - 0.6); s.z = clamp(s.z, PEN.z0 + 0.35, PEN.z1 - 0.35); }
+        else { s.x = clamp(s.x, -8.5, PEN.x0 - 0.5 + (s.mode === "path" ? 4 : 0)); s.z = clamp(s.z, -0.4, 9); }
+      }
+      var sp = Math.hypot(s.vx, s.vz);
+      if (Math.abs(s.vx) > 0.15) s.dir = s.vx > 0 ? 1 : -1;
+      s.ph += dt * sp * 1.4;
+      var grazing = sp < 0.25 && s.mode !== "path" && !s.baa;
+      s.head += ((grazing && !ending ? 0.85 : 0) - s.head) * Math.min(1, dt * 2.5);
+      if (s.munchT) { s.munchT -= dt; s.munch = s.munchT > 0 ? time : 0; if (s.munchT <= 0) s.munchT = 0; }
+      if (s.baa > 0) s.baa = Math.max(0, s.baa - dt);
+      // hops when let out onto the grass
+      if (s.hopN && sp > 1.5 && s.hop <= 0 && s.x > DP.x1 + 0.4) { s.hopV = 2.6; s.hop = 0.001; s.hopN--; }
+      if (s.hop > 0) { s.hopV -= 12 * dt; s.hop += s.hopV * dt; if (s.hop <= 0) s.hop = 0; }
+      // splashes in the foot bath
+      var wet = job === "bath" && s.x > TRO.x0 + 0.1 && s.x < TRO.x1 - 0.1 && Math.abs(s.z) < 0.45;
+      s.dip += ((wet ? 0.12 : 0) - s.dip) * Math.min(1, dt * 10);
+      if (wet && sp > 0.4) {
+        if (Math.random() < dt * 14) { splash(); addPart({ kind: "ring", x: s.x + (Math.random() - 0.5) * 0.6, z: s.z - 0.1, h: 0, life: 0.9 }); }
+        if (Math.random() < dt * 30) addPart({ kind: "drop", x: s.x + (Math.random() - 0.5) * 0.7, z: s.z - 0.15, h: 0.02, vx: (Math.random() - 0.3) * 1.4, vz: -Math.random() * 0.3, vh: 1.2 + Math.random() * 1.6, life: 0.7, size: 0.035 + Math.random() * 0.03, col: Math.random() < 0.5 ? "#D6F3FA" : "#8FD3E0" });
+      }
+    }
+  }
+  function moveDog(dt) {
+    var g = dog, ox = g.x, oz = g.z;
+    if (g.nudge) {
+      var n = g.nudge; n.t += dt;
+      if (n.t > 1.2 && n.t < 3.4) { g.tx = n.s.x - n.s.dir * 1.3 - 0.2; g.tz = n.s.z - 0.25; g.mode = "seek"; g.spdMax = 2.2; }
+      if (n.t > 3.4 && !n.pushed) { n.pushed = true; n.s.hop = 0.001; n.s.hopV = 2.4; n.s.munchT = 0; n.s.tx = n.back.x; n.s.tz = n.back.z; n.s.spd = 1.6; n.s.baa = 1; snd.pop(); coach.say("The dog nudges it back.", 3); }
+      if (n.t > 4.4) { g.tx = n.home.x; g.tz = n.home.z; }
+      if (n.t > 6.5) { g.mode = n.home.pose === "lie" ? "lie" : "seek"; g.nudge = null; }
+    }
+    if (g.mode === "seek" || g.mode === "lie") {
+      var dx = g.tx - g.x, dz = g.tz - g.z, d = Math.hypot(dx, dz), mx = g.spdMax || 3;
+      if (d > 0.03) { var v = Math.min(mx, d * 2.2); g.x += dx / d * v * dt; g.z += dz / d * v * dt; }
+    }
+    var sp = dt > 0 ? Math.hypot(g.x - ox, g.z - oz) / dt : 0;
+    g.spd += (sp - g.spd) * Math.min(1, dt * 8);
+    if (Math.abs(g.x - ox) > dt * 0.25) g.dir = g.x > ox ? 1 : -1;
+    else if (g.spd < 0.2) {
+      // face the sheep while waiting
+      var c = flockCentre(); if (Math.abs(c.x - g.x) > 0.5) g.dir = c.x > g.x ? 1 : -1;
+    }
+    g.ph += dt * (g.spd > 2.2 ? g.spd * 0.75 : g.spd * 1.3);
+    if (g.spd > 2.2) g.pose = "run";
+    else if (g.spd > 0.25) g.pose = "crouch";
+    else g.pose = (g.mode === "lie" || ending || (phase === "ready" && stepId === "bye") || (job === "bath" && stepId === "open" && phase === "ready")) ? "lie" : "crouch";
+  }
+  function updateLamb(dt) {
+    var L = lamb; L.t += dt;
+    var m = L.mum, out = L.t < 0.6 ? ease(L.t / 0.6) : (L.t > 5.2 ? 1 - ease((L.t - 5.2) / 0.7) : 1);
+    var hopT = L.t - 0.6, hops = hopT > 0 && hopT < 4.4;
+    L.dir = job === "bath" && !m.out && !m.counted ? -1 : (m.dir || 1);
+    L.x = m.x + L.dir * (0.4 + 1.2 * out) + (hops ? Math.sin(hopT * 1.4) * 0.5 : 0); L.z = m.z - 0.35 * out;
+    L.h = hops ? Math.abs(Math.sin(hopT * PI * 1.25)) * 0.55 : 0;
+    if (hops && Math.abs(Math.sin(hopT * PI * 1.25)) < 0.05 && !L.tk) { L.tk = true; snd.tick(); } else if (Math.abs(Math.sin(hopT * PI * 1.25)) > 0.3) L.tk = false;
+    L.alpha = out;
+    if (L.t > 6) lamb = null;
+  }
+  function update(dt) {
+    time += dt; phaseT += dt;
+    if (phase === "work" && wk) {
+      wk.t += dt;
+      if (stepId === "bye" || stepId === "away") workRun(dt);
+      else if (stepId === "pen") workPen(dt);
+      else if (stepId === "open") workOpen(dt);
+      else if (stepId === "bath") workBath(dt);
+      else if (stepId === "out") workOut(dt);
+    }
+    // grazing sheep wander a little now and then
+    if (phase !== "work") flock.forEach(function (s) {
+      if (s.mode === "graze" && !s.munchT && hash(s.i, Math.floor(time / 4) + round * 13) > 0.92 && Math.abs(s.tx - s.x) < 0.2) {
+        var nx = s.x + (hash(s.i, Math.floor(time)) - 0.5) * 1.0, nz = s.z + (hash(Math.floor(time), s.i) - 0.5) * 0.6;
+        if (job === "gather" && !s.inPen) { nx = clamp(nx, -8, PEN.x0 - 1); nz = clamp(nz, 0, 8.5); }
+        else if (job === "gather") { nx = clamp(nx, PEN.x0 + 0.7, PEN.x1 - 0.7); nz = clamp(nz, PEN.z0 + 0.4, PEN.z1 - 0.4); }
+        else if (s.out) { nx = clamp(nx, 7.2, 14); nz = clamp(nz, 0, 7); }
+        else { nx = s.x; nz = s.z; }
+        s.tx = nx; s.tz = nz; s.spd = 0.35;
+      }
+    });
+    moveSheep(dt);
+    moveDog(dt);
+    if (lamb) updateLamb(dt);
+    if (shepCall > 0) shepCall = Math.max(0, shepCall - dt);
+    if (faceT > 0) faceT = Math.max(0, faceT - dt);
+    for (var i = bubbles.length - 1; i >= 0; i--) { bubbles[i].t += dt; if (bubbles[i].t > bubbles[i].life) bubbles.splice(i, 1); }
+    if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    updateParts(dt);
+    follow(dt);
+    var wet = job === "bath" && flock.some(function (s) { return s.dip > 0.06 && Math.hypot(s.vx, s.vz) > 0.4; });
+    snd.pour(ending ? 0 : (wet ? 0.5 : 0));
+  }
+
+  // ---------- Cameras ----------
+  function wideBox() {
+    if (job === "gather") return { xa: -9.6, xb: 7.8, za: -1.7, zb: 9.0 };
+    if (stepId === "out" || (phase === "done")) return { xa: -1.5, xb: 14.2, za: -1.7, zb: 7.4 };
+    return { xa: -10.8, xb: 6.7, za: -1.7, zb: 4.2 };
+  }
+  function closeBox() {
+    if (job === "gather") {
+      if (phase === "done" || stepId === "pen") return { xa: PEN.x0 - 3.6, xb: PEN.x1 + 0.6, za: -0.2, zb: PEN.z1 + 0.2 };
+      if (phase === "work") {
+        // the dog and the sheep next to it
+        var nb = null, nd = 1e9;
+        flock.forEach(function (s) { var d = Math.hypot(s.x - dog.x, s.z - dog.z); if (d < nd) { nd = d; nb = s; } });
+        var xa = dog.x - 2.2, xb = dog.x + 2.2, za = dog.z - 1.0, zb = dog.z + 1.0;
+        if (nb && nd < 5) { xa = Math.min(xa, nb.x - 1.2); xb = Math.max(xb, nb.x + 1.2); za = Math.min(za, nb.z - 1.0); zb = Math.max(zb, nb.z + 0.8); }
+        var mx = (xa + xb) / 2, hw = Math.max(3.4, (xb - xa) / 2);
+        return { xa: mx - hw, xb: mx + hw, za: za, zb: zb };
+      }
+      var c = flockCentre();
+      if (stepId === "bye") return { xa: SHEP.x - 1.3, xb: SHEP.x + 5.6, za: -1.6, zb: 2.0 };
+      return { xa: Math.min(dog.x, c.x) - 1.8, xb: Math.max(dog.x, c.x) + 2.4, za: Math.min(dog.z, c.z) - 1.8, zb: Math.max(dog.z, c.z) + 1.4 };
+    }
+    if (stepId === "open") return { xa: -8.8, xb: -2.2, za: -1.2, zb: 2.6 };
+    if (stepId === "bath") return { xa: -3.1, xb: 3.0, za: -1.0, zb: 1.0 };
+    return { xa: 3.0, xb: 11.0, za: -1.2, zb: 4.0 };
+  }
+  function follow(dt, snap) {
+    var e = Math.min(1, dt * 2.0);
+    [[VW, wideBox()], [VC, closeBox()]].forEach(function (q) {
+      var V = q[0], t = q[1];
+      if (snap || !V.box) V.box = { xa: t.xa, xb: t.xb, za: t.za, zb: t.zb };
+      else ["xa", "xb", "za", "zb"].forEach(function (k) { V.box[k] += (t[k] - V.box[k]) * e; });
+      fitView(V);
+    });
+  }
+
+  // =====================================================================================================
+  // Drawing
+  // =====================================================================================================
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    views().forEach(function (V) { ctx.save(); ctx.translate(V.R.x, V.R.y); ctx.beginPath(); ctx.rect(0, 0, V.R.w, V.R.h); ctx.clip(); drawWorld(V); ctx.restore(); });
+    if (split) { ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, VC.R.y); ctx.lineTo(W, VC.R.y); ctx.stroke(); ctx.restore(); }
+  }
+  function put(V, x, z, h, dir, fn, mul) {
+    var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
+    Farm.inUnits(ctx, px(V, x, z), py(V, z, h || 0), ps(V, z) * (mul || 1), V.lw, function () { ctx.scale(d, 1); fn(); });
+  }
+  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
+  function xRangeAt(V, z) { var s = V.k * fz(z); return [V.cam - V.R.w / 2 / s - 1, V.cam + V.R.w / 2 / s + 1]; }
+  function drawHill(V) {
+    var w = V.R.w, h = V.R.h, ZF = 34, yc = py(V, ZF, 0), n = V.sc.night || 0;
+    // the hill: from its crest down to us, a dry stone wall along the top
+    var g = ctx.createLinearGradient(0, yc, 0, h);
+    g.addColorStop(0, mix("#A7D27A", "#2B3A55", n * 0.5)); g.addColorStop(1, mix("#6DB547", "#2B3A55", n * 0.5));
+    ctx.beginPath(); ctx.moveTo(-10, h + 10);
+    for (var x = -10; x <= w + 20; x += 12) ctx.lineTo(x, yc - Math.sin((x / w) * PI * 1.2 + 0.4 - V.cam * 0.02) * V.k * 0.5 - V.k * 0.2);
+    ctx.lineTo(w + 20, h + 10); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = Math.max(1.2, V.lw * 0.7); ctx.strokeStyle = INK; ctx.stroke();
+    var wy = function (x) { return yc - Math.sin((x / w) * PI * 1.2 + 0.4 - V.cam * 0.02) * V.k * 0.5 - V.k * 0.2; };
+    var sw = ps(V, ZF), wh = Math.max(3, sw * 1.1);
+    ctx.fillStyle = mix("#9A9C96", "#2B3A55", n * 0.5); ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, V.lw * 0.5);
+    ctx.beginPath(); ctx.moveTo(-10, wy(-10) + 2);
+    for (x = -10; x <= w + 20; x += 8) ctx.lineTo(x, wy(x) - wh + Math.sin(x * 0.7) * 0.6);
+    for (x = w + 20; x >= -10; x -= 8) ctx.lineTo(x, wy(x) + 1.5);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (x = 0; x < w; x += Math.max(6, sw * 0.8)) { ctx.beginPath(); ctx.moveTo(x, wy(x) - wh * 0.5); ctx.lineTo(x + Math.max(3, sw * 0.4), wy(x) - wh * 0.5); ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.stroke(); }
+    // a couple of trees on the crest
+    [0.18, 0.74].forEach(function (f, i) { var tx = w * f - V.cam * V.k * 0.02; D.tree(ctx, tx, wy(tx) - wh * 0.4, Math.max(16, sw * 7), "oak", "summer", Math.max(1, V.lw * 0.6), 0.3 + i * 0.4); });
+    // grass tufts and flowers in rows up the hill
+    [24, 16, 11, 7.5, 5, 3, 1.4, 0, -1.2, -2.6, -4.2].forEach(function (z, li) {
+      var s = ps(V, z); if (s * 0.25 < 1.5) return;
+      var y0 = py(V, z, 0); if (y0 > h + 20 || y0 < yc) return;
+      var rg = xRangeAt(V, z), sp = 1.5;
+      for (var j = Math.floor(rg[0] / sp); j <= Math.ceil(rg[1] / sp); j++) {
+        var hv = hash(j, li + 20); if (hv < 0.4) continue;
+        var wx = (j + hash(j, li + 21) * 0.8) * sp, wz = z + (hash(j, li + 22) - 0.5) * 0.8, sx = px(V, wx, wz), sy = py(V, wz, 0), hh = s * (0.16 + 0.12 * hash(j, li + 3));
+        if (job === "bath" && wz > -0.8 && wz < 4.6 && wx > HP.x0 - 0.3 && wx < DP.x1 + 0.3) continue;
+        ctx.strokeStyle = mix("#4E9A3C", "#2B3A55", n * 0.5); ctx.lineWidth = Math.max(1, s * 0.022); ctx.beginPath();
+        for (var b = -2; b <= 2; b++) { ctx.moveTo(sx + b * s * 0.03, sy); ctx.quadraticCurveTo(sx + b * s * 0.05, sy - hh * 0.6, sx + b * s * 0.08, sy - hh * (1 - Math.abs(b) * 0.15)); }
+        ctx.stroke();
+        if (hv > 0.82) { ctx.beginPath(); ctx.arc(sx + s * 0.05, sy - hh, Math.max(1.5, s * 0.04), 0, TAU); ctx.fillStyle = hv > 0.92 ? "#FFD84D" : "#FFFFFF"; ctx.fill(); }
+      }
+    });
+  }
+  // A galvanised hurdle between two ground points (x, z), drawn as screen lines
+  function hurdle(V, x1, z1, x2, z2, o) {
+    o = o || {};
+    var lw = Math.max(1.2, ps(V, (z1 + z2) / 2) * 0.045), hgt = o.h || 0.95, col = o.col || STEEL;
+    function L(ax, az, ah, bx, bz, bh, wmul) {
+      ctx.beginPath(); ctx.moveTo(px(V, ax, az), py(V, az, ah)); ctx.lineTo(px(V, bx, bz), py(V, bz, bh));
+      ctx.lineCap = "round"; ctx.strokeStyle = INK; ctx.lineWidth = lw * (wmul || 1) + 2; ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = lw * (wmul || 1); ctx.stroke();
+    }
+    var len = Math.hypot(x2 - x1, z2 - z1), n = Math.max(1, Math.round(len / 0.55));
+    if (!o.open) for (var i = 1; i < n; i++) { var f = i / n; L(lerp(x1, x2, f), lerp(z1, z2, f), 0.12, lerp(x1, x2, f), lerp(z1, z2, f), hgt * 0.9, 0.6); }
+    (o.open ? [0.6, hgt * 0.9] : [0.12, 0.4, 0.66, hgt * 0.9]).forEach(function (hh) { L(x1, z1, hh, x2, z2, hh, 1); });
+    if (o.posts !== false) { L(x1, z1, 0, x1, z1, hgt, 1.6); L(x2, z2, 0, x2, z2, hgt, 1.6); }
+  }
+  // fence panels cut into pieces along their depth so the sheep sort in front of and behind them
+  function fenceItems(items, V, x1, z1, x2, z2, o) {
+    var dz = Math.abs(z2 - z1), n = Math.max(1, Math.ceil(dz / 0.7));
+    for (var i = 0; i < n; i++) {
+      (function (a, b) {
+        var ax = lerp(x1, x2, a), az = lerp(z1, z2, a), bx = lerp(x1, x2, b), bz = lerp(z1, z2, b);
+        var oo = { h: o && o.h, col: o && o.col, open: o && o.open, posts: (o && o.posts === false) ? false : (n === 1 ? true : false) };
+        items.push({ k: (az + bz) / 2 + 0.001, fn: function () { hurdle(V, ax, az, bx, bz, oo); } });
+        if (n > 1 && (!o || o.posts !== false)) {
+          if (i === 0) items.push({ k: az + 0.002, fn: function () { hurdle(V, ax, az, ax, az, { h: o && o.h }); } });
+          items.push({ k: bz + 0.002, fn: function () { hurdle(V, bx, bz, bx, bz, { h: o && o.h }); } });
+        }
+      })(i / n, (i + 1) / n);
+    }
+  }
+  function gateItems(items, V, hx, hz, len, a0, a1, open, col) {
+    var a = lerp(a0, a1, open), ex = hx + Math.cos(a) * len, ez = hz + Math.sin(a) * len;
+    fenceItems(items, V, hx, hz, ex, ez, { col: col || "#E8B53A", h: 1.0 });
+  }
+  function drawWorld(V) {
+    V.sc.sky(ctx, { time: time, arc: null, season: "summer", dusk: dusk });
+    drawHill(V);
+    var items = [], f = faceAmt();
+    if (job === "gather") {
+      // the pen: back, right, front, the fixed side and the gate (hinged at the back corner)
+      fenceItems(items, V, PEN.x0, PEN.z1, PEN.x1, PEN.z1);
+      fenceItems(items, V, PEN.x1, PEN.z1, PEN.x1, PEN.z0);
+      fenceItems(items, V, PEN.x0, PEN.z0, PEN.x1, PEN.z0);
+      fenceItems(items, V, PEN.x0, PEN.z0, PEN.x0, PEN.gz);
+      gateItems(items, V, PEN.x0, PEN.z1, GATE_L, -PI / 2, -PI, gate);
+      items.push({ k: SHEP.z, fn: function () { put(V, SHEP.x, SHEP.z, 0, 1, function () { shepherd(ctx, { call: Math.min(1, shepCall * 2) }); }); } });
+      if (phase === "ready" && (stepId === "bye" || stepId === "away")) drawRoute(V, 0.35 + 0.25 * Math.sin(time * 4));
+      else if (phase === "work" && wk && wk.run) drawRoute(V, 0.6);
+    } else {
+      // holding pen, race, foot bath, drying pen, field gate
+      fenceItems(items, V, HP.x0, HP.z1, HP.x1, HP.z1);
+      fenceItems(items, V, HP.x0, HP.z1, HP.x0, HP.z0);
+      fenceItems(items, V, HP.x1, HP.z1, HP.x1, RACE.w);
+      fenceItems(items, V, HP.x0, -RACE.w, HP.x1, -RACE.w);
+      fenceItems(items, V, HP.x1, -RACE.w, DP.x0, -RACE.w, { open: true });
+      fenceItems(items, V, DP.x0, -RACE.w, DP.x1, -RACE.w);
+      fenceItems(items, V, HP.x1, RACE.w, DP.x0, RACE.w);
+      fenceItems(items, V, DP.x0, RACE.w, DP.x0, DP.z1);
+      fenceItems(items, V, DP.x0, DP.z1, DP.x1, DP.z1);
+      gateItems(items, V, HP.x1, RACE.w, RACE.w * 2, -PI / 2, 0, gate);
+      gateItems(items, V, DP.x1, DP.z1, DP.z1 - DP.z0, -PI / 2, 0, gate2);
+      items.push({ k: 0.46, fn: function () { troughBack(V); } });
+      items.push({ k: -0.001, fn: function () { troughWater(V); } });
+      items.push({ k: -0.46, fn: function () { troughFront(V); } });
+    }
+    flock.forEach(function (s) {
+      items.push({ k: s.z, fn: function () {
+        put(V, s.x, s.z, s.hop, s.dir, function () { sheepShape(ctx, { ph: s.ph, gait: clamp(Math.hypot(s.vx, s.vz) / 1.2, 0, 1), head: s.head, baa: s.baa > 0 ? Math.min(1, s.baa * 2) * Math.abs(Math.sin(time * 9)) : 0, face: f, munch: s.munch, dip: s.dip }); });
+      } });
+    });
+    if (lamb) items.push({ k: lamb.z, fn: function () { ctx.save(); ctx.globalAlpha = lamb.alpha; put(V, lamb.x, lamb.z, lamb.h, lamb.dir, function () { sheepShape(ctx, { lamb: true, ph: time, gait: lamb.h > 0.05 ? 0 : 0.6, face: f }); }, 0.6); ctx.restore(); } });
+    items.push({ k: dog.z, fn: function () { put(V, dog.x, dog.z, 0, dog.dir, function () { collie(ctx, { pose: dog.pose, ph: dog.ph, face: f }); }); } });
+    items.sort(function (a, b) { return b.k - a.k; });
+    items.forEach(function (it) { it.fn(); });
+    drawParts(V);
+    bubbles.forEach(function (b) { drawBubble(V, b); });
+    if (dusk > 0) { ctx.fillStyle = "rgba(20,24,60," + (0.35 * dusk) + ")"; ctx.fillRect(0, 0, V.R.w, V.R.h); }
+  }
+  // the dog's route round the flock as a dotted arrow on the ground (shows which way it goes)
+  function drawRoute(V, alpha) {
+    var r, a0, a1, e;
+    if (phase === "work" && wk && wk.run) { r = wk.run; var u = clamp(wk.t / r.dur, 0, 1); if (u > 0.97) return; a0 = lerp(r.a0, r.a1, ease(u)); a1 = r.a1; e = r.e; alpha *= 1 - u; }
+    else if (stepId === "bye") { e = { cx: -2.4, cz: 3.9, ax: 5.8, az: 4.6 }; a0 = PI * 1.2; a1 = -PI * 0.03; }
+    else { e = { cx: C1.x, cz: C1.z, ax: 4.3, az: 3.6 }; a0 = Math.atan2((dog.z - e.cz) / e.az, (dog.x - e.cx) / e.ax); a1 = PI * 0.93; }
+    var n = 40, pts = [], i;
+    for (i = 0; i <= n; i++) { var p = ellPt(e, lerp(a0, a1, i / n)); pts.push([px(V, p.x, p.z), py(V, p.z, 0)]); }
+    ctx.save(); ctx.globalAlpha = clamp(alpha, 0, 1); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    var lw = Math.max(3, V.k * 0.12);
+    ctx.beginPath(); pts.forEach(function (q, j) { if (j) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); });
+    ctx.setLineDash([lw * 1.2, lw * 1.4]); ctx.lineDashOffset = -time * lw * 3;
+    ctx.strokeStyle = "#FFF6D0"; ctx.lineWidth = lw; ctx.stroke(); ctx.setLineDash([]);
+    var A = pts[n], B = pts[n - 2], dx = A[0] - B[0], dy = A[1] - B[1], dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+    var s2 = lw * 2.2;
+    ctx.beginPath(); ctx.moveTo(A[0] + dx * s2, A[1] + dy * s2); ctx.lineTo(A[0] - dy * s2, A[1] + dx * s2); ctx.lineTo(A[0] + dy * s2, A[1] - dx * s2); ctx.closePath();
+    ctx.fillStyle = "#FFC93C"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.restore();
+  }
+  function troughQuad(V, z0, z1, h) {
+    ctx.beginPath(); ctx.moveTo(px(V, TRO.x0, z0), py(V, z0, h)); ctx.lineTo(px(V, TRO.x1, z0), py(V, z0, h)); ctx.lineTo(px(V, TRO.x1, z1), py(V, z1, h)); ctx.lineTo(px(V, TRO.x0, z1), py(V, z1, h)); ctx.closePath();
+  }
+  function troughBack(V) {
+    // the concrete rim and the inside of the bath, water from the back to the sheep's line
+    var lw = Math.max(1.2, V.lw * 0.8);
+    troughQuad(V, -0.52, 0.52, 0); ctx.fillStyle = "#C9CED3"; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+    troughQuad(V, -0.42, 0.42, 0); ctx.fillStyle = "#3E8FA2"; ctx.fill();
+    troughQuad(V, 0, 0.42, -0.02); ctx.fillStyle = WATER; ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = Math.max(1, V.lw * 0.5);
+    for (var i = 0; i < 4; i++) { var x = lerp(TRO.x0 + 0.3, TRO.x1 - 0.3, (i + ((time * 0.15) % 1)) / 4); ctx.beginPath(); ctx.moveTo(px(V, x, 0.25), py(V, 0.25, 0)); ctx.lineTo(px(V, x + 0.35, 0.25), py(V, 0.25, 0)); ctx.stroke(); }
+  }
+  function troughWater(V) {
+    ctx.save(); ctx.globalAlpha = 0.82; troughQuad(V, -0.42, 0, -0.02); ctx.fillStyle = WATER; ctx.fill(); ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.65)"; ctx.lineWidth = Math.max(1, V.lw * 0.5);
+    for (var i = 0; i < 3; i++) { var x = lerp(TRO.x0 + 0.2, TRO.x1 - 0.4, (i + ((time * 0.2) % 1)) / 3); ctx.beginPath(); ctx.moveTo(px(V, x, -0.22), py(V, -0.22, 0)); ctx.lineTo(px(V, x + 0.4, -0.22), py(V, -0.22, 0)); ctx.stroke(); }
+  }
+  function troughFront(V) {
+    var lw = Math.max(1.2, V.lw * 0.8), z = -0.42, y0 = py(V, z, 0), y1 = py(V, -0.52, 0);
+    ctx.beginPath(); ctx.moveTo(px(V, TRO.x0, z), y0); ctx.lineTo(px(V, TRO.x1, z), y0); ctx.lineTo(px(V, TRO.x1, -0.52), y1); ctx.lineTo(px(V, TRO.x0, -0.52), y1); ctx.closePath();
+    ctx.fillStyle = "#B4BAC0"; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+  }
+  function drawBubble(V, b) {
+    var x, z, h;
+    if (b.who === "shep") { if (job !== "gather") return; x = SHEP.x + 0.3; z = SHEP.z; h = 2.1; }
+    else { x = b.who.x; z = b.who.z; h = 1.25; }
+    if (!inView(V, x, z, h - 0.6)) return;
+    var a = b.t < 0.2 ? b.t / 0.2 : (b.t > b.life - 0.3 ? (b.life - b.t) / 0.3 : 1);
+    var fsz = clamp(ps(V, z) * 0.42, 15, 26), sx = px(V, x, z), sy = py(V, z, h);
+    ctx.save(); ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.font = "800 " + fsz + "px 'Baloo 2', 'Trebuchet MS', sans-serif";
+    var tw = ctx.measureText(b.text).width, bw = tw + fsz * 1.0, bh = fsz * 1.5;
+    var bx = clamp(sx - bw * 0.25, 6, V.R.w - bw - 6), by = Math.max(6, sy - bh - fsz * 0.4);
+    ctx.beginPath(); ctx.moveTo(clamp(sx, bx + 10, bx + bw - 10) - 6, by + bh - 1); ctx.lineTo(sx, Math.min(sy, by + bh + fsz * 0.6)); ctx.lineTo(clamp(sx, bx + 10, bx + bw - 10) + 6, by + bh - 1); ctx.closePath();
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, bh / 2); else ctx.rect(bx, by, bw, bh);
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(b.text, bx + bw / 2, by + bh / 2 + fsz * 0.05);
+    ctx.restore();
+  }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function loop(ts) {
+    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  function onEnding(done) { ending = true; dog.mode = "lie"; dog.tx = dog.x; dog.tz = dog.z; flock.forEach(function (s) { if (s.mode !== "path") { s.tx = s.x; s.tz = s.z; } }); setTimeout(function () { snd.pour(0); done(); }, 2600); }
+  function onWake() { ending = false; dusk = 0; }
+
+  // ---------- Start ----------
+  showSteps();
+  resetScene();
+  resize();
+  bringIn(firstStep());
+  follow(0, true);
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  Toybox.init({
+    app: "farm",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the machines stop and the controls lock. The timer carries on across the farm pages.",
+    goodbyeOption: "End with a “Goodnight, farm” button to press",
+    farewellText: "Time to say goodnight to the farm",
+    goodbyeLabel: "Goodnight, farm",
+    farewellDone: "Night night, farm!",
+    restLine: "The farm is resting.",
+    restLine2: "The sheep will be right here next time.",
+    restArt: Farm.restArt,
+    soundNote: "Soft whistles, baas and splashes. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: onWake,
+    onWake: onWake,
+    onSound: function (on) { if (on) snd.chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  if (/[?&]debug\b/.test(location.search)) window.__farm = {
+    state: function () { return { phase: phase, step: stepId, cur: steps.current(), finished: steps.finished(), job: job, sheep: sheepN, coach: coach.text(), split: split, parts: parts.length, t: wk ? wk.t : -1, dog: { x: dog.x, z: dog.z, pose: dog.pose } }; },
+    screen: function (id) { return partScreen(id || stepId); },
+    surprise: surprise,
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+</body>
+</html>

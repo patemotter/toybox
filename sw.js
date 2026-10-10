@@ -256,6 +256,7 @@ const CORE = [
   "./farm/woods.html",
   "./farm/berries.html",
   "./farm/cows.html",
+  "./farm/sheep.html",
   "./farm/farm.js",
   "./farm/manifest.webmanifest",
   "./farm/icons/icon-180.png",
