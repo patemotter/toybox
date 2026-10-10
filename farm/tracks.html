@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caterpillar Hunt</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Farm">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<script src="farm.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF; --panel: #FFFFFF; --ink: #1D2340; --muted: #4A5578; --edge: #1D2340; --accent: #FFC93C; --plate: #F4FAFF; --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.loads { font-variant-numeric: tabular-nums; }
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+/* The Go says a short phrase ("Drive wheels"): on a narrow row it wraps to two lines instead of being cut off. */
+#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell tb-v2 wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the farm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Farm</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title" id="title">Caterpillar Hunt</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+  </header>
+  <div class="tb-body app">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A wet field with a tractor on wheels and a tractor on tracks, and a cut-away of the soil underneath. Tap the tractor to drive it across."></canvas>
+      <div class="tb-counter loads" id="loads">Worms: 0</div>
+      <div id="coach"></div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <ol id="steps"></ol>
+      <div id="bottom"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Caterpillar Hunt: tractors on tracks ("caterpillar tracks") or on wheels, and looking after the soil.
+  // A soft, wet field. Four jobs, one tap each:
+  //   Wheels: the green tractor drives across on its big tyres. They sink and leave deep ruts with puddles; the
+  //           cut-away shows the tyres squashing the crumbly soil into a hard flat layer (the worms wriggle away).
+  //   Tracks: the big tracked tractor drives across the lane next to it. The long rubber tracks spread its weight:
+  //           only a light flat print, and the soil underneath stays crumbly.
+  //   Loosen: the tracked tractor pulls the subsoiler down the squashed lane. Its long legs run through the
+  //           ground under the hard layer and crack it into crumbs; the packer roller flattens the ruts.
+  //   Look:   the farmer digs out a spadeful: dark crumbly soil, roots, and worms wriggling out of it.
+  // Then weeks go by and the field is wet again. The stage is split like Spuds in Mud: the field with the whole
+  // machine on top (the farm's shared side view) and a close-up below (or beside) that always shows the work:
+  // a cut-away of the soil along the lane being driven, with the machine on top of it.
+  // Drawings live here for now, written like farm.js's (metres, y up negative, facing +x) so they can move into
+  // farm.js later: trackedTractor (origin on the ground under the drive wheel), subsoiler (origin at its hitch
+  // pin, the ground at y = +0.55), farmer and spade (origin at his feet), worm, mole, blackbird.
+  var $ = function (id) { return document.getElementById(id); };
+  var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
+  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var P = SH.P, R = SH.R, C = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs, rr = SH.rr;
+  var NAME = (Farm.NAMES && Farm.NAMES.tracks) || "Caterpillar Hunt";
+  document.title = NAME; $("title").textContent = NAME;
+  function LWu() { return Farm.LW; }
+
+  // ---------- State ----------
+  var KEY = "farm-tracks-v1";
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  if (startFresh || !saved || typeof saved !== "object") saved = {};
+  var count = typeof saved.worms === "number" && isFinite(saved.worms) ? Math.max(0, Math.floor(saved.worms)) : 0;
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ worms: count })); } catch (e) { /* ignore */ } }
+  function world(fn) { try { Farm.world.update(fn); } catch (e) { /* ignore */ } }
+
+  // The field: L metres long. Two lanes along it: the wheel lane on the machine line (depth 1) and the track
+  // lane one step further back (depth LT). The soil of each lane is a row of columns every DX metres.
+  var L = 12, LW_R = 1, LT_R = 1.3, X0 = -8, X1 = L + 8, DX = 0.05, NC = Math.round((X1 - X0) / DX) + 1;
+  var MUD = "#6E4528", MUD_D = "#4B2E1A", SUB = "#97693E", WATER = "#86B3D6", PINK = "#EC8B90", PINK_D = "#CF5F6B";
+  var G = { body: "#3E9F3A", dark: "#2B7A2A", light: "#6CC65C", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696", roof: "#D3DAE2" };
+  function Lane(r) { this.r = r; this.comp = new Float32Array(NC); this.rut = new Float32Array(NC); this.loose = new Float32Array(NC); this.lt = new Float32Array(NC); this.lt.fill(-1); }
+  var lanes = { w: new Lane(LW_R), t: new Lane(LT_R) };
+  function ci(x) { return Math.round((x - X0) / DX); }
+  function cx(i) { return X0 + i * DX; }
+  function inField(x) { return x >= 0 && x <= L; }
+  function at(arr, x) {
+    var f = (x - X0) / DX, i = Math.floor(f), t = f - i;
+    if (i < 0) return arr[0]; if (i >= NC - 1) return arr[NC - 1];
+    return arr[i] + (arr[i + 1] - arr[i]) * t;
+  }
+  function resetLanes() { ["w", "t"].forEach(function (k) { var l = lanes[k]; l.comp.fill(0); l.rut.fill(0); l.loose.fill(0); l.lt.fill(-1); }); }
+
+  // The machines. Each rig: its tractor-frame extent (for the camera), where it waits before the field, the end of
+  // its pass, its speed, its depth (lane) and its name.
+  var THITCH = [-1.15, -0.55], SUB_G = 0.55, LEG = THITCH[0] - 0.45, ROLL = THITCH[0] - 2.35;
+  var RIGS = {
+    wheels: { ext: [-1.3, 4.2], x0: -4.4, end: L + 0.45, v: 3.2, lane: "w", name: "Wheeled tractor" },
+    tracks: { ext: [-1.25, 4.6], x0: -4.75, end: L + 0.25, v: 3.2, lane: "t", name: "Tracked tractor" },
+    sub: { ext: [THITCH[0] - 2.75, 4.6], x0: -4.7, end: L - ROLL + 0.1, v: 3.6, lane: "w", name: "Subsoiler" }
+  };
+  // The steps. go = the Go pill, ready = the coach while it waits for him, work = while it works, busy = when he
+  // taps while it works.
+  var JOBS = {
+    wheels: { go: "Drive wheels", step: "Wheels", ready: "Drive across the wet field.", work: "The heavy wheels squash the soil.", busy: "The tractor is driving across." },
+    tracks: { go: "Drive tracks", step: "Tracks", ready: "Now try the tractor on tracks.", work: "The long tracks spread the weight.", busy: "The tracked tractor is driving across." },
+    sub: { go: "Loosen it", step: "Loosen", ready: "Loosen the squashed soil.", work: "The subsoiler cracks the hard layer.", busy: "The subsoiler is loosening the soil." },
+    look: { go: "Look inside", step: "Look", ready: "Dig up some soil and look.", work: "The spade lifts out the soil.", busy: "The farmer is digging." }
+  };
+  var ORDER = ["wheels", "tracks", "sub", "look"];
+  var job = "wheels", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
+  var m = null, leaving = null;                     // the machine working now, the one driving away
+  var fm = { on: false, x: 0, t: 0, walk: 0, state: "away" };   // the farmer for the Look step
+  var FX = L * 0.5;                                  // where he digs
+  var dg = { t: 0, n: 0 };                           // the dig: time, worms out
+  var faceT = 0, sur = null, growG = 0;
+
+  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  function working() { return phase === "drive" && m && m.v > 0.3; }
+
+  // ---------- The stage: the field view and the close-up ----------
+  var phoneCoach = window.matchMedia ? matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
+  function topRoom() { return phoneCoach && phoneCoach.matches ? 34 : 66; }
+  function gyOf(w, h) { var port = h > w * 1.05, short = !port && h < 460; return h * (short ? 0.75 : 0.7); }
+  var zoomF = { span: 7.4, target: 7.4 };
+  var scF = new Farm.Scene({ L: L, xmin: -16, xmax: L + 20, fit: function (w, h) { return Math.min(w * 0.9 / zoomF.span, (gyOf(w, h) - topRoom()) / 4.5); } });
+  var parts = new Farm.Particles();
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  var W = 300, H = 300, DPR = 1, time = 0;
+  var RG = { f: { x: 0, y: 0, w: 300, h: 150 }, c: { x: 0, y: 150, w: 300, h: 150 }, side: false, pad: 8 };
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    RG.side = W / H > 1.4;
+    if (RG.side) { var fw = Math.round(W * 0.54); RG.f = { x: 0, y: 0, w: fw, h: H }; RG.c = { x: fw, y: 0, w: W - fw, h: H }; }
+    else { var fh = Math.round(H * 0.45); RG.f = { x: 0, y: 0, w: W, h: fh }; RG.c = { x: 0, y: fh, w: W, h: H - fh }; }
+    // On phones the coach pill sits at the bottom of the stage: keep the close-up's story above it.
+    RG.pad = phoneCoach && phoneCoach.matches ? 60 : 8;
+    scF.layout(RG.f.w, RG.f.h);
+    scF.follow(camTarget(), 0, true);
+    snapClose();
+  }
+
+  // ---------- Coach, counter, name tags ----------
+  var coach = Toybox.coach($("coach"));
+  function setCount() { var el = $("loads"); el.textContent = "Worms: " + count; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  $("loads").textContent = "Worms: " + count;
+  function tagAt(text, x, y) { var b = cv.getBoundingClientRect(); Toybox.nametag(text, b.left + x, b.top + y, 2400); }
+  function rigOf(mm) { return RIGS[mm.kind]; }
+  // a point on a machine in the field view: dx metres from its origin, ly in machine units (y up negative)
+  function mScreen(mm, dx, ly) { var r = mm.r, s = scF.S(r); return { x: scF.X(mm.x, r) + dx * s, y: scF.Y(r) + ly * s, s: s }; }
+  function tagRig() {
+    if (!m) return;
+    var g = rigOf(m), p = m.kind === "sub" ? mScreen(m, LEG - 0.4, -1.4) : mScreen(m, 1.2, m.kind === "tracks" ? -4.4 : -3.8);
+    tagAt(g.name, p.x, Math.max(26, p.y));
+  }
+
+  // =====================================================================================================
+  // Drawings (machine units)
+  // =====================================================================================================
+  function faceU(x, y, r, dx, f, look) {
+    if (!f) return;
+    ctx.save(); ctx.globalAlpha *= clamp(f, 0, 1);
+    var blink = Math.sin(time * 2.1) > 0.985 ? 0.15 : 1, lx = look ? look[0] * r * 0.35 : 0, ly = look ? look[1] * r * 0.35 : r * 0.2;
+    [0, dx].forEach(function (ox) {
+      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
+      C(ctx, 0, 0, r, "#FFFFFF", LWu() * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
+      ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 1.3; ctx.lineCap = "round"; ctx.stroke();
+    ctx.restore();
+  }
+  function shine(x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
+  function driverU(x, y, s) {
+    R(ctx, x - 0.26 * s, y + 0.1 * s, 0.52 * s, 0.5 * s, 0.16 * s, "#3D6FB6", LWu() * 0.7);
+    C(ctx, x, y, 0.17 * s, "#F2C8A0", LWu() * 0.7);
+    P(ctx, [x - 0.18 * s, y - 0.04 * s, x - 0.16 * s, y - 0.2 * s, x + 0.16 * s, y - 0.2 * s, x + 0.3 * s, y - 0.06 * s], "#E8473B", LWu() * 0.6);
+  }
+  // A plain round wheel with a rim and a hub (the track's drive wheel, idler and rollers).
+  function hubWheel(x, y, r, rot, rim) {
+    C(ctx, x, y, r, "#3A3F4E");
+    C(ctx, x, y, r * 0.78, rim || G.steel, LWu() * 0.8);
+    C(ctx, x, y, r * 0.3, "#8C97A6", LWu() * 0.6);
+    for (var i = 0; i < 5; i++) { var a = rot + i * TAU / 5; C(ctx, x + Math.cos(a) * r * 0.52, y + Math.sin(a) * r * 0.52, r * 0.08, "#6E7887", 0); }
+  }
+  // The rubber track's outline: the drive wheel (rear, big), the idler (front) and a straight run along the
+  // ground. TK = { dw: [x, y, R], id: [x, y, R], th (belt thickness) }; pointAt(s) walks round it.
+  var TK = { dw: [0, -0.86, 0.86], id: [3.25, -0.62, 0.62], th: 0.16, rollers: [0.95, 1.65, 2.35] };
+  var TSEG = (function () {
+    var d = TK.dw, i = TK.id, segs = [];
+    segs.push({ k: "l", a: [d[0], 0], b: [i[0], 0] });
+    segs.push({ k: "a", c: [i[0], i[1]], r: i[2], a0: Math.PI / 2, a1: -Math.PI / 2 });
+    segs.push({ k: "l", a: [i[0], i[1] - i[2]], b: [d[0], d[1] - d[2]] });
+    segs.push({ k: "a", c: [d[0], d[1]], r: d[2], a0: -Math.PI / 2, a1: -Math.PI * 1.5 });
+    var tot = 0;
+    segs.forEach(function (s) { s.len = s.k === "l" ? Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) : Math.abs(s.a1 - s.a0) * s.r; s.s0 = tot; tot += s.len; });
+    return { segs: segs, len: tot };
+  })();
+  function trackPoint(s) {
+    s = ((s % TSEG.len) + TSEG.len) % TSEG.len;
+    for (var k = 0; k < TSEG.segs.length; k++) {
+      var g = TSEG.segs[k];
+      if (s <= g.s0 + g.len || k === TSEG.segs.length - 1) {
+        var f = (s - g.s0) / g.len;
+        if (g.k === "l") { var dx = g.b[0] - g.a[0], dy = g.b[1] - g.a[1], l = Math.hypot(dx, dy); return { x: g.a[0] + dx * f, y: g.a[1] + dy * f, nx: dy / l, ny: -dx / l }; }
+        var a = lerp(g.a0, g.a1, f); return { x: g.c[0] + Math.cos(a) * g.r, y: g.c[1] + Math.sin(a) * g.r, nx: Math.cos(a), ny: Math.sin(a) };
+      }
+    }
+    return { x: 0, y: 0, nx: 0, ny: 1 };
+  }
+  function trackPath(inset) {
+    var d = TK.dw, i = TK.id;
+    ctx.beginPath();
+    ctx.moveTo(d[0], -inset);
+    ctx.lineTo(i[0], -inset);
+    ctx.arc(i[0], i[1], i[2] - inset, Math.PI / 2, -Math.PI / 2, true);
+    ctx.lineTo(d[0], d[1] - d[2] + inset);
+    ctx.arc(d[0], d[1], d[2] - inset, -Math.PI / 2, -Math.PI * 1.5, true);
+    ctx.closePath();
+  }
+  // The big tracked tractor (side view, facing +x, origin on the ground under the drive wheel's middle).
+  // st = { wheel (m driven), time, face, beacon, hitch: { lift } }. Its linkage's lower pin is at THITCH.
+  function trackedTractor(st) {
+    st = st || {};
+    var lift = (st.hitch && st.hitch.lift) || 0, t = st.time || 0, dist = st.wheel || 0, ly = -lift * 0.6, i;
+    if (st.hitch) {
+      Ln(ctx, -0.3, -0.95, THITCH[0], THITCH[1] + ly, INK, 0.17 + LWu() * 2); Ln(ctx, -0.3, -0.95, THITCH[0], THITCH[1] + ly, G.grey, 0.17);
+      Ln(ctx, -0.55, -1.95, THITCH[0] + 0.05, THITCH[1] - 0.8 + ly, INK, 0.12 + LWu() * 2); Ln(ctx, -0.55, -1.95, THITCH[0] + 0.05, THITCH[1] - 0.8 + ly, "#E2B33A", 0.12);
+      Ln(ctx, -0.35, -2.0, -0.78, -1.55 + ly, INK, 0.11 + LWu() * 2); Ln(ctx, -0.35, -2.0, -0.78, -1.55 + ly, G.grey, 0.11);
+      Ln(ctx, -0.78, -1.55 + ly, -0.8, -0.78 + ly * 0.6, INK, 0.08);
+    }
+    // the frame along the top of the tracks
+    R(ctx, -0.65, -2.2, 5.05, 0.55, 0.1, "#4A505E");
+    // front weights
+    R(ctx, 4.12, -2.12, 0.48, 0.72, 0.08, "#8B95A5");
+    for (i = 0; i < 3; i++) Ln(ctx, 4.2, -1.98 + i * 0.2, 4.52, -1.98 + i * 0.2, "#5D6675", LWu() * 0.8);
+    // the hood
+    ctx.beginPath();
+    ctx.moveTo(1.2, -3.0); ctx.lineTo(3.75, -2.92); ctx.quadraticCurveTo(4.2, -2.9, 4.22, -2.5); ctx.lineTo(4.24, -2.0); ctx.lineTo(1.2, -2.0); ctx.closePath();
+    fs(ctx, G.body);
+    P(ctx, [1.2, -2.3, 4.24, -2.3, 4.24, -2.0, 1.2, -2.0], G.dark, LWu() * 0.8);
+    shine(1.35, -2.9, 3.7, -2.84, 0.07);
+    for (i = 0; i < 5; i++) Ln(ctx, 2.2 + i * 0.22, -2.78, 2.32 + i * 0.22, -2.44, G.dark, 0.06);
+    R(ctx, 4.0, -2.8, 0.26, 0.78, 0.06, G.frame, LWu() * 0.8);
+    for (i = 0; i < 4; i++) Ln(ctx, 4.04, -2.66 + i * 0.17, 4.22, -2.66 + i * 0.17, "#59607A", 0.04);
+    R(ctx, 3.66, -2.9, 0.36, 0.15, 0.05, "#FFE98A", LWu() * 0.7);
+    // the cab
+    P(ctx, [-0.78, -2.2, -0.7, -3.78, 1.26, -3.78, 1.42, -2.2], G.frame);
+    P(ctx, [-0.66, -2.32, -0.6, -3.68, 1.16, -3.68, 1.28, -2.32], G.glass, LWu() * 0.6);
+    driverU(0.32, -3.12, 1.05);
+    Ln(ctx, 0.7, -2.7, 0.92, -2.98, INK, 0.05);
+    ctx.save(); ctx.globalAlpha = 0.55;
+    P(ctx, [-0.42, -3.68, -0.05, -3.68, -0.58, -2.62, -0.62, -3.05], "#FFFFFF", 0);
+    P(ctx, [0.55, -3.68, 0.75, -3.68, 0.12, -2.32, -0.08, -2.32], "#FFFFFF", 0);
+    ctx.restore();
+    Ln(ctx, 0.52, -3.72, 0.55, -2.25, G.frame, 0.07);
+    R(ctx, -0.95, -4.02, 2.42, 0.28, 0.09, G.roof);
+    shine(-0.8, -3.95, 1.3, -3.95, 0.05);
+    var bc = st.beacon ? (Math.sin(t * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
+    if (st.beacon) { ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * Math.max(0, Math.sin(t * 9)); C(ctx, 0.05, -4.1, 0.35, "#FFD34D", 0); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(0.05, -4.02, 0.13, Math.PI, 0); ctx.closePath(); fs(ctx, bc, LWu() * 0.7);
+    Ln(ctx, 1.3, -3.55, 1.6, -3.7, INK, 0.04); R(ctx, 1.55, -3.85, 0.1, 0.28, 0.04, G.frame, LWu() * 0.5);
+    tube(ctx, 1.55, -2.95, 1.55, -4.08, 0.12, "#4E5463");
+    R(ctx, 1.46, -4.22, 0.18, 0.16, 0.04, "#3A3F4E", LWu() * 0.6);
+    // the rubber track: the belt, the frame inside it, the wheels and the lugs that run round
+    trackPath(0); fs(ctx, "#2E3038");
+    trackPath(TK.th); fs(ctx, "#8B95A5", LWu() * 0.7);
+    R(ctx, 0.3, -0.72, 2.7, 0.2, 0.05, "#5D6675", LWu() * 0.7);
+    hubWheel(TK.dw[0], TK.dw[1], TK.dw[2] - TK.th, dist / (TK.dw[2] - TK.th), "#C3CCD6");
+    for (i = 0; i < 12; i++) { var a = dist / TK.dw[2] + i * TAU / 12; C(ctx, TK.dw[0] + Math.cos(a) * (TK.dw[2] - TK.th - 0.03), TK.dw[1] + Math.sin(a) * (TK.dw[2] - TK.th - 0.03), 0.045, "#5D6675", 0); }
+    hubWheel(TK.id[0], TK.id[1], TK.id[2] - TK.th, dist / (TK.id[2] - TK.th), "#C3CCD6");
+    TK.rollers.forEach(function (x) { hubWheel(x, -TK.th - 0.21, 0.21, dist / 0.21, "#AEB8C5"); });
+    var sp = 0.27, n = Math.floor(TSEG.len / sp), off = -(dist % sp);
+    for (i = 0; i < n; i++) {
+      var q = trackPoint(i * sp + off);
+      Ln(ctx, q.x - q.nx * 0.02, q.y - q.ny * 0.02, q.x + q.nx * 0.07, q.y + q.ny * 0.07, "#1E2026", 0.09);
+    }
+    // mudguard over the front of the track
+    ctx.beginPath(); ctx.arc(TK.id[0], TK.id[1], TK.id[2] + 0.14, -Math.PI * 0.95, -0.25); ctx.lineWidth = 0.11; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.arc(TK.id[0], TK.id[1], TK.id[2] + 0.14, -Math.PI * 0.95, -0.25); ctx.lineWidth = 0.07; ctx.strokeStyle = G.body; ctx.stroke();
+    faceU(3.25, -2.65, 0.13, 0.36, st.face, st.look || [1, 0.4]);
+  }
+  // The subsoiler (origin at its hitch pin, the ground at y = +SUB_G, facing +x: it trails behind). Two long
+  // curved legs (the far one darker) with a point at the bottom that runs SUB_G + 0.45 below the pin, a red
+  // toolbar, and a packer roller behind. st = { time, work, roll (m rolled), face }
+  function legShape(dx, col) {
+    var y = SUB_G + 0.45;
+    ctx.beginPath();
+    ctx.moveTo(-0.92 + dx, -0.38); ctx.lineTo(-0.64 + dx, -0.38);
+    ctx.quadraticCurveTo(-0.5 + dx, 0.3, -0.36 + dx, y - 0.16);
+    ctx.lineTo(-0.1 + dx, y - 0.02); ctx.lineTo(-0.2 + dx, y + 0.05);
+    ctx.lineTo(-0.6 + dx, y + 0.02);
+    ctx.quadraticCurveTo(-0.8 + dx, 0.35, -0.92 + dx, -0.38);
+    ctx.closePath(); fs(ctx, col);
+    P(ctx, [-0.08 + dx, y - 0.01, -0.62 + dx, y - 0.06, -0.66 + dx, y + 0.06, -0.2 + dx, y + 0.07], "#5D6675", LWu() * 0.7);
+  }
+  function subsoiler(st) {
+    st = st || {};
+    var i, rl = st.roll || 0, ry = SUB_G - 0.32;
+    // the far leg, then the headstock, the toolbar and the near leg
+    legShape(-0.55, "#7C8696");
+    P(ctx, [0.06, 0.1, 0.06, -0.86, -0.2, -0.86, -0.5, -0.1, -0.5, 0.1], G.grey);
+    C(ctx, 0, 0, 0.07, G.steel, LWu() * 0.7); C(ctx, 0.04, -0.8, 0.07, G.steel, LWu() * 0.7);
+    // arms back to the roller
+    tube(ctx, -1.7, -0.45, -2.35, ry, 0.09, "#A82E28");
+    R(ctx, -1.95, -0.66, 2.0, 0.34, 0.07, "#D8403A");
+    shine(-1.85, -0.6, -0.05, -0.6, 0.05);
+    for (i = 0; i < 3; i++) C(ctx, -1.7 + i * 0.6, -0.49, 0.045, "#A82E28", 0);
+    legShape(0, "#C3CCD6");
+    shine(-0.8, -0.3, -0.62, 0.4, 0.04);
+    // the packer roller: a cage of bars round a shaft
+    C(ctx, -2.35, ry, 0.32, "#5D6675");
+    for (i = 0; i < 8; i++) { var a = rl / 0.32 + i * TAU / 8; C(ctx, -2.35 + Math.cos(a) * 0.25, ry + Math.sin(a) * 0.25, 0.06, "#C3CCD6", LWu() * 0.5); }
+    C(ctx, -2.35, ry, 0.1, "#8C97A6", LWu() * 0.6);
+    faceU(-1.35, -0.55, 0.09, 0.3, st.face, [1, 0]);
+  }
+  // A wriggly earthworm in metres: tail at (x, y), pointing at angle a, len long, ph = its wriggle.
+  function worm(x, y, len, a, ph, fc, thick) {
+    var n = 9, th = thick || 0.03, pts = [], i;
+    var ca = Math.cos(a), sa = Math.sin(a);
+    for (i = 0; i <= n; i++) {
+      var s = i / n * len, w = Math.sin(ph * 5 + i * 0.95) * len * 0.07 * (0.4 + 0.6 * i / n);
+      pts.push([x + ca * s - sa * w, y + sa * s + ca * w]);
+    }
+    function path() { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]); }
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    path(); ctx.strokeStyle = INK; ctx.lineWidth = th + LWu() * 1.6; ctx.stroke();
+    path(); ctx.strokeStyle = PINK; ctx.lineWidth = th; ctx.stroke();
+    // the rings and the saddle
+    for (i = 1; i < n; i++) { var p = pts[i], q = pts[i + 1], dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; Ln(ctx, p[0] - dy / l * th * 0.45, p[1] + dx / l * th * 0.45, p[0] + dy / l * th * 0.45, p[1] - dx / l * th * 0.45, "rgba(150,60,70,0.45)", th * 0.12); }
+    var sd = pts[Math.round(n * 0.68)]; C(ctx, sd[0], sd[1], th * 0.62, PINK_D, 0);
+    var hd = pts[n];
+    if (fc > 0.02) {
+      ctx.save(); ctx.globalAlpha *= clamp(fc, 0, 1);
+      var e = th * 0.28, dx2 = pts[n][0] - pts[n - 1][0], dy2 = pts[n][1] - pts[n - 1][1], l2 = Math.hypot(dx2, dy2) || 1, nx = -dy2 / l2, ny = dx2 / l2;
+      if (ny > 0) { nx = -nx; ny = -ny; }
+      C(ctx, hd[0] + nx * e - dx2 / l2 * e * 0.4, hd[1] + ny * e, e * 0.9, "#FFFFFF", LWu() * 0.5);
+      C(ctx, hd[0] + nx * e - dx2 / l2 * e * 0.4, hd[1] + ny * e, e * 0.45, INK, 0);
+      ctx.restore();
+    }
+  }
+  // The farmer (side view, facing +x, origin at his feet): flat cap, green jumper, wellies. st = { walk (phase),
+  // stride (0..1), hands: [[x, y], [x, y]] (null: arms down), foot: [x, y] (his right foot raised), sock (his
+  // left welly is stuck: the foot comes out in a red sock), pull (bending down), face }
+  function farmer(st) {
+    st = st || {};
+    var wk = st.walk || 0, sd = st.stride || 0, bend = st.pull || 0;
+    var hip = [0, -0.9], sh = [0.04 + bend * 0.2, -1.38 + bend * 0.22], hd = [0.08 + bend * 0.3, -1.57 + bend * 0.24];
+    function leg(fx, fy, front, sock) {
+      var kx = (hip[0] + fx) / 2 + 0.08, ky = (hip[1] + fy) / 2;
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(hip[0], hip[1]); ctx.lineTo(kx, ky); ctx.lineTo(fx, fy - 0.12);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.16 + LWu() * 2; ctx.stroke(); ctx.strokeStyle = front ? "#3D6FB6" : "#2F5A99"; ctx.lineWidth = 0.16; ctx.stroke();
+      if (sock) { R(ctx, fx - 0.07, fy - 0.2, 0.14, 0.2, 0.05, "#E8473B", LWu() * 0.7); R(ctx, fx - 0.07, fy - 0.06, 0.22, 0.07, 0.03, "#E8473B", LWu() * 0.7); }
+      else wellyU(fx, fy, front);
+    }
+    var sw = Math.sin(wk) * 0.22 * sd;
+    var fBack = st.sock ? [-0.12, -0.12 - Math.abs(Math.sin(time * 9)) * 0.08] : [-sw, -Math.max(0, Math.cos(wk)) * 0.06 * sd];
+    leg(fBack[0], fBack[1], false, !!st.sock);
+    var fFront = st.foot || [sw, -Math.max(0, -Math.cos(wk)) * 0.06 * sd];
+    // the body and the head
+    ctx.beginPath(); ctx.moveTo(hip[0] - 0.15, hip[1] + 0.06); ctx.lineTo(sh[0] - 0.17, sh[1] - 0.02); ctx.quadraticCurveTo(sh[0], sh[1] - 0.1, sh[0] + 0.17, sh[1] - 0.02); ctx.lineTo(hip[0] + 0.15, hip[1] + 0.06); ctx.closePath(); fs(ctx, "#3F8D36");
+    Ln(ctx, hip[0] - 0.14, hip[1] + 0.02, hip[0] + 0.14, hip[1] + 0.02, "#2B6A27", 0.05);
+    leg(fFront[0], fFront[1], true, false);
+    C(ctx, hd[0], hd[1], 0.13, "#F2C8A0", LWu() * 0.8);
+    C(ctx, hd[0] + 0.07, hd[1] - 0.01, 0.018, INK, 0);
+    ctx.beginPath(); ctx.arc(hd[0] + 0.06, hd[1] + 0.03, 0.04, 0.1 * Math.PI, 0.7 * Math.PI); ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 0.8; ctx.stroke();
+    P(ctx, [hd[0] - 0.14, hd[1] - 0.04, hd[0] - 0.12, hd[1] - 0.16, hd[0] + 0.12, hd[1] - 0.16, hd[0] + 0.24, hd[1] - 0.06], "#7A5234", LWu() * 0.7);
+    // the arms
+    var hands = st.hands || [[sh[0] + 0.05 + sw * 0.4, -0.9], [sh[0] - 0.05 - sw * 0.4, -0.92]];
+    hands.forEach(function (h, k) {
+      var ex = (sh[0] + h[0]) / 2 - 0.04, ey = (sh[1] + h[1]) / 2 + 0.05;
+      ctx.beginPath(); ctx.moveTo(sh[0], sh[1] + 0.04); ctx.lineTo(ex, ey); ctx.lineTo(h[0], h[1]);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.11 + LWu() * 2; ctx.stroke(); ctx.strokeStyle = k ? "#3F8D36" : "#4FA344"; ctx.lineWidth = 0.11; ctx.stroke();
+      C(ctx, h[0], h[1], 0.055, "#F2C8A0", LWu() * 0.6);
+    });
+  }
+  // a green welly: the sole at (x, y), toe pointing +x
+  function wellyU(x, y, front) {
+    P(ctx, [x - 0.08, y - 0.32, x + 0.07, y - 0.32, x + 0.07, y - 0.08, x + 0.2, y - 0.06, x + 0.2, y, x - 0.09, y], front ? "#2F8F3A" : "#277A31", LWu() * 0.8);
+    Ln(ctx, x - 0.08, y - 0.03, x + 0.2, y - 0.03, "#1E5A25", 0.03);
+  }
+  // A spade: the grip at g, the top of the blade at b, the tip at t (all [x, y])
+  function spade(g, b, t) {
+    tube(ctx, g[0], g[1], b[0], b[1], 0.045, "#B07B3C");
+    var dx = g[0] - b[0], dy = g[1] - b[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    Ln(ctx, g[0] - nx * 0.08, g[1] - ny * 0.08, g[0] + nx * 0.08, g[1] + ny * 0.08, INK, 0.06 + LWu() * 2);
+    Ln(ctx, g[0] - nx * 0.08, g[1] - ny * 0.08, g[0] + nx * 0.08, g[1] + ny * 0.08, "#B07B3C", 0.06);
+    var w = 0.1;
+    P(ctx, [b[0] - nx * w, b[1] - ny * w, b[0] + nx * w, b[1] + ny * w, t[0] + nx * w * 0.85, t[1] + ny * w * 0.85, t[0] - nx * w * 0.85, t[1] - ny * w * 0.85], "#C3CCD6", LWu() * 0.8);
+    shine(b[0] + nx * w * 0.5, b[1] + ny * w * 0.5, t[0] + nx * w * 0.4, t[1] + ny * w * 0.4, 0.025);
+  }
+  // A mole (metres): its middle at (x, y), facing +x; dig = paws going.
+  function mole(x, y, s, dig, look) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    var pw = Math.sin(time * 16) * 0.03 * dig;
+    ctx.beginPath(); ctx.ellipse(0, 0, 0.12, 0.075, 0, 0, TAU); fs(ctx, "#3A3A48", LWu() / s * 0.9);
+    ctx.beginPath(); ctx.ellipse(0.12, -0.005, 0.04, 0.03, 0, 0, TAU); fs(ctx, "#F2A0B0", LWu() / s * 0.7);
+    C(ctx, 0.155, -0.01, 0.012, INK, 0);
+    ctx.beginPath(); ctx.ellipse(0.06 + pw, 0.06, 0.04, 0.025, 0.5, 0, TAU); fs(ctx, "#F2A0B0", LWu() / s * 0.7);
+    ctx.beginPath(); ctx.ellipse(0.0 - pw, 0.065, 0.035, 0.022, -0.3, 0, TAU); fs(ctx, "#E28A9C", LWu() / s * 0.6);
+    C(ctx, 0.07, -0.035, 0.012, INK, 0);
+    if (look) { C(ctx, 0.07, -0.035, 0.016, "#FFFFFF", 0); C(ctx, 0.072, -0.033, 0.009, INK, 0); }
+    ctx.restore();
+  }
+  // A blackbird (screen px: feet at (x, y), s px per metre); with a worm in its beak or not.
+  function blackbird(x, y, s, flap, flip, fly, wormIn) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(flip ? -s : s, s);
+    var keep = ctx.lineWidth, lw = Math.max(1.2, s * 0.02) / s, K = "#22222A";
+    if (!fly) { Ln(ctx, -0.02, -0.06, -0.04, 0, "#F2A51E", 0.025); Ln(ctx, 0.05, -0.06, 0.05, 0, "#F2A51E", 0.025); }
+    ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(-0.12, -0.12); ctx.lineTo(-0.32, -0.2); ctx.lineTo(-0.3, -0.12); ctx.closePath(); ctx.fillStyle = K; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -0.13, 0.15, 0.08, -0.15, 0, TAU); ctx.fillStyle = K; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.13, -0.21, 0.065, 0, TAU); ctx.fillStyle = K; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0.18, -0.23); ctx.lineTo(0.28, -0.2); ctx.lineTo(0.18, -0.18); ctx.closePath(); ctx.fillStyle = "#F2A51E"; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.15, -0.225, 0.018, 0, TAU); ctx.fillStyle = "#FFD34D"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0.152, -0.225, 0.008, 0, TAU); ctx.fillStyle = INK; ctx.fill();
+    var w = fly ? Math.sin(flap * TAU) * 0.16 : 0;
+    ctx.beginPath(); ctx.moveTo(-0.08, -0.14); ctx.lineTo(-0.18, -0.2 - w); ctx.lineTo(0.06, -0.16); ctx.closePath(); ctx.fillStyle = "#3A3A46"; ctx.fill(); ctx.stroke();
+    if (wormIn) {
+      ctx.beginPath(); ctx.moveTo(0.27, -0.2); ctx.quadraticCurveTo(0.33, -0.1 + Math.sin(time * 9) * 0.03, 0.29, 0.0);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.035; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = PINK; ctx.lineWidth = 0.02; ctx.stroke();
+    }
+    ctx.lineWidth = keep;
+    ctx.restore();
+  }
+
+  // ---------- Pictures for the step row ----------
+  var picCache = {};
+  function myPic(id) {
+    if (picCache[id]) return picCache[id];
+    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
+    c.width = PW; c.height = PH;
+    try { x = c.getContext("2d"); } catch (e) { x = null; }
+    if (!x) return "";
+    var keep = ctx, kt = time; ctx = x; time = 0;
+    try {
+      if (id === "wheels") {
+        Farm.inUnits(x, PW * 0.27, PH * 0.84, 24, 2.6, function () {
+          R(ctx, -2.2, -0.05, 7.6, 0.6, 0.1, MUD, 0);
+          R(ctx, -2.2, 0.0, 2.2, 0.18, 0.06, MUD_D, 0);
+          ctx.translate(0, 0.12); D.tractor(ctx, { wheel: 0 });
+        });
+      } else if (id === "tracks") {
+        Farm.inUnits(x, PW * 0.27, PH * 0.9, 22, 2.6, function () { trackedTractor({ wheel: 0 }); });
+      } else if (id === "sub") {
+        Farm.inUnits(x, PW * 0.72, PH * 0.42, 40, 2.6, function () {
+          R(ctx, -3.1, SUB_G, 3.6, 0.7, 0, MUD, 0); Ln(ctx, -3.1, SUB_G, 0.5, SUB_G, INK, 0.05);
+          subsoiler({});
+        });
+      } else {
+        Farm.inUnits(x, PW * 0.5, PH * 0.5, 120, 2.6, function () {
+          R(ctx, -0.2, -0.05, 0.4, 0.38, 0.04, MUD, LWu());
+          for (var k = 0; k < 8; k++) C(ctx, -0.15 + hash(k, 1) * 0.3, 0.0 + hash(k, 2) * 0.3, 0.03, "#8A5A36", 0);
+          spade([-0.45, -0.35], [-0.22, 0.31], [0.22, 0.36]);
+          worm(0.05, 0.12, 0.3, -0.5, 1, 1, 0.045);
+        });
+      }
+    } finally { ctx = keep; time = kt; }
+    var url = "";
+    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
+    picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
+    return picCache[id];
+  }
+
+  // ---------- The flow ----------
+  function setPhase(p) { phase = p; phaseT = 0; }
+  function newRig(kind, fromX) { var g = RIGS[kind]; return { kind: kind, x: fromX, v: 0, r: lanes[g.lane].r, wheel: 0, lift: kind === "sub" ? 1 : 0, sink: 0, roll: 0, flash: 0 }; }
+  // the next machine drives in from the left and stops at the edge of the field
+  function bringIn(kind) {
+    job = kind; steps.at(kind);
+    m = newRig(kind, RIGS[kind].x0 - 10);
+    zoomF.target = kind === "sub" ? 10.6 : (kind === "tracks" ? 7.9 : 7.4);
+    cmode = kind;
+    setPhase("arrive"); steps.busy(true);
+  }
+  function arrived() { setPhase("ready"); steps.busy(false); m.v = 0; tagRig(); snd.clunk(); }
+  function go() {
+    if (locked()) return false;
+    if (phase === "ready" && m && job !== "look") {
+      setPhase("drive"); auto = true; steps.busy(true);
+      snd.horn(); coach.say(JOBS[job].work, 4);
+      if (ghost) ghost.learned("go");
+      return true;
+    }
+    if (phase === "drive" && !auto) { auto = true; steps.busy(true); return true; }
+    if (phase === "ready" && job === "look") {
+      setPhase("dig"); dg.t = 0; dg.n = 0; steps.busy(true); fm.state = "dig";
+      coach.say(JOBS.look.work, 4); snd.tick();
+      if (ghost) ghost.learned("go");
+      return true;
+    }
+    return false;
+  }
+  function passDone() {
+    auto = false; grab = null;
+    var k = m.kind;
+    steps.done(k);
+    leaving = m; m = null;
+    if (k === "wheels") { coach.say("Look at the deep ruts!", 3.5); bringIn("tracks"); }
+    else if (k === "tracks") { coach.say("Only a light print. The soil stays crumbly.", 4); bringIn("sub"); }
+    else {
+      coach.say("The soil is loose and crumbly again.", 4);
+      job = "look"; steps.busy(true);
+      fm.on = true; fm.state = "walk"; fm.x = FX - 4.2; fm.t = 0;
+      zoomF.target = 6.6; cmode = "look";
+      setPhase("walk");
+    }
+  }
+  function farmerHere() { fm.state = "stand"; setPhase("ready"); steps.busy(false); tagAt("Spade", fScreen(0.45, -1.1).x, fScreen(0.45, -1.1).y); }
+  function finishJob() {
+    setPhase("done"); steps.done("look"); steps.finish("Again!"); steps.busy(false); fm.state = "hold";
+    coach.say("Worms love loose, crumbly soil!", 5);
+    world(function (w) { w.soil = "loose"; });
+    Toybox.kind();
+  }
+  function startGrow() {
+    // Again: weeks go by; it rains and the field is soft and wet again
+    setPhase("grow"); steps.busy(true); growG = 0;
+    fm.state = "leave";
+    cmode = "grow"; zoomF.target = 12;
+    coach.say("Weeks go by. The rain makes the field wet.", 3.5);
+  }
+  function again() {
+    if (phase !== "done") return false;
+    if (ghost) ghost.learned("again");
+    steps.reset();
+    startGrow();
+    return true;
+  }
+
+  // ---------- Steps, bar, ghost ----------
+  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: myPic(id), go: J.go, coach: J.ready }; });
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (locked()) return null;
+      var b = cv.getBoundingClientRect();
+      if (phase === "ready" && m) {
+        var p = rigPart();
+        if (ghost.shown("go") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: "go" };
+        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: "go" };
+      }
+      if (phase === "ready" && job === "look") { var q = fScreen(0.45, -0.9); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
+      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      return null;
+    }
+  });
+  var steps = Toybox.steps($("steps"), {
+    steps: STEPS, coach: coach, ghost: ghost,
+    onGo: function () { return doGo(); },
+    onAgain: function () { again(); },
+    onBusy: function () { busyHint(); }
+  });
+  function doGo() {
+    if (locked()) return false;
+    if (phase === "ready" || (phase === "drive" && !auto)) return go();
+    if (phase === "done") return again();
+    busyHint(); return true;
+  }
+  function busyHint() {
+    if (phase === "grow") coach.say("The field is getting wet again.", 3);
+    else if (phase === "drive") { snd.horn(); if (m) m.flash = 1.2; coach.say(JOBS[job].busy, 3); }
+    else if (phase === "arrive") coach.say(job === "sub" ? "Here comes the subsoiler." : "Here comes the tractor.", 3);
+    else if (phase === "walk") coach.say("Here comes the farmer.", 3);
+    else if (phase === "dig") coach.say(JOBS.look.busy, 3);
+  }
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
+
+  function startOver() {
+    if (locked()) return;
+    parts.clear(); cbits.length = 0; faceT = 0; sur = null; auto = false; grab = null; leaving = null;
+    fm.on = false; fm.state = "away";
+    resetLanes(); resetWorms();
+    steps.reset();
+    bringIn("wheels");
+    m.x = RIGS.wheels.x0 - 5;
+    zoomF.span = zoomF.target; scF.layout(RG.f.w, RG.f.h);
+    scF.follow(camTarget(), 0, true); snapClose();
+    coach.say("A new wet field!", 3);
+  }
+
+  // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  var surpriseN = 0;
+  var SUR_T = { boot: 6.2, mole: 6.0, bird: 4.8 };
+  function surprise() {
+    if (locked()) return;
+    var list = ["boot", "mole", "bird", "faces"];
+    var pick = list[surpriseN++ % list.length];
+    if (pick === "boot" && (fm.on || cmode === "look")) pick = list[surpriseN++ % list.length];
+    if (pick === "faces") { faceT = 6; coach.say("Hello, tractors! Hello, worms!", 3); return; }
+    // the moment happens in the close-up, at a spot on its screen (it stays put while the ground moves on)
+    sur = { kind: pick, t: 0, fx: pick === "boot" ? 0.3 : (pick === "mole" ? 0.62 : 0.55), done: false };
+    if (pick === "boot") coach.say("Oh no, a welly is stuck in the mud!", 3.5);
+    else if (pick === "mole") coach.say("A mole digs up to say hello.", 3.5);
+    else coach.say("A blackbird looks for a worm.", 3.5);
+  }
+
+  // =====================================================================================================
+  // The close-up: a cut-away of the soil along the lane being worked, with the machine on top
+  // =====================================================================================================
+  // cmode picks the view: wheels / tracks / sub (follow the machine), look (the farmer's spadeful), grow.
+  var cmode = "wheels";
+  var VIEWS = {
+    wheels: { dx: -0.3, hw: 1.35, top: -0.75, bot: 0.75 },
+    tracks: { dx: 0.9, hw: 1.35, top: -0.7, bot: 0.75 },
+    sub: { dx: LEG - 0.45, hw: 1.35, top: -0.55, bot: 0.75 },
+    look: { dx: 0.55, hw: 0.95, top: -1.3, bot: 0.7 },
+    hold: { dx: 0.6, hw: 0.8, top: -1.15, bot: 0.5 },
+    grow: { dx: 0, hw: 1.6, top: -1.0, bot: 0.9 }
+  };
+  var ccam = { x: 0, hw: 2.7, top: -2.1, bot: 0.92, anchor: null, ax: 0 };
+  var CL = { u: 60, y0: 0, top: -2 };
+  function clView() {
+    if (cmode === "look") return (phase === "dig" && dg.t > 1.3) || phase === "done" || (phase === "grow" && phaseT < 1.2) ? VIEWS.hold : VIEWS.look;
+    var v = VIEWS[cmode] || VIEWS.wheels;
+    // the welly moment: the view rises so the whole farmer shows
+    if (sur && sur.kind === "boot" && sur.t < SUR_T.boot - 0.6) return { dx: v.dx, hw: v.hw, top: Math.min(v.top, -1.95), bot: v.bot };
+    return v;
+  }
+  function clAnchor() {
+    if (cmode === "look" || (cmode === "grow" && fm.on && phaseT < 1.2)) return { id: "fm", x: fm.x };
+    if (cmode === "grow") return { id: "field", x: L / 2 };
+    if (m && m.kind === cmode) return { id: m, x: m.x };
+    if (leaving && leaving.kind === cmode) return { id: leaving, x: leaving.x };
+    return { id: "field", x: L / 2 };
+  }
+  function clLane() { return cmode === "tracks" ? lanes.t : lanes.w; }
+  function snapClose() {
+    var v = clView(), a = clAnchor();
+    ccam.x = a.x + v.dx; ccam.hw = v.hw; ccam.top = v.top; ccam.bot = v.bot; ccam.anchor = a.id; ccam.ax = a.x;
+  }
+  function updateCam(dt) {
+    var v = clView(), a = clAnchor(), e = Math.min(1, dt * 2.4);
+    // move with the machine, and ease toward where the view wants to be
+    if (a.id === ccam.anchor) ccam.x += a.x - ccam.ax;
+    ccam.anchor = a.id; ccam.ax = a.x;
+    ccam.x += (a.x + v.dx - ccam.x) * e;
+    ccam.hw += (v.hw - ccam.hw) * e; ccam.top += (v.top - ccam.top) * e; ccam.bot += (v.bot - ccam.bot) * e;
+  }
+  function clLayout() {
+    var c = RG.c, avail = c.h - RG.pad - 6, hgt = ccam.bot - ccam.top;
+    // never zoom in so far that less than about three metres of the lane shows (big screens show more soil)
+    var u = Math.min(c.w / (2 * ccam.hw), avail / hgt, c.w / (cmode === "look" ? 2.2 : 3.1));
+    CL.u = u; CL.top = ccam.top; CL.y0 = 6 + (avail - hgt * u) * 0.15;
+  }
+  function CX(x) { return RG.c.w / 2 + (x - ccam.x) * CL.u; }
+  function CY(y) { return CL.y0 + (y - CL.top) * CL.u; }
+  function CXi(px) { return ccam.x + (px - RG.c.w / 2) / CL.u; }
+  function CYi(py) { return (py - CL.y0) / CL.u + CL.top; }
+
+  // Worms living in each lane: they wriggle about in crumbly soil and go down and away from squashed soil.
+  var worms = { w: [], t: [] };
+  function resetWorms() {
+    ["w", "t"].forEach(function (k, li) {
+      worms[k] = [];
+      for (var i = 0; i < 9; i++) {
+        var home = 0.16 + 0.26 * hash(i, li + 3);
+        worms[k].push({ x: -1.2 + i * 1.75 + hash(i, li) * 0.9, d: home, home: home, ph: hash(i, 9) * 6, a: hash(i, 4) > 0.5 ? 0 : Math.PI, wig: 0, len: 0.17 + 0.05 * hash(i, 5) });
+      }
+    });
+  }
+  resetWorms();
+  function updateWorms(dt) {
+    ["w", "t"].forEach(function (k) {
+      var ln = lanes[k];
+      worms[k].forEach(function (w) {
+        var f = at(ln.comp, w.x) * (1 - at(ln.loose, w.x)), target = f > 0.35 ? 1.35 : w.home, sp = f > 0.35 ? 0.28 : 0.16;
+        var d0 = w.d;
+        w.d += clamp(target - w.d, -sp * dt, sp * dt);
+        var vert = Math.abs(w.d - d0) > 1e-4;
+        var ta = vert ? (w.d > d0 ? Math.PI / 2 : -Math.PI / 2) : (Math.cos(w.a) >= 0 ? 0.15 * Math.sin(time * 0.5 + w.ph) : Math.PI + 0.15 * Math.sin(time * 0.5 + w.ph));
+        w.a += (ta - w.a) * Math.min(1, dt * 3);
+        w.ph += dt * (vert ? 2.4 : 1.0) + (w.wig > 0 ? dt * 4 : 0);
+        if (!vert) w.x += Math.cos(w.a) * dt * 0.02;
+        if (w.wig > 0) w.wig = Math.max(0, w.wig - dt);
+      });
+    });
+  }
+  // little mud flicks in the close-up (metres), short-lived
+  var cbits = [];
+  function cbit(x, y, vx, vy, col, z) { if (cbits.length > 40) cbits.shift(); cbits.push({ x: x, y: y, vx: vx, vy: vy, col: col, z: z || 0.035, t: 0, life: 0.8 }); }
+  function updateBits(dt) {
+    for (var i = cbits.length - 1; i >= 0; i--) {
+      var b = cbits[i]; b.t += dt; b.vy += 9 * dt; b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.t > b.life) cbits.splice(i, 1);
+    }
+  }
+
+  var CRUMB = ["#7B4E2E", "#865633", "#6A4127", "#91603A"];
+  function zone(d) { return d < 0.34 ? 1 : Math.max(0, 1 - (d - 0.34) / 0.12); }
+  function drawClose() {
+    var c = RG.c;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.beginPath(); ctx.rect(0, 0, c.w, c.h); ctx.clip();
+    clLayout();
+    drawSoil(c);
+    ctx.restore();
+    ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath();
+    if (RG.side) { ctx.moveTo(c.x, 0); ctx.lineTo(c.x, H); } else { ctx.moveTo(0, c.y); ctx.lineTo(W, c.y); }
+    ctx.stroke(); ctx.restore();
+  }
+  function skyCols() { var n = scF.night || 0, d = Math.max(dusk, n * 0.6); return [mix(mix("#7CC4F0", "#3B4A8C", d), "#16204A", n * 0.85), mix(mix("#D9F1FF", "#F7B98A", d), "#2B3A6E", n * 0.8)]; }
+  function drawSoil(c) {
+    var u = CL.u, lw = clamp(u * 0.024, 1.5, 3.2), gy = CY(0), n = scF.night || 0, ln = clLane(), i, j;
+    var xa = CXi(-10), xb = CXi(c.w + 10);
+    // the sky, the hedge and the far field beyond the cut
+    var hy = gy - Math.min(0.75 * u, (gy - 4) * 0.45), sk = skyCols(), g = ctx.createLinearGradient(0, 0, 0, hy);
+    g.addColorStop(0, sk[0]); g.addColorStop(1, sk[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, c.w, hy + 1);
+    var hh = Math.max(6, u * 0.16), off = ccam.x * u * 0.25;
+    ctx.beginPath(); ctx.moveTo(-5, hy + 1);
+    for (var x = -5 - (off % (hh * 1.4)); x <= c.w + 30; x += hh * 1.4) ctx.quadraticCurveTo(x + hh * 0.7, hy - hh * (1.2 + 0.4 * hash(Math.floor((x + off) / (hh * 1.4)), 3)), x + hh * 1.4, hy - hh * 0.7);
+    ctx.lineTo(c.w + 30, hy + 1); ctx.closePath();
+    ctx.fillStyle = mix("#3F8237", "#1E2B44", n * 0.6); ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.strokeStyle = INK; ctx.stroke();
+    var gg = ctx.createLinearGradient(0, hy, 0, gy);
+    gg.addColorStop(0, mix("#9A6A44", "#2B3A55", n * 0.5)); gg.addColorStop(1, mix("#7E5232", "#2B3A55", n * 0.5));
+    ctx.fillStyle = gg; ctx.fillRect(0, hy, c.w, gy - hy + 1);
+    // shiny wet patches on the far field
+    for (i = 0; i < 6; i++) {
+      var px = ((hash(i, 2) * c.w * 1.6 - ccam.x * u * 0.5) % (c.w * 1.6) + c.w * 1.6) % (c.w * 1.6) - c.w * 0.3, py = lerp(hy, gy, 0.3 + 0.5 * hash(i, 3));
+      ctx.beginPath(); ctx.ellipse(px, py, u * 0.35 * (0.6 + hash(i, 4)), u * 0.04 * (0.6 + hash(i, 4)), 0, 0, TAU); ctx.fillStyle = mix("#9CC3DD", "#2B3A55", n * 0.5); ctx.fill();
+    }
+    // the far wall of a rut shows where the cut runs below the field's top
+    ctx.fillStyle = mix("#80522F", "#2B3A55", n * 0.4); ctx.fillRect(0, gy, c.w, c.h - gy);
+    // the cut face: its top follows the rut (and the loosened soil heaves up a little)
+    var stepPx = 3, surf = [];
+    for (var sx = -6; sx <= c.w + 6; sx += stepPx) { var wx = CXi(sx); surf.push([sx, CY(surfAt(ln, wx))]); }
+    ctx.beginPath(); ctx.moveTo(surf[0][0], c.h + 5);
+    surf.forEach(function (p) { ctx.lineTo(p[0], p[1]); });
+    ctx.lineTo(surf[surf.length - 1][0], c.h + 5); ctx.closePath();
+    var sg = ctx.createLinearGradient(0, gy, 0, CY(0.95));
+    sg.addColorStop(0, mix(MUD, "#2B3A55", n * 0.4)); sg.addColorStop(0.5, mix("#74492A", "#2B3A55", n * 0.4)); sg.addColorStop(0.56, mix(SUB, "#2B3A55", n * 0.4)); sg.addColorStop(1, mix("#A57647", "#2B3A55", n * 0.4));
+    ctx.fillStyle = sg; ctx.fill();
+    ctx.save(); ctx.clip();
+    // stones in the subsoil
+    var s0 = Math.floor(xa / 0.37), s1 = Math.ceil(xb / 0.37);
+    for (i = s0; i <= s1; i++) {
+      if (hash(i, 31) < 0.45) continue;
+      var stx = i * 0.37 + hash(i, 32) * 0.3, sty = 0.6 + hash(i, 33) * 0.32, sr = 0.03 + 0.04 * hash(i, 34);
+      ctx.beginPath(); ctx.ellipse(CX(stx), CY(sty), sr * u * 1.3, sr * u, hash(i, 35), 0, TAU); ctx.fillStyle = hash(i, 36) > 0.5 ? "#A3A7AE" : "#8E929A"; ctx.fill();
+      ctx.lineWidth = Math.max(1, lw * 0.5); ctx.strokeStyle = INK; ctx.stroke();
+    }
+    // the squashed layer: dark, dense and streaky where the wheels went
+    var cw = DX * u + 0.6;
+    for (i = Math.max(0, ci(xa)); i <= Math.min(NC - 1, ci(xb)); i++) {
+      var f0 = ln.comp[i] * (1 - ln.loose[i]);
+      if (f0 < 0.02) continue;
+      var x0 = CX(cx(i)) - cw / 2, top = CY(ln.rut[i]), bot = CY(ln.rut[i] + 0.36 * (1 - 0.22 * f0) + 0.05);
+      ctx.fillStyle = "rgba(72,56,46," + (0.62 * f0).toFixed(3) + ")"; ctx.fillRect(x0, top, cw, bot - top);
+      ctx.fillStyle = "rgba(40,30,24," + (0.5 * f0).toFixed(3) + ")";
+      for (j = 1; j <= 4; j++) ctx.fillRect(x0, lerp(top, bot, j / 5) - Math.max(0.6, u * 0.006), cw, Math.max(1.2, u * 0.012));
+    }
+    // the crumbs: round lumps with air between them; squashed they go flat and grey, loosened they open up
+    var gx = 0.085, gd = 0.068, i0 = Math.floor(xa / gx) - 1, i1 = Math.ceil(xb / gx) + 1;
+    for (i = i0; i <= i1; i++) {
+      var bxw = i * gx, ii = ci(bxw);
+      if (ii < 0 || ii >= NC) continue;
+      var comp = ln.comp[ii], lo = ln.loose[ii], rut = ln.rut[ii], hv = heaveAt(ln, bxw);
+      for (j = 0; j < 8; j++) {
+        var d = j * gd + 0.035 + hash(i, j + 50) * 0.025, f = comp * (1 - lo) * zone(d);
+        var ccx = bxw + (hash(i, j) - 0.5) * gx * 0.8, ccy = rut - hv * (1 - d / 0.5) + d * (1 - 0.24 * f);
+        var r0 = 0.03 + 0.014 * hash(j, i);
+        if (lo > 0.02 && lo < 0.98 && comp > 0.3) {
+          // breaking up: the hard layer cracks into blocks that drift apart
+          var br = Math.sin(lo * Math.PI);
+          ccx += (hash(i, j + 70) - 0.5) * 0.03 * br; ccy -= 0.015 * br;
+        }
+        var col = mix(CRUMB[(((i * 7 + j) % 4) + 4) % 4], "#5C4A3D", 0.75 * f);
+        if (n > 0.01) col = mix(col, "#2B3A55", n * 0.4);
+        ctx.beginPath(); ctx.ellipse(CX(ccx), CY(ccy), r0 * u * (1 + 0.7 * f), r0 * u * (1 - 0.55 * f), hash(i, j + 9) * 0.6, 0, TAU);
+        ctx.fillStyle = col; ctx.fill();
+        if (f < 0.6 && u * r0 > 2.5) {
+          // the air gaps between crumbs (the worms and the roots need them)
+          ctx.globalAlpha = (1 - f / 0.6) * (0.75 + 0.25 * lo);
+          ctx.beginPath(); ctx.ellipse(CX(ccx + gx * 0.47), CY(ccy + gd * 0.45), u * (0.012 + 0.01 * lo), u * (0.009 + 0.007 * lo), 0, 0, TAU); ctx.fillStyle = "#2E1C10"; ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    // cracks running up from the subsoiler's point while it pulls through
+    drawCracks(ln, u, lw);
+    drawWorms(ln, u);
+    ctx.restore();
+    // water standing in the deep ruts
+    var wl = 0.075;
+    ctx.beginPath(); var inW = false, last = null;
+    surf.forEach(function (p) {
+      var depth = CYi(p[1]);
+      if (depth > wl + 0.004) { if (!inW) { ctx.moveTo(p[0], CY(wl)); inW = true; } ctx.lineTo(p[0], p[1]); last = p; }
+      else if (inW) { ctx.lineTo(p[0], CY(wl)); ctx.closePath(); inW = false; }
+    });
+    if (inW && last) { ctx.lineTo(last[0], CY(wl)); ctx.closePath(); }
+    ctx.fillStyle = mix(WATER, "#2B3A55", n * 0.5); ctx.fill();
+    // the water's shine
+    ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = Math.max(1.5, u * 0.015); ctx.beginPath();
+    var on = false;
+    surf.forEach(function (p, k) { var d = CYi(p[1]); if (d > wl + 0.01 && k % 9 < 4) { if (!on) { ctx.moveTo(p[0], CY(wl) + 1); on = true; } else ctx.lineTo(p[0], CY(wl) + 1); } else on = false; });
+    ctx.stroke();
+    // the outline of the cut and the far edge of the field
+    ctx.beginPath(); surf.forEach(function (p, k) { if (k) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+    ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(c.w, gy); ctx.lineWidth = Math.max(1, lw * 0.5); ctx.strokeStyle = "rgba(29,35,64,0.45)"; ctx.stroke();
+    // grass on the headlands at each end
+    drawHeadlandGrass(xa, xb, u, lw);
+    // the machines on top of the cut, the farmer, the moments
+    drawCloseMachines(u, lw, gy);
+    if (cmode === "look" || (fm.on && cmode === "grow")) drawCloseFarmer(u, lw);
+    // mud flicks
+    cbits.forEach(function (b) { ctx.globalAlpha = b.t > b.life * 0.6 ? (b.life - b.t) / (b.life * 0.4) : 1; C(ctx, CX(b.x), CY(b.y), b.z * u, b.col, 0); });
+    ctx.globalAlpha = 1;
+    if (sur) drawSurprise(c, u, lw);
+  }
+  function surfAt(ln, x) { return at(ln.rut, x) - heaveAt(ln, x); }
+  function heaveAt(ln, x) { var lo = at(ln.loose, x); return lo > 0 ? 0.035 * lo : 0; }
+  function drawHeadlandGrass(xa, xb, u, lw) {
+    ctx.strokeStyle = "#4E9A3C"; ctx.lineWidth = Math.max(1.2, u * 0.012); ctx.beginPath();
+    for (var x = Math.floor(xa / 0.12) * 0.12; x <= xb; x += 0.12) {
+      if (inField(x)) continue;
+      var px = CX(x), py = CY(0), h = u * (0.06 + 0.05 * hash(Math.round(x * 10), 3));
+      ctx.moveTo(px, py); ctx.lineTo(px - u * 0.015, py - h); ctx.moveTo(px + u * 0.03, py); ctx.lineTo(px + u * 0.04, py - h * 0.8);
+    }
+    ctx.stroke();
+  }
+  function drawCracks(ln, u, lw) {
+    var mm = (m && m.kind === "sub" && cmode === "sub") ? m : null;
+    if (!mm || mm.lift > 0.3 || !inField(mm.x + LEG)) return;
+    var tx = mm.x + LEG + 0.25, ty = 0.45 - mm.lift * 0.6;
+    ctx.strokeStyle = "rgba(40,24,14,0.9)"; ctx.lineWidth = Math.max(1.5, u * 0.012); ctx.lineCap = "round";
+    for (var k = 0; k < 4; k++) {
+      var ang = -0.6 - k * 0.32, len = 0.35 + 0.12 * k, jt = Math.sin(time * 13 + k * 2) * 0.02;
+      ctx.beginPath(); ctx.moveTo(CX(tx), CY(ty));
+      for (var q = 1; q <= 4; q++) { var f = q / 4; ctx.lineTo(CX(tx + Math.cos(ang) * len * f + (q % 2 ? jt : -jt)), CY(ty + Math.sin(ang) * len * f)); }
+      ctx.stroke();
+    }
+  }
+  function drawWorms(ln, u) {
+    var list = ln === lanes.t ? worms.t : worms.w, fc = 0.6 + 0.4 * faceAmt(), xa = CXi(-30), xb = CXi(RG.c.w + 30);
+    Farm.inUnits(ctx, CX(0), CY(0), u, clamp(u * 0.012, 1, 2.2), function () {
+      list.forEach(function (w) {
+        if (w.x < xa || w.x > xb || w.d > 1.3) return;
+        var y = surfAt(ln, w.x) + w.d;
+        var hx = w.x - Math.cos(w.a) * w.len / 2, hy = y - Math.sin(w.a) * w.len / 2;
+        worm(hx, hy, w.len, w.a, w.ph, fc);
+      });
+    });
+  }
+  // the machines in the close-up: the wheeled tractor sits down in its rut, the tracked one barely dips
+  function drawCloseMachines(u, lw, gy) {
+    var lane = clLane(), list = [];
+    if (leaving && lanes[RIGS[leaving.kind].lane] === lane) list.push(leaving);
+    if (m && lanes[RIGS[m.kind].lane] === lane) list.push(m);
+    list.forEach(function (mm) {
+      var ext = RIGS[mm.kind].ext;
+      if (CX(mm.x + ext[1]) < -20 || CX(mm.x + ext[0]) > RG.c.w + 20) return;
+      var f = faceAmt();
+      if (mm.kind === "wheels") {
+        Farm.inUnits(ctx, CX(mm.x), CY(mm.sink), u, lw, function () { D.tractor(ctx, { wheel: mm.wheel, time: time, face: f, look: [1, 0.4], beacon: mm.flash > 0 || (mm === m && phase === "drive") }); });
+        if (mm === m && working()) pressure([mm.x, mm.x + 2.7], [0.42, 0.32], mm.sink, u, 1);
+      } else {
+        Farm.inUnits(ctx, CX(mm.x), CY(mm.kind === "sub" ? 0 : at(lane.rut, mm.x + 1.6)), u, lw, function () {
+          if (mm.kind === "sub") {
+            ctx.save(); ctx.translate(THITCH[0], THITCH[1] - mm.lift * 0.6);
+            subsoiler({ time: time, roll: mm.roll, face: f, work: working() });
+            ctx.restore();
+          }
+          trackedTractor({ wheel: mm.wheel, time: time, face: f, beacon: mm.flash > 0 || (mm === m && phase === "drive"), hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
+        });
+        if (mm === m && working() && mm.kind === "tracks") pressure([mm.x + 1.6], [1.9], 0.03, u, 0.45);
+      }
+    });
+  }
+  // the weight pressing down into the soil: rings that spread down from where a tyre or a track sits
+  function pressure(xs, ws, y0, u, strength) {
+    ctx.save(); ctx.lineCap = "round";
+    xs.forEach(function (x, k) {
+      for (var q = 0; q < 3; q++) {
+        var p = (time * 1.1 + q / 3) % 1, w = ws[k] * (0.6 + 0.5 * p), dep = (0.1 + 0.32 * p) * (strength < 1 ? 0.5 : 1);
+        ctx.globalAlpha = (1 - p) * 0.8 * strength;
+        ctx.beginPath(); ctx.ellipse(CX(x), CY(y0 + 0.02), w * u, dep * u, 0, 0.12 * Math.PI, 0.88 * Math.PI);
+        ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = Math.max(2, u * 0.02); ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+  // The farmer and his spade in the close-up (Look): the spade goes in, levers back, lifts out a slice of soil;
+  // worms wriggle out of it.
+  function spadePose() {
+    var t = phase === "dig" ? dg.t : (phase === "done" || phase === "grow" ? 9 : 0);
+    var dig = ease(clamp(t / 0.8, 0, 1)), lev = ease(clamp((t - 0.8) / 0.5, 0, 1)), lift = ease(clamp((t - 1.3) / 0.9, 0, 1));
+    var tip = [0.45, -0.02 + dig * 0.34], top = [0.45, tip[1] - 0.3], grip = [0.45, -1.05 + dig * 0.25];
+    // lever: tip about the blade's tip
+    function rot(p, c, a) { var dx = p[0] - c[0], dy = p[1] - c[1]; return [c[0] + dx * Math.cos(a) - dy * Math.sin(a), c[1] + dx * Math.sin(a) + dy * Math.cos(a)]; }
+    var a = -lev * 0.42;
+    top = rot(top, tip, a); grip = rot(grip, tip, a);
+    // lift: to the hold pose, the blade flat in front of him with the slice on it
+    var hold = { tip: [0.82, -0.6], top: [0.36, -0.62], grip: [0.02, -1.05] };
+    if (lift > 0) { tip = [lerp(tip[0], hold.tip[0], lift), lerp(tip[1], hold.tip[1], lift)]; top = [lerp(top[0], hold.top[0], lift), lerp(top[1], hold.top[1], lift)]; grip = [lerp(grip[0], hold.grip[0], lift), lerp(grip[1], hold.grip[1], lift)]; }
+    // the slice: a block of soil in front of the blade, then on it
+    var sl0 = { x: 0.47, y: 0, w: 0.42, h: 0.38 }, sl1 = { x: 0.38, y: -0.99, w: 0.42, h: 0.38 };
+    var sl = { x: lerp(sl0.x, sl1.x, lift), y: lerp(sl0.y, sl1.y, lift) - Math.sin(lift * Math.PI) * 0.08, w: 0.42, h: 0.38, a: (1 - lift) * lev * -0.12 };
+    return { t: t, dig: dig, lev: lev, lift: lift, tip: tip, top: top, grip: grip, sl: sl, out: t > 1.3 };
+  }
+  var SLW = [{ fx: 0.0, fy: 0.3, a: Math.PI + 0.3, len: 0.2 }, { fx: 1.0, fy: 0.45, a: -0.25, len: 0.22 }, { fx: 0.55, fy: 1.0, a: 1.6, len: 0.2 }, { fx: 0.25, fy: 0.0, a: -1.9, len: 0.18 }];
+  function drawSlice(sp, u) {
+    var s = sp.sl, i;
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.a || 0);
+    // roots hanging out of the bottom
+    for (i = 0; i < 7; i++) {
+      var rx = 0.04 + i * 0.055, ry = s.h, sw = Math.sin(time * 1.5 + i) * 0.015;
+      ctx.beginPath(); ctx.moveTo(rx, ry - 0.02); ctx.quadraticCurveTo(rx + sw + 0.02, ry + 0.07, rx + sw * 2 - 0.01, ry + 0.09 + hash(i, 2) * 0.08);
+      ctx.strokeStyle = "#EADFC2"; ctx.lineWidth = 0.012; ctx.lineCap = "round"; ctx.stroke();
+    }
+    R(ctx, 0, 0, s.w, s.h, 0.03, "#5E3B22");
+    for (i = 0; i < 26; i++) {
+      var px = 0.03 + hash(i, 11) * (s.w - 0.06), py = 0.03 + hash(i, 12) * (s.h - 0.06);
+      ctx.beginPath(); ctx.ellipse(px, py, 0.026 + 0.012 * hash(i, 13), 0.021, hash(i, 14), 0, TAU); ctx.fillStyle = CRUMB[i % 4]; ctx.fill();
+      if (i % 2) { ctx.beginPath(); ctx.ellipse(px + 0.03, py + 0.022, 0.01, 0.008, 0, 0, TAU); ctx.fillStyle = "#2E1C10"; ctx.fill(); }
+    }
+    // roots inside
+    for (i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0.06 + i * 0.1, 0.01); ctx.quadraticCurveTo(0.1 + i * 0.09, s.h * 0.5, 0.05 + i * 0.11, s.h - 0.01); ctx.strokeStyle = "rgba(234,223,194,0.85)"; ctx.lineWidth = 0.01; ctx.stroke(); }
+    // a few blades of grass on the top
+    for (i = 0; i < 6; i++) Ln(ctx, 0.04 + i * 0.065, 0, 0.03 + i * 0.065 + Math.sin(time + i) * 0.01, -0.05 - hash(i, 5) * 0.04, "#4E9A3C", 0.012);
+    rr(ctx, 0, 0, s.w, s.h, 0.03); ctx.lineWidth = LWu(); ctx.strokeStyle = INK; ctx.stroke();
+    // worms wriggling out
+    var fc = 1;
+    for (i = 0; i < SLW.length; i++) {
+      var te = sp.t - (2.35 + i * 0.7);
+      if (te < 0) continue;
+      var g = ease(clamp(te / 0.6, 0, 1)), w = SLW[i], bx2 = w.fx * s.w, by2 = w.fy * s.h;
+      worm(bx2 - Math.cos(w.a) * 0.05, by2 - Math.sin(w.a) * 0.05, w.len * (0.25 + 0.75 * g), w.a + Math.sin(time * 2 + i) * 0.25, time * 1.4 + i, fc, 0.032);
+    }
+    ctx.restore();
+  }
+  function drawCloseFarmer(u, lw) {
+    if (!fm.on) return;
+    var sp = spadePose(), fx = fm.x, lane = lanes.w, a = fm.state === "leave" ? clamp(1 - phaseT / 1.0, 0, 1) : 1;
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = a;
+    Farm.inUnits(ctx, CX(fx), CY(surfAt(lane, fx)), u, lw, function () {
+      if (sp.out) {
+        // the hole where the slice came out
+        R(ctx, 0.47, -0.01, 0.42, 0.38, 0.03, "#2E1C10", LWu() * 0.7);
+        for (var k = 0; k < 3; k++) { var hx = 0.5 + k * 0.13; Ln(ctx, hx, 0.36, hx + 0.03, 0.42, "#EADFC2", 0.01); }
+      }
+      var walking = fm.state === "walk";
+      var hands = (phase === "dig" || phase === "done" || (phase === "grow" && fm.state !== "walk")) || fm.state === "stand" ? [sp.grip, [lerp(sp.grip[0], sp.top[0], 0.45), lerp(sp.grip[1], sp.top[1], 0.45)]] : null;
+      var foot = phase === "dig" && sp.t < 0.85 ? [sp.top[0] - 0.08, sp.top[1] + 0.02] : null;
+      farmer({ walk: fm.walk, stride: walking ? 1 : 0, hands: hands, foot: foot, face: 1 });
+      if (fm.state !== "walk") {
+        if (sp.out) drawSlice(sp, u);
+        spade(sp.grip, sp.top, sp.tip);
+      }
+    });
+    ctx.restore();
+  }
+  // The Surprise moments, in the close-up
+  function drawSurprise(c, u, lw) {
+    var s = sur, t = s.t, sx = c.w * s.fx, ln = clLane(), wx = CXi(sx), gyy = CY(surfAt(ln, wx));
+    if (s.kind === "boot") {
+      // the farmer walks in, a welly sticks in the mud, his foot pops out (a red sock!), he pulls it out: squelch
+      var walkIn = ease(clamp(t / 1.2, 0, 1)), walkOut = ease(clamp((t - 5.0) / 1.2, 0, 1));
+      var x = lerp(-0.7 * c.w / u, 0, walkIn) * u + sx + walkOut * c.w * 0.85;
+      var stuck = t > 1.2 && t < 4.3, pull = t > 3.2 && t < 4.3 ? Math.sin((t - 3.2) / 1.1 * Math.PI) : 0;
+      var bootY = gyy + u * 0.03;
+      Farm.inUnits(ctx, x, bootY, u, lw, function () {
+        if (stuck) {
+          // the welly stays in the mud while the foot is out
+          ctx.save(); ctx.beginPath(); ctx.rect(-1, -2, 2, 2.0); ctx.clip();
+          var by = t > 3.3 ? -ease(clamp((t - 3.3) / 0.8, 0, 1)) * 0.3 : 0.08;
+          wellyU(-0.13, by, false);
+          ctx.restore();
+          ctx.beginPath(); ctx.ellipse(-0.06, 0.0, 0.2, 0.04, 0, 0, TAU); fs(ctx, MUD_D, LWu() * 0.7);
+        }
+        farmer({ walk: (t < 1.2 || t > 5) ? time * 7 : 0, stride: (t < 1.2 || t > 5) ? 1 : 0, sock: stuck && t > 1.6, pull: pull, hands: pull > 0 ? [[-0.1, -0.5 + (1 - pull) * 0.2], [-0.15, -0.55 + (1 - pull) * 0.2]] : null });
+      });
+      if (t > 4.0 && t < 5.4) {
+        // the squelch word and mud blobs
+        var k = clamp((t - 4.0) / 0.3, 0, 1), fade = clamp((5.4 - t) / 0.4, 0, 1);
+        ctx.save(); ctx.globalAlpha = fade; ctx.translate(x + u * 0.1, gyy - u * 1.0); ctx.rotate(-0.12); ctx.scale(0.6 + 0.4 * k, 0.6 + 0.4 * k);
+        var fz = clamp(u * 0.32, 20, 40);
+        ctx.font = "800 " + fz + "px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.lineJoin = "round"; ctx.lineWidth = Math.max(4, fz * 0.22); ctx.strokeStyle = INK; ctx.strokeText("Squelch!", 0, 0);
+        ctx.fillStyle = "#FFD34D"; ctx.fillText("Squelch!", 0, 0);
+        ctx.restore();
+      }
+      return;
+    }
+    if (s.kind === "mole") {
+      // tunnels in from the side under the ground, pushes up a molehill, pops out and looks around, ducks back
+      var depth = 0.38, mx2, my2, hill = 0, out = 0, fade2 = clamp((6.0 - t) / 0.6, 0, 1);
+      if (t < 2.2) { mx2 = lerp(-0.4, wx - CXi(0) - 0.25, ease(t / 2.2)); my2 = depth; }
+      else if (t < 3.0) { mx2 = wx - CXi(0) - 0.25 + ease((t - 2.2) / 0.8) * 0.25; my2 = lerp(depth, 0.08, ease((t - 2.2) / 0.8)); hill = ease((t - 2.2) / 0.8); }
+      else { mx2 = wx - CXi(0); hill = 1; out = t < 4.8 ? ease(clamp((t - 3.0) / 0.4, 0, 1)) : 1 - ease(clamp((t - 4.8) / 0.4, 0, 1)); my2 = lerp(0.08, -0.06, out); }
+      var mxW = CXi(0) + mx2, sY = surfAt(ln, wx);
+      ctx.save(); ctx.globalAlpha = fade2;
+      // the tunnel behind it
+      ctx.strokeStyle = "rgba(30,18,10,0.85)"; ctx.lineWidth = u * 0.13; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(CX(CXi(0) - 0.5), CY(sY + depth)); ctx.lineTo(CX(Math.min(mxW, wx - 0.25)), CY(sY + depth));
+      if (t > 2.2) ctx.lineTo(CX(mxW), CY(sY + Math.max(0.05, my2)));
+      ctx.stroke();
+      // the molehill
+      if (hill > 0) { ctx.beginPath(); ctx.ellipse(CX(wx), CY(sY), u * 0.2 * hill, u * 0.12 * hill, 0, Math.PI, 0); fs(ctx, "#5E3B22", lw * 0.8); for (var q = 0; q < 5; q++) C(ctx, CX(wx - 0.12 + q * 0.06), CY(sY - 0.04 * hill - hash(q, 2) * 0.05 * hill), u * 0.02, "#7B4E2E", 0); }
+      Farm.inUnits(ctx, CX(mxW), CY(sY + my2), u, lw, function () {
+        if (out > 0) { ctx.save(); ctx.rotate(-1.2 * out); mole(0, 0, 1.3, 0, true); ctx.restore(); }
+        else mole(0, 0, 1.3, 1, false);
+      });
+      if (out > 0.5 && hill > 0) { ctx.beginPath(); ctx.ellipse(CX(wx), CY(sY), u * 0.2, u * 0.06, 0, 0, Math.PI); fs(ctx, "#5E3B22", 0); }
+      ctx.restore();
+      return;
+    }
+    // the blackbird: flies in, hops, tugs a worm out of the soil and flies off with it
+    var inT = 1.1, tug = 2.0, b = t, bx3, by3, fly = true, carrying = false, flipB = true;
+    var tx2 = sx, ty2 = gyy;
+    if (b < inT) { var f = ease(b / inT); bx3 = lerp(c.w + 40, tx2, f); by3 = lerp(-20, ty2, f) - Math.sin(f * Math.PI) * 20; }
+    else if (b < inT + tug) {
+      bx3 = tx2; by3 = ty2; fly = false;
+      var k2 = (b - inT) / tug, stretch = k2 < 0.75 ? Math.abs(Math.sin(k2 * 10)) * 0.4 + k2 * 0.6 : 1;
+      by3 -= Math.sin(k2 * 30) * u * 0.01;
+      // the worm stretching up out of the ground into its beak
+      var bkX = tx2 - u * 0.28 * 1.4 / 1.4, bkY = ty2 - u * 0.2;
+      if (k2 < 0.78) {
+        ctx.beginPath(); ctx.moveTo(bkX, bkY); ctx.quadraticCurveTo(bkX - u * 0.04, ty2 + u * 0.05, bkX - u * 0.02, ty2 + u * (0.25 - 0.18 * stretch));
+        ctx.strokeStyle = INK; ctx.lineWidth = u * 0.045; ctx.lineCap = "round"; ctx.stroke(); ctx.strokeStyle = PINK; ctx.lineWidth = u * 0.03; ctx.stroke();
+      } else carrying = true;
+    } else { var f2 = ease((b - inT - tug) / (SUR_T.bird - inT - tug)); bx3 = lerp(tx2, -40, f2); by3 = lerp(ty2, -30, f2) - Math.sin(f2 * Math.PI) * 25; carrying = true; }
+    blackbird(bx3, by3, u * 1.4, time * 3, flipB, fly, carrying);
+  }
+
+  // ---------- Tap or drag ----------
+  function fScreen(dx, ly) { var r = 0.985, s = scF.S(r); return { x: scF.X(fm.x, r) + dx * s, y: scF.Y(r) + ly * s }; }
+  function rigPart() {
+    if (!m) return { x: -999, y: -999, r: 0 };
+    var p = m.kind === "sub" ? mScreen(m, 0.6, -1.8) : mScreen(m, 1.4, -1.6);
+    return { x: p.x, y: p.y, r: Math.max(2.4 * p.s, 46) };
+  }
+  var press = Toybox.press(cv, {
+    any: true,
+    parts: function () {
+      var b = cv.getBoundingClientRect(), list = [], c = RG.c;
+      if (m && phase !== "grow") { var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r }); }
+      if (m && (cmode === m.kind)) {
+        var mx = m.kind === "sub" ? m.x + LEG : m.x + 1.3, my = m.kind === "sub" ? 0.1 : -0.8;
+        var qx = CX(mx), qy = CY(my);
+        if (qx > 0 && qx < c.w) list.push({ id: "rigc", x: b.left + c.x + qx, y: b.top + c.y + qy, r: Math.max(1.1 * CL.u, 50) });
+      }
+      if (fm.on && (phase === "ready" || phase === "dig" || phase === "done")) {
+        var f = fScreen(0.3, -0.9); list.push({ id: "farmer", x: b.left + f.x, y: b.top + f.y, r: Math.max(1.0 * scF.S(1), 40) });
+        if (cmode === "look") list.push({ id: "slice", x: b.left + c.x + CX(fm.x + 0.6), y: b.top + c.y + CY(phase === "ready" ? -0.4 : -0.8), r: Math.max(0.35 * CL.u, 44) });
+      }
+      return list;
+    },
+    dragStart: function (part, e, s) {
+      if (locked() || part !== "rig" || !m || (phase !== "ready" && phase !== "drive")) return;
+      if (phase === "ready") go();
+      auto = false; grab = { off: scF.wx(s.x - cv.getBoundingClientRect().left, m.r < 1.05 ? 1 : 1) - m.x };
+      if (ghost) ghost.learned("go");
+    },
+    move: function (part, e, s) { if (grab) grab.to = scF.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
+    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
+    tap: function (part, x, y) {
+      if (locked()) return;
+      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
+      if (part) {
+        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
+        if (part === "rig") { snd.horn(); if (m) m.flash = 1.2; tagRig(); return; }
+        if (part === "rigc") { tagAt(closeName(px - RG.c.x, py - RG.c.y), px, py - 30); snd.tick(); return; }
+        if (part === "farmer") { tagAt("Farmer", px, py - 40); snd.tick(); return; }
+        if (part === "slice") { wiggleWorms(); tagAt(phase === "done" ? "Earthworms" : "Crumbly soil", px, py - 40); snd.pop(); return; }
+      }
+      // in the close-up: say what is there (and wiggle a worm under the finger)
+      if (px >= RG.c.x && py >= RG.c.y) {
+        var lx = px - RG.c.x, ly = py - RG.c.y, w = wormAt(lx, ly);
+        if (w) { w.wig = 1.2; tagAt("Earthworm", px, py - 30); snd.pop(); }
+        else { tagAt(closeName(lx, ly), px, py - 30); snd.tick(); }
+        if (ghost) ghost.poke();
+        return;
+      }
+      // anywhere else in the field: a little splash of mud, and the step's line again
+      var rr2 = clamp(scF.B / Math.max(4, py - scF.hY), 0.6, 5);
+      for (var i = 0; i < 5; i++) parts.add({ kind: "dot", x: scF.wx(px, Math.min(1, rr2)) + (Math.random() - 0.5) * 0.4, h: 0.05, r: Math.min(1, rr2), vx: (Math.random() - 0.5) * 1.5, vh: 1.5 + Math.random(), life: 0.7, size: 0.06, col: Math.random() < 0.5 ? MUD_D : WATER });
+      steps.sayStep && steps.sayStep(); if (ghost) ghost.poke();
+    }
+  });
+  function wiggleWorms() { worms.w.forEach(function (w) { w.wig = 1.2; }); }
+  function wormAt(lx, ly) {
+    var ln = clLane(), list = ln === lanes.t ? worms.t : worms.w, best = null, bd = Math.max(28, CL.u * 0.18);
+    list.forEach(function (w) { var y = surfAt(ln, w.x) + w.d, d = Math.hypot(CX(w.x) - lx, CY(y) - ly); if (d < bd) { bd = d; best = w; } });
+    return best;
+  }
+  function closeName(lx, ly) {
+    var wx = CXi(lx), wy = CYi(ly), ln = clLane(), s = surfAt(ln, wx);
+    if (m && cmode === m.kind) {
+      var rx = wx - m.x;
+      if (m.kind === "wheels" && wy < s && wy > -2.0) { if (Math.hypot(rx, wy + 0.95) < 0.95 || Math.hypot(rx - 2.7, wy + 0.66) < 0.66) return "Tyre"; if (wy < -0.2) return "Wheeled tractor"; }
+      if (m.kind !== "wheels" && wy < 0.05 && rx > -0.9 && rx < 3.9 && wy > -1.8) return "Rubber track";
+      if (m.kind === "sub" && rx < THITCH[0] + 0.2 && rx > THITCH[0] - 0.95 && wy > -0.8 && wy < 0.55) return "Subsoiler leg";
+      if (m.kind === "sub" && rx < THITCH[0] - 1.9 && rx > THITCH[0] - 2.8 && wy < 0.1 && wy > -0.6) return "Packer roller";
+      if (wy < -0.3 && rx > -1 && rx < 4.6) return RIGS[m.kind].name;
+    }
+    if (wy < s) return at(ln.rut, wx) > 0.08 ? "Puddle" : "Field";
+    if (wy > 0.55) return "Subsoil";
+    var f = at(ln.comp, wx) * (1 - at(ln.loose, wx));
+    if (f > 0.5 && wy < s + 0.42) return "Squashed soil";
+    return "Crumbly soil";
+  }
+
+  // ---------- Simulation ----------
+  function rigCenter(mm) { var e = RIGS[mm.kind].ext; return mm.x + (e[0] + e[1]) / 2; }
+  function camTarget() {
+    var x;
+    if (phase === "walk" || phase === "dig" || phase === "done" || (phase === "ready" && job === "look")) x = fm.x + 0.5;
+    else if (phase === "grow") x = L / 2;
+    else if (m) {
+      x = rigCenter(m) + m.v / 2.6;
+      if (m.r > 1.05) x += (scF.X(rigCenter(m), m.r) - scF.X(rigCenter(m), 1)) / scF.k;
+    } else x = L / 2;
+    return x;
+  }
+  var engLevel = 0;
+  function stamp(mm, dt) {
+    var ln = lanes[RIGS[mm.kind].lane], i, x;
+    if (mm.kind === "wheels") {
+      [[mm.x, 0.17, 1, 0.3], [mm.x + 2.7, 0.12, 0.85, 0.24]].forEach(function (wh) {
+        for (i = Math.max(0, ci(wh[0] - wh[3])); i <= Math.min(NC - 1, ci(wh[0] + wh[3])); i++) {
+          x = cx(i); if (!inField(x)) continue;
+          var q = Math.sqrt(Math.max(0, 1 - Math.pow((x - wh[0]) / wh[3], 2)));
+          if (x > wh[0]) q *= 0.6;   // ahead of the tyre the soil is only starting to give
+          ln.rut[i] = Math.max(ln.rut[i], wh[1] * q); ln.comp[i] = Math.max(ln.comp[i], wh[2] * Math.min(1, q * 1.4));
+        }
+      });
+      mm.sink += ((inField(mm.x) ? 0.16 : 0) - mm.sink) * Math.min(1, dt * 5);
+      if (inField(mm.x) && mm.v > 0.5) {
+        if (Math.random() < dt * 9) parts.add({ kind: "chunk", x: mm.x - 0.75, h: 1.2 + Math.random() * 0.4, r: 0.995, vx: -1.5 - Math.random() * 1.5, vh: 1.5 + Math.random() * 1.5, life: 0.75, size: 0.09, spin: 6, col: MUD_D });
+        if (Math.random() < dt * 6) parts.add({ kind: "dot", x: mm.x - 0.6, h: 0.1, r: 0.99, vx: -0.8 - Math.random(), vh: 1.8 + Math.random(), life: 0.6, size: 0.06, col: WATER });
+        if (cmode === "wheels" && Math.random() < dt * 14) cbit(mm.x - 0.7 + Math.random() * 0.3, -0.9 - Math.random() * 0.5, -1.4 - Math.random() * 1.2, -1.5 - Math.random() * 1.5, Math.random() < 0.3 ? WATER : MUD_D, 0.03 + Math.random() * 0.02);
+      }
+    } else if (mm.kind === "tracks") {
+      for (i = Math.max(0, ci(mm.x - 0.1)); i <= Math.min(NC - 1, ci(mm.x + 3.3)); i++) {
+        x = cx(i); if (!inField(x)) continue;
+        ln.rut[i] = Math.max(ln.rut[i], 0.03); ln.comp[i] = Math.max(ln.comp[i], 0.16);
+      }
+    } else {
+      var leg = mm.x + LEG, roll = mm.x + ROLL;
+      if (mm.lift < 0.3) {
+        for (i = Math.max(0, ci(leg - 1.5)); i <= Math.min(NC - 1, ci(leg)); i++) { x = cx(i); if (inField(x) && ln.lt[i] < 0) ln.lt[i] = time; }
+        for (i = Math.max(0, ci(roll - 1.5)); i <= Math.min(NC - 1, ci(roll)); i++) { x = cx(i); if (inField(x)) ln.rut[i] = Math.min(ln.rut[i], 0.012); }
+        if (inField(leg) && mm.v > 0.5) {
+          if (Math.random() < dt * 8) parts.add({ kind: "chunk", x: leg + 0.1, h: 0.05, r: 0.995, vx: -0.5 - Math.random() * 0.6, vh: 1.0 + Math.random() * 0.8, life: 0.6, size: 0.07, spin: 5, col: "#7B4E2E" });
+          if (cmode === "sub" && Math.random() < dt * 6) cbit(leg + 0.35, 0.0, -0.4 - Math.random() * 0.4, -1.2 - Math.random(), "#7B4E2E", 0.03);
+        }
+      }
+      // the legs go in at the start of the field and come out at the end
+      var down = leg > -0.3 && leg < L + 0.2 ? 0 : 1;
+      if (mm === m && phase !== "drive" && phase !== "ready") down = 1;
+      if (mm === m && phase === "ready") down = 1;
+      mm.lift += (down - mm.lift) * Math.min(1, dt * 3.5);
+      mm.roll += mm.v * dt;
+    }
+  }
+  function update(dt) {
+    time += dt; phaseT += dt;
+    var drive = 0, i;
+    if (Math.abs(zoomF.span - zoomF.target) > 0.02) { zoomF.span += (zoomF.target - zoomF.span) * Math.min(1, dt * 2.2); scF.layout(RG.f.w, RG.f.h); }
+    if (phase === "arrive" && m) {
+      var g = RIGS[m.kind], d = g.x0 - m.x; m.v = clamp(d * 1.6, 1.2, 7); m.x += Math.min(m.v * dt, Math.max(d, 0.001)); drive = 0.6;
+      if (d < 0.02) { m.x = g.x0; arrived(); }
+    } else if (phase === "drive" && m) {
+      var vt = 0, V = RIGS[m.kind].v;
+      if (grab && grab.to !== undefined) vt = clamp((grab.to - m.x) * 3, 0, V * 1.4);
+      else if (auto) vt = V;
+      m.v += (vt - m.v) * Math.min(1, dt * (vt > m.v ? 3 : 6));
+      m.x += m.v * dt; drive = m.v / V;
+      if (m.x >= RIGS[m.kind].end) passDone();
+    } else if (phase === "walk") {
+      fm.x = Math.min(FX, fm.x + 1.7 * dt); fm.walk += dt * 7;
+      if (fm.x >= FX - 0.001) farmerHere();
+    } else if (phase === "dig") {
+      var t0 = dg.t; dg.t += dt;
+      if (t0 < 0.8 && dg.t >= 0.8) snd.soil(0);
+      if (t0 < 2.2 && dg.t >= 2.2) { snd.clunk(); for (i = 0; i < 6; i++) cbit(fm.x + 0.5 + Math.random() * 0.4, 0.0, (Math.random() - 0.5) * 1.2, -1.2 - Math.random(), "#7B4E2E", 0.025); }
+      for (i = 0; i < SLW.length; i++) {
+        var te = 2.35 + i * 0.7 + 0.3;
+        if (t0 < te && dg.t >= te) { count++; dg.n = i + 1; save(); setCount(); snd.pop(); if (i === SLW.length - 1) snd.chime(); }
+      }
+      if (dg.t >= 2.35 + SLW.length * 0.7 + 0.5) finishJob();
+    } else if (phase === "grow") {
+      growG = clamp(phaseT / 3.4, 0, 1);
+      ["w", "t"].forEach(function (k) { var l = lanes[k]; for (var q = 0; q < NC; q++) { l.rut[q] *= 1 - dt * 1.2; l.comp[q] *= 1 - dt * 1.2; l.loose[q] *= 1 - dt * 1.2; } });
+      if (phaseT > 1.0) { fm.on = false; fm.state = "away"; }
+      if (phaseT >= 3.4) { resetLanes(); resetWorms(); leaving = null; bringIn("wheels"); }
+    }
+    if (m) { m.wheel += m.v * dt; stamp(m, dt); if (m.flash > 0) m.flash = Math.max(0, m.flash - dt); }
+    if (leaving) {
+      leaving.v = Math.min(5, leaving.v + dt * 2); leaving.x += leaving.v * dt; leaving.wheel += leaving.v * dt; stamp(leaving, dt);
+      if (leaving.x > L + 26) leaving = null;
+    }
+    // the loosened soil opens up over a moment after the leg has passed
+    var ln = lanes.w;
+    for (i = 0; i < NC; i++) if (ln.lt[i] >= 0 && ln.loose[i] < 1) { ln.loose[i] = clamp((time - ln.lt[i]) / 0.9, 0, 1); }
+    if (faceT > 0) faceT = Math.max(0, faceT - dt);
+    if (sur) {
+      var s0 = sur.t; sur.t += dt;
+      if (sur.kind === "boot" && s0 < 4.0 && sur.t >= 4.0) { snd.pop(); var cx0 = CXi(RG.c.w * sur.fx); for (i = 0; i < 6; i++) cbit(cx0 + (Math.random() - 0.5) * 0.2, -0.05, (Math.random() - 0.5) * 2, -1.5 - Math.random() * 1.5, MUD_D, 0.035); }
+      if (sur.kind === "mole" && s0 < 3.0 && sur.t >= 3.0) snd.pop();
+      if (sur.kind === "bird" && s0 < 3.0 && sur.t >= 3.0) snd.pop();
+      if (sur.t > (SUR_T[sur.kind] || 5)) sur = null;
+    }
+    if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    parts.update(dt);
+    updateWorms(dt); updateBits(dt);
+    scF.follow(camTarget(), dt); updateCam(dt);
+    var lvl = phase === "drive" ? 0.3 + drive * 0.7 : (phase === "arrive" ? 0.6 : (m ? 0.15 : (leaving ? 0.5 : 0)));
+    engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
+    snd.engine(ending || (!m && !leaving) ? -1 : engLevel);
+    snd.soil(working() ? 0.5 * drive : 0);
+  }
+
+  // ---------- Drawing the field ----------
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(RG.f.x, RG.f.y);
+    ctx.beginPath(); ctx.rect(0, 0, RG.f.w, RG.f.h); ctx.clip();
+    drawField(scF);
+    ctx.restore();
+    drawClose();
+  }
+  var PUDDLES = [];
+  for (var pi = 0; pi < 9; pi++) PUDDLES.push({ x: 0.8 + hash(pi, 1) * (L - 1.6), r: 1.6 + hash(pi, 2) * 2.6, w: 0.5 + hash(pi, 3) * 0.9 });
+  // One lane's marks on the ground: deep ruts with puddles, a light flat track print, or loosened soil.
+  function drawLane(S, ln, half) {
+    var r = ln.r, dr = 0.045 * r, xr = S.xRange(r), i0 = Math.max(0, ci(xr[0]) - 2), i1 = Math.min(NC - 1, ci(xr[1]) + 2), n = S.night || 0;
+    var ra = half === "near" ? r - dr : r, rb = half === "far" ? r + dr : r;
+    if (half === "all") { ra = r - dr; rb = r + dr; }
+    function kind(i) {
+      if (!inField(cx(i))) return 0;
+      if (ln.loose[i] > 0.5) return 3;
+      if (ln.rut[i] > 0.08) return 1;
+      if (ln.rut[i] > 0.008) return 2;
+      return 0;
+    }
+    var i = i0;
+    while (i <= i1) {
+      var k = kind(i);
+      if (!k) { i++; continue; }
+      var j = i; while (j + 1 <= i1 && kind(j + 1) === k) j++;
+      var xa = cx(i) - DX / 2, xb = cx(j) + DX / 2;
+      ctx.beginPath();
+      ctx.moveTo(S.X(xa, rb), S.Y(rb)); ctx.lineTo(S.X(xb, rb), S.Y(rb)); ctx.lineTo(S.X(xb, ra), S.Y(ra)); ctx.lineTo(S.X(xa, ra), S.Y(ra)); ctx.closePath();
+      var col = k === 1 ? MUD_D : (k === 2 ? "#9E6C44" : "#7A4A2A");
+      ctx.fillStyle = mix(col, "#2B3A55", n * 0.4); ctx.fill();
+      var s = S.S(r);
+      if (k === 1 && half !== "near") {
+        // puddles in the ruts, catching the sky
+        for (var q = Math.floor(xa / 0.7); q <= Math.ceil(xb / 0.7); q++) {
+          var px = q * 0.7 + hash(q, 5) * 0.3; if (px < xa || px > xb || hash(q, 6) < 0.3) continue;
+          ctx.beginPath(); ctx.ellipse(S.X(px, r + dr * 0.4), S.Y(r + dr * 0.4), s * (0.18 + 0.15 * hash(q, 7)), Math.max(1.2, (S.Y(r) - S.Y(r + dr)) * 0.45), 0, 0, TAU);
+          ctx.fillStyle = mix(WATER, "#2B3A55", n * 0.5); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(S.X(px, r + dr * 0.4) - s * 0.08, S.Y(r + dr * 0.4) - 1, s * 0.12, Math.max(1, s * 0.015));
+        }
+      }
+      if (k === 1 && half === "near") {
+        // the rut's near lip: a ridge of squeezed-up mud
+        ctx.strokeStyle = mix("#8A5A36", "#2B3A55", n * 0.4); ctx.lineWidth = Math.max(1.5, s * 0.05);
+        ctx.beginPath(); ctx.moveTo(S.X(xa, ra), S.Y(ra)); ctx.lineTo(S.X(xb, ra), S.Y(ra)); ctx.stroke();
+      }
+      if (k === 2 && s * 0.03 > 0.8) {
+        // the track print: neat bars across it
+        ctx.strokeStyle = "rgba(90,56,30,0.55)"; ctx.lineWidth = Math.max(1, s * 0.03); ctx.beginPath();
+        for (var b = Math.ceil(xa / 0.27); b * 0.27 <= xb; b++) { var bx2 = b * 0.27; ctx.moveTo(S.X(bx2, ra), S.Y(ra)); ctx.lineTo(S.X(bx2 + 0.06, rb), S.Y(rb)); }
+        ctx.stroke();
+      }
+      if (k === 3 && s * 0.04 > 1) {
+        // loose crumbly soil
+        ctx.fillStyle = "#A0714A";
+        for (var c2 = Math.floor(xa / 0.22); c2 * 0.22 <= xb; c2++) { var cxp = c2 * 0.22 + hash(c2, 4) * 0.15, rr3 = lerp(ra, rb, hash(c2, 8)); ctx.beginPath(); ctx.arc(S.X(cxp, rr3), S.Y(rr3), Math.max(1, s * 0.035), 0, TAU); ctx.fill(); }
+      }
+      i = j + 1;
+    }
+  }
+  function drawRig(S, mm) {
+    var f = faceAmt(), lit = mm.flash > 0 || (mm === m && phase === "drive");
+    if (mm.kind === "wheels") {
+      S.put(ctx, mm.x, mm.r, 1, function () { ctx.translate(0, mm.sink); D.tractor(ctx, { wheel: mm.wheel, time: time, face: f, look: [1, 0.4], beacon: lit }); });
+    } else {
+      S.put(ctx, mm.x, mm.r, 1, function () {
+        if (mm.kind === "sub") { ctx.save(); ctx.translate(THITCH[0], THITCH[1] - mm.lift * 0.6); subsoiler({ time: time, roll: mm.roll, face: f, work: working() }); ctx.restore(); }
+        trackedTractor({ wheel: mm.wheel, time: time, face: f, beacon: lit, hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
+      });
+    }
+  }
+  function drawField(S) {
+    S.sky(ctx, { time: time, arc: phase === "grow" ? growG : null, season: "spring", dusk: dusk });
+    S.hedge(ctx, { season: "spring" });
+    var P = { crop: "spuds", stage: "soil", time: time };
+    S.field(ctx, "far", P);
+    var n = S.night || 0;
+    PUDDLES.forEach(function (p) {
+      var x = S.X(p.x, p.r), y = S.Y(p.r), s = S.S(p.r);
+      if (x < -60 || x > S.W + 60) return;
+      ctx.beginPath(); ctx.ellipse(x, y, p.w * s, Math.max(1.5, p.w * s * 0.13), 0, 0, TAU); ctx.fillStyle = mix("#9CC3DD", "#2B3A55", n * 0.5); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.fillRect(x - p.w * s * 0.4, y - 1, p.w * s * 0.3, Math.max(1, s * 0.012));
+    });
+    drawLane(S, lanes.t, "all");
+    [leaving, m].forEach(function (mm) { if (mm && mm.r > 1.05) drawRig(S, mm); });
+    parts.draw(ctx, S, function (p) { return p.r > 1.05; });
+    drawLane(S, lanes.w, "far");
+    [leaving, m].forEach(function (mm) { if (mm && mm.r <= 1.05) drawRig(S, mm); });
+    S.field(ctx, "near", P);
+    drawLane(S, lanes.w, "near");
+    parts.draw(ctx, S, function (p) { return p.r <= 1.05; });
+    S.verge(ctx, {});
+    if (fm.on) drawFieldFarmer(S);
+    if (sur && sur.kind === "mole" && sur.t > 2.4) {
+      // the molehill out in the field too
+      var mx = S.wx(S.W * 0.6, 1.12), x = S.X(mx, 1.12), y = S.Y(1.12), s = S.S(1.12), hl = ease(clamp((sur.t - 2.4) / 0.6, 0, 1)) * clamp((6 - sur.t) / 0.6, 0, 1);
+      ctx.beginPath(); ctx.ellipse(x, y, s * 0.3 * hl, s * 0.18 * hl, 0, Math.PI, 0); fs(ctx, "#5E3B22", Math.max(1, S.lw * 0.6));
+    }
+  }
+  function drawFieldFarmer(S) {
+    var sp = spadePose(), a = fm.state === "leave" ? clamp(1 - phaseT / 1.0, 0, 1) : 1;
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = a;
+    S.put(ctx, fm.x, 0.985, 1, function () {
+      var walking = fm.state === "walk";
+      if (sp.out) R(ctx, 0.47, -0.02, 0.42, 0.06, 0.02, "#2E1C10", 0);
+      var hands = walking ? null : [sp.grip, [lerp(sp.grip[0], sp.top[0], 0.45), lerp(sp.grip[1], sp.top[1], 0.45)]];
+      var foot = phase === "dig" && sp.t < 0.85 ? [sp.top[0] - 0.08, sp.top[1] + 0.02] : null;
+      farmer({ walk: fm.walk, stride: walking ? 1 : 0, hands: hands, foot: foot });
+      if (!walking) { if (sp.out) drawSlice(sp, 1); spade(sp.grip, sp.top, sp.tip); }
+    });
+    ctx.restore();
+  }
+  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function loop(ts) {
+    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  function onEnding(done) { ending = true; auto = false; grab = null; if (m) m.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); done(); }, 2600); }
+  function onWake() { ending = false; dusk = 0; }
+
+  // ---------- Start ----------
+  resize();
+  bringIn("wheels");
+  m.x = RIGS.wheels.x0 - 5;
+  zoomF.span = zoomF.target; scF.layout(RG.f.w, RG.f.h);
+  scF.follow(camTarget(), 0, true); snapClose();
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  Toybox.init({
+    app: "farm",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the machines stop and park, and the controls lock. The timer carries on across the farm pages.",
+    goodbyeOption: "End with a “Goodnight, farm” button to press",
+    farewellText: "Time to say goodnight to the farm",
+    goodbyeLabel: "Goodnight, farm",
+    farewellDone: "Night night, farm!",
+    restLine: "The farm is resting.",
+    restLine2: "The machines will be right here next time.",
+    restArt: Farm.restArt,
+    soundNote: "Soft engine and squelchy soil sounds. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: onWake,
+    onWake: onWake,
+    onSound: function (on) { if (on) snd.chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  if (/[?&]debug\b/.test(location.search)) window.__farm = {
+    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: m ? m.x : null, kind: m ? m.kind : null, leaving: leaving ? leaving.kind : null, count: count, coach: coach.text(), cmode: cmode, sur: sur ? sur.kind : null, farmer: fm.state }; },
+    screen: function () {
+      var b = cv.getBoundingClientRect(), p;
+      if (job === "look") p = fScreen(0.45, -0.9); else p = rigPart();
+      return { x: b.left + p.x, y: b.top + p.y };
+    },
+    surprise: surprise,
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+</body>
+</html>
