@@ -4,7 +4,8 @@
  * It defines window.ToyboxProjects.
  *
  * WHAT A PROJECT IS
- * A list of STEPS. Each step is one short visit to one station, opened with a deep link:
+ * A list of STEPS (at most 6: the project page shows them as the shared step row). Each step is one short
+ * visit to one station, opened with a deep link:
  *   <station file>?project=<projectId>&step=<stepId>        (built by ToyboxProjects.stepUrl(step))
  * The station: reads the step with ToyboxProjects.fromQuery() (null when not in project mode), picks the
  * step's tool, locks the material to the project board described in step.job, shows step.title in a banner
@@ -20,12 +21,16 @@
  * STEP SHAPE
  *   { id: "back-cut",                  unique within the project
  *     part: "back",                    a part id from project.parts, or "" (plane, build, sand)
- *     station: "saw-bench",            "wall" (index.html) | "measuring" | "saw-bench" | "drill-press" | "hammer-screws"
+ *     station: "saw-bench",            "wall" (tool-wall.html) | "measuring" | "saw-bench" | "drill-press" | "hammer-screws"
  *     tool: "miter",                   the tool id inside that station (see JOB KINDS)
  *     title: "Cut the Back on the line",   the step banner and the checklist line
  *     coach: "Slide the line under the blade, then pull the saw down!",
  *     done: "The Back is cut!",        the line on the Done! card
- *     job: { kind: ..., board: { l: inches long, w: inches wide }, ... } }
+ *     job: { kind: ..., board: { l: inches long, w: inches wide }, ... },
+ *     name: "Cut", go: "Go cut!",      the project page: the step chip's word and the Go label
+ *     plan: "Cut out the parts!",      the project page's coach line for this step
+ *     covers: ["back-cut", ...] }      the old (22-step) step ids this visit does; old ids still work as
+ *                                      ?step= links (fromQuery returns the visit) and in saved progress
  *
  * JOB KINDS (what each station must do)
  *   plane     wall, tool "planer": switch on, feed job.board through; done when it comes out flat.
@@ -38,6 +43,10 @@
  *             the board slides left/right under the blade (soft snap when the line is under the blade);
  *             pull the saw down; the cut counts when the line is within the kerf. The piece to the LEFT
  *             of the line is the part (job.part); the rest is the stock that stays.
+ *             Optional job.more (the Birdhouse's one cutting visit): the cuts that follow his, in order,
+ *             [{ part, line } | { part, rip: inches wide } | { part: "sides", angle }]. A station may play
+ *             them by itself after his cut ("the saw cuts each mark in turn"); one that ignores them is
+ *             still right, because the plan shows every part cut once the step is finished.
  *   angle     saw-bench, tool "miter": the saw is already swung to job.angle degrees; job.count pieces
  *             (the two Sides) get their top end cut one after the other. The banner says "roof angle";
  *             no degree readout is shown.
@@ -48,14 +57,18 @@
  *             (x across the width from the left edge, y along the length from the bottom end, inches);
  *             switch on, pull the handle; a hole must land on each X (big tolerance; after two misses the
  *             board slides itself under the bit). job.d is the hole diameter in inches (for drawing).
+ *             Optional job.also = { part, board, bit, d, holes }: a second board drilled in the same visit
+ *             (the Floor's drain holes); a station that ignores it is still right (the plan draws them).
  *   assemble  hammer-screws, tool "hammer": job.joins in order; each join = a glue line, then job.nails
  *             nails hammered in; the birdhouse grows with every join. Done after the last join.
  *   sand      wall, tool "orbital": switch on, move the sander over every edge of the finished house.
  *
  * PROGRESS
  * A collection, kept across launches like the 3D Printer shelf (Toybox.fresh() must NOT clear it):
- *   localStorage "workshop-projects-v1" = { <projectId>: { done: ["plane", ...], built: 2 } }
- * Only New on the project page resets `done` (built, the number of finished houses on the shelf, stays).
+ *   localStorage "workshop-projects-v1" = { <projectId>: { done: ["plane", ...], built: 2, finishedAt } }
+ * `done` holds old-style step ids: finishing a visit adds every id in its `covers`, and a visit counts as
+ * done when all of them are there (so saves from the 22-step plan still load). Only New on the project
+ * page resets `done` (built, the number of finished houses on the shelf, stays).
  * ToyboxProjects.finish(step) also sets sessionStorage "workshop-project-just" = step.id so the project
  * page can celebrate that part when it comes back.
  */
@@ -63,7 +76,7 @@
   "use strict";
 
   var KEY = "workshop-projects-v1", JUST = "workshop-project-just";
-  var FILES = { wall: "index.html", measuring: "measuring.html", "saw-bench": "saw-bench.html",
+  var FILES = { wall: "tool-wall.html", measuring: "measuring.html", "saw-bench": "saw-bench.html",
     "drill-press": "drill-press.html", "hammer-screws": "hammer-screws.html" };
 
   // ---------- The birdhouse: one long pine board (a nominal 1x6: 0.75 in thick, 5.5 in wide) ----------
@@ -87,70 +100,51 @@
     steps: []
   };
 
-  function mark(id, part, l, w, target, how, title, coach, done, tool) {
-    var tl = tool || (target <= 10 ? "combosquare" : "tape");
-    return { id: id, part: part, station: "measuring", tool: tl, title: title, coach: coach, done: done,
-      job: { kind: "mark", board: { l: l, w: w }, target: target, mark: how } };
-  }
-  function cut(id, part, l, w, line, title, coach, done) {
-    return { id: id, part: part, station: "saw-bench", tool: "miter", title: title, coach: coach, done: done,
-      job: { kind: "crosscut", board: { l: l, w: w }, line: line, part: part } };
-  }
   var CUT_COACH = "Slide the line under the blade, then pull the saw down!";
 
+  // Six visits (the dad, 2026-10-09: 22 was far too many). Each step keeps the id of the old step whose job it
+  // still is, so the stations' project modes and old links keep working; `covers` lists the old steps it does.
   BIRDHOUSE.steps = [
-    { id: "plane", part: "", station: "wall", tool: "planer",
+    { id: "plane", part: "", station: "wall", tool: "planer", name: "Plane", go: "Go plane it!", plan: "Plane the rough board!",
       title: "Plane the board flat", coach: "Switch on the planer, then feed the board!",
-      done: "The board is flat and smooth.", job: { kind: "plane", board: { l: STOCK, w: BW } } },
+      done: "The board is flat and smooth.", job: { kind: "plane", board: { l: STOCK, w: BW } },
+      covers: ["plane"] },
 
-    mark("back-mark", "back", STOCK, BW, 12, "line", "Measure the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
-    cut("back-cut", "back", STOCK, BW, 12, "Cut the Back on the line", CUT_COACH, "The Back is cut!"),
+    { id: "back-mark", part: "back", station: "measuring", tool: "tape", name: "Measure", go: "Go measure!", plan: "Measure the Back!",
+      title: "Measure the Back: 12 inches", coach: "Pull the tape to 12!", done: "The Back is marked.",
+      job: { kind: "mark", board: { l: STOCK, w: BW }, target: 12, mark: "line" },
+      // the other marks are drawn for him on the plan (and with the square at the saw)
+      covers: ["back-mark", "front-mark", "roof-mark", "blank-mark", "side1-mark", "side2-mark", "floor-mark"] },
 
-    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Slide the square to 9!", "The Front is marked.", "combosquare"),
-    cut("front-cut", "front", 48, BW, 9, "Cut the Front on the line", CUT_COACH, "The Front is cut!"),
+    { id: "back-cut", part: "back", station: "saw-bench", tool: "miter", name: "Cut", go: "Go cut!", plan: "Cut out the parts!",
+      title: "Cut the Back on the line", coach: CUT_COACH, done: "The saw cut all the parts!",
+      job: { kind: "crosscut", board: { l: STOCK, w: BW }, line: 12, part: "back",
+        // The rest of the visit, for a station that plays it: after his cut, the saw cuts these in turn by
+        // itself (inches from the near end of what is left). A station that ignores it is still right: the
+        // plan shows every part cut once this step is done.
+        more: [{ part: "front", line: 9 }, { part: "roof", line: 7.5 }, { part: "blank", line: 26 },
+          { part: "strip", rip: 4 }, { part: "side1", line: 10 }, { part: "side2", line: 10 }, { part: "floor", line: 4 },
+          { part: "sides", angle: 15 }] },
+      covers: ["back-cut", "front-cut", "roof-cut", "blank-cut", "strip-rip", "side1-cut", "side2-cut", "floor-cut", "side-angle"] },
 
-    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Slide the square to 7.5!", "The Roof is marked.", "combosquare"),
-    cut("roof-cut", "roof", 39, BW, 7.5, "Cut the Roof on the line", CUT_COACH, "The Roof is cut!"),
-
-    mark("blank-mark", "blank", 31.5, BW, 26, "line", "Measure the Side blank: 26 inches", "Pull the tape to 26!", "The Side blank is marked.", "tape"),
-    cut("blank-cut", "blank", 31.5, BW, 26, "Cut the Side blank on the line", CUT_COACH, "The Side blank is cut!"),
-
-    { id: "strip-rip", part: "strip", station: "saw-bench", tool: "table",
-      title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4, switch on, push it through!",
-      done: "A long strip, 4 inches wide!", job: { kind: "rip", board: { l: 26, w: BW }, fence: 4, part: "strip" } },
-
-    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Slide the square to 10!", "The Side is marked.", "combosquare"),
-    cut("side1-cut", "side1", 26, 4, 10, "Cut the Side on the line", CUT_COACH, "One Side is cut!"),
-
-    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Slide the square to 10!", "The other Side is marked.", "combosquare"),
-    cut("side2-cut", "side2", 16, 4, 10, "Cut the other Side on the line", CUT_COACH, "Both Sides are cut!"),
-
-    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Slide the square to 4!", "The Floor is marked.", "combosquare"),
-    cut("floor-cut", "floor", 6, 4, 4, "Cut the Floor on the line", CUT_COACH, "The Floor is cut!"),
-
-    { id: "side-angle", part: "side1", station: "saw-bench", tool: "miter",
-      title: "Cut the roof angle on both Sides", coach: "The saw is swung to the roof angle. Line up, then pull it down!",
-      done: "Both Sides have a sloped top.", job: { kind: "angle", board: { l: 10, w: 4 }, angle: 15, count: 2 } },
-
-    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the square to 6, then make an X!", "The door is marked.", "combosquare"),
-
-    { id: "hole-drill", part: "front", station: "drill-press", tool: "holesaw",
+    { id: "hole-drill", part: "front", station: "drill-press", tool: "holesaw", name: "Drill", go: "Go drill!", plan: "Drill the door hole!",
       title: "Drill the door hole", coach: "Switch on the drill press, then pull the handle!",
-      done: "The door is drilled!", job: { kind: "hole", board: { l: 9, w: BW }, bit: "holesaw", d: 1.5, holes: [{ x: BW / 2, y: 6 }] } },
+      done: "The door is drilled!", job: { kind: "hole", board: { l: 9, w: BW }, bit: "holesaw", d: 1.5, holes: [{ x: BW / 2, y: 6 }],
+        // the Floor's drain holes, for a station that drills them in the same visit (else they appear on the plan)
+        also: { part: "floor", board: { l: 4, w: 4 }, bit: "twist", d: 0.25,
+          holes: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }] } },
+      covers: ["hole-mark", "hole-drill", "floor-drill"] },
 
-    { id: "floor-drill", part: "floor", station: "drill-press", tool: "twist",
-      title: "Drill four drain holes in the Floor", coach: "Pull the handle over each X!",
-      done: "Rain can drip out now.", job: { kind: "hole", board: { l: 4, w: 4 }, bit: "twist", d: 0.25,
-        holes: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }] } },
-
-    { id: "build", part: "", station: "hammer-screws", tool: "hammer",
+    { id: "build", part: "", station: "hammer-screws", tool: "hammer", name: "Nail", go: "Go nail it!", plan: "Nail it together!",
       title: "Put the birdhouse together", coach: "Glue, then fasten each piece!",
       done: "The birdhouse stands!", job: { kind: "assemble", glue: true, nails: 2,
-        joins: [["back", "side1"], ["back", "side2"], ["sides", "floor"], ["sides", "front"], ["box", "roof"]] } },
+        joins: [["back", "side1"], ["back", "side2"], ["sides", "floor"], ["sides", "front"], ["box", "roof"]] },
+      covers: ["build"] },
 
-    { id: "sand", part: "", station: "wall", tool: "orbital",
+    { id: "sand", part: "", station: "wall", tool: "orbital", name: "Sand", go: "Go sand it!", plan: "Sand it smooth!",
       title: "Sand the edges smooth", coach: "Switch on the sander and rub every edge!",
-      done: "Smooth all over. The birdhouse is finished!", job: { kind: "sand" } }
+      done: "Smooth all over. The birdhouse is finished!", job: { kind: "sand" },
+      covers: ["sand"] }
   ];
 
   var PROJECTS = [BIRDHOUSE];
@@ -159,7 +153,11 @@
     BY[p.id] = p;
     p.stepBy = {};
     p.partBy = {};
-    p.steps.forEach(function (s, i) { s.project = p.id; s.index = i; p.stepBy[s.id] = s; });
+    p.alias = {};       // an old step id (from the 22-step plan) -> the visit that does its job now
+    p.steps.forEach(function (s, i) {
+      s.project = p.id; s.index = i; p.stepBy[s.id] = s;
+      (s.covers || [s.id]).forEach(function (old) { p.alias[old] = s; });
+    });
     p.parts.forEach(function (q) { p.partBy[q.id] = q; });
   });
 
@@ -182,25 +180,30 @@
     return s;
   }
 
+  // A visit is done when every old step it covers is in the saved list (complete() saves them all), so an old
+  // save made halfway through a visit's old steps does that visit again. Visits are done in order: anything
+  // after the first one not done counts as not done.
+  function isDoneIn(list, s) {
+    return (s.covers || [s.id]).every(function (old) { return list.indexOf(old) !== -1; });
+  }
   // Progress of a project: which steps are done, the next step, whether it is finished.
   function progress(pid) {
     var p = BY[pid];
     if (!p) return null;
     var r = rec(readAll(), pid), done = {}, next = null, count = 0, i;
-    r.done.forEach(function (id) { if (p.stepBy[id]) done[id] = true; });
     for (i = 0; i < p.steps.length; i++) {
-      if (done[p.steps[i].id]) count++;
+      if (!next && isDoneIn(r.done, p.steps[i])) { done[p.steps[i].id] = true; count++; }
       else if (!next) next = p.steps[i];
     }
     return { project: p, done: done, count: count, total: p.steps.length, next: next, finished: !next, built: r.built };
   }
 
   function complete(pid, stepId) {
-    var p = BY[pid];
-    if (!p || !p.stepBy[stepId]) return;
+    var p = BY[pid], st = p && p.alias[stepId];
+    if (!st) return;
     var all = readAll(), r = rec(all, pid);
-    if (r.done.indexOf(stepId) === -1) r.done.push(stepId);
-    var allDone = p.steps.every(function (s) { return r.done.indexOf(s.id) !== -1; });
+    (st.covers || [st.id]).forEach(function (old) { if (r.done.indexOf(old) === -1) r.done.push(old); });
+    var allDone = p.steps.every(function (s) { return isDoneIn(r.done, s); });
     if (allDone && !r.finishedAt) { r.built += 1; r.finishedAt = Date.now(); }
     writeAll(all);
   }
@@ -225,8 +228,7 @@
   function fromQuery() {
     var q = query(), p = BY[q.project];
     if (!p) return null;
-    var s = p.stepBy[q.step];
-    return s || null;
+    return p.stepBy[q.step] || p.alias[q.step] || null;    // old links land on the visit that does that job now
   }
 
   function stepUrl(step) {

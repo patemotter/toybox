@@ -21,97 +21,66 @@
 <style>
 :root {
   --bg: #CDE9FF;
-  --panel: #FFFFFF;
   --ink: #1D2340;
-  --muted: #4A5578;
-  --edge: #1D2340;
-  --accent: #FFC93C;
-  --plate: #F4FAFF;
-  --focus: #2D5BD7;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
 }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); overflow: hidden; }
-body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
+   The panel is the step row (the six visits: Plane, Measure, Cut, Drill, Nail, Sand; the current one is the
+   green Go that opens its station) and the bottom bar (Shelf, New, Surprise). */
 .tb-head a { text-decoration: none; }
-.tb-head .bigtoggle { border-radius: 16px; }
-body.big .tb-panel { display: none; }
+.tb-back .tb-mapic { width: 30px; height: 30px; flex: none; }
+/* Big: the header, the chips and the bottom bar hide; Go stays (it is the one thing to do here). */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-chip, body.big .tb-bottombar { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+/* Six visits on an upright phone: Go keeps its word, so only the next two visits show beside it. */
+@media (max-width: 520px) and (orientation: portrait) {
+  .tb-steps > .tb-st-go ~ .tb-chip ~ .tb-chip ~ .tb-chip { display: none; }
+}
 
-/* The stage: the bench with the growing birdhouse. */
+/* The stage: the bench with the parts, then the growing birdhouse. */
 .tb-stage { background: #EAF4FF; touch-action: none; }
-.tb-stage svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tb-stage svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .scene text { font-family: var(--font); font-weight: 800; pointer-events: none; }
 .scene .part { cursor: pointer; }
-.scene .part.pop { animation: pop 0.9s ease-out; transform-box: fill-box; transform-origin: center; }
+.scene .part.pop { animation: pop 0.9s ease-out both; transform-box: fill-box; transform-origin: center; }
 .scene .part.wig { animation: wig 0.6s ease-in-out; transform-box: fill-box; transform-origin: center; }
-@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 55% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+.scene .part.hop { animation: hop 0.9s ease-in-out both; transform-box: fill-box; transform-origin: center bottom; }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 55% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes wig { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.06, 0.92); } 45% { transform: translateY(-34px) scale(0.96, 1.05) rotate(-3deg); } 75% { transform: translateY(0) scale(1.05, 0.94); } }
 .scene .bird { transition: transform 5.2s cubic-bezier(0.25, 0.7, 0.3, 1); }
+.scene .visitor { transition: transform 3.4s cubic-bezier(0.3, 0.6, 0.35, 1); }
 .scene .spark { animation: twinkle 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.scene .note { animation: note 2.4s ease-out forwards; transform-box: fill-box; transform-origin: center; }
 @keyframes twinkle { 0%, 100% { transform: scale(0.5); opacity: 0.4; } 50% { transform: scale(1.2); opacity: 1; } }
+@keyframes note { 0% { transform: translate(0, 0) scale(0.6); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(18px, -70px) scale(1.1); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .scene .part.pop, .scene .part.wig, .scene .spark { animation: none; }
-  .scene .bird { transition: none; }
+  .scene .part.pop, .scene .part.wig, .scene .part.hop, .scene .spark, .scene .note { animation: none; }
+  .scene .bird, .scene .visitor { transition: none; }
 }
-
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
-
-/* The panel: Go, the step list, the tabs. */
-.tb-go { width: 100%; }
-.steps { display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding: 3px 3px 6px; touch-action: pan-x; overscroll-behavior: contain; }
-.steps::-webkit-scrollbar { display: none; }
-.step { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-width: 78px; min-height: 64px; padding: 4px 6px; font-size: 0.95rem; line-height: 1.05; white-space: nowrap;
-  background: #FFFFFF; color: var(--muted); border-width: 3px; box-shadow: 3px 3px 0 var(--edge); }
-.step svg { width: 28px; height: 28px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.step .lbl { display: flex; align-items: center; gap: 3px; }
-.step .tick { display: none; width: 18px; height: 18px; border-radius: 50%; background: #2EA05A; color: #FFFFFF; font-size: 0.8rem; line-height: 18px; text-align: center; }
-.step.done { background: #DDF6E4; color: #1D6B3A; }
-.step.done .tick { display: inline-block; }
-.step.now { background: var(--accent); color: var(--ink); border-color: var(--edge); box-shadow: 0 0 0 4px rgba(255, 201, 60, 0.45), 3px 3px 0 var(--edge); }
-
-/* Landscape: the panel is a column, so the steps become a vertical list. */
-@media (orientation: landscape) {
-  .steps { flex: 1 1 auto; flex-direction: column; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; min-height: 0; padding: 3px 6px 3px 3px; }
-  .step { flex-direction: row; justify-content: flex-start; gap: 10px; min-height: 46px; width: auto; min-width: 0; padding: 4px 10px; font-size: 1.05rem; }
-}
-@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .step { min-width: 70px; min-height: 58px; font-size: 0.88rem; }
-  .step svg { width: 24px; height: 24px; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-body .tb-panel { width: min(40%, 300px); padding: 6px; gap: 6px; }
-  .step { min-height: 40px; font-size: 0.95rem; padding: 2px 8px; }
-  .tb-tabs .btn { min-height: 40px; }
-}
+.tb-counter { font-variant-numeric: tabular-nums; }
+.rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell wrap">
+<div class="tb-app-shell tb-v2 wrap">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back" href="./" aria-label="Back to the Tool Wall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Tool Wall</span></a>
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the Workshop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M4 16 20 5l16 11v20H4Z" fill="#E7B86A" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="10" y="18" width="20" height="18" fill="#AEB9C5" stroke="#1D2340" stroke-width="2.5"/><path d="M10 23h20M10 28h20M10 33h20" stroke="#1D2340" stroke-width="1.6"/></svg><span>Workshop</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title" id="title">Birdhouse</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body">
     <main class="tb-stage" id="stage">
       <svg class="scene" id="scene" role="img" aria-label="The workbench with the birdhouse parts"></svg>
-      <div class="tb-counter" id="count" role="status" aria-live="polite">Parts: 0 of 6</div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite"></div>
+      <div class="tb-counter" id="count" role="status" aria-live="polite">Houses: 0</div>
+      <div id="coach"></div>
     </main>
-    <section class="tb-panel">
-      <button class="btn tb-go" id="go">Go!</button>
-      <div class="steps" id="steps" role="list" aria-label="The plan"></div>
-      <nav class="tb-tabs" aria-label="Views">
-        <button class="btn" id="tabPlan" data-tab="plan" aria-pressed="true">Plan</button>
-        <button class="btn" id="tabShelf" data-tab="shelf" aria-pressed="false">Shelf</button>
-        <button class="btn tb-new hold" id="newBtn" aria-label="Hold to start a new birdhouse"><span class="fill"></span><span class="label">New</span></button>
-      </nav>
+    <section class="tb-panel" id="panel">
+      <ol id="steps"></ol>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
@@ -139,6 +108,7 @@ body.big .tb-panel { display: none; }
   $("title").textContent = P.name;
   document.title = P.name;
 
+  // The Shelf view is remembered on reload and between pages of the Workshop, not across a fresh visit.
   var VKEY = "workshop-project-view-v1";
   var view = "plan";
   try { if (!(window.Toybox && Toybox.fresh())) view = localStorage.getItem(VKEY) === "shelf" ? "shelf" : "plan"; } catch (e) { view = "plan"; }
@@ -159,135 +129,119 @@ body.big .tb-panel { display: none; }
       o.start(t); o.stop(t + dur + 0.05);
     } catch (e) { /* ignore */ }
   }
+  function chirp() { blip(1320, 0.12, 0.05, "sine", 1760); setTimeout(function () { blip(1480, 0.1, 0.05); }, 160); }
 
-  // ---------- state ----------
+  // ---------- state: the six visits ----------
   var prog = PJ.progress(pid);
   var just = PJ.justFinished();
   function refresh() { prog = PJ.progress(pid); }
   function isDone(id) { return !!prog.done[id]; }
-
-  var VERB = { plane: "Go plane it!", mark: "Go measure!", crosscut: "Go cut!", angle: "Go cut!", rip: "Go rip it!",
-    hole: "Go drill!", assemble: "Go nail it!", sand: "Go sand it!" };
-  var SHORT = { plane: "Plane", "back-mark": "Back 12", "back-cut": "Cut", "front-mark": "Front 9", "front-cut": "Cut",
-    "roof-mark": "Roof 7.5", "roof-cut": "Cut", "blank-mark": "Blank 26", "blank-cut": "Cut", "strip-rip": "Rip 4",
-    "side1-mark": "Side 10", "side1-cut": "Cut", "side2-mark": "Side 10", "side2-cut": "Cut", "floor-mark": "Floor 4",
-    "floor-cut": "Cut", "side-angle": "Angle", "hole-mark": "Door 6", "hole-drill": "Drill", "floor-drill": "Drains",
-    build: "Build", sand: "Sand" };
-  // Small station icons for the step cards (stroke icons, 24x24).
-  var ICON = {
-    measuring: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>',
-    "saw-bench": '<svg viewBox="0 0 24 24"><path d="M3 15h11l3-5 3 5"/><path d="M4 15l1.5 3 1.5-3 1.5 3 1.5-3 1.5 3 1.5-3 1.5 3"/><path d="M14 15V9h4"/></svg>',
-    "drill-press": '<svg viewBox="0 0 24 24"><path d="M6 3h12v6H6z"/><path d="M12 9v9l-2 3h4l-2-3"/><path d="M3 21h18"/></svg>',
-    "hammer-screws": '<svg viewBox="0 0 24 24"><path d="M4 8l5-4 6 6-5 4z"/><path d="M11.5 11.5 20 20"/></svg>',
-    wall: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M3 12h18M8 7v10M16 7v10"/></svg>'
-  };
-
-  // ---------- the panel ----------
-  var stepsEl = $("steps"), goBtn = $("go"), coachEl = $("coach"), countEl = $("count");
-  function buildSteps() {
-    var html = "";
-    P.steps.forEach(function (s) {
-      html += '<button class="btn step" role="listitem" data-step="' + s.id + '" aria-label="' + esc(s.title) + '">' +
-        ICON[s.station] + '<span class="lbl"><span class="tick" aria-hidden="true">\u2713</span>' + esc(SHORT[s.id] || s.title) + '</span></button>';
-    });
-    stepsEl.innerHTML = html;
+  // What is on the bench, by visit (the step ids are the projects.js ids of the six visits).
+  function D() {
+    return { plane: isDone("plane"), measure: isDone("back-mark"), cut: isDone("back-cut"), drill: isDone("hole-drill"),
+      build: isDone("build"), sand: isDone("sand") };
   }
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-
-  function updatePanel() {
-    var next = prog.next, nowEl = null;
-    Array.prototype.forEach.call(stepsEl.children, function (el) {
-      var id = el.dataset.step, d = isDone(id), n = next && next.id === id;
-      el.classList.toggle("done", d);
-      el.classList.toggle("now", n);
-      if (n) { el.setAttribute("aria-current", "step"); nowEl = el; } else el.removeAttribute("aria-current");
-    });
-    if (next) {
-      goBtn.textContent = VERB[next.job.kind] || "Go!";
-      goBtn.disabled = false;
-      coach(next.title);
-    } else {
-      goBtn.textContent = "Build another!";
-      goBtn.disabled = false;
-      coach("The birdhouse is finished!");
-    }
-    var parts = ["back-cut", "front-cut", "roof-cut", "side1-cut", "side2-cut", "floor-cut"].filter(isDone).length;
-    countEl.textContent = "Parts: " + parts + " of 6";
-    if (nowEl) scrollTo(nowEl);
-    $("tabPlan").setAttribute("aria-pressed", view === "plan" ? "true" : "false");
-    $("tabShelf").setAttribute("aria-pressed", view === "shelf" ? "true" : "false");
-    draw();
-  }
-  function scrollTo(el) {
-    try {
-      var box = stepsEl.getBoundingClientRect(), r = el.getBoundingClientRect();
-      var landscape = window.matchMedia("(orientation: landscape)").matches;
-      if (landscape) stepsEl.scrollTop += (r.top + r.height / 2) - (box.top + box.height / 2);
-      else stepsEl.scrollLeft += (r.left + r.width / 2) - (box.left + box.width / 2);
-    } catch (e) { /* ignore */ }
-  }
-  function coach(t) { coachEl.textContent = t; coachEl.classList.remove("off"); }
-
   function locked() { return window.Toybox && Toybox.timer.locked(); }
 
-  function go() {
-    if (locked()) return;
+  // ---------- pictures of each visit's tool (chips and Go share them) ----------
+  var INK = "#1D2340";
+  function svg40(body) { return '<svg viewBox="0 0 40 40" stroke-linejoin="round" stroke-linecap="round">' + body + "</svg>"; }
+  var O = ' stroke="' + INK + '" stroke-width="2.2"';
+  var PIC = {
+    planer: svg40('<rect x="7" y="7" width="26" height="16" rx="3" fill="#3E8ED0"' + O + '/><path d="M12 12h16"' + O + '/><rect x="2" y="23" width="36" height="5" fill="#F3D69C"' + O + '/><rect x="6" y="28" width="28" height="6" rx="1.5" fill="#6F7782"' + O + '/>'),
+    tape: svg40('<rect x="3" y="11" width="21" height="21" rx="6" fill="#FFC93C"' + O + '/><circle cx="13.5" cy="21.5" r="4" fill="#FFFFFF"' + O + '/><rect x="23" y="26" width="13" height="6" fill="#FFF3B0"' + O + '/><path d="M27 26v3M31 26v3M37 24v10"' + O + '/>'),
+    miter: svg40('<rect x="4" y="32" width="32" height="5" rx="1.5" fill="#6F7782"' + O + '/><circle cx="20" cy="20" r="11" fill="#D5DAE1"' + O + '/><circle cx="20" cy="20" r="3" fill="#6F7782"' + O + '/><path d="M8.5 16A12 12 0 0 1 31.5 16" fill="none" stroke="' + INK + '" stroke-width="6"/><path d="M8.5 16A12 12 0 0 1 31.5 16" fill="none" stroke="#F77F00" stroke-width="3"/><path d="M28 10l7-6"' + ' stroke="' + INK + '" stroke-width="6"/><path d="M28 10l7-6" stroke="#F77F00" stroke-width="3"/>'),
+    holesaw: svg40('<rect x="7" y="34" width="24" height="4" rx="1.5" fill="#6F7782"' + O + '/><rect x="25" y="5" width="5" height="29" fill="#AEB9C5"' + O + '/><rect x="6" y="5" width="21" height="11" rx="2.5" fill="#3E8ED0"' + O + '/><path d="M14 16v9"' + ' stroke="' + INK + '" stroke-width="3.2"/><rect x="5" y="26" width="18" height="4" fill="#F3D69C"' + O + '/>'),
+    hammer: svg40('<g transform="rotate(-30 20 20)"><rect x="17.5" y="13" width="5" height="25" rx="2" fill="#D9A55E"' + O + '/><path d="M8 6h22a3 3 0 0 1 3 3v3a3 3 0 0 1-3 3H8l-3-4.5z" fill="#AEB9C5"' + O + '/></g>'),
+    orbital: svg40('<path d="M8 27Q8 11 20 11Q32 11 32 27Z" fill="#3E8ED0"' + O + '/><circle cx="20" cy="9" r="3.2" fill="#6F7782"' + O + '/><rect x="5" y="27" width="30" height="5" rx="1.5" fill="#6F7782"' + O + '/><rect x="5" y="32" width="30" height="3" fill="#D9B46A"' + O + '/>')
+  };
+
+  // ---------- the panel: the step row (Go = the next visit's deep link), the bottom bar ----------
+  var coach = Toybox.coach($("coach"));
+  var countEl = $("count");
+
+  function goTo(id) {
+    var s = P.stepBy[id];
+    if (!s) return false;
+    ghost.learned("go");
     blip(660, 0.12, 0.06, "sine", 880);
-    if (!prog.next) { PJ.reset(pid); refresh(); }
-    if (prog.next) location.href = PJ.stepUrl(prog.next);
+    location.href = PJ.stepUrl(s);
   }
-  goBtn.addEventListener("click", go);
-
-  stepsEl.addEventListener("click", function (e) {
-    var el = e.target.closest ? e.target.closest(".step") : null;
-    if (!el || locked()) return;
-    var s = P.stepBy[el.dataset.step];
-    if (!s) return;
-    if (prog.next && prog.next.id === s.id) { go(); return; }
-    blip(520, 0.08, 0.04);
-    if (isDone(s.id)) { Toybox.toast("Done: " + s.title); wiggle(s.part); }
-    else if (prog.next) Toybox.toast("First: " + prog.next.title);
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (!steps) return null;
+      var r = steps.go.el.getBoundingClientRect();
+      if (!r.width) return null;
+      return { pts: [[r.left + r.width / 2, r.top + r.height / 2]], tap: true, key: "go" };
+    }
   });
+  var steps = Toybox.steps($("steps"), {
+    label: "The plan",
+    steps: P.steps.map(function (s) { return { id: s.id, name: s.name, pic: PIC[s.tool], go: s.go, coach: s.plan }; }),
+    coach: coach,
+    ghost: ghost,
+    onGo: function (id) { return goTo(id); },
+    onAgain: function () { ghost.learned("go"); startOver("again"); }
+  });
+  var bar = Toybox.bar($("bottom"), { shelf: toggleShelf, onNew: function () { startOver("new"); }, onSurprise: surprise });
 
-  $("tabPlan").addEventListener("click", function () { setView("plan"); });
-  $("tabShelf").addEventListener("click", function () { setView("shelf"); });
-  function setView(v) {
-    view = v;
-    try { localStorage.setItem(VKEY, v); } catch (e) { /* ignore */ }
-    blip(520, 0.08, 0.04);
-    updatePanel();
+  // Puts the step row where the saved progress is.
+  function syncSteps() {
+    if (prog.next) steps.at(prog.next.id);
+    else { steps.finish("Build another", Toybox.pics && Toybox.pics.again); coach.step("The birdhouse is finished."); }
+    countEl.textContent = "Houses: " + prog.built;
+    bar.shelfOpen(view === "shelf");
   }
 
-  // New: hold 2 s, the plan starts over (the shelf keeps the finished houses). The fill shows the hold;
-  // a short tap (the click a finished hold swallows) says to keep holding, so the tap never looks dead.
-  $("newBtn").addEventListener("click", function () {
-    if (locked()) return;
-    Toybox.toast("Hold New to start a new birdhouse.");
-  });
-  Toybox.makeHold($("newBtn"), 2000, function () {
-    if (locked()) return;
+  // New (one tap) and Again: a fresh rough board, the plan starts over; the shelf keeps the finished houses.
+  function startOver(how) {
+    var was = prog.count;
     PJ.reset(pid);
     refresh();
     just = null;
-    Toybox.toast("A new board! Start with the planer.");
-    blip(440, 0.25, 0.06, "triangle", 330);
-    updatePanel();
+    setView("plan", true);
+    birdState = "none";
+    anim = { stock: 0 };
+    animUntil = Date.now() + 1500;
+    syncSteps();
     draw();
-  });
+    coach.say(was ? "Here is a new rough board." : "Here is the rough board.", 3.5);
+    blip(440, 0.25, 0.06, "triangle", 330);
+  }
+
+  function setView(v, quiet) {
+    view = v;
+    try { localStorage.setItem(VKEY, v); } catch (e) { /* ignore */ }
+    bar.shelfOpen(view === "shelf");
+    if (!quiet) draw();
+  }
+  function toggleShelf() {
+    setView(view === "shelf" ? "plan" : "shelf");
+    blip(520, 0.08, 0.04);
+    if (view === "shelf") coach.say(prog.built ? "Your birdhouses!" : "Build the first one!", 3.5);
+    else steps.sayStep();
+  }
 
   // ---------- the scene ----------
   var scene = $("scene"), stage = $("stage");
   var W = 0, H = 0;
-  var INK = "#1D2340", PINE = "#F3D69C", PINE_D = "#D9B46A", GRAIN = "#E2BE7A", ROUGH = "#C4A070", ROUGH_D = "#8F6B40";
-  var geo = {};   // part id -> screen box {x, y, w, h} in px, for taps and the celebration
+  var PINE = "#F3D69C", PINE_D = "#D9B46A", GRAIN = "#E2BE7A", ROUGH = "#C4A070", ROUGH_D = "#8F6B40";
+  var geo = {};            // part id -> screen box {x, y, w, h} in px
+  var anim = {}, animUntil = 0;   // part id -> pop delay (s) while a celebration plays
 
-  function resize() {
+  // Redraws only when the stage really changed size (a redraw would restart the bird's flight).
+  function resize(force) {
     var r = stage.getBoundingClientRect();
-    W = Math.max(200, Math.round(r.width)); H = Math.max(200, Math.round(r.height));
+    var w = Math.max(200, Math.round(r.width)), h = Math.max(200, Math.round(r.height));
+    if (!force && w === W && h === H) return;
+    W = w; H = h;
     scene.setAttribute("viewBox", "0 0 " + W + " " + H);
     draw();
   }
 
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function n(v) { return Math.round(v * 10) / 10; }
   function rect(x, y, w, h, fill, extra) {
     return '<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="3" stroke-linejoin="round"' + (extra || "") + '/>';
@@ -300,13 +254,17 @@ body.big .tb-panel { display: none; }
     return '<text x="' + n(x) + '" y="' + n(y) + '" text-anchor="middle" font-size="' + size + '" fill="' + INK + '" stroke="#FFFFFF" stroke-width="4" paint-order="stroke" stroke-linejoin="round">' + esc(t) + '</text>';
   }
 
-  // A board drawn along the "along" axis. In portrait the bench is turned: along = down the screen.
-  // box: {a, c, la, lc} in inches (a = along, c = across), returns px box {x, y, w, h}.
-  // Landscape: the near end of every board is at the left. Portrait: the near end is at the bottom
-  // (the bench front), so the long board runs away from the viewer and off the far edge.
+  // A board drawn along the "along" axis. In portrait the bench is turned: along = up the screen, with the
+  // near end of every board at the bottom (the bench front); in landscape the near end is at the left.
+  // a, c, la, lc in inches (a = along, c = across); returns a px box {x, y, w, h}.
   function toPx(L, a, c, la, lc) {
     if (L.vert) return { x: L.ox + c * L.ppi, y: L.oy + L.alongPx - (a + la) * L.ppi, w: lc * L.ppi, h: la * L.ppi };
     return { x: L.ox + a * L.ppi, y: L.oy + c * L.ppi, w: la * L.ppi, h: lc * L.ppi };
+  }
+  // A point on a board: x inches across it, y inches along it from its near end.
+  function onBoard(b, o, x, y) {
+    if (o.vert) return [b.x + x * o.ppi, b.y + b.h - y * o.ppi];
+    return [b.x + y * o.ppi, b.y + x * o.ppi];
   }
   function grainLines(b, vert, rough) {
     var g = "", i, k = Math.max(2, Math.floor((vert ? b.w : b.h) / 11));
@@ -318,41 +276,40 @@ body.big .tb-panel { display: none; }
     }
     return g;
   }
-  function board(id, b, opts) {
-    opts = opts || {};
-    var fill = opts.rough ? ROUGH : PINE, s = "";
-    s += '<g class="part" data-part="' + id + '">';
-    if (opts.cutTop) {
-      // the Side with its roof angle: the far end (along) is sloped
-      var d = Math.tan(15 * Math.PI / 180) * (opts.vert ? b.w : b.h);
-      if (opts.vert) s += poly([[b.x, b.y + d], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], fill);
+  function board(id, b, o) {
+    o = o || {};
+    var fill = o.rough ? ROUGH : PINE, s = "", cls = "part";
+    if (anim[id] != null && Date.now() < animUntil) cls += " pop";
+    s += '<g class="' + cls + '" data-part="' + id + '"' + (anim[id] ? ' style="animation-delay:' + anim[id] + 's"' : "") + '>';
+    if (o.cutTop) {
+      // a Side with its roof angle: the far end is sloped
+      var d = Math.tan(15 * Math.PI / 180) * (o.vert ? b.w : b.h);
+      if (o.vert) s += poly([[b.x, b.y + d], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], fill);
       else s += poly([[b.x, b.y], [b.x + b.w - d, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], fill);
     } else s += rect(b.x, b.y, b.w, b.h, fill, ' rx="3"');
-    s += grainLines(b, opts.vert, opts.rough);
-    if (opts.line != null) {
-      // the pencil line, `line` inches from the near end
-      var p = opts.line * opts.ppi;
-      if (opts.vert) s += '<line x1="' + n(b.x) + '" y1="' + n(b.y + b.h - p) + '" x2="' + n(b.x + b.w) + '" y2="' + n(b.y + b.h - p) + '" stroke="#3A3F55" stroke-width="2.5"/>';
-      else s += '<line x1="' + n(b.x + p) + '" y1="' + n(b.y) + '" x2="' + n(b.x + p) + '" y2="' + n(b.y + b.h) + '" stroke="#3A3F55" stroke-width="2.5"/>';
-    }
-    if (opts.x) {
-      var cx = opts.vert ? b.x + b.w / 2 : b.x + opts.x.y * opts.ppi, cy = opts.vert ? b.y + b.h - opts.x.y * opts.ppi : b.y + b.h / 2, r = Math.max(6, 0.5 * opts.ppi);
-      s += '<path d="M' + n(cx - r) + ' ' + n(cy - r) + 'L' + n(cx + r) + ' ' + n(cy + r) + 'M' + n(cx + r) + ' ' + n(cy - r) + 'L' + n(cx - r) + ' ' + n(cy + r) + '" stroke="#3A3F55" stroke-width="2.5" stroke-linecap="round"/>';
-    }
-    if (opts.hole) {
-      var hx = opts.vert ? b.x + b.w / 2 : b.x + opts.hole.y * opts.ppi, hy = opts.vert ? b.y + b.h - opts.hole.y * opts.ppi : b.y + b.h / 2, hr = opts.hole.d / 2 * opts.ppi;
-      s += '<circle cx="' + n(hx) + '" cy="' + n(hy) + '" r="' + n(hr) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="3"/>';
-    }
-    if (opts.holes) {
-      opts.holes.forEach(function (h) {
-        var qx = opts.vert ? b.x + h.x * opts.ppi : b.x + h.y * opts.ppi, qy = opts.vert ? b.y + b.h - h.y * opts.ppi : b.y + h.x * opts.ppi;
-        s += '<circle cx="' + n(qx) + '" cy="' + n(qy) + '" r="' + n(Math.max(3, 0.18 * opts.ppi)) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="2"/>';
-      });
-    }
-    if (opts.name) {
+    // grain lines stop short of a sloped end
+    var gb = b;
+    if (o.cutTop) { var dd = Math.tan(15 * Math.PI / 180) * (o.vert ? b.w : b.h); gb = o.vert ? { x: b.x, y: b.y + dd, w: b.w, h: b.h - dd } : { x: b.x, y: b.y, w: b.w - dd, h: b.h }; }
+    s += grainLines(gb, o.vert, o.rough);
+    (o.lines || []).forEach(function (l, k) {
+      // pencil lines, l inches from the near end (the first one is the one he measured)
+      var p = l * o.ppi, sw = k ? 2 : 3;
+      if (o.vert) s += '<line x1="' + n(b.x) + '" y1="' + n(b.y + b.h - p) + '" x2="' + n(b.x + b.w) + '" y2="' + n(b.y + b.h - p) + '" stroke="#3A3F55" stroke-width="' + sw + '"/>';
+      else s += '<line x1="' + n(b.x + p) + '" y1="' + n(b.y) + '" x2="' + n(b.x + p) + '" y2="' + n(b.y + b.h) + '" stroke="#3A3F55" stroke-width="' + sw + '"/>';
+    });
+    (o.xs || []).forEach(function (h) {
+      var c = onBoard(b, o, h.x, h.y), r = Math.max(4, (h.r || 0.45) * o.ppi);
+      s += '<path d="M' + n(c[0] - r) + ' ' + n(c[1] - r) + 'L' + n(c[0] + r) + ' ' + n(c[1] + r) + 'M' + n(c[0] + r) + ' ' + n(c[1] - r) + 'L' + n(c[0] - r) + ' ' + n(c[1] + r) + '" stroke="#3A3F55" stroke-width="2.5" stroke-linecap="round"/>';
+    });
+    (o.holes || []).forEach(function (h) {
+      var c = onBoard(b, o, h.x, h.y);
+      s += '<circle cx="' + n(c[0]) + '" cy="' + n(c[1]) + '" r="' + n(Math.max(3, h.d / 2 * o.ppi)) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="' + (h.d > 1 ? 3 : 2) + '"/>';
+    });
+    if (o.name) {
       var lx = b.x + b.w / 2, ly = b.y + b.h / 2;
-      if (opts.nameAt) { if (opts.vert) ly = b.y + b.h - opts.nameAt * opts.ppi; else lx = b.x + opts.nameAt * opts.ppi; }
-      s += label(lx, ly + 5, opts.name, Math.max(13, Math.min(20, (opts.vert ? b.w : b.h) * 0.32)));
+      if (o.nameAt) { if (o.vert) ly = b.y + b.h - o.nameAt * o.ppi; else lx = b.x + o.nameAt * o.ppi; }
+      if (o.nameDy) ly += o.nameDy * o.ppi;
+      s += label(lx, ly + 5, o.name, Math.max(13, Math.min(20, (o.vert ? b.w : b.h) * 0.32)));
     }
     s += '</g>';
     geo[id] = b;
@@ -364,7 +321,6 @@ body.big .tb-panel { display: none; }
     var top = Math.round(H * 0.14), edge = Math.max(14, Math.round(H * 0.05));
     var s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#DCEFFF"/>';
     s += '<rect x="-4" y="' + top + '" width="' + (W + 8) + '" height="' + (H - top + 8) + '" fill="#D9A864" stroke="' + INK + '" stroke-width="4"/>';
-    // a few bench-top grain streaks
     var i;
     for (i = 0; i < 7; i++) {
       var y = top + 20 + i * ((H - top - edge - 30) / 7);
@@ -374,102 +330,68 @@ body.big .tb-panel { display: none; }
     return { html: s, top: top, edge: edge };
   }
 
-  // Inches to px. Rows across the bench: the long board (it runs off the bench edge, like a real one),
-  // then Back/Front/Roof, then the Side blank (later the strip and its offcut), then the Sides and Floor.
-  var ROW = { stock: 0, a: 5.5 + 0.7, b: 5.5 + 0.7 + 5.5 + 0.7, c: 5.5 + 0.7 + 5.5 + 0.7 + 5.9 + 0.7 };
-  var ACROSS = ROW.c + 4, ALONG = 30;
+  // Inches to px. Two rows of parts along the bench, Back, Front, Roof (5.5 wide), then Side, Side, Floor
+  // (4 wide), or three shorter rows when that draws them bigger (upright screens, tall iPad stages). Before the cut the long
+  // board lies in the middle and runs off the bench, like a real one.
+  var ARR = {
+    flat: { along: 30, across: 10.3, at: { back: [0, 0], front: [12.8, 0], roof: [22.6, 0], side1: [0, 6.3], side2: [10.8, 6.3], floor: [21.6, 6.3] } },
+    vert: { along: 21.8, across: 16.6, at: { back: [0, 0], front: [12.8, 0], roof: [0, 6.3], floor: [8.3, 6.3], side1: [0, 12.6], side2: [10.8, 12.6] } }
+  };
   function layout(b) {
     var vert = H > W * 1.05;
     var pad = 16, counterH = 44;
-    // On upright phones the coach pill sits at the bottom of the stage: keep the near row clear of it.
+    // On upright phones the coach pill sits at the bottom of the stage: keep the near end clear of it.
     var coachPad = (vert && W < 600) ? 46 : 0;
     var alongPx = (vert ? H - b.top - b.edge - counterH - pad * 2.5 - coachPad : W - pad * 2);
     var acrossPx = (vert ? W - pad * 2 : H - b.top - b.edge - counterH - pad * 2.5);
-    var ppi = Math.min(alongPx / ALONG, acrossPx / ACROSS);
-    var L = { vert: vert, ppi: ppi, pad: pad, ox: pad, oy: b.top + counterH + pad, alongPx: alongPx };
-    // centre the used area across the bench
-    var spare = Math.max(0, acrossPx - ACROSS * ppi) / 2;
-    if (vert) L.ox += spare; else L.oy += spare;
+    // whichever arrangement draws the parts bigger on this stage (a tall iPad stage takes the three rows too)
+    function fit(A) { return Math.min(alongPx / A.along, acrossPx / A.across); }
+    var A = fit(ARR.vert) > fit(ARR.flat) ? ARR.vert : ARR.flat, ppi = fit(A);
+    var L = { vert: vert, A: A, ppi: ppi, pad: pad, ox: pad, oy: b.top + counterH + pad, alongPx: alongPx };
+    // centre the used area on the bench, both ways
+    var spareC = Math.max(0, acrossPx - A.across * ppi) / 2, spareA = Math.max(0, alongPx - A.along * ppi) / 2;
+    if (vert) { L.ox += spareC; L.oy -= spareA; } else { L.oy += spareC; L.ox += spareA; }
     return L;
   }
 
-  // The remaining stock after the crosscuts done so far.
-  function stockLeft() {
-    var l = P.board.l;
-    ["back", "front", "roof", "blank"].forEach(function (id) { if (isDone(id + "-cut")) l -= P.partBy[id].l; });
-    return l;
-  }
-  function stripLeft() {
-    var l = 26;
-    ["side1", "side2", "floor"].forEach(function (id) { if (isDone(id + "-cut")) l -= P.partBy[id].l; });
-    return l;
-  }
-  function pendingLine(part) {
-    return isDone(part + "-mark") && !isDone(part + "-cut") ? P.partBy[part].l : null;
-  }
+  var MARKS = [12, 21, 28.5, 54.5];     // the Back, Front, Roof and Side blank lines along the long board
+  var DOOR = [{ x: 2.75, y: 6, d: 1.5 }];
+  var DRAINS = [{ x: 1, y: 1, d: 0.25 }, { x: 3, y: 1, d: 0.25 }, { x: 1, y: 3, d: 0.25 }, { x: 3, y: 3, d: 0.25 }];
 
   function draw() {
     if (!W) return;
     geo = {};
-    var b = bench(), s = b.html;
+    var b = bench(), s = b.html, d = D();
     if (view === "shelf") { s += shelfScene(b); scene.innerHTML = s; return; }
-    if (isDone("build")) { s += houseScene(b); scene.innerHTML = s; return; }
+    if (d.build) { s += houseScene(b, d); scene.innerHTML = s; placeBird(); return; }
 
-    var L = layout(b), ppi = L.ppi, vert = L.vert, gap = 0.7;
-    var planed = isDone("plane");
+    var L = layout(b), ppi = L.ppi, vert = L.vert;
     s += '<clipPath id="benchClip"><rect x="0" y="' + (b.top + 2) + '" width="' + W + '" height="' + (H - b.top - b.edge - 2) + '"/></clipPath><g clip-path="url(#benchClip)">';
-    // Row 0: the long board (what is left of it), running off the bench.
-    var left = stockLeft(), lineOn = null, nextPart = ["back", "front", "roof", "blank"].filter(function (id) { return !isDone(id + "-cut"); })[0];
-    if (nextPart && isDone(nextPart + "-mark")) lineOn = P.partBy[nextPart].l;
-    if (left > 0.1) s += board("stock", toPx(L, 0, ROW.stock, left, 5.5), { rough: !planed, vert: vert, ppi: ppi, line: lineOn, name: planed ? (left > 20 ? "Pine board" : "") : "Rough board", nameAt: 12 });
-    // Row A: Back, Front, Roof.
-    var a = 0;
-    ["back", "front", "roof"].forEach(function (id) {
-      var q = P.partBy[id];
-      if (!isDone(id + "-cut")) return;
-      var o = { vert: vert, ppi: ppi, name: q.name };
-      if (id === "front") {
-        if (isDone("hole-drill")) o.hole = { y: 6, d: 1.5 };
-        else if (isDone("hole-mark")) o.x = { y: 6 };
-      }
-      s += board(id, toPx(L, a, ROW.a, q.l, q.w), o);
-      a += q.l + gap;
-    });
-    // Row B: the Side blank, then the strip (what is left of it) and the offcut.
-    if (isDone("blank-cut")) {
-      if (isDone("strip-rip")) {
-        var sl = stripLeft();
-        var nextS = ["side1", "side2", "floor"].filter(function (id) { return !isDone(id + "-cut"); })[0];
-        var lineS = nextS && isDone(nextS + "-mark") ? P.partBy[nextS].l : null;
-        if (sl > 0.1) s += board("strip", toPx(L, 0, ROW.b, sl, 4), { vert: vert, ppi: ppi, line: lineS, name: sl > 6 ? "Strip" : "" });
-        s += board("offcut", toPx(L, 0, ROW.b + 4.4, 26, 1.5), { vert: vert, ppi: ppi });
-      } else {
-        s += board("blank", toPx(L, 0, ROW.b, 26, 5.5), { vert: vert, ppi: ppi, name: "Side blank" });
-      }
+    if (!d.cut) {
+      // the long board: rough, then planed, then with every pencil line on it
+      s += board("stock", toPx(L, 0, (L.A.across - 5.5) / 2, P.board.l, 5.5), { rough: !d.plane, vert: vert, ppi: ppi,
+        lines: d.measure ? MARKS : null, name: d.plane ? "Pine board" : "Rough board", nameAt: d.measure ? 6 : 15 });
+    } else {
+      ["back", "front", "roof", "side1", "side2", "floor"].forEach(function (id) {
+        var q = P.partBy[id], at = L.A.at[id], o = { vert: vert, ppi: ppi, name: q.name };
+        if (id === "front") { if (d.drill) o.holes = DOOR; else o.xs = [{ x: 2.75, y: 6, r: 0.6 }]; o.nameAt = 2.6; }
+        if (id === "side1" || id === "side2") o.cutTop = true;
+        if (id === "floor") { if (q.l * ppi < 80) o.name = ""; if (d.drill) o.holes = DRAINS; else o.xs = DRAINS.map(function (h) { return { x: h.x, y: h.y, r: 0.3 }; }); }
+        s += board(id, toPx(L, at[0], at[1], q.l, q.w), o);
+      });
     }
-    // Row C: the Sides and the Floor.
-    a = 0;
-    ["side1", "side2", "floor"].forEach(function (id) {
-      var q = P.partBy[id];
-      if (!isDone(id + "-cut")) return;
-      var o = { vert: vert, ppi: ppi, name: q.name };
-      if (id !== "floor" && isDone("side-angle")) o.cutTop = true;
-      if (id === "floor" && isDone("floor-drill")) o.holes = [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }];
-      s += board(id, toPx(L, a, ROW.c, q.l, q.w), o);
-      a += q.l + gap;
-    });
     s += '</g>';
     scene.innerHTML = s;
   }
 
   // The assembled birdhouse (an oblique view: the front face, one side going back-right, the sloped roof,
   // the tall back poking up above the roof).
-  function house(cx, cy, size, finished) {
+  function house(cx, cy, size, finished, pop) {
     var u = size / 14;                                   // px per inch of the house
     var fw = 5.5 * u, fh = 9 * u, dp = 4 * u * 0.55, sk = 0.42, rise = 1.07 * u;  // side depth foreshortened, skew, roof rise
     var x0 = cx - (fw + dp) / 2, y0 = cy + fh / 2 + 0.6 * u;   // front face bottom-left
     var backTop = y0 - dp * sk - 12 * u;
-    var s = '<g class="part house" data-part="house">';
+    var s = '<g class="part house' + (pop ? " pop" : "") + '" data-part="house">';
     // the Back: 12 tall, standing at the rear
     s += rect(x0 + dp, backTop, fw, 12 * u, PINE_D, ' rx="3"');
     // the Side (parallelogram going back-right), its top sloping up toward the back
@@ -487,12 +409,11 @@ body.big .tb-panel { display: none; }
     s += poly([[rx0 - ov, fy], [rx1 - ov, fy], [rx1 + dp, ry0 - dp * sk - rise], [rx0 + dp, ry0 - dp * sk - rise]], "#E7C27A");
     s += rect(rx0 - ov, fy, rx1 - rx0, 0.75 * u, "#E7C27A");
     // nails
-    var i, nails = "";
+    var i;
     for (i = 0; i < 2; i++) {
-      nails += '<circle cx="' + n(x0 + 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
-      nails += '<circle cx="' + n(x0 + fw - 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
+      s += '<circle cx="' + n(x0 + 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
+      s += '<circle cx="' + n(x0 + fw - 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
     }
-    s += nails;
     s += '</g>';
     if (finished) {
       var sp = [[rx0 - ov - 22, fy - 30], [rx1 + dp + 26, ry0 - dp * sk - rise - 10], [x0 - 30, y0 - 3 * u], [x0 + fw + dp + 32, y0 - 1.5 * u]];
@@ -500,12 +421,12 @@ body.big .tb-panel { display: none; }
         s += '<path class="spark" style="animation-delay:' + (k * 0.45) + 's" d="M' + n(p[0]) + ' ' + n(p[1] - 11) + 'l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFC93C" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
       });
     }
-    // where the bird perches: on top of the Back, a little left of centre
-    return { html: s, perch: [x0 + dp + fw * 0.4, backTop], u: u };
+    // where a bird perches: on top of the Back, a little left of centre
+    return { html: s, perch: [x0 + dp + fw * 0.4, backTop], u: u, box: { x: x0 - ov, y: backTop, w: fw + dp + ov, h: y0 - backTop } };
   }
-  function bird(u) {
+  function bird(u, id, cls) {
     var r = Math.max(9, 0.8 * u);
-    return '<g class="bird" id="bird">' +
+    return '<g class="' + cls + '" id="' + id + '" data-part="bird">' +
       '<path d="M' + n(-r * 1.6) + ' ' + n(-r * 0.2) + ' l' + n(-r * 1.1) + ' ' + n(-r * 0.6) + ' l' + n(r * 0.2) + ' ' + n(r * 0.9) + ' z" fill="#3DB4FF" stroke="' + INK + '" stroke-width="3" stroke-linejoin="round"/>' +
       '<ellipse cx="0" cy="0" rx="' + n(r * 1.7) + '" ry="' + n(r * 1.2) + '" fill="#3DB4FF" stroke="' + INK + '" stroke-width="3"/>' +
       '<ellipse cx="' + n(-r * 0.2) + '" cy="' + n(r * 0.25) + '" rx="' + n(r * 1.1) + '" ry="' + n(r * 0.6) + '" fill="#FFE14D" stroke="none"/>' +
@@ -515,39 +436,44 @@ body.big .tb-panel { display: none; }
       '<path d="M' + n(-r * 0.3) + ' ' + n(r * 1.1) + ' v' + n(r * 0.7) + ' M' + n(r * 0.35) + ' ' + n(r * 1.1) + ' v' + n(r * 0.7) + '" stroke="#FF9A4D" stroke-width="3" stroke-linecap="round"/>' +
       '</g>';
   }
-  var birdState = "none";   // none | flying | landed
-  function houseScene(b) {
-    var finished = isDone("sand");
+  var birdState = "none", perchAt = null, birdU = 10;   // the bird that moves into the finished house
+  function houseScene(b, d) {
     var size = Math.min(W * (H > W ? 0.8 : 0.62), (H - b.top - b.edge) * 0.74);
     var cy = b.top + (H - b.top - b.edge) * (W < 600 && H > W ? 0.5 : 0.55);
-    var h = house(W / 2, cy, size, finished), s = h.html;
-    if (!finished) { birdState = "none"; return s; }
-    var perch = [h.perch[0], h.perch[1] - 1.75 * Math.max(9, 0.8 * h.u)];
-    s += bird(h.u);
-    // Place the bird after the markup is in the DOM: off the top-right corner, then a slow glide to the perch.
+    var h = house(W / 2, cy, size, d.sand, anim.house != null && Date.now() < animUntil), s = h.html;
+    geo.house = h.box;
+    birdU = h.u;
+    perchAt = [h.perch[0], h.perch[1] - 1.75 * Math.max(9, 0.8 * h.u)];
+    if (!d.sand) { birdState = "none"; return s; }
+    return s + bird(h.u, "bird", "bird");
+  }
+  // The bird glides in from the top-right corner once, then stays on its perch.
+  function placeBird() {
+    var el = $("bird");
+    if (!el || !perchAt) return;
+    var at = "translate(" + n(perchAt[0]) + "px," + n(perchAt[1]) + "px)";
+    if (birdState !== "none" || reduce) { el.style.transition = "none"; el.style.transform = at; if (birdState === "none") birdState = "landed"; return; }
+    el.style.transition = "none";
+    el.style.transform = "translate(" + (W + 60) + "px,-60px)";
+    birdState = "flying";
     setTimeout(function () {
-      var el = $("bird");
-      if (!el) return;
-      if (birdState === "landed" || reduce) { el.style.transition = "none"; el.style.transform = "translate(" + n(perch[0]) + "px," + n(perch[1]) + "px)"; birdState = "landed"; return; }
-      el.style.transition = "none";
-      el.style.transform = "translate(" + (W + 60) + "px,-60px)";
-      void el.getBoundingClientRect();
-      el.style.transition = "";
-      el.style.transform = "translate(" + n(perch[0]) + "px," + n(perch[1]) + "px)";
-      birdState = "flying";
-      setTimeout(function () { birdState = "landed"; blip(1320, 0.12, 0.05, "sine", 1760); setTimeout(function () { blip(1480, 0.1, 0.05); }, 160); }, 5300);
-    }, 30);
-    return s;
+      var e2 = $("bird");
+      if (!e2) return;
+      void e2.getBoundingClientRect();
+      e2.style.transition = "";
+      e2.style.transform = at;
+      setTimeout(function () { birdState = "landed"; chirp(); notes(perchAt[0], perchAt[1] - 20); }, 5300);
+    }, 40);
   }
   function shelfScene(b) {
     var k = prog.built, s = "", i;
-    var y = b.top + (H - b.top - b.edge) * 0.55, shelfH = 16;
+    var y = b.top + (H - b.top - b.edge) * 0.62, shelfH = 16;
     s += '<rect x="' + n(W * 0.06) + '" y="' + n(y) + '" width="' + n(W * 0.88) + '" height="' + shelfH + '" rx="4" fill="#B07A45" stroke="' + INK + '" stroke-width="4"/>';
     if (!k) {
-      s += label(W / 2, y - 30, "Nothing on the shelf yet.", 22) + label(W / 2, y - 4, "Build the first birdhouse!", 22);
+      s += label(W / 2, y - 64, "Nothing on the shelf yet.", 22) + label(W / 2, y - 34, "Build the first birdhouse!", 22);
       return s;
     }
-    var per = Math.min(5, k), size = Math.min(W * 0.8 / per * 0.8, (H - b.top) * 0.45);
+    var per = Math.min(5, k), size = Math.min(W * 0.8 / per * 0.95, (y - b.top) * 0.75);
     for (i = 0; i < per; i++) {
       var cx = W * 0.1 + (W * 0.8) * (i + 0.5) / per;
       s += house(cx, y - size * 0.42, size, false).html;
@@ -556,148 +482,118 @@ body.big .tb-panel { display: none; }
     return s;
   }
 
-  function wiggle(part) {
-    if (!part) return;
-    var el = scene.querySelector('[data-part="' + part + '"]');
+  // Little music notes rising from a bird.
+  function notes(x, y) {
+    var g = document.createElementNS("http://www.w3.org/2000/svg", "g"), i, s = "";
+    for (i = 0; i < 3; i++) {
+      var nx = x + (i - 1) * 16, ny = y - i * 6;
+      s += '<g class="note" style="animation-delay:' + (i * 0.35) + 's;opacity:0"><path d="M' + n(nx + 6) + ' ' + n(ny - 16) + 'v14" stroke="' + INK + '" stroke-width="2.5" stroke-linecap="round"/><path d="M' + n(nx + 6) + ' ' + n(ny - 16) + 'l7 3" stroke="' + INK + '" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="' + n(nx + 2.5) + '" cy="' + n(ny - 1) + '" rx="5" ry="4" fill="#2D5BD7" stroke="' + INK + '" stroke-width="2"/></g>';
+    }
+    g.innerHTML = s;
+    scene.appendChild(g);
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 3600);
+  }
+
+  function wiggle(el) {
     if (!el) return;
-    el.classList.remove("wig");
+    el.classList.remove("wig", "pop", "hop");
     void el.getBoundingClientRect();
     el.classList.add("wig");
   }
+
+  // Back from a station: the new thing on the bench pops in. After the cut every part pops in turn
+  // (the saw cut each mark one after the other).
+  var CHEER = { plane: "The board is flat and smooth.", "back-mark": "Every part is marked.", "back-cut": "The saw cut every part.",
+    "hole-drill": "The door hole is drilled.", build: "The birdhouse stands up.", sand: "A bird moved in!" };
   function celebrate(stepId) {
-    var s = P.stepBy[stepId];
-    if (!s) return;
-    var target = s.part;
-    if (s.job.kind === "crosscut" || s.job.kind === "rip") target = s.part;
-    else if (s.job.kind === "mark") target = ["back", "front", "roof", "blank"].indexOf(s.part) !== -1 && !isDone(s.part + "-cut") ? "stock" : (isDone(s.part + "-cut") ? s.part : "strip");
-    else if (s.job.kind === "plane") target = "stock";
-    else if (s.job.kind === "assemble" || s.job.kind === "sand") target = "house";
-    var el = scene.querySelector('[data-part="' + target + '"]');
-    if (el) el.classList.add("pop");
-    Toybox.toast(s.done);
+    var s = P.stepBy[stepId] || (P.alias && P.alias[stepId]);
+    if (!s || !isDone(s.id)) return;
+    anim = {};
+    if (s.id === "plane" || s.id === "back-mark") anim.stock = 0;
+    else if (s.id === "back-cut") ["back", "front", "roof", "side1", "side2", "floor"].forEach(function (id, k) { anim[id] = k * 0.5; });
+    else if (s.id === "hole-drill") { anim.front = 0; anim.floor = 0.6; }
+    else anim.house = 0;
+    animUntil = Date.now() + 4500;
+    draw();
+    coach.say(CHEER[s.id] || s.done, 4);
     blip(880, 0.18, 0.06, "sine", 1320);
+    if (s.id === "back-cut") [1, 2, 3, 4, 5].forEach(function (k) { setTimeout(function () { blip(700 + k * 60, 0.08, 0.04); }, k * 500); });
+    if (s.id === "sand" || s.id === "build") { try { Toybox.kind(); } catch (e) { /* ignore */ } }
   }
 
-  // Tapping a part on the bench wiggles it (strong response to every touch).
-  scene.addEventListener("pointerdown", function (e) {
-    if (locked()) return;
-    var g = e.target.closest ? e.target.closest(".part") : null;
-    if (!g) return;
-    e.preventDefault();
-    wiggle(g.dataset.part);
-    blip(520 + Math.random() * 120, 0.09, 0.04);
-    var q = P.partBy[g.dataset.part];
-    if (q) coach(q.name + "!");
-    else if (g.dataset.part === "house") coach(isDone("sand") ? "Tweet tweet!" : "Almost done!");
-    else if (g.dataset.part === "stock") coach(isDone("plane") ? "The board" : "A rough board");
-    if (prog.next) setTimeout(function () { if (prog.next) coach(prog.next.title); }, 2600);
+  // ---------- touching the bench: every part wiggles and says its name ----------
+  function partAt(x, y) {
+    var el = document.elementFromPoint(x, y);
+    var g = el && el.closest ? el.closest("[data-part]") : null;
+    return g && scene.contains(g) ? g : null;
+  }
+  var NAMES = { stock: function () { return D().plane ? "Pine board" : "Rough board"; }, house: function () { return "Birdhouse"; }, bird: function () { return "Bluebird"; } };
+  Toybox.press(scene, {
+    any: true,
+    hit: function (x, y) { return partAt(x, y); },
+    down: function (g, e) {
+      if (!g) { steps.sayStep(); if (steps.go && steps.go.wiggle) steps.go.wiggle(); blip(400, 0.06, 0.03); return; }
+      var id = g.getAttribute("data-part");
+      if (id === "bird") { chirp(); var r0 = g.getBoundingClientRect(); notes(perchAt ? perchAt[0] : W / 2, perchAt ? perchAt[1] - 20 : H / 3); Toybox.nametag("Bluebird", r0.left + r0.width / 2, r0.top - 6); return; }
+      wiggle(g);
+      blip(520 + Math.random() * 120, 0.09, 0.04);
+      var q = P.partBy[id], name = q ? q.name : (NAMES[id] ? NAMES[id]() : "");
+      var r = g.getBoundingClientRect();
+      if (name) Toybox.nametag(name, e.clientX || (r.left + r.width / 2), Math.max(r.top, (e.clientY || r.top) - 40) - 6);
+    }
   });
   stage.addEventListener("gesturestart", function (e) { e.preventDefault(); });
 
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
+  // ---------- Surprise: a fun moment on the bench, taking turns ----------
+  var surpriseK = 0;
+  function surprise() {
+    var k = surpriseK++ % 2;
+    blip(660, 0.1, 0.05, "triangle", 990);
+    if (k === 0) hopAll(); else visitor();
   }
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
+  // Everything on the bench (or the shelf) hops, one after the other, like a wave.
+  function hopAll() {
+    var els = Array.prototype.slice.call(scene.querySelectorAll(".part"));
+    els.sort(function (a, b) { var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return ra.left - rb.left || rb.top - ra.top; });
+    els.forEach(function (el, i) {
+      setTimeout(function () {
+        el.classList.remove("wig", "pop", "hop"); void el.getBoundingClientRect(); el.classList.add("hop");
+        blip(520 + i * 70, 0.09, 0.04);
+        setTimeout(function () { el.classList.remove("hop"); }, 1000);
+      }, i * 260);
+    });
+    coach.say(view === "shelf" ? "The birdhouses hop on the shelf." : D().build ? "The birdhouse hops." : "The parts hop on the bench.", 3);
   }
-  var ghost = makeGhost(function () {
-    if (document.body.classList.contains("big") || goBtn.disabled) return null;
-    return { pts: [ghostPt(goBtn, 0.5, 0.5)], tap: true };
-  });
-  goBtn.addEventListener("pointerdown", function () { ghost.learned(); });
+  // A little bird flies in, lands on the highest thing on the bench, sings, and flies off.
+  var visitT = [];
+  function visitor() {
+    visitT.forEach(clearTimeout); visitT = [];
+    var old = $("visitor"); if (old) old.parentNode.removeChild(old);
+    var top = null;
+    Array.prototype.forEach.call(scene.querySelectorAll(".part"), function (el) {
+      var bb; try { bb = el.getBBox(); } catch (e) { return; }
+      if (!top || bb.y < top.y) top = bb;
+    });
+    var u = Math.max(9, Math.min(16, Math.min(W, H) / 40)) / 0.8 * 0.8;
+    var r = Math.max(9, 0.8 * u);
+    var tx = top ? top.x + top.width * 0.5 + (birdState !== "none" ? r * 4 : 0) : W / 2, ty = top ? top.y - 1.75 * r : H * 0.4;
+    var wrap = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    wrap.innerHTML = bird(u, "visitor", "visitor");
+    scene.appendChild(wrap);
+    var el = $("visitor");
+    el.style.transition = "none";
+    el.style.transform = "translate(" + (W + 70) + "px,-50px) scale(-1,1)";
+    coach.say("A little bird comes to look.", 3.5);
+    visitT.push(setTimeout(function () {
+      void el.getBoundingClientRect();
+      el.style.transition = "";
+      el.style.transform = "translate(" + n(tx) + "px," + n(ty) + "px) scale(-1,1)";
+    }, 40));
+    visitT.push(setTimeout(function () { chirp(); notes(tx, ty - 20); }, 3500));
+    visitT.push(setTimeout(function () { el.style.transform = "translate(" + n(tx) + "px," + n(ty) + "px) scale(1,1)"; el.style.transition = "transform 0.3s"; }, 5600));
+    visitT.push(setTimeout(function () { el.style.transition = ""; el.style.transform = "translate(-90px," + n(ty - 160) + "px) scale(1,1)"; }, 6000));
+    visitT.push(setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 9600));
+  }
 
   // ---------- timer hooks ----------
   function restArt() {
@@ -713,20 +609,19 @@ body.big .tb-panel { display: none; }
   }
 
   // ---------- start up ----------
-  buildSteps();
-  updatePanel();
+  syncSteps();
   resize();
-  window.addEventListener("resize", resize);
-  window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
-  if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe(stage); } catch (e) { /* ignore */ } }
-  window.addEventListener("pageshow", function (e) { if (e.persisted) { refresh(); updatePanel(); draw(); } });
+  window.addEventListener("orientationchange", function () { setTimeout(function () { resize(true); }, 120); });
+  if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe(stage); } catch (e) { window.addEventListener("resize", function () { resize(); }); } }
+  else window.addEventListener("resize", function () { resize(); });
+  window.addEventListener("pageshow", function (e) { if (e.persisted) { refresh(); syncSteps(); resize(true); } });
   if (just) setTimeout(function () { celebrate(just); }, 350);
 
   Toybox.init({
     app: "workshop-project",
     big: { button: $("bigToggle") },
     timerIntro: "When time is up, the plan rests and the controls lock. The timer carries on across Workshop pages.",
-    goodbyeOption: "End with a “Bye bye, birdhouse” button to press",
+    goodbyeOption: "End with a \u201cBye bye, birdhouse\u201d button to press",
     farewellText: "Time to say goodbye",
     goodbyeLabel: "Bye bye, birdhouse",
     farewellDone: "Bye bye!",
@@ -735,16 +630,16 @@ body.big .tb-panel { display: none; }
     restArt: restArt,
     soundNote: "Soft pops and a bird. Hold for 2 seconds.",
     legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
-    onEnding: function (done) { setTimeout(done, 800); },
-    onBig: function () { setTimeout(resize, 50); },
+    onEnding: function (done) { visitT.forEach(clearTimeout); setTimeout(done, 800); },
+    onBig: function () { setTimeout(function () { resize(true); }, 50); },
     onSound: function (on) { if (on) blip(660, 0.15, 0.08, "sine", 880); }
   });
 
   if (debug) {
     window.__pj = {
-      // mark the first n steps done (screenshots)
-      done: function (k) { PJ.reset(pid); P.steps.slice(0, k).forEach(function (s) { PJ.complete(pid, s.id); }); refresh(); updatePanel(); draw(); },
-      celebrate: celebrate, progress: function () { return prog; }, ghost: ghost
+      // mark the first k visits done (screenshots)
+      done: function (k) { PJ.reset(pid); P.steps.slice(0, k).forEach(function (s) { PJ.complete(pid, s.id); }); refresh(); syncSteps(); draw(); },
+      celebrate: celebrate, progress: function () { return prog; }, ghost: ghost, surprise: surprise
     };
   }
 })();
