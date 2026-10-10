@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moooovie Time</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Farm">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<script src="farm.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF; --panel: #FFFFFF; --ink: #1D2340; --muted: #4A5578; --edge: #1D2340; --accent: #FFC93C; --plate: #F4FAFF; --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.loads { font-variant-numeric: tabular-nums; }
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+/* The Go says a short phrase ("Feed them"): on a narrow row it wraps to two lines instead of being cut off. */
+#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell tb-v2 wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the farm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Farm</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title" id="title">Moooovie Time</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+  </header>
+  <div class="tb-body app">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A farmyard with a silage clamp, a telehandler, a green tractor with a mixer wagon, and a cow barn with black and white cows. Tap the telehandler to load the wagon."></canvas>
+      <div class="tb-counter loads" id="loads">Feeds: 0</div>
+      <div id="coach"></div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <ol id="steps"></ol>
+      <div id="bottom"></div>
+    </section>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  // Moooovie Time: feeding the dairy cows, the way the episode shows it.
+  // Load: the telehandler's shear grab cuts a block of silage out of the clamp face and drops it into the mixer
+  //       wagon (behind the green tractor), then lifts in a straw bale while the meal bin's auger pours in meal.
+  // Mix:  the tractor's PTO turns the wagon's vertical auger; the silage, straw and meal swirl into one feed
+  //       (seen over the top of the tub).
+  // Feed: the tractor drives the wagon down the feed passage of the cow barn; the chute lays a line of feed
+  //       along the feed barrier and the cows put their heads through and munch.
+  // Then, by itself: milking time. The cows walk one by one into the milking parlor (no milking is shown).
+  // One world along the machine line: the clamp on the left, the telehandler, the wagon and tractor, the barn
+  // (feed passage on the machine line, the barrier and the cows behind it), the milking parlor, the calf hutch.
+  // The stage is split like Mucky Muck: the whole rig on top (or left), a close-up of the work below (right).
+  // Machine drawings live here for now in farm.js's style and function shapes (metres, y up negative, facing +x)
+  // so they can move into farm.js later: mixer (drawbar eye, ground at +0.5), teleBody / teleBoom with the shear
+  // grab (between the axles), cowSide (feet), cowFront / cowHead (feet / neck), cat (feet), hutch.
+  var $ = function (id) { return document.getElementById(id); };
+  var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
+  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
+  var NAME = (Farm.NAMES && Farm.NAMES.cows) || "Moooovie Time";
+  document.title = NAME; $("title").textContent = NAME;
+  function LW() { return Farm.LW; }
+  function shine(ctx, x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
+  var SIL = ["#8DB846", "#6E9A36", "#B5CF6A"], STRAW = ["#F2D272", "#D9B24A", "#FBE7A1"], MEAL = ["#D98A3A", "#B96E28", "#EDB070"];
+  var FEED = "#9A9A48", FEED2 = "#7E7E38";
+  var reduce = !!U.reduceMotion;
+
+  // ---------- State ----------
+  var KEY = "farm-cows-v1";
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  if (startFresh || typeof saved !== "object" || Array.isArray(saved)) saved = {};
+  var feeds = typeof saved.feeds === "number" && isFinite(saved.feeds) && saved.feeds >= 0 ? Math.floor(saved.feeds) : 0;
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ feeds: feeds })); } catch (e) { /* ignore */ } }
+
+  // ---------- The world (metres along the machine line) ----------
+  var CLF = 9.0, TX = 13.6, WAG = 23.0, BX0 = 30, BX1 = 44, PX0 = 45.5, PX1 = 54, DOOR = 47.6, DOORW = 2.4, PARK = 66, XMAX = 74;
+  var MEALX = 20.2, HUTCH = [26.4, 57.2], BALE = [9.05, 9.95], RB = 1.2, RCOW = 1.3, RFEED = 1.11, RPAR = 1.45, RWALL = 1.62;
+  var COWX = [32.6, 35.4, 38.2, 41.0], CHUTE = -7.05, V_FEED = 3.2;
+
+  // ---------- Small drawing helpers (farm.js style) ----------
+  function wheel(ctx, cx, cy, r, rot, o) {
+    o = o || {};
+    var n = o.lugs || Math.round(r * 22), i, a, l0 = LW();
+    ctx.save(); ctx.translate(cx, cy);
+    for (i = 0; i < n; i++) {
+      a = rot + i * TAU / n;
+      var c = Math.cos(a), s = Math.sin(a), c2 = Math.cos(a + 0.12), s2 = Math.sin(a + 0.12);
+      Pp(ctx, [c * r * 0.93, s * r * 0.93, c * r * 1.06, s * r * 1.06, c2 * r * 1.06, s2 * r * 1.06, c2 * r * 0.93, s2 * r * 0.93], "#2A2C36", l0 * 0.7);
+    }
+    Cc(ctx, 0, 0, r * 0.97, "#33363F", l0);
+    Cc(ctx, 0, 0, r * 0.8, "#40434E", 0);
+    var rimR = r * (o.rim || 0.6);
+    Cc(ctx, 0, 0, rimR, o.rimCol || "#C3CCD6", l0);
+    Cc(ctx, 0, 0, rimR * 0.78, "#A9B4C1", l0 * 0.6);
+    Cc(ctx, 0, 0, rimR * 0.36, "#8C97A6", l0 * 0.7);
+    for (i = 0; i < 6; i++) { a = rot + i * TAU / 6; Cc(ctx, Math.cos(a) * rimR * 0.55, Math.sin(a) * rimR * 0.55, rimR * 0.07, "#6E7887", 0); }
+    ctx.restore();
+  }
+  function face(ctx, x, y, r, dx, f, time, smileW) {
+    if (!f) return;
+    ctx.save(); ctx.globalAlpha = clamp(f, 0, 1);
+    var blink = Math.sin((time || 0) * 2.1) > 0.985 ? 0.15 : 1, l0 = LW(), lx = r * 0.3, ly = r * 0.1;
+    [0, dx].forEach(function (ox) {
+      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
+      Cc(ctx, 0, 0, r, "#FFFFFF", l0 * 0.8); Cc(ctx, lx, ly, r * 0.5, INK, 0); Cc(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
+      ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, smileW || r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = INK; ctx.lineWidth = l0 * 1.3; ctx.lineCap = "round"; ctx.stroke();
+    ctx.restore();
+  }
+  function driverHead(ctx, x, y) {
+    var l0 = LW();
+    Rr(ctx, x - 0.26, y + 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
+    Cc(ctx, x, y, 0.17, "#F2C8A0", l0 * 0.7);
+    Pp(ctx, [x - 0.18, y - 0.04, x - 0.16, y - 0.2, x + 0.16, y - 0.2, x + 0.3, y - 0.06], "#E8473B", l0 * 0.6);
+  }
+  function strands(ctx, x0, y0, w, h, cols, seed, n) {
+    for (var i = 0; i < n; i++) {
+      var sx = x0 + w * hash(i, seed), sy = y0 + h * hash(i, seed + 1);
+      Ln(ctx, sx, sy, sx + 0.2 * (hash(i, seed + 2) - 0.3), sy - 0.05, cols[i % cols.length], 0.045);
+    }
+  }
+  // a straw bale (big square), origin bottom-left, w x h
+  function bale(ctx, x, y, w, h) {
+    var l0 = LW();
+    Rr(ctx, x, y - h, w, h, 0.06, STRAW[0]);
+    ctx.save(); SH.rr(ctx, x, y - h, w, h, 0.06); ctx.clip(); strands(ctx, x, y - h, w, h, [STRAW[1], STRAW[2]], 11, Math.round(w * h * 30)); ctx.restore();
+    Ln(ctx, x + w * 0.3, y - h, x + w * 0.3, y, "#C0392B", 0.035); Ln(ctx, x + w * 0.7, y - h, x + w * 0.7, y, "#C0392B", 0.035);
+    SH.rr(ctx, x, y - h, w, h, 0.06); fs(ctx, null, l0);
+  }
+
+  // =====================================================================================================
+  // The machines (could move into farm.js as Farm.draw.mixer / telehandler / cow ...)
+  // =====================================================================================================
+  // Vertical-auger mixer wagon. Origin at the drawbar eye, ground at y = +0.5, facing +x.
+  // st = { wheel, time, spin (auger angle), door (0..1), chute (0..1 out), belt, face, peek (how far we see in),
+  //        chunks: [{ a, rr, col, s }], mound: { col, h } (a block sitting on top before mixing), fill (0..1), pto }
+  var MX = { cx: -3.85, rimY: -2.78, rx: 2.3, ry: 0.3 };
+  function mixer(ctx, st) {
+    var l0 = LW(), i, B = "#2F7FD1", BD = "#1F5FA6";
+    // drawbar and the PTO shaft (stripes run when it turns)
+    Pp(ctx, [0.1, 0.05, -1.7, -0.62, -1.7, -0.4, 0.1, 0.16], "#7C8696");
+    tube(ctx, 0.95, -0.55, -1.55, -1.05, 0.13, "#F2C230");
+    for (i = 0; i < 6; i++) { var f = ((i / 6) + (st.pto || 0) * 0.15) % 1; Ln(ctx, lerp(0.85, -1.45, f), lerp(-0.57, -1.03, f), lerp(0.85, -1.45, f) - 0.06, lerp(-0.57, -1.03, f) - 0.12, INK, 0.04); }
+    Rr(ctx, -6.0, -0.78, 4.5, 0.22, 0.04, "#3A3F4E");
+    wheel(ctx, -3.3, 0.0, 0.5, (st.wheel || 0) / 0.5, { rim: 0.55, rimCol: "#E2E6EB" });
+    wheel(ctx, -4.45, 0.0, 0.5, (st.wheel || 0) / 0.5, { rim: 0.55, rimCol: "#E2E6EB" });
+    // the chute at the rear: folded up against the tub, or out with its belt running
+    var th = lerp(-Math.PI / 2 - 0.25, Math.PI - 0.32, ease(st.chute || 0));
+    ctx.save(); ctx.translate(-5.75, -0.98); ctx.rotate(th);
+    Rr(ctx, -0.05, -0.14, 1.3, 0.28, 0.06, "#5D6675", l0 * 0.8);
+    for (i = 0; i < 5; i++) { var bx = ((i / 5 + (st.belt || 0)) % 1) * 1.15 + 0.05; Ln(ctx, bx, -0.12, bx, 0.12, "#2A2C36", 0.05); }
+    ctx.restore();
+    // the tub: wider at the top, ribs, the opening seen from a little above
+    Pp(ctx, [-5.55, -0.75, -2.15, -0.75, -1.5, MX.rimY, -6.2, MX.rimY], B);
+    for (i = 1; i < 5; i++) { var rx0 = lerp(-5.55, -2.15, i / 5), rx1 = lerp(-6.2, -1.5, i / 5); Ln(ctx, rx0, -0.8, rx1, MX.rimY + 0.05, BD, 0.07); }
+    shine(ctx, -5.9, -2.45, -1.85, -2.45, 0.08);
+    // the side door at the rear (slides up to let the feed onto the chute)
+    var dy = clamp(st.door || 0, 0, 1) * 0.55;
+    Rr(ctx, -5.55, -1.55, 0.6, 0.62, 0.04, "#2A2D38", l0 * 0.6);
+    Rr(ctx, -5.6, -1.6 - dy, 0.7, 0.66, 0.05, BD, l0 * 0.8);
+    // the opening
+    var ry = MX.ry * (st.peek || 1), cx = MX.cx, cy = MX.rimY;
+    ctx.beginPath(); ctx.ellipse(cx, cy, MX.rx, ry, 0, 0, TAU); fs(ctx, "#2A2D38", l0);
+    var fill = clamp(st.fill || 0, 0, 1);
+    if (fill > 0.01) {
+      ctx.save(); ctx.beginPath(); ctx.ellipse(cx, cy, MX.rx * 0.96, ry * 0.92, 0, 0, TAU); ctx.clip();
+      ctx.beginPath(); ctx.ellipse(cx, cy + ry * (1 - fill) * 0.4, MX.rx * 0.96, ry * 0.92, 0, 0, TAU); ctx.fillStyle = st.base || FEED; ctx.fill();
+      (st.chunks || []).forEach(function (c) {
+        var x = cx + Math.cos(c.a) * c.rr * MX.rx * 0.9, y = cy + Math.sin(c.a) * c.rr * ry * 0.85;
+        ctx.beginPath(); ctx.ellipse(x, y, c.s, c.s * 0.45 * (st.peek || 1), c.a * 0.3, 0, TAU); ctx.fillStyle = c.col; ctx.fill();
+      });
+      ctx.restore();
+    }
+    // the auger's top cone sticks up through the feed; its flight turns
+    var ah = 0.5 + 0.15 * (st.peek || 1), sp = st.spin || 0;
+    Pp(ctx, [cx - 0.42, cy + 0.04, cx, cy - ah, cx + 0.42, cy + 0.04], "#C3CCD6", l0 * 0.8);
+    ctx.save(); ctx.beginPath(); ctx.moveTo(cx - 0.42, cy + 0.04); ctx.lineTo(cx, cy - ah); ctx.lineTo(cx + 0.42, cy + 0.04); ctx.closePath(); ctx.clip();
+    for (i = 0; i < 4; i++) { var q = ((i / 4) + sp / TAU) % 1, yy = cy + 0.04 - q * (ah + 0.1); Ln(ctx, cx - 0.5, yy + 0.12, cx + 0.5, yy - 0.12, "#7C8696", 0.06); }
+    ctx.restore();
+    if (st.mound && st.mound.h > 0.02) {
+      var mh = st.mound.h;
+      ctx.beginPath(); ctx.moveTo(cx - 1.3, cy + 0.05);
+      ctx.quadraticCurveTo(cx - 1.25, cy - mh * 1.1, cx - 0.2, cy - mh); ctx.quadraticCurveTo(cx + 0.9, cy - mh * 1.05, cx + 1.4, cy + 0.05); ctx.closePath();
+      fs(ctx, st.mound.col, l0 * 0.8);
+      ctx.save(); ctx.clip(); strands(ctx, cx - 1.3, cy - mh, 2.7, mh, [SIL[1], STRAW[0], SIL[2]], 5, 24); ctx.restore();
+    }
+    // the front lip of the opening
+    ctx.beginPath(); ctx.ellipse(cx, cy, MX.rx, ry, 0, 0, Math.PI); ctx.lineWidth = l0 * 1.6; ctx.strokeStyle = BD; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, MX.rx, ry, 0, 0, Math.PI); ctx.lineWidth = l0; ctx.strokeStyle = INK; ctx.stroke();
+    // ladder at the front
+    Ln(ctx, -1.95, -0.9, -1.6, -2.6, INK, 0.05); Ln(ctx, -1.75, -0.9, -1.4, -2.6, INK, 0.05);
+    for (i = 0; i < 5; i++) { var ly = -1.1 - i * 0.33; Ln(ctx, -1.93 + i * 0.07, ly, -1.72 + i * 0.07, ly, INK, 0.04); }
+    face(ctx, -4.4, -1.7, 0.17, 0.46, st.face, st.time, 0.26);
+  }
+  // Telehandler: body (origin on the ground between the axles, facing +x) and the boom with the shear grab.
+  var TELE = { pivot: [-1.5, -2.05], len: 3.9 };
+  function teleBody(ctx, st) {
+    var T = "#F2B33A", TD = "#C98A1A", l0 = LW(), rot = (st.wheel || 0) / 0.62, i;
+    Pp(ctx, [-2.2, -0.7, -2.2, -1.55, -1.3, -1.6, 2.0, -1.55, 2.3, -1.15, 2.3, -0.7], T);
+    Rr(ctx, -2.15, -1.95, 1.25, 0.42, 0.1, T);
+    for (i = 0; i < 3; i++) Ln(ctx, -1.95 + i * 0.3, -1.88, -1.85 + i * 0.3, -1.62, TD, 0.05);
+    Pp(ctx, [-0.75, -1.5, -0.7, -2.95, 0.72, -2.95, 1.0, -1.5], "#2B3040");
+    Pp(ctx, [-0.63, -1.62, -0.6, -2.85, 0.62, -2.85, 0.88, -1.62], "#BFE7FA", l0 * 0.6);
+    driverHead(ctx, 0.0, -2.42);
+    Rr(ctx, -0.85, -3.12, 1.95, 0.2, 0.08, T);
+    var bc = st.beacon ? (Math.sin((st.time || 0) * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
+    ctx.beginPath(); ctx.arc(0.1, -3.12, 0.12, Math.PI, 0); ctx.closePath(); fs(ctx, bc, l0 * 0.7);
+    wheel(ctx, -1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    wheel(ctx, 1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    ctx.beginPath(); ctx.arc(-1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(-1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    ctx.beginPath(); ctx.arc(1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    face(ctx, 1.45, -1.32, 0.12, 0.4, st.face, st.time);
+  }
+  function teleEnd(a, ext) { var len = TELE.len + (ext || 0); return [TELE.pivot[0] + Math.cos(a) * len, TELE.pivot[1] + Math.sin(a) * len]; }
+  // st = { a (boom angle, + down), ext, curl (+ tips the front down), jaw (0 shut .. 1 open), load: null | "silage" | "straw" }
+  function teleBoom(ctx, st) {
+    var T = "#F2B33A", TD = "#C98A1A", l0 = LW(), a = st.a || 0, c = Math.cos(a), s = Math.sin(a);
+    var p = TELE.pivot, e = teleEnd(a, st.ext), m = [p[0] + c * 3.3, p[1] + s * 3.3];
+    tube(ctx, 0.35, -1.35, p[0] + c * 1.9, p[1] + s * 1.9 + 0.18, 0.13, "#C3CCD6");
+    tube(ctx, m[0] - c * 0.4, m[1] - s * 0.4, e[0], e[1], 0.26, TD);
+    tube(ctx, p[0], p[1], m[0], m[1], 0.42, T);
+    shine(ctx, p[0] + c * 0.3, p[1] + s * 0.3 - 0.1, m[0] - c * 0.2, m[1] - s * 0.2 - 0.1, 0.06);
+    Cc(ctx, p[0], p[1], 0.16, "#7C8696", l0);
+    ctx.save(); ctx.translate(e[0], e[1]); ctx.rotate(st.curl || 0);
+    shearGrab(ctx, st);
+    ctx.restore();
+  }
+  // The shear grab (block cutter): a back frame with tines along the bottom and a U-shaped blade on top that
+  // swings down to slice the block out of the clamp face. Origin at the boom pin; tines at y = +1.08.
+  function shearGrab(ctx, st) {
+    var l0 = LW(), G = "#5D6675", jaw = clamp(st.jaw || 0, 0, 1);
+    if (st.load === "silage") {
+      Rr(ctx, 0.14, -0.45, 1.24, 1.48, 0.05, SIL[0], l0 * 0.8);
+      ctx.save(); SH.rr(ctx, 0.14, -0.45, 1.24, 1.48, 0.05); ctx.clip();
+      for (var k = 0; k < 6; k++) Ln(ctx, 0.14, -0.3 + k * 0.24, 1.38, -0.28 + k * 0.24, SIL[1], 0.04);
+      strands(ctx, 0.14, -0.45, 1.24, 1.48, [SIL[1], SIL[2]], 3, 26); ctx.restore();
+    } else if (st.load === "straw") bale(ctx, 0.2, 1.03, 0.9, 0.8);
+    Rr(ctx, -0.14, -0.58, 0.26, 1.72, 0.05, G, l0 * 0.8);
+    tube(ctx, 0.05, 1.08, 1.48, 1.08, 0.08, "#C3CCD6");
+    Ln(ctx, 1.44, 1.08, 1.56, 1.0, INK, 0.07);
+    ctx.save(); ctx.translate(0.0, -0.52); ctx.rotate(-jaw * 1.2);
+    // the blade frame: a top bar and the cutting blade hanging down at the front, a light brace between
+    tube(ctx, 0, 0, 1.45, 0, 0.12, "#E2B33A");
+    Ln(ctx, 0.1, 0.05, 1.38, 1.3, "rgba(29,35,64,0.55)", 0.05);
+    Rr(ctx, 1.36, -0.06, 0.12, 1.62, 0.03, "#C3CCD6", l0 * 0.8);
+    for (var i = 0; i < 6; i++) Pp(ctx, [1.36, 0.15 + i * 0.25, 1.28, 0.27 + i * 0.25, 1.36, 0.39 + i * 0.25], "#E2E6EB", l0 * 0.4);
+    ctx.restore();
+    Cc(ctx, 0, -0.52, 0.09, "#C3CCD6", l0 * 0.6);
+    Cc(ctx, 0, 0, 0.08, "#C3CCD6", l0 * 0.6);
+  }
+  // A cow in profile (black and white), origin at its feet in the middle, facing +x. ph = walk phase.
+  function cowSide(ctx, ph, walk, f, time, moo) {
+    var l0 = LW(), sw = walk ? Math.sin(ph) * 0.14 : 0, bob = walk ? Math.abs(Math.sin(ph)) * 0.04 : 0;
+    ctx.save(); ctx.translate(0, -bob);
+    [[-0.72, 0, 1], [-0.52, 1, -1], [0.55, 0, -1], [0.75, 1, 1]].forEach(function (g) {
+      var dx = sw * g[2];
+      Ln(ctx, g[0], -0.85, g[0] + dx, 0, INK, 0.17); Ln(ctx, g[0], -0.85, g[0] + dx, -0.05, g[1] ? "#F4F4F4" : "#2A2D38", 0.11);
+    });
+    Ln(ctx, -0.95, -1.32, -1.08 - sw * 0.5, -0.72, INK, 0.06); Cc(ctx, -1.08 - sw * 0.5, -0.7, 0.07, "#2A2D38", 0);
+    SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, "#FAFAFA");
+    ctx.save(); SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); ctx.clip();
+    [[-0.55, -1.3, 0.35], [0.25, -1.05, 0.3], [0.7, -1.45, 0.22], [-0.95, -0.85, 0.25]].forEach(function (b) { Cc(ctx, b[0], b[1], b[2], "#2A2D38", 0); });
+    ctx.restore(); SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, null, l0);
+    ctx.beginPath(); ctx.ellipse(-0.42, -0.72, 0.18, 0.1, 0, 0, TAU); fs(ctx, "#F2A9B4", l0 * 0.6);
+    var up = moo ? -0.25 : 0;
+    ctx.save(); ctx.translate(0.95, -1.32); ctx.rotate(0.3 + up);
+    ctx.beginPath(); ctx.ellipse(0.25, 0, 0.34, 0.22, 0, 0, TAU); fs(ctx, "#2A2D38");
+    ctx.beginPath(); ctx.ellipse(0.12, -0.02, 0.14, 0.18, 0, 0, TAU); fs(ctx, "#FAFAFA", 0);
+    ctx.beginPath(); ctx.ellipse(0.52, 0.06, 0.15, 0.13, 0, 0, TAU); fs(ctx, "#F2A9B4", l0 * 0.7);
+    if (moo) { ctx.beginPath(); ctx.ellipse(0.58, 0.12, 0.05, 0.06, 0, 0, TAU); fs(ctx, "#7A2E3A", 0); }
+    Pp(ctx, [0.0, -0.16, -0.2, -0.3, -0.05, -0.12], "#2A2D38", l0 * 0.6);
+    Cc(ctx, 0.3, -0.07, 0.05, "#FFFFFF", l0 * 0.4); Cc(ctx, 0.31, -0.07, 0.028, INK, 0);
+    if (f) face(ctx, 0.18, -0.08, 0.06, 0.18, f, time, 0.08);
+    ctx.restore();
+    ctx.restore();
+  }
+  // A cow seen from the front: her chest and front legs behind the barrier (origin at her feet).
+  function cowFront(ctx, k) {
+    var l0 = LW();
+    Ln(ctx, -0.3, -0.7, -0.3, 0, INK, 0.2); Ln(ctx, -0.3, -0.7, -0.3, -0.04, "#FAFAFA", 0.13);
+    Ln(ctx, 0.3, -0.7, 0.3, 0, INK, 0.2); Ln(ctx, 0.3, -0.7, 0.3, -0.04, k % 2 ? "#2A2D38" : "#FAFAFA", 0.13);
+    ctx.beginPath(); ctx.ellipse(0, -1.12, 0.62, 0.55, 0, 0, TAU); fs(ctx, "#FAFAFA");
+    ctx.save(); ctx.beginPath(); ctx.ellipse(0, -1.12, 0.62, 0.55, 0, 0, TAU); ctx.clip();
+    if (k % 2) { Cc(ctx, -0.45, -1.35, 0.4, "#2A2D38", 0); Cc(ctx, 0.5, -0.8, 0.3, "#2A2D38", 0); }
+    else { Cc(ctx, 0.4, -1.4, 0.38, "#2A2D38", 0); Cc(ctx, -0.5, -0.85, 0.25, "#2A2D38", 0); }
+    ctx.restore(); ctx.beginPath(); ctx.ellipse(0, -1.12, 0.62, 0.55, 0, 0, TAU); fs(ctx, null, l0);
+  }
+  // The head from the front, origin at the top of the neck. st = { k, munch (phase), look (-1..1), moo, smile, lick }
+  function cowHead(ctx, st) {
+    var l0 = LW(), k = st.k || 0, chew = st.munch ? Math.sin(st.munch) * 0.04 : 0;
+    // ears
+    [-1, 1].forEach(function (sd) {
+      ctx.save(); ctx.translate(sd * 0.32, -0.02); ctx.rotate(sd * (0.35 + (st.moo ? 0.25 : 0)));
+      ctx.beginPath(); ctx.ellipse(sd * 0.2, 0, 0.2, 0.09, 0, 0, TAU); fs(ctx, k % 2 && sd < 0 ? "#2A2D38" : "#FAFAFA", l0 * 0.8);
+      ctx.beginPath(); ctx.ellipse(sd * 0.2, 0, 0.12, 0.045, 0, 0, TAU); fs(ctx, "#F2A9B4", 0);
+      ctx.restore();
+    });
+    // horn buds
+    Pp(ctx, [-0.2, -0.12, -0.26, -0.24, -0.13, -0.15], "#F4E8C8", l0 * 0.6);
+    Pp(ctx, [0.2, -0.12, 0.26, -0.24, 0.13, -0.15], "#F4E8C8", l0 * 0.6);
+    // the face: wide at the top, narrower down to the muzzle
+    ctx.beginPath(); ctx.moveTo(-0.3, -0.12); ctx.quadraticCurveTo(0, -0.2, 0.3, -0.12); ctx.quadraticCurveTo(0.33, 0.3, 0.2, 0.55); ctx.lineTo(-0.2, 0.55); ctx.quadraticCurveTo(-0.33, 0.3, -0.3, -0.12); ctx.closePath();
+    fs(ctx, "#FAFAFA");
+    ctx.save(); ctx.clip();
+    if (k % 2) Cc(ctx, -0.3, 0.05, 0.24, "#2A2D38", 0); else { Cc(ctx, 0.3, -0.02, 0.22, "#2A2D38", 0); Cc(ctx, -0.32, 0.25, 0.12, "#2A2D38", 0); }
+    ctx.restore();
+    ctx.beginPath(); ctx.moveTo(-0.3, -0.12); ctx.quadraticCurveTo(0, -0.2, 0.3, -0.12); ctx.quadraticCurveTo(0.33, 0.3, 0.2, 0.55); ctx.lineTo(-0.2, 0.55); ctx.quadraticCurveTo(-0.33, 0.3, -0.3, -0.12); ctx.closePath(); fs(ctx, null, l0);
+    // eyes (big and friendly)
+    var lk = (st.look || 0) * 0.025, blink = Math.sin((st.t || 0) * 1.7 + k * 2) > 0.985 ? 0.15 : 1;
+    [-0.13, 0.13].forEach(function (ex) {
+      ctx.save(); ctx.translate(ex, 0.1); ctx.scale(1, blink);
+      Cc(ctx, 0, 0, 0.075, "#FFFFFF", l0 * 0.7); Cc(ctx, lk, 0.01, 0.045, INK, 0); Cc(ctx, lk + 0.015, -0.015, 0.016, "#FFFFFF", 0);
+      ctx.restore();
+    });
+    if (st.smile) { ctx.save(); ctx.globalAlpha = st.smile * 0.6; Cc(ctx, -0.22, 0.28, 0.05, "#FF8FA3", 0); Cc(ctx, 0.22, 0.28, 0.05, "#FF8FA3", 0); ctx.restore(); }
+    // muzzle with nostrils (it moves sideways as she chews)
+    ctx.beginPath(); ctx.ellipse(chew, 0.52, 0.24, 0.14, 0, 0, TAU); fs(ctx, "#F2A9B4", l0 * 0.8);
+    Cc(ctx, chew - 0.08, 0.5, 0.025, "#B86A78", 0); Cc(ctx, chew + 0.08, 0.5, 0.025, "#B86A78", 0);
+    if (st.moo) { ctx.beginPath(); ctx.ellipse(chew, 0.6, 0.08, 0.06 + 0.03 * st.moo, 0, 0, TAU); fs(ctx, "#7A2E3A", l0 * 0.5); }
+    else if (st.munch) { Ln(ctx, chew - 0.12, 0.64, chew + 0.16, 0.6, INK, 0.025); Ln(ctx, chew + 0.05, 0.64, chew + 0.22, 0.7, FEED2, 0.035); Ln(ctx, chew - 0.05, 0.64, chew - 0.2, 0.72, SIL[1], 0.035); }
+  }
+  // the barn cat, origin at its feet, facing +x. st = { ph (walk), sit, tail }
+  function cat(ctx, st) {
+    var l0 = LW(), O = "#F0A040", OD = "#C9781E", w = st.sit ? 0 : Math.sin(st.ph || 0) * 0.06;
+    if (!st.sit) { [-0.18, 0.16].forEach(function (lx, i) { Ln(ctx, lx, -0.16, lx + (i ? w : -w), 0, INK, 0.07); Ln(ctx, lx, -0.16, lx + (i ? w : -w), -0.01, O, 0.04); }); }
+    var tw = Math.sin(st.tail || 0) * 0.12;
+    ctx.beginPath(); ctx.moveTo(-0.22, -0.22); ctx.quadraticCurveTo(-0.5, -0.3 + tw, -0.42, -0.6 + tw); ctx.lineWidth = 0.09; ctx.strokeStyle = INK; ctx.lineCap = "round"; ctx.stroke(); ctx.lineWidth = 0.05; ctx.strokeStyle = O; ctx.stroke();
+    if (st.sit) { ctx.beginPath(); ctx.ellipse(-0.02, -0.2, 0.2, 0.22, -0.2, 0, TAU); fs(ctx, O, l0 * 0.8); }
+    else { ctx.beginPath(); ctx.ellipse(0, -0.24, 0.27, 0.11, 0, 0, TAU); fs(ctx, O, l0 * 0.8); Ln(ctx, -0.08, -0.33, -0.05, -0.17, OD, 0.03); Ln(ctx, 0.04, -0.34, 0.07, -0.17, OD, 0.03); }
+    var hx = st.sit ? 0.1 : 0.27, hy = st.sit ? -0.46 : -0.36;
+    Pp(ctx, [hx - 0.1, hy - 0.05, hx - 0.07, hy - 0.2, hx - 0.01, hy - 0.08], O, l0 * 0.6);
+    Pp(ctx, [hx + 0.02, hy - 0.08, hx + 0.08, hy - 0.2, hx + 0.11, hy - 0.04], O, l0 * 0.6);
+    Cc(ctx, hx, hy, 0.11, O, l0 * 0.8);
+    Cc(ctx, hx + 0.04, hy - 0.01, 0.018, INK, 0); Cc(ctx, hx - 0.04, hy - 0.01, 0.018, INK, 0);
+    Cc(ctx, hx + 0.0, hy + 0.04, 0.015, "#E8738A", 0);
+  }
+  // a calf hutch (white plastic igloo), origin at its feet, door facing us
+  function hutch(ctx) {
+    var l0 = LW();
+    ctx.beginPath(); ctx.moveTo(-0.95, 0); ctx.lineTo(-0.95, -0.9); ctx.quadraticCurveTo(-0.9, -1.45, 0, -1.45); ctx.quadraticCurveTo(0.9, -1.45, 0.95, -0.9); ctx.lineTo(0.95, 0); ctx.closePath(); fs(ctx, "#F4F7FA");
+    shine(ctx, -0.6, -1.25, 0.4, -1.32, 0.06);
+    ctx.beginPath(); ctx.moveTo(-0.42, 0); ctx.lineTo(-0.42, -0.62); ctx.quadraticCurveTo(-0.4, -0.95, 0, -0.95); ctx.quadraticCurveTo(0.4, -0.95, 0.42, -0.62); ctx.lineTo(0.42, 0); ctx.closePath(); fs(ctx, "#3A3348", l0 * 0.8);
+    Ln(ctx, -0.95, -0.02, 0.95, -0.02, "#E8D79A", 0.08);
+  }
+  function calfHead(ctx, up, t) {
+    var l0 = LW(), y = lerp(0.2, -0.35, up), tilt = Math.sin(t * 2.5) * 0.12 * up;
+    ctx.save(); ctx.translate(0, y); ctx.rotate(tilt); ctx.scale(0.7, 0.7);
+    cowHead(ctx, { k: 1, t: t, look: Math.sin(t), smile: 1 });
+    ctx.restore();
+  }
+
+  // =====================================================================================================
+  // Machine and animal state
+  // =====================================================================================================
+  var tele = { x: TX, d: 0, dir: -1, a: 0.25, ext: 0, curl: 0, jaw: 0, load: null, wheel: 0, st: "idle", t: 0 };
+  var rig = { x: WAG, v: 0, wheel: 0, st: "park", spin: 0, spinV: 0, door: 0, chute: 0, belt: 0, pto: 0, mixT: -1, shake: 0 };
+  var tub = { chunks: [], mound: null, fill: 0, mix: 0, base: FEED };
+  var clampS = { notch: 0, fresh: 0, bale: true };
+  var feedX = BX0 + 0.6, feedOn = false, falling = null, meal = 0;
+  var cows = [];
+  function makeCows() { cows = COWX.map(function (x, k) { return { k: k, x0: x, x: x, r: RCOW, st: "wait", head: 0, munch: 0, walk: 0, t: 0, moo: 0, look: 0, side: 0 }; }); }
+  makeCows();
+  var phase = "ready", phaseT = 0, stepId = "load", auto = false, grab = null, ending = false, dusk = 0, time = 0;
+  var faceT = 0, mooS = null, catS = null, calfS = null, lickS = null, doorOpen = 0;
+
+  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  function chuteX() { return rig.x + CHUTE; }
+  function feeding() { return stepId === "feed" && phase === "work"; }
+
+  // =====================================================================================================
+  // The stage: the whole rig on top (or left), a close-up of the work below (or right)
+  // =====================================================================================================
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  var W = 300, H = 300, DPR = 1, split = true;
+  var RF = { x: 0, y: 0, w: 300, h: 300 }, RC = { x: 0, y: 150, w: 300, h: 150 };
+  var zF = { span: 22, mh: 5, target: 22, mht: 5 }, zC = { span: 7, mh: 3.5, target: 7, mht: 3.5 };
+  function fitFor(z) { return function (w, h) { return Math.min(w * 0.92 / z.span, h * 0.6 / z.mh); }; }
+  var scF = new Farm.Scene({ L: 20, xmin: -10, xmax: XMAX, rowDz: 0.5, fit: fitFor(zF) });
+  var scC = new Farm.Scene({ L: 20, xmin: -10, xmax: XMAX, rowDz: 0.5, fit: fitFor(zC) });
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    if (W / H > 1.4) { var fw = Math.round(W * 0.56); RF = { x: 0, y: 0, w: fw, h: H }; RC = { x: fw, y: 0, w: W - fw, h: H }; }
+    else { var hy = Math.round(H * 0.5); RF = { x: 0, y: 0, w: W, h: hy }; RC = { x: 0, y: hy, w: W, h: H - hy }; }
+    scF.layout(RF.w, RF.h); scC.layout(RC.w, RC.h);
+    follow(0, true);
+  }
+  function regOf(sc) { return sc === scC ? RC : RF; }
+  function onScreen(sc, x, y) { var b = cv.getBoundingClientRect(), R = regOf(sc); return { x: b.left + R.x + x, y: b.top + R.y + y }; }
+  function scr2(sc, x, h, r) { r = r || 1; return onScreen(sc, PX(sc, x, r), sc.Y(r) - h * sc.S(r)); }
+  function pt(sc, x, r, h) { return [PX(sc, x, r), sc.Y(r) - (h || 0) * sc.S(r)]; }
+  // a plain perspective for the yard behind the machine line (the same in both views; Scene.X adds a far parallax)
+  function PX(sc, x, r) { return sc.W / 2 + (x - sc.cam) * sc.k / (r || 1); }
+  function putR(sc, x, r, dir, fn) {
+    var d = typeof dir === "number" ? dir : 1; if (Math.abs(d) < 0.12) d = d < 0 ? -0.12 : 0.12;
+    Farm.inUnits(ctx, PX(sc, x, r), sc.Y(r), sc.k / r, sc.lw * 0.9, function () { ctx.scale(d, 1); fn(); });
+  }
+
+  // ---------- Coach, counter, name tags ----------
+  var coach = Toybox.coach($("coach"));
+  function setCount() { var el = $("loads"); el.textContent = "Feeds: " + feeds; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  $("loads").textContent = "Feeds: " + feeds;
+  function tagW(sc, text, x, h, r) {
+    r = r || 1;
+    var R = regOf(sc), px = clamp(PX(sc, x, r), 70, R.w - 70), py = clamp(sc.Y(r) - h * sc.S(r), 34, R.h - 20), p = onScreen(sc, px, py);
+    Toybox.nametag(text, p.x, p.y, 2400);
+  }
+  var tagged = {};
+  function tagOnce(id, sc, text, x, h, r) { if (tagged[id]) return; tagged[id] = 1; tagW(sc, text, x, h, r); }
+
+  // =====================================================================================================
+  // The steps
+  // =====================================================================================================
+  var STEPS = [
+    { id: "load", name: "Load", go: "Load it", coach: "Fill up the mixer wagon." },
+    { id: "mix", name: "Mix", go: "Mix it", coach: "Mix up the cows' food." },
+    { id: "feed", name: "Feed", go: "Feed them", coach: "Take the food to the cows." }
+  ];
+  var BUSY = { load: "The telehandler is loading.", mix: "The auger is mixing.", feed: "The wagon is feeding the cows." };
+
+  // ---------- Pictures for the steps (drawn with the scene's own code) ----------
+  var picCache = {};
+  function pic(id) {
+    if (picCache[id] !== undefined) return picCache[id];
+    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
+    c.width = PW; c.height = PH;
+    try { x = c.getContext("2d"); } catch (e) { x = null; }
+    if (!x) return (picCache[id] = "");
+    var keep = ctx;
+    function fit(w, h, ox, fn) { var s = Math.min(PW * 0.94 / w, PH * 0.9 / h); Farm.inUnits(x, PW / 2 + ox * s, PH * 0.95, s, 3.4, fn); }
+    ctx = x;
+    try {
+      if (id === "load") fit(7.4, 4.6, 0, function () {
+        x.translate(-1.6, 0);
+        teleBoom(x, { a: -0.25, ext: 0.3, curl: 0, jaw: 0, load: "silage" }); teleBody(x, {});
+      });
+      else if (id === "mix") fit(6.6, 3.9, 0, function () {
+        x.translate(3.85, -0.5);
+        mixer(x, { peek: 2.2, fill: 1, spin: 0.8, base: FEED, chunks: [{ a: 0.5, rr: 0.6, col: SIL[0], s: 0.35 }, { a: 2.4, rr: 0.7, col: STRAW[0], s: 0.3 }, { a: 4.2, rr: 0.5, col: MEAL[0], s: 0.3 }] });
+      });
+      else if (id === "feed") fit(3.0, 2.3, 0, function () {
+        x.save(); x.translate(0, -0.3); cowHead(x, { k: 1, munch: 1 }); x.restore();
+        x.beginPath(); x.moveTo(-1.4, 0); x.quadraticCurveTo(-0.7, -0.5, 0, -0.42); x.quadraticCurveTo(0.7, -0.5, 1.4, 0); x.closePath(); fs(x, FEED);
+        strands(x, -1.2, -0.4, 2.4, 0.35, [FEED2, SIL[2], STRAW[0]], 7, 20);
+      });
+    } finally { ctx = keep; }
+    var url = "";
+    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
+    return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
+  }
+
+  // ---------- Steps, bottom bar, ghost ----------
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (locked()) return null;
+      if (phase === "ready") {
+        var p = partScreen(stepId);
+        if (!p) return null;
+        if (stepId === "feed" && ghost.shown("go") >= 1) return { pts: [[p.x, p.y], [p.x + Math.min(W * 0.3, 140), p.y]], key: "go" };
+        return { pts: [[p.x, p.y]], tap: true, key: "go" };
+      }
+      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      return null;
+    }
+  });
+  var steps = Toybox.steps($("steps"), {
+    steps: STEPS.map(function (s) { return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.id) }; }),
+    coach: coach, ghost: ghost,
+    onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); }
+  });
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
+
+  function doGo() {
+    if (locked()) return false;
+    if (phase === "ready" || (phase === "work" && !auto && stepId === "feed")) return go();
+    if (phase === "done") return again();
+    busyHint(); return true;
+  }
+  function busyHint() {
+    if (phase === "arrive") { coach.say("The mixer wagon is backing up.", 3); return; }
+    if (phase === "milk") { coach.say("The cows are going to be milked.", 3); return; }
+    if (phase === "munch") { coach.say("The cows are munching.", 3); return; }
+    if (phase === "work") { snd.horn(); coach.say(BUSY[stepId], 3); }
+  }
+
+  // =====================================================================================================
+  // The flow
+  // =====================================================================================================
+  function setPhase(p) { phase = p; phaseT = 0; }
+  function bringIn(id) {
+    stepId = id; steps.at(id); auto = false; grab = null;
+    setPhase("ready"); steps.busy(false);
+    if (id === "load") tagW(scF, "Telehandler", TX, 3.6);
+    else if (id === "mix") tagW(scF, "Mixer wagon", rig.x - 3.85, 3.2);
+    else if (id === "feed") tagW(scF, "Cow barn", (BX0 + BX1) / 2, 4.2);
+  }
+  function go() {
+    if (phase === "ready") {
+      if (ghost) ghost.learned("go");
+      setPhase("work"); snd.horn(); steps.busy(true);
+      if (stepId === "load") { tele.st = "load"; tele.t = 0; coach.say("The shear grab cuts a block of silage.", 4); }
+      else if (stepId === "mix") { rig.mixT = 0; coach.say("The auger mixes it all up.", 4); }
+      else if (stepId === "feed") { rig.st = "go"; auto = true; coach.say("Off to the cow barn!", 3); }
+      return true;
+    }
+    if (phase === "work" && !auto && stepId === "feed") { auto = true; steps.busy(true); return true; }
+    return false;
+  }
+  function loadDone() { steps.done("load"); bringIn("mix"); }
+  function mixDone() { steps.done("mix"); bringIn("feed"); }
+  function feedDone() {
+    feeds++; save(); setCount(); snd.chime();
+    Farm.world.update(function (w) { w.cows = (typeof w.cows === "number" && isFinite(w.cows) ? w.cows : 0) + 1; });
+    steps.busy(true); grab = null; auto = true;
+    setPhase("munch");
+    coach.say("The cows munch their food.", 3);
+  }
+  function startMilk() {
+    setPhase("milk");
+    coach.say("Milking time! In they go.", 4);
+    tagW(scF, "Milking parlor", DOOR + 2, 3.4, RPAR);
+    cows.forEach(function (c, i) { c.st = "leave"; c.t = -(cows.length - 1 - i) * 1.0; });
+  }
+  function allIn() {
+    setPhase("done"); steps.done("feed"); steps.finish("Again!"); steps.busy(false);
+    coach.say("All the cows are in the milking parlor.", 5);
+    snd.chime(); Toybox.kind();
+  }
+  function again() {
+    if (phase !== "done") return false;
+    if (ghost) ghost.learned("again");
+    resetRound();
+    rig.x = WAG + 14; rig.st = "back"; rig.v = 0;
+    steps.reset(); steps.at("load"); steps.busy(true); stepId = "load";
+    setPhase("arrive");
+    follow(0, true);
+    coach.say("The cows will be hungry again.", 3);
+    return true;
+  }
+  function resetRound() {
+    tele.st = "idle"; tele.d = 0; tele.dir = -1; tele.a = 0.25; tele.ext = 0; tele.curl = 0; tele.jaw = 0; tele.load = null;
+    tub.chunks = []; tub.mound = null; tub.fill = 0; tub.mix = 0; tub.base = FEED;
+    clampS.notch = 0; clampS.fresh = 0; clampS.bale = true;
+    feedX = BX0 + 0.6; feedOn = false; falling = null; meal = 0; doorOpen = 0;
+    rig.st = "park"; rig.x = WAG; rig.v = 0; rig.door = 0; rig.chute = 0; rig.mixT = -1; rig.spinV = 0;
+    makeCows(); lickS = null;
+  }
+  function startOver() {
+    if (locked()) return;
+    parts.length = 0; mooS = null; catS = null; calfS = null; faceT = 0; tagged = {};
+    resetRound();
+    steps.reset(); bringIn("load"); follow(0, true);
+    coach.say("A new day on the farm!", 3);
+    save();
+  }
+
+  // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  var surpriseN = 0;
+  function inYard() { return stepId !== "feed" || (phase === "ready" && rig.x < BX0 - 6); }
+  function cowNear(x) { var best = null, bd = 1e9; cows.forEach(function (c) { if (c.st === "in") return; var d = Math.abs(c.x - x); if (d < bd) { bd = d; best = c; } }); return best; }
+  function surprise() {
+    if (locked()) return;
+    var pick = ["moo", "cat", "calf", "faces"][surpriseN++ % 4];
+    if (pick === "moo" && feeding() && rig.st === "go") {
+      var cabX = rig.x + 1.6, c = null;
+      cows.forEach(function (q) { if (!c && q.st === "wait" && q.x > cabX + 5.6 && q.x < cabX + 10) c = q; });
+      if (c) { lickS = { cow: c, t: 0, smear: 0, wipe: 0 }; coach.say("A cow licks the tractor window!", 3); tagW(scF, "Cow", c.x, 2.2, RCOW); return; }
+    }
+    if (pick === "calf") {
+      var hx = null;
+      HUTCH.forEach(function (h) { var sx = PX(scF, h, 1.45); if (sx > 20 && sx < RF.w - 20) hx = h; });
+      if (hx !== null) { calfS = { x: hx, t: 0 }; coach.say("A calf peeks out!", 3); snd.pop(); tagW(scF, "Calf", hx, 1.8, 1.45); return; }
+      pick = "moo";
+    }
+    if (pick === "moo") {
+      var who;
+      if (inYard() && phase !== "milk" && phase !== "done") who = { paddock: 1, i: surpriseN % 2 };
+      else { var cc = cowNear(scF.cam); who = cc ? { cow: cc } : { door: 1 }; }
+      if (who) { mooS = { who: who, t: 0 }; mooSound(); coach.say("Moo! Says the cow.", 3); return; }
+    }
+    if (pick === "cat") {
+      if (inYard() && phase !== "milk" && phase !== "done") catS = { where: "clamp", x: 4.6, t: 0, st: "walk", ph: 0 };
+      else catS = { where: "barrier", x: (phase === "done" || phase === "milk") ? DOOR - 5 : scC.cam - 2.5, t: 0, st: "walk", ph: 0 };
+      coach.say("The barn cat comes to see.", 3); return;
+    }
+    faceT = 6; coach.say("Hello, machines!", 3);
+  }
+  function mooSound() {
+    var ac = window.Toybox && Toybox.sound.ready();
+    if (!ac) return;
+    try {
+      var t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = "sawtooth"; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(175, t + 0.25); o.frequency.linearRampToValueAtTime(120, t + 1.0);
+      f.type = "lowpass"; f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(900, t + 0.3); f.frequency.linearRampToValueAtTime(400, t + 1.0);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+      o.connect(f); f.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 1.2);
+    } catch (e) { /* ignore */ }
+  }
+
+  // =====================================================================================================
+  // Particles (world x, height h in metres, depth r)
+  // =====================================================================================================
+  var parts = [];
+  function addPart(p) { if (parts.length > 160) parts.shift(); p.t = 0; p.r = p.r || 1; p.rot = p.rot || Math.random() * 3; parts.push(p); }
+  function updateParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i]; p.t += dt;
+      if (p.t >= p.life) { parts.splice(i, 1); continue; }
+      if (p.kind === "puff") { p.x += p.vx * dt; p.h += p.vh * dt; p.size += (p.grow || 0.5) * dt; continue; }
+      p.vh -= (p.g === undefined ? 9 : p.g) * dt; p.x += p.vx * dt; p.h += p.vh * dt; p.rot += (p.spin || 0) * dt;
+      var fl = p.floor || 0;
+      if (p.h < fl) { p.h = fl; p.vh = 0; p.vx *= 0.2; p.spin = 0; if (p.t < p.life - 0.25) p.t = p.life - 0.25; }
+    }
+  }
+  function drawParts(sc, deep) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (deep ? p.r <= 1.01 : p.r > 1.01) continue;
+      var s = sc.S(p.r), x = PX(sc, p.x, p.r), y = sc.Y(p.r) - p.h * s, z = Math.max(1, p.size * s * (sc === scC ? 0.7 : 1)), f = p.t / p.life;
+      if (x < -40 || x > sc.W + 40) continue;
+      ctx.globalAlpha = p.kind === "puff" ? (p.alpha || 0.5) * (1 - f) : (f > 0.7 ? (1 - f) / 0.3 : 1);
+      ctx.fillStyle = p.col;
+      if (p.kind === "puff" || p.kind === "dot") { ctx.beginPath(); ctx.arc(x, y, z, 0, TAU); ctx.fill(); }
+      else { ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.fillRect(-z, -z * 0.25, z * 2, z * 0.5); ctx.restore(); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function pickCol(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+  // =====================================================================================================
+  // Input
+  // =====================================================================================================
+  function partScreen(id) {
+    if (id === "load" || id === "tele") return scr2(scF, tele.x + tele.d, 1.7);
+    if (id === "mix" || id === "feed" || id === "rig") return scr2(scF, rig.x - 3.0, 1.6);
+    return null;
+  }
+  Toybox.press(cv, {
+    any: true,
+    parts: function () {
+      var list = [], p, k = scF.k;
+      p = partScreen("tele"); list.push({ id: "tele", x: p.x, y: p.y, r: Math.max(44, k * 2.2) });
+      p = partScreen("rig"); list.push({ id: "rig", x: p.x, y: p.y, r: Math.max(46, k * 3.4) });
+      p = scr2(scF, CLF - 3, 1.4); list.push({ id: "clamp", x: p.x, y: p.y, r: Math.max(40, k * 2.0) });
+      p = scr2(scF, MEALX, 3.5, 1.5); list.push({ id: "meal", x: p.x, y: p.y, r: Math.max(36, k * 1.2) });
+      cows.forEach(function (c, i) { if (c.st === "in") return; var q = scr2(scF, c.x, 1.3, c.r); list.push({ id: "cow" + i, x: q.x, y: q.y, r: Math.max(30, k * 0.9) }); });
+      p = scr2(scF, DOOR + 2, 1.6, RPAR); list.push({ id: "parlor", x: p.x, y: p.y, r: Math.max(36, k * 1.8) });
+      HUTCH.forEach(function (h, i) { var q = scr2(scF, h, 0.7, 1.45); list.push({ id: "hutch" + i, x: q.x, y: q.y, r: Math.max(30, k * 0.9) }); });
+      if (split) { p = onScreen(scC, RC.w / 2, RC.h * 0.55); list.push({ id: "close", x: p.x, y: p.y, r: Math.min(RC.w, RC.h) * 0.45 }); }
+      return list;
+    },
+    dragStart: function (part, e, s) {
+      if (locked()) return;
+      if (part !== "rig" || stepId !== "feed" || (phase !== "ready" && phase !== "work")) return;
+      if (phase === "ready") go();
+      auto = false; grab = { off: dragWorld(s.x) - rig.x };
+      if (ghost) ghost.learned("go");
+    },
+    move: function (part, e, s) { if (grab) grab.to = dragWorld(s.x) - grab.off; },
+    up: function (part, e, s) { if (grab && !s.tap && phase === "work") { auto = true; steps.busy(true); } grab = null; },
+    tap: function (part) {
+      if (locked()) return;
+      if (part === "close") part = stepId === "load" ? "tele" : "rig";
+      var mine = (part === "tele" && stepId === "load") || (part === "rig" && (stepId === "mix" || stepId === "feed"));
+      if (mine && (phase === "ready" || (phase === "work" && !auto))) { go(); return; }
+      if (part === "tele") { snd.horn(); tagW(scF, tele.st === "load" ? "Shear grab" : "Telehandler", tele.x + tele.d - 2.5, 3.4); return; }
+      if (part === "rig") { snd.horn(); tagW(scF, rig.mixT >= 0 ? "Auger" : (feeding() ? "Chute" : "Mixer wagon"), feeding() ? chuteX() : rig.x - 3.85, 3.2); return; }
+      if (part === "clamp") { tagW(scF, "Silage clamp", CLF - 3, 3.0); steps.sayStep(); return; }
+      if (part === "meal") { tagW(scF, "Meal bin", MEALX, 4.6, 1.5); return; }
+      if (part === "parlor") { tagW(scF, "Milking parlor", DOOR + 2, 3.4, RPAR); return; }
+      if (part.indexOf("hutch") === 0) { var hx = HUTCH[+part.slice(5)]; calfS = { x: hx, t: 0 }; tagW(scF, "Calf hutch", hx, 1.8, 1.45); snd.pop(); return; }
+      if (part.indexOf("cow") === 0) { var c = cows[+part.slice(3)]; mooS = { who: { cow: c }, t: 0 }; mooSound(); tagW(scF, "Cow", c.x, 2.2, c.r); return; }
+      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep();
+      if (ghost) ghost.poke();
+    }
+  });
+  function dragWorld(clientX) { var b = cv.getBoundingClientRect(); return scF.wx(clientX - b.left - RF.x, 1); }
+
+  // =====================================================================================================
+  // Simulation
+  // =====================================================================================================
+  function closeFocus() {
+    if (phase === "arrive") return [rig.x - 3, 9, 3.6];
+    if (lickS) return [rig.x + 4.0, 7.2, 3.6];
+    if (stepId === "load") {
+      if (tele.st === "load") { var fw = forkWorld(); return tele.dir < 0.2 ? [clamp(fw[0] - 0.4, 8.5, 12), 6.2, 3.6] : [18.9, 7, 5.6]; }
+      return [11.6, 7.4, 3.8];
+    }
+    if (stepId === "mix") return [rig.x - 3.85, 6.0, 3.5];
+    if (phase === "munch") return [36.8, 5.2, 2.5];
+    if (phase === "milk" || phase === "done") {
+      var lead = null; cows.forEach(function (c) { if (c.st === "walk" && (!lead || c.x < lead.x)) lead = c; });
+      return [lead ? Math.min(DOOR + 0.5, lead.x + 1.5) : DOOR, 7.5, 3.4];
+    }
+    if (stepId === "feed" && phase === "work" && chuteX() > BX0 - 1 && chuteX() < BX1 + 1) return [chuteX() - 1.9, 5.2, 2.6];
+    return [rig.x - 2.5, 10, 3.8];
+  }
+  function wideFocus() {
+    if (phase === "milk" || phase === "done") {
+      var mn = DOOR; cows.forEach(function (c) { if (c.st !== "in") mn = Math.min(mn, c.x); });
+      return [(mn + DOOR) / 2 + 1, Math.max(15, DOOR - mn + 8)];
+    }
+    if (phase === "munch") return [(BX0 + BX1) / 2 + 1, 18];
+    if (stepId === "feed" && (phase === "work") ) return [Math.max(rig.x - 0.8, 18), 18];
+    return [16.6, 25];
+  }
+  function follow(dt, snap) {
+    var e = dt * 2.2, wf = wideFocus(), cf = closeFocus();
+    zF.target = wf[1]; zF.mht = 5.4; zC.target = cf[1]; zC.mht = cf[2];
+    [[zF, scF, RF], [zC, scC, RC]].forEach(function (q) {
+      var z = q[0];
+      if (snap) { z.span = z.target; z.mh = z.mht; q[1].layout(q[2].w, q[2].h); }
+      else if (Math.abs(z.span - z.target) > 0.02 || Math.abs(z.mh - z.mht) > 0.02) { z.span += (z.target - z.span) * Math.min(1, e); z.mh += (z.mht - z.mh) * Math.min(1, e); q[1].layout(q[2].w, q[2].h); }
+    });
+    scC.follow(cf[0], Math.abs(cf[0] - scC.cam) > 12 ? dt * 3 : dt * 1.6, snap);
+    scF.follow(wf[0], dt * 1.4, snap);
+  }
+  var engLevel = 0;
+  function update(dt) {
+    time += dt; phaseT += dt;
+    var work = 0;
+    work = Math.max(work, updateTele(dt));
+    work = Math.max(work, updateRig(dt));
+    updateFalling(dt);
+    updateCows(dt);
+    if (phase === "munch" && phaseT > 2.2) startMilk();
+    if (phase === "milk" && cows.every(function (c) { return c.st === "in"; })) allIn();
+    doorOpen += (((phase === "milk") ? 1 : 0) - doorOpen) * Math.min(1, dt * 3);
+    clampS.fresh = Math.max(0, clampS.fresh - dt * 0.5);
+    if (faceT > 0) faceT = Math.max(0, faceT - dt);
+    if (mooS) { mooS.t += dt; if (mooS.t > 2.6) mooS = null; }
+    if (calfS) { calfS.t += dt; if (calfS.t > 3.6) calfS = null; }
+    if (catS) updateCat(dt);
+    if (lickS) updateLick(dt);
+    if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    updateParts(dt);
+    follow(dt);
+    engLevel += (work - engLevel) * Math.min(1, dt * 4);
+    snd.engine(ending ? -1 : 0.15 + engLevel * 0.85);
+    snd.soil(rig.mixT >= 0 ? 0.5 * clamp(rig.spinV / 6, 0, 1) : 0);
+    snd.pour(meal > 0.3 || (feedOn && feeding()) ? 0.5 : 0);
+  }
+  // the telehandler: cut a block of silage, drop it in the wagon; lift the straw bale in too
+  var A_REST = 0.25, A_CUT = 0.013, A_LOW = 0.225, A_CARRY = -0.2, A_DROP = -0.357;
+  function pose(o, k) {
+    if (o.a !== undefined) tele.a = lerp(tele.p0.a, o.a, k);
+    if (o.d !== undefined) tele.d = lerp(tele.p0.d, o.d, k);
+    if (o.ext !== undefined) tele.ext = lerp(tele.p0.ext, o.ext, k);
+    if (o.curl !== undefined) tele.curl = lerp(tele.p0.curl, o.curl, k);
+    if (o.jaw !== undefined) tele.jaw = lerp(tele.p0.jaw, o.jaw, k);
+    if (o.dir !== undefined) tele.dir = -Math.cos(Math.PI * lerp(tele.p0.dir < 0 ? 0 : 1, o.dir < 0 ? 0 : 1, k));
+  }
+  // the sequence: [duration, target pose, event]
+  var SEQ = [
+    [0.7, { a: A_CUT, d: -1.2, ext: 0.9, jaw: 1, curl: 0 }],
+    [0.7, { jaw: 0 }, "cut"],
+    [0.45, { a: A_CARRY, d: 0, ext: 0 }],
+    [0.45, { dir: 1 }],
+    [0.45, { a: A_DROP, d: 0.2, ext: 1.97 }],
+    [0.45, { curl: 0.85, jaw: 1 }, "drop"],
+    [0.6, { curl: 0, jaw: 0.6, a: A_CARRY, ext: 0.3, d: 0, dir: -1 }, "straw"],
+    [0.5, { a: A_LOW, d: -1.2, ext: 0.05, jaw: 1 }],
+    [0.4, { jaw: 0 }, "grab"],
+    [0.4, { a: A_CARRY, d: 0, ext: 0 }],
+    [0.45, { dir: 1 }],
+    [0.45, { a: A_DROP, d: 0.2, ext: 1.97 }],
+    [0.45, { curl: 0.85, jaw: 1 }, "drop"],
+    [0.7, { curl: 0, jaw: 0, a: A_REST, ext: 0, d: 0, dir: -1 }]
+  ];
+  function updateTele(dt) {
+    if (tele.st !== "load") return 0;
+    tele.t += dt;
+    var t = tele.t, i = 0, acc = 0;
+    while (i < SEQ.length && t > acc + SEQ[i][0]) { acc += SEQ[i][0]; i++; }
+    if (i !== tele.seg) {
+      if (tele.seg !== undefined && tele.seg < SEQ.length) { pose(SEQ[tele.seg][1], 1); seqEvent(SEQ[tele.seg][2], true); }
+      tele.seg = i; tele.p0 = { a: tele.a, d: tele.d, ext: tele.ext, curl: tele.curl, jaw: tele.jaw, dir: tele.dir };
+      if (i < SEQ.length) seqEvent(SEQ[i][2], false);
+    }
+    if (i >= SEQ.length) {
+      tele.st = "idle"; tele.seg = undefined; tele.dir = -1; tele.a = A_REST; tele.d = 0; tele.ext = 0; tele.curl = 0; tele.jaw = 0;
+      if (meal <= 0) loadDone(); else tele.waitMeal = true;
+      return 0.3;
+    }
+    var k = ease((t - acc) / SEQ[i][0]);
+    pose(SEQ[i][1], k);
+    var ev = SEQ[i][2];
+    if (ev === "cut" && Math.random() < dt * 14) { var fw = forkWorld(); addPart({ kind: "bit", x: fw[0] - 1.3, h: 0.9 + Math.random() * 1.4, vx: 0.4 + Math.random(), vh: Math.random(), life: 0.6, size: 0.06, col: pickCol(SIL), spin: 5 }); }
+    if (ev === "drop" && tele.load && k > 0.45) release();
+    return 0.8;
+  }
+  function seqEvent(ev, end) {
+    if (!ev) return;
+    if (ev === "cut" && end) { tele.load = "silage"; clampS.notch = 1; clampS.fresh = 1; snd.clunk(); tagW(scF, "Silage clamp", CLF - 4, 3.0); }
+    if (ev === "grab" && end) { tele.load = "straw"; clampS.bale = false; snd.clunk(); }
+    if (ev === "straw" && !end) { coach.say("Straw and meal go in too.", 4); meal = 0.01; tagW(scF, "Meal bin", MEALX, 4.6, 1.5); }
+    if (ev === "drop" && end && tele.load) release();
+  }
+  function forkWorld() { var e = teleEnd(tele.a, tele.ext); return [tele.x + tele.d + tele.dir * e[0], -e[1]]; }
+  function release() {
+    var fw = forkWorld();
+    falling = { kind: tele.load, x: fw[0] + tele.dir * 0.7, h: fw[1] - 1.0, vh: 0, rot: 0 };
+    tele.load = null;
+  }
+  function updateFalling(dt) {
+    if (!falling) return;
+    var f = falling; f.vh -= 11 * dt; f.h += f.vh * dt; f.rot += dt * 0.8;
+    if (f.h <= 2.5) {
+      var cx = rig.x + MX.cx, cols = f.kind === "straw" ? STRAW : SIL, n = f.kind === "straw" ? 7 : 10;
+      for (var i = 0; i < n; i++) tub.chunks.push({ a: Math.random() * TAU, rr: 0.15 + Math.random() * 0.7, col: pickCol(cols), s: 0.25 + Math.random() * 0.2, c0: null });
+      if (f.kind === "silage") tub.mound = { col: SIL[0], h: 0.75 };
+      else if (tub.mound) tub.mound.h = 0.95;
+      tub.fill = Math.min(1, tub.fill + 0.5);
+      snd.clunk();
+      for (var j = 0; j < 8; j++) addPart({ kind: "bit", x: cx + (Math.random() - 0.5) * 2.4, h: 2.9, vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random() * 1.5, life: 0.6, size: 0.07, col: pickCol(cols), floor: 2.7, spin: 4 });
+      falling = null;
+    }
+  }
+  // the meal bin's auger pours meal in while the straw goes in
+  function updateMeal(dt) {
+    if (meal <= 0) return;
+    meal += dt;
+    var sp = mealSpout();
+    if (meal > 0.4 && meal < 2.6 && Math.random() < dt * 30) addPart({ kind: "dot", x: sp[0] + (Math.random() - 0.5) * 0.15, h: sp[1] - 0.1, vx: 0, vh: -1, g: 9, life: 0.5, size: 0.05, col: pickCol(MEAL), floor: 2.75 });
+    if (meal > 0.6 && meal < 2.6 && Math.random() < dt * 8) tub.chunks.push({ a: Math.random() * TAU, rr: Math.random() * 0.8, col: pickCol(MEAL), s: 0.12 + Math.random() * 0.1 });
+    if (meal > 2.9) { meal = 0; if (tele.waitMeal) { tele.waitMeal = false; loadDone(); } }
+  }
+  function mealSpout() { return [rig.x + MX.cx + 1.0, 3.55]; }
+  var MIXT = 4.8;
+  function updateRig(dt) {
+    var w = 0;
+    updateMeal(dt);
+    if (rig.mixT >= 0) {
+      rig.mixT += dt; var t = rig.mixT;
+      var target = t < MIXT - 0.6 ? 7 : 0;
+      rig.spinV += (target - rig.spinV) * Math.min(1, dt * 2.2);
+      tub.mix = clamp(t / (MIXT - 0.8), 0, 1);
+      if (tub.mound) { tub.mound.h = Math.max(0, tub.mound.h - dt * 0.45); if (tub.mound.h <= 0.02) tub.mound = null; }
+      tub.chunks.forEach(function (c) {
+        c.a += dt * rig.spinV * (0.25 + 0.2 * (1 - c.rr));
+        if (!c.c0) c.c0 = c.col;
+        c.col = mix(c.c0, FEED, tub.mix * 0.85);
+      });
+      if (tub.mix > 0.3 && tub.chunks.length < 40 && Math.random() < dt * 6) tub.chunks.push({ a: Math.random() * TAU, rr: Math.random() * 0.9, col: FEED2, c0: FEED2, s: 0.1 + Math.random() * 0.08 });
+      rig.shake = Math.sin(time * 40) * 0.015 * clamp(rig.spinV / 7, 0, 1);
+      w = 0.85 * clamp(rig.spinV / 7, 0, 1) + 0.2;
+      if (t > 2 && t < 2.1) tagOnce("auger" + feeds, scF, "Auger", rig.x + MX.cx, 3.4);
+      if (t >= MIXT) { rig.mixT = -1; rig.spinV = 0; rig.shake = 0; coach.say("The food is all mixed!", 3); mixDone(); }
+    }
+    rig.spin += dt * rig.spinV;
+    rig.pto += dt * rig.spinV * 1.5;
+    if (rig.st === "go") {
+      var vt = 0, cx0 = chuteX();
+      if (grab && grab.to !== undefined) vt = clamp((grab.to - rig.x) * 3, 0, 9);
+      else if (auto) vt = cx0 < BX0 + 0.2 ? 6.5 : (cx0 > BX1 - 0.4 ? 7 : V_FEED);
+      if (lickS && lickS.t < 2.6) vt = 0;   // the tractor waits for the cow's lick
+      rig.v += (vt - rig.v) * Math.min(1, dt * (Math.abs(vt) > Math.abs(rig.v) ? 2.5 : 5));
+      rig.x += rig.v * dt; cx0 = chuteX();
+      w = Math.max(0.5, Math.abs(rig.v) / 7);
+      var inBarn = cx0 >= BX0 + 0.4 && cx0 <= BX1 - 0.5;
+      rig.door += ((inBarn ? 1 : 0) - rig.door) * Math.min(1, dt * 4);
+      rig.chute += ((cx0 > BX0 - 3 && cx0 < BX1 ? 1 : 0) - rig.chute) * Math.min(1, dt * 3);
+      feedOn = inBarn && rig.door > 0.5;
+      if (feedOn) {
+        if (feedX < cx0 - 0.1) feedX = Math.min(cx0 - 0.1, BX1 - 0.5);
+        rig.belt += dt * 2.5;
+        tub.fill = clamp(1 - (cx0 - BX0) / (BX1 - BX0), 0.05, 1);
+        if (Math.abs(rig.v) > 0.3 && Math.random() < dt * 40) addPart({ kind: "bit", x: cx0 + (Math.random() - 0.5) * 0.2, h: 1.0, vx: -0.3, vh: -0.5, g: 9, life: 0.45, size: 0.06, col: pickCol([FEED, FEED2, SIL[1], STRAW[1]]), r: 1.06, floor: 0.2, spin: 4 });
+        tagOnce("chute" + feeds, scF, "Chute", cx0, 1.6);
+        tagOnce("barrier" + feeds, scF, "Feed barrier", cx0 - 3, 1.6, RB);
+      }
+      if (phase === "work" && cx0 > BX1 - 0.5) feedDone();
+      if (rig.x >= PARK) { rig.x = PARK; rig.v = 0; rig.st = "park"; grab = null; }
+    } else if (rig.st === "back") {
+      var d = rig.x - WAG; rig.v = -clamp(d * 2, 1.2, 8); rig.x += Math.max(rig.v * dt, -d); w = 0.5;
+      if (Math.random() < dt * 2) snd.tick();
+      if (d < 0.03) { rig.x = WAG; rig.v = 0; rig.st = "park"; snd.clunk(); bringIn("load"); }
+    } else rig.chute = Math.max(0, rig.chute - dt * 2);
+    rig.wheel += -rig.v * dt;
+    return w;
+  }
+  function updateCows(dt) {
+    cows.forEach(function (c) {
+      c.t += dt;
+      if (c.st === "wait") {
+        c.look = clamp((rig.x - 3 - c.x) / 6, -1, 1);
+        c.head = Math.max(0, c.head - dt * 2);
+        if (feedX >= c.x - 0.2 && feeding()) { c.st = "eat"; c.t = 0; }
+      } else if (c.st === "eat") {
+        c.head = Math.min(1, c.head + dt * 2); c.look = 0;
+        if (c.head > 0.9) c.munch += dt * 7;
+        if (c.t > 0.6 && c.t < 0.7) tagOnce("cows" + feeds, scF, "Cows", c.x, 2.2, RCOW);
+      } else if (c.st === "leave") {
+        c.head = Math.max(0, c.head - dt * 2.5);
+        if (c.t > 0.4) { c.st = "walk"; c.t = 0; c.side = 1; c.walk = 0; c.r = RCOW + 0.02; }
+      } else if (c.st === "walk") {
+        var sp = 3.3; c.x += sp * dt; c.walk += dt * 8;
+        if (c.x > DOOR - 0.6) c.r = lerp(RCOW + 0.02, 1.8, clamp((c.x - (DOOR - 0.6)) / 1.6, 0, 1));
+        if (c.x > DOOR + 1.2) c.st = "in";
+      }
+    });
+  }
+  function updateCat(dt) {
+    var c = catS; c.t += dt;
+    if (c.st === "walk") { c.x += dt * 1.6; c.ph += dt * 9; if (c.t > 2.2) { c.st = "sit"; c.t = 0; snd.pop(); } }
+    else if (c.st === "sit") { if (c.t > 2.4) { c.st = "go"; c.t = 0; } }
+    else { c.x += dt * 2.4; c.ph += dt * 11; if (c.t > 2.5) catS = null; }
+  }
+  function updateLick(dt) {
+    var l = lickS; l.t += dt;
+    if (l.t > 0.9 && !l.smear) { l.smear = 1; snd.pop(); }
+    if (l.t > 1.8) l.wipe = clamp((l.t - 1.8) / 1.0, 0, 1);
+    if (l.t > 3.0) lickS = null;
+  }
+
+  // =====================================================================================================
+  // Drawing
+  // =====================================================================================================
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawView(scF, RF);
+    if (split) { drawView(scC, RC); ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); if (RC.x > 0) { ctx.moveTo(RC.x, 0); ctx.lineTo(RC.x, H); } else { ctx.moveTo(0, RC.y); ctx.lineTo(W, RC.y); } ctx.stroke(); ctx.restore(); }
+  }
+  function drawView(sc, R) {
+    ctx.save(); ctx.translate(R.x, R.y);
+    ctx.beginPath(); ctx.rect(0, 0, R.w, R.h); ctx.clip();
+    drawWorld(sc);
+    ctx.restore();
+  }
+  function put(sc, x, dir, fn) {
+    var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
+    Farm.inUnits(ctx, PX(sc, x, 1), sc.gY, sc.k, sc.lw, function () { ctx.scale(d, 1); fn(); });
+  }
+  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
+  function vis(sc, x0, x1, r) { r = r || 1; return PX(sc, x1, r) > -30 && PX(sc, x0, r) < sc.W + 30; }
+  function drawWorld(sc) {
+    sc.sky(ctx, { time: time, season: "spring", dusk: dusk });
+    sc.hedge(ctx, { season: "spring" });
+    drawGround(sc);
+    drawPaddock(sc);
+    drawMealBin(sc);
+    HUTCH.forEach(function (h) { drawHutch(sc, h); });
+    drawParlor(sc, "back");
+    drawBarnBack(sc);
+    cows.forEach(function (c) { if (c.side && c.r > RPAR) drawCowSide(sc, c); });
+    drawParlor(sc, "front");
+    cows.forEach(function (c) { if (!c.side) drawCowBody(sc, c); });
+    drawBarrier(sc);
+    cows.forEach(function (c) { if (!c.side) drawCowHead(sc, c); });
+    cows.forEach(function (c) { if (c.side && c.r <= RPAR && c.st !== "in") drawCowSide(sc, c); });
+    drawParts(sc, true);
+    drawFeedLine(sc);
+    if (catS && catS.where === "barrier") drawCat(sc);
+    drawBarnFront(sc);
+    drawClamp(sc);
+    if (catS && catS.where === "clamp") drawCat(sc);
+    drawRig(sc);
+    drawMealAuger(sc);
+    if (lickS) drawTongue(sc);
+    drawTele(sc);
+    drawFalling(sc);
+    drawParts(sc, false);
+    sc.verge(ctx, {});
+    if (mooS) drawMoo(sc);
+  }
+  function drawGround(sc) {
+    var n = sc.night || 0, yH = sc.Y(sc.rH);
+    ctx.fillStyle = mix("#8CC85A", "#2B3A55", n * 0.5); ctx.fillRect(0, yH, sc.W, sc.gY - yH + 2);
+    ctx.fillStyle = mix("#7DBA4E", "#2B3A55", n * 0.5);
+    for (var i = 0; i < 4; i++) { var r = 1.8 + i * 0.9; ctx.fillRect(0, sc.Y(r) - 1, sc.W, Math.max(1, (sc.Y(r - 0.3) - sc.Y(r)) * 0.4)); }
+    function quad(xa, xb, r0, r1, col) {
+      ctx.beginPath(); ctx.moveTo(PX(sc, xa, r1), sc.Y(r1)); ctx.lineTo(PX(sc, xb, r1), sc.Y(r1)); ctx.lineTo(PX(sc, xb, r0), sc.Y(r0)); ctx.lineTo(PX(sc, xa, r0), sc.Y(r0)); ctx.closePath();
+      ctx.fillStyle = mix(col, "#2B3A55", n * 0.5); ctx.fill(); ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = "rgba(29,35,64,0.45)"; ctx.stroke();
+    }
+    quad(-12, XMAX + 20, 0.86, 1.2, "#C7CBD0");
+    quad(BX0 - 0.3, BX1 + 0.3, 1.2, RWALL, "#B4A88E");
+    quad(PX0 - 0.6, PX1 + 0.6, 1.2, RPAR, "#BDC2C8");
+  }
+  // the paddock behind the yard: a post-and-rail fence and two cows grazing
+  var PADR = 2.1;
+  function drawPaddock(sc) {
+    var rf = PADR + 0.3, sf = sc.S(rf), yf = sc.Y(rf), lw = Math.max(1, sc.lw * 0.6);
+    if (!vis(sc, -10, 26, rf)) return;
+    ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.beginPath();
+    for (var x = -10; x <= 26.01; x += 2) { var fx = PX(sc, x, rf); ctx.moveTo(fx, yf); ctx.lineTo(fx, yf - 1.2 * sf); }
+    ctx.stroke();
+    ctx.lineWidth = lw * 2.2; ctx.strokeStyle = "#9C7350"; ctx.beginPath();
+    ctx.moveTo(PX(sc, -10, rf), yf - 1.05 * sf); ctx.lineTo(PX(sc, 26, rf), yf - 1.05 * sf); ctx.moveTo(PX(sc, -10, rf), yf - 0.6 * sf); ctx.lineTo(PX(sc, 26, rf), yf - 0.6 * sf); ctx.stroke();
+    [[11.5, 1], [16, -1]].forEach(function (p, i) {
+      var talk = mooS && mooS.who.paddock && mooS.who.i === i ? mooS.t : 0;
+      putR(sc, p[0], PADR, p[1], function () {
+        ctx.save(); ctx.translate(0, 0);
+        cowSide(ctx, 0, false, faceAmt(), time, talk > 0 && talk < 1.8);
+        ctx.restore();
+      });
+    });
+  }
+  function drawMealBin(sc) {
+    var r = 1.5;
+    if (!vis(sc, MEALX - 2, MEALX + 2, r)) return;
+    putR(sc, MEALX, r, 1, function () {
+      var l0 = LW(), i;
+      [-0.75, 0.75].forEach(function (lx) { Ln(ctx, lx, 0, lx * 0.8, -1.6, INK, 0.12); Ln(ctx, lx, 0, lx * 0.8, -1.6, "#8C97A6", 0.07); });
+      Pp(ctx, [-0.9, -2.2, 0.9, -2.2, 0.15, -1.3, -0.15, -1.3], "#C3CCD6");
+      Rr(ctx, -0.9, -5.4, 1.8, 3.2, 0.04, "#D3DAE2");
+      for (i = 1; i < 6; i++) Ln(ctx, -0.88, -2.2 - i * 0.53, 0.88, -2.2 - i * 0.53, "rgba(29,35,64,0.3)", 0.04);
+      Pp(ctx, [-0.98, -5.4, 0, -6.1, 0.98, -5.4], "#B7C1CC");
+      shine(ctx, -0.6, -5.2, -0.6, -2.4, 0.08);
+      Ln(ctx, 0.7, -1.9, 0.7, -5.5, INK, 0.04); Ln(ctx, 0.85, -1.9, 0.85, -5.5, INK, 0.04);
+      Rr(ctx, -0.2, -1.32, 0.4, 0.22, 0.04, "#5D6675", l0 * 0.8);
+    });
+  }
+  // the bin's auger: from the bottom of the bin up and over the tub (drawn across depths in screen space)
+  function drawMealAuger(sc) {
+    if ((stepId !== "load" || rig.st !== "park") && meal <= 0) return;
+    var a = pt(sc, MEALX + 0.2, 1.5, 1.2), sp = mealSpout(), b = pt(sc, sp[0], 1, sp[1]), lw = sc.lw;
+    if (b[0] < -40 || a[0] > sc.W + 40) return;
+    var w = 0.24 * sc.k;
+    ctx.save(); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1] - w * 0.2);
+    ctx.strokeStyle = INK; ctx.lineWidth = w + lw * 2; ctx.stroke(); ctx.strokeStyle = "#B7C1CC"; ctx.lineWidth = w; ctx.stroke();
+    if (meal > 0.3) { ctx.setLineDash([w * 0.5, w * 0.7]); ctx.lineDashOffset = -time * w * 5; ctx.strokeStyle = MEAL[0]; ctx.lineWidth = w * 0.35; ctx.stroke(); ctx.setLineDash([]); }
+    ctx.restore();
+    ctx.beginPath(); ctx.moveTo(b[0] - w * 0.5, b[1] - w * 0.4); ctx.lineTo(b[0] + w * 0.5, b[1] - w * 0.4); ctx.lineTo(b[0] + w * 0.3, b[1] + w * 0.6); ctx.lineTo(b[0] - w * 0.3, b[1] + w * 0.6); ctx.closePath();
+    ctx.fillStyle = "#8C97A6"; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.strokeStyle = INK; ctx.stroke();
+    if (meal > 0.4 && meal < 2.6) {
+      var c = pt(sc, sp[0], 1, 2.8);
+      ctx.fillStyle = MEAL[0]; ctx.globalAlpha = 0.85; ctx.fillRect(b[0] - w * 0.18, b[1] + w * 0.6, w * 0.36, Math.max(0, c[1] - b[1] - w * 0.6)); ctx.globalAlpha = 1;
+    }
+  }
+  function drawHutch(sc, x) {
+    var r = 1.45;
+    if (!vis(sc, x - 2, x + 2, r)) return;
+    putR(sc, x, r, 1, function () {
+      hutch(ctx);
+      if (calfS && calfS.x === x) {
+        var t = calfS.t, up = t < 0.5 ? ease(t / 0.5) : (t > 3 ? 1 - ease((t - 3) / 0.5) : 1);
+        ctx.save(); ctx.beginPath(); ctx.rect(-0.5, -1.6, 1.0, 1.6); ctx.clip();
+        ctx.translate(0, -0.25); calfHead(ctx, up, time); ctx.restore();
+      }
+    });
+  }
+  // the parlor: "back" = its dark doorway (cows inside are drawn after it), "front" = the wall with the door
+  function drawParlor(sc, part) {
+    var r = RPAR, n = sc.night || 0;
+    if (!vis(sc, PX0 - 1, PX1 + 1, r)) return;
+    var x0 = PX(sc, PX0, r), x1 = PX(sc, PX1, r), y0 = sc.Y(r), s = sc.S(r), dA = PX(sc, DOOR - DOORW / 2, r), dB = PX(sc, DOOR + DOORW / 2, r), lw = Math.max(1.2, sc.lw * 0.8);
+    if (part === "back") {
+      ctx.fillStyle = "#3A3348"; ctx.fillRect(dA, y0 - 2.3 * s, dB - dA, 2.3 * s);
+      ctx.fillStyle = "rgba(255,240,190,0.35)"; ctx.fillRect(dA + (dB - dA) * 0.6, y0 - 2.1 * s, (dB - dA) * 0.25, 0.5 * s);
+      return;
+    }
+    ctx.beginPath(); ctx.rect(x0, y0 - 3.2 * s, x1 - x0, 3.2 * s); ctx.rect(dB, y0 - 2.3 * s, dA - dB, 2.3 * s);
+    ctx.fillStyle = mix("#F1ECE1", "#2B3A55", n * 0.5); ctx.fill("evenodd");
+    ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.strokeRect(x0, y0 - 3.2 * s, x1 - x0, 3.2 * s); ctx.strokeRect(dA, y0 - 2.3 * s, dB - dA, 2.3 * s);
+    ctx.fillStyle = mix("#C9CDD2", "#2B3A55", n * 0.5); ctx.fillRect(x0, y0 - 0.8 * s, dA - x0, 0.8 * s); ctx.fillRect(dB, y0 - 0.8 * s, x1 - dB, 0.8 * s);
+    // the sliding door, open to the right
+    var dw = dB - dA, dx = doorOpen * dw * 0.95;
+    ctx.fillStyle = mix("#3E9F3A", "#2B3A55", n * 0.5); ctx.fillRect(dA + dx, y0 - 2.3 * s, dw, 2.3 * s); ctx.strokeRect(dA + dx, y0 - 2.3 * s, dw, 2.3 * s);
+    ctx.beginPath(); ctx.moveTo(dA + dx, y0 - 2.3 * s); ctx.lineTo(dA + dx + dw, y0); ctx.moveTo(dA + dx + dw, y0 - 2.3 * s); ctx.lineTo(dA + dx, y0); ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = lw * 1.4; ctx.beginPath(); ctx.moveTo(dA, y0 - 2.45 * s); ctx.lineTo(dB + dw, y0 - 2.45 * s); ctx.stroke(); ctx.lineWidth = lw;
+    // windows and the roof
+    [0.68, 0.84].forEach(function (f) { var wx = lerp(x0, x1, f); ctx.fillStyle = "#BFE7FA"; ctx.fillRect(wx - 0.5 * s, y0 - 2.4 * s, 1.0 * s, 0.8 * s); ctx.strokeRect(wx - 0.5 * s, y0 - 2.4 * s, 1.0 * s, 0.8 * s); });
+    ctx.beginPath(); ctx.moveTo(x0 - 0.4 * s, y0 - 3.2 * s); ctx.lineTo(x1 + 0.4 * s, y0 - 3.2 * s); ctx.lineTo(x1, y0 - 4.1 * s); ctx.lineTo(x0, y0 - 4.1 * s); ctx.closePath();
+    ctx.fillStyle = mix("#5E6B7A", "#2B3A55", n * 0.5); ctx.fill(); ctx.stroke();
+  }
+  function drawBarnBack(sc) {
+    var r = RWALL, n = sc.night || 0;
+    if (!vis(sc, BX0 - 1, BX1 + 1, r)) return;
+    var x0 = PX(sc, BX0 - 0.3, r), x1 = PX(sc, BX1 + 0.3, r), y0 = sc.Y(r), s = sc.S(r), lw = Math.max(1, sc.lw * 0.7);
+    ctx.fillStyle = mix("#9C7350", "#2B3A55", n * 0.5); ctx.fillRect(x0, y0 - 3.6 * s, x1 - x0, 3.6 * s);
+    ctx.strokeStyle = "rgba(29,35,64,0.35)"; ctx.lineWidth = Math.max(1, s * 0.05); ctx.beginPath();
+    for (var x = BX0; x < BX1; x += 0.35) { var px = PX(sc, x, r); ctx.moveTo(px, y0 - 3.5 * s); ctx.lineTo(px, y0 - 1.2 * s); }
+    ctx.stroke();
+    ctx.fillStyle = mix("#C9CDD2", "#2B3A55", n * 0.5); ctx.fillRect(x0, y0 - 1.2 * s, x1 - x0, 1.2 * s);
+    ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.strokeRect(x0, y0 - 3.6 * s, x1 - x0, 3.6 * s);
+    for (var q = 0; q <= 3; q++) { var qx = PX(sc, BX0 + q * (BX1 - BX0) / 3, r); ctx.fillStyle = mix("#5E7A6A", "#2B3A55", n * 0.5); ctx.fillRect(qx - 0.16 * s, y0 - 4.9 * s, 0.32 * s, 4.9 * s); ctx.strokeRect(qx - 0.16 * s, y0 - 4.9 * s, 0.32 * s, 4.9 * s); }
+    // straw bedding on the cows' side
+    ctx.fillStyle = "rgba(242,210,114,0.55)";
+    for (var i = 0; i < 40; i++) { var bx = lerp(BX0, BX1, hash(i, 3)), br = lerp(1.25, RWALL - 0.02, hash(i, 4)); ctx.fillRect(PX(sc, bx, br), sc.Y(br) - 1, sc.S(br) * 0.3, Math.max(1, sc.S(br) * 0.04)); }
+  }
+  function drawCowBody(sc, c) {
+    if (!vis(sc, c.x - 1, c.x + 1, RCOW)) return;
+    var g = headGeo(c);
+    putR(sc, c.x, RCOW, 1, function () {
+      var hy = g.hy * g.r / RCOW;
+      cowFront(ctx, c.k);
+      ctx.beginPath(); ctx.moveTo(-0.38, -1.3); ctx.lineTo(0.38, -1.3); ctx.lineTo(0.2, -hy + 0.15); ctx.lineTo(-0.2, -hy + 0.15); ctx.closePath(); fs(ctx, c.k % 2 ? "#2A2D38" : "#FAFAFA", LW() * 0.8);
+    });
+  }
+  function headGeo(c) {
+    var h = ease(c.head), talk = mooS && mooS.who.cow === c ? mooS.t : 0, lick = lickS && lickS.cow === c ? lickS.t : 0;
+    var up = talk > 0 && talk < 2 ? 0.15 : (lick > 0 && lick < 2.2 ? 0.35 : 0);
+    return { r: lerp(RCOW - 0.02, 1.16, h), hy: lerp(1.75 + up, 0.75, h), tilt: c.look * 0.12 * (1 - h), talk: talk, lick: lick };
+  }
+  function drawCowHead(sc, c) {
+    if (!vis(sc, c.x - 1, c.x + 1, RCOW)) return;
+    var g = headGeo(c);
+    putR(sc, c.x, g.r, 1, function () {
+      ctx.save(); ctx.translate(0, -g.hy); ctx.rotate(g.tilt);
+      cowHead(ctx, { k: c.k, t: time, munch: c.st === "eat" && c.head > 0.9 && !g.talk ? c.munch : 0, look: c.look, moo: g.talk > 0 && g.talk < 1.8 ? 1 : 0, smile: faceAmt() });
+      ctx.restore();
+    });
+  }
+  function drawCowSide(sc, c) {
+    if (!vis(sc, c.x - 2, c.x + 2, c.r)) return;
+    var talk = mooS && mooS.who.cow === c ? mooS.t : 0;
+    putR(sc, c.x, c.r, 1, function () { cowSide(ctx, c.walk, c.st === "walk", faceAmt(), time, talk > 0 && talk < 1.8); });
+  }
+  // the feed barrier: a concrete kerb, the head rails and the uprights (gaps where the heads go)
+  function drawBarrier(sc) {
+    var r = RB;
+    if (!vis(sc, BX0, BX1, r)) return;
+    var s = sc.S(r), y0 = sc.Y(r), xa = PX(sc, BX0, r), xb = PX(sc, BX1, r), lw = Math.max(1, sc.lw * 0.7);
+    ctx.fillStyle = "#D3D7DC"; ctx.fillRect(xa, y0 - 0.35 * s, xb - xa, 0.35 * s); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.strokeRect(xa, y0 - 0.35 * s, xb - xa, 0.35 * s);
+    function rail(h, w) { ctx.beginPath(); ctx.moveTo(xa, y0 - h * s); ctx.lineTo(xb, y0 - h * s); ctx.lineCap = "round"; ctx.lineWidth = w * s + lw * 2; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = w * s; ctx.strokeStyle = "#E8C33A"; ctx.stroke(); }
+    ctx.lineCap = "round";
+    for (var x = BX0 + 0.1; x <= BX1; x += 0.33) {
+      var gap = false;
+      for (var i = 0; i < COWX.length; i++) if (Math.abs(x - COWX[i]) < 0.36) gap = true;
+      if (gap) continue;
+      var px = PX(sc, x, r);
+      ctx.beginPath(); ctx.moveTo(px, y0 - 0.35 * s); ctx.lineTo(px, y0 - 1.25 * s);
+      ctx.lineWidth = 0.06 * s + lw * 2; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.06 * s; ctx.strokeStyle = "#E8C33A"; ctx.stroke();
+    }
+    rail(1.25, 0.1); rail(0.4, 0.07);
+  }
+  function drawFeedLine(sc) {
+    var r = RFEED, a = BX0 + 0.6, b = feedX;
+    if (b - a < 0.1 || !vis(sc, a, b, r)) return;
+    var s = sc.S(r), y0 = sc.Y(r);
+    ctx.beginPath(); ctx.moveTo(PX(sc, a, r), y0);
+    for (var x = a; x <= b; x += 0.25) {
+      var f = Math.min(1, (x - a) / 0.4, (b - x) / 0.4), eat = 0;
+      cows.forEach(function (c) { if (c.st !== "wait" && Math.abs(x - c.x) < 0.5) eat = 0.08; });
+      ctx.lineTo(PX(sc, x, r), y0 - (0.32 - eat + 0.05 * hash(Math.floor(x * 4), 2)) * Math.max(0, f) * s);
+    }
+    ctx.lineTo(PX(sc, b, r), y0); ctx.closePath();
+    ctx.fillStyle = FEED; ctx.fill(); ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = INK; ctx.stroke();
+    ctx.save(); ctx.clip();
+    for (var i = 0; i < (b - a) * 5; i++) { var fx = a + hash(i, 5) * (b - a), fh = hash(i, 6) * 0.3; Ln2(PX(sc, fx, r), y0 - fh * s, s * 0.18, i % 3 ? FEED2 : (i % 2 ? SIL[2] : STRAW[0])); }
+    ctx.restore();
+  }
+  function Ln2(x, y, l, col) { ctx.fillStyle = col; ctx.fillRect(x, y, l, Math.max(1, l * 0.18)); }
+  // the barn roof and front posts on the machine line
+  function drawBarnFront(sc) {
+    if (!vis(sc, BX0 - 1, BX1 + 1)) return;
+    var n = sc.night || 0, BW = BX1 - BX0;
+    put(sc, BX0, 1, function () {
+      var l0 = LW(), i;
+      Pp(ctx, [-0.8, -4.65, BW + 0.8, -4.65, BW + 0.3, -5.9, -0.3, -5.9], mix("#9AA3A8", "#2B3A55", n * 0.5));
+      for (i = 0; i < BW / 0.5; i++) Ln(ctx, -0.55 + i * 0.5, -4.75, -0.18 + i * 0.5, -5.8, "rgba(29,35,64,0.25)", 0.04);
+      [2.5, 6.5, 10.5].forEach(function (rx) { Pp(ctx, [rx, -4.72, rx + 1.2, -4.72, rx + 1.4, -5.82, rx + 0.2, -5.82], "rgba(220,240,255,0.75)", l0 * 0.5); });
+      Rr(ctx, -0.9, -4.78, BW + 1.8, 0.18, 0.05, "#5D6675", l0 * 0.8);
+    });
+  }
+  // the silage clamp: the far wall, the heap under its black sheet and tyres, the open face (with the cut), the bale
+  function drawClamp(sc) {
+    if (!vis(sc, -1, CLF + 2)) return;
+    var n = sc.night || 0;
+    put(sc, 0, 1, function () {
+      var l0 = LW(), i, Hh = 2.4, nx0 = CLF - 1.26, nh = 0.96;
+      Rr(ctx, -0.5, -2.9, CLF + 0.6, 2.9, 0.04, mix("#D5D9DE", "#3B4660", n * 0.5));
+      for (i = 1; i < 6; i++) Ln(ctx, -0.5 + i * (CLF + 0.6) / 6, -2.85, -0.5 + i * (CLF + 0.6) / 6, -0.05, "rgba(29,35,64,0.25)", 0.04);
+      Rr(ctx, -0.55, -3.05, CLF + 0.7, 0.18, 0.05, mix("#B9BFC7", "#3B4660", n * 0.5));
+      // the heap profile (with the notch where the block was cut)
+      ctx.beginPath(); ctx.moveTo(-0.4, 0); ctx.lineTo(-0.4, -Hh + 0.1); ctx.quadraticCurveTo(0, -Hh - 0.05, 1, -Hh);
+      if (clampS.notch) { ctx.lineTo(nx0, -Hh); ctx.lineTo(nx0, -nh); ctx.lineTo(CLF, -nh); }
+      else ctx.lineTo(CLF, -Hh);
+      ctx.lineTo(CLF, 0); ctx.closePath();
+      fs(ctx, mix(SIL[0], "#3B4660", n * 0.4));
+      ctx.save(); ctx.clip();
+      for (i = 0; i < 9; i++) Ln(ctx, CLF - 2.6, -0.25 - i * 0.26, CLF + 0.1, -0.24 - i * 0.26, SIL[1], 0.04);
+      strands(ctx, CLF - 2.6, -Hh, 2.6, Hh, [SIL[1], SIL[2]], 21, 40);
+      if (clampS.fresh > 0) { ctx.globalAlpha = clampS.fresh * 0.5; Rr(ctx, nx0 - 0.1, -nh - 0.05, 0.2, nh, 0, "#E8F5C0", 0); ctx.globalAlpha = 1; }
+      ctx.restore();
+      // the sheet, pulled back from the face, with tyres on it
+      var se = CLF - 1.9;
+      ctx.beginPath(); ctx.moveTo(-0.45, -Hh + 0.1); ctx.quadraticCurveTo(0, -Hh - 0.1, 1, -Hh - 0.06); ctx.lineTo(se, -Hh - 0.06);
+      ctx.lineCap = "round"; ctx.strokeStyle = INK; ctx.lineWidth = 0.2; ctx.stroke(); ctx.strokeStyle = "#24272E"; ctx.lineWidth = 0.12; ctx.stroke();
+      Cc(ctx, se, -Hh - 0.22, 0.2, "#2E3138");
+      for (i = 0; i < 6; i++) { var tx = 0.5 + i * 1.1; if (tx > se - 0.4) break; ctx.beginPath(); ctx.ellipse(tx, -Hh - 0.2, 0.36, 0.13, 0, 0, TAU); fs(ctx, "#2E3138", l0 * 0.8); ctx.beginPath(); ctx.ellipse(tx, -Hh - 0.22, 0.16, 0.05, 0, 0, TAU); fs(ctx, "#5A606C", 0); }
+      if (clampS.bale) bale(ctx, BALE[0], 0, BALE[1] - BALE[0], 0.8);
+    });
+  }
+  function drawTele(sc) {
+    if (!vis(sc, tele.x - 7, tele.x + 7)) return;
+    var x = tele.x + tele.d;
+    put(sc, x, tele.dir, function () {
+      teleBody(ctx, { wheel: tele.wheel + tele.d, time: time, face: faceAmt(), beacon: tele.st === "load" });
+      teleBoom(ctx, { a: tele.a, ext: tele.ext, curl: tele.curl, jaw: tele.jaw, load: tele.load });
+    });
+  }
+  function drawFalling(sc) {
+    if (!falling) return;
+    var f = falling;
+    put(sc, f.x, 1, function () {
+      ctx.translate(0, -f.h); ctx.rotate(f.rot * 0.3);
+      if (f.kind === "straw") bale(ctx, -0.45, 0.4, 0.9, 0.8);
+      else { Rr(ctx, -0.62, -0.74, 1.24, 1.48, 0.05, SIL[0]); strands(ctx, -0.62, -0.74, 1.24, 1.48, [SIL[1], SIL[2]], 3, 20); }
+    });
+  }
+  function drawRig(sc) {
+    if (!vis(sc, rig.x - 8, rig.x + 7)) return;
+    var f = faceAmt(), close = sc === scC;
+    put(sc, rig.x, 1, function () {
+      ctx.translate(0, -0.5 + (rig.shake || 0));
+      mixer(ctx, { wheel: rig.wheel, time: time, spin: rig.spin, door: rig.door, chute: rig.chute, belt: rig.belt, face: f, peek: close ? 2.3 : 1.3,
+        chunks: tub.chunks, mound: tub.mound, fill: tub.fill, base: mix("#7E8A40", FEED, tub.mix), pto: rig.pto });
+      ctx.translate(-Farm.DRAWBAR[0], 0.5 - (rig.shake || 0));
+      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, face: f, look: [1, 0], beacon: rig.st === "go" || rig.mixT >= 0 });
+      if (lickS) lickWindow();
+    });
+    if (Math.random() < 0.06 && (rig.st === "go" || rig.mixT >= 0)) addPart({ kind: "puff", x: rig.x + 1.3 + 1.33, h: 3.45, vx: -0.3, vh: 1.1, life: 1.0, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });
+  }
+  // the cow's lick on the cab's side glass, and the wiper (tractor units)
+  function lickWindow() {
+    var l = lickS, l0 = LW();
+    if (!l.smear || l.wipe >= 1) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(-0.5, -2.9, 1.6, 1.2); ctx.clip();
+    var cut = lerp(-0.6, 1.2, l.wipe);
+    ctx.beginPath(); ctx.rect(cut, -3, 3, 2); ctx.clip();
+    ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.ellipse(0.2, -2.1, 0.45, 0.2, -0.5, 0, TAU); fs(ctx, "#F6C3CF", l0 * 0.5); ctx.globalAlpha = 1;
+    Ln(ctx, -0.05, -2.0, 0.4, -2.25, "rgba(255,255,255,0.7)", 0.05);
+    ctx.restore();
+    if (l.wipe > 0 && l.wipe < 1) { var a = lerp(-2.6, -0.5, Math.sin(l.wipe * Math.PI)); Ln(ctx, 0.3, -1.75, 0.3 + Math.cos(a) * 1.0, -1.75 + Math.sin(a) * 1.0, INK, 0.05); }
+  }
+  function drawTongue(sc) {
+    var l = lickS, c = l.cow, t = l.t;
+    var out = t < 0.9 ? ease(t / 0.9) : (t < 1.4 ? 1 : 1 - ease((t - 1.4) / 0.5));
+    if (out <= 0.01) return;
+    var g = headGeo(c), m = pt(sc, c.x, g.r, g.hy - 0.62), cab = pt(sc, rig.x + 1.3 + 0.2, 1, 2.1);
+    var ex = lerp(m[0], cab[0], out), ey = lerp(m[1], cab[1], out);
+    ctx.save(); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(m[0], m[1]); ctx.quadraticCurveTo((m[0] + ex) / 2, Math.min(m[1], ey) - sc.k * 0.4, ex, ey);
+    ctx.strokeStyle = INK; ctx.lineWidth = sc.k * 0.16 + sc.lw * 2; ctx.stroke(); ctx.strokeStyle = "#F28DA0"; ctx.lineWidth = sc.k * 0.16; ctx.stroke();
+    ctx.restore();
+  }
+  function drawCat(sc) {
+    var c = catS, ground = c.where === "barrier" && c.x > BX1 + 0.2, r = c.where === "barrier" ? (ground ? 1.3 : RB) : 1, h = c.where === "barrier" ? (ground ? 0 : 1.32) : 3.05;
+    putR(sc, c.x, r, 1, function () { ctx.translate(0, -h); ctx.scale(1.3, 1.3); cat(ctx, { ph: c.ph, sit: c.st === "sit", tail: time * 3 }); });
+  }
+  // the speech bubble with the word "Moo!"
+  function drawMoo(sc) {
+    var m = mooS, t = m.t, a = t < 0.2 ? t / 0.2 : (t > 2.2 ? (2.6 - t) / 0.4 : 1), p;
+    if (m.who.door) p = pt(sc, DOOR, RPAR, 2.1);
+    else if (m.who.paddock) { var px = m.who.i ? 16 : 11.5, dir = m.who.i ? -1 : 1; p = pt(sc, px + dir * 1.1, PADR, 1.9); }
+    else { var c = m.who.cow; if (c.side) p = pt(sc, c.x + 1.1, c.r, 2.0); else { var g = headGeo(c); p = pt(sc, c.x, g.r, g.hy + 0.5); } }
+    if (p[0] < -40 || p[0] > sc.W + 40) return;
+    var fsz = clamp(sc.k * 0.75, 15, 34), w = fsz * 2.6, h = fsz * 1.5, bx = clamp(p[0] + fsz * 0.4, 6, sc.W - w - 6), by = Math.max(6, p[1] - h - fsz * 0.9);
+    ctx.save(); ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.beginPath(); ctx.moveTo(bx + w * 0.2, by + h); ctx.lineTo(p[0], p[1] - fsz * 0.2); ctx.lineTo(bx + w * 0.38, by + h);
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, w, h, h * 0.45); else ctx.rect(bx, by, w, h);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK; ctx.font = "800 " + Math.round(fsz) + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Moo!", bx + w / 2, by + h * 0.56);
+    ctx.restore();
+  }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function loop(ts) {
+    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.spinV = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onWake() { ending = false; dusk = 0; }
+
+  // ---------- Start ----------
+  resize();
+  bringIn("load");
+  follow(0, true);
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  Toybox.init({
+    app: "farm",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the machines stop and park, and the controls lock. The timer carries on across the farm pages.",
+    goodbyeOption: "End with a “Goodnight, farm” button to press",
+    farewellText: "Time to say goodnight to the farm",
+    goodbyeLabel: "Goodnight, farm",
+    farewellDone: "Night night, farm!",
+    restLine: "The farm is resting.",
+    restLine2: "The machines will be right here next time.",
+    restArt: Farm.restArt,
+    soundNote: "Soft engine sounds and a gentle moo. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: onWake,
+    onWake: onWake,
+    onSound: function (on) { if (on) snd.chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  if (/[?&]debug\b/.test(location.search)) window.__farm = {
+    state: function () { return { phase: phase, step: stepId, cur: steps.current(), finished: steps.finished(), rig: rig.st, x: rig.x, tele: tele.st, feedX: feedX, cows: cows.map(function (c) { return c.st; }).join(","), feeds: feeds, coach: coach.text(), parts: parts.length }; },
+    screen: function (id) { return partScreen(id || stepId); },
+    surprise: surprise,
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+</body>
+</html>
