@@ -217,6 +217,11 @@ Keep only:
   "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out
   the stones."), never filler ("Out it pops!"). Step chips under or beside Go may be one short word. Read every
   label aloud before shipping.
+- **Debris never hides the work** (the dad: so many shavings "I can't see what I'm doing"): wood shavings, sawdust,
+  chips, curls, dust, crumbs and similar particles fly for the visible moment and then fade away quickly (gone within
+  about 1-1.5 s; nothing piles up on or around the workpiece, and a cap keeps the count low). Never draw them over
+  the cut, the hole, the bit or the part he's working on for longer than a moment. A small tidy pile out of the way
+  (on the floor, in a bin) may stay.
 - Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
 - **No dead buttons** (the dad: "lots of buttons look pressed but don't do anything"): every tap gives a visible
   answer, also when there is nothing to do (a hint like "Draw a line first!", a sparkle). Empty slots that do
