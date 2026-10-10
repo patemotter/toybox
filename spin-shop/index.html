@@ -55,7 +55,6 @@
   --focus: #FFC93C;
   color-scheme: dark;
 }
-html { scroll-padding-top: env(safe-area-inset-top, 0px); }
 *, *::before, *::after { box-sizing: inherit; }
 body {
   margin: 0;
@@ -66,11 +65,23 @@ body {
   line-height: 1.4;
   overflow: hidden;
   overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 html, body { height: 100%; }
-/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
-.stage { background: var(--plate); padding: 6px; }
-.stage-inner { height: 100%; display: flex; align-items: center; justify-content: center; }
+/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
+   The stage is the toy: tap it to spin it, drag round to turn it, tap a part to color it. The wheel's spoke
+   count sits in the stage's corner. The panel: the five toy tiles (or the picked part's colors, with a Toys tile
+   to go back), then the bottom bar (New, Surprise). Both tile sets are two rows, so the panel never changes
+   height. */
+.tb-head a { text-decoration: none; }
+.stage { background: var(--plate); }
+.stage-inner { position: absolute; inset: 0; padding: 6px; display: flex; align-items: center; justify-content: center; }
+/* Room for the spoke count: a band above the toy (upright), at its left (sideways). */
+@media (orientation: portrait) { .stage-inner { padding-top: 64px; } }
+@media (orientation: landscape) { .stage-inner { padding-left: 68px; } }
 #art {
   display: block;
   flex: 0 1 auto;
@@ -82,262 +93,56 @@ html, body { height: 100%; }
   touch-action: none;
   border-radius: 24px;
 }
-#art:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
-.hint { display: none; }
-/* Speed: Stop / Slow / Fast / Zoom, the first row of the panel. */
-.speeds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.speeds .btn { min-height: 46px; font-size: 1.05rem; padding: 0.2rem 0.3rem; }
-/* Big mode: the panel goes away, the header stays (Big turns into Back). */
-body.big .tb-panel { display: none; }
+#art:focus { outline: none; }
+#art:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Spoke count (the wheel only): a number he chooses, with − and + beside it. */
+.spokes { position: absolute; left: 10px; top: 10px; z-index: 3; display: flex; align-items: center; gap: 8px; }
+.spokes[hidden] { display: none; }
+.spokes .btn { width: 52px; height: 52px; min-height: 52px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.spokes .btn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
+.snum { background: #FFFFFF; color: #1D2340; border: var(--tb-outline) solid #1D2340; border-radius: 999px; padding: 2px 12px;
+  font-weight: 800; font-size: var(--tb-fs-count); line-height: 1.15; text-align: center; white-space: nowrap; pointer-events: none; }
+.snum b { display: inline-block; font-size: 1.25em; font-variant-numeric: tabular-nums; }
+@media (orientation: landscape) {
+  .spokes { flex-direction: column-reverse; }
+  .snum { padding: 2px 6px; border-radius: 16px; min-width: 52px; }
+  .snum span { display: block; font-size: var(--tb-fs-small); }
+}
+
+/* Tiles: the toys (3 + 2, centered) or the picked part's colors (4 a row). */
+#tiles .tb-pic svg { width: 100%; height: 100%; display: block; }
+#tiles.is-toys { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+#tiles.is-toys > .tb-tile { grid-column: span 2; }
+#tiles.is-toys > .tb-tile:nth-child(4) { grid-column: 2 / span 2; }
+#tiles.is-colors { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* A color tile: the fill is the paint; its word sits on a small white label so it reads on every color. */
+#tiles .is-swatch .tb-tile-word { background: #FFFFFF; color: #1D2340; border-radius: 999px; padding: 0 5px; max-width: 100%; }
+#tiles .is-swatch .tb-pic[hidden] { display: none; }
+#tiles .tb-tile.pop, #num.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes swpop { 0% { transform: scale(0.85); } 60% { transform: scale(1.1); } 100% { transform: none; } }
+/* Phone held sideways: a wider column, so four colors fit a row at full size (the toy is limited by the height). */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
+}
+/* iPad held sideways: three colors a row in the side column. */
+@media (orientation: landscape) and (min-height: 521px) {
+  #tiles.is-colors { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Big: the header, the panel and the spoke count hide; tapping the toy still spins it. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel, body.big .spokes { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .spokes { pointer-events: none; opacity: 0.4; }
 /* Timer: the shared toast and ending banner (common/toybox.js) sit inside the picture frame here. */
-.stage .toast { position: absolute; top: 10px; z-index: 2; font-size: 1.3rem; }
-.stage .farewell { position: absolute; bottom: 12px; z-index: 2; }
-.stage .farewell p { font-size: 1.25rem; }
-body.ending .panel-body,
-body.ending .speeds,
-body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
+.stage .toast { position: absolute; top: 10px; z-index: 4; }
+.stage .farewell { position: absolute; bottom: 12px; z-index: 4; }
 
 /* Surprise sparkles */
 .sspark { transform-box: fill-box; transform-origin: 50% 50%; animation: sspark 0.9s ease-out forwards; }
 @keyframes sspark { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 45% { transform: scale(1.25) rotate(60deg); opacity: 1; } 100% { transform: scale(0) rotate(120deg); opacity: 0; } }
-/* ---------- Panel: speeds, the picked tab's choices, then the tab bar with Surprise ---------- */
-.panel-body {
-  display: grid;
-  min-height: 0;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
-.tb-panel .panel-body.tb-choices { grid-template-columns: minmax(0, 1fr); gap: 0; }
-.panel-body h2 { display: none; }
-.panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="make"] [data-pane="make"] { visibility: visible; }
-.panel-body section + section { margin-top: 10px; }
-.panel-body section.sec-swatches { margin-top: 0; }
-.note { display: none; }
-.readout { display: none; }
-.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
-.tb-tabs .tab-style { display: none; }
-
-.modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.mode {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: clamp(0.68rem, 2.9vw, 0.95rem);
-  padding: 6px 1px 4px;
-  white-space: nowrap;
-}
-.mode svg { width: 44px; height: 44px; display: block; }
-/* All styles for the current thing share one row, so nothing is hidden off-screen. */
-.styles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-.style {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: clamp(0.64rem, 2.8vw, 0.9rem);
-  padding: 5px 1px 3px;
-  min-height: 0;
-}
-.style svg { width: 38px; height: 38px; display: block; }
-.style span { white-space: nowrap; }
-.styles.six { gap: 4px; }
-.counter {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  row-gap: 2px;
-}
-.counter .btn {
-  width: 48px;
-  height: 48px;
-  font-size: 1.8rem;
-  line-height: 1;
-  padding: 0;
-  flex: none;
-}
-.cgroup { display: flex; align-items: center; gap: 10px; }
-/* Min / Max jump straight to the fewest or most. */
-.counter .btn.minmax { width: auto; min-width: 48px; padding: 0 8px; font-size: 0.95rem; }
-.cgroup[hidden] { display: none; }
-/* Narrow phones: no room for Min/Max next to the lights counter, so hide them there. */
-@media (max-width: 600px) { .counter.has-lights .btn.minmax { display: none; } }
-.numbox { display: flex; flex-direction: column; align-items: center; line-height: 1; }
-.num {
-  font-size: 2.25rem;
-  font-weight: 800;
-  line-height: 1;
-  min-width: 1.6ch;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-/* What the number counts ("spokes", "lights"), so two counters side by side read clearly. */
-.numcap { font-size: 0.78rem; font-weight: 700; color: var(--muted); line-height: 1; margin-top: 1px; }
-/* "Dome" in place of a number: smaller, so the counter keeps its width. */
-.num.word { font-size: 1.25rem; height: 2.25rem; display: flex; align-items: center; justify-content: center; }
-.counter.two { gap: 18px; }
-.counter.two .cgroup { gap: 6px; }
-.counter.two .btn { width: 44px; }
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  padding-right: 3px;
-}
-.row .btn {
-  flex: 0 0 calc((100% - 12px) / 3);
-  min-width: 0;
-  min-height: 40px;
-  padding: 0.2rem 0.2rem;
-  font-size: clamp(0.76rem, 3.5vw, 1rem);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #1D2340;
-  vertical-align: -2px;
-  margin-right: 4px;
-}
-/* Reserve two rows for color parts so the panel height (and picture size) never jumps. */
-#parts { min-height: 86px; align-content: flex-start; }
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 8px;
-}
-.swatch {
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 50%;
-  border: 3px solid var(--edge);
-  cursor: pointer;
-  padding: 0;
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  box-shadow: 2px 2px 0 var(--edge);
-}
-.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; }
-/* Palette swatches and ceiling-fan light swatches share one spot, so the panel height never changes. */
-.swatchbox { display: grid; }
-.swatchbox > .swatches { grid-area: 1 / 1; }
-.swatchbox.lit #swatches,
-.swatchbox:not(.lit) #lightSwatches { visibility: hidden; }
-.lightswatch { color: #1D2340; }
 /* Ceiling-fan lights glow softly (they sit on the still light kit, so they don't spin). */
 #over .glow { animation: glowpulse 2.4s ease-in-out infinite alternate; }
 @keyframes glowpulse { from { opacity: 0.72; } to { opacity: 1; } }
-.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
-
-/* Landscape: the panel is a column on the right; the choices sit in the middle of it. */
-@media (orientation: landscape) {
-  .tb-body .tb-panel { width: min(52%, 460px); justify-content: space-between; }
-  .tb-body .tb-panel .panel-body.tb-choices { flex: 1 1 auto; align-content: center; }
-}
-
-/* Larger screens (tablets, desktop): bigger touch targets. */
-@media (min-width: 700px) and (min-height: 700px) {
-  .tb-panel { gap: 12px; }
-  .panel-body > [data-pane] { width: 100%; max-width: 560px; justify-self: center; }
-  .modes { gap: 12px; }
-  .mode { font-size: 1.1rem; padding: 8px 4px 6px; }
-  .mode svg { width: 64px; height: 64px; }
-  .styles { gap: 10px; }
-  .style { font-size: 0.95rem; padding: 7px 2px 5px; }
-  .style svg { width: 54px; height: 54px; }
-  .styles.six { gap: 8px; }
-  .panel-body section + section { margin-top: 16px; }
-  .counter .btn { width: 60px; height: 60px; font-size: 2.1rem; }
-  .counter .btn.minmax { min-width: 60px; font-size: 1.1rem; }
-  .num { font-size: 2.8rem; }
-  .num.word { font-size: 1.5rem; height: 2.8rem; }
-  .numcap { font-size: 0.95rem; }
-  .counter.two { gap: 28px; }
-  .counter.two .cgroup { gap: 10px; }
-  .counter.two .btn { width: 56px; }
-  .row { gap: 10px; }
-  .row .btn { flex-basis: calc((100% - 20px) / 3); min-height: 50px; font-size: 1.05rem; }
-  .row .dot { width: 18px; height: 18px; margin-right: 6px; }
-  #parts { min-height: 110px; }
-  .swatches { gap: 10px; margin-top: 12px; }
-  .speeds { gap: 10px; }
-  .speeds .btn { min-height: 54px; font-size: 1.15rem; }
-}
-@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
-  .tb-body .tb-panel { width: min(42%, 520px); }
-  .style { font-size: 0.85rem; }
-  .modes { gap: 10px; }
-  .mode { font-size: 0.9rem; }
-}
-
-/* Short landscape phones: tighter panel. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .speeds .btn { font-size: 0.9rem; min-height: 44px; }
-  .swatches { gap: 6px; }
-  .row .btn { font-size: 0.82rem; }
-  .style { font-size: 0.68rem; }
-  .mode { font-size: 0.8rem; }
-}
-
-/* Phones: fewer controls at once. Make (thing + how many), Style (style + pattern) and Colors
-   each show two rows; the sections share two grid rows so the panel never changes height. */
-@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
-  .tb-tabs .tab-style { display: block; }
-  .tb-panel .panel-body.tb-choices { grid-template-rows: auto auto; row-gap: 10px; align-content: center; }
-  .panel-body > [data-pane] { display: contents; }
-  .panel-body section { margin: 0 !important; min-width: 0; visibility: hidden; align-self: center; }
-  .sec-modes, .sec-styles, .sec-parts { grid-area: 1 / 1; }
-  .sec-count, .sec-pattern, .sec-swatches { grid-area: 2 / 1; }
-  .tb-panel[data-tab="make"] .sec-modes, .tb-panel[data-tab="make"] .sec-count,
-  .tb-panel[data-tab="style"] .sec-styles, .tb-panel[data-tab="style"] .sec-pattern { visibility: visible; }
-
-  /* Just - and + on phones; Min and Max stay on bigger screens. */
-  .counter .btn.minmax { display: none; }
-  /* Picture buttons are just pictures on a phone: the names would have to be squeezed tiny. */
-  .mode span, .style span { display: none; }
-  .mode, .style { padding: 4px 1px; min-height: 60px; justify-content: center; }
-  .mode svg { width: 50px; height: 50px; }
-  .style svg { width: 46px; height: 46px; }
-  .row .btn { font-size: 1rem; min-height: 44px; }
-  .swatches { gap: 4px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn { transition: none; }
-  #over .glow { animation: none; }
-}
-/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
-.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
-.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
-.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
-.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
-.pickpic {
-  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
-  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
-  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
-}
-.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
-.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
-.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
-@media (min-width: 700px) and (min-height: 700px) {
-  .pick { gap: 16px; }
-  .pickswatches { gap: 14px; }
-  .pickswatches .swatch { max-width: 92px; }
-  .pickpic { font-size: 1.2rem; width: 150px; }
-}
-.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
 /* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
 .halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
 /* Its color runs yellow, pink, blue, so it shows on every paint color. */
@@ -347,30 +152,19 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   33% { fill: #FF5FB0; stroke: #FF5FB0; }
   66% { fill: #3FC4FF; stroke: #3FC4FF; }
 }
-.pickpic .dim { opacity: 0.25; }
-@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
-/* On phones the sections sit in a shared grid; the picked part's colors take both rows. */
-@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
-  .pick { grid-area: 1 / 1 / 3 / 2; align-self: center; }
-  .panel-body > [data-pane="pick"] { display: contents; }
-  .tb-panel.picking .panel-body section { visibility: hidden !important; }
-}
 /* Things drawn over the spinning part (grilles, shine, the light glow) let taps through to it. */
 #over > :not([data-c]) { pointer-events: none; }
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+@media (prefers-reduced-motion: reduce) {
+  #over .glow, .halo *, #tiles .tb-tile.pop, #num.pop { animation: none; }
+}
 </style>
 </head>
 <body>
-<div class="tb-app-shell">
+<div class="tb-app-shell tb-v2">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Spin Shop</h1>
-    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
 
   <div class="tb-body">
@@ -386,64 +180,20 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
           <g id="timerG"></g>
         </svg>
       </div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Spin it!</div>
+      <div class="spokes" id="spokes" hidden>
+        <button class="btn" id="minus" aria-label="One less spoke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <div class="snum" aria-live="polite"><b id="num">6</b> <span id="numCap">spokes</span></div>
+        <button class="btn" id="plus" aria-label="One more spoke"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
+      </div>
+      <div id="coach"></div>
     </main>
 
-    <section class="tb-panel" data-tab="make">
-      <div class="speeds" id="speeds"></div>
-      <div class="tb-choices panel-body">
-        <div data-pane="make" id="pane-make" role="tabpanel" aria-labelledby="tab-make">
-          <section class="sec-modes">
-            <h2>Make a</h2>
-            <div class="modes" id="modes"></div>
-          </section>
-
-          <section class="sec-styles">
-            <h2>Style</h2>
-            <div class="styles" id="styles"></div>
-          </section>
-
-          <section class="sec-pattern">
-            <h2>Pattern</h2>
-            <div class="row" id="patterns"></div>
-          </section>
-
-          <section class="sec-count">
-            <h2>How many</h2>
-            <div class="counter" id="counter">
-              <div class="cgroup">
-                <button class="btn minmax" id="minBtn" aria-label="Fewest">Min</button>
-                <button class="btn" id="minus" aria-label="One less">−</button>
-                <div class="numbox"><div class="num" id="num" aria-live="polite">6</div><div class="numcap" id="numCap">spokes</div></div>
-                <button class="btn" id="plus" aria-label="One more">+</button>
-                <button class="btn minmax" id="maxBtn" aria-label="Most">Max</button>
-              </div>
-              <div class="cgroup" id="lightsGroup" hidden>
-                <button class="btn" id="lminus" aria-label="One less light">−</button>
-                <div class="numbox"><div class="num" id="lnum" aria-live="polite">3</div><div class="numcap" id="lnumCap">lights</div></div>
-                <button class="btn" id="lplus" aria-label="One more light">+</button>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div data-pane="pick" id="pane-pick" aria-live="polite">
-          <div class="pick">
-            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="-250 -250 500 500" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Spokes</span></div>
-            <div class="pickswatches" id="pickSw"></div>
-          </div>
-        </div>
-      </div>
-
-      <nav class="tb-tabs" role="tablist" aria-label="Controls">
-        <button class="btn tab" role="tab" id="tab-make" data-tab="make" aria-controls="pane-make">Make</button>
-        <button class="btn tab tab-style" role="tab" id="tab-style" data-tab="style" aria-controls="pane-make">Style</button>
-        <button class="btn tb-surprise" data-action="surprise">Surprise</button>
-      </nav>
+    <section class="tb-panel" id="panel">
+      <div id="tiles" role="group" aria-label="Toys"></div>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
-
 <script>
 (function () {
   "use strict";
@@ -553,9 +303,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   var LIGHT_IDS = LIGHTS.map(function (l) { return l[0]; });
   var LMAX = 6;       // most bulbs
   var LDOME = 7;      // the step after 6 bulbs: one big glass dome instead
-  var PATTERNS = [["one", "One color"], ["turns", "Take turns"], ["rainbow", "Rainbow"]];
   var SPEEDS = { stop: 0, slow: 40, fast: 190, zoom: 560 };
-  var SPEED_ORDER = [["stop", "Stop"], ["slow", "Slow"], ["fast", "Fast"], ["zoom", "Zoom"]];
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function styleIds(m) { return MODES[m].styles.map(function (s) { return s.id; }); }
@@ -1187,35 +935,14 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     spinG.setAttribute("transform", (liftT ? liftT + " " : "") + (head ? head + " " : "") + "rotate(" + angle.toFixed(2) + ")");
   }
 
-  // Build static controls once.
-  ORDER.forEach(function (m) {
-    var b = document.createElement("button");
-    b.className = "btn mode";
-    b.dataset.mode = m;
-    b.setAttribute("aria-label", MODES[m].label);
-    b.innerHTML = '<svg viewBox="-250 -250 500 500" aria-hidden="true"></svg><span>' + MODES[m].label + "</span>";
-    $("modes").appendChild(b);
-  });
-  PATTERNS.forEach(function (p) {
-    var b = document.createElement("button");
-    b.className = "btn";
-    b.dataset.pattern = p[0];
-    b.textContent = p[1];
-    $("patterns").appendChild(b);
-  });
-  SPEED_ORDER.forEach(function (p) {
-    var b = document.createElement("button");
-    b.className = "btn";
-    b.dataset.speed = p[0];
-    b.textContent = p[1];
-    $("speeds").appendChild(b);
-  });
+  // ---------- Panel: the toy tiles, or the picked part's colors ----------
   function lightCss(l) {
     return l[0] === "rainbow" ? "conic-gradient(" + RAINBOW_LIGHTS.concat(RAINBOW_LIGHTS[0]).join(", ") + ")"
       : "radial-gradient(circle at 50% 45%, #FFFFFF 0 22%, " + l[2] + " 62%)";
   }
+  function toyPic(m) { return '<svg viewBox="-250 -250 500 500" aria-hidden="true">' + svgInner(DRAW[m](state.per[m])) + "</svg>"; }
   // ---- coloring: tap a big part of the picture (blades, tire, hub, middle, stem, stick, cowling, lights);
-  // it glows and its colors show in the panel. Small details keep their colors.
+  // it glows and the tiles turn into its colors (with a Toys tile to go back). Small details keep their colors.
   var PICKS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink"];
   var PAINT = { wheel: ["main", "main2", "tire", "hub"], fan: ["main", "main2", "light"], flower: ["main", "main2", "middle", "stem"],
     pinwheel: ["main", "main2", "stick"], jet: ["main", "main2", "cowl"] };
@@ -1224,39 +951,12 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     var p = MODES[m].parts.filter(function (q) { return q[0] === (id === "main2" ? "main" : id); })[0];
     return p ? p[1] : "";
   }
-  // Seven bright colors plus the part's usual one (a black tire, a brown stick), so it can always go back.
+  // Six bright colors plus the part's usual one (a black tire, a brown stick), so it can always go back.
   function swatchesFor(m, id) {
-    var d = MODES[m].defaults.colors[id === "main2" ? "main2" : id], list = PICKS.slice();
+    var d = MODES[m].defaults.colors[id === "main2" ? "main2" : id], list = ["Red", "Yellow", "Green", "Blue", "Purple", "Pink"];
     if (d && list.indexOf(d) === -1) list.push(d);
-    else list.push(id === "main" || id === "main2" ? "Sky" : "White");
+    else list.push(id === "main" || id === "main2" ? "Orange" : "White");
     return list;
-  }
-  var pickSwFor = "";
-  function buildPickSwatches(m, id) {
-    var key = m + ":" + id, el = $("pickSw");
-    if (pickSwFor === key) return;
-    pickSwFor = key;
-    el.innerHTML = "";
-    if (id === "light") {
-      LIGHTS.forEach(function (l) {
-        var b = document.createElement("button");
-        b.className = "swatch lightswatch";
-        b.dataset.light = l[0];
-        b.style.background = lightCss(l);
-        b.setAttribute("aria-label", l[1] + " light");
-        el.appendChild(b);
-      });
-      return;
-    }
-    swatchesFor(m, id).forEach(function (name) {
-      var b = document.createElement("button");
-      b.className = "swatch";
-      b.dataset.color = name;
-      b.style.background = hex(name);
-      b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
-      b.setAttribute("aria-label", name);
-      el.appendChild(b);
-    });
   }
   function pickable(m, cfg, id) {
     if (PAINT[m].indexOf(id) === -1) return false;
@@ -1264,16 +964,62 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     if (id === "main2") return cfg.pattern === "turns";
     return true;
   }
+  var tiles = null, tilesFor = "";
+  // The tiles show the toys (nothing picked) or the picked part's colors. Rebuilt only when that changes.
+  function buildTiles() {
+    var m = state.mode, key = picking ? m + ":" + picking : "toys";
+    if (key === tilesFor) return;
+    tilesFor = key;
+    var el = $("tiles");
+    if (!picking) {
+      el.className = el.className.replace(/\bis-colors\b/, "").trim();
+      el.classList.add("is-toys");
+      el.setAttribute("aria-label", "Toys");
+      tiles.items(ORDER.map(function (k) { return { id: k, name: MODES[k].label, pic: toyPic(k) }; }));
+      tiles.set(m);
+      return;
+    }
+    el.classList.remove("is-toys");
+    el.classList.add("is-colors");
+    el.setAttribute("aria-label", partName(m, picking) + " colors");
+    var list;
+    if (picking === "light") list = LIGHTS.map(function (l) { return { id: "l:" + l[0], name: l[0] === "rainbow" ? "Rainbow" : l[1].replace(" white", ""), color: lightCss(l) }; });
+    else list = swatchesFor(m, picking).map(function (n) { return { id: "c:" + n, name: n, color: hex(n) }; });
+    list.push({ id: "toys", name: "Toys", pic: toyPic(m) });
+    tiles.items(list);
+    list.forEach(function (it) { if (it.color) tiles.button(it.id).classList.add("is-swatch"); });
+  }
+  function onTile(id) {
+    if (Toybox.timer.locked()) return;
+    var cfg = state.per[state.mode];
+    if (id === "toys") { setPicking(""); return; }
+    if (ORDER.indexOf(id) !== -1) {
+      momentStop();
+      state.mode = id;
+      ghost.again("spin");
+      vel += 260;            // the new toy arrives with a little spin
+      render();
+      coach.say("Spin the " + MODES[id].label.toLowerCase() + "!", 3);
+      return;
+    }
+    if (id.indexOf("c:") === 0 && picking) {
+      cfg.colors[picking] = id.slice(2);
+      // a color for rainbow blades makes them all that color
+      if (picking === "main" && cfg.pattern === "rainbow") cfg.pattern = "one";
+      state.part[state.mode] = picking;
+    } else if (id.indexOf("l:") === 0 && "lights" in cfg) {
+      cfg.lightColor = id.slice(2);
+    } else return;
+    restartPop(tiles.button(id));
+    render();
+  }
   function setPicking(id) {
     picking = id || "";
     if (picking) coachDone();
-    $("tab-make").closest(".tb-panel").classList.toggle("picking", !!picking);
-    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
-      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
-    });
+    buildTiles();
     showPick();
   }
-  // The glow on the picture and the panel's picture + swatches for the picked part.
+  // The glow on the picture, and the picked color's tile.
   function showPick() {
     Array.prototype.forEach.call(art.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
     if (!picking) return;
@@ -1290,38 +1036,12 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       });
       el.parentNode.insertBefore(h, el);
     });
-    var svg = $("pickSvg");
-    svg.innerHTML = svgInner(DRAW[m](cfg));
-    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, text"), function (el) {
-      if (!el.closest('[data-c="' + picking + '"]')) el.setAttribute("class", "dim");
-    });
-    $("pickName").textContent = partName(m, picking);
-    buildPickSwatches(m, picking);
-    var lit = picking === "light", cur = lit ? cfg.lightColor : (cfg.pattern === "rainbow" && picking === "main" ? "" : cfg.colors[picking]);
-    Array.prototype.forEach.call($("pickSw").children, function (b) {
-      var on = (lit ? b.dataset.light : b.dataset.color) === cur;
-      b.setAttribute("aria-pressed", String(on));
-      b.textContent = on ? "\u2713" : "";
-    });
+    var lit = picking === "light";
+    var cur = lit ? "l:" + cfg.lightColor : (cfg.pattern === "rainbow" && picking === "main" ? "" : "c:" + cfg.colors[picking]);
+    tiles.set(cur);
+    var back = tiles.button("toys");
+    if (back) back.querySelector(".tb-pic").innerHTML = toyPic(m);
   }
-
-  // Style buttons are rebuilt only when the mode changes, so keyboard focus survives style clicks.
-  var styleButtonsFor = null;
-  function buildStyleButtons(m) {
-    var el = $("styles");
-    el.innerHTML = "";
-    MODES[m].styles.forEach(function (st) {
-      var b = document.createElement("button");
-      b.className = "btn style";
-      b.dataset.style = st.id;
-      b.setAttribute("aria-label", st.label);
-      b.innerHTML = '<svg viewBox="-250 -250 500 500" aria-hidden="true"></svg><span>' + st.label + "</span>";
-      el.appendChild(b);
-    });
-    el.classList.toggle("six", MODES[m].styles.length >= 6);
-    styleButtonsFor = m;
-  }
-
 
   function render() {
     momentStop();
@@ -1340,47 +1060,20 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       " with " + n + " " + (n === 1 ? mode.one : mode.many);
     if (hasLights && cfg.lights === LDOME) label += " and a " + lightName(cfg).toLowerCase() + " dome light";
     else if (hasLights && cfg.lights) label += " and " + cfg.lights + " " + lightName(cfg).toLowerCase() + (cfg.lights === 1 ? " light" : " lights");
-    art.setAttribute("aria-label", label);
+    art.setAttribute("aria-label", label + ". Tap it to spin it.");
 
-    Array.prototype.forEach.call(document.querySelectorAll("[data-mode]"), function (b) {
-      var bm = b.dataset.mode;
-      b.setAttribute("aria-pressed", String(bm === m));
-      b.querySelector("svg").innerHTML = svgInner(DRAW[bm](state.per[bm]));
-    });
-
-    if (styleButtonsFor !== m) { buildStyleButtons(m); fitLabels(); }
-    Array.prototype.forEach.call(document.querySelectorAll("[data-style]"), function (b) {
-      var id = b.dataset.style;
-      b.setAttribute("aria-pressed", String(id === cfg.style));
-      b.querySelector("svg").innerHTML = svgInner(DRAW[m](Object.assign({}, cfg, { style: id, count: fitCount(m, id, cfg.count) })));
-    });
-
+    buildTiles();
+    if (!picking) {
+      tiles.set(m);
+      ORDER.forEach(function (k) {
+        var b = tiles.button(k);
+        if (b) b.querySelector(".tb-pic").innerHTML = toyPic(k);
+      });
+    }
+    // The spoke count: the wheel only (a count he chooses).
+    $("spokes").hidden = m !== "wheel";
     $("num").textContent = n;
     $("numCap").textContent = n === 1 ? mode.one : mode.many;
-    $("minus").disabled = n <= MIN;
-    $("plus").disabled = n >= MAX;
-    $("minBtn").disabled = n <= MIN;
-    $("maxBtn").disabled = n >= MAX;
-    $("lightsGroup").hidden = !hasLights;
-    $("counter").classList.toggle("has-lights", !!hasLights);
-    $("counter").classList.toggle("two", hasLights);
-    if (hasLights) {
-      // After 6 bulbs, one more step gives a single big dome.
-      var dome = cfg.lights === LDOME;
-      $("lnum").textContent = dome ? "Dome" : cfg.lights;
-      $("lnum").classList.toggle("word", dome);
-      $("lnumCap").textContent = dome ? "light" : (cfg.lights === 1 ? "light" : "lights");
-      $("lminus").disabled = cfg.lights <= 0;
-      $("lplus").disabled = cfg.lights >= LDOME;
-      $("lplus").setAttribute("aria-label", cfg.lights === LMAX ? "Dome light" : "One more light");
-    }
-
-    Array.prototype.forEach.call(document.querySelectorAll("[data-pattern]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.pattern === cfg.pattern));
-    });
-    Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.speed === state.speed));
-    });
 
     showPick();
     save();
@@ -1389,71 +1082,22 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function lightEntry(cfg) { return LIGHTS.filter(function (l) { return l[0] === cfg.lightColor; })[0] || LIGHTS[0]; }
   function lightName(cfg) { return lightEntry(cfg)[1]; }
 
-  // Shrinks a mode/style label that is wider than its button (e.g. "Jet engine" on a phone),
-  // so every label stays whole and readable without changing the button size.
-  function fitLabels() {
-    Array.prototype.forEach.call(document.querySelectorAll(".mode span, .style span"), function (sp) {
-      var b = sp.parentNode, cs = getComputedStyle(b);
-      if (!b.clientWidth) return; // hidden (Big mode): fitted again when shown
-      sp.style.fontSize = "";
-      var room = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
-      var w = sp.getBoundingClientRect().width;
-      if (room > 0 && w > room) sp.style.fontSize = (parseFloat(getComputedStyle(sp).fontSize) * Math.max(0.6, room / w)).toFixed(2) + "px";
-    });
-  }
-  var fitQueued = false;
-  function queueFit() {
-    if (fitQueued) return;
-    fitQueued = true;
-    requestAnimationFrame(function () { fitQueued = false; fitLabels(); });
-  }
-  window.addEventListener("resize", queueFit);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit);
-
-  // Phone-only control tabs. On wider screens the tab bar is hidden and every pane shows.
-  var tab = "make";
-  function showTab(name) {
-    tab = name;
-    $("tab-make").closest(".tb-panel").setAttribute("data-tab", name);
-    setPicking("");
-  }
-
-  document.addEventListener("click", function (e) {
-    var t = e.target.closest("button");
-    if (!t) return;
-    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
-    // Big, the timer banners and the rest screen are handled by the shared module (common/toybox.js).
-    if (t.id === "bigbtn" || t.closest(".modal, .farewell, .rest")) return;
+  // Spokes − and +: at the fewest or the most, a wiggle and a word instead of nothing.
+  function spokes(d) {
     if (Toybox.timer.locked()) return;
-    var cfg = state.per[state.mode];
-    // Another action puts the colors away (a speed change does not: it is just how fast it turns).
-    if (picking && !t.dataset.color && !t.dataset.light && !t.dataset.speed) setPicking("");
-    if (t.dataset.mode) { state.mode = t.dataset.mode; }
-    else if (t.dataset.style) { cfg.style = t.dataset.style; cfg.count = fitCount(state.mode, cfg.style, cfg.count); }
-    else if (t.dataset.pattern) { cfg.pattern = t.dataset.pattern; }
-    else if (t.dataset.speed) { state.speed = t.dataset.speed; }
-    else if (t.dataset.color) {
-      if (!picking) return;
-      cfg.colors[picking] = t.dataset.color;
-      // a color for rainbow blades makes them all that color
-      if (picking === "main" && cfg.pattern === "rainbow") cfg.pattern = "one";
-      state.part[state.mode] = picking;
-      restartPop(t);
-    }
-    else if (t.dataset.light) { if ("lights" in cfg) { cfg.lightColor = t.dataset.light; restartPop(t); } }
-    else if (t.id === "minus") { cfg.count = Math.max(MIN, cfg.count - 1); }
-    else if (t.id === "plus") { cfg.count = Math.min(MAX, cfg.count + 1); }
-    else if (t.id === "minBtn") { cfg.count = MIN; }
-    else if (t.id === "maxBtn") { cfg.count = MAX; }
-    else if (t.id === "lminus") { if ("lights" in cfg) cfg.lights = Math.max(0, cfg.lights - 1); }
-    else if (t.id === "lplus") { if ("lights" in cfg) cfg.lights = Math.min(LDOME, cfg.lights + 1); }
-    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
-    else return;
+    var cfg = state.per[state.mode], b = $(d < 0 ? "minus" : "plus");
+    if (state.mode !== "wheel") return;
+    var next = cfg.count + d;
+    if (next < MIN || next > MAX) { Toybox.wiggle(b); coach.say(next < MIN ? "Just one spoke!" : "That is the most spokes!", 3); return; }
+    cfg.count = next;
     render();
-  });
+    restartPop($("num"));
+  }
+  $("minus").addEventListener("click", function () { spokes(-1); });
+  $("plus").addEventListener("click", function () { spokes(1); });
 
   function restartPop(el) {
-    if (reduce) return;
+    if (reduce || !el) return;
     el.classList.remove("pop");
     void el.getBoundingClientRect();
     el.classList.add("pop");
@@ -1765,148 +1409,46 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   $("stage").addEventListener("pointermove", function (e) { if (mo && mo.kind === "face") trackPtr(e); });
   if (/[?&]debug\b/.test(location.search)) window.__spinSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { var k = moTurn[state.mode] || 0; return k % 2 === 0 ? SPECIAL[state.mode] : "face"; } };
 
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
-  // Page px of a point inside an element, as fractions of its box.
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
-  }
+  // ---------- Spinning it with a finger ----------
+  // One press is always enough: a tap on the toy gives it a good spin (tap again while it spins: a bigger push)
+  // and, on a big part, picks that part for coloring; a drag round the middle turns it, a fling keeps it going.
   function kick() {
     if (Toybox.timer.locked()) return;
     vel += 450;
   }
-  // Grab the picture and turn it with a finger; let go to fling it. A tap still gives it a push.
   var grab = null;
   function ptrAng(e, c) { return Math.atan2(e.clientY - c[1], e.clientX - c[0]) * 180 / Math.PI; }
-  // Coach: "Spin it!" until the first spin, then (once) "Tap a part to color it!" until he picks a part.
+  // Coach: "Spin the wheel!" until the first spin, then (once) "Tap a part to color it!" until he picks a part.
   var paintHint = 0, pickedOnce = false;
-  function spun() {
-    $("coach").classList.add("off");
-    ghost.learned();
+  function spun(turned) {
+    ghost.learned(turned ? "turn" : "spin");
+    if (turned) ghost.learned("spin");
     if (paintHint) return;
+    coach.clear();
     paintHint = setTimeout(function () {
       if (pickedOnce || Toybox.timer.locked()) return;
-      $("coach").textContent = "Tap a part to color it!";
-      $("coach").classList.remove("off");
-      setTimeout(function () { $("coach").classList.add("off"); }, 10000);
+      coach.say("Tap a part to color it!", 10);
     }, 3500);
   }
   function coachDone() {
     pickedOnce = true;
-    if (paintHint) $("coach").classList.add("off");
+    ghost.learned("part");
   }
   // A tap (not a turn) on a big part picks it for coloring; a tap on the background puts the colors away.
-  function tapPick(el) {
+  function tapPick(el, x, y) {
     var c = el && el.closest ? el.closest("[data-c]") : null, id = c ? c.getAttribute("data-c") : "";
     var m = state.mode, cfg = state.per[m];
-    if (id && pickable(m, cfg, id) && !document.body.classList.contains("big")) { if (id !== picking) setPicking(id); }
+    if (id && pickable(m, cfg, id) && !document.body.classList.contains("big")) {
+      if (id !== picking) { setPicking(id); Toybox.nametag(partName(m, id), x, y - 20); }
+    }
     else if (picking) setPicking("");
   }
   art.addEventListener("pointerdown", function (e) {
     if (Toybox.timer.locked() || grab) return;
+    if (Toybox.isPalm && Toybox.isPalm(e)) return;
     kick();
-    spun();
     var r = art.getBoundingClientRect(), c = [r.left + r.width / 2, r.top + r.height / 2];
-    grab = { id: e.pointerId, c: c, a: ptrAng(e, c), t: performance.now(), x: e.clientX, y: e.clientY, moved: 0, v: 0, el: e.target,
+    grab = { id: e.pointerId, c: c, a: ptrAng(e, c), t: performance.now(), t0: performance.now(), x: e.clientX, y: e.clientY, moved: 0, v: 0, el: e.target,
       far: Math.hypot(e.clientX - c[0], e.clientY - c[1]) > r.width * 0.1, turning: false };
     try { art.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
   });
@@ -1917,7 +1459,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     if (d > 180) d -= 360; if (d < -180) d += 360;
     grab.moved += Math.hypot(e.clientX - grab.x, e.clientY - grab.y);
     grab.x = e.clientX; grab.y = e.clientY;
-    if (!grab.turning && grab.moved > 14 && grab.far) { grab.turning = true; vel = 0; }
+    if (!grab.turning && grab.moved > 12 && grab.far) { grab.turning = true; vel = 0; }
     if (grab.turning) {
       angle = (angle + d) % 360;
       applyTransform();
@@ -1928,8 +1470,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function letGo(e) {
     if (!grab || e.pointerId !== grab.id) return;
     // A fling keeps going; a finger that stopped before letting go leaves it still.
-    if (grab.turning) vel = performance.now() - grab.t > 140 ? 0 : grab.v;
-    else if (e.type === "pointerup" && grab.moved < 14 && !Toybox.timer.locked()) tapPick(grab.el);
+    if (grab.turning) { vel = performance.now() - grab.t > 140 ? 0 : grab.v; spun(true); }
+    else if (e.type === "pointerup" && grab.moved < 12 && !Toybox.timer.locked()) { spun(false); tapPick(grab.el, e.clientX, e.clientY); }
     grab = null;
   }
   // A tap on the stage around the picture puts the colors away too.
@@ -1942,13 +1484,54 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); kick(); }
   });
 
+  // ---------- Coach, ghost hand, bottom bar ----------
+  var coach = Toybox.coach($("coach"));
+  // Idle help: the ghost hand taps the toy first (a tap spins it); on its next showing it turns the toy round
+  // with a finger; once he has spun it, it taps a big part to color it.
+  var ghost = Toybox.ghost({
+    max: 2,
+    plan: function () {
+      if (mo || document.body.classList.contains("big")) return null;
+      var r = art.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = Math.min(r.width, r.height) * 0.3, pts = [];
+      if (R < 30) return null;
+      if (!paintHint) {
+        if (ghost.shown("spin") < 1) return { pts: [[cx + R * 0.55, cy - R * 0.55]], tap: true, key: "spin" };
+        for (var i = 0; i <= 12; i++) { var a = (-150 + i * 15) * Math.PI / 180; pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
+        return { pts: pts, key: "turn" };
+      }
+      if (pickedOnce || picking) return null;
+      // a big part: the tire, the blades or petals, the cowling
+      var el = art.querySelector('[data-c="tire"]') || art.querySelector('[data-c="main"]');
+      if (!el) return null;
+      var b = el.getBoundingClientRect();
+      var p = state.mode === "wheel" ? [b.left + b.width * 0.5, b.top + b.height * 0.04] : [b.left + b.width / 2, b.top + b.height / 2];
+      return { pts: [p], tap: true, key: "part" };
+    }
+  });
+  // New: the toy on screen goes back to how it first looked (his other toys keep their colors).
+  function startOver() {
+    if (Toybox.timer.locked()) return;
+    momentStop();
+    var m = state.mode, d = MODES[m].defaults;
+    state.per[m] = { count: d.count, pattern: d.pattern, style: d.style, colors: Object.assign({}, d.colors) };
+    if (d.lights !== undefined) { state.per[m].lights = d.lights; state.per[m].lightColor = d.lightColor; }
+    state.part[m] = "main";
+    tilesFor = "";
+    picking = "";
+    render();
+    vel += 300;
+    sparkleAt(0, 0, 10, 200);
+    coach.say("A fresh " + MODES[m].label.toLowerCase() + "!", 3);
+  }
+  tiles = Toybox.tiles($("tiles"), { items: [], kind: "pick", rows: 2, onPick: onTile });
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: function () { if (picking) setPicking(""); surprise(); } });
   var last = performance.now();
   function frame(t) {
     var dt = Math.min(0.05, (t - last) / 1000);
     last = t;
     var ending = Toybox.timer.phase() === "ending";
     // While ending, everything winds down to a stop more gently than a normal speed change.
-    var target = ending ? 0 : SPEEDS[state.speed];
+    var target = ending ? 0 : (reduce ? 0 : SPEEDS.slow);
     vel += (target - vel) * Math.min(1, dt * (ending ? 0.4 : 0.95));
     if (grab && grab.turning) { /* the finger is turning it */ }
     else if (Math.abs(vel) > 0.5 || target !== 0) {
@@ -1992,9 +1575,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     return '<svg class="rest-art" viewBox="-250 -250 500 500" aria-hidden="true">' + svgInner(DRAW[m](state.per[m])) + "</svg>";
   }
 
-  showTab(tab);
   render();
-  fitLabels();
+  coach.step("Spin the " + MODES[state.mode].label.toLowerCase() + "!");
   // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
   // (a timer that ran out while away), so the picture is set up first.
   // The toast and the ending banner sit inside the picture frame, as before.
@@ -2020,17 +1602,10 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
       $("tb-restLine").textContent = "The " + MODES[state.mode].label.toLowerCase() + " is resting.";
     },
     onWake: function () { endingDone = null; },
-    onBig: function (on) { if (!on) queueFit(); else if (picking) setPicking(""); },
+    onBig: function (on) { if (on && picking) setPicking(""); },
     onTimer: drawTimer
   });
   $("stage").appendChild($("tb-toast"));
-  // Idle help: the ghost hand turns the picture once around.
-  var ghost = makeGhost(function () {
-    var r = art.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = Math.min(r.width, r.height) * 0.3, pts = [];
-    if (R < 30) return null;
-    for (var i = 0; i <= 12; i++) { var a = (-150 + i * 15) * Math.PI / 180; pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
-    return { pts: pts };
-  });
   $("stage").appendChild($("tb-farewell"));
   requestAnimationFrame(frame);
 })();
