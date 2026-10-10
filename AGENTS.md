@@ -212,6 +212,11 @@ Keep only:
   flick on a drawn machine part) also works with a single tap on it, and the tap does the whole motion for him (tap
   the tractor and it drives the pass; tap the crank and it turns; tap the valve and it opens). Dragging stays as
   the richer way to play, never the only way. Holds keep working as taps too (a tap runs a short visible go).
+- **Plain, correct English** (the dad: "It just says 'Beds!'. This is dumb"): the Go button says what will happen as
+  a short verb phrase ("Make the rows", "Pull a shot", "Pour!"), never a bare noun with "!" ("Beds!", "Milk!",
+  "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out
+  the stones."), never filler ("Out it pops!"). Step chips under or beside Go may be one short word. Read every
+  label aloud before shipping.
 - Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
 - **No dead buttons** (the dad: "lots of buttons look pressed but don't do anything"): every tap gives a visible
   answer, also when there is nothing to do (a hint like "Draw a line first!", a sparkle). Empty slots that do
