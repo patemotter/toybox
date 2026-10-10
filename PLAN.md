@@ -50,8 +50,8 @@ choice? Not polished: close-ups small on phones held sideways; small serve view 
   stopped train (after the button audit, which may touch the same page).
 
 **Surprise rework (the dad, 2026-10-08; rule in AGENTS.md "Surprise = a fun moment"):** each Surprise takes turns
-between a few in-the-moment events on the current scene, no randomizing, no unlocking, not just glitter. One moment in
-most apps: the main objects get happy cartoon faces for a few seconds (blink, smile, look at his finger).
+between a few in-the-moment events on the current scene, no randomizing, no unlocking, not just glitter. (The "happy
+cartoon faces" moment that was in most apps was removed on 2026-10-10: he really doesn't like the faces.)
 - Car Builder: car wash with spinning brushes and suds; a jump over a row of cones; a tow truck gives it a little ride.
 - Rocket Builder: a comet streaks past; a satellite waves; a flying saucer loops around (and beams up a cow, then puts it back).
 - Spin Shop: per toy: the wheel rolls off and back, the fan blows streamers, the pinwheel lifts off like a helicopter

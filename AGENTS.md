@@ -261,6 +261,8 @@ Keep only:
   screen (the hamster somersaults, a giant bubble wobbles across, a cow waits at the crossing), then play goes on.
   Not randomizing choices he could pick himself, and not unlocking content (new foods, pens, patterns, trains):
   anything worth having becomes a real option instead. Take turns between a few moments so it stays fresh.
+  **No cartoon faces** (the dad, 2026-10-10: he really doesn't like them): never put eyes or smiles on machines,
+  food, tools, crops or other objects, as a Surprise or anywhere else. Real animals and people keep normal faces.
 - **Kind words** (the dad's idea): the shared layer shows a card with a gentle reminder ("You are doing great!", a
   smiling sun), a congratulation ("You did it!", a star) or love from Dad ("Dad loves you!", a heart) every few
   minutes of play and sometimes on returning to the home screen. Never first person ("I'm proud..."): the device
