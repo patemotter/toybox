@@ -44,7 +44,8 @@
  *                               "grain"|"potato"|"grass" (Farm.CROP: [fill, strands]), tip (0..1) }.
  *   Farm.draw.combine(ctx, st)  the combine harvester, origin under the front axle: st = { wheel, time, work,
  *                               tank (0..1), auger (0..1 swung out; the page draws the swung tube, see .augerTube),
- *                               beacon }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
+ *                               beacon, header (0 down .. 1 raised), tracks (true: no front wheel; the page draws
+ *                               the track unit) }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
  *   Farm.draw.hare / deer / gull / hawk (ctx, x, y, s, phase, flip)   the farm's life, in screen px.
  *   Farm.draw.telehandler(ctx, st)  the yellow telehandler's body (the page adds its boom), origin on the ground
  *                               between the axles: st = { wheel, time, beacon } (muck.html, cows.html).
@@ -668,7 +669,9 @@
     // ladder
     Ln(ctx, 1.05, -2.95, 1.2, -1.1, INK, 0.05); Ln(ctx, 1.3, -2.95, 1.45, -1.1, INK, 0.05);
     for (i = 0; i < 5; i++) Ln(ctx, 1.07 + i * 0.033, -2.7 + i * 0.38, 1.33 + i * 0.033, -2.7 + i * 0.38, INK, 0.04);
-    // feeder house
+    // feeder house and header: st.header 0 (down, cutting) .. 1 (raised): they swing up about the feeder's top
+    var lift = clamp(st.header || 0, 0, 1);
+    ctx.save(); ctx.translate(0.95, -2.0); ctx.rotate(-lift * 0.16); ctx.translate(-0.95, 2.0);
     P(ctx, [0.85, -2.62, 2.55, -1.62, 2.55, -0.52, 0.85, -1.2], G.dark);
     for (i = 1; i < 4; i++) Ln(ctx, 0.85 + i * 0.42, -2.62 + i * 0.25 + 0.08, 0.85 + i * 0.42, -1.2 + i * 0.17 - 0.08, "#24602A", 0.04);
     // header: back wall, table, auger, reel, the pointed crop divider
@@ -693,10 +696,13 @@
     P(ctx, [2.4, -1.05, 3.2, -1.05, 4.85, -0.2, 4.8, -0.06, 2.4, -0.06], "rgba(225,231,238,0.55)", LW * 0.8);
     ctx.restore();
     for (i = 0; i < 4; i++) P(ctx, [4.45 + i * 0.09, -0.12, 4.5 + i * 0.09, -0.02, 4.55 + i * 0.09, -0.12], "#E2E6EB", LW * 0.4);
-    // wheels
+    ctx.restore();
+    // wheels (st.tracks: no front wheel or mudguard; the page draws its track unit there)
     wheel(ctx, -3.7, -0.62, 0.62, rot / 0.62, { rim: 0.56 });
-    wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58 });
-    ctx.beginPath(); ctx.arc(0, -0.95, 1.12, -Math.PI + 0.25, -0.35); ctx.arc(0, -0.95, 1.0, -0.35, -Math.PI + 0.25, true); ctx.closePath(); fs(ctx, G.body);
+    if (!st.tracks) {
+      wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58 });
+      ctx.beginPath(); ctx.arc(0, -0.95, 1.12, -Math.PI + 0.25, -0.35); ctx.arc(0, -0.95, 1.0, -0.35, -Math.PI + 0.25, true); ctx.closePath(); fs(ctx, G.body);
+    }
   }
 
   // A long tube or belt between two screen points (the swung-out auger or elevator), widths w1 -> w2 px.
