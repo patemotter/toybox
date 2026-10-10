@@ -1117,7 +1117,7 @@
       for (var i = 0; i < rows.length; i++) painter(ctx, self, rows[i], stage, P, xa, xb);
       ctx.restore();
     }
-    if (!w) run(P.stage, 0, L);
+    if (!w) run(P.stage, P.xa === undefined ? 0 : P.xa, P.xb === undefined ? L : P.xb);   // P.xa/P.xb: paint one strip only
     else if (w.dir > 0) { run(w.to, 0, clamp(w.bx, 0, L)); run(P.stage, clamp(w.bx, 0, L), L); }
     else { run(P.stage, 0, clamp(w.bx, 0, L)); run(w.to, clamp(w.bx, 0, L), L); }
     if (w && w.bx > 0 && w.bx < L && P.edge) {
@@ -1218,8 +1218,15 @@
           ctx.strokeStyle = "#A9833E"; ctx.lineWidth = Math.max(1, s * 0.018); ctx.beginPath();
           eachX(sc, row, 0.12, 4, xa, xb, function (x, sx, j) { var yy = row.y0 - hgt * hash(j, 3) * 0.8; ctx.moveTo(sx, yy); ctx.lineTo(sx + s * 0.01, yy - hh * (0.7 + 0.5 * hash(j, 4))); });
           ctx.stroke();
-          ctx.fillStyle = "#F0D58E";
-          eachX(sc, row, 0.5, 10, xa, xb, function (x, sx, j) { ctx.save(); ctx.translate(sx, row.yc); ctx.rotate(hash(j, 6) * 3); ctx.fillRect(-s * 0.15, -s * 0.015, s * 0.3, Math.max(1, s * 0.03)); ctx.restore(); });
+          // loose straws: one path for the whole row (a save/rotate per straw was too slow on the iPad)
+          var sl = s * 0.15, sh = Math.max(0.5, s * 0.015);
+          ctx.fillStyle = "#F0D58E"; ctx.beginPath();
+          eachX(sc, row, 0.5, 10, xa, xb, function (x, sx, j) {
+            var a = hash(j, 6) * 3, ca = Math.cos(a), sa = Math.sin(a), y = row.yc;
+            ctx.moveTo(sx - ca * sl + sa * sh, y - sa * sl - ca * sh); ctx.lineTo(sx + ca * sl + sa * sh, y + sa * sl - ca * sh);
+            ctx.lineTo(sx + ca * sl - sa * sh, y + sa * sl + ca * sh); ctx.lineTo(sx - ca * sl - sa * sh, y - sa * sl + ca * sh); ctx.closePath();
+          });
+          ctx.fill();
         }
         return;
       }
@@ -1235,28 +1242,46 @@
       band(ctx, sc, row, dk);
       var hp = h * s;
       if (hp < 2) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - hp, sc.W, hgt * 0.7 + hp); return; }
-      var step = Math.max(4, Math.min(10, hp * 0.6)), yc = row.yc, W = sc.W, off = sc.cam * sc.k / row.rc;
-      ctx.beginPath(); ctx.moveTo(-5, row.y0 + 0.5);
-      for (var x = -5; x <= W + step; x += step) {
-        var q = Math.floor((x + off) / step), sw = Math.sin(t * 1.7 + (x + off) * 0.02 + row.i * 0.6) * hp * 0.1;
+      var step = hp < 10 ? 28 : Math.max(10, Math.min(18, hp * 0.8)), yc = row.yc, W = sc.W, off = sc.cam * sc.k / row.rc;
+      // only across the strip being painted (xa..xb); painting the whole width and clipping made the field slow
+      var rgW = sc.xRange(row.rc), xs0 = -5, xs1 = W + step;
+      if (xa !== undefined && xb !== undefined) { xs0 = Math.max(-5, rgW[2] * xa + rgW[3] - step); xs1 = Math.min(W + step, rgW[2] * xb + rgW[3] + step); }
+      if (xs1 <= xs0) return;
+      xs0 = Math.floor((xs0 + off) / step) * step - off;
+      ctx.beginPath(); ctx.moveTo(xs0, row.y0 + 0.5);
+      for (var x = xs0; x <= xs1 + step; x += step) {
+        var q = Math.round((x + off) / step), sw = Math.sin(t * 1.7 + (x + off) * 0.02 + row.i * 0.6) * hp * 0.1;
         ctx.lineTo(x + sw, yc - hp * (0.92 + 0.16 * hash(q, row.i)));
       }
-      ctx.lineTo(W + step, row.y0 + 0.5); ctx.closePath();
+      ctx.lineTo(xs1 + step, row.y0 + 0.5); ctx.closePath();
       ctx.fillStyle = col; ctx.fill();
-      ctx.lineWidth = Math.max(1, Math.min(sc.lw * 0.8, hp * 0.06)); ctx.strokeStyle = lt; ctx.stroke();
+      if (hp >= 14) { ctx.lineWidth = Math.max(1, Math.min(sc.lw * 0.8, hp * 0.06)); ctx.strokeStyle = lt; ctx.stroke(); }
       // shade at the bottom of the crop, and the ears on the near rows
       ctx.fillStyle = "rgba(90,60,10,0.18)"; ctx.fillRect(0, row.y0 - Math.min(hp * 0.35, hgt * 0.5), W, Math.min(hp * 0.35, hgt * 0.5) + 0.5);
-      if (gold > 0.25 && row.fine && s * 0.05 > 1.6) {
-        var ear = s * 0.075, lwE = Math.max(0.8, sc.lw * 0.45);
-        ctx.lineWidth = lwE;
-        eachX(sc, row, 0.13, ear * 2.2, xa, xb, function (x2, sx, j) {
+      if (gold > 0.25 && row.fine && s * 0.05 > 2.6) {
+        // All the ears of a row as one path: one fill and one stroke (a save/rotate/fill/stroke per ear made the
+        // field crawl on the iPad).
+        var ear = s * 0.075, lwE = Math.max(0.8, sc.lw * 0.45), awns = ear > 3;
+        var ears = [];
+        eachX(sc, row, 0.13, ear * 3, xa, xb, function (x2, sx, j) {
           var sw = Math.sin(t * 1.7 + (sx + off) * 0.02 + row.i * 0.6) * hp * 0.1, top = yc - hp * (0.95 + 0.18 * hash(j, row.i + 9));
-          ctx.save(); ctx.translate(sx + sw, top); ctx.rotate(sw / Math.max(1, hp) * 1.2 + (hash(j, 2) - 0.5) * 0.3);
-          ctx.beginPath(); ctx.ellipse(0, 0, ear * 0.55, ear * 1.25, 0, 0, TAU); ctx.fillStyle = mix("#9CCB5A", "#F2C84E", gold); ctx.fill();
-          ctx.strokeStyle = mix("#5E8E2E", "#B4862A", gold); ctx.stroke();
-          if (ear > 3) { ctx.beginPath(); ctx.moveTo(0, -ear * 1.2); ctx.lineTo(-ear * 0.3, -ear * 2.1); ctx.moveTo(0, -ear * 1.2); ctx.lineTo(ear * 0.3, -ear * 2.1); ctx.stroke(); }
-          ctx.restore();
+          ears.push(sx + sw, top, sw / Math.max(1, hp) * 1.2 + (hash(j, 2) - 0.5) * 0.3);
         });
+        ctx.beginPath();
+        for (var e = 0; e < ears.length; e += 3) {
+          ctx.moveTo(ears[e] + Math.cos(ears[e + 2]) * ear * 0.55, ears[e + 1] + Math.sin(ears[e + 2]) * ear * 0.55);
+          ctx.ellipse(ears[e], ears[e + 1], ear * 0.55, ear * 1.25, ears[e + 2], 0, TAU);
+        }
+        ctx.fillStyle = mix("#9CCB5A", "#F2C84E", gold); ctx.fill();
+        if (awns) {
+          for (e = 0; e < ears.length; e += 3) {
+            var ex = ears[e], ey = ears[e + 1], ra = ears[e + 2], c = Math.cos(ra), sn = Math.sin(ra);
+            var bx = ex + sn * ear * 1.2, by2 = ey - c * ear * 1.2;
+            ctx.moveTo(bx, by2); ctx.lineTo(ex + c * -ear * 0.3 + sn * ear * 2.1, ey + sn * -ear * 0.3 - c * ear * 2.1);
+            ctx.moveTo(bx, by2); ctx.lineTo(ex + c * ear * 0.3 + sn * ear * 2.1, ey + sn * ear * 0.3 - c * ear * 2.1);
+          }
+        }
+        ctx.lineWidth = lwE; ctx.strokeStyle = mix("#5E8E2E", "#B4862A", gold); ctx.stroke();
       }
     }
   };

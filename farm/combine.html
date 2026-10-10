@@ -938,10 +938,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var headCol = U.mix("#FFC93C", "#A97F45", ripe);
     band(row, dk);
     // the leafy canopy: a wall of leaves up to about three quarters of the plants' height
-    var cTop = near ? hp : hp * 0.7, step = Math.max(4, Math.min(12, s * 0.3)), off = sc.cam * sc.k / row.rc;
-    ctx.beginPath(); ctx.moveTo(-5, row.y0 + 0.5);
-    for (var x0 = -5; x0 <= sc.W + step; x0 += step) { var q0 = Math.floor((x0 + off) / step); ctx.lineTo(x0, row.yc - cTop * (0.86 + 0.22 * hash(q0, row.i))); }
-    ctx.lineTo(sc.W + step, row.y0 + 0.5); ctx.closePath();
+    var cTop = near ? hp : hp * 0.7, step = cTop < 10 ? 30 : Math.max(12, Math.min(20, s * 0.4)), off = sc.cam * sc.k / row.rc;
+    // only across this run's strip of the field (each run used to paint the whole width and clip)
+    var rgC = sc.xRange(row.rc), sxa = Math.max(-5, rgC[2] * xa + rgC[3] - step), sxb = Math.min(sc.W + step, rgC[2] * xb + rgC[3] + step);
+    if (sxb <= sxa) return;
+    sxa = Math.floor((sxa + off) / step) * step - off;
+    ctx.beginPath(); ctx.moveTo(sxa, row.y0 + 0.5);
+    for (var x0 = sxa; x0 <= sxb + step; x0 += step) { var q0 = Math.round((x0 + off) / step); ctx.lineTo(x0, row.yc - cTop * (0.86 + 0.22 * hash(q0, row.i))); }
+    ctx.lineTo(sxb + step, row.y0 + 0.5); ctx.closePath();
     ctx.fillStyle = odd ? leaf : U.mix(leaf, dk, 0.3); ctx.fill();
     if (cTop > 6) { ctx.lineWidth = Math.max(1, Math.min(sc.lw * 0.6, s * 0.03)); ctx.strokeStyle = dk; ctx.stroke(); }
     if (near || bloom <= 0) return;
@@ -973,9 +977,26 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       } else {
         // ripe: the heavy head hangs down, brown at the back, a few yellow petals left
         var r2 = hr * (0.95 + 0.15 * hash(j, 6));
-        Farm.inUnits(ctx, tx + ripe * hr * 0.8, top + r2 * 0.75, 1, 1, function () { sunHead(ctx, 0, 0, r2, 1.25 - 0.25 * hash(j, 8), 0.75 * (1 - ripe) + 0.3 + 0.35 * hash(j, 9), lwH); });
+        headStamp(tx + ripe * hr * 0.8, top + r2 * 0.75, r2, 1.25 - 0.25 * hash(j, 8), 0.75 * (1 - ripe) + 0.3 + 0.35 * hash(j, 9), lwH);
       }
     });
+  }
+  // A ripe head drawn once into a small canvas and stamped (drawing every head's petals, back and face each frame
+  // made the sunflower field crawl on the iPad). Sizes and petal counts are rounded so a few stamps cover a field.
+  var headStamps = {};
+  function headStamp(x, y, r, a, petals, lw) {
+    var rq = Math.max(2, Math.round(r * 2) / 2), pq = Math.round(clamp(petals, 0, 1) * 4) / 4, lq = Math.round(lw * 2) / 2;
+    var key = rq + "|" + pq + "|" + lq + "|" + DPR, st = headStamps[key];
+    if (!st) {
+      var half = Math.ceil(rq * 1.6 + lq + 2), c = document.createElement("canvas");
+      c.width = c.height = Math.ceil(half * 2 * DPR);
+      var x2 = c.getContext("2d"); x2.setTransform(DPR, 0, 0, DPR, half * DPR, half * DPR);
+      sunHead(x2, 0, 0, rq, 0, pq, lq);
+      st = headStamps[key] = { c: c, half: half };
+    }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.drawImage(st.c, -st.half, -st.half, st.half * 2, st.half * 2);
+    ctx.restore();
   }
   function sunField(part, P) {
     var rows = part === "near" ? sc.rowsNear : sc.rowsFar, near = part === "near";
@@ -1068,7 +1089,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     sc.sky(ctx, { time: time, arc: crop.stage === "grow" ? arc : null, season: "summer", dusk: dusk });
     sc.hedge(ctx, { season: "summer" });
     var P = { crop: "wheat", stage: crop.stage === "grow" ? "grow" : "golden", g: crop.g, time: time };
-    drawField("far", P);
+    drawFarCached(P);
     if (birds) drawBirds(false);
     drawStraw();
     if (deer && deer.r > 1) drawDeer();
@@ -1088,15 +1109,38 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (hawk) drawHawk();
     if (birds) drawBirds(true);
   }
+  // The far part of the field is the biggest drawing on the page (dozens of rows across the whole width) and it
+  // made the iPad crawl. Paint it into an offscreen canvas and reuse it until the camera, the cut field or the crop
+  // changes; the far rows don't sway while cached (time 0).
+  // While the camera moves (he is driving) it is painted at half resolution, a quarter of the pixels; once the
+  // camera has stood still for a moment it is painted sharp again.
+  var farCv = document.createElement("canvas"), farCtx = farCv.getContext("2d"), farKey = "", farCam = null, farStill = 0;
+  function drawFarCached(P) {
+    var moving = farCam !== null && (Math.abs(sc.cam - farCam.cam) > 1e-4 || Math.abs(sc.k - farCam.k) > 1e-5);
+    farCam = { cam: sc.cam, k: sc.k };
+    farStill = moving ? 0 : farStill + 1;
+    var q = farStill < 8 && farKey ? 0.5 : 1;
+    var cutSig = crop.stage === "ripe" ? cutN + ":" + (cut.join ? cut.join("") : "") : crop.stage;
+    var key = [cv.width, cv.height, q, sc.cam.toFixed(3), sc.k.toFixed(4), job, crop.stage, (P.g || 0).toFixed(2), cutSig, dusk ? dusk.toFixed(2) : 0].join("|");
+    if (key !== farKey) {
+      var fw = Math.max(1, Math.round(cv.width * q)), fh = Math.max(1, Math.round(cv.height * q));
+      if (farCv.width !== fw || farCv.height !== fh) { farCv.width = fw; farCv.height = fh; }
+      var real = ctx;
+      ctx = farCtx;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fw, fh);
+      ctx.setTransform(DPR * q, 0, 0, DPR * q, 0, 0);
+      try { drawField("far", { crop: P.crop, stage: P.stage, g: P.g, time: 0 }); } finally { ctx = real; }
+      farKey = key;
+    }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(farCv, 0, 0, cv.width, cv.height); ctx.restore();
+  }
   // The field by runs: standing crop where the cutter bar hasn't been, stubble where it has, a clear edge between.
   function drawField(part, P) {
     if (job === "sun") { sunField(part, P); return; }
     var runs = fieldRuns(P);
     if (runs.length === 1) sc.field(ctx, part, { crop: "wheat", stage: runs[0][0], g: P.g, time: P.time });
     else runs.forEach(function (q) {
-      ctx.save(); sc.clipX(ctx, q[1], q[2]);
-      sc.field(ctx, part, { crop: "wheat", stage: q[0], g: P.g, time: P.time });
-      ctx.restore();
+      sc.field(ctx, part, { crop: "wheat", stage: q[0], g: P.g, time: P.time, xa: q[1], xb: q[2] });
     });
     // the cut edges
     var r0 = part === "near" ? sc.rN : 1, r1 = part === "near" ? 1 : sc.rH;
