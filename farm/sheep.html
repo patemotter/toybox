@@ -134,18 +134,9 @@ body.big #jobs { display: none; }
   var BATHDOG = { x: -10.0, z: 1.6 };
 
   // ---------- Small drawing helpers (farm.js style) ----------
-  function eyes(c, x, y, r, f) {
-    // big friendly eyes and a smile for the faces moment (on a dark sheep face: white rims)
-    if (!f) return;
-    c.save(); c.globalAlpha = clamp(f, 0, 1);
-    var l0 = LW();
-    [0, r * 2.3].forEach(function (ox) { Cc(c, x + ox, y, r, "#FFFFFF", l0 * 0.6); Cc(c, x + ox + r * 0.25, y + r * 0.1, r * 0.5, INK, 0); Cc(c, x + ox + r * 0.4, y - r * 0.15, r * 0.17, "#FFFFFF", 0); });
-    c.beginPath(); c.arc(x + r * 1.2, y + r * 1.6, r * 1.3, 0.2 * PI, 0.8 * PI); c.strokeStyle = "#FFFFFF"; c.lineWidth = r * 0.45; c.lineCap = "round"; c.stroke();
-    c.restore();
-  }
   // =====================================================================================================
   // The sheep (could move into farm.js as Farm.draw.sheep): origin on the ground under the middle, facing +x.
-  // st = { ph (leg phase), gait (0..1 legs swinging), head (0..1 down to graze), baa (0..1 mouth), face, munch,
+  // st = { ph (leg phase), gait (0..1 legs swinging), head (0..1 down to graze), baa (0..1 mouth), munch,
   //        lamb (whiter wool), dip (feet in water: legs end lower) }
   // =====================================================================================================
   function sheepShape(c, st) {
@@ -179,13 +170,12 @@ body.big #jobs { display: none; }
     c.beginPath(); c.ellipse(0.02, 0, 0.17, 0.11, 0, 0, TAU); fs(c, FACE);
     Cc(c, -0.07, -0.08, 0.075, wool, l0 * 0.6);
     if (st.baa) { c.beginPath(); c.ellipse(0.15, 0.05, 0.035, 0.02 + 0.035 * st.baa, 0.3, 0, TAU); fs(c, "#E87A8A", l0 * 0.5); }
-    if (st.face) eyes(c, -0.02, -0.03, 0.04, st.face);
     else { Cc(c, 0.02, -0.04, 0.028, "#FFFFFF", 0); Cc(c, 0.03, -0.04, 0.014, INK, 0); }
     c.restore();
   }
   // =====================================================================================================
   // The sheepdog (a generic black-and-white collie; could move into farm.js as Farm.draw.collie).
-  // st = { pose: "run" | "crouch" | "lie" | "stand", ph, face }
+  // st = { pose: "run" | "crouch" | "lie" | "stand", ph }
   // =====================================================================================================
   function collie(c, st) {
     var l0 = LW(), pose = st.pose || "stand", ph = st.ph || 0, s = Math.sin(ph * TAU), Wt = "#FFFFFF";
@@ -229,8 +219,7 @@ body.big #jobs { display: none; }
     Pp(c, [hx + 0.02, hy - 0.1, hx + 0.06, hy - 0.1, hx + 0.22, hy + 0.03, hx + 0.06, hy + 0.06], Wt, 0);
     Cc(c, hx + 0.235, hy + 0.035, 0.025, INK, 0);
     Pp(c, [hx - 0.02, hy - 0.08, hx + 0.02, hy - 0.2, hx + 0.08, hy - 0.08], DOGK, l0 * 0.7);
-    if (st.face) { c.save(); c.globalAlpha = clamp(st.face, 0, 1); Cc(c, hx + 0.03, hy - 0.02, 0.045, "#FFFFFF", l0 * 0.5); Cc(c, hx + 0.05, hy - 0.02, 0.022, INK, 0); c.beginPath(); c.arc(hx + 0.14, hy + 0.06, 0.05, 0.1, 1.6); c.strokeStyle = "#FFFFFF"; c.lineWidth = 0.02; c.stroke(); c.restore(); }
-    else Cc(c, hx + 0.04, hy - 0.025, 0.022, "#E9C46A", 0);
+    Cc(c, hx + 0.04, hy - 0.025, 0.022, "#E9C46A", 0);
     if (pose === "run" || pose === "stand") { c.beginPath(); c.ellipse(hx + 0.18, hy + 0.09, 0.04, 0.02, 0.2, 0, TAU); fs(c, "#E87A8A", 0); }
     legs(false);
   }
@@ -445,7 +434,7 @@ body.big #jobs { display: none; }
   // =====================================================================================================
   // The flock and the dog
   // =====================================================================================================
-  var flock = [], dog = null, gate = 1, gate2 = 0, round = 0, lamb = null, bubbles = [], faceT = 0;
+  var flock = [], dog = null, gate = 1, gate2 = 0, round = 0, lamb = null, bubbles = [];
   function mkSheep(i, x, z) { return { i: i, x: x, z: z, vx: 0, vz: 0, dir: hash(i, round + 7) > 0.5 ? 1 : -1, ph: hash(i, 9), head: 0.8, tx: x, tz: z, spd: 0.4, path: null, pi: 0, mode: "graze", munch: 0, baa: 0, hop: 0, hopV: 0, counted: false, wait: 0, s: 0, dip: 0 }; }
   function spreadHomes() {
     var pts = [], tries = 0, i = 0;
@@ -459,7 +448,7 @@ body.big #jobs { display: none; }
     return pts;
   }
   function resetScene() {
-    round++; flock = []; lamb = null; bubbles = []; faceT = 0; parts.length = 0; wk = null;
+    round++; flock = []; lamb = null; bubbles = []; parts.length = 0; wk = null;
     if (job === "gather") {
       spreadHomes().forEach(function (p, i) { flock.push(mkSheep(i, p[0], p[1])); });
       dog = { x: DOGHOME.x, z: DOGHOME.z, dir: 1, ph: 0, pose: "lie", spd: 0, tx: DOGHOME.x, tz: DOGHOME.z, mode: "seek", nudge: null };
@@ -664,8 +653,10 @@ body.big #jobs { display: none; }
   }
   function surprise() {
     if (locked()) return;
-    var pick = ["lamb", "baa", "munch", "faces"][surpriseN++ % 4];
-    if (pick === "munch" && (phase === "work" || dog.mode === "path" || job === "bath" && stepId !== "open" && phase !== "done")) pick = "faces";
+    var list = ["lamb", "baa", "munch"];
+    var pick = list[surpriseN++ % list.length];
+    // the munch moment needs the gather field at rest; otherwise the next moment plays
+    if (pick === "munch" && (job === "bath" || phase === "work" || dog.mode === "path")) pick = list[surpriseN++ % list.length];
     var vs = visibleSheep();
     if (pick === "lamb") {
       var mum = vs[Math.floor(vs.length / 2)];
@@ -680,14 +671,11 @@ body.big #jobs { display: none; }
       return;
     }
     if (pick === "munch") {
-      var m = vs[vs.length - 1], dx = job === "bath" ? 0 : (m.x > 0 ? 2.2 : -2.2);
-      if (job === "bath") { faceT = 6; coach.say("Hello, sheep!", 3); return; }
+      var m = vs[vs.length - 1], dx = m.x > 0 ? 2.2 : -2.2;
       m.tx = clamp(m.x + dx, -7, 2.5); m.tz = clamp(m.z + 1.2, 0.3, 8); m.spd = 0.9; m.mode = "graze"; m.munchT = 3.2;
       dog.nudge = { s: m, t: 0, home: { x: dog.x, z: dog.z, pose: dog.mode }, back: { x: m.x, z: m.z } };
       coach.say("A sheep wanders off to munch.", 3);
-      return;
     }
-    faceT = 6; coach.say("Hello, sheep!", 3);
   }
 
   // =====================================================================================================
@@ -890,7 +878,6 @@ body.big #jobs { display: none; }
     moveDog(dt);
     if (lamb) updateLamb(dt);
     if (shepCall > 0) shepCall = Math.max(0, shepCall - dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     for (var i = bubbles.length - 1; i >= 0; i--) { bubbles[i].t += dt; if (bubbles[i].t > bubbles[i].life) bubbles.splice(i, 1); }
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     updateParts(dt);
@@ -959,7 +946,6 @@ body.big #jobs { display: none; }
     var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
     Farm.inUnits(ctx, px(V, x, z), py(V, z, h || 0), ps(V, z) * (mul || 1), V.lw, function () { ctx.scale(d, 1); fn(); });
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
   function xRangeAt(V, z) { var s = V.k * fz(z); return [V.cam - V.R.w / 2 / s - 1, V.cam + V.R.w / 2 / s + 1]; }
   function drawHill(V) {
     var w = V.R.w, h = V.R.h, ZF = 34, yc = py(V, ZF, 0), n = V.sc.night || 0;
@@ -1031,7 +1017,7 @@ body.big #jobs { display: none; }
   function drawWorld(V) {
     V.sc.sky(ctx, { time: time, arc: null, season: "summer", dusk: dusk });
     drawHill(V);
-    var items = [], f = faceAmt();
+    var items = [];
     if (job === "gather") {
       // the pen: back, right, front, the fixed side and the gate (hinged at the back corner)
       fenceItems(items, V, PEN.x0, PEN.z1, PEN.x1, PEN.z1);
@@ -1061,11 +1047,11 @@ body.big #jobs { display: none; }
     }
     flock.forEach(function (s) {
       items.push({ k: s.z, fn: function () {
-        put(V, s.x, s.z, s.hop, s.dir, function () { sheepShape(ctx, { ph: s.ph, gait: clamp(Math.hypot(s.vx, s.vz) / 1.2, 0, 1), head: s.head, baa: s.baa > 0 ? Math.min(1, s.baa * 2) * Math.abs(Math.sin(time * 9)) : 0, face: f, munch: s.munch, dip: s.dip }); });
+        put(V, s.x, s.z, s.hop, s.dir, function () { sheepShape(ctx, { ph: s.ph, gait: clamp(Math.hypot(s.vx, s.vz) / 1.2, 0, 1), head: s.head, baa: s.baa > 0 ? Math.min(1, s.baa * 2) * Math.abs(Math.sin(time * 9)) : 0, munch: s.munch, dip: s.dip }); });
       } });
     });
-    if (lamb) items.push({ k: lamb.z, fn: function () { ctx.save(); ctx.globalAlpha = lamb.alpha; put(V, lamb.x, lamb.z, lamb.h, lamb.dir, function () { sheepShape(ctx, { lamb: true, ph: time, gait: lamb.h > 0.05 ? 0 : 0.6, face: f }); }, 0.6); ctx.restore(); } });
-    items.push({ k: dog.z, fn: function () { put(V, dog.x, dog.z, 0, dog.dir, function () { collie(ctx, { pose: dog.pose, ph: dog.ph, face: f }); }); } });
+    if (lamb) items.push({ k: lamb.z, fn: function () { ctx.save(); ctx.globalAlpha = lamb.alpha; put(V, lamb.x, lamb.z, lamb.h, lamb.dir, function () { sheepShape(ctx, { lamb: true, ph: time, gait: lamb.h > 0.05 ? 0 : 0.6 }); }, 0.6); ctx.restore(); } });
+    items.push({ k: dog.z, fn: function () { put(V, dog.x, dog.z, 0, dog.dir, function () { collie(ctx, { pose: dog.pose, ph: dog.ph }); }); } });
     items.sort(function (a, b) { return b.k - a.k; });
     items.forEach(function (it) { it.fn(); });
     drawParts(V);

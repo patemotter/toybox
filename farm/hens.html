@@ -137,7 +137,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var tr = { x: TX0, v: 0, run: 0, mud: 0, load: 1, flash: 0 };
   var prints = { a: TX0, b: TX0 + 3.0 };     // the track prints in the mud (world x of their ends)
   var fd = { t: 0 }, eg = { t: 0 }, feedOn = false, panLvl = 0, binLvl = 0.15, swing = 0, augRun = 0, flow = 0, lid = 0, beltRun = 0;
-  var faceT = 0, crowS = null, chicks = null, perch = null;
+  var crowS = null, chicks = null, perch = null;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function driving() { return phase === "drive" && Math.abs(tr.v) > 0.2; }
@@ -186,19 +186,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // =====================================================================================================
   // Drawings (machine units)
   // =====================================================================================================
-  function faceU(x, y, r, dx, f, look) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha *= clamp(f, 0, 1);
-    var blink = Math.sin(time * 2.1) > 0.985 ? 0.15 : 1, lx = look ? look[0] * r * 0.35 : 0, ly = look ? look[1] * r * 0.35 : r * 0.2;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      C(ctx, 0, 0, r, "#FFFFFF", LWu() * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   function shine(x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
   function tyre(x, y, r, rot, dark) {
     C(ctx, x, y, r, dark ? "#24262D" : "#33363F");
@@ -216,7 +203,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---- The tractor on rubber tracks: the farm's green tractor (generic, no logos) with a track unit on each
   // side in place of the wheels. Origin on the ground under the rear drive wheel, facing +x. st = { run (m
-  // driven: the track belt turns), time, face, beacon, mud (0..1 mud on the track), look }.
+  // driven: the track belt turns), time, beacon, mud (0..1 mud on the track) }.
   var TK = { rx: 0, ry: -0.82, rr: 0.82, fx: 3.0, fy: -0.5, fr: 0.5 };
   var TK_LEN = (function () { var top = Math.hypot(TK.fx - TK.rx, (TK.fy - TK.fr) - (TK.ry - TK.rr)); return [TK.fx - TK.rx, Math.PI * TK.rr, top, Math.PI * TK.fr]; })();
   var TK_PER = TK_LEN[0] + TK_LEN[1] + TK_LEN[2] + TK_LEN[3];
@@ -315,11 +302,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     shine(-0.45, y0 - 0.1, TK.fx + 0.25, y1 - 0.02, 0.05);
     // steps up to the cab
     Ln(ctx, 1.0, -1.6, 1.0, -1.05, INK, 0.05); Ln(ctx, 1.22, -1.58, 1.22, -1.05, INK, 0.05);
-    faceU(2.6, -1.84, 0.13, 0.4, st.face, st.look || [1, 0.3]);
   }
 
   // ---- The feed trailer: a red hopper on one axle with a folding auger. Origin at the drawbar eye, facing +x,
-  // the ground at y = +0.55. st = { run (m driven), load (0..1 grain in the hopper), face }. The auger is drawn
+  // the ground at y = +0.55. st = { run (m driven), load (0..1 grain in the hopper) }. The auger is drawn
   // by the page (it swings up to the feed bin): its pivot is AUG.pivot, folded tip AUG.fold.
   function feedTrailer(st) {
     var Rd = "#D8403A", RD = "#A82E28", ld = clamp(st.load, 0, 1), i;
@@ -344,7 +330,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // the wheel and its mudguard
     tyre(-2.6, 0.1, 0.45, (st.run || 0) / 0.45);
     ctx.beginPath(); ctx.arc(-2.6, 0.1, 0.62, -Math.PI + 0.3, -0.3); ctx.arc(-2.6, 0.1, 0.52, -0.3, -Math.PI + 0.3, true); ctx.closePath(); fs(ctx, RD, LWu() * 0.7);
-    faceU(-3.2, -1.3, 0.13, 0.45, st.face, [1, 0.3]);
   }
 
   // ---- The hen house on wheels: a long wooden house on a steel chassis, raised so the hens can shelter
@@ -352,7 +337,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ramp, and a galvanised feed bin on the right end. The pipe from the bin runs under the floor to the three
   // hanging feeders. Origin on the ground in its middle. st = { pans (0..1 grain in the feeders), flow (grain
   // running in the pipe), bin (0..1), lid (0..1 nest box lid open), belt (belt phase), et (the egg time, or -1),
-  // face, run (the auger is pouring) }.
+  // run (the auger is pouring) }.
   function henHouse(st) {
     var i;
     tyre(-1.78, -0.4, 0.36, 0, true); tyre(2.02, -0.4, 0.36, 0, true);
@@ -433,17 +418,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // the near wheels and their mudguards
     tyre(-1.9, -0.36, 0.36, 0); tyre(1.9, -0.36, 0.36, 0);
     [-1.9, 1.9].forEach(function (x) { ctx.beginPath(); ctx.arc(x, -0.36, 0.5, -Math.PI + 0.35, -0.35); ctx.arc(x, -0.36, 0.42, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, "#5D6675", LWu() * 0.7); });
-    faceU(-0.45, -2.2, 0.1, 0.5, st.face, [0, 1]);
   }
 
   // ---- Egg cartons. In the wide view (side on): cartonSide; in the close-up (from the front, a little above):
   // cartonOpen (the tray with its cups, the lid standing up behind or closing) and cartonShut.
-  function cartonSide(x, yb, n, open, fc) {
+  function cartonSide(x, yb, n, open) {
     if (open) R(ctx, x - 0.18, yb - 0.27, 0.36, 0.13, 0.03, "#F8E39A", LWu() * 0.6);
     for (var j = 0; j < n; j++) { ctx.beginPath(); ctx.ellipse(x - 0.12 + (j % 3) * 0.12, yb - 0.14 - (j >= 3 ? 0.02 : 0), 0.05, 0.06, 0, 0, TAU); fs(ctx, EGGC[j % 2], LWu() * 0.5); }
     R(ctx, x - 0.18, yb - 0.14, 0.36, 0.14, 0.03, CART, LWu() * 0.7);
     if (!open) { for (j = 0; j < 3; j++) { ctx.beginPath(); ctx.arc(x - 0.12 + j * 0.12, yb - 0.14, 0.055, Math.PI, 0); fs(ctx, CART, LWu() * 0.6); } }
-    if (fc) faceU(x - 0.07, yb - 0.08, 0.025, 0.14, fc, [0, 1]);
   }
   var CUP = { dx: 0.29, back: 0.2, front: 0.075, lean: 0.05 };
   function cupPos(j, cx, ty) {
@@ -452,7 +435,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   // the open carton from the front: cx = middle, ty = the top of its front face; eggs = [{ j, col }],
   // lidA = 0 (standing up behind) .. 1 (closed over the cups)
-  function cartonOpen(cx, ty, eggs, lidA, fc) {
+  function cartonOpen(cx, ty, eggs, lidA) {
     var w = 0.98, back = ty - 0.27, i;
     var th = lidA * Math.PI, ly = back - 0.32 * Math.cos(th), lx = 0.06 * Math.cos(th);
     function lidPoly(under) {
@@ -466,41 +449,39 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // eggs in the back row first
     eggs.slice().sort(function (a, b) { return (a.j < 3 ? 0 : 1) - (b.j < 3 ? 0 : 1); }).forEach(function (e) {
       var p = cupPos(e.j, cx, ty);
-      egg(p.x, p.y - 0.07 - (e.hop || 0), e.col, 1, fc);
+      egg(p.x, p.y - 0.07 - (e.hop || 0), e.col, 1);
     });
     R(ctx, cx - w / 2, ty, w, 0.18, 0.04, CART);
     for (i = 0; i < 3; i++) Ln(ctx, cx - CUP.dx * 1.5 + i * CUP.dx + CUP.dx * 0.5, ty + 0.03, cx - CUP.dx * 1.5 + i * CUP.dx + CUP.dx * 0.5, ty + 0.15, CART_D, 0.025);
     if (lidA >= 0.5) lidPoly(false);
   }
-  function cartonShut(cx, yb, fc) {
+  function cartonShut(cx, yb) {
     var w = 0.98;
     P(ctx, [cx - w / 2, yb - 0.18, cx + w / 2, yb - 0.18, cx + w / 2 + 0.03, yb - 0.3, cx - w / 2 + 0.03, yb - 0.3], CART, LWu() * 0.8);
     for (var i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(cx - CUP.dx + i * CUP.dx + 0.015, yb - 0.24, 0.11, 0.035, 0, 0, TAU); fs(ctx, CART_D, LWu() * 0.5); }
     R(ctx, cx - w / 2, yb - 0.18, w, 0.18, 0.04, CART);
     for (i = 0; i < 3; i++) Ln(ctx, cx - CUP.dx + i * CUP.dx, yb - 0.15, cx - CUP.dx + i * CUP.dx, yb - 0.03, CART_D, 0.025);
-    if (fc) faceU(cx - 0.12, yb - 0.1, 0.035, 0.24, fc, [0, 1]);
   }
-  function egg(x, y, col, s, fc) {
+  function egg(x, y, col, s) {
     s = s || 1;
     ctx.beginPath(); ctx.ellipse(x, y, 0.085 * s, 0.11 * s, 0, 0, TAU); fs(ctx, EGGC[col], LWu() * 0.7);
     C(ctx, x - 0.03 * s, y - 0.045 * s, 0.022 * s, "rgba(255,255,255,0.7)", 0);
-    if (fc) faceU(x - 0.03 * s, y, 0.017 * s, 0.06 * s, fc, [0, 1]);
   }
-  // The egg table beside the end of the hen house (origin on the ground in its middle). st = { et, stack, fc }
+  // The egg table beside the end of the hen house (origin on the ground in its middle). st = { et, stack }
   function eggTable(st) {
     var i;
     Ln(ctx, -0.45, -0.6, -0.5, 0, INK, 0.07); Ln(ctx, 0.45, -0.6, 0.5, 0, INK, 0.07);
     Ln(ctx, -0.45, -0.6, -0.5, 0, "#8E5F37", 0.04); Ln(ctx, 0.45, -0.6, 0.5, 0, "#8E5F37", 0.04);
     R(ctx, -0.58, -0.68, 1.16, 0.08, 0.03, "#B07B3C");
     var n = Math.min(st.stack, 12);
-    for (i = 0; i < n; i++) cartonSide(i < 6 ? -0.36 : -0.0, -0.68 - (i % 6) * 0.15, 0, false, st.fc);
+    for (i = 0; i < n; i++) cartonSide(i < 6 ? -0.36 : -0.0, -0.68 - (i % 6) * 0.15, 0, false);
     var cs = cartonState(st.et);
     cs.list.forEach(function (c) {
       var x = 0.32, yb = -0.68;
       if (c.slide > 0) { var sp = stackPos(st.stack, c.slide); x = lerp(0.32, sp.x, ease(c.slide)); yb = lerp(-0.68, sp.y, ease(c.slide)) - Math.sin(c.slide * Math.PI) * 0.15; }
       if (c.inF < 1) x = lerp(0.62, 0.32, ease(c.inF));
       ctx.save(); ctx.globalAlpha *= clamp(c.inF * 2, 0, 1);
-      cartonSide(x, yb, c.eggs.length, c.lid < 0.5, st.fc);
+      cartonSide(x, yb, c.eggs.length, c.lid < 0.5);
       ctx.restore();
     });
   }
@@ -582,7 +563,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         });
       } else {
         Farm.inUnits(x, PW * 0.5, PH * 0.78, 120, 2.6, function () {
-          cartonOpen(0, -0.05, [0, 1, 2, 3, 4].map(function (j) { return { j: j, col: j % 2 }; }), 0, 0);
+          cartonOpen(0, -0.05, [0, 1, 2, 3, 4].map(function (j) { return { j: j, col: j % 2 }; }), 0);
         });
       }
     } finally { ctx = keep; time = kt; }
@@ -809,7 +790,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
   function startOver() {
     if (locked()) return;
-    faceT = 0; auto = false; grab = null;
+    auto = false; grab = null;
     steps.reset();
     resetScene();
     bringIn();
@@ -820,13 +801,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = ["crow", "bonnet", "chicks", "faces"];
+    var list = ["crow", "bonnet", "chicks"];
     var pick = list[surpriseN++ % list.length];
     if (pick === "bonnet" && (perch || phase === "night")) pick = list[surpriseN++ % list.length];
     if (pick === "crow") { crow(); return; }
     if (pick === "bonnet") { startPerch(); coach.say("A hen hops onto the tractor!", 3); return; }
-    if (pick === "chicks") { startChicks(); coach.say("The chicks follow their mum.", 3); return; }
-    faceT = 6; coach.say("Hello, hens!", 3);
+    if (pick === "chicks") { startChicks(); coach.say("The chicks follow their mum.", 3); }
   }
   // The cockerel crows. If he is not in the wide view he flies up onto the gate post first.
   function crow() {
@@ -1067,8 +1047,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       Ln(ctx, -2.95, -0.62, -2.95, 0, "#8E5F37", 0.04); Ln(ctx, 0.25, -0.62, 0.25, 0, "#8E5F37", 0.04); Ln(ctx, -1.0, -0.62, -1.0, 0, "#8E5F37", 0.04);
       R(ctx, -3.3, -0.72, 3.7, 0.1, 0.03, "#B07B3C");
       // the stack of full cartons
-      var fc = faceAmt(), nS = Math.min(cartons, SPER * 2);
-      for (q = 0; q < nS; q++) cartonShut(ESTK[q < SPER ? 0 : 1], -0.72 - (q % SPER) * 0.31, fc);
+      var nS = Math.min(cartons, SPER * 2);
+      for (q = 0; q < nS; q++) cartonShut(ESTK[q < SPER ? 0 : 1], -0.72 - (q % SPER) * 0.31);
       // the carton being filled (and the full one going onto the stack)
       var cs = cartonState(t < 0 ? -1 : t);
       cs.list.forEach(function (cc) {
@@ -1077,8 +1057,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         ctx.save(); ctx.globalAlpha *= a;
         if (cc.slide > 0) {
           var si = Math.min(cartons, SPER * 2 - 1), sx = ESTK[si < SPER ? 0 : 1], sy = -0.72 - (si % SPER) * 0.31, f = ease(cc.slide);
-          cartonShut(lerp(ECART.x, sx, f), lerp(-0.6, sy, f) - Math.sin(cc.slide * Math.PI) * 0.35, fc);
-        } else cartonOpen(cx, ECART.ty, cc.eggs, cc.lid, fc);
+          cartonShut(lerp(ECART.x, sx, f), lerp(-0.6, sy, f) - Math.sin(cc.slide * Math.PI) * 0.35);
+        } else cartonOpen(cx, ECART.ty, cc.eggs, cc.lid);
         ctx.restore();
       });
       // the hen and her chicks walking past (a Surprise)
@@ -1096,7 +1076,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (t >= 0 && t !== Infinity) for (i = 0; i < NEGG; i++) {
         var e = eggCloseAt(i, t);
         if (!e) continue;
-        ctx.save(); ctx.globalAlpha *= e.a; ctx.translate(e.x, e.y); ctx.rotate(e.rot); egg(0, 0, i % 2, 1, 0); ctx.restore();
+        ctx.save(); ctx.globalAlpha *= e.a; ctx.translate(e.x, e.y); ctx.rotate(e.rot); egg(0, 0, i % 2, 1); ctx.restore();
       }
     });
   }
@@ -1198,7 +1178,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (phaseT >= NIGHT_T) bringIn();
     }
     if (tr.flash > 0) tr.flash = Math.max(0, tr.flash - dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (tr.mud > 0 && !inMud(tr.x + 1.5)) tr.mud = Math.max(0.15, tr.mud - dt * 0.05);
     HENS.forEach(function (h) { if (h.st !== "perch" && h.st !== "post") updateHen(h, dt); });
     updatePerch(dt); updatePost(dt);
@@ -1287,7 +1266,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawFence(S, true);
     drawHens(S, function (r) { return r > 1.0; });
     S.put(ctx, HX, 1, 1, function () { henHouse(houseSt()); });
-    S.put(ctx, TABLE, 1, 1, function () { ctx.scale(1.4, 1.4); eggTable({ et: eggTime(), stack: cartons, fc: faceAmt() }); });
+    S.put(ctx, TABLE, 1, 1, function () { ctx.scale(1.4, 1.4); eggTable({ et: eggTime(), stack: cartons }); });
     drawFence(S, false);
     drawHens(S, function (r) { return r <= 1.0 && r > TL + 0.01; });
     drawRig(S);
@@ -1299,7 +1278,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (dk > 0.01) { ctx.fillStyle = "rgba(18,26,66," + dk.toFixed(3) + ")"; ctx.fillRect(0, S.hY, S.W, S.H - S.hY); }
   }
   function houseSt() {
-    return { pans: panLvl, flow: flow, bin: binLvl, lid: lid, belt: beltRun * 0.7, et: phase === "eggs" ? eg.t : -1, face: faceAmt() };
+    return { pans: panLvl, flow: flow, bin: binLvl, lid: lid, belt: beltRun * 0.7, et: phase === "eggs" ? eg.t : -1 };
   }
   // the muddy field on the left, the paddock grass on the right, the track prints in the mud
   var MUD_RS = [0.74, 0.8, 0.86, 0.93, 1.02, 1.14, 1.3, 1.5, 1.8, 2.2, 2.8];
@@ -1438,10 +1417,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     });
   }
   function drawRig(S) {
-    var fc = faceAmt();
     S.put(ctx, tr.x, TL, 1, function () {
-      ctx.save(); ctx.translate(DBAR[0], DBAR[1]); feedTrailer({ run: tr.run, load: tr.load, face: fc }); ctx.restore();
-      tracked({ run: tr.run, time: time, face: fc, beacon: phase === "drive" || tr.flash > 0, mud: tr.mud });
+      ctx.save(); ctx.translate(DBAR[0], DBAR[1]); feedTrailer({ run: tr.run, load: tr.load }); ctx.restore();
+      tracked({ run: tr.run, time: time, beacon: phase === "drive" || tr.flash > 0, mud: tr.mud });
     });
     // the auger: folded along the hopper, or swung up over the feed bin
     var a = augTip(S), w = 0.3 * a.s;
@@ -1474,7 +1452,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.fillStyle = INK; ctx.textBaseline = "middle"; ctx.fillText(txt, bx + fsz * 0.55, by + bh / 2 + 1);
     ctx.restore();
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
 
   // ---------- Loop ----------
   var last = 0;

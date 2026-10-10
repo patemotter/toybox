@@ -115,7 +115,7 @@ body.big #jobs { display: none; }
   var cb = { x: -5.6, dir: 1, face: 1, v: 0, wheel: 0, reel: 0, tank: 0, auger: 0, beacon: false };
   var tr = { x: -40, v: 0, wheel: 0, load: 0, tip: 0, state: "away" };
   var phase = "ready", phaseT = 0, auto = false, grab = null, ending = false, arc = null, dusk = 0, storeLevel = 0, storeRun = 0;
-  var straw = { x0: 0, x1: 0, on: false }, dogS = null, deer = null, hawk = null, faceT = 0, gulls = [];
+  var straw = { x0: 0, x1: 0, on: false }, dogS = null, deer = null, hawk = null, gulls = [];
   // The field's state lives in the shared farm: wheat "golden"|"stubble", sunflowers (w.sun) the same words.
   function worldCrop() { var w = Farm.world.get(); return job === "sun" ? (w.sun === "stubble" ? "stubble" : "golden") : w.wheat; }
   function setWorldCrop(v) { Farm.world.update(function (w) { if (job === "sun") w.sun = v; else w.wheat = v; }); }
@@ -265,7 +265,7 @@ body.big #jobs { display: none; }
     coach.say("A new field!", 3);
   }
   function resetScene() {
-    parts.clear(); deer = hawk = birds = null; gulls = []; faceT = 0; dogS = null; tagged = {}; grab = null;
+    parts.clear(); deer = hawk = birds = null; gulls = []; dogS = null; tagged = {}; grab = null;
     tr.state = "away"; tr.x = -40; tr.load = 0; tr.tip = 0; cb.auger = 0; cb.tank = 0; cb.beacon = false; auto = false; cb.v = 0;
     cb.dir = 1; cb.face = 1; cb.x = startX(1); straw.on = false;
     storeLevel = storeFor(); storeRun = 0;
@@ -284,7 +284,7 @@ body.big #jobs { display: none; }
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = job === "sun" ? ["finches", "faces", "deer"] : ["deer", "hawk", "faces"];
+    var list = job === "sun" ? ["finches", "deer"] : ["deer", "hawk"];
     if (phase === "unload" && tr.state === "pour") list.unshift("drift");
     var pick = list[surpriseN++ % list.length];
     if (pick === "finches") { finches(); return; }
@@ -296,8 +296,7 @@ body.big #jobs { display: none; }
       coach.say("A deer!", 3);
       return;
     }
-    if (pick === "hawk") { hawk = { t: 0, x0: W * 0.5, y0: sc.hY * 0.4 }; coach.say("A hawk!", 3); return; }
-    faceT = 6; coach.say("Hello, combine!", 3);
+    if (pick === "hawk") { hawk = { t: 0, x0: W * 0.5, y0: sc.hY * 0.4 }; coach.say("A hawk!", 3); }
   }
   function bringBack() { if (tr.state !== "drift") return; tr.state = "back"; snd.horn(); coach.say("Back you come!", 3); }
 
@@ -441,7 +440,6 @@ body.big #jobs { display: none; }
     if (deer) { deer.t += dt; if (deer.t > 4) deer = null; }
     if (hawk) { hawk.t += dt; if (hawk.t > 6) hawk = null; }
     if (birds) updateBirds(dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     parts.update(dt);
     var ct = camTarget();
@@ -576,9 +574,8 @@ body.big #jobs { display: none; }
     ctx.fillStyle = "#F0D27E"; ctx.fill(); ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = "#B88F3A"; ctx.stroke();
   }
   function drawCombine() {
-    var f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0;
     sc.put(ctx, cb.x, 1, cb.face, function () {
-      var st = { wheel: cb.wheel, time: time, tank: cb.tank, reel: cb.reel, auger: cb.auger > 0.01, beacon: cb.beacon || cb.flash > 0, face: f, look: [0, 1] };
+      var st = { wheel: cb.wheel, time: time, tank: cb.tank, reel: cb.reel, auger: cb.auger > 0.01, beacon: cb.beacon || cb.flash > 0 };
       if (job === "sun") combineSun(ctx, st, phase === "drive" && cb.v > 0.5);
       else D.combine(ctx, st);
     });
@@ -608,13 +605,13 @@ body.big #jobs { display: none; }
   // world x on the track of a point dx metres along the trailer (drawn at TS), and its height factor
   function trX(dx) { return tr.x + dx * TS() * sc.TRACK / sc.k; }
   function drawTrailer() {
-    var r = sc.TRACK, f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0;
+    var r = sc.TRACK;
     sc.put(ctx, tr.x, r, 1, function () {
       ctx.translate(0, -0.5);
-      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: job === "sun" ? "seed" : "grain", face: f, time: time, look: [0, 1] });
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: job === "sun" ? "seed" : "grain", time: time });
       if (job === "sun") seedFlecks(ctx, tr.load, tr.tip);
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
-      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1] });
+      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true });
     }, TS());
     if (tr.state === "drift" && Math.sin(time * 8) > 0) {
       ctx.save(); ctx.globalAlpha = 0.25; ctx.fillStyle = "#FFC93C";

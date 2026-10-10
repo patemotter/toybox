@@ -36,7 +36,7 @@
  *     .put(ctx, x, r, dir, fn)  draw fn() in machine units (metres, y up negative, facing +x) at world x, depth r,
  *                               facing dir (+1 right, -1 left). Farm.LW is the outline width in units meanwhile.
  *   Farm.draw.tractor(ctx, st)  the one green tractor (generic, no logos), origin on the ground under the rear axle.
- *                               st = { wheel (m driven), time, face (0..1), lights (0..1), beacon, hitch: { lift } }.
+ *                               st = { wheel (m driven), time, lights (0..1), beacon, hitch: { lift } }.
  *                               Farm.HITCH = [x, y] of the lower hitch pin; Farm.DRAWBAR = [x, y] of the drawbar eye.
  *   Farm.draw.bedformer / destoner / planter / harvester (ctx, st)  the potato machines, origin at their hitch
  *                               (st = { wheel, time, work (0..1 running), level (hopper 0..1), lift }).
@@ -44,15 +44,15 @@
  *                               "grain"|"potato"|"grass" (Farm.CROP: [fill, strands]), tip (0..1) }.
  *   Farm.draw.combine(ctx, st)  the combine harvester, origin under the front axle: st = { wheel, time, work,
  *                               tank (0..1), auger (0..1 swung out; the page draws the swung tube, see .augerTube),
- *                               face, beacon }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
+ *                               beacon }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
  *   Farm.draw.hare / deer / gull / hawk (ctx, x, y, s, phase, flip)   the farm's life, in screen px.
  *   Farm.draw.telehandler(ctx, st)  the yellow telehandler's body (the page adds its boom), origin on the ground
- *                               between the axles: st = { wheel, time, beacon, face, look } (muck.html, cows.html).
+ *                               between the axles: st = { wheel, time, beacon } (muck.html, cows.html).
  *   Farm.draw.cow(ctx, st)      a black-and-white cow in profile, machine units, origin at her feet, facing +x:
- *                               st = { ph, walk, graze, moo, face, time } (cows.html, muck.html, the map).
+ *                               st = { ph, walk, graze, moo, time } (cows.html, muck.html, the map).
  *   Farm.rear.bedformer / destoner / planter / harvester / trailer (ctx, st)   the potato machines seen from behind
  *                               (a close-up looking along the rows), origin on the ground in the middle, metres,
- *                               row crests at x = +-0.5: st = { time, run (belt phase), work, level, load, face }.
+ *                               row crests at x = +-0.5: st = { time, run (belt phase), work, level, load }.
  *                               Farm.rear.crossBelt(ctx, x0, y0, x1, y1, run) the destoner's stone conveyor,
  *                               Farm.rear.hood(ctx, c, h, thick) a steel row hood.
  *   Farm.inUnits(ctx, x, y, s, lwPx, fn)  draw fn() in metres at screen (x, y), s px per metre, lwPx outlines.
@@ -238,22 +238,6 @@
     ctx.beginPath(); ctx.arc(0, 0, r * 0.88, -2.5, -1.4); ctx.strokeStyle = "rgba(255,255,255,0.13)"; ctx.lineWidth = r * 0.1; ctx.stroke();
     ctx.restore();
   }
-  // A cartoon face: two eyes at (x, y) apart dx, a smile below. f = 0..1 (fade), look = [x, y] direction.
-  function face(ctx, x, y, r, dx, f, time, look, smileW) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha = clamp(f, 0, 1);
-    var blink = Math.sin((time || 0) * 2.1) > 0.985 ? 0.15 : 1, lx = 0, ly = 0;
-    if (look) { var d = Math.hypot(look[0], look[1]) || 1; lx = look[0] / d * r * 0.35; ly = look[1] / d * r * 0.35; }
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      C(ctx, 0, 0, r, "#FFFFFF", LW * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, smileW || r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = LW * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
-
   // =====================================================================================================
   // The green tractor (side view, facing +x, origin on the ground under the rear axle)
   // =====================================================================================================
@@ -325,7 +309,6 @@
     // fenders
     ctx.beginPath(); ctx.arc(0, -0.95, 1.13, -Math.PI + 0.22, -0.2); ctx.arc(0, -0.95, 1.0, -0.2, -Math.PI + 0.22, true); ctx.closePath(); fs(ctx, G.body);
     ctx.beginPath(); ctx.arc(2.7, -0.66, 0.82, -Math.PI + 0.55, -0.4); ctx.arc(2.7, -0.66, 0.72, -0.4, -Math.PI + 0.55, true); ctx.closePath(); fs(ctx, G.body);
-    face(ctx, 2.75, -1.72, 0.13, 0.36, st.face, t, st.look, 0.2);
   }
 
   // =====================================================================================================
@@ -463,7 +446,7 @@
   // =====================================================================================================
   // The potato machines seen from behind (for a close-up that looks along the rows). Machine units (metres),
   // origin on the ground in the middle, y up negative. The rows' crests are at x = +-0.5 (1 m apart).
-  // st = { time, run (belt/web phase, grows while working), work (0..1), level (hopper 0..1), load (0..1), face }
+  // st = { time, run (belt/web phase, grows while working), work (0..1), level (hopper 0..1), load (0..1) }
   // =====================================================================================================
   function tyreBack(ctx, x, yb, w, h, run) {
     R(ctx, x - w / 2, yb - h, w, h, w * 0.45, "#33363F");
@@ -494,7 +477,6 @@
       Ln(ctx, c - 0.32, -0.46, c - 0.32, -0.3, INK, 0.06); Ln(ctx, c + 0.32, -0.46, c + 0.32, -0.3, INK, 0.06);
       rowHood(ctx, c, st.h === undefined ? 0.38 : st.h, 0.07);
     });
-    face(ctx, -0.25, -0.86, 0.11, 0.5, st.face, t, [0, 1], 0.2);
     ctx.restore();
   }
   function rearDestoner(ctx, st) {
@@ -511,7 +493,6 @@
     ctx.restore();
     R(ctx, -0.76, -1.36, 1.52, 0.78, 0.06, null, LW * 0.8);
     ctx.restore();
-    face(ctx, -0.25, -1.48, 0.1, 0.5, st.face, t, [0, 1], 0.18);
   }
   // the destoner's cross conveyor (drawn over the body): from (x0, y0) on the right to (x1, y1) on the left
   function crossBelt(ctx, x0, y0, x1, y1, run) {
@@ -521,7 +502,7 @@
     C(ctx, x0, y0, 0.09, "#6E7887"); C(ctx, x1, y1, 0.09, "#6E7887");
   }
   function rearPlanter(ctx, st) {
-    var B = "#2F7FD1", BD = "#215E9E", t = st.time || 0, run = st.run || 0, lv = st.level === undefined ? 1 : st.level;
+    var B = "#2F7FD1", BD = "#215E9E", run = st.run || 0, lv = st.level === undefined ? 1 : st.level;
     tyreBack(ctx, -1.15, 0, 0.22, 0.5, run); tyreBack(ctx, 1.15, 0, 0.22, 0.5, run);
     Ln(ctx, -1.15, -0.3, -0.9, -0.95, INK, 0.07); Ln(ctx, 1.15, -0.3, 0.9, -0.95, INK, 0.07);
     // the hopper, heaped with seed potatoes
@@ -543,7 +524,6 @@
       R(ctx, c - 0.09, -0.94, 0.18, 0.7, 0.05, null, LW * 0.7);
       rowHood(ctx, c, 0.34, 0.05);
     });
-    face(ctx, -0.25, -1.42, 0.11, 0.5, st.face, t, [0, 1], 0.2);
   }
   function rearHarvester(ctx, st) {
     var Y = "#F2A51E", YD = "#C27E0D", t = st.time || 0, run = st.run || 0, j = st.work ? Math.sin(t * 30) * 0.01 : 0;
@@ -561,7 +541,6 @@
     // the share under the front lifts the whole row
     P(ctx, [-0.86, -0.46, 0.86, -0.46, 0.8, -0.3, -0.8, -0.3], YD, LW * 0.8);
     ctx.restore();
-    face(ctx, -0.27, -1.96, 0.11, 0.54, st.face, t, [0, 1], 0.2);
   }
   // the tipping trailer from behind: tailgate toward us, the heap of potatoes above the rim
   function rearTrailer(ctx, st) {
@@ -580,7 +559,6 @@
     for (i = 1; i < 4; i++) Ln(ctx, -1.2 + i * 0.6, -1.84, -1.2 + i * 0.6, -0.8, RD, 0.05);
     shine(ctx, -1.05, -1.78, 1.05, -1.78, 0.05);
     R(ctx, -1.08, -0.98, 0.18, 0.1, 0.03, "#FFB648", LW * 0.6); R(ctx, 0.9, -0.98, 0.18, 0.1, 0.03, "#FFB648", LW * 0.6);
-    face(ctx, -0.3, -1.42, 0.13, 0.6, st.face, st.time, [0, 1], 0.22);
   }
   // Draw fn() in machine units at screen (x, y) with s px per metre and outlines lw px wide.
   function inUnits(ctx, x, y, s, lwPx, fn) {
@@ -632,7 +610,6 @@
     ctx.restore();
     // mudguard
     ctx.beginPath(); ctx.arc(-4.72, -0.12, 1.45, -Math.PI + 0.75, -0.75); ctx.lineWidth = 0.12; ctx.strokeStyle = INK; ctx.stroke();
-    face(ctx, -2.25, -1.95, 0.16, 0.42, st.face, st.time, st.look, 0.24);
   }
 
   // =====================================================================================================
@@ -720,7 +697,6 @@
     wheel(ctx, -3.7, -0.62, 0.62, rot / 0.62, { rim: 0.56 });
     wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58 });
     ctx.beginPath(); ctx.arc(0, -0.95, 1.12, -Math.PI + 0.25, -0.35); ctx.arc(0, -0.95, 1.0, -0.35, -Math.PI + 0.25, true); ctx.closePath(); fs(ctx, G.body);
-    face(ctx, 0.45, -3.55, 0.17, 0.5, st.face, t, st.look, 0.26);
   }
 
   // A long tube or belt between two screen points (the swung-out auger or elevator), widths w1 -> w2 px.
@@ -823,7 +799,7 @@
 
   // The telehandler (yellow, generic), in machine units: origin on the ground between the axles, facing +x. The
   // page draws its own boom and attachment (the boom pivot sits at about [-1.5, -2.05]). st = { wheel (m driven),
-  // time, beacon (flashing), face (0..1), look }.
+  // time, beacon (flashing) }.
   function telehandler(ctx, st) {
     st = st || {};
     var T = "#F2B33A", TD = "#C98A1A", rot = (st.wheel || 0) / 0.62, i;
@@ -840,11 +816,10 @@
     wheel(ctx, 1.45, -0.62, 0.62, rot, { rim: 0.55 });
     ctx.beginPath(); ctx.arc(-1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(-1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
     ctx.beginPath(); ctx.arc(1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
-    face(ctx, 1.45, -1.32, 0.12, 0.4, st.face, st.time, st.look);
   }
   // A cow in profile (black and white), in machine units: origin at her feet in the middle, facing +x.
   // st = { ph (phase), walk (legs swing with ph), graze (the head bobs down to eat with ph), moo (head up, mouth
-  // open), face (0..1), time }.
+  // open), time }.
   function cow(ctx, st) {
     st = st || {};
     var ph = st.ph || 0, sw = st.walk ? Math.sin(ph) * 0.14 : 0, bob = st.walk ? Math.abs(Math.sin(ph)) * 0.04 : 0;
@@ -868,7 +843,6 @@
     if (st.moo) { ctx.beginPath(); ctx.ellipse(0.58, 0.12, 0.05, 0.06, 0, 0, TAU); fs(ctx, "#7A2E3A", 0); }
     P(ctx, [0.0, -0.16, -0.2, -0.3, -0.05, -0.12], "#2A2D38", LW * 0.6);
     C(ctx, 0.3, -0.07, 0.05, "#FFFFFF", LW * 0.4); C(ctx, 0.31, -0.07, 0.028, INK, 0);
-    if (st.face) face(ctx, 0.18, -0.08, 0.06, 0.18, st.face, st.time, null, 0.08);
     ctx.restore();
     ctx.restore();
   }

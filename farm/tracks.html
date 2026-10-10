@@ -149,7 +149,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var fm = { on: false, x: 0, t: 0, walk: 0, state: "away" };   // the farmer for the Look step
   var FX = L * 0.5;                                  // where he digs
   var dg = { t: 0, n: 0 };                           // the dig: time, worms out
-  var faceT = 0, sur = null, growG = 0;
+  var sur = null, growG = 0;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function working() { return phase === "drive" && m && m.v > 0.3; }
@@ -196,19 +196,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // =====================================================================================================
   // Drawings (machine units)
   // =====================================================================================================
-  function faceU(x, y, r, dx, f, look) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha *= clamp(f, 0, 1);
-    var blink = Math.sin(time * 2.1) > 0.985 ? 0.15 : 1, lx = look ? look[0] * r * 0.35 : 0, ly = look ? look[1] * r * 0.35 : r * 0.2;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      C(ctx, 0, 0, r, "#FFFFFF", LWu() * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   function shine(x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
   function driverU(x, y, s) {
     R(ctx, x - 0.26 * s, y + 0.1 * s, 0.52 * s, 0.5 * s, 0.16 * s, "#3D6FB6", LWu() * 0.7);
@@ -258,7 +245,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.closePath();
   }
   // The big tracked tractor (side view, facing +x, origin on the ground under the drive wheel's middle).
-  // st = { wheel (m driven), time, face, beacon, hitch: { lift } }. Its linkage's lower pin is at THITCH.
+  // st = { wheel (m driven), time, beacon, hitch: { lift } }. Its linkage's lower pin is at THITCH.
   function trackedTractor(st) {
     st = st || {};
     var lift = (st.hitch && st.hitch.lift) || 0, t = st.time || 0, dist = st.wheel || 0, ly = -lift * 0.6, i;
@@ -317,11 +304,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // mudguard over the front of the track
     ctx.beginPath(); ctx.arc(TK.id[0], TK.id[1], TK.id[2] + 0.14, -Math.PI * 0.95, -0.25); ctx.lineWidth = 0.11; ctx.strokeStyle = INK; ctx.stroke();
     ctx.beginPath(); ctx.arc(TK.id[0], TK.id[1], TK.id[2] + 0.14, -Math.PI * 0.95, -0.25); ctx.lineWidth = 0.07; ctx.strokeStyle = G.body; ctx.stroke();
-    faceU(3.25, -2.65, 0.13, 0.36, st.face, st.look || [1, 0.4]);
   }
   // The subsoiler (origin at its hitch pin, the ground at y = +SUB_G, facing +x: it trails behind). Two long
   // curved legs (the far one darker) with a point at the bottom that runs SUB_G + 0.45 below the pin, a red
-  // toolbar, and a packer roller behind. st = { time, work, roll (m rolled), face }
+  // toolbar, and a packer roller behind. st = { time, work, roll (m rolled) }
   function legShape(dx, col) {
     var y = SUB_G + 0.45;
     ctx.beginPath();
@@ -351,7 +337,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     C(ctx, -2.35, ry, 0.32, "#5D6675");
     for (i = 0; i < 8; i++) { var a = rl / 0.32 + i * TAU / 8; C(ctx, -2.35 + Math.cos(a) * 0.25, ry + Math.sin(a) * 0.25, 0.06, "#C3CCD6", LWu() * 0.5); }
     C(ctx, -2.35, ry, 0.1, "#8C97A6", LWu() * 0.6);
-    faceU(-1.35, -0.55, 0.09, 0.3, st.face, [1, 0]);
   }
   // A wriggly earthworm in metres: tail at (x, y), pointing at angle a, len long, ph = its wriggle.
   function worm(x, y, len, a, ph, fc, thick) {
@@ -609,7 +594,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); cbits.length = 0; faceT = 0; sur = null; auto = false; grab = null; leaving = null;
+    parts.clear(); cbits.length = 0; sur = null; auto = false; grab = null; leaving = null;
     fm.on = false; fm.state = "away";
     resetLanes(); resetWorms();
     steps.reset();
@@ -625,10 +610,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var SUR_T = { boot: 6.2, mole: 6.0, bird: 4.8 };
   function surprise() {
     if (locked()) return;
-    var list = ["boot", "mole", "bird", "faces"];
+    var list = ["boot", "mole", "bird"];
     var pick = list[surpriseN++ % list.length];
     if (pick === "boot" && (fm.on || cmode === "look")) pick = list[surpriseN++ % list.length];
-    if (pick === "faces") { faceT = 6; coach.say("Hello, tractors! Hello, worms!", 3); return; }
     // the moment happens in the close-up, at a spot on its screen (it stays put while the ground moves on)
     sur = { kind: pick, t: 0, fx: pick === "boot" ? 0.3 : (pick === "mole" ? 0.62 : 0.55), done: false };
     if (pick === "boot") coach.say("Oh no, a welly is stuck in the mud!", 3.5);
@@ -875,7 +859,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
   }
   function drawWorms(ln, u) {
-    var list = ln === lanes.t ? worms.t : worms.w, fc = 0.6 + 0.4 * faceAmt(), xa = CXi(-30), xb = CXi(RG.c.w + 30);
+    var list = ln === lanes.t ? worms.t : worms.w, fc = 0.6, xa = CXi(-30), xb = CXi(RG.c.w + 30);
     Farm.inUnits(ctx, CX(0), CY(0), u, clamp(u * 0.012, 1, 2.2), function () {
       list.forEach(function (w) {
         if (w.x < xa || w.x > xb || w.d > 1.3) return;
@@ -893,18 +877,17 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     list.forEach(function (mm) {
       var ext = RIGS[mm.kind].ext;
       if (CX(mm.x + ext[1]) < -20 || CX(mm.x + ext[0]) > RG.c.w + 20) return;
-      var f = faceAmt();
       if (mm.kind === "wheels") {
-        Farm.inUnits(ctx, CX(mm.x), CY(mm.sink), u, lw, function () { D.tractor(ctx, { wheel: mm.wheel, time: time, face: f, look: [1, 0.4], beacon: mm.flash > 0 || (mm === m && phase === "drive") }); });
+        Farm.inUnits(ctx, CX(mm.x), CY(mm.sink), u, lw, function () { D.tractor(ctx, { wheel: mm.wheel, time: time, beacon: mm.flash > 0 || (mm === m && phase === "drive") }); });
         if (mm === m && working()) pressure([mm.x, mm.x + 2.7], [0.42, 0.32], mm.sink, u, 1);
       } else {
         Farm.inUnits(ctx, CX(mm.x), CY(mm.kind === "sub" ? 0 : at(lane.rut, mm.x + 1.6)), u, lw, function () {
           if (mm.kind === "sub") {
             ctx.save(); ctx.translate(THITCH[0], THITCH[1] - mm.lift * 0.6);
-            subsoiler({ time: time, roll: mm.roll, face: f, work: working() });
+            subsoiler({ time: time, roll: mm.roll, work: working() });
             ctx.restore();
           }
-          trackedTractor({ wheel: mm.wheel, time: time, face: f, beacon: mm.flash > 0 || (mm === m && phase === "drive"), hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
+          trackedTractor({ wheel: mm.wheel, time: time, beacon: mm.flash > 0 || (mm === m && phase === "drive"), hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
         });
         if (mm === m && working() && mm.kind === "tracks") pressure([mm.x + 1.6], [1.9], 0.03, u, 0.45);
       }
@@ -1238,7 +1221,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // the loosened soil opens up over a moment after the leg has passed
     var ln = lanes.w;
     for (i = 0; i < NC; i++) if (ln.lt[i] >= 0 && ln.loose[i] < 1) { ln.loose[i] = clamp((time - ln.lt[i]) / 0.9, 0, 1); }
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (sur) {
       var s0 = sur.t; sur.t += dt;
       if (sur.kind === "boot" && s0 < 4.0 && sur.t >= 4.0) { snd.pop(); var cx0 = CXi(RG.c.w * sur.fx); for (i = 0; i < 6; i++) cbit(cx0 + (Math.random() - 0.5) * 0.2, -0.05, (Math.random() - 0.5) * 2, -1.5 - Math.random() * 1.5, MUD_D, 0.035); }
@@ -1321,13 +1303,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
   }
   function drawRig(S, mm) {
-    var f = faceAmt(), lit = mm.flash > 0 || (mm === m && phase === "drive");
+    var lit = mm.flash > 0 || (mm === m && phase === "drive");
     if (mm.kind === "wheels") {
-      S.put(ctx, mm.x, mm.r, 1, function () { ctx.translate(0, mm.sink); D.tractor(ctx, { wheel: mm.wheel, time: time, face: f, look: [1, 0.4], beacon: lit }); });
+      S.put(ctx, mm.x, mm.r, 1, function () { ctx.translate(0, mm.sink); D.tractor(ctx, { wheel: mm.wheel, time: time, beacon: lit }); });
     } else {
       S.put(ctx, mm.x, mm.r, 1, function () {
-        if (mm.kind === "sub") { ctx.save(); ctx.translate(THITCH[0], THITCH[1] - mm.lift * 0.6); subsoiler({ time: time, roll: mm.roll, face: f, work: working() }); ctx.restore(); }
-        trackedTractor({ wheel: mm.wheel, time: time, face: f, beacon: lit, hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
+        if (mm.kind === "sub") { ctx.save(); ctx.translate(THITCH[0], THITCH[1] - mm.lift * 0.6); subsoiler({ time: time, roll: mm.roll, work: working() }); ctx.restore(); }
+        trackedTractor({ wheel: mm.wheel, time: time, beacon: lit, hitch: mm.kind === "sub" ? { lift: mm.lift } : null });
       });
     }
   }
@@ -1373,7 +1355,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     });
     ctx.restore();
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
 
   // ---------- Loop ----------
   var last = 0;

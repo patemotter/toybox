@@ -137,19 +137,6 @@ body.big #jobs { display: none; }
     ctx.beginPath(); ctx.arc(0, 0, r * 0.88, -2.5, -1.4); ctx.strokeStyle = "rgba(255,255,255,0.13)"; ctx.lineWidth = r * 0.1; ctx.stroke();
     ctx.restore();
   }
-  function face(ctx, x, y, r, dx, f, time, smileW) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha = clamp(f, 0, 1);
-    var blink = Math.sin((time || 0) * 2.1) > 0.985 ? 0.15 : 1, l0 = LW(), lx = r * 0.3, ly = r * 0.1;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      Cc(ctx, 0, 0, r, "#FFFFFF", l0 * 0.8); Cc(ctx, lx, ly, r * 0.5, INK, 0); Cc(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, smileW || r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = l0 * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   function driver(ctx, x, y) {
     var l0 = LW();
     Rr(ctx, x - 0.26, y + 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
@@ -246,7 +233,6 @@ body.big #jobs { display: none; }
     wheel(ctx, 0, -1.0, 1.0, rot / 1.0, { rim: 0.58 });
     ctx.beginPath(); ctx.arc(0, -1.0, 1.18, -Math.PI + 0.25, -0.35); ctx.arc(0, -1.0, 1.05, -0.35, -Math.PI + 0.25, true); ctx.closePath(); fs(ctx, G.body);
     ctx.beginPath(); ctx.arc(-3.85, -0.65, 0.82, -Math.PI + 0.45, -0.45); ctx.arc(-3.85, -0.65, 0.72, -0.45, -Math.PI + 0.45, true); ctx.closePath(); fs(ctx, G.body);
-    face(ctx, -2.85, -2.45, 0.2, 0.6, st.face, t, 0.3);
   }
   function pickupHeader(ctx, st) {
     var spin = st.spin || 0, l0 = LW(), i;
@@ -284,7 +270,7 @@ body.big #jobs { display: none; }
   // A green tractor with a front loader and a buck rake (it pushes the silage up the clamp). Tractor units.
   function loader(ctx, st) {
     var lift = st.lift || 0, l0 = LW();
-    D.tractor(ctx, { wheel: st.wheel, time: st.time, face: st.face, look: [0, 1], beacon: st.beacon, lights: st.lights });
+    D.tractor(ctx, { wheel: st.wheel, time: st.time, beacon: st.beacon, lights: st.lights });
     // the loader arms from the tower by the cab down to the tool at the front
     Rr(ctx, 1.05, -2.15, 0.36, 1.15, 0.08, G.dark, l0 * 0.8);
     tube(ctx, 1.25, -2.05, 3.3, -2.15 - lift * 0.6, 0.17, G.dark);
@@ -301,7 +287,7 @@ body.big #jobs { display: none; }
   function heavy(ctx, st) {
     var l0 = LW();
     wheel(ctx, 0.14, -0.97, 0.97, (st.wheel || 0) / 0.97, { rim: 0.58, dual: true, rimCol: "#9AA5B4" });
-    D.tractor(ctx, { wheel: st.wheel, time: st.time, face: st.face, look: [0, 1], beacon: st.beacon, lights: st.lights });
+    D.tractor(ctx, { wheel: st.wheel, time: st.time, beacon: st.beacon, lights: st.lights });
     Rr(ctx, 4.05, -1.75, 0.62, 1.05, 0.1, "#5D6675");
     for (var i = 0; i < 4; i++) Ln(ctx, 4.12, -1.6 + i * 0.24, 4.6, -1.6 + i * 0.24, "#3E4655", l0 * 0.9);
   }
@@ -355,7 +341,7 @@ body.big #jobs { display: none; }
   var field = { stage: "grass", g: 1, wipe: null };
   var swath = { a: 0, b: 0, on: false };
   var phase = "arrive", phaseT = 0, stepId = "mow", auto = false, grab = null, ending = false, dusk = 0, time = 0;
-  var faceT = 0, hare = null, dog = null, sheetT = 0, tireT = 0, uncover = null;
+  var hare = null, dog = null, sheetT = 0, tireT = 0, uncover = null;
 
   function cropStage(c) { return c === "maize" ? "maize" : "grass"; }
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
@@ -648,7 +634,7 @@ body.big #jobs { display: none; }
   }
   function startOver() {
     if (locked()) return;
-    parts.length = 0; hare = null; dog = null; faceT = 0; tagged = {};
+    parts.length = 0; hare = null; dog = null; tagged = {};
     settleClamp();
     field.stage = cropStage(crop); field.g = 1; field.wipe = null; swath.on = false;
     steps.reset();
@@ -675,7 +661,7 @@ body.big #jobs { display: none; }
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = ["hare", "faces", "dog"];
+    var list = ["hare", "dog"];
     var idleClamp = heap.cover > 0.99 && !heap.flap && !uncover && ld.st === "away" && ro.st === "away" && !(stepId === "cover" && phase === "work");
     if (idleClamp) list.splice(1, 0, "wind");
     var pick = list[surpriseN++ % list.length];
@@ -696,9 +682,7 @@ body.big #jobs { display: none; }
       var x1 = at === scA && !split ? scA.cam : at.cam;
       dog = { sc: at, x: at.wx(-40, 0.74), stop: x1 + (hash(surpriseN, 2) - 0.5) * 2, t: 0, st: "run", ph: 0 };
       coach.say("The farm dog comes to see!", 3);
-      return;
     }
-    faceT = 6; coach.say("Hello, machines!", 3);
   }
   function fixFlap() {
     if (!heap.flap) return;
@@ -885,7 +869,6 @@ body.big #jobs { display: none; }
     var working = phase === "work" && rig.v > 0.3 && (stepId === "mow" || stepId === "chop");
     rig.spin += dt * (working ? 14 : (rig.m && phase !== "haul" ? 3 : 0.5));
     if (rig.flash) rig.flash = Math.max(0, rig.flash - dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (hare) { hare.t += dt; if (hare.t > 3.4) hare = null; }
     if (dog) updateDog(dt);
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
@@ -1069,7 +1052,6 @@ body.big #jobs { display: none; }
     var yr = hAt(x), yf = hAt(x + dir * 2.7), a = Math.atan2(yf - yr, 2.7);
     put(sc, x, 1, dir, function () { ctx.translate(0, -yr); ctx.rotate(-a); fn(); });
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
   function drawWorld(sc) {
     var P = { crop: crop, stage: field.stage, g: field.g, wipe: field.wipe, time: time };
     sc.sky(ctx, { time: time, arc: phase === "grow" ? clamp(phaseT / 3.6, 0, 1) : null, season: "summer", dusk: dusk });
@@ -1083,8 +1065,8 @@ body.big #jobs { display: none; }
     if (swath.on && crop === "grass") drawSwath(sc);
     if (crop === "maize") drawMaizeEdge(sc);
     if (rig.m) drawRig(sc);
-    if (ld.st !== "away") putOnHeap(sc, ld.x, -1, function () { loader(ctx, { wheel: -ld.wheel, time: time, lift: ld.lift, face: faceAmt(), beacon: ld.st === "push" }); });
-    if (ro.st !== "away") putOnHeap(sc, ro.x, -1, function () { heavy(ctx, { wheel: -ro.wheel, time: time, face: faceAmt(), beacon: ro.st === "legs" }); });
+    if (ld.st !== "away") putOnHeap(sc, ld.x, -1, function () { loader(ctx, { wheel: -ld.wheel, time: time, lift: ld.lift, beacon: ld.st === "push" }); });
+    if (ro.st !== "away") putOnHeap(sc, ro.x, -1, function () { heavy(ctx, { wheel: -ro.wheel, time: time, beacon: ro.st === "legs" }); });
     if (tr.st !== "away" && tr.r > 0.9 && tr.r <= 1.001) drawTrailer(sc);
     if (rig.m === "forage") drawSpout(sc);
     drawParts(sc, function (p) { return p.r <= 1.001 && p.r > 0.9; });
@@ -1095,17 +1077,17 @@ body.big #jobs { display: none; }
     if (dog && dog.sc === sc) D.dog(ctx, sc.X(dog.x, 0.74), sc.Y(0.74) - (dog.st === "sit" ? 0.15 * SS(sc, 0.74) : 0), SS(sc, 0.74) * 1.6, dog.ph, false, dog.st === "sit");
   }
   function drawRig(sc) {
-    var f = faceAmt(), working = phase === "work" && rig.v > 0.3;
+    var working = phase === "work" && rig.v > 0.3;
     if (rig.m === "mower") {
       put(sc, rig.x, 1, 1, function () {
         ctx.save(); ctx.translate(Farm.HITCH[0], Farm.HITCH[1]);
         mower(ctx, { spin: rig.spin, work: working ? 1 : 0, time: time });
         ctx.restore();
-        D.tractor(ctx, { wheel: rig.wheel, time: time, hitch: { lift: phase === "work" ? 0 : 0.5 }, face: f, look: [0, 1], lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
+        D.tractor(ctx, { wheel: rig.wheel, time: time, hitch: { lift: phase === "work" ? 0 : 0.5 }, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
       });
     } else {
       put(sc, rig.x, 1, 1, function () {
-        forage(ctx, { wheel: rig.wheel, time: time, spin: rig.spin, work: working ? 1 : 0, header: crop === "maize" ? "maize" : "pickup", face: f, beacon: !!rig.flash || phase === "haul" });
+        forage(ctx, { wheel: rig.wheel, time: time, spin: rig.spin, work: working ? 1 : 0, header: crop === "maize" ? "maize" : "pickup", beacon: !!rig.flash || phase === "haul" });
       });
     }
     if (Math.random() < 0.1 && phase !== "grow") addPart({ kind: "puff", x: rig.m === "mower" ? rig.x + 1.33 : rig.x - 3.3, h: rig.m === "mower" ? 3.45 : 4.1, r: 1, vx: -0.6 - rig.v * 0.5, vh: 1.1, life: 1.1, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });
@@ -1148,12 +1130,11 @@ body.big #jobs { display: none; }
     if (chopping && tr.load > 0.35) tagOnce("spout" + loads, sc, "Spout", rig.x - 2.4, 5.6);
   }
   function drawTrailer(sc) {
-    var f = faceAmt();
     put(sc, tr.x, tr.r, 1, function () {
       ctx.translate(0, -0.5);
-      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: tr.crop, face: f, time: time, look: [0, 1] });
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: tr.crop, time: time });
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
-      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1], beacon: tr.st === "back" || tr.st === "tip" });
+      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, beacon: tr.st === "back" || tr.st === "tip" });
     });
   }
   function drawSwath(sc) {

@@ -133,7 +133,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0, flash: 0 };
   var tr = { x: -60, r: TR_FAR, v: 0, wheel: 0, crates: [0, 0, 0], slot: 0, state: "away", t: 0, lane: 0 };
   var phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
-  var faceT = 0, hare = null, jam = null, wonky = null, fly = null, pony = { eat: 0, nod: 0, t: 0, fed: 0 };
+  var hare = null, jam = null, wonky = null, fly = null, pony = { eat: 0, nod: 0, t: 0, fed: 0 };
   var fk = { t: 0, i: 0, done: false };            // the forklift's stacking run
   var shedBase = Math.min(count, 6);               // full crates already in the packhouse when this load arrives
 
@@ -187,20 +187,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // =====================================================================================================
   // Drawings (machine units)
   // =====================================================================================================
-  // A cartoon face like farm.js's: two eyes apart dx at (x, y), a smile. f = 0..1.
-  function faceU(x, y, r, dx, f, look) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha *= clamp(f, 0, 1);
-    var blink = Math.sin(time * 2.1) > 0.985 ? 0.15 : 1, lx = look ? look[0] * r * 0.35 : 0, ly = look ? look[1] * r * 0.35 : r * 0.2;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      C(ctx, 0, 0, r, "#FFFFFF", LWu() * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   // a tyre with tread marks that turn, a rim and a hub (rot in radians)
   function tyre(x, y, r, rot, rim) {
     C(ctx, x, y, r, "#33363F");
@@ -244,7 +230,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     P(ctx, [-2.48, 0.1, -2.62, 0.38, -2.5, 0.4, -2.38, 0.14], "#3A3F4E", LWu() * 0.6);
     tyre(-0.5, 0.3, 0.2, (st.wheel || 0) / 0.2);
     tyre(-2.2, 0.3, 0.2, (st.wheel || 0) / 0.2);
-    faceU(-1.9, -0.52, 0.11, 0.3, st.face, [0, 1]);
   }
   // The carrot harvester (trailed, beside a trailer). The share runs under the bed and lifts it; the carrots
   // ride up the belt (seen through the side window) to the top, and the side elevator carries them out over
@@ -269,7 +254,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (var i = 0; i < 14; i++) {
       var f = ((i / 14 + run * 0.09) % 1 + 1) % 1, x = lerp(wx0, wx1, f), y = lerp(wy0, wy1, f);
       Ln(ctx, x - 0.05, y - 0.16, x + 0.08, y + 0.1, "#C3CCD6", 0.035);
-      if (st.work && st.busy !== false && hash(i, Math.floor(run * 0.09 + i / 14)) > 0.45) carrotSide(x + 0.02, y - 0.1, 0.32, 0.07, -0.65, i, 0);
+      if (st.work && st.busy !== false && hash(i, Math.floor(run * 0.09 + i / 14)) > 0.45) carrotSide(x + 0.02, y - 0.1, 0.32, 0.07, -0.65, i);
     }
     ctx.restore();
     // the top: a cross conveyor under a roof with a rail where the pickers stand
@@ -281,11 +266,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // the side elevator: folded along the top, or swung out (the page draws the swung tube)
     if (!st.out) { R(ctx, -7.4, -2.95, 4.2, 0.24, 0.06, "#5D6675"); C(ctx, MCH.harvester.pivot[0], MCH.harvester.pivot[1] - 0.25, 0.14, "#5D6675"); }
     else C(ctx, MCH.harvester.pivot[0], MCH.harvester.pivot[1], 0.16, "#5D6675");
-    faceU(-4.1, -1.15, 0.13, 0.42, st.face, [0, 1]);
   }
   // A carrot lying along an angle (side view, machine units): shoulder at (x, y), length len, width w,
   // pointing at angle a (0 = straight down).
-  function carrotSide(x, y, len, w, a, k, fc) {
+  function carrotSide(x, y, len, w, a, k) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a);
     var bend = (hash(k, 3) - 0.5) * w * 0.8;
     ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w * 0.9, len * 0.5, bend, len); ctx.quadraticCurveTo(w * 0.9, len * 0.5, w, 0);
@@ -295,7 +279,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // A big wooden crate (bulk box): bottom centre at (cx, yb), load 0..1 (carrots seen between the slats and
   // heaped on top when full).
   var CRATE_X = [-2.35, -4.4, -6.45], CRATE_W = 1.85, CRATE_H = 1.3, DECK = -1.08;
-  function crate(cx, yb, load, k, fc) {
+  function crate(cx, yb, load, k) {
     var w = CRATE_W, h = CRATE_H, x0 = cx - w / 2, top = yb - h, lv = clamp(load, 0, 1), i;
     if (lv > 0.7) {
       // the heap above the rim: a mound with carrots poking out
@@ -305,9 +289,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       ctx.lineTo(x0 + w - 0.05, top + 0.02); ctx.closePath(); fs(ctx, ORANGE, LWu() * 0.7);
       for (i = 0; i < 7; i++) {
         var fx = 0.1 + 0.8 * hash(i, k + 2), py = top - hh * Math.pow(Math.sin(fx * Math.PI), 0.6) * (0.35 + 0.5 * hash(i, k + 4));
-        carrotSide(x0 + w * fx, py, 0.42, 0.075, (hash(i, k + 7) - 0.5) * 2.6 + Math.PI / 2, i + k, 0);
+        carrotSide(x0 + w * fx, py, 0.42, 0.075, (hash(i, k + 7) - 0.5) * 2.6 + Math.PI / 2, i + k);
       }
-      if (fc) faceU(cx - 0.28, top - hh * 0.55, 0.1, 0.56, fc, [0, 1]);
     }
     // the box: corner posts and slats with gaps; the gaps show carrots up to the load
     R(ctx, x0, top, w, h, 0.05, "#5A3A20");
@@ -328,7 +311,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     R(ctx, -7.7, DECK - 0.05, 6.4, 0.24, 0.05, Rd);
     shine(-7.55, DECK + 0.01, -1.45, DECK + 0.01, 0.05);
     ctx.beginPath(); ctx.arc(-4.65, -0.07, 1.4, -Math.PI + 0.72, -0.72); ctx.lineWidth = 0.12; ctx.strokeStyle = INK; ctx.stroke();
-    (st.crates || []).forEach(function (ld, i) { if (ld >= 0) crate(CRATE_X[i], DECK - 0.05, ld, i * 5 + 1, st.face); });
+    (st.crates || []).forEach(function (ld, i) { if (ld >= 0) crate(CRATE_X[i], DECK - 0.05, ld, i * 5 + 1); });
     R(ctx, -1.6, DECK - 0.45, 0.12, 0.42, 0.03, RD, LWu() * 0.7);                    // headboard
   }
   // The forklift (side view, origin on the ground under the front axle, facing +x). st.lift = fork height (m),
@@ -341,7 +324,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // the carriage and the forks
     R(ctx, 0.38, fy - 0.9, 0.12, 0.9, 0.03, "#3A3F4E", LWu() * 0.7);
     R(ctx, 0.42, fy - 0.08, 1.45, 0.08, 0.02, "#3A3F4E", LWu() * 0.7);
-    if (st.load >= 0) crate(0.42 + 0.95, fy, st.load, 3, st.face);
+    if (st.load >= 0) crate(0.42 + 0.95, fy, st.load, 3);
     // body, counterweight, overhead guard, seat and the driver
     P(ctx, [0.25, -0.2, 0.25, -0.95, -0.55, -1.05, -1.6, -1.05, -2.05, -0.85, -2.05, -0.2], Y);
     shine(-0.5, -0.98, -1.55, -0.98, 0.05);
@@ -353,7 +336,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     Ln(ctx, -0.55, -1.45, -0.32, -1.62, INK, 0.05);
     tyre(0, -0.3, 0.3, (st.wheel || 0) / 0.3, "#C3CCD6");
     tyre(-1.55, -0.25, 0.25, (st.wheel || 0) / 0.25, "#C3CCD6");
-    faceU(-0.32, -0.62, 0.1, 0.3, st.face, [1, 0.3]);
   }
   // The pony (side view, metres, origin on the ground under its middle, facing +x). eat = head down munching.
   function ponyDraw(st) {
@@ -405,7 +387,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (i = 0; i < Math.min(n, 6); i++) {
       var col = Math.floor(i / 3), row = i % 3;
       ctx.save(); ctx.translate(DOOR[1] - 0.9 - col * 1.4, -row * 1.0); ctx.scale(0.7, 0.75);
-      crate(0, 0, 1, i + 20, 0); ctx.restore();
+      crate(0, 0, 1, i + 20); ctx.restore();
     }
     ctx.restore();
     R(ctx, DOOR[0] - 0.15, -4.15, DOOR[1] - DOOR[0] + 0.3, 0.2, 0.04, "#8C97A6");
@@ -548,7 +530,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); bits.length = 0; riders.length = 0; faceT = 0; jam = null; hare = null; fly = null; wonky = null;
+    parts.clear(); bits.length = 0; riders.length = 0; jam = null; hare = null; fly = null; wonky = null;
     tr.state = "away"; tr.x = -60; auto = false; grab = null; shed.v = shed.target = 0;
     field.stage = "grown"; field.g = 1; field.wipe = null;
     world(function (w) { w.carrots = "grown"; });
@@ -564,7 +546,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = ["hare", "faces"];
+    var list = ["hare"];
     if (phase === "drive" && job === "lift" && !jam && progress() > 0.08 && progress() < 0.8) list.unshift("jam");
     var pick = list[surpriseN++ % list.length];
     if (pick === "jam") {
@@ -574,9 +556,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (pick === "hare") {
       var rg = sc.xRange(HARE_R);
       hare = { t: 0, x0: rg[0] - 1, x1: rg[1] + 1, stop: lerp(rg[0], rg[1], 0.22) };
-      coach.say("A hare nibbles a carrot top.", 3); return;
+      coach.say("A hare nibbles a carrot top.", 3);
     }
-    faceT = 6; coach.say("Hello, carrots!", 3);
   }
   function popJam() {
     if (!jam) return;
@@ -742,7 +723,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (i = i0; i <= i1; i++) {
       if (lifted(i)) continue;
       var lx = cWX(i) - cmo;
-      carrotPx(CX(lx), CY(-0.03), cLen(i) * u * lerp(0.35, 1, cGrow()), 0.065 * u * lerp(0.5, 1, cGrow()), 0, i, faceAmt(), lw);
+      carrotPx(CX(lx), CY(-0.03), cLen(i) * u * lerp(0.35, 1, cGrow()), 0.065 * u * lerp(0.5, 1, cGrow()), 0, i, lw);
     }
     // the share under the bed
     if (rig.m === "harvester" && phase !== "grow") {
@@ -821,7 +802,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
   }
   // a carrot in screen px, standing in the soil: shoulder at (x, y), len px long, w px half-width
-  function carrotPx(x, y, len, w, ang, k, fc, lw, big) {
+  function carrotPx(x, y, len, w, ang, k, lw, big) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
     var bend = (hash(k, 3) - 0.5) * w * 0.9;
     ctx.beginPath(); ctx.moveTo(-w, 0); ctx.quadraticCurveTo(-w * 0.95, len * 0.55, bend, len);
@@ -830,15 +811,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.strokeStyle = ORANGE_D; ctx.lineWidth = Math.max(1, lw * 0.5);
     for (var i = 1; i < 4; i++) { var f = i / 4.5, hw = w * (1 - f * 0.8); ctx.beginPath(); ctx.moveTo(-hw * 0.7 + bend * f * f, len * f); ctx.lineTo(-hw * 0.1 + bend * f * f, len * f + w * 0.12); ctx.stroke(); }
     ctx.beginPath(); ctx.ellipse(-w * 0.4, len * 0.18, w * 0.18, len * 0.12, 0.1, 0, TAU); ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fill();
-    if (fc > 0 && w > 4) {
-      ctx.globalAlpha *= fc;
-      [-0.38, 0.38].forEach(function (o) { ctx.beginPath(); ctx.arc(o * w, len * 0.2, w * 0.28, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = Math.max(0.8, w * 0.07); ctx.strokeStyle = INK; ctx.stroke(); ctx.beginPath(); ctx.arc(o * w, len * 0.22, w * 0.14, 0, TAU); ctx.fillStyle = INK; ctx.fill(); });
-      ctx.beginPath(); ctx.arc(0, len * 0.3, w * 0.4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineWidth = Math.max(1, w * 0.1); ctx.strokeStyle = INK; ctx.stroke();
-    }
     ctx.restore();
   }
   // the giant wonky carrot: fat, with two legs
-  function wonkyPx(x, y, s, ang, fc, lw) {
+  function wonkyPx(x, y, s, ang, lw) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
     var w = s * 0.16, len = s * 0.55;
     ctx.beginPath(); ctx.moveTo(-w, 0);
@@ -853,16 +829,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (var i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-w * 0.8, len * i * 0.13); ctx.lineTo(-w * 0.2, len * i * 0.13 + w * 0.1); ctx.stroke(); }
     // a tuft of stalk
     ctx.strokeStyle = "#3E8A2E"; ctx.lineWidth = Math.max(2, s * 0.03); ctx.beginPath(); ctx.moveTo(-w * 0.2, 0); ctx.lineTo(-w * 0.35, -w * 0.5); ctx.moveTo(w * 0.15, 0); ctx.lineTo(w * 0.3, -w * 0.55); ctx.stroke();
-    if (fc > 0) {
-      ctx.globalAlpha *= fc;
-      [-0.4, 0.4].forEach(function (o) { ctx.beginPath(); ctx.arc(o * w, len * 0.2, w * 0.25, 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = Math.max(1, w * 0.07); ctx.strokeStyle = INK; ctx.stroke(); ctx.beginPath(); ctx.arc(o * w, len * 0.22, w * 0.12, 0, TAU); ctx.fillStyle = INK; ctx.fill(); });
-      ctx.beginPath(); ctx.arc(0, len * 0.3, w * 0.4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineWidth = Math.max(1, w * 0.1); ctx.strokeStyle = INK; ctx.stroke();
-    }
     ctx.restore();
   }
   function drawCloseRig(u, lw) {
     var m = rig.m, tl = trailed(), o = tl ? Farm.DRAWBAR : Farm.HITCH;
-    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, busy: false, rot: rigRun * 7, run: rigRun * 2, face: faceAmt(), out: m === "harvester" && rig.out > 0.01 };
+    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, busy: false, rot: rigRun * 7, run: rigRun * 2, out: m === "harvester" && rig.out > 0.01 };
     Farm.inUnits(ctx, CX(m === "topper" ? -FRONT : -o[0]), CY(0), u, lw, function () { rigUnits(st); });
   }
   // the tractor and its machine in tractor units (origin on the ground under the rear axle)
@@ -871,16 +842,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (m === "topper") {
       // up when it drives in and out, down on the bed while it works
       var up = phase === "drive" ? 0 : (phase === "ready" ? 0 : 0.15);
-      D.tractor(ctx, { wheel: rig.wheel, time: time, face: st.face, look: [1, 0.3], lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
+      D.tractor(ctx, { wheel: rig.wheel, time: time, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
       tube(ctx, 3.85, -0.62, FRONT + 0.05, -0.55 - up, 0.12, G.grey); tube(ctx, 3.85, -1.25, FRONT - 0.05, -1.32 - up, 0.1, "#E2B33A");
       ctx.save(); ctx.translate(FRONT, -0.5 - up); ctx.scale(-1, 1); topper(st); ctx.restore();
     } else {
       ctx.save(); ctx.translate(Farm.DRAWBAR[0], Farm.DRAWBAR[1]); harvester(st); ctx.restore();
-      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, face: st.face, look: [0, 1], lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
+      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
     }
   }
   function drawRiders(u, lw) {
-    var fc = faceAmt();
     riders.forEach(function (r) {
       var p, a, len = cLen(r.k) * u, w = 0.065 * u;
       if (r.s === "lift") {
@@ -891,9 +861,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         p = { x: q.x + 0.02, y: q.y - 0.09 - Math.abs(Math.sin(r.t * 13 + r.k)) * 0.02 }; a = -1.0 + Math.sin(r.k) * 0.15;
         if (g > 0.9) { ctx.save(); ctx.globalAlpha *= clamp((1 - g) / 0.1, 0, 1); }
       }
-      if (r.wonky) wonkyPx(CX(p.x), CY(p.y), u * 0.75, a, fc, lw);
-      else if (r.giant) wonkyPx(CX(p.x), CY(p.y), u * 0.75, a, fc, lw);
-      else carrotPx(CX(p.x), CY(p.y), len, w, a, r.k, fc, lw);
+      if (r.wonky) wonkyPx(CX(p.x), CY(p.y), u * 0.75, a, lw);
+      else if (r.giant) wonkyPx(CX(p.x), CY(p.y), u * 0.75, a, lw);
+      else carrotPx(CX(p.x), CY(p.y), len, w, a, r.k, lw);
       if (r.s === "web" && r.t / 1.3 > 0.9) ctx.restore();
     });
   }
@@ -910,7 +880,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function jamScreen() { var q = webAt(jam ? jam.f : 0.45); return { x: RG.c.x + CX(q.x + 0.3), y: RG.c.y + CY(q.y - 0.05) }; }
   function drawJam(u, lw) {
     var q = webAt(jam.f), wob = Math.sin(jam.t * 16) * 0.03;
-    wonkyPx(CX(q.x + wob), CY(q.y - 0.16), u * 1.3, -1.15, faceAmt(), lw);
+    wonkyPx(CX(q.x + wob), CY(q.y - 0.16), u * 1.3, -1.15, lw);
     var pr = 0.55 * u * (1 + 0.12 * Math.sin(time * 6));
     ctx.beginPath(); ctx.arc(CX(q.x + 0.3), CY(q.y - 0.05), pr, 0, TAU); ctx.strokeStyle = "rgba(255,201,60,0.9)"; ctx.lineWidth = Math.max(3, lw * 1.6); ctx.stroke();
   }
@@ -927,7 +897,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (wonky.s !== "hop" && wonky.s !== "ledge") return;
     if (shed.v > 0.5) return;
     var p = wonkyLocal();
-    wonkyPx(CX(p.x), CY(p.y), u * 0.8, p.a, faceAmt(), lw);
+    wonkyPx(CX(p.x), CY(p.y), u * 0.8, p.a, lw);
     if (wonky.s === "ledge") {
       var pr = 0.45 * u * (1 + 0.12 * Math.sin(time * 6));
       var mid = wonkyScreen();
@@ -983,11 +953,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var total = shedBase + placed;
     for (i = 0; i < Math.min(total, SLOTS); i++) {
       var s = slotPos(i, L2);
-      Farm.inUnits(ctx, s.x, s.y, u, lw, function () { crate(0, 0, 1, i * 3 + 2, i >= shedBase ? faceAmt() : 0); });
+      Farm.inUnits(ctx, s.x, s.y, u, lw, function () { crate(0, 0, 1, i * 3 + 2); });
     }
     // the forklift
     var F = fkShed(L2);
-    if (F.show) Farm.inUnits(ctx, F.x, fy, u, lw, function () { ctx.scale(-1, 1); forklift({ lift: F.lift, load: F.load, wheel: F.x / u, face: faceAmt() }); });
+    if (F.show) Farm.inUnits(ctx, F.x, fy, u, lw, function () { ctx.scale(-1, 1); forklift({ lift: F.lift, load: F.load, wheel: F.x / u }); });
   }
 
   // ---------- Input ----------
@@ -1099,7 +1069,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     rig.wheel += rig.v * dt;
     if (working()) rigRun += dt * 1.6;
     if (rig.flash && rig.flash < 50) rig.flash = Math.max(0, rig.flash - dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (hare) { hare.t += dt; if (hare.t > 9) hare = null; }
     if (pony.eat > 0) pony.eat = Math.max(0, pony.eat - dt);
     if (pony.nod > 0) pony.nod = Math.max(0, pony.nod - dt);
@@ -1325,8 +1294,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     parts.draw(ctx, sc, function (p) { return p.r <= sc.TRACK + 0.03; });
   }
   function drawRig() {
-    var f = faceAmt(), m = rig.m, tl = trailed();
-    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, rot: rigRun * 7, run: rigRun * 2, face: f, out: m === "harvester" && rig.out > 0.01 };
+    var m = rig.m, tl = trailed();
+    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, rot: rigRun * 7, run: rigRun * 2, out: m === "harvester" && rig.out > 0.01 };
     sc.put(ctx, rig.x, 1, 1, function () { rigUnits(st); });
     if (Math.random() < 0.12) parts.add({ kind: "puff", x: rig.x + 1.33, h: 3.45, r: 1, vx: -0.6 - rig.v * 0.5, vh: 1.2, life: 1.2, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });
   }
@@ -1352,12 +1321,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.restore();
   }
   function drawTrailer() {
-    var f = faceAmt(), t = trScreen();
+    var t = trScreen();
     Farm.inUnits(ctx, t.x, t.y, t.s, sc.lw, function () {
       ctx.translate(0, -0.5);
-      crateTrailer({ wheel: tr.wheel, crates: tr.crates, face: f });
+      crateTrailer({ wheel: tr.wheel, crates: tr.crates });
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
-      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1] });
+      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true });
     });
   }
   function drawFieldFk() {
@@ -1366,7 +1335,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var dx = sc.X(STORE_X + DOOR[0], 1.02);
     ctx.save();
     if (F.x > dx) { ctx.beginPath(); ctx.rect(0, 0, sc.X(STORE_X + DOOR[1], 1.02) + 2, sc.H); ctx.rect(0, 0, dx, sc.H); ctx.clip(); }
-    Farm.inUnits(ctx, F.x, F.y, F.s, sc.lw, function () { ctx.scale(-1, 1); forklift({ lift: F.lift, load: F.load, wheel: F.x / F.s, face: faceAmt() }); });
+    Farm.inUnits(ctx, F.x, F.y, F.s, sc.lw, function () { ctx.scale(-1, 1); forklift({ lift: F.lift, load: F.load, wheel: F.x / F.s }); });
     ctx.restore();
   }
   function ponyScreen() { return { x: sc.X(PONY_X, PONY_R), y: sc.Y(PONY_R) - 1.0 * sc.S(PONY_R) }; }
@@ -1377,7 +1346,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       fence(-2.2, 2.6);
       ponyDraw({ time: time, eat: pony.eat > 0 ? Math.min(1, pony.eat * 2, (4.5 - pony.eat) * 3) : 0, nod: pony.nod, walk: 0 });
       ctx.save(); ctx.translate(1.25, 0); trough();
-      if (pony.eat > 0.3) { var k = clamp(pony.eat / 4.5, 0, 1); ctx.save(); ctx.translate(-0.1, -0.45); ctx.scale(k, k); carrotSide(0, 0, 0.6, 0.14, -Math.PI / 2 + 0.2, 4, 0); ctx.restore(); }
+      if (pony.eat > 0.3) { var k = clamp(pony.eat / 4.5, 0, 1); ctx.save(); ctx.translate(-0.1, -0.45); ctx.scale(k, k); carrotSide(0, 0, 0.6, 0.14, -Math.PI / 2 + 0.2, 4); ctx.restore(); }
       ctx.restore();
     });
     if (pony.eat > 0.3 && Math.random() < 0.15) { var tq = troughScreen(); parts.add({ kind: "dot", x: sc.wx(tq.x, PONY_R) + (Math.random() - 0.5) * 0.4, h: 0.6, r: PONY_R, vx: (Math.random() - 0.5) * 1.5, vh: 1.2, g: 6, life: 0.5, size: 0.04, col: ORANGE }); }
@@ -1386,7 +1355,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var f = clamp(fly.t / fly.dur, 0, 1), e = ease(f);
     var x = lerp(fly.x0, fly.x1, e), y = lerp(fly.y0, fly.y1, e) - Math.sin(f * Math.PI) * Math.min(H * 0.25, 160);
     var u = lerp(CL.u * 0.8, sc.S(PONY_R) * 1.0, e);
-    wonkyPx(x, y, u, f * 6, faceAmt(), 2);
+    wonkyPx(x, y, u, f * 6, 2);
   }
   var HARE_R = 0.92;
   function drawHare() {
@@ -1403,7 +1372,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (Math.random() < 0.1) parts.add({ kind: "chunk", x: x + 0.5, h: 0.4, r: HARE_R, vx: (Math.random() - 0.5), vh: 1, g: 5, life: 0.6, size: 0.05, col: "#5DB040" });
     }
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
 
   // ---------- Loop ----------
   var last = 0;

@@ -135,19 +135,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (i = 0; i < 6; i++) { a = rot + i * TAU / 6; Cc(ctx, Math.cos(a) * rimR * 0.55, Math.sin(a) * rimR * 0.55, rimR * 0.07, "#6E7887", 0); }
     ctx.restore();
   }
-  function face(ctx, x, y, r, dx, f, time, smileW) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha = clamp(f, 0, 1);
-    var blink = Math.sin((time || 0) * 2.1) > 0.985 ? 0.15 : 1, l0 = LW(), lx = r * 0.3, ly = r * 0.1;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      Cc(ctx, 0, 0, r, "#FFFFFF", l0 * 0.8); Cc(ctx, lx, ly, r * 0.5, INK, 0); Cc(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, smileW || r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = l0 * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   function driverHead(ctx, x, y) {
     var l0 = LW();
     Rr(ctx, x - 0.26, y + 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
@@ -173,7 +160,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // The machines (could move into farm.js as Farm.draw.mixer / telehandler / cow ...)
   // =====================================================================================================
   // Vertical-auger mixer wagon. Origin at the drawbar eye, ground at y = +0.5, facing +x.
-  // st = { wheel, time, spin (auger angle), door (0..1), chute (0..1 out), belt, face, peek (how far we see in),
+  // st = { wheel, time, spin (auger angle), door (0..1), chute (0..1 out), belt, peek (how far we see in),
   //        chunks: [{ a, rr, col, s }], mound: { col, h } (a block sitting on top before mixing), fill (0..1), pto }
   var MX = { cx: -3.85, rimY: -2.78, rx: 2.3, ry: 0.3 };
   function mixer(ctx, st) {
@@ -231,7 +218,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // ladder at the front
     Ln(ctx, -1.95, -0.9, -1.6, -2.6, INK, 0.05); Ln(ctx, -1.75, -0.9, -1.4, -2.6, INK, 0.05);
     for (i = 0; i < 5; i++) { var ly = -1.1 - i * 0.33; Ln(ctx, -1.93 + i * 0.07, ly, -1.72 + i * 0.07, ly, INK, 0.04); }
-    face(ctx, -4.4, -1.7, 0.17, 0.46, st.face, st.time, 0.26);
   }
   // Telehandler: body (origin on the ground between the axles, facing +x) and the boom with the shear grab.
   var TELE = { pivot: [-1.5, -2.05], len: 3.9 };
@@ -274,7 +260,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     Cc(ctx, 0, 0, 0.08, "#C3CCD6", l0 * 0.6);
   }
   // A cow in profile (black and white), origin at its feet in the middle, facing +x. ph = walk phase.
-  function cowSide(ctx, ph, walk, f, time, moo) { D.cow(ctx, { ph: ph, walk: walk, face: f, time: time, moo: moo }); }
+  function cowSide(ctx, ph, walk, time, moo) { D.cow(ctx, { ph: ph, walk: walk, time: time, moo: moo }); }
   // A cow seen from the front: her chest and front legs behind the barrier (origin at her feet).
   function cowFront(ctx, k) {
     var l0 = LW();
@@ -362,7 +348,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function makeCows() { cows = COWX.map(function (x, k) { return { k: k, x0: x, x: x, r: RCOW, st: "wait", head: 0, munch: 0, walk: 0, t: 0, moo: 0, look: 0, side: 0 }; }); }
   makeCows();
   var phase = "ready", phaseT = 0, stepId = "load", auto = false, grab = null, ending = false, dusk = 0, time = 0;
-  var faceT = 0, mooS = null, catS = null, calfS = null, lickS = null, doorOpen = 0;
+  var mooS = null, catS = null, calfS = null, lickS = null, doorOpen = 0;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function chuteX() { return rig.x + CHUTE; }
@@ -561,7 +547,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function startOver() {
     if (locked()) return;
-    parts.length = 0; mooS = null; catS = null; calfS = null; faceT = 0; tagged = {};
+    parts.length = 0; mooS = null; catS = null; calfS = null; tagged = {};
     resetRound();
     steps.reset(); bringIn("load"); follow(0, true);
     coach.say("A new day on the farm!", 3);
@@ -574,7 +560,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function cowNear(x) { var best = null, bd = 1e9; cows.forEach(function (c) { if (c.st === "in") return; var d = Math.abs(c.x - x); if (d < bd) { bd = d; best = c; } }); return best; }
   function surprise() {
     if (locked()) return;
-    var pick = ["moo", "cat", "calf", "faces"][surpriseN++ % 4];
+    var pick = ["moo", "cat", "calf"][surpriseN++ % 3];
     if (pick === "moo" && feeding() && rig.st === "go") {
       var cabX = rig.x + 1.6, c = null;
       cows.forEach(function (q) { if (!c && q.st === "wait" && q.x > cabX + 5.6 && q.x < cabX + 10) c = q; });
@@ -595,9 +581,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (pick === "cat") {
       if (inYard() && phase !== "milk" && phase !== "done") catS = { where: "clamp", x: 4.6, t: 0, st: "walk", ph: 0 };
       else catS = { where: "barrier", x: (phase === "done" || phase === "milk") ? DOOR - 5 : scC.cam - 2.5, t: 0, st: "walk", ph: 0 };
-      coach.say("The barn cat comes to see.", 3); return;
+      coach.say("The barn cat comes to see.", 3);
     }
-    faceT = 6; coach.say("Hello, machines!", 3);
   }
   function mooSound() {
     var ac = window.Toybox && Toybox.sound.ready();
@@ -741,7 +726,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "milk" && cows.every(function (c) { return c.st === "in"; })) allIn();
     doorOpen += (((phase === "milk") ? 1 : 0) - doorOpen) * Math.min(1, dt * 3);
     clampS.fresh = Math.max(0, clampS.fresh - dt * 0.5);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (mooS) { mooS.t += dt; if (mooS.t > 2.6) mooS = null; }
     if (calfS) { calfS.t += dt; if (calfS.t > 3.6) calfS = null; }
     if (catS) updateCat(dt);
@@ -946,7 +930,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
     Farm.inUnits(ctx, PX(sc, x, 1), sc.gY, sc.k, sc.lw, function () { ctx.scale(d, 1); fn(); });
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
   function vis(sc, x0, x1, r) { r = r || 1; return PX(sc, x1, r) > -30 && PX(sc, x0, r) < sc.W + 30; }
   function drawWorld(sc) {
     sc.sky(ctx, { time: time, season: "spring", dusk: dusk });
@@ -1005,7 +988,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var talk = mooS && mooS.who.paddock && mooS.who.i === i ? mooS.t : 0;
       putR(sc, p[0], PADR, p[1], function () {
         ctx.save(); ctx.translate(0, 0);
-        cowSide(ctx, 0, false, faceAmt(), time, talk > 0 && talk < 1.8);
+        cowSide(ctx, 0, false, time, talk > 0 && talk < 1.8);
         ctx.restore();
       });
     });
@@ -1113,14 +1096,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var g = headGeo(c);
     putR(sc, c.x, g.r, 1, function () {
       ctx.save(); ctx.translate(0, -g.hy); ctx.rotate(g.tilt);
-      cowHead(ctx, { k: c.k, t: time, munch: c.st === "eat" && c.head > 0.9 && !g.talk ? c.munch : 0, look: c.look, moo: g.talk > 0 && g.talk < 1.8 ? 1 : 0, smile: faceAmt() });
+      cowHead(ctx, { k: c.k, t: time, munch: c.st === "eat" && c.head > 0.9 && !g.talk ? c.munch : 0, look: c.look, moo: g.talk > 0 && g.talk < 1.8 ? 1 : 0 });
       ctx.restore();
     });
   }
   function drawCowSide(sc, c) {
     if (!vis(sc, c.x - 2, c.x + 2, c.r)) return;
     var talk = mooS && mooS.who.cow === c ? mooS.t : 0;
-    putR(sc, c.x, c.r, 1, function () { cowSide(ctx, c.walk, c.st === "walk", faceAmt(), time, talk > 0 && talk < 1.8); });
+    putR(sc, c.x, c.r, 1, function () { cowSide(ctx, c.walk, c.st === "walk", time, talk > 0 && talk < 1.8); });
   }
   // the feed barrier: a concrete kerb, the head rails and the uprights (gaps where the heads go)
   function drawBarrier(sc) {
@@ -1202,7 +1185,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!vis(sc, tele.x - 7, tele.x + 7)) return;
     var x = tele.x + tele.d;
     put(sc, x, tele.dir, function () {
-      teleBody(ctx, { wheel: tele.wheel + tele.d, time: time, face: faceAmt(), beacon: tele.st === "load" });
+      teleBody(ctx, { wheel: tele.wheel + tele.d, time: time, beacon: tele.st === "load" });
       teleBoom(ctx, { a: tele.a, ext: tele.ext, curl: tele.curl, jaw: tele.jaw, load: tele.load });
     });
   }
@@ -1217,13 +1200,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function drawRig(sc) {
     if (!vis(sc, rig.x - 8, rig.x + 7)) return;
-    var f = faceAmt(), close = sc === scC;
+    var close = sc === scC;
     put(sc, rig.x, 1, function () {
       ctx.translate(0, -0.5 + (rig.shake || 0));
-      mixer(ctx, { wheel: rig.wheel, time: time, spin: rig.spin, door: rig.door, chute: rig.chute, belt: rig.belt, face: f, peek: close ? 2.3 : 1.3,
+      mixer(ctx, { wheel: rig.wheel, time: time, spin: rig.spin, door: rig.door, chute: rig.chute, belt: rig.belt, peek: close ? 2.3 : 1.3,
         chunks: tub.chunks, mound: tub.mound, fill: tub.fill, base: mix("#7E8A40", FEED, tub.mix), pto: rig.pto });
       ctx.translate(-Farm.DRAWBAR[0], 0.5 - (rig.shake || 0));
-      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, face: f, look: [1, 0], beacon: rig.st === "go" || rig.mixT >= 0 });
+      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, beacon: rig.st === "go" || rig.mixT >= 0 });
       if (lickS) lickWindow();
     });
     if (Math.random() < 0.06 && (rig.st === "go" || rig.mixT >= 0)) addPart({ kind: "puff", x: rig.x + 1.3 + 1.33, h: 3.45, vx: -0.3, vh: 1.1, life: 1.0, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });

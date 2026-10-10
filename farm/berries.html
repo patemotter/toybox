@@ -147,7 +147,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var ld = { t: 0 };                               // the loading run
   var pr = { t: 0, n: 0, show: 0 };                // the press run: bottles filled in this batch
   var carry = null;                                 // a crate going from the trailer into the press house
-  var faceT = 0, bird = null, shuf = null;
+  var bird = null, shuf = null;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function shaking() { return phase === "drive" && hv.v > 0.3; }
@@ -190,19 +190,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // =====================================================================================================
   // Drawings (machine units)
   // =====================================================================================================
-  function faceU(x, y, r, dx, f, look) {
-    if (!f) return;
-    ctx.save(); ctx.globalAlpha *= clamp(f, 0, 1);
-    var blink = Math.sin(time * 2.1) > 0.985 ? 0.15 : 1, lx = look ? look[0] * r * 0.35 : 0, ly = look ? look[1] * r * 0.35 : r * 0.2;
-    [0, dx].forEach(function (ox) {
-      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
-      C(ctx, 0, 0, r, "#FFFFFF", LWu() * 0.8); C(ctx, lx, ly, r * 0.5, INK, 0); C(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
-      ctx.restore();
-    });
-    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
-    ctx.strokeStyle = INK; ctx.lineWidth = LWu() * 1.3; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
   function shine(x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
   // a tyre with tread marks that turn, a rim and a hub (rot in radians)
   function tyre(x, y, r, rot, rim, dark) {
@@ -251,7 +238,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   // A plastic berry crate seen from the side: bottom middle at (cx, yb); load 0..1 (the berries heap above the
   // rim when it is full).
-  function crateSide(cx, yb, w, h, load, fc) {
+  function crateSide(cx, yb, w, h, load) {
     var x0 = cx - w / 2, top = yb - h, lv = clamp(load, 0, 1), i;
     if (lv > 0.55) {
       var hh = (lv - 0.55) / 0.45 * h * 0.42;
@@ -267,7 +254,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       R(ctx, x0 + w * 0.12, sy, w * 0.76, h * 0.16, h * 0.06, full ? BERRY : CRATE_D, LWu() * 0.5);
     }
     shine(x0 + w * 0.1, top + h * 0.08, x0 + w * 0.9, top + h * 0.08, h * 0.06);
-    if (fc) faceU(cx - w * 0.2, top + h * 0.4, w * 0.09, w * 0.4, fc, [0, 1]);
   }
   // The straddle harvester's far half: drawn before the row, so the bushes pass in front of it. st = { wheel,
   // time, work, run (belt phase), slot (0..2, the crate being filled), crates: [{ x, load, hop }] }
@@ -299,7 +285,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     tube(ctx, 1.98, -2.35, 2.55, -1.66, 0.07, "#4A505E");
     R(ctx, 1.98, HV.deck, 2.12, 0.12, 0.03, "#8C97A6");
     for (i = 0; i < 5; i++) C(ctx, 2.1 + i * 0.47, HV.deck + 0.06, 0.035, "#5D6675", 0);
-    (st.crates || []).forEach(function (c) { if (c) crateSide(c.x, HV.deck - (c.hop || 0) * 0.5, HV.cw, HV.ch, c.load, st.face); });
+    (st.crates || []).forEach(function (c) { if (c) crateSide(c.x, HV.deck - (c.hop || 0) * 0.5, HV.cw, HV.ch, c.load); });
   }
   // a float slot (0..n-1) -> x along a list of slot positions
   function slotX(arr, s) { var i = clamp(Math.floor(s), 0, arr.length - 1), j = Math.min(arr.length - 1, i + 1), f = clamp(s - i, 0, 1); return lerp(arr[i], arr[j], f); }
@@ -347,7 +333,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var bc = Math.sin(time * 9) > 0 ? "#FFD34D" : "#F08A1C";
     if (st.beacon) { ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * Math.max(0, Math.sin(time * 9)); C(ctx, 1.1, -4.76, 0.3, "#FFD34D", 0); ctx.restore(); }
     ctx.beginPath(); ctx.arc(1.1, -4.7, 0.12, Math.PI, 0); ctx.closePath(); fs(ctx, st.beacon ? bc : "#F2A23A", LWu() * 0.7);
-    faceU(-1.3, -3.2, 0.14, 0.45, st.face, [1, 0.4]);
   }
   // The harvester from the front (the close-up looks into it): x across (+ = its far side), origin on the
   // ground in the middle of the row. part "back": the frame, cab, elevator and the platform with the crate;
@@ -377,12 +362,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       R(ctx, -1.0, -4.7, 2.0, 0.2, 0.07, HVC.body);
       var bc = Math.sin(time * 9) > 0 ? "#FFD34D" : "#F08A1C";
       ctx.beginPath(); ctx.arc(-0.6, -4.7, 0.12, Math.PI, 0); ctx.closePath(); fs(ctx, st.beacon ? bc : "#F2A23A", LWu() * 0.7);
-      faceU(-0.32, -3.12, 0.14, 0.64, st.face, [0, 1]);
       // the platform on the far side with the crate being filled, and the elevator up to it
       tube(ctx, EV.leg + 0.2, -2.3, 2.6, -1.66, 0.07, "#4A505E");
       R(ctx, EV.leg + 0.22, HV.deck, 1.45, 0.12, 0.03, "#8C97A6");
       var c = st.crate;
-      if (c && c.a > 0.01) { ctx.save(); ctx.globalAlpha *= c.a; crateEnd(EV.crate + (c.dx || 0), HV.deck - (c.hop || 0) * 0.6, c.load, st.face); ctx.restore(); }
+      if (c && c.a > 0.01) { ctx.save(); ctx.globalAlpha *= c.a; crateEnd(EV.crate + (c.dx || 0), HV.deck - (c.hop || 0) * 0.6, c.load); ctx.restore(); }
       var ang = Math.atan2(EV.E1[1] - EV.E0[1], EV.E1[0] - EV.E0[0]);
       tube(ctx, EV.E0[0], EV.E0[1], EV.E1[0], EV.E1[1], 0.3, "#5D6675");
       for (i = 0; i < 9; i++) {
@@ -415,7 +399,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function plateY(x) { return -0.34 + 0.14 * Math.min(1, Math.abs(x) / 1.1); }
   // a crate seen end-on: bottom middle at (cx, yb)
-  function crateEnd(cx, yb, load, fc) { crateSide(cx, yb, EV.ew, EV.eh, load, fc); }
+  function crateEnd(cx, yb, load) { crateSide(cx, yb, EV.ew, EV.eh, load); }
   // The flatbed trailer (origin at the drawbar eye, ground at +0.5, facing +x). st.crates = [{ x, load, hop }]
   function flatbed(st) {
     var Rd = "#D8403A", RD = "#A82E28";
@@ -427,10 +411,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     R(ctx, -5.7, FB_DECK - 0.05, 4.4, 0.24, 0.05, Rd);
     shine(-5.55, FB_DECK + 0.01, -1.45, FB_DECK + 0.01, 0.05);
     R(ctx, -1.55, FB_DECK - 0.55, 0.12, 0.52, 0.03, RD, LWu() * 0.7);   // headboard
-    (st.crates || []).forEach(function (c) { if (c) crateSide(c.x, FB_DECK - 0.05 - (c.hop || 0) * 0.5, HV.cw, HV.ch, c.load, st.face); });
+    (st.crates || []).forEach(function (c) { if (c) crateSide(c.x, FB_DECK - 0.05 - (c.hop || 0) * 0.5, HV.cw, HV.ch, c.load); });
   }
   // A bottle of blackcurrant juice: bottom middle at (x, yb), fill 0..1, capped or not.
-  function bottle(x, yb, fill, cap, fc, s) {
+  function bottle(x, yb, fill, cap, s) {
     s = s || 1;
     var w = 0.24 * s, h = 0.36 * s;
     ctx.save();
@@ -447,7 +431,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       ctx.beginPath(); ctx.ellipse(x + 0.06 * s, yb - h * 0.55, 0.035 * s, 0.018 * s, -0.5, 0, TAU); ctx.fillStyle = LEAF_L; ctx.fill();
     }
     if (cap) R(ctx, x - 0.065 * s, yb - h - 0.17 * s, 0.13 * s, 0.06 * s, 0.02 * s, "#E8473B", LWu() * 0.7);
-    if (fc && fill > 0.98) faceU(x - 0.05 * s, yb - h * 0.22, 0.03 * s, 0.1 * s, fc, [0, 1]);
     ctx.restore();
   }
   // The juice press house beyond the field (metres, origin on the ground in the middle): a stone barn with a
@@ -469,7 +452,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     R(ctx, DOOR[0] - 0.15, -3.45, DOOR[1] - DOOR[0] + 0.3, 0.2, 0.04, "#8C97A6");
     // the sign: a bottle and a bunch of berries
     R(ctx, -0.8, -4.1, 1.6, 0.85, 0.08, "#FFF8EC");
-    ctx.save(); ctx.translate(-0.3, -3.35); bottle(0, 0, 1, true, 0, 1.3); ctx.restore();
+    ctx.save(); ctx.translate(-0.3, -3.35); bottle(0, 0, 1, true, 1.3); ctx.restore();
     strig(0.3, -3.9, 4, 0.08, BERRY, 0.08);
   }
   // A blackbird (screen px: feet at (x, y), s px per metre), with a berry in its beak or not.
@@ -514,7 +497,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         });
       } else {
         Farm.inUnits(x, PW * 0.5, PH * 0.94, 34, 2.6, function () { pressMachine({ level: 0.6, plate: 0.5, drip: false }); });
-        Farm.inUnits(x, PW * 0.84, PH * 0.94, 34, 2.6, function () { bottle(0, 0, 1, true, 0, 1.3); });
+        Farm.inUnits(x, PW * 0.84, PH * 0.94, 34, 2.6, function () { bottle(0, 0, 1, true, 1.3); });
       }
     } finally { ctx = keep; time = kt; }
     var url = "";
@@ -644,7 +627,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); faceT = 0; bird = null; shuf = null; carry = null; auto = false; grab = null;
+    parts.clear(); bird = null; shuf = null; carry = null; auto = false; grab = null;
     field.stage = "ripe"; field.g = 1;
     world(function (w) { w.berries = "ripe"; });
     steps.reset();
@@ -659,7 +642,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = ["bird", "shuffle", "faces"];
+    var list = ["bird", "shuffle"];
     var pick = list[surpriseN++ % list.length];
     if (pick === "shuffle" && !shuffleTarget()) pick = list[surpriseN++ % list.length];
     if (pick === "bird") {
@@ -668,9 +651,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
     if (pick === "shuffle") {
       shuf = { t: 0, what: shuffleTarget() }; snd.tick();
-      coach.say(shuf.what === "bottles" ? "The bottles swap places!" : "The crates swap places!", 3); return;
+      coach.say(shuf.what === "bottles" ? "The bottles swap places!" : "The crates swap places!", 3);
     }
-    faceT = 6; coach.say("Hello, berries!", 3);
   }
   function shuffleTarget() {
     if (cmode === "press" && pr.show > 0) return "bottles";
@@ -840,9 +822,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (i = 0; i < EBUSH.length; i++) { ctx.beginPath(); ctx.arc(EBUSH[i][0] + j, EBUSH[i][1], EBUSH[i][2], 0, TAU); ctx.fillStyle = i % 2 ? LEAF : "#47973C"; ctx.fill(); }
     for (i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(EBUSH[i][0] + j - 0.08, EBUSH[i][1] - 0.1, EBUSH[i][2] * 0.4, 0, TAU); ctx.fillStyle = LEAF_L; ctx.fill(); }
     // veins of a few leaves
-    var col = mix(UNRIPE, BERRY, ripeG()), fc = faceAmt();
+    var col = mix(UNRIPE, BERRY, ripeG());
     STR.forEach(function (s, k) { if (s.on) strig(s.x + j, s.y, s.n, 0.06, col, 0.03); });
-    if (fc) faceU(-0.16 + j, -1.05, 0.08, 0.32, fc, [0, 1]);
   }
   // the crate in the front view: the one being filled; a full one rolls back and an empty one takes its place
   function endCrate() {
@@ -855,7 +836,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var swapT = 0;
   function hvSt() {
     var cr = crates.map(function (c, i) { if (!c || c.load < 0 || c.moving) return null; var s = shufAt(i, "platform"); return { x: slotX(HV.cr, s.p), load: c.load, hop: s.hop }; });
-    return { wheel: hv.wheel, time: time, work: shaking() ? 1 : 0, run: hv.run, slot: slotF, crates: cr, face: faceAmt(), beacon: phase === "drive" || hv.flash > 0 };
+    return { wheel: hv.wheel, time: time, work: shaking() ? 1 : 0, run: hv.run, slot: slotF, crates: cr, beacon: phase === "drive" || hv.flash > 0 };
   }
   function drawBirdEnd(u) {
     var b = bird, t = b.t, x, y, fly = true, flip = false, berry = false;
@@ -932,7 +913,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
       for (k = 0; k < queue; k++) {
         var s = shufAt(k, "queue"), qx = -3.22, qy = -k * 0.58;
-        ctx.save(); ctx.translate(qx, qy - s.hop * 0.4); crateSide(0, 0, 0.7, 0.54, 1, faceAmt()); ctx.restore();
+        ctx.save(); ctx.translate(qx, qy - s.hop * 0.4); crateSide(0, 0, 0.7, 0.54, 1); ctx.restore();
       }
       // the crate tipper: a post with a lift that raises the crate and tips it over the basket
       R(ctx, -2.62, -2.6, 0.14, 2.6, 0.03, "#5D6675");
@@ -940,7 +921,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         var f = tipping.f, lift = ease(clamp(f / 0.35, 0, 1)), tip = ease(clamp((f - 0.35) / 0.3, 0, 1)) * (f < 0.8 ? 1 : 1 - ease((f - 0.8) / 0.2));
         var cy = lerp(-0.3, -2.25, lift);
         ctx.save(); ctx.translate(-2.1, cy); ctx.rotate(tip * 2.2);
-        crateSide(0.15, 0.3, 0.8, 0.56, f < 0.55 ? 1 : 1 - clamp((f - 0.55) / 0.2, 0, 1), faceAmt());
+        crateSide(0.15, 0.3, 0.8, 0.56, f < 0.55 ? 1 : 1 - clamp((f - 0.55) / 0.2, 0, 1));
         ctx.restore();
         R(ctx, -2.55, cy - 0.06, 0.55, 0.12, 0.03, "#8C97A6", LWu() * 0.7);
         if (f > 0.42 && f < 0.82) for (var q = 0; q < 10; q++) { var ph = (time * 3 + q / 10) % 1; C(ctx, -1.65 + ph * 0.55 + Math.sin(q * 3.1) * 0.08, lerp(-2.1, -1.6, ph) + ph * ph * 0.1, 0.06, BERRY, LWu() * 0.5); }
@@ -975,7 +956,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         else { bxp = lerp(1.9, BSLOT[j], ease(clamp((tj - TB * 0.65) / (TB * 0.8), 0, 1))); fill = 1; }
         if (fill < 1 && fill > 0) Ln(ctx, 1.9, -0.94, 1.9, -0.18 - 0.49 * fill, JUICE, 0.04);
         var s2 = shufAt(j, "bottles");
-        bottle(bxp + (s2.p - j) * 0.38, -0.18 - s2.hop * 0.3, fill, cap, faceAmt(), 1.35);
+        bottle(bxp + (s2.p - j) * 0.38, -0.18 - s2.hop * 0.3, fill, cap, 1.35);
       }
     });
     if (bird && bird.t < BIRD.inT + BIRD.peck + BIRD.outT && cal.press > 0.5) {
@@ -1105,7 +1086,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (hv.flash > 0) hv.flash = Math.max(0, hv.flash - dt);
     slotF += (slot - slotF) * Math.min(1, dt * 3);
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
-    if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (shuf) { shuf.t += dt; if (shuf.t > SW.length * SWT) shuf = null; }
     if (bird) {
       var b0 = bird.t; bird.t += dt;
@@ -1250,13 +1230,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return tr.crates.map(function (ld2, j) { if (ld2 < 0) return null; var s = shufAt(j, "trailer"); return { x: slotX([fbX(0), fbX(1), fbX(2)], s.p), load: ld2, hop: s.hop }; });
   }
   function drawTrailer(S) {
-    var f = faceAmt(), t = trScreenIn(S);
+    var t = trScreenIn(S);
     if (t.x - 6 * t.s > S.W + 20 || t.x + 5 * t.s < -20) return;
     Farm.inUnits(ctx, t.x, t.y, t.s, S.lw, function () {
       ctx.translate(0, -0.5);
-      flatbed({ wheel: tr.wheel, crates: trCrates(), face: f });
+      flatbed({ wheel: tr.wheel, crates: trCrates() });
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
-      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1] });
+      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true });
     });
   }
   // a crate rolling from the harvester's platform back onto the flatbed
@@ -1266,7 +1246,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var a = { x: S.X(hv.x + HV.cr[m.j], 1), y: S.gY + HV.deck * S.k, s: S.k };
     var t = trScreenIn(S), b = { x: t.x + fbX(m.j) * t.s, y: t.y + (FB_DECK - 0.55) * t.s, s: t.s };
     var f = ease(m.f), x = lerp(a.x, b.x, f), y = lerp(a.y, b.y, f) - Math.sin(f * Math.PI) * 0.35 * S.k, s = lerp(a.s, b.s, f);
-    Farm.inUnits(ctx, x, y, s, S.lw, function () { crateSide(0, 0, HV.cw, HV.ch, 1, faceAmt()); });
+    Farm.inUnits(ctx, x, y, s, S.lw, function () { crateSide(0, 0, HV.cw, HV.ch, 1); });
   }
   // a crate going off the trailer into the press house
   function drawCarry(S) {
@@ -1275,7 +1255,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var a = { x: t.x + fbX(carry.k) * t.s, y: t.y + (FB_DECK - 0.55) * t.s };
     var dx = S.X(STORE_X + (DOOR[0] + DOOR[1]) / 2 * 1.02, 1.02), dy = S.Y(1.02) - 0.9 * S.S(1.02);
     ctx.save(); ctx.globalAlpha *= 1 - f * 0.8;
-    Farm.inUnits(ctx, lerp(a.x, dx, f), lerp(a.y, dy, f), lerp(t.s, S.S(1.02) * 0.9, f), S.lw, function () { crateSide(0, 0, HV.cw, HV.ch, 1, 0); });
+    Farm.inUnits(ctx, lerp(a.x, dx, f), lerp(a.y, dy, f), lerp(t.s, S.S(1.02) * 0.9, f), S.lw, function () { crateSide(0, 0, HV.cw, HV.ch, 1); });
     ctx.restore();
   }
   function drawBird(S) {
@@ -1286,7 +1266,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     else { var f2 = ease((t - BIRD.inT - BIRD.peck) / BIRD.outT); x = lerp(x0, x0 - 8 * s, f2); y = lerp(y0, y0 - 6 * s, f2); berry = true; }
     blackbird(x, y, s * 1.9, time * 3, true, fly, berry);
   }
-  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
 
   // ---------- Loop ----------
   var last = 0;
