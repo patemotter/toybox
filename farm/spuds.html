@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spuds in Mud</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Farm">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<script src="farm.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF; --panel: #FFFFFF; --ink: #1D2340; --muted: #4A5578; --edge: #1D2340; --accent: #FFC93C; --plate: #F4FAFF; --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.loads { font-variant-numeric: tabular-nums; }
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell tb-v2 wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the farm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Farm</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title" id="title">Spuds in Mud</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+  </header>
+  <div class="tb-body app">
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A potato field with a green tractor and a bed former. Tap the tractor to make the beds."></canvas>
+      <div class="tb-counter loads" id="loads">Loads: 0</div>
+      <div id="coach"></div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
+    <section class="tb-panel" id="panel">
+      <ol id="steps"></ol>
+      <div id="bottom"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash;
+  var D = Farm.draw, snd = Farm.sound, M = Farm.MACHINES;
+  var NAME = Farm.NAMES.spuds;
+  document.title = NAME; $("title").textContent = NAME;
+
+  // ---------- State ----------
+  var KEY = "farm-spuds-v1";
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  if (startFresh) { saved = {}; Farm.world.update(function (w) { w.spuds = "soil"; }); }
+  var loads = typeof saved.loads === "number" ? saved.loads : 0;
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ loads: loads })); } catch (e) { /* ignore */ } }
+
+  var L = 24, STORE_X = L + 20, VMAX = 6.1;
+  var sc = new Farm.Scene({ L: L, span: 11, spanPort: 8.8, mh: 3.9, xmin: -16, xmax: STORE_X + 9, rowDz: 0.9 });
+  var parts = new Farm.Particles();
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  var W = 300, H = 300, DPR = 1, time = 0;
+
+  // The jobs in order: each one is a tractor with its machine crossing the field once.
+  var JOBS = {
+    beds: { m: "bedformer", from: null, to: "beds", go: "Beds!", coach: "Make the beds!", step: "Beds", tag: "Bed former" },
+    stones: { m: "destoner", from: "beds", to: "destoned", go: "Stones!", coach: "Take out the stones!", step: "Stones", tag: "Destoner" },
+    plant: { m: "planter", from: "destoned", to: "planted", go: "Plant!", coach: "Plant the potatoes!", step: "Plant", tag: "Potato planter" },
+    grow: { auto: true, go: "Grow!", coach: "Let them grow!", step: "Grow" },
+    harvest: { m: "harvester", from: "grown", to: "harvested", go: "Harvest!", coach: "Dig the potatoes!", step: "Harvest", tag: "Potato harvester" }
+  };
+  var ORDER = ["beds", "stones", "plant", "grow", "harvest"];
+  var w0 = Farm.world.get();
+  var field = { stage: w0.spuds === "grown" ? "grown" : w0.spuds, g: 1, wipe: null };
+  var job = ({ soil: "beds", harvested: "beds", beds: "stones", destoned: "plant", planted: "grow", grown: "harvest" })[field.stage] || "beds";
+  var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0 };
+  var tr = { x: -60, v: 0, wheel: 0, load: 0, tip: 0, state: "away" };
+  var phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0, storeLevel = Math.min(1.1, w0.potatoes / 8), storeRun = 0;
+  var hareS = null, gulls = [], faceT = 0, rock = null, webStones = [], stoneT = 0, nextStone = 0;
+
+  function trailed() { return rig.m && M[rig.m].trailed; }
+  function hitchOff() { return trailed() ? -Farm.DRAWBAR[0] : -Farm.HITCH[0]; }
+  function workX() { return rig.x - hitchOff() - M[rig.m].work; }
+  function rearX() { return rig.x - hitchOff() - M[rig.m].len; }
+  function startX(m) { return -0.8 + (m.trailed ? -Farm.DRAWBAR[0] : -Farm.HITCH[0]) + m.work; }
+  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  // a point in the machine's own units (origin at its hitch) -> screen px (the rig is on the machine line)
+  function mScreen(lx, ly) { var o = trailed() ? Farm.DRAWBAR : Farm.HITCH; return { x: sc.X(rig.x, 1) + (o[0] + lx) * sc.k, y: sc.gY + (o[1] + ly) * sc.k }; }
+
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    sc.layout(W, H);
+    sc.follow(camTarget(), 0, true);
+  }
+
+  // ---------- Coach, counter, name tags ----------
+  var coach = Toybox.coach($("coach"));
+  function setLoads() { var el = $("loads"); el.textContent = "Loads: " + loads; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  $("loads").textContent = "Loads: " + loads;
+  function tag(text, x, h, r) { var b = cv.getBoundingClientRect(); Toybox.nametag(text, b.left + sc.X(x, r || 1), b.top + sc.Y(r || 1) - h * sc.S(r || 1), 2200); }
+  function tagM(text, lx, ly) { var b = cv.getBoundingClientRect(), p = mScreen(lx, ly); Toybox.nametag(text, b.left + p.x, b.top + p.y, 2200); }
+
+  // ---------- The flow ----------
+  function setPhase(p) { phase = p; phaseT = 0; }
+  // a tractor with the job's machine drives in from the left to the start of the field
+  function bringIn(id) {
+    job = id; var J = JOBS[id];
+    steps.at(id);
+    if (J.auto) { startGrow(); return; }
+    rig.m = J.m; rig.out = 0;
+    rig.target = startX(M[J.m]); rig.x = rig.target - 10;
+    setPhase("arrive"); steps.busy(true);
+    if (id === "harvest") { tr.state = "with"; tr.load = 0; tr.tip = 0; }
+  }
+  function arrived() {
+    setPhase("ready"); steps.busy(false); rig.v = 0;
+    var J = JOBS[job];
+    tagM(J.tag, -M[J.m].len * 0.5, -1.6);
+    snd.clunk();
+  }
+  function go() {
+    if (phase !== "ready" && !(phase === "drive" && !auto)) return false;
+    if (phase === "ready") {
+      setPhase("drive"); var J = JOBS[job];
+      field.wipe = { bx: workX(), dir: 1, to: J.to };
+      snd.horn();
+    }
+    if (rock) return true;
+    auto = true; steps.busy(true);
+    if (ghost) ghost.learned("go");
+    return true;
+  }
+  function passDone() {
+    auto = false; var J = JOBS[job];
+    field.stage = J.to; field.wipe = null; webStones = [];
+    Farm.world.update(function (w) { w.spuds = J.to; });
+    steps.done(job);
+    if (job === "harvest") { setPhase("store"); tr.state = "go"; rig.v = 0; return; }
+    setPhase("leave");
+  }
+  function startGrow() {
+    setPhase("grow"); steps.busy(true); field.stage = "grow"; field.g = 0; rig.m = null;
+    coach.say("Weeks go by...", 4);
+  }
+  function grown() {
+    field.stage = "grown"; Farm.world.update(function (w) { w.spuds = "grown"; w.season = "autumn"; });
+    steps.done("grow");
+    bringIn("harvest");
+  }
+  function again() {
+    if (phase !== "done") return false;
+    if (ghost) ghost.learned("again");
+    tr.state = "away"; tr.x = -60;
+    steps.reset();
+    bringIn("beds");
+    return true;
+  }
+
+  // ---------- Steps, bar, ghost ----------
+  var PICS = { beds: "bedformer", stones: "destoner", plant: "planter", grow: "grow", harvest: "harvester" };
+  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: Farm.pic(PICS[id]), go: J.go, coach: J.coach }; });
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (locked()) return null;
+      var b = cv.getBoundingClientRect();
+      if (phase === "ready") {
+        var p = [b.left + sc.X(rig.x + 1.5, 1), b.top + sc.gY - 1.8 * sc.k];
+        if (ghost.shown("go") >= 1) return { pts: [p, [p[0] + Math.min(W * 0.35, 160), p[1]]], key: "go" };
+        return { pts: [p], tap: true, key: "go" };
+      }
+      if (rock) { var q = mScreen(-4.0, -0.9); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "rock" }; }
+      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      return null;
+    }
+  });
+  var steps = Toybox.steps($("steps"), {
+    steps: STEPS, coach: coach, ghost: ghost,
+    onGo: function () { return doGo(); },
+    onAgain: function () { again(); },
+    onBusy: function () { busyHint(); }
+  });
+  function doGo() {
+    if (locked()) return false;
+    if (rock) { popRock(); return true; }
+    if (phase === "ready" || (phase === "drive" && !auto)) return go();
+    if (phase === "done") return again();
+    busyHint(); return true;
+  }
+  function busyHint() {
+    if (rock) { popRock(); return; }
+    if (phase === "grow") coach.say("The potatoes are growing!", 3);
+    else if (phase === "drive") { snd.horn(); coach.say(JOBS[job].tag + "!", 3); }
+    else if (phase === "arrive") coach.say("Here comes the " + JOBS[job].tag.toLowerCase() + "!", 3);
+    else if (phase === "leave" || phase === "swap") coach.say("Next machine!", 3);
+    else if (phase === "store") coach.say("To the potato store!", 3);
+  }
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
+
+  function startOver() {
+    if (locked()) return;
+    parts.clear(); hareS = null; gulls = []; faceT = 0; rock = null; webStones = [];
+    tr.state = "away"; tr.x = -60; auto = false; grab = null;
+    field.stage = "soil"; field.wipe = null;
+    Farm.world.update(function (w) { w.spuds = "soil"; });
+    steps.reset();
+    bringIn("beds");
+    sc.follow(camTarget(), 0, true);
+    coach.say("A new field!", 3);
+  }
+
+  // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  var surpriseN = 0;
+  function surprise() {
+    if (locked()) return;
+    var list = ["gulls", "hare", "faces"];
+    if (phase === "drive" && job === "harvest" && !rock) list.unshift("rock");
+    var pick = list[surpriseN++ % list.length];
+    if (pick === "rock") { rock = { t: 0 }; auto = false; rig.v = 0; snd.clunk(); coach.say("A big rock! Tap it!", 4); return; }
+    if (pick === "gulls") {
+      gulls = [];
+      for (var i = 0; i < 6; i++) gulls.push({ t: -i * 0.25, ox: -1 - i * 1.3 - Math.random(), r: 1.08 + Math.random() * 0.5, ph: Math.random() });
+      coach.say("Gulls are coming!", 3); return;
+    }
+    if (pick === "hare") { hareS = { t: 0, x: sc.wx(W * (0.2 + 0.6 * Math.random()), 1) }; coach.say("A hare!", 3); return; }
+    faceT = 6; coach.say("Hello, tractor!", 3);
+  }
+  function popRock() {
+    if (!rock) return;
+    var p = mScreen(-4.0, -0.9);
+    parts.add({ kind: "stone", x: sc.wx(p.x, 1), h: (sc.gY - p.y) / sc.k, r: 0.98, vx: 3.5, vh: 6, g: 12, life: 2.2, size: 0.32, col: "#9EA2AA", spin: 6, bounce: 0.3 });
+    rock = null; snd.pop(); coach.say("Out it pops!", 3);
+    if (ghost) ghost.learned("rock");
+    if (phase === "drive") { auto = true; steps.busy(true); }
+  }
+  function flickStone(st) {
+    var p = webPos(st.f);
+    parts.add({ kind: "stone", x: sc.wx(p.x, 1), h: (sc.gY - p.y) / sc.k, r: 0.97, vx: -2 - Math.random() * 2, vh: 4 + Math.random() * 2, g: 12, life: 1.8, size: 0.13, col: "#A9ACB3", spin: 8, bounce: 0.25 });
+    webStones.splice(webStones.indexOf(st), 1);
+    snd.tick(); snd.pop();
+    if (Math.random() < 0.4) coach.say("Flick!", 3);
+  }
+  // a stone riding up the destoner's web (f 0..1) in screen px
+  function webPos(f) { return mScreen(lerp(-2.6, -4.5, f), lerp(0.12, -0.85, f) - 0.08); }
+
+  // ---------- Input ----------
+  function rigPart() { return { id: "rig", x: sc.X(rig.x, 1) - (rig.m ? M[rig.m].len * 0.3 : 0) * sc.k, y: sc.gY - 1.7 * sc.k, r: 3.2 * sc.k }; }
+  function trPart() { var s = TS(), x0 = sc.X(tr.x, sc.TRACK); return { id: "trailer", x: x0 - 4.2 * s, y: sc.Y(sc.TRACK) - 1.6 * s, r: 2.6 * s }; }
+  var press = Toybox.press(cv, {
+    any: true,
+    parts: function () {
+      var b = cv.getBoundingClientRect(), list = [];
+      webStones.forEach(function (st, i) { var p = webPos(st.f); list.push({ id: "stone" + i, x: b.left + p.x, y: b.top + p.y, r: Math.max(0.5 * sc.k, 30) }); });
+      if (rock) { var q = mScreen(-4.0, -0.9); list.push({ id: "rock", x: b.left + q.x, y: b.top + q.y, r: 1.2 * sc.k }); }
+      if (rig.m) { var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r }); }
+      if (tr.state !== "away") { var t = trPart(); list.push({ id: "trailer", x: b.left + t.x, y: b.top + t.y, r: t.r }); }
+      return list;
+    },
+    dragStart: function (part, e, s) {
+      if (locked() || part !== "rig" || (phase !== "ready" && phase !== "drive") || rock) return;
+      if (phase === "ready") go();
+      auto = false; grab = { off: sc.wx(s.x - cv.getBoundingClientRect().left, 1) - rig.x };
+      if (ghost) ghost.learned("go");
+    },
+    move: function (part, e, s) { if (grab) grab.to = sc.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
+    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") steps.busy(false); grab = null; },
+    tap: function (part, x, y) {
+      if (locked()) return;
+      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
+      if (part && part.indexOf("stone") === 0) { var st = webStones[+part.slice(5)]; if (st) flickStone(st); return; }
+      if (part === "rock") { popRock(); return; }
+      if (part === "trailer") { snd.horn(); tag("Trailer", tr.x - 4.2, 3.4, sc.TRACK); return; }
+      if (part === "rig") {
+        if (rock) { popRock(); return; }
+        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
+        snd.horn(); rig.flash = 1.2; if (rig.m) tagM(M[rig.m].name, -M[rig.m].len * 0.5, -1.6); return;
+      }
+      var sx = sc.X(STORE_X, 1.02);
+      if (Math.abs(px - sx) < 5 * sc.S(1.02) && py < sc.Y(1.02) && py > sc.Y(1.02) - 7 * sc.S(1.02)) { tag("Potato store", STORE_X, 7.4, 1.02); return; }
+      var r = clamp(sc.B / Math.max(4, py - sc.hY), 0.6, 5);
+      for (var i = 0; i < 6; i++) parts.add({ kind: "puff", x: sc.wx(px, Math.min(1, r)) + (Math.random() - 0.5), h: 0.2, r: Math.min(1, r), vx: (Math.random() - 0.5), vh: 0.5, life: 1, size: 0.12, grow: 0.5, col: "#C9A27A", alpha: 0.7 });
+      steps.sayStep(); if (ghost) ghost.poke();
+    }
+  });
+
+  // ---------- Simulation ----------
+  function camTarget() {
+    if (phase === "store" && (tr.state === "tip" || tr.state === "untip" || tr.state === "off")) return STORE_X;
+    if (phase === "store") return Math.min(STORE_X, trX(-4));
+    if (phase === "done") return tr.state === "away" ? STORE_X - 6 : STORE_X;
+    if (phase === "grow") return L / 2;
+    if (phase === "leave") return Math.min(rig.x - 6, L + 6);
+    if (!rig.m) return L / 2;
+    if (rig.m === "harvester" && phase === "drive") return rig.x - (sc.port ? 6.5 : 5.5);
+    var mid = (rig.x + 4.2 + rearX()) / 2;
+    return mid + (sc.port ? 0.2 : 1.2);
+  }
+  var engLevel = 0;
+  function update(dt) {
+    time += dt; phaseT += dt;
+    var drive = 0;
+    if (phase === "arrive") {
+      var d = rig.target - rig.x; rig.v = clamp(d * 2.6, 1.5, 12); rig.x += Math.min(rig.v * dt, Math.max(d, 0.001)); drive = 0.6;
+      if (job === "harvest") rig.out = Math.min(1, rig.out + dt * 0.8);
+      if (d < 0.02) { rig.x = rig.target; arrived(); }
+    } else if (phase === "drive") {
+      var vt = 0;
+      if (rock) vt = 0;
+      else if (grab && grab.to !== undefined) vt = clamp((grab.to - rig.x) * 3, 0, VMAX * 1.4);
+      else if (auto) vt = VMAX;
+      rig.v += (vt - rig.v) * Math.min(1, dt * (vt > rig.v ? 3 : 6));
+      rig.x += rig.v * dt; drive = rig.v / VMAX;
+      field.wipe.bx = workX();
+      workEffects(dt);
+      if (workX() >= L + 0.6) passDone();
+    } else if (phase === "leave") {
+      rig.v = Math.min(12, rig.v + dt * 8); rig.x += rig.v * dt; drive = 0.7;
+      if (sc.X(rearX(), 1) > W + 30 || phaseT > 1.7) {
+        bringIn(ORDER[ORDER.indexOf(job) + 1]);
+      }
+    } else if (phase === "swap") {
+      // the camera glides back over the finished work to the start, the next machine comes in
+      if (phaseT > 0.5) bringIn(ORDER[ORDER.indexOf(job) + 1]);
+    } else if (phase === "grow") {
+      var GT = 4.4;
+      field.g = ease(clamp(phaseT / GT, 0, 1));
+      if (phaseT >= GT) grown();
+    } else if (phase === "store") {
+      updateTrailer(dt);
+    }
+    if (rock) rock.t += dt;
+    if (tr.state === "with") { tr.v = rig.v; var sp = elevSpout(); tr.x = sc.wx(sp.x + 4.4 * TS(), sc.TRACK); tr.wheel = rig.wheel; }
+    else if (tr.state === "off") { tr.t += dt; tr.v = Math.min(9, tr.v + dt * 6); tr.x += tr.v * dt; tr.wheel += tr.v * dt;  if (tr.t > 4) { tr.state = "away"; } }
+    rig.wheel += rig.v * dt;
+    if (rig.flash) rig.flash = Math.max(0, rig.flash - dt);
+    if (hareS) { hareS.t += dt; if (hareS.t > 4) hareS = null; }
+    gulls.forEach(function (g) { g.t += dt; }); if (gulls.length && gulls[0].t > 9) gulls = [];
+    if (faceT > 0) faceT = Math.max(0, faceT - dt);
+    if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    parts.update(dt);
+    sc.follow(camTarget(), dt);
+    var lvl = phase === "drive" ? 0.2 + drive * 0.8 : (phase === "arrive" || phase === "leave" ? 0.6 : (rig.m ? 0.15 : 0));
+    engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
+    snd.engine(ending || (!rig.m && tr.state === "away") ? -1 : engLevel);
+    snd.soil(phase === "drive" ? drive : 0);
+    snd.pour(tr.state === "tip" ? 0.6 : 0);
+  }
+  // what each machine does to the soil, visibly
+  function workEffects(dt) {
+    if (rig.v < 0.4) return;
+    var wx = workX(), m = rig.m;
+    if (m === "bedformer") {
+      if (Math.random() < dt * 40) parts.add({ kind: "chunk", x: wx - 0.4, h: 0.4, r: 0.92 + Math.random() * 0.15, vx: -1.5 - Math.random() * 2, vh: 1.5 + Math.random() * 2, g: 12, life: 0.9, size: 0.09, col: Math.random() > 0.4 ? "#8E5A36" : "#A87450", spin: 9 });
+      if (Math.random() < dt * 6) parts.add({ kind: "puff", x: wx - 0.6, h: 0.3, r: 0.95, vx: -1, vh: 0.4, life: 1.2, size: 0.25, grow: 0.7, col: "#C9A27A", alpha: 0.45 });
+    } else if (m === "destoner") {
+      stoneT += dt;
+      if (stoneT > nextStone) {
+        stoneT = 0; nextStone = 0.45 + Math.random() * 0.5;
+        // a stone drops out of the chute into the wheeling by itself
+        parts.add({ kind: "stone", x: rig.x - hitchOff() - M.destoner.drop, h: 1.0, r: 0.9, vx: -0.5, vh: -0.5, g: 12, life: 6, size: 0.1 + Math.random() * 0.06, col: Math.random() > 0.5 ? "#9EA2AA" : "#B5B8BE", bounce: 0.2 });
+        if (webStones.length < 4) webStones.push({ f: 0 });
+      }
+      webStones.forEach(function (s) { s.f += dt * 0.28; });
+      webStones = webStones.filter(function (s) { return s.f < 1; });
+      if (Math.random() < dt * 25) parts.add({ kind: "dot", x: wx - 1 - Math.random() * 2, h: 0.5, r: 0.95 + Math.random() * 0.1, vx: -0.5, vh: 0, g: 9, life: 0.4, size: 0.04, col: "#7A4A2C" });
+    } else if (m === "planter") {
+      if (Math.random() < dt * 9) parts.add({ kind: "potato", x: wx + 0.05, h: 0.75, r: 0.96, vx: -0.3, vh: -1, g: 12, life: 0.35, size: 0.07, col: "#C9935A" });
+      if (Math.random() < dt * 20) parts.add({ kind: "chunk", x: wx - 0.5, h: 0.3, r: 0.93 + Math.random() * 0.1, vx: -1, vh: 1, g: 12, life: 0.6, size: 0.06, col: "#A06A43", spin: 6 });
+    } else if (m === "harvester") {
+      if (Math.random() < dt * 30) parts.add({ kind: "dot", x: wx - 1.5 - Math.random() * 3, h: 0.6 + Math.random() * 0.6, r: 0.95, vx: -0.4, vh: 0, g: 9, life: 0.5, size: 0.05, col: "#7A4A2C" });
+      if (Math.random() < dt * 8) parts.add({ kind: "puff", x: wx - 0.3, h: 0.3, r: 0.95, vx: -1, vh: 0.5, life: 1.2, size: 0.25, grow: 0.7, col: "#C9A27A", alpha: 0.4 });
+      tr.load = clamp((workX() + 0.8) / (L + 1.4), 0, 1);
+    }
+  }
+  // the harvester's side elevator: from its pivot out over the trailer (screen px)
+  function elevSpout() {
+    var piv = mScreen(M.harvester.pivot[0], M.harvester.pivot[1]), u = rig.out;
+    return { x: piv.x - lerp(1.0, 2.6, u) * sc.k, y: lerp(piv.y, sc.Y(sc.TRACK) - 3.6 * TS(), u), px: piv.x, py: piv.y };
+  }
+  function TS() { return sc.S(1) * 1.04; }
+  function trX(dx) { return tr.x + dx * TS() * sc.TRACK / sc.k; }
+  function updateTrailer(dt) {
+    var ts = tr.state;
+    if (ts === "go") {
+      rig.out = Math.max(0, rig.out - dt);
+      var target = (sc.pit ? sc.pit.x : STORE_X - 2.6) + 7.7 * TS() * sc.TRACK / sc.k, dg = target - tr.x;
+      tr.v = clamp(dg * 2.2, 1.2, 15); tr.x += Math.min(tr.v * dt, Math.max(dg, 0.01)); tr.wheel += tr.v * dt;
+      if (dg < 0.05) { tr.x = target; tr.v = 0; tr.state = "tip"; tr.t = 0; tag("Potato store", STORE_X, 7.4, 1.02); }
+    } else if (ts === "tip") {
+      tr.t += dt; tr.tip = ease(tr.t / 0.8);
+      if (tr.t > 0.6) {
+        tr.load = Math.max(0, 1 - (tr.t - 0.6) / 1.6); storeRun = 1; storeLevel = Math.min(1.1, storeLevel + dt * 0.075);
+        var tx = trX(-7.8), hk = TS() * sc.TRACK / sc.k;
+        if (Math.random() < dt * 14) parts.add({ kind: "potato", x: tx - Math.random() * 0.3, h: (1 + Math.random() * 0.5) * hk, r: sc.TRACK, vx: -0.6, vh: 0, g: 9, life: 0.45, size: 0.09, col: "#C9935A" });
+      }
+      if (tr.t > 2.2) { tr.state = "untip"; tr.t = 0; tr.load = 0; storedLoad(); finishJob(); }
+    } else if (ts === "untip") {
+      tr.t += dt; tr.tip = 1 - ease(tr.t / 0.9); storeRun = Math.max(0, storeRun - dt);
+      if (tr.t >= 0.9) { tr.tip = 0; tr.state = "off"; tr.t = 0; }
+    }
+  }
+  function storedLoad() {
+    loads++; save(); setLoads();
+    Farm.world.update(function (w) { w.potatoes = (w.potatoes || 0) + 1; });
+    snd.chime();
+  }
+  function finishJob() {
+    setPhase("done"); steps.finish("Again!"); steps.busy(false);
+    coach.say("All in the potato store!", 4);
+    Toybox.kind();
+  }
+
+  // ---------- Drawing ----------
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var season = field.stage === "grown" || field.stage === "harvested" || (phase === "grow" && field.g > 0.75) ? "autumn" : (phase === "grow" && field.g > 0.3 ? "summer" : "spring");
+    sc.sky(ctx, { time: time, arc: phase === "grow" ? clamp(phaseT / 4.4, 0, 1) : null, season: season, dusk: dusk });
+    sc.hedge(ctx, { season: season });
+    var P = { crop: "spuds", stage: field.stage === "grown" ? "grow" : field.stage, g: field.stage === "grown" ? 1 : field.g, wipe: field.wipe, time: time, edge: "rgba(70,40,20,0.6)" };
+    if (P.wipe && P.wipe.to === "harvested") P.edge = null;
+    sc.field(ctx, "far", P);
+    if (hareS && hareRr() > 1) drawHare();
+    drawGulls(true);
+    parts.draw(ctx, sc, function (p) { return p.r > 1.0; });
+    if (rig.m) drawRig();
+    sc.field(ctx, "near", P);
+    parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
+    sc.verge(ctx, {});
+    sc.store(ctx, storeLevel, { x: STORE_X, kind: "potato", run: storeRun, time: time });
+    if (tr.state !== "away") drawTrailer();
+    if (rig.m === "harvester" && rig.out > 0.01) drawElevator();
+    parts.draw(ctx, sc, function (p) { return p.r <= sc.TRACK + 0.03; });
+    if (hareS && hareRr() <= 1) drawHare();
+    drawGulls(false);
+  }
+  function drawRig() {
+    var f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0, m = rig.m, tl = trailed();
+    var st = { wheel: rig.wheel, time: time, work: phase === "drive" && rig.v > 0.3 ? 1 : 0, level: m === "planter" ? 1 - (field.wipe ? clamp(workX() / L, 0, 1) * 0.7 : 0) : 1, out: m === "harvester" && rig.out > 0.01 };
+    sc.put(ctx, rig.x, 1, 1, function () {
+      ctx.save();
+      if (tl) ctx.translate(Farm.DRAWBAR[0], Farm.DRAWBAR[1]); else ctx.translate(Farm.HITCH[0], Farm.HITCH[1]);
+      D[m](ctx, st);
+      if (m === "destoner") {
+        webStones.forEach(function (s) { var x = lerp(-2.6, -4.5, s.f), y = lerp(0.12, -0.85, s.f) - 0.08; ctx.beginPath(); ctx.ellipse(x, y, 0.16, 0.12, s.f * 6, 0, Math.PI * 2); ctx.fillStyle = "#B5B8BE"; ctx.fill(); ctx.lineWidth = Farm.LW; ctx.strokeStyle = U.INK; ctx.stroke(); });
+      }
+      if (rock) {
+        var wob = Math.sin(rock.t * 18) * 0.05;
+        ctx.beginPath(); ctx.ellipse(-4.0 + wob, -0.9, 0.42, 0.32, 0.3, 0, Math.PI * 2); ctx.fillStyle = "#8F949C"; ctx.fill(); ctx.lineWidth = Farm.LW; ctx.strokeStyle = U.INK; ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-4.1 + wob, -1.0, 0.12, 0.07, 0.3, 0, Math.PI * 2); ctx.fillStyle = "#B5B8BE"; ctx.fill();
+      }
+      ctx.restore();
+      D.tractor(ctx, { wheel: rig.wheel, time: time, hitch: tl ? null : { lift: phase === "drive" ? 0 : 0.6 }, drawbar: tl, face: f, look: [0, 1], lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
+    });
+    if (phase !== "grow" && Math.random() < 0.12) parts.add({ kind: "puff", x: rig.x + 1.33, h: 3.45, r: 1, vx: -0.6 - rig.v * 0.5, vh: 1.2, life: 1.2, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });
+  }
+  function drawElevator() {
+    var sp = elevSpout(), u = rig.out;
+    D.boom(ctx, sp.px, sp.py, sp.x, sp.y, 0.45 * sc.k, lerp(0.45, 0.6, u) * sc.k, time * (phase === "drive" && rig.v > 0.3 ? 2.5 : 0), "belt", sc.lw);
+    if (phase === "drive" && rig.v > 0.3 && u > 0.9) {
+      // potatoes tumbling from the elevator into the trailer
+      var yb = sc.Y(sc.TRACK) - (2.75 + tr.load * 0.4) * TS(), n = 6;
+      for (var i = 0; i < n; i++) {
+        var f = ((time * 2.2 + i / n) % 1), x = sp.x + Math.sin(i * 2.1) * 0.15 * sc.k, y = lerp(sp.y + 0.3 * sc.k, yb, f * f);
+        D.potato(ctx, x, y, 0.13 * sc.k, i);
+      }
+    }
+  }
+  function drawTrailer() {
+    var r = sc.TRACK, f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0;
+    sc.put(ctx, tr.x, r, 1, function () {
+      ctx.translate(0, -0.5);
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: "potato", face: f, time: time, look: [0, 1] });
+      ctx.translate(-Farm.DRAWBAR[0], 0.5);
+      D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1] });
+    }, TS());
+  }
+  function hareRr() { return lerp(2.2, 0.7, clamp(hareS.t / 4, 0, 1)); }
+  function drawHare() {
+    var f = hareS.t / 4, r = hareRr(), x = hareS.x + f * 8;
+    var hop = Math.abs(Math.sin(hareS.t * 6)) * 0.4;
+    D.hare(ctx, sc.X(x, r), sc.Y(r) - hop * sc.S(r), sc.S(r) * 1.4, (hareS.t * 3) % 1, false);
+  }
+  function drawGulls(far) {
+    if (!gulls.length) return;
+    var base = rig.m ? workX() : L / 2;
+    gulls.forEach(function (g) {
+      if (g.t < 0) return;
+      if ((g.r > 1) !== far) return;
+      var t = g.t, s = sc.S(g.r) * 1.3, x, y, gx = sc.X(base + g.ox, g.r), gy = sc.Y(g.r);
+      if (t < 1.6) { var f = ease(t / 1.6); x = lerp(gx - W * 0.3, gx, f); y = lerp(-20, gy - 0.2 * s, f); D.gull(ctx, x, y, s, t * 3, false); }
+      else if (t < 7.5) { var hop = Math.abs(Math.sin(t * 5 + g.ph * 6)) * 0.12 * s; D.gull(ctx, gx, gy - 0.12 * s - hop, s, 0.25, Math.sin(t + g.ph * 4) > 0.6); }
+      else { var e = (t - 7.5) / 1.5; D.gull(ctx, gx + e * W * 0.4, gy - e * H * 0.6, s, t * 3, false); }
+    });
+  }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function loop(ts) {
+    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); done(); }, 2600); }
+  function onWake() { ending = false; dusk = 0; }
+
+  // ---------- Start ----------
+  resize();
+  bringIn(job);
+  if (phase === "arrive") { rig.x = rig.target - 7; }
+  sc.follow(camTarget(), 0, true);
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  Toybox.init({
+    app: "farm",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the tractor stops and parks, and the controls lock. The timer carries on across the farm pages.",
+    goodbyeOption: "End with a “Goodnight, farm” button to press",
+    farewellText: "Time to say goodnight to the farm",
+    goodbyeLabel: "Goodnight, farm",
+    farewellDone: "Night night, farm!",
+    restLine: "The farm is resting.",
+    restLine2: "The machines will be right here next time.",
+    restArt: Farm.restArt,
+    soundNote: "Soft engine and soil sounds. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: onWake,
+    onWake: onWake,
+    onSound: function (on) { if (on) snd.chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  if (/[?&]debug\b/.test(location.search)) window.__farm = {
+    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: rig.x, m: rig.m, field: field.stage, trailer: tr.state, load: tr.load, loads: loads, stones: webStones.length, rock: !!rock, coach: coach.text() }; },
+    screen: function (id) { var b = cv.getBoundingClientRect(), p = id === "trailer" ? trPart() : (id === "rock" ? mScreen(-4, -0.9) : (id === "stone" ? (webStones[0] ? webPos(webStones[0].f) : rigPart()) : rigPart())); return { x: b.left + p.x, y: b.top + p.y }; },
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+</body>
+</html>
