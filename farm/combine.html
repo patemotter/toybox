@@ -47,6 +47,7 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -59,14 +60,18 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body app">
-    <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A golden wheat field with a green combine harvester. Tap the combine to harvest."></canvas>
-      <div class="tb-counter loads" id="loads">Loads: 0</div>
-      <div id="coach"></div>
-      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
-    </main>
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
+        <canvas id="cv" role="img" aria-label="A golden wheat field with a green combine harvester. Tap the combine to harvest."></canvas>
+        <div class="tb-counter loads" id="loads">Loads: 0</div>
+        <div id="coach"></div>
+        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+      </main>
+      <div id="jobs"></div>
+    </div>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
+      <ol id="stepsW"></ol>
+      <ol id="stepsS" hidden></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -78,6 +83,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash;
   var D = Farm.draw, snd = Farm.sound, C = Farm.COMBINE;
+  var TAU = Math.PI * 2, INK = U.INK, picCache = {};
   var NAME = Farm.NAMES.combine;
   document.title = NAME; $("title").textContent = NAME;
 
@@ -88,10 +94,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
   if (startFresh) saved = {};
   var loads = typeof saved.loads === "number" ? saved.loads : 0;
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ loads: loads })); } catch (e) { /* ignore */ } }
+  // The job ("Sunny Seeds" is the Sunflowers job): "wheat" | "sun". Older saves have no job: wheat.
+  var job = saved.job === "sun" ? "sun" : "wheat";
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ loads: loads, job: job })); } catch (e) { /* ignore */ } }
+  // Sunflower seeds: black with white stripes (the shared CROP table gets a "seed" entry for the trailer and store).
+  var SEED = ["#3D3936", "#ECE8DE"];
+  Farm.CROP.seed = Farm.CROP.seed || SEED;
+  var SUN_H = 1.8;
 
   var L = 24, STORE_X = L + 20, VMAX = 5.6;
-  var sc = new Farm.Scene({ L: L, span: 11.6, mh: 4.7, xmin: -15, xmax: STORE_X + 9, rowDz: 0.5 });
+  var sc = new Farm.Scene({ L: L, span: 11.6, spanPort: 12.6, mh: 4.7, xmin: -15, xmax: STORE_X + 9, rowDz: 0.5 });
   var parts = new Farm.Particles();
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
   var W = 300, H = 300, DPR = 1, time = 0;
@@ -101,8 +113,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var tr = { x: -40, v: 0, wheel: 0, load: 0, tip: 0, state: "away" };
   var phase = "ready", phaseT = 0, auto = false, grab = null, ending = false, arc = null, dusk = 0, storeLevel = 0, storeRun = 0;
   var straw = { x0: 0, x1: 0, on: false }, dogS = null, deer = null, hawk = null, faceT = 0, gulls = [];
-  var w0 = Farm.world.get();
-  storeLevel = Math.min(1.1, w0.grain / 8);
+  // The field's state lives in the shared farm: wheat "golden"|"stubble", sunflowers (w.sun) the same words.
+  function worldCrop() { var w = Farm.world.get(); return job === "sun" ? (w.sun === "stubble" ? "stubble" : "golden") : w.wheat; }
+  function setWorldCrop(v) { Farm.world.update(function (w) { if (job === "sun") w.sun = v; else w.wheat = v; }); }
+  function storeFor() { var w = Farm.world.get(), n = job === "sun" ? (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) : w.grain; return Math.min(1.1, Math.max(0, n) / 8); }
+  storeLevel = storeFor();
+  var birds = null;
 
   function cutX() { return cb.x + cb.dir * C.cut; }
   function pivotX() { return cb.x + cb.dir * C.pivot[0]; }
@@ -141,21 +157,25 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function ready() {
     setPhase("ready"); arc = null; crop.stage = "golden"; crop.g = 1; crop.wipe = null; steps.busy(false);
-    Farm.world.update(function (w) { w.wheat = "golden"; w.season = "summer"; });
+    setWorldCrop("golden"); Farm.world.update(function (w) { w.season = "summer"; });
     steps.at("harvest");
   }
   function harvest() {
     if (phase !== "ready" && phase !== "drive") return false;
-    if (phase === "ready") { setPhase("drive"); crop.wipe = { bx: cutX(), dir: cb.dir, to: "stubble" }; straw.on = true; straw.x0 = cb.x - cb.dir * 6; straw.x1 = straw.x0; snd.horn(); }
+    if (phase === "ready") {
+      setPhase("drive"); crop.wipe = { bx: cutX(), dir: cb.dir, to: "stubble" }; straw.on = job !== "sun"; straw.x0 = cb.x - cb.dir * 6; straw.x1 = straw.x0; snd.horn();
+      if (job === "sun") coach.say("The header takes the heads.", 4);
+    }
     auto = true; steps.busy(true);
     if (ghost) ghost.learned("harvest");
-    tagOnce("reel", "Reel", cb.x + cb.dir * 3.9, 2.6);
+    if (job === "sun") tagOnce("sunhead", "Sunflower header", cb.x + cb.dir * 4.3, 1.9);
+    else tagOnce("reel", "Reel", cb.x + cb.dir * 3.9, 2.6);
     return true;
   }
   function passDone() {
     auto = false; cb.v = 0; setPhase("full"); cb.beacon = true; steps.busy(false);
     crop.stage = "stubble"; crop.wipe = null;
-    Farm.world.update(function (w) { w.wheat = "stubble"; });
+    setWorldCrop("stubble");
     steps.done("harvest");
     tag("Grain tank", cb.x + cb.dir * -2.2, 4.7);
     snd.horn();
@@ -179,6 +199,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     { id: "harvest", name: "Harvest", pic: Farm.pic("combine"), go: "Harvest!", coach: "Tap the combine!" },
     { id: "unload", name: "Unload", pic: Farm.pic("graintrailer"), go: "Unload!", coach: "Unload the grain!" }
   ];
+  var STEPS_SUN = [
+    { id: "harvest", name: "Harvest", pic: pic("combineSun"), go: "Harvest!", coach: "Tap the combine!" },
+    { id: "unload", name: "Unload", pic: pic("seedtrailer"), go: "Unload!", coach: "Unload the seeds!" }
+  ];
   var ghost = Toybox.ghost({
     max: 3,
     onShow: function (p, on) { if (steps) steps.pulse(on); },
@@ -196,11 +220,25 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       return null;
     }
   });
-  var steps = Toybox.steps($("steps"), {
-    steps: STEPS, coach: coach, ghost: ghost,
-    onGo: function (id) { return doGo(id); },
-    onAgain: function () { again(); },
-    onBusy: function () { busyHint(); }
+  function makeSteps(el, list) {
+    return Toybox.steps(el, {
+      steps: list, coach: coach, ghost: ghost,
+      onGo: function (id) { return doGo(id); },
+      onAgain: function () { again(); },
+      onBusy: function () { busyHint(); }
+    });
+  }
+  var stepsW = makeSteps($("stepsW"), STEPS), stepsS = makeSteps($("stepsS"), STEPS_SUN);
+  var steps = job === "sun" ? stepsS : stepsW;
+  function showSteps() {
+    steps = job === "sun" ? stepsS : stepsW;
+    $("stepsW").hidden = job === "sun"; $("stepsS").hidden = job !== "sun";
+    cv.setAttribute("aria-label", job === "sun" ? "A field of ripe sunflowers with a green combine harvester. Tap the combine to harvest." : "A golden wheat field with a green combine harvester. Tap the combine to harvest.");
+  }
+  var jobs = Toybox.jobs($("jobs"), {
+    jobs: [{ id: "wheat", name: "Wheat", pic: Farm.pic("wheat") }, { id: "sun", name: "Sunflowers", pic: pic("sunflower") }],
+    value: job,
+    onPick: function (id) { switchJob(id); }
   });
   function doGo() {
     if (locked()) return false;
@@ -211,30 +249,42 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     busyHint(); return true;
   }
   function busyHint() {
-    if (phase === "grow") coach.say("The wheat is growing!", 3);
+    if (phase === "grow") coach.say(job === "sun" ? "The sunflowers are growing!" : "The wheat is growing!", 3);
     else if (phase === "drive") { snd.horn(); coach.say("Harvesting!", 3); }
     else if (tr.state === "drift") bringBack();
-    else if (phase === "unload") coach.say(tr.state === "tip" || tr.state === "go" ? "Into the grain store!" : "Pouring the grain!", 3);
+    else if (phase === "unload") coach.say(tr.state === "tip" || tr.state === "go" ? "Into the grain store!" : (job === "sun" ? "Pouring the seeds!" : "Pouring the grain!"), 3);
   }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); deer = hawk = null; gulls = []; faceT = 0; dogS = null; tagged = {};
-    tr.state = "away"; tr.x = -40; cb.auger = 0; cb.tank = 0; cb.beacon = false; auto = false; cb.v = 0;
-    cb.dir = 1; cb.face = 1; cb.x = startX(1);
-    sc.follow(camTarget(), 0, true);
-    if (Farm.world.get().wheat === "golden") ready(); else grow(false);
+    resetScene();
     coach.say("A new field!", 3);
+  }
+  function resetScene() {
+    parts.clear(); deer = hawk = birds = null; gulls = []; faceT = 0; dogS = null; tagged = {}; grab = null;
+    tr.state = "away"; tr.x = -40; tr.load = 0; tr.tip = 0; cb.auger = 0; cb.tank = 0; cb.beacon = false; auto = false; cb.v = 0;
+    cb.dir = 1; cb.face = 1; cb.x = startX(1); straw.on = false;
+    storeLevel = storeFor(); storeRun = 0;
+    if (steps.reset) steps.reset();
+    if (worldCrop() === "golden") ready(); else grow(false);
+    sc.follow(camTarget(), 0, true);
+  }
+  function switchJob(id) {
+    if (locked()) { jobs.set(job); return; }
+    job = id === "sun" ? "sun" : "wheat";
+    showSteps(); resetScene(); save();
+    coach.say(job === "sun" ? "Time for the sunflowers!" : "Time for the wheat!", 3);
   }
 
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
-    var list = ["deer", "hawk", "faces"];
+    var list = job === "sun" ? ["finches", "faces", "deer"] : ["deer", "hawk", "faces"];
     if (phase === "unload" && tr.state === "pour") list.unshift("drift");
     var pick = list[surpriseN++ % list.length];
+    if (pick === "finches") { finches(); return; }
     if (pick === "drift") { tr.state = "drift"; tr.dT = 0; coach.say("Tap the trailer!", 4); return; }
     if (pick === "deer") {
       var fromWheat = crop.stage !== "stubble" && crop.wipe;
@@ -296,12 +346,31 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   });
 
   // ---------- Simulation ----------
+  // The camera keeps the whole machine (and the trailer beside it, or the trailer at the store) on screen with
+  // a margin, as close as it can to the view it would like (a little ahead of the combine while it works).
+  var camLim = null;
+  function sxAt(x, r, cam) { return W / 2 + (x - cam) * sc.k / r; }
+  function frame(pts, pref) {
+    var m = Math.max(10, W * 0.03);
+    function lo(c) { var v = 1e9; for (var i = 0; i < pts.length; i++) v = Math.min(v, sxAt(pts[i][0], pts[i][1], c) + pts[i][2]); return v; }
+    function hi(c) { var v = -1e9; for (var i = 0; i < pts.length; i++) v = Math.max(v, sxAt(pts[i][0], pts[i][1], c) + pts[i][2]); return v; }
+    function solve(f, target) { var a = pref - 80, b = pref + 80; for (var i = 0; i < 36; i++) { var c = (a + b) / 2; if (f(c) > target) a = c; else b = c; } return (a + b) / 2; }
+    var cMax = solve(lo, m), cMin = solve(hi, W - m);
+    if (cMin <= cMax) { camLim = [cMin, cMax]; return clamp(pref, cMin, cMax); }
+    var mid = solve(function (c) { return (lo(c) + hi(c)) / 2; }, W / 2);
+    camLim = [mid, mid];
+    return mid;
+  }
+  function combinePts() { return [[cb.x - cb.dir * 6.75, 1, 0], [cb.x + cb.dir * (job === "sun" ? 6.0 : 4.9), 1, 0]]; }
+  function trailerPts() { var t = TS(); return [[tr.x, sc.TRACK, -7.85 * t], [tr.x, sc.TRACK, 5.0 * t]]; }
   function camTarget() {
-    if (phase === "unload" && (tr.state === "tip" || tr.state === "untip" || tr.state === "off")) return STORE_X;
-    if (phase === "unload" && tr.state === "go") return Math.min(STORE_X, trX(-4));
-    if (phase === "unload") return (pivotX() + (tr.state === "in" ? Math.max(tr.x - 5, pivotX() - 6) : pivotX())) / 2;
-    if (phase === "done") return cb.x - cb.dir * 2.5;
-    return cb.x + cb.dir * (sc.port ? 0.6 : 1.4);
+    var ts = tr.state;
+    if (phase === "unload" && (ts === "tip" || ts === "untip" || ts === "off")) return frame([[STORE_X - 5.2, 1.02, 0], [STORE_X + 5.2, 1.02, 0]].concat(ts === "off" ? [] : trailerPts()), STORE_X);
+    if (phase === "unload" && ts === "go") return frame(trailerPts(), Math.min(STORE_X, trX(-4)));
+    if (phase === "unload" && ts === "in") return frame(combinePts(), (pivotX() + Math.max(tr.x - 5, pivotX() - 6)) / 2);
+    if (phase === "unload") return frame(combinePts().concat(trailerPts()), pivotX());
+    if (phase === "done") return frame(combinePts(), cb.x - cb.dir * 2.5);
+    return frame(combinePts(), cb.x + cb.dir * (sc.port ? 0.6 : 1.4));
   }
   var engLevel = 0;
   function update(dt) {
@@ -333,7 +402,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       cb.tank = Math.max(cb.tank, prog);
       straw.x1 = cb.x - cb.dir * 6.2;
       if (cb.tank > 0.55) tagOnce("tank", "Grain tank", cb.x - cb.dir * 2.2, 4.7);
-      if (cb.v > 0.5) {
+      if (cb.v > 0.5 && job === "sun") {
+        // sunflower heads tipping onto the pans, chaff out of the back (no straw: the stalks stay standing)
+        if (Math.random() < dt * 9) parts.add({ kind: "chunk", x: cx + cb.dir * (0.3 + Math.random() * 0.4), h: SUN_H - 0.2, r: 0.9 + Math.random() * 0.2, vx: -cb.dir * (1.2 + Math.random()), vh: 0.4, g: 5, life: 0.5, size: 0.14, col: Math.random() > 0.3 ? "#7A5A34" : "#F2C230", spin: 5 });
+        if (Math.random() < dt * 24) parts.add({ kind: "straw", x: cb.x - cb.dir * 6.3, h: 1.2, r: 0.92 + Math.random() * 0.16, vx: -cb.dir * (2 + Math.random() * 2), vh: 1 + Math.random(), g: 6, drag: 1.5, life: 1.2, size: 0.11, col: Math.random() > 0.5 ? "#9C8461" : "#5E5044", spin: (Math.random() - 0.5) * 12 });
+        if (Math.random() < dt * 8) parts.add({ kind: "puff", x: cb.x - cb.dir * 6.5, h: 1.4, r: 1.0, vx: -cb.dir * 1.2, vh: 0.6, life: 1.3, size: 0.25, grow: 0.7, col: "#D8CCB2", alpha: 0.4 });
+        if (Math.random() < dt * 4) parts.add({ kind: "puff", x: cb.x + cb.dir * 1.0, h: 4.6, r: 1.0, vx: -cb.dir * 0.6, vh: 1.0, life: 1.4, size: 0.12, grow: 0.3, col: "#8A8FA0", alpha: 0.25 });
+      } else if (cb.v > 0.5) {
         // wheat tipping into the header, straw and chaff out of the back, dust
         if (Math.random() < dt * 30) parts.add({ kind: "straw", x: cx + cb.dir * (0.1 + Math.random() * 0.3), h: 0.7 + Math.random() * 0.4, r: 0.9 + Math.random() * 0.2, vx: -cb.dir * (1.5 + Math.random()), vh: 0.5, g: 4, life: 0.5, size: 0.12, col: "#F0C84E", spin: 6 });
         if (Math.random() < dt * 40) parts.add({ kind: "straw", x: cb.x - cb.dir * 6.3, h: 1.2, r: 0.92 + Math.random() * 0.16, vx: -cb.dir * (2 + Math.random() * 2), vh: 1 + Math.random(), g: 6, drag: 1.5, life: 1.6, size: 0.14, col: Math.random() > 0.5 ? "#F3DA8E" : "#D9B35C", spin: (Math.random() - 0.5) * 12 });
@@ -351,10 +426,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (dogS) updateDog(dt);
     if (deer) { deer.t += dt; if (deer.t > 4) deer = null; }
     if (hawk) { hawk.t += dt; if (hawk.t > 6) hawk = null; }
+    if (birds) updateBirds(dt);
     if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     parts.update(dt);
     sc.follow(camTarget(), dt);
+    // the easing never lets the machine slide off the edge (a moving combine pulls the camera along)
+    if (camLim) { var cl = clamp(clamp(sc.cam, camLim[0], camLim[1]), sc.camMin, sc.camMax); sc.cam = phase === "drive" ? cl : sc.cam + (cl - sc.cam) * Math.min(1, dt * 8); }
     var lvl = phase === "drive" ? drive : (tr.state === "in" || tr.state === "go" || tr.state === "off" ? 0.6 : 0.15);
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
     snd.engine(ending ? -1 : engLevel);
@@ -405,14 +483,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function storedLoad() {
     loads++; save(); setLoads();
-    Farm.world.update(function (w) { w.grain = (w.grain || 0) + 1; });
+    Farm.world.update(function (w) { if (job === "sun") w.seeds = (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) + 1; else w.grain = (w.grain || 0) + 1; });
     snd.chime();
   }
   function finishJob() {
     setPhase("done"); steps.done("unload"); steps.finish("Again!"); steps.busy(false);
     coach.say("All in the grain store!", 4);
     Toybox.kind();
-    // the farm dog bounds in and hops into the straw
+    // the farm dog bounds in and hops into the straw (the sunflower field has no straw)
+    if (job === "sun") return;
     var sx = (straw.x0 + straw.x1) / 2;
     dogS = { x: sc.wx(-30, 0.75), r: 0.75, tx: clamp(sx, Math.min(straw.x0, straw.x1) + 2, Math.max(straw.x0, straw.x1) - 2), t: 0, st: "run" };
   }
@@ -430,8 +509,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function tipStream() {
     var tx = trX(-7.8), hk = TS() * sc.TRACK / sc.k;
-    for (var i = 0; i < 3; i++) parts.add({ kind: "dot", x: tx - Math.random() * 0.3, h: (1.0 + Math.random() * 0.5) * hk, r: sc.TRACK, vx: -0.6, vh: 0, g: 9, life: 0.4, size: 0.07, col: Math.random() > 0.3 ? "#EBB93E" : "#C99322" });
+    for (var i = 0; i < 3; i++) parts.add({ kind: "dot", x: tx - Math.random() * 0.3, h: (1.0 + Math.random() * 0.5) * hk, r: sc.TRACK, vx: -0.6, vh: 0, g: 9, life: 0.4, size: 0.07, col: grainCol(Math.random()) });
   }
+  function grainCol(u) { return job === "sun" ? (u > 0.35 ? SEED[0] : SEED[1]) : (u > 0.3 ? "#EBB93E" : "#C99322"); }
   // the auger's spout: from folded (along the side) to out over the trailer
   function spout() {
     var u = cb.auger, r = lerp(1, sc.TRACK + 0.04, u);
@@ -445,25 +525,27 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     sc.sky(ctx, { time: time, arc: phase === "grow" ? arc : null, season: "summer", dusk: dusk });
     sc.hedge(ctx, { season: "summer" });
     var P = { crop: "wheat", stage: crop.stage, g: crop.g, wipe: crop.wipe, time: time, edge: "#B88A2C" };
-    sc.field(ctx, "far", P);
+    if (job === "sun") sunField("far", P); else sc.field(ctx, "far", P);
+    if (birds) drawBirds(false);
     drawStraw();
     if (deer && deer.r > 1) drawDeer();
     parts.draw(ctx, sc, function (p) { return p.r > 1.0; });
     drawCombine();
     if (dogS && dogS.st === "sit") drawDog();
-    sc.field(ctx, "near", P);
+    if (job === "sun") sunField("near", P); else sc.field(ctx, "near", P);
     parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
     sc.verge(ctx, {});
-    sc.store(ctx, storeLevel, { x: STORE_X, kind: "grain", run: storeRun, time: time });
+    sc.store(ctx, storeLevel, { x: STORE_X, kind: job === "sun" ? "seed" : "grain", run: storeRun, time: time });
     if (tr.state !== "away") drawTrailer();
     if (cb.auger > 0.01) drawAuger();
     parts.draw(ctx, sc, function (p) { return p.r <= sc.TRACK + 0.03; });
     if (dogS && dogS.st !== "sit") drawDog();
     if (deer && deer.r <= 1) drawDeer();
     if (hawk) drawHawk();
+    if (birds) drawBirds(true);
   }
   function drawStraw() {
-    if (!straw.on && phase !== "full" && phase !== "unload" && phase !== "done") return;
+    if (job === "sun" || (!straw.on && phase !== "full" && phase !== "unload" && phase !== "done")) return;
     var a = Math.min(straw.x0, straw.x1), b = Math.max(straw.x0, straw.x1), r = 1.04;
     a = Math.max(a, 0); b = Math.min(b, L);
     if (b - a < 0.2) return;
@@ -476,7 +558,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function drawCombine() {
     var f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0;
     sc.put(ctx, cb.x, 1, cb.face, function () {
-      D.combine(ctx, { wheel: cb.wheel, time: time, tank: cb.tank, reel: cb.reel, auger: cb.auger > 0.01, beacon: cb.beacon || cb.flash > 0, face: f, look: [0, 1] });
+      var st = { wheel: cb.wheel, time: time, tank: cb.tank, reel: cb.reel, auger: cb.auger > 0.01, beacon: cb.beacon || cb.flash > 0, face: f, look: [0, 1] };
+      if (job === "sun") combineSun(ctx, st, phase === "drive" && cb.v > 0.5);
+      else D.combine(ctx, st);
     });
   }
   function drawAuger() {
@@ -490,7 +574,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var yb = sc.Y(sc.TRACK) - (2.75 + tr.load * 0.4) * TS(), wv = 0.16 * sS;
       ctx.beginPath(); ctx.moveTo(x2 - wv, y2 + wv); ctx.lineTo(x2 + wv, y2 + wv);
       ctx.lineTo(x2 + wv * 1.4 + Math.sin(time * 20) * 1.5, yb); ctx.lineTo(x2 - wv * 1.4, yb); ctx.closePath();
-      ctx.fillStyle = "#EBB93E"; ctx.fill(); ctx.lineWidth = Math.max(1, lw * 0.6); ctx.strokeStyle = "#B4862A"; ctx.stroke();
+      ctx.fillStyle = job === "sun" ? SEED[0] : "#EBB93E"; ctx.fill(); ctx.lineWidth = Math.max(1, lw * 0.6); ctx.strokeStyle = job === "sun" ? "#1D2340" : "#B4862A"; ctx.stroke();
+      if (job === "sun") {
+        // the white stripes of the seeds, running down the stream
+        ctx.fillStyle = SEED[1];
+        for (var i = 0; i < 7; i++) { var f = (time * 2.2 + i / 7) % 1, sx = lerp(x2, x2 + Math.sin(time * 20) * 0.7, f) + (hash(i, 3) - 0.5) * wv * 1.6, sy = lerp(y2 + wv, yb, f); ctx.fillRect(sx - 1, sy - 2, 2, 4); }
+      }
     }
   }
   // Vehicles on the track are drawn at the machine line's size (a picture-book cheat: true perspective
@@ -502,7 +591,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var r = sc.TRACK, f = faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0;
     sc.put(ctx, tr.x, r, 1, function () {
       ctx.translate(0, -0.5);
-      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: "grain", face: f, time: time, look: [0, 1] });
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: job === "sun" ? "seed" : "grain", face: f, time: time, look: [0, 1] });
+      if (job === "sun") seedFlecks(ctx, tr.load, tr.tip);
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
       D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, face: f, look: [0, 1] });
     }, TS());
@@ -529,6 +619,265 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     D.hawk(ctx, x, y, s, t * 1.3, Math.cos(t * 1.6) > 0 && t < 3.5);
   }
 
+  // ---------- Sunny Seeds: the sunflower header, the seeds, the sunflower field, the goldfinches ----------
+  // Written like farm.js's drawings (metres, y up negative, Farm.shape helpers) so they can move there later.
+  // The combine with a sunflower header: farm.js's combine minus its grain header (clipped off at the feeder
+  // house), then long pans pointing forward, a cross auger and a deflector instead of the reel. The grain tank
+  // shows black seeds. work: true while harvesting (heads ride up the pans).
+  function combineSun(ctx, st, work) {
+    var SH = Farm.shape, keep = Farm.CROP.grain, reel = st.reel || 0, i;
+    ctx.save(); ctx.beginPath(); ctx.rect(-20, -20, 22.42, 40); ctx.clip();
+    Farm.CROP.grain = SEED;
+    try { D.combine(ctx, st); } finally { Farm.CROP.grain = keep; ctx.restore(); }
+    // white stripes on the seeds in the tank window (and the heap on top when it is brim full)
+    var tank = clamp(st.tank || 0, 0, 1);
+    if (tank > 0.05) {
+      var lv = -3.16 - 0.86 * Math.min(1, tank / 0.82);
+      ctx.save(); SH.rr(ctx, -3.75, -4.02, 3.05, 0.86, 0.08); ctx.clip();
+      for (i = 0; i < 22; i++) { var fx = -3.65 + 2.85 * hash(i, 1), fy = lerp(lv + 0.06, -3.2, hash(i, 2)); SH.Ln(ctx, fx, fy, fx + 0.07, fy - 0.03, SEED[1], 0.035); }
+      ctx.restore();
+    }
+    // header: back wall and the cross auger in its trough
+    SH.R(ctx, 2.4, -1.7, 0.4, 1.6, 0.05, "#8F9AAA");
+    SH.P(ctx, [2.4, -0.34, 3.7, -0.3, 3.7, -0.1, 2.4, -0.1], "#AEB8C5");
+    SH.C(ctx, 3.08, -0.58, 0.31, "#C9D1DB");
+    ctx.save(); ctx.beginPath(); ctx.arc(3.08, -0.58, 0.3, 0, TAU); ctx.clip();
+    for (i = -3; i < 4; i++) { var ox = ((reel * 0.6) % 0.3) + i * 0.3; SH.Ln(ctx, 3.08 + ox - 0.2, -0.88, 3.08 + ox + 0.1, -0.28, "#7C8696", 0.05); }
+    ctx.restore();
+    // the long pans: a far one (darker, a little higher) and the near one, each with a pointed yellow snout
+    function pan(dx, dy, col, snout) {
+      SH.P(ctx, [2.75 + dx, -0.95 + dy, 5.25 + dx, -0.62 + dy, 5.25 + dx, -0.4 + dy, 2.75 + dx, -0.36 + dy], col);
+      SH.P(ctx, [5.2 + dx, -0.64 + dy, 5.95 + dx, -0.36 + dy, 5.2 + dx, -0.4 + dy], snout);
+    }
+    pan(-0.25, -0.22, "#9AA5B4", "#D9A21E");
+    pan(0, 0, "#C9D1DB", "#F2B93A");
+    SH.Ln(ctx, 2.85, -0.8, 5.1, -0.54, "rgba(255,255,255,0.6)", 0.06);
+    // cutter knife where the pans meet the trough
+    for (i = 0; i < 4; i++) SH.P(ctx, [3.62 + i * 0.1, -0.36, 3.67 + i * 0.1, -0.24, 3.72 + i * 0.1, -0.36], "#E2E6EB", Farm.LW * 0.4);
+    // sunflower heads riding up the pans to the auger while it works
+    if (work) for (i = 0; i < 3; i++) {
+      var u = (reel * 0.32 + i / 3) % 1, hx = lerp(5.1, 3.3, u), hy = lerp(-0.66, -0.92, u) - 0.2;
+      ctx.save(); ctx.globalAlpha = u > 0.85 ? (1 - u) / 0.15 : 1; sunHead(ctx, hx, hy, 0.24, -0.4 + u * 1.2, 0.35); ctx.restore();
+    }
+    // the deflector over the back of the pans (a curved sheet on two arms)
+    SH.tube(ctx, 2.62, -1.62, 3.5, -1.58, 0.07, "#8F9AAA");
+    ctx.beginPath(); ctx.moveTo(3.2, -1.72); ctx.quadraticCurveTo(3.9, -1.7, 4.2, -1.25); ctx.lineTo(4.05, -1.18); ctx.quadraticCurveTo(3.8, -1.55, 3.2, -1.55); ctx.closePath(); SH.fs(ctx, "#F2B93A", Farm.LW * 0.8);
+  }
+  // A ripe sunflower head seen from the side: brown back, a dark seed face and a few yellow petals left.
+  // (x, y) its centre, r its radius, a its tilt (0 = face to the right), petals 0..1 how many are left.
+  function sunHead(ctx, x, y, r, a, petals, lw) {
+    var SH = Farm.shape, i;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    for (i = 0; i < 9; i++) {
+      if (hash(i, 7) > petals + 0.15) continue;
+      var pa = -1.6 + i * 0.4;
+      ctx.beginPath(); ctx.moveTo(r * 0.2, Math.sin(pa) * r * 0.85); ctx.lineTo(r * (0.85 + 0.3 * hash(i, 2)), Math.sin(pa) * r * 1.3); ctx.lineTo(r * 0.2, Math.sin(pa + 0.3) * r * 0.85); ctx.closePath();
+      SH.fs(ctx, "#FFC93C", lw === undefined ? Farm.LW * 0.6 : lw * 0.6);
+    }
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.62, r, 0, 0, TAU); SH.fs(ctx, "#A97F45", lw);
+    ctx.beginPath(); ctx.ellipse(r * 0.28, 0, r * 0.3, r * 0.9, 0, 0, TAU); SH.fs(ctx, "#4A3424", 0);
+    ctx.beginPath(); ctx.ellipse(-r * 0.12, -r * 0.1, r * 0.22, r * 0.5, 0, 0, TAU); ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fill();
+    ctx.restore();
+  }
+  // The seed heap in the trailer gets its white stripes (same shape as farm.js's trailer heap).
+  function seedFlecks(ctx, load, tip) {
+    load = clamp(load || 0, 0, 1.2); if (load < 0.02) return;
+    var SH = Farm.shape, hh = 0.12 + load * 0.55;
+    ctx.save(); ctx.translate(-7.6, -0.9); ctx.rotate(-clamp(tip || 0, 0, 1) * 0.62); ctx.translate(7.6, 0.9);
+    for (var i = 0; i < 26; i++) {
+      var f = hash(i, 11), x = lerp(-7.3, -1.7, f), top = -2.6 - hh * Math.pow(Math.sin(lerp(0.03, 0.97, f) * Math.PI), 0.6);
+      var y = lerp(top + 0.05, -2.64, hash(i, 12) * 0.8);
+      SH.Ln(ctx, x, y, x + 0.09, y - 0.04, SEED[1], 0.045);
+    }
+    ctx.restore();
+  }
+
+  // The sunflower field, painted row by row like farm.js's field (the standing crop: tall stalks with heavy,
+  // drooping heads; stubble: short stalks left standing). Stages: "golden" (ripe), "grow" (P.g 0..1: green,
+  // then bright yellow flowers facing the sun, then drooping and brown), "stubble".
+  function eachX(row, sp, minPx, xa, xb, fn) {
+    var rg = sc.xRange(row.rc), a = rg[2], b = rg[3];
+    while (a * sp < minPx) sp *= 2;
+    var lo = Math.max(rg[0], xa - sp), hi = Math.min(rg[1], xb + sp);
+    for (var j = Math.floor(lo / sp); j <= Math.ceil(hi / sp); j++) { var x = (j + hash(j, row.i) * 0.6) * sp; fn(x, a * x + b, j); }
+  }
+  function band(row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
+  function sunRow(row, stage, P, xa, xb, near) {
+    var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1, t = P.time || 0, lw = Math.max(1, Math.min(sc.lw * 0.6, s * 0.03));
+    if (stage === "stubble") {
+      band(row, odd ? "#8F7550" : "#876D49");
+      if (s * 0.04 > 0.5) {
+        var sh = s * 0.5 * (near ? 0.6 : 1);
+        ctx.strokeStyle = "#C9AE74"; ctx.lineWidth = Math.max(1.2, s * 0.04); ctx.lineCap = "round"; ctx.beginPath();
+        eachX(row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.moveTo(sx, row.yc); ctx.lineTo(sx, row.yc - hh); });
+        ctx.stroke();
+        if (s * 0.04 > 1) { ctx.fillStyle = "#EEDCA8"; eachX(row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.fillRect(sx - s * 0.025, row.yc - hh - s * 0.012, s * 0.05, Math.max(1, s * 0.025)); }); }
+      }
+      return;
+    }
+    var g = stage === "golden" ? 1 : clamp(P.g || 0, 0, 1);
+    if (g < 0.08) {
+      band(row, odd ? "#8D5A36" : "#84532F");
+      if (g > 0.03 && row.fine) { ctx.fillStyle = "#6DBA45"; eachX(row, 0.5, 5, xa, xb, function (x, sx) { ctx.fillRect(sx - 1, row.yc - s * 0.05, Math.max(2, s * 0.04), Math.max(1.5, s * 0.05)); }); }
+      return;
+    }
+    var ripe = clamp((g - 0.78) / 0.22, 0, 1), bloom = clamp((g - 0.45) / 0.15, 0, 1);
+    var h = lerp(0.1, SUN_H, clamp((g - 0.08) / 0.5, 0, 1)), hp = Math.min(h, near ? 0.65 : 9) * s;
+    var leaf = U.mix("#4FA83A", "#8E9A44", ripe), dk = U.mix("#2F7A25", "#5F6B2C", ripe), stalk = U.mix("#5DAA45", "#B3AA66", ripe);
+    var headCol = U.mix("#FFC93C", "#A97F45", ripe);
+    band(row, dk);
+    // the leafy canopy: a wall of leaves up to about three quarters of the plants' height
+    var cTop = near ? hp : hp * 0.7, step = Math.max(4, Math.min(12, s * 0.3)), off = sc.cam * sc.k / row.rc;
+    ctx.beginPath(); ctx.moveTo(-5, row.y0 + 0.5);
+    for (var x0 = -5; x0 <= sc.W + step; x0 += step) { var q0 = Math.floor((x0 + off) / step); ctx.lineTo(x0, row.yc - cTop * (0.86 + 0.22 * hash(q0, row.i))); }
+    ctx.lineTo(sc.W + step, row.y0 + 0.5); ctx.closePath();
+    ctx.fillStyle = odd ? leaf : U.mix(leaf, dk, 0.3); ctx.fill();
+    if (cTop > 6) { ctx.lineWidth = Math.max(1, Math.min(sc.lw * 0.6, s * 0.03)); ctx.strokeStyle = dk; ctx.stroke(); }
+    if (near || bloom <= 0) return;
+    var hr = s * lerp(0.1, 0.27, bloom);
+    if (!row.fine || hr < 3.2) {
+      // far rows: the heads as dots along the top
+      if (hr < 0.9) return;
+      ctx.fillStyle = headCol;
+      eachX(row, 0.6, Math.max(4, hr * 4), xa, xb, function (x, sx, j) { ctx.beginPath(); ctx.arc(sx, row.yc - hp * (0.9 + 0.1 * hash(j, 3)), Math.max(1, hr * 0.6), 0, TAU); ctx.fill(); });
+      return;
+    }
+    var lwH = Math.max(0.8, Math.min(sc.lw * 0.5, hr * 0.1));
+    eachX(row, 0.7, Math.max(8, hr * 2.1), xa, xb, function (x, sx, j) {
+      var sw = Math.sin(t * 1.2 + x * 0.5 + row.i) * s * 0.02, top = row.yc - hp * (0.94 + 0.1 * hash(j, row.i + 2)), tx = sx + sw;
+      // the top of the stalk above the leaves (it bends over when the head is ripe and heavy)
+      ctx.beginPath(); ctx.moveTo(sx, row.yc - cTop * 0.8); ctx.quadraticCurveTo(sx, top + hp * 0.1, tx + ripe * hr * 0.6, top);
+      var sw2 = Math.max(1.5, s * 0.045);
+      if (sw2 > 2.5) { ctx.strokeStyle = INK; ctx.lineWidth = sw2 + lwH * 2; ctx.stroke(); }
+      ctx.strokeStyle = stalk; ctx.lineWidth = sw2; ctx.stroke();
+      if (ripe < 0.5) {
+        // in flower: a bright yellow face turned to the sun
+        var pr = hr * (1 + 0.1 * hash(j, 6));
+        ctx.save(); ctx.translate(tx, top - pr * 0.5);
+        ctx.fillStyle = "#FFC93C"; ctx.beginPath();
+        for (var k = 0; k < 12; k++) { var a = k * TAU / 12; ctx.moveTo(Math.cos(a) * pr * 0.45, Math.sin(a) * pr * 0.45); ctx.ellipse(Math.cos(a) * pr * 0.72, Math.sin(a) * pr * 0.72, pr * 0.3, pr * 0.14, a, 0, TAU); }
+        ctx.fill(); if (pr > 5) { ctx.lineWidth = lwH; ctx.strokeStyle = "#C98A12"; ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(0, 0, pr * 0.48, 0, TAU); ctx.fillStyle = "#5A3A22"; ctx.fill(); if (pr > 5) { ctx.lineWidth = lwH; ctx.strokeStyle = INK; ctx.stroke(); }
+        ctx.restore();
+      } else {
+        // ripe: the heavy head hangs down, brown at the back, a few yellow petals left
+        var r2 = hr * (0.95 + 0.15 * hash(j, 6));
+        Farm.inUnits(ctx, tx + ripe * hr * 0.8, top + r2 * 0.75, 1, 1, function () { sunHead(ctx, 0, 0, r2, 1.25 - 0.25 * hash(j, 8), 0.75 * (1 - ripe) + 0.3 + 0.35 * hash(j, 9), lwH); });
+      }
+    });
+  }
+  function sunField(part, P) {
+    var rows = part === "near" ? sc.rowsNear : sc.rowsFar, w = P.wipe, near = part === "near";
+    function run(stage, xa, xb) {
+      if (xb - xa < 0.01) return;
+      ctx.save(); sc.clipX(ctx, xa, xb);
+      for (var i = 0; i < rows.length; i++) sunRow(rows[i], stage, P, xa, xb, near);
+      ctx.restore();
+    }
+    if (!w) run(P.stage, 0, L);
+    else if (w.dir > 0) { run(w.to, 0, clamp(w.bx, 0, L)); run(P.stage, clamp(w.bx, 0, L), L); }
+    else { run(P.stage, 0, clamp(w.bx, 0, L)); run(w.to, clamp(w.bx, 0, L), L); }
+    if (part === "far") {
+      ctx.save(); ctx.strokeStyle = "rgba(61,90,40,0.55)"; ctx.lineWidth = Math.max(1.5, sc.lw);
+      [0, L].forEach(function (x) { ctx.beginPath(); ctx.moveTo(sc.X(x, sc.rH), sc.Y(sc.rH)); ctx.lineTo(sc.X(x, 1), sc.gY); ctx.lineTo(sc.X(x, sc.rN), sc.Y(sc.rN)); ctx.stroke(); });
+      ctx.restore();
+    }
+  }
+
+  // Surprise: a flock of goldfinches lands on the sunflower heads to eat the seeds and flies off when the
+  // combine comes close (or after a little while).
+  function standing(x) { if (crop.stage === "stubble") return false; if (!crop.wipe) return x > 0.3 && x < L - 0.3; return crop.wipe.dir > 0 ? x > crop.wipe.bx + 0.5 && x < L - 0.3 : x < crop.wipe.bx - 0.5 && x > 0.3; }
+  function finches() {
+    var list = [], view0 = sc.wx(W * 0.08, 1.1), view1 = sc.wx(W * 0.92, 1.1), spots = [];
+    var heads = crop.stage === "golden" || crop.stage === "grow" && crop.g >= 0.8, mid = cb.x - cb.dir * 0.8;
+    for (var i = 0; i < 40 && spots.length < 7; i++) {
+      var x = lerp(view0, view1, hash(i + surpriseN * 13, 5)), r = 1.06 + 0.22 * hash(i, 6);
+      if (Math.abs(x - mid) < 7.5) continue;                       // not on or next to the combine
+      if (heads && !standing(x)) continue;                         // on a sunflower head while there are some
+      spots.push({ x: x, r: r, ok: heads });
+    }
+    if (!spots.length) spots.push({ x: mid + (mid < L / 2 ? 9 : -9), r: 1.1, ok: heads && standing(mid + (mid < L / 2 ? 9 : -9)) });
+    spots.forEach(function (sp, k) {
+      var onHead = sp.ok;
+      list.push({ x: sp.x - 9 - k * 0.8, h: 7 + k * 0.4, r: sp.r, tx: sp.x, th: onHead ? SUN_H + 0.15 : 0.05, x0: sp.x - 9 - k * 0.8, h0: 7 + k * 0.4, st: "in", t: -k * 0.12, ph: k * 0.3, flip: false });
+    });
+    birds = { list: list, t: 0 };
+    coach.say("Goldfinches come for the seeds!", 4);
+  }
+  function updateBirds(dt) {
+    birds.t += dt;
+    var cx = cutX(), live = 0;
+    birds.list.forEach(function (b) {
+      b.t += dt; b.ph += dt * (b.st === "sit" ? 2 : 14);
+      if (b.st === "in") {
+        var f = clamp(b.t / 1.8, 0, 1), e = ease(f);
+        b.x = lerp(b.x0, b.tx, e); b.h = lerp(b.h0, b.th, e) + Math.sin(f * Math.PI) * 1.2;
+        if (f >= 1) { b.st = "sit"; b.t = 0; }
+      } else if (b.st === "sit") {
+        var near = Math.abs(cb.x + cb.dir * 2 - b.x) < 5.5 || Math.abs(cx - b.x) < 3.5;
+        if (near || b.t > 9 + hash(b.tx, 3) * 2 || (b.th > 1 && !standing(b.x))) { b.st = "off"; b.t = 0; b.vx = (b.x < cx ? -1 : 1) * (5 + hash(b.tx, 4) * 3); b.vh = 4 + hash(b.tx, 5) * 2; b.flip = b.vx < 0; if (near) snd.tick(); }
+      } else if (b.st === "off") {
+        b.x += b.vx * dt; b.h += b.vh * dt; b.vh += dt * 1.5;
+        if (b.t > 3) b.st = "gone";
+      }
+      if (b.st !== "gone") live++;
+    });
+    if (!live) birds = null;
+  }
+  function drawBirds(flying) {
+    birds.list.forEach(function (b) {
+      if (b.st === "gone" || b.t < 0 && b.st === "in") return;
+      if ((b.st === "sit") === flying) return;
+      var s = Math.max(sc.S(b.r) * 0.9, 20), x = sc.X(b.x, b.r), y = sc.Y(b.r) - b.h * sc.S(b.r);
+      finch(ctx, x, y, s, b.ph, b.st !== "sit", b.st === "in" ? b.tx < b.x : b.flip);
+    });
+  }
+  // A goldfinch (yellow, black cap and wings with a white bar), in screen px: s = its length.
+  function finch(c, x, y, s, ph, fly, flip) {
+    c.save(); c.translate(x, y); c.scale(flip ? -s : s, s);
+    var lw = Math.max(1, sc.lw * 0.5) / s, peck = fly ? 0 : Math.max(0, Math.sin(ph * 1.3)) * 0.12;
+    c.lineWidth = lw; c.strokeStyle = INK; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(-0.38, -0.22); c.lineTo(-0.68, -0.32); c.lineTo(-0.64, -0.14); c.closePath(); c.fillStyle = "#1D2340"; c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(-0.05, -0.25, 0.38, 0.22, -0.15, 0, TAU); c.fillStyle = "#FFD23A"; c.fill(); c.stroke();
+    c.save(); c.translate(0.28, -0.42 + peck); c.rotate(peck * 2);
+    c.beginPath(); c.arc(0, 0, 0.17, 0, TAU); c.fillStyle = "#FFD23A"; c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, -0.02, 0.17, Math.PI * 1.05, Math.PI * 1.9); c.closePath(); c.fillStyle = "#1D2340"; c.fill();
+    c.beginPath(); c.moveTo(0.15, -0.04); c.lineTo(0.3, 0.02); c.lineTo(0.14, 0.06); c.closePath(); c.fillStyle = "#F2A0A0"; c.fill(); c.stroke();
+    c.beginPath(); c.arc(0.06, -0.01, 0.035, 0, TAU); c.fillStyle = "#1D2340"; c.fill();
+    c.restore();
+    var flap = fly ? Math.sin(ph) : 0;
+    c.beginPath(); c.moveTo(-0.22, -0.3); c.quadraticCurveTo(0.0, -0.3 - flap * 0.45 - 0.1, 0.12, -0.3 - flap * 0.5); c.quadraticCurveTo(0.02, -0.18, -0.26, -0.18); c.closePath(); c.fillStyle = "#1D2340"; c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-0.16, -0.24 - flap * 0.15); c.lineTo(0.02, -0.26 - flap * 0.28); c.strokeStyle = "#FFFFFF"; c.lineWidth = lw * 1.4; c.stroke();
+    if (!fly) { c.strokeStyle = INK; c.lineWidth = lw; c.beginPath(); c.moveTo(-0.05, -0.05); c.lineTo(-0.08, 0.02); c.moveTo(0.06, -0.05); c.lineTo(0.06, 0.02); c.stroke(); }
+    c.restore();
+  }
+
+  // ---------- Pictures for the sunflower job (drawn with the scene's own code) ----------
+  function pic(id) {
+    if (picCache[id] !== undefined) return picCache[id];
+    var c = document.createElement("canvas"), PW = 168, PH = 120, x, s;
+    c.width = PW; c.height = PH;
+    try { x = c.getContext("2d"); } catch (e) { x = null; }
+    if (!x) return (picCache[id] = "");
+    if (id === "combineSun") { s = Math.min(PW * 0.94 / 12.4, PH * 0.9 / 5.0); Farm.inUnits(x, PW / 2 + 0.3 * s, PH * 0.94, s, 3.4, function () { combineSun(x, { tank: 0.9, time: 0 }, false); }); }
+    else if (id === "seedtrailer") { s = Math.min(PW * 0.94 / 8.2, PH * 0.9 / 3.6); Farm.inUnits(x, PW / 2 + 3.9 * s, PH * 0.94 - 0.5 * s, s, 3.4, function () { D.trailer(x, { load: 1, crop: "seed" }); seedFlecks(x, 1, 0); }); }
+    else if (id === "sunflower") {
+      Farm.inUnits(x, PW / 2, PH, 1, 3, function () {
+        var SH = Farm.shape;
+        SH.Ln(x, 0, 0, 0, -60, INK, 10); SH.Ln(x, 0, 0, 0, -60, "#5DAA45", 6);
+        [[-1, -30], [1, -18]].forEach(function (l) { x.beginPath(); x.moveTo(0, l[1]); x.quadraticCurveTo(l[0] * 22, l[1] - 18, l[0] * 34, l[1] + 2); x.quadraticCurveTo(l[0] * 16, l[1] + 2, 0, l[1] + 6); x.closePath(); SH.fs(x, "#4FA83A", 3); });
+        x.save(); x.translate(0, -76);
+        for (var k = 0; k < 14; k++) { var a = k * TAU / 14; x.beginPath(); x.ellipse(Math.cos(a) * 26, Math.sin(a) * 26, 13, 6.5, a, 0, TAU); SH.fs(x, "#FFC93C", 2.5); }
+        SH.C(x, 0, 0, 19, "#5A3A22", 3);
+        for (k = 0; k < 10; k++) SH.C(x, (hash(k, 1) - 0.5) * 24, (hash(k, 2) - 0.5) * 24, 1.8, "#2E1E12", 0);
+        x.restore();
+      });
+    }
+    var url = "";
+    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
+    return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
+  }
+
   // ---------- Loop ----------
   var last = 0;
   function loop(ts) {
@@ -548,8 +897,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ---------- Start ----------
   resize();
   cb.dir = 1; cb.face = 1; cb.x = startX(1);
+  showSteps();
   sc.follow(camTarget(), 0, true);
-  if (Farm.world.get().wheat === "golden") ready(); else grow(false);
+  if (worldCrop() === "golden") ready(); else grow(false);
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
   else window.addEventListener("resize", resize);
 
@@ -574,7 +924,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, step: steps.current(), finished: steps.finished(), tank: cb.tank, x: cb.x, dir: cb.dir, trailer: tr.state, tx: tr.x, tv: tr.v, cam: sc.cam, load: tr.load, loads: loads, coach: coach.text(), crop: crop.stage }; },
+    surprise: surprise,
+    job: function (id) { if (id) switchJob(id); return job; },
+    state: function () { return { job: job, birds: birds ? birds.list.map(function (b) { return b.st; }).join(",") : "", phase: phase, step: steps.current(), finished: steps.finished(), tank: cb.tank, x: cb.x, dir: cb.dir, trailer: tr.state, tx: tr.x, tv: tr.v, cam: sc.cam, load: tr.load, loads: loads, coach: coach.text(), crop: crop.stage }; },
     screen: function (id) { var b = cv.getBoundingClientRect(), p = id === "trailer" ? trPart() : cbPart(); return { x: b.left + p.x, y: b.top + p.y }; },
     ghost: function () { return ghost.show(); }
   };
