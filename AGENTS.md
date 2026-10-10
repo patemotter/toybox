@@ -242,6 +242,15 @@ Keep only:
   "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out
   the stones."), never filler ("Out it pops!"). Step chips under or beside Go may be one short word. Read every
   label aloud before shipping.
+- **Literal, complete instructions** (the dad, 2026-10-10: "not clear in an autistic processing way. 'Drive to the
+  grain store' drive what to the grain store?"): every instruction names who does what to what, one action, no
+  pronouns or implied subject/object ("Drive the tractor to the grain barn.", "Tap the lever to drop the combine's
+  header."). Show status on the scene rather than in words where possible.
+- **Few labels, and they look different from instructions** (the dad: "not everything needs to be explicitly labeled";
+  the same oval bubble and font for instructions and info is confusing): no name tags shown by themselves; a part's
+  name appears briefly when he taps it, as a small plain label, never in the coach pill's style.
+- **Choices only where they matter to him** (the dad: in a scene like Combine Time the crop matters, wheels/tracks and
+  trailer type don't). When a choice is offered it must be obvious that it's "pick one of these".
 - **The whole machine stays on screen** (the dad keeps seeing machines cut off): at every size and every moment, the
   machine he is working (tractor plus implement, forklift, combine...) and the thing it works on are fully visible
   with a margin. Zoom out or reframe rather than crop; a smaller whole machine beats a big cut-off one.
