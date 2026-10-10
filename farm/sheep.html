@@ -292,6 +292,8 @@ body.big #jobs { display: none; }
     // the coach pill sits at the bottom of the stage on phones: keep the work above it
     var phone = W < 700;
     VC.bot = phone ? 0.76 : 0.93; VW.bot = split ? 0.95 : (phone ? 0.8 : 0.93);
+    // upright phone: look down on the hill a little more, so the flock's spread fills the view's height
+    VW.T = split && phone ? 1.45 : 0.85;
     follow(0, true);
   }
   function views() { return split ? [VW, VC] : [VW]; }
@@ -899,7 +901,18 @@ body.big #jobs { display: none; }
 
   // ---------- Cameras ----------
   function wideBox() {
-    if (job === "gather") return { xa: -9.6, xb: 7.8, za: -1.7, zb: 9.0 };
+    if (job === "gather") {
+      // on an upright phone the wide view frames the flock, the dog and the pen (following them), not the whole
+      // hill: the sheep stay a good size and there's no empty grass in front
+      if (split && W < 700 && flock.length && dog) {
+        var xa = PEN.x0, xb = PEN.x1, za = PEN.z0, zb = PEN.z1;
+        flock.concat([dog]).forEach(function (q) { xa = Math.min(xa, q.x); xb = Math.max(xb, q.x); za = Math.min(za, q.z); zb = Math.max(zb, q.z); });
+        xa -= 1.0; xb += 0.5; za -= 0.8; zb += 0.6;
+        if (xb - xa < 8) { var m = (xa + xb) / 2; xa = m - 4; xb = m + 4; }
+        return { xa: xa, xb: xb, za: za, zb: zb };
+      }
+      return { xa: -9.6, xb: 7.8, za: -1.7, zb: 9.0 };
+    }
     if (stepId === "out" || (phase === "done")) return { xa: -1.5, xb: 14.2, za: -1.7, zb: 7.4 };
     return { xa: -10.8, xb: 6.7, za: -1.7, zb: 4.2 };
   }

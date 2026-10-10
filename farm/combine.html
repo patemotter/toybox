@@ -103,7 +103,10 @@ body.big #jobs { display: none; }
   var SUN_H = 1.8;
 
   var L = 24, STORE_X = L + 20, VMAX = 5.6;
-  var sc = new Farm.Scene({ L: L, span: 11.6, spanPort: 12.6, mh: 4.7, xmin: -15, xmax: STORE_X + 9, rowDz: 0.5 });
+  // zoom.f < 1 zooms out when what must be in view (the trailer tipping at the store) is wider than the screen
+  var zoom = { f: 1, want: 1 };
+  var sc = new Farm.Scene({ L: L, span: 11.6, spanPort: 12.6, mh: 4.7, xmin: -15, xmax: STORE_X + 13, rowDz: 0.5,
+    fit: function (w, h) { var port = h > w * 1.05, short = !port && h < 460; return zoom.f * Math.min(port ? w * 0.95 / 12.6 : w * 0.84 / 11.6, h * (port ? 0.28 : (short ? 0.37 : 0.32)) / 4.7); } });
   var parts = new Farm.Particles();
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
   var W = 300, H = 300, DPR = 1, time = 0;
@@ -356,17 +359,28 @@ body.big #jobs { display: none; }
     function hi(c) { var v = -1e9; for (var i = 0; i < pts.length; i++) v = Math.max(v, sxAt(pts[i][0], pts[i][1], c) + pts[i][2]); return v; }
     function solve(f, target) { var a = pref - 80, b = pref + 80; for (var i = 0; i < 36; i++) { var c = (a + b) / 2; if (f(c) > target) a = c; else b = c; } return (a + b) / 2; }
     var cMax = solve(lo, m), cMin = solve(hi, W - m);
+    // the zoom that makes these points fit with the margin (never closer than the usual view)
+    var span = hi(pref) - lo(pref);
+    zoom.want = span > 1 ? Math.min(1, zoom.f * (W - 2 * m) / span * 0.97) : 1;
     if (cMin <= cMax) { camLim = [cMin, cMax]; return clamp(pref, cMin, cMax); }
     var mid = solve(function (c) { return (lo(c) + hi(c)) / 2; }, W / 2);
     camLim = [mid, mid];
     return mid;
   }
-  function combinePts() { return [[cb.x - cb.dir * 6.75, 1, 0], [cb.x + cb.dir * (job === "sun" ? 6.0 : 4.9), 1, 0]]; }
-  function trailerPts() { var t = TS(); return [[tr.x, sc.TRACK, -7.85 * t], [tr.x, sc.TRACK, 5.0 * t]]; }
+  function combinePts() { return [[cb.x - cb.dir * 6.75, 1, 0], [cb.x + cb.dir * (job === "sun" ? 6.0 : 5.8), 1, 0]]; }
+  function trailerPts() { var t = TS(), tip = tr.state === "tip" || tr.state === "untip"; return [[tr.x, sc.TRACK, (tip ? -9.3 : -8.1) * t], [tr.x, sc.TRACK, 6.5 * t]]; }
   function camTarget() {
     var ts = tr.state;
     if (phase === "unload" && (ts === "tip" || ts === "untip" || ts === "off")) return frame([[STORE_X - 5.2, 1.02, 0], [STORE_X + 5.2, 1.02, 0]].concat(ts === "off" ? [] : trailerPts()), STORE_X);
-    if (phase === "unload" && ts === "go") return frame(trailerPts(), Math.min(STORE_X, trX(-4)));
+    if (phase === "unload" && ts === "go") {
+      // zoom out on the way, so the tipping trailer and the store already fit when it gets there
+      var keepX = tr.x, keepS = tr.state; tr.x = (sc.pit ? sc.pit.x : STORE_X - 2.6) + 7.7 * TS() * sc.TRACK / sc.k; tr.state = "tip";
+      frame([[STORE_X - 5.2, 1.02, 0], [STORE_X + 5.2, 1.02, 0]].concat(trailerPts()), STORE_X);
+      var zw = zoom.want; tr.x = keepX; tr.state = keepS;
+      var c0 = frame(trailerPts(), Math.min(STORE_X, trX(-4)));
+      if (Math.abs(tr.x - STORE_X) < 25) zoom.want = Math.min(zoom.want, zw);
+      return c0;
+    }
     if (phase === "unload" && ts === "in") return frame(combinePts(), (pivotX() + Math.max(tr.x - 5, pivotX() - 6)) / 2);
     if (phase === "unload") return frame(combinePts().concat(trailerPts()), pivotX());
     if (phase === "done") return frame(combinePts(), cb.x - cb.dir * 2.5);
@@ -430,7 +444,13 @@ body.big #jobs { display: none; }
     if (faceT > 0) faceT = Math.max(0, faceT - dt);
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     parts.update(dt);
-    sc.follow(camTarget(), dt);
+    var ct = camTarget();
+    if (Math.abs(zoom.want - zoom.f) > 0.002) {
+      // zoom out at once if something would be cut off, back in gently
+      zoom.f = zoom.want < zoom.f ? Math.max(zoom.want, zoom.f - dt * 0.9) : Math.min(zoom.want, zoom.f + dt * 0.25);
+      sc.layout(W, H); ct = camTarget();
+    }
+    sc.follow(ct, dt);
     // the easing never lets the machine slide off the edge (a moving combine pulls the camera along)
     if (camLim) { var cl = clamp(clamp(sc.cam, camLim[0], camLim[1]), sc.camMin, sc.camMax); sc.cam = phase === "drive" ? cl : sc.cam + (cl - sc.cam) * Math.min(1, dt * 8); }
     var lvl = phase === "drive" ? drive : (tr.state === "in" || tr.state === "go" || tr.state === "off" ? 0.6 : 0.15);
@@ -926,7 +946,7 @@ body.big #jobs { display: none; }
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
     surprise: surprise,
     job: function (id) { if (id) switchJob(id); return job; },
-    state: function () { return { job: job, birds: birds ? birds.list.map(function (b) { return b.st; }).join(",") : "", phase: phase, step: steps.current(), finished: steps.finished(), tank: cb.tank, x: cb.x, dir: cb.dir, trailer: tr.state, tx: tr.x, tv: tr.v, cam: sc.cam, load: tr.load, loads: loads, coach: coach.text(), crop: crop.stage }; },
+    state: function () { return { zoom: zoom.f, job: job, birds: birds ? birds.list.map(function (b) { return b.st; }).join(",") : "", phase: phase, step: steps.current(), finished: steps.finished(), tank: cb.tank, x: cb.x, dir: cb.dir, trailer: tr.state, tx: tr.x, tv: tr.v, cam: sc.cam, load: tr.load, loads: loads, coach: coach.text(), crop: crop.stage }; },
     screen: function (id) { var b = cv.getBoundingClientRect(), p = id === "trailer" ? trPart() : cbPart(); return { x: b.left + p.x, y: b.top + p.y }; },
     ghost: function () { return ghost.show(); }
   };

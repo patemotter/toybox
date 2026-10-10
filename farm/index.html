@@ -37,17 +37,20 @@ body {
   -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
 }
 .tb-head a { text-decoration: none; }
-.stage { background: #A9DCFF; touch-action: none; }
+.stage { background: #8CC95E; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
-.loads { font-variant-numeric: tabular-nums; }
-.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
 body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
-body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+body.ending .homebtn, body.ending .tb-place { pointer-events: none; }
+body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-.tb-place-label { font-size: 1.1rem; }
-@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+/* Map labels (Toybox.map) at the front of each lot; smaller when the lots are small (phones). */
+.tb-place-label { bottom: 4px; }
+.stage.lbl-s .tb-place-label { bottom: 3px; font-size: 15px; gap: 4px; padding: 1px 10px 1px 4px; }
+.stage.lbl-s .tb-place-label .tb-pic { width: 32px; height: 24px; }
+.stage.lbl-xs .tb-place-label { padding: 1px 10px; }
+.stage.lbl-xs .tb-place-label .tb-pic { display: none; }
+.tb-place-label .tb-pic { width: 42px; height: 30px; }
 </style>
 </head>
 <body>
@@ -59,7 +62,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="The farm: a wheat field with a combine harvester and the grain store, and a potato field with a tractor and the potato store."></canvas>
+      <canvas id="cv" role="img" aria-label="The farm: a field for each farm job, with its machine at work."></canvas>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
   </div>
@@ -68,99 +71,368 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 <script>
 (function () {
   "use strict";
+  // The farm map: one lot (a little field seen from its edge) per station, each with its machine at work and
+  // the station's episode name (Farm.NAMES). The whole lot is the tap target (Toybox.map). The lots fill the
+  // stage in a grid picked from the stage's shape (2 x 6 on an upright phone, 4 x 3 sideways...), so the map
+  // always fits one screen.
+  // ADDING A STATION: one entry in STATIONS (its page, the ground colours and a scene drawn in metres). An entry
+  // with ready: false is kept but has no lot until the coordinator sets ready: true.
   var $ = function (id) { return document.getElementById(id); };
-  var D = Farm.draw, U = Farm.u;
+  var D = Farm.draw, U = Farm.u, SH = Farm.shape, INK = U.INK, TAU = Math.PI * 2;
+  var P = SH.P, R = SH.R, C = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
-  var W = 300, H = 300, DPR = 1, time = 0, dusk = 0, ending = false;
-  // Two fields drawn as one landscape: the wheat field at the back (with the grain store), the potato field in
-  // front (with the potato store). Each is a whole place to tap (Toybox.map), read live from farm-world-v1.
-  function viewM() { return W < H ? 19 : 32; }
-  function fit(w) { return w / viewM(); }
-  var A = new Farm.Scene({ L: 10, fit: fit, xmin: -100, xmax: 100 });
-  var B = new Farm.Scene({ L: 10, fit: fit, xmin: -100, xmax: 100, rowDz: 0.9 });
-  var hA = 0, hB = 0, world = Farm.world.get(), V = 20, STX = 0, MX = 0;
+  var W = 300, H = 300, DPR = 1, time = 0, dusk = 0, ending = false, world = Farm.world.get();
   var NEXT = { soil: "bedformer", harvested: "bedformer", beds: "destoner", destoned: "planter", planted: "planter", grown: "harvester" };
+  var SHOW_ALL = /[?&]debug\b/.test(location.search) && /[?&]all\b/.test(location.search);
+
+  // ---------- Small drawings (metres, ground at y = 0, facing +x) ----------
+  function wheel(x, y, r, col) {
+    C(ctx, x, y, r, "#33363F"); C(ctx, x, y, r * 0.58, col || "#C3CCD6"); C(ctx, x, y, r * 0.2, "#8C97A6", Farm.LW * 0.6);
+  }
+  function tractorWith(fn, trailed, st) {
+    // fn draws the implement at the tractor's drawbar eye (trailed) or lower hitch (mounted)
+    ctx.save(); ctx.translate(trailed ? Farm.DRAWBAR[0] : Farm.HITCH[0], trailed ? Farm.DRAWBAR[1] : Farm.HITCH[1]); fn(); ctx.restore();
+    D.tractor(ctx, Object.assign({ time: time, hitch: trailed ? null : { lift: 0.6 }, drawbar: !!trailed }, st || {}));
+  }
+  function roundBale(x, r, col, wrap) {
+    C(ctx, x, -r, r, wrap || col);
+    if (!wrap) { ctx.beginPath(); ctx.arc(x, -r, r * 0.62, 0.4, 5.6); ctx.moveTo(x + r * 0.3, -r); ctx.arc(x, -r, r * 0.3, 0, 5); ctx.strokeStyle = "#C79A35"; ctx.lineWidth = Farm.LW * 0.8; ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(x - r * 0.25, -r * 1.25, r * 0.35, 3.6, 5.2); ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = r * 0.14; ctx.stroke(); }
+  }
+  function crate(x, w, h, fill) {
+    // a wooden crate standing at y = 0 with its contents heaped on top
+    var y = -h;
+    if (fill) fill(x, y, w);
+    R(ctx, x, y, w, h, 0.05, "#D59A5B");
+    for (var i = 1; i < 3; i++) Ln(ctx, x + 0.06, y + h * i / 3, x + w - 0.06, y + h * i / 3, "#A86F38", 0.05);
+  }
+  function carrotsOn(x, y, w) {
+    for (var i = 0; i < 6; i++) {
+      var cx = x + 0.12 + (w - 0.24) * i / 5, a = -0.5 + U.hash(i, 3);
+      ctx.save(); ctx.translate(cx, y + 0.05); ctx.rotate(a);
+      P(ctx, [-0.09, 0, 0.09, 0, 0, 0.5], "#F28A26", Farm.LW * 0.6);
+      Ln(ctx, 0, 0, -0.08, -0.2, "#4FA83A", 0.06); Ln(ctx, 0, 0, 0.08, -0.22, "#4FA83A", 0.06);
+      ctx.restore();
+    }
+  }
+  function berriesOn(x, y, w) {
+    for (var i = 0; i < 9; i++) C(ctx, x + 0.12 + (w - 0.24) * (i % 5) / 4 + (i > 4 ? 0.12 : 0), y - 0.04 - (i > 4 ? 0.12 : 0), 0.1, i % 3 ? "#3B2350" : "#5A3778", Farm.LW * 0.5);
+  }
+  function bush(x, w, h, seed) {
+    ctx.beginPath();
+    var n = Math.max(3, Math.round(w / 0.7));
+    ctx.moveTo(x, 0);
+    for (var i = 0; i <= n; i++) { var bx = x + w * i / n; ctx.arc(bx, -h * (0.7 + 0.25 * U.hash(i, seed)), h * 0.35, Math.PI, 0); }
+    ctx.lineTo(x + w, 0); ctx.closePath(); fs(ctx, "#4E9A3C");
+    for (i = 0; i < n * 4; i++) C(ctx, x + 0.2 + (w - 0.4) * U.hash(i, seed + 1), -h * (0.25 + 0.6 * U.hash(i, seed + 2)), 0.09, "#3B2350", 0);
+  }
+  function spruce(x, h, seed) {
+    R(ctx, x - h * 0.04, -h * 0.25, h * 0.08, h * 0.25, 0.02, "#7A5236");
+    var col = seed > 0.5 ? "#2F7A45" : "#38875A";
+    for (var k = 0; k < 3; k++) {
+      var y0 = -h * (0.15 + k * 0.27), hw = h * (0.3 - k * 0.07);
+      P(ctx, [x - hw, y0, x + hw, y0, x, y0 - h * 0.42], col);
+    }
+  }
+  function sheep(x, ph, flip) {
+    ctx.save(); ctx.translate(x, 0); if (flip) ctx.scale(-1, 1);
+    var bob = Math.max(0, Math.sin(ph)) * 0.08;
+    Ln(ctx, -0.35, -0.4, -0.35, 0, INK, 0.12); Ln(ctx, 0.35, -0.4, 0.35, 0, INK, 0.12);
+    ctx.beginPath();
+    for (var i = 0; i < 8; i++) { var a = i * TAU / 8; ctx.arc(Math.cos(a) * 0.48, -0.72 + Math.sin(a) * 0.3, 0.2, a - 1.6, a + 1.6); }
+    ctx.closePath(); fs(ctx, "#FFFFFF");
+    ctx.beginPath(); ctx.ellipse(0.62, -0.78 + bob, 0.2, 0.15, 0.5 + bob * 2, 0, TAU); fs(ctx, "#2A2D38");
+    C(ctx, 0.66, -0.83 + bob, 0.03, "#FFFFFF", 0);
+    ctx.restore();
+  }
+  function hen(x, ph, col) {
+    var peck = Math.max(0, Math.sin(ph)) * 0.12;
+    ctx.save(); ctx.translate(x, 0);
+    Ln(ctx, -0.06, -0.2, -0.08, 0, "#E8A93A", 0.05); Ln(ctx, 0.08, -0.2, 0.1, 0, "#E8A93A", 0.05);
+    ctx.beginPath(); ctx.ellipse(0, -0.38, 0.3, 0.22, 0, 0, TAU); fs(ctx, col);
+    P(ctx, [-0.25, -0.45, -0.42, -0.72, -0.18, -0.55], col, Farm.LW * 0.8);
+    C(ctx, 0.26, -0.62 + peck, 0.13, col);
+    P(ctx, [0.36, -0.64 + peck, 0.5, -0.6 + peck, 0.36, -0.56 + peck], "#F2B233", Farm.LW * 0.6);
+    P(ctx, [0.18, -0.74 + peck, 0.24, -0.84 + peck, 0.32, -0.74 + peck], "#E0473B", Farm.LW * 0.6);
+    C(ctx, 0.3, -0.65 + peck, 0.025, INK, 0);
+    ctx.restore();
+  }
+  function muckLumps(x0, x1, y, h, n, col) {
+    ctx.beginPath(); ctx.moveTo(x0, y);
+    for (var i = 0; i <= n; i++) { var f = i / n; ctx.lineTo(U.lerp(x0, x1, f), y - h * Math.pow(Math.sin(f * Math.PI), 0.5) - 0.08 * U.hash(i, 9)); }
+    ctx.lineTo(x1, y); ctx.closePath(); fs(ctx, col || "#6B4A2B", Farm.LW * 0.8);
+  }
+
+  // the round baler behind the tractor (tractor units: drawbar eye at Farm.DRAWBAR, ground at y = 0)
+  function BALER() {
+    ctx.save(); ctx.translate(Farm.DRAWBAR[0], 0);
+    tube(ctx, 0, -0.5, -0.9, -1.05, 0.14, "#7C8696");
+    P(ctx, [-0.8, -0.45, -1.3, -0.15, -1.25, 0, -0.75, -0.25], "#7C8696");
+    R(ctx, -4.0, -2.35, 3.0, 2.0, 0.85, "#D9473C");
+    Ln(ctx, -2.6, -2.25, -2.6, -0.5, "#A82E28", 0.07);
+    ctx.beginPath(); ctx.arc(-3.0, -1.35, 0.7, 0, TAU); ctx.strokeStyle = "#A82E28"; ctx.lineWidth = 0.07; ctx.stroke();
+    wheel(-2.2, -0.42, 0.42);
+    ctx.restore();
+  }
+
+  // ---------- The stations ----------
+  // x0, x1, h: the scene's extent in metres (it is fitted into the lot above the label); sky, ground: colours;
+  // rows: field-row colour (or null); scene(): draws it. tile(): the label picture (defaults to scene).
+  var STATIONS = [
+    { id: "spuds", href: "spuds.html", pic: [-10.2, 4.4, 3.9, function () { tractorWith(function () { D.harvester(ctx, { time: 0, wheel: 0, level: 1 }); }, true); }], ready: true, ground: "#8E5C3B", rows: "#7A4C2F", ext: function () {
+        var m = NEXT[world.spuds] || "bedformer", M = Farm.MACHINES[m];
+        return [(M.trailed ? Farm.DRAWBAR[0] : Farm.HITCH[0]) - M.len - 0.4, 4.4, M.trailed ? 3.9 : 3.3];
+      },
+      scene: function () {
+        var m = NEXT[world.spuds] || "bedformer", trl = Farm.MACHINES[m].trailed;
+        tractorWith(function () { D[m](ctx, { time: time, wheel: 0, level: 1, work: 0 }); }, trl);
+      } },
+    { id: "combine", href: "combine.html", pic: [-6.6, 5.5, 4.9], ready: true, ground: "#E8C258", rows: "#D2A53A", x0: -6.6, x1: 5.5, h: 4.9,
+      groundFn: function () { return world.wheat === "golden" ? ["#E8C258", "#D2A53A"] : ["#D9C38C", "#C2A86A"]; },
+      scene: function () { D.combine(ctx, { time: time, reel: time * 0.8, tank: 0.5, wheel: 0 }); } },
+    { id: "bales", href: "bales.html", pic: [-9.1, -2.2, 2.6, function () { roundBale(-8.2, 0.72, "#E8C766"); roundBale(-6.5, 0.72, null, "#3A3D46"); BALER(); }], ready: true, ground: "#D9C77E", rows: "#C2AE5E", x0: -9.4, x1: 4.4, h: 3.2,
+      scene: function () {
+        roundBale(-8.2, 0.72, "#E8C766"); roundBale(-6.5, 0.72, null, "#3A3D46");
+        tractorWith(function () { ctx.save(); ctx.translate(-Farm.DRAWBAR[0], -Farm.DRAWBAR[1]); BALER(); ctx.restore(); }, true);
+      } },
+    { id: "silage", href: "silage.html", pic: [-9.2, -1.3, 3.8], ready: true, ground: "#7EBF4D", rows: "#62A23A", x0: -9.4, x1: 4.4, h: 3.8,
+      scene: function () { tractorWith(function () { D.trailer(ctx, { load: 1, crop: "grass", wheel: 0 }); }, true); } },
+    { id: "carrots", href: "carrots.html", pic: [-1.0, 1.0, 1.4, function () { crate(-0.85, 1.7, 1.0, carrotsOn); }], ready: true, ground: "#9A6640", rows: "#7C4E2E", x0: -7.6, x1: 4.4, h: 3.3,
+      scene: function () {
+        for (var i = 0; i < 7; i++) { var x = -7.2 + i * 1.6; Ln(ctx, x, 0, x - 0.2, -0.45, "#4FA83A", 0.12); Ln(ctx, x, 0, x + 0.2, -0.5, "#5DB847", 0.12); }
+        tractorWith(function () {
+          tube(ctx, 0, 0, -1.2, -0.5, 0.14, "#7C8696");
+          ctx.save(); ctx.translate(0, 0.5);
+          R(ctx, -7.2, -1.1, 6.0, 0.22, 0.04, "#3A3F4E");
+          wheel(-4.6, -0.45, 0.45); wheel(-3.6, -0.45, 0.45);
+          ctx.save(); ctx.translate(0, -1.1);
+          crate(-7.0, 1.7, 1.0, carrotsOn); crate(-5.1, 1.7, 1.0, carrotsOn); crate(-3.2, 1.7, 1.0, carrotsOn);
+          ctx.restore(); ctx.restore();
+        }, true);
+      } },
+    { id: "muck", href: "muck.html", pic: [-10.2, -1.4, 3.3], ready: true, ground: "#74B048", rows: "#5E9838", x0: -10.2, x1: 4.4, h: 3.3,
+      scene: function () {
+        for (var i = 0; i < 6; i++) {
+          var f = (time * 0.5 + i / 6) % 1, x = -7.9 - f * 2.0, y = -1.6 - Math.sin(f * Math.PI) * 1.1;
+          C(ctx, x, y + 0.3 * f, 0.12 + 0.06 * U.hash(i, 2), "#6B4A2B", Farm.LW * 0.6);
+        }
+        tractorWith(function () {
+          tube(ctx, 0, 0, -1.2, -0.6, 0.14, "#7C8696");
+          ctx.save(); ctx.translate(0, 0.5);
+          muckLumps(-7.0, -1.6, -2.2, 0.55, 10);
+          R(ctx, -7.1, -2.25, 5.6, 1.35, 0.08, "#D9473C");
+          for (var k = 1; k < 6; k++) Ln(ctx, -7.1 + k * 0.93, -2.15, -7.1 + k * 0.93, -1.0, "#A82E28", 0.06);
+          // the rear beaters
+          [-2.0, -1.0].forEach(function (y, j) {
+            C(ctx, -7.35, y, 0.32, "#5D6675");
+            for (var a = 0; a < 4; a++) { var an = time * 4 + a * TAU / 4 + j; Ln(ctx, -7.35, y, -7.35 + Math.cos(an) * 0.45, y + Math.sin(an) * 0.45, INK, 0.07); }
+          });
+          wheel(-4.3, -0.55, 0.55);
+          ctx.restore();
+        }, true);
+      } },
+    { id: "woods", href: "woods.html", pic: [-5.1, -3.4, 5.4, function () { spruce(-4.3, 5.2, 0.7); }], ready: true, ground: "#6F9142", rows: null, sky: "#BFE3F5", x0: -5.4, x1: 6.6, h: 5.6,
+      scene: function () {
+        spruce(-4.4, 5.2, 0.7); spruce(5.6, 5.4, 0.3);
+        // the log stack
+        for (var r = 0; r < 3; r++) for (var c = 0; c < 4 - r; c++) { var lx = -4.0 + c * 0.52 + r * 0.26, ly = -0.26 - r * 0.45; C(ctx, lx, ly, 0.24, "#C98F56"); C(ctx, lx, ly, 0.1, "#E3B783", 0); }
+        // the forestry harvester: body on wheels, the cab, the crane reaching to the head on a trunk
+        var T = "#F28C28";
+        R(ctx, 3.75, -4.6, 0.36, 4.6, 0.1, "#8A5A34");
+        P(ctx, [-1.9, -0.75, -1.9, -1.9, -0.6, -2.0, 1.6, -1.9, 1.9, -1.2, 1.9, -0.75], T);
+        P(ctx, [0.1, -1.95, 0.15, -3.2, 1.45, -3.2, 1.7, -1.95], "#2B3040");
+        P(ctx, [0.22, -2.05, 0.26, -3.08, 1.35, -3.08, 1.56, -2.05], "#BFE7FA", Farm.LW * 0.6);
+        tube(ctx, -0.6, -2.0, 1.2, -4.0, 0.3, T); tube(ctx, 1.2, -4.0, 3.3, -3.0, 0.24, T);
+        R(ctx, 3.25, -3.5, 0.55, 1.1, 0.12, "#3A3F4E");
+        P(ctx, [3.7, -3.4, 4.25, -3.2, 4.2, -3.0, 3.7, -3.1], "#C3CCD6", Farm.LW * 0.6);
+        P(ctx, [3.7, -2.75, 4.25, -2.55, 4.2, -2.35, 3.7, -2.45], "#C3CCD6", Farm.LW * 0.6);
+        wheel(-1.2, -0.62, 0.62); wheel(1.2, -0.62, 0.62);
+      } },
+    { id: "berries", href: "berries.html", pic: [-3.1, 3.1, 4.5], ready: true, ground: "#7FB24E", rows: "#69983E", x0: -5.6, x1: 5.6, h: 4.5,
+      scene: function () {
+        bush(-5.6, 11.2, 1.3, 4);
+        // the straddle harvester: a tall arch over the row, wheels at the bottom of its legs
+        var Rd = "#D8403A", RD = "#A82E28";
+        R(ctx, -2.6, -2.2, 0.42, 2.0, 0.08, Rd); R(ctx, 2.0, -2.2, 0.42, 2.0, 0.08, Rd);
+        R(ctx, -2.9, -3.4, 5.6, 1.3, 0.14, Rd);
+        R(ctx, -2.8, -2.25, 5.4, 0.25, 0.06, RD, Farm.LW * 0.8);
+        P(ctx, [0.8, -3.35, 0.85, -4.4, 2.3, -4.4, 2.6, -3.35], "#2B3040");
+        P(ctx, [0.92, -3.45, 0.97, -4.28, 2.18, -4.28, 2.45, -3.45], "#BFE7FA", Farm.LW * 0.6);
+        crate(-2.6, 1.1, 0.6, berriesOn); ctx.save(); ctx.translate(0, -3.4); crate(-2.7, 1.1, 0.55, berriesOn); crate(-1.45, 1.1, 0.55, berriesOn); ctx.restore();
+        wheel(-2.4, -0.48, 0.48); wheel(2.2, -0.48, 0.48);
+      } },
+    { id: "cows", href: "cows.html", pic: [-1.3, 1.7, 1.8, function () { D.cow(ctx, {}); }], ready: true, ground: "#C9C1B0", rows: null, x0: -5.4, x1: 5.4, h: 3.4,
+      scene: function () {
+        // the barn behind: posts and a roof edge; the feed along the barrier
+        R(ctx, -5.6, -3.4, 11.2, 0.3, 0.05, "#7C8696");
+        [-5.2, -1.7, 1.8, 5.2].forEach(function (x) { R(ctx, x - 0.12, -3.1, 0.24, 3.1, 0.03, "#9AA5B4"); });
+        Ln(ctx, -5.6, -1.85, 5.6, -1.85, INK, 0.16); Ln(ctx, -5.6, -1.85, 5.6, -1.85, "#E2B33A", 0.1);
+        [-3.4, -0.1, 3.2].forEach(function (x, i) { ctx.save(); ctx.translate(x, 0); D.cow(ctx, { ph: time * 1.6 + i * 2, graze: true, time: time }); ctx.restore(); });
+        muckLumps(-5.6, 5.6, 0.02, 0.2, 30, "#9A9A48");
+      } },
+    { id: "sheep", href: "sheep.html", pic: [-0.8, 1.0, 1.1, function () { sheep(0, 0, false); }], ready: true, ground: "#86C25A", rows: null, x0: -5.2, x1: 5.4, h: 2.4,
+      scene: function () {
+        // the pen: hurdles at the right
+        for (var k = 0; k < 2; k++) {
+          var hx = 2.5 + k * 1.2;
+          R(ctx, hx, -1.1, 0.12, 1.1, 0.02, "#B98A55"); R(ctx, hx + 1.08, -1.1, 0.12, 1.1, 0.02, "#B98A55");
+          for (var r = 0; r < 3; r++) R(ctx, hx, -1.0 + r * 0.32, 1.2, 0.1, 0.02, "#D9AC72", Farm.LW * 0.7);
+        }
+        sheep(-1.7, time * 2, false); sheep(-0.25, time * 2 + 1.5, false); sheep(1.2, time * 2 + 3, false);
+      },
+      after: function (px) { var p = px(-3.4, 0); D.dog(ctx, p[0], p[1], p[2] * 1.9, time * 0.6, false); } },
+    { id: "hens", href: "hens.html", pic: [-4.4, -0.2, 3.5], ready: false, ground: "#86C25A", rows: null, x0: -4.6, x1: 4.6, h: 3.4,
+      scene: function () {
+        // the hen house on wheels with its ramp
+        R(ctx, -4.0, -2.6, 3.8, 1.8, 0.06, "#D9AC72");
+        for (var i = 1; i < 6; i++) Ln(ctx, -4.0 + i * 0.63, -2.5, -4.0 + i * 0.63, -0.9, "#B98A55", 0.05);
+        P(ctx, [-4.3, -2.55, -2.1, -3.4, 0.1, -2.55], "#D8403A");
+        R(ctx, -1.5, -2.0, 0.6, 0.9, 0.08, "#5A3A22");
+        P(ctx, [-1.5, -1.05, -0.9, -1.05, 0.2, 0, -0.3, 0], "#B98A55");
+        wheel(-3.4, -0.45, 0.45); wheel(-1.0, -0.45, 0.45);
+        hen(1.2, time * 3, "#C86A2E"); hen(2.3, time * 3 + 1.7, "#FFFFFF"); hen(3.5, time * 3 + 3.1, "#A85A26");
+      } },
+    { id: "tracks", href: "tracks.html", pic: [-1.3, 4.4, 3.2], ready: true, ground: "#8E5C3B", rows: "#7A4C2F", x0: -3.8, x1: 4.6, h: 3.2,
+      scene: function () {
+        D.tractor(ctx, { time: time });
+        // the tracks around both wheels
+        var lw = Farm.LW;
+        SH.rr(ctx, -1.05, -1.45, 4.5, 1.45, 0.72); fs(ctx, "#33363F");
+        SH.rr(ctx, -0.85, -1.25, 4.1, 1.05, 0.52); fs(ctx, "#40434E", lw * 0.6);
+        for (var i = 0; i < 16; i++) { var x = -0.7 + i * 0.26; Ln(ctx, x, -0.02, x, -0.18, "#2A2C36", 0.08); }
+        wheel(-0.3, -0.72, 0.5); wheel(2.7, -0.72, 0.5); wheel(1.2, -0.42, 0.26); wheel(0.5, -0.42, 0.26); wheel(1.9, -0.42, 0.26);
+      } }
+  ];
+  STATIONS.forEach(function (st) { st.name = Farm.NAMES[st.id] || st.id; });
+  function visible() { return STATIONS.filter(function (st) { return st.ready || SHOW_ALL; }); }
+  function ext(st) { return st.ext ? st.ext() : [st.x0, st.x1, st.h]; }
+
+  // ---------- Layout: a grid of lots that fills the stage ----------
+  var lots = [], LBL = 36, GAP = 10;
+  function pickGrid(n) {
+    var best = null, g = GAP;
+    for (var cols = 1; cols <= Math.min(6, n); cols++) {
+      var rows = Math.ceil(n / cols), w = (W - g * (cols + 1)) / cols, h = (H - g * (rows + 1)) / rows;
+      if (w < 60 || h < 60) continue;
+      // a lot reads best a bit wider than tall (machines are long); empty cells cost a little
+      var score = Math.abs(Math.log((w / h) / 1.5)) + (rows * cols - n) * 0.16;
+      if (!best || score < best.score) best = { cols: cols, rows: rows, w: w, h: h, score: score };
+    }
+    return best || { cols: 1, rows: n, w: W - 2 * g, h: (H - g * (n + 1)) / n };
+  }
+  function layoutLots() {
+    var vis = visible(), n = vis.length;
+    GAP = Math.round(U.clamp(Math.min(W, H) * 0.022, 6, 16));
+    var gr = pickGrid(n), g = GAP;
+    stage.classList.toggle("lbl-s", gr.h < 150 || gr.w < 230);
+    // on the smallest lots the drawing is the picture and the label is just the name, so it never gets cut off
+    stage.classList.toggle("lbl-xs", gr.w < 186);
+    LBL = gr.h < 150 || gr.w < 230 ? 30 : 38;
+    lots = vis.map(function (st, i) {
+      var row = Math.floor(i / gr.cols), col = i % gr.cols, inRow = Math.min(gr.cols, n - row * gr.cols);
+      var off = (gr.cols - inRow) * (gr.w + g) / 2;
+      return { st: st, x: g + off + col * (gr.w + g), y: g + row * (gr.h + g), w: gr.w, h: gr.h };
+    });
+  }
+  function lotOf(id) { for (var i = 0; i < lots.length; i++) if (lots[i].st.id === id) return lots[i]; return null; }
 
   function resize() {
     var r = stage.getBoundingClientRect();
     W = Math.max(50, r.width); H = Math.max(50, r.height);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    V = viewM();
-    hA = Math.round(H * 0.52);
-    // each field: the field from the left edge, its store at the right, the machine on the near strip
-    var port = W < H, left = 3;
-    A.L = B.L = left + (port ? V - 7 : V - 11.5); STX = left + (port ? V - 1.2 : V - 5.2); MX = left + (port ? 4.2 : 0.3 * V);
-    A.layout(W, hA);
-    hB = H - hA; B.layout(W, hB); var fr = B.Y(B.rH) / hB;
-    hB = Math.ceil((H - hA) / (1 - fr) + B.B * 0.1); B.layout(W, hB);
-    A.cam = B.cam = V / 2 + left;
+    layoutLots();
     if (mp) mp.layout();
   }
-  function offB() { return hA - B.Y(B.rH) + B.B * 0.08; }
+
+  // ---------- Drawing ----------
+  function drawLot(L) {
+    var st = L.st, x = L.x, y = L.y, w = L.w, h = L.h, rad = Math.min(18, w * 0.08);
+    var e = ext(st), gy = y + h - LBL - 6, top = y + 6;
+    var s = Math.min(w * 0.9 / (e[1] - e[0]), (gy - top) / e[2]);
+    var cx = x + w / 2 - (e[0] + e[1]) / 2 * s;
+    var cols = st.groundFn ? st.groundFn() : [st.ground, st.rows];
+    // the field running back to the hedge: it takes the room the machine doesn't need, so a tall lot shows more
+    // field and only a strip of sky
+    var back = U.clamp((gy - top) - e[2] * s * 1.25, (gy - top) * 0.25, (gy - top) * 0.62);
+    ctx.save();
+    SH.rr(ctx, x, y, w, h, rad); ctx.clip();
+    var sg = ctx.createLinearGradient(0, y, 0, gy - back);
+    sg.addColorStop(0, "#7CC4F0"); sg.addColorStop(1, st.sky || "#D6F1FF");
+    ctx.fillStyle = sg; ctx.fillRect(x, y, w, h);
+    // the hedge on the far side of the field
+    ctx.fillStyle = "#4E9A3C"; ctx.beginPath(); ctx.moveTo(x, gy - back + 2);
+    for (var i = 0; i <= 10; i++) ctx.lineTo(x + w * i / 10, gy - back - 4 - 4 * U.hash(i, st.id.length));
+    ctx.lineTo(x + w, gy - back + 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = cols[0]; ctx.fillRect(x, gy - back, w, h);
+    if (cols[1]) {
+      ctx.strokeStyle = cols[1]; ctx.lineWidth = 2;
+      for (i = 1; i < 4; i++) { var ry = gy - back + back * Math.pow(i / 4, 1.4); ctx.beginPath(); ctx.moveTo(x, ry); ctx.lineTo(x + w, ry); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(x, gy + 6); ctx.lineTo(x + w, gy + 6); ctx.stroke();
+    }
+    var lw = U.clamp(s * 0.05, 1.1, 2.4);
+    Farm.inUnits(ctx, cx, gy, s, lw, st.scene);
+    if (st.after) st.after(function (mx, my) { return [cx + mx * s, gy + my * s, s]; });
+    ctx.restore();
+    // the lot's edge
+    SH.rr(ctx, x, y, w, h, rad); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+  }
   function draw() {
     world = Farm.world.get();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    var season = world.season === "autumn" ? "autumn" : "summer";
-    // the wheat field, the combine, the grain store
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hA + 2); ctx.clip();
-    A.sky(ctx, { time: time, season: season, dusk: dusk });
-    A.hedge(ctx, { season: season });
-    var PA = { crop: "wheat", stage: world.wheat === "golden" ? "golden" : "stubble", time: time };
-    A.field(ctx, "far", PA);
-    A.put(ctx, MX + 2.2, 1, 1, function () { D.combine(ctx, { time: time, reel: time * 0.8, tank: 0.3, wheel: 0 }); });
-    A.field(ctx, "near", PA);
-    A.verge(ctx, {});
-    A.store(ctx, Math.min(1.1, world.grain / 8), { x: STX, kind: "grain", time: time });
-    ctx.restore();
-    // the potato field in front, its machine and the potato store
-    ctx.save(); ctx.beginPath(); ctx.rect(0, hA, W, H - hA); ctx.clip();
-    ctx.fillStyle = "#82C257"; ctx.fillRect(0, hA, W, H - hA);
-    ctx.translate(0, offB());
-    B.hedge(ctx, { season: season });
-    var st = world.spuds, PB = { crop: "spuds", stage: st === "grown" ? "grow" : st, g: 1, time: time };
-    B.field(ctx, "far", PB);
-    var m = NEXT[st] || "bedformer", trl = Farm.MACHINES[m].trailed, bx = MX + (trl ? 3.6 : 1.6);
-    B.put(ctx, bx, 1, 1, function () {
-      ctx.save(); ctx.translate(trl ? Farm.DRAWBAR[0] : Farm.HITCH[0], trl ? Farm.DRAWBAR[1] : Farm.HITCH[1]);
-      D[m](ctx, { time: time, wheel: 0, level: 1 }); ctx.restore();
-      D.tractor(ctx, { time: time, hitch: trl ? null : { lift: 0.6 }, drawbar: trl });
-    });
-    B.field(ctx, "near", PB);
-    B.verge(ctx, {});
-    B.store(ctx, Math.min(1.1, world.potatoes / 8), { x: STX, kind: "potato", time: time });
-    ctx.restore();
-    // the hedge line between the two fields
-    ctx.fillStyle = "rgba(29,35,64,0.12)"; ctx.fillRect(0, hA, W, 3);
+    // the farm between the lots: grass with farm tracks
+    ctx.fillStyle = "#8CC95E"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#E3CC94";
+    var g = GAP;
+    lots.forEach(function (L) { ctx.fillRect(L.x - g * 0.3, L.y + L.h + g * 0.2, L.w + g * 0.6, g * 0.6); });
+    lots.forEach(drawLot);
     if (dusk > 0) { ctx.fillStyle = "rgba(20,24,60," + (dusk * 0.4) + ")"; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // The label pictures: the lot's scene (machines only, no field) drawn into a small canvas.
+  function tilePic(st) {
+    var c = document.createElement("canvas"), cw = 168, ch = 120, keep = ctx;
+    c.width = cw; c.height = ch;
+    var e = st.pic || ext(st), s = Math.min(cw * 0.96 / (e[1] - e[0]), ch * 0.94 / e[2]);
+    ctx = c.getContext("2d");
+    if (!ctx) { ctx = keep; return ""; }
+    try {
+      var cx = cw / 2 - (e[0] + e[1]) / 2 * s;
+      Farm.inUnits(ctx, cx, ch * 0.97, s, 3.4, e[3] || st.scene);
+      if (st.after && !e[3]) st.after(function (mx, my) { return [cx + mx * s, ch * 0.97 + my * s, s]; });
+    } catch (err) { /* keep going */ }
+    ctx = keep;
+    var url = ""; try { url = c.toDataURL("image/png"); } catch (err2) { url = ""; }
+    return url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
   }
 
   // ---------- The places ----------
   var mp = null, going = false;
+  layoutLots();
   mp = Toybox.map({
     stage: stage,
-    places: [
-      { href: "combine.html", name: Farm.NAMES.combine, pic: Farm.pic("combine"), rect: function () { return [0, 0, W, hA]; } },
-      { href: "spuds.html", name: Farm.NAMES.spuds, pic: Farm.pic("harvester"), rect: function () { return [0, hA, W, H - hA]; } }
-    ],
+    places: visible().map(function (st) {
+      return { href: st.href, name: st.name, pic: tilePic(st), rect: function () { var L = lotOf(st.id); return L ? [L.x, L.y, L.w, L.h] : null; } };
+    }),
     onPress: function () { going = true; Farm.sound.horn(); if (ghost) ghost.learned("map"); }
   });
   var ghost = Toybox.ghost({
     max: 2,
     plan: function () {
-      if (going) return null;
-      var b = stage.getBoundingClientRect();
-      return { pts: [[b.left + W * 0.45, b.top + hA * 0.7]], tap: true, key: "map" };
+      if (going || !lots.length) return null;
+      var b = stage.getBoundingClientRect(), L = lots[0];
+      return { pts: [[b.left + L.x + L.w * 0.5, b.top + L.y + L.h * 0.45]], tap: true, key: "map" };
     }
   });
 
-  var last = 0;
+  var last = 0, acc = 0;
   function loop(ts) {
     var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
-    time += dt;
+    if (!U.reduceMotion) time += dt;
     if (ending) dusk = Math.min(1, dusk + dt * 0.4);
-    if (!(window.Toybox && Toybox.timer.phase() === "resting")) draw();
+    acc += dt;
+    // a calm map: about 30 frames a second is plenty
+    if (acc >= 0.03 && !(window.Toybox && Toybox.timer.phase() === "resting")) { acc = 0; draw(); }
     requestAnimationFrame(loop);
   }
   resize();
@@ -187,7 +459,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   });
   requestAnimationFrame(loop);
 
-  if (/[?&]debug\b/.test(location.search)) window.__farmMap = { world: function () { return Farm.world.get(); } };
+  if (/[?&]debug\b/.test(location.search)) window.__farmMap = { world: function () { return Farm.world.get(); }, lots: function () { return lots; } };
 })();
 </script>
 </body>

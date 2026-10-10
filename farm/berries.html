@@ -1053,7 +1053,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function camTarget() {
     if (phase === "press" || phase === "done" || (phase === "ready" && job === "press")) return STORE_X + 3.7;
     if (phase === "haul") return clamp(tr.x - 0.1, HX_END + 2, STORE_X + 3.7);
-    if (phase === "out" || phase === "load") return hv.x + 4.6;
+    if (phase === "out" || phase === "load") {
+      // pan toward the trailer only as fast as the zoom opens up, so the harvester's back end never leaves the view
+      var vw = RG.f.w / scF.k;
+      return Math.min(hv.x + 4.6, hv.x + HV.x0 - 0.5 + vw / 2);
+    }
     if (phase === "grow" || !hv.on) return L / 2;
     return hv.x + 0.8;
   }
@@ -1113,6 +1117,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     parts.update(dt);
     updateClose(dt);
     scF.follow(camTarget(), dt); scC.follow(camC(), dt);
+    if (phase === "out" || phase === "load") scF.cam = Math.min(scF.cam, Math.max(scF.camMin, hv.x + HV.x0 - 0.5 + RG.f.w / scF.k / 2));
     var lvl = phase === "drive" ? 0.25 + drive * 0.75 : (phase === "arrive" || phase === "out" || phase === "haul" ? 0.6 : (hv.on ? 0.15 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
     snd.engine(ending || (!hv.on && tr.state === "away") ? -1 : engLevel);

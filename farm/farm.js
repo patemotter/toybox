@@ -11,8 +11,8 @@
  * the store shed at the right end, and a grass verge with flowers.
  *
  * API
- *   Farm.NAMES                  { spuds: "Spuds in Mud", combine: "Combine Time" }: the stations' names (map labels,
- *                               headers, titles). Rename a station here only.
+ *   Farm.NAMES                  { spuds: "Spuds in Mud", combine: "Combine Time", ... }: every station's name (map labels,
+ *                               headers, titles), keyed by its page (spuds.html -> spuds). Rename a station here only.
  *   Farm.world                  the shared farm (localStorage "farm-world-v1", every access in try/catch, unknown
  *                               fields kept): .get() -> { v, wheat: "golden"|"stubble", spuds: a SPUDS stage,
  *                               grain: loads in the grain store, potatoes: loads in the potato store, season }.
@@ -41,11 +41,15 @@
  *   Farm.draw.bedformer / destoner / planter / harvester (ctx, st)  the potato machines, origin at their hitch
  *                               (st = { wheel, time, work (0..1 running), level (hopper 0..1), lift }).
  *   Farm.draw.trailer(ctx, st)  the tipping trailer, origin at its drawbar eye: st = { wheel, load (0..1), crop
- *                               "grain"|"potato", tip (0..1) }.
+ *                               "grain"|"potato"|"grass" (Farm.CROP: [fill, strands]), tip (0..1) }.
  *   Farm.draw.combine(ctx, st)  the combine harvester, origin under the front axle: st = { wheel, time, work,
  *                               tank (0..1), auger (0..1 swung out; the page draws the swung tube, see .augerTube),
  *                               face, beacon }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
  *   Farm.draw.hare / deer / gull / hawk (ctx, x, y, s, phase, flip)   the farm's life, in screen px.
+ *   Farm.draw.telehandler(ctx, st)  the yellow telehandler's body (the page adds its boom), origin on the ground
+ *                               between the axles: st = { wheel, time, beacon, face, look } (muck.html, cows.html).
+ *   Farm.draw.cow(ctx, st)      a black-and-white cow in profile, machine units, origin at her feet, facing +x:
+ *                               st = { ph, walk, graze, moo, face, time } (cows.html, muck.html, the map).
  *   Farm.rear.bedformer / destoner / planter / harvester / trailer (ctx, st)   the potato machines seen from behind
  *                               (a close-up looking along the rows), origin on the ground in the middle, metres,
  *                               row crests at x = +-0.5: st = { time, run (belt phase), work, level, load, face }.
@@ -82,7 +86,7 @@
   }
   var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time", bales: "Brilliant Baler", silage: "Glorious Grass", carrots: "Munchy Crunchy", muck: "Mucky Muck", woods: "Timberrrrr!", berries: "Juicy Squeezy", cows: "Moooovie Time", sheep: "Come Bye" };
+  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time", bales: "Brilliant Baler", silage: "Glorious Grass", carrots: "Munchy Crunchy", muck: "Mucky Muck", woods: "Timberrrrr!", berries: "Juicy Squeezy", cows: "Moooovie Time", sheep: "Come Bye", hens: "Feathered Friends", tracks: "Caterpillar Hunt" };
 
   // =====================================================================================================
   // World: the shared farm (farm-world-v1)
@@ -588,7 +592,7 @@
   // =====================================================================================================
   // Tipping trailer (origin at the drawbar eye, ground at +0.5, facing +x)
   // =====================================================================================================
-  var CROP = { grain: ["#EBB93E", "#C99322"], potato: ["#C9935A", "#9E6B39"] };
+  var CROP = { grain: ["#EBB93E", "#C99322"], potato: ["#C9935A", "#9E6B39"], grass: ["#93C653", "#5E9A2E"] };
   function trailer(ctx, st) {
     st = st || {};
     var rot = st.wheel || 0, Rd = "#D8403A", RD = "#A82E28", load = clamp(st.load || 0, 0, 1.2), tip = clamp(st.tip || 0, 0, 1);
@@ -814,6 +818,58 @@
     C(ctx, 0.41, sit ? -0.6 : -0.54, 0.022, "#FFFFFF", 0);
     if (!sit) { leg(-0.28, 0.5 * st); leg(0.26, -0.5 * st); }
     else { leg(0.22, 0.1); leg(-0.12, 1.2); }
+    ctx.restore();
+  }
+
+  // The telehandler (yellow, generic), in machine units: origin on the ground between the axles, facing +x. The
+  // page draws its own boom and attachment (the boom pivot sits at about [-1.5, -2.05]). st = { wheel (m driven),
+  // time, beacon (flashing), face (0..1), look }.
+  function telehandler(ctx, st) {
+    st = st || {};
+    var T = "#F2B33A", TD = "#C98A1A", rot = (st.wheel || 0) / 0.62, i;
+    P(ctx, [-2.2, -0.7, -2.2, -1.55, -1.3, -1.6, 2.0, -1.55, 2.3, -1.15, 2.3, -0.7], T);
+    R(ctx, -2.15, -1.95, 1.25, 0.42, 0.1, T);
+    for (i = 0; i < 3; i++) Ln(ctx, -1.95 + i * 0.3, -1.88, -1.85 + i * 0.3, -1.62, TD, 0.05);
+    P(ctx, [-0.75, -1.5, -0.7, -2.95, 0.72, -2.95, 1.0, -1.5], "#2B3040");
+    P(ctx, [-0.63, -1.62, -0.6, -2.85, 0.62, -2.85, 0.88, -1.62], "#BFE7FA", LW * 0.6);
+    driver(ctx, 0.0, -2.42, 1);
+    R(ctx, -0.85, -3.12, 1.95, 0.2, 0.08, T);
+    var bc = st.beacon ? (Math.sin((st.time || 0) * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
+    ctx.beginPath(); ctx.arc(0.1, -3.12, 0.12, Math.PI, 0); ctx.closePath(); fs(ctx, bc, LW * 0.7);
+    wheel(ctx, -1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    wheel(ctx, 1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    ctx.beginPath(); ctx.arc(-1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(-1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    ctx.beginPath(); ctx.arc(1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    face(ctx, 1.45, -1.32, 0.12, 0.4, st.face, st.time, st.look);
+  }
+  // A cow in profile (black and white), in machine units: origin at her feet in the middle, facing +x.
+  // st = { ph (phase), walk (legs swing with ph), graze (the head bobs down to eat with ph), moo (head up, mouth
+  // open), face (0..1), time }.
+  function cow(ctx, st) {
+    st = st || {};
+    var ph = st.ph || 0, sw = st.walk ? Math.sin(ph) * 0.14 : 0, bob = st.walk ? Math.abs(Math.sin(ph)) * 0.04 : 0;
+    var hb = st.graze ? Math.max(0, Math.sin(ph)) * 0.25 : 0;
+    ctx.save(); ctx.translate(0, -bob);
+    [[-0.72, 0, 1], [-0.52, 1, -1], [0.55, 0, -1], [0.75, 1, 1]].forEach(function (g) {
+      var dx = sw * g[2];
+      Ln(ctx, g[0], -0.85, g[0] + dx, 0, INK, 0.17); Ln(ctx, g[0], -0.85, g[0] + dx, -0.05, g[1] ? "#F4F4F4" : "#2A2D38", 0.11);
+    });
+    Ln(ctx, -0.95, -1.32, -1.08 - sw * 0.5, -0.72, INK, 0.06); C(ctx, -1.08 - sw * 0.5, -0.7, 0.07, "#2A2D38", 0);
+    rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, "#FAFAFA");
+    ctx.save(); rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); ctx.clip();
+    [[-0.55, -1.3, 0.35], [0.25, -1.05, 0.3], [0.7, -1.45, 0.22], [-0.95, -0.85, 0.25]].forEach(function (b) { C(ctx, b[0], b[1], b[2], "#2A2D38", 0); });
+    ctx.restore(); rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, null, LW);
+    ctx.beginPath(); ctx.ellipse(-0.42, -0.72, 0.18, 0.1, 0, 0, TAU); fs(ctx, "#F2A9B4", LW * 0.6);
+    var up = st.moo ? -0.25 : 0;
+    ctx.save(); ctx.translate(0.95, -1.32 + hb); ctx.rotate((st.graze ? 0.35 : 0.3) + hb * 0.8 + up);
+    ctx.beginPath(); ctx.ellipse(0.25, 0, 0.34, 0.22, 0, 0, TAU); fs(ctx, "#2A2D38");
+    ctx.beginPath(); ctx.ellipse(0.12, -0.02, 0.14, 0.18, 0, 0, TAU); fs(ctx, "#FAFAFA", 0);
+    ctx.beginPath(); ctx.ellipse(0.52, 0.06, 0.15, 0.13, 0, 0, TAU); fs(ctx, "#F2A9B4", LW * 0.7);
+    if (st.moo) { ctx.beginPath(); ctx.ellipse(0.58, 0.12, 0.05, 0.06, 0, 0, TAU); fs(ctx, "#7A2E3A", 0); }
+    P(ctx, [0.0, -0.16, -0.2, -0.3, -0.05, -0.12], "#2A2D38", LW * 0.6);
+    C(ctx, 0.3, -0.07, 0.05, "#FFFFFF", LW * 0.4); C(ctx, 0.31, -0.07, 0.028, INK, 0);
+    if (st.face) face(ctx, 0.18, -0.08, 0.06, 0.18, st.face, st.time, null, 0.08);
+    ctx.restore();
     ctx.restore();
   }
 
@@ -1377,7 +1433,7 @@
     COMBINE: COMBINE,
     CROP: CROP,
     draw: { tractor: tractor, bedformer: bedformer, destoner: destoner, planter: planter, harvester: harvester, trailer: trailer, combine: combine,
-      boom: boom, dog: dog, hare: hare, deer: deer, gull: gull, hawk: hawk, tree: tree, farmstead: farmstead, potato: potatoBlob },
+      boom: boom, cow: cow, telehandler: telehandler, dog: dog, hare: hare, deer: deer, gull: gull, hawk: hawk, tree: tree, farmstead: farmstead, potato: potatoBlob },
     rear: { bedformer: rearBedformer, destoner: rearDestoner, planter: rearPlanter, harvester: rearHarvester, trailer: rearTrailer, crossBelt: crossBelt, hood: rowHood },
     inUnits: inUnits,
     shape: { P: P, R: R, C: C, Ln: Ln, tube: tube, fs: fs, rr: rr },
