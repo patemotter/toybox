@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mucky Muck</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Farm">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script src="../common/toybox.js"></script>
+<script src="farm.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF; --panel: #FFFFFF; --ink: #1D2340; --muted: #4A5578; --edge: #1D2340; --accent: #FFC93C; --plate: #F4FAFF; --focus: #2D5BD7;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+.tb-head a { text-decoration: none; }
+.stage { background: #A9DCFF; touch-action: none; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.loads { font-variant-numeric: tabular-nums; }
+.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+.rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+/* The Go says a short phrase ("Spread it"): on a narrow row it wraps to two lines instead of being cut off. */
+.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+body.big #jobs { display: none; }
+@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="tb-app-shell tb-v2 wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the farm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Farm</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title" id="title">Mucky Muck</h1>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+  </header>
+  <div class="tb-body app">
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
+        <canvas id="cv" role="img" aria-label="A farmyard with a cow barn, a muck heap, a telehandler and a muck spreader, and a grass field. Tap the tractor to scrape the muck."></canvas>
+        <div class="tb-counter loads" id="loads">Loads: 0</div>
+        <div id="coach"></div>
+        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+      </main>
+      <div id="jobs"></div>
+    </div>
+    <section class="tb-panel" id="panel">
+      <ol id="stepsMuck"></ol>
+      <ol id="stepsSlurry" hidden></ol>
+      <div id="bottom"></div>
+    </section>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  // Mucky Muck: feeding the grass with what the cows leave behind, the way the episode shows it.
+  // Spreader:      the yard scraper (the green tractor with a rubber-edged blade on the front) pushes the muck
+  //                down the barn passage onto the muck heap; the telehandler's muck fork lifts it, turns round
+  //                and drops it into the rear-discharge muck spreader; the tractor tows the spreader to the
+  //                field, where the two upright beaters fling the muck out behind it.
+  // Slurry tanker: the vacuum tanker's suction arm dips into the slurry lagoon and the tank fills (it sits down
+  //                on its tyres and burps when it is full); in the field the splash plate sprays it over the grass.
+  // Either way the field goes dark where it was fed, then weeks go by and the grass grows thick and green.
+  // One world along the machine line: the field (x 0..L) on the left, then the farmyard: the spreader (or the
+  // tanker) parked by the muck heap (or the lagoon), the telehandler, and the cow barn with its passage. On a
+  // wide stage one camera follows the work; on an upright stage the stage is split: the whole rig on
+  // top (following the action from the yard to the field) and a big close-up of the work happening below.
+  // Machine drawings live here for now in farm.js's style and function shapes (metres, y up negative, origin
+  // at the drawbar eye with the ground at y = +0.5, facing +x) so they can move into farm.js later:
+  // scraper (tractor units), spreader / tanker (drawbar eye), teleBody / teleBoom (between the axles), cow.
+  var $ = function (id) { return document.getElementById(id); };
+  var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
+  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
+  var NAME = (Farm.NAMES && Farm.NAMES.muck) || "Mucky Muck";
+  document.title = NAME; $("title").textContent = NAME;
+  function LW() { return Farm.LW; }
+  function shine(ctx, x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
+  var G = { body: "#3E9F3A", dark: "#2B7A2A", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
+  var MUCK = ["#6B4A2B", "#52371F", "#C9A45A", "#7E5A34"], SLURRY = ["#6B5233", "#4F3B24", "#8C7446"];
+  var reduce = !!U.reduceMotion;
+
+  // ---------- State ----------
+  var KEY = "farm-muck-v1";
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  if (startFresh || typeof saved !== "object" || Array.isArray(saved)) saved = {};
+  var loads = typeof saved.loads === "number" && isFinite(saved.loads) && saved.loads >= 0 ? Math.floor(saved.loads) : 0;
+  var job = saved.job === "slurry" ? "slurry" : "muck";
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ loads: loads, job: job })); } catch (e) { /* ignore */ } }
+
+  // ---------- The world (metres along the machine line) ----------
+  var L = 20, EYE = 27.5, TX = 37.2, HX0 = 39.8, HW = 4.0, HX1 = HX0 + HW, BX0 = 46.6, BX1 = 60.6, XMAX = BX1 + 9;
+  var LG0 = 31, LG1 = 45;                       // the slurry lagoon (behind the machine line)
+  var SCR_END = HX1 + 4.7, SCR_START = BX1 + 4.3; // the scraper's rear axle: start and where the blade meets the heap
+  var V_SPREAD = 4.2, V_SCRAPE = 3.3;
+  var REAR = { muck: 7.0, slurry: 7.95 };       // drawbar eye -> beaters / splash plate (behind the tractor)
+
+  // ---------- Small drawing helpers (farm.js style) ----------
+  function wheel(ctx, cx, cy, r, rot, o) {
+    o = o || {};
+    var n = o.lugs || Math.round(r * 22), i, a, l0 = LW();
+    ctx.save(); ctx.translate(cx, cy);
+    for (i = 0; i < n; i++) {
+      a = rot + i * TAU / n;
+      var c = Math.cos(a), s = Math.sin(a), c2 = Math.cos(a + 0.12), s2 = Math.sin(a + 0.12);
+      Pp(ctx, [c * r * 0.93, s * r * 0.93, c * r * 1.06, s * r * 1.06, c2 * r * 1.06, s2 * r * 1.06, c2 * r * 0.93, s2 * r * 0.93], "#2A2C36", l0 * 0.7);
+    }
+    Cc(ctx, 0, 0, r * 0.97, "#33363F", l0);
+    if (o.squash) { ctx.beginPath(); ctx.ellipse(0, r * 0.88, r * (0.55 + o.squash * 2.5), r * 0.16, 0, 0, TAU); fs(ctx, "#33363F", l0 * 0.8); }
+    Cc(ctx, 0, 0, r * 0.8, "#40434E", 0);
+    var rimR = r * (o.rim || 0.6);
+    Cc(ctx, 0, 0, rimR, o.rimCol || "#C3CCD6", l0);
+    Cc(ctx, 0, 0, rimR * 0.78, "#A9B4C1", l0 * 0.6);
+    Cc(ctx, 0, 0, rimR * 0.36, "#8C97A6", l0 * 0.7);
+    for (i = 0; i < 6; i++) { a = rot + i * TAU / 6; Cc(ctx, Math.cos(a) * rimR * 0.55, Math.sin(a) * rimR * 0.55, rimR * 0.07, "#6E7887", 0); }
+    ctx.restore();
+  }
+  function face(ctx, x, y, r, dx, f, time, smileW) {
+    if (!f) return;
+    ctx.save(); ctx.globalAlpha = clamp(f, 0, 1);
+    var blink = Math.sin((time || 0) * 2.1) > 0.985 ? 0.15 : 1, l0 = LW(), lx = r * 0.3, ly = r * 0.1;
+    [0, dx].forEach(function (ox) {
+      ctx.save(); ctx.translate(x + ox, y); ctx.scale(1, blink);
+      Cc(ctx, 0, 0, r, "#FFFFFF", l0 * 0.8); Cc(ctx, lx, ly, r * 0.5, INK, 0); Cc(ctx, lx + r * 0.18, ly - r * 0.2, r * 0.16, "#FFFFFF", 0);
+      ctx.restore();
+    });
+    ctx.beginPath(); ctx.arc(x + dx / 2, y + r * 1.0, smileW || r * 1.3, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = INK; ctx.lineWidth = l0 * 1.3; ctx.lineCap = "round"; ctx.stroke();
+    ctx.restore();
+  }
+  function driverHead(ctx, x, y) {
+    var l0 = LW();
+    Rr(ctx, x - 0.26, y + 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
+    Cc(ctx, x, y, 0.17, "#F2C8A0", l0 * 0.7);
+    Pp(ctx, [x - 0.18, y - 0.04, x - 0.16, y - 0.2, x + 0.16, y - 0.2, x + 0.3, y - 0.06], "#E8473B", l0 * 0.6);
+  }
+  // a lumpy mound of muck along y0 from xa to xb, height hh (straw flecks on it)
+  function muckMound(ctx, xa, xb, y0, hh, seed, col) {
+    if (hh <= 0.01 || xb - xa < 0.05) return;
+    var n = Math.max(6, Math.round((xb - xa) * 4)), i;
+    ctx.beginPath(); ctx.moveTo(xa, y0);
+    for (i = 0; i <= n; i++) {
+      var f = i / n, x = lerp(xa, xb, f);
+      ctx.lineTo(x, y0 - hh * Math.pow(Math.sin(f * Math.PI), 0.55) - (i % 2 ? 0.05 : 0) * Math.min(1, hh * 3) * hash(i, seed));
+    }
+    ctx.closePath(); fs(ctx, col || MUCK[0], LW() * 0.8);
+    ctx.save(); ctx.clip();
+    for (i = 0; i < Math.round((xb - xa) * 5); i++) {
+      var sx = lerp(xa, xb, hash(i, seed + 1)), sy = y0 - hh * hash(i, seed + 2) * 0.9;
+      Ln(ctx, sx, sy, sx + 0.16 * (hash(i, seed + 3) - 0.3), sy - 0.05, i % 3 ? MUCK[2] : MUCK[1], 0.045);
+    }
+    ctx.restore();
+  }
+
+  // =====================================================================================================
+  // The machines (could move into farm.js as Farm.draw.scraper / spreader / tanker / telehandler / cow)
+  // =====================================================================================================
+  // The yard scraper: a steel blade with a rubber edge on the tractor's front linkage. Tractor units.
+  function scraper(ctx, st) {
+    var l0 = LW(), up = (st.lift || 0) * 0.3;
+    tube(ctx, 3.95, -1.25, 4.4, -0.95 - up, 0.12, G.grey);
+    tube(ctx, 3.95, -0.8, 4.4, -0.45 - up, 0.12, G.grey);
+    Rr(ctx, 4.35, -1.25 - up, 0.28, 1.15, 0.05, "#F2C230");
+    shine(ctx, 4.43, -1.15 - up, 4.43, -0.3 - up, 0.05);
+    Rr(ctx, 4.38, -0.14 - up, 0.24, 0.16, 0.03, "#2A2C36", l0 * 0.7);
+  }
+  // Rear-discharge muck spreader with two upright beaters. Origin at the drawbar eye, ground at y = +0.5.
+  // st = { wheel, load (0..1), beat (angle), door (0..1 open), time, face }
+  function spreader(ctx, st) {
+    var l0 = LW(), Rd = "#D8403A", RD = "#A82E28", load = clamp(st.load || 0, 0, 1), i;
+    Pp(ctx, [0.1, 0.05, -1.85, -0.72, -1.85, -0.48, 0.1, 0.14], G.grey);
+    Rr(ctx, -6.75, -0.98, 5.1, 0.24, 0.04, "#3A3F4E");
+    wheel(ctx, -3.6, -0.12, 0.62, (st.wheel || 0) / 0.62, { rim: 0.55, rimCol: "#E2E6EB" });
+    wheel(ctx, -4.95, -0.12, 0.62, (st.wheel || 0) / 0.62, { rim: 0.55, rimCol: "#E2E6EB" });
+    if (load > 0.01) muckMound(ctx, -6.45, -1.85, -2.15, 0.15 + load * 0.75, 3);
+    // the box, with ribs, and the mesh guard at the front
+    Rr(ctx, -6.5, -2.22, 4.75, 1.3, 0.08, Rd);
+    Rr(ctx, -6.58, -2.32, 4.9, 0.16, 0.06, RD, l0 * 0.8);
+    for (i = 1; i < 6; i++) Ln(ctx, -6.5 + i * 0.79, -2.15, -6.5 + i * 0.79, -1.0, RD, 0.07);
+    shine(ctx, -6.35, -2.05, -1.95, -2.05, 0.07);
+    Rr(ctx, -1.9, -2.95, 0.14, 0.75, 0.03, "#5D6675", l0 * 0.7);
+    for (i = 0; i < 3; i++) Ln(ctx, -1.85, -2.85 + i * 0.22, -1.7, -2.85 + i * 0.22, "#5D6675", 0.035);
+    // the beaters at the back: two upright rotors with spiral tines (one behind the other)
+    var b = st.beat || 0;
+    [-6.92, -7.12].forEach(function (sx, k) {
+      Ln(ctx, sx, -0.85, sx, -2.55, INK, 0.16); Ln(ctx, sx, -0.85, sx, -2.55, k ? "#5D6675" : "#8C97A6", 0.1);
+      for (var j = 0; j < 8; j++) {
+        var y = -0.95 - j * 0.2, c = Math.cos(b * (k ? -1 : 1) + j * 0.85);
+        Ln(ctx, sx, y, sx + c * 0.34, y - 0.05, INK, 0.09); Ln(ctx, sx, y, sx + c * 0.34, y - 0.05, "#C3CCD6", 0.05);
+      }
+    });
+    // the beater frame: a hood on top and the spreading floor below
+    Pp(ctx, [-6.5, -2.42, -7.5, -2.42, -7.6, -2.62, -6.5, -2.62], "#5D6675", l0 * 0.8);
+    Pp(ctx, [-6.5, -0.86, -7.5, -0.86, -7.55, -0.74, -6.5, -0.74], "#5D6675", l0 * 0.8);
+    // the hydraulic door between the box and the beaters slides up to let the muck out
+    var dy = clamp(st.door || 0, 0, 1) * 1.15;
+    Rr(ctx, -6.62, -2.2 - dy, 0.16, 1.25, 0.03, RD, l0 * 0.8);
+    face(ctx, -4.6, -1.65, 0.16, 0.42, st.face, st.time, 0.24);
+  }
+  // Vacuum slurry tanker: a galvanised tank on two axles, the vacuum pump at the front, the suction arm's
+  // turret at the back top (the page draws the arm) and the splash plate under the rear outlet.
+  // Origin at the drawbar eye, ground at y = +0.5. st = { wheel, load (0..1), time, face, spray (0..1) }
+  var TK = { arm: [-6.75, -2.95] };
+  function tanker(ctx, st) {
+    var l0 = LW(), load = clamp(st.load || 0, 0, 1), sq = load * 0.12, i, Tc = "#B9C3CD", Td = "#8E9AA8";
+    Pp(ctx, [0.1, 0.05, -1.75, -0.78, -1.75, -0.52, 0.1, 0.14], G.grey);
+    Rr(ctx, -7.6, -1.0, 6.2, 0.22, 0.04, "#3A3F4E");
+    wheel(ctx, -4.0, -0.14, 0.66, (st.wheel || 0) / 0.66, { rim: 0.55, rimCol: "#E2E6EB", squash: sq });
+    wheel(ctx, -5.4, -0.14, 0.66, (st.wheel || 0) / 0.66, { rim: 0.55, rimCol: "#E2E6EB", squash: sq });
+    ctx.save(); ctx.translate(0, sq);
+    // the rear outlet and the splash plate
+    tube(ctx, -7.3, -1.25, -7.8, -0.95, 0.2, Td);
+    Pp(ctx, [-7.7, -0.78, -8.25, -1.12, -8.3, -0.98, -7.78, -0.66], "#5D6675", l0 * 0.8);
+    // the tank
+    Rr(ctx, -7.55, -2.8, 6.15, 1.9, 0.92, Tc);
+    for (i = 0; i < 3; i++) Rr(ctx, -2.95 - i * 1.6, -2.82, 0.18, 1.94, 0.06, Td, l0 * 0.7);
+    shine(ctx, -6.9, -2.55, -2.1, -2.55, 0.1);
+    Ln(ctx, -6.9, -1.12, -2.1, -1.12, "rgba(29,35,64,0.18)", 0.12);
+    // the manlid dome on top, the vacuum pump at the front with its pulley and pipe
+    ctx.beginPath(); ctx.arc(-4.2, -2.8, 0.32, Math.PI, 0); ctx.closePath(); fs(ctx, Td, l0 * 0.8);
+    Rr(ctx, -2.35, -3.25, 0.85, 0.5, 0.08, "#3A3F4E", l0 * 0.8);
+    Cc(ctx, -1.95, -3.0, 0.16, "#8C97A6", l0 * 0.6);
+    tube(ctx, -2.35, -3.1, -2.75, -2.75, 0.09, "#5D6675");
+    // the arm's turret at the back
+    Rr(ctx, TK.arm[0] - 0.32, TK.arm[1] - 0.05, 0.64, 0.32, 0.06, "#5D6675", l0 * 0.8);
+    Cc(ctx, TK.arm[0], TK.arm[1], 0.2, "#7C8696", l0 * 0.8);
+    face(ctx, -4.5, -1.95, 0.17, 0.44, st.face, st.time, 0.26);
+    ctx.restore();
+  }
+  // The telehandler (origin on the ground between the axles, facing +x): body, and the boom with the muck fork.
+  var TELE = { pivot: [-1.5, -2.05], len: 3.9 };
+  function teleBody(ctx, st) {
+    var T = "#F2B33A", TD = "#C98A1A", l0 = LW(), rot = (st.wheel || 0) / 0.62, i;
+    Pp(ctx, [-2.2, -0.7, -2.2, -1.55, -1.3, -1.6, 2.0, -1.55, 2.3, -1.15, 2.3, -0.7], T);
+    Rr(ctx, -2.15, -1.95, 1.25, 0.42, 0.1, T);
+    for (i = 0; i < 3; i++) Ln(ctx, -1.95 + i * 0.3, -1.88, -1.85 + i * 0.3, -1.62, TD, 0.05);
+    Pp(ctx, [-0.75, -1.5, -0.7, -2.95, 0.72, -2.95, 1.0, -1.5], "#2B3040");
+    Pp(ctx, [-0.63, -1.62, -0.6, -2.85, 0.62, -2.85, 0.88, -1.62], "#BFE7FA", l0 * 0.6);
+    driverHead(ctx, 0.0, -2.42);
+    Rr(ctx, -0.85, -3.12, 1.95, 0.2, 0.08, T);
+    var bc = st.beacon ? (Math.sin((st.time || 0) * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
+    ctx.beginPath(); ctx.arc(0.1, -3.12, 0.12, Math.PI, 0); ctx.closePath(); fs(ctx, bc, l0 * 0.7);
+    wheel(ctx, -1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    wheel(ctx, 1.45, -0.62, 0.62, rot, { rim: 0.55 });
+    ctx.beginPath(); ctx.arc(-1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(-1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    ctx.beginPath(); ctx.arc(1.45, -0.62, 0.78, -Math.PI + 0.35, -0.35); ctx.arc(1.45, -0.62, 0.68, -0.35, -Math.PI + 0.35, true); ctx.closePath(); fs(ctx, TD);
+    face(ctx, 1.45, -1.32, 0.12, 0.4, st.face, st.time);
+  }
+  function teleEnd(a, ext) { var len = TELE.len + (ext || 0); return [TELE.pivot[0] + Math.cos(a) * len, TELE.pivot[1] + Math.sin(a) * len]; }
+  // st = { a (boom angle, + down), ext (m), curl (fork angle, + tips down), load (0..1 muck on the fork), grip }
+  function teleBoom(ctx, st) {
+    var T = "#F2B33A", TD = "#C98A1A", l0 = LW(), a = st.a || 0, c = Math.cos(a), s = Math.sin(a);
+    var p = TELE.pivot, e = teleEnd(a, st.ext), m = [p[0] + c * 3.3, p[1] + s * 3.3];
+    tube(ctx, 0.35, -1.35, p[0] + c * 1.9, p[1] + s * 1.9 + 0.18, 0.13, G.steel);
+    tube(ctx, m[0] - c * 0.4, m[1] - s * 0.4, e[0], e[1], 0.26, TD);
+    tube(ctx, p[0], p[1], m[0], m[1], 0.42, T);
+    shine(ctx, p[0] + c * 0.3, p[1] + s * 0.3 - 0.1, m[0] - c * 0.2, m[1] - s * 0.2 - 0.1, 0.06);
+    Cc(ctx, p[0], p[1], 0.16, "#7C8696", l0);
+    ctx.save(); ctx.translate(e[0], e[1]); ctx.rotate(st.curl || 0);
+    // the muck fork: a carriage, long tines, and the grab jaws that close on top
+    Rr(ctx, -0.12, -0.42, 0.26, 0.92, 0.05, "#5D6675", l0 * 0.8);
+    if (st.load > 0.02) muckMound(ctx, 0.2, 1.5, 0.4, 0.15 + st.load * 0.5, 7);
+    tube(ctx, 0.08, 0.42, 1.55, 0.4, 0.08, "#C3CCD6");
+    Ln(ctx, 1.5, 0.4, 1.62, 0.3, INK, 0.08);
+    var j = 0.25 + (1 - clamp(st.grip || 0, 0, 1)) * 0.55;
+    ctx.save(); ctx.translate(0.05, -0.38); ctx.rotate(-j + 0.25);
+    tube(ctx, 0, 0, 1.3, 0.2, 0.09, "#5D6675");
+    for (var i = 0; i < 3; i++) Ln(ctx, 0.5 + i * 0.35, 0.15, 0.55 + i * 0.35, 0.36, INK, 0.06);
+    ctx.restore();
+    Cc(ctx, 0, 0, 0.08, "#C3CCD6", l0 * 0.6);
+    ctx.restore();
+  }
+  // A cow (black and white), origin at its feet in the middle, facing +x. ph = head bob phase.
+  function cow(ctx, ph, f, time) {
+    var l0 = LW(), bob = Math.max(0, Math.sin(ph)) * 0.25, i;
+    [[-0.72, 0], [-0.52, 1], [0.55, 0], [0.75, 1]].forEach(function (g) { Ln(ctx, g[0], -0.85, g[0] + (g[1] ? 0.03 : -0.03), 0, INK, 0.17); Ln(ctx, g[0], -0.85, g[0] + (g[1] ? 0.03 : -0.03), -0.05, g[1] ? "#F4F4F4" : "#2A2D38", 0.11); });
+    Ln(ctx, -0.95, -1.32, -1.08, -0.72, INK, 0.06); Cc(ctx, -1.08, -0.7, 0.07, "#2A2D38", 0);
+    SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, "#FAFAFA");
+    ctx.save(); SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); ctx.clip();
+    [[-0.55, -1.3, 0.35], [0.25, -1.05, 0.3], [0.7, -1.45, 0.22], [-0.95, -0.85, 0.25]].forEach(function (b) { Cc(ctx, b[0], b[1], b[2], "#2A2D38", 0); });
+    ctx.restore(); SH.rr(ctx, -1.0, -1.5, 1.95, 0.78, 0.3); fs(ctx, null, l0);
+    ctx.beginPath(); ctx.ellipse(-0.42, -0.72, 0.18, 0.1, 0, 0, TAU); fs(ctx, "#F2A9B4", l0 * 0.6);
+    ctx.save(); ctx.translate(0.95, -1.32 + bob); ctx.rotate(0.35 + bob * 0.8);
+    ctx.beginPath(); ctx.ellipse(0.25, 0, 0.34, 0.22, 0, 0, TAU); fs(ctx, "#2A2D38");
+    ctx.beginPath(); ctx.ellipse(0.12, -0.02, 0.14, 0.18, 0, 0, TAU); fs(ctx, "#FAFAFA", 0);
+    ctx.beginPath(); ctx.ellipse(0.52, 0.06, 0.15, 0.13, 0, 0, TAU); fs(ctx, "#F2A9B4", l0 * 0.7);
+    Pp(ctx, [0.0, -0.16, -0.2, -0.3, -0.05, -0.12], "#2A2D38", l0 * 0.6);
+    Cc(ctx, 0.3, -0.07, 0.045, INK, 0);
+    if (f) face(ctx, 0.18, -0.08, 0.06, 0.18, f, time, 0.08);
+    ctx.restore();
+  }
+
+  // =====================================================================================================
+  // Machine state
+  // =====================================================================================================
+  var heap = { V: 0.45, tgt: 0.45, steam: 0 };
+  var floorMuck = { b: BX1, clean: BX1 };          // muck on the passage floor from HX1 to clean
+  var scr = { x: SCR_START + 8, v: 0, wheel: 0, st: "away", t: 0, roll: 0, tip: 0, lift: 1 };
+  var tele = { x: TX, d: 0, dir: 1, a: 0.25, ext: 0, curl: -0.1, load: 0, grip: 0, wheel: 0, st: "idle", t: 0, n: 0 };
+  var rig = { x: EYE, v: 0, wheel: 0, st: "park", load: 0, beat: 0, door: 0, spray: 0, arm: 0, fillT: -1, flow: 0, burp: 0 };
+  var field = { stage: "hungry", from: "muck", g: 0, wipe: null };
+  var lagoon = { level: 1, stir: 0 };
+  var phase = "arrive", phaseT = 0, stepId = "scrape", auto = false, grab = null, ending = false, dusk = 0, time = 0;
+  var faceT = 0, gulls = null, dog = null, win = null, cowNod = -1, cowNodT = 0;
+
+  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
+  function rear() { return rig.x + REAR[job]; }
+  function firstStep() { return job === "slurry" ? "fill" : "scrape"; }
+  function spreading() { return stepId === "spread" && phase === "work" && rig.st === "go"; }
+
+  // =====================================================================================================
+  // The stage: one view, or two (the yard on top, the field below) on an upright stage
+  // =====================================================================================================
+  var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  var W = 300, H = 300, DPR = 1, split = false;
+  // RF: the wide view (the whole rig, following the action). RC: on a split stage, the close-up of the work.
+  var RF = { x: 0, y: 0, w: 300, h: 300 }, RC = { x: 0, y: 150, w: 300, h: 150 };
+  var zF = { span: 16, mh: 5, target: 16, mht: 5 }, zC = { span: 7, mh: 3, target: 7, mht: 3 };
+  function fitFor(z) { return function (w, h) { return Math.min(w * 0.92 / z.span, h * 0.6 / z.mh); }; }
+  var scF = new Farm.Scene({ L: L, xmin: -15, xmax: XMAX, rowDz: 0.5, fit: fitFor(zF) });
+  var scC = new Farm.Scene({ L: L, xmin: -15, xmax: XMAX, rowDz: 0.5, fit: fitFor(zC) });
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(50, r.width); H = Math.max(50, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // like Spuds in Mud: the wide view and the close-up side by side on a wide stage, stacked otherwise
+    split = true;
+    if (W / H > 1.4) { var fw = Math.round(W * 0.56); RF = { x: 0, y: 0, w: fw, h: H }; RC = { x: fw, y: 0, w: W - fw, h: H }; }
+    else { var hy = Math.round(H * 0.5); RF = { x: 0, y: 0, w: W, h: hy }; RC = { x: 0, y: hy, w: W, h: H - hy }; }
+    scF.layout(RF.w, RF.h); scC.layout(RC.w, RC.h);
+    follow(0, true);
+  }
+  function regOf(sc) { return sc === scC ? RC : RF; }
+  function onScreen(sc, x, y) { var b = cv.getBoundingClientRect(), R = regOf(sc); return { x: b.left + R.x + x, y: b.top + R.y + y }; }
+  function scOf() { return scF; }
+  function SS(sc) { return sc.k; }
+  function scr2(sc, x, h) { return onScreen(sc, sc.X(x, 1), sc.gY - h * sc.k); }
+
+  // ---------- Coach, counter, name tags ----------
+  var coach = Toybox.coach($("coach"));
+  function setLoads() { var el = $("loads"); el.textContent = "Loads: " + loads; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  $("loads").textContent = "Loads: " + loads;
+  function tagW(sc, text, x, h) {
+    var R = regOf(sc), px = clamp(sc.X(x, 1), 70, R.w - 70), py = clamp(sc.gY - h * sc.k, 34, R.h - 20), p = onScreen(sc, px, py);
+    Toybox.nametag(text, p.x, p.y, 2400);
+  }
+  var tagged = {};
+  function tagOnce(id, sc, text, x, h) { if (tagged[id]) return; tagged[id] = 1; tagW(sc, text, x, h); }
+
+  // =====================================================================================================
+  // The jobs and their steps
+  // =====================================================================================================
+  var STEPS = {
+    muck: [
+      { id: "scrape", name: "Scrape", go: "Scrape it", coach: "The scraper pushes the muck." },
+      { id: "load", name: "Load", go: "Load it", coach: "Fill up the muck spreader." },
+      { id: "spread", name: "Spread", go: "Spread it", coach: "Spread the muck on the field." }
+    ],
+    slurry: [
+      { id: "fill", name: "Fill", go: "Fill it", coach: "Fill the tanker with slurry." },
+      { id: "spread", name: "Spread", go: "Spread it", coach: "Spread the slurry on the grass." }
+    ]
+  };
+  var BUSY = {
+    scrape: "The scraper is pushing the muck.", load: "The telehandler is loading.", fill: "The tank is filling up.",
+    spread: "The spreader is spreading.", spreadS: "The tanker is spreading."
+  };
+
+  // ---------- Pictures for the steps and the job tabs (drawn with the scene's own code) ----------
+  var picCache = {};
+  function pic(id) {
+    if (picCache[id] !== undefined) return picCache[id];
+    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
+    c.width = PW; c.height = PH;
+    try { x = c.getContext("2d"); } catch (e) { x = null; }
+    if (!x) return (picCache[id] = "");
+    var keep = ctx;
+    function fit(w, h, ox, fn) { var s = Math.min(PW * 0.94 / w, PH * 0.9 / h); Farm.inUnits(x, PW / 2 + ox * s, PH * 0.95, s, 3.4, fn); }
+    ctx = x;
+    try {
+      if (id === "scraper") fit(6.6, 3.5, 0, function () {
+        x.scale(-1, 1); x.translate(-1.9, 0); muckMound(x, 4.65, 5.5, 0, 0.7, 2); scraper(x, { lift: 0 }); D.tractor(x, {});
+      });
+      else if (id === "tele") fit(7.6, 4.4, 0, function () {
+        x.translate(-1.5, 0);
+        teleBoom(x, { a: -0.28, ext: 0.4, curl: -0.3, load: 1, grip: 1 }); teleBody(x, {});
+      });
+      else if (id === "spreader" || id === "muck") fit(13.4, 3.6, 0, function () {
+        x.scale(-1, 1); x.translate(1.0, -0.5);
+        spreader(x, { load: 0.8, beat: 0.6, door: 0 }); x.translate(-Farm.DRAWBAR[0], 0.5); D.tractor(x, { drawbar: true });
+      });
+      else if (id === "tanker" || id === "slurry") fit(14.2, 3.6, 0, function () {
+        x.scale(-1, 1); x.translate(1.4, -0.5);
+        tanker(x, { load: 0.6 }); x.translate(-Farm.DRAWBAR[0], 0.5); D.tractor(x, { drawbar: true });
+      });
+      else if (id === "fill") fit(10.2, 4.0, 0, function () {
+        x.scale(-1, 1); x.translate(4.65, -0.5);
+        x.save(); x.translate(0, 0); tube(x, TK.arm[0], TK.arm[1], TK.arm[0] - 2.6, TK.arm[1] + 2.8, 0.38, "#4E5463"); x.restore();
+        x.beginPath(); x.ellipse(TK.arm[0] - 2.6, 0.45, 1.3, 0.25, 0, 0, TAU); fs(x, SLURRY[0]);
+        tanker(x, { load: 0.7 });
+      });
+    } finally { ctx = keep; }
+    var url = "";
+    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
+    return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
+  }
+  var PICS = { scrape: "scraper", load: "tele", spread: "spreader", fill: "fill" };
+  function stepList(j) { return STEPS[j].map(function (s) { return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.id === "spread" && j === "slurry" ? "tanker" : PICS[s.id]) }; }); }
+
+  // ---------- Steps, job bar, bottom bar, ghost ----------
+  var ghost = Toybox.ghost({
+    max: 3,
+    onShow: function (p, on) { if (steps) steps.pulse(on); },
+    plan: function () {
+      if (locked()) return null;
+      if (phase === "ready") {
+        var p = partScreen(stepId);
+        if (!p) return null;
+        if ((stepId === "scrape" || stepId === "spread") && ghost.shown("go") >= 1) return { pts: [[p.x, p.y], [p.x - Math.min(W * 0.3, 140), p.y]], key: "go" };
+        return { pts: [[p.x, p.y]], tap: true, key: "go" };
+      }
+      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      return null;
+    }
+  });
+  function mkSteps(el, j) { return Toybox.steps(el, { steps: stepList(j), coach: coach, ghost: ghost, onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); } }); }
+  var stepsM = mkSteps($("stepsMuck"), "muck"), stepsS = mkSteps($("stepsSlurry"), "slurry");
+  var steps = job === "slurry" ? stepsS : stepsM;
+  function showSteps() {
+    steps = job === "slurry" ? stepsS : stepsM;
+    $("stepsMuck").hidden = job === "slurry"; $("stepsSlurry").hidden = job !== "slurry";
+  }
+  var jobs = Toybox.jobs($("jobs"), {
+    jobs: [{ id: "muck", name: "Spreader", pic: pic("muck") }, { id: "slurry", name: "Slurry tanker", pic: pic("slurry") }],
+    value: job,
+    onPick: function (id) { switchJob(id); }
+  });
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
+
+  function doGo() {
+    if (locked()) return false;
+    if (phase === "ready" || (phase === "work" && !auto && (stepId === "scrape" || stepId === "spread"))) return go();
+    if (phase === "done") return again();
+    busyHint(); return true;
+  }
+  function busyHint() {
+    if (phase === "grow") { coach.say("The grass is growing.", 3); return; }
+    if (phase === "arrive") { coach.say("Here comes the yard scraper.", 3); return; }
+    if (phase === "leave") { coach.say("The telehandler is next.", 3); return; }
+    if (phase === "work") { snd.horn(); coach.say(stepId === "spread" && job === "slurry" ? BUSY.spreadS : BUSY[stepId], 3); }
+  }
+
+  // =====================================================================================================
+  // The flow
+  // =====================================================================================================
+  function setPhase(p) { phase = p; phaseT = 0; }
+  function bringIn(id) {
+    stepId = id; steps.at(id); auto = false; grab = null;
+    if (id === "scrape") {
+      floorMuck.clean = BX1; scr.roll = 0; scr.tip = 0; scr.lift = 1;
+      scr.st = "in"; scr.x = SCR_START + 9; scr.v = 0;
+      setPhase("arrive"); steps.busy(true);
+    } else if (id === "load") {
+      setPhase("ready"); steps.busy(false);
+      tagW(scOf(TX), "Telehandler", TX, 3.6);
+    } else if (id === "fill") {
+      setPhase("ready"); steps.busy(false);
+      tagW(scOf(rig.x + 4), "Slurry tanker", rig.x + 4, 3.3);
+    } else if (id === "spread") {
+      setPhase("ready"); steps.busy(false);
+      tagW(scOf(rig.x + 3), job === "slurry" ? "Slurry tanker" : "Muck spreader", rig.x + 4, 3.0);
+    }
+  }
+  function go() {
+    if (phase === "ready") {
+      if (ghost) ghost.learned("go");
+      setPhase("work"); snd.horn(); steps.busy(true);
+      if (stepId === "scrape") { scr.st = "push"; auto = true; coach.say("The muck goes onto the heap.", 4); tagW(scOf(scr.x - 4.5), "Yard scraper", scr.x - 4.5, 1.6); }
+      else if (stepId === "load") { tele.st = "load"; tele.t = 0; tele.n = 0; coach.say("The muck fork lifts the muck.", 4); }
+      else if (stepId === "fill") { rig.fillT = 0; coach.say("The suction arm sucks it up.", 4); }
+      else if (stepId === "spread") {
+        rig.st = "go"; auto = true; rig.load0 = rig.load;
+        field.from = job; field.wipe = null;
+        coach.say(job === "slurry" ? "Off to the field!" : "Off to the field!", 3);
+      }
+      return true;
+    }
+    if (phase === "work" && !auto && (stepId === "scrape" || stepId === "spread")) { auto = true; steps.busy(true); return true; }
+    return false;
+  }
+  function scrapeDone() { steps.done("scrape"); bringIn("load"); }
+  function loadDone() { steps.done("load"); bringIn("spread"); }
+  function fillDone() { steps.done("fill"); bringIn("spread"); }
+  function spreadDone() {
+    loads++; save(); setLoads(); snd.chime();
+    Farm.world.update(function (w) { w.muck = (typeof w.muck === "number" && isFinite(w.muck) ? w.muck : 0) + 1; });
+    field.stage = job; field.wipe = null;
+    setPhase("grow"); steps.busy(true); auto = false; grab = null;
+    coach.say("Weeks go by. The grass grows.", 3);
+  }
+  function grown() {
+    field.stage = "lush"; field.g = 1;
+    setPhase("done"); steps.done("spread"); steps.finish("Again!"); steps.busy(false);
+    coach.say("The grass grows thick and green!", 5);
+    snd.chime(); Toybox.kind();
+  }
+  function again() {
+    if (phase !== "done") return false;
+    if (ghost) ghost.learned("again");
+    steps.reset(); field.stage = "hungry"; field.g = 0; field.wipe = null;
+    parkRig();
+    bringIn(firstStep());
+    coach.say("The cows made more muck!", 3);
+    return true;
+  }
+  function parkRig() { rig.x = EYE; rig.v = 0; rig.st = "park"; rig.load = 0; rig.door = 0; rig.arm = 0; rig.fillT = -1; rig.flow = 0; rig.spray = 0; }
+  function resetYard() {
+    heap.V = heap.tgt = 0.45; tele.st = "idle"; tele.d = 0; tele.dir = 1; tele.a = 0.25; tele.ext = 0; tele.curl = -0.1; tele.load = 0; tele.grip = 0;
+    scr.st = "away"; scr.x = SCR_START + 9; floorMuck.clean = BX1; lagoon.level = 1; lagoon.stir = 0;
+    parkRig();
+  }
+  function startOver() {
+    if (locked()) return;
+    parts.length = 0; gulls = null; dog = null; win = null; faceT = 0; tagged = {};
+    resetYard(); field.stage = "hungry"; field.g = 0; field.wipe = null;
+    steps.reset(); bringIn(firstStep()); follow(0, true);
+    coach.say("A new day on the farm!", 3);
+    save();
+  }
+  function switchJob(id) {
+    if (locked()) { jobs.set(job); return; }
+    job = id === "slurry" ? "slurry" : "muck";
+    parts.length = 0; gulls = null; dog = null; win = null; tagged = {};
+    resetYard(); field.stage = "hungry"; field.g = 0; field.wipe = null;
+    showSteps(); steps.reset(); bringIn(firstStep()); follow(0, true);
+    coach.say(job === "slurry" ? "Slurry for the grass!" : "Muck for the grass!", 3);
+    save();
+  }
+
+  // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  var surpriseN = 0;
+  function actionX() {
+    if (stepId === "spread" && (rig.st === "go" || rig.st === "stop")) return rear() + 2.5;
+    if (phase === "grow" || phase === "done") return field ? L * 0.55 : 0;
+    if (stepId === "scrape" && scr.st !== "away") return scr.x - 6;
+    return job === "slurry" ? rear() - 2 : HX0 + HW / 2;
+  }
+  function surprise() {
+    if (locked()) return;
+    var pick = ["gulls", "dog", "window", "faces"][surpriseN++ % 4];
+    if (pick === "gulls") {
+      gulls = { t: 0, follow: spreading(), x: actionX(), list: [] };
+      if (!gulls.follow && rig.st === "home") gulls.x = L * 0.55;
+      for (var i = 0; i < 7; i++) gulls.list.push({ ox: (hash(i, 3) - 0.5) * 5, ph: hash(i, 4) * 6, h0: 2 + hash(i, 5) * 2.5 });
+      coach.say(gulls.follow ? (job === "slurry" ? "The seagulls follow the tanker!" : "The seagulls follow the spreader!") : "Here come the seagulls!", 4);
+      return;
+    }
+    if (pick === "dog") {
+      var ax = phase === "done" || phase === "grow" ? EYE + REAR[job] - 1.5 : actionX(), from = ax - 11;
+      dog = { x: from, stop: ax - 2.6, t: 0, st: "run", ph: 0, jump: 0, lump: null, flip: false };
+      coach.say("The farm dog comes to see.", 3);
+      return;
+    }
+    if (pick === "window") {
+      var useScr = stepId === "scrape" && scr.st !== "away" && scr.st !== "back";
+      win = { t: 0, who: useScr ? "scr" : "rig", splat: 0, glass: 0, wipe: 0 };
+      coach.say("Quick, shut the window!", 3);
+      return;
+    }
+    faceT = 6; cowNod = 1; cowNodT = 0; coach.say("Hello, machines!", 3);
+  }
+
+  // =====================================================================================================
+  // Particles (world x, height h in metres; drawn on the machine line)
+  // =====================================================================================================
+  var parts = [];
+  function addPart(p) { if (parts.length > 220) parts.shift(); p.t = 0; p.rot = p.rot || Math.random() * 3; parts.push(p); }
+  function updateParts(dt) {
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i]; p.t += dt;
+      if (p.t >= p.life) { parts.splice(i, 1); continue; }
+      if (p.kind === "puff") { p.x += p.vx * dt; p.h += p.vh * dt; p.size += (p.grow || 0.5) * dt; continue; }
+      p.vh -= (p.g === undefined ? 9 : p.g) * dt; p.x += p.vx * dt; p.h += p.vh * dt; p.rot += (p.spin || 0) * dt;
+      var fl = p.floor || 0;
+      if (p.h < fl) { p.h = fl; p.vh = 0; p.vx *= 0.2; p.spin = 0; if (p.t < p.life - 0.25) p.t = p.life - 0.25; }
+    }
+  }
+  function drawParts(sc) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], s = sc.k, x = sc.X(p.x, 1), y = sc.gY - p.h * s, z = Math.max(1, p.size * s * (sc === scC ? 0.6 : 1)), f = p.t / p.life;
+      if (x < -40 || x > sc.W + 40) continue;
+      ctx.globalAlpha = p.kind === "puff" ? (p.alpha || 0.5) * (1 - f) : (f > 0.7 ? (1 - f) / 0.3 : 1);
+      ctx.fillStyle = p.col;
+      if (p.kind === "puff" || p.kind === "drop") { ctx.beginPath(); ctx.arc(x, y, z, 0, TAU); ctx.fill(); }
+      else if (p.kind === "straw") { ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.fillRect(-z, -z * 0.2, z * 2, z * 0.4); ctx.restore(); }
+      else { ctx.beginPath(); ctx.ellipse(x, y, z * 1.2, z * 0.85, p.rot, 0, TAU); ctx.fill(); if (z > 3) { ctx.lineWidth = Math.max(1, sc.lw * 0.5); ctx.strokeStyle = INK; ctx.stroke(); } }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function muckCol() { var r = Math.random(); return r < 0.45 ? MUCK[0] : (r < 0.8 ? MUCK[1] : MUCK[3]); }
+
+  // =====================================================================================================
+  // Input
+  // =====================================================================================================
+  function partScreen(id) {
+    if ((id === "scrape" || id === "scraper") && scr.st !== "away") return scr2(scOf(scr.x - 2.5), scr.x - 2.5, 1.6);
+    if (id === "load" || id === "tele") return scr2(scOf(tele.x), tele.x + tele.d, 1.7);
+    if (id === "fill" || id === "spread" || id === "rig") return scr2(scOf(rig.x + 3), rig.x + 2.5, 1.6);
+    return null;
+  }
+  var press = Toybox.press(cv, {
+    any: true,
+    parts: function () {
+      var list = [], p, sc;
+      if (scr.st !== "away") { sc = scOf(scr.x - 2.5); p = partScreen("scraper"); list.push({ id: "scraper", x: p.x, y: p.y, r: Math.max(44, sc.k * 2.3) }); }
+      if (job === "muck") { sc = scOf(TX); p = partScreen("tele"); list.push({ id: "tele", x: p.x, y: p.y, r: Math.max(44, sc.k * 2.2) }); }
+      sc = scOf(rig.x + 3); p = partScreen("rig"); list.push({ id: "rig", x: p.x, y: p.y, r: Math.max(46, sc.k * 3.4) });
+      if (job === "muck") { sc = scOf(HX0); p = scr2(sc, HX0 + HW / 2 + 0.5, 0.9); list.push({ id: "heap", x: p.x, y: p.y, r: Math.max(40, sc.k * 1.8) }); }
+      else { sc = scOf(LG1); p = onScreen(sc, sc.X(40.5, 1), sc.Y(1.4)); list.push({ id: "lagoon", x: p.x, y: p.y, r: Math.max(40, sc.k * 1.8) }); }
+      sc = scOf(BX0 + 6); p = scr2(sc, BX0 + 6.5, 1.4); list.push({ id: "barn", x: p.x, y: p.y, r: Math.max(40, sc.k * 2.4) });
+      if (split) { p = onScreen(scC, RC.w / 2, RC.h * 0.55); list.push({ id: "close", x: p.x, y: p.y, r: Math.min(RC.w, RC.h) * 0.45 }); }
+      return list;
+    },
+    dragStart: function (part, e, s) {
+      if (locked()) return;
+      var mine = (part === "scraper" && stepId === "scrape") || (part === "rig" && stepId === "spread");
+      if (!mine || (phase !== "ready" && phase !== "work")) return;
+      if (phase === "ready") go();
+      var X0 = part === "scraper" ? scr.x : rig.x;
+      auto = false; grab = { who: part, off: dragWorld(s.x, part === "scraper" ? scr.x : rig.x) - X0 };
+      if (ghost) ghost.learned("go");
+    },
+    move: function (part, e, s) { if (grab) grab.to = dragWorld(s.x, grab.who === "scraper" ? scr.x : rig.x) - grab.off; },
+    up: function (part, e, s) { if (grab && !s.tap && phase === "work") { auto = true; steps.busy(true); } grab = null; },
+    tap: function (part, x, y) {
+      if (locked()) return;
+      if (part === "close") part = stepId === "scrape" ? "scraper" : (stepId === "load" ? "tele" : (stepId === "fill" || stepId === "spread" ? "rig" : null));
+      var mine = (part === "scraper" && stepId === "scrape") || (part === "tele" && stepId === "load") || (part === "rig" && (stepId === "fill" || stepId === "spread"));
+      if (mine && (phase === "ready" || (phase === "work" && !auto))) { go(); return; }
+      if (part === "scraper") { snd.horn(); tagW(scOf(scr.x - 4.5), "Yard scraper", scr.x - 4.5, 1.6); return; }
+      if (part === "tele") { snd.horn(); tagW(scOf(TX), tele.st === "load" ? "Muck fork" : "Telehandler", tele.x + tele.d, 3.6); return; }
+      if (part === "rig") {
+        snd.horn();
+        var sl = job === "slurry";
+        tagW(scOf(rig.x + 3), spreading() ? (sl ? "Splash plate" : "Beaters") : (sl ? (rig.fillT >= 0 ? "Suction arm" : "Slurry tanker") : "Muck spreader"), spreading() ? rear() : rig.x + 4, sl ? 3.2 : 2.9);
+        return;
+      }
+      if (part === "heap") { tagW(scOf(HX0), "Muck heap", HX0 + HW / 2, 2.6); for (var i = 0; i < 5; i++) addPart({ kind: "puff", x: HX0 + 1 + Math.random() * 3, h: 1.4 + Math.random(), vx: 0.1, vh: 0.6, life: 1.6, size: 0.15, grow: 0.3, col: "#E8ECEF", alpha: 0.5 }); steps.sayStep(); return; }
+      if (part === "lagoon") { tagW(scOf(LG1), "Slurry lagoon", 40, 1.2); lagoon.stir = 1.5; snd.pop(); steps.sayStep(); return; }
+      if (part === "barn") { tagW(scOf(BX0 + 6), "Cows", BX0 + 6.5, 2.2); cowNod = Math.floor(Math.random() * 4); cowNodT = 0; return; }
+      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep();
+      if (ghost) ghost.poke();
+    }
+  });
+  function dragWorld(clientX, nearX) { var sc = scOf(nearX), b = cv.getBoundingClientRect(); return sc.wx(clientX - b.left - regOf(sc).x, 1); }
+
+  // =====================================================================================================
+  // Simulation
+  // =====================================================================================================
+  function yardFocus() {
+    if (stepId === "scrape" && (scr.st === "in" || scr.st === "wait" || scr.st === "push" || scr.st === "tip")) return Math.max(HX0 + 2, scr.x - 3.2);
+    if (job === "slurry") return 31.5;
+    return 33.4;
+  }
+  function fieldFocus() {
+    if (stepId === "spread" && (phase === "work" || rig.st === "stop") && rig.x < EYE - 0.5) return rig.x + 2.2;
+    return L / 2;
+  }
+  function yardSpan() {
+    if (stepId === "scrape" && scr.st !== "away" && scr.st !== "back") return 14;
+    return job === "slurry" ? 20 : 24;
+  }
+  // the close-up: [world x of the work, metres across, metres high]
+  function closeFocus() {
+    if (phase === "grow" || phase === "done") return [L * 0.55, 6, 2.2];
+    if (stepId === "scrape") {
+      if (scr.st === "tip") return [HX1 - 0.3, 6.5, 2.8];
+      if (scr.st === "back" || scr.st === "away") return [HX0 + HW / 2 + 0.5, 6.5, 2.8];
+      return [scr.x - 5.6 - scr.roll * 0.6, 6.5, 2.6];
+    }
+    if (stepId === "load") {
+      if (tele.st === "load" && tele.dir < 0.3) return [Math.min(forkWorld()[0] + 0.6, TX - 2.0), 7.5, 4.8];
+      return [TX + 3.3, 7.5, 4.8];
+    }
+    if (stepId === "fill") return [rig.x + 8.6, 7.5, 3.8];
+    if (stepId === "spread") return [rear() + (rig.st === "go" ? 1.8 : 0.6), 6.5, job === "slurry" ? 3.3 : 3.2];
+    return [L * 0.55, 6, 2.2];
+  }
+  function inField() { return phase === "grow" || phase === "done" || (stepId === "spread" && phase === "work" && rig.x < L + 3); }
+  function follow(dt, snap) {
+    var e = dt * 2.2;
+    zF.target = inField() ? (phase === "work" || rig.st === "stop" ? 18 : 22) : yardSpan();
+    if (stepId === "spread" && phase === "work") zF.target = 18;
+    zF.mht = 5.2;
+    var cf = closeFocus(); zC.target = cf[1]; zC.mht = cf[2];
+    [[zF, scF, RF], [zC, scC, RC]].forEach(function (q) {
+      var z = q[0];
+      if (snap) { z.span = z.target; z.mh = z.mht; q[1].layout(q[2].w, q[2].h); }
+      else if (Math.abs(z.span - z.target) > 0.02 || Math.abs(z.mh - z.mht) > 0.02) { z.span += (z.target - z.span) * Math.min(1, e); z.mh += (z.mht - z.mh) * Math.min(1, e); q[1].layout(q[2].w, q[2].h); }
+    });
+    if (split) scC.follow(cf[0], Math.abs(cf[0] - scC.cam) > 12 ? dt * 3 : dt * 1.6, snap);
+    var target = inField() ? fieldFocus() : (stepId === "spread" ? Math.min(rig.x + 3.5, yardFocus()) : yardFocus());
+    scF.follow(target, dt * 1.4, snap);
+  }
+  var engLevel = 0;
+  function update(dt) {
+    time += dt; phaseT += dt;
+    var work = 0;
+    // heap and steam
+    heap.V += (heap.tgt - heap.V) * Math.min(1, dt * 3);
+    if (job === "muck" && Math.random() < dt * 1.6) addPart({ kind: "puff", x: HX0 + 0.8 + Math.random() * (HW - 1), h: heapH(HX0 + HW / 2) * 0.9, vx: 0.15, vh: 0.5, life: 2.2, size: 0.12, grow: 0.25, col: "#EEF2F5", alpha: 0.35 });
+    if (scr.st !== "away") work = Math.max(work, updateScraper(dt));
+    if (job === "muck") work = Math.max(work, updateTele(dt));
+    work = Math.max(work, updateRig(dt));
+    if (phase === "grow") { field.g = ease(clamp(phaseT / 3.6, 0, 1)); if (phaseT >= 3.6) grown(); }
+    lagoon.stir = Math.max(0, lagoon.stir - dt);
+    if (faceT > 0) faceT = Math.max(0, faceT - dt);
+    if (cowNod >= 0) { cowNodT += dt; if (cowNodT > 2.4) cowNod = -1; }
+    if (gulls) updateGulls(dt);
+    if (dog) updateDog(dt);
+    if (win) updateWin(dt);
+    if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    updateParts(dt);
+    follow(dt);
+    engLevel += (work - engLevel) * Math.min(1, dt * 4);
+    snd.engine(ending ? -1 : 0.15 + engLevel * 0.85);
+    snd.soil(spreading() && job === "muck" && rear() < L ? 0.6 : (scr.st === "push" ? 0.4 : 0));
+    snd.pour(spreading() && job === "slurry" && rear() < L ? 0.7 : (rig.flow > 0.5 ? 0.5 : 0));
+  }
+  // the yard scraper: in through the barn, push the muck down the passage, tip it on the heap, back out
+  function updateScraper(dt) {
+    var s = scr.st, w = 0;
+    if (s === "in") {
+      var d = scr.x - SCR_START; scr.v = -clamp(d * 2.2, 1.2, 9); scr.x += Math.max(scr.v * dt, -d); w = 0.5;
+      if (d < 0.03) { scr.x = SCR_START; scr.v = 0; scr.st = "wait"; scr.lift = 0; setPhase("ready"); steps.busy(false); snd.clunk(); tagW(scOf(scr.x - 4.5), "Yard scraper", scr.x - 4.5, 1.6); }
+    } else if (s === "wait") { scr.lift = Math.max(0, scr.lift - dt * 2); }
+    else if (s === "push") {
+      scr.lift = Math.max(0, scr.lift - dt * 3);
+      var vt = 0;
+      if (grab && grab.to !== undefined) vt = -clamp((scr.x - grab.to) * 3, 0, V_SCRAPE * 1.5);
+      else if (auto) vt = -V_SCRAPE;
+      scr.v += (vt - scr.v) * Math.min(1, dt * (Math.abs(vt) > Math.abs(scr.v) ? 3 : 6));
+      scr.x = Math.max(SCR_END, scr.x + scr.v * dt); w = Math.abs(scr.v) / V_SCRAPE;
+      var blade = scr.x - 4.6;
+      floorMuck.clean = Math.min(floorMuck.clean, blade + 0.25);
+      scr.roll = clamp((BX1 - blade) / (BX1 - HX1), 0, 1);
+      if (Math.abs(scr.v) > 0.5 && Math.random() < dt * 10) addPart({ kind: "lump", x: blade - 0.6 - Math.random() * 0.6, h: 0.5 + scr.roll * 0.5, vx: -0.8 - Math.random(), vh: 0.8 + Math.random(), g: 9, life: 0.5, size: 0.08, col: muckCol() });
+      if (scr.x <= SCR_END + 0.01) { scr.st = "tip"; scr.t = 0; scr.v = 0; grab = null; auto = false; }
+    } else if (s === "tip") {
+      scr.t += dt; scr.tip = clamp(scr.t / 0.8, 0, 1);
+      if (scr.t < 0.8 && Math.random() < dt * 20) addPart({ kind: "lump", x: HX1 - 0.2 - Math.random() * 0.8, h: 0.7 + Math.random() * 0.4, vx: -1.2 - Math.random(), vh: 0.6 + Math.random(), g: 9, life: 0.55, size: 0.1, col: muckCol(), floor: 0 });
+      if (scr.t > 0.3 && heap.tgt < 0.85) { heap.tgt = 0.85; snd.clunk(); }
+      if (scr.t > 1.0) { scr.st = "back"; scr.t = 0; scr.lift = 1; setPhase("leave"); coach.say("The muck heap is big now.", 3); }
+    } else if (s === "back") {
+      scr.t += dt; scr.v = Math.min(9, scr.v + dt * 6); scr.x += scr.v * dt; w = 0.6;
+      if (scr.t > 1.3 && stepId === "scrape") scrapeDone();
+      if (scr.x > XMAX + 8) { scr.st = "away"; scr.v = 0; }
+    }
+    scr.wheel += -scr.v * dt;
+    return w;
+  }
+  // the telehandler: two forkfuls from the heap, turning round to drop each one in the spreader
+  var TCYC = 2.9;
+  function updateTele(dt) {
+    if (tele.st !== "load") { tele.a += (0.25 - tele.a) * Math.min(1, dt * 3); tele.dir += (1 - tele.dir) * Math.min(1, dt * 4); return 0; }
+    tele.t += dt;
+    var n = Math.floor(tele.t / TCYC), f = tele.t - n * TCYC, k;
+    if (n >= 2) { tele.st = "idle"; tele.d = 0; tele.dir = 1; tele.load = 0; tele.grip = 0; tele.curl = -0.1; tele.ext = 0; loadDone(); return 0.3; }
+    var A_LOW = 0.39, A_CARRY = -0.2, A_DROP = -0.33;
+    if (f < 0.55) { k = ease(f / 0.55); tele.a = lerp(0.25, A_LOW, k); tele.d = 0.9 * k; tele.dir = 1; tele.curl = 0; tele.grip = 0; tele.ext = 0; }
+    else if (f < 0.85) {
+      k = ease((f - 0.55) / 0.3); tele.curl = -0.35 * k; tele.grip = k;
+      if (tele.load < 0.5 && k > 0.5) { tele.load = 1; heap.tgt = Math.max(0.3, heap.tgt - 0.24); snd.clunk(); for (var i = 0; i < 6; i++) addPart({ kind: "lump", x: tele.x + 4.0 + Math.random() * 0.6, h: 0.5 + Math.random() * 0.6, vx: (Math.random() - 0.5) * 1.5, vh: 1 + Math.random(), g: 9, life: 0.5, size: 0.08, col: muckCol() }); }
+    }
+    else if (f < 1.25) { k = ease((f - 0.85) / 0.4); tele.a = lerp(A_LOW, A_CARRY, k); tele.d = 0.9 * (1 - k); }
+    else if (f < 1.65) { k = ease((f - 1.25) / 0.4); tele.dir = Math.cos(Math.PI * k); }
+    else if (f < 2.0) { k = ease((f - 1.65) / 0.35); tele.dir = -1; tele.a = lerp(A_CARRY, A_DROP, k); tele.ext = 1.0 * k; }
+    else if (f < 2.35) {
+      k = ease((f - 2.0) / 0.35); tele.grip = 1 - k; tele.curl = lerp(-0.35, 0.95, k);
+      if (tele.load > 0.5 && k > 0.4) {
+        tele.load = 0; rig.load = Math.min(1, rig.load + 0.5); snd.clunk();
+        var e = forkWorld();
+        for (var j = 0; j < 14; j++) addPart({ kind: "lump", x: e[0] - Math.random() * 1.2, h: e[1] - 0.2, vx: (Math.random() - 0.5) * 1.2, vh: -Math.random(), g: 10, life: 0.5, size: 0.1, col: muckCol(), floor: 2.3 });
+      }
+    }
+    else { k = ease((f - 2.35) / 0.55); tele.ext = 1 - k; tele.curl = lerp(0.95, 0, k); tele.a = lerp(A_DROP, 0.25, k); tele.dir = -Math.cos(Math.PI * k); }
+    return 0.8;
+  }
+  function forkWorld() { var e = teleEnd(tele.a, tele.ext); return [tele.x + tele.d * 1 + tele.dir * (e[0] + 0.8), -e[1]]; }
+  // the spreader / tanker: fill (tanker), drive out to the field and spread, reverse home during the weeks
+  function updateRig(dt) {
+    var w = 0;
+    if (rig.fillT >= 0) {
+      rig.fillT += dt; var t = rig.fillT;
+      rig.arm = ease(clamp(t / 0.9, 0, 1));
+      if (t > 0.9 && t < 4.6) { rig.flow = Math.min(1, rig.flow + dt * 3); rig.load = clamp((t - 0.9) / 3.7, 0, 1); lagoon.level = 1 - rig.load * 0.15; w = 0.7; if (Math.random() < dt * 4) addPart({ kind: "puff", x: rig.x + 1.95, h: 3.4, vx: 0.4, vh: 1.0, life: 0.9, size: 0.1, grow: 0.35, col: "#A0A6B4", alpha: 0.45 }); }
+      else rig.flow = Math.max(0, rig.flow - dt * 3);
+      if (t >= 4.6 && !rig.burp) {
+        rig.burp = 1; snd.pop(); coach.say("The tank is full!", 3);
+        for (var i = 0; i < 10; i++) addPart({ kind: "drop", x: rig.x + 4.2 + (Math.random() - 0.5) * 0.4, h: 3.1, vx: (Math.random() - 0.5) * 2.4, vh: 1.5 + Math.random() * 2, g: 9, life: 0.7, size: 0.07, col: SLURRY[Math.floor(Math.random() * 3)], floor: 2.75 });
+      }
+      if (t > 4.8) rig.arm = 1 - ease(clamp((t - 4.8) / 0.8, 0, 1));
+      if (t > 5.7) { rig.fillT = -1; rig.burp = 0; rig.arm = 0; rig.flow = 0; fillDone(); }
+    }
+    if (rig.st === "go") {
+      var vt = 0, r = rear();
+      if (grab && grab.to !== undefined) vt = -clamp((rig.x - grab.to) * 3, 0, 9);
+      else if (auto) vt = r > L + 0.3 ? -7 : -V_SPREAD;
+      rig.v += (vt - rig.v) * Math.min(1, dt * (Math.abs(vt) > Math.abs(rig.v) ? 2.5 : 5));
+      rig.x += rig.v * dt; r = rear();
+      w = Math.max(0.5, Math.abs(rig.v) / 7);
+      var on = r <= L + 0.2 && r > 0.2;
+      rig.door += ((on ? 1 : 0) - rig.door) * Math.min(1, dt * 4);
+      rig.spray += ((on ? 1 : 0) - rig.spray) * Math.min(1, dt * 5);
+      if (r <= L + 0.2) {
+        var bx = clamp(r + 1.0, 0, L);
+        if (!field.wipe) field.wipe = { bx: bx, dir: -1, to: job };
+        field.wipe.bx = Math.min(field.wipe.bx, bx);
+        rig.load = clamp(rig.load0 * (r - 0.3) / (L - 0.1), 0, 1);
+        if (Math.abs(rig.v) > 0.4) spreadFx(dt, r);
+        tagOnce((job === "slurry" ? "plate" : "beat") + loads, scOf(r), job === "slurry" ? "Splash plate" : "Beaters", r, 2.6);
+      }
+      if (r <= 0.35) { rig.st = "stop"; rig.v = 0; grab = null; spreadDone(); }
+    } else if (rig.st === "stop") {
+      rig.door = Math.max(0, rig.door - dt * 2); rig.spray = Math.max(0, rig.spray - dt * 3);
+      if (phaseT > 1.2) rig.st = "home";
+    } else if (rig.st === "home") {
+      var d = EYE - rig.x; rig.v = clamp(d * 1.6, 1.5, 11); rig.x += Math.min(rig.v * dt, d); w = 0.5;
+      if (d < 0.03) { rig.x = EYE; rig.v = 0; rig.st = "park"; }
+    }
+    rig.wheel += -rig.v * dt;
+    var beatOn = rig.st === "go" && job === "muck" && rear() <= L + 1.5;
+    rig.beat += dt * (beatOn ? 16 : (stepId === "spread" && phase === "ready" ? 2 : 0));
+    return w;
+  }
+  function spreadFx(dt, r) {
+    var i;
+    if (job === "muck") {
+      for (i = 0; i < 3; i++) if (Math.random() < dt * 30) addPart({ kind: "lump", x: r + 0.3, h: 0.9 + Math.random() * 1.5, vx: 3 + Math.random() * 5, vh: 1 + Math.random() * 3, g: 10, life: 0.75, size: 0.07 + Math.random() * 0.07, col: muckCol(), spin: 6 });
+      if (Math.random() < dt * 12) addPart({ kind: "straw", x: r + 0.3, h: 1.6 + Math.random(), vx: 2 + Math.random() * 4, vh: 2 + Math.random() * 2, g: 7, life: 0.8, size: 0.1, col: MUCK[2], spin: 9 });
+    } else {
+      for (i = 0; i < 4; i++) if (Math.random() < dt * 34) addPart({ kind: "drop", x: r + 0.4, h: 0.85, vx: 2 + Math.random() * 4.5, vh: 1.2 + Math.random() * 2.6, g: 10, life: 0.6, size: 0.07 + Math.random() * 0.07, col: SLURRY[Math.floor(Math.random() * 3)] });
+    }
+  }
+  function updateGulls(dt) {
+    var g = gulls; g.t += dt;
+    if (g.follow && rig.st === "go") g.x = rear() + 3;
+    else g.x += (actionX() - g.x) * Math.min(1, dt * 0.5);
+    if (g.t > 7.5) gulls = null;
+  }
+  function gullPos(gl, i) {
+    var g = gulls, t = g.t, x = g.x + gl.ox, h, flap = (t * 3 + gl.ph) % 1, land = false;
+    var ground = job === "muck" && !g.follow && x > HX0 && x < HX1 + 1 ? heapH(x) : 0;
+    if (t < 1.6) { var k = ease(t / 1.6); x -= (1 - k) * 14; h = lerp(gl.h0 + 6, gl.h0, k); }
+    else if (t < 6) {
+      if (g.follow) { h = 0.6 + 1.6 * Math.abs(Math.sin(t * 1.4 + gl.ph)); x += Math.sin(t * 0.9 + gl.ph) * 1.2; }
+      else { var kk = ease(clamp((t - 1.6) / 0.8, 0, 1)); h = lerp(gl.h0, ground + 0.25, kk); land = kk > 0.98; if (land) flap = 0.25; }
+    } else { var k2 = ease((t - 6) / 1.5); h = lerp(g.follow ? 1.2 : ground + 0.25, gl.h0 + 7, k2); x += k2 * 9; }
+    return { x: x, h: h, flap: flap, land: land, peck: land && Math.sin(t * 6 + gl.ph) > 0.6 };
+  }
+  function updateDog(dt) {
+    var g = dog; g.t += dt;
+    if (g.st === "run") { var dx = g.stop - g.x; g.x += clamp(dx * 2, -8, 8) * dt; g.ph += dt * 3; if (Math.abs(dx) < 0.2) { g.st = "sniff"; g.t = 0; } }
+    else if (g.st === "sniff") {
+      g.ph += dt * 0.6;
+      if (g.t > 0.7 && !g.lump) { g.lump = { t: 0, x0: g.stop + 2.6, h0: job === "muck" ? 1.6 : 1.0 }; }
+      if (g.lump) { g.lump.t += dt; if (g.lump.t > 0.25 && g.jump === 0) { g.st = "hop"; g.t = 0; snd.pop(); coach.say("The dog jumps out of the way!", 3); } }
+    } else if (g.st === "hop") {
+      g.jump = Math.sin(clamp(g.t / 0.5, 0, 1) * Math.PI); g.x -= 3.2 * dt; g.ph += dt * 2;
+      if (g.lump) g.lump.t += dt;
+      if (g.t > 0.5) { g.jump = 0; g.st = "go"; g.t = 0; g.flip = true; }
+    } else {
+      g.x -= 8 * dt; g.ph += dt * 3; if (g.lump) g.lump.t += dt;
+      if (g.t > 2.6) dog = null;
+    }
+    if (dog && dog.lump && dog.lump.t > 0.6 && !dog.lump.splat) {
+      dog.lump.splat = 1; snd.tick();
+      for (var i = 0; i < 8; i++) addPart({ kind: job === "slurry" ? "drop" : "lump", x: dog.stop + (Math.random() - 0.5) * 0.4, h: 0.1, vx: (Math.random() - 0.5) * 3, vh: 1 + Math.random() * 1.5, g: 9, life: 0.5, size: 0.06, col: job === "slurry" ? SLURRY[0] : muckCol() });
+    }
+  }
+  function updateWin(dt) {
+    var w = win; w.t += dt;
+    w.glass = clamp((w.t - 0.5) / 0.5, 0, 1);
+    if (w.t > 1.15 && !w.hit) { w.hit = 1; w.splat = 1; snd.tick(); coach.say("Just in time!", 3); }
+    if (w.t > 1.9) w.wipe = clamp((w.t - 1.9) / 1.0, 0, 1);
+    if (w.t > 3.2) win = null;
+  }
+
+  // =====================================================================================================
+  // Drawing
+  // =====================================================================================================
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawView(scF, RF);
+    if (split) { drawView(scC, RC); ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); if (RC.x > 0) { ctx.moveTo(RC.x, 0); ctx.lineTo(RC.x, H); } else { ctx.moveTo(0, RC.y); ctx.lineTo(W, RC.y); } ctx.stroke(); ctx.restore(); }
+  }
+  function drawView(sc, R) {
+    ctx.save(); ctx.translate(R.x, R.y);
+    ctx.beginPath(); ctx.rect(0, 0, R.w, R.h); ctx.clip();
+    drawWorld(sc);
+    ctx.restore();
+  }
+  function put(sc, x, dir, fn) {
+    var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
+    Farm.inUnits(ctx, sc.X(x, 1), sc.gY, sc.k, sc.lw, function () { ctx.scale(d, 1); fn(); });
+  }
+  function faceAmt() { return faceT > 0 ? Math.min(1, faceT, 6 - faceT) : 0; }
+  function drawWorld(sc) {
+    var P = { stage: field.stage, from: field.from, g: field.g, wipe: field.wipe, time: time };
+    sc.sky(ctx, { time: time, arc: phase === "grow" ? clamp(phaseT / 3.6, 0, 1) : null, season: "spring", dusk: dusk });
+    sc.hedge(ctx, { season: "spring" });
+    fieldPaint(sc, "far", P);
+    drawYard(sc);
+    if (job === "slurry") drawLagoon(sc);
+    drawBarn(sc);
+    drawFloorMuck(sc);
+    if (job === "muck") drawHeap(sc);
+    drawRig(sc);
+    if (job === "muck") drawTele(sc);
+    if (scr.st !== "away") drawScraper(sc);
+    if (job === "slurry") drawArm(sc);
+    if (spreading() && job === "slurry") drawFan(sc);
+    drawParts(sc);
+    if (win) drawLump(sc);
+    if (gulls) drawGulls(sc);
+    fieldPaint(sc, "near", P);
+    sc.verge(ctx, {});
+    if (dog) drawDog(sc);
+  }
+  function drawYard(sc) {
+    var x0 = L + 3, x1 = XMAX + 30, n = sc.night || 0;
+    if (sc.X(x0, 1) > sc.W + 20) return;
+    function quad(xa, xb, r0, r1, col) {
+      ctx.beginPath(); ctx.moveTo(sc.X(xa, r1), sc.Y(r1)); ctx.lineTo(sc.X(xb, r1), sc.Y(r1)); ctx.lineTo(sc.X(xb, r0), sc.Y(r0)); ctx.lineTo(sc.X(xa, r0), sc.Y(r0)); ctx.closePath();
+      ctx.fillStyle = mix(col, "#2B3A55", n * 0.5); ctx.fill(); ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = "rgba(29,35,64,0.45)"; ctx.stroke();
+    }
+    quad(x0, x1, 0.86, 1.08, "#C7CBD0");
+    quad(BX0 - 0.5, BX1 + 0.5, 1.08, 1.45, "#B9BEC4");
+  }
+  // the cow barn: a back wall (blocks and boarding), cows behind the rail, steel posts, the roof
+  function drawBarn(sc) {
+    if (sc.X(BX0 - 1, 1) > sc.W + 20 || sc.X(BX1 + 1, 1) < -20) return;
+    var n = sc.night || 0, BW = BX1 - BX0;
+    put(sc, BX0, 1, function () {
+      var l0 = LW(), i;
+      Rr(ctx, -0.2, -4.9, BW + 0.4, 3.5, 0.03, mix("#9C7350", "#2B3A55", n * 0.5));
+      for (i = 1; i < BW / 0.32; i++) Ln(ctx, i * 0.32 - 0.2, -4.85, i * 0.32 - 0.2, -1.45, "rgba(29,35,64,0.35)", 0.05);
+      Rr(ctx, -0.2, -1.45, BW + 0.4, 1.45, 0.03, mix("#C9CDD2", "#2B3A55", n * 0.5));
+      for (i = 0; i < 3; i++) Ln(ctx, -0.15, -0.36 - i * 0.36, BW + 0.15, -0.36 - i * 0.36, "rgba(29,35,64,0.2)", 0.03);
+      // cows in the cubicles, behind the rail
+      [[1.9, 1], [5.4, -1], [8.9, 1], [12.2, -1]].forEach(function (c, k) {
+        ctx.save(); ctx.translate(c[0], -0.12); ctx.scale(c[1] * 0.92, 0.92);
+        var ph = cowNod === k ? cowNodT * 5 : time * 0.7 + k * 1.7;
+        cow(ctx, ph, faceAmt(), time);
+        ctx.restore();
+      });
+      // the rail between the cubicles and the passage
+      tube(ctx, 0.1, -1.05, BW - 0.1, -1.05, 0.08, "#C3CCD6");
+      tube(ctx, 0.1, -0.6, BW - 0.1, -0.6, 0.08, "#C3CCD6");
+      for (i = 0; i <= 10; i++) tube(ctx, 0.1 + i * (BW - 0.2) / 10, -1.1, 0.1 + i * (BW - 0.2) / 10, 0, 0.07, "#C3CCD6");
+      // posts and the roof
+      for (i = 0; i <= 3; i++) Rr(ctx, i * BW / 3 - 0.16, -4.95, 0.32, 4.95, 0.04, mix("#5E7A6A", "#2B3A55", n * 0.5));
+      Pp(ctx, [-0.8, -4.85, BW + 0.8, -4.85, BW + 0.3, -6.1, -0.3, -6.1], mix("#9AA3A8", "#2B3A55", n * 0.5));
+      for (i = 0; i < BW / 0.5; i++) Ln(ctx, -0.55 + i * 0.5, -4.95, -0.18 + i * 0.5, -6.0, "rgba(29,35,64,0.25)", 0.04);
+      [2.5, 7, 11.5].forEach(function (rx) { Pp(ctx, [rx, -4.92, rx + 1.2, -4.92, rx + 1.4, -6.02, rx + 0.2, -6.02], "rgba(220,240,255,0.75)", l0 * 0.5); });
+      Rr(ctx, -0.9, -4.98, BW + 1.8, 0.18, 0.05, "#5D6675", l0 * 0.8);
+    });
+  }
+  // the muck on the passage floor, from the heap up to where the scraper has cleaned it
+  function drawFloorMuck(sc) {
+    if (job !== "muck") return;
+    var a = HX1, b = floorMuck.clean;
+    if (sc.X(a, 1) > sc.W + 20 || sc.X(b, 1) < -20) return;
+    put(sc, 0, 1, function () {
+      if (b - a > 0.1) {
+        ctx.beginPath(); ctx.moveTo(a, 0);
+        for (var x = a; x <= b; x += 0.4) ctx.lineTo(x, -0.2 - 0.08 * hash(Math.floor(x * 2.5), 3));
+        ctx.lineTo(b, 0); ctx.closePath(); fs(ctx, MUCK[0], LW() * 0.6);
+        for (x = a + 0.2; x < b; x += 0.55) Ln(ctx, x, -0.12, x + 0.2, -0.18, MUCK[2], 0.05);
+      }
+      // the wet clean concrete behind the scraper
+      if (floorMuck.clean < BX1) { ctx.globalAlpha = 0.4; Ln(ctx, floorMuck.clean + 0.3, -0.03, BX1, -0.03, "#8FA0B0", 0.06); ctx.globalAlpha = 1; }
+    });
+  }
+  function heapH(x) {
+    var f = (x - (HX0 + 0.1)) / (HW + 0.9);
+    if (f <= 0 || f >= 1) return 0;
+    return heap.V * 2.5 * Math.pow(Math.sin(f * Math.PI), 0.75) * (1 + 0.04 * Math.sin(x * 5.3));
+  }
+  function drawHeap(sc) {
+    if (sc.X(HX0 - 1, 1) > sc.W + 20 || sc.X(HX1 + 2, 1) < -20) return;
+    var n = sc.night || 0;
+    put(sc, 0, 1, function () {
+      var l0 = LW(), i;
+      // the push wall behind the heap
+      Rr(ctx, HX0 - 0.4, -2.6, HW + 1.3, 2.6, 0.04, mix("#D3D7DC", "#3B4660", n * 0.5));
+      for (i = 1; i < 4; i++) Ln(ctx, HX0 - 0.4 + i * (HW + 1.3) / 4, -2.55, HX0 - 0.4 + i * (HW + 1.3) / 4, -0.05, "rgba(29,35,64,0.25)", 0.04);
+      Rr(ctx, HX0 - 0.45, -2.75, HW + 1.4, 0.18, 0.05, mix("#B9BFC7", "#3B4660", n * 0.5));
+      ctx.beginPath(); ctx.moveTo(HX0 + 0.1, 0);
+      for (var x = HX0 + 0.1; x <= HX1 + 1.0; x += 0.15) ctx.lineTo(x, -heapH(x));
+      ctx.lineTo(HX1 + 1.0, 0); ctx.closePath(); fs(ctx, MUCK[0]);
+      ctx.save(); ctx.clip();
+      for (i = 0; i < 70; i++) { var fx = HX0 + hash(i, 31) * (HW + 1), fy = -hash(i, 32) * 2.4; Ln(ctx, fx, fy, fx + 0.2 * (hash(i, 33) - 0.3), fy - 0.06, i % 3 ? MUCK[2] : MUCK[1], 0.05); }
+      ctx.restore();
+      // the scraper's roll of muck tumbling onto the heap
+      if (scr.st === "tip" && scr.tip < 1) muckMound(ctx, HX1 - 0.4 - scr.tip * 1.2, HX1 + 0.8 - scr.tip * 1.2, -heapH(HX1 - scr.tip) * scr.tip * 0.6, 0.9 * (1 - scr.tip), 9);
+    });
+  }
+  function drawScraper(sc) {
+    var x = scr.x, f = faceAmt();
+    if (sc.X(x - 6, 1) > sc.W + 20 || sc.X(x + 2, 1) < -20) return;
+    put(sc, x, -1, function () {
+      if (scr.st === "push" || scr.st === "wait") muckMound(ctx, 4.62, 5.4 + scr.roll * 1.2, 0, 0.3 + scr.roll * 0.85, 4);
+      scraper(ctx, { lift: scr.lift });
+      D.tractor(ctx, { wheel: scr.wheel, time: time, face: f, look: [0, 1], beacon: scr.st === "push" || scr.st === "back", lights: 0 });
+      if (win && win.who === "scr") windowFx();
+    });
+  }
+  function drawTele(sc) {
+    if (sc.X(tele.x - 6, 1) > sc.W + 20 || sc.X(tele.x + 6, 1) < -20) return;
+    var x = tele.x + tele.d, f = faceAmt();
+    put(sc, x, tele.dir, function () {
+      teleBody(ctx, { wheel: tele.wheel + tele.d, time: time, face: f, beacon: tele.st === "load" });
+      teleBoom(ctx, { a: tele.a, ext: tele.ext, curl: tele.curl, load: tele.load, grip: tele.grip });
+    });
+  }
+  function drawRig(sc) {
+    if (sc.X(rig.x - 7, 1) > sc.W + 20 || sc.X(rig.x + 9, 1) < -20) return;
+    var f = faceAmt();
+    put(sc, rig.x, -1, function () {
+      ctx.translate(0, -0.5);
+      if (job === "slurry") tanker(ctx, { wheel: rig.wheel, load: rig.load, time: time, face: f });
+      else spreader(ctx, { wheel: rig.wheel, load: rig.load, beat: rig.beat, door: rig.door, time: time, face: f });
+      ctx.translate(-Farm.DRAWBAR[0], 0.5);
+      D.tractor(ctx, { wheel: rig.wheel, time: time, drawbar: true, face: f, look: [0, 1], beacon: rig.st === "go" || rig.fillT >= 0 });
+      if (win && win.who === "rig") windowFx();
+    });
+    if (Math.random() < 0.08 && (rig.st === "go" || rig.st === "home")) addPart({ kind: "puff", x: rig.x - 2.63, h: 3.45, vx: 0.6, vh: 1.1, life: 1.0, size: 0.1, grow: 0.35, col: "#8A8FA0", alpha: 0.3 });
+  }
+  // the cab's side window slides shut, the muck splats on the glass, the wiper cleans it (tractor units)
+  function windowFx() {
+    var w = win, l0 = LW();
+    if (w.glass < 1) {
+      ctx.save(); ctx.beginPath(); ctx.rect(-0.47, -2.9, 0.93, 1.2); ctx.clip();
+      Rr(ctx, -0.47, -2.9, 0.93, 1.2, 0.02, "#E6F5FF", 0);
+      driverHead(ctx, 0.3, -2.42);
+      var top = lerp(-1.75, -2.9, w.glass);
+      Rr(ctx, -0.47, top, 0.93, -1.7 - top, 0.02, "rgba(191,231,250,0.95)", l0 * 0.6);
+      ctx.restore();
+    }
+    if (w.splat && w.wipe < 1) {
+      ctx.save(); ctx.beginPath(); ctx.rect(-0.47, -2.9, 0.93, 1.2); ctx.clip();
+      var cut = lerp(-0.6, 0.6, w.wipe);
+      ctx.beginPath(); ctx.rect(cut, -3, 2, 2); ctx.clip();
+      ctx.beginPath(); ctx.ellipse(0.0, -2.35, 0.32, 0.24, 0.3, 0, TAU); fs(ctx, MUCK[0], l0 * 0.6);
+      Cc(ctx, -0.26, -2.12, 0.08, MUCK[0], 0); Cc(ctx, 0.25, -2.55, 0.07, MUCK[0], 0);
+      Ln(ctx, 0.05, -2.2, 0.06, -1.95 + w.wipe * 0.1, MUCK[1], 0.06);
+      ctx.restore();
+    }
+    if (w.wipe > 0 && w.wipe < 1) {
+      var a = lerp(-2.6, -0.5, Math.sin(w.wipe * Math.PI));
+      Ln(ctx, 0.0, -1.75, Math.cos(a) * 0.95, -1.75 + Math.sin(a) * 0.95, INK, 0.05);
+    }
+  }
+  // the lump flying at the cab (screen, along an arc), until it hits the glass
+  function drawLump(sc) {
+    var w = win;
+    if (w.t < 0.65 || w.t > 1.15) return;
+    var f = (w.t - 0.65) / 0.5, from, to;
+    if (w.who === "scr") { from = [scr.x - 4.6, 0.8]; to = [scr.x - 0.3, 2.35]; }
+    else { from = [rig.x + (job === "slurry" ? 7.9 : 7.0), 1.8]; to = [rig.x - 1.3, 2.35]; }
+    var x = lerp(from[0], to[0], f), h = lerp(from[1], to[1], f) + Math.sin(f * Math.PI) * 2.2;
+    ctx.fillStyle = job === "slurry" && w.who === "rig" ? SLURRY[0] : MUCK[0];
+    ctx.beginPath(); ctx.ellipse(sc.X(x, 1), sc.gY - h * sc.k, sc.k * 0.22, sc.k * 0.16, f * 6, 0, TAU); ctx.fill();
+    ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = INK; ctx.stroke();
+  }
+  // the slurry tanker's suction arm: from its turret on the tank down into the lagoon (screen space)
+  function armGeo(sc) {
+    var sq = rig.load * 0.12, px = sc.X(rig.x - TK.arm[0], 1), py = sc.gY + (TK.arm[1] - 0.5 + sq) * sc.k;
+    var restX = sc.X(rig.x - TK.arm[0] - 3.6, 1), restY = py - 0.12 * sc.k;
+    var outX = sc.X(38.6, 1), outY = sc.Y(1.32) + 0.25 * sc.k;
+    var u = rig.arm, ex = lerp(restX, outX, u), ey = lerp(restY, outY, u);
+    var cx = lerp((px + restX) / 2, px + (ex - px) * 0.5, u), cy = lerp(py - 0.2 * sc.k, Math.min(py, ey) - 0.9 * sc.k, u);
+    return { px: px, py: py, ex: ex, ey: ey, cx: cx, cy: cy, w: 0.36 * sc.k };
+  }
+  function drawArm(sc) {
+    if (sc.X(rig.x - 9, 1) > sc.W + 20 || sc.X(rig.x + 10, 1) < -20) return;
+    var g = armGeo(sc), lw = sc.lw;
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(g.px, g.py); ctx.quadraticCurveTo(g.cx, g.cy, g.ex, g.ey);
+    ctx.strokeStyle = INK; ctx.lineWidth = g.w + lw * 2; ctx.stroke();
+    ctx.strokeStyle = "#4E5463"; ctx.lineWidth = g.w; ctx.stroke();
+    if (rig.flow > 0.05) {
+      ctx.setLineDash([g.w * 0.6, g.w * 0.9]); ctx.lineDashOffset = time * g.w * 6;
+      ctx.globalAlpha = rig.flow; ctx.strokeStyle = SLURRY[2]; ctx.lineWidth = g.w * 0.4; ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+    // the nozzle
+    ctx.beginPath(); ctx.arc(g.ex, g.ey, g.w * 0.6, 0, TAU); ctx.fillStyle = "#3A3F4E"; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+    if (rig.flow > 0.3 && rig.arm > 0.95) {
+      for (var i = 0; i < 3; i++) { var rr = ((time * 0.8 + i / 3) % 1); ctx.globalAlpha = 1 - rr; ctx.beginPath(); ctx.ellipse(g.ex, g.ey + g.w * 0.4, g.w * (1 + rr * 3), g.w * (0.3 + rr * 0.8), 0, 0, TAU); ctx.strokeStyle = SLURRY[2]; ctx.lineWidth = Math.max(1, lw * 0.6); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+  }
+  // the fan of slurry from the splash plate
+  function drawFan(sc) {
+    var r = rear(), s = sc.k, x = sc.X(r + 0.3, 1), y = sc.gY - 0.85 * s, a = rig.spray;
+    if (a < 0.05) return;
+    ctx.save(); ctx.globalAlpha = 0.8 * a;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + 1.6 * s, y - 1.6 * s, x + 3.6 * s, sc.gY - 0.05 * s);
+    ctx.lineTo(x + 1.0 * s, sc.gY); ctx.closePath();
+    ctx.fillStyle = SLURRY[0]; ctx.fill();
+    ctx.globalAlpha = 0.7 * a; ctx.strokeStyle = SLURRY[2]; ctx.lineWidth = Math.max(1, sc.lw * 0.7);
+    for (var i = 0; i < 4; i++) { var o = ((time * 3 + i / 4) % 1); ctx.beginPath(); ctx.moveTo(x + s * 0.2, y); ctx.quadraticCurveTo(x + (0.8 + o) * s, y - (1.0 + o * 0.6) * s, x + (1.6 + o * 2) * s, sc.gY); ctx.stroke(); }
+    ctx.restore();
+  }
+  // the slurry lagoon: an earth bank round a brown pool, a fence on the far side
+  function drawLagoon(sc) {
+    var r0 = 1.05, r1 = 1.85, n = sc.night || 0;
+    if (sc.X(LG0 - 2, 1) > sc.W + 20 || sc.X(LG1 + 2, 1) < -20) return;
+    function poly(xa, xb, ra, rb, col, lw) {
+      ctx.beginPath(); ctx.moveTo(sc.X(xa, 1), sc.Y(ra)); ctx.lineTo(sc.X(xb, 1), sc.Y(ra)); ctx.lineTo(sc.X(xb - 0.6, 1), sc.Y(rb)); ctx.lineTo(sc.X(xa + 0.6, 1), sc.Y(rb)); ctx.closePath();
+      ctx.fillStyle = mix(col, "#2B3A55", n * 0.5); ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+    }
+    var lw = Math.max(1.2, sc.lw * 0.8);
+    poly(LG0 - 1.2, LG1 + 1.2, r0 - 0.02, r1 + 0.12, "#6FAE4A", lw);
+    poly(LG0, LG1, r0 + 0.04, r1, mix(SLURRY[0], SLURRY[1], 1 - lagoon.level), lw);
+    // the crust and a sheen on the slurry
+    ctx.save(); ctx.beginPath(); ctx.moveTo(sc.X(LG0, 1), sc.Y(r0 + 0.04)); ctx.lineTo(sc.X(LG1, 1), sc.Y(r0 + 0.04)); ctx.lineTo(sc.X(LG1 - 0.6, 1), sc.Y(r1)); ctx.lineTo(sc.X(LG0 + 0.6, 1), sc.Y(r1)); ctx.closePath(); ctx.clip();
+    for (var i = 0; i < 14; i++) {
+      var rr = lerp(r0 + 0.1, r1 - 0.05, hash(i, 2)), x = lerp(LG0 + 0.5, LG1 - 0.5, hash(i, 1)), s = sc.S(rr);
+      ctx.beginPath(); ctx.ellipse(sc.X(x, 1), sc.Y(rr), s * (0.5 + hash(i, 3)), s * 0.12, 0, 0, TAU); ctx.fillStyle = SLURRY[2]; ctx.fill();
+    }
+    var st = lagoon.stir;
+    if (st > 0) for (i = 0; i < 3; i++) { var q = ((1.5 - st) * 0.9 + i * 0.3) % 1; ctx.globalAlpha = 1 - q; ctx.beginPath(); ctx.ellipse(sc.X(40.5, 1), sc.Y(1.4), sc.S(1.4) * (0.3 + q * 2), sc.S(1.4) * (0.08 + q * 0.4), 0, 0, TAU); ctx.strokeStyle = SLURRY[2]; ctx.lineWidth = 2; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.35; ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = Math.max(1, sc.lw * 0.5);
+    for (i = 0; i < 4; i++) { var rs = lerp(r0 + 0.2, r1 - 0.1, i / 4), xs = LG0 + 2 + i * 2.6 + Math.sin(time * 0.5 + i) * 0.4; ctx.beginPath(); ctx.moveTo(sc.X(xs, 1), sc.Y(rs)); ctx.lineTo(sc.X(xs + 1.4, 1), sc.Y(rs)); ctx.stroke(); }
+    ctx.restore(); ctx.globalAlpha = 1;
+    // the near bank
+    poly(LG0 - 1.2, LG1 + 1.2, r0 - 0.02, r0 + 0.05, "#5E9E3F", lw);
+    // the fence on the far bank
+    var rf = r1 + 0.08, sf = sc.S(rf), yf = sc.Y(rf);
+    ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, sc.lw * 0.7);
+    ctx.beginPath();
+    for (var x2 = LG0 - 1; x2 <= LG1 + 1.01; x2 += 1.6) { var fx = sc.X(x2, 1); ctx.moveTo(fx, yf); ctx.lineTo(fx, yf - 1.1 * sf); }
+    ctx.moveTo(sc.X(LG0 - 1, 1), yf - 0.95 * sf); ctx.lineTo(sc.X(LG1 + 1, 1), yf - 0.95 * sf);
+    ctx.moveTo(sc.X(LG0 - 1, 1), yf - 0.55 * sf); ctx.lineTo(sc.X(LG1 + 1, 1), yf - 0.55 * sf);
+    ctx.stroke();
+  }
+  function drawGulls(sc) {
+    gulls.list.forEach(function (gl, i) {
+      var p = gullPos(gl, i), x = sc.X(p.x, 1), y = sc.gY - p.h * sc.k;
+      if (x < -30 || x > sc.W + 30) return;
+      D.gull(ctx, x, y + (p.peck ? sc.k * 0.08 : 0), sc.k * 1.6, p.flap, !gulls.follow && p.land ? i % 2 === 0 : false);
+    });
+  }
+  function drawDog(sc) {
+    var g = dog, r = 0.78, s = sc.S(r);
+    D.dog(ctx, sc.X(g.x, r), sc.Y(r) - g.jump * 0.7 * s, s * 1.6, g.ph, g.flip, g.st === "sniff");
+    if (g.lump && !g.lump.splat) {
+      var f = clamp(g.lump.t / 0.6, 0, 1), x = lerp(g.lump.x0, g.stop, f), h = lerp(g.lump.h0, 0.1, f) + Math.sin(f * Math.PI) * 1.6;
+      ctx.fillStyle = job === "slurry" ? SLURRY[0] : MUCK[0];
+      ctx.beginPath(); ctx.ellipse(sc.X(x, r), sc.Y(r) - h * s, s * 0.2, s * 0.15, f * 5, 0, TAU); ctx.fill(); ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = INK; ctx.stroke();
+    }
+  }
+
+  // ---------- The field: hungry grass, fed (muck or slurry), then thick and green ----------
+  function eachX(sc, row, sp, minPx, xa, xb, fn) {
+    var rg = sc.xRange(row.rc), a = rg[2], b = rg[3];
+    while (a * sp < minPx) sp *= 2;
+    var lo = Math.max(rg[0], xa - sp), hi = Math.min(rg[1], xb + sp);
+    for (var j = Math.floor(lo / sp); j <= Math.ceil(hi / sp); j++) { var x = (j + hash(j, row.i) * 0.6) * sp; fn(x, a * x + b, j); }
+  }
+  function band(sc, row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
+  function jagged(sc, row, hp, col, lt, t, k) {
+    var step = Math.max(4, Math.min(10, hp * 0.5)), yc = row.yc, off = sc.cam * sc.k / row.rc;
+    ctx.beginPath(); ctx.moveTo(-5, row.y0 + 0.5);
+    for (var x = -5; x <= sc.W + step; x += step) {
+      var q = Math.floor((x + off) / step), sw = Math.sin(t * 1.5 + (x + off) * 0.02 + row.i * 0.6) * hp * 0.06;
+      ctx.lineTo(x + sw, yc - hp * (0.88 + k * hash(q, row.i)));
+    }
+    ctx.lineTo(sc.W + step, row.y0 + 0.5); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill();
+    if (lt) { ctx.lineWidth = Math.max(1, Math.min(sc.lw * 0.8, hp * 0.05)); ctx.strokeStyle = lt; ctx.stroke(); }
+  }
+  function paintRow(sc, row, stage, P, xa, xb, near) {
+    var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1;
+    var g = stage === "lush" ? 1 : (stage === "grow" ? P.g : 0);
+    var fed = stage === "muck" || stage === "slurry" ? stage : (stage === "grow" || stage === "lush" ? P.from : null);
+    var wet = fed === "slurry" ? 1 - g : 0;
+    var base = odd ? "#BAD780" : "#B3D278";
+    band(sc, row, mix(mix(base, "#8C8A4E", wet * 0.75), odd ? "#2F7A2A" : "#2B7327", g));
+    var hp = lerp(0.12, 0.45, g) * (near ? 0.75 : 1) * s;
+    var col = mix(mix("#A3CB66", "#8A9450", wet * 0.6), "#3E9A34", g), lt = mix("#C4E08E", "#76C451", g);
+    if (row.fine && hp >= 1.5) jagged(sc, row, hp, col, lt, P.time, 0.3);
+    else { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - hp, sc.W, hgt * 0.6 + hp); }
+    var m = fed ? 1 - g * 0.9 : 0;
+    if (fed === "muck" && m > 0.05) {
+      ctx.globalAlpha = m;
+      eachX(sc, row, 0.45, 7, xa, xb, function (x, sx, j) {
+        if (hash(j, row.i + 5) < 0.3) return;
+        var rr = Math.max(1.2, s * (0.06 + 0.06 * hash(j, 2)));
+        ctx.beginPath(); ctx.ellipse(sx, row.yc - hp * 0.45, rr * 1.6, rr * 0.8, 0, 0, TAU); ctx.fillStyle = hash(j, 3) > 0.5 ? MUCK[0] : MUCK[1]; ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+    if (fed === "slurry" && m > 0.05 && row.fine && row.i % 2 === 0) {
+      ctx.globalAlpha = 0.5 * m; ctx.fillStyle = SLURRY[1]; ctx.fillRect(0, row.yc - hp * 0.5 - hgt * 0.2, sc.W, Math.max(1, hgt * 0.5)); ctx.globalAlpha = 1;
+    }
+  }
+  function fieldPaint(sc, part, P) {
+    var rows = part === "near" ? sc.rowsNear : sc.rowsFar, w = P.wipe, near = part === "near";
+    if (sc.X(0, 1) > sc.W + 40 && sc.X(L, 1) > sc.W + 40) return;
+    if (sc.X(L, 3) < -40 && sc.X(L, 1) < -40) return;
+    function run(stage, xa, xb) {
+      if (xb - xa < 0.01) return;
+      ctx.save(); sc.clipX(ctx, xa, xb);
+      for (var i = 0; i < rows.length; i++) paintRow(sc, rows[i], stage, P, xa, xb, near);
+      ctx.restore();
+    }
+    if (!w) run(P.stage, 0, L);
+    else { var bx = clamp(w.bx, 0, L); run(P.stage, 0, bx); run(w.to, bx, L); }
+    if (part === "far") {
+      ctx.save(); ctx.strokeStyle = "rgba(61,90,40,0.55)"; ctx.lineWidth = Math.max(1.5, sc.lw);
+      [0, L].forEach(function (x) { ctx.beginPath(); ctx.moveTo(sc.X(x, sc.rH), sc.Y(sc.rH)); ctx.lineTo(sc.X(x, 1), sc.gY); ctx.lineTo(sc.X(x, sc.rN), sc.Y(sc.rN)); ctx.stroke(); });
+      ctx.restore();
+    }
+  }
+
+  // ---------- Loop ----------
+  var last = 0;
+  function loop(ts) {
+    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; scr.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onWake() { ending = false; dusk = 0; }
+
+  // ---------- Start ----------
+  showSteps();
+  resize();
+  bringIn(firstStep());
+  if (job === "muck") scr.x = SCR_START + 5;
+  follow(0, true);
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
+  else window.addEventListener("resize", resize);
+
+  Toybox.init({
+    app: "farm",
+    big: { button: $("bigToggle") },
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the machines stop and park, and the controls lock. The timer carries on across the farm pages.",
+    goodbyeOption: "End with a “Goodnight, farm” button to press",
+    farewellText: "Time to say goodnight to the farm",
+    goodbyeLabel: "Goodnight, farm",
+    farewellDone: "Night night, farm!",
+    restLine: "The farm is resting.",
+    restLine2: "The machines will be right here next time.",
+    restArt: Farm.restArt,
+    soundNote: "Soft engine and splatty sounds. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: onWake,
+    onWake: onWake,
+    onSound: function (on) { if (on) snd.chime(); }
+  });
+  requestAnimationFrame(loop);
+
+  if (/[?&]debug\b/.test(location.search)) window.__farm = {
+    state: function () { return { phase: phase, step: stepId, cur: steps.current(), finished: steps.finished(), job: job, rig: rig.st, x: rig.x, load: rig.load, scr: scr.st, tele: tele.st, heap: heap.V, field: field.stage, loads: loads, coach: coach.text(), split: split, parts: parts.length }; },
+    screen: function (id) { return partScreen(id || stepId); },
+    surprise: surprise,
+    ghost: function () { return ghost.show(); }
+  };
+})();
+</script>
+</body>
+</html>

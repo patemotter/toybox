@@ -252,6 +252,7 @@ const CORE = [
   "./farm/bales.html",
   "./farm/silage.html",
   "./farm/carrots.html",
+  "./farm/muck.html",
   "./farm/farm.js",
   "./farm/manifest.webmanifest",
   "./farm/icons/icon-180.png",
