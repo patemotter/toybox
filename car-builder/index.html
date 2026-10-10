@@ -27,7 +27,6 @@
   --accent: #FFC93C;
   --plate: #F4FAFF;
   --focus: #2D5BD7;
-  --go: #E63946;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
   box-sizing: border-box;
@@ -72,49 +71,17 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
-/* ---------- Stage: the vehicle ---------- */
+/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, job bar, panel ----------
+   The stage is his vehicle: tap a part (body, cab, wheels, engine, roof, lights, the arm or bed) and the panel's
+   tiles show that part's choices; tap the sky or the ground (or the picked job tab) and the tiles show the
+   vehicles again. The job bar under the stage: Builders, Fast cars, Monsters. The panel: the green Go "Drive!",
+   one row of tiles, the bottom bar (New, Surprise). */
+.tb-head a { text-decoration: none; }
 .stage { background: #8FD0F7; }
-.stage-inner { height: 100%; display: flex; flex-direction: column; }
-.scene {
-  position: relative;
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
-  background: #8FD0F7;
-  touch-action: none;
-  cursor: pointer;
-}
+.scene { position: absolute; inset: 0; overflow: hidden; background: #8FD0F7; touch-action: none; cursor: pointer; }
 #art { display: block; width: 100%; height: 100%; touch-action: none; }
-/* Go row: the green Drive! button. */
-.launchbar { flex: none; display: flex; justify-content: center; }
-.launchbar .launch { width: 100%; }
-.launch {
-  width: min(100%, 560px);
-  min-height: 60px;
-  font-size: 1.9rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  color: #FFFFFF;
-  background: var(--go);
-  border-color: #1D2340;
-  box-shadow: 4px 4px 0 #1D2340;
-  text-shadow: 2px 2px 0 #1D2340;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.launch:active { box-shadow: 0 0 0 #1D2340; }
-.launch svg { width: 1.3em; height: 1.3em; flex: none; }
-@media (prefers-reduced-motion: no-preference) {
-  .launch { animation: throb 1.6s ease-in-out infinite; }
-  .launch:active { animation: none; }
-}
-@keyframes throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
 
-/* Builder animations on the SVG rocket. */
+/* Builder animations on the SVG vehicle. */
 .rocket, .spark, .puff { transform-box: fill-box; }
 .rocket { transform-origin: 50% 100%; }
 .rocket.pop { animation: pop 0.65s cubic-bezier(.3, 1.6, .5, 1); }
@@ -127,135 +94,50 @@ body {
 @keyframes puff { 0% { transform: scale(0.3); opacity: 0.95; } 100% { transform: scale(2.2); opacity: 0; } }
 .night { opacity: 0; transition: opacity 4s ease; }
 body.ending .night { opacity: 1; }
+/* The picked part glows: a soft halo pulses behind it (a copy of the part, drawn fat). Its color runs yellow,
+   pink, blue, so it shows on every paint color. */
+.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
+.halo * { animation: halocol 1.8s linear infinite; }
+@keyframes halocol {
+  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
+  33% { fill: #FF5FB0; stroke: #FF5FB0; }
+  66% { fill: #3FC4FF; stroke: #3FC4FF; }
+}
+/* Sparkles, puffs and Surprise layers never catch a tap meant for the picture. */
+#fxG, #surpB, #surpF { pointer-events: none; }
 
-/* Play-timer gauge in the corner of the picture. */
-.fuel {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  pointer-events: none;
-}
+/* Play-timer gauge: the time-left badge, top-right of the stage. */
+.fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar {
-  width: clamp(70px, 22vw, 170px);
-  height: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 3px solid #1D2340;
-  border-radius: 999px;
-  overflow: hidden;
-}
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num {
-  min-width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  background: #FFFFFF;
-  color: #1D2340;
-  border: 3px solid #1D2340;
-  border-radius: 50%;
-  font-size: 1.3rem;
-  font-weight: 800;
-  line-height: 1;
-}
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
 
-/* ---------- Big mode: the panel goes away, the header stays (Big turns into Back) ---------- */
-body.big .tb-panel { display: none; }
+/* Tile and job pictures: small vehicles, cropped to the part. Paint, Stripes, Number and the like are actions. */
+#tiles .tb-pic svg, #jobs .tb-pic svg { width: 100%; height: 100%; display: block; }
+/* Vehicles are wide: their pictures get the tile's width (and a wider picture on the job tabs). */
+#tiles .tb-tile .tb-pic { width: 88%; }
+#jobs .tb-job .tb-pic { width: 48px; height: 32px; }
+@media (max-width: 600px) { #jobs .tb-job .tb-pic { width: 38px; height: 28px; } }
+/* The tiles keep their token size in the side column: two a row on a sideways iPad, four a row on a phone
+   held sideways (the column is wider than usual). */
+@media (orientation: landscape) {
+  .tb-v2 .tb-body .tb-panel { width: calc(2 * var(--tb-tile) + var(--tb-s3) + 2 * var(--tb-s4) + 8px); }
+  #tiles.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
+  #tiles.tb-tilerow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
-/* ---------- Panel: build + colors ---------- */
-.tb-panel .panel-body.tb-choices {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-  overflow: hidden;
-}
-.panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="build"] [data-pane="build"] { visibility: visible; }
-.panel-body section + section { margin-top: 10px; }
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  padding-right: 3px;
-}
-.row .btn {
-  flex: 0 0 calc((100% - 12px) / 3);
-  min-width: 0;
-  min-height: 40px;
-  padding: 0.2rem 0.2rem;
-  font-size: clamp(0.76rem, 3.5vw, 1rem);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.row.four .btn { flex-basis: calc((100% - 18px) / 4); font-size: clamp(0.68rem, 3vw, 1rem); padding: 0.2rem 0.1rem; }
-.row.four .dot { width: 11px; height: 11px; margin-right: 3px; border-width: 1.5px; }
-.dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #1D2340;
-  vertical-align: -2px;
-  margin-right: 4px;
-}
-#buildParts, #colorParts { min-height: 86px; align-content: flex-start; }
-.options {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-  max-width: 520px;
-  margin: 0 auto;
-}
-.opt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  padding: 5px 2px 3px;
-  min-height: 0;
-  font-size: clamp(0.7rem, 3.2vw, 0.95rem);
-  line-height: 1.15;
-  white-space: nowrap;
-}
-.opt svg { width: 44px; height: 54px; display: block; }
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 8px;
-}
-.swatch {
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 50%;
-  border: 3px solid var(--edge);
-  cursor: pointer;
-  padding: 0;
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  box-shadow: 2px 2px 0 var(--edge);
-}
-.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; }
-.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
-.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+/* Big: the header, the job bar, the tiles and the bottom bar hide; Drive! stays. */
+body.big .tb-head > :not(.bigtoggle), body.big #jobs, body.big #tiles, body.big .tb-bottombar { display: none; }
+body.ending .tb-panel, body.ending #jobs, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
 /* ---------- Timer: the toast, banner, sheet and rest screen are in common/toybox.css ---------- */
 /* While driving full screen, the ending banner stays out of the way (the drive parks by itself). */
 .flight:not([hidden]) ~ #tb-farewell { display: none; }
-body.ending .panel-body,
-body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
-body.ending .launchbar { visibility: hidden; }
 
 /* ---------- Rest picture (the rest screen itself is in common/toybox.css) ---------- */
 .rest-art {
@@ -268,7 +150,7 @@ body.ending .launchbar { visibility: hidden; }
   border-radius: 18px;
 }
 
-/* ---------- Flight: full-screen launch ---------- */
+/* ---------- Drive: full screen ---------- */
 .flight {
   position: fixed;
   inset: 0;
@@ -280,75 +162,6 @@ body.ending .launchbar { visibility: hidden; }
 }
 .flight[hidden] { display: none; }
 #fcv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.hud {
-  position: absolute;
-  top: max(10px, env(safe-area-inset-top, 0px));
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.93);
-  border: 3px solid #1D2340;
-  border-radius: 20px;
-  box-shadow: 4px 4px 0 #1D2340;
-  padding: 2px 18px 4px;
-  white-space: nowrap;
-}
-.hud .lbl { font-size: clamp(0.95rem, 2.6vw, 1.4rem); font-weight: 800; line-height: 1.1; margin-top: 2px; }
-.hud .num {
-  font-size: clamp(2rem, 7.5vw, 4.4rem);
-  font-weight: 800;
-  line-height: 1.05;
-  font-variant-numeric: tabular-nums;
-  min-width: 6.4ch;
-}
-.hud .best { font-size: clamp(0.95rem, 2.6vw, 1.3rem); font-weight: 700; line-height: 1.1; }
-.hud .best[hidden] { display: none; }
-.fback {
-  position: absolute;
-  top: max(10px, env(safe-area-inset-top, 0px));
-  left: max(10px, env(safe-area-inset-left, 0px));
-  min-height: 48px;
-  font-size: 1.05rem;
-  padding: 0.2rem 0.9rem;
-  color: #1D2340;
-  background: #FFFFFF;
-  border-color: #1D2340;
-  box-shadow: 3px 3px 0 #1D2340;
-}
-.count {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-.count span {
-  display: block;
-  font-size: min(58vh, 78vw);
-  font-weight: 800;
-  line-height: 1;
-  color: #FFC93C;
-  -webkit-text-stroke: 0.03em #1D2340;
-  text-shadow: 0.05em 0.05em 0 #1D2340;
-  opacity: 0;
-}
-.count span.lift { font-size: min(22vh, 17vw); color: #FFFFFF; }
-.count span.go { animation: countPop 0.75s cubic-bezier(.2, .9, .3, 1) forwards; }
-.count span.lift.go { animation: liftPop 1.2s ease-out forwards; }
-@keyframes countPop {
-  0% { transform: scale(2.4); opacity: 0; }
-  22% { transform: scale(0.95); opacity: 1; }
-  32% { transform: scale(1.04); opacity: 1; }
-  78% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.55); opacity: 0; }
-}
-@keyframes liftPop {
-  0% { transform: scale(0.3) rotate(-6deg); opacity: 0; }
-  20% { transform: scale(1.1) rotate(2deg); opacity: 1; }
-  70% { transform: scale(1) rotate(0deg); opacity: 1; }
-  100% { transform: scale(1.4) translateY(-30%); opacity: 0; }
-}
 .banner {
   position: absolute;
   left: 50%;
@@ -357,9 +170,8 @@ body.ending .launchbar { visibility: hidden; }
   pointer-events: none;
   background: #FFC93C;
   color: #1D2340;
-  border: 4px solid #1D2340;
+  border: 3px solid #1D2340;
   border-radius: 22px;
-  box-shadow: 5px 5px 0 #1D2340;
   padding: 0.1rem 1.1rem 0.25rem;
   font-size: clamp(1.6rem, 5.6vw, 3.2rem);
   font-weight: 800;
@@ -370,327 +182,86 @@ body.ending .launchbar { visibility: hidden; }
 .banner[hidden] { display: none; }
 .banner.go { animation: bannerPop 0.6s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes bannerPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
-.fhint {
-  position: absolute;
-  left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.93);
-  border: 3px solid #1D2340;
-  border-radius: 999px;
-  padding: 0.1rem 1rem 0.2rem;
-  font-size: clamp(1.1rem, 3.6vw, 1.6rem);
-  font-weight: 800;
-  white-space: nowrap;
-  transition: opacity 0.5s ease;
+.dhud {
+  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  pointer-events: none; background: rgba(255, 255, 255, 0.93); border: 2px solid #1D2340; border-radius: 20px;
+  padding: 0 18px 2px; white-space: nowrap;
+  font-size: clamp(1.2rem, 4vw, 2.2rem); font-weight: 800; color: #1D2340; font-variant-numeric: tabular-nums;
 }
-.fhint[hidden] { display: none; }
-.fhint.fade { opacity: 0; }
-.landbar {
-  position: absolute;
-  left: 50%;
-  bottom: max(14px, env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-  width: min(92vw, 560px);
+.dhud[hidden] { display: none; }
+.dctl {
+  position: absolute; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  padding: 0 max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; pointer-events: none;
 }
-.landbar[hidden] { display: none; }
-.landbar .launch { flex: 1 1 auto; width: auto; }
-.landbar .bbuild { flex: none; font-size: 1.2rem; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
-
-/* Landscape (phone on its side, tablet, desktop): picture on the left, controls on the right. */
-@media (orientation: landscape) {
-  .tb-body .tb-panel { width: min(56%, 460px); }
-  .tb-body .tb-panel .panel-body.tb-choices { align-content: center; }
+.dctl > * { pointer-events: auto; }
+.dctl[hidden] { display: none; }
+.acts { display: flex; gap: 12px; flex: 1 1 auto; justify-content: center; flex-wrap: wrap; }
+.act, .horn, .pedal { color: #1D2340; }
+.act { min-height: 64px; min-width: 104px; font-size: 1.5rem; font-weight: 800; background: #FFC93C; border-radius: 20px; }
+.act.on { background: #FFFFFF; }
+.horn { width: 84px; height: 84px; border-radius: 50%; background: #FFFFFF; font-size: 1.1rem; font-weight: 800; padding: 0; flex: none;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; line-height: 1; }
+.horn svg { width: 34px; height: 34px; flex: none; }
+.pedal {
+  flex: none; width: 128px; height: 128px; border-radius: 28px; padding: 0;
+  font-size: 2.2rem; font-weight: 800; color: #FFFFFF; text-shadow: 2px 2px 0 #1D2340; background: var(--tb-go, #1E8C4E);
 }
-
-/* Larger screens (tablets, desktop): bigger touch targets, and controls kept to a comfortable width. */
+.pedal.stop { background: #E63946; }
+.dback {
+  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px));
+  min-height: var(--tb-head-icon, 52px); display: inline-flex; align-items: center; gap: 6px; padding: 0 14px 0 8px;
+  font-size: var(--tb-fs-btn, 18px); color: #1D2340; background: #FFFFFF;
+}
+.dback svg { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.dback[hidden] { display: none; }
+body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibility: hidden; }
 @media (min-width: 744px) and (min-height: 640px) {
-  .tb-panel { gap: 12px; }
-  .launchbar .btn.tb-go.launch { min-height: 76px; font-size: 2.2rem; }
-  .panel-body > [data-pane] { width: 100%; max-width: 560px; justify-self: center; }
-  .panel-body section + section { margin-top: 16px; }
-  .row { gap: 10px; }
-  .row .btn { flex-basis: calc((100% - 20px) / 3); min-height: 56px; font-size: 1.1rem; }
-  .row.four .btn { flex-basis: calc((100% - 30px) / 4); font-size: 1.05rem; }
-  .row .dot { width: 18px; height: 18px; margin-right: 6px; }
-  #buildParts, #colorParts { min-height: 122px; }
-  .options { gap: 10px; }
-  .opt { font-size: 1.05rem; padding: 7px 4px 5px; }
-  .opt svg { width: 76px; height: 94px; }
-  .swatches { gap: 10px; margin-top: 12px; }
-  .swatch { font-size: 1.4rem; }
-  .fuel { top: 12px; left: 12px; }
-  .fuel-bar { height: 22px; }
-  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
-  .fback { min-height: 56px; font-size: 1.25rem; }
-  .landbar .launch { min-height: 84px; font-size: 2.6rem; }
-  .landbar .bbuild { font-size: 1.4rem; padding: 0.4rem 1.4rem; }
+  .act { min-height: 84px; min-width: 150px; font-size: 2rem; }
+  .horn { width: 110px; height: 110px; font-size: 1.4rem; }
+  .horn svg { width: 46px; height: 46px; }
+  .pedal { width: 170px; height: 170px; font-size: 3rem; }
 }
-@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
-  /* a slimmer column on tablets held sideways, so the stage (and the vehicle) is wider */
-  .tb-body .tb-panel { width: min(40%, 460px); }
-  .row .btn { min-height: 64px; }
-  .opt svg { width: 88px; height: 110px; }
-}
-
-/* Short landscape phones: no title, tighter panel. */
 @media (orientation: landscape) and (max-height: 520px) {
-  .tb-panel { gap: 6px; }
-  .launchbar .btn.tb-go.launch { min-height: 52px; font-size: 1.5rem; }
-  .swatches { gap: 6px; }
-  /* vw-based sizes are tuned for portrait; the landscape panel is narrower than the screen width suggests. */
-  .row .btn, .row.four .btn { font-size: 0.82rem; }
-  .opt { font-size: 0.72rem; }
-  .opt svg { width: 40px; height: 48px; }
-  .hud { padding: 0 14px 2px; }
-  .hud .num { font-size: 2.1rem; }
-  .hud .lbl, .hud .best { font-size: 0.9rem; }
-  .landbar {
-    left: auto;
-    right: max(14px, env(safe-area-inset-right, 0px));
-    transform: none;
-    width: auto;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .landbar .launch { min-height: 56px; font-size: 1.4rem; padding: 0.3rem 1rem; }
+  .act { min-height: 56px; min-width: 88px; font-size: 1.2rem; }
+  .horn { width: 68px; height: 68px; font-size: 0.95rem; }
+  .horn svg { width: 28px; height: 28px; }
+  .pedal { width: 96px; height: 96px; font-size: 1.7rem; }
+  .dhud { font-size: 1.1rem; }
   .banner { left: max(14px, env(safe-area-inset-left, 0px)); top: 42%; transform: none; font-size: 1.6rem; }
   .banner.go { animation: bannerPopL 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 }
 @keyframes bannerPopL { 0% { transform: scale(0.3); } 100% { transform: scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .rocket.pop, .rocket.hop { animation: none; }
+  .rocket.pop, .rocket.hop, .halo * { animation: none; }
 }
-/* ---------- Car Builder additions ---------- */
-.tb-panel[data-tab="vehicle"] [data-pane="vehicle"] { visibility: visible; }
-.picrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.picrow.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.pic {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0;
-  padding: 4px 2px 2px; min-height: 0; min-width: 0;
-  font-size: clamp(0.72rem, 3.3vw, 1rem); line-height: 1.1; white-space: nowrap; overflow: hidden;
-}
-.pic svg { width: 100%; height: 50px; display: block; }
-.fams .pic svg { height: 62px; }
-.picrow + .picrow { margin-top: 10px; }
-.options.many { grid-auto-flow: row; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-columns: auto; }
-.opt svg { width: 100%; height: 56px; }
-.opt .numpic { width: 44px; height: 44px; display: grid; place-items: center; font-size: 1.7rem; font-weight: 800; }
-#art { display: block; width: 100%; height: 100%; touch-action: none; }
-
-/* Drive screen */
-.dhud {
-  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
-  pointer-events: none; background: rgba(255, 255, 255, 0.93); border: 3px solid #1D2340; border-radius: 20px;
-  box-shadow: 4px 4px 0 #1D2340; padding: 0 18px 2px; white-space: nowrap;
-  font-size: clamp(1.2rem, 4vw, 2.2rem); font-weight: 800; color: #1D2340; font-variant-numeric: tabular-nums;
-}
-.dhud[hidden] { display: none; }
-.dctl {
-  position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom, 0px));
-  padding: 0 max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; pointer-events: none;
-}
-.dctl > * { pointer-events: auto; }
-.dctl[hidden] { display: none; }
-.acts { display: flex; gap: 10px; flex: 1 1 auto; justify-content: center; flex-wrap: wrap; }
-.act, .horn, .pedal { color: #1D2340; border-color: #1D2340; box-shadow: 4px 4px 0 #1D2340; }
-.act { min-height: 64px; min-width: 104px; font-size: 1.5rem; font-weight: 800; background: #FFC93C; border-radius: 20px; }
-.act:active, .horn:active, .pedal:active { box-shadow: 0 0 0 #1D2340; }
-.act.on { background: #FFFFFF; }
-.horn { width: 84px; height: 84px; border-radius: 50%; background: #FFFFFF; font-size: 1.25rem; font-weight: 800; padding: 0; flex: none; }
-.pedal {
-  flex: none; width: 128px; height: 128px; border-radius: 28px; padding: 0;
-  font-size: 2.2rem; font-weight: 800; color: #FFFFFF; text-shadow: 2px 2px 0 #1D2340; background: #2E9E5B;
-}
-.pedal.stop { background: #E63946; }
-.dback {
-  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px));
-  min-height: 52px; font-size: 1.15rem; padding: 0.2rem 1rem; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340;
-}
-.dback[hidden] { display: none; }
-body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibility: hidden; }
-@media (min-width: 744px) and (min-height: 640px) {
-  .pic svg { height: 74px; }
-  .fams .pic svg { height: 96px; }
-  .pic { font-size: 1.1rem; padding: 6px 4px 4px; }
-  .picrow { gap: 10px; }
-  .opt svg { width: 100%; height: 92px; }
-  .opt .numpic { width: 76px; height: 76px; font-size: 2.8rem; }
-  .act { min-height: 84px; min-width: 150px; font-size: 2rem; }
-  .horn { width: 110px; height: 110px; font-size: 1.6rem; }
-  .pedal { width: 170px; height: 170px; font-size: 3rem; }
-  .dback { min-height: 60px; font-size: 1.35rem; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .pic svg { height: 34px; }
-  .fams .pic svg { height: 40px; }
-  .pic { font-size: 0.72rem; }
-  .opt svg { width: 100%; height: 38px; }
-  .opt .numpic { width: 30px; height: 30px; font-size: 1.2rem; }
-  .act { min-height: 52px; min-width: 84px; font-size: 1.2rem; }
-  .horn { width: 64px; height: 64px; font-size: 1rem; }
-  .pedal { width: 96px; height: 96px; font-size: 1.7rem; }
-  .dhud { font-size: 1.1rem; }
-}
-.lshort { display: none; }
-/* Phones: short picture names at a readable size, bigger tabs, icon-only header buttons. */
-@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
-  .lfull { display: none; }
-  .lshort { display: block; }
-  .pic { font-size: 0.95rem; }
-  .k4 .pic { font-size: 0.9rem; }
-  #prows .popt { font-size: 0.875rem; }
-  #pager .btn { min-height: 44px; font-size: 1rem; }
-}
-/* Tablets: room for the full names ("Cement mixer") in the row of four. */
-@media (min-width: 744px) and (min-height: 640px) {
-  .panel-body > [data-pane="vehicle"] { max-width: 640px; }
-  .k4 .pic { font-size: 0.95rem; padding-left: 2px; padding-right: 2px; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .pic { font-size: 0.85rem; }
-  #prows .popt { font-size: 0.8rem; }
-  #pager .btn { min-height: 44px; font-size: 0.875rem; }
-}
-
-/* Build pane: several part rows at once, each option a zoomed picture of that part */
-.pager { display: flex; gap: 6px; justify-content: center; margin: 0 0 6px; }
-.pager[hidden] { display: none; }
-/* six pages (the excavator and bulldozer): a little tighter so "Tracks" and "Engine" keep their full size */
-.pager.p6 { gap: 4px; }
-.pager.p6 .btn { padding-left: 0; padding-right: 0; }
-.pager .btn { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 0.1rem 0.3rem; font-size: clamp(0.8rem, 3.4vw, 1rem); }
-.prows { display: flex; flex-direction: column; gap: 6px; }
-.prow h4 { margin: 0 0 2px 4px; font-size: 0.85rem; line-height: 1.15; font-weight: 800; color: var(--muted); }
-.prow .popts { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-.popt {
-  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 0;
-  padding: 3px 2px 2px; min-height: 0; min-width: 0; overflow: hidden;
-  font-size: clamp(0.64rem, 2.9vw, 0.9rem); line-height: 1.1; white-space: nowrap;
-}
-.popt svg { width: 100%; height: 44px; display: block; border-radius: 10px; background: #E4F3FF; }
-.popt span { display: block; text-align: center; overflow: hidden; text-overflow: clip; }
-.popt .numpic { height: 44px; display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; }
-.prows.many .popt .numpic { font-size: 1.3rem; }
-@media (min-width: 744px) and (min-height: 640px) {
-  .pager { gap: 10px; margin-bottom: 10px; }
-  .pager .btn { min-height: 48px; font-size: 1.1rem; }
-  .prows { gap: 10px; }
-  .prow h4 { font-size: 1.05rem; margin-bottom: 4px; }
-  .prow .popts { gap: 10px; }
-  .popt { font-size: 1rem; padding: 5px 4px 4px; }
-  .popt svg, .popt .numpic { height: 76px; }
-  .popt .numpic { font-size: 2.4rem; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .pager .btn { min-height: 32px; font-size: 0.8rem; }
-  .prow h4 { font-size: 0.75rem; }
-  .popt { font-size: 0.66rem; }
-  .popt svg, .popt .numpic { height: 36px; }
-  .popt .numpic { font-size: 1.2rem; }
-}
-/* The panel is as tall as the Build tab; the Vehicle and Colors tabs use that room for bigger choices. */
-.panel-body > [data-pane="vehicle"] { display: flex; flex-direction: column; justify-content: center; gap: 10px; container-type: size; }
-[data-pane="vehicle"] .picrow + .picrow { margin-top: 0; }
-[data-pane="vehicle"] .fams .pic svg { height: min(30cqh, 20cqw); }
-[data-pane="vehicle"] #kinds .pic svg { height: min(24cqh, 15cqw); }
-/* Tablet landscape: the panel column is narrower, so the full names get a little smaller. */
-@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
-  .tb-panel .picrow .pic { font-size: 0.85rem; }
-  .tb-panel .picrow.k4 .pic { font-size: 0.78rem; padding-left: 1px; padding-right: 1px; }
-}
-/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
-.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
-.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
-.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
-.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
-.pickpic {
-  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
-  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
-  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
-}
-.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
-.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
-.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
-@media (min-width: 744px) and (min-height: 640px) {
-  .pick { gap: 16px; }
-  .pickswatches { gap: 14px; }
-  .pickswatches .swatch { max-width: 92px; }
-  .pickpic { font-size: 1.2rem; width: 150px; }
-}
-.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
-/* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
-.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
-/* Its color runs yellow, pink, blue, so it shows on every paint color. */
-.halo * { animation: halocol 1.8s linear infinite; }
-@keyframes halocol {
-  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
-  33% { fill: #FF5FB0; stroke: #FF5FB0; }
-  66% { fill: #3FC4FF; stroke: #3FC4FF; }
-}
-.pickpic .dim { opacity: 0.25; }
-/* Sparkles and puffs never catch a tap meant for the picture. */
-#fxG, #surpB, #surpF { pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell">
+<div class="tb-app-shell tb-v2">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Car Builder</h1>
-    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
 
   <div class="tb-body">
-    <main class="tb-stage stage" id="stage">
-      <div class="stage-inner">
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
         <div class="scene" id="scene">
           <svg id="art" viewBox="-300 -400 600 440" preserveAspectRatio="xMidYMax meet" role="img" aria-label="A vehicle"></svg>
-          <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
         </div>
-      </div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap a part to color it!</div>
-    </main>
+        <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+        <div id="coach"></div>
+      </main>
+      <div id="jobs" aria-label="Kinds of vehicles"></div>
+    </div>
 
-    <section class="tb-panel" data-tab="vehicle">
-      <div class="launchbar">
-        <button class="btn tb-go launch" id="launch"><svg viewBox="-60 -50 120 100" aria-hidden="true"><path d="M -52 14 L -52 -10 Q -50 -18 -40 -18 L -22 -18 L -8 -38 L 26 -38 L 40 -18 Q 54 -16 54 -4 L 54 14 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><path d="M -2 -32 L 22 -32 L 30 -18 L -2 -18 Z" fill="#BFE6FF" stroke="#1D2340" stroke-width="5" stroke-linejoin="round"/><circle cx="-28" cy="16" r="14" fill="#2B2E38" stroke="#1D2340" stroke-width="6"/><circle cx="32" cy="16" r="14" fill="#2B2E38" stroke="#1D2340" stroke-width="6"/></svg><span>Drive!</span></button>
-      </div>
-      <div class="tb-choices panel-body">
-        <div data-pane="vehicle" id="pane-vehicle" role="tabpanel" aria-labelledby="tab-vehicle">
-          <div class="picrow fams" id="fams"></div>
-          <div class="picrow" id="kinds"></div>
-        </div>
-        <div data-pane="build" id="pane-build" role="tabpanel" aria-labelledby="tab-build">
-          <div class="pager" id="pager"></div>
-          <div class="prows" id="prows"></div>
-        </div>
-        <div data-pane="pick" id="pane-pick" aria-live="polite">
-          <div class="pick">
-            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="0 0 10 10" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Body</span></div>
-            <div class="pickswatches" id="pickSw"></div>
-          </div>
-        </div>
-      </div>
-      <nav class="tb-tabs" role="tablist" aria-label="Controls">
-        <button class="btn tab" role="tab" id="tab-vehicle" data-tab="vehicle" aria-controls="pane-vehicle">Vehicle</button>
-        <button class="btn tab" role="tab" id="tab-build" data-tab="build" aria-controls="pane-build">Build</button>
-        <button class="btn tb-surprise" data-action="surprise">Surprise</button>
-      </nav>
+    <section class="tb-panel" id="panel">
+      <div id="go"></div>
+      <div id="tiles" role="group" aria-label="Choices for the picked part"></div>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
@@ -700,15 +271,13 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   <canvas id="fcv" aria-label="Driving"></canvas>
   <div class="dhud" id="dhud" hidden></div>
   <div class="banner" id="banner" hidden></div>
-  <button class="btn dback" id="fback">Back</button>
+  <button class="btn dback" id="fback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Build</span></button>
   <div class="dctl" id="dctl">
-    <button class="btn horn" id="horn">Beep!</button>
+    <button class="btn horn" id="horn" aria-label="Beep the horn"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 15h7l13-8v26l-13-8H6z" fill="#FFC93C" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><path d="M31 13q4 7 0 14M35 9q7 11 0 22" fill="none" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/></svg><span>Beep!</span></button>
     <div class="acts" id="acts"></div>
     <button class="btn pedal" id="pedal">Go</button>
   </div>
 </div>
-
-
 <script>
 (function () {
   "use strict";
@@ -1775,7 +1344,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
         s = "";
         v.wheels.forEach(function (w) {
           var g = '<g transform="translate(' + n2(w.x) + " " + n2(w.y) + ')">' + wheelArt(w) + "</g>";
-          s += w.front || (v.track && w.style === "sprocket" && w.x > 0) ? part("wheels", g) : g;
+          // the front wheel names the part (tile crops zoom on it); every wheel can be tapped
+          s += w.front || (v.track && w.style === "sprocket" && w.x > 0) ? part("wheels", g) : '<g data-hit="wheels">' + g + "</g>";
         });
       } else if (l.track) s = part("wheels", trackS(v.track));
       else s = l.svg;
@@ -1801,7 +1371,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
   }
   function freshState() {
-    var s = { fam: "build", kind: "excavator", cfgs: {}, buildPart: "", buildPage: 0, colorPart: "body", tab: "vehicle" };
+    var s = { fam: "build", kind: "excavator", cfgs: {}, part: "vehicle", buildPart: "", buildPage: 0, colorPart: "body", tab: "vehicle" };
     KIND_IDS.forEach(function (k) { s.cfgs[k] = defCfg(k); });
     return s;
   }
@@ -1826,6 +1396,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
             });
           });
         }
+        // the picked part (older saves have none: the vehicles show first)
+        if (typeof o.part === "string") s.part = o.part;
         if (typeof o.buildPart === "string") s.buildPart = o.buildPart;
         if (typeof o.buildPage === "number") s.buildPage = o.buildPage;
         if (typeof o.colorPart === "string") s.colorPart = o.colorPart;
@@ -1923,53 +1495,26 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     return o;
   }
 
-  // Short names for the picture buttons on phones, where the full names do not fit.
-  var SHORT = {
-    build: "Builders", monster: "Monsters", excavator: "Digger", bulldozer: "Dozer", dump: "Dumper",
-    mixer: "Mixer", race: "Race", sports: "Sports", f1: "F1", rally: "Rally", mmuscle: "Muscle"
-  };
-  function labelSpans(full, short) {
-    return short ? '<span class="lfull">' + full + '</span><span class="lshort" aria-hidden="true">' + short + "</span>" : "<span>" + full + "</span>";
-  }
-  // ---- controls ----
-  FAMILIES.forEach(function (f) {
-    var b = document.createElement("button");
-    b.className = "btn pic";
-    b.dataset.fam = f.id;
-    $("fams").appendChild(b);
-  });
-  // ---- coloring: only the big parts can be colored (the body, and a builder's arm, blade, bed or drum).
-  // Tap one on the picture: it glows and its colors show in the panel. Small details keep their colors.
+  // ---- picking a part: tap it on the picture; it glows and the panel's tiles show its choices ----
+  // The parts he can tap: the body (and its stripes and number), a builder's arm, blade, bed or drum ("tool"),
+  // the cab or roof, the roof's beacon, spoiler or bar ("top"), the wheels or tracks, the engine, the lights.
+  // "vehicle" (the sky or the ground, or the picked job tab) shows the family's vehicles instead.
+  // Each part shows at most four tiles: its shapes as picture tiles, and actions (Paint, Stripes, Number, Rims,
+  // the roof's topper) that change it to the next one, their picture showing what comes next.
   var PICKS = ["Red", "Orange", "Yellow", "Green", "Sky", "Blue", "Purple", "Pink"];
-  PICKS.forEach(function (name) {
-    var b = document.createElement("button");
-    b.className = "swatch";
-    b.dataset.color = name;
-    b.style.background = hex(name);
-    b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
-    b.setAttribute("aria-label", name);
-    $("pickSw").appendChild(b);
-  });
-  var picking = ""; // the part being colored ("body" or "tool"), or "" when none is picked
-  function colorable(k) {
-    var names = KINDS[k].names, c = state.cfgs[k], list = [["body", names.body]];
-    if (KINDS[k].fam === "build" && names.tool && c.colors.tool) list.push(["tool", names.tool]);
-    return list;
+  // Old saves may hold a choice that has no tile any more (no engine at all): it is still drawn, no tile picked.
+  var NO_TILE = { engine: ["none"] };
+  // The tile words for the vehicles: real names short enough for a phone tile.
+  var TILE_NAME = { mixer: "Mixer", dump: "Dumper", mmuscle: "Muscle" };
+  var FAM_WORD = { build: "Builders", fast: "Fast cars", monster: "Monsters" };
+  function nextOf(list, cur) {
+    var i = list.indexOf(cur);
+    return list[(i + 1) % list.length];
   }
-  // The drawing groups that wear a color: a truck's body color is its cab; a car's roof joins the body when
-  // it is usually the same color.
-  function glowSel(k, id) {
-    var names = [id];
-    if (id === "body") {
-      var d = KINDS[k].def.colors;
-      if (k === "dump" || k === "mixer") names = ["cab"];
-      else if (KINDS[k].fam !== "build" && d.trim === d.body) names.push("cab");
-    }
-    return names.map(function (n) { return '[data-part="' + n + '"]'; }).join(", ");
-  }
-  function pickLabel(id) {
-    var l = colorable(state.kind).filter(function (p) { return p[0] === id; })[0];
-    return l ? l[1] : "";
+  function nextColor(cur) { return PICKS.indexOf(cur) === -1 ? PICKS[0] : nextOf(PICKS, cur); }
+  function optVals(k, key) {
+    var sp = partSpec(k, key);
+    return sp ? sp[2].map(function (o) { return o[0]; }) : [];
   }
   // Details that sat on the old body color follow it, so nothing vanishes into the new color.
   function fixDetails(k, c) {
@@ -1979,82 +1524,187 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     if (c.colors.stripes === body) c.colors.stripes = d.stripes !== body ? d.stripes : contrast;
     if (c.colors.number === body) c.colors.number = d.number !== body ? d.number : contrast;
   }
-  function setPicking(id) {
-    picking = id || "";
-    if (picking) { state.colorPart = picking; $("coach").classList.add("off"); }
-    $("tab-build").closest(".tb-panel").classList.toggle("picking", !!picking);
-    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
-      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
-    });
-    showPick();
+  // A truck's body color is its cab (dump truck, mixer): the cab row then holds its Paint tile.
+  function bodyOnCab(k) { return k === "dump" || k === "mixer"; }
+  // The drawing groups that wear the body color: a truck's is its cab; a car's roof joins the body when it is
+  // usually the same color.
+  function glowSel(k, part) {
+    var names = [part];
+    if (part === "body") {
+      var d = KINDS[k].def.colors;
+      if (bodyOnCab(k)) names = ["cab"];
+      else if (KINDS[k].fam !== "build" && d.trim === d.body) names.push("cab");
+    }
+    var sel = names.map(function (n) { return '[data-part="' + n + '"]'; });
+    if (part === "wheels") sel.push('[data-hit="wheels"]');
+    return sel.join(", ");
   }
-  // The glow on the picture and the panel's picture + swatches for the picked part.
-  function showPick() {
+  function partName(k, part) {
+    var K = KINDS[k], sp;
+    if (part === "vehicle") return FAM_BY[K.fam].label;
+    if (part === "body") return K.names.body;
+    if (part === "tool") return K.names.tool || "Arm";
+    if (part === "engine") return "Engine";
+    sp = partSpec(k, part);
+    return sp ? sp[1] : "";
+  }
+  // Is the part there to tap on this vehicle?
+  function hasPart(k, part) {
+    if (part === "vehicle" || part === "body") return true;
+    if (part === "tool") return !!(KINDS[k].names.tool && state.cfgs[k].colors.tool);
+    return !!partSpec(k, part);
+  }
+
+  // ---- tile pictures ----
+  function brushPic(col) {
+    var c = hex(col);
+    return '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M30 6 42 18 26 30 18 22Z" fill="#C98B5A" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M18 22 26 30 22 34 14 26Z" fill="#9AA3AF" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M14 26 22 34C19 40 12 44 5 43 4 36 8 29 14 26Z" fill="' + c + '" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="38" cy="38" r="6" fill="' + c + '" stroke="' + OUT + '" stroke-width="2.5"/></svg>';
+  }
+  // A body panel wearing a stripe style (the Stripes tile shows the next one).
+  function stripePic(style, c) {
+    var body = hex(c.colors.body), col = hex(c.colors.stripes || "White");
+    if (col === body) col = isDark(body) ? "#FFFFFF" : OUT;
+    var id = "sp" + (uid++), skin = "M 6 12 Q 6 6 12 6 L 52 6 Q 58 6 58 12 L 58 40 Q 58 46 52 46 L 12 46 Q 6 46 6 40 Z";
+    return '<svg viewBox="0 0 64 52" aria-hidden="true"><clipPath id="' + id + '"><path d="' + skin + '"/></clipPath>' + pth(skin, body, 0) +
+      '<g clip-path="url(#' + id + ')">' + paintS(style, { x0: 6, x1: 58, y0: 6, y1: 46 }, col) + "</g>" + pth(skin, "none", 3) + "</svg>";
+  }
+  function numberPic(num, c) {
+    var col = hex(c.colors.number || "Black");
+    if (!num) return '<svg viewBox="0 0 52 52" aria-hidden="true">' + circ(26, 26, 20, "#FFFFFF", 3) + pth("M 17 26 L 35 26", "none", 4) + "</svg>";
+    return '<svg viewBox="0 0 52 52" aria-hidden="true">' + numberS(26, 26, 20, num, col) + "</svg>";
+  }
+  function rimPic(rim, c) {
+    return '<svg viewBox="-46 -46 92 92" aria-hidden="true">' + wheelArt({ r: 42, rim: rim, rimCol: hex(c.colors.rims || "Gray") }) + "</svg>";
+  }
+  // The vehicle with one choice changed, cropped to the part (the same crop for every choice of a row).
+  // tip: crop to the end of the part (the excavator's bucket, claw or breaker at the end of its long arm).
+  function zoomBox(svgs, names, minW, minH, tip) {
+    var Z = null;
+    svgs.forEach(function (s) {
+      names.forEach(function (n) {
+        var b = partBoxes(s, n);
+        if (b && !b.whole && b.x1 - b.x0 > 0.5) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
+      });
+    });
+    if (!Z) Z = partBoxes(svgs[0], "__none__") || { x0: -300, y0: -300, x1: 300, y1: 0 };
+    if (tip) Z = { x0: Z.x0 + (Z.x1 - Z.x0) * 0.4, x1: Z.x1, y0: Z.y0 + (Z.y1 - Z.y0) * 0.3, y1: Z.y1 };
+    var pad = 14, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2, AR = 1.2;
+    var w = Math.max(Z.x1 - Z.x0 + 2 * pad, minW || 110), hh = Math.max(Z.y1 - Z.y0 + 2 * pad, minH || 80);
+    if (w / hh < AR) w = hh * AR; else hh = w / AR;
+    return [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" ");
+  }
+  function optSvgs(k, c, key, vals) {
+    return vals.map(function (v) {
+      var cc = JSON.parse(JSON.stringify(c));
+      cc[key] = v;
+      return vehicleSVG(makeVehicle(k, cc), {});
+    });
+  }
+  function croppedPics(svgs, names, tip) {
+    var vb = zoomBox(svgs, names, 0, 0, tip);
+    return svgs.map(function (s) { return '<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + s + "</svg>"; });
+  }
+  var ZOOM = { tool: ["tool"], cab: ["cab", "top"], top: ["top", "cab"], wheels: ["wheels"], engine: ["engine"], lights: ["lights"] };
+
+  // The tiles for a part: [{ id, name, pic, action }]. Pick ids are "o:<value>", actions "a:<what>".
+  function tilesFor(k, part) {
+    var c = state.cfgs[k], out = [], key = part, vals, svgs, pics;
+    if (part === "vehicle") {
+      return FAM_BY[KINDS[k].fam].kinds.map(function (kk) {
+        return { id: "k:" + kk, name: TILE_NAME[kk] || KINDS[kk].label, pic: thumb(kk, state.cfgs[kk], 10) };
+      });
+    }
+    if (part === "body") {
+      out.push({ id: "a:paint", name: "Paint", pic: brushPic(nextColor(c.colors.body)), action: true });
+      if (partSpec(k, "paint")) out.push({ id: "a:stripes", name: "Stripes", pic: stripePic(nextOf(optVals(k, "paint"), c.paint), c), action: true });
+      if (partSpec(k, "number")) out.push({ id: "a:number", name: "Number", pic: numberPic(nextOf(optVals(k, "number"), c.number), c), action: true });
+      if (partSpec(k, "top")) out.push(topAction(k, c));
+      return out;
+    }
+    if (part === "tool" && !partSpec(k, "tool")) {
+      return [{ id: "a:paint", name: "Paint", pic: brushPic(nextColor(c.colors.tool)), action: true }];
+    }
+    vals = optVals(k, key).filter(function (v) { return (NO_TILE[key] || []).indexOf(v) === -1; });
+    if (!vals.length) return out;
+    svgs = optSvgs(k, c, key, vals);
+    pics = croppedPics(svgs, ZOOM[part] || [part], part === "tool" && k === "excavator");
+    var sp = partSpec(k, key);
+    vals.forEach(function (v, i) {
+      var label = sp[2].filter(function (o) { return o[0] === v; })[0][1];
+      out.push({ id: "o:" + v, name: label, pic: pics[i] });
+    });
+    if (part === "tool") out.push({ id: "a:paint", name: "Paint", pic: brushPic(nextColor(c.colors.tool)), action: true });
+    if (part === "cab" && bodyOnCab(k)) out.push({ id: "a:paint", name: "Paint", pic: brushPic(nextColor(c.colors.body)), action: true });
+    if (part === "wheels" && partSpec(k, "rims")) out.push({ id: "a:rims", name: "Rims", pic: rimPic(nextOf(optVals(k, "rims"), c.rims), c), action: true });
+    return out.slice(0, 4);
+  }
+  // The roof's topper (beacon, lights, spoiler, roll bar...) as an action on the body row: the next one.
+  function topAction(k, c) {
+    var nv = nextOf(optVals(k, "top"), c.top), cc = JSON.parse(JSON.stringify(c)), sp = partSpec(k, "top");
+    cc.top = nv;
+    var s = vehicleSVG(makeVehicle(k, cc), {});
+    return { id: "a:top", name: sp[1], pic: croppedPics([s, vehicleSVG(makeVehicle(k, c), {})], ["top", "cab"])[0], action: true };
+  }
+  function pickedId(k, part) {
+    if (part === "vehicle") return "k:" + k;
+    if (part === "body" || (part === "tool" && !partSpec(k, "tool"))) return "";
+    return "o:" + state.cfgs[k][part];
+  }
+
+  var tiles = null, jobs = null, tileSig = "";
+  function updateTiles() {
+    if (!tiles) return;
+    var k = state.kind;
+    if (!hasPart(k, state.part)) state.part = "vehicle";
+    var list = tilesFor(k, state.part);
+    var sig = JSON.stringify([k, state.part, list.map(function (t) { return t.id + t.pic; })]);
+    if (sig !== tileSig) {
+      tileSig = sig;
+      tiles.items(list);
+      list.forEach(function (t) {
+        var b = tiles.button(t.id);
+        if (b && t.action) b.classList.add("is-action");
+      });
+    }
+    tiles.set(pickedId(k, state.part));
+  }
+  function updateJobs() {
+    if (!jobs) return;
+    jobs.set(state.fam);
+    Array.prototype.forEach.call(jobs.el.querySelectorAll(".tb-job"), function (b, i) {
+      var f = FAMILIES[i].id, rk = f === state.fam ? state.kind : FAM_REP[f];
+      var pic = thumb(rk, state.cfgs[rk], 8), holder = b.querySelector(".tb-pic");
+      if (holder && holder.getAttribute("data-k") !== rk + JSON.stringify(state.cfgs[rk])) {
+        holder.innerHTML = pic;
+        holder.setAttribute("data-k", rk + JSON.stringify(state.cfgs[rk]));
+      }
+    });
+  }
+
+  // The picked part glows on the picture.
+  function showHalo() {
     var g = $("rocketG");
-    if (g) Array.prototype.forEach.call(g.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
-    if (!picking) return;
-    var k = state.kind, c = cfg();
-    if (!colorable(k).some(function (p) { return p[0] === picking; })) { setPicking(""); return; }
-    var sel = glowSel(k, picking);
-    if (g) Array.prototype.forEach.call(g.querySelectorAll(sel), function (el) {
+    if (!g) return;
+    Array.prototype.forEach.call(g.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (state.part === "vehicle" || document.body.classList.contains("big")) return;
+    var sel = glowSel(state.kind, state.part);
+    Array.prototype.forEach.call(g.querySelectorAll(sel), function (el) {
       if (el.parentNode.closest && el.parentNode.closest(sel)) return;
       var h = el.cloneNode(true);
       h.removeAttribute("data-part");
-      Array.prototype.forEach.call(h.querySelectorAll("[id], [data-part]"), function (x) { x.removeAttribute("id"); x.removeAttribute("data-part"); });
+      h.removeAttribute("data-hit");
+      Array.prototype.forEach.call(h.querySelectorAll("[id], [data-part], [data-hit]"), function (x) { x.removeAttribute("id"); x.removeAttribute("data-part"); x.removeAttribute("data-hit"); });
       h.setAttribute("class", "halo");
       [h].concat(Array.prototype.slice.call(h.querySelectorAll("*"))).forEach(function (x) {
         x.style.strokeWidth = ((parseFloat(x.getAttribute("stroke-width")) || 0) + 22) + "px";
       });
       el.parentNode.insertBefore(h, el);
     });
-    // panel picture: the vehicle with everything but the picked part faded, framed on that part
-    var t = vehicleOf(k, c), svg = $("pickSvg"), Z = null;
-    sel.replace(/data-part="(\w+)"/g, function (m0, n) {
-      var b = partBoxes(t.svg, n);
-      if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
-      return m0;
-    });
-    if (!Z) Z = { x0: t.bb.x, y0: t.bb.y, x1: t.bb.x + t.bb.w, y1: t.bb.y + t.bb.h };
-    var pad = 18, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2, w = Z.x1 - Z.x0 + 2 * pad, hh = Z.y1 - Z.y0 + 2 * pad;
-    if (w / hh < 1.3) w = hh * 1.3; else hh = w / 1.3;
-    svg.setAttribute("viewBox", [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" "));
-    svg.innerHTML = t.svg;
-    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, polyline, text"), function (el) {
-      if (!el.closest(sel) && !el.closest("clipPath")) el.setAttribute("class", "dim");
-    });
-    $("pickName").textContent = pickLabel(picking);
-    var cur = c.colors[picking];
-    Array.prototype.forEach.call($("pickSw").querySelectorAll("[data-color]"), function (bt) {
-      var on = bt.dataset.color === cur;
-      bt.setAttribute("aria-pressed", String(on));
-      bt.textContent = on ? "\u2713" : "";
-    });
   }
 
-
-  // ---- build rows ----
-  // Which part of the drawing each option row zooms in on.
-  var ZOOM = { tool: "tool", cab: "cab", wheels: "wheels", rims: "wheels", engine: "engine", top: "top", lights: "lights", paint: "paint" };
-  // Build pages: each pager button names exactly what its page holds. Parts that belong together share a page
-  // (wheels with their rims, the cab or roof with what sits on top, stripes with the number); a page with only one
-  // of its parts takes that part's own name ("Tracks", "Wing").
-  var GROUPS = [
-    { ids: ["tool"] },
-    { ids: ["wheels", "rims"], label: "Wheels" },
-    { ids: ["cab", "top"], label: "Top" },
-    { ids: ["engine"] },
-    { ids: ["lights"] },
-    { ids: ["paint", "number"], label: "Paint" }
-  ];
-  function buildPages(k) {
-    var ps = kindParts(k), out = [];
-    GROUPS.forEach(function (g) {
-      var rows = [];
-      g.ids.forEach(function (id) { ps.forEach(function (p) { if (p[0] === id) rows.push(p); }); });
-      if (rows.length) out.push({ label: rows.length > 1 ? g.label : rows[0][1], rows: rows });
-    });
-    return out;
-  }
   // Union of the bounding boxes of the drawing's [data-part=name] groups (vehicle units), or null.
   function partBoxes(svgStr, name) {
     meas.innerHTML = "<g>" + svgStr + "</g>";
@@ -2071,51 +1721,6 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     meas.innerHTML = "";
     return r || (all ? { whole: true, x0: all.x0, y0: all.y0, x1: all.x1, y1: all.y1 } : null);
   }
-  function partRow(k, c, p) {
-    var id = p[0], opts = p[2];
-    var row = document.createElement("div");
-    row.className = "prow";
-    var h = document.createElement("h4");
-    h.textContent = p[1];
-    row.appendChild(h);
-    var box = document.createElement("div");
-    box.className = "popts";
-    row.appendChild(box);
-    var pics = [], Z = null;
-    if (id !== "number") {
-      opts.forEach(function (o) {
-        var cc = JSON.parse(JSON.stringify(c));
-        cc[id] = o[0];
-        var s = vehicleSVG(makeVehicle(k, cc), {});
-        var b = partBoxes(s, ZOOM[id] || "body");
-        pics.push(s);
-        if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
-      });
-      if (!Z) Z = partBoxes(pics[0], "__none__") || { x0: -300, y0: -300, x1: 300, y1: 0 };
-      // stripes: a close-up of a panel near the front, not the whole long side
-      if (id === "paint" && Z.x1 - Z.x0 > 1.8 * (Z.y1 - Z.y0)) {
-        var pw = Math.max(1.8 * (Z.y1 - Z.y0), 150), pc = Z.x0 + (Z.x1 - Z.x0) * 0.62;
-        Z = { x0: pc - pw / 2, x1: pc + pw / 2, y0: Z.y0, y1: Z.y1 };
-      }
-      // padding, a minimum size (so tiny parts keep some context) and the button's shape
-      var pad = 16, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2;
-      var w = Math.max(Z.x1 - Z.x0 + 2 * pad, 130), hh = Math.max(Z.y1 - Z.y0 + 2 * pad, 90), AR = 1.5;
-      if (w / hh < AR) w = hh * AR; else hh = w / AR;
-      var vb = [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" ");
-    }
-    opts.forEach(function (o, i) {
-      var bt = document.createElement("button");
-      bt.className = "btn popt";
-      bt.dataset.ppart = id;
-      bt.dataset.opt = String(o[0]);
-      bt.setAttribute("aria-pressed", String(o[0] === c[id]));
-      bt.setAttribute("aria-label", p[1] + ": " + (id === "number" ? (o[0] ? String(o[0]) : "None") : o[1]));
-      if (id === "number") bt.innerHTML = '<span class="numpic">' + (o[0] ? o[0] : "–") + "</span>";
-      else bt.innerHTML = '<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + pics[i] + "</svg><span>" + o[1] + "</span>";
-      box.appendChild(bt);
-    });
-    return row;
-  }
 
   var lastBB = null, baseVB = null;
   function render() {
@@ -2129,59 +1734,12 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     art.setAttribute("viewBox", baseVB.map(n2).join(" "));
     art.innerHTML = backdropS(fam, x0, x1, y0) + '<g id="surpB"></g><g id="carMove"><g class="rocket" id="rocketG">' + t.svg + '</g></g><g id="surpF"></g><g id="fxG"></g>';
     art.setAttribute("aria-label", "A " + KINDS[k].label.toLowerCase());
-
-    // Vehicle tab: families + kinds (phones show the short names so nothing is cut off)
-    Array.prototype.forEach.call(document.querySelectorAll("[data-fam]"), function (bt) {
-      var f = bt.dataset.fam, rk = f === fam ? k : FAM_REP[f];
-      bt.setAttribute("aria-pressed", String(f === fam));
-      bt.setAttribute("aria-label", FAM_BY[f].label);
-      bt.innerHTML = thumb(rk, state.cfgs[rk]) + labelSpans(FAM_BY[f].label, SHORT[f]);
-    });
-    var kinds = $("kinds");
-    kinds.className = "picrow" + (FAM_BY[fam].kinds.length > 3 ? " k4" : "");
-    kinds.innerHTML = "";
-    FAM_BY[fam].kinds.forEach(function (kk) {
-      var bt = document.createElement("button");
-      bt.className = "btn pic";
-      bt.dataset.kind = kk;
-      bt.setAttribute("aria-pressed", String(kk === k));
-      bt.setAttribute("aria-label", KINDS[kk].label);
-      bt.innerHTML = thumb(kk, state.cfgs[kk]) + labelSpans(KINDS[kk].label, SHORT[kk]);
-      kinds.appendChild(bt);
-    });
-
-    // Build tab: several part rows at once (paged), each option a zoomed picture of that part.
-    var pages = buildPages(k), per = 0;
-    pages.forEach(function (pp) { per = Math.max(per, pp.rows.length); });
-    if (!(state.buildPage >= 0 && state.buildPage < pages.length)) state.buildPage = 0;
-    var pg = $("pager");
-    pg.hidden = pages.length < 2;
-    pg.classList.toggle("p6", pages.length > 5);
-    pg.innerHTML = "";
-    pages.forEach(function (pp, i) {
-      var bt = document.createElement("button");
-      bt.className = "btn";
-      bt.dataset.page = String(i);
-      bt.textContent = pp.label;
-      bt.setAttribute("aria-label", pp.rows.map(function (p) { return p[1]; }).join(", "));
-      bt.setAttribute("aria-pressed", String(i === state.buildPage));
-      pg.appendChild(bt);
-    });
-    var rows = $("prows");
-    rows.innerHTML = "";
-    pages[state.buildPage].rows.forEach(function (p) { rows.appendChild(partRow(k, c, p)); });
-    // keep every page the same height so the panel does not jump between pages
-    rows.style.minHeight = "";
-    var rh = 0;
-    Array.prototype.forEach.call(rows.children, function (r) { rh = Math.max(rh, r.offsetHeight); });
-    var gap = parseFloat(getComputedStyle(rows).rowGap) || 0;
-    if (rh && pages.length > 1) rows.style.minHeight = Math.ceil(rh * per + gap * (per - 1)) + "px";
-
-    showPick();
+    updateTiles();
+    updateJobs();
+    showHalo();
     save();
     vbKey = ""; // drive pictures are rebuilt from the new design
   }
-
 
   function restartAnim(el, cls) {
     if (!el || reduce) return;
@@ -2227,40 +1785,171 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     p.x = e.clientX; p.y = e.clientY;
     return p.matrixTransform(m.inverse());
   }
-  $("scene").addEventListener("pointerdown", function (e) {
-    if (Toybox.timer.phase() === "resting") return;
-    if (e.target.closest && e.target.closest("button")) return;
-    var p = svgPoint(e);
-    lastPtr = { x: p.x, y: p.y, at: performance.now() };
-    sparkles(p.x, p.y, 8, 60);
-    if (Toybox.timer.phase() === "ending") return;
-    // A tap on the vehicle picks the part to color (the arm, blade, bed or drum, else the body);
-    // a tap on the sky or the ground puts the colors away.
-    var onV = e.target.closest && e.target.closest("#rocketG");
-    if (onV && !Toybox.timer.locked() && !document.body.classList.contains("big")) {
-      var tl = e.target.closest('[data-part="tool"]');
-      var id = tl && colorable(state.kind).length > 1 ? "tool" : "body";
-      if (id !== picking) { setPicking(id); blip(); }
-    } else if (picking) setPicking("");
-    restartAnim($("rocketG"), "hop");
-    if (lastBB) puffs(lastBB.x + lastBB.w * 0.15, 0, 5);
-    honk();
-  });
-
+  // Screen px of a picture point.
+  function screenPt(x, y) {
+    var m = art.getScreenCTM();
+    if (!m) return null;
+    var p = art.createSVGPoint();
+    p.x = x; p.y = y;
+    p = p.matrixTransform(m);
+    return [p.x, p.y];
+  }
   $("scene").addEventListener("pointermove", function (e) {
     if (!mo || mo.kind !== "face") return;
     var p = svgPoint(e);
     lastPtr = { x: p.x, y: p.y, at: performance.now() };
   });
-
-  var tab = state.tab;
-  function showTab(name) {
-    tab = name;
-    state.tab = name;
-    $("tab-build").closest(".tb-panel").setAttribute("data-tab", name);
-    setPicking("");
-    save();
+  // Which part of the vehicle is under (or close to) a finger: the exact spot first, then a ring around it,
+  // so a finger near the edge of a small part (the lights, a pipe) still counts.
+  var PART_OF = { paint: "body", number: "body" };
+  function partAt(x, y) {
+    var probes = [[0, 0]], k, r;
+    for (r = 14; r <= 28; r += 14) for (k = 0; k < 8; k++) probes.push([Math.cos(k * Math.PI / 4) * r, Math.sin(k * Math.PI / 4) * r]);
+    for (k = 0; k < probes.length; k++) {
+      var el = document.elementFromPoint(x + probes[k][0], y + probes[k][1]);
+      if (!el || !el.closest || !el.closest("#rocketG")) continue;
+      var g = el.closest("[data-part], [data-hit]"), part = g ? (g.getAttribute("data-part") || g.getAttribute("data-hit")) : "body";
+      part = PART_OF[part] || part;
+      // a truck's cab wears the body color, so tapping its cab is the cab (its row has Paint)
+      return hasPart(state.kind, part) ? part : "body";
+    }
+    return null;
   }
+  // Pick a part (a tap on the vehicle): it glows, its name pops up and the tiles show its choices. A tap on
+  // the sky or the ground (part "vehicle") shows the vehicles again.
+  function pickPart(part, x, y) {
+    if (!hasPart(state.kind, part)) return;
+    var same = part === state.part;
+    state.part = part;
+    if (part !== "vehicle") ghost.learned("part");
+    if (x != null && part !== "vehicle") Toybox.nametag(partName(state.kind, part), x, y - 24);
+    updateTiles();
+    showHalo();
+    save();
+    if (same && tiles) Toybox.wiggle(tiles.el);
+    if (!same && tiles) Array.prototype.forEach.call(tiles.el.children, function (b) { b.classList.remove("is-flash"); void b.offsetWidth; b.classList.add("is-flash"); });
+  }
+  // One press is always enough: every tap on the picture honks and bounces the vehicle with sparkles; a tap
+  // on a part picks it (the tiles show its choices), a tap on the sky or the ground shows the vehicles.
+  Toybox.press($("scene"), {
+    any: true,
+    hit: function () { return null; },
+    down: function (part, e) {
+      if (Toybox.timer.phase() === "resting") return;
+      var p = svgPoint(e);
+      lastPtr = { x: p.x, y: p.y, at: performance.now() };
+      sparkles(p.x, p.y, 8, 60);
+      if (Toybox.timer.phase() === "ending") return;
+      restartAnim($("rocketG"), "hop");
+      if (lastBB) puffs(lastBB.x + lastBB.w * 0.15, 0, 5);
+      honk();
+    },
+    tap: function (part, x, y) {
+      if (Toybox.timer.locked() || document.body.classList.contains("big")) return;
+      pickPart(partAt(x, y) || "vehicle", x, y);
+    }
+  });
+
+  // ---------- Panel: Go "Drive!", the picked part's tiles, the job bar, the bottom bar ----------
+  var coach = Toybox.coach($("coach"));
+  var drove = false;
+  // Idle help: the ghost hand taps Drive! first; once he has driven, it taps a part of the vehicle. On the
+  // road it taps Go.
+  var ghost = Toybox.ghost({
+    max: 2,
+    onShow: function (p, on) { if (go) go.pulse(on && p.key === "drive"); },
+    plan: function () {
+      if (!$("flight").hidden) {
+        if (!dv || dv.park || dv.go) return null;
+        var pr = $("pedal").getBoundingClientRect();
+        return pr.width ? { pts: [[pr.left + pr.width / 2, pr.top + pr.height / 2]], tap: true, key: "pedal" } : null;
+      }
+      if (mo) return null;
+      if (!drove) {
+        var b = go.el.getBoundingClientRect();
+        if (b.width) return { pts: [[b.left + b.width / 2, b.top + b.height * 0.55]], tap: true, key: "drive" };
+      }
+      if (!lastBB) return null;
+      var pt = screenPt(lastBB.x + lastBB.w * 0.42, lastBB.y + lastBB.h * 0.55);
+      return pt ? { pts: [pt], tap: true, key: "part" } : null;
+    }
+  });
+  var CAR_PIC = '<svg viewBox="-60 -50 120 100" aria-hidden="true"><path d="M -52 14 L -52 -10 Q -50 -18 -40 -18 L -22 -18 L -8 -38 L 26 -38 L 40 -18 Q 54 -16 54 -4 L 54 14 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><path d="M -2 -32 L 22 -32 L 30 -18 L -2 -18 Z" fill="#BFE6FF" stroke="#1D2340" stroke-width="5" stroke-linejoin="round"/><circle cx="-28" cy="16" r="14" fill="#2B2E38" stroke="#1D2340" stroke-width="6"/><circle cx="32" cy="16" r="14" fill="#2B2E38" stroke="#1D2340" stroke-width="6"/></svg>';
+  function drive() {
+    if (Toybox.timer.locked() || !$("flight").hidden) return;
+    ghost.learned("drive");
+    drove = true;
+    momentStop();
+    openDrive(false);
+  }
+  var go = Toybox.go($("go"), { label: "Drive!", icon: CAR_PIC, onPress: function () { drive(); } });
+  function onTile(id) {
+    if (Toybox.timer.locked()) return;
+    var k = state.kind, c = cfg(), part = state.part, what = id.slice(2), say = "";
+    if (id.indexOf("k:") === 0) {
+      if (!KINDS[what]) return;
+      state.kind = what;
+      say = "A " + KINDS[what].label.toLowerCase() + "!";
+    } else if (id === "a:paint") {
+      var ck = part === "tool" ? "tool" : "body";
+      c.colors[ck] = nextColor(c.colors[ck]);
+      if (ck === "body") fixDetails(k, c);
+      say = c.colors[ck] + " " + partName(k, part === "cab" ? "body" : part).toLowerCase() + "!";
+    } else if (id === "a:stripes") {
+      c.paint = nextOf(optVals(k, "paint"), c.paint);
+      say = c.paint === "none" ? "No stripes!" : partSpec(k, "paint")[2].filter(function (o) { return o[0] === c.paint; })[0][1] + "!";
+    } else if (id === "a:number") {
+      c.number = nextOf(optVals(k, "number"), c.number);
+      say = c.number ? "Number " + c.number + "!" : "No number!";
+    } else if (id === "a:top") {
+      c.top = nextOf(optVals(k, "top"), c.top);
+    } else if (id === "a:rims") {
+      c.rims = nextOf(optVals(k, "rims"), c.rims);
+    } else if (id.indexOf("o:") === 0) {
+      var vals = optVals(k, part).filter(function (v) { return String(v) === what; });
+      if (!vals.length) return;
+      c[part] = vals[0];
+    } else return;
+    ghost.learned("part");
+    render();
+    celebrate();
+    blip();
+    if (say) coach.say(say, 3);
+  }
+  tiles = Toybox.tiles($("tiles"), { items: [], kind: "pick", rows: 1, onPick: onTile });
+  jobs = Toybox.jobs($("jobs"), {
+    jobs: FAMILIES.map(function (f) { return { id: f.id, name: FAM_WORD[f.id], pic: "" }; }),
+    value: state.fam,
+    onPick: function (id) {
+      if (Toybox.timer.locked() || !FAM_BY[id]) return;
+      state.kind = FAM_BY[id].kinds[0];
+      state.part = "vehicle";
+      render();
+      celebrate();
+      blip();
+    }
+  });
+  // A tap on the job tab already picked shows its vehicles again.
+  Array.prototype.forEach.call(jobs.el.querySelectorAll(".tb-job"), function (b, i) {
+    b.setAttribute("aria-label", FAMILIES[i].label);
+    b.addEventListener("click", function () {
+      if (Toybox.timer.locked() || FAMILIES[i].id !== state.fam || state.part === "vehicle") return;
+      pickPart("vehicle");
+    });
+  });
+  // New: every vehicle back to its first look (he stays with the vehicle he has).
+  function startOver() {
+    if (Toybox.timer.locked()) return;
+    momentStop();
+    var k = state.kind;
+    KIND_IDS.forEach(function (kk) { state.cfgs[kk] = defCfg(kk); });
+    state.part = "vehicle";
+    render();
+    celebrate();
+    blip();
+    coach.say("A new " + KINDS[k].label.toLowerCase() + "!", 3);
+  }
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: function () { surprise(); } });
 
   // ---------- Surprise: a fun moment for his vehicle, right now (his build and colors never change) ----------
   // They take turns, never the same one twice in a row: a car wash, a jump over cones, a ride on a tow
@@ -2618,43 +2307,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   }
   if (/[?&]debug\b/.test(location.search)) window.__carSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { return MOMENTS[momentAt % MOMENTS.length]; } };
 
-  document.addEventListener("click", function (e) {
-    var t = e.target.closest("button");
-    if (!t) return;
-    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
-    if (t.id === "fback") { if (!dv || !dv.park) closeDrive(); return; }
-    if (t.classList.contains("hold") || t.id === "bigToggle" || t.closest(".tb-layer, .sheet, .rest, .farewell")) return;
-    if (Toybox.timer.locked()) return;
-    if (t.id === "launch") { if (picking) setPicking(""); openDrive(false); return; }
-    var changed = false, c = cfg(), kind0 = state.kind;
-    if (t.dataset.fam) {
-      if (t.dataset.fam !== state.fam) { state.kind = FAM_BY[t.dataset.fam].kinds[0]; changed = true; }
-    }
-    else if (t.dataset.kind) { changed = state.kind !== t.dataset.kind; state.kind = t.dataset.kind; if (!changed) changed = true; }
-    else if (t.dataset.page) { state.buildPage = Number(t.dataset.page); }
-    else if (t.dataset.ppart && t.dataset.opt !== undefined) {
-      var spec = partSpec(state.kind, t.dataset.ppart);
-      if (!spec) return;
-      c[t.dataset.ppart] = spec[2].filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
-      changed = true;
-    }
-    else if (t.dataset.color) {
-      if (!picking) return;
-      c.colors[picking] = t.dataset.color;
-      if (picking === "body") fixDetails(state.kind, c);
-      changed = true;
-    }
-    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
-    else return;
-    // Another action puts the colors away; picking a color keeps them out.
-    if (!t.dataset.color && (picking && (t.dataset.action || state.kind !== kind0 || t.dataset.ppart))) setPicking("");
-    render();
-    if (changed) {
-      celebrate();
-      blip();
-      if (t.dataset.color) restartAnim(t, "pop");
-    }
-  });
+  // The drive screen's Back ("Build") button.
+  $("fback").addEventListener("click", function () { if (!dv || !dv.park) closeDrive(); });
 
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
@@ -3550,117 +3204,6 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
       el.appendChild(b);
     });
   }
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
-  // Page px of a point inside an element, as fractions of its box.
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
-  }
-  // Idle help: the ghost hand taps Drive!, and on the road it taps Go.
-  var ghost = makeGhost(function () {
-    if ($("flight").hidden) { var l = $("launch"); return l.offsetWidth ? { pts: [ghostPt(l, 0.55, 0.55)], tap: true } : null; }
-    if (!dv || dv.park || dv.go) return null;
-    return { pts: [ghostPt($("pedal"), 0.5, 0.5)], tap: true };
-  }, { max: 3 });
   function openDrive(park) {
     if (dv) { if (park) startPark(); return; }
     F.hidden = false;
@@ -3709,7 +3252,7 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     if (!dv) return;
     var b = e.target.closest ? e.target.closest("button") : null;
     if (b) {
-      if (b.id === "pedal") { if (!dv.park) { ghost.learned(); dv.go = !dv.go; updatePedal(); if (dv.go) dirtBurst(dv.x + VB.xr, 0, 8, dv.fam === "fast" ? "#9AA3AF" : DIRT_L, 0.6); } }
+      if (b.id === "pedal") { if (!dv.park) { ghost.learned("pedal"); dv.go = !dv.go; updatePedal(); if (dv.go) dirtBurst(dv.x + VB.xr, 0, 8, dv.fam === "fast" ? "#9AA3AF" : DIRT_L, 0.6); } }
       else if (b.id === "horn") { honk(); var hp = toWorld(VB.v.head ? VB.v.head.x : 100, VB.v.head ? VB.v.head.y - dv.susp : -60); starBurst(hp.x + 60, hp.y, 6, 300, ["#FFC93C", "#FFFFFF"]); }
       else if (b.dataset.act) { doAction(b.dataset.act); if (b.dataset.act !== "turbo") sfxClick(); }
       return;
@@ -3917,18 +3460,16 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
     return '<svg class="rest-art" viewBox="-300 -420 600 440" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="aspect-ratio: 600 / 440; width: min(78vw, 360px, 46vh)">' + restSVG() + "</svg>";
   }
 
-  // Big mode: hide the title and controls so the rocket and launch pad fill the screen.
-  // The picture is an SVG that scales itself, so no re-layout is needed.
 
 
-  showTab(tab);
   render();
+  coach.step("Tap a part, then Drive!");
   // The old Car Builder sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
   try { if (localStorage.getItem("carbuilder-sound-v1") === "on") localStorage.setItem("carbuilder-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "car-builder",
     big: { button: $("bigToggle") },
-    onBig: function (on) { if (on && picking) setPicking(""); },
+    onBig: function () { showHalo(); },
     timerIntro: "When time is up, the vehicle drives into its garage and rests, and the controls lock.",
     goodbyeOption: "End with a “Park it” button to press",
     farewellText: "Time to park",
@@ -3948,7 +3489,8 @@ body.ending .dctl .act, body.ending .dctl .pedal, body.ending .dback { visibilit
   });
 
   // Test hook, only with ?debug in the address: lets automated checks peek at the drive.
-  if (/[?&]debug\b/.test(location.search)) window.__car = { drive: function () { return dv; }, action: function (a) { doAction(a); }, park: function () { startPark(); } };
+  if (/[?&]debug\b/.test(location.search)) window.__car = { drive: function () { return dv; }, action: function (a) { doAction(a); }, park: function () { startPark(); },
+    state: function () { return state; }, bb: function () { return lastBB; }, screen: screenPt, partAt: partAt };
 })();
 </script>
 </body>
