@@ -46,8 +46,16 @@
  *                               tank (0..1), auger (0..1 swung out; the page draws the swung tube, see .augerTube),
  *                               face, beacon }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
  *   Farm.draw.hare / deer / gull / hawk (ctx, x, y, s, phase, flip)   the farm's life, in screen px.
+ *   Farm.rear.bedformer / destoner / planter / harvester / trailer (ctx, st)   the potato machines seen from behind
+ *                               (a close-up looking along the rows), origin on the ground in the middle, metres,
+ *                               row crests at x = +-0.5: st = { time, run (belt phase), work, level, load, face }.
+ *                               Farm.rear.crossBelt(ctx, x0, y0, x1, y1, run) the destoner's stone conveyor,
+ *                               Farm.rear.hood(ctx, c, h, thick) a steel row hood.
+ *   Farm.inUnits(ctx, x, y, s, lwPx, fn)  draw fn() in metres at screen (x, y), s px per metre, lwPx outlines.
+ *   Farm.shape                  the drawing helpers (P, R, C, Ln, tube, fs, rr) for pages drawing in units.
  *   Farm.MACHINES               { id: { name, len (m behind the hitch), work (m behind the hitch where it works),
  *                               trailed } } for the potato machines.
+ *   Farm.draw.boom(..., kind) kind "belt" (potatoes riding), "belt-empty" (stopped belt), else the green auger.
  *   Farm.Particles()            world-space particles: add({ x, h, r, vx, vh, life, size, col, kind }), update(dt),
  *                               draw(ctx, scene), clear(), count().
  *   Farm.pic(id)                the step/tile picture of a machine ("bedformer", "destoner", "planter", "harvester",
@@ -449,6 +457,135 @@
   }
 
   // =====================================================================================================
+  // The potato machines seen from behind (for a close-up that looks along the rows). Machine units (metres),
+  // origin on the ground in the middle, y up negative. The rows' crests are at x = +-0.5 (1 m apart).
+  // st = { time, run (belt/web phase, grows while working), work (0..1), level (hopper 0..1), load (0..1), face }
+  // =====================================================================================================
+  function tyreBack(ctx, x, yb, w, h, run) {
+    R(ctx, x - w / 2, yb - h, w, h, w * 0.45, "#33363F");
+    ctx.save(); rr(ctx, x - w / 2, yb - h, w, h, w * 0.45); ctx.clip();
+    for (var i = 0; i < 9; i++) { var y = yb - h + (((i / 9) + (run || 0) * 0.35) % 1) * h; Ln(ctx, x - w * 0.42, y, x + w * 0.42, y, "#22242C", LW * 1.4); }
+    ctx.restore();
+    R(ctx, x - w / 2, yb - h, w, h, w * 0.45, null);
+  }
+  // A steel hood shaped like a row (an arch over x = c), from y top of the row h (m) above the ground.
+  function rowHood(ctx, c, h, thick) {
+    ctx.beginPath();
+    for (var i = 0; i <= 16; i++) { var f = i / 16, x = c - 0.56 + f * 1.12, y = -(h + 0.06) * Math.pow(Math.sin(f * Math.PI), 0.8); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = INK; ctx.lineWidth = thick + LW * 2; ctx.stroke();
+    ctx.strokeStyle = G.steel; ctx.lineWidth = thick; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = thick * 0.3; ctx.stroke();
+  }
+  function rearBedformer(ctx, st) {
+    var O = "#F07E22", OD = "#C9600F", t = st.time || 0, j = st.work ? Math.sin(t * 40) * 0.008 : 0;
+    ctx.save(); ctx.translate(0, j);
+    tube(ctx, 0, -1.0, 0, -1.75, 0.1, "#F2C230");                                           // PTO shaft
+    tube(ctx, -0.32, -0.95, 0, -1.7, 0.08, G.grey); tube(ctx, 0.32, -0.95, 0, -1.7, 0.08, G.grey); // headstock
+    R(ctx, -1.2, -1.12, 2.4, 0.66, 0.1, O);
+    shine(ctx, -1.05, -1.02, 1.05, -1.02, 0.06);
+    R(ctx, -1.2, -0.6, 2.4, 0.14, 0.04, OD, LW * 0.8);
+    R(ctx, -1.26, -1.1, 0.14, 1.1, 0.04, OD); R(ctx, 1.12, -1.1, 0.14, 1.1, 0.04, OD);       // side plates
+    [-0.5, 0.5].forEach(function (c) {
+      Ln(ctx, c - 0.32, -0.46, c - 0.32, -0.3, INK, 0.06); Ln(ctx, c + 0.32, -0.46, c + 0.32, -0.3, INK, 0.06);
+      rowHood(ctx, c, st.h === undefined ? 0.38 : st.h, 0.07);
+    });
+    face(ctx, -0.25, -0.86, 0.11, 0.5, st.face, t, [0, 1], 0.2);
+    ctx.restore();
+  }
+  function rearDestoner(ctx, st) {
+    var Rd = "#D9443A", RD = "#A92F27", t = st.time || 0, run = st.run || 0, j = st.work ? Math.sin(t * 34) * 0.01 : 0;
+    tyreBack(ctx, -1.28, 0, 0.3, 0.92, run); tyreBack(ctx, 1.28, 0, 0.3, 0.92, run);
+    ctx.save(); ctx.translate(0, j);
+    R(ctx, -1.02, -1.62, 2.04, 1.2, 0.1, Rd);
+    R(ctx, -1.1, -1.74, 2.2, 0.16, 0.06, RD, LW * 0.8);
+    shine(ctx, -0.9, -1.5, 0.9, -1.5, 0.06);
+    // the web, seen through the back: bars running up, soil crumbs falling through
+    ctx.save(); rr(ctx, -0.76, -1.36, 1.52, 0.78, 0.06); ctx.fillStyle = "#3E2618"; ctx.fill(); ctx.clip();
+    for (var i = 0; i < 8; i++) { var y = -0.58 - (((i / 8) + run * 0.5) % 1) * 0.78; Ln(ctx, -0.76, y, 0.76, y, "#B9C2CD", 0.04); }
+    if (st.work) for (i = 0; i < 10; i++) { var cx = -0.7 + hash(i, 1) * 1.4, cy = -1.36 + (((hash(i, 2) + t * 1.6) % 1)) * 0.8; C(ctx, cx, cy, 0.03, "#8E5A36", 0); }
+    ctx.restore();
+    R(ctx, -0.76, -1.36, 1.52, 0.78, 0.06, null, LW * 0.8);
+    ctx.restore();
+    face(ctx, -0.25, -1.48, 0.1, 0.5, st.face, t, [0, 1], 0.18);
+  }
+  // the destoner's cross conveyor (drawn over the body): from (x0, y0) on the right to (x1, y1) on the left
+  function crossBelt(ctx, x0, y0, x1, y1, run) {
+    tube(ctx, x0, y0, x1, y1, 0.16, "#4A505E");
+    var n = 9;
+    for (var i = 0; i < n; i++) { var f = ((i / n) + run * 0.6) % 1; Ln(ctx, lerp(x0, x1, f), lerp(y0, y1, f) - 0.06, lerp(x0, x1, f), lerp(y0, y1, f) + 0.06, "#8D97A6", 0.03); }
+    C(ctx, x0, y0, 0.09, "#6E7887"); C(ctx, x1, y1, 0.09, "#6E7887");
+  }
+  function rearPlanter(ctx, st) {
+    var B = "#2F7FD1", BD = "#215E9E", t = st.time || 0, run = st.run || 0, lv = st.level === undefined ? 1 : st.level;
+    tyreBack(ctx, -1.15, 0, 0.22, 0.5, run); tyreBack(ctx, 1.15, 0, 0.22, 0.5, run);
+    Ln(ctx, -1.15, -0.3, -0.9, -0.95, INK, 0.07); Ln(ctx, 1.15, -0.3, 0.9, -0.95, INK, 0.07);
+    // the hopper, heaped with seed potatoes
+    if (lv > 0.02) for (var i = 0; i < 11; i++) potatoBlob(ctx, -0.82 + i * 0.165, -1.78 - 0.16 * lv * Math.sin((i + 0.5) / 11 * Math.PI) + 0.04 * hash(i, 3), 0.1, i);
+    P(ctx, [-1.02, -1.8, 1.02, -1.8, 0.8, -1.02, -0.8, -1.02], B);
+    shine(ctx, -0.9, -1.7, 0.9, -1.7, 0.06);
+    R(ctx, -1.08, -1.88, 2.16, 0.12, 0.05, BD, LW * 0.8);
+    R(ctx, -1.0, -1.06, 2.0, 0.12, 0.04, BD, LW * 0.8);
+    // the cup belts: cups carry one potato each down to the row
+    [-0.5, 0.5].forEach(function (c, k) {
+      R(ctx, c - 0.16, -1.0, 0.32, 0.82, 0.08, "#4C95E0");
+      ctx.save(); rr(ctx, c - 0.09, -0.94, 0.18, 0.7, 0.05); ctx.fillStyle = "#1F3F66"; ctx.fill(); ctx.clip();
+      for (var q = 0; q < 4; q++) {
+        var y = -0.94 + (((q / 4) + run * 0.5 + k * 0.12) % 1) * 0.78;
+        R(ctx, c - 0.08, y + 0.05, 0.16, 0.04, 0.02, "#C3CCD6", 0);
+        potatoBlob(ctx, c, y, 0.055, q + k * 4);
+      }
+      ctx.restore();
+      R(ctx, c - 0.09, -0.94, 0.18, 0.7, 0.05, null, LW * 0.7);
+      rowHood(ctx, c, 0.34, 0.05);
+    });
+    face(ctx, -0.25, -1.42, 0.11, 0.5, st.face, t, [0, 1], 0.2);
+  }
+  function rearHarvester(ctx, st) {
+    var Y = "#F2A51E", YD = "#C27E0D", t = st.time || 0, run = st.run || 0, j = st.work ? Math.sin(t * 30) * 0.01 : 0;
+    tyreBack(ctx, -1.3, 0, 0.34, 1.1, run); tyreBack(ctx, 1.3, 0, 0.34, 1.1, run);
+    ctx.save(); ctx.translate(0, j);
+    R(ctx, -1.08, -2.05, 2.16, 1.62, 0.12, Y);
+    R(ctx, -1.16, -2.2, 2.32, 0.18, 0.06, YD, LW * 0.8);
+    Ln(ctx, -1.0, -2.2, -1.0, -2.5, INK, 0.05); Ln(ctx, 1.0, -2.2, 1.0, -2.5, INK, 0.05); Ln(ctx, -1.05, -2.5, 1.05, -2.5, INK, 0.05);
+    shine(ctx, -0.95, -1.92, 0.95, -1.92, 0.06);
+    ctx.save(); rr(ctx, -0.8, -1.78, 1.6, 1.14, 0.06); ctx.fillStyle = "#3E2618"; ctx.fill(); ctx.clip();
+    for (var i = 0; i < 10; i++) { var y = -0.64 - (((i / 10) + run * 0.5) % 1) * 1.14; Ln(ctx, -0.8, y, 0.8, y, "#B9C2CD", 0.04); }
+    if (st.work) for (i = 0; i < 12; i++) C(ctx, -0.74 + hash(i, 1) * 1.48, -1.78 + ((hash(i, 2) + t * 1.4) % 1) * 1.2, 0.03, "#8E5A36", 0);
+    ctx.restore();
+    R(ctx, -0.8, -1.78, 1.6, 1.14, 0.06, null, LW * 0.8);
+    // the share under the front lifts the whole row
+    P(ctx, [-0.86, -0.46, 0.86, -0.46, 0.8, -0.3, -0.8, -0.3], YD, LW * 0.8);
+    ctx.restore();
+    face(ctx, -0.27, -1.96, 0.11, 0.54, st.face, t, [0, 1], 0.2);
+  }
+  // the tipping trailer from behind: tailgate toward us, the heap of potatoes above the rim
+  function rearTrailer(ctx, st) {
+    var Rd = "#D8403A", RD = "#A82E28", load = clamp(st.load || 0, 0, 1.2);
+    tyreBack(ctx, -1.02, 0, 0.36, 1.0, st.run || 0); tyreBack(ctx, 1.02, 0, 0.36, 1.0, st.run || 0);
+    R(ctx, -0.95, -0.78, 1.9, 0.16, 0.04, "#3A3F4E");
+    if (load > 0.01) {
+      var hh = 0.1 + load * 0.55;
+      ctx.beginPath(); ctx.moveTo(-1.15, -1.86);
+      for (var i = 0; i <= 12; i++) { var f = i / 12; ctx.lineTo(lerp(-1.15, 1.15, f), -1.86 - hh * Math.pow(Math.sin(f * Math.PI), 0.6) + Math.sin(i * 2.3) * 0.03); }
+      ctx.closePath(); fs(ctx, CROP.potato[0], LW * 0.8);
+      for (i = 0; i < 13; i++) { var fx = hash(i, 5); potatoBlob(ctx, lerp(-1.0, 1.0, fx), -1.86 - hh * Math.pow(Math.sin(fx * Math.PI), 0.6) * (0.25 + 0.65 * hash(i, 6)), 0.11, i); }
+    }
+    R(ctx, -1.2, -1.9, 2.4, 1.16, 0.08, Rd);
+    R(ctx, -1.26, -1.98, 2.52, 0.14, 0.05, RD, LW * 0.8);
+    for (i = 1; i < 4; i++) Ln(ctx, -1.2 + i * 0.6, -1.84, -1.2 + i * 0.6, -0.8, RD, 0.05);
+    shine(ctx, -1.05, -1.78, 1.05, -1.78, 0.05);
+    R(ctx, -1.08, -0.98, 0.18, 0.1, 0.03, "#FFB648", LW * 0.6); R(ctx, 0.9, -0.98, 0.18, 0.1, 0.03, "#FFB648", LW * 0.6);
+    face(ctx, -0.3, -1.42, 0.13, 0.6, st.face, st.time, [0, 1], 0.22);
+  }
+  // Draw fn() in machine units at screen (x, y) with s px per metre and outlines lw px wide.
+  function inUnits(ctx, x, y, s, lwPx, fn) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    var keep = LW; LW = lwPx / s;
+    try { fn(); } finally { LW = keep; ctx.restore(); }
+  }
+
+  // =====================================================================================================
   // Tipping trailer (origin at the drawbar eye, ground at +0.5, facing +x)
   // =====================================================================================================
   var CROP = { grain: ["#EBB93E", "#C99322"], potato: ["#C9935A", "#9E6B39"] };
@@ -585,7 +722,7 @@
   // A long tube or belt between two screen points (the swung-out auger or elevator), widths w1 -> w2 px.
   function boom(ctx, x1, y1, x2, y2, w1, w2, phase, kind, lw) {
     var dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
-    var col = kind === "belt" ? "#5D6675" : "#5E9E4F";
+    var belt = kind === "belt" || kind === "belt-empty", col = belt ? "#5D6675" : "#5E9E4F";
     ctx.beginPath();
     ctx.moveTo(x1 + nx * w1 / 2, y1 + ny * w1 / 2); ctx.lineTo(x2 + nx * w2 / 2, y2 + ny * w2 / 2);
     ctx.lineTo(x2 - nx * w2 / 2, y2 - ny * w2 / 2); ctx.lineTo(x1 - nx * w1 / 2, y1 - ny * w1 / 2); ctx.closePath();
@@ -593,10 +730,10 @@
     var n = Math.max(4, Math.round(d / 14)), i;
     for (i = 0; i < n; i++) {
       var f = ((i + phase) / n) % 1, w = lerp(w1, w2, f), x = x1 + dx * f, y = y1 + dy * f;
-      if (kind === "belt") {
+      if (belt) {
         ctx.beginPath(); ctx.moveTo(x + nx * w * 0.4, y + ny * w * 0.4); ctx.lineTo(x - nx * w * 0.4, y - ny * w * 0.4);
         ctx.strokeStyle = "#AEB8C5"; ctx.lineWidth = Math.max(1, lw * 0.6); ctx.stroke();
-        if ((i * 7) % 3 !== 0) { ctx.beginPath(); ctx.ellipse(x - nx * w * 0.55, y - ny * w * 0.55, w * 0.22, w * 0.17, 0, 0, TAU); ctx.fillStyle = "#C9935A"; ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.stroke(); }
+        if (kind === "belt" && (i * 7) % 3 !== 0) { ctx.beginPath(); ctx.ellipse(x - nx * w * 0.55, y - ny * w * 0.55, w * 0.22, w * 0.17, 0, 0, TAU); ctx.fillStyle = "#C9935A"; ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.stroke(); }
       } else {
         ctx.beginPath(); ctx.moveTo(x + nx * w * 0.45 - dx / d * w * 0.2, y + ny * w * 0.45 - dy / d * w * 0.2); ctx.lineTo(x - nx * w * 0.45 + dx / d * w * 0.2, y - ny * w * 0.45 + dy / d * w * 0.2);
         ctx.strokeStyle = "#2B7A2A"; ctx.lineWidth = Math.max(1, lw * 0.6); ctx.stroke();
@@ -970,75 +1107,68 @@
     }
   }
   function band(ctx, sc, row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
-  // A ridge across the row: its top at height hr px above the row's middle, rough = lumpiness 0..1.
-  function ridge(ctx, sc, row, hr, rough, face, top, seed) {
-    var W = sc.W, step = Math.max(5, Math.min(14, hr * 2)), yb = row.y0 + 0.5, yc = row.yc - hr;
-    ctx.beginPath(); ctx.moveTo(-5, yb);
-    for (var x = -5; x <= W + step; x += step) {
-      var wx = sc.wx ? x : x;
-      var n = rough ? (hash(Math.floor((x + sc.cam * sc.k / row.rc) / step), row.i + seed) - 0.5) * rough : 0;
-      ctx.lineTo(x, yc - hr * n);
-    }
-    ctx.lineTo(W + step, yb); ctx.closePath();
-    ctx.fillStyle = face; ctx.fill();
-    if (hr > 3) { ctx.lineWidth = Math.max(1, Math.min(sc.lw, hr * 0.18)); ctx.strokeStyle = top; ctx.stroke(); }
-  }
   var PAINT = {
     spuds: function (ctx, sc, row, stage, P, xa, xb) {
+      // Calm, readable stages (the dad: the old dotted texture hid everything). Flat soil is one plain brown;
+      // a field of rows is bold stripes, one per row of the scene (rowDz ~ the row spacing): a light crest line,
+      // the lit face and a dark furrow, so "behind the tractor there are rows now" reads at a glance.
       var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1;
       if (stage === "soil" || stage === "harvested") {
-        var c0 = stage === "soil" ? "#8D5A36" : "#9B6A44", c1 = stage === "soil" ? "#84532F" : "#93633F";
-        band(ctx, sc, row, odd ? c0 : c1);
-        if (row.fine && s * 0.05 > 1.2) {
-          eachX(sc, row, 0.35, 7, xa, xb, function (x, sx, j) {
-            ctx.beginPath(); ctx.ellipse(sx, row.yc + (hash(j, 2) - 0.5) * hgt * 0.6, s * 0.06, s * 0.035, 0, 0, TAU);
-            ctx.fillStyle = hash(j, 5) > 0.5 ? "#6E4126" : "#A87450"; ctx.fill();
-          });
-        }
+        band(ctx, sc, row, stage === "soil" ? (odd ? "#8E5B38" : "#8B5836") : (odd ? "#A2714B" : "#9E6D47"));
         return;
       }
-      // potato beds: tall ridges with a dark furrow between them
-      band(ctx, sc, row, "#4A2B18");
-      var hr = s * (stage === "beds" ? 0.26 : 0.3);
-      if (hr < 1.6) { ctx.fillStyle = "#A06A43"; ctx.fillRect(0, row.y1, sc.W, hgt * 0.6); return; }
-      var rough = stage === "beds" ? 0.22 : (stage === "destoned" ? 0.07 : 0.03);
-      ridge(ctx, sc, row, hr, rough, stage === "beds" ? "#A26B44" : "#AE7650", "#D2A077", 3);
-      ctx.fillStyle = "rgba(60,30,15,0.35)"; ctx.fillRect(0, row.y0 - hgt * 0.22, sc.W, hgt * 0.22 + 0.5);
-      if (!row.fine) return;
-      if (stage === "beds" && s * 0.07 > 1.2) {
-        // stones and clods all over the fresh beds
-        eachX(sc, row, 0.45, 9, xa, xb, function (x, sx, j) {
-          var st = hash(j, 7) > 0.45, z = s * (0.05 + 0.05 * hash(j, 8));
-          ctx.beginPath(); ctx.ellipse(sx, row.yc - hr * (0.2 + 0.7 * hash(j, 9)), z * 1.3, z, 0, 0, TAU);
-          ctx.fillStyle = st ? "#A9ACB3" : "#6F4529"; ctx.fill();
-          if (z > 2.5) { ctx.lineWidth = Math.max(1, sc.lw * 0.6); ctx.strokeStyle = INK; ctx.stroke(); }
-        });
-      }
-      if (stage !== "beds" && (row.i & 1) && s * 0.05 > 1) {
-        // the stones the destoner dropped into the wheelings
-        eachX(sc, row, 0.22, 5, xa, xb, function (x, sx, j) {
-          var z = s * (0.04 + 0.03 * hash(j, 3));
-          ctx.beginPath(); ctx.ellipse(sx, row.y0 - hgt * 0.1, z * 1.3, z, 0, 0, TAU); ctx.fillStyle = hash(j, 4) > 0.5 ? "#9EA2AA" : "#B5B8BE"; ctx.fill();
-          if (z > 2.5) { ctx.lineWidth = Math.max(1, sc.lw * 0.5); ctx.strokeStyle = INK; ctx.stroke(); }
-        });
+      var fresh = stage === "beds", planted = stage !== "beds" && stage !== "destoned";
+      var face = fresh ? "#A36C43" : (planted ? "#9A633D" : "#B57D50"), crest = fresh ? "#C8915F" : (planted ? "#C18A5A" : "#DDA977");
+      var furrow = "#4B2B18";
+      if (!row.fine || hgt < 3) {
+        band(ctx, sc, row, mix(face, furrow, odd ? 0.15 : 0.45));
+      } else {
+        band(ctx, sc, row, face);
+        ctx.fillStyle = furrow; ctx.fillRect(0, row.y0 - hgt * 0.3, sc.W, hgt * 0.3 + 0.5);
+        var cw = Math.max(1.2, hgt * 0.17), cy = row.y1 + hgt * 0.14;
+        if (fresh) {
+          // fresh rows are lumpy on top, with stones and clods showing
+          var step = Math.max(6, s * 0.35);
+          ctx.beginPath(); ctx.moveTo(-5, cy + cw);
+          for (var x = -5; x <= sc.W + step; x += step) ctx.lineTo(x, cy - (hash(Math.floor((x + sc.cam * sc.k / row.rc) / step), row.i) - 0.5) * hgt * 0.22);
+          ctx.lineTo(sc.W + step, cy + cw); ctx.closePath(); ctx.fillStyle = crest; ctx.fill();
+          if (s * 0.08 > 1.6) {
+            eachX(sc, row, 1.5, 22, xa, xb, function (x2, sx, j) {
+              var z = s * (0.06 + 0.05 * hash(j, 8)), st = hash(j, 7) > 0.35;
+              ctx.beginPath(); ctx.ellipse(sx, row.y1 + hgt * (0.35 + 0.25 * hash(j, 9)), z * 1.3, z, 0, 0, TAU);
+              ctx.fillStyle = st ? "#B3B6BD" : "#6F4529"; ctx.fill();
+              if (z > 2.5) { ctx.lineWidth = Math.max(1, sc.lw * 0.55); ctx.strokeStyle = INK; ctx.stroke(); }
+            });
+          }
+        } else {
+          ctx.fillStyle = crest; ctx.fillRect(0, cy - cw / 2, sc.W, cw);
+          if (row.i % 3 === 0 && s * 0.05 > 1.6) {
+            // the stones the destoner laid in the furrow
+            eachX(sc, row, 0.45, 9, xa, xb, function (x2, sx, j) {
+              var z = s * (0.035 + 0.02 * hash(j, 3));
+              ctx.beginPath(); ctx.ellipse(sx, row.y0 - hgt * 0.14, z * 1.3, z, 0, 0, TAU); ctx.fillStyle = hash(j, 4) > 0.5 ? "#8E929A" : "#A3A7AE"; ctx.fill();
+            });
+          }
+        }
       }
       if (stage === "grow" || stage === "grown") {
         var g = stage === "grown" ? 1 : clamp(P.g || 0, 0, 1);
         if (g < 0.04) return;
-        var sz = g < 0.7 ? lerp(0.06, 0.4, g / 0.7) : lerp(0.4, 0.3, (g - 0.7) / 0.3);
-        var die = clamp((g - 0.72) / 0.28, 0, 1);
-        var leaf = mix("#4FA83A", "#B59A4A", die), dk = mix("#3A862C", "#8C6E35", die);
-        var rad = sz * 0.5 * s, cy = row.yc - hr;
-        if (rad < 1.6) { ctx.fillStyle = leaf; ctx.fillRect(0, cy - rad * 1.6, sc.W, rad * 1.8 + 0.5); return; }
+        var sz = g < 0.6 ? lerp(0.08, 0.42, g / 0.6) : lerp(0.42, 0.3, clamp((g - 0.75) / 0.25, 0, 1));
+        var die = clamp((g - 0.75) / 0.25, 0, 1);
+        var leaf = mix("#4FA83A", "#B89B4B", die), dk = mix("#2F7A25", "#80632F", die);
+        var rad = sz * 0.5 * s, by = row.y1 + hgt * 0.2;
+        if (rad < 1.6 || !row.fine) { ctx.fillStyle = leaf; ctx.fillRect(0, by - Math.max(1, rad * 1.6), sc.W, Math.max(1, rad * 1.6) + hgt * 0.4); return; }
         var lw = Math.max(1, Math.min(sc.lw * 0.7, rad * 0.15));
-        eachX(sc, row, 0.33, rad * 1.6, xa, xb, function (x, sx, j) {
-          var sw = Math.sin((P.time || 0) * 1.5 + x * 0.6) * rad * 0.08, rj = rad * (0.85 + 0.3 * hash(j, 6));
+        eachX(sc, row, 0.4, rad * 1.7, xa, xb, function (x2, sx, j) {
+          var sw = Math.sin((P.time || 0) * 1.5 + x2 * 0.6) * rad * 0.08, rj = rad * (0.88 + 0.24 * hash(j, 6));
           ctx.beginPath();
-          ctx.arc(sx - rj * 0.6 + sw, cy - rj * 0.7, rj * 0.7, 0, TAU); ctx.arc(sx + rj * 0.6 + sw, cy - rj * 0.75, rj * 0.72, 0, TAU); ctx.arc(sx + sw, cy - rj * 1.25, rj * 0.78, 0, TAU);
+          ctx.arc(sx - rj * 0.6 + sw, by - rj * 0.6, rj * 0.68, 0, TAU); ctx.arc(sx + rj * 0.6 + sw, by - rj * 0.62, rj * 0.7, 0, TAU); ctx.arc(sx + sw, by - rj * 1.1, rj * 0.76, 0, TAU);
           ctx.fillStyle = leaf; ctx.fill();
           if (rj > 3) { ctx.lineWidth = lw; ctx.strokeStyle = dk; ctx.stroke(); }
-          if (g > 0.42 && g < 0.8 && rj > 3 && hash(j, 10) > 0.4) {
-            for (var q = 0; q < 3; q++) { ctx.beginPath(); ctx.arc(sx + sw + (hash(j, q) - 0.5) * rj * 1.6, cy - rj * (1.2 + hash(q, j) * 0.8), Math.max(1, rj * 0.14), 0, TAU); ctx.fillStyle = q === 1 ? "#C9A8E8" : "#FFFFFF"; ctx.fill(); }
+          if (g > 0.45 && g < 0.78 && rj > 4 && hash(j, 10) > 0.45) {
+            ctx.beginPath(); ctx.arc(sx + sw + (hash(j, 1) - 0.5) * rj, by - rj * 1.55, Math.max(1.5, rj * 0.2), 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+            ctx.beginPath(); ctx.arc(sx + sw + (hash(j, 1) - 0.5) * rj, by - rj * 1.55, Math.max(0.8, rj * 0.08), 0, TAU); ctx.fillStyle = "#FFC93C"; ctx.fill();
           }
         });
       }
@@ -1248,6 +1378,9 @@
     CROP: CROP,
     draw: { tractor: tractor, bedformer: bedformer, destoner: destoner, planter: planter, harvester: harvester, trailer: trailer, combine: combine,
       boom: boom, dog: dog, hare: hare, deer: deer, gull: gull, hawk: hawk, tree: tree, farmstead: farmstead, potato: potatoBlob },
+    rear: { bedformer: rearBedformer, destoner: rearDestoner, planter: rearPlanter, harvester: rearHarvester, trailer: rearTrailer, crossBelt: crossBelt, hood: rowHood },
+    inUnits: inUnits,
+    shape: { P: P, R: R, C: C, Ln: Ln, tube: tube, fs: fs, rr: rr },
     pic: pic,
     restArt: restArt,
     get LW() { return LW; },
