@@ -74,38 +74,59 @@ body {
 .stage { background: #FFF3DC; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
-/* The thing under his finger while he drags an ingredient from the counter. */
+/* Choices: the ingredients (or the straws), dragged into the jar or tapped. */
+.tb-choices { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+.tb-tile { touch-action: none; cursor: grab; position: relative; }
+.tb-tile svg { pointer-events: none; overflow: visible; }
+.tb-tile span { pointer-events: none; white-space: nowrap; }
+.tb-tile.picked { opacity: 0.45; }
+@media (max-width: 600px) { .tb-tile { font-size: 0.84rem; min-height: 66px; } }
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-choices { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .tb-tile { font-size: 0.98rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-choices { gap: 6px; }
+  .tb-tile { min-height: 60px; font-size: 0.8rem; }
+  .tb-tile svg { width: 34px; height: 34px; }
+}
+/* The thing under his finger while he drags it from the panel. */
 .float { position: fixed; left: 0; top: 0; z-index: 30; width: 84px; height: 84px; pointer-events: none;
   filter: drop-shadow(3px 4px 0 rgba(29, 35, 64, 0.25)); will-change: transform; }
 .float svg { width: 100%; height: 100%; display: block; overflow: visible; }
-/* Big: the header, the step chips and the bottom bar hide; Go stays (the scene does every step too). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-chip, body.big .tb-bottombar { display: none; }
+body.big .tb-head > :not(.bigtoggle) { display: none; }
+body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* The Back button shows the kitchen's picture (and its name on an iPad). */
-/* Phone held sideways: the ingredients run along the bottom, so the coach line goes to the top. */
-@media (orientation: landscape) and (max-height: 520px) { #coach.tb-coach { top: 8px; bottom: auto; } }
-.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back mapbtn" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 33h28" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M9 17h22l-2 14H11z" fill="#E63946" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="12" width="26" height="6" rx="3" fill="#B8323E" stroke="#1D2340" stroke-width="2.5"/><rect x="17" y="7" width="6" height="5" rx="2" fill="#3B4256" stroke="#1D2340" stroke-width="2"/><path d="M4 20h5M31 20h5" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/></svg><span>Kitchen</span></a>
+    <a class="btn tb-iconbtn tb-back" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Kitchen</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Blender</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A blender on the kitchen counter with a cup next to it and fruit, yogurt, milk and ice in front"></canvas>
+      <canvas id="cv" role="img" aria-label="A blender on the kitchen counter with a cup next to it"></canvas>
       <div class="tb-counter" id="counter">Smoothies: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach" id="coach">Drag fruit into the jar!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
-      <div id="bottom"></div>
+      <div class="tb-choices" id="choices"></div>
+      <nav class="tb-tabs">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -165,21 +186,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     milk: sv('<path d="M16 22 L30 10 L44 22 L44 56 L16 56 Z" fill="#FFFFFF"' + ST + '/><path d="M16 22 L44 22" fill="none"' + ST + '/><rect x="27" y="4" width="8" height="8" rx="2" fill="#2D7BE5"' + ST + '/><rect x="16" y="32" width="28" height="14" fill="#7EC8FF" stroke="none"/><path d="M16 22 L44 22 L44 56 L16 56 Z" fill="none"' + ST + '/><circle cx="30" cy="39" r="4" fill="#FFFFFF"/>'),
     ice: sv('<rect x="6" y="24" width="24" height="24" rx="5" fill="#DDF3FF"' + ST + ' transform="rotate(-10 18 36)"/><rect x="28" y="16" width="24" height="24" rx="5" fill="#C8ECFF"' + ST + ' transform="rotate(12 40 28)"/><path d="M12 30 L18 28" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/><path d="M34 22 L40 23" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>')
   };
-  // The same pictures drawn on the canvas: the ingredients stand on the counter in front of the blender.
-  var IMG = {};
-  ING_ORDER.forEach(function (id) {
-    var im = new Image();
-    im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ICON[id].replace('<svg viewBox="0 0 60 60" aria-hidden="true">', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="240" height="240">'));
-    IMG[id] = im;
-  });
-  // Step pictures (the chip and the Go of a step share one).
-  function pic(inner) { return '<svg viewBox="0 0 40 40">' + inner + "</svg>"; }
-  var PS = ' stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"';
-  var PIC = {
-    fill: pic('<path d="M10 16 L30 16 L27 36 L13 36 Z" fill="#D6EEFF"' + PS + '/><path d="M20 4 Q12 2 13 9 Q14 14 20 14 Q26 14 27 9 Q28 2 20 4 Z" fill="#E8344E"' + PS + '/><path d="M16 4 L20 1 L24 4" fill="none" stroke="#3E9B3A" stroke-width="2.5" stroke-linecap="round"/>'),
-    blend: pic('<path d="M10 6 L30 6 L27 24 L13 24 Z" fill="#F07A9A"' + PS + '/><path d="M14 13 Q20 9 26 13 M15 19 Q20 15 25 19" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round"/><path d="M9 36 L31 36 L29 25 L11 25 Z" fill="#E63946"' + PS + '/><circle cx="20" cy="31" r="2.6" fill="#FFB627" stroke="#1D2340" stroke-width="1.6"/>'),
-    pour: pic('<path d="M11 14 L29 14 L26 37 L14 37 Z" fill="#D6EEFF"' + PS + '/><path d="M12 21 L28 21 L26 37 L14 37 Z" fill="#F07A9A"/><path d="M11 14 L29 14 L26 37 L14 37 Z" fill="none"' + PS + '/><path d="M21 33 L27 3" stroke="#1D2340" stroke-width="5.5" stroke-linecap="round"/><path d="M21 33 L27 3" stroke="#FFC93C" stroke-width="2.5" stroke-linecap="round"/>')
-  };
+  function strawIcon(col) {
+    return sv('<g transform="rotate(30 30 30)"><rect x="25" y="2" width="10" height="56" rx="4" fill="#FFFFFF"' + ST + '/>' +
+      '<g fill="' + col + '"><rect x="26.5" y="8" width="7" height="6"/><rect x="26.5" y="20" width="7" height="6"/><rect x="26.5" y="32" width="7" height="6"/><rect x="26.5" y="44" width="7" height="6"/></g>' +
+      '<rect x="25" y="2" width="10" height="56" rx="4" fill="none"' + ST + '/></g>');
+  }
 
   // ---------- Saved state ----------
   // items: what is in the jar, in order: { id, f } where f is how far it has mixed in (liquids: how much
@@ -217,24 +228,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   // counter top, y down. The blender is about 1 unit wide and 2 tall; the cup stands at x = 0.95.
   var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
   var cw = 300, ch = 300, dpr = 1, B = 100, ox = 150, oy = 250, LW = 0.03;
-  var X_L = -1.64, X_R = 1.3, H_UP = 2.14, H_DN = 0.62, tall = false, TOPD = 0.5;
-  // The ingredients stand on the worktop in front of the blender (operator's view, a little from above):
-  // upright stages in two rows (4 + 3), wide stages in one row of 7. ROW[i] = { id, x, y (its foot), s (size) }.
-  var ROW = [];
-  function layoutRow() {
-    ROW = [];
-    var W = X_R - X_L;
-    if (tall) {
-      var sp = W / 4;
-      ING_ORDER.forEach(function (id, i) {
-        var back = i < 4, k = back ? i : i - 4;
-        ROW.push({ id: id, x: X_L + (back ? sp / 2 + k * sp : sp + k * sp), y: back ? 0.42 : 0.86, s: 0.42, hop: -9 });
-      });
-    } else {
-      var sp2 = W / 7;
-      ING_ORDER.forEach(function (id, i) { ROW.push({ id: id, x: X_L + sp2 / 2 + i * sp2, y: 0.5, s: Math.min(0.38, sp2 * 0.9), hop: -9 }); });
-    }
-  }
+  var X_L = -1.64, X_R = 1.3, H_UP = 2.14, H_DN = 0.3, tall = false;
   function layout() {
     var r = stage.getBoundingClientRect();
     cw = Math.max(50, r.width); ch = Math.max(50, r.height);
@@ -242,23 +236,18 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var wasTall = tall;
     tall = ch > cw * 1.08;
     X_L = tall ? -0.98 : -1.64; H_UP = tall ? 2.5 : 2.26;
-    H_DN = tall ? 0.98 : 0.62; TOPD = tall ? 0.9 : 0.56;
-    LID_PARK = tall ? { x: -0.45, y: -2.12 } : { x: -1.12, y: -0.07 };
+    LID_PARK = tall ? { x: -0.45, y: -2.36 } : { x: -1.12, y: -0.07 };
     if (wasTall !== tall && !S.lid && !lid.anim && lid.drag == null) { lid.x = LID_PARK.x; lid.y = LID_PARK.y; }
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
-    var dn = H_DN;
-    // Room under the ingredients for the coach line when it sits at the bottom of the stage (upright phones).
-    var ce = $("coach"), ch0 = ce ? ce.offsetHeight : 0, mm = window.matchMedia;
-    var bottomCoach = mm && mm("(max-width: 600px)").matches && !mm("(orientation: landscape) and (max-height: 520px)").matches;
-    var room = bottomCoach ? Math.max(ch0, 34) + 14 : 0;
-    B = Math.min((cw - 12) / (X_R - X_L), (ch - 10 - room) / (H_UP + dn));
+    var phone = Math.min(innerWidth, innerHeight) < 560;
+    var dn = H_DN + (phone ? 0.1 : 0);
+    B = Math.min((cw - 12) / (X_R - X_L), (ch - 10) / (H_UP + dn));
     B = Math.max(30, Math.min(B, 340));
     ox = cw / 2 - B * (X_L + X_R) / 2;
-    var spare = ch - room - B * (H_UP + dn);
-    oy = ch - room - B * dn - Math.max(0, spare) * 0.3;
+    var spare = ch - B * (H_UP + dn);
+    oy = ch - B * dn - Math.max(0, spare) * 0.3;
     LW = 3.4 / B;
-    layoutRow();
   }
   function toLocal(px, py) { var r = cv.getBoundingClientRect(); return { x: (px - r.left - ox) / B, y: (py - r.top - oy) / B }; }
   function toPage(x, y) { var r = cv.getBoundingClientRect(); return [r.left + ox + x * B, r.top + oy + y * B]; }
@@ -285,6 +274,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var pourers = [];  // milk carton / yogurt cup pouring over the jar: { id, k, t0, dur }
   var dollops = [];  // yogurt blobs falling: { k, x, y, vy, amt }
   var parts = [];    // sparkles and drips (scene coords): { x, y, vx, vy, life, max, col, r, star }
+  var sayMsg = "", sayUntil = 0;
 
   function makePieces(k, startX, startY) {
     var it = S.items[k], g = ING[it.id];
@@ -347,23 +337,21 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     for (var i = 0; i < S.items.length; i++) if (S.items[i].f < 0.999) return false;
     return true;
   }
-  // The steps of a smoothie: Fill, Blend, Pour (the lid goes on by itself when it blends; the pour and the
-  // straw happen by themselves after the blend, a tap on the jar or Go pours sooner).
-  var STEPS = [
-    { id: "fill", name: "Fill", pic: PIC.fill, go: "Fill!", coach: "Fill the jar!" },
-    { id: "blend", name: "Blend", pic: PIC.blend, go: "Blend!", coach: "Blend it!" },
-    { id: "pour", name: "Pour", pic: PIC.pour, go: "Pour!", coach: "Pour it in the cup!" }
-  ];
-  var fillQ = [];      // ingredients Go is putting in, one after another: { id, at }
-  function stepNow() {
+  function phase() {
     if (jar.state !== "base") return "pour";
-    if (S.cup.fill > 0 && !S.cup.done) return "pour";
-    if (fillQ.length) return "fill";
-    if (!S.items.length) return S.cup.done ? "fin" : "fill";
-    if (!blended()) return "blend";
-    return "pour";
+    if (S.cup.fill > 0 && !S.cup.straw) return "straw";
+    if (!S.items.length) return S.cup.done ? "done" : "add";
+    if (!blended()) {
+      if (busyAdding()) return "add";
+      if (!S.lid) return "lid";
+      return running() ? "blend" : "run";
+    }
+    return "pour";  // still running: pouring switches it off by itself
   }
-  function mixedShare() { if (!S.items.length) return 0; var f = 0; S.items.forEach(function (it) { f += it.f; }); return f / S.items.length; }
+  var COACH = {
+    add: "Drag fruit into the jar!", done: "Yum! Make another one!", lid: "Put the lid on!", run: "Press Low or High!",
+    blend: "Watch it blend!", pour: "Pour it in the cup!", straw: "Add a straw!"
+  };
 
   // ---------- Sound (off by default; soft and synthesized) ----------
   var master = null, masterCtx = null, hum = null;
@@ -403,22 +391,32 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     hum.g.gain.setTargetAtTime(s > 0.02 ? 0.03 * Math.min(1, s * 1.4) : 0, t, 0.06);
   }
 
-  // ---------- Coach and counter ----------
-  var counterEl = $("counter");
-  var coach = Toybox.coach($("coach"));
-  function say(msg, sec) { coach.say(msg, sec || 3); }
+  // ---------- Coach ----------
+  var coachEl = $("coach"), counterEl = $("counter");
+  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
+  var lastCoach = "";
+  function updateCoach() {
+    var t = Date.now() < sayUntil ? sayMsg : COACH[phase()];
+    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+  }
   function updateCounter() { counterEl.textContent = "Smoothies: " + S.count; }
 
-  // ---------- The ingredients on the counter: tap one = it drops in; or carry it to the jar ----------
-  // A floating copy follows his finger (or flies by itself) from the counter to the top of the jar.
-  function floatAt(el, x, y, sc) { el.style.transform = "translate(" + (x - 42) + "px," + (y - 42) + "px) scale(" + (sc || 1) + ")"; }
-  function makeFloat(id) {
-    var f = document.createElement("div");
-    f.className = "float";
-    f.innerHTML = ICON[id];
-    document.body.appendChild(f);
-    return f;
+  // ---------- Panel: ingredients or straws ----------
+  var choicesEl = $("choices"), choiceMode = "";
+  function renderChoices() {
+    var mode = phase() === "straw" ? "straw" : "ing";
+    if (mode === choiceMode) return;
+    choiceMode = mode;
+    var h = "";
+    if (mode === "ing") ING_ORDER.forEach(function (id) { h += '<button class="btn tb-tile" data-ing="' + id + '" aria-label="' + ING[id].name + '">' + ICON[id] + "<span>" + ING[id].name + "</span></button>"; });
+    else STRAWS.forEach(function (s) { h += '<button class="btn tb-tile" data-straw="' + s.id + '" aria-label="' + s.name + ' straw">' + strawIcon(s.col) + "<span>" + s.name + "</span></button>"; });
+    choicesEl.innerHTML = h;
   }
+
+  // Dragging a tile out of the panel: a floating copy follows the finger; let go anywhere on the
+  // stage and it goes in (the jar, or the cup for a straw). A tap sends it in too.
+  var tileDrags = {};
+  function floatAt(el, x, y, sc) { el.style.transform = "translate(" + (x - 42) + "px," + (y - 42) + "px) scale(" + (sc || 1) + ")"; }
   function flyFloat(el, x0, y0, x1, y1, ms, cb) {
     var t0 = performance.now();
     (function step(t) {
@@ -427,53 +425,62 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (k < 1) requestAnimationFrame(step); else { if (el.parentNode) el.parentNode.removeChild(el); if (cb) cb(); }
     })(t0);
   }
-  function rowOf(id) { for (var i = 0; i < ROW.length; i++) if (ROW[i].id === id) return ROW[i]; return null; }
-  function rowPage(r) { return toPage(r.x, r.y - r.s / 2); }
-  var ingDrags = {}, inFlight = 0;
-  // He taps (or Go picks) an ingredient: it hops on the counter and flies into the jar.
-  function addFromCounter(id, x0, y0, floatEl) {
-    var r = rowOf(id);
-    if (!r) return false;
-    var home = rowPage(r);
-    if (x0 == null) { x0 = home[0]; y0 = home[1]; }
-    r.hop = now();
-    if (jar.state !== "base") { say("Wait for the jar!"); if (floatEl) flyFloat(floatEl, x0, y0, home[0], home[1], 300); return false; }
-    if (totalVol() + flightVol + ING[id].vol > CAP + 0.001) {
+  choicesEl.addEventListener("pointerdown", function (e) {
+    var b = e.target.closest && e.target.closest(".tb-tile");
+    if (!b || locked()) return;
+    e.preventDefault();
+    try { b.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var f = document.createElement("div");
+    f.className = "float";
+    f.innerHTML = b.querySelector("svg").outerHTML;
+    f.style.display = "none";
+    document.body.appendChild(f);
+    tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, ing: b.getAttribute("data-ing"), straw: b.getAttribute("data-straw") };
+    tone(620, 0.08, 0.03, "sine", 820);
+  });
+  function tileMove(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 10) { d.moved = true; d.f.style.display = ""; d.b.classList.add("picked"); }
+    if (d.moved) floatAt(d.f, e.clientX, e.clientY - 20, 1.1);
+  }
+  function tileUp(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    delete tileDrags[e.pointerId];
+    d.b.classList.remove("picked");
+    var r = stage.getBoundingClientRect();
+    var onStage = e.type !== "pointercancel" && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    var br = d.b.getBoundingClientRect(), x0 = d.moved ? e.clientX : br.left + br.width / 2, y0 = d.moved ? e.clientY - 20 : br.top + br.height / 2;
+    d.f.style.display = "";
+    if (locked() || (d.moved && !onStage)) { flyFloat(d.f, x0, y0, br.left + br.width / 2, br.top + br.height / 2, 300); return; }
+    if (d.ing) dropIngredient(d.ing, d.f, x0, y0, d.b);
+    else if (d.straw) dropStraw(d.straw, d.f, x0, y0, d.b);
+  }
+  choicesEl.addEventListener("pointermove", tileMove);
+  choicesEl.addEventListener("pointerup", tileUp);
+  choicesEl.addEventListener("pointercancel", tileUp);
+  choicesEl.addEventListener("click", function (e) { e.preventDefault(); });
+
+  // ---------- Adding ingredients ----------
+  function roomFor(id) { return totalVol() + ING[id].vol <= CAP + 0.001; }
+  function dropIngredient(id, floatEl, x0, y0, tile) {
+    var br = tile.getBoundingClientRect();
+    var ph = phase();
+    if (jar.state !== "base" || ph === "straw") { flyFloat(floatEl, x0, y0, br.left + br.width / 2, br.top + br.height / 2, 300); return; }
+    if (!roomFor(id)) {
       say(running() ? "It's full!" : "It's full! Blend it!");
       jar.wig = 1;
-      if (floatEl) flyFloat(floatEl, x0, y0, home[0], home[1], 320);
-      return false;
+      flyFloat(floatEl, x0, y0, br.left + br.width / 2, br.top + br.height / 2, 320);
+      return;
     }
     // A finished smoothie in the cup goes to the table when he starts the next one.
     if (S.cup.done) sendCupAway();
     if (S.lid) takeLidOff();
-    var f = floatEl || makeFloat(id);
     var top = toPage(jar.x, jar.y - JAR_H - 0.35);
-    inFlight++; flightVol += ING[id].vol;
-    tone(620, 0.08, 0.03, "sine", 820);
-    flyFloat(f, x0, y0, top[0], top[1], reduce ? 120 : 420, function () { inFlight--; flightVol -= ING[id].vol; putIn(id); });
-    return true;
+    flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 360, function () { putIn(id); });
+    learned("add");
   }
-  var flightVol = 0;
-  // Go "Fill!": a good smoothie goes in by itself, one ingredient after another (the recipes take turns).
-  var RECIPES = [["banana", "strawberry", "milk"], ["blueberry", "banana", "yogurt"], ["strawberry", "ice", "milk"], ["spinach", "banana", "milk"], ["blueberry", "strawberry", "yogurt"]];
-  var recipeI = 0;
-  function startFill() {
-    if (fillQ.length || inFlight) return false;
-    if (jar.state !== "base") return false;
-    if (S.cup.done) sendCupAway();
-    var list = RECIPES[recipeI % RECIPES.length].slice();
-    recipeI++;
-    var t = now(), room = CAP - totalVol(), k = 0;
-    list.forEach(function (id) { if (ING[id].vol <= room + 0.001) { fillQ.push({ id: id, at: t + k * (reduce ? 0.2 : 0.62) }); room -= ING[id].vol; k++; } });
-    if (!fillQ.length) { say("It's full! Blend it!"); jar.wig = 1; return false; }
-    return true;
-  }
-  function runFill(t) {
-    while (fillQ.length && t >= fillQ[0].at) { var q = fillQ.shift(); addFromCounter(q.id); }
-  }
-
-  function roomFor(id) { return totalVol() + ING[id].vol <= CAP + 0.001; }
   function putIn(id) {
     if (!roomFor(id)) return;
     var g = ING[id];
@@ -521,13 +528,17 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
 
   // ---------- Buttons on the blender ----------
-  var lidTagged = false;
   function needLid(go) {
-    // The blender only runs with the lid on (a real rule): it goes on by itself, shown, then the motor starts.
+    // The blender only runs with the lid on (a real rule). First try: a reminder and the lid flashes;
+    // the second try puts it on for him.
     if (S.lid) { go(); return; }
-    if (lid.anim && lid.anim.then) return;
-    if (!lidTagged) { lidTagged = true; var sp = lidSpot(), pg = toPage(sp.x, sp.y - 0.12); Toybox.nametag("Lid", pg[0], pg[1], 1800); }
-    putLidOn(go);
+    if (lid.anim) return;
+    lid.tries++;
+    if (lid.tries >= 2) { putLidOn(go); return; }
+    say("Put the lid on!");
+    lid.flashUntil = now() + 3;
+    lid.wig = 1;
+    tone(330, 0.14, 0.04, "triangle", 300);
   }
   function pressButton(which, pid) {
     if (jar.state !== "base") return;
@@ -567,9 +578,14 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     cup.anim = { t0: now(), dur: reduce ? 0.3 : 1.6 };
   }
 
-  // ---------- The straw (it goes in by itself after the pour; the colors take turns) ----------
-  var strawI = Math.floor(Math.random() * STRAWS.length);
-  function nextStraw() { strawI = (strawI + 1) % STRAWS.length; return STRAWS[strawI].col; }
+  // ---------- Straws ----------
+  function dropStraw(sid, floatEl, x0, y0) {
+    var s = null;
+    STRAWS.forEach(function (x) { if (x.id === sid) s = x; });
+    if (!s || phase() !== "straw") { if (floatEl.parentNode) floatEl.parentNode.removeChild(floatEl); return; }
+    var top = toPage(CUP_X + 0.12, -CUP_H - 0.45);
+    flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 380, function () { addStraw(s.col); });
+  }
   function addStraw(col) {
     if (S.cup.straw || !(S.cup.fill > 0)) return;
     S.cup.straw = col;
@@ -654,12 +670,12 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (locked()) return;
     stopMotor();
     pieces.forEach(function (p) { if (!p.fall) burst(jar.x + p.x, jar.y + p.y, 1, ING[p.id].col); });
-    pieces = []; pourers = []; dollops = []; fillQ = []; autoPourAt = 0; autoStrawAt = 0;
+    pieces = []; pourers = []; dollops = [];
     S.items = [];
     if (jar.state !== "base") { jar.state = "back"; jar.t0 = now(); jar.from = { x: jar.x, y: jar.y, a: jar.a }; jar.dur = 0.5; }
     if (S.lid) takeLidOff();
     if (S.cup.fill > 0) sendCupAway();
-    lid.tries = 0;
+    lid.tries = 0; sayUntil = 0;
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }
@@ -687,12 +703,14 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return { x: Math.sin(w) * 0.1 * e, a: Math.sin(w + 0.6) * 0.07 * e, y: -Math.abs(Math.sin(w)) * 0.05 * e,
       lid: -Math.abs(Math.sin(w * 2)) * 0.08 * e, slosh: Math.sin(w - 1.1) * 0.09 * e, bob: e };
   }
+  $("newBtn").addEventListener("click", newSmoothie);
+  $("surpriseBtn").addEventListener("click", surprise);
 
-  // ---------- Touch on the stage (Toybox.press: a tap does the whole motion, a drag follows the finger) ----------
+  // ---------- Touch on the stage ----------
   var stageDrags = {};
   function btnAt(p) {
     if (jar.state !== "base") return -1;
-    if (Math.abs(p.x) > 0.54 || p.y < -0.5 || p.y > 0.03) return -1;   // below that: the ingredients on the worktop
+    if (Math.abs(p.x) > 0.54 || p.y < -0.5 || p.y > 0.22) return -1;
     return p.x < -0.17 ? 0 : (p.x > 0.17 ? 2 : 1);
   }
   function inJar(p) {
@@ -700,24 +718,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return jar.state === "base" && Math.abs(dx) < 0.62 && dy > -JAR_H - 0.2 && dy < JAR_H + 0.06;
   }
   function onLidParked(p) { return !S.lid && !lid.anim && Math.abs(p.x - lid.x) < 0.56 && Math.abs(p.y - lid.y) < 0.3; }
-  function onCup(p) { return Math.abs(p.x - (CUP_X + cup.off)) < 0.34 && p.y > -CUP_H - 0.25 && p.y < 0.03; }
-  // The drawn parts: the parked lid, the three buttons, the jar, the cup. The ingredients are circles (each
-  // gets at least the 2 cm hit area; the nearest wins).
-  function hitPart(x, y) {
-    var p = toLocal(x, y);
-    if (onLidParked(p)) return "lid";
-    if (btnAt(p) >= 0) return "btn";
-    if (inJar(p)) return "jar";
-    if (onCup(p)) return "cup";
-    return null;
-  }
-  function ingParts() {
-    var r = cv.getBoundingClientRect();
-    return ROW.map(function (it) { return { id: "ing:" + it.id, x: r.left + ox + it.x * B, y: r.top + oy + (it.y - it.s / 2) * B, r: it.s * B * 0.55 }; });
-  }
-  function stageDown(part, e) {
+  function onCup(p) { return Math.abs(p.x - (CUP_X + cup.off)) < 0.34 && p.y > -CUP_H - 0.25 && p.y < 0.1; }
+  cv.addEventListener("pointerdown", function (e) {
     if (locked()) return;
-    if (typeof part === "string" && part.indexOf("ing:") === 0) { ingDrags[e.pointerId] = { id: part.slice(4), f: null }; return; }
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var p = toLocal(e.clientX, e.clientY);
     var d = { kind: "", sx: p.x, sy: p.y, moved: false };
     stageDrags[e.pointerId] = d;
@@ -739,24 +744,18 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
         jar.state = "drag"; jar.drag = e.pointerId; tone(420, 0.1, 0.03, "sine", 520);
       } else {
         jar.wig = 1;
-        if (!S.items.length) say("Tap the fruit!");
-        else if (!blended()) say(running() ? "It's blending!" : "Blend it!");
+        if (!S.items.length) say("Drag fruit into the jar!");
       }
     } else if (onCup(p)) {
       if (canPour()) startPour(false);
-      else if (S.cup.fill > 0 && !S.cup.straw && jar.state === "base") addStraw(nextStraw());
       else { cup.wig = 1; if (S.cup.done) burst(CUP_X + cup.off, -CUP_H * 0.8, 6, null, true); }
+    } else if (!S.lid && lid.anim == null && S.items.length && Math.hypot(p.x - lid.x, p.y - lid.y) < 0.75) {
+      d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId;
     } else {
       delete stageDrags[e.pointerId];
     }
-  }
-  function stageMove(part, e) {
-    var g = ingDrags[e.pointerId];
-    if (g) {
-      if (!g.f) { g.f = makeFloat(g.id); var r = rowOf(g.id); if (r) r.hop = now(); }
-      floatAt(g.f, e.clientX, e.clientY - 20, 1.1);
-      return;
-    }
+  });
+  cv.addEventListener("pointermove", function (e) {
     var d = stageDrags[e.pointerId];
     if (!d) return;
     var p = toLocal(e.clientX, e.clientY);
@@ -769,18 +768,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       var pp = pourPose();
       if (Math.hypot(jar.x - pp.x, jar.y - pp.y) < 0.62 || (jar.x > CUP_X - 0.35 && jar.y < -1.2)) startPour(true);
     }
-  }
-  function stageUp(part, e, st) {
-    var g = ingDrags[e.pointerId];
-    if (g) {
-      delete ingDrags[e.pointerId];
-      if (!g.f) return;                       // a tap: Toybox.press calls stageTap
-      var p0 = toLocal(e.clientX, e.clientY), r = rowOf(g.id), home = r ? rowPage(r) : [e.clientX, e.clientY];
-      // Let go above the counter's front (anywhere near the blender) and it goes in; back on the counter, it goes home.
-      if (!st.cancel && !locked() && p0.y < (tall ? 0.2 : 0.25)) { if (addFromCounter(g.id, e.clientX, e.clientY - 20, g.f)) { learned("add"); usedDrag = true; } }
-      else flyFloat(g.f, e.clientX, e.clientY - 20, home[0], home[1], 300);
-      return;
-    }
+  });
+  function stageUp(e) {
     var d = stageDrags[e.pointerId];
     if (!d) return;
     delete stageDrags[e.pointerId];
@@ -799,13 +788,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       else { jar.state = "back"; jar.t0 = now(); jar.from = { x: jar.x, y: jar.y, a: jar.a }; jar.dur = 0.45; }
     }
   }
-  var usedTap = false, usedDrag = false;
-  function stageTap(part) {
-    if (typeof part === "string" && part.indexOf("ing:") === 0) {
-      if (addFromCounter(part.slice(4))) { learned("add"); usedTap = true; }
-    }
-  }
-  var press = Toybox.press(cv, { hit: hitPart, parts: ingParts, any: true, down: stageDown, dragStart: stageMove, move: stageMove, up: stageUp, tap: stageTap });
+  cv.addEventListener("pointerup", stageUp);
+  cv.addEventListener("pointercancel", stageUp);
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -949,39 +933,9 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (q.life >= q.max) parts.splice(i, 1);
     }
     if (parts.length > 300) parts.splice(0, parts.length - 300);
-    runFill(t);
-    autoSteps(t);
-    syncSteps();
-  }
-  // After the blend the smoothie pours itself (a tap on the jar or Go pours sooner), then a straw goes in.
-  var autoPourAt = 0, autoStrawAt = 0;
-  function autoSteps(t) {
-    if (locked()) { autoPourAt = 0; autoStrawAt = 0; return; }
-    if (canPour() && !fillQ.length && !inFlight && !stageDrags[jar.drag]) {
-      if (!autoPourAt) autoPourAt = t + (reduce ? 1.2 : 2.6);
-      else if (t >= autoPourAt) { autoPourAt = 0; startPour(false); }
-    } else autoPourAt = 0;
-    if (S.cup.fill > 0 && !S.cup.straw && jar.state === "base" && !cup.anim) {
-      if (!autoStrawAt) autoStrawAt = t + (reduce ? 0.3 : 0.7);
-      else if (t >= autoStrawAt) { autoStrawAt = 0; addStraw(nextStraw()); }
-    } else autoStrawAt = 0;
-  }
-  // The step row follows what is happening on the scene.
-  var shownStep = "", shownBusy = "";
-  function syncSteps() {
-    if (!steps) return;
-    var k = stepNow();
-    if (k !== shownStep) {
-      shownStep = k;
-      if (k === "fin") { steps.finish("Again!"); coach.say("Yum! A smoothie!", 3); }
-      else steps.at(k);
-    }
-    var b = false;
-    if (k === "fill" && (fillQ.length || inFlight)) b = true;
-    else if (k === "blend" && running() && S.lid) b = Math.round(mixedShare() * 20) / 20;
-    else if (k === "pour" && (jar.state !== "base" || S.cup.fill > 0)) b = true;
-    var key = String(b);
-    if (key !== shownBusy) { shownBusy = key; steps.busy(b); }
+    renderChoices();
+    updateCoach();
+    updateGhostPhase();
   }
   // Liquid surface height (jar-local y) for a fill share, with the jar upright.
   var A0 = polyArea(INNER);
@@ -1066,29 +1020,18 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       rr(sx - 0.18, sy, 0.07, 0.2, 0.02); fs("#C98B4F", 0.8); rr(sx + 0.11, sy, 0.07, 0.2, 0.02); fs("#C98B4F", 0.8);
       rr(sx - 0.6, sy, 1.2, 0.07, 0.03); fs("#E7B77A");
     }
-    // The worktop (seen a little from above, deep enough for the ingredients), its front edge, the cupboards.
-    ctx.fillStyle = "#F6D8A8"; ctx.fillRect(L - 0.1, -0.02, R - L + 0.2, TOPD + 0.02);
-    ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L - 0.1, -0.02); ctx.lineTo(R + 0.1, -0.02); ctx.stroke();
-    rr(L - 0.1, TOPD, R - L + 0.2, 0.09, 0.03); fs("#E7B77A");
-    ctx.fillStyle = "#6FB1E8"; ctx.fillRect(L - 0.1, TOPD + 0.09, R - L + 0.2, Math.max(0, Bt - TOPD));
+    // Counter top and the cupboards under it.
+    rr(L - 0.1, -0.02, R - L + 0.2, 0.1, 0.03); fs("#F1C98E");
+    ctx.fillStyle = "#6FB1E8"; ctx.fillRect(L - 0.1, 0.08, R - L + 0.2, Bt);
     ctx.strokeStyle = INK; ctx.lineWidth = LW;
-    ctx.beginPath(); ctx.moveTo(L - 0.1, TOPD + 0.09); ctx.lineTo(R + 0.1, TOPD + 0.09); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(L - 0.1, 0.08); ctx.lineTo(R + 0.1, 0.08); ctx.stroke();
     var dw = 0.9;
     for (var d = Math.floor(L / dw) * dw + 0.05; d < R; d += dw) {
-      rr(d + 0.04, TOPD + 0.15, dw - 0.08, Math.max(0.05, Bt - TOPD - 0.1), 0.05); fs("#86C1F0", 0.8);
-      rr(d + dw / 2 - 0.12, TOPD + 0.19, 0.24, 0.035, 0.017); fs("#FFFFFF", 0.7);
+      rr(d + 0.04, 0.14, dw - 0.08, Math.max(0.05, Bt - 0.1), 0.05); fs("#86C1F0", 0.8);
+      rr(d + dw / 2 - 0.12, 0.18, 0.24, 0.035, 0.017); fs("#FFFFFF", 0.7);
     }
   }
-  // The ingredients standing on the worktop (back row first). A tapped one hops.
-  function drawRow() {
-    var t = now();
-    ROW.forEach(function (it) {
-      var hk = (t - it.hop) / 0.5, hop = hk >= 0 && hk < 1 ? Math.sin(hk * Math.PI) * 0.12 : 0;
-      ctx.fillStyle = "rgba(29,35,64,0.14)"; ctx.beginPath(); ctx.ellipse(it.x, it.y - 0.01, it.s * 0.42, it.s * 0.08, 0, 0, Math.PI * 2); ctx.fill();
-      var im = IMG[it.id];
-      if (im && im.complete && im.naturalWidth) ctx.drawImage(im, it.x - it.s / 2, it.y - it.s - hop, it.s, it.s);
-    });
-  }
+
   function drawBase() {
     var sh = M.speed > 0.05 && !reduce ? Math.sin(now() * 70) * 0.004 * M.speed : 0;
     ctx.save(); ctx.translate(sh, 0);
@@ -1236,6 +1179,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var fk = funK("face");
     if (fk >= 0) happyFace(0, -0.12, 0.95, fk);
     if (S.lid && !lid.anim && lid.drag == null) drawLidShape(0, -JAR_H - 0.075 + (dn ? dn.lid : 0));
+    else if (S.items.length && jar.state === "base") {
+      var pulse = 0.5 + 0.5 * Math.sin(t * 4);
+      ctx.setLineDash([0.05, 0.04]); ctx.strokeStyle = "rgba(45,91,215," + (0.4 + 0.5 * pulse).toFixed(2) + ")"; ctx.lineWidth = LW * 1.2;
+      rr(-0.45, -JAR_H - 0.13, 0.9, 0.11, 0.04); ctx.stroke(); ctx.setLineDash([]);
+    }
     ctx.restore();
   }
   function drawLidShape(x, y, glow) {
@@ -1249,8 +1197,9 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function drawLidLoose() {
     if (S.lid && !lid.anim && lid.drag == null) return;
     var t = now(), glow = null;
-    if (t < lid.flashUntil) {
-      var k = Math.sin(t * 10) > 0 ? 0.95 : 0.35;
+    var needed = S.items.length && !blended() && !S.lid && jar.state === "base";
+    if (needed || t < lid.flashUntil) {
+      var k = t < lid.flashUntil ? (Math.sin(t * 10) > 0 ? 0.95 : 0.35) : 0.35 + 0.35 * Math.sin(t * 4);
       glow = "rgba(255,201,60," + k.toFixed(2) + ")";
     }
     var wig = lid.wig > 0 ? Math.sin(t * 26) * 0.12 * lid.wig : 0;
@@ -1414,7 +1363,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     drawJar(dn);
     if (dn) ctx.restore();
     drawLidLoose();
-    drawRow();
     drawPourers();
     drawFalling();
     drawParts();
@@ -1433,8 +1381,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     FUN.cur = {};
     lid.drag = null;
     if (jar.state === "drag") { jar.state = "back"; jar.t0 = now(); jar.from = { x: jar.x, y: jar.y, a: jar.a }; jar.dur = 0.6; }
-    Object.keys(ingDrags).forEach(function (k) { var d = ingDrags[k]; if (d.f && d.f.parentNode) d.f.parentNode.removeChild(d.f); });
-    ingDrags = {}; stageDrags = {}; fillQ = [];
+    Object.keys(tileDrags).forEach(function (k) { var d = tileDrags[k]; if (d.f.parentNode) d.f.parentNode.removeChild(d.f); d.b.classList.remove("picked"); });
+    tileDrags = {}; stageDrags = {};
     setTimeout(done, reduce ? 300 : 3200);
   }
   function restArt() {
@@ -1449,64 +1397,136 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
   }
 
-  // ---------- Ghost hand, step row, bottom bar ----------
-  // The ghost taps the part that does the current step (the one-press way); the drag only once he has used the tap.
-  function learned(m) {
-    if (m === "add") ghost.learned("fill");
-    else if (m === "run") ghost.learned("blend");
-    else if (m === "pour") ghost.learned("pour");
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedF = true; stop(); },
+      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
   }
-  var steps = null;
-  var ghost = Toybox.ghost({
-    max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
-    plan: function () {
-      if (Object.keys(ingDrags).length || Object.keys(stageDrags).length || document.body.classList.contains("big")) return null;
-      var k = stepNow(), top = toPage(jar.x, jar.y - JAR_H - 0.2);
-      if (k === "fill" && !fillQ.length && !inFlight) {
-        var r = rowOf("banana"); if (!r) return null;
-        var at = rowPage(r);
-        return usedTap && !usedDrag ? { pts: [at, top], carry: { html: ICON.banana, size: 64 }, key: "fill" } : { pts: [at], tap: true, key: "fill" };
-      }
-      if (k === "blend" && !running()) return { pts: [toPage(0, -0.3)], tap: true, key: "blend" };
-      if (k === "pour" && canPour()) return { pts: [toPage(jar.x, jar.y)], tap: true, key: "pour" };
-      return null;
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // One hint per kind of move; once he has done a move, its hint never shows again this visit.
+  var doneMoves = {}, ghostPhase = "";
+  function learned(m) { doneMoves[m] = true; if (ghostPhase === m || (m === "add" && ghostPhase === "done")) ghost.learned(); }
+  function moveFor(ph) { return ph === "done" ? "add" : ph; }
+  function updateGhostPhase() {
+    var ph = phase();
+    if (ph === ghostPhase) return;
+    ghostPhase = ph;
+    if (ph === "blend" || doneMoves[moveFor(ph)]) ghost.learned(); else ghost.again();
+  }
+  var ghost = makeGhost(function () {
+    if (Object.keys(tileDrags).length || Object.keys(stageDrags).length || document.body.classList.contains("big")) return null;
+    var ph = phase(), tile, top = toPage(jar.x, jar.y - JAR_H - 0.2);
+    if ((ph === "add" || ph === "done") && (tile = choicesEl.querySelector('[data-ing="banana"]'))) {
+      return { pts: [ghostPt(tile, 0.5, 0.45), top], carry: { html: ICON.banana, size: 64 } };
     }
-  });
-  steps = Toybox.steps($("steps"), {
-    steps: STEPS,
-    coach: coach,
-    ghost: ghost,
-    onGo: function (id) {
-      if (id === "fill") { if (!startFill()) return false; learned("add"); return true; }
-      if (id === "blend") {
-        if (!S.items.length) return false;
-        needLid(function () { M.mode = 2; M.flashBtn = 1; M.flashUntil = now() + 0.6; click(); learned("run"); });
-        return true;
-      }
-      if (id === "pour") { if (!canPour()) return false; startPour(false); return true; }
-      return false;
-    },
-    onAgain: function () { if (startFill()) learned("add"); else steps.go.wiggle(); },
-    onBusy: function (id) {
-      if (id === "blend" && M.mode === 1) { M.mode = 2; click(); say("Faster!"); }
-      else if (id === "blend") say("It's blending!");
-      else if (id === "fill") say("In it goes!");
+    if (ph === "lid") return { pts: [toPage(lid.x, lid.y), toPage(jar.x, jar.y - JAR_H - 0.08)] };
+    if (ph === "run") return { pts: [toPage(-0.27, -0.3)], tap: true };
+    if (ph === "off") return { pts: [toPage(M.mode === 2 ? 0 : -0.27, -0.3)], tap: true };
+    if (ph === "pour" && canPour()) return { pts: [toPage(jar.x, jar.y), toPage(pourPose().x, pourPose().y)] };
+    if (ph === "straw" && (tile = choicesEl.querySelector("[data-straw]"))) {
+      return { pts: [ghostPt(tile, 0.5, 0.45), toPage(CUP_X, -CUP_H - 0.2)], carry: { html: tile.querySelector("svg").outerHTML, size: 64 } };
     }
+    return null;
   });
-  Toybox.bar($("bottom"), { onNew: newSmoothie, onSurprise: surprise });
 
   // ---------- Start ----------
   rebuildPieces();
   updateCounter();
+  renderChoices();
   layout();
-  syncSteps();
   var resizeT = 0;
   function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); layout(); }
   window.addEventListener("resize", onResize);
   window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
-  // The step row can change the stage's height: keep the canvas sharp.
-  if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe(stage);
   Toybox.init({
     app: "kitchen",
     big: { button: $("bigToggle") },
@@ -1544,9 +1564,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   if (/[?&]debug\b/.test(location.search)) {
     window.__blender = {
       state: function () {
-        return { phase: stepNow(), items: S.items.map(function (it) { return it.id + ":" + it.f.toFixed(2); }), lid: S.lid, mode: M.mode, speed: +M.speed.toFixed(2),
-          jar: jar.state, cup: S.cup, count: S.count, pieces: pieces.length, coach: coach.text(), level: +level().toFixed(3), color: mixColor(false),
-          step: steps.current(), finished: steps.finished(), go: steps.go.label(), busy: steps.go.isBusy() };
+        return { phase: phase(), items: S.items.map(function (it) { return it.id + ":" + it.f.toFixed(2); }), lid: S.lid, mode: M.mode, speed: +M.speed.toFixed(2),
+          jar: jar.state, cup: S.cup, count: S.count, pieces: pieces.length, coach: coachEl.textContent, level: +level().toFixed(3), color: mixColor(false) };
       },
       pt: function (name) {
         if (name === "jar") return toPage(jar.x, jar.y);
@@ -1556,7 +1575,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
         if (name === "low") return toPage(-0.27, -0.3);
         if (name === "high") return toPage(0, -0.3);
         if (name === "pulse") return toPage(0.27, -0.3);
-        if (name.indexOf("ing:") === 0) { var r = rowOf(name.slice(4)); return r ? rowPage(r) : null; }
         return null;
       },
       ghost: function () { return ghost.show(); },

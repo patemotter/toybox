@@ -71,11 +71,10 @@ body {
   -webkit-touch-callout: none;
   -webkit-text-size-adjust: 100%;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The panel: the five bits as picture tiles and the bottom bar (Shelf, New, Surprise). The router's switch is drawn
-   on the cabinet (the machine's own control); the end view is a small corner panel on the stage. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
-.stage { background: #C9A877; touch-action: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
+.stage { background: #C9A877; }
 #cv {
   position: absolute;
   inset: 0;
@@ -87,46 +86,88 @@ body {
   user-select: none;
   -webkit-touch-callout: none;
 }
-#tiles .tb-pic svg { width: 100%; height: 100%; display: block; }
-/* The Back button shows the Workshop's picture (and its name on an iPad). */
-.mapbtn .tb-mapic { width: 30px; height: 30px; flex: none; }
-/* Big: the header and the panel hide (the switch and the board do everything). */
-body.big .tb-head > :not(.bigtoggle) { display: none; }
+/* Panel: the big choices for the picked tab, then the tab bar (Bits / Height / Wood) and New board. */
+.rchoices { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); }
+.tb { overflow: hidden; }
+.tb svg { display: block; width: 100%; height: 44px; flex: none; }
+.tb .ic svg { height: 44px; }
+.swatch { display: block; width: 62%; max-width: 64px; height: 30px; margin: 7px 0 7px; border: 3px solid #1D2340; border-radius: 6px; flex: none; }
+.toolbar[data-grp="bit"] .tb:not(.bit), .toolbar[data-grp="lvl"] .tb:not(.lvl), .toolbar[data-grp="wood"] .tb:not(.wood) { display: none; }
+.nshort { display: none; }
+.prompt {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 3;
+  transform: translate(-50%, -12px) scale(0.92);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  background: #FFC93C;
+  color: #1D2340;
+  border: 4px solid #1D2340;
+  border-radius: 22px;
+  padding: 0.35rem 1.1rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  box-shadow: 4px 4px 0 #1D2340;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(.3,1.6,.5,1);
+}
+.prompt.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 body.big .tb-panel { display: none; }
-body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
-body.ending .tb-panel, body.ending .mapbtn { opacity: 0.5; }
-body.ending .mapbtn { pointer-events: none; }
+body.ending .toolbar,
+body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(60vw, 240px); }
-/* Landscape: the panel is a right-hand column (the bits three a row, the bottom bar). */
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .rchoices { gap: 6px; }
+  .tb { min-height: 66px; font-size: 0.85rem; padding: 3px 1px 2px; }
+  .tb svg, .tb .ic svg { height: 36px; }
+  .swatch { height: 24px; margin: 6px 0; }
+  .nlong { display: none; }
+  .nshort { display: inline; }
+  .prompt { font-size: 1.15rem; }
+}
 @media (orientation: landscape) {
-  .tb-v2 .tb-body .tb-panel { width: min(36%, 400px); }
-  .tb-v2 #tiles.tb-tilerow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tb-body .tb-panel { width: min(30%, 340px); }
+  /* the column is narrow: three tiles a row so "Roundover" fits, and "New" in the tab bar */
+  .rchoices { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); padding: 0 5px 5px 0; }
+  .tb-tabs .btn { padding-left: 0.15rem; padding-right: 0.15rem; font-size: 0.95rem; }
+  .tb-tabs .nlong { display: none; }
+  .tb-tabs .nshort { display: inline; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  .tb-v2 .tb-body .tb-panel { width: 330px; gap: 8px; }
-  .tb-v2 #tiles.tb-tilerow { gap: 6px; }
-  /* the coach line sits in the band above the table, left of the end view (not over the switch) */
-  #coach.tb-coach { top: 52px; bottom: auto; left: 34%; }
+  .tb-body .tb-panel { width: 210px; padding: 6px; gap: 6px; }
+  .rchoices { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); }
+  .tb { min-height: 0; }
+  .tb svg, .tb .ic svg { height: 30px; }
+  .tb-tabs { flex-wrap: wrap; }
+  .tb-tabs .btn { min-height: 40px; font-size: 0.82rem; }
+  .tb-tabs .tb-new { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prompt { transition: opacity 0.2s ease; }
 }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2 wrap">
+<div class="tb-app-shell wrap">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back mapbtn" id="wallbtn" href="./" aria-label="Back to the Workshop"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M4 16 20 5l16 11v20H4Z" fill="#E7B86A" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="10" y="18" width="20" height="18" fill="#AEB9C5" stroke="#1D2340" stroke-width="2.5"/><path d="M10 23h20M10 28h20M10 33h20" stroke="#1D2340" stroke-width="1.6"/></svg><span>Workshop</span></a>
+    <a class="btn tb-iconbtn tb-back wallbtn" id="wallbtn" href="./" aria-label="Back to the Tool Wall"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Tool Wall</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Router Table</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A router table"></canvas>
-      <div class="tb-counter" id="boardsCount">Boards: 0</div>
-      <div id="coach"></div>
+      <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
     </main>
-    <section class="tb-panel" id="panel">
-      <div id="tiles" role="group" aria-label="Router bits"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel toolbar" id="toolbar">
+      <div class="tb-choices rchoices" id="rchoices"></div>
+      <nav class="tb-tabs" id="rtabs"></nav>
     </section>
   </div>
 </div>
@@ -188,7 +229,6 @@ body.ending .mapbtn { pointer-events: none; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function rnd(a, b) { return a + Math.random() * (b - a); }
   var $ = function (id) { return document.getElementById(id); };
-  var coach = Toybox.coach($("coach"));
   function seeded(seed) {
     var s = (seed >>> 0) || 1;
     return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
@@ -255,7 +295,6 @@ body.ending .mapbtn { pointer-events: none; }
   // Opened from the Toybox home screen: a new uncut board and first-visit settings; keep the shelf.
   if (window.Toybox && Toybox.fresh()) { var keepShelf = S.shelf; S = freshState(); S.shelf = keepShelf; save(); }
   if (linkBit) S.bit = linkBit;
-  S.lvl = 1;   // one good bit height (Middle): the height picker is gone, old saves keep their format
 
   // ---------- Live state ----------
   var R = {
@@ -333,28 +372,36 @@ body.ending .mapbtn { pointer-events: none; }
   function insetHead(w) { return clamp(w * 0.055, 15, 26) * 1.9 + 10; }
   function insetH(w) { return (w - 20) * (IN_Z1 - IN_Z0) / (IN_Y1 - IN_Y0) + insetHead(w); }
 
-  // The whole machine stays on screen (AGENTS.md): the table from end to end with its cabinet and switch always
-  // fits; the end view is a corner panel in the band above it (top-right, clear of the counter). The shelf
-  // lives behind the Shelf button (drawn full-stage while it is open).
-  function insetW(h) { var lo = 60, hi = 900; for (var i = 0; i < 24; i++) { var m = (lo + hi) / 2; if (insetH(m) > h) hi = m; else lo = m; } return lo; }
   function layout() {
-    var pad = CW < 520 || CH < 420 ? 8 : 12;
-    var fw = CW - 2 * pad;
-    // tablets show the coach line top-center: the end view starts under it
-    var topM = window.innerWidth >= 700 && window.innerHeight >= 700 ? 56 : 0;
-    var s = fw / WHOLE_W;
-    var want = Math.min(CH * 0.36, insetH(Math.min(fw * 0.62, 440)));
-    var band = CH - VIEW_H * s - 3 * pad - topM;
-    if (band < want) { band = want; s = Math.min(s, (CH - band - 3 * pad - topM) / VIEW_H); }
-    band = Math.min(band, CH * 0.5, insetH(Math.min(fw * 0.62, 440)) + 4);
-    var ew = Math.min(insetW(band), fw * 0.62, 440);
-    E = { x: CW - pad - ew, y: pad + topM, w: ew, h: Math.round(insetH(ew)) };
-    band += topM;
-    TV = { x: pad, y: band + 2 * pad, w: fw, h: CH - band - 3 * pad };
-    TV.s = s;
-    TV.ox = TV.x + TV.w / 2 - WHOLE_CX * TV.s;
+    var pad = CW < 520 || CH < 420 ? 6 : 10;
+    if (CW / CH >= 1.25) {
+      var sw = clamp(CW * 0.33, 200, 420);
+      TV = { x: pad, y: pad, w: CW - sw - 3 * pad, h: CH - 2 * pad };
+      var eh = Math.round(Math.min(insetH(sw) + 10, (CH - 3 * pad) * 0.62));
+      E = { x: TV.x + TV.w + pad, y: pad, w: sw, h: eh };
+      H = { x: E.x, y: E.y + eh + pad, w: sw, h: CH - 3 * pad - eh };
+    } else if (CW >= 600) {
+      var ew = Math.round((CW - 3 * pad) * 0.6);
+      var band = Math.round(clamp(insetH(ew) + pad, CH * 0.25, CH * 0.5));
+      E = { x: pad, y: pad, w: ew, h: band - pad };
+      H = { x: E.x + ew + pad, y: pad, w: CW - ew - 3 * pad, h: band - pad };
+      TV = { x: pad, y: band + pad, w: CW - 2 * pad, h: CH - band - 2 * pad };
+    } else {
+      // narrow portrait: a small end view in the top corner with the shelf beside it, and the table
+      // (the play) gets the rest of the height, framed a little tighter so it is bigger.
+      var fw = CW - 2 * pad;
+      var ew2 = Math.round((fw - pad) * 0.56);
+      var eh = Math.round(Math.min(insetH(ew2), CH * 0.3));
+      E = { x: pad, y: pad, w: ew2, h: eh };
+      H = { x: E.x + ew2 + pad, y: pad, w: fw - ew2 - pad, h: eh };
+      TV = { x: pad, y: eh + 2 * pad, w: fw, h: CH - eh - 3 * pad };
+    }
+    var narrow = CW < 600 && CW / CH < 1.25;
+    // tablets: the whole table from end to end (phones keep the tighter frame on the bit and the board)
+    var whole = !narrow && TV.w >= 560;
+    TV.s = Math.min(TV.w / (narrow ? NARROW_W : whole ? WHOLE_W : VIEW_W), TV.h / VIEW_H);
+    TV.ox = TV.x + TV.w / 2 - (narrow ? NARROW_CX : whole ? WHOLE_CX : VIEW_CX) * TV.s;
     TV.oy = TV.y + TV.h / 2 - VIEW_CY * TV.s;
-    H = { x: pad, y: pad, w: CW - 2 * pad, h: CH - 2 * pad };
   }
   function resize() {
     var r = cv.getBoundingClientRect();
@@ -729,21 +776,18 @@ body.ending .mapbtn { pointer-events: none; }
   var chips = [], ichips = [];
   function spawnChips(n) {
     var wd = WOODS[S.wood];
-    // Debris never hides the work (AGENTS.md): chips fly for the moment and fade within about 1.2 s; nothing
-    // settles on the table or the board, and a low cap keeps the count small.
-    n = Math.min(n, reduce ? 2 : 6);
-    for (var i = 0; i < n; i++) {
-      if (chips.length >= (reduce ? 10 : 28)) chips.shift();
+    n = Math.min(n, reduce ? 3 : 12);
+    for (var i = 0; i < n && chips.length < 260; i++) {
       var toPort = Math.random() < 0.3;
       var p = q(rnd(-30, 26), rnd(-14, 4), rnd(BT * 0.5, BT + 14));
       chips.push({
         x: p[0], y: p[1], vx: toPort ? rnd(-60, 40) : rnd(-320, 140), vy: toPort ? rnd(-320, -220) : rnd(-420, -160),
-        port: toPort, life: toPort ? 0.45 : rnd(0.8, 1.2), age: 0, rot: rnd(0, 6), vr: rnd(-14, 14),
+        port: toPort, life: toPort ? 0.45 : rnd(2.5, 4.5), age: 0, rot: rnd(0, 6), vr: rnd(-14, 14),
         sz: rnd(5, 11), col: Math.random() < 0.5 ? wd.chip : wd.top, floor: q(0, rnd(126, 228), 0)[1], settled: false
       });
     }
     var m = Math.min(n, reduce ? 2 : 6);
-    for (var j = 0; j < m && ichips.length < 16; j++) {
+    for (var j = 0; j < m && ichips.length < 90; j++) {
       ichips.push({ y: rnd(-4, 12), z: rnd(2, Math.max(4, R.hCur)), vy: rnd(-260, -60), vz: rnd(40, 260), age: 0, life: rnd(0.6, 1.1),
         rot: rnd(0, 6), vr: rnd(-12, 12), sz: rnd(2.5, 5), col: Math.random() < 0.5 ? wd.chip : wd.top });
     }
@@ -757,7 +801,7 @@ body.ending .mapbtn { pointer-events: none; }
       if (p.settled) continue;
       p.vy += 900 * dt;
       p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
-      if (!p.port && p.vy > 0 && p.y >= p.floor) { p.y = p.floor; p.vy = -Math.abs(p.vy) * 0.25; p.vx *= 0.6; }
+      if (!p.port && p.vy > 0 && p.y >= p.floor) { p.y = p.floor; p.settled = true; }
     }
     for (i = ichips.length - 1; i >= 0; i--) {
       p = ichips[i];
@@ -769,7 +813,7 @@ body.ending .mapbtn { pointer-events: none; }
   function drawChips(c) {
     c.lineWidth = lw(1.5); c.strokeStyle = "rgba(29,35,64,0.7)";
     chips.forEach(function (p) {
-      var a = p.port ? 1 - p.age / p.life : Math.min(1, (p.life - p.age) / 0.45);
+      var a = p.port ? 1 - p.age / p.life : Math.min(1, (p.life - p.age) / 0.6);
       c.globalAlpha = Math.max(0, a);
       c.save(); c.translate(p.x, p.y); c.rotate(p.rot);
       c.beginPath(); c.ellipse(0, 0, p.sz, p.sz * 0.45, 0, 0, Math.PI * 2);
@@ -942,7 +986,7 @@ body.ending .mapbtn { pointer-events: none; }
     if (shelfCache.key === key) return shelfCache.L;
     var plankY = H.y + H.h - Math.min(34, H.h * 0.12), avail = plankY - H.y - 50, best = null;
     for (var r = 1; r <= 10; r++) {
-      var bs = Math.min(avail / (r * (BT + 3) + SHELF_L * 0.2), H.w * 0.44 / BOARD_SPAN);
+      var bs = Math.min(avail / (r * (BT + 3) + SHELF_L * 0.2), H.w * 0.86 / BOARD_SPAN);
       var pw = BOARD_SPAN * bs + 12;
       var piles = Math.max(1, Math.min(3, Math.floor((H.w - 16) / pw)));
       var cap = r * piles;
@@ -973,36 +1017,34 @@ body.ending .mapbtn { pointer-events: none; }
       var sp = slotPos(L, i);
       drawShelfBoard(c, sp.x, sp.y, L.bs, show[i].w, show[i].p);
     }
-  }
-  // The Shelf view: the whole stage shows his finished boards on a wall shelf.
-  function drawShelfView(c, t) {
-    c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    c.fillStyle = "#F3E6CC"; c.fillRect(0, 0, CW, CH);
-    drawShelf(c, t);
-  }
-  // A finished board flies to the Shelf button in the bottom bar (or the top corner) and shrinks into it.
-  function shelfTarget() {
-    var b = bbar && bbar.shelf, cr = cv.getBoundingClientRect();
-    if (b) { var r = b.getBoundingClientRect(); if (r.width > 0) return { x: r.left + r.width / 2 - cr.left, y: r.top + r.height / 2 - cr.top }; }
-    return { x: CW - 40, y: 20 };
+    var pp = R.shelfPop > 0 ? 1 + 0.25 * Math.sin(R.shelfPop * Math.PI) : 1;
+    var size = clamp(H.w * 0.09, 16, 26) * pp;
+    // under the coach line when the shelf sits at the top of the stage next to the end view (tablets)
+    var pillY = H.y + size * 0.95 + 4;
+    if (H.y < 40 && H.x > 40 && H.x < CW / 2 + 220) pillY = Math.max(pillY, 66 + size * 0.95);
+    pill(c, "Boards: " + S.count, H.x + 8, pillY, size, "#FFFFFF", OUT, "left");
   }
   function drawFly(c) {
     var f = R.fly;
     if (!f) return;
     c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    var tg = f.to || (f.to = shelfTarget());
+    var L = shelfLayout();
+    var sp = slotPos(L, Math.min(S.shelf.length, L.rows * L.piles - 1));
+    var tx = sp.x, ty = sp.y;
     var e = f.t < 1 ? (1 - Math.pow(1 - f.t, 2)) : 1;
-    var bs = lerp(f.fs, 40 / BOARD_SPAN, e);
-    var x = lerp(f.fx, tg.x - BOARD_SPAN * bs / 2, e), y = lerp(f.fy, tg.y, e) - Math.sin(e * Math.PI) * 120;
-    c.save(); c.globalAlpha = e > 0.85 ? (1 - e) / 0.15 : 1;
+    var x = lerp(f.fx, tx, e), y = lerp(f.fy, ty, e) - Math.sin(e * Math.PI) * 120;
+    var bs = lerp(f.fs, L.bs, e);
     drawShelfBoard(c, x, y, bs, f.wood, f.prof, Math.cos(e * Math.PI) * -1);
-    c.restore();
   }
 
   // ---------- Prompt ----------
-  var now = 0;
+  var promptTimer = null, now = 0;
   function say(msg) {
-    coach.say(msg, 3.4);
+    var el = $("prompt");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(promptTimer);
+    promptTimer = setTimeout(function () { el.classList.remove("show"); }, 3500);
     R.lastSay = now;
   }
   function busy() { return Toybox.timer.locked(); }
@@ -1063,18 +1105,15 @@ body.ending .mapbtn { pointer-events: none; }
   function toggleSwitch() {
     if (busy() || R.chg) return;
     R.on = !R.on;
+    if (R.on) $("prompt").classList.remove("show");
     R.pending = null;
     blip(R.on ? 330 : 260, 0.08, 0.07, "square", R.on ? 440 : 180);
     updateAria();
   }
-  // Changing the bit needs the router stopped: it switches off by itself, the bit is swapped, and it switches
-  // back on if it was running (no "switch it off first" step for him).
   function requestChange(bit, lvl) {
     if (bit === R.bitId && lvl === R.lvl && !R.pending) return;
     R.pending = { bit: bit, lvl: lvl };
-    R.autoFeed = false; R.target = R.bx;
-    if (R.on) { R.on = false; R.fastStop = true; R.resumeOn = true; blip(260, 0.08, 0.07, "square", 180); }
-    say("Changing the bit");
+    if (R.on) { R.on = false; say("Router off to change the bit"); blip(260, 0.08, 0.07, "square", 180); }
   }
   function startChange() {
     var p = R.pending; R.pending = null;
@@ -1091,35 +1130,27 @@ body.ending .mapbtn { pointer-events: none; }
       var f = Math.min(1, c.t / 0.6), e = f * f * (3 - 2 * f);
       R.hCur = lerp(c.h0, expo(c.bit, c.lvl), e);
       R.lvl = c.lvl;
-      if (f >= 1) { R.chg = null; blip(600, 0.06, 0.04, "triangle"); resumeAfterChange(); }
+      if (f >= 1) { R.chg = null; blip(600, 0.06, 0.04, "triangle"); }
       return;
     }
     if (c.t < 0.4) R.show = 1 - c.t / 0.4;
     else {
       if (!c.swapped) { c.swapped = true; R.bitId = c.bit; R.lvl = c.lvl; R.hCur = expo(c.bit, c.lvl); blip(500, 0.07, 0.05, "triangle", 700); }
       R.show = Math.min(1, (c.t - 0.4) / 0.48);
-      if (c.t >= 0.88) { R.show = 1; R.chg = null; resumeAfterChange(); }
+      if (c.t >= 0.88) { R.show = 1; R.chg = null; }
     }
   }
 
-  function resumeAfterChange() {
-    R.fastStop = false;
-    if (R.resumeOn && !busy()) { R.resumeOn = false; R.on = true; blip(330, 0.08, 0.07, "square", 440); updateAria(); }
-    R.resumeOn = false;
-  }
   function cuttingOn() { return R.spin > 0.45 && R.show > 0.98 && !R.chg; }
 
   function moveBoard(dt, dragging) {
     var diff = R.target - R.bx, total = 0;
     R.moveAmt = 0;
     if (!R.board) return 0;
-    // a pass played for him (a tap on the board) moves at a calm, steady feed
-    var maxMove = dragging ? 1e9 : (R.autoFeed ? 230 * dt : 900 * dt);
+    var maxMove = dragging ? 1e9 : 900 * dt;
     if (Math.abs(diff) > maxMove) diff = diff > 0 ? maxMove : -maxMove;
-    var on = cuttingOn();
-    // a pass played for him waits while the bit comes up to speed
-    if (R.autoFeed && !on && (R.on || R.chg || R.pending)) return 0;
     var steps = Math.min(240, Math.ceil(Math.abs(diff) / 4));
+    var on = cuttingOn();
     for (var i = 0; i < steps; i++) {
       var nb = R.bx + diff / steps;
       if (!on) {
@@ -1169,18 +1200,12 @@ body.ending .mapbtn { pointer-events: none; }
     if (S.shelf.length > 24) S.shelf.splice(0, S.shelf.length - 24);
     S.count++;
     R.shelfPop = 1;
-    if (bbar && bbar.shelf) Toybox.wiggle(bbar.shelf);
-    coach.say("It's on the shelf!", 3);
-    Toybox.kind();
     blip(700, 0.1, 0.06, "triangle", 1050);
     save();
     updateAria();
   }
-  // Each new board is the next wood by itself (no wood picker): pine, oak, walnut, pine...
-  function newBoardIn(sameWood) {
-    if (!sameWood) S.wood = WOOD_ORDER[(WOOD_ORDER.indexOf(S.wood) + 1) % WOOD_ORDER.length];
+  function newBoardIn() {
     S.cuts = freshCuts();
-    R.autoFeed = false; R.fun = null;
     recountDone();
     R.bx = BX0 + 520; R.target = BX0; R.board = true; R.finT = 0;
     drags = {};
@@ -1191,6 +1216,14 @@ body.ending .mapbtn { pointer-events: none; }
     if (anyCut()) finishBoard();
     else { newBoardIn(); blip(440, 0.08, 0.05, "sine", 520); }
   }
+  function setWood(w) {
+    if (busy() || !WOODS[w]) return;
+    if (w === S.wood) { R.woodPop = 1; return; }
+    if (anyCut()) { finishBoard(); S.wood = w; }
+    else { S.wood = w; R.woodPop = 1; blip(500, 0.07, 0.05, "sine", 620); }
+    save(); updateToolbar(); updateAria();
+  }
+
   function update(dt) {
     // switch -> spin up / spin down
     if (R.on) R.spin = Math.min(1, R.spin + dt * 1.7);
@@ -1213,8 +1246,6 @@ body.ending .mapbtn { pointer-events: none; }
     R.woodPop = Math.max(0, R.woodPop - dt * 3);
     R.shelfPop = Math.max(0, R.shelfPop - dt * 2.5);
     if (R.fly) { R.fly.t += dt / 1.1; if (R.fly.t >= 1) landFly(); }
-    if (R.autoFeed && Math.abs(R.target - R.bx) < 0.5) { R.autoFeed = false; save(); }
-    if (R.fun) { R.fun.t += dt; if (R.fun.t > R.fun.dur) R.fun = null; }
     // a fully cut board pushed all the way through goes to the shelf by itself
     if (R.board && !dragging && doneCount >= N && R.bx <= BXMIN + 8 && !busy()) {
       R.finT += dt;
@@ -1227,17 +1258,13 @@ body.ending .mapbtn { pointer-events: none; }
   function draw(t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(bgCanvas, 0, 0);
-    updateCounter();
-    if (R.shelfOpen) { drawShelfView(ctx, t); return; }
     drawTableView(ctx, t);
-    drawFun(ctx, t);
     drawInset(ctx, t);
+    drawShelf(ctx, t);
     drawFly(ctx);
   }
 
-  // ---------- Input: tap or drag (Toybox.press, several fingers at once) ----------
-  // Tap the switch: on/off. Tap the board: a whole pass past the bit at a calm feed (at the far end, a fully cut
-  // board goes to the shelf; otherwise it comes back for another pass). Drag: push the board by hand.
+  // ---------- Input ----------
   var drags = {};
   function localPt(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function inRect(p, r, m) { m = m || 0; return p.x >= r.x - m && p.x <= r.x + r.w + m && p.y >= r.y - m && p.y <= r.y + r.h + m; }
@@ -1249,145 +1276,140 @@ body.ending .mapbtn { pointer-events: none; }
     var a = toScreen(R.bx, 0, BT), b = toScreen(R.bx + BL, BW, 0);
     return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
   }
-  function onDown(part, e) {
+  function onDown(e) {
     if (busy()) return;
     var p = localPt(e);
     ensureAudio();
-    if (R.shelfOpen) { drags[e.pointerId] = { shelf: true }; return; }
-    if (inRect(p, switchScreenRect(), 14)) { toggleSwitch(); ghost.learned("switch"); return; }
+    if (inRect(p, switchScreenRect(), 14)) { e.preventDefault(); toggleSwitch(); return; }
     var onBoard = R.board && inRect(p, boardScreenRect(), 30);
-    if (onBoard || inRect(p, TV)) drags[e.pointerId] = { lx: p.x, onBoard: onBoard };
+    if (onBoard || inRect(p, TV)) {
+      e.preventDefault();
+      drags[e.pointerId] = { lx: p.x };
+      try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    }
   }
-  function dragStart(part, e) {
+  function onMove(e) {
     var d = drags[e.pointerId];
-    if (d && !d.shelf) { R.autoFeed = false; R.target = R.bx; d.lx = localPt(e).x; }
-  }
-  function onMove(part, e) {
-    var d = drags[e.pointerId];
-    if (!d || d.shelf || busy()) return;
+    if (!d || busy()) return;
     var p = localPt(e);
     // Gesture gain: the whole pass past the bit takes about 170 px of finger on any screen (the board moves
     // further than the finger on the big iPad table). Lifting keeps the board where it is, so short pushes
     // one after another feed it through too.
     R.target = clamp(R.target + (p.x - d.lx) / TV.s * feedGain(), BXMIN, BXMAX);
-    if (Math.abs(p.x - d.lx) > 0 && cuttingOn()) ghost.learned("push");
     d.lx = p.x;
   }
   function feedGain() { return Math.max(1, (BX0 - BXMIN) * TV.s / 170); }
-  function onUp(part, e, st) {
-    var d = drags[e.pointerId];
-    if (!d) return;
+  function onUp(e) {
+    if (!drags[e.pointerId]) return;
     delete drags[e.pointerId];
     var any = false;
     for (var id in drags) if (drags.hasOwnProperty(id)) any = true;
     if (!any) R.target = clamp(R.target, BXMIN, BXMAX);
-    if (st && st.tap && !busy()) {
-      if (d.shelf) { showShelf(false); return; }
-      tapBoard();
-    }
   }
-  // One press is always enough: a tap plays the whole pass.
-  function tapBoard() {
-    usedTap.push = true;
-    if (!R.board || R.fly) return;
-    if (R.chg || R.pending) { say("Changing the bit"); return; }
-    if (!R.on) {
-      // Two-step machine: the first tap with the router off flashes the switch; the second switches it on.
-      R.flashSwitch = now + 1.6;
-      if ((R.offTries = (R.offTries || 0) + 1) < 2) { say("Switch the router on!"); return; }
-      R.offTries = 0; toggleSwitch();
-    }
-    if (R.bx <= BXMIN + 8) {
-      if (doneCount >= N) { finishBoard(); return; }
-      R.target = BX0;                       // back for another pass
-    } else R.target = BXMIN;
-    R.autoFeed = true;
-  }
-  var press = Toybox.press(cv, { any: true, down: onDown, dragStart: dragStart, move: onMove, up: onUp });
+  cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointermove", onMove);
+  cv.addEventListener("pointerup", onUp);
+  cv.addEventListener("pointercancel", onUp);
+  cv.addEventListener("lostpointercapture", onUp);
   cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
 
-  // ---------- Coach line and ghost hand: switch it on, then tap (later: push) the board ----------
-  function coachStep() {
-    if (busy() || R.chg || R.pending || R.fly || R.autoFeed || R.shelfOpen || !R.board) return "";
-    if (!R.on) return "Switch the router on!";
-    if (!anyCut()) return "Push the board!";
-    return "";
-  }
-  var lastStep = null;
-  setInterval(function () {
-    var t = coachStep();
-    if (t !== lastStep) { lastStep = t; if (t) coach.step(t); else coach.clear(); }
-  }, 300);
-  var usedTap = {};
-  var ghost = Toybox.ghost({
-    max: 3,
-    plan: function () {
-      if (busy() || R.chg || R.fly || !R.board || R.autoFeed || R.shelfOpen) return null;
-      for (var id in drags) if (drags.hasOwnProperty(id)) return null;
-      var cr = cv.getBoundingClientRect();
-      if (!R.on) {
-        var sr = switchScreenRect();
-        return { pts: [[cr.left + sr.x + sr.w / 2, cr.top + sr.y + sr.h / 2]], tap: true, key: "switch" };
-      }
-      if (R.spin < 0.45 || R.bx <= BXMIN + 20 || anyCut()) return null;
-      var br = boardScreenRect(), x0 = cr.left + br.x + br.w * 0.62, y0 = cr.top + br.y + br.h * 0.5;
-      if (!usedTap.push) return { pts: [[x0, y0]], tap: true, key: "push" };
-      var dx = Math.min((R.bx - BXMIN) * TV.s / feedGain(), cr.width * 0.55, 170);   // the geared-up push: a short move
-      return { pts: [[x0, y0], [x0 - dx, y0]], key: "push" };
+  // ---------- Idle help: the Toybox ghost hand ----------
+  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
+  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
+  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
+  function makeIdleGhost(plan, opts) {
+    opts = opts || {};
+    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
+    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
+      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
+    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
+      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
+      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
+      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
+      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
+    document.body.appendChild(el);
+    var dot = el.querySelector(".gh-dot");
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
+    var down = {};
+    function poke() { last = Date.now(); armed = true; stop(); }
+    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
+    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
+    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
+    document.addEventListener("keydown", poke, true);
+    function busy() {
+      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
+      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
+      return false;
     }
+    function play(p) {
+      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
+      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
+      el.style.transformOrigin = "16px 14px";
+      if (reduce) {
+        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
+          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
+        anim = el.animate(frames, { duration: 2600, fill: "both" });
+      } else if (p.hold) {
+        // Press and keep holding (a hold-to-pour button).
+        var hq = pts[0];
+        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
+          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
+          { opacity: 0, transform: at(hq, s * 1.05) }];
+        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
+      } else if (p.tap || pts.length === 1) {
+        var q = pts[0];
+        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
+          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
+          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
+          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
+        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
+      } else {
+        // Fade in, press down, slide along the points, hold, lift and fade.
+        var n = pts.length - 1;
+        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
+        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
+        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
+        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
+        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
+        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
+      }
+      dot.style.opacity = "1";
+      anim.onfinish = function () { stop(); };
+    }
+    setInterval(function () {
+      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
+      var p = null;
+      try { p = plan(); } catch (e) { p = null; }
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      play(p);
+    }, 400);
+    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
+  }
+  // Idle help: tap the switch, then push the board past the spinning bit.
+  makeIdleGhost(function () {
+    if (busy() || R.chg || R.fly || !R.board) return null;
+    for (var id in drags) if (drags.hasOwnProperty(id)) return null;
+    var cr = cv.getBoundingClientRect();
+    if (!R.on) {
+      var sr = switchScreenRect();
+      say("Switch the router on!");
+      return { pts: [[cr.left + sr.x + sr.w / 2, cr.top + sr.y + sr.h / 2]], tap: true };
+    }
+    if (R.spin < 0.45 || R.bx <= BXMIN + 20) return null;
+    var br = boardScreenRect(), x0 = cr.left + br.x + br.w * 0.62, y0 = cr.top + br.y + br.h * 0.5;
+    var dx = Math.min((R.bx - BXMIN) * TV.s / feedGain(), cr.width * 0.55, 170);   // the geared-up push: a short move
+    say("Push the board!");
+    return { pts: [[x0, y0], [x0 - dx, y0]] };
   });
 
-  // ---------- Surprise: a fun moment on the table, taking turns ----------
-  // A long curly shaving shoots out of the bit and drapes over the fence; or the board gets a happy face and winks.
-  var funTurn = 0;
-  function surprise() {
-    if (busy()) return;
-    showShelf(false);
-    if (R.fun) return;
-    var kind = funTurn++ % 2 ? "face" : "curl";
-    R.fun = { kind: kind, t: 0, dur: kind === "curl" ? 3.4 : 3.6 };
-    coach.say(kind === "curl" ? "A long curly shaving!" : "The board says hi!", 3);
-    blip(kind === "curl" ? 700 : 520, 0.16, 0.06, "sine", kind === "curl" ? 1200 : 780);
-  }
-  function drawFun(c, t) {
-    var F = R.fun;
-    if (!F) return;
-    c.save();
-    c.setTransform(DPR * TV.s, 0, 0, DPR * TV.s, DPR * TV.ox, DPR * TV.oy);
-    var a = clamp(Math.min(F.t, F.dur - F.t) / 0.35, 0, 1), wd = WOODS[S.wood], i;
-    c.globalAlpha = a; c.lineCap = "round"; c.lineJoin = "round";
-    if (F.kind === "curl") {
-      // from the bit, up over the fence top and down its back, coiling as it goes
-      var grow = Math.min(1, F.t / 1.1), n = Math.round(90 * grow), pts = [];
-      for (i = 0; i <= n; i++) {
-        var u = i / 90, ang = u * Math.PI * 9;
-        var bx = lerp(0, -260, u), by = -20 - Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) * 70 + Math.max(0, u - 0.62) * 260;
-        pts.push(q(bx + Math.cos(ang) * 10, by, BT + 30 + Math.sin(ang) * 12));
-      }
-      if (pts.length > 1) {
-        c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
-        for (i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
-        c.strokeStyle = OUT; c.lineWidth = 13; c.stroke();
-        c.strokeStyle = wd.chip; c.lineWidth = 8; c.stroke();
-      }
-    } else if (R.board) {
-      var mid = q(R.bx + BL * 0.55, BW * 0.5, BT), wink = F.t > 1.4 && F.t < 1.8;
-      var hop = Math.abs(Math.sin(F.t * 6)) * 6 * (F.t < 1.2 ? 1 : 0);
-      c.translate(mid[0], mid[1] - hop);
-      c.fillStyle = OUT; c.strokeStyle = OUT; c.lineWidth = 5;
-      c.beginPath(); c.arc(-24, -6, 7, 0, Math.PI * 2); c.fill();
-      if (wink) { c.beginPath(); c.moveTo(16, -6); c.lineTo(32, -6); c.stroke(); }
-      else { c.beginPath(); c.arc(24, -6, 7, 0, Math.PI * 2); c.fill(); }
-      c.beginPath(); c.arc(0, 4, 18, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
-      c.fillStyle = "rgba(255,120,140,0.45)";
-      c.beginPath(); c.arc(-40, 8, 9, 0, Math.PI * 2); c.arc(40, 8, 9, 0, Math.PI * 2); c.fill();
-    }
-    c.restore();
-  }
-
-  // ---------- Panel: the bits (tiles) and the bottom bar (Shelf, New, Surprise) ----------
+  // ---------- Toolbar ----------
   function n1(v) { return Math.round(v * 10) / 10; }
   function bitIconSVG(id) {
     var right = [], v, i, top = id === "straight" ? 46 : P0;
@@ -1410,39 +1432,85 @@ body.ending .mapbtn { pointer-events: none; }
     else s += '<path d="M-30 -36 L22 -6 M-30 -6 L22 24" stroke="#5E6570" stroke-width="5" stroke-linecap="round" fill="none"/>';
     return s + "</svg>";
   }
+  function lvlIconSVG(bit, lvl) {
+    var h = expo(bit, lvl), pts = [], i, v;
+    for (i = 0; i <= 16; i++) { v = h * i / 16; pts.push([CB + removalAt(bit, h, v), v]); }
+    var d = "";
+    for (i = 0; i < pts.length; i++) d += (i ? "L" : "M") + n1(-pts[i][0]) + " " + n1(-pts[i][1]) + " ";
+    for (i = pts.length - 1; i >= 0; i--) d += "L" + n1(pts[i][0]) + " " + n1(-pts[i][1]) + " ";
+    d += "Z";
+    var s = '<svg viewBox="-64 -62 128 80" aria-hidden="true">';
+    s += '<path d="' + d + '" fill="#C8CDD6" stroke="#1D2340" stroke-width="4.5" stroke-linejoin="round"/>';
+    if (bit !== "straight") s += '<rect x="-15" y="' + n1(-h - 9) + '" width="30" height="9" rx="3" fill="#4A505B" stroke="#1D2340" stroke-width="4"/>';
+    s += '<rect x="-62" y="0" width="124" height="14" rx="3" fill="#D9D4C7" stroke="#1D2340" stroke-width="4.5"/>';
+    // arrow showing how far it sticks up
+    s += '<path d="M48 -2 L48 ' + n1(-h + 4) + ' M40 ' + n1(-h + 12) + ' L48 ' + n1(-h + 2) + ' L56 ' + n1(-h + 12) + '" fill="none" stroke="#2D5BD7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>';
+    return s + "</svg>";
+  }
   var SHORT_BIT = { roundover: "Round", chamfer: "Bevel", ogee: "Ogee", cove: "Cove", straight: "Groove" };
-  var tiles = null, bbar = null;
   function buildToolbar() {
-    tiles = Toybox.tiles($("tiles"), {
-      kind: "pick", rows: 2, value: S.bit,
-      items: BIT_ORDER.map(function (id) { return { id: id, name: SHORT_BIT[id], pic: bitIconSVG(id) }; }),
-      onPick: function (id) { ensureAudio(); showShelf(false); requestChange(id, S.lvl); blip(560, 0.05, 0.04, "triangle"); }
+    var tb = $("toolbar"), b;
+    // Phones: three tabs (Bits / Height / Wood) take turns in one row, so only a few big buttons show at once.
+    [["bit", "Bits"], ["lvl", "Height"], ["wood", "Wood"]].forEach(function (g) {
+      b = document.createElement("button");
+      b.className = "btn rtab";
+      b.dataset.grp = g[0];
+      b.textContent = g[1];
+      $("rtabs").appendChild(b);
     });
-    BIT_ORDER.forEach(function (id) { var b = tiles.button(id); if (b) b.setAttribute("aria-label", BITS[id].name + " bit"); });
-    bbar = Toybox.bar($("bottom"), {
-      shelf: function () { showShelf(!R.shelfOpen); },
-      onNew: function () { ensureAudio(); showShelf(false); newBoard(); },
-      onSurprise: function () { ensureAudio(); surprise(); }
+    tb.setAttribute("data-grp", "bit");
+    BIT_ORDER.forEach(function (id) {
+      b = document.createElement("button");
+      b.className = "btn tb-tile tb bit";
+      b.dataset.bit = id;
+      b.setAttribute("aria-label", BITS[id].name + " bit");
+      b.innerHTML = bitIconSVG(id) + '<span class="nlong">' + BITS[id].name + '</span><span class="nshort">' + SHORT_BIT[id] + "</span>";
+      $("rchoices").appendChild(b);
+    });
+    var nb = document.createElement("button");
+    nb.className = "btn tb-new newbtn";
+    nb.id = "newBoard";
+    nb.setAttribute("aria-label", "New board");
+    nb.innerHTML = '<span class="nlong">New board</span><span class="nshort">New</span>';
+    LV.forEach(function (l, i) {
+      b = document.createElement("button");
+      b.className = "btn tb-tile tb lvl";
+      b.dataset.lvl = String(i);
+      b.setAttribute("aria-label", "Bit height: " + l.name);
+      b.innerHTML = '<span class="ic"></span><span>' + l.name + "</span>";
+      $("rchoices").appendChild(b);
+    });
+    WOOD_ORDER.forEach(function (w) {
+      b = document.createElement("button");
+      b.className = "btn tb-tile tb wood";
+      b.dataset.wood = w;
+      b.innerHTML = '<span class="swatch" style="background:' + WOODS[w].top + '"></span><span>' + WOODS[w].name + "</span>";
+      $("rchoices").appendChild(b);
+    });
+    $("rtabs").appendChild(nb);
+    tb.addEventListener("click", function (e) {
+      var t = e.target.closest("button");
+      if (!t || busy()) return;
+      ensureAudio();
+      if (t.dataset.grp) { tb.setAttribute("data-grp", t.dataset.grp); blip(640, 0.04, 0.03, "triangle"); }
+      else if (t.dataset.bit) { requestChange(t.dataset.bit, S.lvl); blip(560, 0.05, 0.04, "triangle"); }
+      else if (t.dataset.lvl) { requestChange(S.bit, +t.dataset.lvl); blip(520, 0.05, 0.04, "triangle"); }
+      else if (t.dataset.wood) setWood(t.dataset.wood);
+      else if (t.id === "newBoard") newBoard();
+      updateToolbar();
     });
   }
+  var lvlIconsFor = "";
   function updateToolbar() {
-    if (tiles) tiles.set(R.pending ? R.pending.bit : S.bit);
-  }
-  function showShelf(on) {
-    on = !!on;
-    if (on && busy()) return;
-    if (R.shelfOpen === on) return;
-    R.shelfOpen = on;
-    if (on) { drags = {}; R.autoFeed = false; R.target = R.bx; }
-    if (bbar) bbar.shelfOpen(on);
-  }
-  var shownCount = -1;
-  function updateCounter() {
-    if (shownCount === S.count) return;
-    var el = $("boardsCount"), pop = shownCount >= 0;
-    shownCount = S.count;
-    el.textContent = "Boards: " + S.count;
-    if (pop && !reduce) { el.classList.remove("tb-pop"); void el.offsetWidth; el.classList.add("tb-pop"); }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-bit]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.bit === S.bit)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-lvl]"), function (b) {
+      b.setAttribute("aria-pressed", String(+b.dataset.lvl === S.lvl));
+      if (lvlIconsFor !== S.bit) b.querySelector(".ic").innerHTML = lvlIconSVG(S.bit, +b.dataset.lvl);
+    });
+    lvlIconsFor = S.bit;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wood]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.wood === S.wood)); });
+    var grp = $("toolbar").getAttribute("data-grp");
+    Array.prototype.forEach.call(document.querySelectorAll(".rtab"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.grp === grp)); });
   }
 
   document.addEventListener("keydown", function (e) {
@@ -1452,7 +1520,6 @@ body.ending .mapbtn { pointer-events: none; }
       e.preventDefault();
       R.target = clamp(R.bx + (e.key === "ArrowLeft" ? -24 : 24), BXMIN, BXMAX);
     }
-    else if (e.key === "Escape") showShelf(false);
   });
 
   // ---------- Play timer hooks ----------
@@ -1465,8 +1532,7 @@ body.ending .mapbtn { pointer-events: none; }
     endingDone = done;
     drags = {};
     R.target = R.bx;
-    R.pending = null; R.autoFeed = false; R.fun = null; R.resumeOn = false;
-    showShelf(false);
+    R.pending = null;
     if (!goodbyeOn()) R.on = false;
     else if (!R.on) {
       setTimeout(function () { var gb = $("tb-goodbye"); if (Toybox.timer.phase() === "ending" && gb && !gb.hidden) gb.click(); }, 0);
@@ -1564,11 +1630,10 @@ body.ending .mapbtn { pointer-events: none; }
     updateSound();
     requestAnimationFrame(frame);
   }
-  if (params.debug === "1" || navigator.webdriver) window.__rt = { S: function () { return S; }, R: R, toScreen: toScreen, TV: function () { return TV; }, E: function () { return E; }, H: function () { return H; }, sw: switchScreenRect, board: boardScreenRect, done: function () { return doneCount; },
-    chips: function () { return chips.length + ichips.length; },
-    ui: function () { return { on: R.on, bx: Math.round(R.bx), auto: !!R.autoFeed, done: doneCount, count: S.count, shelf: S.shelf.length, wood: S.wood, bit: R.bitId, chg: !!(R.chg || R.pending), fly: !!R.fly, coach: coach.text(), open: !!R.shelfOpen }; },
-    ghost: function () { return ghost.show(); } };
+  if (params.debug === "1" || navigator.webdriver) window.__rt = { S: function () { return S; }, R: R, toScreen: toScreen, TV: function () { return TV; }, E: function () { return E; }, H: function () { return H; }, sw: switchScreenRect, board: boardScreenRect, done: function () { return doneCount; } };
   requestAnimationFrame(frame);
+  // First thing to do, said once at the start: switch it on.
+  setTimeout(function () { if (!R.on && !busy()) say("Switch the router on!"); }, 900);
 })();
 </script>
 </body>

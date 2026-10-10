@@ -49,7 +49,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   badge (not a button). Grown-ups only; the child can't change the order.
 - `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
-- Multi-page apps: `workshop/` (Workshop map + one-tap gear-up `index.html`, the Tool Wall station `tool-wall.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
+- Multi-page apps: `workshop/` (Tool Wall `index.html`; `tool-wall.html` only redirects to it + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + one station per newer-series episode he knows: `spuds` ("Spuds in Mud"), `combine` ("Combine
@@ -150,8 +150,12 @@ Keep only:
 - **Grown-ups lives only on the home screen** (the launcher): timer, sound and an "App settings" section for every
   app's grown-up options. Apps have no Grown-ups button or sheet. A new app setting goes in the `SETTINGS` list in
   `common/toybox.js` and is read with `Toybox.settings.get(id)`.
-- **Standard layout (every app looks the same; the design system of `plans/redesign.md` sections 1 and 2, decided
-  2026-10-09):** see `tools/shell-demo.html` (views `?view=steps|tiles|gate|map`), the "App shell" and "Shared
+- **The redesign was reverted (the dad, 2026-10-10: "Revert").** It cut choices and replaced hands-on play with a
+  green Go button he just pressed over and over. Every app except the Farm is back to its version from before its
+  "Redesign batch" commit (they keep only the cleaner shared look from `common/toybox.css`). `plans/restore.md` lists
+  what the redesign had removed. Don't migrate any app to the components below again without the dad asking; the
+  Farm still uses them and is being reworked to hands-on play (see "He does the work").
+- **The design system (`plans/redesign.md` sections 1 and 2; now used only by the Farm):** see `tools/shell-demo.html` (views `?view=steps|tiles|gate|map`), the "App shell" and "Shared
   components" parts of `common/toybox.css`, and the component API in the header of `common/toybox.js`. The pilot
   page every migration copies is `construction-site/concrete.html`. A page built from the components adds `tb-v2` to
   its shell (`<div class="tb-app-shell tb-v2">`): that switches on the token sizes for its chrome; pages without it
@@ -209,7 +213,8 @@ Keep only:
 - **No procedural extras**: keep the fun core of each tool and drop steps that only add waiting or fiddling:
   material pickers, size pickers, chuck keys, waiting for a spindle to stop, setup sequences. If something like
   that stays, it happens automatically or with one tap.
-- **Short and direct** (the dad, 2026-10-09: "way too tedious"; "so many little things that don't really matter and
+- **Short and direct** (the dad, 2026-10-09: "way too tedious"; but see "He does the work": short means no chores,
+  not fewer things for him to do or choose; "so many little things that don't really matter and
   get in the way"): the fun payoff comes within seconds of his first touch. No repeated chores before a payoff
   (several passes over the same field, filling twelve cups, step after step), no extra taps or choices that don't
   change anything he cares about, no little side features that clutter the scene or the panel. Real names and real
@@ -218,10 +223,14 @@ Keep only:
   wanted, e.g. Marble Run's lift style): decluttering means rearranging, merging duplicates and making chores
   automatic, never taking away an option, item, mode or interaction he can use. If something seems worth cutting,
   list it as a question for the dad and keep it until he answers.
+- **He does the work** (the dad, 2026-10-10: "He is just clicking a green button over and over watching things
+  happen"): he drives, steers, lifts, pours and turns things himself, on the machine. No button that plays a whole
+  job or step for him; a step row may guide what comes next but never does it. Choices (colors, styles, machines,
+  implements, what to make) are part of the fun: keep and add them.
 - **One press is always enough** (the dad, 2026-10-09): every real control (a drag, a turn, a hold, a pull, a
-  flick on a drawn machine part) also works with a single tap on it, and the tap does the whole motion for him (tap
-  the tractor and it drives the pass; tap the crank and it turns; tap the valve and it opens). Dragging stays as
-  the richer way to play, never the only way. Holds keep working as taps too (a tap runs a short visible go).
+  flick on a drawn machine part) also works with a single tap on it. The tap does **that one control's** real
+  motion (tap the crank and it turns once; tap the valve and it opens; tap the lever and the plow drops), never the
+  whole job. Dragging stays as the richer way to play, never the only way. Holds keep working as taps too.
 - **Plain, correct English** (the dad: "It just says 'Beds!'. This is dumb"): the Go button says what will happen as
   a short verb phrase ("Make the rows", "Pull a shot", "Pour!"), never a bare noun with "!" ("Beds!", "Milk!",
   "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out

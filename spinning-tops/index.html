@@ -67,47 +67,78 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The stage is the bowl with the launcher (its big button is the main control: a tap launches a top). The panel
-   is the five tops as choice tiles and the bottom bar (New, Surprise), built by the shared components. No Go: it
-   would only repeat the launcher's button. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .stage { background: #C9F0D6; touch-action: none; }
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; pointer-events: none; }
 body.big .tb-panel { display: none; }
-.stage .toast { position: absolute; top: 12px; z-index: 4; }
+.stage .toast { position: absolute; top: 12px; z-index: 4; font-size: 1.3rem; }
 .stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
+.stage .farewell p { font-size: 1.25rem; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
-/* The launcher sits at the top of the stage, so the coach line stays at the bottom on tablets too. */
-.stage .tb-coach { top: auto; bottom: 12px; }
 
-/* ---------- Panel: the five tops (three a row on phones, five on an upright iPad) ---------- */
-#tiles.tb-tilerow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
-  #tiles.tb-tilerow { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* ---------- Panel: the five tops as picture tiles, then New and Surprise ---------- */
+.tops.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.toptile { min-width: 0; padding: 3px 2px; white-space: nowrap; }
+.toptile canvas { width: 46px; height: 46px; }
+.toptile .nm { font-weight: 800; }
+.toptile[aria-pressed="true"] { border-width: 4px; }
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 260px); justify-content: space-between; }
+  .tops.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; overflow: hidden; }
+  .tops .toptile:last-child { grid-column: 1 / span 2; }
 }
-@media (orientation: landscape) { .tb-v2 .tb-body .tb-panel { justify-content: space-between; } }
-@media (orientation: landscape) and (max-height: 520px) { .tb-v2 .tb-body .tb-panel { width: 300px; } }
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 184px; }
+  .tops.tb-choices { gap: 5px; }
+  .toptile { min-height: 62px; font-size: 0.88rem; gap: 0; }
+  .toptile canvas { width: 34px; height: 34px; }
+}
+/* Upright phones: five tops in one row, pictures only (the names would have to be squeezed tiny). */
+@media (max-width: 600px) and (orientation: portrait) {
+  .toptile { min-height: 64px; }
+  .toptile .nm { display: none; }
+  .toptile canvas { width: 54px; height: 54px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
+  .tops.tb-choices { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .toptile canvas { width: 66px; height: 66px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 300px); }
+  .tops.tb-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toptile canvas { width: 62px; height: 62px; }
+}
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Spinning Tops</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
       <canvas id="view" role="img" aria-label="A spinning top arena. Press the button on the launcher to spin a top into the bowl, then flick the tops with a finger."></canvas>
-      <div id="coach"></div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Press the button!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
     <section class="tb-panel" id="panel">
-      <div id="tiles" aria-label="Pick a top"></div>
-      <div id="bottom"></div>
+      <div class="tb-choices tops" id="tiles" role="group" aria-label="Pick a top"></div>
+      <nav class="tb-tabs" aria-label="More">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -825,7 +856,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (var i = 0; i < 6 + p * 8; i++) addPart(hx + rnd(-10, 10), hy + rnd(0, 20), rnd(-90, 90) * p, rnd(-20, 40), DES[t.d].spark[i % DES[t.d].spark.length], rnd(0.3, 0.6), rnd(2, 4), 1);
     dirty = true;
     coachUpdate();
-    learnedNow();
+    if (learned.press && learned.flick) ghost.learned();
     return t;
   }
   function pressDown(id) {
@@ -1240,7 +1271,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       t.grab.tx = fp.x + t.grab.ox; t.grab.ty = fp.y + t.grab.oy;
       var m = Math.sqrt(t.grab.tx * t.grab.tx + t.grab.ty * t.grab.ty), lim = 1 - t.r * 0.95;
       if (m > lim) { t.grab.tx *= lim / m; t.grab.ty *= lim / m; }
-      if (P.moved > 18 && t.state === "spin") { learned.flick = true; coachUpdate(); learnedNow(); }
+      if (P.moved > 18 && t.state === "spin") { learned.flick = true; coachUpdate(); if (learned.press) ghost.learned(); }
     } else if (P.role === "push") {
       // a finger sweeping through the bowl bumps the tops it meets
       for (var i = 0; i < tops.length; i++) {
@@ -1254,7 +1285,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var push = clamp(0.35 + fs * 0.5, 0.35, 1.8) * (q.giant ? 0.6 : 1);
         q.vx += nx * push * 0.6 + fvx * 0.25; q.vy += ny * push * 0.6 + fvy * 0.25;
         q.pushT = 0.18;
-        if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); learnedNow(); }
+        if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); if (learned.press) ghost.learned(); }
         else q.hop = 1;
         sClack(0.35);
       }
@@ -1280,8 +1311,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
       // a tap on a top that has fallen over puts it back in the launcher
       if (quick && (t.state === "down" || t.state === "fall") && !Toybox.timer.locked()) goHome(t);
-      // one press is enough: a tap on a spinning top is a medium flick (away from the finger, with a swerve)
-      else if (quick && (t.state === "spin" || t.state === "drop") && !Toybox.timer.locked()) tapFlick(t, P);
     }
   }
   window.addEventListener("pointerup", endPtr);
@@ -1289,22 +1318,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
-  function tapFlick(t, P) {
-    var dx = t.sx - P.x0, dy = (t.sy - P.y0) / Vw.k, m = Math.sqrt(dx * dx + dy * dy);
-    var a = m > 4 ? Math.atan2(dy, dx) : rnd(0, TAU);
-    a += rnd(-0.5, 0.5);
-    // a little toward the middle when it is near the rim, so it swoops round the bowl instead of hitting the wall
-    var r = Math.sqrt(t.x * t.x + t.y * t.y);
-    if (r > 0.45) { var ac = Math.atan2(-t.y, -t.x); a = ac + rnd(-0.9, 0.9); }
-    var sp = (t.giant ? 0.6 : 1) * 1.05;
-    t.vx = Math.cos(a) * sp; t.vy = Math.sin(a) * sp;
-    if (t.state === "spin") t.bump = Math.min(0.3, t.bump + 0.12);
-    t.pushT = 0.18;
-    for (var i = 0; i < 8; i++) addPart(t.sx, t.sy, rnd(-90, 90), rnd(-120, -30), DES[t.d].spark[i % DES[t.d].spark.length], rnd(0.3, 0.6), rnd(2, 4), 1);
-    sClack(0.4);
-    learned.flick = true; coachUpdate(); learnedNow();
-    dirty = true;
-  }
   function goHome(t) {
     t.state = "home"; t.ft = 0; t.hx0 = t.x; t.hy0 = t.y; t.phi0 = t.phi; t.vx = t.vy = 0;
     hang.popT = 0; hang.pop = 0;
@@ -1315,22 +1328,28 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Panel ----------
   function tilePic(di) {
     var c = mkCanvas(128), g = c.getContext("2d"), d = DES[di];
-    var V = { ox: 64, oy: 0, S: 56, k: 0.6, cz: 0.8 };
+    var V = { ox: 64, oy: 0, S: 44, k: 0.6, cz: 0.8 };
     var top = Math.max(d.h * V.S * V.cz + V.S * V.k, (d.h + d.stemH) * V.S * V.cz + 0.3 * V.S * V.k);
     V.oy = 64 + top / 2 + 2;
     drawTop(g, { d: di, r: 1, x: 0, y: 0, z: 0, phi: 0.12, psi: -2.2, theta: 0.3, blur: 0, sc: 1, lt: 12.9, lit: 1, fix: 6 }, V);
     return c;
   }
-  var tiles = Toybox.tiles($("tiles"), {
-    kind: "pick", rows: 2,
-    items: DES.map(function (d, i) { return { id: i, name: d.label, pic: function () { return tilePic(i); } }; }),
-    value: 0,
-    onPick: function (i) { pick(Number(i)); }
+  var tilesEl = $("tiles");
+  DES.forEach(function (d, i) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile toptile";
+    b.setAttribute("data-design", String(i));
+    b.setAttribute("aria-label", d.label + " top");
+    b.appendChild(tilePic(i));
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.label;
+    b.appendChild(nm);
+    tilesEl.appendChild(b);
   });
-  DES.forEach(function (d, i) { var b = tiles.button(i); if (b) b.setAttribute("aria-label", d.label + " top"); });
   function renderTiles() {
     S.design = hang.design;
-    tiles.set(hang.design);
+    Array.prototype.forEach.call(tilesEl.children, function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.getAttribute("data-design")) === hang.design));
+    });
     dirty = true;
   }
   function pick(i) {
@@ -1385,13 +1404,18 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     dirty = true;
     coachUpdate();
   }
-  Toybox.bar($("bottom"), {
-    onNew: function () { newBowl(); },
-    onSurprise: function () { surprise(); }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.id === "bigbtn" || b.closest(".modal, .farewell, .rest")) return;
+    if (Toybox.timer.locked()) return;
+    if (b.hasAttribute("data-design")) pick(Number(b.getAttribute("data-design")));
+    else if (b.id === "newBtn") newBowl();
+    else if (b.id === "surpriseBtn") surprise();
   });
 
   // ---------- Coach line and ghost hand ----------
-  var coach = Toybox.coach($("coach")), coachText = "";
+  var coachEl = $("coach"), coachText = "";
   function coachUpdate() {
     var live = tops.filter(function (t) { return t.state !== "leave" && t.state !== "home"; });
     var spinning = live.some(function (t) { return t.state === "spin" || t.state === "drop"; });
@@ -1400,34 +1424,123 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     else if (spinning && !learned.flick) txt = "Flick the tops!";
     if (txt !== coachText) {
       coachText = txt;
-      if (txt) coach.step(txt); else coach.clear();
+      if (txt) coachEl.textContent = txt;
+      coachEl.classList.toggle("off", !txt);
     }
   }
 
-  // ---------- Ghost hand (Toybox.ghost) ----------
-  // The hand taps the launcher's button; once he has done that, it taps a spinning top (a tap is a medium flick),
-  // and on a later showing flicks one with a sweep.
-  var ghost = Toybox.ghost({
-    max: 3,
-    plan: function () {
-      if (press || ending) return null;
-      if (!learned.press) return { pts: [[rect.left + L.btnX, rect.top + L.btnY - L.bH * 0.6]], tap: true, key: "press" };
-      if (!learned.flick) {
-        var t = tops.filter(function (q) { return q.state === "spin" && q.sx != null; })[0];
-        if (!t) return null;
-        var x0 = rect.left + t.sx, y0 = rect.top + t.sy;
-        if (ghost.shown("flick") < 1) return { pts: [[x0, y0]], tap: true, key: "flick" };
-        return { pts: [[x0 - 50, y0 + 10], [x0 + 40, y0 - 12]], dur: 2600, key: "flickdrag" };
-      }
-      return null;
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
-  });
-  // He did the move himself: never show it again.
-  function learnedNow() {
-    if (!ghost) return;
-    if (learned.press) ghost.learned("press");
-    if (learned.flick) { ghost.learned("flick"); ghost.learned("flickdrag"); }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
   }
+  // The hand taps the launcher's button; once he has done that, it flicks a spinning top.
+  var ghost = makeGhost(function () {
+    if (press) return null;
+    if (!learned.press) return { pts: [[rect.left + L.btnX, rect.top + L.btnY - L.bH * 0.6]], tap: true };
+    if (!learned.flick) {
+      var t = tops.filter(function (q) { return q.state === "spin" && q.sx != null; })[0];
+      if (!t) return null;
+      var x0 = rect.left + t.sx, y0 = rect.top + t.sy;
+      return { pts: [[x0 - 50, y0 + 10], [x0 + 40, y0 - 12]], dur: 2600 };
+    }
+    return null;
+  });
 
   // ---------- Timer ending, goodbye and rest ----------
   function onEnding(done) {

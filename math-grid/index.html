@@ -71,79 +71,160 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage with the job bar, panel ----------
-   Stage: the equation line and the number grid, as big as the stage allows (resize() lays them out: the line on
-   top in an upright stage, beside the grid in a wide one). Job bar: Add / Times. Panel: Go "Blocks!", the four
-   pattern tiles, then the bottom bar (New, Surprise). */
-.tb-head a { text-decoration: none; }
-.stage { background: #24305E; touch-action: none; }
-#cv { position: absolute; left: 0; top: 0; display: block; touch-action: none; }
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+/* Stage: the equation line on top of the number grid. */
+.stage { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+.eqbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 52px; }
 .eq {
-  position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center; text-align: center;
-  color: #FFFFFF; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; pointer-events: none;
-  overflow: hidden; overflow-wrap: break-word;
+  flex: 1 1 auto; min-width: 0; text-align: center; color: #1D2340; font-weight: 800; line-height: 1.05;
+  font-size: clamp(1.5rem, 5.4vw, 3.4rem); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.eq span { display: inline-block; }
-.eq.go span { animation: eqPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+.eq.go { animation: eqPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes eqPop { 0% { transform: scale(0.55); } 100% { transform: scale(1); } }
-/* The coach line sits in the equation's place (top of the stage) while no sum is showing. */
-.stage .tb-coach { top: 8px; bottom: auto; }
-.stage .tb-coach.side { top: 50%; left: var(--side-x, 25%); transform: translate(-50%, -50%); max-width: var(--side-w, 40%); }
-.stage .tb-coach.side { padding: 4px 8px; }
-.stage .tb-coach.side.is-new { animation: none; }
-/* Play-timer gauge, top-right of the stage */
-.fuel { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+.scene {
+  position: relative; flex: 1 1 auto; min-height: 0; border: 3px solid #1D2340; border-radius: 18px;
+  overflow: hidden; background: #24305E; touch-action: none;
+}
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* Play-timer gauge */
+.fuel { flex: none; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar { width: clamp(44px, 10vw, 110px); height: 16px; background: rgba(255, 255, 255, 0.85); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar { width: clamp(50px, 12vw, 120px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num { min-width: 36px; height: 36px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.2rem; font-weight: 800; line-height: 1; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
-.tb-tilerow .tb-pic svg, .tb-job .tb-pic svg { width: 100%; height: 100%; display: block; }
-/* Big mode: the header buttons and the panel and the job bar hide; the grid takes the whole screen. */
-body.big .tb-panel, body.big .tb-jobs { display: none; }
-body.big .tb-head > :not(.bigtoggle) { display: none; }
-body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4; }
-/* Phone held sideways: a wider column (four tiles a row at full size; the grid is limited by the height anyway),
-   and the job bar moves to the top of the column so the grid keeps the whole height. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
-  .tb-panel .tb-jobs { margin: 0; padding: 0; }
-  .tb-panel .tb-job { border-top: var(--tb-outline) solid var(--tb-line); border-radius: 16px; min-height: 56px; }
-}
-/* iPad held sideways: two tiles a row in the side column. */
-@media (orientation: landscape) and (min-height: 521px) {
-  #pats.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* Big mode: the panel goes away, the header stays (Big turns into Back). */
+body.big .tb-panel { display: none; }
+
+/* ---------- Panel: Blocks (go), then Grid or Patterns choices, then the tab bar with Clear ---------- */
+.btn.tb-go.build { display: flex; align-items: center; justify-content: center; gap: 12px; line-height: 1.05; }
+.btn.build small { font-size: 0.8em; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.btn.build .short { display: none; }
+.mg-choices { display: flex; flex-direction: column; gap: 8px; }
+.ctrl { display: flex; gap: 8px; align-items: stretch; }
+.ctrl .btn { min-width: 0; padding: 0.2rem 0.4rem; font-size: clamp(0.9rem, 2.8vw, 1.2rem); white-space: nowrap; line-height: 1.1; }
+.seg { display: flex; gap: 6px; flex: 1 1 0; min-width: 0; }
+.seg .btn { flex: 1 1 0; }
+.op { font-size: 1.5em; font-weight: 800; margin-right: 4px; vertical-align: -0.08em; }
+.pats { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 8px; }
+.pats .btn { min-width: 0; padding: 0.2rem 0.3rem; font-size: clamp(0.9rem, 2.6vw, 1.15rem); line-height: 1.05; }
+.multi { display: flex; gap: 4px; min-width: 0; }
+.multi .main { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.multi .main b { font-size: 1.6em; line-height: 1; }
+.multi .step { flex: 0 0 auto; width: 44px; padding: 0; font-size: 1.5rem; }
+.tb-tabs .tab { display: none; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 /* Rest picture: sleepy number blocks on a night sky (the rest screen itself is in common/toybox.css). */
 .rest-art { aspect-ratio: 1; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-@media (prefers-reduced-motion: reduce) {
-  .eq.go span { animation: none; }
+/* Landscape: grid on the left, controls on the right. */
+@media (orientation: landscape) {
+  .ctrl.modes { flex-direction: column; }
+  .pats { grid-template-columns: 1fr 1fr; }
+  .pats .multi { grid-column: 1 / -1; }
+  .ctrl .btn, .pats .btn { font-size: clamp(0.9rem, 1.8vw, 1.25rem); }
 }
+@media (orientation: portrait) and (max-width: 600px) {
+  .pats { grid-template-columns: 1fr 1fr 1fr; }
+  .pats .multi { grid-column: 1 / -1; }
+  .pats .btn { font-size: 0.95rem; }
+}
+@media (min-width: 700px) and (min-height: 700px) {
+  .stage { padding: 10px; gap: 8px; }
+  .eqbar { min-height: 64px; }
+  .tb-panel { gap: 12px; }
+  .mg-choices { gap: 12px; }
+  .ctrl, .pats { gap: 10px; }
+  .ctrl .btn, .pats .btn { min-height: 60px; }
+  .multi .step { width: 56px; }
+  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
+}
+/* ---------- Phones: tabs (Grid / Patterns) show one group at a time ---------- */
+@media (orientation: portrait) and (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .stage { padding: 4px; gap: 4px; }
+  .eqbar { min-height: 40px; }
+  .btn.build .long { display: none; }
+  .btn.build .short { display: inline; }
+  .tb-tabs .tab { display: block; }
+  .mg-choices { display: block; height: 102px; flex: none; }
+  .tb-panel[data-tab="grid"] [data-pane]:not([data-pane="grid"]),
+  .tb-panel[data-tab="pats"] [data-pane]:not([data-pane="pats"]) { display: none; }
+  .ctrl.modes { display: grid; grid-template-rows: 48px 48px; gap: 6px; }
+  .ctrl.modes .btn { min-height: 0; height: 48px; font-size: 1.05rem; }
+  .op { font-size: 1.3em; }
+  .pats { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 48px 48px; gap: 6px; }
+  .pats .multi { grid-column: 1 / -1; }
+  .pats .btn { min-height: 0; height: 48px; font-size: 1rem; }
+  .multi .main { flex-direction: row; gap: 8px; }
+  .multi .main b { font-size: 1.4em; }
+  .multi .step { width: 56px; font-size: 1.6rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .eq { font-size: 1.6rem; }
+  .tb-body .tb-panel { justify-content: space-between; }
+  .mg-choices { height: 102px; }
+  .ctrl.modes { display: grid; grid-template-rows: 46px 46px; }
+  .ctrl.modes .btn, .pats .btn { height: 46px; }
+  .pats { grid-template-rows: 46px 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eq.go { animation: none; }
+}
+/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Math Grid</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
-    <div class="tb-stagecol" id="stagecol">
-      <main class="tb-stage stage" id="scene">
-        <canvas id="cv" aria-label="A number grid. Tap a square to see its sum, or drag across the grid to fill it with blocks."></canvas>
-        <div class="eq" id="eq" aria-live="polite"></div>
+    <main class="tb-stage stage">
+      <div class="eqbar">
         <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
-        <div id="coach"></div>
-      </main>
-      <div id="jobs"></div>
-    </div>
+        <div class="eq" id="eq" aria-live="polite">Tap a number!</div>
+      </div>
+      <div class="scene" id="scene">
+        <canvas id="cv" aria-label="A number grid"></canvas>
+      </div>
+    </main>
 
-    <section class="tb-panel" id="panel">
-      <div id="go"></div>
-      <div id="pats" role="group" aria-label="Patterns"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel" id="panel" data-tab="grid">
+      <button class="btn tb-go build" id="buildBtn" aria-label="Count it with blocks"><span class="long">Count with blocks</span><span class="short">Blocks</span><small id="buildEq">3 × 4</small></button>
+      <div class="tb-choices mg-choices">
+        <div class="ctrl modes" data-pane="grid">
+          <div class="seg">
+            <button class="btn" data-mode="add" aria-pressed="false"><span class="op">+</span>Add</button>
+            <button class="btn" data-mode="times" aria-pressed="true"><span class="op">×</span>Times</button>
+          </div>
+          <div class="seg">
+            <button class="btn" data-size="10" aria-pressed="true">0 to 10</button>
+            <button class="btn" data-size="12" aria-pressed="false">0 to 12</button>
+          </div>
+        </div>
+        <div class="pats" data-pane="pats">
+          <div class="multi">
+            <button class="btn step" data-step="-1" aria-label="Smaller number">−</button>
+            <button class="btn main" data-pat="mult" aria-pressed="false"><span>Multiples of</span><b id="multN">3</b></button>
+            <button class="btn step" data-step="1" aria-label="Bigger number">+</button>
+          </div>
+          <button class="btn" data-pat="dbl" aria-pressed="false">Doubles</button>
+          <button class="btn" data-pat="sq" aria-pressed="false">Squares</button>
+          <button class="btn" data-pat="same" aria-pressed="false">Same answer</button>
+        </div>
+      </div>
+      <nav class="tb-tabs" id="tabs">
+        <button class="btn tab" data-tab="grid" aria-pressed="true">Grid</button>
+        <button class="btn tab" data-tab="pats" aria-pressed="false">Patterns</button>
+        <button class="btn tb-new" id="clearBtn">Clear</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -175,13 +256,12 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
   // ---------- State ----------
   var KEY = "mathgrid-state-v1";
   // Opening Math Grid from the Toybox home screen (Toybox.fresh) starts the first-visit grid (Times,
-  // nothing picked, no pattern or blocks); a reload keeps it. The grown-up settings (spoken numbers, and
-  // "mathgrid-twelve": a 0 to 12 grid instead of 0 to 10) live on the Toybox home screen and are kept.
+  // 0 to 10, nothing picked, no pattern or blocks); a reload keeps it. The grown-up setting
+  // (spoken numbers) lives on the Toybox home screen and is kept.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
   }
-  function sizeSetting() { return Toybox.settings.get("mathgrid-twelve") ? 12 : 10; }
-  var mode = "times", N = sizeSetting(), sel = null, pat = "", multN = 3, sameV = 12, hasBlocks = false;
+  var mode = "times", N = 10, sel = null, pat = "", multN = 3, sameV = 12, hasBlocks = false;
   function val(r, c) { return mode === "times" ? r * c : r + c; }
   function opSym() { return mode === "times" ? "×" : "+"; }
   function save() {
@@ -192,7 +272,7 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
       var o = JSON.parse(localStorage.getItem(KEY) || "null");
       if (!o || typeof o !== "object") return;
       if (o.mode === "add" || o.mode === "times") mode = o.mode;
-      // o.N (the old "0 to 10 / 0 to 12" buttons) is ignored: the grid size is a home-screen setting now.
+      if (o.N === 10 || o.N === 12) N = o.N;
       if (o.sel && typeof o.sel.r === "number" && typeof o.sel.c === "number") sel = { r: clamp(o.sel.r | 0, 0, N), c: clamp(o.sel.c | 0, 0, N) };
       if (["", "mult", "dbl", "sq", "same"].indexOf(o.pat) !== -1) pat = o.pat;
       if (typeof o.multN === "number") multN = clamp(o.multN | 0, 1, 12);
@@ -202,40 +282,18 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
   }
 
   // ---------- Canvas + layout ----------
-  // The canvas covers the stage. The grid is the biggest square that fits; the equation line goes above it in
-  // an upright stage, or beside it (on the left) in a wide one.
-  var cv = $("cv"), ctx = cv.getContext("2d"), scene = $("scene"), eqEl = $("eq");
-  var CW = 1, CH = 1, DPR = 1, cs = 20, OX = 0, OY = 0, side = false;
+  var cv = $("cv"), ctx = cv.getContext("2d"), scene = $("scene");
+  var CW = 1, CH = 1, DPR = 1, cs = 20, OX = 0, OY = 0;
   function resize() {
-    CW = Math.max(1, scene.clientWidth); CH = Math.max(1, scene.clientHeight);
+    var r = scene.getBoundingClientRect();
+    CW = Math.max(1, r.width - 6); CH = Math.max(1, r.height - 6);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
-    cv.style.width = CW + "px"; cv.style.height = CH + "px";
-    var n = N + 2, pad = CW < 600 || CH < 600 ? 4 : 10;
-    var eqTop = Math.round(Math.max(44, Math.min(72, CH * 0.075)));
-    // Wide stage: the line goes beside the grid (at least about 110 px of words) when that makes the grid bigger.
-    var gTop = Math.min(CW - 2 * pad, CH - eqTop - pad), sideW = CW >= 600 && CH >= 600 ? 150 : 110, gSide = Math.min(CH - 2 * pad, CW - 2 * pad - sideW);
-    side = gSide > gTop + 4;
-    var g;
-    if (side) {
-      g = gSide;
-      cs = g / n; OX = CW - pad - cs * n; OY = (CH - cs * n) / 2;
-      setBox(eqEl, 6, 8, OX - 12, CH - 16);
-    } else {
-      g = gTop;
-      cs = g / n; OX = (CW - cs * n) / 2; OY = eqTop + Math.max(0, (CH - eqTop - pad - cs * n) / 2);
-      setBox(eqEl, 8, 0, CW - 16, OY);
-    }
-    var fs = side ? Math.max(20, Math.min(44, (OX - 12) / 4.2)) : Math.max(22, Math.min(54, eqTop * 0.72, CW / 13));
-    eqEl.style.fontSize = Math.round(fs) + "px";
-    eqEl.style.whiteSpace = side ? "normal" : "nowrap";
-    var co = $("coach");
-    co.classList.toggle("side", side);
-    if (side) { co.style.setProperty("--side-x", (OX / 2) + "px"); co.style.setProperty("--side-w", Math.max(100, OX - 10) + "px"); }
+    var n = N + 2;
+    cs = Math.min(CW / n, CH / n);
+    OX = (CW - cs * n) / 2; OY = (CH - cs * n) / 2;
   }
-  function setBox(el, x, y, w, h) { el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = Math.max(0, w) + "px"; el.style.height = Math.max(0, h) + "px"; }
   window.addEventListener("resize", resize);
-  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(scene);
   // Grid index (0 = header, 1 = number 0, ...) under a client point.
   function hit(cx, cy, clampBody) {
     var r = cv.getBoundingClientRect();
@@ -296,18 +354,16 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
   function eqText(r, c) { return r + " " + opSym() + " " + c + " = " + val(r, c); }
   function sayEq(r, c) { say(r + (mode === "times" ? " times " : " plus ") + c + " is " + val(r, c)); }
 
-  // The equation line (big white numbers on the stage). With nothing to show, the coach line takes its place.
-  var eqText0 = "";
+  var eqEl = $("eq");
   function setEq(t, pop) {
-    if (eqText0 !== t) { eqText0 = t; eqEl.innerHTML = t ? "<span></span>" : ""; if (t) eqEl.firstChild.textContent = t; }
-    if (t) { if (coach) coach.clear(); }
-    else if (coach) coach.step("Tap a number!");
-    if (t && pop && !reduceMotion) { eqEl.classList.remove("go"); void eqEl.offsetWidth; eqEl.classList.add("go"); }
+    buildLabel();
+    if (eqEl.textContent !== t) eqEl.textContent = t;
+    if (pop && !reduceMotion) { eqEl.classList.remove("go"); void eqEl.offsetWidth; eqEl.classList.add("go"); }
   }
   function restEq() {
     if (sel) setEq(eqText(sel.r, sel.c), false);
     else if (pat) setEq(patText(), false);
-    else setEq("", false);
+    else setEq("Tap a number!", false);
   }
 
   // ---------- Blocks ----------
@@ -487,19 +543,10 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
             }
           }
         }
-        // Surprise: a wave of hopping, rainbow-lit squares from the top-left corner.
-        var wt = (now - waveT) / 1000 - (ri + ci) * 0.07;
-        if (wt > 0 && wt < 0.6) {
-          var hop = Math.sin(Math.PI * wt / 0.6);
-          y -= hop * cs * (reduceMotion ? 0.1 : 0.35); s = Math.max(s, 1 + 0.15 * hop);
-          if (ri > 0 && ci > 0) { fill = colorOf(1 + (ri + ci) % 12); ink = inkOn(fill); }
-        }
         var w = (cs - g) * s, ox = x + (cs - w) / 2, oy = y + (cs - w) / 2;
         rr(ox, oy, w, w, rad); ctx.fillStyle = fill; ctx.fill();
         if (ri === 0 || ci === 0 || s > 1.001) { ctx.lineWidth = lw; ctx.strokeStyle = "#1D2340"; ctx.stroke(); }
-        var ft = (now - facesT) / 1000;
-        if (ft > 0 && ft < 5 && (ri === 0) !== (ci === 0)) drawFace(x + cs / 2, y + cs / 2, w, ink, ft, ri + ci);
-        else text(label, x + cs / 2, y + cs / 2, fsz * Math.max(1, s * 0.95), ink);
+        text(label, x + cs / 2, y + cs / 2, fsz * Math.max(1, s * 0.95), ink);
       }
     }
     // The tapped square pops big.
@@ -541,21 +588,6 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
       ctx.globalAlpha = 1;
     });
   }
-  // A happy face on a number square (Surprise): the number moves up a little, two eyes that blink and look
-  // around, and a smile.
-  function drawFace(cx, cy, w, ink, t, k) {
-    var pop = Math.min(1, t * 4) * (t > 4.6 ? (5 - t) / 0.4 : 1);
-    text(String(k - 1), cx, cy - w * 0.2 * pop, w * (0.55 - 0.15 * pop), ink);
-    if (pop <= 0.05) return;
-    var look = Math.sin(t * 2.2 + k) * w * 0.05, blink = ((t * 1.3 + k * 0.37) % 2.4) < 0.12;
-    ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1.5, w * 0.06); ctx.lineCap = "round";
-    [-1, 1].forEach(function (sd) {
-      var ex = cx + sd * w * 0.17 + look, ey = cy + w * 0.06;
-      if (blink) { ctx.beginPath(); ctx.moveTo(ex - w * 0.05, ey); ctx.lineTo(ex + w * 0.05, ey); ctx.stroke(); }
-      else { ctx.beginPath(); ctx.arc(ex, ey, w * 0.06 * pop, 0, TAU); ctx.fill(); }
-    });
-    ctx.beginPath(); ctx.arc(cx + look * 0.5, cy + w * 0.16, w * 0.14 * pop, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
-  }
   var mixCache = {};
   function mixA(h) {
     if (mixCache[h]) return mixCache[h];
@@ -578,18 +610,118 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
     requestAnimationFrame(loop);
   }
 
-  // ---------- Ghost hand (Toybox.ghost): taps a number in the grid ----------
-  var ghost = Toybox.ghost({
-    max: 3,
-    plan: function () {
-      if (ending) return null;
-      var rc = cv.getBoundingClientRect(), cc = cellCenter(4, 5);
-      return { pts: [[rc.left + cc.x, rc.top + cc.y]], tap: true, key: "tap" };
+  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // Page px of a point inside an element, as fractions of its box.
+  function ghostPt(elm, fx, fy) {
+    var r = elm.getBoundingClientRect();
+    return [r.left + r.width * fx, r.top + r.height * fy];
+  }
+  // Idle help: the ghost hand taps a number in the grid.
+  var ghost = makeGhost(function () {
+    var rc = cv.getBoundingClientRect(), cc = cellCenter(4, 5);
+    return { pts: [[rc.left + cc.x, rc.top + cc.y]], tap: true };
   });
   // ---------- Pointer input (several fingers at once) ----------
   var slotN = 0;
-  Toybox.palmGuard(cv);
   cv.addEventListener("pointerdown", function (e) {
     if (ending) return;
     e.preventDefault();
@@ -643,7 +775,7 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
       save();
       return;
     }
-    if (h.ri === 0 && h.ci === 0) { setMode(mode === "times" ? "add" : "times"); blip(); return; }
+    if (h.ri === 0 && h.ci === 0) { setMode(mode === "times" ? "add" : "times"); return; }
     if (h.ri === 0 || h.ci === 0) { tapHeader(h.ri === 0 ? h.ci - 1 : h.ri - 1, h); return; }
     tapCell(h.ri - 1, h.ci - 1);
   }
@@ -657,8 +789,6 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
     selT = now;
     var v = val(r, c);
     if (pat === "same") { sameV = v; patT = now; }
-    // The Multiples tile counts by the last number he tapped.
-    if (pat !== "mult" && v >= 2 && v <= 12) { multN = v; updateButtons(); }
     var cc = cellCenter(r + 1, c + 1);
     burst(cc.x, cc.y, 18, null);
     ring(cc.x, cc.y, cs * 1.4, "#FFC93C");
@@ -679,7 +809,7 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
     if (m !== mode) { clearBlocks(true); build = null; }
     mode = m;
     if (pat) patT = now;
-    if (jobs) jobs.set(m);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-mode]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.mode === m)); });
     restEq();
     save();
   }
@@ -690,11 +820,13 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
     if (sel) sel = { r: Math.min(sel.r, N), c: Math.min(sel.c, N) };
     resize();
     patT = now;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === n)); });
     restEq();
     save();
+    chime();
   }
   function setPat(p, force) {
-    if (pat === p && !force) { blip(); return; }
+    if (pat === p && !force) { pat = ""; patT = now; updateButtons(); restEq(); save(); blip(); return; }
     pat = p;
     if (p === "dbl" && mode !== "add") setMode("add");
     if (p === "sq" && mode !== "times") setMode("times");
@@ -711,82 +843,39 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
     chime();
     save();
   }
+  // The block-counting button names the sum it will count (the tapped square, or 3 × 4).
+  function buildLabel() {
+    var r = sel ? sel.r : 3, c = sel ? sel.c : 4;
+    if (r === 0 || c === 0) { r = r || 3; c = c || 4; }
+    var el = $("buildEq");
+    if (el) el.textContent = r + " " + opSym() + " " + c;
+  }
   function updateButtons() {
-    if (!tiles) return;
-    tiles.set(pat || null);
-    var b = tiles.button("mult");
-    if (b) b.querySelector(".tb-pic").innerHTML = multPic(multN);
-  }
-  function startOver() {
-    clearBlocks(true); sel = null; pat = ""; patT = now; updateButtons(); restEq(); save(); whoosh();
+    buildLabel();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pat]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.pat === pat)); });
+    $("multN").textContent = String(multN);
   }
 
-  // ---------- Pictures for the job tabs, Go and the pattern tiles (flat, 2 px ink outline) ----------
-  function sq(x, y, s, fill) { return '<rect x="' + x + '" y="' + y + '" width="' + s + '" height="' + s + '" rx="' + (s * 0.22) + '" fill="' + fill + '" stroke="#1D2340" stroke-width="2"/>'; }
-  function svg(inner) { return '<svg viewBox="0 0 48 48" aria-hidden="true">' + inner + "</svg>"; }
-  var PIC_ADD = svg(sq(6, 6, 36, "#FFFFFF") + '<path d="M24 14v20M14 24h20" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/>');
-  var PIC_TIMES = svg(sq(6, 6, 36, "#FFFFFF") + '<path d="M16.5 16.5l15 15M31.5 16.5l-15 15" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/>');
-  var PIC_BLOCKS = svg(sq(4, 26, 18, "#3A86FF") + sq(26, 26, 18, "#2E9E5B") + sq(15, 5, 18, "#FFC93C"));
-  function multPic(n) {
-    var col = colorOf(n), o = "";
-    for (var i = 0; i < 9; i++) o += sq(3 + (i % 3) * 14.5, 3 + Math.floor(i / 3) * 14.5, 12, (i + 1) % 3 === 0 ? col : "#EEF3FF");
-    o += '<circle cx="37" cy="37" r="10" fill="' + col + '" stroke="#1D2340" stroke-width="2"/>';
-    o += '<text x="37" y="41.5" text-anchor="middle" font-family="Baloo 2, sans-serif" font-weight="800" font-size="' + (n >= 10 ? 10 : 13) + '" fill="' + inkOn(col) + '">' + n + "</text>";
-    return svg(o);
-  }
-  var PIC_DBL = svg(sq(2, 14, 18, "#FF5DA2") + sq(28, 14, 18, "#FF5DA2") + '<path d="M24 19v10M19 24h10" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/>' +
-    '<circle cx="11" cy="23" r="2.4" fill="#1D2340"/><circle cx="37" cy="23" r="2.4" fill="#1D2340"/>');
-  var PIC_SQ = (function () { var o = ""; for (var i = 0; i < 9; i++) o += sq(4 + (i % 3) * 14, 4 + Math.floor(i / 3) * 14, 12, "#00B4D8"); return svg(o); })();
-  var PIC_SAME = svg(sq(3, 3, 17, "#FFC93C") + sq(28, 28, 17, "#FFC93C") + sq(28, 3, 17, "#EEF3FF") + sq(3, 28, 17, "#EEF3FF") +
-    '<path d="M18 22h12M18 27h12" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/>');
-
-  // ---------- Panel: job bar (Add / Times), Go "Blocks!", the pattern tiles, the bottom bar ----------
-  var coach = Toybox.coach($("coach"));
-  var jobs = Toybox.jobs($("jobs"), {
-    jobs: [{ id: "add", name: "Add", pic: PIC_ADD }, { id: "times", name: "Times", pic: PIC_TIMES }],
-    value: mode,
-    onPick: function (id) { if (!ending) { setMode(id); blip(); } }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    // Phone tabs (Grid / Patterns): show one group of controls at a time.
+    if (t.classList.contains("tab")) {
+      $("panel").dataset.tab = t.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) { b.setAttribute("aria-pressed", String(b === t)); });
+      return;
+    }
+    if (ending || Toybox.timer.locked()) return;
+    if (t.dataset.mode) { setMode(t.dataset.mode); blip(); }
+    else if (t.dataset.size) { setSize(Number(t.dataset.size)); }
+    else if (t.dataset.pat) { setPat(t.dataset.pat, false); }
+    else if (t.dataset.step) {
+      multN = clamp(multN + Number(t.dataset.step), 1, 12);
+      setPat("mult", true);
+    }
+    else if (t.id === "buildBtn") { startBuild(); }
+    else if (t.id === "clearBtn") { clearBlocks(true); sel = null; pat = ""; patT = now; updateButtons(); restEq(); save(); whoosh(); }
   });
-  var go = Toybox.go($("go"), {
-    label: "Blocks!", icon: PIC_BLOCKS,
-    onPress: function () { if (ending) return false; ghost.learned(); startBuild(); }
-  });
-  var tiles = Toybox.tiles($("pats"), {
-    items: [
-      { id: "mult", name: "Multiples", pic: multPic(multN) },
-      { id: "dbl", name: "Doubles", pic: PIC_DBL },
-      { id: "sq", name: "Squares", pic: PIC_SQ },
-      { id: "same", name: "Same", pic: PIC_SAME }
-    ],
-    value: null, kind: "pick", rows: 1,
-    onPick: function (id) { if (!ending) setPat(id, true); }
-  });
-  tiles.button("same").setAttribute("aria-label", "Same answer");
-  Toybox.bar($("bottom"), { onNew: function () { if (!ending) startOver(); }, onSurprise: function () { if (!ending) surprise(); } });
-  // Phone held sideways: the job bar sits at the top of the panel column (the grid keeps the full height).
-  var sideMQ = window.matchMedia ? window.matchMedia("(orientation: landscape) and (max-height: 520px)") : null;
-  function placeJobs() {
-    var inPanel = sideMQ && sideMQ.matches, jb = $("jobs");
-    if (inPanel && jb.parentNode !== $("panel")) $("panel").insertBefore(jb, $("panel").firstChild);
-    else if (!inPanel && jb.parentNode !== $("stagecol")) $("stagecol").appendChild(jb);
-  }
-  if (sideMQ) { if (sideMQ.addEventListener) sideMQ.addEventListener("change", function () { placeJobs(); resize(); }); else if (sideMQ.addListener) sideMQ.addListener(function () { placeJobs(); resize(); }); }
-  placeJobs();
-
-  // ---------- Surprise: a fun moment on the grid, taking turns ----------
-  // 1. a wave of hopping, rainbow-lit squares sweeps across the grid from the corner;
-  // 2. the number squares along the edges get happy faces for a few seconds (they blink and look around);
-  // 3. the whole grid wobbles like jelly, then settles.
-  var SURPRISES = ["wave", "faces", "jelly"], surpriseN = 0, waveT = -9999, facesT = -9999;
-  function surprise() {
-    var k = SURPRISES[surpriseN++ % SURPRISES.length];
-    if (k === "wave") { waveT = now; chime(); }
-    else if (k === "faces") { facesT = now; blip(); setTimeout(blip, 180); }
-    else { jiggle = 1.6; whoosh(); }
-    var cc = cellCenter(1, 1);
-    burst(cc.x, cc.y, 14, null);
-  }
-
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
@@ -904,7 +993,7 @@ body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4
 
   // ---------- Start ----------
   load();
-  Toybox.settings.onChange(function (id) { if (id === "mathgrid-twelve") setSize(sizeSetting()); });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === N)); });
   setMode(mode);
   resize();
   if (hasBlocks && sel) fillBlocks(sel.r, sel.c, false);

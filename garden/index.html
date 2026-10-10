@@ -67,55 +67,81 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The stage is the garden: the watering can, the sun, the cloud, the trowel and the plants all work with a tap (or
-   a drag). The panel is the six seed packets as tiles (tap = it is planted in the next empty spot; drag one onto
-   the soil to plant it right there) and the bottom bar (New, Surprise). */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .scene { background: #9ED8FF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .scene .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
 body.big .tb-panel { display: none; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
-/* Seed packets: tap to plant, or drag onto the soil. Three a row on phones, six on an upright iPad. */
-#seeds .tb-tile { touch-action: none; cursor: grab; }
-#seeds .tb-tile .tb-pic, #seeds .tb-tile .tb-tile-word { pointer-events: none; }
-#seeds .tb-tile.lift { opacity: 0.45; }
-#seeds.tb-tilerow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
-  #seeds.tb-tilerow { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-}
-@media (orientation: landscape) { .tb-v2 .tb-body .tb-panel { justify-content: space-between; } }
-@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
-  #seeds.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (orientation: landscape) and (max-height: 520px) { .tb-v2 .tb-body .tb-panel { width: 326px; } }
+/* Seed packets: picture tiles you can drag onto the soil (or tap, then tap a spot). */
+.seeds .tb-tile { touch-action: none; cursor: grab; }
+.seeds .tb-tile svg { pointer-events: none; }
+.seeds .tb-tile span { pointer-events: none; white-space: nowrap; }
+.seeds .tb-tile.lift { opacity: 0.45; }
 .dragpacket { position: fixed; left: 0; top: 0; z-index: 40; width: 78px; height: 78px; pointer-events: none;
   filter: drop-shadow(5px 7px 0 rgba(29, 35, 64, 0.3)); will-change: transform; }
 .dragpacket[hidden] { display: none; }
 .dragpacket svg { display: block; width: 100%; height: 100%; }
+
+/* Landscape: a slimmer panel so the garden gets the room. */
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 340px); }
+  .seeds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (orientation: landscape) and (min-width: 1000px) and (min-height: 700px) {
+  .seeds .tb-tile { min-height: 132px; font-size: 1.2rem; }
+  .seeds .tb-tile svg { width: 84px; height: 84px; }
+}
+/* Upright phones: all six packets in one row, pictures only (the packet shows what grows). */
+@media (max-width: 600px) and (orientation: portrait) {
+  .seeds { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+  .seeds .tb-tile { min-height: 64px; padding: 3px 2px; border-radius: 14px; }
+  .seeds .tb-tile svg { width: 100%; max-width: 50px; height: auto; aspect-ratio: 1; }
+  .seeds .tb-tile span { display: none; }
+}
+/* Phones held sideways: two columns of packets with their names. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: min(30%, 260px); }
+  .seeds { gap: 6px; }
+  .seeds .tb-tile { min-height: 0; padding: 3px 2px; font-size: 0.9rem; }
+  .seeds .tb-tile svg { width: 38px; height: 38px; }
+}
+/* Upright tablets: one row of six. */
+@media (min-width: 700px) and (min-height: 700px) and (orientation: portrait) {
+  .seeds { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
 .rest-art { border: 3px solid #1D2340; border-radius: 18px; background: #22305E; }
+/* Ghost hand: a see-through hand that shows the main move (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Garden</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage scene" id="stage">
       <canvas id="cv" aria-label="A garden bed with the sun, a cloud, a watering can, a trowel and a basket"></canvas>
       <div class="tb-counter" id="count">Picked: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Plant a seed!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
     <section class="tb-panel">
-      <div id="seeds" aria-label="Seed packets"></div>
-      <div id="bottom"></div>
+      <div class="tb-choices seeds" id="seeds"></div>
+      <nav class="tb-tabs">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -230,11 +256,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     L.base = H - 6 - L.raise;
     L.cs = clamp(m * (L.side ? 0.2 : 0.21), 62, 150);
     L.bw = clamp(m * (L.side ? 0.24 : 0.25), 76, 140);
-    L.canHome = { x: L.side ? Math.max(L.cs * 0.42 + 4, W * 0.08) : L.cs * 0.45 + 8, y: L.base - L.cs * (L.raise ? 0.33 : 0.46) };
+    L.canHome = { x: L.side ? Math.max(L.cs * 0.42 + 4, W * 0.08) : L.cs * 0.45 + 8, y: L.base - L.cs * 0.33 };
     L.bx = W - L.bw / 2 - 6;
     L.tl = clamp(m * 0.2, 56, 130);
     if (L.side) { L.trA = 0.22; var tx = W * 0.075, ty = L.soilTop + L.tl * 0.1; L.trHome = { x: tx + Math.sin(L.trA) * L.tl * 0.8, y: ty - Math.cos(L.trA) * L.tl * 0.8 }; }
-    else { L.trA = -1.3; L.trHome = { x: W * 0.47 - L.tl * 0.3, y: L.base - L.tl * (L.raise ? 0.2 : 0.32) }; }
+    else { L.trA = -1.3; L.trHome = { x: W * 0.47 - L.tl * 0.3, y: L.base - L.tl * 0.2 }; }
     L.specks = [];
     for (i = 0; i < Math.round(W * (H - L.soilTop) / 900); i++) L.specks.push([rand(0, W), rand(L.soilTop + 8, H), rand(1.2, 3.2), Math.random() < 0.5 ? "#7B4A24" : "#B07A47"]);
     L.pickets = [];
@@ -329,13 +355,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var p = S.spots[i];
     if (!p || p.pa < 1 || p.s >= 4) return;
     p.w += n;
-    if (p.w >= NEED && now() >= p.next) {
-      if (grow(i)) {
-        learned.water = true;
-        // one watering is enough: a seed comes up and goes straight on to its leaves
-        if (p.s === 1) setTimeout(function () { if (!ending && S.spots[i] === p && p.s === 1) { p.next = 0; grow(i, true); } }, 650);
-      }
-    }
+    if (p.w >= NEED && now() >= p.next) { if (grow(i)) learned.water = true; }
   }
   function sunTap() {
     shine = 1; sunSnd();
@@ -346,16 +366,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     S.spots.forEach(function (p, i) { if (p && p.pa >= 1 && p.s >= 1 && p.s < 4) list.push(i); if (p && p.s === 0) seeds = true; });
     if (!list.length) { if (seeds) say("Water the seed first!"); return; }
     sunGrowAt = t;
-    // one tap is enough: every plant that is up grows stage by stage all the way to its flower or fruit
     list.forEach(function (i, j) {
       var p = S.spots[i];
-      for (var st = p.s, n = 0; st < 4; st++, n++) {
-        (function (n) {
-          setTimeout(function () { if (!ending && S.spots[i] === p && p.s < 4) { p.next = 0; grow(i, j > 0 || n > 0); } }, 350 + j * 260 + n * 560);
-        })(n);
-      }
+      setTimeout(function () { if (!ending && S.spots[i] === p) grow(i, j > 0); }, 350 + j * 260);
     });
-    sunGrowAt = t + (list.length - 1) * 260 + 1400;
   }
   function pick(i, j) {
     var p = S.spots[i];
@@ -701,7 +715,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (sel && y > L.fenceTop - 30) { plantAt(sel, x, y); return; }
     var pi = hitPlant(x, y);
     if (pi >= 0) { wiggle(pi); return; }
-    if (y > L.soilTop - 20) { dirt(x, Math.max(y, L.soilTop), 3); if (S.spots.indexOf(null) >= 0 && !sel) say("Tap a seed packet!"); }
+    if (y > L.soilTop - 20) { dirt(x, Math.max(y, L.soilTop), 3); if (S.spots.indexOf(null) >= 0 && !sel) say("Drag a seed here!"); }
   });
   cv.addEventListener("pointermove", function (e) {
     var q = ptrs[e.pointerId];
@@ -753,8 +767,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var sp = S.spots[q.i];
       if (!sp) return;
       sp.pull = null;
-      // one tap is enough: it comes off (or up) at once
-      if (q.moved < 12) pick(q.i, q.j);
+      if (q.moved < 12) {
+        sp.wig = 0.6;
+        sp.taps++;
+        if (sp.taps >= 2) pick(q.i, q.j);
+        else say(sp.k === "carrot" ? "Pull it up!" : "Pull it off!");
+      }
     }
   }
   cv.addEventListener("pointerup", endPtr);
@@ -815,36 +833,29 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       '<path d="M8 6h44v8H8z" fill="' + c[1] + '" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/>' +
       '<g transform="translate(5 6) scale(0.84)">' + produceSVG(k) + "</g></svg>";
   }
-  // Tap a packet: the seed goes into the next empty spot (left to right). Drag it to plant it right there.
-  var seedTiles = Toybox.tiles($("seeds"), {
-    kind: "action", rows: 2,
-    items: KINDS.map(function (k) { return { id: k, name: NAMES[k], pic: packetSVG(k) }; }),
-    onPick: function (k) {
-      if (now() - packetPtrAt < 500 && lastDragged) return;   // the click that ends a drag is not a tap
-      plantNext(k);
-    }
-  });
   var tiles = {};
   KINDS.forEach(function (k) {
-    var b = seedTiles.button(k);
-    tiles[k] = b;
+    var b = document.createElement("button");
+    b.className = "btn tb-tile";
     b.setAttribute("aria-label", NAMES[k] + " seeds");
-    b.addEventListener("pointerdown", function (e) { if (!Toybox.isPalm(e)) packetDown(e, k, b); });
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = packetSVG(k) + "<span>" + NAMES[k] + "</span>";
+    tiles[k] = b;
+    b.addEventListener("pointerdown", function (e) { packetDown(e, k, b); });
+    // keyboard: Enter/Space picks the packet (pointer taps are handled on pointerup)
+    b.addEventListener("click", function () { if (now() - packetPtrAt > 900 && !locked()) setSel(sel === k ? null : k); });
+    $("seeds").appendChild(b);
   });
-  function plantNext(k) {
-    if (locked()) return;
-    var i = S.spots.indexOf(null);
-    if (i < 0) { say("The bed is full! Tap New."); bonk(); seedTiles.flash(k); return; }
-    plantAt(k, L.spots[i], L.fenceTop - 20);
+  function setSel(k) {
+    sel = k;
+    KINDS.forEach(function (n) { tiles[n].setAttribute("aria-pressed", String(n === k)); });
   }
-  function setSel(k) { sel = k; }
-  var lastDragged = false;
   var drag = null, dp = $("dragPacket"), packetPtrAt = -1e9;
   function packetDown(e, k, b) {
     if (locked()) return;
+    e.preventDefault();
     try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     drag = { id: e.pointerId, k: k, b: b, x0: e.clientX, y0: e.clientY, moved: false };
-    lastDragged = false;
   }
   function packetMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
@@ -866,8 +877,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     dp.hidden = true;
     d.b.classList.remove("lift");
     if (e.type === "pointercancel" || locked()) return;
-    lastDragged = d.moved;
-    if (!d.moved) return;      // a tap: the tile's click plants it (seedTiles onPick)
+    if (!d.moved) { setSel(sel === d.k ? null : d.k); blip(); return; }
     var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top - 20;
     if (x >= -20 && x <= r.width + 20 && y >= -20 && y <= r.height + 20) plantAt(d.k, clamp(x, 0, W), clamp(y, 0, H));
   }
@@ -875,10 +885,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   document.addEventListener("pointerup", packetUp);
   document.addEventListener("pointercancel", packetUp);
 
-  Toybox.bar($("bottom"), {
-    onNew: function () { if (!locked()) newBed(); },
-    onSurprise: function () { if (!locked()) surprise(); }
-  });
+  $("newBtn").addEventListener("click", function () { if (!locked()) newBed(); });
+  $("surpriseBtn").addEventListener("click", function () { if (!locked()) surprise(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -1613,66 +1621,154 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (ripe(p) && p.g) return "Pull the big strawberry!"; if (ripe(p)) return p.k === "carrot" ? "Pull the carrot!" : p.k === "pumpkin" ? "Pick the pumpkin!" : p.k === "tomato" ? "Pick a tomato!" : "Pick a strawberry!"; }
     for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (p && p.s === 0) return "Water the seed!"; }
     for (i = 0; i < NSPOT; i++) { p = S.spots[i]; if (p && p.s < 4) return "Tap the sun!"; }
-    if (S.spots.indexOf(null) >= 0 && !document.body.classList.contains("big")) return "Tap a seed packet!";
+    if (S.spots.indexOf(null) >= 0 && !document.body.classList.contains("big")) return "Plant a seed!";
     if (V.bee) return "Tap the bee!";
     if (V.bird) return "Tap the bird!";
     return "Make it rain!";
   }
-  var coach = Toybox.coach($("coach")), coachShownText = "";
+  var coachEl = $("coach");
   function coachTick() {
     var t = coachLine();
-    if (t !== coachShownText) { coachShownText = t; coach.step(t); }
+    if (coachEl.textContent !== t) coachEl.textContent = t;
   }
   setInterval(coachTick, 300);
 
-  // ---------- Ghost hand (Toybox.ghost) ----------
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedAll = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedAll || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedAll = true; stop(); },
+      again: function () { learnedAll = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
   function ghostPt(elm, fx, fy) {
     var r = elm.getBoundingClientRect();
     return [r.left + r.width * fx, r.top + r.height * fy];
   }
-  // The next move, at most twice each per visit and never again once he has done it: the tap first (a packet,
-  // the can, the sun, a fruit), the drag on its second showing.
+  // The next move, once each until he has done it (at most twice per move per visit).
+  var ghostShown = { plant: 0, water: 0, sun: 0, pick: 0 };
   function ghostPlan() {
-    var rc = cv.getBoundingClientRect(), i, p;
-    if (ending || drag || Object.keys(ptrs).length) return null;
-    for (i = 0; i < NSPOT; i++) {
+    var rc = cv.getBoundingClientRect(), i, p, move = null, plan = null;
+    if (sel || drag || Object.keys(ptrs).length) return null;
+    for (i = 0; i < NSPOT && !plan; i++) {
       p = S.spots[i];
       if (ripe(p) && !learned.pick) {
         for (var j = 0; j < nF(p); j++) if (p.m & (1 << j)) {
           var f = p.k === "carrot" ? plantPt(i, 0, -8) : fruitPt(i, j);
-          if (ghost.shown("pick") < 1) return { pts: [[rc.left + f.x, rc.top + f.y]], tap: true, key: "pick" };
-          return { pts: [[rc.left + f.x, rc.top + f.y], [rc.left + f.x, rc.top + f.y - 80]], dur: 2800, key: "pickdrag" };
+          move = "pick"; plan = { pts: [[rc.left + f.x, rc.top + f.y], [rc.left + f.x, rc.top + f.y - 80]], dur: 2800 }; break;
         }
       }
     }
-    for (i = 0; i < NSPOT; i++) {
+    for (i = 0; i < NSPOT && !plan; i++) {
       p = S.spots[i];
       if (p && p.s === 0 && p.pa >= 1 && !learned.water) {
-        var cp = [rc.left + can.x, rc.top + can.y - L.cs * 0.3];
-        if (ghost.shown("water") < 1) return { pts: [cp], tap: true, key: "water" };
-        return { pts: [cp, [rc.left + L.spots[i] - spoutOff(0.75), rc.top + Math.max(L.cs * 0.6, L.soilTop - L.cs * 0.9) - L.cs * 0.3]], dur: 3400, key: "waterdrag" };
+        move = "water";
+        plan = { pts: [[rc.left + can.x, rc.top + can.y - L.cs * 0.3], [rc.left + L.spots[i] - spoutOff(0.75), rc.top + Math.max(L.cs * 0.6, L.soilTop - L.cs * 0.9) - L.cs * 0.3]], dur: 3400 };
       }
     }
-    if (!learned.sun && S.spots.some(function (q) { return q && q.pa >= 1 && q.s >= 1 && q.s < 4; })) {
-      return { pts: [[rc.left + L.sunX, rc.top + L.sunY]], tap: true, key: "sun" };
+    if (!plan && !learned.sun && S.spots.some(function (q) { return q && q.pa >= 1 && q.s >= 1 && q.s < 4; })) {
+      move = "sun"; plan = { pts: [[rc.left + L.sunX, rc.top + L.sunY]], tap: true };
     }
-    if (!learned.plant && !S.spots.some(function (q) { return q; }) && !document.body.classList.contains("big")) {
+    if (!plan && !learned.plant && !S.spots.some(function (q) { return q; }) && !document.body.classList.contains("big")) {
       var tile = tiles.sunflower, k = nearestEmpty(W / 2);
       if (tile && tile.offsetWidth && k >= 0) {
-        if (ghost.shown("plant") < 1) return { pts: [ghostPt(tile, 0.5, 0.45)], tap: true, key: "plant" };
-        return { pts: [ghostPt(tile, 0.5, 0.45), [rc.left + L.spots[k], rc.top + L.soilTop - 10]], carry: { html: packetSVG("sunflower"), size: 64 }, key: "plantdrag" };
+        move = "plant";
+        plan = { pts: [ghostPt(tile, 0.5, 0.45), [rc.left + L.spots[k], rc.top + L.soilTop - 10]], carry: { html: packetSVG("sunflower"), size: 64 } };
       }
     }
-    return null;
+    if (!plan || ghostShown[move] >= 2) return null;
+    ghostShown[move]++;
+    return plan;
   }
-  var ghost = Toybox.ghost({ max: 2, plan: ghostPlan });
-  // He did it himself: that hint never shows again.
-  setInterval(function () {
-    if (learned.pick) { ghost.learned("pick"); ghost.learned("pickdrag"); }
-    if (learned.water) { ghost.learned("water"); ghost.learned("waterdrag"); }
-    if (learned.sun) ghost.learned("sun");
-    if (learned.plant) { ghost.learned("plant"); ghost.learned("plantdrag"); }
-  }, 500);
+  var ghost = makeGhost(ghostPlan, { max: 8, ok: function () { return !ending; } });
 
   // ---------- Sound (off by default; soft and synthesized) ----------
   var master = null, masterCtx = null;
@@ -1713,7 +1809,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Ending: the sun sets, the flowers close, the visitors go home, the garden sleeps.
   function onEnding(done) {
     ending = true; endT0 = now();
-    releaseAll();
+    releaseAll(); setSel(null);
     if (drag) { dp.hidden = true; drag.b.classList.remove("lift"); drag = null; }
     visitorsLeave();
     rainbowUntil = 0;
@@ -1771,7 +1867,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__garden = {
-    state: function () { return { spots: S.spots.map(function (p) { return p ? { k: p.k, s: p.s, m: p.m, pa: p.pa } : null; }), picked: S.picked, basket: S.basket.length, visitors: Object.keys(V).filter(function (k) { return !!V[k]; }), coach: coachShownText, rb: rb, night: night }; },
+    state: function () { return { spots: S.spots.map(function (p) { return p ? { k: p.k, s: p.s, m: p.m, pa: p.pa } : null; }), picked: S.picked, basket: S.basket.length, visitors: Object.keys(V).filter(function (k) { return !!V[k]; }), coach: coachEl.textContent, rb: rb, night: night }; },
     pt: function (name, i, j) {
       var r = cv.getBoundingClientRect(), p;
       if (name === "spot") p = { x: L.spots[i], y: L.soilTop };

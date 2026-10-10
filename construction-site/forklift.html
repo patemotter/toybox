@@ -72,54 +72,96 @@ body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The panel is the green Go ("Move it!": the forklift moves the next pallet) and the bottom bar (New, Surprise),
-   built by the shared components in common/toybox.js. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv.grabbing { cursor: grabbing; }
 .count { font-variant-numeric: tabular-nums; }
 .count.pop { animation: pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+/* The hint is the coach line (tb-coach). */
+.hint { background: var(--accent); }
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
 
 /* Play-timer gauge: the time-left badge, top-right of the stage. */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
 
-/* Big: the header and the bottom bar hide; Go stays (a tap on a pallet on the stage does the same). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-bottombar { display: none; }
+/* Big: full-screen play. Dragging the forks is the play, so the panel goes too. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+
+/* ---------- Panel: Move it! (Go row), New wall and Surprise (tab bar) ---------- */
+.act { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.act svg { width: 40px; height: 40px; flex: none; pointer-events: none; }
+.act span { pointer-events: none; }
+.tb-go.act svg { width: 56px; height: 46px; }
+.tb-tabs .act svg { width: 30px; height: 30px; }
+.wiggle { animation: wiggle 0.7s ease-in-out 2; }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg) scale(1.05); } 75% { transform: rotate(4deg) scale(1.05); } }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* The Back button shows the site's picture (and its name on an iPad). */
-.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+
+/* Ghost hand: a see-through hand that shows the main move once (master copy: tools/snippets/ghost-hand.css). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+
+@media (max-width: 600px) {
+  .tb-go.act svg { width: 46px; height: 38px; }
+  .hint { white-space: normal; line-height: 1.15; }
+}
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(22%, 220px); }
+  .tb-go.act { flex: 0 1 200px; min-height: 120px; flex-direction: column; gap: 2px; }
+  .tb-go.act svg { width: 80px; height: 66px; }
+  .tb-tabs { margin-top: auto; flex-direction: column; }
+  .tb-tabs .btn { min-height: 60px; white-space: normal; line-height: 1.05; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 150px; padding: 6px; gap: 6px; }
+  .tb-go.act { flex: 1 1 auto; min-height: 0; max-height: 150px; }
+  .tb-go.act svg { width: 56px; height: 46px; }
+  .tb-tabs { gap: 8px; }
+  .tb-tabs .btn { min-height: 50px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .count.pop { animation: none; }
+  .hint.go, .count.pop, .wiggle { animation: none; }
 }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2 wrap">
+<div class="tb-app-shell wrap">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the site"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 34h30" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M13 34V7M13 8h22M13 8 6 14" fill="none" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 33V8h21" fill="none" stroke="#FFC72C" stroke-width="1.6"/><path d="M29 8v11" stroke="#1D2340" stroke-width="2"/><rect x="25.5" y="19" width="7" height="6" fill="#F77F00" stroke="#1D2340" stroke-width="2"/></svg><span>Site</span></a>
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Forklift</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A forklift unloading pallets from a delivery truck and lifting them up to a scaffold where a bricklayer builds a wall. Tap a pallet and the forklift moves it, or drag the forks."></canvas>
+      <canvas id="cv" role="img" aria-label="A forklift unloading pallets from a delivery truck and lifting them up to a scaffold where a bricklayer builds a wall"></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter count" id="count">Pallets: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach hint" id="hint" hidden></div>
     </main>
     <section class="tb-panel" id="panel">
-      <div id="go"></div>
-      <div id="bottom"></div>
+      <button class="btn tb-go act" id="goBtn" aria-label="Move it! The forklift moves the next pallet"><svg viewBox="0 0 60 48" aria-hidden="true"><g stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"><rect x="3" y="20" width="10" height="18" rx="4" fill="#4A5066"/><path d="M11 38 V22 H22 V26 H34 L37 30 V38 Z" fill="#FFC93C"/><path d="M14 22 V7 M33 26 L31 7" fill="none" stroke-width="3"/><rect x="11" y="4" width="24" height="5" rx="1.5" fill="#3A4150"/><rect x="37" y="8" width="4" height="32" fill="#5B6476"/><rect x="41" y="14" width="3" height="20" fill="#4A5066"/><path d="M43 34 H58 V36.5 L55 38 H43 Z" fill="#3A4150"/><rect x="44" y="28" width="14" height="5" fill="#B5793A"/><rect x="45" y="15" width="12" height="13" fill="#C8553D"/><path d="M45 19.5 H57 M45 24 H57 M51 15 V19.5 M48 19.5 V24 M54 19.5 V24" fill="none" stroke="#E9B9A8" stroke-width="1.4"/><circle cx="10" cy="40" r="5.5" fill="#2F3447"/><circle cx="31" cy="39" r="7" fill="#2F3447"/><circle cx="31" cy="39" r="2.5" fill="#C9D3E0" stroke-width="1.5"/></g></svg><span>Move it!</span></button>
+      <nav class="tb-tabs" id="acts">
+        <button class="btn tb-new act" id="newBtn"><svg viewBox="0 0 48 48" aria-hidden="true"><g stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"><rect x="5" y="36" width="38" height="7" fill="#B8BEC8"/><rect x="7" y="27" width="16" height="9" fill="#C8553D"/><rect x="23" y="27" width="16" height="9" fill="#C8553D"/><rect x="13" y="18" width="16" height="9" fill="#C8553D"/><rect x="29" y="18" width="10" height="9" fill="#C8553D"/><path d="M9 8 L19 18 L17 20 L7 10 Z" fill="#9AA5B1"/><path d="M5 6 L11 4 L13 10 Z" fill="#B5793A"/></g></svg><span>New wall</span></button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -144,14 +186,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---------- World (units; y is up, ground at y = 0) ----------
   // Left to right: the truck bay, the yard with three lay-down spots, the scaffold and the house wall.
-  var WORLD_L = -30, WORLD_R = 1650, VIEW_UP = 505, VIEW_DOWN = 30, MINW = 520, MINW_UP = 520;
+  var WORLD_L = -30, WORLD_R = 1650, VIEW_UP = 505, VIEW_DOWN = 30, MINW = 520;
   var FORK = 100, BACK = 238, MID = 118, PW = 110, HALF = 55, PH = 14, SLOT = 3, TRAVEL = 14, H_MAX = 360;
   var OUTER_TOP = 228, CARR_H = 52, FREE = 166;       // free lift: the carriage rises inside the mast first
   var LOADC = 56;                                      // fork carriage to the middle of a pallet on the forks
   var TR_X = 440, TB = 100, TS = 390;                  // truck bed rear end, bed top, stack spot
   var YARD = [640, 775, 910], SNAP = 66;
   var SC_L = 1140, SC_R = 1330, LOW = 130, HIGH = 280, LC = 1190;
-  var WALL_L = 1345, WALL_R = 1585, ROW_H = 80, FOUND = 12, ROWS = 4;   // four tall rows: a short job (was eight)
+  var WALL_L = 1345, WALL_R = 1585, ROW_H = 40, FOUND = 12, ROWS = 8;
   var XMIN = TR_X + 4, XMAX = SC_L - 4;                 // the forklift's body stays between these
   var LOADH = { bricks: 54, blocks: 54, lumber: 46, pipes: 48 };
   var KINDS = ["bricks", "blocks", "lumber", "pipes", "empties"];
@@ -161,8 +203,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ---------- State ----------
   var objs = [];               // pallets lying somewhere: { k, n, x, y, tr (on the truck, x relative to it) }
   var rows = 0, wallDone = false, count = 0, trucks = 0;
-  // Empty pallets the bricklayer has finished with stack themselves under the scaffold (no chore for him).
-  var pile = 0, drops = [];
   var F = { x: 600, dir: -1, vx: 0, h: TRAVEL, vh: 0, tilt: 0, load: null, engaged: null, slide: null, turn: null,
     wheel: 0, odo: 0, parked: false, assist: null, wave: -9, waveArm: -9 };
   var truck = { state: "arrive", off: -760, t: 0, ready: 0, toot: -9 };
@@ -189,7 +229,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function saveState() {
     try {
       localStorage.setItem(STATEKEY, JSON.stringify({
-        v: 1, rows: rows, done: wallDone, count: count, trucks: trucks, truck: truck.state === "parked" ? "here" : "away", pile: pile,
+        v: 1, rows: rows, done: wallDone, count: count, trucks: trucks, truck: truck.state === "parked" ? "here" : "away",
         objs: objs.map(function (o) { return { k: o.k, n: o.n, x: Math.round(o.x), y: Math.round(o.y), tr: !!o.tr }; }),
         load: F.load ? { k: F.load.k, n: F.load.n } : null,
         f: { x: Math.round(F.x), dir: F.dir, h: Math.round(F.h) }
@@ -206,7 +246,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       wallDone = !!so.done && rows >= ROWS;
       count = okNum(so.count) ? Math.max(0, Math.floor(so.count)) : 0;
       trucks = okNum(so.trucks) ? Math.max(0, Math.floor(so.trucks)) : 0;
-      pile = okNum(so.pile) ? clamp(Math.floor(so.pile), 0, ROWS) : 0;
       var here = so.truck === "here";
       objs = [];
       (Array.isArray(so.objs) ? so.objs : []).forEach(function (q) {
@@ -241,15 +280,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function makeTruckLoad() {
     var have = countWallPallets(), need = Math.max(0, ROWS - rows - have), list = [];
-    // Lumber or pipes only while the yard keeps room for them (at most three wait there), so a load never gets stuck.
-    var extras = 0;
-    objs.forEach(function (o) { if (isYard(o) && isFull(o) && !wallKind(o)) extras++; });
-    if (F.load && isFull(F.load) && !wallKind(F.load)) extras++;
-    var roomy = yardRoom() >= 2 && extras < 3;
-    if (roomy && (need < 3 || trucks % 2 === 0)) list.push(trucks % 2 ? "pipes" : "lumber");
+    if (yardRoom() > 0 && (need < 3 || trucks % 2 === 0)) list.push(trucks % 2 ? "pipes" : "lumber");
     var idx = rows + have;
-    while (list.length < 3 && need > 0) { list.push(idx < 2 ? "blocks" : "bricks"); idx++; need--; }
-    if (!list.length && roomy) list.push(trucks % 2 ? "pipes" : "lumber");
+    while (list.length < 3 && need > 0) { list.push(idx < 4 ? "blocks" : "bricks"); idx++; need--; }
+    if (!list.length) list.push(trucks % 2 ? "pipes" : "lumber");
     var y = TB;
     list.forEach(function (k) { var o = { k: k, n: 1, x: TS, y: y, tr: true }; objs.push(o); y += objH(o); });
   }
@@ -275,7 +309,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function stepTruck(dt) {
     truck.t += dt;
     if (truck.state === "arrive") {
-      var u = clamp(truck.t / 3, 0, 1);
+      var u = clamp(truck.t / 4.5, 0, 1);
       truck.off = -760 * (1 - ease(u));
       if (u >= 1) { truck.state = "parked"; truck.off = 0; hiss(); puff(TR_X - 20, 4, 0.6, 1); saveState(); }
     } else if (truck.state === "parked") {
@@ -293,7 +327,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       truck.off = -900 * v * v;
       if (v >= 1) { truck.state = "away"; truck.t = 0; objs = objs.filter(function (o) { return !o.tr; }); saveState(); }
     } else if (truck.state === "away") {
-      if (truck.t > 1) { newTruck(); flashCoach("Here comes the next truck!", 3500); saveState(); }
+      if (truck.t > 3) { newTruck(); flashCoach("Here comes the next truck!", 3500); saveState(); }
     }
   }
 
@@ -353,7 +387,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var list = [], i;
     function add(x, base, dir, kind) { var t = stackTop(x, base); list.push({ x: x, top: t, dir: dir, kind: kind }); }
     var landings = [];
-    var act = rows < 2 ? [LOW, HIGH] : [HIGH, LOW];
+    var act = rows < 4 ? [LOW, HIGH] : [HIGH, LOW];
     act.forEach(function (b) { landings.push(b); });
     if (load.k === "empties") {
       if (truck.state === "parked") add(TS, TB, -1, "truck");
@@ -609,8 +643,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!same) { count++; showCount(true); }
     flashCoach("Set it down!", 2400);
     if (steps.length && auto) autoPlaced++;
-    else if (byHand && ghost) ghost.learned("drag");
-    if (usedTap && ghost) ghost.learned("tap");
+    else if (byHand && ghost) ghost.learned();
     regrab();
     saveState();
   }
@@ -741,8 +774,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         return;
       }
       var list = [], ax = d * (appr - F.x) > 4 ? appr : F.x;
-      // The place is behind the load (he set it down past it): back up beyond it with the load held up, then come in.
-      if (d * (at - F.x) < -4) { ax = appr; list.push(mv(F.x, Math.max(hh, F.h))); }
       if (ax !== F.x) list.push(mv(ax, TRAVEL));
       list.push(mv(ax, Math.max(hh, ax === F.x ? F.h : 0)));
       list.push(mv(at, hh, INCH));
@@ -751,7 +782,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       return;
     }
     var o = nextPickup();
-    if (autoPick) { var ap = pickable(autoPick); if (ap) o = ap; else autoPick = null; }
     if (!o) {
       if (truck.state !== "parked" || bl.job || truck.ready > 0) { autoWait += 0.5; steps = [{ wait: 0.5 }]; if (autoWait > 20) auto = false; return; }
       auto = false;
@@ -761,7 +791,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     autoWait = 0;
     var pd = pickupDir(o);
     if (pd !== d) { steps = [{ turn: true }]; return; }
-    autoPick = null;
     var face = nearFace(o), slot = o.y + SLOT, appr2 = face - d * (FORK + 30);
     steps = [
       mv(appr2, slot),
@@ -769,30 +798,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       mv(null, slot + 24, null, function () { return F.load === o; }, 5)
     ];
   }
-  // Move it! (Go) or a tap on a pallet: one whole pallet move, calmly. pick = the pallet he tapped.
-  var autoPick = null;
-  function pickable(o) {
-    if (!o || objs.indexOf(o) < 0) return null;
-    if (reachable(o)) return o;
-    // Not the top one of its stack: the top one goes first.
-    var top = null;
-    objs.forEach(function (q) { if (q !== o && reachable(q) && Math.abs(wx(q) - wx(o)) < 40 && !!q.tr === !!o.tr && q.y > o.y) top = q; });
-    return top;
-  }
-  function moveIt(pick) {
-    if (ending || Toybox.timer.locked()) return false;
-    if (drag) { drag = null; cv.classList.remove("grabbing"); }
+  function moveIt() {
+    if (ending || Toybox.timer.locked()) return;
+    if (drag) { drag = null; $("cv").classList.remove("grabbing"); }
     byHand = false;
-    if (pick && !F.load && !(F.engaged && !F.engaged.placed)) {
-      var pk = pickable(pick);
-      if (pk && pk !== F.engaged) { autoPick = pk; if (!stepsLocked) steps = []; }
-    }
     auto = true; autoPlaced = 0; autoWait = 0;
     if (!steps.length) planAuto();
-    if (!auto && !steps.length) return false;
+    if (!auto && !steps.length) { wiggle($("goBtn")); return; }
     whirr();
-    return true;
   }
+  function wiggle(b) { b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle"); }
 
   // ---------- The bricklayer and the wall ----------
   var bl = { deck: LOW, x: 1300, y: LOW, st: "idle", t: 0, job: null, lifts: 0, face: 1, flag: false };
@@ -848,13 +863,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var o = bl.job;
     bl.job = null; bl.carry = false;
     rows++; rowAnim = clock; pieceT = [];
-    if (o) {
-      // The empty pallet slides down to the stack under the scaffold by itself.
-      var oi = objs.indexOf(o);
-      if (oi >= 0) objs.splice(oi, 1);
-      drops.push({ x: wx(o), y: o.y, t: 0 });
-      if (F.engaged === o) F.engaged = null;
-    }
+    if (o) { o.busy = false; o.k = "empties"; o.n = 1; delete o.left; }
+    mergeEmpties();
     puff(WALL_L + 40, wallTop(), 0.6, 1); puff(WALL_R - 40, wallTop(), 0.6, 1);
     sparkles((WALL_L + WALL_R) / 2, wallTop() + 10, 6);
     chime();
@@ -877,7 +887,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     objs.forEach(function (o) { puff(wx(o), o.y + 20, 0.8, 1); });
     if (F.load) puff(F.x + F.dir * LOADC, F.h + 20, 0.8, 1);
     for (var r = 0; r < rows; r++) puff(rand(WALL_L, WALL_R), FOUND + r * ROW_H + 20, 0.9, 1);
-    rows = 0; wallDone = false; count = 0; roof.t = -9; rowAnim = -9; pieceT = []; pile = 0; drops = [];
+    rows = 0; wallDone = false; count = 0; roof.t = -9; rowAnim = -9; pieceT = [];
     objs = []; F.load = null; F.engaged = null; F.slide = null; F.assist = null;
     steps = []; stepsLocked = false; auto = false;
     bl.job = null; bl.st = "idle"; bl.deck = LOW; bl.y = LOW; bl.x = 1300; bl.flag = false; bl.carry = false;
@@ -985,20 +995,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (reduce) n = Math.min(n, 1);
     for (var i = 0; i < n * 4 && dust.length < 90; i++) {
       dust.push({ x: x + rand(-14, 14) * size, y: y + rand(-4, 10) * size, vx: rand(-50, 50) * size, vy: rand(10, 50) * size,
-        r: rand(10, 20) * size, life: 0, max: rand(0.7, 1.2), c: Math.random() < 0.5 ? "#E3D3BD" : "#CDBA9C" });
+        r: rand(10, 20) * size, life: 0, max: rand(0.9, 1.6), c: Math.random() < 0.5 ? "#E3D3BD" : "#CDBA9C" });
     }
   }
   function sparkles(x, y, n) {
     for (var i = 0; i < n; i++) {
       var a = rand(0, Math.PI * 2), d = rand(30, 90);
-      stars.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.6, s: rand(9, 15), life: 0, max: rand(0.8, 1.2), d: rand(0, 0.3) });
+      stars.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.6, s: rand(9, 15), life: 0, max: rand(1.1, 1.8), d: rand(0, 0.5) });
     }
   }
   var CONF = ["#E63946", "#FFC93C", "#2E9E5B", "#3A86FF", "#FF6FD8", "#F77F00"];
   function confetti(x, y, n) {
     for (var i = 0; i < n; i++) {
       conf.push({ x: x + rand(-20, 20), y: y, vx: rand(-240, 240), vy: rand(160, 480), a: rand(0, 6), w: rand(-6, 6),
-        s: rand(7, 12), c: CONF[i % CONF.length], life: 0, max: rand(1.2, 1.5) });
+        s: rand(7, 12), c: CONF[i % CONF.length], life: 0, max: rand(3.5, 5.5) });
     }
   }
   function stepParticles(dt) {
@@ -1018,35 +1028,26 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (c.y < 3) { c.y = 3; c.vy = 0; c.vx = 0; c.w = 0; }
     }
     for (i = rings.length - 1; i >= 0; i--) { rings[i].t += dt; if (rings[i].t > 0.7) rings.splice(i, 1); }
-    for (i = skids.length - 1; i >= 0; i--) { skids[i].t += dt; if (skids[i].t > 1.5) skids.splice(i, 1); }
+    for (i = skids.length - 1; i >= 0; i--) { skids[i].t += dt; if (skids[i].t > 6) skids.splice(i, 1); }
   }
 
   // ---------- Canvas and camera ----------
   var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0, camC = 600, camSet = false, camLead = 0;
-  var OY0 = 0, vpan = false, camY = 0;   // upright stages: the view rises with the forks when they lift high
   function resize() {
     var r = $("stage").getBoundingClientRect();
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
     // Fit the mast at full lift; a narrow (upright) stage shows a window that pans with the forklift.
-    // Upright stages zoom in on the machine (less empty sky); on phones the coach line sits at the bottom of the
-    // stage, so a strip of ground under the wheels is kept for it.
-    var narrow = cw < ch * 1.2, low = coachLow() ? 50 : 0;
-    var wantW = narrow ? Math.max(MINW_UP, cw * 0.9) : clamp(cw * 1.22, MINW, WORLD_R - WORLD_L);
-    S = Math.min((ch - low) / VIEW_UP, ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
-    var spare = Math.max(0, ch - low - VIEW_UP * S - VIEW_DOWN * S);
-    OY = OY0 = ch - Math.max(VIEW_DOWN * S, low) - spare * 0.28;
-    vpan = narrow;
+    var wantW = clamp(cw * 1.22, MINW, WORLD_R - WORLD_L);
+    S = Math.min(ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
+    var spare = Math.max(0, ch - (VIEW_UP + VIEW_DOWN) * S);
+    OY = ch - VIEW_DOWN * S - spare * 0.28;
     camSet = false;
     camera(0);
   }
   function camera(dt) {
     var visW = cw / S, full = WORLD_R - WORLD_L, c;
-    // The whole machine (counterweight to fork tips, and the load) is always in view, with a margin.
-    var e1 = F.x - F.dir * (BACK + 12), e2 = F.x + F.dir * (F.load ? LOADC + HALF + 6 : FORK + 6);
-    if (F.turn) { e1 = F.x - F.dir * MID - (BACK + FORK) / 2 - 10; e2 = F.x - F.dir * MID + (BACK + FORK) / 2 + 10; }
-    var lo = Math.min(e1, e2), hi = Math.max(e1, e2), mg = Math.min(30, Math.max(0, (visW - (hi - lo)) / 2));
     if (visW >= full) c = (WORLD_L + WORLD_R) / 2;
     else {
       var mv2 = Math.abs(F.vx) > 25 ? sgn(F.vx) : 0;
@@ -1055,33 +1056,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       // Lean ahead as far as the scene goes while the back of the machine stays in view (the wall or the truck shows).
       var lean = F.x - F.dir * BACK + F.dir * (visW / 2 - 16);
       var focus = F.dir > 0 ? Math.max(F.x + 12, Math.min(lean, WALL_R + 30 - visW / 2)) : Math.min(F.x - 12, Math.max(lean, WORLD_L + 10 + visW / 2));
-      // A narrow (upright) view leans a little further toward the forks, so the pallet ahead shows.
-      if (visW < 520) focus += F.dir * 40;
-      // Resting while the bricklayer lays a row (or the wall is finished): the view drifts over to the wall.
-      if (!drag && !steps.length && !auto && clock - lastMove > 0.8 && (bl.job || (wallDone && clock - roof.t < 8)) && visW < 900) focus = WALL_L - 20;
       if (F.turn) focus = F.x - F.dir * MID;
       focus += camLead;
       if (wallDone && roof.t > 0 && clock - roof.t < 6 && visW > 700) focus = (focus + (WALL_L + WALL_R) / 2) / 2;
-      focus = clamp(focus, hi + mg - visW / 2, lo - mg + visW / 2);
       c = clamp(focus, WORLD_L + visW / 2, WORLD_R - visW / 2);
     }
-    var wy = 0;
-    if (vpan) {
-      var need = Math.max(290, F.h + (F.load ? objH(F.load) : 0) + 80), topW = OY0 / S - 8;
-      if (Math.abs(bl.x - c) < visW / 2) need = Math.max(need, bl.y + 110);   // the bricklayer up on the deck
-      wy = Math.max(0, need - topW) * S;
-    }
-    if (!camSet || dt === 0) { camC = c; camY = wy; camSet = true; }
-    else { camC += (c - camC) * (1 - Math.exp(-2.4 * dt)); camY += (wy - camY) * (1 - Math.exp(-2.4 * dt)); }
-    // The easing never lets the machine slip off the edge (driving, turning) or the forks off the top (lifting).
-    if (visW < full) camC = clamp(clamp(camC, hi + mg - visW / 2, lo - mg + visW / 2), WORLD_L + visW / 2, WORLD_R - visW / 2);
-    camY = Math.max(camY, wy - 6 * S);
+    if (!camSet || dt === 0) { camC = c; camSet = true; }
+    else camC += (c - camC) * (1 - Math.exp(-2.4 * dt));
     OX = cw / 2 - camC * S;
-    OY = OY0 + camY;
   }
   window.addEventListener("resize", resize);
-  var lowMQ = window.matchMedia ? window.matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
-  function coachLow() { return !!(lowMQ && lowMQ.matches) && !document.body.classList.contains("big"); }
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - OX) / S, y: (OY - (cy - r.top)) / S }; }
   function worldToScreen(x, y) { var r = cv.getBoundingClientRect(); return [r.left + OX + x * S, r.top + OY - y * S]; }
   function worldT() { ctx.setTransform(dpr * S, 0, 0, -dpr * S, dpr * OX, dpr * OY); }
@@ -1164,7 +1148,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     });
     // Tire marks from turning around.
     skids.forEach(function (k) {
-      ctx.globalAlpha = 0.45 * (1 - k.t / 1.5);
+      ctx.globalAlpha = 0.45 * (1 - k.t / 6);
       ctx.strokeStyle = "#5E4B35"; ctx.lineWidth = 6;
       ctx.beginPath(); ctx.ellipse(k.x, -6, 90, 6, 0, 0, Math.PI); ctx.stroke();
       ctx.globalAlpha = 1;
@@ -1182,24 +1166,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.fillStyle = "#5A3E22";
     ctx.fillRect(-40, 2, 30, 8); ctx.fillRect(10, 2, 30, 8);
     line(-HALF + 2, 10.5, HALF - 2, 10.5, 1.5, "#8C6334");
-  }
-  // The stack of empty pallets under the scaffold, and the ones on their way down to it.
-  var PILE_X = (SC_L + SC_R) / 2;
-  function stepDrops(dt) {
-    for (var i = drops.length - 1; i >= 0; i--) {
-      var d = drops[i];
-      d.t += dt / (reduce ? 0.6 : 1.4);
-      if (d.t >= 1) { drops.splice(i, 1); pile++; thud(); puff(PILE_X, Math.min(pile, 7) * PH, 0.4, 1); saveState(); }
-    }
-  }
-  function drawPile() {
-    var n = Math.min(pile, 7), i;
-    for (i = 0; i < n; i++) { ctx.save(); ctx.translate(PILE_X, i * PH); drawPalletBase(); ctx.restore(); }
-    drops.forEach(function (d) {
-      var u = ease(d.t), ty = Math.min(pile, 7) * PH;
-      var x = d.x + (PILE_X - d.x) * u, y = d.y + (ty - d.y) * u + Math.sin(u * Math.PI) * 30;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(u * Math.PI) * 0.15); drawPalletBase(); ctx.restore();
-    });
   }
   function brickPattern(x, y, w, h, col, mortar, rh, bw) {
     ctx.save();
@@ -1403,7 +1369,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (var i = 0; i < n; i++) {
       var x = WALL_L + i * w, oy = 0;
       if (times && times[i] != null) oy = (1 - ease((clock - times[i]) / 0.3)) * 18;
-      if (r < 2) {
+      if (r < 4) {
         box(x + 1, y0 + oy, w - 2, ROW_H, 2, "#A9B0BC", 3);
         ctx.fillStyle = "#8D95A5"; ctx.fillRect(x + 8, y0 + oy + 8, w - 16, 4);
       } else {
@@ -1443,7 +1409,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var walking = bl.st === "walk" || bl.st === "back" || (bl.st === "lift" && true);
     drawPerson(bl.x, bl.y, bl.face, {
       walk: walking && !reduce ? clock * 9 : 0,
-      carry: bl.st === "lift" && bl.carry ? (rows < 2 ? "blocks" : "bricks") : null,
+      carry: bl.st === "lift" && bl.carry ? (rows < 4 ? "blocks" : "bricks") : null,
       tap: bl.st === "idle",
       wave: bl.flag && wallDone && roof.t > 0 && clock - roof.t < 8
     });
@@ -1643,7 +1609,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawSky(t);
     drawGround();
     drawCone(SC_L - 60 + 0); drawCone(-10);
-    drawPile();
     drawScaffold(t);
     drawWall(t);
     drawObjects(function (o) { return onDeck(o); });
@@ -1694,7 +1659,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (F.engaged && !F.load && !F.slide && F.dir * (tipX() - nearFace(F.engaged)) < -2) { var was = F.engaged.placed; disengage(); if (was) coachAgain(); }
     }
     stepBricklayer(dt);
-    stepDrops(dt);
     stepMoments(dt);
     stepParticles(dt);
     clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > WORLD_R + 300) c.x = WORLD_L - 300; });
@@ -1706,116 +1670,72 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else beepT = 0;
   }
 
-  // ---------- Input: tap or drag (Toybox.press) ----------
-  // One press is always enough: a tap on a pallet moves that whole pallet to its next place; a tap on the forklift
-  // or the forks does the next move (like Move it!); a tap on the truck's cab toots its horn; a tap on the ground
-  // drives the forks there. Dragging (or holding still) moves the forks with the finger: drive and lift by hand.
+  // ---------- Input: drag the forks; tap the cab to honk ----------
   function onForklift(w) {
     var back = F.x - F.dir * BACK, lo = Math.min(back, F.x - F.dir * 30), hi = Math.max(back, F.x - F.dir * 30);
     return w.x > lo && w.x < hi && w.y > 0 && w.y < 250;
   }
   function onTruckCab(w) { return truckHere() && w.x > 20 + truck.off && w.x < 160 + truck.off && w.y > 0 && w.y < 190; }
-  function onForks(w) {
-    var c = F.x + F.dir * LOADC, lh = F.load ? objH(F.load) : 0;
-    if (Math.abs(w.x - (F.x + F.dir * FORK / 2)) < FORK / 2 + 30 && w.y > F.h - 40 && w.y < F.h + Math.max(70, lh + 30)) return true;
-    return !!(F.load && Math.abs(w.x - c) < HALF + 20 && w.y > F.h - 20 && w.y < F.h + lh + 20);
-  }
-  function palletAt(w) {
-    var best = null, bd = 1e9;
-    objs.forEach(function (o) {
-      var x = wx(o);
-      if (o.busy || Math.abs(w.x - x) > HALF + 16 || w.y < o.y - 16 || w.y > topOf(o) + 16) return;
-      var d = Math.abs(w.x - x) + Math.abs(w.y - (o.y + objH(o) / 2)) * 0.5;
-      if (d < bd) { bd = d; best = o; }
-    });
-    return best;
-  }
-  function startDrag(e, x0, y0) {
-    var w = screenToWorld(x0, y0);
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (ending || Toybox.timer.locked()) return;
+    if (drag && drag.id !== e.pointerId) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    if (onTruckCab(w)) { toot(); rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 }); return; }
     if (!stepsLocked) { steps = []; }
-    auto = false; autoPick = null;
-    // Grabbing the forks, the load or the machine itself moves it from where it is; a press anywhere else calls the forks over.
-    var tip = tipX(), cab = onForklift(w), near = cab || onForks(w);
+    auto = false;
+    // Grabbing the forks, the load or the machine itself moves it from where it is; a touch anywhere else calls the forks over.
+    var tip = tipX(), near = false;
+    var c = F.x + F.dir * LOADC, lh = F.load ? objH(F.load) : 0;
+    if (Math.abs(w.x - (F.x + F.dir * FORK / 2)) < FORK / 2 + 30 && w.y > F.h - 40 && w.y < F.h + Math.max(70, lh + 30)) near = true;
+    if (F.load && Math.abs(w.x - c) < HALF + 20 && w.y > F.h - 20 && w.y < F.h + lh + 20) near = true;
+    var cab = onForklift(w);
+    if (cab) near = true;
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, wx: w.x, wy: w.y, ox: near ? tip - w.x : 0, oy: near ? F.h - w.y : -10,
       paused: false, t0: performance.now(), moved: 0, cab: cab };
-    var wn = screenToWorld(e.clientX, e.clientY);
-    drag.wx = wn.x; drag.wy = wn.y;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     cv.classList.add("grabbing");
     dragged = true; byHand = true;
-  }
-  var usedTap = false;
-  var press = Toybox.press(cv, {
-    any: true,
-    dragStart: function (part, e, st) {
-      if (ending || Toybox.timer.locked()) return;
-      if (drag && drag.id !== e.pointerId) return;
-      if (onTruckCab(screenToWorld(st.x0, st.y0))) return;
-      startDrag(e, st.x0, st.y0);
-    },
-    move: function (part, e) {
-      if (!drag || drag.id !== e.pointerId) return;
-      drag.moved += Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy);
-      drag.sx = e.clientX; drag.sy = e.clientY;
-      var w = screenToWorld(e.clientX, e.clientY);
-      drag.wx = w.x; drag.wy = w.y;
-    },
-    up: function (part, e) {
-      if (!drag || drag.id !== e.pointerId) return;
-      drag = null;
-      cv.classList.remove("grabbing");
-    },
-    tap: function (part, x, y) {
-      if (ending) return;
-      var w = screenToWorld(x, y);
-      if (onTruckCab(w)) { toot(); rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 }); tagWorld("Delivery truck", 90 + truck.off, 200); return; }
-      var o = F.load || (F.engaged && !F.engaged.placed) ? null : palletAt(w);
-      if (o) {
-        usedTap = true;
-        tagWorld(o.k === "empties" ? "Empty pallets" : "Pallet of " + o.k, wx(o), topOf(o) + 20);
-        if (!moveIt(o)) nothingToDo();
-        return;
-      }
-      if (F.load || F.engaged || onForks(w) || onForklift(w)) {
-        if (onForklift(w) && !F.load && !F.engaged && !nextPickup()) { honk(); return; }
-        usedTap = true;
-        if (!moveIt()) nothingToDo();
-        return;
-      }
-      // The ground: drive the forks over there (a short, calm drive).
-      if (stepsLocked || F.turn) return;
-      auto = false; autoPick = null;
-      var dx = clampBody(w.x - F.dir * FORK, F.dir);
-      steps = [mv(dx, F.h, INCH)];
-      rings.push({ x: w.x, y: Math.max(10, w.y), t: 0 });
-    }
   });
-  function nothingToDo() {
-    go.wiggle();
-    if (truck.state !== "parked") flashCoach("Here comes the truck!", 3000);
-    else flashCoach("All done! Tap New!", 3000);
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    drag.moved += Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy);
+    drag.sx = e.clientX; drag.sy = e.clientY;
+    var w = screenToWorld(e.clientX, e.clientY);
+    drag.wx = w.x; drag.wy = w.y;
+  });
+  function endDrag(e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var was = drag;
+    drag = null;
+    cv.classList.remove("grabbing");
+    if (was.cab && was.moved < 12 && performance.now() - was.t0 < 450) honk();
   }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
   function honk() { horn(); F.waveArm = clock; rings.push({ x: F.x + F.dir * (FORK + 20), y: 150, t: 0, arc: F.dir }); flashCoach("Beep beep!", 2000); }
 
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "goBtn") moveIt();
+    else if (t.id === "newBtn") newWall();
+    else if (t.id === "surpriseBtn") surprise();
+  });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
   document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
 
-  // ---------- Counter, coach line and name tags ----------
+  // ---------- Counter and coach line ----------
   function showCount(pop) {
     var el = $("count");
     el.textContent = "Pallets: " + count;
     if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
-  var coach = Toybox.coach($("coach"));
-  function tagWorld(text, x, y) {
-    if (ending) return;
-    var p = worldToScreen(x, y);
-    Toybox.nametag(text, p[0], p[1], 2000);
-  }
-  var coachShown = null;
+  var coachShown = "", coachUntil = 0, flashText = "", flashUntil = 0;
   function coachWanted() {
-    if (F.turn) return coachShown || "";
+    if (F.turn) return coachShown;
     if (F.load) {
       var d = bestDest(F.load), c = F.x + F.dir * LOADC;
       if (d && Math.abs(c - d.x) < 70 && F.h - SLOT - d.top > 40) return "Lower it down!";
@@ -1824,17 +1744,25 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       return "Put it in the yard!";
     }
     if (F.engaged) return F.engaged.placed ? "Back out!" : "Lift it up!";
-    if (truck.state === "arrive" && truck.off < -200) return "Here comes the truck!";
-    if (nextPickup()) return "Move a pallet!";
-    if (wallDone) return "The wall is done!";
+    if (truck.state === "parked") {
+      if (truckFull()) return "Drag the forks to the pallet!";
+      if (deckEmpties()) return "Load the empty pallets on the truck!";
+    }
+    if (rows < ROWS) for (var i = 0; i < objs.length; i++) if (isYard(objs[i]) && wallKind(objs[i])) return "Drag the forks to the pallet!";
+    if (truck.state === "arrive") return truck.off < -200 ? "Here comes the truck!" : "Drag the forks to the pallet!";
     return "";
   }
-  function flashCoach(text, ms) { coach.say(text, (ms || 3000) / 1000); }
-  function coachAgain() { coachShown = null; }
+  function flashCoach(text, ms) { flashText = text; flashUntil = Date.now() + ms; coachShown = ""; }
+  function coachAgain() { coachShown = ""; }
   function coachTick() {
-    if (ending) return;
-    var t = coachWanted();
-    if (t !== coachShown) { coachShown = t; coach.step(t); }
+    var now = Date.now(), el = $("hint");
+    var t = now < flashUntil ? flashText : coachWanted();
+    if (ending || !t) { if (!el.hidden) el.hidden = true; coachShown = t ? "" : coachShown; return; }
+    if (t !== coachShown) {
+      coachShown = t; el.textContent = t; el.hidden = false; el.classList.remove("off");
+      if (!reduce) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
+      coachUntil = now + Math.max(6000, now < flashUntil ? flashUntil - now : 0);
+    } else if (now > coachUntil && !el.classList.contains("off")) el.classList.add("off");
   }
 
   // ---------- Sound (off by default; soft and synthesized) ----------
@@ -1910,7 +1838,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ending = true; drag = null; auto = false; F.parked = false;
     cv.classList.remove("grabbing");
     if (!stepsLocked && !F.slide) steps = [];
-    press.cancel(); autoPick = null;
+    $("hint").hidden = true;
     if (!info.goodbye) parking = true;
   }
   function goodbyePark() { parking = true; chime(); }
@@ -1959,74 +1887,135 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     camera(dt);
     draw(clock);
     coachTick();
-    updateGo();
     humT += dt; if (humT > 0.1) { humT = 0; humTick(); }
     requestAnimationFrame(loop);
   }
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveState(); });
   window.addEventListener("pagehide", saveState);
 
-  // ---------- Panel: Go ("Move it!") and the bottom bar (New, Surprise); the ghost hand ----------
-  var PIC_MOVE = '<svg viewBox="0 0 60 48"><g stroke="#1D2340" stroke-width="2" stroke-linejoin="round"><rect x="3" y="20" width="10" height="18" rx="4" fill="#4A5066"/><path d="M11 38 V22 H22 V26 H34 L37 30 V38 Z" fill="#FFC93C"/><path d="M14 22 V7 M33 26 L31 7" fill="none" stroke-width="3"/><rect x="11" y="4" width="24" height="5" rx="1.5" fill="#3A4150"/><rect x="37" y="8" width="4" height="32" fill="#5B6476"/><rect x="41" y="14" width="3" height="20" fill="#4A5066"/><path d="M43 34 H58 V36.5 L55 38 H43 Z" fill="#3A4150"/><rect x="44" y="28" width="14" height="5" fill="#B5793A"/><rect x="45" y="15" width="12" height="13" fill="#C8553D"/><circle cx="10" cy="40" r="5.5" fill="#2F3447"/><circle cx="31" cy="39" r="7" fill="#2F3447"/><circle cx="31" cy="39" r="2.5" fill="#C9D3E0" stroke-width="1.5"/></g></svg>';
-  var go = Toybox.go($("go"), {
-    label: "Move it!", icon: PIC_MOVE,
-    onPress: function () {
-      if (ending) return false;
-      ghost.learned("go");
-      return moveIt();
-    },
-    onIdle: function () { if (truck.state !== "parked") flashCoach("Here comes the truck!", 3000); else flashCoach("All done! Tap New!", 3000); },
-    onBusy: function () { coach.say("Moving it!", 3); }
-  });
-  function updateGo() {
-    var busy = auto && !ending;
-    if (busy !== go.isBusy()) go.busy(busy);
+  // ---------- Idle help: the Toybox ghost hand (master copy: tools/snippets/ghost-hand.js) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
   }
-  Toybox.bar($("bottom"), { onNew: newWall, onSurprise: surprise });
-
   function inStage(p) {
     var r = $("stage").getBoundingClientRect();
     return [clamp(p[0], r.left + 34, r.right - 34), clamp(p[1], r.top + 34, r.bottom - 34)];
   }
   function forkPt() { return worldToScreen(F.x + F.dir * FORK * 0.6, F.h + 6); }
-  // The ghost hand: first it taps the next pallet (the one-press way); once he has used the tap, it drags the
-  // forks into the pallet's openings, then up, then over to its place.
-  var ghost = Toybox.ghost({
-    max: 3,
-    plan: function () {
-      if (ending || drag || steps.length || auto || F.turn || F.slide) return null;
-      var f = inStage(forkPt());
-      if (!usedTap) {
-        if (F.load || F.engaged) return null;
-        var t = nextPickup();
-        if (!t) return null;
-        var tp = worldToScreen(wx(t), t.y + objH(t) / 2), sr = $("stage").getBoundingClientRect();
-        if (tp[0] < sr.left + 20 || tp[0] > sr.right - 20) return null;   // out of view (the camera is at the wall)
-        return { pts: [inStage(tp)], tap: true, key: "tap" };
-      }
-      if (F.load) {
-        var d = bestDest(F.load);
-        if (!d || d.dir !== F.dir) return null;
-        return { pts: [f, inStage(worldToScreen(d.x - F.dir * (LOADC - FORK * 0.6), d.top + 30))], key: "drag" };
-      }
-      if (F.engaged) {
-        if (F.engaged.placed) return { pts: [f, inStage(worldToScreen(F.x - F.dir * 140 + F.dir * FORK * 0.6, F.h + 6))], key: "drag" };
-        return { pts: [f, inStage(worldToScreen(F.x + F.dir * FORK * 0.6, F.h + 90))], key: "drag" };
-      }
-      var o = nextPickup();
-      if (!o || pickupDir(o) !== F.dir) return null;
-      return { pts: [f, inStage(worldToScreen(nearFace(o) + F.dir * FORK * 0.6, o.y + SLOT + 6))], key: "drag" };
+  // The ghost hand drags the forks to the next pallet's openings, then up, then to the place.
+  var ghost = makeGhost(function () {
+    if (ending || drag || steps.length || auto || F.turn || F.slide) return null;
+    var f = inStage(forkPt());
+    if (F.load) {
+      var d = bestDest(F.load);
+      if (!d || d.dir !== F.dir) return null;
+      coachAgain();
+      return { pts: [f, inStage(worldToScreen(d.x - F.dir * (LOADC - FORK * 0.6), d.top + 30))] };
     }
-  });
+    if (F.engaged) {
+      coachAgain();
+      if (F.engaged.placed) return { pts: [f, inStage(worldToScreen(F.x - F.dir * 140 + F.dir * FORK * 0.6, F.h + 6))] };
+      return { pts: [f, inStage(worldToScreen(F.x + F.dir * FORK * 0.6, F.h + 90))] };
+    }
+    var o = nextPickup();
+    if (!o || pickupDir(o) !== F.dir) return null;
+    coachAgain();
+    return { pts: [f, inStage(worldToScreen(nearFace(o) + F.dir * FORK * 0.6, o.y + SLOT + 6))] };
+  }, { max: 3 });
 
   // ---------- Start ----------
   var startFresh = !!(window.Toybox && Toybox.fresh());
   if (startFresh || !loadState()) {
     rows = 0; wallDone = false; count = 0; trucks = 0; objs = [];
-    F.x = 560; F.dir = -1; F.h = TRAVEL; F.load = null; pile = 0;
+    F.x = 600; F.dir = -1; F.h = TRAVEL; F.load = null;
     newTruck();
-    // The first truck is already there when he opens the page.
-    truck.state = "parked"; truck.off = 0; truck.t = 0;
     saveState();
   }
   resize();
@@ -2061,7 +2050,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         engaged: F.engaged ? F.engaged.k : null, slide: F.slide ? [F.slide.x, F.slide.h] : null, fx: F.x, fh: F.h, placed: !!(F.engaged && F.engaged.placed), turning: !!F.turn, rows: rows, done: wallDone,
         count: count, truck: truck.state, auto: auto, steps: steps.length, parked: F.parked,
         objs: objs.map(function (o) { return { k: o.k, n: o.n, x: Math.round(wx(o)), y: Math.round(o.y), tr: !!o.tr }; }),
-        coach: coach.text(), go: go.label(), busy: go.isBusy(), pile: pile, bl: bl.st, crossing: !!crossing, bird: bird ? bird.st : null, hop: !!hop, faces: clock - faces < 5.5 };
+        coach: $("hint").hidden ? "" : $("hint").textContent, bl: bl.st, crossing: !!crossing, bird: bird ? bird.st : null, hop: !!hop, faces: clock - faces < 5.5 };
     },
     toScreen: function (x, y) { var p = worldToScreen(x, y); return { x: p[0], y: p[1] }; },
     forkScreen: function () { var p = forkPt(); return { x: p[0], y: p[1] }; },

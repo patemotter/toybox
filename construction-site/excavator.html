@@ -75,56 +75,131 @@ body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The panel is one green Go that alternates Dig! / Dump! and the bottom bar (New, Surprise), built by the shared
-   components in common/toybox.js. On the picture: drag the bucket, tap the dirt to dig, tap the truck to dump. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv.held { cursor: grabbing; }
+/* "Loads" is the counter (tb-counter); the hint is the coach line (tb-coach). */
 .loads { font-variant-numeric: tabular-nums; }
 .loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
-/* Play-timer gauge: the time-left badge, top-right of the stage. */
+.hint { background: var(--accent); }
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
+/* Long coach lines wrap on phones instead of being cut off. */
+@media (max-width: 600px) { .hint { white-space: normal; line-height: 1.15; } }
+
+/* Play-timer gauge */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
-/* Big: the header and the bottom bar hide; Go stays (taps on the picture dig and dump too). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-bottombar { display: none; }
+
+/* ---------- Panel: the two backup buttons, Dig and Dump (picture tiles) ---------- */
+.acts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.tb-tile.act {
+  flex-direction: row; gap: 10px; min-height: 78px; padding: 4px 10px;
+  background: var(--tile); color: #1D2340; font-size: 1.45rem; font-weight: 800; line-height: 1;
+}
+.tb-tile.act svg { width: 70px; height: 52px; flex: none; pointer-events: none; overflow: visible; }
+.tb-tile.act span { pointer-events: none; }
+.tb-tile.act.on { background: var(--accent); transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* Big: the header shrinks to the Big button and the panel hides; the bucket is dragged on the picture. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+
+/* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* The Back button shows the site's picture (and its name on an iPad). */
-.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* Phone held sideways: the coach line goes to the top, clear of the machine and the crate. */
+
+/* Tablets: bigger tiles. */
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-tile.act { min-height: 104px; font-size: 1.8rem; gap: 14px; }
+  .tb-tile.act svg { width: 96px; height: 72px; }
+}
+/* Landscape: the stage on the left, Dig and Dump stacked in a slim column on the right. */
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(20%, 210px); }
+  .tb-body .tb-panel .acts { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, 1fr); overflow: visible; }
+  .tb-tile.act { flex-direction: column; gap: 4px; }
+}
 @media (orientation: landscape) and (max-height: 520px) {
-  #coach.tb-coach { top: 10px; bottom: auto; }
+  .tb-body .tb-panel { width: 132px; padding: 6px; }
+  .acts { gap: 8px; }
+  .tb-tile.act { min-height: 0; font-size: 1.2rem; }
+  .tb-tile.act svg { width: 64px; height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .loads.pop { animation: none; }
+  .hint.go, .loads.pop { animation: none; }
 }
+/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2 wrap">
+<div class="tb-app-shell wrap">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the site"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 34h30" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M13 34V7M13 8h22M13 8 6 14" fill="none" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 33V8h21" fill="none" stroke="#FFC72C" stroke-width="1.6"/><path d="M29 8v11" stroke="#1D2340" stroke-width="2"/><rect x="25.5" y="19" width="7" height="6" fill="#F77F00" stroke="#1D2340" stroke-width="2"/></svg><span>Site</span></a>
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Excavator</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck. Tap the dirt to dig, tap the truck to dump, or drag the bucket."></canvas>
+      <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck. Drag the bucket to dig."></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter loads" id="loads">Loads: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach hint" id="hint" hidden></div>
     </main>
-    <section class="tb-panel" id="panel">
-      <div id="go"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel panel" id="panel">
+      <div class="tb-choices acts" id="acts">
+        <button class="btn tb-tile act" id="digBtn" aria-label="Dig: scoop up a bucket of dirt">
+          <svg viewBox="0 0 64 48" aria-hidden="true">
+            <path d="M1 46 C8 29 21 23 34 24 C48 25 58 33 63 46 Z" fill="#8B5A2B" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round"/>
+            <circle cx="12" cy="40" r="2" fill="#5E3A1B"/><circle cx="50" cy="39" r="2.2" fill="#5E3A1B"/><circle cx="42" cy="43" r="1.8" fill="#5E3A1B"/>
+            <path d="M0 3 L22 13" stroke="#1D2340" stroke-width="9" stroke-linecap="round"/>
+            <path d="M0 3 L22 13" stroke="#FFC72C" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40 L25 32 Z" fill="#3A4150"/>
+            <path d="M25 32 C30 28 37 28 41 30 L34 37 L28 40 Z" fill="#7A4B22"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#1D2340" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#FFC72C" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M27 39 L32 38 L27 45 Z" fill="#C9CED6" stroke="#1D2340" stroke-width="1.8" stroke-linejoin="round"/>
+            <circle cx="22" cy="13" r="2.6" fill="#9AA3B2" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="49" cy="13" r="3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="55" cy="21" r="2.5" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/>
+            <circle cx="50" cy="5" r="2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+          </svg><span>Dig</span></button>
+        <button class="btn tb-tile act" id="dumpBtn" aria-label="Dump: pour the dirt into the truck">
+          <svg viewBox="0 0 64 48" aria-hidden="true">
+            <path d="M22 32 C27 22 49 21 56 32 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M19 32 H61 L59 41 H20 Z" fill="#E63946" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M3 41 V32 L7 26 H17 V41 Z" fill="#F77F00" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M8.5 28 H14.5 V32.5 H6 Z" fill="#9FD6F5" stroke="#1D2340" stroke-width="1.6" stroke-linejoin="round"/>
+            <circle cx="11" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <circle cx="43" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <circle cx="53" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>
+            <path d="M64 1 L50 7" stroke="#1D2340" stroke-width="8" stroke-linecap="round"/>
+            <path d="M64 1 L50 7" stroke="#FFC72C" stroke-width="4" stroke-linecap="round"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15 Z" fill="#3A4150"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#1D2340" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="M27 14 L30 16 L26 20 Z" fill="#C9CED6" stroke="#1D2340" stroke-width="1.5" stroke-linejoin="round"/>
+            <circle cx="50" cy="7" r="2.4" fill="#9AA3B2" stroke="#1D2340" stroke-width="1.4"/>
+            <circle cx="35" cy="15" r="2.6" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="40" cy="19" r="2.3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="35" cy="23" r="2.2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/>
+            <circle cx="42" cy="12" r="2" fill="#7A4B22" stroke="#1D2340" stroke-width="1.2"/>
+          </svg><span>Dump</span></button>
+      </div>
     </section>
   </div>
 </div>
@@ -163,7 +238,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var PH_READY = -95 * DEG, PH_CARRY = -165 * DEG, PH_DUMP = -25 * DEG, PH_PARK = -60 * DEG;
   var GROUND = 16;                    // nothing on the arm goes lower than this (except into the pile)
   var CAP = 2600;                     // bucket holds this much dirt
-  var TRUCK_CAP = 5600;               // a truck is full after 3 buckets
+  var TRUCK_CAP = 6400;               // a truck is full after about 3 buckets
   var PV = 26;                        // dirt in one pour grain
 
   // Bucket outline in bucket coords (u from pin toward the teeth, v toward the opening).
@@ -381,7 +456,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function visTop() { return OY / S; }
   // The treasure crate: in the strip of ground in front, at the left edge of a wide view, or (when the view
   // pans) under the excavator, where both the dirt side and the truck side can see it.
-  function crateX() { return wideView() ? visLeft() + 82 * crateK() : CX; }
+  function crateX() { return wideView() ? visLeft() + 82 : CX; }
   var CRATE_TOP = -4;
 
   function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
@@ -610,20 +685,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     rows.forEach(function (r) { r[0].forEach(function (x) { SLOTS.push([x, r[1]]); }); });
   })();
   var SLOT_S = 0.85;
-  // A phone held sideways shows the whole site small: the crate is drawn bigger there.
-  function crateK() { return wideView() && ch < 480 ? 1.35 : 1; }
-  var CRATE_B = CRATE_TOP - 56;   // the crate grows up from its bottom edge
-  function slotPos(i) { var s = SLOTS[Math.min(i, SLOTS.length - 1)], K = crateK(); return { x: crateX() + s[0] * K, y: CRATE_B + (CRATE_TOP + s[1] - CRATE_B) * K }; }
+  function slotPos(i) { var s = SLOTS[Math.min(i, SLOTS.length - 1)]; return { x: crateX() + s[0], y: CRATE_TOP + s[1] }; }
   function drawCrate() {
     var x = crateX(), b = crate.bounce;
-    var K = crateK();
-    ctx.save(); ctx.translate(x, CRATE_B); ctx.scale(K * (1 + 0.06 * b), K * (1 - 0.06 * b)); ctx.translate(-x, -CRATE_B);
+    ctx.save(); ctx.translate(x, CRATE_TOP - 56); ctx.scale(1 + 0.06 * b, 1 - 0.06 * b); ctx.translate(-x, -(CRATE_TOP - 56));
     // the open lid leaning back behind
     shape([[x - 56, CRATE_TOP], [x + 56, CRATE_TOP], [x + 50, CRATE_TOP + 26], [x - 50, CRATE_TOP + 26]], "#A86F38", 4);
     // treasures, top rows first so the lower ones sit in front
     var items = crate.items.slice(-SLOTS.length), n = items.length;
     for (var i = n - 1; i >= 0; i--) {
-      var sl = SLOTS[Math.min(i, SLOTS.length - 1)], p = { x: x + sl[0], y: CRATE_TOP + sl[1] };
+      var p = slotPos(i);
       drawTreasure(items[i], p.x, p.y + 4, SLOT_S, ((i * 37) % 7 - 3) * 0.06);
     }
     // the front of the box
@@ -643,7 +714,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (f.t < SHOW_T) return { x: f.hx, y: f.hy + Math.sin((f.t - POP_T) * 3.2) * 8, s: 2.1 };
     var u = smooth((f.t - SHOW_T) / (FLY_T - SHOW_T)), sp = slotPos(f.slot), cx = (f.hx + sp.x) / 2, cy = Math.max(f.hy, sp.y) + 90;
     var x = (1 - u) * (1 - u) * f.hx + 2 * (1 - u) * u * cx + u * u * sp.x, y = (1 - u) * (1 - u) * f.hy + 2 * (1 - u) * u * cy + u * u * (sp.y + 4);
-    return { x: x, y: y, s: lerp(2.1, SLOT_S * crateK(), u) };
+    return { x: x, y: y, s: lerp(2.1, SLOT_S, u) };
   }
   function drawFlyers(now) {
     flyers.forEach(function (f) {
@@ -810,42 +881,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     beeps.forEach(function (b) {
-      var sx = OX + b.x * S, sy = OY - b.y * S, a = b.life < 0 ? 0 : clamp(1 - b.life / (b.text ? 1.8 : 1.1), 0, 1);
+      var sx = OX + b.x * S, sy = OY - b.y * S, a = clamp(1 - b.life / 1.1, 0, 1);
       ctx.globalAlpha = a;
       ctx.font = "800 " + Math.max(16, Math.round(34 * S)) + "px " + fontFam;
-      if (a <= 0) return;
-      ctx.lineWidth = Math.max(4, 8 * S); ctx.strokeStyle = OUT; ctx.strokeText(b.text || "BEEP", sx, sy);
-      ctx.fillStyle = "#FFD166"; ctx.fillText(b.text || "BEEP", sx, sy);
+      ctx.lineWidth = Math.max(4, 8 * S); ctx.strokeStyle = OUT; ctx.strokeText("BEEP", sx, sy);
+      ctx.fillStyle = "#FFD166"; ctx.fillText("BEEP", sx, sy);
     });
     ctx.globalAlpha = 1;
   }
   var fontFam = '"Baloo 2", "Trebuchet MS", sans-serif';
-  // Surprise: happy cartoon faces on the dirt pile and the truck for a few seconds (they blink and look at the bucket).
-  function drawFace(x, y, r, look, blink) {
-    var ey = y + r * 0.22, ex = r * 0.44;
-    [-1, 1].forEach(function (sd) {
-      if (blink) { ctx.beginPath(); ctx.moveTo(x + sd * ex - r * 0.2, ey); ctx.lineTo(x + sd * ex + r * 0.2, ey); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke(); return; }
-      circle(x + sd * ex, ey, r * 0.27, "#FFFFFF", 3.5);
-      circle(x + sd * ex + look * r * 0.1, ey + r * 0.02, r * 0.13, OUT, 0);
-    });
-    ctx.globalAlpha = 0.55; circle(x - r * 0.72, y - r * 0.12, r * 0.16, "#FF8FA3", 0); circle(x + r * 0.72, y - r * 0.12, r * 0.16, "#FF8FA3", 0); ctx.globalAlpha = 1;
-    ctx.beginPath(); ctx.arc(x, y - r * 0.02, r * 0.46, Math.PI * 1.15, Math.PI * 1.85); ctx.lineWidth = 4.5; ctx.strokeStyle = OUT; ctx.lineCap = "round"; ctx.stroke();
-  }
-  function drawFaces(now) {
-    var t = surprise.t, k = Math.min(1, t / 0.35, (surprise.dur - t) / 0.35), blink = (now % 2600) < 160;
-    if (k <= 0) return;
-    var b = bucketWorld();
-    // the dirt pile: at its highest point
-    var best = 0, bx = PX0 + 200;
-    for (var i = 0; i < PN; i++) if (pile[i] > best) { best = pile[i]; bx = PX0 + (i + 0.5) * PCW; }
-    if (best > 60) {
-      var py = best * 0.48, pr = 30 + Math.min(16, best * 0.08);
-      ctx.save(); ctx.translate(bx, py); ctx.scale(k, k); drawFace(0, 0, pr, b.x < bx ? -1 : 1, blink); ctx.restore();
-    }
-    if (truck.state !== "gone") {
-      ctx.save(); ctx.translate(truck.dx + 70, 134 + truck.bounce); ctx.scale(k, k); drawFace(0, 0, 19, b.x < truck.dx + 70 ? -1 : 1, blink); ctx.restore();
-    }
-  }
   function draw() {
     var now = performance.now();
     camera();
@@ -856,7 +900,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawPile();
     drawGlints(now);
     if (truck.state !== "gone") drawTruck(truck);
-    if (surprise && surprise.kind === "faces") drawFaces(now);
     drawExcavator();
     worldT();
     drawCrate();
@@ -944,27 +987,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       function () { return { wait: 0.7 }; }
     ];
   }
-  // Surprise: lift the arm high and wave the bucket side to side (it stays curled, so nothing spills).
-  function wavePlan() {
-    var carry = function () { return m.fill > 0.05 ? PH_CARRY : PH_READY; };
-    var to = function (x, y, v) { return function () { return { tip: [x, y], ph: carry(), v: v || 260, rate: 90 }; }; };
-    return [to(300, 470, 320), to(365, 505), to(245, 505), to(365, 505), to(245, 505), to(295, 300, 320)];
-  }
-  // New: back round to the dirt, bucket ready.
-  function homePlan() {
-    return [
-      function () { return side() < 0 ? { swing: "pile" } : null; },
-      function () { return { tip: [295, 265], ph: PH_READY, v: 300, rate: 90 }; }
-    ];
-  }
   function startAuto(kind) {
     if (ending) return;
     if (auto) { if (auto.kind !== kind) queued = kind; updateButtons(); return; }
     if (kind === "dump" && m.pouring) return; // it is already tipping out
     drag = null; glide = null; cv.classList.remove("held");
     if (kind === "dump" && m.fill < 0.03) say("Dig some dirt first!");
-    var plan = kind === "dig" ? digPlan() : kind === "dump" ? dumpPlan() : kind === "wave" ? wavePlan() : homePlan();
-    auto = { kind: kind, steps: plan, i: -1, cur: null, t: 0, best: 1e9, bestT: 0 };
+    auto = { kind: kind, steps: kind === "dig" ? digPlan() : dumpPlan(), i: -1, cur: null, t: 0, best: 1e9, bestT: 0 };
     nextStep();
     updateButtons();
   }
@@ -1236,8 +1265,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
     }
     puffs = puffs.filter(function (q) { q.life += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.r += q.vr * dt; return q.life < q.max; });
-    beeps = beeps.filter(function (b) { b.life += dt; if (b.life > 0) b.y += 40 * dt; return b.life < (b.text ? 1.8 : 1.1); });
-    if (surprise) { surprise.t += dt; if (surprise.t > surprise.dur) surprise = null; }
+    beeps = beeps.filter(function (b) { b.life += dt; b.y += 40 * dt; return b.life < 1.1; });
     clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > visRight() + 40) c.x = visLeft() - 140; });
   }
 
@@ -1293,196 +1321,109 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
     } else if (t.state === "full") {
       t.t += dt; t.bounce = Math.sin(t.t * 30) * 2 * Math.max(0, 1 - t.t);
-      if (t.t > 1.3) { t.state = "leaving"; t.v = 0; loads++; saveState(); showLoads(true); chime(); if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1800); }
+      if (t.t > 1.6) { t.state = "leaving"; t.v = 0; loads++; saveState(); showLoads(true); chime(); if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1800); }
     } else if (t.state === "leaving") {
-      t.v = Math.min(620, t.v + 520 * dt); t.dx -= t.v * dt; t.wheel -= t.v * dt / 27;
+      t.v = Math.min(350, t.v + 200 * dt); t.dx -= t.v * dt; t.wheel -= t.v * dt / 27;
       if (Math.random() < 0.3) puffs.push({ x: t.dx + 300, y: 30, r: 10, vr: 30, vx: 40, vy: 30, life: 0, max: 0.9, col: "#C8A06A", a: 0.5 });
       if (t.dx + 330 < Math.min(visLeft(), camLeft(1)) - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
     } else if (t.state === "gone") {
       t.t += dt;
-      if (t.t > 0.3) { t.state = "arriving"; t.dx = Math.min(visLeft(), camLeft(1)) - 360; t.t = 0; t.beepT = 0; say("Beep beep! New truck!", 3200); }
+      if (t.t > 1.2) { t.state = "arriving"; t.dx = Math.min(visLeft(), camLeft(1)) - 360; t.t = 0; t.beepT = 0; say("Beep beep! New truck!", 3200); }
     } else if (t.state === "arriving") {
       var dist = -t.dx;
-      t.v = clamp(dist * 1.6, 60, 420); t.dx = Math.min(0, t.dx + t.v * dt); t.wheel += t.v * dt / 27;
+      t.v = clamp(dist * 1.1, 30, 200); t.dx = Math.min(0, t.dx + t.v * dt); t.wheel += t.v * dt / 27;
       t.beepT -= dt;
       if (t.beepT <= 0) { beeps.push({ x: t.dx + 330, y: 190, life: 0 }); beepSnd(); t.beepT = 0.6; }
       if (t.dx >= -0.5) { t.dx = 0; t.state = "in"; t.bounce = 4; }
     }
   }
 
-  // ---------- Coach line: always says what he can do right now (Toybox.coach) ----------
-  var coach = Toybox.coach($("coach")), coachText = null;
-  function say(text, ms) { if (!ending) coach.say(text, Math.max(3, (ms || 3000) / 1000)); }
-  // What Go (and a tap on the bucket) does next: dig with an empty bucket, dump a full one.
-  function nextKind() {
-    if (auto && auto.kind !== "wave") return auto.kind === "dig" ? "dump" : "dig";
-    if (m.pouring) return "dig";
-    return m.fill > 0.05 ? "dump" : "dig";
-  }
+  // ---------- Coach line: always says what he can do right now ----------
+  var coachEl = $("hint"), coachText = null, announce = null, loaded = false;
+  function say(text, ms) { if (!ending) announce = { text: text, until: performance.now() + Math.max(3000, ms || 3000) }; }
   function stateLine() {
-    if (ending || parking) return "";
-    return nextKind() === "dump" ? "Dump it in the truck!" : "Dig the dirt!";
+    if (ending || m.swingPhase || m.pouring || parking) return "";
+    if (side() < 0) {
+      if (m.fill > 0.05) return truck.state === "in" ? (auto ? "" : "Dump it in the truck!") : "Wait for the truck!";
+      return auto ? "" : "Back to the dirt!";
+    }
+    if (auto) return "";
+    // a little stickiness so the line does not flicker while dirt spills
+    if (m.fill >= 0.6) loaded = true; else if (m.fill < 0.3) loaded = false;
+    return loaded ? "Take it to the truck!" : "Drag the bucket into the dirt!";
   }
   function coachTick() {
-    var want = stateLine();
-    if (want && want !== coachText) { coachText = want; coach.step(want); }
-    updateButtons();
+    var now = performance.now();
+    if (announce && now > announce.until) announce = null;
+    var locked = false;
+    try { locked = Toybox.timer.locked(); } catch (e) { /* ignore */ }
+    var want = ending || locked ? "" : (announce ? announce.text : stateLine());
+    if (want === coachText) return;
+    coachText = want;
+    if (!want) { coachEl.classList.add("off"); return; }
+    coachEl.textContent = want; coachEl.hidden = false; coachEl.classList.remove("off");
+    coachEl.classList.remove("go"); void coachEl.offsetWidth; coachEl.classList.add("go");
   }
 
-  // ---------- Panel: one Go that alternates Dig! and Dump!, then New and Surprise ----------
-  var PIC_DIG = '<svg viewBox="0 0 64 48"><path d="M1 46 C8 29 21 23 34 24 C48 25 58 33 63 46 Z" fill="#8B5A2B" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round"/>' +
-    '<path d="M0 3 L22 13" stroke="#1D2340" stroke-width="9" stroke-linecap="round"/><path d="M0 3 L22 13" stroke="#FFC72C" stroke-width="4.5" stroke-linecap="round"/>' +
-    '<path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40 L25 32 Z" fill="#3A4150"/><path d="M25 32 C30 28 37 28 41 30 L34 37 L28 40 Z" fill="#7A4B22"/>' +
-    '<path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#1D2340" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<path d="M22 13 L36 12 L42 20 L41 30 L34 37 L28 40" fill="none" stroke="#FFC72C" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="49" cy="13" r="3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/><circle cx="55" cy="21" r="2.5" fill="#7A4B22" stroke="#1D2340" stroke-width="1.5"/></svg>';
-  var PIC_DUMP = '<svg viewBox="0 0 64 48"><path d="M22 32 C27 22 49 21 56 32 Z" fill="#7A4B22" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>' +
-    '<path d="M19 32 H61 L59 41 H20 Z" fill="#E63946" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/><path d="M3 41 V32 L7 26 H17 V41 Z" fill="#F77F00" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>' +
-    '<path d="M8.5 28 H14.5 V32.5 H6 Z" fill="#9FD6F5" stroke="#1D2340" stroke-width="1.6" stroke-linejoin="round"/><circle cx="11" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>' +
-    '<circle cx="43" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/><circle cx="53" cy="43" r="4" fill="#2B2F3A" stroke="#1D2340" stroke-width="1.8"/>' +
-    '<path d="M64 1 L50 7" stroke="#1D2340" stroke-width="8" stroke-linecap="round"/><path d="M64 1 L50 7" stroke="#FFC72C" stroke-width="4" stroke-linecap="round"/>' +
-    '<path d="M50 7 L45 2 L35 2 L29 8 L28 15 Z" fill="#3A4150"/><path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#1D2340" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<path d="M50 7 L45 2 L35 2 L29 8 L28 15" fill="none" stroke="#FFC72C" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="35" cy="17" r="2.6" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/><circle cx="40" cy="22" r="2.3" fill="#7A4B22" stroke="#1D2340" stroke-width="1.3"/></svg>';
-  var goKind = "";
-  var go = Toybox.go($("go"), {
-    label: "Dig!", icon: PIC_DIG,
-    onPress: function () {
-      if (ending) return false;
-      clunk();
-      if (ghost) ghost.learned("go");
-      startAuto(nextKind());
-    }
-  });
+  // ---------- Buttons ----------
   function updateButtons() {
-    var k = nextKind();
-    if (k === goKind) return;
-    goKind = k;
-    go.set(k === "dump" ? "Dump!" : "Dig!", k === "dump" ? PIC_DUMP : PIC_DIG);
+    $("digBtn").classList.toggle("on", !!(auto && auto.kind === "dig") || queued === "dig");
+    $("dumpBtn").classList.toggle("on", !!(auto && auto.kind === "dump") || queued === "dump");
   }
   function showLoads(pop) {
     var el = $("loads");
     el.textContent = "Loads: " + loads;
     if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
-  // New: a fresh dirt pile (with new finds hidden in it) and an empty truck; the loads and the crate stay.
-  function startOver() {
-    if (ending) return;
-    stopAuto(); drag = null; glide = null; cv.classList.remove("held");
-    m.fill = 0; m.pouring = false; grains = []; surprise = null;
-    for (var i = 0; i < PN; i++) pile[i] = pileInit[i];
-    for (var j = 0; j < GN; j++) gheap[j] = 0;
-    regrow = 0; hidden.length = 0; hideTreasures();
-    if (truck.state === "in" || truck.state === "arriving") { for (var k = 0; k < BEDN; k++) truck.bed[k] = 0; truck.load = 0; }
-    for (var q = 0; q < 10; q++) puffs.push({ x: rand(PX0 + 60, PX0 + PN * PCW - 60), y: rand(20, 120), r: 16, vr: 40, vx: rand(-30, 30), vy: rand(30, 80), life: 0, max: 0.9, col: "#C8A06A", a: 0.6 });
-    if (side() < 0 || m.swingPhase) startAuto("home"); else setGoal(PH_READY, 80);
-    whoosh();
-    if (ghost) ghost.again();
-  }
-  // Surprise: a fun moment on this scene, taking turns: happy faces on the dirt pile and the truck; the
-  // excavator lifts its arm high and waves hello.
-  var surprise = null, surpriseTurn = 0;
-  function doSurprise() {
-    if (ending) return;
-    var kind = surpriseTurn++ % 2 === 0 ? "faces" : "wave";
-    if (kind === "wave") {
-      drag = null; glide = null;
-      if (auto) stopAuto();
-      startAuto("wave");
-      beeps.push({ x: CX + 120 * facing(), y: 560, life: -0.4, text: "HI!" });
-      honk();
-    } else {
-      surprise = { kind: "faces", t: 0, dur: 5.5 };
-      if (truck.state === "in") truck.bounce = 8;
-      sparkleSnd();
-    }
-  }
-  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: doSurprise });
+  $("digBtn").addEventListener("click", function () { if (!ending) { clunk(); startAuto("dig"); } });
+  $("dumpBtn").addEventListener("click", function () { if (!ending) { clunk(); startAuto("dump"); } });
 
-  // ---------- Input: tap or drag (Toybox.press). Drag the bucket; tap the dirt = dig, tap the truck = dump ----------
-  var tapDrag = null, tagged = {};
-  function tag(text, wx, wy) {
-    if (tagged[text] || ending) return;
-    tagged[text] = true;
-    var q = pagePt(wx, wy);
-    Toybox.nametag(text, q[0], q[1], 2000);
-  }
-  // What a press at world point w is on.
-  function partAt(w) {
-    var b = bucketWorld();
-    if (Math.hypot(w.x - b.x, w.y - b.y) < Math.max(90, 50 / S)) return "bucket";
-    // the truck side: the truck itself, or (zoomed in on the dirt side) anywhere behind the cab
-    if (w.y < 300 && (w.x < CX - 40 || (truck.state !== "gone" && w.x > truck.dx && w.x < truck.dx + 330 && w.y < 240))) return "truck";
-    // the dirt side: the pile itself, or (zoomed in on the truck side) anywhere behind the cab
-    if (w.x > CX + 40 && w.y < Math.max(pileAt(w.x) + 70, 300)) return "dirt";
-    if (Math.abs(w.x - CX) < 130 && w.y < 300) return "machine";
-    return null;
-  }
-  function tapAt(x, y) {
-    if (ending) return;
-    var w = screenToWorld(x, y), part = partAt(w), d = tapDrag;
-    tapDrag = null;
-    if (part === "dirt") {
-      tag("Dirt pile", w.x, Math.max(pileAt(w.x), 40) + 30);
-      usedTap.dig = true; ghost.learned("dig"); clunk(); startAuto("dig");
-    } else if (part === "truck") {
-      if (truck.state !== "gone") tag("Dump truck", clamp(truck.dx + 160, visLeft() + 60, visRight() - 60), 200);
-      usedTap.dump = true; ghost.learned("dump"); clunk();
-      if (m.fill > 0.05 || m.pouring) startAuto("dump");
-      else { startAuto("dig"); queued = "dump"; } // an empty bucket: dig first, then dump
-    } else if (part === "bucket" || part === "machine") {
-      var bw = bucketWorld();
-      if (part === "bucket") tag("Bucket", bw.x, bw.y + 70); else tag("Excavator", CX, 330);
-      clunk(); startAuto(nextKind());
-    } else if (d && d.last && !d.pending) glide = { x: d.last.x, y: d.last.y, v: 1100, t: 0 };
-  }
-  Toybox.press(cv, {
-    any: true,
-    down: function (part, e) {
-      if (ending || drag) return;
-      var w = screenToWorld(e.clientX, e.clientY), sd = side(), lx = (w.x - CX) * sd;
-      // A finger takes over from Dig and Dump at once.
-      if (auto) stopAuto();
-      glide = null;
-      if (m.swingPhase === "lift") { m.swingPhase = ""; m.carry = null; } // not turning yet: stay on this side
-      drag = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), mode: "reach", off: null, pending: !!m.swingPhase, dwell: 0, last: null, behind: false };
-      cv.classList.add("held");
-      if (m.swingPhase) return;
-      var k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID);
-      // Generous grab: anywhere on or near the bucket, or on the arm near it.
-      var grabR = Math.max(88, 46 / S), near = Math.hypot(lx - bm.x, w.y - bm.y) < grabR;
-      if (!near) BUCKET.forEach(function (p) { var q = bpt(k, p); if (Math.hypot(lx - q.x, w.y - q.y) < Math.max(40, 28 / S)) near = true; });
-      if (!near) {
-        var ax = k.t2.x - k.t1.x, ay = k.t2.y - k.t1.y, al = ax * ax + ay * ay, u = clamp(((lx - k.t1.x) * ax + (w.y - k.t1.y) * ay) / al, 0, 1);
-        if (u > 0.35 && Math.hypot(lx - (k.t1.x + ax * u), w.y - (k.t1.y + ay * u)) < Math.max(36, 26 / S)) near = true;
-      }
-      if (near) { drag.mode = "grab"; drag.off = { x: k.t2.x - lx, y: k.t2.y - w.y }; return; }
-      // Behind the machine (the truck, or the pile when at the truck): a tap there digs or dumps; a drag swings round.
-      if (lx < -40) { drag.behind = true; drag.pending = true; }
-    },
-    dragStart: function (part, e) {
-      if (!drag || drag.id !== e.pointerId) return;
-      if (drag.behind) {
-        drag.behind = false; drag.pending = false;
-        if (side() > 0) learned.swing = true;
-      }
-      ghost.learned("drag");
-    },
-    move: function (part, e) {
-      if (!drag || drag.id !== e.pointerId) return;
-      drag.cx = e.clientX; drag.cy = e.clientY;
-    },
-    up: function (part, e, st) {
-      if (!drag || drag.id !== e.pointerId) return;
-      var d = drag;
-      drag = null; cv.classList.remove("held");
-      if (ending) return;
-      if (st.tap) { tapDrag = d; return; } // the tap plays the whole motion (tapAt)
-      // Let go over the truck bed with dirt in the bucket: tip it out.
-      if (!d.pending && !m.swingPhase && !m.pouring && m.fill > 0.05 && overBed(0)) { learned.dump = true; startPour(); }
-    },
-    tap: function (part, x, y) { tapAt(x, y); }
+  // ---------- Input: drag the bucket; tap behind the machine to swing ----------
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (ending || drag) return;
+    var w = screenToWorld(e.clientX, e.clientY), sd = side(), lx = (w.x - CX) * sd;
+    // A finger takes over from Dig and Dump at once.
+    if (auto) stopAuto();
+    glide = null;
+    if (m.swingPhase === "lift") { m.swingPhase = ""; m.carry = null; } // not turning yet: stay on this side
+    drag = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), mode: "reach", off: null, pending: !!m.swingPhase, dwell: 0, last: null };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    cv.classList.add("held");
+    if (m.swingPhase) return;
+    var k = fk(m.a1, m.a2, m.a3), bm = bpt(k, BUCKET_MID);
+    // Generous grab: anywhere on or near the bucket, or on the arm near it.
+    var grabR = Math.max(88, 46 / S), near = Math.hypot(lx - bm.x, w.y - bm.y) < grabR;
+    if (!near) BUCKET.forEach(function (p) { var q = bpt(k, p); if (Math.hypot(lx - q.x, w.y - q.y) < Math.max(40, 28 / S)) near = true; });
+    if (!near) {
+      var ax = k.t2.x - k.t1.x, ay = k.t2.y - k.t1.y, al = ax * ax + ay * ay, u = clamp(((lx - k.t1.x) * ax + (w.y - k.t1.y) * ay) / al, 0, 1);
+      if (u > 0.35 && Math.hypot(lx - (k.t1.x + ax * u), w.y - (k.t1.y + ay * u)) < Math.max(36, 26 / S)) near = true;
+    }
+    if (near) { drag.mode = "grab"; drag.off = { x: k.t2.x - lx, y: k.t2.y - w.y }; return; }
+    // Behind the machine (the truck, or the pile when at the truck): swing round there.
+    if (lx < -40) {
+      if (sd > 0) learned.swing = true;
+      drag.pending = true;
+      startSwing(sd > 0 ? "truck" : "pile");
+    }
   });
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    drag.cx = e.clientX; drag.cy = e.clientY;
+  });
+  function endDrag(e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var d = drag;
+    drag = null; cv.classList.remove("held");
+    if (ending) return;
+    // Let go over the truck bed with dirt in the bucket: tip it out.
+    if (!d.pending && !m.swingPhase && !m.pouring && m.fill > 0.05 && overBed(0)) { learned.dump = true; startPour(); }
+    // A quick tap away from the bucket: the bucket keeps going to where he tapped.
+    else if (!d.pending && d.mode === "reach" && d.last && performance.now() - d.t0 < 450 && Math.hypot(d.cx - d.x0, d.cy - d.y0) < 24) glide = { x: d.last.x, y: d.last.y, v: 1100, t: 0 };
+  }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("lostpointercapture", endDrag);
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
@@ -1533,8 +1474,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function onEnding(done, info) {
     endingDone = done;
-    ending = true; drag = null; glide = null; auto = null; queued = null; surprise = null; parkT = 0;
-    coach.clear(); coachText = null;
+    ending = true; drag = null; glide = null; auto = null; queued = null; announce = null; parkT = 0;
     cv.classList.remove("held");
     updateButtons();
     if (!info.goodbye) parking = true;
@@ -1562,7 +1502,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return o;
   }
   function restArt() { return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' + restSVG() + "</svg>"; }
-  function onWake() { ending = false; parking = false; endingDone = null; parkT = 0; coachText = null; setGoal(PH_READY, 80); }
+  function onWake() { ending = false; parking = false; endingDone = null; parkT = 0; setGoal(PH_READY, 80); }
 
   // Big mode: the header shrinks to the Big button and Dig/Dump hide; the bucket is dragged on the picture.
   function onBig() { resize(); }
@@ -1586,27 +1526,130 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   updateButtons();
   showLoads(false);
 
-  // ---------- Ghost hand (Toybox.ghost): the tap first (tap the dirt, tap the truck), the drag once he has used the tap ----------
+  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
   // Page px of a world point.
   function pagePt(x, y) { var r = cv.getBoundingClientRect(); return [r.left + OX + x * S, r.top + OY - y * S]; }
-  var ghost = Toybox.ghost({
-    max: 3,
-    onShow: function (p, on) { go.pulse(on); },
-    plan: function () {
-      if (ending || drag || auto || glide || m.swingPhase || m.pouring || surprise) return null;
-      if (m.fill <= 0.05) {
-        var sp = digSpot(), x = sp.lx + CX - 13;
-        if (!usedTap.dig) return { pts: [side() > 0 || wideView() ? pagePt(x, Math.max(sp.top - 30, GROUND + 20)) : pagePt(Math.min(CX + 75, visRight() - 40), 200)], tap: true, key: "dig" };
-        if (side() < 0) return null;
-        var b = bucketWorld();
-        return { pts: [pagePt(b.x, b.y), pagePt(x, Math.max(sp.top - 40, GROUND + 20))], dur: 3400, key: "drag" };
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // The idle hand shows the next move: drag the bucket into the dirt, over behind the cab, or over the truck bed.
+  var ghost = makeGhost(function () {
+    if (ending || drag || auto || glide || m.swingPhase || m.pouring) return null;
+    var b = bucketWorld();
+    if (side() > 0) {
+      if (m.fill < 0.6) {
+        if (learned.dig) return null;
+        var s = digSpot(), x = s.lx + CX - 13;
+        return { pts: [pagePt(b.x, b.y), pagePt(x, Math.max(s.top - 40, GROUND + 20))], dur: 3400 };
       }
-      if (truck.state !== "in") return null;
-      if (side() > 0 && !wideView()) return { pts: [pagePt(Math.max(CX - 75, visLeft() + 40), 200)], tap: true, key: "dump" };
-      return { pts: [pagePt(truck.dx + 200, 150)], tap: true, key: "dump" };
+      if (learned.swing) return null;
+      return { pts: [pagePt(b.x, b.y), pagePt(b.x - 120, b.y + 60), pagePt(Math.max(CX - 75, visLeft() + 30), Math.max(b.y, 340))], dur: 3400 };
     }
+    if (m.fill > 0.05 && truck.state === "in") {
+      if (learned.dump) return null;
+      return { pts: [pagePt(b.x, b.y), pagePt(truck.dx + 200, 280)], dur: 3000 };
+    }
+    if (m.fill <= 0.05 && !$("panel").offsetParent) return null;
+    if (m.fill <= 0.05) return { pts: [ghostPt($("digBtn"), 0.5, 0.5)], tap: true };
+    return null;
   });
-  var usedTap = {};
 
   Toybox.init({
     app: "construction-site",
@@ -1638,7 +1681,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         auto: auto ? auto.kind + ":" + auto.i : "", queued: queued || "", pouring: m.pouring, drag: drag ? drag.mode + (drag.pending ? "/pending" : "") : "",
         truck: truck.state, load: truck.load, loads: loads, pile: pileTotal(), pile0: pileTotal0, grains: grains.length, pen: curPen,
         hidden: hidden.map(function (h) { return h.kind; }), reachLeft: reachLeft(), crate: crate.items.slice(), flyers: flyers.length, found: found.slice(),
-        coach: coach.text(), go: go.label(), surprise: surprise ? surprise.kind : "", pan: PAN, S: S, win: WIN };
+        coach: coachEl.hidden || coachEl.classList.contains("off") ? "" : coachEl.textContent, pan: PAN, S: S, win: WIN };
     },
     toScreen: function (x, y) { var p = pagePt(x, y); return { x: p[0], y: p[1] }; },
     bucket: function () { var b = bucketWorld(); var p = pagePt(b.x, b.y); return { x: p[0], y: p[1], wx: b.x, wy: b.y }; },

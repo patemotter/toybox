@@ -77,10 +77,17 @@ body {
 #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #map [data-go], #map [data-food] { cursor: pointer; }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
-/* Map labels (Toybox.map) on the cupboards in front of each station; smaller when the stations are drawn small. */
-.tb-place-label { bottom: 4px; }
-.scene.lbl-s .tb-place-label { font-size: 15px; gap: 4px; padding: 2px 8px 2px 4px; }
-.scene.lbl-s .tb-place-label .tb-pic { width: 24px; height: 24px; }
+.sbtn {
+  position: absolute; left: 0; top: 0; z-index: 2; transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; text-decoration: none;
+  color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 4px 4px 0 #1D2340;
+  font-size: clamp(1.05rem, 2.6vw, 1.6rem); font-weight: 800; line-height: 1; min-height: 56px;
+  padding: 0.25rem 1rem 0.25rem 0.5rem; border-width: 4px; border-radius: 20px;
+}
+.sbtn:active { transform: translate(-50%, -50%) translate(3px, 3px); box-shadow: 0 0 0 #1D2340; }
+.sbtn svg { width: 1.7em; height: 1.9em; flex: none; display: block; overflow: visible; pointer-events: none; }
+.sbtn span { pointer-events: none; padding-top: 0.12em; }
+.sbtn.small { min-height: 46px; font-size: 1rem; padding: 0.15rem 0.7rem 0.15rem 0.35rem; border-width: 3px; box-shadow: 3px 3px 0 #1D2340; }
 .food { transform-box: fill-box; transform-origin: 50% 100%; }
 .food.wig { animation: wig 0.7s ease-in-out; }
 @keyframes wig { 20% { transform: rotate(-8deg) scale(1.06); } 45% { transform: rotate(7deg) scale(1.06); } 70% { transform: rotate(-4deg); } 100% { transform: none; } }
@@ -90,48 +97,134 @@ body {
 @keyframes hop2 { 40% { transform: translateY(-18px); } 100% { transform: none; } }
 .puff { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; border-radius: 50%; border: 2px solid rgba(29, 35, 64, 0.35); }
 body.big .tb-head > :not(.bigtoggle) { display: none; }
-body.ending .homebtn, body.ending .tb-place, body.ending #map [data-go] { pointer-events: none; }
-body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
-.confetti { position: fixed; left: 0; top: 0; z-index: 70; width: 12px; height: 12px; border: 2px solid #1D2340; border-radius: 3px; pointer-events: none; }
+body.ending .homebtn, body.ending .sbtn, body.ending #map [data-go] { pointer-events: none; }
+body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
 
-/* ---------- Getting ready (Toybox.gate): wash hands, apron and chef hat, one tap does all three ---------- */
-.tb-gate { background-color: #DDEFFC; }
-.gate-home { position: absolute; z-index: 2; left: max(12px, env(safe-area-inset-left, 0px)); top: max(10px, env(safe-area-inset-top, 0px)); }
+/* ---------- Getting ready: wash hands, apron and chef hat ---------- */
+.gate {
+  position: fixed; inset: 0; z-index: 40; overflow: hidden;
+  background-color: #DDEFFC;
+  background-image: linear-gradient(#BFD9EC 3px, transparent 3px), linear-gradient(90deg, #BFD9EC 3px, transparent 3px);
+  background-size: 64px 64px; transition: opacity 0.7s ease;
+}
+.gate[hidden] { display: none; }
+.gate.open { opacity: 0; pointer-events: none; }
+.gtop {
+  position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px));
+}
+.gtop .homebtn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px;
+  padding: 2px 12px 2px 9px; font-weight: 700; font-size: 1rem; color: #1D2340; text-decoration: none;
+  background: #FFFFFF; border: 3px solid #1D2340; border-radius: 12px; box-shadow: 2px 2px 0 #1D2340;
+}
+.gtop .homebtn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 #1D2340; }
+.gtop .homebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.gcard {
+  position: absolute; z-index: 2; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, calc(100% - 28px)); height: min(900px, calc(100% - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  margin-top: 26px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px;
+  background: var(--panel); color: var(--ink); border: 4px solid var(--edge); border-radius: 28px; box-shadow: 6px 6px 0 var(--edge); padding: 12px 14px 16px;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.gcard.leaving { opacity: 0; transform: translate(-50%, -40%) scale(0.95); pointer-events: none; }
+.gtitle { text-align: center; }
+.gtitle h2 { margin: 0; font-size: clamp(1.9rem, 6.5vw, 3.2rem); font-weight: 800; line-height: 1; }
+.gtitle p { margin: 4px 0 0; font-size: clamp(1.2rem, 3.6vw, 1.7rem); font-weight: 800; color: #2D5BD7; line-height: 1.2; min-height: 1.2em; }
+.gscene { position: relative; min-height: 0; touch-action: none; overflow: hidden; }
+.gscene svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; touch-action: none; }
+.gtray { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.gtray[hidden] { display: none; }
+.gslot { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #FFE3C2; color: #1D2340;
+  border: 3px solid #1D2340; border-radius: 20px; padding: 6px 6px 8px; }
+.gslot.on { background: #BDF0C8; }
+.gitem { width: min(220px, 100%); height: clamp(60px, 11vh, 120px); touch-action: none; cursor: grab; position: relative; z-index: 2; }
+.gitem svg { width: 100%; height: 100%; overflow: visible; display: block; pointer-events: none; }
+.gitem.drag { z-index: 45; transition: none; }
+.gitem.back { transition: transform 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.gitem.gone { transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0; }
+.glabel { font-weight: 800; font-size: clamp(0.82rem, 3.4vw, 1.5rem); line-height: 1.1; text-align: center; white-space: nowrap; }
+.glabel .ok { display: none; color: #1E7A43; }
+.gslot.on .ok { display: inline; }
+.tgt { animation: tgtpulse 1.4s ease-in-out infinite; }
+@keyframes tgtpulse { 50% { opacity: 0.25; } }
+.popin { transform-box: fill-box; transform-origin: 50% 50%; animation: popin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes popin { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+.hop { animation: hop 0.6s ease-out 2; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes hop { 30% { transform: translateY(-16px); } 60% { transform: translateY(0); } }
 .rubbing { animation: rub 0.32s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
 @keyframes rub { 50% { transform: translateX(5px) rotate(8deg); } }
+.confetti { position: fixed; left: 0; top: 0; z-index: 70; width: 12px; height: 12px; border: 2px solid #1D2340; border-radius: 3px; pointer-events: none; }
 
 /* Timer pieces above the gate (z-index 40). */
 .toast { top: max(70px, calc(env(safe-area-inset-top, 0px) + 70px)); z-index: 46; }
 .farewell { z-index: 45; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 
+@media (min-width: 744px) and (min-height: 640px) {
+  .sbtn.small { min-height: 56px; font-size: 1.15rem; }
+}
 @media (orientation: landscape) and (max-height: 520px) {
-  .gate-home { top: 8px; }
-  /* Phone held sideways: the station labels run along the bottom, so the coach line goes to the top. */
-  #coach.tb-coach { top: 8px; bottom: auto; }
+  .gcard { grid-template-columns: 1.55fr 1fr; grid-template-rows: auto minmax(0, 1fr); margin-top: 22px; height: calc(100% - 70px); column-gap: 14px; }
+  .gtitle { grid-column: 1 / 3; }
+  .gtitle h2 { font-size: 1.7rem; display: inline; }
+  .gtitle p { font-size: 1.15rem; display: inline; margin-left: 12px; }
+  .gscene { grid-column: 1; grid-row: 2; }
+  .gtray { grid-column: 2; grid-row: 2; align-content: center; align-self: center; grid-template-columns: 1fr; gap: 6px; }
+  .gslot { flex-direction: row; justify-content: center; gap: 8px; padding: 3px 8px; border-radius: 16px; }
+  .gitem { width: 42%; height: clamp(40px, 15vh, 62px); }
+  .glabel { font-size: 1rem; }
 }
-/* Upright: a bigger chef. */
-@media (orientation: portrait) { .tb-gate-worker { width: min(78vw, 50vh, 420px); } }
-/* The three getting-ready items in one row. */
-.tb-gate .tb-gate-items { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (prefers-reduced-motion: reduce) {
-  .rubbing { animation: none; }
+  .tgt, .hop, .rubbing { animation: none; }
 }
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Kitchen</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body">
     <main class="tb-stage stage scene" id="scene">
       <svg id="map" role="img" aria-label="A sunny kitchen with a blender, a stand mixer, a cutting board, a stove and a table"></svg>
-      <div id="coach"></div>
+      <div id="sbtns"></div>
+      <div class="tb-coach" id="coach">Tap the blender!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
+  </div>
+</div>
+
+<!-- Getting ready: wash hands, apron and chef hat, in any order. -->
+<div class="gate" id="gate" hidden>
+  <div class="gtop">
+    <a class="homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg><span>Home</span></a>
+  </div>
+  <div class="gcard" id="gcard">
+    <div class="gtitle"><h2 id="gTitle">Get ready to cook!</h2><p id="gSub">Wash hands, apron, chef hat!</p></div>
+    <div class="gscene" id="dressWrap"><svg id="gChar" viewBox="0 -24 200 316" role="img" aria-label="A little chef getting ready"></svg></div>
+    <div class="gtray" id="gtray">
+      <div class="gslot" id="slotHands">
+        <div class="gitem" id="itHands" data-item="hands" role="button" tabindex="0" aria-label="Wash hands"><svg viewBox="0 0 120 84" aria-hidden="true"></svg></div>
+        <div class="glabel">Wash hands <span class="ok">✓</span></div>
+      </div>
+      <div class="gslot" id="slotApron">
+        <div class="gitem" id="itApron" data-item="apron" role="button" tabindex="0" aria-label="Apron"><svg viewBox="54 84 92 176" aria-hidden="true"></svg></div>
+        <div class="glabel">Apron <span class="ok">✓</span></div>
+      </div>
+      <div class="gslot" id="slotHat">
+        <div class="gitem" id="itHat" data-item="hat" role="button" tabindex="0" aria-label="Chef hat"><svg viewBox="44 -28 112 80" aria-hidden="true"></svg></div>
+        <div class="glabel">Chef hat <span class="ok">✓</span></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -157,6 +250,7 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
     { id: "stove", label: "Stove", ready: true }
   ];
   function readyOn() { try { return sessionStorage.getItem(READY_KEY) === "on"; } catch (e) { return true; } }
+  function setReady() { try { sessionStorage.setItem(READY_KEY, "on"); } catch (e) { /* ignore */ } }
   var NEXT = (function () {
     var m = /[?&]next=([a-z-]+)/.exec(location.search);
     if (!m) return "";
@@ -279,7 +373,7 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
   }
 
   // ---------- Map layout ----------
-  var mapSvg = $("map"), scene = $("scene");
+  var mapSvg = $("map"), scene = $("scene"), sbtns = $("sbtns");
   var TW = 300, TH = 340, TOP = 150, TBH = 300, TRW = 440;
   var L = null;
   function chooseLayout(cw, ch) {
@@ -366,11 +460,15 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
     o += tableSVG(tb, items);
     mapSvg.setAttribute("viewBox", "0 0 " + VW.toFixed(2) + " " + VH.toFixed(2));
     mapSvg.innerHTML = o;
-    // The map's places: the whole station is the hit area; its label sits on the cupboards in front of it.
-    placeRect = {};
-    scene.classList.toggle("lbl-s", TW * L.s < 200);
-    places.forEach(function (p) { placeRect[p.st.id] = [p.x * L.s, (p.y + 20) * L.s, TW * L.s, (TH - 20) * L.s]; });
-    if (mp) mp.layout();
+    // Station buttons sit on the cupboards in front of each ready station.
+    var small = L.s < 0.6;
+    places.forEach(function (p) {
+      var b = btnEls[p.st.id];
+      if (!b) return;
+      b.classList.toggle("small", small);
+      b.style.left = ((p.x + 150) * L.s).toFixed(1) + "px";
+      b.style.top = ((p.y + 300) * L.s).toFixed(1) + "px";
+    });
     popNew(items);
   }
   function tableSVG(tb, items) {
@@ -430,21 +528,20 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
     });
     try { sessionStorage.setItem(SEENKEY, String(maxT)); } catch (e) { /* ignore */ }
   }
-  // ---------- The map's places (Toybox.map) ----------
+  var btnEls = {};
   var ICONBOX = { blender: "80 40 140 216", "cutting-board": "20 140 250 125" };
-  var placeRect = {}, mp = null;
-  function makeMap() {
-    mp = Toybox.map({
-      stage: scene,
-      places: STATIONS.filter(function (st) { return st.ready; }).map(function (st) {
-        return { href: st.id + ".html", name: st.label, pic: '<svg viewBox="' + (ICONBOX[st.id] || "0 0 300 260") + '">' + ART[st.id](true) + "</svg>",
-          rect: function () { return placeRect[st.id] || null; } };
-      }),
-      onPress: function (pl) { if (ghost) ghost.learned("map"); goStation(pl.href.replace(".html", "")); }
-    });
-  }
+  STATIONS.forEach(function (st) {
+    if (!st.ready) return;
+    var a = document.createElement("a");
+    a.className = "btn sbtn";
+    a.href = st.id + ".html";
+    a.dataset.go = st.id;
+    a.innerHTML = '<svg viewBox="' + (ICONBOX[st.id] || "0 0 300 260") + '" aria-hidden="true">' + ART[st.id](true) + "</svg><span>" + st.label + "</span>";
+    sbtns.appendChild(a);
+    btnEls[st.id] = a;
+  });
 
-  // ---------- Going to a station (Toybox.map goes after a short hop); touching food ----------
+  // ---------- Going to a station; touching food ----------
   var going = false;
   function goStation(id) {
     if (going || locked()) return;
@@ -456,7 +553,7 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
       for (var i = 0; i < 12; i++) puff(r.left + r.width * rand(0.25, 0.75), r.top + r.height * rand(0.2, 0.6), i);
       m.classList.remove("hop"); void m.getBoundingClientRect(); if (ANIM) m.classList.add("hop");
     }
-    setTimeout(function () { going = false; }, 1500);
+    setTimeout(function () { location.href = id + ".html"; }, reduceMotion ? 0 : 520);
   }
   function puff(x, y, i) {
     var d = document.createElement("div"), s = rand(14, 30);
@@ -471,6 +568,8 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
   }
   mapSvg.addEventListener("click", function (e) {
     if (locked()) return;
+    var g = e.target.closest && e.target.closest("[data-go]");
+    if (g) { goStation(g.getAttribute("data-go")); return; }
     var f = e.target.closest && e.target.closest("[data-food]");
     if (f) {
       f.classList.remove("wig", "newpop"); void f.getBoundingClientRect(); f.classList.add("wig");
@@ -479,38 +578,54 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
       tone(rand(600, 760), 0.14, 0.04, "sine", 900);
     }
   });
+  sbtns.addEventListener("click", function (e) {
+    var a = e.target.closest("a[data-go]");
+    if (!a) return;
+    e.preventDefault();
+    goStation(a.dataset.go);
+  });
   window.addEventListener("pageshow", function (e) {
     going = false;
     if (e.persisted) { lastSize = ""; scheduleBuild(); }
   });
 
-  // ---------- Getting ready (Toybox.gate): one tap washes hands, puts on the apron and the chef hat ----------
+  // ---------- The chef and the getting-ready ----------
   var APRON_D = "M80 112 L120 112 L122 146 Q138 150 138 162 L136 246 Q100 254 64 246 L62 162 Q62 150 78 146 Z";
   var HAT_D = "M70 34 Q50 20 62 2 Q70 -14 88 -8 Q100 -22 114 -8 Q132 -14 138 2 Q150 20 130 34 Z";
-  function apronSVG(fill, sw) {
-    var o = P("M82 112 Q100 88 118 112", "none", 5) + P(APRON_D, fill, sw);
-    o += Rc(84, 182, 32, 24, 6, "#FFFFFF", 3) + S("M66 168 L134 168", "#FFFFFF", 3);
+  function apronSVG(fill, sw, extra) {
+    var on = fill !== "none";
+    var o = P("M82 112 Q100 88 118 112", "none", on ? 5 : sw, extra) + P(APRON_D, fill, sw, extra);
+    if (on) o += Rc(84, 182, 32, 24, 6, "#FFFFFF", 3) + S("M66 168 L134 168", "#FFFFFF", 3);
     return o;
   }
-  function hatSVG(fill, sw) { return P(HAT_D, fill, sw) + Rc(68, 28, 64, 20, 6, fill, sw) + S("M86 12 L86 26 M100 6 L100 26 M114 12 L114 26", "#E3E9F2", 3); }
-  // The chef, in a 3:4 box (the gate's worker frame).
-  var CHEF_VB = "-20 -36 240 320";
+  function hatSVG(fill, sw, extra) { return P(HAT_D, fill, sw, extra) + Rc(68, 28, 64, 20, 6, fill, sw, extra) + (fill === "none" ? "" : S("M86 12 L86 26 M100 6 L100 26 M114 12 L114 26", "#E3E9F2", 3)); }
+  var DASH = ' stroke-dasharray="7 6" stroke="#2D5BD7"';
+  function tgtG(id, svg) { return '<g id="' + id + '" class="tgt">' + svg.replace(/stroke="#1D2340" /g, "") + "</g>"; }
   function chefSVG() {
-    var o = shadow(100, 280, 64, 6);
-    o += P("M62 254 L96 254 L98 278 L54 278 Q54 262 62 254 Z", "#7A4B1E", 4) + P("M138 254 L104 254 L102 278 L146 278 Q146 262 138 254 Z", "#7A4B1E", 4);
-    o += P("M64 198 L136 198 L134 258 L106 258 L100 222 L94 258 L66 258 Z", "#34508F", 4);
+    var o = shadow(100, 284, 64, 8);
+    o += P("M62 258 L96 258 L98 282 L54 282 Q54 266 62 258 Z", "#7A4B1E", 4) + P("M138 258 L104 258 L102 282 L146 282 Q146 266 138 258 Z", "#7A4B1E", 4);
+    o += P("M64 198 L136 198 L134 262 L106 262 L100 222 L94 262 L66 262 Z", "#34508F", 4);
     o += Rc(40, 108, 24, 76, 12, "#FFC93C", 4) + Rc(136, 108, 24, 76, 12, "#FFC93C", 4);
+    o += '<g id="chefHandL">' + C(52, 188, 11, SKIN, 4) + '</g><g id="chefHandR">' + C(148, 188, 11, SKIN, 4) + "</g>";
+    o += '<g id="handsTgt" class="tgt">' + C(52, 188, 19, "none", 3, DASH) + C(148, 188, 19, "none", 3, DASH) + "</g>";
+    o += '<g id="washFx"></g>';
+    o += '<g id="handsOn" style="display:none">' + star(36, 176, 9) + star(164, 176, 9) + star(62, 204, 6) + star(138, 204, 6) + "</g>";
     o += Rc(92, 96, 16, 12, 2, SKIN, 3);
     o += P("M62 198 L62 120 Q62 104 80 104 L120 104 Q138 104 138 120 L138 198 Z", "#FFC93C", 4);
-    o += '<g id="chefHandL">' + C(52, 188, 11, SKIN, 4) + '</g><g id="chefHandR">' + C(148, 188, 11, SKIN, 4) + "</g>";
-    o += '<g id="washFx"></g>';
+    o += tgtG("apronTgt", apronSVG("none", 3, DASH));
+    o += '<g id="apronOn" style="display:none">' + apronSVG("#E63946", 4) + "</g>";
     o += C(100, 70, 33, SKIN, 4);
     o += P("M67 64 Q66 36 100 36 Q134 36 133 64 Q118 50 100 52 Q82 50 67 64 Z", "#6B3E1E", 4);
     o += C(88, 72, 4.5, INK, 0) + C(112, 72, 4.5, INK, 0) + C(80, 84, 5, "#F59BA0", 0) + C(120, 84, 5, "#F59BA0", 0);
     o += P("M88 86 Q100 97 112 86", "none", 4);
-    return o;
+    o += tgtG("hatTgt", hatSVG("none", 3, DASH));
+    o += '<g id="hatOn" style="display:none">' + hatSVG("#FFFFFF", 4) + "</g>";
+    return '<g id="charAll">' + o + "</g>";
   }
-  function pic(vb, body) { return '<svg viewBox="' + vb + '">' + body + "</svg>"; }
+  $("gChar").innerHTML = chefSVG();
+  document.querySelector("#itApron svg").innerHTML = apronSVG("#E63946", 4);
+  document.querySelector("#itHat svg").innerHTML = hatSVG("#FFFFFF", 4);
+
   // A sink with a tap and soap: the "Wash hands" item.
   function sinkSVG() {
     return Rc(6, 44, 108, 16, 6, "#F4F7FA", 3.5) + P("M14 58 L106 58 Q102 80 60 80 Q18 80 14 58 Z", "#C9DCEA", 3.5) +
@@ -518,12 +633,13 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
       Ln(68, 36, 68, 62, "#7EC8FF", 5) + Rc(84, 18, 22, 28, 7, "#FF9EC8", 3) + Rc(90, 8, 10, 10, 2, "#FFFFFF", 2.5) +
       C(26, 30, 7, "#FFFFFF", 2.5) + C(16, 20, 5, "#FFFFFF", 2.5) + C(30, 14, 4, "#FFFFFF", 2.5);
   }
-  // Washing plays by itself on the chef's hands: rub with bubbles, a rinse, then sparkly clean (about 1.5 s).
-  var washing = false;
+  document.querySelector("#itHands svg").innerHTML = sinkSVG();
+  // Washing plays by itself on the chef's hands: rub with bubbles, a rinse, then sparkly clean (about 2 s).
+  var washing = false, washTimers = [];
   function washHands(done) {
-    var fx = $("washFx"), hl = $("chefHandL"), hr = $("chefHandR"), NS = "http://www.w3.org/2000/svg";
-    if (!fx) { done(); return; }
     washing = true;
+    var fx = $("washFx"), hl = $("chefHandL"), hr = $("chefHandR"), NS = "http://www.w3.org/2000/svg";
+    $("handsTgt").style.display = "none";
     if (!reduceMotion) { hl.classList.add("rubbing"); hr.classList.add("rubbing"); }
     var bubbles = [];
     function bubble(cx) {
@@ -533,14 +649,16 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
       fx.appendChild(g);
       bubbles.push({ g: g, x: x, y: y, vy: 0 });
     }
-    var t0 = performance.now(), dur = reduceMotion ? 400 : 1500, made = 0;
+    var t0 = performance.now(), dur = reduceMotion ? 500 : 2100, made = 0;
     tone(300, 0.15, 0.05, "sine", 180);
     (function step(t) {
       var k = (t - t0) / dur;
       if (k < 0.5) {
+        // Soap and rubbing: bubbles grow on both hands.
         var want = Math.floor(k / 0.5 * 24);
         while (made < want) { bubble(made % 2 ? 148 : 52); made++; if (made % 4 === 0) tone(rand(700, 1000), 0.06, 0.02, "sine", 1300); }
       } else if (k < 0.85) {
+        // Rinse: water splashes down and the bubbles wash away.
         if (!fx.querySelector(".splash")) {
           var w = document.createElementNS(NS, "g");
           w.setAttribute("class", "splash");
@@ -550,13 +668,99 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
         }
         bubbles.forEach(function (b) { b.vy += 0.6; b.y += b.vy; b.g.setAttribute("transform", "translate(" + b.x.toFixed(1) + " " + b.y.toFixed(1) + ")"); b.g.setAttribute("opacity", String(Math.max(0, 1 - (b.y - 188) / 50))); });
       }
-      if (k < 1) { requestAnimationFrame(step); return; }
+      if (k < 1) { washTimers.push(requestAnimationFrame(step)); return; }
       fx.innerHTML = "";
       hl.classList.remove("rubbing"); hr.classList.remove("rubbing");
       washing = false;
-      chime();
       done();
     })(t0);
+  }
+
+  // ----- Apron and chef hat (drag onto the chef, or tap) -----
+  var DRESS = { hands: false, apron: false, hat: false }, dressDrags = {};
+  var DRESS_IDS = { hands: "Hands", apron: "Apron", hat: "Hat" };
+  function itemParts(el) { var k = el.dataset.item; return { on: $(k + "On"), t: $(k + "Tgt"), slot: $("slot" + DRESS_IDS[k]) }; }
+  function overChef(x, y) { var r = $("gChar").getBoundingClientRect(); return x > r.left - 20 && x < r.right + 20 && y > r.top - 20 && y < r.bottom + 20; }
+  function dressDown(e) {
+    var el = e.currentTarget;
+    if (DRESS[el.dataset.item] || dressDrags[el.id] || locked()) return;
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    dressDrags[el.id] = { id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
+    el.classList.remove("back"); el.classList.add("drag");
+    el.style.transform = "scale(1.12)";
+    blip();
+  }
+  function dressMove(e) {
+    var el = e.currentTarget, d = dressDrags[el.id];
+    if (!d || d.id !== e.pointerId) return;
+    var dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 10) d.moved = true;
+    el.style.transform = "translate(" + dx + "px," + dy + "px) scale(1.12)";
+    itemParts(el).t.style.opacity = overChef(e.clientX, e.clientY) ? "1" : "";
+  }
+  function dressUp(e) {
+    var el = e.currentTarget, d = dressDrags[el.id];
+    if (!d || d.id !== e.pointerId) return;
+    delete dressDrags[el.id];
+    el.classList.remove("drag");
+    itemParts(el).t.style.opacity = "";
+    if (e.type === "pointercancel" && d.moved) { el.classList.add("back"); el.style.transform = ""; return; }
+    if (!d.moved || overChef(e.clientX, e.clientY)) putOn(el);
+    else { el.classList.add("back"); el.style.transform = ""; }
+  }
+  function putOn(el) {
+    if (DRESS[el.dataset.item] || stage2 === "done") return;
+    var k = el.dataset.item, p = itemParts(el);
+    DRESS[k] = true;
+    el.classList.add("gone");
+    el.style.transform = (el.style.transform || "") + " scale(0.4)";
+    if (ghost) ghost.again();
+    function shown() {
+      p.t.style.display = "none";
+      p.on.style.display = "";
+      p.on.classList.remove("popin"); void p.on.getBoundingClientRect(); p.on.classList.add("popin");
+      p.slot.classList.add("on");
+      var r = p.on.getBoundingClientRect();
+      confetti(r.left + r.width / 2, r.top + r.height / 2, 20);
+      if (k === "hands") chime(); else plop();
+      if (DRESS.hands && DRESS.apron && DRESS.hat && !washing) dressDone();
+    }
+    if (k === "hands") washHands(shown); else shown();
+  }
+  ["itHands", "itApron", "itHat"].forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("pointerdown", dressDown);
+    el.addEventListener("pointermove", dressMove);
+    el.addEventListener("pointerup", dressUp);
+    el.addEventListener("pointercancel", dressUp);
+    el.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && !DRESS[el.dataset.item]) { e.preventDefault(); putOn(el); } });
+  });
+  function resetDress() {
+    washTimers.forEach(cancelAnimationFrame); washTimers = []; washing = false;
+    $("washFx").innerHTML = ""; $("chefHandL").classList.remove("rubbing"); $("chefHandR").classList.remove("rubbing");
+    Object.keys(DRESS_IDS).forEach(function (k) {
+      DRESS[k] = false;
+      var el = $("it" + DRESS_IDS[k]); el.className = "gitem"; el.style.transform = "";
+      $(k + "On").style.display = "none"; $(k + "Tgt").style.display = "";
+      $("slot" + DRESS_IDS[k]).classList.remove("on");
+    });
+    $("charAll").classList.remove("hop");
+  }
+  var stage2 = "dress";
+  function dressDone() {
+    if (stage2 === "done") return;
+    stage2 = "done";
+    setTimeout(function () {
+      chime();
+      $("gTitle").textContent = "Ready to cook!";
+      $("gSub").textContent = "Let's go!";
+      var c = $("charAll");
+      c.classList.remove("hop"); void c.getBoundingClientRect(); if (!reduceMotion) c.classList.add("hop");
+      var r = $("gChar").getBoundingClientRect();
+      confetti(r.left + r.width / 2, r.top + r.height * 0.3, 40);
+      setTimeout(openKitchen, reduceMotion ? 400 : 2200);
+    }, 250);
   }
   function confetti(x, y, n) {
     if (reduceMotion) n = Math.min(n, 6);
@@ -573,44 +777,29 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
         { duration: rand(800, 1300), easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = (function (el) { return function () { el.remove(); }; })(d);
     }
   }
-  var gt = null;
-  function gateOpen() { return !!(gt && !gt.el.hidden); }
+
+  // ----- The gate as a whole -----
+  var gateEl = $("gate"), gcard = $("gcard"), gateTimer = null, opening = false;
   function showGate() {
-    if (gt && gt.el.parentNode) gt.el.parentNode.removeChild(gt.el);
-    gt = Toybox.gate({
-      flag: READY_KEY,
-      title: "Get ready to cook!",
-      viewBox: CHEF_VB,
-      worker: chefSVG(),
-      workerLabel: "Get ready: wash hands, apron and chef hat",
-      hint: "Tap the chef to get ready!",
-      ms: 1500,
-      items: [
-        { id: "hands", name: "Wash hands", art: pic("0 -8 120 96", sinkSVG()), onArt: star(36, 176, 9) + star(164, 176, 9) + star(62, 204, 6) + star(138, 204, 6) },
-        { id: "apron", name: "Apron", art: pic("50 84 100 176", apronSVG("#E63946", 4)), onArt: apronSVG("#E63946", 4) },
-        { id: "hat", name: "Chef hat", art: pic("40 -30 120 84", hatSVG("#FFFFFF", 4)), onArt: hatSVG("#FFFFFF", 4) }
-      ],
-      extra: { hands: washHands },
-      onPut: function (id) { if (ghost) ghost.learned("gate"); if (id !== "hands") plop(); },
-      done: openKitchen
-    });
-    // A way home for the grown-up (nothing traps him).
-    var home = document.createElement("a");
-    home.className = "btn tb-iconbtn gate-home";
-    home.href = "../";
-    home.setAttribute("aria-label", "Back to Toybox");
-    home.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>';
-    gt.el.appendChild(home);
-    gt.el.classList.add("tb-v2");
-    if (ghost) ghost.again("gate");
+    clearTimeout(gateTimer); opening = false;
+    stage2 = "dress";
+    $("gTitle").textContent = "Get ready to cook!";
+    $("gSub").textContent = "Wash hands, apron, chef hat!";
+    gateEl.hidden = false;
+    gateEl.classList.remove("open");
+    gcard.classList.remove("leaving");
+    resetDress();
   }
   function openKitchen() {
-    var w = gt && gt.el.querySelector(".tb-gate-worker");
-    if (w) { var r = w.getBoundingClientRect(); confetti(r.left + r.width / 2, r.top + r.height * 0.3, 40); }
-    chime();
-    if (NEXT && !locked()) { location.replace(NEXT); return; }
-    coach.say("Ready to cook!", 3);
-    if (ghost) ghost.again("map");
+    if (opening || locked()) return;
+    opening = true;
+    setReady();
+    gcard.classList.add("leaving");
+    gateTimer = setTimeout(function () {
+      if (NEXT && !locked()) { location.replace(NEXT); return; }
+      gateEl.classList.add("open");
+      gateTimer = setTimeout(function () { gateEl.hidden = true; opening = false; if (ghost) ghost.again(); }, reduceMotion ? 200 : 750);
+    }, reduceMotion ? 50 : 450);
   }
 
   // ---------- Sound (off by default; soft and synthesized) ----------
@@ -643,7 +832,7 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
   }
   function onWake() {
     try { mapSvg.unpauseAnimations(); } catch (e) { /* ignore */ }
-    if (!readyOn() && !gateOpen()) showGate();
+    if (!readyOn() && gateEl.hidden) showGate();
   }
   function restArt() {
     var o = '<rect width="400" height="300" fill="#2B3A67"/>';
@@ -679,21 +868,112 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
   // The table changes when a station adds food in another tab.
   window.addEventListener("storage", function (e) { if (e.key === TABLEKEY || e.key === null) { lastSize = ""; scheduleBuild(); } });
 
-  // ---------- Coach and ghost hand ----------
-  var coach = Toybox.coach($("coach"));
-  coach.step("Tap the blender!");
-  function midOf(el) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
-  var ghost = Toybox.ghost({
-    max: 2,
-    plan: function () {
-      if (gateOpen()) {
-        if (washing) return null;
-        var w = gt.el.querySelector(".tb-gate-worker");
-        return w ? { pts: [midOf(w)], tap: true, key: "gate" } : null;
-      }
-      var go = mp && mp.places[0];
-      return go && !go.hidden ? { pts: [midOf(go)], tap: true, key: "map" } : null;
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedF = true; stop(); },
+      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function midOf(el) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+  var ghost = null;
+  ghost = makeGhost(function () {
+    if (!gateEl.hidden) {
+      if (opening || washing || stage2 !== "dress" || Object.keys(dressDrags).length) return null;
+      if (!DRESS.hands) return { pts: [midOf($("itHands")), midOf($("handsTgt"))] };
+      if (!DRESS.apron) return { pts: [midOf($("itApron")), midOf($("apronTgt"))] };
+      if (!DRESS.hat) return { pts: [midOf($("itHat")), midOf($("hatTgt"))] };
+      return null;
+    }
+    var go = btnEls.blender || mapSvg.querySelector("[data-go]");
+    return go ? { pts: [midOf(go)], tap: true } : null;
   });
 
   // ---------- Start ----------
@@ -716,19 +996,20 @@ body.ending .homebtn, body.ending .tb-place-label { opacity: 0.4; }
     onBig: function () { lastSize = ""; scheduleBuild(); },
     onSound: function (on) { if (on) chime(); }
   });
-  makeMap();
   scheduleBuild();
   if (readyOn()) {
     if (NEXT && Toybox.timer.phase() !== "resting") { location.replace(NEXT); }
   } else if (!locked()) {
     showGate();
   }
+  // Tapping a station on the map is "the move"; once done the hand stops for the map.
+  sbtns.addEventListener("pointerdown", function () { if (gateEl.hidden && ghost) ghost.learned(); });
 
   // Test hooks, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) {
     window.__kitchen = {
       layout: function () { return L && { cols: L.cols, rows: L.rows, table: L.table, s: L.s }; },
-      gate: function () { return { hidden: !gateOpen(), washing: washing, dress: gt ? { hands: gt.isOn("hands"), apron: gt.isOn("apron"), hat: gt.isOn("hat") } : null, ready: readyOn() }; },
+      gate: function () { return { hidden: gateEl.hidden, stage: stage2, washing: washing, dress: { hands: DRESS.hands, apron: DRESS.apron, hat: DRESS.hat }, ready: readyOn(), title: $("gTitle").textContent }; },
       table: function () { return mapSvg.querySelectorAll("[data-food]").length; },
       ghost: function () { return ghost.show(); }
     };

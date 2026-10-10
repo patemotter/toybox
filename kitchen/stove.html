@@ -70,49 +70,65 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .tb-head a { text-decoration: none; }
-/* ---------- Standard app shell (common/toybox.css, tb-v2) ----------
-   The stage (the stove, the jug or the pot, the plate or the bowl, the toppings or the food on a wall shelf),
-   the job bar hanging from it (Pancakes, Soup, Pasta), and the panel: the step row (Pour, Flip, Plate or Add,
-   Stir, Fill: the current step is the green Go) and the bottom bar (New, Surprise). */
+.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #FFF3DC; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
-/* The thing under his finger while he carries a topping or food from the shelf. */
+/* Choices: what to cook (Pancakes, Soup, Pasta), then the food or toppings, dragged in or tapped. */
+.tb-choices { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+.tb-tile { touch-action: none; cursor: grab; position: relative; }
+.tb-tile.recipe { cursor: pointer; background: #FFF1D6; color: #1D2340; }
+.tb-tile.recipe[aria-pressed="true"] { background: var(--accent); }
+.tb-tile svg { pointer-events: none; overflow: visible; }
+.tb-tile span { pointer-events: none; white-space: nowrap; }
+.tb-tile.picked { opacity: 0.45; }
+@media (max-width: 600px) { .tb-tile { font-size: 0.84rem; min-height: 66px; } }
+@media (min-width: 700px) and (min-height: 700px) {
+  .tb-choices { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  .tb-tile { font-size: 0.98rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-choices { gap: 6px; }
+  .tb-tile { min-height: 60px; font-size: 0.8rem; }
+  .tb-tile svg { width: 34px; height: 34px; }
+}
+/* The thing under his finger while he drags it from the panel. */
 .float { position: fixed; left: 0; top: 0; z-index: 30; width: 84px; height: 84px; pointer-events: none;
   filter: drop-shadow(3px 4px 0 rgba(29, 35, 64, 0.25)); will-change: transform; }
 .float svg { width: 100%; height: 100%; display: block; overflow: visible; }
-/* Big: the header, the job bar, the chips and the bottom bar hide; Go stays (stage taps do every step too). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-chip, body.big .tb-bottombar, body.big .tb-jobs { display: none; }
-body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.resting .tb-jobs { pointer-events: none; }
+body.big .tb-head > :not(.bigtoggle) { display: none; }
+body.big .tb-panel { display: none; }
+body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* The Back button shows the kitchen's picture (and its name on an iPad). */
-.backbtn .tb-mapic { width: 30px; height: 30px; }
-/* Two step rows (the pan's and the pot's); only the current job's shows. */
-.tb-steps[hidden] { display: none; }
+/* Ghost hand (tools/snippets/ghost-hand.css) */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back backbtn" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M11 20a7 7 0 0 1 3-13 8 8 0 0 1 12 0 7 7 0 0 1 3 13v4H11z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="11" y="24" width="18" height="8" rx="2" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5"/><path d="M16 24v8M24 24v8" stroke="#1D2340" stroke-width="2"/></svg><span>Kitchen</span></a>
+    <a class="btn tb-iconbtn tb-back" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Kitchen</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Stove</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body">
-    <div class="tb-stagecol">
-      <main class="tb-stage stage" id="stage">
-        <canvas id="cv" role="img" aria-label="A stove with a frying pan or a pot on the burner, a batter jug, a plate and a bowl, toppings and food on a shelf"></canvas>
-        <div class="tb-counter" id="counter">Pancakes: 0</div>
-        <div id="coach"></div>
-        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
-      </main>
-      <div id="jobs"></div>
-    </div>
+    <main class="tb-stage stage" id="stage">
+      <canvas id="cv" role="img" aria-label="A stove with a frying pan or a pot on the burner, a batter jug, a plate and a bowl"></canvas>
+      <div class="tb-counter" id="counter">Pancakes: 0</div>
+      <div class="tb-coach" id="coach">Turn the knob!</div>
+      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+    </main>
     <section class="tb-panel" id="panel">
-      <ol id="stepsPan"></ol>
-      <ol id="stepsPot" hidden></ol>
-      <div id="bottom"></div>
+      <div class="tb-choices" id="choices"></div>
+      <nav class="tb-tabs">
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -265,17 +281,13 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   function layout() {
     var r = stage.getBoundingClientRect();
     cw = Math.max(50, r.width); ch = Math.max(50, r.height);
-    tall = ch > cw * 0.85;
-    // Upright (and square-ish) stages: the toppings or food stand on a shelf along the top of the wall.
-    // Wide stages (a phone held sideways): on a shelf on the wall left of the stove.
-    H_UP = tall ? 2.5 : 1.62;
+    tall = ch > cw * 1.08;
+    H_UP = tall ? 2.3 : 1.62;
     // Upright stages: the batter jug waits on a little wall shelf and the plate stands closer to the stove,
     // so the scene is narrower and everything can be bigger.
     JUG.x = tall ? -0.62 : -1.08; JUG.y = tall ? -1.4 : -0.2;
     PLATE.x = BOWL.x = tall ? 0.99 : 1.08; RAIL.x = tall ? 0.98 : 1.06;
-    X_L = tall ? -1.02 : -3.06; X_R = tall ? 1.4 : 1.47;
-    SHELF.s = tall ? 0.36 : 0.42; SHELF.gap = tall ? 0.44 : 0.46;
-    SHELF.x0 = tall ? (X_L + X_R) / 2 - 2 * SHELF.gap : -0.92 - 4 * SHELF.gap; SHELF.y = tall ? -2.08 : -1.0;
+    X_L = tall ? -1.02 : -1.48; X_R = tall ? 1.4 : 1.47;
     JUG_HOME.x = JUG.x; JUG_HOME.y = JUG.y - 0.27;
     if (jug.st === "home") { jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; }
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -283,12 +295,10 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     phone = Math.min(innerWidth, innerHeight) < 560;
     // On phones the coach line sits at the bottom of the stage: leave room so it doesn't cover the knob.
     var dn = H_DN + (phone ? (tall ? 0.3 : 0.22) : 0);
-    // Room at the top so the counter (and the coach line on tablets) don't cover the shelf.
-    var up = H_UP + (phone ? 0.3 : 0.42);
-    B = Math.min((cw - 12) / (X_R - X_L), (ch - 10) / (up + dn));
+    B = Math.min((cw - 12) / (X_R - X_L), (ch - 10) / (H_UP + dn));
     B = Math.max(30, Math.min(B, 400));
     ox = cw / 2 - B * (X_L + X_R) / 2;
-    var spare = ch - B * (up + dn);
+    var spare = ch - B * (H_UP + dn);
     oy = ch - B * dn - Math.max(0, spare) * 0.4;
     LW = 3.4 / B;
   }
@@ -315,10 +325,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   var potSwirl = 0;
   var tops = {};                 // topping animations: id -> start time
   var parts = [];                // sparkles, drops and steam (scene coords)
-  // Things that happen by themselves after one press: the pancake strip is done (panDone), the pot's strip is
-  // done (potDone), food going in one after another (addQueue), three turns of the spoon (autoStir), the
-  // ladle filling the bowl (fillQueue: ladles still to go).
-  var panDone = false, potDone = false, addQueue = [], addNextT = 0, autoStir = null, fillQueue = 0, addTurn = 0;
+  var sayMsg = "", sayUntil = 0;
   function spatHome() { return { x: RAIL.x - 0.17, y: RAIL.y + 0.62, a: Math.PI }; }
   function ladleHome() { return { x: RAIL.x + 0.17, y: RAIL.y + 0.6, a: 0 }; }
   (function () { var h = spatHome(); spat.x = h.x; spat.y = h.y; h = ladleHome(); ladle.x = h.x; ladle.y = h.y; })();
@@ -331,7 +338,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   function pcReady1() { var pc = S.pc; return pc && pc.ph === "pan" && !pc.flipped && pc.c1 >= 1; }
   function pcReady2() { var pc = S.pc; return pc && pc.ph === "pan" && pc.c1 >= 1 && pc.c2 >= 1; }
   function stackFull() { return S.stack.list.length >= STACK_MAX && !S.stack.done; }
-  function canPour() { return !S.pc && jug.st === "home" && !swap; }
+  function canPour() { return !S.pc && jug.st === "home" && !stackFull() && !swap; }
 
   function phase() {
     if (isPan()) {
@@ -358,6 +365,26 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     if (hot < 0.55) return "heat";
     return "stir";
   }
+  function coachFor(ph) {
+    switch (ph) {
+      case "knob": return "Turn the knob!";
+      case "pour": case "pouring": return "Pour the batter!";
+      case "bubbles": return "Wait for the bubbles!";
+      case "flip": return "Flip it!";
+      case "fly": return "Wheee!";
+      case "cook2": return "Almost ready!";
+      case "plate": case "carry": return "Slide it onto the plate!";
+      case "again": return "Pour another one!";
+      case "top": return "Add a topping!";
+      case "more": return isPan() ? "Yum! Pour another one!" : "Yum! Cook some more!";
+      case "add": return S.recipe === "pasta" ? "Drop in the pasta!" : "Drop in some food!";
+      case "heat": return "Wait for the bubbles!";
+      case "stir": return "Stir the pot!";
+      case "fill": case "ladling": return "Fill the bowl!";
+    }
+    return "";
+  }
+
   // ---------- Sound (off by default; soft and synthesized) ----------
   var master = null, masterCtx = null, loops = null, noiseBuf = null;
   function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; loops = null; noiseBuf = null; } return master; }
@@ -417,73 +444,35 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   }
 
   // ---------- Coach and counter ----------
-  var coach = Toybox.coach($("coach")), counterEl = $("counter");
-  function say(msg, ms) { coach.say(msg, Math.max(3, (ms || 3500) / 1000)); }
-  var lastCount = "";
-  function updateCounter() {
+  var coachEl = $("coach"), counterEl = $("counter");
+  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
+  var lastCoach = "", lastCount = "";
+  function updateCoach() {
+    var t = Date.now() < sayUntil ? sayMsg : coachFor(phase());
+    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
     // One counter: pancakes while making pancakes, bowls at the pot.
     var c = wareNow() === "pan" ? "Pancakes: " + S.nP : "Bowls: " + S.nB;
     if (c !== lastCount) { lastCount = c; counterEl.textContent = c; }
   }
-  function tagAt(text, x, y) { if (locked()) return; var pg = toPage(x, y); Toybox.nametag(text, pg[0], pg[1], 2000); }
 
-  // ---------- The wall shelf: the toppings (pancakes) or the food (soup, pasta) ----------
-  // Tap one: it goes onto the pancakes or into the pot. Or carry it there with a finger. The shelf has room
-  // for five, so switching the job never moves the stove.
-  var SHELF = { n: 5, s: 0.34, gap: 0.4, x0: -2.5, y: -1.1 };
-  var IMG = {};
-  function svgImg(svg) {
-    var img = new Image();
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" '));
-    return img;
-  }
-  TOP_ORDER.concat(SOUP_FOODS, PASTA_FOODS).forEach(function (id) { IMG[id] = svgImg(ICON[id]); });
-  function shelfIds() { return S.recipe === "pancakes" ? TOP_ORDER : (S.recipe === "pasta" ? PASTA_FOODS : SOUP_FOODS); }
-  function shelfName(id) { return TOPS[id] ? TOPS[id].name : FOOD[id].name; }
-  function shelfSlot(i) {
-    var n = shelfIds().length, off = tall ? (SHELF.n - n) * SHELF.gap / 2 : (SHELF.n - n) * SHELF.gap;
-    return { x: SHELF.x0 + off + i * SHELF.gap, y: SHELF.y, s: SHELF.s };
-  }
-  function shelfAt(p) {
-    if (swap) return "";
-    var ids = shelfIds(), best = "", bd = 9;
-    for (var i = 0; i < ids.length; i++) {
-      var sl = shelfSlot(i), dx = Math.abs(p.x - sl.x), dy = Math.abs(p.y - (sl.y - sl.s * 0.5));
-      if (dx < SHELF.gap * 0.5 && dy < sl.s * 0.7 && dx + dy < bd) { bd = dx + dy; best = ids[i]; }
-    }
-    return best;
-  }
-  function shelfPage(id) { var i = shelfIds().indexOf(id); if (i < 0) return null; var sl = shelfSlot(i); return toPage(sl.x, sl.y - sl.s * 0.5); }
-  var shelfGlow = 0;
-  function drawPantry(al) {
-    var x0 = SHELF.x0 - SHELF.s * 0.7, x1 = SHELF.x0 + (SHELF.n - 1) * SHELF.gap + SHELF.s * 0.7, y = SHELF.y, t = now();
-    rr(x0 + 0.1, y, 0.06, 0.18, 0.02); fs("#C98B4F", 0.8); rr(x1 - 0.16, y, 0.06, 0.18, 0.02); fs("#C98B4F", 0.8);
-    rr(x0, y, x1 - x0, 0.06, 0.03); fs("#E7B77A");
-    ctx.save(); ctx.globalAlpha *= al;
-    var ids = shelfIds(), glow = t < shelfGlow;
-    ids.forEach(function (id, i) {
-      var sl = shelfSlot(i), img = IMG[id];
-      if (glow) { ell(sl.x, sl.y - sl.s * 0.5, sl.s * 0.62, sl.s * 0.62); ctx.fillStyle = "rgba(255,201,60," + (0.25 + 0.2 * Math.sin(t * 6)).toFixed(2) + ")"; ctx.fill(); }
-      if (img && img.complete && img.naturalWidth) ctx.drawImage(img, sl.x - sl.s / 2, sl.y - sl.s - 0.005, sl.s, sl.s);
+  // ---------- Panel: what to cook, then the food or the toppings ----------
+  var choicesEl = $("choices"), choiceMode = "";
+  function renderChoices() {
+    var mode = S.recipe;
+    if (mode === choiceMode) return;
+    choiceMode = mode;
+    var h = "";
+    RECIPES.forEach(function (r) {
+      h += '<button class="btn tb-tile recipe" data-recipe="' + r.id + '" aria-pressed="' + (r.id === S.recipe) + '" aria-label="Cook ' + r.name + '">' + ICON[r.id] + "<span>" + r.name + "</span></button>";
     });
-    ctx.restore();
-  }
-  // Use one thing from the shelf: it flies from the shelf (or from his finger) onto the pancakes or into the pot.
-  function useItem(id, x0, y0, floatEl) {
-    var pg = shelfPage(id) || [x0, y0];
-    if (x0 == null) { x0 = pg[0]; y0 = pg[1]; }
-    var f = floatEl;
-    if (!f) { f = makeFloat(ICON[id]); floatAt(f, x0, y0, 0.8); }
-    var back = function (ms) { flyFloat(f, x0, y0, pg[0], pg[1], ms || 300); };
-    if (locked() || swap) { back(); return false; }
-    var l = toLocal(pg[0], pg[1]);
-    tagAt(shelfName(id), l.x, l.y - SHELF.s * 0.6);
-    if (TOPS[id]) return dropTop(id, f, x0, y0, back);
-    return dropFood(id, f, x0, y0, back);
+    if (mode === "pancakes") TOP_ORDER.forEach(function (id) { h += '<button class="btn tb-tile" data-top="' + id + '" aria-label="' + TOPS[id].name + '">' + ICON[id] + "<span>" + TOPS[id].name + "</span></button>"; });
+    else (mode === "pasta" ? PASTA_FOODS : SOUP_FOODS).forEach(function (id) { h += '<button class="btn tb-tile" data-food="' + id + '" aria-label="' + FOOD[id].name + '">' + ICON[id] + "<span>" + FOOD[id].name + "</span></button>"; });
+    choicesEl.innerHTML = h;
   }
 
-  // ---------- Floating things (a topping or food on its way) ----------
-  function makeFloat(svg) { var f = document.createElement("div"); f.className = "float"; f.innerHTML = svg; document.body.appendChild(f); return f; }
+  // Dragging a tile out of the panel: a floating copy follows the finger; let go anywhere on the
+  // stage and it goes in (the pot, or onto the pancakes). A tap sends it in too.
+  var tileDrags = {};
   function floatAt(el, x, y, sc) { el.style.transform = "translate(" + (x - 42) + "px," + (y - 42) + "px) scale(" + (sc || 1) + ")"; }
   function flyFloat(el, x0, y0, x1, y1, ms, cb) {
     var t0 = performance.now();
@@ -493,6 +482,45 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
       if (k < 1) requestAnimationFrame(step); else { if (el.parentNode) el.parentNode.removeChild(el); if (cb) cb(); }
     })(t0);
   }
+  choicesEl.addEventListener("pointerdown", function (e) {
+    var b = e.target.closest && e.target.closest(".tb-tile");
+    if (!b || locked()) return;
+    e.preventDefault();
+    var rid = b.getAttribute("data-recipe");
+    if (rid) { pickRecipe(rid); return; }
+    try { b.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var f = document.createElement("div");
+    f.className = "float";
+    f.innerHTML = b.querySelector("svg").outerHTML;
+    f.style.display = "none";
+    document.body.appendChild(f);
+    tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, food: b.getAttribute("data-food"), top: b.getAttribute("data-top") };
+    tone(620, 0.08, 0.03, "sine", 820);
+  });
+  function tileMove(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 10) { d.moved = true; d.f.style.display = ""; d.b.classList.add("picked"); }
+    if (d.moved) floatAt(d.f, e.clientX, e.clientY - 20, 1.1);
+  }
+  function tileUp(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    delete tileDrags[e.pointerId];
+    d.b.classList.remove("picked");
+    var r = stage.getBoundingClientRect();
+    var onStage = e.type !== "pointercancel" && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    var br = d.b.getBoundingClientRect(), x0 = d.moved ? e.clientX : br.left + br.width / 2, y0 = d.moved ? e.clientY - 20 : br.top + br.height / 2;
+    d.f.style.display = "";
+    var back = function (ms) { flyFloat(d.f, x0, y0, br.left + br.width / 2, br.top + br.height / 2, ms || 300); };
+    if (locked() || (d.moved && !onStage) || swap) { back(); return; }
+    if (d.food) dropFood(d.food, d.f, x0, y0, back);
+    else if (d.top) dropTop(d.top, d.f, x0, y0, back);
+  }
+  choicesEl.addEventListener("pointermove", tileMove);
+  choicesEl.addEventListener("pointerup", tileUp);
+  choicesEl.addEventListener("pointercancel", tileUp);
+  choicesEl.addEventListener("click", function (e) { e.preventDefault(); });
 
   // ---------- Picking what to cook: the pan and the pot change places on the burner ----------
   function pickRecipe(id) {
@@ -502,7 +530,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     S.recipe = id;
     if (from !== to) { swap = { from: from, to: to, t0: now(), dur: reduce ? 0.2 : 1.1 }; tone(520, 0.12, 0.035, "sine", 700); }
     else tone(700, 0.08, 0.03, "sine", 900);
-    shelfGlow = now() + 1.6;
+    learned("recipe");
+    sayUntil = 0;
     save();
   }
   function cancelDrags() {
@@ -515,15 +544,18 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     var was = on();
     K.anim = { from: K.v, to: v, t0: now(), dur: reduce ? 0.1 : 0.45 };
     click();
-    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); tagAt("Burner on", KNOB.x, KNOB.y - KNOB.r - 0.05); }
+    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); learned("knob"); if (lastCoach === "Turn on the stove!") sayUntil = 0; }
   }
-  // Cooking with the burner off: the first pour (or food in the pot, or a stir) turns it on for him; the
-  // knob shows it turning. The knob itself still turns on and off with a tap or a twist.
+  // Two-step rule: cooking with the stove off says "Turn on the stove!" and flashes the knob;
+  // the second try turns it on for him.
   function needHeat() {
-    if (on() && !(K.anim && K.anim.to <= 0.08)) return true;
-    K.flashUntil = now() + 1.5;
-    knobTo(0.75);
-    return true;
+    if (on()) return true;
+    K.tries++;
+    if (K.tries >= 2) { K.tries = 0; sayUntil = 0; knobTo(0.75); return true; }
+    say("Turn on the stove!");
+    K.flashUntil = now() + 3; K.wig = 1;
+    gentle();
+    return false;
   }
   function knobAngle(p) { return Math.atan2(p.x - KNOB.x, -(p.y - KNOB.y)); }
 
@@ -538,14 +570,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   }
   function newPancake(x) {
     S.pc = { ph: "pour", r: 0.05, x: x, c1: 0, c2: 0, flipped: false, z: 0, th: 0, bub: makeBubbles(), wig: 0, sqT: -9 };
-    panDone = false;
     if (S.stack.done) sendAway("plate");
-    else if (S.stack.list.length >= STACK_MAX) {
-      // A full plate goes to the table by itself (no topping) and a clean one slides in.
-      S.stack.done = true; S.stack.t = Date.now();
-      addToTable({ k: "pancakes", c: GOLD, s: "", t: S.stack.t });
-      sendAway("plate");
-    }
+    learned("pour");
   }
   function fitPc() { var pc = S.pc; var m = Math.max(0, PAN.fx - pc.r - 0.01); pc.x = clamp(pc.x, -m, m); }
   function jugSpout() {
@@ -571,6 +597,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     spat.held = false; spat.until = now() + 0.7;
     puff(0.35, 0.03 + 0.03 * s, 1200);
     tone(400, 0.3 + s * 0.3, 0.03, "sine", 900);
+    if (!magic) learned("flip");
   }
   function landPancake() {
     var pc = S.pc, f = pc.fly;
@@ -590,6 +617,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     pc.ph = "toplate";
     pc.to = { t0: now(), dur: reduce ? 0.2 : 0.6, x0: x0, y0: y0 };
     spat.held = true;
+    learned("plate");
   }
   function addToStack() {
     var pc = S.pc;
@@ -599,28 +627,25 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     pat(); tone(520, 0.12, 0.03, "sine", 780, 0.05);
     burst(PLATE.x, stackTopY(), 10, null, true);
     spat.held = false; spat.until = now() + 0.3;
-    // The pancake is done: every step ticked, Go says "Again!". The toppings on the shelf go on the stack.
-    panDone = true;
-    if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1200);
-    shelfGlow = now() + 2.4;
     save();
   }
   function dropTop(id, floatEl, x0, y0, back) {
     if (!isPan()) { back(); return; }
-    if (!S.stack.list.length || away) { say("Make a pancake first!"); plate.wig = 1; back(320); return false; }
+    if (!S.stack.list.length) { say("Make a pancake first!"); plate.wig = 1; back(320); return; }
     var top = toPage(PLATE.x, stackTopY() - 0.35);
     flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 380, function () { addTop(id); });
-    return true;
   }
   function addTop(id) {
     if (!S.stack.list.length || !TOPS[id]) return;
     if (S.stack.tops.indexOf(id) >= 0) { burst(PLATE.x, stackTopY() - 0.1, 10, null, true); tone(880, 0.12, 0.03); return; }
     S.stack.tops.push(id);
     tops[id] = now();
+    learned("top");
     if (id === "berries") { plop(); setTimeout(plop, 120); } else if (id === "butter") pat(); else tone(300, 0.6, 0.03, "sine", 200);
     if (!S.stack.done) {
       S.stack.done = true; S.stack.t = Date.now();
       addToTable({ k: "pancakes", c: GOLD, s: TOPS[id].col, t: S.stack.t });
+      if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
       setTimeout(chime, 500);
       for (var i = 0; i < 3; i++) setTimeout(function () { burst(PLATE.x, stackTopY() - 0.1, 14, null, true); }, 600 + i * 260);
     } else updateTable(S.stack.t, TOPS[id].col);
@@ -647,17 +672,15 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   }
   function rebuildPieces() { pieces = []; S.pot.items.forEach(function (id) { addPieces(id, false); }); }
   function dropFood(id, floatEl, x0, y0, back) {
-    if (isPan()) { back(); return false; }
-    if (S.pot.items.length >= POT_MAX) { say(cooked() ? "The pot is full! Fill the bowl!" : "The pot is full! Stir it!"); spoon.wig = 1; back(320); return false; }
-    if (ladle.st !== "home") { back(); return false; }
+    if (isPan()) { back(); return; }
+    if (S.pot.items.length >= POT_MAX) { say(cooked() ? "The pot is full! Fill the bowl!" : "The pot is full! Stir it!"); spoon.wig = 1; back(320); return; }
+    if (ladle.st !== "home") { back(); return; }
     var top = toPage(POT.x, POT.ty - 0.3);
     flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 360, function () { putFood(id); });
-    return true;
+    learned("add");
   }
   function putFood(id) {
     if (S.pot.items.length >= POT_MAX || isPan()) return;
-    needHeat();
-    potDone = false;
     if (S.bowl.done) sendAway("bowl");
     S.pot.items.push(id);
     addPieces(id, true);
@@ -693,6 +716,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     var dip = { x: POT.x + 0.12, y: waterY() + 0.02, a: -0.35 };
     ladleTo([{ p: { x: dip.x, y: POT.ty - 0.35, a: -0.35 }, dur: 0.6 }, { p: dip, dur: 0.35, dip: true }, { p: { x: BOWL.x - 0.2, y: POT.ty - 0.2, a: -0.35 }, dur: 0.6 },
       { p: ladlePourAt(), dur: 0.4 }, { p: ladlePourAt(), dur: 0.9, pour: true }, { p: ladleHome(), dur: 0.7, home: true }]);
+    learned("fill");
   }
   function ladleScoop() {
     if (ladle.full) return;
@@ -724,14 +748,13 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   function finishBowl() {
     S.bowl.done = true;
     S.nB++;
-    potDone = true; fillQueue = 0;
     addToTable({ k: S.bowl.k || "soup", c: S.bowl.c || "#F4A340", s: "", t: Date.now() });
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
     chime();
     for (var i = 0; i < 3; i++) setTimeout(function () { burst(BOWL.x, BOWL.y - 0.25, 14, null, true); }, i * 260);
     S.pot.items = []; S.pot.stir = 0; pieces = [];
     setTimeout(function () { if (!isPan() && S.pot.level < 0.99) runFaucet(true); }, reduce ? 200 : 1300);
-    say("Yum!", 4000);
+    say("Yum! Cook some more!", 4000);
     save();
   }
 
@@ -812,10 +835,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
       else if (S.bowl.fill > 0) { burst(BOWL.x, BOWL.y - 0.2, 10, S.bowl.c || "#FFFFFF"); S.bowl = blankBowl(); }
       if (S.pot.level < 0.99) runFaucet(true);
     }
-    K.tries = 0;
-    panDone = false; potDone = false; addQueue = []; autoStir = null; fillQueue = 0;
+    K.tries = 0; sayUntil = 0;
     save();
-    say(isPan() ? "A clean pan!" : "A fresh pot!");
     tone(500, 0.2, 0.04, "sine", 300);
   }
   // Stove moments. The pan: the magic flip (the pancake spins way up and lands the same side up, so it
@@ -922,11 +943,10 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     else if (S.stack.list.length && !away) happyFace(PLATE.x, stackTopY() - 0.01, 0.62, k, 0.5);
     else if (!pc) happyFace(PAN.x, PAN.y, 0.95, k, 0.5);
   }
+  $("newBtn").addEventListener("click", newCook);
+  $("surpriseBtn").addEventListener("click", surprise);
 
-  // ---------- Touch on the stage: tap or drag (Toybox.press) ----------
-  // Every drawn control: a tap does the whole motion (the knob: on or off; the jug: pours a pancake; the
-  // pancake: a good flip, or onto the plate; the pot: three turns of the spoon, or fills the bowl; a shelf
-  // thing: onto the pancakes or into the pot); a drag, a twist or a flick is the real move.
+  // ---------- Touch on the stage ----------
   var stageDrags = {};
   function nearKnob(p) { return Math.hypot(p.x - KNOB.x, p.y - KNOB.y) < 0.3; }
   function inPan(p) { var dx = (p.x - PAN.x) / 0.72, dy = (p.y - PAN.y + 0.04) / 0.34; return dx * dx + dy * dy < 1; }
@@ -939,134 +959,95 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
   function onBowl(p) { return Math.abs(p.x - BOWL.x) < BOWL.rx + 0.08 && p.y > BOWL.y - 0.45 && p.y < BOWL.y + 0.1; }
   function onFaucet(p) { return p.x > FAUCET.x - 0.5 && p.x < FAUCET.x + 0.12 && p.y > FAUCET.y - 0.2 && p.y < FAUCET.y + 0.14; }
   function potAngle(p) { return Math.atan2((p.y - waterY()) / (POT.ry * 0.9), (p.x - POT.x) / (POT.rx * 0.93)); }
-  // Exact shapes first; a press near a small part (the knob, the jug, a shelf thing, the tap) snaps to it
-  // within the 2 cm key target.
-  function exactHit(x, y) {
-    var p = toLocal(x, y);
-    if (shelfAt(p)) return "shelf";
-    if (nearKnob(p)) return "knob";
-    if (swap) return null;
-    if (wareNow() === "pan") return onJug(p) || inPan(p) || onPlate(p) || onSpatRest(p) ? "scene" : null;
-    return onFaucet(p) || inPot(p) || onBowl(p) || onLadleRest(p) ? "scene" : null;
-  }
-  function smallParts() {
-    var out = [], kp = toPage(KNOB.x, KNOB.y);
-    out.push({ id: "knob", x: kp[0], y: kp[1], r: KNOB.r * B });
-    if (!swap) shelfIds().forEach(function (id, i) { var sl = shelfSlot(i), pg = toPage(sl.x, sl.y - sl.s * 0.5); out.push({ id: "item:" + id, x: pg[0], y: pg[1], r: sl.s * B * 0.5 }); });
-    if (!swap && wareNow() === "pan" && jug.st === "home") { var jp = toPage(jug.x, jug.y); out.push({ id: "jug", x: jp[0], y: jp[1], r: 0.3 * B }); }
-    if (!swap && wareNow() === "pot") { var fp = toPage(FAUCET.x - 0.2, FAUCET.y - 0.1); out.push({ id: "faucet", x: fp[0], y: fp[1], r: 0.25 * B }); }
-    return out;
-  }
-  function partPoint(part, p) {
-    // A snapped press acts as if it landed on the part itself.
-    if (part === "knob") return { x: KNOB.x, y: KNOB.y };
-    if (part === "jug") return { x: jug.x, y: jug.y };
-    if (part === "faucet") return { x: FAUCET.x - 0.2, y: FAUCET.y - 0.1 };
-    return p;
-  }
-  var press = Toybox.press(cv, {
-    any: true,
-    hit: exactHit,
-    parts: smallParts,
-    down: function (part, e) {
-      if (locked()) return;
-      var p = toLocal(e.clientX, e.clientY), t = now();
-      if (part && part !== "scene" && part !== "shelf" && part.indexOf("item:") !== 0) p = partPoint(part, p);
-      var d = { kind: "", sx: p.x, sy: p.y, moved: false, t0: t, samples: [[p.x, p.y, t]], id: e.pointerId };
-      stageDrags[e.pointerId] = d;
-      var item = part && part.indexOf("item:") === 0 ? part.slice(5) : shelfAt(p);
-      if (item) { d.kind = "item"; d.item = item; return; }
-      if (nearKnob(p) && K.drag == null) {
-        d.kind = "knob"; d.pa = knobAngle(p); d.turn = 0; K.drag = e.pointerId; K.anim = null;
-        return;
-      }
-      if (!swap) { if (wareNow() === "pan") downPan(p, d); else downPot(p, d); }
-      if (!d.kind) delete stageDrags[e.pointerId];
-    },
-    dragStart: function (part, e) {
-      var d = stageDrags[e.pointerId];
-      if (d && d.kind === "item" && !d.f) { d.f = makeFloat(ICON[d.item]); floatAt(d.f, e.clientX, e.clientY - 20, 1.1); tone(620, 0.08, 0.03, "sine", 820); }
-    },
-    move: function (part, e) { moveStage(e); },
-    up: function (part, e, st) { stageUp(e, st); }
+
+  cv.addEventListener("pointerdown", function (e) {
+    if (locked()) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var p = toLocal(e.clientX, e.clientY), t = now();
+    var d = { kind: "", sx: p.x, sy: p.y, moved: false, t0: t, samples: [[p.x, p.y, t]], id: e.pointerId };
+    stageDrags[e.pointerId] = d;
+    if (nearKnob(p) && K.drag == null) {
+      d.kind = "knob"; d.pa = knobAngle(p); d.turn = 0; K.drag = e.pointerId; K.anim = null;
+      return;
+    }
+    if (!swap) { if (wareNow() === "pan") downPan(p, d); else downPot(p, d); }
+    if (!d.kind) delete stageDrags[e.pointerId];
   });
   function downPan(p, d) {
     var pc = S.pc;
     if (pc && pc.ph === "pan" && (onPancake(p) || inPan(p) || onSpatRest(p))) {
       if (pcReady1()) {
-        // Spatula under the pancake; a flick up flips it (a tap: a good flip).
+        // Spatula under the pancake; a flick up flips it.
         d.kind = "flip"; d.px0 = pc.x; pc.ph = "lift"; pc.z = 0; spat.held = true; tone(420, 0.08, 0.03, "sine", 520);
-      } else if (pc.flipped) {
-        // Cooked on top: slide it onto the plate (a tap does it all; it cooks the last bit at once).
+      } else if (pcReady2()) {
         d.kind = "slide"; pc.ph = "carry"; pc.wx = PAN.x + pc.x; pc.wy = PAN.y; d.dx = pc.wx - p.x; d.dy = pc.wy - p.y; spat.held = true;
       } else {
         pc.wig = 1; d.kind = "tap";
-        if (!on()) needHeat();
-        say("Wait for the bubbles!");
+        if (!on()) { say("Turn on the stove!"); K.flashUntil = now() + 3; K.wig = 1; }
+        else say(pc.flipped ? "Almost ready!" : "Wait for the bubbles!");
       }
       return;
     }
     if (onPlate(p)) {
       d.kind = "tap";
-      if (pc && pc.ph === "pan" && pc.flipped) { pc.c2 = 1; toPlate(); }
+      if (pcReady2()) toPlate();
       else if (S.stack.done) { burst(PLATE.x, stackTopY() - 0.1, 8, null, true); plate.wig = 0.6; }
-      else { plate.wig = 1; if (S.stack.list.length) { shelfGlow = now() + 2; say("Add a topping!"); } }
+      else plate.wig = 1;
       return;
     }
     if (jug.st === "home" && onJug(p)) {
       d.kind = "tap";
-      if (!canPour()) { jug.wig = 1; return; }
-      needHeat();
+      if (!canPour()) { jug.wig = 1; if (stackFull()) say("Add a topping!"); return; }
+      if (!needHeat()) { jug.wig = 1; return; }
       d.kind = "jug"; jug.st = "drag"; d.dx = jug.x - p.x; d.dy = jug.y - p.y; tone(420, 0.1, 0.03, "sine", 520);
       return;
     }
     if (!pc && inPan(p) && jug.st === "home") {
       // A tap on the empty pan pours a pancake too.
       d.kind = "tap";
-      if (!canPour()) { jug.wig = 1; return; }
-      needHeat(); usedTap.pour = true;
+      if (!canPour()) { jug.wig = 1; if (stackFull()) say("Add a topping!"); return; }
+      if (!needHeat()) { jug.wig = 1; return; }
       autoPour(0.32);
     }
   }
   function downPot(p, d) {
     if (onFaucet(p)) { d.kind = "tap"; runFaucet(S.pot.level < 0.99); return; }
-    if (cooked() && ladle.st === "home" && !fillQueue && (inPot(p) || onLadleRest(p))) {
-      d.kind = "ladle"; d.fromRest = onLadleRest(p); d.p = p;
+    if (cooked() && ladle.st === "home" && (inPot(p) || onLadleRest(p))) {
+      d.kind = "ladle"; d.fromRest = onLadleRest(p); ladle.st = "drag"; ladle.path = null;
+      if (!d.fromRest) { ladle.x = p.x; ladle.y = Math.max(p.y, waterY() - 0.05); ladle.a = -0.35; ladleScoop(); }
+      learned("fill");
       return;
     }
-    if (inPot(p) && ladle.st === "home" && !autoStir) {
-      if (!S.pot.items.length) { d.kind = "tap"; spoon.wig = 1; shelfGlow = now() + 2; say(S.recipe === "pasta" ? "Drop in the pasta!" : "Drop in some food!"); return; }
-      needHeat();
-      d.kind = "stir"; d.pa = potAngle(p); d.lt = now();
+    if (inPot(p) && ladle.st === "home") {
+      if (S.pot.items.length && !on() && !needHeat()) { spoon.wig = 1; d.kind = "tap"; return; }
+      d.kind = "stir"; spoon.drag = true; d.pa = potAngle(p); d.lt = now();
       return;
     }
     if (onBowl(p)) {
       d.kind = "tap";
-      if (cooked()) { doFill(); usedTap.fill = true; }
+      if (cooked()) autoLadle();
       else if (S.bowl.done) { burst(BOWL.x, BOWL.y - 0.2, 8, null, true); bowlV.wig = 0.6; }
       else bowlV.wig = 1;
     }
   }
-  function moveStage(e) {
+  cv.addEventListener("pointermove", function (e) {
     var d = stageDrags[e.pointerId];
     if (!d) return;
     var p = toLocal(e.clientX, e.clientY), t = now(), pc = S.pc;
     if (Math.hypot(p.x - d.sx, p.y - d.sy) > 0.08) d.moved = true;
     d.samples.push([p.x, p.y, t]);
     while (d.samples.length > 2 && t - d.samples[0][2] > 0.12) d.samples.shift();
-    if (d.kind === "item") {
-      if (d.f) floatAt(d.f, e.clientX, e.clientY - 20, 1.1);
-    } else if (d.kind === "knob") {
+    if (d.kind === "knob") {
       var a = knobAngle(p), da = wrapA(a - d.pa);
       d.pa = a; d.turn += Math.abs(da);
       if (d.turn > 0.15) d.moved = true;
       var was = on();
       K.v = clamp(K.v + da / KNOB_SWEEP, 0, 1);
-      if (!was && on()) { click(); puff(0.5, 0.05, 900); }
+      if (!was && on()) { click(); puff(0.5, 0.05, 900); learned("knob"); K.tries = 0; sayUntil = 0; }
       else if (was && !on()) click();
     } else if (d.kind === "jug") {
       jug.x = clamp(p.x + d.dx, X_L + 0.1, X_R - 0.1); jug.y = clamp(p.y + d.dy, -H_UP + 0.3, -0.25);
-      if (jug.pouring) ghost.learned("pour");
     } else if (d.kind === "flip" && pc && pc.ph === "lift") {
       pc.z = clamp(d.sy - p.y, 0, 0.35);
       var m = Math.max(0, PAN.fx - pc.r - 0.01);
@@ -1075,73 +1056,58 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
       if (dt > 0.02) {
         // Speed in screens per second, so a flick feels the same on a phone and on an iPad.
         var vUp = (s0[1] - p.y) * B / dt / Math.max(300, Math.min(innerWidth, innerHeight));
-        if (vUp > 0.6 && d.sy - p.y > 0.05) { d.kind = "done"; launch(clamp((vUp - 0.6) / 2.4, 0, 1)); ghost.learned("flip"); }
+        if (vUp > 0.6 && d.sy - p.y > 0.05) { d.kind = "done"; launch(clamp((vUp - 0.6) / 2.4, 0, 1)); }
       }
     } else if (d.kind === "slide" && pc && pc.ph === "carry") {
       pc.wx = clamp(p.x + d.dx, X_L, X_R); pc.wy = clamp(p.y + d.dy, -H_UP + 0.2, 0.1);
     } else if (d.kind === "stir") {
-      spoon.drag = true;
       var pa = potAngle(p), dp = wrapA(pa - d.pa), dts = Math.max(0.008, t - d.lt);
       d.pa = pa; d.lt = t;
       potSwirl = clamp(lerp(potSwirl, dp / dts, 0.3), -7, 7);
-      if (Math.abs(dp) > 0.01) ghost.learned("stir");
+      if (Math.abs(dp) > 0.01) learned("stir");
       if (S.pot.items.length && hot > 0.35 && S.pot.stir < 1) {
-        S.pot.stir = Math.min(1, S.pot.stir + Math.abs(dp) / (TAU * 2) * Math.min(1, hot * 1.3));
+        S.pot.stir = Math.min(1, S.pot.stir + Math.abs(dp) / (TAU * 3) * Math.min(1, hot * 1.3));
         if (S.pot.stir >= 1) potCooked();
       }
-    } else if (d.kind === "ladle") {
-      if (ladle.st !== "drag") {
-        ladle.st = "drag"; ladle.path = null;
-        if (!d.fromRest) { ladle.x = d.p.x; ladle.y = Math.max(d.p.y, waterY() - 0.05); ladle.a = -0.35; ladleScoop(); }
-      }
+    } else if (d.kind === "ladle" && ladle.st === "drag") {
       ladle.x = p.x; ladle.y = p.y; ladle.a = -0.35;
       if (!ladle.full && inPot(p) && p.y > waterY() - 0.15) { ladle.y = Math.max(p.y, waterY() - 0.05); ladleScoop(); }
     }
-  }
+  });
   function potCooked() {
     chime();
     burst(POT.x, waterY(), 16, null, true);
     save();
   }
-  function stageUp(e, st) {
+  function stageUp(e) {
     var d = stageDrags[e.pointerId];
     if (!d) return;
     delete stageDrags[e.pointerId];
-    var pc = S.pc, cancel = e.type === "pointercancel" || (st && st.cancel), tap = st ? st.tap : !d.moved;
-    if (d.kind === "item") {
-      if (cancel || locked()) { if (d.f && d.f.parentNode) d.f.parentNode.removeChild(d.f); return; }
-      if (tap || !d.f) { if (d.f && d.f.parentNode) d.f.parentNode.removeChild(d.f); if (useItem(d.item)) usedTap[isPan() ? "top" : "add"] = true; return; }
-      var r = stage.getBoundingClientRect(), onStage = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      if (!onStage || shelfAt(toLocal(e.clientX, e.clientY))) { var pg = shelfPage(d.item) || [e.clientX, e.clientY]; flyFloat(d.f, e.clientX, e.clientY - 20, pg[0], pg[1], 300); return; }
-      if (useItem(d.item, e.clientX, e.clientY - 20, d.f)) ghost.learned(isPan() ? "top" : "add");
-    } else if (d.kind === "knob") {
+    var pc = S.pc, cancel = e.type === "pointercancel";
+    if (d.kind === "knob") {
       K.drag = null;
-      if (tap && !cancel) knobTo(on() ? 0 : 0.75);
+      if (!d.moved && !cancel) knobTo(on() ? 0 : 0.75);
+      else if (on()) K.tries = 0;
     } else if (d.kind === "jug") {
-      if (tap && !cancel) { jug.st = "home"; jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; usedTap.pour = true; autoPour(0.32); }
+      if (!d.moved && !cancel) { jug.st = "home"; jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; autoPour(0.32); }
       else { endPour(); jug.st = "back"; jug.t0 = now(); jug.from = { x: jug.x, y: jug.y }; }
     } else if (d.kind === "flip") {
-      if (pc && pc.ph === "lift") {
-        if (cancel) { pc.ph = "pan"; pc.z = 0; spat.held = false; }
-        else { launch(tap ? 0.55 : 0.15); if (tap) usedTap.flip = true; }
-      }
+      if (pc && pc.ph === "lift") { if (cancel) { pc.ph = "pan"; pc.z = 0; spat.held = false; } else launch(0.15); }
     } else if (d.kind === "slide") {
       if (pc && pc.ph === "carry") {
         var nearPlate = Math.hypot(pc.wx - PLATE.x, pc.wy - PLATE.y) < 0.7 || pc.wx > PAN.x + PAN.rx;
         var inside = Math.abs(pc.wx - PAN.x) < PAN.fx && Math.abs(pc.wy - PAN.y) < 0.3;
         if (cancel) { pc.ph = "pan"; spat.held = false; }
-        else if (tap || nearPlate || !inside) { pc.c2 = 1; toPlate(); }
+        else if (!d.moved || nearPlate || !inside) toPlate();
         else { pc.ph = "pan"; pc.x = pc.wx - PAN.x; fitPc(); spat.held = false; pat(); }
       }
     } else if (d.kind === "stir") {
       spoon.drag = false;
-      if (tap && !cancel) { doStir(); usedTap.stir = true; }
-    } else if (d.kind === "ladle") {
-      if (ladle.st === "drag") {
-        var nearBowl = Math.hypot(ladle.x - BOWL.x, ladle.y - BOWL.y) < 0.75 || ladle.x > POT.x + POT.rx + 0.15;
-        if (ladle.full && nearBowl && !cancel) { startLadlePour(); ghost.learned("fill"); }
-        else { ladle.st = "back"; ladle.full = false; ladleTo([{ p: ladleHome(), dur: 0.5, home: true }]); }
-      } else if (tap && !cancel) { doFill(); usedTap.fill = true; }
+    } else if (d.kind === "ladle" && ladle.st === "drag") {
+      var nearBowl = Math.hypot(ladle.x - BOWL.x, ladle.y - BOWL.y) < 0.75 || ladle.x > POT.x + POT.rx + 0.15;
+      if (ladle.full && nearBowl && !cancel) startLadlePour();
+      else if (!d.moved && !cancel) { ladle.st = "home"; ladle.full = false; autoLadle(); }
+      else { ladle.st = "back"; ladle.full = false; ladleTo([{ p: ladleHome(), dur: 0.5, home: true }]); }
     }
   }
   function endPour() {
@@ -1149,6 +1115,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     jug.pouring = false;
     if (pc && pc.ph === "pour") { pc.ph = "pan"; pc.spread = true; save(); }
   }
+  cv.addEventListener("pointerup", stageUp);
+  cv.addEventListener("pointercancel", stageUp);
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -1183,7 +1151,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     var fl = on() ? 0.45 + 0.55 * K.v : 0;
     flame += (fl - flame) * Math.min(1, dt * (fl > flame ? 7 : 3.5));
     if (flame < 0.004) flame = 0;
-    if (on()) hot = Math.min(1, hot + dt * 0.9 * (0.6 + 0.4 * K.v)); else hot = Math.max(0, hot - dt * 0.12);
+    if (on()) hot = Math.min(1, hot + dt * 0.36 * (0.6 + 0.4 * K.v)); else hot = Math.max(0, hot - dt * 0.12);
     K.wig = Math.max(0, K.wig - dt * 1.4);
 
     // The pan and the pot changing places.
@@ -1234,24 +1202,9 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     }
     if (parts.length > 320) parts.splice(0, parts.length - 320);
     updateLoops(w === "pan" && pc && (pc.ph === "pan" || pc.ph === "pour" || pc.ph === "lift") ? hot : 0);
-    automate(t);
-    updateCounter();
-    updateSteps();
-  }
-  // One press: the queued food goes in one after another; the ladle goes again until the bowl is full; a
-  // flipped pancake slides onto the plate by itself once its second side is golden.
-  function automate(t) {
-    if (addQueue.length && t >= addNextT && !swap) {
-      if (isPan() || S.pot.items.length >= POT_MAX) addQueue = [];
-      else { useItem(addQueue.shift()); addNextT = t + (reduce ? 0.15 : 0.5); }
-    }
-    if (fillQueue > 0 && ladle.st === "home" && !isPan() && !swap) {
-      if (cooked() && !S.bowl.done) { fillQueue--; autoLadle(); } else fillQueue = 0;
-    }
-    var pc = S.pc;
-    if (pc && pc.ph === "pan" && pc.flipped && pc.c2 >= 1 && isPan() && !swap) {
-      if (!pc.plateT) pc.plateT = t; else if (t - pc.plateT > (reduce ? 0.2 : 0.7)) toPlate();
-    }
+    renderChoices();
+    updateCoach();
+    updateGhostPhase();
   }
 
   function updatePan(t, dt) {
@@ -1300,10 +1253,10 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     if (pc.ph !== "pour" && pc.spread) { pc.r = Math.min(Math.max(pc.r, 0.24), pc.r + dt * 0.15); if (pc.r >= 0.24) pc.spread = false; fitPc(); }
     // Cooking: the side facing down cooks (only while the burner is on). Nothing burns: it stops at golden.
     if ((pc.ph === "pan" || pc.ph === "pour") && hot > 0.05 && !swap && isPan()) {
-      var rate2 = Math.min(1, hot * 1.4) * (0.7 + 0.3 * Math.max(K.v, 0.3)) * (reduce ? 2 : 1) * (on() ? 1 : 0.3);
+      var rate2 = hot * (0.6 + 0.4 * Math.max(K.v, 0.3)) * (reduce ? 2 : 1);
       if (!pc.flipped) {
         var before = pc.c1;
-        pc.c1 = Math.min(1, pc.c1 + dt * rate2 / 2.8);
+        pc.c1 = Math.min(1, pc.c1 + dt * rate2 / 6.5);
         if (pc.bub) for (i = 0; i < pc.bub.length; i++) {
           var b = pc.bub[i];
           if (!b.popped && before < b.p && pc.c1 >= b.p) { b.popped = true; pip(); }
@@ -1311,7 +1264,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
         if (before < 1 && pc.c1 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 6, "#FFF3C4"); save(); }
       } else {
         var b2 = pc.c2;
-        pc.c2 = Math.min(1, pc.c2 + dt * rate2 / 2.2);
+        pc.c2 = Math.min(1, pc.c2 + dt * rate2 / 4.5);
         if (b2 < 1 && pc.c2 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 10, null, true); tone(880, 0.2, 0.03); save(); }
       }
     }
@@ -1345,17 +1298,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
       if (Math.random() < 0.3 && fk > 0.1 && fk < 0.95) ripples.push({ x: FAUCET.x, y: wy, t0: t });
       if (fk >= 1) { faucet.run = null; save(); }
     }
-    // Three turns of the spoon by themselves (a tap on the pot, or Go "Stir!"): the food cooks as it goes round.
-    var stirAng = null;
-    if (autoStir) {
-      var sk = clamp((t - autoStir.t0) / autoStir.dur, 0, 1);
-      stirAng = ease(sk) * TAU * 3;
-      potSwirl = lerp(potSwirl, 5, Math.min(1, dt * 6));
-      if (S.pot.items.length) S.pot.stir = Math.max(S.pot.stir, lerp(autoStir.s0, 1, sk));
-      if (sk >= 1) { autoStir = null; if (S.pot.items.length) { S.pot.stir = 1; potCooked(); } }
-    }
     // Swirl: the stirring sets the food going round; boiling keeps it moving a little.
-    if (!spoon.drag && !autoStir) potSwirl *= Math.pow(0.35, dt);
+    if (!spoon.drag) potSwirl *= Math.pow(0.35, dt);
     var drift = boil ? 0.25 : 0.05;
     for (i = pieces.length - 1; i >= 0; i--) {
       var p = pieces[i];
@@ -1385,10 +1329,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     for (i = ripples.length - 1; i >= 0; i--) if (t - ripples[i].t0 > 0.8) ripples.splice(i, 1);
     // Spoon: in the finger when stirring, otherwise leaning in the pot.
     var rest = { x: POT.x + 0.26, y: wy + 0.02, a: 0.5 };
-    if (stirAng !== null) {
-      var ux0 = Math.cos(stirAng + 0.3);
-      spoon.x = POT.x + ux0 * POT.rx * 0.6; spoon.y = wy + Math.sin(stirAng + 0.3) * POT.ry * 0.6; spoon.a = 0.3 + 0.35 * ux0;
-    } else if (spoon.drag) {
+    if (spoon.drag) {
       var ids = Object.keys(stageDrags), dd = null;
       ids.forEach(function (k) { if (stageDrags[k].kind === "stir") dd = stageDrags[k]; });
       if (dd && dd.samples.length) {
@@ -1459,6 +1400,16 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     for (var x = Math.floor(L / tile) * tile; x < R; x += tile) { ctx.moveTo(x, top); ctx.lineTo(x, BACK); }
     ctx.stroke();
     ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L, top); ctx.lineTo(R, top); ctx.stroke();
+    // A range hood over the stove, when there is room above it.
+    if (T < -2.25 && wareNow() === "pot") {
+      var hy = -2.02;
+      rr(-0.22, T - 0.1, 0.44, hy - 0.55 - T + 0.12, 0.02); fs("#C9D3E0");
+      ctx.beginPath(); ctx.moveTo(-0.5, hy - 0.55); ctx.lineTo(0.5, hy - 0.55); ctx.lineTo(0.86, hy); ctx.lineTo(-0.86, hy); ctx.closePath(); fs("#DDE3EC");
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.moveTo(-0.38, hy - 0.48); ctx.lineTo(-0.66, hy - 0.06); ctx.stroke();
+      rr(-0.9, hy - 0.02, 1.8, 0.1, 0.04); fs("#9AA5B8");
+      ell(-0.45, hy + 0.09, 0.08, 0.02); ctx.fillStyle = "rgba(255,240,170,0.9)"; ctx.fill();
+      ell(0.45, hy + 0.09, 0.08, 0.02); ctx.fill();
+    }
     // Counter top, seen from a little above; the cooktop in the middle.
     ctx.fillStyle = "#F1C98E"; ctx.fillRect(L, BACK, R - L, -BACK);
     ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L, BACK); ctx.lineTo(R, BACK); ctx.stroke();
@@ -1935,7 +1886,6 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     ctx.lineJoin = "round";
     drawRoom();
     drawRail();
-    drawPantry(swap ? Math.abs(1 - 2 * clamp((now() - swap.t0) / swap.dur, 0, 1)) : 1);
     var w = wareNow(), dy = 0, al = 1;
     if (swap) {
       var sk = (now() - swap.t0) / swap.dur;
@@ -1967,7 +1917,8 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     if (on() || (K.anim && K.anim.to > 0)) knobTo(0);
     K.drag = null;
     cancelDrags();
-    addQueue = []; fillQueue = 0; autoStir = null;
+    Object.keys(tileDrags).forEach(function (k) { var d = tileDrags[k]; if (d.f.parentNode) d.f.parentNode.removeChild(d.f); d.b.classList.remove("picked"); });
+    tileDrags = {};
     setTimeout(done, reduce ? 300 : 3200);
   }
   function restArt() {
@@ -1986,170 +1937,139 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
   }
 
-  // ---------- Panel: the job bar, the step row (Go is the current step) and the bottom bar ----------
-  // Step pictures: flat colors, 2 px ink outline (shared by the chip and the Go of a step).
-  function pic(body) { return '<svg viewBox="0 0 40 40">' + body + "</svg>"; }
-  var PIC = {
-    pour: pic('<path d="M8 8h18l-4 8H12z" fill="#D6EEFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 16c-1 6 3 8 0 14" fill="none" stroke="#1D2340" stroke-width="6" stroke-linecap="round"/><path d="M17 16c-1 6 3 8 0 14" fill="none" stroke="#F7E2A4" stroke-width="3" stroke-linecap="round"/><ellipse cx="20" cy="33" rx="12" ry="3.5" fill="#F7E2A4" stroke="#1D2340" stroke-width="2"/>'),
-    flip: pic('<path d="M5 30h17l9-10" fill="none" stroke="#1D2340" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="24" cy="12" rx="9" ry="4" fill="#ECBE68" stroke="#1D2340" stroke-width="2.5" transform="rotate(-25 24 12)"/><path d="M8 18a10 10 0 0 1 6-8" fill="none" stroke="#3DB4FF" stroke-width="2.5" stroke-linecap="round"/>'),
-    plate: pic('<ellipse cx="20" cy="27" rx="16" ry="6" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5"/><ellipse cx="20" cy="23" rx="10" ry="4" fill="#D8963C" stroke="#1D2340" stroke-width="2"/><ellipse cx="20" cy="18.5" rx="10" ry="4" fill="#ECBE68" stroke="#1D2340" stroke-width="2"/>'),
-    add: pic('<path d="M7 24h26q0 11-13 11T7 24z" fill="#E63946" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="20" cy="24" rx="13" ry="3.5" fill="#BFE6FF" stroke="#1D2340" stroke-width="2"/><circle cx="15" cy="10" r="4" fill="#FF8A1F" stroke="#1D2340" stroke-width="2"/><circle cx="25" cy="15" r="3.2" fill="#5DBB3F" stroke="#1D2340" stroke-width="2"/>'),
-    stir: pic('<path d="M7 22h26q0 12-13 12T7 22z" fill="#E63946" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="20" cy="22" rx="13" ry="3.5" fill="#F4A340" stroke="#1D2340" stroke-width="2"/><path d="M22 23 31 4" stroke="#1D2340" stroke-width="5" stroke-linecap="round"/><path d="M22 23 31 4" stroke="#D9A066" stroke-width="2.4" stroke-linecap="round"/><path d="M10 17a9 3 0 0 1 9-3" fill="none" stroke="#3DB4FF" stroke-width="2.4" stroke-linecap="round"/>'),
-    fill: pic('<path d="M7 22h26q-1 12-13 12T7 22z" fill="#3DB4FF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="20" cy="22" rx="13" ry="3.5" fill="#F4A340" stroke="#1D2340" stroke-width="2"/><path d="M12 5q10-2 13 8" fill="none" stroke="#1D2340" stroke-width="2.5" stroke-linecap="round"/><path d="M22 12a5 3 0 0 0 7 4l-1-5z" fill="#C9D3E0" stroke="#1D2340" stroke-width="2"/>')
-  };
-  var PAN_STEPS = [
-    { id: "pour", name: "Pour", pic: PIC.pour, go: "Pour!", coach: "Pour the batter!" },
-    { id: "flip", name: "Flip", pic: PIC.flip, go: "Flip!", coach: "Flip the pancake!" },
-    { id: "plate", name: "Plate", pic: PIC.plate, go: "Plate it!", coach: "Onto the plate!" }
-  ];
-  var POT_STEPS = [
-    { id: "add", name: "Add", pic: PIC.add, go: "Add!", coach: "Drop in some food!" },
-    { id: "stir", name: "Stir", pic: PIC.stir, go: "Stir!", coach: "Stir the pot!" },
-    { id: "fill", name: "Fill", pic: PIC.fill, go: "Fill!", coach: "Fill the bowl!" }
-  ];
-  // The current step (or "" when the job is done) and how far the motion running by itself has got.
-  function panStep() {
-    var pc = S.pc;
-    if (!pc) return jug.st === "auto" ? { id: "pour", v: 0.06 } : { id: panDone ? "" : "pour", v: false };
-    if (pc.ph === "pour") return { id: "pour", v: clamp(pc.r / 0.32, 0.06, 1) };
-    if (pc.ph === "fly") return pc.fly && pc.fly.magic ? { id: pc.flipped ? "plate" : "flip", v: false } : { id: "flip", v: 1 };
-    if (pc.ph === "carry" || pc.ph === "toplate") return { id: "plate", v: 1 };
-    if (!pc.flipped) return { id: "flip", v: pc.c1 < 1 ? clamp(pc.c1, 0.06, 1) : false };
-    return { id: "plate", v: false };
-  }
-  function potStep() {
-    if (addQueue.length) return { id: "add", v: 0.5 };
-    if (fillQueue > 0 || (ladle.st !== "home" && ladle.st !== "drag")) return { id: "fill", v: clamp(S.bowl.fill, 0.06, 1) };
-    if (!S.pot.items.length) return { id: potDone && S.bowl.done ? "" : "add", v: false };
-    if (!cooked()) return { id: "stir", v: autoStir ? clamp(S.pot.stir, 0.06, 1) : false };
-    return { id: "fill", v: false };
-  }
-  var lastStep = { pan: null, pot: null }, lastBusy = { pan: null, pot: null }, lastRow = "";
-  function updateSteps() {
-    if (!stepsPan || !stepsPot) return;
-    var k = wareNow(), row = k === "pan" ? stepsPan : stepsPot;
-    if (k !== lastRow) {
-      lastRow = k;
-      stepsPan.el.hidden = k !== "pan"; stepsPot.el.hidden = k === "pan";
-      lastStep[k] = null; lastBusy[k] = null;
+  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
+    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
-    var cur = k === "pan" ? panStep() : potStep();
-    if (!cur.id) { if (!row.finished()) { row.finish("Again!"); lastStep[k] = ""; say(k === "pan" ? "Yum! Another one?" : "Yum!", 4000); } }
-    else if (cur.id !== lastStep[k]) { lastStep[k] = cur.id; row.at(cur.id); }
-    var bk = cur.v === false ? "no" : Math.round(cur.v * 40);
-    if (bk !== lastBusy[k]) { lastBusy[k] = bk; row.busy(cur.v); }
-  }
-  // One press: Go does the current step for him, at the calm pace.
-  function doPour() {
-    if (!isPan() || swap) return false;
-    if (!canPour()) { jug.wig = 1; return false; }
-    needHeat();
-    autoPour(0.32);
-  }
-  function doAdd() {
-    if (isPan() || swap) return false;
-    needHeat();
-    var ids = S.recipe === "pasta" ? PASTA_FOODS : SOUP_FOODS, n = S.recipe === "pasta" ? 1 : 3;
-    addQueue = [];
-    for (var i = 0; i < n; i++) addQueue.push(ids[(addTurn + i) % ids.length]);
-    addTurn += n;
-    addNextT = 0;
-  }
-  function doStir() {
-    if (isPan() || swap || autoStir) return false;
-    if (!S.pot.items.length) { shelfGlow = now() + 2; spoon.wig = 1; return false; }
-    if (cooked()) return false;
-    needHeat();
-    autoStir = { t0: now(), dur: reduce ? 1 : 3.2, s0: S.pot.stir };
-    tone(330, 0.5, 0.02, "sine", 440);
-  }
-  function doFill() {
-    if (isPan() || !cooked() || S.bowl.done) return false;
-    fillQueue = S.bowl.fill >= 0.5 ? 1 : 2;
-  }
-  function doStep(id) {
-    if (locked()) return false;
-    usedTap[id] = true;
-    if (id === "pour") return doPour();
-    if (id === "flip") { if (!pcReady1()) return false; launch(0.55); return; }
-    if (id === "plate") { var pc = S.pc; if (!pc || pc.ph !== "pan" || !pc.flipped) return false; pc.c2 = 1; toPlate(); return; }
-    if (id === "add") return doAdd();
-    if (id === "stir") return doStir();
-    if (id === "fill") return doFill();
-    return false;
-  }
-
-  // The ghost hand: the tap first (the jug, the pancake, a shelf thing, the pot, the bowl); the real move
-  // (carry the jug, flick the pancake, carry the food, stir round, carry the ladle) once he has used the tap.
-  var usedTap = {};
-  var ghost = Toybox.ghost({
-    max: 3,
-    onShow: function (p, on) { var row = isPan() ? stepsPan : stepsPot; if (row) row.pulse(on); },
-    plan: function () {
-      if (Object.keys(stageDrags).length || document.body.classList.contains("big") || swap) return null;
-      var cur = isPan() ? panStep() : potStep(), i;
-      if (cur.v !== false && cur.id) return null;
-      if (!cur.id) { var row = isPan() ? stepsPan : stepsPot, gr = row.go.el.getBoundingClientRect(); return { pts: [[gr.left + gr.width / 2, gr.top + gr.height / 2]], tap: true, key: "again" }; }
-      if (cur.id === "pour" && jug.st === "home") {
-        if (!usedTap.pour) return { pts: [toPage(jug.x, jug.y)], tap: true, key: "pour" };
-        var ps = pourSpot(); return { pts: [toPage(jug.x, jug.y), toPage(ps.x, ps.y)], key: "pour" };
-      }
-      if (cur.id === "flip" && S.pc && pcReady1()) {
-        var c = toPage(PAN.x + S.pc.x, PAN.y);
-        return usedTap.flip ? { pts: [c, [c[0], c[1] - 0.75 * B]], dur: 2600, key: "flip" } : { pts: [c], tap: true, key: "flip" };
-      }
-      if (cur.id === "add") {
-        var id0 = shelfIds()[0], sp = shelfPage(id0);
-        if (!sp) return null;
-        return usedTap.add ? { pts: [sp, toPage(POT.x, POT.ty - 0.1)], carry: { html: ICON[id0], size: 64 }, key: "add" } : { pts: [sp], tap: true, key: "add" };
-      }
-      if (cur.id === "stir") {
-        var wy = waterY();
-        if (!usedTap.stir) return { pts: [toPage(POT.x, wy)], tap: true, key: "stir" };
-        var p2 = [];
-        for (i = 0; i <= 16; i++) { var b = i / 8 * TAU; p2.push(toPage(POT.x + Math.cos(b) * POT.rx * 0.55, wy + Math.sin(b) * POT.ry * 0.55)); }
-        return { pts: p2, dur: 3600, key: "stir" };
-      }
-      if (cur.id === "fill") return usedTap.fill ? { pts: [toPage(POT.x + 0.1, waterY()), toPage(BOWL.x, BOWL.y - 0.25)], key: "fill" } : { pts: [toPage(BOWL.x, BOWL.y - 0.2)], tap: true, key: "fill" };
-      return null;
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
     }
+    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learnedF = true; stop(); },
+      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // One hint per kind of move; once he has done a move, its hint never shows again this visit.
+  var doneMoves = {}, ghostPhase = "";
+  var MOVES = { knob: "knob", pour: "pour", again: "pour", flip: "flip", plate: "plate", top: "top", add: "add", stir: "stir", fill: "fill" };
+  function moveFor(ph) { if (ph === "more") return isPan() ? "pour" : "add"; return MOVES[ph] || ""; }
+  function learned(m) { doneMoves[m] = true; if (moveFor(ghostPhase) === m) ghost.learned(); }
+  function updateGhostPhase() {
+    var ph = phase();
+    if (ph === ghostPhase) return;
+    ghostPhase = ph;
+    var m = moveFor(ph);
+    if (!m || doneMoves[m]) ghost.learned(); else ghost.again();
+  }
+  var ghost = makeGhost(function () {
+    if (Object.keys(tileDrags).length || Object.keys(stageDrags).length || document.body.classList.contains("big") || swap) return null;
+    var ph = phase(), tile, i;
+    if (ph === "knob") {
+      var pts = [];
+      for (i = 0; i <= 8; i++) { var a = i / 8 * 2.4; pts.push(toPage(KNOB.x + Math.sin(a) * KNOB.r * 0.75, KNOB.y - Math.cos(a) * KNOB.r * 0.75)); }
+      return { pts: pts };
+    }
+    if ((ph === "pour" || ph === "again" || ph === "more") && isPan() && jug.st === "home") { var ps = pourSpot(); return { pts: [toPage(jug.x, jug.y), toPage(ps.x, ps.y)] }; }
+    if (ph === "flip" && S.pc) { var c = toPage(PAN.x + S.pc.x, PAN.y); return { pts: [c, [c[0], c[1] - 0.75 * B]], dur: 2600 }; }
+    if (ph === "plate" && S.pc) return { pts: [toPage(PAN.x + S.pc.x, PAN.y), toPage(PLATE.x, stackTopY() - 0.04)] };
+    if (ph === "top" && (tile = choicesEl.querySelector('[data-top="syrup"]'))) return { pts: [ghostPt(tile, 0.5, 0.45), toPage(PLATE.x, stackTopY() - 0.1)], carry: { html: ICON.syrup, size: 64 } };
+    if ((ph === "add" || ph === "more") && !isPan() && (tile = choicesEl.querySelector("[data-food]"))) return { pts: [ghostPt(tile, 0.5, 0.45), toPage(POT.x, POT.ty - 0.1)], carry: { html: tile.querySelector("svg").outerHTML, size: 64 } };
+    if (ph === "stir") {
+      var wy = waterY(), p2 = [];
+      for (i = 0; i <= 16; i++) { var b = i / 8 * TAU; p2.push(toPage(POT.x + Math.cos(b) * POT.rx * 0.55, wy + Math.sin(b) * POT.ry * 0.55)); }
+      return { pts: p2, dur: 3600 };
+    }
+    if (ph === "fill") return { pts: [toPage(POT.x + 0.1, waterY()), toPage(BOWL.x, BOWL.y - 0.25)] };
+    return null;
   });
-  var jobs = Toybox.jobs($("jobs"), {
-    jobs: RECIPES.map(function (r) { return { id: r.id, name: r.name, pic: ICON[r.id] }; }),
-    value: S.recipe,
-    onPick: function (id) {
-      if (swap) { jobs.set(S.recipe); return; }
-      addQueue = []; fillQueue = 0;
-      pickRecipe(id);
-      say(id === "pancakes" ? "Pancakes!" : (id === "soup" ? "Soup!" : "Pasta!"));
-    }
-  });
-  function makeRow(el, list) {
-    return Toybox.steps(el, {
-      steps: list,
-      coach: coach,
-      ghost: ghost,
-      onGo: function (id) { return doStep(id); },
-      onAgain: function () { ghost.learned("again"); if (isPan()) doPour(); else doAdd(); },
-      onBusy: function (id) {
-        if (!on() && (id === "flip" || id === "stir" || id === "add")) { needHeat(); return; }
-        if (id === "flip") say("Wait for the bubbles!");
-        else if (id === "pour") say("Pouring!");
-        else if (id === "stir") say("Round and round!");
-        else if (id === "fill") say("Filling the bowl!");
-        else if (id === "plate") say("Onto the plate!");
-      }
-    });
-  }
-  var stepsPan = makeRow($("stepsPan"), PAN_STEPS);
-  var stepsPot = makeRow($("stepsPot"), POT_STEPS);
-  Toybox.bar($("bottom"), { onNew: newCook, onSurprise: surprise });
 
   // ---------- Start ----------
   rebuildPieces();
+  renderChoices();
   layout();
-  // The step row can change the stage's height (a phone held sideways): keep the canvas sharp.
-  if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe(stage);
   (function () { var h = spatHome(); spat.x = h.x; spat.y = h.y; spoon.y = waterY() + 0.02; })();
   var resizeT = 0;
   function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); layout(); }
@@ -2193,7 +2113,7 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
     window.__stove = {
       state: function () {
         var pc = S.pc;
-        return { recipe: S.recipe, phase: phase(), coach: coach.text(), step: (isPan() ? stepsPan : stepsPot).current(), finished: (isPan() ? stepsPan : stepsPot).finished(), go: (isPan() ? stepsPan : stepsPot).go.label(), goBusy: (isPan() ? stepsPan : stepsPot).go.isBusy(), counter: counterEl.textContent, knob: +K.v.toFixed(2), on: on(), hot: +hot.toFixed(2), flame: +flame.toFixed(2),
+        return { recipe: S.recipe, phase: phase(), coach: coachEl.textContent, counter: counterEl.textContent, knob: +K.v.toFixed(2), on: on(), hot: +hot.toFixed(2), flame: +flame.toFixed(2),
           pc: pc ? { ph: pc.ph, r: +pc.r.toFixed(3), x: +pc.x.toFixed(3), c1: +pc.c1.toFixed(2), c2: +pc.c2.toFixed(2), flipped: pc.flipped, z: +(pc.z || 0).toFixed(2), turns: pc.fly ? pc.fly.turns : 0, h: pc.fly ? +pc.fly.h.toFixed(2) : 0 } : null,
           stack: JSON.parse(JSON.stringify(S.stack)), pot: { items: S.pot.items.slice(), stir: +S.pot.stir.toFixed(2), level: +S.pot.level.toFixed(2), pieces: pieces.length, cooked: cooked() },
           bowl: JSON.parse(JSON.stringify(S.bowl)), nP: S.nP, nB: S.nB, jug: jug.st, ladle: ladle.st, swap: !!swap, away: !!away };
@@ -2213,7 +2133,6 @@ body.ending .tb-panel, body.resting .tb-panel, body.ending .tb-jobs, body.restin
         if (name === "spatula") return toPage(spat.x, spat.y);
         if (name === "faucet") return toPage(FAUCET.x - 0.2, FAUCET.y - 0.12);
         if (name === "B") return B;
-        if (name.indexOf("item:") === 0) return shelfPage(name.slice(5));
         return null;
       },
       potPt: function (u, v) { return toPage(POT.x + u * POT.rx * 0.7, waterY() + v * POT.ry * 0.7); },

@@ -72,54 +72,87 @@ body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The panel is the green Go ("Lift!": the crane does the next piece) and the bottom bar (New, Surprise), built by
-   the shared components in common/toybox.js. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
+.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv.grabbing { cursor: grabbing; }
 .count { font-variant-numeric: tabular-nums; }
 .count.pop { animation: pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
+/* The hint is the coach line (tb-coach). */
+.hint { background: var(--accent); }
+.hint[hidden] { display: none; }
+.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
 
 /* Play-timer gauge: the time-left badge, top-right of the stage. */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 3px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
 
-/* Big: the header and the bottom bar hide; Go stays (a tap on a load on the stage does the same). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-bottombar { display: none; }
+/* Big: full-screen play. Dragging the hook is the play, so the panel goes too. */
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+
+/* ---------- Panel: Lift! (Go row), New building (tab bar) ---------- */
+.act { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.act svg { width: 40px; height: 40px; flex: none; pointer-events: none; }
+.act span { pointer-events: none; }
+.tb-go.act svg { width: 46px; height: 46px; }
+.tb-tabs .act svg { width: 30px; height: 30px; }
+.tb-new.wiggle { animation: wiggle 0.7s ease-in-out 2; }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg) scale(1.05); } 75% { transform: rotate(4deg) scale(1.05); } }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
+
+/* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* The Back button shows the site's picture (and its name on an iPad). */
-.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
+
+@media (max-width: 600px) {
+  .tb-go.act svg { width: 38px; height: 38px; }
+  .hint { white-space: normal; line-height: 1.15; }
+}
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(22%, 220px); }
+  .tb-go.act { flex: 0 1 200px; min-height: 120px; flex-direction: column; gap: 2px; }
+  .tb-go.act svg { width: 70px; height: 70px; }
+  .tb-tabs { margin-top: auto; }
+  .tb-tabs .btn { min-height: 64px; white-space: normal; line-height: 1.05; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 150px; padding: 6px; gap: 6px; }
+  .tb-go.act { flex: 1 1 auto; min-height: 0; max-height: 150px; }
+  .tb-go.act svg { width: 48px; height: 48px; }
+  .tb-tabs .btn { min-height: 54px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .count.pop { animation: none; }
+  .hint.go, .count.pop, .tb-new.wiggle { animation: none; }
 }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2 wrap">
+<div class="tb-app-shell wrap">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to the site"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 34h30" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M13 34V7M13 8h22M13 8 6 14" fill="none" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 33V8h21" fill="none" stroke="#FFC72C" stroke-width="1.6"/><path d="M29 8v11" stroke="#1D2340" stroke-width="2"/><rect x="25.5" y="19" width="7" height="6" fill="#F77F00" stroke="#1D2340" stroke-width="2"/></svg><span>Site</span></a>
+    <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Tower Crane</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A tower crane next to a building that grows floor by floor. Tap a load and the crane carries it to the building, or drag the hook."></canvas>
+      <canvas id="cv" role="img" aria-label="A tower crane next to a building that grows floor by floor"></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter count" id="count">Floors: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach hint" id="hint" hidden></div>
     </main>
     <section class="tb-panel" id="panel">
-      <div id="go"></div>
-      <div id="bottom"></div>
+      <button class="btn tb-go act" id="liftBtn" aria-label="Lift! The crane does the next piece"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M2 7 H46" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M2 7 H46" stroke="#FFC72C" stroke-width="3" stroke-linecap="round"/><rect x="17" y="9" width="14" height="6" rx="2" fill="#6B7385" stroke="#1D2340" stroke-width="2.5"/><path d="M24 15 V21" stroke="#1D2340" stroke-width="2.5"/><rect x="18" y="20" width="12" height="9" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5"/><path d="M24 29 V32 M24 32 L10 38 M24 32 L38 38" stroke="#1D2340" stroke-width="2.5" stroke-linecap="round" fill="none"/><rect x="5" y="37" width="38" height="7" rx="1.5" fill="#5B6B8C" stroke="#1D2340" stroke-width="2.5"/><path d="M7 40.5 H41" stroke="#8C9BBA" stroke-width="2"/></svg><span>Lift!</span></button>
+      <nav class="tb-tabs" id="acts">
+        <button class="btn tb-new act" id="newBtn"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="12" width="28" height="32" fill="#C8553D" stroke="#1D2340" stroke-width="3" stroke-linejoin="round"/><rect x="7" y="8" width="34" height="6" fill="#5B6B8C" stroke="#1D2340" stroke-width="3"/><rect x="14" y="18" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="26" y="18" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="14" y="30" width="8" height="8" fill="#9FD6F5" stroke="#1D2340" stroke-width="2.5"/><rect x="26" y="32" width="8" height="12" fill="#7A4B22" stroke="#1D2340" stroke-width="2.5"/></svg><span>New building</span></button>
+      </nav>
     </section>
   </div>
 </div>
@@ -143,18 +176,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var STATEKEY = "site-crane-v1";
 
   // ---------- World (units; y is up, ground at y = 0) ----------
-  // The crane top (jib, counter-jib, cab, trolley) is drawn in its own frame and set DROP lower than it used to
-  // be: three floors need a shorter mast, so the whole scene is drawn bigger.
-  var DROP = 130;
-  var WORLD_L = -175, WORLD_R = 925, VIEW_UP = 690 - DROP, VIEW_DOWN = 34, MINW = 400;
-  var MAST_L = 62, MAST_R = 118, MAST_C = 90, MAST_TOP0 = 512, MAST_TOP = MAST_TOP0 - DROP;
-  var JIB_B = 540, JIB_T = 578, JIB_TIP = 880, CJ_END = -150, APEX_Y = 664;   // crane-top frame
-  var TY0 = 518, TY = TY0 - DROP;         // the hoist cable leaves the trolley here (frame / world)
+  var WORLD_L = -175, WORLD_R = 925, VIEW_UP = 690, VIEW_DOWN = 34, MINW = 480;
+  var MAST_L = 62, MAST_R = 118, MAST_C = 90, MAST_TOP = 512;
+  var JIB_B = 540, JIB_T = 578, JIB_TIP = 880, CJ_END = -150, APEX_Y = 664;
+  var TY = 518;                           // the hoist cable leaves the trolley here
   var TMIN = 214, TMAX = 852;             // trolley travel along the jib
   var LMIN = 60, HOOK_MAX = TY - LMIN;    // shortest cable: hook block just under the trolley
   var SLING = 40;                         // hook to the top of a hanging load
   var BX = 620, BW = 200, BC = 720;       // the building
-  var FOUND = 16, FLOOR_H = 64, WALL_H = 50, PIER = 50, FLOORS = 3;
+  var FOUND = 16, FLOOR_H = 64, WALL_H = 50, PIER = 50, FLOORS = 5;
   var DUN = [[422, 444], [556, 578]];     // timber blocks the steel beam lies on
   var DUN_H = 8;
   var G = 900, SWING_K = 0.22;            // pendulum: gravity and how much the trolley's pull swings it
@@ -172,8 +202,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   ];
 
   // ---------- Saved building (a reload keeps it; a fresh visit from the home screen starts empty) ----------
-  // Three floors (the redesign's cut); each floor takes bricks, a window and a steel beam in any order.
-  var floors = 0, cur = { bricks: false, window: false, beam: false }, topped = false, styleIdx = 0;
+  var floors = 0, cur = { bricks: false, window: false }, topped = false, styleIdx = 0;
   var startFresh = !!(window.Toybox && Toybox.fresh());
   if (!startFresh) try {
     var so = JSON.parse(localStorage.getItem(STATEKEY) || "null");
@@ -181,13 +210,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (typeof so.floors === "number") floors = clamp(Math.floor(so.floors), 0, FLOORS);
       cur.bricks = !!so.bricks && floors < FLOORS;
       cur.window = !!so.window && floors < FLOORS;
-      cur.beam = !!so.beam && floors < FLOORS;
       topped = !!so.topped && floors === FLOORS;
       if (typeof so.style === "number") styleIdx = Math.abs(Math.floor(so.style)) % STYLES.length;
     }
   } catch (e) { /* ignore */ }
   function saveState() {
-    try { localStorage.setItem(STATEKEY, JSON.stringify({ floors: floors, bricks: cur.bricks, window: cur.window, beam: cur.beam, topped: topped, style: styleIdx })); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(STATEKEY, JSON.stringify({ floors: floors, bricks: cur.bricks, window: cur.window, topped: topped, style: styleIdx })); } catch (e) { /* ignore */ }
   }
   if (startFresh) saveState();
   function style() { return STYLES[styleIdx]; }
@@ -206,19 +234,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var d = quick ? 0 : 0.1, n = 0;
       if (!cur.bricks) loads.push(makeLoad("bricks", d + 0.3 * n++));
       if (!cur.window) loads.push(makeLoad("window", d + 0.3 * n++));
-      if (!cur.beam) loads.push(makeLoad("beam", d + 0.3 * n++));
+      loads.push(makeLoad("beam", d + 0.3 * n++));
     }
     loads.forEach(function (l) { if (!quick) puff(l.x, 6, 0.8, 2); });
   }
   function baseY() { return FOUND + floors * FLOOR_H; }
   function roofY() { return FOUND + FLOORS * FLOOR_H; }
-  // Can this piece go into the building now? Bricks, window and beam in any order (no forced order); the tree
-  // goes on the top once the last floor is done.
+  // Can this piece go into the building now? Bricks and window in any order; the beam goes on last.
   function allowed(kind) {
     if (topped) return false;
     if (kind === "tree") return floors >= FLOORS;
     if (floors >= FLOORS) return false;
-    return !cur[kind];
+    if (kind === "bricks") return !cur.bricks;
+    if (kind === "window") return !cur.window;
+    return cur.bricks && cur.window;
   }
   function targetBottom(kind) {
     if (kind === "tree") return roofY();
@@ -230,8 +259,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (floors >= FLOORS) return "tree";
     if (!cur.bricks) return "bricks";
     if (!cur.window) return "window";
-    if (!cur.beam) return "beam";
-    return null;
+    return "beam";
   }
   function findLoad(kind) { for (var i = 0; i < loads.length; i++) if (loads[i].kind === kind && loads[i] !== carried) return loads[i]; return null; }
   function ringOf(l) { return { x: l.x, y: l.y + l.h + SLING }; }
@@ -246,7 +274,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (floors < FLOORS) {
         if (cur.bricks && ((x0 < BX + PIER && x1 > BX) || (x0 < BX + BW && x1 > BX + BW - PIER))) g = Math.max(g, b + WALL_H);
         if (cur.window && x1 > BX + PIER && x0 < BX + BW - PIER) g = Math.max(g, b + WALL_H);
-        if (cur.beam) g = Math.max(g, b + WALL_H + 14);
       }
       if (topped && x1 > BC - 22 && x0 < BC + 22) g = Math.max(g, roofY() + KIND.tree.h);
     }
@@ -394,7 +421,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- The building grows ----------
-  var anim = { bricks: -9, window: -9, beam: -9, floor: -9, top: -9 };
+  var anim = { bricks: -9, window: -9, floor: -9, top: -9 };
   function placeCarried() {
     var l = carried;
     if (!l) return;
@@ -406,22 +433,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     puff(BC - 90, b + 4, 0.8, 2); puff(BC + 90, b + 4, 0.8, 2);
     if (k === "bricks") { cur.bricks = true; anim.bricks = clock; }
     else if (k === "window") { cur.window = true; anim.window = clock; }
-    else if (k === "beam") { cur.beam = true; anim.beam = clock; }
+    else if (k === "beam") floorDone();
     else if (k === "tree") topOut();
-    tagWorld(k === "beam" ? "Steel beam" : (k === "bricks" ? "Bricks" : (k === "window" ? "Window" : "Topping-out tree")), BC, b + (k === "beam" ? WALL_H + 40 : 90));
-    if (cur.bricks && cur.window && cur.beam) floorDone();
     sparkles(BC, b + 30, 6);
-    if (byHand && ghost) ghost.learned("drag");
-    else if (usedTap && ghost) ghost.learned("hook");
+    if (byHand && ghost) ghost.learned();
     saveState();
   }
   var spawnIn = 0;
   function floorDone() {
     floors++;
-    cur.bricks = false; cur.window = false; cur.beam = false;
+    cur.bricks = false; cur.window = false;
     anim.floor = clock;
     showCount(true);
-    coach.say("Floor done!", 3.2);
+    flashCoach("Floor done!", 3200);
     setTimeout(chime, 250);
     sparkles(BC, baseY() - 6, 12);
     spawnIn = 1.8;
@@ -430,7 +454,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function topOut() {
     topped = true;
     anim.top = clock;
-    coach.say("Topped out!", 6);
+    flashCoach("Topped out!", 6000);
     fanfare();
     confetti(BC, roofY() + 70, reduce ? 20 : 90);
     loads = [];
@@ -439,7 +463,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function newBuilding() {
     if (ending) return;
     for (var f = 0; f <= Math.min(floors, FLOORS - 1); f++) puff(BC + rand(-80, 80), FOUND + f * FLOOR_H + 30, 1.3, 2);
-    floors = 0; cur.bricks = false; cur.window = false; cur.beam = false; topped = false;
+    floors = 0; cur.bricks = false; cur.window = false; topped = false;
     styleIdx = (styleIdx + 1) % STYLES.length;
     carried = null; auto = false; setJobs([], false); freeMove = false;
     if (drag) drag.paused = false;
@@ -450,7 +474,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     saveState();
     chime();
     coachAgain();
-    if (ghost) ghost.again("hook");
   }
 
   // ---------- Lift!: one tap does the next piece, calmly ----------
@@ -485,10 +508,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
       return;
     }
-    // A tapped load first (he picked it); otherwise the next piece the building needs.
     var k = nextKind(), t = k && findLoad(k);
-    if (autoPick && loads.indexOf(autoPick) >= 0 && autoPick !== carried && allowed(autoPick.kind)) { t = autoPick; k = t.kind; }
-    autoPick = null;
     if (!k) { auto = false; return; }
     if (!t || t.born > clock) { setJobs([wait(0.4)], false); return; }
     var r = ringOf(t);
@@ -500,22 +520,18 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     list.push(fn(function () { attach(t); }));
     setJobs(list, false);
   }
-  // Lift! (Go) or a tap on a load: the crane does a whole piece, calmly. pick = the load he tapped.
-  var autoPick = null;
-  function lift(pick) {
-    if (ending || Toybox.timer.locked()) return false;
-    if (topped) return false;
-    drag = null; cv.classList.remove("grabbing");
+  function lift() {
+    if (ending || Toybox.timer.locked()) return;
+    if (topped) { flashCoach("Tap New building!", 3500); wiggleNew(); return; }
+    drag = null; $("cv").classList.remove("grabbing");
     byHand = false;
-    if (pick && !carried) {
-      autoPick = pick;
-      // Already busy with another load: let this one start afresh.
-      if (auto && !jobsLocked) setJobs([], false);
-    }
     auto = true;
     if (!jobs.length) planAuto();
     whirr();
-    return true;
+  }
+  function wiggleNew() {
+    var b = $("newBtn");
+    b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle");
   }
 
   // ---------- Timer ending: the hook rises, the trolley runs in, the crane stops ----------
@@ -540,20 +556,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (reduce) n = Math.min(n, 1);
     for (var i = 0; i < n * 4 && dust.length < 140; i++) {
       dust.push({ x: x + rand(-14, 14) * size, y: y + rand(-4, 10) * size, vx: rand(-50, 50) * size, vy: rand(10, 50) * size,
-        r: rand(10, 20) * size, life: 0, max: rand(0.7, 1.2), c: Math.random() < 0.5 ? "#E3D3BD" : "#CDBA9C" });
+        r: rand(10, 20) * size, life: 0, max: rand(0.9, 1.6), c: Math.random() < 0.5 ? "#E3D3BD" : "#CDBA9C" });
     }
   }
   function sparkles(x, y, n) {
     for (var i = 0; i < n; i++) {
       var a = rand(0, Math.PI * 2), d = rand(50, 130);
-      stars.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.5, s: rand(9, 16), life: 0, max: rand(0.8, 1.2), d: rand(0, 0.3) });
+      stars.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.5, s: rand(9, 16), life: 0, max: rand(1.1, 1.8), d: rand(0, 0.5) });
     }
   }
   var CONF = ["#E63946", "#FFC93C", "#2E9E5B", "#3A86FF", "#FF6FD8", "#F77F00"];
   function confetti(x, y, n) {
     for (var i = 0; i < n; i++) {
       conf.push({ x: x + rand(-20, 20), y: y, vx: rand(-260, 260), vy: rand(160, 520), a: rand(0, 6), w: rand(-6, 6),
-        s: rand(7, 12), c: CONF[i % CONF.length], life: 0, max: rand(1.2, 1.5) });
+        s: rand(7, 12), c: CONF[i % CONF.length], life: 0, max: rand(3.5, 5.5) });
     }
   }
   function stepParticles(dt) {
@@ -585,10 +601,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     // Fit the crane's height; on a narrow (upright) stage show a window at least MINW wide that pans with the hook.
     // Tablets show more of the site (the mast and the building together); phones zoom in on the hook.
     var wantW = Math.max(MINW, Math.min(860, cw * 0.9));
-    // On phones the coach line sits at the bottom of the stage: keep a strip of ground under the loads for it.
-    var low = coachLow() ? 52 : 0;
-    S = Math.min((ch - low) / VIEW_UP, ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
-    OY = ch - Math.max(VIEW_DOWN * S, low);
+    S = Math.min(ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
+    OY = ch - VIEW_DOWN * S;
     camSet = false;
     camera(0);
   }
@@ -601,7 +615,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       focus = clamp(focus, hx - visW / 2 + 60, hx + visW / 2 - 60);
       var wide = clamp((visW - MINW) / 300, 0, 1) * 0.75;
       focus += (470 - focus) * wide;
-      if (waveT > 0) focus = 200;   // Surprise: the crane driver waves from the cab
       c = clamp(focus, WORLD_L + visW / 2, WORLD_R - visW / 2);
     }
     if (!camSet || dt === 0) { camC = c; camSet = true; }
@@ -609,8 +622,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     OX = cw / 2 - camC * S;
   }
   window.addEventListener("resize", resize);
-  var lowMQ = window.matchMedia ? window.matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
-  function coachLow() { return !!(lowMQ && lowMQ.matches) && !document.body.classList.contains("big"); }
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - 3 - OX) / S, y: (OY - (cy - r.top - 3)) / S }; }
   function worldToScreen(x, y) { var r = cv.getBoundingClientRect(); return [r.left + 3 + OX + x * S, r.top + 3 + OY - y * S]; }
   function worldT() { ctx.setTransform(dpr * S, 0, 0, -dpr * S, dpr * OX, dpr * OY); }
@@ -719,8 +730,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     circle(-12, 568, 5, "#C9CED6", 3);
     line(3, 566, MAST_L, 556, 2.5, "#555D6E");
     // Slewing unit (turntable) on top of the mast.
-    box(50, MAST_TOP0 - 4, 80, 32, 6, "#6B7385", 4);
-    line(54, MAST_TOP0 + 12, 126, MAST_TOP0 + 12, 3, "#9AA3B2");
+    box(50, MAST_TOP - 4, 80, 32, 6, "#6B7385", 4);
+    line(54, MAST_TOP + 12, 126, MAST_TOP + 12, 3, "#9AA3B2");
     // Tower top (A-frame).
     fatLine(64, JIB_T - 4, MAST_C, APEX_Y, 7, YEL, 3);
     fatLine(116, JIB_T - 4, MAST_C, APEX_Y, 7, YEL, 3);
@@ -760,12 +771,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var x = cr.x;
     line(JIB_TIP - 8, JIB_B + 4, x + 22, JIB_B - 6, 2, "#555D6E");
     line(MAST_R, JIB_B + 4, x - 22, JIB_B - 6, 2, "#555D6E");
-    box(x - 26, TY0, 52, 20, 5, "#6B7385", 4);
+    box(x - 26, TY, 52, 20, 5, "#6B7385", 4);
     [-14, 14].forEach(function (o) {
       circle(x + o, JIB_B + 4, 7, "#3A4150", 3);
       line(x + o, JIB_B + 4, x + o + Math.cos(cr.wheel) * 6, JIB_B + 4 + Math.sin(cr.wheel) * 6, 2.5, "#C9CED6");
     });
-    circle(x - 8, TY0 + 6, 5, "#C9CED6", 2.5); circle(x + 8, TY0 + 6, 5, "#C9CED6", 2.5);
+    circle(x - 8, TY + 6, 5, "#C9CED6", 2.5); circle(x + 8, TY + 6, 5, "#C9CED6", 2.5);
   }
   // Local coordinates of the hook (origin at the bottom of the hook's bowl, y up) to world.
   function hookPt(lx, ly) {
@@ -883,7 +894,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var sc = reduce ? 1 : (age < 0.5 ? ease(age / 0.5) * 1.08 : (age < 0.7 ? 1.08 - 0.08 * (age - 0.5) / 0.2 : 1));
       ctx.save(); ctx.translate(l.x, l.y); ctx.scale(sc, sc);
       var glow = l.kind === nk && !carried && !ending ? 0.35 + 0.3 * Math.sin(t * 4) : 0;
-      if (faceT > 0) glow = 0;
       drawSlings(l, glow);
       drawLoad(l.kind, t);
       ctx.restore();
@@ -909,11 +919,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (floors < FLOORS) {
       var b0 = baseY(), p = cur.bricks ? clamp((clock - anim.bricks) / 1.3, 0, 1) : 0;
       if (reduce && cur.bricks) p = 1;
-      // The beam can go up before the walls: two temporary steel props hold it until the bricks are in.
-      if (cur.beam && p < 1) {
-        [BX + 18, BX + BW - 18].forEach(function (px) { box(px - 5, b0, 10, WALL_H, 1, "#9AA3B2", 3); line(px - 12, b0 + 2, px + 12, b0 + 2, 4, OUT); });
-      }
-      drawFloor(b0, cur.bricks ? ease(p) : 0, cur.window, cur.beam, cur.window ? (clock - anim.window) / 1.2 : 0);
+      drawFloor(b0, cur.bricks ? ease(p) : 0, cur.window, false, cur.window ? (clock - anim.window) / 1.2 : 0);
       if (cur.bricks && p < 1) {
         // The pallet unpacks into the two walls.
         ctx.save(); ctx.translate(BC, b0); ctx.scale(1 - p, 1 - p); drawLoad("bricks", t); ctx.restore();
@@ -985,16 +991,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawLoose(t);
     drawTargetGhost(t);
     drawMast();
-    ctx.save(); ctx.translate(0, -DROP);
     drawTop(t);
     drawJib();
     drawTrolley();
     drawCab();
-    drawWave(t);
-    ctx.restore();
     drawCableAndHook(t);
-    drawFaces(t);
-    drawBirds();
     drawParticles();
   }
 
@@ -1036,70 +1037,28 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (allowed(k) && hx > BX - 30 && hx < BX + BW + 30 && bottom < targetBottom(k) + 150) { byHand = true; startPlace(); }
   }
 
-  // ---------- Input: tap or drag (Toybox.press) ----------
-  // One press is always enough: a tap on a load sends the hook to fetch it and carry it to the building; a tap on
-  // the hook or the building does the next piece (like Lift!); a tap on the sky brings the hook there. Dragging
-  // (or holding still) moves the hook with the finger: the real way, hooking on and putting in by hand.
-  function loadAt(w) {
-    var best = null, bd = 1e9;
-    loads.forEach(function (l) {
-      if (l === carried || l.born > clock) return;
-      var top = l.y + l.h + SLING + 14, half = Math.max(l.w / 2, 46) + 14;
-      if (w.x < l.x - half || w.x > l.x + half || w.y < l.y - 20 || w.y > top) return;
-      var d = Math.abs(w.x - l.x);
-      if (d < bd) { bd = d; best = l; }
-    });
-    return best;
-  }
-  function onBuilding(w) { return w.x > BX - 20 && w.x < BX + BW + 20 && w.y > -10 && w.y < roofY() + (topped ? 120 : 40); }
-  function onHook(w) { var p = hookPt(0, 22), r = Math.max(70, 50 / S); return (p[0] - w.x) * (p[0] - w.x) + (p[1] - w.y) * (p[1] - w.y) < r * r; }
-  function startDrag(id, x0, y0) {
-    var w = screenToWorld(x0, y0);
-    // Grabbing the hook itself keeps it under the finger; a press anywhere else calls the hook over.
-    var near = onHook(w);
-    drag = { id: id, wx: w.x, wy: w.y, ox: near ? hookX() - w.x : 0, oy: near ? hookY() - w.y : 0, paused: false };
+  // ---------- Input: drag the hook anywhere on the picture ----------
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (ending || Toybox.timer.locked()) return;
+    if (drag && drag.id !== e.pointerId) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    var p = hookPt(0, 22), dx = p[0] - w.x, dy = p[1] - w.y;
+    // Grabbing the hook itself keeps it under the finger; a touch anywhere else calls the hook over.
+    var near = dx * dx + dy * dy < Math.pow(Math.max(60, 46 / S), 2);
+    drag = { id: e.pointerId, wx: w.x, wy: w.y, ox: near ? hookX() - w.x : 0, oy: near ? hookY() - w.y : 0, paused: false };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     cv.classList.add("grabbing");
     if (!jobsLocked) { setJobs([], false); }
-    auto = false; autoPick = null; dragged = true;
-  }
-  var usedTap = false;
-  var press = Toybox.press(cv, {
-    any: true,
-    dragStart: function (part, e, st) {
-      if (ending || Toybox.timer.locked()) return;
-      if (drag && drag.id !== e.pointerId) return;
-      startDrag(e.pointerId, st.x0, st.y0);
-      var w = screenToWorld(e.clientX, e.clientY);
-      drag.wx = w.x; drag.wy = w.y;
-    },
-    move: function (part, e) {
-      if (!drag || drag.id !== e.pointerId) return;
-      var w = screenToWorld(e.clientX, e.clientY);
-      drag.wx = w.x; drag.wy = w.y;
-    },
-    up: function (part, e) { endDrag(e.pointerId); },
-    tap: function (part, x, y) {
-      if (ending) return;
-      var w = screenToWorld(x, y);
-      if (topped) {
-        if (onBuilding(w)) { sparkles(BC, roofY() + 50, 6); chime(); }
-        coach.say("Topped out!", 3);
-        go.wiggle();
-        return;
-      }
-      var l = loadAt(w);
-      if (l && !carried) { usedTap = true; tagWorld(KIND[l.kind].name === "steel beam" ? "Steel beam" : (l.kind === "bricks" ? "Pallet of bricks" : "Window"), l.x, l.y + l.h + SLING + 30); lift(l); return; }
-      if (carried || onHook(w) || onBuilding(w) || l) { usedTap = true; lift(); return; }
-      // The sky: the hook glides over to that spot.
-      if (jobsLocked) return;
-      auto = false; autoPick = null;
-      setJobs([mv(w.x, Math.max(w.y, 40))], false);
-      rings.push({ x: w.x, y: w.y, t: 0 });
-      whirr();
-    }
+    auto = false; dragged = true;
   });
-  function endDrag(id) {
-    if (!drag || drag.id !== id) return;
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag || drag.id !== e.pointerId) return;
+    var w = screenToWorld(e.clientX, e.clientY);
+    drag.wx = w.x; drag.wy = w.y;
+  });
+  function endDrag(e) {
+    if (!drag || drag.id !== e.pointerId) return;
     var was = drag;
     drag = null;
     cv.classList.remove("grabbing");
@@ -1114,38 +1073,49 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       } else startSetDown();
     }
   }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
 
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "liftBtn") lift();
+    else if (t.id === "newBtn") newBuilding();
+  });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
   document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
 
-  // ---------- Counter, coach line and name tags ----------
+  // ---------- Counter and coach line ----------
   function showCount(pop) {
     var el = $("count");
     el.textContent = "Floors: " + floors;
     if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
-  var coach = Toybox.coach($("coach"));
-  function tagWorld(text, x, y) {
-    if (ending) return;
-    var p = worldToScreen(x, y);
-    Toybox.nametag(text, p[0], p[1], 2000);
-  }
-  // The sticky coach line follows the job: hook a load, take it to the building, the tree on top.
-  var coachShown = null;
+  var coachShown = "", coachUntil = 0, flashText = "", flashUntil = 0, nowMs = 0;
   function coachWanted() {
     if (topped) return "Topped out!";
-    if (carried) return carried.kind === "tree" ? "Put it on the top!" : "Take it to the building!";
+    if (!dragged) return "Drag the hook!";
+    if (carried) {
+      if (allowed(carried.kind)) return carried.kind === "tree" ? "Put it on the top!" : "Take it to the building!";
+      return !cur.bricks ? "Bricks first!" : "Window first!";
+    }
     var k = nextKind();
     if (!k || !findLoad(k)) return "";
     return "Hook the " + KIND[k].name + "!";
   }
-  function coachAgain() { coachShown = null; }
+  function flashCoach(text, ms) { flashText = text; flashUntil = Date.now() + ms; coachShown = ""; }
+  function coachAgain() { coachShown = ""; }
   function coachTick() {
-    if (ending) return;
-    var t = coachWanted();
-    if (t !== coachShown) { coachShown = t; coach.step(t); }
+    var now = Date.now(), el = $("hint");
+    var t = now < flashUntil ? flashText : coachWanted();
+    if (ending || !t) { if (!el.hidden) el.hidden = true; coachShown = t ? "" : coachShown; return; }
+    if (t !== coachShown) {
+      coachShown = t; el.textContent = t; el.hidden = false; el.classList.remove("off");
+      if (!reduce) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
+      coachUntil = now + Math.max(6000, now < flashUntil ? flashUntil - now : 0);
+    } else if (now > coachUntil && !el.classList.contains("off")) el.classList.add("off");
   }
 
   // ---------- Sound (off by default; soft and synthesized) ----------
@@ -1166,8 +1136,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function clunk(p) { tone(150, 0.2, 0.05 * p + 0.01, "triangle", 70); tone(620, 0.06, 0.012 * p, "square", 420); }
   function whirr() { tone(200, 0.35, 0.015, "sine", 320); }
-  function tweet() { tone(2200, 0.08, 0.012, "sine", 2800); tone(2400, 0.08, 0.012, "sine", 3000, 0.12); }
-  function toot() { tone(300, 0.2, 0.03, "square"); tone(360, 0.3, 0.03, "square", null, 0.22); }
   function chime() { tone(523, 0.4, 0.035); tone(659, 0.4, 0.035, "sine", 0, 0.14); tone(784, 0.6, 0.035, "sine", 0, 0.28); }
   function fanfare() { [523, 659, 784, 1047, 784, 1047].forEach(function (f, i) { tone(f, i === 5 ? 0.9 : 0.3, 0.035, "triangle", 0, i * 0.17); }); }
   // The motor hum follows how fast the trolley and the winch move.
@@ -1203,7 +1171,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ending = true; drag = null; auto = false; parked = false;
     cv.classList.remove("grabbing");
     if (!jobsLocked) setJobs([], false);
-    press.cancel(); autoPick = null; birds = []; faceT = 0; waveT = 0;
+    $("hint").hidden = true;
     if (!info.goodbye) parking = true;
   }
   function goodbyePark() { parking = true; chime(); }
@@ -1246,138 +1214,139 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     lastT = t;
     var phase = Toybox.timer.phase();
     if (phase !== "resting") step(dt);
-    if (phase !== "resting") stepSurprise(dt);
     camera(dt);
     draw(clock);
     coachTick();
-    updateGo();
     humT += dt; if (humT > 0.1) { humT = 0; humTick(); }
     requestAnimationFrame(loop);
   }
 
-  // ---------- Surprise: a fun moment on the scene right now (they take turns) ----------
-  // 1. the loads (and the hook) get happy faces that blink and look at the hook; 2. little birds land on the jib,
-  // hop along it and fly off; 3. the operator waves from the cab and the warning lights twinkle.
-  var faceT = 0, birds = [], waveT = 0, surpriseTurn = 0;
-  function surprise() {
-    if (ending || Toybox.timer.locked()) return;
-    var k = surpriseTurn++ % 3;
-    if (k === 0) { faceT = reduce ? 3.5 : 5.5; chime(); coach.say("Happy loads!", 3.5); }
-    else if (k === 1) {
-      birds = [];
-      for (var i = 0; i < 3; i++) birds.push({ t: -i * 0.35, x0: visRight() + 40 + i * 30, y0: 680 + i * 20, tx: 300 + i * 70 + rand(-10, 10), x: 0, y: 0, hop: rand(0, 6) });
-      tweet(); coach.say("Little birds!", 3.5);
-    } else { waveT = reduce ? 3 : 4.5; toot(); coach.say("Hello, crane driver!", 3.5); }
+  // ---------- Idle help: the Toybox ghost hand (master copy: tools/snippets/ghost-hand.js) ----------
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
   }
-  function stepSurprise(dt) {
-    faceT = Math.max(0, faceT - dt);
-    waveT = Math.max(0, waveT - dt);
-    birds.forEach(function (b) {
-      b.t += dt; b.hop += dt * 7;
-      var T = b.t, sitY = JIB_T - DROP + 5;
-      if (T < 0) { b.x = b.x0; b.y = b.y0; return; }
-      if (T < 1.8) { var f = ease(T / 1.8); b.x = b.x0 + (b.tx - b.x0) * f; b.y = b.y0 + (sitY - b.y0) * f + Math.sin(f * Math.PI) * 40; b.fly = true; }
-      else if (T < 6.5) { b.x = b.tx + Math.sin((T - 1.8) * 1.3) * 14; b.y = sitY + Math.abs(Math.sin(b.hop)) * 7; b.fly = false; }
-      else { var g = ease(Math.min(1, (T - 6.5) / 2)); b.x = b.tx + (WORLD_L - 200 - b.tx) * g; b.y = sitY + g * 160; b.fly = true; }
-    });
-    birds = birds.filter(function (b) { return b.t < 8.6; });
-  }
-  function drawFace(x, y, r, t) {
-    var blink = Math.sin(t * 2.3) > 0.96, look = clamp((hookX() - x) / 300, -1, 1) * r * 0.12;
-    ctx.save();
-    [-1, 1].forEach(function (sd) {
-      var ex = x + sd * r * 0.38 + look;
-      if (blink) { line(ex - r * 0.12, y + r * 0.2, ex + r * 0.12, y + r * 0.2, 3, OUT); }
-      else { circle(ex, y + r * 0.2, r * 0.17, "#FFFFFF", 2.5); circle(ex + look * 0.4, y + r * 0.2, r * 0.08, OUT, 0); }
-    });
-    ctx.beginPath(); ctx.arc(x + look, y - r * 0.05, r * 0.32, Math.PI * 1.15, Math.PI * 1.85); ctx.lineWidth = 3.5; ctx.strokeStyle = OUT; ctx.lineCap = "round"; ctx.stroke();
-    ctx.restore();
-  }
-  function drawFaces(t) {
-    if (faceT <= 0) return;
-    loads.forEach(function (l) { if (l !== carried && l.born <= clock) drawFace(l.x, l.y + l.h / 2 + (l.kind === "beam" ? 8 : 0), Math.min(26, l.h * 0.55 + 8), t); });
-    if (carried) { var hb = hookY() - SLING - carried.h / 2; drawFace(hookX(), hb, Math.min(26, carried.h * 0.55 + 8), t); }
-    drawFace(hookX(), hookY() + 33, 15, t);
-  }
-  function drawBirds() {
-    birds.forEach(function (b) {
-      if (b.t < 0) return;
-      var flap = b.fly ? Math.sin(b.t * 22) * 9 : 0, dir = b.t > 6.5 ? -1 : 1;
-      ctx.save(); ctx.translate(b.x, b.y); ctx.scale(1.3 * dir, 1.3);
-      circle(0, 10, 10, "#3DB4FF", 3);
-      circle(9, 19, 6.5, "#3DB4FF", 3);
-      shape([[14, 21], [22, 19], [14, 16]], "#FFB627", 2.5);
-      circle(11, 21, 1.8, OUT, 0);
-      shape([[-3, 13], [-15, 17 + flap], [-5, 6]], "#2D8FD8", 2.5);
-      ctx.restore();
-    });
-  }
-  function drawWave(t) {
-    if (waveT <= 0) return;
-    var a = Math.sin(t * 9) * 0.5;
-    ctx.save(); ctx.translate(186, 512); ctx.rotate(-0.6 + a);
-    fatLine(0, 0, 26, 0, 6, "#F2C094", 3);
-    circle(30, 0, 7, "#F2C094", 3);
-    ctx.restore();
-    ctx.save(); ctx.translate(205, 560); ctx.scale(1, -1);
-    ctx.font = '800 26px "Baloo 2", sans-serif'; ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = OUT; ctx.lineWidth = 5; ctx.lineJoin = "round";
-    ctx.strokeText("HI!", 0, 0); ctx.fillText("HI!", 0, 0);
-    ctx.restore();
-  }
-
-  // ---------- Panel: Go ("Lift!") and the bottom bar (New, Surprise); the ghost hand ----------
-  var PIC_LIFT = '<svg viewBox="0 0 48 48"><path d="M2 7 H46" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M2 7 H46" stroke="#FFC72C" stroke-width="3" stroke-linecap="round"/><rect x="17" y="9" width="14" height="6" rx="2" fill="#6B7385" stroke="#1D2340" stroke-width="2"/><path d="M24 15 V21" stroke="#1D2340" stroke-width="2"/><rect x="18" y="20" width="12" height="9" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2"/><path d="M24 29 V32 M24 32 L10 38 M24 32 L38 38" stroke="#1D2340" stroke-width="2" stroke-linecap="round" fill="none"/><rect x="5" y="37" width="38" height="7" rx="1.5" fill="#5B6B8C" stroke="#1D2340" stroke-width="2"/></svg>';
-  var goTopped = null;
-  var go = Toybox.go($("go"), {
-    label: "Lift!", icon: PIC_LIFT,
-    onPress: function () {
-      if (ending) return false;
-      if (topped) { ghost.learned("again"); newBuilding(); return true; }
-      ghost.learned("go");
-      return lift();
-    },
-    onBusy: function () { coach.say("Lifting!", 3); }
-  });
-  function updateGo() {
-    if (goTopped !== topped) { goTopped = topped; if (topped) go.set("Again!", Toybox.pics.again); else go.set("Lift!", PIC_LIFT); }
-    var busy = !topped && auto && !ending;
-    if (busy !== go.isBusy()) go.busy(busy);
-  }
-  Toybox.bar($("bottom"), { onNew: newBuilding, onSurprise: surprise });
-
-  // The ghost hand: first it taps the load the building needs (the one-press way); once he has used the tap, it
-  // drags the hook to the load. Topped out: it taps Again!.
+  // The ghost hand drags the hook to the next load (or, carrying, to the building).
   function inStage(p) {
     var r = $("stage").getBoundingClientRect();
     return [clamp(p[0], r.left + 34, r.right - 34), clamp(p[1], r.top + 34, r.bottom - 34)];
   }
-  var ghost = Toybox.ghost({
-    max: 3,
-    onShow: function (p, on) { if (p && p.key === "again") go.pulse(on); },
-    plan: function () {
-      if (ending || drag || jobs.length || auto) return null;
-      if (topped) {
-        if (clock - anim.top < 5) return null;
-        var gr = go.el.getBoundingClientRect();
-        if (!gr.width) return null;
-        return { pts: [[gr.left + gr.width / 2, gr.top + gr.height / 2]], tap: true, key: "again" };
-      }
-      if (carried) return null;
-      // Any order goes: show the needed piece that is in view (the next one first).
-      var sr = $("stage").getBoundingClientRect(), l = null;
-      ["bricks", "window", "beam", "tree"].forEach(function (k) {
-        var c = !l && allowed(k) && findLoad(k);
-        if (!c || c.born > clock) return;
-        var q = worldToScreen(c.x, c.y + c.h / 2);
-        if (q[0] > sr.left + 30 && q[0] < sr.right - 30) l = c;
-      });
-      if (!l) return null;
-      var mid = inStage(worldToScreen(l.x, l.y + l.h / 2 + 10));
-      if (!usedTap) return { pts: [mid], tap: true, key: "hook" };
-      var h = inStage(worldToScreen(hookX(), hookY() + 22)), r = ringOf(l);
-      return { pts: [h, inStage(worldToScreen(r.x, r.y))], key: "drag" };
+  var ghost = makeGhost(function () {
+    if (ending || drag || jobs.length || auto) return null;
+    if (topped) {
+      if (Toybox.isBig()) return null;
+      flashCoach("Tap New building!", 3500);
+      var nb = $("newBtn").getBoundingClientRect();
+      return { pts: [[nb.left + nb.width / 2, nb.top + nb.height / 2]], tap: true };
     }
-  });
+    var h = inStage(worldToScreen(hookX(), hookY() + 22));
+    if (carried) {
+      if (!allowed(carried.kind)) return null;
+      coachAgain();
+      return { pts: [h, inStage(worldToScreen(BC, targetBottom(carried.kind) + carried.h + SLING + 40))] };
+    }
+    var k = nextKind(), l = k && findLoad(k);
+    if (!l || l.born > clock) return null;
+    coachAgain();
+    var r = ringOf(l);
+    return { pts: [h, inStage(worldToScreen(r.x, r.y))] };
+  }, { max: 3 });
 
   // ---------- Start ----------
   spawnLoads(true);
@@ -1414,7 +1383,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     state: function () {
       return { floors: floors, bricks: cur.bricks, window: cur.window, topped: topped, carried: carried ? carried.kind : null,
         hook: { x: Math.round(hookX()), y: Math.round(hookY()) }, trolley: Math.round(cr.x), th: +cr.th.toFixed(3), jobs: jobs.length, locked: jobsLocked, auto: auto,
-        loads: loads.map(function (l) { return { kind: l.kind, x: Math.round(l.x), y: Math.round(l.y) }; }), coach: coach.text(), go: go.label(), busy: go.isBusy(), beam: cur.beam, parked: parked };
+        loads: loads.map(function (l) { return { kind: l.kind, x: Math.round(l.x), y: Math.round(l.y) }; }), coach: $("hint").hidden ? "" : $("hint").textContent, parked: parked };
     },
     toScreen: function (x, y) { var p = worldToScreen(x, y); return { x: p[0], y: p[1] }; },
     hookScreen: function () { var p = worldToScreen(hookX(), hookY() + 22); return { x: p[0], y: p[1] }; },

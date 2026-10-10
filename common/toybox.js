@@ -203,10 +203,8 @@
       note: "In the apps built from the new layout. Uses the device's voice, so it only speaks when sound is on (headphones on the plane)." },
     { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
       note: "Uses the device's voice, so it only speaks when sound is on." },
-    { id: "mathgrid-twelve", app: "Math Grid", label: "Grid from 0 to 12 (instead of 0 to 10)", type: "bool", def: false },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
-    { id: "printer-clear", app: "3D Printer", label: "Hold to clear My prints", type: "action" },
-    { id: "measuring-cm", app: "Measuring", label: "Measure in centimeters (instead of inches)", type: "bool", def: false }
+    { id: "printer-clear", app: "3D Printer", label: "Hold to clear My prints", type: "action" }
   ];
   var SET_BY = {};
   SETTINGS.forEach(function (d) { SET_BY[d.id] = d; });

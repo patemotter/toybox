@@ -114,7 +114,14 @@ works, simple machines, word crane, coin machine). The dad: he likes learning, b
 
 ---
 
-## Toybox UI/UX redesign (in progress, 2026-10-09)
+## Toybox UI/UX redesign (REVERTED 2026-10-10)
+
+The dad: the redesign removed customisation and left him "clicking a green button over and over watching things
+happen". Every app except the Farm went back to its pre-redesign version (the audit of what had been removed is
+`plans/restore.md`). The Farm keeps the components for now and is being reworked so he drives and works the machines
+himself. The original redesign notes follow for reference only.
+
+### (old) Toybox UI/UX redesign (2026-10-09)
 
 `plans/redesign.md` is the design system for every app (screen structure, step row, job bar, tiles, touch sizes for
 a 3-year-old, placement, one meaning per color, words, a cleaner chrome) and the per-page migration. The dad

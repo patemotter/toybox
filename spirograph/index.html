@@ -28,6 +28,8 @@
   --plate: #F4FAFF;
   --focus: #2D5BD7;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --tile: 62px;
+  --pic: 38px;
   color-scheme: light;
   box-sizing: border-box;
 }
@@ -85,68 +87,147 @@ body {
 .stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
 .stage .farewell p { font-size: 1.25rem; }
 body.big .tb-panel { display: none; }
-body.big .shelfview { display: none; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 body.ending #view { cursor: default; }
 .rest-art { aspect-ratio: 1; }
-/* The old sheet flying onto the Shelf button when New is pressed. */
+/* The old sheet flying into the Mine tab when New is pressed. */
 .flyaway { position: fixed; z-index: 30; pointer-events: none; border-radius: 18px; border: 3px solid #1D2340; background: #FFFFFF;
   transform-origin: 0 0; transition: transform 0.9s cubic-bezier(.45,.05,.4,1), opacity 0.9s ease; }
 
-/* ---------- Panel (tb-v2): the rings, the wheels and the Pen, then the bottom bar ----------
-   Two rows of tiles: the four rings (each shows its shape), then the three wheels (each shows the pattern it makes)
-   and the Pen (a tap puts the next pen in). The bottom bar: Shelf (his drawings), New, Surprise. */
-.tb-head a { text-decoration: none; }
-.tb-tilerow .tb-pic canvas, .tb-tilerow .tb-pic svg { width: 100%; height: 100%; display: block; }
-.tb-tilerow .tb-tile.pop { animation: tb-pop 0.6s ease-out; }
-@media (prefers-reduced-motion: reduce) { .tb-tilerow .tb-tile.pop { animation: none; } }
-/* Phone held sideways: a wider column, so four tiles fit a row at full size (the ring is limited by the height). */
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
+/* ---------- Panel: Go, the picked tab's choices, then the tab bar ---------- */
+.tb-tabs .tab[aria-pressed="true"] { background: var(--accent); color: #1D2340; }
+.panes.tb-choices { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
+.pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+#panel[data-tab="gears"] [data-pane="gears"],
+#panel[data-tab="rings"] [data-pane="rings"],
+#panel[data-tab="pens"] [data-pane="pens"],
+#panel[data-tab="mine"] [data-pane="mine"] { visibility: visible; }
+.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.btn.opt {
+  min-width: 0; min-height: var(--tile); height: var(--tile); padding: 2px 4px; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  font-size: 0.95rem; line-height: 1; white-space: nowrap;
 }
-/* iPad held sideways: two tiles a row in the side column. */
-@media (orientation: landscape) and (min-height: 521px) {
-  #rings.tb-tilerow, #gears.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-/* Big: the header buttons and the panel hide; drawing goes on. */
-body.big .tb-head > :not(.bigtoggle) { display: none; }
+.opt canvas { width: var(--pic); height: var(--pic); display: block; flex: none; }
+/* Rings: one row of four tall tiles (as tall as the two rows of the Gears tab). */
+.row.ringrow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ringrow .btn.opt { height: calc(var(--tile) * 2 + 6px); gap: 4px; }
+.ringrow .opt canvas { width: calc(var(--pic) * 1.45); height: calc(var(--pic) * 1.45); max-width: 100%; }
+/* Surprise: the tiles that changed give a little sparkly hop. */
+.btn.pop { animation: tb-pop 0.9s ease-out; }
+@keyframes tb-pop { 0% { transform: scale(1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 0 rgba(255,201,60,0.9); }
+  35% { transform: scale(1.1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 8px rgba(255,201,60,0.55); }
+  100% { transform: scale(1); box-shadow: 3px 3px 0 var(--edge), 0 0 0 14px rgba(255,201,60,0); } }
+@media (prefers-reduced-motion: reduce) { .btn.pop { animation: none; } }
+.opt .nm { font-weight: 800; }
+.pens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.btn.pen { min-width: 0; height: var(--tile); min-height: 44px; padding: 0 2px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; }
+.pen svg { width: 100%; max-width: 76px; height: 100%; max-height: 40px; display: block; overflow: visible; }
+.shelf { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 4px 6px 2px; height: calc(var(--tile) * 2 + 6px);
+  align-items: center; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: thin; }
+.btn.thumb { flex: none; height: calc(var(--tile) * 2 - 6px); aspect-ratio: 1; min-height: 0; padding: 3px; border-radius: 16px; background: #FFFFFF; }
+.thumb canvas { width: 100%; height: 100%; display: block; }
+.btn.thumb[aria-pressed="true"] { background: var(--accent); }
+.shelf .empty { margin: auto; font-weight: 800; color: var(--muted); text-align: center; font-size: 1.05rem; line-height: 1.2; padding: 0 8px; }
 
-/* Shelf: his drawings, covering the paper while it is open. A tap on one puts it back on the paper. */
-.shelfview { position: absolute; inset: 0; z-index: 5; background: #F4FAFF; padding: 14px; overflow-y: auto; overscroll-behavior: contain;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; align-content: start; touch-action: pan-y; }
-.shelfview[hidden] { display: none; }
-.shelfview .btn.thumb { aspect-ratio: 1; min-height: 0; padding: 4px; border-radius: 18px; background: #FFFFFF; }
-.shelfview .thumb canvas { width: 100%; height: 100%; display: block; }
-.shelfview .btn.thumb[aria-pressed="true"] { background: var(--tb-pick); }
-.shelfview .empty { grid-column: 1 / -1; margin: auto; padding: 24px 12px; font-weight: 800; color: var(--muted); text-align: center;
-  font-size: var(--tb-fs-btn); line-height: 1.25; }
-@media (min-width: 700px) and (min-height: 700px) { .shelfview { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; padding: 18px; } }
+/* Tabs: short words share the room, Surprise gets a little more. */
+.tb-tabs .btn { flex: 1 1 auto; padding-left: 0.2rem; padding-right: 0.2rem; }
+@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
+  .tb-tabs { gap: 4px; }
+  .tb-tabs .btn { font-size: 0.86rem; padding-left: 0.1rem; padding-right: 0.1rem; }
+}
+.tb-tabs .btn.tb-surprise { flex: 1.5 1 auto; }
+/* Upright phones: the round ring leaves spare height, so the picture tiles can be bigger. */
+@media (orientation: portrait) and (max-width: 600px) { :root { --tile: 82px; --pic: 50px; } }
+@media (orientation: portrait) and (max-width: 600px) and (max-height: 760px) { :root { --tile: 66px; --pic: 40px; } }
+/* Landscape: panel on the right (the ring is limited by the height, so the panel can be wide). */
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(40%, 420px); justify-content: space-between; }
+  .tb-body .tb-panel .tb-choices { overflow: visible; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: min(44%, 360px); }
+  :root { --tile: 84px; --pic: 50px; }
+  .tb-tabs .btn { font-size: 0.88rem; }
+}
+/* Tablets: bigger tiles. */
+@media (min-width: 700px) and (min-height: 700px) {
+  :root { --tile: 100px; --pic: 64px; }
+  .row, .pens { gap: 10px; }
+  .pane { gap: 10px; }
+  .btn.opt { font-size: 1.1rem; gap: 2px; border-radius: 16px; }
+  .btn.pen { height: 100px; }
+  .pen svg { max-width: 110px; max-height: 60px; }
+  .shelf { height: 210px; gap: 12px; }
+  .ringrow .btn.opt { height: calc(var(--tile) * 2 + 10px); }
+  .btn.thumb { height: 190px; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(36%, 420px); }
+  :root { --tile: 150px; --pic: 96px; }
+  .btn.pen { height: 150px; }
+  .pen svg { max-height: 80px; }
+  .shelf { height: 310px; }
+  .btn.thumb { height: 140px; }
+  .ringrow .btn.opt { height: calc(var(--tile) * 2 + 10px); }
+  .shelf { flex-wrap: wrap; align-content: flex-start; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; }
+  .tb-tabs .btn { font-size: 1.05rem; }
+}
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 @media (prefers-reduced-motion: reduce) { .flyaway { transition: opacity 0.4s ease; } }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Spirograph</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="view" role="img" aria-label="A sheet of paper with a gear ring and a wheel gear holding a pen. Move a finger round and round to draw a pattern, or tap the paper."></canvas>
-      <div class="shelfview" id="shelf" role="group" aria-label="My drawings" hidden></div>
-      <div id="coach"></div>
+      <canvas id="view" role="img" aria-label="A sheet of paper with a gear ring and a wheel gear holding a pen. Move a finger round and round to draw a pattern."></canvas>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Move your finger round and round!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
-    <section class="tb-panel" id="panel">
-      <div id="rings" role="group" aria-label="Rings"></div>
-      <div id="gears" role="group" aria-label="Wheels and the pen"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel" id="panel" data-tab="gears">
+      <button class="btn tb-go" id="goBtn">Draw!</button>
+      <div class="panes tb-choices">
+        <div class="pane" data-pane="gears" role="tabpanel" aria-label="Wheels and pen holes">
+          <div class="row" id="wheelRow"></div>
+          <div class="row" id="holeRow"></div>
+        </div>
+        <div class="pane" data-pane="rings" role="tabpanel" aria-label="Rings">
+          <div class="row ringrow" id="ringRow"></div>
+        </div>
+        <div class="pane" data-pane="pens" role="tabpanel" aria-label="Pens">
+          <div class="pens" id="penRow"></div>
+        </div>
+        <div class="pane" data-pane="mine" role="tabpanel" aria-label="My drawings">
+          <div class="shelf" id="shelf"></div>
+        </div>
+      </div>
+      <nav class="tb-tabs" aria-label="Controls">
+        <button class="btn tab" data-tab="gears">Gears</button>
+        <button class="btn tab" data-tab="rings">Rings</button>
+        <button class="btn tab" data-tab="pens">Pens</button>
+        <button class="btn tab" data-tab="mine">Mine</button>
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
+
 <script>
 (function () {
   "use strict";
@@ -642,11 +723,9 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     if (mo.lift > 0 && !mo.goodbye) { mo.lift = Math.max(0, mo.lift - dt / 0.5); dirty = true; }
     if (mo.goodbye) { stepGoodbye(dt); return; }
     if (mo.auto && !mo.reseat) {
-      var stepU = P / AUTO_LAP_S * dt;
-      mo.uT += mo.dir * stepU;
-      mo.autoLeft -= stepU;
+      mo.uT += mo.dir * P / AUTO_LAP_S * dt;
       var cp = curPat();
-      if (mo.autoLeft <= 0 || (cp && cp.done && !mo.autoDone)) mo.auto = false;
+      if (cp && cp.done) { mo.auto = false; renderGo(); }
     }
     var lead = mo.uT - st.u, maxLead = P * 0.45;
     if (lead > maxLead) { mo.uT = st.u + maxLead; lead = maxLead; }
@@ -672,8 +751,7 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var r = view.getBoundingClientRect();
     ptrs[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top, moved: 0, t: now() };
-    mo.auto = false;   // a finger takes over
-    if (shelfOpen()) openShelf(false);
+    if (mo.auto) { mo.auto = false; renderGo(); }   // a finger takes over
     if (surp && surp.kind !== "face") surpStop();   // the wheel is back in its place at once
     ripple(e.clientX - r.left, e.clientY - r.top);
   }
@@ -707,8 +785,8 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     delete ptrs[e.pointerId];
     if (locked()) return;
     afterLift();
-    // A tap draws a whole loop by itself.
-    if (p.moved < 12 && now() - p.t < 600) tapDraw();
+    // A tap rolls the wheel a little way, so every touch draws something.
+    if (p.moved < 8 && now() - p.t < 600) { mo.uT += mo.dir * geoNow().S.P * 0.06; }
   }
   view.addEventListener("pointerdown", onDown);
   view.addEventListener("pointermove", onMove);
@@ -726,9 +804,9 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     fx.sparkle = { p: p, G: patGeo(p), t0: now(), dur: reduce ? 1200 : 3000 };
     chimeSound();
     // once a visit, a soft hint that a new pen makes a new layer (nothing stops: the wheel keeps going)
-    if (!mo.saidPen) { mo.saidPen = true; coach.say("Try a new pen!", 4); }
+    if (!mo.saidPen) { mo.saidPen = true; coachSay("Pick a new pen!", 3500); }
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
-    mo.auto = false;
+    if (mo.auto) { mo.auto = false; renderGo(); }
     dirty = true;
   }
   function drawFx(t) {
@@ -887,23 +965,42 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
   }
 
   // ---------- Panel ----------
-  // Picture tiles: each ring shows its shape with the pattern it makes; each wheel shows its pattern with the
-  // current pen; the Pen tile shows the pen that is in (a tap puts the next one in).
+  // Picture tiles: each wheel and each hole shows the pattern it makes with the current pen.
   function tileCanvas() { var c = document.createElement("canvas"); c.setAttribute("aria-hidden", "true"); return c; }
-  var ringTiles = null, gearTiles = null, bar = null, tileCv = {};
   function buildTiles() {
-    ringTiles = Toybox.tiles($("rings"), {
-      items: SHAPE_IDS.map(function (id) { var c = tileCv["r:" + id] = tileCanvas(); return { id: id, name: SHAPE_NAME[id], pic: function () { return c; } }; }),
-      value: st.rig.shape, kind: "pick", rows: 1, onPick: pickRing
+    var wr = $("wheelRow"), hr = $("holeRow");
+    wr.innerHTML = ""; hr.innerHTML = "";
+    WHEELS.forEach(function (w) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.wheel = w; b.setAttribute("aria-label", WHEEL_NAME[w] + " wheel");
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = WHEEL_NAME[w]; b.appendChild(s);
+      wr.appendChild(b);
     });
-    var g = WHEELS.map(function (w) { var c = tileCv["w:" + w] = tileCanvas(); return { id: w, name: WHEEL_NAME[w], pic: function () { return c; } }; });
-    g.push({ id: "pen", name: "Pen", pic: penSVG(PEN[st.rig.pen]) });
-    gearTiles = Toybox.tiles($("gears"), { items: g, value: st.rig.wheel, kind: "pick", rows: 1, onPick: pickGear });
-    var pb = gearTiles.button("pen");
-    pb.classList.add("is-action");
-    pb.removeAttribute("aria-pressed");
-    pb.setAttribute("aria-label", "Next pen");
-    ringTiles.button(SHAPE_IDS[0]).closest(".tb-tilerow").setAttribute("aria-label", "Rings");
+    HOLES.forEach(function (h) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.hole = h; b.setAttribute("aria-label", "Pen hole: " + HOLE_NAME[h]);
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = HOLE_NAME[h]; b.appendChild(s);
+      hr.appendChild(b);
+    });
+    var rr = $("ringRow");
+    rr.innerHTML = "";
+    SHAPE_IDS.forEach(function (id) {
+      var b = document.createElement("button");
+      b.className = "btn opt"; b.dataset.ring = id; b.setAttribute("aria-label", SHAPE_NAME[id] + " ring");
+      b.appendChild(tileCanvas());
+      var s = document.createElement("span"); s.className = "nm"; s.textContent = SHAPE_NAME[id]; b.appendChild(s);
+      rr.appendChild(b);
+    });
+    var pr = $("penRow");
+    pr.innerHTML = "";
+    PENS.forEach(function (p) {
+      var b = document.createElement("button");
+      b.className = "btn pen"; b.dataset.pen = p.id; b.setAttribute("aria-label", p.name + " pen");
+      b.innerHTML = penSVG(p);
+      pr.appendChild(b);
+    });
   }
   function penSVG(p) {
     var id = "pg" + p.id, fill = p.c || "url(#" + id + ")", defs = "";
@@ -913,8 +1010,8 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     }
     var sparkles = p.id === "glitter" ? '<path d="M30 9l1.6 3.4 3.4 1.6-3.4 1.6L30 19l-1.6-3.4L25 14l3.4-1.6z" fill="#FFFFFF" stroke="#1D2340" stroke-width="1.2"/>' +
       '<path d="M44 26l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#FFF7C2"/><circle cx="38" cy="12" r="1.6" fill="#FFFFFF"/>' : "";
-    return '<svg viewBox="0 -20 80 80" aria-hidden="true">' + defs +
-      '<g transform="rotate(-40 40 20)" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round">' +
+    return '<svg viewBox="0 0 80 40" aria-hidden="true">' + defs +
+      '<g transform="rotate(-14 40 20)" stroke="#1D2340" stroke-width="2.6" stroke-linejoin="round">' +
       '<path d="M5 20 L14 15 L14 25 Z" fill="' + fill + '"/>' +
       '<path d="M14 13 H22 V27 H14 Z" fill="#E7ECF6"/>' +
       '<rect x="22" y="10" width="34" height="20" rx="4" fill="' + fill + '"/>' +
@@ -967,27 +1064,33 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
   }
   function renderPreviews() {
     var r = st.rig;
-    if (!ringTiles) return;
-    ringTiles.set(r.shape);
-    gearTiles.set(r.wheel);
-    var pb = gearTiles.button("pen");
-    pb.removeAttribute("aria-pressed");
-    WHEELS.forEach(function (w) {
-      drawThumb(tileCv["w:" + w], [previewPat(r.shape, w, r.hole, r.pen)], { lw: 0.03, plain: true });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wheel]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.wheel === r.wheel));
+      drawThumb(b.querySelector("canvas"), [previewPat(r.shape, b.dataset.wheel, r.hole, r.pen)], { lw: 0.03, plain: true });
     });
-    SHAPE_IDS.forEach(function (id) {
-      drawThumb(tileCv["r:" + id], [previewPat(id, r.wheel, r.hole, r.pen)], { lw: 0.022, plain: true, ring: id });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-hole]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.hole === r.hole));
+      drawThumb(b.querySelector("canvas"), [previewPat(r.shape, r.wheel, b.dataset.hole, r.pen)], { lw: 0.03, plain: true });
+    });
+    renderRings();
+  }
+  function renderRings() {
+    var r = st.rig;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-ring]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.ring === r.shape));
+      drawThumb(b.querySelector("canvas"), [previewPat(b.dataset.ring, r.wheel, r.hole, r.pen)], { lw: 0.022, plain: true, ring: b.dataset.ring });
     });
   }
   function renderPens() {
-    if (!gearTiles) return;
-    gearTiles.button("pen").querySelector(".tb-pic").innerHTML = penSVG(PEN[st.rig.pen]);
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pen]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.pen === st.rig.pen));
+    });
   }
   function renderShelf() {
     var sh = $("shelf");
     sh.innerHTML = "";
     if (!st.shelf.length) {
-      var e = document.createElement("p"); e.className = "empty"; e.textContent = "Tap New and your drawing goes here.";
+      var e = document.createElement("p"); e.className = "empty"; e.textContent = "Tap New to put your drawing here.";
       sh.appendChild(e);
       return;
     }
@@ -996,7 +1099,6 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
       b.className = "btn thumb"; b.dataset.shelf = d.id; b.setAttribute("aria-label", "A saved drawing");
       b.setAttribute("aria-pressed", String(d.id === st.from));
       b.appendChild(tileCanvas());
-      b.addEventListener("click", function () { if (!locked()) { loadShelf(d.id); openShelf(false); } });
       sh.appendChild(b);
     });
     // draw after layout so the canvases have their size
@@ -1008,20 +1110,25 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     });
   }
   function shelfById(id) { for (var i = 0; i < st.shelf.length; i++) if (st.shelf[i].id === id) return st.shelf[i]; return null; }
-  // The Shelf button opens his drawings over the paper; pressed again (or a drawing picked) it closes.
-  function openShelf(on) {
-    var sh = $("shelf");
-    if (on) { surpStop(); renderShelf(); }
-    sh.hidden = !on;
-    if (bar) bar.shelfOpen(on);
-    if (on) coach.clear();
+  function renderGo() {
+    var b = $("goBtn");
+    b.textContent = mo.auto ? "Stop" : "Draw!";
+    b.setAttribute("aria-pressed", "false");
   }
-  function shelfOpen() { return !$("shelf").hidden; }
+  function showTab(name) {
+    st.tab = name;
+    $("panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.tab === name));
+    });
+    if (name === "mine") renderShelf();
+    if (name === "gears" || name === "rings") renderPreviews();
+    scheduleSave();
+  }
 
   // ---------- Choices ----------
   function setRig(changes) {
     var r = st.rig, oldShape = r.shape, oldP = SHAPES[oldShape].P;
-    if (changes.wheel) changes.hole = "edge";
     Object.keys(changes).forEach(function (k) { r[k] = changes[k]; });
     if (changes.shape && changes.shape !== oldShape) {
       st.u = st.u / oldP * SHAPES[r.shape].P;
@@ -1049,7 +1156,7 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     return d;
   }
   function flyToShelf() {
-    var r = view.getBoundingClientRect(), tab = bar && bar.shelf;
+    var r = view.getBoundingClientRect(), tab = document.querySelector('.tab[data-tab="mine"]');
     var img = document.createElement("canvas");
     img.width = view.width; img.height = view.height;
     img.getContext("2d").drawImage(view, 0, 0);
@@ -1074,13 +1181,21 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     st.pats = []; st.cur = -1; st.from = null;
     mo.auto = false; mo.reseat = null; fx.sparkle = null; mo.uT = st.u; mo.v = 0;
     var r = st.rig;
-    r.ph = 0; r.hole = "edge";
+    r.ph = 0;
     if (r.shape !== "round") { st.u = st.u / SHAPES[r.shape].P * SHAPES.round.P; mo.uT = st.u; r.shape = "round"; }
     relayout();
-    renderPreviews(); renderPens();
-    if (had && bar && bar.shelf) setTimeout(function () { Toybox.wiggle(bar.shelf); }, 850);
-    coach.say(had ? "A clean sheet of paper." : "Draw round and round!", 3);
+    renderGo(); renderPreviews(); renderPens();
+    if (st.tab === "mine") renderShelf();
+    if (had) pulseTab("mine");
+    coachSay(had ? "Fresh paper!" : "Move your finger round and round!", 3000);
     saveNow();
+  }
+  function pulseTab(name) {
+    var t = document.querySelector('.tab[data-tab="' + name + '"]');
+    if (!t || !t.animate || reduce) return;
+    setTimeout(function () {
+      t.animate([{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 600, easing: "ease-out" });
+    }, 850);
   }
   function loadShelf(id) {
     if (id === st.from) return;
@@ -1099,18 +1214,18 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     }
     mo.uT = st.u;
     relayout();
-    renderPreviews();
+    renderGo(); renderPreviews(); renderShelf();
     saveNow();
   }
-  // One press is always enough: a tap on the paper rolls the wheel once round the ring by itself (calm, about
-  // five seconds), drawing as it goes; on a finished pattern it rolls round the line already drawn (no new layer:
-  // only a new pen, wheel or ring makes one). A finger on the paper takes over at once.
-  function tapDraw() {
+  function goDraw() {
     if (surp && surp.kind !== "face") surpStop();
+    if (mo.auto) { mo.auto = false; renderGo(); return; }
     var p = curPat();
-    mo.auto = true; mo.dir = 1; mo.autoLeft = geoNow().S.P; mo.autoDone = !!(p && p.done);
-    learnedDrawing();
-    ghost.learned("tap");
+    if (p && p.done) newLayer(true);
+    mo.auto = true; mo.dir = 1;
+    learnedDrawing(true);
+    coachSay("Watch it draw!", 3000);
+    renderGo();
   }
   // ---------- Surprise: a fun moment with the gears, right now ----------
   // It never draws and never changes his choices or his drawing (the dad's rule). The moments take turns,
@@ -1147,12 +1262,11 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     starsAround(8, 1.2);
   }
   function surpStart(kind) {
-    if (kind !== "face") { mo.auto = false; mo.uT = st.u; mo.v = 0; }
-    if (shelfOpen()) openShelf(false);
+    if (kind !== "face") { mo.auto = false; renderGo(); mo.uT = st.u; mo.v = 0; }
     surp = { kind: kind, t0: now(), dur: kind === "roll" ? 7600 : kind === "spin" ? (reduce ? 2400 : 5200) : 6200, clicked: false };
     if (kind === "roll") liftSound();
     if (kind === "face") starsAround(8, 1.1);
-    coach.clear();
+    coachEl.classList.add("off");
     dirty = true;
   }
   function surpStop() {
@@ -1236,43 +1350,43 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
   view.addEventListener("pointermove", function (e) { var r = view.getBoundingClientRect(); lastPtr = { x: e.clientX - r.left, y: e.clientY - r.top, at: now() }; });
   view.addEventListener("pointerdown", function (e) { var r = view.getBoundingClientRect(); lastPtr = { x: e.clientX - r.left, y: e.clientY - r.top, at: now() }; });
 
-  // ---------- Choices: rings, wheels, the pen (each new one starts a new layer; what is drawn stays) ----------
-  function pickRing(id) {
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest, .tb-turn, .tb-off")) return;
     if (locked()) return;
-    if (shelfOpen()) openShelf(false);
-    if (id !== st.rig.shape) setRig({ shape: id });
-    wiggle();
-  }
-  function pickGear(id) {
-    if (locked()) return;
-    if (shelfOpen()) openShelf(false);
-    if (id === "pen") { nextPen(); return; }
-    if (id !== st.rig.wheel) setRig({ wheel: id });
-    wiggle();
-  }
-  function nextPen() {
-    var i = 0;
-    for (var k = 0; k < PENS.length; k++) if (PENS[k].id === st.rig.pen) i = k;
-    var cp = curPat();
-    st.rig.pen = PENS[(i + 1) % PENS.length].id;
-    gearTiles.set(st.rig.wheel);
-    renderPens(); renderPreviews(); dirty = true; scheduleSave();
-    var pb = gearTiles.button("pen");
-    pb.classList.remove("pop"); void pb.offsetWidth; pb.classList.add("pop");
-    Toybox.nametag(PEN[st.rig.pen].name + " pen", pb.getBoundingClientRect().left + pb.offsetWidth / 2, pb.getBoundingClientRect().top);
-    // a new pen on a finished pattern starts a new layer; on an unfinished one the same curve goes on in the new color
-    if (cp && cp.done) newLayer(false); else wiggle();
-  }
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.dataset.wheel) { if (t.dataset.wheel !== st.rig.wheel) setRig({ wheel: t.dataset.wheel }); wiggle(); return; }
+    if (t.dataset.hole) { if (t.dataset.hole !== st.rig.hole) setRig({ hole: t.dataset.hole }); wiggle(); return; }
+    if (t.dataset.ring) { if (t.dataset.ring !== st.rig.shape) setRig({ shape: t.dataset.ring }); wiggle(); return; }
+    if (t.dataset.pen) {
+      var changed = t.dataset.pen !== st.rig.pen, cp = curPat();
+      st.rig.pen = t.dataset.pen; renderPens(); renderPreviews(); dirty = true; scheduleSave();
+      // a new pen on a finished pattern starts a new layer; on an unfinished one the same curve goes on in the new color
+      if (changed && cp && cp.done) newLayer(false); else wiggle();
+      return;
+    }
+    if (t.dataset.shelf) { loadShelf(t.dataset.shelf); return; }
+    if (t.id === "goBtn") { goDraw(); return; }
+    if (t.id === "newBtn") { newPaper(); return; }
+    if (t.id === "surpriseBtn") { surprise(); return; }
+  });
   // A choice answers with a little hop of the wheel.
   function wiggle() { mo.lift = Math.max(mo.lift, 0.6); dirty = true; clickSound(); }
 
   // ---------- Coach ----------
-  var coach = Toybox.coach($("coach")), learned = false;
-  function learnedDrawing() {
+  var coachEl = $("coach"), coachT = 0, learned = false;
+  function coachSay(text, ms) {
+    coachEl.textContent = text;
+    coachEl.classList.remove("off");
+    clearTimeout(coachT);
+    if (ms) coachT = setTimeout(function () { coachEl.classList.add("off"); }, ms);
+  }
+  function learnedDrawing(quiet) {
     if (learned) return;
     learned = true;
-    ghost.learned("round");
-    coach.clear();
+    ghost.learned();
+    if (!quiet) coachT = setTimeout(function () { coachEl.classList.add("off"); }, 2500);
   }
 
   // ---------- Sound (only when the grown-up turned it on) ----------
@@ -1326,30 +1440,115 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
     tone(ac, 660, t, 0.25, 0.05); tone(ac, 880, t + 0.5, 0.3, 0.05);
   }
 
-  // ---------- Ghost hand ----------
-  // The hand taps the paper first (a tap draws a whole loop); on its next showing it circles a finger round the
-  // paper, the way the wheel goes.
-  var ghost = Toybox.ghost({
-    max: 2,
-    ok: function () { return !document.body.classList.contains("resting"); },
-    plan: function () {
-      if (mo.auto || shelfOpen() || learned || (Toybox.turning && Toybox.turning())) return null;
-      var r = view.getBoundingClientRect(), pts = [], rad = view0.sc * 0.55;
-      if (ghost.shown("tap") < 1) return { pts: [[r.left + view0.cx + rad * 0.4, r.top + view0.cy - rad * 0.3]], tap: true, key: "tap" };
-      for (var i = 0; i <= 40; i++) {
-        var a = -Math.PI / 2 + i / 40 * TAU * 1.15;
-        pts.push([r.left + view0.cx + Math.cos(a) * rad, r.top + view0.cy + Math.sin(a) * rad]);
-      }
-      return { pts: pts, dur: 4600, key: "round" };
+  // ---------- Ghost hand (same look in every app; master copy in tools/snippets/ghost-hand.js) ----------
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var lastT = Date.now(), shown = 0, armed = true, isLearned = false, run = null, el = null;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
-  });
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { lastT = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function gframe() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(gframe);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(gframe);
+    }
+    setInterval(function () {
+      if (run || isLearned || !armed || shown >= MAX || Date.now() - lastT < IDLE) return;
+      if (blocked()) { lastT = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { isLearned = true; stop(); },
+      again: function () { isLearned = false; shown = 0; armed = true; lastT = Date.now(); },
+      poke: poke,
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // The hand circles a finger round the paper, the way the wheel goes.
+  var ghost = makeGhost(function () {
+    if (mo.auto || Toybox.turning && Toybox.turning()) return null;
+    var r = view.getBoundingClientRect(), pts = [], rad = view0.sc * 0.55;
+    for (var i = 0; i <= 40; i++) {
+      var a = -Math.PI / 2 + i / 40 * TAU * 1.15;
+      pts.push([r.left + view0.cx + Math.cos(a) * rad, r.top + view0.cy + Math.sin(a) * rad]);
+    }
+    return { pts: pts, dur: 4600 };
+  }, { ok: function () { return !document.body.classList.contains("resting"); } });
 
   // ---------- Timer ending, goodbye, rest ----------
   function onEnding(done) {
     ptrs = {};
     surpStop();
-    mo.auto = false;
-    if (shelfOpen()) openShelf(false);
+    mo.auto = false; renderGo();
     if (mo.reseat) { mo.reseat = null; st.cur = -1; }
     mo.ending = true; mo.endDone = done; mo.endAt = now();
     saveNow();
@@ -1410,7 +1609,7 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
         });
         return { pats: st.pats.length, done: st.pats.filter(function (p) { return p.done; }).length, bad: bad };
       },
-      ghost: function () { return ghost.show(); }, tapDraw: tapDraw,
+      ghost: function () { return ghost.show(); },
       surprise: surprise, newPaper: newPaper, setRig: setRig,
       moment: function (k) { if (k) { surpStop(); surpStart(k); } return surp ? surp.kind : ""; },
       ink: function () { return paper.toDataURL(); }
@@ -1419,15 +1618,14 @@ body.big .tb-head > :not(.bigtoggle) { display: none; }
 
   // ---------- Start ----------
   buildTiles();
-  bar = Toybox.bar($("bottom"), { shelf: function () { openShelf(!shelfOpen()); }, onNew: newPaper, onSurprise: surprise });
+  showTab(st.tab);
   renderPens();
+  renderGo();
   resize();
-  renderPreviews();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); renderPreviews(); }).observe(stage);
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
-  if (hasInk()) learned = true;
-  else coach.step("Draw round and round!");
+  if (hasInk()) { learned = true; coachSay("Move your finger round and round!", 3500); }
   Toybox.init({
     app: "spirograph",
     big: { button: $("bigToggle") },

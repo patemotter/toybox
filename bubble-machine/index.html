@@ -67,10 +67,7 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The stage is the play: the machine's own switch and speed dial, the wand (drag it, or tap the sky and it blows
-   a stream there), the soap jar (a tap = the next soap color) and the bubbles to pop. The panel is the seven wands
-   as choice tiles and the bottom bar (New, Surprise). No Go: switching on is the switch on the machine. */
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .stage { background: #A9DCFF; touch-action: none; }
 #sky, #view {
   position: absolute;
@@ -83,26 +80,72 @@ body {
 }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; width: 44px; height: 44px; pointer-events: none; }
 body.big .tb-panel { display: none; }
-.stage .toast { position: absolute; top: 12px; z-index: 4; }
+.stage .toast { position: absolute; top: 12px; z-index: 4; font-size: 1.3rem; }
 .stage .farewell { position: absolute; top: 12px; bottom: auto; z-index: 4; }
+.stage .farewell p { font-size: 1.25rem; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 /* iOS: a drag that starts on the header or on the panel's empty background never pans the page; the buttons
    still tap. (The page itself is pinned by common/toybox.css.) */
 .tb-head, .tb-panel { touch-action: none; overscroll-behavior: none; }
 .tb-head .btn, .tb-panel .btn { touch-action: manipulation; }
-#wands .tb-pic svg { overflow: visible; }
-@media (orientation: landscape) { .tb-v2 .tb-body .tb-panel { justify-content: space-between; } }
-/* Phones held sideways: a wider column, so the wands stay in two rows of four at full tile size. */
-@media (orientation: landscape) and (max-height: 520px) { .tb-v2 .tb-body .tb-panel { width: 356px; } }
-@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) { #wands.tb-tilerow { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- Panel: wand and soap picture tiles, then the tab bar (Wands / Colors on phones, New, Surprise) ---------- */
+.tb-choices.bm-choices { display: flex; flex-direction: column; gap: 8px; }
+.wands, .soaps { display: grid; gap: 6px; }
+.wands { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.soaps { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.soap, .wandt { min-width: 0; padding: 3px 2px; white-space: nowrap; }
+.soap svg, .wandt svg { width: 44px; height: 44px; overflow: visible; }
+.soap .nm, .wandt .nm { font-weight: 800; }
+.soap[aria-pressed="true"], .wandt[aria-pressed="true"] { border-width: 4px; }
+.tb-tabs .tab { display: none; }
+@media (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 260px); justify-content: space-between; }
+  .tb-body .tb-panel .tb-choices.bm-choices { overflow: hidden; }
+  .wands, .soaps { grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; }
+}
+@media (min-width: 700px) and (min-height: 700px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(30%, 300px); }
+  .wandt, .soap { min-height: 76px; font-size: 0.95rem; }
+  .wandt svg, .soap svg { width: 40px; height: 40px; }
+}
+/* Phones: one group at a time (Wands or Colors), picked in the tab bar, pictures only. Both groups take the
+   same height, so switching never resizes the stage. */
+@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .tb-tabs .tab { display: block; }
+  .tb-panel[data-tab="wands"] .soaps, .tb-panel[data-tab="soaps"] .wands { display: none; }
+  .soap .nm, .wandt .nm { display: none; }
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .soap, .wandt { min-height: 62px; }
+  .soap svg { width: 46px; height: 46px; }
+  /* Seven wands across a narrow phone (375 px and less): the picture shrinks to the tile instead of spilling out. */
+  .wandt svg { width: 100%; max-width: 40px; height: auto; aspect-ratio: 1 / 1; }
+  .wands { gap: 5px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-body .tb-panel { width: 184px; }
+  .wands, .soaps { gap: 5px; grid-template-rows: repeat(3, 50px); }
+  .soap, .wandt { min-height: 0; }
+  .soap svg, .wandt svg { width: 38px; height: 38px; }
+  .tb-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .tb-tabs .btn { min-height: 44px; }
+}
+
+/* Ghost hand: a see-through hand that shows the main move once (same look in every app). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Bubble Machine</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
@@ -110,13 +153,21 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <canvas id="sky" aria-hidden="true"></canvas>
       <canvas id="view" role="img" aria-label="A bubble machine and a bubble wand. Switch the machine on, pop the bubbles, drag the wand to blow bubbles."></canvas>
       <div class="tb-counter" id="counter" aria-live="polite">Bubbles: 0</div>
-      <div id="coach"></div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite">Switch on the bubble machine!</div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
 
-    <section class="tb-panel" id="panel">
-      <div id="wands" aria-label="Bubble wand"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel" id="panel" data-tab="wands">
+      <div class="tb-choices bm-choices">
+        <div class="wands" id="wands" role="group" aria-label="Bubble wand"></div>
+        <div class="soaps" id="soaps" role="group" aria-label="Bubble soap"></div>
+      </div>
+      <nav class="tb-tabs" aria-label="More">
+        <button class="btn tab" data-tab="wands" aria-pressed="true">Wands</button>
+        <button class="btn tab" data-tab="soaps" aria-pressed="false">Colors</button>
+        <button class="btn tb-new" id="newBtn">New</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
@@ -420,10 +471,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // sky for bubbles (the dad: they were far too big). The switch, dial, jar and wand keep big touch areas.
     if (H > W && W < 600) {
       // Upright phone: both stand on the grass line, above the coach line.
-      // (the grass band holds the coach pill under the machine and the jar)
-      G = clamp(H * 0.11, 54, 70);
+      G = clamp(H * 0.1, 40, 64);
       groundY = H - G;
-      M.s = Math.min(W * 0.3 / 200, (H - G) * 0.26 / 235);
+      M.s = Math.min(W * 0.3 / 200, (H - G) * 0.22 / 235);
       M.x = Math.max(6, W * 0.02);
       M.y = groundY + 3;
       J.s = clamp(W / 390, 0.82, 1.1) * 0.62;
@@ -1021,7 +1071,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     addBubble(b);
     useSoap(r);
     if (!fast || fast < 0.5) blowSound(r);
-    if (!learned.wand) { learned.wand = true; coachUpdate(); if (ghost) { ghost.learned("sky"); ghost.learned("wand"); } }
+    if (!learned.wand) { learned.wand = true; coachUpdate(); }
   }
   // Where the handle meets the loop (the fish's belly is higher than the others' bottoms).
   function loopBottom(id) { return id === "fish" ? 0.58 : (id === "round" || id === "hexagon" ? 1 : 0.92); }
@@ -1034,54 +1084,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // (the drawn turn of a bubble is its sw: the wobble axis ax and the film's own turn cancel out)
     if (wd.animal) { b.sw = rnd(-0.12, 0.12); b.ss = 0; }
     else { b.sw = Math.random() * TAU; b.ss = rnd(0.12, 0.25) * (Math.random() < 0.5 ? -1 : 1); }
-  }
-  // A tap on the sky: the wand flies there (0.45 s), sweeps once across the spot blowing a stream of bubbles in
-  // the picked shape, and stays there, like after his own drag.
-  function autoBlow(x, y) {
-    if (wand.held !== null || ending) return;
-    var D = clamp(170 * J.b, 110, 260);
-    x = clamp(x, wand.ring + D / 2 + 4, W - wand.ring - D / 2 - 4);
-    y = clamp(y, wand.ring + 30, groundY - wand.stick * 0.6 - wand.ring);
-    wand.back = null; wand.drop = null; wand.home = false;
-    wand.held = "auto"; wand.soap = 1; wand.emptyAt = 0; wand.filmAt = performance.now();
-    wand.ox = 0; wand.oy = 0; wand.pend = 0; wand.moved = 0; wand.v = 0;
-    var dir = x < W / 2 ? 1 : -1;
-    wand.auto = { t0: performance.now(), x0: wand.x, y0: wand.y, x: x, y: y, D: D, dir: dir, n: 0 };
-  }
-  var AUTO_FLY = 450, AUTO_SWEEP = 1100, AUTO_N = 6;
-  function updateAuto(now) {
-    var A = wand.auto, t = now - A.t0;
-    var sx = A.x - A.dir * A.D / 2;
-    if (t < AUTO_FLY) {
-      var u = easeOut(t / AUTO_FLY);
-      wand.x = lerp(A.x0, sx, u); wand.y = lerp(A.y0, A.y, u) - Math.sin(u * Math.PI) * 30 * J.s;
-      wand.lean = lerp(wand.lean, 0, 0.2);
-      return;
-    }
-    var k = Math.min(1, (t - AUTO_FLY) / AUTO_SWEEP);
-    var px = sx + A.dir * A.D * k, py = A.y + Math.sin(k * TAU) * A.D * 0.12;
-    var dx = px - wand.x, dy = py - wand.y, d = Math.hypot(dx, dy) || 1;
-    wand.x = px; wand.y = py;
-    wand.dx = dx / d; wand.dy = dy / d; wand.v = 520 * J.b; wand.lastMove = now;
-    wand.lean += (clamp(wand.dx * 0.3, -0.4, 0.4) - wand.lean) * 0.2;
-    // the bubbles let go one after another along the sweep (a big one now and then)
-    while (A.n < AUTO_N && k >= (A.n + 0.5) / AUTO_N) {
-      A.n++;
-      if (wand.soap > 0) releaseWandBubble(wand.bub * (A.n === 3 ? rnd(1.6, 2.1) : rnd(0.55, 1.1)), 0);
-    }
-    if (k >= 1) { wand.auto = null; wand.moved = 99; wandRelease(); }
-  }
-  // A tap on the soap jar: the next soap color (its name pops up), and the wand dips into it (from the sky it
-  // glides home first).
-  function jarTap() {
-    var i = 0;
-    for (var k = 0; k < SOAPS.length; k++) if (SOAPS[k].id === S.soap) i = k;
-    var next = SOAPS[(i + 1) % SOAPS.length];
-    pickSoap(next.id);
-    var b = jarBox();
-    Toybox.nametag(next.label + " soap", rect.left + J.x, rect.top + b.y - 6);
-    if (!wand.home && wand.held === null) sendHome(); else if (wand.held === null) refill(true);
-    else refill(true);
   }
   function wandRelease() {
     if (wand.pend > wand.bub * 0.6 && wand.soap > 0) releaseWandBubble(wand.pend, 0);
@@ -1098,7 +1100,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     wand.x = wand.drop.x0; wand.y = wand.drop.y0;
   }
   function updateWand(now, dt) {
-    if (wand.auto) { updateAuto(now); if (wand.auto) return; }
     if (wand.held !== null) {
       // Standing still: a big bubble lets go by itself.
       if (now - wand.lastMove > 260) {
@@ -1460,7 +1461,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     S.on = on;
     saveNow();
     clickSound(on);
-    if (on) { learned.sw = true; mach.flashUntil = 0; if (ghost) ghost.learned("switch"); }
+    if (on) { learned.sw = true; mach.flashUntil = 0; }
     coachUpdate();
   }
   function setSpeed(i) {
@@ -1496,11 +1497,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Coach line and ghost hand ----------
-  var coach = Toybox.coach($("coach")), lastCoach = null;
+  var coachEl = $("coach"), lastCoach = null;
   function coachText() {
     var now = performance.now();
     if (tempCoach && now < tempCoach.until) return tempCoach.text;
-    if (!S.on && !learned.sw) return "Switch on the machine!";
+    if (!S.on && !learned.sw) return "Switch on the bubble machine!";
     if (!learned.pop && liveCount() > 0) return "Pop the bubbles!";
     if (!learned.wand) return "Drag the wand!";
     return null;
@@ -1509,40 +1510,134 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var t = coachText();
     if (t === lastCoach) return;
     lastCoach = t;
-    if (t) coach.step(t); else coach.clear();
+    if (t) { coachEl.textContent = t; coachEl.classList.remove("off"); }
+    else coachEl.classList.add("off");
   }
   function liveCount() { var n = 0; for (var i = 0; i < bubbles.length; i++) if (!bubbles[i].dead) n++; return n; }
 
-  // ---------- Ghost hand (Toybox.ghost) ----------
-  // Idle help shows the next move: the switch, then a bubble to pop, then the wand: first a tap on the sky (the
-  // wand flies there and blows a stream), on a later showing the drag.
-  var ghost = Toybox.ghost({
-    max: 3,
-    plan: function () {
-      if (ending) return null;
-      var r = view.getBoundingClientRect();
-      if (!S.on && !learned.sw) {
-        return { pts: [[r.left + mx(SW.x + SW.w / 2), r.top + my(SW.y + 18)]], tap: true, key: "switch" };
-      }
-      if (!learned.pop) {
-        var best = null;
-        bubbles.forEach(function (b) {
-          if (b.dead || b.kind !== "n" || b.grow < 1) return;
-          var fy = b.y + b.vy * 0.9;
-          if (fy < b.r + 40 || b.x < 40 || b.x > W - 40) return;
-          if (!best || b.r > best.r) best = b;
-        });
-        if (best) return { pts: [[r.left + best.x + best.vx * 0.9, r.top + best.y + best.vy * 0.9]], tap: true, dur: 2000, key: "pop" };
-      }
-      if (!learned.wand && wand.held === null) {
-        if (ghost.shown("sky") < 1) return { pts: [[r.left + W * 0.5, r.top + H * 0.32]], tap: true, key: "sky" };
-        // From wherever the wand is, a slow wavy drag toward the middle of the sky.
-        var x0 = r.left + wand.x, y0 = r.top + wand.y, x1 = r.left + W * 0.5, y1 = r.top + H * 0.35;
-        return { pts: [[x0, y0], [lerp(x0, x1, 0.35), lerp(y0, y1, 0.35) - H * 0.06], [lerp(x0, x1, 0.7), lerp(y0, y1, 0.7) + H * 0.04], [x1, y1]], key: "wand" };
-      }
-      return null;
+  // ---------- Ghost hand (same look in every app) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
     }
-  });
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // Idle help shows the next move: the switch, then a bubble to pop, then the wand.
+  var ghost = makeGhost(function () {
+    var r = view.getBoundingClientRect();
+    if (!S.on && !learned.sw) {
+      return { pts: [[r.left + mx(SW.x + SW.w / 2), r.top + my(SW.y + 18)]], tap: true };
+    }
+    if (!learned.pop) {
+      var best = null;
+      bubbles.forEach(function (b) {
+        if (b.dead || b.kind !== "n" || b.grow < 1) return;
+        var fy = b.y + b.vy * 0.9;
+        if (fy < b.r + 40 || b.x < 40 || b.x > W - 40) return;
+        if (!best || b.r > best.r) best = b;
+      });
+      if (best) return { pts: [[r.left + best.x + best.vx * 0.9, r.top + best.y + best.vy * 0.9]], tap: true, dur: 2000 };
+    }
+    if (!learned.wand && wand.held === null) {
+      // From wherever the wand is, a slow wavy drag toward the middle of the sky.
+      var x0 = r.left + wand.x, y0 = r.top + wand.y, x1 = r.left + W * 0.5, y1 = r.top + H * 0.35;
+      return { pts: [[x0, y0], [lerp(x0, x1, 0.35), lerp(y0, y1, 0.35) - H * 0.06], [lerp(x0, x1, 0.7), lerp(y0, y1, 0.7) + H * 0.04], [x1, y1]] };
+    }
+    return null;
+  }, { max: 3 });
 
   // ---------- Touch: switch, dial, wand, bubbles (several fingers at once) ----------
   var ptrs = {};
@@ -1566,7 +1661,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function tapPop(b) {
     popBubble(b, false);
-    if (!learned.pop) { learned.pop = true; coachUpdate(); ghost.learned("pop"); }
+    if (!learned.pop) { learned.pop = true; coachUpdate(); }
   }
   // A touch on empty sky: a soft puff of air pushes nearby bubbles away.
   function puff(px, py) {
@@ -1588,14 +1683,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     rect = { left: r.left, top: r.top };
     var p = local(e), now = performance.now();
     try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
-    var info = { mode: "pop", x: p.x, y: p.y, x0: p.x, y0: p.y, moved: 0, t0: now, sky: false };
+    var info = { mode: "pop", x: p.x, y: p.y, x0: p.x, y0: p.y, moved: 0 };
     ptrs[e.pointerId] = info;
     if (hitSwitch(p.x, p.y)) { info.mode = "none"; setOn(!S.on); return; }
     if (hitDial(p.x, p.y)) { info.mode = "dial"; info.speed0 = S.speed; return; }
     var b = bubbleAt(p.x, p.y);
     var onRing = Math.hypot(p.x - wand.x, p.y - wand.y) < wand.ring + 8;
-    // The soap jar (the part of the wand's handle inside it belongs to the jar): the next soap color.
-    if (!onRing && !b && hitJar(p.x, p.y) && p.y > jarBox().y - 4) { info.mode = "none"; jarTap(); return; }
     if (wand.held === null && (onRing || (!b && hitWand(p.x, p.y)))) {
       info.mode = "wand";
       wand.held = e.pointerId;
@@ -1607,11 +1700,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
     if (b) { tapPop(b); return; }
     if (trainAt(p.x, p.y)) { info.mode = "none"; trainPop(false); if (!learned.pop) { learned.pop = true; coachUpdate(); } return; }
-    if (hitJar(p.x, p.y)) { info.mode = "none"; jarTap(); return; }
+    if (hitJar(p.x, p.y)) { info.mode = "none"; if (!wand.home && wand.held === null) sendHome(); else refill(true); return; }
     var d = duckAt(p.x, p.y);
     if (d) { if (d.state === "sit") { d.hop = 1; squeak(1); } info.mode = "none"; return; }
     if (inMachine(p.x, p.y)) { info.mode = "none"; machineTap(); return; }
-    info.sky = true;
     puff(p.x, p.y);
   });
   view.addEventListener("pointermove", function (e) {
@@ -1656,8 +1748,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!info) return;
     delete ptrs[e.pointerId];
     if (info.mode === "wand" && wand.held === e.pointerId) wandRelease();
-    // One press is enough: a quick tap on the empty sky sends the wand there to blow a stream of bubbles.
-    if (info.mode === "pop" && info.sky && info.moved < 12 && performance.now() - info.t0 < 350 && e.type === "pointerup" && !Toybox.timer.locked()) autoBlow(info.x0, info.y0);
     if (info.mode === "dial" && info.moved <= 10 && e.type === "pointerup" && !Toybox.timer.locked()) setSpeed(S.speed + 1);
     else if (info.mode === "dial" && info.speed0 === S.speed && e.type === "pointerup") mach.speedLabelAt = performance.now();
   }
@@ -1920,13 +2010,19 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       '<path d="' + d + '" fill="rgba(160,215,255,0.55)" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/>' +
       '<path d="' + d + '" fill="none" stroke="#FF9A4D" stroke-width="3" stroke-linejoin="round"/></svg>';
   }
-  var wandTiles = Toybox.tiles($("wands"), {
-    kind: "pick", rows: 2, value: S.wand,
-    items: WANDS.map(function (w) { return { id: w.id, name: w.label, pic: wandIcon(w) }; }),
-    onPick: function (id) { pickWand(id); }
+  WANDS.forEach(function (w) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile wandt";
+    b.dataset.wand = w.id;
+    b.setAttribute("aria-label", w.label + " wand");
+    b.innerHTML = wandIcon(w) + '<span class="nm">' + w.label + "</span>";
+    $("wands").appendChild(b);
   });
-  WANDS.forEach(function (w) { var b = wandTiles.button(w.id); if (b) b.setAttribute("aria-label", w.label + " wand"); });
-  function renderWands() { wandTiles.set(S.wand); }
+  function renderWands() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wand]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.wand === S.wand));
+    });
+  }
   function pickWand(id, quiet) {
     if (!WAND_BY[id]) return;
     S.wand = id;
@@ -1940,10 +2036,24 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (!quiet) tickSound(1);
   }
   renderWands();
+  SOAPS.forEach(function (s) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile soap";
+    b.dataset.soap = s.id;
+    b.setAttribute("aria-label", s.label + " bubbles");
+    b.innerHTML = soapIcon(s) + '<span class="nm">' + s.label + "</span>";
+    $("soaps").appendChild(b);
+  });
+  function renderSoaps() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-soap]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.soap === S.soap));
+    });
+  }
   function pickSoap(id) {
     if (!SOAP_BY[id]) return;
     S.soap = id;
     saveNow();
+    renderSoaps();
     // fresh film everywhere: the machine's wands dip again, the wand shimmers in
     mach.film = [true, true, true, true, true, true];
     mach.spill = 1;
@@ -1967,9 +2077,20 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       coachUpdate();
     }
   }
-  Toybox.bar($("bottom"), {
-    onNew: function () { newSky(); },
-    onSurprise: function () { surprise(); }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.id === "bigbtn" || t.closest(".modal, .farewell, .rest")) return;
+    if (Toybox.timer.locked()) return;
+    if (t.classList.contains("tab")) {
+      $("panel").dataset.tab = t.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll(".tb-tabs .tab"), function (b) { b.setAttribute("aria-pressed", String(b === t)); });
+      tickSound(0);
+    }
+    else if (t.dataset.wand) pickWand(t.dataset.wand);
+    else if (t.dataset.soap) pickSoap(t.dataset.soap);
+    else if (t.id === "newBtn") newSky();
+    else if (t.id === "surpriseBtn") surprise();
   });
 
   // ---------- Timer ending, goodbye and rest ----------
@@ -1978,7 +2099,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     endingT0 = performance.now();
     endingDone = done;
     Object.keys(ptrs).forEach(function (id) { delete ptrs[id]; });
-    if (wand.auto) wand.auto = null;
     if (wand.held !== null) wandRelease();
     sendHome();
     if (S.on) { S.on = false; saveNow(); }
@@ -2045,6 +2165,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Start ----------
+  renderSoaps();
   resize();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
   window.addEventListener("resize", resize);

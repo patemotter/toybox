@@ -28,6 +28,8 @@
   --plate: #F4FAFF;
   --focus: #2D5BD7;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --bh: 46px;
+  --chip: 46px;
   color-scheme: light;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
@@ -71,11 +73,7 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
-   The stage is the picture: draw with fingers and every line is copied round the middle (mirrored, with a soft
-   glow); a tap paints a little starburst; a tap on the middle knob starts or stops the slow spin. The panel: How
-   many (3, 4, 6, 8) and the colors (Rainbow + 3) as two rows of tiles, then the bottom bar (New, Surprise). */
-.tb-head a { text-decoration: none; }
+/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .stage {
   background: #FFFDF7;
   touch-action: none;
@@ -94,53 +92,278 @@ body {
 }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
-/* How many: a tiny kaleidoscope with that many slices and the number in the middle. */
-.tb-tilerow .tb-pic svg { width: 100%; height: 100%; display: block; overflow: visible; }
-/* A color tile: the fill is the paint; its word sits on a small white label so it reads on every color. */
-#paints .is-swatch .tb-tile-word { background: #FFFFFF; color: #1D2340; border-radius: 999px; padding: 0 5px; max-width: 100%; }
-#paints .is-swatch .tb-pic[hidden] { display: none; }
-/* Phone held sideways: a wider column, so four tiles fit a row at full size (the picture is limited by the height). */
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
+/* ---------- Panel: the picked tab's choices (every group on tablets), then the tab bar with Clear ---------- */
+.grp h2 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--muted);
 }
-/* iPad held sideways: two tiles a row in the side column. */
-@media (orientation: landscape) and (min-height: 521px) {
-  #counts.tb-tilerow, #paints.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Phones: one group of controls at a time, picked with the tabs. */
+.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+/* Five buttons share the phone tab bar: Surprise gets a little more room for its longer word. */
+.tb-tabs .btn.tb-surprise { flex: 1.3 1 0; }
+.panes.tb-choices { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
+.pane { grid-area: 1 / 1; visibility: hidden; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#panel[data-tab="draw"] [data-pane="draw"],
+#panel[data-tab="colors"] [data-pane="colors"],
+#panel[data-tab="effects"] [data-pane="effects"] { visibility: visible; }
+
+/* How many: big numbers with that many dots around them. */
+.counts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.count {
+  min-height: var(--bh);
+  height: var(--bh);
+  padding: 2px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+}
+.count svg { height: calc(var(--bh) - 12px); width: auto; max-width: 100%; display: block; overflow: visible; }
+.count .n { font-family: var(--font); font-weight: 800; fill: currentColor; }
+.count .d { fill: currentColor; opacity: 0.55; }
+.count[aria-pressed="true"] .d { fill: #E63946; opacity: 1; }
+
+/* Color: rainbow plus color chips. */
+.paints { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; justify-items: center; align-items: center; }
+.swatch {
+  width: var(--chip);
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--edge);
+  box-shadow: 2px 2px 0 var(--edge);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  transition: transform 0.08s ease;
+}
+.swatch:active { transform: scale(0.92); }
+.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; transform: scale(1.06); }
+.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
+.swatch.rainbow {
+  background: conic-gradient(#E63946, #F77F00, #FFC93C, #A7D129, #2E9E5B, #5BC0EB, #2D5BD7, #7B4FC9, #F26CA7, #E63946);
+  color: #1D2340;
+}
+.swatch .tick {
+  width: 58%;
+  height: 58%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
-/* ---------- Big mode: the header buttons and the panel go away; drawing goes on ---------- */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
+/* Brush: three sizes, a dot of each size above its name. */
+.sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.size {
+  min-width: 0;
+  min-height: var(--bh);
+  height: var(--bh);
+  padding: 0 2px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.size .szw { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.size .sz { flex: none; border-radius: 50%; background: currentColor; display: block; }
+
+/* Effects: on/off switches. ON is a green switch with the word "On" (not the yellow "picked" fill). */
+.fxs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.fxs .fx { grid-column: span 2; }
+.fxs .fx:nth-child(4) { grid-column: 2 / span 2; }
+.btn.fx {
+  min-width: 0;
+  min-height: 56px;
+  padding: 4px 2px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.95rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.btn.fx[aria-pressed="true"] { background: #DDF5E5; color: #1D2340; }
+.fx .top { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.fx svg { width: 20px; height: 20px; flex: none; display: block; }
+.fx .state { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 800; }
+.fx .sw {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: #C3CBDD;
+  border: 2.5px solid #1D2340;
+}
+.fx .sw::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 2px solid #1D2340;
+  box-sizing: border-box;
+  transition: left 0.15s ease;
+}
+.fx[aria-pressed="true"] .sw { background: #2E9E5B; }
+.fx[aria-pressed="true"] .sw::after { left: 15px; }
+
+/* ---------- Big mode: the panel goes away, the header stays (Big turns into Back) ---------- */
+body.big .tb-panel { display: none; }
 
 /* ---------- Timer bits on the picture (the shared toast and banner are moved into the stage) ---------- */
-.stage .toast { position: absolute; top: 14px; z-index: 4; }
-.stage .farewell { position: absolute; bottom: 16px; z-index: 4; }
-body.ending .tb-panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
+.stage .toast { position: absolute; top: 14px; z-index: 2; font-size: 1.3rem; }
+.stage .farewell { position: absolute; bottom: 16px; z-index: 2; }
+.stage .farewell p { font-size: 1.25rem; }
+body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 body.ending #view { cursor: default; }
 .rest-art { aspect-ratio: 1; }
+
+/* Short landscape phones. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --bh: 46px; --chip: 40px; }
+  .size { gap: 3px; font-size: 0.85rem; }
+  .size .szw { width: 16px; }
+}
+
+/* Tablets and desktop: bigger everything, every group shown with its heading (no tabs). */
+@media (min-width: 744px) and (min-height: 640px) {
+  :root { --bh: 66px; --chip: 58px; }
+  .tb-panel { gap: 12px; }
+  .tb-tabs .tab { display: none; }
+  .panes.tb-choices { display: flex; flex-direction: column; gap: 12px; }
+  .pane { visibility: visible; gap: 12px; }
+  .grp h2 { font-size: 1.1rem; margin-bottom: 6px; }
+  .counts, .paints, .sizes { gap: 10px; }
+  .count { border-radius: 16px; }
+  .size { font-size: 1.1rem; border-radius: 16px; }
+  .size .szw { width: 30px; height: 30px; }
+  .fxs { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .fxs .fx, .fxs .fx:nth-child(4) { grid-column: auto; }
+  .btn.fx { min-height: 72px; font-size: 1.1rem; gap: 6px; border-radius: 16px; }
+  .fx svg { width: 26px; height: 26px; }
+  .fx .state { font-size: 0.9rem; }
+  .fx .sw { width: 42px; height: 24px; }
+  .fx .sw::after { width: 16px; height: 16px; }
+  .fx[aria-pressed="true"] .sw::after { left: 19px; }
+  .swatch .tick { font-size: 1.4rem; }
+}
+/* Tablet portrait: How many and Brush share a row, then a row of colors, a row of effects, then Clear. */
+@media (min-width: 744px) and (min-height: 640px) and (orientation: portrait) {
+  .pane[data-pane="draw"] { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.25fr); gap: 14px; }
+  .paints { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .size { flex-direction: column; gap: 4px; font-size: 1rem; }
+  :root { --bh: 68px; }
+}
+/* Tablet landscape: the groups stacked in a tall side panel. */
+@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
+  .tb-body .tb-panel { width: min(40%, 470px); }
+  :root { --bh: 70px; --chip: 56px; }
+  /* Effects: three on top, two below, so each label has room. */
+  .fxs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .fxs .fx { grid-column: span 2; }
+  .fxs .fx:nth-child(4) { grid-column: 2 / span 2; }
+}
+@media (min-width: 1300px) and (min-height: 900px) {
+  :root { --bh: 80px; --chip: 66px; }
+}
+
+/* Phones: icon-only Home and Big; no headings that repeat the tab name. */
+@media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .grp-brush h2, .grp-colors h2, .grp-fx h2 { display: none; }
+  .size { gap: 4px; font-size: 0.9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch, .fx .sw::after { transition: none; }
+}
+/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
+.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
+.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ghosthand > svg { position: relative; }
+.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
+.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell tb-v2">
+<div class="tb-app-shell">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Kaleidoscope</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
+    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="view" role="img" aria-label="Drawing space. Draw with your fingers and every line is copied around the middle. Tap the middle to spin it."></canvas>
+      <canvas id="view" role="img" aria-label="Drawing space. Draw with your fingers and every line is copied around the middle."></canvas>
       <svg class="ring" id="ring" aria-hidden="true"></svg>
-      <div id="coach"></div>
     </main>
 
-    <section class="tb-panel" id="panel">
-      <div id="counts" role="group" aria-label="How many copies"></div>
-      <div id="paints" role="group" aria-label="Colors"></div>
-      <div id="bottom"></div>
+    <section class="tb-panel" id="panel" data-tab="draw">
+      <div class="panes tb-choices">
+        <div class="pane" data-pane="draw" id="pane-draw" role="tabpanel" aria-labelledby="tab-draw">
+          <section class="grp">
+            <h2>How many</h2>
+            <div class="counts" id="counts"></div>
+          </section>
+          <section class="grp grp-brush">
+            <h2>Brush</h2>
+            <div class="sizes">
+              <button class="btn size" data-size="small" aria-label="Small brush"><span class="szw"><span class="sz" style="width:8px;height:8px"></span></span><span class="lbl">Small</span></button>
+              <button class="btn size" data-size="medium" aria-label="Medium brush"><span class="szw"><span class="sz" style="width:14px;height:14px"></span></span><span class="lbl">Medium</span></button>
+              <button class="btn size" data-size="big" aria-label="Big brush"><span class="szw"><span class="sz" style="width:22px;height:22px"></span></span><span class="lbl">Big</span></button>
+            </div>
+          </section>
+        </div>
+        <div class="pane" data-pane="colors" id="pane-colors" role="tabpanel" aria-labelledby="tab-colors">
+          <section class="grp grp-colors">
+            <h2>Color</h2>
+            <div class="paints" id="paints"></div>
+          </section>
+        </div>
+        <div class="pane" data-pane="effects" id="pane-effects" role="tabpanel" aria-labelledby="tab-effects">
+          <section class="grp grp-fx">
+            <h2>Effects</h2>
+            <div class="fxs">
+            <button class="btn fx" data-toggle="mirror"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2v24" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 3"/><path d="M11 6 3 14l8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/><path d="M17 6l8 8-8 8z" fill="#5BC0EB" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Mirror</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="glow"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="#FFC93C" opacity="0.35"/><path d="M14 3l2.6 8.4L25 14l-8.4 2.6L14 25l-2.6-8.4L3 14l8.4-2.6z" fill="#FFF3B0" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Glow</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="spin"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 14a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg><span class="lbl">Spin</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="guides"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="2.5 3"><path d="M14 2v24M3.6 8l20.8 12M3.6 20 24.4 8"/></svg><span class="lbl">Lines</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            <button class="btn fx" data-toggle="dark"><span class="top"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M19 4.5A10 10 0 1 0 23.5 19 8 8 0 0 1 19 4.5z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Dark</span></span><span class="state"><span class="sw" aria-hidden="true"></span><span class="st">Off</span></span></button>
+            </div>
+          </section>
+        </div>
+      </div>
+      <nav class="tb-tabs" role="tablist" aria-label="Controls">
+        <button class="btn tab" role="tab" id="tab-draw" data-tab="draw" aria-controls="pane-draw">Draw</button>
+        <button class="btn tab" role="tab" id="tab-colors" data-tab="colors" aria-controls="pane-colors">Colors</button>
+        <button class="btn tab" role="tab" id="tab-effects" data-tab="effects" aria-controls="pane-effects">Effects</button>
+        <button class="btn tb-new" id="clearBtn">Clear</button>
+        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
+      </nav>
     </section>
   </div>
 </div>
+
 <script>
 (function () {
   "use strict";
@@ -150,9 +373,7 @@ body.ending #view { cursor: default; }
   // Timer, sound and Big are shared Toybox-wide (common/toybox.js); these old keys carry over once.
   var OLD_TKEY = "kaleido-timer-v1", OLD_SKEY = "kaleido-sound-v1", OLD_BKEY = "kaleido-big-v1";
   var OUT = "#1D2340";
-  var COUNTS = [2, 3, 4, 6, 8, 12];  // every count an old save may hold
-  var TILE_COUNTS = [3, 4, 6, 8];      // the ones he picks from (an old 2 or 12 becomes the nearest)
-  var PAINTS = ["Rainbow", "Red", "Blue", "Green"];
+  var COUNTS = [2, 3, 4, 6, 8, 12];
   var PALETTE = [
     ["Red", "#E63946"], ["Orange", "#F77F00"], ["Yellow", "#FFC93C"], ["Lime", "#A7D129"],
     ["Green", "#2E9E5B"], ["Sky", "#5BC0EB"], ["Blue", "#2D5BD7"], ["Purple", "#7B4FC9"],
@@ -180,7 +401,7 @@ body.ending #view { cursor: default; }
     try { localStorage.removeItem(KEY); localStorage.removeItem(AKEY); } catch (e) { /* ignore */ }
   }
   function freshState() {
-    return { count: 6, mirror: true, paint: "Rainbow", glow: true, size: "medium", dark: false, spin: false, guides: false };
+    return { count: 6, mirror: true, paint: "Rainbow", glow: false, size: "medium", dark: false, spin: false, guides: false };
   }
   function loadState() {
     var s = freshState();
@@ -190,15 +411,11 @@ body.ending #view { cursor: default; }
         if (COUNTS.indexOf(o.count) !== -1) s.count = o.count;
         if (o.paint === "Rainbow" || HEX[o.paint]) s.paint = o.paint;
         if (Object.prototype.hasOwnProperty.call(SIZES, o.size)) s.size = o.size;
-        if (typeof o.spin === "boolean") s.spin = o.spin;
+        ["mirror", "glow", "dark", "spin", "guides"].forEach(function (k) {
+          if (typeof o[k] === "boolean") s[k] = o[k];
+        });
       }
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
-    // Only these choices are left (the saved format keeps every field): How many 3/4/6/8, Rainbow + 3 colors,
-    // the medium brush, Mirror and Glow always on, the light paper, no guide lines.
-    if (s.count === 2) s.count = 3;
-    if (s.count === 12) s.count = 8;
-    if (PAINTS.indexOf(s.paint) === -1) s.paint = "Rainbow";
-    s.size = "medium"; s.mirror = true; s.glow = true; s.dark = false; s.guides = false;
     return s;
   }
   function save() {
@@ -206,24 +423,58 @@ body.ending #view { cursor: default; }
   }
   var state = loadState();
 
-  // ---------- Panel: How many and the colors (tiles), New and Surprise ----------
-  // A tiny kaleidoscope with n slices and the number in the middle (the count he chooses stays a number).
-  function countPic(n) {
-    var sv = '<svg viewBox="-30 -30 60 60" aria-hidden="true">', i, a0, a1, cols = ["#FF6B8A", "#FFC93C", "#4CD964", "#3DB4FF", "#8E6CFF", "#FF9A4D"];
+  // ---------- Controls ----------
+  COUNTS.forEach(function (n) {
+    var b = document.createElement("button");
+    b.className = "btn count";
+    b.dataset.count = String(n);
+    b.setAttribute("aria-label", n + " copies");
+    var dots = "", i, a, rr = n > 8 ? 2.2 : 2.8;
     for (i = 0; i < n; i++) {
-      a0 = -Math.PI / 2 + i * 2 * Math.PI / n; a1 = a0 + 2 * Math.PI / n;
-      sv += '<path d="M0 0L' + (27 * Math.cos(a0)).toFixed(2) + " " + (27 * Math.sin(a0)).toFixed(2) + "A27 27 0 0 1 " +
-        (27 * Math.cos(a1)).toFixed(2) + " " + (27 * Math.sin(a1)).toFixed(2) + 'Z" fill="' + cols[i % cols.length] + '" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/>';
+      a = -Math.PI / 2 + i * 2 * Math.PI / n;
+      dots += '<circle class="d" cx="' + (25 * Math.cos(a)).toFixed(2) + '" cy="' + (25 * Math.sin(a)).toFixed(2) + '" r="' + rr + '"/>';
     }
-    return sv + '<circle r="12" fill="#FFFFFF" stroke="#1D2340" stroke-width="2"/><text x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="800" font-family="Baloo 2, Trebuchet MS, sans-serif" fill="#1D2340">' + n + "</text></svg>";
-  }
-  var RAINBOW_CSS = "conic-gradient(#E63946, #F77F00, #FFC93C, #A7D129, #2E9E5B, #5BC0EB, #2D5BD7, #7B4FC9, #F26CA7, #E63946)";
-  var countTiles = null, paintTiles = null;
+    b.innerHTML = '<svg viewBox="-30 -30 60 60" aria-hidden="true">' + dots +
+      '<text class="n" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="' + (n > 9 ? 25 : 30) + '">' + n + "</text></svg>";
+    $("counts").appendChild(b);
+  });
+  (function () {
+    var b = document.createElement("button");
+    b.className = "swatch rainbow";
+    b.dataset.paint = "Rainbow";
+    b.setAttribute("aria-label", "Rainbow");
+    b.title = "Rainbow";
+    $("paints").appendChild(b);
+    PALETTE.forEach(function (p) {
+      var c = document.createElement("button");
+      c.className = "swatch";
+      c.dataset.paint = p[0];
+      c.style.background = p[1];
+      c.style.color = isDark(p[1]) ? "#FFFFFF" : "#1D2340";
+      c.setAttribute("aria-label", p[0]);
+      c.title = p[0];
+      $("paints").appendChild(c);
+    });
+  })();
 
   function renderControls() {
-    if (countTiles) countTiles.set(String(state.count));
-    if (paintTiles) paintTiles.set(state.paint);
-    $("stage").style.background = BG.light;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-count]"), function (b) {
+      b.setAttribute("aria-pressed", String(Number(b.dataset.count) === state.count));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-paint]"), function (b) {
+      var on = b.dataset.paint === state.paint;
+      b.setAttribute("aria-pressed", String(on));
+      b.innerHTML = on ? '<span class="tick"' + (b.dataset.paint === "Rainbow" ? ' style="background:#FFFFFF"' : "") + ">✓</span>" : "";
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.size === state.size));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-toggle]"), function (b) {
+      var on = !!state[b.dataset.toggle];
+      b.setAttribute("aria-pressed", String(on));
+      b.querySelector(".st").textContent = on ? "On" : "Off";
+    });
+    $("stage").style.background = state.dark ? BG.dark : BG.light;
     dirty = true;
     save();
   }
@@ -305,7 +556,7 @@ body.ending #view { cursor: default; }
     var flips = state.mirror ? [1, -1] : [1];
     // Glow: soft additive halos (they brighten where they cross), then a bright solid core on top.
     var passes = state.glow
-      ? [[3.4, colorFor(p, 0.07, 62), "source-over"], [2.0, colorFor(p, 0.12, 60), "source-over"], [1, colorFor(p, 1), "source-over"]]
+      ? [[3.6, colorFor(p, 0.045, 55), "lighter"], [2.0, colorFor(p, 0.09, 58), "lighter"], [0.7, colorFor(p, 1, 80), "source-over"]]
       : [[1, colorFor(p, 1), "source-over"]];
     actx.lineCap = "round";
     actx.lineJoin = "round";
@@ -337,70 +588,125 @@ body.ending #view { cursor: default; }
 
   function localXY(e) { return { x: e.clientX - viewRect.left, y: e.clientY - viewRect.top }; }
 
-  function playing() { return !Toybox.timer.locked(); }
-
-  // ---------- Coach and ghost hand ----------
-  var coach = Toybox.coach($("coach"));
-  var spinHinted = false, spinHintT = 0;
-  // Idle help: on an empty picture the hand taps it first (a tap paints a starburst), then draws a wavy line on
-  // its next showing; once he has drawn, it taps the knob in the middle (a tap there starts the spin).
-  var ghost = Toybox.ghost({
-    max: 2,
-    plan: function () {
-      if (moment || wipe) return null;
-      var r = view.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, RR = Math.min(r.width, r.height) * 0.32, pts = [];
-      if (!hasInk) {
-        if (ghost.shown("draw") < 1) return { pts: [[cx + RR * 0.5, cy - RR * 0.45]], tap: true, key: "draw" };
-        for (var i = 0; i <= 16; i++) { var t = i / 16; pts.push([cx - RR + 2 * RR * t, cy - RR * 0.55 + Math.sin(t * Math.PI * 2) * RR * 0.25]); }
-        return { pts: pts, key: "line" };
+  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
       }
-      if (state.spin) return null;
-      return { pts: [[cx, cy]], tap: true, key: "spin" };
+      return pts[pts.length - 1];
     }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // Page px of a point inside an element, as fractions of its box.
+  function ghostPt(elm, fx, fy) {
+    var r = elm.getBoundingClientRect();
+    return [r.left + r.width * fx, r.top + r.height * fy];
+  }
+  function playing() { return !Toybox.timer.locked(); }
+  // Idle help: on an empty picture, the ghost hand draws one wavy line.
+  var ghost = makeGhost(function () {
+    if (hasInk) return null;
+    var r = view.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = Math.min(r.width, r.height) * 0.32, pts = [];
+    for (var i = 0; i <= 16; i++) { var t = i / 16; pts.push([cx - R + 2 * R * t, cy - R * 0.55 + Math.sin(t * Math.PI * 2) * R * 0.25]); }
+    return { pts: pts };
   });
-  function drewSomething() {
-    ghost.learned("draw"); ghost.learned("line");
-    if (spinHinted || state.spin) return;
-    spinHinted = true;
-    coach.clear();
-    // once, a little later: the knob in the middle spins the picture
-    spinHintT = setTimeout(function () { if (!state.spin && playing()) coach.say("Tap the middle to spin it!", 6); }, 7000);
-  }
-
-  // ---------- The knob in the middle: a tap starts or stops the slow spin ----------
-  function hubR() { return clamp(R * 0.1, 22, 38); }
-  function onHub(q) { return Math.hypot(q.x - W / 2, q.y - H / 2) < Math.max(hubR() + 14, 46); }
-  function toggleSpin() {
-    state.spin = !state.spin;
-    clearTimeout(spinHintT);
-    ghost.learned("spin");
-    coach.say(state.spin ? "Round and round!" : "It stopped.", 3);
-    whooshSound();
-    renderControls();
-  }
-
-  // ---------- A tap paints a starburst: short rays all round the dot, copied like every line ----------
-  function starburst(p, x, y) {
-    var k = artSide / (2 * A), r0 = 0.035 * k * sizeScale(), r1 = 0.085 * k * sizeScale(), path = new Path2D(), i, a;
-    for (i = 0; i < 8; i++) {
-      a = i * Math.PI / 4 + (p.hue % 45) * Math.PI / 180;
-      path.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
-      path.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
-    }
-    strokeAll(path, baseWidth() * 0.6, p);
-  }
-  function firstDot(p) {
-    var path = new Path2D();
-    path.moveTo(p.lx, p.ly);
-    path.lineTo(p.lx + 0.01, p.ly);
-    strokeAll(path, baseWidth() * p.pr, p);
-  }
 
   view.addEventListener("pointerdown", function (e) {
     if (!playing()) return;
-    if (Toybox.isPalm && Toybox.isPalm(e)) return;
     e.preventDefault();
     if (moment) finishMoment();
+    ghost.learned();
     try { view.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     var r = view.getBoundingClientRect();
     viewRect = { left: r.left, top: r.top };
@@ -408,16 +714,15 @@ body.ending #view { cursor: default; }
     var p = {
       sx: q.x, sy: q.y, pr: pressureOf(e), q: [],
       lx: pt.x, ly: pt.y, mx: pt.x, my: pt.y,
-      hue: nextHue, note: -1,
-      x0: q.x, y0: q.y, t0: performance.now(), moved: 0,
-      // On the knob: wait and see (a tap spins, a drag draws from here)
-      pend: onHub(q)
+      hue: nextHue, note: -1
     };
     nextHue = (nextHue + 47) % 360;
     pointers[e.pointerId] = p;
-    if (p.pend) return;
-    // A dot right away, so every touch paints.
-    firstDot(p);
+    // A dot right away, so a tap paints too.
+    var path = new Path2D();
+    path.moveTo(pt.x, pt.y);
+    path.lineTo(pt.x + 0.01, pt.y);
+    strokeAll(path, baseWidth() * p.pr, p);
     addRipple(q.x, q.y, p);
     toneFor(p, q.x, q.y);
     dirty = true;
@@ -427,21 +732,13 @@ body.ending #view { cursor: default; }
     var p = pointers[e.pointerId];
     if (!p) return;
     e.preventDefault();
-    var last = localXY(e);
-    p.moved = Math.max(p.moved, Math.hypot(last.x - p.x0, last.y - p.y0));
-    if (p.pend) {
-      if (p.moved < 12) return;
-      // It is a drag after all: it draws from where it started.
-      p.pend = false;
-      firstDot(p);
-      addRipple(p.x0, p.y0, p);
-    }
     var list = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
     if (!list.length) list = [e];
     list.forEach(function (ce) {
       var q = localXY(ce);
       p.q.push(q.x, q.y, pressureOf(ce));
     });
+    var last = localXY(e);
     p.sx = last.x; p.sy = last.y;
     toneFor(p, last.x, last.y);
   });
@@ -449,14 +746,9 @@ body.ending #view { cursor: default; }
   function endPointer(e) {
     var p = pointers[e.pointerId];
     if (!p) return;
-    delete pointers[e.pointerId];
-    var tap = e.type === "pointerup" && p.moved < 12 && performance.now() - p.t0 < 600;
-    if (p.pend) { if (tap && playing()) toggleSpin(); return; }
     flushPointer(p, true);
-    if (tap && playing()) starburst(p, p.lx, p.ly);
-    drewSomething();
+    delete pointers[e.pointerId];
     scheduleSave();
-    dirty = true;
   }
   view.addEventListener("pointerup", endPointer);
   view.addEventListener("pointercancel", endPointer);
@@ -468,7 +760,6 @@ body.ending #view { cursor: default; }
   // Turns this pointer's new samples into one smooth curve (midpoint quadratic smoothing) and paints it.
   // While the picture spins, a finger held still keeps painting circles.
   function flushPointer(p, finish) {
-    if (p.pend) return;
     var samples = p.q;
     p.q = [];
     if (!samples.length) {
@@ -629,28 +920,15 @@ body.ending #view { cursor: default; }
     if (drawWipe(now)) busy = true;
     if (drawRipples(now)) busy = true;
     vctx.restore();
-    if (!moment && playing()) drawHub();
+    if (!hasInk && !wipe && !moment && playing()) {
+      // Empty picture: a little hint in the middle.
+      vctx.fillStyle = state.dark ? "rgba(255,255,255,0.45)" : "rgba(29,35,64,0.38)";
+      vctx.textAlign = "center";
+      vctx.textBaseline = "middle";
+      vctx.font = "800 " + Math.round(clamp(R * 0.11, 18, 40)) + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+      vctx.fillText("Draw with your fingers!", W / 2, H / 2);
+    }
     return busy;
-  }
-
-  // The knob in the middle (the pin the picture turns on): a white button with a turning arrow that turns with it.
-  function drawHub() {
-    var hr = hubR(), c = vctx;
-    c.save();
-    c.translate(W / 2, H / 2);
-    c.beginPath(); c.arc(1, 2.5, hr, 0, 2 * Math.PI); c.fillStyle = "rgba(29,35,64,0.18)"; c.fill();
-    c.beginPath(); c.arc(0, 0, hr, 0, 2 * Math.PI);
-    c.fillStyle = state.spin ? "#FFC93C" : "#FFFFFF"; c.fill();
-    c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
-    c.rotate(angle);
-    c.lineWidth = Math.max(2.5, hr * 0.16); c.lineCap = "round"; c.lineJoin = "round";
-    c.beginPath(); c.arc(0, 0, hr * 0.52, -Math.PI * 0.85, Math.PI * 0.55); c.stroke();
-    // arrowhead at the end of the arc, pointing the way it turns
-    var ea = Math.PI * 0.55, rr = hr * 0.52, ex = Math.cos(ea) * rr, ey = Math.sin(ea) * rr, s2 = hr * 0.3;
-    var tx = -Math.sin(ea), ty = Math.cos(ea), nx = Math.cos(ea), ny = Math.sin(ea);
-    c.beginPath(); c.moveTo(ex + tx * s2, ey + ty * s2); c.lineTo(ex + nx * s2 * 0.8, ey + ny * s2 * 0.8); c.lineTo(ex - nx * s2 * 0.8, ey - ny * s2 * 0.8); c.closePath();
-    c.fillStyle = OUT; c.fill(); c.stroke();
-    c.restore();
   }
 
   // ---------- Saving the drawing ----------
@@ -700,7 +978,6 @@ body.ending #view { cursor: default; }
       actx.globalCompositeOperation = "source-over";
       hasInk = true;
       dirty = true;
-      if (coach) coach.clear();
     };
     img.src = o.img;
   }
@@ -763,23 +1040,26 @@ body.ending #view { cursor: default; }
     });
   }
 
-  // ---------- Panel ----------
-  countTiles = Toybox.tiles($("counts"), {
-    items: TILE_COUNTS.map(function (n) { return { id: String(n), name: n + " copies", pic: countPic(n) }; }),
-    value: String(state.count), kind: "pick", rows: 1,
-    onPick: function (id) { if (!playing()) return; state.count = Number(id); renderControls(); }
-  });
-  paintTiles = Toybox.tiles($("paints"), {
-    items: PAINTS.map(function (n) { return { id: n, name: n, color: n === "Rainbow" ? RAINBOW_CSS : HEX[n] }; }),
-    value: state.paint, kind: "swatch", rows: 1,
-    onPick: function (id) { if (!playing()) return; state.paint = id; renderControls(); }
-  });
-  function startOver() {
+  // ---------- Buttons ----------
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    // Big, the banner and the rest screen belong to the shared module (common/toybox.js).
+    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
     if (!playing()) return;
-    clearPicture();
-    coach.say("Draw something new!", 3);
-  }
-  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: function () { surprise(); } });
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.dataset.count) { state.count = Number(t.dataset.count); }
+    else if (t.dataset.paint) { state.paint = t.dataset.paint; }
+    else if (t.dataset.size) { state.size = t.dataset.size; }
+    else if (t.dataset.toggle) {
+      var k = t.dataset.toggle;
+      state[k] = !state[k];
+      if (k === "glow" && state.glow) state.dark = true;   // glow shines best in the dark
+    }
+    else if (t.id === "clearBtn") { clearPicture(); return; }
+    else return;
+    renderControls();
+  });
 
   // ---------- Frame loop ----------
   var last = performance.now();
@@ -930,6 +1210,7 @@ body.ending #view { cursor: default; }
   }
   // A touch (or the timer) ends the moment: it fades straight back to his picture.
   function finishMoment() { if (moment) { if (moment.src) { moment.src.width = 0; moment.src.height = 0; } moment = null; dirty = true; } }
+  $("surpriseBtn").addEventListener("click", surprise);
   // A gentle rainbow flower in the picture's own symmetry, drawn on a canvas of its own.
   function examplePic() {
     var c = makeCanvas(artSide), g = c.getContext("2d"), n = state.count, k = artSide / (2 * A), cx = artSide / 2, i, j;
@@ -1015,8 +1296,16 @@ body.ending #view { cursor: default; }
     vctx.globalAlpha = base;
   }
 
+  function showTab(name) {
+    $("panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(b.dataset.tab === name));
+    });
+  }
+
   // ---------- Start ----------
   if (reduce && state.spin) state.spin = false;
+  showTab("draw");
   resize();
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
   window.addEventListener("resize", resize);
@@ -1051,7 +1340,6 @@ body.ending #view { cursor: default; }
   });
   $("stage").appendChild($("tb-toast"));
   $("stage").appendChild($("tb-farewell"));
-  if (!hasInk) coach.step("Draw with your fingers!");
   requestAnimationFrame(frame);
 })();
 </script>
