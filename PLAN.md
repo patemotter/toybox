@@ -96,9 +96,11 @@ ending with open questions for the dad; settle those before building.
 - **Garbage Truck:** the side-loader arm grabs a bin, tips it into the hopper, the packer squashes the load, the
   load slides out at the depot.
 - **Forklift:** forks under a pallet, raise the mast, load a truck; could be a Construction Site station.
-- **Farm (phase 1 done 2026-10-09: map + the field station (being replaced by "Spuds in Mud" and joined by "Combine Time": every station is a newer-series episode he knows) + `farm/farm.js`, green tractor with grey hubs):** the
-  machines and their jobs, like *Tractor Ted* (the dad: no milking or animal chores): field work,
-  combine, hay and bales, silage, muck spreading; see `plans/farm.md` section 0.
+- **Farm (done 2026-10-10):** 12 stations, one per newer-series episode he knows (list in AGENTS.md §2), all on the
+  farm map; plans in `plans/farm.md` section 0 and `plans/farm-episodes.md`. Look at again with the dad: job lengths
+  (most 20-32 s), the open questions each station's notes list below, and the small wide views on phones held sideways.
+- **On hold (the dad, 2026-10-10: "wait on the new apps"):** Garbage Truck, Sewing Machine, Play Dough. Plans stay in
+  `plans/`; don't build them until he says so.
 - **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
   thread, guiding the fabric, making something.
 - **Play Dough Factory:** squish, roll and cut dough, an extruder press with dies.
@@ -118,7 +120,7 @@ works, simple machines, word crane, coin machine). The dad: he likes learning, b
 a 3-year-old, placement, one meaning per color, words, a cleaner chrome) and the per-page migration. The dad
 approved it as proposed ("do what you think"); **revisit it with him after he has played the redesigned apps.**
 Rollout: batch 0 (tokens + shared components in `common/`, Concrete as the pilot; **done 2026-10-09**), then batches 1-7 of at most three
-agents (see its section 4). New apps (Garbage Truck, Sewing Machine, Play Dough, more Farm stations) follow the
+agents (see its section 4; **all done 2026-10-10**). New apps (Garbage Truck, Sewing Machine, Play Dough, more Farm stations) follow the
 system and its section 5 cuts.
 
 ---

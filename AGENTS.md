@@ -52,9 +52,15 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Multi-page apps: `workshop/` (Workshop map + one-tap gear-up `index.html`, the Tool Wall station `tool-wall.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
-  and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + `spuds` ("Spuds in Mud"), `combine`
-  ("Combine Time"); `field.html` only redirects to spuds), more stations per `plans/farm.md`; shared code in `farm/farm.js`, documented in its header, world state in
-  `farm-world-v1`).
+  and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + one station per newer-series episode he knows: `spuds` ("Spuds in Mud"), `combine` ("Combine
+  Time": Wheat | Sunflowers, the Sunny Seeds episode), `bales` ("Brilliant Baler": Hay | Haylage), `silage` ("Glorious
+  Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
+  ("Timberrrrr!": Logs | Chipper), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
+  parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
+  Hunt"); `field.html` only redirects to spuds. Each station: a step row (plus a job bar where the episode has two
+  jobs), a split stage on tall screens (the whole rig on top, a close-up of the work happening now below). Shared
+  code in `farm/farm.js` (`Farm.NAMES`, scene, tractor, combine, telehandler, cow...), documented in its header,
+  world state in `farm-world-v1`; a map lot is one `STATIONS` entry in `farm/index.html`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
   train-builder, farm.
