@@ -67,68 +67,42 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
+/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
+   The stage is the cage: tap the wheel, the food, the water, the house or the hamster. The panel is the green
+   Go "Treat!" (its picture is the next treat) and the bottom bar (Surprise only: there is nothing to start over). */
 .scene { background: #FFE3BD; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .scene .tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; pointer-events: none; }
-
-/* Panel: the green Treat! button, then the tab bar with Surprise. */
-.btn.tb-go { display: flex; align-items: center; justify-content: center; gap: 10px; }
-.tb-go svg { width: 40px; height: 40px; flex: none; overflow: visible; }
-.tb-tabs .btn.tb-surprise { font-size: 1.15rem; }
 body.big .tb-panel { display: none; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
-.tb-go.pop svg { animation: treatPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+#go .tb-pic svg { overflow: visible; }
+#go.pop .tb-pic { animation: treatPop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes treatPop { 0% { transform: scale(0.4) rotate(-30deg); } 100% { transform: none; } }
-
-@media (orientation: landscape) {
-  .tb-body .tb-panel { width: clamp(150px, 20vw, 240px); }
-  .btn.tb-go { flex: 1 1 auto; max-height: 230px; flex-direction: column; gap: 2px; }
-  .tb-go svg { width: clamp(40px, 11vh, 84px); height: clamp(40px, 11vh, 84px); }
-  .tb-tabs { margin-top: auto; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .btn.tb-go { max-height: 160px; }
-}
-@media (min-width: 700px) and (min-height: 700px) {
-  .tb-tabs .btn.tb-surprise { font-size: 1.3rem; }
-  .tb-go svg { width: 52px; height: 52px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tb-go.pop svg { animation: none; }
-}
+@media (orientation: landscape) { .tb-v2 .tb-body .tb-panel { justify-content: space-between; } }
+@media (prefers-reduced-motion: reduce) { #go.pop .tb-pic { animation: none; } }
 
 /* Rest picture: the hamster asleep in its little house (the rest screen itself is in common/toybox.css). */
 .rest-art { border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-
-/* Ghost hand: a see-through hand that shows the main move once (tools/snippets/ghost-hand.css). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell">
+<div class="tb-app-shell tb-v2">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Hamster</h1>
-    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage scene" id="scene">
       <canvas id="cv" aria-label="A hamster in its cage with a wheel, a food bowl, a water bottle and a little house"></canvas>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" hidden></svg>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap the wheel!</div>
+      <div id="coach"></div>
     </main>
 
     <section class="tb-panel">
-      <button class="btn tb-go" id="treatBtn"><svg id="treatPic" viewBox="-30 -30 60 60" aria-hidden="true"></svg><span>Treat!</span></button>
-      <nav class="tb-tabs">
-        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
-      </nav>
+      <div id="go"></div>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
@@ -202,6 +176,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var tall = Lt * 1.15 > Lw;
     var L = Math.max(22, Math.min(tall ? Lt : Lw, 150));
     var g = { W: W, H: H, L: L, tall: tall, lw: Math.max(2, Math.min(5, L * 0.045)) };
+    // On upright phones the cage's width sets L and the hamster came out small: draw him a fifth bigger there
+    // (he still fits the tube, the house door and the wheel). HL is the hamster's own size.
+    g.hs = tall && W <= 500 ? 1.2 : 1; g.HL = L * g.hs;
     g.tr = 0.46 * L;
     g.floorY = H - 0.85 * L;
     g.cageX0 = Math.max(6, W * 0.012); g.cageX1 = W - g.cageX0;
@@ -232,7 +209,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     g.topY = tall ? H * 0.03 : Math.max(H * 0.03, w.y - R - 0.45 * L);
     var n = localNose(DRINK_REAR);
     g.bottle.tipX = g.bottle.x + 0.07 * L;
-    g.bottle.tipY = g.floorY + n.y * L - 0.03 * L;
+    g.bottle.tipY = g.floorY + n.y * g.HL - 0.03 * L;
     g.bottle.capY = g.bottle.tipY - 0.42 * L;
     g.bottle.bodyB = g.bottle.capY - 0.12 * L;
     g.bottle.bodyT = g.bottle.bodyB - 1.25 * L;
@@ -806,7 +783,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     ctx.restore();
   }
   function drawHamster() {
-    var L = G.L, o = G.lw / L, p = P;
+    var L = G.HL, o = G.lw / L, p = P;
     var rear = ham.rearS, curl = ham.curlS;
     ctx.save();
     ctx.translate(ham.x, ham.y - p.lift * L);
@@ -917,7 +894,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   // The middle of the hamster's body in stage px (for taps, hearts and the trail).
   function hamCenter() {
-    var L = G.L, k = ham.where === "house" ? 0.94 : 1, lx = 0.05, ly = -(0.36 + 0.15 * ham.rearS) * k;
+    var L = G.HL, k = ham.where === "house" ? 0.94 : 1, lx = 0.05, ly = -(0.36 + 0.15 * ham.rearS) * k;
     var c = Math.cos(ham.th), s = Math.sin(ham.th), wx = ham.f * L * lx, wy = L * ly;
     return { x: ham.x + wx * c - wy * s, y: ham.y + wx * s + wy * c - P.lift * L };
   }
@@ -968,7 +945,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function spotWheel(side) { return { lvl: G.wheel.lvl, x: clampX(G.wheel.lvl, G.wheel.x + side * 0.62 * G.wheel.R), f: -side }; }
   function spotBowl(side) { return { lvl: "floor", x: clampX("floor", G.bowl.x + side * 1.08 * G.L), f: -side }; }
-  function spotWater(side) { var f = -side, n = localNose(DRINK_REAR); return { lvl: "floor", x: clampX("floor", G.bottle.tipX - f * n.x * G.L), f: f }; }
+  function spotWater(side) { var f = -side, n = localNose(DRINK_REAR); return { lvl: "floor", x: clampX("floor", G.bottle.tipX - f * n.x * G.HL), f: f }; }
   function spotBed() { return { lvl: "floor", x: clampX("floor", G.bed.x) }; }
   function anchorOf(spotFn) { return function () { var s = spotFn(); return { x: s.x, y: surfY(s.lvl), f: s.f, lvl: s.lvl }; }; }
 
@@ -1402,6 +1379,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function grabScoop(x, y) {
     if (scoop.state !== "home" || ending) return false;
     tried.bag = true; items.bag.b = 1; sTap();
+    if (ghost) { ghost.learned("bag"); ghost.learned("bagdrag"); }
     scoop.state = "drag"; scoop.full = true; scoop.x = x; scoop.y = y; scoop.tilt = 0; scoop.t = 0; scoop.moved = 0; scoop.gx = x; scoop.gy = y;
     return true;
   }
@@ -1481,7 +1459,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (live.length >= 6) { items.bowl.b = 0.3; return; }
     var kind = TREATS[treatIdx % TREATS.length]; treatIdx++;
     drawTreatPic();
-    var btn = $("treatBtn"); btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop");
+    var btn = go.el; btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop");
     var u, tries = 0;
     do {
       u = rand(0.05, 0.95); tries++;
@@ -1578,7 +1556,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function inRect(x, y, x0, y0, x1, y1) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
   function hitTest(x, y) {
     var L = G.L, c = hamCenter(), pad = 0.2 * L;
-    if (Math.hypot(x - c.x, y - c.y) < 0.62 * L && ham.where !== "house") return "pet";
+    if (Math.hypot(x - c.x, y - c.y) < 0.62 * G.HL && ham.where !== "house") return "pet";
     var g = G.bag;
     if (inRect(x, y, g.x - 0.75 * L, g.y - 0.45 * L, g.x + 0.85 * L, g.ledge + 0.3 * L)) return "bag";
     var b = G.bottle;
@@ -1632,7 +1610,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
     if (what === "wheel") {
       tried.wheel = true; items.wheel.b = 1; sTap();
-      ghost.learned();
+      ghost.learned("wheel");
       // winding down after super duper fast: the taps sparkle, and the dizzy, proud finish still plays
       if (ham.wasSuper && ham.act && ((ham.act.name === "wheel" && ham.act.after) || ham.act.name === "hop")) {
         for (var j = 0; j < 3; j++) spawn("spark", G.wheel.x + rand(-1, 1) * G.wheel.R, G.wheel.y + rand(-1, 1) * G.wheel.R, { life: 0.7 });
@@ -1682,8 +1660,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function up(e) { var p = ptrs[e.pointerId]; if (p && p.scoop) releaseScoop(); delete ptrs[e.pointerId]; }
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
-  $("treatBtn").addEventListener("click", function () { if (!(window.Toybox && Toybox.timer.locked())) dropTreat(); });
-  $("surpriseBtn").addEventListener("click", function () { if (!(window.Toybox && Toybox.timer.locked())) surprise(); });
+  // ---------- Panel: Go "Treat!" and the bottom bar (Surprise) ----------
+  var go = Toybox.go($("go"), {
+    label: "Treat!", icon: '<svg viewBox="-30 -30 60 60">' + treatSVG(TREATS[0]) + "</svg>",
+    onPress: function () { if (ending) return false; dropTreat(); }
+  });
+  Toybox.bar($("bottom"), { onNew: null, onSurprise: function () { surprise(); } });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -1695,10 +1677,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (k === "carrot") return '<g stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"><ellipse cx="-17" cy="-14" rx="4" ry="9" transform="rotate(-35 -17 -14)" fill="#4CC76A"/><ellipse cx="-11" cy="-18" rx="4" ry="8" fill="#4CC76A"/><path d="M-18 -10 Q-16 10 -4 12 L22 4 Q2 -18 -18 -10Z" fill="#FF8A2B"/></g>';
     return '<circle cx="0" cy="2" r="17" fill="#4F6BDE" stroke="#1D2340" stroke-width="3.5"/><path d="M0 -15 L3 -10 L8 -11 L5 -7 L7 -3 L0 -6 L-7 -3 L-5 -7 L-8 -11 L-3 -10Z" fill="#2B3A8F"/><circle cx="-6" cy="-3" r="3.5" fill="#FFFFFF" opacity="0.75"/>';
   }
-  function drawTreatPic() { $("treatPic").innerHTML = treatSVG(TREATS[treatIdx % TREATS.length]); }
+  function drawTreatPic() { if (go) go.set("Treat!", '<svg viewBox="-30 -30 60 60">' + treatSVG(TREATS[treatIdx % TREATS.length]) + "</svg>"); }
 
   // ---------- Coach line and ghost hand ----------
-  var coachEl = $("coach"), coachShown = "";
+  var coach = Toybox.coach($("coach")), coachShown = "";
   function coachText() {
     if (clock < superMsgUntil) return "Super duper fast!";
     if (food < 0.04 && scoop.state === "home" && !pour) return "Fill the food bowl!";
@@ -1714,112 +1696,26 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function updateCoach() {
     var t = coachText();
-    if (t) { if (t !== coachShown) coachEl.textContent = t; coachEl.classList.remove("off"); }
-    else coachEl.classList.add("off");
+    if (t !== coachShown) { if (t) coach.step(t); else coach.clear(); }
     coachShown = t;
-  }
-  // ---------- Ghost hand (same look in every app; tools/snippets/ghost-hand.js) ----------
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
   }
   function pagePt(x, y) { var r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; }
   // The hand shows the wheel; while the bowl is empty (and he has never filled it) it shows the food bag.
-  var ghost = makeGhost(function () {
-    if (!G) return null;
-    if (food < 0.04 && !tried.bag && scoop.state === "home") { var sh = scoopHome(), pp = pourSpot(); return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L), pagePt(pp.x, pp.y + 0.45 * G.L)], dur: 3400 }; }
-    if (!tried.wheel) return { pts: [pagePt(G.wheel.x + 0.3 * G.wheel.R, G.wheel.y - 0.45 * G.wheel.R)], tap: true };
-    return null;
-  }, { max: 3, ok: function () { return !ending; } });
+  // The hand taps the wheel; while the bowl is empty (and he has never filled it) it taps the food jar (the scoop
+  // then pours by itself), and on a later showing carries the scoop to the bowl.
+  var ghost = Toybox.ghost({
+    max: 3,
+    plan: function () {
+      if (!G || ending) return null;
+      if (food < 0.04 && !tried.bag && scoop.state === "home") {
+        var sh = scoopHome(), pp = pourSpot();
+        if (ghost.shown("bag") < 1) return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L)], tap: true, key: "bag" };
+        return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L), pagePt(pp.x, pp.y + 0.45 * G.L)], dur: 3400, key: "bagdrag" };
+      }
+      if (!tried.wheel) return { pts: [pagePt(G.wheel.x + 0.3 * G.wheel.R, G.wheel.y - 0.45 * G.wheel.R)], tap: true, key: "wheel" };
+      return null;
+    }
+  });
 
   // ---------- Sound (off by default; soft and synthesized) ----------
   var master = null, masterCtx = null, noiseBuf = null;
