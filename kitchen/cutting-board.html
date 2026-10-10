@@ -770,14 +770,98 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     arrive(id);
     tone(500, 0.2, 0.04, "sine", 300);
   }
-  // Cutting Board moments: a little mouse peeks over the board, sniffs the food and scurries off.
-  var FUN_ORDER = ["mouse"];
-  function funOk(id) { return true; }
+  // Cutting Board moments: a little mouse peeks over the board, sniffs the food and scurries off; the cut
+  // pieces hop into a shape, a letter or a number and back (never a face).
+  var FUN_ORDER = ["mouse", "shape"];
+  function shapePieces() { return cur && !cur.flying && !cur.f.apple && cur.order.length && cur.pieces.length >= 3 ? cur.pieces : null; }
+  function funOk(id) {
+    if (id === "shape") return !!shapePieces();
+    return true;
+  }
+  // Shapes, letters and numbers as strokes in units of about -1..1 (y down).
+  function ringPts(cx, cy, rx, ry, a0, a1, m) {
+    var out = [];
+    for (var i = 0; i <= m; i++) { var a = a0 + (a1 - a0) * i / m; out.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
+    return out;
+  }
+  function starPts() {
+    var out = [];
+    for (var i = 0; i <= 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.42 : 1; out.push([Math.cos(a) * r, Math.sin(a) * r + 0.08]); }
+    return out;
+  }
+  var SHAPES = {
+    circle: { word: "a circle", min: 5, closed: true, strokes: [ringPts(0, 0, 1, 1, -Math.PI / 2, Math.PI * 1.5, 32)] },
+    square: { word: "a square", min: 4, closed: true, strokes: [[[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9], [-0.9, -0.9]]] },
+    triangle: { word: "a triangle", min: 3, closed: true, strokes: [[[0, -1], [1, 0.8], [-1, 0.8], [0, -1]]] },
+    star: { word: "a star", min: 5, closed: true, strokes: [starPts()] }
+  };
+  var GLYPHS = {
+    A: [[[-0.7, 1], [0, -1], [0.7, 1]], [[-0.36, 0.25], [0.36, 0.25]]],
+    B: [[[-0.6, 1], [-0.6, -1], [0.25, -1], [0.55, -0.75], [0.55, -0.25], [0.25, 0], [-0.6, 0]],
+        [[0.25, 0], [0.65, 0.3], [0.65, 0.7], [0.3, 1], [-0.6, 1]]],
+    C: [ringPts(0, 0, 0.75, 1, Math.PI * 0.25, Math.PI * 1.75, 20)],
+    S: [[[0.6, -0.75], [0.2, -1], [-0.35, -1], [-0.65, -0.65], [-0.45, -0.15], [0.4, 0.1], [0.65, 0.55], [0.4, 0.95], [-0.2, 1], [-0.62, 0.75]]],
+    6: [[[0.5, -0.85], [0, -1], [-0.5, -0.6], [-0.62, 0.3], [-0.4, 0.9], [0.1, 1], [0.55, 0.7], [0.6, 0.3], [0.3, 0], [-0.2, 0], [-0.6, 0.3]]],
+    7: [[[-0.6, -1], [0.6, -1], [-0.1, 1]]],
+    8: [ringPts(0, -0.5, 0.42, 0.5, -Math.PI / 2, Math.PI * 1.5, 16), ringPts(0, 0.5, 0.55, 0.5, -Math.PI / 2, Math.PI * 1.5, 16)],
+    9: [[[0.6, -0.3], [0.3, 0], [-0.2, 0], [-0.6, -0.3], [-0.55, -0.7], [-0.1, -1], [0.4, -0.9], [0.62, -0.4], [0.5, 0.5], [0, 1], [-0.5, 0.88]]]
+  };
+  // n points spread evenly along the strokes (closed shapes: around the outline; open ones: end to end).
+  function strokePoints(strokes, closed, n) {
+    var segs = [], L = 0;
+    strokes.forEach(function (st) {
+      for (var i = 1; i < st.length; i++) {
+        var d = Math.hypot(st[i][0] - st[i - 1][0], st[i][1] - st[i - 1][1]);
+        segs.push({ a: st[i - 1], b: st[i], d: d, at: L }); L += d;
+      }
+    });
+    var out = [], gap = closed ? L / n : L / Math.max(1, n - 1);
+    for (var k = 0; k < n; k++) {
+      var want = Math.min(k * gap, L - 1e-6), sg = segs[0];
+      for (var j = 0; j < segs.length; j++) if (segs[j].at <= want) sg = segs[j];
+      var f = sg.d ? (want - sg.at) / sg.d : 0;
+      out.push([lerp(sg.a[0], sg.b[0], f), lerp(sg.a[1], sg.b[1], f)]);
+    }
+    return out;
+  }
+  var SHAPE_TURN = ["circle", "square", "letter", "triangle", "star", "number"];
+  // The next shape in turn that works with this many pieces, with its points and its coach line.
+  function nextShape(c, n) {
+    var letter = c.f.name.charAt(0).toUpperCase();
+    for (var j = 0; j < SHAPE_TURN.length; j++) {
+      var kind = SHAPE_TURN[(FUN.shapeI || 0) % SHAPE_TURN.length];
+      FUN.shapeI = (FUN.shapeI || 0) + 1;
+      if (kind === "letter" && n >= 6 && GLYPHS[letter]) {
+        return { pts: strokePoints(GLYPHS[letter], false, n), line: "The pieces make " + (letter === "A" ? "an " : "a ") + letter + ", for " + c.f.name + "!" };
+      }
+      if (kind === "number" && n >= 6 && GLYPHS[n]) {
+        return { pts: strokePoints(GLYPHS[n], false, n), line: n + " pieces make a " + n + "!" };
+      }
+      if (SHAPES[kind] && n >= SHAPES[kind].min) {
+        return { pts: strokePoints(SHAPES[kind].strokes, true, n), line: "The pieces make " + SHAPES[kind].word + "!" };
+      }
+    }
+    return { pts: strokePoints(SHAPES.triangle.strokes, true, n), line: "The pieces make a triangle!" };
+  }
   function surprise() {
     if (locked()) return;
     var id = funPick(FUN_ORDER, funOk);
     if (!id) { burst(0, 0, 12, null, true); if (cur) cur.wig = 0.6; return; }
     if (id === "mouse") { funStart("mouse", reduce ? 5 : 7); FUN.mouseSide = FUN.mouseSide > 0 ? -1 : 1; say("A little mouse!"); }
+    else if (id === "shape") {
+      var sh = nextShape(cur, cur.pieces.length);
+      funStart("shape", reduce ? 4 : 5.5); FUN.shapeOf = cur; FUN.shapePts = sh.pts;
+      say(sh.line); tone(520, 0.1, 0.03, "sine", 700);
+    }
+  }
+  // 0..1: how far into the shape the pieces are, with a hop arc for piece i.
+  function shapeHop(i, n) {
+    var k = funK("shape");
+    if (k < 0 || FUN.shapeOf !== cur || !cur || cur.flying || !FUN.shapePts || FUN.shapePts.length !== n) return null;
+    var T = FUN.cur.shape.dur, tt = k * T, st = i * (reduce ? 0 : 0.07), go = reduce ? 0.3 : 0.65;
+    var a = clamp((tt - st) / go, 0, 1), b = clamp((tt - (T - go - 0.1 - (n - 1 - i) * (reduce ? 0 : 0.05))) / go, 0, 1);
+    var e = ease(a) * (1 - ease(b)), arc = Math.sin(a * Math.PI) + Math.sin(b * Math.PI);
+    return { e: e, z: arc * 0.28 * MAMP };
   }
   // The mouse: comes in over the far edge of the board, creeps toward the food, sniffs, then scurries off.
   function drawMouse(t) {
@@ -789,6 +873,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (cur && !cur.flying) {
       if (cur.f.apple && !cur.pieces.length) fy = foodOrigin(cur).y - AR;
       cur.pieces.forEach(function (q) { fy = Math.min(fy, pieceBounds(cur, q)[1]); });
+      if (FUN.cur.shape) fy = Math.min(fy, foodOrigin(cur).y - 0.75);
     }
     var start = { x: side * 0.5, y: top - 0.45 }, peek = { x: side * 0.45, y: edge + 0.02 }, sniff = { x: side * 0.2, y: Math.max(edge + 0.24, fy - 0.42) };
     var x, y, a = Math.PI / 2, run = 0, sniffing = 0, exitK = 0;
@@ -1204,6 +1289,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function drawPieceBoard(c, p, t) {
     var o = foodOrigin(c), x = o.x + p.cx + p.ox, y = o.y + p.cy + p.oy;
     var rot = c.wig ? Math.sin(t * 22) * 0.05 * c.wig : 0;
+    var so = shapeOffset(c, p);
+    if (so) { x += so.x; y += so.y; rot += Math.sin(t * 5 + p.cx * 4) * 0.08 * so.wig * MAMP; }
     var isFace = p.face, isCoin = p.coin, sx = 1;
     if (p.flipT > 0 && t < p.flipT + 0.45) {
       var k = (t - p.flipT) / 0.45;
@@ -1229,6 +1316,18 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     }
     var list = c.pieces.slice().sort(function (a, b) { return (a.cy + a.oy) - (b.cy + b.oy) || (a.cx - b.cx); });
     if (!c.flying) list.forEach(function (p) { drawPieceBoard(c, p, t); });
+  }
+  function shapeOffset(c, p) {
+    // While the pieces make a shape (a Surprise moment): where this piece is drawn instead.
+    if (c !== cur || !FUN.cur.shape) return null;
+    var order = c.pieces.slice().sort(byCx), i = order.indexOf(p), n = order.length;
+    var h = shapeHop(i, n);
+    if (!h || i < 0) return null;
+    var big = 0;
+    order.forEach(function (q) { big = Math.max(big, pieceSize(q, c.f)); });
+    var sc = 0.6 * clamp(big / 0.45, 1, 1.15), sp = FUN.shapePts[i], o = foodOrigin(c);
+    var x0 = o.x + p.cx + p.ox, y0 = o.y + p.cy + p.oy;
+    return { x: lerp(x0, o.x + sp[0] * sc, h.e) - x0, y: lerp(y0, o.y + sp[1] * sc, h.e) - y0 - h.z, wig: h.e };
   }
   function drawGuides(c, t) {
     if (c.flying || c.enterT > 0) return;
@@ -1346,7 +1445,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       leaving.c.ey = -ease(lk) * 2.8;
       ctx.save(); ctx.globalAlpha = 1 - lk; drawFood(leaving.c, t); ctx.restore();
     }
-    if (cur) { drawFood(cur, t); drawGuides(cur, t); }
+    if (cur) { drawFood(cur, t); if (!FUN.cur.shape) drawGuides(cur, t); }
     drawMouse(t);
     drawBowl(t);
     drawLanded();

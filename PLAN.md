@@ -58,7 +58,9 @@ cartoon faces" moment that was in most apps was removed on 2026-10-10: he really
   seed, the jet's afterburner kicks on.
 - Jigsaw: the finished part of the picture comes alive (the excavator digs, the rocket puffs); loose pieces hop aside and back.
 - Blender: the blender dances on the counter with the lid bouncing; whipped cream and a cherry on the current smoothie.
-- Cutting Board: a little mouse peeks out, sniffs and scurries off; the cut pieces hop into a smiley face and back.
+- Cutting Board: a little mouse peeks out, sniffs and scurries off; the cut pieces hop into a shape and back (the dad,
+  2026-10-10: shapes, letters or numbers, never a face): circle, square, triangle, star, the food's first letter, the
+  number of pieces, taking turns as the piece count allows.
 - Stand Mixer: sprinkles/chips rain (kept); the batter climbs the beater and plops back.
 - Stove: the magic flip (kept); the pot lid rattles and pops up with a puff of steam.
 - Sand Table: (building now) a sea turtle's flipper tracks; a toy dump truck's tire tracks; a gust ripples the sand.
