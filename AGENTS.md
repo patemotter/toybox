@@ -49,7 +49,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   badge (not a button). Grown-ups only; the child can't change the order.
 - `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
-- Multi-page apps: `workshop/` (Tool Wall `index.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
+- Multi-page apps: `workshop/` (Workshop map + one-tap gear-up `index.html`, the Tool Wall station `tool-wall.html` + stations: `drill-press`, `saw-bench`, `hammer-screws`,
   `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`) and `construction-site/` (site map +
   `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + `spuds` ("Spuds in Mud"), `combine`

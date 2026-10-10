@@ -64,6 +64,7 @@ const CORE = [
   // Workshop
   "./workshop/",
   "./workshop/index.html",
+  "./workshop/tool-wall.html",
   "./workshop/drill-press.html",
   "./workshop/saw-bench.html",
   "./workshop/hammer-screws.html",
