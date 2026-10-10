@@ -289,6 +289,11 @@
   // ---------- Big ----------
   var ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
   var ICON_SHRINK = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
+  // No page zoom (the dad, 2026-10-10): Safari can ignore the viewport's user-scalable=no, so cancel its pinch
+  // gesture events on every page. Pointer and touch events still arrive, so two-finger play keeps working.
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false });
+  });
   var bigBtn = null;
   function bigKey() { return "toybox-big-" + (opts.app || "app"); }
   // The Big button is gone (the dad, 2026-10-10: it rarely changed what he could see). Big mode is always off; the
