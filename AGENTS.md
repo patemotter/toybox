@@ -217,6 +217,9 @@ Keep only:
   "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out
   the stones."), never filler ("Out it pops!"). Step chips under or beside Go may be one short word. Read every
   label aloud before shipping.
+- **The whole machine stays on screen** (the dad keeps seeing machines cut off): at every size and every moment, the
+  machine he is working (tractor plus implement, forklift, combine...) and the thing it works on are fully visible
+  with a margin. Zoom out or reframe rather than crop; a smaller whole machine beats a big cut-off one.
 - **Debris never hides the work** (the dad: so many shavings "I can't see what I'm doing"): wood shavings, sawdust,
   chips, curls, dust, crumbs and similar particles fly for the visible moment and then fade away quickly (gone within
   about 1-1.5 s; nothing piles up on or around the workpiece, and a cap keeps the count low). Never draw them over
