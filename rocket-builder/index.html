@@ -27,7 +27,6 @@
   --accent: #FFC93C;
   --plate: #F4FAFF;
   --focus: #2D5BD7;
-  --go: #E63946;
   --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
   box-sizing: border-box;
@@ -72,71 +71,13 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
-/* ---------- Stage: the rocket on its launch pad ---------- */
+/* ---------- Standard app shell (common/toybox.css, tb-v2): header, stage, panel ----------
+   The stage is the rocket on its pad: tap a part (nose cone, body, windows, fins, engine) and the panel's tiles
+   show that part's choices. The panel: the green Go "Launch!", one row of tiles, the bottom bar (New, Surprise). */
+.tb-head a { text-decoration: none; }
 .stage { background: #8FD0F7; }
-.stage-inner { height: 100%; display: flex; flex-direction: column; }
-.scene {
-  position: relative;
-  flex: 1 1 0;
-  min-height: 0;
-  overflow: hidden;
-  background: #8FD0F7;
-  touch-action: none;
-  cursor: pointer;
-}
+.scene { position: absolute; inset: 0; overflow: hidden; background: #8FD0F7; touch-action: none; cursor: pointer; }
 #art { display: block; width: 100%; height: 100%; touch-action: none; }
-/* Go row: the trip picker next to the green Launch button. */
-.launchbar { flex: none; display: flex; justify-content: center; align-items: stretch; gap: 8px; }
-/* Trip picker next to Launch: three picture buttons. */
-.trips { flex: none; display: flex; gap: 6px; }
-.trip {
-  width: auto;
-  min-width: 62px;
-  padding-left: 4px !important;
-  padding-right: 4px !important;
-  min-height: 60px;
-  padding: 3px 2px 2px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  font-size: 0.9rem;
-  line-height: 1.05;
-  color: #1D2340;
-  background: #FFFFFF;
-  border-color: #1D2340;
-  box-shadow: 3px 3px 0 #1D2340;
-  white-space: nowrap;
-}
-.trip svg { width: 32px; height: 32px; display: block; flex: none; }
-.trip[aria-pressed="true"] { background: var(--accent); outline: 4px solid var(--accent); outline-offset: 2px; }
-.launchbar .launch { flex: 1 1 auto; min-width: 0; width: auto; max-width: 560px; }
-.launch {
-  width: min(100%, 560px);
-  min-height: 60px;
-  font-size: 1.9rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  color: #FFFFFF;
-  background: var(--go);
-  border-color: #1D2340;
-  box-shadow: 4px 4px 0 #1D2340;
-  text-shadow: 2px 2px 0 #1D2340;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.launch:active { box-shadow: 0 0 0 #1D2340; }
-.launch svg { width: 1.3em; height: 1.3em; flex: none; }
-@media (prefers-reduced-motion: no-preference) {
-  .launch { animation: throb 1.6s ease-in-out infinite; }
-  .launch:active { animation: none; }
-}
-@keyframes throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
 
 /* Builder animations on the SVG rocket. */
 .rocket, .spark, .puff { transform-box: fill-box; }
@@ -151,154 +92,46 @@ body {
 @keyframes puff { 0% { transform: scale(0.3); opacity: 0.95; } 100% { transform: scale(2.2); opacity: 0; } }
 .night { opacity: 0; transition: opacity 4s ease; }
 body.ending .night { opacity: 1; }
+/* The picked part glows: a soft halo pulses behind it (a copy of the part, drawn fat). Its color runs yellow,
+   pink, blue, so it shows on every paint color. */
+.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
+.halo * { animation: halocol 1.8s linear infinite; }
+@keyframes halocol {
+  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
+  33% { fill: #FF5FB0; stroke: #FF5FB0; }
+  66% { fill: #3FC4FF; stroke: #3FC4FF; }
+}
+/* Sparkles and puffs never catch a tap meant for the picture. */
+#fxG, .surp { pointer-events: none; }
 
-/* Play-timer gauge in the corner of the picture. */
-.fuel {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  pointer-events: none;
-}
+/* Play-timer gauge: the time-left badge, top-right of the stage. */
+.fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
-.fuel-bar {
-  width: clamp(70px, 22vw, 170px);
-  height: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 3px solid #1D2340;
-  border-radius: 999px;
-  overflow: hidden;
-}
+.fuel-bar { width: clamp(60px, 14vw, 140px); height: 18px; background: rgba(255, 255, 255, 0.8); border: 2px solid #1D2340; border-radius: 999px; overflow: hidden; }
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
-.fuel-num {
-  min-width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  background: #FFFFFF;
-  color: #1D2340;
-  border: 3px solid #1D2340;
-  border-radius: 50%;
-  font-size: 1.3rem;
-  font-weight: 800;
-  line-height: 1;
-}
+.fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 2px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
 
-/* ---------- Big mode: the panel goes away, the header stays (Big turns into Back) ---------- */
-body.big .tb-panel { display: none; }
+/* The tile pictures: a small rocket, cropped to the part. The Paint tile is an action (its "+" badge). */
+#tiles .tb-pic svg { width: 100%; height: 100%; display: block; }
+/* The tiles keep their token size in the side column: two a row on a sideways iPad, four a row on a phone
+   held sideways (the column is wider than usual). */
+@media (orientation: landscape) {
+  .tb-v2 .tb-body .tb-panel { width: calc(2 * var(--tb-tile) + var(--tb-s3) + 2 * var(--tb-s4) + 8px); }
+  #tiles.tb-tilerow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-body .tb-panel { width: calc(4 * var(--tb-tile) + 3 * var(--tb-s2) + 24px); }
+  #tiles.tb-tilerow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
-/* ---------- Panel: build + colors ---------- */
-.tb-panel .panel-body.tb-choices {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-  overflow: hidden;
-}
-.panel-body > [data-pane] { grid-area: 1 / 1; visibility: hidden; margin: 0; min-width: 0; }
-.tb-panel[data-tab="build"] [data-pane="build"] { visibility: visible; }
-.panel-body section + section { margin-top: 10px; }
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  padding-right: 3px;
-}
-.row .btn {
-  flex: 0 0 calc((100% - 12px) / 3);
-  min-width: 0;
-  min-height: 40px;
-  padding: 0.2rem 0.2rem;
-  font-size: clamp(0.76rem, 3.5vw, 1rem);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.row.four .btn { flex-basis: calc((100% - 18px) / 4); font-size: clamp(0.68rem, 3vw, 1rem); padding: 0.2rem 0.1rem; }
-.row.four .dot { width: 11px; height: 11px; margin-right: 3px; border-width: 1.5px; }
-.dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #1D2340;
-  vertical-align: -2px;
-  margin-right: 4px;
-}
-#buildParts, #colorParts { min-height: 86px; align-content: flex-start; }
-/* Phones: one part at a time, picked with arrows (instead of two rows of part buttons). */
-.stepper { display: none; align-items: stretch; justify-content: center; gap: 8px; }
-.stepper .btn { min-height: 44px; }
-.sbtn { flex: none; width: 56px; padding: 0; font-size: 1.9rem; line-height: 1; }
-.slabel { flex: 0 1 200px; min-width: 0; font-size: 1.15rem; padding: 0.1rem 0.6rem; white-space: nowrap; }
-@media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .stepper { display: flex; }
-  #buildParts, #colorParts { display: none; }
-  #colorStep { margin-bottom: 2px; }
-  .launchbar .launch svg { display: none; }
-  .landbar .launch { font-size: 1.6rem; }
-  .launchbar .launch { font-size: 1.6rem; padding-left: 0.3rem; padding-right: 0.3rem; }
-}
-.options {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-  max-width: 520px;
-  margin: 0 auto;
-}
-.opt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  padding: 5px 2px 3px;
-  min-height: 0;
-  font-size: clamp(0.7rem, 3.2vw, 0.95rem);
-  line-height: 1.15;
-  white-space: nowrap;
-}
-.opt svg { width: 44px; height: 54px; display: block; }
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 8px;
-}
-.swatch {
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 50%;
-  border: 3px solid var(--edge);
-  cursor: pointer;
-  padding: 0;
-  font: inherit;
-  font-size: 1.1rem;
-  font-weight: 800;
-  display: grid;
-  place-items: center;
-  box-shadow: 2px 2px 0 var(--edge);
-}
-.swatch[aria-pressed="true"] { outline: 5px solid var(--accent); outline-offset: 2px; }
-.swatch:focus-visible { outline: 5px solid var(--focus); outline-offset: 2px; }
-.tb-tabs .tab[aria-selected="true"] { background: var(--accent); color: #1D2340; }
+/* Big: the header, the tiles and the bottom bar hide; Launch stays (tapping the pad launches too). */
+body.big .tb-head > :not(.bigtoggle), body.big #tiles, body.big .tb-bottombar { display: none; }
+body.ending .tb-panel, body.ending .homebtn { pointer-events: none; opacity: 0.4; }
 
 /* ---------- Timer: the shared toast and ending banner (common/toybox.js) ---------- */
-.toast { top: max(12px, env(safe-area-inset-top, 0px)); z-index: 45; font-size: 1.3rem; }
+.toast { top: max(12px, env(safe-area-inset-top, 0px)); z-index: 45; }
 .stage .farewell { position: absolute; bottom: 12px; z-index: 2; }
-.stage .farewell p { font-size: 1.25rem; }
-/* The rocket's own .opt (part options) must not restyle the sheet's "(optional)" note. */
-.sheet .opt { display: inline; padding: 0; font-size: inherit; line-height: inherit; white-space: normal; }
-body.ending .panel-body,
-body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
-body.ending .launchbar { visibility: hidden; }
-
-/* The minute buttons in the shared sheet: three per row, as before. */
-.sheet .row .btn { flex-basis: calc((100% - 12px) / 3); min-height: 48px; font-size: 1rem; }
 /* Rest picture: the child's rocket on its pad. */
 .rest-art {
   display: block;
@@ -324,35 +157,45 @@ body.ending .launchbar { visibility: hidden; }
 /* A goodbye flight that is still in the air when the rest screen comes up finishes on top of it. */
 body.resting .flight { z-index: 55; }
 #fcv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* A planet's name: a label in a pill at the top, on the side away from the planet. */
 .pname {
   position: absolute;
   left: 50%;
-  top: max(72px, calc(env(safe-area-inset-top, 0px) + 66px));
+  top: max(76px, calc(env(safe-area-inset-top, 0px) + 70px));
   transform: translateX(-50%);
   pointer-events: none;
-  font-size: clamp(2.4rem, 11vw, 5.6rem);
+  font-size: clamp(1.8rem, 8vw, 3.6rem);
   font-weight: 800;
-  line-height: 1;
-  color: #FFC93C;
-  -webkit-text-stroke: 0.035em #1D2340;
-  text-shadow: 0.05em 0.05em 0 #1D2340;
+  line-height: 1.1;
+  color: #1D2340;
+  background: #FFC93C;
+  border: 2px solid #1D2340;
+  border-radius: 999px;
+  padding: 0.05em 0.6em 0.12em;
   white-space: nowrap;
 }
+.pname.left { left: max(14px, env(safe-area-inset-left, 0px)); transform: none; }
+.pname.right { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); transform: none; }
 .pname[hidden] { display: none; }
 .pname.go { animation: namePop 0.7s cubic-bezier(.3, 1.5, .5, 1); }
+.pname.left.go, .pname.right.go { animation: namePopS 0.7s cubic-bezier(.3, 1.5, .5, 1); }
 @keyframes namePop { 0% { transform: translateX(-50%) scale(0.3); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+@keyframes namePopS { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .fback {
   position: absolute;
   top: max(10px, env(safe-area-inset-top, 0px));
   left: max(10px, env(safe-area-inset-left, 0px));
-  min-height: 48px;
-  font-size: 1.05rem;
-  padding: 0.2rem 0.9rem;
+  min-height: var(--tb-head-icon, 52px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 0 8px;
+  font-size: var(--tb-fs-btn, 18px);
   color: #1D2340;
   background: #FFFFFF;
-  border-color: #1D2340;
-  box-shadow: 3px 3px 0 #1D2340;
 }
+.fback svg, .bbuild svg { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.fback[hidden] { display: none; }
 .count {
   position: absolute;
   inset: 0;
@@ -392,11 +235,10 @@ body.resting .flight { z-index: 55; }
   top: max(15%, 104px);
   transform: translateX(-50%);
   pointer-events: none;
-  background: #FFC93C;
+  background: #FFFFFF;
   color: #1D2340;
-  border: 4px solid #1D2340;
+  border: 2px solid #1D2340;
   border-radius: 22px;
-  box-shadow: 5px 5px 0 #1D2340;
   padding: 0.1rem 1.1rem 0.25rem;
   font-size: clamp(1.6rem, 5.6vw, 3.2rem);
   font-weight: 800;
@@ -413,8 +255,8 @@ body.resting .flight { z-index: 55; }
   bottom: max(16px, env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.93);
-  border: 3px solid #1D2340;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #1D2340;
   border-radius: 999px;
   padding: 0.1rem 1rem 0.2rem;
   font-size: clamp(1.1rem, 3.6vw, 1.6rem);
@@ -424,186 +266,86 @@ body.resting .flight { z-index: 55; }
 }
 .fhint[hidden] { display: none; }
 .fhint.fade { opacity: 0; }
+/* Out in space: where to? Three picture tiles (Moon, Mars, Planets); the Moon by itself after a few seconds. */
+.tripbar {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
+  transform: translateX(-50%);
+  width: min(calc(100vw - 32px), 420px);
+  padding: 10px;
+  background: #FFFFFF;
+  border-radius: var(--tb-r-stage, 20px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.tripbar[hidden] { display: none; }
+.tripbar p { margin: 0 0 6px; text-align: center; font-size: var(--tb-fs-coach, 20px); font-weight: 800; line-height: 1.2; }
+.tripbar .tb-pic svg { width: 100%; height: 100%; display: block; }
+/* The trip's countdown: a ring of dots fills under the words. */
+.tripwait { display: block; height: 6px; margin: 8px 6px 0; border-radius: 3px; background: #E3E9F5; overflow: hidden; }
+.tripwait span { display: block; height: 100%; width: 0; background: #9AA3AF; }
 .landbar {
   position: absolute;
   left: 50%;
-  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   transform: translateX(-50%);
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: stretch;
-  width: min(92vw, 560px);
+  width: min(calc(100vw - 32px), 560px);
 }
 .landbar[hidden] { display: none; }
-.landbar .launch { flex: 1 1 auto; width: auto; }
-.landbar .bbuild { flex: none; font-size: 1.2rem; color: #1D2340; background: #FFFFFF; border-color: #1D2340; box-shadow: 3px 3px 0 #1D2340; }
+.landbar .tb-gopill { flex: 1 1 auto; width: auto; }
+.landbar .bbuild { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: var(--tb-go-h, 72px); padding: 0 16px 0 10px; font-size: var(--tb-fs-btn, 18px); color: #1D2340; background: #FFFFFF; }
+.landbar .bbuild[hidden] { display: none; }
 
-/* Landscape (phone on its side, tablet, desktop): picture on the left, controls on the right. */
-@media (orientation: landscape) {
-  .tb-body .tb-panel { width: min(56%, 460px); }
-  .tb-body .tb-panel .panel-body.tb-choices { align-content: center; }
-}
-
-/* Larger screens (tablets, desktop): bigger touch targets, and controls kept to a comfortable width. */
-@media (min-width: 744px) and (min-height: 640px) {
-  .tb-panel { gap: 12px; }
-  .launchbar .btn.tb-go.launch { min-height: 76px; font-size: 2.2rem; }
-  .panel-body > [data-pane] { width: 100%; max-width: 560px; justify-self: center; }
-  .panel-body section + section { margin-top: 16px; }
-  .row { gap: 10px; }
-  .row .btn { flex-basis: calc((100% - 20px) / 3); min-height: 56px; font-size: 1.1rem; }
-  .row.four .btn { flex-basis: calc((100% - 30px) / 4); font-size: 1.05rem; }
-  .row .dot { width: 18px; height: 18px; margin-right: 6px; }
-  #buildParts, #colorParts { min-height: 122px; }
-  .options { gap: 10px; }
-  .opt { font-size: 1.05rem; padding: 7px 4px 5px; }
-  .opt svg { width: 76px; height: 94px; }
-  .swatches { gap: 10px; margin-top: 12px; }
-  .swatch { font-size: 1.4rem; }
-  .fuel { top: 12px; left: 12px; }
-  .fuel-bar { height: 22px; }
-  .fuel-num { min-width: 48px; height: 48px; font-size: 1.5rem; }
-  .fback { min-height: 56px; font-size: 1.25rem; }
-  .landbar .launch { min-height: 84px; font-size: 2.6rem; }
-  .landbar .bbuild { font-size: 1.4rem; padding: 0.4rem 1.4rem; }
-  .trips { gap: 10px; }
-  .trip { width: 92px; min-height: 76px; font-size: 1.1rem; }
-  .trip svg { width: 44px; height: 44px; }
-}
-@media (min-width: 744px) and (min-height: 640px) and (orientation: landscape) {
-  .tb-body .tb-panel { width: min(44%, 520px); }
-  .trip { width: 80px; }
-  .launchbar .btn.tb-go.launch { font-size: 1.8rem; padding-left: 0.4rem; padding-right: 0.4rem; gap: 6px; }
-  .row .btn { min-height: 64px; }
-  .opt svg { width: 88px; height: 110px; }
-}
-
-/* Short landscape phones: no title, tighter panel. */
+/* Short landscape phones: the planet name and the flight buttons move out of the way. */
 @media (orientation: landscape) and (max-height: 520px) {
-  .tb-panel { gap: 6px; }
-  .launchbar .btn.tb-go.launch { min-height: 52px; font-size: 1.5rem; }
-  .trip { min-height: 52px; width: 58px; font-size: 0.82rem; }
-  .trip svg { width: 24px; height: 24px; }
-  .swatches { gap: 6px; }
-  /* vw-based sizes are tuned for portrait; the landscape panel is narrower than the screen width suggests. */
-  .row .btn, .row.four .btn { font-size: 0.82rem; }
-  .opt { font-size: 0.72rem; }
-  .opt svg { width: 40px; height: 48px; }
-  .pname { top: 12px; font-size: 2.6rem; }
+  .pname { top: 12px; font-size: 2.2rem; }
   .landbar {
     left: auto;
     top: max(10px, env(safe-area-inset-top, 0px));
     bottom: auto;
     right: max(14px, env(safe-area-inset-right, 0px));
     transform: none;
-    width: auto;
+    width: 280px;
     flex-direction: column;
-    align-items: stretch;
+    gap: 12px;
   }
-  .landbar .launch { min-height: 56px; font-size: 1.4rem; padding: 0.3rem 1rem; }
+  .landbar .bbuild { min-height: 52px; justify-content: center; }
+  .tripbar { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); transform: none; width: 340px; bottom: 12px; padding: 8px; }
+  .tripbar p { margin-bottom: 4px; }
   .banner { left: max(14px, env(safe-area-inset-left, 0px)); top: 42%; transform: none; font-size: 1.6rem; }
   .banner.go { animation: bannerPopL 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 }
 @keyframes bannerPopL { 0% { transform: scale(0.3); } 100% { transform: scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn, .tab { transition: none; }
-  .rocket.pop, .rocket.hop { animation: none; }
+  .rocket.pop, .rocket.hop, .halo * { animation: none; }
 }
-/* Tapping a part of the rocket opens its choices: the panel flashes. */
-.tb-panel.flash { animation: panelflash 0.9s ease-out; }
-@keyframes panelflash { 0% { outline: 6px solid #FFC93C; outline-offset: 2px; } 100% { outline: 6px solid rgba(255, 201, 60, 0); outline-offset: 2px; } }
-/* ---------- Coloring: tap a part on the picture; it glows and its colors show here ---------- */
-.tb-panel.picking .panel-body > [data-pane]:not([data-pane="pick"]) { visibility: hidden; }
-.tb-panel.picking .panel-body > [data-pane="pick"] { visibility: visible; }
-.panel-body > [data-pane="pick"] { display: flex; align-items: center; justify-content: center; }
-.pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; max-width: 520px; margin: 0 auto; }
-.pickpic {
-  display: flex; flex-direction: column; align-items: center; gap: 0; width: clamp(78px, 24vw, 128px);
-  padding: 4px 4px 2px; border: 3px solid var(--edge); border-radius: 16px; background: #E4F3FF;
-  box-shadow: 3px 3px 0 var(--edge); color: #1D2340; font-weight: 800; font-size: 1.05rem; line-height: 1.15;
-}
-.pickpic svg { display: block; width: 100%; height: clamp(52px, 9vh, 92px); }
-.pickswatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; justify-items: center; padding: 7px; }
-.pickswatches .swatch { width: 100%; max-width: 66px; min-width: 44px; }
-@media (min-width: 744px) and (min-height: 640px) {
-  .pick { gap: 16px; }
-  .pickswatches { gap: 14px; }
-  .pickswatches .swatch { max-width: 92px; }
-  .pickpic { font-size: 1.2rem; width: 150px; }
-}
-.pickswatches .swatch.pop { animation: swpop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes swpop { 0% { transform: scale(0.8); } 60% { transform: scale(1.15); } 100% { transform: none; } }
-/* The picked part glows: a soft yellow halo pulses behind it (a copy of the part, drawn fat). */
-.halo, .halo * { fill: #FFE14D; stroke: #FFE14D; stroke-linejoin: round !important; stroke-dasharray: none !important; pointer-events: none; }
-/* Its color runs yellow, pink, blue, so it shows on every paint color. */
-.halo * { animation: halocol 1.8s linear infinite; }
-@keyframes halocol {
-  0%, 100% { fill: #FFE14D; stroke: #FFE14D; }
-  33% { fill: #FF5FB0; stroke: #FF5FB0; }
-  66% { fill: #3FC4FF; stroke: #3FC4FF; }
-}
-.pickpic .dim { opacity: 0.25; }
-/* Sparkles and puffs never catch a tap meant for the picture. */
-#fxG, .surp { pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .halo *, .pickswatches .swatch.pop { animation: none; } }
-/* Ghost hand: a see-through hand that shows the main move once (same look as Bulldozer and Measuring). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell">
+<div class="tb-app-shell tb-v2">
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Rocket Builder</h1>
-    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
 
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <div class="stage-inner">
-        <div class="scene" id="scene">
-          <svg id="art" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax meet" role="img" aria-label="A rocket on its launch pad"></svg>
-          <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
-        </div>
+      <div class="scene" id="scene">
+        <svg id="art" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax meet" role="img" aria-label="A rocket on its launch pad"></svg>
       </div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Tap a part to color it!</div>
+      <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
+      <div id="coach"></div>
     </main>
 
-    <section class="tb-panel" data-tab="build">
-      <div class="launchbar">
-        <div class="trips" role="group" aria-label="Pick a trip">
-          <button class="btn trip" data-trip="moon" aria-pressed="false"><svg viewBox="-30 -30 60 60" aria-hidden="true"><circle r="24" fill="#C9D2E3" stroke="#1D2340" stroke-width="4"/><circle cx="-8" cy="-7" r="7" fill="#9AA3AF"/><circle cx="9" cy="8" r="5.5" fill="#9AA3AF"/><circle cx="7" cy="-12" r="3.5" fill="#9AA3AF"/><circle cx="-9" cy="12" r="3" fill="#9AA3AF"/></svg><span>Moon</span></button>
-          <button class="btn trip" data-trip="mars" aria-pressed="false"><svg viewBox="-30 -30 60 60" aria-hidden="true"><circle r="24" fill="#D9643A" stroke="#1D2340" stroke-width="4"/><ellipse cx="0" cy="-19" rx="10" ry="3.5" fill="#FFFFFF"/><ellipse cx="-7" cy="3" rx="10" ry="5" fill="#B44A2B"/><ellipse cx="10" cy="11" rx="6" ry="3" fill="#B44A2B"/><ellipse cx="8" cy="-6" rx="5" ry="2.5" fill="#EE9A6A"/></svg><span>Mars</span></button>
-          <button class="btn trip" data-trip="planets" aria-pressed="false"><svg viewBox="-34 -30 68 60" aria-hidden="true"><g transform="rotate(-18)"><path d="M -31 0 A 31 9 0 0 1 31 0" fill="none" stroke="#1D2340" stroke-width="9"/><path d="M -31 0 A 31 9 0 0 1 31 0" fill="none" stroke="#FFC93C" stroke-width="4.5"/></g><circle r="17" fill="#F0D58C" stroke="#1D2340" stroke-width="4"/><path d="M -15 -5 H 15 M -14 6 H 14" stroke="#D9B86A" stroke-width="4"/><g transform="rotate(-18)"><path d="M 31 0 A 31 9 0 0 1 -31 0" fill="none" stroke="#1D2340" stroke-width="9"/><path d="M 31 0 A 31 9 0 0 1 -31 0" fill="none" stroke="#FFC93C" stroke-width="4.5"/></g></svg><span>Planets</span></button>
-        </div>
-        <button class="btn tb-go launch" id="launch"><svg viewBox="-50 -60 100 120" aria-hidden="true"><path d="M0 -55 C 22 -35 24 -5 20 25 L -20 25 C -24 -5 -22 -35 0 -55 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><circle cy="-12" r="9" fill="#5BC0EB" stroke="#1D2340" stroke-width="6"/><path d="M -20 0 L -40 30 L -20 25 Z M 20 0 L 40 30 L 20 25 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/><path d="M -12 30 Q 0 62 12 30 Z" fill="#F77F00" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/></svg><span>Launch!</span></button>
-      </div>
-      <div class="tb-choices panel-body">
-        <div data-pane="build" id="pane-build" role="tabpanel" aria-labelledby="tab-build">
-          <section>
-            <div class="row" id="buildParts"></div>
-            <div class="stepper" id="buildStep"><button class="btn sbtn" data-step="build" data-dir="-1" aria-label="Previous part">&lsaquo;</button><button class="btn slabel" data-step="build" data-dir="1" id="buildStepLabel">Nose</button><button class="btn sbtn" data-step="build" data-dir="1" aria-label="Next part">&rsaquo;</button></div>
-          </section>
-          <section>
-            <div class="options" id="options"></div>
-          </section>
-        </div>
-        <div data-pane="pick" id="pane-pick" aria-live="polite">
-          <div class="pick">
-            <div class="pickpic" id="pickPic"><svg id="pickSvg" viewBox="0 0 10 10" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg><span id="pickName">Nose</span></div>
-            <div class="pickswatches" id="pickSw"></div>
-          </div>
-        </div>
-      </div>
-      <nav class="tb-tabs" role="tablist" aria-label="Controls">
-        <button class="btn tab" role="tab" id="tab-build" data-tab="build" aria-controls="pane-build">Build</button>
-        <button class="btn tb-surprise" data-action="surprise">Surprise</button>
-      </nav>
+    <section class="tb-panel" id="panel">
+      <div id="go"></div>
+      <div id="tiles" role="group" aria-label="Choices for the picked part"></div>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
@@ -615,13 +357,13 @@ body.resting .flight { z-index: 55; }
   <div class="pname" id="pname" aria-live="polite" hidden></div>
   <div class="banner" id="banner" hidden></div>
   <div class="fhint" id="fhint" hidden>Tap to boost!</div>
-  <button class="btn fback" id="fback">Back</button>
+  <button class="btn fback" id="fback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Build</span></button>
+  <div class="tripbar" id="tripbar" hidden><p>Where to?</p><div id="tripTiles"></div><span class="tripwait"><span id="tripWait"></span></span></div>
   <div class="landbar" id="landbar" hidden>
-    <button class="btn launch" id="again"><span>Launch again!</span></button>
-    <button class="btn bbuild" id="fbuild">Build</button>
+    <button id="again"></button>
+    <button class="btn bbuild" id="fbuild"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Build</span></button>
   </div>
 </div>
-
 <script>
 (function () {
   "use strict";
@@ -671,6 +413,21 @@ body.resting .flight { z-index: 55; }
     { id: "windows", label: "Windows", opts: [[0, "None"], [1, "1 window"], [2, "2 windows"], [3, "3 windows"]] },
     { id: "boosters", label: "Boosters", opts: [[0, "None"], [2, "2 boosters"]] }
   ];
+  // The parts he taps on the rocket; the panel's tiles show the picked part's choices (one row, at most 4).
+  // Older saves may hold a shape that has no tile any more (a round nose, round fins, a tall 1-stage body):
+  // it is still drawn, just no tile is picked. "paint" names the color the Paint tile changes.
+  var PARTS = {
+    nose: { name: "Nose cone", items: [["pointy", "Pointy"], ["capsule", "Capsule"], ["dome", "Dome"]], paint: "nose" },
+    body: { name: "Body", items: [["small", "Small"], ["medium", "Medium"], ["big", "Big"]], paint: "body" },
+    windows: { name: "Windows", items: [[0, "None"], [1, "One"], [2, "Two"], [3, "Three"]] },
+    fins: { name: "Fins", items: [["swept", "Swept"], ["big", "Big"], ["zigzag", "Zigzag"]], paint: "fins" },
+    engine: { name: "Engine", items: [[0, "Single"], [2, "Boosters"]] }
+  };
+  // The body tiles are whole rockets: stages and height go together.
+  var BODY_SET = { small: { stages: 1, size: "short" }, medium: { stages: 2, size: "medium" }, big: { stages: 3, size: "tall" } };
+  // Old saves name a Build part ("stages", "size", "boosters"); they map onto the parts above.
+  var OLD_PART = { nose: "nose", stages: "body", size: "body", fins: "fins", windows: "windows", boosters: "engine" };
+  var PART_TO_OLD = { nose: "nose", body: "stages", windows: "windows", fins: "fins", engine: "boosters" };
   var TRIPS = ["moon", "mars", "planets"];
   var BUILD_BY = {};
   BUILD.forEach(function (b) { BUILD_BY[b.id] = b; });
@@ -681,7 +438,7 @@ body.resting .flight { z-index: 55; }
     return {
       nose: "pointy", stages: 2, size: "medium", fins: "swept", windows: 2, boosters: 0,
       colors: { nose: "Red", body: "White", bands: "Blue", fins: "Red", windows: "Sky", boosters: "Gray", flame: "Orange" },
-      buildPart: "nose", colorPart: "nose", trip: "moon"
+      buildPart: "nose", colorPart: "nose", trip: "moon", part: "nose"
     };
   }
   function validOpt(id, v) {
@@ -702,6 +459,7 @@ body.resting .flight { z-index: 55; }
         if (BUILD_BY[o.buildPart]) s.buildPart = o.buildPart;
         if (CPARTS.some(function (p) { return p[0] === o.colorPart; })) s.colorPart = o.colorPart;
         if (TRIPS.indexOf(o.trip) >= 0) s.trip = o.trip;
+        s.part = PARTS[o.part] ? o.part : (OLD_PART[s.buildPart] || "nose");
       }
     } catch (e) { /* storage unavailable or bad data: use defaults */ }
     return s;
@@ -863,8 +621,8 @@ body.resting .flight { z-index: 55; }
         if (cfg.boosters) {
           [-1, 1].forEach(function (side) {
             var cx = side * bcx, btop = s0.yb - bh, ch = bw * 1.25, o = "";
-            o += bellS(cx, s0.yb, bw * 1.4, NOZ * 0.75);
-            o += tubeS(cx, btop, bw, bh, hex(c.boosters), btop + 14, hex(c.bands));
+            o += '<g data-c="engine">' + bellS(cx, s0.yb, bw * 1.4, NOZ * 0.75);
+            o += tubeS(cx, btop, bw, bh, hex(c.boosters), btop + 14, hex(c.bands)) + "</g>";
             o += '<path data-c="nose" d="M ' + n2(cx - bw / 2) + " " + n2(btop) + " Q " + n2(cx - bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx) + " " + n2(btop - ch) +
               " Q " + n2(cx + bw / 2) + " " + n2(btop - ch * 0.7) + " " + n2(cx + bw / 2) + " " + n2(btop) + ' Z" fill="' + hex(c.nose) + '"' + STROKE5 + "/>";
             layers.push({
@@ -875,14 +633,14 @@ body.resting .flight { z-index: 55; }
           });
         }
       }
-      var o2 = bellS(0, s.yb, s.w, NOZ);
+      var o2 = '<g data-c="engine">' + bellS(0, s.yb, s.w, NOZ) + "</g>";
       o2 += '<g data-c="body">' + tubeS(0, s.bodyTop, s.w, s.yb - s.bodyTop, hex(c.body), s.yb - 28, hex(c.bands)) + "</g>";
       if (!s.top) {
         var wu = st[i + 1].w;
         o2 += '<path d="M ' + n2(-s.w / 2) + " " + n2(s.bodyTop) + " L " + n2(-wu / 2) + " " + n2(s.yt) + " L " + n2(wu / 2) + " " + n2(s.yt) + " L " + n2(s.w / 2) + " " + n2(s.bodyTop) +
           ' Z" fill="' + hex(c.bands) + '"' + STROKE5 + "/>";
       }
-      wins.forEach(function (wn) { if (wn.s === i) o2 += windowS(wn.y, r, glass); });
+      wins.forEach(function (wn) { if (wn.s === i) o2 += '<g data-c="windows">' + windowS(wn.y, r, glass) + "</g>"; });
       if (s.top) o2 += nose.svg;
       layers.push({
         group: String(i),
@@ -967,48 +725,52 @@ body.resting .flight { z-index: 55; }
   var $ = function (id) { return document.getElementById(id); };
   var art = $("art");
 
-  BUILD.forEach(function (b) {
-    var el = document.createElement("button");
-    el.className = "btn";
-    el.dataset.bpart = b.id;
-    el.textContent = b.label;
-    $("buildParts").appendChild(el);
-  });
-  // ---- coloring: only the big parts can be colored (nose, body, fins). Tap one on the picture: it glows and
-  // its colors show in the panel. Stripes, windows, boosters and the flame keep their colors.
+  // ---- coloring: the big parts (nose cone, body, fins) have a Paint tile: each tap paints the part the next
+  // color. Stripes, windows, boosters and the flame keep their colors.
   var PICKS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Pink", "White"];
-  var PICK_NAMES = { nose: "Nose", body: "Body", fins: "Fins" };
-  PICKS.forEach(function (name) {
-    var b = document.createElement("button");
-    b.className = "swatch";
-    b.dataset.color = name;
-    b.style.background = hex(name);
-    b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
-    b.setAttribute("aria-label", name);
-    $("pickSw").appendChild(b);
-  });
-  var picking = ""; // "nose", "body", "fins", or "" when no part is picked
   // The stripes follow a body color that would hide them.
   function fixDetails() {
     var c = state.colors, d = freshState().colors;
     c.bands = d.bands;
     if (c.bands === c.body) c.bands = c.body === "White" ? "Red" : "White";
   }
-  function setPicking(id) {
-    picking = id || "";
-    if (picking) { state.colorPart = picking; $("coach").classList.add("off"); }
-    $("tab-build").closest(".tb-panel").classList.toggle("picking", !!picking);
-    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
-      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
-    });
-    showPick();
+  function bodyVal(s) {
+    for (var k in BODY_SET) if (BODY_SET[k].stages === s.stages && BODY_SET[k].size === s.size) return k;
+    return null;
   }
-  // The glow on the picture and the panel's picture + swatches for the picked part.
-  function showPick() {
-    var rg = $("rocketG");
-    if (rg) Array.prototype.forEach.call(rg.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
-    if (!picking) return;
-    if (rg) Array.prototype.forEach.call(rg.querySelectorAll('[data-c="' + picking + '"]'), function (el) {
+  // The picked part's current choice (a tile id), or null when an old save holds a shape with no tile.
+  function partVal(part, s) {
+    s = s || state;
+    if (part === "body") return bodyVal(s);
+    var v = part === "engine" ? s.boosters : s[part];
+    return PARTS[part].items.some(function (it) { return it[0] === v; }) ? String(v) : null;
+  }
+  function applyOpt(part, v, s) {
+    s = s || state;
+    if (part === "body") { s.stages = BODY_SET[v].stages; s.size = BODY_SET[v].size; }
+    else if (part === "engine") s.boosters = v;
+    else s[part] = v;
+  }
+  function nextColor(part) {
+    var i = PICKS.indexOf(state.colors[part]);
+    return PICKS[(i + 1) % PICKS.length];
+  }
+  // The Paint tile's picture: a brush dipped in the next color.
+  function brushPic(col) {
+    var c = hex(col);
+    return '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M30 6 42 18 26 30 18 22Z" fill="#C98B5A" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M18 22 26 30 22 34 14 26Z" fill="#9AA3AF" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<path d="M14 26 22 34C19 40 12 44 5 43 4 36 8 29 14 26Z" fill="' + c + '" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="38" cy="38" r="6" fill="' + c + '" stroke="' + OUT + '" stroke-width="2.5"/></svg>';
+  }
+
+  // The picked part glows on the picture.
+  function showHalo() {
+    var rg = $("rocketG"), part = state.part;
+    if (!rg) return;
+    Array.prototype.forEach.call(rg.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (document.body.classList.contains("big")) return;
+    Array.prototype.forEach.call(rg.querySelectorAll('[data-c="' + part + '"]'), function (el) {
       var h = el.cloneNode(true);
       h.removeAttribute("data-c");
       h.setAttribute("class", "halo");
@@ -1017,25 +779,9 @@ body.resting .flight { z-index: 55; }
       });
       el.parentNode.insertBefore(h, el);
     });
-    var g = geo(state), svg = $("pickSvg"), vb;
-    if (picking === "body") { var b = g.bbox, w = b[2] - b[0], hh = b[3] - b[1]; vb = [b[0] - (hh * 0.8 - w) / 2, b[1], hh * 0.8, hh]; if (w > hh * 0.8) vb = b.slice(0, 2).concat([w, hh]); }
-    else vb = miniView(g, picking);
-    svg.setAttribute("viewBox", vb.map(n2).join(" "));
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    svg.innerHTML = rocketSVG(g);
-    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, text"), function (el) {
-      if (!el.closest('[data-c="' + picking + '"]')) el.setAttribute("class", "dim");
-    });
-    $("pickName").textContent = PICK_NAMES[picking];
-    var cur = state.colors[picking];
-    Array.prototype.forEach.call($("pickSw").querySelectorAll("[data-color]"), function (bt) {
-      var on = bt.dataset.color === cur;
-      bt.setAttribute("aria-pressed", String(on));
-      bt.textContent = on ? "\u2713" : "";
-    });
   }
 
-  // Mini rocket for an option button, cropped to show the part being picked.
+  // Mini rocket for a tile, cropped to show the part being picked.
   function miniView(g, part) {
     var T = g.top, b = g.bbox, size;
     if (part === "nose") {
@@ -1047,22 +793,68 @@ body.resting .flight { z-index: 55; }
       return [-size / 2, 22 - size * 1.23, size, size * 1.23];
     }
     if (part === "windows") return [-100, T.bodyTop - 50, 200, 246];
-    if (part === "boosters") return [-150, -320, 300, 340];
-    return [-210, -500, 420, 520];
+    if (part === "engine") return [-160, -300, 320, 330];
+    // the whole rocket, on a common scale so Small, Medium and Big look their size
+    return [-230, -470, 460, 490];
+  }
+  function optPic(part, v) {
+    var cfg = JSON.parse(JSON.stringify(state));
+    applyOpt(part, v, cfg);
+    var mg = geo(cfg);
+    return '<svg viewBox="' + miniView(mg, part).map(n2).join(" ") + '" preserveAspectRatio="xMidYMax meet" aria-hidden="true">' + rocketSVG(mg) + "</svg>";
   }
 
-  var optionsFor = null;
-  function buildOptionButtons(part) {
-    var el = $("options");
-    el.innerHTML = "";
-    BUILD_BY[part].opts.forEach(function (o) {
-      var b = document.createElement("button");
-      b.className = "btn opt";
-      b.dataset.opt = String(o[0]);
-      b.innerHTML = '<svg viewBox="0 0 10 10" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg><span>' + o[1] + "</span>";
-      el.appendChild(b);
-    });
-    optionsFor = part;
+  var tiles = null, tileSig = "";
+  function updateTiles() {
+    if (!tiles) return;
+    var part = state.part, spec = PARTS[part];
+    var list = spec.items.map(function (it) { return { id: String(it[0]), name: it[1], pic: optPic(part, it[0]) }; });
+    if (spec.paint) list.push({ id: "paint", name: "Paint", pic: brushPic(nextColor(spec.paint)) });
+    var sig = JSON.stringify([part, list.map(function (t) { return t.pic; })]);
+    if (sig !== tileSig) {
+      tileSig = sig;
+      tiles.items(list);
+      var pb = tiles.button("paint");
+      if (pb) { pb.classList.add("is-action"); pb.setAttribute("aria-label", "Paint the " + spec.name.toLowerCase()); }
+    }
+    tiles.set(partVal(part));
+  }
+  function onTile(id) {
+    if (Toybox.timer.locked()) return;
+    var part = state.part, spec = PARTS[part];
+    if (id === "paint") { paintPart(); return; }
+    var it = spec.items.filter(function (o) { return String(o[0]) === id; })[0];
+    if (!it) return;
+    applyOpt(part, it[0]);
+    ghost.learned("part");
+    var g = render();
+    celebrate(g);
+    blip();
+  }
+  // Paint: the picked part gets the next color, with a sparkle and its new color's name.
+  function paintPart() {
+    var spec = PARTS[state.part];
+    if (!spec.paint) return;
+    var c = nextColor(spec.paint);
+    state.colors[spec.paint] = c;
+    if (spec.paint === "body") fixDetails();
+    var g = render();
+    celebrate(g);
+    blip();
+    coach.say(c + " " + spec.name.toLowerCase() + "!", 3);
+  }
+  // Pick a part (a tap on the rocket): it glows, its name pops up and the tiles show its choices.
+  function pickPart(part, x, y) {
+    if (!PARTS[part]) return;
+    var same = part === state.part;
+    state.part = part;
+    state.buildPart = PART_TO_OLD[part];
+    if (PARTS[part].paint) state.colorPart = PARTS[part].paint;
+    ghost.learned("part");
+    if (x != null) Toybox.nametag(PARTS[part].name, x, y - 24);
+    render();
+    if (same && tiles) Toybox.wiggle(tiles.el);
+    else if (tiles) PARTS[part].items.forEach(function (it) { tiles.flash(String(it[0])); });
   }
 
   function render() {
@@ -1071,39 +863,13 @@ body.resting .flight { z-index: 55; }
     if (mo && buildKey() !== moKey) momentStop();
     art.innerHTML = sceneSVG(state, false);
     if (mo) attachLayers();
-
-    Array.prototype.forEach.call(document.querySelectorAll("[data-bpart]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.bpart === state.buildPart));
-    });
-    if (optionsFor !== state.buildPart) buildOptionButtons(state.buildPart);
-    Array.prototype.forEach.call(document.querySelectorAll("[data-opt]"), function (b) {
-      var spec = BUILD_BY[state.buildPart];
-      var val = spec.opts.filter(function (o) { return String(o[0]) === b.dataset.opt; })[0][0];
-      b.setAttribute("aria-pressed", String(val === state[state.buildPart]));
-      var cfg = Object.assign({}, state);
-      cfg[state.buildPart] = val;
-      var mg = geo(cfg);
-      var vb = miniView(mg, state.buildPart);
-      var svg = b.querySelector("svg");
-      svg.setAttribute("viewBox", vb.map(n2).join(" "));
-      svg.innerHTML = rocketSVG(mg);
-    });
-
-    $("buildStepLabel").textContent = BUILD_BY[state.buildPart].label;
-    updateTrips();
-    showPick();
+    updateTiles();
+    showHalo();
     art.setAttribute("aria-label", "A " + state.size + " rocket with " + state.stages + (state.stages === 1 ? " stage" : " stages") + " on its launch pad");
     save();
     layerKey = ""; // flight pictures are rebuilt from the new design
     return g;
   }
-
-  function updateTrips() {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-trip]"), function (b) {
-      b.setAttribute("aria-pressed", String(b.dataset.trip === state.trip));
-    });
-  }
-
   // Builder effects: a squash-and-stretch pop, sparkles, steam puffs.
   function restartAnim(el, cls) {
     if (!el || reduce) return;
@@ -1150,153 +916,101 @@ body.resting .flight { z-index: 55; }
     p.x = e.clientX; p.y = e.clientY;
     return p.matrixTransform(m.inverse());
   }
+  // Screen px of a picture point.
+  function screenPt(x, y) {
+    var m = art.getScreenCTM();
+    if (!m) return null;
+    var p = art.createSVGPoint();
+    p.x = x; p.y = y;
+    p = p.matrixTransform(m);
+    return [p.x, p.y];
+  }
   $("scene").addEventListener("pointermove", function (e) {
     if (!mo || mo.kind !== "face") return;
     var p = svgPoint(e);
     lastPtr = { x: p.x, y: p.y, at: performance.now() };
   });
-  $("scene").addEventListener("pointerdown", function (e) {
-    if (Toybox.timer.phase() === "resting") return;
-    if (e.target.closest && e.target.closest("button")) return;   // the Big/Back button sits on the picture
-    var p = svgPoint(e);
-    lastPtr = { x: p.x, y: p.y, at: performance.now() };
-    sparkles(p.x, p.y, 7, 50);
+  // Which part of the rocket is under (or close to) a finger: the exact spot first, then a ring around it,
+  // so a small finger near the edge of a fin still counts.
+  function partAt(x, y) {
+    var probes = [[0, 0]], k, r;
+    for (r = 14; r <= 28; r += 14) for (k = 0; k < 8; k++) probes.push([Math.cos(k * Math.PI / 4) * r, Math.sin(k * Math.PI / 4) * r]);
+    for (k = 0; k < probes.length; k++) {
+      var el = document.elementFromPoint(x + probes[k][0], y + probes[k][1]);
+      if (!el || !el.closest || !el.closest("#rocketG")) continue;
+      if (el.closest('[data-g="bL"], [data-g="bR"]') && !el.closest('[data-c="nose"]')) return "engine";
+      var c = el.closest("[data-c]"), part = c ? c.getAttribute("data-c") : "body";
+      return PARTS[part] ? part : "body";
+    }
+    return null;
+  }
+  // The launch pad and the tower: a tap there launches (Big mode has no tiles, so this is how he goes then too).
+  function onPad(p) {
+    return (p.y > -6 && p.y < 48 && Math.abs(p.x) < 160) || (p.x < -176 && p.x > -250 && p.y > -430 && p.y < 48);
+  }
+  // One press is always enough: every tap on the picture gets a hop and sparkles; a tap on a part picks it,
+  // a tap on the pad launches.
+  Toybox.press($("scene"), {
+    any: true,
+    hit: function () { return null; },
+    down: function (part, e) {
+      var p = svgPoint(e);
+      lastPtr = { x: p.x, y: p.y, at: performance.now() };
+      sparkles(p.x, p.y, 7, 50);
+      restartAnim($("rocketG"), "hop");
+      puffs(0, 0, 6);
+      blip();
+    },
+    tap: function (part, x, y, e) {
+      if (Toybox.timer.locked()) return;
+      var hitPart = partAt(x, y);
+      if (hitPart && !document.body.classList.contains("big")) { pickPart(hitPart, x, y); return; }
+      if (onPad(svgPoint(e))) launch();
+    }
+  });
+  function launch() {
+    if (Toybox.timer.locked() || !$("flight").hidden) return;
+    ghost.learned("launch");
+    launched = true;
+    openFlight(false);
+  }
+
+  // ---------- Panel: Go "Launch!", the picked part's tiles, the bottom bar ----------
+  var coach = Toybox.coach($("coach"));
+  // Idle help: the ghost hand taps Launch first; once he has launched, it taps a part of the rocket.
+  var ghost = Toybox.ghost({
+    max: 2,
+    onShow: function (p, on) { if (go) go.pulse(on && p.key === "launch"); },
+    plan: function () {
+      if (!$("flight").hidden || mo) return null;
+      if (!launched) {
+        var b = go.el.getBoundingClientRect();
+        if (b.width) return { pts: [[b.left + b.width / 2, b.top + b.height * 0.55]], tap: true, key: "launch" };
+      }
+      var rg = $("rocketG");
+      if (!rg) return null;
+      var g = geo(state), part = state.part === "fins" ? "nose" : "fins";
+      var pt = part === "fins" ? screenPt(g.stages[0].w / 2 + 22, g.stages[0].yb - 26) : screenPt(0, (g.top.yt + g.noseTop) / 2 + 6);
+      return pt ? { pts: [pt], tap: true, key: "part" } : null;
+    }
+  });
+  var launched = false;
+  var ROCKET_PIC = '<svg viewBox="-50 -60 100 120" aria-hidden="true"><path d="M0 -55 C 22 -35 24 -5 20 25 L -20 25 C -24 -5 -22 -35 0 -55 Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="7" stroke-linejoin="round"/><circle cy="-12" r="9" fill="#5BC0EB" stroke="#1D2340" stroke-width="6"/><path d="M -20 0 L -40 30 L -20 25 Z M 20 0 L 40 30 L 20 25 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/><path d="M -12 30 Q 0 62 12 30 Z" fill="#F77F00" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/></svg>';
+  var go = Toybox.go($("go"), { label: "Launch!", icon: ROCKET_PIC, onPress: function () { launch(); } });
+  tiles = Toybox.tiles($("tiles"), { items: [], kind: "pick", rows: 1, onPick: onTile });
+  // New: the first-visit rocket again (the nose cone picked).
+  function startOver() {
     if (Toybox.timer.locked()) return;
-    restartAnim($("rocketG"), "hop");
-    puffs(0, 0, 6);
-    blip();
-    tapPart(e.target);
-  });
-  // Tapping the rocket picks the part to color (nose, body or fins; anything else on it counts as the body),
-  // and lines up that part's shapes in Build. A tap on the sky or the ground puts the colors away.
-  function tapPart(el) {
-    var onR = el.closest && el.closest("#rocketG");
-    if (!onR || document.body.classList.contains("big")) { if (picking) setPicking(""); return; }
-    var c = el.closest("[data-c]"), part = c ? c.getAttribute("data-c") : "body";
-    state.buildPart = part === "body" ? (state.windows ? "windows" : "stages") : part;
-    if (part !== picking) setPicking(part);
+    momentStop();
+    var t = state.trip;
+    state = freshState();
+    state.trip = t;
     render();
+    celebrate(geo(state));
+    blip();
+    coach.say("A new rocket!", 3);
   }
-
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
-  // Page px of a point inside an element, as fractions of its box.
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
-  }
-  // Idle help: the ghost hand taps Launch once.
-  var ghost = makeGhost(function () {
-    var b = $("launch");
-    if (!b || !b.offsetWidth || !$("flight").hidden) return null;
-    return { pts: [ghostPt(b, 0.5, 0.55)], tap: true };
-  });
-  // Phone-and-tablet control tabs.
-  var tab = "build";
-  function showTab(name) {
-    tab = name;
-    $("tab-build").closest(".tb-panel").setAttribute("data-tab", name);
-    setPicking("");
-  }
-
+  Toybox.bar($("bottom"), { onNew: startOver, onSurprise: function () { surprise(); } });
   // ---------- Surprise: a fun moment on the launch pad, right now (his rocket never changes) ----------
   // They take turns, never the same twice in a row: a comet streaks past, a satellite drifts by and waves,
   // a friendly flying saucer loops around the rocket (and gives a cow a little ride), a happy face.
@@ -1594,47 +1308,14 @@ body.resting .flight { z-index: 55; }
   }
   if (/[?&]debug\b/.test(location.search)) window.__rocketSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { return MOMENTS[momentAt % MOMENTS.length]; } };
 
-  document.addEventListener("click", function (e) {
-    var t = e.target.closest("button");
-    if (!t) return;
-    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
-    // Big, the banner and the rest screen belong to the shared module (common/toybox.js).
-    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
-    if (t.id === "fback" || t.id === "fbuild") { closeFlight(); return; }
-    if (t.id === "again") {
+  // The flight screen's buttons: Build (back to the pad), Launch again / Fly home.
+  $("fback").addEventListener("click", function () { closeFlight(); });
+  $("fbuild").addEventListener("click", function () { closeFlight(); });
+  var againGo = Toybox.go($("again"), {
+    label: "Launch again!", icon: ROCKET_PIC,
+    onPress: function () {
       if (fl && fl.waitHome) { flyHome(); return; }
-      if (!Toybox.timer.locked()) startFlight(false);
-      return;
-    }
-    if (Toybox.timer.locked()) return;
-    if (t.id === "launch") { ghost.learned(); if (picking) setPicking(""); openFlight(false); return; }
-    if (t.dataset.trip) { state.trip = t.dataset.trip; updateTrips(); save(); blip(); return; }
-    var changed = false;
-    if (t.dataset.step) {
-      var dir = Number(t.dataset.dir) || 1;
-      var bi = BUILD.map(function (b) { return b.id; }), k = bi.indexOf(state.buildPart);
-      state.buildPart = bi[(k + dir + bi.length) % bi.length];
-    }
-    else if (t.dataset.bpart) { state.buildPart = t.dataset.bpart; }
-    else if (t.dataset.opt !== undefined) {
-      var spec = BUILD_BY[state.buildPart];
-      var val = spec.opts.filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
-      state[state.buildPart] = val;
-      changed = true;
-    }
-    else if (t.dataset.color) {
-      if (!picking) return;
-      state.colors[picking] = t.dataset.color;
-      if (picking === "body") fixDetails();
-      changed = true;
-    }
-    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
-    else return;
-    var g = render();
-    if (changed) {
-      celebrate(g);
-      blip();
-      if (t.dataset.color) restartAnim(t, "pop");
+      startFlight(false);
     }
   });
 
@@ -1734,6 +1415,16 @@ body.resting .flight { z-index: 55; }
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   var TRIP_NAME = { moon: "The Moon", mars: "Mars" };
+  var MOON_PIC = '<svg viewBox="-30 -30 60 60" aria-hidden="true"><circle r="24" fill="#C9D2E3" stroke="#1D2340" stroke-width="3"/><circle cx="-8" cy="-7" r="7" fill="#9AA3AF"/><circle cx="9" cy="8" r="5.5" fill="#9AA3AF"/><circle cx="7" cy="-12" r="3.5" fill="#9AA3AF"/><circle cx="-9" cy="12" r="3" fill="#9AA3AF"/></svg>';
+  var MARS_PIC = '<svg viewBox="-30 -30 60 60" aria-hidden="true"><circle r="24" fill="#D9643A" stroke="#1D2340" stroke-width="3"/><ellipse cx="0" cy="-19" rx="10" ry="3.5" fill="#FFFFFF"/><ellipse cx="-7" cy="3" rx="10" ry="5" fill="#B44A2B"/><ellipse cx="10" cy="11" rx="6" ry="3" fill="#B44A2B"/><ellipse cx="8" cy="-6" rx="5" ry="2.5" fill="#EE9A6A"/></svg>';
+  var PLANETS_PIC = '<svg viewBox="-34 -30 68 60" aria-hidden="true"><g transform="rotate(-18)"><path d="M -31 0 A 31 9 0 0 1 31 0" fill="none" stroke="#1D2340" stroke-width="8"/><path d="M -31 0 A 31 9 0 0 1 31 0" fill="none" stroke="#FFC93C" stroke-width="4"/></g><circle r="17" fill="#F0D58C" stroke="#1D2340" stroke-width="3"/><path d="M -15 -5 H 15 M -14 6 H 14" stroke="#D9B86A" stroke-width="4"/><g transform="rotate(-18)"><path d="M 31 0 A 31 9 0 0 1 -31 0" fill="none" stroke="#1D2340" stroke-width="8"/><path d="M 31 0 A 31 9 0 0 1 -31 0" fill="none" stroke="#FFC93C" stroke-width="4"/></g></svg>';
+  var EARTH_PIC = '<svg viewBox="-30 -30 60 60" aria-hidden="true"><circle r="24" fill="#4C9BE8" stroke="#1D2340" stroke-width="3"/><path d="M-14 -14c6-4 12-2 12 4s-8 6-6 12-8 4-10-2 0-10 4-14Z" fill="#3FAE5A"/><path d="M6 4c6-2 12 2 10 8s-8 6-10 2-4-8 0-10Z" fill="#3FAE5A"/></svg>';
+  // Out in space he picks where to go (picture tiles); the Moon by itself after a few seconds.
+  var tripTiles = Toybox.tiles($("tripTiles"), {
+    kind: "pick", rows: 1,
+    items: [{ id: "moon", name: "Moon", pic: MOON_PIC }, { id: "mars", name: "Mars", pic: MARS_PIC }, { id: "planets", name: "Planets", pic: PLANETS_PIC }],
+    onPick: function (id) { pickTrip(id); }
+  });
   var LANDED_TEXT = { moon: "On the Moon!", mars: "On Mars!" };
   // The planets tour, in order from the Sun. r: size as a share of the short screen side.
   var TOUR = [
@@ -1829,7 +1520,7 @@ body.resting .flight { z-index: 55; }
     G.layers.forEach(function (l) { groups[l.group] = { on: true, dx: 0, dy: 0, s: 1 }; });
     return {
       phase: "count", t: 0, total: 0, goodbye: goodbye,
-      trip: goodbye ? "home" : (state.trip || "moon"),
+      trip: goodbye ? "home" : "",
       rise: 0, v: 0, cam: 0, P: 0, alt: 0, apogee: 0,
       boost: 0, x: 0, vx: 0, ang: 0, shake: 0, flame: 0, flameGap: 0,
       active: 0, sepIdx: 0, groups: groups, debris: [], parts: [], texts: [], rings: [],
@@ -1861,6 +1552,7 @@ body.resting .flight { z-index: 55; }
   function startFlight(goodbye) {
     prepLayers();
     fl = newFlight(goodbye);
+    showTrips(false);
     $("landbar").hidden = true;
     $("banner").hidden = true;
     hideName();
@@ -1874,6 +1566,7 @@ body.resting .flight { z-index: 55; }
     var wasGoodbye = !!(fl && fl.goodbye);
     F.hidden = true;
     fl = null;
+    showTrips(false);
     running = false;
     stopRumble();
     clearTimeout(bannerTimer);
@@ -1886,7 +1579,7 @@ body.resting .flight { z-index: 55; }
   // The big button at the bottom: "Fly home" out in space, "Launch again!" back on the pad.
   function showLandbar(home) {
     if (Toybox.timer.locked()) return;
-    $("again").firstChild.textContent = home ? "Fly home" : "Launch again!";
+    againGo.set(home ? "Fly home" : "Launch again!", home ? EARTH_PIC : ROCKET_PIC);
     $("fbuild").hidden = home;
     $("landbar").hidden = false;
   }
@@ -1913,9 +1606,11 @@ body.resting .flight { z-index: 55; }
   }
   // A planet's name in big letters.
   var nameTimer = null, nameShown = "";
-  function showName(text, ms) {
+  function showName(text, ms, side) {
     var el = $("pname");
     clearTimeout(nameTimer);
+    el.classList.toggle("left", side === "left");
+    el.classList.toggle("right", side === "right");
     if (nameShown !== text || el.hidden) {
       el.textContent = text;
       el.hidden = false;
@@ -2181,7 +1876,7 @@ body.resting .flight { z-index: 55; }
       return;
     }
     if (ph === "tour" && popAsteroid(x, y)) return;
-    if (ph === "ascent" || ph === "coast" || ph === "ignite" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward") {
+    if (ph === "ascent" || ph === "coast" || ph === "ignite" || ph === "pick" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward") {
       fl.boost = Math.min(3, fl.boost + 1);
       if (ph === "coast") { fl.v += H * 0.6; fl.flameGap = 0; }
       if (!reduce) fl.shake = Math.max(fl.shake, 5);
@@ -2271,7 +1966,7 @@ body.resting .flight { z-index: 55; }
     var ph = f.phase;
 
     // Steering: dragging fingers nudge the rocket sideways while it flies.
-    var free = ph === "ascent" || ph === "coast" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward" || (ph === "descent" && f.t < DESCENT_T * 0.65);
+    var free = ph === "ascent" || ph === "coast" || ph === "pick" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward" || (ph === "descent" && f.t < DESCENT_T * 0.65);
     var drag = 0, nd = 0;
     Object.keys(f.ptrs).forEach(function (k) { drag += f.ptrs[k] - W / 2; nd++; });
     var target = free ? (nd ? clamp(drag / nd, -W * 0.3, W * 0.3) * 0.5 : 0) : 0;
@@ -2280,7 +1975,7 @@ body.resting .flight { z-index: 55; }
     f.vx += ((target - f.x) * 5 - f.vx * 3.2) * dt;
     f.x += f.vx * dt;
     if (ph !== "flip" && ph !== "swing") {
-      f.ang = (ph === "ascent" || ph === "coast" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward") ? clamp(f.vx / W * 0.5, -0.3, 0.3) : 0;
+      f.ang = (ph === "ascent" || ph === "coast" || ph === "pick" || ph === "cruise" || ph === "tour" || ph === "tourEnd" || ph === "homeward") ? clamp(f.vx / W * 0.5, -0.3, 0.3) : 0;
     }
 
     if (ph === "count") {
@@ -2332,6 +2027,16 @@ body.resting .flight { z-index: 55; }
       f.alt = altFromRise(f.rise);
       setRumble(0.06 * f.flame);
       if (f.t >= 2.6 && f.v < H * 0.45) startDescent();
+    } else if (ph === "pick") {
+      // Out in space, coasting while he picks where to go.
+      f.flame = 0.4 + 0.6 * Math.min(1, f.boost);
+      f.sv += (H * (1.2 + 1.6 * f.boost) - f.sv) * Math.min(1, dt * 1.2);
+      streamStars(f.sv, dt);
+      f.earthDrop += f.sv * dt * 0.15;
+      f.cy += (H * 0.42 - f.cy) * Math.min(1, dt);
+      setRumble(0.03 + 0.03 * f.boost);
+      $("tripWait").style.width = (clamp(f.t / TRIP_WAIT, 0, 1) * 100).toFixed(1) + "%";
+      if (f.t >= TRIP_WAIT) { tripTiles.flash("moon"); tripTiles.set("moon"); pickTrip("moon"); }
     } else if (ph === "cruise") {
       // Coasting toward the Moon or Mars; it grows bigger and bigger.
       var CR = 7.5;
@@ -2520,7 +2225,26 @@ body.resting .flight { z-index: 55; }
     f.v = 0;
     f.t = 0;
     f.named = false;
-    f.phase = f.trip === "planets" ? "tour" : "cruise";
+    // Where to? The tiles show; the Moon by itself after a few seconds.
+    f.phase = "pick";
+    showTrips(true);
+  }
+  var TRIP_WAIT = 4.5;
+  function showTrips(on) {
+    $("tripbar").hidden = !on;
+    if (on) { tripTiles.set(null); $("tripWait").style.width = "0"; }
+  }
+  function pickTrip(id) {
+    var f = fl;
+    if (!f || f.phase !== "pick") return;
+    showTrips(false);
+    f.trip = id;
+    state.trip = id;
+    save();
+    f.t = 0;
+    f.named = false;
+    f.phase = id === "planets" ? "tour" : "cruise";
+    blip();
   }
 
   function touchdown() {
@@ -2704,7 +2428,7 @@ body.resting .flight { z-index: 55; }
       f.beltNext -= dt;
       if (u < 0.8 && f.beltNext <= 0) { spawnAsteroid(); f.beltNext = rand(0.18, 0.4); }
     }
-    if (u > 0.12 && u < 0.86) showName(item.n);
+    if (u > 0.12 && u < 0.86) showName(item.n, 0, f.body ? (f.tside > 0 ? "left" : "right") : "");
     else if (u >= 0.86) hideName();
   }
   function endTour() {
@@ -2724,7 +2448,7 @@ body.resting .flight { z-index: 55; }
     f.waitHome = false;
     $("landbar").hidden = true;
     if (f.phase === "explore") stow(true);
-    else if (f.phase === "cruise" || f.phase === "tour" || f.phase === "tourEnd") startHomeward();
+    else if (f.phase === "pick" || f.phase === "cruise" || f.phase === "tour" || f.phase === "tourEnd") { showTrips(false); startHomeward(); }
   }
   function flyHome() {
     var f = fl;
@@ -2792,6 +2516,8 @@ body.resting .flight { z-index: 55; }
       return;
     }
     showLandbar(false);
+    // A whole trip, there and back: sometimes a kind-words card.
+    if (f.trip && f.trip !== "home") Toybox.kind();
   }
 
   // ---- drawing ----
@@ -3348,11 +3074,11 @@ body.resting .flight { z-index: 55; }
       var landed = f.body && f.body.r > 1.3 * M && (f.trip === "moon" || f.trip === "mars");
       if (landed && f.trip === "moon") drawBody({ kind: "earth", x: W * 0.8, y: H * 0.16, r: M * 0.07, rot: 0 });
       if (landed && f.trip === "mars") {
-        // Dusty pink haze over the Martian ground.
-        var gtop = f.body.y - f.body.r;
-        var hz = ctx.createLinearGradient(0, gtop - H * 0.45, 0, gtop);
-        hz.addColorStop(0, "rgba(240,150,100,0)"); hz.addColorStop(1, "rgba(240,150,100,0.45)");
-        ctx.fillStyle = hz; ctx.fillRect(0, gtop - H * 0.45, W, H * 0.45 + 4);
+        // The Martian sky: thin butterscotch dust, thick near the ground, fading up into the dark.
+        var gtop = f.body.y - f.body.r, hzH = H * 0.7;
+        var hz = ctx.createLinearGradient(0, gtop - hzH, 0, gtop);
+        hz.addColorStop(0, "rgba(214,140,96,0)"); hz.addColorStop(0.55, "rgba(222,146,100,0.45)"); hz.addColorStop(1, "rgba(238,170,120,0.85)");
+        ctx.fillStyle = hz; ctx.fillRect(0, gtop - hzH, W, hzH + 4);
       }
     }
     f.sats.forEach(drawSat);
@@ -3387,14 +3113,18 @@ body.resting .flight { z-index: 55; }
         drawFlame(n, len, f.total);
       });
     }
+    // In a dark sky the fire glows (added light, shrinking as it cools) instead of fading to a muddy brown.
+    var darkSky = f.space || f.alt > 40000;
+    if (darkSky) ctx.globalCompositeOperation = "lighter";
     for (i = 0; i < ps.length; i++) {
       p = ps[i];
       if (p.kind !== 0) continue;
       a = 1 - p.age / p.life;
-      ctx.globalAlpha = Math.min(1, a * 1.4);
+      ctx.globalAlpha = darkSky ? Math.min(1, 0.3 + a * 0.8) : Math.min(1, a * 1.4);
       ctx.fillStyle = p.col;
-      ctx.beginPath(); ctx.arc(p.x, p.y + cam, p.r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y + cam, darkSky ? p.r * (0.35 + 0.65 * a) : p.r, 0, Math.PI * 2); ctx.fill();
     }
+    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
 
     // Spent stages and boosters tumbling away.
@@ -3543,8 +3273,8 @@ body.resting .flight { z-index: 55; }
     return '<svg class="rest-art" viewBox="-260 -600 520 660" preserveAspectRatio="xMidYMax slice" aria-hidden="true">' + sceneSVG(state, true) + "</svg>";
   }
 
-  showTab(tab);
   render();
+  coach.step("Tap a part, then Launch!");
   // The old sound key said "on"/"off"; the shared module reads "1" for on.
   try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
   // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
@@ -3552,7 +3282,7 @@ body.resting .flight { z-index: 55; }
   Toybox.init({
     app: "rocket-builder",
     big: { button: $("bigToggle") },
-    onBig: function (on) { if (on && picking) setPicking(""); },
+    onBig: function () { showHalo(); },
     timerIntro: "When time is up, the rocket flies home, lands and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye launch button to press",
     farewellText: "Time to say goodbye",
@@ -3577,7 +3307,11 @@ body.resting .flight { z-index: 55; }
   $("stage").appendChild($("tb-farewell"));
 
   // Test hook for automated checks, only with ?debug in the address.
-  if (/[?&]debug\b/.test(location.search)) { dbg = { speed: 1, flight: function () { return fl; } }; window.__rocket = dbg; }
+  if (/[?&]debug\b/.test(location.search)) {
+    dbg = { speed: 1, flight: function () { return fl; }, state: function () { return state; },
+      screen: function (x, y) { return screenPt(x, y); }, geo: function () { return geo(state); }, ghost: function () { return ghost.show(); } };
+    window.__rocket = dbg;
+  }
 })();
 </script>
 </body>
