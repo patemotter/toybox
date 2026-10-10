@@ -1655,8 +1655,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     snd("pick");
     dirty = true;
   });
-  stage.addEventListener("pointermove", function (e) { var q = stagePt(e); lastPtr = { x: q[0], y: q[1], at: now() }; });
-  stage.addEventListener("pointerdown", function (e) { var q = stagePt(e); lastPtr = { x: q[0], y: q[1], at: now() }; }, true);
   cv.addEventListener("pointermove", function (e) {
     var h = held[e.pointerId];
     if (!h) return;
@@ -1728,19 +1726,19 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Surprise: a fun moment on the puzzle, right now ----------
-  // They take turns (never the same twice in a row, starting at a random one); his pieces never move for
-  // good and nothing is cut again: (1) the part of the picture he has put together comes alive, (2) the
-  // loose pieces hop aside and back like popcorn, (3) the board gets a happy face that looks at his finger.
+  // They take turns (not the same twice in a row unless nothing else fits, starting at a random one); his
+  // pieces never move for good and nothing is cut again: (1) the part of the picture he has put together
+  // comes alive, (2) the loose pieces hop aside and back like popcorn.
   // On the picture chooser and the shelf the cards hop or wave. Pressed again during a moment: a few sparkles.
-  var MOMENTS = ["alive", "hop", "face"];
+  var MOMENTS = ["alive", "hop"];
   var momentAt = Math.floor(Math.random() * MOMENTS.length), lastMoment = "";
-  var mo = null, lastPtr = null, cardMoment = 0, cardBusyUntil = 0;
+  var mo = null, cardMoment = 0, cardBusyUntil = 0;
   function momentOk(k) {
     if (!puz || !LY || !big) return false;
     var done = !!(st.cur && st.cur.done);
     if (k === "alive") return done || placedCount() > 0;
     if (k === "hop") return !done && order.some(function (p) { return p.heldBy == null && !p.anim; });
-    return true;
+    return false;
   }
   function surprise() {
     if (window.Toybox && Toybox.timer.locked()) return;
@@ -1750,12 +1748,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var t = now();
     var aliveBusy = st.cur.done && t - aliveT0 < PIC_BY[puz.pic].dur * 1000;
     if (mo || aliveBusy) { smallSparkles(); return; }
-    for (var i = 0; i < MOMENTS.length; i++) {
-      var k = MOMENTS[(momentAt + i) % MOMENTS.length];
-      if (k === lastMoment || !momentOk(k)) continue;
-      momentAt += i + 1; lastMoment = k;
-      startMoment(k);
-      return;
+    for (var pass = 0; pass < 2; pass++) {
+      for (var i = 0; i < MOMENTS.length; i++) {
+        var k = MOMENTS[(momentAt + i) % MOMENTS.length];
+        if ((!pass && k === lastMoment) || !momentOk(k)) continue;
+        momentAt += i + 1; lastMoment = k;
+        startMoment(k);
+        return;
+      }
     }
     smallSparkles();
   }
@@ -1781,8 +1781,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         p.hop = reduce ? { t0: t + i * 40, dur: 700, dx: 0, up: 6 } : { t0: t + i * 70, dur: 1300, dx: dx, up: Math.min(cell * 0.5, 46) };
       });
       mo = { kind: "hop", t0: t, dur: 1400 + list.length * 70 };
-    } else {
-      mo = { kind: "face", t0: t, dur: 5600 };
     }
     dirty = true;
   }
@@ -1815,40 +1813,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       });
       c.restore();
       c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    } else if (mo.kind === "face") {
-      var r = st.cur && st.cur.done ? doneRect(t) : { x: LY.bx, y: LY.by, w: LY.bw, h: LY.bh };
-      var D = mo.dur / 1000, ft = u / 1000;
-      var k = Math.min(smooth(ft / 0.5), 1 - smooth((ft - (D - 0.5)) / 0.5));
-      if (k <= 0) return;
-      var pop = ft < 0.6 ? 1 + Math.sin(clamp(ft / 0.6, 0, 1) * Math.PI) * 0.15 : 1;
-      var cx = r.x + r.w / 2, cy = r.y + r.h * 0.46, er = Math.min(r.w, r.h) * 0.13;
-      happyFace(c, cx, cy, er, k * pop, ft, reduce ? 0 : Math.sin(ft * 3) * 0.05);
     }
-  }
-  // A cartoon face: two big eyes that look at his finger and blink, rosy cheeks, a happy open smile.
-  function happyFace(c, cx, cy, er, sc, ft, rot) {
-    var look = lastPtr && now() - lastPtr.at < 8000 ? lastPtr : { x: cx + er * 3, y: cy + er * 2 };
-    var bl = 1;
-    [1.3, 2.9, 3.2, 4.6].forEach(function (b) { var d = Math.abs(ft - b); if (d < 0.12) bl = Math.min(bl, d / 0.12); });
-    var sep = er * 1.35;
-    c.save();
-    c.translate(cx, cy); c.rotate(rot || 0); c.scale(sc, sc);
-    c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = Math.max(3, er * 0.12);
-    [-1, 1].forEach(function (sgn) {
-      var ex = sgn * sep, ey = -er * 0.4;
-      c.save(); c.translate(ex, ey); c.scale(1, Math.max(0.08, bl));
-      c.beginPath(); c.ellipse(0, 0, er, er * 1.12, 0, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill(); c.stroke();
-      var dx = look.x - (cx + ex), dy = look.y - (cy + ey), d = Math.hypot(dx, dy) || 1, m = Math.min(er * 0.42, d);
-      c.beginPath(); c.arc(dx / d * m, dy / d * m, er * 0.5, 0, TAU); c.fillStyle = OUT; c.fill();
-      c.beginPath(); c.arc(dx / d * m - er * 0.17, dy / d * m - er * 0.2, er * 0.17, 0, TAU); c.fillStyle = "#FFFFFF"; c.fill();
-      c.restore();
-      c.beginPath(); c.ellipse(sgn * sep * 1.75, er * 0.85, er * 0.42, er * 0.26, 0, 0, TAU); c.fillStyle = "rgba(255,143,184,0.85)"; c.fill();
-    });
-    c.beginPath(); c.moveTo(-er * 1.05, er * 0.75); c.quadraticCurveTo(0, er * 2.05, er * 1.05, er * 0.75); c.closePath();
-    c.fillStyle = "#E8505B"; c.fill(); c.stroke();
-    c.beginPath(); c.moveTo(-er * 0.55, er * 1.28); c.quadraticCurveTo(0, er * 1.05, er * 0.55, er * 1.28); c.quadraticCurveTo(0, er * 1.75, -er * 0.55, er * 1.28);
-    c.fillStyle = "#FF8FB8"; c.fill();
-    c.restore();
   }
   // Picture chooser and shelf: the cards hop like popcorn or rise in a wave (taking turns).
   function cardSurprise() {

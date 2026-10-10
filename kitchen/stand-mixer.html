@@ -747,10 +747,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   // ---------- Surprise: a fun moment on the scene, right now (the moments take turns) ----------
   // FUN.cur[kind] = { t0, dur } while a moment plays. Nothing here changes his food or his progress.
   var FUN = { cur: {}, last: "", i: 0 }, MAMP = reduce ? 0.35 : 1;
-  var finger = { x: 0, y: 0, t: -99 };
-  function trackFinger(e) { finger.x = e.clientX; finger.y = e.clientY; finger.t = now(); }
-  document.addEventListener("pointerdown", trackFinger, true);
-  document.addEventListener("pointermove", trackFinger, true);
   function funStart(kind, dur) { FUN.cur[kind] = { t0: now(), dur: dur }; FUN.last = kind; }
   function funK(kind) {
     var m = FUN.cur[kind];
@@ -761,46 +757,17 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
   function funEnv(k, a) { a = a || 0.12; return k < 0 ? 0 : clamp(Math.min(k / a, (1 - k) / a), 0, 1); }
   function funPop(t) { t = clamp(t, 0, 1) - 1; return 1 + 2.2 * t * t * t + 1.2 * t * t; }
-  // The next moment in turn that can happen now, never the one just played.
+  // The next moment in turn that can happen now; the one just played only when nothing else can.
   function funPick(order, ok) {
-    for (var j = 0; j < order.length; j++) {
-      var id = order[(FUN.i + j) % order.length];
-      if (FUN.cur[id] || id === FUN.last || !ok(id)) continue;
-      FUN.i = (FUN.i + j + 1) % order.length;
-      return id;
-    }
-    return "";
-  }
-  // A cartoon face (scene units): eyes that follow his finger and blink, rosy cheeks, a big smile.
-  // k: how far through the moment (it pops in and out); s: size; sq: squash for things seen from above.
-  function happyFace(cx, cy, s, k, sq) {
-    var app = funEnv(k, 0.1);
-    if (app <= 0) return;
-    var t = now(), pop = app < 1 ? Math.max(0.01, funPop(app)) : 1, sc = s * pop;
-    var p = finger.t > t - 4 ? toLocal(finger.x, finger.y) : { x: cx + Math.sin(t * 0.8) * 3, y: cy + 0.6 };
-    var dx = p.x - cx, dy = p.y - cy, dl = Math.hypot(dx, dy) || 1;
-    var lx = dx / dl, ly = dy / dl, blink = ((t + 0.7) % 2.4) < 0.14 ? 0.12 : 1;
-    var lw = LW / sc;
-    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc * (sq || 1));
-    ctx.lineJoin = "round"; ctx.lineCap = "round";
-    ctx.fillStyle = "rgba(255,111,145,0.55)";
-    ctx.beginPath(); ctx.ellipse(-0.27, 0.12, 0.07, 0.045, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0.27, 0.12, 0.07, 0.045, 0, 0, Math.PI * 2); ctx.fill();
-    for (var side = -1; side <= 1; side += 2) {
-      var ex = side * 0.15;
-      ctx.beginPath(); ctx.ellipse(ex, 0, 0.1, 0.125 * blink, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = lw * 1.1; ctx.strokeStyle = INK; ctx.stroke();
-      if (blink > 0.5) {
-        ctx.beginPath(); ctx.arc(ex + lx * 0.04, ly * 0.055, 0.055, 0, Math.PI * 2); ctx.fillStyle = INK; ctx.fill();
-        ctx.beginPath(); ctx.arc(ex + lx * 0.04 - 0.02, ly * 0.055 - 0.022, 0.018, 0, Math.PI * 2); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+    for (var pass = 0; pass < 2; pass++) {
+      for (var j = 0; j < order.length; j++) {
+        var id = order[(FUN.i + j) % order.length];
+        if (FUN.cur[id] || (!pass && id === FUN.last) || !ok(id)) continue;
+        FUN.i = (FUN.i + j + 1) % order.length;
+        return id;
       }
     }
-    // An open smile with a little tongue.
-    ctx.beginPath(); ctx.moveTo(-0.13, 0.13); ctx.quadraticCurveTo(0, 0.36, 0.13, 0.13); ctx.quadraticCurveTo(0, 0.18, -0.13, 0.13); ctx.closePath();
-    ctx.fillStyle = "#B8324A"; ctx.fill();
-    ctx.save(); ctx.clip(); ctx.beginPath(); ctx.ellipse(0, 0.27, 0.07, 0.05, 0, 0, Math.PI * 2); ctx.fillStyle = "#FF8FA3"; ctx.fill(); ctx.restore();
-    ctx.lineWidth = lw * 1.1; ctx.strokeStyle = INK; ctx.stroke();
-    ctx.restore();
+    return "";
   }
 
   // ---------- New and Surprise ----------
@@ -822,9 +789,9 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     tone(500, 0.2, 0.04, "sine", 300);
   }
   // Stand Mixer moments: sprinkles or chocolate chips rain into the bowl; food coloring drops swirl into
-  // the batter and blend back; the batter climbs the beater and plops back down; a happy face on the head;
-  // the mixer nods hello. Nothing changes the recipe (the sprinkles only top it).
-  var FUN_ORDER = ["sprinkles", "color", "climb", "face", "nod"];
+  // the batter and blend back; the batter climbs the beater and plops back down; the mixer nods hello.
+  // Nothing changes the recipe (the sprinkles only top it).
+  var FUN_ORDER = ["sprinkles", "color", "climb", "nod"];
   var COLOR_SETS = [["#3DB4FF", "#FF6FB5", "#4CD964"], ["#8E6CFF", "#FFB627", "#FF4D6D"], ["#2EC4B6", "#FF6FD8", "#FFD23F"]];
   function batterIn() { return !!S.recipe && !take && level() > 0.05; }
   function funOk(id) {
@@ -844,7 +811,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       FUN.cols.forEach(function (c, i) { drops.push({ kind: "drop", id: "", x: -0.16 + i * 0.16, y: RIM_Y - 0.9 - i * 0.18, vx: 0, vy: 0, rot: 0, spin: 0, r: 0.035, col: c, amt: 0 }); });
       say("Pretty colors!");
     } else if (id === "climb") { funStart("climb", reduce ? 3.5 : 4.6); FUN.plopped = false; say("Up it goes!"); tone(300, 1.6, 0.025, "sine", 700); }
-    else if (id === "face") { funStart("face", 6); say("Hello, mixer!"); tone(660, 0.12, 0.03, "sine", 880); tone(880, 0.16, 0.03, "sine", 1100, 0.15); }
     else { funStart("nod", reduce ? 2.5 : 3.6); twist = 1; say("The mixer says hi!"); click(); setTimeout(click, 420); setTimeout(click, 840); }
   }
   // The head's extra nod (a Surprise moment), added to its tilt when it is drawn.
@@ -1563,8 +1529,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (fk > 0) { circ(kx, LV_Y - 0.08, 0.13); ctx.fillStyle = "rgba(255,201,60," + fk.toFixed(2) + ")"; ctx.fill(); }
     rr(kx - 0.03, LV_Y - 0.14, 0.06, 0.15, 0.02); fs("#C9D3E0", 0.9);
     circ(kx, LV_Y - 0.15, 0.065); fs(M.pos > 0 ? "#FFC93C" : "#FFFFFF", 1);
-    var fk = funK("face");
-    if (fk >= 0) happyFace(-0.08, -1.52, 0.74, fk);
     ctx.restore();
   }
   // The speed's name over the lever while it is set or being moved.
