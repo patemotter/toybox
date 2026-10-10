@@ -74,54 +74,42 @@ body {
 .stage { background: #DCE7F1; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .stage .tbadge { position: absolute; top: 8px; right: 8px; z-index: 3; }
-/* Choices: the foods for the board (a tap puts one on). */
-.tb-choices { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
-.tb-tile { touch-action: manipulation; position: relative; }
-.tb-tile svg { pointer-events: none; overflow: visible; }
-.tb-tile span { pointer-events: none; white-space: nowrap; }
-@media (max-width: 600px) { .tb-tile { font-size: 0.84rem; min-height: 66px; } }
-@media (min-width: 700px) and (min-height: 700px) {
-  .tb-choices { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
-  .tb-tile { font-size: 0.98rem; }
-}
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-choices { gap: 6px; }
-  .tb-tile { min-height: 60px; font-size: 0.8rem; }
-  .tb-tile svg { width: 34px; height: 34px; }
-}
+/* Big: the header and the panel hide (the knife and the board do everything). */
 body.big .tb-head > :not(.bigtoggle) { display: none; }
 body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
-/* Ghost hand (tools/snippets/ghost-hand.css) */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
+/* Landscape: a wider side panel so the seven food tiles keep their full size (3 a row on an iPad, 4 on a phone). */
+@media (orientation: landscape) {
+  .tb-v2 .tb-body .tb-panel { width: 400px; }
+  .tb-v2 #tiles.tb-tilerow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .tb-v2 .tb-body .tb-panel { width: 360px; }
+  .tb-v2 #tiles.tb-tilerow { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+}
+/* The Back button shows the kitchen's picture (and its name on an iPad). */
+.mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
 </style>
 </head>
 <body>
-<div class="tb-app-shell">
+<div class="tb-app-shell tb-v2">
   <header class="tb-head">
-    <a class="btn tb-iconbtn tb-back" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Kitchen</span></a>
+    <a class="btn tb-iconbtn tb-back mapbtn" id="backbtn" href="./" aria-label="Back to the kitchen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 33h28" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M9 17h22l-2 14H11z" fill="#E63946" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="12" width="26" height="6" rx="3" fill="#B8323E" stroke="#1D2340" stroke-width="2.5"/><rect x="17" y="7" width="6" height="5" rx="2" fill="#3B4256" stroke="#1D2340" stroke-width="2"/><path d="M4 20h5M31 20h5" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/></svg><span>Kitchen</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Cutting board</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
+    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A wooden cutting board with food to slice, a kid's nylon knife and a bowl"></canvas>
       <div class="tb-counter" id="counter">Snacks: 0</div>
-      <div class="tb-coach" id="coach">Cut it in half!</div>
+      <div id="coach"></div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
     <section class="tb-panel" id="panel">
-      <div class="tb-choices" id="choices"></div>
-      <nav class="tb-tabs">
-        <button class="btn tb-new" id="newBtn">New</button>
-        <button class="btn tb-surprise" id="surpriseBtn">Surprise</button>
-      </nav>
+      <div id="tiles"></div>
+      <div id="bottom"></div>
     </section>
   </div>
 </div>
@@ -186,8 +174,10 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return out;
   }
   var LH = 0.95; // half length of the long foods
-  function coinCuts(L) { return [[-L / 4, -1, -L / 4, 1], [L / 4, -1, L / 4, 1], [-3 * L / 4, -1, -3 * L / 4, 1], [3 * L / 4, -1, 3 * L / 4, 1]]; }
-  function halfQuarterCuts(L) { return [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }, { say: "Now in quarters!", cuts: [[-L / 2, -1, -L / 2, 1], [L / 2, -1, L / 2, 1]] }]; }
+  // At most two cuts per food (the dad: short and direct): the first stroke halves it, the second makes all the
+  // coins (or cubes) at once, the knife chopping each line by itself.
+  function coinCuts(L) { return [[-L / 3, -1, -L / 3, 1], [L / 3, -1, L / 3, 1], [-2 * L / 3, -1, -2 * L / 3, 1], [2 * L / 3, -1, 2 * L / 3, 1]]; }
+  function halfCut() { return [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }]; }
 
   var bananaYc = function (x) { return 0.22 * (1 - x * x / (LH * LH)) - 0.1; };
   var bananaT = function (x) { return 0.03 + 0.17 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(x) / LH, 2.4)), 0.5); };
@@ -199,11 +189,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   };
   var FOODS = {
     banana: { name: "Banana", col: "#FFD84D", pts: longOutline(LH, bananaYc, bananaT), t: bananaT, yc: bananaYc,
-      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFF7D8" },
+      steps: halfCut().concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFF7D8" },
     cucumber: { name: "Cucumber", col: "#7CC46A", pts: longOutline(LH, function () { return 0; }, cucT), t: cucT, yc: function () { return 0; },
-      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into circles!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#DDF5C0" },
+      steps: halfCut().concat([{ say: "Slice it into circles!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#DDF5C0" },
     carrot: { name: "Carrot", col: "#FF8A1F", pts: longOutline(LH, function () { return 0; }, carT), t: carT, yc: function () { return 0; },
-      steps: halfQuarterCuts(LH).concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFB86A", padL: 0.42 },
+      steps: halfCut().concat([{ say: "Slice it into coins!", cuts: coinCuts(LH) }]), coins: true, sep: 0.06, cut: "#FFB86A", padL: 0.42 },
     strawberry: { name: "Strawberry", col: "#E8344E", sep: 0.12, cut: "#FFE3E8", flipAfter: 0,
       pts: (function () {
         var o = [];
@@ -216,8 +206,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       })(),
       steps: [{ say: "Cut it in half!", cuts: [[0, -1.2, 0, 1.2]] }, { say: "Now in quarters!", cuts: [[-1, 0.06, 1, 0.06]] }] },
     cheese: { name: "Cheese", col: "#FFC93C", pts: [[-0.9, -0.42], [0.9, -0.42], [0.9, 0.42], [-0.9, 0.42]], depth: 0.16, side: "#E8A41E", sep: 0.07, cut: "#FFE07A",
-      steps: [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }, { say: "Now in quarters!", cuts: [[-0.45, -1, -0.45, 1], [0.45, -1, 0.45, 1]] },
-        { say: "Now make cubes!", cuts: [[-1, 0, 1, 0]] }] },
+      steps: [{ say: "Cut it in half!", cuts: [[0, -1, 0, 1]] }, { say: "Now make cubes!", cuts: [[-0.45, -1, -0.45, 1], [0.45, -1, 0.45, 1], [-1, 0, 1, 0]] }] },
     bread: { name: "Bread", col: "#E2B07A", depth: 0.07, side: "#A8693A", sep: 0.11, cut: "#FFF1D6",
       pts: (function () {
         var o = [[-0.7, 0.7], [-0.72, -0.28]];
@@ -448,7 +437,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var knife = { x: 2.05, y: -0.72, a: Math.PI, hold: null, anim: null, back: null, fx: 0, fy: 0 };
   var bowl = { offx: 0, offy: 0, swapT: -99, swapped: true, wig: 0, forkT: -99 };
   var parts = [];
-  var sayMsg = "", sayUntil = 0;
   var bowlCache = null;
   function bowlBuilt() {
     if (!bowlCache) bowlCache = S.bowl.map(function (b) { return buildFood(b.i, b.c, false); });
@@ -471,7 +459,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
   var COACH = {
     pick: "Pick a food!", done: "Yum! Pick a food!", flying: "Into the bowl!", press: "Press the slicer down!",
-    slices: "Apple slices!", sweep: "Slide them into the bowl!"
+    slices: "Apple slices!", sweep: "Into the bowl!"
   };
   function coachText() {
     var ph = phase();
@@ -519,35 +507,31 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
 
   // ---------- Coach and counter ----------
-  var coachEl = $("coach"), counterEl = $("counter");
-  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
+  var counterEl = $("counter");
+  var coach = Toybox.coach($("coach"));
+  function say(msg, sec) { coach.say(msg, sec || 3); }
   var lastCoach = "";
   function updateCoach() {
-    var t = Date.now() < sayUntil ? sayMsg : coachText();
-    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+    var t = coachText();
+    if (t !== lastCoach) { lastCoach = t; coach.step(t); }
   }
   function updateCounter() { counterEl.textContent = "Snacks: " + S.count; }
 
-  // ---------- Panel: the foods ----------
-  var choicesEl = $("choices");
-  (function () {
-    var h = "";
-    ORDER.forEach(function (id) { h += '<button class="btn tb-tile" data-food="' + id + '" aria-pressed="false" aria-label="' + FOODS[id].name + '">' + ICON[id] + "<span>" + FOODS[id].name + "</span></button>"; });
-    choicesEl.innerHTML = h;
-  })();
+  // ---------- Panel: the foods (choice tiles; picking one puts it on the board) ----------
+  function tilePic(id) { return ICON[id].replace(' aria-hidden="true"', ""); }
+  var tiles = Toybox.tiles($("tiles"), {
+    kind: "pick", rows: 2,
+    items: ORDER.map(function (id) { return { id: id, name: FOODS[id].name, pic: tilePic(id) }; }),
+    value: "",
+    onPick: function (id) { chooseFood(id); }
+  });
   var lastPicked = null;
   function updateTiles() {
     var id = cur && !cur.flying ? cur.id : (pending || "");
     if (id === lastPicked) return;
     lastPicked = id;
-    Array.prototype.forEach.call(choicesEl.querySelectorAll(".tb-tile"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-food") === id ? "true" : "false"); });
+    tiles.set(id);
   }
-  choicesEl.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest(".tb-tile");
-    if (!b) return;
-    e.preventDefault();
-    chooseFood(b.getAttribute("data-food"));
-  });
 
   // ---------- Picking a food ----------
   function arrive(id) {
@@ -559,7 +543,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function chooseFood(id) {
     if (locked() || !FOODS[id]) return;
     learned("pick");
-    sayUntil = 0;
     if (cur && cur.flying) { pending = id; save(); return; }
     if (cur && cur.f.apple && cur.pressed && !cur.pieces.length) return;
     if (cur && cur.order.length) { pending = id; sweep(); return; }
@@ -629,7 +612,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     knife.anim = { t0: now(), mx: s.mx, my: s.my, dx: g.dx, dy: g.dy, h: s.h + 0.3, a: g.a, dur: reduce ? 0.12 : 0.34 };
     knife.back = null;
     chop();
-    learned("cut");
+    // The rest of this step's lines (all the coins, all the cubes) chop by themselves, one after another.
+    remaining(cur).forEach(function (h) { if (h.s === g.s && cutQ.indexOf(h) < 0) cutQ.push(h); });
     // Juice and crumbs along the cut.
     var col = cur.f.cut;
     for (var i = 0; i < 9; i++) {
@@ -799,7 +783,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     flights = []; pending = ""; leaving = null;
     if (S.bowl.length) swapBowl();
     knife.anim = null; knife.hold = null; knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a };
-    sayUntil = 0;
+    cutQ = []; sweepAt = 0;
     arrive(id);
     tone(500, 0.2, 0.04, "sine", 300);
   }
@@ -883,17 +867,14 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     // Little sniff puffs.
     if (sniffing && !reduce && Math.random() < 0.05) parts.push({ x: x + rand(-0.05, 0.05), y: y + 0.32, vx: rand(-0.2, 0.2), vy: rand(0.05, 0.25), life: 0, max: 0.6, col: "#FFFFFF", r: 0.02, star: false, flat: true });
   }
-  $("newBtn").addEventListener("click", newBoard);
-  $("surpriseBtn").addEventListener("click", surprise);
 
   // ---------- Touch on the stage ----------
   var drags = {};
   function onBowl(p) { return Math.hypot(p.x - BOWL.x - bowl.offx, p.y - BOWL.y - bowl.offy) < BOWL.r + 0.08; }
   function onBoard(p) { return Math.abs(p.x) < BW / 2 + 0.1 && Math.abs(p.y) < BH / 2 + 0.12; }
-  cv.addEventListener("pointerdown", function (e) {
+  // Toybox.press: a tap does the whole motion (the next cut, the slicer, into the bowl); a drag moves the knife.
+  function boardDown(part, e) {
     if (locked()) return;
-    e.preventDefault();
-    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     var p = toLocal(e.clientX, e.clientY);
     if (onBowl(p)) { tapBowl(); return; }
     if (!cur) { if (onBoard(p)) say(S.done ? "Yum! Pick a food!" : "Pick a food!"); return; }
@@ -909,8 +890,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     drags[e.pointerId] = d;
     knife.hold = e.pointerId; knife.back = null;
     knife.fx = p.x; knife.fy = p.y;
-  });
-  cv.addEventListener("pointermove", function (e) {
+  }
+  function boardMove(part, e) {
     var d = drags[e.pointerId];
     if (!d) return;
     var p = toLocal(e.clientX, e.clientY);
@@ -924,13 +905,13 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (d.pts.length > 14) d.pts.shift();
       if (d.len > 0.34 && !knife.anim) {
         var g = nearestGuide(cur, d.pts);
-        if (g) cutGuide(g);
+        if (g) { cutGuide(g); learned("cut"); }
         d.len = 0; d.pts = [p];
       }
     }
     d.lx = p.x; d.ly = p.y;
-  });
-  function stageUp(e) {
+  }
+  function stageUp(part, e) {
     var d = drags[e.pointerId];
     if (!d) return;
     delete drags[e.pointerId];
@@ -938,15 +919,14 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     // A tap on the food: the knife makes the next cut for him.
     if (e.type !== "pointercancel" && !d.moved && cur && !cur.flying && !complete(cur) && onFood(p, 0.25) && !knife.anim) {
       var g = nearestGuide(cur, [p]);
-      if (g) cutGuide(g);
+      if (g) { cutGuide(g); usedTap = true; ghost.again("cut"); }
     }
     if (knife.hold === e.pointerId) {
       knife.hold = null;
       if (!knife.anim) knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a };
     }
   }
-  cv.addEventListener("pointerup", stageUp);
-  cv.addEventListener("pointercancel", stageUp);
+  Toybox.press(cv, { any: true, down: boardDown, dragStart: boardMove, move: boardMove, up: stageUp });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
@@ -1028,10 +1008,19 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (q.life >= q.max) parts.splice(i, 1);
     }
     if (parts.length > 300) parts.splice(0, parts.length - 300);
+    // The rest of a step's lines chop by themselves; a finished food slides into the bowl by itself.
+    if (cutQ.length && !knife.anim && cur && !cur.flying && t >= cutNext) {
+      var g2 = cutQ.shift();
+      if (!cur.done[g2.gid]) { cutGuide(g2); cutNext = t + (reduce ? 0.1 : 0.42); }
+    }
+    if (cur && !cur.flying && complete(cur) && cur.pieces.length && !cutQ.length && !knife.anim && !locked()) {
+      if (!sweepAt) sweepAt = t + (cur.f.apple ? (reduce ? 1.4 : 2.8) : (reduce ? 0.8 : 1.8));
+      else if (t >= sweepAt) { sweepAt = 0; sweep(); }
+    } else sweepAt = 0;
     updateTiles();
     updateCoach();
-    updateGhostPhase();
   }
+  var cutQ = [], cutNext = 0, sweepAt = 0;
 
   // ---------- Drawing ----------
   function rr(x, y, w, h, r) {
@@ -1460,137 +1449,40 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
   }
 
-  // ---------- Ghost hand (tools/snippets/ghost-hand.js) ----------
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learnedF = false, run = null, el = null;
-    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function easeG(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
+  // ---------- Ghost hand (Toybox.ghost) and the bottom bar ----------
+  // The tap first (tap the food = the next cut; tap a food tile), the knife stroke once he has used the tap.
+  var usedTap = false;
+  function learned(m) { if (m === "cut" || m === "press" || m === "pick") ghost.learned(m === "press" ? "cut" : m); }
+  var ghost = Toybox.ghost({
+    max: 3,
+    plan: function () {
+      if (Object.keys(drags).length || document.body.classList.contains("big") || cutQ.length) return null;
+      var ph = phase();
+      if (ph === "cut" && !knife.anim) {
+        var g = remaining(cur)[0];
+        if (!g) return null;
+        var s = guideSeg(cur, g);
+        if (!usedTap) return { pts: [toPage(s.mx, s.my)], tap: true, key: "cut" };
+        return { pts: [toPage(s.x1 + g.dx * 0.15, s.y1 + g.dy * 0.15), toPage(s.x2 - g.dx * 0.15, s.y2 - g.dy * 0.15)].reverse(), carry: { html: KNIFE_SVG, size: 64 }, key: "cut" };
       }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduceG ? 0.5 : easeG(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      if (ph === "press") { var o = foodOrigin(cur); return { pts: [toPage(o.x, o.y)], tap: true, key: "cut" }; }
+      if (ph === "pick" || ph === "done") {
+        var tile = tiles.button("cucumber");
+        if (tile) { var r = tile.getBoundingClientRect(); return { pts: [[r.left + r.width / 2, r.top + r.height * 0.45]], tap: true, key: "pick" }; }
       }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
+      return null;
     }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learnedF || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learnedF = true; stop(); },
-      again: function () { learnedF = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
-  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
-  // One hint per kind of move; once he has done a move, its hint never shows again this visit.
-  var doneMoves = {}, ghostPhase = "";
-  function moveFor(ph) { return ph === "done" ? "pick" : ph; }
-  function learned(m) { doneMoves[m] = true; if (moveFor(ghostPhase) === m) ghost.learned(); }
-  function updateGhostPhase() {
-    var ph = phase();
-    if (ph === ghostPhase) return;
-    ghostPhase = ph;
-    if (ph === "flying" || ph === "slices" || doneMoves[moveFor(ph)]) ghost.learned(); else ghost.again();
-  }
-  var ghost = makeGhost(function () {
-    if (Object.keys(drags).length || document.body.classList.contains("big")) return null;
-    var ph = phase();
-    if (ph === "cut") {
-      var g = remaining(cur)[0];
-      if (!g) return null;
-      var s = guideSeg(cur, g);
-      return { pts: [toPage(s.x1 + g.dx * 0.15, s.y1 + g.dy * 0.15), toPage(s.x2 - g.dx * 0.15, s.y2 - g.dy * 0.15)].reverse(), carry: { html: KNIFE_SVG, size: 64 } };
-    }
-    if (ph === "press") { var o = foodOrigin(cur); return { pts: [toPage(o.x, o.y)], tap: true }; }
-    if (ph === "sweep") {
-      var o2 = foodOrigin(cur);
-      return { pts: [toPage(o2.x, o2.y), toPage(BOWL.x, BOWL.y)] };
-    }
-    if (ph === "pick" || ph === "done") {
-      var tile = choicesEl.querySelector('[data-food="cucumber"]');
-      if (tile) return { pts: [ghostPt(tile, 0.5, 0.45)], tap: true };
-    }
-    return null;
   });
+  Toybox.bar($("bottom"), { onNew: newBoard, onSurprise: surprise });
 
   // ---------- Start ----------
   if (S.food) { cur = buildFood(S.food, S.cuts, false); }
   if (S.done) bowl.forkT = -10;
   updateCounter();
   layout();
+  updateTiles();
+  updateCoach();
+  if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe(stage);
   var resizeT = 0;
   function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); layout(); }
   window.addEventListener("resize", onResize);
@@ -1619,7 +1511,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   if (/[?&]debug\b/.test(location.search)) {
     window.__cut = {
       state: function () {
-        return { phase: phase(), coach: coachEl.textContent, food: cur ? cur.id : "", step: cur ? stepOf(cur) : -1, cuts: cur ? cur.order.slice() : [],
+        return { phase: phase(), coach: coach.text(), food: cur ? cur.id : "", step: cur ? stepOf(cur) : -1, cuts: cur ? cur.order.slice() : [],
           pieces: cur ? cur.pieces.length : 0, coins: cur ? cur.pieces.filter(function (p) { return p.coin; }).length : 0,
           faces: cur ? cur.pieces.filter(function (p) { return p.face; }).length : 0, flying: !!(cur && cur.flying), pending: pending,
           bowl: S.bowl.map(function (b) { return b.i; }), bowlPieces: bowlCount(), done: S.done, count: S.count, tall: tall };
