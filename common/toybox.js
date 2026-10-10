@@ -291,8 +291,10 @@
   var ICON_SHRINK = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
   var bigBtn = null;
   function bigKey() { return "toybox-big-" + (opts.app || "app"); }
+  // The Big button is gone (the dad, 2026-10-10: it rarely changed what he could see). Big mode is always off; the
+  // API stays so pages that ask still work, and saved "toybox-big-<app>" values are ignored.
   function setBig(on, remember) {
-    on = !!on;
+    on = false; remember = false;
     document.body.classList.toggle("big", on);
     if (bigBtn) {
       bigBtn.setAttribute("aria-pressed", String(on));
@@ -468,7 +470,7 @@
       }
       if (bigBtn) {
         bigBtn.classList.add("btn", "bigtoggle");
-        bigBtn.addEventListener("click", function () { setBig(!isBig()); });
+        bigBtn.hidden = true; bigBtn.style.display = "none"; bigBtn.setAttribute("aria-hidden", "true");
       }
     }
   }
@@ -1200,7 +1202,7 @@
     soundOn = get(SKEY) === "1";
     build();
     inited = true;
-    if (opts.big) setBig(get(bigKey()) === "1", false);
+    if (opts.big) setBig(false, false);
     updateSoundUI();
     sync();
     wireTurn();
@@ -1229,7 +1231,6 @@
       if (e.key === TKEY || e.key === null) { timer = parseTimer(get(TKEY)); sync(); }
       if (e.key === SKEY || e.key === null) { var on = get(SKEY) === "1"; if (on !== soundOn) setSound(on, true); }
       if (e.key === SETKEY || e.key === null) SETTINGS.forEach(function (d) { setListeners.forEach(function (fn) { try { fn(d.id, settingGet(d.id)); } catch (er) { /* ignore */ } }); });
-      if (opts.big && (e.key === bigKey() || e.key === null)) { var big = get(bigKey()) === "1"; if (big !== isBig()) setBig(big, false); }
     });
   }
 

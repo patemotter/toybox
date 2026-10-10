@@ -188,11 +188,17 @@ Keep only:
   icons 52 (60); at least 12 px between controls and 24 px between New and anything he taps often; the bottom row
   at least 16 px above the safe area. Text at least 14 px anywhere he looks. `tools/fit.js` and `tools/buttons.js`
   report small tiles, small targets and text-only buttons (problems on `tb-v2` pages, warnings elsewhere).
-- The **Big** button hides the controls for full-screen play (per app, remembered).
+- **No Big button** (the dad, 2026-10-10: it rarely changed what he could see): `common/toybox.js` hides every Big
+  button and keeps Big mode off (`Toybox.setBig` is a no-op, saved `toybox-big-<app>` values are ignored). Don't add one.
+- **The coach line is big and at the bottom of the stage on every size** (the dad, 2026-10-10: small at the top, he
+  missed it). Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
 - Prefer making the play area bigger over fitting more buttons. On upright phones, frame scenes tightly (pan with
   the action, turn wide layouts upright) rather than leaving empty sky.
 - **No picture-in-picture insets** unless they show something unique (kept: the Router Table end view, now a
-  small corner panel). Alternate full views behind a button are fine.
+  small corner panel). Alternate full views behind a button are fine. **No split stage of two equal views** (the dad,
+  2026-10-10: it must be clear what is an inset and what he controls; controls on top with the view below is
+  backwards): one main view he controls fills the stage, the things he touches low near his hands; a close-up is a
+  small, clearly framed and labeled corner inset at most.
 - **An app may prefer one orientation**: `Toybox.init({ orientation: "landscape" })` (or `"portrait"`). Held the
   other way, the shared layer covers the app with a "Turn it sideways!" / "Turn it upright!" card (a turning
   tablet picture and a small "Play like this" button, so rotation lock never traps him; remembered for the session).
@@ -204,7 +210,7 @@ Keep only:
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
-  coach line** in a pill ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
+  coach line** in a pill at the bottom of the stage ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
 - **Direct manipulation**: drag the saw, turn the wheel, pull the tape, spin the toy with a finger. If a control
   is drawn on a machine, it must work (switches, height wheels, handles); don't draw fake controls. Remove HTML
   buttons that duplicate a working on-machine control.
