@@ -82,7 +82,7 @@
   }
   var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time" };
+  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time", bales: "Brilliant Baler" };
 
   // =====================================================================================================
   // World: the shared farm (farm-world-v1)
