@@ -203,6 +203,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     layoutScene();
     sc.follow(camTarget(), 0, true);
+    closeLayout();
   }
 
   // ---------- Coach, counter, name tags ----------
@@ -395,6 +396,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function rigBox() { var a = trPt(-7.9, -3.3), b = trPt(5.4, 0.3); return [Math.min(a[0], b[0]), a[1], Math.max(a[0], b[0]), b[1]]; }
   function hitAt(x, y) {
     var minR = Math.max(26, parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tb-key")) * 0.34 || 40);
+    if (inClose(x, y)) return "inset";
     var best = null, bd = 1e9;
     controls().forEach(function (c) {
       var d = Math.hypot(x - c.p[0], y - c.p[1]);
@@ -429,7 +431,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     },
     hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
-      if (locked() || !part) return;
+      if (locked() || !part || part === "inset") return;
       var b = cv.getBoundingClientRect();
       if (grab && grab.id === e.pointerId && grab.what === "auger" && part === "auger") return;
       grab = { what: part, fx: s.x - b.left, fy: s.y - b.top, x0: s.x0 - b.left, y0: s.y0 - b.top, id: e.pointerId };
@@ -474,6 +476,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (locked()) return;
       var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top, n;
       // every part he taps says its name for a moment, and does its one real motion
+      if (part === "inset") { closeTap(); return; }
       if (part === "lever") { tag("Header lever", leverPt()); toggleHeader(); return; }
       if (part === "horn") { tag("Horn", hornPt()); toot(); return; }
       if (part === "auger") { tag("Grain spout", augerPt()); augerTap(); return; }
@@ -643,6 +646,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     parts.update(dt);
     if (!ending) updateStep();
+    updateClose(dt);
     // camera
     var ct = camTarget();
     if (Math.abs(zoom.want - zoom.f) > 0.002) {
@@ -712,6 +716,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     say(HDR_LINE, 3); flash.lever = 3;
   }
   function cutting(dt, n) {
+    cu.lastCut = time;
     if (cutN >= NC) { setWorldCrop("stubble"); }
     saveSoon();
     var cx = cutX(), back = cb.x - cb.dir * 6.3;
@@ -1096,6 +1101,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (deer && deer.r <= 1) drawDeer();
     if (hawk) drawHawk();
     if (birds) drawBirds(true);
+    drawClose();
   }
   // The far part of the field is the biggest drawing on the page (dozens of rows across the whole width) and it
   // made the iPad crawl. It is painted into an offscreen canvas wider than the screen (a margin each side) and
@@ -1327,6 +1333,421 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
 
+  // ---------- The close-up: a framed picture in a top corner that follows the moment ----------
+  // The dad: he knows the episode by heart and loves its moments and seeing how the machine really works. The
+  // close-up is for watching (a tap on it does what a tap on that machine does): while cutting, the header and a
+  // cutaway of the combine (reel, knife, cross auger, feeder house, drum, sieve, clean grain elevator, grain tank,
+  // straw walkers, the swath); while unloading, the grain spout pouring into the trailer; at the grain barn, the
+  // trailer tipping into the heap. Between moments it fades away. It goes in the top corner that doesn't cover
+  // the machine he works or the control the coach names (top-right first), shrinks if needed, or hides.
+  // Drawn straight onto the stage canvas at its own small size each frame (16 x 10 close-up units).
+  var cu = { shown: null, a: 0, fit: 0, rect: null, corner: "r", travel: 0, flow: 0, lastCut: -9, ph: 0, pf: 0, tf: 0, cY: 54 };
+  function closeMode() {
+    if (ending || crop.stage !== "ripe") return null;
+    var ts = tr.state;
+    if (ts === "store" || ts === "tip" || ts === "untip") return "tip";
+    if ((ts === "side" || ts === "drift") && (cb.tank > 0.02 || tr.load > 0.04)) return "pour";
+    if (!fieldDone() && cb.hdr < 0.5 && !cb.hdrUp) return "cut";
+    return null;
+  }
+  function closeLayout() {
+    var el = $("loads");
+    cu.cY = el ? el.offsetTop + el.offsetHeight + 8 : 54;
+  }
+  // screen boxes the close-up must never cover: the machines he works, the control the coach names, the barn
+  function closeAvoid() {
+    var list = [], pad = 6;
+    function box(b) { list.push([b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad]); }
+    function pt(p, r) { box([p[0] - r, p[1] - r, p[0] + r, p[1] + r]); }
+    if (focus === "combine" || cu.shown !== "tip") box(cbBox());
+    if (tr.state !== "away") box(rigBox());
+    if (cb.auger > 0.01) pt(augerPt(), 34);
+    if (cb.hdr < 0.99 || cue === "lever") pt(leverPt(), 30);
+    if (cue === "tiplever" || cu.shown === "tip") pt(tipLeverPt(), 30);
+    if (cu.shown === "tip") { var sx = sc.X(STORE_X, 1.02), s = sc.S(1.02); box([sx - 5.2 * s, sc.Y(1.02) - 7.3 * s, sx + 5.2 * s, sc.Y(1.02)]); }
+    return list;
+  }
+  function closePlace() {
+    var m = 10, port = H > W * 1.05, w0 = W * (W >= 700 && H >= 500 ? 0.43 : (port ? 0.54 : 0.4));
+    w0 = Math.min(w0, (H - CR) * 0.42 * 1.6);
+    var yR = $("tbadge").hasAttribute("hidden") ? m : 74, yL = cu.cY, avoid = closeAvoid();
+    var order = cu.corner === "l" ? ["l", "r"] : ["r", "l"], sizes = [1, 0.88, 0.76, 0.64, 0.54];
+    for (var i = 0; i < sizes.length; i++) {
+      var w = w0 * sizes[i], h = w / 1.6;
+      if (w < 104) break;
+      for (var j = 0; j < 2; j++) {
+        var c = order[j], r = c === "r" ? [W - m - w, yR, w, h] : [m, yL, w, h], ok = true;
+        for (var k = 0; k < avoid.length && ok; k++) { var b = avoid[k]; if (r[0] < b[2] && r[0] + r[2] > b[0] && r[1] < b[3] && r[1] + r[3] + 16 > b[1]) ok = false; }
+        if (ok) { cu.corner = c; return r; }
+      }
+    }
+    return null;
+  }
+  function updateClose(dt) {
+    var mode = closeMode();
+    cu.ph += dt;
+    if (cb.hdr < 0.5) cu.travel += Math.abs(cb.v) * dt;
+    var want = time - cu.lastCut < 0.35 ? 1 : 0;
+    cu.flow += (want - cu.flow) * Math.min(1, dt * (want ? 4 : 1.2));
+    cu.pf += ((cb.pouring ? 1 : 0) - cu.pf) * Math.min(1, dt * 6);
+    cu.tf += ((tr.flow && tr.state === "tip" ? 1 : 0) - cu.tf) * Math.min(1, dt * 5);
+    if (mode !== cu.shown) {
+      cu.a = Math.max(0, cu.a - dt * 3);
+      if (cu.a <= 0) { cu.shown = mode; cu.rect = null; cu.fit = 0; }
+    } else if (mode) cu.a = Math.min(1, cu.a + dt * 2.5);
+    if (!cu.shown) return;
+    var t = closePlace();
+    cu.fit = Math.max(0, Math.min(1, cu.fit + (t ? dt * 3 : -dt * 4)));
+    if (!t) return;
+    if (!cu.rect || cu.fit < 0.05) cu.rect = t.slice();
+    else for (var i = 0; i < 4; i++) cu.rect[i] += (t[i] - cu.rect[i]) * Math.min(1, dt * 6);
+  }
+  function closeAlpha() { return cu.shown && cu.rect ? cu.a * cu.fit : 0; }
+  function inClose(x, y) { var r = cu.rect; return closeAlpha() > 0.4 && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]; }
+  function closeTap() {
+    if (cu.shown === "cut") combineTap();
+    else if (cu.shown === "pour") augerTap();
+    else if (cu.shown === "tip") rigTap();
+  }
+  // Painted into its own small canvas (every other frame, at most 1.5 px per css px: the picture is for watching,
+  // so 30 a second is plenty) and copied onto the stage each frame, faded in and out with globalAlpha.
+  var cuc = { cv: document.createElement("canvas"), key: "", n: 0, M: 6, B: 20 };
+  cuc.ctx = cuc.cv.getContext("2d");
+  function drawClose() {
+    var al = closeAlpha();
+    if (al < 0.01) return;
+    var r = cu.rect, w = Math.round(r[2]), h = Math.round(r[3]), M = cuc.M;
+    var q = Math.min(DPR, 1.5), key = w + "|" + h + "|" + q + "|" + cu.shown + "|" + job;
+    if (key !== cuc.key || (cuc.n++ & 1) === 0) {
+      var cw = Math.ceil((w + 2 * M) * q), ch = Math.ceil((h + M + cuc.B) * q);
+      if (cuc.cv.width !== cw || cuc.cv.height !== ch) { cuc.cv.width = cw; cuc.cv.height = ch; }
+      var real = ctx; ctx = cuc.ctx;
+      try { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cw, ch); ctx.setTransform(q, 0, 0, q, 0, 0); paintClose(M, M, w, h); }
+      finally { ctx = real; }
+      cuc.key = key;
+    }
+    ctx.save(); ctx.globalAlpha = al;
+    ctx.drawImage(cuc.cv, r[0] - M, r[1] - M, w + 2 * M, h + M + cuc.B);
+    ctx.restore();
+  }
+  function paintClose(x, y, w, h) {
+    var s = w / 16;
+    ctx.save();
+    // a white mat around an ink frame: clearly a picture, not part of the field
+    SH.rr(ctx, x, y, w, h, 12); ctx.lineWidth = 8; ctx.strokeStyle = "#FFFFFF"; ctx.stroke();
+    ctx.save(); ctx.clip();
+    var lwp = Math.max(1.2, s * 0.13);
+    if (cu.shown === "cut") Farm.inUnits(ctx, x, y, s, lwp, function () { if (cb.face < 0) { ctx.translate(16, 0); ctx.scale(-1, 1); } cuCut(); });
+    // the trailer views draw in the trailer's own metres
+    else if (cu.shown === "pour") Farm.inUnits(ctx, x + 17.47 * s, y + 11.79 * s, s * 2.105, lwp, cuPour);
+    else Farm.inUnits(ctx, x + 21.28 * s, y + 9.2 * s, s * 1.6, lwp, cuTip);
+    ctx.restore();
+    SH.rr(ctx, x, y, w, h, 12); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    // its small plain label, hanging from the bottom edge (styled like the part name tags, not the coach line)
+    ctx.font = '500 14px "Baloo 2", "Trebuchet MS", system-ui, sans-serif';
+    var tw = ctx.measureText("Close-up").width + 14, lx = x + 12, ly = y + h - 5;
+    SH.rr(ctx, lx, ly, tw, 21, 4); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "rgba(29,35,64,0.6)"; ctx.stroke();
+    ctx.fillStyle = INK; ctx.textBaseline = "middle"; ctx.fillText("Close-up", lx + 7, ly + 11);
+    ctx.restore();
+  }
+  function cuWheel(x, y, r, rot) {
+    SH.C(ctx, x, y, r, "#33363F");
+    for (var k = 0; k < 10; k++) { var a = rot + k * TAU / 10, c = Math.cos(a), sn = Math.sin(a); SH.Ln(ctx, x + c * r * 0.84, y + sn * r * 0.84, x + c * r * 0.98, y + sn * r * 0.98, "#4A4E5C", r * 0.16); }
+    SH.C(ctx, x, y, r * 0.58, "#C3CCD6"); SH.C(ctx, x, y, r * 0.22, "#8C97A6", Farm.LW * 0.7);
+    for (k = 0; k < 5; k++) { var b = rot + k * TAU / 5; SH.C(ctx, x + Math.cos(b) * r * 0.4, y + Math.sin(b) * r * 0.4, r * 0.06, "#6E7887", 0); }
+  }
+  function grainDot(x, y, r, k) {
+    if (job === "sun") {
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.7, r * 1.1, 0.5, 0, TAU); ctx.fillStyle = SEED[0]; ctx.fill();
+      SH.Ln(ctx, x - r * 0.15, y - r * 0.5, x + r * 0.2, y + r * 0.4, SEED[1], r * 0.35);
+    } else { ctx.beginPath(); ctx.ellipse(x, y, r * 0.75, r, 0.5, 0, TAU); ctx.fillStyle = k & 1 ? "#F4CB57" : "#E0A92E"; ctx.fill(); }
+  }
+  // a point along a polyline [x0, y0, x1, y1, ...] at f (0..1, by length)
+  function along(p, f) {
+    var L2 = 0, i, seg = [];
+    for (i = 0; i + 3 < p.length; i += 2) { var d = Math.hypot(p[i + 2] - p[i], p[i + 3] - p[i + 1]); seg.push(d); L2 += d; }
+    var want = clamp(f, 0, 1) * L2;
+    for (i = 0; i < seg.length; i++) {
+      if (want <= seg[i] || i === seg.length - 1) { var u = seg[i] ? want / seg[i] : 0, j = i * 2; return [lerp(p[j], p[j + 2], u), lerp(p[j + 1], p[j + 3], u), Math.atan2(p[j + 3] - p[j + 1], p[j + 2] - p[j])]; }
+      want -= seg[i];
+    }
+    return [p[0], p[1], 0];
+  }
+  // ---- Cutting: the header and the combine cut open, facing right; units 16 x 10, the ground at y = 9.2 ----
+  function cuCut() {
+    var sun = job === "sun", fl = cu.flow, run = clamp(1 - cb.hdr * 2, 0, 1), T = cu.ph, s = cu.travel * 1.5, i, f, x, y, p;
+    var KX = sun ? 13.4 : 12.95;
+    var straw = sun ? ["#9C8461", "#5E5044"] : ["#F3DA8E", "#D9B35C"];
+    ctx.fillStyle = "#BFE6FF"; ctx.fillRect(-1, -1, 18, 12);
+    ctx.fillStyle = sun ? "#8F7550" : "#D3AF62"; ctx.fillRect(-1, 9.2, 18, 2);
+    SH.Ln(ctx, -1, 9.2, 17, 9.2, "#9C7A3C", 0.06);
+    // stubble left standing behind the knife
+    ctx.strokeStyle = sun ? "#B39A64" : "#E9CF84"; ctx.lineWidth = sun ? 0.13 : 0.07; ctx.lineCap = "round"; ctx.beginPath();
+    for (i = 0; i < 42; i++) {
+      x = ((i * 0.41 - s) % 17.22 + 17.22) % 17.22 - 0.6; if (x > KX - 0.1) continue;
+      var sh = sun ? 1.5 + 0.3 * hash(i, 2) : 0.45 + 0.15 * hash(i, 2);
+      ctx.moveTo(x, 9.2); ctx.lineTo(x + 0.05, 9.2 - sh);
+    }
+    ctx.stroke();
+    // the crop standing ahead of the header (it comes toward the knife as the combine drives)
+    if (sun) {
+      for (i = 0; i < 5; i++) {
+        x = KX + 0.15 + ((i * 1.15 - s) % 5.75 + 5.75) % 5.75;
+        var sw = Math.sin(T * 1.3 + i) * 0.05;
+        SH.Ln(ctx, x, 9.2, x + sw, 5.6, INK, 0.2); SH.Ln(ctx, x, 9.2, x + sw, 5.6, "#9AA35A", 0.12);
+        [7.6, 6.6].forEach(function (ly, k) { var d = k ? -1 : 1; ctx.beginPath(); ctx.moveTo(x, ly); ctx.quadraticCurveTo(x + d * 0.5, ly - 0.45, x + d * 0.85, ly + 0.05); ctx.quadraticCurveTo(x + d * 0.4, ly + 0.05, x, ly + 0.15); SH.fs(ctx, "#8E9A44", Farm.LW * 0.7); });
+        sunHead(ctx, x + sw + 0.3, 5.45, 0.55, 1.15, 0.4);
+      }
+    } else {
+      for (i = 0; i < 13; i++) {
+        x = KX + 0.12 + ((i * 0.36 - s) % 4.68 + 4.68) % 4.68;
+        var lean = run * clamp(1 - (x - KX) / 1.6, 0, 1) * -0.8 + Math.sin(T * 2 + i * 1.7) * 0.06, top = 5.85 + 0.35 * hash(i, 1);
+        SH.Ln(ctx, x, 9.2, x + lean, top, INK, 0.12); SH.Ln(ctx, x, 9.2, x + lean, top, "#D9A93A", 0.06);
+        ctx.save(); ctx.translate(x + lean, top - 0.28); ctx.rotate(lean * 0.4);
+        SH.Ln(ctx, 0, -0.3, -0.05, -0.75, INK, 0.025); SH.Ln(ctx, 0.06, -0.3, 0.12, -0.72, INK, 0.025);
+        ctx.beginPath(); ctx.ellipse(0, 0, 0.13, 0.38, 0, 0, TAU); SH.fs(ctx, "#EBB93E", Farm.LW * 0.7);
+        ctx.restore();
+      }
+    }
+    // feeder house (behind the body), its chain carrying the crop up to the drum
+    var FD = [9.6, 4.2, 11.25, 7.0, 10.7, 8.75, 9.2, 5.9];
+    SH.P(ctx, [FD[0], FD[1], FD[2], FD[3], FD[4], FD[5], FD[6], FD[7]], "#2B7A2A");
+    SH.P(ctx, [9.75, 4.6, 11.0, 7.05, 10.6, 8.35, 9.4, 5.9], "#2A2E3A", Farm.LW * 0.6);
+    for (i = 0; i < 6; i++) {
+      f = (i / 6 + T * 0.7 * run) % 1;
+      var ax = lerp(10.95, 9.7, f), ay = lerp(7.2, 4.85, f);
+      SH.Ln(ctx, ax - 0.3, ay + 0.15, ax + 0.25, ay - 0.15, "#8F9AAA", 0.07);
+    }
+    // the crop: pushed onto the knife, carried by the cross auger to the middle, up the feeder house
+    var PATH = sun ? [12.6, 7.25, 11.75, 7.55, 11.0, 7.75, 9.6, 5.2] : [12.95, 8.55, 11.75, 8.4, 11.0, 7.95, 9.6, 5.2];
+    if (fl > 0.02) {
+      ctx.save(); ctx.globalAlpha *= fl;
+      for (i = 0; i < 9; i++) {
+        p = along(PATH, (i / 9 + T * 0.8) % 1);
+        if (sun) { SH.Ln(ctx, p[0] - 0.15, p[1] - 0.1, p[0] + 0.15, p[1] + 0.1, straw[i & 1], 0.12); }
+        else {
+          ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(p[2] + 0.4);
+          SH.Ln(ctx, -0.35, 0, 0.25, 0, "#D9A93A", 0.07);
+          ctx.beginPath(); ctx.ellipse(0.32, 0, 0.17, 0.08, 0, 0, TAU); ctx.fillStyle = "#EBB93E"; ctx.fill(); ctx.restore();
+        }
+      }
+      ctx.restore();
+    }
+    // the header
+    if (sun) {
+      SH.R(ctx, 10.95, 5.9, 0.42, 2.35, 0.06, "#8F9AAA");
+      SH.P(ctx, [11.0, 7.95, 12.6, 7.65, 12.6, 8.2, 11.0, 8.3], "#AEB8C5");
+      // the long pans (a far one, then the near one), each with a pointed yellow snout
+      [[-0.3, -0.25, "#9AA5B4", "#D9A21E"], [0, 0, "#C9D1DB", "#F2B93A"]].forEach(function (q) {
+        SH.P(ctx, [11.4 + q[0], 7.05 + q[1], 15.3 + q[0], 7.7 + q[1], 15.3 + q[0], 8.0 + q[1], 11.4 + q[0], 8.1 + q[1]], q[2]);
+        SH.P(ctx, [15.25 + q[0], 7.7 + q[1], 16.3 + q[0], 7.98 + q[1], 15.25 + q[0], 8.0 + q[1]], q[3]);
+      });
+      // the knife under the pans
+      for (i = 0; i < 4; i++) { var kx = 13.2 + i * 0.16 + Math.sin(T * 30) * 0.05 * run; SH.P(ctx, [kx, 8.0, kx + 0.08, 8.2, kx + 0.16, 8.0], "#E2E6EB", Farm.LW * 0.5); }
+      // heads riding up the pans to the cross auger
+      if (fl > 0.02) for (i = 0; i < 3; i++) {
+        f = (T * 0.45 + i / 3) % 1;
+        ctx.save(); ctx.globalAlpha *= fl * (f > 0.85 ? (1 - f) / 0.15 : 1);
+        sunHead(ctx, lerp(14.4, 11.9, f), lerp(7.45, 7.0, f) - 0.45, 0.45, 0.9 - f * 1.4, 0.3);
+        ctx.restore();
+      }
+      cuAuger(11.75, 7.5, 0.45, T, run);
+      // the deflector over the back of the pans
+      ctx.beginPath(); ctx.moveTo(11.1, 5.9); ctx.quadraticCurveTo(12.3, 5.8, 12.9, 6.6); ctx.lineTo(12.65, 6.75); ctx.quadraticCurveTo(12.1, 6.15, 11.1, 6.2); ctx.closePath(); SH.fs(ctx, "#F2B93A");
+    } else {
+      SH.R(ctx, 10.95, 6.6, 0.42, 2.4, 0.06, "#8F9AAA");
+      SH.P(ctx, [11.0, 8.75, 12.95, 8.85, 13.15, 9.0, 11.0, 9.02], "#AEB8C5");
+      for (i = 0; i < 3; i++) { var kx2 = 12.75 + i * 0.16 + Math.sin(T * 30) * 0.05 * run; SH.P(ctx, [kx2, 8.86, kx2 + 0.08, 9.06, kx2 + 0.16, 8.86], "#E2E6EB", Farm.LW * 0.5); }
+      cuAuger(11.75, 8.3, 0.45, T, run);
+      // the reel: its bats come round and push the stalks back onto the knife
+      SH.tube(ctx, 11.2, 6.75, 12.75, 6.45, 0.14, "#8F9AAA");
+      var rc = [12.75, 6.4], R0 = 1.45, ra = cb.reel * 1.6;
+      ctx.beginPath(); ctx.arc(rc[0], rc[1], R0 * 0.55, 0, TAU); ctx.strokeStyle = "#E2B33A"; ctx.lineWidth = 0.07; ctx.stroke();
+      for (i = 0; i < 5; i++) {
+        var a = ra + i * TAU / 5, bx = rc[0] + Math.cos(a) * R0, by = rc[1] + Math.sin(a) * R0;
+        SH.Ln(ctx, rc[0], rc[1], bx, by, INK, 0.12); SH.Ln(ctx, rc[0], rc[1], bx, by, "#E2B33A", 0.07);
+        SH.Ln(ctx, bx, by, bx + 0.1, by + 0.5, INK, 0.05); SH.Ln(ctx, bx - 0.12, by, bx - 0.04, by + 0.48, INK, 0.05);
+        SH.R(ctx, bx - 0.3, by - 0.14, 0.6, 0.28, 0.1, "#FFC93C");
+      }
+      SH.C(ctx, rc[0], rc[1], 0.16, "#8F9AAA");
+    }
+    // the body, cut open
+    SH.P(ctx, [1.25, 3.9, 0.35, 4.5, 0.35, 6.9, 1.25, 7.1], "#2B7A2A");
+    SH.R(ctx, 1.2, 3.4, 8.85, 4.4, 0.2, "#3E9F3A");
+    SH.R(ctx, 1.2, 7.15, 8.85, 0.65, 0.1, "#2B7A2A", Farm.LW * 0.8);
+    SH.R(ctx, 1.65, 3.85, 7.95, 3.2, 0.25, "#2F3442", Farm.LW * 0.8);
+    ctx.save(); SH.rr(ctx, 1.65, 3.85, 7.95, 3.2, 0.25); ctx.clip();
+    // threshing drum (rasp bars turning) over its concave
+    var dx = 7.75, dy = 4.75, dr = 0.68;
+    ctx.beginPath(); ctx.arc(dx, dy, dr + 0.18, 0.25, Math.PI - 0.2); ctx.strokeStyle = "#8F9AAA"; ctx.lineWidth = 0.12; ctx.stroke();
+    SH.C(ctx, dx, dy, dr, "#7C8696");
+    for (i = 0; i < 6; i++) { var da = T * 7 * run + i * TAU / 6; SH.Ln(ctx, dx + Math.cos(da) * dr * 0.35, dy + Math.sin(da) * dr * 0.35, dx + Math.cos(da) * dr * 0.95, dy + Math.sin(da) * dr * 0.95, "#C9D1DB", 0.12); }
+    SH.C(ctx, dx, dy, 0.14, "#59607A", 0);
+    // the crop going into the drum
+    if (fl > 0.02) { ctx.save(); ctx.globalAlpha *= fl; for (i = 0; i < 3; i++) { f = (i / 3 + T * 1.2) % 1; SH.Ln(ctx, lerp(9.6, 8.4, f) - 0.2, lerp(5.35, 5.1, f), lerp(9.6, 8.4, f) + 0.2, lerp(5.35, 5.1, f) - 0.05, straw[i & 1], 0.1); } ctx.restore(); }
+    // straw walkers (a zigzag shelf) shaking the straw to the back
+    var wk = Math.sin(T * 10) * 0.05 * run;
+    ctx.beginPath(); for (x = 7.0; x >= 1.7; x -= 0.45) { var zz = (Math.round((7.0 - x) / 0.45) & 1) ? 4.35 : 4.6; if (x === 7.0) ctx.moveTo(x, zz + wk); else ctx.lineTo(x, zz + wk); }
+    ctx.strokeStyle = "#AEB8C5"; ctx.lineWidth = 0.1; ctx.stroke();
+    // sieve (shaking) and the clean grain trough under it
+    var sv = Math.sin(T * 14) * 0.07 * run;
+    SH.Ln(ctx, 3.2 + sv, 6.05, 7.3 + sv, 6.3, "#8F9AAA", 0.1);
+    for (i = 0; i < 12; i++) { x = 3.4 + i * 0.33 + sv; SH.Ln(ctx, x, 6.0 + i * 0.02, x, 6.18 + i * 0.02, "#59607A", 0.04); }
+    ctx.beginPath(); ctx.moveTo(3.3, 6.55); ctx.lineTo(3.4, 6.85); ctx.lineTo(9.0, 6.85); ctx.lineTo(9.1, 6.55); ctx.strokeStyle = "#8F9AAA"; ctx.lineWidth = 0.08; ctx.stroke();
+    var lv = lerp(3.3, 1.35, clamp(cb.tank, 0, 1));
+    if (fl > 0.02) {
+      ctx.save(); ctx.globalAlpha *= fl;
+      // straw riding the walkers to the back
+      for (i = 0; i < 9; i++) { f = (i / 9 + T * 0.35) % 1; x = lerp(6.9, 1.7, f); y = 4.25 - Math.abs(Math.sin(f * 20)) * 0.2 + wk; SH.Ln(ctx, x - 0.22, y + 0.03, x + 0.22, y - 0.05, straw[i & 1], 0.09); }
+      // grain falling from the drum onto the sieve, through it, and along the trough to the elevator
+      for (i = 0; i < 7; i++) { f = (i / 7 + T * 1.3) % 1; grainDot(lerp(7.5, 4.0 + 3 * hash(i, 1), f), lerp(5.4, 6.0, f), 0.075, i); }
+      for (i = 0; i < 6; i++) { f = (i / 6 + T * 1.6) % 1; grainDot(3.6 + i * 0.6 + sv, lerp(6.2, 6.7, f), 0.07, i); }
+      for (i = 0; i < 12; i++) { f = (i / 12 + T * 0.6) % 1; grainDot(lerp(3.5, 9.0, f), 6.72, 0.075, i + 1); }
+      ctx.restore();
+    }
+    ctx.restore();
+    // the grain tank on top, cut open: the grain level rises as the field is cut
+    SH.P(ctx, [2.7, 3.45, 2.5, 1.05, 8.5, 1.05, 8.3, 3.45], "#3E9F3A");
+    SH.R(ctx, 2.4, 0.82, 6.2, 0.3, 0.08, "#6CC65C");
+    SH.R(ctx, 3.0, 1.3, 5.0, 2.0, 0.15, "#2F3442", Farm.LW * 0.8);
+    ctx.save(); SH.rr(ctx, 3.0, 1.3, 5.0, 2.0, 0.15); ctx.clip();
+    if (cb.tank > 0.002) {
+      ctx.beginPath(); ctx.moveTo(2.9, 3.4); ctx.lineTo(2.9, lv + 0.25); ctx.quadraticCurveTo(6.4, lv - 0.45, 8.1, lv + 0.05); ctx.lineTo(8.1, 3.4); ctx.closePath();
+      ctx.fillStyle = sun ? SEED[0] : "#EBB93E"; ctx.fill();
+      for (i = 0; i < 18; i++) { x = 3.1 + 4.8 * hash(i, 3); y = lerp(lv + 0.3, 3.25, hash(i, 4)); SH.Ln(ctx, x, y, x + 0.12, y - 0.04, sun ? SEED[1] : "#C99322", 0.05); }
+    }
+    ctx.restore();
+    // the clean grain elevator: paddles on a chain carry the grain up and tip it into the tank
+    SH.R(ctx, 8.75, 1.15, 0.6, 5.85, 0.12, "#5E9E4F");
+    SH.R(ctx, 8.85, 1.35, 0.4, 5.5, 0.08, "#2F3442", 0);
+    for (i = 0; i < 9; i++) {
+      f = (i / 9 + T * 0.55 * run) % 1; y = lerp(6.8, 1.45, f);
+      SH.Ln(ctx, 8.88, y, 9.22, y, "#AEB8C5", 0.06);
+      if (fl > 0.05 || (cb.tank > 0 && run > 0 && fl > 0.01)) { ctx.save(); ctx.globalAlpha *= clamp(fl * 1.5, 0, 1); ctx.beginPath(); ctx.ellipse(9.05, y - 0.1, 0.16, 0.09, 0, 0, TAU); ctx.fillStyle = sun ? SEED[0] : "#EBB93E"; ctx.fill(); ctx.restore(); }
+    }
+    // the elevator's head spills the grain into the tank
+    ctx.beginPath(); ctx.moveTo(9.35, 1.2); ctx.quadraticCurveTo(9.3, 0.75, 8.6, 0.8); ctx.lineTo(8.1, 1.15); ctx.lineTo(8.75, 1.25); ctx.closePath(); SH.fs(ctx, "#5E9E4F");
+    if (fl > 0.02) { ctx.save(); ctx.globalAlpha *= fl; for (i = 0; i < 7; i++) { f = (i / 7 + T * 1.5) % 1; grainDot(lerp(8.0, 7.2 - 0.6 * hash(i, 5), f), lerp(1.3, lv, f * f), 0.08, i); } ctx.restore(); }
+    // straw falling out of the back onto the swath
+    ctx.beginPath(); ctx.moveTo(-1, 9.25);
+    for (x = -1; x <= 2.0; x += 0.25) ctx.lineTo(x, 9.2 - (0.5 + 0.12 * Math.sin((x + s) * 3.1)) * clamp((2.0 - x) / 0.9, 0, 1));
+    ctx.lineTo(2.0, 9.25); ctx.closePath(); SH.fs(ctx, straw[0], Farm.LW * 0.7);
+    if (fl > 0.02) { ctx.save(); ctx.globalAlpha *= fl; for (i = 0; i < 6; i++) { f = (i / 6 + T * 0.9) % 1; x = lerp(0.6, -0.1, f) - hash(i, 2) * 0.4; y = lerp(5.6, 8.8, f * f); SH.Ln(ctx, x - 0.2, y, x + 0.2, y - 0.12 + 0.2 * hash(i, 6), straw[i & 1], 0.1); } ctx.restore(); }
+    // cab
+    SH.R(ctx, 9.6, 3.3, 1.9, 0.18, 0.05, "#3A3F4E", Farm.LW * 0.7);
+    SH.P(ctx, [9.7, 3.35, 9.75, 1.45, 11.15, 1.45, 11.45, 3.35], "#2B3040");
+    SH.P(ctx, [9.85, 3.25, 9.88, 1.6, 11.05, 1.6, 11.3, 3.25], "#BFE7FA", Farm.LW * 0.6);
+    SH.C(ctx, 10.45, 2.45, 0.27, "#F2C9A0", Farm.LW * 0.6); SH.R(ctx, 10.13, 2.08, 0.62, 0.2, 0.08, "#D2483D", Farm.LW * 0.5);
+    SH.R(ctx, 10.0, 2.75, 0.9, 0.5, 0.12, "#3F6FB5", Farm.LW * 0.6);
+    SH.R(ctx, 9.55, 1.2, 2.05, 0.28, 0.08, "#F2EEE2");
+    // wheels
+    cuWheel(2.75, 8.6, 0.6, cu.travel / 0.6);
+    cuWheel(9.3, 8.1, 1.1, cu.travel / 1.1);
+    ctx.beginPath(); ctx.arc(9.3, 8.1, 1.3, -Math.PI + 0.25, -0.35); ctx.arc(9.3, 8.1, 1.15, -0.35, -Math.PI + 0.25, true); ctx.closePath(); SH.fs(ctx, "#3E9F3A");
+  }
+  // the cross auger end-on: its flights turn and pull the crop to the middle
+  function cuAuger(x, y, r, T, run) {
+    SH.C(ctx, x, y, r, "#C9D1DB");
+    for (var k = 0; k < 3; k++) { var a = -T * 5 * run + k * TAU / 3; SH.Ln(ctx, x, y, x + Math.cos(a) * r * 0.92, y + Math.sin(a) * r * 0.92, "#7C8696", 0.08); }
+    SH.C(ctx, x, y, r * 0.25, "#8F9AAA", Farm.LW * 0.6);
+  }
+  // ---- Unloading: the grain spout from close by, pouring into the trailer (the trailer's own units) ----
+  function cuPour() {
+    // trailer metres: x -8.3 .. -0.7, y -5.6 .. -0.85
+    var sun = job === "sun", T = cu.ph, pf = cu.pf, i, f;
+    {
+      ctx.fillStyle = "#BFE6FF"; ctx.fillRect(-12, -8, 16, 7.6);
+      ctx.fillStyle = "#D3AF62"; ctx.fillRect(-12, -0.5, 16, 2);
+      var load = clamp(tr.load, 0, 1.05), u = ease(cb.auger), side = sc.X(pivotX(), 1) > augerOutX() ? 1 : -1, MX = -4.6;
+      var top = -2.6 - (0.12 + load * 0.55) - (0.1 + load * 0.45);
+      ctx.save();
+      if (side < 0) { ctx.translate(2 * MX, 0); ctx.scale(-1, 1); }
+      // the combine behind: its side and the grain tank with a window (it empties as the trailer fills)
+      SH.R(ctx, -1.6, -6.2, 6, 5.9, 0.2, "#3E9F3A");
+      SH.R(ctx, -1.2, -5.6, 2.2, 1.6, 0.12, "#2F3442", Farm.LW * 0.8);
+      ctx.save(); SH.rr(ctx, -1.2, -5.6, 2.2, 1.6, 0.12); ctx.clip();
+      var tl = lerp(-4.05, -5.5, clamp(cb.tank, 0, 1));
+      if (cb.tank > 0.003) { ctx.fillStyle = sun ? SEED[0] : "#EBB93E"; ctx.fillRect(-1.3, tl, 2.4, 2); }
+      ctx.restore();
+      SH.Ln(ctx, -1.5, -3.6, 4.3, -3.6, "#2B7A2A", 0.12);
+      // the grain spout: a tube with a window on its auger flights, swinging out over the trailer
+      if (u > 0.01) {
+        var ex = lerp(0.2, MX, u), ey = lerp(-5.5, -4.75, u), sx0 = 1.6, sy0 = -5.9;
+        SH.tube(ctx, sx0, sy0, ex, ey, 0.62, "#5E9E4F");
+        var dx = ex - sx0, dy = ey - sy0, d = Math.hypot(dx, dy) || 1, nx = -dy / d * 0.18, ny = dx / d * 0.18;
+        ctx.beginPath(); ctx.moveTo(sx0 + dx * 0.15 + nx, sy0 + dy * 0.15 + ny); ctx.lineTo(sx0 + dx * 0.85 + nx, sy0 + dy * 0.85 + ny); ctx.lineTo(sx0 + dx * 0.85 - nx, sy0 + dy * 0.85 - ny); ctx.lineTo(sx0 + dx * 0.15 - nx, sy0 + dy * 0.15 - ny); ctx.closePath(); SH.fs(ctx, "#2F3442", Farm.LW * 0.6);
+        ctx.save(); ctx.clip();
+        for (i = 0; i < 12; i++) {
+          f = ((i / 12) + T * 0.9 * (cb.pouring ? 1 : 0)) % 1; var fx = sx0 + dx * f, fy = sy0 + dy * f;
+          SH.Ln(ctx, fx - nx * 1.2 + dx / d * 0.12, fy - ny * 1.2 + dy / d * 0.12, fx + nx * 1.2 - dx / d * 0.12, fy + ny * 1.2 - dy / d * 0.12, "#AEB8C5", 0.07);
+          if (pf > 0.05) grainDot(fx + dx / d * 0.1, fy + dy / d * 0.1, 0.07, i);
+        }
+        ctx.restore();
+        // the spout's mouth, pointing down
+        SH.P(ctx, [ex - 0.42, ey - 0.15, ex + 0.42, ey - 0.15, ex + 0.3, ey + 0.55, ex - 0.3, ey + 0.55], "#5E9E4F");
+        SH.Ln(ctx, ex - 0.3, ey + 0.5, ex + 0.3, ey + 0.5, "#2B7A2A", 0.08);
+      }
+      ctx.restore();
+      // the heap under the spout (behind the trailer's sides), the trailer, its own heap
+      if (load > 0.01) {
+        ctx.beginPath(); ctx.moveTo(-7.4, -2.6); ctx.quadraticCurveTo(-6.4, -2.7, MX - 0.25, top + 0.02); ctx.quadraticCurveTo(MX, top - 0.08, MX + 0.25, top + 0.02); ctx.quadraticCurveTo(-2.6, -2.7, -1.6, -2.6); ctx.closePath();
+        SH.fs(ctx, sun ? SEED[0] : CROP_FILL, Farm.LW * 0.8);
+      }
+      D.trailer(ctx, { wheel: tr.wheel, load: load, tip: 0, crop: sun ? "seed" : "grain", time: time });
+      if (sun) seedFlecks(ctx, load, 0);
+      // the stream: a thick river of grain from the mouth onto the heap, grains tumbling in it, a little dust
+      if (pf > 0.02 && u > 0.95) {
+        var y0 = -4.25, y1 = load > 0.01 ? top : -2.6, wv = 0.36 * pf, wb = 0.62 * pf, sw = Math.sin(T * 9) * 0.04;
+        ctx.save(); ctx.beginPath(); ctx.rect(-12, -9, 20, 6.26); ctx.clip();
+        ctx.beginPath(); ctx.moveTo(MX - wv, y0); ctx.lineTo(MX + wv, y0);
+        ctx.quadraticCurveTo(MX + wv - 0.05, (y0 + y1) / 2, MX + wb + sw, y1 + 0.05); ctx.lineTo(MX - wb + sw, y1 + 0.05);
+        ctx.quadraticCurveTo(MX - wv + 0.05, (y0 + y1) / 2, MX - wv, y0); ctx.closePath();
+        SH.fs(ctx, sun ? SEED[0] : "#EBB93E", Farm.LW * 0.7);
+        for (i = 0; i < 16; i++) { f = (i / 16 + T * 2.2) % 1; grainDot(MX + (hash(i, 2) - 0.5) * lerp(wv, wb, f) * 1.4, lerp(y0, y1, f), 0.08, i); }
+        // grains bouncing off the heap, and a little dust
+        for (i = 0; i < 10; i++) { f = (i / 10 + T * 1.6) % 1; var dir = i & 1 ? 1 : -1, bx = MX + dir * (0.3 + f * (0.8 + hash(i, 4))); ctx.save(); ctx.globalAlpha *= (1 - f) * pf; grainDot(bx, y1 + 0.05 - Math.sin(f * Math.PI) * (0.3 + 0.3 * hash(i, 5)) + f * 0.25, 0.07, i); ctx.restore(); }
+        ctx.restore();
+        for (i = 0; i < 5; i++) { f = (i / 5 + T * 0.5) % 1; ctx.save(); ctx.globalAlpha *= 0.35 * (1 - f) * pf; SH.C(ctx, MX + (hash(i, 7) - 0.5) * 2.2 * (0.4 + f), y1 - 0.2 - f * 1.0, 0.25 + f * 0.45, sun ? "#CFC6B6" : "#F6E7B8", 0); ctx.restore(); }
+      }
+    }
+  }
+  var CROP_FILL = "#EBB93E";
+  // ---- At the grain barn: the trailer's back end tipping, the grain sliding out onto the barn's heap ----
+  function cuTip() {
+    // trailer metres: x -13.3 .. -3.3, y -5.75 .. 0.5
+    var sun = job === "sun", T = cu.ph, tf = cu.tf, i, f;
+    {
+      ctx.fillStyle = "#BFE6FF"; ctx.fillRect(-14, -8, 12, 8);
+      ctx.fillStyle = "#86C25A"; ctx.fillRect(-8.4, -0.4, 8, 2);
+      // inside the barn: plank wall, the concrete floor, the heap
+      ctx.fillStyle = "#4A3B2C"; ctx.fillRect(-14, -8, 5.6, 8);
+      for (i = 0; i < 9; i++) SH.Ln(ctx, -14, -5.5 + i * 0.7, -8.4, -5.5 + i * 0.7, "#3A2D21", 0.06);
+      ctx.fillStyle = "#B9BFC7"; ctx.fillRect(-14, 0.5, 5.7, 1.5);
+      SH.Ln(ctx, -14, 0.5, -8.3, 0.5, "#8C939C", 0.06);
+      var lvl = clamp(storeLevel, 0, 1.1), hh = 0.9 + lvl * 2.4, hx = -11.3, top = 0.5 - hh;
+      ctx.beginPath(); ctx.moveTo(hx - 3.2, 0.55); ctx.quadraticCurveTo(hx - 1.2, top - 0.1, hx, top); ctx.quadraticCurveTo(hx + 1.3, top - 0.1, hx + 3.0, 0.55); ctx.closePath();
+      SH.fs(ctx, sun ? SEED[0] : "#EBB93E", Farm.LW * 0.8);
+      for (i = 0; i < 22; i++) { var fx = hx + (hash(i, 1) - 0.5) * 4.4, fy = lerp(top + 0.25, 0.4, hash(i, 2)); if (Math.abs(fx - hx) / 2.6 < (fy - top) / hh) SH.Ln(ctx, fx, fy, fx + 0.14, fy - 0.05, sun ? SEED[1] : "#C99322", 0.06); }
+      // the door post and the roof edge
+      SH.R(ctx, -8.6, -6.2, 0.35, 6.7, 0.04, "#8C939C");
+      SH.R(ctx, -14.2, -6.3, 6.0, 0.4, 0.04, "#5B6472");
+      // the trailer (tipped by the lever on the tractor)
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: sun ? "seed" : "grain", time: time });
+      if (sun) seedFlecks(ctx, tr.load, tr.tip);
+      // the grain sliding out of the back, down onto the heap
+      if (tf > 0.02) {
+        var th = -tr.tip * 0.62, c = Math.cos(th), sn = Math.sin(th);
+        var rot = function (px, py) { var vx = px + 7.6, vy = py + 0.9; return [-7.6 + vx * c - vy * sn, -0.9 + vx * sn + vy * c]; };
+        var a = rot(-7.62, -2.4), b = rot(-7.62, -1.0), ex = -9.1, ey = Math.max(top + 0.3, top + (ex - hx) * (ex - hx) / 9 * hh);
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(a[0] - 0.9, a[1] + 0.3, ex - 0.4, ey); ctx.lineTo(ex + 0.5, ey + 0.15); ctx.quadraticCurveTo(b[0] - 0.4, b[1] + 0.2, b[0], b[1]); ctx.closePath();
+        ctx.save(); ctx.globalAlpha *= tf; SH.fs(ctx, sun ? SEED[0] : "#EBB93E", Farm.LW * 0.7);
+        for (i = 0; i < 12; i++) { f = (i / 12 + T * 1.8) % 1; var g0 = lerp(a[0], b[0], hash(i, 3)), g1 = lerp(a[1], b[1], hash(i, 3)); grainDot(lerp(g0, ex, f) - Math.sin(f * Math.PI) * 0.3, lerp(g1, ey, f * f), 0.09, i); }
+        for (i = 0; i < 4; i++) { f = (i / 4 + T * 0.5) % 1; ctx.save(); ctx.globalAlpha *= 0.3 * (1 - f); SH.C(ctx, ex - 0.4 + (hash(i, 8) - 0.5) * 1.6, ey - 0.3 - f * 1.2, 0.3 + f * 0.5, sun ? "#CFC6B6" : "#F6E7B8", 0); ctx.restore(); }
+        ctx.restore();
+      }
+    }
+  }
+
   // ---------- Pictures for the tiles and the guide (drawn with the scene's own code) ----------
   function pic(id) {
     if (picCache[id] !== undefined) return picCache[id];
@@ -1434,7 +1855,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     state: function () {
       return { cam: sc.cam, camLim: camLim, cmm: [sc.camMin, sc.camMax], k: sc.k, nag: nag.hdr, to: cb.to, job: job, crop: crop.stage, cutN: cutN, NC: NC, hdrUp: cb.hdrUp, hdr: cb.hdr, x: cb.x, dir: cb.dir, v: cb.v, tank: cb.tank,
         auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepLine, cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0,
-        dog: dogS ? { x: dogS.x, face: dogS.face, st: dogS.st } : null, hawk: hawk ? { x: hawk.x, face: hawk.face } : null, trStep: tr.step, trTo: tr.to };
+        dog: dogS ? { x: dogS.x, face: dogS.face, st: dogS.st } : null, hawk: hawk ? { x: hawk.x, face: hawk.face } : null, trStep: tr.step, trTo: tr.to,
+        close: { mode: cu.shown, alpha: +closeAlpha().toFixed(2), rect: cu.rect && cu.rect.map(Math.round), corner: cu.corner } };
     },
     // viewport points of the parts he touches
     screen: function (id) {
@@ -1450,6 +1872,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       out.cbBox = a.map(Math.round); out.rigBox = r && r.map(Math.round); out.W = Math.round(W);
       return out;
     },
+    closeAvoid: function () { return { avoid: closeAvoid().map(function (b) { return b.map(Math.round); }), W: W, H: H, CR: CR, cY: cu.cY }; },
     ghost: function () { return ghost.show(); }
   };
 })();
