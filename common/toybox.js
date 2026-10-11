@@ -1207,6 +1207,7 @@
     soundOn = get(SKEY) === "1";
     build();
     inited = true;
+    watchAllCoaches();
     if (opts.big) setBig(false, false);
     updateSoundUI();
     sync();
@@ -1529,12 +1530,56 @@
       speechSynthesis.speak(u);
     } catch (e) { /* no voice */ }
   }
+  // ---------- Instruction or information? (the dad, 2026-10-11) ----------
+  // Every coach pill (.tb-coach) is watched: a line that asks him to do something ("Drag fruit into the jar!",
+  // "Tap the lever to drop the combine's header.") gets the instruction look (is-do: dark pill, white bold text, a
+  // tapping finger, a gentle pulse while it waits for him); a line that only says what is happening ("The blender
+  // whizzes it up.") gets the information look (is-info: small, plain, quiet). Pages keep setting the text as
+  // before; data-coach="do" or "info" on the element forces a kind.
+  var DO_WORDS = ("tap drag pull push hold drive put pour press switch turn add pick choose cut drop crack flip stir slide " +
+    "swing fill fold lift lower open close toot blend mix scoop grind tamp steam froth lock unlock spin roll draw paint " +
+    "build try find give feed plant water take bring shake sweep smooth start stop make let move rotate hit hammer screw " +
+    "tighten loosen measure mark saw sand drill plane clamp glue nail wipe wash dry dress pop catch throw launch fly steer " +
+    "load tip dump dig scrape spread wrap stack bale mow chop rake send gather pen line sort crank wind pump squeeze flick " +
+    "fling aim shoot ring knock sow cover peel slice dice whisk beat knead serve plate set place connect join attach color " +
+    "colour print grab carry bounce blow follow hang keep sharpen scrub walk shut hook cook use pat rub tickle pet").split(" ");
+  var DO_SET = {};
+  DO_WORDS.forEach(function (w) { DO_SET[w] = 1; });
+  // An instruction if any sentence in the line starts with a doing word ("A big rock is stuck. Tap it!").
+  function coachKind(text) {
+    var t = String(text || "").trim().toLowerCase();
+    if (!t) return "";
+    var parts = t.split(/[.!?]+\s*/), i;
+    for (i = 0; i < parts.length; i++) {
+      var p = parts[i].replace(/^[^a-z]+/, "").replace(/^(quick|now|next|then|first|please|ok|okay|and)\b[,\s]*/, "");
+      if (DO_SET[p.split(/[^a-z']+/)[0]]) return "do";
+    }
+    return "info";
+  }
+  function watchCoach(el) {
+    if (!el || el.__tbWatch) return;
+    el.__tbWatch = true;
+    var last = null;
+    function apply() {
+      var forced = el.getAttribute("data-coach"), text = el.textContent, kind = forced || coachKind(text);
+      if (text === last) return;
+      last = text;
+      el.classList.toggle("is-do", kind === "do");
+      el.classList.toggle("is-info", kind === "info");
+      if (kind === "do") { el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new"); }
+    }
+    try { new MutationObserver(apply).observe(el, { childList: true, characterData: true, subtree: true }); } catch (e) { /* old browser */ }
+    apply();
+  }
+  function watchAllCoaches() { Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), watchCoach); }
+
   function coachLine(el) {
     el = elOf(el);
     el.classList.add("tb-coach");
     el.setAttribute("role", "status");
     el.setAttribute("aria-live", "polite");
     el.innerHTML = '<span class="tb-coach-dot" aria-hidden="true"></span><span class="tb-coach-text"></span>';
+    watchCoach(el);
     var txt = el.lastChild, stepText = "", sayText = "", sayUntil = 0, t = 0, shown = null, api;
     function show() {
       clearTimeout(t);

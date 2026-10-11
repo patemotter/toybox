@@ -192,6 +192,11 @@ Keep only:
   button and keeps Big mode off (`Toybox.setBig` is a no-op, saved `toybox-big-<app>` values are ignored). Don't add one.
 - **The coach line is big and at the bottom of the stage on every size** (the dad, 2026-10-10: small at the top, he
   missed it). Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
+- **Instructions look different from information** (the dad, 2026-10-11: on the iPad they looked the same and were easy
+  to miss). `common/toybox.js` watches every `.tb-coach` and marks it `is-do` when a sentence starts with an action
+  verb (`DO_WORDS`; "Tap the lever.", "A rock is stuck. Tap it!") and `is-info` otherwise ("The destoner takes out the
+  stones."). `is-do` = dark pill, white bold text, yellow finger, yellow glow and a gentle pulse; `is-info` = smaller,
+  quiet white pill. Write instructions starting with the verb; force a kind with `data-coach="do"|"info"` if needed.
 - Prefer making the play area bigger over fitting more buttons. On upright phones, frame scenes tightly (pan with
   the action, turn wide layouts upright) rather than leaving empty sky.
 - **No picture-in-picture insets** unless they show something unique (kept: the Router Table end view, now a
