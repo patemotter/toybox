@@ -186,7 +186,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .mr-tabs .btn.tb-surprise { min-height: 58px; font-size: 1.35rem; }
 }
 @media (min-width: 744px) and (min-height: 640px) and (orientation: portrait) {
-  .runs { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .runs { grid-template-columns: repeat(10, minmax(0, 1fr)); }
   .runbtn .long { display: inline; }
   .runbtn .short { display: none; }
   .runbtn { font-size: 0.95rem; white-space: normal; text-align: center; }
@@ -206,9 +206,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .lotsbtn svg { width: 32px; height: 32px; }
   /* Every pane is the same height (two rows), so switching tabs never resizes the board. */
   [data-pane] { height: 106px; }
-  .runs { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: 50px 50px; gap: 6px; }
+  .runs { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: 50px 50px; gap: 6px; }
   .runbtn { font-size: 0.9rem; line-height: 1.05; padding: 2px 1px 1px; border-radius: 12px; overflow: hidden; }
   .runbtn svg { width: 30px; height: 30px; }
+  .runbtn { font-size: 0.82rem; }
   .lifts { grid-template-columns: 1fr 1fr; gap: 8px; }
   .liftbtn { flex-direction: column; gap: 2px; min-height: 0; font-size: 1.1rem; border-radius: 16px; }
   .liftbtn svg { width: 44px; height: 44px; }
@@ -297,7 +298,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   var NC = COLORS.length, RAINBOW = NC;   // color index NC = a rainbow-swirl marble
   var RUNS = [["zigzag", "Zigzag", "Zigzag"], ["spiral", "Spiral", "Spiral tower"], ["loop", "Loop", "Loop-de-loop"],
     ["funnels", "Funnels", "Funnels"], ["machine", "Machine", "Machine"], ["mix1", "Mix 1", "Mix 1"], ["mix2", "Mix 2", "Mix 2"],
-    ["kit", "Kit", "Kit"]];
+    ["kit", "Kit", "Kit"], ["race", "Race", "Race"], ["construction", "Site", "Construction site"]];
   var RUN_IDS = RUNS.map(function (r) { return r[0]; });
 
   // The world is a fixed 1000 x 1160 board, scaled to fit the stage.
@@ -799,6 +800,790 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       rp: (RM + cr + 1) / Math.sin(Math.PI / n), pocket: [] };
   }
 
+  // ---------- Race: a marble race down side-by-side lanes ----------
+  // The course is seen from the front (downhill is down the screen), lanes side by side. Marbles roll along
+  // the feeder rail and hop into their own lane behind the start gate. A tap on the gate drops it, and it
+  // drops by itself a moment after the marbles are lined up. They race past bumps, a drop and a mixing zone
+  // with pegs (where they can change lanes), cross the checkered finish and roll into the tray. The podium
+  // shows 1st, 2nd and 3rd by color (gold, silver, bronze rosettes) until the next race finishes.
+  // Racers move in their own simple model (progress p down the course, sideways offset l), so they never stall.
+  var race = null;
+  var RACE = { lanes: 5, lw: 56, top: 385, bot: 1012, slot: 410, gate: 441, fin: 962, bumps: [560, 868], drop: 792,
+    mix0: 632, mix1: 748, pegs: [[672, -84], [672, 28], [714, -28], [714, 84]], pegR: 13 };
+  var GOLD = "#FFC93C", SILVER = "#C9D3E6", BRONZE = "#E0915A";
+  function rxc(p) { return 470 + 60 * Math.cos(TAU * (p - RACE.top) / (RACE.bot - RACE.top)); }
+  function rdx(p) { return -60 * TAU / (RACE.bot - RACE.top) * Math.sin(TAU * (p - RACE.top) / (RACE.bot - RACE.top)); }
+  function laneL(k) { return (k - (RACE.lanes - 1) / 2) * RACE.lw; }
+  function raceHalf() { return RACE.lanes * RACE.lw / 2; }
+  BUILD.race = function () {
+    // Feeder rail from the hopper chute, over the start box.
+    addSeg(345, 335, 720, 368, { col: "#5B7CFF" });
+    race = { phase: "line", t: 0, sinceJoin: 9, gate: 0, wig: 0, n: 0, shown: [], win: null, winT: 0, flag: 0, spark: 0 };
+  };
+  // Each racer gets its own solid color (the picked color first), so the race is easy to follow.
+  function raceColor() {
+    var used = {}, i, c;
+    for (i = 0; i < balls.length; i++) if (!balls[i].car) used[balls[i].c] = 1;
+    for (i = 0; i < hopper.queue.length; i++) if (!hopper.queue[i].car) used[hopper.queue[i].c] = 1;
+    var start = typeof state.color === "number" ? state.color : (colorI++ % NC);
+    for (i = 0; i < NC; i++) { c = (start + i) % NC; if (!used[c]) return c; }
+    return start % NC;
+  }
+  function raceCapture(b) {
+    if (b.x < 392 || b.x > 740 || b.y > 400 || b.y < 220) return;
+    b.mode = "race"; b.rvl = 0; b.rv = 0; b.hop = 0;
+    if (b.car) { b.rpace = true; b.rph = "park"; b.lane = -1; b.vx = 0; b.vy = 0; return; }
+    var taken = {}, i, best = -1, bd = 1e9;
+    for (i = 0; i < balls.length; i++) {
+      var o = balls[i];
+      if (o !== b && o.mode === "race" && !o.rpace && (o.rph === "join" || o.rph === "wait")) taken[o.lane] = 1;
+    }
+    for (i = 0; i < RACE.lanes; i++) {
+      if (taken[i]) continue;
+      var d = Math.abs(rxc(RACE.slot) + laneL(i) - b.x);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (best < 0) { b.mode = "free"; return; }
+    raceJoin(b, best);
+  }
+  function raceJoin(b, lane) {
+    b.lane = lane; b.rl = laneL(lane); b.rp = RACE.slot; b.rph = "join"; b.rj = 0; b.jx0 = b.x; b.jy0 = b.y;
+    b.vx = 0; b.vy = 0;
+    race.sinceJoin = 0;
+    tick();
+  }
+  function raceGo() {
+    if (race.phase === "go") return;
+    race.phase = "go"; race.t = 0; race.n = 0; race.wig = 0;
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      if (b.mode === "race" && b.rph === "wait") { b.rph = "run"; b.rv = rand(30, 60); b.luck = rand(0.88, 1.12); b.rvl = 0; }
+    }
+    var gx = rxc(RACE.gate);
+    burst(gx - raceHalf(), RACE.gate, 2, 6, 160, 0.5); burst(gx + raceHalf(), RACE.gate, 2, 6, 160, 0.5);
+    if (live()) { tone(523, 0.18, 0.05, "triangle"); tone(784, 0.3, 0.05, "triangle", 0, 0.16); }
+  }
+  function raceFinish(b) {
+    race.n++;
+    if (race.n === 1) {
+      // A new winner: the podium starts over, the flags wave hard and the winner gets a spotlight.
+      race.shown = []; race.win = b; race.winT = 2.2; race.flag = 1;
+      chime();
+      burst(b.x, b.y, b.c, 18, 280, 0.8); ring(b.x, b.y, b.c, RM, 0.7);
+    } else burst(b.x, b.y, b.c, 6, 160, 0.5);
+    if (race.shown.length < 3) race.shown.push({ c: b.c, pop: 0 });
+  }
+  function raceTapGate(pt) {
+    var gx = rxc(RACE.gate);
+    if (Math.abs(pt.y - RACE.gate) > 24 || Math.abs(pt.x - gx) > raceHalf() + 40) return false;
+    var waiting = 0;
+    for (var i = 0; i < balls.length; i++) if (balls[i].mode === "race" && balls[i].rph === "wait") waiting++;
+    if (race.phase === "line" && waiting) { started = true; raceGo(); }
+    else { race.wig = 1; ring(pt.x, pt.y, 2, 18, 0.5); tick(); }
+    return true;
+  }
+  function raceStep(h) {
+    var i, j, b, R = RACE, W2 = raceHalf(), waiting = 0, joining = 0, running = 0;
+    race.t += h; race.sinceJoin += h;
+    race.gate += ((race.phase === "go" ? 1 : 0) - race.gate) * Math.min(1, h * (race.phase === "go" ? 10 : 3));
+    race.wig = Math.max(0, race.wig - h * 2);
+    race.flag = Math.max(0, race.flag - h * 0.35);
+    if (race.winT > 0) {
+      race.winT -= h;
+      race.spark -= h;
+      if (race.spark <= 0 && race.win) { race.spark = 0.22; burst(race.win.x + rand(-20, 20), race.win.y + rand(-20, 20), 2, 3, 120, 0.5); }
+    }
+    for (i = 0; i < race.shown.length; i++) race.shown[i].pop = Math.min(1, race.shown[i].pop + h * 3);
+    var rs = [];
+    for (i = 0; i < balls.length; i++) {
+      b = balls[i];
+      if (b.mode !== "race") continue;
+      if (b.rph === "park") {
+        // The Surprise car waits on the rail, then follows the racers down like a pace car.
+        b.vx = 0; b.vy = 0;
+        if (race.phase === "go" && race.t > 0.9) { b.lane = 2; b.rl = 0; b.rp = R.slot; b.rph = "join"; b.rj = 0; b.jx0 = b.x; b.jy0 = b.y; }
+        continue;
+      }
+      if (b.rph === "join") {
+        joining++;
+        b.rj = Math.min(1, b.rj + h / 0.42);
+        var e = b.rj * b.rj * (3 - 2 * b.rj);
+        b.x = b.jx0 + (rxc(b.rp) + b.rl - b.jx0) * e;
+        b.y = b.jy0 + (b.rp - b.jy0) * e - 36 * Math.sin(Math.PI * b.rj);
+        b.spin = 5;
+        if (b.rj >= 1) {
+          if (b.rpace || race.phase === "go") { b.rph = "run"; b.rv = 50; b.luck = rand(0.88, 1.12); }
+          else { b.rph = "wait"; burst(b.x, b.y + RM, b.c, 4, 100, 0.35); }
+        }
+        continue;
+      }
+      if (b.rph === "wait") { waiting++; b.x = rxc(b.rp) + b.rl; b.y = b.rp; b.spin = 0; continue; }
+      if (!b.rpace) { running++; rs.push(b); }
+      var p0 = b.rp, dx = rdx(b.rp), cs = 1 / Math.sqrt(1 + dx * dx);
+      var vt = b.rpace ? 125 : 150 * b.luck;
+      b.rv += (vt - b.rv) * Math.min(1, h * 0.9);
+      if (b.rv < 40) b.rv = 40;
+      b.rp += b.rv * cs * h;
+      var inMix = b.rp > R.mix0 && b.rp < R.mix1;
+      if (b.rpace) b.rl += (0 - b.rl) * Math.min(1, h * 4);
+      else if (inMix) { b.rvl *= Math.exp(-h * 1.2); b.lane = -1; }
+      else {
+        if (b.lane < 0) {
+          var bl = 0, bd2 = 1e9;
+          for (j = 0; j < R.lanes; j++) if (Math.abs(laneL(j) - b.rl) < bd2) { bd2 = Math.abs(laneL(j) - b.rl); bl = j; }
+          b.lane = bl;
+        }
+        b.rvl += ((laneL(b.lane) - b.rl) * 70 - b.rvl * 15) * h;
+      }
+      b.rl += b.rvl * h;
+      if (b.rl < -W2 + RM) { b.rl = -W2 + RM; if (b.rvl < 0) b.rvl = -b.rvl * 0.5; }
+      if (b.rl > W2 - RM) { b.rl = W2 - RM; if (b.rvl > 0) b.rvl = -b.rvl * 0.5; }
+      if (!b.rpace) {
+        for (j = 0; j < R.bumps.length; j++) {
+          if (p0 < R.bumps[j] && b.rp >= R.bumps[j]) { b.rv *= rand(0.7, 0.95); b.luck = rand(0.86, 1.14); b.hop = Math.max(b.hop, 0.8); burst(b.x, b.y + RM, b.c, 3, 110, 0.35); clack(0.4); }
+        }
+        if (p0 < R.mix0 && b.rp >= R.mix0) { b.rvl = rand(-110, 110); b.luck = rand(0.86, 1.14); }
+        if (p0 < R.drop && b.rp >= R.drop) { b.rv += 70; b.hop = 1; burst(b.x, b.y + RM, 2, 4, 140, 0.4); clack(0.6); }
+        if (p0 < R.fin && b.rp >= R.fin) raceFinish(b);
+        if (b.rp > R.mix0 - 30 && b.rp < R.mix1 + 30) {
+          for (j = 0; j < R.pegs.length; j++) {
+            var pg = R.pegs[j], ex = rxc(b.rp) + b.rl - (rxc(pg[0]) + pg[1]), ey = b.rp - pg[0], ed = Math.sqrt(ex * ex + ey * ey), mind = RM + R.pegR;
+            if (ed >= mind) continue;
+            if (Math.abs(ex) < 2) ex = Math.random() < 0.5 ? -2 : 2;
+            ed = Math.sqrt(ex * ex + ey * ey);
+            var ov = mind - ed;
+            b.rl += ex / ed * ov; b.rp += Math.max(0, ey / ed * ov);
+            b.rvl += ex / ed * Math.max(60, b.rv * 0.6);
+            b.rv *= 0.985;
+            if (ov > 3) { clack(0.3); }
+          }
+        }
+      }
+      if (b.rp >= R.bot) {
+        // Off the end of the course into the tray, and round again by the lift.
+        b.mode = "free"; b.rph = null; b.rpace = false;
+        b.x = rxc(b.rp) + b.rl; b.y = b.rp;
+        b.vx = rdx(b.rp) * b.rv * cs + b.rvl * 0.3; b.vy = b.rv * cs;
+        b.cool = 0.2; b.age = 0; b.nudges = 0; b.stillT = 0;
+        continue;
+      }
+      b.x = rxc(b.rp) + b.rl; b.y = b.rp; b.spin = b.rv / RM;
+    }
+    // Racers bump each other (side by side in the mixing zone, or one behind the other in a lane).
+    for (i = 0; i < rs.length; i++) for (j = i + 1; j < rs.length; j++) {
+      var a = rs[i], c = rs[j];
+      if (a.mode !== "race" || c.mode !== "race") continue;
+      var qx = (rxc(c.rp) + c.rl) - (rxc(a.rp) + a.rl), qy = c.rp - a.rp, qd = Math.sqrt(qx * qx + qy * qy);
+      if (qd >= 2 * RM) continue;
+      if (qd < 1e-3) { qx = 1; qy = 0; qd = 1; }
+      var o2 = (2 * RM - qd) / 2, nx = qx / qd, ny = qy / qd;
+      a.rl -= nx * o2; a.rp -= ny * o2; c.rl += nx * o2; c.rp += ny * o2;
+      var back = a.rp < c.rp ? a : c, front = back === a ? c : a;
+      if (back.rv > front.rv) { var m = (back.rv + front.rv) / 2; back.rv = m - 12; front.rv = m + 12; if (back.rv - front.rv < -40) clack(0.3); }
+      a.rvl -= nx * 40; c.rvl += nx * 40;
+      a.x = rxc(a.rp) + a.rl; a.y = a.rp; c.x = rxc(c.rp) + c.rl; c.y = c.rp;
+    }
+    if (race.phase === "line") {
+      var all = total();
+      if (waiting > 0 && joining === 0 && (race.sinceJoin > (waiting >= all ? 0.8 : 3.0) || (ending && race.sinceJoin > 0.3))) raceGo();
+    } else if (running === 0 && joining === 0 && race.t > 0.6) { race.phase = "line"; race.t = 0; race.sinceJoin = 0; }
+  }
+
+  // The course: sandy lanes with red and white curbs, bumps, a drop, a mixing zone with pegs, a checkered finish.
+  function raceEdge(g, l, p0, p1) {
+    var pts = [], p;
+    for (p = p0; p < p1; p += 6) pts.push([rxc(p) + l, p]);
+    pts.push([rxc(p1) + l, p1]);
+    poly(g, pts);
+  }
+  function raceQuad(g, p0, p1, l0, l1) {
+    g.beginPath(); g.moveTo(rxc(p0) + l0, p0); g.lineTo(rxc(p0) + l1, p0); g.lineTo(rxc(p1) + l1, p1); g.lineTo(rxc(p1) + l0, p1); g.closePath();
+  }
+  function drawRaceCourse(g) {
+    var R = RACE, W2 = raceHalf(), p, k, B = W2 + 12;
+    g.beginPath();
+    for (p = R.top; p <= R.bot; p += 6) g.lineTo(rxc(p) - B, p);
+    for (p = R.bot; p >= R.top; p -= 6) g.lineTo(rxc(p) + B, p);
+    g.closePath();
+    g.fillStyle = darkBoard ? "#E8D9B0" : "#FFF3D6"; g.fill();
+    g.lineWidth = 5; g.strokeStyle = OUT; g.stroke();
+    // Mixing zone: a blue patch with no lane walls.
+    g.save(); raceQuad(g, R.mix0, R.mix1, -W2, W2); g.fillStyle = "rgba(62,200,255,0.22)"; g.fill(); g.restore();
+    // Curbs.
+    [-W2 - 6, W2 + 6].forEach(function (l) {
+      g.lineCap = "butt";
+      g.lineWidth = 12; g.strokeStyle = OUT; raceEdge(g, l, R.top + 4, R.bot - 2);
+      g.lineWidth = 8; g.strokeStyle = "#FFFFFF"; raceEdge(g, l, R.top + 4, R.bot - 2);
+      g.setLineDash([18, 18]); g.strokeStyle = "#FF4D6D"; raceEdge(g, l, R.top + 4, R.bot - 2); g.setLineDash([]);
+      g.lineCap = "round";
+    });
+    // Lane walls (not in the mixing zone).
+    for (k = 1; k < R.lanes; k++) {
+      var l = laneL(k) - R.lw / 2;
+      [[R.top + 6, R.mix0], [R.mix1, R.bot - 4]].forEach(function (seg) {
+        g.lineWidth = 7; g.strokeStyle = OUT; raceEdge(g, l, seg[0], seg[1]);
+        g.lineWidth = 3; g.strokeStyle = "#FFFFFF"; raceEdge(g, l, seg[0], seg[1]);
+      });
+    }
+    // Bumps: orange and yellow stripes across the lanes.
+    R.bumps.forEach(function (bp) {
+      for (k = 0; k < 10; k++) {
+        raceQuad(g, bp - 7, bp + 7, -W2 + k * W2 / 5, -W2 + (k + 1) * W2 / 5);
+        g.fillStyle = k % 2 ? "#FFD23F" : "#FF9F1C"; g.fill();
+      }
+      raceQuad(g, bp - 7, bp + 7, -W2, W2); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+    });
+    // The drop: a ledge with a shadow below it.
+    raceQuad(g, R.drop, R.drop + 18, -W2, W2); g.fillStyle = "rgba(29,35,64,0.18)"; g.fill();
+    g.lineWidth = 5; g.strokeStyle = OUT;
+    g.beginPath(); g.moveTo(rxc(R.drop) - W2, R.drop); g.lineTo(rxc(R.drop) + W2, R.drop); g.stroke();
+    g.lineWidth = 3; g.strokeStyle = "rgba(255,255,255,0.8)";
+    g.beginPath(); g.moveTo(rxc(R.drop - 4) - W2 + 4, R.drop - 4); g.lineTo(rxc(R.drop - 4) + W2 - 4, R.drop - 4); g.stroke();
+    // Checkered finish line.
+    var sq = W2 / 10;
+    for (var row = 0; row < 2; row++) for (k = 0; k < 20; k++) {
+      raceQuad(g, R.fin - 12 + row * 12, R.fin + row * 12, -W2 + k * sq, -W2 + (k + 1) * sq);
+      g.fillStyle = (k + row) % 2 ? "#FFFFFF" : OUT; g.fill();
+    }
+    raceQuad(g, R.fin - 12, R.fin + 12, -W2, W2); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+    // Start stalls: a soft color under each lane's slot.
+    for (k = 0; k < R.lanes; k++) {
+      raceQuad(g, R.top + 8, R.gate - 6, laneL(k) - R.lw / 2 + 5, laneL(k) + R.lw / 2 - 5);
+      g.fillStyle = "rgba(91,124,255,0.14)"; g.fill();
+    }
+    // Pegs in the mixing zone.
+    R.pegs.forEach(function (pg) {
+      g.beginPath(); g.arc(rxc(pg[0]) + pg[1], pg[0], R.pegR, 0, TAU);
+      g.fillStyle = "#FF9F1C"; g.fill(); g.lineWidth = 4; g.strokeStyle = OUT; g.stroke();
+      g.beginPath(); g.arc(rxc(pg[0]) + pg[1] - 4, pg[0] - 4, 4, 0, TAU); g.fillStyle = "rgba(255,255,255,0.8)"; g.fill();
+    });
+    // The podium (its marbles and ribbons are drawn live).
+    PODIUM.forEach(function (s) {
+      rrect(g, s.x - 38, s.top, 76, 1008 - s.top, 8);
+      g.fillStyle = s.col; g.fill(); g.lineWidth = 4; g.strokeStyle = OUT; g.stroke();
+      g.fillStyle = "rgba(255,255,255,0.4)"; g.fillRect(s.x - 30, s.top + 6, 8, 1008 - s.top - 14);
+    });
+  }
+  // 1st in the middle (tallest, gold), 2nd on the left (silver), 3rd on the right (bronze).
+  var PODIUM = [{ x: 180, top: 900, col: GOLD }, { x: 102, top: 930, col: SILVER }, { x: 258, top: 952, col: BRONZE }];
+  function rosette(x, y, col, inner, sc) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT;
+    ctx.beginPath(); ctx.moveTo(-8, 6); ctx.lineTo(-14, 34); ctx.lineTo(-6, 28); ctx.lineTo(-1, 36); ctx.lineTo(0, 8); ctx.closePath();
+    ctx.fillStyle = col; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, 6); ctx.lineTo(14, 34); ctx.lineTo(6, 28); ctx.lineTo(1, 36); ctx.lineTo(0, 8); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    for (var k = 0; k < 24; k++) { var a = k * TAU / 24, r = k % 2 ? 15 : 19; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fillStyle = inner; ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  function flag(x, top, dir, now, amp) {
+    ctx.strokeStyle = OUT; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(x, RACE.fin + 10); ctx.lineTo(x, top - 6); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, top - 8, 5, 0, TAU); ctx.fillStyle = GOLD; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    var Wf = 58, Hf = 38, nu = 5, nv = 3, u, v;
+    function P(fu, fv) { return [x + dir * fu * Wf, top + fv * Hf + Math.sin(fu * 5 - now / (amp > 0.3 ? 90 : 220)) * (4 + 8 * amp) * fu]; }
+    for (u = 0; u < nu; u++) for (v = 0; v < nv; v++) {
+      var a = P(u / nu, v / nv), b = P((u + 1) / nu, v / nv), c = P((u + 1) / nu, (v + 1) / nv), d = P(u / nu, (v + 1) / nv);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath();
+      ctx.fillStyle = (u + v) % 2 ? "#FFFFFF" : OUT; ctx.fill();
+    }
+    var e = [P(0, 0), P(1, 0), P(1, 1), P(0, 1)], i;
+    ctx.beginPath(); ctx.moveTo(e[0][0], e[0][1]);
+    for (i = 1; i <= 10; i++) { var q = P(i / 10, 0); ctx.lineTo(q[0], q[1]); }
+    for (i = 10; i >= 0; i--) { var q2 = P(i / 10, 1); ctx.lineTo(q2[0], q2[1]); }
+    ctx.closePath(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+  }
+  function drawRaceBack(now) {
+    var W2 = raceHalf();
+    // Spotlight on the winner.
+    if (race.winT > 0 && race.win) {
+      ctx.globalAlpha = Math.min(1, race.winT) * 0.85;
+      ctx.drawImage(glows[2], race.win.x - 95, race.win.y - 95, 190, 190);
+      ctx.globalAlpha = 1;
+    }
+    // Finish flags, waving harder when a racer crosses the line.
+    var fx = rxc(RACE.fin);
+    flag(fx - W2 - 24, RACE.fin - 100, -1, now, reduce ? 0 : race.flag);
+    flag(fx + W2 + 24, RACE.fin - 100, 1, now + 300, reduce ? 0 : race.flag);
+    // Podium: the marble on each step and its rosette (gold, silver, bronze; the middle is the marble's color).
+    for (var i = 0; i < 3; i++) {
+      var s = PODIUM[i], r = race.shown[i];
+      if (r) {
+        var sc = r.pop < 1 ? 0.6 + 0.4 * Math.sin(r.pop * Math.PI / 2) + 0.15 * Math.sin(r.pop * Math.PI) : 1;
+        drawMarble({ c: r.c, ang: 0 }, s.x, s.top - RM - 1, sc);
+        rosette(s.x, s.top + 28, s.col, colHex(r.c), 0.9);
+      } else rosette(s.x, s.top + 28, s.col, "#FFFFFF", 0.9);
+    }
+  }
+  function drawRaceFront(now) {
+    // The start gate: a striped bar across the lanes that falls flat when it drops.
+    var W2 = raceHalf(), gx = rxc(RACE.gate), gd = race.gate, wig = race.wig > 0 && !reduce ? Math.sin(now / 35) * 4 * race.wig : 0;
+    var y = RACE.gate + gd * 14 + wig, th = 18 * (1 - gd * 0.72), x0 = gx - W2 - 10, x1 = gx + W2 + 10;
+    rrect(ctx, x0, y - th / 2, x1 - x0, th, Math.min(8, th / 2));
+    ctx.fillStyle = "#FF4D6D"; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = "#FFFFFF";
+    for (var x = x0 + 10; x < x1; x += 44) { ctx.beginPath(); ctx.moveTo(x, y + th); ctx.lineTo(x + 14, y - th); ctx.lineTo(x + 30, y - th); ctx.lineTo(x + 16, y + th); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    rrect(ctx, x0, y - th / 2, x1 - x0, th, Math.min(8, th / 2));
+    ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    [x0 - 6, x1 + 6].forEach(function (px) {
+      rrect(ctx, px - 9, RACE.gate - 26, 18, 44, 6);
+      ctx.fillStyle = GOLD; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    });
+  }
+
+  // ---------- Construction: a silly building-site run ----------
+  // The marbles ride the machines, each one moving by itself when marbles reach it (a tap also starts it):
+  // the tower crane's bucket catches them from the hopper chute, carries them across and tips them onto a
+  // scaffold plank ramp (a traffic cone is the bumper at its end); they roll into the sand pit; the digger
+  // scoops them, swings round and drops them on the conveyor belt; the belt fills the dump truck; the truck
+  // tips its bed into the cement mixer's hopper; the drum tumbles them and lets them out down its chute into
+  // the tray. Every machine holds its marbles itself (no physics in the machines), so nothing can jam.
+  var site = null;
+  var CR = { pick: 408, drop: 735, jib: 196, hy: 392, cap: 6 };
+  var HARD = "#FFC400", SAFE = "#FF7A1A";
+  var CR_SLOTS = [[-40, -4], [0, -2], [40, -4], [-20, -40], [20, -40], [0, -74]];
+  var PIT = { x0: 45, x1: 305, floor: 690 };
+  var PIT_SLOTS = (function () {
+    var s = [], r, j;
+    for (r = 0; r < 5; r++) for (j = 0; j < 5 - r; j++) s.push([80 + r * 23 + j * 46, PIT.floor - RM - r * 40]);
+    return s;
+  })();
+  var DIG = { hx: 420, hy: 652, root: [-30, -24], L1: 150, L2: 128 };
+  var DIG_POSE = { rest: [-150, -42, 0.5], down: [-232, 8, 0], scoop: [-188, 14, 1], up: [-172, -92, 1], dump: [-150, -58, -0.5] };
+  var DIG_SLOTS = [[0, -10], [-24, -18], [24, -18], [-12, -46], [12, -46]];
+  var BELT = { ax: 530, ay: 668, bx: 760, by: 610 };
+  BELT.L = Math.hypot(BELT.bx - BELT.ax, BELT.by - BELT.ay);
+  BELT.ux = (BELT.bx - BELT.ax) / BELT.L; BELT.uy = (BELT.by - BELT.ay) / BELT.L;
+  var TRK = { hx: 618, hy: 754, len: 196, wall: 34 };
+  var TRK_SLOTS = [[32, -27], [78, -27], [124, -27], [170, -27], [55, -64], [101, -64], [147, -64], [78, -101], [124, -101]];
+  var DRUM = { x: 395, y: 935, rx: 150, ry: 64, tilt: -0.15 };
+  BUILD.construction = function () {
+    addSeg(822, 470, 330, 548, { kind: "plank", col: "#E9B872", e: 0.2 });
+    // Traffic cone bumper at the right end of the plank ramp (its two sides bounce the marbles back).
+    var c1 = addSeg(845, 398, 824, 470, { kind: "cone", col: SAFE, e: 0.45, r: 10 });
+    addSeg(845, 398, 866, 470, { kind: "cone", col: SAFE, e: 0.45, r: 10 });
+    c1.draw = [845, 392, 478];
+    // The cement mixer's chute down to the tray.
+    addSeg(548, 930, 655, 990, { col: SAFE });
+    site = {
+      crane: { x: CR.pick, ph: "wait", t: 0, since: 0, tip: 0, load: [], wig: 0, sw: 0 },
+      pit: [],
+      dig: { ph: "idle", t: 0, since: 0, sx: 1, B: DIG_POSE.rest.slice(0, 2), curl: 0.5, from: null, load: [], wig: 0 },
+      belt: [], beltU: 0, beltBoost: 0, beltRoll: 0,
+      truck: { ph: "wait", t: 0, since: 0, a: 0, load: [], wig: 0, cd: 0 },
+      drum: { rot: 0, list: [], cd: 0, boost: 0 }
+    };
+  };
+  function holdIt(b, where) { b.mode = "hold"; b.hold = where; b.vx = 0; b.vy = 0; b.spin = 0; }
+  function letGo(b, vx, vy) { b.mode = "free"; b.hold = null; b.vx = vx; b.vy = vy; b.scool = 0.5; b.cool = 0.1; b.age = 0; b.nudges = 0; b.stillT = 0; }
+  function ease3(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+  function siteCapture(b) {
+    var S = site, c = S.crane;
+    if (b.scool > 0) return;
+    if (b.x > 348 && b.x < 500 && b.y > 270 && b.y < 440 && c.ph === "wait" && c.load.length < CR.cap) {
+      holdIt(b, "crane"); b.slot = c.load.length; c.load.push(b); c.since = 0; tick(); return;
+    }
+    if (b.x > 30 && b.x < 336 && b.y > 470 && b.y < 705 && b.vy > -60) {
+      holdIt(b, "pit"); S.pit.push(b); if (S.pit.length === 1) S.dig.since = 0; return;
+    }
+    if (b.x > 490 && b.x < 625 && b.y > 560 && b.y < 700 && b.vy > -20) {
+      holdIt(b, "belt"); b.bs = clamp((b.x - BELT.ax) * BELT.ux + (b.y - BELT.ay) * BELT.uy, 0, BELT.L - 10); S.belt.push(b); return;
+    }
+    if (b.x > 640 && b.x < 850 && b.y > 590 && b.y < 770 && b.vy > -40 && S.truck.ph === "wait" && S.truck.load.length < TRK_SLOTS.length) {
+      holdIt(b, "truck"); b.slot = S.truck.load.length; b.bx = TRK_SLOTS[b.slot][0]; b.by = TRK_SLOTS[b.slot][1]; S.truck.load.push(b); S.truck.since = 0; tick(); return;
+    }
+    if (b.x > 535 && b.x < 650 && b.y > 780 && b.y < 890 && b.vy > -50) {
+      holdIt(b, "drum"); b.dt = 0; b.dph = rand(0, TAU); b.du = 0.8; S.drum.list.push(b); tick(); return;
+    }
+  }
+  function easeTo(b, x, y, k) { b.x += (x - b.x) * k; b.y += (y - b.y) * k; }
+  function rotP(x, y, a) { var c = Math.cos(a), s = Math.sin(a); return [x * c - y * s, x * s + y * c]; }
+  function truckPt(lx, ly, a) { var q = rotP(lx, ly, -a); return [TRK.hx + q[0], TRK.hy + q[1]]; }
+  function digIK(B) {
+    var rx = DIG.root[0], ry = DIG.root[1], dx = B[0] - rx, dy = B[1] - ry, d = Math.hypot(dx, dy);
+    d = clamp(d, Math.abs(DIG.L1 - DIG.L2) + 2, DIG.L1 + DIG.L2 - 2);
+    var base = Math.atan2(dy, dx), k = Math.acos(clamp((DIG.L1 * DIG.L1 + d * d - DIG.L2 * DIG.L2) / (2 * DIG.L1 * d), -1, 1));
+    var e1 = [rx + Math.cos(base + k) * DIG.L1, ry + Math.sin(base + k) * DIG.L1], e2 = [rx + Math.cos(base - k) * DIG.L1, ry + Math.sin(base - k) * DIG.L1];
+    var E = e1[1] < e2[1] ? e1 : e2, a2 = Math.atan2(B[1] - E[1], B[0] - E[0]);
+    return { E: E, T: [E[0] + Math.cos(a2) * DIG.L2, E[1] + Math.sin(a2) * DIG.L2] };
+  }
+  function digPhase(d, ph, pose) {
+    d.ph = ph; d.t = 0; d.from = [d.B[0], d.B[1], d.curl]; d.to = pose;
+  }
+  function beltStartClear() {
+    for (var i = 0; i < site.belt.length; i++) if (site.belt[i].bs < 120) return false;
+    return true;
+  }
+  function digGo() { var d = site.dig; if (d.ph !== "idle" || !site.pit.length) return false; digPhase(d, "down", DIG_POSE.down); tick(); return true; }
+  function craneGo() { var c = site.crane; if (c.ph !== "wait" || !c.load.length) return false; c.ph = "go"; c.t = 0; tick(); return true; }
+  function truckGo() { var t = site.truck; if (t.ph !== "wait" || !t.load.length) return false; t.ph = "up"; t.t = 0; bellSound(1); return true; }
+  function siteStep(h) {
+    var S = site, i, b, k = Math.min(1, h * 16);
+    // --- Crane ---
+    var c = S.crane;
+    c.t += h; c.since += h; c.wig = Math.max(0, c.wig - h * 2);
+    if (c.ph === "wait") {
+      if ((c.load.length >= CR.cap && c.since > 0.3) || (c.load.length && c.since > 1.3) || (ending && c.load.length && c.since > 0.3)) craneGo();
+    } else if (c.ph === "go") {
+      var f = ease3(c.t / 1.5);
+      c.x = CR.pick + (CR.drop - CR.pick) * f; c.sw = Math.sin(f * Math.PI) * 0.07;
+      if (c.t >= 1.5) { c.ph = "tip"; c.t = 0; c.sw = 0; }
+    } else if (c.ph === "tip") {
+      c.tip = -1.7 * ease3(c.t / 0.6);
+      if (c.tip < -0.9 && c.load.length) {
+        bellSound(3);
+        c.load.forEach(function (m) { letGo(m, rand(-50, 90), rand(0, 60)); });
+        c.load = [];
+      }
+      if (c.t >= 0.6) { c.ph = "hold"; c.t = 0; }
+    } else if (c.ph === "hold") { if (c.t > 0.35) { c.ph = "untip"; c.t = 0; } }
+    else if (c.ph === "untip") { c.tip = -1.7 * (1 - ease3(c.t / 0.5)); if (c.t >= 0.5) { c.tip = 0; c.ph = "back"; c.t = 0; } }
+    else if (c.ph === "back") {
+      var fb = ease3(c.t / 1.3);
+      c.x = CR.drop + (CR.pick - CR.drop) * fb; c.sw = -Math.sin(fb * Math.PI) * 0.05;
+      if (c.t >= 1.3) { c.x = CR.pick; c.ph = "wait"; c.t = 0; c.since = 0; c.sw = 0; }
+    }
+    var ba = c.tip + c.sw;
+    c.load.forEach(function (m, j) { var q = rotP(CR_SLOTS[j][0], CR_SLOTS[j][1], ba); easeTo(m, c.x + q[0], CR.hy + q[1], Math.min(1, h * 22)); });
+    // --- Pit and digger ---
+    var d = S.dig;
+    d.t += h; d.wig = Math.max(0, d.wig - h * 2);
+    if (S.pit.length) d.since += h;
+    S.pit.forEach(function (m, j) {
+      var sl = PIT_SLOTS[j % PIT_SLOTS.length], up = Math.floor(j / PIT_SLOTS.length);
+      easeTo(m, sl[0] + up * 12, sl[1] - up * 30, Math.min(1, h * 7));
+    });
+    var DUR = { down: 0.8, scoop: 0.45, lift: 0.7, swing: 0.9, dump: 0.5, hold: 0.3, back: 0.9 };
+    if (d.ph === "idle") {
+      if (S.pit.length && beltStartClear() && (S.pit.length >= 4 || d.since > 0.6 || ending)) digGo();
+    } else {
+      var u = ease3(d.t / DUR[d.ph]);
+      if (d.from && d.to) {
+        d.B[0] = d.from[0] + (d.to[0] - d.from[0]) * u; d.B[1] = d.from[1] + (d.to[1] - d.from[1]) * u;
+        d.curl = d.from[2] + (d.to[2] - d.from[2]) * u;
+      }
+      if (d.ph === "swing") d.sx = Math.cos(Math.PI * u);
+      if (d.ph === "back") d.sx = -Math.cos(Math.PI * u);
+      if (d.t >= DUR[d.ph]) {
+        if (d.ph === "down") digPhase(d, "scoop", DIG_POSE.scoop);
+        else if (d.ph === "scoop") {
+          var n = Math.min(DIG_SLOTS.length, S.pit.length);
+          d.load = S.pit.splice(S.pit.length - n, n);
+          d.load.forEach(function (m) { m.hold = "dig"; });
+          burst(DIG.hx - 200, 650, 1, 6, 150, 0.5);
+          tick();
+          digPhase(d, "lift", DIG_POSE.up);
+        } else if (d.ph === "lift") { d.ph = "swing"; d.t = 0; d.from = null; }
+        else if (d.ph === "swing") { d.sx = -1; digPhase(d, "dump", DIG_POSE.dump); }
+        else if (d.ph === "dump") {
+          d.load.forEach(function (m) { letGo(m, rand(-30, 30), 20); m.scool = 0; });
+          if (d.load.length) tick();
+          d.load = [];
+          d.ph = "hold"; d.t = 0; d.from = null;
+        } else if (d.ph === "hold") digPhase(d, "back", DIG_POSE.rest);
+        else if (d.ph === "back") { d.sx = 1; d.ph = "idle"; d.t = 0; d.since = 0; d.from = null; }
+      }
+    }
+    var ik = digIK(d.B);
+    d.T = ik.T; d.E = ik.E;
+    d.load.forEach(function (m, j) {
+      var q = DIG_SLOTS[j];
+      easeTo(m, DIG.hx + d.sx * (ik.T[0] + q[0]), DIG.hy + ik.T[1] + q[1], Math.min(1, h * 14));
+    });
+    // --- Conveyor belt ---
+    var bv = 95 * (1 + S.beltBoost);
+    S.beltBoost = Math.max(0, S.beltBoost - h * 0.5);
+    S.beltU += bv * h;
+    S.belt.sort(function (p, q) { return q.bs - p.bs; });
+    var t = S.truck, prev = null;
+    for (i = 0; i < S.belt.length; i++) {
+      b = S.belt[i];
+      b.bs += bv * h;
+      if (prev) b.bs = Math.min(b.bs, prev.bs - 47);
+      if (b.bs >= BELT.L) {
+        if (!prev && t.ph === "wait" && t.load.length < TRK_SLOTS.length) {
+          S.belt.splice(i, 1); i--;
+          letGo(b, BELT.ux * 100, BELT.uy * 100 - 20); b.scool = 0;
+          continue;
+        }
+        b.bs = BELT.L;
+      }
+      var bx = BELT.ax + BELT.ux * b.bs + BELT.uy * (RM + 7), by = BELT.ay + BELT.uy * b.bs - BELT.ux * (RM + 7);
+      easeTo(b, bx, by, Math.min(1, h * 12));
+      b.spin = 0;
+      prev = b;
+    }
+    // --- Dump truck ---
+    t.t += h; t.since += h; t.wig = Math.max(0, t.wig - h * 2);
+    if (t.ph === "wait") {
+      if ((t.load.length >= 5 && t.since > 0.4) || (t.load.length && t.since > 1.8) || (ending && t.load.length && t.since > 0.3)) truckGo();
+    } else if (t.ph === "up") {
+      t.a = Math.min(0.8, t.a + h * 0.9);
+      if (t.a > 0.3) {
+        for (i = 0; i < t.load.length; i++) {
+          b = t.load[i];
+          b.bx -= 240 * h * (t.a / 0.8);
+          b.by += (-27 - b.by) * Math.min(1, h * 6);
+          if (b.bx < 6) {
+            var lp = truckPt(b.bx, b.by, t.a);
+            b.x = lp[0]; b.y = lp[1];
+            letGo(b, -Math.cos(t.a) * 200, Math.sin(t.a) * 200); b.scool = 0;
+            t.load.splice(i, 1); i--;
+          }
+        }
+      }
+      if (!t.load.length && t.a >= 0.8) { t.ph = "hold"; t.t = 0; }
+    } else if (t.ph === "hold") { if (t.t > 0.3) { t.ph = "down"; t.t = 0; } }
+    else if (t.ph === "down") { t.a = Math.max(0, t.a - h * 1.0); if (t.a <= 0) { t.ph = "wait"; t.t = 0; t.since = 0; } }
+    t.load.forEach(function (m) { var q = truckPt(m.bx, m.by, t.a); easeTo(m, q[0], q[1], Math.min(1, h * 14)); });
+    // --- Cement mixer ---
+    var dr = S.drum;
+    dr.boost = Math.max(0, dr.boost - h * 0.4);
+    dr.rot += h * 1.6 * (1 + dr.boost);
+    dr.cd -= h;
+    for (i = 0; i < dr.list.length; i++) {
+      b = dr.list[i];
+      b.dt += h * (1 + dr.boost);
+      var wander = 0.68 * Math.sin(b.dt * 0.9 + b.dph), bounce = Math.abs(Math.sin(b.dt * 3.2 + b.dph)) * 0.9;
+      if (b.dt < 0.5) wander = 0.8 + (wander - 0.8) * b.dt / 0.5;
+      var lq = rotP(wander * DRUM.rx * 0.78, DRUM.ry * 0.5 - bounce * DRUM.ry, DRUM.tilt);
+      easeTo(b, DRUM.x + lq[0], DRUM.y + lq[1], Math.min(1, h * 9));
+      b.spin = 3;
+      if (b.dt > (ending ? 0.8 : 1.9) && dr.cd <= 0) {
+        dr.cd = 0.3;
+        dr.list.splice(i, 1); i--;
+        b.x = 556; b.y = 897;
+        letGo(b, 110, 30);
+      }
+    }
+  }
+  function siteTap(pt) {
+    var S = site, c = S.crane;
+    started = true;
+    if (Math.abs(pt.x - c.x) < 85 && pt.y > CR.hy - 110 && pt.y < CR.hy + 45) {
+      if (!craneGo()) { c.wig = 1; tick(); }
+      ring(pt.x, pt.y, 2, 18, 0.5); return true;
+    }
+    if (pt.x > PIT.x0 - 10 && pt.x < 500 && pt.y > 560 && pt.y < 730) {
+      if (!digGo()) { S.dig.wig = 1; tick(); }
+      ring(pt.x, pt.y, 2, 18, 0.5); return true;
+    }
+    if (pt.x > 520 && pt.x < 790 && pt.y > 580 && pt.y < 690) { S.beltBoost = 1; ring(pt.x, pt.y, 2, 18, 0.5); tick(); return true; }
+    if (pt.x > 600 && pt.x < 875 && pt.y > 660 && pt.y < 820) {
+      if (!truckGo()) { S.truck.wig = 1; honk(); }
+      ring(pt.x, pt.y, 2, 18, 0.5); return true;
+    }
+    if (pt.x > 150 && pt.x < 640 && pt.y > 820 && pt.y < 1040) { S.drum.boost = 1.2; ring(pt.x, pt.y, 1, 18, 0.5); tick(); return true; }
+    return false;
+  }
+
+  // --- Drawing the site ---
+  function drawCone(g, x, top, bot) {
+    var hw = (bot - top) * 0.32;
+    g.beginPath(); g.moveTo(x - 5, top); g.lineTo(x + 5, top); g.lineTo(x + hw, bot - 8); g.lineTo(x - hw, bot - 8); g.closePath();
+    g.fillStyle = SAFE; g.fill(); g.lineWidth = 4; g.strokeStyle = OUT; g.stroke();
+    var y1 = top + (bot - top) * 0.35, y2 = top + (bot - top) * 0.55, w1 = 5 + (hw - 5) * 0.35, w2 = 5 + (hw - 5) * 0.55;
+    g.beginPath(); g.moveTo(x - w1, y1); g.lineTo(x + w1, y1); g.lineTo(x + w2, y2); g.lineTo(x - w2, y2); g.closePath();
+    g.fillStyle = "#FFFFFF"; g.fill(); g.lineWidth = 2.5; g.stroke();
+    rrect(g, x - hw - 8, bot - 10, 2 * hw + 16, 10, 3);
+    g.fillStyle = SAFE; g.fill(); g.lineWidth = 3.5; g.stroke();
+  }
+  function drawPlank(g, s) {
+    strokeSeg(g, s, 24, OUT);
+    strokeSeg(g, s, 17, "#E9B872");
+    g.strokeStyle = "#C98F4A"; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(s.ax, s.ay + 2); g.lineTo(s.bx, s.by + 2); g.stroke();
+    // Board joints.
+    var n = Math.floor(Math.hypot(s.bx - s.ax, s.by - s.ay) / 120);
+    g.strokeStyle = OUT; g.lineWidth = 3;
+    for (var k = 1; k <= n; k++) { var f = k / (n + 1), x = s.ax + (s.bx - s.ax) * f, y = s.ay + (s.by - s.ay) * f; g.beginPath(); g.moveTo(x, y - 9); g.lineTo(x, y + 9); g.stroke(); }
+  }
+  function tube(g, ax, ay, bx, by, w) {
+    g.lineCap = "round";
+    g.strokeStyle = OUT; g.lineWidth = w + 4; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+    g.strokeStyle = "#B8C2D6"; g.lineWidth = w; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+  }
+  function lattice(g, x0, y0, x1, y1, vertical) {
+    // A yellow steel truss (tower crane mast or jib).
+    g.fillStyle = HARD; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+    g.lineWidth = 3; g.strokeStyle = OUT; g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    g.beginPath();
+    var step = vertical ? (x1 - x0) : (y1 - y0), p, z = 0;
+    if (vertical) for (p = y0; p < y1; p += step, z++) { g.moveTo(z % 2 ? x1 : x0, p); g.lineTo(z % 2 ? x0 : x1, Math.min(y1, p + step)); }
+    else for (p = x0; p < x1; p += step, z++) { g.moveTo(p, z % 2 ? y1 : y0); g.lineTo(Math.min(x1, p + step), z % 2 ? y0 : y1); }
+    g.lineWidth = 2.5; g.stroke();
+  }
+  function drawSiteStatic(g) {
+    // Tower crane: mast by the lift, jib along the top, the cab under the jib.
+    lattice(g, 838, 196, 870, 1046, true);
+    rrect(g, 822, 1036, 64, 16, 4); g.fillStyle = "#B8C2D6"; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+    g.beginPath(); g.moveTo(838, 186); g.lineTo(854, 150); g.lineTo(870, 186); g.closePath(); g.fillStyle = HARD; g.fill(); g.lineWidth = 3; g.stroke();
+    g.strokeStyle = OUT; g.lineWidth = 2.5; g.beginPath(); g.moveTo(854, 152); g.lineTo(520, 184); g.stroke();
+    lattice(g, 330, 184, 872, 206, false);
+    rrect(g, 796, 206, 42, 36, 6); g.fillStyle = HARD; g.fill(); g.lineWidth = 3; g.stroke();
+    rrect(g, 802, 212, 22, 16, 3); g.fillStyle = "#BFE6FF"; g.fill(); g.stroke();
+    // Scaffold under the plank ramp: a lower tube with braces.
+    tube(g, 812, 506, 340, 582, 7);
+    for (var k = 0; k < 6; k++) {
+      var f0 = k / 6, f1 = (k + 1) / 6;
+      tube(g, 822 - 492 * f0, 470 + 78 * f0 + 10, 812 - 472 * f1, 506 + 76 * f1, 5);
+    }
+    // Digger ledge: a yellow steel beam braced from the wall.
+    tube(g, 14, 820, 150, 726, 6);
+    rrect(g, 12, 712, 556, 20, 4); g.fillStyle = "#8A6A44"; g.fill(); g.lineWidth = 3.5; g.strokeStyle = OUT; g.stroke();
+    g.fillStyle = "#A9825A"; g.fillRect(16, 715, 548, 5);
+    // Sand pit: back wall and sand.
+    rrect(g, PIT.x0, 598, PIT.x1 - PIT.x0, PIT.floor - 598 + 22, 6); g.fillStyle = "#C98F4A"; g.fill(); g.lineWidth = 4; g.strokeStyle = OUT; g.stroke();
+    g.beginPath(); g.moveTo(PIT.x0 + 4, PIT.floor + 18); g.quadraticCurveTo((PIT.x0 + PIT.x1) / 2, PIT.floor - 24, PIT.x1 - 4, PIT.floor + 18); g.closePath();
+    g.fillStyle = "#F2CF86"; g.fill();
+    // Truck platform: a beam from the crane mast.
+    rrect(g, 632, 812, 240, 16, 4); g.fillStyle = "#8A6A44"; g.fill(); g.lineWidth = 3.5; g.strokeStyle = OUT; g.stroke();
+    tube(g, 860, 900, 760, 830, 6);
+    // Conveyor legs (behind the truck).
+    tube(g, 548, 674, 548, 712, 7);
+    tube(g, 742, 622, 742, 812, 7);
+    // Ground cones.
+    drawCone(g, 545, 690, 712);
+  }
+  function drawSiteFrontStatic(f) {
+    // The pit's low front wall and the mixer's charging hopper sit in front of the marbles.
+    rrect(f, PIT.x0, 664, PIT.x1 - PIT.x0, 48, 6); f.fillStyle = "#E9B872"; f.fill(); f.lineWidth = 4; f.strokeStyle = OUT; f.stroke();
+    f.strokeStyle = "#C98F4A"; f.lineWidth = 2.5; f.beginPath(); f.moveTo(PIT.x0 + 8, 688); f.lineTo(PIT.x1 - 8, 688); f.stroke();
+    f.beginPath(); f.moveTo(552, 816); f.lineTo(630, 816); f.lineTo(604, 872); f.lineTo(578, 872); f.closePath();
+    f.fillStyle = SAFE; f.fill(); f.lineWidth = 4; f.strokeStyle = OUT; f.stroke();
+    f.fillStyle = "rgba(255,255,255,0.45)"; f.fillRect(560, 822, 26, 6);
+  }
+  function wheel(x, y, r, a) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, TAU); ctx.fillStyle = "#E7EAF5"; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r * 0.45, y + Math.sin(a) * r * 0.45); ctx.lineTo(x - Math.cos(a) * r * 0.45, y - Math.sin(a) * r * 0.45); ctx.stroke();
+  }
+  function drawSiteBack(now) {
+    var S = site, c = S.crane, d = S.dig, t = S.truck, dr = S.drum, k;
+    var wg = function (w) { return reduce ? 0 : Math.sin(now / 35) * 4 * w; };
+    // Crane trolley, cable, hook and the bucket's bail.
+    var cx = c.x + wg(c.wig), ba = c.tip + c.sw;
+    rrect(ctx, cx - 22, 200, 44, 16, 4); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    var hk = rotP(0, -64, c.sw), hx = cx + hk[0], hy = CR.hy + hk[1];
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(cx, 214); ctx.lineTo(hx, hy - 8); ctx.stroke();
+    var l1 = rotP(-62, -10, ba), r1 = rotP(62, -10, ba);
+    ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(cx + l1[0], CR.hy + l1[1]); ctx.lineTo(hx, hy); ctx.lineTo(cx + r1[0], CR.hy + r1[1]); ctx.stroke();
+    ctx.beginPath(); ctx.arc(hx, hy, 8, 0, TAU); ctx.fillStyle = HARD; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    // Conveyor belt.
+    var L = BELT.L, ang = Math.atan2(BELT.uy, BELT.ux);
+    ctx.save(); ctx.translate(BELT.ax, BELT.ay); ctx.rotate(ang);
+    rrect(ctx, -16, -8, L + 32, 26, 13); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.strokeStyle = HARD; ctx.lineWidth = 4;
+    var off = S.beltU % 30;
+    for (k = off - 30; k < L; k += 30) { if (k < -4) continue; ctx.beginPath(); ctx.moveTo(k, -7); ctx.lineTo(k, -1); ctx.stroke(); }
+    [0, L].forEach(function (x) {
+      ctx.beginPath(); ctx.arc(x, 5, 9, 0, TAU); ctx.fillStyle = "#B8C2D6"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(S.beltU / 9) * 9, 5 + Math.sin(S.beltU / 9) * 9); ctx.lineTo(x - Math.cos(S.beltU / 9) * 9, 5 - Math.sin(S.beltU / 9) * 9); ctx.stroke();
+    });
+    ctx.restore();
+    // Excavator: tracks, then the turning house with the boom and stick.
+    rrect(ctx, 345, 684, 150, 28, 14); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    for (k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(362 + k * 29, 698, 7, 0, TAU); ctx.fillStyle = "#B8C2D6"; ctx.fill(); ctx.lineWidth = 2.5; ctx.stroke(); }
+    var sx = d.sx, dwx = wg(d.wig);
+    ctx.save(); ctx.translate(DIG.hx + dwx, DIG.hy); ctx.scale(Math.abs(sx) < 0.08 ? (sx < 0 ? -0.08 : 0.08) : sx, 1);
+    rrect(ctx, -12, 24, 24, 10, 3); ctx.fillStyle = "#3B3F52"; ctx.fill();
+    rrect(ctx, -62, -20, 124, 46, 10); ctx.fillStyle = HARD; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    rrect(ctx, 34, -28, 34, 50, 10); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.stroke();
+    rrect(ctx, -60, -74, 50, 56, 8); ctx.fillStyle = HARD; ctx.fill(); ctx.stroke();
+    rrect(ctx, -54, -68, 38, 28, 5); ctx.fillStyle = "#BFE6FF"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fillRect(-50, -64, 8, 18);
+    if (d.E && d.T) {
+      var R0 = DIG.root, E = d.E, T = d.T;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = OUT; ctx.lineWidth = 24; ctx.beginPath(); ctx.moveTo(R0[0], R0[1]); ctx.lineTo(E[0], E[1]); ctx.stroke();
+      ctx.strokeStyle = HARD; ctx.lineWidth = 17; ctx.stroke();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(E[0], E[1]); ctx.lineTo(T[0], T[1]); ctx.stroke();
+      ctx.strokeStyle = HARD; ctx.lineWidth = 11; ctx.stroke();
+      // Hydraulic rams.
+      ctx.strokeStyle = OUT; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(R0[0] + (E[0] - R0[0]) * 0.55, R0[1] + (E[1] - R0[1]) * 0.55 + 10); ctx.stroke();
+      ctx.strokeStyle = "#E7EAF5"; ctx.lineWidth = 4; ctx.stroke();
+      [R0, E].forEach(function (q) { ctx.beginPath(); ctx.arc(q[0], q[1], 7, 0, TAU); ctx.fillStyle = "#E7EAF5"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke(); });
+    }
+    ctx.restore();
+    // Dump truck: chassis, wheels, cab and the lifting ram (the bed is drawn in front of the marbles).
+    var tw = wg(t.wig);
+    ctx.save(); ctx.translate(tw, 0);
+    rrect(ctx, 612, 768, 252, 20, 6); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    var rp = truckPt(112, 0, t.a);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(700, 772); ctx.lineTo(rp[0], rp[1]); ctx.stroke();
+    ctx.strokeStyle = "#E7EAF5"; ctx.lineWidth = 6; ctx.stroke();
+    rrect(ctx, 812, 700, 56, 76, 10); ctx.fillStyle = SAFE; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    rrect(ctx, 822, 710, 38, 28, 5); ctx.fillStyle = "#BFE6FF"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = HARD; ctx.beginPath(); ctx.arc(862, 762, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    wheel(664, 794, 18, -t.a); wheel(780, 794, 18, -t.a); wheel(832, 794, 18, -t.a);
+    ctx.restore();
+    // Cement mixer truck: chassis, cab, wheels and the inside of the drum (the marbles tumble in it).
+    rrect(ctx, 168, 990, 420, 18, 6); ctx.fillStyle = "#3B3F52"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    rrect(ctx, 160, 916, 86, 84, 12); ctx.fillStyle = HARD; ctx.fill(); ctx.stroke();
+    rrect(ctx, 170, 926, 44, 32, 5); ctx.fillStyle = "#BFE6FF"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(166, 980, 5, 0, TAU); ctx.fill(); ctx.stroke();
+    var wr = dr.rot * 0.8;
+    wheel(204, 1010, 23, wr); wheel(446, 1010, 23, wr); wheel(512, 1010, 23, wr);
+    ctx.lineWidth = 8; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(300, 990); ctx.lineTo(310, 960); ctx.moveTo(500, 990); ctx.lineTo(490, 945); ctx.stroke();
+    ctx.save(); ctx.translate(DRUM.x, DRUM.y); ctx.rotate(DRUM.tilt);
+    ctx.beginPath(); ctx.ellipse(0, 0, DRUM.rx, DRUM.ry, 0, 0, TAU); ctx.fillStyle = "#6E4A2A"; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 6, DRUM.rx - 14, DRUM.ry - 12, 0, 0, TAU); ctx.fillStyle = "#8A6142"; ctx.fill();
+    ctx.restore();
+  }
+  function drawSiteFront(now) {
+    var S = site, c = S.crane, d = S.dig, t = S.truck, dr = S.drum, k;
+    var wg = function (w) { return reduce ? 0 : Math.sin(now / 35) * 4 * w; };
+    // Crane bucket (a concrete skip) in front of its marbles.
+    ctx.save(); ctx.translate(c.x + wg(c.wig), CR.hy); ctx.rotate(c.tip + c.sw);
+    ctx.beginPath(); ctx.moveTo(-66, -8); ctx.lineTo(66, -8); ctx.lineTo(50, 30); ctx.lineTo(-50, 30); ctx.closePath();
+    ctx.fillStyle = SAFE; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = HARD; ctx.fillRect(-58, 6, 116, 8);
+    ctx.strokeRect(-58, 6, 116, 8);
+    ctx.restore();
+    // Digger bucket in front of its marbles.
+    if (d.T) {
+      ctx.save(); ctx.translate(DIG.hx + wg(d.wig), DIG.hy);
+      ctx.scale(Math.abs(d.sx) < 0.08 ? (d.sx < 0 ? -0.08 : 0.08) : d.sx, 1);
+      ctx.translate(d.T[0], d.T[1]); ctx.rotate((d.curl - 1) * 1.3);
+      ctx.beginPath(); ctx.moveTo(-34, -4); ctx.quadraticCurveTo(-30, 26, 0, 26); ctx.quadraticCurveTo(30, 26, 34, -4); ctx.lineTo(24, -4); ctx.lineTo(24, 6); ctx.lineTo(-24, 6); ctx.lineTo(-24, -4); ctx.closePath();
+      ctx.fillStyle = HARD; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+      ctx.fillStyle = "#B8C2D6";
+      for (k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(-34 + k * 6, -4); ctx.lineTo(-40 + k * 6, -14); ctx.lineTo(-30 + k * 6, -6); ctx.closePath(); ctx.fill(); ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.restore();
+    }
+    // Dump truck bed: its side wall hides the lower half of the marbles; the tailgate swings open to tip.
+    ctx.save(); ctx.translate(TRK.hx + wg(t.wig), TRK.hy); ctx.rotate(-t.a);
+    ctx.beginPath(); ctx.moveTo(-4, 6); ctx.lineTo(TRK.len, 6); ctx.lineTo(TRK.len + 6, -TRK.wall - 20); ctx.lineTo(TRK.len - 6, -TRK.wall - 20); ctx.lineTo(TRK.len - 8, -TRK.wall); ctx.lineTo(-4, -TRK.wall); ctx.closePath();
+    ctx.fillStyle = HARD; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.lineWidth = 3;
+    for (k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(k * TRK.len / 4, -TRK.wall + 4); ctx.lineTo(k * TRK.len / 4, 2); ctx.stroke(); }
+    ctx.save(); ctx.translate(-4, -TRK.wall); ctx.rotate(t.a > 0.05 ? -Math.min(1, t.a / 0.4) * 0.9 : 0);
+    rrect(ctx, -6, 0, 10, TRK.wall + 6, 3); ctx.fillStyle = SAFE; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+    // Mixer drum front: see-through between its spiral stripes, so the tumbling marbles show.
+    ctx.save(); ctx.translate(DRUM.x, DRUM.y); ctx.rotate(DRUM.tilt);
+    ctx.beginPath(); ctx.ellipse(0, 0, DRUM.rx, DRUM.ry, 0, 0, TAU);
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fillRect(-DRUM.rx, -DRUM.ry, DRUM.rx * 2, DRUM.ry * 2);
+    var ph = (dr.rot * 22) % 64;
+    for (k = -DRUM.rx - 80 + ph; k < DRUM.rx + 80; k += 64) {
+      ctx.beginPath(); ctx.moveTo(k, -DRUM.ry); ctx.lineTo(k + 18, -DRUM.ry); ctx.lineTo(k - 22, DRUM.ry); ctx.lineTo(k - 40, DRUM.ry); ctx.closePath();
+      ctx.fillStyle = "rgba(255,196,0,0.9)"; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    ctx.restore();
+    ctx.beginPath(); ctx.ellipse(0, 0, DRUM.rx, DRUM.ry, 0, 0, TAU);
+    ctx.lineWidth = 12; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = 7; ctx.strokeStyle = SAFE; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.ellipse(0, 0, DRUM.rx - 20, DRUM.ry - 14, 0, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+    ctx.restore();
+  }
+
   function newPath(kind) {
     var p = { kind: kind, xs: [], ys: [], zs: [], ss: [], ga: [], cosA: [], k: 0.2, R: 0, L: 0 };
     paths.push(p);
@@ -826,7 +1611,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   function buildWorld(id) {
     segs = []; bodies = []; bells = []; bars = []; paths = []; funnels = []; boosters = []; tramps = []; tower = null;
-    spinners = []; decor = [];
+    spinners = []; decor = []; race = null; site = null;
     buildCommon();
     BUILD[id]();
     runInfo = id;
@@ -981,6 +1766,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         g.lineWidth = 10; g.strokeStyle = d.col; g.stroke();
       }
     });
+    if (race) drawRaceCourse(g);
+    if (site) drawSiteStatic(g);
     // Smooth tracks (squiggles, S-curves, half-pipes): a translucent channel the marbles ride in.
     paths.forEach(function (pa) {
       if (pa.kind !== "track") return;
@@ -1025,6 +1812,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (tower) drawHelix(g, false);
     segs.forEach(function (s) {
       if (s.kind === "tramp" || s.kind === "bar") return;
+      if (s.kind === "cone") { if (s.draw) drawCone(g, s.draw[0], s.draw[1], s.draw[2]); return; }
+      if (s.kind === "plank") { drawPlank(g, s); return; }
       var col = s.kind === "glass" ? "#9ED8FF" : s.col;
       strokeSeg(g, s, 2 * s.r + 6, OUT);
       strokeSeg(g, s, 2 * s.r, col);
@@ -1074,6 +1863,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     f2.strokeStyle = "rgba(255,255,255,0.55)";
     f2.lineWidth = 5;
     f2.beginPath(); f2.moveTo(170, 160); f2.lineTo(220, 205); f2.stroke();
+    if (site) drawSiteFrontStatic(f2);
     decor.forEach(function (d) {
       if (d.k === "housing") {
         // A clear case around a paddle wheel: glassy disc with a bright rim, open where marbles go in and out.
@@ -1238,6 +2028,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- Marbles ----------
   var colorI = 0, nextId = 1;
   function nextColor() {
+    if (race) return raceColor();
     if (state.color === "rainbow") return RAINBOW;
     if (state.color === "mix") { colorI++; return colorI % 5 === 0 ? RAINBOW : colorI % NC; }
     return state.color;
@@ -1260,8 +2051,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return n;
   }
   // Room for one more marble: under the cap, or recycle one from the tray (or the oldest one).
+  // The Race run holds one marble per lane; every other run holds up to CAP.
+  function capNow() { return race ? RACE.lanes : CAP; }
   function makeRoom() {
-    if (total() < CAP) return true;
+    if (total() < capNow()) return true;
     return false;
     var best = -1, i, b, bestScore = -1;
     for (i = 0; i < balls.length; i++) {
@@ -1317,7 +2110,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     started = true;
     ghost.learned();
     DROP_BTN.flash = 1;
-    var n = Math.min(CAP - total(), CAP), i;
+    var n = Math.min(capNow() - total(), CAP), i;
     var lb = $("lotsBtn");
     lb.classList.remove("pour"); void lb.offsetWidth; lb.classList.add("pour");
     if (n <= 0) { ring(HOP_X, 170, RAINBOW, 20, 0.4); return; }
@@ -1330,6 +2123,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function updateHopper(h) {
     hopper.wait += h;
     if (!hopper.queue.length) { hopper.pending = 0; return; }
+    // Race: the hopper waits while a race is on. Construction: it waits while the crane bucket is away or full.
+    if ((race && race.phase !== "line") || (site && (site.crane.ph !== "wait" || site.crane.load.length >= CR.cap))) return;
     if ((!ending || hopper.pending > 0) && hopper.wait >= (hopper.queue.length > 3 ? 0.18 : 0.28) && outletClear()) {
       hopperRelease();
       if (hopper.pending > 0) hopper.pending--;
@@ -1725,6 +2520,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     updateLift(h);
     updateHopper(h);
     for (i = 0; i < bodies.length; i++) if (bodies[i].kind === "bucket") updateBucket(bodies[i], h);
+    if (race) raceStep(h);
+    if (site) siteStep(h);
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
       b.ang += b.spin * h;
@@ -1739,6 +2536,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         b.y += b.vy * h;
         if (b.cool > 0) b.cool -= h;
         if (b.wcool > 0) b.wcool -= h;
+        if (b.scool > 0) b.scool -= h;
       } else if (b.mode === "path") pathStep(b, h);
       else if (b.mode === "orbit") orbitStep(b, h);
       else if (b.mode === "spout") spoutStep(b, h);
@@ -1764,6 +2562,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       tryEnterPath(b);
       if (b.mode === "free" && funnels.length) tryFunnel(b);
       if (b.mode === "free") hopperCapture(b);
+      if (b.mode === "free" && race) raceCapture(b);
+      if (b.mode === "free" && site) siteCapture(b);
       if (b.mode === "free") liftPickup(b);
       if (b.mode === "free") boosterCheck(b, h);
       if (b.mode === "free") bellSensors(b);
@@ -1962,6 +2762,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     drawBars();
     drawTramps();
     drawBells(now);
+    if (race) drawRaceBack(now);
+    if (site) drawSiteBack(now);
 
     // Helix marbles behind the tower first.
     for (i = 0; i < balls.length; i++) {
@@ -2014,6 +2816,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var hq = hopper.queue[i], hp = HOP_HEAP[i - HOP_SLOTS.length];
       drawMarble(hq, hp[0], hp[1], 1);
     }
+    if (race) drawRaceFront(now);
+    if (site) drawSiteFront(now);
     drawFunnelRims();
 
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2514,6 +3318,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       startDropHold(e.pointerId);
       return;
     }
+    // Race: a tap on the start gate drops it.
+    if (race && raceTapGate(pt)) return;
     // A marble: give it a hop.
     var best = null, bd = (RM * 2.2) * (RM * 2.2);
     for (i = 0; i < balls.length; i++) {
@@ -2557,6 +3363,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       tick();
       return;
     }
+    if (site && siteTap(pt)) return;
     if (pt.x > 880 && pt.x < 990) { lift.boost = 1.2; burst(pt.x, pt.y, 2, 6, 180, 0.4); tick(); return; }
     // Anywhere else: a sparkle, big and long enough to see on a phone (every touch answers).
     var c = (Math.random() * NC) | 0;
@@ -2571,6 +3378,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     else if (b.mode === "path") b.v += (b.v >= 0 ? 1 : -1) * 220;
     else if (b.mode === "orbit") b.f.boost = Math.min(2, b.f.boost + 0.6);
     else if (b.mode === "wheel") { b.wb.w += b.wb.dir * 2; b.wb.flash = 1; }
+    else if (b.mode === "race" && b.rph === "run") b.rv += 90;
     tick();
   }
   function release(e) { stopDropHold(e.pointerId); }
@@ -2730,6 +3538,19 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // ---------- Controls ----------
   var RUN_ICONS = {
+    race: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/>' +
+      '<rect x="7" y="7" width="33" height="46" rx="4" fill="#FFF3D6" stroke="#1D2340" stroke-width="2.5"/>' +
+      '<path d="M18 8v37M29 8v37" stroke="#1D2340" stroke-width="2"/>' +
+      '<g fill="#1D2340"><rect x="7" y="45" width="5.5" height="4"/><rect x="18" y="45" width="5.5" height="4"/><rect x="29" y="45" width="5.5" height="4"/><rect x="12.5" y="49" width="5.5" height="4"/><rect x="23.5" y="49" width="5.5" height="4"/><rect x="34.5" y="49" width="5.5" height="4"/></g>' +
+      '<circle cx="12.5" cy="35" r="4.6" fill="#FF4D6D" stroke="#1D2340" stroke-width="2"/><circle cx="23.5" cy="25" r="4.6" fill="#FFD23F" stroke="#1D2340" stroke-width="2"/><circle cx="34.5" cy="16" r="4.6" fill="#3EC8FF" stroke="#1D2340" stroke-width="2"/>' +
+      '<path d="M46 52V9" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/>' +
+      '<path d="M46 10h10v12H46z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2"/><path d="M46 10h5v6h-5zM51 16h5v6h-5z" fill="#1D2340"/>',
+    construction: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/>' +
+      '<circle cx="16" cy="18" r="5" fill="#FF4D6D" stroke="#1D2340" stroke-width="2"/><circle cx="26" cy="15" r="5" fill="#3EC8FF" stroke="#1D2340" stroke-width="2"/><circle cx="35" cy="19" r="5" fill="#5BE36B" stroke="#1D2340" stroke-width="2"/>' +
+      '<path d="M7 21h34l-3 15H10z" fill="#FFC400" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<rect x="40" y="24" width="14" height="16" rx="3" fill="#FF7A1A" stroke="#1D2340" stroke-width="2.5"/><rect x="44" y="27" width="7" height="6" rx="1" fill="#BFE6FF" stroke="#1D2340" stroke-width="1.5"/>' +
+      '<rect x="6" y="36" width="49" height="6" rx="2" fill="#3B3F52" stroke="#1D2340" stroke-width="2"/>' +
+      '<circle cx="16" cy="46" r="6" fill="#3B3F52" stroke="#1D2340" stroke-width="2.5"/><circle cx="16" cy="46" r="2.2" fill="#E7EAF5"/><circle cx="45" cy="46" r="6" fill="#3B3F52" stroke="#1D2340" stroke-width="2.5"/><circle cx="45" cy="46" r="2.2" fill="#E7EAF5"/>',
     mix1: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><path d="M8 9 L22 13" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9 L22 13" fill="none" stroke="#FF4D6D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 17 h20 l-7 9 h-6z" fill="#FF9F1C" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><path d="M10 34 q5 -5 10 0 t10 0 t10 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 34 q5 -5 10 0 t10 0 t10 0" fill="none" stroke="#5BE36B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="40" y="36" width="5" height="20" fill="#B26BFF" stroke="#1D2340" stroke-width="2"/><path d="M34 42 Q42 47 51 41 M34 50 Q42 55 51 49" fill="none" stroke="#1D2340" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 42 Q42 47 51 41 M34 50 Q42 55 51 49" fill="none" stroke="#FFD23F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
     mix2: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><path d="M7 9 L20 14" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9 L20 14" fill="none" stroke="#5B7CFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g stroke="#1D2340" stroke-width="3.5" stroke-linecap="round"><path d="M28 9V25M20 17H36M22.5 11.5 33.5 22.5M33.5 11.5 22.5 22.5"/></g><circle cx="28" cy="17" r="3" fill="#FF4D6D" stroke="#1D2340" stroke-width="2"/><path d="M40 40 a9 9 0 1 0 -1 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 40 a9 9 0 1 0 -1 0" fill="none" stroke="#FF4D6D" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 33 h16 l-6 7 h-4z" fill="#5BE36B" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="6" y="47.0" width="7" height="4" fill="#FF4D6D" stroke="#1D2340" stroke-width="1.5"/><rect x="15" y="48.5" width="7" height="4" fill="#FFD23F" stroke="#1D2340" stroke-width="1.5"/><rect x="24" y="50.0" width="7" height="4" fill="#5BE36B" stroke="#1D2340" stroke-width="1.5"/><rect x="33" y="51.5" width="7" height="4" fill="#3EC8FF" stroke="#1D2340" stroke-width="1.5"/><rect x="42" y="53.0" width="7" height="4" fill="#B26BFF" stroke="#1D2340" stroke-width="1.5"/>',
     kit: '<rect x="2" y="2" width="56" height="56" rx="12" fill="#D6ECFF" stroke="#1D2340" stroke-width="3"/><rect x="13" y="20" width="8" height="34" fill="#2FBF4A" fill-opacity="0.6" stroke="#1D2340" stroke-width="2"/><rect x="38" y="30" width="8" height="24" fill="#7AD7FF" fill-opacity="0.7" stroke="#1D2340" stroke-width="2"/><rect x="7" y="51" width="46" height="5" rx="2" fill="#FF3B3B" stroke="#1D2340" stroke-width="2"/><path d="M7 10 h6 v4 h6 v4 h6 v4" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10 h6 v4 h6 v4 h6 v4" fill="none" stroke="#9B3DFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 28 q5 -6 10 0 t10 0" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M28 28 q5 -6 10 0 t10 0" fill="none" stroke="#FFC400" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 36 h22 l-8 7 h-6z" fill="#2E7BFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><circle cx="41" cy="15" r="7" fill="#2E7BFF" fill-opacity="0.5" stroke="#1D2340" stroke-width="2"/><circle cx="41" cy="15" r="2.5" fill="#FFC400" stroke="#1D2340" stroke-width="1.5"/>',
@@ -2986,6 +3807,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       balls: function () { return balls.map(function (b) { return { id: b.id, m: b.mode, x: Math.round(b.x), y: Math.round(b.y), vx: Math.round(b.vx), vy: Math.round(b.vy) }; }); },
       lift: function (id) { switchLift(id); renderControls(); },
       setRun: function (id) { switchRun(id); renderControls(); },
+      race: function () { return race && { phase: race.phase, t: +race.t.toFixed(2), sinceJoin: +race.sinceJoin.toFixed(2), shown: race.shown.map(function (r) { return r.c; }), racers: balls.filter(function (b) { return b.mode === "race"; }).map(function (b) { return [b.rph, Math.round(b.rp), b.lane]; }) }; },
+      site: function () { return site && { crane: [site.crane.ph, site.crane.load.length, Math.round(site.crane.x)], pit: site.pit.length, dig: site.dig.ph, belt: site.belt.length, truck: [site.truck.ph, site.truck.load.length], drum: site.drum.list.length }; },
       toScreen: function (x, y) { var r = canvas.getBoundingClientRect(); return { x: r.left + OX + x * S, y: r.top + OY + y * S }; }
     };
   }
