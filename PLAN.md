@@ -8,12 +8,12 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 
 | # | Item | Status |
 | --- | --- | --- |
-| – | 3D Printer, Water Works, Car Builder builder rows, shared timer (phase 1) | In progress |
+| – | 3D Printer, Water Works, Car Builder builder rows, shared timer (phase 1) | Done |
 | 1 | Water Works (now Water Table) | Done |
 | 2 | Math Grid | Done |
 | 3 | Engine Room | Removed |
 | 4 | Toybox-wide timer and sound, Big button everywhere, cleanup | Done |
-| 5 | Construction Site | Rework: excavator, tower crane, then dump truck and auger |
+| 5 | Construction Site | Excavator, Tower Crane, Forklift, Concrete, Wrecking Ball done; Dump Truck and Big Auger planned |
 | 6 | Train Builder | Done |
 | 7 | New Workshop stations | Done |
 | 8 | UI polish pass (declutter, slow-down, fresh start, intuitive pass) | Done, more polish as feedback comes |
@@ -23,6 +23,8 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 12 | Hamster | Done |
 | 13 | Garden | Done |
 | 14 | Bubble Machine | Done |
+| 15 | Spinning Tops, Spirograph, Sand Table, Espresso Machine | Done |
+| 16 | Farm (12 episode stations) | Done (12 stations; authentic Tractor Ted episode highlights as in Spuds in Mud) |
 
 Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
 should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** (done; can't go wrong: any finger
@@ -38,7 +40,7 @@ enough, or should more happen by itself (moving the jug under the wand)? tray of
 choice? Not polished: close-ups small on phones held sideways; small serve view on upright phones).
 
 **Decided 2026-10-07 (the dad: "do whatever you think"; keep as built unless he says otherwise):**
-- Marble Run: Lots! fills the hopper to 30 (he liked it); the cap stays 30.
+- Marble Run: Lots! fills the hopper to 30 (he liked it); the cap stays 30; 8 active runs (Zigzag, Spiral tower, Loop-de-loop, Funnels, Machine, Mix 1, Mix 2, Kit; Race and Construction site disabled for now); runs start with a rolling marble; toy car faces forward; steeper bottom tray.
 - Water Table: the cup pours only into the bowls while carried.
 - Gear Box: the tooth number may cover the small 8-tooth tile picture on phones.
 - Bubble Machine: 7 wands (Round, Hexagon, Star, Heart, Bunny, Cat, Fish); the machine keeps blowing round bubbles.
@@ -99,8 +101,11 @@ ending with open questions for the dad; settle those before building.
   load slides out at the depot.
 - **Forklift:** forks under a pallet, raise the mast, load a truck; could be a Construction Site station.
 - **Farm (done 2026-10-10):** 12 stations, one per newer-series episode he knows (list in AGENTS.md §2), all on the
-  farm map; plans in `plans/farm.md` section 0 and `plans/farm-episodes.md`. Look at again with the dad: job lengths
-  (most 20-32 s), the open questions each station's notes list below, and the small wide views on phones held sideways.
+  farm map; plans in `plans/farm.md` section 0 and `plans/farm-episodes.md`.
+  *Design direction (2026-10-11):* testing showed he strongly preferred Spuds in Mud over the manual-driving
+  Combine Time pilot. Complex mechanics are only secondary; what he cares about most is whether the stations hit
+  the key highlights of the Tractor Ted episodes (split stage, real machines, clear process). Stations will focus
+  on authentic episode highlights rather than manual driving chores.
 - **On hold (the dad, 2026-10-10: "wait on the new apps"):** Garbage Truck, Sewing Machine, Play Dough. Plans stay in
   `plans/`; don't build them until he says so.
 - **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
@@ -408,15 +413,13 @@ done) OK; the fire truck sprays water with no fire drawn (not scary) OK.
 
 **Timer ending:** appliances switch off and spin down; rest line "The kitchen is resting."
 
-**Phase 1 built:** `kitchen/index.html` (kitchen page, getting-ready gate, the table kept as a collection in
-`kitchen-table-v1`, entries `{k, c, s, t}`) and `kitchen/blender.html` (counter "Smoothies"). To add a station: set
-`ready: true` in the kitchen page's `STATIONS` with an `ICONBOX`, add the page to the top-level
-`sw.js`, copy the ready-flag redirect and the kitchen-check script from `blender.html`, append food to the table.
+**Built:** `kitchen/index.html` (kitchen page, getting-ready gate, the table kept as a collection in
+`kitchen-table-v1`, entries `{k, c, s, t}`) and all 4 stations: `kitchen/blender.html` (counter "Smoothies"),
+`kitchen/cutting-board.html` (cutting knife, apple slicer, fractions), `kitchen/stand-mixer.html` (cookies,
+whisk/paddle/dough hook), and `kitchen/stove.html` (pancakes and soup). Finished foods accumulate on the kitchen table.
 Questions for the dad: is "switch it off before lifting the jar" a step too many; Pulse hold-to-run; should the
 finished cup go to the table by itself; keep the table across visits (now) or clear it; more ingredients (mango,
 peanut butter)?
-
-**Agents:** 1 for the kitchen home page and hand washing, then 1 per station (4 in v1), each owning its own page, like the Workshop.
 
 ---
 

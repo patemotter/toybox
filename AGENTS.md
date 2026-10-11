@@ -63,7 +63,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   world state in `farm-world-v1`; a map lot is one `STATIONS` entry in `farm/index.html`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
-  train-builder, farm.
+  train-builder, bubble-machine (shown as "Bubbles"), hamster, garden, spinning-tops, kitchen,
+  spirograph, jigsaw, sand-table, espresso-machine, farm.
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
@@ -295,12 +296,13 @@ Keep only:
   card stays, every usual line on or off, and their own lines, each with a sun, star or heart ("Show one now"
   previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
-- **Farm stations are built around the episode's moments** (the dad, 2026-10-11): he knows each episode by heart. His
-  joy is not finishing the job; it is taking part in the episode's key moments and seeing how the machine really
-  works (in Spuds in Mud: destoning the rows; in Combine Time: the grain going out of the spout into the tractor's
-  trailer). Make those moments big, hands-on and clearly visible (a framed close-up that follows the current moment
-  is welcome), and don't pad a station with steps that aren't moments he knows. Ask the dad for an episode's key
-  moments when unsure.
+- **Farm stations are built around the episode's moments** (the dad, 2026-10-11): he knows each episode by heart.
+  Testing confirmed he strongly preferred Spuds in Mud over the manual-driving Combine Time pilot: complex mechanics
+  are only part of what he cares about; what matters most to him is that the station hits the main highlights of the
+  actual Tractor Ted episodes they are designed around (real machines and processes shown clearly, like Spuds in
+  Mud's bed former → destoner → planter → harvester sequence with the split-view close-up of the work). Make those
+  moments big, visually clear and faithful to the episode; do not replace the authentic highlights with manual driving
+  chores or complex steering controls. Ask the dad for an episode's key moments when unsure.
 - Real names, no brand names or logos. Exception (the dad): the Farm's stations are named after the episodes of
   the farm-machinery show he watches ("Combine Time", "Brilliant Baler"...), because he knows them; only titles he actually knows (the dad: "It's Sow Time" means nothing to him, and every station is a newer-series episode he knows: "Spuds in Mud" replaced the plowing field, "Combine Time" next); station names live in one constant, `Farm.NAMES` in `farm/farm.js`; never the show's
   own name, characters or logo.

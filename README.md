@@ -15,7 +15,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Math Grid: a big times and plus table to tap, drag and build blocks on | [`math-grid/`](math-grid/) |
 | 3D Printer: pick spool colors, print a Benchy layer by layer, and fill your shelf | [`3d-printer/`](3d-printer/) |
 | Water Table: pour into funnels, turn valves and spin water wheels | [`water-works/`](water-works/) |
-| Construction Site: gear up, then excavator, concrete road and wrecking ball stations | [`construction-site/`](construction-site/) |
+| Construction Site: gear up, then excavator, concrete road, forklift, tower crane and wrecking ball stations | [`construction-site/`](construction-site/) |
 | Train Builder: couple engines and cars, paint them, then run the train through a tunnel, a crossing and a station | [`train-builder/`](train-builder/) |
 | Bubbles: a bubble machine with a switch and speed dial, a wand to blow your own bubbles, and a Bubbles counter that keeps counting | [`bubble-machine/`](bubble-machine/) |
 | Hamster: a happy pet hamster: tap the wheel, food, water or bed and it goes there; fill the bowl and the bottle; give treats | [`hamster/`](hamster/) |
@@ -26,7 +26,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Jigsaw: real jigsaw puzzles with knobbed pieces, 9 pictures from 4 to 24 pieces; finished pictures come alive and go on My puzzles shelf | [`jigsaw/`](jigsaw/) |
 | Sand Table: a kinetic sand table: drag the ball to carve lines, or tap Draw! and watch it draw spirals, flowers, stars and hearts; Smooth sweeps it flat | [`sand-table/`](sand-table/) |
 | Espresso Machine: the family's real espresso routine: warm up, weigh 18 grams, grind, whisk, tamp, pull the shot on the scale, steam the milk and pour; lattes, cappuccinos and steamers | [`espresso-machine/`](espresso-machine/) |
-| Farm: a farm through the year: drive the green tractor in Plowing (plow, harrow, seed drill, fertilizer spreader, sprayer) until the wheat turns golden; the farm map shows the field as it is | [`farm/`](farm/) |
+| Farm: farm map and 12 stations based on newer-series episodes: Spuds in Mud, Combine Time, Brilliant Baler, Glorious Grass, Munchy Crunchy, Mucky Muck, Timberrrrr!, Juicy Squeezy, Moooovie Time, Come Bye, Feathered Friends, Caterpillar Hunt | [`farm/`](farm/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
