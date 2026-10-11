@@ -819,7 +819,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     OY = (CH - H * S) / 2;
     darkBoard = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     makeSprites();
-    if (!built) buildWorld(state.run);
+    if (!built) { buildWorld(state.run); startMarble(); }
     drawLayers();
     built = true;
   }
@@ -2665,9 +2665,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (b.mode === "drive" || b.tx == null) return;
     var dx = b.x - b.tx[3], dy = b.y - b.ty[3], d = Math.sqrt(dx * dx + dy * dy);
     b.carW += (b.mode === "lift" ? 0 : d / 3 / 9) * (b.carF || 1);
+    // Face the way it is moving right now (the trail three frames back turned it round late, so it
+    // briefly drove backwards after every change of direction), also round the spiral lift.
+    var dx1 = b.x - b.tx[1];
+    if (Math.abs(dx1) > 0.5) b.carF = dx1 < 0 ? -1 : 1;
     if (b.mode === "lift") { b.carA += (0 - b.carA) * Math.min(1, dt * 6); return; }
     if (d < 2.5) return;
-    if (Math.abs(dx) > 1.5) b.carF = dx < 0 ? -1 : 1;
     var ta = b.carF > 0 ? Math.atan2(dy, dx) : Math.atan2(-dy, -dx);
     var da = ta - b.carA;
     while (da > Math.PI) da -= TAU;
@@ -2807,7 +2810,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     tick();
     save();
   }
-  // Switching runs: a fresh, empty run (Marbles: 0); Drop adds marbles again.
+  // Every run starts with one marble already rolling (the dad: not an empty run at zero).
+  function startMarble() {
+    if (total() > 0) return;
+    hopper.queue.push({ c: nextColor(), x: HOP_X, y: 120, ang: 0 });
+  }
+  // Switching runs: a fresh run with one marble rolling; Drop adds more.
   function switchRun(id) {
     if (id === state.run) return;
     balls.forEach(function (b) { burst(b.x, b.y, b.c, 2, 120, 0.4); });
@@ -2817,6 +2825,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     state.run = id;
     buildWorld(id);
     if (id === "kit" && state.lift !== "spiral") { state.lift = "spiral"; lift.carry = []; }
+    startMarble();
     drawLayers();
     save();
   }
