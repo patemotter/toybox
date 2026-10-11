@@ -46,12 +46,12 @@ body {
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The choices: three pairs side by side (crop | combine | trailer), each pair one picture tile above the other. */
-.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tb-s3); }
-.choices .tb-tilerow { --tb-cols: 1 !important; }
-.choices .tb-tilerow .tb-tile-word { white-space: normal; text-wrap: balance; line-height: 1.05; }
-/* iPad held upright: all six tiles in one row */
-@media (orientation: portrait) and (min-width: 700px) { .choices .tb-tilerow { --tb-cols: 2 !important; } }
+/* The one choice: the crop, two big picture tiles side by side under a small heading (pick one of the two). */
+.crop { display: flex; flex-direction: column; gap: var(--tb-s1); }
+.crop-head { margin: 0 0 0 var(--tb-s1); font-size: var(--tb-fs-small); font-weight: 700; color: var(--tb-ink-2, #4A5578); line-height: 1.2; }
+#tCrop.tb-tilerow { --tb-cols: 2 !important; gap: var(--tb-s3); }
+#tCrop .btn.tb-tile { min-height: calc(var(--tb-tile) * 1.3); }
+#tCrop .tb-tile .tb-pic { width: calc(var(--tb-tile) * 0.78); height: calc(var(--tb-tile) * 0.66); }
 /* The guide: chips that show what comes next (progress, not buttons). Only where there is room (tablets). */
 .guide { display: none; list-style: none; margin: 0; padding: 0; justify-content: space-between; gap: 4px; pointer-events: none; }
 .guide .tb-chip { min-width: 0; flex: 1 1 0; }
@@ -82,10 +82,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     </div>
     <section class="tb-panel" id="panel">
       <ol class="guide" id="guide" aria-label="What comes next"></ol>
-      <div class="choices">
-        <div id="tCrop" aria-label="Crop"></div>
-        <div id="tComb" aria-label="Combine"></div>
-        <div id="tTrail" aria-label="Trailer"></div>
+      <div class="crop" role="group" aria-labelledby="cropHead">
+        <p class="crop-head" id="cropHead">Crop</p>
+        <div id="tCrop"></div>
       </div>
       <div id="bottom"></div>
     </section>
@@ -103,10 +102,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   document.title = NAME; $("title").textContent = NAME;
 
   // ---------- State ----------
-  // He does the work: he lowers the header, drives the combine through the crop, toots for the tractor, swings
-  // out the unloading auger and pours, drives the tractor to the grain store and pulls the tipping lever.
-  // Nothing plays a whole job for him; waiting and fiddling (the trailer following the spout, folding the auger
-  // when the tank is empty, the tractor going back) happen by themselves.
+  // He does the work: he drops the header, drives the combine through the whole field, swings out the grain spout
+  // and fills the trailer, drives the tractor to the grain barn and pulls the lever to tip the trailer. One field is
+  // one trip: the grain tank holds the whole field, and when the field is cut the tractor and trailer pull up next
+  // to the combine by themselves. Waiting and fiddling (the tractor coming, the trailer staying under the grain
+  // spout, folding the grain spout when the tank is empty, the tractor going home) happen by themselves.
   var KEY = "farm-combine-v2";
   var startFresh = !!(window.Toybox && Toybox.fresh());
   var saved = {};
@@ -115,12 +115,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var loads = typeof saved.loads === "number" && isFinite(saved.loads) ? saved.loads : 0;
   if (startFresh) loads = 0;
   var job = saved.job === "sun" ? "sun" : "wheat";                       // the crop: "wheat" | "sun"
-  var rig = { cb: saved.cb === "tracks" ? "tracks" : "wheels", tr: saved.tr === "chaser" ? "chaser" : "trailer" };
   var SEED = ["#3D3936", "#ECE8DE"];
   Farm.CROP.seed = Farm.CROP.seed || SEED;
   var SUN_H = 1.8;
 
-  var L = 24, STORE_X = L + 20, VMAX = 5.6, CAP = 12, POUR = 2.8;   // CAP: metres of crop that fill the tank
+  // L: the field's length (m); CAP: metres of crop that fill the grain tank (the whole field); POUR: seconds to empty
+  // a full grain tank into the trailer
+  var L = 36, STORE_X = L + 20, VMAX = 5.6, CAP = L, POUR = 3.6;
   var CELL = 0.25, NC = Math.round(L / CELL), cut = new Uint8Array(NC), cutN = 0;
   var zoom = { f: 1, want: 1 };
   var sc = new Farm.Scene({ L: L, span: 11.6, spanPort: 12.6, mh: 4.7, xmin: -15, xmax: STORE_X + 13, rowDz: 0.5,
@@ -131,25 +132,28 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   var crop = { stage: "ripe", g: 1 };
   // the combine: x = world x of its front axle, dir = the way it faces, face = the drawn facing (turning: -1..1),
-  // hdr = header lift (0 down .. 1 up), tank 0..1, auger 0..1 (swung out), pour = seconds of a tapped pour left
+  // hdr = header lift (0 down .. 1 up), tank 0..1, auger 0..1 (the grain spout swung out), pour = seconds of a
+  // tapped pour left
   var cb = { x: -C.cut - 1.4, dir: 1, face: 1, v: 0, to: null, turn: null, hdr: 1, hdrUp: true, reel: 0, wheel: 0, tank: 0,
     auger: 0, augerTo: 0, pour: 0, hold: false, horn: 0, emptyT: 0 };
-  // the tractor and its trailer (or chaser bin) on the farm track: x = world x of the drawbar eye
-  var tr = { x: -60, v: 0, face: 1, state: "away", load: 0, tip: 0, aug: 0, lever: 0, wheel: 0, t: 0, to: null, heldT: 0, turn: null };
+  // the tractor and its grain trailer on the farm track: x = world x of the drawbar eye; step = how far one tap on
+  // the tractor drives it toward the grain barn (a third of the way, at least 9 m)
+  var tr = { x: -60, v: 0, face: 1, state: "away", load: 0, tip: 0, lever: 0, wheel: 0, t: 0, to: null, heldT: 0, turn: null, step: 9, callT: 0 };
   var grab = null, ending = false, dusk = 0, storeLevel = 0, storeRun = 0, arc = null;
-  var flash = { lever: 0, horn: 0, auger: 0, tiplever: 0, rig: 0, combine: 0 }, nag = { hdr: 0, last: -9, full: -9, pour: -9 };
+  var flash = { lever: 0, auger: 0, tiplever: 0, rig: 0, combine: 0 }, nag = { hdr: 0, last: -9, pour: -9 };
   var dogS = null, deer = null, hawk = null, birds = null, cue = null, focus = "combine", focusT = 0, doneSaid = false;
   function worldCrop() { var w = Farm.world.get(); return job === "sun" ? (w.sun === "stubble" ? "stubble" : "golden") : w.wheat; }
   function setWorldCrop(v) { Farm.world.update(function (w) { if (job === "sun") w.sun = v; else w.wheat = v; }); }
-  function storeFor() { var w = Farm.world.get(), n = job === "sun" ? (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) : w.grain; return Math.min(1.1, Math.max(0, n) / 8); }
+  // the grain barn's heap: one load of the bigger field fills it about a third
+  function storeFor() { var w = Farm.world.get(), n = job === "sun" ? (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) : w.grain; return Math.min(1.1, Math.max(0, n) / 5); }
   function cropWord() { return job === "sun" ? "sunflowers" : "wheat"; }
-  function grainWord() { return job === "sun" ? "seeds" : "grain"; }
   function save() {
     var s = ""; for (var i = 0; i < NC; i++) s += cut[i] ? "1" : "0";
-    try { localStorage.setItem(KEY, JSON.stringify({ loads: loads, job: job, cb: rig.cb, tr: rig.tr, cut: s, tank: Math.round(cb.tank * 100) / 100 })); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ loads: loads, job: job, cut: s, tank: Math.round(cb.tank * 100) / 100 })); } catch (e) { /* ignore */ }
   }
   var saveT = 0;
   function saveSoon() { clearTimeout(saveT); saveT = setTimeout(save, 600); }
+  window.addEventListener("pagehide", function () { clearTimeout(saveT); save(); });
 
   function cutX() { return cb.x + cb.dir * C.cut; }
   function pivotX() { return cb.x + cb.dir * C.pivot[0]; }
@@ -193,8 +197,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function resize() {
     var r = stage.getBoundingClientRect();
     W = Math.max(50, r.width); H = Math.max(50, r.height);
-    // keep the bottom of the stage for the coach line, so it never sits over the machines
-    CR = Math.round(Math.min(H * 0.16, W >= 700 && H >= 500 ? 70 : 54));
+    // keep the bottom of the stage for the coach line, so it never sits over the machines (two lines on a phone)
+    CR = Math.round(Math.min(H * 0.17, W >= 700 && H >= 500 ? 72 : (W < 520 ? 64 : 56)));
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     layoutScene();
@@ -208,14 +212,21 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function say(text, sec) { sec = Math.max(3, sec || 3); sayEnd = time + sec; coach.say(text, sec); }
   function setLoads() { var el = $("loads"); el.textContent = "Loads: " + loads; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   $("loads").textContent = "Loads: " + loads;
-  function tag(text, p) { var b = cv.getBoundingClientRect(); Toybox.nametag(text, b.left + p[0], b.top + p[1] - 14, 2200); }
-  var tagged = {};
-  function tagOnce(id, text, p) { if (tagged[id]) return; tagged[id] = 1; tag(text, p); }
+  // A part's name, only when he taps that part, for a moment: a small label with a pointer down to the part (the
+  // pointer stays over the part when the label is nudged in from the screen edge).
+  function tag(text, p) {
+    var b = cv.getBoundingClientRect(), x = b.left + p[0], el = Toybox.nametag(text, x, b.top + p[1] - 6, 1500);
+    if (el && el.style) {
+      var dx = x - (parseFloat(el.style.left) || x), half = Math.max(0, (el.offsetWidth || 60) / 2 - 10);
+      el.style.setProperty("--tb-tag-dx", clamp(dx, -half, half).toFixed(1) + "px");
+    }
+  }
 
   // screen points of the machines' parts (units: metres, y up negative, as farm.js draws them)
   function cbPt(ux, uy) { var s = sc.S(1); return [sc.X(cb.x, 1) + ux * s * cb.face, sc.Y(1) + uy * s]; }
   function trPt(px, py) { var s = TS(); return [sc.X(tr.x, sc.TRACK) + px * s * tr.face, sc.Y(sc.TRACK) + py * s]; }
-  // the header lever in the cab, the horn on the grain tank, the auger (folded along the side or out over the track)
+  // the header lever in the cab, the horn on the grain tank, the grain spout (folded along the side or out over
+  // the track)
   var LEVER = [1.42, -3.32], HORN = [-0.45, -4.78];
   function leverPt() { return cbPt(LEVER[0], LEVER[1]); }
   function hornPt() { return cbPt(HORN[0], HORN[1]); }
@@ -228,46 +239,39 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function augerPt() { return cb.auger > 0.5 ? spoutPt() : cbPt(-5.3, -3.5); }
   function headerPt() { return cbPt(3.9, -0.8 - cb.hdr * 0.55); }
   function tipLeverPt() { return trPt(0.3 - tr.lever * 0.35, -2.55 + tr.lever * 0.2); }
-  // where the drawbar has to be for the bed's middle to be under the spout
+  // where the drawbar has to be for the bed's middle to be under the grain spout
   function spotX() { return sc.wx(augerOutX() + 4.5 * TS(), sc.TRACK); }
   function pitX() { return sc.pit ? sc.pit.x : STORE_X - 2.6; }
-  function storeSpot() { return pitX() + (rig.tr === "chaser" ? 10.5 : 7.7) * TF(); }
+  function storeSpot() { return pitX() + 7.7 * TF(); }
   function underSpout() { return (tr.state === "side") && Math.abs(tr.x - spotX()) < 0.9 * TF() + 0.3; }
 
   // ---------- Controls: what each one does (one press is always enough) ----------
-  function setHeader(up, auto) {
+  var HDR_LINE = "Tap the lever to drop the combine’s header.";
+  function setHeader(up) {
     if (cb.hdrUp === up) return;
     cb.hdrUp = up; snd.clunk(); flash.lever = 0;
-    if (!up) {
-      tagOnce("header", job === "sun" ? "Sunflower header" : "Header", headerPt());
-      if (ghost) ghost.learned("lever");
-      if (auto) say("The header goes down.", 3);
-    }
+    if (!up && ghost) ghost.learned("lever");
   }
   function toggleHeader() { setHeader(!cb.hdrUp); }
+  // The horn is just for fun now: nothing waits on it (the tractor comes by itself when the field is cut).
   function toot() {
     snd.horn(); cb.horn = 1.4;
-    if (ghost) ghost.learned("horn");
-    tagOnce("horn", "Horn", hornPt());
-    if (tr.state === "away" || tr.state === "back") {
-      if (cb.tank < 0.04) { say(crop.stage === "grow" ? (job === "sun" ? "The sunflowers are growing!" : "The wheat is growing!") : "Cut some " + cropWord() + " first!", 3); return; }
-      callTractor();
-    } else if (tr.state === "side" || tr.state === "in" || tr.state === "drift") {
-      if (tr.state === "drift") { bringBack(); return; }
-      say("The tractor is here!", 3);
-    } else say("The tractor is at the store.", 3);
+    if (tr.state === "drift") bringBack();
   }
   function callTractor() {
-    tr.state = "in"; tr.face = 1; tr.turn = null; tr.tip = 0; tr.aug = 0; tr.lever = 0;
-    tr.x = Math.min(spotX() - 6, sc.wx(-30, sc.TRACK) - 6.5 * TF()); tr.v = 6;
-    say("Here comes the tractor!", 3);
+    tr.state = "in"; tr.face = 1; tr.turn = null; tr.tip = 0; tr.lever = 0; tr.callT = 0;
+    tr.x = Math.min(spotX() - 6, sc.wx(-30, sc.TRACK) - 6.5 * TF()); tr.v = 9;
+  }
+  // A line for a try that can't work yet: what to do first, said literally.
+  function notYet() {
+    if (!fieldDone()) { say("Cut all the " + cropWord() + " with the combine first.", 3); flash.combine = 3; return; }
+    if (tr.state === "store" || tr.state === "tip" || tr.state === "untip" || tr.state === "dock" || tr.state === "road") return;
+    say("Wait for the tractor to stop next to the combine.", 3);
   }
   function augerTap() {
     if (cb.auger < 0.5 && cb.augerTo < 0.5) {
       cb.augerTo = 1; snd.clunk();
-      tagOnce("auger", "Unloading auger", augerPt());
       if (ghost) ghost.learned("auger");
-      if (tr.state === "away") { say("Toot for the tractor!", 3); flash.horn = 3; }
       return;
     }
     if (cb.augerTo < 0.5) { cb.augerTo = 1; return; }
@@ -275,16 +279,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     startPour(0.9);
   }
   function startPour(sec) {
-    if (tr.state === "away" || tr.state === "back") { say("Toot for the tractor!", 3); flash.horn = 3; cb.augerTo = 1; return false; }
-    if (tr.state === "drift") { say("Tap the trailer!", 3); flash.rig = 3; return false; }
-    if (tr.load >= 0.995) { say("The trailer is full!", 3); flash.rig = 3; return false; }
+    if (tr.state === "away" || tr.state === "back" || tr.state === "in") { notYet(); cb.augerTo = 1; return false; }
+    if (tr.state === "drift") { bringBack(); return false; }
+    if (tr.state !== "side" || cb.tank <= 0.0005) return false;
     if (sec) cb.pour = Math.max(cb.pour, sec);
     if (ghost) ghost.learned("pour");
     return true;
   }
   function combineTap() {
     if (cb.turn) return;
-    var b = bounds(cb.dir), to = clamp(cb.x + cb.dir * 3.2, Math.min(b[0], cb.x), Math.max(b[1], cb.x));
+    var b = bounds(cb.dir), to = clamp(cb.x + cb.dir * 4.8, Math.min(b[0], cb.x), Math.max(b[1], cb.x));
     if (Math.abs(to - cb.x) < 0.3) { startTurn(); return; }
     cb.to = to;
     if (ghost) ghost.learned("drive-tap");
@@ -293,67 +297,59 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (cb.turn) return;
     cb.turn = { t: 0, from: cb.dir, x0: cb.x, x1: cb.x - cb.dir * 1.0 }; cb.v = 0; cb.to = null;
   }
+  // the tractor leaves for the grain barn (only with the grain tank empty: one field is one trip)
+  function startRoad() {
+    tr.state = "road"; tr.to = null; tr.heldT = 0;
+    tr.step = Math.max(9, (storeSpot() - tr.x) / 3);
+    if (ghost) ghost.learned("rig-tap");
+  }
   function rigTap() {
     if (tr.state === "drift") { bringBack(); return; }
-    if (tr.state === "side" || tr.state === "road") {
-      if (tr.load < 0.04) { say(tr.state === "side" ? "Pour the " + grainWord() + " in!" : "Fill the trailer first!", 3); snd.horn(); return; }
-      tr.state = "road"; tr.to = Math.min(storeSpot(), tr.x + 7);
+    if (tr.state === "side") {
+      if (cb.tank > 0.02) { say("Hold the grain spout to fill the trailer.", 3); flash.auger = 3; return; }
+      if (tr.load < 0.04) { notYet(); return; }
+      startRoad();
+    }
+    if (tr.state === "road") {
+      tr.to = Math.min(storeSpot(), Math.max(tr.x, tr.to === null ? tr.x : tr.to) + tr.step);
       if (ghost) ghost.learned("rig-tap");
       return;
     }
-    if (tr.state === "store") { say("Pull the lever!", 3); flash.tiplever = 3; return; }
-    snd.horn(); tag(rig.tr === "chaser" ? "Chaser bin" : "Trailer", trPt(-1.8, -3.4));
+    if (tr.state === "store") { say("Pull the lever to tip the trailer.", 3); flash.tiplever = 3; }
   }
-  function bringBack() { if (tr.state !== "drift") return; tr.state = "side"; tr.heldT = 0; snd.horn(); say("Back you come!", 3); }
+  function bringBack() { if (tr.state !== "drift") return; tr.state = "side"; tr.heldT = 0; snd.horn(); }
   function tipTap() {
     if (tr.state === "store") { startTip(); return; }
-    if (tr.state === "tip" || tr.state === "untip" || tr.state === "unload") return;
-    tr.lever = 0.5; setTimeout(function () { if (tr.state !== "tip" && tr.state !== "unload") tr.lever = 0; }, 350);
-    say(tr.load > 0.04 ? "Drive to the grain store first!" : "Fill the trailer first!", 3);
+    if (tr.state === "tip" || tr.state === "untip" || tr.state === "dock") return;
+    tr.lever = 0.5; setTimeout(function () { if (tr.state !== "tip") tr.lever = 0; }, 350);
+    if (tr.load > 0.04 && cb.tank <= 0.02) say("Drive the tractor to the grain barn.", 3);
+    else if (tr.state === "side") say("Hold the grain spout to fill the trailer.", 3);
   }
   function startTip() {
     if (tr.state !== "store") return;
-    tr.state = rig.tr === "chaser" ? "unload" : "tip"; tr.t = 0; snd.clunk();
-    tagOnce("tiplever" + rig.tr, rig.tr === "chaser" ? "Auger lever" : "Tipping lever", tipLeverPt());
+    tr.state = "tip"; tr.t = 0; snd.clunk();
     if (ghost) ghost.learned("tip");
   }
 
-  // ---------- Choices: tiles in the panel ----------
-  var tCrop = Toybox.tiles($("tCrop"), { rows: 2, value: job, onPick: function (id) { switchCrop(id); },
+  // ---------- The choice: the crop, two picture tiles in the panel ----------
+  var tCrop = Toybox.tiles($("tCrop"), { rows: 1, value: job, onPick: function (id) { switchCrop(id); },
     items: [{ id: "wheat", name: "Wheat", pic: Farm.pic("wheat") }, { id: "sun", name: "Sunflowers", pic: pic("sunflower") }] });
-  var tComb = Toybox.tiles($("tComb"), { rows: 2, value: rig.cb, onPick: function (id) { rig.cb = id; snd.clunk(); cb.flashB = 1.2; save(); say(id === "tracks" ? "Big rubber tracks!" : "Big wheels!", 3); } });
-  var tTrail = Toybox.tiles($("tTrail"), { rows: 2, value: rig.tr, onPick: function (id) { switchTrailer(id); } });
-  function combineTiles() {
-    tComb.items([{ id: "wheels", name: "Wheels", pic: pic("cb-wheels-" + job) }, { id: "tracks", name: "Tracks", pic: pic("cb-tracks-" + job) }]);
-    tTrail.items([{ id: "trailer", name: "Grain trailer", pic: pic("trailer-" + job) }, { id: "chaser", name: "Chaser bin", pic: pic("chaser-" + job) }]);
-  }
-  function switchTrailer(id) {
-    rig.tr = id === "chaser" ? "chaser" : "trailer"; save(); snd.clunk();
-    // a tip or an unload in progress finishes at once (the load goes into the store)
-    if (tr.state === "tip" || tr.state === "untip" || tr.state === "unload") { tr.tip = 0; tr.aug = 0; tr.lever = 0; storedLoad(); }
-    else if (tr.state === "store") tr.state = "road";
-    tr.tip = 0; tr.aug = 0;
-    say(rig.tr === "chaser" ? "The chaser bin!" : "The grain trailer!", 3);
-    if (tr.state !== "away") tag(rig.tr === "chaser" ? "Chaser bin" : "Grain trailer", trPt(-1.8, -3.4));
-  }
   function switchCrop(id) {
     if (locked()) { tCrop.set(job); return; }
     save();
     job = id === "sun" ? "sun" : "wheat";
-    combineTiles(); resetScene(false); save();
-    say(job === "sun" ? "Time for the sunflowers!" : "Time for the wheat!", 3);
+    drawGuide(); resetScene(false); save();
   }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
   function startOver() {
     if (locked()) return;
     resetScene(true);
-    say(job === "sun" ? "New sunflowers grow!" : "New wheat grows!", 3);
   }
   // A fresh field: back to the start; regrow: the crop grows again ("weeks go by") instead of reading the farm.
   function resetScene(regrow) {
-    parts.clear(); deer = hawk = birds = null; dogS = null; tagged = {}; grab = null; doneSaid = false;
-    tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0; tr.aug = 0; tr.lever = 0; tr.v = 0; tr.to = null; tr.turn = null; tr.face = 1;
+    parts.clear(); deer = hawk = birds = null; dogS = null; grab = null; doneSaid = false;
+    tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0; tr.lever = 0; tr.v = 0; tr.to = null; tr.turn = null; tr.face = 1; tr.callT = 0;
     cb.auger = 0; cb.augerTo = 0; cb.tank = 0; cb.v = 0; cb.to = null; cb.turn = null; cb.pour = 0; cb.hold = false;
     cb.dir = 1; cb.face = 1; cb.x = -C.cut - 1.4; cb.hdrUp = true; cb.hdr = 1; nag.hdr = 0;
     clearField();
@@ -367,6 +363,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function ripe() { crop.stage = "ripe"; crop.g = 1; arc = null; setWorldCrop("golden"); Farm.world.update(function (w) { w.season = "summer"; }); }
 
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
+  // (No coach line: the scene shows it. The tractor rolling away comes back by itself.)
   var surpriseN = 0;
   function surprise() {
     if (locked()) return;
@@ -374,18 +371,17 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (tr.state === "side" && cb.auger > 0.9 && cb.tank > 0.05) list.unshift("drift");
     var pick = list[surpriseN++ % list.length];
     if (pick === "finches") { finches(); return; }
-    if (pick === "drift") { tr.state = "drift"; tr.t = 0; say("Tap the trailer!", 4); flash.rig = 4; return; }
+    if (pick === "drift") { tr.state = "drift"; tr.t = 0; snd.horn(); return; }
     if (pick === "deer") {
       var x0 = cutN < NC ? cutX() + cb.dir * 5 : sc.wx(W * 0.25, 1);
       deer = { x: x0, r: 2.6, t: 0, dir: hash(surpriseN, 3) > 0.5 ? 1 : -1 };
-      say("A deer!", 3);
       return;
     }
-    if (pick === "hawk") { hawk = { t: 0 }; say("A hawk!", 3); }
+    if (pick === "hawk") { hawk = { t: 0, x: W * 0.5 + W * 0.25, face: -1 }; }
   }
 
   // ---------- Input: tap or drag (Toybox.press) ----------
-  // Controls (lever, horn, auger, tipping lever) win when the finger is near them; then the machines.
+  // Controls (lever, horn, grain spout, tipping lever) win when the finger is near them; then the machines.
   function controls() {
     var list = [], s = sc.S(1);
     list.push({ id: "lever", p: leverPt(), r: 0.9 * s });
@@ -411,14 +407,25 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (onRig) return "rig";
     return null;
   }
+  // the name of the part of a machine under a tap (screen px)
+  function cbPartName(px, py) {
+    var u = (px - sc.X(cb.x, 1)) / (sc.S(1) * cb.face), v = (py - sc.Y(1)) / sc.S(1);
+    if (u > 2.3 && v > -2.2) return [job === "sun" ? "Sunflower header" : "Header", headerPt()];
+    if (u < -0.6 && u > -4.6 && v < -3.0) return ["Grain tank", cbPt(-2.2, -4.7)];
+    return ["Combine harvester", cbPt(-0.6, -4.9)];
+  }
+  function rigPartName(px) {
+    var u = (px - sc.X(tr.x, sc.TRACK)) / (TS() * tr.face);
+    return u < -0.3 ? ["Grain trailer", trPt(-4.6, -3.0)] : ["Tractor", trPt(2.0, -3.3)];
+  }
   var press = Toybox.press(cv, {
     any: true,
-    // holding the auger pours from the moment the finger is down (a still finger sends no moves)
+    // holding the grain spout pours from the moment the finger is down (a still finger sends no moves)
     down: function (part, e, s) {
       if (locked() || part !== "auger" || cb.auger < 0.5 || cb.augerTo < 0.5) return;
       var b = cv.getBoundingClientRect();
       grab = { what: "auger", u0: cb.auger, fx: s.x - b.left, fy: s.y - b.top, x0: s.x0 - b.left, y0: s.y0 - b.top, id: e.pointerId };
-      if (cb.tank > 0.01 && tr.state !== "away" && tr.state !== "back" && tr.state !== "drift" && tr.load < 0.995) { cb.hold = true; if (ghost) ghost.learned("pour"); }
+      if (cb.tank > 0.01 && tr.state === "side") { cb.hold = true; if (ghost) ghost.learned("pour"); }
     },
     hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
@@ -430,8 +437,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       else if (part === "lever") grab.what = "lever";
       else if (part === "rig") {
         grab.off = sc.wx(grab.x0, sc.TRACK) - tr.x;
-        if ((tr.state === "side" || tr.state === "drift") && tr.load > 0.04 && cb.augerTo < 0.5) tr.state = "road";
         if (tr.state === "drift") tr.state = "side";
+        if (tr.state === "side" && tr.load > 0.04 && cb.tank <= 0.02) startRoad();
+        else if (tr.state === "side" && cb.tank > 0.02) { say("Hold the grain spout to fill the trailer.", 3); flash.auger = 3; }
         tr.to = null;
         if (ghost) ghost.learned("rig");
       } else if (part === "auger") {
@@ -457,23 +465,24 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (!grab || grab.id !== e.pointerId) return;
       if (grab.what === "auger") {
         cb.hold = false;
-        if (grab.u0 < 0.5 || cb.augerTo < 1) { cb.augerTo = cb.auger > 0.35 ? 1 : 0; if (cb.augerTo === 1 && grab.u0 < 0.5) { snd.clunk(); tagOnce("auger", "Unloading auger", augerPt()); if (ghost) ghost.learned("auger"); } }
+        if (grab.u0 < 0.5 || cb.augerTo < 1) { cb.augerTo = cb.auger > 0.35 ? 1 : 0; if (cb.augerTo === 1 && grab.u0 < 0.5) { snd.clunk(); if (ghost) ghost.learned("auger"); } }
       } else if (grab.what === "tiplever" && tr.state === "store") tr.lever = 0;
       else if (grab.what === "rig") tr.heldT = 1.6;
       grab = null;
     },
     tap: function (part, x, y) {
       if (locked()) return;
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part === "lever") { toggleHeader(); return; }
-      if (part === "horn") { toot(); return; }
-      if (part === "auger") { augerTap(); return; }
-      if (part === "tiplever") { tipTap(); return; }
-      if (part === "combine") { combineTap(); return; }
-      if (part === "rig") { rigTap(); return; }
-      // anywhere else: the store's name, or a little puff of chaff and the line again
+      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top, n;
+      // every part he taps says its name for a moment, and does its one real motion
+      if (part === "lever") { tag("Header lever", leverPt()); toggleHeader(); return; }
+      if (part === "horn") { tag("Horn", hornPt()); toot(); return; }
+      if (part === "auger") { tag("Grain spout", augerPt()); augerTap(); return; }
+      if (part === "tiplever") { tag("Tipping lever", tipLeverPt()); tipTap(); return; }
+      if (part === "combine") { n = cbPartName(px, py); tag(n[0], n[1]); combineTap(); return; }
+      if (part === "rig") { n = rigPartName(px); tag(n[0], n[1]); rigTap(); return; }
+      // anywhere else: the grain barn's name, or a little puff of chaff and the line again
       var sx = sc.X(STORE_X, 1.02);
-      if (Math.abs(px - sx) < 5 * sc.S(1.02) && py < sc.Y(1.02) && py > sc.Y(1.02) - 7 * sc.S(1.02)) { tag("Grain store", [sx, sc.Y(1.02) - 7.4 * sc.S(1.02)]); return; }
+      if (Math.abs(px - sx) < 5 * sc.S(1.02) && py < sc.Y(1.02) && py > sc.Y(1.02) - 7 * sc.S(1.02)) { tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]); return; }
       var r = clamp(sc.B / Math.max(4, py - sc.hY), 0.6, 5);
       for (var i = 0; i < 6; i++) parts.add({ kind: "puff", x: sc.wx(px, Math.min(1, r)) + (Math.random() - 0.5), h: 0.3, r: Math.min(1, r), vx: (Math.random() - 0.5), vh: 0.6, life: 1, size: 0.12, grow: 0.5, col: "#F3DE9A", alpha: 0.7 });
       say(stepLine, 3);
@@ -483,29 +492,27 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   });
 
   // ---------- What to do now: the coach line, the glowing control and the guide chips ----------
-  var stepLine = "", GUIDE = ["hdr", "cut", "toot", "pour", "road", "tip"], guideAt = -1;
+  // Every line says who does what to what, one action, no pronouns (the dad: words are taken exactly).
+  var stepLine = "", GUIDE = ["hdr", "cut", "pour", "road", "tip"], guideAt = -1;
   function nowStep() {
-    var ts = tr.state, grain = grainWord();
-    if (crop.stage === "grow") return { line: job === "sun" ? "The sunflowers are growing!" : "The wheat is growing!", cue: null, g: 0 };
-    if (ts === "tip" || ts === "untip" || ts === "unload") return { line: job === "sun" ? "Out pour the seeds!" : "Out pours the grain!", cue: null, g: 5 };
-    if (ts === "store") return { line: rig.tr === "chaser" ? "Pull the lever to unload!" : "Pull the lever to tip!", cue: "tiplever", g: 5 };
-    if (ts === "road") return { line: "Drive to the grain store!", cue: "rig", g: 4 };
-    if (ts === "drift") return { line: "Tap the trailer!", cue: "rig", g: 3 };
-    if (ts === "side") {
-      if (cb.tank > 0.02 && tr.load < 0.995) {
-        if (cb.augerTo < 0.5) return { line: "Swing out the auger!", cue: "auger", g: 3 };
-        return { line: "Hold the auger to pour!", cue: "auger", g: 3 };
+    var ts = tr.state, crp = cropWord();
+    if (crop.stage === "grow") return { line: "Wait for the " + crp + " to grow.", cue: null, g: 0 };
+    if (ts === "tip" || ts === "untip") return { line: job === "sun" ? "Watch the seeds pour into the grain barn." : "Watch the grain pour into the grain barn.", cue: null, g: 4 };
+    if (ts === "store") return { line: "Pull the lever to tip the trailer.", cue: "tiplever", g: 4 };
+    if (ts === "road" || ts === "dock") return { line: "Drive the tractor to the grain barn.", cue: ts === "road" ? "rig" : null, g: 3 };
+    if (ts === "side" || ts === "drift") {
+      if (cb.tank > 0.02) {
+        if (ts === "drift") return { line: "Wait for the tractor to stop next to the combine.", cue: null, g: 2 };
+        if (cb.augerTo < 0.5) return { line: "Swing the grain spout over the trailer.", cue: "auger", g: 2 };
+        return { line: "Hold the grain spout to fill the trailer.", cue: "auger", g: 2 };
       }
-      if (tr.load > 0.04 && (cb.tank <= 0.02 || tr.load >= 0.995)) return { line: "Drive to the grain store!", cue: "rig", g: 4 };
+      if (tr.load > 0.04) return { line: "Drive the tractor to the grain barn.", cue: "rig", g: 3 };
     }
-    if (ts === "in") return { line: "Here comes the tractor!", cue: null, g: 2 };
-    if (cb.tank >= 0.999 || (fieldDone() && cb.tank > 0.02)) {
-      if (ts === "away" || ts === "back") return { line: "Toot for the tractor!", cue: "horn", g: 2 };
-    }
-    if (fieldDone()) return { line: "Tap New for a new field!", cue: null, g: -1 };
-    if (cb.hdrUp) return { line: "Drop the header!", cue: "lever", g: 0 };
-    if (cb.tank < 0.08) return { line: job === "sun" ? "Drive into the sunflowers!" : "Drive into the wheat!", cue: "combine", g: 1 };
-    return { line: "Fill the grain tank!", cue: "combine", g: 1 };
+    if (fieldDone() && cb.tank > 0.02) return { line: "Wait for the tractor to stop next to the combine.", cue: null, g: 2 };
+    if (fieldDone()) return { line: "Tap New to grow new " + crp + ".", cue: null, g: -1 };
+    if (cb.hdrUp) return { line: HDR_LINE, cue: "lever", g: 0 };
+    if (cutN === 0) return { line: "Drag the combine into the " + crp + ".", cue: "combine", g: 1 };
+    return { line: "Drag the combine through all the " + crp + ".", cue: "combine", g: 1 };
   }
   function updateStep() {
     var s = nowStep();
@@ -517,9 +524,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var guideEl = $("guide");
   function guideItems() {
     return [
-      { id: "hdr", name: "Header", pic: pic("lever") }, { id: "cut", name: "Cut", pic: pic("cb-wheels-" + job) },
-      { id: "toot", name: "Toot", pic: pic("horn") }, { id: "pour", name: "Pour", pic: pic("auger") },
-      { id: "road", name: "Drive", pic: pic("trailer-" + job) }, { id: "tip", name: rig.tr === "chaser" ? "Unload" : "Tip", pic: pic(rig.tr === "chaser" ? "chaser-" + job : "tip-" + job) }
+      { id: "hdr", name: "Header", pic: pic("lever") }, { id: "cut", name: "Cut", pic: pic("cb-" + job) },
+      { id: "pour", name: "Fill", pic: pic("auger") },
+      { id: "road", name: "Drive", pic: pic("trailer-" + job) }, { id: "tip", name: "Tip", pic: pic("tip-" + job) }
     ];
   }
   var TICK = '<svg class="tb-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.2 4.2 8.8-9.4" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -539,8 +546,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var b = cv.getBoundingClientRect();
       function vp(p) { return [b.left + p[0], b.top + p[1]]; }
       if (cue === "lever") return { pts: [vp(leverPt())], tap: true, key: "lever" };
-      if (cue === "horn") return { pts: [vp(hornPt())], tap: true, key: "horn" };
-      if (cue === "auger") return cb.augerTo < 0.5 ? { pts: [vp(augerPt()), vp([augerPt()[0], spoutPt()[1] + 30])], key: "auger" } : { pts: [vp(augerPt())], hold: true, key: "pour" };
+      if (cue === "auger") return cb.augerTo < 0.5 ? { pts: [vp(augerPt())], tap: true, key: "auger" } : { pts: [vp(augerPt())], hold: true, key: "pour" };
       if (cue === "tiplever") return { pts: [vp(tipLeverPt())], tap: true, key: "tip" };
       if (cue === "rig") { var r = vp(trPt(-2.5, -1.8)); return ghost.shown("rig") >= 1 ? { pts: [r, [r[0] + Math.min(W * 0.35, 160), r[1]]], key: "rig" } : { pts: [r], tap: true, key: "rig" }; }
       if (cue === "combine") { var p = vp(cbPt(-2.4, -2.0)); return ghost.shown("drive") >= 1 ? { pts: [p, [p[0] + cb.dir * Math.min(W * 0.35, 160), p[1]]], key: "drive" } : { pts: [p], tap: true, key: "drive" }; }
@@ -550,7 +556,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---------- Simulation ----------
   // The camera keeps the machine he is working fully on screen with a margin (the combine, with the trailer beside
-  // it; or the tractor and trailer on the way to the store, with the store once it is near), zooming out if needed.
+  // it; or the tractor and trailer on the way to the grain barn), zooming out if needed. On the way to the grain
+  // barn the zoom is the one that fits the barn and the tipped trailer from the start, so it stays the same for the
+  // whole drive (a changing zoom repaints the whole field every frame; a steady one only pans it).
   var camLim = null;
   function sxAt(x, r, cam) { return W / 2 + (x - cam) * sc.k / r; }
   function frame(pts, pref) {
@@ -568,27 +576,23 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function combinePts() { var f = cb.face, a = cb.x + f * -6.8, b = cb.x + f * 6.0; return [[Math.min(a, b), 1, 0], [Math.max(a, b), 1, 0]]; }
   function trailerPts() {
-    var t = TS(), back = tr.state === "tip" || tr.state === "untip" ? -9.4 : (rig.tr === "chaser" && tr.aug > 0.05 ? -11.0 : -8.1);
+    var t = TS(), back = tr.state === "tip" || tr.state === "untip" ? -9.4 : -8.1;
     var a = tr.face > 0 ? back : -5.6, b = tr.face > 0 ? 5.6 : -back;
     return [[tr.x, sc.TRACK, a * t], [tr.x, sc.TRACK, b * t]];
   }
   function camTarget() {
     var ts = tr.state;
-    if (ts === "road" || ts === "dock" || ts === "store" || ts === "tip" || ts === "untip" || ts === "unload") {
+    if (ts === "road" || ts === "dock" || ts === "store" || ts === "tip" || ts === "untip") {
       focus = "rig";
-      var pts = trailerPts(), near = storeSpot() - tr.x < 24;
-      if (near) {
-        // zoom out on the way, so the trailer at the store and the store itself fit when it gets there
-        var keepX = tr.x, keepS = tr.state; tr.x = storeSpot(); tr.state = rig.tr === "chaser" ? "unload" : "tip";
-        var keepA = tr.aug; tr.aug = 1;
-        var spts = [[STORE_X - 5.2, 1.02, 0], [STORE_X + 5.2, 1.02, 0]].concat(trailerPts());
-        tr.x = keepX; tr.state = keepS; tr.aug = keepA;
-        frame(spts, STORE_X); var zw = zoom.want;
-        var c0 = frame(pts.concat(ts === "road" ? [] : spts), ts === "road" ? tr.x + 2 : STORE_X);
-        zoom.want = Math.min(zoom.want, zw);
-        return c0;
-      }
-      return frame(pts, tr.x + 3);
+      var pts = trailerPts();
+      var keepX = tr.x, keepS = tr.state; tr.x = storeSpot(); tr.state = "tip";
+      var spts = [[STORE_X - 5.2, 1.02, 0], [STORE_X + 5.2, 1.02, 0]].concat(trailerPts());
+      tr.x = keepX; tr.state = keepS;
+      frame(spts, STORE_X); var zw = zoom.want;
+      // on the road the camera looks ahead (the rig at the back of the view), so the grain barn comes into view soon
+      var c0 = frame(pts.concat(ts === "road" ? [] : spts), ts === "road" ? tr.x + 40 : STORE_X);
+      zoom.want = Math.min(zoom.want, zw);
+      return c0;
     }
     focus = "combine";
     var p = combinePts();
@@ -608,25 +612,26 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cb.hdr += ((cb.hdrUp ? 1 : 0) - cb.hdr) * Math.min(1, dt * 4.5);
     cb.reel += dt * (cb.hdr < 0.5 ? 1.4 + Math.abs(cb.v) * 0.4 : 0);
     cb.wheel += cb.v * dt;
-    // the unloading auger and the pour
+    // the grain spout and the pour
     if (!(grab && grab.what === "auger")) cb.auger += clamp(cb.augerTo - cb.auger, -dt * 1.2, dt * 1.2);
     if (cb.pour > 0) cb.pour = Math.max(0, cb.pour - dt);
     var want = (cb.hold || cb.pour > 0) && cb.auger > 0.97 && cb.tank > 0.0005;
-    var pouring = want && underSpout() && tr.load < 0.999;
+    var pouring = want && underSpout();
     cb.pouring = pouring;
     if (pouring) {
-      var d = Math.min(cb.tank, dt / POUR, 1 - tr.load);
-      cb.tank -= d; tr.load += d;
-      if (cb.tank < 0.0005) cb.tank = 0;
+      // the trailer takes the whole grain tank (the last bit goes in with the rest, nothing is left in the tank)
+      var d = Math.min(cb.tank, dt / POUR);
+      cb.tank -= d; tr.load = Math.min(1.05, tr.load + d);
+      if (cb.tank < 0.02) { tr.load = Math.min(1.05, tr.load + cb.tank); cb.tank = 0; }
       saveSoon();
-    } else if (want && time - nag.pour > 3.5) {
-      nag.pour = time;
-      if (tr.state === "side" && tr.load >= 0.999) { say("The trailer is full!", 3); flash.rig = 3; }
-      else if (tr.state === "in" || tr.state === "side") say("The trailer is coming!", 3);
+    } else if (want && tr.state === "in" && time - nag.pour > 3.5) {
+      nag.pour = time; say("Wait for the tractor to stop next to the combine.", 3);
     }
-    // the tank is empty: the auger folds by itself
+    // the tank is empty: the grain spout folds by itself
     if (cb.augerTo > 0.5 && cb.tank <= 0.0005 && !cb.hold && !(grab && grab.what === "auger")) { cb.emptyT += dt; if (cb.emptyT > 0.9) { cb.augerTo = 0; cb.emptyT = 0; } }
     else cb.emptyT = 0;
+    // the whole field is cut: the tractor and trailer pull up next to the combine by themselves
+    if (tr.state === "away" && fieldDone() && cb.tank > 0.02 && !locked()) { tr.callT += dt; if (tr.callT > 0.8) callTractor(); }
     if (tr.state !== "away") updateTractor(dt);
     if (cb.horn > 0) cb.horn = Math.max(0, cb.horn - dt);
     if (cb.flashB) cb.flashB = Math.max(0, cb.flashB - dt);
@@ -657,7 +662,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // He drives: the combine's middle follows his finger (held ahead of it, it keeps driving), a tap drives it a
-  // short way. It cuts only where the cutter bar goes, with the header down, until the tank is full.
+  // short way. It cuts only where the cutter bar goes, with the header down (the grain tank holds the whole field).
   function driveCombine(dt) {
     if (cb.turn) {
       var T = cb.turn; T.t += dt / 0.9;
@@ -687,13 +692,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       else { iA = Math.ceil(c0 / CELL - 0.5) - 1; iB = Math.ceil(c1 / CELL - 0.5); }
       for (i = iA; cb.dir > 0 ? i <= iB : i >= iB; i += cb.dir) {
         if (i < 0 || i >= NC || cut[i]) continue;
-        if (cb.hdr > 0.3 || cb.tank >= 0.999) { stopAt = (i + 0.5) * CELL - cb.dir * 0.02; break; }
+        if (cb.hdr > 0.3) { stopAt = (i + 0.5) * CELL - cb.dir * 0.02; break; }
         markCut(i); n++; cb.tank = Math.min(1, cb.tank + CELL / CAP);
       }
       if (stopAt !== null) {
         var byTap = cb.to !== null;          // a tap always gets its answer; a held drag only every so often
         nx = stopAt - cb.dir * C.cut; cb.v = 0; cb.to = null;
-        if (cb.hdr > 0.3) headerNag(byTap); else fullNag(byTap);
+        headerNag(byTap);
       }
       if (n) cutting(dt, n);
     }
@@ -703,17 +708,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!cb.hdrUp) return;               // already on its way down
     if (!force && time - nag.last < 1.2) return;
     nag.last = time; nag.hdr++;
-    if (nag.hdr >= 2 || !cb.hdrUp) { setHeader(false, true); return; }
-    say("Drop the header!", 3); flash.lever = 3;
-  }
-  function fullNag(force) {
-    if (!force && time - nag.full < 3) { flash.horn = Math.max(flash.horn, 1); return; }
-    nag.full = time; flash.horn = 3; cb.flashB = 2;
-    say("The grain tank is full!", 3);
-    tagOnce("tank", "Grain tank", cbPt(-2.2, -4.7));
+    if (nag.hdr >= 2) { setHeader(false); return; }   // the second push drops it for him
+    say(HDR_LINE, 3); flash.lever = 3;
   }
   function cutting(dt, n) {
-    if (cb.tank > 0.3) tagOnce("tank", "Grain tank", cbPt(-2.2, -4.7));
     if (cutN >= NC) { setWorldCrop("stubble"); }
     saveSoon();
     var cx = cutX(), back = cb.x - cb.dir * 6.3;
@@ -728,8 +726,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
   }
 
-  // The tractor: comes when called, follows the spout by itself (unless he is moving it), goes where he drives it,
-  // tips at the store when he pulls the lever, then goes back by itself.
+  // The tractor: pulls up beside the combine by itself when the field is cut, follows the grain spout by itself
+  // (unless he is moving it), drives toward the grain barn when he taps or drags it, pulls over the pit by itself,
+  // tips when he pulls the lever, then goes home by itself.
   function updateTractor(dt) {
     var ts = tr.state, f = TF();
     if (tr.heldT > 0) tr.heldT = Math.max(0, tr.heldT - dt);
@@ -743,8 +742,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
     if (ts === "in") {
       var d = spotX() - tr.x;
-      tr.v = clamp(d * 1.6, 0.8, 9); tr.x += Math.min(tr.v * dt, Math.max(d, 0.005));
-      if (d < 0.05) { tr.state = "side"; tr.v = 0; tagOnce("rig" + loads, "Tractor and " + (rig.tr === "chaser" ? "chaser bin" : "trailer"), trPt(-2, -3.6)); }
+      tr.v = clamp(d * 1.6, 0.8, 12); tr.x += Math.min(tr.v * dt, Math.max(d, 0.005));
+      if (d < 0.05) { tr.state = "side"; tr.v = 0; }
     } else if (ts === "side" || ts === "road") {
       var target = null;
       if (held) target = sc.wx(grab.fx, sc.TRACK) - grab.off;
@@ -752,48 +751,37 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       else if (tr.heldT <= 0) target = spotX();
       if (ts === "road" && target !== null) target = Math.min(target, storeSpot());
       if (target !== null) {
-        var dd = target - tr.x, vmax = ts === "road" ? 9 : 7;
-        var vt = clamp(dd * 2.2, -vmax, vmax);
-        tr.v += (vt - tr.v) * Math.min(1, dt * 5);
+        // on the road it goes briskly (the dad: the tractor felt slow); beside the combine it creeps
+        var dd = target - tr.x, vmax = ts === "road" ? 15 : 7;
+        var vt = clamp(dd * (ts === "road" ? 3 : 2.2), -vmax, vmax);
+        tr.v += (vt - tr.v) * Math.min(1, dt * (ts === "road" ? 4 : 5));
         if (Math.abs(dd) < 0.02 && !held) { tr.v = 0; if (ts === "road") tr.to = null; }
         tr.x += tr.v * dt;
         tr.x = Math.max(tr.x, sc.xmin + 6 * f);
       } else tr.v *= Math.max(0, 1 - dt * 6);
-      // it reaches the store: pulls up over the pit by itself
+      // it reaches the grain barn: pulls up over the pit by itself
       if (ts === "road" && tr.x > storeSpot() - 2.2 * f - 0.6) { tr.state = "dock"; tr.to = null; }
-      // the auger folded and the tank empty: he can take it away (a drag right or a tap)
-      if (ts === "side" && held && tr.load > 0.04 && cb.augerTo < 0.5) tr.state = "road";
     } else if (ts === "dock") {
       var dk = storeSpot() - tr.x;
-      tr.v = clamp(dk * 2.2, 0.5, 7); tr.x += Math.min(tr.v * dt, Math.max(dk, 0.005));
-      if (dk < 0.03) { tr.x = storeSpot(); tr.v = 0; tr.state = "store"; tag("Grain store", [sc.X(STORE_X, 1.02), sc.Y(1.02) - 7.4 * sc.S(1.02)]); snd.clunk(); }
+      tr.v = clamp(dk * 2.2, 0.5, 9); tr.x += Math.min(tr.v * dt, Math.max(dk, 0.005));
+      if (dk < 0.03) { tr.x = storeSpot(); tr.v = 0; tr.state = "store"; snd.clunk(); }
     } else if (ts === "drift") {
+      // Surprise: it rolls on a little way, then comes back by itself
       tr.t += dt; if (tr.t < 1.4) { tr.v = 1.6; tr.x += tr.v * dt; } else tr.v = 0;
-      if (tr.t > 9) bringBack();
+      if (tr.t > 3.2) bringBack();
     } else if (ts === "tip") {
       tr.t += dt; tr.lever = Math.min(1, tr.t / 0.3);
       tr.tip = ease(tr.t / 0.9);
       tr.flow = tr.t > 0.6 && tr.load > 0;
-      if (tr.flow) { var dl = Math.min(tr.load, dt / 1.6); tr.load -= dl; storeLevel = Math.min(1.1, storeLevel + dl * 0.125); storeRun = 1; tipStream(); }
+      if (tr.flow) { var dl = Math.min(tr.load, dt / 2.0); tr.load -= dl; storeLevel = Math.min(1.1, storeLevel + dl * 0.2); storeRun = 1; tipStream(); }
       if (tr.t > 0.6 && tr.load <= 0.001) { tr.load = 0; tr.flow = false; tr.state = "untip"; tr.t = 0; storedLoad(); }
     } else if (ts === "untip") {
       tr.t += dt; tr.tip = 1 - ease(tr.t / 0.9); tr.lever = Math.max(0, 1 - tr.t / 0.4); storeRun = Math.max(0, storeRun - dt);
       if (tr.t >= 0.9) { tr.tip = 0; goBack(); }
-    } else if (ts === "unload") {
-      tr.t += dt; tr.lever = Math.min(1, tr.t / 0.3);
-      if (tr.t < 1.0) tr.aug = ease(tr.t / 1.0);
-      else if (tr.load > 0.001) {
-        tr.aug = 1; tr.flow = true;
-        var dl2 = Math.min(tr.load, dt / 1.8); tr.load -= dl2; storeLevel = Math.min(1.1, storeLevel + dl2 * 0.125); storeRun = 1; chaserStream();
-        if (tr.load <= 0.001) { tr.load = 0; tr.flow = false; tr.t2 = 0; storedLoad(); }
-      } else {
-        tr.t2 = (tr.t2 || 0) + dt; tr.aug = 1 - ease(tr.t2 / 0.9); tr.lever = Math.max(0, 1 - tr.t2 / 0.4); storeRun = Math.max(0, storeRun - dt);
-        if (tr.t2 >= 0.9) { tr.aug = 0; goBack(); }
-      }
     } else if (ts === "back") {
       tr.v = Math.min(14, tr.v + dt * 7); tr.x -= tr.v * dt;
-      // gone past the left edge of the view (or far away): it waits out of sight until the next toot
-      if (sc.X(tr.x, sc.TRACK) + 6 * TS() < -20 || tr.x < sc.xmin - 30) { tr.state = "away"; tr.x = -60; tr.v = 0; tr.face = 1; }
+      // gone past the left edge of the view (or far away): it waits out of sight
+      if (sc.X(tr.x, sc.TRACK) + 6 * TS() < -20 || tr.x < sc.xmin - 30) { tr.state = "away"; tr.x = -60; tr.v = 0; tr.face = 1; tr.callT = 0; }
     }
     tr.wheel += Math.abs(tr.v) * dt * (tr.v < 0 && tr.face > 0 ? -1 : 1);
   }
@@ -804,23 +792,26 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     snd.chime();
     if (fieldDone() && cb.tank < 0.02 && !doneSaid) {
       doneSaid = true;
-      say(job === "sun" ? "All the sunflowers are in the store!" : "All the wheat is in the store!", 5);
+      say(job === "sun" ? "All the sunflower seeds are in the grain barn." : "All the wheat is in the grain barn.", 5);
       Toybox.kind();
       if (job !== "sun") {
-        var mid = clamp(cb.x - cb.dir * 8, 3, L - 3);
-        dogS = { x: sc.wx(-30, 0.75), r: 0.75, tx: mid, t: 0, st: "run" };
+        // the farm dog runs out of the grain barn along the track to the combine and jumps up in the stubble in
+        // front of it (in front, so the combine never hides it)
+        dogS = { x: STORE_X - 3, r: 0.75, tx: clamp(cb.x - cb.dir * 1.5, 2, L - 2), t: 0, st: "run", face: -1 };
       }
-    } else {
-      say(job === "sun" ? "The seeds are in the store!" : "The grain is in the store!", 4);
-      if (loads % 2 === 0) Toybox.kind();
     }
   }
+  // The farm dog: always faces the way it runs (face = the sign of its last move), and keeps that facing when it sits.
   function updateDog(dt) {
     var d = dogS; d.t += dt;
-    if (d.st === "run") { var dx = d.tx - d.x; d.x += clamp(dx * 2, -7, 7) * dt; d.ph = (d.ph || 0) + dt * 3; if (Math.abs(dx) < 0.3) { d.st = "jump"; d.jt = 0; } }
-    else if (d.st === "jump") {
-      d.jt += dt; var f = clamp(d.jt / 0.7, 0, 1); d.r = lerp(0.75, 1.0, f); d.h = Math.sin(f * Math.PI) * 1.0;
-      if (f >= 1) { d.st = "sit"; d.h = 0; for (var i = 0; i < 14; i++) parts.add({ kind: "straw", x: d.x + (Math.random() - 0.5), h: 0.3, r: 1.0, vx: (Math.random() - 0.5) * 3, vh: 2 + Math.random() * 2, g: 7, drag: 1, life: 1.4, size: 0.12, col: "#F3DA8E", spin: 8 }); }
+    if (d.st === "run") {
+      var dx = d.tx - d.x, step = clamp(dx * 2, -7, 7) * dt;
+      if (Math.abs(step) > 1e-4) d.face = step > 0 ? 1 : -1;
+      d.x += step; d.ph = (d.ph || 0) + dt * 3;
+      if (Math.abs(dx) < 0.3) { d.st = "jump"; d.jt = 0; }
+    } else if (d.st === "jump") {
+      d.jt += dt; var f = clamp(d.jt / 0.7, 0, 1); d.r = lerp(0.75, 0.92, f); d.h = Math.sin(f * Math.PI) * 1.0;
+      if (f >= 1) { d.st = "sit"; d.h = 0; for (var i = 0; i < 14; i++) parts.add({ kind: "straw", x: d.x + (Math.random() - 0.5), h: 0.3, r: 0.92, vx: (Math.random() - 0.5) * 3, vh: 2 + Math.random() * 2, g: 7, drag: 1, life: 1.4, size: 0.12, col: "#F3DA8E", spin: 8 }); }
     } else d.ph = (d.ph || 0) + dt * 0.8;
   }
   function grainCol(u) { return job === "sun" ? (u > 0.35 ? SEED[0] : SEED[1]) : (u > 0.3 ? "#EBB93E" : "#C99322"); }
@@ -828,7 +819,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var tx = tr.x - 7.8 * TF(), hk = TS() * sc.TRACK / sc.k;
     for (var i = 0; i < 3; i++) parts.add({ kind: "dot", x: tx - Math.random() * 0.3, h: (1.0 + Math.random() * 0.5) * hk, r: sc.TRACK, vx: -0.6, vh: 0, g: 9, life: 0.4, size: 0.07, col: grainCol(Math.random()) });
   }
-  function chaserStream() { /* drawn as a solid stream in drawChaserAuger */ }
   // ---------- Sunny Seeds: the sunflower header, the seeds, the sunflower field, the goldfinches ----------
   // Written like farm.js's drawings (metres, y up negative, Farm.shape helpers) so they can move there later.
   // The combine with a sunflower header: farm.js's combine minus its grain header (clipped off at the feeder
@@ -938,7 +928,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var headCol = U.mix("#FFC93C", "#A97F45", ripe);
     band(row, dk);
     // the leafy canopy: a wall of leaves up to about three quarters of the plants' height
-    var cTop = near ? hp : hp * 0.7, step = cTop < 10 ? 30 : Math.max(12, Math.min(20, s * 0.4)), off = sc.cam * sc.k / row.rc;
+    var cTop = near ? hp : hp * 0.7, step = cTop < 10 ? 30 : Math.max(12, Math.min(20, s * 0.4)), off = sc.cam * sc.rate(row.rc);
     // only across this run's strip of the field (each run used to paint the whole width and clip)
     var rgC = sc.xRange(row.rc), sxa = Math.max(-5, rgC[2] * xa + rgC[3] - step), sxb = Math.min(sc.W + step, rgC[2] * xb + rgC[3] + step);
     if (sxb <= sxa) return;
@@ -1032,7 +1022,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       list.push({ x: sp.x - 9 - k * 0.8, h: 7 + k * 0.4, r: sp.r, tx: sp.x, th: onHead ? SUN_H + 0.15 : 0.05, x0: sp.x - 9 - k * 0.8, h0: 7 + k * 0.4, st: "in", t: -k * 0.12, ph: k * 0.3, flip: false });
     });
     birds = { list: list, t: 0 };
-    say("Goldfinches come for the seeds!", 4);
   }
   function updateBirds(dt) {
     birds.t += dt;
@@ -1095,7 +1084,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (deer && deer.r > 1) drawDeer();
     parts.draw(ctx, sc, function (p) { return p.r > 1.0; });
     drawCombine();
-    if (dogS && dogS.st === "sit") drawDog();
     drawField("near", P);
     parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
     sc.verge(ctx, {});
@@ -1104,35 +1092,99 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (cb.auger > 0.01) drawAuger();
     parts.draw(ctx, sc, function (p) { return p.r <= sc.TRACK + 0.03; });
     drawCue();
-    if (dogS && dogS.st !== "sit") drawDog();
+    if (dogS) drawDog();
     if (deer && deer.r <= 1) drawDeer();
     if (hawk) drawHawk();
     if (birds) drawBirds(true);
   }
   // The far part of the field is the biggest drawing on the page (dozens of rows across the whole width) and it
-  // made the iPad crawl. Paint it into an offscreen canvas and reuse it until the camera, the cut field or the crop
-  // changes; the far rows don't sway while cached (time 0).
-  // While the camera moves (he is driving) it is painted at half resolution, a quarter of the pixels; once the
-  // camera has stood still for a moment it is painted sharp again.
-  var farCv = document.createElement("canvas"), farCtx = farCv.getContext("2d"), farKey = "", farCam = null, farStill = 0;
-  function drawFarCached(P) {
-    var moving = farCam !== null && (Math.abs(sc.cam - farCam.cam) > 1e-4 || Math.abs(sc.k - farCam.k) > 1e-5);
-    farCam = { cam: sc.cam, k: sc.k };
-    farStill = moving ? 0 : farStill + 1;
-    var q = farStill < 8 && farKey ? 0.5 : 1;
-    var cutSig = crop.stage === "ripe" ? cutN + ":" + (cut.join ? cut.join("") : "") : crop.stage;
-    var key = [cv.width, cv.height, q, sc.cam.toFixed(3), sc.k.toFixed(4), job, crop.stage, (P.g || 0).toFixed(2), cutSig, dusk ? dusk.toFixed(2) : 0].join("|");
-    if (key !== farKey) {
-      var fw = Math.max(1, Math.round(cv.width * q)), fh = Math.max(1, Math.round(cv.height * q));
-      if (farCv.width !== fw || farCv.height !== fh) { farCv.width = fw; farCv.height = fh; }
-      var real = ctx;
-      ctx = farCtx;
-      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, fw, fh);
-      ctx.setTransform(DPR * q, 0, 0, DPR * q, 0, 0);
-      try { drawField("far", { crop: P.crop, stage: P.stage, g: P.g, time: 0 }); } finally { ctx = real; }
-      farKey = key;
+  // made the iPad crawl. It is painted into an offscreen canvas wider than the screen (a margin each side) and
+  // reused:
+  //  - while the camera pans (the combine or the tractor driving), the copy is panned instead of painted again:
+  //    each depth of the field moves at its own parallax rate (sc.rate), linear from the hedge down to the machine
+  //    line, so the copy is drawn in thin horizontal strips, each shifted by its own rate. It is painted again only
+  //    when the pan runs out of margin;
+  //  - when the combine cuts more of the crop, only the newly cut strip of the field is painted over (stubble);
+  //  - a new zoom, size, crop, growth or dusk paints it all again.
+  // While the camera moves a full repaint is at half resolution (a quarter of the pixels); once the camera has
+  // stood still for a moment it is painted sharp again. The far rows don't sway while cached (time 0).
+  var far = { cv: document.createElement("canvas"), key: "", cam: 0, q: 1, M: 0, cut: null, still: 0, lastCam: null, lastK: 0 };
+  far.ctx = far.cv.getContext("2d");
+  // paint into the copy: the scene thinks the screen is the copy's width at the copy's camera
+  function farPaint(fn) {
+    var real = ctx, kw = sc.W, kc = sc.cam;
+    ctx = far.ctx; sc.W = W + 2 * far.M; sc.cam = far.cam;
+    ctx.setTransform(DPR * far.q, 0, 0, DPR * far.q, 0, 0);
+    try { fn(); } finally { ctx = real; sc.W = kw; sc.cam = kc; }
+  }
+  function farFull(P, q) {
+    far.M = Math.round(Math.min(320, W * 0.3)); far.q = q; far.cam = sc.cam;
+    var fw = Math.max(1, Math.ceil((W + 2 * far.M) * DPR * q)), fh = Math.max(1, Math.ceil(H * DPR * q));
+    if (far.cv.width !== fw || far.cv.height !== fh) { far.cv.width = fw; far.cv.height = fh; }
+    far.ctx.setTransform(1, 0, 0, 1, 0, 0); far.ctx.clearRect(0, 0, fw, fh);
+    farPaint(function () { drawField("far", { crop: P.crop, stage: P.stage, g: P.g, time: 0 }); });
+    far.cut = cut.slice();
+  }
+  // Paint the cells cut since the copy was made: stubble over each new strip (and a little into the stubble beside
+  // it, to cover the old cut edge), the crop's tops above the hedge line cleared, a new cut edge where crop stands.
+  function farCutUpdate() {
+    var segs = [], i = 0;
+    while (i < NC) {
+      if (cut[i] && !far.cut[i]) { var j = i; while (j < NC && cut[j] && !far.cut[j]) j++; segs.push([i, j - 1]); i = j; } else i++;
     }
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(farCv, 0, 0, cv.width, cv.height); ctx.restore();
+    if (!segs.length) return;
+    var halfPx = Math.max(2, sc.lw * 1.1) / 2 + 2, ext = halfPx / Math.max(1, Math.min(sc.k, sc.Wf / L));
+    farPaint(function () {
+      segs.forEach(function (g) {
+        var xa = g[0] * CELL, xb = (g[1] + 1) * CELL;
+        var pa = g[0] > 0 && cut[g[0] - 1] ? ext : 0, pb = g[1] < NC - 1 && cut[g[1] + 1] ? ext : 0;
+        ctx.save(); sc.clipX(ctx, xa - pa, xb + pb);
+        ctx.clearRect(0, 0, sc.W, sc.Y(sc.rH) - 0.5);
+        if (job === "sun") for (var r = 0; r < sc.rowsFar.length; r++) sunRow(sc.rowsFar[r], "stubble", {}, xa - pa, xb + pb, false);
+        else sc.field(ctx, "far", { crop: "wheat", stage: "stubble", g: 1, time: 0, xa: xa - pa, xb: xb + pb });
+        ctx.restore();
+        if (job !== "sun") {
+          ctx.save(); ctx.strokeStyle = "#B88A2C"; ctx.lineWidth = Math.max(2, sc.lw * 1.1); ctx.lineCap = "round";
+          [[g[0] > 0 && !cut[g[0] - 1], xa], [g[1] < NC - 1 && !cut[g[1] + 1], xb]].forEach(function (e) {
+            if (!e[0]) return;
+            ctx.beginPath(); ctx.moveTo(sc.X(e[1], 1), sc.Y(1)); ctx.lineTo(sc.X(e[1], sc.rH), sc.Y(sc.rH)); ctx.stroke();
+          });
+          ctx.restore();
+        }
+      });
+    });
+    for (i = 0; i < NC; i++) far.cut[i] = cut[i];
+  }
+  function drawFarCached(P) {
+    var moving = far.lastCam !== null && (Math.abs(sc.cam - far.lastCam) > 1e-4 || Math.abs(sc.k - far.lastK) > 1e-5);
+    far.lastCam = sc.cam; far.lastK = sc.k;
+    far.still = moving ? 0 : far.still + 1;
+    var key = [cv.width, cv.height, W, sc.k.toFixed(4), job, crop.stage, (P.g || 0).toFixed(2), dusk ? dusk.toFixed(2) : 0].join("|");
+    var dc = sc.cam - far.cam, fresh = far.key === key && far.cut && far.cut.length === NC;
+    var shrunk = false;
+    if (fresh && crop.stage === "ripe") for (var i = 0; i < NC; i++) if (far.cut[i] && !cut[i]) { shrunk = true; break; }
+    if (!fresh || shrunk || Math.abs(dc) * sc.k > far.M - 2) {
+      farFull(P, far.still < 8 && far.key ? 0.5 : 1); far.key = key; dc = 0;
+    } else if (far.q < 1 && far.still >= 8) {
+      farFull(P, 1); dc = 0;
+    } else if (crop.stage === "ripe") farCutUpdate();
+    // draw the copy, panned by dc metres of camera: one strip per ~1 px of parallax difference
+    var s = DPR, q = far.q, M = far.M, Wd = cv.width, src = far.cv;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    function piece(y0, y1, rate) {
+      var d0 = Math.round(y0 * s), d1 = Math.min(cv.height, Math.round(y1 * s));
+      if (d1 <= d0) return;
+      var sx = (M + dc * rate) * s * q;
+      ctx.drawImage(src, sx, d0 * q, W * s * q, (d1 - d0) * q, 0, d0, Wd, d1 - d0);
+    }
+    if (Math.abs(dc) < 1e-6) piece(0, H, 0);
+    else {
+      var yT = sc.Y(sc.rH), yB = sc.gY, n = clamp(Math.ceil(Math.abs(dc) * (sc.k - sc.kf)), 1, 220), hs = (yB - yT) / n;
+      piece(0, yT, sc.kf);
+      for (var k = 0; k < n; k++) piece(yT + k * hs, yT + (k + 1) * hs, sc.kf + (sc.k - sc.kf) * (k + 0.5) / n);
+      piece(yB, H, sc.k);
+    }
+    ctx.restore();
   }
   // The field by runs: standing crop where the cutter bar hasn't been, stubble where it has, a clear edge between.
   function drawField(part, P) {
@@ -1164,10 +1216,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function drawCombine() {
     sc.put(ctx, cb.x, 1, cb.face, function () {
       var st = { wheel: cb.wheel, time: time, tank: cb.tank, reel: cb.reel, auger: cb.auger > 0.01, beacon: cb.tank >= 0.999 || cb.flashB > 0,
-        header: cb.hdr, tracks: rig.cb === "tracks" };
+        header: cb.hdr };
       if (job === "sun") combineSun(ctx, st, cb.hdr < 0.3 && cb.v > 0.5 && crop.stage === "ripe");
       else D.combine(ctx, st);
-      if (st.tracks) trackUnit(ctx, cb.wheel);
       hornShape(ctx, cb.horn);
       leverShape(ctx, cb.hdr);
     });
@@ -1196,33 +1247,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
     }
   }
-  // The rubber track unit in place of the front wheel: a long belt round two idlers, rollers and lugs that run.
-  function trackUnit(c, dist) {
-    var xa = -1.3, xb = 1.3, ra = 0.5, yc = -0.5, top = -1.0, th = 0.13, i;
-    function path(inset) {
-      c.beginPath(); c.moveTo(xa, -inset); c.lineTo(xb, -inset);
-      c.arc(xb, yc, ra - inset, Math.PI / 2, -Math.PI / 2, true); c.lineTo(xa, top + inset);
-      c.arc(xa, yc, ra - inset, -Math.PI / 2, Math.PI / 2, true); c.closePath();
-    }
-    path(0); SH.fs(c, "#2E3038");
-    path(th); SH.fs(c, "#8B95A5", Farm.LW * 0.7);
-    SH.R(c, xa, -0.66, xb - xa, 0.18, 0.05, "#5D6675", Farm.LW * 0.6);
-    [xa, xb].forEach(function (x) {
-      SH.C(c, x, yc, ra - th - 0.02, "#C3CCD6", Farm.LW * 0.8); SH.C(c, x, yc, 0.12, "#8C97A6", Farm.LW * 0.6);
-      for (var k = 0; k < 5; k++) { var a = dist / (ra - th) + k * TAU / 5; SH.C(c, x + Math.cos(a) * 0.24, yc + Math.sin(a) * 0.24, 0.045, "#6E7887", 0); }
-    });
-    for (i = 0; i < 3; i++) SH.C(c, -0.55 + i * 0.55, -0.27, 0.13, "#AEB8C5", Farm.LW * 0.6);
-    // lugs: the bottom run stands still on the ground, the top run moves forward
-    var sp = 0.26, len = xb - xa, off = ((dist % sp) + sp) % sp;
-    for (i = 0; i <= len / sp; i++) {
-      var xbt = xa + ((i * sp - off + len * 4) % len), xtp = xa + ((i * sp + off) % len);
-      SH.R(c, xbt - 0.05, -0.04, 0.1, 0.08, 0.02, "#1D2340", 0);
-      SH.R(c, xtp - 0.05, top - 0.04, 0.1, 0.08, 0.02, "#1D2340", 0);
-    }
-    // the guard over it, in the combine's green
-    SH.R(c, xa - 0.25, top - 0.24, len + 0.5, 0.2, 0.08, "#3E9F3A", Farm.LW * 0.8);
-  }
-  // The combine's unloading auger, from its pivot out over the track; grain pours from the spout while he pours.
+  // The combine's grain spout (its unloading auger), from its pivot out over the track; grain pours from the end
+  // while he pours.
   function drawAuger() {
     var lw = sc.lw, sp = spoutPt();
     var x1 = sc.X(pivotX(), 1), y1 = sc.Y(1) + C.pivot[1] * sc.S(1);
@@ -1243,64 +1269,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var r = sc.TRACK, crp = job === "sun" ? "seed" : "grain";
     sc.put(ctx, tr.x, r, tr.face, function () {
       ctx.translate(0, -0.5);
-      if (rig.tr === "chaser") chaserBin(ctx, { wheel: tr.wheel, load: tr.load, crop: crp, aug: tr.aug, flow: tr.flow && tr.state === "unload", time: time });
-      else { D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: crp, time: time }); if (job === "sun") seedFlecks(ctx, tr.load, tr.tip); }
+      D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: crp, time: time }); if (job === "sun") seedFlecks(ctx, tr.load, tr.tip);
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
       D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true });
       tipLeverShape(ctx, tr.lever);
     }, TS());
   }
-  // The tipping (or auger) lever on the back of the tractor, by the spool valves: pulled back while it works.
+  // The tipping lever on the back of the tractor, by the spool valves: pulled back while it works.
   function tipLeverShape(c, pull) {
     var bx = -0.72, by = -1.45, kx = lerp(-1.0, -1.42, pull), ky = lerp(-2.58, -2.4, pull);
     SH.R(c, -0.95, -1.62, 0.5, 0.3, 0.05, "#3A3F4E", Farm.LW * 0.7);
     SH.Ln(c, bx, by, kx, ky, INK, 0.17); SH.Ln(c, bx, by, kx, ky, "#59607A", 0.09);
     SH.C(c, kx, ky, 0.22, "#FFC93C", Farm.LW * 0.8);
     SH.C(c, kx - 0.06, ky - 0.07, 0.06, "rgba(255,255,255,0.75)", 0);
-  }
-  // A chaser bin: a big hopper on one axle of flotation tyres, with its own folding auger at the front that
-  // swings up and back over the bin to pour (origin at its drawbar eye, ground at +0.5, facing +x).
-  // st = { wheel, load (0..1), crop, aug (0 folded .. 1 out), flow (pouring), time }
-  var BIN = "#2F7FC1", BIN_D = "#1F5F96";
-  function chaserAug(a) {
-    var A0 = -Math.PI / 2, A1 = Math.atan2(-3.4, -8.75), l = lerp(2.2, 9.4, a), ang = lerp(A0, A1, a);
-    return [-1.75 + Math.cos(ang) * l, -1.3 + Math.sin(ang) * l];
-  }
-  function chaserBin(c, st) {
-    var load = clamp(st.load || 0, 0, 1.1), col = Farm.CROP[st.crop || "grain"], i, rot = (st.wheel || 0) / 0.95;
-    SH.P(c, [0.1, 0.05, -1.5, -0.62, -1.5, -0.42, 0.1, 0.12], "#7C8696");
-    SH.R(c, -6.9, -1.25, 5.4, 0.25, 0.05, "#3A3F4E");
-    if (load > 0.01) {
-      var hh = 0.15 + load * 0.6;
-      c.beginPath(); c.moveTo(-7.2, -3.1);
-      for (i = 0; i <= 12; i++) { var f = i / 12; c.lineTo(lerp(-7.2, -1.6, f), -3.1 - hh * Math.pow(Math.sin(f * Math.PI), 0.6)); }
-      c.lineTo(-1.6, -3.1); c.closePath(); SH.fs(c, col[0], Farm.LW * 0.8);
-      for (i = 0; i < 18; i++) { var fx = lerp(-6.8, -2.0, hash(i, 7)), fy = -3.16 - hh * 0.5 * hash(i, 8); SH.Ln(c, fx, fy, fx + 0.12, fy - 0.03, st.crop === "seed" ? SEED[1] : col[1], 0.045); }
-    }
-    SH.P(c, [-7.45, -3.15, -1.35, -3.15, -2.1, -1.05, -6.7, -1.05], BIN);
-    SH.R(c, -7.55, -3.28, 6.3, 0.18, 0.06, BIN_D, Farm.LW * 0.8);
-    for (i = 1; i < 6; i++) { var t = i / 6; SH.Ln(c, lerp(-7.45, -1.35, t), -3.05, lerp(-6.7, -2.1, t), -1.15, BIN_D, 0.07); }
-    SH.Ln(c, -7.2, -2.95, -1.6, -2.95, "rgba(255,255,255,0.45)", 0.07);
-    // the tyre (a wide flotation tyre) and its mudguard
-    SH.C(c, -4.4, -0.45, 0.95, "#33363F", Farm.LW);
-    for (i = 0; i < 22; i++) { var a = rot + i * TAU / 22; SH.Ln(c, -4.4 + Math.cos(a) * 0.86, -0.45 + Math.sin(a) * 0.86, -4.4 + Math.cos(a) * 0.98, -0.45 + Math.sin(a) * 0.98, "#2A2C36", 0.09); }
-    SH.C(c, -4.4, -0.45, 0.55, "#E2E6EB", Farm.LW); SH.C(c, -4.4, -0.45, 0.2, "#8C97A6", Farm.LW * 0.6);
-    for (i = 0; i < 6; i++) { var b = rot + i * TAU / 6; SH.C(c, -4.4 + Math.cos(b) * 0.35, -0.45 + Math.sin(b) * 0.35, 0.05, "#6E7887", 0); }
-    c.beginPath(); c.arc(-4.4, -0.45, 1.2, -Math.PI + 0.6, -0.6); c.lineWidth = 0.12; c.strokeStyle = INK; c.stroke();
-    // the folding auger: a green tube with a spiral, the spout at its end
-    var e = chaserAug(st.aug || 0), sx = -1.75, sy = -1.3;
-    SH.tube(c, sx, sy, e[0], e[1], 0.32, "#5E9E4F");
-    var n = Math.max(3, Math.round(Math.hypot(e[0] - sx, e[1] - sy) / 0.45));
-    for (i = 1; i < n; i++) { var g = ((i + (st.flow ? (st.time || 0) * 3 : 0)) % n) / n, px = lerp(sx, e[0], g), py = lerp(sy, e[1], g); SH.Ln(c, px - 0.08, py - 0.12, px + 0.08, py + 0.12, "#2B7A2A", 0.05); }
-    SH.P(c, [e[0] - 0.24, e[1] - 0.1, e[0] + 0.24, e[1] - 0.1, e[0] + 0.16, e[1] + 0.35, e[0] - 0.16, e[1] + 0.35], "#5E9E4F", Farm.LW * 0.8);
-    SH.C(c, sx, sy, 0.16, "#2B7A2A", Farm.LW * 0.6);
-    if (st.flow) {
-      // the stream down into the store's intake pit
-      var w = 0.16, yb = 0.45;
-      c.beginPath(); c.moveTo(e[0] - w, e[1] + 0.35); c.lineTo(e[0] + w, e[1] + 0.35); c.lineTo(e[0] + w * 1.4 + Math.sin((st.time || 0) * 20) * 0.04, yb); c.lineTo(e[0] - w * 1.4, yb); c.closePath();
-      SH.fs(c, st.crop === "seed" ? SEED[0] : col[0], Farm.LW * 0.6);
-      if (st.crop === "seed") for (i = 0; i < 6; i++) { var ff = ((st.time || 0) * 2.2 + i / 6) % 1; SH.Ln(c, e[0] + (hash(i, 3) - 0.5) * 0.2, lerp(e[1] + 0.4, yb, ff), e[0] + (hash(i, 3) - 0.5) * 0.2, lerp(e[1] + 0.4, yb, ff) + 0.12, SEED[1], 0.05); }
-    }
   }
   // The control the coach line names glows on the scene (a soft pulsing ring), faster when it flashes.
   function drawCue() {
@@ -1309,11 +1290,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     function add(id, p, r) { var f = flash[id] > 0, on = cue === id; if (f || on) list.push([p, r, f]); }
     var s = sc.S(1);
     add("lever", leverPt(), Math.max(22, 0.55 * s));
-    add("horn", hornPt(), Math.max(22, 0.6 * s));
     add("auger", augerPt(), Math.max(24, 0.7 * s));
     add("tiplever", tipLeverPt(), Math.max(22, 0.55 * TS()));
     if (cue === "rig" || flash.rig > 0) list.push([trPt(-2.6, -1.6), Math.max(40, 3.8 * TS()), flash.rig > 0, 0.45]);
-    if (cue === "combine" && Math.abs(cb.v) < 0.3 && !grab) list.push([cbPt(-0.8, -2.2), Math.max(44, 4.6 * s), false, 0.4]);
+    if ((cue === "combine" && Math.abs(cb.v) < 0.3 && !grab) || flash.combine > 0) list.push([cbPt(-0.8, -2.2), Math.max(44, 4.6 * s), flash.combine > 0, 0.4]);
     list.forEach(function (g) {
       var p = g[0], sp = g[2] ? 9 : 4.5, k = 0.5 + 0.5 * Math.sin(time * sp), r = g[1] * (1 + 0.12 * k), a = g[3] || 1;
       ctx.save();
@@ -1327,7 +1307,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function drawDog() {
     var d = dogS, s = sc.S(d.r);
-    D.dog(ctx, sc.X(d.x, d.r), sc.Y(d.r) - (d.h || 0) * s - (d.st === "sit" ? 0.18 * s : 0), s * 1.1, d.ph || 0, false, d.st === "sit");
+    D.dog(ctx, sc.X(d.x, d.r), sc.Y(d.r) - (d.h || 0) * s - (d.st === "sit" ? 0.18 * s : 0), s * 1.1, d.ph || 0, d.face < 0, d.st === "sit");
   }
   function drawDeer() {
     var f = deer.t / 4, r = lerp(2.6, 0.6, f), x = deer.x + deer.dir * f * 10;
@@ -1335,12 +1315,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var hop = Math.abs(Math.sin(deer.t * 5)) * 0.6;
     D.deer(ctx, sc.X(x, r), sc.Y(r) - hop * sc.S(r), sc.S(r) * 1.2, deer.t * 2.5 % 1, deer.dir < 0);
   }
+  // The hawk circles, swoops low over the field and flies off; it always faces the way it is flying.
   function drawHawk() {
     var t = hawk.t, x, y, s = Math.max(28, sc.k * 1.2);
     if (t < 3.5) { x = W * 0.5 + Math.cos(t * 1.6) * W * 0.25; y = sc.hY * 0.5 + Math.sin(t * 1.6) * sc.hY * 0.15; }
     else if (t < 4.6) { var f = (t - 3.5) / 1.1; x = W * 0.5 + W * 0.25 * Math.cos(3.5 * 1.6) + f * W * 0.15; y = lerp(sc.hY * 0.5, sc.gY - sc.k * 0.4, Math.sin(f * Math.PI / 2)); }
     else { var g = (t - 4.6) / 1.4; x = W * 0.5 + W * 0.25 * Math.cos(5.6) + W * 0.15 + g * W * 0.5; y = lerp(sc.gY - sc.k * 0.4, -40, g); }
-    D.hawk(ctx, x, y, s, t * 1.3, Math.cos(t * 1.6) > 0 && t < 3.5);
+    if (hawk.x !== undefined && Math.abs(x - hawk.x) > 0.05) hawk.face = x > hawk.x ? 1 : -1;
+    hawk.x = x;
+    D.hawk(ctx, x, y, s, t * 1.3, hawk.face < 0);
   }
 
 
@@ -1355,17 +1338,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (/^cb-/.test(id)) {
       s = Math.min(PW * 0.94 / 12.4, PH * 0.9 / 5.0);
       Farm.inUnits(x, PW / 2 + 0.3 * s, PH * 0.94, s, 3.4, function () {
-        var st = { tank: 0.9, time: 0, header: 0, tracks: /tracks/.test(id) };
+        var st = { tank: 0.9, time: 0, header: 0 };
         if (sun) combineSun(x, st, false); else D.combine(x, st);
-        if (st.tracks) trackUnit(x, 0);
       });
     } else if (/^(trailer|tip)-/.test(id)) {
       var tip = /^tip/.test(id) ? 0.8 : 0;
       s = Math.min(PW * 0.94 / (tip ? 8.6 : 8.2), PH * 0.9 / (tip ? 5.0 : 3.6));
       Farm.inUnits(x, PW / 2 + 3.9 * s, PH * 0.94 - 0.5 * s, s, 3.4, function () { D.trailer(x, { load: 1, crop: crp, tip: tip }); if (sun) seedFlecks(x, 1, tip); });
-    } else if (/^chaser-/.test(id)) {
-      s = Math.min(PW * 0.94 / 8.2, PH * 0.9 / 4.2);
-      Farm.inUnits(x, PW / 2 + 4.2 * s, PH * 0.94 - 0.5 * s, s, 3.4, function () { chaserBin(x, { load: 1, crop: crp, aug: 0 }); });
     } else if (id === "lever") {
       Farm.inUnits(x, PW / 2, PH, 1, 3, function () {
         SH.R(x, -40, -22, 80, 18, 6, "#3A3F4E", 3);
@@ -1416,7 +1395,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---------- Start ----------
   resize();
-  combineTiles();
   (function restore() {
     var w = worldCrop();
     if (w !== "golden" && !(typeof saved.cut === "string" && saved.job === job)) { grow(); return; }
@@ -1454,8 +1432,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
     surprise: surprise,
     state: function () {
-      return { cam: sc.cam, camLim: camLim, cmm: [sc.camMin, sc.camMax], k: sc.k, nag: nag.hdr, to: cb.to, job: job, rig: rig.cb + "/" + rig.tr, crop: crop.stage, cutN: cutN, NC: NC, hdrUp: cb.hdrUp, hdr: cb.hdr, x: cb.x, dir: cb.dir, v: cb.v, tank: cb.tank,
-        auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepLine, cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0 };
+      return { cam: sc.cam, camLim: camLim, cmm: [sc.camMin, sc.camMax], k: sc.k, nag: nag.hdr, to: cb.to, job: job, crop: crop.stage, cutN: cutN, NC: NC, hdrUp: cb.hdrUp, hdr: cb.hdr, x: cb.x, dir: cb.dir, v: cb.v, tank: cb.tank,
+        auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepLine, cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0,
+        dog: dogS ? { x: dogS.x, face: dogS.face, st: dogS.st } : null, hawk: hawk ? { x: hawk.x, face: hawk.face } : null, trStep: tr.step, trTo: tr.to };
     },
     // viewport points of the parts he touches
     screen: function (id) {

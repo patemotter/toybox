@@ -24,6 +24,7 @@
  *     .X(x, r) .Y(r) .S(r)      world x at depth r (1 = the machine line, < 1 nearer, > 1 further) -> screen x;
  *                               the ground line of depth r; px per m at depth r. R.TRACK = the farm track's depth.
  *     .wx(px, r)                screen x -> world x (r <= 1)
+ *     .rate(r)                  px the ground at depth r moves per metre of camera move (parallax)
  *     .cam, .follow(x, dt, snap) camera (world x at the screen centre), eased toward x, kept in [xmin, xmax]
  *     .sky(ctx, o)              sky, sun, clouds, hills, the farm on the horizon, the hedge. o = { time, arc (null
  *                               or 0..1: weeks go by, the sun runs over three times), season, dusk (0..1) }
@@ -959,6 +960,14 @@
     var keep = LW; LW = this.lw / s; fn(); LW = keep;
     ctx.restore();
   };
+  // how many px the ground at depth r moves on screen when the camera moves one metre (parallax: the machine line
+  // moves k, the hedge kf). The far field is linear in y between them, so a page can pan a painted copy of the far
+  // field strip by strip instead of painting it again (combine.html).
+  SP.rate = function (r) {
+    if (r <= 1) return this.k / r;
+    var u = (1 - 1 / r) / (1 - 1 / this.rH);
+    return this.k * (1 - u) + this.kf * u;
+  };
   // world x range at depth r that is on screen
   SP.xRange = function (r) {
     var b = this.X(0, r), a = this.X(1, r) - b;
@@ -1242,7 +1251,8 @@
       band(ctx, sc, row, dk);
       var hp = h * s;
       if (hp < 2) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - hp, sc.W, hgt * 0.7 + hp); return; }
-      var step = hp < 10 ? 28 : Math.max(10, Math.min(18, hp * 0.8)), yc = row.yc, W = sc.W, off = sc.cam * sc.k / row.rc;
+      // off: the wavy top of the crop moves with the ground at this depth (it used to drift against it)
+      var step = hp < 10 ? 28 : Math.max(10, Math.min(18, hp * 0.8)), yc = row.yc, W = sc.W, off = sc.cam * sc.rate(row.rc);
       // only across the strip being painted (xa..xb); painting the whole width and clipping made the field slow
       var rgW = sc.xRange(row.rc), xs0 = -5, xs1 = W + step;
       if (xa !== undefined && xb !== undefined) { xs0 = Math.max(-5, rgW[2] * xa + rgW[3] - step); xs1 = Math.min(W + step, rgW[2] * xb + rgW[3] + step); }
