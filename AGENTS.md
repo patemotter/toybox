@@ -305,7 +305,7 @@ Keep only:
   chores or complex steering controls. Ask the dad for an episode's key moments when unsure.
 - Real names, no brand names or logos. Exception (the dad, 2026-10-11): the Farm app is specifically Tractor Ted
   themed and oriented: the app is shown as "Tractor Ted", the green tractor is drawn as Tractor Ted (friendly eyes on the
-  windscreen, yellow wheel rims, smiling grille and "TED" bonnet badge), the farm dog is Midge (scruffy tri-color terrier
+  windscreen, green wheels, smiling grille and "TED" bonnet badge), the farm dog is Midge (scruffy tri-color terrier
   with red collar and gold tag), the pony is Merlin, and the 12 stations follow the actual Tractor Ted episodes he has memorized.
 
 ### Fresh start

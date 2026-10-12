@@ -326,9 +326,9 @@
     // steps
     Ln(ctx, 1.0, -1.55, 1.0, -0.95, INK, 0.05); Ln(ctx, 1.22, -1.55, 1.22, -0.95, INK, 0.05);
     Ln(ctx, 1.0, -1.3, 1.22, -1.3, INK, 0.05); Ln(ctx, 1.0, -1.05, 1.22, -1.05, INK, 0.05);
-    // wheels (Tractor Ted's iconic bright yellow rims)
-    wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58, rimCol: "#FFC93C", rimIn: "#E5B226" });
-    wheel(ctx, 2.7, -0.66, 0.66, rot / 0.66, { rim: 0.58, rimCol: "#FFC93C", rimIn: "#E5B226" });
+    // wheels (Tractor Ted's green wheels)
+    wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58, rimCol: G.body, rimIn: G.dark });
+    wheel(ctx, 2.7, -0.66, 0.66, rot / 0.66, { rim: 0.58, rimCol: G.body, rimIn: G.dark });
     // fenders
     ctx.beginPath(); ctx.arc(0, -0.95, 1.13, -Math.PI + 0.22, -0.2); ctx.arc(0, -0.95, 1.0, -0.2, -Math.PI + 0.22, true); ctx.closePath(); fs(ctx, G.body);
     ctx.beginPath(); ctx.arc(2.7, -0.66, 0.82, -Math.PI + 0.55, -0.4); ctx.arc(2.7, -0.66, 0.72, -0.4, -Math.PI + 0.55, true); ctx.closePath(); fs(ctx, G.body);
