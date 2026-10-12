@@ -243,10 +243,10 @@
   // =====================================================================================================
   // The green tractor (side view, facing +x, origin on the ground under the rear axle)
   // =====================================================================================================
-  var G = { body: "#3E9F3A", dark: "#2B7A2A", light: "#6CC65C", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
+  var G = { body: "#3CB436", dark: "#2A8826", light: "#68CB5C", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
   var HITCH = [-1.05, -0.5], TOPLINK = [-1.0, -1.3], DRAWBAR = [-1.3, -0.5];
   function driver(ctx, x, y, s) {
-    // shoulders, head and cap behind the glass
+    // shoulders, head and cap behind the glass (Farmer Tom)
     R(ctx, x - 0.26 * s, y + 0.1 * s, 0.52 * s, 0.5 * s, 0.16 * s, "#3D6FB6", LW * 0.7);
     C(ctx, x, y, 0.17 * s, "#F2C8A0", LW * 0.7);
     P(ctx, [x - 0.18 * s, y - 0.04 * s, x - 0.16 * s, y - 0.2 * s, x + 0.16 * s, y - 0.2 * s, x + 0.3 * s, y - 0.06 * s], "#E8473B", LW * 0.6);
@@ -274,14 +274,24 @@
     fs(ctx, G.body);
     P(ctx, [1.0, -1.42, 3.84, -1.42, 3.84, -1.12, 1.0, -1.12], G.dark, LW * 0.8);
     shine(ctx, 1.15, -1.98, 3.3, -1.92, 0.07);
+    // yellow stripe along the bonnet
+    P(ctx, [1.3, -1.68, 3.45, -1.68, 3.45, -1.52, 1.3, -1.52], "#FFC93C", LW * 0.5);
+    // TED lettering badge
+    Ln(ctx, 2.05, -1.66, 2.15, -1.66, INK, 0.035); Ln(ctx, 2.10, -1.66, 2.10, -1.54, INK, 0.035);
+    Ln(ctx, 2.22, -1.66, 2.22, -1.54, INK, 0.035); Ln(ctx, 2.22, -1.66, 2.31, -1.66, INK, 0.03); Ln(ctx, 2.22, -1.60, 2.29, -1.60, INK, 0.03); Ln(ctx, 2.22, -1.54, 2.31, -1.54, INK, 0.03);
+    Ln(ctx, 2.38, -1.66, 2.38, -1.54, INK, 0.035); ctx.beginPath(); ctx.arc(2.38, -1.60, 0.06, -Math.PI / 2, Math.PI / 2); ctx.strokeStyle = INK; ctx.lineWidth = 0.035; ctx.stroke();
     // side vents
-    for (i = 0; i < 4; i++) Ln(ctx, 2.0 + i * 0.22, -1.86, 2.12 + i * 0.22, -1.56, G.dark, 0.06);
-    // grille and the headlight
+    for (i = 0; i < 3; i++) Ln(ctx, 2.65 + i * 0.22, -1.86, 2.77 + i * 0.22, -1.72, G.dark, 0.05);
+    // grille and headlights
     R(ctx, 3.62, -1.86, 0.24, 0.72, 0.06, G.frame, LW * 0.8);
     for (i = 0; i < 4; i++) Ln(ctx, 3.66, -1.74 + i * 0.16, 3.82, -1.74 + i * 0.16, "#59607A", 0.04);
     var lit = clamp(st.lights || 0, 0, 1);
     if (lit) { ctx.save(); ctx.globalAlpha = 0.5 * lit; C(ctx, 3.95, -1.8, 0.55, "#FFF7C2", 0); ctx.restore(); }
-    R(ctx, 3.32, -1.97, 0.34, 0.14, 0.05, lit ? "#FFFDE0" : "#FFE98A", LW * 0.7);
+    C(ctx, 3.68, -1.88, 0.13, lit ? "#FFFDE0" : "#FFE98A", LW * 0.7);
+    C(ctx, 3.68, -1.88, 0.07, lit ? "#FFFFFF" : "#FFF7C2", 0);
+    // smiling mouth curve on the front bumper
+    ctx.beginPath(); ctx.arc(3.82, -1.34, 0.14, -0.7, 0.7); ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 0.05; ctx.lineCap = "round"; ctx.stroke();
+    ctx.beginPath(); ctx.arc(3.82, -1.34, 0.14, -0.7, 0.7); ctx.strokeStyle = INK; ctx.lineWidth = 0.025; ctx.lineCap = "round"; ctx.stroke();
     // cab
     P(ctx, [-0.62, -1.58, -0.56, -3.0, 1.12, -3.0, 1.24, -1.58], G.frame);
     P(ctx, [-0.5, -1.7, -0.46, -2.9, 1.02, -2.9, 1.11, -1.7], G.glass, LW * 0.6);
@@ -292,6 +302,17 @@
     P(ctx, [0.5, -2.9, 0.68, -2.9, 0.1, -1.7, -0.08, -1.7], "#FFFFFF", 0);
     ctx.restore();
     Ln(ctx, 0.48, -2.95, 0.5, -1.62, G.frame, 0.07); // door post
+    // Tractor Ted's friendly expressive eyes on the front windscreen
+    // near eye
+    ctx.beginPath(); ctx.ellipse(0.78, -2.42, 0.12, 0.17, 0.06, 0, TAU); fs(ctx, "#FFFFFF", LW * 0.6);
+    ctx.beginPath(); ctx.arc(0.82, -2.40, 0.07, 0, TAU); fs(ctx, INK, 0);
+    C(ctx, 0.84, -2.43, 0.024, "#FFFFFF", 0);
+    ctx.beginPath(); ctx.arc(0.78, -2.60, 0.10, 0.3, 2.5, true); ctx.strokeStyle = INK; ctx.lineWidth = 0.035; ctx.lineCap = "round"; ctx.stroke();
+    // far eye
+    ctx.beginPath(); ctx.ellipse(0.96, -2.46, 0.09, 0.14, 0.10, 0, TAU); fs(ctx, "#FFFFFF", LW * 0.5);
+    ctx.beginPath(); ctx.arc(0.99, -2.44, 0.055, 0, TAU); fs(ctx, INK, 0);
+    C(ctx, 1.01, -2.47, 0.02, "#FFFFFF", 0);
+    ctx.beginPath(); ctx.arc(0.96, -2.61, 0.08, 0.3, 2.5, true); ctx.strokeStyle = INK; ctx.lineWidth = 0.03; ctx.lineCap = "round"; ctx.stroke();
     // roof, beacon, mirror
     R(ctx, -0.78, -3.22, 2.08, 0.26, 0.09, G.body);
     shine(ctx, -0.65, -3.16, 1.15, -3.16, 0.05);
@@ -305,9 +326,9 @@
     // steps
     Ln(ctx, 1.0, -1.55, 1.0, -0.95, INK, 0.05); Ln(ctx, 1.22, -1.55, 1.22, -0.95, INK, 0.05);
     Ln(ctx, 1.0, -1.3, 1.22, -1.3, INK, 0.05); Ln(ctx, 1.0, -1.05, 1.22, -1.05, INK, 0.05);
-    // wheels
-    wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58 });
-    wheel(ctx, 2.7, -0.66, 0.66, rot / 0.66, { rim: 0.58 });
+    // wheels (Tractor Ted's iconic bright yellow rims)
+    wheel(ctx, 0, -0.95, 0.95, rot / 0.95, { rim: 0.58, rimCol: "#FFC93C", rimIn: "#E5B226" });
+    wheel(ctx, 2.7, -0.66, 0.66, rot / 0.66, { rim: 0.58, rimCol: "#FFC93C", rimIn: "#E5B226" });
     // fenders
     ctx.beginPath(); ctx.arc(0, -0.95, 1.13, -Math.PI + 0.22, -0.2); ctx.arc(0, -0.95, 1.0, -0.2, -Math.PI + 0.22, true); ctx.closePath(); fs(ctx, G.body);
     ctx.beginPath(); ctx.arc(2.7, -0.66, 0.82, -Math.PI + 0.55, -0.4); ctx.arc(2.7, -0.66, 0.72, -0.4, -Math.PI + 0.55, true); ctx.closePath(); fs(ctx, G.body);
@@ -787,18 +808,37 @@
 
 
   function dog(ctx, x, y, s, ph, flip, sit) {
+    // Midge the cheeky farm terrier
     ctx.save(); ctx.translate(x, y); ctx.scale(flip ? -s : s, s); LW = 2.2 / s;
-    var st = Math.sin(ph * TAU), wag = Math.sin(ph * TAU * 3) * 0.25, K = "#2A2D38", Wt = "#FFFFFF";
+    var st = Math.sin(ph * TAU), wag = Math.sin(ph * TAU * 3) * 0.25;
+    var Wt = "#FAF8F2", Tn = "#C87A38", Dk = "#2A2D38", Red = "#D83C32", Gold = "#FFC93C";
     function leg(x0, a) { Ln(ctx, x0, -0.22, x0 + Math.sin(a) * 0.24, 0, INK, 0.09); Ln(ctx, x0, -0.22, x0 + Math.sin(a) * 0.24, 0, Wt, 0.05); }
     if (!sit) { leg(-0.22, -0.5 * st); leg(0.2, 0.5 * st); }
-    P(ctx, [-0.32, -0.36, -0.55, -0.55 + wag * 0.4, -0.5, -0.6 + wag * 0.4, -0.3, -0.42], K, LW * 0.8);
-    ctx.beginPath(); ctx.ellipse(0, sit ? -0.24 : -0.34, 0.36, 0.14, sit ? -0.5 : 0, 0, TAU); fs(ctx, K);
-    ctx.beginPath(); ctx.ellipse(0.18, sit ? -0.3 : -0.3, 0.13, 0.1, 0, 0, TAU); fs(ctx, Wt, 0);
-    C(ctx, 0.36, sit ? -0.56 : -0.5, 0.13, K);
-    P(ctx, [0.42, sit ? -0.58 : -0.52, 0.58, sit ? -0.52 : -0.46, 0.44, sit ? -0.46 : -0.4], Wt, LW * 0.7);
-    C(ctx, 0.58, sit ? -0.52 : -0.46, 0.03, INK, 0);
-    P(ctx, [0.28, sit ? -0.64 : -0.58, 0.3, sit ? -0.78 : -0.72, 0.38, sit ? -0.66 : -0.6], K, LW * 0.7);
-    C(ctx, 0.41, sit ? -0.6 : -0.54, 0.022, "#FFFFFF", 0);
+    // wagging tail (white base, tan tip)
+    P(ctx, [-0.32, -0.36, -0.55, -0.55 + wag * 0.4, -0.5, -0.6 + wag * 0.4, -0.3, -0.42], Wt, LW * 0.8);
+    P(ctx, [-0.44, -0.48 + wag * 0.25, -0.55, -0.55 + wag * 0.4, -0.5, -0.6 + wag * 0.4, -0.40, -0.52 + wag * 0.25], Tn, 0);
+    // body: white coat
+    ctx.beginPath(); ctx.ellipse(0, sit ? -0.24 : -0.34, 0.36, 0.14, sit ? -0.5 : 0, 0, TAU); fs(ctx, Wt, LW * 0.8);
+    // tan patch on back
+    ctx.beginPath(); ctx.ellipse(-0.06, sit ? -0.28 : -0.38, 0.16, 0.08, sit ? -0.5 : 0, 0, TAU); fs(ctx, Tn, 0);
+    // small dark saddle accent
+    ctx.beginPath(); ctx.ellipse(-0.04, sit ? -0.30 : -0.40, 0.08, 0.04, sit ? -0.5 : 0, 0, TAU); fs(ctx, Dk, 0);
+    // red collar with gold tag
+    P(ctx, [0.26, sit ? -0.48 : -0.42, 0.35, sit ? -0.50 : -0.44, 0.33, sit ? -0.38 : -0.32, 0.24, sit ? -0.36 : -0.30], Red, LW * 0.6);
+    C(ctx, 0.27, sit ? -0.36 : -0.30, 0.035, Gold, LW * 0.4);
+    // head: tan base
+    C(ctx, 0.36, sit ? -0.56 : -0.5, 0.14, Tn, LW * 0.8);
+    // white blaze on face and white muzzle
+    P(ctx, [0.42, sit ? -0.58 : -0.52, 0.58, sit ? -0.52 : -0.46, 0.44, sit ? -0.44 : -0.38], Wt, LW * 0.7);
+    P(ctx, [0.36, sit ? -0.66 : -0.60, 0.44, sit ? -0.54 : -0.48, 0.40, sit ? -0.52 : -0.46, 0.33, sit ? -0.64 : -0.58], Wt, 0);
+    // black button nose
+    C(ctx, 0.58, sit ? -0.52 : -0.46, 0.032, INK, 0);
+    // folded ears
+    P(ctx, [0.28, sit ? -0.64 : -0.58, 0.3, sit ? -0.78 : -0.72, 0.38, sit ? -0.66 : -0.6], Tn, LW * 0.7);
+    P(ctx, [0.30, sit ? -0.78 : -0.72, 0.34, sit ? -0.76 : -0.70, 0.38, sit ? -0.66 : -0.60], "#9E521E", 0);
+    // eye with catchlight
+    C(ctx, 0.41, sit ? -0.6 : -0.54, 0.026, INK, 0);
+    C(ctx, 0.418, sit ? -0.608 : -0.548, 0.009, "#FFFFFF", 0);
     if (!sit) { leg(-0.28, 0.5 * st); leg(0.26, -0.5 * st); }
     else { leg(0.22, 0.1); leg(-0.12, 1.2); }
     ctx.restore();

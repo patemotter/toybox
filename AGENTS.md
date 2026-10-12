@@ -64,7 +64,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
   train-builder, bubble-machine (shown as "Bubbles"), hamster, garden, spinning-tops, kitchen,
-  spirograph, jigsaw, sand-table, espresso-machine, farm.
+  spirograph, jigsaw, sand-table, espresso-machine, farm (shown as "Tractor Ted").
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
@@ -303,9 +303,10 @@ Keep only:
   Mud's bed former → destoner → planter → harvester sequence with the split-view close-up of the work). Make those
   moments big, visually clear and faithful to the episode; do not replace the authentic highlights with manual driving
   chores or complex steering controls. Ask the dad for an episode's key moments when unsure.
-- Real names, no brand names or logos. Exception (the dad): the Farm's stations are named after the episodes of
-  the farm-machinery show he watches ("Combine Time", "Brilliant Baler"...), because he knows them; only titles he actually knows (the dad: "It's Sow Time" means nothing to him, and every station is a newer-series episode he knows: "Spuds in Mud" replaced the plowing field, "Combine Time" next); station names live in one constant, `Farm.NAMES` in `farm/farm.js`; never the show's
-  own name, characters or logo.
+- Real names, no brand names or logos. Exception (the dad, 2026-10-11): the Farm app is specifically Tractor Ted
+  themed and oriented: the app is shown as "Tractor Ted", the green tractor is drawn as Tractor Ted (friendly eyes on the
+  windscreen, yellow wheel rims, smiling grille and "TED" bonnet badge), the farm dog is Midge (scruffy tri-color terrier
+  with red collar and gold tag), the pony is Merlin, and the 12 stations follow the actual Tractor Ted episodes he has memorized.
 
 ### Fresh start
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
