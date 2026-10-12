@@ -1272,6 +1272,12 @@
       }
     }
     if (document.readyState === "complete") start(); else window.addEventListener("load", start);
+    // Ask the browser to keep this site's saved data (his collections, the grown-up settings) when the
+    // device runs low on space; without it iOS may clear localStorage and the offline cache. Safe to
+    // repeat: once granted it stays granted.
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+    } catch (e) { /* not supported */ }
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "visible" && reg && navigator.onLine !== false) reg.update().catch(function () {});
     });

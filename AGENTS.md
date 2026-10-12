@@ -35,8 +35,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 
 ## 2. Repository and architecture
 
-- Repo `patemotter/toybox`. No build step, no frameworks, no modules: each app is one folder with a
-  self-contained `index.html` (inline CSS + JS in a `"use strict"` IIFE, ES5 style: `var`, `function`).
+- Repo `patemotter/toybox`. No build step, no frameworks: each app is one folder with an `index.html`
+  (CSS + JS inline, or in plain `.js`/`.css` files next to the page, see "Code style and structure" in §4).
+  The architecture (a home-screen web app, plain JS drawing on canvas/SVG, one service worker, GitHub Pages)
+  was reviewed on 2026-10-12 and stays: no rewrite, no framework, no native app.
 - Every app folder: `index.html` (plus extra pages for multi-page apps), `manifest.webmanifest`,
   `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Older apps also have a `sw.js`:
   a retired stub (see Offline below); keep it, but a new app gets none.
@@ -363,6 +365,20 @@ Keep only:
   re-reads state on back/forward restore. Don't copy timer/sound code into apps; extend `common/` instead.
 - Keys: `toybox-timer-v1`, `toybox-sound-v1` ("1"/"0"), `toybox-big-<app>`. App state uses an app-prefixed
   localStorage key. Wrap every storage access in try/catch. Keep saved formats backward compatible.
+- `common/toybox.js` calls `navigator.storage.persist()` on every page so iOS doesn't clear saved data
+  (collections, settings, the offline cache) when the device is low on space. Keep it.
+
+### Code style and structure (decided 2026-10-12; apply when you are already in a file, no mass rewrites)
+- **Modern JavaScript is allowed** in new and changed code: `let`/`const`, arrow functions, classes,
+  template strings. Every iOS Safari the family uses supports them. Keep `"use strict"` and the IIFE (or use
+  `<script type="module">`, which also needs no build step). Don't convert untouched old code just for style.
+- **Split big pages**: when you work substantially on a page over about 2500 lines, move its script into plain
+  `.js` files next to it (e.g. `saw-bench.js`, or by topic: drawing, input, state), loaded with `<script src>`.
+  No bundler. Add every new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it).
+- **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
+  provides (the ghost hand from `tools/snippets`, the coach pill, audio setup), switch it to the shared version
+  (`Toybox.ghost`, `Toybox.coach`, `Toybox.sound.ready()`) in the same change. When two or more apps need the
+  same helper, add it to `common/` instead of copying it.
 
 ### Browser/iOS findings
 - Play surfaces: pointer events, `touch-action: none`, prevent `gesturestart`, no text selection or long-press
