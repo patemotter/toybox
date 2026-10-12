@@ -1,0 +1,3220 @@
+// Script of index.html, moved out of the page unchanged (2026-10-12) so agents can read and edit it in parts.
+// Loaded by a plain <script src> at the same place in the page, so it runs exactly as the inline script did.
+// Sections, in order (search for the title to jump to one):
+//   - What can be built
+//   - Vehicle art (SVG units; y = 0 is the ground, up is negative, the vehicle faces right)
+//   - wheels
+//   - tracks
+//   - paint, numbers, lights, roof and engine bits
+//   - the vehicle model: drawing layers plus the bits the drive mode animates
+//   - Construction
+//   - Fast cars
+//   - Monster trucks
+//   - Rescue
+//   - Farm
+//   - Builder
+//   - builder background, by family
+//   - controls
+//   - build rows
+//   - Surprise: a fun moment for his vehicle, right now (his build and colors never change)
+//   - Drive
+//   - vehicle bitmaps: each drawing layer becomes a small picture
+//   - the world
+//   - particles (world units, y up)
+//   - pose animations
+//   - parking at the end of play time
+//   - step
+//   - drawing
+//   - open / close
+//   - Ghost hand (same look as Bulldozer and Measuring)
+//   - Sound (off by default; soft and synthesized)
+//   - vehicle sounds (only when sound is on)
+//   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
+(function () {
+  "use strict";
+  var OUT = "#1D2340";
+  var KEY = "carbuilder-v1";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var PALETTE = [
+    ["Red", "#E63946"], ["Orange", "#F77F00"], ["Yellow", "#FFC93C"], ["Lime", "#A7D129"],
+    ["Green", "#2E9E5B"], ["Teal", "#1FA6A0"], ["Sky", "#5BC0EB"], ["Blue", "#2D5BD7"],
+    ["Purple", "#7B4FC9"], ["Pink", "#F26CA7"], ["Brown", "#8B5A3C"], ["Gray", "#9AA3AF"],
+    ["White", "#FFFFFF"], ["Black", "#26282E"]
+  ];
+  var HEX = {};
+  PALETTE.forEach(function (p) { HEX[p[0]] = p[1]; });
+  var NAMES = PALETTE.map(function (p) { return p[0]; });
+  function hex(name) { return HEX[name] || "#999999"; }
+  function rgb(h) {
+    return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  }
+  function isDark(h) {
+    var c = rgb(h);
+    return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 120;
+  }
+  // Linear blend of hex color a toward hex color b by fraction t.
+  function mix(a, b, t) {
+    var x = rgb(a), y = rgb(b);
+    return "#" + [0, 1, 2].map(function (k) {
+      var v = Math.round(x[k] + (y[k] - x[k]) * t);
+      return (v < 16 ? "0" : "") + v.toString(16);
+    }).join("");
+  }
+  function shade(h, t) { return mix(h, "#1D2340", t); }
+  function tint(h, t) { return mix(h, "#FFFFFF", t); }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function n2(v) { return (Math.round(v * 100) / 100).toString(); }
+  function fmt(v) { return String(Math.max(0, Math.floor(v))).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+  function starD(cx, cy, R, r, n, rot) {
+    var d = "", k, a, rr;
+    rot = rot || 0;
+    for (k = 0; k < n * 2; k++) {
+      a = rot + k * Math.PI / n;
+      rr = k % 2 ? r : R;
+      d += (k ? " L " : "M ") + n2(cx + rr * Math.sin(a)) + " " + n2(cy - rr * Math.cos(a));
+    }
+    return d + " Z";
+  }
+  // ---------- What can be built ----------
+  var OPT = {
+    cab: [["square", "Square"], ["round", "Round"], ["slant", "Slanted"]],
+    wheels: [["s", "Small"], ["m", "Medium"], ["l", "Big"]],
+    wheelsM: [["l", "Big"], ["xl", "Huge"], ["xxl", "Giant"]],
+    tracks: [["steel", "Steel"], ["rubber", "Rubber"], ["spiky", "Spiky"]],
+    rims: [["star", "Star"], ["spokes", "Spokes"], ["dish", "Dish"], ["holes", "Holes"]],
+    engine: [["none", "None"], ["one", "1 pipe"], ["two", "2 pipes"], ["blower", "Blower"]],
+    lights: [["round", "Round"], ["square", "Square"], ["big", "Big"]],
+    number: [[0, "None"], [1, "1"], [2, "2"], [3, "3"], [4, "4"], [5, "5"], [6, "6"], [7, "7"], [8, "8"], [9, "9"]],
+    paint: [["none", "None"], ["stripes", "Stripes"], ["flames", "Flames"], ["checks", "Checks"], ["zigzag", "Zigzag"]],
+    topFast: [["none", "None"], ["spoiler", "Spoiler"], ["wing", "Big wing"]],
+    topMonster: [["none", "None"], ["rollbar", "Roll bar"], ["lights", "Light bar"]],
+    topWork: [["none", "None"], ["beacon", "Beacon"], ["lights", "Lights"]],
+    topRescue: [["bar", "Light bar"], ["big", "Big bar"], ["beacons", "Beacons"]]
+  };
+
+  var FAMILIES = [
+    { id: "build", label: "Construction", kinds: ["excavator", "bulldozer", "dump", "mixer"] },
+    { id: "fast", label: "Fast cars", kinds: ["race", "sports", "f1", "rally"] },
+    { id: "monster", label: "Monster trucks", kinds: ["mpickup", "mmuscle", "mjeep"] }
+  ];
+  var FAM_BY = {};
+  FAMILIES.forEach(function (f) { FAM_BY[f.id] = f; });
+
+  // parts: [part id, button label, option list]; names: labels for the color parts.
+  function P(id, label, opts) { return [id, label, opts]; }
+  var WORK_PARTS = [P("cab", "Cab", OPT.cab), P("wheels", "Wheels", OPT.wheels), P("rims", "Rims", OPT.rims), P("engine", "Engine", OPT.engine),
+    P("top", "Roof", OPT.topWork), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
+  var TRACK_PARTS = [P("cab", "Cab", OPT.cab), P("wheels", "Tracks", OPT.tracks), P("engine", "Engine", OPT.engine),
+    P("top", "Roof", OPT.topWork), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
+  var CAR_PARTS = [P("cab", "Roof", OPT.cab), P("wheels", "Wheels", OPT.wheels), P("rims", "Rims", OPT.rims), P("engine", "Engine", OPT.engine),
+    P("top", "Spoiler", OPT.topFast), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
+  var MONSTER_PARTS = [P("cab", "Roof", OPT.cab), P("wheels", "Wheels", OPT.wheelsM), P("rims", "Rims", OPT.rims), P("engine", "Engine", OPT.engine),
+    P("top", "Top", OPT.topMonster), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
+  var RESCUE_PARTS = [P("cab", "Cab", OPT.cab), P("wheels", "Wheels", OPT.wheels), P("rims", "Rims", OPT.rims),
+    P("top", "Lights", OPT.topRescue), P("lights", "Headlights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
+
+  function withTool(list, label, opts) { return [P("tool", label, opts)].concat(list); }
+
+  var KINDS = {
+    excavator: { fam: "build", label: "Excavator", parts: withTool(TRACK_PARTS, "Tool", [["bucket", "Bucket"], ["claw", "Claw"], ["breaker", "Breaker"]]),
+      names: { body: "Body", trim: "Cab", tool: "Arm", rims: "Wheels" },
+      def: { tool: "bucket", cab: "square", wheels: "steel", rims: "dish", engine: "one", top: "beacon", lights: "square", number: 0, paint: "none",
+        colors: { body: "Yellow", trim: "Black", tool: "Yellow", rims: "Gray", stripes: "Black", number: "Black" } } },
+    bulldozer: { fam: "build", label: "Bulldozer", parts: withTool(TRACK_PARTS, "Blade", [["blade", "Blade"], ["big", "Big blade"], ["ripper", "Ripper"]]),
+      names: { body: "Body", trim: "Cab", tool: "Blade", rims: "Wheels" },
+      def: { tool: "blade", cab: "square", wheels: "steel", rims: "dish", engine: "one", top: "lights", lights: "square", number: 0, paint: "none",
+        colors: { body: "Yellow", trim: "Black", tool: "Yellow", rims: "Gray", stripes: "Black", number: "Black" } } },
+    dump: { fam: "build", label: "Dump truck", parts: WORK_PARTS,
+      names: { body: "Cab", trim: "Frame", tool: "Bed", rims: "Rims" },
+      def: { cab: "round", wheels: "m", rims: "dish", engine: "two", top: "beacon", lights: "round", number: 0, paint: "none",
+        colors: { body: "Yellow", trim: "Gray", tool: "Red", rims: "White", stripes: "Black", number: "Black" } } },
+    mixer: { fam: "build", label: "Cement mixer", parts: WORK_PARTS,
+      names: { body: "Cab", trim: "Frame", tool: "Drum", rims: "Rims" },
+      def: { cab: "square", wheels: "m", rims: "holes", engine: "one", top: "beacon", lights: "square", number: 0, paint: "none",
+        colors: { body: "Blue", trim: "Gray", tool: "Orange", rims: "White", stripes: "White", number: "Black" } } },
+    race: { fam: "fast", label: "Race car", parts: CAR_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "square", wheels: "m", rims: "star", engine: "two", top: "spoiler", lights: "square", number: 8, paint: "stripes",
+        colors: { body: "Blue", trim: "Yellow", rims: "Yellow", stripes: "Yellow", number: "Red" } } },
+    sports: { fam: "fast", label: "Sports car", parts: CAR_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "slant", wheels: "m", rims: "spokes", engine: "two", top: "none", lights: "round", number: 0, paint: "none",
+        colors: { body: "Red", trim: "Red", rims: "Gray", stripes: "White", number: "Black" } } },
+    f1: { fam: "fast", label: "F1 car", parts: [P("wheels", "Wheels", OPT.wheels), P("rims", "Rims", OPT.rims), P("engine", "Engine", OPT.engine),
+      P("top", "Wing", [["none", "Small"], ["spoiler", "Medium"], ["wing", "Big"]]), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)],
+      names: { body: "Body", trim: "Wings", rims: "Rims" },
+      def: { cab: "square", wheels: "m", rims: "dish", engine: "one", top: "spoiler", lights: "round", number: 1, paint: "stripes",
+        colors: { body: "Red", trim: "White", rims: "Yellow", stripes: "White", number: "Black" } } },
+    rally: { fam: "fast", label: "Rally car", parts: CAR_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "square", wheels: "m", rims: "holes", engine: "one", top: "spoiler", lights: "big", number: 3, paint: "zigzag",
+        colors: { body: "Sky", trim: "White", rims: "White", stripes: "Pink", number: "Blue" } } },
+    mpickup: { fam: "monster", label: "Pickup", rest: "monster truck", parts: MONSTER_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "square", wheels: "xl", rims: "star", engine: "two", top: "rollbar", lights: "round", number: 7, paint: "flames",
+        colors: { body: "Green", trim: "Green", rims: "Yellow", stripes: "Orange", number: "Black" } } },
+    mmuscle: { fam: "monster", label: "Muscle car", rest: "monster truck", parts: MONSTER_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "slant", wheels: "xl", rims: "spokes", engine: "blower", top: "none", lights: "square", number: 5, paint: "flames",
+        colors: { body: "Purple", trim: "Black", rims: "Gray", stripes: "Yellow", number: "Purple" } } },
+    mjeep: { fam: "monster", label: "Jeep", rest: "monster truck", parts: MONSTER_PARTS,
+      names: { body: "Body", trim: "Roof", rims: "Rims" },
+      def: { cab: "square", wheels: "xl", rims: "holes", engine: "one", top: "lights", lights: "round", number: 2, paint: "checks",
+        colors: { body: "Orange", trim: "Black", rims: "White", stripes: "Black", number: "Black" } } },
+  };
+  var KIND_IDS = Object.keys(KINDS);
+  function kindParts(k) { return KINDS[k].parts; }
+  function partSpec(k, id) {
+    var ps = KINDS[k].parts;
+    for (var i = 0; i < ps.length; i++) if (ps[i][0] === id) return ps[i];
+    return null;
+  }
+  function restName(k) { return KINDS[k].rest || KINDS[k].label.toLowerCase(); }
+  // ---------- Vehicle art (SVG units; y = 0 is the ground, up is negative, the vehicle faces right) ----------
+  var GLASS = "#BFE6FF", DARK = "#2B2E38", RUBBER = "#3A3F4E", STEEL = "#9AA3AF", STEEL_D = "#5B6684", CHROME = "#D5DCE8";
+  var DIRT = "#8B5A3C", DIRT_L = "#B07A4F", LAMP = "#FFF3B0", AMBER = "#F7A400";
+  var FONT = "'Baloo 2', 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif";
+  var uid = 0;
+
+  function sk(sw) { return ' stroke="' + OUT + '" stroke-width="' + (sw == null ? 5 : sw) + '" stroke-linejoin="round" stroke-linecap="round"'; }
+  function pth(d, fill, sw, extra) { return '<path d="' + d + '" fill="' + fill + '"' + (sw === 0 ? "" : sk(sw)) + (extra || "") + "/>"; }
+  function circ(cx, cy, r, fill, sw, extra) { return '<circle cx="' + n2(cx) + '" cy="' + n2(cy) + '" r="' + n2(Math.max(0.5, r)) + '" fill="' + fill + '"' + (sw === 0 ? "" : sk(sw)) + (extra || "") + "/>"; }
+  function rct(x, y, w, h, rx, fill, sw, extra) {
+    return '<rect x="' + n2(x) + '" y="' + n2(y) + '" width="' + n2(Math.max(0.5, w)) + '" height="' + n2(Math.max(0.5, h)) + '" rx="' + n2(rx || 0) + '" fill="' + fill + '"' + (sw === 0 ? "" : sk(sw)) + (extra || "") + "/>";
+  }
+  function polyD(pts) {
+    return pts.map(function (p, i) { return (i ? "L " : "M ") + n2(p[0]) + " " + n2(p[1]); }).join(" ");
+  }
+  // A thick bar with a dark outline (for arms, booms, pipes).
+  function beam(pts, w, col, sw) {
+    sw = sw == null ? 5 : sw;
+    var d = polyD(pts);
+    return '<path d="' + d + '" fill="none" stroke="' + OUT + '" stroke-width="' + n2(w + 2 * sw) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + n2(w) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  // Hydraulic ram: dark barrel then a shiny rod.
+  function ram(a, b, w) {
+    var m = [lerp(a[0], b[0], 0.55), lerp(a[1], b[1], 0.55)];
+    return beam([a, m], w || 12, STEEL_D, 4) + beam([m, b], (w || 12) * 0.5, CHROME, 3.5);
+  }
+  // Polygon with rounded corners. Points are [x, y, radius]; [x, y, "A", R, sweep, large] draws an arc to (x, y).
+  function rp(pts, open) {
+    var n = pts.length, d = "";
+    for (var i = 0; i < n; i++) {
+      var p = pts[i], cmd = i ? " L " : "M ";
+      if (p[2] === "A") { d += " A " + n2(p[3]) + " " + n2(p[3]) + " 0 " + p[5] + " " + p[4] + " " + n2(p[0]) + " " + n2(p[1]); continue; }
+      var r = p[2] || 0;
+      if (!r || (open && (i === 0 || i === n - 1))) { d += cmd + n2(p[0]) + " " + n2(p[1]); continue; }
+      var a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+      var ax = a[0] - p[0], ay = a[1] - p[1], bx = b[0] - p[0], by = b[1] - p[1];
+      var la = Math.sqrt(ax * ax + ay * ay) || 1, lb = Math.sqrt(bx * bx + by * by) || 1;
+      var ra = Math.min(r, la / 2), rb = Math.min(r, lb / 2);
+      d += cmd + n2(p[0] + ax * ra / la) + " " + n2(p[1] + ay * ra / la) + " Q " + n2(p[0]) + " " + n2(p[1]) + " " + n2(p[0] + bx * rb / lb) + " " + n2(p[1] + by * rb / lb);
+    }
+    return d + (open ? "" : " Z");
+  }
+  // Points along a body's bottom edge (right to left) that cut arches over the wheels.
+  function arches(sill, list) {
+    var pts = [];
+    list.slice().sort(function (a, b) { return b.x - a.x; }).forEach(function (a) {
+      var dy = sill - a.cy;
+      if (Math.abs(dy) >= a.R) return;
+      var dx = Math.sqrt(a.R * a.R - dy * dy);
+      pts.push([a.x + dx, sill, 0]);
+      pts.push([a.x - dx, sill, "A", a.R, 0, dy > 0 ? 1 : 0]);
+    });
+    return pts;
+  }
+  function wellS(sill, list) {
+    var o = "";
+    list.forEach(function (a) {
+      var dy = sill - a.cy;
+      if (Math.abs(dy) >= a.R) return;
+      var dx = Math.sqrt(a.R * a.R - dy * dy);
+      o += pth("M " + n2(a.x - dx) + " " + n2(sill) + " A " + n2(a.R) + " " + n2(a.R) + " 0 " + (dy > 0 ? 1 : 0) + " 1 " + n2(a.x + dx) + " " + n2(sill) + " Z", "#20232C", 0);
+    });
+    return o;
+  }
+  function part(name, svg) { return '<g data-part="' + name + '">' + svg + "</g>"; }
+  function txt(x, y, s, size, fill, stroke) {
+    return '<text x="' + n2(x) + '" y="' + n2(y) + '" font-family="' + FONT + '" font-weight="800" font-size="' + n2(size) + '" text-anchor="middle" dominant-baseline="central"' +
+      (stroke ? ' stroke="' + stroke + '" stroke-width="' + n2(size * 0.14) + '" paint-order="stroke" stroke-linejoin="round"' : "") + ' fill="' + fill + '">' + s + "</text>";
+  }
+  function onBody(col) { return isDark(col) ? "#FFFFFF" : OUT; }
+  function glassS(d, extraClipShine) {
+    var id = "gl" + (uid++);
+    return '<clipPath id="' + id + '"><path d="' + d + '"/></clipPath>' + pth(d, GLASS, 4) +
+      '<g clip-path="url(#' + id + ')"><path d="' + (extraClipShine || "") + '" fill="rgba(255,255,255,0.75)"/></g>' + pth(d, "none", 4);
+  }
+  // A glass window with a diagonal shine across its bounding box.
+  function windowS(d, x0, y0, x1, y1) {
+    var w = x1 - x0, h = y1 - y0;
+    var shine = "M " + n2(x0 + w * 0.18) + " " + n2(y1 + 4) + " L " + n2(x0 + w * 0.42) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.55) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.31) + " " + n2(y1 + 4) + " Z" +
+      " M " + n2(x0 + w * 0.6) + " " + n2(y1 + 4) + " L " + n2(x0 + w * 0.84) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.89) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.65) + " " + n2(y1 + 4) + " Z";
+    return glassS(d, shine);
+  }
+
+  // ---- wheels ----
+  function wheelArt(w) {
+    var r = w.r, o = "", k, a, n;
+    if (w.style === "roller") {
+      o += circ(0, 0, r, STEEL, 4) + circ(0, 0, r * 0.55, w.rimCol, 3);
+      for (k = 0; k < 3; k++) { a = k * 2.094; o += circ(Math.cos(a) * r * 0.28, Math.sin(a) * r * 0.28, r * 0.12, OUT, 0); }
+      return o;
+    }
+    if (w.style === "sprocket") {
+      n = 10;
+      var d = "";
+      for (k = 0; k < n * 2; k++) {
+        a = k * Math.PI / n;
+        var rr = k % 2 ? r * 0.82 : r;
+        d += (k ? " L " : "M ") + n2(Math.cos(a) * rr) + " " + n2(Math.sin(a) * rr);
+      }
+      o += pth(d + " Z", STEEL_D, 4) + circ(0, 0, r * 0.62, w.rimCol, 3.5) + circ(0, 0, r * 0.22, CHROME, 3);
+      for (k = 0; k < 5; k++) { a = k * 1.2566; o += circ(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42, r * 0.07, OUT, 0); }
+      return o;
+    }
+    // A tire.
+    if (w.knobby) {
+      n = 14;
+      for (k = 0; k < n; k++) {
+        a = k * 2 * Math.PI / n;
+        o += '<rect x="' + n2(r - 6) + '" y="' + n2(-r * 0.13) + '" width="' + n2(r * 0.16 + 6) + '" height="' + n2(r * 0.26) + '" rx="3" fill="' + DARK + '"' + sk(4) + ' transform="rotate(' + n2(a * 180 / Math.PI) + ')"/>';
+      }
+    }
+    o += circ(0, 0, r, DARK, 5);
+    n = Math.max(10, Math.round(r / 3.4));
+    var lines = "";
+    for (k = 0; k < n; k++) {
+      a = k * 2 * Math.PI / n;
+      lines += "M " + n2(Math.cos(a) * r * 0.84) + " " + n2(Math.sin(a) * r * 0.84) + " L " + n2(Math.cos(a) * (r - 1)) + " " + n2(Math.sin(a) * (r - 1)) + " ";
+    }
+    o += '<path d="' + lines + '" stroke="#4A5064" stroke-width="' + n2(Math.max(3, r * 0.07)) + '" stroke-linecap="round"/>';
+    o += circ(0, 0, r * 0.8, RUBBER, 0);
+    var rr2 = r * 0.6, rc = w.rimCol, rd = shade(rc, 0.45);
+    o += circ(0, 0, rr2, rc, 4);
+    if (w.rim === "star") {
+      o += circ(0, 0, rr2 * 0.8, "#30333F", 0);
+      o += pth(starD(0, 0, rr2 * 0.8, rr2 * 0.34, 5), rc, 3);
+    } else if (w.rim === "spokes") {
+      o += circ(0, 0, rr2 * 0.82, "#30333F", 0);
+      var sp = "";
+      for (k = 0; k < 8; k++) { a = k * Math.PI / 4; sp += "M 0 0 L " + n2(Math.cos(a) * rr2 * 0.82) + " " + n2(Math.sin(a) * rr2 * 0.82) + " "; }
+      o += '<path d="' + sp + '" stroke="' + OUT + '" stroke-width="' + n2(rr2 * 0.2) + '" stroke-linecap="round"/>';
+      o += '<path d="' + sp + '" stroke="' + rc + '" stroke-width="' + n2(rr2 * 0.1) + '" stroke-linecap="round"/>';
+    } else if (w.rim === "holes") {
+      for (k = 0; k < 6; k++) { a = k * Math.PI / 3; o += circ(Math.cos(a) * rr2 * 0.56, Math.sin(a) * rr2 * 0.56, rr2 * 0.17, "#30333F", 2.5); }
+    } else {
+      o += circ(0, 0, rr2 * 0.66, tint(rc, 0.35), 3);
+      for (k = 0; k < 5; k++) { a = k * 1.2566 - 1.57; o += circ(Math.cos(a) * rr2 * 0.4, Math.sin(a) * rr2 * 0.4, rr2 * 0.08, rd, 0); }
+    }
+    o += circ(0, 0, Math.max(4, r * 0.12), CHROME, 3);
+    o += '<path d="M ' + n2(-r * 0.62) + " " + n2(-r * 0.62) + " A " + n2(r * 0.88) + " " + n2(r * 0.88) + " 0 0 1 " + n2(-r * 0.05) + " " + n2(-r * 0.88) + '" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="' + n2(r * 0.08) + '" stroke-linecap="round"/>';
+    return o;
+  }
+
+  // ---- tracks ----
+  var TRACK = {
+    steel: { belt: STEEL_D, inner: "#3A3F4E", lug: STEEL, spike: false },
+    rubber: { belt: DARK, inner: "#454B5C", lug: "#1F2129", spike: false },
+    spiky: { belt: DARK, inner: "#454B5C", lug: "#C9D2E3", spike: true }
+  };
+  // Positions around the track's outside: [x, y, angle] for lug k, shifted by offset (units). A growing offset
+  // runs the belt anticlockwise (forward along the bottom), so driving forward passes a falling offset.
+  function trackLugs(t, offset) {
+    var x0 = t.x0, x1 = t.x1, r = t.r, L1 = x1 - x0, arc = Math.PI * r, per = 2 * L1 + 2 * arc;
+    var n = Math.round(per / t.gap), step = per / n, out = [];
+    for (var k = 0; k < n; k++) {
+      var s = ((k * step + offset) % per + per) % per, p;
+      if (s < L1) p = [x0 + s, 0, 0];                                     // bottom
+      else if (s < L1 + arc) { var a = (s - L1) / r; p = [x1 + Math.sin(a) * r, -r + Math.cos(a) * r, -a]; }
+      else if (s < 2 * L1 + arc) p = [x1 - (s - L1 - arc), -2 * r, Math.PI]; // top
+      else { var b = (s - 2 * L1 - arc) / r; p = [x0 - Math.sin(b) * r, -r - Math.cos(b) * r, Math.PI - b]; }
+      out.push(p);
+    }
+    return out;
+  }
+  function lugS(t, p) {
+    var st = TRACK[t.style], deg = n2(-p[2] * 180 / Math.PI);
+    if (st.spike) return '<path d="M -9 0 L 0 9 L 9 0 Z" fill="' + st.lug + '"' + sk(3.5) + ' transform="translate(' + n2(p[0]) + " " + n2(p[1]) + ") rotate(" + deg + ')"/>';
+    return '<rect x="-8" y="-2" width="16" height="8" rx="2" fill="' + st.lug + '"' + sk(3.5) + ' transform="translate(' + n2(p[0]) + " " + n2(p[1]) + ") rotate(" + deg + ')"/>';
+  }
+  function trackBaseS(t) {
+    var st = TRACK[t.style], r = t.r;
+    return rct(t.x0 - r, -2 * r, t.x1 - t.x0 + 2 * r, 2 * r, r, st.belt, 5) +
+      rct(t.x0 - r + 11, -2 * r + 11, t.x1 - t.x0 + 2 * r - 22, 2 * r - 22, r - 11, st.inner, 3);
+  }
+  function trackS(t) {
+    var o = trackBaseS(t);
+    trackLugs(t, 0).forEach(function (p) { o += lugS(t, p); });
+    return o;
+  }
+  function addTrack(v, c, x0, x1, r) {
+    var t = { x0: x0, x1: x1, r: r, style: c.wheels, gap: 30 };
+    v.track = t;
+    v.L.push({ track: true, chain: [] });
+    var rc = c.col.rims;
+    v.wheels.push({ x: x0, y: -r, r: r - 9, style: "sprocket", rimCol: rc });
+    v.wheels.push({ x: x1, y: -r, r: r - 11, style: "sprocket", rimCol: rc });
+    var n = Math.max(2, Math.round((x1 - x0) / 46) - 1);
+    for (var k = 1; k <= n; k++) v.wheels.push({ x: x0 + (x1 - x0) * k / (n + 1), y: -15, r: 13, style: "roller", rimCol: rc });
+    v.wheels.push({ x: (x0 + x1) / 2, y: -2 * r + 13, r: 8, style: "roller", rimCol: rc });
+  }
+
+  // ---- paint, numbers, lights, roof and engine bits ----
+  function paintS(style, b, col) {
+    var x0 = b.x0, x1 = b.x1, y0 = b.y0, y1 = b.y1, w = x1 - x0, h = y1 - y0, m = (y0 + y1) / 2, o = "";
+    if (style === "stripes") {
+      o += rct(x0 - 20, y0 + h * 0.22, w + 40, h * 0.22, 0, col, 3) + rct(x0 - 20, y0 + h * 0.56, w + 40, h * 0.09, 0, col, 3);
+    } else if (style === "flames") {
+      var tips = [[0.58, 0.18], [0.82, 0.38], [0.66, 0.6], [0.44, 0.8]], d = "M " + n2(x1 + 20) + " " + n2(y0 + h * 0.02), di = d;
+      tips.forEach(function (t, i) {
+        var tx = x1 - w * t[0], ty = y0 + h * t[1], vx = x1 - w * t[0] * 0.38, vy = y0 + h * (t[1] + 0.12);
+        d += " Q " + n2(tx + w * 0.18) + " " + n2(ty - h * 0.14) + " " + n2(tx) + " " + n2(ty) + " Q " + n2(tx + w * 0.16) + " " + n2(ty + h * 0.02) + " " + n2(vx) + " " + n2(vy);
+        var s = 0.6, tx2 = x1 - w * t[0] * s, vx2 = x1 - w * t[0] * s * 0.38;
+        di += " Q " + n2(tx2 + w * 0.12) + " " + n2(ty - h * 0.1) + " " + n2(tx2) + " " + n2(ty) + " Q " + n2(tx2 + w * 0.1) + " " + n2(ty + h * 0.02) + " " + n2(vx2) + " " + n2(vy);
+      });
+      d += " L " + n2(x1 + 20) + " " + n2(y1) + " Z";
+      di += " L " + n2(x1 + 20) + " " + n2(y1) + " Z";
+      o += pth(d, col, 3.5) + pth(di, mix(col, "#FFE066", 0.55), 0);
+    } else if (style === "checks") {
+      var s = Math.max(8, h * 0.17), cols = Math.ceil((w + 40) / s), yy = m - s;
+      o += rct(x0 - 20, yy, w + 40, 2 * s, 0, "#FFFFFF", 0);
+      var sq = "";
+      for (var i = 0; i < cols; i++) for (var j = 0; j < 2; j++) {
+        if ((i + j) % 2) continue;
+        sq += "M " + n2(x0 - 20 + i * s) + " " + n2(yy + j * s) + " h " + n2(s) + " v " + n2(s) + " h " + n2(-s) + " Z ";
+      }
+      o += '<path d="' + sq + '" fill="' + col + '"/>' + rct(x0 - 20, yy, w + 40, 2 * s, 0, "none", 3);
+    } else if (style === "zigzag") {
+      var zz = [[x0 - 20, m + h * 0.05]], k2 = 7;
+      for (var q = 1; q <= k2; q++) zz.push([x0 - 20 + (w + 40) * q / k2, m + (q % 2 ? -1 : 1) * h * 0.18]);
+      o += beam(zz, Math.max(7, h * 0.14), col, 3);
+    }
+    return o;
+  }
+  function numberS(x, y, r, num, col) {
+    var light = !isDark(col) && rgb(col)[0] + rgb(col)[1] + rgb(col)[2] > 600;
+    return circ(x, y, r, light ? "#26282E" : "#FFFFFF", 4) + txt(x, y + r * 0.06, String(num), r * 1.5, col);
+  }
+  // Paint (clipped to the body side) and the number roundel.
+  function decalS(c, skin, band, door) {
+    var o = "";
+    if (c.paint !== "none" && band) {
+      var id = "cp" + (uid++);
+      o += '<clipPath id="' + id + '"><path d="' + skin + '"/></clipPath><g data-part="paint" clip-path="url(#' + id + ')">' + paintS(c.paint, band, c.col.stripes) + "</g>" +
+        pth(skin, "none", 5);
+    }
+    if (c.number && door) o += part("number", numberS(door.x, door.y, door.r, c.number, c.col.number));
+    return o;
+  }
+  function headS(c, x, y, s) {
+    var o = "";
+    if (c.lights === "square") o += rct(x - s * 1.1, y - s * 0.8, s * 1.6, s * 1.6, 4, LAMP, 4);
+    else if (c.lights === "big") o += circ(x - s * 0.4, y, s * 1.35, CHROME, 4) + circ(x - s * 0.4, y, s * 0.95, LAMP, 3) + circ(x - s * 0.7, y - s * 0.35, s * 0.3, "#FFFFFF", 0);
+    else o += circ(x - s * 0.3, y, s * 0.95, CHROME, 4) + circ(x - s * 0.3, y, s * 0.6, LAMP, 0);
+    return part("lights", o);
+  }
+  function tailS(x, y, w, h) { return rct(x, y, w, h, 3, "#E63946", 3.5); }
+  function beaconS(v, x, y, col) {
+    v.beacons.push({ x: x, y: y - 14, col: col || AMBER });
+    return rct(x - 14, y - 6, 28, 8, 3, STEEL_D, 3.5) + pth("M " + n2(x - 11) + " " + n2(y - 6) + " Q " + n2(x - 11) + " " + n2(y - 30) + " " + n2(x) + " " + n2(y - 30) + " Q " + n2(x + 11) + " " + n2(y - 30) + " " + n2(x + 11) + " " + n2(y - 6) + " Z", col || AMBER, 3.5) +
+      rct(x - 6, y - 24, 4, 12, 2, "rgba(255,255,255,0.7)", 0);
+  }
+  function workLightsS(x0, x1, y) {
+    var o = beam([[x0, y], [x0, y - 14], [x1, y - 14], [x1, y]], 4, STEEL_D, 3);
+    [x0 + 8, x1 - 8].forEach(function (x) { o += rct(x - 9, y - 30, 18, 15, 3, "#FFFFFF", 3.5) + rct(x - 5, y - 26, 10, 7, 1, LAMP, 0); });
+    return o;
+  }
+  function lightBarS(v, xc, y, w, big) {
+    var h = big ? 18 : 13, o = rct(xc - w / 2 - 4, y - 5, w + 8, 7, 2, STEEL_D, 3);
+    var segs = big ? 4 : 2, sw = w / segs;
+    for (var i = 0; i < segs; i++) {
+      var col = i < segs / 2 ? "#E63946" : "#2D5BD7";
+      o += rct(xc - w / 2 + i * sw, y - 5 - h, sw, h, i === 0 ? 6 : (i === segs - 1 ? 6 : 1), col, 3.5);
+      v.beacons.push({ x: xc - w / 2 + (i + 0.5) * sw, y: y - 5 - h / 2, col: col, alt: i < segs / 2 ? 0 : 1 });
+    }
+    o += rct(xc - w / 2 + 5, y - 2 - h, w - 10, 3, 1.5, "rgba(255,255,255,0.6)", 0);
+    return o;
+  }
+  function domeS(v, x, y, col, alt) {
+    v.beacons.push({ x: x, y: y - 14, col: col, alt: alt });
+    return rct(x - 13, y - 5, 26, 7, 2, STEEL_D, 3) + pth("M " + n2(x - 10) + " " + n2(y - 5) + " Q " + n2(x - 10) + " " + n2(y - 26) + " " + n2(x) + " " + n2(y - 26) + " Q " + n2(x + 10) + " " + n2(y - 26) + " " + n2(x + 10) + " " + n2(y - 5) + " Z", col, 3.5);
+  }
+  // Roof items for the work/rescue/monster families. roof = [x0, x1, y].
+  function roofS(v, c, roof, fam) {
+    var x0 = roof[0], x1 = roof[1], y = roof[2], xc = (x0 + x1) / 2, o = "";
+    if (fam === "rescue") {
+      if (c.top === "beacons") o += domeS(v, x0 + 16, y, "#E63946", 0) + domeS(v, x1 - 16, y, "#2D5BD7", 1);
+      else o += lightBarS(v, xc, y, Math.min(x1 - x0 - 10, c.top === "big" ? 96 : 70), c.top === "big");
+    } else if (c.top === "beacon") o += beaconS(v, xc, y);
+    else if (c.top === "lights") o += fam === "monster" ? lightBarMonster(xc, y, x1 - x0) : workLightsS(xc - 26, xc + 26, y);
+    return part("top", o);
+  }
+  function lightBarMonster(xc, y, w) {
+    var o = beam([[xc - w * 0.35, y], [xc - w * 0.35, y - 16], [xc + w * 0.35, y - 16], [xc + w * 0.35, y]], 5, STEEL_D, 3);
+    for (var i = 0; i < 4; i++) {
+      var x = xc - w * 0.3 + i * w * 0.2;
+      o += circ(x, y - 28, 10, CHROME, 3.5) + circ(x, y - 28, 6, LAMP, 0);
+    }
+    return o;
+  }
+  // Exhaust stacks rising from (x, y), h tall; exhaust points recorded for smoke.
+  function stacksS(v, c, x, y, h, gap) {
+    var o = "";
+    if (c.engine === "none") return part("engine", "");
+    if (c.engine === "blower") {
+      v.exhausts.push({ x: x, y: y - h * 0.55 });
+      o += rct(x - 20, y - h * 0.32, 40, h * 0.32 + 4, 5, CHROME, 4) + rct(x - 14, y - h * 0.52, 28, h * 0.22, 4, STEEL_D, 4);
+      o += pth("M " + n2(x - 16) + " " + n2(y - h * 0.5) + " L " + n2(x + 22) + " " + n2(y - h * 0.62) + " L " + n2(x + 22) + " " + n2(y - h * 0.44) + " Z", "#FFC93C", 3.5);
+      for (var i = 0; i < 3; i++) o += rct(x - 16 + i * 12, y - h * 0.3, 7, h * 0.26, 2, "rgba(29,35,64,0.25)", 0);
+      return part("engine", o);
+    }
+    var xs = c.engine === "two" ? [x - (gap || 16), x + (gap || 16) * 0.2] : [x];
+    xs.forEach(function (sx, i) {
+      var top = y - h + i * 6;
+      o += beam([[sx, y], [sx, top]], 9, i === 0 && xs.length > 1 ? "#AEB6C4" : CHROME, 4);
+      o += rct(sx - 9, top - 6, 18, 7, 2, STEEL_D, 3.5);
+      v.exhausts.push({ x: sx, y: top - 6 });
+    });
+    return part("engine", o);
+  }
+  // Rear pipes for fast cars, or a blower poking through the hood.
+  function pipesS(v, c, rear, hood) {
+    var o = "";
+    if (c.engine === "none") return part("engine", "");
+    if (c.engine === "blower" && hood) {
+      var x = hood[0], y = hood[1];
+      v.exhausts.push({ x: x, y: y - 44 });
+      o += rct(x - 24, y - 26, 48, 28, 6, CHROME, 4);
+      for (var i = 0; i < 4; i++) o += rct(x - 19 + i * 10, y - 22, 5, 20, 2, "rgba(29,35,64,0.25)", 0);
+      o += pth("M " + n2(x - 20) + " " + n2(y - 26) + " L " + n2(x - 14) + " " + n2(y - 46) + " L " + n2(x + 26) + " " + n2(y - 46) + " L " + n2(x + 18) + " " + n2(y - 26) + " Z", STEEL_D, 4);
+      o += rct(x - 6, y - 42, 28, 8, 3, "#FFC93C", 3);
+      return part("engine", o);
+    }
+    var ys = c.engine === "two" ? [rear[1] - 4, rear[1] + 8] : [rear[1] + 2];
+    ys.forEach(function (py) {
+      o += beam([[rear[0] + 18, py], [rear[0] - 10, py]], 8, CHROME, 3.5) + circ(rear[0] - 12, py, 5, DARK, 3);
+      v.exhausts.push({ x: rear[0] - 14, y: py, back: true });
+    });
+    return part("engine", o);
+  }
+  function spoilerS(c, x, y, big) {
+    var col = c.col.trim, o = "";
+    var h = big ? 46 : 26, w = big ? 74 : 58;
+    o += beam([[x + 12, y], [x + 8, y - h]], 6, STEEL_D, 3.5) + beam([[x + 40, y], [x + 36, y - h]], 6, STEEL_D, 3.5);
+    o += pth(rp([[x - 8, y - h - 12, 4], [x + w - 6, y - h - 2, 4], [x + w - 4, y - h + 8, 4], [x - 6, y - h + 4, 4]]), col, 4);
+    if (big) o += rct(x - 12, y - h - 20, 10, 34, 3, shade(col, 0.15), 3.5);
+    return part("top", o);
+  }
+  // ---- the vehicle model: drawing layers plus the bits the drive mode animates ----
+  // L: layers back to front. A layer is {svg, chain} (chain = joints it hangs from), {wheels:true} or {track:true}.
+  function mkV(kind, c) {
+    return { kind: kind, c: c, L: [], wheels: [], joints: {}, track: null, drum: null, exhausts: [], beacons: [], shocks: [], hooks: {}, head: null, bed: null };
+  }
+  function add(v, svg, chain) { v.L.push({ svg: svg, chain: chain || [] }); }
+  function addWheels(v) { v.L.push({ wheels: true, chain: [] }); }
+  function wheel(v, c, x, r, extra) {
+    var w = { x: x, y: -r, r: r, style: "tire", rim: c.rims, rimCol: c.col.rims, knobby: !!(extra && extra.knobby) };
+    if (extra && extra.front) w.front = true;
+    v.wheels.push(w);
+    return w;
+  }
+
+  // Lower body + greenhouse for cars (race, sports, rally, police and the monster bodies).
+  function ghPts(xa, xb, yb, yt, style) {
+    var h = yb - yt;
+    if (style === "round") return [[xa, yb, 0], [xa + 2, yt + h * 0.1, 30], [xa + (xb - xa) * 0.38, yt - h * 0.04, 40], [xb - h * 0.75, yt + h * 0.02, 30], [xb, yb, 0]];
+    if (style === "slant") return [[xa, yb, 0], [xa + (xb - xa) * 0.45, yt, 16], [xb - h * 0.72, yt, 12], [xb, yb, 0]];
+    return [[xa, yb, 0], [xa + h * 0.12, yt, 10], [xb - h * 0.55, yt, 10], [xb, yb, 0]];
+  }
+  function insetPts(pts, d) {
+    // Move each vertex inward along the bisector (simple polygon inset, fine for these chunky shapes).
+    var n = pts.length, cx = 0, cy = 0;
+    pts.forEach(function (p) { cx += p[0] / n; cy += p[1] / n; });
+    return pts.map(function (p) {
+      var dx = cx - p[0], dy = cy - p[1], l = Math.sqrt(dx * dx + dy * dy) || 1;
+      return [p[0] + dx / l * d * 1.25, p[1] + dy / l * d, Math.max(0, (p[2] || 0) - d * 0.6)];
+    });
+  }
+  function carBody(v, c, P) {
+    var K = c.col, o = "", arcList = P.wb.map(function (w) { return { x: w.x, cy: -w.r, R: w.r + (P.pad || 7) }; });
+    var pts = [
+      [P.xr + 8, P.sill, 10], [P.xr, P.deck + 16, 12], [P.xr + 16, P.deck, 10], [P.cowl, P.belt, 6],
+      [P.xf - 18, P.hoodF, 22], [P.xf, P.noseY, 12], [P.xf - 6, P.sill, 8]
+    ].concat(arches(P.sill, arcList));
+    var skin = rp(pts);
+    // greenhouse
+    var g = P.gh, gp = ghPts(g.xa, g.xb, P.belt + 8, g.yt, c.cab);
+    var gh = pth(rp(gp), K.trim, 5);
+    var wy0 = g.yt + 10, wy1 = P.belt - 6;
+    var wp = ghPts(g.xa + 13, g.xb - 14, wy1, wy0, c.cab).map(function (p, i) { return [p[0], p[1], i === 0 || i === gp.length - 1 ? 4 : Math.max(4, (p[2] || 0) - 6)]; });
+    var bx = g.bx || (g.xa + (g.xb - g.xa) * 0.5);
+    gh += windowS(rp(wp), g.xa, wy0, g.xb, wy1) + rct(bx - 6, wy0 - 4, 12, wy1 - wy0 + 6, 2, K.trim, 4);
+    if (P.extraCab) gh += P.extraCab;
+    add(v, part("cab", gh));
+    o += wellS(P.sill, arcList) + pth(skin, K.body, 5);
+    if (P.twoTone) o += P.twoTone(skin);
+    o += pth("M " + n2(P.xr + 30) + " " + n2(P.belt + 10) + " L " + n2(P.xf - 40) + " " + n2(P.belt + 10), "none", 0, ' stroke="rgba(255,255,255,0.35)" stroke-width="6" stroke-linecap="round"');
+    o += decalS(c, skin, { x0: P.xr, x1: P.xf, y0: P.belt + 4, y1: P.sill - 2 }, P.door);
+    if (P.label) o += txt(P.label.x, P.label.y, P.label.text, P.label.size, onBody(P.label.on || K.body), P.label.stroke);
+    o += rct(bx - 30, P.belt + 14, 18, 6, 3, shade(K.body, 0.35), 0);
+    o += rct(P.xf - 14, P.sill - 12, 22, 14, 5, P.bumper || CHROME, 4) + rct(P.xr - 8, P.sill - 12, 22, 14, 5, P.bumper || CHROME, 4);
+    o += tailS(P.xr - 3, P.deck + 12, 12, 14);
+    o += headS(c, P.xf - 8, (P.hoodF + P.noseY) / 2 + 4, P.headS || 9);
+    if (P.extraBody) o += P.extraBody;
+    add(v, part("body", o));
+    v.head = { x: P.xf, y: (P.hoodF + P.noseY) / 2 + 4 };
+    return skin;
+  }
+  function shockS(x0, y0, x1, y1, col) {
+    var dx = x1 - x0, dy = y1 - y0, l = Math.sqrt(dx * dx + dy * dy), ux = dx / l, uy = dy / l, px = -uy, py = ux, d = "", n = 7;
+    for (var i = 0; i <= n; i++) {
+      var t = 0.18 + 0.64 * i / n, s = (i % 2 ? 1 : -1) * 9;
+      d += (i ? " L " : "M ") + n2(x0 + dx * t + px * s) + " " + n2(y0 + dy * t + py * s);
+    }
+    return beam([[x0, y0], [x1, y1]], 8, CHROME, 3.5) + '<path d="' + d + '" fill="none" stroke="' + OUT + '" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + (col || "#FFC93C") + '" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+
+  // A truck cab with an optional hood. o: x0, x1 (cab), hoodX (front), yb, yt, hoodY, wheel {x, r}, flat (no hood).
+  function truckCab(v, c, o) {
+    var K = c.col, st = c.cab, h = o.yb - o.yt, fx = o.flat ? o.hoodX : o.x1;
+    var pts = [[o.x0, o.yb, 6], [o.x0, o.yt, 10]];
+    if (st === "round") pts.push([fx - 4, o.yt, 44], [fx, o.yt + h * 0.5, 14]);
+    else if (st === "slant") pts.push([fx - h * 0.3, o.yt, 8], [fx, o.yt + h * 0.47, 8]);
+    else pts.push([fx - 4, o.yt, 10], [fx, o.yt + 14, 8]);
+    if (!o.flat) pts.push([o.x1 + 4, o.hoodY, 6], [o.hoodX - 14, o.hoodY + 2, 16], [o.hoodX, o.hoodY + 20, 8]);
+    pts.push([o.hoodX, o.yb, 8]);
+    var arc = [{ x: o.wheel.x, cy: -o.wheel.r, R: o.wheel.r + 9 }];
+    pts = pts.concat(arches(o.yb, arc));
+    var skin = rp(pts), s = "";
+    s += wellS(o.yb, arc) + pth(skin, K.body, 5);
+    s += decalS(c, skin, { x0: o.x0, x1: o.hoodX, y0: o.yt + h * 0.55, y1: o.yb - 4 }, null);
+    // side window
+    var wx0 = o.x0 + 14, wx1 = fx - 12, wy0 = o.yt + 12, wy1 = o.yt + h * 0.48, wp;
+    if (st === "round") wp = [[wx0, wy1, 4], [wx0, wy0, 6], [wx1 - 4, wy0, 30], [wx1, wy1, 4]];
+    else if (st === "slant") wp = [[wx0, wy1, 4], [wx0, wy0, 6], [wx1 - (wy1 - wy0) * 0.64, wy0, 5], [wx1, wy1, 4]];
+    else wp = [[wx0, wy1, 4], [wx0, wy0, 6], [wx1, wy0, 6], [wx1, wy1, 4]];
+    if (o.split) {
+      var mx = o.split;
+      s += windowS(rp(wp), wx0, wy0, wx1, wy1) + rct(mx - 6, wy0 - 3, 12, wy1 - wy0 + 6, 2, K.body, 4);
+    } else s += windowS(rp(wp), wx0, wy0, wx1, wy1);
+    // door seam, handle, mirror, step
+    var dx0 = o.x0 + 8, dx1 = o.split ? o.split - 4 : fx - 6;
+    s += pth("M " + n2(o.split ? o.split + 6 : dx0) + " " + n2(wy1 + 4) + " L " + n2(o.split ? o.split + 6 : dx0) + " " + n2(o.yb - 6), "none", 0, ' stroke="' + shade(K.body, 0.4) + '" stroke-width="3"');
+    s += rct((dx0 + dx1) / 2 + 8, wy1 + 14, 20, 6, 3, shade(K.body, 0.4), 0);
+    s += beam([[fx - 2, o.yt + h * 0.32], [fx + 12, o.yt + h * 0.32]], 4, STEEL_D, 3) + rct(fx + 8, o.yt + h * 0.2, 9, 30, 3, STEEL_D, 3.5);
+    s += rct(o.x0 + 18, o.yb - 4, 34, 10, 3, STEEL, 3.5);
+    if (!o.flat) {
+      // grille + bumper
+      s += rct(o.hoodX - 9, o.hoodY + 22, 12, o.yb - o.hoodY - 30, 3, K.trim, 3.5);
+      for (var k = 0; k < 4; k++) s += rct(o.hoodX - 7, o.hoodY + 28 + k * (o.yb - o.hoodY - 40) / 4, 8, 3, 1, "rgba(29,35,64,0.45)", 0);
+      s += headS(c, o.hoodX - 2, o.hoodY + 30, 9);
+      v.head = { x: o.hoodX, y: o.hoodY + 30 };
+    } else {
+      s += rct(o.hoodX - 9, o.yb - 46, 12, 36, 3, K.trim, 3.5) + headS(c, o.hoodX - 2, o.yb - 56, 9);
+      v.head = { x: o.hoodX, y: o.yb - 56 };
+    }
+    s += rct(o.hoodX - 12, o.yb - 10, 26, 18, 5, K.trim, 4);
+    add(v, part("cab", s));
+    return { skin: skin, roof: [o.x0 + 10, fx - (st === "slant" ? h * 0.3 : 20), o.yt] };
+  }
+  function chassisS(x0, x1, y, col) {
+    return rct(x0, y - 16, x1 - x0, 18, 4, col || "#3A3F4E", 4);
+  }
+  function mudflap(x, y) { return rct(x - 4, y, 9, 34, 3, DARK, 3); }
+
+  // ---------------- Construction ----------------
+  function genExcavator(v, c) {
+    var K = c.col, o = "";
+    addTrack(v, c, -112, 112, 36);
+    addWheels(v);
+    // house
+    o += rct(-62, -86, 124, 16, 4, "#3A3F4E", 4);
+    var house = rp([[-140, -84, 8], [-140, -158, 10], [30, -158, 0], [104, -150, 10], [104, -84, 8]]);
+    o += pth(house, K.body, 5);
+    o += decalS(c, house, { x0: -140, x1: 104, y0: -150, y1: -90 }, { x: -40, y: -118, r: 22 });
+    o += pth(rp([[-150, -84, 8], [-178, -96, 16], [-178, -148, 16], [-150, -160, 8], [-120, -160, 4], [-120, -84, 4]]), K.trim, 5);
+    for (var i = 0; i < 4; i++) o += rct(-108 + i * 16, -146, 8, 26, 3, shade(K.body, 0.3), 0);
+    o += beam([[-140, -166], [-140, -176], [-20, -176], [-20, -166]], 4, STEEL_D, 3);
+    o += tailS(-182, -134, 8, 14) + headS(c, 98, -104, 9);
+    o += stacksS(v, c, -95, -158, 60);
+    add(v, part("body", o));
+    // the arm: boom -> stick -> tool
+    v.joints = { boom: { x: 64, y: -126 }, stick: { x: 238, y: -262 }, tool: { x: 296, y: -118 } };
+    var boom = beam([[60, -126], [170, -266], [242, -262]], 30, K.tool) + ram([42, -110], [140, -218], 14) +
+      circ(64, -126, 9, STEEL_D, 3.5) + rct(120, -220, 40, 10, 4, shade(K.tool, 0.3), 0);
+    add(v, part("tool", boom), ["boom"]);
+    var stick = beam([[222, -296], [238, -262], [296, -118]], 22, K.tool) + ram([172, -262], [222, -294], 11) + ram([246, -232], [290, -150], 9) +
+      circ(238, -262, 8, STEEL_D, 3.5);
+    add(v, part("tool", stick), ["boom", "stick"]);
+    var tl = "";
+    if (c.tool === "claw") {
+      tl += pth(rp([[290, -124, 6], [306, -120, 6], [320, -60, 10], [308, -16, 4], [296, -40, 6], [292, -80, 8]]), K.tool, 4.5);
+      tl += pth(rp([[296, -118, 6], [284, -112, 6], [262, -66, 10], [270, -20, 4], [278, -44, 6], [286, -84, 8]]), shade(K.tool, 0.2), 4.5);
+      v.hooks.load = { chain: ["boom", "stick", "tool"], x: 291, y: -44, r: 20 };
+      v.hooks.tip = { chain: ["boom", "stick", "tool"], x: 290, y: -16 };
+    } else if (c.tool === "breaker") {
+      tl += rct(278, -124, 36, 76, 8, K.tool, 4.5) + rct(284, -116, 24, 10, 3, shade(K.tool, 0.3), 0) + rct(288, -48, 16, 18, 3, STEEL_D, 4);
+      tl += pth("M 290 -30 L 302 -30 L 298 4 L 294 4 Z", CHROME, 4);
+      v.hooks.tip = { chain: ["boom", "stick", "tool"], x: 296, y: 4 };
+    } else {
+      tl += pth(rp([[288, -126, 8], [322, -116, 12], [334, -70, 30], [314, -24, 16], [266, -14, 0], [276, -34, 6], [294, -80, 10]]), K.tool, 5);
+      tl += pth("M 268 -14 L 262 -4 L 276 -8 Z M 282 -18 L 278 -6 L 290 -12 Z", CHROME, 3);
+      tl += pth("M 300 -86 Q 316 -64 302 -36", "none", 0, ' stroke="' + shade(K.tool, 0.35) + '" stroke-width="5" stroke-linecap="round"');
+      v.hooks.load = { chain: ["boom", "stick", "tool"], x: 296, y: -44, r: 24 };
+      v.hooks.tip = { chain: ["boom", "stick", "tool"], x: 266, y: -10 };
+    }
+    tl += circ(296, -118, 8, STEEL_D, 3.5);
+    add(v, part("tool", tl), ["boom", "stick", "tool"]);
+    // cab in front of the boom root
+    var cb = cabBox(v, c, 6, 98, -156, -262, "work");
+    add(v, part("cab", cb));
+  }
+  // A square-ish operator cab (excavator, dozer, loader, tractor). Returns svg; records roof items.
+  function cabBox(v, c, x0, x1, yb, yt, fam) {
+    var K = c.col, st = c.cab, h = yb - yt, o = "", pts;
+    if (st === "round") pts = [[x0, yb, 4], [x0, yt, 12], [x1, yt, 34], [x1, yb, 4]];
+    else if (st === "slant") pts = [[x0, yb, 4], [x0, yt, 10], [x1 - h * 0.28, yt, 8], [x1, yt + h * 0.55, 6], [x1, yb, 4]];
+    else pts = [[x0, yb, 4], [x0, yt, 10], [x1, yt, 10], [x1, yb, 4]];
+    o += pth(rp(pts), K.trim, 5);
+    var ip = insetPts(pts, 10);
+    ip[0][1] = ip[ip.length - 1][1] = yb - h * 0.22;
+    o += windowS(rp(ip), x0 + 8, yt + 8, x1 - 8, yb - 10);
+    o += rct(x0 + (x1 - x0) * 0.55 - 5, yt + 6, 10, h * 0.8, 2, K.trim, 4);
+    o += rct(x0 - 4, yt - 8, x1 - x0 + 8, 12, 5, K.trim, 4);
+    o += roofS(v, c, [x0 + 6, x1 - 6, yt - 8], fam === "farm" ? "farm" : "work");
+    return o;
+  }
+
+  function genBulldozer(v, c) {
+    var K = c.col, o = "";
+    addTrack(v, c, -118, 104, 38);
+    addWheels(v);
+    if (c.tool === "ripper") {
+      o += beam([[-150, -60], [-196, -60], [-206, -6]], 14, K.tool) + pth("M -212 -12 L -200 -12 L -208 6 Z", CHROME, 3);
+    }
+    var body = rp([[-160, -76, 6], [-160, -152, 8], [112, -152, 10], [132, -132, 8], [132, -76, 6]]);
+    o += pth(body, K.body, 5);
+    o += decalS(c, body, { x0: -160, x1: 132, y0: -146, y1: -82 }, { x: 40, y: -114, r: 22 });
+    for (var i = 0; i < 5; i++) o += rct(118, -136 + i * 11, 10, 5, 2, "rgba(29,35,64,0.5)", 0);
+    o += headS(c, 104, -118, 9);
+    o += rct(-10, -142, 100, 8, 4, shade(K.body, 0.25), 0);
+    o += stacksS(v, c, 70, -152, 56);
+    add(v, part("body", o));
+    o = cabBox(v, c, -150, -40, -152, -262, "work");
+    add(v, part("cab", o));
+    // blade on push arms, lifted around the pivot
+    v.joints = { blade: { x: -40, y: -40 } };
+    var big = c.tool === "big", top = big ? -168 : -138, bl = "";
+    bl += beam([[-40, -40], [156, -44]], 18, shade(K.tool, 0.15)) + ram([96, -140], [154, -96], 12);
+    bl += pth(rp([[150, -2, 4], [150, top + 6, 6], [178, top - 6, 8], [166, top * 0.55, 30], [196, -6, 4], [190, 2, 2]]), K.tool, 5);
+    bl += pth("M 158 " + n2(top + 14) + " Q 154 " + n2(top * 0.5) + " 168 -16", "none", 0, ' stroke="' + shade(K.tool, 0.3) + '" stroke-width="5" stroke-linecap="round"');
+    bl += pth("M 186 -10 L 198 -10 L 196 2 L 186 2 Z", CHROME, 3.5);
+    if (big) bl += pth(rp([[148, -4, 4], [148, top + 10, 6], [132, top + 24, 6], [132, -16, 4]]), shade(K.tool, 0.2), 4.5);
+    add(v, part("tool", bl), ["blade"]);
+    v.hooks.blade = { chain: ["blade"], x: 196, y: -4 };
+  }
+
+  function genDump(v, c) {
+    var K = c.col, r = { s: 35, m: 40, l: 46 }[c.wheels], o = "";
+    var fw = wheel(v, c, 160, r, { front: true }); wheel(v, c, -92, r); wheel(v, c, -176, r);
+    o += chassisS(-236, 210, -70, shade(K.trim, 0.2)) + rct(76, -104, 52, 30, 10, CHROME, 4) + mudflap(-224, -78);
+    add(v, o);
+    // bed (tips about its back corner)
+    v.joints = { bed: { x: -232, y: -94 } };
+    var b = "";
+    var bed = rp([[-238, -92, 6], [-248, -204, 8], [46, -204, 6], [46, -92, 6]]);
+    b += pth(bed, K.tool, 5);
+    for (var i = 0; i < 5; i++) b += rct(-200 + i * 50, -196, 9, 96, 3, shade(K.tool, 0.22), 0);
+    b += rct(-252, -214, 302, 14, 5, shade(K.tool, 0.12), 4.5) + pth(rp([[46, -214, 4], [76, -214, 6], [76, -200, 4], [46, -200, 4]]), shade(K.tool, 0.12), 4.5);
+    b += decalS(c, bed, { x0: -248, x1: 46, y0: -196, y1: -100 }, c.number ? { x: -100, y: -148, r: 26 } : null);
+    add(v, part("tool", b), ["bed"]);
+    v.bed = { chain: ["bed"], x0: -240, x1: 40, y: -212, h: 44, col: DIRT };
+    var cab = truckCab(v, c, { x0: 58, x1: 158, hoodX: 236, yb: -84, yt: -236, hoodY: -150, wheel: fw });
+    add(v, roofS(v, c, cab.roof, "work"));
+    add(v, stacksS(v, c, 50, -110, 140, 14));
+    addWheels(v);
+  }
+
+  function genMixer(v, c) {
+    var K = c.col, r = { s: 35, m: 40, l: 46 }[c.wheels], o = "";
+    var fw = wheel(v, c, 160, r, { front: true }); wheel(v, c, -92, r); wheel(v, c, -176, r);
+    o += chassisS(-236, 210, -70, shade(K.trim, 0.2)) + rct(76, -104, 52, 30, 10, CHROME, 4) + mudflap(-224, -78);
+    // supports and water tank
+    o += pth("M -200 -86 L -186 -160 L -166 -160 L -170 -86 Z", K.trim, 4.5) + pth("M 6 -86 L 18 -130 L 36 -130 L 32 -86 Z", K.trim, 4.5);
+    o += rct(38, -200, 18, 112, 8, CHROME, 4);
+    add(v, o);
+    var drum = rp([[48, -112, 26], [48, -186, 26], [-50, -246, 70], [-192, -232, 26], [-222, -206, 8], [-222, -168, 8], [-196, -132, 26], [-60, -96, 70]]);
+    v.drum = { d: drum, col: K.tool, band: tint(K.tool, 0.55), y0: -250, y1: -92, x0: -226, x1: 52 };
+    var dr = pth(drum, K.tool, 5) + drumStripes(v.drum, 0) + pth(drum, "none", 5);
+    v.drumLayer = v.L.length; add(v, part("tool", dr));
+    // rear hopper + chute (the chute swings down to pour)
+    add(v, pth("M -214 -244 L -250 -270 L -262 -256 L -226 -210 Z", shade(K.tool, 0.25), 4.5) + ram([-182, -120], [-224, -190], 8));
+    v.joints = { chute: { x: -226, y: -170 } };
+    add(v, part("tool", beam([[-226, -170], [-272, -126]], 16, STEEL) + pth("M -280 -132 L -266 -118 L -276 -108 L -290 -122 Z", STEEL_D, 4)), ["chute"]);
+    v.hooks.pour = { chain: ["chute"], x: -284, y: -116 };
+    var cab = truckCab(v, c, { x0: 58, x1: 158, hoodX: 236, yb: -84, yt: -236, hoodY: -150, wheel: fw });
+    add(v, roofS(v, c, cab.roof, "work"));
+    add(v, stacksS(v, c, 36, -206, 40, 12));
+    addWheels(v);
+  }
+  // Spiral bands on the mixer drum; phase slides them along so the drum looks like it is turning.
+  function drumStripes(dm, phase) {
+    var d = "", sp = 64, w = 22, x;
+    var start = dm.x0 - 80 + (((phase % sp) + sp) % sp) - sp;
+    for (x = start; x < dm.x1 + 80; x += sp) {
+      d += "M " + n2(x) + " " + n2(dm.y1) + " L " + n2(x + w) + " " + n2(dm.y1) + " L " + n2(x + w + 70) + " " + n2(dm.y0) + " L " + n2(x + 70) + " " + n2(dm.y0) + " Z ";
+    }
+    var id = "dm" + (uid++);
+    return '<clipPath id="' + id + '"><path d="' + dm.d + '"/></clipPath><g clip-path="url(#' + id + ')"><path d="' + d + '" fill="' + dm.band + '"/>' +
+      '<path d="M ' + n2(dm.x0) + " " + n2(dm.y0 + 30) + " L " + n2(dm.x1) + " " + n2(dm.y0 + 70) + '" stroke="rgba(255,255,255,0.35)" stroke-width="12" fill="none"/></g>';
+  }
+
+  function genLoader(v, c) {
+    var K = c.col, r = { s: 50, m: 56, l: 63 }[c.wheels], o = "";
+    var rw = wheel(v, c, -108, r), fw = wheel(v, c, 100, r, { front: true });
+    var arc = [{ x: rw.x, cy: -r, R: r + 9 }, { x: fw.x, cy: -r, R: r + 9 }];
+    o += rct(-30, -112, 60, 40, 8, "#3A3F4E", 4);
+    var rear = rp([[-200, -66, 10], [-206, -158, 14], [-40, -164, 6], [-34, -66, 6]].concat(arches(-66, [arc[0]])));
+    o += wellS(-66, [arc[0]]) + pth(rear, K.body, 5);
+    o += decalS(c, rear, { x0: -206, x1: -34, y0: -156, y1: -72 }, null);
+    o += rct(-214, -100, 24, 34, 6, K.trim, 4.5);
+    for (var i = 0; i < 4; i++) o += rct(-196, -146 + i * 12, 40, 5, 2, "rgba(29,35,64,0.4)", 0);
+    o += tailS(-208, -152, 10, 14);
+    var front = rp([[20, -70, 6], [20, -124, 6], [130, -124, 8], [150, -70, 6]].concat(arches(-70, [arc[1]])));
+    o += wellS(-70, [arc[1]]) + pth(front, K.body, 5);
+    o += stacksS(v, c, -170, -158, 56);
+    add(v, part("body", o));
+    o = cabBox(v, c, -96, 6, -160, -300, "work");
+    if (c.number) o += part("number", numberS(-120, -112, 22, c.number, K.number));
+    o += headS(c, 132, -106, 9);
+    v.head = { x: 140, y: -106 };
+    add(v, part("cab", o));
+    addWheels(v);
+    v.joints = { arm: { x: 0, y: -150 }, tool: { x: 196, y: -64 } };
+    add(v, part("tool", beam([[0, -150], [110, -146], [196, -64]], 24, K.tool) + ram([40, -96], [120, -138], 12) + circ(0, -150, 9, STEEL_D, 3.5)), ["arm"]);
+    var big = c.tool === "big", bh = big ? 120 : 98, bw = big ? 112 : 92, tl = "";
+    tl += pth(rp([[182, -bh, 8], [204, -bh - 8, 8], [200, -bh * 0.55, 30], [188, -6, 10], [184 + bw, -4, 0], [186 + bw, -18, 4], [196, -bh * 0.4 - 8, 0], [210, -bh + 6, 6]]), K.tool, 5);
+    tl += pth("M " + n2(176 + bw) + " -2 L " + n2(194 + bw) + " -2 L " + n2(190 + bw) + " -14 Z", CHROME, 3);
+    tl += circ(196, -64, 8, STEEL_D, 3.5);
+    add(v, part("tool", tl), ["arm", "tool"]);
+    v.hooks.load = { chain: ["arm", "tool"], x: 200 + bw * 0.45, y: -26, r: bw * 0.36 };
+    v.hooks.tip = { chain: ["arm", "tool"], x: 186 + bw, y: -6 };
+  }
+
+  function genCrane(v, c) {
+    var K = c.col, r = { s: 35, m: 40, l: 46 }[c.wheels], o = "";
+    var fw = wheel(v, c, 170, r, { front: true }); wheel(v, c, -62, r); wheel(v, c, -146, r);
+    o += chassisS(-250, 220, -70, shade(K.trim, 0.2));
+    o += rct(-254, -106, 344, 24, 5, K.trim, 4.5) + rct(-246, -96, 30, 40, 4, STEEL_D, 4) + rct(52, -96, 30, 40, 4, STEEL_D, 4);
+    o += rct(-250, -60, 38, 16, 4, "#FFC93C", 3.5) + rct(48, -60, 38, 16, 4, "#FFC93C", 3.5);
+    // turret + operator cab
+    var tur = rp([[-226, -104, 6], [-226, -172, 10], [-90, -172, 10], [-90, -104, 6]]);
+    o += pth(tur, K.body, 5) + decalS(c, tur, { x0: -226, x1: -90, y0: -166, y1: -110 }, c.number ? { x: -178, y: -138, r: 22 } : null);
+    o += rct(-132, -206, 40, 84, 8, K.trim, 4.5) + windowS(rp([[-126, -150, 3], [-126, -198, 5], [-98, -198, 5], [-98, -150, 3]]), -126, -198, -98, -150);
+    add(v, o);
+    var cab = truckCab(v, c, { x0: 86, x1: 168, hoodX: 244, yb: -84, yt: -214, hoodY: -144, wheel: fw });
+    add(v, roofS(v, c, [cab.roof[0], cab.roof[1] - 20, cab.roof[2]], "work"));
+    add(v, stacksS(v, c, 76, -110, 120, 12));
+    addWheels(v);
+    v.joints = { boom: { x: -186, y: -166 } };
+    var bm = beam([[-186, -166], [70, -222]], 32, K.tool) + beam([[60, -220], [262, -262]], 20, shade(K.tool, 0.12)) +
+      ram([-150, -112], [-90, -186], 14) + circ(-186, -166, 10, STEEL_D, 4) + circ(262, -262, 10, STEEL_D, 4);
+    for (var i = 0; i < 4; i++) bm += rct(-150 + i * 50, -186 - i * 11, 22, 6, 3, shade(K.tool, 0.3), 0, ' transform="rotate(-12 ' + (-139 + i * 50) + " " + (-183 - i * 11) + ')"');
+    add(v, part("tool", bm), ["boom"]);
+    v.hooks.boomTip = { chain: ["boom"], x: 262, y: -262 };
+    v.crane = { rest: 34 };
+    add(v, hookS(262, -262, 34));
+  }
+  function plusD(cx, cy, a, t) {
+    return "M " + n2(cx - a) + " " + n2(cy - t) + " H " + n2(cx - t) + " V " + n2(cy - a) + " H " + n2(cx + t) + " V " + n2(cy - t) + " H " + n2(cx + a) +
+      " V " + n2(cy + t) + " H " + n2(cx + t) + " V " + n2(cy + a) + " H " + n2(cx - t) + " V " + n2(cy + t) + " H " + n2(cx - a) + " Z";
+  }
+  function hookS(x, y, len) {
+    return '<path d="M ' + n2(x) + " " + n2(y) + " L " + n2(x) + " " + n2(y + len) + '" stroke="' + OUT + '" stroke-width="3"/>' +
+      rct(x - 11, y + len, 22, 20, 5, "#FFC93C", 3.5) + pth("M " + n2(x) + " " + n2(y + len + 20) + " L " + n2(x) + " " + n2(y + len + 30) + " Q " + n2(x + 10) + " " + n2(y + len + 40) + " " + n2(x - 2) + " " + n2(y + len + 44) + " Q " + n2(x - 10) + " " + n2(y + len + 42) + " " + n2(x - 10) + " " + n2(y + len + 34), "none", 5, "");
+  }
+
+  // ---------------- Fast cars ----------------
+  function genCarLike(v, c, kind) {
+    var K = c.col, base = { s: 30, m: 34, l: 39 }[c.wheels], P;
+    if (kind === "sports") {
+      wheel(v, c, -116, base - 1); wheel(v, c, 120, base - 1, { front: true });
+      P = { xr: -186, xf: 198, sill: -16, belt: -66, deck: -70, cowl: 34, hoodF: -48, noseY: -34, gh: { xa: -96, xb: 40, yt: -108 }, door: { x: -6, y: -42, r: 20 } };
+    } else if (kind === "rally") {
+      wheel(v, c, -112, base); wheel(v, c, 116, base, { front: true });
+      P = { xr: -168, xf: 180, sill: -30, belt: -84, deck: -96, cowl: 44, hoodF: -76, noseY: -56, gh: { xa: -164, xb: 48, yt: -142, bx: -40 }, door: { x: 0, y: -57, r: 22 } };
+      P.extraBody = mudflap(-148, -42) + mudflap(80, -40);
+      P.extraCab = rct(-80, -152, 54, 12, 5, K.trim, 4) + pth("M -70 -152 L -60 -162 L -36 -162 L -32 -152 Z", shade(K.trim, 0.2), 3.5);
+    } else if (kind === "police") {
+      wheel(v, c, -122, base); wheel(v, c, 124, base, { front: true });
+      P = { xr: -196, xf: 196, sill: -22, belt: -80, deck: -82, cowl: 64, hoodF: -66, noseY: -44, gh: { xa: -100, xb: 66, yt: -132 }, door: null };
+      P.twoTone = function (skin) {
+        var id = "tt" + (uid++);
+        return '<clipPath id="' + id + '"><path d="' + skin + '"/></clipPath><g clip-path="url(#' + id + ')">' + rct(-104, -90, 176, 80, 0, K.trim, 4) + "</g>" + pth(skin, "none", 5);
+      };
+      P.label = { x: -16, y: -50, text: "POLICE", size: 26, on: K.trim };
+    } else {
+      wheel(v, c, -118, base); wheel(v, c, 122, base, { front: true });
+      P = { xr: -192, xf: 194, sill: -20, belt: -78, deck: -80, cowl: 60, hoodF: -62, noseY: -42, gh: { xa: -96, xb: 62, yt: -128 }, door: { x: -16, y: -50, r: 24 } };
+    }
+    P.wb = v.wheels;
+    var skin = carBody(v, c, P);
+    if (kind === "police") add(v, roofS(v, c, [-60, 10, -132], "rescue"));
+    else if (c.top !== "none") add(v, spoilerS(c, P.xr + 8, P.deck, c.top === "wing"));
+    add(v, pipesS(v, c, [P.xr, P.sill - 8], [(P.cowl + P.xf) / 2, P.hoodF + (P.cowl - P.xf) / 2 * (P.hoodF - P.belt) / (P.xf - P.cowl) * -0.2]));
+    addWheels(v);
+    return skin;
+  }
+
+  function genF1(v, c) {
+    var K = c.col, r = { s: 34, m: 38, l: 42 }[c.wheels], o = "";
+    var rw = wheel(v, c, -138, r), fw = wheel(v, c, 152, Math.round(r * 0.9), { front: true });
+    // rear wing
+    var wh = { none: 74, spoiler: 96, wing: 122 }[c.top];
+    o += beam([[-180, -50], [-176, -wh + 4]], 8, STEEL_D, 3.5);
+    o += pth(rp([[-222, -wh - 14, 4], [-150, -wh - 6, 4], [-150, -wh + 8, 4], [-222, -wh, 4]]), K.trim, 4.5);
+    if (c.top === "wing") o += pth(rp([[-218, -wh + 14, 4], [-158, -wh + 18, 4], [-158, -wh + 28, 4], [-218, -wh + 24, 4]]), K.trim, 4);
+    o += rct(-228, -wh - 22, 12, wh - 30, 4, shade(K.trim, 0.2), 4);
+    add(v, part("top", o));
+    var body = rp([[-200, -18, 6], [-204, -62, 8], [-120, -74, 12], [-64, -104, 20], [-30, -98, 8], [30, -76, 12], [120, -60, 16], [250, -36, 12], [252, -22, 6], [140, -16, 4]]);
+    o = pth(body, K.body, 5);
+    o += decalS(c, body, { x0: -204, x1: 252, y0: -80, y1: -20 }, c.number ? { x: 92, y: -42, r: 18 } : null);
+    // sidepod intake + cockpit + helmet + halo
+    o += pth(rp([[-40, -60, 6], [40, -58, 10], [40, -34, 6], [-30, -34, 6]]), shade(K.body, 0.2), 4);
+    o += circ(-2, -98, 18, K.trim, 4.5) + pth("M 2 -104 Q 18 -104 18 -92 L 4 -92 Z", "#26282E", 3);
+    o += pth("M -36 -92 Q -8 -126 34 -86", "none", 0, ' stroke="' + OUT + '" stroke-width="12" fill="none" stroke-linecap="round"') +
+      pth("M -36 -92 Q -8 -126 34 -86", "none", 0, ' stroke="' + STEEL_D + '" stroke-width="5" fill="none" stroke-linecap="round"');
+    o += pth("M -60 -100 L -50 -126 L -26 -126 L -30 -100 Z", K.body, 4.5) + rct(-48, -122, 14, 10, 3, "#26282E", 0);
+    // front wing
+    o += pth(rp([[200, -10, 3], [262, -12, 3], [264, -2, 3], [200, -2, 3]]), K.trim, 4) + rct(236, -30, 10, 28, 3, shade(K.trim, 0.2), 3.5);
+    add(v, part("body", o));
+    add(v, pipesS(v, c, [-204, -44], [-40, -128]));
+    v.head = { x: 250, y: -30 };
+    addWheels(v);
+  }
+
+  // ---------------- Monster trucks ----------------
+  function genMonster(v, c, kind) {
+    var K = c.col, r = { l: 78, xl: 88, xxl: 98 }[c.wheels], S = -Math.round(r * 1.6), o = "";
+    var rw = wheel(v, c, -150, r, { knobby: true }), fw = wheel(v, c, 150, r, { knobby: true, front: true });
+    o += rct(-190, S - 6, 380, 22, 6, "#3A3F4E", 4);
+    [rw.x, fw.x].forEach(function (wx) {
+      o += shockS(wx - 46, S + 6, wx - 8, -r, "#FFC93C") + shockS(wx + 46, S + 6, wx + 8, -r, "#FFC93C");
+      v.shocks.push({ bx: wx - 46, by: S + 6, wx: wx - 8, wy: -r }, { bx: wx + 46, by: S + 6, wx: wx + 8, wy: -r });
+    });
+    o += rct(-r * 0.2 - 150, -r - 10, r * 0.4, 20, 6, STEEL_D, 3.5) + rct(-r * 0.2 + 150, -r - 10, r * 0.4, 20, 6, STEEL_D, 3.5);
+    add(v, o, []);
+    v.shockLayer = v.L.length - 1;
+    var P;
+    if (kind === "mmuscle") {
+      P = { xr: -210, xf: 222, sill: S, belt: S - 52, deck: S - 56, cowl: 40, hoodF: S - 44, noseY: S - 26, gh: { xa: -104, xb: 46, yt: S - 100 }, pad: 12 };
+    } else if (kind === "mjeep") {
+      P = { xr: -196, xf: 206, sill: S, belt: S - 62, deck: S - 66, cowl: 60, hoodF: S - 62, noseY: S - 40, gh: { xa: -186, xb: 66, yt: S - 132, bx: -60 }, pad: 12 };
+      P.extraBody = circ(-212, S - 50, 34, DARK, 5) + circ(-212, S - 50, 18, K.rims, 4) + circ(-212, S - 50, 6, CHROME, 3);
+    } else {
+      P = { xr: -214, xf: 222, sill: S, belt: S - 60, deck: S - 60, cowl: 66, hoodF: S - 50, noseY: S - 30, gh: { xa: -46, xb: 72, yt: S - 124 }, pad: 12 };
+      P.extraBody = rct(-206, S - 66, 150, 10, 4, shade(K.body, 0.3), 3.5) + pth("M -190 " + n2(S - 4) + " L -190 " + n2(S - 54), "none", 0, ' stroke="' + shade(K.body, 0.35) + '" stroke-width="3"');
+    }
+    P.wb = [{ x: rw.x, r: r }, { x: fw.x, r: r }];
+    P.door = { x: (P.gh.xa + P.gh.xb) / 2 + 6, y: S - 30, r: 22 };
+    carBody(v, c, P);
+    if (c.top === "rollbar") {
+      var rb = kind === "mpickup" ? [-150, -60] : [P.gh.xa + 30, P.gh.xa + 90];
+      var ry = kind === "mpickup" ? S - 60 : P.gh.yt + 4;
+      add(v, part("top", beam([[rb[0], ry], [rb[0] + 14, ry - 70], [rb[1] - 6, ry - 70], [rb[1], ry]], 9, STEEL_D, 4) + circ(rb[0] + 30, ry - 82, 11, CHROME, 3.5) + circ(rb[0] + 30, ry - 82, 6, LAMP, 0) + circ(rb[1] - 24, ry - 82, 11, CHROME, 3.5) + circ(rb[1] - 24, ry - 82, 6, LAMP, 0)));
+    } else if (c.top === "lights") {
+      var gx = P.gh, gxc = (gx.xa + gx.xb) / 2 - 16;
+      add(v, part("top", lightBarMonster(gxc, gx.yt, 120)));
+    } else add(v, part("top", ""));
+    if (c.engine === "blower") add(v, pipesS(v, c, null, [(P.cowl + P.xf) / 2 + 6, P.hoodF + 2]));
+    else add(v, stacksS(v, c, kind === "mpickup" ? -60 : P.gh.xa + 10, P.belt + 2, 76, 16));
+    addWheels(v);
+  }
+
+  // ---------------- Rescue ----------------
+  function genFire(v, c) {
+    var K = c.col, r = { s: 35, m: 40, l: 46 }[c.wheels], o = "";
+    var fw = wheel(v, c, 168, r, { front: true }); wheel(v, c, -124, r); wheel(v, c, -200, r);
+    o += chassisS(-250, 230, -70, "#3A3F4E");
+    var body = rp([[-256, -76, 6], [-256, -200, 8], [64, -200, 6], [64, -76, 6]].concat(arches(-76, [{ x: -124, cy: -r, R: r + 9 }, { x: -200, cy: -r, R: r + 9 }])));
+    o += wellS(-76, [{ x: -124, cy: -r, R: r + 9 }, { x: -200, cy: -r, R: r + 9 }]) + pth(body, K.body, 5);
+    o += decalS(c, body, { x0: -256, x1: 64, y0: -110, y1: -80 }, null);
+    [[-240, -164], [-150, -78], [-60, 10]].forEach(function (d, i) {
+      var x0 = d[0], x1 = d[1], top = -190, bot = i === 0 ? -122 : -122;
+      o += rct(x0, top, x1 - x0 - 6, bot - top, 6, K.trim, 4);
+      for (var k = 1; k < 5; k++) o += rct(x0 + 4, top + k * (bot - top) / 5, x1 - x0 - 14, 3, 1, shade(K.trim, 0.3), 0);
+    });
+    o += txt(-96, -106, "FIRE", 30, onBody(K.body));
+    o += rct(-262, -216, 330, 18, 6, CHROME, 4.5) + mudflap(-250, -76);
+    o += tailS(-262, -112, 10, 18);
+    add(v, part("body", o));
+    var cab = truckCab(v, c, { x0: 62, x1: 244, hoodX: 244, yb: -76, yt: -232, wheel: fw, flat: true, split: 150 });
+    if (c.number) add(v, part("number", numberS(190, -118, 22, c.number, K.number)));
+    add(v, roofS(v, c, [cab.roof[0] + 30, cab.roof[1] - 20, cab.roof[2]], "rescue"));
+    addWheels(v);
+    v.joints = { ladder: { x: -226, y: -236 } };
+    var lad = rct(-246, -250, 40, 34, 8, STEEL_D, 4.5);
+    lad += beam([[-226, -236], [214, -246]], 7, K.tool, 4) + beam([[-226, -256], [214, -266]], 7, K.tool, 4);
+    for (var i = 0; i < 18; i++) {
+      var x = -210 + i * 24, y1 = -238 - (x + 226) * 10 / 440, y2 = y1 - 20;
+      lad += '<path d="M ' + n2(x) + " " + n2(y1) + " L " + n2(x) + " " + n2(y2) + '" stroke="' + OUT + '" stroke-width="5" stroke-linecap="round"/>';
+    }
+    lad += rct(204, -276, 26, 30, 5, "#FFC93C", 4) + circ(-226, -236, 10, CHROME, 4);
+    add(v, part("tool", lad), ["ladder"]);
+    v.hooks.nozzle = { chain: ["ladder"], x: 232, y: -262 };
+  }
+
+  function genAmbulance(v, c) {
+    var K = c.col, r = { s: 32, m: 36, l: 41 }[c.wheels], o = "";
+    var rw = wheel(v, c, -128, r), fw = wheel(v, c, 158, r, { front: true });
+    var arcs = [{ x: rw.x, cy: -r, R: r + 8 }, { x: fw.x, cy: -r, R: r + 8 }];
+    var st = c.cab, top = -236;
+    var nose = st === "round" ? [[112, top, 8], [146, top, 30], [194, -150, 30]] : st === "slant" ? [[112, top, 8], [130, top, 6], [196, -148, 8]] : [[112, top, 8], [160, top, 10], [172, -150, 6]];
+    var pts = [[-214, -40, 8], [-214, top, 10]].concat(nose).concat([[226, -124, 22], [234, -90, 10], [230, -40, 8]]).concat(arches(-40, arcs));
+    var skin = rp(pts);
+    o += wellS(-40, arcs) + pth(skin, K.body, 5);
+    o += decalS(c, skin, { x0: -214, x1: 234, y0: -230, y1: -60 }, null);
+    var id = "am" + (uid++);
+    o += '<clipPath id="' + id + '"><path d="' + skin + '"/></clipPath><g clip-path="url(#' + id + ')">' + rct(-230, -122, 480, 20, 0, K.trim, 4) + "</g>" + pth(skin, "none", 5);
+    o += txt(-50, -150, "AMBULANCE", 34, onBody(K.body) === OUT ? K.trim : "#FFFFFF");
+    o += pth(plusD(10, -196, 21, 9), K.trim, 4);
+    // windows: cab side + rear box window
+    var wy0 = top + 16, wy1 = -150;
+    var cw = st === "round" ? [[124, wy1, 4], [124, wy0, 6], [146, wy0, 26], [176, wy1, 4]] : st === "slant" ? [[124, wy1, 4], [124, wy0, 6], [134, wy0, 4], [178, wy1, 4]] : [[124, wy1, 4], [124, wy0, 6], [158, wy0, 6], [160, wy1, 4]];
+    o += windowS(rp(cw), 124, wy0, 176, wy1);
+    o += pth("M 112 " + n2(top) + " L 112 -50", "none", 0, ' stroke="' + shade(K.body, 0.4) + '" stroke-width="4"');
+    o += windowS(rp([[-196, -206, 6], [-150, -206, 6], [-150, -170, 6], [-196, -170, 6]]), -196, -206, -150, -170);
+    o += rct(230 - 16, -50, 26, 16, 5, K.trim === "#FFFFFF" ? CHROME : K.trim, 4) + rct(-222, -50, 22, 16, 5, CHROME, 4);
+    o += headS(c, 228, -102, 9) + tailS(-218, -140, 10, 20);
+    if (c.number) o += part("number", numberS(60, -76, 22, c.number, K.number));
+    v.head = { x: 232, y: -102 };
+    add(v, part("body", o));
+    add(v, roofS(v, c, [-200, 100, top], "rescue"));
+    addWheels(v);
+  }
+
+  // ---------------- Farm ----------------
+  function genTractor(v, c) {
+    var K = c.col, R = { s: 66, m: 74, l: 84 }[c.wheels], fr = Math.round(R * 0.56), o = "";
+    var rx = -72, fxw = 132;
+    if (c.tool === "trailer") {
+      var tw1 = wheel(v, c, -392, 30), tw2 = wheel(v, c, -270, 30);
+      var t = beam([[-200, -54], [-236, -54]], 9, STEEL_D, 4);
+      t += pth(rp([[-430, -64, 6], [-430, -126, 6], [-226, -126, 6], [-226, -64, 6]]), K.tool, 5);
+      for (var i = 0; i < 6; i++) t += rct(-420 + i * 32, -118, 8, 48, 3, shade(K.tool, 0.25), 0);
+      [[-420, -186], [-350, -186], [-280, -186], [-385, -244], [-315, -244]].forEach(function (b) {
+        t += rct(b[0], b[1], 68, 58, 10, "#F2C14E", 4.5) + pth("M " + (b[0] + 8) + " " + (b[1] + 20) + " h 52 M " + (b[0] + 8) + " " + (b[1] + 38) + " h 52", "none", 0, ' stroke="#C8962E" stroke-width="4" stroke-linecap="round"');
+      });
+      add(v, part("tool", t));
+      v.trailer = true;
+    }
+    var rw = wheel(v, c, rx, R), fw = wheel(v, c, fxw, fr, { front: true });
+    o += rct(-20, -86, 210, 26, 6, "#3A3F4E", 4);
+    var hood = rp([[-10, -84, 0], [-10, -150, 6], [178, -142, 14], [204, -118, 10], [206, -80, 8]]);
+    o += pth(hood, K.body, 5);
+    o += decalS(c, hood, { x0: -10, x1: 206, y0: -140, y1: -88 }, c.number ? { x: 70, y: -114, r: 22 } : null);
+    o += rct(196, -126, 14, 44, 4, K.trim, 4);
+    for (var k = 0; k < 4; k++) o += rct(198, -120 + k * 10, 10, 4, 1, "rgba(29,35,64,0.45)", 0);
+    o += headS(c, 204, -134, 8);
+    v.head = { x: 210, y: -134 };
+    o += stacksS(v, c, 120, -146, 64);
+    add(v, part("body", o));
+    o = cabBox(v, c, -164, -10, -150, -312, "farm");
+    // big fender over the rear wheel
+    o += pth("M " + n2(rx - R - 16) + " " + n2(-R + 6) + " A " + n2(R + 16) + " " + n2(R + 16) + " 0 0 1 " + n2(rx + R + 16) + " " + n2(-R + 6) +
+      " L " + n2(rx + R + 2) + " " + n2(-R + 6) + " A " + n2(R + 2) + " " + n2(R + 2) + " 0 0 0 " + n2(rx - R - 2) + " " + n2(-R + 6) + " Z", K.body, 5);
+    o += rct(-196, -84, 30, 12, 4, STEEL_D, 4) + tailS(-196, -110, 10, 16);
+    add(v, part("cab", o));
+    addWheels(v);
+    if (c.tool === "loader") {
+      v.joints = { arm: { x: 10, y: -160 }, tool: { x: 262, y: -70 } };
+      add(v, part("tool", beam([[10, -160], [150, -178], [262, -70]], 18, K.tool) + ram([60, -96], [150, -170], 10) + circ(10, -160, 8, STEEL_D, 3.5)), ["arm"]);
+      var bt = pth(rp([[250, -112, 8], [268, -118, 8], [264, -64, 26], [256, -6, 8], [338, -4, 0], [340, -16, 4], [272, -48, 0], [276, -102, 6]]), K.tool, 5) + circ(262, -70, 7, STEEL_D, 3.5);
+      add(v, part("tool", bt), ["arm", "tool"]);
+      v.hooks.load = { chain: ["arm", "tool"], x: 296, y: -24, r: 28 };
+      v.hooks.tip = { chain: ["arm", "tool"], x: 338, y: -6 };
+    } else if (c.tool === "plow") {
+      v.joints = { plow: { x: -176, y: -74 } };
+      var pl = beam([[-176, -74], [-236, -60], [-330, -60]], 10, K.tool) + beam([[-196, -112], [-236, -60]], 8, STEEL_D, 4);
+      [-246, -296].forEach(function (x) {
+        pl += beam([[x, -60], [x - 6, -24]], 8, K.tool, 4) + pth("M " + (x - 26) + " -30 Q " + (x - 8) + " -36 " + (x + 4) + " -24 L " + (x - 2) + " 2 Q " + (x - 22) + " -4 " + (x - 30) + " -16 Z", CHROME, 4);
+      });
+      add(v, part("tool", pl), ["plow"]);
+      v.hooks.plow = { chain: ["plow"], x: -270, y: 0 };
+    } else if (c.tool !== "trailer") add(v, part("tool", ""));
+  }
+
+  var GEN = {
+    excavator: genExcavator, bulldozer: genBulldozer, dump: genDump, mixer: genMixer, loader: genLoader, crane: genCrane,
+    race: function (v, c) { genCarLike(v, c, "race"); }, sports: function (v, c) { genCarLike(v, c, "sports"); },
+    rally: function (v, c) { genCarLike(v, c, "rally"); }, police: function (v, c) { genCarLike(v, c, "police"); },
+    f1: genF1, mpickup: function (v, c) { genMonster(v, c, "mpickup"); }, mmuscle: function (v, c) { genMonster(v, c, "mmuscle"); },
+    mjeep: function (v, c) { genMonster(v, c, "mjeep"); }, fire: genFire, ambulance: genAmbulance, tractor: genTractor
+  };
+  // Config (option values + color names) -> drawable model.
+  function makeVehicle(kind, cfg) {
+    var c = {};
+    Object.keys(cfg).forEach(function (k) { if (k !== "colors") c[k] = cfg[k]; });
+    c.col = {};
+    Object.keys(cfg.colors).forEach(function (k) { c.col[k] = hex(cfg.colors[k]); });
+    if (!c.col.tool) c.col.tool = c.col.trim;
+    var v = mkV(kind, c);
+    GEN[kind](v, c);
+    return v;
+  }
+  // Apply a joint chain (pose angles, radians) to a rest-pose point.
+  function chainPt(v, chain, pose, x, y) {
+    for (var i = chain.length - 1; i >= 0; i--) {
+      var j = v.joints[chain[i]], a = pose[chain[i]] || 0;
+      if (!a) continue;
+      var dx = x - j.x, dy = y - j.y, cs = Math.cos(a), sn = Math.sin(a);
+      x = j.x + dx * cs - dy * sn; y = j.y + dx * sn + dy * cs;
+    }
+    return { x: x, y: y };
+  }
+  function chainAngle(chain, pose) {
+    var a = 0;
+    chain.forEach(function (j) { a += pose[j] || 0; });
+    return a;
+  }
+  // Whole vehicle as SVG (builder picture, option thumbnails, rest picture).
+  function vehicleSVG(v, pose) {
+    pose = pose || {};
+    var o = "";
+    v.L.forEach(function (l) {
+      var s;
+      if (l.wheels) {
+        s = "";
+        v.wheels.forEach(function (w) {
+          var g = '<g transform="translate(' + n2(w.x) + " " + n2(w.y) + ')">' + wheelArt(w) + "</g>";
+          s += w.front || (v.track && w.style === "sprocket" && w.x > 0) ? part("wheels", g) : g;
+        });
+      } else if (l.track) s = part("wheels", trackS(v.track));
+      else s = l.svg;
+      for (var i = l.chain.length - 1; i >= 0; i--) {
+        var j = v.joints[l.chain[i]], a = pose[l.chain[i]] || 0;
+        if (a) s = '<g transform="rotate(' + n2(a * 180 / Math.PI) + " " + n2(j.x) + " " + n2(j.y) + ')">' + s + "</g>";
+      }
+      o += s;
+    });
+    return o;
+  }
+
+  // ================= Builder =================
+  var NS = "http://www.w3.org/2000/svg";
+  var $ = function (id) { return document.getElementById(id); };
+  var art = $("art");
+  var FAM_REP = { build: "excavator", fast: "race", monster: "mpickup" };
+
+  function defCfg(k) { return JSON.parse(JSON.stringify(KINDS[k].def)); }
+  // Opening Car Builder from the Toybox home screen (Toybox.fresh) starts the first-visit vehicles,
+  // parts and tab again; a reload keeps the current build. Nothing here is a collection.
+  if (window.Toybox && Toybox.fresh()) {
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+  }
+  function freshState() {
+    var s = { fam: "build", kind: "excavator", cfgs: {}, buildPart: "", buildPage: 0, colorPart: "body", tab: "vehicle" };
+    KIND_IDS.forEach(function (k) { s.cfgs[k] = defCfg(k); });
+    return s;
+  }
+  function validOpt(k, id, val) {
+    var sp = partSpec(k, id);
+    return !!sp && sp[2].some(function (o) { return o[0] === val; });
+  }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (KINDS[o.kind]) { s.kind = o.kind; s.fam = KINDS[o.kind].fam; }
+        if (o.cfgs && typeof o.cfgs === "object") {
+          KIND_IDS.forEach(function (k) {
+            var oc = o.cfgs[k];
+            if (!oc || typeof oc !== "object") return;
+            Object.keys(s.cfgs[k]).forEach(function (p) {
+              if (p === "colors") {
+                if (oc.colors) Object.keys(s.cfgs[k].colors).forEach(function (ck) { if (HEX[oc.colors[ck]]) s.cfgs[k].colors[ck] = oc.colors[ck]; });
+              } else if (validOpt(k, p, oc[p])) s.cfgs[k][p] = oc[p];
+            });
+          });
+        }
+        if (typeof o.buildPart === "string") s.buildPart = o.buildPart;
+        if (typeof o.buildPage === "number") s.buildPage = o.buildPage;
+        if (typeof o.colorPart === "string") s.colorPart = o.colorPart;
+        if (["vehicle", "build"].indexOf(o.tab) !== -1) s.tab = o.tab;
+        else if (o.tab === "colors") s.tab = "build"; // the old Colors tab is gone: coloring is done by tapping a part
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return s;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  var state = loadState();
+  function cfg() { return state.cfgs[state.kind]; }
+
+  // Hidden SVG for measuring drawings.
+  var meas = document.createElementNS(NS, "svg");
+  meas.setAttribute("aria-hidden", "true");
+  meas.setAttribute("style", "position:absolute;left:-9999px;top:0;width:10px;height:10px;visibility:hidden;pointer-events:none");
+  document.body.appendChild(meas);
+  function bboxOf(svgStr) {
+    meas.innerHTML = "<g>" + svgStr + "</g>";
+    var b;
+    try { b = meas.firstChild.getBBox(); } catch (e) { b = { x: -300, y: -300, width: 600, height: 300 }; }
+    var r = { x: b.x, y: b.y, w: b.width, h: b.height };
+    meas.innerHTML = "";
+    return r;
+  }
+  function vehicleOf(kind, c) {
+    var v = makeVehicle(kind, c);
+    var s = vehicleSVG(v, {});
+    return { v: v, svg: s, bb: bboxOf(s) };
+  }
+  function thumb(kind, c, pad) {
+    var t = vehicleOf(kind, c), p = pad || 14;
+    return '<svg viewBox="' + [t.bb.x - p, t.bb.y - p, t.bb.w + 2 * p, t.bb.h + 2 * p].map(n2).join(" ") + '" preserveAspectRatio="xMidYMax meet" aria-hidden="true">' + t.svg + "</svg>";
+  }
+
+  // ---- builder background, by family ----
+  function cloudS(x, y, s) {
+    var parts = [[-0.36, 0.06, 0.27], [0, -0.14, 0.36], [0.36, 0.04, 0.26], [0.14, 0.14, 0.26], [-0.16, 0.14, 0.26]];
+    var a = "", b = "";
+    parts.forEach(function (p) {
+      a += '<circle cx="' + n2(x + p[0] * s) + '" cy="' + n2(y + p[1] * s) + '" r="' + n2(p[2] * s + 3) + '" fill="' + OUT + '"/>';
+      b += '<circle cx="' + n2(x + p[0] * s) + '" cy="' + n2(y + p[1] * s) + '" r="' + n2(p[2] * s - 1) + '" fill="#FFFFFF"/>';
+    });
+    return a + b;
+  }
+  function coneS(x, s) {
+    return pth("M " + n2(x - 14 * s) + " 0 L " + n2(x - 4 * s) + " " + n2(-46 * s) + " L " + n2(x + 4 * s) + " " + n2(-46 * s) + " L " + n2(x + 14 * s) + " 0 Z", "#F77F00", 4) +
+      rct(x - 9 * s, -30 * s, 18 * s, 9 * s, 0, "#FFFFFF", 0) + rct(x - 20 * s, -4, 40 * s, 8, 3, "#F77F00", 4);
+  }
+  function moundS(x, w, h, col) {
+    return pth("M " + n2(x - w) + " 2 Q " + n2(x - w * 0.5) + " " + n2(-h * 1.05) + " " + n2(x) + " " + n2(-h) + " Q " + n2(x + w * 0.5) + " " + n2(-h * 1.05) + " " + n2(x + w) + " 2 Z", col, 5) +
+      circ(x - w * 0.3, -h * 0.45, 5, shade(col, 0.25), 0) + circ(x + w * 0.2, -h * 0.6, 4, shade(col, 0.25), 0) + circ(x + w * 0.45, -h * 0.25, 5, shade(col, 0.25), 0);
+  }
+  function backdropS(fam, x0, x1, y0) {
+    var o = '<defs><linearGradient id="bsky" gradientUnits="userSpaceOnUse" x1="0" y1="' + n2(y0) + '" x2="0" y2="20"><stop offset="0" stop-color="#4FAEEB"/><stop offset="1" stop-color="#CBEBFF"/></linearGradient></defs>';
+    o += '<rect x="-4000" y="-4000" width="8000" height="4040" fill="url(#bsky)"/>';
+    var cx = (x0 + x1) / 2, w = x1 - x0;
+    o += '<g transform="translate(' + n2(x1 - w * 0.14) + " " + n2(y0 + 70) + ')"><circle r="40" fill="#FFC93C"' + sk(5) + '/><circle r="27" fill="#FFE07A"/></g>';
+    o += cloudS(x0 + w * 0.2, y0 + 80, 110) + cloudS(cx + w * 0.12, y0 + 140, 80);
+    if (fam === "build") {
+      o += '<ellipse cx="' + n2(x0) + '" cy="20" rx="' + n2(w * 0.4) + '" ry="90" fill="#C9935F"' + sk(5) + "/>";
+      o += '<rect x="-4000" y="0" width="8000" height="3000" fill="#B07A4F" stroke="' + OUT + '" stroke-width="5"/>';
+      o += '<rect x="-4000" y="26" width="8000" height="14" fill="#9A6842"/>';
+      o += moundS(x0 + 40, 90, 70, DIRT_L) + coneS(x1 - 40, 1) + coneS(x0 + w * 0.06 + 150, 0.8);
+    } else if (fam === "fast") {
+      o += '<ellipse cx="' + n2(x1) + '" cy="20" rx="' + n2(w * 0.45) + '" ry="100" fill="#5DAE4A"' + sk(5) + "/>";
+      o += '<rect x="-4000" y="-14" width="8000" height="14" fill="#E63946" stroke="' + OUT + '" stroke-width="4"/>';
+      var cb = "";
+      for (var k = -40; k < 40; k++) cb += "M " + (k * 60) + " -14 h 30 v 14 h -30 Z ";
+      o += '<path d="' + cb + '" fill="#FFFFFF"/>';
+      o += '<rect x="-4000" y="0" width="8000" height="3000" fill="#5B6274" stroke="' + OUT + '" stroke-width="5"/>';
+      var dash = "";
+      for (k = -30; k < 30; k++) dash += "M " + (k * 140) + " 40 h 70 v 10 h -70 Z ";
+      o += '<path d="' + dash + '" fill="#FFFFFF"/>';
+    } else {
+      o += '<ellipse cx="' + n2(x0 + w * 0.2) + '" cy="30" rx="' + n2(w * 0.5) + '" ry="120" fill="#C9935F"' + sk(5) + "/>";
+      o += '<rect x="-4000" y="0" width="8000" height="3000" fill="#8B5A3C" stroke="' + OUT + '" stroke-width="5"/>';
+      o += '<rect x="-4000" y="22" width="8000" height="10" fill="#734A30"/>';
+      o += oldCarS(x1 - 110, 0, "#2D5BD7", 0.6);
+    }
+    return o;
+  }
+  // An old car (for monster trucks to crush). x = left end, k = how crushed (0..1).
+  function oldCarS(x, k, col, s) {
+    s = s || 1;
+    var h = (88 - 56 * k) * s, w = 220 * s, o = "";
+    var body = rp([[x, -12 * s, 6], [x, -h * 0.55, 10], [x + w * 0.22, -h * 0.6, 6], [x + w * 0.34, -h, 10], [x + w * 0.7, -h, 10], [x + w * 0.82, -h * 0.6, 6], [x + w, -h * 0.55, 10], [x + w, -12 * s, 6]]);
+    o += circ(x + w * 0.22, -18 * s, 18 * s, DARK, 4) + circ(x + w * 0.78, -18 * s, 18 * s, DARK, 4);
+    o += pth(body, col, 4.5);
+    o += pth(rp([[x + w * 0.37, -h * 0.62, 3], [x + w * 0.4, -h * 0.9, 5], [x + w * 0.66, -h * 0.9, 5], [x + w * 0.72, -h * 0.62, 3]]), k > 0.5 ? "#9CC6E0" : GLASS, 3.5);
+    if (k > 0.5) o += pth("M " + n2(x + w * 0.45) + " " + n2(-h * 0.88) + " L " + n2(x + w * 0.52) + " " + n2(-h * 0.7) + " L " + n2(x + w * 0.6) + " " + n2(-h * 0.84), "none", 3);
+    return o;
+  }
+
+  // Short names for the picture buttons on phones, where the full names do not fit.
+  var SHORT = {
+    build: "Builders", monster: "Monsters", excavator: "Digger", bulldozer: "Dozer", dump: "Dumper",
+    mixer: "Mixer", race: "Race", sports: "Sports", f1: "F1", rally: "Rally", mmuscle: "Muscle"
+  };
+  function labelSpans(full, short) {
+    return short ? '<span class="lfull">' + full + '</span><span class="lshort" aria-hidden="true">' + short + "</span>" : "<span>" + full + "</span>";
+  }
+  // ---- controls ----
+  FAMILIES.forEach(function (f) {
+    var b = document.createElement("button");
+    b.className = "btn pic";
+    b.dataset.fam = f.id;
+    $("fams").appendChild(b);
+  });
+  // ---- coloring: only the big parts can be colored (the body, and a builder's arm, blade, bed or drum).
+  // Tap one on the picture: it glows and its colors show in the panel. Small details keep their colors.
+  var PICKS = ["Red", "Orange", "Yellow", "Green", "Sky", "Blue", "Purple", "Pink"];
+  PICKS.forEach(function (name) {
+    var b = document.createElement("button");
+    b.className = "swatch";
+    b.dataset.color = name;
+    b.style.background = hex(name);
+    b.style.color = isDark(hex(name)) ? "#FFFFFF" : "#1D2340";
+    b.setAttribute("aria-label", name);
+    $("pickSw").appendChild(b);
+  });
+  var picking = ""; // the part being colored ("body" or "tool"), or "" when none is picked
+  function colorable(k) {
+    var names = KINDS[k].names, c = state.cfgs[k], list = [["body", names.body]];
+    if (KINDS[k].fam === "build" && names.tool && c.colors.tool) list.push(["tool", names.tool]);
+    return list;
+  }
+  // The drawing groups that wear a color: a truck's body color is its cab; a car's roof joins the body when
+  // it is usually the same color.
+  function glowSel(k, id) {
+    var names = [id];
+    if (id === "body") {
+      var d = KINDS[k].def.colors;
+      if (k === "dump" || k === "mixer") names = ["cab"];
+      else if (KINDS[k].fam !== "build" && d.trim === d.body) names.push("cab");
+    }
+    return names.map(function (n) { return '[data-part="' + n + '"]'; }).join(", ");
+  }
+  function pickLabel(id) {
+    var l = colorable(state.kind).filter(function (p) { return p[0] === id; })[0];
+    return l ? l[1] : "";
+  }
+  // Details that sat on the old body color follow it, so nothing vanishes into the new color.
+  function fixDetails(k, c) {
+    var d = KINDS[k].def.colors, body = c.colors.body;
+    if (c.colors.trim && d.trim === d.body) c.colors.trim = body;
+    var contrast = isDark(hex(body)) ? "White" : "Black";
+    if (c.colors.stripes === body) c.colors.stripes = d.stripes !== body ? d.stripes : contrast;
+    if (c.colors.number === body) c.colors.number = d.number !== body ? d.number : contrast;
+  }
+  function setPicking(id) {
+    picking = id || "";
+    if (picking) { state.colorPart = picking; $("coach").classList.add("off"); }
+    $("tab-build").closest(".tb-panel").classList.toggle("picking", !!picking);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) {
+      b.setAttribute("aria-selected", String(!picking && b.dataset.tab === tab));
+    });
+    showPick();
+  }
+  // The glow on the picture and the panel's picture + swatches for the picked part.
+  function showPick() {
+    var g = $("rocketG");
+    if (g) Array.prototype.forEach.call(g.querySelectorAll(".halo"), function (h) { h.parentNode.removeChild(h); });
+    if (!picking) return;
+    var k = state.kind, c = cfg();
+    if (!colorable(k).some(function (p) { return p[0] === picking; })) { setPicking(""); return; }
+    var sel = glowSel(k, picking);
+    if (g) Array.prototype.forEach.call(g.querySelectorAll(sel), function (el) {
+      if (el.parentNode.closest && el.parentNode.closest(sel)) return;
+      var h = el.cloneNode(true);
+      h.removeAttribute("data-part");
+      Array.prototype.forEach.call(h.querySelectorAll("[id], [data-part]"), function (x) { x.removeAttribute("id"); x.removeAttribute("data-part"); });
+      h.setAttribute("class", "halo");
+      [h].concat(Array.prototype.slice.call(h.querySelectorAll("*"))).forEach(function (x) {
+        x.style.strokeWidth = ((parseFloat(x.getAttribute("stroke-width")) || 0) + 22) + "px";
+      });
+      el.parentNode.insertBefore(h, el);
+    });
+    // panel picture: the vehicle with everything but the picked part faded, framed on that part
+    var t = vehicleOf(k, c), svg = $("pickSvg"), Z = null;
+    sel.replace(/data-part="(\w+)"/g, function (m0, n) {
+      var b = partBoxes(t.svg, n);
+      if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
+      return m0;
+    });
+    if (!Z) Z = { x0: t.bb.x, y0: t.bb.y, x1: t.bb.x + t.bb.w, y1: t.bb.y + t.bb.h };
+    var pad = 18, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2, w = Z.x1 - Z.x0 + 2 * pad, hh = Z.y1 - Z.y0 + 2 * pad;
+    if (w / hh < 1.3) w = hh * 1.3; else hh = w / 1.3;
+    svg.setAttribute("viewBox", [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" "));
+    svg.innerHTML = t.svg;
+    Array.prototype.forEach.call(svg.querySelectorAll("path, rect, circle, ellipse, line, polygon, polyline, text"), function (el) {
+      if (!el.closest(sel) && !el.closest("clipPath")) el.setAttribute("class", "dim");
+    });
+    $("pickName").textContent = pickLabel(picking);
+    var cur = c.colors[picking];
+    Array.prototype.forEach.call($("pickSw").querySelectorAll("[data-color]"), function (bt) {
+      var on = bt.dataset.color === cur;
+      bt.setAttribute("aria-pressed", String(on));
+      bt.textContent = on ? "\u2713" : "";
+    });
+  }
+
+
+  // ---- build rows ----
+  // Which part of the drawing each option row zooms in on.
+  var ZOOM = { tool: "tool", cab: "cab", wheels: "wheels", rims: "wheels", engine: "engine", top: "top", lights: "lights", paint: "paint" };
+  // Build pages: each pager button names exactly what its page holds. Parts that belong together share a page
+  // (wheels with their rims, the cab or roof with what sits on top, stripes with the number); a page with only one
+  // of its parts takes that part's own name ("Tracks", "Wing").
+  var GROUPS = [
+    { ids: ["tool"] },
+    { ids: ["wheels", "rims"], label: "Wheels" },
+    { ids: ["cab", "top"], label: "Top" },
+    { ids: ["engine"] },
+    { ids: ["lights"] },
+    { ids: ["paint", "number"], label: "Paint" }
+  ];
+  function buildPages(k) {
+    var ps = kindParts(k), out = [];
+    GROUPS.forEach(function (g) {
+      var rows = [];
+      g.ids.forEach(function (id) { ps.forEach(function (p) { if (p[0] === id) rows.push(p); }); });
+      if (rows.length) out.push({ label: rows.length > 1 ? g.label : rows[0][1], rows: rows });
+    });
+    return out;
+  }
+  // Union of the bounding boxes of the drawing's [data-part=name] groups (vehicle units), or null.
+  function partBoxes(svgStr, name) {
+    meas.innerHTML = "<g>" + svgStr + "</g>";
+    var r = null;
+    Array.prototype.forEach.call(meas.querySelectorAll('[data-part="' + name + '"]'), function (g) {
+      var b;
+      try { b = g.getBBox(); } catch (e) { return; }
+      if (!b.width && !b.height) return;
+      if (!r) r = { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
+      else { r.x0 = Math.min(r.x0, b.x); r.y0 = Math.min(r.y0, b.y); r.x1 = Math.max(r.x1, b.x + b.width); r.y1 = Math.max(r.y1, b.y + b.height); }
+    });
+    var all = null;
+    if (!r) { try { var b2 = meas.firstChild.getBBox(); all = { x0: b2.x, y0: b2.y, x1: b2.x + b2.width, y1: b2.y + b2.height }; } catch (e) { /* ignore */ } }
+    meas.innerHTML = "";
+    return r || (all ? { whole: true, x0: all.x0, y0: all.y0, x1: all.x1, y1: all.y1 } : null);
+  }
+  function partRow(k, c, p) {
+    var id = p[0], opts = p[2];
+    var row = document.createElement("div");
+    row.className = "prow";
+    var h = document.createElement("h4");
+    h.textContent = p[1];
+    row.appendChild(h);
+    var box = document.createElement("div");
+    box.className = "popts";
+    row.appendChild(box);
+    var pics = [], Z = null;
+    if (id !== "number") {
+      opts.forEach(function (o) {
+        var cc = JSON.parse(JSON.stringify(c));
+        cc[id] = o[0];
+        var s = vehicleSVG(makeVehicle(k, cc), {});
+        var b = partBoxes(s, ZOOM[id] || "body");
+        pics.push(s);
+        if (b && !b.whole) Z = Z ? { x0: Math.min(Z.x0, b.x0), y0: Math.min(Z.y0, b.y0), x1: Math.max(Z.x1, b.x1), y1: Math.max(Z.y1, b.y1) } : b;
+      });
+      if (!Z) Z = partBoxes(pics[0], "__none__") || { x0: -300, y0: -300, x1: 300, y1: 0 };
+      // stripes: a close-up of a panel near the front, not the whole long side
+      if (id === "paint" && Z.x1 - Z.x0 > 1.8 * (Z.y1 - Z.y0)) {
+        var pw = Math.max(1.8 * (Z.y1 - Z.y0), 150), pc = Z.x0 + (Z.x1 - Z.x0) * 0.62;
+        Z = { x0: pc - pw / 2, x1: pc + pw / 2, y0: Z.y0, y1: Z.y1 };
+      }
+      // padding, a minimum size (so tiny parts keep some context) and the button's shape
+      var pad = 16, cx = (Z.x0 + Z.x1) / 2, cy = (Z.y0 + Z.y1) / 2;
+      var w = Math.max(Z.x1 - Z.x0 + 2 * pad, 130), hh = Math.max(Z.y1 - Z.y0 + 2 * pad, 90), AR = 1.5;
+      if (w / hh < AR) w = hh * AR; else hh = w / AR;
+      var vb = [cx - w / 2, cy - hh / 2, w, hh].map(n2).join(" ");
+    }
+    opts.forEach(function (o, i) {
+      var bt = document.createElement("button");
+      bt.className = "btn popt";
+      bt.dataset.ppart = id;
+      bt.dataset.opt = String(o[0]);
+      bt.setAttribute("aria-pressed", String(o[0] === c[id]));
+      bt.setAttribute("aria-label", p[1] + ": " + (id === "number" ? (o[0] ? String(o[0]) : "None") : o[1]));
+      if (id === "number") bt.innerHTML = '<span class="numpic">' + (o[0] ? o[0] : "–") + "</span>";
+      else bt.innerHTML = '<svg viewBox="' + vb + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' + pics[i] + "</svg><span>" + o[1] + "</span>";
+      box.appendChild(bt);
+    });
+    return row;
+  }
+
+  var lastBB = null, baseVB = null;
+  function render() {
+    var k = state.kind, c = cfg(), fam = KINDS[k].fam;
+    state.fam = fam;
+    var t = vehicleOf(k, c), b = t.bb;
+    lastBB = b;
+    var padX = Math.max(60, b.w * 0.12), x0 = b.x - padX, x1 = b.x + b.w + padX, y0 = b.y - 50, y1 = 46;
+    momentStop();
+    baseVB = [x0, y0, x1 - x0, y1 - y0];
+    art.setAttribute("viewBox", baseVB.map(n2).join(" "));
+    art.innerHTML = backdropS(fam, x0, x1, y0) + '<g id="surpB"></g><g id="carMove"><g class="rocket" id="rocketG">' + t.svg + '</g></g><g id="surpF"></g><g id="fxG"></g>';
+    art.setAttribute("aria-label", "A " + KINDS[k].label.toLowerCase());
+
+    // Vehicle tab: families + kinds (phones show the short names so nothing is cut off)
+    Array.prototype.forEach.call(document.querySelectorAll("[data-fam]"), function (bt) {
+      var f = bt.dataset.fam, rk = f === fam ? k : FAM_REP[f];
+      bt.setAttribute("aria-pressed", String(f === fam));
+      bt.setAttribute("aria-label", FAM_BY[f].label);
+      bt.innerHTML = thumb(rk, state.cfgs[rk]) + labelSpans(FAM_BY[f].label, SHORT[f]);
+    });
+    var kinds = $("kinds");
+    kinds.className = "picrow" + (FAM_BY[fam].kinds.length > 3 ? " k4" : "");
+    kinds.innerHTML = "";
+    FAM_BY[fam].kinds.forEach(function (kk) {
+      var bt = document.createElement("button");
+      bt.className = "btn pic";
+      bt.dataset.kind = kk;
+      bt.setAttribute("aria-pressed", String(kk === k));
+      bt.setAttribute("aria-label", KINDS[kk].label);
+      bt.innerHTML = thumb(kk, state.cfgs[kk]) + labelSpans(KINDS[kk].label, SHORT[kk]);
+      kinds.appendChild(bt);
+    });
+
+    // Build tab: several part rows at once (paged), each option a zoomed picture of that part.
+    var pages = buildPages(k), per = 0;
+    pages.forEach(function (pp) { per = Math.max(per, pp.rows.length); });
+    if (!(state.buildPage >= 0 && state.buildPage < pages.length)) state.buildPage = 0;
+    var pg = $("pager");
+    pg.hidden = pages.length < 2;
+    pg.classList.toggle("p6", pages.length > 5);
+    pg.innerHTML = "";
+    pages.forEach(function (pp, i) {
+      var bt = document.createElement("button");
+      bt.className = "btn";
+      bt.dataset.page = String(i);
+      bt.textContent = pp.label;
+      bt.setAttribute("aria-label", pp.rows.map(function (p) { return p[1]; }).join(", "));
+      bt.setAttribute("aria-pressed", String(i === state.buildPage));
+      pg.appendChild(bt);
+    });
+    var rows = $("prows");
+    rows.innerHTML = "";
+    pages[state.buildPage].rows.forEach(function (p) { rows.appendChild(partRow(k, c, p)); });
+    // keep every page the same height so the panel does not jump between pages
+    rows.style.minHeight = "";
+    var rh = 0;
+    Array.prototype.forEach.call(rows.children, function (r) { rh = Math.max(rh, r.offsetHeight); });
+    var gap = parseFloat(getComputedStyle(rows).rowGap) || 0;
+    if (rh && pages.length > 1) rows.style.minHeight = Math.ceil(rh * per + gap * (per - 1)) + "px";
+
+    showPick();
+    save();
+    vbKey = ""; // drive pictures are rebuilt from the new design
+  }
+
+
+  function restartAnim(el, cls) {
+    if (!el || reduce) return;
+    el.classList.remove("pop", "hop");
+    void el.getBoundingClientRect();
+    el.classList.add(cls);
+  }
+  var SPARK_COLS = ["#FFC93C", "#F26CA7", "#5BC0EB", "#A7D129", "#FFFFFF", "#F77F00"];
+  function sparkles(x, y, n, spread) {
+    var fx = $("fxG");
+    if (!fx) return;
+    var s = "";
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, d = spread * (0.3 + Math.random() * 0.7);
+      var px = x + Math.cos(a) * d, py = y + Math.sin(a) * d, r = rand(12, 26);
+      s += '<path class="spark" style="animation-delay:' + Math.round(Math.random() * 160) + 'ms" d="' + starD(px, py, r, r * 0.38, 4) + '" fill="' + pick(SPARK_COLS) + '" stroke="' + OUT + '" stroke-width="2.5" stroke-linejoin="round"/>';
+    }
+    var g = document.createElementNS(NS, "g");
+    g.innerHTML = s;
+    fx.appendChild(g);
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1300);
+  }
+  function puffs(x, y, n) {
+    var fx = $("fxG");
+    if (!fx) return;
+    var s = "";
+    for (var i = 0; i < n; i++) {
+      s += '<circle class="puff" style="animation-delay:' + Math.round(i * 40) + 'ms" cx="' + n2(x + rand(-90, 90)) + '" cy="' + n2(y + rand(-14, 6)) + '" r="' + n2(rand(16, 30)) + '" fill="#FFFFFF" stroke="#C9D2E3" stroke-width="4"/>';
+    }
+    var g = document.createElementNS(NS, "g");
+    g.innerHTML = s;
+    fx.appendChild(g);
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 1700);
+  }
+  function celebrate() {
+    restartAnim($("rocketG"), "pop");
+    if (lastBB) sparkles(lastBB.x + lastBB.w / 2, lastBB.y + lastBB.h / 2, 12, lastBB.w * 0.45);
+  }
+  function svgPoint(e) {
+    var m = art.getScreenCTM();
+    if (!m) return { x: 0, y: -100 };
+    var p = art.createSVGPoint();
+    p.x = e.clientX; p.y = e.clientY;
+    return p.matrixTransform(m.inverse());
+  }
+  $("scene").addEventListener("pointerdown", function (e) {
+    if (Toybox.timer.phase() === "resting") return;
+    if (e.target.closest && e.target.closest("button")) return;
+    var p = svgPoint(e);
+    sparkles(p.x, p.y, 8, 60);
+    if (Toybox.timer.phase() === "ending") return;
+    // A tap on the vehicle picks the part to color (the arm, blade, bed or drum, else the body);
+    // a tap on the sky or the ground puts the colors away.
+    var onV = e.target.closest && e.target.closest("#rocketG");
+    if (onV && !Toybox.timer.locked() && !document.body.classList.contains("big")) {
+      var tl = e.target.closest('[data-part="tool"]');
+      var id = tl && colorable(state.kind).length > 1 ? "tool" : "body";
+      if (id !== picking) { setPicking(id); blip(); }
+    } else if (picking) setPicking("");
+    restartAnim($("rocketG"), "hop");
+    if (lastBB) puffs(lastBB.x + lastBB.w * 0.15, 0, 5);
+    honk();
+  });
+
+  var tab = state.tab;
+  function showTab(name) {
+    tab = name;
+    state.tab = name;
+    $("tab-build").closest(".tb-panel").setAttribute("data-tab", name);
+    setPicking("");
+    save();
+  }
+
+  // ---------- Surprise: a fun moment for his vehicle, right now (his build and colors never change) ----------
+  // They take turns, never the same one twice in a row: a car wash, a jump over cones, a ride on a tow
+  // truck. Calm pace; with reduced motion only the car wash (no zooming).
+  var MOMENTS = reduce ? ["wash"] : ["wash", "jump", "tow"];
+  var momentAt = Math.floor(Math.random() * MOMENTS.length);
+  var mo = null, moRaf = 0;
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    if (mo || !lastBB) { if (lastBB) sparkles(lastBB.x + lastBB.w / 2, lastBB.y + lastBB.h / 2, 6, lastBB.w * 0.3); return; }
+    var kind = MOMENTS[momentAt % MOMENTS.length];
+    momentAt++;
+    startMoment(kind);
+  }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function easeIO(t) { t = clamp01(t); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function seg(t, a, b) { return clamp01((t - a) / (b - a)); }
+  // The visible part of the picture, in picture units (the SVG shows more than its viewBox on wide screens).
+  function visBox() {
+    var m = art.getScreenCTM(), r = art.getBoundingClientRect();
+    if (!m || !r.width) return { x0: -300, x1: 300, y0: -400, y1: 46 };
+    var inv = m.inverse(), p = art.createSVGPoint();
+    p.x = r.left; p.y = r.top; var a = p.matrixTransform(inv);
+    p.x = r.right; p.y = r.bottom; var b = p.matrixTransform(inv);
+    return { x0: a.x, x1: b.x, y0: a.y, y1: b.y };
+  }
+  // Zoom out around the bottom of the picture (the ground stays put): z = 1 is the usual framing.
+  function setZoom(z, cx) {
+    var v = baseVB, w = v[2] * z, h = v[3] * z, c = v[0] + v[2] / 2 + (cx || 0);
+    art.setAttribute("viewBox", [c - w / 2, v[1] + v[3] - h, w, h].map(n2).join(" "));
+  }
+  function carMove(dx, dy, rot, px, py, sx, sy) {
+    var g = $("carMove");
+    if (!g) return;
+    var t = "translate(" + n2(dx) + " " + n2(dy) + ")";
+    if (rot) t += " rotate(" + n2(rot) + " " + n2(px) + " " + n2(py) + ")";
+    if (sx && (sx !== 1 || sy !== 1)) t += " translate(" + n2(px) + " " + n2(py) + ") scale(" + n2(sx) + " " + n2(sy) + ") translate(" + n2(-px) + " " + n2(-py) + ")";
+    g.setAttribute("transform", t);
+  }
+  function momentStop() {
+    if (!mo) return;
+    $("coach").style.opacity = "";
+    var m = mo; mo = null;
+    cancelAnimationFrame(moRaf);
+    try { m.cleanup(); } catch (e) { /* ignore */ }
+    var g = $("carMove"); if (g) g.removeAttribute("transform");
+    if (baseVB) art.setAttribute("viewBox", baseVB.map(n2).join(" "));
+    ["surpB", "surpF"].forEach(function (id) { var x = $(id); if (x) x.innerHTML = ""; });
+  }
+  function startMoment(kind) {
+    var B = lastBB, back = $("surpB"), front = $("surpF");
+    if (!back || !front) return;
+    var m = kind === "wash" ? washMoment(B, back, front) : kind === "jump" ? jumpMoment(B, back, front) :
+      towMoment(B, back, front);
+    m.kind = kind; m.t0 = performance.now();
+    $("coach").style.opacity = "0";
+    mo = m;
+    function step(now) {
+      if (mo !== m) return;
+      var t = (now - m.t0) / 1000;
+      if (t >= m.dur) { m.step(m.dur); momentStop(); return; }
+      m.step(t);
+      moRaf = requestAnimationFrame(step);
+    }
+    moRaf = requestAnimationFrame(step);
+  }
+  // How far to zoom out so the picture shows x0..x1 and up to height top (picture units).
+  function zoomFor(x0, x1, top) {
+    var v = visBox(), z = Math.max(1, (x1 - x0) / (v.x1 - v.x0), (46 - top) / (46 - v.y0));
+    return Math.min(z, 3);
+  }
+
+  // Car wash: a roll-over wash glides over his vehicle: spinning brushes and suds, then a rinse, then it shines.
+  function washMoment(B, back, front) {
+    var v = visBox(), H = B.h, W = B.w;
+    var GH = H + 70, GW = Math.max(150, Math.min(260, W * 0.4)), br = Math.max(46, Math.min(90, GW * 0.34));
+    var xs = v.x0 - GW - 40, xe = v.x1 + 40;  // the gantry's left edge, off one side to off the other
+    var defs = el("defs", {}, back);
+    var mk = el("mask", { id: "carMask", maskUnits: "userSpaceOnUse", x: -5000, y: -5000, width: 10000, height: 10000, style: "mask-type:alpha" }, defs);
+    el("use", { href: "#rocketG" }, mk);
+    // suds and the shine only on the vehicle
+    var suds = el("g", { mask: "url(#carMask)" }, front);
+    var gleam = el("g", { mask: "url(#carMask)" }, front);
+    var gl = el("path", { d: "", fill: "#FFFFFF", opacity: "0" }, gleam);
+    var foam = [], i;
+    var cols = ["#FFFFFF", "#FFFFFF", "#F4FBFF", "#FFE3F3", "#E2F4FF"];
+    for (i = 0; i < 46; i++) {
+      var fxp = B.x + Math.random() * W, fyp = B.y + H * 0.15 + Math.random() * H * 0.85, fr = rand(10, 24) * Math.max(0.8, Math.min(1.5, H / 180));
+      foam.push({ x: fxp, e: el("circle", { cx: n2(fxp), cy: n2(fyp), r: n2(fr), fill: pick(cols), stroke: "#AFC6DE", "stroke-width": 3, opacity: "0" }, suds), r: fr });
+    }
+    // a few drips that run down off the vehicle (not masked)
+    var drips = el("g", {}, front);
+    // the gantry: back post and beam behind, the brushes and the near post in front
+    var gB = el("g", {}, back), gF = el("g", {}, front);
+    el("rect", { x: 0, y: -GH, width: GW, height: 26, rx: 8, fill: "#3A86FF", stroke: OUT, "stroke-width": 5 }, gB);
+    el("rect", { x: GW - 26, y: -GH, width: 26, height: GH, rx: 6, fill: "#2F6FD6", stroke: OUT, "stroke-width": 5 }, gB);
+    el("rect", { x: GW * 0.2, y: -GH - 34, width: GW * 0.6, height: 36, rx: 10, fill: "#FFC93C", stroke: OUT, "stroke-width": 4 }, gB);
+    el("text", { x: GW / 2, y: -GH - 9, "text-anchor": "middle", "font-family": FONT, "font-weight": 800, "font-size": 24, fill: OUT }, gB).textContent = "Wash";
+    // the top brush (seen end-on: a big round brush) hangs from the beam and rolls over the roof
+    var top = el("g", {}, gF);
+    el("line", { x1: GW / 2, y1: -GH + 20, x2: GW / 2, y2: B.y - br * 0.55, stroke: STEEL_D, "stroke-width": 8, "stroke-linecap": "round" }, gF);
+    var topSpin = el("g", {}, top);
+    el("circle", { r: br, fill: "#4CC9F0", stroke: OUT, "stroke-width": 4, opacity: "0.92" }, topSpin);
+    for (i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      el("line", { x1: n2(Math.cos(a) * br * 0.25), y1: n2(Math.sin(a) * br * 0.25), x2: n2(Math.cos(a) * br * 0.98), y2: n2(Math.sin(a) * br * 0.98), stroke: i % 2 ? "#F26CA7" : "#FFFFFF", "stroke-width": 7, "stroke-linecap": "round" }, topSpin);
+    }
+    el("circle", { r: br * 0.2, fill: STEEL, stroke: OUT, "stroke-width": 4 }, topSpin);
+    // the near side brush: a tall spinning brush (its stripes slide by) on the front post
+    var sideW = Math.max(34, br * 0.62), sideH = GH - 40;
+    var side = el("g", {}, gF);
+    var cp = el("clipPath", { id: "washClip" }, defs);
+    el("rect", { x: 0, y: -sideH, width: sideW, height: sideH, rx: sideW / 2 }, cp);
+    var sideBody = el("g", { "clip-path": "url(#washClip)" }, side);
+    el("rect", { x: 0, y: -sideH, width: sideW, height: sideH, fill: "#FF8FC8", opacity: "0.85" }, sideBody);
+    var stripes = el("g", {}, sideBody), sd = "";
+    for (i = -4; i < sideH / 22 + 4; i++) sd += "M -10 " + n2(-i * 22) + " L " + n2(sideW + 10) + " " + n2(-i * 22 - 18) + " L " + n2(sideW + 10) + " " + n2(-i * 22 - 8) + " L -10 " + n2(-i * 22 + 10) + " Z ";
+    el("path", { d: sd, fill: "#FFFFFF", opacity: "0.8" }, stripes);
+    el("rect", { x: 0, y: -sideH, width: sideW, height: sideH, rx: sideW / 2, fill: "none", stroke: OUT, "stroke-width": 4 }, side);
+    el("rect", { x: -18, y: -GH, width: 24, height: GH, rx: 6, fill: "#3A86FF", stroke: OUT, "stroke-width": 5 }, gF);
+    // rinse: water spray from the beam
+    var spray = el("g", { opacity: "0" }, gF), sp = "";
+    for (i = 0; i < 7; i++) sp += "M " + n2(GW * (0.12 + i * 0.13)) + " " + n2(-GH + 26) + " l " + n2(rand(-8, 8)) + " " + n2(GH * 0.8) + " ";
+    el("path", { d: sp, fill: "none", stroke: "#5BC0EB", "stroke-width": 7, "stroke-linecap": "round", "stroke-dasharray": "14 16" }, spray);
+    var sprayPath = spray.firstChild;
+    var z = Math.min(1.5, zoomFor(B.x - 40, B.x + W + 40, -GH - 60));
+    var T1 = 0.6, T2 = 4.6, T3 = 5.0, T4 = 8.4, T5 = 10.6, dripT = 0;
+    var gx = function (t) {   // the gantry's left edge over time: across to the right, then back (rinse), then away
+      if (t < T1) return xs;
+      if (t < T2) return lerp(xs, xe, easeIO(seg(t, T1, T2)));
+      if (t < T3) return xe;
+      return lerp(xe, xs, easeIO(seg(t, T3, T4)));
+    };
+    return {
+      dur: T5 + 0.4,
+      step: function (t) {
+        setZoom(1 + (z - 1) * Math.min(easeIO(t / 0.8), 1 - easeIO(seg(t, T5 - 0.6, T5))));
+        var x = gx(t), brushX = x + GW / 2;
+        gB.setAttribute("transform", "translate(" + n2(x) + " 0)");
+        gF.setAttribute("transform", "translate(" + n2(x) + " 0)");
+        var spin = t * 220;
+        topSpin.setAttribute("transform", "translate(" + n2(GW / 2) + " " + n2(B.y - br * 0.55) + ") rotate(" + n2(t < T3 ? spin : -spin) + ")");
+        side.setAttribute("transform", "translate(" + n2(GW * 0.08) + " 0)");
+        stripes.setAttribute("transform", "translate(0 " + n2(((t < T3 ? 1 : -1) * t * 90) % 44) + ")");
+        var rinsing = t > T3 && t < T4;
+        spray.setAttribute("opacity", rinsing ? "1" : "0");
+        if (rinsing) sprayPath.setAttribute("stroke-dashoffset", n2(-t * 160));
+        side.setAttribute("opacity", rinsing ? "0.35" : "1");
+        top.setAttribute("opacity", rinsing ? "0.35" : "1");
+        foam.forEach(function (f) {
+          var on = t < T3 ? brushX > f.x : (t < T4 ? brushX + GW * 0.3 > f.x : false);
+          var o = on ? 1 : 0;
+          if (f.o !== o) {
+            f.o = o; f.e.setAttribute("opacity", String(o));
+            if (!o && t > T3 && Math.random() < 0.35) {
+              var d = el("circle", { cx: n2(f.x), cy: n2(B.y + H * 0.6), r: n2(f.r * 0.45), fill: "#BFE6FF", stroke: "#5BC0EB", "stroke-width": 2 }, drips);
+              d._t = t;
+            }
+          }
+          if (o) f.e.setAttribute("transform", "translate(0 " + n2(Math.sin(t * 2 + f.x) * 2) + ")");
+        });
+        Array.prototype.slice.call(drips.childNodes).forEach(function (d) {
+          var a2 = t - d._t; if (a2 > 1) { drips.removeChild(d); return; }
+          d.setAttribute("transform", "translate(0 " + n2(a2 * a2 * (H * 0.5 + 60)) + ")");
+          d.setAttribute("opacity", n2(1 - a2));
+        });
+        // shine: a white gleam slides across the clean vehicle, with sparkles
+        var u = seg(t, T4 + 0.1, T4 + 1.6);
+        if (u > 0 && u < 1) {
+          var gx0 = B.x - 120 + (W + 240) * u;
+          gl.setAttribute("d", "M " + n2(gx0) + " " + n2(B.y - 20) + " l 60 0 l -90 " + n2(H + 40) + " l -60 0 Z M " + n2(gx0 + 80) + " " + n2(B.y - 20) + " l 22 0 l -90 " + n2(H + 40) + " l -22 0 Z");
+          gl.setAttribute("opacity", "0.75");
+        } else gl.setAttribute("opacity", "0");
+        if (t > T4 + 0.3 && dripT < 3 && t > T4 + 0.3 + dripT * 0.55) {
+          dripT++;
+          sparkles(B.x + W * (0.2 + Math.random() * 0.6), B.y + H * (0.2 + Math.random() * 0.5), 5, Math.min(W, H) * 0.35);
+          if (dripT === 1) { restartAnim($("rocketG"), "pop"); chime(); }
+        }
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // A little jump: it backs up, a ramp and a row of cones pop up, it zooms over them and lands with a bounce.
+  function jumpMoment(B, back, front) {
+    var W = B.w, H = B.h, cx0 = B.x + W / 2;
+    var backD = Math.max(90, W * 0.35), rs = B.x + W + Math.max(40, W * 0.12), rl = Math.max(130, W * 0.45), rh = Math.min(70, Math.max(34, W * 0.12));
+    var re = rs + rl, cs = Math.max(0.7, Math.min(1.4, H / 170)), gap = 46 * cs, n = 3;
+    var c0 = re + 40 * cs, ce = c0 + gap * (n - 1) + 20 * cs;
+    var land = ce + W / 2 + Math.max(40, W * 0.12);           // where the vehicle's middle lands
+    var peak = 46 * cs + 40 + rh;                              // how high the bottom gets over the cones
+    // the camera zooms out a little (enough for the jump's height) and pans along with the vehicle
+    var z = Math.max(1.15, Math.min(1.6, zoomFor(0, 0, B.y - peak - 30))), vw = (visBox().x1 - visBox().x0) * z;
+    var lead = Math.max(0, Math.min(W * 0.35, (vw - W) / 2 - 20));
+    var props = el("g", {}, back);
+    var ramp = el("path", { d: "M " + n2(rs) + " 0 L " + n2(re) + " " + n2(-rh) + " L " + n2(re) + " 0 Z", fill: "#FFC93C", stroke: OUT, "stroke-width": 5, "stroke-linejoin": "round" }, props);
+    el("path", { d: "M " + n2(rs + rl * 0.35) + " " + n2(-rh * 0.35) + " L " + n2(rs + rl * 0.35) + " 0 M " + n2(rs + rl * 0.7) + " " + n2(-rh * 0.7) + " L " + n2(rs + rl * 0.7) + " 0", stroke: OUT, "stroke-width": 4 }, props);
+    var cones = el("g", {}, props), cstr = "";
+    for (var i = 0; i < n; i++) cstr += coneS(c0 + i * gap, cs);
+    cones.innerHTML = cstr;
+    var T0 = 0.9, T1 = 2.4, T2 = 2.7, T3 = 5.3, T4 = 6.3, T5 = 7.0, T6 = 7.7, T7 = 9.6, T8 = 10.5;
+    var x1 = -backD, x2 = land - cx0, a = 0.35, landed = false;
+    function drive(u) { var f = u < a ? u * u / (2 * a) : a / 2 + (u - a); return f / (1 - a / 2); }
+    return {
+      dur: T8,
+      step: function (t) {
+        var zk = Math.min(easeIO(t / T0), 1 - easeIO(seg(t, T7, T8)));
+        // ramp and cones pop up from the ground, then sink back before it drives home
+        var up = Math.min(easeIO(seg(t, 0.3, 1.1)), 1 - easeIO(seg(t, T5, T6)));
+        props.setAttribute("transform", "translate(0 " + n2((1 - up) * (rh + 60 * cs)) + ")");
+        props.setAttribute("opacity", n2(Math.min(1, up * 3)));
+        var dx = 0, dy = 0, rot = 0, sx = 1, sy = 1;
+        if (t < T1) dx = x1 * easeIO(seg(t, T0 - 0.4, T1));
+        else if (t < T2) dx = x1;
+        else if (t < T3) {
+          dx = lerp(x1, x2, drive(seg(t, T2, T3)));
+          var cx = cx0 + dx;
+          if (cx > rs && cx < re) { dy = -rh * (cx - rs) / rl; rot = -Math.atan(rh / rl) * 180 / Math.PI; }
+          else if (cx >= re) {
+            var u = (cx - re) / (land - re);
+            dy = lerp(-rh, 0, u) - 4 * peak * u * (1 - u);
+            rot = (-Math.atan(rh / rl) * 180 / Math.PI) * (1 - u * 2) * 0.9;
+          }
+        } else if (t < T4) {
+          dx = x2;
+          if (!landed) { landed = true; puffs(land, 0, 6); honk(); }
+          var b = seg(t, T3, T4);
+          dy = -H * 0.12 * Math.abs(Math.sin(b * Math.PI * 2)) * (1 - b);
+          var sq = Math.max(0, 1 - b * 3) * 0.08;
+          sx = 1 + sq; sy = 1 - sq;
+        } else if (t < T6) dx = x2;
+        else dx = x2 * (1 - easeIO(seg(t, T6, T7)));
+        carMove(dx, dy, rot, cx0, 0, sx, sy);
+        var fw = easeIO(seg(t, T1, T2 + 0.9)) * (1 - easeIO(seg(t, T6, T7)));
+        setZoom(1 + (z - 1) * zk, lerp(dx * 0.5 + lead * zk, dx + lead * 0.5, fw));
+      },
+      cleanup: function () {}
+    };
+  }
+
+  // A ride on a tow truck: it backs up to the front of his vehicle, hooks it, lifts the front a little,
+  // gives it a short ride and back, sets it down gently and drives off.
+  function towMoment(B, back, front) {
+    var W = B.w, H = B.h, fx = B.x + W;
+    var s = Math.max(0.9, Math.min(2, Math.min(H, 220) / 110)), TL = 195 * s;
+    var gapX = 18 * s, rideD = Math.max(80, W * 0.3);
+    var tx = fx + gapX;  // where the truck's back end parks
+    var v = visBox(), txStart = Math.max(v.x1 + 20, tx + TL * 0.6);
+    var hookY = -Math.max(18, Math.min(H * 0.32, 60));
+    var z = Math.min(1.6, zoomFor(B.x - 30, tx + TL + 30, -Math.max(H, 110 * s) - 40)), base = baseVB[0] + baseVB[2] / 2;
+    var tr = el("g", {}, back);
+    tr.innerHTML = towTruckS(s);
+    var cable = el("line", { stroke: OUT, "stroke-width": 4, "stroke-linecap": "round" }, front);
+    var hook = el("path", { d: "M 0 -6 L 0 6 Q 0 16 9 16 Q 17 16 17 8", fill: "none", stroke: STEEL_D, "stroke-width": 6, "stroke-linecap": "round" }, front);
+    var tipX = -2 * s, tipY = -88 * s;
+    var lift = Math.atan(Math.min(H * 0.26, 56) / W) * 180 / Math.PI;
+    var T0 = 0.9, T1 = 3.0, T2 = 3.8, T3 = 4.8, T4 = 6.4, T5 = 6.8, T6 = 8.4, T7 = 9.3, T8 = 9.9, T9 = 11.6, T10 = 12.4;
+    var tooted = 0;
+    return {
+      dur: T10,
+      step: function (t) {
+        var zk = Math.min(easeIO(t / T0), 1 - easeIO(seg(t, T9 - 0.4, T10)));
+        var x, ride = 0, ang = 0, hookD;   // hookD 0 = up at the boom, 1 = down at the bumper
+        if (t < T1) x = lerp(txStart, tx, easeIO(seg(t, 0.2, T1)));
+        else x = tx;
+        hookD = easeIO(seg(t, T1, T2)) * (1 - easeIO(seg(t, T8, T9 - 0.9)));
+        ang = easeIO(seg(t, T2, T3)) * (1 - easeIO(seg(t, T7, T8)));
+        ride = rideD * (easeIO(seg(t, T3 + 0.1, T4)) - easeIO(seg(t, T5, T6)));
+        if (t > T8 + 0.5) x = tx + (txStart - tx + TL) * easeIO(seg(t, T9 - 1.2, T9 + 0.2));
+        x += ride;
+        if (t > T3 && !tooted) { tooted = 1; honk(); }
+        tr.setAttribute("transform", "translate(" + n2(x) + " 0)");
+        carMove(ride, 0, -lift * ang, B.x, 0);
+        // the camera: zoomed out a little, centred between his vehicle and the tow truck
+        var camX = ((B.x + ride) + Math.min(x, tx + ride) + TL) / 2 - base;
+        setZoom(1 + (z - 1) * zk, camX * zk);
+        // the hook: at the boom tip, or down at the front bumper (which rises with the lift)
+        var bx = fx + ride, by = hookY - Math.sin(lift * ang * Math.PI / 180) * W;
+        var hx = lerp(x + tipX, bx + 4, hookD), hy = lerp(tipY + 30 * s, by - 4, hookD);
+        cable.setAttribute("x1", n2(x + tipX)); cable.setAttribute("y1", n2(tipY));
+        cable.setAttribute("x2", n2(hx)); cable.setAttribute("y2", n2(hy - 6));
+        hook.setAttribute("transform", "translate(" + n2(hx) + " " + n2(hy) + ") scale(" + n2(Math.max(1, s * 0.9)) + ")");
+      },
+      cleanup: function () {}
+    };
+  }
+  // A friendly tow truck, facing right, its back end (the boom) at x = 0 on the ground. s = size.
+  function towTruckS(s) {
+    function P(v) { return n2(v * s); }
+    var o = '<g stroke="' + OUT + '" stroke-width="' + n2(Math.max(4, 4.5 * s)) + '" stroke-linejoin="round" stroke-linecap="round">';
+    o += '<path d="M ' + P(6) + ' ' + P(-20) + ' L ' + P(6) + ' ' + P(-48) + ' L ' + P(120) + ' ' + P(-48) + ' L ' + P(120) + ' ' + P(-20) + ' Z" fill="#F77F00"/>';
+    o += '<path d="M ' + P(116) + ' ' + P(-20) + ' L ' + P(116) + ' ' + P(-96) + ' L ' + P(160) + ' ' + P(-96) + ' L ' + P(190) + ' ' + P(-58) + ' L ' + P(192) + ' ' + P(-20) + ' Z" fill="#FFC93C"/>';
+    o += '<path d="M ' + P(128) + ' ' + P(-60) + ' L ' + P(128) + ' ' + P(-86) + ' L ' + P(156) + ' ' + P(-86) + ' L ' + P(176) + ' ' + P(-60) + ' Z" fill="' + GLASS + '"/>';
+    o += '<rect x="' + P(126) + '" y="' + P(-108) + '" width="' + P(30) + '" height="' + P(12) + '" rx="' + P(4) + '" fill="#F7A400"/>';
+    o += '<path d="M ' + P(40) + ' ' + P(-48) + ' L ' + P(-2) + ' ' + P(-88) + '" stroke-width="' + P(9) + '" fill="none"/>';
+    o += '<path d="M ' + P(40) + ' ' + P(-48) + ' L ' + P(-2) + ' ' + P(-88) + '" stroke="' + STEEL + '" stroke-width="' + P(4) + '" fill="none"/>';
+    o += '<circle cx="' + P(-2) + '" cy="' + P(-88) + '" r="' + P(6) + '" fill="' + STEEL + '"/>';
+    o += '<rect x="' + P(184) + '" y="' + P(-36) + '" width="' + P(10) + '" height="' + P(10) + '" rx="' + P(3) + '" fill="' + LAMP + '"/>';
+    o += '<circle cx="' + P(40) + '" cy="' + P(-18) + '" r="' + P(18) + '" fill="' + RUBBER + '"/><circle cx="' + P(40) + '" cy="' + P(-18) + '" r="' + P(7) + '" fill="' + STEEL + '"/>';
+    o += '<circle cx="' + P(158) + '" cy="' + P(-18) + '" r="' + P(18) + '" fill="' + RUBBER + '"/><circle cx="' + P(158) + '" cy="' + P(-18) + '" r="' + P(7) + '" fill="' + STEEL + '"/>';
+    o += '</g>';
+    return o;
+  }
+
+  if (/[?&]debug\b/.test(location.search)) window.__carSurprise = { start: function (k) { momentStop(); startMoment(k); }, running: function () { return mo ? mo.kind : ""; }, next: function () { return MOMENTS[momentAt % MOMENTS.length]; } };
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.id === "fback") { if (!dv || !dv.park) closeDrive(); return; }
+    if (t.classList.contains("hold") || t.id === "bigToggle" || t.closest(".tb-layer, .sheet, .rest, .farewell")) return;
+    if (Toybox.timer.locked()) return;
+    if (t.id === "launch") { if (picking) setPicking(""); openDrive(false); return; }
+    var changed = false, c = cfg(), kind0 = state.kind;
+    if (t.dataset.fam) {
+      if (t.dataset.fam !== state.fam) { state.kind = FAM_BY[t.dataset.fam].kinds[0]; changed = true; }
+    }
+    else if (t.dataset.kind) { changed = state.kind !== t.dataset.kind; state.kind = t.dataset.kind; if (!changed) changed = true; }
+    else if (t.dataset.page) { state.buildPage = Number(t.dataset.page); }
+    else if (t.dataset.ppart && t.dataset.opt !== undefined) {
+      var spec = partSpec(state.kind, t.dataset.ppart);
+      if (!spec) return;
+      c[t.dataset.ppart] = spec[2].filter(function (o) { return String(o[0]) === t.dataset.opt; })[0][0];
+      changed = true;
+    }
+    else if (t.dataset.color) {
+      if (!picking) return;
+      c.colors[picking] = t.dataset.color;
+      if (picking === "body") fixDetails(state.kind, c);
+      changed = true;
+    }
+    else if (t.dataset.action === "surprise") { if (picking) setPicking(""); surprise(); return; }
+    else return;
+    // Another action puts the colors away; picking a color keeps them out.
+    if (!t.dataset.color && (picking && (t.dataset.action || state.kind !== kind0 || t.dataset.ppart))) setPicking("");
+    render();
+    if (changed) {
+      celebrate();
+      blip();
+      if (t.dataset.color) restartAnim(t, "pop");
+    }
+  });
+
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+
+  // Rest picture: the vehicle parked in its garage at night.
+  function restSVG() {
+    var t = vehicleOf(state.kind, cfg()), b = t.bb;
+    var s = Math.min(380 / b.w, 250 / b.h), cx = b.x + b.w / 2;
+    var o = '<rect x="-400" y="-500" width="800" height="560" fill="#1B1F4A"/>';
+    [[-250, -380], [-150, -340], [220, -390], [260, -300], [-270, -260], [140, -360]].forEach(function (p, i) {
+      o += '<path d="' + starD(p[0], p[1], i % 2 ? 8 : 12, i % 2 ? 3 : 5, 4) + '" fill="#FFF6C8"/>';
+    });
+    o += '<g transform="translate(-230 -330)"><circle r="30" fill="#FFF6C8"' + sk(5) + '/><circle cx="12" cy="-8" r="26" fill="#1B1F4A"/></g>';
+    o += '<rect x="-400" y="0" width="800" height="60" fill="#4A6A3A"' + sk(5) + "/>";
+    o += pth("M -250 -300 L 0 -400 L 250 -300 Z", "#E63946", 5);
+    o += rct(-240, -310, 480, 312, 6, "#C9D2E3", 5);
+    o += rct(-212, -286, 424, 288, 6, "#FFE9A8", 5);
+    o += '<g transform="translate(0 -6) scale(' + n2(s) + ") translate(" + n2(-cx) + ' 0)">' + t.svg + "</g>";
+    // door partly down
+    o += rct(-212, -286, 424, 70, 4, "#9AA3AF", 5) + rct(-212, -262, 424, 4, 0, "#5B6684", 0) + rct(-212, -240, 424, 4, 0, "#5B6684", 0);
+    o += txt(150, -350, "Z", 34, "#FFFFFF", OUT) + txt(190, -380, "z", 26, "#FFFFFF", OUT);
+    return o;
+  }
+
+  // ================= Drive =================
+  var F = $("flight"), cv = $("fcv"), ctx = cv.getContext("2d");
+  var W = 0, H = 0, DPR = 1, SC = 1, baseY = 0, CX = 0;
+  var dv = null, running = false, lastT = 0;
+  var vbKey = "", VB = null;
+  var G = 1700;
+  var FP = {
+    build: { max: 190, acc: 160, dial: 40, step: 10, factor: 30 / 190, k: 300, c: 18 },
+    fast: { max: 1150, acc: 440, dial: 200, step: 40, factor: 180 / 1150, k: 380, c: 22 },
+    monster: { max: 600, acc: 300, dial: 100, step: 20, factor: 80 / 600, k: 70, c: 5 }
+  };
+  var LAP = 9000;
+
+  function sizeDrive() {
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    var b = VB ? VB.bb : { x: -260, y: -360, w: 520, h: 360 };
+    SC = Math.min((H > W ? 0.66 : 0.5) * W / b.w, 0.42 * H / b.h);
+    var ctl = $("dctl"), ch = ctl.offsetHeight || 140;
+    baseY = Math.min(H * 0.78, H - ch - 18);
+    if (H < 520 && W > H) baseY = H - ch - 20;
+    baseY = Math.max(baseY, H * 0.55);
+    CX = W * (H > W ? 0.47 : 0.38) - (b.x + b.w / 2) * SC;
+  }
+  window.addEventListener("resize", function () { if (!F.hidden) { sizeDrive(); prepVehicle(); } });
+
+  // ---- vehicle bitmaps: each drawing layer becomes a small picture ----
+  function bitmap(svgStr, bb) {
+    var o = { c: null, bb: bb };
+    var pw = Math.max(1, Math.ceil(bb.w * SC * DPR)), ph = Math.max(1, Math.ceil(bb.h * SC * DPR));
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + pw + '" height="' + ph + '" viewBox="' + [bb.x, bb.y, bb.w, bb.h].map(n2).join(" ") + '">' + svgStr + "</svg>";
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement("canvas");
+      c.width = pw; c.height = ph;
+      c.getContext("2d").drawImage(img, 0, 0, pw, ph);
+      o.c = c;
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    return o;
+  }
+  function padBB(b, p) { return { x: b.x - p, y: b.y - p, w: b.w + 2 * p, h: b.h + 2 * p }; }
+  function prepVehicle() {
+    var c = cfg();
+    var key = state.kind + JSON.stringify(c) + "|" + SC.toFixed(3) + "|" + DPR + "|" + W + "x" + H;
+    if (key === vbKey && VB) return;
+    var t = vehicleOf(state.kind, c), v = t.v;
+    var first = !VB || VB.kind !== state.kind || VB.cfg !== JSON.stringify(c);
+    VB = { kind: state.kind, cfg: JSON.stringify(c), v: v, bb: t.bb, layers: [], wheels: [] };
+    if (first) { sizeDrive(); }
+    vbKey = state.kind + JSON.stringify(c) + "|" + SC.toFixed(3) + "|" + DPR + "|" + W + "x" + H;
+    v.L.forEach(function (l, i) {
+      if (l.wheels) { VB.layers.push({ type: "wheels" }); return; }
+      if (l.track) { var ts = trackBaseS(v.track); VB.layers.push({ type: "track", bm: bitmap(ts, padBB(bboxOf(ts), 8)) }); return; }
+      if (i === v.shockLayer) { VB.layers.push({ type: "shocks" }); return; }
+      if (i === v.drumLayer) {
+        var frames = [], bbd = null;
+        for (var f = 0; f < 8; f++) {
+          var ds = part("tool", pth(v.drum.d, v.drum.col, 5) + drumStripes(v.drum, f * 8) + pth(v.drum.d, "none", 5));
+          if (!bbd) bbd = padBB(bboxOf(ds), 8);
+          frames.push(bitmap(ds, bbd));
+        }
+        VB.layers.push({ type: "drum", frames: frames, chain: [] });
+        return;
+      }
+      var bb = bboxOf(l.svg);
+      if (bb.w < 1 || bb.h < 1) { VB.layers.push({ type: "none" }); return; }
+      VB.layers.push({ type: "img", bm: bitmap(l.svg, padBB(bb, 8)), chain: l.chain });
+    });
+    v.wheels.forEach(function (w) {
+      var R = w.r * 1.3 + 12;
+      VB.wheels.push({ w: w, bm: bitmap(wheelArt(w), { x: -R, y: -R, w: 2 * R, h: 2 * R }) });
+    });
+    // wheel base for ground contact: the lowest wheels (or the track ends)
+    var xs = v.wheels.filter(function (w) { return w.style !== "roller" || w.y > -20; }).map(function (w) { return w.x; });
+    VB.xr = Math.min.apply(null, xs);
+    VB.xf = Math.max.apply(null, xs);
+    if (VB.xf - VB.xr < 60) { VB.xr -= 60; VB.xf += 60; }
+  }
+
+  // ---- the world ----
+  function newDrive(park) {
+    var fam = KINDS[state.kind].fam;
+    return {
+      fam: fam, kind: state.kind, x: 0, y: 0, vy: 0, air: false, ang: 0, speed: 0, go: false, dist: 0,
+      susp: 0, suspV: 0, lastVY: 0, pose: {}, anims: [], objs: [], nextObj: 700, parts: [], lap: 1, crushed: 0,
+      bedFill: 1, loaded: false, drumPhase: 0, drumFast: 0, turbo: 0, bladeUp: false, park: null, t: 0,
+      smokeT: 0, camY: 0, shake: 0, wantPark: !!park, piles: 0
+    };
+  }
+  function addObj(o) { dv.objs.push(o); return o; }
+  function genWorld() {
+    var ahead = dv.x + (W / SC) * 1.6 + 400;
+    while (dv.nextObj < ahead) {
+      var x = dv.nextObj;
+      if (dv.park && x > dv.park.gx - 600) { dv.nextObj = x + 5000; break; }
+      if (dv.fam === "build") {
+        var h = rand(50, 105);
+        addObj({ type: "pile", x: x + 150, s: h * 1.7, hgt: h, col: DIRT_L, vx: 0 });
+        if (Math.random() < 0.6) addObj({ type: "cone", x: x + rand(450, 650) });
+        dv.nextObj = x + rand(800, 1300);
+      } else if (dv.fam === "monster") {
+        if (Math.random() < 0.5) {
+          addObj({ type: "ramp", x: x, len: 380, hgt: rand(120, 170), top: 70, drop: 34 });
+          dv.nextObj = x + 380 + 70 + rand(700, 1000);
+        } else {
+          var n = 1 + Math.floor(Math.random() * 3);
+          for (var i = 0; i < n; i++) addObj({ type: "car", x: x + i * 236, w: 220, k: 0, crushed: false, col: pick(["#E63946", "#2D5BD7", "#2E9E5B", "#F26CA7", "#7B4FC9", "#1FA6A0", "#F77F00"]) });
+          dv.nextObj = x + n * 236 + rand(600, 900);
+        }
+      } else {
+        dv.nextObj = x + 100000;
+      }
+    }
+    var behind = dv.x - (W / SC) * 1.2 - 600;
+    dv.objs = dv.objs.filter(function (o) { return (o.x + (o.len || 0) + (o.top || 0) + (o.w || 0) + (o.s || 0) + 200) > behind || o.type === "garage"; });
+  }
+  function rampH(o, x) {
+    var u = x - o.x;
+    if (u < 0) return 0;
+    if (u < o.len) return o.hgt * u / o.len;
+    u -= o.len;
+    if (u < o.top) return o.hgt;
+    u -= o.top;
+    if (u < o.drop) return o.hgt * (1 - u / o.drop);
+    return 0;
+  }
+  function groundH(x) {
+    var h = 0;
+    for (var i = 0; i < dv.objs.length; i++) {
+      var o = dv.objs[i], v = 0;
+      if (o.type === "pile") { var u = (x - o.x) / o.s; if (u > -1 && u < 1) v = o.hgt * (1 - u * u); }
+      else if (o.type === "ramp") v = rampH(o, x);
+      else if (o.type === "car") {
+        var q = (x - o.x) / o.w;
+        if (q > 0 && q < 1) v = (88 - 56 * o.k) * Math.min(1, q / 0.2, (1 - q) / 0.2);
+      }
+      if (v > h) h = v;
+    }
+    return h;
+  }
+
+  // vehicle-local point (y down) -> world (y up)
+  function toWorld(px, py) {
+    var lx = px, ly = -py, cs = Math.cos(dv.ang), sn = Math.sin(dv.ang);
+    return { x: dv.x + lx * cs - ly * sn, y: dv.y + lx * sn + ly * cs };
+  }
+  function hookWorld(h, body) {
+    var p = chainPt(VB.v, h.chain, dv.pose, h.x, h.y);
+    return toWorld(p.x, p.y - (body === false ? 0 : dv.susp));
+  }
+  function sx(wx) { return CX + (wx - dv.x) * SC; }
+  function sy(wy) { return baseY - (wy - dv.camY) * SC; }
+
+  // ---- particles (world units, y up) ----
+  var MAXP = 420;
+  function addP(kind, x, y, vx, vy, r, life, col, g) {
+    if (dv.parts.length >= MAXP) dv.parts.shift();
+    dv.parts.push({ kind: kind, x: x, y: y, vx: vx, vy: vy, r: r, life: life, age: 0, col: col, g: g == null ? 1 : g, rot: Math.random() * 6 });
+  }
+  function dirtBurst(x, y, n, col, up) {
+    for (var i = 0; i < n; i++) addP("dot", x + rand(-30, 30), y + rand(0, 20), rand(-260, 260), rand(150, 520) * (up || 1), rand(7, 16), rand(0.7, 1.3), Math.random() < 0.5 ? col : shade(col, 0.2));
+  }
+  function starBurst(x, y, n, speed, cols) {
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, s = rand(0.3, 1) * speed;
+      addP("star", x, y, Math.cos(a) * s, Math.sin(a) * s + 200, rand(12, 24), rand(0.6, 1.1), pick(cols || SPARK_COLS), 0.6);
+    }
+  }
+  function confetti(x, y, n) {
+    for (var i = 0; i < n; i++) addP("conf", x + rand(-200, 200), y + rand(0, 300), rand(-200, 200), rand(200, 700), rand(8, 14), rand(1.4, 2.4), pick(SPARK_COLS.concat(["#E63946", "#2D5BD7"])), 0.5);
+  }
+  function updateParts(dt) {
+    var ps = dv.parts;
+    for (var i = ps.length - 1; i >= 0; i--) {
+      var p = ps[i];
+      p.age += dt;
+      if (p.age > p.life) { ps.splice(i, 1); continue; }
+      if (p.kind === "smoke") { p.x += p.vx * dt; p.y += p.vy * dt; p.r += 30 * dt; continue; }
+      p.vy -= G * p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.rot += dt * 5;
+      if (p.kind === "dot" || p.kind === "cem") {
+        var gh = groundH(p.x);
+        if (p.y < gh) { p.y = gh; p.vy = -p.vy * 0.25; p.vx *= 0.5; }
+      }
+    }
+  }
+
+  // ---- pose animations ----
+  var ANIM_SLOW = 1.3;
+  function busy() { return dv.anims.length > 0; }
+  function queue(steps) { steps.forEach(function (s) { s.t = 0; dv.anims.push(s); }); }
+  function stepAnims(dt) {
+    var a = dv.anims[0];
+    if (!a) return;
+    if (!a.from) {
+      a.from = {};
+      Object.keys(a.to || {}).forEach(function (k) { a.from[k] = dv.pose[k] || 0; });
+      if (a.start) a.start();
+    }
+    // Machine moves (dig, tip, pour) play out about a third slower than written, so there is time to watch.
+    a.t += dt / ANIM_SLOW;
+    var f = ease(a.t / a.dur);
+    Object.keys(a.to || {}).forEach(function (k) { dv.pose[k] = lerp(a.from[k], a.to[k], f); });
+    if (a.during) a.during(f, dt);
+    if (a.t >= a.dur) { dv.anims.shift(); if (a.done) a.done(); }
+  }
+  function pileAt(x, add, col) {
+    var best = null;
+    dv.objs.forEach(function (o) { if (o.type === "pile" && Math.abs(o.x - x) < o.s * 0.8 && (!col || o.col === col)) best = o; });
+    if (best) { best.hgt = Math.min(150, best.hgt + add * 0.5); best.s = best.hgt * 1.7; return best; }
+    return addObj({ type: "pile", x: x, s: add * 1.7, hgt: add, col: col || DIRT_L, vx: 0 });
+  }
+
+  // Action buttons per vehicle.
+  var ACTIONS = {
+    excavator: [["dig", "Dig"], ["dump", "Dump"]],
+    bulldozer: [["push", "Push!"], ["lift", "Lift"]],
+    dump: [["load", "Load"], ["tip", "Tip"]],
+    mixer: [["spin", "Spin"], ["pour", "Pour"]],
+    fast: [["turbo", "Turbo!"]],
+    monster: [["jump", "Jump!"]]
+  };
+  function actionsFor() { return ACTIONS[dv.kind] || ACTIONS[dv.fam] || []; }
+  function doAction(id) {
+    if (!dv || dv.park) return;
+    var v = VB.v;
+    if (id === "dig") {
+      if (busy()) return;
+      queue([
+        { to: { boom: 0.12, stick: -0.1, tool: -0.4 }, dur: 0.45 },
+        { to: { tool: 0.85, stick: 0.12 }, dur: 0.55, start: function () {
+          var h = v.hooks.tip || v.hooks.load, p = hookWorld(h);
+          dirtBurst(p.x, Math.max(0, groundH(p.x)), 18, DIRT_L);
+          dv.objs.forEach(function (o) { if (o.type === "pile" && Math.abs(o.x - p.x) < o.s) { o.hgt *= 0.7; o.s = o.hgt * 1.7; } });
+          dv.objs = dv.objs.filter(function (o) { return o.type !== "pile" || o.hgt > 22; });
+          dv.loaded = true;
+          sfxThud();
+        } },
+        { to: { boom: -0.4, stick: -0.05 }, dur: 0.55 }
+      ]);
+    } else if (id === "dump") {
+      if (busy()) return;
+      queue([
+        { to: { boom: -0.45, stick: -0.3, tool: 0.85 }, dur: 0.45 },
+        { to: { tool: -1.1 }, dur: 0.5, start: function () {
+          var h = v.hooks.load || v.hooks.tip, p = hookWorld(h);
+          if (dv.loaded || true) for (var i = 0; i < 26; i++) addP("dot", p.x + rand(-25, 25), p.y + rand(-10, 20), rand(-60, 60), rand(-80, 80), rand(9, 18), 1.6, Math.random() < 0.5 ? DIRT_L : DIRT);
+          dv.loaded = false;
+        }, done: function () { var h = v.hooks.load || v.hooks.tip, p = hookWorld(h); pileAt(p.x, 46); sfxThud(); } },
+        { to: { boom: 0, stick: 0, tool: 0 }, dur: 0.6 }
+      ]);
+    } else if (id === "lift") {
+      if (busy()) return;
+      dv.bladeUp = !dv.bladeUp;
+      queue([{ to: { blade: dv.bladeUp ? -0.22 : 0 }, dur: 0.45 }]);
+    } else if (id === "push") {
+      if (busy()) return;
+      dv.bladeUp = false;
+      queue([{ to: { blade: 0.05 }, dur: 0.15 }, { to: { blade: 0 }, dur: 0.4 }]);
+      dv.speed = Math.max(dv.speed, 0) + 240;
+      var bp = hookWorld(v.hooks.blade);
+      dirtBurst(bp.x, 10, 22, DIRT_L, 1.2);
+      dv.objs.forEach(function (o) { if (o.type === "pile" && o.x > dv.x && o.x - o.s < bp.x + 300) o.vx = 520; });
+      dv.shake = 0.3;
+      sfxThud();
+    } else if (id === "load") {
+      if (busy() || (dv.pose.bed || 0) < -0.05) return;
+      queue([{ to: {}, dur: 1.0, during: function (f, dt) {
+        dv.bedFill = Math.min(1, dv.bedFill + dt * 1.2);
+        if (Math.random() < 0.8) { var bx = rand(v.bed.x0 + 20, v.bed.x1 - 20), p = toWorld(bx, v.bed.y - 260); addP("dot", p.x, p.y, rand(-20, 20), -100, rand(9, 16), 0.5, Math.random() < 0.5 ? DIRT_L : DIRT); }
+      }, done: function () { dv.bedFill = 1; sfxThud(); } }]);
+    } else if (id === "tip") {
+      if (busy()) return;
+      var pour = function (f, dt) {
+        if ((dv.pose.bed || 0) > -0.3 || dv.bedFill <= 0) return;
+        dv.bedFill = Math.max(0, dv.bedFill - dt * 0.9);
+        var p = hookWorld({ chain: ["bed"], x: v.bed.x0 - 10, y: v.bed.y + 30 });
+        for (var i = 0; i < 2; i++) addP("dot", p.x + rand(-10, 10), p.y + rand(-20, 20), rand(-140, -40), rand(-60, 40), rand(9, 18), 1.4, Math.random() < 0.5 ? DIRT_L : DIRT);
+      };
+      var had = dv.bedFill;
+      queue([
+        { to: { bed: -0.85 }, dur: 0.9, during: pour },
+        { to: { bed: -0.85 }, dur: 0.7, during: pour, done: function () { if (had > 0.2) { var p = toWorld(v.bed.x0 - 70, 0); pileAt(p.x, 40 + 40 * had); sfxThud(); } } },
+        { to: { bed: 0 }, dur: 0.8 }
+      ]);
+    } else if (id === "spin") {
+      dv.drumFast = 3;
+      var dm = v.drum, cp = toWorld((dm.x0 + dm.x1) / 2, (dm.y0 + dm.y1) / 2);
+      starBurst(cp.x, cp.y, 10, 500);
+    } else if (id === "pour") {
+      if (busy()) return;
+      dv.drumFast = Math.max(dv.drumFast, 2.6);
+      queue([
+        { to: { chute: -0.45 }, dur: 0.4 },
+        { to: { chute: -0.45 }, dur: 1.8, during: function () {
+          var p = hookWorld(v.hooks.pour);
+          for (var i = 0; i < 2; i++) addP("cem", p.x + rand(-6, 6), p.y, rand(-90, -30), rand(-40, 0), rand(9, 15), 1.2, Math.random() < 0.5 ? "#B8BEC8" : "#9AA3AF");
+        }, done: function () { var p = hookWorld(v.hooks.pour); pileAt(p.x - 60, 60, "#AEB4BE"); } },
+        { to: { chute: 0 }, dur: 0.5 }
+      ]);
+    } else if (id === "turbo") {
+      dv.turbo = 1.8;
+      dv.go = true;
+      banner("Turbo!", 1200);
+      updatePedal();
+    } else if (id === "jump") {
+      if (dv.air) return;
+      dv.air = true;
+      dv.vy = 720;
+      dv.suspV -= 250;
+      dirtBurst(dv.x, dv.y, 16, DIRT_L);
+    }
+  }
+
+  // ---- parking at the end of play time ----
+  function startPark() {
+    if (!dv || dv.park) return;
+    var span = (W / SC);
+    var gx = Math.round(dv.x + Math.max(900, span * 0.8) + Math.max(0, dv.speed) * 0.5);
+    var b = VB.bb;
+    dv.park = { gx: gx, x0: gx + b.x - 70, x1: gx + b.x + b.w + 60, h: -b.y + 100, door: 0, doneT: 0 };
+    dv.objs = dv.objs.filter(function (o) {
+      var ox = o.x - (o.s || 0);
+      return !(ox > dv.x + 300 && ox < gx + b.w + 1200);
+    });
+    dv.nextObj = gx + 100000;
+    dv.go = false;
+    dv.anims = [];
+    dv.pose = {};
+    dv.turbo = 0;
+    updatePedal();
+    $("dhud").hidden = true;
+  }
+  function parkSpeed() {
+    var P = FP[dv.fam], rem = dv.park.gx - dv.x;
+    var cruise = clamp(P.max * 0.55, 320, 600);
+    if (rem <= 1) return 0;
+    return Math.min(cruise, Math.sqrt(2 * P.acc * 0.9 * rem) + 12);
+  }
+
+  // ---- step ----
+  function step(dt) {
+    var P = FP[dv.fam], v = VB.v;
+    dv.t += dt;
+    genWorld();
+    stepAnims(dt);
+    var target = dv.go ? P.max * (dv.turbo > 0 ? 1.45 : 1) : 0;
+    if (dv.park) target = parkSpeed();
+    if (dv.speed < target) dv.speed = Math.min(target, dv.speed + P.acc * dt * (dv.turbo > 0 ? 2.2 : 1) * (dv.park ? 2 : 1));
+    else dv.speed = Math.max(target, dv.speed - P.acc * 1.6 * dt);
+    if (dv.park && dv.park.gx - dv.x < 2 && dv.speed < 30) { dv.speed = 0; dv.x = Math.max(dv.x, dv.park.gx - 1); }
+    dv.turbo = Math.max(0, dv.turbo - dt);
+    dv.drumFast = Math.max(0, dv.drumFast - dt);
+    dv.x += dv.speed * dt;
+    dv.dist += dv.speed * dt;
+    dv.drumPhase += dt * (14 + dv.speed * 0.08 + (dv.drumFast > 0 ? 150 : 0));
+
+    // bulldozer pushes piles along
+    if (dv.kind === "bulldozer" && v.hooks.blade && (dv.pose.blade || 0) > -0.1) {
+      var bx = hookWorld(v.hooks.blade).x;
+      dv.objs.forEach(function (o) {
+        if (o.type !== "pile" || o.x < dv.x) return;
+        if (o.x - o.s * 0.75 < bx) {
+          o.x = bx + o.s * 0.75;
+          if (dv.speed > 30 && Math.random() < 0.35) addP("dot", bx + 10, o.hgt * 0.6, rand(40, 220), rand(150, 400), rand(8, 14), 0.8, DIRT_L);
+        }
+      });
+    }
+    dv.objs.forEach(function (o) {
+      if (o.type === "pile" && o.vx) { o.x += o.vx * dt; o.vx = Math.max(0, o.vx - 900 * dt); }
+      if (o.type === "car" && o.crushed && o.k < 1) o.k = Math.min(1, o.k + dt * 5);
+    });
+    // merge piles that touch
+    var piles = dv.objs.filter(function (o) { return o.type === "pile"; }).sort(function (a, b) { return a.x - b.x; });
+    for (var i = 1; i < piles.length; i++) {
+      var a = piles[i - 1], b = piles[i];
+      if (!a.dead && b.x - a.x < (a.s + b.s) * 0.45 && a.col === b.col) {
+        b.hgt = Math.min(160, Math.sqrt(a.hgt * a.hgt + b.hgt * b.hgt)); b.s = b.hgt * 1.7; a.dead = true;
+      }
+    }
+    if (piles.some(function (p) { return p.dead; })) dv.objs = dv.objs.filter(function (o) { return !o.dead; });
+
+    // monster trucks crush old cars
+    if (dv.fam === "monster") {
+      dv.objs.forEach(function (o) {
+        if (o.type !== "car" || o.crushed) return;
+        var fx = dv.x + VB.xf;
+        if (fx > o.x + 40 && fx < o.x + o.w + 40 && dv.y < 140) {
+          o.crushed = true;
+          dv.crushed++;
+          starBurst(o.x + o.w / 2, 70, 14, 600, ["#BFE6FF", "#FFFFFF", "#FFC93C", o.col]);
+          dirtBurst(o.x + o.w / 2, 20, 10, DIRT_L);
+          dv.suspV -= 160;
+          dv.shake = 0.35;
+          banner("Crunch!", 900);
+          setHud();
+          sfxCrunch();
+        }
+      });
+    }
+
+    // ride on the ground (or fly)
+    var hr = groundH(dv.x + VB.xr), hf = groundH(dv.x + VB.xf);
+    var gy = hr + (hf - hr) * (0 - VB.xr) / (VB.xf - VB.xr);
+    var gang = Math.atan2(hf - hr, VB.xf - VB.xr);
+    var prevY = dv.y;
+    if (dv.air) {
+      dv.vy -= G * dt;
+      dv.y += dv.vy * dt;
+      dv.ang += (gang * 0.5 - dv.ang) * Math.min(1, dt * 1.6);
+      if (dv.y <= gy) {
+        var impact = -dv.vy;
+        dv.y = gy; dv.air = false; dv.vy = 0; dv.ang = gang;
+        dv.suspV -= Math.min(900, impact * 0.55);
+        if (impact > 350) {
+          dirtBurst(dv.x + VB.xr, gy, 14, dv.fam === "fast" ? "#9AA3AF" : DIRT_L);
+          dirtBurst(dv.x + VB.xf, gy, 14, dv.fam === "fast" ? "#9AA3AF" : DIRT_L);
+          dv.shake = Math.min(0.5, impact / 1500);
+          sfxThud();
+        }
+      }
+    } else {
+      if (gy < dv.y - 4 && dv.lastVY > 140) { dv.air = true; dv.vy = dv.lastVY; }
+      else { dv.y = gy; dv.ang = gang; }
+    }
+    var vy = (dv.y - prevY) / Math.max(dt, 0.001);
+    if (!dv.air) {
+      // ground pushing up quickly kicks the suspension
+      dv.suspV -= clamp(vy - dv.lastVY, -400, 400) * (dv.fam === "monster" ? 0.45 : 0.2);
+      dv.lastVY = vy;
+    } else dv.lastVY = dv.vy;
+    // springy suspension
+    var a = -P.k * dv.susp - P.c * dv.suspV;
+    dv.suspV += a * dt;
+    if (dv.fam === "monster" && dv.speed > 50 && !dv.air && Math.random() < dt * 4) dv.suspV += rand(-60, 60);
+    dv.susp += dv.suspV * dt;
+    dv.susp = clamp(dv.susp, -38, 70);
+    dv.shake = Math.max(0, dv.shake - dt);
+    // camera lifts for big jumps
+    var wantCam = Math.max(0, dv.y - 120) * 0.85;
+    dv.camY += (wantCam - dv.camY) * Math.min(1, dt * 4);
+
+    // laps
+    if (dv.fam === "fast") {
+      var lap = Math.floor(dv.x / LAP) + 1;
+      if (lap > dv.lap && !dv.park) {
+        dv.lap = lap;
+        confetti(dv.x + 600, 300, 60);
+        banner("Another lap!", 3000);
+        setHud();
+        sfxCheer();
+      }
+    }
+    // exhaust smoke
+    dv.smokeT -= dt;
+    if (dv.smokeT <= 0 && v.exhausts.length) {
+      dv.smokeT = dv.speed > 10 || dv.go ? 0.09 : 0.3;
+      v.exhausts.forEach(function (e) {
+        var p = toWorld(e.x, e.y - dv.susp);
+        addP("smoke", p.x, p.y, e.back ? -120 : rand(-60, -20), e.back ? rand(10, 40) : rand(80, 140), rand(8, 14), 0.9, "rgba(120,128,148,", 0);
+        if (dv.turbo > 0 && e.back) addP("fire", p.x - 10, p.y, -500, rand(-20, 20), rand(10, 18), 0.25, pick(["#FFC93C", "#F77F00", "#E63946"]), 0);
+      });
+    }
+    // parked: close the door, then rest
+    if (dv.park && dv.speed === 0 && Math.abs(dv.park.gx - dv.x) < 6) {
+      dv.park.door = Math.min(1, dv.park.door + dt * 0.6);
+      if (dv.park.door >= 1) {
+        dv.park.doneT += dt;
+        if (dv.park.doneT > 1.2 && !dv.park.rested) { dv.park.rested = true; parked(); return; }
+      }
+    }
+    updateParts(dt);
+    setEngine(dv.speed / P.max);
+  }
+
+  // ---- drawing ----
+  var SKYC = { build: ["#58B4EE", "#D4EEFF"], fast: ["#4FAEEB", "#CBEBFF"], monster: ["#F2A65A", "#FFE1A8"] };
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function strokeFill(fill, lw) {
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.lineWidth = lw || 4; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.stroke();
+  }
+  function cloud(x, y, s) {
+    var parts = [[-0.36, 0.06, 0.27], [0, -0.14, 0.36], [0.36, 0.04, 0.26], [0.14, 0.14, 0.26], [-0.16, 0.14, 0.26]];
+    ctx.fillStyle = OUT;
+    parts.forEach(function (p) { ctx.beginPath(); ctx.arc(x + p[0] * s, y + p[1] * s, p[2] * s + 3, 0, 7); ctx.fill(); });
+    ctx.fillStyle = "#FFFFFF";
+    parts.forEach(function (p) { ctx.beginPath(); ctx.arc(x + p[0] * s, y + p[1] * s, p[2] * s - 1, 0, 7); ctx.fill(); });
+  }
+  function wrap(v, m) { return ((v % m) + m) % m; }
+  function drawBack() {
+    var sc = SKYC[dv.fam], g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, sc[0]); g.addColorStop(1, sc[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var camPx = dv.x * SC, lift = dv.camY * SC;
+    // sun + clouds (slow)
+    ctx.beginPath(); ctx.arc(W * 0.8, H * 0.16 + lift * 0.1, Math.min(W, H) * 0.06, 0, 7); strokeFill("#FFC93C", 4);
+    var cs = Math.min(W, H) * 0.22, span = W + cs * 2;
+    for (var i = 0; i < 4; i++) cloud(wrap(i * span / 4 - camPx * 0.08, span) - cs, H * (0.12 + 0.09 * (i % 2)) + lift * 0.15, cs * (i % 2 ? 0.8 : 1));
+    // far hills
+    var hy = baseY - H * 0.12 + lift * 0.4;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (var x = 0; x <= W + 20; x += 20) {
+      var wx = (x + camPx * 0.25) / Math.max(1, H * 0.5);
+      ctx.lineTo(x, hy - Math.sin(wx * 2.1) * H * 0.05 - Math.sin(wx * 0.9 + 1) * H * 0.06);
+    }
+    ctx.lineTo(W, H); ctx.closePath();
+    strokeFill(dv.fam === "monster" ? "#D9A066" : "#7CC55A", 4);
+    // middle layer
+    var my = baseY + lift * 0.7, u = SC;
+    if (dv.fam === "fast") {
+      // grandstand with a cheering crowd
+      var gw = 1100 * u, off = wrap(-camPx * 0.6, gw);
+      for (var k = -1; k < W / gw + 1; k++) {
+        var x0 = off + k * gw, top = my - 300 * u;
+        rr(x0 + 40 * u, top, gw - 80 * u, 210 * u, 10 * u); strokeFill("#C9D2E3", 4);
+        ctx.fillStyle = "#9AA3AF"; ctx.fillRect(x0 + 40 * u, top + 150 * u, gw - 80 * u, 12 * u);
+        for (var r = 0; r < 3; r++) for (var c = 0; c < 18; c++) {
+          ctx.beginPath();
+          ctx.arc(x0 + 90 * u + c * (gw - 180 * u) / 17, top + (40 + r * 40) * u + Math.sin(dv.t * 9 + c + r * 2) * 4 * u, 13 * u, 0, 7);
+          ctx.fillStyle = SPARK_COLS[(c + r * 2) % SPARK_COLS.length]; ctx.fill();
+        }
+        rr(x0 + 40 * u, top - 40 * u, gw - 80 * u, 40 * u, 8 * u); strokeFill("#E63946", 4);
+      }
+    } else if (dv.fam === "build") {
+      // tower crane silhouettes and a fence
+      var cw = 1500 * u, coff = wrap(-camPx * 0.5, cw);
+      ctx.strokeStyle = "#E3A92E"; ctx.lineWidth = Math.max(3, 14 * u);
+      for (k = -1; k < W / cw + 1; k++) {
+        var cx = coff + k * cw + 300 * u, ctop = my - 620 * u;
+        ctx.beginPath(); ctx.moveTo(cx, my - 40 * u); ctx.lineTo(cx, ctop); ctx.moveTo(cx - 160 * u, ctop + 20 * u); ctx.lineTo(cx + 420 * u, ctop + 20 * u);
+        ctx.moveTo(cx + 360 * u, ctop + 20 * u); ctx.lineTo(cx + 360 * u, ctop + 140 * u + Math.sin(dv.t) * 20 * u); ctx.stroke();
+        ctx.fillStyle = "#3A3F4E"; ctx.fillRect(cx - 170 * u, ctop + 14 * u, 60 * u, 50 * u);
+      }
+      var fw = 160 * u, foff = wrap(-camPx * 0.8, fw);
+      ctx.fillStyle = "#F77F00";
+      for (k = -1; k < W / fw + 1; k++) ctx.fillRect(foff + k * fw, my - 90 * u, 10 * u, 90 * u);
+      ctx.fillRect(0, my - 80 * u, W, 8 * u); ctx.fillRect(0, my - 40 * u, W, 8 * u);
+    } else {
+      // arena stands with flood lights
+      var aw = 1300 * u, aoff = wrap(-camPx * 0.55, aw);
+      for (k = -1; k < W / aw + 1; k++) {
+        var ax = aoff + k * aw;
+        ctx.beginPath(); ctx.moveTo(ax, my); ctx.lineTo(ax + 120 * u, my - 260 * u); ctx.lineTo(ax + aw - 120 * u, my - 260 * u); ctx.lineTo(ax + aw, my); ctx.closePath();
+        strokeFill("#5B6684", 4);
+        for (r = 0; r < 4; r++) for (c = 0; c < 16; c++) {
+          ctx.beginPath(); ctx.arc(ax + 180 * u + c * (aw - 360 * u) / 15, my - (220 - r * 50) * u + Math.sin(dv.t * 8 + c * 1.3 + r) * 3 * u, 12 * u, 0, 7);
+          ctx.fillStyle = SPARK_COLS[(c * 3 + r) % SPARK_COLS.length]; ctx.fill();
+        }
+        ctx.fillStyle = "#3A3F4E"; ctx.fillRect(ax + aw / 2 - 6 * u, my - 520 * u, 12 * u, 260 * u);
+        rr(ax + aw / 2 - 50 * u, my - 560 * u, 100 * u, 40 * u, 8 * u); strokeFill(Math.sin(dv.t * 4 + k) > 0 ? "#FFF3B0" : "#FFFFFF", 3);
+      }
+    }
+  }
+  function drawGround() {
+    var gcol = dv.fam === "fast" ? "#5B6274" : (dv.fam === "build" ? "#B07A4F" : "#8B5A3C");
+    var step = 10;
+    ctx.beginPath(); ctx.moveTo(-10, H + 10);
+    for (var x = -10; x <= W + 10; x += step) ctx.lineTo(x, sy(groundH(dv.x + (x - CX) / SC)));
+    ctx.lineTo(W + 10, H + 10); ctx.closePath();
+    strokeFill(gcol, 5);
+    var camPx = dv.x * SC, top = sy(0);
+    if (dv.fam === "fast") {
+      // curbs and lane dashes
+      var cw = 60 * SC, off = wrap(-camPx, cw * 2);
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, top - 1, W, 16 * SC);
+      ctx.fillStyle = "#E63946";
+      for (var k = -1; k < W / (cw * 2) + 1; k++) ctx.fillRect(off + k * cw * 2, top - 1, cw, 16 * SC);
+      var dw = 140 * SC, doff = wrap(-camPx, dw * 2);
+      ctx.fillStyle = "#FFFFFF";
+      for (k = -1; k < W / (dw * 2) + 1; k++) ctx.fillRect(doff + k * dw * 2, top + 60 * SC, dw, 12 * SC);
+      // start / finish lines
+      var n0 = Math.floor((dv.x - W / SC) / LAP), n1 = Math.ceil((dv.x + W / SC) / LAP);
+      for (var n = Math.max(0, n0); n <= n1; n++) {
+        var fx = sx(n * LAP), sq = 20 * SC;
+        for (var i = 0; i < 2; i++) for (var j = 0; j < 7; j++) {
+          ctx.fillStyle = (i + j) % 2 ? "#FFFFFF" : "#1D2340";
+          ctx.fillRect(fx + i * sq, top + j * sq, sq, sq);
+        }
+        // gantry
+        ctx.fillStyle = "#3A3F4E";
+        ctx.fillRect(fx - 200 * SC, top - 420 * SC, 14 * SC, 420 * SC);
+        ctx.fillRect(fx + 220 * SC, top - 420 * SC, 14 * SC, 420 * SC);
+        rr(fx - 230 * SC, top - 500 * SC, 490 * SC, 90 * SC, 12 * SC); strokeFill("#1D2340", 4);
+        ctx.fillStyle = "#FFC93C"; ctx.font = "800 " + Math.round(60 * SC) + "px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(n === 0 ? "START" : "LAP " + (n + 1), fx + 15 * SC, top - 452 * SC);
+      }
+    } else {
+      // pebbles / tire tracks
+      var pw = 90 * SC, poff = wrap(-camPx, pw);
+      ctx.fillStyle = "rgba(29,35,64,0.18)";
+      for (k = -1; k < W / pw + 1; k++) {
+        ctx.beginPath(); ctx.arc(poff + k * pw, top + 30 * SC + (k % 3) * 22 * SC, 7 * SC, 0, 7); ctx.fill();
+      }
+    }
+  }
+  function drawObjects() {
+    dv.objs.forEach(function (o) {
+      if (o.type === "pile") {
+        var x0 = sx(o.x - o.s), x1 = sx(o.x + o.s);
+        if (x1 < -50 || x0 > W + 50) return;
+        ctx.beginPath(); ctx.moveTo(x0, sy(0));
+        for (var x = x0; x <= x1; x += 6) { var u = (dv.x + (x - CX) / SC - o.x) / o.s; ctx.lineTo(x, sy(o.hgt * Math.max(0, 1 - u * u))); }
+        ctx.lineTo(x1, sy(0)); ctx.closePath();
+        strokeFill(o.col, 4);
+        ctx.fillStyle = shade(o.col, 0.25);
+        [[-0.4, 0.4], [0.1, 0.65], [0.45, 0.3], [-0.1, 0.25]].forEach(function (p) { ctx.beginPath(); ctx.arc(sx(o.x + p[0] * o.s), sy(o.hgt * p[1]), 6 * SC, 0, 7); ctx.fill(); });
+      } else if (o.type === "ramp") {
+        var rx0 = sx(o.x), rx1 = sx(o.x + o.len + o.top + o.drop);
+        if (rx1 < -50 || rx0 > W + 50) return;
+        ctx.beginPath(); ctx.moveTo(rx0, sy(0)); ctx.lineTo(sx(o.x + o.len), sy(o.hgt)); ctx.lineTo(sx(o.x + o.len + o.top), sy(o.hgt)); ctx.lineTo(rx1, sy(0)); ctx.closePath();
+        strokeFill("#C98A4B", 5);
+        ctx.strokeStyle = "#8B5A3C"; ctx.lineWidth = 3;
+        for (var k = 1; k < 4; k++) { ctx.beginPath(); ctx.moveTo(sx(o.x + o.len * k / 4), sy(o.hgt * k / 4)); ctx.lineTo(sx(o.x + o.len * k / 4), sy(0)); ctx.stroke(); }
+        // arrow sign
+        ctx.fillStyle = "#FFC93C"; ctx.beginPath();
+        var ax = sx(o.x + o.len * 0.55), ay = sy(o.hgt * 0.3);
+        ctx.moveTo(ax - 22 * SC, ay - 10 * SC); ctx.lineTo(ax + 6 * SC, ay - 10 * SC); ctx.lineTo(ax + 6 * SC, ay - 24 * SC); ctx.lineTo(ax + 30 * SC, ay); ctx.lineTo(ax + 6 * SC, ay + 24 * SC); ctx.lineTo(ax + 6 * SC, ay + 10 * SC); ctx.lineTo(ax - 22 * SC, ay + 10 * SC); ctx.closePath();
+        strokeFill("#FFC93C", 3);
+      } else if (o.type === "car") {
+        var cx0 = sx(o.x);
+        if (cx0 > W + 50 || cx0 + o.w * SC < -50) return;
+        drawOldCar(o);
+      } else if (o.type === "cone") {
+        var qx = sx(o.x), qy = sy(0), s = SC;
+        if (qx < -40 || qx > W + 40) return;
+        ctx.beginPath(); ctx.moveTo(qx - 16 * s, qy); ctx.lineTo(qx - 5 * s, qy - 54 * s); ctx.lineTo(qx + 5 * s, qy - 54 * s); ctx.lineTo(qx + 16 * s, qy); ctx.closePath();
+        strokeFill("#F77F00", 3);
+        ctx.fillStyle = "#FFFFFF"; ctx.fillRect(qx - 10 * s, qy - 36 * s, 20 * s, 10 * s);
+      }
+    });
+  }
+  function drawOldCar(o) {
+    var k = o.k, h = (88 - 56 * k), w = o.w, x = o.x;
+    var P = function (fx, fy) { return [sx(x + w * fx), sy(fy)]; };
+    // wheels
+    [0.22, 0.78].forEach(function (f) { var p = P(f, 18); ctx.beginPath(); ctx.arc(p[0], p[1], 18 * SC, 0, 7); strokeFill(DARK, 3); });
+    var pts = [[0, 12], [0, h * 0.55], [0.22, h * 0.6], [0.34, h], [0.7, h], [0.82, h * 0.6], [1, h * 0.55], [1, 12]];
+    ctx.beginPath();
+    pts.forEach(function (p, i) { var q = P(p[0], p[1]); if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); });
+    ctx.closePath(); strokeFill(o.col, 4);
+    var wp = [[0.37, h * 0.62], [0.4, h * 0.9], [0.66, h * 0.9], [0.72, h * 0.62]];
+    ctx.beginPath();
+    wp.forEach(function (p, i) { var q = P(p[0], p[1]); if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); });
+    ctx.closePath(); strokeFill(k > 0.5 ? "#9CC6E0" : GLASS, 3);
+    if (k > 0.5) {
+      ctx.beginPath(); var a = P(0.45, h * 0.88), b = P(0.52, h * 0.7), c = P(0.6, h * 0.84);
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+  }
+  function drawGarageBack() {
+    var g = dv.park;
+    if (!g) return;
+    var x0 = sx(g.x0), x1 = sx(g.x1), y0 = sy(0), y1 = sy(g.h);
+    if (x0 > W + 400) return;
+    ctx.fillStyle = "#4A4F63"; ctx.fillRect(x0, y1, x1 - x0, y0 - y1);
+    ctx.fillStyle = "#FFE9A8"; ctx.globalAlpha = 0.25; ctx.fillRect(x0, y1, x1 - x0, y0 - y1); ctx.globalAlpha = 1;
+  }
+  function drawGarageFront() {
+    var g = dv.park;
+    if (!g) return;
+    var x0 = sx(g.x0), x1 = sx(g.x1), y0 = sy(0), y1 = sy(g.h), p = 50 * SC;
+    if (x0 > W + 400) return;
+    // door rolling down
+    if (g.door > 0) {
+      var dh = (y0 - y1) * g.door;
+      ctx.fillStyle = "#C9D2E3"; ctx.fillRect(x0, y1, x1 - x0, dh);
+      ctx.fillStyle = "#9AA3AF";
+      for (var yy = y1 + 26 * SC; yy < y1 + dh; yy += 26 * SC) ctx.fillRect(x0, yy, x1 - x0, 5 * SC);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.strokeRect(x0, y1, x1 - x0, dh);
+    }
+    // pillars, lintel and roof
+    rr(x0 - p, y1 - p, p, y0 - y1 + p, 4); strokeFill("#E63946", 4);
+    rr(x1, y1 - p, p, y0 - y1 + p, 4); strokeFill("#E63946", 4);
+    rr(x0 - p, y1 - p, x1 - x0 + 2 * p, p, 4); strokeFill("#E63946", 4);
+    ctx.beginPath(); ctx.moveTo(x0 - p * 1.8, y1 - p); ctx.lineTo((x0 + x1) / 2, y1 - p - 160 * SC); ctx.lineTo(x1 + p * 1.8, y1 - p); ctx.closePath();
+    strokeFill("#2D5BD7", 5);
+    ctx.fillStyle = "#FFFFFF"; ctx.font = "800 " + Math.round(56 * SC) + "px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("GARAGE", (x0 + x1) / 2, y1 - p - 60 * SC);
+  }
+  function applyChain(chain) {
+    for (var i = 0; i < chain.length; i++) {
+      var j = VB.v.joints[chain[i]], a = dv.pose[chain[i]] || 0;
+      if (!a || !j) continue;
+      ctx.translate(j.x, j.y); ctx.rotate(a); ctx.translate(-j.x, -j.y);
+    }
+  }
+  function drawBM(bm) { if (bm && bm.c) ctx.drawImage(bm.c, bm.bb.x, bm.bb.y, bm.bb.w, bm.bb.h); }
+  function drawVehicle() {
+    var v = VB.v, sh = dv.shake > 0 ? Math.sin(dv.t * 70) * dv.shake * 10 : 0;
+    ctx.save();
+    ctx.translate(sx(dv.x), sy(dv.y) + sh);
+    ctx.rotate(-dv.ang);
+    ctx.scale(SC, SC);
+    var spin = dv.dist;
+    VB.layers.forEach(function (L, idx) {
+      if (L.type === "none") return;
+      if (L.type === "wheels") {
+        VB.wheels.forEach(function (W2) {
+          var w = W2.w;
+          ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(spin / Math.max(8, w.r)); drawBM(W2.bm); ctx.restore();
+        });
+        return;
+      }
+      if (L.type === "track") {
+        drawBM(L.bm);
+        var t = v.track, st = TRACK[t.style];
+        // Driving forward, the belt turns clockwise like its wheels: back along the bottom (where it grips the
+        // ground), forward over the top.
+        trackLugs(t, -spin).forEach(function (p) {
+          ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(-p[2]);
+          ctx.beginPath();
+          if (st.spike) { ctx.moveTo(-9, 0); ctx.lineTo(0, 9); ctx.lineTo(9, 0); ctx.closePath(); }
+          else rr(-8, -2, 16, 8, 2);
+          strokeFill(st.lug, 3.5);
+          ctx.restore();
+        });
+        return;
+      }
+      if (L.type === "shocks") {
+        v.shocks.forEach(function (s) {
+          ctx.beginPath(); ctx.moveTo(s.bx, s.by - dv.susp); ctx.lineTo(s.wx, s.wy);
+          ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 16; ctx.stroke();
+          ctx.strokeStyle = CHROME; ctx.lineWidth = 8; ctx.stroke();
+          ctx.strokeStyle = "#FFC93C"; ctx.lineWidth = 5; ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+        });
+        return;
+      }
+      ctx.save();
+      ctx.translate(0, -dv.susp);
+      if (L.chain && L.chain.length) applyChain(L.chain);
+      // dirt in the dump bed sits behind the bed walls
+      if (v.bed && L.chain && L.chain[0] === "bed" && dv.bedFill > 0.02) {
+        var b = v.bed, hh = b.h * 1.6 * dv.bedFill;
+        ctx.beginPath(); ctx.moveTo(b.x0 + 6, b.y + 14);
+        ctx.quadraticCurveTo((b.x0 + b.x1) / 2, b.y + 8 - hh * 2, b.x1 - 6, b.y + 14); ctx.closePath();
+        strokeFill(DIRT_L, 4);
+      }
+      if (L.type === "drum") {
+        var fi = Math.floor(wrap(dv.drumPhase, 64) / 8) % 8;
+        drawBM(L.frames[fi] && L.frames[fi].c ? L.frames[fi] : L.frames[0]);
+      } else drawBM(L.bm);
+      // a scoop of dirt in the excavator bucket
+      if (dv.loaded && v.hooks.load && L.chain && L.chain.length === 3 && idx === lastToolLayer()) {
+        var hk = v.hooks.load;
+        ctx.beginPath(); ctx.arc(hk.x, hk.y - 6, hk.r * 0.9, 0, 7); strokeFill(DIRT_L, 4);
+      }
+      ctx.restore();
+    });
+    // flashing beacons
+    if (v.beacons.length && (dv.speed > 5 || dv.go || busy() || dv.park)) {
+      v.beacons.forEach(function (b, i) {
+        var on = Math.sin(dv.t * 9 + (b.alt ? Math.PI : 0) + i * 0.3) > 0;
+        if (!on) return;
+        ctx.save(); ctx.translate(0, -dv.susp);
+        ctx.globalAlpha = 0.45; ctx.fillStyle = b.col;
+        ctx.beginPath(); ctx.arc(b.x, b.y, 34, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1; ctx.restore();
+      });
+    }
+    ctx.restore();
+  }
+  var ltl = { key: "", idx: -1 };
+  function lastToolLayer() {
+    if (ltl.key === vbKey) return ltl.idx;
+    var idx = -1;
+    VB.v.L.forEach(function (l, i) { if (l.chain && l.chain.length === 3) idx = i; });
+    ltl = { key: vbKey, idx: idx };
+    return idx;
+  }
+  function drawParts() {
+    dv.parts.forEach(function (p) {
+      var x = sx(p.x), y = sy(p.y), r = p.r * SC, f = 1 - p.age / p.life;
+      if (x < -60 || x > W + 60) return;
+      if (p.kind === "smoke") {
+        ctx.fillStyle = p.col + (0.5 * f).toFixed(3) + ")";
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      } else if (p.kind === "star") {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.globalAlpha = Math.min(1, f * 2);
+        ctx.beginPath();
+        for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4, rr2 = k % 2 ? r * 0.4 : r; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
+        ctx.closePath(); strokeFill(p.col, 2.5);
+        ctx.restore(); ctx.globalAlpha = 1;
+      } else if (p.kind === "conf") {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.fillRect(-r, -r * 0.5, r * 2, r); ctx.restore();
+      } else if (p.kind === "fire") {
+        ctx.globalAlpha = f; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(x, y, r * (0.6 + f), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      } else {
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = p.col; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.stroke();
+      }
+    });
+  }
+  function drawSpeed() {
+    var P = FP[dv.fam], R = clamp(Math.min(W, H) * 0.12, 48, 100);
+    var cx = W - R - Math.max(14, W * 0.02), cy = R + 14 + (H > W ? 0 : 0);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7);
+    ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.stroke();
+    var a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+    // colored band
+    ctx.lineWidth = R * 0.1;
+    [["#2E9E5B", 0, 0.5], ["#FFC93C", 0.5, 0.8], ["#E63946", 0.8, 1]].forEach(function (b) {
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.86, a0 + (a1 - a0) * b[1], a0 + (a1 - a0) * b[2]); ctx.strokeStyle = b[0]; ctx.stroke();
+    });
+    ctx.fillStyle = OUT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "800 " + Math.round(R * 0.2) + "px " + FONT;
+    // tick marks at every step; no numbers (the needle and colors show the speed)
+    ctx.lineCap = "round";
+    for (var vv = 0; vv <= P.dial; vv += P.step) {
+      var a = a0 + (a1 - a0) * vv / P.dial;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * R * 0.7, cy + Math.sin(a) * R * 0.7); ctx.lineTo(cx + Math.cos(a) * R * 0.78, cy + Math.sin(a) * R * 0.78);
+      ctx.lineWidth = R * 0.045; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+    var shown = Math.round(dv.speed * P.factor);
+    var na = a0 + (a1 - a0) * clamp(shown / P.dial, 0, 1.04);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(na) * R * 0.8, cy + Math.sin(na) * R * 0.8);
+    ctx.lineCap = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = R * 0.11; ctx.stroke();
+    ctx.strokeStyle = "#E63946"; ctx.lineWidth = R * 0.06; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.1, 0, 7); ctx.fillStyle = OUT; ctx.fill();
+    ctx.restore();
+  }
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawBack();
+    drawGround();
+    drawObjects();
+    drawGarageBack();
+    drawVehicle();
+    drawParts();
+    drawGarageFront();
+    drawSpeed();
+  }
+
+  // ---- open / close ----
+  function setHud() {
+    var el = $("dhud");
+    if (!dv || dv.park) { el.hidden = true; return; }
+    el.hidden = false;
+    // Counters stay (the dad's call): laps for fast cars, crushed cars for monster trucks.
+    if (dv.fam === "fast") el.textContent = "Lap " + dv.lap;
+    else if (dv.fam === "monster") el.textContent = "Crushed: " + dv.crushed;
+    else el.textContent = KINDS[dv.kind].label;
+  }
+  function updatePedal() {
+    var p = $("pedal");
+    var on = dv && dv.go;
+    p.textContent = on ? "Stop" : "Go";
+    p.classList.toggle("stop", !!on);
+  }
+  function buildActs() {
+    var el = $("acts");
+    el.innerHTML = "";
+    actionsFor().forEach(function (a) {
+      var b = document.createElement("button");
+      b.className = "btn act";
+      b.dataset.act = a[0];
+      b.textContent = a[1];
+      el.appendChild(b);
+    });
+  }
+  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
+  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
+  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
+  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
+  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
+  function makeGhost(plan, opt) {
+    opt = opt || {};
+    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
+    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function build() {
+      el = document.createElement("div");
+      el.className = "ghosthand";
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
+        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
+        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
+        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
+      el.insertBefore(carryEl, el.firstChild);
+      document.body.appendChild(el);
+    }
+    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
+    var carryEl = document.createElement("div");
+    carryEl.className = "gh-carry";
+    function poke() { last = Date.now(); armed = true; if (run) stop(); }
+    document.addEventListener("pointerdown", poke, true);
+    document.addEventListener("keydown", poke, true);
+    function blocked() {
+      if (document.hidden) return true;
+      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
+      return !!(opt.ok && !opt.ok());
+    }
+    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function at(pts, f) {
+      if (pts.length < 2) return pts[0];
+      var segs = [], tot = 0, i;
+      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
+      var d = f * tot;
+      for (i = 0; i < segs.length; i++) {
+        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
+        d -= segs[i];
+      }
+      return pts[pts.length - 1];
+    }
+    function frame() {
+      if (!run) return;
+      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
+      if (t >= 1) { stop(); return; }
+      if (p.tap || p.pts.length < 2) {
+        var pt = p.pts[0];
+        x = pt[0]; y = pt[1];
+        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
+        sc = press ? 0.92 : 1;
+        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
+      } else {
+        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
+        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
+        var q = at(p.pts, f); x = q[0]; y = q[1];
+        press = t > 0.12 && t < 0.86;
+        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
+      }
+      el.style.opacity = (0.85 * a).toFixed(3);
+      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
+      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
+      carryEl.style.opacity = press ? "0.75" : "0";
+      requestAnimationFrame(frame);
+    }
+    function show(p) {
+      if (!el) build();
+      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
+      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
+      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
+      el.style.display = "block";
+      carryEl.innerHTML = p.carry ? p.carry.html : "";
+      if (p.carry) {
+        var c = p.carry.size;
+        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
+      }
+      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
+      requestAnimationFrame(frame);
+    }
+    setInterval(function () {
+      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
+      if (blocked()) { last = Date.now(); return; }
+      var p = plan();
+      if (!p || !p.pts || !p.pts.length) return;
+      armed = false; shown++;
+      show(p);
+    }, 250);
+    return {
+      learned: function () { learned = true; stop(); },
+      // something new to show (a new mode): allow the hint again
+      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
+      poke: poke,
+      // test hook: show it now
+      show: function () { var p = plan(); if (p) show(p); return !!p; }
+    };
+  }
+  // Page px of a point inside an element, as fractions of its box.
+  function ghostPt(elm, fx, fy) {
+    var r = elm.getBoundingClientRect();
+    return [r.left + r.width * fx, r.top + r.height * fy];
+  }
+  // Idle help: the ghost hand taps Drive!, and on the road it taps Go.
+  var ghost = makeGhost(function () {
+    if ($("flight").hidden) { var l = $("launch"); return l.offsetWidth ? { pts: [ghostPt(l, 0.55, 0.55)], tap: true } : null; }
+    if (!dv || dv.park || dv.go) return null;
+    return { pts: [ghostPt($("pedal"), 0.5, 0.5)], tap: true };
+  }, { max: 3 });
+  function openDrive(park) {
+    if (dv) { if (park) startPark(); return; }
+    F.hidden = false;
+    sizeDrive();
+    prepVehicle();
+    sizeDrive();
+    prepVehicle();
+    dv = newDrive(park);
+    dv.x = dv.fam === "fast" ? 400 : 0;
+    buildActs();
+    updatePedal();
+    setHud();
+    if (park) startPark();
+    startEngine();
+    if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
+  }
+  function closeDrive() {
+    F.hidden = true;
+    dv = null;
+    running = false;
+    stopEngine();
+    clearTimeout(bannerTimer);
+    $("banner").hidden = true;
+  }
+  var bannerTimer = null;
+  function banner(text, ms) {
+    var el = $("banner");
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.remove("go");
+    void el.offsetWidth;
+    el.classList.add("go");
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(function () { el.hidden = true; }, Math.max(3000, ms || 0));
+  }
+  function loop(t) {
+    if (!running) return;
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    lastT = t;
+    if (dv) { step(dt); if (dv) draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  // Controls on the drive screen (pointerdown for an instant response; several fingers at once).
+  F.addEventListener("pointerdown", function (e) {
+    if (!dv) return;
+    var b = e.target.closest ? e.target.closest("button") : null;
+    if (b) {
+      if (b.id === "pedal") { if (!dv.park) { ghost.learned(); dv.go = !dv.go; updatePedal(); if (dv.go) dirtBurst(dv.x + VB.xr, 0, 8, dv.fam === "fast" ? "#9AA3AF" : DIRT_L, 0.6); } }
+      else if (b.id === "horn") { honk(); var hp = toWorld(VB.v.head ? VB.v.head.x : 100, VB.v.head ? VB.v.head.y - dv.susp : -60); starBurst(hp.x + 60, hp.y, 6, 300, ["#FFC93C", "#FFFFFF"]); }
+      else if (b.dataset.act) { doAction(b.dataset.act); if (b.dataset.act !== "turbo") sfxClick(); }
+      return;
+    }
+    // tap anywhere: sparkles, and a little hop
+    var wx = dv.x + (e.clientX - CX) / SC, wy = (baseY - e.clientY) / SC + dv.camY;
+    starBurst(wx, wy, 7, 400);
+    if (!dv.air && !dv.park) { dv.suspV -= 160; }
+  });
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
+  // starts/resumes audio on every touch while sound is on. Car Builder builds its own master gain and
+  // noise buffer once per context.
+  var actx = null, master = null, noiseBuf = null, rumble = null;
+  function canPlay() {
+    var ac = Toybox.sound.ready();
+    if (!ac) return false;
+    if (ac !== actx) {
+      try {
+        master = ac.createGain();
+        master.gain.value = 0.8;
+        master.connect(ac.destination);
+        var len = Math.floor(ac.sampleRate * 1.5);
+        noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+        var d = noiseBuf.getChannelData(0), last = 0;
+        for (var i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
+        actx = ac; rumble = null; engine = null;
+      } catch (e) { return false; }
+    }
+    return true;
+  }
+  function tone(freq, dur, vol, type, slideTo) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
+  function beep(hi) { tone(hi ? 880 : 587, hi ? 0.5 : 0.28, 0.07, "sine"); }
+  function whoosh(vol) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf;
+    f.type = "bandpass"; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.exponentialRampToValueAtTime(1400, t + 0.5);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + 0.8);
+  }
+  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
+  function startRumble() {
+    if (!canPlay() || rumble) return;
+    var src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf; src.loop = true;
+    f.type = "lowpass"; f.frequency.value = 220;
+    g.gain.value = 0.0001;
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start();
+    rumble = { src: src, f: f, g: g };
+  }
+  function setRumble(level) {
+    if (!rumble || !actx) return;
+    rumble.g.gain.setTargetAtTime(Math.max(0.0001, level), actx.currentTime, 0.12);
+    rumble.f.frequency.setTargetAtTime(160 + level * 1800, actx.currentTime, 0.2);
+  }
+  function stopRumble() {
+    if (!rumble) return;
+    var r = rumble;
+    rumble = null;
+    try {
+      r.g.gain.setTargetAtTime(0.0001, actx.currentTime, 0.15);
+      r.src.stop(actx.currentTime + 0.8);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---- vehicle sounds (only when sound is on) ----
+  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
+  function honk() {
+    if (!canPlay()) return;
+    var t = actx.currentTime, f = actx.createBiquadFilter(), g = actx.createGain();
+    f.type = "lowpass"; f.frequency.value = 1300;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
+    g.gain.setValueAtTime(0.06, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    f.connect(g); g.connect(master);
+    [349, 440].forEach(function (fr) {
+      var o = actx.createOscillator();
+      o.type = "square"; o.frequency.value = fr;
+      o.connect(f); o.start(t); o.stop(t + 0.45);
+    });
+  }
+  function noiseHit(freq, dur, vol) {
+    if (!canPlay()) return;
+    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf;
+    f.type = "lowpass"; f.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+  function sfxThud() { noiseHit(380, 0.35, 0.22); tone(90, 0.25, 0.05, "sine", 55); }
+  function sfxCrunch() { noiseHit(1600, 0.4, 0.16); setTimeout(function () { noiseHit(900, 0.3, 0.12); }, 90); }
+  function sfxCheer() { chime(); }
+  function sfxClick() { tone(660, 0.08, 0.03, "sine"); }
+  var engine = null;
+  function startEngine() {
+    if (!canPlay() || engine) return;
+    var t = actx.currentTime, f = actx.createBiquadFilter(), g = actx.createGain();
+    f.type = "lowpass"; f.frequency.value = 400; f.Q.value = 2;
+    g.gain.value = 0.0001;
+    g.gain.setTargetAtTime(0.035, t, 0.3);
+    f.connect(g); g.connect(master);
+    var o1 = actx.createOscillator(), o2 = actx.createOscillator();
+    o1.type = "sawtooth"; o2.type = "triangle";
+    o1.frequency.value = 55; o2.frequency.value = 56.5;
+    o1.connect(f); o2.connect(f);
+    o1.start(); o2.start();
+    engine = { f: f, g: g, o1: o1, o2: o2 };
+  }
+  function setEngine(frac) {
+    if (!engine && dv && Toybox.sound.on()) startEngine();
+    if (!engine || !actx) return;
+    var t = actx.currentTime, base = dv && dv.fam === "fast" ? 70 : (dv && dv.fam === "monster" ? 48 : 42);
+    var fr = base + frac * base * 1.8;
+    engine.o1.frequency.setTargetAtTime(fr, t, 0.1);
+    engine.o2.frequency.setTargetAtTime(fr * 1.02, t, 0.1);
+    engine.f.frequency.setTargetAtTime(300 + frac * 900, t, 0.1);
+    engine.g.gain.setTargetAtTime(0.03 + frac * 0.035, t, 0.15);
+  }
+  function stopEngine() {
+    if (!engine) return;
+    var e = engine;
+    engine = null;
+    try {
+      e.g.gain.setTargetAtTime(0.0001, actx.currentTime, 0.1);
+      e.o1.stop(actx.currentTime + 0.5); e.o2.stop(actx.currentTime + 0.5);
+    } catch (err) { /* ignore */ }
+  }
+  // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
+  // Ending: the vehicle drives into its garage (straight away if it is out driving; otherwise after the
+  // Park button, or by itself when the grown-up turned that button off), then it rests.
+  var endingDone = null, parkT = null;
+  function drawFuel(info) {
+    var active = info.phase === "running" || info.phase === "ending";
+    $("fuel").hidden = !active;
+    if (!active) return;
+    var f = info.fraction, fill = $("fuelFill");
+    fill.style.width = (f * 100).toFixed(1) + "%";
+    fill.style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(info.showMinutes && info.phase === "running");
+    $("fuelNum").textContent = String(info.minutes);
+  }
+  // Whether the grown-up chose the Park button (read-only peek at the shared timer settings).
+  function goodbyeOn() {
+    try { var t = JSON.parse(localStorage.getItem("toybox-timer-v1") || "null"); return !t || t.goodbye !== false; } catch (e) { return true; }
+  }
+  function onEnding(done) {
+    endingDone = done;
+    var gb = $("tb-goodbye");
+    if (gb) gb.textContent = "Park the " + KINDS[state.kind].label.toLowerCase();
+    clearTimeout(parkT);
+    if (dv) startPark();
+    else if (!goodbyeOn()) parkT = setTimeout(function () { if (Toybox.timer.phase() === "ending" && !dv) openDrive(true); }, 2500);
+  }
+  function goodbyeLaunch() { openDrive(true); }
+  // The drive calls this once the vehicle is parked in its garage.
+  function parked() {
+    if (endingDone) { endingDone(); endingDone = null; }
+    // Parked while the Park button was hidden under the drive: count it as pressed.
+    var gb = $("tb-goodbye");
+    if (Toybox.timer.phase() === "ending" && gb && !gb.hidden) gb.click();
+  }
+  function onRest() {
+    clearTimeout(parkT);
+    endingDone = null;
+    if (!F.hidden) closeDrive();
+  }
+  // Releasing the 4-second unlock hold can land as a click on whatever is under the lock (the
+  // controls here), so clicks right after waking up are ignored.
+  var wokeAt = -1e9;
+  document.addEventListener("click", function (e) {
+    if (performance.now() - wokeAt < 700) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
+  function onWake() {
+    wokeAt = performance.now();
+    clearTimeout(parkT);
+    endingDone = null;
+    if (dv && dv.park && !F.hidden) closeDrive();
+  }
+  function restArt() {
+    var line = $("tb-restLine");
+    if (line) line.textContent = "The " + restName(state.kind) + " is resting.";
+    return '<svg class="rest-art" viewBox="-300 -420 600 440" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="aspect-ratio: 600 / 440; width: min(78vw, 360px, 46vh)">' + restSVG() + "</svg>";
+  }
+
+  // Big mode: hide the title and controls so the rocket and launch pad fill the screen.
+  // The picture is an SVG that scales itself, so no re-layout is needed.
+
+
+  showTab(tab);
+  render();
+  // The old Car Builder sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
+  try { if (localStorage.getItem("carbuilder-sound-v1") === "on") localStorage.setItem("carbuilder-sound-v1", "1"); } catch (e) { /* ignore */ }
+  Toybox.init({
+    app: "car-builder",
+    big: { button: $("bigToggle") },
+    onBig: function (on) { if (on && picking) setPicking(""); },
+    timerIntro: "When time is up, the vehicle drives into its garage and rests, and the controls lock.",
+    goodbyeOption: "End with a “Park it” button to press",
+    farewellText: "Time to park",
+    goodbyeLabel: "Park it",
+    farewellDone: "Bye bye!",
+    restLine: "The car is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft engine hum and horn. Hold for 2 seconds.",
+    legacy: { timer: "carbuilder-timer-v1", sound: "carbuilder-sound-v1", big: "carbuilder-big-v1" },
+    onEnding: onEnding,
+    onGoodbye: goodbyeLaunch,
+    onRest: onRest,
+    onWake: onWake,
+    onSound: function (on) { if (on) setTimeout(chime, 60); else { stopRumble(); stopEngine(); } },
+    onTimer: drawFuel
+  });
+
+  // Test hook, only with ?debug in the address: lets automated checks peek at the drive.
+  if (/[?&]debug\b/.test(location.search)) window.__car = { drive: function () { return dv; }, action: function (a) { doAction(a); }, park: function () { startPark(); } };
+})();

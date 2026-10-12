@@ -4,8 +4,12 @@
 #
 # The check job builds _site (the published files only: no tools/, archive/, plans/, .github/ or Markdown), stamps the
 # offline cache version into _site/sw.js, checks that every file is in the service worker's CORE list, and loads
-# every page in a browser (tools/smoke.js: page errors, page scroll). If any of that fails, nothing is published
-# and the live Toybox stays as it was.
+# every page in a browser at four sizes (tools/smoke.js: page errors, page scroll). If any of that fails, nothing
+# is published and the live Toybox stays as it was.
+#
+# The report job runs the slow finders (tools/fit.js: cut-off labels at five sizes; tools/buttons.js: taps that
+# change nothing, phone and iPad) on the pages this push changed (tools/changed-pages.js; every page on "Run
+# workflow"). It never blocks the deploy: agents read its log or the run summary and fix what it lists.
 name: Deploy to GitHub Pages
 
 on:
@@ -55,18 +59,76 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.48.2
           npx playwright install --with-deps chromium
 
-      - name: Load every page (iPad, then iPhone)
+      - name: Load every page (iPad and iPhone, both ways round)
         run: |
           npx --yes http-server@14.1.1 _site -p 8120 -c-1 -s &
           for i in $(seq 1 30); do curl -sf http://localhost:8120/ >/dev/null && break; sleep 1; done
           pages=$(grep -o '"\./[^"]*\.html"' _site/sw.js | sed 's/^"\.\///; s/"$//')
-          SIZE=1180x820 node tools/smoke.js $pages
-          SIZE=390x844 MOBILE=1 node tools/smoke.js $pages
+          SIZE=1180x820 node tools/smoke.js $pages > smoke-ipad-wide.txt 2>&1 & a=$!
+          SIZE=820x1180 node tools/smoke.js $pages > smoke-ipad.txt 2>&1 & b=$!
+          SIZE=390x844 MOBILE=1 node tools/smoke.js $pages > smoke-phone.txt 2>&1 & c=$!
+          SIZE=844x390 MOBILE=1 node tools/smoke.js $pages > smoke-phone-wide.txt 2>&1 & d=$!
+          fail=0
+          for j in $a $b $c $d; do wait $j || fail=1; done
+          for f in smoke-*.txt; do echo "== $f"; grep -v '^ok' "$f" || echo "all ok"; done
+          exit $fail
 
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
           path: _site
+
+  report:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Pages this change touched
+        id: pages
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then base="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then base="${{ github.event.before }}"
+          else base=all; fi
+          node tools/changed-pages.js "$base" HEAD > pages.txt
+          echo "count=$(grep -c . pages.txt || true)" >> "$GITHUB_OUTPUT"
+          echo "Pages to check:"; cat pages.txt
+
+      - name: Install Playwright (Chromium)
+        if: steps.pages.outputs.count != '0'
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+
+      - name: Cut-off labels (fit.js) and dead buttons (buttons.js)
+        if: steps.pages.outputs.count != '0'
+        run: |
+          npx --yes http-server@14.1.1 . -p 8120 -c-1 -s &
+          for i in $(seq 1 30); do curl -sf http://localhost:8120/ >/dev/null && break; sleep 1; done
+          pages=$(cat pages.txt)
+          mkdir -p report
+          SHOTS=report/fit node tools/fit.js $pages > report/fit.txt 2>&1 & a=$!
+          SIZE=390x844 MOBILE=1 SHOTS=report/buttons-phone node tools/buttons.js $pages > report/buttons-phone.txt 2>&1 & b=$!
+          SIZE=1180x820 SHOTS=report/buttons-ipad node tools/buttons.js $pages > report/buttons-ipad.txt 2>&1 & c=$!
+          wait $a $b $c
+          for f in report/fit.txt report/buttons-phone.txt report/buttons-ipad.txt; do echo "===== $f"; cat "$f"; done
+          { echo "## Toybox report"; echo; echo "Pages: $(tr '\n' ' ' < pages.txt)"; echo
+            for f in report/fit.txt report/buttons-phone.txt report/buttons-ipad.txt; do
+              echo "### $(basename "$f" .txt)"; echo '```'; tail -c 30000 "$f"; echo '```'; done; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.pages.outputs.count != '0'
+        with:
+          name: toybox-report
+          path: report/
+          retention-days: 14
 
   deploy:
     needs: check

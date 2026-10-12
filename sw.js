@@ -75,6 +75,9 @@ const CORE = [
   "./workshop/shadow-board.html",
   "./workshop/project.html",
   "./workshop/projects.js",
+  "./workshop/index.js",
+  "./workshop/saw-bench.js",
+  "./workshop/hammer-screws.js",
   "./workshop/manifest.webmanifest",
   "./workshop/icons/icon-180.png",
   "./workshop/icons/icon-192.png",
@@ -93,6 +96,7 @@ const CORE = [
   // Marble Run
   "./marble-run/",
   "./marble-run/index.html",
+  "./marble-run/index.js",
   "./marble-run/manifest.webmanifest",
   "./marble-run/icons/icon-180.png",
   "./marble-run/icons/icon-192.png",
@@ -102,6 +106,7 @@ const CORE = [
   // Car Builder
   "./car-builder/",
   "./car-builder/index.html",
+  "./car-builder/index.js",
   "./car-builder/manifest.webmanifest",
   "./car-builder/icons/icon-180.png",
   "./car-builder/icons/icon-192.png",

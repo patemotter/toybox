@@ -1,0 +1,3537 @@
+// Script of hammer-screws.html, moved out of the page unchanged (2026-10-12) so agents can read and edit it in parts.
+// Loaded by a plain <script src> at the same place in the page, so it runs exactly as the inline script did.
+// Sections, in order (search for the title to jump to one):
+//   - Basics
+//   - Shapes: one list of path parts draws on canvas and in SVG
+//   - Tool data
+//   - Saved state
+//   - Project mode (guided build from the Tool Wall)
+//   - Tool drawings (millimetres; hammers: striking face at 0,0 pointing down, handle to the right)
+//   - Build the panel
+//   - Canvas & layout
+//   - Painting helpers
+//   - Board scene geometry
+//   - Board scene background
+//   - Fastener drawing
+//   - Metal scene
+//   - Joint scene (mallet, dead-blow)
+//   - Yard scene (sledgehammer)
+//   - Particles
+//   - Sound (off by default; soft synth only)
+//   - Overlays: tool name, readout, hint, cam-out help
+//   - Board contents
+//   - Hammers: swinging
+//   - Assemble scene (Project mode birdhouse)
+//   - Hammer gestures
+//   - Pulling nails with the claw
+//   - Screwdrivers
+//   - Power drivers
+//   - Pointer input on the workbench
+//   - Drawing the tools
+//   - Scene background cache
+//   - Readout and the coach line
+//   - Ghost hint: shows the gesture when nothing has happened for a while
+//   - Main loop
+//   - Panel
+//   - Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page)
+//   - Start
+(function () {
+  "use strict";
+
+  // ---------- Basics ----------
+  var OUT = "#1D2340";
+  var STEEL = "#CBD3DE", STEEL_D = "#8794A6", HICKORY = "#E3B06B", RUBBER = "#30323A", BLACK = "#2B2E36";
+  var YELLOW = "#FFC93C", ORANGE = "#F77F00", ORANGE_D = "#C85F00";
+  var PITCH = 3;                 // wood screw thread: 3 mm per turn
+  var MAXF = 90;                 // fasteners per board
+  var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function n2(v) { return Math.round(v * 100) / 100; }
+  function nowMs() { return performance.now(); }
+  function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+  function rng(seed) {
+    var s = (seed >>> 0) || 1;
+    return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
+
+  // ---------- Shapes: one list of path parts draws on canvas and in SVG ----------
+  function P(d, f, s, c) { return { d: d, f: f || null, s: s || 0, c: c || OUT }; }
+  function rect(x, y, w, h) { return "M" + n2(x) + " " + n2(y) + "H" + n2(x + w) + "V" + n2(y + h) + "H" + n2(x) + "Z"; }
+  function rrect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    return "M" + n2(x + r) + " " + n2(y) + "H" + n2(x + w - r) + "Q" + n2(x + w) + " " + n2(y) + " " + n2(x + w) + " " + n2(y + r) +
+      "V" + n2(y + h - r) + "Q" + n2(x + w) + " " + n2(y + h) + " " + n2(x + w - r) + " " + n2(y + h) +
+      "H" + n2(x + r) + "Q" + n2(x) + " " + n2(y + h) + " " + n2(x) + " " + n2(y + h - r) +
+      "V" + n2(y + r) + "Q" + n2(x) + " " + n2(y) + " " + n2(x + r) + " " + n2(y) + "Z";
+  }
+  function circ(cx, cy, r) {
+    return "M" + n2(cx - r) + " " + n2(cy) + "A" + n2(r) + " " + n2(r) + " 0 1 0 " + n2(cx + r) + " " + n2(cy) +
+      "A" + n2(r) + " " + n2(r) + " 0 1 0 " + n2(cx - r) + " " + n2(cy) + "Z";
+  }
+  function poly(pts) { return "M" + pts.map(function (p) { return n2(p[0]) + " " + n2(p[1]); }).join("L") + "Z"; }
+  function handlePath(x0, x1, ay, t0, t1) {
+    var h0 = t0 / 2, h1 = t1 / 2, hm = Math.min(h0, h1) * 0.82, xm = x0 + (x1 - x0) * 0.4, xe = x1 - h1;
+    return "M" + x0 + " " + n2(ay - h0) + "Q" + n2(xm) + " " + n2(ay - hm) + " " + n2(xe) + " " + n2(ay - h1) +
+      "Q" + x1 + " " + n2(ay - h1) + " " + x1 + " " + ay + "Q" + x1 + " " + n2(ay + h1) + " " + n2(xe) + " " + n2(ay + h1) +
+      "Q" + n2(xm) + " " + n2(ay + hm) + " " + x0 + " " + n2(ay + h0) + "Z";
+  }
+  var pathCache = {};
+  function p2d(d) { return pathCache[d] || (pathCache[d] = new Path2D(d)); }
+  function drawParts(c, parts) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], path = p2d(p.d);
+      if (p.f) { c.fillStyle = p.f; c.fill(path); }
+      if (p.s) { c.lineWidth = p.s; c.strokeStyle = p.c; c.lineJoin = "round"; c.lineCap = "round"; c.stroke(path); }
+    }
+  }
+  function partsSVG(parts) {
+    return parts.map(function (p) {
+      return '<path d="' + p.d + '" fill="' + (p.f || "none") + '"' +
+        (p.s ? ' stroke="' + p.c + '" stroke-width="' + p.s + '" stroke-linejoin="round" stroke-linecap="round"' : "") + "/>";
+    }).join("");
+  }
+  function bboxT(box, deg, mir) {
+    var a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    [[box[0], box[1]], [box[2], box[1]], [box[0], box[3]], [box[2], box[3]]].forEach(function (p) {
+      var x = p[0] * ca - p[1] * sa, y = p[0] * sa + p[1] * ca;
+      if (mir) x = -x;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    });
+    return [x0, y0, x1, y1];
+  }
+  function iconSVG(inner, box, deg, mir, pad, shrink) {
+    var b = bboxT(box, deg, mir), p = pad || 6, s = shrink || 0;
+    var w = b[2] - b[0], h = b[3] - b[1];
+    var vb = n2(b[0] - p + w * s / 2) + " " + n2(b[1] - p + h * s / 2) + " " + n2(w * (1 - s) + 2 * p) + " " + n2(h * (1 - s) + 2 * p);
+    return '<svg viewBox="' + vb + '" aria-hidden="true"><g transform="' + (mir ? "scale(-1 1) " : "") + "rotate(" + deg + ')">' + inner + "</g></svg>";
+  }
+
+  // ---------- Tool data ----------
+  var HAMMERS = {
+    claw:     { name: "Claw hammer", short: "Claw", scene: "board", drive: 9, bounce: 0.36, down: 120, shake: 4, snd: "nail", rest: 0.55 },
+    framing:  { name: "Framing hammer", sub: "milled face", short: "Framing", scene: "board", drive: 15, bounce: 0.3, down: 105, shake: 6, snd: "nail", rest: 0.55 },
+    ballpeen: { name: "Ball-peen hammer", short: "Ball-peen", scene: "metal", drive: 0, bounce: 0.4, down: 110, shake: 3, snd: "metal", rest: 0.55 },
+    mallet:   { name: "Rubber mallet", short: "Mallet", scene: "joint", drive: 6, bounce: 0.75, down: 130, shake: 3, snd: "rubber", rest: 0.55 },
+    deadblow: { name: "Dead-blow hammer", sub: "no bounce", short: "Dead-blow", scene: "joint", drive: 10, bounce: 0, down: 140, shake: 5, snd: "dead", rest: 0.55 },
+    sledge:   { name: "Sledgehammer", short: "Sledge", scene: "yard", drive: 1, bounce: 0.12, down: 430, shake: 16, snd: "sledge", rest: 0.95 }
+  };
+  var HAMMER_ORDER = ["claw", "framing", "ballpeen", "mallet", "deadblow", "sledge"];
+  var DRIVERS = {
+    flathead:    { name: "Flathead screwdriver", short: "Flathead", head: "slotted", kind: "hand", color: ORANGE },
+    phillips:    { name: "Phillips screwdriver", short: "Phillips", head: "phillips", kind: "hand", color: YELLOW },
+    torx:        { name: "Torx driver", short: "Torx", head: "torx", kind: "hand", color: "#2D5BD7" },
+    square:      { name: "Square driver", sub: "Robertson", short: "Square", head: "square", kind: "hand", color: "#E63946" },
+    hex:         { name: "Allen key", sub: "L-shaped hex key", short: "Allen key", head: "hex", kind: "key" },
+    drilldriver: { name: "Cordless drill/driver", short: "Drill/ driver", kind: "power", color: YELLOW },
+    impact:      { name: "Impact driver", short: "Impact driver", kind: "power", color: ORANGE }
+  };
+  var DRIVER_ORDER = ["flathead", "phillips", "torx", "square", "hex", "drilldriver", "impact"];
+  var HEADS = {
+    slotted:  { name: "Slotted", alt: "flathead", driver: "flathead", color: "#CDD3DB" },
+    phillips: { name: "Phillips", alt: "cross", driver: "phillips", color: "#CDD3DB" },
+    torx:     { name: "Torx", alt: "star", driver: "torx", color: "#C9A26A" },
+    square:   { name: "Square", alt: "Robertson", driver: "square", color: "#E3C55C" },
+    hex:      { name: "Hex socket", alt: "Allen", driver: "hex", color: "#59606D" }
+  };
+  var HEAD_ORDER = ["slotted", "phillips", "torx", "square", "hex"];
+  var SIZES = [{ len: 25, name: "Short" }, { len: 40, name: "Medium" }, { len: 50, name: "Long" }, { len: 65, name: "Longest" }];
+  var NAILS = {
+    c25:  { label: "Small", len: 25, shank: 1.8, head: 4.4, kind: "common" },
+    c50:  { label: "Medium", len: 50, shank: 2.9, head: 6.7, kind: "common" },
+    c75:  { label: "Big", len: 75, shank: 3.8, head: 7.9, kind: "common" },
+    c100: { label: "Giant", len: 100, shank: 4.9, head: 10.3, kind: "common" },
+    fin:  { label: "Finishing", len: 50, shank: 2.3, head: 3.1, kind: "finish" },
+    roof: { label: "Roofing", len: 32, shank: 3.1, head: 9.5, kind: "roof" }
+  };
+  var NAIL_ORDER = ["c25", "c50", "c75", "c100", "fin", "roof"];
+
+  // ---------- Saved state ----------
+  var KEY = "workshop-hammer-v1";
+  function freshBoard() { return { nails: [], screws: [], holes: [], marks: [] }; }
+  function freshMetal() { return { dents: [], rivets: [0, 1, 2, 3, 4].map(function () { return { s: 0, f: "ball" }; }) }; }
+  function freshJoint() { return { gap: 32, hits: 0, joints: 0, cd: 0, cx: 0, chops: 0, notch: 0 }; }
+  function freshYard() { return { wedge: 30, hits: 0, logs: 0, stake: 430, shits: 0, stakes: 0, pile: 0 }; }
+  function freshState() {
+    return { mode: "hammer", hammer: "claw", driver: "phillips", nail: "c50", act: "hit", face: "ball",
+      head: "phillips", len: 25, bit: "phillips", dir: "fwd", clutch: 14, pulled: 0,
+      board: freshBoard(), metal: freshMetal(), joint: freshJoint(), yard: freshYard() };
+  }
+  function num(v, lo, hi, d) { return (typeof v === "number" && isFinite(v)) ? clamp(v, lo, hi) : d; }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!o || typeof o !== "object") return s;
+      if (o.mode === "hammer" || o.mode === "screw") s.mode = o.mode;
+      if (HAMMERS[o.hammer]) s.hammer = o.hammer;
+      if (DRIVERS[o.driver]) s.driver = o.driver;
+      if (NAILS[o.nail]) s.nail = o.nail;
+      if (o.act === "hit" || o.act === "pull") s.act = o.act;
+      if (o.face === "ball" || o.face === "flat") s.face = o.face;
+      if (HEADS[o.head]) s.head = o.head;
+      if (HEADS[o.bit]) s.bit = o.bit;
+      if (SIZES.some(function (z) { return z.len === o.len; })) s.len = o.len;
+      if (o.dir === "fwd" || o.dir === "rev") s.dir = o.dir;
+      s.clutch = Math.round(num(o.clutch, 1, 20, 14));
+      s.pulled = Math.round(num(o.pulled, 0, 1e6, 0));
+      var b = o.board;
+      if (b && typeof b === "object") {
+        if (Array.isArray(b.nails)) b.nails.slice(0, MAXF).forEach(function (n) {
+          if (!n || !NAILS[n.t]) return;
+          var L = NAILS[n.t].len;
+          s.board.nails.push({ u: num(n.u, 0, 1, 0.5), v: num(n.v, 0, 1, 0.5), t: n.t, d: num(n.d, 1, L, 3), dd: 0, vd: 0,
+            hits: Math.round(num(n.hits, 0, 999, 0)), bent: num(n.bent, -1.4, 1.4, 0) });
+        });
+        if (Array.isArray(b.screws)) b.screws.slice(0, MAXF).forEach(function (q) {
+          if (!q || !HEADS[q.h]) return;
+          var L = SIZES.some(function (z) { return z.len === q.len; }) ? q.len : 25;
+          s.board.screws.push({ u: num(q.u, 0, 1, 0.5), v: num(q.v, 0, 1, 0.5), h: q.h, len: L, d: num(q.d, 0.5, L + 2.5, 4), a: num(q.a, -1e6, 1e6, 0), dd: 0, done: !!q.done });
+        });
+        if (Array.isArray(b.holes)) b.holes.slice(-120).forEach(function (q) {
+          if (q && typeof q.u === "number" && typeof q.v === "number") s.board.holes.push({ u: num(q.u, 0, 1, 0.5), v: num(q.v, 0, 1, 0.5), r: num(q.r, 1, 8, 2) });
+        });
+        if (Array.isArray(b.marks)) b.marks.slice(-120).forEach(function (q) {
+          if (q && typeof q.u === "number" && (q.k === "round" || q.k === "waffle")) s.board.marks.push({ u: num(q.u, 0, 1, 0.5), v: num(q.v, 0, 1, 0.5), k: q.k });
+        });
+      }
+      var m = o.metal;
+      if (m && typeof m === "object") {
+        if (Array.isArray(m.dents)) m.dents.slice(-220).forEach(function (q) {
+          if (q && (q.f === "ball" || q.f === "flat")) s.metal.dents.push({ u: num(q.u, 0, 1, 0.5), v: num(q.v, 0, 1, 0.5), f: q.f });
+        });
+        if (Array.isArray(m.rivets) && m.rivets.length === 5) s.metal.rivets = m.rivets.map(function (r) {
+          return { s: Math.round(num(r && r.s, 0, 4, 0)), f: r && r.f === "flat" ? "flat" : "ball" };
+        });
+      }
+      var j = o.joint;
+      if (j && typeof j === "object") {
+        s.joint.gap = num(j.gap, 0, 32, 32); s.joint.joints = Math.round(num(j.joints, 0, 1e6, 0));
+        s.joint.cx = num(j.cx, 0, 150, 0); s.joint.cd = num(j.cd, 0, 18, 0); s.joint.chops = Math.round(num(j.chops, 0, 1e6, 0));
+        s.joint.notch = num(j.notch, 0, 170, 0); s.joint.hits = Math.round(num(j.hits, 0, 999, 0));
+        if (s.joint.gap <= 0) s.joint.gap = 32;
+      }
+      var y = o.yard;
+      if (y && typeof y === "object") {
+        s.yard.wedge = num(y.wedge, 30, 115, 30); s.yard.logs = Math.round(num(y.logs, 0, 1e6, 0)); s.yard.hits = Math.round(num(y.hits, 0, 999, 0));
+        s.yard.stake = num(y.stake, 90, 430, 430); s.yard.stakes = Math.round(num(y.stakes, 0, 1e6, 0)); s.yard.shits = Math.round(num(y.shits, 0, 999, 0));
+        s.yard.pile = Math.round(num(y.pile, 0, 8, 0));
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return s;
+  }
+  // Opened from the Toybox home screen: a fresh board, first-visit tools (nothing here is a collection).
+  var startFresh = !!(window.Toybox && Toybox.fresh());
+  var state = startFresh ? freshState() : loadState();
+  // One good default nail and one default screw (no size pickers); the clutch stops each screw flush.
+  state.nail = "c50"; state.len = 25; state.clutch = 14;
+  state.board.nails.forEach(function (n) { n.dd = n.d; });
+  state.board.screws.forEach(function (q) { q.dd = q.d; });
+  var saveWanted = false, lastSave = 0;
+  function save() {
+    saveWanted = false; lastSave = nowMs();
+    try {
+      var b = state.board;
+      var out = {
+        mode: state.mode, hammer: state.hammer, driver: state.driver, nail: state.nail, act: state.act, face: state.face,
+        head: state.head, len: state.len, bit: state.bit, dir: state.dir, clutch: state.clutch, pulled: state.pulled,
+        board: {
+          nails: b.nails.map(function (n) { return { u: n2(n.u * 100) / 100, v: n2(n.v * 100) / 100, t: n.t, d: n2(n.d), hits: n.hits, bent: n2(n.bent) }; }),
+          screws: b.screws.map(function (q) { return { u: n2(q.u * 100) / 100, v: n2(q.v * 100) / 100, h: q.h, len: q.len, d: n2(q.d), a: Math.round(q.a), done: q.done }; }),
+          holes: b.holes, marks: b.marks
+        },
+        metal: state.metal, joint: state.joint, yard: state.yard
+      };
+      localStorage.setItem(KEY, JSON.stringify(out));
+    } catch (e) { /* ignore */ }
+  }
+  function saveSoon() { saveWanted = true; }
+  if (startFresh) save();
+
+  // Deep link: ?tool=<id>
+  (function () {
+    var q = "";
+    try { q = new URLSearchParams(location.search).get("tool") || ""; } catch (e) { q = ""; }
+    if (HAMMERS[q]) { state.mode = "hammer"; state.hammer = q; }
+    else if (DRIVERS[q]) {
+      state.mode = "screw"; state.driver = q;
+      if (DRIVERS[q].head) state.head = DRIVERS[q].head;
+    }
+    // Auto-match: a power driver starts with the bit that fits the screws.
+    state.bit = state.head;
+  })();
+
+  // ---------- Project mode (guided build from the Tool Wall) ----------
+  var PSTEP = window.ToyboxProjects && ToyboxProjects.fromQuery();
+  if (PSTEP && (PSTEP.station !== "hammer-screws" || !PSTEP.job || PSTEP.job.kind !== "assemble")) PSTEP = null;
+  var PJ = PSTEP ? {
+    joins: PSTEP.job.joins || [
+      ["back", "side1"],
+      ["back", "side2"],
+      ["sides", "floor"],
+      ["sides", "front"],
+      ["box", "roof"]
+    ],
+    step: 0,
+    joinIdx: 0,
+    phase: "glue", // "glue" -> "slide" -> "nails" -> "pause" -> "done"
+    glueProg: 0,
+    glueHeld: false,
+    glueAuto: false,
+    slideProg: 0,
+    pauseT: 0,
+    fasteners: [0, 0],
+    activeIdx: 0,
+    powerBurst: 0,
+    impT: 0,
+    nails: [],
+    doneNails: [],
+    finished: false
+  } : null;
+  if (PSTEP) {
+    document.body.classList.add("project");
+    state.mode = "hammer";
+    state.hammer = "claw";
+    state.act = "hit";
+    var wb = $("wallBtn");
+    if (wb) {
+      wb.href = ToyboxProjects.planUrl(PSTEP.project);
+      wb.setAttribute("aria-label", "Back to the plan");
+      wb.setAttribute("data-short", "Plan");
+      var wsp = wb.querySelector("span");
+      if (wsp) wsp.textContent = "Plan";
+    }
+    var pjb = $("pjBanner");
+    if (pjb) { pjb.textContent = PSTEP.title; pjb.hidden = false; }
+  }
+
+  // ---------- Tool drawings (millimetres; hammers: striking face at 0,0 pointing down, handle to the right) ----------
+  function hammerArt(id, icon) {
+    var parts = [], ay, piv, top, Lh, box, flipF = 0, i, z;
+    if (id === "claw") {
+      ay = -56; Lh = icon ? 250 : 318;
+      parts.push(P(handlePath(10, Lh, ay, 20, 26), HICKORY, 2.6));
+      parts.push(P("M30 " + (ay - 1) + "Q" + (Lh * 0.5) + " " + (ay - 4) + " " + (Lh - 20) + " " + (ay - 2), null, 1.5, "rgba(140,85,30,0.55)"));
+      parts.push(P("M-14 0Q0 2.5 14 0L15 -5L11 -10V-26L17 -32V-80C20 -98 34 -112 54 -117L59 -121C40 -131 8 -129 -6 -113C-14 -103 -17 -92 -17 -80V-32L-11 -26V-10L-15 -5Z", STEEL, 2.6));
+      parts.push(P(rrect(-13, -76, 4, 42, 2), "rgba(255,255,255,0.75)"));
+      parts.push(P("M3 -105C14 -117 32 -122 52 -119", null, 1.6, STEEL_D));
+      piv = [Lh - 60, ay]; top = -131; box = [-17, -131, Lh, 3];
+    } else if (id === "framing") {
+      ay = -58; Lh = icon ? 300 : 410;
+      parts.push(P(handlePath(12, Lh, ay, 22, 26), YELLOW, 2.6));
+      parts.push(P(rrect(Lh - 150, ay - 15, 152, 30, 14), BLACK, 2.6));
+      z = "";
+      for (i = Lh - 136; i < Lh - 12; i += 14) z += "M" + i + " " + (ay - 12) + "V" + (ay + 12);
+      parts.push(P(z, null, 2.2, "rgba(255,255,255,0.22)"));
+      parts.push(P("M-17 0L17 0L18 -6L13 -12V-28L19 -34V-86Q18 -122 9 -154L-3 -156Q-15 -122 -19 -86V-34L-13 -28V-12L-18 -6Z", STEEL, 2.6));
+      z = "M-16 0";
+      for (i = 0; i < 12; i++) z += "l1.33 2.4l1.33 -2.4";
+      parts.push(P(z, null, 1.5, OUT));
+      parts.push(P(rrect(-15, -80, 4, 44, 2), "rgba(255,255,255,0.75)"));
+      parts.push(P("M3 -152V-112", null, 1.8, STEEL_D));
+      piv = [Lh - 75, ay]; top = -156; box = [-19, -156, Lh, 4];
+    } else if (id === "ballpeen") {
+      ay = -46; Lh = icon ? 240 : 290;
+      parts.push(P(handlePath(10, Lh, ay, 20, 24), HICKORY, 2.6));
+      parts.push(P("M30 " + (ay - 1) + "Q" + (Lh * 0.5) + " " + (ay - 4) + " " + (Lh - 20) + " " + (ay - 2), null, 1.5, "rgba(140,85,30,0.55)"));
+      parts.push(P("M-13 0Q0 2 13 0L14 -6L9 -14V-20L14 -26V-66Q8 -76 7 -84A15 15 0 1 0 -7 -84Q-8 -76 -14 -66V-26L-9 -20V-14L-14 -6Z", STEEL, 2.6));
+      parts.push(P(rrect(-11, -62, 3.5, 34, 1.7), "rgba(255,255,255,0.75)"));
+      parts.push(P(circ(-5, -102, 4), "rgba(255,255,255,0.8)"));
+      piv = [Lh - 55, ay]; top = -113; box = [-15, -113, Lh, 3]; flipF = 112.3;
+    } else if (id === "mallet") {
+      ay = -58; Lh = icon ? 240 : 300;
+      parts.push(P(handlePath(26, Lh, ay, 22, 26), HICKORY, 2.6));
+      parts.push(P(rrect(-28, -116, 56, 116, 8), RUBBER, 2.6));
+      parts.push(P("M-27 -9H27M-27 -107H27", null, 2, "rgba(255,255,255,0.16)"));
+      parts.push(P(rrect(-21, -104, 7, 92, 3.5), "rgba(255,255,255,0.22)"));
+      piv = [Lh - 55, ay]; top = -116; box = [-28, -116, Lh, 2];
+    } else if (id === "deadblow") {
+      ay = -62; Lh = icon ? 250 : 312;
+      parts.push(P(handlePath(28, Lh, ay, 24, 28), ORANGE, 2.6));
+      parts.push(P(rrect(Lh - 112, ay - 15, 116, 30, 13), BLACK, 2.6));
+      parts.push(P(rrect(-30, -124, 60, 124, 10), ORANGE, 2.6));
+      parts.push(P(rrect(-30, -13, 60, 13, 5), ORANGE_D, 2.2));
+      parts.push(P(rrect(-30, -124, 60, 13, 5), ORANGE_D, 2.2));
+      parts.push(P(rrect(-18, -100, 36, 76, 7), "rgba(29,35,64,0.3)", 1.6));
+      if (icon) {
+        z = "";
+        [[-8, -34], [0, -34], [8, -34], [-4, -42], [4, -42], [-8, -50], [0, -50], [8, -50]].forEach(function (q) { z += circ(q[0], q[1], 3.6); });
+        parts.push(P(z, STEEL, 1));
+      }
+      parts.push(P(rrect(-25, -108, 5, 92, 2.5), "rgba(255,255,255,0.35)"));
+      piv = [Lh - 55, ay]; top = -124; box = [-30, -124, Lh, 2];
+    } else {
+      ay = -85; Lh = icon ? 430 : 860;
+      parts.push(P(handlePath(34, Lh, ay, 32, 38), HICKORY, 3));
+      parts.push(P("M60 " + (ay - 2) + "Q" + (Lh * 0.5) + " " + (ay - 6) + " " + (Lh - 30) + " " + (ay - 3), null, 2, "rgba(140,85,30,0.55)"));
+      parts.push(P("M-30 0L30 0L34 -6V-164L30 -170H-30L-34 -164V-6Z", "#555C69", 3));
+      parts.push(P(rect(-30, -5, 60, 5), STEEL));
+      parts.push(P(rect(-30, -170, 60, 5), STEEL));
+      parts.push(P(rrect(-26, -158, 7, 146, 3), "rgba(255,255,255,0.28)"));
+      piv = [Lh - 220, ay]; top = -170; box = [-34, -170, Lh, 2];
+    }
+    return { parts: parts, pivot: piv, top: top, ay: ay, box: box, flipF: flipF };
+  }
+
+  var TIP = {
+    slotted: [P("M-3 -24L-3.9 -8L-3.5 0H3.5L3.9 -8L3 -24Z", STEEL, 1.6), P("M-2.6 -9L0 -2L2.6 -9", null, 1, STEEL_D)],
+    phillips: [P("M-3 -24V-9L-0.9 0H0.9L3 -9V-24Z", STEEL, 1.6), P("M0 -20V-3", null, 1, STEEL_D)],
+    torx: [P("M-2.9 -24V-1.2Q-2.9 0 -1.7 0H1.7Q2.9 0 2.9 -1.2V-24Z", STEEL, 1.6), P("M-1.2 -20V-2M1.2 -20V-2", null, 0.9, STEEL_D)],
+    square: [P("M-3 -24L-2.9 -8L-2 0H2L2.9 -8L3 -24Z", STEEL, 1.6), P("M0 -20V-3", null, 1, STEEL_D)],
+    hex: [P("M-2.9 -24V0H2.9V-24Z", STEEL, 1.6), P("M0 -21V-2", null, 1, STEEL_D)]
+  };
+  var HANDLE_D = "M-12 -100L12 -100Q17 -104 17 -114V-176Q17 -190 0 -190Q-17 -190 -17 -176V-114Q-17 -104 -12 -100Z";
+  function screwdriverArt(id) {
+    var d = DRIVERS[id], parts = [];
+    parts.push(P(rect(-3, -98, 6, 76), STEEL, 1.8));
+    parts.push(P(rect(-1.7, -94, 1.3, 68), "rgba(255,255,255,0.75)"));
+    parts = parts.concat(TIP[d.head]);
+    parts.push(P(rrect(-7, -105, 14, 9, 2), STEEL, 1.8));
+    parts.push(P(HANDLE_D, d.color, 2.6));
+    parts.push(P(rrect(-11, -168, 22, 52, 7), "rgba(29,35,64,0.8)"));
+    return { parts: parts, box: [-17, -190, 17, 2], hy0: -186, hy1: -104, hw: 17 };
+  }
+  function hexKeyIconParts() {
+    var d = "M0 0V-26Q0 -32 6 -32H84";
+    return [P(d, null, 9, OUT), P(d, null, 5.5, "#4A505C"), P("M-1 -4V-25", null, 1.4, "rgba(255,255,255,0.6)"), P("M8 -33.5H80", null, 1.4, "rgba(255,255,255,0.6)")];
+  }
+  var powerCache = {};
+  function powerArt(kind, bit) {
+    var key = kind + "|" + bit;
+    if (powerCache[key]) return powerCache[key];
+    var parts = [], body = kind === "impact" ? ORANGE : YELLOW, o;
+    parts.push(P(rect(-3.2, -50, 6.4, 28), STEEL, 1.6));
+    parts = parts.concat(TIP[bit]);
+    if (kind === "drilldriver") {
+      parts.push(P("M-13 -48L13 -48L18 -62V-104H-18V-62Z", BLACK, 2.6));
+      parts.push(P(rrect(-25, -124, 50, 22, 4), "#3C4150", 2.6));
+      parts.push(P("M-25 -124H25L29 -140V-238Q29 -254 13 -254H-13Q-29 -254 -29 -238V-140Z", body, 2.6));
+      parts.push(P(rrect(-18, -232, 36, 72, 9), BLACK));
+      parts.push(P("M-10 -222V-206M-3 -222V-206M4 -222V-206M11 -222V-206", null, 2.4, "#5D6474"));
+      parts.push(P("M26 -238L120 -230V-186L26 -192Z", BLACK, 2.6));
+      parts.push(P("M27 -237L119 -229V-221L27 -228Z", body));
+      parts.push(P("M38 -193L60 -191L58 -174Q48 -168 40 -176Z", "#4B5160", 2.2));
+      parts.push(P(rrect(34, -214, 14, 12, 3), "#8E99A9", 2));
+      parts.push(P(rrect(116, -262, 48, 102, 8), BLACK, 2.6));
+      parts.push(P(rect(116, -236, 48, 10), body));
+      parts.push(P(circ(130, -248, 2.6) + circ(140, -248, 2.6) + circ(150, -248, 2.6), "#7CFF8A"));
+      parts.push(P(rrect(-9, -262, 18, 9, 3), "#4B5160", 2));
+      parts.push(P(rrect(-25, -236, 4, 90, 2), "rgba(255,255,255,0.45)"));
+      o = { parts: parts, box: [-29, -263, 165, 2], chuck: [-104, -50, 18], collar: -113, trig: [26, -262, 165, -160], body: [-30, -263, 30, -46] };
+    } else {
+      parts.push(P(rrect(-9, -84, 18, 36, 3), BLACK, 2.4));
+      parts.push(P("M-17 -84H17L23 -104H-23Z", "#9AA3AF", 2.4));
+      parts.push(P("M-25 -104H25L28 -120V-212Q28 -228 13 -228H-13Q-28 -228 -28 -212V-120Z", body, 2.6));
+      parts.push(P(rrect(-17, -206, 34, 64, 9), BLACK));
+      parts.push(P("M-9 -196V-180M-2 -196V-180M5 -196V-180", null, 2.4, "#5D6474"));
+      parts.push(P("M25 -212L112 -204V-162L25 -168Z", BLACK, 2.6));
+      parts.push(P("M26 -211L111 -203V-195L26 -202Z", body));
+      parts.push(P("M37 -169L57 -167L55 -151Q46 -145 39 -153Z", "#4B5160", 2.2));
+      parts.push(P(rrect(33, -190, 14, 12, 3), "#8E99A9", 2));
+      parts.push(P(rrect(108, -236, 48, 100, 8), BLACK, 2.6));
+      parts.push(P(rect(108, -210, 48, 10), body));
+      parts.push(P(circ(122, -222, 2.6) + circ(132, -222, 2.6) + circ(142, -222, 2.6), "#7CFF8A"));
+      parts.push(P(circ(0, -94, 3), "#FFF6B0", 1.2));
+      parts.push(P(rrect(-24, -210, 4, 84, 2), "rgba(255,255,255,0.45)"));
+      o = { parts: parts, box: [-28, -237, 157, 2], chuck: [-84, -48, 9], collar: 0, trig: [25, -237, 157, -140], body: [-29, -229, 29, -46] };
+    }
+    powerCache[key] = o;
+    return o;
+  }
+  function chiselArt() {
+    return [
+      P("M-9.5 0L-9.5 -95L9.5 -95L9.5 0Z", STEEL, 2.2),
+      P(rect(-9.5, -9, 19, 9), "#E8EEF5"),
+      P("M-9.5 -9H9.5", null, 1.2, STEEL_D),
+      P(rect(-6, -90, 3, 76), "rgba(255,255,255,0.7)"),
+      P("M-5 -95L5 -95L7 -108L-7 -108Z", STEEL, 2),
+      P(rrect(-12, -122, 24, 14, 3), "#D2AE52", 2.2),
+      P("M-12 -122L-15 -200Q-15 -208 -8 -208L8 -208Q15 -208 15 -200L12 -122Z", "#C7783E", 2.4),
+      P("M-4 -126L-6 -200", null, 2, "rgba(255,255,255,0.35)"),
+      P(rrect(-15, -214, 30, 9, 3), STEEL, 2.2)
+    ];
+  }
+
+  // Screw recess shapes, top view, radius 100.
+  var RECESS = {
+    slotted: rect(-90, -13, 180, 26),
+    phillips: "M-13 -68H13V-13H68V13H13V68H-13V13H-68V-13H-13Z",
+    torx: (function () {
+      var pts = [], i, a, r;
+      for (i = 0; i < 72; i++) { a = i / 72 * 2 * Math.PI; r = 46 + 14 * Math.cos(6 * a); pts.push([r * Math.sin(a), -r * Math.cos(a)]); }
+      return poly(pts);
+    })(),
+    square: rect(-32, -32, 64, 64),
+    hex: (function () { var pts = [], i; for (i = 0; i < 6; i++) pts.push([44 * Math.sin(i * Math.PI / 3), -44 * Math.cos(i * Math.PI / 3)]); return poly(pts); })()
+  };
+  function headIcon(h) {
+    var col = HEADS[h].color;
+    return '<svg viewBox="-112 -112 224 224" aria-hidden="true"><circle r="98" fill="' + col + '" stroke="' + OUT + '" stroke-width="12"/>' +
+      '<path d="M-60 -55 A80 80 0 0 1 40 -78" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="12" stroke-linecap="round"/>' +
+      '<path d="' + RECESS[h] + '" fill="#262A33"/>' + (h === "phillips" ? '<path d="M0 -22L22 0L0 22L-22 0Z" fill="#11141A"/>' : "") + "</svg>";
+  }
+  function bitIcon(h) {
+    return '<svg viewBox="-112 -112 224 224" aria-hidden="true"><circle r="96" fill="#3C4150" stroke="' + OUT + '" stroke-width="10"/>' +
+      '<path d="' + RECESS[h] + '" fill="' + STEEL + '" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round" transform="scale(1.25)"/></svg>';
+  }
+  function nailIconParts(N) {
+    var L = N.len, w = Math.max(2.4, N.shank * 1.5), hr = N.kind === "finish" ? w * 0.75 : N.head * 0.75, col = N.kind === "roof" ? "#AEB6BE" : STEEL;
+    var parts = [];
+    parts.push(P("M" + n2(-w / 2) + " " + (-L + 2) + "V" + n2(-w * 1.6) + "L0 0L" + n2(w / 2) + " " + n2(-w * 1.6) + "V" + (-L + 2) + "Z", col, 1.4));
+    parts.push(P(rect(-w / 2 + w * 0.2, -L + 4, Math.max(0.8, w * 0.22), L - 4 - w * 1.8), "rgba(255,255,255,0.8)"));
+    if (N.kind === "roof") parts.push(P("M" + n2(-w / 2) + " -14L" + n2(w / 2) + " -16M" + n2(-w / 2) + " -10L" + n2(w / 2) + " -12M" + n2(-w / 2) + " -18L" + n2(w / 2) + " -20", null, 0.8, OUT));
+    parts.push(P(rrect(-hr, -L - 1.6, hr * 2, 3.2, 1), col, 1.4));
+    return parts;
+  }
+  function screwSideParts(len, col) {
+    var w = 4.2, parts = [], z = "", y;
+    parts.push(P("M-1.6 " + (-len + 4) + "V-5L0 0L1.6 -5V" + (-len + 4) + "Z", col, 1));
+    for (y = -5; y > -len + 5; y -= 3) z += "M-2.4 " + y + "L2.4 " + (y - 1.5);
+    parts.push(P(z, null, 1, OUT));
+    parts.push(P("M-4.2 " + (-len) + "H4.2L1.6 " + (-len + 4) + "H-1.6Z", col, 1));
+    return parts;
+  }
+
+  // ---------- Build the panel ----------
+  var ARTS = {};
+  HAMMER_ORDER.forEach(function (id) { ARTS[id] = hammerArt(id, false); });
+  var DRV_ART = {};
+  ["flathead", "phillips", "torx", "square"].forEach(function (id) { DRV_ART[id] = screwdriverArt(id); });
+
+  function hammerIcon(id) { var a = hammerArt(id, true); return iconSVG(partsSVG(a.parts), a.box, 45, false, 8, 0.12); }
+  function driverIcon(id) {
+    var d = DRIVERS[id];
+    if (d.kind === "hand") { var a = DRV_ART[id]; return iconSVG(partsSVG(a.parts), a.box, 45, false, 8, 0.1); }
+    if (d.kind === "key") return iconSVG(partsSVG(hexKeyIconParts()), [-5, -38, 88, 4], -25, false, 8);
+    var p = powerArt(id, id === "impact" ? "phillips" : "phillips");
+    return iconSVG(partsSVG(p.parts), p.box, 90, true, 8);
+  }
+  $("tabHammer").innerHTML = iconSVG(partsSVG(hammerArt("claw", true).parts), [-17, -131, 250, 3], 45, false, 6, 0.1) + "<span>Hammers &amp; nails</span>";
+  $("tabScrew").innerHTML = iconSVG(partsSVG(DRV_ART.phillips.parts), [-17, -190, 17, 2], 45, false, 6, 0.1) + "<span>Screws &amp; drivers</span>";
+  var TOOL_ALIAS = { ballpeen: "peen", flathead: "flat", torx: "star", hex: "ratchet", drilldriver: "drill" };
+  HAMMER_ORDER.forEach(function (id) {
+    var b = document.createElement("button");
+    b.className = "btn tool"; b.dataset.hammer = id; b.dataset.tool = TOOL_ALIAS[id] || id;
+    b.innerHTML = hammerIcon(id) + "<span>" + HAMMERS[id].short + "</span>";
+    b.setAttribute("aria-label", HAMMERS[id].name);
+    $("hammerBtns").appendChild(b);
+  });
+  DRIVER_ORDER.forEach(function (id) {
+    var b = document.createElement("button");
+    b.className = "btn tool"; b.dataset.driver = id; b.dataset.tool = TOOL_ALIAS[id] || id;
+    b.innerHTML = driverIcon(id) + "<span>" + DRIVERS[id].short + "</span>";
+    b.setAttribute("aria-label", DRIVERS[id].name);
+    $("driverBtns").appendChild(b);
+  });
+  HEAD_ORDER.forEach(function (h) {
+    var b = document.createElement("button");
+    b.className = "btn bitbtn"; b.dataset.bit = h;
+    b.innerHTML = bitIcon(h);
+    b.setAttribute("aria-label", HEADS[h].name + " bit");
+    b.title = HEADS[h].name + " bit";
+    $("bitBtns").appendChild(b);
+  });
+
+  // ---------- Canvas & layout ----------
+  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var W = 300, H = 300, DPR = 1;
+  var bg = document.createElement("canvas"), bgx = bg.getContext("2d"), bgDirty = true;
+  var LB = {}, LM = {}, LJ = {}, LY = {}, LA = {};
+  var OB = 0.5;
+
+  function sceneName() { if (PJ) return "assemble"; return state.mode === "screw" ? "board" : HAMMERS[state.hammer].scene; }
+
+  function resize() {
+    var w = Math.max(80, cv.clientWidth), h = Math.max(80, cv.clientHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    if (w === W && h === H && cv.width === Math.round(w * DPR)) return;
+    W = w; H = h;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    bg.width = cv.width; bg.height = cv.height;
+    layoutAll();
+    bgDirty = true;
+  }
+  function layoutAll() {
+    // Board: 340 x 200 mm top, 105 mm thick, seen from above the front edge.
+    var BW = 280, BD = 140, BT = 100, ROOM = 108, FOOT = 16, tot, k;
+    k = Math.min(W * 0.9 / BW, H / (ROOM + BD * OB + BT + FOOT));
+    tot = (ROOM + BD * OB + BT + FOOT) * k;
+    LB = { k: k, x0: (W - BW * k) / 2, w: BW * k, yBack: (H - tot) / 2 + ROOM * k, dTop: BD * OB * k, bt: BT };
+    LB.yFront = LB.yBack + LB.dTop; LB.yBottom = LB.yFront + BT * k;
+    // Metal: 220 x 150 mm steel plate on a bench block.
+    k = Math.min(W * 0.9 / 160, H / (100 + 48 + 6 + 30 + 14));
+    tot = (100 + 48 + 6 + 30 + 14) * k;
+    LM = { k: k, x0: (W - 140 * k) / 2, w: 140 * k, yBack: (H - tot) / 2 + 100 * k, dTop: 48 * k };
+    LM.yFront = LM.yBack + LM.dTop; LM.yEdge = LM.yFront + 6 * k; LM.yBlock = LM.yEdge + 30 * k;
+    // Joint: 400 mm board with a chisel and a post.
+    k = Math.min(W * 0.92 / 400, H / (250 + 60 + 45 + 26));
+    tot = (250 + 60 + 45 + 26) * k;
+    LJ = { k: k, x0: (W - 400 * k) / 2, w: 400 * k, yBack: (H - tot) / 2 + 250 * k, dTop: 60 * k };
+    LJ.yFront = LJ.yBack + LJ.dTop; LJ.yBottom = LJ.yFront + 45 * k; LJ.mid = LJ.yBack + LJ.dTop * 0.5;
+    // Yard: stump, log and a stake.
+    k = Math.min(W * 0.95 / 860, H / (250 + 300 + 260 + 110));
+    tot = (250 + 300 + 260 + 110) * k;
+    LY = { k: k };
+    LY.ground = (H - tot) / 2 + (250 + 300 + 260) * k + 30 * k;
+    LY.sx = Math.max(W * 0.36, 230 * k);
+    LY.kx = Math.min(W - 60 * k, Math.max(LY.sx + 300 * k, W * 0.8));
+    LY.stumpTop = LY.ground - 240 * k;
+    LY.logTop = LY.stumpTop - 300 * k;
+    // Assemble (Project Mode birdhouse):
+    k = Math.min(W * 0.88 / 360, H / 410);
+    LA = { k: k, cx: W * 0.5, cy: H * 0.58, benchY: H * 0.50 };
+    if (PSTEP) {
+      var pjb = $("pjBanner");
+      if (pjb && !pjb.hidden) {
+        pjb.style.fontSize = "";
+        var fs = parseFloat(getComputedStyle(pjb).fontSize) || 16;
+        while (pjb.scrollWidth > pjb.clientWidth + 1 && fs > 11) {
+          fs -= 0.5;
+          pjb.style.fontSize = fs + "px";
+        }
+      }
+    }
+  }
+
+  // ---------- Painting helpers ----------
+  function ellipse(c, x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, Math.PI * 2); }
+  function setFont(c, px, w) { c.font = (w || 800) + " " + Math.round(px) + "px 'Baloo 2', 'Trebuchet MS', sans-serif"; }
+  function outlinedText(c, text, x, y, px, fill) {
+    setFont(c, px); c.textAlign = "center"; c.textBaseline = "middle"; c.lineJoin = "round";
+    c.lineWidth = Math.max(3, px * 0.22); c.strokeStyle = OUT; c.strokeText(text, x, y);
+    c.fillStyle = fill || "#FFFFFF"; c.fillText(text, x, y);
+  }
+  function woodRect(c, x, y, w, h, base, grain, seed, knots) {
+    var r = rng(seed), i, xx, yy, n = Math.max(4, Math.round(h / 9));
+    c.fillStyle = base; c.fillRect(x, y, w, h);
+    c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.strokeStyle = grain; c.lineCap = "round";
+    for (i = 0; i < n; i++) {
+      yy = y + h * (i + r() * 0.8) / n;
+      var amp = 1 + r() * 3, f = 0.01 + r() * 0.02, ph = r() * 6;
+      c.globalAlpha = 0.25 + r() * 0.35; c.lineWidth = 1 + r() * 2;
+      c.beginPath(); c.moveTo(x - 2, yy);
+      for (xx = x; xx <= x + w + 20; xx += 16) c.lineTo(xx, yy + Math.sin(xx * f + ph) * amp);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+    for (i = 0; i < (knots || 0); i++) {
+      var kx = x + w * (0.15 + r() * 0.7), ky = y + h * (0.25 + r() * 0.5), kr = 5 + r() * 7;
+      c.fillStyle = "rgba(120,70,25,0.55)"; ellipse(c, kx, ky, kr * 1.4, kr * 0.7); c.fill();
+      c.strokeStyle = "rgba(120,70,25,0.35)"; c.lineWidth = 1.5;
+      ellipse(c, kx, ky, kr * 2.4, kr * 1.15); c.stroke();
+      ellipse(c, kx, ky, kr * 3.4, kr * 1.6); c.stroke();
+    }
+    c.restore();
+  }
+  function pegboard(c, x, y, w, h) {
+    c.fillStyle = "#C79A64"; c.fillRect(x, y, w, h);
+    var s = Math.max(18, Math.min(30, W / 26)), i, j;
+    c.fillStyle = "#8B6038";
+    for (j = y + s / 2; j < y + h; j += s) for (i = x + s / 2; i < x + w; i += s) { c.beginPath(); c.arc(i, j, s * 0.12, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = "rgba(255,255,255,0.08)"; c.fillRect(x, y, w, h * 0.4);
+  }
+  function benchTop(c, y0, y1) {
+    woodRect(c, 0, y0, W, y1 - y0, "#A56C38", "#7A4A22", 91, 0);
+    c.fillStyle = "#6E4321"; c.fillRect(0, y1, W, H - y1);
+    c.fillStyle = "rgba(255,255,255,0.18)"; c.fillRect(0, y1, W, 3);
+    c.strokeStyle = "rgba(60,30,10,0.35)"; c.lineWidth = 2;
+    for (var x = W * 0.21; x < W; x += W * 0.29) { c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke(); }
+  }
+
+  // ---------- Board scene geometry ----------
+  function bpt(u, v) { return { x: LB.x0 + u * LB.w, y: LB.yBack + v * LB.dTop }; }
+  function boardSpot(x, y) {
+    var u = (x - LB.x0) / LB.w, v = (y - LB.yBack) / LB.dTop;
+    if (u < 0.01 || u > 0.99) return null;
+    if (v >= 0.02 && v <= 1.0) return { u: clamp(u, 0.04, 0.96), v: clamp(v, 0.08, 0.94) };
+    if (y > LB.yFront && y < LB.yBottom) return { u: clamp(u, 0.04, 0.96), v: 0.93 };
+    return null;
+  }
+  function nailDims(N) {
+    var k = LB.k, w = Math.max(4, N.shank * k * 2);
+    var hr = N.kind === "finish" ? w * 0.85 : Math.max(w * 0.95, N.head * k * 0.95);
+    return { w: w, hr: hr, hy: hr * 0.42, ht: Math.max(2, 1.4 * k) };
+  }
+  // Head top point of a nail on screen (where the hammer face lands).
+  function nailTop(n) {
+    var N = NAILS[n.t], p = bpt(n.u, n.v), k = LB.k, dm = nailDims(N);
+    var tipY = p.y + n.dd * k, headY = tipY - N.len * k, baseY = Math.min(p.y, tipY);
+    if (n.bent) {
+      var len = baseY - headY, hk = Math.min(len * 0.45, 22 * k), up = len - hk, a = n.bent * 0.75;
+      return { x: p.x + Math.sin(a) * up, y: baseY - hk - Math.cos(a) * up - dm.ht };
+    }
+    if (headY > p.y - 0.5) return { x: p.x, y: p.y - dm.hy * 0.3 };
+    return { x: p.x, y: headY - dm.ht * 0.5 };
+  }
+  var SCREW = { core: 2.9, outer: 4.3, head: 8.4, cone: 3.8 };
+  function screwDims() { var k = LB.k, f = 1.8; return { core: SCREW.core * k * f, outer: SCREW.outer * k * f, hr: SCREW.head * k * f / 2, cone: SCREW.cone * k * 1.2, pp: PITCH * k }; }
+  function screwTop(q) {
+    var p = bpt(q.u, q.v), k = LB.k;
+    var tipY = p.y + q.dd * k, headY = tipY - q.len * k;
+    if (headY > p.y) return { x: p.x, y: p.y + Math.min(3, q.dd - q.len) * k * 0.4 };
+    return { x: p.x, y: headY };
+  }
+
+  // ---------- Board scene background ----------
+  function drawBoardBg(c) {
+    var k = LB.k, yJ = LB.yBack + LB.dTop * 0.55, yE = Math.min(H - 4, LB.yBottom + 12 * k), i, p;
+    pegboard(c, 0, 0, W, yJ);
+    benchTop(c, yJ, yE);
+    c.fillStyle = "rgba(40,20,5,0.35)";
+    c.fillRect(LB.x0 + 10, LB.yFront + 12, LB.w + 4, LB.yBottom - LB.yFront);
+    woodRect(c, LB.x0, LB.yBack, LB.w, LB.dTop, "#F1CB90", "#C88E4D", 7, 2);
+    woodRect(c, LB.x0, LB.yFront, LB.w, LB.yBottom - LB.yFront, "#DCA663", "#A86F33", 11, 0);
+    c.fillStyle = "rgba(255,255,255,0.35)"; c.fillRect(LB.x0, LB.yFront, LB.w, 3);
+    c.fillStyle = "rgba(0,0,0,0.12)"; c.fillRect(LB.x0, LB.yBottom - 8, LB.w, 8);
+    // Marks a hammer face leaves around a nail it set flush.
+    state.board.marks.forEach(function (m) {
+      p = bpt(m.u, m.v);
+      var r = 13 * k;
+      c.fillStyle = "rgba(150,95,40,0.28)"; ellipse(c, p.x, p.y, r, r * 0.45); c.fill();
+      if (m.k === "waffle") {
+        c.save(); ellipse(c, p.x, p.y, r, r * 0.45); c.clip();
+        c.strokeStyle = "rgba(110,65,25,0.5)"; c.lineWidth = 1.2;
+        for (i = -r; i < r; i += 3.2 * k) {
+          c.beginPath(); c.moveTo(p.x + i, p.y - r); c.lineTo(p.x + i + r, p.y + r); c.stroke();
+          c.beginPath(); c.moveTo(p.x + i, p.y + r); c.lineTo(p.x + i + r, p.y - r); c.stroke();
+        }
+        c.restore();
+      }
+    });
+    state.board.holes.forEach(function (h) {
+      p = bpt(h.u, h.v);
+      var r = Math.max(2.5, h.r * k);
+      c.fillStyle = "rgba(230,190,130,0.9)"; ellipse(c, p.x, p.y, r * 2.1, r); c.fill();
+      c.fillStyle = "#4A2E14"; ellipse(c, p.x, p.y, r, r * 0.5); c.fill();
+    });
+    c.lineWidth = 3; c.strokeStyle = OUT; c.lineJoin = "round";
+    c.strokeRect(LB.x0, LB.yBack, LB.w, LB.yBottom - LB.yBack);
+    c.beginPath(); c.moveTo(LB.x0, LB.yFront); c.lineTo(LB.x0 + LB.w, LB.yFront); c.stroke();
+  }
+
+  // ---------- Fastener drawing ----------
+  function drawNail(c, n, active) {
+    var N = NAILS[n.t], p = bpt(n.u, n.v), k = LB.k, dm = nailDims(N);
+    var tipY = p.y + n.dd * k, headY = tipY - N.len * k, baseY = Math.min(p.y, tipY);
+    var col = N.kind === "roof" ? "#AEB6BE" : "#C6CED9";
+    c.lineJoin = "round"; c.lineCap = "round";
+    if (tipY > p.y) { c.fillStyle = "rgba(60,30,5,0.3)"; ellipse(c, p.x + dm.w * 0.6, p.y + 1, dm.w * 1.3, dm.w * 0.45); c.fill(); }
+    if (n.bent && headY < baseY - 1) {
+      var len = baseY - headY, hk = Math.min(len * 0.45, 22 * k), up = len - hk, a = n.bent * 0.75;
+      var kx = p.x, ky = baseY - hk, ex = kx + Math.sin(a) * up, ey = ky - Math.cos(a) * up;
+      c.strokeStyle = OUT; c.lineWidth = dm.w + 4;
+      c.beginPath(); c.moveTo(p.x, baseY); c.lineTo(kx, ky); c.lineTo(ex, ey); c.stroke();
+      c.strokeStyle = col; c.lineWidth = dm.w;
+      c.beginPath(); c.moveTo(p.x, baseY); c.lineTo(kx, ky); c.lineTo(ex, ey); c.stroke();
+      c.save(); c.translate(ex, ey); c.rotate(a);
+      c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+      ellipse(c, 0, 0, dm.hr, dm.hy); c.fill(); c.stroke();
+      c.restore();
+      return;
+    }
+    if (headY < baseY - 1) {
+      var sh = baseY - headY;
+      c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+      c.beginPath(); c.rect(p.x - dm.w / 2, headY, dm.w, sh); c.fill(); c.stroke();
+      if (N.kind === "roof") {
+        c.strokeStyle = "rgba(29,35,64,0.45)"; c.lineWidth = 1;
+        for (var ry = baseY - 3; ry > Math.max(headY + 4, baseY - 22 * k); ry -= Math.max(3, 1.6 * k)) { c.beginPath(); c.moveTo(p.x - dm.w / 2, ry); c.lineTo(p.x + dm.w / 2, ry - 1.5); c.stroke(); }
+      }
+      c.fillStyle = "rgba(255,255,255,0.8)"; c.fillRect(p.x - dm.w / 2 + dm.w * 0.16, headY + 2, Math.max(1, dm.w * 0.24), Math.max(0, sh - 3));
+      if (tipY < p.y) {
+        c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(p.x - dm.w / 2, tipY); c.lineTo(p.x, tipY + dm.w * 1.7); c.lineTo(p.x + dm.w / 2, tipY); c.closePath(); c.fill(); c.stroke();
+      }
+      c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+      c.beginPath(); c.rect(p.x - dm.hr, headY, dm.hr * 2, dm.ht); c.fill();
+      ellipse(c, p.x, headY + dm.ht, dm.hr, dm.hy); c.fill(); c.stroke();
+      c.fillRect(p.x - dm.hr, headY, dm.hr * 2, dm.ht);
+      c.beginPath(); c.moveTo(p.x - dm.hr, headY); c.lineTo(p.x - dm.hr, headY + dm.ht); c.moveTo(p.x + dm.hr, headY); c.lineTo(p.x + dm.hr, headY + dm.ht); c.stroke();
+      ellipse(c, p.x, headY, dm.hr, dm.hy); c.fill(); c.stroke();
+      c.fillStyle = "rgba(255,255,255,0.85)"; ellipse(c, p.x - dm.hr * 0.3, headY - dm.hy * 0.2, dm.hr * 0.35, dm.hy * 0.35); c.fill();
+      if (N.kind === "finish") { c.fillStyle = "rgba(29,35,64,0.45)"; ellipse(c, p.x, headY, dm.hr * 0.4, dm.hy * 0.4); c.fill(); }
+    } else {
+      c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+      ellipse(c, p.x, p.y, dm.hr, dm.hy); c.fill(); c.stroke();
+      c.fillStyle = "rgba(255,255,255,0.85)"; ellipse(c, p.x - dm.hr * 0.3, p.y - dm.hy * 0.2, dm.hr * 0.35, dm.hy * 0.35); c.fill();
+    }
+  }
+  function drawScrew(c, q) {
+    var p = bpt(q.u, q.v), k = LB.k, dm = screwDims(), col = HEADS[q.h].color;
+    var tipY = p.y + q.dd * k, headY = tipY - q.len * k, baseY = Math.min(p.y, tipY);
+    var coneB = headY + dm.cone;
+    c.lineJoin = "round"; c.lineCap = "round";
+    if (tipY > p.y) { c.fillStyle = "rgba(60,30,5,0.3)"; ellipse(c, p.x + dm.outer * 0.5, p.y + 1, dm.outer * 1.3, dm.outer * 0.45); c.fill(); }
+    if (headY < p.y - 0.5) {
+      if (coneB < baseY) {
+        c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+        c.beginPath(); c.rect(p.x - dm.core / 2, coneB, dm.core, baseY - coneB); c.fill(); c.stroke();
+        // Threads stay put against the wood while the screw turns in: one thread per turn.
+        var ph = ((q.a / 360) % 1 + 1) % 1, y, top = coneB + 2;
+        c.save(); c.beginPath(); c.rect(p.x - dm.outer, top, dm.outer * 2, baseY - top + (tipY < p.y ? dm.pp * 2 : 0)); c.clip();
+        for (y = tipY - ph * dm.pp; y > top - dm.pp; y -= dm.pp) {
+          c.strokeStyle = OUT; c.lineWidth = Math.max(3, dm.pp * 0.42);
+          c.beginPath(); c.moveTo(p.x - dm.outer / 2, y); c.lineTo(p.x + dm.outer / 2, y - dm.pp / 2); c.stroke();
+          c.strokeStyle = col; c.lineWidth = Math.max(1.5, dm.pp * 0.22);
+          c.beginPath(); c.moveTo(p.x - dm.outer / 2 + 1, y - 0.3); c.lineTo(p.x + dm.outer / 2 - 1, y - dm.pp / 2 + 0.3); c.stroke();
+        }
+        c.restore();
+        c.fillStyle = "rgba(255,255,255,0.55)"; c.fillRect(p.x - dm.core / 2 + 1.5, coneB + 1, Math.max(1, dm.core * 0.2), Math.max(0, baseY - coneB - 2));
+        if (tipY < p.y) {
+          c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+          c.beginPath(); c.moveTo(p.x - dm.core / 2, tipY - 1); c.lineTo(p.x, tipY + dm.core * 1.8); c.lineTo(p.x + dm.core / 2, tipY - 1); c.closePath(); c.fill(); c.stroke();
+        }
+      }
+      c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(p.x - dm.hr, headY); c.lineTo(p.x + dm.hr, headY); c.lineTo(p.x + dm.core / 2, Math.min(coneB, baseY)); c.lineTo(p.x - dm.core / 2, Math.min(coneB, baseY)); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = "rgba(0,0,0,0.12)";
+      c.beginPath(); c.moveTo(p.x + dm.hr * 0.2, headY); c.lineTo(p.x + dm.hr, headY); c.lineTo(p.x + dm.core / 2, Math.min(coneB, baseY)); c.closePath(); c.fill();
+      drawScrewHead(c, p.x, headY, dm.hr, col, q);
+    } else {
+      var sink = Math.min(3, q.dd - q.len) * k * 0.4;
+      c.fillStyle = "rgba(90,55,20,0.5)"; ellipse(c, p.x, p.y, dm.hr * 1.18, dm.hr * 0.5); c.fill();
+      drawScrewHead(c, p.x, p.y + sink, dm.hr, col, q);
+    }
+  }
+  function drawScrewHead(c, x, y, r, col, q) {
+    c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
+    ellipse(c, x, y, r, r * 0.45); c.fill(); c.stroke();
+    c.save(); c.translate(x, y); c.scale(1, 0.45); c.rotate(q.a * Math.PI / 180); c.scale(r / 100, r / 100);
+    c.fillStyle = "#23262E"; c.fill(p2d(RECESS[q.h]));
+    if (q.h === "phillips") { c.fillStyle = "#0E1015"; c.fill(p2d("M0 -22L22 0L0 22L-22 0Z")); }
+    c.restore();
+    c.strokeStyle = "rgba(255,255,255,0.75)"; c.lineWidth = Math.max(1.5, r * 0.12);
+    c.beginPath(); c.ellipse(x, y, r * 0.78, r * 0.33, 0, Math.PI * 1.08, Math.PI * 1.45); c.stroke();
+  }
+  function drawXray(c) {
+    var k = LB.k, b = state.board, dmS = screwDims();
+    c.save(); c.beginPath(); c.rect(LB.x0 + 1.5, LB.yFront + 2, LB.w - 3, LB.yBottom - LB.yFront - 3.5); c.clip();
+    b.nails.forEach(function (n) {
+      if (n.dd <= 0) return;
+      var N = NAILS[n.t], p = bpt(n.u, n.v), w = Math.max(4, N.shank * k * 2), y1 = LB.yFront + n.dd * k, act = n === activeNail;
+      c.globalAlpha = act ? 0.95 : 0.4;
+      c.fillStyle = "#3C4658"; c.fillRect(p.x - w / 2, LB.yFront, w, Math.max(0, y1 - LB.yFront - w * 1.6));
+      c.beginPath(); c.moveTo(p.x - w / 2, y1 - w * 1.6); c.lineTo(p.x, y1); c.lineTo(p.x + w / 2, y1 - w * 1.6); c.closePath(); c.fill();
+      if (act) { c.fillStyle = "rgba(255,255,255,0.6)"; c.fillRect(p.x - w / 2 + 1, LB.yFront, 1.5, Math.max(0, y1 - LB.yFront - w * 1.6)); }
+    });
+    b.screws.forEach(function (q) {
+      if (q.dd <= 0) return;
+      var p = bpt(q.u, q.v), y1 = LB.yFront + q.dd * k, act = q === activeScrew, y, ph = ((q.a / 360) % 1 + 1) % 1;
+      c.globalAlpha = act ? 0.95 : 0.4;
+      c.fillStyle = "#3C4658"; c.strokeStyle = "#3C4658";
+      c.fillRect(p.x - dmS.core / 2, LB.yFront, dmS.core, Math.max(0, y1 - LB.yFront - dmS.core * 1.6));
+      c.beginPath(); c.moveTo(p.x - dmS.core / 2, y1 - dmS.core * 1.6); c.lineTo(p.x, y1); c.lineTo(p.x + dmS.core / 2, y1 - dmS.core * 1.6); c.closePath(); c.fill();
+      c.lineWidth = Math.max(2, dmS.pp * 0.3);
+      for (y = y1 - ph * dmS.pp - dmS.pp * 0.3; y > LB.yFront; y -= dmS.pp) {
+        c.beginPath(); c.moveTo(p.x - dmS.outer / 2, y); c.lineTo(p.x + dmS.outer / 2, y - dmS.pp / 2); c.stroke();
+      }
+    });
+    c.globalAlpha = 1;
+    c.restore();
+  }
+
+  // ---------- Metal scene ----------
+  function mpt(u, v) { return { x: LM.x0 + u * LM.w, y: LM.yBack + v * LM.dTop }; }
+  function rivetPos(i) { return mpt(0.14 + i * 0.18, 0.8); }
+  function drawDent(c, d) {
+    var p = mpt(d.u, d.v), k = LM.k;
+    if (d.f === "ball") {
+      var r = 4.5 * k;
+      c.fillStyle = "#7E8A9A"; ellipse(c, p.x, p.y, r, r * 0.5); c.fill();
+      c.fillStyle = "#E9EEF4"; ellipse(c, p.x + r * 0.16, p.y + r * 0.1, r * 0.78, r * 0.36); c.fill();
+      c.fillStyle = "#B4BECB"; ellipse(c, p.x + r * 0.08, p.y + r * 0.04, r * 0.55, r * 0.25); c.fill();
+      c.fillStyle = "#FFFFFF"; ellipse(c, p.x + r * 0.3, p.y + r * 0.16, r * 0.14, r * 0.07); c.fill();
+    } else {
+      var r2 = 6 * k;
+      c.fillStyle = "rgba(244,247,251,0.9)"; ellipse(c, p.x, p.y, r2, r2 * 0.45); c.fill();
+      c.strokeStyle = "rgba(80,90,105,0.55)"; c.lineWidth = 1.4; c.stroke();
+    }
+  }
+  function drawMetalBg(c) {
+    var k = LM.k, i;
+    pegboard(c, 0, 0, W, LM.yBack + LM.dTop * 0.4);
+    benchTop(c, LM.yBack + LM.dTop * 0.4, Math.min(H - 4, LM.yBlock + 10 * k));
+    // bench block
+    var bx = LM.x0 - 8 * k, bw = LM.w + 16 * k;
+    c.fillStyle = "rgba(40,20,5,0.35)"; c.fillRect(bx + 10, LM.yBack + 8, bw, LM.yBlock - LM.yBack);
+    c.fillStyle = "#6B7280"; c.fillRect(bx, LM.yBack - 5 * k, bw, LM.yFront - LM.yBack + 9 * k);
+    c.fillStyle = "#4E5462"; c.fillRect(bx, LM.yEdge - 2 * k, bw, LM.yBlock - LM.yEdge + 2 * k);
+    c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(bx, LM.yBack - 5 * k, bw, LM.yBlock - LM.yBack + 5 * k);
+    // plate
+    c.fillStyle = "#BCC6D2"; c.fillRect(LM.x0, LM.yBack, LM.w, LM.dTop);
+    var r = rng(5);
+    for (i = 0; i < 40; i++) {
+      c.fillStyle = r() > 0.5 ? "rgba(255,255,255,0.25)" : "rgba(80,90,105,0.12)";
+      c.fillRect(LM.x0, LM.yBack + r() * LM.dTop, LM.w, 1 + r() * 2);
+    }
+    c.fillStyle = "rgba(255,255,255,0.35)";
+    c.beginPath(); c.moveTo(LM.x0 + LM.w * 0.15, LM.yBack); c.lineTo(LM.x0 + LM.w * 0.3, LM.yBack); c.lineTo(LM.x0 + LM.w * 0.18, LM.yFront); c.lineTo(LM.x0 + LM.w * 0.03, LM.yFront); c.closePath(); c.fill();
+    c.fillStyle = "#8C98A9"; c.fillRect(LM.x0, LM.yFront, LM.w, LM.yEdge - LM.yFront);
+    c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(LM.x0, LM.yBack, LM.w, LM.yEdge - LM.yBack);
+    c.beginPath(); c.moveTo(LM.x0, LM.yFront); c.lineTo(LM.x0 + LM.w, LM.yFront); c.stroke();
+    state.metal.dents.forEach(function (d) { drawDent(c, d); });
+  }
+  function drawRivet(c, i) {
+    var R = state.metal.rivets[i], p = rivetPos(i), k = LM.k, s = R.s;
+    var h = (12 - s * 1.9) * k, hw = (5 + s * 1.6) * k, sw = 5 * k;
+    c.fillStyle = "rgba(40,45,55,0.35)"; ellipse(c, p.x + 2, p.y + 1, hw * 1.2, hw * 0.5); c.fill();
+    c.fillStyle = "#C2CBD6"; c.strokeStyle = OUT; c.lineWidth = 2;
+    if (s === 0) {
+      c.beginPath(); c.rect(p.x - sw, p.y - h, sw * 2, h); c.fill(); c.stroke();
+      ellipse(c, p.x, p.y - h, sw, sw * 0.45); c.fill(); c.stroke();
+    } else if (R.f === "ball") {
+      c.beginPath(); c.ellipse(p.x, p.y, hw, h, 0, Math.PI, 2 * Math.PI); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = "rgba(255,255,255,0.8)"; ellipse(c, p.x - hw * 0.35, p.y - h * 0.55, hw * 0.25, h * 0.2); c.fill();
+    } else {
+      c.beginPath(); c.moveTo(p.x - hw, p.y); c.lineTo(p.x - hw, p.y - h * 0.7); c.quadraticCurveTo(p.x - hw, p.y - h, p.x, p.y - h); c.quadraticCurveTo(p.x + hw, p.y - h, p.x + hw, p.y - h * 0.7); c.lineTo(p.x + hw, p.y); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = "#E3E8EF"; ellipse(c, p.x, p.y - h, hw * 0.8, hw * 0.3); c.fill();
+    }
+    if (s >= 4) { c.strokeStyle = "#2E9E5B"; c.lineWidth = 3; ellipse(c, p.x, p.y, hw * 1.5, hw * 0.65); c.stroke(); }
+  }
+  function rivetTop(i) {
+    var R = state.metal.rivets[i], p = rivetPos(i), k = LM.k;
+    return { x: p.x, y: p.y - (12 - R.s * 1.9) * k - 1 };
+  }
+
+  // ---------- Joint scene (mallet, dead-blow) ----------
+  function chiselX() { return LJ.x0 + (40 + state.joint.cx + 9.5) * LJ.k; }
+  function postX() { return LJ.x0 + 300 * LJ.k; }
+  var CH = 0.8;   // the chisel is drawn a little smaller than life so it fits beside the post
+  function chiselTop() { return { x: chiselX(), y: LJ.mid + state.joint.cd * LJ.k - 214 * CH * LJ.k }; }
+  function postTop() { var k = LJ.k; return { x: postX(), y: LJ.mid - (state.joint.gap + jointDrop) * k - 130 * k - 3 * k }; }
+  var jointDrop = 0, newJointAt = 0;
+  function drawJointBg(c) {
+    var k = LJ.k;
+    pegboard(c, 0, 0, W, LJ.mid);
+    benchTop(c, LJ.mid, Math.min(H - 4, LJ.yBottom + 12 * k));
+    c.fillStyle = "rgba(40,20,5,0.35)"; c.fillRect(LJ.x0 + 10, LJ.yFront + 10, LJ.w, LJ.yBottom - LJ.yFront);
+    woodRect(c, LJ.x0, LJ.yBack, LJ.w, LJ.dTop, "#E9BD83", "#BF8546", 23, 1);
+    woodRect(c, LJ.x0, LJ.yFront, LJ.w, LJ.yBottom - LJ.yFront, "#D29B5B", "#A0692F", 29, 0);
+    c.fillStyle = "rgba(255,255,255,0.3)"; c.fillRect(LJ.x0, LJ.yFront, LJ.w, 3);
+    // the mortise being chopped
+    var J = state.joint;
+    if (J.notch > 0) {
+      var nx0 = LJ.x0 + 40 * k, nx1 = LJ.x0 + (40 + J.notch) * k, ny0 = LJ.yBack + LJ.dTop * 0.3, ny1 = LJ.yBack + LJ.dTop * 0.7;
+      c.fillStyle = "#5C3A1C"; c.fillRect(nx0, ny0, nx1 - nx0, ny1 - ny0);
+      c.fillStyle = "#B57B40"; c.fillRect(nx0, ny0, nx1 - nx0, (ny1 - ny0) * 0.35);
+      c.strokeStyle = OUT; c.lineWidth = 2; c.strokeRect(nx0, ny0, nx1 - nx0, ny1 - ny0);
+    }
+    c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(LJ.x0, LJ.yBack, LJ.w, LJ.yBottom - LJ.yBack);
+    c.beginPath(); c.moveTo(LJ.x0, LJ.yFront); c.lineTo(LJ.x0 + LJ.w, LJ.yFront); c.stroke();
+    // mortise for the post
+    var px = postX();
+    c.fillStyle = "#4A2E14"; c.fillRect(px - 13 * k, LJ.mid - 5 * k, 26 * k, 10 * k);
+  }
+  function drawJointDyn(c) {
+    var k = LJ.k, J = state.joint, px = postX(), base = LJ.mid, g = J.gap + jointDrop;
+    // post with its tenon
+    var shoulder = base - g * k;
+    if (g > 0.2) {
+      c.fillStyle = "#EBC58E"; c.strokeStyle = OUT; c.lineWidth = 2.5;
+      c.beginPath(); c.rect(px - 12 * k, shoulder, 24 * k, base - shoulder + 1); c.fill(); c.stroke();
+      c.strokeStyle = "rgba(150,100,40,0.5)"; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(px - 4 * k, shoulder); c.lineTo(px - 4 * k, base); c.moveTo(px + 5 * k, shoulder); c.lineTo(px + 5 * k, base); c.stroke();
+    }
+    c.save(); c.beginPath(); c.rect(0, 0, W, base + 1); c.clip();
+    woodRect(c, px - 25 * k, shoulder - 130 * k, 50 * k, 130 * k, "#C98F4F", "#9A6128", 41, 0);
+    c.restore();
+    c.fillStyle = "#E4B678"; c.fillRect(px - 25 * k, shoulder - 136 * k, 50 * k, 6 * k);
+    c.strokeStyle = OUT; c.lineWidth = 3;
+    c.strokeRect(px - 25 * k, shoulder - 136 * k, 50 * k, 136 * k);
+    c.beginPath(); c.moveTo(px - 25 * k, shoulder - 130 * k); c.lineTo(px + 25 * k, shoulder - 130 * k); c.stroke();
+    if (g <= 0.2) { c.fillStyle = "rgba(46,158,91,0.9)"; outlinedText(c, "✓", px + 38 * k, base - 20 * k, Math.max(22, 18 * k), "#7CFF8A"); }
+    // chisel (only the part above the wood shows)
+    var cx = chiselX(), cy = LJ.mid + J.cd * k;
+    c.save(); c.beginPath(); c.rect(0, 0, W, LJ.mid); c.clip();
+    c.translate(cx, cy); c.scale(k * CH, k * CH); drawParts(c, chiselArt());
+    c.restore();
+    c.fillStyle = "rgba(60,30,5,0.45)"; c.fillRect(cx - 10 * k, LJ.mid - 1.5, 20 * k, 3);
+  }
+
+  // ---------- Yard scene (sledgehammer) ----------
+  var logSplit = null, logDrop = 0, stakeDrop = 0, newLogAt = 0, newStakeAt = 0;
+  function wedgeTop() { var Y = state.yard, k = LY.k; return { x: LY.sx, y: LY.logTop - logDrop * k - (150 - Y.wedge) * k }; }
+  function stakeTop() { var k = LY.k; return { x: LY.kx, y: LY.ground - (state.yard.stake + stakeDrop) * k }; }
+  function drawYardBg(c) {
+    var k = LY.k, g = LY.ground;
+    var grd = c.createLinearGradient(0, 0, 0, g);
+    grd.addColorStop(0, "#8FD0FF"); grd.addColorStop(1, "#DDF2FF");
+    c.fillStyle = grd; c.fillRect(0, 0, W, g);
+    c.fillStyle = "#FFFFFF";
+    [[0.18, 0.12], [0.62, 0.08], [0.85, 0.2]].forEach(function (q) {
+      var x = W * q[0], y = H * q[1], r = Math.max(14, 30 * k);
+      ellipse(c, x, y, r * 1.6, r * 0.7); c.fill(); ellipse(c, x + r, y - r * 0.3, r, r * 0.7); c.fill();
+    });
+    // fence
+    c.fillStyle = "#D9B07A"; c.strokeStyle = "rgba(29,35,64,0.5)"; c.lineWidth = 2;
+    for (var x = 8; x < W; x += Math.max(26, 60 * k)) { c.fillRect(x, g - 190 * k, 30 * k, 190 * k); c.strokeRect(x, g - 190 * k, 30 * k, 190 * k); }
+    c.fillRect(0, g - 160 * k, W, 18 * k); c.fillRect(0, g - 70 * k, W, 18 * k);
+    c.fillStyle = "#79C267"; c.fillRect(0, g - 18 * k, W, 26 * k);
+    c.fillStyle = "#9B6A3E"; c.fillRect(0, g + 8 * k, W, H - g);
+    var r = rng(17);
+    c.fillStyle = "#5FA650";
+    for (var i = 0; i < 60; i++) { var gx = r() * W; c.beginPath(); c.moveTo(gx, g - 14 * k); c.lineTo(gx + 4, g - 30 * k - r() * 20 * k); c.lineTo(gx + 8, g - 14 * k); c.fill(); }
+    c.fillStyle = "rgba(60,35,15,0.35)";
+    for (i = 0; i < 40; i++) { ellipse(c, r() * W, g + 20 * k + r() * (H - g), 3 + r() * 5, 2 + r() * 3); c.fill(); }
+    // stump
+    var sw = 440 * k, sx = LY.sx, st = LY.stumpTop;
+    c.fillStyle = "#6E4526"; c.fillRect(sx - sw / 2, st, sw, g - st);
+    c.strokeStyle = "rgba(40,20,5,0.45)"; c.lineWidth = 3;
+    for (i = -4; i <= 4; i++) { c.beginPath(); c.moveTo(sx + i * sw / 10, st + 10); c.lineTo(sx + i * sw / 10 + 4, g); c.stroke(); }
+    c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(sx - sw / 2, st, sw, g - st);
+    c.fillStyle = "#E2B67C"; ellipse(c, sx, st, sw / 2, sw * 0.12); c.fill(); c.stroke();
+    c.strokeStyle = "rgba(140,90,40,0.6)"; c.lineWidth = 2;
+    for (i = 1; i < 6; i++) { ellipse(c, sx, st, sw / 2 * i / 6, sw * 0.12 * i / 6); c.stroke(); }
+    // split pieces stacked by the stump
+    for (i = 0; i < state.yard.pile; i++) {
+      var px = sx - sw / 2 - 70 * k - (i % 3) * 60 * k + 10 * k, py = g - 30 * k - Math.floor(i / 3) * 52 * k;
+      if (px < 10) px = sx + sw / 2 + 50 * k + (i % 3) * 55 * k;
+      c.fillStyle = "#D9A866"; c.strokeStyle = OUT; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(px - 28 * k, py + 24 * k); c.lineTo(px + 28 * k, py + 24 * k); c.arc(px, py + 24 * k, 28 * k, 0, Math.PI, true); c.fill(); c.stroke();
+      c.fillStyle = "#6E4526"; c.fillRect(px - 28 * k, py + 20 * k, 56 * k, 4 * k);
+    }
+  }
+  function drawLog(c, x, top, w, h, crack, half) {
+    var k = LY.k;
+    c.fillStyle = "#8A5A33"; c.strokeStyle = OUT; c.lineWidth = 3;
+    c.beginPath();
+    if (half === -1) c.rect(x - w / 2, top, w / 2, h); else if (half === 1) c.rect(x, top, w / 2, h); else c.rect(x - w / 2, top, w, h);
+    c.fill(); c.stroke();
+    c.strokeStyle = "rgba(40,20,5,0.45)"; c.lineWidth = 3;
+    for (var i = -3; i <= 3; i++) {
+      var lx = x + i * w / 8;
+      if ((half === -1 && lx > x) || (half === 1 && lx < x)) continue;
+      c.beginPath(); c.moveTo(lx, top + 14 * k); c.lineTo(lx + 3, top + h - 6); c.stroke();
+    }
+    c.fillStyle = "#EDC48B"; c.strokeStyle = OUT; c.lineWidth = 3;
+    c.beginPath();
+    if (half === -1) c.ellipse(x, top, w / 2, w * 0.13, 0, Math.PI * 0.5, Math.PI * 1.5);
+    else if (half === 1) c.ellipse(x, top, w / 2, w * 0.13, 0, -Math.PI * 0.5, Math.PI * 0.5);
+    else c.ellipse(x, top, w / 2, w * 0.13, 0, 0, Math.PI * 2);
+    c.closePath(); c.fill(); c.stroke();
+    if (!half) {
+      c.strokeStyle = "rgba(150,95,40,0.6)"; c.lineWidth = 2;
+      for (i = 1; i < 5; i++) { ellipse(c, x, top, w / 2 * i / 5, w * 0.13 * i / 5); c.stroke(); }
+    }
+    if (crack > 0 && !half) {
+      c.strokeStyle = "#2A1708"; c.lineWidth = 3.5;
+      c.beginPath(); c.moveTo(x, top);
+      var steps = 8, yy;
+      for (i = 1; i <= steps; i++) { yy = top + h * Math.min(1, crack) * i / steps; c.lineTo(x + (i % 2 ? 5 : -5) * k * 2, yy); }
+      c.stroke();
+    }
+  }
+  function drawWedge(c, x, tipY) {
+    var k = LY.k;
+    c.fillStyle = "#8E99A9"; c.strokeStyle = OUT; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(x - 32 * k, tipY - 150 * k); c.lineTo(x + 32 * k, tipY - 150 * k); c.lineTo(x + 3 * k, tipY); c.lineTo(x - 3 * k, tipY); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#C9D1DC"; c.fillRect(x - 32 * k, tipY - 150 * k, 64 * k, 10 * k);
+    c.strokeRect(x - 32 * k, tipY - 150 * k, 64 * k, 10 * k);
+    c.fillStyle = "rgba(255,255,255,0.4)";
+    c.beginPath(); c.moveTo(x - 24 * k, tipY - 138 * k); c.lineTo(x - 14 * k, tipY - 138 * k); c.lineTo(x - 2 * k, tipY - 20 * k); c.closePath(); c.fill();
+  }
+  function drawYardDyn(c) {
+    var k = LY.k, Y = state.yard, w = 300 * k, h = 300 * k, x = LY.sx, top = LY.logTop - logDrop * k;
+    if (logSplit) {
+      var t = logSplit.t * 0.74;
+      [-1, 1].forEach(function (s) {
+        c.save();
+        c.translate(x + s * t * 120 * k, LY.stumpTop + t * t * 60 * k);
+        c.rotate(s * Math.min(1.35, t * 1.6));
+        c.translate(-x, -LY.stumpTop);
+        c.globalAlpha = clamp(2.2 - t * 1.4, 0, 1);
+        drawLog(c, x, LY.logTop, w, h, 0, s);
+        c.restore();
+      });
+    } else if (!newLogAt) {
+      c.save(); c.beginPath(); c.rect(0, 0, W, LY.stumpTop + 1); c.clip();
+      drawLog(c, x, top, w, h, (Y.wedge - 30) / 85, 0);
+      c.restore();
+      c.save(); c.beginPath(); c.ellipse(x, top, w / 2 + 40, w * 0.13, 0, Math.PI, 0); c.rect(0, 0, W, top); c.clip();
+      drawWedge(c, x, top + Y.wedge * k - 0);
+      c.restore();
+    }
+    // stake
+    if (!newStakeAt || stakeDrop > 0) {
+      var sx = LY.kx, e = Y.stake + stakeDrop, g = LY.ground;
+      c.save(); c.beginPath(); c.rect(0, 0, W, g - 6 * k); c.clip();
+      c.fillStyle = "#D7A869"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(sx - 25 * k, g - e * k, 50 * k, e * k + 20); c.fill(); c.stroke();
+      c.fillStyle = "#EBC58E"; c.fillRect(sx - 25 * k, g - e * k - 8 * k, 50 * k, 8 * k); c.strokeRect(sx - 25 * k, g - e * k - 8 * k, 50 * k, 8 * k);
+      c.strokeStyle = "rgba(140,90,40,0.5)"; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(sx - 8 * k, g - e * k); c.lineTo(sx - 6 * k, g); c.moveTo(sx + 9 * k, g - e * k); c.lineTo(sx + 10 * k, g); c.stroke();
+      if (Y.shits > 2) { c.fillStyle = "#F3D7A6"; for (var i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(sx + i * 10 * k - 4, g - e * k - 8 * k); c.lineTo(sx + i * 10 * k, g - e * k - 14 * k); c.lineTo(sx + i * 10 * k + 4, g - e * k - 8 * k); c.fill(); } }
+      c.restore();
+      c.fillStyle = "#6E4526"; ellipse(c, sx, g - 4 * k, 40 * k, 8 * k); c.fill();
+    }
+  }
+
+  // ---------- Particles ----------
+  var parts = [], MAXP = reduce ? 120 : 420;
+  var grav = { x: 0, y: 1 };   // gravity for flying bits: straight down
+  function addP(o) { if (parts.length >= MAXP) parts.shift(); o.life = 0; parts.push(o); }
+  function fibers(x, y, n, s, cols) {
+    if (reduce) n = Math.ceil(n / 3);
+    for (var i = 0; i < n; i++) addP({ t: "fiber", x: x + rnd(-6, 6), y: y, vx: rnd(-1, 1) * 260 * s, vy: rnd(-460, -140) * s, g: 1, max: rnd(0.45, 0.9), len: rnd(5, 13), w: rnd(1.8, 3.4), rot: rnd(0, 6.28), vr: rnd(-14, 14), c: pick(cols || ["#F6D9A6", "#E8BC7C", "#FFF0D2", "#D9A35F"]) });
+  }
+  function dust(x, y, n, s, col) {
+    if (reduce) n = Math.ceil(n / 3);
+    for (var i = 0; i < n; i++) addP({ t: "dust", x: x + rnd(-10, 10), y: y + rnd(-4, 4), vx: rnd(-90, 90) * s, vy: rnd(-120, -20) * s, g: -0.03, max: rnd(0.6, 1.3), r: rnd(4, 11) * (0.7 + s * 0.3), c: col || "235,210,165" });
+  }
+  function sparks(x, y, n) {
+    if (reduce) n = Math.ceil(n / 3);
+    for (var i = 0; i < n; i++) { var a = rnd(-Math.PI * 0.95, -Math.PI * 0.05), v = rnd(250, 620); addP({ t: "spark", x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 0.8, max: rnd(0.18, 0.4), c: pick(["#FFF3B0", "#FFD34D", "#FFFFFF"]) }); }
+  }
+  function chips(x, y, n, s) {
+    if (reduce) n = Math.ceil(n / 2);
+    for (var i = 0; i < n; i++) addP({ t: "chip", x: x, y: y, vx: rnd(-1, 1) * 300 * s, vy: rnd(-520, -220) * s, g: 1, max: rnd(0.7, 1.1), r: rnd(6, 14), rot: rnd(0, 6.28), vr: rnd(-10, 10), c: pick(["#F2CF97", "#E3B072", "#FBE3BA"]) });
+  }
+  function clods(x, y, n) {
+    for (var i = 0; i < n; i++) addP({ t: "clod", x: x + rnd(-20, 20), y: y, vx: rnd(-260, 260), vy: rnd(-380, -120), g: 1, max: rnd(0.5, 0.9), r: rnd(3, 7), c: pick(["#7A5230", "#9B6A3E", "#5E3E22"]) });
+  }
+  function ring(x, y, r1, col, ry) { addP({ t: "ring", x: x, y: y, r1: r1, ry: ry || 0.45, max: 0.32, c: col || "255,255,255" }); }
+  function pop(text, x, y, size, col) { addP({ t: "pop", text: text, x: x, y: y, vy: -50, max: 1.45, size: size || 26, c: col || "#FFFFFF", g: 0 }); }
+  function stars(x, y, n) {
+    if (reduce) n = Math.ceil(n / 2);
+    for (var i = 0; i < n; i++) { var a = rnd(0, Math.PI * 2), v = rnd(80, 260); addP({ t: "star", x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, g: 0.25, max: rnd(0.6, 1.0), r: rnd(5, 10), rot: rnd(0, 6), vr: rnd(-6, 6), c: pick(["#FFC93C", "#FFFFFF", "#7CFF8A", "#5BC0EB", "#F26CA7"]) }); }
+  }
+  function flyer(kind, ref, x, y) { addP({ t: "fly", kind: kind, ref: ref, x: x, y: y, vx: rnd(-160, 160), vy: rnd(-620, -480), g: 1, rot: 0, vr: rnd(-14, 14), max: 1.3 }); }
+
+  function updateParts(dt) {
+    var gx = grav.x * 1400, gy = grav.y * 1400, i, p;
+    for (i = parts.length - 1; i >= 0; i--) {
+      p = parts[i];
+      p.life += dt;
+      if (p.life >= p.max) { parts.splice(i, 1); continue; }
+      if (p.t === "ring" || p.t === "pop") { if (p.t === "pop") p.y += p.vy * dt; continue; }
+      if (p.t === "dust") { p.vx *= Math.pow(0.2, dt); p.vy *= Math.pow(0.2, dt); p.vx += grav.x * 40 * dt; p.vy += (grav.y - 1) * 40 * dt - 6 * dt; }
+      else { p.vx += gx * p.g * dt; p.vy += gy * p.g * dt; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.vr) p.rot += p.vr * dt;
+    }
+  }
+  function drawParts2(c) {
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], f = p.life / p.max, a = 1 - f;
+      if (p.t === "dust") {
+        c.fillStyle = "rgba(" + p.c + "," + (0.55 * a).toFixed(3) + ")";
+        c.beginPath(); c.arc(p.x, p.y, p.r * (1 + f * 1.4), 0, Math.PI * 2); c.fill();
+      } else if (p.t === "fiber") {
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.globalAlpha = Math.min(1, a * 1.6);
+        c.fillStyle = p.c; c.strokeStyle = "rgba(29,35,64,0.6)"; c.lineWidth = 1;
+        c.fillRect(-p.len / 2, -p.w / 2, p.len, p.w); c.strokeRect(-p.len / 2, -p.w / 2, p.len, p.w);
+        c.restore();
+      } else if (p.t === "chip") {
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.globalAlpha = Math.min(1, a * 1.6);
+        c.strokeStyle = OUT; c.lineWidth = 6; c.beginPath(); c.arc(0, 0, p.r, 0.3, 3.6); c.stroke();
+        c.strokeStyle = p.c; c.lineWidth = 3.5; c.beginPath(); c.arc(0, 0, p.r, 0.3, 3.6); c.stroke();
+        c.restore();
+      } else if (p.t === "spark") {
+        c.strokeStyle = p.c; c.globalAlpha = a; c.lineWidth = 2.5; c.lineCap = "round";
+        c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025); c.stroke();
+        c.globalAlpha = 1;
+      } else if (p.t === "clod") {
+        c.fillStyle = p.c; c.globalAlpha = Math.min(1, a * 2); c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+      } else if (p.t === "ring") {
+        var r = p.r1 * (0.3 + f * 1.1);
+        c.strokeStyle = "rgba(" + p.c + "," + (0.9 * a).toFixed(3) + ")"; c.lineWidth = 5 * a + 1;
+        ellipse(c, p.x, p.y, r, r * p.ry); c.stroke();
+      } else if (p.t === "pop") {
+        c.globalAlpha = Math.min(1, a * 2.5);
+        outlinedText(c, p.text, p.x, p.y, p.size * (f < 0.15 ? 0.7 + f * 2 : 1), p.c);
+        c.globalAlpha = 1;
+      } else if (p.t === "star") {
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.globalAlpha = Math.min(1, a * 2);
+        c.fillStyle = p.c; c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath();
+        for (var j = 0; j < 10; j++) { var rr = j % 2 ? p.r * 0.45 : p.r, aa = j * Math.PI / 5; c.lineTo(Math.sin(aa) * rr, -Math.cos(aa) * rr); }
+        c.closePath(); c.fill(); c.stroke(); c.restore();
+      } else if (p.t === "fly") {
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.globalAlpha = Math.min(1, a * 2);
+        var k = LB.k;
+        if (p.kind === "nail") {
+          var N = NAILS[p.ref], w = Math.max(4, N.shank * k * 2), L = N.len * k;
+          c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+          c.beginPath(); c.rect(-w / 2, -L / 2, w, L); c.fill(); c.stroke();
+          c.beginPath(); c.rect(-Math.max(w, N.head * k * 0.78), -L / 2 - 3, 2 * Math.max(w, N.head * k * 0.78), 4); c.fill(); c.stroke();
+        } else {
+          var L2 = p.ref * k, dm = screwDims();
+          c.fillStyle = "#CDD3DB"; c.strokeStyle = OUT; c.lineWidth = 2;
+          c.beginPath(); c.rect(-dm.core / 2, -L2 / 2, dm.core, L2); c.fill(); c.stroke();
+          c.beginPath(); c.moveTo(-dm.hr, -L2 / 2 - 3); c.lineTo(dm.hr, -L2 / 2 - 3); c.lineTo(dm.core / 2, -L2 / 2 + 3); c.lineTo(-dm.core / 2, -L2 / 2 + 3); c.closePath(); c.fill(); c.stroke();
+        }
+        c.restore();
+      }
+    }
+    c.globalAlpha = 1;
+  }
+
+  // Sawdust that settles on the board.
+  var specks = [];
+  function addSpecks(u, v, n) {
+    for (var i = 0; i < n; i++) {
+      if (specks.length > 360) specks.shift();
+      specks.push({ u: clamp(u + rnd(-0.05, 0.05), 0.005, 0.995), v: clamp(v + rnd(-0.12, 0.12), 0.01, 0.99), r: rnd(1.2, 2.6), c: pick(["#FFF2D8", "#F7DDB0", "#EBC58E"]) });
+    }
+  }
+  function drawSpecks(c) {
+    for (var i = 0; i < specks.length; i++) {
+      var s = specks[i], p = bpt(s.u, s.v);
+      c.fillStyle = s.c; c.fillRect(p.x - s.r, p.y - s.r * 0.6, s.r * 2, s.r * 1.2);
+    }
+  }
+
+  // ---------- Sound (off by default; soft synth only) ----------
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
+  // starts/resumes audio on every touch while sound is on. This page keeps its own master gain and
+  // noise buffer, built once per context.
+  var AC = null, master = null, noiseBuf = null;
+  function A() {
+    var a = Toybox.sound.ready();
+    if (!a) return null;
+    if (a !== AC) {
+      try {
+        master = a.createGain(); master.gain.value = 0.5; master.connect(a.destination);
+        noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.5), a.sampleRate);
+        var d = noiseBuf.getChannelData(0);
+        for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        AC = a; motor = null;
+      } catch (e) { return null; }
+    }
+    return AC;
+  }
+  function ensureAudio() { A(); }
+  function tone(freq, dur, type, gain, freqEnd, delay) {
+    var ac = A(); if (!ac) return;
+    try {
+      var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
+      if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* ignore */ }
+  }
+  function noise(dur, ftype, freq, gain, delay, q) {
+    var ac = A(); if (!ac) return;
+    try {
+      var t = ac.currentTime + (delay || 0), s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      s.buffer = noiseBuf; f.type = ftype; f.frequency.value = freq; f.Q.value = q || 1;
+      g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
+    } catch (e) { /* ignore */ }
+  }
+  function sndHit(kind, s) {
+    s = clamp(s || 1, 0.6, 2.2);
+    if (kind === "nail") { noise(0.035, "bandpass", 2600, 0.1 * s, 0, 1.2); tone(170, 0.09, "sine", 0.16 * s, 80); tone(1900, 0.14, "sine", 0.025); }
+    else if (kind === "metal") { tone(1250, 0.5, "sine", 0.05); tone(2710, 0.35, "sine", 0.025); tone(4100, 0.2, "sine", 0.012); noise(0.02, "highpass", 3000, 0.05); }
+    else if (kind === "rubber") { tone(140, 0.12, "sine", 0.18, 100); noise(0.05, "lowpass", 700, 0.07); tone(300, 0.16, "sine", 0.035, 430, 0.03); }
+    else if (kind === "dead") { noise(0.12, "lowpass", 280, 0.22); tone(90, 0.12, "sine", 0.18, 60); }
+    else if (kind === "sledge") { tone(70, 0.32, "sine", 0.28, 40); noise(0.22, "lowpass", 420, 0.22); }
+    else if (kind === "wood") { tone(220, 0.08, "triangle", 0.1, 160); noise(0.04, "bandpass", 1200, 0.1); }
+  }
+  function sndTick() { noise(0.01, "bandpass", 2600, 0.05, 0, 2); }
+  function sndClick() { noise(0.007, "highpass", 3800, 0.11); tone(2200, 0.02, "square", 0.008); }
+  function sndImpact() { noise(0.014, "bandpass", 1700, 0.13, 0, 1.5); tone(150, 0.03, "square", 0.025); }
+  function sndSqueak(t) { tone(650 + 500 * t, 0.07, "sine", 0.02); }
+  function sndPop() { tone(480, 0.14, "sine", 0.07, 1150); }
+  function sndSlip() { tone(720, 0.14, "triangle", 0.05, 260); noise(0.05, "highpass", 2500, 0.04); }
+  function sndChime() { tone(660, 0.26, "triangle", 0.05); tone(990, 0.36, "triangle", 0.045, null, 0.09); }
+  function sndCrack() { noise(0.28, "bandpass", 900, 0.22, 0, 0.8); tone(80, 0.22, "sine", 0.2, 50); }
+
+  function sndPlace() { tone(900, 0.05, "sine", 0.03, 1300); noise(0.015, "bandpass", 4000, 0.03); }
+  var motor = null;
+  function motorSet(level, kind) {
+    var ac = A();
+    if (!ac || level < 0.02) { if (motor) { try { motor.g.gain.setTargetAtTime(0.0001, AC.currentTime, 0.05); var m = motor; setTimeout(function () { try { m.o.stop(); } catch (e) { } }, 300); } catch (e) { } motor = null; } return; }
+    try {
+      if (!motor) {
+        var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+        o.type = "sawtooth"; f.type = "lowpass"; f.frequency.value = 700; g.gain.value = 0.0001;
+        o.connect(f); f.connect(g); g.connect(master); o.start();
+        motor = { o: o, f: f, g: g };
+      }
+      var base = kind === "impact" ? 140 : 110;
+      motor.o.frequency.setTargetAtTime(base + level * 160, ac.currentTime, 0.05);
+      motor.g.gain.setTargetAtTime(0.03 * level, ac.currentTime, 0.05);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Overlays: tool name, readout, hint, cam-out help ----------
+  var lastName = "", lastBig = "", lastSmall = "", lastHint = "";
+  function setName(name, sub) {
+    var key = name + "|" + (sub || "");
+    if (key === lastName) return;
+    lastName = key;
+    $("toolName").innerHTML = name + (sub ? "<small>" + sub + "</small>" : "");
+  }
+  function setRead(big, small) {
+    if (big !== lastBig) { $("readBig").textContent = big; lastBig = big; }
+    if (small !== lastSmall) { $("readSmall").textContent = small; lastSmall = small; }
+  }
+  function setHint(t) { if (t !== lastHint) { $("hint").textContent = t; lastHint = t; } }
+  var hintHold = 0, hintMsg = "", hintOk = false;
+  function flashHint(t, sec, ok) { hintMsg = t; hintHold = sec || 3; hintOk = !!ok; }
+  var camTimer = null, camFixTo = null;
+  function showCamout(head, isBit) {
+    var H0 = HEADS[head], needDriver = H0.driver;
+    $("camText").textContent = "Slip! That is a " + H0.name + " screw. It needs " + (isBit ? "a " + H0.name + " bit." : "the " + DRIVERS[needDriver].name + ".");
+    $("camFix").textContent = isBit ? "Use the " + H0.name + " bit" : "Use the " + DRIVERS[needDriver].name.replace(" screwdriver", "") + (DRIVERS[needDriver].kind === "hand" && needDriver !== "torx" && needDriver !== "square" ? " screwdriver" : "");
+    camFixTo = isBit ? { bit: head } : { driver: needDriver };
+    var tipParts = isBit ? null : (DRIVERS[needDriver].kind === "key" ? hexKeyIconParts() : DRV_ART[needDriver].parts);
+    var right = isBit ? '<g transform="translate(176 58) scale(0.42)">' + bitIcon(head).replace(/<\/?svg[^>]*>/g, "") + "</g>"
+      : (DRIVERS[needDriver].kind === "key" ? '<g transform="translate(150 80) rotate(-25) scale(0.62)">' + partsSVG(tipParts) + "</g>"
+        : '<g transform="translate(150 98) rotate(45) scale(0.5)">' + partsSVG(tipParts) + "</g>");
+    $("camArt").innerHTML = '<g transform="translate(52 58) scale(0.48)">' + headIcon(head).replace(/<\/?svg[^>]*>/g, "") + "</g>" +
+      '<path d="M100 58 H124 M116 50 L124 58 L116 66" fill="none" stroke="#1D2340" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' + right;
+    $("camout").hidden = false;
+    var btn = document.querySelector(isBit ? '[data-bit="' + head + '"]' : '[data-driver="' + needDriver + '"]');
+    if (btn) { btn.classList.remove("pulse"); void btn.offsetWidth; btn.classList.add("pulse"); }
+    clearTimeout(camTimer);
+    camTimer = setTimeout(function () { $("camout").hidden = true; }, 6500);
+  }
+  function hideCamout() { clearTimeout(camTimer); $("camout").hidden = true; }
+
+  // ---------- Board contents ----------
+  var activeNail = null, activeScrew = null;
+  function countAll() { return state.board.nails.length + state.board.screws.length; }
+  function farFromOthers(u, v) {
+    var b = state.board, minU = 9 / 280, minV = 9 / 140, ok = true;
+    b.nails.concat(b.screws).forEach(function (f) { if (Math.abs(f.u - u) < minU && Math.abs(f.v - v) < minV) ok = false; });
+    return ok;
+  }
+  // A free spot on the board: the one asked for, or the nearest free one, or any free one.
+  function freeSpot(pref) {
+    if (pref && farFromOthers(pref.u, pref.v)) return pref;
+    var best = null, bd = 1e9, i, u, v, d;
+    for (i = 0; i < 160; i++) {
+      u = rnd(0.1, 0.9); v = rnd(0.22, 0.88);
+      if (!farFromOthers(u, v)) continue;
+      d = pref ? (u - pref.u) * (u - pref.u) * 4 + (v - pref.v) * (v - pref.v) : Math.abs(u - 0.5) + Math.abs(v - 0.55) * 0.6 + rnd(0, 0.35);
+      if (d < bd) { bd = d; best = { u: u, v: v }; }
+    }
+    return best;
+  }
+  function roomSpot(pref) {
+    var spot = countAll() < MAXF ? freeSpot(pref) : null;
+    if (!spot) { newBoard(); spot = pref || { u: 0.5, v: 0.55 }; }
+    return spot;
+  }
+  function nailDone(n) { return !n.bent && n.d >= NAILS[n.t].len - 0.05; }
+  function onBoard(f, list) { return !!f && list.indexOf(f) >= 0; }
+  // A new nail is started for you: it lands upright and the hammer taps it in a little.
+  function placeNail(pref) {
+    var spot = roomSpot(pref);
+    var n = { u: spot.u, v: spot.v, t: state.nail, d: 2, dd: -26, vd: 0, hits: 0, bent: 0 };
+    state.board.nails.push(n);
+    sortBoard();
+    activeNail = n;
+    sndPlace();
+    var p = bpt(n.u, n.v);
+    ring(p.x, p.y, 26 * LB.k, "255,201,60");
+    if (state.mode === "hammer" && state.act === "hit") {
+      ham.tgt = { kind: "nail", ref: n };
+      ham.phase = "tapin"; ham.t = 0; ham.tapN = n; ham.tapK = 0;
+    }
+    saveSoon(); updateCounts();
+    return n;
+  }
+  function tapIn(n) {
+    if (!onBoard(n, state.board.nails)) return;
+    var N = NAILS[n.t], p = bpt(n.u, n.v);
+    n.d = Math.min(N.len, n.d + 3); n.vd = 30;
+    ring(p.x, p.y - 4, 14 * LB.k, "255,255,255");
+    fibers(p.x, p.y, 3, 0.4);
+    sndHit("nail", 0.6);
+    shakeAmp = Math.max(shakeAmp, reduce ? 0.2 : 1);
+    pop("tap", p.x + (ham.tapK % 2 ? 34 : -34) * LB.k * 0.8, p.y - N.len * LB.k * 0.5, 16, "#FFFFFF");
+  }
+  function placeScrew(pref) {
+    var spot = roomSpot(pref);
+    var q = { u: spot.u, v: spot.v, h: state.head, len: state.len, d: 4, dd: -20, a: 0, done: false };
+    state.board.screws.push(q);
+    sortBoard();
+    activeScrew = q; drv.camT = 0;
+    if (state.dir !== "fwd") { state.dir = "fwd"; render(); }
+    sndPlace();
+    var p = bpt(q.u, q.v);
+    ring(p.x, p.y, 26 * LB.k, "255,201,60");
+    saveSoon(); updateCounts();
+    return q;
+  }
+  // Going in, a screw is finished when it is flush (or the clutch stopped it).
+  function screwFinished(q) { return state.dir === "fwd" && (q.d >= q.len - 0.01 || !!q.stopped); }
+  function nearestScrew(x, y, only) {
+    var best = null, bd = 1e9;
+    state.board.screws.forEach(function (q) {
+      if (only && !only(q)) return;
+      var t = screwTop(q), d = Math.hypot(t.x - x, t.y - y); if (d < bd) { bd = d; best = q; }
+    });
+    return best;
+  }
+  // Backing screws out: the next one is one this tool fits; if none fit, the tool changes to fit.
+  function nextOutScrew(x, y) {
+    var q = nearestScrew(x, y, driverMatches) || nearestScrew(x, y);
+    if (q && !driverMatches(q)) {
+      if (DRIVERS[state.driver].kind === "power") { state.bit = q.h; pulseBtn('[data-bit="' + q.h + '"]'); }
+      else { state.driver = HEADS[q.h].driver; pulseBtn('[data-driver="' + state.driver + '"]'); }
+      state.head = q.h; hideCamout(); render();
+    }
+    return q;
+  }
+  function nearestNail(x, y) {
+    var best = null, bd = 1e9;
+    state.board.nails.forEach(function (n) { var t = nailTop(n), d = Math.hypot(t.x - x, t.y - y); if (d < bd) { bd = d; best = n; } });
+    return best;
+  }
+  // Never stuck: returns the screw to work on, putting a new one in when needed.
+  function ensureScrew(x, y) {
+    var spot = x === null ? null : boardSpot(x, y);
+    var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null;
+    if (state.dir === "rev") {
+      if (q) return { q: q, placed: false };
+      q = nextOutScrew(x === null ? W / 2 : x, y === null ? H / 2 : y);
+      if (q) { activeScrew = q; drv.camT = 0; return { q: q, placed: false }; }
+    }
+    if (q && !screwFinished(q)) return { q: q, placed: false };
+    return { q: placeScrew(spot), placed: true };
+  }
+  function sortBoard() {
+    state.board.nails.sort(function (a, b) { return a.v - b.v; });
+    state.board.screws.sort(function (a, b) { return a.v - b.v; });
+  }
+  function nearNail(x, y, r) {
+    var best = null, bd = r;
+    state.board.nails.forEach(function (n) {
+      var p = bpt(n.u, n.v), t = nailTop(n);
+      var d = distSeg(x, y, p.x, Math.min(p.y, p.y + n.dd * LB.k), t.x, t.y);
+      if (d < bd) { bd = d; best = n; }
+    });
+    return best;
+  }
+  function nearScrew(x, y, r) {
+    var best = null, bd = r;
+    state.board.screws.forEach(function (q) {
+      var p = bpt(q.u, q.v), t = screwTop(q);
+      var d = distSeg(x, y, p.x, p.y, t.x, t.y);
+      if (d < bd) { bd = d; best = q; }
+    });
+    return best;
+  }
+  function distSeg(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+    var x = ax + t * dx - px, y = ay + t * dy - py;
+    return Math.sqrt(x * x + y * y);
+  }
+  function removeNail(n) {
+    var i = state.board.nails.indexOf(n);
+    if (i < 0) return;
+    state.board.nails.splice(i, 1);
+    state.board.holes.push({ u: n.u, v: n.v, r: NAILS[n.t].shank * 0.7 });
+    if (state.board.holes.length > 120) state.board.holes.shift();
+    if (activeNail === n) activeNail = null;
+    bgDirty = true; updateCounts(); saveSoon();
+  }
+  function removeScrew(q) {
+    var i = state.board.screws.indexOf(q);
+    if (i < 0) return;
+    state.board.screws.splice(i, 1);
+    state.board.holes.push({ u: q.u, v: q.v, r: 2.2 });
+    if (state.board.holes.length > 120) state.board.holes.shift();
+    if (activeScrew === q) activeScrew = null;
+    bgDirty = true; updateCounts(); saveSoon();
+  }
+  function updateCounts() {
+    lastBig = ""; // the one counter (top right) refreshes on the next frame
+  }
+
+  // ---------- Hammers: swinging ----------
+  // theta: how far the hammer is raised (radians, about the hand). 0 = face on the target.
+  var ham = { theta: 0.55, phase: "rest", t: 0, from: 0, dur: 0, s: 1, g: null, tgt: null, pos: null, mir: false, slosh: 0, side: 0, peak: 0 };
+  function hamScale() {
+    var sc = sceneName();
+    if (sc === "assemble") return LA.k * 0.72;
+    if (sc === "board") return LB.k * 0.66;
+    if (sc === "metal") return LM.k * 0.5;
+    if (sc === "joint") return LJ.k * 0.62;
+    return LY.k * 0.95;
+  }
+  function hamPivot() {
+    var a = ARTS[state.hammer], ts = hamScale(), flip = state.hammer === "ballpeen" && state.face === "ball";
+    var py = flip ? (-a.flipF - a.pivot[1]) : a.pivot[1];
+    return { x: a.pivot[0] * ts, y: py * ts };
+  }
+  function raiseAt(th) { var P0 = hamPivot(); return P0.x * Math.sin(th) + (-P0.y) * (1 - Math.cos(th)); }
+  function thetaFor(raise) {
+    var lo = 0, hi = state.hammer === "sledge" ? 1.45 : 1.3, i;
+    if (raise <= 0) return 0;
+    if (raise >= raiseAt(hi)) return hi;
+    for (i = 0; i < 24; i++) { var m = (lo + hi) / 2; if (raiseAt(m) < raise) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+
+  // ---------- Assemble scene (Project mode birdhouse) ----------
+  var PJ_LABELS = [
+    "Join 1: Left side to the back",
+    "Join 2: Right side to the back",
+    "Join 3: Floor on the bottom",
+    "Join 4: Front wall on the front",
+    "Join 5: Roof on the top"
+  ];
+  function pjSeamInfo(step) {
+    var k = LA.k, cx = LA.cx, cy = LA.cy + 14 * k;
+    var bw = 128 * k, bh = 136 * k;
+    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
+    if (step === 0) {
+      return {
+        x0: xL + 8 * k, y0: yT + 14 * k, x1: xL + 8 * k, y1: yB - 14 * k,
+        nx0: xL, ny0: yT + 28 * k, nx1: xL, ny1: yB - 28 * k,
+        dx: -42 * k, dy: 0
+      };
+    }
+    if (step === 1) {
+      return {
+        x0: xR - 8 * k, y0: yT + 14 * k, x1: xR - 8 * k, y1: yB - 14 * k,
+        nx0: xR, ny0: yT + 28 * k, nx1: xR, ny1: yB - 28 * k,
+        dx: 42 * k, dy: 0
+      };
+    }
+    if (step === 2) {
+      return {
+        x0: xL + 14 * k, y0: yB - 6 * k, x1: xR - 14 * k, y1: yB - 6 * k,
+        nx0: xL + 24 * k, ny0: yB, nx1: xR - 24 * k, ny1: yB,
+        dx: 0, dy: 38 * k
+      };
+    }
+    if (step === 3) {
+      return {
+        x0: xL + 10 * k, y0: yT + 20 * k, x1: xR - 10 * k, y1: yT + 20 * k,
+        nx0: xL + 20 * k, ny0: cy, nx1: xR - 20 * k, ny1: cy,
+        dx: 0, dy: -40 * k
+      };
+    }
+    var roofPeakY = yT - 54 * k;
+    return {
+      x0: cx - 44 * k, y0: (roofPeakY + yT) * 0.5, x1: cx + 44 * k, y1: (roofPeakY + yT) * 0.5,
+      nx0: cx - 36 * k, ny0: yT - 18 * k, nx1: cx + 36 * k, ny1: yT - 18 * k,
+      dx: 0, dy: -46 * k
+    };
+  }
+  function pjSpawnNails() {
+    if (!PJ) return;
+    var s = pjSeamInfo(PJ.step);
+    PJ.fasteners = [0, 0];
+    PJ.activeIdx = 0;
+    PJ.powerBurst = 0;
+    PJ.impT = 0;
+    PJ.nails = [
+      { x: s.nx0, y: s.ny0, hits: 0, maxHits: 3, prog: 0, a: 0, step: PJ.step },
+      { x: s.nx1, y: s.ny1, hits: 0, maxHits: 3, prog: 0, a: 0, step: PJ.step }
+    ];
+    ham.tgt = { kind: "pjnail", idx: 0 };
+  }
+  function pjNailTop(idx) {
+    if (!PJ || !PJ.nails[idx]) return { x: LA.cx, y: LA.cy };
+    var n = PJ.nails[idx], k = LA.k;
+    var prog = clamp(PJ.fasteners[idx] || 0, 0, 1);
+    var stickOut = Math.max(0, 1 - prog) * 28 * k;
+    return { x: n.x, y: n.y - stickOut - (state.mode === "screw" ? 0 : 3 * k) };
+  }
+  function pjNextNailIdx() {
+    if (!PJ) return -1;
+    for (var i = 0; i < PJ.nails.length; i++) if ((PJ.fasteners[i] || 0) < 0.999) return i;
+    return -1;
+  }
+  function pjAdvanceFastener(idx, delta, isScrew) {
+    if (!PJ || PJ.phase !== "nails") return;
+    if (!PJ.nails[idx] || PJ.fasteners[idx] >= 0.999) {
+      var ni = pjNextNailIdx();
+      if (ni >= 0) idx = ni; else return;
+    }
+    var n = PJ.nails[idx];
+    PJ.activeIdx = idx;
+    var before = PJ.fasteners[idx] || 0;
+    var after = Math.min(1, before + delta);
+    if (after > 0.96) after = 1;
+    PJ.fasteners[idx] = after;
+    n.prog = after;
+    n.hits = Math.min(3, Math.round(after * 3));
+    n.doneKind = isScrew ? "screw" : "nail";
+    n.head = DRIVERS[state.driver].head || state.bit || "phillips";
+    if (after >= 1 && before < 1) {
+      PJ.powerBurst = 0;
+      stars(n.x, n.y, 10);
+      pop("In!", n.x, n.y - 36 * LA.k, 22, "#7CFF8A");
+      sndChime();
+      var nextIdx = pjNextNailIdx();
+      if (nextIdx >= 0) {
+        PJ.activeIdx = nextIdx;
+        ham.tgt = { kind: "pjnail", idx: nextIdx };
+      } else {
+        PJ.phase = "pause";
+        PJ.pauseT = 0;
+        if (trig.on) setTrigger(false, null);
+        motorSet(0);
+        pop("Joined!", LA.cx, LA.cy - 90 * LA.k, 26, "#FFC93C");
+      }
+    }
+  }
+  function drawAssembleBg(c) {
+    var yB = LA.benchY;
+    pegboard(c, 0, 0, W, yB);
+    benchTop(c, yB, H);
+  }
+  function drawBirdhousePiece(c, kind, ox, oy) {
+    var k = LA.k, cx = LA.cx + (ox || 0), cy = LA.cy + 14 * k + (oy || 0);
+    var bw = 128 * k, bh = 136 * k;
+    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
+    var peakY = yT - 54 * k;
+    c.save();
+    c.lineJoin = "round"; c.lineCap = "round";
+    if (kind === "back") {
+      c.fillStyle = "rgba(40,20,5,0.28)";
+      c.fillRect(xL + 8 * k, yT + 8 * k, bw, bh);
+      c.fillStyle = "#D89F5B"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
+      c.fill(); c.stroke();
+    } else if (kind === "side1") {
+      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xL - 12 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
+    } else if (kind === "side2") {
+      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xR - 10 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
+    } else if (kind === "floor") {
+      c.fillStyle = "#C98D48"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.rect(xL - 12 * k, yB - 6 * k, bw + 24 * k, 18 * k); c.fill(); c.stroke();
+    } else if (kind === "front") {
+      c.fillStyle = "#F2CA92"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath();
+      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
+      c.fill(); c.stroke();
+      // Round entry door hole
+      c.fillStyle = "#4A2E14"; c.strokeStyle = OUT; c.lineWidth = 3;
+      c.beginPath(); c.arc(cx, cy - 12 * k, 24 * k, 0, Math.PI * 2); c.fill(); c.stroke();
+    } else if (kind === "roof") {
+      c.fillStyle = "#DE9B52"; c.strokeStyle = OUT; c.lineWidth = 3;
+      var rw = bw * 0.68;
+      c.beginPath();
+      c.moveTo(cx, peakY - 12 * k);
+      c.lineTo(cx - rw, yT + 14 * k);
+      c.lineTo(cx - rw + 10 * k, yT + 26 * k);
+      c.lineTo(cx, peakY + 4 * k);
+      c.lineTo(cx + rw - 10 * k, yT + 26 * k);
+      c.lineTo(cx + rw, yT + 14 * k);
+      c.closePath();
+      c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+  function drawGlueBottle(c, x, y, tilt) {
+    var k = LA.k * 0.9;
+    c.save();
+    c.translate(x, y);
+    c.rotate(tilt || 0);
+    // Nozzle pointing down at (0,0)
+    c.fillStyle = "#F77F00"; c.strokeStyle = OUT; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(-4 * k, -16 * k); c.lineTo(4 * k, -16 * k); c.lineTo(2 * k, 0); c.lineTo(-2 * k, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#FFFFFF";
+    c.beginPath(); c.rect(-18 * k, -72 * k, 36 * k, 56 * k); c.fill(); c.stroke();
+    c.fillStyle = "#2D5BD7";
+    c.fillRect(-15 * k, -54 * k, 30 * k, 22 * k);
+    c.restore();
+  }
+  function updateAssemble(dt) {
+    if (!PJ || PJ.finished) return;
+    if (PJ.phase === "glue") {
+      if (PJ.glueHeld || PJ.glueAuto) {
+        PJ.glueProg = Math.min(1, PJ.glueProg + dt * 1.35);
+        if (Math.random() < 0.35) {
+          var s = pjSeamInfo(PJ.step);
+          var gx = lerp(s.x0, s.x1, PJ.glueProg), gy = lerp(s.y0, s.y1, PJ.glueProg);
+          ring(gx, gy, 10 * LA.k, "255,250,230");
+        }
+        if (PJ.glueProg >= 1) {
+          PJ.glueHeld = false; PJ.glueAuto = false;
+          PJ.phase = "slide"; PJ.slideProg = 0;
+          sndPop();
+        }
+      }
+    } else if (PJ.phase === "slide") {
+      PJ.slideProg = Math.min(1, PJ.slideProg + dt * 2.5);
+      if (PJ.slideProg >= 1) {
+        PJ.phase = "nails";
+        pjSpawnNails();
+        sndPlace();
+      }
+    } else if (PJ.phase === "nails" && state.mode === "screw") {
+      var kind = DRIVERS[state.driver].kind;
+      var idx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
+      if (kind === "power") {
+        var on = (trig.on || PJ.powerBurst > 0) && !locked() && idx >= 0;
+        if (PJ.powerBurst > 0) PJ.powerBurst = Math.max(0, PJ.powerBurst - dt);
+        pw.lvl += ((on ? 1 : 0) - pw.lvl) * Math.min(1, dt * 8);
+        motorSet(pw.lvl, state.driver);
+        if (on && idx >= 0) {
+          var n = PJ.nails[idx];
+          var delta = dt * 1.65;
+          pw.spin += 1400 * dt;
+          n.a = (n.a || 0) + 1400 * dt;
+          PJ.impT = (PJ.impT || 0) + dt;
+          if (PJ.impT > 0.075) {
+            PJ.impT = 0;
+            if (state.driver === "impact") sndImpact(); else sndTick();
+            shakeAmp = Math.max(shakeAmp, reduce ? 0.4 : 1.8);
+            fibers(n.x, n.y, 2, 0.5);
+            dust(n.x, n.y - 2, 2, 0.5);
+          }
+          pjAdvanceFastener(idx, delta, true);
+        }
+      } else {
+        motorSet(0);
+        if (drv.g && !drv.g.circling && !locked() && idx >= 0) {
+          drv.g.holdT = (drv.g.holdT || 0) + dt;
+          if (drv.g.holdT > 0.25) {
+            var n2 = PJ.nails[idx];
+            var d2 = dt * 1.35;
+            drv.ang += d2 * 720;
+            n2.a = (n2.a || 0) + d2 * 720;
+            if (Math.random() < 0.35) { sndTick(); fibers(n2.x, n2.y, 1, 0.4); }
+            pjAdvanceFastener(idx, d2, true);
+          }
+        }
+      }
+    } else if (PJ.phase === "pause") {
+      motorSet(0);
+      PJ.pauseT += dt;
+      if (PJ.pauseT >= 0.55) {
+        PJ.nails.forEach(function (n) {
+          PJ.doneNails.push({ x: n.x, y: n.y, kind: n.doneKind || "nail", head: n.head || "phillips", a: n.a || 0 });
+        });
+        PJ.nails = [];
+        if (PJ.step + 1 < PJ.joins.length) {
+          PJ.step++;
+          PJ.joinIdx = PJ.step;
+          PJ.phase = "glue";
+          PJ.glueProg = 0; PJ.slideProg = 0; PJ.pauseT = 0;
+        } else {
+          PJ.phase = "done";
+          PJ.finished = true;
+          stars(LA.cx, LA.cy, 24);
+          sndChime();
+          var href = ToyboxProjects.finish(PSTEP);
+          var pjb = $("pjBack"), pjdt = $("pjDoneText"), pjd = $("pjDone");
+          if (pjb) pjb.href = href;
+          if (pjdt) pjdt.textContent = PSTEP.done;
+          if (pjd) pjd.hidden = false;
+        }
+      }
+    }
+  }
+  function drawAssembleDyn(c, dt) {
+    if (!PJ) return;
+    updateAssemble(dt);
+    var k = LA.k, step = PJ.step, s = pjSeamInfo(step);
+    // Always draw back piece first
+    drawBirdhousePiece(c, "back", 0, 0);
+    var order = ["side1", "side2", "floor", "front", "roof"];
+    for (var i = 0; i < step; i++) {
+      drawBirdhousePiece(c, order[i], 0, 0);
+    }
+    var curKind = order[step];
+    if (curKind) {
+      if (PJ.phase === "glue") {
+        // Show the new piece waiting slightly offset
+        c.save(); c.globalAlpha = 0.85;
+        drawBirdhousePiece(c, curKind, s.dx, s.dy);
+        c.restore();
+        // Dashed seam guide
+        c.save();
+        c.strokeStyle = "rgba(255,201,60,0.85)"; c.lineWidth = 6 * k; c.lineCap = "round"; c.setLineDash([8 * k, 8 * k]);
+        c.beginPath(); c.moveTo(s.x0, s.y0); c.lineTo(s.x1, s.y1); c.stroke();
+        c.restore();
+        if (PJ.glueProg > 0) {
+          c.save();
+          c.strokeStyle = "#FFFDF6"; c.lineWidth = 9 * k; c.lineCap = "round";
+          c.beginPath(); c.moveTo(s.x0, s.y0);
+          c.lineTo(lerp(s.x0, s.x1, PJ.glueProg), lerp(s.y0, s.y1, PJ.glueProg));
+          c.stroke();
+          c.restore();
+        }
+        var bx = lerp(s.x0, s.x1, PJ.glueProg), by = lerp(s.y0, s.y1, PJ.glueProg);
+        drawGlueBottle(c, bx, by - 4 * k, 0.25);
+      } else if (PJ.phase === "slide") {
+        var f = 1 - Math.pow(1 - PJ.slideProg, 3);
+        drawBirdhousePiece(c, curKind, s.dx * (1 - f), s.dy * (1 - f));
+      } else {
+        drawBirdhousePiece(c, curKind, 0, 0);
+      }
+    }
+    // Draw previously driven fasteners
+    PJ.doneNails.forEach(function (dn) {
+      if (dn.kind === "screw") {
+        var dh = dn.head || "phillips";
+        drawScrewHead(c, dn.x, dn.y, 6 * k, HEADS[dh] ? HEADS[dh].color : "#CDD3DB", { h: dh, a: dn.a || 0 });
+      } else {
+        c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+        ellipse(c, dn.x, dn.y, 5 * k, 2.6 * k); c.fill(); c.stroke();
+      }
+    });
+    // Draw active fasteners for current join
+    if (PJ.phase === "nails" || PJ.phase === "pause") {
+      var actIdx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
+      PJ.nails.forEach(function (n, idx) {
+        var prog = clamp(PJ.fasteners[idx] || 0, 0, 1);
+        var stick = Math.max(0, 1 - prog) * 28 * k;
+        if (state.mode === "screw") {
+          var sh = DRIVERS[state.driver].head || state.bit || "phillips";
+          var scol = HEADS[sh] ? HEADS[sh].color : "#CDD3DB";
+          var sw = 4.2 * k, hr = 6.5 * k, cone = 4.2 * k;
+          var headY = n.y - stick;
+          if (stick > 1) {
+            var coneB = Math.min(n.y, headY + cone);
+            if (coneB < n.y) {
+              c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
+              c.beginPath(); c.rect(n.x - sw / 2, coneB, sw, n.y - coneB); c.fill(); c.stroke();
+              c.strokeStyle = OUT; c.lineWidth = Math.max(1.8, 1.6 * k);
+              for (var ty = n.y - 2 * k; ty > coneB + 1.5 * k; ty -= 3.8 * k) {
+                c.beginPath(); c.moveTo(n.x - sw * 0.72, ty); c.lineTo(n.x + sw * 0.72, ty - 1.8 * k); c.stroke();
+              }
+            }
+            c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
+            c.beginPath();
+            c.moveTo(n.x - hr, headY); c.lineTo(n.x + hr, headY);
+            c.lineTo(n.x + sw / 2, coneB); c.lineTo(n.x - sw / 2, coneB);
+            c.closePath(); c.fill(); c.stroke();
+          }
+          drawScrewHead(c, n.x, headY, hr, scol, { h: sh, a: n.a || 0 });
+          if (PJ.phase === "nails" && idx === actIdx) {
+            c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3;
+            ellipse(c, n.x, headY, 12 * k, 6 * k); c.stroke();
+          }
+        } else {
+          c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+          if (stick > 1) {
+            c.beginPath(); c.rect(n.x - 2.2 * k, n.y - stick, 4.4 * k, stick); c.fill(); c.stroke();
+          }
+          ellipse(c, n.x, n.y - stick, 5.5 * k, 2.8 * k); c.fill(); c.stroke();
+          if (PJ.phase === "nails" && idx === actIdx) {
+            c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3;
+            ellipse(c, n.x, n.y - stick, 12 * k, 6 * k); c.stroke();
+          }
+        }
+      });
+      if (PJ.phase === "nails") {
+        if (state.mode === "screw") drawDriverTool(c, dt);
+        else drawHammerTool(c);
+      }
+    }
+  }
+  function hitPjNail(idx, s) {
+    if (!PJ || PJ.phase !== "nails") return;
+    if (!PJ.nails[idx] || PJ.fasteners[idx] >= 0.999) {
+      var ni = pjNextNailIdx();
+      if (ni >= 0) idx = ni; else return;
+    }
+    var n = PJ.nails[idx];
+    sndHit(HAMMERS[state.hammer].snd, s);
+    fibers(n.x, n.y, 5, 0.7);
+    dust(n.x, n.y - 2, 3, 0.6);
+    pjAdvanceFastener(idx, 1 / 3, false);
+  }
+
+  function defaultTarget() {
+    var sc = sceneName();
+    if (sc === "assemble") {
+      var ni = pjNextNailIdx();
+      return ni >= 0 ? { kind: "pjnail", idx: ni } : { kind: "pjnail", idx: 0 };
+    }
+    if (sc === "board") return activeNail ? { kind: "nail", ref: activeNail } : null;
+    if (sc === "metal") return ham.tgt && (ham.tgt.kind === "plate" || ham.tgt.kind === "rivet") ? ham.tgt : { kind: "plate", u: 0.5, v: 0.4 };
+    if (sc === "joint") return ham.tgt && (ham.tgt.kind === "post" || ham.tgt.kind === "chisel") ? ham.tgt : { kind: "post" };
+    return ham.tgt && (ham.tgt.kind === "wedge" || ham.tgt.kind === "stake") ? ham.tgt : { kind: "wedge" };
+  }
+  function targetPoint(tg) {
+    if (!tg) {
+      var sc = sceneName();
+      if (sc === "board") return { x: W * 0.62, y: Math.max(LB.yBack - 30 * LB.k, 40) };
+      return { x: W / 2, y: H / 2 };
+    }
+    switch (tg.kind) {
+      case "pjnail": return pjNailTop(tg.idx || 0);
+      case "nail": return nailTop(tg.ref);
+      case "plate": var p = mpt(tg.u, tg.v); return { x: p.x, y: p.y };
+      case "rivet": return rivetTop(tg.i);
+      case "chisel": return chiselTop();
+      case "post": return postTop();
+      case "wedge": return wedgeTop();
+      case "stake": return stakeTop();
+    }
+    return { x: W / 2, y: H / 2 };
+  }
+  function pickHammerTarget(x, y) {
+    var sc = sceneName(), i, p, best = null, bd;
+    if (sc === "assemble") {
+      if (!PJ || PJ.phase !== "nails") return null;
+      bd = 1e9;
+      for (i = 0; i < PJ.nails.length; i++) {
+        if (PJ.fasteners[i] >= 0.999) continue;
+        p = pjNailTop(i);
+        var d0 = Math.hypot(x - p.x, y - p.y);
+        if (d0 < bd) { bd = d0; best = { kind: "pjnail", idx: i }; }
+      }
+      if (best) PJ.activeIdx = best.idx;
+      return best;
+    }
+    if (sc === "board") {
+      var n = nearNail(x, y, Math.max(34, 18 * LB.k));
+      return n ? { kind: "nail", ref: n } : null;
+    }
+    if (sc === "metal") {
+      bd = Math.max(30, 12 * LM.k);
+      for (i = 0; i < 5; i++) { p = rivetTop(i); var d = Math.hypot(x - p.x, y - (p.y + 8)); if (d < bd) { bd = d; best = { kind: "rivet", i: i }; } }
+      if (best) return best;
+      var u = (x - LM.x0) / LM.w, v = (y - LM.yBack) / LM.dTop;
+      if (u > -0.05 && u < 1.05 && v > -0.6 && v < 1.4) return { kind: "plate", u: clamp(u, 0.05, 0.95), v: clamp(v, 0.1, 0.92) };
+      return null;
+    }
+    // Joint and yard: a tap right on a thing picks it; a tap anywhere else does the current job.
+    var near = Math.max(56, Math.min(W, H) * 0.11);
+    if (sc === "joint") {
+      var dc = Math.abs(x - chiselX()), dp = Math.abs(x - postX());
+      if (Math.min(dc, dp) > near) return null;
+      return dc < dp ? { kind: "chisel" } : { kind: "post" };
+    }
+    var dw = Math.abs(x - LY.sx), ds = Math.abs(x - LY.kx);
+    if (Math.min(dw, ds) > near) return null;
+    return dw < ds ? { kind: "wedge" } : { kind: "stake" };
+  }
+  // Taps away from any target still do the job: the next rivet that needs hitting.
+  var newRivetsAt = 0, autoPullAt = 0, autoHitAt = 0, autoScrewAt = 0;
+  function jobTarget() {
+    var sc = sceneName();
+    if (sc === "metal") {
+      for (var i = 0; i < 5; i++) if (state.metal.rivets[i].s < 4) return { kind: "rivet", i: i };
+      return { kind: "plate", u: rnd(0.15, 0.85), v: rnd(0.2, 0.6) };
+    }
+    return defaultTarget();
+  }
+  function queueSwing(s) {
+    if (!ham.tgt) return;
+    if (ham.phase === "down" || ham.phase === "tapin" || ham.phase === "bounce") { ham.queue = Math.min(6, (ham.queue || 0) + 1); return; }
+    startSwing(s || 1, 0);
+  }
+  function startSwing(s, side) {
+    var h = HAMMERS[state.hammer];
+    ham.phase = "down"; ham.t = 0; ham.from = Math.max(ham.theta, 0.12);
+    ham.dur = (PJ ? Math.min(85, h.down) : h.down) * Math.sqrt(clamp(ham.from / h.rest, 0.3, 2)) / 1000;
+    ham.s = s; ham.side = side || 0;
+  }
+  function strike(s, side) {
+    var h = HAMMERS[state.hammer], tg = ham.tgt, T = targetPoint(tg);
+    ham.theta = 0; ham.phase = "bounce"; ham.t = 0; ham.from = 0;
+    ham.peak = Math.min(h.bounce * (0.6 + 0.4 * Math.min(s, 1.8)), restTheta() * 1.25);
+    if (state.hammer === "deadblow") ham.slosh = 1;
+    shakeAmp = Math.max(shakeAmp, (reduce ? 0.3 : 1) * h.shake * s);
+    ring(T.x, T.y, (26 + 16 * s) * hamScale() / 1.3 + 10, state.hammer === "sledge" ? "255,240,200" : "255,255,255");
+    if (s > 1.45) pop("Big hit!", T.x, T.y - 40, 22, "#FFC93C");
+    if (!tg) { sndHit("wood", s); return; }
+    switch (tg.kind) {
+      case "pjnail": hitPjNail(tg.idx || 0, s); break;
+      case "nail": hitNail(tg.ref, s, side); break;
+      case "plate": hitPlate(tg, s); break;
+      case "rivet": hitRivet(tg.i, s); break;
+      case "chisel": hitChisel(s); break;
+      case "post": hitPost(s); break;
+      case "wedge": hitWedge(s); break;
+      case "stake": hitStake(s); break;
+    }
+    saveSoon();
+  }
+  function hitNail(n, s, side) {
+    var N = NAILS[n.t], h = HAMMERS[state.hammer], p = bpt(n.u, n.v), T = nailTop(n);
+    n.hits++;
+    sndHit("nail", s);
+    if (n.bent) {
+      n.bent = clamp(n.bent * 1.25, -1.4, 1.4);
+      fibers(p.x, p.y, 4, 0.6);
+      autoPullAt = nowMs() + 800;
+      return;
+    }
+    var left = N.len - n.d;
+    if (left <= 0.05) {
+      pop("All in!", T.x, T.y - 50, 22, "#7CFF8A");
+      fibers(p.x, p.y, 4, 0.5);
+      return;
+    }
+    if (side && s > 1.3 && N.len >= 50 && left > 14 && Math.random() < 0.5) {
+      n.bent = side > 0 ? 1 : -1;
+      pop("Bent!", T.x, T.y - 50, 26, "#FFC93C");
+      fibers(p.x, p.y, 6, 0.8);
+      autoPullAt = nowMs() + 1600;
+      return;
+    }
+    var drive = h.drive * s * (N.kind === "finish" ? 1.15 : 1);
+    var old = n.d;
+    n.d = Math.min(N.len, n.d + drive);
+    n.vd = (n.d - old) * 26;
+    fibers(p.x, p.y, Math.round(5 + 5 * s), 0.6 + 0.4 * s);
+    dust(p.x, p.y - 4, Math.round(3 + 3 * s), 0.8);
+    addSpecks(n.u, n.v, Math.round(2 + 3 * s));
+    if (n.d >= N.len - 0.05) {
+      n.d = N.len;
+      state.board.marks.push({ u: n.u, v: n.v, k: state.hammer === "framing" ? "waffle" : "round" });
+      if (state.board.marks.length > 120) state.board.marks.shift();
+      bgDirty = true;
+      stars(p.x, p.y - 6, 12);
+      pop("All the way in!", p.x, p.y - 60, 24, "#7CFF8A");
+      sndChime();
+    }
+  }
+  function hitPlate(tg, s) {
+    var M = state.metal, p = mpt(tg.u, tg.v), f = state.face;
+    var d = { u: clamp(tg.u + rnd(-0.01, 0.01), 0.03, 0.97), v: clamp(tg.v + rnd(-0.02, 0.02), 0.05, 0.95), f: f };
+    M.dents.push(d);
+    if (M.dents.length > 220) { M.dents.shift(); bgDirty = true; }
+    else if (!bgDirty) drawDentOnBg(d);
+    sndHit("metal", s);
+    sparks(p.x, p.y, Math.round(6 + 6 * s));
+  }
+  function drawDentOnBg(d) { bgx.setTransform(DPR, 0, 0, DPR, 0, 0); drawDent(bgx, d); }
+  function hitRivet(i, s) {
+    var R = state.metal.rivets[i], p = rivetTop(i);
+    sndHit("metal", s);
+    sparks(p.x, p.y, Math.round(5 + 5 * s));
+    if (R.s < 4) {
+      R.s = Math.min(4, R.s + (s > 1.5 ? 2 : 1)); R.f = state.face;
+      if (R.s >= 4) {
+        stars(p.x, p.y, 12); pop("Rivet set!", p.x, p.y - 50, 24, "#7CFF8A"); sndChime();
+        if (state.metal.rivets.every(function (r) { return r.s >= 4; })) { newRivetsAt = nowMs() + 6000; pop("All set!", W / 2, LM.yBack - 30, 30, "#7CFF8A"); stars(W / 2, LM.yBack, 16); }
+      }
+      else pop(state.face === "ball" ? "Rounder" : "Flatter", p.x, p.y - 44, 20, "#FFFFFF");
+    } else {
+      R.f = state.face;
+      pop("Set!", p.x, p.y - 44, 20, "#7CFF8A");
+    }
+  }
+  function hitChisel(s) {
+    var J = state.joint, k = LJ.k, T = chiselTop(), cx = chiselX();
+    sndHit(state.hammer === "mallet" ? "rubber" : "dead", s);
+    sndHit("wood", 0.7);
+    J.cd = Math.min(18, J.cd + (state.hammer === "mallet" ? 5 : 6.5) * s);
+    fibers(cx, LJ.mid, 5, 0.8);
+    if (J.cd >= 18) {
+      J.cd = 0; J.chops++;
+      J.notch = Math.min(170, Math.max(J.notch, J.cx + 19));
+      J.cx += 9;
+      if (J.cx > 150) { J.cx = 0; }
+      chips(cx, LJ.mid, 5, 1);
+      pop("Chop!", cx, LJ.mid - 40 * k, 24, "#FFC93C");
+      bgDirty = true;
+    }
+  }
+  function hitPost(s) {
+    var J = state.joint, k = LJ.k, T = postTop(), dead = state.hammer === "deadblow";
+    sndHit(dead ? "dead" : "rubber", s);
+    if (J.gap <= 0 || newJointAt) { pop("Snug!", T.x, T.y - 30, 22, "#7CFF8A"); if (newJointAt) newJointAt = Math.min(newJointAt, nowMs() + 400); return; }
+    J.hits++;
+    if (J.hits === 1) pop("No dents!", T.x, T.y - 46, 20, "#7CFF8A");
+    J.gap = Math.max(0, J.gap - (dead ? 10 : 6) * s);
+    dust(postX(), LJ.mid, 4, 0.6);
+    if (J.gap <= 0) {
+      J.joints++;
+      stars(postX(), LJ.mid - 40 * k, 14);
+      pop("Snug fit!", postX(), LJ.mid - 170 * k, 26, "#7CFF8A");
+      sndChime();
+      newJointAt = nowMs() + 5000;
+    }
+  }
+  function hitWedge(s) {
+    var Y = state.yard, k = LY.k, T = wedgeTop();
+    sndHit("sledge", s);
+    if (logSplit || newLogAt) { if (newLogAt && !logSplit) newLogAt = Math.min(newLogAt, nowMs() + 300); return; }
+    Y.hits++;
+    sparks(T.x, T.y, 6);
+    chips(T.x, LY.logTop, 3, 1);
+    Y.wedge = Math.min(115, Y.wedge + 24 * s);
+    if (Y.wedge >= 115) {
+      Y.logs++; Y.wedge = 30; Y.hits = 0;
+      Y.pile = Math.min(8, Y.pile + 1);
+      logSplit = { t: 0 };
+      sndCrack();
+      chips(LY.sx, LY.logTop + 60 * k, 10, 1.4);
+      dust(LY.sx, LY.stumpTop, 10, 1.5, "200,160,110");
+      pop("Split!", LY.sx, LY.logTop - 60 * k, 34, "#FFC93C");
+      newLogAt = nowMs() + 5000;
+      sndChime();
+    }
+  }
+  function hitStake(s) {
+    var Y = state.yard, k = LY.k, T = stakeTop();
+    sndHit("sledge", s);
+    if (newStakeAt) { newStakeAt = Math.min(newStakeAt, nowMs() + 400); return; }
+    Y.shits++;
+    Y.stake = Math.max(90, Y.stake - 55 * s);
+    clods(LY.kx, LY.ground, 8);
+    dust(LY.kx, LY.ground, 6, 1.2, "160,120,80");
+    if (Y.stake <= 90) {
+      Y.stakes++;
+      stars(LY.kx, LY.ground - 100 * k, 12);
+      pop("Stake in!", LY.kx, LY.ground - 200 * k, 28, "#7CFF8A");
+      sndChime();
+      newStakeAt = nowMs() + 5000;
+    }
+  }
+
+  // How high the hammer may rest above its target and still show its whole head.
+  function restTheta() {
+    var h = HAMMERS[state.hammer], T = targetPoint(ham.tgt), a = ARTS[state.hammer];
+    var room = T.y - Math.abs(a.top) * hamScale() - 10;
+    return Math.min(h.rest, thetaFor(Math.max(18, room)));
+  }
+  function updateHammer(dt) {
+    var h = { rest: restTheta(), bounce: HAMMERS[state.hammer].bounce }, g = ham.g;
+    if (state.hammer === "deadblow") ham.slosh *= Math.pow(0.02, dt);
+    if (ham.phase === "down") {
+      ham.t += dt;
+      var f = clamp(ham.t / ham.dur, 0, 1);
+      ham.theta = ham.from * (1 - f * f);
+      if (f >= 1) strike(ham.s, ham.side);
+    } else if (ham.phase === "bounce") {
+      ham.t += dt;
+      var over = false;
+      if (state.hammer === "deadblow") { ham.theta = 0.008 * Math.sin(ham.t * 60) * Math.max(0, 1 - ham.t * 6); if (ham.t > (ham.queue ? 0.1 : 0.28)) over = true; }
+      else {
+        var b = clamp(ham.t / 0.12, 0, 1);
+        ham.theta = ham.peak * Math.sin(b * Math.PI / 2);
+        if (b >= 1) over = true;
+      }
+      if (over) {
+        if (ham.queue > 0) { ham.queue--; ham.phase = "rest"; startSwing(1, 0); }
+        else { ham.phase = "settle"; ham.t = 0; ham.from = ham.theta; }
+      }
+    } else if (ham.phase === "tapin") {
+      // The hammer starts a new nail with two little taps.
+      ham.t += dt;
+      if (!onBoard(ham.tapN, state.board.nails)) { ham.phase = "settle"; ham.t = 0; ham.from = ham.theta; return; }
+      if (ham.t < 0.16) ham.theta = lerp(ham.theta, 0.24, Math.min(1, dt * 16));
+      else {
+        var u = (ham.t - 0.16) / 0.2, k = Math.floor(u), fu = u - k;
+        if (k >= 2) {
+          ham.theta = 0.24; ham.phase = "settle"; ham.t = 0; ham.from = ham.theta;
+          if (ham.queue > 0) { ham.queue--; startSwing(1, 0); }
+        } else {
+          ham.theta = fu < 0.5 ? 0.24 * (1 - (fu / 0.5) * (fu / 0.5)) : 0.24 * ((fu - 0.5) / 0.5);
+          if (fu >= 0.5 && ham.tapK <= k) { ham.tapK = k + 1; tapIn(ham.tapN); }
+        }
+      }
+    } else if (ham.phase === "settle" || ham.phase === "rest") {
+      // A finger on the bench lifts the hammer right away, ready to hit.
+      var want = h.rest;
+      if (g && !g.struck && !g.following && !g.dead && !g.placed) want = Math.min(state.hammer === "sledge" ? 1.3 : 1.15, h.rest + 0.3);
+      if (ham.phase === "settle") {
+        ham.t += dt;
+        var e = clamp(ham.t / 0.3, 0, 1);
+        ham.theta = lerp(ham.from, want, 1 - Math.pow(1 - e, 3));
+        if (e >= 1) ham.phase = "rest";
+      } else ham.theta = lerp(ham.theta, want, Math.min(1, dt * (want > h.rest ? 16 : 8)));
+    }
+  }
+
+  // ---------- Hammer gestures ----------
+  // Tap anywhere: the hammer lifts while the finger is down and hits when it lets go.
+  // Swipe down anywhere: a big hit. With no nail yet, the first tap puts one in.
+  function hamDown(g) {
+    var sc = sceneName(), tg = null;
+    if (sc === "assemble") {
+      if (!PJ || PJ.finished) { g.dead = true; return; }
+      if (PJ.phase === "glue") {
+        PJ.glueHeld = true;
+        PJ.glueAuto = true;
+        g.dead = true;
+        return;
+      }
+      if (PJ.phase !== "nails") { g.dead = true; return; }
+      if (ham.g) { g.extra = true; return; }
+      tg = pickHammerTarget(g.x, g.y) || defaultTarget();
+      ham.tgt = tg;
+      ham.g = g;
+      g.anchorY = g.y; g.minY = g.y; g.armed = true; g.struck = false; g.following = false;
+      return;
+    }
+    if (ham.g) { g.extra = true; return; }
+    if (sc === "board") {
+      var cur = onBoard(activeNail, state.board.nails) && !nailDone(activeNail) ? activeNail : null;
+      var n = nearNail(g.x, g.y, Math.max(34, 18 * LB.k));
+      if (n && !nailDone(n)) cur = n;
+      if (!cur) {
+        var sq = !n && nearScrew(g.x, g.y, 30);
+        if (sq) { flashHint("That is a screw! It needs a screwdriver.", 3); g.dead = true; return; }
+        cur = placeNail(boardSpot(g.x, g.y));
+        g.placed = true;
+      }
+      activeNail = cur;
+      tg = { kind: "nail", ref: cur };
+    } else {
+      tg = pickHammerTarget(g.x, g.y) || jobTarget();
+    }
+    ham.tgt = tg;
+    ham.g = g;
+    g.anchorY = g.y; g.minY = g.y; g.armed = true; g.struck = false; g.following = false;
+  }
+  function hamMove(g) {
+    if (g.extra || g.dead || g !== ham.g || !ham.tgt) return;
+    if (g.moved < 8) return;
+    var sp = speed(g);
+    if (g.armed) {
+      if (g.y < g.minY) g.minY = g.y;
+      var swipe = g.y - g.minY > 30 && sp.vy > 300;
+      var raise = g.following ? g.h0 + (g.anchorY - g.y) : 1;
+      if ((swipe || (raise <= 0 && sp.vy > 0)) && ham.phase !== "tapin") {
+        var vN = sp.vy / H, s = swipe ? clamp(1.5 + vN * 0.15, 1.5, 2.2) : clamp(0.9 + vN * 0.2, 0.9, 1.4);
+        if (state.hammer === "sledge") s = swipe ? clamp(1.4 + vN * 0.1, 1.4, 1.8) : 1;
+        var side = (Math.abs(sp.vx) > 1.4 * Math.abs(sp.vy)) ? (sp.vx > 0 ? 1 : -1) : 0;
+        g.struck = true; g.armed = false; g.lowY = g.y; ham.queue = 0;
+        strike(s, side);
+        return;
+      }
+      if (ham.phase === "tapin" || ham.phase === "down") return;
+      if (!g.following) { g.following = true; g.anchorY = g.y; g.h0 = raiseAt(ham.theta); return; }
+      ham.phase = "follow";
+      ham.theta = thetaFor(Math.max(0, raise));
+    } else {
+      // After a hit, lift the finger a little to get ready for the next swing.
+      if (g.y > g.lowY) g.lowY = g.y;
+      if (g.y < g.lowY - 26) { g.armed = true; g.minY = g.y; g.following = false; }
+    }
+  }
+  function hamUp(g) {
+    if (PJ && PJ.glueHeld) PJ.glueHeld = false;
+    if (g.dead) return;
+    if (g.extra) { if (g.moved < 14) queueSwing(1); return; }
+    if (g !== ham.g) return;
+    ham.g = null;
+    if (g.struck) { if (ham.phase === "follow") { ham.phase = "settle"; ham.t = 0; ham.from = ham.theta; } return; }
+    if (g.placed && g.moved < 14) return;   // that tap put the nail in
+    var raise = raiseAt(ham.theta);
+    var s = ham.phase === "follow" && raise > 30 ? clamp(0.9 + raise / H, 0.9, 1.6) : 1;
+    if (ham.phase === "follow") ham.phase = "rest";
+    queueSwing(s);
+  }
+  function speed(g) {
+    var s = g.samples, a = s[0], b = s[s.length - 1];
+    for (var i = s.length - 1; i >= 0; i--) { if (b.t - s[i].t > 70) { a = s[i]; break; } a = s[i]; }
+    var dt = Math.max(0.008, (b.t - a.t) / 1000);
+    return { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt };
+  }
+
+  // ---------- Pulling nails with the claw ----------
+  // In the pull pose the hammer head lies on the board; the claw grips under the nail head.
+  var pull = null;
+  var PB = [-88, 17], PC = [-118, -44];   // fulcrum and claw notch (strike art turned a quarter turn)
+  function clawH(a) { var fx = PC[0] - PB[0], fy = PC[1] - PB[1]; return -(fx * Math.sin(a) + fy * Math.cos(a)); }
+  // One obvious action: press a nail (or anywhere near it) and drag back, or just hold.
+  function pullDown(g) {
+    if (pull && pull.g) { g.extra = true; return; }
+    pull = null;
+    var n = nearNail(g.x, g.y, Math.max(60, 26 * LB.k));
+    if (!n && onBoard(activeNail, state.board.nails)) n = activeNail;
+    if (!n) n = nearestNail(g.x, g.y);
+    if (!n) { flashHint("No nails to pull. Back to hitting!", 3); setAct("hit"); g.dead = true; return; }
+    activeNail = n;
+    gripNail(g, n);
+    sndTick();
+  }
+  function gripNail(g, n) {
+    var N = NAILS[n.t], k = LB.k, ts = hamScale() / k, e = (N.len - n.d);
+    var block = e > 40 ? 40 : 0;
+    // clawH rises from -1.3 rad up to its peak near 0.46 rad, so search only that part.
+    var amax = Math.atan((PC[0] - PB[0]) / (PC[1] - PB[1]));
+    var lo = -1.3, hi = amax, i;
+    var want = (e - block) / ts;
+    for (i = 0; i < 26; i++) { var m = (lo + hi) / 2; if (clawH(m) < want) lo = m; else hi = m; }
+    var a0 = (lo + hi) / 2;
+    var p = bpt(n.u, n.v);
+    var s = hamScale();
+    var cxOff = ((PC[0] - PB[0]) * Math.cos(a0) - (PC[1] - PB[1]) * Math.sin(a0)) * s;
+    var F = { x: p.x - cxOff, y: p.y - block * k };
+    pull = { g: g, n: n, a0: a0, a: a0, amax: Math.max(a0 + 0.05, amax), block: block, F: F, sx: g.x, sy: g.y, held: 0, top: 0 };
+  }
+  function pullMove(g) { /* progress is worked out every frame in updatePull */ }
+  function updatePull(dt) {
+    if (!pull || !pull.g || pull.done || pull.release) return;
+    var g = pull.g, n = pull.n, N = NAILS[n.t];
+    if (!onBoard(n, state.board.nails)) { pull.release = 0.001; return; }
+    pull.held += dt;
+    var reach = clamp(Math.min(W, H) * 0.2, 70, 140);   // never a long pull on the big iPad bench
+    var prog = Math.max(Math.hypot(g.x - pull.sx, g.y - pull.sy) / reach, (pull.held - 0.25) / 0.8);
+    prog = clamp(prog, 0, 1);
+    if (prog >= 1) {
+      // The claw has gone as far as it goes: grip again lower down and keep pulling.
+      pull.top += dt;
+      if (pull.top > 0.15) { gripNail(g, n); pull.held = 0.2; sndTick(); }
+      return;
+    }
+    var a = pull.a0 + prog * (pull.amax - pull.a0);
+    if (a <= pull.a) return;
+    pull.a = a;
+    var ts = hamScale() / LB.k;
+    var nd = N.len - (pull.block + clawH(a) * ts);
+    if (nd < n.d) {
+      if (n.d - nd > 1.2 || Math.random() < 0.3) { sndSqueak(prog); }
+      var p = bpt(n.u, n.v);
+      if (Math.random() < 0.4) fibers(p.x, p.y, 2, 0.4);
+      n.d = Math.max(0, nd); n.dd = n.d; n.vd = 0;
+      if (n.d <= 9) {
+        flyer("nail", n.t, p.x, p.y - (N.len - n.d) * LB.k / 2);
+        sndPop();
+        state.pulled++;
+        pop("Pulled out!", p.x, p.y - 70, 26, "#FFC93C");
+        stars(p.x, p.y, 8);
+        removeNail(n);
+        pull.done = true; pull.release = 0.001;
+        autoHitAt = nowMs() + 1000;
+        saveSoon();
+      }
+    }
+  }
+  function pullUp(g) {
+    if (!pull || pull.g !== g) return;
+    if (!pull.done && onBoard(pull.n, state.board.nails)) {
+      var left = Math.round(pull.n.d);
+      if (left > 9) flashHint("Pull again!", 3);
+    }
+    pull.g = null;
+    pull.release = 0.001;
+    saveSoon();
+  }
+  function setAct(a) {
+    state.act = a; pull = null; ham.phase = "rest"; ham.queue = 0;
+    ham.tgt = defaultTarget();
+    render();
+  }
+
+  // ---------- Screwdrivers ----------
+  var drv = { ang: 0, cam: 0, camT: 0, pos: null, g: null, snug: false, tickAcc: 0, turnAcc: 0, mir: false, pend: 0, hold: 0 };
+  function driverMatches(q) {
+    var d = DRIVERS[state.driver];
+    if (d.kind === "power") return state.bit === q.h;
+    return d.head === q.h;
+  }
+  // Hand drivers: press and hold turns the screw steadily (Righty tighty / Lefty loosey),
+  // a quick tap gives half a turn, and drawing circles still works too.
+  function handDown(g) {
+    if (drv.g) { g.extra = true; return; }
+    var q = nearScrew(g.x, g.y, Math.max(34, 16 * LB.k));
+    if (q) { if (activeScrew !== q) { activeScrew = q; drv.camT = 0; } }
+    else {
+      var n = nearNail(g.x, g.y, 24);
+      if (n && !boardSpot(g.x, g.y)) flashHint("That is a nail! Nails need a hammer.", 3);
+      // Anywhere else works on the current screw (or starts a new one when it is done).
+      g.placed = ensureScrew(g.x, g.y).placed;
+    }
+    drv.g = g; g.turner = true; g.holdT = 0; drv.snug = false; drv.hold = 0;
+  }
+  function handMove(g) {
+    if (!g.turner || g.moved < 14) return;
+    g.circling = true;
+    if (!activeScrew) return;
+    var s = g.samples, b = s[s.length - 1];
+    if (!g.hp) { g.hp = { x: b.x, y: b.y }; return; }
+    var dx = b.x - g.hp.x, dy = b.y - g.hp.y;
+    if (dx * dx + dy * dy < 30) return;
+    var hd = Math.atan2(dy, dx);
+    g.hp = { x: b.x, y: b.y };
+    if (g.head === undefined) { g.head = hd; return; }
+    var d = wrapAng(hd - g.head);
+    g.head = hd;
+    if (Math.abs(d) > 2.2) return;
+    turnBy(d * 180 / Math.PI);
+  }
+  function handUp(g) {
+    var dir = state.dir === "fwd" ? 1 : -1;
+    if (g.extra) { if (g.moved < 14 && activeScrew) drv.pend += 180 * dir; return; }
+    if (g.turner && drv.g === g) drv.g = null;
+    if (!g.circling && !g.placed && g.holdT < 0.22 && activeScrew) drv.pend += 180 * dir;
+    drv.hold = 0;
+    saveSoon();
+  }
+  function updateHand(dt) {
+    if (drv.pend) {
+      var st = (drv.pend > 0 ? 1 : -1) * Math.min(Math.abs(drv.pend), 900 * dt);
+      drv.pend -= st;
+      if (Math.abs(drv.pend) < 0.5) drv.pend = 0;
+      if (activeScrew) turnBy(st); else drv.pend = 0;
+    }
+    var g = drv.g;
+    if (!g || g.circling || locked()) { drv.hold = 0; return; }
+    g.holdT += dt;
+    if (g.holdT < (g.placed ? 0.45 : 0.22) || !activeScrew) return;
+    var q = activeScrew, rate = (1.8 + q.len / 25) * 360;
+    drv.hold = Math.min(1, drv.hold + dt * 3);
+    turnBy((state.dir === "fwd" ? 1 : -1) * rate * drv.hold * dt);
+  }
+  function turnBy(deg) {
+    var q = activeScrew;
+    if (!q) return;
+    if (!driverMatches(q)) {
+      drv.ang += deg;
+      if (nowMs() - drv.camT > 650) { camOut(q, false); }
+      return;
+    }
+    var maxD = q.len, before = q.d;
+    var nd = q.d + deg / 360 * PITCH;
+    if (nd >= maxD) {
+      deg = (maxD - q.d) / PITCH * 360;
+      nd = maxD;
+      if (!drv.snug) {
+        drv.snug = true;
+        if (!q.done) { q.done = true; screwDone(q); }
+        else { var T0 = screwTop(q); pop("Snug!", T0.x, T0.y - 40, 22, "#7CFF8A"); }
+      }
+    } else drv.snug = false;
+    q.d = nd; q.dd = nd; q.a += deg; drv.ang += deg;
+    turnFx(q, deg, before);
+    if (q.d <= 0.3) screwOut(q);
+  }
+  function turnFx(q, deg, before) {
+    drv.tickAcc += Math.abs(deg);
+    while (drv.tickAcc >= 30) { drv.tickAcc -= 30; sndTick(); }
+    var p = bpt(q.u, q.v);
+    if (deg > 0 && Math.random() < Math.min(0.9, Math.abs(deg) / 25)) {
+      addP({ t: "fiber", x: p.x + rnd(-6, 6), y: p.y, vx: rnd(-90, 90), vy: rnd(-160, -40), g: 0.6, max: 0.5, len: rnd(4, 8), w: 2, rot: rnd(0, 6), vr: rnd(-12, 12), c: pick(["#FFF0D2", "#F6D9A6"]) });
+      if (Math.random() < 0.15) addSpecks(q.u, q.v, 1);
+    }
+    var turnsBefore = Math.floor(before / PITCH), turnsNow = Math.floor(q.d / PITCH);
+    if (turnsNow !== turnsBefore && DRIVERS[state.driver].kind !== "power") {
+      var T = screwTop(q);
+      pop(deg > 0 ? "↻" : "↺", T.x + 40, T.y - 14, 18, deg > 0 ? "#FFFFFF" : "#BFE3FF");
+    }
+  }
+  function screwDone(q) {
+    var p = bpt(q.u, q.v);
+    stars(p.x, p.y, 12);
+    pop("All the way in!", p.x, p.y - 60, 24, "#7CFF8A");
+    sndChime();
+    saveSoon();
+  }
+  function screwOut(q) {
+    var p = bpt(q.u, q.v);
+    flyer("screw", q.len, p.x, p.y - q.len * LB.k / 2);
+    sndPop();
+    pop("Out!", p.x, p.y - 60, 26, "#FFC93C");
+    removeScrew(q);
+    drv.pend = 0;
+    if (!state.board.screws.length && state.dir === "rev") { state.dir = "fwd"; render(); flashHint("All out! Back to Righty tighty.", 3, true); }
+  }
+  function camOut(q, isBit) {
+    drv.camT = nowMs(); hintHold = 0;
+    drv.cam = 1;
+    var T = screwTop(q);
+    sparks(T.x, T.y, 4);
+    sndSlip();
+    pop("Slip!", T.x - 40, T.y - 30, 22, "#FFC93C");
+    showCamout(q.h, isBit);
+  }
+
+  // ---------- Power drivers ----------
+  var trig = { on: false, src: null };
+  var pw = { lvl: 0, spin: 0, impT: 0, clickT: 0, msgT: 0, brk: 0, wasSlip: false, stall: false };
+  function toolBox() {
+    var a = DRIVERS[state.driver], ts = drvScale();
+    if (!drv.pos) return null;
+    var art = powerArt(state.driver, state.bit), b = art.box;
+    var x0 = drv.mir ? drv.pos.x - b[2] * ts : drv.pos.x + b[0] * ts, x1 = drv.mir ? drv.pos.x - b[0] * ts : drv.pos.x + b[2] * ts;
+    return { x0: x0, x1: x1, y0: drv.pos.y + b[1] * ts, y1: drv.pos.y + (b[3] - 46) * ts, kind: a.kind };
+  }
+  // Power drivers: press and hold anywhere on the bench (or the big button) to drive.
+  function powDown(g) {
+    if (trig.on) { g.extra = true; return; }
+    var q = nearScrew(g.x, g.y, Math.max(34, 16 * LB.k));
+    if (q) { activeScrew = q; q.stopped = false; drv.camT = 0; }
+    else ensureScrew(g.x, g.y);
+    setTrigger(true, g); g.trig = true;
+  }
+  function powUp(g) {
+    if (g.trig && trig.src === g) setTrigger(false, null);
+  }
+  function setTrigger(on, src) {
+    if (on && locked()) return;
+    trig.on = on; trig.src = on ? src : null;
+    $("trigger").classList.toggle("on", on);
+    if (!on) { pw.wasSlip = false; pw.stall = false; saveSoon(); }
+    else { pw.brk = 0; ensureAudio(); }
+  }
+  function torqueNeed(q) {
+    if (q.d < q.len - 0.01) return 1 + 13 * (q.d / q.len);
+    return q.d < q.len + 2 ? 19 : 99;
+  }
+  function updatePower(dt) {
+    var kind = state.driver, on = trig.on && !locked();
+    pw.lvl += ((on ? 1 : 0) - pw.lvl) * Math.min(1, dt * (on ? 6 : 8));
+    var q = activeScrew, dir = state.dir === "fwd" ? 1 : -1;
+    var rps = (kind === "impact" ? 4.5 : 3.8) * pw.lvl;
+    motorSet(pw.lvl, kind);
+    if (!on) { pw.spin += rps * 360 * dt * dir; return; }
+    if (!q) { pw.spin += rps * 360 * dt * dir; return; }
+    if (!driverMatches(q)) {
+      pw.spin += rps * 360 * dt * dir;
+      if (nowMs() - drv.camT > 450) camOut(q, true);
+      return;
+    }
+    var T = screwTop(q), mm = rps * PITCH * dt, before = q.d;
+    if (dir > 0) {
+      var need = torqueNeed(q);
+      if (kind === "drilldriver") {
+        if (need > state.clutch) {
+          pw.clickT += dt;
+          while (pw.clickT > 1 / 15) {
+            pw.clickT -= 1 / 15;
+            sndClick();
+            shakeAmp = Math.max(shakeAmp, reduce ? 0.5 : 2.2);
+            drv.cam = 0.25;
+            if (Math.random() < 0.3) pop("click", T.x + rnd(-40, 40), T.y - rnd(30, 70), 16, "#FFFFFF");
+          }
+          if (!pw.wasSlip) {
+            pw.wasSlip = true; q.stopped = true;
+            if (q.d < q.len - 0.01) flashHint("Click-click! The clutch stopped it.", 4);
+            else if (q.d <= q.len + 0.01) flashHint("Flush. Just right!", 3, true);
+            else flashHint("Sunk in deep!", 3, true);
+            if (q.d >= q.len - 0.01 && !q.done) { q.done = true; screwDone(q); }
+          }
+          return;
+        }
+        var maxD = state.clutch >= 19 ? q.len + 2.5 : q.len;
+        q.d = Math.min(maxD, q.d + mm);
+        var deg = (q.d - before) / PITCH * 360;
+        q.a += deg; pw.spin += deg; q.dd = q.d;
+        turnFx(q, deg, before);
+      } else {
+        if (need < 6) {
+          q.d = Math.min(q.len + 1.5, q.d + mm);
+        } else {
+          pw.impT += dt;
+          while (pw.impT > 1 / 14) {
+            pw.impT -= 1 / 14;
+            sndImpact();
+            shakeAmp = Math.max(shakeAmp, reduce ? 0.5 : 2.6);
+            ring(T.x, T.y, 22, "255,201,60");
+            if (q.d < q.len + 1.5) q.d = Math.min(q.len + 1.5, q.d + 0.9);
+            else if (!pw.stall) { pw.stall = true; flashHint("Snug! Let go of the trigger.", 3, true); }
+            if (Math.random() < 0.25) pop(pick(["rat", "tat", "rat-a-tat"]), T.x + rnd(-50, 50), T.y - rnd(30, 80), 16, "#FFC93C");
+          }
+        }
+        var deg2 = (q.d - before) / PITCH * 360;
+        q.a += deg2; pw.spin += deg2 + (need >= 6 ? 0 : 0); q.dd = q.d;
+        turnFx(q, deg2, before);
+        if (q.d >= q.len - 0.01 && !q.done) { q.done = true; screwDone(q); }
+      }
+    } else {
+      if (kind === "impact" && pw.brk < 0.35 && q.d > q.len - 4) {
+        pw.brk += dt; pw.impT += dt;
+        while (pw.impT > 1 / 14) { pw.impT -= 1 / 14; sndImpact(); shakeAmp = Math.max(shakeAmp, 2); ring(T.x, T.y, 22, "255,201,60"); }
+        return;
+      }
+      q.d = Math.max(0, q.d - mm);
+      var deg3 = (q.d - before) / PITCH * 360;
+      q.a += deg3; pw.spin += deg3; q.dd = q.d;
+      turnFx(q, deg3, before);
+      if (q.d <= 0.3) screwOut(q);
+    }
+  }
+  function drvScale() {
+    var k = sceneName() === "assemble" ? LA.k * 1.05 : LB.k;
+    return DRIVERS[state.driver].kind === "power" ? k * 0.56 : k * 0.68;
+  }
+  function pjScrewDown(g) {
+    if (!PJ || PJ.finished || PJ.phase !== "nails") { g.dead = true; return; }
+    var best = -1, bd = 1e9, i, p, d0;
+    for (i = 0; i < PJ.nails.length; i++) {
+      if ((PJ.fasteners[i] || 0) >= 0.999) continue;
+      p = pjNailTop(i);
+      d0 = Math.hypot(g.x - p.x, g.y - p.y);
+      if (d0 < bd) { bd = d0; best = i; }
+    }
+    if (best < 0) { g.dead = true; return; }
+    PJ.activeIdx = best;
+    ham.tgt = { kind: "pjnail", idx: best };
+    if (DRIVERS[state.driver].kind === "power") {
+      PJ.powerBurst = Math.max(PJ.powerBurst || 0, 0.23);
+      setTrigger(true, g);
+      g.trig = true;
+    } else {
+      var n = PJ.nails[best];
+      drv.ang += 240;
+      n.a = (n.a || 0) + 240;
+      fibers(n.x, n.y, 4, 0.5);
+      dust(n.x, n.y - 2, 2, 0.5);
+      sndTick();
+      sndHit("wood", 0.45);
+      pjAdvanceFastener(best, 1 / 3, true);
+      drv.g = g; g.turner = true; g.holdT = 0;
+    }
+  }
+  function pjScrewMove(g) {
+    if (!PJ || PJ.phase !== "nails" || !g.turner || g.moved < 14) return;
+    g.circling = true;
+    var idx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
+    if (idx < 0) return;
+    var s = g.samples, b = s[s.length - 1];
+    if (!g.hp) { g.hp = { x: b.x, y: b.y }; return; }
+    var dx = b.x - g.hp.x, dy = b.y - g.hp.y;
+    if (dx * dx + dy * dy < 30) return;
+    var hd = Math.atan2(dy, dx);
+    g.hp = { x: b.x, y: b.y };
+    if (g.head === undefined) { g.head = hd; return; }
+    var d = Math.abs(wrapAng(hd - g.head));
+    g.head = hd;
+    if (d > 2.2) return;
+    var deg = d * 180 / Math.PI;
+    var n = PJ.nails[idx];
+    drv.ang += deg;
+    n.a = (n.a || 0) + deg;
+    if (Math.random() < 0.35) { sndTick(); fibers(n.x, n.y, 1, 0.4); }
+    pjAdvanceFastener(idx, deg / 720, true);
+  }
+  function pjScrewUp(g) {
+    if (g.trig && trig.src === g) setTrigger(false, null);
+    if (g.turner && drv.g === g) drv.g = null;
+  }
+
+  // ---------- Pointer input on the workbench ----------
+  var gest = {};
+  function locked() { return Toybox.timer.locked(); }
+  function toLocal(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (locked()) return;
+    ensureAudio();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var p = toLocal(e), t = nowMs();
+    var g = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y, t0: t, moved: 0, samples: [{ x: p.x, y: p.y, t: t }] };
+    gest[e.pointerId] = g;
+    acted();
+    if (!$("camout").hidden && nowMs() - drv.camT > 1200) hideCamout();
+    if (sceneName() === "assemble") {
+      if (PJ && PJ.phase === "nails" && state.mode === "screw") pjScrewDown(g);
+      else hamDown(g);
+      return;
+    }
+    if (state.mode === "hammer") {
+      if (sceneName() === "board" && state.act === "pull") pullDown(g); else hamDown(g);
+    } else if (DRIVERS[state.driver].kind === "power") powDown(g);
+    else handDown(g);
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var g = gest[e.pointerId];
+    if (!g || locked()) return;
+    var p = toLocal(e), t = nowMs();
+    g.x = p.x; g.y = p.y;
+    g.moved = Math.max(g.moved, Math.hypot(p.x - g.x0, p.y - g.y0));
+    g.samples.push({ x: p.x, y: p.y, t: t });
+    if (g.samples.length > 8) g.samples.shift();
+    if (sceneName() === "assemble") {
+      if (PJ && PJ.phase === "nails" && state.mode === "screw") pjScrewMove(g);
+      else if (state.mode === "hammer") hamMove(g);
+      return;
+    }
+    if (state.mode === "hammer") {
+      if (sceneName() === "board" && state.act === "pull") pullMove(g); else hamMove(g);
+    } else if (DRIVERS[state.driver].kind === "hand" || DRIVERS[state.driver].kind === "key") handMove(g);
+  });
+  function endPointer(e) {
+    var g = gest[e.pointerId];
+    if (!g) return;
+    delete gest[e.pointerId];
+    if (locked()) { if (g === ham.g) ham.g = null; if (g === drv.g) drv.g = null; if (trig.src === g) setTrigger(false, null); return; }
+    if (sceneName() === "assemble") {
+      if (PJ && PJ.glueHeld) PJ.glueHeld = false;
+      if (state.mode === "screw") pjScrewUp(g);
+      else hamUp(g);
+      return;
+    }
+    if (state.mode === "hammer") {
+      if (sceneName() === "board" && state.act === "pull") pullUp(g); else hamUp(g);
+    } else if (DRIVERS[state.driver].kind === "power") powUp(g);
+    else handUp(g);
+  }
+  cv.addEventListener("pointerup", endPointer);
+  cv.addEventListener("pointercancel", endPointer);
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  var trigBtn = $("trigger"), trigAt = 0, trigLate = null;
+  var TRIG_MIN = 650;  // a quick tap still drives the screw a visible bit (the trigger stays in this long)
+  function trigRelease() {
+    if (trig.src !== "btn") return;
+    var left = TRIG_MIN - (Date.now() - trigAt);
+    clearTimeout(trigLate);
+    if (left > 0) trigLate = setTimeout(function () { if (trig.src === "btn") setTrigger(false, null); }, left);
+    else setTrigger(false, null);
+  }
+  function trigPress() {
+    if (locked()) return;
+    acted(); ensureAudio();
+    clearTimeout(trigLate); trigAt = Date.now();
+    if (trig.on) return;
+    ensureScrew(null, null);
+    if (activeScrew) activeScrew.stopped = false;
+    setTrigger(true, "btn");
+  }
+  trigBtn.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    try { trigBtn.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    trigPress();
+  });
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach(function (ev) {
+    trigBtn.addEventListener(ev, trigRelease);
+  });
+  trigBtn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  trigBtn.addEventListener("keydown", function (e) { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); trigPress(); } });
+  trigBtn.addEventListener("keyup", function (e) { if (e.key === " " || e.key === "Enter") setTrigger(false, null); });
+
+  // ---------- Drawing the tools ----------
+  var shakeAmp = 0;
+  var endPose = 0;   // 0..1 while the timer ends: tools are put down on the bench
+  function drawHammerTool(c) {
+    var id = state.hammer, art = ARTS[id], ts = hamScale();
+    var T = targetPoint(ham.tgt);
+    if (!ham.pos || ham.phase === "rest" || ham.phase === "settle" || ham.phase === "tapin") {
+      if (!ham.pos) ham.pos = { x: T.x, y: T.y };
+      ham.pos.x = lerp(ham.pos.x, T.x, 0.25); ham.pos.y = lerp(ham.pos.y, T.y, 0.25);
+    } else { ham.pos.x = T.x; ham.pos.y = T.y; }
+    var mirNow = ham.pos.x > W * 0.56;
+    if (ham.phase === "rest" || ham.phase === "settle") ham.mir = mirNow;
+    var flip = id === "ballpeen" && state.face === "ball";
+    var P0 = hamPivot();
+    var th = ham.theta + (ham.phase === "rest" && !reduce ? Math.sin(nowMs() / 600) * 0.02 : 0);
+    var x = ham.pos.x, y = ham.pos.y;
+    var sy = 1;
+    if (endPose > 0) {
+      var e = endPose, rx = W * 0.3, ry = H - Math.max(24, 20 * ts);
+      x = lerp(x, rx, e); y = lerp(y, ry, e); th = lerp(th, 0, e); sy = lerp(1, 0.5, e);
+    }
+    c.save();
+    c.translate(x, y);
+    if (sy !== 1) c.scale(1, sy);
+    if (ham.mir) c.scale(-1, 1);
+    c.translate(P0.x, P0.y); c.rotate(th); c.translate(-P0.x, -P0.y);
+    c.scale(ts, ts);
+    if (flip) { c.translate(0, -art.flipF); c.scale(1, -1); }
+    drawParts(c, art.parts);
+    if (id === "deadblow") {
+      var sl = ham.slosh, j = 0;
+      c.save(); c.beginPath(); c.rect(-18, -100, 36, 76); c.clip();
+      c.fillStyle = STEEL; c.strokeStyle = OUT; c.lineWidth = 1;
+      for (var yy = -28; yy > -60; yy -= 7) for (var xx = -14 + (j++ % 2) * 3.5; xx < 15; xx += 7) {
+        c.beginPath(); c.arc(xx + Math.sin(yy + nowMs() / 40) * sl * 3, yy - sl * 22 * (1 + (yy + 28) / 40), 3.4, 0, Math.PI * 2); c.fill(); c.stroke();
+      }
+      c.restore();
+    }
+    c.restore();
+  }
+  function drawPullTool(c) {
+    var art = ARTS[state.hammer], s = hamScale();
+    if (pull && pull.release) {
+      pull.release += 1 / 60;
+      if (pull.release > 0.35) { pull = null; }
+    }
+    if (!pull) {
+      // Waiting: the hammer hangs ready, claw first.
+      var T = { x: W * 0.62, y: Math.max(LB.yBack - 40 * LB.k, 60) };
+      if (activeNail) { var t0 = nailTop(activeNail); T = { x: t0.x + 60 * s, y: t0.y - 40 * s }; }
+      c.save(); c.translate(T.x, T.y); c.rotate(-0.35 + (reduce ? 0 : Math.sin(nowMs() / 600) * 0.03)); c.scale(s, s); c.rotate(-Math.PI / 2); c.translate(17, 88);
+      drawParts(c, art.parts); c.restore();
+      return;
+    }
+    var a = pull.a, fade = pull.release ? clamp(1 - pull.release / 0.35, 0, 1) : 1;
+    if (pull.block) {
+      var k = LB.k, p = bpt(pull.n.u, pull.n.v);
+      c.fillStyle = "#E7B676"; c.strokeStyle = OUT; c.lineWidth = 2.5;
+      c.beginPath(); c.rect(pull.F.x - 30 * k, pull.F.y, 50 * k, p.y - pull.F.y); c.fill(); c.stroke();
+      c.fillStyle = "#F6D9A6"; c.fillRect(pull.F.x - 30 * k, pull.F.y, 50 * k, 4 * k);
+    }
+    c.save();
+    c.globalAlpha = fade;
+    c.translate(pull.F.x, pull.F.y);
+    c.rotate(a);
+    c.scale(s, s);
+    c.translate(-PB[0], -PB[1]);
+    c.rotate(-Math.PI / 2);
+    drawParts(c, art.parts);
+    c.restore();
+    if (!pull.release) {
+      // a curved arrow showing which way to pull the handle
+      var hx = pull.F.x + Math.sin(a) * 150 * s, hy = pull.F.y - Math.cos(a) * 150 * s;
+      c.strokeStyle = "#FFC93C"; c.lineWidth = 6; c.lineCap = "round";
+      c.beginPath(); c.arc(pull.F.x, pull.F.y, 175 * s, -Math.PI / 2 + a - 0.05, -Math.PI / 2 + a + 0.5); c.stroke();
+      var ea = -Math.PI / 2 + a + 0.5, ex = pull.F.x + Math.cos(ea) * 175 * s, ey = pull.F.y + Math.sin(ea) * 175 * s;
+      c.fillStyle = "#FFC93C"; c.beginPath(); c.moveTo(ex + Math.cos(ea + 1.4) * 14, ey + Math.sin(ea + 1.4) * 14); c.lineTo(ex + Math.cos(ea) * 14, ey + Math.sin(ea) * 14); c.lineTo(ex - Math.cos(ea) * 14, ey - Math.sin(ea) * 14); c.closePath(); c.fill();
+      void hx; void hy;
+    }
+  }
+  function drawDriverTool(c, dt) {
+    var id = state.driver, d = DRIVERS[id], ts = drvScale(), isPj = sceneName() === "assemble";
+    var T;
+    if (isPj && PJ) {
+      var idx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
+      T = idx >= 0 ? pjNailTop(idx) : { x: LA.cx, y: LA.cy };
+    } else if (activeScrew) T = screwTop(activeScrew);
+    else T = { x: W * 0.5, y: Math.max(LB.yBack - 10 * LB.k, (d.kind === "power" ? 263 : d.kind === "key" ? 60 : 190) * ts + 64) };
+    if (!drv.pos) drv.pos = { x: T.x, y: T.y };
+    drv.pos.x = lerp(drv.pos.x, T.x, Math.min(1, dt * 16)); drv.pos.y = lerp(drv.pos.y, T.y, Math.min(1, dt * 16));
+    drv.cam *= Math.pow(0.004, dt);
+    var x = drv.pos.x, y = drv.pos.y - drv.cam * 9 * ts, rot = drv.cam * 0.12 * Math.sin(nowMs() / 22);
+    var sy = 1;
+    if (endPose > 0) {
+      var e = endPose;
+      x = lerp(x, W * 0.62, e); y = lerp(y, H - Math.max(20, 14 * ts), e); rot = lerp(rot, Math.PI / 2, e); sy = lerp(1, 0.55, e);
+    }
+    if (d.kind === "power") {
+      drv.mir = x > W * 0.6;
+      if ((trig.on || (PJ && PJ.powerBurst > 0)) && !reduce) { x += rnd(-1, 1) * 0.8 * pw.lvl; y += rnd(-1, 1) * 0.6 * pw.lvl; }
+      drawPowerTool(c, x, y, ts, rot, sy);
+    } else if (d.kind === "key") {
+      drawHexKey(c, x, y, ts, rot, sy);
+    } else {
+      c.save(); c.translate(x, y); if (sy !== 1) c.scale(1, sy); c.rotate(rot); c.scale(ts, ts);
+      var art = DRV_ART[id];
+      drawParts(c, art.parts);
+      drawFlutes(c, art, drv.ang);
+      c.restore();
+      if ((isPj ? (PJ && PJ.phase === "nails") : activeScrew) && endPose === 0 && !reduce) drawTurnGuide(c, x, y - 145 * ts, 30 * ts + 22);
+    }
+  }
+  function drawFlutes(c, art, angDeg) {
+    c.save(); c.clip(p2d(HANDLE_D));
+    var i, ph, xx, n = 8, hw = art.hw;
+    for (i = 0; i < n; i++) {
+      ph = (angDeg + i * 360 / n) * Math.PI / 180;
+      if (Math.cos(ph) > -0.05) continue;
+      xx = Math.sin(ph) * hw * 0.95;
+      var wgt = -Math.cos(ph);
+      c.strokeStyle = i === 0 ? "rgba(255,255,255,0.95)" : "rgba(29,35,64,0.55)";
+      c.lineWidth = (i === 0 ? 4.5 : 3) * wgt + 0.5;
+      c.beginPath(); c.moveTo(xx, art.hy0 + 4); c.lineTo(xx, art.hy1 - 6); c.stroke();
+    }
+    c.restore();
+    // butt end of the handle with a dot that turns with the finger
+    c.fillStyle = "rgba(255,255,255,0.18)"; c.strokeStyle = OUT; c.lineWidth = 2;
+    var ty = -187, r = 14;
+    ph = angDeg * Math.PI / 180;
+    c.fillStyle = "#FFFFFF"; c.beginPath(); c.arc(Math.sin(ph) * r * 0.7, ty - Math.cos(ph) * r * 0.32, 3.2, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
+  function drawTurnGuide(c, x, y, r) {
+    var t = nowMs() / 1000;
+    c.save(); c.globalAlpha = 0.85;
+    c.strokeStyle = "#FFC93C"; c.lineWidth = 5; c.lineCap = "round"; c.setLineDash([10, 9]); c.lineDashOffset = -t * 30;
+    c.beginPath(); c.ellipse(x, y, r * 1.5, r * 0.75, 0, -Math.PI * 0.85, Math.PI * 0.85); c.stroke();
+    c.setLineDash([]);
+    var ea = Math.PI * 0.85, ex = x + Math.cos(ea) * r * 1.5, ey = y + Math.sin(ea) * r * 0.75;
+    c.fillStyle = "#FFC93C"; c.beginPath(); c.moveTo(ex - 12, ey - 2); c.lineTo(ex + 6, ey - 10); c.lineTo(ex + 4, ey + 9); c.closePath(); c.fill();
+    c.restore();
+  }
+  function drawHexKey(c, x, y, ts, rot, sy) {
+    var ang = (drv.ang + 90) * Math.PI / 180;
+    c.save(); c.translate(x, y); if (sy !== 1) c.scale(1, sy); c.rotate(rot);
+    ts *= 1.35;
+    var bx = 0, by = -26 * ts, L = 88 * ts;
+    var ex = bx + Math.sin(ang) * L, ey = by - Math.cos(ang) * L * 0.45;
+    var front = Math.cos(ang) < 0, w = Math.max(5, 5.5 * ts);
+    function seg(x0, y0, x1, y1) {
+      c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = w + 4; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      c.strokeStyle = "#4A505C"; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      c.strokeStyle = "rgba(255,255,255,0.55)"; c.lineWidth = Math.max(1.2, w * 0.25); c.beginPath(); c.moveTo(x0 - w * 0.2, y0 - 1); c.lineTo(x1 - w * 0.2, y1 - 1); c.stroke();
+    }
+    if (front) { seg(0, 0, bx, by); seg(bx, by, ex, ey); } else { seg(bx, by, ex, ey); seg(0, 0, bx, by); }
+    c.restore();
+    if ((sceneName() === "assemble" ? (PJ && PJ.phase === "nails") : activeScrew) && endPose === 0 && !reduce) drawTurnGuide(c, x, y - 26 * ts, L * 0.7);
+  }
+  function drawPowerTool(c, x, y, ts, rot, sy) {
+    var art = powerArt(state.driver, state.bit), mir = drv.mir;
+    c.save(); c.translate(x, y); if (sy !== 1) c.scale(1, sy); c.rotate(rot); if (mir) c.scale(-1, 1); c.scale(ts, ts);
+    drawParts(c, art.parts);
+    // spinning chuck / collet
+    var ch = art.chuck, i, ph, xx;
+    c.save(); c.beginPath(); c.rect(-ch[2], ch[0], ch[2] * 2, ch[1] - ch[0]); c.clip();
+    for (i = 0; i < 8; i++) {
+      ph = (pw.spin + i * 45) * Math.PI / 180;
+      if (Math.cos(ph) > 0) continue;
+      xx = Math.sin(ph) * ch[2] * 0.9;
+      c.strokeStyle = "rgba(255,255,255,0.35)"; c.lineWidth = 2.5 * -Math.cos(ph) + 0.5;
+      c.beginPath(); c.moveTo(xx, ch[0] + 3); c.lineTo(xx * 0.8, ch[1] - 3); c.stroke();
+    }
+    c.restore();
+    // bit tip twist marks
+    for (i = 0; i < 2; i++) {
+      ph = (pw.spin + i * 180) * Math.PI / 180;
+      if (Math.cos(ph) > 0) continue;
+      c.strokeStyle = "rgba(29,35,64,0.6)"; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(Math.sin(ph) * 2.6, -46); c.lineTo(Math.sin(ph) * 2.6, -26); c.stroke();
+    }
+    if (state.driver === "drilldriver") {
+      c.save(); if (mir) c.scale(-1, 1);
+      var cy = art.collar;
+      c.fillStyle = "#FFFFFF"; c.beginPath(); c.arc(0, cy + 1, 3.2, 0, Math.PI * 2); c.fill();
+      c.fillStyle = "rgba(255,255,255,0.5)";
+      c.beginPath(); c.arc(-14, cy + 1, 2.2, 0, Math.PI * 2); c.arc(14, cy + 1, 2.2, 0, Math.PI * 2); c.fill();
+      c.restore();
+    }
+    // forward / reverse arrow on the switch
+    c.save(); if (mir) c.scale(-1, 1);
+    var sx = state.driver === "drilldriver" ? 41 : 40, syy = state.driver === "drilldriver" ? -208 : -184;
+    if (mir) sx = -sx;
+    setFont(c, 11); c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = OUT;
+    c.fillText(state.dir === "fwd" ? "↻" : "↺", sx, syy);
+    c.restore();
+    c.restore();
+  }
+
+  // ---------- Scene background cache ----------
+  function rebuildBg() {
+    bgx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bgx.clearRect(0, 0, W, H);
+    var sc = sceneName();
+    if (sc === "assemble") drawAssembleBg(bgx);
+    else if (sc === "board") drawBoardBg(bgx);
+    else if (sc === "metal") drawMetalBg(bgx);
+    else if (sc === "joint") drawJointBg(bgx);
+    else drawYardBg(bgx);
+    bgDirty = false;
+  }
+
+  // ---------- Readout and the coach line ----------
+  // The coach always says the next thing to do, as a numbered step.
+  function coachInfo() {
+    var sc = sceneName(), Dv = DRIVERS[state.driver];
+    if (sc === "assemble" && PJ) {
+      if (PJ.finished) return { n: "✓", ok: true, t: "Birdhouse built!", s: "" };
+      if (PJ.phase === "glue") return { n: "1", t: "Tap to squeeze wood glue!", s: "" };
+      if (PJ.phase === "slide") return { n: "1", t: "Putting the wood together…", s: "" };
+      return { n: "2", t: state.mode === "screw" ? "Drive both screws in!" : "Tap each nail 3 times!", s: "" };
+    }
+    if (state.mode === "hammer") {
+      if (sc === "board") {
+        if (state.act === "pull") {
+          if (!state.board.nails.length) return { n: "✓", ok: true, t: "Pulled out!", s: "Back to hitting…" };
+          if (pull && pull.g && !pull.done) return { n: "↑", t: "Pull back!", s: "Keep going, or just hold" };
+          return { n: "1", t: "Press a nail and pull back", s: "The claw pulls it out" };
+        }
+        var cur = onBoard(activeNail, state.board.nails) ? activeNail : null;
+        if (cur && cur.bent) return { n: "!", t: "Bent nail! Pull it out", s: "The claw is coming…" };
+        if (cur && !nailDone(cur)) return { n: "2", t: "Tap to hit the nail!", s: "Swipe down for a BIG hit" };
+        if (cur) return { n: "✓", ok: true, t: "Nail is in! Tap for another", s: "" };
+        return { n: "1", t: "Tap the board to put a nail in", s: "" };
+      }
+      if (sc === "metal") {
+        var set = state.metal.rivets.filter(function (r) { return r.s >= 4; }).length;
+        if (set >= 5) return { n: "✓", ok: true, t: "All the rivets are set!", s: newRivetsAt ? "New rivets coming…" : "Tap the plate for dents" };
+        return { n: "1", t: "Tap to hit the rivets", s: set + " of 5 set · " + (state.face === "ball" ? "the ball makes them round" : "the flat face makes them flat") };
+      }
+      if (sc === "joint") {
+        var J = state.joint;
+        if (ham.tgt && ham.tgt.kind === "chisel") return { n: "1", t: "Tap to hit the chisel", s: "Chop out a mortise · or tap the post" };
+        if (newJointAt || J.gap <= 0) return { n: "✓", ok: true, t: "Snug fit! No dents!", s: "A new post is coming…" };
+        return { n: "1", t: "Tap to knock the post in", s: "Gap: " + Math.round(J.gap) + " mm · or tap the chisel" };
+      }
+      if (ham.tgt && ham.tgt.kind === "stake") {
+        if (newStakeAt) return { n: "✓", ok: true, t: "The stake is in!", s: "A new stake is coming…" };
+        return { n: "1", t: "Tap to drive the stake", s: "Or hit the wedge to split the log" };
+      }
+      if (logSplit || newLogAt) return { n: "✓", ok: true, t: "Split!", s: "A new log is coming…" };
+      return { n: "1", t: "Tap to hit the wedge", s: "Split the log! Or hit the stake" };
+    }
+    var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null, rev = state.dir === "rev";
+    if (q && !driverMatches(q)) {
+      var nd = DRIVERS[HEADS[q.h].driver];
+      var need = Dv.kind === "power" ? "a " + HEADS[q.h].name + " bit" : (nd.kind === "key" ? "the Allen key" : "the " + nd.short + " driver");
+      return { n: "!", t: "This screw needs " + need, s: $("camout").hidden ? "Try it and watch it slip!" : "Tap the yellow button to swap" };
+    }
+    if (Dv.kind === "power") {
+      if (!q && !(rev && state.board.screws.length)) return { n: "1", t: "Hold the big button to drive a screw", s: "" };
+      if (rev) return { n: "1", t: trig.on ? "Backing it out…" : "Hold the button to back it out", s: "Reverse ↺" };
+      if (q.stopped && q.d < q.len - 0.01) return { n: "!", t: "Click-click! Hold for another", s: "" };
+      if (screwFinished(q)) return { n: "✓", ok: true, t: "Screw is in! Hold for another", s: "" };
+      return { n: "1", t: trig.on ? "Driving… keep holding!" : "Hold the big button to drive it", s: trig.on ? "" : "Or hold anywhere on the bench" };
+    }
+    if (!q && !(rev && state.board.screws.length)) return { n: "1", t: "Tap the board for a screw", s: "" };
+    if (rev) return { n: "1", t: "Hold to turn it out", s: "Lefty loosey ↺" };
+    if (screwFinished(q)) return { n: "✓", ok: true, t: "Screw is in! Tap for another", s: "" };
+    return { n: "1", t: drv.hold > 0 ? "Turning… keep holding!" : "Hold to turn the screw in", s: "Righty tighty ↻ · or draw circles" };
+  }
+  var lastCoach = "";
+  function setCoach(o) {
+    var key = o ? o.n + "|" + o.t + "|" + o.s + "|" + !!o.flash : "";
+    if (key === lastCoach) return;
+    var prevN = lastCoach.split("|")[0];
+    lastCoach = key;
+    var el = $("coach");
+    if (!o) { el.hidden = true; return; }
+    el.hidden = false;
+    $("coachNum").textContent = o.n;
+    // Only the ✓ and ! badges mean something; step numbers were just decoration.
+    var deco = /^[0-9↑]$/.test(o.n);
+    $("coachNum").hidden = deco;
+    el.classList.toggle("nonum", deco);
+    $("hint").textContent = o.t;
+    $("coachSub").textContent = "";
+    el.classList.toggle("ok", !!o.ok);
+    el.classList.toggle("flash", !!o.flash);
+    if (prevN !== o.n) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  }
+  var lastJob = null;
+  function updateReadout() {
+    var jk = ham.tgt ? ham.tgt.kind : "";
+    if (jk !== lastJob) {
+      lastJob = jk;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-job]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.job === jk)); });
+    }
+    var sc = sceneName(), Hm = HAMMERS[state.hammer], Dv = DRIVERS[state.driver];
+    if (sc === "assemble" && PJ) {
+      setName(state.mode === "hammer" ? Hm.name : Dv.name, "");
+      setRead("Joined: " + (PJ.finished ? PJ.joins.length : PJ.step) + " of " + PJ.joins.length, "");
+    } else if (state.mode === "hammer") {
+      setName(Hm.name, "");
+      if (sc === "board") setRead("Nails: " + state.board.nails.length, "");
+      else if (sc === "metal") setRead("Rivets: " + state.metal.rivets.filter(function (r) { return r.s >= 4; }).length, "");
+      else if (sc === "joint") setRead("Joints: " + state.joint.joints, "");
+      else if (ham.tgt && ham.tgt.kind === "stake") setRead("Stakes: " + state.yard.stakes, "");
+      else setRead("Logs: " + state.yard.logs, "");
+    } else {
+      setName(Dv.name, "");
+      setRead("Screws: " + state.board.screws.length, "");
+    }
+    var o = coachInfo();
+    if (hintHold > 0 && hintMsg) o = hintOk ? { n: "✓", ok: true, t: hintMsg, s: "" } : { n: "!", t: hintMsg, s: "", flash: true };
+    if (locked()) o = null;
+    setCoach(o);
+  }
+
+  // ---------- Ghost hint: shows the gesture when nothing has happened for a while ----------
+  var idleSince = 0, ghostA = 0, ghostDrawn = false, GHOST_IDLE = 4500, GHOST_CYC = 2400;
+  var gcv = $("gcv"), gctx = gcv.getContext("2d");
+  function acted() { idleSince = nowMs(); ghostA = 0; if (hintOk) hintHold = 0; }
+  function stageXY(el) {
+    var r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
+    return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2, r: r.width / 2 };
+  }
+  function ghostPlan() {
+    var sc = sceneName(), alt = Math.floor((nowMs() - idleSince) / GHOST_CYC) % 2, t, p;
+    var R = clamp(Math.min(W, H) * 0.05, 20, 34);
+    if (sc === "assemble" && PJ) {
+      if (PJ.finished || PJ.phase === "slide" || PJ.phase === "pause") return null;
+      if (PJ.phase === "glue") {
+        var gs = pjSeamInfo(PJ.step);
+        return { k: "tap", x: (gs.x0 + gs.x1) / 2, y: (gs.y0 + gs.y1) / 2, R: R };
+      }
+      var ni = pjNextNailIdx();
+      if (ni < 0) return null;
+      t = pjNailTop(ni);
+      return { k: "tap", x: t.x, y: t.y, R: R };
+    }
+    if (state.mode === "hammer") {
+      if (sc === "board") {
+        if (state.act === "pull") {
+          var pn = onBoard(activeNail, state.board.nails) ? activeNail : state.board.nails[state.board.nails.length - 1];
+          if (!pn) return null;
+          t = nailTop(pn);
+          return { k: "drag", x: t.x, y: t.y + 4, x2: t.x + Math.max(80, Math.min(W, H) * 0.22), y2: t.y + 30, R: R };
+        }
+        var cur = onBoard(activeNail, state.board.nails) && !nailDone(activeNail) ? activeNail : null;
+        if (!cur) { var fs = freeSpot({ u: 0.5, v: 0.55 }) || { u: 0.5, v: 0.55 }; p = bpt(fs.u, fs.v); return { k: "tap", x: p.x, y: p.y, R: R }; }
+        t = nailTop(cur);
+        if (alt) return { k: "swipe", x: t.x + (t.x > W * 0.6 ? -1 : 1) * Math.max(70, 26 * LB.k), y: t.y - Math.min(H * 0.32, 160), y2: t.y + 10, R: R };
+        return { k: "tap", x: t.x, y: t.y, R: R };
+      }
+      if (sc === "metal") {
+        var jt = jobTarget();
+        t = jt.kind === "rivet" ? rivetTop(jt.i) : mpt(0.5, 0.4);
+        return { k: "tap", x: t.x, y: t.y + 6, R: R };
+      }
+      if (sc === "joint") { t = ham.tgt && ham.tgt.kind === "chisel" ? chiselTop() : postTop(); return { k: "tap", x: t.x, y: t.y + 30 * LJ.k, R: R }; }
+      t = ham.tgt && ham.tgt.kind === "stake" ? stakeTop() : wedgeTop();
+      return { k: "tap", x: t.x, y: t.y + 30 * LY.k, R: R };
+    }
+    var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null, power = DRIVERS[state.driver].kind === "power";
+    if (q && !driverMatches(q)) return null;
+    var none = !q && !(state.dir === "rev" && state.board.screws.length);
+    if (none || (q && screwFinished(q) && !power)) {
+      var fs2 = freeSpot({ u: 0.5, v: 0.55 }) || { u: 0.5, v: 0.55 }; p = bpt(fs2.u, fs2.v);
+      if (!power || !alt) return { k: "tap", x: p.x, y: p.y, R: R };
+    }
+    if (power) { var b = stageXY($("trigger")); return { k: "hold", x: b.x + b.r * 0.42, y: b.y + b.r * 0.5, cx: b.x, cy: b.y, R: R * 0.8, ring: b.r + 8 }; }
+    if (!q) q = nearestScrew(W / 2, H / 2);
+    if (!q) return null;
+    t = screwTop(q);
+    if (alt) return { k: "circle", x: t.x, y: t.y - 40, r: Math.max(46, 24 * LB.k), R: R, rev: state.dir === "rev" };
+    return { k: "hold", x: t.x, y: t.y + 4, R: R, ring: R * 1.7 };
+  }
+  // The Toybox ghost hand on a canvas (same look as every page): fingertip at (x, y), s = scale (1 is about 64 px tall).
+  function ghostHand(c, x, y, s, press) {
+    function box(x0, y0, w, h, r) {
+      c.beginPath(); c.moveTo(x0 + r, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, r); c.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+      c.arcTo(x0, y0 + h, x0, y0, r); c.arcTo(x0, y0, x0 + w, y0, r); c.closePath(); c.fill(); c.stroke();
+    }
+    c.save(); c.translate(x, y); c.scale(s * (press ? 0.92 : 1), s * (press ? 0.92 : 1));
+    c.lineJoin = "round"; c.strokeStyle = "#1D2340";
+    c.lineWidth = 2; c.fillStyle = "rgba(255,201,60,0.95)"; c.beginPath(); c.arc(0, 2, press ? 12 : 9, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.lineWidth = 3; c.fillStyle = "#FFFFFF"; c.globalAlpha *= 0.92;
+    box(-12, 22, 44, 40, 16); box(10, 14, 14, 24, 7); box(-9, -6, 18, 40, 9);
+    c.restore();
+  }
+  function gDot(c, x, y, R, press) { ghostHand(c, x, y, clamp(R / 24, 0.95, 1.35), press); }
+  function gRipple(c, x, y, R, f) {
+    if (f <= 0 || f >= 1) return;
+    c.strokeStyle = "rgba(255,255,255," + (0.95 * (1 - f)).toFixed(3) + ")"; c.lineWidth = 7 * (1 - f) + 1;
+    c.beginPath(); c.arc(x, y, R * (1 + 1.5 * f), 0, Math.PI * 2); c.stroke();
+  }
+  function gArrow(c, x0, y0, x1, y1, w) {
+    var a = Math.atan2(y1 - y0, x1 - x0), hl = w * 2.2;
+    var bx = x1 - Math.cos(a) * hl, by = y1 - Math.sin(a) * hl;
+    c.lineCap = "round"; c.lineJoin = "round";
+    [[OUT, w + 7], ["#FFC93C", w]].forEach(function (st) {
+      c.strokeStyle = st[0]; c.fillStyle = st[0]; c.lineWidth = st[1];
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(bx, by); c.stroke();
+      var e = st[1] === w ? 0 : 3.5;
+      c.beginPath();
+      c.moveTo(x1 + Math.cos(a) * e, y1 + Math.sin(a) * e);
+      c.lineTo(bx + Math.cos(a + Math.PI / 2) * (hl * 0.75 + e), by + Math.sin(a + Math.PI / 2) * (hl * 0.75 + e));
+      c.lineTo(bx - Math.cos(a + Math.PI / 2) * (hl * 0.75 + e), by - Math.sin(a + Math.PI / 2) * (hl * 0.75 + e));
+      c.closePath(); c.fill();
+    });
+  }
+  function drawGhost(c, g, ph) {
+    var R = g.R, f, x, y;
+    if (g.k === "tap") {
+      if (ph < 0.3) { f = ph / 0.3; x = g.x + R * 1.8 * (1 - f); y = g.y + R * 1.8 * (1 - f); c.globalAlpha *= f; gDot(c, x, y, R, false); }
+      else { gRipple(c, g.x, g.y, R, (ph - 0.33) / 0.45); gDot(c, g.x, g.y, R, ph > 0.33 && ph < 0.6); }
+    } else if (g.k === "swipe") {
+      gArrow(c, g.x, g.y - R * 0.2, g.x, g.y2, Math.max(8, R * 0.42));
+      f = clamp((ph - 0.2) / 0.3, 0, 1); f = f * f;
+      y = lerp(g.y, g.y2, f);
+      gRipple(c, g.x, g.y2, R, (ph - 0.5) / 0.4);
+      gDot(c, g.x, y, R, ph > 0.15);
+    } else if (g.k === "drag") {
+      gArrow(c, g.x, g.y, g.x2, g.y2, Math.max(8, R * 0.42));
+      f = clamp((ph - 0.2) / 0.45, 0, 1); f = 1 - (1 - f) * (1 - f);
+      gDot(c, lerp(g.x, g.x2, f), lerp(g.y, g.y2, f), R, ph > 0.12 && ph < 0.75);
+    } else if (g.k === "hold") {
+      f = clamp((ph - 0.12) / 0.7, 0, 1);
+      c.lineCap = "round";
+      c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 12;
+      var hx = g.cx === undefined ? g.x : g.cx, hy = g.cy === undefined ? g.y : g.cy;
+      c.beginPath(); c.arc(hx, hy, g.ring, 0, Math.PI * 2); c.stroke();
+      if (f > 0) { c.strokeStyle = "#FFC93C"; c.lineWidth = 8; c.beginPath(); c.arc(hx, hy, g.ring, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); c.stroke(); }
+      gDot(c, g.x, g.y, R, ph > 0.1 && ph < 0.88);
+    } else if (g.k === "circle") {
+      var dir = g.rev ? -1 : 1, r = g.r, a0 = -Math.PI / 2;
+      c.save(); c.setLineDash([10, 10]); c.lineDashOffset = -dir * nowMs() / 30;
+      c.strokeStyle = "#FFC93C"; c.lineWidth = 6; c.beginPath(); c.arc(g.x, g.y, r, 0, Math.PI * 2); c.stroke(); c.restore();
+      f = ph * Math.PI * 2 * dir;
+      gDot(c, g.x + Math.cos(a0 + f) * r, g.y + Math.sin(a0 + f) * r, R, true);
+    }
+  }
+  function updateGhost() {
+    var now = nowMs(), want = !locked() && endPose === 0 && !Toybox.sheetOpen() && $("camout").hidden &&
+      !Object.keys(gest).length && !trig.on && now - idleSince > GHOST_IDLE && now - idleSince < GHOST_IDLE + 2 * GHOST_CYC && ham.phase !== "tapin";
+    var plan = want ? ghostPlan() : null;
+    ghostA = plan ? Math.min(1, ghostA + 0.05) : 0;
+    $("trigger").classList.toggle("nudge", !!plan && plan.k === "hold" && DRIVERS[state.driver].kind === "power" && state.mode === "screw");
+    if (!plan) { if (ghostDrawn) { gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, gcv.width, gcv.height); ghostDrawn = false; } return; }
+    if (gcv.width !== cv.width || gcv.height !== cv.height) { gcv.width = cv.width; gcv.height = cv.height; }
+    var c = gctx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.clearRect(0, 0, W, H);
+    c.save();
+    c.globalAlpha = ghostA * 0.95;
+    drawGhost(c, plan, ((now - idleSince) % GHOST_CYC) / GHOST_CYC);
+    c.restore();
+    ghostDrawn = true;
+  }
+
+  // ---------- Main loop ----------
+  var last = nowMs();
+  function frame(t) {
+    var dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
+    last = t;
+    resize();
+    var card = $("toolCard"), tiny = card.clientHeight < 96;
+    if (tiny !== card.classList.contains("off")) card.classList.toggle("off", tiny);
+    if (hintHold > 0) hintHold -= dt;
+    var sc = sceneName();
+    if (bgDirty) rebuildBg();
+    if (Toybox.timer.phase() === "ending") { endPose = Math.min(1, endPose + dt / 1.3); if (endPose >= 1 && endingDone) { endingDone(); endingDone = null; } }
+    else if (endPose > 0 && Toybox.timer.phase() !== "resting") endPose = Math.max(0, endPose - dt * 2);
+    // nails settle with a little bounce after each hit
+    state.board.nails.forEach(function (n) {
+      if (n === (pull && pull.n)) return;
+      var acc = 1600 * (n.d - n.dd) - 34 * n.vd;
+      n.vd += acc * dt; n.dd += n.vd * dt;
+      if (Math.abs(n.d - n.dd) < 0.02 && Math.abs(n.vd) < 0.5) { n.dd = n.d; n.vd = 0; }
+    });
+    state.board.screws.forEach(function (q) { if (q.dd < q.d) q.dd = Math.min(q.d, q.dd + dt * 120); else q.dd = q.d; });
+    if (state.mode === "hammer") { updateHammer(dt); updatePull(dt); }
+    if (state.mode === "screw" && DRIVERS[state.driver].kind === "power") { if (sc !== "assemble") updatePower(dt); }
+    else { motorSet(0); if (state.mode === "screw" && sc !== "assemble") updateHand(dt); }
+    var nowT = nowMs();
+    if (autoPullAt && nowT > autoPullAt) {
+      autoPullAt = 0;
+      if (state.mode === "hammer" && sc === "board" && state.act === "hit" && activeNail && activeNail.bent && !locked()) {
+        setAct("pull");
+        var bt = nailTop(activeNail);
+        pop("Pull it out!", bt.x, bt.y - 40, 24, "#FFC93C");
+        idleSince = nowT - GHOST_IDLE + 600;
+      }
+    }
+    if (autoHitAt && nowT > autoHitAt && !(pull && pull.g)) { autoHitAt = 0; if (state.act === "pull") setAct("hit"); }
+    // Screws: when the last one comes out, a new one is started a moment later.
+    if (!PJ && state.mode === "screw" && state.dir === "fwd" && !onBoard(activeScrew, state.board.screws) && !Object.keys(gest).length && !trig.on && !locked() && endPose === 0) {
+      if (!autoScrewAt) autoScrewAt = nowT + 1000;
+      else if (nowT > autoScrewAt) { autoScrewAt = 0; autoScrew(false); }
+    } else autoScrewAt = 0;
+    if (newRivetsAt && nowT > newRivetsAt) {
+      newRivetsAt = 0;
+      state.metal.rivets = freshMetal().rivets;
+      if (sc === "metal") { pop("New rivets!", W / 2, LM.yBack - 30, 28, "#FFC93C"); sndPlace(); }
+      saveSoon();
+    }
+    if (logSplit) { logSplit.t += dt; if (logSplit.t > 1.9) { logSplit = null; bgDirty = true; } }
+    if (newLogAt && nowMs() > newLogAt) { newLogAt = 0; logDrop = 300; }
+    if (logDrop > 0) logDrop = Math.max(0, logDrop - dt * 900);
+    if (newStakeAt && nowMs() > newStakeAt) { newStakeAt = 0; state.yard.stake = 430; state.yard.shits = 0; stakeDrop = 400; saveSoon(); }
+    if (stakeDrop > 0) stakeDrop = Math.max(0, stakeDrop - dt * 1000);
+    if (newJointAt && nowMs() > newJointAt) { newJointAt = 0; state.joint.gap = 32; state.joint.hits = 0; jointDrop = 220; saveSoon(); }
+    if (jointDrop > 0) jointDrop = Math.max(0, jointDrop - dt * 700);
+    updateParts(dt);
+    shakeAmp *= Math.pow(0.0015, dt);
+    if (shakeAmp < 0.05) shakeAmp = 0;
+
+    var c = ctx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.clearRect(0, 0, W, H);
+    c.save();
+    if (shakeAmp > 0 && !reduce) { c.drawImage(bg, 0, 0, W, H); c.translate(rnd(-1, 1) * shakeAmp, rnd(-1, 1) * shakeAmp); }
+    c.drawImage(bg, 0, 0, W, H);
+    if (sc === "assemble") {
+      drawAssembleDyn(c, dt);
+    } else if (sc === "board") {
+      drawSpecks(c);
+      drawXray(c);
+      var act = activeNail || activeScrew;
+      var list = [];
+      state.board.nails.forEach(function (n) { list.push({ v: n.v, n: n }); });
+      state.board.screws.forEach(function (q) { list.push({ v: q.v, q: q }); });
+      list.sort(function (a, b) { return a.v - b.v; });
+      if (act && endPose === 0) {
+        var ap = bpt(act.u, act.v), pr = 1 + (reduce ? 0 : Math.sin(t / 250) * 0.08);
+        c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 4;
+        ellipse(c, ap.x, ap.y, 16 * LB.k * pr, 7 * LB.k * pr); c.stroke();
+      }
+      list.forEach(function (it) { if (it.n) drawNail(c, it.n); else drawScrew(c, it.q); });
+      if (state.mode === "hammer") { if (state.act === "pull") drawPullTool(c); else drawHammerTool(c); }
+      else drawDriverTool(c, dt);
+    } else if (sc === "metal") {
+      for (var i = 0; i < 5; i++) drawRivet(c, i);
+      drawHammerTool(c);
+    } else if (sc === "joint") {
+      drawJointDyn(c);
+      drawHammerTool(c);
+    } else {
+      drawYardDyn(c);
+      drawHammerTool(c);
+    }
+    drawParts2(c);
+    c.restore();
+    updateReadout();
+    updateGhost();
+    if (saveWanted && nowMs() - lastSave > 600) save();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Panel ----------
+  var sub = "tools";
+  function render() {
+    var m = state.mode;
+    $("tabHammer").setAttribute("aria-pressed", String(m === "hammer"));
+    $("tabScrew").setAttribute("aria-pressed", String(m === "screw"));
+    $("paneHammer").classList.toggle("off", m !== "hammer");
+    $("paneScrew").classList.toggle("off", m !== "screw");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-hammer]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.hammer === state.hammer)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-driver]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.driver === state.driver)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nail]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.nail === state.nail)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-act]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.act === state.act)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-face]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.face === state.face)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-head]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.head === state.head)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-len]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.len) === state.len)); });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-bit]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.bit === state.bit)); });
+    $("dirBtn").textContent = state.dir === "fwd" ? "Forward \u21BB" : "Reverse \u21BA";
+    $("dirBtn").classList.toggle("rev", state.dir !== "fwd");
+    $("panel").setAttribute("data-sub", sub);
+    $("subHam").setAttribute("aria-pressed", String(m === "hammer" && sub === "tools"));
+    $("subNails").setAttribute("aria-pressed", String(m === "hammer" && sub === "supplies"));
+    $("subDrv").setAttribute("aria-pressed", String(m === "screw" && sub === "tools"));
+    $("subScr").setAttribute("aria-pressed", String(m === "screw" && sub === "supplies"));
+    $("subNails").textContent = ({ board: "Nails", metal: "Faces", joint: "Jobs", yard: "Jobs" })[HAMMERS[state.hammer].scene];
+    Array.prototype.forEach.call(document.querySelectorAll("[data-hdir]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.hdir === state.dir)); });
+    var sc = HAMMERS[state.hammer].scene;
+    $("ctxNails").classList.toggle("off", sc !== "board");
+    $("ctxMetal").classList.toggle("off", sc !== "metal");
+    $("ctxJoint").classList.toggle("off", sc !== "joint");
+    $("ctxYard").classList.toggle("off", sc !== "yard");
+    var kind = DRIVERS[state.driver].kind;
+    $("powerCtl").classList.toggle("off", kind !== "power");
+    $("handDir").classList.toggle("off", kind === "power");
+    $("trigger").hidden = !(m === "screw" && kind === "power" && !PJ);
+    $("stage").classList.toggle("pow", m === "screw" && kind === "power" && !PJ);
+    renderCard();
+    updateCounts();
+    saveSoon();
+  }
+  var FACTS = {
+    claw: "The curved claw pulls nails back out.",
+    framing: "A long handle and a milled face: fewer hits for each nail.",
+    ballpeen: "The round peen shapes metal and rounds over rivets.",
+    mallet: "A soft rubber head taps wood together without dents.",
+    deadblow: "Steel shot inside the head stops the bounce.",
+    sledge: "A heavy steel head on a long handle. Big, slow swings!",
+    flathead: "A flat blade fits slotted screws.",
+    phillips: "A cross tip fits Phillips screws.",
+    torx: "A six-point star grips tight and rarely slips.",
+    square: "Square drive, also called Robertson. The screw stays on the tip.",
+    hex: "Hex key or Allen key. The long arm of the L gives you leverage.",
+    drilldriver: "The clutch clicks and stops the screw when it is all the way in.",
+    impact: "A hammer and anvil inside go rat-a-tat for extra twist."
+  };
+  var cardKey = "";
+  function renderCard() {
+    var id = state.mode === "hammer" ? state.hammer : state.driver;
+    if (id === cardKey) return;
+    cardKey = id;
+    $("cardArt").innerHTML = state.mode === "hammer" ? hammerIcon(id) : driverIcon(id);
+    $("cardText").textContent = FACTS[id];
+  }
+  function setScene() {
+    bgDirty = true;
+    ham.tgt = defaultTarget();
+    ham.phase = "rest"; ham.g = null; ham.pos = null;
+    drv.pos = null;
+    pull = null;
+    if (trig.on) setTrigger(false, null);
+    hideCamout();
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.classList.contains("hold") || t.id === "trigger" || t.id === "bigToggle" || t.closest(".sheet, .rest, .farewell")) return;
+    if (locked()) return;
+    ensureAudio();
+    acted();
+    var oldScene = sceneName(), oldMode = state.mode;
+    if (t.dataset.mode) { state.mode = t.dataset.mode === "driver" ? "screw" : t.dataset.mode; }
+    else if (t.dataset.hammer) { state.hammer = t.dataset.hammer; state.mode = "hammer"; }
+    else if (t.dataset.driver) { state.mode = "screw"; pickDriver(t.dataset.driver); }
+    else if (t.dataset.nail) { state.nail = t.dataset.nail; }
+    else if (t.dataset.act) {
+      if (t.dataset.act === "pull" && !state.board.nails.length) { flashHint("No nails yet! Hit one in first.", 3); sndClick(); }
+      else setAct(t.dataset.act);
+    }
+    else if (t.dataset.job) { ham.tgt = { kind: t.dataset.job }; ham.queue = 0; if (ham.phase === "follow") ham.phase = "rest"; sndClick(); }
+    else if (t.dataset.face) { state.face = t.dataset.face; ham.pos = null; }
+    else if (t.dataset.head) { pickHead(t.dataset.head); }
+    else if (t.dataset.hdir) { state.dir = t.dataset.hdir; drv.pend = 0; sndClick(); }
+    else if (t.dataset.len) { pickLen(Number(t.dataset.len)); }
+    else if (t.dataset.bit) { state.bit = t.dataset.bit; hideCamout(); }
+    else if (t.id === "dirBtn") { state.dir = state.dir === "fwd" ? "rev" : "fwd"; sndClick(); }
+    else if (t.dataset.pick) { var pk = t.dataset.pick.split(":"); state.mode = pk[0]; sub = pk[1]; }
+    else if (t.id === "camFix") {
+      if (camFixTo && camFixTo.driver) { state.driver = camFixTo.driver; }
+      if (camFixTo && camFixTo.bit) state.bit = camFixTo.bit;
+      drv.camT = 0; hideCamout();
+    }
+    else if (t.dataset.newboard) { newBoard(); }
+    else if (t.dataset.reset) { resetScene(t.dataset.reset); }
+    else return;
+    var modeMoved = !!t.dataset.mode || state.mode !== oldMode;
+    if (sceneName() !== oldScene || modeMoved || t.dataset.hammer) setScene();
+    if (modeMoved || t.dataset.newboard) autoScrew(false);
+    render();
+  });
+  // Auto-match: picking a screw picks the driver (or bit) that fits it.
+  function pulseBtn(sel) {
+    var b = document.querySelector(sel);
+    if (b) { b.classList.remove("pulse"); void b.offsetWidth; b.classList.add("pulse"); }
+  }
+  function pickHead(h) {
+    state.head = h; drv.camT = 0; hideCamout();
+    if (DRIVERS[state.driver].kind === "power") { if (state.bit !== h) { state.bit = h; pulseBtn('[data-bit="' + h + '"]'); } }
+    else if (state.driver !== HEADS[h].driver) { state.driver = HEADS[h].driver; pulseBtn('[data-driver="' + state.driver + '"]'); }
+    if (state.dir === "rev") state.dir = "fwd";
+    autoScrew(true);
+  }
+  function pickLen(len) {
+    state.len = len;
+    if (state.dir === "rev") state.dir = "fwd";
+    autoScrew(true);
+  }
+  // Picking a driver: a fresh, untouched screw changes to fit it. A screw already being
+  // turned keeps its head, so a different driver on it shows the friendly cam-out slip.
+  function pickDriver(id) {
+    state.driver = id; drv.camT = 0; hideCamout(); drv.pend = 0;
+    if (PJ) {
+      if (DRIVERS[id].head) { state.head = DRIVERS[id].head; state.bit = DRIVERS[id].head; }
+      return;
+    }
+    var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null;
+    var busy = q && !screwFinished(q) && !fresh(q) ? q : null;
+    if (DRIVERS[id].kind === "power") state.bit = busy ? busy.h : state.head;
+    else if (!busy) state.head = DRIVERS[id].head;
+    if (!busy) autoScrew(true);
+  }
+  function fresh(q) { return !q.done && q.d <= 4.01; }
+  // There is always a screw standing ready: a new one is started for you.
+  // force: the screw choice changed, so a fresh screw changes to match, or a new one goes in.
+  function autoScrew(force) {
+    if (PJ || state.mode !== "screw" || locked() || state.dir === "rev") return;
+    var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null;
+    if (q && fresh(q)) {
+      if (q.h !== state.head || q.len !== state.len) {
+        q.h = state.head; q.len = state.len; drv.camT = 0;
+        var p = bpt(q.u, q.v);
+        ring(p.x, p.y, 26 * LB.k, "255,201,60"); sndPlace(); saveSoon();
+      }
+      return;
+    }
+    if (q && (!force || (!screwFinished(q) && q.h === state.head && q.len === state.len))) return;
+    placeScrew(null);
+  }
+  function newBoard() {
+    state.board = freshBoard();
+    activeNail = null; activeScrew = null; specks = []; pull = null;
+    ham.tgt = defaultTarget();
+    bgDirty = true;
+    dust(W / 2, LB.yBack + LB.dTop / 2, 16, 1.5);
+    stars(W / 2, LB.yBack + LB.dTop / 2, 14);
+    pop("New board!", W / 2, LB.yBack - 10, 30, "#FFC93C");
+    sndChime();
+    updateCounts(); saveSoon();
+  }
+  function resetScene(which) {
+    if (which === "metal") { state.metal = freshMetal(); pop("New plate!", W / 2, LM.yBack - 20, 28, "#FFC93C"); }
+    else if (which === "joint") { state.joint = freshJoint(); jointDrop = 220; newJointAt = 0; pop("New wood!", W / 2, LJ.yBack - 40, 28, "#FFC93C"); }
+    else if (which === "log") { state.yard.wedge = 30; state.yard.hits = 0; logSplit = null; newLogAt = 0; logDrop = 300; }
+    else if (which === "stake") { state.yard.stake = 430; state.yard.shits = 0; newStakeAt = 0; stakeDrop = 400; }
+    sndPlace();
+    bgDirty = true; saveSoon();
+  }
+
+  // ---------- Play timer hooks (the shared Toybox timer: it keeps going on every Workshop page) ----------
+  // Ending: the tools are put down on the bench (optional Goodbye tap), then the workshop rests.
+  var endingDone = null;
+  function setNavDisabled(on) {
+    ["wallBtn", "homeBtn"].forEach(function (id) {
+      var a = $(id);
+      if (on) { a.setAttribute("aria-disabled", "true"); a.setAttribute("tabindex", "-1"); }
+      else { a.removeAttribute("aria-disabled"); a.removeAttribute("tabindex"); }
+    });
+  }
+  ["wallBtn", "homeBtn"].forEach(function (id) {
+    $(id).addEventListener("click", function (e) { if (locked()) e.preventDefault(); });
+  });
+  // Small ring on the workbench: the colored arc is the time left.
+  function drawTimer(info) {
+    var g = $("tring");
+    var active = info.phase === "running" || info.phase === "ending";
+    if (!active) { g.innerHTML = ""; g.hidden = true; return; }
+    g.hidden = false;
+    var f = info.fraction, mins = info.minutes;
+    var R = 19, col = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    var sv = '<circle r="26" fill="#FFFFFF" stroke="#1D2340" stroke-width="3"/><circle r="' + R + '" fill="none" stroke="rgba(29,35,64,0.14)" stroke-width="8"/>';
+    if (f >= 0.9995) sv += '<circle r="' + R + '" fill="none" stroke="' + col + '" stroke-width="8"/>';
+    else if (f > 0.002) {
+      var a = f * 2 * Math.PI;
+      sv += '<path d="M0 ' + (-R) + " A" + R + " " + R + " 0 " + (a > Math.PI ? 1 : 0) + " 1 " + n2(R * Math.sin(a)) + " " + n2(-R * Math.cos(a)) +
+        '" fill="none" stroke="' + col + '" stroke-width="8" stroke-linecap="round"/>';
+    }
+    if (info.showMinutes && info.phase === "running") {
+      sv += '<text x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="' + (mins > 9 ? 15 : 18) +
+        '" font-weight="800" font-family="Baloo 2, Trebuchet MS, sans-serif" fill="#1D2340">' + mins + "</text>";
+    }
+    g.innerHTML = sv;
+  }
+  function onEnding(done) {
+    endingDone = done;
+    if (trig.on) setTrigger(false, null);
+    pull = null; ham.g = null; drv.g = null; gest = {};
+    hideCamout();
+    setNavDisabled(true);
+  }
+  function goodbyeTap() {
+    stars(W / 2, H / 2, 26);
+    dust(W / 2, H * 0.7, 14, 1.4);
+    sndChime();
+  }
+  function restArtSVG() {
+    var s = '<rect x="0" y="0" width="400" height="150" rx="18" fill="#C79A64"/>', x, y;
+    for (y = 14; y < 150; y += 22) for (x = 14; x < 400; x += 22) s += '<circle cx="' + x + '" cy="' + y + '" r="3" fill="#8B6038"/>';
+    // tools hanging on the pegboard
+    s += '<g transform="translate(46 22) rotate(90) scale(0.42)">' + partsSVG(hammerArt("claw", true).parts) + "</g>";
+    s += '<g transform="translate(110 20) rotate(90) scale(0.4)">' + partsSVG(hammerArt("mallet", true).parts) + "</g>";
+    s += '<g transform="translate(300 126) scale(0.52)">' + partsSVG(DRV_ART.flathead.parts) + "</g>";
+    s += '<g transform="translate(330 126) scale(0.52)">' + partsSVG(DRV_ART.torx.parts) + "</g>";
+    s += '<g transform="translate(360 126) scale(0.52)">' + partsSVG(DRV_ART.square.parts) + "</g>";
+    s += '<text x="210" y="92" text-anchor="middle" font-size="40" font-family="Baloo 2, Trebuchet MS, sans-serif" font-weight="800" fill="#1D2340">z z z</text>';
+    // the bench, with tools put down
+    s += '<rect x="0" y="140" width="400" height="60" fill="#A56C38" stroke="#1D2340" stroke-width="4"/><rect x="0" y="198" width="400" height="40" rx="6" fill="#6E4321" stroke="#1D2340" stroke-width="4"/>';
+    s += '<g transform="translate(60 182) scale(0.5 0.28)">' + partsSVG(hammerArt("claw", true).parts) + "</g>";
+    s += '<g transform="translate(230 178) rotate(90) scale(0.28 0.5)">' + partsSVG(DRV_ART.phillips.parts) + "</g>";
+    [[220, 160, 80], [236, 164, 100], [330, 160, 70], [350, 166, 95]].forEach(function (q) {
+      s += '<g transform="translate(' + q[0] + " " + q[1] + ") rotate(" + q[2] + ') scale(0.32)">' + partsSVG(nailIconParts(NAILS.c50)) + "</g>";
+    });
+    return '<svg class="rest-art" viewBox="0 0 400 240" aria-hidden="true">' + s + "</svg>";
+  }
+  function onRest() { endingDone = null; setNavDisabled(true); endPose = 1; }
+  function onWake() { endingDone = null; setNavDisabled(false); }
+  window.addEventListener("pagehide", function () { if (saveWanted) save(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { if (saveWanted) save(); if (trig.on) setTrigger(false, null); motorSet(0); } });
+
+  // ---------- Start ----------
+  if (state.mode === "hammer" && HAMMERS[state.hammer].scene === "board" && state.board.nails.length) {
+    var unfinished = state.board.nails.filter(function (n) { return n.d < NAILS[n.t].len; });
+    activeNail = unfinished.length ? unfinished[unfinished.length - 1] : null;
+  }
+  if (state.mode === "screw" && state.board.screws.length) {
+    var looseScrews = state.board.screws.filter(function (q) { return q.d < q.len - 0.01 && driverMatches(q); });
+    activeScrew = looseScrews.length ? looseScrews[looseScrews.length - 1] : null;
+  }
+  idleSince = nowMs();
+  render();
+  setScene();
+  resize();
+  autoScrew(false);
+  // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
+  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
+  Toybox.init({
+    app: "workshop-hammer",
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the tools are put down, the workshop rests, and the controls lock. The timer carries over to every Workshop page.",
+    goodbyeOption: "End with a Goodbye tap button to press",
+    farewellText: "Time to put the tools down",
+    goodbyeLabel: "Goodbye tap",
+    farewellDone: "Bye bye, workshop!",
+    restLine: "The workshop is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArtSVG,
+    soundNote: "Soft taps, clicks and a motor hum. Hold for 2 seconds.",
+    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    onEnding: onEnding,
+    onGoodbye: goodbyeTap,
+    onRest: onRest,
+    onWake: onWake,
+    onBig: function () { resize(); },
+    onSound: function (on) { if (on) sndChime(); else motorSet(0); },
+    onTimer: drawTimer
+  });
+  requestAnimationFrame(function (t) { last = t; frame(t); });
+})();

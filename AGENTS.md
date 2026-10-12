@@ -73,7 +73,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - `tools/`: `smoke.js` (load + drag + error/scroll check), `buttons.js` (taps every button on every page and
   flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
   cut off by their button or tile at every test size, with the real font; `common/toybox.js` shrinks an overflowing
-  label down to 70% as a safety net, so fix the layout when it reports something), `add-app.py` (add an app to launcher, top-level
+  label down to 70% as a safety net, so fix the layout when it reports something), `shot.js` (screenshots of one
+  page at named sizes, with tap/drag/click steps; the everyday check), `changed-pages.js` (the pages a git range
+  touched; used by the CI report job), `add-app.py` (add an app to launcher, top-level
   `sw.js` and README), `snippets/` (the old pasted copies of the idle ghost hand and the coach pill; the master
   is now `Toybox.ghost` / `Toybox.coach` in `common/`), `shell-demo.html` (every shared component).
 
@@ -372,9 +374,12 @@ Keep only:
 - **Modern JavaScript is allowed** in new and changed code: `let`/`const`, arrow functions, classes,
   template strings. Every iOS Safari the family uses supports them. Keep `"use strict"` and the IIFE (or use
   `<script type="module">`, which also needs no build step). Don't convert untouched old code just for style.
-- **Split big pages**: when you work substantially on a page over about 2500 lines, move its script into plain
-  `.js` files next to it (e.g. `saw-bench.js`, or by topic: drawing, input, state), loaded with `<script src>`.
-  No bundler. Add every new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it).
+- **Split big pages**: when you work substantially on a page over about 2500 lines, move its script into a plain
+  `.js` file next to it with the page's name (`saw-bench.html` → `saw-bench.js`), loaded with `<script src>` at
+  the same place, with a "Sections" list at its top (the titles of its section comments). No bundler. Add every
+  new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it). Done so far: Saw Bench,
+  Tool Wall (`workshop/index.js`), Hammer & Screws, Car Builder, Marble Run. Keep each Sections list current
+  when you add or rename a section.
 - **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
   provides (the ghost hand from `tools/snippets`, the coach pill, audio setup), switch it to the shared version
   (`Toybox.ghost`, `Toybox.coach`, `Toybox.sound.ready()`) in the same change. When two or more apps need the
@@ -419,29 +424,44 @@ Keep only:
 
 ## 5. Working on it
 
-### With several agents
-- At most **three agents at a time** (the owner cares about not overloading the machine).
-- Each agent owns specific files. Don't edit files outside your assignment. Shared files (`common/`, the
-  launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are edited by the coordinator only, unless assigned.
-- The top-level `sw.js` is the coordinator's: agents don't edit its `CORE`; the coordinator adds new pages.
-- **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
-  tree**: other agents' uncommitted work lives there. To compare with an older version, export it with
-  `git show HEAD:<path> > <scratch file>` instead.
-- Subagents don't commit or push; the coordinator reviews screenshots, smoke-tests and commits per app/group.
-- Pace: get it working first, save early, one quick test pass, report within about 20 minutes, listing UI issues
-  you noticed but didn't polish. Report: what works, what changed, open questions for the dad, screenshot paths.
+Only agents change this repo (Claude Code, Antigravity and others); the dad doesn't edit code. Optimise for agents:
+small changes should take minutes, not tens of minutes.
 
-### Testing
-- Serve: `npx http-server . -p <your port> -c-1 -s` (use a unique port per agent).
-- Playwright: on the owner's Mac it's a global npm install (`npm root -g`), so scripts need
-  `NODE_PATH=$(npm root -g)`. Its own Chromium download may not be available; `CHANNEL=chrome` (smoke.js) or
-  `chromium.launch({ channel: "chrome" })` drives the installed Google Chrome instead. Don't run
-  `playwright install` unless the download actually works. Block Google Fonts in tests:
-  `context.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort())`.
-- Workshop pages need `sessionStorage["workshop-gear"]="on"` (and `"workshop-check-skip"="1"` to skip the check);
-  site pages need `"site-gear"="on"`, or they redirect to the gear-up.
-- `node tools/smoke.js <pages...>` (PORT, SIZE, MOBILE=1 env vars) for a quick pass. Then drive the real play
-  action, check no page errors and no page scroll, take screenshots at the three sizes and **look at them**.
+### How to work (decided 2026-10-12)
+- **Do small changes yourself, in one agent.** A fix, a tweak, a new option or anything in one or two pages: no
+  subagents. Read only the files the change needs (big pages have a "Sections" list at the top of their `.js`:
+  search for a section title instead of reading the whole file).
+- **Subagents only for big, independent work**: a new app or station, or several unrelated jobs at once. Then at
+  most **three agents at a time**; each owns specific files and doesn't edit outside them; shared files
+  (`common/`, the launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are the coordinator's; subagents don't
+  commit or push; they report what works, what changed, open questions for the dad and screenshot paths.
+- **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
+  tree** while other agents may have uncommitted work in it. To compare with an older version, export it with
+  `git show HEAD:<path> > <scratch file>` (or a `git worktree` outside the repo).
+- `PLAN.md` (backlog, plans for new apps, history) only needs reading when the task is about the backlog, a new
+  app or something it names; it isn't needed for a fix.
+
+### Checking a change (match the checks to the change)
+- **Every change**: `node tools/check-site.js` (when files were added or renamed) and `node tools/smoke.js <changed
+  pages>`, then `node tools/shot.js <page>` and **look at** the picture of what changed (upright phone by
+  default; add `--sizes` for layout work). Drive the real action with `--do` steps (`tap:`, `drag:`, `click:`,
+  `wait:`, `eval:`, `shot:`; see its header) instead of writing a new Playwright script.
+- **Layout or new UI** (panel, tiles, header, a new control): also `--sizes all` in `shot.js`.
+- **The slow finders run on GitHub, not locally**: after the push, the deploy workflow's **report** job runs
+  `tools/fit.js` (cut-off labels, five sizes) and `tools/buttons.js` (taps that change nothing, phone and iPad) on
+  the pages the push changed, and shows the results in the run's summary and log (artifact `toybox-report` has the
+  pictures). It never blocks the deploy. Read it when it finishes (Claude: the GitHub tools `actions_list` /
+  `get_job_logs`; elsewhere `gh run view --log`) and fix what it lists in a follow-up commit. Run `fit.js` or
+  `buttons.js` locally only when you are fixing something they reported.
+- The deploy's **check** job (blocking) smoke-tests every page at four sizes; if it fails nothing is published.
+
+### Testing setup
+- Serve: `npx http-server . -p <your port> -c-1 -s` (a unique port per agent); tools take `PORT=<port>`.
+- Playwright: with a global install, scripts need `NODE_PATH=$(npm root -g)`. If its own Chromium isn't
+  available, `CHANNEL=chrome` drives an installed Google Chrome. Don't run `playwright install` unless the
+  download actually works. The tools block Google Fonts themselves.
+- The tools set the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) so stations don't redirect to the
+  gear-up; in your own scripts set them in sessionStorage (and `"workshop-check-skip"="1"`).
 
 ### Adding a new app
 1. Build the folder (see §2), using `common/` for the grown-up layer, following every rule in §3.
