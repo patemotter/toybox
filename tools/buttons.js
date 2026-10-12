@@ -413,6 +413,8 @@ async function testPage(browser, helper, url) {
     } catch (e) { verdict = { alive: false, why: 'recheck error ' + e.message.slice(0, 50) }; }
     if (verdict.alive) { res.alive++; continue; }
     if (c.selected) { res.selectedNoop = (res.selectedNoop || []).concat(c.label); continue; } // tapping the current tab/choice again
+    // A grown-up hold button (sound, timer) whose fill started: a quick tap is meant to do nothing more.
+    if (c.hold && P.domOnly && P.domOnly.some(d => /fill/.test(d))) { res.holdOnly = (res.holdOnly || []).concat(c.label); continue; }
     const note = [P.domOnly ? 'dom only: ' + P.domOnly.join(' ') : '', c.hold ? 'hold button' : '', c.selected ? 'already selected' : '', c.faded ? 'looks faded' : '', verdict.why].filter(Boolean).join(', ');
     res.dead.push({ label: c.label, path: c.path, note, via: c.via.length });
     if (SHOTS && verdict.s1 && verdict.s2) {
@@ -464,6 +466,8 @@ async function testPage(browser, helper, url) {
   }
   const sel = results.filter(r => r.selectedNoop);
   if (sel.length) console.log('\nAlready selected, tap again does nothing (fine): ' + sel.map(r => `${r.url} [${r.selectedNoop.join('] [')}]`).join(', '));
+  const holds = results.filter(r => r.holdOnly);
+  if (holds.length) console.log('\nHold buttons, a tap only starts the fill (fine): ' + holds.map(r => `${r.url} [${r.holdOnly.join('] [')}]`).join(', '));
   const nr = results.filter(r => r.notReached.length);
   if (nr.length) console.log('\nNot reached (hidden when their turn came, or time cap): ' + nr.map(r => `${r.url} (${r.notReached.length})`).join(', '));
   if (process.env.OUT) fs.writeFileSync(process.env.OUT, JSON.stringify(results, null, 1));

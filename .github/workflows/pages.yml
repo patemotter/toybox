@@ -118,10 +118,14 @@ jobs:
           SIZE=390x844 MOBILE=1 SHOTS=report/buttons-phone node tools/buttons.js $pages > report/buttons-phone.txt 2>&1 & b=$!
           SIZE=1180x820 SHOTS=report/buttons-ipad node tools/buttons.js $pages > report/buttons-ipad.txt 2>&1 & c=$!
           wait $a $b $c
-          for f in report/fit.txt report/buttons-phone.txt report/buttons-ipad.txt; do echo "===== $f"; cat "$f"; done
+          # The "ui warn" / "warn" lines measure pages against the reverted redesign's sizes (AGENTS.md §3): they
+          # stay in the artifact's full files but are left out of the log and summary, so only real findings show.
+          for f in report/fit.txt report/buttons-phone.txt report/buttons-ipad.txt; do
+            grep -vE 'ui warn|^warn |^ok ' "$f" > "${f%.txt}-findings.txt" || true; done
+          for f in report/*-findings.txt; do echo "===== $f"; cat "$f"; done
           { echo "## Toybox report"; echo; echo "Pages: $(tr '\n' ' ' < pages.txt)"; echo
-            for f in report/fit.txt report/buttons-phone.txt report/buttons-ipad.txt; do
-              echo "### $(basename "$f" .txt)"; echo '```'; tail -c 30000 "$f"; echo '```'; done; } >> "$GITHUB_STEP_SUMMARY"
+            for f in report/*-findings.txt; do
+              echo "### $(basename "$f" -findings.txt)"; echo '```'; tail -c 30000 "$f"; echo '```'; done; } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: steps.pages.outputs.count != '0'
