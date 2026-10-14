@@ -663,7 +663,7 @@
   function firstStep() { return job === "chip" ? "turn" : "fell"; }
 
   // =====================================================================================================
-  // The stage: one view, or two on an upright stage (the whole job on top, a close-up of the work below)
+  // The stage: one view (the close-up view below is switched off; the code stays in case a step needs it again)
   // =====================================================================================================
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
   var W = 300, H = 300, DPR = 1, split = false;
@@ -682,7 +682,7 @@
     W = Math.max(50, r.width); H = Math.max(50, r.height);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    split = H > W * 0.92;
+    split = false;   // one view (the dad, 2026-10-14: the close-up below added nothing here)
     // the coach pill sits at the bottom of the stage: on a split stage the close-up stops above it, so the work
     // it shows (the wheels, the foot of the post) is never under the pill
     if (split) { var hy = Math.round(H * 0.52), co = Math.min(84, Math.round(H * 0.12)); RW = { x: 0, y: 0, w: W, h: hy }; RC = { x: 0, y: hy, w: W, h: H - hy - co }; }
@@ -909,6 +909,7 @@
       Farm.world.update(function (w) { w.chips = (typeof w.chips === "number" && isFinite(w.chips) ? w.chips : 0) + 1; });
     } else { coach.say("The sheep are safe in the field.", 5); fld.home = 0.01; }
     save(); setCount(true); snd.chime(); Toybox.kind();
+    coach.step(job === "chip" ? "Tap the wood chipper to chip more branches." : "Tap the field to cut another tree.");
   }
   function again() {
     if (phase !== "done") return false;
@@ -1429,7 +1430,7 @@
     }
     if (phase === "work" && part && part !== "hole") { busyHint(); return; }
     if (tagLogs(part)) return;
-    if (phase === "done") { coach.say("The sheep are safe in the field.", 3); return; }
+    if (phase === "done") { again(); return; }   // no step row: a tap on the finished scene starts the next tree
     hint();
   }
   // which view a finger is in, and the world x under it
@@ -1482,6 +1483,7 @@
       var mine = false;
       if (stepId === "turn") mine = part === "tractor" || part === "chipper";
       else if (stepId === "feed" || stepId === "chips") mine = part === "pile" || part === "grapple" || part === "chipper" || part === "tractor";
+      if (phase === "done") { again(); return; }
       if (mine && phase === "ready") { go(); return; }
       if (part === "spout") { ch.kick = 1; snd.pop(); tag("Spout", NOZ[0], NOZ[1] + 0.3); if (phase !== "work") coach.say("The spout aims the chips.", 3); return; }
       if (part === "tractor") { snd.horn(); tag("Swivel seat", -0.3, 3.1); return; }
@@ -1489,7 +1491,7 @@
       if (part === "grapple") { grp.open = 1; snd.tick(); tag("Crane", grp.x, grp.h + 0.9); return; }
       if (part === "pile") { snd.tick(); tag("Branches", (PILE0 + PILE1) / 2, 1.5); return; }
       if (part === "trailer") { snd.clunk(); tag("Trailer", TRC, 3.9); return; }
-      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep();
+      if (phase === "done") { again(); return; } else steps.sayStep();
       if (ghost) ghost.poke();
     }
   });
@@ -1599,6 +1601,12 @@
   function follow(dt, snap) {
     var e = Math.min(1, dt * 2.2), rg = wideRange(), ct = closeTarget();
     zW.target = rg.xb - rg.xa; zW.mht = rg.mh; zW.tcx = (rg.xa + rg.xb) / 2;
+    // an upright stage is narrow: the wide range leaves the machines small under a big sky, so frame the work
+    // more tightly there (between the wide range and the close-up)
+    if (!split && H > W * 1.2 && job === "logs" && stepId !== "lorry") {   // the lorry and the chipper rig are too long
+      var a = 0.4;
+      zW.target += (ct.span - zW.target) * a; zW.tcx += (ct.cx - zW.tcx) * a; zW.mht += (ct.mh - zW.mht) * a;
+    }
     zC.target = ct.span; zC.mht = ct.mh; zC.tcx = ct.cx;
     [[zW, scW, RW], [zC, scC, RC]].forEach(function (q) {
       var z = q[0];
@@ -1964,10 +1972,9 @@
   }
   // Over the scene: a ring on the thing to touch next, and the saw line's end view while a log goes through.
   function drawOverlays() {
-    if (job !== "logs") return;
     var b = cv.getBoundingClientRect();
     if (phase === "ready" && !(drag && drag.kind !== "act")) {
-      var p = targetPt();
+      var p = job === "logs" ? targetPt() : partScreen(stepId);
       if (p) {
         var x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
         ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
@@ -1975,7 +1982,7 @@
         ctx.restore();
       }
     }
-    if (stepId === "saw" && mill.inset) {
+    if (job === "logs" && stepId === "saw" && mill.inset) {
       var R = RW, sz = Math.round(Math.min(R.w * 0.26, R.h * 0.36, 132)), x0 = R.x + R.w - sz - 64, y0 = R.y + 10;
       if (x0 < R.x + R.w * 0.45) x0 = R.x + R.w - sz - 10;
       ctx.save();

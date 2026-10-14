@@ -60,11 +60,15 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
   Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
   loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, the
-  tractor's post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
-  do, it never does it; Chipper still uses the old Go-plays-the-step pattern), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
+  tractor's post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). **No step row and one view**
+  (the dad, 2026-10-14: the close-up below "added nothing" and the green step chips looked like buttons): the coach
+  line and a yellow ring on the scene point at the next thing to tap or drag; at the end a tap on the scene starts
+  again. Chipper is played the same way, by tapping the machine), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
-  Hunt"); `field.html` only redirects to spuds. Each station: a step row (plus a job bar where the episode has two
-  jobs), a split stage on tall screens (the whole rig on top, a close-up of the work happening now below). Shared
+  Hunt"); `field.html` only redirects to spuds. Each station not yet rebuilt: a step row (plus a job bar where the
+  episode has two jobs), a split stage on tall screens (the whole rig on top, a close-up of the work below). A
+  rebuilt hands-on station follows Timberrrrr!: no step row, one view framed on the work, the split close-up only
+  where it shows something the main view can't. Shared
   code in `farm/farm.js` (`Farm.NAMES`, scene, tractor, combine, telehandler, cow...), documented in its header,
   world state in `farm-world-v1`; a map lot is one `STATIONS` entry in `farm/index.html`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
