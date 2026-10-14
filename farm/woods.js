@@ -10,7 +10,7 @@
   //   Sawmill: drive the log loader to the pile, grab the logs, drive to the log deck and drop them on it; then
   //            each log rolls onto the conveyor: the squaring saw cuts off the round sides, the splitting saw
   //            cuts it into two square fence posts (an end-view inset shows it).
-  //   Fence:   at the field Les stands a post in the gap, pushes it straight (spirit level), Tractor Ted backs up
+  //   Fence:   at the field Farmer Tom stands a post in the gap, Tractor Ted backs up
   //            with the post knocker and knocks it in, Farmer Tom fixes the netting: the sheep are safe.
   // Chipper: the tractor's seat swivels round to face the wood chipper on the back; the chipper's crane
   //          unfolds, grabs the branches off the brash pile and lays them on the infeed table; the rollers pull
@@ -713,7 +713,6 @@
     "saw.drop": { say: "Tap the grab to put the logs on the deck.", part: "grab" },
     "saw.feed": { say: "Tap a log to send it through the saws.", part: "deck" },
     "fence.stand": { say: "Tap a post to stand it in the hole.", part: "ppile" },
-    "fence.plumb": { say: "Tap the post to make it straight.", part: "post" },
     "fence.ted": { say: "Drive Tractor Ted to the post.", part: "ted" },
     "fence.knock": { say: "Tap the post knocker to knock the post in.", part: "knocker" },
     "fence.wire": { say: "Tap the fence wire to fix it to the post.", part: "wire" }
@@ -822,7 +821,7 @@
     if (phase === "done") return again();
     busyHint(); return true;
   }
-  var BUSYL = { fell: "The harvester is working.", logs: "The harvester head is cutting.", lorry: "The timber lorry is working.", saw: "The loader and the saws are working.", fence: "Les and Farmer Tom are working." };
+  var BUSYL = { fell: "The harvester is working.", logs: "The harvester head is cutting.", lorry: "The timber lorry is working.", saw: "The loader and the saws are working.", fence: "Farmer Tom is working." };
   function busyHint() {
     if (job === "logs") { snd.horn(); coach.say(BUSYL[stepId] || "Wait a moment.", 3); return; }
     if (phase === "arrive") { coach.say("Here comes the harvester.", 3); return; }
@@ -907,7 +906,6 @@
     fld = {
       post: { st: "pile", tilt: 0, sink: 0 }, pileN: 1, wire: 0, lift: 0, knocks: 0, home: 0, said: false,
       ted: { x: TED0, wheel: 0 },
-      les: { x: PPILE + 1.4, px: PPILE + 1.4, walk: 0, stride: 0, hands: null, bend: 0, flip: false },
       tom: { x: PPILE - 1.5, px: PPILE - 1.5, walk: 0, stride: 0, hands: null, bend: 0, flip: false },
       midge: { x: HOLE + 4.8, ph: 0 },
       sheep: [{ x: 140.5, r: 1.42, ph: 0.1, head: 1, flip: false }, { x: 144.2, r: 1.24, ph: 0.6, head: 1, flip: true }, { x: 158.8, r: 1.34, ph: 0.3, head: 1, flip: false },
@@ -944,8 +942,7 @@
     if (k === "saw.drive2" && (p === "loader" || p === "deck" || p === "grab")) return driveLoader(LD_DECK, 1, "drop"), true;
     if (k === "saw.drop" && (p === "grab" || p === "loader" || p === "deck")) return loaderDrop(), true;
     if (k === "saw.feed" && (p === "deck" || p === "saw")) return sawNext(), true;
-    if (k === "fence.stand" && (p === "ppile" || p === "les" || p === "hole")) return standPostUp(), true;
-    if (k === "fence.plumb" && (p === "post" || p === "les")) return nudgePost(), true;
+    if (k === "fence.stand" && (p === "ppile" || p === "tom" || p === "hole")) return standPostUp(), true;
     if (k === "fence.ted" && (p === "ted" || p === "knocker")) return driveTed(), true;
     if (k === "fence.knock" && (p === "knocker" || p === "ted" || p === "post")) return knock(), true;
     if (k === "fence.wire" && (p === "wire" || p === "tom" || p === "post")) return fixWire(), true;
@@ -1191,36 +1188,30 @@
     Farm.world.update(function (w) { w.posts = (typeof w.posts === "number" && isFinite(w.posts) ? w.posts : 0) + 2; });
     fld.pileN = Math.min(6, mposts.length);
   }
-  // Fence: the posts go to the field. Les stands a post in the hole, pushes it straight (the spirit level shows
-  // it), Tractor Ted backs up with the post knocker and knocks it in, Farmer Tom fixes the netting to it.
+  // Fence: the posts go to the field. Farmer Tom stands a post in the gap, Tractor Ted backs up with the post
+  // knocker and knocks it in, Farmer Tom fixes the netting to it.
   function fenceIn() {
     fld.pileN = Math.max(1, Math.min(6, mposts.length));
     coach.say("The fence posts go to the field.", 4);
-    run(2.6, function () {}, function () { coach.say("The sheep can get out of the gap.", 4); setSub("stand"); tag("Les", fld.les.x, 2.0, 0.97); });
+    run(2.6, function () {}, function () { coach.say("The sheep can get out of the gap.", 4); setSub("stand"); tag("Farmer Tom", fld.tom.x, 2.0, 0.97); });
   }
   function standPostUp() {
-    var L = fld.les, x0 = L.x, pickX = PPILE + 0.9, holdX = HOLE - 0.55;
-    coach.say("Les carries a post to the hole.", 3);
+    var T = fld.tom, x0 = T.x, pickX = PPILE + 0.9, holdX = HOLE - 0.55;
+    coach.say("Farmer Tom carries a post to the hole.", 3);
     run(3.4, function (t) {
-      if (t < 0.9) { L.x = lerp(x0, pickX, ease(t / 0.9)); L.flip = pickX < x0; L.bend = 0; L.hands = null; }
-      else if (t < 1.4) { L.bend = Math.sin(PI * (t - 0.9) / 0.5) * 0.8; if (t > 1.15 && onceM("pick")) { fld.post.st = "held"; fld.pileN = Math.max(0, fld.pileN - 1); snd.tick(); } }
-      else if (t < 2.6) { L.flip = false; L.bend = 0; L.x = lerp(pickX, holdX, ease((t - 1.4) / 1.2)); }
-      else if (onceM("stand")) { fld.post.st = "stand"; fld.post.tilt = 0.3; fld.post.sink = SINK[0]; snd.clunk(); }
-      L.hands = fld.post.st === "held" ? [[0.25, -1.25], [0.1, -1.0]] : (fld.post.st === "stand" ? [[0.45, -1.3], [0.42, -1.02]] : null);
-    }, function () { tag("Spirit level", HOLE + 0.2, 1.8, 1); setSub("plumb"); });
-  }
-  function nudgePost() {
-    var t0 = fld.post.tilt, t1 = Math.abs(t0) < 0.12 ? 0 : t0 * 0.35;
-    coach.say(t1 === 0 ? "Now the post is straight." : "Les pushes the post.", 3);
-    run(0.9, function (t) { fld.post.tilt = lerp(t0, t1, ease(t / 0.9)); fld.les.bend = Math.sin(PI * t / 0.9) * 0.25; },
-      function () { fld.les.bend = 0; if (t1 === 0) { snd.chime(); setSub("ted"); } else setSub("plumb"); });
+      if (t < 0.9) { T.x = lerp(x0, pickX, ease(t / 0.9)); T.flip = pickX < x0; T.bend = 0; }
+      else if (t < 1.4) { T.bend = Math.sin(PI * (t - 0.9) / 0.5) * 0.8; if (t > 1.15 && onceM("pick")) { fld.post.st = "held"; fld.pileN = Math.max(0, fld.pileN - 1); snd.tick(); } }
+      else if (t < 2.6) { T.flip = false; T.bend = 0; T.x = lerp(pickX, holdX, ease((t - 1.4) / 1.2)); }
+      else if (onceM("stand")) { fld.post.st = "stand"; fld.post.tilt = 0; fld.post.sink = SINK[0]; snd.clunk(); }
+      T.hands = fld.post.st === "held" ? [[0.25, -1.25], [0.1, -1.0]] : (fld.post.st === "stand" ? [[0.45, -1.3], [0.42, -1.02]] : null);
+    }, function () { setSub("ted"); });
   }
   function driveTed() {
-    var x0 = fld.ted.x, dur = Math.max(0.7, Math.abs(x0 - TEDK) / 2.4), lx = fld.les.x;
+    var x0 = fld.ted.x, dur = Math.max(0.7, Math.abs(x0 - TEDK) / 2.4), tx = fld.tom.x;
     coach.say("Tractor Ted backs up to the post.", 3);
     run(dur, function (t) {
       var nx = lerp(x0, TEDK, ease(t / dur)); fld.ted.wheel += nx - fld.ted.x; fld.ted.x = nx;
-      fld.les.x = lerp(lx, HOLE - 1.8, ease(t / dur)); fld.les.hands = null;
+      fld.tom.x = lerp(tx, HOLE - 1.8, ease(t / dur)); fld.tom.hands = null;
     }, function () { fld.ted.x = TEDK; snd.clunk(); setSub("knock"); });
   }
   var SINK = [0.3, 0.6, 0.9, 1.2], KNOCKSAY = ["The weight drops on the post.", "The post goes down.", "The post is in the ground."];
@@ -1371,7 +1362,6 @@
         add("ted", fld.ted.x + 0.6, 1.8, 1.8);
         add("knocker", fld.ted.x + KX, 2.4, 1.1);
         add("wire", HOLE + 1.8, 0.6, 1.1);
-        add("les", fld.les.x, 1.1, 0.8, 0.97);
         add("tom", fld.tom.x, 1.1, 0.8, 0.97);
       } else {
         add("tractor", -0.9, 2.0, 2.0);
@@ -1385,7 +1375,7 @@
     return list;
   }
   // A real part's name pops up when he taps it (a small plain label)
-  var NAMESL = { lorry: "Timber lorry", lorrylogs: "Logs", crane: "Crane", weigh: "Weighbridge", stack2: "Log pile", loader: "Log loader", grab: "Log grab", deck: "Log deck", saw: "Saws", postpile: "Fence posts", ppile: "Fence posts", post: "Fence post", hole: "Post hole", ted: "Tractor Ted", knocker: "Post knocker", wire: "Sheep fence", les: "Les", tom: "Farmer Tom" };
+  var NAMESL = { lorry: "Timber lorry", lorrylogs: "Logs", crane: "Crane", weigh: "Weighbridge", stack2: "Log pile", loader: "Log loader", grab: "Log grab", deck: "Log deck", saw: "Saws", postpile: "Fence posts", ppile: "Fence posts", post: "Fence post", hole: "Post hole", ted: "Tractor Ted", knocker: "Post knocker", wire: "Sheep fence", tom: "Farmer Tom" };
   function tagLogs(part) {
     if (part === "harv") { snd.horn(); tag("Forestry harvester", harv.x, 3.4); return true; }
     if (part === "head") { snd.tick(); head.roll += 2; tag("Harvester head", head.x, head.h + 0.7, head.r); return true; }
@@ -1397,7 +1387,7 @@
       if (part === "lorry" || part === "loader" || part === "ted") snd.horn(); else snd.tick();
       var p = { lorry: [lorry.x - 1, 4.2, LR], lorrylogs: [lorry.x + LBUNK, 3.0, LR], crane: [lorry.crane.x, lorry.crane.h + 0.3, LR], weigh: [HUT[0], 3.4, HUT[1]], stack2: [STK2, 1.6, 1],
         loader: [loader.x, 4.0, 1], grab: [grabPt().x, grabPt().h + 1.4, 1], deck: [DECK + 0.3, 2.2, 1.15], saw: [SAW1, 3.4, 1], postpile: [PSTK, 1.8, 1], ppile: [PPILE, 1.0, 0.95],
-        post: [HOLE, postTop() + 0.4, 1], hole: [HOLE, 0.6, 1], ted: [fld.ted.x + 0.5, 3.6, 1], knocker: [fld.ted.x + KX, 4.7, 1], wire: [HOLE + 1.8, 1.5, 1], les: [fld.les.x, 2.0, 0.97], tom: [fld.tom.x, 2.0, 0.97] }[part];
+        post: [HOLE, postTop() + 0.4, 1], hole: [HOLE, 0.6, 1], ted: [fld.ted.x + 0.5, 3.6, 1], knocker: [fld.ted.x + KX, 4.7, 1], wire: [HOLE + 1.8, 1.5, 1], tom: [fld.tom.x, 2.0, 0.97] }[part];
       tag(NAMESL[part], p[0], p[1], p[2]); return true;
     }
     return false;
@@ -1427,7 +1417,6 @@
       else if (k === "lorry.drive" && (p === "lorry" || p === "lorrylogs" || p === "crane" || /^wheel\d$/.test(p))) drag = { kind: "lorry", sc: sc, off: w0 - lorry.x, x0: lorry.x };
       else if ((k === "saw.drive" || k === "saw.drive2") && (p === "loader" || p === "grab")) drag = { kind: "loader", sc: sc, off: w0 - loader.x, x0: loader.x };
       else if (k === "fence.ted" && (p === "ted" || p === "knocker")) drag = { kind: "ted", sc: sc, off: w0 - fld.ted.x, x0: fld.ted.x };
-      else if (k === "fence.plumb" && (p === "post" || p === "les")) drag = { kind: "post", sc: sc, t0: fld.post.tilt };
       else drag = { kind: "act", part: part };
     },
     move: function (part, e, s) {
@@ -1440,7 +1429,6 @@
         if (Math.abs(nx - loader.x) > 0.01) loader.tdir = nx < loader.x ? -1 : 1;
         loader.wheel += (nx - loader.x) * loader.dir; loader.x = nx; carryLogs();
       } else if (drag.kind === "ted") { nx = clamp(wxAt(drag.sc, s.x) - drag.off, TEDK, TED0 + 2); fld.ted.wheel += nx - fld.ted.x; fld.ted.x = nx; }
-      else if (drag.kind === "post") fld.post.tilt = clamp(drag.t0 + s.dx / drag.sc.S(1) * 0.35, -0.45, 0.45);
     },
     up: function (part, e, s) {
       var d = drag; drag = null;
@@ -1457,10 +1445,6 @@
         return;
       }
       if (d.kind === "ted") { if (fld.ted.x < d.x0 - 0.5 || Math.abs(fld.ted.x - TEDK) < 1.2) driveTed(); return; }
-      if (d.kind === "post") {
-        if (Math.abs(fld.post.tilt) < 0.08) { var t0 = fld.post.tilt; run(0.4, function (t) { fld.post.tilt = lerp(t0, 0, ease(t / 0.4)); }, function () { snd.chime(); coach.say("Now the post is straight.", 3); setSub("ted"); }); }
-        else coach.say("Push the post until the bubble is in the middle.", 3);
-      }
     },
     tap: function (part, x, y) {
       if (locked()) return;
@@ -1623,7 +1607,7 @@
         p.x += (tx - p.x) * Math.min(1, dt * 4); p.h += (th - p.h) * Math.min(1, dt * 5);
       });
       // the people walk when they move; the sheep graze; the gap sheep wanders towards the gap until it is fixed
-      [fld.les, fld.tom].forEach(function (P) {
+      [fld.tom].forEach(function (P) {
         var mv = Math.abs(P.x - P.px); P.px = P.x;
         if (mv > 0.0005) { P.walk += mv * 7; P.stride = Math.min(1, P.stride + dt * 6); } else P.stride = Math.max(0, P.stride - dt * 5);
       });
@@ -1894,7 +1878,7 @@
     });
   }
   // The field: sheep behind the fence, the fence with its gap, the old broken post, Tractor Ted and the post
-  // knocker, Les and Farmer Tom, the pile of new posts, and Midge at the end of the day.
+  // knocker, Farmer Tom, the pile of new posts, and Midge at the end of the day.
   function netSpan(c, xa, xb, sag) {
     var NET = [0.15, 0.4, 0.65, 0.9], l0 = LW(), n = Math.max(2, Math.round((xb - xa) / 0.4)), i, j;
     function yAt(hh, f) { return -Math.max(0.03, hh - sag * Math.sin(PI * f) * (0.4 + hh * 0.6)); }
@@ -1923,7 +1907,7 @@
     });
     // the old broken post lying in the grass
     put(sc, HOLE - 1.4, 0.985, 1, function () { ctx.translate(0, -0.12); ctx.rotate(-0.08); Rr(ctx, -0.8, -0.1, 1.15, 0.2, 0.03, "#9C8A6A"); Pp(ctx, [0.35, -0.1, 0.55, -0.02, 0.42, 0.1, 0.35, 0.1], "#9C8A6A", LW() * 0.7); Ln(ctx, -0.6, -0.02, 0.2, 0.0, "#7A6A50", 0.03); });
-    if (fld.post.st === "stand") put(sc, HOLE, 1, 1, function () { standPost(ctx, postTop(), fld.post.tilt, stepId === "fence" && (sub === "plumb" || sub === "ted") ? 1 : 0); });
+    if (fld.post.st === "stand") put(sc, HOLE, 1, 1, function () { standPost(ctx, postTop(), 0, 0); });
     put(sc, fld.ted.x, 1, 1, function () {
       var over = Math.abs(fld.ted.x - TEDK) < 0.25 && fld.post.st === "stand";
       knocker(ctx, over ? postTop() : 1.2, fld.lift);
@@ -1932,11 +1916,11 @@
     put(sc, PPILE, 0.95, 1, function () {
       for (var i = 0; i < fld.pileN; i++) { ctx.save(); ctx.translate((i % 2) * 0.1, -0.12 - i * 0.2); postShape(ctx, LOGL, 0.24); ctx.restore(); }
     });
-    [["les", "#3D6FB6", "beanie"], ["tom", "#3F8D36", "cap"]].forEach(function (q) {
+    [["tom", "#3F8D36", "cap"]].forEach(function (q) {
       var P = fld[q[0]];
       if (P.x > TED0 + 30) return;
       put(sc, P.x, 0.97, P.flip ? -1 : 1, function () {
-        if (q[0] === "les" && fld.post.st === "held") { ctx.save(); ctx.translate(0.15, -1.15); ctx.rotate(-1.15); postShape(ctx, LOGL, 0.24); ctx.restore(); }
+        if (fld.post.st === "held") { ctx.save(); ctx.translate(0.15, -1.15); ctx.rotate(-1.15); postShape(ctx, LOGL, 0.24); ctx.restore(); }
         person(ctx, { walk: P.walk, stride: P.stride, hands: P.hands, bend: P.bend, jumper: q[1], hat: q[2] });
         if (q[0] === "tom" && P.hands) { tube(ctx, P.hands[0][0], P.hands[0][1], P.hands[0][0] + 0.05, P.hands[0][1] - 0.35, 0.05, "#B07B3C"); Rr(ctx, P.hands[0][0] - 0.08, P.hands[0][1] - 0.42, 0.24, 0.1, 0.03, "#5D6675", LW() * 0.6); }
       });

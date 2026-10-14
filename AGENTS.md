@@ -59,8 +59,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
   ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
   Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
-  loader, then each log through the squaring and splitting saws), Fence (Les plumbs the post, Tractor Ted's post
-  knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
+  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, Tractor Ted's
+  post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
   do, it never does it; Chipper still uses the old Go-plays-the-step pattern), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
   Hunt"); `field.html` only redirects to spuds. Each station: a step row (plus a job bar where the episode has two
