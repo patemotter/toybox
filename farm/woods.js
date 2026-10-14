@@ -357,11 +357,35 @@
     [-1.6, 1.35].forEach(function (x) { c.beginPath(); c.arc(x, -0.82, 1.0, -PI + 0.35, -0.35); c.arc(x, -0.82, 0.9, -0.35, -PI + 0.35, true); c.closePath(); fs(c, Y1, l0 * 0.8); });
   }
   // The sawmill shed (drawn behind the saw line): steel columns and a long roof. Local x from DECK.
-  function millShed(c) {
+  // The sawmill is indoors, like in the episode (the dad: the child noticed it was "outside"): a closed building with
+  // its front wall cut away so he can see in. millBack (behind the saw line, local x from DECK): the cladded back
+  // wall, the roof's underside with lights, and the big open doorway at the left end that the loader drives through.
+  var MILL_X0 = -3.8, MILL_X1 = 19.2, MILL_H = 6.4;
+  function millBack(c) {
+    var l0 = LW(), i;
+    Rr(c, MILL_X0, -MILL_H, MILL_X1 - MILL_X0, MILL_H, 0.02, "#8E9E8B", l0);
+    for (i = 0; MILL_X0 + 0.5 + i * 0.6 < MILL_X1; i++) Ln(c, MILL_X0 + 0.5 + i * 0.6, -MILL_H + 0.1, MILL_X0 + 0.5 + i * 0.6, -0.1, "#7D8D7A", 0.05);
+    Rr(c, MILL_X0, -1.2, MILL_X1 - MILL_X0, 1.2, 0.02, "#B9B4A8", l0 * 0.8);
+    for (i = 0; i < 5; i++) Rr(c, MILL_X0 + 2.5 + i * 4.2, -MILL_H + 0.35, 2.4, 0.5, 0.05, "#CFE8F5", l0 * 0.6);
+    Rr(c, MILL_X0 - 0.3, -MILL_H - 0.55, MILL_X1 - MILL_X0 + 0.6, 0.6, 0.04, "#5E6B5C", l0);
+    [MILL_X0 + 4.2, MILL_X0 + 9.6, MILL_X0 + 15.0, MILL_X0 + 20.4].forEach(function (x) {
+      if (x > MILL_X1) return;
+      Ln(c, x, -MILL_H, x, -MILL_H + 0.7, INK, 0.04);
+      c.beginPath(); c.arc(x, -MILL_H + 0.7, 0.28, PI, 0); c.closePath(); fs(c, "#5D6675", l0 * 0.6);
+      c.save(); c.globalAlpha = 0.18; c.beginPath(); c.moveTo(x - 0.25, -MILL_H + 0.72); c.lineTo(x - 1.4, -0.2); c.lineTo(x + 1.4, -0.2); c.lineTo(x + 0.25, -MILL_H + 0.72); c.closePath(); c.fillStyle = "#FFF4C2"; c.fill(); c.restore();
+    });
+    // the open doorway at the left end: the yard shows through it
+    Rr(c, MILL_X0, -4.4, 2.6, 4.4, 0.02, "#A9DCFF", l0);
+    Rr(c, MILL_X0, -1.0, 2.6, 1.0, 0.02, "#93AE5E", 0);
+    Rr(c, MILL_X0, -4.75, 2.6, 0.35, 0.04, "#E2B33A", l0 * 0.8);
+    for (i = 0; i < 6; i++) Ln(c, MILL_X0 + 0.1, -4.62 + i * 0.0, MILL_X0 + 2.5, -4.62, "#C98A1A", 0.02);
+  }
+  // in front of the saw line: the cut edges of the walls and the roof, so it reads as the inside of a building
+  function millFrame(c) {
     var l0 = LW();
-    [-2.6, 5.4, 13.4].forEach(function (x) { Rr(c, x - 0.12, -5.4, 0.24, 5.4, 0.03, "#7C8696", l0 * 0.8); });
-    Pp(c, [-3.4, -5.3, 14.4, -5.3, 14.4, -5.75, -3.4, -6.35], "#5E8F5A");
-    for (var i = 0; i < 18; i++) Ln(c, -3.1 + i * 1.0, -5.38, -3.1 + i * 1.0, -5.75 - (17 - i) * 0.035, "#4C7848", 0.04);
+    Rr(c, MILL_X0 - 0.35, -MILL_H - 0.35, 0.35, MILL_H + 0.35, 0.02, "#6F7F6C", l0);
+    Rr(c, MILL_X1, -MILL_H - 0.35, 0.35, MILL_H + 0.35, 0.02, "#6F7F6C", l0);
+    Pp(c, [MILL_X0 - 0.6, -MILL_H - 0.3, MILL_X1 + 0.6, -MILL_H - 0.3, MILL_X1 + 0.6, -MILL_H - 0.75, MILL_X0 - 0.6, -MILL_H - 0.75], "#5E6B5C", l0);
   }
   // The saw line at the machine line (local x from DECK): the conveyor of rollers, the squaring saw at SAW1 (two
   // blades take the round sides off) and the splitting saw at SAW2 (a band blade cuts the square log into two
@@ -1550,7 +1574,7 @@
       return { xa: lorry.x - 15.4, xb: lorry.x + 4.6, mh: 5.2 };
     }
     if (stepId === "saw" && sub !== "feed") return { xa: STK2 - 2.6, xb: DECK + 2.6, mh: 4.6 };
-    if (stepId === "saw") return { xa: DECK - 2.4, xb: PSTK + 2.2, mh: 6.6 };
+    if (stepId === "saw") return { xa: DECK - 3.4, xb: PSTK + 2.6, mh: 7.4 };
     return { xa: PPILE - 3.2, xb: TED0 + 4.2, mh: 4.8 };
   }
   function closeTarget() {
@@ -1836,7 +1860,11 @@
   // world point -> screen in a view
   function wp(sc, x, h, r) { return [PX(sc, x, r), sc.Y(r) - h * sc.S(r)]; }
   function drawMill(sc) {
-    put(sc, DECK, 1.35, 1, function () { millShed(ctx); });
+    put(sc, DECK, 1.14, 1, function () { millBack(ctx); });
+    // the concrete floor inside, from the back wall to the cut-away front
+    var f0 = wp(sc, DECK + MILL_X0, 0, 1.14), f1 = wp(sc, DECK + MILL_X1, 0, 1.14), f2 = wp(sc, DECK + MILL_X1, 0, 0.9), f3 = wp(sc, DECK + MILL_X0, 0, 0.9);
+    ctx.beginPath(); ctx.moveTo(f0[0], f0[1]); ctx.lineTo(f1[0], f1[1]); ctx.lineTo(f2[0], f2[1]); ctx.lineTo(f3[0], f3[1]); ctx.closePath();
+    ctx.fillStyle = mix("#C9C5BB", "#2B3A55", dusk * 0.5); ctx.fill();
     // the holding pile
     if (logs.some(function (L) { return L.st === "stack2"; }) || stepId === "lorry" || (stepId === "saw" && sub !== "feed")) put(sc, STK2, 1, 1, function () { stakes(ctx, 1.5, 1.25); });
     logs.forEach(function (L) { if (L.st === "stack2") drawLog(sc, L); });
@@ -1858,6 +1886,7 @@
     // the loader and what it carries
     put(sc, loader.x, 1, loader.dir, function () { loaderShape(ctx, { wheel: loader.wheel, lift: loader.lift, clamp: loader.clamp, time: time, beacon: !!mo && stepId === "saw" && sub !== "feed" }); });
     logs.forEach(function (L) { if (L.st === "loader") drawLog(sc, L); });
+    put(sc, DECK, 1.0, 1, function () { millFrame(ctx); });
   }
   // a log on the saw line: round where it has not reached the squaring saw, square after it, two posts after
   // the splitting saw

@@ -7,6 +7,13 @@ machine moments, in the episode's order, and skips the tangents: the children's 
 Tractor Ted's recaps, side trips (stables, picnics, bird-seed balls). When unsure whether a moment is main or a
 tangent, leave it out or ask the dad.
 
+**Nothing that isn't rooted in the episode** (the dad, 2026-10-14: he "will not likely enjoy the extra pieces unless
+it is rooted in the episode itself"). No invented steps, machines or places; when a station is rebuilt, the extras it
+has now that the episode doesn't show go (the potato harvest in Spuds in Mud, the grain barn in Combine Time, the
+silage sheet in Glorious Grass, the slurry tanker in Mucky Muck). **Places look like the episode**, too: he notices
+(Timberrrrr!'s sawmill was outdoors; in the episode it is inside a closed building, so now it is).
+**Let's Go Racing is never built** (the dad: it "feels weird").
+
 Build the way Timberrrrr! was rebuilt (2026-10-14, `farm/woods.js`): he does every step himself (each tap on a
 machine part plays that one control's motion, the vehicles also drive by drag, the Go only points at the next
 thing). The rules in AGENTS.md still apply: no Tractor Ted drawn, no Les, no milking, no numbers except at most the
@@ -26,7 +33,7 @@ episode's counting moment (Timberrrrr! counts the lorry's six wheels).
 | Feathered Friends (`hens`) | Drive → Feed → Eggs | the tracked tractor; the loader lifting the feed hopper, filled from the silo |
 | Mucky Muck (`muck`) | Scrape → Load → Spread (+ Slurry tanker) | the telehandler's muck grab filling the trailer; tipping at the field heap |
 | Brilliant Baler (`bales`) | Hay and Haylage | **a different crop** in the episode: elephant grass, Farmer Tom's big square baler, the bale grab stacking a flatbed |
-| Hello Ewe!, Mighty Mushrooms, Let's Go Racing | no station | ask the dad before adding stations |
+| Hello Ewe!, Mighty Mushrooms | no station | ask the dad before adding stations (Let's Go Racing: never) |
 | Juicy Squeezy (`berries`), Come Bye (`sheep`), Caterpillar Hunt (`tracks`) | built from the older breakdown | not in this guide: leave them unless the dad asks |
 
 Farmer Tom drives in several episodes (the combine, the baler's tractor, the muck telehandler, the mower): dress
