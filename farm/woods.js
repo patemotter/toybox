@@ -477,7 +477,7 @@
     c.restore();
   }
   // A person (from Caterpillar Hunt's farmer), side view facing +x, origin at the feet: wellies, a jumper and a
-  // hat. st = { walk (phase), stride (0..1), hands: [[x, y], [x, y]] | null, bend (0..1), jumper, hat: "cap" | "beanie" | "bald" }
+  // hat. st = { walk (phase), stride (0..1), hands: [[x, y], [x, y]] | null, bend (0..1), jumper, collar, short (sleeves), hat: "cap" | "beanie" | "bald" }
   function person(c, st) {
     var l0 = LW(), wk = st.walk || 0, sd = st.stride || 0, bend = st.bend || 0, jum = st.jumper || "#3F8D36";
     var hip = [0, -0.9], sh = [0.04 + bend * 0.2, -1.38 + bend * 0.22], hd = [0.08 + bend * 0.3, -1.57 + bend * 0.24];
@@ -502,7 +502,7 @@
       // Farmer Tom (the dad's photo): bald, light stubble, the pale shirt collar showing at the neck of his fleece
       c.beginPath(); c.arc(hd[0] + 0.02, hd[1] + 0.03, 0.1, 0.1 * PI, 0.9 * PI); c.strokeStyle = "rgba(90,70,50,0.35)"; c.lineWidth = 0.045; c.stroke();
       Ln(c, hd[0] - 0.06, hd[1] - 0.08, hd[0] + 0.02, hd[1] - 0.1, "rgba(255,255,255,0.6)", 0.025);
-      Pp(c, [sh[0] - 0.07, sh[1] - 0.01, sh[0] + 0.09, sh[1] - 0.01, sh[0] + 0.02, sh[1] + 0.13], "#F4F1E8", l0 * 0.5);
+      Pp(c, [sh[0] - 0.07, sh[1] - 0.01, sh[0] + 0.09, sh[1] - 0.01, sh[0] + 0.02, sh[1] + 0.13], st.collar || "#F4F1E8", l0 * 0.5);
     } else if (st.hat === "beanie") { c.beginPath(); c.arc(hd[0] - 0.01, hd[1] - 0.04, 0.14, PI, 0); c.closePath(); fs(c, "#D8403A", l0 * 0.7); Cc(c, hd[0] - 0.01, hd[1] - 0.19, 0.045, "#D8403A", l0 * 0.6); }
     else Pp(c, [hd[0] - 0.14, hd[1] - 0.04, hd[0] - 0.12, hd[1] - 0.16, hd[0] + 0.12, hd[1] - 0.16, hd[0] + 0.24, hd[1] - 0.06], "#7A5234", l0 * 0.7);
     var hands = st.hands || [[sh[0] + 0.05 + sw * 0.4, -0.9], [sh[0] - 0.05 - sw * 0.4, -0.92]];
@@ -510,6 +510,7 @@
       var ex = (sh[0] + h[0]) / 2 - 0.04, ey = (sh[1] + h[1]) / 2 + 0.05;
       c.beginPath(); c.moveTo(sh[0], sh[1] + 0.04); c.lineTo(ex, ey); c.lineTo(h[0], h[1]);
       c.strokeStyle = INK; c.lineWidth = 0.11 + l0 * 2; c.stroke(); c.strokeStyle = k ? mix(jum, INK, 0.15) : jum; c.lineWidth = 0.11; c.stroke();
+      if (st.short) { c.beginPath(); c.moveTo(lerp(sh[0], ex, 0.75), lerp(sh[1] + 0.04, ey, 0.75)); c.lineTo(ex, ey); c.lineTo(h[0], h[1]); c.strokeStyle = "#EBC09A"; c.lineWidth = 0.09; c.stroke(); }
       Cc(c, h[0], h[1], 0.055, "#F2C8A0", l0 * 0.6);
     });
   }
@@ -1921,12 +1922,12 @@
     put(sc, PPILE, 0.95, 1, function () {
       for (var i = 0; i < fld.pileN; i++) { ctx.save(); ctx.translate((i % 2) * 0.1, -0.12 - i * 0.2); postShape(ctx, LOGL, 0.24); ctx.restore(); }
     });
-    [["tom", "#5B5438", "bald"]].forEach(function (q) {
+    [["tom", Farm.tom.top, "bald"]].forEach(function (q) {
       var P = fld[q[0]];
       if (P.x > TED0 + 30) return;
       put(sc, P.x, 0.97, P.flip ? -1 : 1, function () {
         if (fld.post.st === "held") { ctx.save(); ctx.translate(0.15, -1.15); ctx.rotate(-1.15); postShape(ctx, LOGL, 0.24); ctx.restore(); }
-        person(ctx, { walk: P.walk, stride: P.stride, hands: P.hands, bend: P.bend, jumper: q[1], hat: q[2] });
+        person(ctx, { walk: P.walk, stride: P.stride, hands: P.hands, bend: P.bend, jumper: q[1], hat: q[2], collar: Farm.tom.collar, short: Farm.tom.short });
         if (q[0] === "tom" && P.hands) { tube(ctx, P.hands[0][0], P.hands[0][1], P.hands[0][0] + 0.05, P.hands[0][1] - 0.35, 0.05, "#B07B3C"); Rr(ctx, P.hands[0][0] - 0.08, P.hands[0][1] - 0.42, 0.24, 0.1, 0.03, "#5D6675", LW() * 0.6); }
       });
     });

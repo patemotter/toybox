@@ -48,6 +48,8 @@
  *                               tank (0..1), auger (0..1 swung out; the page draws the swung tube, see .augerTube),
  *                               beacon, header (0 down .. 1 raised), tracks (true: no front wheel; the page draws
  *                               the track unit) }. Farm.COMBINE = { cut (x of the cutter bar), pivot: [x, y] }.
+ *   Farm.tom                    Farmer Tom's clothes for this page: { top, dark, collar, short (short sleeves) }; the
+ *                               pink summer shirt on the summer episodes' pages, the olive fleece on the others.
  *   Farm.draw.hare / deer / gull / hawk (ctx, x, y, s, phase, flip)   the farm's life, in screen px.
  *   Farm.draw.telehandler(ctx, st)  the yellow telehandler's body (the page adds its boom), origin on the ground
  *                               between the axles: st = { wheel, time, beacon } (muck.html, cows.html).
@@ -247,10 +249,16 @@
   var G = { body: "#3CB436", dark: "#2A8826", light: "#68CB5C", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
   var PLAIN = { body: "#D8403A", dark: "#A82E28", light: "#EE7A70", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
   var HITCH = [-1.05, -0.5], TOPLINK = [-1.0, -1.3], DRAWBAR = [-1.3, -0.5];
+  // Farmer Tom's clothes follow the episode's season, like the show (the dad's photos): a pale pink short-sleeved
+  // shirt in the summer episodes, the dark olive-brown fleece over a pale shirt collar in the others.
+  var TOM_SHIRT = { combine: 1, bales: 1, silage: 1, berries: 1, sheep: 1, hens: 1 };
+  var TOM = TOM_SHIRT[((location.pathname.match(/([a-z-]+)\.html$/) || [])[1]) || ""]
+    ? { top: "#EDC4C6", dark: "#D4A2A6", collar: "#F7E3E4", short: true }
+    : { top: "#5B5438", dark: "#4A442C", collar: "#F4F1E8", short: false };
   function driver(ctx, x, y, s) {
-    // shoulders and head behind the glass: Farmer Tom (bald, an olive-brown fleece)
-    R(ctx, x - 0.26 * s, y + 0.1 * s, 0.52 * s, 0.5 * s, 0.16 * s, "#5B5438", LW * 0.7);
-    P(ctx, [x - 0.06 * s, y + 0.12 * s, x + 0.06 * s, y + 0.12 * s, x, y + 0.26 * s], "#F4F1E8", 0);
+    // shoulders and head behind the glass: Farmer Tom (bald; his clothes follow the season, see TOM)
+    R(ctx, x - 0.26 * s, y + 0.1 * s, 0.52 * s, 0.5 * s, 0.16 * s, TOM.top, LW * 0.7);
+    P(ctx, [x - 0.06 * s, y + 0.12 * s, x + 0.06 * s, y + 0.12 * s, x, y + 0.26 * s], TOM.collar, 0);
     C(ctx, x, y, 0.17 * s, "#EBC09A", LW * 0.7);
     ctx.beginPath(); ctx.arc(x + 0.02 * s, y + 0.04 * s, 0.12 * s, 0.15 * Math.PI, 0.85 * Math.PI); ctx.strokeStyle = "rgba(90,70,50,0.35)"; ctx.lineWidth = 0.05 * s; ctx.stroke();
   }
@@ -1470,6 +1478,7 @@
 
   window.Farm = {
     NAMES: NAMES,
+    tom: TOM,
     SPUDS: SPUDS,
     world: world,
     sound: sound,

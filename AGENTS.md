@@ -316,8 +316,10 @@ Keep only:
   **Tractor Ted himself is never drawn** (the dad, 2026-10-14: he is the show's cartoon narrator and doesn't do the
   farm work; the drawn version was scary and "unless it's 1:1 we are better off not including him"). Every working
   tractor is an ordinary red tractor (`Farm.draw.tractor`: no face, no badge); coach lines say "the tractor".
-  **Farmer Tom** (from the dad's photo): bald, light stubble, a dark olive-brown zip fleece over a pale shirt collar;
-  he drives the tractors. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
+  **Farmer Tom** (from the dad's photos): bald, light stubble; his clothes change like in the show (`Farm.tom`, set in
+  `farm/farm.js` by page): a pale pink short-sleeved shirt in the summer episodes (Combine Time, Brilliant Baler,
+  Glorious Grass, Juicy Squeezy, Come Bye, Feathered Friends), a dark olive-brown zip fleece over a pale shirt collar
+  in the others. He drives the tractors; other machines (combine, harvester, lorry, loader) have their own drivers. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
   body, short legs, floppy ears, scruffy beard and eyebrows (`Farm.draw.dog`). The pony is Merlin.
 
 ### Fresh start
