@@ -1,3 +1,6 @@
+> **Superseded (2026-10-14):** build from `plans/tractor-ted-episodes.md` (the dad's scene-by-scene guide). The
+> "never the show's characters" rule below is out of date: Farmer Tom and Midge are drawn now, Tractor Ted never.
+
 # Farm stations from the newer-series episodes
 
 Source: a per-episode mini-game breakdown the dad passed on (2026-10-09), adapted here to the Toybox rules

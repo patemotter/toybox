@@ -305,6 +305,8 @@ Keep only:
   previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
 - **Farm stations are built around the episode's moments** (the dad, 2026-10-11): he knows each episode by heart.
+  **`plans/tractor-ted-episodes.md` is the source of truth** (the dad's scene-by-scene guide, 2026-10-14, with how
+  each station compares): rebuild a station from its episode there, hands-on like Timberrrrr!.
   Testing confirmed he strongly preferred Spuds in Mud over the manual-driving Combine Time pilot: complex mechanics
   are only part of what he cares about; what matters most to him is that the station hits the main highlights of the
   actual Tractor Ted episodes they are designed around (real machines and processes shown clearly, like Spuds in
@@ -319,7 +321,8 @@ Keep only:
   **Farmer Tom** (from the dad's photos): bald, light stubble; his clothes change like in the show (`Farm.tom`, set in
   `farm/farm.js` by page): a pale pink short-sleeved shirt in the summer episodes (Combine Time, Brilliant Baler,
   Glorious Grass, Juicy Squeezy, Come Bye, Feathered Friends), a dark olive-brown zip fleece over a pale shirt collar
-  in the others. He drives the tractors; other machines (combine, harvester, lorry, loader) have their own drivers. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
+  in the others. He drives the tractors and, in the episodes, also the combine, the baler's tractor, the muck telehandler and the
+  mower (see `plans/tractor-ted-episodes.md`); the forestry harvester, lorry and loader have their own drivers. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
   body, short legs, floppy ears, scruffy beard and eyebrows (`Farm.draw.dog`). The pony is Merlin.
 
 ### Fresh start
