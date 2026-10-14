@@ -57,7 +57,11 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + one station per newer-series episode he knows: `spuds` ("Spuds in Mud"), `combine` ("Combine
   Time": Wheat | Sunflowers, the Sunny Seeds episode), `bales` ("Brilliant Baler": Hay | Haylage), `silage` ("Glorious
   Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
-  ("Timberrrrr!": Logs | Chipper), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
+  ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
+  Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
+  loader, then each log through the squaring and splitting saws), Fence (Les plumbs the post, Tractor Ted's post
+  knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
+  do, it never does it; Chipper still uses the old Go-plays-the-step pattern), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
   Hunt"); `field.html` only redirects to spuds. Each station: a step row (plus a job bar where the episode has two
   jobs), a split stage on tall screens (the whole rig on top, a close-up of the work happening now below). Shared
@@ -378,7 +382,7 @@ Keep only:
   `.js` file next to it with the page's name (`saw-bench.html` → `saw-bench.js`), loaded with `<script src>` at
   the same place, with a "Sections" list at its top (the titles of its section comments). No bundler. Add every
   new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it). Done so far: Saw Bench,
-  Tool Wall (`workshop/index.js`), Hammer & Screws, Car Builder, Marble Run. Keep each Sections list current
+  Tool Wall (`workshop/index.js`), Hammer & Screws, Car Builder, Marble Run, Timberrrrr! (`farm/woods.js`). Keep each Sections list current
   when you add or rename a section.
 - **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
   provides (the ghost hand from `tools/snippets`, the coach pill, audio setup), switch it to the shared version

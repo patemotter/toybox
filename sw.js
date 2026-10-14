@@ -259,6 +259,7 @@ const CORE = [
   "./farm/carrots.html",
   "./farm/muck.html",
   "./farm/woods.html",
+  "./farm/woods.js",
   "./farm/berries.html",
   "./farm/cows.html",
   "./farm/sheep.html",
