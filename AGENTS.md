@@ -305,8 +305,9 @@ Keep only:
   previews). Never invent family members in the built-in lines.
 - No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
 - **Farm stations are built around the episode's moments** (the dad, 2026-10-11): he knows each episode by heart.
-  **`plans/tractor-ted-episodes.md` is the source of truth** (the dad's scene-by-scene guide, 2026-10-14, with how
-  each station compares): rebuild a station from its episode there, hands-on like Timberrrrr!.
+  **`plans/tractor-ted-episodes.md`** (the dad's scene-by-scene guide, 2026-10-14) is the reference: take an episode's
+  main machine moments and skip its tangents (children's scenes, mishaps, side trips; the dad: "we don't have to
+  follow every single piece"), hands-on like Timberrrrr!.
   Testing confirmed he strongly preferred Spuds in Mud over the manual-driving Combine Time pilot: complex mechanics
   are only part of what he cares about; what matters most to him is that the station hits the main highlights of the
   actual Tractor Ted episodes they are designed around (real machines and processes shown clearly, like Spuds in

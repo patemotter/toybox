@@ -1,31 +1,33 @@
 # Tractor Ted episodes: the source of truth for the Farm stations
 
 The dad's scene-by-scene breakdown of the modern episodes (Google Doc "Tractor Ted Episodes", 2026-10-14, checked
-by him against the broadcasts). **Build every Farm station from its episode here**, the way Timberrrrr! was rebuilt
-(2026-10-14, `farm/woods.js`): the episode's machines and moments in the episode's order, and he does every step
-himself (each tap on a machine part plays that one control's motion, the vehicles also drive by drag, the Go only
-points at the next thing). The rules in AGENTS.md still apply on top: no Tractor Ted drawn, no Les (the dad cut him
-from Timberrrrr!), no milking, no numbers except an episode's own counting moment (Timberrrrr! counts the lorry's six
-wheels), the children's side scenes left out unless the dad asks.
+by him against the broadcasts). **Use it as a reference, not a checklist** (the dad: "we don't have to follow every
+single piece. There's lots of tangents or extra things not worth including"). A station takes the episode's main
+machine moments, in the episode's order, and skips the tangents: the children's scenes, jokes and mishaps, Les,
+Tractor Ted's recaps, side trips (stables, picnics, bird-seed balls). When unsure whether a moment is main or a
+tangent, leave it out or ask the dad.
 
-## How the stations compare with the episodes (2026-10-14)
+Build the way Timberrrrr! was rebuilt (2026-10-14, `farm/woods.js`): he does every step himself (each tap on a
+machine part plays that one control's motion, the vehicles also drive by drag, the Go only points at the next
+thing). The rules in AGENTS.md still apply: no Tractor Ted drawn, no Les, no milking, no numbers except at most the
+episode's counting moment (Timberrrrr! counts the lorry's six wheels).
 
-| Station (page) | What it does now | What the episode has that it doesn't |
+## The main moments per station (2026-10-14, tangents left out)
+
+| Station (page) | What it does now | Main moments from the episode worth adding |
 | --- | --- | --- |
-| Timberrrrr! (`woods`) | Fell → Logs → Lorry → Sawmill → Fence, hands-on | done (the Chipper job is "Chip Chipping", not in this guide) |
-| Spuds in Mud (`spuds`) | Beds → Stones → Plant → weeks go by → Harvest | the forklift lifting the big seed-potato bag over the planter and cutting it open; Midge riding in the cab. The episode has no harvest (ours does) |
-| Combine Time (`combine`, Wheat) | Harvest → Unload → Store | Farmer Tom drives the combine: lower the header, cut, thresh; the auger empties into the trailer on the move; the square baler bales the straw behind. No grain barn in the episode |
-| Sunny Seeds (`combine`, Sunflowers) | the same steps with sunflowers | the sunflower header towed on its narrow trolley and docked to the combine; the trailer fills big woven bags at the yard (Midge tastes the seeds) |
-| Munchy Crunchy (`carrots`) | Tops → Lift → Crates | counting five carrots; the harvester's elevator fills a trailer alongside, which tips into a lorry; the wash plant: shaker rollers, washing barrel, crates, the forklift stacking them, the bagging machine |
-| Moovie Time (`cows`) | Load → Mix → Feed, the cows walk into the parlor | bale spikes and the bucket filling the mixer wagon; walking the herd to the barn (one slow cow, a gate left open); the wagon feeding along the barrier; counting six cows. No parlor in this episode |
-| Glorious Grass (`silage`, Grass) | Mow → Chop → Clamp → Roll → Cover | front and rear disc mowers; the twin-rotor rake making the windrow; counting four tractors and the forager; trailers swapping under the spout; the buck-rake pushing the clamp up. No sheet in the episode |
-| Feathered Friends (`hens`) | Drive → Feed → Eggs | the tracked tractor's dipstick check and spin on the spot; the loader's forks lifting the feed hopper, filled from the silo; eggs into trays (Midge eats a dropped egg) |
-| Mucky Muck (`muck`) | Scrape → Load → Spread (+ Slurry tanker) | walking the cows out; the telehandler's muck grab filling the trailer; tipping and pushing up the field heap; loading the spreader. No scraper or slurry tanker in the episode |
-| Brilliant Baler (`bales`) | Hay and Haylage | **a different crop**: the episode is elephant grass (Miscanthus): the forager cuts it into swaths, Farmer Tom's big square baler, counting four bales, the squeeze grab stacking them on a flatbed, the biomass boiler, bagging bedding for the pony |
-| Hello Ewe! | no station (our sheep station is "Come Bye") | yard scraping, hoof check with the blue spray, the straw chopper/blower, bottle-feeding a lamb (milking left out) |
-| Mighty Mushrooms | no station | the crane lorry loading straw, the compost bunkers, the mushroom houses and picking |
-| Let's Go Racing | no station | harrowing the gallop, the tractor and passenger trailer, the racehorses |
-| Juicy Squeezy (`berries`), Come Bye (`sheep`), Caterpillar Hunt (`tracks`) | built from the older breakdown | not in this guide: ask the dad before changing them |
+| Timberrrrr! (`woods`) | Fell → Logs → Lorry → Sawmill → Fence, hands-on | done |
+| Spuds in Mud (`spuds`) | Beds → Stones → Plant → weeks go by → Harvest | the forklift lifting the big seed-potato bag over the planter |
+| Combine Time (`combine`, Wheat) | Harvest → Unload → Store | Farmer Tom drives the combine; the auger empties into the trailer on the move; the square baler bales the straw |
+| Sunny Seeds (`combine`, Sunflowers) | the same steps with sunflowers | the dried sunflower heads; the seeds filling a big woven bag at the yard |
+| Munchy Crunchy (`carrots`) | Tops → Lift → Crates | the harvester's elevator filling a trailer alongside; the wash plant (rollers, washing barrel, crates) |
+| Moovie Time (`cows`) | Load → Mix → Feed | the telehandler filling the mixer wagon; the wagon feeding along the barrier |
+| Glorious Grass (`silage`, Grass) | Mow → Chop → Clamp → Roll → Cover | the rake making the windrow; trailers under the forager's spout; the buck-rake at the clamp |
+| Feathered Friends (`hens`) | Drive → Feed → Eggs | the tracked tractor; the loader lifting the feed hopper, filled from the silo |
+| Mucky Muck (`muck`) | Scrape → Load → Spread (+ Slurry tanker) | the telehandler's muck grab filling the trailer; tipping at the field heap |
+| Brilliant Baler (`bales`) | Hay and Haylage | **a different crop** in the episode: elephant grass, Farmer Tom's big square baler, the bale grab stacking a flatbed |
+| Hello Ewe!, Mighty Mushrooms, Let's Go Racing | no station | ask the dad before adding stations |
+| Juicy Squeezy (`berries`), Come Bye (`sheep`), Caterpillar Hunt (`tracks`) | built from the older breakdown | not in this guide: leave them unless the dad asks |
 
 Farmer Tom drives in several episodes (the combine, the baler's tractor, the muck telehandler, the mower): dress
 those drivers as him (`Farm.tom`) when a station is rebuilt.
