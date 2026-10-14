@@ -59,7 +59,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
   ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
   Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
-  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, a plain
+  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, the
   tractor's post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
   do, it never does it; Chipper still uses the old Go-plays-the-step pattern), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
@@ -312,12 +312,13 @@ Keep only:
   moments big, visually clear and faithful to the episode; do not replace the authentic highlights with manual driving
   chores or complex steering controls. Ask the dad for an episode's key moments when unsure.
 - Real names, no brand names or logos. Exception (the dad, 2026-10-11): the Farm app is specifically Tractor Ted
-  themed and oriented: the app is shown as "Tractor Ted", the green tractor is drawn as Tractor Ted (friendly eyes on the
-  windscreen, green wheels, smiling grille and "TED" bonnet badge), the farm dog is Midge (scruffy tri-color terrier
-  with red collar and gold tag), the pony is Merlin, and the 12 stations follow the actual Tractor Ted episodes he has memorized.
-  **Tractor Ted is the show's cartoon presenter, he doesn't do the farm work** (the dad, 2026-10-14, on Timberrrrr!):
-  working tractors are ordinary tractors (`Farm.draw.tractor(ctx, { plain: true })`: red, no face, no TED badge).
-  Timberrrrr! is switched; the other stations still drive Ted until the dad says how to change them.
+  themed: the app is shown as "Tractor Ted" and the 12 stations follow the actual episodes he has memorized.
+  **Tractor Ted himself is never drawn** (the dad, 2026-10-14: he is the show's cartoon narrator and doesn't do the
+  farm work; the drawn version was scary and "unless it's 1:1 we are better off not including him"). Every working
+  tractor is an ordinary red tractor (`Farm.draw.tractor`: no face, no badge); coach lines say "the tractor".
+  **Farmer Tom** (from the dad's photo): bald, light stubble, a dark olive-brown zip fleece over a pale shirt collar;
+  he drives the tractors. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
+  body, short legs, floppy ears, scruffy beard and eyebrows (`Farm.draw.dog`). The pony is Merlin.
 
 ### Fresh start
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
