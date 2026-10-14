@@ -10,7 +10,7 @@
   //   Sawmill: drive the log loader to the pile, grab the logs, drive to the log deck and drop them on it; then
   //            each log rolls onto the conveyor: the squaring saw cuts off the round sides, the splitting saw
   //            cuts it into two square fence posts (an end-view inset shows it).
-  //   Fence:   at the field Farmer Tom stands a post in the gap, Tractor Ted backs up
+  //   Fence:   at the field Farmer Tom stands a post in the gap, the tractor backs up
   //            with the post knocker and knocks it in, Farmer Tom fixes the netting: the sheep are safe.
   // Chipper: the tractor's seat swivels round to face the wood chipper on the back; the chipper's crane
   //          unfolds, grabs the branches off the brash pile and lays them on the infeed table; the rollers pull
@@ -45,7 +45,7 @@
   // lorry (front axle at LXF, depth LR) loads there and drives to the weighbridge (WB; the lorry stops at LXW); its
   // crane puts the logs on the holding pile (STK2); the loader carries them to the log deck (DECK); the saw line
   // squares them (SAW1) and splits them (SAW2); the posts land on PSTK. The field: the fence (posts FENCE_X, the
-  // gap at HOLE), the new posts' pile (PPILE), Tractor Ted with the post knocker (parked at TED0, knocking at TEDK).
+  // gap at HOLE), the new posts' pile (PPILE), the tractor with the post knocker (parked at TED0, knocking at TEDK).
   var HV0 = -7.4, HPIV = [2.7, 2.75], TH = 8.6, CUT_H = 0.4, SG = 0.9, LOGL = 2.5;
   var STKA_X = -2.05;
   var PARK = { x: HV0 + 4.95, h: 1.45, r: 1, rot: 0 };
@@ -429,7 +429,7 @@
     }
     c.restore();
   }
-  // The post knocker on Tractor Ted's linkage (Ted's units: origin under the rear axle, facing +x): a tall red
+  // The post knocker on the tractor's linkage (tractor units: origin under the rear axle, facing +x): a tall red
   // mast behind the tractor with the heavy weight that slides up it and drops onto the post. top = height of the
   // post top under it, lift 0..1 (the weight raised).
   var KX = -2.05;
@@ -713,7 +713,7 @@
     "saw.drop": { say: "Tap the grab to put the logs on the deck.", part: "grab" },
     "saw.feed": { say: "Tap a log to send it through the saws.", part: "deck" },
     "fence.stand": { say: "Tap a post to stand it in the hole.", part: "ppile" },
-    "fence.ted": { say: "Drive Tractor Ted to the post.", part: "ted" },
+    "fence.ted": { say: "Drive the tractor to the post.", part: "ted" },
     "fence.knock": { say: "Tap the post knocker to knock the post in.", part: "knocker" },
     "fence.wire": { say: "Tap the fence wire to fix it to the post.", part: "wire" }
   };
@@ -736,7 +736,7 @@
     });
     else if (id === "chip") fit(9.4, 4.5, 0, function () {
       x.scale(-1, 1); x.translate(-2.3, 0);
-      chipper(x, { fly: 0.4 }); chipperFront(x); D.tractor(x, { hitch: { lift: 0 } });
+      chipper(x, { fly: 0.4 }); chipperFront(x); D.tractor(x, { plain: true, hitch: { lift: 0 } });
     });
     else if (id === "fell") fit(4.6, 9.4, 0, function () {
       x.save(); x.scale(0.95, 0.95); treeShape(x, { s0: 0, top: true, whorls: makeWhorls(), cut: 0 });
@@ -763,7 +763,7 @@
     });
     else if (id === "turn") fit(5.2, 3.9, 0, function () {
       x.scale(-1, 1); x.translate(-1.8, 0);
-      D.tractor(x, { driver: false }); driverFig(x, 0.3, -2.42, -1);
+      D.tractor(x, { plain: true, driver: false }); driverFig(x, 0.3, -2.42, -1);
       x.beginPath(); x.arc(0.3, -3.25, 0.6, -PI * 0.95, -PI * 0.08); x.strokeStyle = INK; x.lineWidth = 0.24; x.lineCap = "round"; x.stroke();
       x.strokeStyle = "#FFC93C"; x.lineWidth = 0.13; x.stroke();
       Pp(x, [0.95, -3.5, 0.62, -3.3, 1.05, -3.05], "#FFC93C", LW());
@@ -1188,7 +1188,7 @@
     Farm.world.update(function (w) { w.posts = (typeof w.posts === "number" && isFinite(w.posts) ? w.posts : 0) + 2; });
     fld.pileN = Math.min(6, mposts.length);
   }
-  // Fence: the posts go to the field. Farmer Tom stands a post in the gap, Tractor Ted backs up with the post
+  // Fence: the posts go to the field. Farmer Tom stands a post in the gap, the tractor backs up with the post
   // knocker and knocks it in, Farmer Tom fixes the netting to it.
   function fenceIn() {
     fld.pileN = Math.max(1, Math.min(6, mposts.length));
@@ -1208,7 +1208,7 @@
   }
   function driveTed() {
     var x0 = fld.ted.x, dur = Math.max(0.7, Math.abs(x0 - TEDK) / 2.4), tx = fld.tom.x;
-    coach.say("Tractor Ted backs up to the post.", 3);
+    coach.say("The tractor backs up to the post.", 3);
     run(dur, function (t) {
       var nx = lerp(x0, TEDK, ease(t / dur)); fld.ted.wheel += nx - fld.ted.x; fld.ted.x = nx;
       fld.tom.x = lerp(tx, HOLE - 1.8, ease(t / dur)); fld.tom.hands = null;
@@ -1375,7 +1375,7 @@
     return list;
   }
   // A real part's name pops up when he taps it (a small plain label)
-  var NAMESL = { lorry: "Timber lorry", lorrylogs: "Logs", crane: "Crane", weigh: "Weighbridge", stack2: "Log pile", loader: "Log loader", grab: "Log grab", deck: "Log deck", saw: "Saws", postpile: "Fence posts", ppile: "Fence posts", post: "Fence post", hole: "Post hole", ted: "Tractor Ted", knocker: "Post knocker", wire: "Sheep fence", tom: "Farmer Tom" };
+  var NAMESL = { lorry: "Timber lorry", lorrylogs: "Logs", crane: "Crane", weigh: "Weighbridge", stack2: "Log pile", loader: "Log loader", grab: "Log grab", deck: "Log deck", saw: "Saws", postpile: "Fence posts", ppile: "Fence posts", post: "Fence post", hole: "Post hole", ted: "Tractor", knocker: "Post knocker", wire: "Sheep fence", tom: "Farmer Tom" };
   function tagLogs(part) {
     if (part === "harv") { snd.horn(); tag("Forestry harvester", harv.x, 3.4); return true; }
     if (part === "head") { snd.tick(); head.roll += 2; tag("Harvester head", head.x, head.h + 0.7, head.r); return true; }
@@ -1877,7 +1877,7 @@
       ctx.restore();
     });
   }
-  // The field: sheep behind the fence, the fence with its gap, the old broken post, Tractor Ted and the post
+  // The field: sheep behind the fence, the fence with its gap, the old broken post, the tractor and the post
   // knocker, Farmer Tom, the pile of new posts, and Midge at the end of the day.
   function netSpan(c, xa, xb, sag) {
     var NET = [0.15, 0.4, 0.65, 0.9], l0 = LW(), n = Math.max(2, Math.round((xb - xa) / 0.4)), i, j;
@@ -1911,7 +1911,7 @@
     put(sc, fld.ted.x, 1, 1, function () {
       var over = Math.abs(fld.ted.x - TEDK) < 0.25 && fld.post.st === "stand";
       knocker(ctx, over ? postTop() : 1.2, fld.lift);
-      D.tractor(ctx, { wheel: fld.ted.wheel, time: time, hitch: { lift: 0 }, beacon: !!mo && (sub === "ted" || sub === "knock") });
+      D.tractor(ctx, { plain: true, wheel: fld.ted.wheel, time: time, hitch: { lift: 0 }, beacon: !!mo && (sub === "ted" || sub === "knock") });
     });
     put(sc, PPILE, 0.95, 1, function () {
       for (var i = 0; i < fld.pileN; i++) { ctx.save(); ctx.translate((i % 2) * 0.1, -0.12 - i * 0.2); postShape(ctx, LOGL, 0.24); ctx.restore(); }
@@ -1983,7 +1983,7 @@
     });
     put(sc, 0, 1, -1, function () {
       chipper(ctx, { fly: ch.flyA, roll: ch.roll, time: time, aim: ch.aim });
-      D.tractor(ctx, { time: time, hitch: { lift: 0 }, driver: false, beacon: ch.fly > 0.5 });
+      D.tractor(ctx, { plain: true, time: time, hitch: { lift: 0 }, driver: false, beacon: ch.fly > 0.5 });
       // the swivel seat: the driver turns round to face the chipper
       ctx.save(); ctx.beginPath(); ctx.rect(-0.5, -2.9, 1.6, 1.2); ctx.clip();
       driverFig(ctx, 0.3, -2.42, Math.cos(PI * ch.sw), true);

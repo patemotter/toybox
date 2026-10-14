@@ -59,8 +59,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
   ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
   Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
-  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, Tractor Ted's
-  post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
+  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, a plain
+  tractor's post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). The Go only points at the next thing to
   do, it never does it; Chipper still uses the old Go-plays-the-step pattern), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
   Hunt"); `field.html` only redirects to spuds. Each station: a step row (plus a job bar where the episode has two
@@ -315,6 +315,9 @@ Keep only:
   themed and oriented: the app is shown as "Tractor Ted", the green tractor is drawn as Tractor Ted (friendly eyes on the
   windscreen, green wheels, smiling grille and "TED" bonnet badge), the farm dog is Midge (scruffy tri-color terrier
   with red collar and gold tag), the pony is Merlin, and the 12 stations follow the actual Tractor Ted episodes he has memorized.
+  **Tractor Ted is the show's cartoon presenter, he doesn't do the farm work** (the dad, 2026-10-14, on Timberrrrr!):
+  working tractors are ordinary tractors (`Farm.draw.tractor(ctx, { plain: true })`: red, no face, no TED badge).
+  Timberrrrr! is switched; the other stations still drive Ted until the dad says how to change them.
 
 ### Fresh start
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
