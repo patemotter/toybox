@@ -47,8 +47,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Shake them"): on a narrow row it wraps to two lines instead of being cut off. */
-#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* No step row (like Timberrrrr!): he works the machines on the stage; the coach line and the yellow ring on the
+   scene show what to touch next. The panel holds only the bottom bar. */
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -68,7 +68,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -78,14 +77,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 (function () {
   "use strict";
   // Juicy Squeezy: the blackcurrant harvest, the way the episode shows it. A field of blackcurrant bushes in long
-  // rows, heavy with dark purple berries. Three jobs, one tap each:
-  //   Shake: the tall straddle harvester drives OVER the row (the bushes pass through its middle). Its shaker
-  //          rods shake each bush, the berries shower down onto the catching plates, ride the elevator up and
-  //          drop into the crates on its platform.
-  //   Load:  the green tractor brings the flatbed trailer alongside; the full crates roll onto it.
-  //   Press: the trailer drives to the juice press. Each crate tips into the press basket, the press plate
-  //          squeezes the berries, dark juice runs into the tank and fills the bottles, which line up on the bench.
-  // Then weeks go by and the next row is ripe. The stage is split like Spuds in Mud: the field with the whole
+  // rows, heavy with dark purple berries. Built like Timberrrrr! (farm/woods.js): no step row; a yellow ring on
+  // the scene and one coach line point at the next thing to touch, and each tap on a machine part plays that one
+  // control's motion (the harvester and the tractor also drive with a drag). Three jobs he does himself:
+  //   Shake: he switches on the shaker rods, then drives the tall straddle harvester OVER the row (the bushes
+  //          pass through its middle). The rods shake each bush, the berries shower down onto the catching
+  //          plates, ride the elevator up and drop into the crates on its platform.
+  //   Load:  the tractor brings the flatbed trailer alongside; he taps the crates and they roll onto it.
+  //   Press: he drives the tractor to the juice press. The crate tipper tips the crates into the press basket,
+  //          he turns the red wheel and the press plate squeezes the berries, dark juice runs into the tank,
+  //          and he opens the juice tap to fill the bottles, which line up on the bench.
+  // After the last step a tap on the scene starts again: weeks go by and the next row is ripe. The press steps'
+  // controls are in the close-up (inside the press house); a tap on the press house in the field does them too.
+  // The stage is split like Spuds in Mud: the field with the whole
   // machine on top (the farm's shared side view) and a close-up below (or beside) that always shows the work
   // happening now: looking into the harvester from the front (the shakers and the falling berries), a closer
   // side view of the crates going onto the trailer, then the inside of the juice press.
@@ -131,21 +135,30 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var FBC = 3.5, FB_DECK = -1.08, FBXS = [-4.75, -3.55, -2.35];
   function fbX(j) { return FBXS[j]; }
 
-  // The steps. go = the Go pill, ready = the coach while it waits for him, work = while it works, busy = when he
-  // taps while it works.
-  var JOBS = {
-    shake: { go: "Shake them", step: "Shake", ready: "Shake the berries off the bushes.", work: "The shaker rods shake the bushes.", busy: "The harvester is shaking the bushes." },
-    load: { go: "Load them", step: "Load", ready: "Put the crates on the trailer.", work: "The crates roll onto the trailer.", busy: "The crates are going on." },
-    press: { go: "Press them", step: "Press", ready: "Now press the berries.", work: "The press squeezes out the juice.", busy: "The press is squeezing." }
+  // The things he does, in order (want = the one wanted now): the coach line names it, the ring marks it.
+  var SAY = {
+    shaker: "Tap the shaker rods to switch them on.",
+    drive: "Drive the harvester along the row of bushes.",
+    crates: "Tap the crates to roll them onto the trailer.",
+    tractor: "Drive the tractor to the juice press.",
+    tipper: "Tap the crate tipper to tip the berries into the press.",
+    wheel: "Turn the red wheel to squeeze the berries.",
+    tap: "Open the juice tap to fill the bottles."
   };
-  var ORDER = ["shake", "load", "press"];
+  // what he sees while each job works, and the line when he taps while it works
+  var JOBS = {
+    shake: { work: "The shaker rods shake the bushes.", busy: "The harvester is shaking the bushes." },
+    load: { work: "The crates roll onto the trailer.", busy: "The crates are going on." },
+    press: { work: "The press squeezes out the juice.", busy: "The press is working." }
+  };
   var field = { stage: "ripe", g: 1 };
   var job = "shake", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
-  var hv = { on: true, x: HX0 - 9, v: 0, wheel: 0, target: HX0, run: 0, flash: 0 };
+  var want = null, glow = 0, offTries = 0, drag = null;
+  var hv = { on: true, x: HX0 - 9, v: 0, wheel: 0, target: HX0, run: 0, flash: 0, shake: false };
   var crates = [{ load: 0 }, { load: 0 }, { load: 0 }], slot = 0, slotF = 0;
   var tr = { x: -40, r: TR_R, v: 0, wheel: 0, state: "away", t: 0, lane: 0, crates: [-1, -1, -1] };
   var ld = { t: 0 };                               // the loading run
-  var pr = { t: 0, n: 0, show: 0 };                // the press run: bottles filled in this batch
+  var pr = { t: 0, stop: 0, n: 0, show: 0 };       // the press run (it plays up to stop, then waits for him)
   var carry = null;                                 // a crate going from the trailer into the press house
   var bird = null, shuf = null;
 
@@ -259,7 +272,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // time, work, run (belt phase), slot (0..2, the crate being filled), crates: [{ x, load, hop }] }
   var E0 = [1.15, -0.34], E1 = [2.02, -2.62];
   function hvFar(st) {
-    var sh = st.work ? Math.sin(time * 30) * 0.05 : 0, i;
+    var sh = st.rods ? Math.sin(time * 30) * 0.05 : 0, i;
     ctx.save(); ctx.translate(0.16, -0.1);
     R(ctx, 1.52, -2.85, 0.46, 1.95, 0.06, HVC.far);
     R(ctx, -2.08, -2.85, 0.46, 1.95, 0.06, HVC.far);
@@ -292,14 +305,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // The near half: the catching plates, the near shaker, the legs on their wheels, the bridge over the row,
   // the engine and the cab on top.
   function hvNear(st) {
-    var sh = st.work ? Math.sin(time * 30) * 0.06 : 0, i;
+    var sh = st.rods ? Math.sin(time * 30) * 0.06 : 0, i;
     // the catching plates (overlapping, closing round the stems) and the belt under them
     R(ctx, -1.62, -0.24, 3.2, 0.17, 0.05, "#4A505E");
     for (i = 0; i < 9; i++) { var px = -1.6 + i * 0.35; P(ctx, [px, -0.32, px + 0.42, -0.38, px + 0.44, -0.24, px + 0.02, -0.2], i % 2 ? "#FFD34D" : "#F7C531", LWu() * 0.7); }
     // the near shaker: a drum hanging from the bridge with its fibreglass rods
     tube(ctx, 0, -2.75, sh * 0.3, -2.38, 0.1, "#4A505E");
     for (i = 0; i < 9; i++) {
-      var y = -0.6 - i * 0.2, len = 0.22 + 0.42 * Math.abs(Math.cos(i * 1.3)), tilt = st.work ? Math.sin(time * 32 + i) * 0.04 : 0;
+      var y = -0.6 - i * 0.2, len = 0.22 + 0.42 * Math.abs(Math.cos(i * 1.3)), tilt = st.rods ? Math.sin(time * 32 + i) * 0.04 : 0;
       [-1, 1].forEach(function (d) {
         Ln(ctx, sh, y, sh + d * (0.13 + len), y + tilt, INK, 0.075);
         Ln(ctx, sh, y, sh + d * (0.13 + len), y + tilt, "#FFF1C9", 0.04);
@@ -339,7 +352,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // "front": the shakers, their rods and the catching plates, drawn over the bush.
   var EV = { leg: 1.4, drum: 0.78, crate: 2.32, ew: 0.64, eh: 0.46, E0: [1.12, -0.3], E1: [2.05, -2.45] };
   function hvEnd(st, part) {
-    var i, sh = st.work ? Math.sin(time * 30) * 0.035 : 0;
+    var i, sh = st.rods ? Math.sin(time * 30) * 0.035 : 0;
     if (part === "back") {
       // wheels end-on, hub boxes, legs
       [-EV.leg, EV.leg].forEach(function (x) {
@@ -389,7 +402,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var dx = d * EV.drum + sh * d;
       tube(ctx, d * EV.drum, -2.75, dx, -2.42, 0.1, "#4A505E");
       for (var k = 0; k < 9; k++) {
-        var y = -0.62 - k * 0.2, tip = d * (0.12 + 0.18 * hash(k, d + 3)), wob = st.work ? Math.sin(time * 32 + k * 1.7) * 0.06 : 0;
+        var y = -0.62 - k * 0.2, tip = d * (0.12 + 0.18 * hash(k, d + 3)), wob = st.rods ? Math.sin(time * 32 + k * 1.7) * 0.06 : 0;
         Ln(ctx, dx, y, tip + sh * d, y + (k % 2 ? 0.08 : -0.06) + wob, INK, 0.075);
         Ln(ctx, dx, y, tip + sh * d, y + (k % 2 ? 0.08 : -0.06) + wob, "#FFF1C9", 0.04);
       }
@@ -475,148 +488,127 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.restore();
   }
 
-  // ---------- Pictures for the step row ----------
-  var picCache = {};
-  function myPic(id) {
-    if (picCache[id]) return picCache[id];
-    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
-    c.width = PW; c.height = PH;
-    try { x = c.getContext("2d"); } catch (e) { x = null; }
-    if (!x) return "";
-    var keep = ctx, kt = time; ctx = x; time = 0;
-    try {
-      if (id === "shake") {
-        Farm.inUnits(x, PW * 0.42, PH * 0.97, 22, 2.6, function () {
-          var st = { wheel: 0, work: 0, run: 0, slot: 0, crates: [{ x: HV.cr[0], load: 1 }, { x: HV.cr[1], load: 0.4 }, { x: HV.cr[2], load: 0 }] };
-          hvFar(st); bushSide(-0.45, 1, 1, 1, false); bushSide(0.45, 2, 1, 1, false); hvNear(st);
-        });
-      } else if (id === "load") {
-        Farm.inUnits(x, PW * 0.73, PH * 0.84, 22, 2.6, function () {
-          flatbed({ crates: [{ x: fbX(0), load: 1 }, { x: fbX(1), load: 1 }, { x: fbX(2), load: 1 }] });
-          ctx.translate(-Farm.DRAWBAR[0], 0.5); D.tractor(ctx, { wheel: 0, drawbar: true });
-        });
-      } else {
-        Farm.inUnits(x, PW * 0.5, PH * 0.94, 34, 2.6, function () { pressMachine({ level: 0.6, plate: 0.5, drip: false }); });
-        Farm.inUnits(x, PW * 0.84, PH * 0.94, 34, 2.6, function () { bottle(0, 0, 1, true, 1.3); });
-      }
-    } finally { ctx = keep; time = kt; }
-    var url = "";
-    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
-    picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
-    return picCache[id];
-  }
-
   // ---------- The flow ----------
+  // Each thing he does (want) waits for his tap on that part (or a drag for the vehicles); the tap plays that
+  // one control's motion, then the next thing is his again.
   function setPhase(p) { phase = p; phaseT = 0; }
+  function setWant(w) { want = w; setPhase("ready"); glow = 0; coach.step(SAY[w]); if (ghost) ghost.poke(); }
+  function working(info) { want = null; coach.clear(); if (info) coach.say(info, 3); }
   // the harvester drives in along the headland and lines up over the row by itself
   function bringIn() {
-    job = "shake"; steps.at("shake");
-    hv.on = true; hv.target = HX0; hv.x = HX0 - 9; hv.v = 0;
+    job = "shake"; want = null; offTries = 0;
+    hv.on = true; hv.shake = false; hv.target = HX0; hv.x = HX0 - 9; hv.v = 0;
     crates = [{ load: 0 }, { load: 0 }, { load: 0 }]; slot = 0; slotF = 0;
     tr.state = "away"; tr.x = -40; tr.crates = [-1, -1, -1];
+    pr.t = 0; pr.stop = 0; pr.n = 0; pr.show = 0;
     zoomF.target = 8.6; cmode = "end"; closeReset();
-    setPhase("arrive"); steps.busy(true);
+    setPhase("arrive"); coach.clear();
   }
-  function arrived() { setPhase("ready"); steps.busy(false); hv.v = 0; tagHv(); snd.clunk(); }
-  function go() {
-    if (locked()) return false;
-    if (phase === "ready" && job === "shake") {
-      setPhase("drive"); auto = true; steps.busy(true);
-      snd.horn(); coach.say(JOBS.shake.work, 4);
-      if (ghost) ghost.learned("go");
-      return true;
-    }
-    if (phase === "drive" && !auto) { auto = true; steps.busy(true); return true; }
-    if (phase === "ready" && job === "load") {
-      setPhase("load"); ld.t = -0.01; steps.busy(true); snd.clunk();
-      coach.say(JOBS.load.work, 4);
-      if (ghost) ghost.learned("go");
-      return true;
-    }
-    if (phase === "ready" && job === "press") {
-      setPhase("press"); pr.t = -0.01; pr.n = 0; pr.show = 0; steps.busy(true); snd.clunk();
-      coach.say(JOBS.press.work, 4);
-      if (ghost) ghost.learned("go");
-      return true;
-    }
-    return false;
+  function arrived() { hv.v = 0; tagHv(); snd.clunk(); setWant("shaker"); }
+  // Shake: switch the shaker rods on, then drive the harvester along the row
+  function doShaker() {
+    hv.shake = true; offTries = 0; setPhase("spin"); snd.clunk();
+    working("The shaker rods start to shake.");
+  }
+  function doDrive() {
+    setPhase("drive"); auto = true; snd.horn();
+    working(JOBS.shake.work);
   }
   function passDone() {
-    auto = false; field.stage = "picked";
+    auto = false; grab = null; hv.shake = false; field.stage = "picked";
     world(function (w) { w.berries = "picked"; });
-    steps.done("shake"); job = "load"; steps.busy(true);
+    job = "load";
     setPhase("out");
     tr.state = "come"; tr.r = TR_R; tr.lane = 0; tr.crates = [-1, -1, -1]; tr.x = HX_END - 15; tr.v = 0;
     zoomF.target = 16; cmode = "side"; zoomC.target = 7.2;
-    coach.say("Here comes the trailer.", 3);
+    working("Here comes the trailer.");
   }
-  function loadDone() {
-    steps.done("load"); job = "press"; steps.busy(true);
-    setPhase("haul"); tr.state = "go"; tr.t = 0; tr.v = 0;
-    coach.say("The trailer goes to the juice press.", 3);
+  // Load: the crates roll off the platform onto the trailer
+  function doCrates() { setPhase("load"); ld.t = -0.01; snd.clunk(); working(JOBS.load.work); }
+  function loadDone() { job = "press"; setWant("tractor"); }
+  // Press: drive to the press, tip the crates, squeeze, fill the bottles
+  function doHaul() {
+    setPhase("haul"); tr.state = "go"; tr.t = 0; tr.v = 0; snd.horn();
+    working("The tractor pulls the trailer to the juice press.");
   }
   function atPress() {
-    tr.state = "parked"; tr.v = 0;
-    setPhase("ready"); steps.busy(false); cmode = "press";
-    zoomF.target = 16.8;
+    tr.state = "parked"; tr.v = 0; cmode = "press";
+    zoomF.target = 16.8; pr.t = 0; pr.stop = 0; pr.n = 0; pr.show = 0;
     tagAt("Juice press", scF.X(STORE_X + 1.9, 1.02), scF.Y(1.02) - 3.7 * scF.S(1.02));
-    snd.clunk();
+    snd.clunk(); setWant("tipper");
+  }
+  function pressTo(stop, info) { pr.stop = stop; setPhase("press"); snd.clunk(); working(info); }
+  function doTip() { pressTo(T_PRESS0, "The crate tipper tips the berries into the press."); }
+  function doSqueeze() { pressTo(T_B0, JOBS.press.work); }
+  function doFill() { pressTo(T_END, "The juice runs into the bottles."); }
+  function pressStop() {
+    if (pr.stop === T_PRESS0) setWant("wheel");
+    else if (pr.stop === T_B0) setWant("tap");
+    else finishJob();
   }
   function finishJob() {
-    setPhase("done"); steps.done("press"); steps.finish("Again!"); steps.busy(false);
+    setPhase("done"); want = null;
+    coach.step("Tap the field to start again.");
     coach.say("Look at all the juice!", 5);
     Toybox.kind();
   }
   function startGrow() {
     // Again: weeks go by and the next row is ripe
-    setPhase("grow"); steps.busy(true); hv.on = false; field.stage = "ripe"; field.g = 0;
+    setPhase("grow"); want = null; hv.on = false; hv.shake = false; field.stage = "ripe"; field.g = 0;
     world(function (w) { w.berries = "ripe"; });
     tr.state = "away"; tr.crates = [-1, -1, -1]; carry = null;
     zoomF.target = 15; cmode = "end"; closeReset();
-    coach.say("Weeks go by. The berries get ripe.", 3);
+    working("Weeks go by. The berries get ripe.");
   }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    steps.reset();
     startGrow();
     return true;
   }
+  // his tap (or a slow press) on a part while something is wanted: true if it was the right thing
+  var HVP = { hv: 1, shaker: 1, hvc: 1 };
+  function act(part) {
+    var p = part || "";
+    if (want === "shaker") {
+      if (p === "shaker" || p === "hvc") { doShaker(); return true; }
+      if (p === "hv") {
+        // two-step machine: driving while the shakers are off says so first, then switches them on for him
+        if (++offTries >= 2) { doShaker(); return true; }
+        coach.say("Switch the shaker rods on first!", 3); glow = 3; hv.flash = 1.2; snd.horn(); return true;
+      }
+      return false;
+    }
+    if (want === "drive" && HVP[p]) { doDrive(); return true; }
+    if (want === "crates" && (p === "crates" || p === "crateC" || p === "trailer" || p === "trailerC" || p === "tractor")) { doCrates(); return true; }
+    if (want === "tractor" && (p === "tractor" || p === "trailer" || p === "trailerC" || p === "house")) { doHaul(); return true; }
+    if (want === "tipper" && (p === "tipper" || p === "queue" || p === "house")) { doTip(); return true; }
+    if (want === "wheel" && (p === "wheel" || p === "press" || p === "house")) { doSqueeze(); return true; }
+    if (want === "tap" && (p === "jtap" || p === "tank" || p === "bench" || p === "house")) { doFill(); return true; }
+    return false;
+  }
 
-  // ---------- Steps, bar, ghost ----------
-  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: myPic(id), go: J.go, coach: J.ready }; });
+  // ---------- Coach hints, ghost, bar ----------
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
-      var b = cv.getBoundingClientRect(), q;
-      if (phase === "ready" && job === "shake") {
-        var p = hvScreen(0, -1.8);
-        if (ghost.shown("go") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: "go" };
-        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: "go" };
+      var b = cv.getBoundingClientRect();
+      if (phase === "ready") {
+        var p = targetPt(); if (!p) return null;
+        if (want === "drive" && ghost.shown("drive") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: "drive" };
+        if (want === "tractor" && ghost.shown("tractor") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: "tractor" };
+        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: want };
       }
-      if (phase === "ready" && job === "load") { q = closeCrate(); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
-      if (phase === "ready" && job === "press") { q = pressScreen(); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (phase === "done" && phaseT > 4) return { pts: [[b.left + RG.f.x + RG.f.w / 2, b.top + RG.f.y + RG.f.h * 0.6]], tap: true, key: "again" };
       return null;
     }
   });
-  var steps = Toybox.steps($("steps"), {
-    steps: STEPS, coach: coach, ghost: ghost,
-    onGo: function () { return doGo(); },
-    onAgain: function () { again(); },
-    onBusy: function () { busyHint(); }
-  });
-  function doGo() {
-    if (locked()) return false;
-    if (phase === "ready" || (phase === "drive" && !auto)) return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
+  function hint() { if (want) { coach.say(SAY[want], 3); glow = 3; } if (ghost) ghost.poke(); }
   function busyHint() {
     if (phase === "grow") coach.say("The berries are getting ripe.", 3);
     else if (phase === "drive") { snd.horn(); hv.flash = 1.2; coach.say(JOBS.shake.busy, 3); }
+    else if (phase === "spin") coach.say("The shaker rods start to shake.", 3);
     else if (phase === "arrive") coach.say("Here comes the harvester.", 3);
     else if (phase === "out") coach.say("Here comes the trailer.", 3);
     else if (phase === "load") coach.say(JOBS.load.busy, 3);
@@ -627,10 +619,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); bird = null; shuf = null; carry = null; auto = false; grab = null;
+    parts.clear(); bird = null; shuf = null; carry = null; auto = false; grab = null; drag = null;
     field.stage = "ripe"; field.g = 1;
     world(function (w) { w.berries = "ripe"; });
-    steps.reset();
     bringIn();
     zoomF.span = zoomF.target; scF.layout(RG.f.w, RG.f.h);
     hv.x = HX0 - 6;
@@ -656,7 +647,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function shuffleTarget() {
     if (cmode === "press" && pr.show > 0) return "bottles";
-    if (cmode === "press" && phase === "ready") return "queue";
+    if (cmode === "press" && want === "tipper") return "queue";
     if (hv.on && crates.some(function (c) { return c.load >= 0; }) && (phase === "arrive" || phase === "ready" || phase === "drive" || phase === "out")) return "platform";
     if (tr.state !== "away" && tr.crates.some(function (c) { return c >= 0; })) return "trailer";
     return null;
@@ -800,7 +791,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!near) { machine("back"); machine("front"); }
     else machine("back");
     // the bush in the middle of the tunnel
-    Farm.inUnits(ctx, CX(0), CY(0), u, lw, function () { bushEnd(st.work); });
+    Farm.inUnits(ctx, CX(0), CY(0), u, lw, function () { bushEnd(st.rods); });
     if (near) machine("front");
     // the berries falling, rolling down the plates, carried off on the belts
     var br = 0.065 * u;
@@ -836,7 +827,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var swapT = 0;
   function hvSt() {
     var cr = crates.map(function (c, i) { if (!c || c.load < 0 || c.moving) return null; var s = shufAt(i, "platform"); return { x: slotX(HV.cr, s.p), load: c.load, hop: s.hop }; });
-    return { wheel: hv.wheel, time: time, work: shaking() ? 1 : 0, run: hv.run, slot: slotF, crates: cr, beacon: phase === "drive" || hv.flash > 0 };
+    return { wheel: hv.wheel, time: time, work: shaking() ? 1 : 0, rods: hv.shake && !ending, run: hv.run, slot: slotF, crates: cr, beacon: phase === "drive" || hv.flash > 0 };
   }
   function drawBirdEnd(u) {
     var b = bird, t = b.t, x, y, fly = true, flip = false, berry = false;
@@ -848,11 +839,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- The juice press (the close-up at the end) ----------
-  var PV = { cx: 0.38, hw: 4.02, up: 2.95, dn: 0.18 };
+  var PV = { cx: 0.3, hw: 4.2, up: 3.05, dn: 0.18 };
   var PL = { u: 40, gy: 100 };
   function PX(x) { return RG.c.w / 2 + (x - PV.cx) * PL.u; }
   function PY(y) { return PL.gy + y * PL.u; }
-  var TIP = 0.85, T_PRESS0 = 2.55, T_PRESS1 = 4.1, T_B0 = 3.9, TB = 0.45, NBOT = 6, T_END = T_B0 + NBOT * TB + 0.3;
+  var TIP = 0.85, T_PRESS0 = 2.6, T_PRESS1 = 4.5, T_B0 = 4.7, TB = 0.5, NBOT = 6, T_END = T_B0 + NBOT * TB + 0.3;
   var BSLOT = [];
   for (var bi = 0; bi < NBOT; bi++) BSLOT.push(2.12 + bi * 0.38);
   // the basket press: a slatted basket on a tray, the plate on a screw under the top beam (metres, origin on
@@ -883,7 +874,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     tube(ctx, 0, -2.75, 0, plY, 0.12, "#AEB8C5");
     for (i = 0; i < 6; i++) { var sy = lerp(-2.68, plY - 0.05, i / 6); Ln(ctx, -0.08, sy, 0.08, sy + 0.05, INK, 0.03); }
     R(ctx, -0.6, plY - 0.08, 1.2, 0.16, 0.04, "#8C97A6");
-    C(ctx, 0, -2.82, 0.16, "#E8473B", LWu() * 0.8);
+    // the red hand wheel on top of the screw: it turns as the plate goes down
+    C(ctx, 0, -2.86, 0.3, "#E8473B", LWu() * 0.8); C(ctx, 0, -2.86, 0.19, "#F4F1EA", LWu() * 0.6);
+    for (i = 0; i < 4; i++) { var wa = pl * 9 + i * Math.PI / 2; Ln(ctx, 0, -2.86, Math.cos(wa) * 0.22, -2.86 + Math.sin(wa) * 0.22, "#E8473B", 0.07); }
+    C(ctx, 0, -2.86, 0.07, "#B23A30", LWu() * 0.6);
     // juice running out between the slats
     if (st.drip) {
       for (i = 0; i < 7; i++) {
@@ -896,7 +890,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var avail = c.h - RG.pad - 6;
     PL.u = Math.min(c.w / (2 * PV.hw), avail / (PV.up + PV.dn));
     PL.gy = 6 + (avail - (PV.up + PV.dn) * PL.u) * 0.6 + PV.up * PL.u;
-    var u = PL.u, lw = clamp(u * 0.03, 1.5, 3.2), i, t = phase === "press" ? pr.t : (phase === "done" ? T_END : 0);
+    var u = PL.u, lw = clamp(u * 0.03, 1.5, 3.2), i, t = phase === "done" ? T_END : pr.t;
     // the room: whitewashed wall, a window, a concrete floor
     ctx.fillStyle = "#F1E9DA"; ctx.fillRect(0, 0, c.w, PY(0));
     ctx.fillStyle = "#E4D9C4"; for (i = 0; i < 12; i++) ctx.fillRect(0, PY(-0.4 - i * 0.5), c.w, Math.max(1, u * 0.02));
@@ -908,7 +902,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var queue = 0, tipping = null;
       for (var k = 0; k < 3; k++) {
         var tk = t - k * TIP;
-        if (phase === "ready" || tk < 0) queue++;
+        if (tk <= 0) queue++;
         else if (tk < TIP) tipping = { k: k, f: tk / TIP };
       }
       for (k = 0; k < queue; k++) {
@@ -928,13 +922,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       } else R(ctx, -2.55, -0.16, 0.55, 0.12, 0.03, "#8C97A6", LWu() * 0.7);
       // the press
       var lvl = 0; for (k = 0; k < 3; k++) lvl += clamp((t - k * TIP - TIP * 0.45) / (TIP * 0.35), 0, 1) / 3;
-      var plate = phase === "ready" ? 0 : ease(clamp((t - T_PRESS0) / (T_PRESS1 - T_PRESS0), 0, 1)) * (t > T_END - 0.3 ? 1 : 1);
+      var plate = ease(clamp((t - T_PRESS0) / (T_PRESS1 - T_PRESS0), 0, 1));
       ctx.save(); ctx.translate(-0.9, 0);
-      pressMachine({ level: lvl, plate: plate, drip: t > T_PRESS0 + 0.3 && t < T_B0 + NBOT * TB, juice: t > T_PRESS0 + 0.3 ? 1 : 0 });
+      pressMachine({ level: lvl, plate: plate, drip: t > T_PRESS0 + 0.3 && t < T_B0, juice: t > T_PRESS0 + 0.3 ? 1 : 0 });
       ctx.restore();
       // the juice from the tray into the tank, and the tank's window
-      var tank = clamp((t - T_PRESS0 - 0.4) / 1.3, 0, 1) - clamp((t - T_B0) / (NBOT * TB), 0, 1) * 0.55;
-      if (phase === "ready") tank = 0;
+      var tank = clamp((t - T_PRESS0 - 0.4) / 1.7, 0, 1) - clamp((t - T_B0) / (NBOT * TB), 0, 1) * 0.55;
       tube(ctx, 0.2, -0.5, 0.55, -0.5, 0.08, "#AEB8C5");
       tube(ctx, 0.55, -0.5, 0.55, -2.25, 0.08, "#AEB8C5");
       tube(ctx, 0.55, -2.25, 0.85, -2.25, 0.08, "#AEB8C5");
@@ -947,7 +940,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       tube(ctx, 1.65, -1.0, 1.9, -1.0, 0.08, "#AEB8C5"); R(ctx, 1.84, -1.1, 0.12, 0.16, 0.03, "#E8473B", LWu() * 0.6);
       R(ctx, 1.4, -0.18, 2.9, 0.1, 0.03, "#B07B3C"); Ln(ctx, 1.55, -0.08, 1.55, 0, INK, 0.07); Ln(ctx, 4.15, -0.08, 4.15, 0, INK, 0.07);
       // the bottles: each one fills under the tap, gets its cap and joins the line
-      var nb = phase === "done" ? NBOT : (phase === "press" ? NBOT : 0);
+      var nb = NBOT;
       for (var j = 0; j < nb; j++) {
         var tj = t - T_B0 - j * TB;
         if (tj < 0) continue;
@@ -972,52 +965,105 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var c = RG.c, x = scC.X(hv.x + HV.cr[1], 1), y = scC.gY + (HV.deck - HV.ch * 0.5) * scC.k;
     return { x: c.x + x, y: c.y + y };
   }
-  function pressScreen() { return { x: RG.c.x + PX(-0.9), y: RG.c.y + PY(-1.2) }; }
-  function hvPart() { var p = hvScreen(0.8, -2.0); return { x: p.x, y: p.y, r: Math.max(2.6 * scF.k, 48) }; }
+  // a spot in the press room (metres) -> canvas px
+  function pressPt(x, y) { return { x: RG.c.x + PX(x), y: RG.c.y + PY(y) }; }
+  function pressScreen() { return pressPt(-0.9, -1.2); }
+  var PRESS_PARTS = { tipper: [-2.3, -0.45, 0.6], queue: [-3.22, -0.6, 0.5], wheel: [-0.9, -2.82, 0.4], press: [-0.9, -1.2, 0.6], jtap: [1.9, -1.02, 0.3], tank: [1.2, -1.6, 0.5], bench: [3.0, -0.4, 0.6] };
   function trScreenF() { return trScreenIn(scF); }
   function trScreenIn(S) { var s = trScale(S, tr.r); return { x: S.X(tr.x, 1), y: S.Y(tr.r), s: s }; }
+  function tractorPt() { var t = trScreenF(); return { x: t.x + 2.0 * t.s, y: t.y - 1.3 * t.s, r: Math.max(1.6 * t.s, 36) }; }
+  function trailerPt() { var t = trScreenF(); return { x: t.x - 3.5 * t.s, y: t.y - 1.4 * t.s, r: Math.max(1.8 * t.s, 36) }; }
+  function cratesPt() { var p = hvScreen(HV.cr[1], HV.deck - 0.25); p.r = Math.max(1.1 * scF.k, 34); return p; }
+  function onPlatform() { return hv.on && crates.some(function (c) { return c.load >= 0; }); }
+  // The ring and the ghost's target: the part wanted now, in canvas px (the field view, or the press room)
+  function targetPt() {
+    if (!want) return null;
+    if (want === "shaker") return hvScreen(0, -1.5);
+    if (want === "drive") return hvScreen(1.3, -3.9);
+    if (want === "crates") return cratesPt();
+    if (want === "tractor") return tractorPt();
+    var q = PRESS_PARTS[want === "tap" ? "jtap" : want];
+    return q ? pressPt(q[0], q[1]) : null;
+  }
+  // the part id that does the wanted thing
+  function wantPart() { return want ? ({ shaker: "shaker", drive: "hv", crates: "crates", tractor: "tractor", tipper: "tipper", wheel: "wheel", tap: "jtap" })[want] : null; }
+  function wxAt(clientX) { return scF.wx(clientX - cv.getBoundingClientRect().left, 1); }
+  var NAMES = { shaker: "Shaker rods", hv: "Blackcurrant harvester", crates: "Crates", crateC: "Crates", tractor: "Tractor", trailer: "Flatbed trailer",
+    trailerC: "Flatbed trailer", house: "Juice press", tipper: "Crate tipper", queue: "Crates", wheel: "Press wheel", press: "Juice press",
+    jtap: "Juice tap", tank: "Juice tank", bench: "Bottles" };
+  function tagPart(part, px, py) {
+    if (!part) return false;
+    var name = part === "hvc" ? endPartName(px - RG.c.x, py - RG.c.y) : NAMES[part];
+    if (!name) return false;
+    if (part === "hv" || part === "tractor" || part === "trailer" || part === "trailerC") { snd.horn(); hv.flash = part === "hv" ? 1.2 : hv.flash; } else snd.tick();
+    tagAt(name, px, py - 40);
+    return true;
+  }
   var press = Toybox.press(cv, {
     any: true,
     parts: function () {
       var b = cv.getBoundingClientRect(), list = [], c = RG.c;
-      if (hv.on && phase !== "grow") { var p = hvPart(); list.push({ id: "hv", x: b.left + p.x, y: b.top + p.y, r: p.r }); }
+      function add(id, p, r) { list.push({ id: id, x: b.left + p.x, y: b.top + p.y, r: r || p.r || 40 }); }
+      if (hv.on && phase !== "grow") {
+        add("hv", hvScreen(1.3, -3.9), Math.max(1.3 * scF.k, 40));
+        add("shaker", hvScreen(0, -1.5), Math.max(0.9 * scF.k, 30));
+        if (onPlatform()) add("crates", cratesPt());
+      }
       if (cmode === "end" && hv.on) list.push({ id: "hvc", x: b.left + c.x + CX(0.3), y: b.top + c.y + CY(-1.2), r: Math.max(1.3 * CL.u, 50) });
       if (cmode === "side") {
-        var q = closeCrate(); list.push({ id: "crate", x: b.left + q.x, y: b.top + q.y, r: Math.max(1.0 * scC.k, 44) });
+        if (onPlatform()) { var q = closeCrate(); list.push({ id: "crateC", x: b.left + q.x, y: b.top + q.y, r: Math.max(1.0 * scC.k, 44) }); }
         if (tr.state !== "away") { var t2 = trScreenIn(scC); list.push({ id: "trailerC", x: b.left + c.x + t2.x - 2.5 * t2.s, y: b.top + c.y + t2.y - 1.6 * t2.s, r: Math.max(1.5 * t2.s, 44) }); }
       }
-      if (cmode === "press") { var ps = pressScreen(); list.push({ id: "press", x: b.left + ps.x, y: b.top + ps.y, r: Math.max(1.2 * PL.u, 50) }); }
-      if (tr.state !== "away") { var t = trScreenF(); if (t.x > -40 && t.x < RG.f.w + 40) list.push({ id: "trailer", x: b.left + t.x - 1.5 * t.s, y: b.top + t.y - 1.6 * t.s, r: Math.max(1.8 * t.s, 40) }); }
+      if (cmode === "press" && cal.press > 0.5) Object.keys(PRESS_PARTS).forEach(function (id) { var q = PRESS_PARTS[id]; add(id, pressPt(q[0], q[1]), Math.max(q[2] * PL.u, 30)); });
+      if (tr.state !== "away") {
+        var tp = tractorPt(); if (tp.x > -40 && tp.x < RG.f.w + 40) add("tractor", tp);
+        var tl = trailerPt(); if (tl.x > -40 && tl.x < RG.f.w + 40) add("trailer", tl);
+      }
       var hx = scF.X(STORE_X, 1.02);
       if (hx > -40 && hx < RG.f.w + 40) list.push({ id: "house", x: b.left + hx, y: b.top + scF.Y(1.02) - 2.6 * scF.S(1.02), r: Math.max(3 * scF.S(1.02), 44) });
       return list;
     },
     dragStart: function (part, e, s) {
-      if (locked() || part !== "hv" || job !== "shake" || (phase !== "ready" && phase !== "drive")) return;
-      if (phase === "ready") go();
-      auto = false; grab = { off: scF.wx(s.x - cv.getBoundingClientRect().left, 1) - hv.x };
-      if (ghost) ghost.learned("go");
+      drag = null;
+      if (locked()) return;
+      var p = part || "";
+      if ((p === "hv" || p === "shaker") && (want === "drive" || phase === "drive")) {
+        // drive the harvester with a finger; when he lets go it carries on along the row
+        if (phase === "ready") { setPhase("drive"); snd.horn(); working(JOBS.shake.work); }
+        auto = false; grab = { off: wxAt(s.x0) - hv.x };
+        if (ghost) ghost.learned("drive");
+        return;
+      }
+      if ((p === "tractor" || p === "trailer") && want === "tractor") { drag = { kind: "tr", x0: s.x0 }; return; }
+      if (phase === "ready") drag = { kind: "act", part: part };
     },
-    move: function (part, e, s) { if (grab) grab.to = scF.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
+    move: function (part, e, s) {
+      if (grab) grab.to = wxAt(s.x) - grab.off;
+      if (drag && drag.kind === "tr" && want === "tractor" && s.x - drag.x0 > 16) {
+        // a drag toward the press sets the tractor going: it drives on to the press house
+        drag = null; if (ghost) ghost.learned("tractor"); doHaul();
+      }
+    },
+    up: function (part, e, s) {
+      if (grab && phase === "drive") auto = true;
+      grab = null;
+      var d = drag; drag = null;
+      if (d && d.kind === "act" && !s.tap && !locked() && phase === "ready") { var w = want; if (act(d.part) && ghost) ghost.learned(w); }
+    },
     tap: function (part, x, y) {
       if (locked()) return;
       var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part) {
-        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
-        if (part === "hv") { snd.horn(); hv.flash = 1.2; tagHv(); return; }
-        if (part === "hvc") { tagAt(endPartName(px - RG.c.x, py - RG.c.y), px, py - 30); snd.tick(); return; }
-        if (part === "crate") { tagAt("Crates", px, py - 30); snd.tick(); return; }
-        if (part === "trailer" || part === "trailerC") { snd.horn(); tagAt("Flatbed trailer", px, py - 40); return; }
-        if (part === "press") { tagAt("Juice press", px, py - 50); snd.tick(); return; }
-        if (part === "house") { tagAt("Juice press", px, py - 60); return; }
-      }
-      // anywhere else: a little puff, and the step's line again
+      if (phase === "done") { again(); return; }   // no step row: a tap on the finished scene starts again
+      if (phase === "ready") { var w = want; if (act(part)) { if (ghost) ghost.learned(w); return; } }
+      if (phase !== "ready" && part) { if (!tagPart(part, px, py)) busyHint(); return; }
+      if (tagPart(part, px, py)) return;
+      if (phase !== "ready") { busyHint(); return; }
+      // anywhere else: a little puff, and the instruction again
       if (px < RG.f.x + RG.f.w && py < RG.f.y + RG.f.h) {
         var rr2 = clamp(scF.B / Math.max(4, py - scF.hY), 0.6, 5);
         for (var i = 0; i < 5; i++) parts.add({ kind: "puff", x: scF.wx(px, Math.min(1, rr2)) + (Math.random() - 0.5) * 0.6, h: 0.2, r: Math.min(1, rr2), vx: (Math.random() - 0.5), vh: 0.5, life: 0.9, size: 0.12, grow: 0.5, col: "#BFE3A0", alpha: 0.7 });
       }
-      steps.sayStep && steps.sayStep(); if (ghost) ghost.poke();
+      hint();
     }
   });
   function endPartName(x, y) {
@@ -1032,9 +1078,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---------- Simulation ----------
   function camTarget() {
-    if (phase === "press" || phase === "done" || (phase === "ready" && job === "press")) return STORE_X + 3.7;
+    if (phase === "press" || phase === "done" || tr.state === "parked") return STORE_X + 3.7;
     if (phase === "haul") return clamp(tr.x - 0.1, HX_END + 2, STORE_X + 3.7);
-    if (phase === "out" || phase === "load") {
+    if (loadView()) {
       // pan toward the trailer only as fast as the zoom opens up, so the harvester's back end never leaves the view
       var vw = RG.f.w / scF.k;
       return Math.min(hv.x + 4.6, hv.x + HV.x0 - 0.5 + vw / 2);
@@ -1042,6 +1088,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "grow" || !hv.on) return L / 2;
     return hv.x + 0.8;
   }
+  function loadView() { return phase === "out" || phase === "load" || (phase === "ready" && (want === "crates" || want === "tractor")); }
   function camC() {
     if (phase === "haul" || (job === "press" && tr.state !== "away")) return tr.x - FBC * trScale(scC, tr.r) / scC.k + 1.0;
     return hv.x + HV.x1 + 0.7;
@@ -1076,6 +1123,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       updateTrailer(dt);
     } else if (phase === "press") {
       updatePress(dt);
+    } else if (phase === "spin") {
+      if (phaseT >= 1.2) setWant("drive");
     } else if (phase === "grow") {
       field.g = ease(clamp(phaseT / GROW_T, 0, 1));
       if (phaseT >= GROW_T) { field.g = 1; bringIn(); }
@@ -1084,6 +1133,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (shaking()) hv.run += dt * 1.6;
     else if (phase === "out" && hv.v > 0.05) hv.run += dt * 0.8;
     if (hv.flash > 0) hv.flash = Math.max(0, hv.flash - dt);
+    if (glow > 0) glow = Math.max(0, glow - dt);
     slotF += (slot - slotF) * Math.min(1, dt * 3);
     if (swapT > 0) swapT = Math.max(0, swapT - dt);
     if (shuf) { shuf.t += dt; if (shuf.t > SW.length * SWT) shuf = null; }
@@ -1097,7 +1147,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     parts.update(dt);
     updateClose(dt);
     scF.follow(camTarget(), dt); scC.follow(camC(), dt);
-    if (phase === "out" || phase === "load") scF.cam = Math.min(scF.cam, Math.max(scF.camMin, hv.x + HV.x0 - 0.5 + RG.f.w / scF.k / 2));
+    if (loadView()) scF.cam = Math.min(scF.cam, Math.max(scF.camMin, hv.x + HV.x0 - 0.5 + RG.f.w / scF.k / 2));
     var lvl = phase === "drive" ? 0.25 + drive * 0.75 : (phase === "arrive" || phase === "out" || phase === "haul" ? 0.6 : (hv.on ? 0.15 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
     snd.engine(ending || (!hv.on && tr.state === "away") ? -1 : engLevel);
@@ -1119,7 +1169,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       tr.v = clamp(d * 2.2, 1.2, 14); tr.x += Math.min(tr.v * dt, Math.max(d, 0.001)); tr.wheel += tr.v * dt;
       if (d < 0.02 && HX_END - hv.x < 0.05) {
         tr.x = target; tr.v = 0; tr.state = "with";
-        setPhase("ready"); steps.busy(false);
+        setWant("crates");
         tagAt("Flatbed trailer", trScreenF().x - 2.4 * trScreenF().s, trScreenF().y - 2.4 * trScreenF().s);
         snd.clunk();
       }
@@ -1147,7 +1197,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return null;
   }
   function updatePress(dt) {
-    var b = pr.t; pr.t += dt;
+    var b = pr.t; pr.t = Math.min(pr.stop, pr.t + dt);
     for (var k = 0; k < 3; k++) { var t0 = k * TIP; if (b < t0 && pr.t >= t0) { tr.crates[k] = -1; carry = { k: k, t: 0 }; snd.clunk(); } }
     for (var j = 0; j < NBOT; j++) {
       var tc = T_B0 + j * TB + TB * 0.6;
@@ -1156,7 +1206,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         world(function (w) { w.juice = (typeof w.juice === "number" && isFinite(w.juice) ? w.juice : 0) + 1; });
       }
     }
-    if (pr.t >= T_END) finishJob();
+    if (pr.t >= pr.stop) pressStop();
   }
 
   // ---------- Drawing the field (and the side close-up: the same world, nearer) ----------
@@ -1169,6 +1219,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawWorld(scF, true);
     ctx.restore();
     drawClose();
+    drawRing();
+  }
+  // the yellow ring round the part he touches next (brighter after a hint)
+  function drawRing() {
+    if (phase !== "ready" || grab || locked()) return;
+    var p = targetPt(); if (!p) return;
+    var k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.6 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
   }
   function farRow(S, r) {
     var s = S.S(r), y = S.Y(r), xa = S.X(-0.1, r), xb = S.X(L + 0.1, r), n = scF.night || 0, i;
@@ -1304,18 +1364,28 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     onWake: onWake,
     onSound: function (on) { if (on) snd.chime(); }
   });
+  Toybox.offFirst({ running: function () { return hv.shake; }, name: "the shaker rods", off: function (done) { hv.shake = false; done(); } });
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: hv.x, field: field.stage, trailer: tr.state, crates: crates.map(function (c) { return c.load; }), onTrailer: tr.crates.slice(), count: count, coach: coach.text(), cmode: cmode, bird: !!bird, shuf: shuf ? shuf.what : null }; },
+    state: function () { return { phase: phase, job: job, want: want, part: wantPart(), done: phase === "done", shake: hv.shake, x: hv.x, field: field.stage, trailer: tr.state, crates: crates.map(function (c) { return c.load; }), onTrailer: tr.crates.slice(), count: count, coach: coach.text(), cmode: cmode, bird: !!bird, shuf: shuf ? shuf.what : null }; },
     screen: function (id) {
       var b = cv.getBoundingClientRect(), p;
       if (id === "crate") p = closeCrate();
       else if (id === "press") p = pressScreen();
       else if (id === "hvc") p = { x: RG.c.x + CX(0.3), y: RG.c.y + CY(-1.2) };
-      else p = hvPart();
-      return { x: b.left + p.x, y: b.top + p.y };
+      else if (id === "ring") p = targetPt();
+      else p = hvScreen(1.3, -3.9);
+      return p ? { x: b.left + p.x, y: b.top + p.y } : null;
     },
+    // play his tap on a part (the part's id as in state().part), or on the scene (null)
+    tap: function (part) {
+      if (locked()) return;
+      if (phase === "done") { again(); return; }
+      if (phase === "ready" && act(part)) return;
+      if (!tagPart(part, W / 2, H / 2)) { if (phase === "ready") hint(); else busyHint(); }
+    },
+    next: function () { window.__farm.tap(wantPart()); },
     surprise: surprise,
     ghost: function () { return ghost.show(); }
   };
