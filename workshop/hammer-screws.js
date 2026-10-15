@@ -3420,8 +3420,8 @@
   function resetScene(which) {
     if (which === "metal") { state.metal = freshMetal(); pop("New plate!", W / 2, LM.yBack - 20, 28, "#FFC93C"); }
     else if (which === "joint") { state.joint = freshJoint(); jointDrop = 220; newJointAt = 0; pop("New wood!", W / 2, LJ.yBack - 40, 28, "#FFC93C"); }
-    else if (which === "log") { state.yard.wedge = 30; state.yard.hits = 0; logSplit = null; newLogAt = 0; logDrop = 300; }
-    else if (which === "stake") { state.yard.stake = 430; state.yard.shits = 0; newStakeAt = 0; stakeDrop = 400; }
+    else if (which === "log") { state.yard.wedge = 30; state.yard.hits = 0; logSplit = null; newLogAt = 0; logDrop = 300; pop("New log!", LY.sx, LY.logTop - 30 * LY.k, 28, "#FFC93C"); }
+    else if (which === "stake") { state.yard.stake = 430; state.yard.shits = 0; newStakeAt = 0; stakeDrop = 400; pop("New stake!", LY.kx, LY.logTop - 30 * LY.k, 28, "#FFC93C"); }
     sndPlace();
     bgDirty = true; saveSoon();
   }
