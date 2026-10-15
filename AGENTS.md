@@ -323,7 +323,8 @@ Keep only:
   actual Tractor Ted episodes they are designed around (real machines and processes shown clearly, like Spuds in
   Mud's bed former → destoner → planter → harvester sequence with the split-view close-up of the work). Make those
   moments big, visually clear and faithful to the episode; do not replace the authentic highlights with manual driving
-  chores or complex steering controls. Ask the dad for an episode's key moments when unsure.
+  chores or complex steering controls. When unsure, follow the guide (the dad, 2026-10-15: "when in doubt just default to the episode guide"); change
+  an existing station only when it is very obviously different from its episode and misses key pieces.
 - Real names, no brand names or logos. Exception (the dad, 2026-10-11): the Farm app is specifically Tractor Ted
   themed: the app is shown as "Tractor Ted" and the 12 stations follow the actual episodes he has memorized.
   **Tractor Ted himself is never drawn** (the dad, 2026-10-14: he is the show's cartoon narrator and doesn't do the

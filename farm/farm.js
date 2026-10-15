@@ -91,7 +91,7 @@
   }
   var reduceMotion = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time", bales: "Brilliant Baler", silage: "Glorious Grass", carrots: "Munchy Crunchy", muck: "Mucky Muck", woods: "Timberrrrr!", berries: "Juicy Squeezy", cows: "Moooovie Time", sheep: "Come Bye", hens: "Feathered Friends", tracks: "Caterpillar Hunt" };
+  var NAMES = { spuds: "Spuds in Mud", combine: "Combine Time", bales: "Brilliant Baler", silage: "Glorious Grass", carrots: "Munchy Crunchy", muck: "Mucky Muck", woods: "Timberrrrr!", berries: "Juicy Squeezy", cows: "Moooovie Time", sheep: "Come Bye", hens: "Feathered Friends", tracks: "Caterpillar Hunt", ewe: "Hello Ewe!", mushrooms: "Mighty Mushrooms" };
 
   // =====================================================================================================
   // World: the shared farm (farm-world-v1)

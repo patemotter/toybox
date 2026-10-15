@@ -10,7 +10,10 @@ tangent, leave it out or ask the dad.
 **Nothing that isn't rooted in the episode** (the dad, 2026-10-14: he "will not likely enjoy the extra pieces unless
 it is rooted in the episode itself"). No invented steps, machines or places; when a station is rebuilt, the extras it
 has now that the episode doesn't show are questions for the dad (the grain barn in Combine Time, the silage sheet in
-Glorious Grass, the slurry tanker in Mucky Muck). Kept by the dad (2026-10-15): the potato harvest in Spuds in Mud. **Places look like the episode**, too: he notices
+Glorious Grass, the slurry tanker in Mucky Muck). Kept by the dad (2026-10-15): the potato harvest in Spuds in Mud.
+**When in doubt, follow this guide** (the dad, 2026-10-15). Change an existing station only when it is very
+obviously different from its episode and misses the episode's key pieces; small extras (the grain barn, the silage
+sheet, the slurry tanker) stay. **Places look like the episode**, too: he notices
 (Timberrrrr!'s sawmill was outdoors; in the episode it is inside a closed building, so now it is).
 **Let's Go Racing is never built** (the dad: it "feels weird").
 
