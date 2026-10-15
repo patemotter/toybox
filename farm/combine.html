@@ -46,8 +46,6 @@ body {
 body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Cut the wheat"): on a narrow row it wraps to two lines instead of being cut off. */
-.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
 body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
@@ -63,7 +61,7 @@ body.big #jobs { display: none; }
   <div class="tb-body app">
     <div class="tb-stagecol">
       <main class="tb-stage stage" id="stage">
-        <canvas id="cv" role="img" aria-label="A golden wheat field with a green combine harvester. Tap the combine to harvest."></canvas>
+        <canvas id="cv" role="img" aria-label="A golden wheat field with a green combine harvester. Tap the lever in the cab to drop the header."></canvas>
         <div class="tb-counter loads" id="loads">Loads: 0</div>
         <div id="coach"></div>
         <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
@@ -71,8 +69,6 @@ body.big #jobs { display: none; }
       <div id="jobs"></div>
     </div>
     <section class="tb-panel" id="panel">
-      <ol id="stepsWheat"></ol>
-      <ol id="stepsSun" hidden></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -89,11 +85,18 @@ body.big #jobs { display: none; }
   document.title = NAME; $("title").textContent = NAME;
 
   // ---------- State ----------
-  // He does the work: he drops the header, drives the combine through the whole field, swings out the grain spout
-  // and fills the trailer, drives the tractor to the grain barn and pulls the lever to tip the trailer. One field is
-  // one trip: the grain tank holds the whole field, and when the field is cut the tractor and trailer pull up next
-  // to the combine by themselves. Waiting and fiddling (the tractor coming, the trailer staying under the grain
-  // spout, folding the grain spout when the tank is empty, the tractor going home) happen by themselves.
+  // Combine Time (Wheat) and Sunny Seeds (Sunflowers): he does every step himself, on the scene, like Timberrrrr!
+  // (no step row, no Go). Each tap on a machine part plays that one control's motion:
+  //   Cut:    tap the header lever in the cab: the header drops; drive the combine (a tap, or a drag on it): it cuts
+  //           the whole field (the grain tank holds it all), then lifts the header; the tractor and trailer pull
+  //           up beside it by themselves.
+  //   Unload: tap the grain spout: it swings out over the trailer; tap it again: the grain pours into the trailer
+  //           until the tank is empty, then the spout folds by itself.
+  //   Store:  drive the tractor (a tap, or a drag on it) to the grain barn; tap the tipping lever on the tractor:
+  //           the trailer tips the load onto the heap, "Loads" counts it, the tractor goes home by itself.
+  // The coach line and a yellow ring on the scene point at the next thing to touch; a tap on any other part
+  // shows its name. At the end a tap on the field grows the crop again ("Weeks go by..."). The corner close-up
+  // shows the moment (inside the combine, the spout pouring, the trailer tipping).
   var KEY = "farm-combine-v2";
   var startFresh = !!(window.Toybox && Toybox.fresh());
   var saved = {};
@@ -234,14 +237,11 @@ body.big #jobs { display: none; }
   function underSpout() { return (tr.state === "side") && Math.abs(tr.x - spotX()) < 0.9 * TF() + 0.3; }
 
   // ---------- Controls: what each one does (one press is always enough) ----------
-  var HDR_LINE = "Tap the lever to drop the combine’s header.";
   function setHeader(up) {
     if (cb.hdrUp === up) return;
     cb.hdrUp = up; snd.clunk(); flash.lever = 0;
-    if (!up && ghost) ghost.learned("lever");
   }
-  function toggleHeader() { setHeader(!cb.hdrUp); }
-  // The horn is just for fun now: nothing waits on it (the tractor comes by itself when the field is cut).
+  // The horn is just for fun: nothing waits on it.
   function toot() {
     snd.horn(); cb.horn = 1.4;
     if (tr.state === "drift") bringBack();
@@ -250,133 +250,54 @@ body.big #jobs { display: none; }
     tr.state = "in"; tr.face = 1; tr.turn = null; tr.tip = 0; tr.lever = 0; tr.callT = 0;
     tr.x = Math.min(spotX() - 6, sc.wx(-30, sc.TRACK) - 6.5 * TF()); tr.v = 9;
   }
-  // A line for a try that can't work yet: what to do first, said literally.
-  function notYet() {
-    if (!fieldDone()) { say("Cut all the " + cropWord() + " with the combine first.", 3); flash.combine = 3; return; }
-    if (tr.state === "store" || tr.state === "tip" || tr.state === "untip" || tr.state === "dock" || tr.state === "road") return;
-    say("Wait for the tractor to stop next to the combine.", 3);
-  }
-  function augerTap() {
-    if (cb.auger < 0.5 && cb.augerTo < 0.5) {
-      cb.augerTo = 1; snd.clunk();
-      if (ghost) ghost.learned("auger");
-      return;
-    }
-    if (cb.augerTo < 0.5) { cb.augerTo = 1; return; }
-    if (cb.tank < 0.02) { cb.augerTo = 0; snd.clunk(); return; }
-    startPour(0.9);
-  }
-  function startPour(sec) {
-    if (tr.state === "away" || tr.state === "back" || tr.state === "in") { notYet(); cb.augerTo = 1; return false; }
-    if (tr.state === "drift") { bringBack(); return false; }
-    if (tr.state !== "side" || cb.tank <= 0.0005) return false;
-    if (sec) cb.pour = Math.max(cb.pour, sec);
-    if (ghost) ghost.learned("pour");
-    return true;
-  }
-  function combineTap() {
-    if (cb.turn) return;
-    var b = bounds(cb.dir), to = clamp(cb.x + cb.dir * 4.8, Math.min(b[0], cb.x), Math.max(b[1], cb.x));
-    if (Math.abs(to - cb.x) < 0.3) { startTurn(); return; }
-    cb.to = to;
-    if (ghost) ghost.learned("drive-tap");
-  }
-  function startTurn() {
-    if (cb.turn) return;
-    cb.turn = { t: 0, from: cb.dir, x0: cb.x, x1: cb.x - cb.dir * 1.0 }; cb.v = 0; cb.to = null;
-  }
-  // the tractor leaves for the grain barn (only with the grain tank empty: one field is one trip)
-  function startRoad() {
-    tr.state = "road"; tr.to = null; tr.heldT = 0;
-    tr.step = Math.max(9, (storeSpot() - tr.x) / 3);
-    if (ghost) ghost.learned("rig-tap");
-  }
-  function rigTap() {
-    if (tr.state === "drift") { bringBack(); return; }
-    if (tr.state === "side") {
-      if (cb.tank > 0.02) { say("Hold the grain spout to fill the trailer.", 3); flash.auger = 3; return; }
-      if (tr.load < 0.04) { notYet(); return; }
-      startRoad();
-    }
-    if (tr.state === "road") {
-      tr.to = Math.min(storeSpot(), Math.max(tr.x, tr.to === null ? tr.x : tr.to) + tr.step);
-      if (ghost) ghost.learned("rig-tap");
-      return;
-    }
-    if (tr.state === "store") { say("Pull the lever to tip the trailer.", 3); flash.tiplever = 3; }
-  }
   function bringBack() { if (tr.state !== "drift") return; tr.state = "side"; tr.heldT = 0; snd.horn(); }
-  function tipTap() {
-    if (tr.state === "store") { startTip(); return; }
-    if (tr.state === "tip" || tr.state === "untip" || tr.state === "dock") return;
-    tr.lever = 0.5; setTimeout(function () { if (tr.state !== "tip") tr.lever = 0; }, 350);
-    if (tr.load > 0.04 && cb.tank <= 0.02) say("Drive the tractor to the grain barn.", 3);
-    else if (tr.state === "side") say("Hold the grain spout to fill the trailer.", 3);
-  }
+  // the tractor leaves for the grain barn and drives all the way there (one tap is enough)
+  function startRoad() { tr.state = "road"; tr.to = storeSpot(); tr.heldT = 0; }
   function startTip() {
     if (tr.state !== "store") return;
     tr.state = "tip"; tr.t = 0; snd.clunk();
-    if (ghost) ghost.learned("tip");
   }
 
-  // ---------- Steps, jobs, bottom bar ----------
-  var STEPS = {
-    wheat: [
-      { id: "cut", name: "Harvest", go: "Cut the wheat", coach: "The combine cuts the wheat.", pic: "cb-wheat" },
-      { id: "unload", name: "Unload", go: "Empty the tank", coach: "The auger empties into the trailer.", pic: "auger" },
-      { id: "store", name: "Store", go: "Store the grain", coach: "Tip the grain into the barn.", pic: "tip-wheat" }
-    ],
-    sun: [
-      { id: "cut", name: "Harvest", go: "Cut sunflowers", coach: "The combine cuts the sunflowers.", pic: "cb-sun" },
-      { id: "unload", name: "Unload", go: "Empty the tank", coach: "The auger empties into the trailer.", pic: "auger" },
-      { id: "store", name: "Store", go: "Store the seeds", coach: "Tip the seeds into the barn.", pic: "tip-sun" }
-    ]
+  // ---------- The steps: what he does, in order ----------
+  // No step row and no Go (the dad: every station like Timberrrrr!): he works each control on the scene himself.
+  // Each thing he does has the coach's line (a literal instruction) and the part the yellow ring points at; a tap
+  // on that part plays that one control's motion. Waiting (the tractor coming, the grain spout folding when the
+  // tank is empty, the tractor going home) happens by itself, with an information line saying what happens.
+  var SUB = {
+    "cut.lever": { say: "Tap the lever to drop the combine’s header.", part: "lever" },
+    "cut.drive": { say: "Drive the combine through the {crop}.", part: "combine" },
+    "unload.swing": { say: "Tap the grain spout to swing it out over the trailer.", part: "auger" },
+    "unload.pour": { say: "Tap the grain spout to fill the trailer with {grain}.", part: "auger" },
+    "store.drive": { say: "Drive the tractor to the grain barn.", part: "rig" },
+    "store.tip": { say: "Tap the lever on the tractor to tip the trailer.", part: "tiplever" }
   };
-  var BUSY = {
-    cut: "The combine is harvesting.",
-    unload: "The grain is pouring into the trailer.",
-    store: "The trailer is tipping the grain."
+  // the parts that also do the step (forgiving: the whole machine that has the control)
+  var ALSO = {
+    "cut.lever": ["lever", "header"],
+    "cut.drive": ["combine", "header", "lever"],
+    "unload.swing": ["auger", "tank"],
+    "unload.pour": ["auger", "tank", "rig"],
+    "store.drive": ["rig", "tiplever", "barn"],
+    "store.tip": ["tiplever", "rig", "barn"]
   };
-
-  var phase = "ready", phaseT = 0, stepId = "cut", autoCut = false;
+  var BUSY = { cut: "The combine is working.", unload: "The grain spout is working.", store: "The tractor is working." };
+  var phase = "ready", phaseT = 0, stepId = "cut", sub = "lever", autoCut = false, miss = 0;
   var straw = { x0: 0, x1: 0, on: false };
+  function key() { return stepId + "." + sub; }
+  function words(t) { return t.replace("{crop}", cropWord()).replace("{grain}", job === "sun" ? "sunflower seeds" : "grain"); }
+  function sayFor(k) { var d = SUB[k]; return d ? words(d.say) : ""; }
+  function wantPart() { if (phase !== "ready") return null; var d = SUB[key()]; return d ? d.part : null; }
 
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
       var b = cv.getBoundingClientRect();
-      function vp(p) { return [b.left + p[0], b.top + p[1]]; }
-      if (phase === "ready") {
-        if (stepId === "cut") return { pts: [vp(cbPt(-0.6, -2.5))], tap: true, key: "cut" };
-        if (stepId === "unload") return { pts: [vp(augerPt())], tap: true, key: "unload" };
-        if (stepId === "store") return { pts: [vp(trPt(-2.5, -1.8))], tap: true, key: "store" };
-      }
-      if (phase === "done" && phaseT > 4) {
-        var g = steps.go.el.getBoundingClientRect();
-        if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" };
-      }
+      if (phase === "ready") { var p = wantPt(); if (!p) return null; return { pts: [[b.left + p[0], b.top + p[1]]], tap: true, key: key() }; }
+      if (phase === "done" && phaseT > 5) return { pts: [[b.left + W * 0.5, b.top + (sc.hY + sc.gY) / 2]], tap: true, key: "again" };
       return null;
     }
   });
-
-  function mkSteps(el, j) {
-    return Toybox.steps(el, {
-      steps: STEPS[j].map(function (s) {
-        return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.pic) };
-      }),
-      coach: coach, ghost: ghost,
-      onGo: doGo, onAgain: again, onBusy: busyHint
-    });
-  }
-  var stepsW = mkSteps($("stepsWheat"), "wheat"), stepsS = mkSteps($("stepsSun"), "sun");
-  var steps = job === "sun" ? stepsS : stepsW;
-  function showSteps() {
-    steps = job === "sun" ? stepsS : stepsW;
-    $("stepsWheat").hidden = job === "sun";
-    $("stepsSun").hidden = job !== "sun";
-  }
   var jobs = Toybox.jobs($("jobs"), {
     jobs: [
       { id: "wheat", name: "Wheat", pic: Farm.pic("wheat") },
@@ -386,117 +307,128 @@ body.big #jobs { display: none; }
     onPick: switchJob
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
-
-  function doGo() {
-    if (locked()) return false;
-    if (phase === "ready") return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
-  function busyHint() {
-    if (phase === "work") { snd.horn(); coach.say(BUSY[stepId], 3); }
-  }
+  function busyHint() { snd.horn(); coach.say(BUSY[stepId] || "Wait a moment.", 3); }
+  function hint() { var t = sayFor(key()); if (t) coach.say(t, 3); if (cue && cue in flash) flash[cue] = 3; if (ghost) ghost.poke(); }
 
   // =====================================================================================================
-  // The flow: Cut -> Unload -> Store -> Again
+  // The flow: Cut (lever, drive) -> Unload (swing, pour) -> Store (drive, tip) -> a tap starts again
   // =====================================================================================================
   function setPhase(p) { phase = p; phaseT = 0; }
+  function setSub(s) {
+    sub = s; miss = 0; setPhase("ready");
+    var d = SUB[key()]; cue = d ? d.part : null;
+    var t = sayFor(key()); if (t) coach.step(t);
+    if (ghost) ghost.poke();
+  }
+  // his tap started a control's motion: the ring goes, an information line says what is happening
+  function working(line) { setPhase("work"); cue = null; coach.step(line); }
   function bringIn(id) {
-    stepId = id; steps.at(id); setPhase("ready"); steps.busy(false);
+    stepId = id;
     if (id === "cut") {
-      cb.x = -C.cut - 1.4; cb.dir = 1; cb.face = 1; cb.v = 0; cb.tank = 0;
-      cb.hdrUp = true; cb.hdr = 1; cb.auger = 0; cb.augerTo = 0;
+      cb.x = -C.cut - 1.4; cb.dir = 1; cb.face = 1; cb.v = 0; cb.to = null; cb.turn = null;
+      cb.hdrUp = true; cb.hdr = 1; cb.auger = 0; cb.augerTo = 0; cb.pour = 0; autoCut = false;
       tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0;
       straw = { x0: 0, x1: 0, on: (job !== "sun") };
-      ripe();
-      clearField();
-      coach.say(job === "sun" ? "The combine cuts the sunflowers." : "The combine cuts the wheat.", 3);
-      cue = "combine";
-    } else if (id === "unload") {
-      cb.v = 0; cb.hdrUp = true;
-      tr.state = "side"; tr.x = spotX(); tr.v = 0; tr.face = 1;
-      cb.augerTo = 1;
-      coach.say("The grain spout empties into the trailer.", 3);
-      cue = "auger";
-    } else if (id === "store") {
-      cb.auger = 0; cb.augerTo = 0;
-      tr.state = "road"; tr.v = 0; tr.face = 1;
-      coach.say(job === "sun" ? "Tip the seeds into the barn." : "Tip the grain into the barn.", 3);
-      cue = "rig";
-    }
+      // the crop is still growing ("Weeks go by..."): his turn comes when it is ripe
+      if (crop.stage === "grow") { setPhase("grow"); cue = null; coach.step(job === "sun" ? "The sunflowers grow." : "The wheat grows."); return; }
+      setSub("lever");
+    } else if (id === "unload") setSub("swing");
+    else if (id === "store") setSub("drive");
   }
-  function go() {
-    if (phase !== "ready") return false;
-    if (ghost) ghost.learned("go");
-    setPhase("work"); snd.horn(); steps.busy(true); cue = null;
-    if (stepId === "cut") {
+  // what each step's tap does (true: it did something)
+  function act(part) {
+    var k = key(), ok = ALSO[k] && ALSO[k].indexOf(part) >= 0;
+    if (!ok) return false;
+    if (ghost) ghost.learned(k);
+    if (k === "cut.lever") {
       setHeader(false);
-      cb.hdr = 0;
-      autoCut = true;
-      coach.say(job === "sun" ? "The combine cuts the sunflowers." : "The combine cuts the wheat.", 3);
-    } else if (stepId === "unload") {
-      cb.augerTo = 1;
-      cb.pour = 999;
-      coach.say(job === "sun" ? "The sunflower seeds pour into the trailer." : "The grain pours into the trailer.", 3);
-    } else if (stepId === "store") {
-      tr.state = "road"; tr.to = storeSpot();
-      coach.say(job === "sun" ? "The tractor takes the seeds to the barn." : "The tractor takes the grain to the barn.", 3);
+      working("The header drops down to the " + cropWord() + ".");
+      return true;
     }
-    return true;
+    if (k === "cut.drive") { startCut(); return true; }
+    if (k === "unload.swing") {
+      cb.augerTo = 1; snd.clunk();
+      working("The grain spout swings out over the trailer.");
+      return true;
+    }
+    if (k === "unload.pour") {
+      cb.pour = 999;
+      working(job === "sun" ? "The sunflower seeds pour into the trailer." : "The grain pours into the trailer.");
+      return true;
+    }
+    if (k === "store.drive") {
+      startRoad(); snd.horn();
+      working(job === "sun" ? "The tractor takes the seeds to the grain barn." : "The tractor takes the grain to the grain barn.");
+      return true;
+    }
+    if (k === "store.tip") {
+      startTip();
+      working(job === "sun" ? "The trailer tips the seeds into the grain barn." : "The trailer tips the grain into the grain barn.");
+      return true;
+    }
+    return false;
   }
-  function stepDone(id) {
-    var list = STEPS[job], i = list.map(function (s) { return s.id; }).indexOf(id);
-    steps.done(id);
-    if (i < list.length - 1) bringIn(list[i + 1].id);
-    else finish();
+  function startCut() {
+    if (cb.hdrUp) setHeader(false);
+    autoCut = true; snd.horn();
+    working(job === "sun" ? "The combine cuts the sunflowers." : "The combine cuts the wheat.");
   }
   function finish() {
-    setPhase("done"); steps.finish("Again!"); steps.busy(false); cue = null;
-    coach.say(job === "sun" ? "All the sunflower seeds are in the grain barn!" : "All the wheat is in the grain barn!", 5);
-    Farm.world.update(function (w) {
-      if (job === "sun") { w.sun = "stubble"; }
-      else { w.wheat = "stubble"; }
-    });
+    setPhase("done"); cue = null;
+    Farm.world.update(function (w) { if (job === "sun") w.sun = "stubble"; else w.wheat = "stubble"; });
+    coach.step("Tap the field to grow more " + cropWord() + ".");
+    coach.say(job === "sun" ? "All the sunflower seeds are in the grain barn." : "All the wheat is in the grain barn.", 5);
   }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
     resetScene(false);
-    steps.reset();
     bringIn("cut");
     return true;
   }
   function switchJob(id) {
     if (locked()) { jobs.set(job); return; }
     job = id === "sun" ? "sun" : "wheat";
-    showSteps();
     resetScene(false);
-    steps.reset();
     bringIn("cut");
     save();
   }
   function startOver() {
     if (locked()) return;
     resetScene(true);
-    steps.reset();
     bringIn("cut");
     save();
   }
   function resetScene(regrow) {
     parts.clear(); deer = hawk = birds = null; dogS = null; grab = null; doneSaid = false; autoCut = false;
-    tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0; tr.lever = 0; tr.v = 0; tr.to = null; tr.turn = null; tr.face = 1; tr.callT = 0;
+    tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0; tr.lever = 0; tr.v = 0; tr.to = null; tr.turn = null; tr.face = 1; tr.callT = 0; tr.flow = false;
     cb.auger = 0; cb.augerTo = 0; cb.tank = 0; cb.v = 0; cb.to = null; cb.turn = null; cb.pour = 0; cb.hold = false;
     cb.dir = 1; cb.face = 1; cb.x = -C.cut - 1.4; cb.hdrUp = true; cb.hdr = 1; nag.hdr = 0;
     clearField();
     straw = { x0: 0, x1: 0, on: (job !== "sun") };
     storeLevel = storeFor(); storeRun = 0;
     if (regrow || worldCrop() !== "golden") grow(); else ripe();
-    cv.setAttribute("aria-label", job === "sun" ? "A field of ripe sunflowers with a green combine harvester. Tap the combine to harvest." : "A golden wheat field with a green combine harvester. Tap the combine to harvest.");
+    cv.setAttribute("aria-label", job === "sun" ? "A field of ripe sunflowers with a green combine harvester. Tap the lever in the cab to drop the header." : "A golden wheat field with a green combine harvester. Tap the lever in the cab to drop the header.");
     sc.follow(camTarget(), 0, true);
     saveSoon();
   }
   function grow() { crop.stage = "grow"; crop.g = 0; arc = 0; crop.t = 0; coach.say("Weeks go by...", 3); }
   function ripe() { crop.stage = "ripe"; crop.g = 1; arc = null; setWorldCrop("golden"); Farm.world.update(function (w) { w.season = "summer"; }); }
+  // A new instruction sits in the middle of the stage (common/toybox.css); when the part it names is right there
+  // under it, it moves just above or below that part (whichever stays nearer the middle), so the ring shows.
+  var coachEl = $("coach");
+  function placeCoach() {
+    var cl = coachEl.classList, top = "";
+    if (cl.contains("is-do") && !cl.contains("is-seen") && phase === "ready") {
+      var p = wantPt(), h = coachEl.offsetHeight || 60, r = 34;
+      if (p && Math.abs(p[1] - H / 2) < h / 2 + r) {
+        var up = p[1] - r - 6 - h / 2, dn = p[1] + r + 6 + h / 2, lo = h / 2 + 8, hi = H - h / 2 - 8;
+        var c = [up, dn].filter(function (y) { return y >= lo && y <= hi; });
+        if (c.length) top = Math.round(c.sort(function (a, b) { return Math.abs(a - H / 2) - Math.abs(b - H / 2); })[0]) + "px";
+      }
+    }
+    if (coachEl.style.top !== top) coachEl.style.top = top;
+  }
 
   // ---------- Merlin the Pony & Fence ----------
   var pony = { eat: 0, nod: 0, t: 0 };
@@ -578,7 +510,7 @@ body.big #jobs { display: none; }
     }
   }
 
-  // ---------- Input: tap handling (Toybox.press) ----------
+  // ---------- Input: taps and drags on the scene (Toybox.press) ----------
   function controls() {
     var list = [], s = sc.S(1);
     list.push({ id: "lever", p: leverPt(), r: 0.9 * s });
@@ -592,19 +524,23 @@ body.big #jobs { display: none; }
   function inBox(x, y, b) { return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]; }
   function cbBox() { var a = cbPt(-6.8, -4.8), b = cbPt(5.9, 0.2); return [Math.min(a[0], b[0]), a[1], Math.max(a[0], b[0]), b[1]]; }
   function rigBox() { var a = trPt(-7.9, -3.3), b = trPt(5.4, 0.3); return [Math.min(a[0], b[0]), a[1], Math.max(a[0], b[0]), b[1]]; }
+  function barnBox() { var sx = sc.X(STORE_X, 1.02), s = sc.S(1.02); return [sx - 5 * s, sc.Y(1.02) - 7 * s, sx + 5 * s, sc.Y(1.02)]; }
+  // the part under a point on the canvas (canvas px)
   function hitAt(x, y) {
     var minR = Math.max(26, parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tb-key")) * 0.34 || 40);
     if (inClose(x, y)) return "inset";
-    var best = null, bd = 1e9;
+    var best = null, bd = 1e9, want = wantPart();
     controls().forEach(function (c) {
-      var d = Math.hypot(x - c.p[0], y - c.p[1]);
-      if (d <= Math.max(c.r, minR) && d < bd) { bd = d; best = c.id; }
+      var d = Math.hypot(x - c.p[0], y - c.p[1]), r = Math.max(c.r, minR);
+      if (c.id === want) r *= 1.25;                  // the part the ring marks wins a near miss
+      if (d <= r && d < bd) { bd = d; best = c.id; }
     });
     if (best) return best;
     var onRig = tr.state !== "away" && inBox(x, y, rigBox()), onCb = inBox(x, y, cbBox());
     if (onRig && (!onCb || y > sc.Y(1) - 0.4 * sc.S(1))) return "rig";
-    if (onCb) return "combine";
+    if (onCb) { var n = cbPartName(x, y)[0]; return n === "Grain tank" ? "tank" : (/eader/.test(n) ? "header" : "combine"); }
     if (onRig) return "rig";
+    if (inBox(x, y, barnBox())) return "barn";
     return null;
   }
   function cbPartName(px, py) {
@@ -617,51 +553,80 @@ body.big #jobs { display: none; }
     var u = (px - sc.X(tr.x, sc.TRACK)) / (TS() * tr.face);
     return u < -0.3 ? ["Grain trailer", trPt(-4.6, -3.0)] : ["Tractor", trPt(2.0, -3.3)];
   }
-
+  // the screen point (canvas px) of the part the ring marks
+  function wantPt() {
+    var w = wantPart();
+    if (w === "lever") return leverPt();
+    if (w === "combine") return cbPt(-0.8, -2.2);
+    if (w === "auger") return augerPt();
+    if (w === "rig") return trPt(-2.6, -1.6);
+    if (w === "tiplever") return tipLeverPt();
+    return null;
+  }
+  // a part's real name, as a small tag, when he taps it (px, py: where he tapped, canvas px)
+  function tagPart(part, px, py) {
+    var n;
+    if (part === "pony") { pony.nod = 1.2; snd.tick(); tag("Merlin", ponyScreen()); return true; }
+    if (part === "lever") { snd.tick(); tag("Header lever", leverPt()); return true; }
+    if (part === "horn") { tag("Horn", hornPt()); toot(); return true; }
+    if (part === "auger") { snd.tick(); tag("Grain spout", augerPt()); return true; }
+    if (part === "tiplever") { snd.tick(); tag("Tipping lever", tipLeverPt()); return true; }
+    if (part === "combine" || part === "tank" || part === "header") { n = cbPartName(px, py); snd.tick(); tag(n[0], n[1]); return true; }
+    if (part === "rig") { n = rigPartName(px); snd.tick(); tag(n[0], n[1]); return true; }
+    if (part === "barn") { var sx = sc.X(STORE_X, 1.02); snd.tick(); tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]); return true; }
+    return false;
+  }
+  // the close-up shows the moment he is working: a tap on it is a tap on the part the ring marks
+  function insetPart() {
+    var w = wantPart(), m = cu.shown;
+    if (w && ((m === "cut" && stepId === "cut") || (m === "pour" && stepId === "unload") || (m === "tip" && stepId === "store"))) return w;
+    return null;
+  }
+  function tapPart(part, px, py) {
+    if (locked()) return;
+    if (part === "inset") { part = insetPart(); if (!part) { if (phase === "work") busyHint(); else hint(); return; } }
+    if (phase === "done") { if (part === "horn" || part === "pony") tagPart(part, px, py); else again(); return; }
+    if (phase === "ready" && act(part)) return;
+    var named = tagPart(part, px, py);
+    if (part === "horn" || part === "pony") return;
+    if (phase === "work" || phase === "grow") { if (!named) busyHint(); return; }
+    // a tap on the right machine but not on its control: on the second try the control works for him
+    if (phase === "ready" && key() === "cut.lever" && (part === "combine" || part === "tank")) {
+      if (++miss >= 2) { act("lever"); return; }
+    }
+    hint();
+  }
+  // He drives by drag too: a drag on the combine (header down, driving) or on the tractor (to the grain barn)
+  // moves it under his finger (held ahead, it keeps driving); when he lets go it carries on to its stop.
+  function canvasX(clientX) { return clientX - cv.getBoundingClientRect().left; }
   var press = Toybox.press(cv, {
     any: true,
-    tap: function (part, x, y) {
-      if (locked()) return;
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top, n;
-      if (part === "inset") { closeTap(); return; }
-      if (part === "pony") { pony.nod = 1.2; snd.tick(); tag("Merlin", ponyScreen()); return; }
-      if (part === "lever") { tag("Header lever", leverPt()); toggleHeader(); return; }
-      if (part === "horn") { tag("Horn", hornPt()); toot(); return; }
-      if (part === "auger") {
-        tag("Grain spout", augerPt());
-        if (stepId === "unload" && phase === "ready") { go(); return; }
-        augerTap(); return;
+    hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
+    dragStart: function (part, e, s) {
+      grab = null;
+      if (locked() || phase !== "ready") return;
+      var k = key();
+      if (k === "cut.drive" && (part === "combine" || part === "header" || part === "tank")) {
+        if (ghost) ghost.learned(k);
+        if (cb.hdrUp) setHeader(false);
+        grab = { what: "combine", fx: canvasX(s.x) };
+        working(job === "sun" ? "The combine cuts the sunflowers." : "The combine cuts the wheat.");
+      } else if (k === "store.drive" && part === "rig") {
+        if (ghost) ghost.learned(k);
+        tr.state = "road"; tr.to = null; tr.heldT = 0;
+        grab = { what: "rig", fx: canvasX(s.x), off: sc.wx(canvasX(s.x0), sc.TRACK) - tr.x };
+        working(job === "sun" ? "The tractor takes the seeds to the grain barn." : "The tractor takes the grain to the grain barn.");
       }
-      if (part === "tiplever") {
-        tag("Tipping lever", tipLeverPt());
-        if (stepId === "store" && phase === "ready") { go(); return; }
-        tipTap(); return;
-      }
-      if (part === "combine") {
-        n = cbPartName(px, py); tag(n[0], n[1]);
-        if (stepId === "cut" && phase === "ready") { go(); return; }
-        if (stepId === "unload" && phase === "ready") { go(); return; }
-        combineTap(); return;
-      }
-      if (part === "rig") {
-        n = rigPartName(px); tag(n[0], n[1]);
-        if (stepId === "unload" && phase === "ready") { go(); return; }
-        if (stepId === "store" && phase === "ready") { go(); return; }
-        rigTap(); return;
-      }
-      var sx = sc.X(STORE_X, 1.02);
-      if (Math.abs(px - sx) < 5 * sc.S(1.02) && py < sc.Y(1.02) && py > sc.Y(1.02) - 7 * sc.S(1.02)) {
-        tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]);
-        if (stepId === "store" && phase === "ready") { go(); return; }
-        return;
-      }
-      if (phase === "ready") { go(); return; }
-      if (phase === "done") { again(); return; }
-      busyHint();
-      if (ghost) ghost.poke();
-    }
+    },
+    move: function (part, e, s) { if (grab) grab.fx = canvasX(s.x); },
+    up: function (part, e, s) {
+      var g = grab; grab = null;
+      if (!g || s.tap) return;
+      if (g.what === "combine") autoCut = true;
+      else if (g.what === "rig" && tr.state === "road") tr.to = storeSpot();
+    },
+    tap: function (part, x, y) { var b = cv.getBoundingClientRect(); tapPart(part, x - b.left, y - b.top); }
   });
-
   // ---------- Simulation ----------
   // The camera keeps the machine he is working fully on screen with a margin (the combine, with the trailer beside
   // it; or the tractor and trailer on the way to the grain barn), zooming out if needed. On the way to the grain
@@ -704,7 +669,9 @@ body.big #jobs { display: none; }
     }
     focus = "combine";
     var p = combinePts();
-    if (ts === "side" || ts === "drift" || (ts === "in" && Math.abs(tr.x - spotX()) < 4)) p = p.concat(trailerPts());
+    if (ts === "side" || ts === "drift") p = p.concat(trailerPts());
+    // the tractor is on its way: frame the place it stops at from the start (the zoom eases out before it arrives)
+    else if (ts === "in") { var keep = tr.x; tr.x = spotX(); p = p.concat(trailerPts()); tr.x = keep; }
     return frame(p, cb.x + cb.dir * (sc.port ? 0.4 : 1.2));
   }
   var engLevel = 0, lastFocus = "combine";
@@ -725,7 +692,7 @@ body.big #jobs { display: none; }
     // the grain spout and the pour
     if (!(grab && grab.what === "auger")) cb.auger += clamp(cb.augerTo - cb.auger, -dt * 1.2, dt * 1.2);
     if (cb.pour > 0) cb.pour = Math.max(0, cb.pour - dt);
-    var want = (phase === "work" && stepId === "unload") || ((cb.hold || cb.pour > 0) && cb.auger > 0.97 && cb.tank > 0.0005);
+    var want = (cb.hold || cb.pour > 0) && cb.auger > 0.97 && cb.tank > 0.0005;
     var pouring = want && underSpout();
     cb.pouring = pouring;
     if (pouring) {
@@ -743,21 +710,20 @@ body.big #jobs { display: none; }
       if (cb.emptyT > 0.9) { cb.augerTo = 0; cb.emptyT = 0; }
     } else cb.emptyT = 0;
 
-    // Step progression in work phase
+    // The flow: when the motion his tap started has finished, the next thing is his.
+    phaseT += dt;
+    if (phase === "grow" && crop.stage === "ripe") setSub("lever");
     if (phase === "work") {
-      if (stepId === "cut" && !autoCut && tr.state === "side") {
-        stepDone("cut");
-      } else if (stepId === "unload" && cb.tank <= 0.0005 && cb.auger < 0.05) {
-        stepDone("unload");
-      } else if (stepId === "store") {
-        if (tr.state === "store") {
-          startTip();
-        } else if (tr.state === "back") {
-          stepDone("store");
-        }
-      }
+      var k = key();
+      if (k === "cut.lever" && cb.hdr < 0.08) setSub("drive");
+      else if (k === "cut.drive" && !autoCut && !grab && tr.state === "side") bringIn("unload");
+      else if (k === "unload.swing" && cb.auger > 0.97) setSub("pour");
+      else if (k === "unload.pour" && cb.tank <= 0.0005 && cb.auger < 0.05) { cb.pour = 0; bringIn("store"); }
+      else if (k === "store.drive" && tr.state === "store") setSub("tip");
+      else if (k === "store.tip" && (tr.state === "back" || tr.state === "away")) finish();
     }
 
+    placeCoach();
     if (tr.state !== "away") updateTractor(dt);
     if (cb.horn > 0) cb.horn = Math.max(0, cb.horn - dt);
     if (cb.flashB) cb.flashB = Math.max(0, cb.flashB - dt);
@@ -803,14 +769,14 @@ body.big #jobs { display: none; }
       var dist = dest - cb.x;
       if (dist <= 0.05) {
         cb.x = dest; cb.v = 0; autoCut = false;
-        cb.hdrUp = true;
+        setHeader(true);
         callTractor();
+        coach.step("The tractor brings the trailer to the combine.");
       } else {
         vt = clamp(dist * 2.2, 1.2, VMAX * 0.75);
       }
     } else if (grab && grab.what === "combine") {
       var fw = sc.wx(grab.fx, 1), wantX = fw + 0.5 * cb.dir, ahead = (wantX - cb.x) * cb.dir;
-      if (ahead < -3.2) { startTurn(); return; }
       vt = ahead < -0.3 ? Math.max(-2.2, ahead * 2) : (ahead > 0.1 ? clamp(ahead * 3, 0, VMAX) : 0);
     } else if (cb.to !== null) {
       var a2 = (cb.to - cb.x) * cb.dir;
@@ -828,7 +794,7 @@ body.big #jobs { display: none; }
       else { iA = Math.ceil(c0 / CELL - 0.5) - 1; iB = Math.ceil(c1 / CELL - 0.5); }
       for (i = iA; cb.dir > 0 ? i <= iB : i >= iB; i += cb.dir) {
         if (i < 0 || i >= NC || cut[i]) continue;
-        if (!autoCut && cb.hdr > 0.3) { stopAt = (i + 0.5) * CELL - cb.dir * 0.02; break; }
+        if (!autoCut && cb.hdrUp && cb.hdr > 0.3) { stopAt = (i + 0.5) * CELL - cb.dir * 0.02; break; }
         markCut(i); n++; cb.tank = Math.min(1, cb.tank + CELL / CAP);
       }
       if (stopAt !== null) {
@@ -845,7 +811,7 @@ body.big #jobs { display: none; }
     if (!force && time - nag.last < 1.2) return;
     nag.last = time; nag.hdr++;
     if (nag.hdr >= 2) { setHeader(false); return; }   // the second push drops it for him
-    say(HDR_LINE, 3); flash.lever = 3;
+    say("Tap the lever to drop the combine’s header.", 3); flash.lever = 3;
   }
   function cutting(dt, n) {
     cu.lastCut = time;
@@ -889,7 +855,7 @@ body.big #jobs { display: none; }
       if (ts === "road" && target !== null) target = Math.min(target, storeSpot());
       if (target !== null) {
         // on the road it goes briskly (the dad: the tractor felt slow); beside the combine it creeps
-        var dd = target - tr.x, vmax = ts === "road" ? 15 : 7;
+        var dd = target - tr.x, vmax = ts === "road" ? Math.min(15, 3 + phaseT * 6) : 7;
         var vt = clamp(dd * (ts === "road" ? 3 : 2.2), -vmax, vmax);
         tr.v += (vt - tr.v) * Math.min(1, dt * (ts === "road" ? 4 : 5));
         if (Math.abs(dd) < 0.02 && !held) { tr.v = 0; if (ts === "road") tr.to = null; }
@@ -929,7 +895,6 @@ body.big #jobs { display: none; }
     snd.chime();
     if (fieldDone() && cb.tank < 0.02 && !doneSaid) {
       doneSaid = true;
-      say(job === "sun" ? "All the sunflower seeds are in the grain barn." : "All the wheat is in the grain barn.", 5);
       Toybox.kind();
       if (job !== "sun") {
         // the farm dog runs out of the grain barn along the track to the combine and jumps up in the stubble in
@@ -1537,11 +1502,6 @@ body.big #jobs { display: none; }
   }
   function closeAlpha() { return cu.shown && cu.rect ? cu.a * cu.fit : 0; }
   function inClose(x, y) { var r = cu.rect; return closeAlpha() > 0.4 && x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]; }
-  function closeTap() {
-    if (cu.shown === "cut") combineTap();
-    else if (cu.shown === "pour") augerTap();
-    else if (cu.shown === "tip") rigTap();
-  }
   // Painted into its own small canvas (every other frame, at most 1.5 px per css px: the picture is for watching,
   // so 30 a second is plenty) and copied onto the stage each frame, faded in and out with globalAlpha.
   var cuc = { cv: document.createElement("canvas"), key: "", n: 0, M: 6, B: 20 };
@@ -1945,7 +1905,11 @@ body.big #jobs { display: none; }
     coach.clear(); stepShown = "";
     setTimeout(function () { cb.augerTo = 0; snd.engine(-1); done(); }, 2600);
   }
-  function onWake() { ending = false; dusk = 0; stepShown = ""; }
+  function onWake() {
+    ending = false; dusk = 0; stepShown = "";
+    if (phase === "ready") coach.step(sayFor(key()));
+    else if (phase === "done") coach.step("Tap the field to grow more " + cropWord() + ".");
+  }
 
   // ---------- Start ----------
   resize();
@@ -1956,11 +1920,12 @@ body.big #jobs { display: none; }
     if (typeof saved.cut === "string" && saved.cut.length === NC && saved.job === job) {
       for (var i = 0; i < NC; i++) if (saved.cut.charAt(i) === "1") markCut(i);
       cb.tank = clamp(+saved.tank || 0, 0, 1);
+      // a field already cut to the end grows again ("Weeks go by...")
+      if (fieldDone()) { clearField(); cb.tank = 0; grow(); }
     }
   })();
   storeLevel = storeFor();
   sc.follow(camTarget(), 0, true);
-  showSteps();
   bringIn("cut");
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(stage);
   else window.addEventListener("resize", resize);
@@ -1982,13 +1947,18 @@ body.big #jobs { display: none; }
     onWake: onWake,
     onSound: function (on) { if (on) snd.chime(); }
   });
+  // leaving the page while a machine works switches it off quietly
+  Toybox.offFirst({
+    running: function () { return autoCut || Math.abs(cb.v) > 0.05 || cb.pouring || tr.state === "road" || tr.state === "tip"; },
+    off: function (done) { autoCut = false; grab = null; cb.v = 0; cb.pour = 0; tr.to = null; snd.engine(-1); snd.pour(0); done(); }
+  });
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
     surprise: surprise,
     state: function () {
       return { cam: sc.cam, camLim: camLim, cmm: [sc.camMin, sc.camMax], k: sc.k, nag: nag.hdr, to: cb.to, job: job, crop: crop.stage, cutN: cutN, NC: NC, hdrUp: cb.hdrUp, hdr: cb.hdr, x: cb.x, dir: cb.dir, v: cb.v, tank: cb.tank,
-        auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepLine, cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0,
+        auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepId, sub: sub, phase: phase, want: wantPart(), cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0,
         dog: dogS ? { x: dogS.x, face: dogS.face, st: dogS.st } : null, hawk: hawk ? { x: hawk.x, face: hawk.face } : null, trStep: tr.step, trTo: tr.to,
         close: { mode: cu.shown, alpha: +closeAlpha().toFixed(2), rect: cu.rect && cu.rect.map(Math.round), corner: cu.corner } };
     },
@@ -2007,7 +1977,11 @@ body.big #jobs { display: none; }
       return out;
     },
     closeAvoid: function () { return { avoid: closeAvoid().map(function (b) { return b.map(Math.round); }), W: W, H: H, CR: CR, cY: cu.cY }; },
-    ghost: function () { return ghost.show(); }
+    ghost: function () { return ghost.show(); },
+    // play the station by script: tap(part) is a tap on that part ("lever", "combine", "auger", "rig",
+    // "tiplever", "horn", "pony", "barn", "tank", "header", "inset", or null for the field)
+    tap: function (part) { var p = part === "want" ? wantPart() : part, q = p === "combine" ? cbPt(-0.8, -2.2) : (p === "rig" ? trPt(-2.6, -1.6) : [W / 2, H / 2]); tapPart(p || null, q[0], q[1]); },
+    want: function () { var p = wantPt(), b = cv.getBoundingClientRect(); return p ? { x: b.left + p[0], y: b.top + p[1] } : null; }
   };
 })();
 </script>
