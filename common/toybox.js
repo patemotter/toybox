@@ -1578,6 +1578,20 @@
     apply();
   }
   function watchAllCoaches() { Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), watchCoach); }
+  // An instruction sits in the middle of the stage: while a finger is down on that stage it fades, so it never
+  // hides the part he is touching or the work under it.
+  (function () {
+    var down = 0;
+    function fade(on, target) {
+      Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), function (c) {
+        c.classList.toggle("is-touching", on && !!c.parentElement && c.parentElement.contains(target));
+      });
+    }
+    document.addEventListener("pointerdown", function (e) { down++; fade(true, e.target); }, true);
+    function up() { down = Math.max(0, down - 1); if (!down) fade(false, null); }
+    document.addEventListener("pointerup", up, true);
+    document.addEventListener("pointercancel", up, true);
+  })();
 
   function coachLine(el) {
     el = elOf(el);

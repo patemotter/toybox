@@ -68,7 +68,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Hunt"); `field.html` only redirects to spuds. Each station not yet rebuilt: a step row (plus a job bar where the
   episode has two jobs), a split stage on tall screens (the whole rig on top, a close-up of the work below). A
   rebuilt hands-on station follows Timberrrrr!: no step row, one view framed on the work, the split close-up only
-  where it shows something the main view can't. Shared
+  where it shows something the main view can't (the dad, 2026-10-15: "some dual views add something, Timberrr did
+  not"). Kept: Spuds in Mud, Combine Time (corner inset), Brilliant Baler, Glorious Grass, Munchy Crunchy, Juicy
+  Squeezy, Feathered Friends (inside the hen house), Caterpillar Hunt (under the wheel). One view: Timberrrrr!,
+  Mucky Muck, Moooovie Time, Come Bye (they only repeated the main view bigger). Shared
   code in `farm/farm.js` (`Farm.NAMES`, scene, tractor, combine, telehandler, cow...), documented in its header,
   world state in `farm-world-v1`; a map lot is one `STATIONS` entry in `farm/index.html`).
 - Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
@@ -203,8 +206,10 @@ Keep only:
   report small tiles, small targets and text-only buttons (problems on `tb-v2` pages, warnings elsewhere).
 - **No Big button** (the dad, 2026-10-10: it rarely changed what he could see): `common/toybox.js` hides every Big
   button and keeps Big mode off (`Toybox.setBig` is a no-op, saved `toybox-big-<app>` values are ignored). Don't add one.
-- **The coach line is big and at the bottom of the stage on every size** (the dad, 2026-10-10: small at the top, he
-  missed it). Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
+- **Instructions sit big in the middle of the stage on every size** (the dad, 2026-10-15: he missed them at the top,
+  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every `is-do` coach line; it fades
+  while a finger is on the stage so it never hides the work. Information lines (`is-info`) stay small at the bottom.
+  Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
 - **Instructions look different from information** (the dad, 2026-10-11: on the iPad they looked the same and were easy
   to miss). `common/toybox.js` watches every `.tb-coach` and marks it `is-do` when a sentence starts with an action
   verb (`DO_WORDS`; "Tap the lever.", "A rock is stuck. Tap it!") and `is-info` otherwise ("The destoner takes out the
@@ -228,7 +233,7 @@ Keep only:
 
 ### Making things intuitive
 - **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
-  coach line** in a pill at the bottom of the stage ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
+  coach line** in a pill in the middle of the stage ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
 - **Direct manipulation**: drag the saw, turn the wheel, pull the tape, spin the toy with a finger. If a control
   is drawn on a machine, it must work (switches, height wheels, handles); don't draw fake controls. Remove HTML
   buttons that duplicate a working on-machine control.

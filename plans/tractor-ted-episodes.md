@@ -9,8 +9,8 @@ tangent, leave it out or ask the dad.
 
 **Nothing that isn't rooted in the episode** (the dad, 2026-10-14: he "will not likely enjoy the extra pieces unless
 it is rooted in the episode itself"). No invented steps, machines or places; when a station is rebuilt, the extras it
-has now that the episode doesn't show go (the potato harvest in Spuds in Mud, the grain barn in Combine Time, the
-silage sheet in Glorious Grass, the slurry tanker in Mucky Muck). **Places look like the episode**, too: he notices
+has now that the episode doesn't show are questions for the dad (the grain barn in Combine Time, the silage sheet in
+Glorious Grass, the slurry tanker in Mucky Muck). Kept by the dad (2026-10-15): the potato harvest in Spuds in Mud. **Places look like the episode**, too: he notices
 (Timberrrrr!'s sawmill was outdoors; in the episode it is inside a closed building, so now it is).
 **Let's Go Racing is never built** (the dad: it "feels weird").
 
@@ -32,8 +32,8 @@ episode's counting moment (Timberrrrr! counts the lorry's six wheels).
 | Glorious Grass (`silage`, Grass) | Mow → Chop → Clamp → Roll → Cover | the rake making the windrow; trailers under the forager's spout; the buck-rake at the clamp |
 | Feathered Friends (`hens`) | Drive → Feed → Eggs | the tracked tractor; the loader lifting the feed hopper, filled from the silo |
 | Mucky Muck (`muck`) | Scrape → Load → Spread (+ Slurry tanker) | the telehandler's muck grab filling the trailer; tipping at the field heap |
-| Brilliant Baler (`bales`) | Hay and Haylage | **a different crop** in the episode: elephant grass, Farmer Tom's big square baler, the bale grab stacking a flatbed |
-| Hello Ewe!, Mighty Mushrooms | no station | ask the dad before adding stations (Let's Go Racing: never) |
+| Brilliant Baler (`bales`) | Hay and Haylage | keep Hay and Haylage (the dad, 2026-10-15: he likes the square and round bale choice; the grass type doesn't matter); worth adding: the bale grab stacking a flatbed |
+| Hello Ewe!, Mighty Mushrooms | no station yet | the dad, 2026-10-15: each gets its own station (enough material in both). Let's Go Racing: never |
 | Juicy Squeezy (`berries`), Come Bye (`sheep`), Caterpillar Hunt (`tracks`) | built from the older breakdown | not in this guide: leave them unless the dad asks |
 
 Farmer Tom drives in several episodes (the combine, the baler's tractor, the muck telehandler, the mower): dress
