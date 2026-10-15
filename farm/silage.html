@@ -47,8 +47,6 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Fill the clamp"): on a narrow row it wraps to two lines instead of being cut off. */
-.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
 body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
@@ -64,7 +62,7 @@ body.big #jobs { display: none; }
   <div class="tb-body app">
     <div class="tb-stagecol">
       <main class="tb-stage stage" id="stage">
-        <canvas id="cv" role="img" aria-label="A grass field with Tractor Ted and a mower, and the silage clamp in the farmyard. Tap Tractor Ted to mow the grass."></canvas>
+        <canvas id="cv" role="img" aria-label="A grass field with Tractor Ted and a mower, and the silage clamp in the farmyard. Tap the mower to lower it onto the grass."></canvas>
         <div class="tb-counter loads" id="loads">Loads: 0</div>
         <div id="coach"></div>
         <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
@@ -72,8 +70,6 @@ body.big #jobs { display: none; }
       <div id="jobs"></div>
     </div>
     <section class="tb-panel" id="panel">
-      <ol id="stepsGrass"></ol>
-      <ol id="stepsMaize" hidden></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -86,6 +82,9 @@ body.big #jobs { display: none; }
   // alongside, the trailer tips it at the silage clamp and a loader pushes it up the heap, a heavy tractor rolls
   // it flat (it gets flat and shiny), and the black sheet goes on with tires on top. Maize (A-maizing Day): the
   // forage harvester with a maize header cuts the tall maize instead, then the same clamp work.
+  // Hands-on like Timberrrrr! (no step row, no Go): he lowers the mower, drives it, swings the spout out, drives
+  // the harvester, drives the trailer to the clamp, pulls the tipping lever, drives the loader, the heavy tractor,
+  // and pulls the sheet over; a yellow ring and the coach line mark the next thing (see "What he does, in order").
   // One world: the field (x 0..L) and, along the farm track to the right, the silage clamp in the yard. On a
   // wide stage one camera follows the work from the field to the clamp; on an upright stage the stage is split:
   // the field on top and the clamp below, so he sees the trailer go from one to the other.
@@ -334,13 +333,13 @@ body.big #jobs { display: none; }
   function landTires() { heap.tires.forEach(function (q) { q.st = "on"; q.t = 1; }); }
 
   // ---------- The machines' state ----------
-  var rig = { m: null, x: -20, v: 0, wheel: 0, target: 0, flash: 0, spin: 0, spout: 0 };
-  var tr = { x: -60, r: TR_FAR, v: 0, wheel: 0, load: 0, tip: 0, st: "away", t: 0, crop: crop };
+  var rig = { m: null, x: -20, v: 0, wheel: 0, target: 0, flash: 0, spin: 0, spout: 0, lift: 1 };
+  var tr = { x: -60, r: TR_FAR, v: 0, wheel: 0, load: 0, tip: 0, lever: 0, st: "away", t: 0, crop: crop };
   var ld = { x: XMAX + 10, v: 0, wheel: 0, st: "away", t: 0, lift: 0 };
   var ro = { x: XMAX + 10, v: 0, wheel: 0, st: "away", t: 0, leg: 0, from: 0, to: 0 };
   var field = { stage: "grass", g: 1, wipe: null };
   var swath = { a: 0, b: 0, on: false };
-  var phase = "arrive", phaseT = 0, stepId = "mow", auto = false, grab = null, ending = false, dusk = 0, time = 0;
+  var phase = "arrive", phaseT = 0, stepId = "mow", sub = "", auto = false, grab = null, ending = false, dusk = 0, time = 0;
   var hare = null, dog = null, sheetT = 0, tireT = 0, uncover = null;
 
   function cropStage(c) { return c === "maize" ? "maize" : "grass"; }
@@ -399,34 +398,44 @@ body.big #jobs { display: none; }
   function save() { try { localStorage.setItem(KEY, JSON.stringify({ loads: loads, job: crop, clamp: { V: heap.V, covered: heap.cover > 0.5, crop: heap.crop } })); } catch (e) { /* ignore */ } }
 
   // =====================================================================================================
-  // The jobs and their steps
+  // What he does, in order (no step row and no Go: the dad wants every station like Timberrrrr!)
   // =====================================================================================================
-  var JOBS = {
-    grass: [
-      { id: "mow", name: "Mow", go: "Mow it", coach: "The mower cuts the grass." },
-      { id: "chop", name: "Chop", go: "Chop it", coach: "Chop the grass into the trailer." },
-      { id: "clamp", name: "Clamp", go: "Fill the clamp", coach: "Tip it in the silage clamp." },
-      { id: "roll", name: "Roll", go: "Roll it flat", coach: "Roll it flat to squash the air out." },
-      { id: "cover", name: "Cover", go: "Cover it", coach: "Cover it with the black sheet." }
-    ],
-    maize: [
-      { id: "chop", name: "Chop", go: "Chop it", coach: "Chop the maize into the trailer." },
-      { id: "clamp", name: "Clamp", go: "Fill the clamp", coach: "Tip it in the silage clamp." },
-      { id: "roll", name: "Roll", go: "Roll it flat", coach: "Roll it flat to squash the air out." },
-      { id: "cover", name: "Cover", go: "Cover it", coach: "Cover it with the black sheet." }
-    ]
+  // He works each control on the scene himself. Each thing he does has a literal instruction (the coach line) and
+  // the part the yellow ring marks; a tap on that part plays that one control's motion (the mower drops, the spout
+  // swings out, the tractor drives to the clamp, the lever tips the trailer...). The machines also drive by drag.
+  // Machines arriving, the trailer backing up to the clamp and the tires going on happen by themselves, with an
+  // information line saying what happens. Grass: Mow (lower, drive) -> Chop (spout, drive, drive to the clamp) ->
+  // Clamp (tip, push) -> Roll -> Cover. Maize starts at Chop. After the sheet, a tap on the scene starts again.
+  var SUB = {
+    "mow.lower": { say: "Tap the mower to lower it onto the grass.", part: "mower" },
+    "mow.drive": { say: "Drive the tractor through the grass.", part: "rig" },
+    "chop.spout": { say: "Tap the spout to swing it over the trailer.", part: "spout" },
+    "chop.drive": { say: "Drive the forage harvester through the {crop}.", part: "rig" },
+    "chop.haul": { say: "Drive the tractor to the silage clamp.", part: "trailer" },
+    "clamp.tip": { say: "Tap the lever on the tractor to tip the trailer.", part: "tiplever" },
+    "clamp.push": { say: "Drive the loader to push the {crop} up the heap.", part: "loader" },
+    "roll.drive": { say: "Drive the heavy tractor over the silage to squash the air out.", part: "roller" },
+    "cover.sheet": { say: "Tap the black sheet to pull it over the silage.", part: "sheet" }
   };
-  var WORK = {
-    mow: "The cut grass lies in rows.", chop: "Chopped grass flies into the trailer.", chopM: "Chopped maize flies into the trailer.",
-    clamp: "The trailer tips it out.", roll: "The heavy tractor squashes it flat.", cover: "The sheet keeps the air out."
+  // the parts that also do the step (forgiving: the whole machine that has the control)
+  var ALSO = {
+    "mow.lower": ["mower"], "mow.drive": ["rig", "mower"],
+    "chop.spout": ["spout"], "chop.drive": ["rig", "spout"], "chop.haul": ["trailer", "tiplever"],
+    "clamp.tip": ["tiplever"], "clamp.push": ["loader"], "roll.drive": ["roller"], "cover.sheet": ["sheet", "heap"]
   };
+  // the right machine but not its control: the second try works the control for him
+  var NEAR = { "mow.lower": ["rig"], "chop.spout": ["rig"], "clamp.tip": ["trailer"] };
   var BUSY = {
-    mow: "The mower is cutting the grass.", chop: "The forage harvester is chopping.", haul: "The trailer is going to the clamp.",
-    clamp: "The loader pushes it up the heap.", roll: "The heavy tractor is rolling it.", cover: "The sheet is going on."
+    mow: "The mower is cutting the grass.", chop: "The forage harvester is chopping.", haul: "The trailer is going to the silage clamp.",
+    clamp: "The trailer is tipping.", push: "The loader is pushing the heap.", roll: "The heavy tractor is rolling the silage.", cover: "The sheet is going on."
   };
   function firstStep() { return crop === "maize" ? "chop" : "mow"; }
+  function cropWord() { return crop === "maize" ? "maize" : "grass"; }
+  function key() { return stepId + "." + sub; }
+  function sayFor(k) { var d = SUB[k]; return d ? d.say.replace("{crop}", cropWord()) : ""; }
+  function wantPart() { if (phase !== "ready") return null; var d = SUB[key()]; return d ? d.part : null; }
 
-  // ---------- Pictures for the steps and the job tabs (drawn with the scene's own code) ----------
+  // ---------- Pictures for the job tabs (drawn with the scene's own code) ----------
   var picCache = {};
   function pic(id) {
     if (picCache[id] !== undefined) return picCache[id];
@@ -434,29 +443,7 @@ body.big #jobs { display: none; }
     c.width = PW; c.height = PH;
     try { x = c.getContext("2d"); } catch (e) { x = null; }
     if (!x) return (picCache[id] = "");
-    function fit(w, h, ox, oy, fn) { var s = Math.min(PW * 0.94 / w, PH * 0.9 / h); Farm.inUnits(x, PW / 2 + ox * s, PH * 0.95 - oy * s, s, 3.4, fn); }
-    if (id === "mower") fit(8.8, 3.5, 0.2, 0, function () { x.save(); x.translate(Farm.HITCH[0], Farm.HITCH[1]); mower(x, { spin: 0.4 }); x.restore(); D.tractor(x, {}); });
-    else if (id === "forage" || id === "forageM") fit(10.4, 4.6, 0.25, 0, function () {
-      tube(x, FH.pivot[0], FH.pivot[1], FH.pivot[0] - 2.6, FH.pivot[1] - 0.5, 0.42, G.body);
-      forage(x, { header: id === "forageM" ? "maize" : "pickup", spin: 0.3 });
-    });
-    else if (id === "tip") fit(8.4, 4.8, 4.0, 0, function () {
-      var C0 = Farm.CROP[id === "tip" && crop === "maize" ? "maize" : "grass"];
-      x.beginPath(); x.moveTo(-9.6, 0); x.quadraticCurveTo(-8.6, -2.6, -7.6, 0); x.closePath(); fs(x, C0[0]);
-      x.translate(0, -0.5); D.trailer(x, { load: 0.5, tip: 1, crop: "grass" });
-    });
-    else if (id === "roll") fit(7.6, 4.8, 0.2, 0, function () {
-      Pp(x, [-3.6, 0, -3.6, -1.2, 0.6, -1.2, 3.4, 0], "#7FA640");
-      shine(x, -3.4, -1.12, 0.5, -1.12, 0.12);
-      x.save(); x.translate(-2.6, -1.2); heavy(x, {}); x.restore();
-    });
-    else if (id === "cover") fit(7.6, 2.6, 0, 0, function () {
-      Pp(x, [-3.7, 0, -3.7, -1.5, 1.2, -1.5, 3.7, 0], "#7FA640");
-      x.beginPath(); x.moveTo(-3.7, -1.55); x.lineTo(1.2, -1.55); x.lineTo(3.75, 0); x.strokeStyle = INK; x.lineWidth = 0.34; x.lineJoin = "round"; x.stroke(); x.strokeStyle = "#2A2D33"; x.lineWidth = 0.2; x.stroke();
-      [-3.0, -1.8, -0.6, 0.6].forEach(function (tx) { tireShape(x, tx, -1.62, 1); });
-      tireShape(x, 2.2, -0.95, 1, -0.5);
-    });
-    else if (id === "grass") {
+    if (id === "grass") {
       Farm.inUnits(x, PW / 2, PH * 0.92, 1, 3, function () {
         for (var i = 0; i < 9; i++) { var bx = -60 + i * 15, hh = 60 + 30 * hash(i, 2); x.beginPath(); x.moveTo(bx - 7, 0); x.quadraticCurveTo(bx - 4, -hh * 0.6, bx + (hash(i, 3) - 0.5) * 30, -hh); x.quadraticCurveTo(bx + 2, -hh * 0.5, bx + 7, 0); x.closePath(); fs(x, i & 1 ? "#5DAE3E" : "#4FA83A", 3); }
         Cc(x, -30, -66, 8, "#FFFFFF", 2.5); Cc(x, -30, -66, 3.5, "#FFC93C", 0); Cc(x, 34, -58, 7, "#FFD84D", 2.5);
@@ -476,33 +463,25 @@ body.big #jobs { display: none; }
     try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
     return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
   }
-  var PICS = { mow: "mower", chop: "forage", clamp: "tip", roll: "roll", cover: "cover" };
-  function stepList(c) { return JOBS[c].map(function (s) { return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.id === "chop" && c === "maize" ? "forageM" : PICS[s.id]) }; }); }
 
-  // ---------- Steps, job bar, bottom bar, ghost ----------
+  // ---------- Job bar, bottom bar, ghost ----------
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
-      if (heap.flap) { var f = flapScreen(); return { pts: [[f.x, f.y]], tap: true, key: "flap" }; }
+      var b = cv.getBoundingClientRect();
+      if (heap.flap) { var f = ptOf("flap"); return { pts: [[b.left + f[0], b.top + f[1]]], tap: true, key: "flap" }; }
       if (phase === "ready") {
-        var p = partScreen(stepId);
+        var p = wantPt(), k = key();
         if (!p) return null;
-        if ((stepId === "mow" || stepId === "chop") && ghost.shown("go") >= 1) return { pts: [[p.x, p.y], [p.x + Math.min(W * 0.35, 160), p.y]], key: "go" };
-        return { pts: [[p.x, p.y]], tap: true, key: "go" };
+        var x = b.left + p[0], y = b.top + p[1];
+        if ((k === "mow.drive" || k === "chop.drive" || k === "chop.haul") && ghost.shown(k) >= 1) return { pts: [[x, y], [x + Math.min(W * 0.35, 160), y]], key: k };
+        return { pts: [[x, y]], tap: true, key: k };
       }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (phase === "done" && phaseT > 5) { var q = ptOf("heap"); if (q) return { pts: [[b.left + q[0], b.top + q[1]]], tap: true, key: "again" }; }
       return null;
     }
   });
-  var stepsG = Toybox.steps($("stepsGrass"), { steps: stepList("grass"), coach: coach, ghost: ghost, onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); } });
-  var stepsM = Toybox.steps($("stepsMaize"), { steps: stepList("maize"), coach: coach, ghost: ghost, onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); } });
-  var steps = crop === "maize" ? stepsM : stepsG;
-  function showSteps() {
-    steps = crop === "maize" ? stepsM : stepsG;
-    $("stepsGrass").hidden = crop === "maize"; $("stepsMaize").hidden = crop !== "maize";
-  }
   var jobs = Toybox.jobs($("jobs"), {
     jobs: [{ id: "grass", name: "Grass", pic: pic("grass") }, { id: "maize", name: "Maize", pic: pic("maize") }],
     value: crop,
@@ -510,117 +489,140 @@ body.big #jobs { display: none; }
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
-  function doGo() {
-    if (locked()) return false;
-    if (heap.flap) { fixFlap(); return true; }
-    if (phase === "ready" || (phase === "work" && (stepId === "mow" || stepId === "chop") && !auto)) return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
+  var cue = null, flashT = 0, miss = 0;
   function busyHint() {
     if (heap.flap) { fixFlap(); return; }
-    if (phase === "grow") { coach.say(crop === "maize" ? "The maize is growing." : "The grass is growing.", 3); return; }
-    if (phase === "arrive") { coach.say("Here comes the " + machineName(stepId).toLowerCase() + ".", 3); return; }
+    if (phase === "grow") { coach.say("The " + cropWord() + " is growing.", 3); return; }
+    if (phase === "arrive") { coach.say(stepId === "roll" ? "The heavy tractor is coming." : (stepId === "mow" ? "The tractor is bringing the mower." : "The forage harvester is coming."), 3); return; }
+    if (phase === "leave") { coach.say("The forage harvester is coming next.", 3); return; }
     if (phase === "haul") { coach.say(BUSY.haul, 3); return; }
-    if (phase === "leave") { coach.say("Here comes the next machine.", 3); return; }
     if (phase === "work") {
-      if (stepId === "mow" || stepId === "chop") { snd.horn(); rig.flash = 1.2; }
-      coach.say(stepId === "clamp" && (tr.st === "back" || tr.st === "tip") ? "The trailer is tipping." : BUSY[stepId], 3);
+      var k = stepId === "clamp" ? (ld.st !== "away" ? "push" : "clamp") : stepId;
+      if ((stepId === "mow" || stepId === "chop") && sub === "drive") { snd.horn(); rig.flash = 1.2; }
+      coach.say(BUSY[k] || "Wait a moment.", 3);
     }
   }
-  function machineName(id) { return ({ mow: "Mower", chop: "Forage harvester", clamp: "Trailer", roll: "Heavy tractor", cover: "Sheet" })[id] || "Machine"; }
+  function hint() { var t = sayFor(key()); if (t) coach.say(t, 3); flashT = time + 3; if (ghost) ghost.poke(); }
 
   // =====================================================================================================
   // The flow
   // =====================================================================================================
   function setPhase(p) { phase = p; phaseT = 0; }
-  // bring the step's machine in (by itself); the step row shows the step as current
+  // his turn: the instruction and the ring
+  function setSub(s) {
+    sub = s; miss = 0; setPhase("ready");
+    var d = SUB[key()]; cue = d ? d.part : null;
+    var t = sayFor(key()); if (t) coach.step(t);
+    if (ghost) ghost.poke();
+  }
+  // his tap started a control's motion (or a machine is coming): the ring goes, an information line says what happens
+  function working(line, ph) { setPhase(ph || "work"); cue = null; if (line) coach.step(line); }
+  // bring the step's machine in (by itself)
   function bringIn(id) {
-    stepId = id; steps.at(id); auto = false; grab = null;
+    stepId = id; sub = ""; auto = false; grab = null; cue = null;
     if (id === "mow" || id === "chop") {
-      rig.m = id === "mow" ? "mower" : "forage"; rig.v = 0; rig.spout = 0;
+      rig.m = id === "mow" ? "mower" : "forage"; rig.v = 0; rig.spout = 0; rig.lift = 1;
       rig.target = id === "mow" ? -0.8 + hitchOff() + MOW.work : -0.8 - FH.front[crop === "maize" ? "maize" : "pickup"];
       rig.x = rig.target - 11;
       setZoom(id === "mow" ? 11 : 14.5, id === "mow" ? 4.4 : 5.2);
-      if (id === "chop") { tr.st = "with"; tr.r = TR_FAR; tr.load = 0; tr.tip = 0; tr.crop = crop; tr.x = trWithX(); }
-      setPhase("arrive"); steps.busy(true);
-    } else if (id === "clamp") {
-      setPhase("ready"); steps.busy(false);
-      tagW(scAt(tr.x), "Trailer", tr.x - 3, 3.8, tr.r);
+      if (id === "chop") { tr.st = "with"; tr.r = TR_FAR; tr.load = 0; tr.tip = 0; tr.lever = 0; tr.crop = crop; tr.x = trWithX(); }
+      working(id === "mow" ? "The tractor brings the mower to the field." : "The forage harvester comes with a trailer.", "arrive");
     } else if (id === "roll") {
       ro.to = rampEnd() + 0.4 + 4.2; ro.st = "in"; ro.x = ro.to + 10; ro.v = 0;
-      setPhase("arrive"); steps.busy(true);
+      working("The heavy tractor comes to the silage clamp.", "arrive");
     } else if (id === "cover") {
-      sheetT = 0; tireT = 0; heap.tires = [];
-      setPhase("ready"); steps.busy(false);
-      var e = rampEnd();
-      tagW(clampSc(), "Silage clamp", (CL0 + e) / 2, hAt((CL0 + e) / 2) + 1.4);
+      sheetT = 0; tireT = 0; heap.tires = []; heap.cover = 0;
+      setSub("sheet");
     }
   }
   function arrived() {
-    setPhase("ready"); steps.busy(false); rig.v = 0; snd.clunk();
-    if (stepId === "mow") tagW(scA, "Disc mower", mowX(), 1.9);
-    else if (stepId === "chop") tagW(scA, "Forage harvester", rig.x - 1.5, 4.9);
-    else if (stepId === "roll") tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8);
+    rig.v = 0; snd.clunk();
+    if (stepId === "mow") { setSub("lower"); tagW(scA, "Disc mower", mowX(), 1.9); }
+    else if (stepId === "chop") { setSub("spout"); tagW(scA, "Forage harvester", rig.x - 1.5, 4.9); }
+    else if (stepId === "roll") { setSub("drive"); tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); }
   }
-  function go() {
-    if (phase === "ready") {
-      if (ghost) ghost.learned("go");
-      setPhase("work"); snd.horn();
-      if (stepId === "mow" || stepId === "chop") {
-        field.wipe = { bx: workX(), dir: 1, to: stepId === "mow" ? "swaths" : (crop === "maize" ? "maizestub" : "stubble") };
-        if (stepId === "mow") { swath.on = true; swath.a = 0; swath.b = 0; }
-        coach.say(stepId === "mow" ? WORK.mow : (crop === "maize" ? WORK.chopM : WORK.chop), 4);
-        auto = true; steps.busy(true);
-        if (stepId === "chop") tagW(scA, crop === "maize" ? "Maize header" : "Pickup", frontX() - 0.8, 1.9);
-        return true;
-      }
-      steps.busy(true);
-      if (stepId === "clamp") { tr.st = "back"; tr.t = 0; coach.say(WORK.clamp, 3); }
-      else if (stepId === "roll") { ro.st = "legs"; ro.leg = 0; ro.t = 0; ro.from = ro.x; coach.say(WORK.roll, 4); }
-      else if (stepId === "cover") { sheetT = 0; heap.tires = makeTires(); coach.say(WORK.cover, 3); }
+  // what his tap on a part does (true: it did something)
+  function act(part) {
+    var k = key(), ok = ALSO[k] && ALSO[k].indexOf(part) >= 0;
+    if (!ok || phase !== "ready") return false;
+    if (ghost) ghost.learned(k);
+    if (k === "mow.lower") { snd.clunk(); working("The mower drops onto the grass."); return true; }
+    if (k === "mow.drive" || k === "chop.drive") { startPass(); auto = true; return true; }
+    if (k === "chop.spout") { snd.clunk(); working("The spout swings out over the trailer."); return true; }
+    if (k === "chop.haul") { startHaul(); return true; }
+    if (k === "clamp.tip") {
+      tr.st = "tip"; tr.t = 0; heap.hb = heap.h.slice(); heap.lump = 0; snd.clunk();
+      working("The trailer tips the " + cropWord() + " out at the silage clamp.");
       return true;
     }
-    if (phase === "work" && (stepId === "mow" || stepId === "chop") && !auto) { auto = true; steps.busy(true); return true; }
+    if (k === "clamp.push") {
+      ld.st = "push"; ld.t = 0; heap.before = heap.h.slice(); snd.horn();
+      working("The buck rake pushes the " + cropWord() + " up the heap.");
+      return true;
+    }
+    if (k === "roll.drive") {
+      ro.st = "legs"; ro.leg = 0; ro.t = 0; ro.from = ro.x; snd.horn();
+      working("The heavy tractor squashes the air out.");
+      return true;
+    }
+    if (k === "cover.sheet") {
+      sheetT = 0; heap.tires = makeTires(); snd.pop();
+      working("The sheet keeps the air out.");
+      return true;
+    }
     return false;
+  }
+  // the mower or the forage harvester starts its pass through the field
+  function startPass() {
+    if (phase === "work" && sub === "drive") return;
+    field.wipe = { bx: workX(), dir: 1, to: stepId === "mow" ? "swaths" : (crop === "maize" ? "maizestub" : "stubble") };
+    if (stepId === "mow") { swath.on = true; swath.a = 0; swath.b = 0; }
+    snd.horn();
+    working(stepId === "mow" ? "The mower cuts the grass." : (crop === "maize" ? "Chopped maize flies into the trailer." : "Chopped grass flies into the trailer."));
+    if (stepId === "chop") tagW(scA, crop === "maize" ? "Maize header" : "Pickup", frontX() - 0.8, 1.9);
   }
   function passDone() {
     auto = false; grab = null; field.stage = field.wipe.to; field.wipe = null;
-    if (stepId === "mow") { steps.done("mow"); setPhase("leave"); steps.busy(true); return; }
-    // chopping done: the trailer is full and drives to the clamp, the harvester stops at the end
-    tr.load = 1; tr.st = "haul"; tr.t = 0; setPhase("haul"); steps.busy(true);
-    coach.say("Off to the silage clamp!", 3); snd.horn();
+    if (stepId === "mow") { working("The cut grass lies in rows.", "leave"); return; }
+    // chopping done: the trailer is full; the harvester stops and folds its spout; his turn to drive the trailer
+    tr.load = 1;
+    setSub("haul");
+  }
+  function startHaul() {
+    tr.st = "haul"; tr.t = 0; snd.horn();
     if (heap.cover > 0.02) { uncover = { t: 0 }; heap.flap = null; }
+    working("The tractor takes the " + cropWord() + " to the silage clamp.", "haul");
   }
-  function atClamp() {
-    steps.done("chop");   // the clamp step is current now
-    bringIn("clamp");
-  }
+  // the trailer has backed up to the clamp: his turn to tip it
+  function atClamp() { stepId = "clamp"; setSub("tip"); tagW(clampSc(), "Trailer", tr.x - 3, 3.8, 1); }
   function tipped() {
     loads++; save(); setLoads(); snd.chime();
     Farm.world.update(function (w) { w.clamp = (typeof w.clamp === "number" && isFinite(w.clamp) ? w.clamp : 0) + 1; w.season = "summer"; });
+    coach.step("The loader comes with its buck rake.");
   }
-  function pushed() { steps.done("clamp"); bringIn("roll"); }
-  function rolled() { steps.done("roll"); bringIn("cover"); }
+  function loaderIn() { if (stepId === "clamp") { setSub("push"); tagW(clampSc(), "Buck rake", ld.x - 5.4, hAt(ld.x - 5) + 1.8); } }
+  function pushed() { bringIn("roll"); }
+  function rolled() { bringIn("cover"); }
   function covered() {
-    setPhase("done"); steps.done("cover"); steps.finish("Again!"); steps.busy(false);
+    setPhase("done"); cue = null;
     save(); snd.chime();
+    coach.step("Tap the silage clamp to start again.");
     coach.say("The silage is safe for the winter!", 5);
     Toybox.kind();
   }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    steps.reset(); startGrow();
+    startGrow();
     return true;
   }
   // weeks go by: the field grows back, then the first machine comes
   function startGrow() {
     field.stage = crop === "maize" ? "mgrow" : "grow"; field.g = 0; field.wipe = null; swath.on = false;
     rig.m = null; tr.st = "away"; tr.x = -60; ld.st = "away"; ro.st = "away";
-    setZoom(13, 4.9); steps.at(firstStep()); steps.busy(true);
-    setPhase("grow");
-    coach.say("Weeks go by. The " + (crop === "maize" ? "maize" : "grass") + " grows.", 3);
+    stepId = firstStep(); sub = ""; cue = null;
+    setZoom(13, 4.9);
+    working("Weeks go by. The " + cropWord() + " grows.", "grow");
   }
   function grown() { field.stage = cropStage(crop); field.g = 1; bringIn(firstStep()); }
 
@@ -630,14 +632,13 @@ body.big #jobs { display: none; }
     if (heap.V > 0) { setFlat(heap.V, 1); heap.cover = 1; heap.tires = makeTires(); landTires(); }
     else { heap.cover = 0; heap.tires = []; }
     heap.lump = 0; heap.hb = null; heap.before = null; heap.flap = null; uncover = null;
-    tr.st = "away"; tr.x = -60; ld.st = "away"; ld.x = XMAX + 10; ro.st = "away"; ro.x = XMAX + 10;
+    tr.st = "away"; tr.x = -60; tr.lever = 0; ld.st = "away"; ld.x = XMAX + 10; ro.st = "away"; ro.x = XMAX + 10;
   }
   function startOver() {
     if (locked()) return;
     parts.length = 0; hare = null; dog = null; tagged = {};
     settleClamp();
     field.stage = cropStage(crop); field.g = 1; field.wipe = null; swath.on = false;
-    steps.reset();
     bringIn(firstStep());
     follow(0, true);
     coach.say("A new field!", 3);
@@ -649,7 +650,6 @@ body.big #jobs { display: none; }
     heap.crop = heap.V > 0 ? heap.crop : crop;
     parts.length = 0; hare = null; dog = null; tagged = {};
     settleClamp();
-    showSteps(); steps.reset();
     field.stage = cropStage(crop); field.g = 1; field.wipe = null; swath.on = false;
     bringIn(firstStep());
     follow(0, true);
@@ -726,61 +726,141 @@ body.big #jobs { display: none; }
   function bitCol(c) { var a = c === "maize" ? MAIZES : GREENS; return a[Math.floor(Math.random() * a.length)]; }
 
   // =====================================================================================================
-  // Input
+  // Input: every part is hit-tested; the part the ring marks wins a near miss
   // =====================================================================================================
-  function rigCentre() { return rig.m === "mower" ? { x: rig.x - 0.6, h: 1.7, w: 3.0 } : { x: rig.x - 0.6, h: 2.2, w: 3.4 }; }
-  function partScreen(id) {
-    var sc, p;
-    if ((id === "mow" || id === "chop") && rig.m) { var c = rigCentre(); return onScreen(scA, scA.X(c.x, 1), scA.gY - c.h * scA.k); }
-    if (id === "clamp" && tr.st !== "away") { sc = scAt(tr.x); return onScreen(sc, sc.X(tr.x - 3.2 * unitW(tr.r), 1), sc.Y(tr.r) - 2.2 * SS(sc, tr.r)); }
-    if (id === "roll" && ro.st !== "away") { sc = clampSc(); p = ro.x - 1.8; return onScreen(sc, sc.X(p, 1), sc.gY - (hAt(ro.x) + 1.8) * sc.k); }
-    if (id === "cover") { sc = clampSc(); var e = rampEnd(), m = (CL0 + e) / 2; return onScreen(sc, sc.X(m, 1), sc.gY - (hAt(m) + 0.5) * sc.k); }
+  function cpt(sc, x, y) { var R = regOf(sc); return [R.x + x, R.y + y]; }
+  // the tipping lever on the back of the tractor pulling the trailer (tractor units), pulled back while it tips
+  function leverLocal(pull) { return [lerp(-1.0, -1.42, pull) - Farm.DRAWBAR[0], lerp(-2.58, -2.4, pull)]; }
+  // a part's point on the canvas (px), and its hit radius
+  function ptOf(id) {
+    var sc, s, p, e, m;
+    if (id === "mower" && rig.m === "mower") return cpt(scA, scA.X(rig.x - hitchOff() - 2.0, 1), scA.gY - (0.75 + rig.lift * 0.4) * scA.k);
+    if (id === "rig" && rig.m) return rig.m === "mower" ? cpt(scA, scA.X(rig.x + 1.7, 1), scA.gY - 1.9 * scA.k) : cpt(scA, scA.X(rig.x - 1.0, 1), scA.gY - 2.3 * scA.k);
+    if (id === "spout" && rig.m === "forage") {
+      var g = spoutGeo(scA), t = 0.62, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+      return cpt(scA, a * g.px + b * g.cx + c * g.ex, a * g.py + b * g.cy + c * g.ey);
+    }
+    if ((id === "trailer" || id === "tiplever") && tr.st !== "away") {
+      sc = scAt(tr.x); s = SS(sc, tr.r);
+      if (id === "trailer") return cpt(sc, sc.X(tr.x, 1) - 3.2 * s, sc.Y(tr.r) - 2.2 * s);
+      p = leverLocal(tr.lever || 0);
+      return cpt(sc, sc.X(tr.x, 1) + p[0] * s, sc.Y(tr.r) + p[1] * s);
+    }
+    if (id === "loader" && ld.st !== "away") { sc = clampSc(); return cpt(sc, sc.X(ld.x - 2.0, 1), sc.gY - (hAt(ld.x) + 1.7) * sc.k); }
+    if (id === "roller" && ro.st !== "away") { sc = clampSc(); return cpt(sc, sc.X(ro.x - 1.8, 1), sc.gY - (hAt(ro.x) + 1.8) * sc.k); }
+    if (id === "sheet") { sc = clampSc(); return cpt(sc, sc.X(CL0 + 0.4, 1), sc.gY - (hAt(CL0 + 0.4) + 0.4) * sc.k); }
+    if (id === "heap") { sc = clampSc(); e = rampEnd(); m = (CL0 + e) / 2; return cpt(sc, sc.X(m, 1), sc.gY - (hAt(m) + 0.5) * sc.k); }
+    if (id === "flap") { sc = clampSc(); e = rampEnd() - 0.4; return cpt(sc, sc.X(e, 1), sc.gY - (hAt(e) + 0.7) * sc.k); }
     return null;
   }
-  function flapScreen() { var sc = clampSc(), e = rampEnd() - 0.4; return onScreen(sc, sc.X(e, 1), sc.gY - (hAt(e) + 0.7) * sc.k); }
+  function radiusOf(id) {
+    var kA = scA.k, kB = clampSc().k;
+    if (id === "mower") return 1.7 * kA;
+    if (id === "rig") return (rig.m === "mower" ? 2.2 : 3.0) * kA;
+    if (id === "spout") return 1.0 * kA;
+    if (id === "trailer") return 2.6 * SS(scAt(tr.x), tr.r);
+    if (id === "tiplever") return 0.75 * SS(scAt(tr.x), tr.r);
+    if (id === "loader" || id === "roller") return 2.3 * kB;
+    if (id === "sheet") return 0.9 * kB;
+    if (id === "heap") return 2.2 * kB;
+    if (id === "flap") return 1.2 * kB;
+    return 40;
+  }
+  function liveParts() {
+    var l = [];
+    if (heap.flap) l.push("flap");
+    if (rig.m === "mower") l.push("mower");
+    if (rig.m) l.push("rig");
+    if (rig.m === "forage") l.push("spout");
+    if (tr.st !== "away") { l.push("trailer"); l.push("tiplever"); }
+    if (ld.st !== "away") l.push("loader");
+    if (ro.st !== "away") l.push("roller");
+    if (stepId === "cover" && phase === "ready") l.push("sheet");
+    if (heap.V > 0 || stepId === "cover") l.push("heap");
+    return l;
+  }
+  // the part under a point (canvas px): nearest within its radius (at least about 1.4 cm)
+  function hitAt(x, y) {
+    var minR = Math.max(26, (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tb-key")) || 120) * 0.34);
+    var best = null, bd = 1e9, want = wantPart();
+    liveParts().forEach(function (id) {
+      var p = ptOf(id); if (!p) return;
+      // a part off its view (the split stage) can't be hit
+      var R = regOf(id === "mower" || id === "rig" || id === "spout" ? scA : (id === "trailer" || id === "tiplever" ? scAt(tr.x) : clampSc()));
+      if (p[0] < R.x || p[0] > R.x + R.w || p[1] < R.y || p[1] > R.y + R.h) return;
+      var d = Math.hypot(x - p[0], y - p[1]), r = Math.max(radiusOf(id), minR);
+      if (id === want) r *= 1.25;
+      if (d <= r && d / r < bd) { bd = d / r; best = id; }
+    });
+    return best;
+  }
+  // the screen point (canvas px) of the part the ring marks
+  function wantPt() { var w = wantPart(); return w ? ptOf(w) : null; }
+  // a part's real name, as a small tag, when he taps it
+  function tagPart(part) {
+    if (part === "mower") { snd.tick(); tagW(scA, "Disc mower", mowX(), 1.9); return true; }
+    if (part === "rig") { snd.horn(); rig.flash = 1.2; tagW(scA, rig.m === "mower" ? "Tractor" : "Forage harvester", rig.m === "mower" ? rig.x + 1.7 : rig.x - 1.5, rig.m === "mower" ? 3.6 : 4.9); return true; }
+    if (part === "spout") { snd.tick(); tagW(scA, "Spout", rig.x - 2.4, 5.6); return true; }
+    if (part === "trailer") { snd.horn(); tagW(scAt(tr.x), "Trailer", tr.x - 3, 3.8, tr.r); return true; }
+    if (part === "tiplever") { snd.tick(); tagW(scAt(tr.x), "Tipping lever", tr.x + 0.3, 3.2, tr.r); return true; }
+    if (part === "loader") { snd.horn(); tagW(clampSc(), "Buck rake", ld.x - 5.4, hAt(ld.x - 5) + 1.8); return true; }
+    if (part === "roller") { snd.horn(); tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); return true; }
+    if (part === "sheet") { snd.tick(); tagW(clampSc(), "Black sheet", CL0 + 0.4, hAt(CL0 + 0.4) + 1.2); return true; }
+    if (part === "heap") {
+      var e2 = rampEnd(), m = (CL0 + e2) / 2; snd.tick();
+      tagW(clampSc(), heap.cover > 0.5 ? (heap.tires.length ? "Tires" : "Black sheet") : "Silage clamp", m, hAt(m) + 1.2);
+      return true;
+    }
+    return false;
+  }
+  // a little puff of grass where he tapped (canvas px)
+  function puff(px, py) {
+    var sc = split && py > RB.y ? scB : scA, R = regOf(sc), wx = sc.wx(px - R.x, 1);
+    for (var i = 0; i < 6; i++) addPart({ kind: "bit", x: wx + (Math.random() - 0.5) * 0.6, h: Math.max(0, (sc.gY - (py - R.y)) / sc.k), r: 1, vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random(), g: 6, life: 0.8, size: 0.09, col: bitCol(crop), spin: 6 });
+  }
+  function tapPart(part, px, py) {
+    if (locked()) return;
+    if (part === "flap") { fixFlap(); return; }
+    if (phase === "done") { again(); return; }
+    if (phase === "ready" && act(part)) return;
+    var k = key();
+    if (phase === "ready" && NEAR[k] && NEAR[k].indexOf(part) >= 0 && ++miss >= 2) { act(SUB[k].part); return; }
+    var named = part ? tagPart(part) : false;
+    if (!named) puff(px, py);
+    if (phase === "ready") hint(); else if (!named) busyHint();
+  }
+  // He drives by drag too: a drag on the mower's tractor or the forage harvester moves it under his finger (held
+  // ahead, it keeps driving); a drag on the trailer's tractor pulls it along the track toward the clamp; a drag on
+  // the loader or the heavy tractor starts its drive. When he lets go it carries on to its stop.
   var press = Toybox.press(cv, {
     any: true,
-    parts: function () {
-      var list = [], p;
-      if (heap.flap) { p = flapScreen(); list.push({ id: "flap", x: p.x, y: p.y, r: Math.max(44, clampSc().k * 1.2) }); }
-      if (rig.m) { p = partScreen("chop"); list.push({ id: "rig", x: p.x, y: p.y, r: Math.max(46, scA.k * (rig.m === "mower" ? 2.6 : 3.2)) }); }
-      if (tr.st !== "away") { p = partScreen("clamp"); list.push({ id: "trailer", x: p.x, y: p.y, r: Math.max(40, scAt(tr.x).k * 2.6 * unitW(tr.r)) }); }
-      if (ro.st !== "away") { p = partScreen("roll"); list.push({ id: "roller", x: p.x, y: p.y, r: Math.max(44, clampSc().k * 2.4) }); }
-      if (ld.st !== "away") { var sc = clampSc(); p = onScreen(sc, sc.X(ld.x - 2.2, 1), sc.gY - (hAt(ld.x) + 1.6) * sc.k); list.push({ id: "loader", x: p.x, y: p.y, r: Math.max(44, sc.k * 2.4) }); }
-      if (heap.V > 0 || stepId === "cover") { p = partScreen("cover"); list.push({ id: "heap", x: p.x, y: p.y, r: Math.max(40, clampSc().k * 2.2) }); }
-      return list;
-    },
+    hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
-      if (locked() || part !== "rig" || !(stepId === "mow" || stepId === "chop") || (phase !== "ready" && phase !== "work")) return;
-      if (phase === "ready") go();
-      auto = false; grab = { off: dragWorld(s.x) - rig.x };
-      if (ghost) ghost.learned("go");
+      grab = null;
+      if (locked() || !part) return;
+      var k = key(), driving = (stepId === "mow" || stepId === "chop") && sub === "drive" && (phase === "ready" || phase === "work");
+      if (driving && (part === "rig" || part === "mower" || part === "spout")) {
+        if (ghost) ghost.learned(k);
+        startPass(); auto = false;
+        grab = { what: "rig", off: dragWorld(s.x) - rig.x };
+      } else if (phase === "ready" && k === "chop.haul" && (part === "trailer" || part === "tiplever")) {
+        if (ghost) ghost.learned(k);
+        startHaul();
+        grab = { what: "trailer", lx: s.x0, acc: 0 };
+        grab.acc = Math.max(0, s.x - s.x0) / Math.max(10, scA.k);
+        grab.lx = s.x;
+      } else if (phase === "ready" && ((k === "clamp.push" && part === "loader") || (k === "roll.drive" && part === "roller"))) act(part);
     },
-    move: function (part, e, s) { if (grab) grab.to = dragWorld(s.x) - grab.off; },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "work") { auto = true; steps.busy(true); } grab = null; },
-    tap: function (part, x, y) {
-      if (locked()) return;
-      if (part === "flap") { fixFlap(); return; }
-      var mine = (part === "rig" && (stepId === "mow" || stepId === "chop")) || (part === "trailer" && stepId === "clamp") ||
-        (part === "roller" && stepId === "roll") || (part === "heap" && stepId === "cover");
-      if (mine && (phase === "ready" || (phase === "work" && !auto && (stepId === "mow" || stepId === "chop")))) { go(); return; }
-      if (part === "rig") { snd.horn(); rig.flash = 1.2; tagW(scA, rig.m === "mower" ? "Disc mower" : "Forage harvester", rig.m === "mower" ? mowX() : rig.x - 1.5, rig.m === "mower" ? 1.9 : 4.9); return; }
-      if (part === "trailer") { snd.horn(); var st = scAt(tr.x); tagW(st, "Trailer", tr.x - 3, 3.8, tr.r); return; }
-      if (part === "roller") { snd.horn(); tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); return; }
-      if (part === "loader") { snd.horn(); tagW(clampSc(), "Buck rake", ld.x - 5.4, hAt(ld.x - 5) + 1.8); return; }
-      if (part === "heap") {
-        var e2 = rampEnd(), m = (CL0 + e2) / 2;
-        tagW(clampSc(), heap.cover > 0.5 ? (heap.tires.length ? "Tires" : "Sheet") : "Silage clamp", m, hAt(m) + 1.2);
-        if (phase === "done") coach.say("Silage for the cows!", 3); else steps.sayStep && steps.sayStep();
-        return;
-      }
-      // anywhere else: a little puff of grass, and the step's line
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top, sc = split && py > RB.y ? scB : scA, R = regOf(sc);
-      var wx = sc.wx(px - R.x, 1);
-      for (var i = 0; i < 6; i++) addPart({ kind: "bit", x: wx + (Math.random() - 0.5) * 0.6, h: Math.max(0, (sc.gY - (py - R.y)) / sc.k), r: 1, vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random(), g: 6, life: 0.8, size: 0.09, col: bitCol(crop), spin: 6 });
-      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep();
-      if (ghost) ghost.poke();
-    }
+    move: function (part, e, s) {
+      if (!grab) return;
+      if (grab.what === "rig") grab.to = dragWorld(s.x) - grab.off;
+      else { grab.acc += Math.max(0, s.x - grab.lx) / Math.max(10, scA.k); grab.lx = s.x; }
+    },
+    up: function (part, e, s) {
+      var g = grab; grab = null;
+      if (g && g.what === "rig" && phase === "work" && sub === "drive") auto = true;
+    },
+    tap: function (part, x, y) { var b = cv.getBoundingClientRect(); tapPart(part, x - b.left, y - b.top); }
   });
   function dragWorld(clientX) { var b = cv.getBoundingClientRect(); return scA.wx(clientX - b.left - RA.x, 1); }
 
@@ -796,14 +876,15 @@ body.big #jobs { display: none; }
   }
   function clampFocus() {
     var lo = CL0 + 5.5;
-    if (tr.st === "wait" || tr.st === "back" || tr.st === "tip" || tr.st === "untip") return Math.max(lo, tr.x - 2.4);
-    if (phase === "haul") return Math.max(lo, Math.min(WAIT_X, tr.x + tr.v / 2.6) - 2.4);
-    if (ld.st === "in" || ld.st === "push") return clamp(ld.x - 2.6, lo, CL1 + 6);
+    if (tr.st === "wait" || tr.st === "back" || tr.st === "park" || tr.st === "tip" || tr.st === "untip") return Math.max(lo, tr.x - 2.4);
+    if (phase === "haul") return Math.max(lo, Math.min(WAIT_X, tr.x + tr.v * 0.15) - 1.6);
+    if (ld.st === "in" || ld.st === "wait" || ld.st === "push") return clamp(ld.x - 2.6, lo, CL1 + 6);
     if (ro.st === "in" || ro.st === "wait" || ro.st === "legs") return clamp((CL0 + ro.to + 1) / 2, lo, CL1 + 6);
     return Math.max(lo, (CL0 + Math.max(rampEnd(), CL1)) / 2 + 0.5);
   }
   function clampSpan() {
-    if (phase === "haul" || tr.st === "wait" || tr.st === "back" || tr.st === "tip" || tr.st === "untip" || ld.st === "in" || ld.st === "push") return 16;
+    if (phase === "haul" && tr.st === "haul") return 17.5;
+    if (phase === "haul" || tr.st === "wait" || tr.st === "back" || tr.st === "park" || tr.st === "tip" || tr.st === "untip" || ld.st === "in" || ld.st === "wait" || ld.st === "push") return 16;
     if (ro.st === "in" || ro.st === "wait" || ro.st === "legs") return 14.5;
     return 12.5;
   }
@@ -813,7 +894,7 @@ body.big #jobs { display: none; }
   function follow(dt, snap) {
     if (split) { scA.follow(fieldFocus(), dt, snap); scB.follow(clampFocus(), dt * 1.6, snap); return; }
     var target;
-    if (phase === "haul") target = tr.x < CL0 - 6 ? tr.x - 2 : clampFocus();
+    if (phase === "haul") target = Math.min(tr.x - 1.2 + tr.v * 0.3, clampFocus());
     else if (atClampNow() && phase !== "grow") target = clampFocus();
     else target = fieldFocus();
     scA.follow(target, phase === "haul" || atClampNow() ? dt * 1.6 : dt, snap);
@@ -838,8 +919,15 @@ body.big #jobs { display: none; }
       if (phaseT >= GT) grown();
     } else if (phase === "arrive" && rig.m && (stepId === "mow" || stepId === "chop")) {
       var d = rig.target - rig.x; rig.v = clamp(d * 2.4, 1.5, 12); rig.x += Math.min(rig.v * dt, Math.max(d, 0.001)); drive = 0.6;
-      if (rig.m === "forage") rig.spout = Math.min(1, rig.spout + dt * 0.9);
       if (d < 0.02) { rig.x = rig.target; arrived(); }
+    } else if (phase === "work" && stepId === "mow" && sub === "lower") {
+      // the hitch lowers the mower onto the grass
+      rig.lift = 1 - ease(phaseT / 0.9);
+      if (phaseT >= 0.9) { rig.lift = 0; snd.tick(); setSub("drive"); }
+    } else if (phase === "work" && stepId === "chop" && sub === "spout") {
+      // the spout swings out over the trailer
+      rig.spout = Math.min(1, rig.spout + dt * 0.9);
+      if (rig.spout >= 1) { snd.tick(); setSub("drive"); }
     } else if (phase === "work" && (stepId === "mow" || stepId === "chop")) {
       var vt = 0;
       if (grab && grab.to !== undefined) vt = clamp((grab.to - rig.x) * 3, 0, VPASS * 1.4);
@@ -853,9 +941,9 @@ body.big #jobs { display: none; }
       workEffects(dt);
       if (workX() >= L + 0.6) passDone();
     } else if (phase === "leave") {
-      rig.v = Math.min(12, rig.v + dt * 8); rig.x += rig.v * dt; drive = 0.7;
+      rig.v = Math.min(12, rig.v + dt * 8); rig.x += rig.v * dt; drive = 0.7; rig.lift = Math.min(1, rig.lift + dt * 2);
       if (phaseT > 1.1) bringIn("chop");
-    } else if (phase === "haul") {
+    } else if (phase === "haul" || (phase === "ready" && stepId === "chop" && sub === "haul")) {
       // the harvester stops and folds its spout; the trailer drives to the clamp
       rig.v = Math.max(0, rig.v - dt * 8); rig.x += rig.v * dt;
       rig.spout = Math.max(0, rig.spout - dt * 1.2);
@@ -902,7 +990,10 @@ body.big #jobs { display: none; }
     else if (s === "haul") {
       tr.t += dt;
       var d = WAIT_X - tr.x;
-      tr.v = Math.min(clamp(d * 1.6, 1.4, 12), tr.v + dt * 7); tr.x += Math.min(tr.v * dt, Math.max(d, 0.01));
+      if (grab && grab.what === "trailer") {
+        // pulled along under his finger: it goes as far as his finger went, and stops when the finger stops
+        var stp = Math.min(grab.acc, 12 * dt, Math.max(d, 0.01)); grab.acc -= stp; tr.x += stp; tr.v = stp / Math.max(dt, 0.001);
+      } else { tr.v = Math.min(clamp(d * 1.6, 1.4, 12), tr.v + dt * 7); tr.x += Math.min(tr.v * dt, Math.max(d, 0.01)); }
       // out past the harvester onto the farm track, then up into the yard by the clamp
       var rear = tr.x - 7.6 * unitW(tr.r);
       if (tr.x < CL1 + 6) { if (rear > L + 1.2 || tr.r < TR_FAR - 0.01) tr.r = Math.max(0.77, tr.r - dt * 1.1); }
@@ -910,14 +1001,14 @@ body.big #jobs { display: none; }
       if (d < 0.05 && tr.r >= 0.999) { tr.x = WAIT_X; tr.r = 1; tr.v = 0; tr.st = "wait"; tr.t = 0; snd.clunk(); }
       if (tr.x > CL0 - 6) tagOnce("clamp" + loads, clampSc(), "Silage clamp", (CL0 + CL1) / 2, 2.9);
     } else if (s === "wait") {
-      // a moment for the camera to settle on the whole rig before his turn
-      if (phase === "haul") { tr.t += dt; if (tr.t > 0.9) atClamp(); }
+      // a moment for the camera to settle, then it backs up to the clamp by itself
+      tr.t += dt; if (tr.t > 0.5) { tr.st = "back"; tr.t = 0; }
     } else if (s === "back") {
       tr.t += dt; var db = tr.x - TIP_X;
       tr.v = -clamp(db * 2, 0.8, 3); tr.x += Math.max(tr.v * dt, -db);
-      if (db < 0.02) { tr.x = TIP_X; tr.v = 0; tr.st = "tip"; tr.t = 0; heap.hb = heap.h.slice(); heap.lump = 0; tagW(clampSc(), "Trailer", tr.x - 3, 3.8, 1); }
+      if (db < 0.02) { tr.x = TIP_X; tr.v = 0; tr.st = "park"; tr.t = 0; snd.clunk(); if (phase === "haul") atClamp(); }
     } else if (s === "tip") {
-      tr.t += dt; tr.tip = ease(tr.t / 0.9);
+      tr.t += dt; tr.tip = ease(tr.t / 0.9); tr.lever = Math.min(1, tr.t / 0.3);
       if (tr.t > 0.55) {
         var f = clamp((tr.t - 0.55) / 1.5, 0, 1);
         tr.load = 1 - f; heap.lump = f;
@@ -926,7 +1017,7 @@ body.big #jobs { display: none; }
       }
       if (tr.t > 2.15) { tr.st = "untip"; tr.t = 0; tr.load = 0; tipped(); ld.st = "in"; ld.x = CL0 + CLL + 8.45 + 9; ld.v = 0; ld.t = 0; heap.crop = tr.crop; }
     } else if (s === "untip") {
-      tr.t += dt; tr.tip = 1 - ease(tr.t / 0.7);
+      tr.t += dt; tr.tip = 1 - ease(tr.t / 0.7); tr.lever = Math.max(0, 1 - tr.t / 0.4);
       if (tr.t >= 0.7) { tr.tip = 0; tr.st = "off"; tr.t = 0; }
     } else if (s === "off") {
       tr.t += dt; tr.v = Math.min(10, tr.v + dt * 6); tr.x += tr.v * dt; tr.r = Math.max(0.77, tr.r - dt * 0.6);
@@ -940,7 +1031,7 @@ body.big #jobs { display: none; }
     PUSH_FROM = CL0 + CLL + 2.0 + 6.45; PUSH_TO = CL0 + 0.9 + 6.45;
     if (s === "in") {
       var d = ld.x - PUSH_FROM; ld.v = -clamp(d * 2.2, 1.2, 10); ld.x += Math.max(ld.v * dt, -d);
-      if (d < 0.03) { ld.x = PUSH_FROM; ld.st = "push"; ld.t = 0; heap.before = heap.h.slice(); coach.say(BUSY.clamp, 3); tagW(clampSc(), "Loader", ld.x - 2, hAt(ld.x) + 3.8); }
+      if (d < 0.03) { ld.x = PUSH_FROM; ld.v = 0; ld.st = "wait"; ld.t = 0; snd.clunk(); loaderIn(); }
     } else if (s === "push") {
       ld.t += dt; var PT = 2.6, f = ease(clamp(ld.t / PT, 0, 1)), nv = Math.min(4, heap.V + 1);
       var nx = lerp(PUSH_FROM, PUSH_TO, f); ld.v = (nx - ld.x) / Math.max(dt, 0.001); ld.x = nx;
@@ -1037,6 +1128,7 @@ body.big #jobs { display: none; }
       drawView(scB, RB);
       ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, RB.y); ctx.lineTo(W, RB.y); ctx.stroke(); ctx.restore();
     }
+    drawCue();
   }
   function drawView(sc, R) {
     ctx.save(); ctx.translate(R.x, R.y);
@@ -1080,10 +1172,10 @@ body.big #jobs { display: none; }
     var working = phase === "work" && rig.v > 0.3;
     if (rig.m === "mower") {
       put(sc, rig.x, 1, 1, function () {
-        ctx.save(); ctx.translate(Farm.HITCH[0], Farm.HITCH[1]);
+        ctx.save(); ctx.translate(Farm.HITCH[0], Farm.HITCH[1] - rig.lift * 0.4);
         mower(ctx, { spin: rig.spin, work: working ? 1 : 0, time: time });
         ctx.restore();
-        D.tractor(ctx, { wheel: rig.wheel, time: time, hitch: { lift: phase === "work" ? 0 : 0.5 }, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
+        D.tractor(ctx, { wheel: rig.wheel, time: time, hitch: { lift: rig.lift }, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
       });
     } else {
       put(sc, rig.x, 1, 1, function () {
@@ -1135,7 +1227,47 @@ body.big #jobs { display: none; }
       D.trailer(ctx, { wheel: tr.wheel, load: tr.load, tip: tr.tip, crop: tr.crop, time: time });
       ctx.translate(-Farm.DRAWBAR[0], 0.5);
       D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true, beacon: tr.st === "back" || tr.st === "tip" });
+      tipLeverShape(ctx, tr.lever || 0);
     });
+  }
+  // The tipping lever on the back of the tractor, by the spool valves (tractor units): pulled back while it tips.
+  function tipLeverShape(c, pull) {
+    var bx = -0.72, by = -1.45, kx = lerp(-1.0, -1.42, pull), ky = lerp(-2.58, -2.4, pull);
+    Rr(c, -0.95, -1.62, 0.5, 0.3, 0.05, "#3A3F4E", LW() * 0.7);
+    Ln(c, bx, by, kx, ky, INK, 0.17); Ln(c, bx, by, kx, ky, "#59607A", 0.09);
+    Cc(c, kx, ky, 0.22, "#FFC93C", LW() * 0.8);
+    Cc(c, kx - 0.06, ky - 0.07, 0.06, "rgba(255,255,255,0.75)", 0);
+  }
+  // The part the coach line names glows on the scene (a soft pulsing yellow ring), faster after a hint.
+  function drawCue() {
+    if (locked() || phase !== "ready" || !cue) return;
+    var p = ptOf(cue); if (!p) return;
+    var big = cue === "rig" || cue === "trailer" || cue === "loader" || cue === "roller";
+    var r0 = big ? Math.max(40, radiusOf(cue) * 0.8) : Math.max(24, radiusOf(cue) * 0.75);
+    var sp = time < flashT ? 9 : 4.5, k = 0.5 + 0.5 * Math.sin(time * sp), r = r0 * (1 + 0.12 * k);
+    ctx.save();
+    ctx.globalAlpha = (0.55 + 0.45 * k) * (big ? 0.6 : 1);
+    ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, TAU);
+    ctx.lineWidth = Math.max(4, r * 0.14); ctx.strokeStyle = "#FFE14D"; ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(29,35,64,0.6)";
+    ctx.beginPath(); ctx.arc(p[0], p[1], r + Math.max(2, r * 0.08), 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+  // A new instruction sits in the middle of the stage (common/toybox.css); when the part it names is right there
+  // under it, it moves just above or below that part (whichever stays nearer the middle), so the ring shows.
+  var coachEl = $("coach");
+  function placeCoach() {
+    var cl = coachEl.classList, top = "";
+    if (cl.contains("is-do") && !cl.contains("is-seen") && phase === "ready") {
+      var p = wantPt(), h = coachEl.offsetHeight || 60, r = cue ? Math.max(34, radiusOf(cue) * 0.9) : 34;
+      if (p && Math.abs(p[1] - H / 2) < h / 2 + r) {
+        var up = p[1] - r - 6 - h / 2, dn = p[1] + r + 6 + h / 2, lo = h / 2 + 8, hi = H - h / 2 - 8;
+        var c = [up, dn].filter(function (y) { return y >= lo && y <= hi; });
+        if (c.length) top = Math.round(c.sort(function (a, b) { return Math.abs(a - H / 2) - Math.abs(b - H / 2); })[0]) + "px";
+        else top = Math.round(p[1] > H / 2 ? lo : hi) + "px";   // a short stage: the edge away from the ring
+      }
+    }
+    if (coachEl.style.top !== top) coachEl.style.top = top;
   }
   function drawSwath(sc) {
     var a = clamp(swath.a, 0, L), b = clamp(swath.b, 0, L);
@@ -1256,6 +1388,11 @@ body.big #jobs { display: none; }
           ctx.beginPath(); ctx.arc(ex - 0.3, ey - 0.6, pr, 0, TAU); ctx.strokeStyle = "rgba(255,201,60,0.9)"; ctx.lineWidth = 0.09; ctx.stroke();
         }
       }
+      // the black sheet rolled up on top of the heap at the end wall, waiting to be pulled over
+      if (stepId === "cover" && heap.cover <= 0.001 && cnt) {
+        var ry = -hAtLocal(0.4) - 0.32;
+        Cc(ctx, 0.4, ry, 0.32, "#2E3138"); ctx.beginPath(); ctx.arc(0.4, ry, 0.16, 0, 4.5); ctx.strokeStyle = "#5A606C"; ctx.lineWidth = 0.05; ctx.stroke();
+      }
       // the tires on top of the sheet
       heap.tires.forEach(function (q) {
         var ty = -hAtLocal(q.x) - 0.08, a = Math.atan2(hAtLocal(q.x + 0.3) - hAtLocal(q.x - 0.3), 0.6);
@@ -1369,7 +1506,7 @@ body.big #jobs { display: none; }
   var last = 0;
   function loop(ts) {
     var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts;
-    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
+    if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); placeCoach(); }
     requestAnimationFrame(loop);
   }
   function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
@@ -1382,7 +1519,6 @@ body.big #jobs { display: none; }
     heap.V = V; heap.crop = c.crop === "maize" ? "maize" : (c.crop === "grass" ? "grass" : crop);
     if (V > 0) { setFlat(V, 1); if (c.covered) { heap.cover = 1; heap.tires = makeTires(); landTires(); } }
   })();
-  showSteps();
   field.stage = cropStage(crop);
   resize();
   bringIn(firstStep());
@@ -1412,9 +1548,36 @@ body.big #jobs { display: none; }
   });
   requestAnimationFrame(loop);
 
+  // leaving the page while a machine works switches it off quietly
+  Toybox.offFirst({
+    running: function () { return auto || !!grab || phase === "haul" || tr.st === "tip" || ld.st === "push" || ro.st === "legs"; },
+    off: function (done) { auto = false; grab = null; rig.v = 0; snd.engine(-1); snd.soil(0); snd.pour(0); done(); }
+  });
+
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, step: stepId, cur: steps.current(), finished: steps.finished(), crop: crop, x: rig.x, m: rig.m, field: field.stage, trailer: tr.st, tx: tr.x, tr: tr.r, load: tr.load, loader: ld.st, roller: ro.st, V: heap.V, cover: heap.cover, tires: heap.tires.length, loads: loads, coach: coach.text(), split: split, flap: !!heap.flap }; },
-    screen: function (id) { return id === "flap" ? flapScreen() : partScreen(id || stepId); },
+    state: function () {
+      return { camA: scA.cam, kA: scA.k, WA: RA.w, zoomA: zoomA.span, phase: phase, step: stepId, sub: sub, key: key(), want: wantPart(), cue: cue, crop: crop, x: rig.x, m: rig.m, lift: rig.lift, spout: rig.spout, field: field.stage,
+        trailer: tr.st, tx: tr.x, tr: tr.r, load: tr.load, tip: tr.tip, loader: ld.st, roller: ro.st, V: heap.V, cover: heap.cover, tires: heap.tires.length, loads: loads,
+        coach: coach.text(), coachKind: coachEl.classList.contains("is-do") ? "do" : "info", split: split, flap: !!heap.flap };
+    },
+    // viewport point of a part ("want" = the part the ring marks)
+    screen: function (id) { var p = ptOf(id === "want" || !id ? wantPart() : id), b = cv.getBoundingClientRect(); return p ? { x: b.left + p[0], y: b.top + p[1] } : null; },
+    want: function () { var p = wantPt(), b = cv.getBoundingClientRect(); return p ? { x: b.left + p[0], y: b.top + p[1] } : null; },
+    // play the station by script: a tap on a part ("mower", "rig", "spout", "trailer", "tiplever", "loader", "roller",
+    // "sheet", "heap", "flap", "want", or null for the field)
+    tap: function (part) { var id = part === "want" ? wantPart() : part, p = id ? ptOf(id) : [W / 2, H / 2]; tapPart(id || null, p ? p[0] : W / 2, p ? p[1] : H / 2); },
+    hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
+    // the machine he is working, in screen px, against its view (is it whole on screen?)
+    inView: function () {
+      var out = {};
+      function box(name, sc, x0, x1) { var R = regOf(sc), a = sc.X(x0, 1), b2 = sc.X(x1, 1); out[name] = { l: Math.round(a), r: Math.round(b2), w: Math.round(R.w), ok: a >= 0 && b2 <= R.w }; }
+      if (rig.m === "mower") box("rig", scA, rig.x - hitchOff() - 3.7, rig.x + 4.25);
+      else if (rig.m) box("rig", scA, rig.x - 5.4, rig.x + FH.front[crop === "maize" ? "maize" : "pickup"] + 0.2);
+      if (tr.st !== "away" && tr.st !== "off") { var ts = scAt(tr.x), s = SS(ts, tr.r), R = regOf(ts), c = ts.X(tr.x, 1), a1 = c - 8.0 * s, b1 = c + 5.55 * s; out.trailer = { l: Math.round(a1), r: Math.round(b1), w: Math.round(R.w), ok: a1 >= 0 && b1 <= R.w }; }
+      if (ld.st === "wait" || ld.st === "push") box("loader", clampSc(), ld.x - 6.5, ld.x + 1.0);
+      if (ro.st === "wait" || ro.st === "legs") box("roller", clampSc(), ro.x - 4.7, ro.x + 1.0);
+      return out;
+    },
     surprise: surprise,
     ghost: function () { return ghost.show(); }
   };
