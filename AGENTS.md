@@ -207,8 +207,9 @@ Keep only:
 - **No Big button** (the dad, 2026-10-10: it rarely changed what he could see): `common/toybox.js` hides every Big
   button and keeps Big mode off (`Toybox.setBig` is a no-op, saved `toybox-big-<app>` values are ignored). Don't add one.
 - **Instructions sit big in the middle of the stage on every size** (the dad, 2026-10-15: he missed them at the top,
-  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every `is-do` coach line; it fades
-  while a finger is on the stage so it never hides the work. Information lines (`is-info`) stay small at the bottom.
+  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every new `is-do` coach line; at
+  his first touch it drops to the bottom of the stage (`is-seen`) so it never hides the work (the dad, 2026-10-15: left in
+  the middle it covered what he was doing), and the next new instruction pops up in the middle again. Information lines (`is-info`) stay small at the bottom.
   Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
 - **Instructions look different from information** (the dad, 2026-10-11: on the iPad they looked the same and were easy
   to miss). `common/toybox.js` watches every `.tb-coach` and marks it `is-do` when a sentence starts with an action

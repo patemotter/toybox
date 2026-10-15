@@ -1570,6 +1570,7 @@
       var forced = el.getAttribute("data-coach"), text = el.textContent, kind = forced || coachKind(text);
       if (text === last) return;
       last = text;
+      if (text !== el.__tbSeen) el.classList.remove("is-seen");   // a short note and back: still seen
       el.classList.toggle("is-do", kind === "do");
       el.classList.toggle("is-info", kind === "info");
       if (kind === "do") { el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new"); }
@@ -1578,20 +1579,13 @@
     apply();
   }
   function watchAllCoaches() { Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), watchCoach); }
-  // An instruction sits in the middle of the stage: while a finger is down on that stage it fades, so it never
-  // hides the part he is touching or the work under it.
-  (function () {
-    var down = 0;
-    function fade(on, target) {
-      Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), function (c) {
-        c.classList.toggle("is-touching", on && !!c.parentElement && c.parentElement.contains(target));
-      });
-    }
-    document.addEventListener("pointerdown", function (e) { down++; fade(true, e.target); }, true);
-    function up() { down = Math.max(0, down - 1); if (!down) fade(false, null); }
-    document.addEventListener("pointerup", up, true);
-    document.addEventListener("pointercancel", up, true);
-  })();
+  // A new instruction sits in the middle of the stage; once he touches anything (the stage or a button) it has been seen and moves down to
+  // the bottom (is-seen), out of the way of the work. A new instruction line clears it again (watchCoach).
+  document.addEventListener("pointerdown", function (e) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tb-coach.is-do:not(.is-seen)"), function (c) {
+      c.classList.add("is-seen"); c.__tbSeen = c.textContent;
+    });
+  }, true);
 
   function coachLine(el) {
     el = elOf(el);
