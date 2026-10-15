@@ -65,7 +65,10 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   line and a yellow ring on the scene point at the next thing to tap or drag; at the end a tap on the scene starts
   again. Chipper is played the same way, by tapping the machine), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
   parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
-  Hunt"); `field.html` only redirects to spuds. Each station not yet rebuilt: a step row (plus a job bar where the
+  Hunt"), `ewe` ("Hello Ewe!": scrape the shed passage, count four sheep onto the parlor platform, the blue foot
+  spray, the straw chopper beds the shed; script `farm/ewe.js`), `mushrooms` ("Mighty Mushrooms": the crane lorry's straw,
+  the steaming compost bunker, filling the growing shelves, picking; script `farm/mushrooms.js`); both built hands-on like
+  Timberrrrr! (2026-10-15); `field.html` only redirects to spuds. Each station not yet rebuilt: a step row (plus a job bar where the
   episode has two jobs), a split stage on tall screens (the whole rig on top, a close-up of the work below). A
   rebuilt hands-on station follows Timberrrrr!: no step row, one view framed on the work, the split close-up only
   where it shows something the main view can't (the dad, 2026-10-15: "some dual views add something, Timberrr did
