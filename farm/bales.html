@@ -43,13 +43,12 @@ body {
 .loads { font-variant-numeric: tabular-nums; }
 .loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
-/* Big: the header, the job bar, the chips and the bottom bar hide; Go stays (a tap on the machine does every step too). */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-chip, body.big .tb-bottombar, body.big .tb-jobs { display: none; }
+body.big .tb-head > :not(.bigtoggle), body.big .tb-panel, body.big #jobs { display: none; }
 body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Stack the bales"): on a narrow row it wraps to two lines instead of being cut off. */
-.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* No step row and no Go (like Timberrrrr!): he works the machines on the stage; the coach line and the yellow ring
+   on the scene show what to touch next. The panel holds only the bottom bar (the job bar hangs from the stage). */
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -64,7 +63,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   <div class="tb-body app">
     <div class="tb-stagecol">
       <main class="tb-stage stage" id="stage">
-        <canvas id="cv" role="img" aria-label="A grass field with Tractor Ted and a disc mower, and a close-up of the mower cutting the grass. Tap Tractor Ted to mow."></canvas>
+        <canvas id="cv" role="img" aria-label="A grass field with a red tractor and a disc mower, and a close-up of the mower. Tap the mower to start the cutting discs."></canvas>
         <div class="tb-counter loads" id="loads">Bales: 0</div>
         <div id="coach"></div>
         <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
@@ -72,8 +71,6 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
       <div id="jobs"></div>
     </div>
     <section class="tb-panel" id="panel">
-      <ol id="stepsHay"></ol>
-      <ol id="stepsLage" hidden></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -89,9 +86,20 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   // Haylage: mow and rake the same, the round baler rolls the grass into round bales (it stops, net-wraps,
   //          opens its tailgate and drops each one), and the bale wrapper picks each bale up, spins it in film
   //          and tips it onto its end: a row of wrapped bales.
-  // The stage is split like Spuds in Mud: the field with the whole rig (the farm's shared side view) and a
-  // close-up that shows the work: the discs cutting, the rake wheels from above, a cut through the baler, the
-  // trailer being stacked, the bale spinning on the wrapper from above.
+  // He does every step himself, built like Timberrrrr! (farm/woods.js): no step row and no Go; a yellow ring on
+  // the field view and one coach line point at the next thing to touch. Each tap on a machine part plays that one
+  // control's motion: tap the mower and its discs start, tap the tractor and it drives the pass (or drag it: let
+  // go and it carries on), tap the round baler's tailgate and the bale rolls out, tap the bale grab and one bale
+  // goes onto the trailer, tap the wrapper's arm, then its turntable. Tapping another part shows its name. After
+  // the last step a tap on the scene starts a new field.
+  //   Hay:     Mow (discs on, drive), the sun dries it, Rake (drive), Bale (flywheel on, drive), Stack (for each
+  //            bale: the bale grab lifts it onto the trailer, drive the telehandler to the next), drive the
+  //            trailer to the hay barn.
+  //   Haylage: Mow, Rake, Bale (pickup on, drive until the chamber is full, the net goes round, tap the tailgate:
+  //            three times), Wrap (for each bale: the arm loads it, the turntable wraps and tips it, drive on).
+  // The stage is split like Spuds in Mud: the field with the whole rig (the farm's shared side view, where he
+  // works) and a close-up that shows the work: the discs cutting, the rake wheels from above, a cut through the
+  // baler, the trailer being stacked, the bale spinning on the wrapper from above.
   // Machine drawings live here for now, written like farm.js's (machine units = metres, y up negative, origin
   // at the drawbar eye with the ground at y = +0.5, facing +x) so they can move into farm.js later.
   var $ = function (id) { return document.getElementById(id); };
@@ -124,30 +132,41 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     rbaler: { name: "Round baler", len: 4.7, work: 1.9 },
     wrapper: { name: "Bale wrapper", len: 4.3, work: 1.9 }
   };
-  // The steps. go = the Go pill (what will happen), ready = the coach while it waits for him, work = the coach
-  // while the machine works, busy = when he taps while it works, span = metres the field view shows (whole rig).
+  // The steps. span = metres the field view shows (whole rig), busy = when he taps while it works.
   var JOBS = {
-    mow: { m: "mower", to: "mown", go: "Mow it", step: "Mow", span: 12, pic: "mower",
-      ready: "The disc mower cuts the grass.", work: "The cut grass falls in a row.", busy: "The mower is cutting the grass." },
-    rake: { m: "rake", to: "raked", go: "Rake it", step: "Rake", span: 13.5, pic: "rake",
-      ready: "The wheel rake makes one big row.", work: "The wheels roll it into a row.", busy: "The rake is raking." },
-    bale: { m: "sqbaler", to: "baled", go: "Bale it", step: "Bale", span: 17, pic: "sqbaler",
-      ready: "The baler makes big bales.", work: "The plunger packs the hay tight.", busy: "The baler is making bales." },
-    rbale: { m: "rbaler", to: "baled", go: "Bale it", step: "Bale", span: 13, pic: "rbaler",
-      ready: "The baler rolls up the grass.", work: "The grass rolls round and round.", busy: "The round baler is baling." },
-    stack: { m: "tele", go: "Stack them", step: "Stack", span: 16.5, pic: "tele",
-      ready: "The telehandler stacks them.", work: "The bales go onto the trailer.", busy: "The telehandler is stacking." },
-    wrap: { m: "wrapper", go: "Wrap them", step: "Wrap", span: 13, pic: "wrapper",
-      ready: "The wrapper wraps each bale.", work: "The bale spins in the wrap.", busy: "The wrapper is wrapping." }
+    mow: { m: "mower", to: "mown", span: 12, busy: "The mower is cutting the grass." },
+    rake: { m: "rake", to: "raked", span: 13.5, busy: "The rake is raking." },
+    bale: { m: "sqbaler", to: "baled", span: 17, busy: "The baler is making bales." },
+    rbale: { m: "rbaler", to: "baled", span: 13, busy: "The round baler is baling." },
+    stack: { m: "tele", span: 16.5, busy: "The telehandler is stacking." },
+    wrap: { m: "wrapper", span: 13, busy: "The wrapper is wrapping." }
+  };
+  // What he does next (job.sub): the instruction and the part the ring marks.
+  var SUB = {
+    "mow.on": { say: "Tap the mower to start the cutting discs.", part: "imp" },
+    "mow.drive": { say: "Drive the tractor across the field to cut the grass.", part: "tractor" },
+    "rake.drive": { say: "Drive the tractor across the field to rake the grass into a row.", part: "tractor" },
+    "bale.on": { say: "Tap the baler to start its flywheel.", part: "imp" },
+    "bale.drive": { say: "Drive the tractor along the row to make the bales.", part: "tractor" },
+    "rbale.on": { say: "Tap the baler to start its pickup.", part: "imp" },
+    "rbale.drive": { say: "Drive the tractor along the row to fill the baler.", part: "tractor" },
+    "rbale.gate": { say: "Tap the tailgate to let the round bale out.", part: "gate" },
+    "stack.lift": { say: "Tap the bale grab to lift the bale onto the trailer.", part: "grab" },
+    "stack.drive": { say: "Drive the telehandler to the next bale.", part: "tele" },
+    "stack.haul": { say: "Drive the tractor to the hay barn.", part: "hauler" },
+    "wrap.load": { say: "Tap the loading arm to pick up the round bale.", part: "arm" },
+    "wrap.wrap": { say: "Tap the turntable to wrap the bale.", part: "table" },
+    "wrap.drive": { say: "Drive the tractor to the next round bale.", part: "tractor" },
+    clump: { say: "Tap the stuck grass to clear the pickup.", part: "clump" }
   };
   var ORDER = { hay: ["mow", "rake", "bale", "stack"], haylage: ["mow", "rake", "rbale", "wrap"] };
 
   var field = { stage: "grass", wipe: null, dry: 0 };
-  var rig = { m: null, x: -20, v: 0, wheel: 0, target: 0, flash: 0, hold: null, gate: 0 };
+  var rig = { m: null, x: -20, v: 0, wheel: 0, target: 0, flash: 0, hold: null, gate: 0, on: false, spin: 0 };
   var tele = { on: false, x: -30, v: 0, wheel: 0, clamp: 0, tip: null, from: null, back: 0 };
   var tr = { state: "away", x: -60, r: TR_FAR, v: 0, wheel: 0, lane: 0, target: 0 };
   var bales = [];             // { k: "square"|"round", x, st, t, slot, wrap, film, rot }
-  var job = "mow", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
+  var job = "mow", sub = "", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0, mo = null, glow = 0;
   var seq = null, baleN = 0, clump = null, hare = null, dog = null, film = FILMS[filmN % 2];
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
@@ -210,13 +229,13 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     // the rubber curtain at the front and the cutter bar with a spinning disc under it
     for (var i = 0; i < 4; i++) R(ctx, -1.82 - i * 0.12, 0.0, 0.1, 0.36, 0.02, "#2B3040", lw * 0.5);
     R(ctx, -2.35, 0.34, 0.75, 0.12, 0.04, "#5D6675", lw * 0.8);
-    var spin = st.work ? t * 22 : 0;
+    var spin = st.work || st.spin ? t * 22 : 0;
     ctx.beginPath(); ctx.ellipse(-1.95, 0.42, 0.32, 0.07, 0, 0, TAU); fs(ctx, "#9AA5B4", lw * 0.7);
     for (i = 0; i < 2; i++) {
       var a2 = spin + i * Math.PI, kx = -1.95 + Math.cos(a2) * 0.34, ky = 0.42 + Math.sin(a2) * 0.075;
       P(ctx, [kx - 0.07, ky - 0.025, kx + 0.07, ky - 0.025, kx + 0.04, ky + 0.03, kx - 0.04, ky + 0.03], "#E2E6EB", lw * 0.5);
     }
-    if (st.work) { ctx.save(); ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.ellipse(-1.95, 0.42, 0.38, 0.09, 0, 0, TAU); ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 0.03; ctx.stroke(); ctx.restore(); }
+    if (st.work || st.spin) { ctx.save(); ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.ellipse(-1.95, 0.42, 0.38, 0.09, 0, 0, TAU); ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 0.03; ctx.stroke(); ctx.restore(); }
     // swath fins at the back
     P(ctx, [-4.08, -0.15, -4.55, 0.18, -4.5, 0.4, -4.08, 0.26], "#C3CCD6", lw * 0.8);
   }
@@ -614,43 +633,26 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   }
 
   // =====================================================================================================
-  // Coach, counter, name tags, steps
+  // Coach, counter, name tags, ghost, job bar, bottom bar
   // =====================================================================================================
   var coach = Toybox.coach($("coach"));
   function setCount() { var el = $("loads"); el.textContent = "Bales: " + count; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   $("loads").textContent = "Bales: " + count;
   function tagAt(text, x, y) { var b = cv.getBoundingClientRect(); Toybox.nametag(text, b.left + x, b.top + y, 2400); }
   function rigScreen(lx, ly) { return { x: sc.X(rig.x, 1) + (Farm.DRAWBAR[0] + lx) * sc.k, y: sc.gY + (Farm.DRAWBAR[1] + ly) * sc.k }; }
-  function tagRig() {
-    if (job === "stack") { var t = teleScreen(); tagAt("Telehandler", t.x, Math.max(26, t.y - 3.3 * sc.k)); return; }
-    if (!rig.m) return;
-    var p = rigScreen(-M().len * 0.5, -(rig.m === "sqbaler" ? 2.9 : 2.4)); tagAt(M().name, p.x, Math.max(26, p.y));
-  }
 
+  function key() { return clump ? "clump" : job + "." + sub; }
+  function want() { return phase === "ready" || clump ? (SUB[key()] || {}).part || null : null; }
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
-      var b = cv.getBoundingClientRect();
-      if (clump) { var q = clumpScreen(); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "clump" }; }
-      if (phase === "ready") { var p = rigPart(); return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: "go" }; }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      var w = want();
+      if (w) { var p = partPt(w); if (!p) return null; var b = cv.getBoundingClientRect(); return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: key() }; }
+      if (phase === "done" && phaseT > 4) { var b2 = cv.getBoundingClientRect(); return { pts: [[b2.left + RG.f.w / 2, b2.top + RG.f.h * 0.6]], tap: true, key: "again" }; }
       return null;
     }
   });
-  function mkSteps(el, k) {
-    return Toybox.steps(el, {
-      steps: ORDER[k].map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: pic(J.pic), go: J.go, coach: J.ready }; }),
-      coach: coach, ghost: ghost,
-      onGo: function () { return doGo(); },
-      onAgain: function () { again(); },
-      onBusy: function () { busyHint(); }
-    });
-  }
-  var rows = { hay: mkSteps($("stepsHay"), "hay"), haylage: mkSteps($("stepsLage"), "haylage") };
-  var steps = rows[kind];
-  function showRow() { $("stepsHay").hidden = kind !== "hay"; $("stepsLage").hidden = kind !== "haylage"; steps = rows[kind]; }
   var jobs = Toybox.jobs($("jobs"), {
     jobs: [{ id: "hay", name: "Hay", pic: pic("hay") }, { id: "haylage", name: "Haylage", pic: pic("haylage") }],
     value: kind,
@@ -661,57 +663,73 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   // =====================================================================================================
   // The flow
   // =====================================================================================================
+  // Each job has a few things for him to do in turn (sub); each tap on the right part plays that one control's
+  // motion (phase "work" or "drive"), then the next thing is his again (phase "ready").
   function setPhase(p) { phase = p; phaseT = 0; }
+  function ready(s) { sub = s; setPhase("ready"); rig.v = 0; tele.v = 0; var d = SUB[key()]; if (d) coach.step(d.say); if (ghost) ghost.poke(); }
+  // a passing information line while a machine works (the old instruction goes)
+  function inform(text, sec) { coach.clear(); coach.say(text, sec || 3); }
+  function run(dur, fn, end) { mo = { t: 0, dur: dur, fn: fn, end: end }; setPhase("work"); }
   function bringIn(id) {
-    job = id; var J = JOBS[id];
-    steps.at(id);
-    clump = null; seq = null; auto = false; grab = null;
+    job = id;
+    clump = null; seq = null; auto = false; grab = null; mo = null; sub = "";
+    rig.on = false; rig.spin = 0;
     if (id === "stack") {
       rig.m = null; tele.on = true; tele.x = -12; tele.v = 0; tele.clamp = 0; tele.tip = null; tele.from = null; tele.back = 0;
-      tele.target = sortedBales()[0].x - 1.2 - TELE.rest[0] - 0.05;
+      seq = { i: 0, s: "idle", t: 0, order: sortedBales() };
+      seq.order.forEach(function (b, i) { b.slot = i; });
+      tele.target = teleTarget(0);
       tr.state = "with"; tr.r = TR_FAR; tr.x = trTargetFor(0) - 14; tr.v = 0;
-      setZoom(J.span, 4.2);
+      setZoom(JOBS[id].span, 4.2);
     } else {
       tele.on = false;
-      rig.m = J.m; rig.v = 0; rig.hold = null; rig.gate = 0;
-      rig.target = id === "wrap" ? sortedBales()[0].x - Farm.DRAWBAR[0] + WR_LOAD : startX(J.m);
+      rig.m = JOBS[id].m; rig.v = 0; rig.hold = null; rig.gate = 0;
+      if (id === "wrap") seq = { i: 0, s: "idle", t: 0, order: sortedBales() };
+      rig.target = id === "wrap" ? seq.order[0].x - Farm.DRAWBAR[0] + WR_LOAD : startX(JOBS[id].m);
       rig.x = rig.target - 11;
-      setZoom(J.span, 3.6);
+      setZoom(JOBS[id].span, 3.6);
+      baleN = 0;
     }
-    setPhase("arrive"); steps.busy(true);
+    setPhase("arrive");
+    coach.clear();
     closeStart(id);
   }
-  function arrived() { setPhase("ready"); steps.busy(false); rig.v = 0; tele.v = 0; tagRig(); snd.clunk(); }
-  function go() {
-    if (phase !== "ready" && !(phase === "drive" && !auto)) return false;
+  function arrived() {
+    rig.v = 0; tele.v = 0; snd.clunk();
+    if (job === "mow" || job === "bale" || job === "rbale") ready("on");
+    else if (job === "rake") ready("drive");
+    else if (job === "stack") ready("lift");
+    else ready("load");
+  }
+  // the PTO: the machine's moving parts spin up
+  function switchOn() {
+    rig.on = true; snd.clunk();
+    inform(job === "mow" ? "The cutting discs spin fast." : (job === "bale" ? "The flywheel spins up." : "The pickup tines turn."), 3);
+    run(1.2, function (t) { rig.spin = ease(t / 1.2); }, function () { rig.spin = 1; ready("drive"); });
+  }
+  // one tap (or a drag let go) drives the tractor along the whole pass
+  function startDrive() {
     var J = JOBS[job];
-    if (phase === "ready") {
-      if (job === "stack" || job === "wrap") {
-        setPhase("work"); seq = { i: 0, s: job === "wrap" ? "load" : "grab", t: 0, order: sortedBales() };
-        if (job === "stack") seq.order.forEach(function (b, i) { b.slot = i; });
-      }
-      else { setPhase("drive"); field.wipe = { bx: workX(), dir: 1, to: J.to }; baleN = 0; }
-      snd.horn(); coach.say(J.work, 4);
-      if (job === "wrap") { var b = seq.order[0]; b.st = "load"; b.t = 0; }
-    }
-    if (clump) return true;
-    auto = true; steps.busy(true);
-    if (ghost) ghost.learned("go");
-    return true;
+    setPhase("drive");
+    if (!field.wipe) field.wipe = { bx: workX(), dir: 1, to: J.to };
+    auto = true; snd.horn();
+    inform(job === "mow" ? "The cut grass falls in a row." : job === "rake" ? "The wheels roll the grass into a row." :
+      job === "bale" ? "The plunger packs the hay tight." : "The grass rolls round and round.", 4);
   }
   function passDone() {
-    auto = false; var J = JOBS[job];
+    auto = false; grab = null; var J = JOBS[job];
     field.stage = J.to; field.wipe = null;
-    steps.done(job);
-    setPhase("leave"); steps.busy(true);
+    rig.on = false;
+    setPhase("leave");
   }
   function nextAfterLeave() {
     var ord = ORDER[kind], nx = ord[ord.indexOf(job) + 1];
-    if (job === "mow" && kind === "hay") { setPhase("dry"); coach.say("The sun dries the grass into hay.", 3); return; }
+    if (job === "mow" && kind === "hay") { setPhase("dry"); inform("The sun dries the grass into hay.", 3); return; }
     bringIn(nx);
   }
   function finishRound(line) {
-    setPhase("done"); steps.done(job); steps.finish("Again!"); steps.busy(false);
+    setPhase("done"); sub = "";
+    coach.step("Tap the field to start again.");
     coach.say(line, 5);
     Toybox.kind();
   }
@@ -719,14 +737,14 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
     newRound();
+    inform("A new field of grass!", 3);
     return true;
   }
   function newRound() {
-    parts.clear(); cps.length = 0; bales = []; clump = null; seq = null; hare = null; dog = null;
+    parts.clear(); cps.length = 0; bales = []; clump = null; seq = null; hare = null; dog = null; mo = null;
     tr.state = "away"; tr.x = -60; tele.on = false; auto = false; grab = null;
     field.stage = "grass"; field.wipe = null; field.dry = 0;
     filmN++; film = FILMS[filmN % 2]; save();
-    steps.reset();
     bringIn("mow");
   }
   function startOver() {
@@ -734,34 +752,73 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     newRound();
     setZoom(JOBS.mow.span, 3.6, true);
     sc.follow(camTarget(), 0, true);
-    coach.say("A new field of grass!", 3);
+    inform("A new field of grass!", 3);
   }
   function switchKind(id) {
     if (locked()) { jobs.set(kind); return; }
-    var at = steps.current(), keep = (at === "mow" || at === "rake") && phase !== "done";
-    kind = id; save(); showRow();
-    if (keep) { steps.at(at); if (phase === "ready" || phase === "arrive") steps.busy(phase === "arrive"); else steps.busy(true); coach.say(id === "hay" ? "Hay is dry grass." : "Haylage is wrapped grass.", 3); return; }
+    var keep = (job === "mow" || job === "rake") && phase !== "done";
+    kind = id; save();
+    var line = id === "hay" ? "Hay is dry grass." : "Haylage is wrapped grass.";
+    if (keep) { coach.say(line, 3); return; }
     newRound();
     setZoom(JOBS.mow.span, 3.6, true);
     sc.follow(camTarget(), 0, true);
-    coach.say(id === "hay" ? "Hay is dry grass." : "Haylage is wrapped grass.", 3);
-  }
-  function doGo() {
-    if (locked()) return false;
-    if (clump) { popClump(); return true; }
-    if (phase === "ready" || (phase === "drive" && !auto)) return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
+    coach.say(line, 3);
   }
   function busyHint() {
-    if (clump) { popClump(); return; }
     if (phase === "drive" || phase === "work") { snd.horn(); rig.flash = 1.2; coach.say(JOBS[job].busy, 3); }
     else if (phase === "arrive") coach.say("Here comes the " + (job === "stack" ? "telehandler" : M().name.toLowerCase()) + ".", 3);
     else if (phase === "leave") coach.say("Here comes the next machine.", 3);
     else if (phase === "dry") coach.say("The sun is drying the hay.", 3);
     else if (phase === "haul") coach.say("The bales are going to the barn.", 3);
   }
+  function hint() { var d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function sortedBales() { return bales.filter(function (b) { return b.st === "field"; }).sort(function (a, b) { return a.x - b.x; }); }
+
+  // ---------- Stack: the telehandler's bale grab puts each bale on the trailer ----------
+  function teleTarget(i) { var b = seq && seq.order[i]; return b ? b.x - 1.2 - TELE.rest[0] - 0.05 : tele.x; }
+  function liftBale() { seq.s = "grab"; seq.t = 0; setPhase("work"); snd.clunk(); inform("The bale grab squeezes the bale.", 3); }
+  function driveTele() { seq.s = "drive"; seq.t = 0; setPhase("work"); snd.horn(); }
+  // ---------- Wrap: the arm loads a bale, the turntable wraps it and tips it onto its end ----------
+  function wrapLoad() { var b = seq.order[seq.i]; seq.s = "load"; seq.t = 0; b.st = "load"; b.t = 0; setPhase("work"); snd.clunk(); inform("The arm lifts the bale onto the turntable.", 3); }
+  function wrapSpin() { seq.s = "wrap"; seq.t = 0; setPhase("work"); snd.horn(); inform("The bale spins in the wrap.", 4); }
+  function wrapDrive() { seq.s = "drive"; seq.t = 0; setPhase("work"); snd.horn(); }
+  // ---------- The round baler: full, the net goes round, then the tailgate lets the bale out ----------
+  function baleFull() {
+    auto = false; grab = null; rig.v = 0; rig.hold = { t: 0 }; cl.frac = 1;
+    inform("Full! Net goes round it.", 3);
+    run(0.9, function (t) { cl.netA = clamp(t / 0.9, 0, 1); }, function () { cl.netA = 1; ready("gate"); });
+  }
+  function openGate() {
+    var h = rig.hold || (rig.hold = { t: 0 });
+    snd.clunk();
+    run(1.6, function (t) {
+      h.t = 0.45 + t * (1.0 / 1.6);
+      rig.gate = h.t < 0.75 ? ease((h.t - 0.45) / 0.3) : (h.t < 1.15 ? 1 : 1 - ease((h.t - 1.15) / 0.3));
+      if (h.t >= 0.75 && !h.out) { h.out = true; inform("The round bale rolls out.", 3); cl.eject.push({ s: "out", t: 0, rot: cl.spin }); bales.push({ k: "round", x0: rearX() + 0.6, x: rearX() + 0.6, st: "roll", t: 0, rot: 0 }); snd.clunk(); }
+    }, function () {
+      rig.hold = null; rig.gate = 0; baleN++; cl.netA = 0; cl.frac = 0;
+      if (baleN >= NB) passDone(); else ready("drive");
+    });
+  }
+
+  // ---------- What a tap on each part does ----------
+  function act(part) {
+    var k = key(), p = part || "", isBale = /^bale\d+$/.test(p);
+    var rigP = p === "tractor" || p === "imp" || p === "close";
+    if (k === "clump") { if (p === "clump" || rigP) { popClump(); return true; } return false; }
+    if (phase !== "ready") return false;
+    if (sub === "on" && rigP) { switchOn(); return true; }
+    if (sub === "drive" && job !== "stack" && job !== "wrap" && rigP) { startDrive(); return true; }
+    if (k === "rbale.gate" && (p === "gate" || p === "imp" || p === "close")) { openGate(); return true; }
+    if (k === "stack.lift" && (p === "grab" || p === "tele" || p === "close" || isBale)) { liftBale(); return true; }
+    if (k === "stack.drive" && (p === "tele" || p === "grab" || p === "close" || isBale)) { driveTele(); return true; }
+    if (k === "stack.haul" && (p === "hauler" || p === "barn" || p === "close")) { startHaul(); return true; }
+    if (k === "wrap.load" && (p === "arm" || p === "imp" || p === "close" || isBale)) { wrapLoad(); return true; }
+    if (k === "wrap.wrap" && (p === "table" || p === "imp" || p === "close")) { wrapSpin(); return true; }
+    if (k === "wrap.drive" && (p === "tractor" || p === "imp" || p === "close" || isBale)) { wrapDrive(); return true; }
+    return false;
+  }
 
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
   var surpriseN = 0;
@@ -771,8 +828,8 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     if (phase === "drive" && (job === "bale" || job === "rbale") && !clump && progress() < 0.85 && !rig.hold) list = ["clump"];
     var pick = list[surpriseN++ % list.length];
     if (pick === "clump") {
-      clump = { t: 0 }; auto = false; rig.flash = 99; snd.clunk();
-      coach.say("Tap the stuck grass!", 4); return;
+      clump = { t: 0 }; auto = false; grab = null; rig.flash = 99; snd.clunk();
+      coach.step(SUB.clump.say); if (ghost) ghost.poke(); return;
     }
     if (pick === "hare") {
       hare = { t: 0, x: (rig.m ? rig.x + 4.6 : (tele.on ? tele.x + 3 : camX() - 2)), r: 1.25 };
@@ -789,12 +846,11 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   function camX() { return sc.cam; }
   function popClump() {
     if (!clump) return;
-    clump = null; rig.flash = 0; snd.pop(); coach.say("The baler takes the grass again.", 3);
-    var q = rigScreen(-M().work, -0.2);
+    clump = null; rig.flash = 0; snd.pop(); inform("The baler takes the grass again.", 3);
     for (var i = 0; i < 10; i++) parts.add({ kind: "straw", x: rig.x + Farm.DRAWBAR[0] - M().work + (Math.random() - 0.5) * 0.6, h: 0.5, r: 0.98, vx: (Math.random() - 0.3) * 4, vh: 2 + Math.random() * 3, g: 9, life: 0.9, size: 0.14, col: swathCol(), spin: 8 });
     ccps.push({ t: 0, life: 0.6, x: 0, y: 0, kind: "pop" });
     if (ghost) ghost.learned("clump");
-    if (phase === "drive") { auto = true; steps.busy(true); }
+    if (phase === "drive") auto = true;
   }
 
   // =====================================================================================================
@@ -905,7 +961,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     }
     // the mower, big, with a window into its hood
     var oy = CY(-0.5);
-    Farm.inUnits(ctx, CX(CUT + 1.9 - 0.36), oy, u, lw, function () { mower(ctx, { time: time, wheel: cl.scroll, work: mowing && rig.v > 0.3 ? 1 : 0, cut: true, run: cl.ph }); });
+    Farm.inUnits(ctx, CX(CUT + 1.9 - 0.36), oy, u, lw, function () { mower(ctx, { time: time, wheel: cl.scroll, work: mowing && rig.v > 0.3 ? 1 : 0, spin: job === "mow" && rig.on, cut: true, run: cl.ph }); });
     drawCps(lw);
     if (hare && hare.close) drawCloseHare(u);
   }
@@ -1141,7 +1197,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
       var bx = lerp(sl.x - 2.6, sl.x, f), by = lerp(0.5, sl.y, f) - Math.sin(f * Math.PI) * 1.4;
       Farm.inUnits(ctx, CX(bx), CY(by - 0.5), u, lw, function () { squareBale(ctx, {}); });
       gs = { x: bx - 1.25, y: by, cl: 1 };
-    } else if (seq && seq.s === "release" && seq.b) { var s2 = SLOTS[seq.b.slot]; gs = { x: s2.x - 1.25, y: s2.y, cl: 1 - ease(seq.t / 0.35) }; }
+    } else if (seq && seq.s === "release" && seq.b) { var s2 = SLOTS[seq.b.slot]; gs = { x: s2.x - 1.25, y: s2.y, cl: 1 - ease(clamp(seq.t / REL_T, 0, 1)) }; }
     if (gs) {
       var gx = CX(gs.x), gy = CY(gs.y - 0.5), pin = [gx, gy - 0.65 * u];
       ctx.beginPath(); ctx.moveTo(pin[0], pin[1]); ctx.lineTo(pin[0] - 3 * u, pin[1] + 2.2 * u); ctx.lineCap = "round"; ctx.strokeStyle = INK; ctx.lineWidth = 0.34 * u + lw * 2; ctx.stroke(); ctx.strokeStyle = "#F2B33A"; ctx.lineWidth = 0.34 * u; ctx.stroke();
@@ -1287,17 +1343,17 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   function drawCloseHare(u) { void u; }
 
   // ---------- Close-up simulation ----------
-  var LIFT_T = 0.95, LOAD_T = 0.6, TIP_T = 0.6, WRAP_T = 1.8, GRAB_T = 0.4, REL_T = 0.3;
+  var LIFT_T = 1.4, LOAD_T = 0.9, TIP_T = 0.9, WRAP_T = 2.6, GRAB_T = 0.6, REL_T = 0.45, BACK_T = 0.5;
   function updateClose(dt) {
     if (xfade.v < 1) xfade.v = Math.min(1, xfade.v + dt / 0.6);
     var wk = working();
     var mv = (phase === "drive" ? rig.v : 0);
     if (job === "wrap") mv = rig.v;
     cl.scroll += mv * dt;
-    if (wk) cl.ph += dt * 1.4;
-    if (job === "bale") cl.fly += dt * (wk ? 9 : (phase === "ready" || phase === "drive" ? 2 : 0.6));
+    if (wk || rig.on) cl.ph += dt * 1.4 * (wk ? 1 : rig.spin);
+    if (job === "bale") cl.fly += dt * 9 * (rig.on ? rig.spin : 0);
     if (cl.tie > 0) { cl.tie += dt / 0.6; cl.knot += dt * 14; if (cl.tie >= 1) cl.tie = 0; }
-    if (job === "rbale" && (wk || cl.netA > 0)) cl.spin += dt * (wk ? 5 : 3);
+    if (job === "rbale" && (wk || rig.on)) cl.spin += dt * (wk ? 5 : (rig.hold && cl.netA < 1 ? 3 : 1.2 * rig.spin));
     if (job === "wrap") cl.spin += dt * (bales.some(function (b) { return b.st === "table" && b.wrap < 1; }) ? 3.4 : 0);
     // mower: cut grass flying out of the back onto the swath
     if (job === "mow" && wk && Math.random() < dt * 22) cps.push({ x: EXIT + 0.15, y: -0.3, vx: -1 - Math.random(), vy: -0.6 - Math.random() * 0.8, g: 5, t: 0, life: 0.55, r: 0.06, col: swathCol(), rot: Math.random() * 3, spin: 8 });
@@ -1322,10 +1378,6 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   // Input
   // =====================================================================================================
   function teleScreen() { return { x: sc.X(tele.x, 1), y: sc.gY }; }
-  function rigPart() {
-    if (job === "stack") { var t = teleScreen(); return { x: t.x, y: t.y - 1.6 * sc.k, r: Math.max(2.6 * sc.k, 46) }; }
-    return { x: sc.X(rig.x, 1) - (rig.m ? M().len * 0.3 : 0) * sc.k, y: sc.gY - 1.6 * sc.k, r: Math.max(3.2 * sc.k, 46) };
-  }
   function closePart() { var c = RG.c; return { x: c.x + c.w / 2, y: c.y + (c.h - RG.pad) / 2, r: Math.max(Math.min(c.w, c.h) * 0.3, 50) }; }
   function clumpScreen() {
     if (!clump) return { x: 0, y: 0 };
@@ -1333,50 +1385,133 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     return { x: p.x, y: p.y };
   }
   function clumpCloseScreen() { sideLayout(VIEWS[cview] || VIEWS.bale); var x = cview === "rbale" ? 1.25 : 1.65; return { x: RG.c.x + CX(x), y: RG.c.y + CY(-0.35) }; }
-  var press = Toybox.press(cv, {
+  // each machine's part to tap (machine units from the drawbar eye): the hood, the flywheel, the body
+  var IMP = { mower: [-2.9, -0.3, 1.0], rake: [-3.4, -0.5, 1.4], sqbaler: [-2.55, -1.55, 0.8], rbaler: [-2.7, -0.9, 1.0], wrapper: [-3.4, -0.5, 0.8] };
+  function trCab() { var t = trScreen(); return { x: t.x + (-Farm.DRAWBAR[0] + 0.9) * t.s, y: t.y - 1.7 * t.s, s: t.s }; }
+  // a part's spot on the canvas (css px) and its size, or null when it isn't there
+  function partPt(id) {
+    var k = sc.k, p;
+    if (id === "close") return closePart();
+    if (id === "clump") { if (!clump) return null; p = clumpScreen(); return { x: p.x, y: p.y - 0.2 * k, r: 0.8 * k }; }
+    if (id === "tractor") return rig.m ? { x: sc.X(rig.x + 0.9, 1), y: sc.gY - 1.7 * k, r: 1.5 * k } : null;
+    if (id === "imp") { if (!rig.m) return null; var q = IMP[rig.m]; p = rigScreen(q[0], q[1]); return { x: p.x, y: p.y, r: q[2] * k }; }
+    if (id === "gate") { if (rig.m !== "rbaler") return null; p = rigScreen(-3.95, -0.75); return { x: p.x, y: p.y, r: 0.9 * k }; }
+    if (id === "arm") { if (rig.m !== "wrapper") return null; p = rigScreen(-1.75, -0.55); return { x: p.x, y: p.y, r: 0.7 * k }; }
+    if (id === "table") { if (rig.m !== "wrapper") return null; p = rigScreen(WR.table[0], -1.7); return { x: p.x, y: p.y, r: 0.9 * k }; }
+    if (id === "tele") { if (!tele.on) return null; var t = teleScreen(); return { x: t.x, y: t.y - 1.9 * k, r: 1.6 * k }; }
+    if (id === "grab") { if (!tele.on) return null; var t2 = teleScreen(); return { x: t2.x + (TELE.rest[0] + 0.7) * k, y: t2.y + (TELE.rest[1] - 0.55) * k, r: 0.9 * k }; }
+    if (id === "hauler") { if (tr.state === "away") return null; var c = trCab(); return { x: c.x, y: c.y, r: 1.5 * c.s }; }
+    if (id === "barn") { var bs = barnScreen(); return { x: bs.x, y: bs.y - 4 * bs.s, r: 5 * bs.s }; }
+    var m = /^bale(\d+)$/.exec(id);
+    if (m) {
+      var b = bales[+m[1]]; if (!b || (b.st !== "field" && b.st !== "stand")) return null;
+      var r = baleR(b), s = sc.S(r);
+      return { x: sc.X(b.x, r), y: sc.Y(r) - (b.k === "square" ? 0.45 : 0.7) * s, r: 1.0 * s };
+    }
+    return null;
+  }
+  var PART_IDS = ["clump", "tractor", "imp", "gate", "arm", "table", "tele", "grab", "hauler", "barn"];
+  function partList() {
+    var b = cv.getBoundingClientRect(), list = [];
+    function add(id, p) {
+      if (!p || p.x < -20 || p.x > RG.f.w + 20 || p.y < -20 || p.y > RG.f.h + 20) return;
+      list.push({ id: id, x: b.left + p.x, y: b.top + p.y, r: Math.max(24, p.r) });
+    }
+    PART_IDS.forEach(function (id) { add(id, partPt(id)); });
+    bales.forEach(function (q, i) { add("bale" + i, partPt("bale" + i)); });
+    if (clump) { var q2 = clumpCloseScreen(); list.push({ id: "clump", x: b.left + q2.x, y: b.top + q2.y, r: Math.max(0.5 * CLX.u, 40) }); }
+    var cp = closePart(); list.push({ id: "close", x: b.left + cp.x, y: b.top + cp.y, r: cp.r });
+    return list;
+  }
+  var PART_NAMES = { tractor: "Tractor", gate: "Tailgate", arm: "Loading arm", table: "Turntable", tele: "Telehandler", grab: "Bale grab",
+    hauler: "Bale trailer", barn: "Hay barn", clump: "Stuck grass" };
+  function tagPart(part) {
+    if (!part || part === "close") return false;
+    var p = partPt(part); if (!p) return false;
+    var name = PART_NAMES[part];
+    if (part === "imp") name = M().name;
+    var m = /^bale(\d+)$/.exec(part);
+    if (m) { var b = bales[+m[1]]; b.hop = 0.01; name = b.st === "stand" ? "Wrapped bale" : (b.k === "square" ? "Big bale" : "Round bale"); }
+    if (!name) return false;
+    if (part === "tractor" || part === "tele" || part === "hauler") snd.horn(); else snd.tick();
+    tagAt(name, p.x, Math.max(26, p.y - Math.min(60, p.r * 0.8)));
+    return true;
+  }
+  // a tap on nothing in particular: a few blades of grass fly up
+  function tapFx(px, py) {
+    if (px < RG.f.w && py < RG.f.h) {
+      var r = clamp(sc.B / Math.max(4, py - sc.hY), 0.6, 5);
+      for (var i = 0; i < 6; i++) parts.add({ kind: "straw", x: sc.wx(px, Math.min(1, r)) + (Math.random() - 0.5), h: 0.3, r: Math.min(1, r), vx: (Math.random() - 0.5) * 2, vh: 1.5 + Math.random(), g: 6, life: 1, size: 0.12, col: field.stage === "grass" ? "#5DAA45" : swathCol(), spin: 6 });
+    } else {
+      for (var j = 0; j < 6; j++) ccps.push({ kind: "spark", t: 0, life: 0.6, x: px - RG.c.x, y: py - RG.c.y, vx: (Math.random() - 0.5) * 120, vy: -60 - Math.random() * 80 });
+    }
+  }
+  function tapPart(part, px, py) {
+    if (locked()) return;
+    if (phase === "done") { again(); return; }     // no step row: a tap on the finished scene starts a new field
+    var k = key();
+    if (act(part)) { if (ghost) ghost.learned(k); glow = 0; return; }
+    if (typeof px === "number") tapFx(px, py);
+    if (phase === "ready" || clump) { if (!tagPart(part)) hint(); return; }
+    if (!tagPart(part)) busyHint();
+  }
+  var drag = null;
+  function wxAt(clientX) { return sc.wx(clientX - cv.getBoundingClientRect().left, 1); }
+  Toybox.press(cv, {
     any: true,
-    parts: function () {
-      var b = cv.getBoundingClientRect(), list = [];
-      if (clump) { var q = clumpScreen(); list.push({ id: "clump", x: b.left + q.x, y: b.top + q.y, r: Math.max(0.8 * sc.k, 36) }); var q2 = clumpCloseScreen(); list.push({ id: "clump", x: b.left + q2.x, y: b.top + q2.y, r: Math.max(0.5 * CLX.u, 40) }); }
-      if ((rig.m || tele.on) && phase !== "dry") {
-        var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r });
-        var m = closePart(); list.push({ id: "close", x: b.left + m.x, y: b.top + m.y, r: m.r });
-      }
-      return list;
-    },
+    parts: partList,
     dragStart: function (part, e, s) {
-      if (locked() || part !== "rig" || !isPass() || (phase !== "ready" && phase !== "drive") || clump || rig.hold) return;
-      if (phase === "ready") go();
-      auto = false; grab = { off: sc.wx(s.x - cv.getBoundingClientRect().left, 1) - rig.x };
-      if (ghost) ghost.learned("go");
-    },
-    move: function (part, e, s) { if (grab) grab.to = sc.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
-    tap: function (part, x, y) {
+      drag = null; grab = null;
       if (locked()) return;
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part === "clump") { popClump(); return; }
-      if (part === "rig" || part === "close") {
-        if (clump) { popClump(); return; }
-        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
-        if (phase === "done") { snd.horn(); tagRig(); coach.say("Tap Again for a new field.", 3); return; }
-        snd.horn(); rig.flash = 1.2; tagRig(); return;
-      }
-      if (px < RG.f.w && py < RG.f.h) {
-        if (tr.state !== "away") { var tp = trScreen(); if (Math.abs(px - (tp.x - 4.5 * tp.s)) < 5 * tp.s && py > tp.y - 3 * tp.s && py < tp.y) { snd.horn(); tagAt("Bale trailer", tp.x - 4.5 * tp.s, tp.y - 3 * tp.s); return; } }
-        var bs = barnScreen();
-        if (Math.abs(px - bs.x) < 6.5 * bs.s && py < bs.y && py > bs.y - 8 * bs.s) { tagAt("Hay barn", bs.x, bs.y - 8.2 * bs.s); return; }
-        var hit = null;
-        bales.forEach(function (q) { if (q.st !== "field" && q.st !== "stand") return; var sx = sc.X(q.x, 1); if (Math.abs(px - sx) < 1.4 * sc.k && py > sc.gY - 1.6 * sc.k && py < sc.gY + 0.3 * sc.k) hit = q; });
-        if (hit) { hit.hop = 0.01; snd.pop(); tagAt(hit.st === "stand" ? "Wrapped bale" : (hit.k === "square" ? "Big bale" : "Round bale"), sc.X(hit.x, 1), sc.gY - 1.7 * sc.k); return; }
-        var r = clamp(sc.B / Math.max(4, py - sc.hY), 0.6, 5);
-        for (var i = 0; i < 6; i++) parts.add({ kind: "straw", x: sc.wx(px, Math.min(1, r)) + (Math.random() - 0.5), h: 0.3, r: Math.min(1, r), vx: (Math.random() - 0.5) * 2, vh: 1.5 + Math.random(), g: 6, life: 1, size: 0.12, col: field.stage === "grass" ? "#5DAA45" : swathCol(), spin: 6 });
-      } else {
-        for (var j = 0; j < 6; j++) ccps.push({ kind: "spark", t: 0, life: 0.6, x: px - RG.c.x, y: py - RG.c.y, vx: (Math.random() - 0.5) * 120, vy: -60 - Math.random() * 80 });
-      }
-      steps.sayStep(); if (ghost) ghost.poke();
+      var k = key(), p = part || "", rigP = p === "tractor" || p === "imp";
+      if (!clump && rigP && rig.m && isPass() && (phase === "drive" || (phase === "ready" && sub === "drive"))) {
+        if (phase === "ready") startDrive();
+        auto = false; grab = { off: wxAt(s.x0) - rig.x }; drag = { kind: "rig" };
+        if (ghost) ghost.learned(k);
+      } else if (phase === "ready" && k === "wrap.drive" && (rigP || /^bale/.test(p))) {
+        drag = { kind: "wrap", off: wxAt(s.x0) - rig.x, x0: rig.x, to: seq.order[seq.i].x - Farm.DRAWBAR[0] + WR_LOAD };
+      } else if (phase === "ready" && k === "stack.drive" && (p === "tele" || p === "grab")) {
+        drag = { kind: "tele", off: wxAt(s.x0) - tele.x, x0: tele.x, to: teleTarget(seq.i) };
+      } else if (phase === "ready" && k === "stack.haul" && p === "hauler") {
+        drag = { kind: "haul", x0: tr.x, off: wxAt(s.x0) - tr.x };
+      } else drag = { kind: "act", part: part };
+    },
+    move: function (part, e, s) {
+      if (!drag || locked()) return;
+      if (drag.kind === "rig") { if (grab) grab.to = wxAt(s.x) - grab.off; return; }
+      if (phase !== "ready") return;
+      var nx;
+      if (drag.kind === "wrap") { nx = clamp(wxAt(s.x) - drag.off, drag.x0, drag.to); rig.wheel += nx - rig.x; rig.x = nx; }
+      else if (drag.kind === "tele") { nx = clamp(wxAt(s.x) - drag.off, drag.x0, drag.to); tele.wheel += nx - tele.x; tele.x = nx; }
+      else if (drag.kind === "haul") { nx = clamp(wxAt(s.x) - drag.off, drag.x0, drag.x0 + 3); tr.wheel += nx - tr.x; tr.x = nx; }
+    },
+    up: function (part, e, s) {
+      var d = drag; drag = null;
+      if (!d || locked()) { grab = null; return; }
+      if (d.kind === "rig") { if (phase === "drive" && !clump) auto = true; grab = null; return; }
+      if (s.tap) return;
+      var k = key();
+      if (d.kind === "act") { tapPart(d.part); return; }
+      if (phase !== "ready") return;
+      // a drag towards the stop sets the machine going: it carries on to its stop when he lets go
+      if (d.kind === "wrap" && Math.abs(rig.x - d.x0) > 0.3) { act("tractor"); if (ghost) ghost.learned(k); }
+      else if (d.kind === "tele" && Math.abs(tele.x - d.x0) > 0.3) { act("tele"); if (ghost) ghost.learned(k); }
+      else if (d.kind === "haul" && Math.abs(tr.x - d.x0) > 0.3) { act("hauler"); if (ghost) ghost.learned(k); }
+    },
+    tap: function (part, x, y) {
+      var b = cv.getBoundingClientRect();
+      tapPart(part, x - b.left, y - b.top);
     }
   });
+  function drawRing() {
+    var w = want();
+    if (!w || locked() || (drag && drag.kind !== "act")) return;
+    var p = partPt(w); if (!p) return;
+    var k = 0.5 + 0.5 * Math.sin(time * 4), rad = clamp(p.r * 0.75, 24, 46) + k * 7;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.6 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
+  }
 
   // =====================================================================================================
   // Simulation
@@ -1419,7 +1554,8 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     } else if (phase === "drive") {
       updatePass(dt); drive = rig.v / VPASS;
     } else if (phase === "work") {
-      if (job === "stack") updateStack(dt); else updateWrap(dt);
+      if (mo) { mo.t += dt; if (mo.fn) mo.fn(Math.min(mo.t, mo.dur)); if (mo.t >= mo.dur) { var e = mo.end; mo = null; e(); } }
+      else if (job === "stack") updateStack(dt); else if (job === "wrap") updateWrap(dt);
       drive = Math.max(rig.v, tele.v) / VPASS;
     } else if (phase === "leave") {
       rig.v = Math.min(12, rig.v + dt * 8); rig.x += rig.v * dt; drive = 0.7;
@@ -1431,7 +1567,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     } else if (phase === "haul") {
       updateHaul(dt);
     }
-    if (tr.state === "with" && phase === "work") { /* the trailer drives in updateStack */ }
+    glow = Math.max(0, glow - dt);
     rig.wheel += rig.v * dt;
     if (rig.flash && rig.flash < 50) rig.flash = Math.max(0, rig.flash - dt);
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
@@ -1479,48 +1615,40 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
       }
       if (Math.floor(time * 2.6) !== Math.floor((time - dt) * 2.6) && working()) snd.tick();
     } else if (job === "rbale") {
+      // the chamber fills; when it is full the tractor stops, the net goes round and the tailgate is his
       var full = Math.min(NB, Math.floor(p * NB + 1e-6));
-      if (!rig.hold) cl.frac = p * NB - baleN;
-      if (full > baleN && !rig.hold) { rig.hold = { t: 0 }; cl.frac = 1; coach.say("Full! Net goes round it.", 3); }
-      if (rig.hold) {
-        var h = rig.hold; h.t += dt;
-        cl.netA = clamp(h.t / 0.45, 0, 1);
-        rig.gate = h.t < 0.45 ? 0 : (h.t < 0.75 ? ease((h.t - 0.45) / 0.3) : (h.t < 1.15 ? 1 : 1 - ease((h.t - 1.15) / 0.3)));
-        if (h.t >= 0.75 && !h.out) { h.out = true; coach.say("The round bale rolls out.", 3); cl.eject.push({ s: "out", t: 0, rot: cl.spin }); bales.push({ k: "round", x0: rearX() + 0.6, x: rearX() + 0.6, st: "roll", t: 0, rot: 0 }); snd.clunk(); }
-        if (h.t >= 1.45) { rig.hold = null; rig.gate = 0; baleN++; cl.netA = 0; cl.frac = 0; if (baleN >= NB) { passDone(); return; } }
-      }
+      cl.frac = clamp(p * NB - baleN, 0, 1);
+      if (full > baleN) { baleFull(); return; }
     }
     if (workX() >= L + 0.6 && job !== "rbale") passDone();
-    if (job === "rbale" && workX() >= L + 0.02 && baleN < NB && !rig.hold) { rig.hold = { t: 0 }; cl.frac = 1; }
   }
   // the telehandler stacks the bales on the trailer beside it, one by one
   function trTargetFor(i) { var b = sortedBales()[i] || bales[i]; if (!b) return tr.x; return b.x + 1.1 - SLOTS[i].x / TR_FAR; }
   function updateStack(dt) {
     var s = seq; if (!s) return;
-    if (!s.order) { s.order = sortedBales(); s.order.forEach(function (b, i) { b.slot = i; }); }
     var b = s.order[s.i];
     if (!b) return;
     s.t += dt;
-    var tgt = b.x - 1.2 - TELE.rest[0] - 0.05;
     function driveTo(x, vmax) { var d = x - tele.x; tele.v = Math.abs(d) < 0.02 ? 0 : clamp(Math.abs(d) * 2.4, 1.2, vmax) * (d < 0 ? -1 : 1); tele.x += clamp(tele.v * dt, -Math.abs(d), Math.abs(d)); tele.wheel += tele.v * dt; return Math.abs(d) < 0.02; }
-    function trTo(x) { var d = x - tr.x; tr.v = Math.abs(d) < 0.02 ? 0 : clamp(Math.abs(d) * 2.4, 1, 10) * (d < 0 ? -1 : 1); tr.x += clamp(tr.v * dt, -Math.abs(d), Math.abs(d)); tr.wheel += tr.v * dt; }
-    trTo(b.x + 1.1 - SLOTS[s.i].x / TR_FAR + 0.0);
-    if (s.s === "drive") { if (driveTo(tgt, 10) && s.t > 0.05) { s.s = "grab"; s.t = 0; } }
-    else if (s.s === "grab") { driveTo(tgt, 9); tele.clamp = ease(s.t / GRAB_T); if (s.t >= GRAB_T) { s.s = "lift"; s.t = 0; b.st = "carry"; b.t = 0; snd.clunk(); } }
+    function trTo(x) { var d = x - tr.x; tr.v = Math.abs(d) < 0.02 ? 0 : clamp(Math.abs(d) * 2.4, 1, 8) * (d < 0 ? -1 : 1); tr.x += clamp(tr.v * dt, -Math.abs(d), Math.abs(d)); tr.wheel += tr.v * dt; }
+    trTo(b.x + 1.1 - SLOTS[s.i].x / TR_FAR);
+    if (s.s === "drive") { if (driveTo(teleTarget(s.i), 7) && s.t > 0.05 && Math.abs(tr.v) < 0.05) { s.s = "idle"; ready("lift"); } }
+    else if (s.s === "grab") { tele.v = 0; tele.clamp = ease(s.t / GRAB_T); if (s.t >= GRAB_T) { s.s = "lift"; s.t = 0; b.st = "carry"; b.t = 0; snd.clunk(); coach.say("The boom lifts the bale onto the trailer.", 3); } }
     else if (s.s === "lift") { b.t = s.t; tele.v = 0; if (s.t >= LIFT_T) { s.s = "release"; s.t = 0; s.b = b; b.st = "trailer"; snd.clunk(); } }
     else if (s.s === "release") { tele.clamp = 1 - ease(s.t / REL_T); if (s.t >= REL_T) { s.s = "back"; s.t = 0; tele.clamp = 0; tele.from = slotGrab(b); } }
     else if (s.s === "back") {
-      if (s.t >= 0.3) {
-        tele.from = null; s.i++;
-        if (s.i >= s.order.length) { seq = null; tele.v = 0; startHaul(); return; }
-        s.s = "drive"; s.t = 0;
+      if (s.t >= BACK_T) {
+        tele.from = null; s.i++; s.s = "idle";
+        if (s.i >= s.order.length) { tele.v = 0; inform("The bales are on the trailer.", 3); ready("haul"); return; }
+        ready("drive");
       }
     }
   }
   function startHaul() {
-    setPhase("haul"); tr.state = "haul"; tr.lane = 0; steps.done("stack"); steps.busy(true);
+    seq = null;
+    setPhase("haul"); tr.state = "haul"; tr.lane = 0; snd.horn();
     tr.target = STORE_X + 4.8 / BARN_R;
-    coach.say("Off to the hay barn!", 3);
+    inform("Off to the hay barn!", 3);
     setTimeout(function () { if (phase === "haul") setView("barn"); }, 1400);
   }
   function updateHaul(dt) {
@@ -1537,29 +1665,31 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
       }
     }
   }
-  // the wrapper: load a bale, wrap it while driving to the next, tip it off on its end
+  // the wrapper: the arm loads a bale, the turntable spins it in film and tips it off on its end; then he drives
+  // to the next bale
   function updateWrap(dt) {
     var s = seq; if (!s) return;
-    if (!s.order) s.order = sortedBales();
-    var b = s.order[s.i], nx = s.order[s.i + 1];
+    var b = s.order[s.i];
+    if (!b) return;
     s.t += dt;
     function driveTo(x, vmax) { var d = x - rig.x; rig.v = Math.abs(d) < 0.02 ? 0 : clamp(Math.abs(d) * 2.2, 1, vmax); rig.x += Math.min(rig.v * dt, Math.max(d, 0)); return d < 0.02; }
-    if (s.s === "load") {
+    if (s.s === "drive") {
+      if (driveTo(b.x - Farm.DRAWBAR[0] + WR_LOAD, 5)) { rig.v = 0; s.s = "idle"; snd.clunk(); ready("load"); }
+    } else if (s.s === "load") {
       rig.v = 0; b.st = "load"; b.t = s.t;
-      if (s.t >= LOAD_T) { b.st = "table"; b.wrap = 0; b.film = film; s.s = "wrap"; s.t = 0; snd.clunk(); }
+      if (s.t >= LOAD_T) { b.st = "table"; b.wrap = 0; b.film = film; s.s = "idle"; snd.clunk(); ready("wrap"); }
     } else if (s.s === "wrap") {
       b.wrap = clamp(s.t / WRAP_T, 0, 1);
-      var there = nx ? driveTo(nx.x - Farm.DRAWBAR[0] + WR_LOAD, 5.5) : (rig.v = 0, true);
-      if (b.wrap >= 1 && there) { s.s = "tip"; s.t = 0; b.st = "tip"; b.t = 0; rig.v = 0; snd.clunk(); }
+      if (b.wrap >= 1) { s.s = "tip"; s.t = 0; b.st = "tip"; b.t = 0; snd.clunk(); coach.say("The turntable tips the bale onto its end.", 3); }
     } else if (s.s === "tip") {
       b.t = s.t;
       if (s.t >= TIP_T) {
         b.st = "stand"; b.x = rig.x + Farm.DRAWBAR[0] - 4.85; snd.pop();
         count++; save(); setCount();
         Farm.world.update(function (w) { w.wrapped = (typeof w.wrapped === "number" && isFinite(w.wrapped) ? w.wrapped : 0) + 1; w.season = "summer"; });
-        s.i++;
-        if (!nx) { seq = null; rig.v = 0; setView("row"); setZoom(18, 3.6); finishRound("A row of wrapped bales!"); return; }
-        s.s = "load"; s.t = 0;
+        s.i++; s.s = "idle";
+        if (s.i >= s.order.length) { seq = null; rig.v = 0; setView("row"); setZoom(18, 3.6); finishRound("A row of wrapped bales!"); return; }
+        ready("drive");
       }
     }
   }
@@ -1589,6 +1719,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     ctx.save(); ctx.translate(RG.f.x, RG.f.y);
     ctx.beginPath(); ctx.rect(0, 0, RG.f.w, RG.f.h); ctx.clip();
     drawField();
+    drawRing();
     ctx.restore();
     drawClose();
   }
@@ -1629,7 +1760,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   function drawRig() {
     var m = rig.m;
     var tb = bales.filter(function (b) { return b.st === "table" || b.st === "load" || b.st === "tip"; })[0];
-    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, run: cl.ph, gate: rig.gate, inside: m === "rbaler" && rig.gate > 0.05 && rig.hold && !rig.hold.out, rot: cl.spin, fly: cl.fly, knot: cl.knot, film: film };
+    var st = { wheel: rig.wheel, time: time, work: working() ? 1 : 0, spin: rig.on, run: cl.ph, gate: rig.gate, inside: m === "rbaler" && rig.gate > 0.05 && rig.hold && !rig.hold.out, rot: cl.spin, fly: cl.fly, knot: cl.knot, film: film };
     if (m === "wrapper") {
       st.arm = tb && tb.st === "load" ? clamp(tb.t / LOAD_T, 0, 1) : 0;
       st.tilt = tb && tb.st === "tip" ? Math.sin(clamp(tb.t / TIP_T, 0, 1) * Math.PI) : 0;
@@ -1670,7 +1801,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
       var f2 = ease(clamp(cb.t / LIFT_T, 0, 1)), a = { x: sc.X(cb.x, 1) - 1.25 * k, y: sc.gY, s: k }, bpt = slotGrab(cb);
       g = { x: lerp(a.x, bpt.x, f2), y: lerp(a.y, bpt.y, f2) - Math.sin(f2 * Math.PI) * 1.3 * k, s: lerp(k, bpt.s, f2) };
     } else if (seq && seq.s === "release" && seq.b) g = slotGrab(seq.b);
-    else if (tele.from && seq && seq.s === "back") { var e = ease(clamp(seq.t / 0.3, 0, 1)); g = { x: lerp(tele.from.x, rest.x, e), y: lerp(tele.from.y, rest.y, e), s: lerp(tele.from.s, k, e) }; }
+    else if (tele.from && seq && seq.s === "back") { var e = ease(clamp(seq.t / BACK_T, 0, 1)); g = { x: lerp(tele.from.x, rest.x, e), y: lerp(tele.from.y, rest.y, e), s: lerp(tele.from.s, k, e) }; }
     else g = rest;
     // the boom: from its pivot at the back to the grab's pin (two sections and the lift ram)
     var pv = { x: t.x + TELE.pivot[0] * k, y: t.y + TELE.pivot[1] * k }, pin = { x: g.x, y: g.y - 0.65 * g.s };
@@ -1700,7 +1831,6 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     ctx.beginPath();
     for (var i = 0; i < 12; i++) { var a = i * TAU / 12, rad = 0.38 * k * (0.8 + 0.3 * hash(i, 4)); ctx.lineTo(p.x + wob + Math.cos(a) * rad, p.y - 0.2 * k + Math.sin(a) * rad * 0.8); }
     ctx.closePath(); ctx.fillStyle = swathCol(); ctx.fill(); ctx.lineWidth = sc.lw; ctx.strokeStyle = INK; ctx.stroke();
-    ctx.beginPath(); ctx.arc(p.x, p.y - 0.2 * k, Math.max(18, 0.7 * k) * (1 + 0.12 * Math.sin(time * 6)), 0, TAU); ctx.strokeStyle = "rgba(255,201,60,0.95)"; ctx.lineWidth = Math.max(3, sc.lw * 1.4); ctx.stroke();
   }
   function drawHare(far) {
     var t = hare.t, r = far ? 1.3 : 0.92, x0 = hare.x, s = sc.S(r) * 1.2;
@@ -1733,10 +1863,10 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); done(); }, 2600); }
+  function machineOff(done) { rig.on = false; rig.spin = 0; if (done) done(); }
+  function onEnding(done) { ending = true; auto = false; grab = null; drag = null; rig.v = 0; machineOff(); setTimeout(function () { snd.engine(-1); snd.soil(0); done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
-  showRow();
   resize();
   bringIn("mow");
   setZoom(JOBS.mow.span, 3.6, true);
@@ -1764,15 +1894,18 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     onWake: onWake,
     onSound: function (on) { if (on) snd.chime(); }
   });
+  Toybox.offFirst({ running: function () { return rig.on; }, off: function (done) { machineOff(done); } });
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, kind: kind, step: steps.current(), finished: steps.finished(), x: rig.x, m: rig.m, field: field.stage, bales: bales.map(function (b) { return b.st; }), count: count, coach: coach.text(), tr: tr.state, clump: !!clump }; },
-    screen: function (id) {
-      var b = cv.getBoundingClientRect(), p;
-      if (id === "clump") p = clumpScreen(); else if (id === "close") p = closePart(); else p = rigPart();
-      return { x: b.left + p.x, y: b.top + p.y };
+    state: function () {
+      return { phase: phase, job: job, kind: kind, sub: sub, key: key(), part: want(), x: rig.x, m: rig.m, on: rig.on, field: field.stage,
+        bales: bales.map(function (b) { return b.st; }), count: count, coach: coach.text(), tr: tr.state, clump: !!clump, seq: seq ? seq.s + seq.i : null };
     },
+    tap: function (p) { tapPart(p); },
+    next: function () { tapPart(want()); },
+    target: function () { var w = want(), p = w && partPt(w); if (!p) return null; var b = cv.getBoundingClientRect(); return { x: b.left + p.x, y: b.top + p.y }; },
+    screen: function (id) { var p = partPt(id), b = cv.getBoundingClientRect(); return p ? { x: b.left + p.x, y: b.top + p.y } : null; },
     surprise: surprise,
     ghost: function () { return ghost.show(); }
   };
