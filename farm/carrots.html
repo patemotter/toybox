@@ -47,8 +47,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Lift them"): on a narrow row it wraps to two lines instead of being cut off. */
-#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* No step row (like Timberrrrr!): he works the machines on the stage; the coach line and the yellow ring on the
+   field show what to touch next. The panel holds only the bottom bar. */
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -62,13 +62,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A carrot field with Tractor Ted and a topper, and a close-up of the carrots in the soil. Tap Tractor Ted to cut off the green tops."></canvas>
+      <canvas id="cv" role="img" aria-label="A carrot field with a tractor and a topper, and a close-up of the carrots in the soil. Tap the topper to lower it onto the carrot tops."></canvas>
       <div class="tb-counter loads" id="loads">Crates: 0</div>
       <div id="coach"></div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -78,11 +77,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 (function () {
   "use strict";
   // Munchy Crunchy: the carrot harvest, the way the episode shows it. The field is full of carrots in beds,
-  // their feathery green tops in rows. Three jobs, one tap each:
-  //   Top:   the topper's flails spin and chop the green tops off; the tops fly out into a row.
-  //   Lift:  the carrot harvester's share runs under the bed and loosens it; the carrots ride up the belt and
-  //          the side elevator into the big wooden crates on the trailer that drives alongside.
-  //   Stack: the trailer drives to the packhouse and the forklift stacks the crates of bright orange carrots.
+  // their feathery green tops in rows. Three jobs, done hands-on like Timberrrrr! (no step row, see "The flow"):
+  //   Top:   he lowers the topper on the tractor's front and drives along the field; the flails chop the green
+  //          tops off and the tops fly out into a row.
+  //   Lift:  he swings the carrot harvester's elevator out over the trailer and drives along the field; the share
+  //          runs under the bed, the carrots ride up the belt and the elevator into the big wooden crates on the
+  //          trailer that drives alongside. Then he drives the trailer to the packhouse.
+  //   Stack: he taps the forklift and it takes a crate into the packhouse, one crate per tap.
   // A giant wonky carrot comes up once per harvest: tap it and it goes to the pony at the field edge.
   // The stage is split like Spuds in Mud: the field with the whole rig (the farm's shared side view) and a
   // close-up below (or beside) that cuts through the bed, so he sees the carrots in the soil, the flails and
@@ -116,21 +117,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     topper: { name: "Topper", len: 2.65, work: 1.35, trailed: false, front: true },
     harvester: { name: "Carrot harvester", len: 7.8, work: 2.2, trailed: true, pivot: [-6.35, -2.6] }
   };
-  // The steps. go = the Go pill (what will happen), ready = the coach while it waits for him, work = the coach
-  // while the machine works, busy = when he taps while it works, span = metres the field view shows (whole rig).
+  // The jobs, in order: top, lift, stack. work = the coach while the machine works, busy = when he taps while it
+  // works, span = metres the field view shows (the whole rig). What he is asked to do is in SAY (the flow).
   var JOBS = {
-    top: { m: "topper", to: "topped", go: "Top them", step: "Top", tag: "Topper", span: 11.5,
-      ready: "The topper cuts off the tops.", work: "The flails chop off the green tops.", busy: "The topper is cutting the tops." },
-    lift: { m: "harvester", to: "lifted", go: "Lift them", step: "Lift", tag: "Carrot harvester", span: 17.5,
-      ready: "Now lift the carrots.", work: "The carrots ride up the belt.", busy: "The harvester is lifting carrots." },
-    stack: { go: "Stack them", step: "Stack", tag: "Forklift", span: 22,
-      ready: "The forklift stacks the crates.", work: "The forklift takes the crates in.", busy: "The forklift is stacking." }
+    top: { m: "topper", to: "topped", tag: "Topper", span: 11.5,
+      work: "The flails chop off the green tops.", busy: "The topper is cutting the tops." },
+    lift: { m: "harvester", to: "lifted", tag: "Carrot harvester", span: 17.5,
+      work: "The carrots ride up the belt.", busy: "The harvester is lifting carrots." },
+    stack: { tag: "Forklift", span: 22,
+      work: "The forklift takes a crate into the packhouse.", busy: "The forklift is stacking." }
   };
-  var ORDER = ["top", "lift", "stack"];
   var w0 = Farm.world.get();
   var field = { stage: w0.carrots === "topped" ? "topped" : "grown", g: 1, wipe: null };
   var job = field.stage === "topped" ? "lift" : "top";
-  var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0, flash: 0 };
+  var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0, flash: 0, lift: 1, on: false };
   var tr = { x: -60, r: TR_FAR, v: 0, wheel: 0, crates: [0, 0, 0], slot: 0, state: "away", t: 0, lane: 0 };
   var phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
   var hare = null, jam = null, wonky = null, fly = null, pony = { eat: 0, nod: 0, t: 0, fed: 0 };
@@ -393,149 +393,149 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     R(ctx, DOOR[0] - 0.15, -4.15, DOOR[1] - DOOR[0] + 0.3, 0.2, 0.04, "#8C97A6");
   }
 
-  // ---------- Pictures for the step row ----------
-  var picCache = {};
-  function myPic(id) {
-    if (picCache[id]) return picCache[id];
-    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
-    c.width = PW; c.height = PH;
-    try { x = c.getContext("2d"); } catch (e) { x = null; }
-    if (!x) return "";
-    var keep = ctx; ctx = x;
-    var fit = { top: [2.9, 1.6, 2.65, 0.5], lift: [8.2, 3.3, 7.95, 0.5], stack: [4.1, 2.6, 2.15, 0] }[id];
-    var s = Math.min(PW * 0.94 / fit[0], PH * 0.9 / fit[1]);
-    try {
-      Farm.inUnits(x, PW / 2 - fit[0] / 2 * s + fit[2] * s, PH * 0.94 - fit[3] * s, s, 3.2, function () {
-        if (id === "top") topper({ rot: 0.3 });
-        else if (id === "lift") harvester({});
-        else forklift({ lift: 0.25, load: 1 });
-      });
-    } finally { ctx = keep; }
-    var url = "";
-    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
-    picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
-    return picCache[id];
-  }
-
   // ---------- The flow ----------
+  // Built like Timberrrrr!: no step row. Each machine drives in by itself (arrive); then he works its controls in
+  // turn (sub): lower the topper onto the tops, or swing the harvester's elevator out over the trailer (one short
+  // motion, phase "set"), then he drives the pass (tap or drag the tractor). The topper drives off by itself
+  // (leave) and the harvester comes. After the harvest he drives the trailer to the packhouse, and the forklift
+  // takes the crates in, one crate per tap. A yellow ring on the field view and one coach line point at the
+  // next thing to touch; after the last crate a tap on the scene starts again.
+  var SUBS = { top: ["lower", "drive"], lift: ["elev", "drive", "haul"], stack: ["fork"] };
+  var SAY = {
+    "top.lower": { say: "Tap the topper to lower it onto the carrot tops.", part: "imp" },
+    "top.drive": { say: "Drive the tractor along the field to cut off the green tops.", part: "tractor" },
+    "lift.elev": { say: "Tap the elevator to swing it over the trailer.", part: "elev" },
+    "lift.drive": { say: "Drive the tractor along the field to lift the carrots.", part: "tractor" },
+    "lift.haul": { say: "Drive the trailer to the packhouse.", part: "trailer" },
+    "stack.fork": { say: "Tap the forklift to take a crate into the packhouse.", part: "fork" }
+  };
+  var sub = "lower", mo = null, glow = 0;
+  function key() { return job + "." + sub; }
+  function want() { return phase === "ready" ? ((SAY[key()] || {}).part || null) : null; }
   function setPhase(p) { phase = p; phaseT = 0; }
-  // a tractor with the job's machine drives in from the left to the start of the field
+  function setSub(s) { sub = s; setPhase("ready"); var d = SAY[key()]; if (d) coach.step(d.say); if (ghost) ghost.poke(); }
+  function nextSub() { var l = SUBS[job], i = l.indexOf(sub); setSub(l[i + 1]); }
+  // one control's motion: fn(f 0..1) each frame, end() when it is done
+  function runSet(dur, fn, end) { mo = { t: 0, dur: dur, fn: fn, end: end }; setPhase("set"); }
+  // a tractor with the job's machine drives in from the left to the start of the field (the topper raised,
+  // the harvester's elevator folded)
   function bringIn(id) {
     job = id; var J = JOBS[id];
-    steps.at(id);
-    rig.m = J.m; rig.out = 0; rig.v = 0;
+    rig.m = J.m; rig.out = 0; rig.v = 0; rig.on = false; rig.lift = 1;
     rig.target = startX(MCH[J.m]); rig.x = rig.target - 10;
+    sub = SUBS[id][0];
     setZoom(J.span);
-    setPhase("arrive"); steps.busy(true);
+    setPhase("arrive");
+    coach.step("Here comes the " + J.tag.toLowerCase() + ".");
     closeStart();
     if (id === "lift") { wonky = null; tr.state = "with"; tr.r = TR_FAR; tr.lane = 0; tr.crates = [0, 0, 0]; tr.slot = 0; tr.slotF = 0; }
   }
   function arrived() {
-    setPhase("ready"); steps.busy(false); rig.v = 0;
+    rig.v = 0;
     tagRig(); snd.clunk();
+    setSub(SUBS[job][0]);
+  }
+  // the one-control motions
+  function lowerIt() {
+    snd.clunk();
+    runSet(1.0, function (f) { rig.lift = 1 - ease(f); }, function () { rig.lift = 0; rig.on = true; snd.tick(); nextSub(); });
+  }
+  function swingElev() {
+    snd.clunk();
+    runSet(1.3, function (f) { rig.out = ease(f); }, function () { rig.out = 1; snd.tick(); nextSub(); });
   }
   function go() {
-    if (job === "stack") {
-      if (phase !== "ready") return false;
-      setPhase("stack"); fk.t = 0; fk.i = 0; fk.done = false; steps.busy(true);
-      coach.say(JOBS.stack.work, 4); snd.horn();
-      if (ghost) ghost.learned("go");
-      return true;
-    }
-    if (phase !== "ready" && !(phase === "drive" && !auto)) return false;
-    if (phase === "ready") {
+    if (phase === "ready" && sub === "drive") {
       setPhase("drive"); var J = JOBS[job];
       field.wipe = { bx: workX(), dir: 1, to: J.to };
       snd.horn();
-      coach.say(J.work, 4);
-    }
+      coach.step(J.work);
+    } else if (!(phase === "drive" && !auto)) return false;
     if (jam) return true;
-    auto = true; steps.busy(true);
-    if (ghost) ghost.learned("go");
+    auto = true;
     return true;
   }
+  function haul() { tr.state = "go"; tr.t = 0; setPhase("out"); snd.horn(); coach.step("The trailer goes to the packhouse."); }
+  // the forklift takes one crate off the trailer and stacks it in the packhouse
+  function forkGo() { setPhase("stack"); fk.t = 0; snd.horn(); coach.step(JOBS.stack.work); }
   function passDone() {
     auto = false; var J = JOBS[job];
     field.stage = J.to; field.wipe = null;
     world(function (w) { w.carrots = J.to; });
-    steps.done(job);
     if (job === "lift") {
-      setPhase("out"); tr.state = "wait"; tr.t = 0; steps.busy(true);
-      coach.say("The crates go to the packhouse.", 3);
+      // the elevator folds back by itself; he drives the trailer away
+      rig.v = 0; setSub("haul");
       return;
     }
-    setPhase("leave"); steps.busy(true);
+    rig.on = false;
+    setPhase("leave"); coach.step("Here comes the carrot harvester.");
   }
   function startGrow() {
     // Again: the carrots grow back (weeks go by in a moment)
-    setPhase("grow"); steps.busy(true); rig.m = null; field.stage = "grown"; field.g = 0; field.wipe = null;
+    setPhase("grow"); rig.m = null; field.stage = "grown"; field.g = 0; field.wipe = null;
     world(function (w) { w.carrots = "grown"; });
     setZoom(13);
     closeStart();
-    coach.say("Weeks go by. The carrots grow.", 3);
+    coach.step("Weeks go by. The carrots grow.");
   }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    tr.state = "away"; tr.x = -60; shed.target = 0; fk.done = false;
+    tr.state = "away"; tr.x = -60; shed.target = 0; fk.done = false; fk.i = 0;
     shedBase = Math.min(count, 6);
-    steps.reset();
     startGrow();
     return true;
   }
+  // a tap or a finished drag on a part: does it play the control he is asked for?
+  var RIG_PARTS = { tractor: 1, imp: 1, close: 1, elev: 1 };
+  function act(part) {
+    var k = key();
+    if (phase !== "ready" || !part) return false;
+    if (RIG_PARTS[part] && sub === "lower") { lowerIt(); return true; }
+    if ((part === "elev" || part === "imp" || part === "close") && sub === "elev") { swingElev(); return true; }
+    if (RIG_PARTS[part] && sub === "drive") { go(); return true; }
+    if ((part === "trailer" || part === "store") && k === "lift.haul") { haul(); return true; }
+    if ((part === "fork" || part === "trailer" || part === "store") && k === "stack.fork") { forkGo(); return true; }
+    return false;
+  }
 
-  // ---------- Steps, bar, ghost ----------
-  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: myPic(id), go: J.go, coach: J.ready }; });
+  // ---------- Ghost, bar, hints ----------
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
       var b = cv.getBoundingClientRect();
       if (jam) { var q = jamScreen(); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "jam" }; }
-      if (wonky && wonky.s === "ledge") { var wq = wonkyScreen(); return { pts: [[b.left + wq.x, b.top + wq.y]], tap: true, key: "wonky" }; }
-      if (phase === "ready" && job === "stack") { var f = fkScreen(); return { pts: [[b.left + f.x, b.top + f.y]], tap: true, key: "go" }; }
-      if (phase === "ready" && rig.m) {
-        var p = mScreen(workX() - originX(), -0.9);
-        if (ghost.shown("go") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.35, 160), b.top + p.y]], key: "go" };
-        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: "go" };
+      if (phase === "ready") {
+        var p = targetPt(); if (!p) return null;
+        if ((sub === "drive" || sub === "haul") && ghost.shown(key()) >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.35, 160), b.top + p.y]], key: key() };
+        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: key() };
       }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (wonky && wonky.s === "ledge") { var wq = wonkyScreen(); return { pts: [[b.left + wq.x, b.top + wq.y]], tap: true, key: "wonky" }; }
+      if (phase === "done" && phaseT > 4) return { pts: [[b.left + RG.f.w / 2, b.top + RG.f.h * 0.6]], tap: true, key: "again" };
       return null;
     }
   });
-  var steps = Toybox.steps($("steps"), {
-    steps: STEPS, coach: coach, ghost: ghost,
-    onGo: function () { return doGo(); },
-    onAgain: function () { again(); },
-    onBusy: function () { busyHint(); }
-  });
-  function doGo() {
-    if (locked()) return false;
-    if (jam) { popJam(); return true; }
-    if (phase === "ready" || (phase === "drive" && !auto)) return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
+  function hint() { var d = SAY[key()]; if (phase === "ready" && d) coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function busyHint() {
     if (jam) { popJam(); return; }
     if (phase === "grow") coach.say("The carrots are growing.", 3);
     else if (phase === "drive") { snd.horn(); rig.flash = 1.2; coach.say(JOBS[job].busy, 3); }
     else if (phase === "arrive") coach.say("Here comes the " + JOBS[job].tag.toLowerCase() + ".", 3);
-    else if (phase === "leave") coach.say("Here comes the harvester.", 3);
+    else if (phase === "leave") coach.say("Here comes the carrot harvester.", 3);
     else if (phase === "out") coach.say("The trailer is going to the packhouse.", 3);
     else if (phase === "stack") coach.say(JOBS.stack.busy, 3);
+    else if (phase === "set") { snd.tick(); rig.flash = 1.2; }
   }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
   function startOver() {
     if (locked()) return;
-    parts.clear(); bits.length = 0; riders.length = 0; jam = null; hare = null; fly = null; wonky = null;
+    parts.clear(); bits.length = 0; riders.length = 0; jam = null; hare = null; fly = null; wonky = null; mo = null;
     tr.state = "away"; tr.x = -60; auto = false; grab = null; shed.v = shed.target = 0;
     field.stage = "grown"; field.g = 1; field.wipe = null;
     world(function (w) { w.carrots = "grown"; });
-    shedBase = Math.min(count, 6); fk.done = false;
-    steps.reset();
+    shedBase = Math.min(count, 6); fk.done = false; fk.i = 0; fk.t = 0;
     bringIn("top");
     setZoom(JOBS.top.span, true);
     sc.follow(camTarget(), 0, true);
@@ -565,7 +565,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (var i = 0; i < 8; i++) bits.push({ kind: "spark", x: webAt(jam.f).x, y: webAt(jam.f).y - 0.2, vx: (Math.random() - 0.5) * 3, vy: -1.5 - Math.random() * 1.5, g: 5, life: 0.7, r: 0.04 });
     jam = null; rig.flash = 0; snd.pop(); coach.say("The giant carrot pops free.", 3);
     if (ghost) ghost.learned("jam");
-    if (phase === "drive") { auto = true; steps.busy(true); }
+    if (phase === "drive") auto = true;
   }
 
   // ---------- The close-up: a cut through the bed, side on, the machine's working part big ----------
@@ -841,7 +841,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var m = rig.m;
     if (m === "topper") {
       // up when it drives in and out, down on the bed while it works
-      var up = phase === "drive" ? 0 : (phase === "ready" ? 0 : 0.15);
+      var up = rig.lift * 0.45;
       D.tractor(ctx, { wheel: rig.wheel, time: time, lights: rig.flash ? 1 : 0, beacon: !!rig.flash });
       tube(ctx, 3.85, -0.62, FRONT + 0.05, -0.55 - up, 0.12, G.grey); tube(ctx, 3.85, -1.25, FRONT - 0.05, -1.32 - up, 0.1, "#E2B33A");
       ctx.save(); ctx.translate(FRONT, -0.5 - up); ctx.scale(-1, 1); topper(st); ctx.restore();
@@ -930,10 +930,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase !== "stack" || fk.done) return { x: parkIn, lift: 0, load: -1, show: true };
     var n = shedBase + i, s = slotPos(Math.min(n, SLOTS - 1), L2), tx = s.x + 1.37 * u, h = s.row * (CRATE_H + 0.02);
     var t1 = FK.app + FK.up, t2 = t1 + FK.inn, t3 = t2 + FK.down;
-    if (t < t1) return i === 0 ? { x: lerp(parkIn, off, ease(t / t1)), lift: 0, load: -1, show: true } : { x: off, lift: 0, load: -1, show: false };
+    if (t < t1) return { x: lerp(parkIn, off, ease(t / t1)), lift: 0, load: -1, show: true };
     if (t < t2) { var f = ease((t - t1) / FK.inn); return { x: lerp(off, tx, f), lift: h + 0.2, load: 1, show: true }; }
     if (t < t3) return { x: tx, lift: h + 0.2 - 0.2 * ease((t - t2) / FK.down), load: 1, show: true };
-    var g = ease((t - t3) / FK.out); return { x: lerp(tx, i === 2 ? parkIn : off, g), lift: h * (1 - g), load: -1, show: true, placed: true };
+    var g = ease((t - t3) / FK.out); return { x: lerp(tx, parkIn, g), lift: h * (1 - g), load: -1, show: true, placed: true };
   }
   function drawShed(c, lw) {
     var L2 = shedLayout(c), u = L2.u, fy = L2.fy, n = sc.night || 0, i;
@@ -949,7 +949,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.fillStyle = "#B8BEC6"; ctx.fillRect(0, fy, c.w, c.h - fy);
     ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(c.w, fy); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.stroke();
     // the stacks
-    var placed = fk.done ? 3 : (phase === "stack" ? fk.i + (fkShed(L2).placed ? 1 : 0) : 0);
+    var placed = job === "stack" ? fk.i + (phase === "stack" && fkShed(L2).placed ? 1 : 0) : 0;
     var total = shedBase + placed;
     for (i = 0; i < Math.min(total, SLOTS); i++) {
       var s = slotPos(i, L2);
@@ -961,61 +961,116 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- Input ----------
-  function rigPart() { return { x: sc.X(rig.x, 1) + (front() ? 2.2 : -(rig.m ? MCH[rig.m].len * 0.3 : 0)) * sc.k, y: sc.gY - 1.7 * sc.k, r: Math.max(3.2 * sc.k, 46) }; }
+  // the parts he can touch, in canvas px: the tractor, its machine, the harvester's elevator, the trailer, the
+  // packhouse, the forklift (field view), and the machine and the forklift in the close-up
+  function tractorPt() { return { x: sc.X(rig.x, 1) + 1.9 * sc.k, y: sc.gY - 1.7 * sc.k, r: Math.max(2.0 * sc.k, 40) }; }
+  function implPt() {
+    if (front()) { var q = mScreen(MCH.topper.len * 0.5, -0.35 - rig.lift * 0.45); return { x: q.x, y: q.y, r: Math.max(1.3 * sc.k, 40) }; }
+    var p = mScreen(-MCH.harvester.len * 0.5, -1.3);
+    return { x: p.x, y: p.y, r: Math.max(MCH.harvester.len * 0.42 * sc.k, 40) };
+  }
+  function elevPt() { var sp = elevSpout(); return rig.out < 0.5 ? { x: sp.px - 0.3 * sc.k, y: sp.py, r: Math.max(1.4 * sc.k, 36) } : { x: (sp.px + sp.x) / 2, y: (sp.py + sp.y) / 2, r: Math.max(1.6 * sc.k, 36) }; }
+  function trBodyPt() { var t = trScreen(); return { x: t.x - 4.4 * t.s, y: t.y - 2.0 * t.s, r: Math.max(3.2 * t.s, 40) }; }
+  function trTractorPt() { var t = trScreen(); return { x: t.x - Farm.DRAWBAR[0] * t.s + 1.9 * t.s, y: t.y - 1.7 * t.s, r: Math.max(2.0 * t.s, 36) }; }
+  function storePt() { var S = sc.S(1.02); return { x: sc.X(STORE_X, 1.02), y: sc.Y(1.02) - 3.5 * S, r: Math.max(3 * S, 40) }; }
+  function forkPt() { var f = fieldFk(), s = fieldFkState().s; return { x: f.x, y: f.y, r: Math.max(1.5 * s, 36) }; }
   function closeMachinePart() { var c = RG.c, mx = rig.m === "harvester" ? -4.2 : 1.3, my = rig.m === "harvester" ? -1.2 : -0.6; return { x: c.x + CX(mx), y: c.y + CY(my), r: Math.max(1.2 * CL.u, 50) }; }
   function fkScreen() {
     var c = RG.c;
     if (shed.v > 0.5) { var L2 = shedLayout(c), F = fkShed(L2); return { x: c.x + F.x - 0.8 * L2.u, y: c.y + L2.fy - 1.2 * L2.u }; }
     return fieldFk();
   }
-  var press = Toybox.press(cv, {
-    any: true,
-    parts: function () {
-      var b = cv.getBoundingClientRect(), list = [];
-      if (jam) { var q = jamScreen(); list.push({ id: "jam", x: b.left + q.x, y: b.top + q.y, r: Math.max(0.5 * CL.u, 40) }); }
-      if (wonky && wonky.s === "ledge" && shed.v < 0.5) { var wq = wonkyScreen(); list.push({ id: "wonky", x: b.left + wq.x, y: b.top + wq.y, r: Math.max(0.5 * CL.u, 40) }); }
-      if (job === "stack" && (phase === "ready" || phase === "stack" || phase === "done")) { var f = fkScreen(); list.push({ id: "fork", x: b.left + f.x, y: b.top + f.y, r: 50 }); var tf = fieldFk(); list.push({ id: "fork", x: b.left + tf.x, y: b.top + tf.y, r: 40 }); }
-      if (rig.m && phase !== "grow" && shed.v < 0.5) {
-        var m = closeMachinePart(); list.push({ id: "close", x: b.left + m.x, y: b.top + m.y, r: m.r });
-        var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r });
-      }
-      var ps = ponyScreen(); if (ps.x > 0 && ps.x < RG.f.w) list.push({ id: "pony", x: b.left + ps.x, y: b.top + ps.y, r: 30 });
-      return list;
-    },
-    dragStart: function (part, e, s) {
-      if (locked() || part !== "rig" || (phase !== "ready" && phase !== "drive") || jam || job === "stack") return;
-      if (phase === "ready") go();
-      auto = false; grab = { off: sc.wx(s.x - cv.getBoundingClientRect().left, 1) - rig.x };
-      if (ghost) ghost.learned("go");
-    },
-    move: function (part, e, s) { if (grab) grab.to = sc.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
-    tap: function (part, x, y) {
-      if (locked()) return;
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part === "jam") { popJam(); return; }
-      if (part === "wonky") { feedPony(false); return; }
-      if (part === "pony") { pony.nod = 1.2; snd.tick(); tagAt("Merlin", px, py - 30); return; }
-      if (part === "fork") {
-        if (phase === "ready" && job === "stack") { go(); return; }
-        snd.horn(); tagAt("Forklift", px, py - 40); return;
-      }
-      if (part === "rig" || part === "close") {
-        if (jam) { popJam(); return; }
-        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
-        snd.horn(); rig.flash = 1.2; tagRig(); return;
-      }
-      if (px < RG.f.w && py < RG.f.h) {
-        if (tr.state !== "away") { var tp = trScreen(); if (px > tp.x - 7.8 * tp.s && px < tp.x + 5 * tp.s && py > tp.y - 3.2 * tp.s && py < tp.y) { snd.horn(); tagAt("Crate trailer", tp.x - 3 * tp.s, tp.y - 3 * tp.s); return; } }
-        var sx = sc.X(STORE_X, 1.02);
-        if (Math.abs(px - sx) < 6 * sc.S(1.02) && py < sc.Y(1.02) && py > sc.Y(1.02) - 6.5 * sc.S(1.02)) { tagAt("Packhouse", sx, sc.Y(1.02) - 6.6 * sc.S(1.02)); return; }
+  function partList() {
+    var list = [];
+    function add(id, p) { if (p) list.push({ id: id, x: p.x, y: p.y, r: p.r }); }
+    if (jam) { var q = jamScreen(); add("jam", { x: q.x, y: q.y, r: Math.max(0.5 * CL.u, 40) }); }
+    if (wonky && wonky.s === "ledge" && shed.v < 0.5) { var wq = wonkyScreen(); add("wonky", { x: wq.x, y: wq.y, r: Math.max(0.5 * CL.u, 40) }); }
+    if (job === "stack") {
+      if (shed.v > 0.5) { var f = fkScreen(); add("fork", { x: f.x, y: f.y, r: 50 }); }
+      if (fieldFkState().show) add("fork", forkPt());
+    }
+    if (rig.m && phase !== "grow" && shed.v < 0.5) {
+      add("close", closeMachinePart());
+      if (rig.m === "harvester" && tr.state === "with") add("elev", elevPt());
+      add("imp", implPt());
+      add("tractor", tractorPt());
+    }
+    if (tr.state !== "away") { add("trailer", trBodyPt()); add("trailer", trTractorPt()); }
+    var ps = ponyScreen(); if (ps.x > 0 && ps.x < RG.f.w) add("pony", { x: ps.x, y: ps.y, r: 30 });
+    if (job === "stack" || phase === "out" || sub === "haul") add("store", storePt());
+    return list;
+  }
+  // the point the ring and the ghost hand show (canvas px)
+  function targetPt() {
+    var w = want(); if (!w) return null;
+    if (w === "tractor") return tractorPt();
+    if (w === "imp") return implPt();
+    if (w === "elev") return elevPt();
+    if (w === "trailer") return trBodyPt();             // the crates (its tractor is behind the harvester's)
+    if (w === "fork") return forkPt();
+    return null;
+  }
+  var TAGS = { tractor: "Tractor", elev: "Elevator", trailer: "Crate trailer", store: "Packhouse", fork: "Forklift", pony: "Merlin" };
+  function tagPart(part) {
+    var p = partList().filter(function (q) { return q.id === part; })[0];
+    var name = part === "imp" || part === "close" ? (rig.m ? JOBS[job].tag : null) : TAGS[part];
+    if (!p || !name) return false;
+    if (part === "tractor" || part === "trailer" || part === "fork") snd.horn(); else snd.tick();
+    if (part === "tractor" || part === "imp") rig.flash = 1.2;
+    if (part === "pony") pony.nod = 1.2;
+    tagAt(name, p.x, Math.max(26, p.y - Math.min(60, p.r * 0.7)));
+    return true;
+  }
+  function tapPart(part, px, py) {
+    if (phase === "done") { again(); return; }          // no step row: a tap on the finished scene starts again
+    if (part === "jam" || (jam && RIG_PARTS[part])) { popJam(); return; }
+    if (part === "wonky") { feedPony(false); return; }
+    var k = key();
+    if (act(part)) { if (ghost) ghost.learned(k); glow = 0; return; }
+    // a tap inside the ring counts, even when another part's centre is nearer
+    var tp = targetPt();
+    if (tp && px !== undefined && Math.hypot(px - tp.x, py - tp.y) < clamp(tp.r * 0.75, 30, 54) + 8 && act(want())) { if (ghost) ghost.learned(k); glow = 0; return; }
+    if (phase === "drive" && !auto && RIG_PARTS[part]) { go(); return; }
+    if (part && tagPart(part)) { if (phase === "ready") glow = 3; return; }
+    if (part) { busyHint(); return; }
+    // the bare field or soil: a little puff of soil where he touched, and the hint
+    if (px !== undefined) {
+      if (px < RG.f.x + RG.f.w && py < RG.f.y + RG.f.h) {
         var rr2 = clamp(sc.B / Math.max(4, py - sc.hY), 0.6, 5);
         for (var i = 0; i < 6; i++) parts.add({ kind: "puff", x: sc.wx(px, Math.min(1, rr2)) + (Math.random() - 0.5), h: 0.2, r: Math.min(1, rr2), vx: (Math.random() - 0.5), vh: 0.5, life: 1, size: 0.12, grow: 0.5, col: "#C9A27A", alpha: 0.7 });
       } else if (shed.v < 0.5) {
         var lx = (px - RG.c.x - RG.c.w / 2) / CL.u + ccam.cx, ly = (py - RG.c.y - CL.gy) / CL.u;
         for (var j = 0; j < 6; j++) bits.push({ kind: "crumb", x: lx, y: Math.min(ly, 0), vx: (Math.random() - 0.5) * 1.4, vy: -0.8 - Math.random(), g: 8, life: 0.7, r: 0.025 });
       }
-      steps.sayStep(); if (ghost) ghost.poke();
+    }
+    if (phase === "ready") hint(); else busyHint();
+  }
+  var DRIVE_PARTS = { tractor: 1, imp: 1, close: 1 }, drag = null;
+  var press = Toybox.press(cv, {
+    any: true,
+    parts: function () { var b = cv.getBoundingClientRect(); return partList().map(function (p) { return { id: p.id, x: b.left + p.x, y: b.top + p.y, r: p.r }; }); },
+    dragStart: function (part, e, s) {
+      drag = null;
+      if (locked() || jam) return;
+      var bx = cv.getBoundingClientRect().left;
+      if (DRIVE_PARTS[part] && ((phase === "ready" && sub === "drive") || phase === "drive")) {
+        if (phase === "ready") { go(); if (ghost) ghost.learned(key()); glow = 0; }
+        auto = false; grab = { off: sc.wx(s.x - bx, 1) - rig.x };
+      } else if (phase === "ready") drag = { part: part };
+    },
+    move: function (part, e, s) { if (grab) grab.to = sc.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
+    up: function (part, e, s) {
+      // a drag towards the end of the field sets the tractor going: it carries on by itself when he lets go
+      if (grab && !s.tap && phase === "drive") auto = true;
+      grab = null;
+      var d = drag; drag = null;
+      if (d && !s.tap && !locked()) { var k = key(); if (act(d.part)) { if (ghost) ghost.learned(k); glow = 0; } }
+    },
+    tap: function (part, x, y) {
+      if (locked()) return;
+      var b = cv.getBoundingClientRect();
+      tapPart(part, x - b.left, y - b.top);
+      if (ghost) ghost.poke();
     }
   });
 
@@ -1036,8 +1091,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (Math.abs(zoom.span - zoom.target) > 0.02) { zoom.span += (zoom.target - zoom.span) * Math.min(1, dt * 2.2); sc.layout(RG.f.w, RG.f.h); }
     if (phase === "arrive") {
       var d = rig.target - rig.x; rig.v = clamp(d * 2.4, 1.5, 12); rig.x += Math.min(rig.v * dt, Math.max(d, 0.001)); drive = 0.6;
-      if (job === "lift") rig.out = Math.min(1, rig.out + dt * 0.8);
       if (d < 0.02) { rig.x = rig.target; arrived(); }
+    } else if (phase === "set") {
+      mo.t += dt; var mf = clamp(mo.t / mo.dur, 0, 1); mo.fn(mf);
+      if (mf >= 1) { var mend = mo.end; mo = null; mend(); }
     } else if (phase === "drive") {
       var vt = 0;
       if (jam) vt = 0;
@@ -1050,6 +1107,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (workX() >= L + 0.6) passDone();
     } else if (phase === "leave") {
       rig.v = Math.min(12, rig.v + dt * 8); rig.x += rig.v * dt; drive = 0.7;
+      rig.lift = Math.min(1, rig.lift + dt * 2);
       if (phaseT > 0.85) bringIn("lift");
     } else if (phase === "grow") {
       var GT = 3.2;
@@ -1068,6 +1126,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
     rig.wheel += rig.v * dt;
     if (working()) rigRun += dt * 1.6;
+    else if (rig.on && rig.m) rigRun += dt * 0.6;                 // the topper's flails turn once it is lowered
+    if (job === "lift" && sub === "haul" && phase !== "drive") rig.out = Math.max(0, rig.out - dt * 0.9);   // the elevator folds back
+    glow = Math.max(0, glow - dt);
     if (rig.flash && rig.flash < 50) rig.flash = Math.max(0, rig.flash - dt);
     if (hare) { hare.t += dt; if (hare.t > 9) hare = null; }
     if (pony.eat > 0) pony.eat = Math.max(0, pony.eat - dt);
@@ -1133,10 +1194,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (dg < 0.05 && tr.lane >= 1) {
         tr.x = target; tr.v = 0; tr.state = "parked"; tr.t = 0;
         rig.m = null;                               // the harvester has gone on to the next field
-        job = "stack"; steps.at("stack"); setPhase("ready"); steps.busy(false); shed.target = 1;
+        job = "stack"; fk.i = 0; fk.t = 0; fk.done = false; shed.target = 1;
         setZoom(JOBS.stack.span);
         tagAt("Packhouse", sc.X(STORE_X, 1.02), sc.Y(1.02) - 6.6 * sc.S(1.02));
         snd.clunk();
+        setSub("fork");
       }
     }
   }
@@ -1153,11 +1215,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
     if (fk.t >= FKT) {
       fk.i++; fk.t = 0;
-      if (fk.i >= 3) { fk.done = true; fk.i = 2; finishJob(); }
+      if (fk.i >= 3) { fk.done = true; finishJob(); }
+      else setSub("fork");
     }
   }
   function finishJob() {
-    setPhase("done"); steps.done("stack"); steps.finish("Again!"); steps.busy(false);
+    setPhase("done");
+    coach.step("Tap the field to start again.");
     coach.say("Look at all the carrots!", 5);
     Toybox.kind();
   }
@@ -1165,13 +1229,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // back in with it (screen px in the field view)
   function fieldFkState() {
     var dx = sc.X(STORE_X + (DOOR[0] + DOOR[1]) / 2, 1.02), y = sc.Y(0.95), s = trScale(sc.TRACK) * 0.92;
-    var res = { x: dx, y: y, s: s, lift: 0.1, load: -1, show: false };
+    var res = { x: dx, y: y, s: s, lift: 0.1, load: -1, show: job === "stack" && !fk.done };
     if (job !== "stack" || phase !== "stack" || fk.done) return res;
     var cs = crateScreen(fk.i), cx = cs.x + 1.37 * s, t = fk.t, ts = trScreen();
     var l0 = Math.max(0, (y - (ts.y + (DECK - 0.55) * ts.s)) / s);
     if (t < FK.app) { res.x = lerp(dx, cx, ease(t / FK.app)); res.lift = l0; res.show = true; }
     else if (t < FK.app + FK.up) { res.x = cx; res.lift = l0 + 0.5 * ease((t - FK.app) / FK.up); res.load = 1; res.show = true; }
     else if (t < FK.app + FK.up + FK.back) { res.x = lerp(cx, dx + 1.5 * s, ease((t - FK.app - FK.up) / FK.back)); res.lift = l0 + 0.5; res.load = 1; res.show = true; }
+    else if (t < FKT - FK.out) res.show = false;              // inside, stacking the crate (the close-up shows it)
     return res;
   }
   function fieldFk() { var f = fieldFkState(); return { x: f.x - 1.0 * f.s, y: f.y - 1.4 * f.s }; }
@@ -1187,6 +1252,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.restore();
     drawClose();
     if (fly) drawFly();
+    drawRing();
+  }
+  // the yellow ring on the next thing to touch (it glows brighter after a hint)
+  function drawRing() {
+    if (phase !== "ready" || grab || locked()) return;
+    var p = targetPt(); if (!p) return;
+    var k = 0.5 + 0.5 * Math.sin(time * 4), rad = clamp(p.r * 0.75, 30, 54) + k * 8;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.6 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI * 2); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
   }
   function band(row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
   function eachX(row, sp, minPx, xa, xb, fn) {
@@ -1287,7 +1362,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawHare();
     parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
     sc.verge(ctx, {});
-    sc.put(ctx, STORE_X, 1.02, 1, function () { packhouse(shedBase + (fk.done ? 3 : (phase === "stack" ? fk.i : 0))); });
+    sc.put(ctx, STORE_X, 1.02, 1, function () { packhouse(shedBase + (job === "stack" ? fk.i : 0)); });
     drawPony();
     drawFieldFk();
     if (tr.state !== "away" && tr.r <= 1) drawTrailer();
@@ -1380,7 +1455,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.on = false; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -1411,17 +1486,22 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     onWake: onWake,
     onSound: function (on) { if (on) snd.chime(); }
   });
+  // leaving with the tractor driving or the topper's flails turning: it stops quietly and the link goes at once
+  Toybox.offFirst({ running: function () { return phase === "drive" || rig.on; }, name: "tractor", off: function (done) { auto = false; grab = null; rig.v = 0; rig.on = false; done(); } });
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: rig.x, m: rig.m, field: field.stage, trailer: tr.state, crates: tr.crates.slice(), count: count, jam: !!jam, wonky: wonky ? wonky.s : null, pony: pony.fed, coach: coach.text(), fk: fk.i, shed: shed.v }; },
+    state: function () { return { phase: phase, job: job, sub: sub, key: key(), part: want(), x: rig.x, m: rig.m, lift: rig.lift, on: rig.on, out: rig.out, field: field.stage, trailer: tr.state, crates: tr.crates.slice(), count: count, jam: !!jam, wonky: wonky ? wonky.s : null, pony: pony.fed, coach: coach.text(), fk: fk.i, shed: shed.v, k: sc.k, cam: sc.cam, span: zoom.span, fw: RG.f.w }; },
+    tap: function (p) { tapPart(p || null); },
+    next: function () { tapPart(want() || (phase === "done" ? null : "none")); },
+    target: function () { var p = targetPt(), b = cv.getBoundingClientRect(); return p ? { x: b.left + p.x, y: b.top + p.y } : null; },
     screen: function (id) {
       var b = cv.getBoundingClientRect(), p;
       if (id === "jam") p = jamScreen();
       else if (id === "wonky") p = wonkyScreen();
       else if (id === "fork") p = fkScreen();
       else if (id === "close") p = closeMachinePart();
-      else p = rigPart();
+      else p = partList().filter(function (q) { return q.id === id; })[0] || tractorPt();
       return { x: b.left + p.x, y: b.top + p.y };
     },
     surprise: surprise,
