@@ -11,7 +11,7 @@ tangent, leave it out or ask the dad.
 it is rooted in the episode itself"). No invented steps, machines or places; when a station is rebuilt, the extras it
 has now that the episode doesn't show are questions for the dad (the grain barn in Combine Time, the silage sheet in
 Glorious Grass, the slurry tanker in Mucky Muck). Kept by the dad (2026-10-15): the potato harvest in Spuds in Mud.
-**Tap counts are fine as built** (the dad, 2026-10-16: one tap per bale, crate or forkful stays). **Being added**
+**Tap counts are fine as built** (the dad, 2026-10-16: one tap per bale, crate or forkful stays). **Added**
 (the dad, 2026-10-16): the forklift lifting the seed-potato bag over the planter (Spuds in Mud), the square baler
 (Combine Time, Wheat), the wash plant (Munchy Crunchy).
 **When in doubt, follow this guide** (the dad, 2026-10-15). Change an existing station only when it is very
