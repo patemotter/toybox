@@ -47,8 +47,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Feed them"): on a narrow row it wraps to two lines instead of being cut off. */
-#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* No step row (like Timberrrrr!): he works the machines on the stage; the coach line and the yellow ring on the
+   scene show what to touch next. The panel holds only the bottom bar. */
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -61,14 +61,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body app">
-    <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A muddy field with Tractor Ted on rubber tracks and a feed trailer, a hen house on wheels in a grassy paddock with hens, and a close-up of the work. Tap Tractor Ted to drive to the hens."></canvas>
-      <div class="tb-counter loads" id="loads">Eggs: 0</div>
-      <div id="coach"></div>
-      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
-    </main>
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
+        <canvas id="cv" role="img" aria-label="A muddy field with a green tractor on rubber tracks and a feed trailer, a hen house on wheels in a grassy paddock with hens, and a close-up of the work. Drive the tractor to the hen house."></canvas>
+        <div class="tb-counter loads" id="loads">Eggs: 0</div>
+        <div id="coach"></div>
+        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+      </main>
+    </div>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -79,16 +80,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   "use strict";
   // Feathered Friends: a morning with the hens, the way the episode shows it. A green tractor on rubber tracks
   // pulls the feed trailer through a muddy field (the wide tracks spread the weight, so it glides over the mud
-  // and never sinks) to the hen house on wheels in its grassy paddock. Three jobs, one tap each:
-  //   Drive: the tractor drives through the mud and the gate and parks beside the hen house.
-  //   Feed:  the feed trailer's auger swings up and fills the feed bin on the end of the hen house; the grain
-  //          runs down the pipe into the hanging feeders under the house and the hens run over and peck.
-  //   Eggs:  the lid of the nest boxes opens, the egg belt runs and the eggs roll out of the end of the house,
+  // and never sinks) to the hen house on wheels in its grassy paddock. Built hands-on like Timberrrrr!
+  // (farm/woods.js): no step row; a yellow ring on the scene and one coach line point at the next thing to touch,
+  // and each tap on a part plays that one control's motion. Three jobs, five things he does:
+  //   Drive: tap (or drag) the tractor: it drives through the mud and the gate and parks beside the hen house.
+  //   Feed:  tap the auger: it swings up over the feed bin on the end of the hen house. Tap it again: it pours
+  //          the grain into the bin, the grain runs down the pipe into the hanging feeders under the house, the
+  //          hens run over and peck, and the auger folds away.
+  //   Eggs:  tap the nest boxes: their lid opens. Tap the egg belt: the eggs roll out of the end of the house,
   //          down the chute and into an egg carton; full cartons close and go onto the stack on the table.
-  // Then night falls and it is the next morning. The stage is split like the other stations: the wide view
-  // with the whole tractor, trailer and hen house on top, and a close-up below (or beside) that always shows the
-  // work now: the tracks gliding over the mud, the grain pouring into the feeders with the hens pecking, the
-  // eggs rolling into the carton.
+  // Then a tap on the scene: night falls and it is the next morning. The stage is split: the wide view with the
+  // whole tractor, trailer and hen house on top, and a close-up below (or beside) that shows the work the wide
+  // view can't: the tracks gliding over the mud, the grain in the feeders with the hens pecking, the egg end of
+  // the house (the eggs rolling into the carton). The ring sits on the wide view for the tractor and the auger,
+  // and on the close-up for the nest boxes and the egg belt.
   // Drawings live here for now, written like farm.js's (metres, y up negative, facing +x) so they can move into
   // farm.js later: tracked (the green tractor on rubber tracks, origin on the ground under the rear drive wheel),
   // feedTrailer (origin at its drawbar eye, ground at +0.55), henHouse (origin on the ground in its middle),
@@ -127,16 +132,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var EGGC = ["#C98B55", "#F8F4EA"];
   var G = { body: "#3E9F3A", dark: "#2B7A2A", frame: "#2B3040", glass: "#BFE7FA", grey: "#7C8696" };
 
-  var JOBS = {
-    drive: { go: "Drive there", step: "Drive", ready: "Drive the tractor to the hens.", work: "The tracks glide over the mud.", busy: "The tractor is on the way." },
-    feed: { go: "Feed them", step: "Feed", ready: "Fill the feeders with grain.", work: "The grain pours into the feeders.", busy: "The hens are getting their grain." },
-    eggs: { go: "Get eggs", step: "Eggs", ready: "Collect the eggs.", work: "The eggs roll into the carton.", busy: "The eggs are rolling out." }
+  // What he does next (job.sub): the coach line and the part the ring marks.
+  var SUB = {
+    "drive.drive": { say: "Drive the tractor to the hen house.", part: "rig" },
+    "feed.swing": { say: "Tap the auger to swing it up to the feed bin.", part: "auger" },
+    "feed.pour": { say: "Tap the auger to pour the grain into the feed bin.", part: "auger" },
+    "eggs.lid": { say: "Tap the nest boxes to open the lid.", part: "nest" },
+    "eggs.belt": { say: "Tap the egg belt to roll the eggs out.", part: "belt" }
   };
-  var ORDER = ["drive", "feed", "eggs"];
-  var job = "drive", phase = "ready", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
+  var BUSY = { drive: "The tractor is on the way.", feed: "The hens are getting their grain.", eggs: "The eggs are rolling out." };
+  var job = "drive", sub = "drive", phase = "ready", phaseT = 0, glow = 0, auto = false, grab = null, ending = false, dusk = 0;
   var tr = { x: TX0, v: 0, run: 0, mud: 0, load: 1, flash: 0 };
   var prints = { a: TX0, b: TX0 + 3.0 };     // the track prints in the mud (world x of their ends)
-  var fd = { t: 0 }, eg = { t: 0 }, feedOn = false, panLvl = 0, binLvl = 0.15, swing = 0, augRun = 0, flow = 0, lid = 0, beltRun = 0;
+  var fd = { t: 0, stop: 0 }, eg = { t: 0, stop: 0 }, feedOn = false, panLvl = 0, binLvl = 0.15, swing = 0, augRun = 0, flow = 0, lid = 0, beltRun = 0;
   var crowS = null, chicks = null, perch = null;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
@@ -537,47 +545,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.restore();
   }
 
-  // ---------- Pictures for the step row ----------
-  var picCache = {};
-  function myPic(id) {
-    if (picCache[id]) return picCache[id];
-    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
-    c.width = PW; c.height = PH;
-    try { x = c.getContext("2d"); } catch (e) { x = null; }
-    if (!x) return "";
-    var keep = ctx, kt = time; ctx = x; time = 0;
-    try {
-      if (id === "drive") {
-        x.fillStyle = "#8A623E"; x.beginPath(); x.ellipse(PW * 0.5, PH * 0.9, PW * 0.48, PH * 0.09, 0, 0, TAU); x.fill();
-        Farm.inUnits(x, PW * 0.62, PH * 0.9, 15, 2.4, function () {
-          ctx.save(); ctx.translate(DBAR[0], DBAR[1]); feedTrailer({ load: 1 }); ctx.restore();
-          tracked({ run: 0, mud: 0.6 });
-        });
-      } else if (id === "feed") {
-        Farm.inUnits(x, PW * 0.5, PH * 0.98, 92, 2.6, function () {
-          tube(ctx, 0, -1.2, 0, -0.44, 0.06, GALV);
-          ctx.beginPath(); ctx.moveTo(-0.27, -0.42); ctx.quadraticCurveTo(0, -0.62, 0.27, -0.42); ctx.closePath(); fs(ctx, GRAIN, LWu() * 0.6);
-          P(ctx, [-0.31, -0.43, 0.31, -0.43, 0.23, -0.27, -0.23, -0.27], "#E0483B", LWu() * 0.8);
-          ctx.save(); ctx.translate(-0.62, 0); henU({ col: 0, peck: 0.9 }); ctx.restore();
-          ctx.save(); ctx.translate(0.62, 0); ctx.scale(-1, 1); henU({ col: 1, peck: 0.3 }); ctx.restore();
-        });
-      } else {
-        Farm.inUnits(x, PW * 0.5, PH * 0.78, 120, 2.6, function () {
-          cartonOpen(0, -0.05, [0, 1, 2, 3, 4].map(function (j) { return { j: j, col: j % 2 }; }), 0);
-        });
-      }
-    } finally { ctx = keep; time = kt; }
-    var url = "";
-    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
-    picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
-    return picCache[id];
-  }
-
   // ---------- The egg run: one timeline for both views ----------
   var NEGG = 12, BELT_T = 0.7, ROLL_T = 0.4;
   function eggStart(i) { return 0.6 + 0.38 * i + (i >= 6 ? 1.1 : 0); }
   function eggLand(i) { return eggStart(i) + BELT_T + ROLL_T; }
-  var FULL = [eggLand(5), eggLand(11)], EGG_END = FULL[1] + 1.15;
+  var FULL = [eggLand(5), eggLand(11)], EGG_END = FULL[1] + 1.15, LID_T = 0.5;
   // where egg i is at time t: null (not out yet), { stage: "belt" | "roll" | "cup", f }
   function eggAt(i, t) {
     var a = eggStart(i);
@@ -601,7 +573,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return { list: list };
   }
   function eggTime() {
-    if (phase === "eggs") return eg.t;
+    if (job === "eggs" && (phase === "eggs" || phase === "ready")) return eg.t;
     if (phase === "done") return Infinity;
     return -1;
   }
@@ -682,58 +654,69 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- The flow ----------
+  // Each job has one or two things for him to do in turn (sub). A tap on the right part plays that one
+  // control's motion (phase "drive" | "feed" | "eggs"), then the next thing is his again (phase "ready").
   function setPhase(p) { phase = p; phaseT = 0; }
-  function bringIn() {
-    job = "drive"; steps.at("drive");
-    tr.x = TX0; tr.v = 0; tr.load = 1;
-    camC.mode = "track";
-    setPhase("ready"); steps.busy(false);
+  function key() { return job + "." + sub; }
+  function setSub(j, s2) {
+    job = j; sub = s2; setPhase("ready");
+    var d = SUB[key()]; if (d) coach.step(d.say);
+    if (ghost) ghost.poke();
   }
-  function go() {
-    if (locked()) return false;
-    if (phase !== "ready") return false;
-    if (ghost) ghost.learned("go");
-    if (job === "drive") {
-      setPhase("drive"); auto = true; steps.busy(true);
-      snd.horn(); coach.say(JOBS.drive.work, 4);
-      prints.a = Math.min(prints.a, tr.x);
-      return true;
+  function bringIn() {
+    tr.x = TX0; tr.v = 0; tr.load = 1; fd.t = 0; eg.t = 0; auto = false; grab = null;
+    camC.mode = "track";
+    setSub("drive", "drive");
+  }
+  function startDrive() {
+    setPhase("drive"); auto = true;
+    snd.horn(); coach.say("The tracks glide over the mud.", 4);
+    prints.a = Math.min(prints.a, tr.x);
+  }
+  // the part he touched is the next thing: play its motion and say what happens
+  function act(part) {
+    if (locked() || phase !== "ready") return false;
+    var k = key(), p = part || "";
+    if (k === "drive.drive" && (p === "rig" || p === "trackC")) { startDrive(); return true; }
+    if (k === "feed.swing" && (p === "auger" || p === "trailer" || p === "bin")) {
+      setPhase("feed"); fd.stop = F_UP; snd.clunk(); coach.say("The auger swings up over the feed bin.", 3); return true;
     }
-    if (job === "feed") {
-      setPhase("feed"); fd.t = 0; steps.busy(true); snd.clunk();
-      coach.say(JOBS.feed.work, 4);
-      return true;
+    if (k === "feed.pour" && (p === "auger" || p === "trailer" || p === "bin")) {
+      setPhase("feed"); fd.stop = F_END; snd.clunk(); coach.say("The grain pours into the feeders.", 4); return true;
     }
-    if (job === "eggs") {
-      setPhase("eggs"); eg.t = 0; steps.busy(true); snd.clunk();
-      coach.say(JOBS.eggs.work, 4);
-      return true;
+    if (k === "eggs.lid" && (p === "nest" || p === "belt" || p === "house")) {
+      setPhase("eggs"); eg.stop = LID_T; snd.tick(); coach.say("The hens lay their eggs in the nest boxes.", 3); return true;
+    }
+    if (k === "eggs.belt" && (p === "belt" || p === "nest" || p === "carton" || p === "house")) {
+      setPhase("eggs"); eg.stop = EGG_END; snd.clunk(); coach.say("The eggs roll into the carton.", 4); return true;
     }
     return false;
   }
   function parked() {
     auto = false; tr.v = 0; tr.x = TX_PARK; grab = null;
-    steps.done("drive"); job = "feed"; setPhase("ready"); steps.busy(false);
     camC.mode = "feed"; snd.clunk();
     var p = housePt(scF, 0, -3.1); tagAt("Hen house", p.x, p.y);
+    setSub("feed", "swing");
   }
   function feedDone() {
-    steps.done("feed"); job = "eggs"; setPhase("ready"); steps.busy(false);
     camC.mode = "eggs";
+    setSub("eggs", "lid");
   }
   function finishJob() {
-    setPhase("done"); steps.done("eggs"); steps.finish("Again!"); steps.busy(false);
+    setPhase("done");
     coach.say("Look at all the eggs!", 5);
+    coach.step("Tap the hen house to start again.");
     snd.chime();
     Toybox.kind();
   }
   var NIGHT_T = 3.2, nightReset = false;
   function startNight() {
-    setPhase("night"); steps.busy(true); nightReset = false;
+    setPhase("night"); nightReset = false;
     coach.say("Night falls. Then it is morning.", 3);
   }
   function resetScene() {
-    tr.x = TX0; tr.v = 0; tr.load = 1; tr.mud = 0.2; swing = 0; flow = 0; panLvl = 0; binLvl = 0.15; lid = 0;
+    tr.x = TX0; tr.v = 0; tr.load = 1; tr.mud = 0.2; swing = 0; flow = 0; augRun = 0; panLvl = 0; binLvl = 0.15; lid = 0;
+    fd.t = 0; eg.t = 0;
     feedOn = false; stopFeeding(); perch = null; crowS = null; chicks = null;
     HENS.forEach(function (h) { if (h.st === "perch" || h.st === "post") { h.st = "idle"; h.h = 0; h.sit = false; h.x = clamp(h.x, PAD.x0, PAD.x1); h.r = clamp(h.r, PAD.r0, PAD.r1); } });
     prints.a = TX0; prints.b = TX0 + 3;
@@ -745,53 +728,34 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    steps.reset();
     startNight();
     return true;
   }
-  // ---------- Steps, bar, ghost ----------
-  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: myPic(id), go: J.go, coach: J.ready }; });
+  // ---------- Coach hints, ghost, bottom bar ----------
+  function hint() { var d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
+  function busyHint() {
+    if (phase === "night") { coach.say("It is nearly morning.", 3); return; }
+    if (phase === "drive") { snd.horn(); tr.flash = 1.2; }
+    coach.say(BUSY[job] || "Wait a moment.", 3);
+  }
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
       var b = cv.getBoundingClientRect(), q;
-      if (phase === "ready" && job === "drive") {
-        q = rigPt(scF, 1.6, -1.4);
-        if (ghost.shown("go") >= 1) return { pts: [[b.left + q.x, b.top + q.y], [b.left + q.x + Math.min(RG.f.w * 0.3, 140), b.top + q.y]], key: "go" };
-        return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" };
+      if (phase === "ready") {
+        q = targetPt(); if (!q) return null;
+        var k = key();
+        if (k === "drive.drive" && ghost.shown(k) >= 1) return { pts: [[b.left + q.x, b.top + q.y], [b.left + q.x + Math.min(RG.f.w * 0.3, 140), b.top + q.y]], key: k };
+        return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: k };
       }
-      if (phase === "ready" && job === "feed") { q = rigPt(scF, DBAR[0] - 2.5, -1.2); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
-      if (phase === "ready" && job === "eggs") { q = nestClose(); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (phase === "done" && phaseT > 4) return { pts: [[b.left + RG.f.w / 2, b.top + RG.f.h * 0.6]], tap: true, key: "again" };
       return null;
     }
   });
-  var steps = Toybox.steps($("steps"), {
-    steps: STEPS, coach: coach, ghost: ghost,
-    onGo: function () { return doGo(); },
-    onAgain: function () { again(); },
-    onBusy: function () { busyHint(); }
-  });
-  function doGo() {
-    if (locked()) return false;
-    if (phase === "ready") return go();
-    if (phase === "drive" && !auto) { auto = true; steps.busy(true); return true; }
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
-  function busyHint() {
-    if (phase === "drive") { snd.horn(); tr.flash = 1.2; coach.say(JOBS.drive.busy, 3); }
-    else if (phase === "feed") coach.say(JOBS.feed.busy, 3);
-    else if (phase === "eggs") coach.say(JOBS.eggs.busy, 3);
-    else if (phase === "night") coach.say("It is nearly morning.", 3);
-  }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
   function startOver() {
     if (locked()) return;
-    auto = false; grab = null;
-    steps.reset();
     resetScene();
     bringIn();
     coach.say("A new morning with the hens.", 3);
@@ -974,7 +938,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // =====================================================================================================
   // The egg-end close-up (its own drawing)
   // =====================================================================================================
-  var EV = { cx: -0.45, hw: 1.7, up: 2.2, dn: 0.14 };
+  var EV = { cx: -0.3, hw: 1.9, up: 2.2, dn: 0.14 };
   var EL = { u: 40, gy: 100 };
   function EX(x) { return RG.c.w / 2 + (x - EV.cx) * EL.u; }
   function EY(y) { return EL.gy + y * EL.u; }
@@ -992,7 +956,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return null;
   }
   function drawEggEnd(c) {
-    var avail = c.h - RG.pad - 6;
+    var avail = c.h - (RG.side ? 8 : RG.pad) - 6;
     EL.u = Math.min(c.w / (2 * EV.hw), avail / (EV.up + EV.dn));
     EL.gy = 6 + (avail - (EV.up + EV.dn) * EL.u) * 0.62 + EV.up * EL.u;
     var u = EL.u, lw = clamp(u * 0.024, 1.4, 3.0), n = scF.night || 0, t = eggTime(), i;
@@ -1080,38 +1044,82 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
     });
   }
-  function nestClose() { return { x: RG.c.x + EX(0.2), y: RG.c.y + EY(-1.5) }; }
+  // the egg end in the close-up: the nest boxes (with the hens in them) and the egg belt coming out of the house
+  function nestClose() { return { x: RG.c.x + EX(0.95), y: RG.c.y + EY(-1.95) }; }
+  function beltClose() { return { x: RG.c.x + EX(0.15), y: RG.c.y + EY(-1.36) }; }
   function cartonClose() { return { x: RG.c.x + EX(ECART.x), y: RG.c.y + EY(ECART.ty - 0.1) }; }
 
   // ---------- Tap or drag ----------
   function rigPart() { var p = rigPt(scF, 1.4, -1.5); return { x: p.x, y: p.y, r: Math.max(2.2 * p.s, 46) }; }
   function trailerPart() { var p = rigPt(scF, DBAR[0] - 2.5, -1.3); return { x: p.x, y: p.y, r: Math.max(1.5 * p.s, 40) }; }
+  // the auger: its middle while it lies folded on the trailer, its spout once it is up over the feed bin
+  function augerPart() { var a = augTip(scF), f = swing > 0.5 ? 1 : 0.55; return { x: lerp(a.bx, a.x, f), y: lerp(a.by, a.y, f), r: Math.max(0.9 * a.s, 40) }; }
+  function binPart() { var p = housePt(scF, 3.0, -2.7); return { x: p.x, y: p.y, r: Math.max(0.8 * scF.k, 36) }; }
+  // where the ring goes (stage px): the part he should touch next
+  function targetPt() {
+    var d = SUB[key()], t = d ? d.part : null;
+    if (t === "rig") return rigPart();
+    if (t === "auger") return augerPart();
+    if (t === "nest") return calE > 0.5 ? nestClose() : null;
+    if (t === "belt") return calE > 0.5 ? beltClose() : null;
+    return null;
+  }
+  function partList() {
+    var b = cv.getBoundingClientRect(), list = [], c = RG.c, p;
+    function add(id, q) { list.push({ id: id, x: b.left + q.x, y: b.top + q.y, r: q.r || 40 }); }
+    add("rig", rigPart());
+    add("trailer", trailerPart());
+    add("auger", augerPart());
+    var hx = scF.X(HX, 1);
+    if (hx > -40 && hx < RG.f.w + 40) {
+      p = housePt(scF, -0.6, -1.9); add("house", { x: p.x, y: p.y, r: Math.max(2.0 * scF.k, 44) });
+      add("bin", binPart());
+    }
+    if (camC.mode === "eggs" && calE > 0.5) {
+      p = nestClose(); add("nest", { x: p.x, y: p.y, r: Math.max(0.45 * EL.u, 36) });
+      p = beltClose(); add("belt", { x: p.x, y: p.y, r: Math.max(0.35 * EL.u, 36) });
+      p = cartonClose(); add("carton", { x: p.x, y: p.y, r: Math.max(0.55 * EL.u, 40) });
+    } else {
+      if (camC.mode === "track") { p = rigPt(scC, 1.5, -0.7); add("trackC", { x: c.x + p.x, y: c.y + p.y, r: Math.max(1.2 * p.s, 46) }); }
+      HENS.forEach(function (h, i) {
+        if (h.gone) return;
+        var q = henScreen(scC, h);
+        if (q.x > 0 && q.x < c.w && q.y > 0 && q.y < c.h) add("hen" + i, { x: c.x + q.x, y: c.y + q.y, r: Math.max(0.4 * q.s, 26) });
+      });
+    }
+    return list;
+  }
+  var PNAMES = { rig: "Tracked tractor", trackC: "Rubber tracks", trailer: "Feed trailer", auger: "Auger", bin: "Feed bin", house: "Hen house",
+    nest: "Nest boxes", belt: "Egg belt", carton: "Egg carton" };
+  function tagPart(part) {
+    var p = null, L = partList(), b = cv.getBoundingClientRect();
+    for (var i = 0; i < L.length; i++) if (L[i].id === part) p = L[i];
+    var name = PNAMES[part];
+    if (!p || !name) return false;
+    if (part === "rig" || part === "trackC") { snd.horn(); tr.flash = 1.2; } else snd.tick();
+    tagAt(name, p.x - b.left, p.y - b.top - Math.min(60, p.r * 0.6));
+    return true;
+  }
+  function tapPart(part) {
+    if (locked()) return;
+    if (phase === "done") { again(); return; }   // no step row: a tap on the finished scene starts the next morning
+    if (part && part.indexOf("hen") === 0) { henTap(HENS[+part.slice(3)]); return; }
+    if (phase === "ready") { var k = key(); if (act(part)) { if (ghost) ghost.learned(k); glow = 0; return; } }
+    if (phase === "drive" && !auto && (part === "rig" || part === "trackC")) { auto = true; return; }
+    if (part && tagPart(part)) return;
+    if (phase === "ready") hint(); else busyHint();
+  }
+  var actPart = null;
   var press = Toybox.press(cv, {
     any: true,
-    parts: function () {
-      var b = cv.getBoundingClientRect(), list = [], c = RG.c, p;
-      p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r });
-      p = trailerPart(); list.push({ id: "trailer", x: b.left + p.x, y: b.top + p.y, r: p.r });
-      var hx = scF.X(HX, 1);
-      if (hx > -40 && hx < RG.f.w + 40) { p = housePt(scF, -0.6, -1.9); list.push({ id: "house", x: b.left + p.x, y: b.top + p.y, r: Math.max(2.0 * scF.k, 44) }); }
-      if (camC.mode === "eggs" && calE > 0.5) {
-        p = nestClose(); list.push({ id: "nest", x: b.left + p.x, y: b.top + p.y, r: Math.max(0.6 * EL.u, 40) });
-        p = cartonClose(); list.push({ id: "carton", x: b.left + p.x, y: b.top + p.y, r: Math.max(0.55 * EL.u, 40) });
-      } else {
-        if (camC.mode === "track") { p = rigPt(scC, 1.5, -0.7); list.push({ id: "trackC", x: b.left + c.x + p.x, y: b.top + c.y + p.y, r: Math.max(1.2 * p.s, 46) }); }
-        HENS.forEach(function (h, i) {
-          if (h.gone) return;
-          var q = henScreen(scC, h);
-          if (q.x > 0 && q.x < c.w && q.y > 0 && q.y < c.h) list.push({ id: "hen" + i, x: b.left + c.x + q.x, y: b.top + c.y + q.y, r: Math.max(0.4 * q.s, 26) });
-        });
-      }
-      return list;
-    },
+    parts: partList,
     dragStart: function (part, e, s) {
-      if (locked() || (part !== "rig" && part !== "trackC") || job !== "drive" || (phase !== "ready" && phase !== "drive")) return;
-      if (phase === "ready") go();
+      grab = null; actPart = null;
+      if (locked()) return;
+      var drive = (part === "rig" || part === "trackC") && job === "drive" && (phase === "ready" || phase === "drive");
+      if (!drive) { actPart = part; return; }
+      if (phase === "ready") { startDrive(); if (ghost) ghost.learned("drive.drive"); }
       auto = false; grab = { S: part === "rig" ? scF : scC, ox: part === "rig" ? 0 : RG.c.x, off: null };
-      if (ghost) ghost.learned("go");
     },
     move: function (part, e, s) {
       if (!grab) return;
@@ -1119,28 +1127,22 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (grab.off === null) grab.off = wx - tr.x;
       grab.to = wx - grab.off;
     },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
+    // let go of the tractor and it carries on to the hen house; a drag on another part works like a tap on it
+    up: function (part, e, s) {
+      if (grab && !s.tap && phase === "drive") auto = true;
+      grab = null;
+      var a = actPart; actPart = null;
+      if (a && !s.tap && !locked() && phase === "ready") { var k = key(); if (act(a)) { if (ghost) ghost.learned(k); glow = 0; } }
+    },
     tap: function (part, x, y) {
       if (locked()) return;
       var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part && part.indexOf("hen") === 0) { henTap(HENS[+part.slice(3)]); return; }
-      if (part) {
-        if (phase === "ready") { go(); return; }
-        if (phase === "drive" && !auto) { auto = true; steps.busy(true); return; }
-        if (phase === "done" && (part === "rig" || part === "trackC")) { again(); return; }
-        if (part === "rig" || part === "trackC") { snd.horn(); tr.flash = 1.2; tagAt("Tracked tractor", px, py - 50); return; }
-        if (part === "trailer") { tagAt(swing > 0.3 ? "Auger" : "Feed trailer", px, py - 40); snd.tick(); return; }
-        if (part === "house") { tagAt(phase === "feed" ? "Feed bin" : "Hen house", px, py - 50); snd.tick(); return; }
-        if (part === "nest") { tagAt("Nest boxes", px, py - 40); snd.tick(); return; }
-        if (part === "carton") { tagAt("Egg carton", px, py - 40); snd.tick(); return; }
-      }
-      // anywhere else: a little puff of grass, and the step's line again
-      if (px < RG.f.x + RG.f.w && py < RG.f.y + RG.f.h && py > scF.hY) {
+      // a tap on the grass of the wide view: a little puff
+      if (!part && px < RG.f.x + RG.f.w && py < RG.f.y + RG.f.h && py > scF.hY) {
         var r2 = clamp(scF.B / Math.max(4, py - scF.hY), 0.75, 3);
         for (var i = 0; i < 5; i++) parts.add({ kind: "puff", x: scF.wx(px, Math.min(1, r2)) + (Math.random() - 0.5) * 0.5, h: 0.15, r: Math.min(1, r2), vx: (Math.random() - 0.5), vh: 0.5, life: 0.8, size: 0.1, grow: 0.4, col: "#BFE3A0", alpha: 0.7 });
       }
-      if (steps.sayStep) steps.sayStep();
-      if (ghost) ghost.poke();
+      tapPart(part);
     }
   });
 
@@ -1163,20 +1165,21 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else if (phase === "feed") {
       updateFeed(dt);
     } else if (phase === "eggs") {
-      var b0 = eg.t; eg.t += dt;
+      var b0 = eg.t; eg.t = Math.min(eg.stop, eg.t + dt);
       lid = clamp(eg.t / 0.5, 0, 1) * (1 - clamp((eg.t - (EGG_END - 0.6)) / 0.5, 0, 1));
-      if (eg.t > 0.4 && eg.t < EGG_END - 0.6) beltRun += dt;
+      if (eg.t > LID_T && eg.t < EGG_END - 0.6) beltRun += dt;
       for (i = 0; i < NEGG; i++) { var tl = eggLand(i); if (b0 < tl && eg.t >= tl) { count++; save(); setCount(); snd.pop(); world(function (w) { w.eggs = num(w.eggs) + 1; }); } }
       for (i = 0; i < 2; i++) {
         if (b0 < FULL[i] && eg.t >= FULL[i]) snd.tick();
         var ts = FULL[i] + 0.95;
         if (b0 < ts && eg.t >= ts) { cartons++; save(); snd.clunk(); }
       }
-      if (eg.t >= EGG_END) finishJob();
+      if (eg.t >= eg.stop) { if (eg.stop < EGG_END) setSub("eggs", "belt"); else finishJob(); }
     } else if (phase === "night") {
       if (!nightReset && phaseT >= NIGHT_T / 2) { nightReset = true; resetScene(); }
       if (phaseT >= NIGHT_T) bringIn();
     }
+    glow = Math.max(0, glow - dt);
     if (tr.flash > 0) tr.flash = Math.max(0, tr.flash - dt);
     if (tr.mud > 0 && !inMud(tr.x + 1.5)) tr.mud = Math.max(0.15, tr.mud - dt * 0.05);
     HENS.forEach(function (h) { if (h.st !== "perch" && h.st !== "post") updateHen(h, dt); });
@@ -1204,7 +1207,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // the feed run: the auger swings up, pours into the bin, the grain runs down to the feeders, the auger folds
   var F_UP = 1.1, F_POUR = 4.2, F_DOWN = 5.3, F_END = 5.6;
   function updateFeed(dt) {
-    var b = fd.t; fd.t += dt; var t = fd.t;
+    var b = fd.t; fd.t = Math.min(fd.stop, fd.t + dt); var t = fd.t;
     swing = t < F_UP ? ease(t / F_UP) : (t < F_POUR ? 1 : 1 - ease((t - F_POUR) / (F_DOWN - F_POUR)));
     augRun = t > F_UP && t < F_POUR ? 1 : 0;
     tr.load = lerp(1, 0.35, clamp((t - F_UP) / (F_POUR - F_UP), 0, 1));
@@ -1215,7 +1218,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (b < 2.0 && t >= 2.0) { feedOn = true; startFeeding(); }
     if (b < F_UP && t >= F_UP) { var p = augTip(scF); tagAt("Auger", p.x, p.y - 20); }
     if (b < 2.6 && t >= 2.6) { var q = housePt(scC, PANS[1], -0.5); tagAt("Feeders", RG.c.x + q.x, RG.c.y + q.y - 30); }
-    if (t >= F_END) feedDone();
+    if (t >= fd.stop) { if (fd.stop < F_END) setSub("feed", "pour"); else feedDone(); }
   }
   function splash(dt) {
     if (parts.count() > 140) return;
@@ -1256,6 +1259,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath();
     if (RG.side) { ctx.moveTo(c.x, 0); ctx.lineTo(c.x, H); } else { ctx.moveTo(0, c.y); ctx.lineTo(W, c.y); }
     ctx.stroke(); ctx.restore();
+    drawRing();
+  }
+  // the yellow ring on the part he should touch next
+  function drawRing() {
+    if (phase !== "ready" || grab || locked()) return;
+    var p = targetPt(); if (!p) return;
+    var k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
   }
   function drawWorld(S, isField) {
     var arc = phase === "night" ? clamp(phaseT / NIGHT_T, 0, 1) / 3 : null;
@@ -1278,7 +1291,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (dk > 0.01) { ctx.fillStyle = "rgba(18,26,66," + dk.toFixed(3) + ")"; ctx.fillRect(0, S.hY, S.W, S.H - S.hY); }
   }
   function houseSt() {
-    return { pans: panLvl, flow: flow, bin: binLvl, lid: lid, belt: beltRun * 0.7, et: phase === "eggs" ? eg.t : -1 };
+    return { pans: panLvl, flow: flow, bin: binLvl, lid: lid, belt: beltRun * 0.7, et: job === "eggs" && (phase === "eggs" || phase === "ready") ? eg.t : -1 };
   }
   // the muddy field on the left, the paddock grass on the right, the track prints in the mud
   var MUD_RS = [0.74, 0.8, 0.86, 0.93, 1.02, 1.14, 1.3, 1.5, 1.8, 2.2, 2.8];
@@ -1494,9 +1507,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     onWake: onWake,
     onSound: function (on) { if (on) snd.chime(); }
   });
+  Toybox.offFirst({ running: function () { return phase === "feed" && augRun > 0; }, off: function (done) { augRun = 0; flow = 0; snd.pour(0); if (done) done(); } });
   requestAnimationFrame(loop);
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: tr.x, count: count, cartons: cartons, coach: coach.text(), cmode: camC.mode, feedOn: feedOn, pans: panLvl, k: camF.k, cam: camF.cam, hard: camF.hard, perch: perch ? perch.stage : null, crow: !!crowS, chicks: !!chicks }; },
+    state: function () { return { phase: phase, job: job, sub: sub, key: key(), part: (SUB[key()] || {}).part || null, x: tr.x, count: count, cartons: cartons, coach: coach.text(), cmode: camC.mode, feedOn: feedOn, pans: panLvl, swing: swing, bin: binLvl, lid: lid, k: camF.k, cam: camF.cam, hard: camF.hard, perch: perch ? perch.stage : null, crow: !!crowS, chicks: !!chicks }; },
+    tap: function (p) { tapPart(p); },
+    next: function () { tapPart((SUB[key()] || {}).part || null); },
+    // the ring's place in viewport px (null when there is nothing to touch)
+    target: function () { var p = phase === "ready" ? targetPt() : null, b = cv.getBoundingClientRect(); return p ? { x: b.left + p.x, y: b.top + p.y } : null; },
     // the rig's and the house's screen extents in the wide view (for the "always fully visible" check)
     extents: function () {
       var S = scF, a = rigPt(S, RIG.back, -RIG.top), b = rigPt(S, RIG.front, 0), h0 = housePt(S, TABLE - HX - 0.6, -4.2), h1 = housePt(S, 3.5, 0);
@@ -1507,6 +1525,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (id === "nest") p = nestClose();
       else if (id === "carton") p = cartonClose();
       else if (id === "trailer") p = trailerPart();
+      else if (id === "belt") p = beltClose();
+      else if (id === "auger") p = augerPart();
+      else if (id === "bin") p = binPart();
       else p = rigPart();
       return { x: b.left + p.x, y: b.top + p.y };
     },
