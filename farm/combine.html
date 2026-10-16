@@ -94,6 +94,10 @@ body.big #jobs { display: none; }
   //           until the tank is empty, then the spout folds by itself.
   //   Store:  drive the tractor (a tap, or a drag on it) to the grain barn; tap the tipping lever on the tractor:
   //           the trailer tips the load onto the heap, "Loads" counts it, the tractor goes home by itself.
+  //   Bale:   (Wheat only, the episode's "the square baler bales the straw") the combine drives off and a tractor
+  //           brings a big square baler to the row of straw the combine left; drive the tractor along the straw (a
+  //           tap, or a drag on it): the pickup lifts the straw, the knotters tie each bale and it slides down the
+  //           chute onto the field. Sunflowers end after Store.
   // The coach line and a yellow ring on the scene point at the next thing to touch; a tap on any other part
   // shows its name. At the end a tap on the field grows the crop again ("Weeks go by..."). The corner close-up
   // shows the moment (inside the combine, the spout pouring, the trailer tipping).
@@ -130,7 +134,7 @@ body.big #jobs { display: none; }
   // the tractor drives it toward the grain barn (a third of the way, at least 9 m)
   var tr = { x: -60, v: 0, face: 1, state: "away", load: 0, tip: 0, lever: 0, wheel: 0, t: 0, to: null, heldT: 0, turn: null, step: 9, callT: 0 };
   var grab = null, ending = false, dusk = 0, storeLevel = 0, storeRun = 0, arc = null;
-  var flash = { lever: 0, auger: 0, tiplever: 0, rig: 0, combine: 0 }, nag = { hdr: 0, last: -9, pour: -9 };
+  var flash = { lever: 0, auger: 0, tiplever: 0, rig: 0, combine: 0, baler: 0 }, nag = { hdr: 0, last: -9, pour: -9 };
   var dogS = null, deer = null, hawk = null, birds = null, cue = null, focus = "combine", focusT = 0, doneSaid = false;
   function worldCrop() { var w = Farm.world.get(); return job === "sun" ? (w.sun === "stubble" ? "stubble" : "golden") : w.wheat; }
   function setWorldCrop(v) { Farm.world.update(function (w) { if (job === "sun") w.sun = v; else w.wheat = v; }); }
@@ -269,7 +273,8 @@ body.big #jobs { display: none; }
     "unload.swing": { say: "Tap the grain spout to swing it out over the trailer.", part: "auger" },
     "unload.pour": { say: "Tap the grain spout to fill the trailer with {grain}.", part: "auger" },
     "store.drive": { say: "Drive the tractor to the grain barn.", part: "rig" },
-    "store.tip": { say: "Tap the lever on the tractor to tip the trailer.", part: "tiplever" }
+    "store.tip": { say: "Tap the lever on the tractor to tip the trailer.", part: "tiplever" },
+    "bale.drive": { say: "Drive the tractor along the straw to make square bales.", part: "baler" }
   };
   // the parts that also do the step (forgiving: the whole machine that has the control)
   var ALSO = {
@@ -278,9 +283,10 @@ body.big #jobs { display: none; }
     "unload.swing": ["auger", "tank"],
     "unload.pour": ["auger", "tank", "rig"],
     "store.drive": ["rig", "tiplever", "barn"],
-    "store.tip": ["tiplever", "rig", "barn"]
+    "store.tip": ["tiplever", "rig", "barn"],
+    "bale.drive": ["baler", "bale"]
   };
-  var BUSY = { cut: "The combine is working.", unload: "The grain spout is working.", store: "The tractor is working." };
+  var BUSY = { cut: "The combine is working.", unload: "The grain spout is working.", store: "The tractor is working.", bale: "The baler is working." };
   var phase = "ready", phaseT = 0, stepId = "cut", sub = "lever", autoCut = false, miss = 0;
   var straw = { x0: 0, x1: 0, on: false };
   function key() { return stepId + "." + sub; }
@@ -311,7 +317,8 @@ body.big #jobs { display: none; }
   function hint() { var t = sayFor(key()); if (t) coach.say(t, 3); if (cue && cue in flash) flash[cue] = 3; if (ghost) ghost.poke(); }
 
   // =====================================================================================================
-  // The flow: Cut (lever, drive) -> Unload (swing, pour) -> Store (drive, tip) -> a tap starts again
+  // The flow: Cut (lever, drive) -> Unload (swing, pour) -> Store (drive, tip) -> Bale (drive; Wheat only) -> a tap
+  // starts again
   // =====================================================================================================
   function setPhase(p) { phase = p; phaseT = 0; }
   function setSub(s) {
@@ -334,6 +341,13 @@ body.big #jobs { display: none; }
       setSub("lever");
     } else if (id === "unload") setSub("swing");
     else if (id === "store") setSub("drive");
+    else if (id === "bale") {
+      // the combine drives off; the tractor brings the square baler to the start of the straw by itself
+      bl.state = "in"; bl.x = BL_START - 22; bl.v = 9; bl.n = 0; bl.tied = 0; bl.p = 0; bl.knotT = 0; fieldBales = []; autoBale = false;
+      if (!cb.away) cb.leave = true;
+      sub = "in"; miss = 0; setPhase("work"); cue = null;
+      coach.step("The tractor brings the square baler to the straw.");
+    }
   }
   // what each step's tap does (true: it did something)
   function act(part) {
@@ -361,6 +375,11 @@ body.big #jobs { display: none; }
       working(job === "sun" ? "The tractor takes the seeds to the grain barn." : "The tractor takes the grain to the grain barn.");
       return true;
     }
+    if (k === "bale.drive") {
+      autoBale = true; snd.horn();
+      working("The baler picks up the straw and makes square bales.");
+      return true;
+    }
     if (k === "store.tip") {
       startTip();
       working(job === "sun" ? "The trailer tips the seeds into the grain barn." : "The trailer tips the grain into the grain barn.");
@@ -377,7 +396,7 @@ body.big #jobs { display: none; }
     setPhase("done"); cue = null;
     Farm.world.update(function (w) { if (job === "sun") w.sun = "stubble"; else w.wheat = "stubble"; });
     coach.step("Tap the field to grow more " + cropWord() + ".");
-    coach.say(job === "sun" ? "All the sunflower seeds are in the grain barn." : "All the wheat is in the grain barn.", 5);
+    coach.say(job === "sun" ? "All the sunflower seeds are in the grain barn." : "The grain is in the grain barn and the straw is in bales.", 5);
   }
   function again() {
     if (phase !== "done") return false;
@@ -403,7 +422,8 @@ body.big #jobs { display: none; }
     parts.clear(); deer = hawk = birds = null; dogS = null; grab = null; doneSaid = false; autoCut = false;
     tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0; tr.lever = 0; tr.v = 0; tr.to = null; tr.turn = null; tr.face = 1; tr.callT = 0; tr.flow = false;
     cb.auger = 0; cb.augerTo = 0; cb.tank = 0; cb.v = 0; cb.to = null; cb.turn = null; cb.pour = 0; cb.hold = false;
-    cb.dir = 1; cb.face = 1; cb.x = -C.cut - 1.4; cb.hdrUp = true; cb.hdr = 1; nag.hdr = 0;
+    cb.dir = 1; cb.face = 1; cb.x = -C.cut - 1.4; cb.hdrUp = true; cb.hdr = 1; nag.hdr = 0; cb.leave = false; cb.away = false;
+    bl.state = "away"; bl.x = -60; bl.v = 0; bl.n = 0; bl.tied = 0; bl.p = 0; bl.knotT = 0; fieldBales = []; autoBale = false;
     clearField();
     straw = { x0: 0, x1: 0, on: (job !== "sun") };
     storeLevel = storeFor(); storeRun = 0;
@@ -513,9 +533,11 @@ body.big #jobs { display: none; }
   // ---------- Input: taps and drags on the scene (Toybox.press) ----------
   function controls() {
     var list = [], s = sc.S(1);
-    list.push({ id: "lever", p: leverPt(), r: 0.9 * s });
-    list.push({ id: "horn", p: hornPt(), r: 0.8 * s });
-    list.push({ id: "auger", p: augerPt(), r: 1.1 * s });
+    if (!cb.away) {
+      list.push({ id: "lever", p: leverPt(), r: 0.9 * s });
+      list.push({ id: "horn", p: hornPt(), r: 0.8 * s });
+      list.push({ id: "auger", p: augerPt(), r: 1.1 * s });
+    }
     if (tr.state !== "away" && Math.abs(tr.face) > 0.5) list.push({ id: "tiplever", p: tipLeverPt(), r: 0.8 * TS() });
     var ps = ponyScreen();
     list.push({ id: "pony", p: ps, r: 1.2 * sc.S(PONY_R) });
@@ -536,7 +558,9 @@ body.big #jobs { display: none; }
       if (d <= r && d < bd) { bd = d; best = c.id; }
     });
     if (best) return best;
-    var onRig = tr.state !== "away" && inBox(x, y, rigBox()), onCb = inBox(x, y, cbBox());
+    if (bl.state !== "away" && inBox(x, y, blBox())) return "baler";
+    if (baleAt(x, y) >= 0) return "bale";
+    var onRig = tr.state !== "away" && inBox(x, y, rigBox()), onCb = !cb.away && inBox(x, y, cbBox());
     if (onRig && (!onCb || y > sc.Y(1) - 0.4 * sc.S(1))) return "rig";
     if (onCb) { var n = cbPartName(x, y)[0]; return n === "Grain tank" ? "tank" : (/eader/.test(n) ? "header" : "combine"); }
     if (onRig) return "rig";
@@ -561,6 +585,7 @@ body.big #jobs { display: none; }
     if (w === "auger") return augerPt();
     if (w === "rig") return trPt(-2.6, -1.6);
     if (w === "tiplever") return tipLeverPt();
+    if (w === "baler") return balerPt();
     return null;
   }
   // a part's real name, as a small tag, when he taps it (px, py: where he tapped, canvas px)
@@ -573,6 +598,8 @@ body.big #jobs { display: none; }
     if (part === "tiplever") { snd.tick(); tag("Tipping lever", tipLeverPt()); return true; }
     if (part === "combine" || part === "tank" || part === "header") { n = cbPartName(px, py); snd.tick(); tag(n[0], n[1]); return true; }
     if (part === "rig") { n = rigPartName(px); snd.tick(); tag(n[0], n[1]); return true; }
+    if (part === "baler") { n = balerPartName(px, py); snd.tick(); tag(n[0], n[1]); return true; }
+    if (part === "bale") { var bi = baleAt(px, py), bb = fieldBales[bi]; if (!bb) return false; snd.tick(); tag("Straw bale", [sc.X(bb.x, 1), sc.Y(1) - 1.0 * sc.S(1)]); return true; }
     if (part === "barn") { var sx = sc.X(STORE_X, 1.02); snd.tick(); tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]); return true; }
     return false;
   }
@@ -596,8 +623,8 @@ body.big #jobs { display: none; }
     }
     hint();
   }
-  // He drives by drag too: a drag on the combine (header down, driving) or on the tractor (to the grain barn)
-  // moves it under his finger (held ahead, it keeps driving); when he lets go it carries on to its stop.
+  // He drives by drag too: a drag on the combine (header down, driving), on the tractor (to the grain barn) or on
+  // the square baler's tractor (along the straw) moves it under his finger (held ahead, it keeps driving); when he lets go it carries on to its stop.
   function canvasX(clientX) { return clientX - cv.getBoundingClientRect().left; }
   var press = Toybox.press(cv, {
     any: true,
@@ -616,6 +643,10 @@ body.big #jobs { display: none; }
         tr.state = "road"; tr.to = null; tr.heldT = 0;
         grab = { what: "rig", fx: canvasX(s.x), off: sc.wx(canvasX(s.x0), sc.TRACK) - tr.x };
         working(job === "sun" ? "The tractor takes the seeds to the grain barn." : "The tractor takes the grain to the grain barn.");
+      } else if (k === "bale.drive" && (part === "baler" || part === "bale")) {
+        if (ghost) ghost.learned(k);
+        grab = { what: "baler", fx: canvasX(s.x), off: sc.wx(canvasX(s.x0), 1) - bl.x };
+        working("The baler picks up the straw and makes square bales.");
       }
     },
     move: function (part, e, s) { if (grab) grab.fx = canvasX(s.x); },
@@ -623,6 +654,7 @@ body.big #jobs { display: none; }
       var g = grab; grab = null;
       if (!g || s.tap) return;
       if (g.what === "combine") autoCut = true;
+      else if (g.what === "baler") autoBale = true;
       else if (g.what === "rig" && tr.state === "road") tr.to = storeSpot();
     },
     tap: function (part, x, y) { var b = cv.getBoundingClientRect(); tapPart(part, x - b.left, y - b.top); }
@@ -655,6 +687,12 @@ body.big #jobs { display: none; }
   }
   function camTarget() {
     var ts = tr.state;
+    if (stepId === "bale" && bl.state !== "away") {
+      // the tractor and the square baler (and, on its way in, the place it stops at)
+      focus = "baler";
+      var bx = bl.state === "in" ? BL_START : bl.x, bp = [[bx + BL.back, 1, 0], [bx + BL.front, 1, 0]];
+      return frame(bp, bx + (BL.back + BL.front) / 2 + 0.8);
+    }
     if (ts === "road" || ts === "dock" || ts === "store" || ts === "tip" || ts === "untip") {
       focus = "rig";
       var pts = trailerPts();
@@ -720,11 +758,14 @@ body.big #jobs { display: none; }
       else if (k === "unload.swing" && cb.auger > 0.97) setSub("pour");
       else if (k === "unload.pour" && cb.tank <= 0.0005 && cb.auger < 0.05) { cb.pour = 0; bringIn("store"); }
       else if (k === "store.drive" && tr.state === "store") setSub("tip");
-      else if (k === "store.tip" && (tr.state === "back" || tr.state === "away")) finish();
+      else if (k === "store.tip" && (tr.state === "back" || tr.state === "away")) { if (job === "sun") finish(); else bringIn("bale"); }
+      else if (k === "bale.in" && bl.state === "wait") setSub("drive");
+      else if (k === "bale.drive" && bl.state === "done") finish();
     }
 
     placeCoach();
     if (tr.state !== "away") updateTractor(dt);
+    if (bl.state !== "away") updateBaler(dt);
     if (cb.horn > 0) cb.horn = Math.max(0, cb.horn - dt);
     if (cb.flashB) cb.flashB = Math.max(0, cb.flashB - dt);
     Object.keys(flash).forEach(function (k) { if (flash[k] > 0) flash[k] = Math.max(0, flash[k] - dt); });
@@ -747,7 +788,8 @@ body.big #jobs { display: none; }
       var cl = clamp(clamp(sc.cam, camLim[0], camLim[1]), sc.camMin, sc.camMax);
       sc.cam = focusT > 1.0 ? cl : sc.cam + (cl - sc.cam) * Math.min(1, dt * 8);
     }
-    var lvl = Math.max(Math.abs(cb.v) / VMAX, cb.hdr < 0.5 ? 0.35 : 0.15, tr.state === "road" || tr.state === "in" || tr.state === "back" ? 0.6 : 0);
+    var lvl = Math.max(Math.abs(cb.v) / VMAX, cb.hdr < 0.5 ? 0.35 : 0.15, tr.state === "road" || tr.state === "in" || tr.state === "back" ? 0.6 : 0,
+      bl.v > 0.1 ? 0.6 : (bl.state === "wait" || bl.state === "work" ? 0.3 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
     snd.engine(ending ? -1 : engLevel);
     snd.pour(cb.pouring || tr.flow ? 0.8 : 0);
@@ -756,6 +798,13 @@ body.big #jobs { display: none; }
   // He drives: the combine's middle follows his finger (held ahead of it, it keeps driving), a tap drives it a
   // short way. It cuts only where the cutter bar goes, with the header down (the grain tank holds the whole field).
   function driveCombine(dt) {
+    if (cb.away) { cb.v = 0; return; }
+    if (cb.leave) {
+      // the baler comes: the combine drives off the field, past the grain barn, and is gone
+      cb.v = Math.min(VMAX * 0.8, cb.v + dt * 2.5); cb.x += cb.v * dt;
+      if (cb.x > STORE_X + 18) { cb.leave = false; cb.away = true; cb.v = 0; }
+      return;
+    }
     if (cb.turn) {
       var T = cb.turn; T.t += dt / 0.9;
       cb.face = lerp(T.from, -T.from, ease(T.t)); cb.x = lerp(T.x0, T.x1, ease(T.t));
@@ -921,6 +970,184 @@ body.big #jobs { display: none; }
     var tx = tr.x - 7.8 * TF(), hk = TS() * sc.TRACK / sc.k;
     for (var i = 0; i < 3; i++) parts.add({ kind: "dot", x: tx - Math.random() * 0.3, h: (1.0 + Math.random() * 0.5) * hk, r: sc.TRACK, vx: -0.6, vh: 0, g: 9, life: 0.4, size: 0.07, col: grainCol(Math.random()) });
   }
+  // ---------- The square baler (Wheat only), after the grain is in the grain barn ----------
+  // The episode: "a tractor pulling a high-density square baler follows the combine's straw swath, compressing loose
+  // stems into rectangular bales and ejecting them along the field". Farmer Tom drives the tractor (Farm.draw.tractor
+  // has him in the cab). The pickup lifts the row of straw, the flywheel drives the plunger that packs it, the
+  // knotters tie each bale with twine and it slides down the chute onto the field behind. The bales stay on the
+  // field until the field grows again.
+  // Drawn like farm.js's machines (metres, y up negative, facing +x); the baler's origin is at its drawbar eye with
+  // the ground at y = +0.5 (the same big square baler as Brilliant Baler's, bales.html, so they can move to
+  // farm.js together). bl.x = world x of the tractor's rear axle on the machine line. bl.state: "away" | "in"
+  // (driving up to the straw by itself) | "wait" (his turn) | "work" | "done". bl.p = how far the bale in the chute
+  // has come out (0..1), bl.n = bales dropped, bl.tied = bales tied.
+  // BL: metres from the tractor's rear axle: the pickup tines, the back of a bale leaving the chute, the front weights.
+  var BL = { pick: -3.05, back: -11.4, front: 4.3 };
+  var BALE_N = 6, BL_V = 3.4;
+  var BL_START = -0.6 - BL.pick, BL_END = L + 0.3 - BL.pick;
+  // the chute's mouth (drawbar units), the way a bale slides down it, its tilt
+  var CHUTE = { x: -7.75, y: -0.95, dx: -1.45 / Math.hypot(1.45, 0.7), dy: 0.7 / Math.hypot(1.45, 0.7), a: Math.atan2(-0.7, 1.45) };
+  // the bales land along the field: the first near its start, the last as the pickup reaches the end of the straw.
+  // A bale comes out of the chute over BALE_EVERY metres of driving (EMIT0: where the first one starts to show).
+  var CHUTE_OFF = -(Farm.DRAWBAR[0] + CHUTE.x + CHUTE.dx * 1.2), FIRST_BALE = 2.0;
+  var BALE_EVERY = (BL_END - FIRST_BALE - CHUTE_OFF) / (BALE_N - 1), EMIT0 = FIRST_BALE + CHUTE_OFF - BALE_EVERY;
+  var bl = { x: -60, v: 0, state: "away", wheel: 0, run: 0, fly: 0, knot: 0, knotT: 0, p: 0, n: 0, tied: 0 };
+  var fieldBales = [], autoBale = false;     // fieldBales: { x (world x of its middle), h0, a0, t (since it left the chute) }
+  var BALE_FALL = 0.6;
+  function chutePose(p) {
+    var d = p * 2.4 - 1.2;
+    return [CHUTE.x + CHUTE.dx * d, CHUTE.y + CHUTE.dy * d, CHUTE.a];
+  }
+  // screen points in the rig's units (from the tractor's rear axle)
+  function blPt(ux, uy) { var s = sc.S(1); return [sc.X(bl.x, 1) + ux * s, sc.Y(1) + uy * s]; }
+  function blBox() { var a = blPt(BL.back + 0.4, -3.5), b = blPt(BL.front, 0.2); return [a[0], a[1], b[0], b[1]]; }
+  function balerPt() { return blPt(1.5, -1.7); }
+  function balerPartName(px, py) {
+    var s = sc.S(1), u = (px - sc.X(bl.x, 1)) / s, v = (py - sc.Y(1)) / s, du = u - Farm.DRAWBAR[0], dv = v - Farm.DRAWBAR[1];
+    if (u > -0.85) return ["Tractor", blPt(1.0, -3.4)];
+    if (Math.hypot(du + 2.55, dv + 1.55) < 0.8) return ["Flywheel", blPt(-3.85, -2.9)];
+    if (du > -3.1 && dv > -0.65) return ["Pickup", blPt(-3.6, -0.9)];
+    if (du < -5.5 && du > -7.0 && dv < -2.2) return ["Knotters", blPt(-7.55, -3.35)];
+    if (du < -3.1 && du > -5.15 && dv > -1.9 && dv < -1.1) return ["Twine", blPt(-5.4, -2.4)];
+    if (du < -7.6) return ["Bale chute", blPt(-9.8, -1.6)];
+    return ["Square baler", blPt(-6.2, -3.25)];
+  }
+  // the bale on the field under a point (canvas px), or -1
+  function baleAt(x, y) {
+    var s = sc.S(1), gy = sc.Y(1);
+    for (var i = fieldBales.length - 1; i >= 0; i--) {
+      var bx = sc.X(fieldBales[i].x, 1);
+      if (x >= bx - 1.4 * s && x <= bx + 1.4 * s && y >= gy - 1.3 * s && y <= gy + 0.3 * s) return i;
+    }
+    return -1;
+  }
+  // world x where the row of straw still lies (the pickup has lifted it up to here); the row is drawn a little
+  // further back (depth 1.04), so it is cut where it meets the pickup on the screen
+  function strawFrom() {
+    if (bl.state === "away") return -1e9;
+    var rg = sc.xRange(1.04);
+    return (sc.X(bl.x + BL.pick, 1) - rg[3]) / rg[2];
+  }
+  function updateBaler(dt) {
+    var st = bl.state, held = grab && grab.what === "baler";
+    if (st === "in") {
+      var d = BL_START - bl.x;
+      bl.v = clamp(d * 1.6, 0.8, 9); bl.x += Math.min(bl.v * dt, Math.max(d, 0.005));
+      if (d < 0.05) { bl.x = BL_START; bl.v = 0; bl.state = "wait"; }
+    } else if (st === "wait" || st === "work") {
+      var vt = 0;
+      if (!locked()) {
+        if (held) { var ahead = sc.wx(grab.fx, 1) - grab.off - bl.x; vt = ahead > 0.1 ? clamp(ahead * 3, 0, BL_V * 1.3) : 0; }
+        else if (autoBale) vt = clamp((BL_END - bl.x) * 2.2, 1.2, BL_V);
+      }
+      bl.v += (vt - bl.v) * Math.min(1, dt * (vt > bl.v ? 3 : 7));
+      if (bl.v < 0.01 && vt === 0) bl.v = 0;
+      bl.x = Math.min(BL_END, bl.x + bl.v * dt);
+      if (bl.v > 0.05) bl.state = "work";
+      if (bl.x >= BL_END - 1e-4) { bl.x = BL_END; bl.v = 0; autoBale = false; }
+      baleOut();
+      // straw lifted by the pickup tines (a few bits, gone in a moment)
+      if (bl.v > 0.4 && Math.random() < dt * 10) parts.add({ kind: "straw", x: bl.x + BL.pick + 0.2, h: 0.3, r: 0.99, vx: 0.6, vh: 1.0 + Math.random(), g: 7, life: 0.5, size: 0.12, col: Math.random() > 0.5 ? "#F3DA8E" : "#D9B35C", spin: 8 });
+      if (bl.x >= BL_END && bl.n >= BALE_N && fieldBales.every(function (b) { return b.t >= BALE_FALL; })) bl.state = "done";
+    }
+    bl.wheel += bl.v * dt;
+    // the PTO runs while the baler works: the flywheel turns, the pickup tines turn while it drives
+    var on = bl.state === "wait" || bl.state === "work";
+    bl.fly += dt * (on ? 2.2 + bl.v * 0.8 : 0);
+    bl.run += dt * (bl.v > 0.05 ? 0.25 + bl.v * 0.12 : 0);
+    if (bl.knotT > 0) { bl.knotT = Math.max(0, bl.knotT - dt); bl.knot += dt * 9; }
+    fieldBales.forEach(function (b) { if (b.t < BALE_FALL) b.t = Math.min(BALE_FALL, b.t + dt); });
+  }
+  // the bales: each one is tied as it starts to leave the chamber and drops off the chute when it is all the way out
+  function baleOut() {
+    var raw = (bl.x - EMIT0) / BALE_EVERY;
+    if (raw < 0) { bl.p = 0; return; }
+    while (bl.n < BALE_N && raw >= bl.n + 1 - 1e-6) dropBale();
+    var tie = Math.min(BALE_N, Math.floor(raw + 1e-6) + 1);
+    if (raw > 0.001 && bl.tied < tie) {
+      bl.tied = tie; bl.knotT = 0.7; snd.tick();
+      if (tie === 1) say("The knotters tie the bale with twine.", 3);
+    }
+    bl.p = bl.n < BALE_N ? clamp(raw - bl.n, 0, 1) : 0;
+  }
+  function dropBale() {
+    bl.n++;
+    var q = chutePose(1), ax = EMIT0 + bl.n * BALE_EVERY;
+    fieldBales.push({ x: ax + Farm.DRAWBAR[0] + q[0], h0: -(Farm.DRAWBAR[1] + q[1]), a0: q[2], t: 0 });
+    snd.clunk();
+  }
+  function strawBale(c) {
+    SH.R(c, -1.2, -0.9, 2.4, 0.9, 0.08, "#F0D27E");
+    c.save(); SH.rr(c, -1.2, -0.9, 2.4, 0.9, 0.08); c.clip();
+    for (var i = 0; i < 14; i++) SH.Ln(c, -1.1 + i * 0.165, -0.86, -1.04 + i * 0.165, -0.06, "#CFA54A", 0.035);
+    c.restore();
+    SH.Ln(c, -1.18, -0.3, 1.18, -0.3, "#E8743B", 0.045); SH.Ln(c, -1.18, -0.6, 1.18, -0.6, "#E8743B", 0.045);
+    SH.Ln(c, -1.05, -0.8, 1.05, -0.8, "rgba(255,255,255,0.45)", 0.06);
+  }
+  function blWheel(c, cx, cy, r, rot) {
+    var n = Math.round(r * 22), i, a, lw = Farm.LW;
+    c.save(); c.translate(cx, cy);
+    for (i = 0; i < n; i++) {
+      a = rot + i * TAU / n;
+      var co = Math.cos(a), si = Math.sin(a), c2 = Math.cos(a + 0.12), s2 = Math.sin(a + 0.12);
+      SH.P(c, [co * r * 0.93, si * r * 0.93, co * r * 1.06, si * r * 1.06, c2 * r * 1.06, s2 * r * 1.06, c2 * r * 0.93, s2 * r * 0.93], "#2A2C36", lw * 0.7);
+    }
+    SH.C(c, 0, 0, r * 0.97, "#33363F");
+    SH.C(c, 0, 0, r * 0.55, "#C3CCD6");
+    SH.C(c, 0, 0, r * 0.2, "#8C97A6", lw * 0.7);
+    for (i = 0; i < 5; i++) { a = rot + i * TAU / 5; SH.C(c, Math.cos(a) * r * 0.34, Math.sin(a) * r * 0.34, r * 0.05, "#6E7887", 0); }
+    c.restore();
+  }
+  // The big square baler from the side (origin at its drawbar eye, the ground at y = +0.5, facing +x).
+  // st = { wheel, run (pickup tines), fly (flywheel turn), knot (knotter turn), p (the bale in the chute, 0..1) }
+  function squareBaler(c, st) {
+    var Rd = "#D9443A", RD = "#A92F27", CRM = "#F4EFE6", lw = Farm.LW, i;
+    SH.tube(c, 0.15, -0.42, -1.9, -1.2, 0.1, "#F2C230");                              // PTO shaft
+    SH.tube(c, 0.05, 0.02, -2.25, -1.0, 0.18, Rd); SH.C(c, 0, 0, 0.08, "#C3CCD6");      // drawbar
+    // the pickup at the front, low: spring tines turning, lifting the straw
+    SH.P(c, [-1.75, 0.42, -1.6, 0.05, -2.2, -0.55, -3.0, -0.55, -3.0, 0.42], "#5D6675");
+    c.save(); c.beginPath(); c.rect(-2.0, 0.0, 0.6, 0.5); c.clip();
+    for (i = 0; i < 6; i++) { var a = -(st.run || 0) * 6 + i * TAU / 6; SH.Ln(c, -1.75, 0.2, -1.75 + Math.cos(a) * 0.28, 0.2 + Math.sin(a) * 0.28, "#E2E6EB", 0.035); }
+    c.restore();
+    // the bale on its way out (behind the body: only the part out of the chamber shows)
+    if (st.p > 0) { var q = chutePose(st.p); c.save(); c.translate(q[0], q[1]); c.rotate(q[2]); strawBale(c); c.restore(); }
+    // the chute at the back (rollers) and the tandem wheels
+    SH.P(c, [-7.7, -0.95, -9.15, -0.25, -9.15, -0.08, -7.7, -0.72], "#7C8696", lw * 0.8);
+    for (i = 0; i < 5; i++) SH.C(c, -7.95 - i * 0.26, -0.78 + i * 0.13, 0.06, "#C3CCD6", lw * 0.4);
+    blWheel(c, -5.55, 0.05, 0.45, (st.wheel || 0) / 0.45);
+    blWheel(c, -6.55, 0.05, 0.45, (st.wheel || 0) / 0.45);
+    // the bale chamber body
+    SH.R(c, -7.75, -2.35, 5.15, 1.62, 0.12, Rd);
+    SH.R(c, -7.75, -2.35, 5.15, 0.36, 0.1, CRM, lw * 0.8);
+    SH.Ln(c, -7.55, -2.25, -2.8, -2.25, "rgba(255,255,255,0.45)", 0.06);
+    SH.Ln(c, -5.25, -1.98, -5.25, -0.78, RD, 0.05); SH.Ln(c, -6.6, -1.98, -6.6, -0.78, RD, 0.05);
+    // twine boxes: a window with the balls of twine
+    SH.R(c, -5.05, -1.82, 1.9, 0.62, 0.08, "#2D2A26", lw * 0.8);
+    for (i = 0; i < 4; i++) { SH.C(c, -4.8 + i * 0.47, -1.51, 0.2, "#EAD9A8", lw * 0.6); SH.C(c, -4.8 + i * 0.47, -1.51, 0.06, "#B79A57", 0); }
+    // knotters on top (they turn when a bale is tied)
+    SH.R(c, -6.9, -2.75, 1.3, 0.42, 0.1, "#E2E6EB");
+    for (i = 0; i < 3; i++) { var kx = -6.6 + i * 0.36; SH.C(c, kx, -2.55, 0.12, "#9AA5B4", lw * 0.6); SH.Ln(c, kx, -2.55, kx + Math.cos(st.knot || 0) * 0.11, -2.55 + Math.sin(st.knot || 0) * 0.11, INK, 0.03); }
+    // the flywheel at the front
+    SH.C(c, -2.55, -1.55, 0.62, "#9AA5B4");
+    for (i = 0; i < 5; i++) { var fa = (st.fly || 0) + i * TAU / 5; SH.Ln(c, -2.55, -1.55, -2.55 + Math.cos(fa) * 0.55, -1.55 + Math.sin(fa) * 0.55, "#5D6675", 0.06); }
+    SH.C(c, -2.55, -1.55, 0.14, "#6E7887");
+  }
+  function drawFieldBales() {
+    fieldBales.forEach(function (b) {
+      var f = clamp(b.t / BALE_FALL, 0, 1), e = ease(f), h = b.h0 * (1 - f * f), a = b.a0 * (1 - e);
+      sc.put(ctx, b.x - 0.45 * e, 1, 1, function () { ctx.translate(0, -h); ctx.rotate(a); strawBale(ctx); });
+    });
+  }
+  function drawBaler() {
+    if (bl.state === "away") return;
+    sc.put(ctx, bl.x, 1, 1, function () {
+      ctx.save(); ctx.translate(Farm.DRAWBAR[0], Farm.DRAWBAR[1]);
+      squareBaler(ctx, { wheel: bl.wheel, run: bl.run, fly: bl.fly, knot: bl.knot, p: bl.p });
+      ctx.restore();
+      D.tractor(ctx, { wheel: bl.wheel, time: time, drawbar: true });
+    });
+  }
+
   // ---------- Sunny Seeds: the sunflower header, the seeds, the sunflower field, the goldfinches ----------
   // Written like farm.js's drawings (metres, y up negative, Farm.shape helpers) so they can move there later.
   // The combine with a sunflower header: farm.js's combine minus its grain header (clipped off at the feeder
@@ -1185,12 +1412,17 @@ body.big #jobs { display: none; }
     drawStraw();
     if (deer && deer.r > 1) drawDeer();
     parts.draw(ctx, sc, function (p) { return p.r > 1.0; });
-    drawCombine();
+    if (!cb.away && !cb.leave) drawCombine();
     drawField("near", P);
     parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
     sc.verge(ctx, {});
     drawPony();
+    // the square baler and its bales come after the pony's paddock (the rig's tractor drives past it at the end)
+    if (fieldBales.length) drawFieldBales();
+    drawBaler();
     sc.store(ctx, storeLevel, { x: STORE_X, kind: job === "sun" ? "seed" : "grain", run: storeRun, time: time });
+    // the combine driving off passes in front of the grain barn
+    if (cb.leave) drawCombine();
     if (tr.state !== "away") drawRig();
     if (cb.auger > 0.01) drawAuger();
     parts.draw(ctx, sc, function (p) { return p.r <= sc.TRACK + 0.03; });
@@ -1304,13 +1536,15 @@ body.big #jobs { display: none; }
     for (var i = 1; i < runs.length; i++) { var x = runs[i][1]; ctx.beginPath(); ctx.moveTo(sc.X(x, r0), sc.Y(r0)); ctx.lineTo(sc.X(x, r1), sc.Y(r1)); ctx.stroke(); }
     ctx.restore();
   }
-  // the straw the combine leaves in a row behind it (wheat only), wherever it has cut
+  // the straw the combine leaves in a row behind it (wheat only), wherever it has cut, until the baler's pickup
+  // lifts it
   function drawStraw() {
     if (job === "sun" || crop.stage !== "ripe" || !cutN) return;
-    var r = 1.04, s = sc.S(r), y = sc.Y(r), step = 0.4;
+    var r = 1.04, s = sc.S(r), y = sc.Y(r), step = 0.4, from = strawFrom();
     fieldRuns().forEach(function (q) {
       if (q[0] !== "stubble" || q[2] - q[1] < 0.6) return;
-      var a = q[1] + 0.15, b = q[2] - 0.15;
+      var a = Math.max(q[1] + 0.15, from), b = q[2] - 0.15;
+      if (b - a < 0.3) return;
       ctx.beginPath(); ctx.moveTo(sc.X(a, r), y);
       for (var x = a; x <= b; x += step) ctx.lineTo(sc.X(x, r), y - s * (0.28 + 0.1 * hash(Math.floor(x / step), 3)));
       ctx.lineTo(sc.X(b, r), y); ctx.closePath();
@@ -1396,6 +1630,7 @@ body.big #jobs { display: none; }
     add("lever", leverPt(), Math.max(22, 0.55 * s));
     add("auger", augerPt(), Math.max(24, 0.7 * s));
     add("tiplever", tipLeverPt(), Math.max(22, 0.55 * TS()));
+    if ((cue === "baler" && Math.abs(bl.v) < 0.3 && !grab) || flash.baler > 0) list.push([balerPt(), Math.max(40, 2.9 * s), flash.baler > 0, 0.6]);
     if (cue === "rig" || flash.rig > 0) list.push([trPt(-2.6, -1.6), Math.max(40, 3.8 * TS()), flash.rig > 0, 0.45]);
     if ((cue === "combine" && Math.abs(cb.v) < 0.3 && !grab) || flash.combine > 0) list.push([cbPt(-0.8, -2.2), Math.max(44, 4.6 * s), flash.combine > 0, 0.4]);
     list.forEach(function (g) {
@@ -1901,7 +2136,7 @@ body.big #jobs { display: none; }
 
   // ---------- Timer ending ----------
   function onEnding(done) {
-    ending = true; grab = null; cb.to = null; cb.hold = false; cb.pour = 0; tr.to = null;
+    ending = true; grab = null; cb.to = null; cb.hold = false; cb.pour = 0; tr.to = null; autoBale = false;
     coach.clear(); stepShown = "";
     setTimeout(function () { cb.augerTo = 0; snd.engine(-1); done(); }, 2600);
   }
@@ -1949,8 +2184,8 @@ body.big #jobs { display: none; }
   });
   // leaving the page while a machine works switches it off quietly
   Toybox.offFirst({
-    running: function () { return autoCut || Math.abs(cb.v) > 0.05 || cb.pouring || tr.state === "road" || tr.state === "tip"; },
-    off: function (done) { autoCut = false; grab = null; cb.v = 0; cb.pour = 0; tr.to = null; snd.engine(-1); snd.pour(0); done(); }
+    running: function () { return autoCut || autoBale || Math.abs(cb.v) > 0.05 || bl.v > 0.05 || cb.pouring || tr.state === "road" || tr.state === "tip"; },
+    off: function (done) { autoCut = false; autoBale = false; grab = null; cb.v = 0; bl.v = 0; cb.pour = 0; tr.to = null; snd.engine(-1); snd.pour(0); done(); }
   });
   requestAnimationFrame(loop);
 
@@ -1959,19 +2194,22 @@ body.big #jobs { display: none; }
     state: function () {
       return { cam: sc.cam, camLim: camLim, cmm: [sc.camMin, sc.camMax], k: sc.k, nag: nag.hdr, to: cb.to, job: job, crop: crop.stage, cutN: cutN, NC: NC, hdrUp: cb.hdrUp, hdr: cb.hdr, x: cb.x, dir: cb.dir, v: cb.v, tank: cb.tank,
         auger: cb.auger, pouring: !!cb.pouring, trailer: tr.state, tx: tr.x, load: tr.load, tip: tr.tip, loads: loads, coach: coach.text(), step: stepId, sub: sub, phase: phase, want: wantPart(), cue: cue, zoom: zoom.f, focus: focus, birds: birds ? birds.list.length : 0,
+        baler: { state: bl.state, x: +bl.x.toFixed(2), v: +bl.v.toFixed(2), p: +bl.p.toFixed(2), n: bl.n, tied: bl.tied, bales: fieldBales.length, auto: autoBale }, combineAway: !!cb.away, combineLeaving: !!cb.leave,
         dog: dogS ? { x: dogS.x, face: dogS.face, st: dogS.st } : null, hawk: hawk ? { x: hawk.x, face: hawk.face } : null, trStep: tr.step, trTo: tr.to,
         close: { mode: cu.shown, alpha: +closeAlpha().toFixed(2), rect: cu.rect && cu.rect.map(Math.round), corner: cu.corner } };
     },
     // viewport points of the parts he touches
     screen: function (id) {
       var b = cv.getBoundingClientRect(), p = { lever: leverPt, horn: hornPt, auger: augerPt, header: headerPt, tiplever: tipLeverPt,
-        combine: function () { return cbPt(-2.4, -2.0); }, rig: function () { return trPt(-3.0, -1.6); }, spout: spoutPt }[id]();
+        combine: function () { return cbPt(-2.4, -2.0); }, rig: function () { return trPt(-3.0, -1.6); }, spout: spoutPt, baler: balerPt,
+        knotters: function () { return blPt(-7.55, -3.0); }, pickup: function () { return blPt(-3.4, -0.3); } }[id]();
       return { x: b.left + p[0], y: b.top + p[1] };
     },
     // is the whole machine on screen? (combine and, when out, the rig)
     inView: function () {
-      var a = cbBox(), r = tr.state !== "away" ? rigBox() : null, out = {};
-      out.combine = a[0] >= -1 && a[2] <= W + 1;
+      var a = cbBox(), r = tr.state !== "away" ? rigBox() : null, out = {}, bb = bl.state !== "away" ? blBox() : null;
+      out.combine = cb.away ? null : a[0] >= -1 && a[2] <= W + 1;
+      out.baler = bb ? (bb[0] >= -1 && bb[2] <= W + 1 && bb[1] >= -1) : null; out.blBox = bb && bb.map(Math.round);
       out.rig = r ? (r[0] >= -1 && r[2] <= W + 1) : null;
       out.cbBox = a.map(Math.round); out.rigBox = r && r.map(Math.round); out.W = Math.round(W);
       return out;
@@ -1979,8 +2217,12 @@ body.big #jobs { display: none; }
     closeAvoid: function () { return { avoid: closeAvoid().map(function (b) { return b.map(Math.round); }), W: W, H: H, CR: CR, cY: cu.cY }; },
     ghost: function () { return ghost.show(); },
     // play the station by script: tap(part) is a tap on that part ("lever", "combine", "auger", "rig",
-    // "tiplever", "horn", "pony", "barn", "tank", "header", "inset", or null for the field)
-    tap: function (part) { var p = part === "want" ? wantPart() : part, q = p === "combine" ? cbPt(-0.8, -2.2) : (p === "rig" ? trPt(-2.6, -1.6) : [W / 2, H / 2]); tapPart(p || null, q[0], q[1]); },
+    // "tiplever", "horn", "pony", "barn", "tank", "header", "baler", "bale", "inset", or null for the field)
+    tap: function (part) {
+      var p = part === "want" ? wantPart() : part;
+      var q = p === "combine" ? cbPt(-0.8, -2.2) : (p === "rig" ? trPt(-2.6, -1.6) : (p === "baler" ? balerPt() : (p === "bale" && fieldBales.length ? [sc.X(fieldBales[0].x, 1), sc.Y(1) - 0.4 * sc.S(1)] : [W / 2, H / 2])));
+      tapPart(p || null, q[0], q[1]);
+    },
     want: function () { var p = wantPt(), b = cv.getBoundingClientRect(); return p ? { x: b.left + p[0], y: b.top + p[1] } : null; }
   };
 })();
