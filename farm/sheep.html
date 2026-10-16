@@ -47,10 +47,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Pen them"): on a narrow row it wraps to two lines instead of being cut off. */
-.tb-steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
-/* "Come bye" is two words: let a chip's word wrap under its dot instead of running into the next chip. */
-.tb-steps .tb-chip-word { white-space: normal; text-align: center; }
+/* No step row (like Timberrrrr!): he gives the dog its commands and works the gates on the stage; the coach line
+   and the yellow ring on the scene show what to touch next. The panel holds only the bottom bar. */
 body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
@@ -74,8 +72,6 @@ body.big #jobs { display: none; }
       <div id="jobs"></div>
     </div>
     <section class="tb-panel" id="panel">
-      <ol id="stepsGather"></ol>
-      <ol id="stepsBath" hidden></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -84,17 +80,20 @@ body.big #jobs { display: none; }
 (function () {
   "use strict";
   // Come Bye (and Hello Ewe): the sheepdog and the sheep, the way the episodes show it.
-  // Gather:    a flock grazes spread over the hillside. The shepherd whistles "Come bye" and the sheepdog runs
-  //            clockwise round the flock (seen from above), up the left side, along the back, down the right;
-  //            the sheep bunch up. "Away" sends it anticlockwise, back round to the left, and the sheep walk
-  //            toward the pen. "Pen them": the dog walks up behind them in its low crouch, the sheep file in
-  //            through the gate one by one, the gate swings shut and the dog lies down ("Lie down").
-  // Foot bath: the gate of the holding pen opens into the race; the sheep trot one by one down the race and
-  //            through the shallow foot bath (splashes) into the drying pen; the field gate opens and they run
-  //            out onto the green grass.
+  // Built like Timberrrrr! (farm/woods.js): no step row, one view. He gives every command himself: a tap on the
+  // sheepdog (or the sheep, or the shepherd) is the shepherd's whistle for the next command, a tap on a gate swings
+  // it. A yellow ring on the scene marks the next thing to touch and the coach line names it; a tap on anything
+  // else shows its name. After the last step a tap on the scene starts again.
+  // Gather:    a flock grazes spread over the hillside. "Come bye": the sheepdog runs clockwise round the flock
+  //            (seen from above), up the left side, along the back, down the right; the sheep bunch up. "Away"
+  //            sends it anticlockwise, back round to the left, and the sheep walk toward the pen. "Walk on": the
+  //            dog walks up behind them in its low crouch and the sheep file in through the gate one by one. He
+  //            shuts the gate, then "Lie down": the dog lies down.
+  // Foot bath: he opens the gate of the holding pen into the race; "Walk on": the sheep trot one by one down the
+  //            race and through the shallow foot bath (splashes) into the drying pen; he opens the field gate and
+  //            they run out onto the green grass.
   // The ground is a plane: x along the screen (metres), z away from us up the hill (metres), seen from a little
-  // above (own projection below; Farm.Scene draws only the sky). On an upright stage the stage is split: the whole
-  // job on top and a close-up below (the dog running, the gate, the feet splashing).
+  // above (own projection below; Farm.Scene draws only the sky).
   // Drawings live here for now in farm.js's style and function shapes (metres, y up negative, origin on the
   // ground under the middle, facing +x) so they can move into farm.js later: sheepShape, collie, shepherd,
   // hurdle, trough.
@@ -258,7 +257,13 @@ body.big #jobs { display: none; }
   function py(V, z, h) { return V.gY - V.k * fz(z) * (z * V.T + (h || 0)); }
   function ps(V, z) { return V.k * fz(z); }
   function fitView(V) {
-    var b = V.box, w = V.R.w, h = V.R.h, fa = fz(b.za), T = V.T;
+    var b = V.box, w = V.R.w, h = V.R.h, fa = fz(b.za);
+    // a tall stage looks down on the ground more, just enough that the box fills the height too
+    if (V === VW && V.tilt) {
+      var kw = w * 0.94 / ((b.xb - b.xa) * fa), avh = h * ((V.bot || 0.93) - 0.07), fb = fz(b.zb);
+      V.T = clamp((avh / kw - HTOP * fb) / Math.max(0.5, b.zb * fb - b.za * fa), 0.85, 3.4);
+    }
+    var T = V.T;
     var vext = (b.zb * T + HTOP) * fz(b.zb) - b.za * T * fa;
     var bot = V.bot || 0.93, top = 0.07, av = h * (bot - top);
     V.k = Math.min(w * 0.94 / ((b.xb - b.xa) * fa), av / vext);
@@ -281,8 +286,8 @@ body.big #jobs { display: none; }
     // the coach pill sits at the bottom of the stage on phones: keep the work above it
     var phone = W < 700;
     VC.bot = phone ? 0.76 : 0.93; VW.bot = split ? 0.95 : (phone ? 0.8 : 0.93);
-    // upright phone: look down on the hill a little more, so the flock's spread fills the view's height
-    VW.T = H > W && phone ? 1.45 : 0.85;
+    // the view tilts to fill the stage (fitView)
+    VW.tilt = true; VW.T = 0.85;
     follow(0, true);
   }
   function views() { return split ? [VW, VC] : [VW]; }
@@ -322,30 +327,23 @@ body.big #jobs { display: none; }
   // =====================================================================================================
   // The jobs and their steps
   // =====================================================================================================
-  var STEPS = {
-    gather: [
-      { id: "bye", name: "Come bye", go: "Come bye", coach: "Send the dog round the sheep." },
-      { id: "away", name: "Away", go: "Away", coach: "Send the dog back the other way." },
-      { id: "pen", name: "Pen", go: "Pen them", coach: "Walk the sheep into the pen." }
-    ],
-    bath: [
-      { id: "open", name: "Gate", go: "Open it", coach: "Open the gate to the race." },
-      { id: "bath", name: "Bath", go: "Send them", coach: "Send the sheep through the foot bath." },
-      { id: "out", name: "Field", go: "Let them out", coach: "Let the sheep out into the field." }
-    ]
+  // Each step is one thing he does on the scene (part = where the ring sits, ok = the parts that do it).
+  var ORDER = { gather: ["bye", "away", "pen", "shut", "down"], bath: ["open", "bath", "out"] };
+  var STEP = {
+    bye: { say: "Tap the sheepdog to send it round the sheep.", part: "dog", ok: { dog: 1, sheep: 1, shep: 1 } },
+    away: { say: "Tap the sheepdog to send it back the other way.", part: "dog", ok: { dog: 1, sheep: 1, shep: 1 } },
+    pen: { say: "Tap the sheepdog to walk the sheep into the pen.", part: "dog", ok: { dog: 1, sheep: 1, shep: 1, pen: 1 } },
+    shut: { say: "Tap the gate to shut the sheep in the pen.", part: "gate", ok: { gate: 1, pen: 1 } },
+    down: { say: "Tap the sheepdog to make it lie down.", part: "dog", ok: { dog: 1, shep: 1 } },
+    open: { say: "Tap the gate to open the race.", part: "gate", ok: { gate: 1 } },
+    bath: { say: "Tap the sheepdog to walk the sheep through the foot bath.", part: "dog", ok: { dog: 1, sheep: 1, trough: 1 } },
+    out: { say: "Tap the field gate to let the sheep out.", part: "field", ok: { field: 1 } }
   };
-  var BUSY = { bye: "The dog is running round.", away: "The dog is running round.", pen: "The sheep are going in.", open: "The gate is opening.", bath: "The sheep are in the foot bath.", out: "The sheep are going out." };
+  var AGAIN = { gather: "Tap the field to bring a new flock.", bath: "Tap the field to bring more sheep." };
+  var BUSY = { bye: "The dog is running round.", away: "The dog is running round.", pen: "The sheep are going in.", shut: "The gate is shutting.", down: "The dog is lying down.", open: "The gate is opening.", bath: "The sheep are in the foot bath.", out: "The sheep are going out." };
 
-  // ---------- Pictures (drawn with the scene's own code) ----------
+  // ---------- Pictures for the job tabs (drawn with the scene's own code) ----------
   var picCache = {};
-  function arcArrow(x, cx, cy, rx, ry, a0, a1, lw) {
-    x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, a0, a1, a1 < a0);
-    x.lineCap = "round"; x.strokeStyle = INK; x.lineWidth = lw * 1.9; x.stroke(); x.strokeStyle = "#FFC93C"; x.lineWidth = lw; x.stroke();
-    var ex = cx + Math.cos(a1) * rx, ey = cy + Math.sin(a1) * ry, d = a1 < a0 ? -1 : 1;
-    var tx = -Math.sin(a1) * rx * d, ty = Math.cos(a1) * ry * d, tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
-    x.beginPath(); x.moveTo(ex + tx * lw * 2.2, ey + ty * lw * 2.2); x.lineTo(ex - ty * lw * 1.8, ey + tx * lw * 1.8); x.lineTo(ex + ty * lw * 1.8, ey - tx * lw * 1.8); x.closePath();
-    x.fillStyle = "#FFC93C"; x.fill(); x.lineWidth = lw * 0.45; x.strokeStyle = INK; x.lineJoin = "round"; x.stroke();
-  }
   function pic(id) {
     if (picCache[id] !== undefined) return picCache[id];
     var cnv = document.createElement("canvas"), PW = 168, PH = 120, x;
@@ -353,69 +351,34 @@ body.big #jobs { display: none; }
     try { x = cnv.getContext("2d"); } catch (e) { x = null; }
     if (!x) return (picCache[id] = "");
     function at(cx, cy, s, fn) { Farm.inUnits(x, cx, cy, s, 3.2, fn); }
-    function hurdleP(x0, x1, y, s) {
-      x.lineCap = "round";
-      [0.2, 0.5, 0.8].forEach(function (hh) { x.strokeStyle = INK; x.lineWidth = 6; x.beginPath(); x.moveTo(x0, y - hh * s); x.lineTo(x1, y - hh * s); x.stroke(); x.strokeStyle = STEEL; x.lineWidth = 3; x.stroke(); });
-      [x0, x1].forEach(function (q) { x.strokeStyle = INK; x.lineWidth = 7; x.beginPath(); x.moveTo(q, y); x.lineTo(q, y - 0.95 * s); x.stroke(); x.strokeStyle = STEEL; x.lineWidth = 4; x.stroke(); });
-    }
     if (id === "gather") {
       at(110, 104, 62, function () { sheepShape(x, { head: 0.2 }); });
       at(44, 108, 58, function () { collie(x, { pose: "crouch", ph: 0.2 }); });
-    } else if (id === "bathjob" || id === "bath") {
+    } else {
       x.fillStyle = "#3E8FA2"; x.fillRect(14, 92, 140, 22); x.strokeStyle = INK; x.lineWidth = 3; x.strokeRect(14, 92, 140, 22);
       at(84, 104, 70, function () { sheepShape(x, { gait: 0.8, ph: 0.25, dip: 0.12 }); });
       x.globalAlpha = 0.6; x.fillStyle = WATER; x.fillRect(16, 96, 136, 16); x.globalAlpha = 1;
       [[30, 80], [140, 76], [128, 66]].forEach(function (q) { Cc(x, q[0], q[1], 5, "#BFE9F2", 2); });
-    } else if (id === "bye" || id === "away") {
-      at(84, 84, 56, function () { sheepShape(x, { head: 0.6 }); });
-      if (id === "bye") arcArrow(x, 84, 64, 70, 46, PI * 0.75, -PI * 0.15, 7);
-      else arcArrow(x, 84, 64, 70, 46, PI * 0.25, PI * 1.15, 7);
-      var ax = id === "bye" ? 84 + Math.cos(-PI * 0.15) * 70 : 84 + Math.cos(PI * 1.15) * 70;
-      at(id === "bye" ? 134 : 34, 116, 44, function () { if (id === "away") x.scale(-1, 1); collie(x, { pose: "run", ph: 0.1 }); });
-    } else if (id === "pen") {
-      hurdleP(14, 154, 70, 44);
-      at(60, 112, 40, function () { sheepShape(x, {}); });
-      at(112, 112, 40, function () { sheepShape(x, { head: 0.7 }); });
-      hurdleP(14, 154, 116, 40);
-    } else if (id === "open") {
-      hurdleP(10, 60, 108, 70);
-      x.save(); x.translate(64, 108); x.transform(1, -0.25, 0, 1, 0, 0); hurdleP(0, 90, 0, 70); x.restore();
-      x.beginPath(); x.arc(64, 108, 70, -PI * 0.42, -PI * 0.1); x.strokeStyle = "#FFC93C"; x.lineWidth = 6; x.lineCap = "round"; x.stroke();
-    } else if (id === "out") {
-      x.fillStyle = "#74B84C"; x.fillRect(0, 96, PW, 24);
-      [[30, 104], [150, 110], [100, 112], [60, 115]].forEach(function (q, i) { Cc(x, q[0], q[1], 4, i % 2 ? "#FFFFFF" : "#FFD84D", 1.5); });
-      at(70, 104, 58, function () { sheepShape(x, { head: 0.8 }); });
-      at(128, 98, 40, function () { sheepShape(x, { gait: 0.8, ph: 0.3 }); });
     }
     var url = "";
     try { url = cnv.toDataURL("image/png"); } catch (e) { url = ""; }
     return (picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "");
   }
-  function stepList(j) { return STEPS[j].map(function (s) { return { id: s.id, name: s.name, go: s.go, coach: s.coach, pic: pic(s.id) }; }); }
 
-  // ---------- Steps, job bar, bottom bar, ghost ----------
-  var phase = "ready", phaseT = 0, stepId = "bye", ending = false, dusk = 0, time = 0;
+  // ---------- Job bar, bottom bar, ghost ----------
+  var phase = "ready", phaseT = 0, stepId = "bye", ending = false, dusk = 0, time = 0, glow = 0;
   var wk = null;
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
-  function firstStep() { return job === "bath" ? "open" : "bye"; }
-  var steps = null;
+  function firstStep() { return ORDER[job][0]; }
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
-      if (phase === "ready") { var p = partScreen(stepId); if (!p) return null; return { pts: [[p.x, p.y]], tap: true, key: "go" }; }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (phase === "ready") { var p = targetPt(); if (!p) return null; return { pts: [[p.x, p.y]], tap: true, key: stepId }; }
+      if (phase === "done" && phaseT > 4) { var b = cv.getBoundingClientRect(); return { pts: [[b.left + W * 0.4, b.top + H * 0.62]], tap: true, key: "again" }; }
       return null;
     }
   });
-  function mkSteps(el, j) { return Toybox.steps(el, { steps: stepList(j), coach: coach, ghost: ghost, onGo: function () { return doGo(); }, onAgain: function () { again(); }, onBusy: function () { busyHint(); } }); }
-  var stepsG = mkSteps($("stepsGather"), "gather"), stepsB = mkSteps($("stepsBath"), "bath");
-  steps = job === "bath" ? stepsB : stepsG;
-  function showSteps() {
-    steps = job === "bath" ? stepsB : stepsG;
-    $("stepsGather").hidden = job === "bath"; $("stepsBath").hidden = job !== "bath";
-  }
   var jobs = Toybox.jobs($("jobs"), {
     jobs: [{ id: "gather", name: "Gather", pic: pic("gather") }, { id: "bath", name: "Foot bath", pic: pic("bathjob") }],
     value: job,
@@ -423,12 +386,7 @@ body.big #jobs { display: none; }
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
-  function doGo() {
-    if (locked()) return false;
-    if (phase === "ready") return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
+  function hint() { var d = STEP[stepId]; if (d && phase === "ready") coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function busyHint() { if (phase === "work") coach.say(BUSY[stepId], 3); }
 
   // =====================================================================================================
@@ -478,30 +436,36 @@ body.big #jobs { display: none; }
   // =====================================================================================================
   function setPhase(p) { phase = p; phaseT = 0; }
   function bringIn(id) {
-    stepId = id; steps.at(id); wk = null;
-    setPhase("ready"); steps.busy(false);
+    stepId = id; wk = null;
+    setPhase("ready");
+    coach.step(STEP[id].say);
+    if (ghost) ghost.poke();
   }
+  // one command or one gate: plays that one motion, then the next thing is his again
   function go() {
     if (phase !== "ready") return false;
-    if (ghost) ghost.learned("go");
-    setPhase("work"); steps.busy(true);
+    if (ghost) ghost.learned(stepId);
+    glow = 0;
+    setPhase("work");
     wk = { t: 0, ev: {} };
-    if (stepId === "bye") { whistle("bye"); shepCall = 1.4; bubble("Come bye!", "shep"); coach.say("Come bye! The dog runs round.", 4); startRun(true); }
-    else if (stepId === "away") { whistle("away"); shepCall = 1.4; bubble("Away!", "shep"); coach.say("Away! Round the other way.", 4); startRun(false); }
-    else if (stepId === "pen") { whistle("walk"); shepCall = 1.2; bubble("Walk on!", "shep"); coach.say("The dog walks up behind them.", 3); startPen(); }
-    else if (stepId === "open") { snd.clunk(); coach.say("The gate swings open.", 3); }
-    else if (stepId === "bath") { coach.say("The sheep trot down the race.", 3); startBath(); }
-    else if (stepId === "out") { snd.clunk(); coach.say("The field gate opens.", 3); }
+    if (stepId === "bye") { whistle("bye"); shepCall = 1.4; bubble("Come bye!", "shep"); coach.step("Come bye! The dog runs round the sheep."); startRun(true); }
+    else if (stepId === "away") { whistle("away"); shepCall = 1.4; bubble("Away!", "shep"); coach.step("Away! The dog runs back the other way."); startRun(false); }
+    else if (stepId === "pen") { whistle("walk"); shepCall = 1.2; bubble("Walk on!", "shep"); coach.step("The dog walks up behind the sheep."); startPen(); }
+    else if (stepId === "shut") { snd.clunk(); coach.step("The gate swings shut."); }
+    else if (stepId === "down") { whistle("down"); shepCall = 1.4; bubble("Lie down!", "shep"); dog.mode = "lie"; dog.tx = dog.x; dog.tz = dog.z; coach.step("The dog lies down. Good dog!"); }
+    else if (stepId === "open") { snd.clunk(); coach.step("The gate swings open."); }
+    else if (stepId === "bath") { whistle("walk"); coach.step("The sheep trot down the race."); startBath(); }
+    else if (stepId === "out") { snd.clunk(); coach.step("The field gate opens."); }
     return true;
   }
   function stepDone(id) {
-    var list = STEPS[job], i = list.map(function (s) { return s.id; }).indexOf(id);
-    steps.done(id);
-    if (i < list.length - 1) bringIn(list[i + 1].id);
+    var list = ORDER[job], i = list.indexOf(id);
+    if (i < list.length - 1) bringIn(list[i + 1]);
     else finish();
   }
   function finish() {
-    setPhase("done"); wk = null; steps.finish("Again!"); steps.busy(false);
+    setPhase("done"); wk = null;
+    coach.step(AGAIN[job]);
     coach.say(job === "bath" ? "All the sheep are out on the grass!" : "All the sheep are in the pen!", 5);
     save(); snd.chime(); Toybox.kind();
     Farm.world.update(function (w) { w.sheep = (typeof w.sheep === "number" && isFinite(w.sheep) ? w.sheep : 0) + (job === "bath" ? NBATH : NSHEEP); });
@@ -510,21 +474,18 @@ body.big #jobs { display: none; }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    resetScene(); steps.reset(); bringIn(firstStep()); follow(0, true);
-    coach.say(job === "bath" ? "More sheep for the foot bath." : "A new flock on the hill.", 3);
+    resetScene(); bringIn(firstStep()); follow(0, true);
     return true;
   }
   function startOver() {
     if (locked()) return;
-    resetScene(); steps.reset(); bringIn(firstStep()); follow(0, true);
-    coach.say(job === "bath" ? "The sheep wait in the pen." : "The sheep graze on the hill.", 3);
+    resetScene(); bringIn(firstStep()); follow(0, true);
     save();
   }
   function switchJob(id) {
     if (locked()) { jobs.set(job); return; }
     job = id === "bath" ? "bath" : "gather";
-    resetScene(); showSteps(); steps.reset(); bringIn(firstStep()); follow(0, true);
-    coach.say(job === "bath" ? "Time for the foot bath." : "Gather the sheep.", 3);
+    resetScene(); bringIn(firstStep()); follow(0, true);
     $("cv").setAttribute("aria-label", job === "bath" ? "Sheep in a pen next to a race with a shallow foot bath, then a gate to the green field." : "A hillside field with a flock of sheep, a sheepdog, the shepherd and a pen.");
     save();
   }
@@ -587,15 +548,19 @@ body.big #jobs { display: none; }
     }
     flock.forEach(function (s) { if (!s.counted && s.x > PEN.x0 + 0.3) { s.counted = true; s.inPen = true; countOne(); } });
     var allIn = flock.every(function (s) { return s.counted; });
-    if (allIn && wk.inT < 0) { wk.inT = t; coach.say("All in! The gate swings shut.", 3); }
-    if (wk.inT >= 0) {
-      var g = (t - wk.inT - 0.1) / 1.0;
-      gate = 1 - ease(clamp(g, 0, 1));
-      if (g >= 1 && once("shut")) { snd.clunk(); }
-      if (t - wk.inT > 1.3 && once("down")) { whistle("down"); shepCall = 1.4; bubble("Lie down!", "shep"); dog.mode = "lie"; coach.say("Lie down. Good dog!", 4); }
-      if (t - wk.inT > 2.9) stepDone("pen");
-    }
+    if (allIn && wk.inT < 0) { wk.inT = t; coach.say("All the sheep are in the pen.", 3); }
+    if (wk.inT >= 0 && t - wk.inT > 1.0) { dog.tx = dog.x; dog.tz = dog.z; stepDone("pen"); }
     if (t > 16 && wk.inT < 0) flock.forEach(function (s) { if (!s.counted) { s.x = s.spot[0]; s.z = s.spot[1]; s.mode = "graze"; s.tx = s.x; s.tz = s.z; } });
+  }
+  // he shuts the pen gate, then tells the dog to lie down
+  function workShut() {
+    var g = wk.t / 1.0;
+    gate = 1 - ease(clamp(g, 0, 1));
+    if (g >= 1 && once("shut")) { snd.clunk(); }
+    if (wk.t > 1.5) stepDone("shut");
+  }
+  function workDown() {
+    if (wk.t > 1.8) stepDone("down");
   }
   // ---------- Foot bath ----------
   function workOpen(dt) {
@@ -709,55 +674,75 @@ body.big #jobs { display: none; }
   // =====================================================================================================
   // Input
   // =====================================================================================================
-  function partScreen(id) {
-    if (id === "bye" || id === "away" || id === "pen") {
-      // the sheep nearest the middle of the flock that a view shows whole
-      var c = flockCentre(), best = null, bd = 1e9, V = null;
-      [split ? VC : null, VW].forEach(function (v) {
-        if (!v || best) return;
-        flock.forEach(function (s) { if (!inView(v, s.x, s.z, 0.6)) return; var d = Math.hypot(s.x - c.x, s.z - c.z); if (d < bd) { bd = d; best = s; V = v; } });
-      });
-      return best ? scrPt(V, best.x, best.z, 0.6) : bestPt(c.x, c.z, 0.6);
-    }
-    if (id === "open") return bestPt(HP.x1, 0, 0.6);
-    if (id === "bath") return bestPt(-6.6, 0.8, 0.6);
-    if (id === "out") return bestPt(DP.x1, 1.4, 0.7);
+  // the middle of a gate on the ground, wherever it has swung to
+  function gateMid(which) {
+    var hx, hz, len, a;
+    if (which === "field") { hx = DP.x1; hz = DP.z1; len = DP.z1 - DP.z0; a = lerp(-PI / 2, 0, gate2); }
+    else if (job === "gather") { hx = PEN.x0; hz = PEN.z1; len = GATE_L; a = lerp(-PI / 2, -PI, gate); }
+    else { hx = HP.x1; hz = RACE.w; len = RACE.w * 2; a = lerp(-PI / 2, 0, gate); }
+    return { x: hx + Math.cos(a) * len * 0.5, z: hz + Math.sin(a) * len * 0.5 };
+  }
+  // where a part is on the screen (the ring, the ghost hand, the debug hook)
+  function partPt(id) {
+    if (id === "dog") return bestPt(dog.x, dog.z, 0.35);
+    if (id === "gate" || id === "field") { var g = gateMid(id); return bestPt(g.x, g.z, 0.55); }
+    if (id === "sheep") { var c = flockCentre(); return bestPt(c.x, c.z, 0.6); }
+    if (id === "shep") return bestPt(SHEP.x, SHEP.z, 1.0);
+    if (id === "pen") return bestPt((PEN.x0 + PEN.x1) / 2, PEN.z0 + 0.3, 0.5);
+    if (id === "trough") return bestPt((TRO.x0 + TRO.x1) / 2, -0.3, 0);
     return null;
   }
+  function targetPt() { var d = STEP[stepId]; return phase === "ready" && d ? partPt(d.part) : null; }
   function partList() {
     var list = [];
     views().forEach(function (V) {
       function add(id, x, z, h, size) { if (inView(V, x, z, h)) { var p = scrPt(V, x, z, h); list.push({ id: id, x: p.x, y: p.y, r: Math.max(26, ps(V, z) * size) }); } }
+      var g = gateMid("gate");
       flock.forEach(function (s) { add("sheep", s.x, s.z, 0.55, 0.75); });
-      add("dog", dog.x, dog.z, 0.3, 0.55);
-      if (job === "gather") { add("shep", SHEP.x, SHEP.z, 1.0, 0.6); add("gate", PEN.x0, PEN.gz + 1.2, 0.5, 0.6); add("pen", (PEN.x0 + PEN.x1) / 2, PEN.z0 + 0.3, 0.5, 0.7); }
-      else { add("gate", HP.x1, 0, 0.5, 0.5); add("trough", (TRO.x0 + TRO.x1) / 2, -0.3, 0.0, 0.7); add("field", DP.x1, 1.4, 0.6, 0.6); }
+      add("dog", dog.x, dog.z, 0.3, 0.6);
+      add("gate", g.x, g.z, 0.5, job === "gather" ? 0.9 : 0.6);
+      if (job === "gather") { add("shep", SHEP.x, SHEP.z, 1.0, 0.6); add("pen", (PEN.x0 + PEN.x1) / 2, PEN.z0 + 0.3, 0.5, 0.7); }
+      else { var f = gateMid("field"); add("trough", (TRO.x0 + TRO.x1) / 2, -0.3, 0.0, 0.7); add("field", f.x, f.z, 0.6, 0.8); }
     });
     return list;
   }
+  // a part that isn't next: its real name as a small tag (and its own little motion)
+  function tagPart(part) {
+    if (part === "sheep") { var c = flockCentre(); snd.pop(); tag("Sheep", c.x, c.z, 1.2); return true; }
+    if (part === "dog") { snd.pop(); tag("Sheepdog", dog.x, dog.z, 0.9); return true; }
+    if (part === "shep") { whistle("walk"); shepCall = 1; tag("Shepherd", SHEP.x, SHEP.z, 2.0); return true; }
+    if (part === "gate") { var g = gateMid("gate"); snd.clunk(); tag("Gate", g.x, g.z, 1.2); return true; }
+    if (part === "pen") { snd.clunk(); tag("Pen", (PEN.x0 + PEN.x1) / 2, PEN.z1, 1.2); return true; }
+    if (part === "trough") { splash(); for (var i = 0; i < 3; i++) addPart({ kind: "ring", x: lerp(TRO.x0 + 0.3, TRO.x1 - 0.3, Math.random()), z: (Math.random() - 0.5) * 0.5, h: 0, life: 0.9 }); tag("Foot bath", (TRO.x0 + TRO.x1) / 2, 0, 0.6); return true; }
+    if (part === "field") { var f = gateMid("field"); snd.clunk(); tag("Field gate", f.x, f.z, 1.2); return true; }
+    return false;
+  }
+  function tapPart(part) {
+    if (locked()) return;
+    if (phase === "done") { again(); return; }   // no step row: a tap on the finished scene starts again
+    var d = STEP[stepId];
+    if (phase === "ready" && part && d.ok[part]) { go(); return; }
+    if (phase === "work") { if (!tagPart(part)) busyHint(); return; }
+    if (tagPart(part)) { glow = 2; return; }
+    hint();
+  }
+  // a drag that starts on the dog (or another part that gives the command) gives it when he lets go
+  var dragPart = null;
   Toybox.press(cv, {
     any: true,
     parts: partList,
-    tap: function (part) {
-      if (locked()) return;
-      var mine = false;
-      if (stepId === "bye" || stepId === "away") mine = part === "sheep" || part === "dog" || part === "shep";
-      else if (stepId === "pen") mine = part === "sheep" || part === "dog" || part === "shep" || part === "gate" || part === "pen";
-      else if (stepId === "open") mine = part === "gate" || part === "sheep" || part === "dog";
-      else if (stepId === "bath") mine = part === "sheep" || part === "trough" || part === "dog";
-      else if (stepId === "out") mine = part === "field" || part === "sheep" || part === "dog";
-      if (mine && phase === "ready") { go(); return; }
-      if (part === "sheep") { var c = flockCentre(); snd.pop(); tag("Sheep", c.x, c.z, 1.2); return; }
-      if (part === "dog") { snd.pop(); tag("Sheepdog", dog.x, dog.z, 0.9); return; }
-      if (part === "shep") { whistle("walk"); shepCall = 1; tag("Shepherd", SHEP.x, SHEP.z, 2.0); return; }
-      if (part === "gate") { snd.clunk(); tag("Gate", job === "gather" ? PEN.x0 : HP.x1, job === "gather" ? PEN.gz + 1.2 : 0, 1.2); return; }
-      if (part === "pen") { snd.clunk(); tag("Pen", (PEN.x0 + PEN.x1) / 2, PEN.z1, 1.2); return; }
-      if (part === "trough") { splash(); for (var i = 0; i < 3; i++) addPart({ kind: "ring", x: lerp(TRO.x0 + 0.3, TRO.x1 - 0.3, Math.random()), z: (Math.random() - 0.5) * 0.5, h: 0, life: 0.9 }); tag("Foot bath", (TRO.x0 + TRO.x1) / 2, 0, 0.6); return; }
-      if (part === "field") { snd.clunk(); tag("Field gate", DP.x1, 1.4, 1.2); return; }
-      if (phase === "done") coach.say("Tap Again!", 3); else steps.sayStep && steps.sayStep();
-      if (ghost) ghost.poke();
-    }
+    dragStart: function (part) { dragPart = part; },
+    up: function () { var p = dragPart; dragPart = null; if (p && !locked() && phase === "ready" && STEP[stepId].ok[p]) go(); },
+    tap: function (part) { tapPart(part); }
   });
+  // the yellow ring on the next thing to touch
+  function drawRing() {
+    var p = targetPt(); if (!p) return;
+    var b = cv.getBoundingClientRect(), x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
+  }
 
   // =====================================================================================================
   // Update
@@ -854,11 +839,13 @@ body.big #jobs { display: none; }
     if (L.t > 6) lamb = null;
   }
   function update(dt) {
-    time += dt; phaseT += dt;
+    time += dt; phaseT += dt; glow = Math.max(0, glow - dt);
     if (phase === "work" && wk) {
       wk.t += dt;
       if (stepId === "bye" || stepId === "away") workRun(dt);
       else if (stepId === "pen") workPen(dt);
+      else if (stepId === "shut") workShut(dt);
+      else if (stepId === "down") workDown(dt);
       else if (stepId === "open") workOpen(dt);
       else if (stepId === "bath") workBath(dt);
       else if (stepId === "out") workOut(dt);
@@ -887,19 +874,32 @@ body.big #jobs { display: none; }
   }
 
   // ---------- Cameras ----------
+  // the smallest box round some ground points (x, z), at least minW wide
+  function boxOf(pts, minW) {
+    var xa = 1e9, xb = -1e9, za = 1e9, zb = -1e9;
+    pts.forEach(function (q) { xa = Math.min(xa, q[0]); xb = Math.max(xb, q[0]); za = Math.min(za, q[1]); zb = Math.max(zb, q[1]); });
+    xa -= 1.1; xb += 1.1; za -= 0.4; zb += 0.2;   // small margins in depth: a tall stage looks steeply down on them
+    if (xb - xa < minW) { var m = (xa + xb) / 2; xa = m - minW / 2; xb = m + minW / 2; }
+    return { xa: xa, xb: xb, za: za, zb: zb };
+  }
   function wideBox() {
-    if (job === "gather") {
-      // on an upright phone the wide view frames the flock, the dog and the pen (following them), not the whole
-      // hill: the sheep stay a good size and there's no empty grass in front
-      if (split && W < 700 && flock.length && dog) {
-        var xa = PEN.x0, xb = PEN.x1, za = PEN.z0, zb = PEN.z1;
-        flock.concat([dog]).forEach(function (q) { xa = Math.min(xa, q.x); xb = Math.max(xb, q.x); za = Math.min(za, q.z); zb = Math.max(zb, q.z); });
-        xa -= 1.0; xb += 0.5; za -= 0.8; zb += 0.6;
-        if (xb - xa < 8) { var m = (xa + xb) / 2; xa = m - 4; xb = m + 4; }
-        return { xa: xa, xb: xb, za: za, zb: zb };
+    // the view frames the flock, the dog and what they are working toward (following them), not the whole hill:
+    // the sheep stay a good size and there's no empty grass
+    if (flock.length && dog) {
+      var pts = flock.map(function (s) { return [s.x, s.z]; });
+      pts.push([dog.x, dog.z]);
+      if (job === "gather") {
+        if (stepId === "bye") pts.push([SHEP.x, SHEP.z], [-8.2, 3.9], [3.4, 3.9], [-2.4, 8.5]);
+        else if (stepId === "away") pts.push([SHEP.x, SHEP.z], [PEN.x0, PEN.z0], [PEN.x1, PEN.z1], [-6.3, 3.6], [-2, 7.2]);
+        else pts.push([PEN.x0, PEN.z0], [PEN.x1, PEN.z1]);
+        return boxOf(pts, 9);
       }
-      return { xa: -9.6, xb: 7.8, za: -1.7, zb: 9.0 };
+      if (stepId === "out" || phase === "done") { pts.push([DP.x0, DP.z0], [DP.x1, DP.z1]); return boxOf(pts, 9); }
+      if (stepId === "open") pts.push([HP.x0, HP.z0], [HP.x1, HP.z1], [HP.x1 + 1.6, 0]);
+      else pts.push([TRO.x0, 0], [TRO.x1, 0]);
+      return boxOf(pts, 9);
     }
+    if (job === "gather") return { xa: -9.6, xb: 7.8, za: -1.7, zb: 9.0 };
     if (stepId === "out" || (phase === "done")) return { xa: -1.5, xb: 14.2, za: -1.7, zb: 7.4 };
     return { xa: -10.8, xb: 6.7, za: -1.7, zb: 4.2 };
   }
@@ -941,6 +941,7 @@ body.big #jobs { display: none; }
     ctx.clearRect(0, 0, W, H);
     views().forEach(function (V) { ctx.save(); ctx.translate(V.R.x, V.R.y); ctx.beginPath(); ctx.rect(0, 0, V.R.w, V.R.h); ctx.clip(); drawWorld(V); ctx.restore(); });
     if (split) { ctx.save(); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, VC.R.y); ctx.lineTo(W, VC.R.y); ctx.stroke(); ctx.restore(); }
+    if (!locked()) drawRing();
   }
   function put(V, x, z, h, dir, fn, mul) {
     var d = Math.abs(dir) < 0.12 ? (dir < 0 ? -0.12 : 0.12) : dir;
@@ -1129,7 +1130,6 @@ body.big #jobs { display: none; }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
-  showSteps();
   resetScene();
   resize();
   bringIn(firstStep());
@@ -1158,8 +1158,12 @@ body.big #jobs { display: none; }
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, step: stepId, cur: steps.current(), finished: steps.finished(), job: job, sheep: sheepN, coach: coach.text(), split: split, parts: parts.length, t: wk ? wk.t : -1, dog: { x: dog.x, z: dog.z, pose: dog.pose } }; },
-    screen: function (id) { return partScreen(id || stepId); },
+    state: function () { var d = STEP[stepId]; return { phase: phase, step: stepId, part: phase === "ready" ? d.part : (phase === "done" ? "field" : null), ok: Object.keys(d.ok), job: job, sheep: sheepN, coach: coach.text(), parts: parts.length, t: wk ? wk.t : -1, gate: gate, gate2: gate2, view: { T: VW.T, k: VW.k, gY: VW.gY, box: VW.box, h: VW.R.h }, dog: { x: dog.x, z: dog.z, pose: dog.pose } }; },
+    tap: function (p) { tapPart(p || null); },
+    next: function () { tapPart(phase === "ready" ? STEP[stepId].part : null); },
+    target: function () { return targetPt(); },
+    screen: function (id) { return partPt(id || STEP[stepId].part); },
+    job: function (id) { switchJob(id); jobs.set(job); },
     surprise: surprise,
     ghost: function () { return ghost.show(); }
   };
