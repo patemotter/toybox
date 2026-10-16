@@ -68,10 +68,12 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Hunt"), `ewe` ("Hello Ewe!": scrape the shed passage, count four sheep onto the parlor platform, the blue foot
   spray, the straw chopper beds the shed; script `farm/ewe.js`), `mushrooms` ("Mighty Mushrooms": the crane lorry's straw,
   the steaming compost bunker, filling the growing shelves, picking; script `farm/mushrooms.js`); both built hands-on like
-  Timberrrrr! (2026-10-15); `field.html` only redirects to spuds. Each station not yet rebuilt: a step row (plus a job bar where the
-  episode has two jobs), a split stage on tall screens (the whole rig on top, a close-up of the work below). A
-  rebuilt hands-on station follows Timberrrrr!: no step row, one view framed on the work, the split close-up only
-  where it shows something the main view can't (the dad, 2026-10-15: "some dual views add something, Timberrr did
+  Timberrrrr! (2026-10-15); `field.html` only redirects to spuds. **Every station is hands-on like Timberrrrr!** (rebuilt
+  2026-10-15/16): no step row and no Go; he works each machine on the scene, a yellow ring and the instruction show
+  the next part, other parts show their name, a tap after the last step starts again; job tabs stay; a `?debug`
+  hook `window.__farm` (`state()` with the wanted part, `tap(part)`) plays each station in tests. The panel holds only
+  the bottom bar (`tb-panel-bar`: a slim column of New and Surprise in landscape). One view framed on the work, the
+  split close-up only where it shows something the main view can't (the dad, 2026-10-15: "some dual views add something, Timberrr did
   not"). Kept: Spuds in Mud, Combine Time (corner inset), Brilliant Baler, Glorious Grass, Munchy Crunchy, Juicy
   Squeezy, Feathered Friends (inside the hen house), Caterpillar Hunt (under the wheel). One view: Timberrrrr!,
   Mucky Muck, Moooovie Time, Come Bye (they only repeated the main view bigger). Shared
