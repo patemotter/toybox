@@ -47,8 +47,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-/* The Go says a short phrase ("Drive wheels"): on a narrow row it wraps to two lines instead of being cut off. */
-#steps .tb-go-word { white-space: normal; text-align: center; text-wrap: balance; }
+/* No step row (like Timberrrrr!): he works the machines on the stage; the coach line and the yellow ring on the
+   scene show what to touch next. The panel holds only the bottom bar. */
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -62,13 +62,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A wet field with Tractor Ted on wheels and a tractor on tracks, and a cut-away of the soil underneath. Tap Tractor Ted to drive across."></canvas>
+      <canvas id="cv" role="img" aria-label="A wet field with a tractor on wheels and a tractor on tracks, and a cut-away of the soil underneath. Drive the tractor across the field."></canvas>
       <div class="tb-counter loads" id="loads">Worms: 0</div>
       <div id="coach"></div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
     <section class="tb-panel" id="panel">
-      <ol id="steps"></ol>
       <div id="bottom"></div>
     </section>
   </div>
@@ -78,14 +77,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 (function () {
   "use strict";
   // Caterpillar Hunt: tractors on tracks ("caterpillar tracks") or on wheels, and looking after the soil.
-  // A soft, wet field. Four jobs, one tap each:
-  //   Wheels: the green tractor drives across on its big tyres. They sink and leave deep ruts with puddles; the
+  // A soft, wet field. Four jobs he does himself, built like Timberrrrr! (farm/woods.js): no step row, a yellow
+  // ring on the field view and one coach line point at the next thing to touch; each tap plays that one control's
+  // motion (a tractor also drives with a drag: let go and it carries on across). After the last step a tap on the
+  // scene starts again.
+  //   Wheels: the red tractor drives across on its big tyres. They sink and leave deep ruts with puddles; the
   //           cut-away shows the tyres squashing the crumbly soil into a hard flat layer (the worms wriggle away).
   //   Tracks: the big tracked tractor drives across the lane next to it. The long rubber tracks spread its weight:
   //           only a light flat print, and the soil underneath stays crumbly.
-  //   Loosen: the tracked tractor pulls the subsoiler down the squashed lane. Its long legs run through the
+  //   Loosen: he taps the subsoiler to lower its legs into the ground at the edge of the field, then drives the
+  //           tracked tractor, which pulls the subsoiler down the squashed lane. Its long legs run through the
   //           ground under the hard layer and crack it into crumbs; the packer roller flattens the ruts.
-  //   Look:   the farmer digs out a spadeful: dark crumbly soil, roots, and worms wriggling out of it.
+  //   Look:   Farmer Tom walks in; a tap on the spade pushes it into the soil, the next tap lifts out a spadeful:
+  //           dark crumbly soil, roots, and worms wriggling out of it.
   // Then weeks go by and the field is wet again. The stage is split like Spuds in Mud: the field with the whole
   // machine on top (the farm's shared side view) and a close-up below (or beside) that always shows the work:
   // a cut-away of the soil along the lane being driven, with the machine on top of it.
@@ -133,22 +137,32 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var RIGS = {
     wheels: { ext: [-1.3, 4.2], x0: -4.4, end: L + 0.45, v: 3.2, lane: "w", name: "Wheeled tractor" },
     tracks: { ext: [-1.25, 4.6], x0: -4.75, end: L + 0.25, v: 3.2, lane: "t", name: "Tracked tractor" },
-    sub: { ext: [THITCH[0] - 2.75, 4.6], x0: -4.7, end: L - ROLL + 0.1, v: 3.6, lane: "w", name: "Subsoiler" }
+    sub: { ext: [THITCH[0] - 2.75, 4.6], x0: -LEG, end: L - ROLL + 0.1, v: 3.6, lane: "w", name: "Subsoiler" }
   };
-  // The steps. go = the Go pill, ready = the coach while it waits for him, work = while it works, busy = when he
-  // taps while it works.
+  // The jobs: work = the coach while it works, busy = when he taps while it works.
   var JOBS = {
-    wheels: { go: "Drive wheels", step: "Wheels", ready: "Drive across the wet field.", work: "The heavy wheels squash the soil.", busy: "The tractor is driving across." },
-    tracks: { go: "Drive tracks", step: "Tracks", ready: "Now try the tractor on tracks.", work: "The long tracks spread the weight.", busy: "The tracked tractor is driving across." },
-    sub: { go: "Loosen it", step: "Loosen", ready: "Loosen the squashed soil.", work: "The subsoiler cracks the hard layer.", busy: "The subsoiler is loosening the soil." },
-    look: { go: "Look inside", step: "Look", ready: "Dig up some soil and look.", work: "The spade lifts out the soil.", busy: "The farmer is digging." }
+    wheels: { work: "The heavy wheels squash the soil.", busy: "The tractor is driving across." },
+    tracks: { work: "The long tracks spread the weight.", busy: "The tracked tractor is driving across." },
+    sub: { work: "The subsoiler cracks the hard layer.", busy: "The subsoiler is loosening the soil." },
+    look: { work: "The spade lifts out the soil.", busy: "Farmer Tom is digging." }
+  };
+  // What he does next (job.sub): the instruction and the part on the field view that does it (the ring sits on it).
+  var NEXT = {
+    "wheels.drive": { say: "Drive the tractor on wheels across the wet field.", part: "rig" },
+    "tracks.drive": { say: "Drive the tractor on tracks across the wet field.", part: "rig" },
+    "sub.lower": { say: "Tap the subsoiler to lower its legs into the soil.", part: "sub" },
+    "sub.drive": { say: "Drive the tractor on tracks to pull the subsoiler.", part: "rig" },
+    "look.dig": { say: "Tap the spade to dig into the soil.", part: "spade" },
+    "look.lift": { say: "Tap the spade to lift out the soil.", part: "spade" },
+    "look.again": { say: "Tap the field to start again.", part: "field" }
   };
   var ORDER = ["wheels", "tracks", "sub", "look"];
-  var job = "wheels", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
+  var job = "wheels", sub = "drive", phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
+  var glow = 0, misses = 0;                         // the ring glows after a hint; wrong tries (help on the second)
   var m = null, leaving = null;                     // the machine working now, the one driving away
   var fm = { on: false, x: 0, t: 0, walk: 0, state: "away" };   // the farmer for the Look step
   var FX = L * 0.5;                                  // where he digs
-  var dg = { t: 0, n: 0 };                           // the dig: time, worms out
+  var dg = { t: 0, n: 0, goal: 0 };                  // the dig: time, worms out, where this tap's motion stops
   var sur = null, growG = 0;
 
   function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
@@ -156,10 +170,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
   // ---------- The stage: the field view and the close-up ----------
   var phoneCoach = window.matchMedia ? matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
-  function topRoom() { return phoneCoach && phoneCoach.matches ? 34 : 66; }
+  function topRoom() { return phoneCoach && phoneCoach.matches ? 34 : 50; }
   function gyOf(w, h) { var port = h > w * 1.05, short = !port && h < 460; return h * (short ? 0.75 : 0.7); }
-  var zoomF = { span: 7.4, target: 7.4 };
-  var scF = new Farm.Scene({ L: L, xmin: -16, xmax: L + 20, fit: function (w, h) { return Math.min(w * 0.9 / zoomF.span, (gyOf(w, h) - topRoom()) / 4.5); } });
+  // span = metres across, tall = metres high the field view must show (less for Farmer Tom than for a tractor)
+  var zoomF = { span: 7.4, target: 7.4, tall: 4.5, tallT: 4.5 };
+  var scF = new Farm.Scene({ L: L, xmin: -16, xmax: L + 20, fit: function (w, h) { return Math.min(w * 0.9 / zoomF.span, (gyOf(w, h) - topRoom()) / zoomF.tall); } });
   var parts = new Farm.Particles();
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
   var W = 300, H = 300, DPR = 1, time = 0;
@@ -171,7 +186,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     RG.side = W / H > 1.4;
     if (RG.side) { var fw = Math.round(W * 0.54); RG.f = { x: 0, y: 0, w: fw, h: H }; RG.c = { x: fw, y: 0, w: W - fw, h: H }; }
-    else { var fh = Math.round(H * 0.45); RG.f = { x: 0, y: 0, w: W, h: fh }; RG.c = { x: 0, y: fh, w: W, h: H - fh }; }
+    else { var fh = Math.round(H * 0.5); RG.f = { x: 0, y: 0, w: W, h: fh }; RG.c = { x: 0, y: fh, w: W, h: H - fh }; }
     // On phones the coach pill sits at the bottom of the stage: keep the close-up's story above it.
     RG.pad = phoneCoach && phoneCoach.matches ? 60 : 8;
     scF.layout(RG.f.w, RG.f.h);
@@ -452,160 +467,126 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.restore();
   }
 
-  // ---------- Pictures for the step row ----------
-  var picCache = {};
-  function myPic(id) {
-    if (picCache[id]) return picCache[id];
-    var c = document.createElement("canvas"), PW = 168, PH = 120, x;
-    c.width = PW; c.height = PH;
-    try { x = c.getContext("2d"); } catch (e) { x = null; }
-    if (!x) return "";
-    var keep = ctx, kt = time; ctx = x; time = 0;
-    try {
-      if (id === "wheels") {
-        Farm.inUnits(x, PW * 0.27, PH * 0.84, 24, 2.6, function () {
-          R(ctx, -2.2, -0.05, 7.6, 0.6, 0.1, MUD, 0);
-          R(ctx, -2.2, 0.0, 2.2, 0.18, 0.06, MUD_D, 0);
-          ctx.translate(0, 0.12); D.tractor(ctx, { wheel: 0 });
-        });
-      } else if (id === "tracks") {
-        Farm.inUnits(x, PW * 0.27, PH * 0.9, 22, 2.6, function () { trackedTractor({ wheel: 0 }); });
-      } else if (id === "sub") {
-        Farm.inUnits(x, PW * 0.72, PH * 0.42, 40, 2.6, function () {
-          R(ctx, -3.1, SUB_G, 3.6, 0.7, 0, MUD, 0); Ln(ctx, -3.1, SUB_G, 0.5, SUB_G, INK, 0.05);
-          subsoiler({});
-        });
-      } else {
-        Farm.inUnits(x, PW * 0.5, PH * 0.5, 120, 2.6, function () {
-          R(ctx, -0.2, -0.05, 0.4, 0.38, 0.04, MUD, LWu());
-          for (var k = 0; k < 8; k++) C(ctx, -0.15 + hash(k, 1) * 0.3, 0.0 + hash(k, 2) * 0.3, 0.03, "#8A5A36", 0);
-          spade([-0.45, -0.35], [-0.22, 0.31], [0.22, 0.36]);
-          worm(0.05, 0.12, 0.3, -0.5, 1, 1, 0.045);
-        });
-      }
-    } finally { ctx = keep; time = kt; }
-    var url = "";
-    try { url = c.toDataURL("image/png"); } catch (e) { url = ""; }
-    picCache[id] = url ? '<img alt="" src="' + url + '" style="width:100%;height:100%;object-fit:contain;display:block">' : "";
-    return picCache[id];
-  }
-
   // ---------- The flow ----------
   function setPhase(p) { phase = p; phaseT = 0; }
-  function newRig(kind, fromX) { var g = RIGS[kind]; return { kind: kind, x: fromX, v: 0, r: lanes[g.lane].r, wheel: 0, lift: kind === "sub" ? 1 : 0, sink: 0, roll: 0, flash: 0 }; }
+  function key() { return job + "." + sub; }
+  function want() { return phase === "ready" || phase === "done" ? (NEXT[key()] || {}).part || null : null; }
+  // The instruction line: it waits until a passing information line has had its time (coach.step would cut it).
+  var sayEnd = 0, pending = null;
+  function say(text, sec) { coach.say(text, sec); sayEnd = time + Math.max(3, sec || 3.5); }
+  function stepLine(text) { pending = text; if (time >= sayEnd) { coach.step(text); pending = null; } }
+  function setSub(sb) { sub = sb; setPhase("ready"); misses = 0; var d = NEXT[key()]; if (d) stepLine(d.say); if (ghost) ghost.poke(); }
+  function newRig(kind, fromX) { var g = RIGS[kind]; return { kind: kind, x: fromX, v: 0, r: lanes[g.lane].r, wheel: 0, lift: kind === "sub" ? 1 : 0, lowered: false, sink: 0, roll: 0, flash: 0 }; }
   // the next machine drives in from the left and stops at the edge of the field
   function bringIn(kind) {
-    job = kind; steps.at(kind);
+    job = kind; sub = kind === "sub" ? "lower" : "drive";
     m = newRig(kind, RIGS[kind].x0 - 10);
     zoomF.target = kind === "sub" ? 10.6 : (kind === "tracks" ? 7.9 : 7.4);
     cmode = kind;
-    setPhase("arrive"); steps.busy(true);
+    setPhase("arrive");
   }
-  function arrived() { setPhase("ready"); steps.busy(false); m.v = 0; tagRig(); snd.clunk(); }
-  function go() {
-    if (locked()) return false;
-    if (phase === "ready" && m && job !== "look") {
-      setPhase("drive"); auto = true; steps.busy(true);
-      snd.horn(); coach.say(JOBS[job].work, 4);
-      if (ghost) ghost.learned("go");
-      return true;
-    }
-    if (phase === "drive" && !auto) { auto = true; steps.busy(true); return true; }
-    if (phase === "ready" && job === "look") {
-      setPhase("dig"); dg.t = 0; dg.n = 0; steps.busy(true); fm.state = "dig";
-      coach.say(JOBS.look.work, 4); snd.tick();
-      if (ghost) ghost.learned("go");
-      return true;
-    }
+  function arrived() { m.v = 0; tagRig(); snd.clunk(); setSub(sub); }
+  // Drive: the tractor sets off across the field (a tap drives it all the way; a drag drives it by hand).
+  function drive() {
+    setPhase("drive"); auto = true;
+    snd.horn(); say(JOBS[job].work, 4);
+    return true;
+  }
+  // Lower: the subsoiler's legs go down into the soil at the edge of the field.
+  function lower() {
+    setPhase("lower"); m.lowered = true; snd.clunk();
+    for (var i = 0; i < 6; i++) parts.add({ kind: "chunk", x: m.x + LEG + (Math.random() - 0.3) * 0.5, h: 0.05, r: 0.995, vx: (Math.random() - 0.5) * 1.2, vh: 1.0 + Math.random(), life: 0.7, size: 0.07, spin: 5, col: "#7B4E2E" });
+    say("The subsoiler's legs go into the soil.", 3.5);
+    return true;
+  }
+  // Dig: the spade goes into the soil (his foot pushes it down); Lift: it levers back and lifts out the soil.
+  function dig(goal) { setPhase("dig"); dg.goal = goal; fm.state = "dig"; snd.tick(); if (goal > 1) say(JOBS.look.work, 4); return true; }
+  var DIG_IN = 0.85, DIG_END = 2.35 + 4 * 0.7 + 0.5;
+  // He touched `part` while it is his turn: do it if it is the next thing (true), or not (false).
+  function act(part) {
+    if (locked() || phase !== "ready") return false;
+    var k = key();
+    if (k === "wheels.drive" || k === "tracks.drive" || k === "sub.drive") return part === "rig" || part === "rigc" ? drive() : false;
+    if (k === "sub.lower") return part === "sub" || part === "rigc" ? lower() : false;
+    if (k === "look.dig") return part === "spade" || part === "farmer" || part === "slice" ? dig(DIG_IN) : false;
+    if (k === "look.lift") return part === "spade" || part === "farmer" || part === "slice" ? dig(DIG_END) : false;
     return false;
   }
   function passDone() {
     auto = false; grab = null;
     var k = m.kind;
-    steps.done(k);
     leaving = m; m = null;
-    if (k === "wheels") { coach.say("Look at the deep ruts!", 3.5); bringIn("tracks"); }
-    else if (k === "tracks") { coach.say("Only a light print. The soil stays crumbly.", 4); bringIn("sub"); }
+    if (k === "wheels") { bringIn("tracks"); say("Look at the deep ruts!", 3.5); }
+    else if (k === "tracks") { bringIn("sub"); say("Only a light print. The soil stays crumbly.", 4); }
     else {
-      coach.say("The soil is loose and crumbly again.", 4);
-      job = "look"; steps.busy(true);
-      fm.on = true; fm.state = "walk"; fm.x = FX - 4.2; fm.t = 0;
-      zoomF.target = 6.6; cmode = "look";
+      job = "look"; sub = "dig";
+      fm.on = true; fm.state = "walk"; fm.x = FX - 4.2; fm.t = 0; dg.t = 0; dg.n = 0;
+      zoomF.target = 4.8; cmode = "look";
       setPhase("walk");
+      say("The soil is loose and crumbly again.", 4);
     }
   }
-  function farmerHere() { fm.state = "stand"; setPhase("ready"); steps.busy(false); tagAt("Spade", fScreen(0.45, -1.1).x, fScreen(0.45, -1.1).y); }
+  function farmerHere() { fm.state = "stand"; tagAt("Spade", fScreen(0.45, -1.1).x, fScreen(0.45, -1.1).y); setSub("dig"); }
   function finishJob() {
-    setPhase("done"); steps.done("look"); steps.finish("Again!"); steps.busy(false); fm.state = "hold";
-    coach.say("Worms love loose, crumbly soil!", 5);
+    fm.state = "hold"; sub = "again"; setPhase("done");
+    say("Worms love loose, crumbly soil!", 5);
+    stepLine(NEXT["look.again"].say);
     world(function (w) { w.soil = "loose"; });
     Toybox.kind();
   }
   function startGrow() {
     // Again: weeks go by; it rains and the field is soft and wet again
-    setPhase("grow"); steps.busy(true); growG = 0;
-    fm.state = "leave";
+    setPhase("grow"); growG = 0;
+    fm.state = "leave"; pending = null; coach.clear();
     cmode = "grow"; zoomF.target = 12;
-    coach.say("Weeks go by. The rain makes the field wet.", 3.5);
+    say("Weeks go by. The rain makes the field wet.", 3.5);
   }
   function again() {
     if (phase !== "done") return false;
     if (ghost) ghost.learned("again");
-    steps.reset();
     startGrow();
     return true;
   }
 
-  // ---------- Steps, bar, ghost ----------
-  var STEPS = ORDER.map(function (id) { var J = JOBS[id]; return { id: id, name: J.step, pic: myPic(id), go: J.go, coach: J.ready }; });
+  // ---------- Ghost, bottom bar, hints ----------
   var ghost = Toybox.ghost({
     max: 3,
-    onShow: function (p, on) { if (steps) steps.pulse(on); },
     plan: function () {
       if (locked()) return null;
       var b = cv.getBoundingClientRect();
-      if (phase === "ready" && m) {
-        var p = rigPart();
-        if (ghost.shown("go") >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: "go" };
-        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: "go" };
+      if (phase === "ready") {
+        var p = targetPt(); if (!p) return null;
+        var k = key();
+        // the drives: the tap first, the drag on its second showing
+        if (NEXT[k].part === "rig" && ghost.shown(k) >= 1) return { pts: [[b.left + p.x, b.top + p.y], [b.left + p.x + Math.min(RG.f.w * 0.3, 140), b.top + p.y]], key: k };
+        return { pts: [[b.left + p.x, b.top + p.y]], tap: true, key: k };
       }
-      if (phase === "ready" && job === "look") { var q = fScreen(0.45, -0.9); return { pts: [[b.left + q.x, b.top + q.y]], tap: true, key: "go" }; }
-      if (phase === "done" && phaseT > 4) { var g = steps.go.el.getBoundingClientRect(); if (g.width) return { pts: [[g.left + g.width / 2, g.top + g.height / 2]], tap: true, key: "again" }; }
+      if (phase === "done" && phaseT > 4) return { pts: [[b.left + RG.f.x + RG.f.w * 0.5, b.top + RG.f.y + RG.f.h * 0.75]], tap: true, key: "again" };
       return null;
     }
   });
-  var steps = Toybox.steps($("steps"), {
-    steps: STEPS, coach: coach, ghost: ghost,
-    onGo: function () { return doGo(); },
-    onAgain: function () { again(); },
-    onBusy: function () { busyHint(); }
-  });
-  function doGo() {
-    if (locked()) return false;
-    if (phase === "ready" || (phase === "drive" && !auto)) return go();
-    if (phase === "done") return again();
-    busyHint(); return true;
-  }
+  function hint() { var d = NEXT[key()]; if (d) say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function busyHint() {
-    if (phase === "grow") coach.say("The field is getting wet again.", 3);
-    else if (phase === "drive") { snd.horn(); if (m) m.flash = 1.2; coach.say(JOBS[job].busy, 3); }
-    else if (phase === "arrive") coach.say(job === "sub" ? "Here comes the subsoiler." : "Here comes the tractor.", 3);
-    else if (phase === "walk") coach.say("Here comes the farmer.", 3);
-    else if (phase === "dig") coach.say(JOBS.look.busy, 3);
+    if (phase === "grow") say("The field is getting wet again.", 3);
+    else if (phase === "drive") { snd.horn(); if (m) m.flash = 1.2; say(JOBS[job].busy, 3); }
+    else if (phase === "arrive") say(job === "sub" ? "Here comes the subsoiler." : "Here comes the tractor.", 3);
+    else if (phase === "lower") say("The subsoiler's legs go into the soil.", 3);
+    else if (phase === "walk") say("Here comes Farmer Tom.", 3);
+    else if (phase === "dig") say(JOBS.look.busy, 3);
   }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
   function startOver() {
     if (locked()) return;
     parts.clear(); cbits.length = 0; sur = null; auto = false; grab = null; leaving = null;
-    fm.on = false; fm.state = "away";
+    fm.on = false; fm.state = "away"; dg.t = 0; dg.n = 0;
     resetLanes(); resetWorms();
-    steps.reset();
+    pending = null; coach.clear();
     bringIn("wheels");
     m.x = RIGS.wheels.x0 - 5;
-    zoomF.span = zoomF.target; scF.layout(RG.f.w, RG.f.h);
+    zoomF.span = zoomF.target; zoomF.tall = zoomF.tallT = 4.5; scF.layout(RG.f.w, RG.f.h);
     scF.follow(camTarget(), 0, true); snapClose();
-    coach.say("A new wet field!", 3);
+    say("A new wet field!", 3);
   }
 
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
@@ -912,7 +893,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // The farmer and his spade in the close-up (Look): the spade goes in, levers back, lifts out a slice of soil;
   // worms wriggle out of it.
   function spadePose() {
-    var t = phase === "dig" ? dg.t : (phase === "done" || phase === "grow" ? 9 : 0);
+    var t = phase === "done" || phase === "grow" ? 9 : dg.t;
     var dig = ease(clamp(t / 0.8, 0, 1)), lev = ease(clamp((t - 0.8) / 0.5, 0, 1)), lift = ease(clamp((t - 1.3) / 0.9, 0, 1));
     var tip = [0.45, -0.02 + dig * 0.34], top = [0.45, tip[1] - 0.3], grip = [0.45, -1.05 + dig * 0.25];
     // lever: tip about the blade's tip
@@ -1060,54 +1041,93 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var p = m.kind === "sub" ? mScreen(m, 0.6, -1.8) : mScreen(m, 1.4, -1.6);
     return { x: p.x, y: p.y, r: Math.max(2.4 * p.s, 46) };
   }
+  // the subsoiler on the field view (its red toolbar)
+  function subPart() {
+    if (!m || m.kind !== "sub") return null;
+    var p = mScreen(m, THITCH[0] - 1.0, THITCH[1] - 0.35 - m.lift * 0.6);
+    return { x: p.x, y: p.y, r: Math.max(1.2 * p.s, 40) };
+  }
+  // the spade in Farmer Tom's hands on the field view
+  function spadePart() { var sp = spadePose(), q = [lerp(sp.grip[0], sp.tip[0], 0.45), lerp(sp.grip[1], sp.tip[1], 0.45)], p = fScreen(q[0], q[1]); return { x: p.x, y: p.y, r: Math.max(0.6 * scF.S(1), 40) }; }
+  // where the ring goes: the next thing to touch, in canvas px (null: nothing)
+  function targetPt() {
+    var w = want();
+    if (w === "rig") return rigPart();
+    if (w === "sub") return subPart();
+    if (w === "spade" && fm.on) return spadePart();
+    return null;
+  }
+  var NAMES = { rig: null, sub: "Subsoiler", spade: "Spade", farmer: "Farmer Tom" };
   var press = Toybox.press(cv, {
     any: true,
     parts: function () {
-      var b = cv.getBoundingClientRect(), list = [], c = RG.c;
-      if (m && phase !== "grow") { var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r }); }
+      var b = cv.getBoundingClientRect(), list = [], c = RG.c, q;
+      if (m && phase !== "grow") {
+        var p = rigPart(); list.push({ id: "rig", x: b.left + p.x, y: b.top + p.y, r: p.r });
+        q = subPart(); if (q) list.push({ id: "sub", x: b.left + q.x, y: b.top + q.y, r: q.r });
+      }
       if (m && (cmode === m.kind)) {
         var mx = m.kind === "sub" ? m.x + LEG : m.x + 1.3, my = m.kind === "sub" ? 0.1 : -0.8;
         var qx = CX(mx), qy = CY(my);
         if (qx > 0 && qx < c.w) list.push({ id: "rigc", x: b.left + c.x + qx, y: b.top + c.y + qy, r: Math.max(1.1 * CL.u, 50) });
       }
       if (fm.on && (phase === "ready" || phase === "dig" || phase === "done")) {
-        var f = fScreen(0.3, -0.9); list.push({ id: "farmer", x: b.left + f.x, y: b.top + f.y, r: Math.max(1.0 * scF.S(1), 40) });
-        if (cmode === "look") list.push({ id: "slice", x: b.left + c.x + CX(fm.x + 0.6), y: b.top + c.y + CY(phase === "ready" ? -0.4 : -0.8), r: Math.max(0.35 * CL.u, 44) });
+        q = spadePart(); list.push({ id: "spade", x: b.left + q.x, y: b.top + q.y, r: q.r });
+        var f = fScreen(0.0, -1.2); list.push({ id: "farmer", x: b.left + f.x, y: b.top + f.y, r: Math.max(0.5 * scF.S(1), 36) });
+        if (cmode === "look") list.push({ id: "slice", x: b.left + c.x + CX(fm.x + 0.6), y: b.top + c.y + CY(phase === "ready" && sub === "dig" ? -0.4 : -0.8), r: Math.max(0.35 * CL.u, 44) });
       }
       return list;
     },
     dragStart: function (part, e, s) {
-      if (locked() || part !== "rig" || !m || (phase !== "ready" && phase !== "drive")) return;
-      if (phase === "ready") go();
-      auto = false; grab = { off: scF.wx(s.x - cv.getBoundingClientRect().left, m.r < 1.05 ? 1 : 1) - m.x };
-      if (ghost) ghost.learned("go");
+      grab = null;
+      if (locked() || !m || part !== "rig") return;
+      var k = key();
+      if (phase === "ready") {
+        if (k !== "wheels.drive" && k !== "tracks.drive" && k !== "sub.drive") return;
+        drive();
+      } else if (phase !== "drive") return;
+      auto = false; grab = { off: scF.wx(s.x - cv.getBoundingClientRect().left, 1) - m.x };
+      if (ghost) ghost.learned(k);
+      glow = 0;
     },
     move: function (part, e, s) { if (grab) grab.to = scF.wx(s.x - cv.getBoundingClientRect().left, 1) - grab.off; },
-    up: function (part, e, s) { if (grab && !s.tap && phase === "drive") { auto = true; steps.busy(true); } grab = null; },
-    tap: function (part, x, y) {
-      if (locked()) return;
-      var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
-      if (part) {
-        if (phase === "ready" || (phase === "drive" && !auto)) { go(); return; }
-        if (part === "rig") { snd.horn(); if (m) m.flash = 1.2; tagRig(); return; }
-        if (part === "rigc") { tagAt(closeName(px - RG.c.x, py - RG.c.y), px, py - 30); snd.tick(); return; }
-        if (part === "farmer") { tagAt("Farmer", px, py - 40); snd.tick(); return; }
-        if (part === "slice") { wiggleWorms(); tagAt(phase === "done" ? "Earthworms" : "Crumbly soil", px, py - 40); snd.pop(); return; }
-      }
-      // in the close-up: say what is there (and wiggle a worm under the finger)
-      if (px >= RG.c.x && py >= RG.c.y) {
-        var lx = px - RG.c.x, ly = py - RG.c.y, w = wormAt(lx, ly);
-        if (w) { w.wig = 1.2; tagAt("Earthworm", px, py - 30); snd.pop(); }
-        else { tagAt(closeName(lx, ly), px, py - 30); snd.tick(); }
-        if (ghost) ghost.poke();
-        return;
-      }
-      // anywhere else in the field: a little splash of mud, and the step's line again
-      var rr2 = clamp(scF.B / Math.max(4, py - scF.hY), 0.6, 5);
-      for (var i = 0; i < 5; i++) parts.add({ kind: "dot", x: scF.wx(px, Math.min(1, rr2)) + (Math.random() - 0.5) * 0.4, h: 0.05, r: Math.min(1, rr2), vx: (Math.random() - 0.5) * 1.5, vh: 1.5 + Math.random(), life: 0.7, size: 0.06, col: Math.random() < 0.5 ? MUD_D : WATER });
-      steps.sayStep && steps.sayStep(); if (ghost) ghost.poke();
-    }
+    up: function (part, e, s) {
+      var was = grab; grab = null;
+      if (was) { if (!s.tap && phase === "drive") auto = true; return; }
+      // a press that wandered a little on a part still counts as touching it
+      if (!s.tap && part && !locked()) tapPart(part, s.x, s.y);
+    },
+    tap: function (part, x, y) { if (!locked()) tapPart(part, x, y); }
   });
+  // He touched the scene: the next thing does its motion; other parts say their name; anywhere else, a hint.
+  function tapPart(part, x, y) {
+    var b = cv.getBoundingClientRect(), px = x - b.left, py = y - b.top;
+    if (phase === "done") { again(); return; }    // no step row: a tap on the finished scene starts again
+    if (phase === "drive" && !auto && (part === "rig" || part === "rigc")) { auto = true; return; }
+    if (phase === "ready") {
+      var k = key();
+      if (act(part)) { if (ghost) ghost.learned(k); glow = 0; return; }
+      // the subsoiler is still up: the first time a hint, the second time its legs go down for him
+      if (k === "sub.lower" && part === "rig") { if (misses++ >= 1) { lower(); if (ghost) ghost.learned(k); glow = 0; } else hint(); return; }
+    }
+    if (part === "rig") { snd.horn(); if (m) m.flash = 1.2; tagRig(); if (phase !== "ready") busyHint(); return; }
+    if (part === "rigc") { tagAt(closeName(px - RG.c.x, py - RG.c.y), px, py - 30); snd.tick(); return; }
+    if (part === "sub" || part === "spade" || part === "farmer") { tagAt(NAMES[part], px, py - 40); snd.tick(); return; }
+    if (part === "slice") { wiggleWorms(); tagAt(dg.t > 2.3 ? "Earthworms" : "Crumbly soil", px, py - 40); snd.pop(); return; }
+    // in the close-up: say what is there (and wiggle a worm under the finger)
+    if (px >= RG.c.x && py >= RG.c.y) {
+      var lx = px - RG.c.x, ly = py - RG.c.y, w = wormAt(lx, ly);
+      if (w) { w.wig = 1.2; tagAt("Earthworm", px, py - 30); snd.pop(); }
+      else { tagAt(closeName(lx, ly), px, py - 30); snd.tick(); }
+      if (phase === "ready") glow = 2;
+      if (ghost) ghost.poke();
+      return;
+    }
+    // anywhere else in the field: a little splash of mud, and the instruction again
+    var rr2 = clamp(scF.B / Math.max(4, py - scF.hY), 0.6, 5);
+    for (var i = 0; i < 5; i++) parts.add({ kind: "dot", x: scF.wx(px, Math.min(1, rr2)) + (Math.random() - 0.5) * 0.4, h: 0.05, r: Math.min(1, rr2), vx: (Math.random() - 0.5) * 1.5, vh: 1.5 + Math.random(), life: 0.7, size: 0.06, col: Math.random() < 0.5 ? MUD_D : WATER });
+    if (phase === "ready") hint(); else busyHint();
+  }
   function wiggleWorms() { worms.w.forEach(function (w) { w.wig = 1.2; }); }
   function wormAt(lx, ly) {
     var ln = clLane(), list = ln === lanes.t ? worms.t : worms.w, best = null, bd = Math.max(28, CL.u * 0.18);
@@ -1177,9 +1197,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         }
       }
       // the legs go in at the start of the field and come out at the end
-      var down = leg > -0.3 && leg < L + 0.2 ? 0 : 1;
-      if (mm === m && phase !== "drive" && phase !== "ready") down = 1;
-      if (mm === m && phase === "ready") down = 1;
+      var down = mm.lowered && leg < L + 0.2 ? 0 : 1;
       mm.lift += (down - mm.lift) * Math.min(1, dt * 3.5);
       mm.roll += mm.v * dt;
     }
@@ -1187,7 +1205,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function update(dt) {
     time += dt; phaseT += dt;
     var drive = 0, i;
-    if (Math.abs(zoomF.span - zoomF.target) > 0.02) { zoomF.span += (zoomF.target - zoomF.span) * Math.min(1, dt * 2.2); scF.layout(RG.f.w, RG.f.h); }
+    zoomF.tallT = cmode === "look" ? 2.7 : 4.5;
+    if (Math.abs(zoomF.span - zoomF.target) > 0.02 || Math.abs(zoomF.tall - zoomF.tallT) > 0.02) {
+      zoomF.span += (zoomF.target - zoomF.span) * Math.min(1, dt * 2.2); zoomF.tall += (zoomF.tallT - zoomF.tall) * Math.min(1, dt * 2.2);
+      scF.layout(RG.f.w, RG.f.h);
+    }
     if (phase === "arrive" && m) {
       var g = RIGS[m.kind], d = g.x0 - m.x; m.v = clamp(d * 1.6, 1.2, 7); m.x += Math.min(m.v * dt, Math.max(d, 0.001)); drive = 0.6;
       if (d < 0.02) { m.x = g.x0; arrived(); }
@@ -1201,15 +1223,17 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else if (phase === "walk") {
       fm.x = Math.min(FX, fm.x + 1.7 * dt); fm.walk += dt * 7;
       if (fm.x >= FX - 0.001) farmerHere();
+    } else if (phase === "lower") {
+      if (m && m.lift < 0.04) { m.lift = 0; setSub("drive"); }
     } else if (phase === "dig") {
-      var t0 = dg.t; dg.t += dt;
+      var t0 = dg.t; dg.t = Math.min(dg.goal, dg.t + dt);
       if (t0 < 0.8 && dg.t >= 0.8) snd.soil(0);
       if (t0 < 2.2 && dg.t >= 2.2) { snd.clunk(); for (i = 0; i < 6; i++) cbit(fm.x + 0.5 + Math.random() * 0.4, 0.0, (Math.random() - 0.5) * 1.2, -1.2 - Math.random(), "#7B4E2E", 0.025); }
       for (i = 0; i < SLW.length; i++) {
         var te = 2.35 + i * 0.7 + 0.3;
         if (t0 < te && dg.t >= te) { count++; dg.n = i + 1; save(); setCount(); snd.pop(); if (i === SLW.length - 1) snd.chime(); }
       }
-      if (dg.t >= 2.35 + SLW.length * 0.7 + 0.5) finishJob();
+      if (dg.t >= dg.goal) { if (dg.goal >= DIG_END) finishJob(); else setSub("lift"); }
     } else if (phase === "grow") {
       growG = clamp(phaseT / 3.4, 0, 1);
       ["w", "t"].forEach(function (k) { var l = lanes[k]; for (var q = 0; q < NC; q++) { l.rut[q] *= 1 - dt * 1.2; l.comp[q] *= 1 - dt * 1.2; l.loose[q] *= 1 - dt * 1.2; } });
@@ -1232,6 +1256,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (sur.t > (SUR_T[sur.kind] || 5)) sur = null;
     }
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
+    if (pending && time >= sayEnd) { coach.step(pending); pending = null; }
+    if (glow > 0) glow = Math.max(0, glow - dt);
     parts.update(dt);
     updateWorms(dt); updateBits(dt);
     scF.follow(camTarget(), dt); updateCam(dt);
@@ -1251,6 +1277,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawField(scF);
     ctx.restore();
     drawClose();
+    drawRing();
+  }
+  // the yellow ring on the next thing to touch (on the field view he controls)
+  function drawRing() {
+    if (phase !== "ready" || grab || locked()) return;
+    var p = targetPt(); if (!p) return;
+    var k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
+    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
+    ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
   }
   var PUDDLES = [];
   for (var pi = 0; pi < 9; pi++) PUDDLES.push({ x: 0.8 + hash(pi, 1) * (L - 1.6), r: 1.6 + hash(pi, 2) * 2.6, w: 0.5 + hash(pi, 3) * 0.9 });
@@ -1399,12 +1435,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, step: steps.current(), finished: steps.finished(), x: m ? m.x : null, kind: m ? m.kind : null, leaving: leaving ? leaving.kind : null, count: count, coach: coach.text(), cmode: cmode, sur: sur ? sur.kind : null, farmer: fm.state }; },
+    state: function () { return { phase: phase, job: job, sub: sub, key: key(), want: want(), lift: m ? m.lift : null, dig: dg.t, x: m ? m.x : null, kind: m ? m.kind : null, leaving: leaving ? leaving.kind : null, count: count, coach: coach.text(), cmode: cmode, sur: sur ? sur.kind : null, farmer: fm.state }; },
+    // the ring's spot in viewport px (the field's middle when the scene is finished)
     screen: function () {
-      var b = cv.getBoundingClientRect(), p;
-      if (job === "look") p = fScreen(0.45, -0.9); else p = rigPart();
+      var b = cv.getBoundingClientRect(), p = targetPt() || { x: RG.f.x + RG.f.w * 0.5, y: RG.f.y + RG.f.h * 0.75 };
       return { x: b.left + p.x, y: b.top + p.y };
     },
+    tap: function (part) { var b = cv.getBoundingClientRect(); tapPart(part || null, b.left + RG.f.w * 0.5, b.top + RG.f.h * 0.75); },
+    next: function () { var w = want(); window.__farm.tap(w === "field" ? null : w); },
     surprise: surprise,
     ghost: function () { return ghost.show(); }
   };
