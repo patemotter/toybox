@@ -77,7 +77,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 (function () {
   "use strict";
   // Spuds in Mud: the potato year on one field, the way the episode shows it. Four machines, one tap each:
-  // the bed former makes the rows, the destoner takes out the stones, the potato planter plants, weeks go by
+  // the bed former makes the rows, the destoner takes out the stones, a forklift lifts the big bag of seed
+  // potatoes over the potato planter and he opens the bag to fill its hopper, the planter plants, weeks go by
   // (automatic), the potato harvester digs them up into a trailer, and the trailer tips them into the store.
   // The stage is split: the field with the whole rig on it (side view, the farm's shared scene), and a close-up
   // that looks along the rows from just behind the machine, with a cut through the soil, so he SEES the job:
@@ -116,13 +117,21 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var field = { stage: w0.spuds, g: 1, wipe: null };
   var job = ({ soil: "rows", harvested: "rows", beds: "stones", destoned: "plant", planted: "plant", grown: "dig" })[field.stage] || "rows";
   if (field.stage === "planted") field.stage = "destoned";        // the growing happens on screen: plant again
-  var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0, flash: 0, lift: 0, on: false };
+  var rig = { m: null, x: -20, v: 0, wheel: 0, out: 0, flash: 0, lift: 0, on: false, fill: 1 };
+  // the forklift with the bag of seed potatoes (plant job): x = world x of its mast face, fy = fork height (m, up
+  // negative), bag = how full the bag is, open = its chute, state "away" | "in" (with the planter) | "off" (backing away)
+  var fk = { x: -40, fy: -1.45, bag: 1, open: 0, wheel: 0, v: 0, state: "away", t: 0 };
+  var FK = { reach: 0.95, lowY: -1.45, topY: -4.85, back: 1.3, span: 13, mh: 4.0 };
   var tr = { x: -60, r: 1.7, v: 0, wheel: 0, load: 0, tip: 0, state: "away", t: 0 };
   var phase = "arrive", phaseT = 0, auto = false, grab = null, ending = false, dusk = 0;
   var storeLevel = Math.min(1.1, w0.potatoes / 8), storeRun = 0, growG = 0;
   var gulls = [], rock = null;
 
   function trailed() { return rig.m && M[rig.m].trailed; }
+  // where the forklift stands so the bag hangs over the middle of the planter's hopper (hopper: 0.3..2.2 m behind
+  // the hitch), and where it waits before it lifts (a little further back)
+  function fkHome() { return rig.target + Farm.HITCH[0] - 1.26 - FK.reach; }
+  function fkLoading() { return job === "plant" && fk.state === "in"; }
   function hitchOff() { return trailed() ? -Farm.DRAWBAR[0] : -Farm.HITCH[0]; }
   function workX() { return rig.x - hitchOff() - M[rig.m].work; }
   function rearX() { return rig.x - hitchOff() - M[rig.m].len; }
@@ -131,8 +140,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function progress() { if (phase === "drive") return clamp(workX() / L, 0, 1); return phase === "leave" || phase === "out" ? 1 : 0; }
 
   // ---------- The stage: the field view and the close-up ----------
-  var zoom = { span: 11.5, target: 11.5 };
-  var sc = new Farm.Scene({ L: L, xmin: -16, xmax: STORE_X + 9, rowDz: 1.4, fit: function (w, h) { return Math.min(w * 0.92 / zoom.span, h * 0.42 / 3.6); } });
+  var zoom = { span: 11.5, target: 11.5, mh: 3.6, mhTarget: 3.6 };
+  var sc = new Farm.Scene({ L: L, xmin: -16, xmax: STORE_X + 9, rowDz: 1.4, fit: function (w, h) { return Math.min(w * 0.92 / zoom.span, h * 0.42 / zoom.mh); } });
   var parts = new Farm.Particles();
   var cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
   var W = 300, H = 300, DPR = 1, time = 0;
@@ -151,7 +160,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     sc.layout(RG.f.w, RG.f.h);
     sc.follow(camTarget(), 0, true);
   }
-  function setZoom(span, snap) { zoom.target = span; if (snap) { zoom.span = span; sc.layout(RG.f.w, RG.f.h); } }
+  function setZoom(span, snap, mh) { zoom.target = span; zoom.mhTarget = mh || 3.6; if (snap) { zoom.span = span; zoom.mh = zoom.mhTarget; sc.layout(RG.f.w, RG.f.h); } }
 
   // ---------- Coach, counter, name tags ----------
   var coach = Toybox.coach($("coach"));
@@ -167,12 +176,17 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // "set"), then he drives the pass (tap or drag the tractor). It drives off by itself (leave) and the next
   // machine comes. After the harvest he drives the trailer to the potato store and tips it. A yellow ring on
   // the field view and one coach line point at the next thing to touch.
-  var SUBS = { rows: ["lower", "drive"], stones: ["on", "drive"], plant: ["lower", "drive"], dig: ["elev", "drive", "haul", "tip"] };
+  // Before planting (the episode's "Mechanical Potato Planter Loading"): a forklift brings the one-ton bag of
+  // seed potatoes in behind the planter; he taps the forklift (it lifts the bag over the hopper) and the bag (its
+  // chute opens and the seed potatoes pour in, the hopper fills); then the forklift backs away by itself.
+  var SUBS = { rows: ["lower", "drive"], stones: ["on", "drive"], plant: ["fork", "bag", "lower", "drive"], dig: ["elev", "drive", "haul", "tip"] };
   var SAY = {
     "rows.lower": { say: "Tap the bed former to lower it into the soil.", part: "imp" },
     "rows.drive": { say: "Drive the tractor along the field to make the rows.", part: "tractor" },
     "stones.on": { say: "Tap the destoner to switch it on.", part: "imp" },
     "stones.drive": { say: "Drive the tractor along the rows to take out the stones.", part: "tractor" },
+    "plant.fork": { say: "Tap the forklift to lift the bag over the planter.", part: "fork" },
+    "plant.bag": { say: "Tap the bag to open it and fill the planter.", part: "bag" },
     "plant.lower": { say: "Tap the planter to lower it onto the rows.", part: "imp" },
     "plant.drive": { say: "Drive the tractor along the rows to plant the potatoes.", part: "tractor" },
     "dig.elev": { say: "Tap the elevator to swing it over the trailer.", part: "elev" },
@@ -195,7 +209,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     rig.m = J.m; rig.out = 0; rig.v = 0; rig.on = false; rig.lift = M[J.m].trailed ? 0 : 1;
     rig.target = startX(M[J.m]); rig.x = rig.target - 10;
     sub = SUBS[id][0];
-    setZoom(J.span);
+    rig.fill = id === "plant" ? 0 : 1;
+    if (id === "plant") { fk.state = "in"; fk.fy = FK.lowY; fk.bag = 1; fk.open = 0; fk.v = 0; fk.x = fkHome() - FK.back - 4; setZoom(FK.span, false, FK.mh); }
+    else { fk.state = "away"; setZoom(J.span); }
     setPhase("arrive");
     coach.step("Here comes the " + J.tag.toLowerCase() + ".");
     closeStart(id);
@@ -218,6 +234,26 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function swingElev() {
     snd.clunk();
     runSet(1.3, function (f) { rig.out = ease(f); }, function () { rig.out = 1; snd.tick(); nextSub(); });
+  }
+  // the forklift lifts the bag up and creeps forward until the bag hangs over the planter's hopper
+  function liftBag() {
+    snd.clunk(); coach.step("The forklift lifts the bag over the planter.");
+    var x0 = fk.x, x1 = fkHome();
+    runSet(2.4, function (f) {
+      fk.fy = lerp(FK.lowY, FK.topY, ease(f / 0.62));
+      var g = ease((f - 0.6) / 0.4), nx = lerp(x0, x1, g); fk.wheel += nx - fk.x; fk.x = nx;
+    }, function () { fk.x = x1; fk.fy = FK.topY; snd.tick(); nextSub(); });
+  }
+  // the bag's chute opens and the seed potatoes pour into the hopper; then the forklift backs away by itself
+  function openBag() {
+    snd.clunk(); coach.step("The seed potatoes pour into the planter.");
+    runSet(2.8, function (f) {
+      fk.open = ease(f / 0.15); fk.bag = 1 - ease((f - 0.08) / 0.84); rig.fill = ease((f - 0.12) / 0.85);
+    }, function () {
+      fk.bag = 0; rig.fill = 1; fk.state = "off"; fk.t = 0; fk.v = 0; snd.tick();
+      setZoom(JOBS.plant.span);
+      nextSub();
+    });
   }
   function go() {
     if (phase === "ready" && sub === "drive") {
@@ -264,6 +300,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function act(part) {
     var k = key();
     if (phase !== "ready" || !part) return false;
+    if ((part === "fork" || part === "bag") && k === "plant.fork") { liftBag(); return true; }
+    if (part === "bag" && k === "plant.bag") { openBag(); return true; }
     if (RIG_PARTS[part] && (sub === "lower")) { lowerIt(); return true; }
     if (RIG_PARTS[part] && sub === "on") { switchOn(); return true; }
     if ((part === "elev" || part === "imp" || part === "close") && sub === "elev") { swingElev(); return true; }
@@ -305,7 +343,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function startOver() {
     if (locked()) return;
     parts.clear(); cps.length = 0; gulls = []; rock = null; closeGull = null; mo = null;
-    tr.state = "away"; tr.x = -60; auto = false; grab = null; storeMix.v = storeMix.target = 0;
+    tr.state = "away"; tr.x = -60; auto = false; grab = null; storeMix.v = storeMix.target = 0; fk.state = "away";
     field.stage = "soil"; field.wipe = null;
     Farm.world.update(function (w) { w.spuds = "soil"; });
     bringIn("rows");
@@ -348,7 +386,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function bump(x) { var P = 2.6, xx = ((x + 1.3) % P + P) % P - 1.3, a = Math.abs(xx); if (a > 1.0) return 0; return Math.pow(0.5 + 0.5 * Math.cos(Math.PI * (a - 0.5) / 0.5), 0.65); }
   // views: cx = the middle, hw = half the width shown, up / dn = metres shown above / below the ground
   var VIEW = { rows: { cx: 0, hw: 1.15, up: 1.25, dn: 0.4 }, stones: { cx: -0.15, hw: 1.42, up: 1.5, dn: 0.42 }, plant: { cx: 0, hw: 1.2, up: 1.6, dn: 0.4 },
-    grow: { cx: 0, hw: 1.2, up: 1.15, dn: 0.48 }, dig: { cx: 1.05, hw: 2.05, up: 2.85, dn: 0.36 } };
+    grow: { cx: 0, hw: 1.2, up: 1.15, dn: 0.48 }, load: { cx: 0, hw: 1.35, up: 4.6, dn: 0.32 }, dig: { cx: 1.05, hw: 2.05, up: 2.85, dn: 0.36 } };
   var ccam = { cx: 0, hw: 1.3, up: 1.3, dn: 0.42 }, cview = "rows";
   var CL = { u: 100, gy: 100, hy: 20 };
   function clLayout() {
@@ -441,7 +479,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (cs.lowered < lowTo) cs.lowered = Math.min(lowTo, cs.lowered + dt / 1.1);
     else cs.lowered = Math.max(lowTo, cs.lowered - dt / (phase === "set" ? 1.0 : 0.9));
     // the camera eases to this job's view
-    var v = VIEW[cview] || VIEW.rows, e = Math.min(1, dt * 2.2);
+    var v = cview === "plant" && fk.state === "in" ? VIEW.load : (VIEW[cview] || VIEW.rows), e = Math.min(1, dt * 2.2);
     ccam.cx += (v.cx - ccam.cx) * e; ccam.hw += (v.hw - ccam.hw) * e; ccam.up += (v.up - ccam.up) * e; ccam.dn += (v.dn - ccam.dn) * e;
     storeMix.v += (storeMix.target - storeMix.v) * Math.min(1, dt * 3);
     if (cs.beyond2) cs.mix = Math.min(1, cs.mix + dt / 0.7);
@@ -477,7 +515,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         else if (s.s === "fly" && s.t >= s.dur) { s.s = "rest"; }
       });
     } else if (cview === "plant") {
-      var lv = 1 - 0.6 * p;
+      var lv = rig.fill * (1 - 0.6 * p);
       if (working) {
         seeds.forEach(function (s, k) {
           if (s.s === "wait" && p > 0.03 + k * 0.09) { s.s = "open"; s.t = 0; }
@@ -578,6 +616,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (cview === "stones") drawStones(u, lw, yOff, false);
     if (cview === "dig") drawDig(u, lw, yOff);
     if (cview === "plant") drawDrops(u, lw, yOff);
+    if (cview === "plant" && fk.state === "in") drawCloseBag(u, lw, yOff);
     if (rock) drawRock(u, lw);
     // the cut through the soil, nearest to us
     drawCut(c, u, lw);
@@ -779,6 +818,29 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (r.s === "fall") { var g = r.t / 0.4, x = lerp(E.b[0], CX(r.tx), g), y = lerp(E.b[1] + 0.1 * u, CY(-1.95 - tr.load * 0.4), g * g); potato(x, y, 0.09 * u, r.k); }
     });
   }
+  // the bag seen from behind the planter: it comes in from the side as the forklift creeps up, then pours
+  function closeBag(yOff) {
+    var reach = clamp(1 - (fkHome() - fk.x) / FK.back, 0, 1), g = bagGeom(), top = yOff - 1.88 - 0.62 - 1.05;
+    return { x: lerp(ccam.cx - RG.c.w / 2 / CL.u - 1.2, 0, ease(reach)), g: { top: top, bot: top + (g.bot - g.top), hw: g.hw, bw: g.bw }, fy: top - 0.16 };
+  }
+  function drawCloseBag(u, lw, yOff) {
+    var b = closeBag(yOff);
+    Farm.inUnits(ctx, CX(b.x), CY(0), u, lw, function () {
+      if (fk.open > 0 && fk.bag > 0.03) {
+        var y1 = yOff - 1.8 - 0.16 * rig.fill;
+        for (var i = 0; i < 6; i++) { var f = (time * 1.8 + i / 6) % 1; D.potato(ctx, Math.sin(i * 2.3) * 0.09, lerp(b.g.bot + 0.2, y1, f * f), 0.09, i); }
+      }
+      drawBag(0, b.g, fk.open, fk.bag, b.fy);
+      // the forks, seen end-on through the loops
+      [-0.19, 0.19].forEach(function (o) { SH.R(ctx, o - 0.11, b.fy - 0.06, 0.22, 0.1, 0.02, "#9AA5B4"); });
+    });
+  }
+  function closeBagPt() {
+    if (cview !== "plant" || fk.state !== "in") return null;
+    var b = closeBag(-(1 - ease(cs.lowered)) * 3.2);
+    if (b.x < ccam.cx - RG.c.w / 2 / CL.u) return null;
+    return { x: RG.c.x + CX(b.x), y: RG.c.y + CY((b.g.top + b.g.bot) / 2), r: Math.max(0.6 * CL.u, 36) };
+  }
   function rockScreen() { var yOff = -(1 - ease(cs.lowered)) * 3.2; return rock ? { x: RG.c.x + CX(rock.x), y: RG.c.y + CY(rock.y + yOff) } : { x: 0, y: 0 }; }
   function drawRock(u, lw) {
     var yOff = -(1 - ease(cs.lowered)) * 3.2, wob = Math.sin(rock.t * 16) * 0.02;
@@ -846,6 +908,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function trBodyPt() { var t = trScreen(); return { x: t.x - 3.9 * t.s, y: t.y - 2.0 * t.s, r: Math.max(3.2 * t.s, 40) }; }
   function trTractorPt() { var t = trScreen(); return { x: t.x - Farm.DRAWBAR[0] * t.s + 1.9 * t.s, y: t.y - 1.7 * t.s, r: Math.max(2.0 * t.s, 36) }; }
   function storePt() { var S = sc.S(1.02); return { x: sc.X(STORE_X, 1.02), y: sc.Y(1.02) - 3.5 * S, r: Math.max(3 * S, 40) }; }
+  function fkScreen(lx, ly) { return { x: sc.X(fk.x, 1) + lx * sc.k, y: sc.gY + ly * sc.k }; }
+  function fkPt() { var p = fkScreen(-1.25, -1.35); return { x: p.x, y: p.y, r: Math.max(1.35 * sc.k, 40) }; }
+  function bagPt() { var g = bagGeom(), p = fkScreen(FK.reach, (g.top + g.bot) / 2); return { x: p.x, y: p.y, r: Math.max(0.75 * sc.k, 36) }; }
   function closeMachinePart() { var c = RG.c; return { x: c.x + CX(0), y: c.y + CY(-0.9), r: Math.max(1.2 * CL.u, 50) }; }
   function stoneScreen(s) { var p = stonePos(s), yo = (s.s === "lift" || s.s === "web" || s.s === "drop" || s.s === "belt") ? -(1 - ease(cs.lowered)) * 3.2 : 0; return { x: RG.c.x + CX(p.x), y: RG.c.y + CY(p.y + yo) }; }
   function partList() {
@@ -857,6 +922,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (s.s === "soil" && !(phase === "ready" || phase === "drive")) return;
       var p = stoneScreen(s); add("stone" + i, { x: p.x, y: p.y, r: Math.max(s.r * CL.u * 1.6, 26) });
     });
+    if (fk.state === "in") {
+      add("fork", fkPt());
+      add("bag", bagPt());
+      var cb = closeBagPt(); if (cb) add("bag", cb);
+    }
     if (rig.m && phase !== "grow") {
       add("close", closeMachinePart());
       if (rig.m === "harvester" && tr.state === "with" && job === "dig" && (sub === "elev" || rig.out > 0.5)) add("elev", elevPt());
@@ -873,15 +943,17 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (w === "tractor") return tractorPt();
     if (w === "imp") return implPt();
     if (w === "elev") return elevPt();
+    if (w === "fork") return fkPt();
+    if (w === "bag") return bagPt();
     if (w === "trailer") return sub === "haul" ? trTractorPt() : trBodyPt();
     return null;
   }
-  var TAGS = { tractor: "Tractor", elev: "Elevator", trailer: "Trailer", store: "Potato store" };
+  var TAGS = { tractor: "Tractor", elev: "Elevator", trailer: "Trailer", store: "Potato store", fork: "Forklift", bag: "Bag of seed potatoes" };
   function tagPart(part) {
     var p = partList().filter(function (q) { return q.id === part; })[0];
     var name = part === "imp" || part === "close" ? JOBS[job].tag : TAGS[part];
     if (!p || !name) return false;
-    if (part === "tractor" || part === "trailer") snd.horn(); else snd.tick();
+    if (part === "tractor" || part === "trailer" || part === "fork") snd.horn(); else snd.tick();
     if (part === "tractor" || part === "imp") rig.flash = 1.2;
     tagAt(name, p.x, Math.max(26, p.y - Math.min(60, p.r * 0.7)));
     return true;
@@ -945,16 +1017,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "grow") return L / 2;
     if (!rig.m) return L / 2;
     var front = rig.x + 4.3, back = rearX();
+    if (fkLoading()) back = Math.min(back, fkHome() - FK.back - 2.85);
     return (front + back) / 2 + (sc.port ? 0 : 0.3);
   }
   var engLevel = 0, rigRun = 0;
   function update(dt) {
     time += dt; phaseT += dt;
     var drive = 0;
-    if (Math.abs(zoom.span - zoom.target) > 0.02) { zoom.span += (zoom.target - zoom.span) * Math.min(1, dt * 2.2); sc.layout(RG.f.w, RG.f.h); }
+    if (Math.abs(zoom.span - zoom.target) > 0.02 || Math.abs(zoom.mh - zoom.mhTarget) > 0.02) {
+      zoom.span += (zoom.target - zoom.span) * Math.min(1, dt * 2.2); zoom.mh += (zoom.mhTarget - zoom.mh) * Math.min(1, dt * 2.2); sc.layout(RG.f.w, RG.f.h);
+    }
     if (phase === "arrive") {
       var d = rig.target - rig.x; rig.v = clamp(d * 2.4, 1.5, 12); rig.x += Math.min(rig.v * dt, Math.max(d, 0.001)); drive = 0.6;
-      if (d < 0.02) { rig.x = rig.target; arrived(); }
+      if (fk.state === "in") { var fx = fkHome() - FK.back - (rig.target - rig.x); fk.wheel += fx - fk.x; fk.x = fx; }
+      if (d < 0.02) { rig.x = rig.target; if (fk.state === "in") fk.x = fkHome() - FK.back; arrived(); }
     } else if (phase === "set") {
       mo.t += dt; var mf = clamp(mo.t / mo.dur, 0, 1); mo.fn(mf);
       if (mf >= 1) { var mend = mo.end; mo = null; mend(); }
@@ -982,6 +1058,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (phase === "out" && phaseT > 0.9) storeMix.target = 1;
     }
     if (rock) rock.t += dt;
+    if (fk.state === "off") {
+      // the empty bag comes down and the forklift backs away to the yard
+      fk.t += dt; fk.fy = Math.min(FK.lowY, fk.fy + dt * 1.6);
+      if (fk.t > 0.8) { fk.v = Math.min(4, fk.v + dt * 3); fk.x -= fk.v * dt; fk.wheel -= fk.v * dt; }
+      if (fk.t > 6) fk.state = "away";
+    }
     if (tr.state === "with") { tr.v = rig.v; tr.x = trWithX(); tr.wheel = rig.wheel; tr.r = TR_FAR; }
     else if (tr.state === "off") { tr.t += dt; tr.v = Math.min(9, tr.v + dt * 6); tr.x += tr.v * dt; tr.wheel += tr.v * dt; if (tr.t > 4) tr.state = "away"; }
     rig.wheel += rig.v * dt;
@@ -1091,7 +1173,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     drawGulls(true);
     parts.draw(ctx, sc, function (p) { return p.r > 1.0; });
     if (tr.state !== "away" && tr.r > 1) drawTrailer();
+    if (fk.state !== "away") drawForklift();
     if (rig.m) drawRig();
+    if (fk.state === "in" && fk.open > 0) drawPour();
     if (rig.m === "harvester" && rig.out > 0.01 && tr.r > 1) drawElevator();
     sc.field(ctx, "near", P);
     parts.draw(ctx, sc, function (p) { return p.r <= 1.0 && p.r > sc.TRACK + 0.03; });
@@ -1103,7 +1187,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function drawRig() {
     var m = rig.m, tl = trailed();
-    var st = { wheel: rig.wheel, time: time, work: (phase === "drive" && rig.v > 0.3) || rig.on ? 1 : 0, level: m === "planter" ? 1 - (field.wipe ? clamp(workX() / L, 0, 1) * 0.6 : 0) : 1, out: m === "harvester" && rig.out > 0.01 };
+    var st = { wheel: rig.wheel, time: time, work: (phase === "drive" && rig.v > 0.3) || rig.on ? 1 : 0, level: m === "planter" ? rig.fill * (1 - (field.wipe ? clamp(workX() / L, 0, 1) * 0.6 : 0)) : 1, out: m === "harvester" && rig.out > 0.01 };
     sc.put(ctx, rig.x, 1, 1, function () {
       ctx.save();
       if (tl) ctx.translate(Farm.DRAWBAR[0], Farm.DRAWBAR[1]); else ctx.translate(Farm.HITCH[0], Farm.HITCH[1] - rig.lift * 0.4);
@@ -1133,6 +1217,90 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       D.tractor(ctx, { wheel: tr.wheel, time: time, drawbar: true });
     });
   }
+  // ---------- The forklift and the bag of seed potatoes ----------
+  // Side view in metres, facing the planter (+x), origin on the ground under the face of the mast. The bag hangs
+  // by its four lifting loops from the forks; its chute at the bottom is tied shut until he opens it.
+  function bagGeom() {
+    var f = fk.bag, top = fk.fy + 0.16, h = lerp(0.5, 1.05, f);
+    return { top: top, bot: top + h, hw: lerp(0.46, 0.56, f), bw: lerp(0.26, 0.53, f) };
+  }
+  function hopperTop() { return Farm.HITCH[1] - rig.lift * 0.4 - 2.18 - 0.22 * rig.fill; }
+  function drawBag(cx, g, open, f, fy) {
+    var top = g.top, bot = g.bot, hw = g.hw, bw = g.bw;
+    // lifting loops over the forks
+    [-0.38, 0.38].forEach(function (o) { var x = cx + o * hw * 2 * 0.5; SH.R(ctx, x - 0.07, fy - 0.12, 0.14, top - fy + 0.16, 0.05, "#3E7BC4"); });
+    // the woven bag: square shoulders, bulging sides when full, sagging folds when empty
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, top);
+    ctx.lineTo(cx + hw, top);
+    ctx.quadraticCurveTo(cx + hw + 0.08 * f, (top + bot) / 2, cx + bw, bot - 0.06);
+    ctx.quadraticCurveTo(cx, bot + 0.07, cx - bw, bot - 0.06);
+    ctx.quadraticCurveTo(cx - hw - 0.08 * f, (top + bot) / 2, cx - hw, top);
+    ctx.closePath(); SH.fs(ctx, "#F1EFE4");
+    ctx.save(); ctx.clip();
+    for (var i = 1; i < 8; i++) SH.Ln(ctx, cx - hw + i * hw / 4, top, cx - hw + i * hw / 4, bot + 0.1, "rgba(150,140,110,0.25)", 0.02);
+    for (i = 1; i < 6; i++) SH.Ln(ctx, cx - hw - 0.1, top + i * (bot - top) / 6, cx + hw + 0.1, top + i * (bot - top) / 6, "rgba(150,140,110,0.18)", 0.02);
+    if (f < 0.6) for (i = 0; i < 3; i++) SH.Ln(ctx, cx - hw * 0.7 + i * hw * 0.6, top + 0.1, cx - hw * 0.5 + i * hw * 0.6, bot - 0.12, "rgba(120,110,85,0.45)", 0.03);
+    SH.R(ctx, cx - hw - 0.1, top + 0.12, hw * 2 + 0.2, 0.09, 0, "#3E7BC4", 0);
+    ctx.restore();
+    // the chute: a short spout under the bag, tied with a cord until it is opened
+    var cw = 0.12 + 0.03 * open;
+    SH.P(ctx, [cx - cw, bot - 0.04, cx + cw, bot - 0.04, cx + cw * 0.9, bot + 0.2, cx - cw * 0.9, bot + 0.2], "#E5E2D4");
+    if (open < 0.5) SH.R(ctx, cx - 0.16, bot + 0.05, 0.32, 0.07, 0.03, "#D8403A");
+    else { SH.Ln(ctx, cx + cw, bot + 0.06, cx + cw + 0.18, bot + 0.3, INK, 0.06); SH.Ln(ctx, cx + cw, bot + 0.06, cx + cw + 0.18, bot + 0.3, "#D8403A", 0.035); }
+  }
+  function forklift(st) {
+    var O = "#E8862A", OD = "#B8621A", fy = st.fy, wr = st.wheel || 0;
+    // counterweight and body
+    SH.P(ctx, [-2.95, -0.28, -2.95, -1.28, -2.7, -1.4, -2.05, -1.4, -2.05, -0.28], OD);
+    SH.P(ctx, [-2.1, -0.3, -0.25, -0.3, -0.25, -0.95, -0.55, -1.08, -2.1, -1.08], O);
+    SH.Ln(ctx, -2.0, -0.98, -0.65, -0.98, "rgba(255,255,255,0.45)", 0.06);
+    // the operator on his seat, hands on the steering wheel
+    SH.R(ctx, -1.95, -1.3, 0.5, 0.24, 0.06, "#2B3040");
+    SH.R(ctx, -1.98, -1.85, 0.16, 0.6, 0.05, "#2B3040");
+    SH.Ln(ctx, -1.35, -1.55, -0.95, -1.4, INK, 0.16); SH.Ln(ctx, -1.35, -1.55, -0.95, -1.4, "#C6E83A", 0.1);
+    SH.R(ctx, -1.72, -1.95, 0.44, 0.7, 0.16, "#C6E83A");
+    SH.Ln(ctx, -1.7, -1.52, -1.3, -1.52, "#B9C2CF", 0.06);
+    SH.C(ctx, -1.48, -2.15, 0.17, "#C99267");
+    ctx.beginPath(); ctx.arc(-1.48, -2.17, 0.18, Math.PI * 1.05, Math.PI * 1.95); ctx.closePath(); SH.fs(ctx, "#3A2A20");
+    SH.Ln(ctx, -0.95, -1.08, -0.82, -1.45, INK, 0.07);
+    SH.Ln(ctx, -1.0, -1.43, -0.72, -1.5, INK, 0.08);
+    // the overhead guard
+    SH.Ln(ctx, -2.05, -1.38, -1.95, -2.55, INK, 0.12); SH.Ln(ctx, -2.05, -1.38, -1.95, -2.55, "#3A3F4E", 0.07);
+    SH.Ln(ctx, -0.5, -1.05, -0.6, -2.55, INK, 0.12); SH.Ln(ctx, -0.5, -1.05, -0.6, -2.55, "#3A3F4E", 0.07);
+    SH.R(ctx, -2.12, -2.66, 1.62, 0.13, 0.04, "#3A3F4E");
+    // wheels
+    [[-2.2, -0.3, 0.3], [-0.62, -0.36, 0.36]].forEach(function (w) {
+      SH.C(ctx, w[0], w[1], w[2], "#33363F"); SH.C(ctx, w[0], w[1], w[2] * 0.55, "#C3CCD6", LWf() * 0.7);
+      var a = wr / w[2]; SH.Ln(ctx, w[0], w[1], w[0] + Math.cos(a) * w[2] * 0.4, w[1] + Math.sin(a) * w[2] * 0.4, "#7C8696", 0.05);
+      SH.C(ctx, w[0], w[1], w[2] * 0.15, "#7C8696", LWf() * 0.6);
+    });
+    // the mast: the outer rails, the inner rails rising with the forks, the lift chain and the tilt ram
+    var inTop = Math.min(-2.6, fy - 0.62);
+    SH.Ln(ctx, -0.55, -0.85, -0.18, -1.25, INK, 0.12); SH.Ln(ctx, -0.55, -0.85, -0.18, -1.25, "#C3CCD6", 0.07);
+    SH.R(ctx, -0.24, -2.65, 0.2, 2.55, 0.03, "#5D6675");
+    SH.R(ctx, -0.2, inTop, 0.13, -0.15 - inTop, 0.03, "#7C8696");
+    SH.Ln(ctx, -0.07, inTop + 0.05, -0.02, fy - 0.45, "#2B3040", 0.035);
+    // the carriage with its load backrest, and the forks
+    SH.R(ctx, -0.06, fy - 0.6, 0.14, 0.66, 0.03, "#3A3F4E");
+    SH.P(ctx, [0.02, fy - 0.02, 1.55, fy - 0.02, 1.6, fy + 0.07, 0.02, fy + 0.07], "#9AA5B4");
+  }
+  function LWf() { return Farm.LW; }
+  function drawForklift() {
+    sc.put(ctx, fk.x, 1, 1, function () {
+      forklift({ fy: fk.fy, wheel: fk.wheel });
+      drawBag(FK.reach, bagGeom(), fk.open, fk.bag, fk.fy);
+    });
+  }
+  // seed potatoes pouring from the open chute down into the hopper
+  function drawPour() {
+    if (fk.bag < 0.03) return;
+    var g = bagGeom(), x0 = fk.x + FK.reach, y0 = g.bot + 0.2, y1 = hopperTop(), n = 7;
+    for (var i = 0; i < n; i++) {
+      var f = (time * 1.8 + i / n) % 1, x = sc.X(x0, 1) + Math.sin(i * 2.3) * 0.1 * sc.k, y = sc.gY + lerp(y0, y1, f * f) * sc.k;
+      D.potato(ctx, x, y, 0.11 * sc.k, i);
+    }
+  }
   function drawGulls(far) {
     if (!gulls.length) return;
     var base = rig.m && phase === "drive" ? workX() : (rig.m ? rearX() - 1 : L / 2);
@@ -1160,7 +1328,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   resize();
   if (job === "dig") { closeStart("grow"); growG = 1; field.stage = "grown"; }
   bringIn(job);
-  setZoom(JOBS[job].span, true);
+  setZoom(zoom.target, true, zoom.mhTarget);
   var v0 = VIEW[cview]; ccam.cx = v0.cx; ccam.hw = v0.hw; ccam.up = v0.up; ccam.dn = v0.dn;
   if (phase === "arrive") { rig.x = rig.target - 7; }
   sc.follow(camTarget(), 0, true);
@@ -1190,7 +1358,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
-    state: function () { return { phase: phase, job: job, sub: sub, key: key(), part: want(), x: rig.x, m: rig.m, lift: rig.lift, on: rig.on, out: rig.out, field: field.stage, trailer: tr.state, load: tr.load, loads: loads, stones: stones.length, pile: pile.length, rock: !!rock, coach: coach.text(), grow: growG, k: sc.k, cam: sc.cam, span: zoom.span, fw: RG.f.w }; },
+    state: function () { return { phase: phase, job: job, sub: sub, key: key(), part: want(), x: rig.x, m: rig.m, lift: rig.lift, on: rig.on, out: rig.out, field: field.stage, trailer: tr.state, load: tr.load, loads: loads, stones: stones.length, pile: pile.length, rock: !!rock, coach: coach.text(), grow: growG, fill: rig.fill, forklift: fk.state, bag: fk.bag, fy: fk.fy, k: sc.k, cam: sc.cam, span: zoom.span, fw: RG.f.w }; },
     tap: function (p) { tapPart(p || null); },
     next: function () { tapPart(want() || (phase === "done" ? null : "none")); },
     target: function () { var p = targetPt(), b = cv.getBoundingClientRect(); return p ? { x: b.left + p.x, y: b.top + p.y } : null; },
