@@ -39,6 +39,17 @@ from a carton; close-ups for grinding, top-down whisking and frothing; a latte t
 enough, or should more happen by itself (moving the jug under the wand)? tray of three, oldest delivered? latte art
 choice? Not polished: close-ups small on phones held sideways; small serve view on upright phones).
 
+**Sewing Machine** (done 2026-10-17, from the dad's photo of the family's machine, drawn without its logo): the
+operator's view of a white computerized machine; Start/Stop (green, red while sewing) or the foot pedal sews, the
+needle, take-up lever, feed dogs and handwheel move for real, he steers the fabric by dragging it; six stitch tiles
+(Straight, Zigzag, Wave, Scallop, Hearts, Stars; also the arrow keys under the screen); Reverse back-tacks, the needle
+button, a Slow/Medium/Fast slider; the presser foot lever (sewing with it up shows the foot on the screen, the second
+try lowers it for him); at the end of the fabric: lift the foot, pull the fabric out, snip with the thread cutter
+("Pieces" counter). Thread rack and fabric pile on the scene. Surprise: the button jar spills, a ball of yarn rolls
+by, a butterfly lands on the fabric. Questions: does the real machine's body have colored accents (drawn white and
+grey)? keep both the pedal and Start/Stop (on the real machine Start/Stop only works with the pedal unplugged)?
+more stitches? a shelf for finished pieces?
+
 **Decided 2026-10-07 (the dad: "do whatever you think"; keep as built unless he says otherwise):**
 - Marble Run: Lots! fills the hopper to 30 (he liked it); the cap stays 30; 8 active runs (Zigzag, Spiral tower, Loop-de-loop, Funnels, Machine, Mix 1, Mix 2, Kit; Race and Construction site disabled for now); runs start with a rolling marble; toy car faces forward; steeper bottom tray.
 - Water Table: the cup pours only into the bowls while carried.

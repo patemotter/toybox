@@ -274,7 +274,17 @@ const CORE = [
   "./farm/icons/icon-180.png",
   "./farm/icons/icon-192.png",
   "./farm/icons/icon-512.png",
-  "./farm/icons/icon-maskable-512.png"
+  "./farm/icons/icon-maskable-512.png",
+
+  // Sewing Machine
+  "./sewing-machine/",
+  "./sewing-machine/index.html",
+  "./sewing-machine/index.js",
+  "./sewing-machine/manifest.webmanifest",
+  "./sewing-machine/icons/icon-180.png",
+  "./sewing-machine/icons/icon-192.png",
+  "./sewing-machine/icons/icon-512.png",
+  "./sewing-machine/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
