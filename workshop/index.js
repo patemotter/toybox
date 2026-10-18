@@ -359,25 +359,36 @@
     pl: { k: "power", rpm: 3000, unit: "strokes a minute", emit: [[44, 160]], fx: "dust", snd: "saw" }, st: "saw-bench" });
   add("power", { id: "recip", n: "Reciprocating saw",
     d: "A long blade pushes in and out very fast. It is a demolition saw for cutting through wood, nails and pipes.",
-    p: [["Blade", -14, 97], ["Shoe", 26, 95], ["Front grip", 52, 93], ["Motor", 108, 92], ["Trigger", 164, 118], ["Handle", 188, 98]],
+    p: [["Blade", -34, 110], ["Shoe", 12, 104], ["Front grip", 62, 98], ["Motor", 122, 96], ["Trigger", 170, 92], ["Handle", 192, 104]],
     f: function () {
-      return G("", P("M36 90 L-44 92 L-44 98" + zig(-44, 98, 36, 104, 16, 4, 0.6) + " Z", SHN, 2.5), "rec", ' data-v="9 0"') +
-        R(60, 70, 98, 46, YEL, 16) + vents(80, 80, 5, 9, 24) +
-        P("M150 66 L176 66 Q196 66 196 86 L196 110 Q196 128 178 128 L156 128 L156 112 L176 112 Q180 112 180 106 L180 88 Q180 82 174 82 L150 82 Z", BLK) +
-        R(158, 112, 12, 12, RED, 3) + R(36, 74, 32, 38, RUB, 12) + P("M32 70 L22 70 L22 120 L32 120", STL, 3) + R(20, 70, 8, 50, STL, 3);
+      // Side view, nose to the left: the blade sticks out low under the shoe, a slim gearbox nose, a rubber front
+      // grip, the motor body, and a closed D-handle at the back with the trigger inside it.
+      return G("", P("M24 102 L-58 104 L-66 110" + zig(-66, 110, 24, 112, 18, 4, 0.6) + " Z", SHN, 2.5), "rec", ' data-v="9 0"') +
+        P("M18 92 Q34 86 50 86 L50 118 Q34 118 18 114 Z", STK) +
+        R(46, 78, 34, 42, RUB, 13) + L(56, 84, 56, 114, "#5A6070", 2.5) + L(64, 84, 64, 114, "#5A6070", 2.5) + L(72, 84, 72, 114, "#5A6070", 2.5) +
+        P("M78 80 Q78 70 90 70 L150 72 Q160 72 160 84 L160 112 Q160 124 148 124 L90 124 Q78 124 78 114 Z", YEL) + vents(100, 82, 5, 9, 28) +
+        P("M150 70 L170 62 Q188 56 196 70 L200 110 Q200 130 182 130 L152 124 L152 112 L180 114 Q186 114 186 106 L183 80 Q180 72 172 76 L156 84 Z", BLK) +
+        R(162, 84, 10, 14, RED, 3) +
+        R(6, 88, 12, 34, STL, 3) + C(12, 105, 3, STK, 2);
     },
-    pl: { k: "power", rpm: 2800, unit: "strokes a minute", emit: [[-10, 102]], fx: "dust", snd: "saw" }, st: "saw-bench" });
+    pl: { k: "power", rpm: 2800, unit: "strokes a minute", emit: [[-30, 114]], fx: "dust", snd: "saw" }, st: "saw-bench" });
   add("power", { id: "tracksaw", n: "Track saw", z: "Plunge saw",
     d: "A circular saw that rides on a long aluminum track, so it makes perfectly straight cuts across big sheets.",
-    p: [["Handle", 152, 30], ["Body", 64, 108], ["Blade", 100, 152], ["Dust port", 188, 120], ["Track", 40, 157]],
+    p: [["Handle", 150, 26], ["Blade guard", 72, 98], ["Motor", 150, 112], ["Front knob", 40, 90], ["Base", 100, 143], ["Dust port", 188, 118], ["Track", 40, 156]],
     f: function (s) {
+      // Side view of a plunge saw sitting flat on its base: the blade hides inside the rounded guard until it
+      // plunges (in the job it pokes out below the base and through the board). The motor is at the back with
+      // the loop handle over it.
       var job = s && s.job;
-      return bladeDisc(100, job ? 140 : 116, 40, 18) +
-        P("M30 146 L30 104 Q30 80 56 74 L140 66 Q170 64 176 90 L176 146 Z", YEL) + L(42, 132, 166, 132, "#E0A818", 3) +
-        P("M92 72 C92 36 112 26 140 26 L160 26 Q178 26 178 46 L178 72 L160 72 L160 46 L114 46 Q108 46 108 56 L108 72 Z", BLK) +
-        R(176, 108, 22, 24, BLK, 5) + (job ? "" : R(4, 150, 192, 12, "#D5DCE4", 3) + L(8, 156, 192, 156, STD, 2) + R(4, 162, 192, 5, RED, 2));
+      return (job ? bladeDisc(84, 146, 40, 18) : "") +
+        P("M30 140 L30 118 Q32 74 82 70 Q128 72 134 112 L134 140 Z", YEL) + L(40, 128, 128, 128, "#E0A818", 3) +
+        R(120, 92, 52, 46, DRK, 14) + L(134, 102, 134, 128, "#6B7384", 3) + L(143, 102, 143, 128, "#6B7384", 3) + L(152, 102, 152, 128, "#6B7384", 3) + L(161, 102, 161, 128, "#6B7384", 3) +
+        P("M104 74 C106 40 122 26 148 26 L162 26 Q180 26 180 46 L180 94 L166 94 L166 50 Q166 42 158 42 L148 42 Q124 42 120 74 Z", BLK) +
+        R(148, 42, 10, 12, RED, 3) + C(40, 92, 9, BLK) + R(170, 110, 26, 16, BLK, 5) +
+        R(16, 138, 168, 10, "#B9C3CE", 3) +
+        (job ? "" : R(2, 148, 196, 10, "#D5DCE4", 3) + L(6, 153, 194, 153, STD, 2) + R(2, 158, 196, 5, RED, 2));
     },
-    pl: { k: "power", rpm: 5000, emit: [[96, 160]], fx: "dust", snd: "saw" }, st: "saw-bench" });
+    pl: { k: "power", rpm: 5000, emit: [[46, 170]], fx: "dust", snd: "saw" }, st: "saw-bench" });
 
   // ---------- Drills & bits ----------
   function drillBody(u, col, opt) {
@@ -4194,9 +4205,9 @@
   J0("keyhole", { k: "trace", shape: "box", closed: 1, mat: "dry", use: "Cutting holes in drywall, starting from a drilled hole.", anchor: [50, 104], preR: -90, s: 1, coach: "Start in the drilled hole and saw around the box.", done: "A hole for the outlet box!" });
   // Power saws
   J0("circular", { k: "saw", mode: "circ", use: "Fast, straight cuts across boards.", anchor: [84, 138], s: 1.25, lead: 52.8, coach: "Hold the saw and push it along the line." });
-  J0("tracksaw", { k: "saw", mode: "circ", mat: "ply", track: 1, use: "Long, perfectly straight cuts in big sheets.", anchor: [100, 164], s: 1.15, lead: 38, coach: "Hold the saw and push it along the track." });
+  J0("tracksaw", { k: "saw", mode: "circ", mat: "ply", track: 1, use: "Long, perfectly straight cuts in big sheets.", anchor: [84, 148], s: 1.15, lead: 40, coach: "Hold the saw and push it along the track." });
   J0("jigsaw", { k: "trace", shape: "wave", power: 1, use: "Cutting curves in boards.", anchor: [44, 150], s: 0.95, coach: "Hold the jigsaw and follow the wavy line.", done: "A wavy cut! Jigsaws can turn corners." });
-  J0("recip", { k: "saw", mode: "recip", mat: "pipe", use: "Cutting through pipes, nails and old wood.", anchor: [-10, 103], s: 1.4 });
+  J0("recip", { k: "saw", mode: "recip", mat: "pipe", use: "Cutting through pipes, nails and old wood.", anchor: [-24, 114], s: 1.2 });
   // Drills (with the bit they hold)
   J0("drilldriver", { k: "screw", power: 1, clutch: 1, recess: "cross", size: "PH2", use: "Drilling holes and driving screws.", anchor: [-22, 76], preR: -90, s: 0.72, extra: SDRV(8), turns: 4, secs: 2.2, done: "In it goes! The clutch clicks so the screw stops at the right depth." });
   J0("impact", { k: "screw", power: 1, snd: "impact", shake: 0.9, recess: "star", size: "T25", use: "Driving long, big screws.", anchor: [-38, 76], preR: -90, s: 0.72, extra: SDRV(24), turns: 6, secs: 2, done: "Rat-a-tat! The long screw went all the way in." });

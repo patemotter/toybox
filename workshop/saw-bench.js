@@ -793,22 +793,25 @@
     ctx.beginPath(); ctx.rect(-200, shoeY + 8, 400, 200); ctx.clip();
     discBlade(ctx, R, o.spin || 0, 28, o.speed || 0);
     ctx.restore();
-    // plunge spring post at the rear
-    rrect(ctx, -124, shoeY - 52, 14, 54, 5); fs(ctx, C.aluD, 2.4);
-    // body: dark housing hiding the blade, yellow side panel
-    smooth(ctx, [[-112, shoeY + 2], [-110, -70], [-80, -104], [0, -112], [80, -104], [112, -60], [114, shoeY + 2]]);
-    fs(ctx, C.gray);
-    smooth(ctx, [[-84, shoeY - 12], [-80, -64], [-50, -88], [20, -92], [78, -80], [92, -46], [92, shoeY - 12]]);
+    // plunge spring post at the front of the motor
+    rrect(ctx, 62, shoeY - 40, 14, 42, 5); fs(ctx, C.aluD, 2.4);
+    // motor at the back: a dark drum standing up off the base, with vents
+    rrect(ctx, 70, -64, 96, shoeY + 62, 22); fs(ctx, C.gray);
+    for (var i = 0; i < 4; i++) line(ctx, 92 + i * 16, -48, 92 + i * 16, shoeY - 16, "rgba(255,255,255,0.28)", 5);
+    // dust port behind the motor
+    rrect(ctx, 160, -14, 38, 26, 7); fs(ctx, C.grip, 2.4);
+    // the rounded yellow blade guard hides the blade until it plunges
+    smooth(ctx, [[-124, shoeY + 2], [-122, -24], [-96, -84], [-30, -108], [40, -100], [86, -58], [96, shoeY + 2]]);
     fs(ctx, C.yellow);
-    ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); fs(ctx, C.steelD, 2.2);
-    line(ctx, -40, shoeY - 22, 60, shoeY - 22, "rgba(29,35,64,0.4)", 3);
-    // closed handle on top and the front knob
-    smooth(ctx, [[-36, -100], [-50, -150], [-16, -176], [50, -174], [72, -150], [62, -104]]);
-    smooth(ctx, [[-22, -112], [-28, -146], [-8, -160], [44, -158], [54, -142], [46, -112]], true);
-    ctx.fillStyle = C.grip; ctx.fill("evenodd"); ctx.lineWidth = 3 * PX; ctx.strokeStyle = OUT; ctx.stroke();
+    line(ctx, -108, shoeY - 16, 86, shoeY - 16, C.yellowD, 4);
+    ctx.beginPath(); ctx.arc(-10, -10, 12, 0, 7); fs(ctx, C.steelD, 2.2);
+    // loop handle from the top of the guard back over the motor, with the trigger under its top bar
+    smooth(ctx, [[-20, -104], [-6, -156], [36, -178], [124, -178], [160, -150], [160, -62], [138, -62], [138, -140], [120, -156], [44, -156], [18, -138], [10, -100]]);
+    fs(ctx, C.grip);
     var tq = o.trig ? 4 : 0;
-    smooth(ctx, [[2, -112 - tq], [14, -112 - tq], [12, -100 - tq], [4, -100 - tq]]); fs(ctx, o.trig ? C.red : C.yellow, 2);
-    smooth(ctx, [[90, -96], [122, -108], [138, -90], [124, -72], [96, -76]]); fs(ctx, C.grip);
+    smooth(ctx, [[88, -156 + tq], [102, -156 + tq], [100, -140 + tq], [90, -140 + tq]]); fs(ctx, o.trig ? C.red : C.yellow, 2);
+    // front knob
+    ctx.beginPath(); ctx.arc(-104, -62, 17, 0, 7); fs(ctx, C.grip);
     // base plate with the groove that rides on the track rib
     rrect(ctx, -150, shoeY, 300, 8, 2); fs(ctx, C.alu, 2.6);
     rrect(ctx, -150, shoeY + 8, 300, 4, 1); fs(ctx, C.grip, 1.6);
@@ -1040,7 +1043,7 @@
     tablesaw: { fn: drawTableIcon, box: [-252, -424, 252, 2] },
     mitersaw: { fn: drawMiter, box: [-335, -390, 255, 58], opt: { alpha: 0.45 } },
     recip: { fn: drawRecip, box: [-216, -54, 406, 44] },
-    tracksaw: { fn: drawTrack, box: [-172, -180, 177, 82], opt: { plunge: 1, depth: 30, rail: true } }
+    tracksaw: { fn: drawTrack, box: [-172, -180, 200, 82], opt: { plunge: 1, depth: 30, rail: true } }
   };
 
   // Draw a saw picture centered in a w x h box (CSS px) on ctx.
