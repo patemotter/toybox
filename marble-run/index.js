@@ -2487,6 +2487,15 @@
     return s;
   }
 
+  // Drawn behind the tower post: helix marbles on the back half, and marbles on the feed ramp or track that runs
+  // behind the top of the post to the helix's start at the back (they used to show in front of the post, then
+  // jump behind it where they joined the helix).
+  function behindTower(b) {
+    if (b.mode === "path" && b.path.kind === "helix") return b.z < 0;
+    if (!tower || (b.mode !== "free" && b.mode !== "path")) return false;
+    return Math.abs(b.x - tower.cx) < tower.w / 2 + RM + 14 && b.y < tower.path.ys[0] + RM && b.y > tower.top - 90;
+  }
+
   function render(now) {
     var i, b, k, p, spiral = spiralLift();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2511,7 +2520,7 @@
     // Helix marbles behind the tower first.
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "path" && b.path.kind === "helix" && b.z < 0) drawMarble(b, b.x, b.y, marbleScale(b));
+      if (behindTower(b)) drawMarble(b, b.x, b.y, marbleScale(b));
     }
     if (tower) {
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2528,7 +2537,7 @@
     var trailN = reduce ? 3 : TRAIL;
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.car || b.mode === "lift" || b.mode === "spout" || (b.mode === "path" && b.z < 0)) continue;
+      if (b.car || b.mode === "lift" || b.mode === "spout" || behindTower(b)) continue;
       var vx = b.x - b.tx[TRAIL - 1], vy = b.y - b.ty[TRAIL - 1];
       if (vx * vx + vy * vy < 400) continue;
       for (k = trailN - 1; k >= 1; k--) {
@@ -2542,12 +2551,12 @@
     ctx.fillStyle = "rgba(29,35,64,0.16)";
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "spout" || (b.mode === "path" && b.z < 0) || (b.mode === "lift" && spiral)) continue;
+      if (b.mode === "spout" || behindTower(b) || (b.mode === "lift" && spiral)) continue;
       ctx.beginPath(); ctx.arc(b.x + 5, b.y + 7, RM, 0, Math.PI * 2); ctx.fill();
     }
     for (i = 0; i < balls.length; i++) {
       b = balls[i];
-      if (b.mode === "spout" || (b.mode === "path" && b.z < 0) || (b.mode === "lift" && spiral)) continue;
+      if (b.mode === "spout" || behindTower(b) || (b.mode === "lift" && spiral)) continue;
       drawMarble(b, b.x, b.y, marbleScale(b));
     }
     for (i = 0; i < hopper.queue.length && i < HOP_SLOTS.length; i++) {
