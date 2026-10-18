@@ -1867,9 +1867,8 @@
     $("dAgain").hidden = (D && D.view !== "use") || !!(J && J.pj);
     if (!J.K.sw) motorOff();
     if (J.pj && window.ToyboxProjects) {
-      var url = ToyboxProjects.finish(J.pj);
+      ToyboxProjects.doneLink($("pjBack"), J.pj);
       $("pjDoneLine").textContent = J.pj.done;
-      $("pjBack").href = url;
       $("pjDone").hidden = false;
     }
     var r = dStage.getBoundingClientRect();

@@ -5150,6 +5150,14 @@
           });
         });
         b.hit = hb;
+        // the other pencil lines from the measuring bench (cut on the next steps); they stay on the stock
+        var oth = this.pj.job.others || [];
+        for (var oi = 0; oi < oth.length; oi++) {
+          var ox = b.bx + (oth[oi] - (b.hasLine ? 0 : this.pj.job.line)) * this.pj.S;
+          if (ox <= b.bx + 2 || ox >= b.bx + b.L - 2) continue;
+          var o0 = c.P(ox, 0, sec.h + 0.5), o1 = c.P(ox, -sec.w, sec.h + 0.5);
+          line(g, o0[0], o0[1], o1[0], o1[1], "rgba(58,63,75,0.4)", 2.5);   // lighter: not this cut
+        }
         if (b.hasLine) {
           var l0 = c.P(b.bx + b.lineF, 0, sec.h + 0.5), l1 = c.P(b.bx + b.lineF + sec.w * t, -sec.w, sec.h + 0.5);
           if (aligned) line(g, l0[0], l0[1], l1[0], l1[1], "rgba(255,201,60,0.8)", 9);
@@ -5735,8 +5743,7 @@
   function pjComplete(delayMs) {
     if (!PJ || PJ.done) return;
     PJ.done = true;
-    var url = ToyboxProjects.finish(PSTEP);
-    $("pjBack").setAttribute("href", url);
+    ToyboxProjects.doneLink($("pjBack"), PSTEP, (delayMs || 0) + 3000);
     $("pjDoneLine").textContent = PSTEP.done;
     setTimeout(function () {
       PJ.over = true; PJ.coachOn = false;

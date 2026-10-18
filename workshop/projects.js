@@ -9,8 +9,11 @@
  * The station: reads the step with ToyboxProjects.fromQuery() (null when not in project mode), picks the
  * step's tool, locks the material to the project board described in step.job, shows step.title in a banner
  * at the top of the stage and step.coach in the coach pill, hides unrelated choices, and when the job is
- * done shows "Done! ✓" with step.done and ONE button "Back to the plan" (never automatic) whose href is
- * ToyboxProjects.finish(step) (it records the progress and returns the project page URL).
+ * done shows "Done! ✓" with step.done and ONE button, set up by ToyboxProjects.doneLink(button, step): it
+ * records the progress and points the button at the next step. When the next step is on the same machine
+ * the page moves on by itself 3 s after the card shows (the dad, 2026-10-18: no green button to press between
+ * steps); otherwise the button says where to go next ("Go to the miter saw"). The plan stays one tap away
+ * through the station's Back button.
  *
  * NUMBERS
  * Inches with decimals ("7.5", never "7 ½"); ToyboxProjects.fmt(n) formats them. Numbers are allowed only
@@ -29,15 +32,18 @@
  *
  * JOB KINDS (what each station must do)
  *   plane     wall, tool "planer": switch on, feed job.board through; done when it comes out flat.
- *   mark      measuring, tool "tape": the project board lies with its left end at the tape hook; pull the
- *             tape to job.target (readout in halves, snaps within 0.25); a pencil tick appears at the hook.
+ *   mark      measuring, tool "tape" or "combosquare": the project board lies with its left end at the tape
+ *             hook (or the square's head); pull the tape / slide the rule to job.target, measured from the left
+ *             end (readout in halves, snaps within 0.25); a pencil tick appears there. job.prior: lines marked
+ *             earlier on the same board, drawn on it.
  *             job.mark === "line": then the speed square hooks on the edge at the tick and a line is drawn
  *             by dragging along its edge (across the board). job.mark === "x": an X is drawn at the tick,
  *             centred across the width (the entrance hole). Done when the line / X is drawn.
  *   crosscut  saw-bench, tool "miter": job.board with a pencil line job.line inches from its left end;
  *             the board slides left/right under the blade (soft snap when the line is under the blade);
  *             pull the saw down; the cut counts when the line is within the kerf. The piece to the LEFT
- *             of the line is the part (job.part); the rest is the stock that stays.
+ *             of the line is the part (job.part); the rest is the stock that stays. job.others: the board's
+ *             other pencil lines (cut on the next steps), drawn lighter.
  *   angle     saw-bench, tool "miter": the saw is already swung to job.angle degrees; job.count pieces
  *             (the two Sides) get their top end cut one after the other. The banner says "roof angle";
  *             no degree readout is shown.
@@ -87,45 +93,48 @@
     steps: []
   };
 
-  function mark(id, part, l, w, target, how, title, coach, done, tool) {
+  // job.prior: lines already marked on this board in the same run (inches from its left end), drawn on it.
+  function mark(id, part, l, w, target, how, title, coach, done, tool, prior) {
     var tl = tool || (target <= 10 ? "combosquare" : "tape");
     return { id: id, part: part, station: "measuring", tool: tl, title: title, coach: coach, done: done,
-      job: { kind: "mark", board: { l: l, w: w }, target: target, mark: how } };
+      job: { kind: "mark", board: { l: l, w: w }, target: target, mark: how, prior: prior || [] } };
   }
-  function cut(id, part, l, w, line, title, coach, done) {
+  // job.others: the other pencil lines still on the board (inches from its left end), cut on later steps.
+  function cut(id, part, l, w, line, title, coach, done, others) {
     return { id: id, part: part, station: "saw-bench", tool: "miter", title: title, coach: coach, done: done,
-      job: { kind: "crosscut", board: { l: l, w: w }, line: line, part: part } };
+      job: { kind: "crosscut", board: { l: l, w: w }, line: line, part: part, others: others || [] } };
   }
   var CUT_COACH = "Slide the line under the blade, then pull the saw down!";
 
+  // Like a real shop: plane the board, measure and mark every part the miter saw will cut, cut them one after
+  // another, rip the strip on the table saw, mark and cut the Sides and the Floor, then the angle, the holes,
+  // the build and the sanding. Each mark is measured from the board's end (the banner shows the sum), and
+  // steps at the same station run on by themselves (ToyboxProjects.after).
   BIRDHOUSE.steps = [
     { id: "plane", part: "", station: "wall", tool: "planer",
       title: "Plane the board flat", coach: "Switch on the planer, then feed the board!",
       done: "The board is flat and smooth.", job: { kind: "plane", board: { l: STOCK, w: BW } } },
 
-    mark("back-mark", "back", STOCK, BW, 12, "line", "Measure the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
-    cut("back-cut", "back", STOCK, BW, 12, "Cut the Back on the line", CUT_COACH, "The Back is cut!"),
+    mark("back-mark", "back", STOCK, BW, 12, "line", "Mark the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
+    mark("front-mark", "front", STOCK, BW, 21, "line", "Mark the Front: 12 + 9 = 21", "Pull the tape to 21!", "The Front is marked.", "tape", [12]),
+    mark("roof-mark", "roof", STOCK, BW, 28.5, "line", "Mark the Roof: 21 + 7.5 = 28.5", "Pull the tape to 28.5!", "The Roof is marked.", "tape", [12, 21]),
+    mark("blank-mark", "blank", STOCK, BW, 54.5, "line", "Mark the Side blank: 28.5 + 26 = 54.5", "Pull the tape to 54.5!", "Every line is marked. Off to the miter saw!", "tape", [12, 21, 28.5]),
 
-    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Slide the rule out to 9!", "The Front is marked.", "combosquare"),
-    cut("front-cut", "front", 48, BW, 9, "Cut the Front on the line", CUT_COACH, "The Front is cut!"),
-
-    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Slide the rule out to 7.5!", "The Roof is marked.", "combosquare"),
-    cut("roof-cut", "roof", 39, BW, 7.5, "Cut the Roof on the line", CUT_COACH, "The Roof is cut!"),
-
-    mark("blank-mark", "blank", 31.5, BW, 26, "line", "Measure the Side blank: 26 inches", "Pull the tape to 26!", "The Side blank is marked.", "tape"),
+    cut("back-cut", "back", STOCK, BW, 12, "Cut the Back on the line", CUT_COACH, "The Back is cut!", [21, 28.5, 54.5]),
+    cut("front-cut", "front", 48, BW, 9, "Cut the Front on the line", CUT_COACH, "The Front is cut!", [16.5, 42.5]),
+    cut("roof-cut", "roof", 39, BW, 7.5, "Cut the Roof on the line", CUT_COACH, "The Roof is cut!", [33.5]),
     cut("blank-cut", "blank", 31.5, BW, 26, "Cut the Side blank on the line", CUT_COACH, "The Side blank is cut!"),
 
     { id: "strip-rip", part: "strip", station: "saw-bench", tool: "table",
       title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4, switch on, push it through!",
       done: "A long strip, 4 inches wide!", job: { kind: "rip", board: { l: 26, w: BW }, fence: 4, part: "strip" } },
 
-    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Slide the rule out to 10!", "The Side is marked.", "combosquare"),
-    cut("side1-cut", "side1", 26, 4, 10, "Cut the Side on the line", CUT_COACH, "One Side is cut!"),
+    mark("side1-mark", "side1", 26, 4, 10, "line", "Mark a Side: 10 inches", "Slide the rule out to 10!", "One Side is marked.", "combosquare"),
+    mark("side2-mark", "side2", 26, 4, 20, "line", "Mark the other Side: 10 + 10 = 20", "Pull the tape to 20!", "The other Side is marked.", "tape", [10]),
+    mark("floor-mark", "floor", 26, 4, 24, "line", "Mark the Floor: 20 + 4 = 24", "Pull the tape to 24!", "Every line is marked. Off to the miter saw!", "tape", [10, 20]),
 
-    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Slide the rule out to 10!", "The other Side is marked.", "combosquare"),
-    cut("side2-cut", "side2", 16, 4, 10, "Cut the other Side on the line", CUT_COACH, "Both Sides are cut!"),
-
-    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Slide the rule out to 4!", "The Floor is marked.", "combosquare"),
+    cut("side1-cut", "side1", 26, 4, 10, "Cut a Side on the line", CUT_COACH, "One Side is cut!", [20, 24]),
+    cut("side2-cut", "side2", 16, 4, 10, "Cut the other Side on the line", CUT_COACH, "Both Sides are cut!", [14]),
     cut("floor-cut", "floor", 6, 4, 4, "Cut the Floor on the line", CUT_COACH, "The Floor is cut!"),
 
     { id: "side-angle", part: "side1", station: "saw-bench", tool: "miter",
@@ -235,6 +244,37 @@
   }
   function planUrl(pid) { return "project.html?project=" + encodeURIComponent(pid); }
 
+  var PLACE = { measuring: "measuring bench", "drill-press": "drill press", "hammer-screws": "nail bench",
+    planer: "planer", orbital: "sander", miter: "miter saw", table: "table saw" };
+  // Where the Done card's one button goes after a step: the next step (at the same station it opens by
+  // itself after a few seconds, so he never has to tap through), another station, or the finished birdhouse.
+  function after(step) {
+    var p = BY[step.project], n = p ? p.steps[step.index + 1] : null;
+    if (!n) return { href: planUrl(step.project), label: "See the birdhouse!", auto: false };
+    var sameMachine = n.station === step.station && (n.station !== "saw-bench" || n.tool === step.tool);
+    if (sameMachine) return { href: stepUrl(n), label: "Next step", auto: true };
+    return { href: stepUrl(n), label: "Go to the " + (PLACE[n.tool] || PLACE[n.station]), auto: false };
+  }
+  // Record the step and point the Done card's button (an <a>) on: its label, its link and, when the next step
+  // is at the same station, the move on by itself delayMs after the card shows (default 3 s; results stay
+  // on screen a while). A tap on the button goes at once.
+  function doneLink(a, step, delayMs) {
+    complete(step.project, step.id);
+    try { sessionStorage.setItem(JUST, step.id); } catch (e) { /* ignore */ }
+    var n = after(step);
+    if (!a) return n.href;
+    a.setAttribute("href", n.href);
+    a.textContent = n.label;
+    if (n.auto) {
+      setTimeout(function () {
+        if (!document.body.contains(a)) return;
+        var go = function () { location.href = n.href; };
+        if (window.Toybox && Toybox.beforeLeave) Toybox.beforeLeave(go); else go();
+      }, delayMs == null ? 3000 : delayMs);
+    }
+    return n.href;
+  }
+
   // A station calls this when the job is done: records it and returns the "Back to the plan" URL.
   function finish(step) {
     complete(step.project, step.id);
@@ -258,6 +298,8 @@
     stepUrl: stepUrl,
     planUrl: planUrl,
     finish: finish,
+    after: after,
+    doneLink: doneLink,
     justFinished: justFinished,
     fmt: fmt
   };

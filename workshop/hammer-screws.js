@@ -1721,9 +1721,8 @@
           PJ.finished = true;
           stars(LA.cx, LA.cy, 24);
           sndChime();
-          var href = ToyboxProjects.finish(PSTEP);
           var pjb = $("pjBack"), pjdt = $("pjDoneText"), pjd = $("pjDone");
-          if (pjb) pjb.href = href;
+          ToyboxProjects.doneLink(pjb, PSTEP);
           if (pjdt) pjdt.textContent = PSTEP.done;
           if (pjd) pjd.hidden = false;
         }

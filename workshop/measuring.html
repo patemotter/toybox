@@ -1181,6 +1181,11 @@ body.ending .pjstep { visibility: hidden; }
     c.save();
     c.beginPath(); c.rect(b.x0, topY, Math.min(b.x1, CW + 10) - b.x0, b.h); c.clip();
     c.strokeStyle = "rgba(52,56,66,0.9)"; c.lineCap = "round"; c.lineWidth = lw;
+    // the lines already marked on this board in the same run
+    (PSTEP.job.prior || []).forEach(function (v) {
+      var px = b.x0 + v * T.ppi;
+      c.beginPath(); c.moveTo(px, bot); c.lineTo(px, topY); c.stroke();
+    });
     if (PJ.tick > 0) {
       var th = Math.min(b.h * 0.4, Math.max(28, T.ppi * 1.1)), y1 = bot - th * PJ.tick;
       c.lineWidth = lw * 1.3;
@@ -2633,7 +2638,6 @@ body.ending .pjstep { visibility: hidden; }
   function finishJob() {
     if (PJ.finished) return;
     PJ.finished = true; PJ.phase = "done"; PJ.msg = null;
-    PJ.href = ToyboxProjects.finish(PSTEP);
     var card = document.createElement("div");
     card.className = "pjdone";
     card.setAttribute("role", "dialog");
@@ -2641,9 +2645,8 @@ body.ending .pjstep { visibility: hidden; }
     card.innerHTML = '<div class="pjdone-txt"><div class="pjdone-t">Done! ✓</div><div class="pjdone-l"></div></div><a class="btn tb-go" id="pjback"></a>';
     card.querySelector(".pjdone-l").textContent = PSTEP.done;
     var a = card.querySelector("a");
-    a.textContent = "Back to the plan";
-    a.href = PJ.href;
     $("stage").appendChild(card);
+    PJ.href = ToyboxProjects.doneLink(a, PSTEP);
     PJ.card = card;
     chime();
     updateAria(true);
