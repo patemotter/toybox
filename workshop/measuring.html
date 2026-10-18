@@ -501,8 +501,8 @@ body.ending .pjstep { visibility: hidden; }
     PJ.comboD = PJ.comboIn * ppi;
     // The speed square (or upright combination square) rides the project board's near (bottom) edge.
     Q.bx = o.x0; Q.by = o.cy - h / 2; Q.bw = o.x1 - o.x0; Q.bh = h; Q.sl = sl; Q.lip = lip; Q.flipT = 1;
-    if (PJ.lineT > 0) Q.xd = PJ.tickX + easeIO(PJ.sqAway) * 1.5 * ppi;
-    else Q.xd = PJ.onTick ? PJ.tickX : clamp(PJ.tickX + PJ.sqOff * ppi, o.x0, Math.min(o.x1 - ppi * 0.3, CW - sl * 0.3));
+    if (PJ.lineT > 0) Q.xd = pjSeat() + easeIO(PJ.sqAway) * 1.5 * ppi;
+    else Q.xd = PJ.onTick ? pjSeat() : clamp(PJ.tickX + PJ.sqOff * ppi, o.x0, Math.min(o.x1 - ppi * 0.3, CW - sl * 0.3));
   }
 
   function layoutCombo() {
@@ -1171,11 +1171,13 @@ body.ending .pjstep { visibility: hidden; }
   // The pencil marks on the project board: the tick under the hook, the strokes along the square, the line
   // that finishes itself, the X. Returns where the pencil tip is while a mark draws itself (or null).
   // The pencil line is drawn just left of the square's edge: the square's dark outline is painted after the
-  // marks, so a line exactly on the edge would be hidden under it.
+  // marks, so a line exactly on the edge would be hidden under it. So the square seats with its edge that far
+  // right of the tick (pjSeat), and the line lands right on top of the tick, like a pencil run along a real square.
   function pjLineOff() { return -(clamp(U * 0.006, 3, 5) / 2 + 4); }
+  function pjSeat() { return PJ.tickX - pjLineOff(); }
   function drawMarks(c) {
     var b = PJ.board, bot = b.cy + b.h / 2, topY = b.cy - b.h / 2, pen = null;
-    var lw = clamp(U * 0.006, 3, 5), lx = PJ.tickX + pjLineOff();
+    var lw = clamp(U * 0.006, 3, 5), lx = PJ.tickX;
     c.save();
     c.beginPath(); c.rect(b.x0, topY, Math.min(b.x1, CW + 10) - b.x0, b.h); c.clip();
     c.strokeStyle = "rgba(52,56,66,0.9)"; c.lineCap = "round"; c.lineWidth = lw;
@@ -2609,7 +2611,7 @@ body.ending .pjstep { visibility: hidden; }
     PJ.phase = "square"; PJ.sqIn = reduce ? 1 : 0.001; PJ.cover = null; PJ.lineT = 0; PJ.sqAway = 0;
     S.sq = 90; S.flip = true; S.lines = []; Q.flipT = 1; Q.live = null; Q.clearT = 0;
     if (PJ.tool === "combosquare") {
-      PJ.onTick = true; PJ.sqOff = 0; Q.xd = PJ.tickX; Q.clack = 1; Q.edgeFlash = 1;
+      PJ.onTick = true; PJ.sqOff = 0; Q.xd = pjSeat(); Q.clack = 1; Q.edgeFlash = 1;
     } else {
       PJ.onTick = false; PJ.sqOff = 1.2;
       Q.xd = clamp(PJ.tickX + PJ.sqOff * T.ppi, PJ.board.x0, Math.min(PJ.board.x1 - T.ppi * 0.3, CW - Q.sl * 0.3));
@@ -2648,7 +2650,7 @@ body.ending .pjstep { visibility: hidden; }
       if (settledTool && PJ.tick >= 1 && !busy()) { PJ.wait -= dt; if (PJ.wait <= 0) startPhaseB(); }
     } else if (PJ.phase === "square") {
       if (PJ.sqIn < 1) PJ.sqIn = Math.min(1, PJ.sqIn + dt / 0.5);
-      if (PJ.lineT === 0 && PJ.onTick && Math.abs(Q.xd - PJ.tickX) > 0.1) Q.xd = lerp(Q.xd, PJ.tickX, Math.min(1, dt * 12));
+      if (PJ.lineT === 0 && PJ.onTick && Math.abs(Q.xd - pjSeat()) > 0.1) Q.xd = lerp(Q.xd, pjSeat(), Math.min(1, dt * 12));
       if (PJ.lineT > 0 && PJ.lineT < 1) PJ.lineT = reduce ? 1 : Math.min(1, PJ.lineT + dt / 0.8);
       else if (PJ.lineT >= 1 && !busy()) { PJ.wait -= dt; if (PJ.wait <= 0) finishJob(); }
     } else if (PJ.phase === "x") {
@@ -2658,7 +2660,7 @@ body.ending .pjstep { visibility: hidden; }
     // once the line is drawn the square glides a little to the right, so the line shows (also under the card)
     if (PJ.mark === "line" && PJ.lineT >= 1 && PJ.sqAway < 1) {
       PJ.sqAway = reduce ? 1 : Math.min(1, PJ.sqAway + dt / 0.9);
-      Q.xd = PJ.tickX + easeIO(PJ.sqAway) * 1.5 * T.ppi;
+      Q.xd = pjSeat() + easeIO(PJ.sqAway) * 1.5 * T.ppi;
     }
     pjCoach();
   }
