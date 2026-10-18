@@ -690,15 +690,16 @@
   }
   add("wrenches", { id: "combowrench", st: "wrenches", n: "Combination wrench",
     d: "One end is open to slide onto a nut from the side. The other end is a closed ring that grips all the way around.",
-    p: [["Open end", 22, 100], ["Handle", 100, 100], ["Box end", 166, 100]],
+    p: [["Open end", 12, 100], ["Handle", 100, 100], ["Box end", 176, 100]],
     rot: -28,
     f: function () {
-      return G("rotate(-28 100 100)", P("M56 92 L150 94 L150 106 L56 108 Z", STL) + shine(64, 96, 144, 97) +
-        P("M62 90 L42 76 Q16 72 10 90 L24 96 L24 104 L10 110 Q16 128 42 124 L62 110 Z", STL) +
-        P("M10 90 L24 96 L24 104 L10 110", "none", 3) +
-        C(166, 100, 22, STL) + P(star(166, 100, 12, 10, 12, 0), "#5E6878", 2));
+      // A real one is about six times as long as its ends are wide: a slim I-beam handle, the open end turned
+      // 15 degrees, a 12-point ring at the other end.
+      return G("rotate(-28 100 100)", P("M34 95 Q100 97 164 95 L164 105 Q100 103 34 105 Z", STL) + L(46, 100, 152, 100, STD, 3) + shine(48, 97, 150, 97, 2) +
+        G("rotate(-15 22 100)", P("M40 94 Q36 82 22 82 Q8 82 3 91 L15 95 L15 105 L3 109 Q8 118 22 118 Q36 118 40 106 Z", STL)) +
+        C(176, 100, 15.5, STL) + P(star(176, 100, 9.4, 8.2, 12, 0), "#5E6878", 2));
     },
-    pl: { k: "twist", c: [166, 100] } });
+    pl: { k: "twist", c: [176, 100] } });
   add("wrenches", { id: "adjwrench", n: "Adjustable wrench",
     d: "Turn the little worm screw and the jaw slides open or closed, so one wrench fits many nut sizes.",
     p: [["Fixed jaw", 30, 66], ["Moving jaw", function (s) { return rotP(30, 92 + s.gap, -20, 100, 100); }],
@@ -717,10 +718,12 @@
       rd: function (v) { return Math.round(6 + v * 1.1) + " mm jaw"; } } });
   add("wrenches", { id: "ratchet", st: "wrenches", n: "Socket wrench", z: "Ratchet",
     d: "A socket clicks onto the square drive. The ratchet turns the nut one way and clicks freely back the other way.",
-    p: [["Head", 40, 80], ["Square drive", 40, 100], ["Direction lever", 22, 116], ["Handle", 140, 100]],
+    p: [["Head", 40, 84], ["Square drive", 40, 100], ["Direction lever", 40, 112], ["Handle", 150, 100]],
     f: function () {
-      return P("M58 92 L184 94 Q196 100 184 106 L58 108 Z", STL) + P("M118 93 L184 94 Q196 100 184 106 L118 107 Z", RUB) +
-        C(40, 100, 24, STL) + R(32, 92, 16, 16, "#5E6878", 2, 2.5) + P("M16 112 L28 118 L24 126 L12 120 Z", RED, 2.5) + shine(28, 84, 50, 80);
+      // A pear-shaped head that runs into a slim handle with a rubber grip; the flip lever sits on the head.
+      return P("M40 82 Q56 82 62 94 L190 95 Q198 100 190 105 L62 106 Q56 118 40 118 Q22 118 22 100 Q22 82 40 82 Z", STL) +
+        P("M110 95 L190 95 Q198 100 190 105 L110 105 Z", RUB) + L(122, 97, 122, 103, "#5A6070", 2) + L(136, 97, 136, 103, "#5A6070", 2) + L(150, 97, 150, 103, "#5A6070", 2) + L(164, 97, 164, 103, "#5A6070", 2) +
+        R(34, 94, 12, 12, "#5E6878", 2, 2.5) + P("M33 110 Q40 106 47 110 L45 116 Q40 114 35 116 Z", RED, 2) + shine(30, 88, 46, 86) + shine(70, 97, 104, 97, 2);
     },
     pl: { k: "twist", c: [40, 100], ratchet: 1 } });
   add("wrenches", { id: "sockets", st: "wrenches", n: "Socket set",
@@ -3244,7 +3247,7 @@
   KINDS.wrench = {
     noGear: function (J) { return J.step === 1; },   // turning the nut goes by angle (geared in move)
     init: function (J, c) {
-      var g = { nx: 160, ny: 156, nr: c.nr || 21, goal: c.goal || 540 };
+      var g = { nx: 190, ny: 150, nr: c.nr || 21, goal: c.goal || 540 };
       J.g = g; J.na = 0; J.ta = c.ta0 || -150; J.p = 0; J.step = c.adj ? 0 : c.pick ? 0 : 1;
       var tl = J.tl; tl.s = c.s || 1.15; tl.ax = c.anchor[0]; tl.ay = c.anchor[1]; tl.preR = c.preR || 0;
       if (c.adj) J.s.gap = 34;
@@ -3332,15 +3335,16 @@
     work: function (J) {
       var g = J.g, c = J.cfg, s = "", i;
       // A steel bracket bolted down.
-      s += P(rr(30, 80, 260, 156, 26), "#B9C3CE") + Cf(62, 112, 12, "#6E7A88") + Cf(258, 112, 12, "#6E7A88") + Cf(62, 204, 12, "#6E7A88") + Cf(258, 204, 12, "#6E7A88");
-      s += L(46, 92, 270, 92, "#FFFFFF", 3, ' opacity="0.6"');
+      var bx = g.nx - 130, by = g.ny - 76;
+      s += P(rr(bx, by, 260, 156, 26), "#B9C3CE") + Cf(bx + 32, by + 32, 12, "#6E7A88") + Cf(bx + 228, by + 32, 12, "#6E7A88") + Cf(bx + 32, by + 124, 12, "#6E7A88") + Cf(bx + 228, by + 124, 12, "#6E7A88");
+      s += L(bx + 16, by + 12, bx + 240, by + 12, "#FFFFFF", 3, ' opacity="0.6"');
       if (c.pipe) {
-        s += C(g.nx, g.ny, 44, "#C9A44A") + P(hexD(g.nx, g.ny, 40, 0), "none", 2) + C(g.nx, g.ny, g.nr, "#AEB8C4", 3) + C(g.nx, g.ny, g.nr - 6, "#3B4150", 2.5);
+        s += C(g.nx, g.ny, g.nr * 1.83, "#C9A44A") + P(hexD(g.nx, g.ny, g.nr * 1.67, 0), "none", 2) + C(g.nx, g.ny, g.nr, "#AEB8C4", 3) + C(g.nx, g.ny, g.nr * 0.75, "#3B4150", 2.5);
         s += '<g transform="rotate(' + n2(J.na) + " " + g.nx + " " + g.ny + ')">' + L(g.nx, g.ny - g.nr + 1, g.nx, g.ny - g.nr + 6, RED, 4) + "</g>";
       } else {
-        s += C(g.nx, g.ny, 30, "#DCE2E9", 3);
+        s += C(g.nx, g.ny, g.nr * 2.2, "#DCE2E9", 3);
         s += '<g transform="rotate(' + n2(J.na) + " " + g.nx + " " + g.ny + ')">' + P(hexD(g.nx, g.ny, g.nr, 0), "#C3CCD6") + L(g.nx + g.nr * 0.5, g.ny - g.nr * 0.86, g.nx + g.nr, g.ny, "#FFFFFF", 2.5) + "</g>";
-        s += C(g.nx, g.ny, 9, "#9AA6B4", 2.5) + (c.pick ? T(g.nx, g.ny + 46, c.size, 13, O) : "");
+        s += C(g.nx, g.ny, g.nr * 0.62, "#9AA6B4", 2.5) + (c.pick ? T(g.nx, g.ny + 46, c.size, 13, O) : "");
       }
       if (c.pick) {
         if (J.step === 0 || J.fly) {
@@ -3354,7 +3358,7 @@
             s += C(sx, sy, r, i === J.sock ? "#E9EEF3" : STL) + P(star(sx, sy, SOCK[i] * 0.55, SOCK[i] * 0.48, 12, 0), "#5E6878", 2) + T(sx, sy + r + 10, SOCK[i], 12, O);
           }
         } else s += C(g.nx, g.ny, 21, STL) + P(star(g.nx, g.ny, 13 * 0.55, 13 * 0.48, 12, 0), "#5E6878", 2);
-      } else if (c.ratchet) s += C(g.nx, g.ny, 23, STL, 3);
+      } else if (c.ratchet) s += C(g.nx, g.ny, g.nr * 1.3, STL, 3);
       // Side view inset: the nut runs down the bolt until it is snug.
       var ix = 352, iy = 52, gap = 20 * (1 - J.p);
       s += R(ix - 44, iy - 30, 88, 124, "#FFFFFF", 12, 3) + caption(ix, iy + 82, "Side view");
@@ -4240,11 +4244,11 @@
   J0("square", { k: "screw", recess: "square", size: "#2", anchor: [100, 188], use: "Turning square-hole screws." });
   J0("hex", { k: "screw", recess: "hex", head: "cap", size: "5 mm", anchor: [162, 28], preR: 90, sweep: 1, seat: 4, turns: 3, rate: 2.2, screwCol: "#4B515E", use: "Turning bolts with a six-sided hole, like on furniture.", coach: "Drag to the right to swing the long arm around.", done: "Tight! The long arm gives you lots of turning power." });
   // Wrenches
-  J0("combowrench", { k: "wrench", size: "13 mm", nr: 13, anchor: rotP(166, 100, -28, 100, 100), preR: 28, ta0: 20, use: "Tightening and loosening nuts and bolts." });
-  J0("adjwrench", { k: "wrench", adj: 1, size: "19 mm", nr: 14.6, anchor: rotP(23, 93, -20, 100, 100), preR: 20, ta0: 170, use: "Nuts of many sizes, with one wrench." });
-  J0("ratchet", { k: "wrench", ratchet: 1, size: "13 mm", nr: 13, anchor: [40, 100], ta0: 170, use: "Turning nuts fast without taking the wrench off.", done: "Tight! Click-click: the ratchet only turns the nut one way." });
-  J0("sockets", { k: "wrench", pick: 1, ratchet: 1, size: "13 mm", nr: 13, anchor: [40, 100], ta0: 170, useArt: "ratchet", use: "Fitting the ratchet to every size of nut.", done: "The right socket fit, and the nut is tight!" });
-  J0("pipewrench", { k: "wrench", pipe: 1, size: "Pipe", nr: 24, goal: 360, anchor: rotP(38, 79, -18, 100, 100), preR: 18, ta0: 170, use: "Gripping and turning round pipes.", done: "The pipe is screwed tight into the fitting!" });
+  J0("combowrench", { k: "wrench", size: "13 mm", nr: 7.5, s: 0.8, anchor: rotP(176, 100, -28, 100, 100), preR: 28, ta0: 20, use: "Tightening and loosening nuts and bolts." });
+  J0("adjwrench", { k: "wrench", adj: 1, size: "19 mm", nr: 10.8, s: 0.85, anchor: rotP(23, 93, -20, 100, 100), preR: 20, ta0: 170, use: "Nuts of many sizes, with one wrench." });
+  J0("ratchet", { k: "wrench", ratchet: 1, size: "13 mm", nr: 11, s: 0.85, anchor: [40, 100], ta0: 170, use: "Turning nuts fast without taking the wrench off.", done: "Tight! Click-click: the ratchet only turns the nut one way." });
+  J0("sockets", { k: "wrench", pick: 1, ratchet: 1, size: "13 mm", nr: 11, s: 0.85, anchor: [40, 100], ta0: 170, useArt: "ratchet", use: "Fitting the ratchet to every size of nut.", done: "The right socket fit, and the nut is tight!" });
+  J0("pipewrench", { k: "wrench", pipe: 1, size: "Pipe", nr: 17.7, s: 0.85, goal: 360, anchor: rotP(38, 79, -18, 100, 100), preR: 18, ta0: 170, use: "Gripping and turning round pipes.", done: "The pipe is screwed tight into the fitting!" });
   // Measuring and marking
   J0("tape", { k: "tape", use: "Measuring how long things are." });
   J0("speedsquare", { k: "square", use: "Marking square (90°) and 45° lines." });
