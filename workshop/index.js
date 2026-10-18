@@ -253,28 +253,28 @@
     pl: { k: "saw", cut: "pull", ax: [-1, 0], emit: [70, 128] }, st: "saw-bench" });
   add("saws", { id: "panel", n: "Panel saw", z: "Western hand saw",
     d: "The classic Western (American) hand saw. Its teeth lean toward the far end, so it cuts on the push stroke.",
-    p: [["Toe", 10, 112], ["Blade", 64, 104], ["Teeth", 60, 140], ["Saw nuts", 128, 78], ["Handle", 168, 116]],
+    p: [["Toe", 0, 118], ["Blade", 60, 112], ["Teeth", 60, 138], ["Saw nuts", 132, 96], ["Handle", 160, 120]],
     f: function () {
-      return P("M126 56 L8 96 L8 136" + zig(8, 136, 126, 136, 24, 6, -0.75) + " Z", STL) + shine(20, 112, 110, 112) +
-        dHandle(118, 66);
+      return P("M134 86 L-8 106 L-8 130" + zig(-8, 130, 134, 130, 30, 5, -0.75) + " Z", STL) + shine(4, 120, 120, 118) +
+        dHandle(126, 92, 0.6);
     },
-    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [60, 140] }, st: "saw-bench" });
+    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [60, 135] }, st: "saw-bench" });
   add("saws", { id: "backsaw", n: "Tenon saw", z: "Backsaw",
     d: "A backsaw with a heavy brass back that keeps the blade stiff, for straight, accurate cuts like tenons. It cuts on the push.",
-    p: [["Brass back", 64, 76], ["Blade", 50, 108], ["Teeth", 60, 138], ["Handle", 168, 120]],
+    p: [["Brass back", 60, 87], ["Blade", 50, 112], ["Teeth", 60, 134], ["Handle", 160, 118]],
     f: function () {
-      return P("M14 84 L128 84 L128 134" + zig(128, 134, 14, 134, 30, -5, 0.75) + " Z", STL) +
-        R(10, 72, 122, 13, BRS, 3) + dHandle(120, 76);
+      return P("M-4 92 L132 92 L132 130" + zig(132, 130, -4, 130, 36, -4, 0.75) + " Z", STL) +
+        R(-8, 82, 144, 11, BRS, 3) + dHandle(128, 88, 0.6);
     },
-    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [60, 138] }, st: "saw-bench" });
+    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [60, 134] }, st: "saw-bench" });
   add("saws", { id: "dovetail", n: "Dovetail saw", z: "Fine backsaw",
     d: "A small backsaw with very fine teeth and an open pistol grip, made for cutting dovetail joints. It cuts on the push.",
-    p: [["Back", 80, 84], ["Blade", 64, 108], ["Fine teeth", 70, 128], ["Pistol grip", 162, 124]],
+    p: [["Back", 72, 93], ["Blade", 64, 110], ["Fine teeth", 70, 126], ["Pistol grip", 152, 122]],
     f: function () {
-      return P("M32 90 L134 90 L134 126" + zig(134, 126, 32, 126, 36, -3.5, 0.75) + " Z", STL) +
-        R(28, 80, 110, 11, BRS, 3) + pistolGrip(132, 86, 1.05);
+      return P("M14 98 L134 98 L134 124" + zig(134, 124, 14, 124, 40, -3, 0.75) + " Z", STL) +
+        R(10, 89, 128, 10, BRS, 3) + pistolGrip(132, 94, 0.75);
     },
-    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [70, 128] }, st: "saw-bench" });
+    pl: { k: "saw", cut: "push", ax: [-1, 0], emit: [70, 126] }, st: "saw-bench" });
   add("saws", { id: "coping", n: "Coping saw",
     d: "A deep U-shaped frame holds a very thin blade, so it can cut curves and twisty shapes. The blade can be turned to steer the cut.",
     p: [["Frame", 86, 32], ["Blade", 70, 134], ["Blade pin", 34, 132], ["Handle", 176, 132]],
@@ -286,13 +286,13 @@
     pl: { k: "saw", cut: "pull", ax: [-1, 0], emit: [80, 136] }, st: "saw-bench" });
   add("saws", { id: "fret", n: "Fret saw",
     d: "Like a coping saw but with a much deeper frame and an even thinner blade, for cutting tiny curves far from the edge.",
-    p: [["Deep frame", 90, 16], ["Blade", 80, 168], ["Clamp", 28, 168], ["Handle", 180, 168]],
+    p: [["Deep frame", 94, 8], ["Blade", 94, 168], ["Clamp", 52, 168], ["Handle", 168, 168]],
     f: function () {
-      return bar("M26 168 L26 24 Q26 16 34 16 L148 16 Q156 16 156 24 L156 168", "#D5DDE6", 6) +
-        L(26, 168, 158, 168, O, 3) + L(26, 168, 158, 168, SHN, 1.2) +
-        R(20, 160, 14, 16, STK, 2.5) + R(152, 160, 10, 16, STK, 3) + R(162, 160, 38, 18, WD, 9);
+      return bar("M56 168 L56 16 Q56 8 64 8 L124 8 Q132 8 132 16 L132 168", "#D5DDE6", 6) +
+        L(56, 168, 134, 168, O, 3) + L(56, 168, 134, 168, SHN, 1.2) +
+        R(50, 160, 14, 16, STK, 2.5) + R(128, 160, 10, 16, STK, 3) + R(138, 159, 56, 20, WD, 10);
     },
-    pl: { k: "saw", cut: "pull", ax: [-1, 0], emit: [80, 170] }, st: "saw-bench" });
+    pl: { k: "saw", cut: "pull", ax: [-1, 0], emit: [94, 170] }, st: "saw-bench" });
   add("saws", { id: "hacksaw", n: "Hacksaw",
     d: "A saw for cutting metal and plastic. A stiff frame stretches a fine-toothed blade tight. It cuts on the push stroke.",
     p: [["Frame", 92, 58], ["Blade", 94, 122], ["Teeth", 60, 128], ["Wing nut", 18, 122], ["Grip", 178, 112]],
@@ -359,14 +359,14 @@
     pl: { k: "power", rpm: 3000, unit: "strokes a minute", emit: [[44, 160]], fx: "dust", snd: "saw" }, st: "saw-bench" });
   add("power", { id: "recip", n: "Reciprocating saw",
     d: "A long blade pushes in and out very fast. It is a demolition saw for cutting through wood, nails and pipes.",
-    p: [["Blade", 12, 97], ["Shoe", 26, 95], ["Front grip", 52, 93], ["Motor", 108, 92], ["Trigger", 164, 118], ["Handle", 188, 98]],
+    p: [["Blade", -14, 97], ["Shoe", 26, 95], ["Front grip", 52, 93], ["Motor", 108, 92], ["Trigger", 164, 118], ["Handle", 188, 98]],
     f: function () {
-      return G("", P("M36 90 L-2 92 L-2 98" + zig(-2, 98, 36, 104, 8, 4, 0.6) + " Z", SHN, 2.5), "rec", ' data-v="9 0"') +
+      return G("", P("M36 90 L-44 92 L-44 98" + zig(-44, 98, 36, 104, 16, 4, 0.6) + " Z", SHN, 2.5), "rec", ' data-v="9 0"') +
         R(60, 70, 98, 46, YEL, 16) + vents(80, 80, 5, 9, 24) +
         P("M150 66 L176 66 Q196 66 196 86 L196 110 Q196 128 178 128 L156 128 L156 112 L176 112 Q180 112 180 106 L180 88 Q180 82 174 82 L150 82 Z", BLK) +
         R(158, 112, 12, 12, RED, 3) + R(36, 74, 32, 38, RUB, 12) + P("M32 70 L22 70 L22 120 L32 120", STL, 3) + R(20, 70, 8, 50, STL, 3);
     },
-    pl: { k: "power", rpm: 2800, unit: "strokes a minute", emit: [[14, 102]], fx: "dust", snd: "saw" }, st: "saw-bench" });
+    pl: { k: "power", rpm: 2800, unit: "strokes a minute", emit: [[-10, 102]], fx: "dust", snd: "saw" }, st: "saw-bench" });
   add("power", { id: "tracksaw", n: "Track saw", z: "Plunge saw",
     d: "A circular saw that rides on a long aluminum track, so it makes perfectly straight cuts across big sheets.",
     p: [["Handle", 152, 30], ["Body", 64, 108], ["Blade", 100, 152], ["Dust port", 188, 120], ["Track", 40, 157]],
@@ -543,69 +543,77 @@
     pl: { k: "power", rpm: 1200, emit: [[100, 190]], fx: "grit", snd: "hammerdrill", shake: 2 }, st: "drill-press" });
 
   // ---------- Hammers ----------
-  var SWING = function (hx, hy) { return { k: "swing", pv: [100, 188], hit: [hx, hy] }; };
+  // Each head is drawn big and shrunk by its K about (100, HY), so the handle is about two to three times as long as
+  // the head, like the real tools. Outlines keep their width; hp() maps a point of the full-size head (face, claw).
+  var HY = 48, K_CLAW = 0.55, K_FRAME = 0.52, K_PEEN = 0.5, K_MALLET = 0.62, K_DEAD = 0.55, K_SLEDGE = 0.5;
+  function headK(k, inner) {
+    inner = inner.replace(/stroke-width="([\d.]+)"/g, function (m, w) { return 'stroke-width="' + n2(w / k) + '"'; });
+    return G("translate(100 " + HY + ") scale(" + k + ") translate(-100 " + -HY + ")", inner);
+  }
+  function hp(k, x, y) { return [n2(100 + (x - 100) * k), n2(HY + (y - HY) * k)]; }
+  var SWING = function (h, pv) { return { k: "swing", pv: pv || [100, 188], hit: h }; };
+  function woodHandle(top, bot) {
+    return P("M95 " + top + " L105 " + top + " L108 " + (bot - 8) + " Q108 " + bot + " 100 " + bot + " Q92 " + bot + " 92 " + (bot - 8) + " Z", WD) +
+      L(97.5, top + 10, 98, bot - 8, WDL, 2.5);
+  }
   function fgHandle(top, col, grip) {
-    return P("M92 " + top + " L108 " + top + " L111 186 Q111 194 100 194 Q89 194 89 186 Z", col) +
-      (grip ? P("M90 128 L110 128 L111 186 Q111 194 100 194 Q89 194 89 186 Z", grip) + L(93, 140, 107, 140, "#5A6070", 2.5) + L(93, 152, 107, 152, "#5A6070", 2.5) + L(93, 164, 107, 164, "#5A6070", 2.5) : "");
+    return P("M95 " + top + " L105 " + top + " L108 186 Q108 194 100 194 Q92 194 92 186 Z", col) +
+      (grip ? P("M93 128 L107 128 L108 186 Q108 194 100 194 Q92 194 92 186 Z", grip) + L(95, 140, 105, 140, "#5A6070", 2.5) + L(95, 152, 105, 152, "#5A6070", 2.5) + L(95, 164, 105, 164, "#5A6070", 2.5) : "");
   }
   add("hammers", { id: "claw", n: "Claw hammer",
     d: "The everyday hammer. Hit nails with the flat face, and use the curved claw to pull nails out.",
-    p: [["Face", 38, 48], ["Head", 100, 30], ["Claw", 166, 64], ["Handle", 100, 104], ["Grip", 100, 168]],
+    p: [["Face", 70, 48], ["Head", 100, 32], ["Claw", 132, 56], ["Handle", 100, 104], ["Grip", 100, 168]],
     f: function () {
-      return fgHandle(56, YEL, BLK) + P("M84 28 L116 28 L116 70 L84 70 Z", STL) +
+      return fgHandle(52, YEL, BLK) + headK(K_CLAW, P("M84 28 L116 28 L116 70 L84 70 Z", STL) +
         P("M86 36 L52 38 L48 34 L48 64 L52 60 L86 62 Z", STL) + R(34, 28, 16, 42, STL, 5) + shine(38, 34, 38, 62, 2.5) +
-        P("M114 34 C140 34 162 44 178 76 L170 82 C156 62 140 56 114 60 Z", STL);
+        P("M114 34 C140 34 162 44 178 76 L170 82 C156 62 140 56 114 60 Z", STL));
     },
-    pl: SWING(38, 48), st: "hammer-screws" });
+    pl: SWING(hp(K_CLAW, 38, 48)), st: "hammer-screws" });
   add("hammers", { id: "framing", n: "Framing hammer",
     d: "A big, heavy hammer for building house frames. The waffle face grips the nail and the straight rip claw pries boards apart.",
-    p: [["Waffle face", 30, 48], ["Head", 100, 30], ["Rip claw", 168, 50], ["Handle", 100, 120]],
+    p: [["Waffle face", 66, 48], ["Head", 100, 32], ["Rip claw", 134, 48], ["Handle", 100, 120]],
     f: function () {
       var face = R(24, 26, 16, 44, STL, 5), i;
       for (i = 0; i < 4; i++) face += L(27, 33 + i * 9, 37, 33 + i * 9, STK, 1.6);
-      return P("M91 56 L109 56 L112 190 Q112 198 100 198 Q88 198 88 190 Z", WD) + L(96, 64, 97, 188, WDL, 3) +
-        P("M84 26 L116 26 L116 70 L84 70 Z", STL) + P("M86 34 L42 36 L42 60 L86 62 Z", STL) + face +
-        P("M114 32 L184 44 L186 52 L114 60 Z", STL) + L(148, 46, 184, 48, O, 2);
+      return woodHandle(52, 198) + headK(K_FRAME, P("M84 26 L116 26 L116 70 L84 70 Z", STL) + P("M86 34 L42 36 L42 60 L86 62 Z", STL) + face +
+        P("M114 32 L184 44 L186 52 L114 60 Z", STL) + L(148, 46, 184, 48, O, 2));
     },
-    pl: SWING(30, 48), st: "hammer-screws" });
+    pl: SWING(hp(K_FRAME, 30, 48)), st: "hammer-screws" });
   add("hammers", { id: "ballpeen", n: "Ball-peen hammer",
     d: "A metalworking hammer. The flat face hits punches and chisels, and the round peen shapes and rounds over metal.",
-    p: [["Face", 38, 46], ["Ball peen", 164, 46], ["Handle", 100, 124], ["Wedge", 100, 28]],
+    p: [["Face", 74, 46], ["Ball peen", 126, 46], ["Handle", 100, 124], ["Wedge", 100, 36]],
     f: function () {
-      return P("M93 60 L107 60 L110 188 Q110 196 100 196 Q90 196 90 188 Z", WD) + L(97, 70, 98, 186, WDL, 3) +
-        R(86, 28, 28, 38, STL, 4) + P("M86 34 L52 36 L52 58 L86 60 Z", STL) + R(36, 26, 18, 42, STL, 5) +
-        P("M114 38 L142 40 L142 52 L114 56 Z", STL) + C(160, 46, 18, STL) + shine(152, 38, 156, 34, 3) + L(94, 31, 106, 31, WDD, 3);
+      return woodHandle(52, 196) + headK(K_PEEN, R(86, 28, 28, 38, STL, 4) + P("M86 34 L52 36 L52 58 L86 60 Z", STL) + R(36, 26, 18, 42, STL, 5) +
+        P("M114 38 L142 40 L142 52 L114 56 Z", STL) + C(160, 46, 18, STL) + shine(152, 38, 156, 34, 3) + L(94, 31, 106, 31, WDD, 3));
     },
-    pl: SWING(38, 46), st: "hammer-screws" });
+    pl: SWING(hp(K_PEEN, 38, 46)), st: "hammer-screws" });
   add("hammers", { id: "mallet", n: "Wooden mallet", z: "Joiner's mallet",
     d: "A wooden hammer for tapping chisels and joints together without denting the wood.",
-    p: [["Head", 100, 30], ["Face", 40, 50], ["Handle", 100, 130]],
+    p: [["Head", 100, 30], ["Face", 68, 50], ["Handle", 100, 130]],
     f: function () {
-      return P("M92 70 L108 70 L110 190 Q110 196 100 196 Q90 196 90 190 Z", WD) + L(96, 80, 97, 188, WDL, 3) +
-        P("M40 24 L160 18 L160 84 L40 78 Z", WDL) + L(52, 34, 150, 30, WD, 2.5) + L(52, 50, 150, 48, WD, 2.5) + L(52, 66, 150, 66, WD, 2.5) +
-        R(92, 18, 16, 66, "none", 2, 2.5);
+      return woodHandle(56, 196) + headK(K_MALLET, P("M40 24 L160 18 L160 84 L40 78 Z", WDL) + L(52, 34, 150, 30, WD, 2.5) + L(52, 50, 150, 48, WD, 2.5) + L(52, 66, 150, 66, WD, 2.5) +
+        R(92, 18, 16, 66, "none", 2, 2.5));
     },
-    pl: SWING(40, 50), st: "hammer-screws" });
+    pl: SWING(hp(K_MALLET, 40, 50)), st: "hammer-screws" });
   add("hammers", { id: "deadblow", n: "Dead blow hammer",
     d: "The soft head is filled with steel shot, so it hits hard without bouncing back or marking the work.",
-    p: [["Face", 34, 50], ["Steel shot", 100, 50], ["Head", 140, 30], ["Handle", 100, 130]],
+    p: [["Face", 70, 50], ["Steel shot", 100, 50], ["Head", 118, 34], ["Handle", 100, 130]],
     f: function () {
       var shot = "", i, j;
       for (i = 0; i < 6; i++) for (j = 0; j < 2; j++) shot += Cf(80 + i * 8 + j * 4, 46 + j * 8, 3, "#9AA6B4");
-      return P("M91 70 L109 70 L111 188 Q111 196 100 196 Q89 196 89 188 Z", ORG) + P("M90 132 L110 132 L111 188 Q111 196 100 196 Q89 196 89 188 Z", BLK) +
-        R(40, 26, 120, 48, ORG, 16) + R(28, 24, 16, 52, BLK, 7) + R(156, 24, 16, 52, BLK, 7) +
-        R(72, 38, 56, 24, "#FFFFFF", 10) + shot + R(72, 38, 56, 24, "none", 10, 2.5);
+      return P("M95 52 L105 52 L108 188 Q108 196 100 196 Q92 196 92 188 Z", ORG) + P("M93 132 L107 132 L108 188 Q108 196 100 196 Q92 196 92 188 Z", BLK) +
+        headK(K_DEAD, R(40, 26, 120, 48, ORG, 16) + R(28, 24, 16, 52, BLK, 7) + R(156, 24, 16, 52, BLK, 7) +
+        R(72, 38, 56, 24, "#FFFFFF", 10) + shot + R(72, 38, 56, 24, "none", 10, 2.5));
     },
-    pl: SWING(34, 50), st: "hammer-screws" });
+    pl: SWING(hp(K_DEAD, 34, 50)), st: "hammer-screws" });
   add("hammers", { id: "sledge", n: "Sledgehammer",
     d: "A very heavy hammer with a long handle, for breaking things and driving stakes. Swing it with two hands!",
-    p: [["Head", 100, 26], ["Face", 30, 50], ["Long handle", 100, 140]],
+    p: [["Head", 100, 30], ["Face", 68, 50], ["Long handle", 100, 170]],
     f: function () {
-      return P("M92 70 L108 70 L110 192 Q110 198 100 198 Q90 198 90 192 Z", WD) + L(96, 80, 97, 190, WDL, 3) +
-        P("M36 30 L44 22 L156 22 L164 30 L164 72 L156 80 L44 80 L36 72 Z", "#6E7A88") + R(24, 28, 16, 46, "#6E7A88", 5) + R(160, 28, 16, 46, "#6E7A88", 5) +
-        shine(48, 32, 150, 32, 3);
+      return woodHandle(52, 262) + headK(K_SLEDGE, P("M36 30 L44 22 L156 22 L164 30 L164 72 L156 80 L44 80 L36 72 Z", "#6E7A88") +
+        R(24, 28, 16, 46, "#6E7A88", 5) + R(160, 28, 16, 46, "#6E7A88", 5) + shine(48, 32, 150, 32, 3));
     },
-    pl: SWING(28, 50), st: "hammer-screws" });
+    pl: SWING(hp(K_SLEDGE, 28, 50), [100, 256]), st: "hammer-screws" });
 
   // ---------- Screwdrivers & drivers ----------
   function screwdriver(col, tip, inset, sz, nj) {
@@ -892,7 +900,7 @@
     d: "A very thick, strong chisel for chopping deep square holes called mortises. You hit it hard with a mallet.",
     p: [["Hoop", 100, 8], ["Handle", 100, 42], ["Leather washer", 100, 82], ["Thick blade", 100, 130], ["Bevel", 104, 172]],
     f: function () {
-      return R(78, 10, 44, 70, WD, 18) + L(88, 20, 88, 70, WDL, 3) + R(80, 4, 40, 10, STK, 3) + R(80, 78, 40, 9, "#7A4A2A", 3) +
+      return R(84, 10, 32, 70, WD, 14) + L(92, 20, 92, 70, WDL, 3) + R(85, 4, 30, 10, STK, 3) + R(85, 78, 30, 9, "#7A4A2A", 3) +
         R(88, 86, 24, 10, STL, 3) + P("M90 96 L110 96 L110 152 L92 190 L90 190 Z", STL) + L(95, 100, 95, 184, "#FFFFFF", 2.5, ' opacity="0.6"') +
         L(110, 152, 92, 190, O, 2);
     },
@@ -2787,9 +2795,9 @@
     // Claw pulling: hammer upside down, rocking on the curve of its claw.
     placeClaw: function (J) {
       var g = J.g, tl = J.tl, nx = g.tx + 80;
-      tl.ax = 150; tl.ay = 39; tl.preR = 180; tl.s = J.cfg.s || 1;
+      var cl = hp(K_CLAW, 150, 39); tl.ax = cl[0]; tl.ay = cl[1]; tl.preR = 180; tl.s = J.cfg.s || 1;
       tl.x = nx + 16 * tl.s; tl.y = g.yT; tl.a = J.pull;
-      J.nailHead = [J.nx0 || (J.nx0 = toolPt(166, 64)[0]), g.yT - 25 * tl.s - 6 - J.pull * 1.4];
+      J.nailHead = [J.nx0 || (J.nx0 = toolPt(hp(K_CLAW, 166, 64)[0], hp(K_CLAW, 166, 64)[1])[0]), g.yT - 25 * tl.s - 6 - J.pull * 1.4];
     },
     work: function (J) {
       var g = J.g, c = J.cfg, s = "", p = J.p, x = g.tx, y = g.yT, t = g.tg, top = KINDS.tap.targetY(J, p), i;
@@ -4164,7 +4172,7 @@
       var top = toolPt(100, 4), A, t = J.sw, imp = 0.17;
       if (t < 0) A = 34; else if (t < 0.09) A = 34 + 10 * t / 0.09; else if (t < imp) A = 44 * (1 - (t - 0.09) / (imp - 0.09)); else A = 34 * (1 - Math.pow(1 - Math.min(1, (t - imp) / 0.3), 2));
       if (J.done) A = 34;
-      return '<g transform="' + swingPlace({ face: [40, 51], handle: [100, 194], s: 0.8, preR: -90, tx: top[0], ty: top[1] }, A) + '">' + TOOL.mallet.f({}, "jml") + "</g>";
+      return '<g transform="' + swingPlace({ face: hp(K_MALLET, 40, 51), handle: [100, 194], s: 0.8, preR: -90, tx: top[0], ty: top[1] }, A) + '">' + TOOL.mallet.f({}, "jml") + "</g>";
     }
   };
 
@@ -4176,19 +4184,19 @@
   J0("ryoba", { k: "saw", use: "Cutting boards, along the grain or across it.", anchor: [70, 127], rot: 12.6, s: 1.45, cut: "pull" });
   J0("dozuki", { k: "saw", mat: "oak", use: "Fine, straight cuts for joints like dovetails.", anchor: [76, 133], s: 1.45, cut: "pull" });
   J0("kataba", { k: "saw", use: "Deep cuts across wide boards.", anchor: [73, 127], rot: 9, s: 1.45, cut: "pull" });
-  J0("panel", { k: "saw", use: "Cutting boards to length.", anchor: [67, 141], s: 1.4, cut: "push" });
-  J0("backsaw", { k: "saw", mat: "oak", use: "Straight, accurate cuts, like the shoulders of a tenon.", anchor: [71, 138], s: 1.4, cut: "push" });
-  J0("dovetail", { k: "saw", mat: "oak", use: "Small, fine cuts for dovetail joints.", anchor: [83, 129], s: 1.5, cut: "push", travel: 300 });
+  J0("panel", { k: "saw", use: "Cutting boards to length.", anchor: [60, 135], s: 1.4, cut: "push" });
+  J0("backsaw", { k: "saw", mat: "oak", use: "Straight, accurate cuts, like the shoulders of a tenon.", anchor: [60, 134], s: 1.4, cut: "push" });
+  J0("dovetail", { k: "saw", mat: "oak", use: "Small, fine cuts for dovetail joints.", anchor: [72, 127], s: 1.5, cut: "push", travel: 300 });
   J0("hacksaw", { k: "saw", mat: "steel", use: "Cutting metal bars, bolts and pipes.", anchor: [92, 127], s: 1.15, cut: "push", travel: 420, range: 40 });
   J0("bow", { k: "saw", mat: "log", use: "Cutting logs and branches.", anchor: [101, 158], s: 1.05, cut: "both", travel: 380 });
   J0("coping", { k: "trace", shape: "corner", use: "Cutting curves and shapes.", anchor: [88, 132], preR: -90, s: 1, coach: "Follow the curvy line with the saw.", done: "A curvy corner, cut out!" });
-  J0("fret", { k: "trace", shape: "heart", closed: 1, use: "Cutting tiny curves far from the edge.", anchor: [92, 168], preR: -90, s: 0.8, coach: "The blade goes through a drilled hole. Follow the heart!", done: "A heart, cut right out of the middle!" });
+  J0("fret", { k: "trace", shape: "heart", closed: 1, use: "Cutting tiny curves far from the edge.", anchor: [94, 168], preR: -90, s: 0.8, coach: "The blade goes through a drilled hole. Follow the heart!", done: "A heart, cut right out of the middle!" });
   J0("keyhole", { k: "trace", shape: "box", closed: 1, mat: "dry", use: "Cutting holes in drywall, starting from a drilled hole.", anchor: [50, 104], preR: -90, s: 1, coach: "Start in the drilled hole and saw around the box.", done: "A hole for the outlet box!" });
   // Power saws
   J0("circular", { k: "saw", mode: "circ", use: "Fast, straight cuts across boards.", anchor: [84, 138], s: 1.25, lead: 52.8, coach: "Hold the saw and push it along the line." });
   J0("tracksaw", { k: "saw", mode: "circ", mat: "ply", track: 1, use: "Long, perfectly straight cuts in big sheets.", anchor: [100, 164], s: 1.15, lead: 38, coach: "Hold the saw and push it along the track." });
   J0("jigsaw", { k: "trace", shape: "wave", power: 1, use: "Cutting curves in boards.", anchor: [44, 150], s: 0.95, coach: "Hold the jigsaw and follow the wavy line.", done: "A wavy cut! Jigsaws can turn corners." });
-  J0("recip", { k: "saw", mode: "recip", mat: "pipe", use: "Cutting through pipes, nails and old wood.", anchor: [14, 101], s: 1.4 });
+  J0("recip", { k: "saw", mode: "recip", mat: "pipe", use: "Cutting through pipes, nails and old wood.", anchor: [-10, 103], s: 1.4 });
   // Drills (with the bit they hold)
   J0("drilldriver", { k: "screw", power: 1, clutch: 1, recess: "cross", size: "PH2", use: "Drilling holes and driving screws.", anchor: [-22, 76], preR: -90, s: 0.72, extra: SDRV(8), turns: 4, secs: 2.2, done: "In it goes! The clutch clicks so the screw stops at the right depth." });
   J0("impact", { k: "screw", power: 1, snd: "impact", shake: 0.9, recess: "star", size: "T25", use: "Driving long, big screws.", anchor: [-38, 76], preR: -90, s: 0.72, extra: SDRV(24), turns: 6, secs: 2, done: "Rat-a-tat! The long screw went all the way in." });
@@ -4208,12 +4216,12 @@
   J0("plug", { k: "bore", type: "ring", w: 51, stop: 24, T: 40, tip: 0, plugOut: "up", plugW: 26, plugH: 24, use: "Cutting wooden plugs to hide screws.", anchor: [100, 170], s: 0.8, extra: CH(10), done: "A wooden plug, ready to hide a screw!" });
   J0("masonry", { k: "bore", mat: "brick", T: 70, w: 21, tip: 8, fx: "grit", snd: "hammerdrill", shake: 1.2, use: "Holes in brick and stone.", anchor: [100, 192], s: 0.7, extra: CH(10), done: "A hole in the brick, ready for a wall plug!", mmT: 60 });
   // Hammers
-  J0("claw", { k: "tap", target: "nail", claw: 1, face: [34, 49], handle: [100, 192], s: 1, use: "Driving nails in, and pulling them out with the claw.", coach: "Tap to swing the hammer and drive the nail in!" });
-  J0("framing", { k: "tap", target: "bignail", face: [24, 48], handle: [100, 196], s: 1, use: "Driving big nails into house frames.", coach: "Tap to swing! It's heavy, so it drives big nails fast.", done: "A big nail, in just a few hits!" });
-  J0("ballpeen", { k: "tap", target: "rivet", face: [178, 46], handle: [100, 194], preR: 90, raiseDir: -1, s: 1, use: "Shaping metal and setting rivets.", coach: "Tap to hit the rivet with the round peen.", done: "The rivet head is round and set! That's called peening." });
-  J0("mallet", { k: "tap", target: "tenon", face: [40, 51], handle: [100, 194], s: 0.95, use: "Tapping joints together and hitting chisels.", coach: "Tap to knock the joint together.", done: "The joint is tapped together, tight!" });
-  J0("deadblow", { k: "tap", target: "flush", tx: 232, face: [28, 50], handle: [100, 194], s: 0.95, use: "Knocking parts into place without bouncing or dents.", coach: "Tap the high board down until it is flush.", done: "Flush! It hit hard, with no bounce and no dents." });
-  J0("sledge", { k: "tap", target: "stake", face: [24, 51], handle: [100, 196], s: 0.85, raise: 26, use: "Driving stakes and breaking things.", coach: "Tap to swing the big sledgehammer!", done: "The stake is deep in the ground!" });
+  J0("claw", { k: "tap", target: "nail", claw: 1, face: hp(K_CLAW, 34, 49), handle: [100, 192], s: 1, use: "Driving nails in, and pulling them out with the claw.", coach: "Tap to swing the hammer and drive the nail in!" });
+  J0("framing", { k: "tap", target: "bignail", face: hp(K_FRAME, 24, 48), handle: [100, 196], s: 1, use: "Driving big nails into house frames.", coach: "Tap to swing! It's heavy, so it drives big nails fast.", done: "A big nail, in just a few hits!" });
+  J0("ballpeen", { k: "tap", target: "rivet", face: hp(K_PEEN, 178, 46), handle: [100, 194], preR: 90, raiseDir: -1, s: 1, use: "Shaping metal and setting rivets.", coach: "Tap to hit the rivet with the round peen.", done: "The rivet head is round and set! That's called peening." });
+  J0("mallet", { k: "tap", target: "tenon", face: hp(K_MALLET, 40, 51), handle: [100, 194], s: 0.95, use: "Tapping joints together and hitting chisels.", coach: "Tap to knock the joint together.", done: "The joint is tapped together, tight!" });
+  J0("deadblow", { k: "tap", target: "flush", tx: 232, face: hp(K_DEAD, 28, 50), handle: [100, 194], s: 0.95, use: "Knocking parts into place without bouncing or dents.", coach: "Tap the high board down until it is flush.", done: "Flush! It hit hard, with no bounce and no dents." });
+  J0("sledge", { k: "tap", target: "stake", face: hp(K_SLEDGE, 24, 51), handle: [100, 260], s: 0.7, raise: 26, use: "Driving stakes and breaking things.", coach: "Tap to swing the big sledgehammer!", done: "The stake is deep in the ground!" });
   // Screwdrivers
   J0("flathead", { k: "screw", recess: "slot", size: "Slotted", anchor: [100, 190], use: "Turning screws with one straight slot." });
   J0("phillips", { k: "screw", recess: "cross", size: "PH2", anchor: [100, 192], use: "Turning cross-head screws, the most common kind." });

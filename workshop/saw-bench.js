@@ -432,23 +432,26 @@
   // Western closed handle ("tote") with saw nuts. Rounded via midpoints.
   var TOTE_OUT = [[-26, -108], [-16, -134], [12, -151], [48, -151], [72, -134], [75, -114], [64, -98], [102, -30], [118, -4], [110, 18], [82, 23], [46, 16], [16, 4], [-6, -18], [-22, -52]];
   var TOTE_HOLE = [[6, -110], [26, -125], [44, -123], [47, -106], [39, -90], [65, -26], [60, -11], [40, -9], [22, -26], [8, -66]];
+  // TOTE_K shrinks the drawn outline to a real tote's size (about 135 mm tall) next to the blade.
+  var TOTE_K = 0.78;
   function tote(ctx, dx, dy, nuts) {
     ctx.save();
     ctx.translate(dx, dy);
+    ctx.scale(TOTE_K, TOTE_K);
     smooth(ctx, TOTE_OUT);
     smooth(ctx, TOTE_HOLE, true);
     ctx.fillStyle = C.beech;
     ctx.fill("evenodd");
-    ctx.lineWidth = 3 * PX; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.lineWidth = 3 * PX / TOTE_K; ctx.strokeStyle = OUT; ctx.lineJoin = "round"; ctx.stroke();
     // a lighter cheek line for a carved look
     ctx.beginPath();
     ctx.moveTo(-14, -100); ctx.quadraticCurveTo(-8, -138, 30, -142);
-    ctx.strokeStyle = C.beechL; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = C.beechL; ctx.lineWidth = 3 / TOTE_K; ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(78, -84); ctx.quadraticCurveTo(100, -40, 106, -6);
     ctx.stroke();
     ctx.restore();
-    (nuts || []).forEach(function (n) { nut(ctx, n[0] + dx, n[1] + dy, 6.5); });
+    (nuts || []).forEach(function (n) { nut(ctx, n[0] * TOTE_K + dx, n[1] * TOTE_K + dy, 6); });
   }
 
   // ---------------- Hand saws (teeth tips on y = 0, handle on the right) ----------------
@@ -552,12 +555,14 @@
     rrect(ctx, -227, -57, 233, 14, 4);
     fs(ctx, C.brass);
     line(ctx, -222, -53, 2, -53, "rgba(255,255,255,0.55)", 2.2);
-    // open pistol grip
+    // open pistol grip, a real one's size (about 95 mm tall)
+    ctx.save(); ctx.scale(0.8, 0.8);
     smooth(ctx, [[-16, -62], [10, -68], [32, -60], [38, -40], [58, 8], [64, 34], [52, 50], [34, 46], [24, 24], [8, -8], [-14, -28]]);
-    fs(ctx, C.beech);
+    fs(ctx, C.beech, 3 / 0.8);
     ctx.beginPath(); ctx.moveTo(30, -44); ctx.quadraticCurveTo(46, 0, 54, 30);
-    ctx.strokeStyle = C.beechL; ctx.lineWidth = 3; ctx.stroke();
-    nut(ctx, -2, -38, 5.5); nut(ctx, 16, -52, 5.5);
+    ctx.strokeStyle = C.beechL; ctx.lineWidth = 3 / 0.8; ctx.stroke();
+    ctx.restore();
+    nut(ctx, -2, -32, 5); nut(ctx, 13, -44, 5);
   }
 
   // Coping saw: blade on y = 0 from x -165 to 0, U frame above (toward -y), handle in line on the right.
@@ -1020,9 +1025,9 @@
     ryoba: { fn: drawRyoba, box: [-252, -98, 320, 2] },
     dozuki: { fn: drawDozuki, box: [-242, -72, 302, 1] },
     kataba: { fn: drawKataba, box: [-254, -82, 292, 1] },
-    panel: { fn: drawPanel, box: [-522, -153, 120, 24] },
-    backsaw: { fn: drawBacksaw, box: [-336, -147, 128, 30] },
-    dovetail: { fn: drawDovetail, box: [-228, -70, 66, 52] },
+    panel: { fn: drawPanel, box: [-522, -124, 94, 20] },
+    backsaw: { fn: drawBacksaw, box: [-336, -118, 100, 26] },
+    dovetail: { fn: drawDovetail, box: [-228, -58, 54, 42] },
     coping: { fn: drawCoping, box: [-192, -131, 122, 17] },
     fret: { fn: drawFret, box: [-158, -305, 132, 16] },
     hacksaw: { fn: drawHacksaw, box: [-364, -132, 58, 41] },
