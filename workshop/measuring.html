@@ -477,7 +477,7 @@ body.ending .pjstep { visibility: hidden; }
     fitBanner();
     var isCombo = PJ.tool === "combosquare";
     var cs = clamp(U * 0.2, 74, 150);
-    var xL = isCombo ? PAD + Math.max(24, Math.round(cs * 0.32)) : PAD + cs + 12;
+    var xL = isCombo ? PAD + 84 : PAD + cs + 12;   // combination square: room for its head hooked on the left end
     var bannerH = $("pjstep").offsetHeight || 0;
     $("mcoach").style.top = (10 + bannerH + 8) + "px";
     $("stage").style.setProperty("--pj-top", (10 + bannerH + 6) + "px");  // short screens: the Done card goes here
@@ -515,7 +515,7 @@ body.ending .pjstep { visibility: hidden; }
     C.headW = clamp(C.rw * 1.65, 42, 74);
     C.bw = 12 * ppi;
     C.bh = clamp(ppi * 4.4, 110, Math.max(120, CH - OPTH - topSpace - PAD - 12));
-    C.bx = Math.max(PAD + 14, (CW - C.bw - C.headW * 0.7) / 2);
+    C.bx = Math.max(PAD + C.headW + 8, (CW - C.bw + C.headW) / 2);   // the head hooks on the board's left end
     C.by = Math.max(topSpace, (CH - OPTH + topSpace - C.bh) / 2);
   }
 
@@ -1213,7 +1213,9 @@ body.ending .pjstep { visibility: hidden; }
   // =====================================================================
   function pjRuleY() { var b = PJ.board; return b.cy - b.h * 0.16; }
   function pjRuleW() { return clamp(T.ppi * 0.78, 22, 42); }
-  function drawComboRule(c, x0, cy, lenPx, rw, ppi, unit) {
+  // rev: the scale counts from the right-hand end (the rule's tip when it is slid out of a head on its left).
+  function drawComboRule(c, x0, cy, lenPx, rw, ppi, unit, rev) {
+    function gx(d) { return rev ? x0 + lenPx - d : x0 + d; }
     c.save();
     c.fillStyle = "rgba(60,35,10,0.22)";
     rr(c, x0 + 4, cy - rw / 2 + 5, lenPx, rw, 3); c.fill();
@@ -1235,7 +1237,7 @@ body.ending .pjstep { visibility: hidden; }
       var pcm = lenPx / 30;
       var every = pcm >= 20 ? 1 : (pcm >= 11 ? 2 : 5);
       for (var m = 1; m <= 60; m++) {
-        var xx = x0 + m * pcm / 2, isCm = m % 2 === 0;
+        var xx = gx(m * pcm / 2), isCm = m % 2 === 0;
         if (!isCm && pcm < 14) continue;
         c.lineWidth = isCm ? 2 : 1.2;
         var th = rw * (isCm ? 0.32 : 0.2);
@@ -1249,7 +1251,7 @@ body.ending .pjstep { visibility: hidden; }
       var div = ppi >= 28 ? 4 : 2;
       var n = Math.round(lenPx / ppi * div);
       for (var i = 1; i <= n; i++) {
-        var x = x0 + i * ppi / div, f;
+        var x = gx(i * ppi / div), f;
         if (i % div === 0) f = 0.34; else if (i % (div / 2) === 0) f = 0.24; else f = 0.15;
         c.lineWidth = i % div === 0 ? 2.2 : 1.4;
         c.beginPath(); c.moveTo(x, top); c.lineTo(x, top + rw * f); c.stroke();
@@ -1296,6 +1298,16 @@ body.ending .pjstep { visibility: hidden; }
     fs(c, "#E63946", 2);
     c.restore();
   }
+  // The square measuring from the end of a board, like the real tool: the head's square face hooks on the
+  // board's left end at x0 (the head hangs off to the left), the rule lies along the board and is slid out to
+  // tip; the scale counts from the tip, so the reading at the head's face is the length from the end.
+  function drawComboHooked(c, x0, tip, ry, rw, ppi, unit, lockGlow) {
+    drawComboRule(c, tip - 12 * ppi, ry, 12 * ppi, rw, ppi, unit, true);
+    c.save();
+    c.translate(2 * x0, 0); c.scale(-1, 1);
+    drawComboHead(c, x0, ry, rw, lockGlow);
+    c.restore();
+  }
   // Upright combination square hooked on the project board's near (bottom) edge at Q.xd for Phase 2 ("square").
   function drawComboSquareUpright(c, alpha) {
     var G = sqGeom(), x = G.corner.x, ey = G.ey, sl = Q.sl;
@@ -1338,7 +1350,7 @@ body.ending .pjstep { visibility: hidden; }
     if (PJ.phase !== "combo" || PJ.comboHeld || busy() || Math.abs(PJ.comboD - PJ.target * T.ppi) < T.ppi * 0.5) return;
     var b = PJ.board, ry = pjRuleY(), rw = pjRuleW(), sw = clamp(rw * 1.65, 42, 74);
     var hx = b.x0 + PJ.comboD, tx = PJ.tickX;
-    var startX = tx > hx ? hx + sw + 10 : hx - 10;
+    var startX = tx > hx ? hx + 10 : hx - 10;
     var dx = tx - startX, L = Math.abs(dx);
     if (L < 36) return;
     var ux = dx > 0 ? 1 : -1, k = reduce ? 0.6 : (now * 0.9) % 1, sz = Math.max(11, rw * 0.38);
@@ -1359,7 +1371,7 @@ body.ending .pjstep { visibility: hidden; }
     var b = PJ.board;
     var maxD = Math.min(12 * T.ppi, b.x1 - b.x0);
     var d = clamp(hx - b.x0, 0, maxD), tx = PJ.target * T.ppi;
-    var zone = (PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14)) * Math.max(1, pjTapeGain() * 0.6);
+    var zone = PJ.misses >= 2 ? Math.max(T.ppi, 40) : Math.max(0.25 * T.ppi, 14);
     var was = PJ.onTarget;
     PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
     if (!PJ.onTarget) { PJ.comboD = d; PJ.comboIn = d / T.ppi; }
@@ -1386,7 +1398,8 @@ body.ending .pjstep { visibility: hidden; }
   function comboDownPJ(p, id) {
     if (PJ.phase !== "combo" || PJ.comboHeld) return false;
     var b = PJ.board, ry = pjRuleY(), rw = pjRuleW(), hx = b.x0 + PJ.comboD, sw = clamp(rw * 1.65, 42, 74);
-    var onHead = p.x >= hx - 36 && p.x <= hx + sw + 36 && p.y >= ry - rw * 1.4 - 24 && p.y <= ry + rw * 2.4 + 24;
+    void sw;
+    var onHead = p.x >= hx - 44 && p.x <= hx + 40 && p.y >= ry - rw * 1.4 - 24 && p.y <= ry + rw * 1.4 + 24;   // the rule's tip
     var onBand = p.x >= b.x0 - 20 && p.x <= b.x0 + 12.5 * T.ppi + 40 && Math.abs(p.y - b.cy) < Math.max(b.h * 0.75, 70);
     if (onHead || onBand) {
       PJ.comboHeld = true;
@@ -1396,7 +1409,7 @@ body.ending .pjstep { visibility: hidden; }
       blip(900, 0.05, 0.05, "triangle");
       return true;
     }
-    pjSay("Slide the square!", "flash", 2.5);
+    pjSay("Slide the rule!", "flash", 2.5);
     return false;
   }
   // Free play combination square
@@ -1439,7 +1452,7 @@ body.ending .pjstep { visibility: hidden; }
     if (C.live) {
       var y0 = lerp(by, by + bh, C.live.t0), y1 = lerp(by, by + bh, C.live.t1);
       c.strokeStyle = "rgba(52,56,66,0.95)";
-      c.beginPath(); c.moveTo(hx - 3, y0); c.lineTo(hx - 3, y1); c.stroke();
+      c.beginPath(); c.moveTo(hx, y0); c.lineTo(hx, y1); c.stroke();
     }
     c.restore();
     rr(c, bx, by, bw, bh, 6); fs(c, null, 3.5);
@@ -1449,19 +1462,18 @@ body.ending .pjstep { visibility: hidden; }
       c.save();
       c.strokeStyle = "rgba(255,90,60," + Math.min(1, pulse) + ")";
       c.lineWidth = 6; c.lineCap = "round"; c.setLineDash([12, 10]);
-      c.beginPath(); c.moveTo(hx - 5, by + rw * 0.8); c.lineTo(hx - 5, by + bh); c.stroke();
+      c.beginPath(); c.moveTo(hx, by + rw * 0.8); c.lineTo(hx, by + bh); c.stroke();
       c.restore();
     }
-    // 12-inch slotted steel rule and sliding stock head
-    drawComboRule(c, bx, ry, bw, rw, C.ppi, S.unit);
-    drawComboHead(c, hx, ry, rw, 0);
+    // the head hooked on the board's left end, the 12-inch rule slid out to hx
+    drawComboHooked(c, bx, hx, ry, rw, C.ppi, S.unit, 0);
     if (C.live) {
-      drawPencil(c, hx - 3, lerp(by, by + bh, C.live.t1), clamp(U * 0.2, 80, 170));
+      drawPencil(c, hx, lerp(by, by + bh, C.live.t1), clamp(U * 0.2, 80, 170));
     }
-    // readout bubble above the stock head
+    // readout bubble above the head (the reading is at its face)
     var F = C.F, sw = clamp(rw * 1.65, 42, 74);
-    var rbx = hx + sw * 0.35, rby = Math.max(PAD + F * 0.7, ry - rw * 0.95 - F * 0.8);
-    readout(c, comboText(), rbx, rby, F, C.live ? 1 : 0, hx, ry - rw * 0.55);
+    var rbx = Math.max(F * 1.6, bx - sw * 0.35), rby = Math.max(PAD + F * 0.7, ry - rw * 0.95 - F * 0.8);
+    readout(c, comboText(), rbx, rby, F, C.live ? 1 : 0, bx, ry - rw * 0.55);
   }
   function comboSlideFree(x) {
     S.comboF = clamp((x - C.bx) / Math.max(1, C.bw), 0, 1);
@@ -1474,9 +1486,10 @@ body.ending .pjstep { visibility: hidden; }
     syncComboBoard();
     var bx = C.bx, by = C.by, bw = C.bw, bh = C.bh, rw = C.rw, ry = by + rw * 0.35;
     var hx = bx + S.comboF * bw, sw = clamp(rw * 1.65, 42, 74);
-    var headBot = ry + rw * 2.15;
+    var headBot = ry + rw * 0.9;
+    void sw;
     var nearLine = Math.abs(p.x - hx) < 44 && p.y >= by - 10 && p.y <= by + bh + 24;
-    var onHead = p.x >= hx - 30 && p.x <= hx + sw + 30 && p.y >= ry - rw * 1.3 - 20 && p.y <= headBot + 20;
+    var onHead = p.x >= hx - 40 && p.x <= hx + 36 && p.y >= ry - rw * 1.3 - 20 && p.y <= headBot + 20;   // the rule's tip
     var onRule = p.x >= bx - 16 && p.x <= bx + bw + 20 && p.y >= ry - rw && p.y <= ry + rw * 1.4;
     if (nearLine && p.y > headBot - 10) {
       var t0 = clamp((p.y - by) / bh, 0, 1);
@@ -1499,14 +1512,14 @@ body.ending .pjstep { visibility: hidden; }
       return true;
     }
     C.edgeFlash = 1;
-    say("Slide the square or draw along the red edge");
+    say("Slide the rule or draw along the red line");
     return false;
   }
   function comboMove(dr, p) {
     if (dr.type === "comboPJ") {
-      // geared like the project tape: the head slides up to pjTapeGain() times the finger
+      // the rule follows the finger one to one (it is at most 12 inches long, so no gearing like the tape)
       if (dr.bx == null) { dr.bx = p.x; dr.d0 = PJ.comboD || 0; }
-      setComboPJ(PJ.board.x0 + dr.d0 + (p.x - dr.bx) * pjTapeGain());
+      setComboPJ(PJ.board.x0 + dr.d0 + (p.x - dr.bx));
       return;
     }
     syncComboBoard();
@@ -1541,7 +1554,7 @@ body.ending .pjstep { visibility: hidden; }
       var lv = C.live, hx = C.bx + S.comboF * C.bw;
       var y0 = lerp(C.by, C.by + C.bh, lv.t0), y1 = lerp(C.by, C.by + C.bh, lv.t1);
       if (Math.abs(y1 - y0) > 8) {
-        var a = toBoard(hx - 3, y0), b = toBoard(hx - 3, y1);
+        var a = toBoard(hx, y0), b = toBoard(hx, y1);
         S.lines.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
         if (S.lines.length > 80) S.lines.shift();
         save();
@@ -1562,16 +1575,14 @@ body.ending .pjstep { visibility: hidden; }
     if (PJ.tool === "combosquare") {
       if (PJ.phase === "combo" || PJ.phase === "tick" || (PJ.mark === "x" && (PJ.phase === "x" || PJ.phase === "done"))) {
         var b = PJ.board, ry = pjRuleY(), rw = pjRuleW(), hx = b.x0 + PJ.comboD;
-        var ruleLen = 12 * T.ppi;
-        drawComboRule(c, b.x0, ry, ruleLen, rw, T.ppi, "in");
-        drawComboHead(c, hx, ry, rw, PJ.knobLock);
+        drawComboHooked(c, b.x0, hx, ry, rw, T.ppi, "in", PJ.knobLock);
         if (PJ.phase === "combo") drawComboArrow(c);
         if (PJ.phase === "combo" || PJ.phase === "tick") {
           var cv = PJ.comboHeld || PJ.comboD > 0.5 ? tapeValue(PJ.comboD) : T.shown;
-          var sw = clamp(rw * 1.65, 42, 74), rbx = hx + sw * 0.35;
+          var sw = clamp(rw * 1.65, 42, 74), rbx = Math.max(F * 1.6, b.x0 - sw * 0.35);
           var aboveC = ry - rw * 0.9 - F * 1.3 > clear;
           var byC = aboveC ? ry - rw * 0.9 - F * 0.75 : b.cy + b.h / 2 + F * 0.85;
-          readout(c, tapeText(cv), rbx, byC, F, PJ.onTarget || PJ.phase === "tick" ? 1 : 0, hx, aboveC ? ry - rw * 0.55 : ry + rw * 1.5);
+          readout(c, tapeText(cv), rbx, byC, F, PJ.onTarget || PJ.phase === "tick" ? 1 : 0, b.x0, aboveC ? ry - rw * 0.55 : ry + rw * 1.5);
         }
       }
     } else {
@@ -2581,7 +2592,7 @@ body.ending .pjstep { visibility: hidden; }
     PJ.msg = { text: text, cls: cls || "flash", until: now + (secs || 3) };
   }
   function pjBaseCoach() {
-    if (PJ.phase === "combo") return PJ.onTarget && PJ.comboHeld ? "Let go!" : "Slide the square to " + ToyboxProjects.fmt(PJ.target) + "!";
+    if (PJ.phase === "combo") return PJ.onTarget && PJ.comboHeld ? "Let go!" : "Slide the rule out to " + ToyboxProjects.fmt(PJ.target) + "!";
     if (PJ.phase === "tape") return PJ.onTarget && T.hookHeld ? "Let go!" : "Pull the tape to " + ToyboxProjects.fmt(PJ.target) + "!";
     if (PJ.phase === "square") return PJ.lineT > 0 ? "A straight line!" : (PJ.onTick ? "Draw along the square!" : "Slide the square to the mark!");
     if (PJ.phase === "x") return "X marks the door!";
@@ -2671,7 +2682,7 @@ body.ending .pjstep { visibility: hidden; }
     function scr(x, y) { return [cr.left + x, cr.top + y]; }
     if (PJ.phase === "combo") {
       var ry = pjRuleY(), hx = PJ.board.x0 + PJ.comboD;
-      return { pts: [scr(hx + 20, ry), scr(hx + 20 + (PJ.tickX - hx) / pjTapeGain(), ry)], duration: 3800 };
+      return { pts: [scr(hx + 20, ry), scr(hx + 20 + (PJ.tickX - hx), ry)], duration: 3800 };
     }
     if (PJ.phase === "tape") {
       var h = hookPt();
@@ -2690,7 +2701,7 @@ body.ending .pjstep { visibility: hidden; }
     return null;
   }, { max: 3 });
 
-  var HINTS = { tape: "Pull the hook out!", combosquare: "Slide the square or draw a line!", level: "Make the bubble sit in the middle", square: "Draw along the red edge", caliper: "Put a part in the jaws" };
+  var HINTS = { tape: "Pull the hook out!", combosquare: "Slide the rule or draw a line!", level: "Make the bubble sit in the middle", square: "Draw along the red edge", caliper: "Put a part in the jaws" };
   function setTool(t, quiet) {
     if (TOOLS.indexOf(t) === -1) return;
     if (PJ) {

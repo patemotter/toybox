@@ -799,17 +799,19 @@
       rd: function (v) { return Math.round(v) + "°"; } } });
   add("measure", { id: "combosquare", st: "measuring", n: "Combination square",
     d: "A steel ruler with a sliding head. The head marks square and slanted lines, and the little bubble checks for level.",
-    p: [["Rule", 170, 78], ["Head", function (s) { return [s.hx + 10, 112]; }], ["Lock knob", function (s) { return [s.hx + 34, 92]; }],
-      ["Bubble vial", function (s) { return [s.hx + 18, 104]; }]],
+    p: [["Rule", 170, 78], ["Head", function (s) { return [s.hx + 36, 100]; }], ["Lock knob", function (s) { return [s.hx + 50, 96]; }],
+      ["Bubble vial", function (s) { return [s.hx + 30, 102]; }]],
     f: function (s) {
+      // A 12-inch rule through a head about a third as long. The head's square (90 degree) face is its right
+      // end, which hangs down below the rule; the 45 degree face is the slope on its left end.
       var x = s.hx, out = R(8, 70, 186, 16, STL, 1, 2.5), i;
-      for (i = 1; i < 24; i++) out += L(8 + i * 7.5, 70.5, 8 + i * 7.5, i % 2 ? 74 : 77, O, 1);
-      return out + P("M" + x + " 58 L" + (x + 48) + " 58 L" + (x + 48) + " 98 L" + (x + 22) + " 124 L" + x + " 124 Z", "#4F6A8F") +
-        L(x + 4, 62, x + 4, 120, "#8FA6C6", 2) + R(x + 6, 100, 24, 9, "#C6F07A", 4, 2) + Cf(x + 18, 104.5, 3, "#F4FFE0") +
-        C(x + 34, 90, 7, BRS, 2.5);
+      for (i = 1; i < 24; i++) out += L(8 + i * 7.75, 70.5, 8 + i * 7.75, i % 2 ? 74 : 77, O, 1);
+      return out + P("M" + x + " 66 L" + (x + 62) + " 66 L" + (x + 62) + " 112 L" + (x + 28) + " 112 L" + x + " 86 Z", "#4F6A8F") +
+        L(x + 59, 70, x + 59, 108, "#8FA6C6", 2) + R(x + 20, 98, 22, 8, "#C6F07A", 4, 2) + Cf(x + 31, 102, 2.6, "#F4FFE0") +
+        C(x + 50, 96, 5.5, BRS, 2.5);
     },
     st0: { hx: 70 },
-    pl: { k: "param", key: "hx", min: 22, max: 146, ax: [1, 0], hi: "Slide the head along the rule",
+    pl: { k: "param", key: "hx", min: 8, max: 132, ax: [1, 0], hi: "Slide the head along the rule",
       rd: function (v) { var inches = (v - 8) / 15; return "Head at " + inch(inches) + " · " + Math.round(inches * 2.54) + " cm"; } } });
   function lvlPt(x, y) { return function (s) { return rotP(x, y, s.ang, 100, 100); }; }
   add("measure", { id: "level", st: "measuring", n: "Spirit level",
@@ -3570,22 +3572,23 @@
   };
   KINDS.combosq = {
     init: function (J) {
-      J.tl.s = 1.2; J.tl.ax = 108; J.tl.ay = 86; J.tl.x = 300; J.tl.y = 60;
-      J.s.hx = 60; setArt(J.t.f(J.s, "j" + D.u));
+      // the head at the end of the rule; its square face (right end, at the rule's bottom edge) goes on the corner
+      J.tl.s = 1; J.tl.ax = 70; J.tl.ay = 86; J.tl.x = 236; J.tl.y = 60;
+      J.s.hx = 8; setArt(J.t.f(J.s, "j" + D.u));
       coach("Slide the square onto the corner of the board to check it.");
-      hint({ k: "drag", x: 300, y: 40, dx: -110, dy: 70 });
+      hint({ k: "drag", x: 250, y: 40, dx: -86, dy: 70 });
       readout("Is it square?");
     },
     back: function (J) { return KINDS.wrench.back(J); },
     down: function (J, p, e) { grab(J, p, e, [J.tl.x, J.tl.y]); },
     move: function (J, p, e) {
       if (!mine(J, e)) return;
-      J.tl.x = clamp(p[0] + J.grab[0], 60, 360); J.tl.y = clamp(p[1] + J.grab[1], 20, 260);
-      if (Math.hypot(J.tl.x - 190, J.tl.y - 130) < 26) { J.tl.x = 190; J.tl.y = 130; J.ptr = null; SND.snap(); readout("90°", true); finish("No gaps anywhere. The corner is square: 90°!"); }
+      J.tl.x = clamp(p[0] + J.grab[0], 70, 270); J.tl.y = clamp(p[1] + J.grab[1], 20, 260);
+      if (Math.hypot(J.tl.x - 150, J.tl.y - 130) < 26) { J.tl.x = 150; J.tl.y = 130; J.ptr = null; SND.snap(); readout("90°", true); finish("No gaps anywhere. The corner is square: 90°!"); }
     },
     work: function (J) {
-      var s = bdh(190, 130, 260, 120, WOOD.oak, 4);
-      if (J.done) s += tag(250, 200, "Square!", "#8EE07A", 16);
+      var s = bdh(150, 130, 300, 120, WOOD.oak, 4);
+      if (J.done) s += tag(230, 200, "Square!", "#8EE07A", 16);
       return s;
     }
   };

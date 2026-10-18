@@ -106,10 +106,10 @@
     mark("back-mark", "back", STOCK, BW, 12, "line", "Measure the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
     cut("back-cut", "back", STOCK, BW, 12, "Cut the Back on the line", CUT_COACH, "The Back is cut!"),
 
-    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Slide the square to 9!", "The Front is marked.", "combosquare"),
+    mark("front-mark", "front", 48, BW, 9, "line", "Measure the Front: 9 inches", "Slide the rule out to 9!", "The Front is marked.", "combosquare"),
     cut("front-cut", "front", 48, BW, 9, "Cut the Front on the line", CUT_COACH, "The Front is cut!"),
 
-    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Slide the square to 7.5!", "The Roof is marked.", "combosquare"),
+    mark("roof-mark", "roof", 39, BW, 7.5, "line", "Measure the Roof: 7.5 inches", "Slide the rule out to 7.5!", "The Roof is marked.", "combosquare"),
     cut("roof-cut", "roof", 39, BW, 7.5, "Cut the Roof on the line", CUT_COACH, "The Roof is cut!"),
 
     mark("blank-mark", "blank", 31.5, BW, 26, "line", "Measure the Side blank: 26 inches", "Pull the tape to 26!", "The Side blank is marked.", "tape"),
@@ -119,20 +119,20 @@
       title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4, switch on, push it through!",
       done: "A long strip, 4 inches wide!", job: { kind: "rip", board: { l: 26, w: BW }, fence: 4, part: "strip" } },
 
-    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Slide the square to 10!", "The Side is marked.", "combosquare"),
+    mark("side1-mark", "side1", 26, 4, 10, "line", "Measure a Side: 10 inches", "Slide the rule out to 10!", "The Side is marked.", "combosquare"),
     cut("side1-cut", "side1", 26, 4, 10, "Cut the Side on the line", CUT_COACH, "One Side is cut!"),
 
-    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Slide the square to 10!", "The other Side is marked.", "combosquare"),
+    mark("side2-mark", "side2", 16, 4, 10, "line", "Measure the other Side: 10 inches", "Slide the rule out to 10!", "The other Side is marked.", "combosquare"),
     cut("side2-cut", "side2", 16, 4, 10, "Cut the other Side on the line", CUT_COACH, "Both Sides are cut!"),
 
-    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Slide the square to 4!", "The Floor is marked.", "combosquare"),
+    mark("floor-mark", "floor", 6, 4, 4, "line", "Measure the Floor: 4 inches", "Slide the rule out to 4!", "The Floor is marked.", "combosquare"),
     cut("floor-cut", "floor", 6, 4, 4, "Cut the Floor on the line", CUT_COACH, "The Floor is cut!"),
 
     { id: "side-angle", part: "side1", station: "saw-bench", tool: "miter",
       title: "Cut the roof angle on both Sides", coach: "The saw is swung to the roof angle. Line up, then pull it down!",
       done: "Both Sides have a sloped top.", job: { kind: "angle", board: { l: 10, w: 4 }, angle: 15, count: 2 } },
 
-    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the square to 6, then make an X!", "The door is marked.", "combosquare"),
+    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the rule out to 6, then make an X!", "The door is marked.", "combosquare"),
 
     { id: "hole-drill", part: "front", station: "drill-press", tool: "holesaw",
       title: "Drill the door hole", coach: "Switch on the drill press, then pull the handle!",
