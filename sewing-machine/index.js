@@ -12,6 +12,11 @@
   //   The presser foot lever lifts the foot: then the fabric slides freely (move it to sew another row, or pull
   //   it out toward him). The thread cutter on the side of the head snips the threads: the piece is done.
   //   A tap on a spool in the thread rack threads that color; a tap on a fabric in the pile starts a new piece.
+  //   The bobbin (the lower thread): a tap on the bobbin box puts an empty bobbin on the bobbin winder on top of the
+  //   machine; Start (or the pedal) then winds the spool's thread onto it instead of sewing, and the winder stops by
+  //   itself when the bobbin is full. A tap on the full bobbin (or dragging it there) puts it in the bobbin case
+  //   under the clear cover in front of the needle. A fresh visit starts with the spool pin and the bobbin case empty
+  //   and no fabric on the machine, so he does it in the real order: spool, wind, bobbin in, fabric, sew.
   // Units: one "unit" is the drawing's own scale; x to the right, y down; the needle point on the needle plate
   // is (0, 0). The fabric is drawn flat on the table without perspective so the stitches keep their shape.
   //
@@ -41,12 +46,16 @@
   // =====================================================================================================
   // Setup and saved state
   // =====================================================================================================
-  // localStorage "sewing-machine-v1": { stitch, thread, fabric, speed, pieces, fx, ftop, foot, runs: [{ c, p: [u, w, ...] }], open }
+  // localStorage "sewing-machine-v1": { stitch, thread (-1: no spool), fabric, speed, pieces, fx, ftop, foot, off (no fabric on
+  // the machine), runs: [{ c, p: [u, w, ...] }], open, bob (the bobbin in the case: a thread, -1: none), win (the bobbin on
+  // the winder: { r: [[thread, fill], ...], fill }) }
   const KEY = "sewing-machine-v1";
   const startFresh = !!(window.Toybox && Toybox.fresh());
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
   if (startFresh || typeof saved !== "object" || Array.isArray(saved)) saved = {};
+  // a first visit (nothing saved): no spool, no bobbin, no fabric yet
+  const blank = !("stitch" in saved);
 
   // =====================================================================================================
   // Stitches, threads and fabrics
@@ -96,17 +105,18 @@
   const pickIdx = (v, n, d) => (Number.isInteger(v) && v >= 0 && v < n ? v : d);
   const S = {
     stitch: ST[saved.stitch] ? saved.stitch : "straight",
-    thread: pickIdx(saved.thread, THREADS.length, 4),
+    thread: blank || saved.thread === -1 ? -1 : pickIdx(saved.thread, THREADS.length, 4),
     fabric: pickIdx(saved.fabric, FABRICS.length, 0),
     speed: pickIdx(saved.speed, 3, 1),
     pieces: pickIdx(saved.pieces, 1e6, 0)
   };
   const SPEED = [1.5, 2.4, 3.6];            // stitches a second: Slow, Medium, Fast (calm, AGENTS.md "Pace")
   const SPEED_NAME = ["Slow", "Medium", "Fast"];
+  const WIND = [0.2, 0.28, 0.38];          // how much of a bobbin winds in a second: Slow, Medium, Fast
 
   // The fabric: FW x FH units, drawn with its back-left corner at (F.x, F.top).
   const FW = 64, FH = 42, START_TOP = -7;
-  const F = { x: -FW / 2, top: START_TOP, slide: null, swap: null };
+  const F = { x: -FW / 2, top: START_TOP, slide: null, swap: null, off: blank || saved.off === true };
   if (typeof saved.fx === "number" && isFinite(saved.fx)) F.x = clamp(saved.fx, -70, 10);
   if (typeof saved.ftop === "number" && isFinite(saved.ftop)) F.top = clamp(saved.ftop, -(FH - 1), 8);
   // Seams: runs of needle drops in fabric units (u from the left edge, w from the back edge), one thread color each.
@@ -117,12 +127,23 @@
   }
   // the run still attached to the needle (threads not snipped yet), or null
   let cur = Number.isInteger(saved.open) && runs[saved.open] ? runs[saved.open] : null;
+  // The bobbin: the one in the bobbin case (a thread index, -1: none; saves from before bobbins had one of the spool's
+  // color), the one on the bobbin winder ({ r: rings of thread [color, the fill it reaches], fill 0..1, at: when it
+  // lands on the spindle }), the bobbin being dragged, the loading move and how far the clear cover is open.
+  const okC = (c) => Number.isInteger(c) && c >= 0 && c < THREADS.length;
+  const B = { inCase: blank ? -1 : "bob" in saved ? (okC(saved.bob) ? saved.bob : -1) : S.thread, win: null, drag: null, load: null,
+    cover: 0, spin: 0, caseT: 0 };
+  if (saved.win && Array.isArray(saved.win.r)) {
+    const r = saved.win.r.filter((q) => Array.isArray(q) && okC(q[0]) && typeof q[1] === "number" && isFinite(q[1]));
+    B.win = { r: r.map((q) => [q[0], clamp(q[1], 0, 1)]), fill: clamp(+saved.win.fill || 0, 0, 1), at: 0 };
+  }
   let saveT = 0;
   function save() {
     saveT = 0;
     try {
       localStorage.setItem(KEY, JSON.stringify({ stitch: S.stitch, thread: S.thread, fabric: S.fabric, speed: S.speed, pieces: S.pieces,
-        fx: +F.x.toFixed(2), ftop: +F.top.toFixed(2), foot: M.foot, runs: runs.map((r) => ({ c: r.c, p: r.p.map((v) => +v.toFixed(2)) })),
+        fx: +F.x.toFixed(2), ftop: +F.top.toFixed(2), foot: M.foot, off: F.off, bob: B.load ? B.load.c : B.inCase,
+        win: B.win && !(B.load && B.load.w) ? { r: B.win.r, fill: +B.win.fill.toFixed(3) } : null, runs: runs.map((r) => ({ c: r.c, p: r.p.map((v) => +v.toFixed(2)) })),
         open: cur ? runs.indexOf(cur) : -1 }));
     } catch (e) { /* ignore */ }
   }
@@ -148,6 +169,9 @@
   const SPOOL = { x: 32, y: -88 };
   const LEVER = { x: 5, y: -22 };
   const TABLE = { t: -46, b: 38, face: 44 };
+  const WINDER = { x: 47, y: -90.6 };                        // the bobbin on the bobbin winder's spindle
+  const CASE = { x: 1, y: 7 };                               // the bobbin case under the clear cover
+  const BOXB = { x: -64, y: 25.5, w: 22, h: 11.5 };          // the box of empty bobbins on the table, near his hands
   // Things around the machine move with the layout: the thread rack, the fabric pile, the button jar, the pedal.
   let L = null;
   function layoutScene() {
@@ -265,11 +289,12 @@
   const M = {
     T: 0, v: 0, run: false, src: "", goal: null, goalV: 0, lat: 0, mv: null, pi: -1, rev: 0,
     foot: saved.foot === false ? false : true, footA: saved.foot === false ? 1 : 0,
-    pedal: false, pedalA: 0, footTries: 0, warn: 0, flash: {}, spool: 0, everSewn: false, steered: false, sewn: 0
+    pedal: false, pedalA: 0, footTries: 0, warn: 0, flash: {}, spool: 0, everSewn: false, steered: false, sewn: 0,
+    wind: false, windSrc: "", windStop: 0, needTries: {}
   };
   const depth = (T) => (1 - Math.cos(TAU * T)) / 2;
   const needleU = () => M.lat - F.x, needleW = () => -F.top;
-  function under() { const u = -F.x, w = needleW(); return u > 0 && u < FW && w > 0 && w < FH; }
+  function under() { const u = -F.x, w = needleW(); return !F.off && u > 0 && u < FW && w > 0 && w < FH; }
   const atEnd = () => under() && needleW() >= FH - 3;
   const attached = () => !!(cur && cur.p.length);
   function nextStep() {
@@ -284,7 +309,8 @@
   function drop() {
     // the needle goes into the fabric: one stitch
     snd.tick();
-    if (!under()) return;
+    // no stitch forms without the top thread and the bobbin thread
+    if (!under() || S.thread < 0 || B.inCase < 0) return;
     const u = needleU(), w = needleW();
     if (u <= 0.4 || u >= FW - 0.4) return;
     if (!cur) { cur = { c: S.thread, p: [] }; runs.push(cur); if (runs.length > 60) runs.shift(); }
@@ -317,6 +343,19 @@
     }
   }
   function motion(dt) {
+    if (M.wind) {
+      // winding the bobbin: the needle stays still, the spool and the bobbin spin
+      if (!B.win || locked()) stopWind();
+      else {
+        const r = WIND[S.speed], w = B.win, last = w.r[w.r.length - 1];
+        w.fill = Math.min(1, w.fill + r * dt);
+        if (last && last[0] === S.thread) last[1] = w.fill; else w.r.push([S.thread, w.fill]);
+        B.spin += dt * r * 9;
+        M.spool += dt * 2.4;
+        if (w.fill >= 1) windDone();
+        else if (M.windStop && now() > M.windStop) stopWind();
+      }
+    }
     if (M.run) {
       const tgt = M.rev > 0 ? SPEED[0] : SPEED[S.speed];
       M.v += (tgt - M.v) * Math.min(1, dt * 5);
@@ -337,6 +376,112 @@
   // Actions
   // =====================================================================================================
   const busy = () => M.run || M.goal != null;
+  // the winder is on while a bobbin that isn't full sits on it: Start and the pedal wind instead of sewing
+  const winderOn = () => !!(B.win && B.win.fill < 1 && B.win.at <= now());
+  // what the machine still needs before it can sew: a spool on the spool pin, then a bobbin in the bobbin case
+  const missing = () => (S.thread < 0 ? "spool" : B.inCase < 0 && !B.load ? "bobbin" : "");
+  function needBlocked(part) {
+    const k = missing();
+    if (!k) return false;
+    // one press of the pedal reaches here twice (held, then let go): count it once
+    if (now() - (M.needT || 0) < 0.8) return true;
+    M.needT = now();
+    M.needTries[k] = (M.needTries[k] || 0) + 1;
+    if (M.needTries[k] >= 2) {
+      // second try: do it for him (the blue spool; a full bobbin of the thread's color goes straight in)
+      M.needTries[k] = 0;
+      if (k === "spool") pickThread(4); else loadBobbin(null);
+      return true;
+    }
+    const w = want();
+    if (w && w.say) { coach.say(w.say, 3.5); glowPart = w.part; glowT = now() + 3; }
+    if (part) flashPart(part);
+    return true;
+  }
+  function winderHint(part) {
+    coach.say("The bobbin winder is on. Tap the green Start button to wind the bobbin.", 3.5);
+    glowPart = "start"; glowT = now() + 3;
+    if (part) flashPart(part);
+  }
+  function startWind(src) {
+    if (M.wind || locked()) return;
+    if (S.thread < 0) { needBlocked(src === "pedal" ? "pedal" : "start"); M.pedal = false; return; }
+    M.wind = true; M.windSrc = src; M.windStop = 0;
+    snd.motor(true);
+    ghost.learned("start");
+  }
+  function stopWind() { if (M.wind) { M.wind = false; saveSoon(); } }
+  function windDone() {
+    // the winder stops by itself when the bobbin is full
+    stopWind();
+    M.pedal = false;
+    snd.chime();
+    for (let i = 0; i < 10; i++) sparkle(WINDER.x, WINDER.y - 2);
+    save();
+  }
+  function tapBox() {
+    snd.click(); flashPart("bobbox");
+    if (B.win || B.load) { tagPart("bobbox"); return; }
+    // an empty bobbin goes onto the winder's spindle
+    const t = now();
+    B.win = { r: [], fill: 0, at: t + 0.8 };
+    bflights.push({ r: [], fill: 0, x0: BOXB.x + BOXB.w / 2, y0: BOXB.y + 3, x1: WINDER.x, y1: WINDER.y, t0: t, dur: 0.8, done: () => { snd.clunk(); save(); } });
+    snd.pop();
+    ghost.learned("bobbox");
+  }
+  function tapWinder() {
+    flashPart("bobwin");
+    if (!B.win || B.win.at > now() || B.load) { tagPart("bobwin"); return; }
+    if (M.wind) { tagPart("bobwin"); return; }
+    if (B.win.fill < 0.3) { coach.say("Tap the green Start button to wind the bobbin.", 3); glowPart = "start"; glowT = now() + 3; return; }
+    loadBobbin(B.win);
+  }
+  // the fabric lies over the clear bobbin cover
+  const coverHidden = () => !F.off && F.x < 9 && F.x + FW > -7 && F.top < 11 && F.top + FH > 3.5;
+  function loadBobbin(w) {
+    // w: the bobbin on the winder, or null for a full one straight from the box (his second try without a bobbin)
+    if (B.load || locked()) return;
+    if (M.run) stopRun();
+    stopWind();
+    M.pedal = false;
+    const c0 = Math.max(0, S.thread), r = w ? w.r : [[c0, 1]], c = r.length ? r[r.length - 1][0] : c0;
+    const from = B.drag ? { x: B.drag.x, y: B.drag.y } : w ? { x: WINDER.x, y: WINDER.y } : { x: BOXB.x + BOXB.w / 2, y: BOXB.y + 3 };
+    // the fabric is in the way: lift the foot and slide it toward him, and back again afterwards
+    let fab = null;
+    if (coverHidden() && !F.swap) { fab = { x: F.x, top: F.top, foot: M.foot }; M.foot = false; snd.clunk(); slideTo(F.x, 12); }
+    // opening the bobbin cover ends the seam
+    if (cur) { cur = null; M.pi = -1; }
+    B.load = { t0: now(), w, r, fill: w ? w.fill : 1, c, from, old: B.inCase, fab, step: 0 };
+    B.drag = null;
+    ghost.learned("bobwin");
+  }
+  function stepLoad(t) {
+    // the clear cover slides open, the old bobbin (if any) goes back in the box, the new one drops in, the cover closes
+    const l = B.load;
+    if (!l) { B.cover = 0; return; }
+    const a = l.fab ? 0.9 : 0, u = t - l.t0;
+    B.cover = clamp((u - a + 0.3) / 0.6, 0, 1) * (1 - clamp((u - a - 1.9) / 0.5, 0, 1));
+    if (l.step === 0 && u >= a + 0.3) {
+      l.step = 1; snd.click();
+      if (l.old >= 0) bflights.push({ r: [[l.old, 0.6]], fill: 0.6, x0: CASE.x, y0: CASE.y, x1: BOXB.x + BOXB.w / 2, y1: BOXB.y + 3, t0: t, dur: 0.8 });
+      B.inCase = -1;
+    }
+    if (l.step === 1 && u >= a + 0.5) {
+      l.step = 2;
+      if (l.w && B.win === l.w) B.win = null;
+      bflights.push({ r: l.r, fill: l.fill, x0: l.from.x, y0: l.from.y, x1: CASE.x, y1: CASE.y, t0: t, dur: 1.0,
+        done: () => { B.inCase = l.c; B.caseT = now(); snd.pop(); } });
+    }
+    if (l.step === 2 && u >= a + 2.4) {
+      l.step = 3; snd.clunk();
+      if (l.fab) slideTo(l.fab.x, l.fab.top); else { B.load = null; save(); }
+    }
+    if (l.step === 3 && u >= a + 3.3) {
+      B.load = null;
+      if (l.fab.foot) setFoot(true);
+      save();
+    }
+  }
   function footBlocked(part) {
     M.footTries++;
     if (M.footTries >= 2) {
@@ -352,6 +497,9 @@
   }
   function startRun(src) {
     if (locked() || M.run) return;
+    if (B.load || (B.win && B.win.at > now())) { M.pedal = false; return; }
+    if (winderOn()) { startWind(src); return; }
+    if (needBlocked(src === "pedal" ? "pedal" : "start")) { M.pedal = false; return; }
     if (!M.foot && footBlocked(src === "pedal" ? "pedal" : "start")) { M.pedal = false; return; }
     if (atEnd()) {
       coach.say("The fabric is all sewn. Lift the presser foot lever.", 3.5);
@@ -373,12 +521,19 @@
   function tapStart() {
     snd.click();
     flashPart("start");
+    if (M.wind) { stopWind(); return; }
     if (M.run) { stopRun(); return; }
     startRun("button");
   }
   function sewSome(n, part) {
     // a few stitches at Slow (a tap on the pedal, the handwheel or Reverse)
-    if (M.run) return;
+    if (M.run || M.wind || B.load) return;
+    if (winderOn()) {
+      // a tap on the pedal winds a little; the handwheel and Reverse don't sew while the winder is on
+      if (part === "pedal") { startWind("tap"); if (M.wind) M.windStop = now() + 0.8; } else winderHint(part);
+      return;
+    }
+    if (part !== "wheel" && needBlocked(part)) return;
     if (!M.foot && part !== "wheel" && footBlocked(part)) return;
     if (atEnd() && part !== "wheel") { coach.say("The fabric is all sewn. Lift the presser foot lever.", 3.5); glowPart = "lever"; glowT = now() + 3; return; }
     const base = M.goal != null ? M.goal : M.T;
@@ -387,13 +542,15 @@
   }
   function tapReverse() {
     snd.click(); flashPart("rev");
+    if (winderOn()) { winderHint("rev"); return; }
+    if (M.wind || B.load || needBlocked("rev")) return;
     if (!M.foot && footBlocked("rev")) return;
     M.rev = 4;
     if (!M.run) sewSome(4, "rev");
   }
   function tapNeedle() {
     snd.click(); flashPart("ndl");
-    if (M.run) return;
+    if (M.run || M.wind || B.load) return;
     if (M.goal != null) return;
     // needle up -> down into the fabric; down -> up again (finishing the stitch)
     const fr = M.T - Math.floor(M.T);
@@ -408,7 +565,7 @@
     if (down) M.footTries = 0;
     saveSoon();
   }
-  function tapLever() { setFoot(!M.foot); ghost.learned("lever"); }
+  function tapLever() { if (B.load) return; setFoot(!M.foot); ghost.learned("lever"); }
   function setSpeed(i, tag) {
     i = clamp(i, 0, 2);
     if (i !== S.speed) snd.click();
@@ -447,35 +604,40 @@
     if (i === S.thread) { tagPart("spool"); return; }
     const from = L.spools[i], old = S.thread;
     flights.push({ c: i, x0: from.x, y0: from.y - 5, x1: SPOOL.x, y1: SPOOL.y, t0: now(), dur: 0.7, toPin: true });
-    flights.push({ c: old, x0: SPOOL.x, y0: SPOOL.y, x1: L.spools[old].x, y1: L.spools[old].y - 5, t0: now(), dur: 0.7, toPin: false });
+    if (old >= 0) flights.push({ c: old, x0: SPOOL.x, y0: SPOOL.y, x1: L.spools[old].x, y1: L.spools[old].y - 5, t0: now(), dur: 0.7, toPin: false });
     S.thread = i;
     // a new spool means threading again: the old thread is cut at the needle
     if (cur) { cur = null; M.pi = -1; }
     snd.pop();
     const p = vp(from.x, from.y - 12);
     Toybox.nametag(THREADS[i].name + " thread", p.x, p.y, 2000);
+    M.needTries.spool = 0;
     save();
   }
   function pickFabric(i) {
-    if (F.swap) return;
+    if (F.swap || B.load) return;
     if (M.run) stopRun();
     const r = L.fabs[i], p = vp(r.x + r.w / 2, r.y - 1);
     Toybox.nametag(FABRICS[i].name, p.x, p.y, 2000);
     snd.pop();
-    F.swap = { i, t0: now(), from: { x: F.x, top: F.top }, fab: { x: r.x, y: r.y, w: r.w, h: r.h }, done: false };
+    F.swap = { i, t0: now() - swapSkip(), from: { x: F.x, top: F.top }, fab: { x: r.x, y: r.y, w: r.w, h: r.h }, done: false };
     M.foot = false;
   }
+  // with no fabric on the machine there is no old piece to slide away first
+  const swapDur = () => (reduce ? 0.5 : 1.4), swapSkip = () => (F.off ? 0.45 * swapDur() : 0);
   function newPiece(fab) {
     S.fabric = fab;
     runs = []; cur = null; M.pi = -1;
+    F.off = false;
     F.x = -FW / 2; F.top = START_TOP; F.slide = null;
     repaint();
     save();
   }
   function startOver() {
+    if (B.load || F.swap) { snd.pop(); return; }
     if (M.run) stopRun();
     M.rev = 0;
-    F.swap = { i: S.fabric, t0: now(), from: { x: F.x, top: F.top }, fab: null, done: false };
+    F.swap = { i: S.fabric, t0: now() - swapSkip(), from: { x: F.x, top: F.top }, fab: null, done: false };
     M.foot = false;
     snd.pop();
   }
@@ -504,6 +666,13 @@
   // What to do next, from what is on the machine: one line and the part it names (the ring on the scene).
   function want() {
     if (F.swap) return null;
+    if (B.load) return { say: "The bobbin goes into the bobbin case.", part: null, soft: true };
+    if (M.wind) return { say: "The thread winds onto the bobbin.", part: null, soft: true };
+    if (B.win && B.win.at > now()) return null;
+    if (S.thread < 0) return { say: "Tap a thread spool to put it on the spool pin.", part: "spool4" };
+    if (B.win && B.win.fill < 1) return { say: "Tap the green Start button to wind the bobbin.", part: "start" };
+    if (B.win) return { say: "Tap the full bobbin to put it in the machine.", part: "bobwin" };
+    if (B.inCase < 0) return { say: "Tap the bobbin box to put a bobbin on the bobbin winder.", part: "bobbox" };
     if (attached() && !under()) return { say: "Tap the thread cutter to snip the threads.", part: "cutter" };
     if (atEnd()) return M.foot ? { say: "Lift the presser foot lever.", part: "lever" } : { say: "Drag the fabric toward you to pull it out.", part: "fabric" };
     if (!under()) return { say: "Tap a fabric in the pile to sew a new piece.", part: "fab" + ((S.fabric + 1) % FABRICS.length) };
@@ -558,7 +727,7 @@
   }
   function tagPart(id) {
     const N = { start: "Start/Stop", rev: "Reverse", ndl: "Needle up/down", slider: "Speed", wheel: "Handwheel", lever: "Presser foot lever",
-      cutter: "Thread cutter", spool: "Thread spool", lcd: "Screen", takeup: "Take-up lever", pedal: "Foot pedal", jar: "Button jar",
+      cutter: "Thread cutter", spool: "Thread spool", bobbox: "Bobbin box", bobwin: "Bobbin winder", cover: "Bobbin cover", lcd: "Screen", takeup: "Take-up lever", pedal: "Foot pedal", jar: "Button jar",
       left: "Stitch", right: "Stitch", fabric: FABRICS[S.fabric].name, needle: "Needle", foot: "Presser foot", plate: "Needle plate", bobbin: "Bobbin" };
     const p = partPt(id);
     if (p && N[id]) Toybox.nametag(N[id], p.x, p.y - 14, 2000);
@@ -572,7 +741,7 @@
   // A fun moment on the table, then play goes on: the button jar tips over, a ball of yarn rolls across, a
   // butterfly lands on the fabric. They take turns.
   let fx = null, surpriseN = 0;
-  const flights = [], bits = [];
+  const flights = [], bits = [], bflights = [];
   function surprise() {
     if (fx) return;
     const kinds = ["buttons", "yarn", "butterfly"], k = kinds[surpriseN++ % kinds.length];
@@ -655,12 +824,15 @@
       { id: "wheel", x: WHEEL.x, y: WHEEL.y, r: 5, box: [WHEEL.x - 5, WHEEL.y - WHEEL.ry - 1, 10, WHEEL.ry * 2 + 2] },
       { id: "lever", x: leverEnd().x, y: leverEnd().y, r: 4 },
       { id: "cutter", x: CUTTER.x, y: CUTTER.y, r: 3.5 },
-      { id: "spool", x: SPOOL.x, y: SPOOL.y, r: 6 },
+      { id: "bobbox", x: BOXB.x + BOXB.w / 2, y: BOXB.y + BOXB.h / 2, r: 6, box: [BOXB.x, BOXB.y, BOXB.w, BOXB.h] },
+      { id: "bobwin", x: WINDER.x, y: WINDER.y, r: 5 },
       { id: "lcd", x: LCD.x + LCD.w / 2, y: LCD.y + LCD.h / 2, r: 6, box: [LCD.x, LCD.y, LCD.w, LCD.h] },
       { id: "takeup", x: -9, y: takeupY(), r: 3 },
       { id: "pedal", x: L.pedal.x, y: L.pedal.y, r: 8, box: [L.pedal.x - 14, L.pedal.y - 7, 28, 13] },
       { id: "jar", x: L.jar.x, y: L.jar.y - 7, r: 7 }
     ];
+    if (S.thread >= 0) l.push({ id: "spool", x: SPOOL.x, y: SPOOL.y, r: 6 });
+    if (!coverHidden()) l.push({ id: "cover", x: CASE.x, y: CASE.y, r: 3.5, box: [-6.5, 4.2, 15, 5.6] });
     L.spools.forEach((s, i) => { if (i !== S.thread) l.push({ id: "spool" + i, x: s.x, y: s.y - 5.5, r: 4.2, box: [s.x - 3.6, s.y - 11.5, 7.2, 12] }); });
     L.fabs.forEach((f, i) => l.push({ id: "fab" + i, x: f.x + f.w / 2, y: f.y + f.h / 2, r: 5, box: [f.x, f.y, f.w, f.h] }));
     return l;
@@ -684,7 +856,7 @@
     });
     if (best && bd <= 0) return best;
     const r = fabricRect();
-    if (w.x > r.x && w.x < r.x + r.w && w.y > r.y && w.y < r.y + r.h && !inMachine(w.x, w.y)) return "fabric";
+    if (!F.off && w.x > r.x && w.x < r.x + r.w && w.y > r.y && w.y < r.y + r.h && !inMachine(w.x, w.y)) return "fabric";
     return best;
   }
   function inMachine(x, y) {
@@ -704,9 +876,13 @@
     dragStart: (part, e, s) => {
       if (locked()) return;
       if (part === "slider") drag = { k: "slider" };
-      else if (part === "wheel") drag = { k: "wheel", y: s.y0 };
-      else if (part === "fabric") {
-        if (F.swap) return;
+      else if (part === "wheel") { drag = { k: "wheel", y: s.y0 }; if (winderOn()) winderHint("wheel"); }
+      else if (part === "bobwin") {
+        if (!B.win || B.win.at > now() || M.wind || B.load) return;
+        if (B.win.fill < 0.3) { coach.say("Tap the green Start button to wind the bobbin.", 3); glowPart = "start"; glowT = now() + 3; return; }
+        drag = { k: "bobbin" }; B.drag = world(s.x, s.y);
+      } else if (part === "fabric") {
+        if (F.swap || B.load) return;
         if (M.foot && !M.run) { coach.say("Lift the presser foot lever to move the fabric.", 3); glowPart = "lever"; glowT = now() + 3; return; }
         if (!M.foot && M.T % 1) M.goal = Math.ceil(M.T);
         F.slide = null;
@@ -720,7 +896,9 @@
         // turning the top of the handwheel toward him (down on the screen) sews by hand
         const d = (s.y - drag.y) / (sc * WHEEL.ry * 1.6);
         drag.y = s.y;
-        if (d > 0 && !M.run && M.goal == null) { advance(Math.min(0.25, d)); M.everSewn = true; }
+        if (d > 0 && !M.run && M.goal == null && !winderOn() && !M.wind && !B.load) { advance(Math.min(0.25, d)); M.everSewn = true; }
+      } else if (drag.k === "bobbin") {
+        if (B.drag) B.drag = world(s.x, s.y);
       } else if (drag.k === "fabric") {
         const dx = s.dx / sc, dy = s.dy / sc;
         if (drag.steer) {
@@ -743,6 +921,15 @@
       const d = drag; drag = null;
       if (!d || locked()) return;
       if (d.k === "slider") setSpeed(S.speed, true);
+      if (d.k === "bobbin" && B.drag) {
+        // dropped near the bobbin cover: in it goes; anywhere else it goes back on the winder
+        if (Math.hypot(B.drag.x - CASE.x, B.drag.y - CASE.y) < 16 && B.win) loadBobbin(B.win);
+        else if (B.win) {
+          B.win.at = now() + 0.5;
+          bflights.push({ r: B.win.r, fill: B.win.fill, x0: B.drag.x, y0: B.drag.y, x1: WINDER.x, y1: WINDER.y, t0: now(), dur: 0.5 });
+          B.drag = null;
+        }
+      }
       if (d.k === "fabric") {
         if (!M.foot && s.dy / sc > 6 && needleW() < FH * 0.9 && needleW() > -2 && attached()) slideTo(F.x, 4);
         saveSoon();
@@ -764,6 +951,8 @@
       else if (/^fab\d$/.test(part)) pickFabric(+part.slice(3));
       else if (part === "fabric") tapFabric();
       else if (part === "jar") { tagPart("jar"); snd.rattle(); }
+      else if (part === "bobbox") tapBox();
+      else if (part === "bobwin") tapWinder();
       else if (part) tagPart(part);
       else {
         const w = want();
@@ -817,6 +1006,41 @@
     ell(x - w, y, 1.1, r + 0.9); fs("#F1D9AE", 0.8);
     ell(x + w, y, 1.1, r + 0.9); fs("#F1D9AE", 0.8);
     ell(x + w + 1.4, y, 0.9, 2.1); fs("#C9CED6", 0.8);           // the spool cap
+  }
+  // a bobbin standing on its end, seen from a little above (on the winder, in the air): clear flanges, the thread
+  // wound between them (rings: [[thread, the fill it reaches], ...], inside out) turning with spin
+  function bobbin3(x, y, k, rings, fill, spin) {
+    const R = 3.3 * k, H = 2.8 * k, e = 0.45, core = 1.1 * k, span = R - 0.35 * k - core, rT = core + span * clamp(fill, 0, 1);
+    const top = y - H / 2, bot = y + H / 2, outer = rings.length && fill > 0.02 ? THREADS[rings[rings.length - 1][0]].c : null;
+    ell(x, bot, R, R * e); fs("rgba(232,242,255,0.95)", 0.7);
+    if (outer) {
+      ctx.beginPath(); ctx.rect(x - rT, top, rT * 2, H); ctx.ellipse(x, bot, rT, rT * e, 0, 0, Math.PI);
+      ctx.fillStyle = outer; ctx.fill();
+      ctx.save(); ctx.clip();
+      ctx.strokeStyle = "rgba(0,0,0,0.18)"; ctx.lineWidth = 0.3 * k;
+      for (let i = 0; i < 6; i++) {
+        const xx = x - rT + (((i / 6 + spin) % 1 + 1) % 1) * 2 * rT;
+        ctx.beginPath(); ctx.moveTo(xx, top); ctx.lineTo(xx - 0.6 * k, bot + rT * e); ctx.stroke();
+      }
+      ctx.restore();
+      line(x - rT, top, x - rT, bot, "rgba(29,35,64,0.45)", 0.3 * k); line(x + rT, top, x + rT, bot, "rgba(29,35,64,0.45)", 0.3 * k);
+    } else { rr(x - core, top, core * 2, H, 0.2); fs("#E8ECF1", 0.5); }
+    ell(x, top, R, R * e); fs("rgba(232,242,255,0.92)", 0.7);
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = core + span * clamp(rings[i][1], 0, fill);
+      if (r > core + 0.05) { ell(x, top, r, r * e); fs(THREADS[rings[i][0]].c, 0.3); }
+    }
+    ell(x, top, core, core * e); fs("#FFFFFF", 0.5);
+    ell(x, top, 0.45 * k, 0.45 * k * e); fs("#9AA3B2", 0);
+  }
+  // a bobbin lying in the bobbin case, seen from above
+  function bobbinTop(x, y, r, col, rot) {
+    circ(x, y, r); fs("rgba(232,242,255,0.95)", 0.6);
+    circ(x, y, r * 0.8); fs(col, 0);
+    ctx.save(); circ(x, y, r * 0.8); ctx.clip();
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x, y, r * (0.45 + i * 0.13), rot + i, rot + i + 2); ctx.strokeStyle = "rgba(0,0,0,0.16)"; ctx.lineWidth = 0.25; ctx.stroke(); }
+    ctx.restore();
+    circ(x, y, r * 0.32); fs("#FFFFFF", 0.4);
   }
   function folded(f, i, x, y, w, h) {
     // a folded piece of fabric: the pattern on top, a fold line, a darker front edge
@@ -906,10 +1130,16 @@
     for (let i = 0; i < 4; i++) line(13 + i * 2.6, -4.2, 13 + i * 2.6, 3.4, "rgba(29,35,64,0.35)", 0.4);
     const fdog = M.mv && M.foot ? Math.sin(M.mv.done * Math.PI) * 0.8 : 0;
     [-4.5, 4.5].forEach((xx) => { rr(xx - 1, -3 - fdog, 2, 5, 0.4); fs("#5A6170", 0.5); });
-    rr(-6.5, 4.2, 15, 5.6, 1.5); fs("rgba(190,225,255,0.65)", 0.8);
-    circ(1, 7, 2); fs("#FFFFFF", 0.6); circ(1, 7, 0.7); fs("#C9CED6", 0.4);
+    // the bobbin case (a dark hole when empty, the bobbin he put in spinning down as it settles) under the clear
+    // cover, which slides toward him while a bobbin goes in
+    circ(CASE.x, CASE.y, 2.6); fs("#5A6170", 0.6);
+    if (B.inCase >= 0) bobbinTop(CASE.x, CASE.y, 2.3, THREADS[B.inCase].c, Math.max(0, 1 - (now() - B.caseT) / 1.2) * 9);
+    ctx.globalAlpha = 1 - B.cover * 0.5;
+    rr(-6.5, 4.2 + B.cover * 6.5, 15, 5.6, 1.5); fs("rgba(190,225,255,0.65)", 0.8);
+    ctx.globalAlpha = 1;
   }
   function drawFabric() {
+    if (F.off) return;
     const r = fabricRect();
     ctx.save();
     ctx.shadowColor = "rgba(29,35,64,0.18)"; ctx.shadowBlur = 6 * sc * DPR / 2; ctx.shadowOffsetY = 1;
@@ -920,7 +1150,7 @@
   }
   function drawSwapFabric() {
     // the old piece slides off the table to the front, the new one comes from the pile and settles under the foot
-    const s = F.swap, u = (now() - s.t0) / (reduce ? 0.5 : 1.4);
+    const s = F.swap, u = (now() - s.t0) / swapDur();
     if (u < 0.45) {
       const k = ease(u / 0.45);
       F.x = lerp(s.from.x, s.from.x, k); F.top = lerp(s.from.top, 70, k);
@@ -934,8 +1164,8 @@
   function drawMachineBack() {
     // top of the machine (seen from a little above), then the arm and the pillar
     rr(TOPB.l + 1, TOPB.t, TOPB.r - TOPB.l - 1, TOPB.b - TOPB.t + 4, 4); fs("#FFFFFF", 1.2);
-    // bobbin winder and the thread guide on top
-    rr(44, -90.5, 4.4, 3, 1); fs("#C9CED6", 0.8); circ(46.2, -89, 1.2); fs("#FFFFFF", 0.6);
+    // the bobbin winder (its spindle clicks to the right while it winds) and the thread guide on top
+    rr(43, -90.4, 9, 3, 1); fs("#C9CED6", 0.8); circ(WINDER.x + (winderOn() ? 1.2 : 0), -89, 1.2); fs("#FFFFFF", 0.6);
     rr(-8, -88.5, 4, 2.2, 0.8); fs("#C9CED6", 0.8);
     // arm + pillar
     ctx.beginPath();
@@ -992,22 +1222,24 @@
   function drawHead() {
     rr(HEAD.l, HEAD.t, HEAD.r - HEAD.l, HEAD.b - HEAD.t, 4); fs("#F7F7F3", 1.2);
     // the threading slot and the take-up lever bobbing in it
-    const th = THREADS[S.thread].c, ly = takeupY();
+    const th = S.thread >= 0 ? THREADS[S.thread].c : "", ly = takeupY();
     rr(-12, -78, 6, 32, 2); fs("#E2E5EA", 0.8);
     line(-9, -77, -9, -47, "rgba(29,35,64,0.25)", 0.5);
     rr(-13.6, ly - 1.4, 9.2, 2.8, 1.2); fs("#9AA3B2", 0.9);
     // the thread: spool -> guide -> down the slot -> up to the take-up lever -> down to the needle
     const tip = needleTip();
+    if (S.thread >= 0) {
     ctx.beginPath();
     ctx.moveTo(SPOOL.x - 6, SPOOL.y); ctx.lineTo(-6, -87.4); ctx.lineTo(-7.4, -78); ctx.lineTo(-7.4, -47.5);
     ctx.quadraticCurveTo(-9, -45.5, -10.6, -47.5); ctx.lineTo(-10.6, ly); ctx.lineTo(-3.2, -24); ctx.lineTo(M.lat - 0.3, -20.5);
     ctx.lineTo(M.lat, tip - 1.6);
     ctx.strokeStyle = th; ctx.lineWidth = 0.55; ctx.lineJoin = "round"; ctx.stroke();
+    }
     // buttons on the front of the head: Start/Stop, Reverse, Needle up/down, the speed slider
     const st = BTN.start, k = pressK("start");
     circ(st.x, st.y + 0.6, st.r + 0.4); fs("#C9CED6", 0);
-    circ(st.x, st.y + k * 0.6, st.r); fs(M.run ? "#E5484D" : "#35C26B", 1);
-    if (M.run) { rr(st.x - 1.5, st.y - 1.5 + k * 0.6, 3, 3, 0.4); fs("#FFFFFF", 0); }
+    circ(st.x, st.y + k * 0.6, st.r); fs(M.run || M.wind ? "#E5484D" : "#35C26B", 1);
+    if (M.run || M.wind) { rr(st.x - 1.5, st.y - 1.5 + k * 0.6, 3, 3, 0.4); fs("#FFFFFF", 0); }
     else { poly([[st.x - 1.2, st.y - 2 + k * 0.6], [st.x - 1.2, st.y + 2 + k * 0.6], [st.x + 2.1, st.y + k * 0.6]]); fs("#FFFFFF", 0); }
     const rv = BTN.rev, kr = pressK("rev");
     circ(rv.x, rv.y + kr * 0.5, rv.r); fs(M.rev > 0 ? "#FFC93C" : "#FFFFFF", 0.9);
@@ -1064,7 +1296,7 @@
     ctx.strokeStyle = darker(col, 0.3); ctx.lineWidth = 0.75; ctx.stroke();
     ctx.strokeStyle = col; ctx.lineWidth = 0.45; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0.5, 0.5); ctx.quadraticCurveTo((0.5 + ex) / 2, ey / 2 + 3, ex + 0.4, ey + 0.2);
-    ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = 0.45; ctx.stroke();
+    ctx.strokeStyle = B.inCase >= 0 ? THREADS[B.inCase].c : "rgba(255,255,255,0.95)"; ctx.lineWidth = 0.45; ctx.stroke();
   }
   function drawFlights(t) {
     for (let i = flights.length - 1; i >= 0; i--) {
@@ -1075,9 +1307,42 @@
     }
   }
   function drawSpoolOnPin() {
-    if (flights.some((f) => f.toPin)) return;
+    if (S.thread < 0 || flights.some((f) => f.toPin)) { line(SPOOL.x - 6.5, SPOOL.y, SPOOL.x + 7.5, SPOOL.y, "#AEB6C2", 1.3); return; }
     const k = pressK("spool");
     spoolSide(SPOOL.x, SPOOL.y - k, THREADS[S.thread].c, M.spool);
+  }
+  function drawWinder() {
+    const w = B.win;
+    if (!w || w.at > now()) return;
+    const x = B.drag ? B.drag.x : WINDER.x + (winderOn() ? 1.2 : 0), y = B.drag ? B.drag.y : WINDER.y;
+    // the thread from the spool to the bobbin while it winds (snipped once it is full)
+    // (drawn bigger than the real bobbin so he can watch it fill)
+    const k = 1.6 + pressK("bobwin") * 0.2 + (B.drag ? 0.2 : 0);
+    if (!B.drag && S.thread >= 0 && w.fill < 1 && (M.wind || w.fill > 0)) {
+      const rT = (1.1 + 1.85 * w.fill) * k;
+      line(SPOOL.x + 3, SPOOL.y - 3, x - rT, y - 0.6, THREADS[S.thread].c, 0.6);
+    }
+    bobbin3(x, y, k, w.r, w.fill, B.spin);
+  }
+  function drawBobbinBox() {
+    // a clear box of empty bobbins
+    const b = BOXB, k = pressK("bobbox");
+    rr(b.x, b.y - k, b.w, b.h, 2); fs("rgba(205,233,255,0.8)", 1);
+    line(b.x + 1.5, b.y + 2.4 - k, b.x + b.w - 1.5, b.y + 2.4 - k, "rgba(29,35,64,0.3)", 0.5);
+    for (let i = 0; i < 8; i++) {
+      const x = b.x + 3.5 + (i % 4) * 5, y = b.y + 5.2 + Math.floor(i / 4) * 4 - k;
+      circ(x, y, 1.9); fs("rgba(240,246,255,0.95)", 0.6);
+      circ(x, y, 0.7); fs("#C9CED6", 0.4);
+    }
+  }
+  function drawBFlights(t) {
+    // bobbins in the air: from the box to the winder, from the winder into the case, the old one back to the box
+    for (let i = bflights.length - 1; i >= 0; i--) {
+      const f = bflights[i], u = (t - f.t0) / f.dur;
+      if (u >= 1) { bflights.splice(i, 1); if (f.done) f.done(); continue; }
+      const k = ease(u), x = lerp(f.x0, f.x1, k), y = lerp(f.y0, f.y1, k) - Math.sin(u * Math.PI) * 12;
+      bobbin3(x, y, 1.5 - 0.3 * Math.abs(u - 0.5), f.r, f.fill, u * 2);
+    }
   }
   function drawFx(t) {
     if (!fx) return;
@@ -1155,6 +1420,7 @@
     drawRack();
     drawPile();
     drawJar(t);
+    drawBobbinBox();
     drawBed();
     drawFabric();
     drawMachineBack();
@@ -1162,9 +1428,12 @@
     drawPanel();
     drawHead();
     drawSpoolOnPin();
+    if (!B.drag) drawWinder();
     drawNeedleArea();
     drawLooseThreads();
     drawFlights(t);
+    drawBFlights(t);
+    if (B.drag) drawWinder();
     drawFx(t);
     drawBits(t, dt);
     drawGlow(t);
@@ -1184,7 +1453,8 @@
       if (k >= 1) { F.slide = null; saveSoon(); }
     }
     if (F.swap) drawSwapFabric();
-    snd.update(M.v);
+    stepLoad(t);
+    snd.update(M.wind ? 3.2 : M.v);
     updCoach();
     draw(t, dt);
     requestAnimationFrame(loop);
@@ -1193,6 +1463,7 @@
     // time is up: the machine finishes its stitch with the needle up and stops
     M.pedal = false;
     if (M.run) stopRun();
+    stopWind();
     const wait = () => (busy() ? setTimeout(wait, 150) : done());
     wait();
   }
@@ -1212,7 +1483,7 @@
   resize();
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { M.pedal = false; if (M.run) stopRun(); save(); } });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { M.pedal = false; if (M.run) stopRun(); stopWind(); save(); } });
   window.addEventListener("pagehide", save);
   Toybox.init({
     app: "sewing-machine",
@@ -1231,17 +1502,18 @@
     onWake: () => { last = now(); },
     onSound: (on) => { if (on) snd.chime(); }
   });
-  Toybox.offFirst({ running: () => M.run, off: (done) => { M.pedal = false; stopRun(); setTimeout(done, 300); } });
+  Toybox.offFirst({ running: () => M.run || M.wind, off: (done) => { M.pedal = false; stopRun(); stopWind(); setTimeout(done, 300); } });
   requestAnimationFrame(loop);
 
   // Test hooks, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) {
     window.__sew = {
-      state: () => ({ run: M.run, T: +M.T.toFixed(2), foot: M.foot, stitch: S.stitch, thread: THREADS[S.thread].name, fabric: FABRICS[S.fabric].name,
+      state: () => ({ run: M.run, T: +M.T.toFixed(2), foot: M.foot, stitch: S.stitch, thread: S.thread >= 0 ? THREADS[S.thread].name : null,
+        bobbin: B.inCase >= 0 ? THREADS[B.inCase].name : null, winder: B.win ? +B.win.fill.toFixed(2) : null, wind: M.wind, loading: !!B.load, off: F.off, fabric: FABRICS[S.fabric].name,
         speed: SPEED_NAME[S.speed], fx: +F.x.toFixed(1), ftop: +F.top.toFixed(1), under: under(), atEnd: atEnd(), attached: attached(),
         stitches: runs.reduce((a, r) => a + r.p.length / 2, 0), runs: runs.length, pieces: S.pieces, coach: coach.text(), want: (want() || {}).part || null }),
       pt: (id) => partPt(id),
-      tap: (id) => { if (id === "pedal") { sewSome(2, "pedal"); return; } const fn = { start: tapStart, rev: tapReverse, ndl: tapNeedle, lever: tapLever, cutter: snip, fabric: tapFabric }[id]; if (fn) fn(); else if (/^spool\d$/.test(id)) pickThread(+id.slice(5)); else if (/^fab\d$/.test(id)) pickFabric(+id.slice(3)); },
+      tap: (id) => { if (id === "pedal") { sewSome(2, "pedal"); return; } const fn = { start: tapStart, rev: tapReverse, ndl: tapNeedle, lever: tapLever, cutter: snip, fabric: tapFabric, bobbox: tapBox, bobwin: tapWinder }[id]; if (fn) fn(); else if (/^spool\d$/.test(id)) pickThread(+id.slice(5)); else if (/^fab\d$/.test(id)) pickFabric(+id.slice(3)); },
       ghost: () => ghost.show()
     };
   }

@@ -45,7 +45,13 @@ needle, take-up lever, feed dogs and handwheel move for real, he steers the fabr
 (Straight, Zigzag, Wave, Scallop, Hearts, Stars; also the arrow keys under the screen); Reverse back-tacks, the needle
 button, a Slow/Medium/Fast slider; the presser foot lever (sewing with it up shows the foot on the screen, the second
 try lowers it for him); at the end of the fabric: lift the foot, pull the fabric out, snip with the thread cutter
-("Pieces" counter). Thread rack and fabric pile on the scene. Surprise: the button jar spills, a ball of yarn rolls
+("Pieces" counter). Thread rack and fabric pile on the scene. **Bobbin** (2026-10-19, the family: he likes helping thread
+and wind the bobbin; winding is his favorite part): a fresh visit starts with an empty spool pin, an empty bobbin case and
+no fabric, in the real order: tap a spool, tap the bobbin box (an empty bobbin goes on the bobbin winder on top), Start
+or the pedal winds it (the winder stops by itself when full), tap or drag the full bobbin and it drops into the case
+under the clear cover (the cover slides open and shut by itself; fabric in the way slides aside and back), then fabric
+and sew. Sewing with no spool or bobbin hints first, then does it for him on the second try. Questions: should he open
+and close the bobbin cover himself? flip a finished piece over to see the bobbin thread underneath? Surprise: the button jar spills, a ball of yarn rolls
 by, a butterfly lands on the fabric. Questions: does the real machine's body have colored accents (drawn white and
 grey)? keep both the pedal and Start/Stop (on the real machine Start/Stop only works with the pedal unplugged)?
 more stitches? a shelf for finished pieces?
