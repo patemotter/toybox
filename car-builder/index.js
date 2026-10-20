@@ -26,7 +26,7 @@
 //   - step
 //   - drawing
 //   - open / close
-//   - Ghost hand (same look as Bulldozer and Measuring)
+//   - Ghost hand
 //   - Sound (off by default; soft and synthesized)
 //   - vehicle sounds (only when sound is on)
 //   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
@@ -44,7 +44,6 @@
   ];
   var HEX = {};
   PALETTE.forEach(function (p) { HEX[p[0]] = p[1]; });
-  var NAMES = PALETTE.map(function (p) { return p[0]; });
   function hex(name) { return HEX[name] || "#999999"; }
   function rgb(h) {
     return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
@@ -67,7 +66,6 @@
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function rand(a, b) { return a + Math.random() * (b - a); }
   function n2(v) { return (Math.round(v * 100) / 100).toString(); }
-  function fmt(v) { return String(Math.max(0, Math.floor(v))).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
   function starD(cx, cy, R, r, n, rot) {
@@ -115,8 +113,6 @@
     P("top", "Spoiler", OPT.topFast), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
   var MONSTER_PARTS = [P("cab", "Roof", OPT.cab), P("wheels", "Wheels", OPT.wheelsM), P("rims", "Rims", OPT.rims), P("engine", "Engine", OPT.engine),
     P("top", "Top", OPT.topMonster), P("lights", "Lights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
-  var RESCUE_PARTS = [P("cab", "Cab", OPT.cab), P("wheels", "Wheels", OPT.wheels), P("rims", "Rims", OPT.rims),
-    P("top", "Lights", OPT.topRescue), P("lights", "Headlights", OPT.lights), P("number", "Number", OPT.number), P("paint", "Stripes", OPT.paint)];
 
   function withTool(list, label, opts) { return [P("tool", label, opts)].concat(list); }
 
@@ -253,7 +249,7 @@
   }
   // A glass window with a diagonal shine across its bounding box.
   function windowS(d, x0, y0, x1, y1) {
-    var w = x1 - x0, h = y1 - y0;
+    var w = x1 - x0;
     var shine = "M " + n2(x0 + w * 0.18) + " " + n2(y1 + 4) + " L " + n2(x0 + w * 0.42) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.55) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.31) + " " + n2(y1 + 4) + " Z" +
       " M " + n2(x0 + w * 0.6) + " " + n2(y1 + 4) + " L " + n2(x0 + w * 0.84) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.89) + " " + n2(y0 - 4) + " L " + n2(x0 + w * 0.65) + " " + n2(y1 + 4) + " Z";
     return glassS(d, shine);
@@ -876,7 +872,7 @@
 
   function genF1(v, c) {
     var K = c.col, r = { s: 34, m: 38, l: 42 }[c.wheels], o = "";
-    var rw = wheel(v, c, -138, r), fw = wheel(v, c, 152, Math.round(r * 0.9), { front: true });
+    wheel(v, c, -138, r); wheel(v, c, 152, Math.round(r * 0.9), { front: true });
     // rear wing
     var wh = { none: 74, spoiler: 96, wing: 122 }[c.top];
     o += beam([[-180, -50], [-176, -wh + 4]], 8, STEEL_D, 3.5);
@@ -1006,7 +1002,7 @@
     var K = c.col, R = { s: 66, m: 74, l: 84 }[c.wheels], fr = Math.round(R * 0.56), o = "";
     var rx = -72, fxw = 132;
     if (c.tool === "trailer") {
-      var tw1 = wheel(v, c, -392, 30), tw2 = wheel(v, c, -270, 30);
+      wheel(v, c, -392, 30); wheel(v, c, -270, 30);
       var t = beam([[-200, -54], [-236, -54]], 9, STEEL_D, 4);
       t += pth(rp([[-430, -64, 6], [-430, -126, 6], [-226, -126, 6], [-226, -64, 6]]), K.tool, 5);
       for (var i = 0; i < 6; i++) t += rct(-420 + i * 32, -118, 8, 48, 3, shade(K.tool, 0.25), 0);
@@ -1016,7 +1012,7 @@
       add(v, part("tool", t));
       v.trailer = true;
     }
-    var rw = wheel(v, c, rx, R), fw = wheel(v, c, fxw, fr, { front: true });
+    wheel(v, c, rx, R); wheel(v, c, fxw, fr, { front: true });
     o += rct(-20, -86, 210, 26, 6, "#3A3F4E", 4);
     var hood = rp([[-10, -84, 0], [-10, -150, 6], [178, -142, 14], [204, -118, 10], [206, -80, 8]]);
     o += pth(hood, K.body, 5);
@@ -1079,11 +1075,6 @@
       x = j.x + dx * cs - dy * sn; y = j.y + dx * sn + dy * cs;
     }
     return { x: x, y: y };
-  }
-  function chainAngle(chain, pose) {
-    var a = 0;
-    chain.forEach(function (j) { a += pose[j] || 0; });
-    return a;
   }
   // Whole vehicle as SVG (builder picture, option thumbnails, rest picture).
   function vehicleSVG(v, pose) {
@@ -1775,7 +1766,7 @@
     var z = Math.max(1.15, Math.min(1.6, zoomFor(0, 0, B.y - peak - 30))), vw = (visBox().x1 - visBox().x0) * z;
     var lead = Math.max(0, Math.min(W * 0.35, (vw - W) / 2 - 20));
     var props = el("g", {}, back);
-    var ramp = el("path", { d: "M " + n2(rs) + " 0 L " + n2(re) + " " + n2(-rh) + " L " + n2(re) + " 0 Z", fill: "#FFC93C", stroke: OUT, "stroke-width": 5, "stroke-linejoin": "round" }, props);
+    el("path", { d: "M " + n2(rs) + " 0 L " + n2(re) + " " + n2(-rh) + " L " + n2(re) + " 0 Z", fill: "#FFC93C", stroke: OUT, "stroke-width": 5, "stroke-linejoin": "round" }, props);
     el("path", { d: "M " + n2(rs + rl * 0.35) + " " + n2(-rh * 0.35) + " L " + n2(rs + rl * 0.35) + " 0 M " + n2(rs + rl * 0.7) + " " + n2(-rh * 0.7) + " L " + n2(rs + rl * 0.7) + " 0", stroke: OUT, "stroke-width": 4 }, props);
     var cones = el("g", {}, props), cstr = "";
     for (var i = 0; i < n; i++) cstr += coneS(c0 + i * gap, cs);
@@ -2385,8 +2376,8 @@
       dv.lastVY = vy;
     } else dv.lastVY = dv.vy;
     // springy suspension
-    var a = -P.k * dv.susp - P.c * dv.suspV;
-    dv.suspV += a * dt;
+    var acc = -P.k * dv.susp - P.c * dv.suspV;
+    dv.suspV += acc * dt;
     if (dv.fam === "monster" && dv.speed > 50 && !dv.air && Math.random() < dt * 4) dv.suspV += rand(-60, 60);
     dv.susp += dv.suspV * dt;
     dv.susp = clamp(dv.susp, -38, 70);
@@ -2818,117 +2809,18 @@
       el.appendChild(b);
     });
   }
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
+  // ---------- Ghost hand ----------
   // Page px of a point inside an element, as fractions of its box.
   function ghostPt(elm, fx, fy) {
     var r = elm.getBoundingClientRect();
     return [r.left + r.width * fx, r.top + r.height * fy];
   }
   // Idle help: the ghost hand taps Drive!, and on the road it taps Go.
-  var ghost = makeGhost(function () {
+  var ghost = Toybox.ghost({ max: 3, plan: function () {
     if ($("flight").hidden) { var l = $("launch"); return l.offsetWidth ? { pts: [ghostPt(l, 0.55, 0.55)], tap: true } : null; }
     if (!dv || dv.park || dv.go) return null;
     return { pts: [ghostPt($("pedal"), 0.5, 0.5)], tap: true };
-  }, { max: 3 });
+  } });
   function openDrive(park) {
     if (dv) { if (park) startPark(); return; }
     F.hidden = false;
@@ -2991,7 +2883,7 @@
   // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
   // starts/resumes audio on every touch while sound is on. Car Builder builds its own master gain and
   // noise buffer once per context.
-  var actx = null, master = null, noiseBuf = null, rumble = null;
+  var actx = null, master = null, noiseBuf = null;
   function canPlay() {
     var ac = Toybox.sound.ready();
     if (!ac) return false;
@@ -3004,7 +2896,7 @@
         noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
         var d = noiseBuf.getChannelData(0), last = 0;
         for (var i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
-        actx = ac; rumble = null; engine = null;
+        actx = ac; engine = null;
       } catch (e) { return false; }
     }
     return true;
@@ -3022,48 +2914,9 @@
     o.start(t); o.stop(t + dur + 0.05);
   }
   function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
-  function beep(hi) { tone(hi ? 880 : 587, hi ? 0.5 : 0.28, 0.07, "sine"); }
-  function whoosh(vol) {
-    if (!canPlay()) return;
-    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = noiseBuf;
-    f.type = "bandpass"; f.Q.value = 1.2;
-    f.frequency.setValueAtTime(300, t);
-    f.frequency.exponentialRampToValueAtTime(1400, t + 0.5);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start(t); src.stop(t + 0.8);
-  }
   function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
-  function startRumble() {
-    if (!canPlay() || rumble) return;
-    var src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = noiseBuf; src.loop = true;
-    f.type = "lowpass"; f.frequency.value = 220;
-    g.gain.value = 0.0001;
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start();
-    rumble = { src: src, f: f, g: g };
-  }
-  function setRumble(level) {
-    if (!rumble || !actx) return;
-    rumble.g.gain.setTargetAtTime(Math.max(0.0001, level), actx.currentTime, 0.12);
-    rumble.f.frequency.setTargetAtTime(160 + level * 1800, actx.currentTime, 0.2);
-  }
-  function stopRumble() {
-    if (!rumble) return;
-    var r = rumble;
-    rumble = null;
-    try {
-      r.g.gain.setTargetAtTime(0.0001, actx.currentTime, 0.15);
-      r.src.stop(actx.currentTime + 0.8);
-    } catch (e) { /* ignore */ }
-  }
 
   // ---- vehicle sounds (only when sound is on) ----
-  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
   function honk() {
     if (!canPlay()) return;
     var t = actx.currentTime, f = actx.createBiquadFilter(), g = actx.createGain();
@@ -3211,7 +3064,7 @@
     onGoodbye: goodbyeLaunch,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(chime, 60); else { stopRumble(); stopEngine(); } },
+    onSound: function (on) { if (on) setTimeout(chime, 60); else { stopEngine(); } },
     onTimer: drawFuel
   });
 

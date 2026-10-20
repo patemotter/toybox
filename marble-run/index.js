@@ -21,7 +21,7 @@
 //   - Per-frame bookkeeping
 //   - Drawing
 //   - Input
-//   - Ghost hand (same look as Bulldozer and Measuring)
+//   - Ghost hand
 //   - Surprise: a fun moment on the run right now
 //   - Controls
 //   - Main loop
@@ -190,9 +190,7 @@
 
   // ---------- Canvas ----------
   var stage = $("stage"), canvas = $("board"), ctx = canvas.getContext("2d");
-  var base = document.createElement("canvas"), bctx = base.getContext("2d");
-  var mid = document.createElement("canvas"), mctx = mid.getContext("2d");
-  var front = document.createElement("canvas"), fctx = front.getContext("2d");
+  var base = document.createElement("canvas"), mid = document.createElement("canvas"), front = document.createElement("canvas");
   var DPR = 1, CW = 0, CH = 0, S = 1, OX = 0, OY = 0;
   var built = false;
   var darkBoard = false;
@@ -213,7 +211,6 @@
   var parts = [];
   var gravX = 0, gravY = 1;    // gravity points straight down the screen
   var ending = false, endingDone = null;
-  var runInfo = null;
 
   function addSeg(ax, ay, bx, by, o) {
     o = o || {};
@@ -251,7 +248,7 @@
   var hopper = { queue: [], wait: 0, pending: 0 };
   var lift = { u: 0, v: 240, carry: [], boost: 0, gear: 0, th: 0 };
   // Spiral (screw) lift: a helical ramp around a post. Each carry slot rides one groove.
-  var SCR_P = 160, SCR_RO = 50, SCR_RI = 11, SCR_RM = 28, SCR_SQ = 0.3, SCR_EXIT = 70, SCR_RR = 38;
+  var SCR_P = 160, SCR_RI = 11, SCR_RM = 28, SCR_SQ = 0.3, SCR_EXIT = 70, SCR_RR = 38;
   function spiralLift() { return state.lift === "spiral"; }
 
   function buildCommon() {
@@ -966,7 +963,7 @@
   function craneGo() { var c = site.crane; if (c.ph !== "wait" || !c.load.length) return false; c.ph = "go"; c.t = 0; tick(); return true; }
   function truckGo() { var t = site.truck; if (t.ph !== "wait" || !t.load.length) return false; t.ph = "up"; t.t = 0; bellSound(1); return true; }
   function siteStep(h) {
-    var S = site, i, b, k = Math.min(1, h * 16);
+    var S = site, i, b;
     // --- Crane ---
     var c = S.crane;
     c.t += h; c.since += h; c.wig = Math.max(0, c.wig - h * 2);
@@ -1357,7 +1354,6 @@
     spinners = []; decor = []; race = null; site = null;
     buildCommon();
     BUILD[id]();
-    runInfo = id;
     updateBodies(0);
   }
 
@@ -1793,29 +1789,11 @@
     for (i = 0; i < hopper.queue.length; i++) if (hopper.queue[i].car) n--;
     return n;
   }
-  // Room for one more marble: under the cap, or recycle one from the tray (or the oldest one).
+  // Room for one more marble: only while under the cap. At the cap Drop adds nothing (its caller shows a ring
+  // instead); marbles are never taken away to make room.
   // The Race run holds one marble per lane; every other run holds up to CAP.
   function capNow() { return race ? RACE.lanes : CAP; }
-  function makeRoom() {
-    if (total() < capNow()) return true;
-    return false;
-    var best = -1, i, b, bestScore = -1;
-    for (i = 0; i < balls.length; i++) {
-      b = balls[i];
-      if (b.mode !== "free") continue;
-      var sc = (b.y > TRAY_Y ? 1e6 : 0) + b.age;
-      if (sc > bestScore) { bestScore = sc; best = i; }
-    }
-    if (best < 0) {
-      if (hopper.queue.length) { hopper.queue.shift(); return true; }
-      return false;
-    }
-    b = balls[best];
-    burst(b.x, b.y, b.c, 8, 200, 0.5);
-    ring(b.x, b.y, b.c, RM, 0.4);
-    balls.splice(best, 1);
-    return true;
-  }
+  function makeRoom() { return total() < capNow(); }
 
   // ---------- Hopper ----------
   var HOP_SLOTS = [[230, 186], [207, 150], [253, 150], [184, 114], [230, 114], [276, 114]];
@@ -2024,7 +2002,7 @@
 
   var bgrid = null, bnext = null, bcs = 2 * RM + 2, bgw = 1, bgh = 1;
   function ballPairs() {
-    var n = balls.length, i, j, a, b, cx, cy, gx, gy;
+    var n = balls.length, i, j, a, cx, cy, gx, gy;
     if (!n) return;
     bgw = Math.ceil(W / bcs) + 2;
     bgh = Math.ceil((H + 200) / bcs) + 2;
@@ -2359,14 +2337,14 @@
       if (b.mode === "free") {
         // Out of the board: back into the tray.
         if (b.x < -60 || b.x > W + 60 || b.y > H + 60 || b.y < -200) { toTray(b); continue; }
-        var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
         var inTray = b.y > TRAY_Y;
         var inBucket = false;
         for (k = 0; k < bodies.length; k++) {
           var bd = bodies[k];
           if (bd.kind === "bucket" && Math.abs(b.x - bd.cx) < bd.R && Math.abs(b.y - bd.cy) < bd.R) inBucket = true;
         }
-        if (!inTray && !inBucket && sp < 30) {
+        if (!inTray && !inBucket && speed < 30) {
           b.stillT += sdt;
           if (b.stillT > 1.2) {
             b.stillT = 0;
@@ -2376,7 +2354,7 @@
             b.vy -= rand(150, 260);
             ring(b.x, b.y, b.c, RM, 0.35);
           }
-        } else if (sp > 80) b.stillT = 0;
+        } else if (speed > 80) b.stillT = 0;
         if (!inTray && b.age > 70) { toTray(b); continue; }
         if (inTray) { b.age = 0; b.nudges = 0; }
       }
@@ -2932,119 +2910,20 @@
   // ---------- Input ----------
   var playLocked = function () { return Toybox.timer.locked(); };
   var started = false;
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
+  // ---------- Ghost hand ----------
   // Page px of a point inside an element, as fractions of its box.
   function ghostPt(elm, fx, fy) {
     var r = elm.getBoundingClientRect();
     return [r.left + r.width * fx, r.top + r.height * fy];
   }
   // Idle help: until the first marble is dropped, the ghost hand taps the DROP button on the hopper.
-  var ghost = makeGhost(function () {
+  var ghost = Toybox.ghost({ max: 2, plan: function () {
     if (started || !built) return null;
     var r = canvas.getBoundingClientRect(), db = $("dropBtn");
     // Where the hopper button is small (phones), show the big Drop button instead.
     if (DROP_BTN.r * S < 30 && db.offsetWidth && !document.body.classList.contains("big")) return { pts: [ghostPt(db, 0.5, 0.55)], tap: true };
     return { pts: [[r.left + OX + DROP_BTN.x * S, r.top + OY + DROP_BTN.y * S]], tap: true };
-  });
+  } });
   function worldPoint(e) {
     var r = canvas.getBoundingClientRect();
     return { x: (e.clientX - r.left - OX) / S, y: (e.clientY - r.top - OY) / S };

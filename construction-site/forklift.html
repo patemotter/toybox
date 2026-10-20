@@ -111,13 +111,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 /* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 
-/* Ghost hand: a see-through hand that shows the main move once (master copy: tools/snippets/ghost-hand.css). */
-.ghosthand { position: fixed; left: 0; top: 0; z-index: 45; display: none; pointer-events: none; opacity: 0; will-change: transform, opacity; }
-.ghosthand svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ghosthand > svg { position: relative; }
-.ghosthand .gh-carry svg { width: 100%; height: 100%; transform: rotate(14deg); }
-.ghosthand .gh-press { opacity: 0; transition: opacity 0.12s ease; }
-
 @media (max-width: 600px) {
   .tb-go.act svg { width: 46px; height: 38px; }
   .hint { white-space: normal; line-height: 1.15; }
@@ -449,7 +442,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var drag = null;             // { id, sx, sy, wx, wy, ox, oy, paused, t0, moved, cab }
   var steps = [], stepsLocked = false, auto = false, autoPlaced = 0, autoWait = 0, byHand = false;
   var ending = false, parking = false, endingDone = null;
-  var bumps = 0, lastBump = -9, behindT = 0, pickFrom = null, lastMove = 0, stopFor = 0;
+  var bumps = 0, lastBump = -9, behindT = 0, pickFrom = null, stopFor = 0;
   function tipX() { return F.x + F.dir * FORK; }
   function nearFace(o) { return wx(o) - F.dir * HALF; }
   function approach(pos, vel, target, vmax, amax, h) {
@@ -1644,7 +1637,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     stepMoments(dt);
     stepParticles(dt);
     clouds.forEach(function (c) { c.x += 6 * dt; if (c.x > WORLD_R + 300) c.x = WORLD_L - 300; });
-    if (Math.abs(F.vx) > 4 || Math.abs(F.vh) > 4) lastMove = clock;
     // Reversing: the beacon flashes and beep rings pop from the back.
     if (F.dir * F.vx < -25 && !F.turn) {
       beepT -= dt;
@@ -1875,104 +1867,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveState(); });
   window.addEventListener("pagehide", saveState);
 
-  // ---------- Idle help: the Toybox ghost hand (master copy: tools/snippets/ghost-hand.js) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduceG = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduceG ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
+  // ---------- Ghost hand ----------
   function inStage(p) {
     var r = $("stage").getBoundingClientRect();
     return [clamp(p[0], r.left + 34, r.right - 34), clamp(p[1], r.top + 34, r.bottom - 34)];
   }
   function forkPt() { return worldToScreen(F.x + F.dir * FORK * 0.6, F.h + 6); }
   // The ghost hand drags the forks to the next pallet's openings, then up, then to the place.
-  var ghost = makeGhost(function () {
+  var ghost = Toybox.ghost({ max: 3, plan: function () {
     if (ending || drag || steps.length || auto || F.turn || F.slide) return null;
     var f = inStage(forkPt());
     if (F.load) {
@@ -1990,7 +1892,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!o || pickupDir(o) !== F.dir) return null;
     coachAgain();
     return { pts: [f, inStage(worldToScreen(nearFace(o) + F.dir * FORK * 0.6, o.y + SLOT + 6))] };
-  }, { max: 3 });
+  } });
 
   // ---------- Start ----------
   var startFresh = !!(window.Toybox && Toybox.fresh());
