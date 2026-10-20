@@ -114,7 +114,8 @@
  *        circular arrow), Surprise (rainbow, a gift), with their icons and the palm-safe spacing.
  *      var coach = Toybox.coach(el) -> coach.step(text) (the sticky line for the current step, with the step
  *        dot; calling it again with the same line changes nothing), coach.say(text, sec) (a passing line, at least
- *        3 s, then back to the step line), coach.clear(),
+ *        3 s, then back to the step line), coach.clear(), coach.avoid(x, y) (viewport px: a new instruction in the
+ *        middle of the stage moves to the other half if it would cover that point, e.g. the part it names),
  *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
  *        home screen's App setting "coach-voice" is on and sound is on.
  *      var ghost = Toybox.ghost({ plan: fn, max: 3, idleMs: 4500, ok: fn, onShow: fn(plan, on) })
@@ -1578,7 +1579,18 @@
     el.setAttribute("aria-live", "polite");
     el.innerHTML = '<span class="tb-coach-dot" aria-hidden="true"></span><span class="tb-coach-text"></span>';
     watchCoach(el);
-    var txt = el.lastChild, stepText = "", sayText = "", sayUntil = 0, t = 0, shown = null, api;
+    var txt = el.lastChild, stepText = "", sayText = "", sayUntil = 0, t = 0, shown = null, avoidPt = null, api;
+    // A new instruction sits in the middle of the stage. If that would cover the point the page passed to avoid(),
+    // it sits in the half of the stage away from the point instead. The test uses the middle position, not where
+    // the pill is now, so calling avoid() on every frame never makes it jump back and forth.
+    function place() {
+      el.style.removeProperty("--tb-coach-top");
+      if (!avoidPt || !el.parentElement || !el.classList.contains("is-do") || el.classList.contains("is-seen")) return;
+      var box = el.parentElement.getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 24;
+      var cy = box.top + box.height / 2, x = avoidPt[0], y = avoidPt[1];
+      if (x < r.left - pad || x > r.right + pad || y < cy - r.height / 2 - pad || y > cy + r.height / 2 + pad) return;
+      el.style.setProperty("--tb-coach-top", y > cy ? "27%" : "73%");
+    }
     function show() {
       clearTimeout(t);
       var saying = now() < sayUntil, line = saying ? sayText : stepText;
@@ -1592,6 +1604,8 @@
         txt.textContent = line;
         el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new");
         speak(line);
+        // After the instruction/information sorting, which runs when the text changes.
+        requestAnimationFrame(place);
       }
     }
     api = {
@@ -1602,6 +1616,8 @@
       // line short; the same line again changes nothing, so pages may call step() on every frame.
       step: function (text) { text = String(text || ""); if (text === stepText) return; stepText = text; sayUntil = 0; show(); },
       clear: function () { stepText = ""; sayUntil = 0; show(); },
+      // The point (viewport px) a new instruction must not cover, e.g. the part it names; avoid() with no point clears it.
+      avoid: function (x, y) { avoidPt = x == null ? null : [x, y]; place(); },
       text: function () { return el.classList.contains("off") ? "" : txt.textContent; }
     };
     show();

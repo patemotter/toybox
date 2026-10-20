@@ -39,8 +39,8 @@ Fade them within 1 to 1.5 s; only a tidy pile on the floor may stay.
   head on iPad; the part's name tag can land on the pill's text (Spuds, Munchy Crunchy). Also Sewing Machine (the
   spool rack, sideways phone), Sand Table (the ball, iPad and sideways phone), Router Table (the End view label),
   Jigsaw (the Train tile), Rocket Builder (the rocket body).
-- Proposed shared fix (common/): let `coach.step(text, { avoid: [x, y] })` place a new instruction above or below
-  a target point instead of dead center; stations pass the ringed part.
+- Shared fix (done): `coach.avoid(x, y)` moves a new centered instruction to the other half of the stage when it
+  would cover that point; stations pass the ringed part.
 - Farm stations: a passing info line falls back to the step line, so an instruction for something already done
   comes back while the machine works ("Tap the sheep to count them." after the count). Clear the step line when a
   station enters its work phase, or add a shared `coach.busy()`.
@@ -56,7 +56,8 @@ Sewing Machine's first line is three lines tall on an upright phone; shorten it.
 Tool Wall tag subtitles and category chips, Saw Bench material and saw cards, Kaleidoscope section labels and On/Off,
 Math Grid panel buttons, Marble Run layout tiles, Spin Shop's "spokes" caption, Rocket Builder's "Stage away!"
 (about 8 px), Car Builder tiles on iPad, Blender Low/High/Pulse on the phone, Garden tiles, Espresso's "for Mom" lines,
-Combine Time's "Close-up" label, and every Farm name tag (10 to 11 px: raise the shared `Toybox.nametag` size once).
+Combine Time's "Close-up" label. (The Farm's name tags looked small in downscaled pictures, but they are the shared
+`Toybox.nametag` at 14 px.)
 
 ### 1f. Chrome against the Look rules
 - Red as chrome: Train Builder's Stop button, Wrecking Ball's red Down arrow.
