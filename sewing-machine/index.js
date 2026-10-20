@@ -399,7 +399,7 @@
     return true;
   }
   function winderHint(part) {
-    coach.say("The bobbin winder is on. Tap the green Start button to wind the bobbin.", 3.5);
+    coach.say("Tap the green Start button.", 3.5);
     glowPart = "start"; glowT = now() + 3;
     if (part) flashPart(part);
   }
@@ -433,7 +433,7 @@
     flashPart("bobwin");
     if (!B.win || B.win.at > now() || B.load) { tagPart("bobwin"); return; }
     if (M.wind) { tagPart("bobwin"); return; }
-    if (B.win.fill < 0.3) { coach.say("Tap the green Start button to wind the bobbin.", 3); glowPart = "start"; glowT = now() + 3; return; }
+    if (B.win.fill < 0.3) { coach.say("Tap the green Start button.", 3); glowPart = "start"; glowT = now() + 3; return; }
     loadBobbin(B.win);
   }
   // the fabric lies over the clear bobbin cover
@@ -502,7 +502,7 @@
     if (needBlocked(src === "pedal" ? "pedal" : "start")) { M.pedal = false; return; }
     if (!M.foot && footBlocked(src === "pedal" ? "pedal" : "start")) { M.pedal = false; return; }
     if (atEnd()) {
-      coach.say("The fabric is all sewn. Lift the presser foot lever.", 3.5);
+      coach.say("Lift the presser foot lever.", 3.5);
       glowPart = "lever"; glowT = now() + 3;
       M.pedal = false;
       return;
@@ -535,7 +535,7 @@
     }
     if (part !== "wheel" && needBlocked(part)) return;
     if (!M.foot && part !== "wheel" && footBlocked(part)) return;
-    if (atEnd() && part !== "wheel") { coach.say("The fabric is all sewn. Lift the presser foot lever.", 3.5); glowPart = "lever"; glowT = now() + 3; return; }
+    if (atEnd() && part !== "wheel") { coach.say("Lift the presser foot lever.", 3.5); glowPart = "lever"; glowT = now() + 3; return; }
     const base = M.goal != null ? M.goal : M.T;
     M.goal = Math.floor(base + 1e-6) + n; M.goalV = SPEED[0] * (part === "wheel" ? 0.6 : 1);
     M.everSewn = true;
@@ -669,23 +669,25 @@
     if (B.load) return { say: "The bobbin goes into the bobbin case.", part: null, soft: true };
     if (M.wind) return { say: "The thread winds onto the bobbin.", part: null, soft: true };
     if (B.win && B.win.at > now()) return null;
-    if (S.thread < 0) return { say: "Tap a thread spool to put it on the spool pin.", part: "spool4" };
-    if (B.win && B.win.fill < 1) return { say: "Tap the green Start button to wind the bobbin.", part: "start" };
-    if (B.win) return { say: "Tap the full bobbin to put it in the machine.", part: "bobwin" };
-    if (B.inCase < 0) return { say: "Tap the bobbin box to put a bobbin on the bobbin winder.", part: "bobbox" };
-    if (attached() && !under()) return { say: "Tap the thread cutter to snip the threads.", part: "cutter" };
-    if (atEnd()) return M.foot ? { say: "Lift the presser foot lever.", part: "lever" } : { say: "Drag the fabric toward you to pull it out.", part: "fabric" };
-    if (!under()) return { say: "Tap a fabric in the pile to sew a new piece.", part: "fab" + ((S.fabric + 1) % FABRICS.length) };
+    if (S.thread < 0) return { say: "Tap a thread spool.", part: "spool4" };
+    if (B.win && B.win.fill < 1) return { say: "Tap the green Start button.", part: "start" };
+    if (B.win) return { say: "Tap the full bobbin.", part: "bobwin" };
+    if (B.inCase < 0) return { say: "Tap the bobbin box.", part: "bobbox" };
+    if (attached() && !under()) return { say: "Tap the thread cutter.", part: "cutter" };
+    if (atEnd()) return M.foot ? { say: "Lift the presser foot lever.", part: "lever" } : { say: "Pull the fabric toward you.", part: "fabric" };
+    if (!under()) return { say: "Tap a fabric in the pile.", part: "fab" + ((S.fabric + 1) % FABRICS.length) };
     if (!M.foot) return { say: "Lower the presser foot lever.", part: "lever" };
     // while it sews, no new line pops up over the needle: the ghost hand shows the steering instead
     if (M.run) return M.steered ? null : { say: "", part: "fabric", soft: true };
     if (busy()) return null;
-    return { say: "Tap the green Start button to sew.", part: "start" };
+    return { say: "Tap the green Start button.", part: "start" };
   }
   let lastWant = "", glowPart = null, glowT = 0;
   function updCoach() {
     const w = want(), k = w ? w.say : "";
     if (k !== lastWant) { lastWant = k; if (k) coach.step(k); else coach.clear(); }
+    const p = w && w.part ? partPt(w.part) : null;
+    if (p) coach.avoid(p.x, p.y); else coach.avoid();
   }
   const ghost = Toybox.ghost({
     max: 3,
@@ -879,11 +881,11 @@
       else if (part === "wheel") { drag = { k: "wheel", y: s.y0 }; if (winderOn()) winderHint("wheel"); }
       else if (part === "bobwin") {
         if (!B.win || B.win.at > now() || M.wind || B.load) return;
-        if (B.win.fill < 0.3) { coach.say("Tap the green Start button to wind the bobbin.", 3); glowPart = "start"; glowT = now() + 3; return; }
+        if (B.win.fill < 0.3) { coach.say("Tap the green Start button.", 3); glowPart = "start"; glowT = now() + 3; return; }
         drag = { k: "bobbin" }; B.drag = world(s.x, s.y);
       } else if (part === "fabric") {
         if (F.swap || B.load) return;
-        if (M.foot && !M.run) { coach.say("Lift the presser foot lever to move the fabric.", 3); glowPart = "lever"; glowT = now() + 3; return; }
+        if (M.foot && !M.run) { coach.say("Lift the presser foot lever.", 3); glowPart = "lever"; glowT = now() + 3; return; }
         if (!M.foot && M.T % 1) M.goal = Math.ceil(M.T);
         F.slide = null;
         drag = { k: "fabric", x0: F.x, t0: F.top, steer: M.foot };

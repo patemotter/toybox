@@ -87,8 +87,8 @@
 
   // Camera regions [x0, x1, top, bottom]: the stage frames the area of the current step.
   var REG = {
-    choose: [15.0, 34.2, -10.7, 0.9],
-    trayTall: [24.6, 34.4, -10.7, 0.9],
+    choose: [14.0, 34.2, -10.7, 0.9],
+    chooseTall: [13.9, 22.6, -10.7, 0.9],
     ready: [10.2, 22.6, -8.4, 0.6],
     mach: [14.4, 24.2, -8.4, 0.6],
     weigh: [-0.3, 5.9, -5.7, 0.9],
@@ -231,7 +231,7 @@
   }
   function region() {
     var st = S.step, tall = H > W * 1.1;
-    if (st === "choose") return tall ? REG.trayTall : REG.choose;
+    if (st === "choose") return tall ? REG.chooseTall : REG.choose;
     if (st === "power") return REG.mach;
     if (st === "ready") return isCoffee() ? REG.ready : REG.mach;
     if (st === "serve") return tall ? REG.serveTall : REG.serve;
@@ -1115,8 +1115,8 @@
     if (M.pending && M.on && M.heat < 1) return "Warming up…";
     switch (st) {
       case "choose": return "Pick a drink!";
-      case "power": return "Switch it on!";
-      case "ready": return !M.on ? "Switch it on!" : (M.heat < 1 ? "Warming up…" : (M.pump ? "Hot water!" : "Getting ready…"));
+      case "power": return "Switch on the espresso machine!";
+      case "ready": return !M.on ? "Switch on the espresso machine!" : (M.heat < 1 ? "Warming up…" : (M.pump ? "Hot water!" : "Getting ready…"));
       case "weigh": return WG.right ? "Just right!" : "Scoop 18 grams!";
       case "hopper": return "Pour in the beans!";
       case "grind": return G ? "Grinding!" : "Press grind!";
@@ -1236,12 +1236,12 @@
     if (!quiet) click();
     save();
   }
-  // Two-step machines: pressing while off says "Switch it on!"; the second time it switches on for him.
+  // Two-step machines: pressing while off asks him to switch the machine on; the second time it switches on for him.
   function needHot(fn) {
     if (M.on && M.heat >= 1) return true;
     if (!M.on) {
       if (M.offTries >= 1) { powerOn(); M.pending = fn; }
-      else { M.offTries++; sayNow("Switch it on!", 3); M.flash.power = now() + 3; }
+      else { M.offTries++; sayNow("Switch on the espresso machine!", 3); M.flash.power = now() + 3; }
       return false;
     }
     M.pending = fn;
