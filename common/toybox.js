@@ -176,11 +176,8 @@
 
   var opts = {};
   var inited = false;
-  function hook(name) {
-    var fn = opts[name];
-    if (typeof fn !== "function") return;
-    try { fn.apply(null, Array.prototype.slice.call(arguments, 1)); } catch (e) { setTimeout(function () { throw e; }); }
-  }
+  // Runs the init option `name` (onSound, onBig, ...) if the page gave one.
+  function hook(name) { call.apply(null, [opts[name]].concat(Array.prototype.slice.call(arguments, 1))); }
 
   // ---------- Grown-up settings (kept on the home screen) ----------
   // The Grown-ups sheet lives only on the Toybox home screen. App-specific grown-up options are listed

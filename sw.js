@@ -338,7 +338,8 @@ self.addEventListener("fetch", (event) => {
         // A redirect (e.g. a folder without its trailing slash) can't answer a page load from here;
         // let the browser follow it itself.
         if (res.redirected) return fetch(req);
-        if (res.ok && res.type === "basic") cache.put(cacheKey(url), res.clone());
+        // waitUntil keeps the worker alive until the copy is saved, also after the page got its answer.
+        if (res.ok && res.type === "basic") event.waitUntil(cache.put(cacheKey(url), res.clone()));
         return res;
       });
       const cached = await cache.match(req, { ignoreSearch: true });
@@ -360,7 +361,7 @@ self.addEventListener("fetch", (event) => {
       const network = fetch(req)
         .then((res) => {
           // Opaque responses (cross-origin, no-cors) can't be inspected but are safe to cache.
-          if (res && (res.ok || res.type === "opaque")) cache.put(sameOrigin ? cacheKey(url) : req, res.clone());
+          if (res && (res.ok || res.type === "opaque")) event.waitUntil(cache.put(sameOrigin ? cacheKey(url) : req, res.clone()));
           return res;
         })
         .catch(() => cached);
