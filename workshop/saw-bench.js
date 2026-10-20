@@ -5705,20 +5705,19 @@
     var px = parseFloat(getComputedStyle(el).fontSize) || 20;
     while (el.scrollWidth > el.clientWidth + 1 && px > (minPx || 11)) { px -= 1; el.style.fontSize = px + "px"; }
   }
+  var pjCoach = null;   // Toybox.coach on #pjCoach, made when a project step starts
+  // ms = 0: the step's lasting line. ms > 0: a hint for that long, and the step's line does not come back.
   function pjSay(text, ms) {
     if (!PJ || PJ.over) return;
-    var el = $("pjCoach");
-    el.textContent = text; el.hidden = false; el.classList.remove("off");
-    pjFitPill(el, 11);
-    PJ.coachOn = true;
-    clearTimeout(PJ.sayT); PJ.sayT = 0;
-    if (ms) PJ.sayT = setTimeout(function () { PJ.sayT = 0; PJ.intro = false; PJ.coachOn = false; el.classList.add("off"); }, ms);
+    if (ms) { PJ.intro = false; pjCoach.clear(); pjCoach.say(text, ms / 1000); }
+    else pjCoach.step(text);
+    pjFitPill($("pjCoach"), 11);
   }
   // The child has made the first move: the step's coach line goes away.
   function pjCoachDone() {
     if (!PJ || !PJ.intro) return;
     PJ.intro = false;
-    if (!PJ.sayT) { PJ.coachOn = false; $("pjCoach").classList.add("off"); }
+    pjCoach.clear();
   }
   // The job is done: record it now; the card (with the finished work behind it) comes after the drop.
   function pjComplete(delayMs) {
@@ -5727,9 +5726,8 @@
     ToyboxProjects.doneLink($("pjBack"), PSTEP, (delayMs || 0) + 3000);
     $("pjDoneLine").textContent = PSTEP.done;
     setTimeout(function () {
-      PJ.over = true; PJ.coachOn = false;
-      clearTimeout(PJ.sayT); PJ.sayT = 0;
-      $("pjCoach").classList.add("off");
+      PJ.over = true;
+      pjCoach.clear();
       $("pjDone").hidden = false;
       if (scene && scene.pid != null) scene.up({ id: scene.pid, x: 0, y: 0 });
       Sound.clack();
@@ -5749,7 +5747,7 @@
   function strokeHint(g, x, y, text, dir, lit, sub) {
     if (endingNow()) return;
     // project mode: the step banner sits at the top, and the coach pill speaks instead while it shows
-    if (PJ) { if (PJ.coachOn || PJ.over) return; y += PJ.topPad; }
+    if (PJ) { if (PJ.over || pjCoach.text()) return; y += PJ.topPad; }
     var f = Math.round(clamp(Math.min(W, H) * 0.062, 22, 38));
     g.font = "800 " + f + "px " + FONT;
     var vert = dir === 2 || dir === 3 || dir === 4;
@@ -6288,7 +6286,7 @@
     var xSaws = PSTEP.job.kind === "crosscut" ? ["ryoba", "kataba", "panel", "backsaw", "mitersaw", "tablesaw", "circular", "tracksaw"] : null;
     PJ = { step: PSTEP, job: PSTEP.job, kind: PSTEP.job.kind, sawId: PSTEP.tool === "table" ? "tablesaw" : "mitersaw",
       saws: xSaws, S: PSTEP.tool === "table" ? 16 : 20, count: PSTEP.job.count || 1, cuts: 0, misses: 0,
-      done: false, over: false, intro: true, coachOn: false, sayT: 0, topPad: 0, fenceInit: false };
+      done: false, over: false, intro: true, topPad: 0, fenceInit: false };
     app.saw = (xSaws && want && xSaws.indexOf(want) !== -1) ? want : PJ.sawId;
     document.body.classList.add("project");
     if (!xSaws) document.body.classList.add("project-locked");
@@ -6301,6 +6299,7 @@
     }
     var banner = $("pjBanner");
     banner.textContent = PSTEP.title; banner.hidden = false;
+    pjCoach = Toybox.coach($("pjCoach"));
     pjSay(PSTEP.coach, 0);
   }
   // (a step with a job this station does not know plays normally, still without saving over the child's bench)
@@ -6312,7 +6311,6 @@
   try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-saw",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the saws stop and go back on the rack, and the bench locks.",
     goodbyeOption: "End with a “Hang it up” button to press",
     farewellText: "Time to put the saw away",
@@ -6327,7 +6325,6 @@
     onGoodbye: hangUp,
     onRest: onRest,
     onWake: onWake,
-    onBig: function () { resize(); },
     onSound: function (on) { if (on) { Sound.unlock(); Sound.clack(); } else Sound.quiet(); },
     onTimer: function (info) { TI = info; }
   });

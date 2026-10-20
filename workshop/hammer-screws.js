@@ -1911,6 +1911,8 @@
     ham.dur = (PJ ? Math.min(85, h.down) : h.down) * Math.sqrt(clamp(ham.from / h.rest, 0.3, 2)) / 1000;
     ham.s = s; ham.side = side || 0;
   }
+  // The ghost hand's key for each hammer target (see the Ghost hint section).
+  var GHOST_KEY = { pjnail: "pjnail", nail: "nail", plate: "metal", rivet: "metal", chisel: "joint", post: "joint", wedge: "yard", stake: "yard" };
   function strike(s, side) {
     var h = HAMMERS[state.hammer], tg = ham.tgt, T = targetPoint(tg);
     ham.theta = 0; ham.phase = "bounce"; ham.t = 0; ham.from = 0;
@@ -1930,6 +1932,8 @@
       case "wedge": hitWedge(s); break;
       case "stake": hitStake(s); break;
     }
+    var gk = GHOST_KEY[tg.kind];
+    if (gk) ghost.learned(gk);
     saveSoon();
   }
   function hitNail(n, s, side) {
@@ -2132,6 +2136,7 @@
       if (PJ.phase === "glue") {
         PJ.glueHeld = true;
         PJ.glueAuto = true;
+        ghost.learned("glue");
         g.dead = true;
         return;
       }
@@ -2274,6 +2279,7 @@
         stars(p.x, p.y, 8);
         removeNail(n);
         pull.done = true; pull.release = 0.001;
+        ghost.learned("pull");
         autoHitAt = nowMs() + 1000;
         saveSoon();
       }
@@ -2394,6 +2400,7 @@
   }
   function screwDone(q) {
     var p = bpt(q.u, q.v);
+    ghost.learned(DRIVERS[state.driver].kind === "power" ? "trigger" : "turn");
     stars(p.x, p.y, 12);
     pop("All the way in!", p.x, p.y - 60, 24, "#7CFF8A");
     sndChime();
@@ -2401,6 +2408,7 @@
   }
   function screwOut(q) {
     var p = bpt(q.u, q.v);
+    ghost.learned(DRIVERS[state.driver].kind === "power" ? "trigger" : "turn");
     flyer("screw", q.len, p.x, p.y - q.len * LB.k / 2);
     sndPop();
     pop("Out!", p.x, p.y - 60, 26, "#FFC93C");
@@ -2973,26 +2981,28 @@
   }
 
   // ---------- Ghost hint: shows the gesture when nothing has happened for a while ----------
-  var idleSince = 0, ghostA = 0, ghostDrawn = false, GHOST_IDLE = 4500, GHOST_CYC = 2400;
-  var gcv = $("gcv"), gctx = gcv.getContext("2d");
-  function acted() { idleSince = nowMs(); ghostA = 0; if (hintOk) hintHold = 0; }
+  // The shared Toybox ghost hand. Each move has a key (nail, pull, metal, joint, yard, glue, pjnail, turn, trigger),
+  // and the page calls ghost.learned(key) once he has done that move himself. Where a move can be shown two ways
+  // (tap or swipe the nail, hold or circle the screwdriver), the showings take turns.
+  function acted() { if (hintOk) hintHold = 0; }
   function stageXY(el) {
     var r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
     return { x: r.left - c.left + r.width / 2, y: r.top - c.top + r.height / 2, r: r.width / 2 };
   }
-  function ghostPlan() {
-    var sc = sceneName(), alt = Math.floor((nowMs() - idleSince) / GHOST_CYC) % 2, t, p;
-    var R = clamp(Math.min(W, H) * 0.05, 20, 34);
+  function gTap(key, x, y) { return { key: key, pts: [[x, y]], tap: true }; }
+  // The next move in canvas px (the plan below moves it to viewport px).
+  function ghostMove() {
+    var sc = sceneName(), t, p;
     if (sc === "assemble" && PJ) {
       if (PJ.finished || PJ.phase === "slide" || PJ.phase === "pause") return null;
       if (PJ.phase === "glue") {
         var gs = pjSeamInfo(PJ.step);
-        return { k: "tap", x: (gs.x0 + gs.x1) / 2, y: (gs.y0 + gs.y1) / 2, R: R };
+        return gTap("glue", (gs.x0 + gs.x1) / 2, (gs.y0 + gs.y1) / 2);
       }
       var ni = pjNextNailIdx();
       if (ni < 0) return null;
       t = pjNailTop(ni);
-      return { k: "tap", x: t.x, y: t.y, R: R };
+      return gTap("pjnail", t.x, t.y);
     }
     if (state.mode === "hammer") {
       if (sc === "board") {
@@ -3000,119 +3010,59 @@
           var pn = onBoard(activeNail, state.board.nails) ? activeNail : state.board.nails[state.board.nails.length - 1];
           if (!pn) return null;
           t = nailTop(pn);
-          return { k: "drag", x: t.x, y: t.y + 4, x2: t.x + Math.max(80, Math.min(W, H) * 0.22), y2: t.y + 30, R: R };
+          return { key: "pull", pts: [[t.x, t.y + 4], [t.x + Math.max(80, Math.min(W, H) * 0.22), t.y + 30]] };
         }
         var cur = onBoard(activeNail, state.board.nails) && !nailDone(activeNail) ? activeNail : null;
-        if (!cur) { var fs = freeSpot({ u: 0.5, v: 0.55 }) || { u: 0.5, v: 0.55 }; p = bpt(fs.u, fs.v); return { k: "tap", x: p.x, y: p.y, R: R }; }
+        if (!cur) { var fs = freeSpot({ u: 0.5, v: 0.55 }) || { u: 0.5, v: 0.55 }; p = bpt(fs.u, fs.v); return gTap("nail", p.x, p.y); }
         t = nailTop(cur);
-        if (alt) return { k: "swipe", x: t.x + (t.x > W * 0.6 ? -1 : 1) * Math.max(70, 26 * LB.k), y: t.y - Math.min(H * 0.32, 160), y2: t.y + 10, R: R };
-        return { k: "tap", x: t.x, y: t.y, R: R };
+        if (ghost.shown("nail") % 2) {
+          var sx = t.x + (t.x > W * 0.6 ? -1 : 1) * Math.max(70, 26 * LB.k);
+          return { key: "nail", pts: [[sx, t.y - Math.min(H * 0.32, 160)], [sx, t.y + 10]] };
+        }
+        return gTap("nail", t.x, t.y);
       }
       if (sc === "metal") {
         var jt = jobTarget();
         t = jt.kind === "rivet" ? rivetTop(jt.i) : mpt(0.5, 0.4);
-        return { k: "tap", x: t.x, y: t.y + 6, R: R };
+        return gTap("metal", t.x, t.y + 6);
       }
-      if (sc === "joint") { t = ham.tgt && ham.tgt.kind === "chisel" ? chiselTop() : postTop(); return { k: "tap", x: t.x, y: t.y + 30 * LJ.k, R: R }; }
+      if (sc === "joint") { t = ham.tgt && ham.tgt.kind === "chisel" ? chiselTop() : postTop(); return gTap("joint", t.x, t.y + 30 * LJ.k); }
       t = ham.tgt && ham.tgt.kind === "stake" ? stakeTop() : wedgeTop();
-      return { k: "tap", x: t.x, y: t.y + 30 * LY.k, R: R };
+      return gTap("yard", t.x, t.y + 30 * LY.k);
     }
     var q = onBoard(activeScrew, state.board.screws) ? activeScrew : null, power = DRIVERS[state.driver].kind === "power";
+    var key = power ? "trigger" : "turn", alt = ghost.shown(key) % 2;
     if (q && !driverMatches(q)) return null;
     var none = !q && !(state.dir === "rev" && state.board.screws.length);
     if (none || (q && screwFinished(q) && !power)) {
       var fs2 = freeSpot({ u: 0.5, v: 0.55 }) || { u: 0.5, v: 0.55 }; p = bpt(fs2.u, fs2.v);
-      if (!power || !alt) return { k: "tap", x: p.x, y: p.y, R: R };
+      if (!power || !alt) return gTap(key, p.x, p.y);
     }
-    if (power) { var b = stageXY($("trigger")); return { k: "hold", x: b.x + b.r * 0.42, y: b.y + b.r * 0.5, cx: b.x, cy: b.y, R: R * 0.8, ring: b.r + 8 }; }
+    // The power driver's trigger also pulses while the hand shows it.
+    if (power) { var b = stageXY($("trigger")); return { key: key, pts: [[b.x + b.r * 0.42, b.y + b.r * 0.5]], hold: true, nudge: state.mode === "screw" }; }
     if (!q) q = nearestScrew(W / 2, H / 2);
     if (!q) return null;
     t = screwTop(q);
-    if (alt) return { k: "circle", x: t.x, y: t.y - 40, r: Math.max(46, 24 * LB.k), R: R, rev: state.dir === "rev" };
-    return { k: "hold", x: t.x, y: t.y + 4, R: R, ring: R * 1.7 };
-  }
-  // The Toybox ghost hand on a canvas (same look as every page): fingertip at (x, y), s = scale (1 is about 64 px tall).
-  function ghostHand(c, x, y, s, press) {
-    function box(x0, y0, w, h, r) {
-      c.beginPath(); c.moveTo(x0 + r, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, r); c.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
-      c.arcTo(x0, y0 + h, x0, y0, r); c.arcTo(x0, y0, x0 + w, y0, r); c.closePath(); c.fill(); c.stroke();
+    if (alt) {
+      // One turn of a circle above the screw, the way the screwdriver turns.
+      var r = Math.max(46, 24 * LB.k), dir = state.dir === "rev" ? -1 : 1, pts = [], i;
+      for (i = 0; i <= 16; i++) { var a = -Math.PI / 2 + dir * i * Math.PI / 8; pts.push([t.x + Math.cos(a) * r, t.y - 40 + Math.sin(a) * r]); }
+      return { key: key, pts: pts };
     }
-    c.save(); c.translate(x, y); c.scale(s * (press ? 0.92 : 1), s * (press ? 0.92 : 1));
-    c.lineJoin = "round"; c.strokeStyle = "#1D2340";
-    c.lineWidth = 2; c.fillStyle = "rgba(255,201,60,0.95)"; c.beginPath(); c.arc(0, 2, press ? 12 : 9, 0, Math.PI * 2); c.fill(); c.stroke();
-    c.lineWidth = 3; c.fillStyle = "#FFFFFF"; c.globalAlpha *= 0.92;
-    box(-12, 22, 44, 40, 16); box(10, 14, 14, 24, 7); box(-9, -6, 18, 40, 9);
-    c.restore();
+    return { key: key, pts: [[t.x, t.y + 4]], hold: true };
   }
-  function gDot(c, x, y, R, press) { ghostHand(c, x, y, clamp(R / 24, 0.95, 1.35), press); }
-  function gRipple(c, x, y, R, f) {
-    if (f <= 0 || f >= 1) return;
-    c.strokeStyle = "rgba(255,255,255," + (0.95 * (1 - f)).toFixed(3) + ")"; c.lineWidth = 7 * (1 - f) + 1;
-    c.beginPath(); c.arc(x, y, R * (1 + 1.5 * f), 0, Math.PI * 2); c.stroke();
-  }
-  function gArrow(c, x0, y0, x1, y1, w) {
-    var a = Math.atan2(y1 - y0, x1 - x0), hl = w * 2.2;
-    var bx = x1 - Math.cos(a) * hl, by = y1 - Math.sin(a) * hl;
-    c.lineCap = "round"; c.lineJoin = "round";
-    [[OUT, w + 7], ["#FFC93C", w]].forEach(function (st) {
-      c.strokeStyle = st[0]; c.fillStyle = st[0]; c.lineWidth = st[1];
-      c.beginPath(); c.moveTo(x0, y0); c.lineTo(bx, by); c.stroke();
-      var e = st[1] === w ? 0 : 3.5;
-      c.beginPath();
-      c.moveTo(x1 + Math.cos(a) * e, y1 + Math.sin(a) * e);
-      c.lineTo(bx + Math.cos(a + Math.PI / 2) * (hl * 0.75 + e), by + Math.sin(a + Math.PI / 2) * (hl * 0.75 + e));
-      c.lineTo(bx - Math.cos(a + Math.PI / 2) * (hl * 0.75 + e), by - Math.sin(a + Math.PI / 2) * (hl * 0.75 + e));
-      c.closePath(); c.fill();
-    });
-  }
-  function drawGhost(c, g, ph) {
-    var R = g.R, f, x, y;
-    if (g.k === "tap") {
-      if (ph < 0.3) { f = ph / 0.3; x = g.x + R * 1.8 * (1 - f); y = g.y + R * 1.8 * (1 - f); c.globalAlpha *= f; gDot(c, x, y, R, false); }
-      else { gRipple(c, g.x, g.y, R, (ph - 0.33) / 0.45); gDot(c, g.x, g.y, R, ph > 0.33 && ph < 0.6); }
-    } else if (g.k === "swipe") {
-      gArrow(c, g.x, g.y - R * 0.2, g.x, g.y2, Math.max(8, R * 0.42));
-      f = clamp((ph - 0.2) / 0.3, 0, 1); f = f * f;
-      y = lerp(g.y, g.y2, f);
-      gRipple(c, g.x, g.y2, R, (ph - 0.5) / 0.4);
-      gDot(c, g.x, y, R, ph > 0.15);
-    } else if (g.k === "drag") {
-      gArrow(c, g.x, g.y, g.x2, g.y2, Math.max(8, R * 0.42));
-      f = clamp((ph - 0.2) / 0.45, 0, 1); f = 1 - (1 - f) * (1 - f);
-      gDot(c, lerp(g.x, g.x2, f), lerp(g.y, g.y2, f), R, ph > 0.12 && ph < 0.75);
-    } else if (g.k === "hold") {
-      f = clamp((ph - 0.12) / 0.7, 0, 1);
-      c.lineCap = "round";
-      c.strokeStyle = "rgba(29,35,64,0.55)"; c.lineWidth = 12;
-      var hx = g.cx === undefined ? g.x : g.cx, hy = g.cy === undefined ? g.y : g.cy;
-      c.beginPath(); c.arc(hx, hy, g.ring, 0, Math.PI * 2); c.stroke();
-      if (f > 0) { c.strokeStyle = "#FFC93C"; c.lineWidth = 8; c.beginPath(); c.arc(hx, hy, g.ring, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); c.stroke(); }
-      gDot(c, g.x, g.y, R, ph > 0.1 && ph < 0.88);
-    } else if (g.k === "circle") {
-      var dir = g.rev ? -1 : 1, r = g.r, a0 = -Math.PI / 2;
-      c.save(); c.setLineDash([10, 10]); c.lineDashOffset = -dir * nowMs() / 30;
-      c.strokeStyle = "#FFC93C"; c.lineWidth = 6; c.beginPath(); c.arc(g.x, g.y, r, 0, Math.PI * 2); c.stroke(); c.restore();
-      f = ph * Math.PI * 2 * dir;
-      gDot(c, g.x + Math.cos(a0 + f) * r, g.y + Math.sin(a0 + f) * r, R, true);
+  var ghost = Toybox.ghost({
+    ok: function () { return endPose === 0 && $("camout").hidden && !Object.keys(gest).length && !trig.on && ham.phase !== "tapin"; },
+    onShow: function (p, on) { $("trigger").classList.toggle("nudge", on && !!p.nudge); },
+    plan: function () {
+      var g = ghostMove();
+      if (!g) return null;
+      var cr = cv.getBoundingClientRect();
+      g.pts = g.pts.map(function (pt) { return [cr.left + pt[0], cr.top + pt[1]]; });
+      g.dur = 2400;
+      return g;
     }
-  }
-  function updateGhost() {
-    var now = nowMs(), want = !locked() && endPose === 0 && !Toybox.sheetOpen() && $("camout").hidden &&
-      !Object.keys(gest).length && !trig.on && now - idleSince > GHOST_IDLE && now - idleSince < GHOST_IDLE + 2 * GHOST_CYC && ham.phase !== "tapin";
-    var plan = want ? ghostPlan() : null;
-    ghostA = plan ? Math.min(1, ghostA + 0.05) : 0;
-    $("trigger").classList.toggle("nudge", !!plan && plan.k === "hold" && DRIVERS[state.driver].kind === "power" && state.mode === "screw");
-    if (!plan) { if (ghostDrawn) { gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, gcv.width, gcv.height); ghostDrawn = false; } return; }
-    if (gcv.width !== cv.width || gcv.height !== cv.height) { gcv.width = cv.width; gcv.height = cv.height; }
-    var c = gctx;
-    c.setTransform(DPR, 0, 0, DPR, 0, 0);
-    c.clearRect(0, 0, W, H);
-    c.save();
-    c.globalAlpha = ghostA * 0.95;
-    drawGhost(c, plan, ((now - idleSince) % GHOST_CYC) / GHOST_CYC);
-    c.restore();
-    ghostDrawn = true;
-  }
+  });
 
   // ---------- Main loop ----------
   var last = nowMs();
@@ -3145,7 +3095,6 @@
         setAct("pull");
         var bt = nailTop(activeNail);
         pop("Pull it out!", bt.x, bt.y - 40, 24, "#FFC93C");
-        idleSince = nowT - GHOST_IDLE + 600;
       }
     }
     if (autoHitAt && nowT > autoHitAt && !(pull && pull.g)) { autoHitAt = 0; if (state.act === "pull") setAct("hit"); }
@@ -3208,7 +3157,6 @@
     drawParts2(c);
     c.restore();
     updateReadout();
-    updateGhost();
     if (saveWanted && nowMs() - lastSave > 600) save();
     requestAnimationFrame(frame);
   }
@@ -3287,7 +3235,7 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    if (t.classList.contains("hold") || t.id === "trigger" || t.id === "bigToggle" || t.closest(".sheet, .rest, .farewell")) return;
+    if (t.classList.contains("hold") || t.id === "trigger" || t.closest(".sheet, .rest, .farewell")) return;
     if (locked()) return;
     ensureAudio();
     acted();
@@ -3468,7 +3416,6 @@
     var looseScrews = state.board.screws.filter(function (q) { return q.d < q.len - 0.01 && driverMatches(q); });
     activeScrew = looseScrews.length ? looseScrews[looseScrews.length - 1] : null;
   }
-  idleSince = nowMs();
   render();
   setScene();
   resize();
@@ -3477,7 +3424,6 @@
   try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-hammer",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the tools are put down, the workshop rests, and the controls lock. The timer carries over to every Workshop page.",
     goodbyeOption: "End with a Goodbye tap button to press",
     farewellText: "Time to put the tools down",
@@ -3492,7 +3438,6 @@
     onGoodbye: goodbyeTap,
     onRest: onRest,
     onWake: onWake,
-    onBig: function () { resize(); },
     onSound: function (on) { if (on) sndChime(); else motorSet(0); },
     onTimer: drawTimer
   });

@@ -2479,7 +2479,6 @@
   try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-measuring",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the tape zips back, the tools settle and rest, and the controls lock. The timer carries on across Workshop pages.",
     goodbyeOption: "End with a “Put away” button to press",
     farewellText: "Time to put the tools away",
@@ -2494,7 +2493,6 @@
     onGoodbye: goodbye,
     onRest: onRest,
     onWake: onWake,
-    onBig: function () { resize(); },
     onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
   });
 

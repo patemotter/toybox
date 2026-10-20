@@ -4521,7 +4521,6 @@
   try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the shop door rolls down, the workshop rests, and the controls lock. The timer keeps going on every Workshop page.",
     goodbyeOption: "End with a “Close the shop” button to press",
     farewellText: "Time to close the shop",
@@ -4536,7 +4535,6 @@
     onGoodbye: closeShop,
     onRest: onRest,
     onWake: onWake,
-    onBig: function (on) { if (on && !(D && D.pj)) closeDetail(true); },
     onSound: function (on) { if (on) SND.chime(); else motorOff(); },
     onTimer: drawTimer
   });
