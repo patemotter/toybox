@@ -1,0 +1,117 @@
+# Design review, October 2026
+
+A review of every page against `AGENTS.md`, at all five test sizes (upright and sideways phone, upright and
+sideways iPad, iPad Pro), with the main interaction played on each page. Nothing was broken in the sense of page
+errors or page scroll: all 59 pages load and pass the smoke test at every size. The findings below are rule
+violations and polish, grouped by theme so one agent can fix one theme across pages. Screenshots from the review
+were in `/tmp/toybox-review/` (not kept).
+
+The engineering cleanup that ran alongside it is done and not repeated here: the idle ghost hand is the shared one,
+the Workshop stations and Hammer & Screws use the shared coach line, the six biggest pages moved their scripts to
+`.js` files, the whole site lints clean (`tools/lint.js`, now a blocking deploy check), and the shared layer had
+four bugs fixed (reduced motion on new instructions, a palm guard that could block every touch, toasts, keyboard
+holds).
+
+## 1. Fix without asking (clear rule violations)
+
+### 1a. Machines and scenes cut off ("The whole machine stays on screen")
+- **Espresso Machine**: on the first screen (drink chooser) on an upright phone and the 820 px iPad, the machine is
+  off-screen; only the wall and the knock box show. Frame the machine on the chooser too. Worst finding.
+- **Workshop**: Drill Press (sideways phone; upright iPad: head touches the top, base runs off), Lathe (upright phone:
+  both ends), Router Table (upright and sideways phone), Hammer & Screws (sideways phone and upright iPad: the hammer),
+  Birdhouse plan (sideways iPad: the board), Measuring in project mode (upright phone).
+- **Kitchen**: Stove (sideways phone), Cutting Board (iPad: the knife handle).
+- **Marble Run**: the bottom tray and the lift's lower gear are clipped on iPad and sideways phone.
+- **Garden**: the watering can, trowel and basket are clipped on sideways phone and iPad.
+- **Construction Site**: Excavator (upright phone and iPad: the counterweight; the truck off-screen at the start),
+  Tower Crane (counter-jib and jib end on phone and iPad; the mast leaves the screen during Lift on the phone),
+  Concrete (upright iPad: the form runs past both edges), Forklift (upright iPad Pro: the rack and the load), site
+  map (sideways phone: the bottom labels are cut off).
+- **Farm**: Moooovie Time (the mixer wagon is cut off at the right at every size), Come Bye (the pen fence runs off
+  the right), Feathered Friends (the close-up hen house is cut at the right).
+
+### 1b. Shavings and chips stay on the work ("Debris never hides the work")
+Drill Press chips, Lathe shavings on the bed and tool rest, and Router Table chips are still there 2 s after the cut.
+Fade them within 1 to 1.5 s; only a tidy pile on the floor may stay.
+
+### 1c. The instruction pill covers what it names
+- The centered instruction sits on the ringed target on most Farm stations on a sideways phone, and on the cab or
+  head on iPad; the part's name tag can land on the pill's text (Spuds, Munchy Crunchy). Also Sewing Machine (the
+  spool rack, sideways phone), Sand Table (the ball, iPad and sideways phone), Router Table (the End view label),
+  Jigsaw (the Train tile), Rocket Builder (the rocket body).
+- Proposed shared fix (common/): let `coach.step(text, { avoid: [x, y] })` place a new instruction above or below
+  a target point instead of dead center; stations pass the ringed part.
+- Farm stations: a passing info line falls back to the step line, so an instruction for something already done
+  comes back while the machine works ("Tap the sheep to count them." after the count). Clear the step line when a
+  station enters its work phase, or add a shared `coach.busy()`.
+
+### 1d. Instructions with pronouns or wrong objects ("Literal, complete instructions")
+"Cut it in half!", "Slice it into coins!" (Cutting Board: name the food), "Drag fruit into the jar!" (Blender: yogurt,
+milk and ice aren't fruit), "Turn it on!" (Drill Press), "Switch it on!" (Espresso), "Drag the tool onto a bolt!"
+(Wrenches), "Press the button!" (Spinning Tops: which one), "Treat!" (Hamster: a bare noun), the Birdhouse project
+lines with several actions each (`workshop/projects.js`), "Drive the yard scraper…" (Mucky Muck: the tractor drives).
+Sewing Machine's first line is three lines tall on an upright phone; shorten it.
+
+### 1e. Text under 14 px
+Tool Wall tag subtitles and category chips, Saw Bench material and saw cards, Kaleidoscope section labels and On/Off,
+Math Grid panel buttons, Marble Run layout tiles, Spin Shop's "spokes" caption, Rocket Builder's "Stage away!"
+(about 8 px), Car Builder tiles on iPad, Blender Low/High/Pulse on the phone, Garden tiles, Espresso's "for Mom" lines,
+Combine Time's "Close-up" label, and every Farm name tag (10 to 11 px: raise the shared `Toybox.nametag` size once).
+
+### 1f. Chrome against the Look rules
+- Red as chrome: Train Builder's Stop button, Wrecking Ball's red Down arrow.
+- Dashed outlines: Saw Bench's Wood and Teeth groups, Hammer & Screws' info card, Concrete's coming-step chips,
+  3D Printer's 20 empty "My prints" boxes.
+- Hard offset shadows: the launcher tiles (`box-shadow: 5px 5px 0`) and Jigsaw's picture cards.
+- Cream tiles mixed with white: Stove's dish tiles.
+- Lathe's green "Done!" shows before anything is done (green means Go).
+- Construction Site: Forklift's Surprise has no gift icon; Wrecking Ball and Tower Crane have no Surprise button.
+- Farm: name tags show by themselves when a machine arrives (`tagRig`), against "no name tags shown by themselves"
+  (see question 6).
+
+## 2. Polish (space and framing)
+- Scenes framed for landscape on upright screens, with empty sky or ground: Bubbles (the machine is tiny in a
+  corner), Timberrrrr!, Mucky Muck (the heap isn't visible), Forklift, Wrecking Ball, Mighty Mushrooms, Hello Ewe,
+  Garden, Espresso on the iPad Pro, Birdhouse plan.
+- Grey bands around Gear Box's board; white bands around Jigsaw's picker.
+- Empty panels on iPad (Router, Lathe, Blender, Cutting Board, Stove, Shadow Board, Spin Shop, Rocket, Car Builder,
+  Hamster, Math Grid, Water Table, Spinning Tops, 3D Printer); Stand Mixer's three tiles stretch huge; Wrenches' size
+  tiles stretch very tall on sideways iPad.
+- Kitchen tile rows on the 820 px iPad wrap one tile onto a second row (seven tiles in six columns).
+- The launcher's pictures are small on the 820 px iPad and the sideways iPad; two names wrap to two lines.
+- Water Table's layout strip shows three of six layouts on an upright phone.
+- Router Table bit names differ by size (Round/Bevel/Groove on the phone, Roundover/Chamfer/Straight on iPad); use
+  one set of real names.
+- Hammer & Screws has four tabs on the phone and two on iPad; its sideways-phone panel is half empty.
+- Sewing Machine's spools are tiny targets; Spinning Tops' launcher sits far from his hands on iPad.
+- Rocket Builder: brownish engine particles; a white ring and a dark star over the rocket during staging.
+- Train Builder: the tunnel hill reads as a green pipe with no tunnel mouth.
+- Kitchen map on iPad: the coach and station labels cover the cutting board and the stove.
+
+## 3. Questions for the dad (keep as is until he answers)
+1. **Whole-job buttons**: Construction Site's "Move it!", Dig/Dump, "Lift!" and Concrete's step Go, Espresso's
+   "Do it!", and the "Draw!" buttons in Spirograph and Sand Table play a whole job. Keep them as optional helpers, or
+   make those pages hands-on like the Farm? (At least Espresso's button should say its step's verb.)
+2. **Control rows on upright phones**: Spin Shop, Rocket Builder, Kaleidoscope, Math Grid, 3D Printer, Train
+   Builder and Spirograph have four rows of controls under the stage, Marble Run five, Saw Bench 16+ controls. Merge
+   or move some onto the stage?
+3. **Marble Run**: two Drop controls (on the hopper and in the panel). Keep both?
+4. **Shadow Board**: a tap turns a tool 45 degrees; should a tap hang it on its shadow ("one press is enough")?
+5. **Birdhouse**: are the sizes on the plan's step chips ("Back 12", "Roof 7.5") fine? May project mode hide the
+   saws a step doesn't use?
+6. **Farm**: make the split close-ups (Brilliant Baler, Munchy Crunchy, Juicy Squeezy, Feathered Friends, Spuds)
+   corner insets on wide screens, or switch them off in phases where they repeat the main view? Keep the name tag
+   that shows when a machine arrives? Should the tracked tractor be green (Feathered Friends, Caterpillar Hunt) or
+   red like every other tractor? Should Come Bye's shepherd be Farmer Tom? Add Feathered Friends' "loader lifts the
+   feed hopper" moment from the guide?
+7. **Grown-ups sheet**: it opens with a single tap on the home screen, and he reads well. Make opening it a hold?
+8. **Launcher**: six columns on wide tablets so the pictures are bigger?
+9. **Shared coach on the Workshop stations**: each new instruction now pops into the middle until his first touch.
+   Hammer & Screws changes its line on nearly every nail; is the middle too much there? Measuring now has an empty
+   band at the top where its old coach sat; reclaim it for the scene?
+
+## 4. Suggested order
+1. Section 1 in parallel batches, one theme or page group per agent, no two agents on one file: 1a+1b per app,
+   1c's shared coach change in common/ first, then 1d/1e/1f with the page groups.
+2. Section 2 after that, page by page.
+3. Section 3 once the dad has answered; until then nothing there changes.

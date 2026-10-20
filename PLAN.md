@@ -24,13 +24,13 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 13 | Garden | Done |
 | 14 | Bubble Machine | Done |
 | 15 | Spinning Tops, Spirograph, Sand Table, Espresso Machine | Done |
-| 16 | Farm (12 episode stations) | Done (12 stations; authentic Tractor Ted episode highlights as in Spuds in Mud) |
+| 16 | Farm (episode stations) | Done (14 stations; authentic Tractor Ted episode highlights as in Spuds in Mud) |
 
 Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
 should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** (done; can't go wrong: any finger
 movement rolls the gear, the curve is always perfect. The dad: finger drawing never stops or reseats by itself,
 a new layer only when he picks a new pen/wheel/hole/ring; every ring is a tile (round, oval, flower, triangle);
-Surprise only shuffles the setup and never draws), **Sand
+Surprise plays a moment on the page, e.g. the gear wheel rolls off and back, and never draws), **Sand
 Table** (done; the dad: Draw! never smooths by itself, finished patterns stay and new ones draw on top; Smooth is his
 tool and glows when the sand is full. Open: should the pattern resume 2.6 s after his finger lets go? bigger ball?), **Espresso Machine** (done: the family's real routine, warm up, weigh 18.0 g, grind, whisk, tamp, lock in,
 10 s soak then the shot to about 36 g in about 28 s, steam, pour; latte for Mom, cappuccino for Dad, steamer for
@@ -123,7 +123,7 @@ ending with open questions for the dad; settle those before building.
   Combine Time pilot. Complex mechanics are only secondary; what he cares about most is whether the stations hit
   the key highlights of the Tractor Ted episodes (split stage, real machines, clear process). Stations will focus
   on authentic episode highlights rather than manual driving chores.
-- **On hold (the dad, 2026-10-10: "wait on the new apps"):** Garbage Truck, Sewing Machine, Play Dough. Plans stay in
+- **On hold (the dad, 2026-10-10: "wait on the new apps"):** Garbage Truck, Play Dough (Sewing Machine was built 2026-10-17). Plans stay in
   `plans/`; don't build them until he says so.
 - **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
   thread, guiding the fabric, making something.
@@ -134,7 +134,6 @@ CNC and laser, roller coaster, toy factory, balance scale, clock shop, kite, fir
 light lab, flashlight cave, ice resurfacer, pottery wheel, stamps, weather, goo jar, post office, vet, blocks and more.
 Also set aside: the "learning" round (sawmill, sheep to sweater, recycling plant, crayon factory, beekeeping, water
 works, simple machines, word crane, coin machine). The dad: he likes learning, but not these ideas.
-| – | Workshop Projects | On hold |
 
 ---
 
@@ -546,7 +545,7 @@ not kept across visits.
 
 ---
 
-## In progress: Workshop Projects
+## Workshop Projects
 
 An end-to-end build with the real methods: plane, measure, mark, square, cut, rip, drill, nail, sand. First
 project: **a birdhouse** from one long pine board (a nominal 1x6). Units: inches with decimals ("7.5"), never
@@ -566,16 +565,15 @@ fractions; numbers appear only inside project steps that measure or set a machin
   → Side 10, Side 10, Floor 4 → roof angle on both Sides (miter saw pre-swung, "roof angle", no degrees) → mark the
   door 6 up (X) → hole saw (Drill Press) → four drain holes → glue + two nails per join (Hammer & Screws) → sand
   (Tool Wall) → the house on the shelf, a bird lands.
-- Status: project page + data done; Saw Bench and Measuring project modes in progress; then Drill Press,
-  Hammer & Screws (the house grows join by join), Tool Wall planer/sander deep links, a Projects card on the Tool
-  Wall (`?next=project` in the gear-up list). Project two candidates: a tool tote, a wooden toy train engine.
+- Status (2026-10-20): the project page, the data and project modes on Measuring, Saw Bench (miter and table saw),
+  Drill Press and Hammer & Screws work; the Tool Wall has a "Build a birdhouse" card and the planer/sander deep
+  links. Project two candidates: a tool tote, a wooden toy train engine.
 
-## In progress: two shared cards (common/toybox.js)
+## Two shared cards (common/toybox.js)
 
-- **Turn the device**: `Toybox.init({ orientation })`. Adopted: Train Builder (landscape), Concrete (portrait).
-- **Switch it off first**: `Toybox.offFirst(...)` guards the way out while a machine runs. To wire (each page
-  provides `running / name / off(done) / flash`): Tool Wall mini-plays (in progress), then Saw Bench (table,
-  band, scroll, miter saws), Drill Press, Lathe, Router Table. Machines keep running between goes on the same
+- **Turn the device**: `Toybox.init({ orientation })`. Adopted: Concrete (portrait) only.
+- **Switch it off first**: `Toybox.offFirst({ running, off })`: leaving the page while a machine runs switches it
+  off quietly and goes at once (no card any more; `name` and `flash` are ignored). Machines keep running between goes on the same
   screen; "Done!" / "Again" no longer switch them off.
 
 ---
@@ -584,7 +582,7 @@ fractions; numbers appear only inside project steps that measure or set a machin
 
 Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
 - One self-contained folder (`index.html`, `manifest.webmanifest`, icons; no `sw.js`) using `common/` for the timer,
-  sound, Big button and fresh start. Offline-first; the only external file is the Baloo 2 font.
+  sound and fresh start. Offline-first; the only external file is the Baloo 2 font.
 - Sound off by default (2-second grown-up hold). Just as fun with sound off.
 - One screen, no page scroll, iPhone and iPad, touch and mouse. Phone header and two-rows-of-controls rules.
 - Numbers only where they're the point; one simple counter per page.
