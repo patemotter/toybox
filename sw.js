@@ -56,6 +56,7 @@ const CORE = [
   // Rocket Builder
   "./rocket-builder/",
   "./rocket-builder/index.html",
+  "./rocket-builder/index.js",
   "./rocket-builder/manifest.webmanifest",
   "./rocket-builder/icons/icon-180.png",
   "./rocket-builder/icons/icon-192.png",
@@ -159,6 +160,7 @@ const CORE = [
   // Train Builder
   "./train-builder/",
   "./train-builder/index.html",
+  "./train-builder/index.js",
   "./train-builder/manifest.webmanifest",
   "./train-builder/icons/icon-180.png",
   "./train-builder/icons/icon-192.png",
