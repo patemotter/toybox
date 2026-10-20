@@ -463,8 +463,9 @@ small changes should take minutes, not tens of minutes.
 - **Do small changes yourself, in one agent.** A fix, a tweak, a new option or anything in one or two pages: no
   subagents. Read only the files the change needs (big pages have a "Sections" list at the top of their `.js`:
   search for a section title instead of reading the whole file).
-- **Subagents only for big, independent work**: a new app or station, or several unrelated jobs at once. Then at
-  most **three agents at a time**; each owns specific files and doesn't edit outside them; shared files
+- **Subagents only for big, independent work**: a new app or station, or several unrelated jobs at once. Run as
+  many at a time as the work splits into (no limit, the dad 2026-10-19); each owns specific files and doesn't edit
+  outside them, and no two own the same file; shared files
   (`common/`, the launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are the coordinator's; subagents don't
   commit or push; they report what works, what changed, open questions for the dad and screenshot paths.
 - **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
