@@ -96,8 +96,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   label down to 70% as a safety net, so fix the layout when it reports something), `shot.js` (screenshots of one
   page at named sizes, with tap/drag/click steps; the everyday check), `changed-pages.js` (the pages a git range
   touched; used by the CI report job), `add-app.py` (add an app to launcher, top-level
-  `sw.js` and README), `snippets/` (the old pasted copies of the idle ghost hand and the coach pill; the master
-  is now `Toybox.ghost` / `Toybox.coach` in `common/`), `shell-demo.html` (every shared component).
+  `sw.js` and README), `shell-demo.html` (every shared component).
 
 ### Offline (service workers)
 - **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-v<number>"`, stamped by the deploy). `common/toybox.js`
@@ -303,7 +302,7 @@ Keep only:
   for him.
 - **Idle ghost hand**: after ~4.5 s without a touch, a see-through hand shows the next move, at most 2–3 times
   per visit, never again once he has done it, never while the sheet is open or the timer is ending/resting.
-  Use `Toybox.ghost` (same look everywhere; pages not migrated yet still carry the pasted `tools/snippets` copy).
+  Use `Toybox.ghost` (same look everywhere; every page uses it).
   Coach line: `Toybox.coach` (the `.tb-coach` pill).
 - Nothing traps him: always a visible way to start over ("New", "Clear"), no dead-end overlays.
 - **Surprise = a fun moment, right now, on the current scene** (the dad's rule): something happens to what is on
@@ -418,7 +417,7 @@ Keep only:
   3D Printer, Espresso Machine, Peg Drop, Timberrrrr! (`farm/woods.js`). Keep each Sections list current
   when you add or rename a section.
 - **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
-  provides (the ghost hand from `tools/snippets`, the coach pill, audio setup), switch it to the shared version
+  provides (the ghost hand, the coach pill, audio setup), switch it to the shared version
   (`Toybox.ghost`, `Toybox.coach`, `Toybox.sound.ready()`) in the same change. When two or more apps need the
   same helper, add it to `common/` instead of copying it.
 

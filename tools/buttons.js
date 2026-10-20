@@ -168,8 +168,7 @@ function installHelpers() {
         var at = visible(el);
         if (!at) return;
         var lab = label(el), kind = 'tap', href = el.getAttribute && el.getAttribute('href');
-        if (el.classList.contains('bigtoggle')) kind = 'skip:big';
-        else if (/^(‹|<|home\b|back\b|all machines|tool wall)/i.test(lab) || el.matches('.home, .back, [data-home]')) kind = 'skip:home/back';
+        if (/^(‹|<|home\b|back\b|all machines|tool wall)/i.test(lab) || el.matches('.home, .back, [data-home]')) kind = 'skip:home/back';
         else if (href && !/^#/.test(href) && !/^javascript:/i.test(href)) {
           var u = new URL(href, location.href);
           if (u.pathname !== location.pathname) kind = 'link';

@@ -1824,8 +1824,8 @@
   }
 
   // ---------- Ghost hand ----------
-  // The see-through hand that shows the next move after a quiet spell (look: the master copy in this file's CSS,
-  // also tools/snippets/ghost-hand.css). plan() returns null or { pts: [[x, y], ...] in viewport px, tap: true |
+  // The see-through hand that shows the next move after a quiet spell (look: common/toybox.css, "Ghost hand").
+  // plan() returns null or { pts: [[x, y], ...] in viewport px, tap: true |
   // hold: true | (several points: a drag), carry: { html, size }, dur: ms, key: "pour" }. Each key shows at most
   // `max` times per visit and never again once learned(key) (he did it himself).
   function ghostHand(o) {
