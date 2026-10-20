@@ -1213,7 +1213,7 @@
   // ================= App =================
   var $ = function (id) { return document.getElementById(id); };
   var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  var SOUND_KEY = "workshop-sound-v1", WALL_KEY = "workshop-wall-v1", GEAR_KEY = "workshop-gear";
+  var WALL_KEY = "workshop-wall-v1", GEAR_KEY = "workshop-gear";
   var PSTEP = window.ToyboxProjects ? ToyboxProjects.fromQuery() : null;
   if (PSTEP && PSTEP.station !== "wall") PSTEP = null;
   if (PSTEP) document.body.classList.add("project");
@@ -1892,7 +1892,6 @@
     s += " translate(" + n2(-tl.ax) + " " + n2(-tl.ay) + ")";
     return s;
   }
-  function fmtNum(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
   // Where a point of the tool drawing is in the scene right now.
   function toolPt(x, y) { return ptOf(J.tl, x, y); }
   function ptOf(tl, x, y) {
@@ -3194,12 +3193,12 @@
       KINDS.scrub.place(J);
       if (c.power && J.run < 0.3) return;
       if (dist < 0.3) return;
-      var pw = (c.pad || 60) * J.tl.s / 2, i, j, cu = g.W / g.nu, cv = g.Dp / g.nv, hit = false;
+      var pw = (c.pad || 60) * J.tl.s / 2, i, j, cu = g.W / g.nu, cv = g.Dp / g.nv;
       for (i = 0; i < g.nu; i++) for (j = 0; j < g.nv; j++) {
         var mu = (i + 0.5) * cu, mv = (j + 0.5) * cv;
         if (Math.abs(mu - u) < pw + cu * 0.3 && Math.abs(mv - v) < 30 + cv * 0.3) {
           var k = j * g.nu + i;
-          if (g.lv[k] <= g.st) { g.cells[k] += dist * (c.power ? 1.6 : 1); if (g.cells[k] > (c.need || 26)) { g.lv[k] = g.st + 1; hit = true; } }
+          if (g.lv[k] <= g.st) { g.cells[k] += dist * (c.power ? 1.6 : 1); if (g.cells[k] > (c.need || 26)) g.lv[k] = g.st + 1; }
         }
       }
       J.dd = (J.dd || 0) + dist;
@@ -3263,7 +3262,7 @@
       var c = J.cfg, g = J.g;
       J.step = 1;
       coach(c.ratchet ? "Swing the handle around to the right. Swing back: click, click!" : "Drag the handle around to the right to tighten. Righty tighty!");
-      var a = (J.ta + 30) * Math.PI / 180, R0 = 120;
+      var R0 = 120;
       hint({ k: "circle", x: g.nx, y: g.ny, r: R0 });
       readout(c.size + " · 0 turns");
     },
@@ -3680,7 +3679,6 @@
     },
     move: function (J, p, e) {
       if (!mine(J, e)) return;
-      var g = J.g;
       if (J.step === 0) {
         var dy = p[1] - J.last[1]; J.last = p;
         var was = J.s.fx;
@@ -3979,7 +3977,6 @@
       if (nx > J.bx) {
         J.bx = nx;
         if (nx > J.maxx) { J.maxx = nx; if (nx + 220 > 200 && nx < 200) { puff(204, 172, "chips", 2, 40, -200); } }
-        var f = clamp((200 - J.bx) / 220, 0, 1); f = 1 - f;
         readout(J.maxx > 100 ? "Nearly straight…" : J.maxx > -20 ? "Straightening…" : "");
         if (J.maxx >= 190) finish("The edge is perfectly straight and flat!");
       }
@@ -4565,101 +4562,26 @@
     showGear();
   }
   // ---------- Idle help: the Toybox ghost hand ----------
-  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
-  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
-  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
-  function makeIdleGhost(plan, opts) {
-    opts = opts || {};
-    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
-    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
-    el.setAttribute("aria-hidden", "true");
-    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
-      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
-    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
-      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
-      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
-      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
-      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
-    document.body.appendChild(el);
-    var dot = el.querySelector(".gh-dot");
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
-    var down = {};
-    function poke() { last = Date.now(); armed = true; stop(); }
-    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
-    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
-    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
-    document.addEventListener("keydown", poke, true);
-    function busy() {
-      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
-      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
-      return false;
-    }
-    function play(p) {
-      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
-      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
-      el.style.transformOrigin = "16px 14px";
-      if (reduce) {
-        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
-          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
-        anim = el.animate(frames, { duration: 2600, fill: "both" });
-      } else if (p.hold) {
-        // Press and keep holding (a hold-to-pour button).
-        var hq = pts[0];
-        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
-          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
-          { opacity: 0, transform: at(hq, s * 1.05) }];
-        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
-      } else if (p.tap || pts.length === 1) {
-        var q = pts[0];
-        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
-          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
-          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
-          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
-        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
-      } else {
-        // Fade in, press down, slide along the points, hold, lift and fade.
-        var n = pts.length - 1;
-        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
-        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
-        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
-        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
-        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
-      }
-      dot.style.opacity = "1";
-      anim.onfinish = function () { stop(); };
-    }
-    setInterval(function () {
-      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
-      var p = null;
-      try { p = plan(); } catch (e) { p = null; }
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      play(p);
-    }, 400);
-    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
-  }
+  // After a few seconds with no touch it shows the main move once; a touch re-arms it; at most 3 times a visit.
   function midOf(el) { var r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
-  makeIdleGhost(function () {
+  Toybox.ghost({ max: 3, plan: function () {
     if (!gearEl.hidden) {
       // Gear-up: drag the next piece of gear onto the worker, then tap "Open the Workshop!".
       if (opening) return null;
-      if (!$("gOpen").hidden) return { pts: [midOf($("gOpen"))], tap: true };
+      if (!$("gOpen").hidden) return { pts: [midOf($("gOpen"))], tap: true, dur: 3000 };
       var it = !GEAR.gog ? $("itGog") : !GEAR.muf ? $("itMuf") : null;
       if (!it || gearDrags[it.id]) return null;
-      return { pts: [midOf(it), midOf(itemTarget(it).t)] };
+      return { pts: [midOf(it), midOf(itemTarget(it).t)], dur: 3400 };
     }
     // The wall: tap a tool to lift it off its hook (the open card has its own hint).
     if (!$("detail").hidden) return null;
     var br = board.getBoundingClientRect(), tools = board.querySelectorAll(".tool"), i, r;
     for (i = 0; i < tools.length; i++) {
       r = tools[i].getBoundingClientRect();
-      if (r.width && r.top >= br.top + 4 && r.bottom <= br.bottom - 4 && r.left >= br.left && r.right <= br.right) return { pts: [[r.left + r.width / 2, r.top + r.height * 0.42]], tap: true };
+      if (r.width && r.top >= br.top + 4 && r.bottom <= br.bottom - 4 && r.left >= br.left && r.right <= br.right) return { pts: [[r.left + r.width / 2, r.top + r.height * 0.42]], tap: true, dur: 3000 };
     }
     return null;
-  });
+  } });
   var lastT = now(), SLOW = 0.75;
   function frame(t) {
     var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));

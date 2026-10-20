@@ -21,7 +21,7 @@ const CORE = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
 
-  // Shared (grown-up timer, sound, Big: used by migrated apps)
+  // The shared layer every page loads (timer, sound, components)
   "./common/toybox.css",
   "./common/toybox.js",
 
@@ -74,6 +74,7 @@ const CORE = [
   "./workshop/router-table.html",
   "./workshop/wrenches.html",
   "./workshop/measuring.html",
+  "./workshop/measuring.js",
   "./workshop/shadow-board.html",
   "./workshop/project.html",
   "./workshop/projects.js",

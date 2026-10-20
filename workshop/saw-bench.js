@@ -40,7 +40,7 @@
 //   - Ending: the saw goes back on the rack
 //   - Main loop
 //   - Choosing a saw
-//   - Ghost hand (same look as Bulldozer and Measuring)
+//   - Ghost hand: the Toybox ghost hand
 //   - Rack
 //   - Controls under the bench
 //   - Pointer input on the bench
@@ -61,7 +61,6 @@
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function rnd(a, b) { return a + Math.random() * (b - a); }
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
   function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
   function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -1554,7 +1553,7 @@
     },
     // Pencil lines for the next cuts, and the length of the piece about to come off.
     marks: function (g) {
-      var wk = this.wk, y = this.c, i, a, b, all = [this.c], acc = this.c;
+      var wk = this.wk, i, all = [this.c], acc = this.c;
       for (i = 0; i < this.cuts.length; i++) { acc += this.cuts[i]; if (acc < this.L - 10) all.push(acc); }
       g.lineCap = "round";
       for (i = 0; i < all.length; i++) {
@@ -1565,19 +1564,6 @@
         g.strokeStyle = i === 0 ? (this.mat.metal ? "rgba(255,255,255,0.9)" : "rgba(29,35,64,0.85)") : (this.mat.metal ? "rgba(255,255,255,0.55)" : "rgba(29,35,64,0.45)");
         g.lineWidth = i === 0 ? 2.4 : 1.8; g.setLineDash(i === 0 ? [] : [6, 5]); g.stroke(); g.setLineDash([]);
       }
-    },
-    pieceLabel: function (g) {
-      return; // no length readout: the pencil line shows where the cut goes
-      var wk = this.wk, p = this.P(-wk.w / 2, 0, 0), q = this.P(wk.w / 2, 0, 0);
-      if (this.op) {
-        // under the piece that comes off, on the floor side of the board
-        var u = this.P(-wk.w / 2, this.c / 2, 0), lb = this.P(-wk.w / 2, 0, 0);
-        var lx = Math.max(u[0], this.P(-wk.w / 2, this.c, 0)[0] + 40);
-        label(g, mmText(this.c), inchText(this.c), Math.min(lx, W - 70), Math.max(u[1], lb[1]) + 34, "center");
-        return;
-      }
-      if (p[0] - 130 < bin.x + bin.w) label(g, mmText(this.c), inchText(this.c), q[0] + 12, q[1] + 4, "left");
-      else label(g, mmText(this.c), inchText(this.c), p[0] - 12, p[1] + 4, "right");
     },
     // ---------- input ----------
     down: function (pt) {
@@ -1707,7 +1693,6 @@
     },
     // ---------- per frame ----------
     update: function (dt) {
-      var wk = this.wk, saw = this.saw;
       if (this.slideT < 1) {
         this.slideT = Math.min(1, this.slideT + dt / 0.7);
         this.cView = lerp(this.slideFrom, this.slideTo, ease(this.slideT));
@@ -1839,7 +1824,6 @@
       else if (this.depth > 0) this.kerf(g, this.depth, 1e9);
       // tool parts on the off-cut side of the blade sit on top of the board
       if (this.op) withAway(g, this.toolAnchor(), function () { self.opToolFront(g); });
-      if (this.slideT >= 1 && !this.waitNew) this.pieceLabel(g);
       this.drawHints(g);
     },
     drawSupportFront: function (g) {
@@ -2600,7 +2584,7 @@
       if (mat.kind === "drywall") {
         g.fillStyle = mat.face; g.fillRect(-10, -10, BW + 20, BH + 20);
         g.fillStyle = "rgba(0,0,0,0.05)";
-        for (var i = 0; i < 40; i++) g.fillRect((i * 97) % BW, (i * 53) % BH, 3, 3);
+        for (i = 0; i < 40; i++) g.fillRect((i * 97) % BW, (i * 53) % BH, 3, 3);
         g.fillStyle = "#8C94A0";
         [[30, 30], [330, 30], [30, 230], [330, 230]].forEach(function (p) { g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fill(); });
       } else {
@@ -3316,7 +3300,7 @@
       return pts;
     },
     drawBgFront: function () {
-      var g = bgx, S = this.S, self = this, band = this.band, x, y, i, a, b;
+      var g = bgx, band = this.band, x, y, i, a, b;
       g.setTransform(DPR, 0, 0, DPR, 0, 0);
       PX = 1;
       // pegboard wall, then the floor meeting it along a line
@@ -5051,7 +5035,7 @@
       this.prism(g, rr2(202, -128, 46, 130, 10), -40, 40, C.aluD);
     },
     drawBlade: function (g) {
-      var c = this.cam, self = this, R = MITER.R, arb = miterArbor(this.alpha), N = 24, st = Math.PI * 2 / N, i, a, pts = [];
+      var self = this, R = MITER.R, arb = miterArbor(this.alpha), N = 24, st = Math.PI * 2 / N, i, a, pts = [];
       for (i = 0; i < N; i++) {
         a = this.spinA + i * st;
         [[0, R - 11], [0.14, R - 7], [0.2, R], [0.55, R - 5]].forEach(function (k) {
@@ -5232,7 +5216,7 @@
       this.drawBg();
     },
     drawBg: function () {
-      var g = bgx, i;
+      var g = bgx;
       g.setTransform(DPR, 0, 0, DPR, 0, 0); PX = 1;
       g.fillStyle = "#C9A06A"; g.fillRect(0, 0, W, H);
       g.fillStyle = "rgba(70,40,15,0.35)";
@@ -5317,7 +5301,7 @@
       this.lens.push(this.lens.shift());
     },
     draw: function (g) {
-      var self = this, sec = this.sec, Se = this.Se, i;
+      var self = this, sec = this.sec, Se = this.Se;
       // ---- side view ----
       g.save();
       g.beginPath(); g.rect(0, 0, this.ew, this.eh); g.clip();
@@ -5353,7 +5337,7 @@
       }
     },
     drawPlan: function (g) {
-      var Sp = this.Sp, pc = this.pc, self = this, t = Math.tan(this.theta * Math.PI / 180), i, a;
+      var Sp = this.Sp, pc = this.pc, self = this, t = Math.tan(this.theta * Math.PI / 180), a;
       var R = 120;
       PX = 1;
       g.save();
@@ -5390,15 +5374,12 @@
         g.globalAlpha = 1;
       }
       // blade line through the turntable center, and the saw head above it
-      var p0 = this.plan(-95 * t - 0, -95), p1 = this.plan(95 * t, 95);
       g.save(); g.translate(pc[0], pc[1]); g.rotate(-this.theta * Math.PI / 180);
       rrect(g, -9 * Sp, -110 * Sp, 18 * Sp, 220 * Sp, 6 * Sp);
       g.fillStyle = "rgba(255,201,60,0.55)"; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
       line(g, 0, -105 * Sp, 0, 105 * Sp, this.cutting ? "#E63946" : "#5B6475", 2.5);
       g.restore();
       g.restore();
-      // next piece length label
-      var lenNow = Math.round(this.endB + this.shift);
     }
   };
 
@@ -5875,117 +5856,18 @@
   // ===================================================================
   // Choosing a saw
   // ===================================================================
-  // ---------- Ghost hand (same look as Bulldozer and Measuring) ----------
-  // After a few quiet seconds, a see-through hand shows the main move once. A touch re-arms it, it shows
-  // at most twice per visit, and never again once the child has done the move (ghost.learned()).
-  // plan() returns { pts: [[x, y], ...] in page px, tap: true for a tap, carry: { html, size } for a see-through
-  // thing under the finger (a gear being dragged), dur: ms } or null when there is nothing to show.
-  function makeGhost(plan, opt) {
-    opt = opt || {};
-    var IDLE = opt.idle || 4500, MAX = opt.max || 2;
-    var last = Date.now(), shown = 0, armed = true, learned = false, run = null, el = null;
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function build() {
-      el = document.createElement("div");
-      el.className = "ghosthand";
-      el.setAttribute("aria-hidden", "true");
-      el.innerHTML = '<svg viewBox="-24 -18 64 84"><circle class="gh-press" cx="0" cy="0" r="17" fill="rgba(255,201,60,0.55)"/>' +
-        '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
-        '<rect x="-9" y="-6" width="18" height="40" rx="9"/><rect x="-12" y="22" width="44" height="40" rx="16"/>' +
-        '<rect x="10" y="14" width="14" height="24" rx="7"/></g>' +
-        '<circle cx="0" cy="2" r="5" fill="rgba(255,201,60,0.9)"/></svg>';
-      el.insertBefore(carryEl, el.firstChild);
-      document.body.appendChild(el);
-    }
-    function stop() { run = null; if (el) { el.style.display = "none"; carryEl.innerHTML = ""; } }
-    var carryEl = document.createElement("div");
-    carryEl.className = "gh-carry";
-    function poke() { last = Date.now(); armed = true; if (run) stop(); }
-    document.addEventListener("pointerdown", poke, true);
-    document.addEventListener("keydown", poke, true);
-    function blocked() {
-      if (document.hidden) return true;
-      if (window.Toybox && (Toybox.sheetOpen() || Toybox.timer.phase() === "ending" || Toybox.timer.phase() === "resting")) return true;
-      return !!(opt.ok && !opt.ok());
-    }
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function at(pts, f) {
-      if (pts.length < 2) return pts[0];
-      var segs = [], tot = 0, i;
-      for (i = 1; i < pts.length; i++) { var l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(l); tot += l; }
-      var d = f * tot;
-      for (i = 0; i < segs.length; i++) {
-        if (d <= segs[i] || i === segs.length - 1) { var t = segs[i] ? Math.min(1, d / segs[i]) : 0; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]; }
-        d -= segs[i];
-      }
-      return pts[pts.length - 1];
-    }
-    function frame() {
-      if (!run) return;
-      var t = (Date.now() - run.t0) / run.dur, p = run.p, s = run.s, x, y, a, press, sc = 1;
-      if (t >= 1) { stop(); return; }
-      if (p.tap || p.pts.length < 2) {
-        var pt = p.pts[0];
-        x = pt[0]; y = pt[1];
-        a = t < 0.15 ? t / 0.15 : (t > 0.85 ? (1 - t) / 0.15 : 1);
-        press = (t > 0.3 && t < 0.42) || (t > 0.55 && t < 0.67);
-        sc = press ? 0.92 : 1;
-        if (t < 0.3) { var k = 1 - t / 0.3; x += 26 * s * k; y += 30 * s * k; }
-      } else {
-        a = t < 0.1 ? t / 0.1 : (t > 0.9 ? (1 - t) / 0.1 : 1);
-        var f = reduce ? 0.5 : ease(Math.max(0, Math.min(1, (t - 0.16) / 0.66)));
-        var q = at(p.pts, f); x = q[0]; y = q[1];
-        press = t > 0.12 && t < 0.86;
-        sc = t < 0.12 ? 1.12 - 0.12 * (t / 0.12) : 1;
-      }
-      el.style.opacity = (0.85 * a).toFixed(3);
-      el.style.transform = "translate(" + (x - 24 * s) + "px," + (y - 18 * s) + "px) rotate(-14deg) scale(" + sc + ")";
-      el.lastChild.firstChild.style.opacity = press ? "1" : "0";
-      carryEl.style.opacity = press ? "0.75" : "0";
-      requestAnimationFrame(frame);
-    }
-    function show(p) {
-      if (!el) build();
-      var s = Math.max(1, Math.min(1.7, Math.min(innerWidth, innerHeight) / 360));
-      el.style.width = (64 * s) + "px"; el.style.height = (84 * s) + "px";
-      el.style.transformOrigin = (24 * s) + "px " + (18 * s) + "px";
-      el.style.display = "block";
-      carryEl.innerHTML = p.carry ? p.carry.html : "";
-      if (p.carry) {
-        var c = p.carry.size;
-        carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
-      }
-      run = { p: p, s: s, t0: Date.now(), dur: p.dur || (p.tap ? 2400 : 3200) };
-      requestAnimationFrame(frame);
-    }
-    setInterval(function () {
-      if (run || learned || !armed || shown >= MAX || Date.now() - last < IDLE) return;
-      if (blocked()) { last = Date.now(); return; }
-      var p = plan();
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      show(p);
-    }, 250);
-    return {
-      learned: function () { learned = true; stop(); },
-      // something new to show (a new mode): allow the hint again
-      again: function () { learned = false; shown = 0; armed = true; last = Date.now(); },
-      poke: poke,
-      // test hook: show it now
-      show: function () { var p = plan(); if (p) show(p); return !!p; }
-    };
-  }
-  // Page px of a point inside an element, as fractions of its box.
-  function ghostPt(elm, fx, fy) {
-    var r = elm.getBoundingClientRect();
-    return [r.left + r.width * fx, r.top + r.height * fy];
-  }
+  // ---------- Ghost hand: the Toybox ghost hand ----------
+  // After a few quiet seconds, a see-through hand shows the current saw's move, at most twice. Picking a saw calls
+  // ghost.again(), so each newly picked saw can show its move twice more.
   // What the ghost hand would show right now, in canvas px (set by the scene while it draws).
   var gAim = null;
-  var ghost = makeGhost(function () {
-    if (!gAim || !scene || (PJ && PJ.over)) return null;
-    var r = canvas.getBoundingClientRect();
-    return { pts: gAim.pts.map(function (q) { return [r.left + q[0], r.top + q[1]]; }), tap: gAim.tap, dur: gAim.dur };
+  var ghost = Toybox.ghost({
+    max: 2,
+    plan: function () {
+      if (!gAim || !scene || (PJ && PJ.over)) return null;
+      var r = canvas.getBoundingClientRect();
+      return { pts: gAim.pts.map(function (q) { return [r.left + q[0], r.top + q[1]]; }), tap: gAim.tap, dur: gAim.dur };
+    }
   });
   // Two-step machines (table, band and scroll saws): pushing while the switch is off says "Press the green
   // button!" and flashes the switch; the second push (a new press) switches it on for him.

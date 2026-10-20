@@ -147,7 +147,6 @@
     fin:  { label: "Finishing", len: 50, shank: 2.3, head: 3.1, kind: "finish" },
     roof: { label: "Roofing", len: 32, shank: 3.1, head: 9.5, kind: "roof" }
   };
-  var NAIL_ORDER = ["c25", "c50", "c75", "c100", "fin", "roof"];
 
   // ---------- Saved state ----------
   var KEY = "workshop-hammer-v1";
@@ -486,14 +485,6 @@
     parts.push(P(rrect(-hr, -L - 1.6, hr * 2, 3.2, 1), col, 1.4));
     return parts;
   }
-  function screwSideParts(len, col) {
-    var w = 4.2, parts = [], z = "", y;
-    parts.push(P("M-1.6 " + (-len + 4) + "V-5L0 0L1.6 -5V" + (-len + 4) + "Z", col, 1));
-    for (y = -5; y > -len + 5; y -= 3) z += "M-2.4 " + y + "L2.4 " + (y - 1.5);
-    parts.push(P(z, null, 1, OUT));
-    parts.push(P("M-4.2 " + (-len) + "H4.2L1.6 " + (-len + 4) + "H-1.6Z", col, 1));
-    return parts;
-  }
 
   // ---------- Build the panel ----------
   var ARTS = {};
@@ -536,7 +527,7 @@
   });
 
   // ---------- Canvas & layout ----------
-  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var cv = $("cv"), ctx = cv.getContext("2d");
   var W = 300, H = 300, DPR = 1;
   var bg = document.createElement("canvas"), bgx = bg.getContext("2d"), bgDirty = true;
   var LB = {}, LM = {}, LJ = {}, LY = {}, LA = {};
@@ -1260,7 +1251,7 @@
   }
 
   // ---------- Overlays: tool name, readout, hint, cam-out help ----------
-  var lastName = "", lastBig = "", lastSmall = "", lastHint = "";
+  var lastName = "", lastBig = "", lastSmall = "";
   function setName(name, sub) {
     var key = name + "|" + (sub || "");
     if (key === lastName) return;
@@ -1271,7 +1262,6 @@
     if (big !== lastBig) { $("readBig").textContent = big; lastBig = big; }
     if (small !== lastSmall) { $("readSmall").textContent = small; lastSmall = small; }
   }
-  function setHint(t) { if (t !== lastHint) { $("hint").textContent = t; lastHint = t; } }
   var hintHold = 0, hintMsg = "", hintOk = false;
   function flashHint(t, sec, ok) { hintMsg = t; hintHold = sec || 3; hintOk = !!ok; }
   var camTimer = null, camFixTo = null;
@@ -1473,13 +1463,6 @@
   }
 
   // ---------- Assemble scene (Project mode birdhouse) ----------
-  var PJ_LABELS = [
-    "Join 1: Left side to the back",
-    "Join 2: Right side to the back",
-    "Join 3: Floor on the bottom",
-    "Join 4: Front wall on the front",
-    "Join 5: Roof on the top"
-  ];
   function pjSeamInfo(step) {
     var k = LA.k, cx = LA.cx, cy = LA.cy + 14 * k;
     var bw = 128 * k, bh = 136 * k;
@@ -2016,7 +1999,7 @@
     }
   }
   function hitChisel(s) {
-    var J = state.joint, k = LJ.k, T = chiselTop(), cx = chiselX();
+    var J = state.joint, k = LJ.k, cx = chiselX();
     sndHit(state.hammer === "mallet" ? "rubber" : "dead", s);
     sndHit("wood", 0.7);
     J.cd = Math.min(18, J.cd + (state.hammer === "mallet" ? 5 : 6.5) * s);
@@ -2068,7 +2051,7 @@
     }
   }
   function hitStake(s) {
-    var Y = state.yard, k = LY.k, T = stakeTop();
+    var Y = state.yard, k = LY.k;
     sndHit("sledge", s);
     if (newStakeAt) { newStakeAt = Math.min(newStakeAt, nowMs() + 400); return; }
     Y.shits++;
@@ -2438,13 +2421,6 @@
   // ---------- Power drivers ----------
   var trig = { on: false, src: null };
   var pw = { lvl: 0, spin: 0, impT: 0, clickT: 0, msgT: 0, brk: 0, wasSlip: false, stall: false };
-  function toolBox() {
-    var a = DRIVERS[state.driver], ts = drvScale();
-    if (!drv.pos) return null;
-    var art = powerArt(state.driver, state.bit), b = art.box;
-    var x0 = drv.mir ? drv.pos.x - b[2] * ts : drv.pos.x + b[0] * ts, x1 = drv.mir ? drv.pos.x - b[0] * ts : drv.pos.x + b[2] * ts;
-    return { x0: x0, x1: x1, y0: drv.pos.y + b[1] * ts, y1: drv.pos.y + (b[3] - 46) * ts, kind: a.kind };
-  }
   // Power drivers: press and hold anywhere on the bench (or the big button) to drive.
   function powDown(g) {
     if (trig.on) { g.extra = true; return; }
@@ -2902,7 +2878,7 @@
   }
 
   // ---------- Readout and the coach line ----------
-  // The coach always says the next thing to do, as a numbered step.
+  // The coach always says the next thing to do.
   function coachInfo() {
     var sc = sceneName(), Dv = DRIVERS[state.driver];
     if (sc === "assemble" && PJ) {
@@ -2960,25 +2936,13 @@
     if (screwFinished(q)) return { n: "✓", ok: true, t: "Screw is in! Tap for another", s: "" };
     return { n: "1", t: drv.hold > 0 ? "Turning… keep holding!" : "Hold to turn the screw in", s: "Righty tighty ↻ · or draw circles" };
   }
-  var lastCoach = "";
+  // The shared coach pill sorts each line into an instruction or an information look by itself.
+  var coach = Toybox.coach($("coach")), lastCoach = "";
   function setCoach(o) {
-    var key = o ? o.n + "|" + o.t + "|" + o.s + "|" + !!o.flash : "";
-    if (key === lastCoach) return;
-    var prevN = lastCoach.split("|")[0];
-    lastCoach = key;
-    var el = $("coach");
-    if (!o) { el.hidden = true; return; }
-    el.hidden = false;
-    $("coachNum").textContent = o.n;
-    // Only the ✓ and ! badges mean something; step numbers were just decoration.
-    var deco = /^[0-9↑]$/.test(o.n);
-    $("coachNum").hidden = deco;
-    el.classList.toggle("nonum", deco);
-    $("hint").textContent = o.t;
-    $("coachSub").textContent = "";
-    el.classList.toggle("ok", !!o.ok);
-    el.classList.toggle("flash", !!o.flash);
-    if (prevN !== o.n) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+    var t = o ? o.t : "";
+    if (t === lastCoach) return;
+    lastCoach = t;
+    if (t) coach.step(t); else coach.clear();
   }
   var lastJob = null;
   function updateReadout() {

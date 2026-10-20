@@ -123,30 +123,6 @@ body {
   text-shadow: 1px 1px 0 #1D2340;
 }
 .sizebtn[aria-pressed="true"] { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--edge); }
-/* Friendly prompt ("Too big! Try a smaller one."): the coach line spot. */
-.prompt {
-  position: absolute;
-  left: 50%;
-  top: 58px;            /* just under the counter pill, so a long line never covers it */
-  z-index: 3;
-  transform: translate(-50%, -12px) scale(0.92);
-  width: max-content;
-  max-width: calc(100% - 24px);
-  background: #FFC93C;
-  color: #1D2340;
-  border: 4px solid #1D2340;
-  border-radius: 22px;
-  padding: 0.35rem 1.1rem;
-  font-size: 1.45rem;
-  font-weight: 800;
-  line-height: 1.15;
-  text-align: center;
-  box-shadow: 4px 4px 0 #1D2340;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(.3,1.6,.5,1);
-}
-.prompt.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .tb-counter.pop { animation: cpop 0.4s cubic-bezier(.3,1.6,.5,1); }
 @keyframes cpop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
 /* Big: the size row is the play, so it stays; the header shrinks to the Big button. */
@@ -166,7 +142,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .sizebtn { min-height: 66px; }
   .sizebtn svg { width: 64px; height: 26px; }
   .sizebtn b { font-size: 1.3rem; padding: 1px 6px 0; border-radius: 10px; }
-  .prompt { font-size: 1.15rem; top: auto; bottom: 10px; }
 }
 @media (max-width: 480px) { .mode svg { display: none; } }
 /* Landscape: the panel is a column; the sizes fill it as a grid, the tabs sit at the bottom. */
@@ -187,10 +162,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   .dirbtn svg { width: 22px; height: 22px; }
   .sizebtn svg { width: 40px; height: 16px; }
   .sizebtn b { font-size: 1.1rem; padding: 0 6px; border-radius: 9px; border-width: 2px; }
-  .prompt { font-size: 1.1rem; top: auto; bottom: 8px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .prompt { transition: opacity 0.2s ease; }
 }
 </style>
 </head>
@@ -206,7 +177,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A bolt board with five hex bolts"></canvas>
       <div class="tb-counter" id="boltsCount">Bolts out: 0</div>
-      <div class="prompt" id="prompt" role="status" aria-live="polite"></div>
+      <div id="coach"></div>
     </main>
     <section class="tb-panel toolbar" id="toolbar">
       <div class="sizes" id="sizes" role="group" aria-label="Size"></div>
@@ -249,6 +220,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   var K = 0.62;                         // how much the flat board is squashed (we look at it from the front a bit)
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   function $(id) { return document.getElementById(id); }
+  var coach = Toybox.coach($("coach"));
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function dist(ax, ay, bx, by) { var dx = ax - bx, dy = ay - by; return Math.sqrt(dx * dx + dy * dy); }
@@ -324,7 +296,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     LY.counter = { x: t.x + t.w / 2, y: t.y + Math.min(40, t.h * 0.22) - U * 0.4, size: 22 };
     // Bolt slots: try one row of 5, rows of 3+2, or 2+2+1, keep the biggest bolts
     var m = Math.min(plate.w, plate.h) * 0.05;
-    // Narrow screens: keep a band at the top of the plate free for the prompt bubble.
+    // Narrow screens: keep a band at the top of the plate free for the coach line.
     var res = W < 600 ? Math.min(74, plate.h * 0.14) : 0;
     var ix = plate.x + m, iy = plate.y + m + res, iw = plate.w - 2 * m, ih = plate.h - 2 * m - res;
     var opts = [[5], [3, 2], [2, 2, 1]], best = null;
@@ -335,14 +307,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     });
     U = Math.min(best.u, 110);
     LY.slots = [];
-    var k = 0, rowsN = best.rows.length;
+    var rowsN = best.rows.length;
     for (var r = 0; r < rowsN; r++) {
       var n = best.rows[r], cols0 = best.rows[0];
       for (var c = 0; c < n; c++) {
         var x = ix + iw * (c + 0.5 + (cols0 - n) / 2) / cols0;
         var y = iy + ih * (r + 0.5) / rowsN + U * 0.8;
         LY.slots.push({ x: x, y: y });
-        k++;
       }
     }
   }
@@ -436,7 +407,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       c.beginPath(); c.arc(q[0], q[1], cs, 0, TAU); c.fillStyle = "#D9DFE7"; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
       c.save(); c.translate(q[0], q[1]); c.rotate(0.4 + k); c.beginPath(); c.moveTo(-cs * 0.6, 0); c.lineTo(cs * 0.6, 0); c.stroke(); c.restore();
     });
-    var i;
     // The parts tray: a red steel dish with a rolled rim, seen from above and a little in front
     var tb = LY.trayBox, trr = Math.min(24, tb.h * 0.24, tb.w * 0.16);
     var sd = clamp(tb.h * 0.06, 4, 9), rim = clamp(Math.min(tb.w, tb.h) * 0.085, 7, 15), tg2;
@@ -533,14 +503,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Prompts and effects ----------
-  var promptTimer = null;
-  function say(msg, ms) {
-    var el = $("prompt");
-    el.textContent = msg;
-    el.classList.add("show");
-    clearTimeout(promptTimer);
-    promptTimer = setTimeout(function () { el.classList.remove("show"); }, ms || 3500);
-  }
+  function say(msg, ms) { coach.say(msg, (ms || 3500) / 1000); }
   function addFx(o) { o.t0 = now; fx.push(o); if (fx.length > 80) fx.shift(); }
   function busy() { return Toybox.timer.locked(); }
 
@@ -1644,105 +1607,28 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   });
 
   // ---------- Idle help: the Toybox ghost hand ----------
-  // Same look on every page: a see-through white hand with a dark outline and a yellow fingertip dot.
-  // After a few seconds with no touch it shows the main move ONCE; a touch re-arms it; at most 3 times a visit.
-  // plan() returns null (nothing to show) or { pts: [[x, y], ...] in viewport px, tap: true for a tap, hold: true for press-and-hold }.
-  function makeIdleGhost(plan, opts) {
-    opts = opts || {};
-    var IDLE = opts.idle || 4500, MAX = opts.max || 3;
-    var el = document.createElement("div"), last = Date.now(), armed = true, shown = 0, anim = null;
-    el.setAttribute("aria-hidden", "true");
-    el.style.cssText = "position:fixed;left:0;top:0;width:64px;height:80px;z-index:40;pointer-events:none;opacity:0;" +
-      "filter:drop-shadow(3px 4px 0 rgba(29,35,64,0.25));will-change:transform,opacity";
-    el.innerHTML = '<svg viewBox="-16 -12 64 80" width="64" height="80" style="display:block;overflow:visible">' +
-      '<circle class="gh-dot" cx="0" cy="2" r="9" fill="rgba(255,201,60,0.95)" stroke="#1D2340" stroke-width="2"/>' +
-      '<g fill="#FFFFFF" stroke="#1D2340" stroke-width="3" stroke-linejoin="round" opacity="0.92">' +
-      '<rect x="-12" y="22" width="44" height="40" rx="16"/><rect x="10" y="14" width="14" height="24" rx="7"/>' +
-      '<rect x="-9" y="-6" width="18" height="40" rx="9"/></g></svg>';
-    document.body.appendChild(el);
-    var dot = el.querySelector(".gh-dot");
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function stop() { if (anim) { anim.cancel(); anim = null; } el.style.opacity = "0"; }
-    var down = {};
-    function poke() { last = Date.now(); armed = true; stop(); }
-    // Idle time counts from when the last finger lifts; nothing shows while a finger is down.
-    document.addEventListener("pointerdown", function (e) { down[e.pointerId] = 1; poke(); }, true);
-    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function (e) { if (down[e.pointerId]) { delete down[e.pointerId]; last = Date.now(); } }, true); });
-    document.addEventListener("keydown", poke, true);
-    function busy() {
-      if (Object.keys(down).length || document.hidden || document.body.classList.contains("ending") || document.body.classList.contains("resting")) return true;
-      try { if (Toybox.sheetOpen() || Toybox.timer.locked()) return true; } catch (e) { /* ignore */ }
-      return false;
-    }
-    function play(p) {
-      var pts = p.pts, s = Math.max(1, Math.min(1.35, Math.min(innerWidth, innerHeight) / 560)), frames = [];
-      function at(q, sc) { return "translate(" + (q[0] - 16) + "px," + (q[1] - 14) + "px) scale(" + sc + ")"; }
-      el.style.transformOrigin = "16px 14px";
-      if (reduce) {
-        frames = [{ opacity: 0, transform: at(pts[0], s) }, { opacity: 1, offset: 0.15, transform: at(pts[0], s) },
-          { opacity: 1, offset: 0.85, transform: at(pts[0], s) }, { opacity: 0, transform: at(pts[0], s) }];
-        anim = el.animate(frames, { duration: 2600, fill: "both" });
-      } else if (p.hold) {
-        // Press and keep holding (a hold-to-pour button).
-        var hq = pts[0];
-        frames = [{ opacity: 0, transform: at(hq, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(hq, s * 1.15) },
-          { opacity: 1, offset: 0.25, transform: at(hq, s * 0.9) }, { opacity: 1, offset: 0.85, transform: at(hq, s * 0.9) },
-          { opacity: 0, transform: at(hq, s * 1.05) }];
-        anim = el.animate(frames, { duration: 3200, fill: "both", easing: "ease-in-out" });
-      } else if (p.tap || pts.length === 1) {
-        var q = pts[0];
-        frames = [{ opacity: 0, transform: at(q, s * 1.15) }, { opacity: 1, offset: 0.12, transform: at(q, s * 1.15) },
-          { offset: 0.24, transform: at(q, s * 0.92) }, { offset: 0.36, transform: at(q, s * 1.1) },
-          { offset: 0.5, transform: at(q, s * 0.92) }, { offset: 0.62, transform: at(q, s * 1.1) },
-          { opacity: 1, offset: 0.85, transform: at(q, s) }, { opacity: 0, transform: at(q, s) }];
-        anim = el.animate(frames, { duration: 3000, fill: "both", easing: "ease-in-out" });
-      } else {
-        // Fade in, press down, slide along the points, hold, lift and fade.
-        var n = pts.length - 1;
-        frames.push({ opacity: 0, offset: 0, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.12, transform: at(pts[0], s * 1.15) });
-        frames.push({ opacity: 1, offset: 0.2, transform: at(pts[0], s) });
-        for (var i = 1; i <= n; i++) frames.push({ opacity: 1, offset: 0.2 + 0.58 * i / n, transform: at(pts[i], s), easing: "ease-in-out" });
-        frames.push({ opacity: 1, offset: 0.88, transform: at(pts[n], s * 1.12) });
-        frames.push({ opacity: 0, offset: 1, transform: at(pts[n], s * 1.12) });
-        anim = el.animate(frames, { duration: opts.duration || 3400, fill: "both" });
-      }
-      dot.style.opacity = "1";
-      anim.onfinish = function () { stop(); };
-    }
-    setInterval(function () {
-      if (!armed || shown >= MAX || Date.now() - last < IDLE || busy()) return;
-      var p = null;
-      try { p = plan(); } catch (e) { p = null; }
-      if (!p || !p.pts || !p.pts.length) return;
-      armed = false; shown++;
-      play(p);
-    }, 400);
-    return { poke: poke, stop: stop, show: function () { var p = plan(); if (p) play(p); } };
-  }
-  // Idle help: drag the tool onto the bolt of its size, turn the handle, or carry a loose bolt to the tray.
-  makeIdleGhost(function () {
+  // Drag the tool onto the bolt of its size, turn the handle, or carry a loose bolt to the tray. The coach says
+  // the move as the hand shows it.
+  Toybox.ghost({ max: 3, onShow: function (p, on) { if (on && p.say) say(p.say); }, plan: function () {
     if (busy() || Object.keys(drags).length) return null;
     var cr = cv.getBoundingClientRect(), i, p, q;
     function scr(o) { return [cr.left + o.x, cr.top + o.y]; }
     for (i = 0; i < SIZES.length; i++) {
       if (!S.bolts[i].tray && S.bolts[i].l >= MAXL - 1e-6 && !rt[i].carry && !rt[i].fly && T.slot !== i) {
-        say("Drag the bolt to the tray!");
-        return { pts: [scr(headTop(i)), scr(trayPos(i))] };
+        return { pts: [scr(headTop(i)), scr(trayPos(i))], dur: 3400, say: "Drag the bolt to the tray!" };
       }
     }
     if (T.state === "on" && T.slot >= 0) {
       var h = headTop(T.slot), g = toolGeom(toolMM()), r = g.L * 0.85, sgn = S.dir === "tighten" ? -1 : 1, pts = [];
       for (i = 0; i <= 3; i++) { var a = T.ang + sgn * i * 0.45; pts.push([clamp(cr.left + h.x + Math.cos(a) * r, cr.left + 16, cr.right - 40), cr.top + h.y + Math.sin(a) * r * K]); }
-      return { pts: pts, duration: 4000 };
+      return { pts: pts, dur: 3400 };
     }
     if (T.state !== "ready") return null;
     i = SIZES.indexOf(toolMM());
     if (i < 0 || S.bolts[i].tray || S.bolts[i].l >= MAXL - 1e-6) return null;
     p = readyPose(); q = headTop(i);
-    say("Drag it onto the " + SIZES[i] + " bolt!");
-    return { pts: [scr(p), scr(q)] };
-  });
+    return { pts: [scr(p), scr(q)], dur: 3400, say: "Drag it onto the " + SIZES[i] + " bolt!" };
+  } });
 
   setTimeout(function () { if (!busy()) say("Drag the tool onto a bolt!", 4200); }, 700);
 
