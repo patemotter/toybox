@@ -110,7 +110,19 @@ Combine Time's "Close-up" label, and every Farm name tag (10 to 11 px: raise the
    Hammer & Screws changes its line on nearly every nail; is the middle too much there? Measuring now has an empty
    band at the top where its old coach sat; reclaim it for the scene?
 
-## 4. Suggested order
+## 4. Engineering follow-ups
+- `Toybox.coach`: a new `step()` line and `clear()` cut a running `say()` line short, so Excavator and the four
+  Kitchen stations each keep a small guard that makes the step line wait. A shared option (for example
+  `Toybox.coach(el, { stepWaits: true })` plus `coach.hush()`) would let those five pages drop their guards.
+- Sand Table still runs its own coach: several of its lasting lines are information lines, which would need the
+  shared coach to show a lasting line without the step styling.
+- `Toybox.gate` has no user, and `Toybox.steps`/`Toybox.go` are only used by the Farm's design-system pages and
+  `tools/shell-demo.html`; `migrate()` and the pages' `legacy:` keys are one-time moves from before the shared layer.
+  Ask the dad before deleting any of them.
+- The label-fit MutationObserver in `common/toybox.js` re-measures every button on any class change in the body;
+  narrow it if it ever shows up as slow on the iPad.
+
+## 5. Suggested order
 1. Section 1 in parallel batches, one theme or page group per agent, no two agents on one file: 1a+1b per app,
    1c's shared coach change in common/ first, then 1d/1e/1f with the page groups.
 2. Section 2 after that, page by page.
