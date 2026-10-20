@@ -91,6 +91,8 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
 - Hard offset shadows (`box-shadow: Npx Npx 0`) are still set in page CSS about 90 times, mostly the older apps'
   original style (e.g. the Construction Site map's labels and gate card); move chrome to the shared lip and card
   look when a page is worked on. Many older pages' Surprise buttons also lack the shared gift icon.
+- Tool Wall on a sideways phone: the station tiles are about 11 px (52 px wide; "Measure" needs a layout change to
+  fit at 14 px), and the tool drawings carry tiny words ("TIP", "SHAPE").
 - Upright phones now show the whole Excavator and Tower Crane, which makes them small under a lot of sky, and
   Concrete's mixer truck cab is still cut off at the right on upright screens (fitting it would shrink the form).
 
@@ -117,8 +119,9 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
    band at the top where its old coach sat; reclaim it for the scene?
 10. **Blender line**: "Drag an ingredient into the jar!" (correct, two lines on a phone) or "Drag food into the
     jar!" (one line, but ice isn't food)?
-11. **Small whole machines**: on an upright phone the whole Excavator and Tower Crane are now small (loads about
-    20 px; touch areas stay big). Fine, or is panning with a bigger, partly cut-off machine better for him?
+11. **Small whole machines**: on phones the whole Excavator, Tower Crane, Drill Press, Lathe and Router Table are
+    now small (Router Table on an upright phone most; crane loads about 20 px; touch areas stay big), and Measuring's
+    project mode shows the whole 60-inch board. Fine, or is a bigger, partly cut-off machine better for him?
 12. **Wrecking Ball's Up arrow** is green (green means Go): make Up and Down both ink?
 13. **Surprise on Wrecking Ball and Tower Crane**: they have none; add one (a new feature)?
 
