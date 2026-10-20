@@ -14,6 +14,13 @@ holds).
 
 ## 1. Fix without asking (clear rule violations)
 
+**Status 2026-10-20: done.** Every item below is fixed and deployed, with these exceptions, which stay open:
+- Train Builder's car tiles are under 14 px on upright phones; at 14 px five no longer fit a row (question 14).
+- Some hard offset shadows remain on chrome not listed here (Rocket Builder's trip and back buttons, the 3D Printer's
+  swatches, the picture buttons in Spin Shop, Rocket Builder and Car Builder; see section 2's sweep).
+- Spuds in Mud and Munchy Crunchy keep the done instruction for about a second while an implement lowers; the next
+  instruction replaces it (clearing it would make the pill blink).
+
 ### 1a. Machines and scenes cut off ("The whole machine stays on screen")
 - **Espresso Machine**: on the first screen (drink chooser) on an upright phone and the 820 px iPad, the machine is
   off-screen; only the wall and the knock box show. Frame the machine on the chooser too. Worst finding.
@@ -124,11 +131,15 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
     project mode shows the whole 60-inch board. Fine, or is a bigger, partly cut-off machine better for him?
 12. **Wrecking Ball's Up arrow** is green (green means Go): make Up and Down both ink?
 13. **Surprise on Wrecking Ball and Tower Crane**: they have none; add one (a new feature)?
+14. **Train Builder car tiles**: 14 px needs four tiles a row (a third row in the panel, so the stage gets a
+    little shorter) or shorter car names. Which?
+15. **Car Builder's Stop pedal** is red. It is a drawn pedal he presses, like a real brake; keep it red?
 
 ## 4. Engineering follow-ups
 - `Toybox.coach`: a new `step()` line and `clear()` cut a running `say()` line short, so Excavator and the four
   Kitchen stations each keep a small guard that makes the step line wait. A shared option (for example
   `Toybox.coach(el, { stepWaits: true })` plus `coach.hush()`) would let those five pages drop their guards.
+  (Done: `coach.avoid()`, `coach.busy()`, and `step()` with an unchanged line no longer cutting a passing line.)
 - Sand Table still runs its own coach: several of its lasting lines are information lines, which would need the
   shared coach to show a lasting line without the step styling.
 - `Toybox.gate` has no user, and `Toybox.steps`/`Toybox.go` are only used by the Farm's design-system pages and
