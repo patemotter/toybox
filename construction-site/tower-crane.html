@@ -33,28 +33,6 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
-  color-scheme: dark;
-}
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
 body {
@@ -74,18 +52,12 @@ body {
 }
 /* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
-.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv.grabbing { cursor: grabbing; }
 .count { font-variant-numeric: tabular-nums; }
 .count.pop { animation: pop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
-/* The hint is the coach line (tb-coach). */
-.hint { background: var(--accent); }
-.hint[hidden] { display: none; }
-.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
 
 /* Play-timer gauge: the time-left badge, top-right of the stage. */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
@@ -94,9 +66,6 @@ body {
 .fuel-bar span { display: block; height: 100%; width: 100%; background: #2E9E5B; transition: width 0.4s linear; }
 .fuel-num { min-width: 40px; height: 40px; display: grid; place-items: center; background: #FFFFFF; color: #1D2340; border: 3px solid #1D2340; border-radius: 50%; font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .fuel-num[hidden] { display: none; }
-
-/* Big: full-screen play. Dragging the hook is the play, so the panel goes too. */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 
 /* ---------- Panel: Lift! (Go row), New building (tab bar) ---------- */
 .act { display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -113,7 +82,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
 
 @media (max-width: 600px) {
   .tb-go.act svg { width: 38px; height: 38px; }
-  .hint { white-space: normal; line-height: 1.15; }
 }
 @media (orientation: landscape) {
   .tb-body .tb-panel { width: min(22%, 220px); }
@@ -129,7 +97,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   .tb-tabs .btn { min-height: 54px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hint.go, .count.pop, .tb-new.wiggle { animation: none; }
+  .count.pop, .tb-new.wiggle { animation: none; }
 }
 </style>
 </head>
@@ -139,14 +107,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Tower Crane</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A tower crane next to a building that grows floor by floor"></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter count" id="count">Floors: 0</div>
-      <div class="tb-coach hint" id="hint" hidden></div>
+      <div class="tb-coach" id="hint" hidden></div>
     </main>
     <section class="tb-panel" id="panel">
       <button class="btn tb-go act" id="liftBtn" aria-label="Lift! The crane does the next piece"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M2 7 H46" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M2 7 H46" stroke="#FFC72C" stroke-width="3" stroke-linecap="round"/><rect x="17" y="9" width="14" height="6" rx="2" fill="#6B7385" stroke="#1D2340" stroke-width="2.5"/><path d="M24 15 V21" stroke="#1D2340" stroke-width="2.5"/><rect x="18" y="20" width="12" height="9" rx="2.5" fill="#FFC72C" stroke="#1D2340" stroke-width="2.5"/><path d="M24 29 V32 M24 32 L10 38 M24 32 L38 38" stroke="#1D2340" stroke-width="2.5" stroke-linecap="round" fill="none"/><rect x="5" y="37" width="38" height="7" rx="1.5" fill="#5B6B8C" stroke="#1D2340" stroke-width="2.5"/><path d="M7 40.5 H41" stroke="#8C9BBA" stroke-width="2"/></svg><span>Lift!</span></button>
@@ -1091,7 +1058,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     el.textContent = "Floors: " + floors;
     if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
-  var coachShown = "", coachUntil = 0, flashText = "", flashUntil = 0;
+  var coach = Toybox.coach("#hint"), coachShown = "", flashText = "", flashUntil = 0;
   function coachWanted() {
     if (topped) return "Topped out!";
     if (!dragged) return "Drag the hook!";
@@ -1106,14 +1073,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function flashCoach(text, ms) { flashText = text; flashUntil = Date.now() + ms; coachShown = ""; }
   function coachAgain() { coachShown = ""; }
   function coachTick() {
-    var now = Date.now(), el = $("hint");
+    var now = Date.now();
     var t = now < flashUntil ? flashText : coachWanted();
-    if (ending || !t) { if (!el.hidden) el.hidden = true; coachShown = t ? "" : coachShown; return; }
-    if (t !== coachShown) {
-      coachShown = t; el.textContent = t; el.hidden = false; el.classList.remove("off");
-      if (!reduce) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
-      coachUntil = now + Math.max(6000, now < flashUntil ? flashUntil - now : 0);
-    } else if (now > coachUntil && !el.classList.contains("off")) el.classList.add("off");
+    if (ending || !t) { if (coach.text()) coach.clear(); coachShown = t ? "" : coachShown; return; }
+    // Each new line stays at least 6 s (longer for a long flash), then fades out.
+    if (t !== coachShown) { coachShown = t; coach.say(t, Math.max(6000, now < flashUntil ? flashUntil - now : 0) / 1000); }
   }
 
   // ---------- Sound (off by default; soft and synthesized) ----------
@@ -1169,7 +1133,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ending = true; drag = null; auto = false; parked = false;
     cv.classList.remove("grabbing");
     if (!jobsLocked) setJobs([], false);
-    $("hint").hidden = true;
+    coach.clear();
     if (!info.goodbye) parking = true;
   }
   function goodbyePark() { parking = true; chime(); }
@@ -1203,7 +1167,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     parked = true; parking = false; endingDone = null;
   }
   function onWake() { ending = false; parking = false; parked = false; endingDone = null; coachAgain(); }
-  function onBig() { resize(); requestAnimationFrame(resize); }
 
   // ---------- Loop ----------
   var lastT = 0, humT = 0;
@@ -1228,7 +1191,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var ghost = Toybox.ghost({ max: 3, plan: function () {
     if (ending || drag || jobs.length || auto) return null;
     if (topped) {
-      if (Toybox.isBig()) return null;
       flashCoach("Tap New building!", 3500);
       var nb = $("newBtn").getBoundingClientRect();
       return { pts: [[nb.left + nb.width / 2, nb.top + nb.height / 2]], tap: true };
@@ -1255,7 +1217,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   showCount(false);
   Toybox.init({
     app: "construction-site",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the crane pulls its hook up and rests, and the buttons lock. The timer carries on across the site pages.",
     goodbyeOption: "End with a “Park it” button to press",
     farewellText: "Time to say goodbye",
@@ -1265,15 +1226,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine2: "The crane will be right here next time.",
     restArt: restArt,
     soundNote: "Soft motor hums and clunks. Hold for 2 seconds.",
-    legacy: { timer: "site-timer-v1", sound: "site-sound-v1", big: "site-big-v1" },
+    legacy: { timer: "site-timer-v1", sound: "site-sound-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyePark,
     onRest: onRest,
     onWake: onWake,
-    onBig: onBig,
     onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
+  resize(); requestAnimationFrame(resize);
   requestAnimationFrame(loop);
 
   // Test hook, only with ?debug in the address.
@@ -1281,7 +1242,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     state: function () {
       return { floors: floors, bricks: cur.bricks, window: cur.window, topped: topped, carried: carried ? carried.kind : null,
         hook: { x: Math.round(hookX()), y: Math.round(hookY()) }, trolley: Math.round(cr.x), th: +cr.th.toFixed(3), jobs: jobs.length, locked: jobsLocked, auto: auto,
-        loads: loads.map(function (l) { return { kind: l.kind, x: Math.round(l.x), y: Math.round(l.y) }; }), coach: $("hint").hidden ? "" : $("hint").textContent, parked: parked };
+        loads: loads.map(function (l) { return { kind: l.kind, x: Math.round(l.x), y: Math.round(l.y) }; }), coach: coach.text(), parked: parked };
     },
     toScreen: function (x, y) { var p = worldToScreen(x, y); return { x: p[0], y: p[1] }; },
     hookScreen: function () { var p = worldToScreen(hookX(), hookY() + 22); return { x: p[0], y: p[1] }; },

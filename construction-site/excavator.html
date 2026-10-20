@@ -35,28 +35,7 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
-    --tile: #E6F2FF;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
-  --tile: #E6F2FF;
-  color-scheme: dark;
+  :root:not([data-theme="light"]) { --tile: #E6F2FF; }
 }
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
@@ -77,20 +56,13 @@ body {
 }
 /* ---------- Standard app shell (common/toybox.css): header, stage, panel ---------- */
 .tb-head a { text-decoration: none; }
-.tb-head .bigtoggle { border-radius: 16px; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv.held { cursor: grabbing; }
-/* "Loads" is the counter (tb-counter); the hint is the coach line (tb-coach). */
+/* "Loads" is the counter (tb-counter). */
 .loads { font-variant-numeric: tabular-nums; }
 .loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
-.hint { background: var(--accent); }
-.hint[hidden] { display: none; }
-.hint.go { animation: hintPop 0.45s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
-/* Long coach lines wrap on phones instead of being cut off. */
-@media (max-width: 600px) { .hint { white-space: normal; line-height: 1.15; } }
 
 /* Play-timer gauge */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
@@ -110,9 +82,6 @@ body {
 .tb-tile.act span { pointer-events: none; }
 .tb-tile.act.on { background: var(--accent); transform: translate(3px, 3px); box-shadow: 0 0 0 var(--edge); }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
-
-/* Big: the header shrinks to the Big button and the panel hides; the bucket is dragged on the picture. */
-body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 
 /* ---------- Timer (sheet, toast, banner and rest screen come from common/toybox.css) ---------- */
 .rest-art { width: min(70vw, 300px, 40vh); aspect-ratio: 6 / 5; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
@@ -135,7 +104,7 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   .tb-tile.act svg { width: 64px; height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hint.go, .loads.pop { animation: none; }
+  .loads.pop { animation: none; }
 }
 </style>
 </head>
@@ -145,14 +114,13 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
     <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to all machines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>All machines</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Excavator</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls">Big</button>
   </header>
   <div class="tb-body app">
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="An excavator next to a dirt pile and a dump truck. Drag the bucket to dig."></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="tb-counter loads" id="loads">Loads: 0</div>
-      <div class="tb-coach hint" id="hint" hidden></div>
+      <div class="tb-coach" id="hint" hidden></div>
     </main>
     <section class="tb-panel panel" id="panel">
       <div class="tb-choices acts" id="acts">
@@ -1333,8 +1301,14 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   }
 
   // ---------- Coach line: always says what he can do right now ----------
-  var coachEl = $("hint"), coachText = null, announce = null, loaded = false;
-  function say(text, ms) { if (!ending) announce = { text: text, until: performance.now() + Math.max(3000, ms || 3000) }; }
+  var coach = Toybox.coach("#hint"), coachText = null, sayUntil = 0, loaded = false;
+  // A passing line (a find, a new truck) wins over the step line until it runs out.
+  function say(text, ms) {
+    if (ending) return;
+    ms = Math.max(3000, ms || 3000);
+    sayUntil = performance.now() + ms;
+    coach.say(text, ms / 1000);
+  }
   function stateLine() {
     if (ending || m.swingPhase || m.pouring || parking) return "";
     if (side() < 0) {
@@ -1347,16 +1321,14 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
     return loaded ? "Take it to the truck!" : "Drag the bucket into the dirt!";
   }
   function coachTick() {
-    var now = performance.now();
-    if (announce && now > announce.until) announce = null;
     var locked = false;
     try { locked = Toybox.timer.locked(); } catch (e) { /* ignore */ }
-    var want = ending || locked ? "" : (announce ? announce.text : stateLine());
+    // The shared coach's step() would cut a passing line short, so the step line waits until it has run out.
+    if (!ending && !locked && performance.now() < sayUntil) return;
+    var want = ending || locked ? "" : stateLine();
     if (want === coachText) return;
     coachText = want;
-    if (!want) { coachEl.classList.add("off"); return; }
-    coachEl.textContent = want; coachEl.hidden = false; coachEl.classList.remove("off");
-    coachEl.classList.remove("go"); void coachEl.offsetWidth; coachEl.classList.add("go");
+    if (want) coach.step(want); else coach.clear();
   }
 
   // ---------- Buttons ----------
@@ -1468,7 +1440,8 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   }
   function onEnding(done, info) {
     endingDone = done;
-    ending = true; drag = null; glide = null; auto = null; queued = null; announce = null; parkT = 0;
+    ending = true; drag = null; glide = null; auto = null; queued = null; parkT = 0;
+    sayUntil = 0; coachText = ""; coach.clear();
     cv.classList.remove("held");
     updateButtons();
     if (!info.goodbye) parking = true;
@@ -1497,9 +1470,6 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
   }
   function restArt() { return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' + restSVG() + "</svg>"; }
   function onWake() { ending = false; parking = false; endingDone = null; parkT = 0; setGoal(PH_READY, 80); }
-
-  // Big mode: the header shrinks to the Big button and Dig/Dump hide; the bucket is dragged on the picture.
-  function onBig() { resize(); }
 
   // ---------- Loop ----------
   var lastT = 0;
@@ -1548,7 +1518,6 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 
   Toybox.init({
     app: "construction-site",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the excavator parks its bucket and rests, and the controls lock. The timer carries on across the site pages.",
     goodbyeOption: "End with a “Park it” button to press",
     farewellText: "Time to say goodbye",
@@ -1558,12 +1527,11 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
     restLine2: "The machines will be right here next time.",
     restArt: restArt,
     soundNote: "Soft digs and beeps. Hold for 2 seconds.",
-    legacy: { timer: "site-timer-v1", sound: "site-sound-v1", big: "site-big-v1" },
+    legacy: { timer: "site-timer-v1", sound: "site-sound-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyePark,
     onRest: onWake,
     onWake: onWake,
-    onBig: onBig,
     onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
@@ -1576,7 +1544,7 @@ body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
         auto: auto ? auto.kind + ":" + auto.i : "", queued: queued || "", pouring: m.pouring, drag: drag ? drag.mode + (drag.pending ? "/pending" : "") : "",
         truck: truck.state, load: truck.load, loads: loads, pile: pileTotal(), pile0: pileTotal0, grains: grains.length, pen: curPen,
         hidden: hidden.map(function (h) { return h.kind; }), reachLeft: reachLeft(), crate: crate.items.slice(), flyers: flyers.length, found: found.slice(),
-        coach: coachEl.hidden || coachEl.classList.contains("off") ? "" : coachEl.textContent, pan: PAN, S: S, win: WIN };
+        coach: coach.text(), pan: PAN, S: S, win: WIN };
     },
     toScreen: function (x, y) { var p = pagePt(x, y); return { x: p[0], y: p[1] }; },
     bucket: function () { var b = bucketWorld(); var p = pagePt(b.x, b.y); return { x: p[0], y: p[1], wx: b.x, wy: b.y }; },
