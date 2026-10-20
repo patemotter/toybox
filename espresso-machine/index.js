@@ -2604,7 +2604,6 @@
   if (["ready", "shot", "serve", "knock", "rinse"].indexOf(S.step) >= 0) ENTER[S.step]();
   Toybox.init({
     app: "espresso-machine",
-    big: { button: $("bigToggle") },
     badge: $("tbadge"),
     timerIntro: "When time is up, the espresso machine winds down and switches off, and the controls lock.",
     goodbyeOption: "End with a “Switch off” button to press",
@@ -2618,7 +2617,6 @@
     onEnding: onEnding,
     onRest: function () { stopLoops(); },
     onWake: function () { last = now(); },
-    onBig: function () { setTimeout(layout, 30); },
     onSound: function (on) { if (on) chime(); else stopLoops(); }
   });
   Toybox.offFirst({

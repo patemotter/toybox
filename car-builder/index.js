@@ -1547,7 +1547,7 @@
     // A tap on the vehicle picks the part to color (the arm, blade, bed or drum, else the body);
     // a tap on the sky or the ground puts the colors away.
     var onV = e.target.closest && e.target.closest("#rocketG");
-    if (onV && !Toybox.timer.locked() && !document.body.classList.contains("big")) {
+    if (onV && !Toybox.timer.locked()) {
       var tl = e.target.closest('[data-part="tool"]');
       var id = tl && colorable(state.kind).length > 1 ? "tool" : "body";
       if (id !== picking) { setPicking(id); blip(); }
@@ -1882,7 +1882,7 @@
     if (!t) return;
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
     if (t.id === "fback") { if (!dv || !dv.park) closeDrive(); return; }
-    if (t.classList.contains("hold") || t.id === "bigToggle" || t.closest(".tb-layer, .sheet, .rest, .farewell")) return;
+    if (t.classList.contains("hold") || t.closest(".tb-layer, .sheet, .rest, .farewell")) return;
     if (Toybox.timer.locked()) return;
     if (t.id === "launch") { if (picking) setPicking(""); openDrive(false); return; }
     var changed = false, c = cfg(), kind0 = state.kind;
@@ -3048,8 +3048,6 @@
   try { if (localStorage.getItem("carbuilder-sound-v1") === "on") localStorage.setItem("carbuilder-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "car-builder",
-    big: { button: $("bigToggle") },
-    onBig: function (on) { if (on && picking) setPicking(""); },
     timerIntro: "When time is up, the vehicle drives into its garage and rests, and the controls lock.",
     goodbyeOption: "End with a “Park it” button to press",
     farewellText: "Time to park",
@@ -3059,7 +3057,7 @@
     restLine2: "It will be right here next time.",
     restArt: restArt,
     soundNote: "Soft engine hum and horn. Hold for 2 seconds.",
-    legacy: { timer: "carbuilder-timer-v1", sound: "carbuilder-sound-v1", big: "carbuilder-big-v1" },
+    legacy: { timer: "carbuilder-timer-v1", sound: "carbuilder-sound-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyeLaunch,
     onRest: onRest,

@@ -2053,7 +2053,6 @@
   $("printBtn").addEventListener("click", function () { if (ghost) ghost.learned(); });
   Toybox.init({
     app: "3d-printer",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the print finishes or pauses, the printer cools down and rests, and the controls lock.",
     goodbyeOption: "End with a Lights off button to press",
     farewellText: "Time to say goodbye",
@@ -2063,12 +2062,11 @@
     restLine2: "It will be right here next time.",
     restArt: function () { return '<canvas class="rest-art" id="restArt" aria-hidden="true"></canvas>'; },
     soundNote: "Soft motor whirs, fan hum and a done chime. Hold for 2 seconds.",
-    legacy: { timer: "3dprinter-timer-v1", sound: "3dprinter-sound-v1", big: "3dprinter-big-v1" },
+    legacy: { timer: "3dprinter-timer-v1", sound: "3dprinter-sound-v1" },
     onEnding: onEnding,
     onGoodbye: function () { lightsOut = true; },
     onRest: function () { endingDone = null; drawRestArt(); },
     onWake: function () { endingDone = null; lightsOut = false; updateUI(); },
-    onBig: function () { needLayout = true; },
     onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });

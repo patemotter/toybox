@@ -33,28 +33,6 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
-  color-scheme: dark;
-}
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
 body {
@@ -84,15 +62,6 @@ body {
 .info[hidden] { display: none; }
 .info .btn { min-height: 44px; font-size: 1rem; padding: 0.1rem 0.7rem; color: #1D2340; background: var(--accent); border-color: #1D2340; box-shadow: 2px 2px 0 #1D2340; white-space: nowrap; }
 .info .btn[hidden] { display: none; }
-.hint {
-  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 4; pointer-events: none;
-  background: var(--accent); color: #1D2340; border: 4px solid #1D2340; border-radius: 22px;
-  box-shadow: 4px 4px 0 #1D2340; padding: 0.1rem 1rem 0.2rem; font-size: clamp(1.1rem, 3.4vw, 2rem);
-  font-weight: 800; white-space: nowrap;
-}
-.hint[hidden] { display: none; }
-.hint.go { animation: hintPop 0.6s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes hintPop { 0% { transform: translateX(-50%) scale(0.3); } 100% { transform: translateX(-50%) scale(1); } }
 .ghost { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; filter: drop-shadow(6px 8px 0 rgba(29, 35, 64, 0.35)); }
 .ghost svg { display: block; width: 100%; height: 100%; }
 
@@ -105,7 +74,6 @@ body {
 .fuel-num[hidden] { display: none; }
 
 /* Big mode: the panel goes away, the header stays (Big turns into Back). */
-body.big .tb-panel { display: none; }
 
 /* ---------- Panel: gear tray and drive in the choices; Long train / New in the tab bar ---------- */
 .gb-choices { display: flex; flex-direction: column; gap: 8px; }
@@ -157,9 +125,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   .ctrl .btn { min-height: 44px; font-size: 0.95rem; }
   .dial { width: 46px; height: 46px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hint.go { animation: none; }
-}
 </style>
 </head>
 <body>
@@ -167,7 +132,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Gear Box</h1>
-    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
@@ -175,8 +139,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       <canvas id="cv" aria-label="A plate of pegs with gears"></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
       <div class="info" id="info" hidden><span id="infoText"></span><button class="btn" id="driveThis" hidden>Drive this</button></div>
-      <div class="hint" id="hint" hidden></div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite">Add a gear!</div>
+      <div id="coach"></div>
     </main>
 
     <section class="tb-panel">
@@ -648,15 +611,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
 
   // ---------- Hint + info ----------
-  var hintTimer = null;
-  function hint(text, ms) {
-    var el = $("hint");
-    el.textContent = text;
-    el.hidden = false;
-    el.classList.remove("go"); void el.offsetWidth; el.classList.add("go");
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(function () { el.hidden = true; }, Math.max(3200, ms || 0));
-  }
+  var coach = Toybox.coach($("coach")), coachStep = null;
+  function hint(text, ms) { coach.say(text, Math.max(3200, ms || 0) / 1000); }
   function showHintThrottled() {
     if (now - lastHint < 2600) return;
     lastHint = now;
@@ -883,9 +839,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Idle help: the ghost hand drags a gear from the tray onto the pegs.
   var gearPlaced = false, cranked = false;
   function updateCoach() {
-    var c = $("coach"), t = mode === "crank" && !cranked && byId(driverId) ? "Turn the handle!" : !gearPlaced ? "Add a gear!" : "";
-    if (t) c.textContent = t;
-    c.classList.toggle("off", !t);
+    var t = mode === "crank" && !cranked && byId(driverId) ? "Turn the handle!" : !gearPlaced ? "Add a gear!" : "";
+    // This runs every 400 ms; a repeated step() would cut short a passing hint line.
+    if (t !== coachStep) { coachStep = t; coach.step(t); }
   }
   var ghostHand = Toybox.ghost({ max: 2, plan: function () {
     var d = byId(driverId), rc = cv.getBoundingClientRect();
@@ -1137,7 +1093,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   try { if (localStorage.getItem("gearbox-sound-v1") === "on") localStorage.setItem("gearbox-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "gear-box",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the gears coast to a stop and rest, and the controls lock.",
     goodbyeOption: "End with a Last spin button to press",
     farewellText: "Time to say goodbye",
@@ -1147,15 +1102,15 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine2: "They will be right here next time.",
     restArt: restSVG,
     soundNote: "Soft tooth clicks. Hold for 2 seconds.",
-    legacy: { timer: "gearbox-timer-v1", sound: "gearbox-sound-v1", big: "gearbox-big-v1" },
+    legacy: { timer: "gearbox-timer-v1", sound: "gearbox-sound-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyeSpin,
     onRest: onRest,
     onWake: onWake,
-    onBig: function () { resize(); },
     onSound: function (on) { if (on) setTimeout(chime, 60); },
     onTimer: drawFuel
   });
+  resize();
   requestAnimationFrame(loop);
 
   // Test hook, only with ?debug in the address.
