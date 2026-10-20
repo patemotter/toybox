@@ -78,7 +78,7 @@
   const BIN0 = 0.25, BINW = 0.5, NBIN = 48;
   const PENS = [[4, 1.34], [7.5, 1.5], [10.6, 1.38], [13.8, 1.54], [16.8, 1.33], [20, 1.46]];
 
-  const BLUE = "#2F6FD0", BLUED = "#1F4E9E", BLUEL = "#5E95E8", STEEL = "#C3CCD6", GALV = "#B8C2CC", DARK = "#3A3F4E";
+  const BLUE = "#2F6FD0", BLUED = "#1F4E9E", STEEL = "#C3CCD6", GALV = "#B8C2CC", DARK = "#3A3F4E";
   const CHG = "#4BA35A", CHGD = "#357A42", STRAW = "#E8C65E", STRAWD = "#C9A443", OLDBED = "#9A8458", NEWBED = "#EDCD6E";
   const FEEDC = ["#6F7B3A", "#7E6A38", "#8C8A45", "#5F6B33"], MUCK = "#6B4E31", MUCKD = "#4E3822", SPRAY = "#2F7DE1";
   const WOOL = "#F6F0E2", WOOLD = "#DED3BC", FACE = "#EEE0D2", FACED = "#C9B2A2", HOOF = "#5A4F48";
@@ -408,7 +408,6 @@
     }
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
-  function tag(text, p) { if (p) Toybox.nametag(text, p.x, p.y, 2400); }
   function hint() { const d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; ghost.poke(); }
   function busyHint() { snd.horn(); coach.say(BUSY[stepId] || "Wait a moment.", 3); }
 

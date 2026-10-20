@@ -203,8 +203,7 @@ body.big #jobs { display: none; }
   // ---------- Coach, counter, name tags ----------
   var coach = Toybox.coach($("coach"));
   // A passing line stays its full time even when the step changes underneath it (coach.step would cut it short).
-  var sayEnd = 0, stepShown = "";
-  function say(text, sec) { sec = Math.max(3, sec || 3); sayEnd = time + sec; coach.say(text, sec); }
+  function say(text, sec) { coach.say(text, Math.max(3, sec || 3)); }
   function setLoads() { var el = $("loads"); el.textContent = "Loads: " + loads; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   $("loads").textContent = "Loads: " + loads;
   // A part's name, only when he taps that part, for a moment: a small label with a pointer down to the part (the
@@ -288,7 +287,6 @@ body.big #jobs { display: none; }
   };
   var BUSY = { cut: "The combine is working.", unload: "The grain spout is working.", store: "The tractor is working.", bale: "The baler is working." };
   var phase = "ready", phaseT = 0, stepId = "cut", sub = "lever", autoCut = false, miss = 0;
-  var straw = { x0: 0, x1: 0, on: false };
   function key() { return stepId + "." + sub; }
   function words(t) { return t.replace("{crop}", cropWord()).replace("{grain}", job === "sun" ? "sunflower seeds" : "grain"); }
   function sayFor(k) { var d = SUB[k]; return d ? words(d.say) : ""; }
@@ -335,7 +333,6 @@ body.big #jobs { display: none; }
       cb.x = -C.cut - 1.4; cb.dir = 1; cb.face = 1; cb.v = 0; cb.to = null; cb.turn = null;
       cb.hdrUp = true; cb.hdr = 1; cb.auger = 0; cb.augerTo = 0; cb.pour = 0; autoCut = false;
       tr.state = "away"; tr.x = -60; tr.load = 0; tr.tip = 0;
-      straw = { x0: 0, x1: 0, on: (job !== "sun") };
       // the crop is still growing ("Weeks go by..."): his turn comes when it is ripe
       if (crop.stage === "grow") { setPhase("grow"); cue = null; coach.step(job === "sun" ? "The sunflowers grow." : "The wheat grows."); return; }
       setSub("lever");
@@ -425,7 +422,6 @@ body.big #jobs { display: none; }
     cb.dir = 1; cb.face = 1; cb.x = -C.cut - 1.4; cb.hdrUp = true; cb.hdr = 1; nag.hdr = 0; cb.leave = false; cb.away = false;
     bl.state = "away"; bl.x = -60; bl.v = 0; bl.n = 0; bl.tied = 0; bl.p = 0; bl.knotT = 0; fieldBales = []; autoBale = false;
     clearField();
-    straw = { x0: 0, x1: 0, on: (job !== "sun") };
     storeLevel = storeFor(); storeRun = 0;
     if (regrow || worldCrop() !== "golden") grow(); else ripe();
     cv.setAttribute("aria-label", job === "sun" ? "A field of ripe sunflowers with a green combine harvester. Tap the lever in the cab to drop the header." : "A golden wheat field with a green combine harvester. Tap the lever in the cab to drop the header.");
@@ -626,7 +622,7 @@ body.big #jobs { display: none; }
   // He drives by drag too: a drag on the combine (header down, driving), on the tractor (to the grain barn) or on
   // the square baler's tractor (along the straw) moves it under his finger (held ahead, it keeps driving); when he lets go it carries on to its stop.
   function canvasX(clientX) { return clientX - cv.getBoundingClientRect().left; }
-  var press = Toybox.press(cv, {
+  Toybox.press(cv, {
     any: true,
     hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
@@ -1233,7 +1229,7 @@ body.big #jobs { display: none; }
   }
   function band(row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
   function sunRow(row, stage, P, xa, xb, near) {
-    var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1, t = P.time || 0, lw = Math.max(1, Math.min(sc.lw * 0.6, s * 0.03));
+    var s = row.s, odd = row.i & 1, t = P.time || 0;
     if (stage === "stubble") {
       band(row, odd ? "#8F7550" : "#876D49");
       if (s * 0.04 > 0.5) {
@@ -2137,11 +2133,11 @@ body.big #jobs { display: none; }
   // ---------- Timer ending ----------
   function onEnding(done) {
     ending = true; grab = null; cb.to = null; cb.hold = false; cb.pour = 0; tr.to = null; autoBale = false;
-    coach.clear(); stepShown = "";
+    coach.clear();
     setTimeout(function () { cb.augerTo = 0; snd.engine(-1); done(); }, 2600);
   }
   function onWake() {
-    ending = false; dusk = 0; stepShown = "";
+    ending = false; dusk = 0;
     if (phase === "ready") coach.step(sayFor(key()));
     else if (phase === "done") coach.step("Tap the field to grow more " + cropWord() + ".");
   }

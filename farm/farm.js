@@ -966,10 +966,10 @@
     this.Wf = W * 1.3 + (this.camMax - this.camMin) * this.kf;
     this.lw = clamp(this.k * 0.055, 1.6, 3.2);
     // rows of the field: from the machine line out to the hedge, and in to the near edge
-    var rows = [], r = 1, dr0 = this.rowDz / 10, dr, i = 0, h;
+    var rows = [], r = 1, dr0 = this.rowDz / 10, dr, i = 0;
     while (r < this.rH) {
       dr = dr0; var lvl = 0;
-      while ((h = this.B * (1 / r - 1 / (r + dr))) < 2.4 && lvl < 8) { dr *= 2; lvl++; }
+      while (this.B * (1 / r - 1 / (r + dr)) < 2.4 && lvl < 8) { dr *= 2; lvl++; }
       var r1 = Math.min(this.rH, r + dr);
       rows.push({ r0: r, r1: r1, rc: (r + r1) / 2, i: i++, fine: lvl === 0 });
       r = r1;
@@ -1373,7 +1373,7 @@
   // the track beside it and a short elevator up to a hatch in the shed's side. level 0..1 (heap size),
   // o = { x (the shed's middle), kind, run (0..1 elevator running), time }. Sets this.pit = { x, r }.
   SP.store = function (ctx, level, o) {
-    var self = this, kind = o.kind || "grain", col = CROP[kind], r = 1.02, x = o.x;
+    var kind = o.kind || "grain", col = CROP[kind], r = 1.02, x = o.x;
     this.put(ctx, x, r, 1, function () {
       P(ctx, [-4.6, 0, -4.6, -5.0, 0, -7.0, 4.6, -5.0, 4.6, 0], "#86A97C");
       for (var i = -4; i <= 4; i++) Ln(ctx, i, -0.1, i, -5.0 - (4.6 - Math.abs(i)) * 0.43 + 0.3, "#6E9264", 0.06);

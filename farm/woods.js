@@ -1437,7 +1437,7 @@
   function scAt(vy) { var b = cv.getBoundingClientRect(); return split && vy - b.top >= RC.y ? scC : scW; }
   function wxAt(sc, vx) { var b = cv.getBoundingClientRect(), R = regOf(sc); return sc.wx(vx - b.left - R.x, 1); }
   var drag = null;
-  var press = Toybox.press(cv, {
+  Toybox.press(cv, {
     any: true,
     parts: partList,
     dragStart: function (part, e, s) {
