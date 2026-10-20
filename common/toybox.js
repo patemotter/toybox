@@ -113,7 +113,8 @@
  *        bb.surprise, bb.shelf. The bottom bar: Shelf (blue, only apps with a collection), New (orange, the
  *        circular arrow), Surprise (rainbow, a gift), with their icons and the palm-safe spacing.
  *      var coach = Toybox.coach(el) -> coach.step(text) (the sticky line for the current step, with the step
- *        dot), coach.say(text, sec) (a passing line, at least 3 s, then back to the step line), coach.clear(),
+ *        dot; calling it again with the same line changes nothing), coach.say(text, sec) (a passing line, at least
+ *        3 s, then back to the step line), coach.clear(),
  *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
  *        home screen's App setting "coach-voice" is on and sound is on.
  *      var ghost = Toybox.ghost({ plan: fn, max: 3, idleMs: 4500, ok: fn, onShow: fn(plan, on) })
@@ -1597,8 +1598,9 @@
       el: el,
       // A passing line (a hint after a mistake, a cheer), at least 3 s, then back to the step's line.
       say: function (text, sec) { sayText = String(text || ""); sayUntil = now() + Math.max(3, sec || 3.5) * 1000; show(); },
-      // The sticky line for the current step ("Pour the batter!"), with the step dot.
-      step: function (text) { stepText = String(text || ""); sayUntil = 0; show(); },
+      // The sticky line for the current step ("Pour the batter!"), with the step dot. A new line cuts a passing
+      // line short; the same line again changes nothing, so pages may call step() on every frame.
+      step: function (text) { text = String(text || ""); if (text === stepText) return; stepText = text; sayUntil = 0; show(); },
       clear: function () { stepText = ""; sayUntil = 0; show(); },
       text: function () { return el.classList.contains("off") ? "" : txt.textContent; }
     };
