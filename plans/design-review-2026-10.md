@@ -88,6 +88,11 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
 - Rocket Builder: brownish engine particles; a white ring and a dark star over the rocket during staging.
 - Train Builder: the tunnel hill reads as a green pipe with no tunnel mouth.
 - Kitchen map on iPad: the coach and station labels cover the cutting board and the stove.
+- Hard offset shadows (`box-shadow: Npx Npx 0`) are still set in page CSS about 90 times, mostly the older apps'
+  original style (e.g. the Construction Site map's labels and gate card); move chrome to the shared lip and card
+  look when a page is worked on. Many older pages' Surprise buttons also lack the shared gift icon.
+- Upright phones now show the whole Excavator and Tower Crane, which makes them small under a lot of sky, and
+  Concrete's mixer truck cab is still cut off at the right on upright screens (fitting it would shrink the form).
 
 ## 3. Questions for the dad (keep as is until he answers)
 1. **Whole-job buttons**: Construction Site's "Move it!", Dig/Dump, "Lift!" and Concrete's step Go, Espresso's
@@ -110,6 +115,12 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
 9. **Shared coach on the Workshop stations**: each new instruction now pops into the middle until his first touch.
    Hammer & Screws changes its line on nearly every nail; is the middle too much there? Measuring now has an empty
    band at the top where its old coach sat; reclaim it for the scene?
+10. **Blender line**: "Drag an ingredient into the jar!" (correct, two lines on a phone) or "Drag food into the
+    jar!" (one line, but ice isn't food)?
+11. **Small whole machines**: on an upright phone the whole Excavator and Tower Crane are now small (loads about
+    20 px; touch areas stay big). Fine, or is panning with a bigger, partly cut-off machine better for him?
+12. **Wrecking Ball's Up arrow** is green (green means Go): make Up and Down both ink?
+13. **Surprise on Wrecking Ball and Tower Crane**: they have none; add one (a new feature)?
 
 ## 4. Engineering follow-ups
 - `Toybox.coach`: a new `step()` line and `clear()` cut a running `say()` line short, so Excavator and the four
