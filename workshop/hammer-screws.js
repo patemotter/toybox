@@ -1838,7 +1838,13 @@
   function targetPoint(tg) {
     if (!tg) {
       var sc = sceneName();
-      if (sc === "board") return { x: W * 0.62, y: Math.max(LB.yBack - 30 * LB.k, 40) };
+      if (sc === "board") {
+        // The resting hammer stays whole on the stage: its head below the top edge (with room for the raise) and,
+        // as it rests mirrored with the handle to the left, the handle's end inside the left edge.
+        var a = ARTS[state.hammer], ts = hamScale(), m = 12;
+        return { x: Math.min(W - m + a.box[0] * ts, Math.max(W * 0.62, a.box[2] * ts + m)),
+          y: Math.max(LB.yBack - 30 * LB.k, -a.top * ts + 40) };
+      }
       return { x: W / 2, y: H / 2 };
     }
     switch (tg.kind) {

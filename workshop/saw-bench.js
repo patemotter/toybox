@@ -5900,7 +5900,7 @@
     canvas.setAttribute("aria-label", s.name + " at the saw bench");
     if (!fromLoad && PJ && PJ.kind === "crosscut" && !PJ.done) {
       if (id === "mitersaw") pjSay(PSTEP.coach, 3500);
-      else if (id === "tablesaw") pjSay("Turn on the saw, then push the yellow handle!", 3500);
+      else if (id === "tablesaw") pjSay("Switch on the table saw!", 3500);
       else if (id === "circular" || id === "tracksaw") pjSay("Hold and push the saw across the line!", 3500);
       else pjSay("Saw back and forth on the pencil line!", 3500);
     }

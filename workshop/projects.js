@@ -26,7 +26,7 @@
  *     station: "saw-bench",            "wall" (index.html) | "measuring" | "saw-bench" | "drill-press" | "hammer-screws"
  *     tool: "miter",                   the tool id inside that station (see JOB KINDS)
  *     title: "Cut the Back on the line",   the step banner and the checklist line
- *     coach: "Slide the line under the blade, then pull the saw down!",
+ *     coach: "Slide the line under the blade!",   one action, naming the object
  *     done: "The Back is cut!",        the line on the Done! card
  *     job: { kind: ..., board: { l: inches long, w: inches wide }, ... } }
  *
@@ -104,7 +104,7 @@
     return { id: id, part: part, station: "saw-bench", tool: "miter", title: title, coach: coach, done: done,
       job: { kind: "crosscut", board: { l: l, w: w }, line: line, part: part, others: others || [] } };
   }
-  var CUT_COACH = "Slide the line under the blade, then pull the saw down!";
+  var CUT_COACH = "Slide the line under the blade!";
 
   // Like a real shop: plane the board, measure and mark every part the miter saw will cut, cut them one after
   // another, rip the strip on the table saw, mark and cut the Sides and the Floor, then the angle, the holes,
@@ -112,7 +112,7 @@
   // steps at the same station run on by themselves (ToyboxProjects.after).
   BIRDHOUSE.steps = [
     { id: "plane", part: "", station: "wall", tool: "planer",
-      title: "Plane the board flat", coach: "Switch on the planer, then feed the board!",
+      title: "Plane the board flat", coach: "Feed the board into the planer!",
       done: "The board is flat and smooth.", job: { kind: "plane", board: { l: STOCK, w: BW } } },
 
     mark("back-mark", "back", STOCK, BW, 12, "line", "Mark the Back: 12 inches", "Pull the tape to 12!", "The Back is marked.", "tape"),
@@ -126,7 +126,7 @@
     cut("blank-cut", "blank", 31.5, BW, 26, "Cut the Side blank on the line", CUT_COACH, "The Side blank is cut!"),
 
     { id: "strip-rip", part: "strip", station: "saw-bench", tool: "table",
-      title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4, switch on, push it through!",
+      title: "Rip the Side blank to 4 inches", coach: "Slide the fence to 4!",
       done: "A long strip, 4 inches wide!", job: { kind: "rip", board: { l: 26, w: BW }, fence: 4, part: "strip" } },
 
     mark("side1-mark", "side1", 26, 4, 10, "line", "Mark a Side: 10 inches", "Slide the rule out to 10!", "One Side is marked.", "combosquare"),
@@ -138,13 +138,13 @@
     cut("floor-cut", "floor", 6, 4, 4, "Cut the Floor on the line", CUT_COACH, "The Floor is cut!"),
 
     { id: "side-angle", part: "side1", station: "saw-bench", tool: "miter",
-      title: "Cut the roof angle on both Sides", coach: "The saw is swung to the roof angle. Line up, then pull it down!",
+      title: "Cut the roof angle on both Sides", coach: "Slide the Side under the blade!",
       done: "Both Sides have a sloped top.", job: { kind: "angle", board: { l: 10, w: 4 }, angle: 15, count: 2 } },
 
-    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the rule out to 6, then make an X!", "The door is marked.", "combosquare"),
+    mark("hole-mark", "front", 9, BW, 6, "x", "Mark the door: 6 inches up", "Slide the rule out to 6!", "The door is marked.", "combosquare"),
 
     { id: "hole-drill", part: "front", station: "drill-press", tool: "holesaw",
-      title: "Drill the door hole", coach: "Switch on the drill press, then pull the handle!",
+      title: "Drill the door hole", coach: "Switch on the drill press!",
       done: "The door is drilled!", job: { kind: "hole", board: { l: 9, w: BW }, bit: "holesaw", d: 1.5, holes: [{ x: BW / 2, y: 6 }] } },
 
     { id: "floor-drill", part: "floor", station: "drill-press", tool: "twist",
@@ -153,12 +153,12 @@
         holes: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }] } },
 
     { id: "build", part: "", station: "hammer-screws", tool: "hammer",
-      title: "Put the birdhouse together", coach: "Glue, then fasten each piece!",
+      title: "Put the birdhouse together", coach: "Squeeze wood glue on the joint!",
       done: "The birdhouse stands!", job: { kind: "assemble", glue: true, nails: 2,
         joins: [["back", "side1"], ["back", "side2"], ["sides", "floor"], ["sides", "front"], ["box", "roof"]] } },
 
     { id: "sand", part: "", station: "wall", tool: "orbital",
-      title: "Sand the edges smooth", coach: "Switch on the sander and rub every edge!",
+      title: "Sand the edges smooth", coach: "Sand every edge smooth!",
       done: "Smooth all over. The birdhouse is finished!", job: { kind: "sand" } }
   ];
 

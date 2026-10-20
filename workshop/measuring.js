@@ -184,12 +184,13 @@
     var top = 10 + bannerH + 8 + (coach.el.offsetHeight || 0) + 12;
     T.clearY = top - 6;   // the tape and rule readouts go below this line when there is no room above
     var w = PSTEP.job.board.w, l = PSTEP.job.board.l;
-    var visIn = Math.max(isCombo ? 13.2 : 10, PJ.target * 1.35, PJ.target + 6);
+    // The whole board stays on screen, its far end included.
+    var visIn = Math.max(isCombo ? 13.2 : 10, PJ.target * 1.35, PJ.target + 6, l + 1);
     var ppi;
     if (isCombo) {
       // the whole 12-inch rule stays on screen: its tail runs back past the head over the bench, so the board
       // starts 12 inches in (the rule's full length when it is pushed all the way back)
-      visIn = 12 + PJ.target + 2.5;
+      visIn = 12 + Math.max(PJ.target + 2.5, l + 1);
       ppi = Math.max(3, Math.min((CW - PAD - 16) / visIn, (CH - top - 50) / (w * 1.25)));
       xL = Math.max(xL, PAD + 6 + 12 * ppi);
     } else ppi = Math.max(3, Math.min((CW - xL - 10) / visIn, (CH - top - 50) / (w * 1.25)));

@@ -64,6 +64,8 @@ body {
   -webkit-touch-callout: none;
 }
 /* Panel: Done (the Go row), the tools and Sand (choices), then New in the tab bar. */
+/* Done stays grey until there is a turned piece to finish: green means there is something to do. */
+.btn.tb-go.done.is-off { background: var(--tb-off); color: var(--tb-ink-2); box-shadow: 0 var(--tb-lip-h) 0 var(--tb-lip); }
 .tools { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .tool { overflow: hidden; }
 .tb-tile.tool svg { width: 100%; max-width: 116px; height: 32px; display: block; }
@@ -333,15 +335,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     } else {
       var lw2 = CW - 2 * pad;
       var avail = CH - top - 2 * pad;
-      // Narrow screens: zoom in on the work (the outer ends of the headstock and tailstock are cropped).
-      // The switch panel stays a sensible size so the lathe gets the rest of the height.
-      // Wide stages (tablets) show the whole lathe with a little room at both ends.
-      var crop = lw2 < 700, view = lw2 < 480 ? 610 : (crop ? 770 : WW * 1.06);
+      // The whole lathe shows with a little room at both ends. The switch panel stays a sensible size so the
+      // lathe gets the rest of the height.
+      var view = WW * 1.06;
       var ps = Math.max(0.2, Math.min(lw2 / PW_H, 1.0, avail * 0.3 / PH_H));
       var ph = Math.round(PH_H * ps);
       s = Math.min(lw2 / view, (avail - ph) / WH);
       var lh2 = avail - ph;
-      M = { x: pad, y: top, w: lw2, h: lh2, s: s, cx: crop ? 548 : WW / 2 };
+      M = { x: pad, y: top, w: lw2, h: lh2, s: s };
       P = { x: pad, y: top + lh2 + pad, w: lw2, h: ph, vert: false };
     }
     M.ox = M.x + M.w / 2 - (M.cx || WW / 2) * M.s;
@@ -577,10 +578,14 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
 
   // ---------- Shavings, chips, dust and sparkles ----------
   var emitAcc = 0;
+  // Shavings fly for a moment and fade out by SHAV_LIFE seconds, so nothing stays on the blank, the tool rest or
+  // the bed. Only a small pile on the floor stays a while.
+  var SHAV_LIFE = 1.3, SHAV_FADE = 0.4, PART_CAP = reduce ? 60 : 120, FLOOR_PILE = 40;
+  function onFloor(p) { return p.settled && p.y >= FLOOR - 3; }
   function spawn(type, x, y, W) {
-    if (parts.length > (reduce ? 160 : 320)) {
+    if (parts.length > PART_CAP) {
       for (var k = 0; k < parts.length; k++) if (parts[k].settled) { parts.splice(k, 1); break; }
-      if (parts.length > (reduce ? 160 : 320)) return;
+      if (parts.length > PART_CAP) return;
     }
     var p = {
       type: type, x: x, y: y, vx: rnd(-240, 240), vy: rnd(-600, -250), a: rnd(0, TAU), va: rnd(-9, 9),
@@ -617,6 +622,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         if (p.t > (p.type === "star" ? 1.2 : 1.2)) parts.splice(i, 1);
         continue;
       }
+      if (!onFloor(p) && p.t > SHAV_LIFE) { parts.splice(i, 1); continue; }
       if (p.settled) { settled++; if (p.t - p.st > 18) { parts.splice(i, 1); settled--; } continue; }
       if (p.type !== "chunk") p.len = p.lmax * Math.min(1, p.t / 0.22);
       else p.len = p.lmax;
@@ -632,8 +638,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       }
       if (p.x < -60 || p.x > WW + 60) parts.splice(i, 1);
     }
-    if (settled > 160) {
-      for (i = 0; i < parts.length && settled > 160; i++) if (parts[i].settled) { parts.splice(i, 1); i--; settled--; }
+    if (settled > FLOOR_PILE) {
+      for (i = 0; i < parts.length && settled > FLOOR_PILE; i++) if (parts[i].settled) { parts.splice(i, 1); i--; settled--; }
     }
   }
   function drawParts(c) {
@@ -656,8 +662,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         continue;
       }
       c.save();
-      // Settled shavings slowly fade away so they never pile up forever.
-      if (p.settled && p.t - p.st > 12) c.globalAlpha = Math.max(0, 1 - (p.t - p.st - 12) / 6);
+      // The floor pile slowly fades away so it never grows forever.
+      if (!onFloor(p)) c.globalAlpha = clamp((SHAV_LIFE - p.t) / SHAV_FADE, 0, 1);
+      else if (p.t - p.st > 12) c.globalAlpha = Math.max(0, 1 - (p.t - p.st - 12) / 6);
       c.translate(p.x, p.y); c.rotate(p.a);
       if (p.type === "chunk") {
         var s2 = p.w;
@@ -1599,7 +1606,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       WOODS[S.wood].name + " blank" + (R.everCut ? ", being turned" : ", still square") + ". Tool: " + TOOLS[S.tool].name + ". Pieces: " + S.pieces + ".";
     if (t !== lastLabel) { lastLabel = t; cv.setAttribute("aria-label", t); }
   }
-  var lastT = performance.now(), ariaAt = 0;
+  var lastT = performance.now(), ariaAt = 0, doneEl = $("doneBtn");
   function frame(t) {
     var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
     lastT = t;
@@ -1614,6 +1621,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (Toybox.timer.phase() === "ending") endingFrame();
       draw();
       if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
+      doneEl.classList.toggle("is-off", !cutSomething());
     }
     updateSound();
     requestAnimationFrame(frame);
