@@ -55,7 +55,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   <div class="tb-body app">
     <div class="tb-stagecol">
       <main class="tb-stage stage" id="stage">
-        <canvas id="cv" role="img" aria-label="A farmyard with a cow barn, a muck heap, a telehandler and a muck spreader, and a grass field. Drive the yard scraper to push the muck onto the heap."></canvas>
+        <canvas id="cv" role="img" aria-label="A farmyard with a cow barn, a muck heap, a telehandler and a muck spreader, and a grass field. Drive the tractor to push the muck onto the heap."></canvas>
         <div class="tb-counter loads" id="loads">Loads: 0</div>
         <div id="coach"></div>
         <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
@@ -316,7 +316,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // on that part plays that one control's motion. Waiting (the scraper coming in, the suction arm folding, the
   // tractor going home) happens by itself, with an information line saying what happens.
   var SUB = {
-    "scrape.push": { say: "Drive the yard scraper to push the muck onto the heap.", part: "scraper" },
+    "scrape.push": { say: "Drive the tractor to push the muck onto the heap.", part: "scraper" },
     "load.grab": { say: "Tap the muck fork to grab the muck from the heap.", part: "fork" },
     "load.drop": { say: "Tap the muck fork to drop the muck in the spreader.", part: "fork" },
     "fill.arm": { say: "Tap the suction arm to dip it in the slurry.", part: "arm" },
@@ -1127,21 +1127,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.beginPath(); ctx.arc(p[0], p[1], r + Math.max(2, r * 0.08), 0, TAU); ctx.stroke();
     ctx.restore();
   }
-  // A new instruction sits in the middle of the stage (common/toybox.css); when the part it names is right there
-  // under it, it moves just above or below that part (whichever stays nearer the middle), so the ring shows.
-  var coachEl = $("coach");
-  function placeCoach() {
-    var cl = coachEl.classList, top = "";
-    if (cl.contains("is-do") && !cl.contains("is-seen") && phase === "ready") {
-      var p = wantPt(), h = coachEl.offsetHeight || 60, r = 44;
-      if (p && Math.abs(p[1] - H / 2) < h / 2 + r) {
-        var up = p[1] - r - 6 - h / 2, dn = p[1] + r + 6 + h / 2, lo = h / 2 + 8, hi = H - h / 2 - 8;
-        var c = [up, dn].filter(function (y) { return y >= lo && y <= hi; });
-        if (c.length) top = Math.round(c.sort(function (a, b) { return Math.abs(a - H / 2) - Math.abs(b - H / 2); })[0]) + "px";
-      }
-    }
-    if (coachEl.style.top !== top) coachEl.style.top = top;
-  }
+  // A new instruction keeps clear of the ringed part (viewport px).
+  function placeCoach() { var p = wantPt(), b = cv.getBoundingClientRect(); Farm.avoid(coach, p && b.left + p[0], p && b.top + p[1]); }
   // the slurry tanker's suction arm: from its turret on the tank down into the lagoon (screen space)
   function armGeo(sc) {
     var sq = rig.load * 0.12, px = sc.X(rig.x - TK.arm[0], 1), py = sc.gY + (TK.arm[1] - 0.5 + sq) * sc.k;

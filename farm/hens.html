@@ -647,7 +647,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ---------- The flow ----------
   // Each job has one or two things for him to do in turn (sub). A tap on the right part plays that one
   // control's motion (phase "drive" | "feed" | "eggs"), then the next thing is his again (phase "ready").
-  function setPhase(p) { phase = p; phaseT = 0; }
+  // Leaving "ready" for a busy phase: the instruction he has just carried out goes (coach.busy()).
+  function setPhase(p) { if (phase === "ready" && p !== "ready") coach.busy(); phase = p; phaseT = 0; }
   function key() { return job + "." + sub; }
   function setSub(j, s2) {
     job = j; sub = s2; setPhase("ready");
@@ -909,7 +910,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // Close-up: the tracks in the mud, then the feeders with the hens; the egg end has its own drawing.
   function closeK(mode) {
     var w = RG.c.w, h = RG.c.h;
-    if (mode === "feed") return Math.min(w * 0.94 / 5.6, (yAt(w, h, 1) - 8) / 1.75);
+    // the whole hen house, the feed bin at its end included
+    if (mode === "feed") return Math.min(w * 0.94 / 8.8, (yAt(w, h, 1) - 8) / 1.75);
     return Math.min(w * 0.94 / 5.8, (yAt(w, h, TL) - 8) * TL / 2.3);
   }
   function closeTarget(mode) { return mode === "feed" ? HX - 0.45 : tr.x + 1.5; }
@@ -1254,8 +1256,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   // the yellow ring on the part he should touch next
   function drawRing() {
-    if (phase !== "ready" || grab || Farm.locked(ending)) return;
-    var p = targetPt(); if (!p) return;
+    var p = phase !== "ready" || grab || Farm.locked(ending) ? null : targetPt(), b = cv.getBoundingClientRect();
+    // A new instruction keeps clear of the ringed part (viewport px).
+    Farm.avoid(coach, p && b.left + p.x, p && b.top + p.y);
+    if (!p) return;
     Farm.drawRing(ctx, p.x, p.y, time, { glow: glow });
   }
   function drawWorld(S, isField) {

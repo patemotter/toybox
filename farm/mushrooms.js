@@ -470,7 +470,8 @@
   // =====================================================================================================
   // The flow
   // =====================================================================================================
-  function setPhase(p) { phase = p; phaseT = 0; }
+  // Leaving "ready" for a busy phase: the instruction he has just carried out goes (coach.busy()).
+  function setPhase(p) { if (phase === "ready" && p !== "ready") coach.busy(); phase = p; phaseT = 0; }
   function setSub(s) {
     sub = s; setPhase("ready");
     var t = sayFor(key()); if (t) coach.step(t);
@@ -568,7 +569,7 @@
       }
     }, function () {
       grabs++;
-      if (grabs >= 3) { coach.say("The bin is full of straw.", 3); setSub("drive"); }
+      if (grabs >= 3) { setSub("drive"); coach.say("The bin is full of straw.", 3); }
       else setSub("grab");
     });
   }
@@ -576,7 +577,7 @@
     var x0 = lorry.x, dur = clamp((LXC - x0) / 6.5, 1.0, 9);
     snd.horn();
     run(dur, function (t) { var nx = lerp(x0, LXC, ease(t / dur)); lorry.wheel += nx - lorry.x; lorry.x = nx; craneRest(); },
-      function () { lorry.x = LXC; craneRest(); snd.clunk(); coach.say("This is the compost yard.", 3); setSub("tip"); });
+      function () { lorry.x = LXC; craneRest(); snd.clunk(); setSub("tip"); coach.say("This is the compost yard.", 3); });
     mo.cam = true;
   }
   function tipBin() {
@@ -677,7 +678,7 @@
     }, function () {
       shelf[i].c = 1; elev.run = 0;
       if (i < NT - 1) setSub("fill");
-      else { coach.say("The shelves are full of compost.", 3); setSub("peat"); }
+      else { setSub("peat"); coach.say("The shelves are full of compost.", 3); }
     });
   }
   function peatAll() {
@@ -1127,9 +1128,10 @@
     }
   }
   function drawRing() {
-    if (phase !== "ready" || (drag && drag.kind !== "act")) return;
-    var p = targetPt(); if (!p) return;
-    var b = cv.getBoundingClientRect();
+    var p = phase !== "ready" || (drag && drag.kind !== "act") ? null : targetPt(), b = cv.getBoundingClientRect();
+    // A new instruction keeps clear of the ringed part (viewport px).
+    Farm.avoid(coach, p && p.x, p && p.y, 33);
+    if (!p) return;
     Farm.drawRing(ctx, p.x - b.left, p.y - b.top, time, { r: 26, grow: 7, glow: glow });
   }
 

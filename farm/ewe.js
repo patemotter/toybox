@@ -415,7 +415,8 @@
   // control's motion (mo), then the next thing is his again. mo.fn may return true to end the motion early.
   const ORDER = ["scrape", "parlor", "foot", "bed"];
   const key = () => stepId + "." + sub;
-  function setPhase(p) { phase = p; phaseT = 0; }
+  // Leaving "ready" for a busy phase: the instruction he has just carried out goes (coach.busy()).
+  function setPhase(p) { if (phase === "ready" && p !== "ready") coach.busy(); phase = p; phaseT = 0; }
   function setSub(s) { sub = s; setPhase("ready"); const d = SUB[key()]; if (d) coach.step(d.say); ghost.poke(); }
   function run(dur, fn, end) { mo = { t: 0, dur, fn, end, ev: {} }; setPhase("work"); }
   function onceM(id) { if (!mo || mo.ev[id]) return false; mo.ev[id] = 1; return true; }
@@ -513,7 +514,7 @@
     });
   }
   function doScoop() {
-    driveBlue(scoopX(), 2.0, scoopFill, () => { bt.fill = 1; pile.amt = 0; snd.clunk(); coach.say("The bucket is full of old feed.", 3); setSub("lift"); });
+    driveBlue(scoopX(), 2.0, scoopFill, () => { bt.fill = 1; pile.amt = 0; snd.clunk(); setSub("lift"); coach.say("The bucket is full of old feed.", 3); });
   }
   function doLift() {
     const l0 = bt.lift;
@@ -601,7 +602,7 @@
     s.path = [[60.1, 1.3], [60.9, RRACE], [SPOT_RACE, RRACE]]; s.spd = 1.2;
     tom.tx = TOM_X;
     snd.tick();
-    run(12, (t) => t > 0.5 && arrived(s), () => { s.flip = false; coach.say("The sheep stands still in the race.", 3); setSub("check"); });
+    run(12, (t) => t > 0.5 && arrived(s), () => { s.flip = false; setSub("check"); coach.say("The sheep stands still in the race.", 3); });
   }
   function checkFoot() {
     const s = sheep[0];
@@ -650,7 +651,7 @@
   }
   function chopperOn() {
     rt.on = true; snd.clunk();
-    run(1.4, (t) => { rt.rate = ease(t / 1.4); }, () => { rt.rate = 1; coach.say("The chopper shreds the straw bale.", 3); setSub("drive"); });
+    run(1.4, (t) => { rt.rate = ease(t / 1.4); }, () => { rt.rate = 1; setSub("drive"); coach.say("The chopper shreds the straw bale.", 3); });
   }
   function redMoved() { const p = clamp((RT_START - rt.x) / (RT_START - RT_END), 0, 1); rt.bale = Math.min(rt.bale, lerp(1, 0.12, p)); }
   function driveRed() {
@@ -1187,9 +1188,10 @@
     });
   }
   function drawRing() {
-    if (phase !== "ready" || (drag && drag.kind !== "act")) return;
-    const p = targetPt(); if (!p) return;
-    const b = cv.getBoundingClientRect();
+    const p = phase !== "ready" || (drag && drag.kind !== "act") ? null : targetPt(), b = cv.getBoundingClientRect();
+    // A new instruction keeps clear of the ringed part (viewport px).
+    Farm.avoid(coach, p && p.x, p && p.y);
+    if (!p) return;
     Farm.drawRing(ctx, p.x - b.left, p.y - b.top, time, { glow: glow });
   }
   function draw() {

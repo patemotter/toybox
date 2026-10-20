@@ -70,6 +70,8 @@
  *   Farm.drawRing(ctx, x, y, t, o)  the pulsing yellow ring on the next thing to tap, at canvas px (x, y), t = the
  *                               page's clock (s). o = { r (radius at rest, 30), grow (8), alpha (faintest, 0.55),
  *                               glow (> 0: nearly opaque) }.
+ *   Farm.avoid(coach, x, y, r)  keeps a new instruction clear of the yellow ring (radius r) at viewport (x, y): calls
+ *                               coach.avoid with the ring's edge nearest the stage's middle. x null: nothing to avoid.
  *   Farm.locked(ending)         true while play input is ignored: the page's own ending flag or the timer's lock.
  *   Farm.MACHINES               { id: { name, len (m behind the hitch), work (m behind the hitch where it works),
  *                               trailed } } for the potato machines.
@@ -1212,6 +1214,16 @@
     ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
     ctx.restore();
   }
+  // Drops the coach's step line while a machine is busy. coach.clear() also cuts a passing line short, so a line
+  // that is showing is said again.
+  // coach.avoid() tests a point; the point of the ring nearest the middle of the stage is passed (never past the
+  // middle, which would send the line to the ring's side), so the line keeps clear of the whole ring.
+  function avoidRing(coach, x, y, r) {
+    if (x == null || !coach.el.parentElement) { coach.avoid(); return; }
+    var box = coach.el.parentElement.getBoundingClientRect();
+    function edge(v, mid) { var d = mid - v; return v + (d > 0 ? 1 : -1) * Math.min(r || 38, Math.max(0, Math.abs(d) - 1)); }
+    coach.avoid(edge(x, box.left + box.width / 2), edge(y, box.top + box.height / 2));
+  }
   // True while play input is ignored: the page is winding down (its own ending flag) or the shared timer locks it.
   function locked(ending) { return ending || (window.Toybox && Toybox.timer.locked()); }
   var PAINT = {
@@ -1519,6 +1531,7 @@
     eachX: eachX,
     drawRing: drawRing,
     locked: locked,
+    avoid: avoidRing,
     shape: { P: P, R: R, C: C, Ln: Ln, tube: tube, fs: fs, rr: rr },
     pic: pic,
     restArt: restArt,

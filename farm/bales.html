@@ -649,7 +649,8 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   // =====================================================================================================
   // Each job has a few things for him to do in turn (sub); each tap on the right part plays that one control's
   // motion (phase "work" or "drive"), then the next thing is his again (phase "ready").
-  function setPhase(p) { phase = p; phaseT = 0; }
+  // Leaving "ready" for a busy phase: the instruction he has just carried out goes (coach.busy()).
+  function setPhase(p) { if (phase === "ready" && p !== "ready") coach.busy(); phase = p; phaseT = 0; }
   function ready(s) { sub = s; setPhase("ready"); rig.v = 0; tele.v = 0; var d = SUB[key()]; if (d) coach.step(d.say); if (ghost) ghost.poke(); }
   // a passing information line while a machine works (the old instruction goes)
   function inform(text, sec) { coach.clear(); coach.say(text, sec || 3); }
@@ -1488,10 +1489,12 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     }
   });
   function drawRing() {
-    var w = want();
-    if (!w || Farm.locked(ending) || (drag && drag.kind !== "act")) return;
-    var p = partPt(w); if (!p) return;
-    Farm.drawRing(ctx, p.x, p.y, time, { r: clamp(p.r * 0.75, 24, 46), grow: 7, alpha: 0.6, glow: glow });
+    var w = want(), p = !w || Farm.locked(ending) || (drag && drag.kind !== "act") ? null : partPt(w), b = cv.getBoundingClientRect();
+    // A new instruction keeps clear of the ringed part (viewport px).
+    var r = p && clamp(p.r * 0.75, 24, 46);
+    Farm.avoid(coach, p && b.left + p.x, p && b.top + p.y, r + 7);
+    if (!p) return;
+    Farm.drawRing(ctx, p.x, p.y, time, { r: r, grow: 7, alpha: 0.6, glow: glow });
   }
 
   // =====================================================================================================

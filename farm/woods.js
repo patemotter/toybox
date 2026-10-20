@@ -804,7 +804,8 @@
   // =====================================================================================================
   // The flow
   // =====================================================================================================
-  function setPhase(p) { phase = p; }
+  // Leaving "ready" for a busy phase: the instruction he has just carried out goes (coach.busy()).
+  function setPhase(p) { if (phase === "ready" && p !== "ready") coach.busy(); phase = p; }
   // Logs: each step has a few things for him to do in turn (sub); each tap on the right machine part plays that
   // one control's motion (mo), then the next thing is his again.
   function key() { return stepId + "." + sub; }
@@ -822,7 +823,8 @@
     if (id === "turn") tag("Wood chipper", 2.4, 2.6);
   }
   function bringLogs(id) {
-    stepId = id; sayStep(); mo = null;
+    // Each thing he does brings its own instruction (setSub); the lorry and the posts arrive with no instruction.
+    stepId = id; mo = null;
     if (id === "fell") { setSub("drive"); tag("Forestry harvester", harv.x, 3.4); }
     else if (id === "logs") setSub("feed");
     else if (id === "lorry") lorryIn();
@@ -1369,7 +1371,7 @@
       var k = key();
       if (act(part)) { if (ghost) ghost.learned(k); glow = 0; return; }
     }
-    if (phase === "work" && part && part !== "hole") { busyHint(); return; }
+    if (phase === "work") { busyHint(); return; }
     if (tagLogs(part)) return;
     if (phase === "done") { again(); return; }   // no step row: a tap on the finished scene starts the next tree
     hint();
@@ -1432,7 +1434,7 @@
       if (part === "grapple") { grp.open = 1; snd.tick(); tag("Crane", grp.x, grp.h + 0.9); return; }
       if (part === "pile") { snd.tick(); tag("Branches", (PILE0 + PILE1) / 2, 1.5); return; }
       if (part === "trailer") { snd.clunk(); tag("Trailer", TRC, 3.9); return; }
-      if (phase === "done") { again(); return; } else sayStep();
+      if (phase === "done") { again(); return; } else if (phase === "ready") sayStep(); else busyHint();
       if (ghost) ghost.poke();
     }
   });
@@ -1913,15 +1915,14 @@
   }
   // Over the scene: a ring on the thing to touch next, and the saw line's end view while a log goes through.
   function drawOverlays() {
-    var b = cv.getBoundingClientRect();
-    if (phase === "ready" && !(drag && drag.kind !== "act")) {
-      var p = job === "logs" ? targetPt() : partScreen(stepId);
-      if (p) {
-        var x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
-        ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
-        ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
-        ctx.restore();
-      }
+    var b = cv.getBoundingClientRect(), p = phase === "ready" && !(drag && drag.kind !== "act") ? (job === "logs" ? targetPt() : partScreen(stepId)) : null;
+    // A new instruction keeps clear of the ringed part (viewport px).
+    Farm.avoid(coach, p && p.x, p && p.y);
+    if (p) {
+      var x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
+      ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+      ctx.restore();
     }
     if (job === "logs" && stepId === "saw" && mill.inset) {
       var R = RW, sz = Math.round(Math.min(R.w * 0.26, R.h * 0.36, 132)), x0 = R.x + R.w - sz - 64, y0 = R.y + 10;

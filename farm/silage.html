@@ -1242,21 +1242,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ctx.beginPath(); ctx.arc(p[0], p[1], r + Math.max(2, r * 0.08), 0, TAU); ctx.stroke();
     ctx.restore();
   }
-  // A new instruction sits in the middle of the stage (common/toybox.css); when the part it names is right there
-  // under it, it moves just above or below that part (whichever stays nearer the middle), so the ring shows.
-  var coachEl = $("coach");
+  // A new instruction keeps clear of the ringed part (viewport px).
   function placeCoach() {
-    var cl = coachEl.classList, top = "";
-    if (cl.contains("is-do") && !cl.contains("is-seen") && phase === "ready") {
-      var p = wantPt(), h = coachEl.offsetHeight || 60, r = cue ? Math.max(34, radiusOf(cue) * 0.9) : 34;
-      if (p && Math.abs(p[1] - H / 2) < h / 2 + r) {
-        var up = p[1] - r - 6 - h / 2, dn = p[1] + r + 6 + h / 2, lo = h / 2 + 8, hi = H - h / 2 - 8;
-        var c = [up, dn].filter(function (y) { return y >= lo && y <= hi; });
-        if (c.length) top = Math.round(c.sort(function (a, b) { return Math.abs(a - H / 2) - Math.abs(b - H / 2); })[0]) + "px";
-        else top = Math.round(p[1] > H / 2 ? lo : hi) + "px";   // a short stage: the edge away from the ring
-      }
-    }
-    if (coachEl.style.top !== top) coachEl.style.top = top;
+    var p = wantPt(), b = cv.getBoundingClientRect();
+    Farm.avoid(coach, p && b.left + p[0], p && b.top + p[1], cue ? Math.max(34, radiusOf(cue) * 0.9) : 34);
   }
   function drawSwath(sc) {
     var a = clamp(swath.a, 0, L), b = clamp(swath.b, 0, L);
@@ -1539,7 +1528,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     state: function () {
       return { camA: scA.cam, kA: scA.k, WA: RA.w, zoomA: zoomA.span, phase: phase, step: stepId, sub: sub, key: key(), want: wantPart(), cue: cue, crop: crop, x: rig.x, m: rig.m, lift: rig.lift, spout: rig.spout, field: field.stage,
         trailer: tr.st, tx: tr.x, tr: tr.r, load: tr.load, tip: tr.tip, loader: ld.st, roller: ro.st, V: heap.V, cover: heap.cover, tires: heap.tires.length, loads: loads,
-        coach: coach.text(), coachKind: coachEl.classList.contains("is-do") ? "do" : "info", split: split, flap: !!heap.flap };
+        coach: coach.text(), coachKind: coach.el.classList.contains("is-do") ? "do" : "info", split: split, flap: !!heap.flap };
     },
     // viewport point of a part ("want" = the part the ring marks)
     screen: function (id) { var p = ptOf(id === "want" || !id ? wantPart() : id), b = cv.getBoundingClientRect(); return p ? { x: b.left + p[0], y: b.top + p[1] } : null; },

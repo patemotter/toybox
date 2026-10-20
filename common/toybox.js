@@ -114,7 +114,8 @@
  *        circular arrow), Surprise (rainbow, a gift), with their icons and the palm-safe spacing.
  *      var coach = Toybox.coach(el) -> coach.step(text) (the sticky line for the current step, with the step
  *        dot; calling it again with the same line changes nothing), coach.say(text, sec) (a passing line, at least
- *        3 s, then back to the step line), coach.clear(), coach.avoid(x, y) (viewport px: a new instruction in the
+ *        3 s, then back to the step line), coach.clear(), coach.busy() (drops the step line and lets a passing line
+ *        finish), coach.avoid(x, y) (viewport px: a new instruction in the
  *        middle of the stage moves to the other half if it would cover that point, e.g. the part it names),
  *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
  *        home screen's App setting "coach-voice" is on and sound is on.
@@ -1616,6 +1617,8 @@
       // line short; the same line again changes nothing, so pages may call step() on every frame.
       step: function (text) { text = String(text || ""); if (text === stepText) return; stepText = text; sayUntil = 0; show(); },
       clear: function () { stepText = ""; sayUntil = 0; show(); },
+      // A machine is busy and he has nothing to do: drop the step line but let a passing line finish its time.
+      busy: function () { stepText = ""; show(); },
       // The point (viewport px) a new instruction must not cover, e.g. the part it names; avoid() with no point clears it.
       avoid: function (x, y) { avoidPt = x == null ? null : [x, y]; place(); },
       text: function () { return el.classList.contains("off") ? "" : txt.textContent; }
