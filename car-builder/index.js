@@ -158,7 +158,7 @@
       names: { body: "Body", trim: "Roof", rims: "Rims" },
       def: { cab: "slant", wheels: "xl", rims: "spokes", engine: "blower", top: "none", lights: "square", number: 5, paint: "flames",
         colors: { body: "Purple", trim: "Black", rims: "Gray", stripes: "Yellow", number: "Purple" } } },
-    mjeep: { fam: "monster", label: "Jeep", rest: "monster truck", parts: MONSTER_PARTS,
+    mjeep: { fam: "monster", label: "Off-roader", rest: "monster truck", parts: MONSTER_PARTS,
       names: { body: "Body", trim: "Roof", rims: "Rims" },
       def: { cab: "square", wheels: "xl", rims: "holes", engine: "one", top: "lights", lights: "round", number: 2, paint: "checks",
         colors: { body: "Orange", trim: "Black", rims: "White", stripes: "Black", number: "Black" } } },

@@ -43,9 +43,9 @@ body {
   padding: 62px 12px 12px; touch-action: manipulation; }
 .cards[hidden] { display: none; }
 .card { font: inherit; color: #1D2340; background: #FFFFFF; border: 4px solid #1D2340; border-radius: 18px;
-  box-shadow: 4px 4px 0 #1D2340; padding: 5px 5px 2px; display: flex; flex-direction: column; align-items: stretch;
+  box-shadow: 0 var(--tb-lip-h) 0 var(--tb-lip), var(--tb-card); padding: 5px 5px 2px; display: flex; flex-direction: column; align-items: stretch;
   gap: 2px; cursor: pointer; min-width: 0; transition: transform 0.08s ease, box-shadow 0.08s ease; position: relative; }
-.card:active { transform: translate(3px, 3px); box-shadow: 0 0 0 #1D2340; }
+.card:active { transform: translateY(var(--tb-lip-h)); box-shadow: 0 0 0 var(--tb-lip), var(--tb-card); }
 .card canvas { display: block; width: 100%; aspect-ratio: 4 / 3; height: auto; border-radius: 10px; border: 3px solid #1D2340; background: #E6F2FF; }
 .card span { font-weight: 800; font-size: 1.05rem; line-height: 1.15; text-align: center; white-space: nowrap; overflow: hidden; }
 .card.now { background: var(--accent); }
@@ -53,13 +53,13 @@ body {
 .card.pop { animation: cardpop 0.5s cubic-bezier(.3,1.6,.5,1); }
 @keyframes cardpop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
 /* The shelf: finished puzzles stand on wooden planks; the others wait as faint pictures. */
-.shelf .card { background: #FFF6E0; box-shadow: 0 9px 0 -1px #B9773A, 4px 13px 0 -1px #1D2340; }
+.shelf .card { background: #FFF6E0; box-shadow: 0 9px 0 -1px #B9773A, var(--tb-card); }
 .shelf .card.empty { background: rgba(255, 255, 255, 0.45); border-style: dashed; border-color: rgba(29, 35, 64, 0.35); box-shadow: 0 9px 0 -1px rgba(185, 119, 58, 0.45); cursor: default; }
 .shelf .card.empty canvas { filter: grayscale(1) opacity(0.28); border-color: rgba(29, 35, 64, 0.25); }
 .shelf .card.empty span { color: rgba(29, 35, 64, 0.4); }
 .chip { position: absolute; left: 50%; top: -12px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px;
   background: #FFFFFF; border: 3px solid #1D2340; border-radius: 999px; padding: 0 8px 0 5px; font-weight: 800; font-size: 0.95rem;
-  line-height: 1.4; box-shadow: 2px 2px 0 #1D2340; pointer-events: none; white-space: nowrap; }
+  line-height: 1.4; pointer-events: none; white-space: nowrap; }
 .chip svg { width: 22px; height: 17px; }
 
 /* Panel: the green Go (Peek / Next puzzle), the size choices, then the tabs. */
@@ -83,7 +83,7 @@ body {
   .sizes .tb-tile b { font-size: 1.1rem; }
   body.m-play .sizes { display: none; }
   .cards { padding: 12px 10px 52px; gap: 10px; }
-  .card { border-width: 3px; border-radius: 14px; box-shadow: 3px 3px 0 #1D2340; padding: 4px 4px 1px; }
+  .card { border-width: 3px; border-radius: 14px; padding: 4px 4px 1px; }
   .card canvas { border-width: 2px; border-radius: 8px; }
   .card span { font-size: 0.95rem; }
 }
@@ -97,7 +97,7 @@ body {
   .tb-tabs { flex-wrap: wrap; }
   .tb-tabs .btn { flex: 1 1 40%; min-height: 44px; }
   .cards { padding: 10px 10px 50px; gap: 8px; }
-  .card { border-width: 3px; border-radius: 14px; box-shadow: 3px 3px 0 #1D2340; padding: 3px 3px 0; }
+  .card { border-width: 3px; border-radius: 14px; padding: 3px 3px 0; }
   .card canvas { border-width: 2px; border-radius: 8px; }
   .card span { font-size: 0.9rem; }
   .btn.tb-go svg { width: 30px; height: 24px; }
@@ -1563,6 +1563,17 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (text) { if (text !== coachText) coach.textContent = text; coach.classList.remove("off"); }
     else coach.classList.add("off");
     coachText = text || coachText;
+    placeCoach();
+  }
+  // Over the picture cards, a new instruction sits in the larger empty band above or below the grid, not in the
+  // middle of the stage where it would cover a card's picture and name.
+  function placeCoach() {
+    var grid = st.mode === "choose" ? chooser : (st.mode === "shelf" ? shelfEl : null);
+    var first = grid && grid.firstElementChild, last = grid && grid.lastElementChild;
+    if (!first) { coach.style.removeProperty("--tb-coach-top"); return; }
+    var sr = stage.getBoundingClientRect(), top = first.getBoundingClientRect().top - sr.top;
+    var bottom = sr.bottom - last.getBoundingClientRect().bottom;
+    coach.style.setProperty("--tb-coach-top", (top >= bottom ? top / 2 : sr.height - bottom / 2) + "px");
   }
   function updateCoach() {
     if (st.mode === "choose") setCoach("Pick a picture!");
@@ -1976,6 +1987,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
       el.style.gridTemplateColumns = "repeat(" + bestC + ", " + Math.floor(best) + "px)";
     });
+    placeCoach();
   }
 
   var tabPics = $("tabPics"), tabShelf = $("tabShelf"), newBtn = $("newBtn"), surpriseBtn = $("surpriseBtn");

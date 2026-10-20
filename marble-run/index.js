@@ -1339,9 +1339,12 @@
     DPR = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(CW * DPR);
     canvas.height = Math.round(CH * DPR);
-    S = Math.min(CW / W, CH / H);
+    // The stage fits the drawn run, not the world box: nothing is drawn above y 40, and the lift's lower
+    // sprocket hangs below the world to about y 1185. A few pixels of margin keep it off the stage frame.
+    var FIT_TOP = 40, FIT_BOT = 1192, M = 8;
+    S = Math.min((CW - 2 * M) / W, (CH - 2 * M) / (FIT_BOT - FIT_TOP));
     OX = (CW - W * S) / 2;
-    OY = (CH - H * S) / 2;
+    OY = (CH - (FIT_BOT - FIT_TOP) * S) / 2 - FIT_TOP * S;
     darkBoard = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     makeSprites();
     if (!built) { buildWorld(state.run); startMarble(); }

@@ -487,8 +487,21 @@
     art.setAttribute("aria-label", "A " + state.size + " rocket with " + state.stages + (state.stages === 1 ? " stage" : " stages") + " on its launch pad");
     save();
     layerKey = ""; // flight pictures are rebuilt from the new design
+    placeCoach(g);
     return g;
   }
+
+  // A new instruction sits in the middle of the stage (common/toybox.css), which is the rocket's body. Put it in
+  // the sky above the rocket instead, through the --tb-coach-top the shared style reads.
+  var coachGeo = null;
+  function placeCoach(g) {
+    coachGeo = g || coachGeo;
+    var m = art.getScreenCTM(), c = $("coach");
+    if (!m || !coachGeo) return;
+    var gap = m.f + m.d * coachGeo.bbox[1] - $("stage").getBoundingClientRect().top;
+    c.style.setProperty("--tb-coach-top", Math.max(c.offsetHeight / 2 + 8, gap / 2) + "px");
+  }
+  window.addEventListener("resize", function () { placeCoach(); });
 
   function updateTrips() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-trip]"), function (b) {
