@@ -242,7 +242,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var pourers = [];  // milk carton / yogurt cup pouring over the jar: { id, k, t0, dur }
   var dollops = [];  // yogurt blobs falling: { k, x, y, vy, amt }
   var parts = [];    // sparkles and drips (scene coords): { x, y, vx, vy, life, max, col, r, star }
-  var sayMsg = "", sayUntil = 0;
+  var sayUntil = 0, sayCut = false;
 
   function makePieces(k, startX, startY) {
     var it = S.items[k], g = ING[it.id];
@@ -360,12 +360,19 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
 
   // ---------- Coach ----------
-  var coachEl = $("coach"), counterEl = $("counter");
-  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
-  var lastCoach = "";
+  var coachEl = $("coach"), counterEl = $("counter"), coach = Toybox.coach(coachEl);
+  // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
+  // step line would cut it short in the shared coach.
+  function say(msg, ms) { ms = Math.max(3000, ms || 3000); sayUntil = Date.now() + ms; sayCut = false; coach.say(msg, ms / 1000); }
+  // Ends a running passing line; the next frame swaps it for the step line.
+  function hush() { if (Date.now() < sayUntil) sayCut = true; sayUntil = 0; }
   function updateCoach() {
-    var t = Date.now() < sayUntil ? sayMsg : COACH[phase()];
-    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+    if (Date.now() < sayUntil) return;
+    var line = COACH[phase()];
+    // The shared coach can only end a passing line by clearing; skip it when the text stays the same.
+    if (sayCut && coach.text() !== line) coach.clear();
+    sayCut = false;
+    coach.step(line);
   }
   function updateCounter() { counterEl.textContent = "Smoothies: " + S.count; }
 
@@ -610,7 +617,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (jar.state !== "base") { jar.state = "back"; jar.t0 = now(); jar.from = { x: jar.x, y: jar.y, a: jar.a }; jar.dur = 0.5; }
     if (S.lid) takeLidOff();
     if (S.cup.fill > 0) sendCupAway();
-    lid.tries = 0; sayUntil = 0;
+    lid.tries = 0; hush();
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }

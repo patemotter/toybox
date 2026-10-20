@@ -292,7 +292,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var take = null;   // the finished batter lifting out to the counter
   var foodSlide = null, foodPop = 1;
   var oldBeater = null, twist = 0, climb = 0, peaks = 0;
-  var sayMsg = "", sayUntil = 0;
+  var sayUntil = 0, sayCut = false;
 
   function item(id, make) {
     for (var i = 0; i < S.items.length; i++) if (S.items[i].id === id) return S.items[i];
@@ -426,12 +426,19 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
 
   // ---------- Coach and counter ----------
-  var coachEl = $("coach"), counterEl = $("counter");
-  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
-  var lastCoach = "";
+  var coachEl = $("coach"), counterEl = $("counter"), coach = Toybox.coach(coachEl);
+  // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
+  // step line would cut it short in the shared coach.
+  function say(msg, ms) { ms = Math.max(3000, ms || 3000); sayUntil = Date.now() + ms; sayCut = false; coach.say(msg, ms / 1000); }
+  // Ends a running passing line; the next frame swaps it for the step line.
+  function hush() { if (Date.now() < sayUntil) sayCut = true; sayUntil = 0; }
   function updateCoach() {
-    var t = Date.now() < sayUntil ? sayMsg : coachLine(phase());
-    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+    if (Date.now() < sayUntil) return;
+    var line = coachLine(phase());
+    // The shared coach can only end a passing line by clearing; skip it when the text stays the same.
+    if (sayCut && coach.text() !== line) coach.clear();
+    sayCut = false;
+    coach.step(line);
   }
   function updateCounter() { counterEl.textContent = "Bowls: " + S.count; }
 
@@ -537,7 +544,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     sendFoodAway();
     S.recipe = id; S.items = []; S.top = ""; pending = {};
     climb = 0; peaks = 0;
-    head.tries = 0; M.tries = 0; sayUntil = 0;
+    head.tries = 0; M.tries = 0; hush();
     tone(520, 0.12, 0.04, "sine", 780);
     learned("recipe");
     save();
@@ -750,7 +757,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     clearFlying();
     S.recipe = ""; S.items = []; S.top = ""; climb = 0; peaks = 0;
     sendFoodAway();
-    head.tries = 0; M.tries = 0; sayUntil = 0;
+    head.tries = 0; M.tries = 0; hush();
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }

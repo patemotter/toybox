@@ -415,7 +415,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var knife = { x: 2.05, y: -0.72, a: Math.PI, hold: null, anim: null, back: null, fx: 0, fy: 0 };
   var bowl = { offx: 0, offy: 0, swapT: -99, swapped: true, wig: 0, forkT: -99 };
   var parts = [];
-  var sayMsg = "", sayUntil = 0;
+  var sayUntil = 0, sayCut = false;
   var bowlCache = null;
   function bowlBuilt() {
     if (!bowlCache) bowlCache = S.bowl.map(function (b) { return buildFood(b.i, b.c, false); });
@@ -486,12 +486,19 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
 
   // ---------- Coach and counter ----------
-  var coachEl = $("coach"), counterEl = $("counter");
-  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
-  var lastCoach = "";
+  var coachEl = $("coach"), counterEl = $("counter"), coach = Toybox.coach(coachEl);
+  // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
+  // step line would cut it short in the shared coach.
+  function say(msg, ms) { ms = Math.max(3000, ms || 3000); sayUntil = Date.now() + ms; sayCut = false; coach.say(msg, ms / 1000); }
+  // Ends a running passing line; the next frame swaps it for the step line.
+  function hush() { if (Date.now() < sayUntil) sayCut = true; sayUntil = 0; }
   function updateCoach() {
-    var t = Date.now() < sayUntil ? sayMsg : coachText();
-    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+    if (Date.now() < sayUntil) return;
+    var line = coachText();
+    // The shared coach can only end a passing line by clearing; skip it when the text stays the same.
+    if (sayCut && coach.text() !== line) coach.clear();
+    sayCut = false;
+    coach.step(line);
   }
   function updateCounter() { counterEl.textContent = "Snacks: " + S.count; }
 
@@ -526,7 +533,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   function chooseFood(id) {
     if (locked() || !FOODS[id]) return;
     learned("pick");
-    sayUntil = 0;
+    hush();
     if (cur && cur.flying) { pending = id; save(); return; }
     if (cur && cur.f.apple && cur.pressed && !cur.pieces.length) return;
     if (cur && cur.order.length) { pending = id; sweep(); return; }
@@ -731,7 +738,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     flights = []; pending = ""; leaving = null;
     if (S.bowl.length) swapBowl();
     knife.anim = null; knife.hold = null; knife.back = { t0: now(), fx: knife.x, fy: knife.y, fa: knife.a };
-    sayUntil = 0;
+    hush();
     arrive(id);
     tone(500, 0.2, 0.04, "sine", 300);
   }

@@ -293,7 +293,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   var potSwirl = 0;
   var tops = {};                 // topping animations: id -> start time
   var parts = [];                // sparkles, drops and steam (scene coords)
-  var sayMsg = "", sayUntil = 0;
+  var sayUntil = 0, sayCut = false;
   function spatHome() { return { x: RAIL.x - 0.17, y: RAIL.y + 0.62, a: Math.PI }; }
   function ladleHome() { return { x: RAIL.x + 0.17, y: RAIL.y + 0.6, a: 0 }; }
   (function () { var h = spatHome(); spat.x = h.x; spat.y = h.y; h = ladleHome(); ladle.x = h.x; ladle.y = h.y; })();
@@ -412,12 +412,21 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
   }
 
   // ---------- Coach and counter ----------
-  var coachEl = $("coach"), counterEl = $("counter");
-  function say(msg, ms) { sayMsg = msg; sayUntil = Date.now() + Math.max(3000, ms || 3000); }
-  var lastCoach = "", lastCount = "";
+  var coachEl = $("coach"), counterEl = $("counter"), coach = Toybox.coach(coachEl);
+  // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
+  // step line would cut it short in the shared coach.
+  function say(msg, ms) { ms = Math.max(3000, ms || 3000); sayUntil = Date.now() + ms; sayCut = false; coach.say(msg, ms / 1000); }
+  // Ends a running passing line; the next frame swaps it for the step line.
+  function hush() { if (Date.now() < sayUntil) sayCut = true; sayUntil = 0; }
+  var lastCount = "";
   function updateCoach() {
-    var t = Date.now() < sayUntil ? sayMsg : coachFor(phase());
-    if (t !== lastCoach) { lastCoach = t; coachEl.textContent = t; }
+    if (Date.now() >= sayUntil) {
+      var line = coachFor(phase());
+      // The shared coach can only end a passing line by clearing; skip it when the text stays the same.
+      if (sayCut && coach.text() !== line) coach.clear();
+      sayCut = false;
+      coach.step(line);
+    }
     // One counter: pancakes while making pancakes, bowls at the pot.
     var c = wareNow() === "pan" ? "Pancakes: " + S.nP : "Bowls: " + S.nB;
     if (c !== lastCount) { lastCount = c; counterEl.textContent = c; }
@@ -499,7 +508,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (from !== to) { swap = { from: from, to: to, t0: now(), dur: reduce ? 0.2 : 1.1 }; tone(520, 0.12, 0.035, "sine", 700); }
     else tone(700, 0.08, 0.03, "sine", 900);
     learned("recipe");
-    sayUntil = 0;
+    hush();
     save();
   }
   function cancelDrags() {
@@ -512,14 +521,14 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var was = on();
     K.anim = { from: K.v, to: v, t0: now(), dur: reduce ? 0.1 : 0.45 };
     click();
-    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); learned("knob"); if (lastCoach === "Turn on the stove!") sayUntil = 0; }
+    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); learned("knob"); if (coach.text() === "Turn on the stove!") hush(); }
   }
   // Two-step rule: cooking with the stove off says "Turn on the stove!" and flashes the knob;
   // the second try turns it on for him.
   function needHeat() {
     if (on()) return true;
     K.tries++;
-    if (K.tries >= 2) { K.tries = 0; sayUntil = 0; knobTo(0.75); return true; }
+    if (K.tries >= 2) { K.tries = 0; hush(); knobTo(0.75); return true; }
     say("Turn on the stove!");
     K.flashUntil = now() + 3; K.wig = 1;
     gentle();
@@ -769,7 +778,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       else if (S.bowl.fill > 0) { burst(BOWL.x, BOWL.y - 0.2, 10, S.bowl.c || "#FFFFFF"); S.bowl = blankBowl(); }
       if (S.pot.level < 0.99) runFaucet(true);
     }
-    K.tries = 0; sayUntil = 0;
+    K.tries = 0; hush();
     save();
     tone(500, 0.2, 0.04, "sine", 300);
   }
@@ -968,7 +977,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (d.turn > 0.15) d.moved = true;
       var was = on();
       K.v = clamp(K.v + da / KNOB_SWEEP, 0, 1);
-      if (!was && on()) { click(); puff(0.5, 0.05, 900); learned("knob"); K.tries = 0; sayUntil = 0; }
+      if (!was && on()) { click(); puff(0.5, 0.05, 900); learned("knob"); K.tries = 0; hush(); }
       else if (was && !on()) click();
     } else if (d.kind === "jug") {
       jug.x = clamp(p.x + d.dx, X_L + 0.1, X_R - 0.1); jug.y = clamp(p.y + d.dy, -H_UP + 0.3, -0.25);
