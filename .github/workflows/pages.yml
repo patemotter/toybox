@@ -3,7 +3,8 @@
 # "Run workflow" in the Actions tab republishes on demand.
 #
 # The check job builds _site (the published files only: no tools/, archive/, plans/, .github/ or Markdown), stamps the
-# offline cache version into _site/sw.js, checks that every file is in the service worker's CORE list, and loads
+# offline cache version into _site/sw.js, checks that every file is in the service worker's CORE list, lints every
+# published script (tools/lint.js), and loads
 # every page in a browser at four sizes (tools/smoke.js: page errors, page scroll). If any of that fails, nothing
 # is published and the live Toybox stays as it was.
 #
@@ -29,13 +30,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the full history: the cache version counts commits
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Build _site (published files only)
         run: |
@@ -53,6 +54,12 @@ jobs:
 
       - name: Every published file is cached offline
         run: node tools/check-site.js _site
+
+      # Correctness rules only (undefined names, unreachable code, redeclared names); unused variables are warnings.
+      - name: Lint every published script
+        run: |
+          npm install --no-save --no-package-lock eslint@9.29.0 globals@16.3.0
+          QUIET=1 node tools/lint.js
 
       - name: Install Playwright (Chromium)
         run: |
@@ -73,7 +80,7 @@ jobs:
           for f in smoke-*.txt; do echo "== $f"; grep -v '^ok' "$f" || echo "all ok"; done
           exit $fail
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
           path: _site
@@ -83,13 +90,13 @@ jobs:
     continue-on-error: true
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Pages this change touched
         id: pages
@@ -127,7 +134,7 @@ jobs:
             for f in report/*-findings.txt; do
               echo "### $(basename "$f" -findings.txt)"; echo '```'; tail -c 30000 "$f"; echo '```'; done; } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.pages.outputs.count != '0'
         with:
           name: toybox-report
@@ -148,6 +155,6 @@ jobs:
       group: pages
       cancel-in-progress: true
     steps:
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

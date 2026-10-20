@@ -10,12 +10,13 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..'));
-const SKIP_DIRS = new Set(['.git', '.github', 'tools', 'archive', 'plans', 'node_modules']);
+// Like the deploy: dot folders (.git, .github, local tool folders) are never published either.
+const SKIP_DIRS = new Set(['tools', 'archive', 'plans', 'node_modules']);
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const rel = path.relative(ROOT, path.join(dir, e.name)).split(path.sep).join('/');
-    if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) walk(path.join(dir, e.name), out); }
+    if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) walk(path.join(dir, e.name), out); }
     else if (!/(^|\/)sw\.js$/.test(rel) && !/\.md$/.test(rel) && !e.name.startsWith('.')) out.push(rel);
   }
   return out;

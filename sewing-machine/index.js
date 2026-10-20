@@ -1487,7 +1487,6 @@
   window.addEventListener("pagehide", save);
   Toybox.init({
     app: "sewing-machine",
-    big: { button: $("bigToggle") },
     badge: $("tbadge"),
     timerIntro: "When time is up, the sewing machine finishes its stitch and stops, and the controls lock.",
     goodbyeOption: "End with a “Goodnight, sewing machine” button to press",

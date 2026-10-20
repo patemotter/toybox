@@ -87,8 +87,9 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
-- `tools/`: `smoke.js` (load + drag + error/scroll check), `buttons.js` (taps every button on every page and
-  flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
+- `tools/`: `smoke.js` (load + drag + error/scroll check), `lint.js` (ESLint correctness rules on every published
+  script, inline ones included; errors block the deploy, unused variables are warnings), `buttons.js` (taps every
+  button on every page and flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
   cut off by their button or tile at every test size, with the real font; `common/toybox.js` shrinks an overflowing
   label down to 70% as a safety net, so fix the layout when it reports something), `shot.js` (screenshots of one
   page at named sizes, with tap/drag/click steps; the everyday check), `changed-pages.js` (the pages a git range
@@ -127,8 +128,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/sw.js | grep CACHE`.
 - **The deploy checks first** (the `check` job): it builds `_site` from the tracked files minus `tools/`, `archive/`,
   `plans/`, `.github/` and Markdown (those stay in the repo but aren't published, so archived apps have no live URL), stamps
-  the cache version, runs `tools/check-site.js`, then `tools/smoke.js` on every page at 1180x820 and at 390x844 as a
-  phone. Any failure publishes nothing and the live Toybox stays as it was: fix it and push again. Pull requests
+  the cache version, runs `tools/check-site.js` and `tools/lint.js`, then `tools/smoke.js` on every page at 1180x820
+  and at 390x844 as a phone. Any failure publishes nothing and the live Toybox stays as it was: fix it and push again. Pull requests
   run the same checks without publishing.
 
 ---
@@ -211,7 +212,8 @@ Keep only:
   at least 16 px above the safe area. Text at least 14 px anywhere he looks. `tools/fit.js` and `tools/buttons.js`
   report small tiles, small targets and text-only buttons (problems on `tb-v2` pages, warnings elsewhere).
 - **No Big button** (the dad, 2026-10-10: it rarely changed what he could see): `common/toybox.js` hides every Big
-  button and keeps Big mode off (`Toybox.setBig` is a no-op, saved `toybox-big-<app>` values are ignored). Don't add one.
+  button that a page still passes as `big:` and keeps Big mode off (`Toybox.setBig` / `isBig` are no-op stubs, and
+  `onBig` is called once with false). Don't add one; when you touch a page that still wires one, remove it.
 - **Instructions sit big in the middle of the stage on every size** (the dad, 2026-10-15: he missed them at the top,
   then at the bottom; "just put it in the middle"). `common/toybox.css` centers every new `is-do` coach line; at
   his first touch it drops to the bottom of the stage (`is-seen`) so it never hides the work (the dad, 2026-10-15: left in
@@ -386,7 +388,7 @@ Keep only:
   `info.goodbye` says whether the Goodbye button will show. `endingMaxMs` (default 15000) for long goodbye
   animations (Rocket Builder uses ~36000).
 - `Toybox.timer.locked()` (ignore play input while ending/resting), `Toybox.sound.ready()` (AudioContext or null;
-  play sound only through it), `Toybox.makeHold(btn, ms, onDone)`, `Toybox.toast(msg)`, `Toybox.setBig(on)`.
+  play sound only through it), `Toybox.makeHold(btn, ms, onDone)`, `Toybox.toast(msg)`.
 - `Toybox.settings.get(id)` / `.onChange(fn)` / `.action(id, fn)`: app settings chosen on the home screen (stored in
   `toybox-settings-v1`). `home: true` in `Toybox.init` is for the launcher only.
 - `Toybox.fresh()`: true on the first load of a page under a new launch id. The launcher stores
@@ -397,7 +399,7 @@ Keep only:
   navigation; `data-tb-noguard` on a link exempts it.
 - The module swallows the click that follows a finished hold, syncs timer/sound/Big across open tabs, and
   re-reads state on back/forward restore. Don't copy timer/sound code into apps; extend `common/` instead.
-- Keys: `toybox-timer-v1`, `toybox-sound-v1` ("1"/"0"), `toybox-big-<app>`. App state uses an app-prefixed
+- Keys: `toybox-timer-v1`, `toybox-sound-v1` ("1"/"0"). App state uses an app-prefixed
   localStorage key. Wrap every storage access in try/catch. Keep saved formats backward compatible.
 - `common/toybox.js` calls `navigator.storage.persist()` on every page so iOS doesn't clear saved data
   (collections, settings, the offline cache) when the device is low on space. Keep it.
@@ -410,7 +412,8 @@ Keep only:
   `.js` file next to it with the page's name (`saw-bench.html` → `saw-bench.js`), loaded with `<script src>` at
   the same place, with a "Sections" list at its top (the titles of its section comments). No bundler. Add every
   new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it). Done so far: Saw Bench,
-  Tool Wall (`workshop/index.js`), Hammer & Screws, Car Builder, Marble Run, Timberrrrr! (`farm/woods.js`). Keep each Sections list current
+  Tool Wall (`workshop/index.js`), Hammer & Screws, Measuring, Car Builder, Marble Run, Rocket Builder, Train Builder,
+  3D Printer, Espresso Machine, Peg Drop, Timberrrrr! (`farm/woods.js`). Keep each Sections list current
   when you add or rename a section.
 - **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
   provides (the ghost hand from `tools/snippets`, the coach pill, audio setup), switch it to the shared version
@@ -475,9 +478,9 @@ small changes should take minutes, not tens of minutes.
   app or something it names; it isn't needed for a fix.
 
 ### Checking a change (match the checks to the change)
-- **Every change**: `node tools/check-site.js` (when files were added or renamed) and `node tools/smoke.js <changed
-  pages>`, then `node tools/shot.js <page>` and **look at** the picture of what changed (upright phone by
-  default; add `--sizes` for layout work). Drive the real action with `--do` steps (`tap:`, `drag:`, `click:`,
+- **Every change**: `node tools/check-site.js` (when files were added or renamed), `node tools/lint.js <changed
+  files>` (zero errors; don't add warnings) and `node tools/smoke.js <changed pages>`, then `node tools/shot.js
+  <page>` and **look at** the picture of what changed (upright phone by default; add `--sizes` for layout work). Drive the real action with `--do` steps (`tap:`, `drag:`, `click:`,
   `wait:`, `eval:`, `shot:`; see its header) instead of writing a new Playwright script.
 - **Layout or new UI** (panel, tiles, header, a new control): also `--sizes all` in `shot.js`.
 - **The slow finders run on GitHub, not locally**: after the push, the deploy workflow's **report** job runs
@@ -486,13 +489,16 @@ small changes should take minutes, not tens of minutes.
   pictures). It never blocks the deploy. Read it when it finishes (Claude: the GitHub tools `actions_list` /
   `get_job_logs`; elsewhere `gh run view --log`) and fix what it lists in a follow-up commit. Run `fit.js` or
   `buttons.js` locally only when you are fixing something they reported.
-- The deploy's **check** job (blocking) smoke-tests every page at four sizes; if it fails nothing is published.
+- The deploy's **check** job (blocking) lints every script and smoke-tests every page at four sizes; if it fails
+  nothing is published.
 
 ### Testing setup
 - Serve: `npx http-server . -p <your port> -c-1 -s` (a unique port per agent); tools take `PORT=<port>`.
 - Playwright: with a global install, scripts need `NODE_PATH=$(npm root -g)`. If its own Chromium isn't
   available, `CHANNEL=chrome` drives an installed Google Chrome. Don't run `playwright install` unless the
   download actually works. The tools block Google Fonts themselves.
+- Lint: `tools/lint.js` needs ESLint 9 and `globals`; install them outside the repo (e.g. `npm install --prefix
+  /tmp/toybox-lint eslint@9 globals`) and run with `NODE_PATH=/tmp/toybox-lint/node_modules`.
 - The tools set the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) so stations don't redirect to the
   gear-up; in your own scripts set them in sessionStorage (and `"workshop-check-skip"="1"`).
 

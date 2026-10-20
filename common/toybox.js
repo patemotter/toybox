@@ -1,24 +1,23 @@
-/* Toybox shared layer: play timer, sound setting, Big toggle, and the shared components every app is built
+/* Toybox shared layer: play timer, sound setting, and the shared components every app is built
  * from (Go, step row, job bar, tiles, bottom bar, coach, ghost hand, tap-or-drag, palm guard, gate, map: 6.).
  *
  * One timer and one sound setting for the whole Toybox (same origin, same localStorage):
  *   toybox-timer-v1  the play timer (wall-clock endAt, so it counts across apps and reloads)
  *   toybox-sound-v1  "1" or "0" (sound is OFF by default)
- *   toybox-big-<app> "1" or "0" (Big mode is remembered per app)
  * A change made in one open page reaches the others through the `storage` event.
  *
  * HOW AN APP ADOPTS IT
  * 1. In <head>, before the app's own <style> and <script>:
  *      <link rel="stylesheet" href="../common/toybox.css">
  *      <script src="../common/toybox.js"></script>
- *    (toybox.css has the tokens, .btn, .bigtoggle, .tbadge, sheet, toast, ending banner and
+ *    (toybox.css has the tokens, .btn, .tbadge, sheet, toast, ending banner and
  *    rest screen. The app's own CSS comes after it and may override anything.)
- * 2. In the page: a grown-up button, optionally an <svg class="tbadge" viewBox="0 0 60 60" hidden>
- *    for the time-left badge, and a <button class="btn bigtoggle"> (or let the module make one).
+ * 2. In the page: optionally an <svg class="tbadge" viewBox="0 0 60 60" hidden> for the time-left badge
+ *    (the launcher also has its grown-up button).
  *    Do NOT add the sheet, toast, farewell or rest markup: the module builds them.
  * 3. At the end of the app's script, once its scene is ready, call Toybox.init({...}):
  *      Toybox.init({
- *        app: "peg-drop",                         // folder name; used for the Big key
+ *        app: "peg-drop",                         // folder name; keys the turn-the-device choice
  *        grownButton: el,                         // home screen only: opens the sheet. In apps it is hidden:
  *                                                 // the Grown-ups sheet lives only on the Toybox home screen.
  *        home: true,                              // only the launcher passes this (sheet + App settings)
@@ -34,8 +33,8 @@
  *        restArt: function () { return '<svg class="rest-art" viewBox="..">..</svg>'; },
  *        soundNote: "Soft bubble sounds. Hold for 2 seconds.",
  *        sections: [el],                          // extra sheet sections (e.g. offline); moved in, unhidden
- *        big: { button: el } or { into: el },     // wire an existing .bigtoggle, or create one in `into`
- *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1", big: "fishtank-big-v1" },
+ *        big: { button: el },                     // removed feature: the button is only hidden (don't add one)
+ *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1" },
  *        orientation: "landscape",                // optional: "landscape" or "portrait". Held the other way,
  *                                                 // the app is covered by a "Turn it sideways!" / "Turn it
  *                                                 // upright!" card with a turning tablet and a small "Play
@@ -50,7 +49,7 @@
  *        onGoodbye: function () {},     // the goodbye button was pressed: a little farewell animation
  *        onRest: function () {},        // the rest screen is up (pause the loop if you like)
  *        onWake: function () {},        // back to idle after ending/rest (stop or unlock): wake things up
- *        onBig: function (on) {},       // Big mode changed (also called once at init)
+ *        onBig: function (on) {},       // removed feature: called once at init with false
  *        onSound: function (on) {},     // sound setting changed (also from another page)
  *        onOpen: function () {},        // the grown-up sheet opened (refresh the app's own sections)
  *        onTimer: function (info) {},   // badge-style updates: {phase, remainingMs, fraction, minutes, showMinutes}
@@ -63,7 +62,7 @@
  *      Toybox.sound.ready()    the AudioContext if sound is on and running, else null (use it to play)
  *      Toybox.sound.unlock()   create/resume the AudioContext; call inside a user gesture. The module
  *                              already does this on every pointerdown/click/keydown while sound is on.
- *      Toybox.setBig(on), Toybox.isBig(), Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
+ *      Toybox.setBig() / Toybox.isBig() are no-op stubs (Big is gone); Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
  *      Toybox.settings.get(id) an app setting chosen on the home screen (ids in SETTINGS below:
  *                              "mathgrid-voice", "printer-name", ...).
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
@@ -149,7 +148,7 @@
  *      Toybox.pics.play / .again (Go pictures).
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
  * 3.5 s passed) AND for done() (endingMaxMs, 15 s by default, at most), then 1.2 s more, then shows the rest screen.
- * body gets class "ending" while winding down, "resting" on the rest screen, "big" in Big mode,
+ * body gets class "ending" while winding down, "resting" on the rest screen,
  * "turn" while the turn-the-device card shows.
  */
 (function () {
@@ -192,7 +191,7 @@
       listTitle: "Which apps ask for something special",
       list: [
         "Turn the device: only Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
-        "Sound: every app has soft sound effects, all off until you turn sound on above",
+        "Sound: every app except Spin Shop has soft sound effects, all off until you turn sound on above",
         "Motion (tilt and shake): no app uses it; the Toybox never asks for motion access",
         "Nothing uses the camera, the microphone or location; after the first visit nothing needs the internet (it only checks for updates when online)"
       ] },
@@ -286,31 +285,18 @@
     hook("onSound", on);
   }
 
-  // ---------- Big ----------
-  var ICON_EXPAND = '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
-  var ICON_SHRINK = '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>';
+  // ---------- No page zoom ----------
   // No page zoom (the dad, 2026-10-10): Safari can ignore the viewport's user-scalable=no, so cancel its pinch
   // gesture events on every page. Pointer and touch events still arrive, so two-finger play keeps working.
   ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) {
     document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false });
   });
-  var bigBtn = null;
-  function bigKey() { return "toybox-big-" + (opts.app || "app"); }
-  // The Big button is gone (the dad, 2026-10-10: it rarely changed what he could see). Big mode is always off; the
-  // API stays so pages that ask still work, and saved "toybox-big-<app>" values are ignored.
-  function setBig(on, remember) {
-    on = false; remember = false;
-    document.body.classList.toggle("big", on);
-    if (bigBtn) {
-      bigBtn.setAttribute("aria-pressed", String(on));
-      bigBtn.setAttribute("aria-label", on ? "Show the controls" : "Full screen: hide the controls");
-      bigBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + (on ? ICON_SHRINK : ICON_EXPAND) + "</svg><span>" + (on ? "Back" : "Big") + "</span>";
-    }
-    if (remember !== false) put(bigKey(), on ? "1" : "0");
-    if (opts.big && typeof opts.big.onChange === "function") { try { opts.big.onChange(on); } catch (e) { /* ignore */ } }
-    hook("onBig", on);
-  }
-  function isBig() { return document.body.classList.contains("big"); }
+
+  // ---------- Big (removed) ----------
+  // The Big button is gone (the dad, 2026-10-10: it rarely changed what he could see). Pages that still pass `big:`
+  // get their button hidden, and these stubs keep their setBig/isBig/onBig calls working: Big mode is always off.
+  function setBig() { document.body.classList.remove("big"); hook("onBig", false); }
+  function isBig() { return false; }
 
   // ---------- Press-and-hold buttons (a quick tap does nothing) ----------
   // A finished hold often closes the sheet or rest screen while the finger is still down; the
@@ -324,6 +310,8 @@
     document.addEventListener("pointerup", function () {
       if (swallowArmed) { swallowArmed = false; swallowUntil = now() + 400; }
     }, true);
+    // A hold finished with the keyboard has no pointerup to swallow; don't let it eat the next tap's click.
+    document.addEventListener("keyup", function () { swallowArmed = false; }, true);
     document.addEventListener("click", function (e) {
       if (now() < swallowUntil) { swallowUntil = 0; e.preventDefault(); e.stopPropagation(); }
     }, true);
@@ -466,17 +454,10 @@
       else { opts.grownButton.hidden = true; opts.grownButton.style.display = "none"; opts.grownButton.setAttribute("aria-hidden", "true"); }
     }
 
-    var big = opts.big;
-    if (big) {
-      bigBtn = big.button || null;
-      if (!bigBtn && big.into) {
-        bigBtn = document.createElement("button");
-        big.into.appendChild(bigBtn);
-      }
-      if (bigBtn) {
-        bigBtn.classList.add("btn", "bigtoggle");
-        bigBtn.hidden = true; bigBtn.style.display = "none"; bigBtn.setAttribute("aria-hidden", "true");
-      }
+    var bigBtn = opts.big && opts.big.button;
+    if (bigBtn) {
+      bigBtn.classList.add("btn", "bigtoggle");
+      bigBtn.hidden = true; bigBtn.style.display = "none"; bigBtn.setAttribute("aria-hidden", "true");
     }
   }
 
@@ -617,7 +598,8 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () {
       el.classList.remove("show");
-      setTimeout(function () { el.hidden = true; }, 450);
+      // Kept in toastTimer too, so a new toast during the fade cancels the hiding.
+      toastTimer = setTimeout(function () { el.hidden = true; }, 450);
     }, 7000);
   }
   function hideToast() {
@@ -797,10 +779,6 @@
       if (s === "1" || s === "true" || s === "on") on = true;
       else { try { var o = JSON.parse(s || "null"); on = !!(o && o[legacy.soundField || "sound"] === true); } catch (e) { /* ignore */ } }
       if (on) put(SKEY, "1");
-    }
-    if (legacy.big && get(bigKey()) === null) {
-      var b = get(legacy.big);
-      if (b !== null) put(bigKey(), b === "1" ? "1" : "0");
     }
   }
 
@@ -1437,7 +1415,7 @@
   var UI = {
     back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
     home: '<path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/>',
-    big: ICON_EXPAND,
+    big: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     "new": '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 3.8v4.4h-4.4"/>',
     surprise: '<rect x="4.5" y="11" width="15" height="9.5" rx="1.5"/><path d="M3.5 7.5h17V11h-17z"/><path d="M12 7.5v13"/><path d="M12 7.5C10.5 4 7 3.6 7 5.6c0 1.4 2.4 1.9 5 1.9 2.6 0 5-.5 5-1.9 0-2-3.5-1.6-5 1.9"/>',
     shelf: '<path d="M3.5 20.5h17M4.5 20.5V4M19.5 20.5V4M4.5 12.5h15"/><path d="M7 12.5V8h3v4.5M13 12.5l1.6-4.6 2.6.9-1.3 3.7"/><path d="M7.5 20.5v-4.5h3.5v4.5"/>',
@@ -1462,6 +1440,12 @@
     document.addEventListener("pointermove", m, true);
     document.addEventListener("pointerup", u, true);
     document.addEventListener("pointercancel", u, true);
+    // iOS can drop the pointerup when the app goes to the background; a touch left behind would then count as a
+    // resting palm forever and block every later touch.
+    function clear() { touchesDown = {}; }
+    document.addEventListener("visibilitychange", clear);
+    window.addEventListener("pagehide", clear);
+    window.addEventListener("blur", clear);
   })();
   function isPalm(e) {
     if (!e || e.pointerType !== "touch") return false;
@@ -1470,6 +1454,8 @@
     for (var id in touchesDown) {
       if (Number(id) === e.pointerId) continue;
       var t = touchesDown[id];
+      // A touch older than 30 s lost its pointerup some other way: forget it rather than block everything.
+      if (now() - t.t > 30000) { delete touchesDown[id]; continue; }
       if (t.still && now() - t.t > 1000) return true;
     }
     return false;
@@ -1941,7 +1927,9 @@
       try { p = plan(); } catch (e) { p = null; }
       if (!p || !p.pts || !p.pts.length) return;
       var key = p.key || "*";
-      if (learnedK[key] || (counts[key] || 0) >= MAX) return;
+      // The key comes from the plan, so plan() must run first; when its move is used up, wait a whole idle
+      // time before asking again instead of calling plan() four times a second.
+      if (learnedK[key] || (counts[key] || 0) >= MAX) { last = now(); return; }
       armed = false; counts[key] = (counts[key] || 0) + 1;
       show(p);
     }, 250);
