@@ -35,28 +35,6 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
-  color-scheme: dark;
-}
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
 body {
@@ -227,8 +205,6 @@ body {
 .fx[aria-pressed="true"] .sw { background: #2E9E5B; }
 .fx[aria-pressed="true"] .sw::after { left: 15px; }
 
-/* ---------- Big mode: the panel goes away, the header stays (Big turns into Back) ---------- */
-body.big .tb-panel { display: none; }
 
 /* ---------- Timer bits on the picture (the shared toast and banner are moved into the stage) ---------- */
 .stage .toast { position: absolute; top: 14px; z-index: 2; font-size: 1.3rem; }
@@ -287,7 +263,7 @@ body.ending #view { cursor: default; }
   :root { --bh: 80px; --chip: 66px; }
 }
 
-/* Phones: icon-only Home and Big; no headings that repeat the tab name. */
+/* Phones: no headings that repeat the tab name. */
 @media (max-width: 600px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
   .grp-brush h2, .grp-colors h2, .grp-fx h2 { display: none; }
   .size { gap: 4px; font-size: 0.9rem; }
@@ -303,7 +279,6 @@ body.ending #view { cursor: default; }
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Kaleidoscope</h1>
-    <button class="btn tb-iconbtn" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
@@ -364,8 +339,8 @@ body.ending #view { cursor: default; }
 
   var KEY = "kaleido-v1";          // settings
   var AKEY = "kaleido-art-v1";     // saved drawing (downscaled PNG data URL)
-  // Timer, sound and Big are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "kaleido-timer-v1", OLD_SKEY = "kaleido-sound-v1", OLD_BKEY = "kaleido-big-v1";
+  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
+  var OLD_TKEY = "kaleido-timer-v1", OLD_SKEY = "kaleido-sound-v1";
   var OUT = "#1D2340";
   var COUNTS = [2, 3, 4, 6, 8, 12];
   var PALETTE = [
@@ -933,8 +908,8 @@ body.ending #view { cursor: default; }
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    // Big, the banner and the rest screen belong to the shared module (common/toybox.js).
-    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
+    // The banner and the rest screen belong to the shared module (common/toybox.js).
+    if (t.closest(".modal, .farewell, .rest")) return;
     if (!playing()) return;
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
     if (t.dataset.count) { state.count = Number(t.dataset.count); }
@@ -1204,11 +1179,10 @@ body.ending #view { cursor: default; }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { dirty = true; });
   // The old sound key said "on"/"off"; the shared module reads "1" for on.
   try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
+  // The shared grown-up layer: play timer and sound. It may start the ending right away
   // (a timer that ran out while away), so the picture is set up first.
   Toybox.init({
     app: "kaleidoscope",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the spinning slows, the picture fades, and the controls lock.",
     goodbyeOption: "End with a Goodbye spin button to press",
     farewellText: "Time to say goodbye",
@@ -1218,12 +1192,11 @@ body.ending #view { cursor: default; }
     restLine2: "It will be right here next time.",
     restArt: drawRestArt,
     soundNote: "Soft tones that go higher as a finger moves away from the middle. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY, big: OLD_BKEY },
+    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
     onEnding: onEnding,
     onGoodbye: goodbyeSpin,
     onRest: function () { endingDone = null; spinVel = 0; },
     onWake: function () { endingDone = null; dirty = true; },
-    onBig: function () { if (W) resize(); },
     onSound: function (on) { if (on) whooshSound(); },
     onTimer: function (info) { timerInfo = info; drawTimer(); }
   });

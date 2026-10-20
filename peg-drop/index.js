@@ -21,8 +21,8 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var KEY = "pegdrop-v1";
-  // Timer, sound and Big are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "pegdrop-timer-v1", OLD_SKEY = "pegdrop-sound-v1", OLD_BKEY = "pegdrop-big-v1";
+  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
+  var OLD_TKEY = "pegdrop-timer-v1", OLD_SKEY = "pegdrop-sound-v1";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var COLORS = [
@@ -1899,9 +1899,8 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
-    // The extra Big/Back buttons use the shared module (common/toybox.js).
-    if (t.dataset.action === "big") { Toybox.setBig(!Toybox.isBig()); return; }
-    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
+    // The banner and the rest screen belong to the shared module (common/toybox.js).
+    if (t.closest(".modal, .farewell, .rest")) return;
     // Phone tabs (Play / Board / Balls): show one group of controls at a time.
     if (t.classList.contains("tab")) {
       $("panel").dataset.tab = t.dataset.tab;
@@ -2050,11 +2049,10 @@
   build();
   // The old sound key said "on"/"off"; the shared module reads "1" for on.
   try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
+  // The shared grown-up layer: play timer and sound. It may start the ending right away
   // (a timer that ran out while away), so the board is built first.
   Toybox.init({
     app: "peg-drop",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the balls stop dropping and settle into the bins, and the controls lock.",
     goodbyeOption: "End with a Last drop button to press",
     farewellText: "Time to say goodbye",
@@ -2064,7 +2062,7 @@
     restLine2: "They will be right here next time.",
     restArt: restArt,
     soundNote: "Soft plinks as the balls bounce. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY, big: OLD_BKEY },
+    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
     onEnding: onEnding,
     onGoodbye: lastDrop,
     onRest: onRest,

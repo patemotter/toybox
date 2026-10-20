@@ -846,7 +846,7 @@
     var sw = x1 - x0;
     // Room for the coach line: at the bottom on phones, at the top on tablets.
     var phone = W < 600 || H < 500, padT = phone ? 4 : 52, padB = phone ? 34 : 4, ah = H - padT - padB;
-    // A lower camera on very wide stages (a phone held sideways in Big mode), so the layout fills the width.
+    // A lower camera on very wide stages (a phone held sideways), so the layout fills the width.
     var vsW = (W - 8) / sw, base = UPRIGHT ? 36 : 31;
     for (var k = base; k >= 25; k--) {
       setTilt(k / 50);
@@ -1622,10 +1622,9 @@
     W = Math.max(50, stage.clientWidth); H = Math.max(50, stage.clientHeight);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    // Upright or sideways is decided only when the screen itself changes (turning the device, Big on/off),
+    // Upright or sideways is decided only when the screen itself changes (turning the device),
     // never by a small change of the stage (a tab, a toast), so the layout can't flip while he plays.
-    var big = document.body.classList.contains("big");
-    var key = innerWidth + "x" + innerHeight + (big ? "b" : "");
+    var key = innerWidth + "x" + innerHeight;
     var turned = false;
     if (key !== orientKey || !run) { orientKey = key; turned = orient(bestUpright()); }
     if (turned || !run) startRun(); else buildLayer();
@@ -1674,8 +1673,6 @@
       var pc = state.pieces[i];
       if (TYPES[pc.t].eng) {
         toot();
-        // Big mode has no Go button: a tap on the engine starts a stopped train.
-        if (document.body.classList.contains("big") && !state.go) setGo(true);
         return;
       }
       if (sel === i) endSel(); else showSel(i);
@@ -2176,18 +2173,13 @@
     if (!state.pieces.length) return "Tap an engine!";
     if (!hasEngine()) return "Add an engine!";
     if (!carCount()) return "Now add cars!";
-    if (!state.go) return document.body.classList.contains("big") ? "Tap the engine!" : "Tap Go!";
+    if (!state.go) return "Tap Go!";
     if (state.layout === "switch" && !flipped) return "Tap a yellow arrow!";
     if (!tooted) return "Tap the engine!";
     return "";
   }
-  var coachT = 0;
-  function updateCoach() {
-    var el = $("coach"), txt = coachText();
-    clearTimeout(coachT);
-    if (txt) { el.textContent = txt; el.classList.remove("off"); }
-    else el.classList.add("off");
-  }
+  var coach = Toybox.coach($("coach"));
+  function updateCoach() { coach.step(coachText()); }
 
   // ---------- iOS zoom guards ----------
   ["gesturestart", "gesturechange"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }); });
@@ -2211,7 +2203,7 @@
     return [r.left + r.width * fx, r.top + r.height * fy];
   }
   // Idle help: tap an engine, then a car, then Go!, then (on Switches) a yellow arrow.
-  function vis(el) { return el && el.offsetParent && !document.body.classList.contains("big"); }
+  function vis(el) { return el && el.offsetParent; }
   function ghostPhase() {
     if (!state.pieces.length) return "engine";
     if (!carCount()) return "car";
@@ -2232,9 +2224,6 @@
     if (ph === "go") {
       var g = $("go");
       if (vis(g)) return { pts: [ghostPt(g, 0.5, 0.5)], tap: true };
-      // Big mode: show a tap on the engine instead
-      var e0 = carPoses()[0], rc = cv.getBoundingClientRect();
-      if (document.body.classList.contains("big") && e0 && TYPES[e0.p.t].eng) return { pts: [[rc.left + SX(e0.x), rc.top + SY(e0.y, e0.z + 26)]], tap: true };
       return null;
     }
     if (ph === "switch") {
@@ -2274,7 +2263,6 @@
   Toybox.init({
     app: "train-builder",
     badge: $("tbadge"),
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the train pulls into the station and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye toot button to press",
     farewellText: "Last stop!",
@@ -2291,7 +2279,6 @@
       if (run) { run.ending = false; run.endDone = null; run.dwell = 1; }
       state.go = false; save(); updateGo(); updateCoach();
     },
-    onBig: function () { setTimeout(resize, 30); updateCoach(); },
     onSound: function (on) { if (on) setTimeout(sChime, 60); }
   });
   if ($("tb-farewell")) stage.appendChild($("tb-farewell"));

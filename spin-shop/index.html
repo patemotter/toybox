@@ -33,28 +33,6 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #13233F;
-    --panel: #1C3157;
-    --ink: #EEF3FF;
-    --muted: #B4C1DE;
-    --edge: #9FB8E8;
-    --plate: #E6F2FF;
-    --focus: #FFC93C;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #13233F;
-  --panel: #1C3157;
-  --ink: #EEF3FF;
-  --muted: #B4C1DE;
-  --edge: #9FB8E8;
-  --plate: #E6F2FF;
-  --focus: #FFC93C;
-  color-scheme: dark;
-}
 html { scroll-padding-top: env(safe-area-inset-top, 0px); }
 *, *::before, *::after { box-sizing: inherit; }
 body {
@@ -87,8 +65,6 @@ html, body { height: 100%; }
 /* Speed: Stop / Slow / Fast / Zoom, the first row of the panel. */
 .speeds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .speeds .btn { min-height: 46px; font-size: 1.05rem; padding: 0.2rem 0.3rem; }
-/* Big mode: the panel goes away, the header stays (Big turns into Back). */
-body.big .tb-panel { display: none; }
 /* Timer: the shared toast and ending banner (common/toybox.js) sit inside the picture frame here. */
 .stage .toast { position: absolute; top: 10px; z-index: 2; font-size: 1.3rem; }
 .stage .farewell { position: absolute; bottom: 12px; z-index: 2; }
@@ -364,7 +340,6 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   <header class="tb-head">
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title">Spin Shop</h1>
-    <button class="btn tb-iconbtn" id="bigbtn" aria-pressed="false" aria-label="Full screen: hide the controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Big</span></button>
   </header>
 
   <div class="tb-body">
@@ -1387,7 +1362,7 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   function fitLabels() {
     Array.prototype.forEach.call(document.querySelectorAll(".mode span, .style span"), function (sp) {
       var b = sp.parentNode, cs = getComputedStyle(b);
-      if (!b.clientWidth) return; // hidden (Big mode): fitted again when shown
+      if (!b.clientWidth) return; // hidden: nothing to measure
       sp.style.fontSize = "";
       var room = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
       var w = sp.getBoundingClientRect().width;
@@ -1415,8 +1390,8 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     var t = e.target.closest("button");
     if (!t) return;
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
-    // Big, the timer banners and the rest screen are handled by the shared module (common/toybox.js).
-    if (t.id === "bigbtn" || t.closest(".modal, .farewell, .rest")) return;
+    // The timer banners and the rest screen are handled by the shared module (common/toybox.js).
+    if (t.closest(".modal, .farewell, .rest")) return;
     if (Toybox.timer.locked()) return;
     var cfg = state.per[state.mode];
     // Another action puts the colors away (a speed change does not: it is just how fast it turns).
@@ -1719,27 +1694,26 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   var grab = null;
   function ptrAng(e, c) { return Math.atan2(e.clientY - c[1], e.clientX - c[0]) * 180 / Math.PI; }
   // Coach: "Spin it!" until the first spin, then (once) "Tap a part to color it!" until he picks a part.
-  var paintHint = 0, pickedOnce = false;
+  var coach = Toybox.coach($("coach")), paintHint = 0, pickedOnce = false;
+  coach.step("Spin it!");
   function spun() {
-    $("coach").classList.add("off");
+    coach.clear();
     ghost.learned();
     if (paintHint) return;
     paintHint = setTimeout(function () {
       if (pickedOnce || Toybox.timer.locked()) return;
-      $("coach").textContent = "Tap a part to color it!";
-      $("coach").classList.remove("off");
-      setTimeout(function () { $("coach").classList.add("off"); }, 10000);
+      coach.say("Tap a part to color it!", 10);
     }, 3500);
   }
   function coachDone() {
     pickedOnce = true;
-    if (paintHint) $("coach").classList.add("off");
+    if (paintHint) coach.clear();
   }
   // A tap (not a turn) on a big part picks it for coloring; a tap on the background puts the colors away.
   function tapPick(el) {
     var c = el && el.closest ? el.closest("[data-c]") : null, id = c ? c.getAttribute("data-c") : "";
     var m = state.mode, cfg = state.per[m];
-    if (id && pickable(m, cfg, id) && !document.body.classList.contains("big")) { if (id !== picking) setPicking(id); }
+    if (id && pickable(m, cfg, id)) { if (id !== picking) setPicking(id); }
     else if (picking) setPicking("");
   }
   art.addEventListener("pointerdown", function (e) {
@@ -1836,12 +1810,11 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
   showTab(tab);
   render();
   fitLabels();
-  // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
+  // The shared grown-up layer: play timer and sound. It may start the ending right away
   // (a timer that ran out while away), so the picture is set up first.
   // The toast and the ending banner sit inside the picture frame, as before.
   Toybox.init({
     app: "spin-shop",
-    big: { button: $("bigbtn") },
     timerIntro: "For grown-ups. When time is up, the picture slows down and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye spin button to press",
     farewellText: "Time to say goodbye",
@@ -1857,13 +1830,12 @@ body.ending [data-action="surprise"] { pointer-events: none; opacity: 0.4; }
     onRest: function () {
       endingDone = null;
       vel = 0;
-      Toybox.setBig(false);
       $("tb-restLine").textContent = "The " + MODES[state.mode].label.toLowerCase() + " is resting.";
     },
     onWake: function () { endingDone = null; },
-    onBig: function (on) { if (!on) queueFit(); else if (picking) setPicking(""); },
     onTimer: drawTimer
   });
+  queueFit();
   $("stage").appendChild($("tb-toast"));
   // Idle help: the ghost hand turns the picture once around.
   var ghost = Toybox.ghost({ max: 2, plan: function () {

@@ -2921,7 +2921,7 @@
     if (started || !built) return null;
     var r = canvas.getBoundingClientRect(), db = $("dropBtn");
     // Where the hopper button is small (phones), show the big Drop button instead.
-    if (DROP_BTN.r * S < 30 && db.offsetWidth && !document.body.classList.contains("big")) return { pts: [ghostPt(db, 0.5, 0.55)], tap: true };
+    if (DROP_BTN.r * S < 30 && db.offsetWidth) return { pts: [ghostPt(db, 0.5, 0.55)], tap: true };
     return { pts: [[r.left + OX + DROP_BTN.x * S, r.top + OY + DROP_BTN.y * S]], tap: true };
   } });
   function worldPoint(e) {
@@ -3388,7 +3388,6 @@
   try { if (localStorage.getItem("marblerun-sound-v1") === "on") localStorage.setItem("marblerun-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "marble-run",
-    big: { button: $("bigToggle") },
     timerIntro: "When time is up, the lift stops, the marbles roll down to the tray and rest, and the controls lock.",
     goodbyeOption: "End with a Last marble button to press",
     farewellText: "Time to say goodbye",
@@ -3398,7 +3397,7 @@
     restLine2: "They will be right here next time.",
     restArt: restArt,
     soundNote: "Soft clicks, bells and rolling. Hold for 2 seconds.",
-    legacy: { timer: "marblerun-timer-v1", sound: "marblerun-sound-v1", big: "marblerun-big-v1" },
+    legacy: { timer: "marblerun-timer-v1", sound: "marblerun-sound-v1" },
     onEnding: onEnding,
     onGoodbye: lastMarble,
     onRest: onRest,

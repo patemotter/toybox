@@ -22,8 +22,8 @@
 
   var OUT = "#1D2340";
   var KEY = "rocketbuilder-v1";
-  // Timer, sound and Big are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "rocketbuilder-timer-v1", OLD_SKEY = "rocketbuilder-sound-v1", OLD_BKEY = "rocketbuilder-big-v1";
+  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
+  var OLD_TKEY = "rocketbuilder-timer-v1", OLD_SKEY = "rocketbuilder-sound-v1";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var PALETTE = [
@@ -544,7 +544,6 @@
   }
   $("scene").addEventListener("pointerdown", function (e) {
     if (Toybox.timer.phase() === "resting") return;
-    if (e.target.closest && e.target.closest("button")) return;   // the Big/Back button sits on the picture
     var p = svgPoint(e);
     sparkles(p.x, p.y, 7, 50);
     if (Toybox.timer.locked()) return;
@@ -557,7 +556,7 @@
   // and lines up that part's shapes in Build. A tap on the sky or the ground puts the colors away.
   function tapPart(el) {
     var onR = el.closest && el.closest("#rocketG");
-    if (!onR || document.body.classList.contains("big")) { if (picking) setPicking(""); return; }
+    if (!onR) { if (picking) setPicking(""); return; }
     var c = el.closest("[data-c]"), part = c ? c.getAttribute("data-c") : "body";
     state.buildPart = part === "body" ? (state.windows ? "windows" : "stages") : part;
     if (part !== picking) setPicking(part);
@@ -839,8 +838,8 @@
     var t = e.target.closest("button");
     if (!t) return;
     if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
-    // Big, the banner and the rest screen belong to the shared module (common/toybox.js).
-    if (t.id === "bigToggle" || t.closest(".modal, .farewell, .rest")) return;
+    // The banner and the rest screen belong to the shared module (common/toybox.js).
+    if (t.closest(".modal, .farewell, .rest")) return;
     if (t.id === "fback" || t.id === "fbuild") { closeFlight(); return; }
     if (t.id === "again") {
       if (fl && fl.waitHome) { flyHome(); return; }
@@ -2788,12 +2787,10 @@
   render();
   // The old sound key said "on"/"off"; the shared module reads "1" for on.
   try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer, sound, Big. It may start the ending right away
+  // The shared grown-up layer: play timer and sound. It may start the ending right away
   // (a timer that ran out while away), so the rocket is drawn first.
   Toybox.init({
     app: "rocket-builder",
-    big: { button: $("bigToggle") },
-    onBig: function (on) { if (on && picking) setPicking(""); },
     timerIntro: "When time is up, the rocket flies home, lands and rests, and the controls lock.",
     goodbyeOption: "End with a Goodbye launch button to press",
     farewellText: "Time to say goodbye",
@@ -2803,7 +2800,7 @@
     restLine2: "It will be right here next time.",
     restArt: restArt,
     soundNote: "Soft beeps and rocket rumble. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY, big: OLD_BKEY },
+    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
     onEnding: onEnding,
     // The goodbye flight takes about 26 s, and a trip cut short flies home in about 30 s at most;
     // give it room to land before the rest screen.
