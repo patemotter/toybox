@@ -143,7 +143,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var STATEKEY = "site-crane-v1";
 
   // ---------- World (units; y is up, ground at y = 0) ----------
-  var WORLD_L = -175, WORLD_R = 925, VIEW_UP = 690, VIEW_DOWN = 34, MINW = 480;
+  var WORLD_L = -175, WORLD_R = 925, VIEW_UP = 690, VIEW_DOWN = 34;
   var MAST_L = 62, MAST_R = 118, MAST_C = 90, MAST_TOP = 512;
   var JIB_B = 540, JIB_T = 578, JIB_TIP = 880, CJ_END = -150, APEX_Y = 664;
   var TY = 518;                           // the hoist cable leaves the trolley here
@@ -558,35 +558,19 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- Canvas and camera ----------
-  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0, camC = 300, camSet = false;
+  var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0;
   function resize() {
     var r = $("stage").getBoundingClientRect();
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cw = Math.max(1, r.width - 6); ch = Math.max(1, r.height - 6);
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
-    // Fit the crane's height; on a narrow (upright) stage show a window at least MINW wide that pans with the hook.
-    // Tablets show more of the site (the mast and the building together); phones zoom in on the hook.
-    var wantW = Math.max(MINW, Math.min(860, cw * 0.9));
-    S = Math.min(ch / (VIEW_UP + VIEW_DOWN), cw / wantW);
-    OY = ch - VIEW_DOWN * S;
-    camSet = false;
-    camera(0);
+    // Fit the whole crane, counter-jib to jib end, at every size, so nothing of it ever leaves the stage.
+    S = Math.min(ch / (VIEW_UP + VIEW_DOWN), cw / (WORLD_R - WORLD_L));
+    // Spare height lifts the ground above the coach line's place at the bottom of the stage.
+    OY = ch - VIEW_DOWN * S - clamp(ch - (VIEW_UP + VIEW_DOWN) * S, 0, 56);
+    camera();
   }
-  function camera(dt) {
-    var visW = cw / S, full = WORLD_R - WORLD_L, c;
-    if (visW >= full) c = (WORLD_L + WORLD_R) / 2;
-    else {
-      // Follow the hook; carrying, look ahead to the building; wider stages lean toward the whole site.
-      var hx = hookX(), focus = carried && allowed(carried.kind) ? (hx + BC) / 2 : hx;
-      focus = clamp(focus, hx - visW / 2 + 60, hx + visW / 2 - 60);
-      var wide = clamp((visW - MINW) / 300, 0, 1) * 0.75;
-      focus += (470 - focus) * wide;
-      c = clamp(focus, WORLD_L + visW / 2, WORLD_R - visW / 2);
-    }
-    if (!camSet || dt === 0) { camC = c; camSet = true; }
-    else camC += (c - camC) * (1 - Math.exp(-2.6 * dt));
-    OX = cw / 2 - camC * S;
-  }
+  function camera() { OX = cw / 2 - (WORLD_L + WORLD_R) / 2 * S; }
   window.addEventListener("resize", resize);
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - 3 - OX) / S, y: (OY - (cy - r.top - 3)) / S }; }
   function worldToScreen(x, y) { var r = cv.getBoundingClientRect(); return [r.left + 3 + OX + x * S, r.top + 3 + OY - y * S]; }
@@ -1175,7 +1159,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     lastT = t;
     var phase = Toybox.timer.phase();
     if (phase !== "resting") step(dt);
-    camera(dt);
     draw(clock);
     coachTick();
     humT += dt; if (humT > 0.1) { humT = 0; humTick(); }

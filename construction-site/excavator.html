@@ -379,9 +379,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
 
   // ---------- Canvas and camera ----------
-  // Wide stages show the whole site. Tall stages (an upright phone or iPad) zoom in on the machine and pan
-  // between the dirt side and the truck side as it swings; the extra height goes to sky and a strip of
-  // ground in front, where the treasure crate sits clear of the coach line.
+  // Every stage shows the whole site, so the excavator and the truck it loads are always fully on screen.
+  // Tall stages (an upright phone or iPad) fit the site's width and keep it low, so a new instruction in the
+  // middle of the stage sits in the sky; on a phone a strip of ground in front leaves room for the coach line.
   var cv = $("cv"), ctx = cv.getContext("2d"), dpr = 1, cw = 0, ch = 0, S = 1, OX = 0, OY = 0, WIN = WORLD_W, PAN = false;
   function coachAtBottom() { return innerWidth <= 600 || (innerWidth > innerHeight && innerHeight <= 520); }
   function resize() {
@@ -391,7 +391,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
     PAN = ch > cw * 0.95;
     if (PAN) {
-      S = Math.min(ch / 640, cw / (cw > 600 ? 640 : 480));
+      S = cw / (VIEW_X1 - VIEW_X0);
       OY = ch - (VIEW_DOWN + (coachAtBottom() ? 56 / S : 0)) * S;
     } else {
       // the whole site plus a small margin, so the truck's cab and the machine never touch the edges
@@ -401,14 +401,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     WIN = cw / S;
     camera();
   }
-  function wideView() { return WIN >= WORLD_W; }
-  // Left edge of the view: f = 0 on the dirt side, 1 on the truck side.
-  function camLeft(f) {
-    if (wideView()) return (VIEW_X0 + VIEW_X1) / 2 - WIN / 2;
-    var back = clamp((WIN - 480) * 0.4, 0, 60); // a wider window also shows the back of the machine
-    return lerp(CX - 95 - back, CX + 95 + back - WIN, f);
-  }
-  function camera() { OX = -camLeft(smooth(m.swing / Math.PI)) * S; }
+  // The view is always at least as wide as the whole site (see resize), so it stays centered on it.
+  function camLeft() { return (VIEW_X0 + VIEW_X1) / 2 - WIN / 2; }
+  function camera() { OX = -camLeft() * S; }
   window.addEventListener("resize", resize);
   if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe($("stage"));
   function screenToWorld(cx, cy) { var r = cv.getBoundingClientRect(); return { x: (cx - r.left - OX) / S, y: (OY - (cy - r.top)) / S }; }
@@ -418,7 +413,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function visTop() { return OY / S; }
   // The treasure crate: in the strip of ground in front, at the left edge of a wide view, or (when the view
   // pans) under the excavator, where both the dirt side and the truck side can see it.
-  function crateX() { return wideView() ? visLeft() + 82 : CX; }
+  function crateX() { return visLeft() + 82; }
   var CRATE_TOP = -4;
 
   function path(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); }
@@ -483,7 +478,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       }
     }
     // traffic cones at the edges
-    if (WIN < WORLD_W) drawCone(L + 40, 4); // (a wide view has the treasure crate there)
     drawCone(R - 40, 4);
   }
   function drawCone(x, y) {
@@ -910,7 +904,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ----- Dig and Dump: whole motions that run by themselves (calm) -----
   function digSpot() {
     var lo = CX + 215, hi = CX + 470;
-    if (WIN < WORLD_W) hi = Math.min(hi, camLeft(0) + WIN - 70);
     var best = lo, bestV = -1e9;
     for (var x = lo; x <= hi; x += 6) { var v = pileAt(x) - (x - lo) * 0.12; if (v > bestV) { bestV = v; best = x; } }
     return { lx: best - CX + 13, top: pileAt(best) };
@@ -1287,10 +1280,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else if (t.state === "leaving") {
       t.v = Math.min(350, t.v + 200 * dt); t.dx -= t.v * dt; t.wheel -= t.v * dt / 27;
       if (Math.random() < 0.3) puffs.push({ x: t.dx + 300, y: 30, r: 10, vr: 30, vx: 40, vy: 30, life: 0, max: 0.9, col: "#C8A06A", a: 0.5 });
-      if (t.dx + 330 < Math.min(visLeft(), camLeft(1)) - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
+      if (t.dx + 330 < visLeft() - 20) { truckCount++; truck = newTruck(truckCount); truck.t = 0; truck.state = "gone"; }
     } else if (t.state === "gone") {
       t.t += dt;
-      if (t.t > 1.2) { t.state = "arriving"; t.dx = Math.min(visLeft(), camLeft(1)) - 360; t.t = 0; t.beepT = 0; say("Beep beep! New truck!", 3200); }
+      if (t.t > 1.2) { t.state = "arriving"; t.dx = visLeft() - 360; t.t = 0; t.beepT = 0; say("Beep beep! New truck!", 3200); }
     } else if (t.state === "arriving") {
       var dist = -t.dx;
       t.v = clamp(dist * 1.1, 30, 200); t.dx = Math.min(0, t.dx + t.v * dt); t.wheel += t.v * dt / 27;
