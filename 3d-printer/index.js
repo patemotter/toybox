@@ -1,0 +1,2080 @@
+// Script of 3d-printer/index.html, loaded by a plain <script src> at the same place in the page.
+// Sections, in order (search for the title to jump to one):
+//   - Colors
+//   - Saved settings
+//   - Stroke font for the name sign (4 wide, 6 tall grid)
+//   - Model geometry
+//   - Slicing and drawing prints
+//   - The printer scene (canvas)
+//   - Printing
+//   - Frame update
+//   - Controls
+//   - Viewer: look at one print big and turn it
+//   - Tabs, buttons
+//   - Surprise: a fun moment on the printer right now
+//   - Sound (off by default; soft and synthesized)
+//   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
+//   - Main loop
+//   - Ghost hand
+
+(function () {
+  "use strict";
+
+  var OUT = "#1D2340";
+  var KEY = "3dprinter-v1";
+  var SHKEY = "3dprinter-shelf-v1";
+  var PKEY = "3dprinter-purge-v1";
+  var SHELF_MAX = 20;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- Colors ----------
+  // Filaments: [id, name, color, kind]. Kinds change how a print is shaded.
+  var FILS = [
+    ["orange", "Benchy orange", "#FF7A1A", "basic"], ["red", "Red", "#E63946", "basic"],
+    ["yellow", "Yellow", "#FFC93C", "basic"], ["green", "Green", "#2E9E5B", "basic"],
+    ["sky", "Sky blue", "#5BC0EB", "basic"], ["blue", "Blue", "#2D5BD7", "basic"],
+    ["purple", "Purple", "#7B4FC9", "basic"], ["pink", "Pink", "#F26CA7", "basic"],
+    ["white", "White", "#F2F2EE", "basic"], ["black", "Black", "#383B44", "basic"],
+    ["grey", "Grey", "#9AA3AF", "basic"], ["sgold", "Silk gold", "#D9A532", "silk"],
+    ["ssilver", "Silk silver", "#BFC6D1", "silk"], ["scopper", "Silk copper", "#C7663A", "silk"],
+    ["mmint", "Matte mint", "#86D3B0", "matte"], ["mlilac", "Matte lilac", "#B7A0E0", "matte"],
+    ["gglow", "Glow green", "#C6F28A", "glow"], ["bglow", "Glow blue", "#9FE6FF", "glow"],
+    // Gradient filaments change color along the spool, so a print changes color as it grows.
+    ["rainbow", "Rainbow", "#E63946", "grad", ["#E63946", "#FF7A1A", "#FFC93C", "#2E9E5B", "#2D5BD7", "#7B4FC9"]],
+    ["sunset", "Sunset", "#FF7A1A", "grad", ["#FF8A1F", "#F26CA7", "#7B4FC9"]],
+    ["ocean", "Ocean", "#2D5BD7", "grad", ["#2D5BD7", "#1FB5B5", "#2E9E5B"]],
+    // Sparkle filaments: a base color full of glitter flecks.
+    ["galaxy", "Galaxy black", "#2C2747", "sparkle"], ["sblue", "Sparkle blue", "#2D5BD7", "sparkle"],
+    ["spurple", "Sparkle purple", "#7B4FC9", "sparkle"]
+  ];
+  var FIL = {};
+  FILS.forEach(function (f) { FIL[f[0]] = { id: f[0], name: f[1], hex: f[2], kind: f[3], stops: f[4] || null }; });
+  function fil(id) { return FIL[id] || FIL.orange; }
+  // The filament's color at point t (0..1) along a print's height. Plain filaments ignore t.
+  function hexAt(id, t) {
+    var f = fil(id);
+    if (!f.stops) return f.hex;
+    var n = f.stops.length - 1, u = clamp(t || 0, 0, 1) * n, i = Math.min(n - 1, Math.floor(u));
+    return mix(f.stops[i], f.stops[i + 1], u - i);
+  }
+  // Small fixed pseudo-random numbers (same every time, so baked pictures stay the same).
+  function hash(a, b) { var x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); }
+
+  function rgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+  function mix(a, b, t) {
+    var x = rgb(a), y = rgb(b);
+    return "#" + [0, 1, 2].map(function (k) {
+      var v = Math.round(x[k] + (y[k] - x[k]) * t);
+      v = Math.max(0, Math.min(255, v));
+      return (v < 16 ? "0" : "") + v.toString(16);
+    }).join("");
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---------- Saved settings ----------
+  function freshState() {
+    return { model: "benchy", multi: false, slots: ["orange", "white", "blue", "black"], sel: 0, name: "TOYBOX", faster: false };
+  }
+  function cleanName(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 8); }
+  function loadState() {
+    var s = freshState();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (MODEL_BY[o.model]) s.model = o.model;
+        if (typeof o.multi === "boolean") s.multi = o.multi;
+        if (Array.isArray(o.slots) && o.slots.length === 4) o.slots.forEach(function (f, i) { if (FIL[f]) s.slots[i] = f; });
+        if (o.sel >= 0 && o.sel < 4) s.sel = o.sel | 0;
+        if (typeof o.name === "string" && cleanName(o.name)) s.name = cleanName(o.name);
+        if (typeof o.faster === "boolean") s.faster = o.faster;
+      }
+    } catch (e) { /* storage unavailable or bad data: use defaults */ }
+    return s;
+  }
+  // The name sign letters are a grown-up setting on the Toybox home screen ("printer-name"), so the
+  // saved state no longer holds them (an old saved name is carried over once, below).
+  function save() {
+    var o = {};
+    Object.keys(state).forEach(function (k) { if (k !== "name") o[k] = state[k]; });
+    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
+  }
+  function printerName() { return cleanName(Toybox.settings.get("printer-name")) || "TOYBOX"; }
+
+  // ---------- Stroke font for the name sign (4 wide, 6 tall grid) ----------
+  var FONT_SRC = {
+    A: "0,0 0,4 2,6 4,4 4,0|0,3 4,3", B: "0,0 0,6 3,6 4,5 4,4 3,3 0,3|3,3 4,2 4,1 3,0 0,0",
+    C: "4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1", D: "0,0 0,6 2,6 4,4 4,2 2,0 0,0", E: "4,6 0,6 0,0 4,0|0,3 3,3",
+    F: "4,6 0,6 0,0|0,3 3,3", G: "4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,3 2,3", H: "0,0 0,6|4,0 4,6|0,3 4,3",
+    I: "2,0 2,6|1,6 3,6|1,0 3,0", J: "4,6 4,1 3,0 1,0 0,1", K: "0,0 0,6|4,6 0,2|1.4,3.4 4,0", L: "0,6 0,0 4,0",
+    M: "0,0 0,6 2,3 4,6 4,0", N: "0,0 0,6 4,0 4,6", O: "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0",
+    P: "0,0 0,6 3,6 4,5 4,4 3,3 0,3", Q: "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0|2.5,1.5 4,0",
+    R: "0,0 0,6 3,6 4,5 4,4 3,3 0,3|2,3 4,0", S: "4,5 3,6 1,6 0,5 0,4 1,3 3,3 4,2 4,1 3,0 1,0 0,1",
+    T: "0,6 4,6|2,6 2,0", U: "0,6 0,1 1,0 3,0 4,1 4,6", V: "0,6 2,0 4,6", W: "0,6 1,0 2,3 3,0 4,6",
+    X: "0,0 4,6|0,6 4,0", Y: "0,6 2,3 4,6|2,3 2,0", Z: "0,6 4,6 0,0 4,0",
+    "0": "1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0", "1": "1,5 2,6 2,0|1,0 3,0", "2": "0,5 1,6 3,6 4,5 4,4 0,0 4,0",
+    "3": "0,5 1,6 3,6 4,5 4,4 3,3 4,2 4,1 3,0 1,0 0,1|1.5,3 3,3", "4": "3,0 3,6 0,2 4,2",
+    "5": "4,6 0,6 0,3 3,3.5 4,2.5 4,1 3,0 1,0 0,1", "6": "4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,2 3,3 0,3",
+    "7": "0,6 4,6 1.5,0", "8": "1,3 0,4 0,5 1,6 3,6 4,5 4,4 3,3 1,3 0,2 0,1 1,0 3,0 4,1 4,2 3,3",
+    "9": "0,1 1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,4 1,3 4,3"
+  };
+  var FONT = {};
+  Object.keys(FONT_SRC).forEach(function (k) {
+    FONT[k] = FONT_SRC[k].split("|").map(function (line) {
+      return line.split(" ").map(function (p) { var a = p.split(","); return [Number(a[0]), Number(a[1])]; });
+    });
+  });
+
+  // ---------- Model geometry ----------
+  // A model is sliced into flat layers. Each layer is a list of polygons seen from above:
+  // { pts: [[x, y]...], holes: [[[x, y]...]], pi: part index, dark: true for a dark top detail }.
+  // x runs left-right, y runs front (negative) to back, z is up. Units are about 1 mm * 2.
+  function circle(cx, cy, r, n) {
+    var pts = [], i;
+    for (i = 0; i < n; i++) { var a = i / n * Math.PI * 2; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    return pts;
+  }
+  function rect(x0, y0, x1, y1) { return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]; }
+  function rrect(x0, y0, x1, y1, r) {
+    var pts = [], c = [[x1 - r, y0 + r, -90], [x1 - r, y1 - r, 0], [x0 + r, y1 - r, 90], [x0 + r, y0 + r, 180]];
+    c.forEach(function (q) {
+      for (var k = 0; k <= 3; k++) { var a = (q[2] + k * 30) * Math.PI / 180; pts.push([q[0] + Math.cos(a) * r, q[1] + Math.sin(a) * r]); }
+    });
+    return pts;
+  }
+  // A thick line as a polygon (used for letters drawn on a flat top).
+  function bar(x0, y0, x1, y1, w) {
+    var dx = x1 - x0, dy = y1 - y0, l = Math.sqrt(dx * dx + dy * dy) || 1, nx = -dy / l * w / 2, ny = dx / l * w / 2;
+    return [[x0 + nx, y0 + ny], [x1 + nx, y1 + ny], [x1 - nx, y1 - ny], [x0 - nx, y0 - ny]];
+  }
+  function segDist(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+    var x = ax + dx * t - px, y = ay + dy * t - py;
+    return Math.sqrt(x * x + y * y);
+  }
+  // Where a horizontal line at height z crosses a side-view polygon: [[x0, x1], ...].
+  function scanPoly(poly, z) {
+    var xs = [], i, n = poly.length;
+    for (i = 0; i < n; i++) {
+      var a = poly[i], b = poly[(i + 1) % n];
+      if ((a[1] <= z && b[1] > z) || (b[1] <= z && a[1] > z)) xs.push(a[0] + (z - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+    }
+    xs.sort(function (p, q) { return p - q; });
+    var out = [];
+    for (i = 0; i + 1 < xs.length; i += 2) out.push([xs[i], xs[i + 1]]);
+    return out;
+  }
+  // Where a horizontal line at height z crosses a thick stroke (capsule of radius r).
+  function scanStroke(a, b, r, z) {
+    var lo = Infinity, hi = -Infinity, n = 16, k;
+    for (k = 0; k <= n; k++) {
+      var x = lerp(a[0], b[0], k / n), y = lerp(a[1], b[1], k / n), d = Math.abs(y - z);
+      if (d < r) { var w = Math.sqrt(r * r - d * d); lo = Math.min(lo, x - w); hi = Math.max(hi, x + w); }
+    }
+    return lo < hi ? [lo, hi] : null;
+  }
+  function mergeIv(iv) {
+    iv.sort(function (p, q) { return p[0] - q[0]; });
+    var out = [];
+    iv.forEach(function (v) {
+      var l = out[out.length - 1];
+      if (l && v[0] <= l[1] + 0.5) l[1] = Math.max(l[1], v[1]); else out.push([v[0], v[1]]);
+    });
+    return out;
+  }
+  // Intervals stood up into slabs of depth y0..y1.
+  function slabs(iv, y0, y1, pi, out) {
+    iv.forEach(function (v) { if (v[1] - v[0] > 0.8) out.push({ pts: rect(v[0], y0, v[1], y1), pi: pi }); });
+  }
+
+  // Benchy: the classic little tugboat.
+  function hullW(z) { return 17 + 14 * Math.pow(clamp(z / 40, 0, 1), 0.6); }
+  function bowX(z) { return 40 + 18 * (z / 40); }
+  function sternX(z) { return -46 - 5 * (z / 40); }
+  function hullPts(z) {
+    var w = hullW(z), xb = bowX(z), xs = sternX(z), bs = xb - 40, pts = [], i, n = 16, rc = 7, u;
+    pts.push([xs, -w + rc], [xs + rc * 0.3, -w + rc * 0.3], [xs + rc, -w], [bs, -w]);
+    for (i = 1; i <= n; i++) { u = i / n; pts.push([bs + u * (xb - bs), -w * Math.pow(Math.max(0, 1 - Math.pow(u, 2.2)), 0.55)]); }
+    for (i = n - 1; i >= 1; i--) { u = i / n; pts.push([bs + u * (xb - bs), w * Math.pow(1 - Math.pow(u, 2.2), 0.55)]); }
+    pts.push([bs, w], [xs + rc, w], [xs + rc * 0.3, w - rc * 0.3], [xs, w - rc]);
+    return pts;
+  }
+  function cabinFront(z) { return 9 + (z - 40) * 0.1; }
+  function benchyLayer(z, top) {
+    var P = [];
+    if (z < 40) P.push({ pts: hullPts(z), pi: 0 });
+    if (z >= 40 && z < 80) {
+      P.push({ pts: rrect(-34, -23, cabinFront(z), 23, 3), pi: 1 });
+      if (z < 52) P.push({ pts: rect(-48, -7, -40, 7), pi: 1 });
+      if (z >= 50 && z < 52) P.push({ pts: rect(-46.5, -4, -41.5, 4), pi: 1, dark: true });
+    }
+    if (z >= 80 && z < 86) P.push({ pts: rrect(-42, -29, 16, 29, 4), pi: 2 });
+    if (z >= 86) {
+      var cx = -26 - (z - 86) * 0.24;
+      P.push({ pts: circle(cx, 0, 7.5, 20), pi: 3 });
+      if (top) P.push({ pts: circle(cx, 0, 4.4, 14), pi: 3, dark: true });
+    }
+    return P;
+  }
+  function benchyDecal(x, y, z) {
+    if (z < 40) {
+      var w = hullW(z), ay = Math.abs(y);
+      if (ay > w - 3.5) {
+        if (Math.pow(x + 26, 2) + Math.pow(z - 27, 2) < 20 || Math.pow(x + 6, 2) + Math.pow(z - 27, 2) < 20) return "dark";
+      }
+      var hx = bowX(z) - 15;
+      if (ay > 4 && Math.pow((x - hx) / 4.5, 2) + Math.pow((z - 33) / 3.2, 2) < 1) return "dark";
+      return null;
+    }
+    if (z < 80) {
+      if (x < -38) return null;
+      if (x > cabinFront(z) - 2.5 && z > 56 && z < 74 && Math.abs(y) > 3 && Math.abs(y) < 18) return "dark";
+      if (Math.abs(y) > 20.5 && z > 54 && z < 74 && ((x > -28 && x < -15) || (x > -11 && x < 2))) return "dark";
+      if (x < -32 && Math.abs(y) < 12 && z < 72) return "dark";
+    }
+    return null;
+  }
+
+  // Calibration cube with X, Y and Z letters.
+  var CUBE_X = [[-13, -17, 13, 17], [-13, 17, 13, -17]];
+  var CUBE_Y = [[-13, 17, 0, 1], [13, 17, 0, 1], [0, 1, 0, -17]];
+  function cubeLayer(z, top) {
+    var P = [{ pts: rect(-38, -38, 38, 38), pi: 0 }];
+    if (top) [[-13, 13, 13, 13], [13, 13, -13, -13], [-13, -13, 13, -13]].forEach(function (s) { P.push({ pts: bar(s[0], s[1], s[2], s[3], 5), pi: 0, dark: true }); });
+    return P;
+  }
+  function onLetter(list, u, v) { return list.some(function (s) { return segDist(u, v, s[0], s[1], s[2], s[3]) < 2.8; }); }
+  function cubeDecal(x, y, z) {
+    if (y < -36.5 && onLetter(CUBE_X, x, z - 38)) return "dark";
+    if (x > 36.5 && onLetter(CUBE_Y, y, z - 38)) return "dark";
+    return null;
+  }
+
+  // Rocket with three fins and a round window.
+  var WIN_A = -Math.PI / 2 + 0.35;
+  function rocketLayer(z, top) {
+    var P = [], r;
+    if (z < 100) r = 25; else r = Math.max(2, 25 * Math.sqrt(Math.max(0, 1 - Math.pow((z - 100) / 50, 2))));
+    if (z < 100) P.push({ pts: circle(0, 0, r, 28), pi: 0 });
+    else P.push({ pts: circle(0, 0, r, 24), pi: 1 });
+    if (z < 46) {
+      var ro = 24 + 30 * Math.pow(1 - z / 46, 0.7) + 4;
+      [WIN_A + Math.PI, WIN_A + Math.PI / 3, WIN_A - Math.PI / 3].forEach(function (a) {
+        var c = Math.cos(a), s = Math.sin(a), nx = -s * 3.5, ny = c * 3.5;
+        P.push({ pts: [[c * 22 + nx, s * 22 + ny], [c * ro + nx, s * ro + ny], [c * ro - nx, s * ro - ny], [c * 22 - nx, s * 22 - ny]], pi: 2 });
+      });
+    }
+    return P;
+  }
+  function rocketDecal(x, y, z) {
+    if (z > 100) return null;
+    var r = Math.sqrt(x * x + y * y);
+    if (r < 23.5) return null;
+    var da = Math.atan2(y, x) - WIN_A;
+    while (da > Math.PI) da -= Math.PI * 2;
+    while (da < -Math.PI) da += Math.PI * 2;
+    var d = Math.sqrt(Math.pow(da * 25, 2) + Math.pow(z - 70, 2));
+    if (d < 8.5) return "#8FD0FF";
+    if (d < 12) return "dark";
+    return null;
+  }
+
+  // Gear with a raised hub.
+  function gearOuter() {
+    var pts = [], n = 12 * 12, i;
+    for (i = 0; i < n; i++) {
+      var a = i / n * Math.PI * 2, p = (a * 12 / (Math.PI * 2)) % 1, r;
+      if (p < 0.3) r = 62; else if (p < 0.45) r = lerp(62, 50, (p - 0.3) / 0.15); else if (p < 0.8) r = 50; else r = lerp(50, 62, (p - 0.8) / 0.2);
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    return pts;
+  }
+  var GEAR_OUT = gearOuter();
+  function gearLayer(z) {
+    var holes = [circle(0, 0, 12, 20).reverse()], k;
+    if (z < 22) {
+      for (k = 0; k < 6; k++) { var a = k * Math.PI / 3 + 0.5; holes.push(circle(Math.cos(a) * 36, Math.sin(a) * 36, 7, 14).reverse()); }
+      return [{ pts: GEAR_OUT, holes: holes, pi: 0 }];
+    }
+    return [{ pts: circle(0, 0, 24, 28), holes: [circle(0, 0, 12, 20).reverse()], pi: 1 }];
+  }
+
+  // Stegosaurus: a side picture stood up, with thinner back plates.
+  var DINO = [[-108, 34], [-80, 44], [-50, 58], [-20, 70], [10, 70], [35, 60], [52, 48], [64, 51], [80, 53], [92, 47], [93, 39],
+    [78, 34], [60, 36], [46, 30], [40, 25], [40, 0], [24, 0], [22, 21], [-6, 19], [-14, 21], [-14, 0], [-32, 0], [-36, 25],
+    [-56, 32], [-82, 35]];
+  var PLATES = [[-66, 46, 18], [-42, 56, 24], [-14, 64, 28], [14, 64, 26], [36, 54, 20]].map(function (p) {
+    return [[p[0] - 11, p[1]], [p[0] - 4, p[1] + p[2] * 0.85], [p[0], p[1] + p[2]], [p[0] + 4, p[1] + p[2] * 0.85], [p[0] + 11, p[1]], [p[0], p[1] - 8]];
+  }).concat([[[-104, 34], [-112, 50], [-96, 38]], [[-92, 38], [-96, 56], [-84, 42]]]);
+  function dinoLayer(z) {
+    var P = [];
+    slabs(scanPoly(DINO, z), -15, 15, 0, P);
+    var iv = [];
+    PLATES.forEach(function (pl) { iv = iv.concat(scanPoly(pl, z)); });
+    slabs(mergeIv(iv), -3.5, 3.5, 1, P);
+    return P;
+  }
+  function dinoDecal(x, y, z) {
+    if (Math.abs(y) > 14 && Math.pow(x - 79, 2) + Math.pow(z - 46, 2) < 10) return "dark";
+    return null;
+  }
+
+  // Star standing on two points.
+  var STAR = (function () {
+    var pts = [], i;
+    for (i = 0; i < 10; i++) { var a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 31 : 72; pts.push([Math.cos(a) * r, 58.3 + Math.sin(a) * r]); }
+    return pts;
+  })();
+  function starLayer(z) { var P = []; slabs(scanPoly(STAR, z), -13, 13, 0, P); return P; }
+
+  // Name sign: a base with standing letters.
+  function signInfo(name) {
+    var chars = cleanName(name || "TOYBOX").split(""), n = chars.length || 1;
+    // Letter size shrinks for long names, but the strokes stay thin and the gaps stay open.
+    var GAP = 2.2, sc = Math.min(8, 214 / (n * 4 + (n - 1) * GAP));
+    var w = n * 4 * sc + (n - 1) * GAP * sc, strokes = [];
+    chars.forEach(function (ch, i) {
+      var g = FONT[ch];
+      if (!g) return;
+      var x0 = -w / 2 + i * (4 + GAP) * sc;
+      g.forEach(function (line) {
+        for (var k = 0; k + 1 < line.length; k++) strokes.push([[x0 + line[k][0] * sc, 8 + line[k][1] * sc], [x0 + line[k + 1][0] * sc, 8 + line[k + 1][1] * sc]]);
+      });
+    });
+    var r = clamp(sc * 0.42, 1.7, 3.2);
+    return { w: w, sc: sc, r: r, strokes: strokes, h: 8 + 6 * sc + r };
+  }
+  function signLayer(info) {
+    return function (z) {
+      var P = [];
+      if (z < 8) { P.push({ pts: rrect(-info.w / 2 - 12, -16, info.w / 2 + 12, 16, 5), pi: 0 }); return P; }
+      var iv = [], r = info.r;
+      info.strokes.forEach(function (s) { var v = scanStroke(s[0], s[1], r, z); if (v) iv.push(v); });
+      slabs(mergeIv(iv), -6, 6, 1, P);
+      return P;
+    };
+  }
+
+  // Spiral vase (hollow, open at the top).
+  function vaseLayer(z) {
+    var rb = 30 + 18 * Math.sin(Math.PI * (z / 120) * 0.85 + 0.25), out = [], inn = [], n = 96, i;
+    for (i = 0; i < n; i++) {
+      var a = i / n * Math.PI * 2, r = rb * (1 + 0.09 * Math.cos(8 * a + z * 0.05));
+      out.push([Math.cos(a) * r, Math.sin(a) * r]);
+      inn.push([Math.cos(a) * (r - 4), Math.sin(a) * (r - 4)]);
+    }
+    var pi = Math.min(3, Math.floor(z / 30));
+    return [{ pts: out, holes: z > 4 ? [inn.reverse()] : [], pi: pi }];
+  }
+
+  var MODELS = [
+    { id: "benchy", label: "Benchy", h: 106, lh: 2, yaw: -35, layer: benchyLayer, decal: benchyDecal,
+      parts: ["Hull", "Cabin", "Roof", "Chimney"] },
+    { id: "cube", label: "Cube", h: 76, lh: 2, yaw: -32, layer: cubeLayer, decal: cubeDecal, parts: ["Cube"] },
+    { id: "rocket", label: "Rocket", h: 150, lh: 3, yaw: -20, layer: rocketLayer, decal: rocketDecal, parts: ["Body", "Nose", "Fins"] },
+    { id: "gear", label: "Gear", h: 32, lh: 1.6, yaw: 0, layer: gearLayer, parts: ["Gear", "Hub"] },
+    { id: "dino", label: "Dinosaur", h: 92, lh: 2, yaw: -18, layer: dinoLayer, decal: dinoDecal, parts: ["Body", "Plates"] },
+    { id: "star", label: "Star", h: 128, lh: 2.6, yaw: -14, layer: starLayer, parts: ["Star"] },
+    { id: "name", label: "Name sign", h: 64, lh: 2, yaw: -12, layer: null, parts: ["Base", "Letters"] },
+    { id: "vase", label: "Vase", h: 120, lh: 2.5, yaw: 0, layer: vaseLayer, parts: ["Bottom", "Middle", "Upper", "Top"] }
+  ];
+  var MODEL_BY = {};
+  MODELS.forEach(function (m) { MODEL_BY[m.id] = m; });
+
+  var state = loadState();
+  // An old name saved by the 3D Printer itself moves to the shared setting once (if that is still unset).
+  if (state.name !== "TOYBOX" && Toybox.settings.get("printer-name") === "TOYBOX") Toybox.settings.set("printer-name", state.name);
+  state.name = printerName();
+  save();
+  // Opened fresh from the Toybox home screen: the first model, the first spool, no print running.
+  // The spool colors he set and the shelf of finished prints stay.
+  if (Toybox.fresh()) {
+    (function () {
+      var f = freshState();
+      state.model = f.model; state.multi = f.multi; state.sel = f.sel; state.faster = f.faster;
+      save();
+    })();
+  }
+
+  // ---------- Slicing and drawing prints ----------
+  var K = 0.42; // how much depth shows when looking down a little (also used for the build plate)
+  var prepCache = {};
+  function prep(id, name) {
+    var m = MODEL_BY[id] || MODELS[0], key = id + (id === "name" ? "|" + cleanName(name) : "");
+    if (prepCache[key]) return prepCache[key];
+    var layerFn = m.layer, H = m.h;
+    if (id === "name") { var info = signInfo(name); layerFn = signLayer(info); H = Math.ceil(info.h); }
+    var n = Math.round(H / m.lh), layers = [], R = 10, i;
+    for (i = 0; i < n; i++) {
+      var z0 = i * m.lh, z1 = z0 + m.lh, polys = layerFn(z0 + m.lh / 2, i === n - 1);
+      if (!polys.length) continue;
+      var edges = [];
+      polys.forEach(function (p) {
+        p.pts.forEach(function (q) { R = Math.max(R, Math.sqrt(q[0] * q[0] + q[1] * q[1])); });
+        if (p.dark) return;
+        [p.pts].concat(p.holes || []).forEach(function (ring, ri) {
+          var pts = subdivide(ring, 4), a2 = 0, k, len = pts.length;
+          for (k = 0; k < len; k++) { var a = pts[k], b = pts[(k + 1) % len]; a2 += a[0] * b[1] - b[0] * a[1]; }
+          var sg = (ri > 0 ? -1 : 1) * (a2 > 0 ? 1 : -1);
+          for (k = 0; k < len; k++) {
+            var p0 = pts[k], p1 = pts[(k + 1) % len], dx = p1[0] - p0[0], dy = p1[1] - p0[1], l = Math.sqrt(dx * dx + dy * dy);
+            if (l < 0.01) continue;
+            edges.push({ ax: p0[0], ay: p0[1], bx: p1[0], by: p1[1], nx: sg * dy / l, ny: -sg * dx / l, pi: p.pi,
+              dec: m.decal ? m.decal((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (z0 + z1) / 2) : null });
+          }
+        });
+      });
+      layers.push({ z0: z0, z1: z1, polys: polys, edges: edges, len: 0 });
+    }
+    // Perimeter length of each layer: how far the nozzle travels while printing it.
+    layers.forEach(function (L) {
+      L.polys.forEach(function (p) { if (!p.dark) L.len += ringLen(p.pts) + (p.holes || []).reduce(function (s, h) { return s + ringLen(h); }, 0); });
+    });
+    // R0: how far the bottom layer reaches (for a shadow that fits under the print).
+    var R0 = 0;
+    if (layers[0]) layers[0].polys.forEach(function (p) { p.pts.forEach(function (q) { R0 = Math.max(R0, Math.sqrt(q[0] * q[0] + q[1] * q[1])); }); });
+    var P = { m: m, id: id, name: cleanName(name), layers: layers, R: R + 4, R0: Math.max(R0, R * 0.45), H: H, yaw: m.yaw * Math.PI / 180 };
+    prepCache[key] = P;
+    return P;
+  }
+  function ringLen(r) {
+    var s = 0, k;
+    for (k = 0; k < r.length; k++) { var a = r[k], b = r[(k + 1) % r.length]; s += Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)); }
+    return s;
+  }
+  function subdivide(ring, maxLen) {
+    var out = [], k;
+    for (k = 0; k < ring.length; k++) {
+      var a = ring[k], b = ring[(k + 1) % ring.length], d = Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2)), n = Math.max(1, Math.ceil(d / maxLen)), j;
+      for (j = 0; j < n; j++) out.push([lerp(a[0], b[0], j / n), lerp(a[1], b[1], j / n)]);
+    }
+    return out;
+  }
+
+  // Shades of one filament: walls get darker as they turn away from the light.
+  var shadeCache = {};
+  function wallCol(fid, q, odd, t) {
+    var f = fil(fid), hex = hexAt(fid, t), key = hex + f.kind + q + (odd ? "o" : "e");
+    if (shadeCache[key]) return shadeCache[key];
+    var lev = q / 20, amt = { basic: 0.58, silk: 0.62, matte: 0.4, glow: 0.36, grad: 0.55, sparkle: 0.5 }[f.kind] * (1 - lev) + (odd ? 0.07 : 0);
+    var c = mix(hex, "#14182B", amt);
+    if (f.kind === "silk" && lev > 0.68) c = mix(c, "#FFFFFF", (lev - 0.68) * 1.7);
+    if (f.kind === "matte") c = mix(c, "#B9BCC4", 0.12);
+    shadeCache[key] = c;
+    return c;
+  }
+  function topCol(fid, t) { var f = fil(fid); return mix(hexAt(fid, t), "#FFFFFF", f.kind === "silk" ? 0.3 : (f.kind === "sparkle" ? 0.18 : 0.12)); }
+  function darkCol(fid, t) { return mix(hexAt(fid, t), "#14182B", 0.68); }
+
+  // Draws one layer: the walls that face us, then the flat top.
+  // H: the print's height (gradient filaments change color with height).
+  // glints: a list that gets a few bright points on sparkle walls, which twinkle when drawn.
+  function drawSlab(ctx, L, cols, odd, yaw, sc, ox, oy, H, glints) {
+    var cs = Math.cos(yaw), sn = Math.sin(yaw), buckets = {}, order = [], t = L.z0 / (H || 1), flecks = [];
+    function X(x, y) { return ox + (x * cs - y * sn) * sc; }
+    function Y(x, y, z) { return oy - (x * sn + y * cs) * K * sc - z * sc; }
+    L.edges.forEach(function (e) {
+      var nX = e.nx * cs - e.ny * sn, nD = e.nx * sn + e.ny * cs;
+      if (nD > -0.02) return;
+      var lev = 0.3 + 0.7 * Math.max(0, -0.45 * nX - 0.89 * nD), q = Math.round(lev * 20), fid = cols[e.pi] || cols[0], col;
+      if (e.dec === "dark") col = mix(darkCol(fid, t), "#000000", (1 - lev) * 0.3);
+      else if (e.dec) col = mix(e.dec, "#14182B", (1 - lev) * 0.45);
+      else col = wallCol(fid, q, odd, t);
+      if (fil(fid).kind === "sparkle" && !e.dec) {
+        var hr = hash(e.ax * 0.7 + L.z0, e.ay * 0.9 - L.z0);
+        if (hr < 0.22) {
+          var fx = X((e.ax + e.bx) / 2, (e.ay + e.by) / 2), fy = Y((e.ax + e.bx) / 2, (e.ay + e.by) / 2, (L.z0 + L.z1) / 2);
+          flecks.push(fx, fy, hr < 0.08 ? "#FFFFFF" : mix(hexAt(fid, t), "#FFFFFF", 0.6));
+          if (glints && hr < 0.012) glints.push({ x: fx, y: fy, ph: hash(fx, fy) * 6.28 });
+        }
+      }
+      if (!buckets[col]) { buckets[col] = []; order.push(col); }
+      buckets[col].push(X(e.ax, e.ay), Y(e.ax, e.ay, L.z0), X(e.bx, e.by), Y(e.bx, e.by, L.z0), X(e.bx, e.by), Y(e.bx, e.by, L.z1), X(e.ax, e.ay), Y(e.ax, e.ay, L.z1));
+    });
+    ctx.lineWidth = Math.max(0.6, sc * 0.35);
+    ctx.lineJoin = "round";
+    order.forEach(function (col) {
+      var b = buckets[col], i;
+      ctx.beginPath();
+      for (i = 0; i < b.length; i += 8) { ctx.moveTo(b[i], b[i + 1]); ctx.lineTo(b[i + 2], b[i + 3]); ctx.lineTo(b[i + 4], b[i + 5]); ctx.lineTo(b[i + 6], b[i + 7]); ctx.closePath(); }
+      ctx.fillStyle = col; ctx.strokeStyle = col;
+      ctx.fill(); ctx.stroke();
+    });
+    var fr = Math.max(0.7, sc * 0.55), k;
+    for (k = 0; k < flecks.length; k += 3) { ctx.fillStyle = flecks[k + 2]; ctx.fillRect(flecks[k] - fr / 2, flecks[k + 1] - fr / 2, fr, fr); }
+    L.polys.forEach(function (p) {
+      var fid = cols[p.pi] || cols[0];
+      ctx.beginPath();
+      [p.pts].concat(p.holes || []).forEach(function (ring) {
+        ring.forEach(function (q, k) { var x = X(q[0], q[1]), y = Y(q[0], q[1], L.z1); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+        ctx.closePath();
+      });
+      ctx.fillStyle = p.dark ? darkCol(fid, t) : topCol(fid, t);
+      ctx.fill("evenodd");
+      if (!p.dark && fil(fid).kind === "sparkle") {
+        // Glitter on the top surface.
+        // Points just inside the outline (a little way from a corner toward the middle).
+        var j, n = Math.min(40, p.pts.length), mx = 0, my = 0;
+        p.pts.forEach(function (v) { mx += v[0]; my += v[1]; });
+        mx /= p.pts.length; my /= p.pts.length;
+        for (j = 0; j < n; j++) {
+          var a = p.pts[Math.floor(hash(j, L.z0) * p.pts.length)], h2 = hash(j + 3, L.z1);
+          if (h2 > 0.5) continue;
+          var fi = 0.03 + h2 * 0.14, qx = a[0] + (mx - a[0]) * fi, qy = a[1] + (my - a[1]) * fi;
+          ctx.fillStyle = h2 < 0.2 ? "#FFFFFF" : "rgba(255,255,255,0.55)";
+          ctx.fillRect(X(qx, qy) - fr / 2, Y(qx, qy, L.z1) - fr / 2, fr, fr);
+        }
+      }
+    });
+  }
+  function hasGlow(cols) { return cols.some(function (f) { return fil(f).kind === "glow"; }); }
+
+  // Offscreen picture of a print, with a chunky dark outline around it.
+  // Size: the print's footprint radius R and height H, in model units times sc.
+  function Pic(P, cols, yaw, sc) {
+    var pad = 6 / sc + 4, w = 2 * (P.R + pad), h = P.H + 2 * P.R * K + 2 * pad;
+    this.P = P; this.cols = cols; this.yaw = yaw; this.sc = sc;
+    this.cv = document.createElement("canvas");
+    this.cv.width = Math.max(2, Math.ceil(w * sc)); this.cv.height = Math.max(2, Math.ceil(h * sc));
+    this.ox = (P.R + pad) * sc; this.oy = (P.H + P.R * K + pad) * sc;
+    this.sil = document.createElement("canvas");
+    this.sil.width = this.cv.width; this.sil.height = this.cv.height;
+    this.done = 0;
+    this.glints = [];
+  }
+  Pic.prototype.bake = function (upto) {
+    var ctx = this.cv.getContext("2d"), i;
+    for (i = this.done; i < upto; i++) drawSlab(ctx, this.P.layers[i], this.cols, i % 2 === 1, this.yaw, this.sc, this.ox, this.oy, this.P.H, this.glints);
+    this.done = Math.max(this.done, upto);
+    var s = this.sil.getContext("2d");
+    s.globalCompositeOperation = "source-over";
+    s.clearRect(0, 0, this.sil.width, this.sil.height);
+    s.drawImage(this.cv, 0, 0);
+    s.globalCompositeOperation = "source-in";
+    s.fillStyle = OUT;
+    s.fillRect(0, 0, this.sil.width, this.sil.height);
+    s.globalCompositeOperation = "source-over";
+  };
+  Pic.prototype.clear = function () {
+    this.cv.getContext("2d").clearRect(0, 0, this.cv.width, this.cv.height);
+    this.sil.getContext("2d").clearRect(0, 0, this.sil.width, this.sil.height);
+    this.done = 0;
+    this.glints = [];
+  };
+  // Draw with the model origin at (x, y); k scales the picture; ow is the outline width in pixels.
+  Pic.prototype.draw = function (ctx, x, y, k, ow) {
+    var w = this.cv.width * k, h = this.cv.height * k, x0 = x - this.ox * k, y0 = y - this.oy * k, a;
+    if (!this.done) return;
+    for (a = 0; a < 8; a++) ctx.drawImage(this.sil, x0 + Math.cos(a * Math.PI / 4) * ow, y0 + Math.sin(a * Math.PI / 4) * ow, w, h);
+    if (hasGlow(this.cols)) { ctx.save(); ctx.shadowColor = "rgba(200,255,150,0.9)"; ctx.shadowBlur = 14 * k * 2; ctx.drawImage(this.cv, x0, y0, w, h); ctx.restore(); }
+    else ctx.drawImage(this.cv, x0, y0, w, h);
+    // Sparkle prints twinkle a little.
+    if (this.glints.length && !reduce) {
+      var now = performance.now() / 1000, gi, s = Math.max(1.5, this.sc * k * 1.1);
+      ctx.save();
+      for (gi = 0; gi < this.glints.length && gi < 60; gi++) {
+        var gp = this.glints[gi], al = Math.pow(Math.max(0, Math.sin(now * 2.2 + gp.ph)), 6);
+        if (al < 0.05) continue;
+        var gx = x0 + gp.x * k, gy = y0 + gp.y * k, r = s * (0.6 + al);
+        ctx.globalAlpha = al; ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath(); ctx.moveTo(gx, gy - r * 2); ctx.lineTo(gx + r * 0.4, gy - r * 0.4); ctx.lineTo(gx + r * 2, gy); ctx.lineTo(gx + r * 0.4, gy + r * 0.4);
+        ctx.lineTo(gx, gy + r * 2); ctx.lineTo(gx - r * 0.4, gy + r * 0.4); ctx.lineTo(gx - r * 2, gy); ctx.lineTo(gx - r * 0.4, gy - r * 0.4); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+  };
+  // Full picture of a finished print fitted into a w x h box (pixels). Returns a canvas.
+  function fitPic(P, cols, yaw, w, h) {
+    var tw = 2 * P.R + 12, th = P.H + 2 * P.R * K + 12, sc = Math.min(w / tw, h / th);
+    var pic = new Pic(P, cols, yaw, sc);
+    pic.bake(P.layers.length);
+    var cv = document.createElement("canvas");
+    cv.width = Math.ceil(w); cv.height = Math.ceil(h);
+    var ctx = cv.getContext("2d"), ow = Math.max(1.5, Math.min(w, h) * 0.018);
+    var cx = w / 2, cy = h / 2 + (P.H + 2 * P.R * K) * sc / 2 - P.R * K * sc;
+    pic.draw(ctx, cx, cy, 1, ow);
+    return cv;
+  }
+  // Which filament each part of a model uses.
+  function colsFor(m, multi, slots, sel) {
+    return m.parts.map(function (p, i) { return multi ? slots[Math.min(i, 3)] : slots[sel]; });
+  }
+  function slotsFor(m, multi, sel) {
+    return m.parts.map(function (p, i) { return multi ? Math.min(i, 3) : sel; });
+  }
+
+  // ---------- The printer scene (canvas) ----------
+  // Design units: the printer is 600 wide; everything is drawn in these units and scaled to fit.
+  var PX0 = 80, PX1 = 680, PY0 = 300, PY1 = 992;
+  var CX0 = 106, CX1 = 654, CY0 = 324, CY1 = 928;
+  // MS: design units per model unit. The plate, the toolhead and the print picture all use it,
+  // so the nozzle tip always lands where the filament goes.
+  var YTIP = 476, PCX = 380, MS = 1.7, PW = 128 * MS, PD = 128 * K * MS;
+  var BAY0 = 104, BAYW = 114;
+  var CHUTE = { x: 140, y: 128 }; // above the purge chute at the back right
+  var IDLE_Z = 46;
+
+  var cv = $("cv"), ctx = cv.getContext("2d");
+  var LY = { W: 1, H: 1, dpr: 1, sc: 1, ox: 0, oy: 0, shelf: null, cam: null };
+
+  // Hardware state: where everything is right now.
+  var hw = {
+    x: CHUTE.x, y: CHUTE.y, bedZ: IDLE_Z, noz: 25, bed: 25, fan: 0, fanAng: 0, light: 1,
+    door: 0, plateOut: 0, flex: 0, lid: 0, lidUntil: 0, lidOpen: false, idleFeed: null,
+    loaded: state.sel, feed: null, spoolAng: [0, 0, 0, 0], swap: [0, 0, 0, 0], swapOld: ["", "", "", ""],
+    dryT: 25, hum: 18, purge: null, poops: [], blob: null, ripple: null, fly: null, pile: [], speed: 0, cut: 0
+  };
+  try {
+    var pl = JSON.parse(localStorage.getItem(PKEY) || "[]");
+    if (Array.isArray(pl)) hw.pile = pl.filter(function (p) { return p && FIL[p.f] && typeof p.x === "number"; }).slice(-40);
+  } catch (e) { /* ignore */ }
+  function savePile() { try { localStorage.setItem(PKEY, JSON.stringify(hw.pile)); } catch (e) { /* ignore */ } }
+
+  var speckle = (function () {
+    var c = document.createElement("canvas"), g, i;
+    c.width = c.height = 24;
+    g = c.getContext("2d");
+    g.fillStyle = "#D2A84E"; g.fillRect(0, 0, 24, 24);
+    for (i = 0; i < 40; i++) { g.fillStyle = Math.random() < 0.5 ? "rgba(120,80,20,0.35)" : "rgba(255,235,170,0.5)"; g.fillRect(Math.random() * 24, Math.random() * 24, 1.6, 1.6); }
+    return c;
+  })();
+  var speckPat = null;
+
+  function layout() {
+    var r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    LY.W = Math.max(1, r.width); LY.H = Math.max(1, r.height); LY.dpr = dpr;
+    cv.width = Math.round(LY.W * dpr); cv.height = Math.round(LY.H * dpr);
+    // Visible design area: x from L0 to the right edge of the shelf column, y from VTOP to VBOT
+    // (the empty sky above the filament box and most of the table are cropped off).
+    var VTOP = 44, VBOT = 1030, L0 = 64, COL = 744;
+    var wide = LY.W / LY.H >= 0.98, need = wide ? COL + 236 - L0 : 670;
+    LY.sc = Math.min(LY.H / (VBOT - VTOP), LY.W / need);
+    var colW = wide ? clamp(LY.W / LY.sc - COL - 12, 226, 380) : 0, right = wide ? COL + colW : 734;
+    LY.ox = (LY.W - (right - L0) * LY.sc) / 2 - L0 * LY.sc;
+    LY.oy = LY.H - VBOT * LY.sc;
+    var top = (78 - LY.oy) / LY.sc; // clear of the Big button
+    LY.shelf = wide ? { x: COL, w: colW } : null;
+    if (wide) LY.shelf.top = top + 40;
+    if (job && job.pic) rebuildPic();
+    shelfThumbs = {};
+  }
+
+  function rr(g, x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+    g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+    g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
+  }
+  function fillStroke(g, fill, lw, stroke) { g.fillStyle = fill; g.fill(); if (lw) { g.lineWidth = lw; g.strokeStyle = stroke || OUT; g.stroke(); } }
+
+  // Nozzle position on screen (toolhead at plate coords x, y).
+  function tipXAt(x) { return PCX + x * MS; }
+  // How far up the print the nozzle is (0..1): gradient filament in the tube matches it.
+  function printT() { var L = job && job.printing ? job.P.layers[job.L] : null; return L ? L.z0 / job.P.H : 0; }
+  function tipX() { return tipXAt(hw.x); }
+  function tipY() { return YTIP - hw.y * K * MS; }
+  function plateY() { return YTIP + hw.bedZ * MS; }
+
+  function drawBg(g, vw) {
+    var x0 = -LY.ox / LY.sc - 10, x1 = vw + 10;
+    var gr = g.createLinearGradient(0, -LY.oy / LY.sc, 0, 1000);
+    gr.addColorStop(0, "#EEF5FD"); gr.addColorStop(1, "#D3E3F4");
+    g.fillStyle = gr; g.fillRect(x0, -LY.oy / LY.sc - 10, x1 - x0, 1012 + LY.oy / LY.sc);
+    g.fillStyle = "#C98B4E"; g.fillRect(x0, 1000, x1 - x0, 80);
+    g.fillStyle = "#E0A86A"; g.fillRect(x0, 1000, x1 - x0, 12);
+    g.fillStyle = OUT; g.fillRect(x0, 997, x1 - x0, 5);
+  }
+
+  // ----- Filament box on top -----
+  function bayX(i) { return BAY0 + BAYW * (i + 0.5); }
+  function drawSpool(g, cx, top, fid, ang, alpha) {
+    var f = fil(fid), x0 = cx - 34, w = 68, y0 = top + 8, y1 = 236;
+    g.save();
+    g.globalAlpha = alpha === undefined ? 1 : alpha;
+    if (f.kind === "glow") { g.shadowColor = f.hex; g.shadowBlur = 16; }
+    rr(g, x0, y0, w, y1 - y0 + 10, 10);
+    fillStroke(g, f.hex, 0);
+    g.shadowBlur = 0;
+    g.save();
+    rr(g, x0, y0, w, y1 - y0 + 10, 10); g.clip();
+    var yy, bi;
+    if (f.stops) {
+      // Gradient filament: the colors come round in bands as it winds.
+      for (yy = y0, bi = 0; yy < y1 + 10; yy += 15, bi++) {
+        g.fillStyle = hexAt(fid, ((bi * 15 + ang * 2) % 120) / 120 * 0.999);
+        g.fillRect(x0, yy, w, 16);
+      }
+    }
+    if (f.kind === "sparkle") {
+      var now = performance.now() / 1000;
+      for (bi = 0; bi < 26; bi++) {
+        var sx = x0 + 6 + hash(bi, 1) * (w - 12), sy = y0 + 6 + ((hash(bi, 2) * (y1 - y0) + ang * 3) % (y1 - y0)), tw = 0.45 + 0.55 * Math.max(0, Math.sin(now * 2.5 + bi * 1.7));
+        g.fillStyle = "rgba(255,255,255," + tw.toFixed(2) + ")";
+        g.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+      }
+    }
+    var sh = g.createLinearGradient(x0, 0, x0 + w, 0);
+    sh.addColorStop(0, "rgba(255,255,255,0.35)"); sh.addColorStop(0.35, "rgba(255,255,255,0)");
+    sh.addColorStop(0.7, "rgba(0,0,0,0.05)"); sh.addColorStop(1, "rgba(20,24,43,0.35)");
+    g.fillStyle = sh; g.fillRect(x0, y0, w, 200);
+    if (f.kind === "silk") { g.fillStyle = "rgba(255,255,255,0.45)"; g.fillRect(x0 + 12, y0, 9, 200); }
+    g.strokeStyle = "rgba(20,24,43,0.22)"; g.lineWidth = 2;
+    var off = ((ang % 9) + 9) % 9, y;
+    for (y = y0 + off; y < y1 + 10; y += 9) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y + 2); g.stroke(); }
+    g.restore();
+    rr(g, x0, y0, w, y1 - y0 + 10, 10); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+    [-1, 1].forEach(function (s) {
+      rr(g, cx + s * 42 - 5, top, 10, y1 - top + 14, 5);
+      fillStroke(g, "#4A4F59", 3);
+      g.fillStyle = "rgba(255,255,255,0.25)"; g.fillRect(cx + s * 42 - 2, top + 6, 2.5, y1 - top - 6);
+    });
+    g.restore();
+  }
+  function drawBox(g) {
+    // Top glass lid of the printer, seen a little from above.
+    g.beginPath(); g.moveTo(PX0 + 4, PY0 + 2); g.lineTo(PX0 + 28, PY0 - 22); g.lineTo(PX1 - 28, PY0 - 22); g.lineTo(PX1 - 4, PY0 + 2); g.closePath();
+    fillStroke(g, "rgba(120,150,180,0.55)", 4);
+    g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 3; g.beginPath(); g.moveTo(PX0 + 50, PY0 - 14); g.lineTo(PX0 + 180, PY0 - 14); g.stroke();
+    // Box body.
+    rr(g, 96, 96, 568, 198, 22); fillStroke(g, "#2E3239", 5);
+    rr(g, 104, 104, 456, 130, 12); fillStroke(g, "#1C1F25", 0);
+    // Bay walls.
+    var i;
+    for (i = 1; i < 4; i++) { g.fillStyle = "#262A30"; g.fillRect(BAY0 + BAYW * i - 3, 106, 6, 128); }
+    // Spools.
+    for (i = 0; i < 4; i++) {
+      var sw = hw.swap[i], cx = bayX(i);
+      if (sw > 0.5) drawSpool(g, cx, 112 - (sw - 0.5) * 2 * 190, hw.swapOld[i] || state.slots[i], hw.spoolAng[i]);
+      else if (sw > 0) drawSpool(g, cx, 112 - sw * 2 * 190, state.slots[i], hw.spoolAng[i]);
+      else drawSpool(g, cx, 112, state.slots[i], hw.spoolAng[i]);
+    }
+    tubePart(g, "box");
+    // Front panel with feeders and slot numbers.
+    rr(g, 96, 236, 568, 58, 14); fillStroke(g, "#363A42", 5);
+    var used = planSlots();
+    for (i = 0; i < 4; i++) {
+      var bx = bayX(i), on = used.indexOf(i) !== -1;
+      g.beginPath(); g.arc(bx - 24, 265, 13, 0, Math.PI * 2);
+      fillStroke(g, on ? "#FFC93C" : "#4A4F59", 3, on ? OUT : "#1A1D22");
+      rr(g, bx + 2, 245, 40, 40, 8); fillStroke(g, "#22252B", 3, "#15171B");
+      g.beginPath(); g.arc(bx + 22, 256, 5, 0, Math.PI * 2);
+      g.fillStyle = hw.loaded === i ? "#7CF27C" : "#5B616C"; g.fill();
+      g.fillStyle = "#0E1014"; g.fillRect(bx + 14, 270, 16, 6);
+    }
+    // Drying display: a little heater icon with soft warm waves.
+    rr(g, 572, 112, 84, 116, 12); fillStroke(g, "#0E2A2E", 4);
+    g.strokeStyle = "#FF9F43"; g.lineWidth = 5; g.lineCap = "round";
+    [596, 614, 632].forEach(function (x, i) {
+      var ph = performance.now() / 400 + i;
+      g.beginPath(); g.moveTo(x, 182);
+      g.bezierCurveTo(x - 8, 170 + Math.sin(ph) * 2, x + 8, 158, x, 144 + Math.sin(ph) * 2); g.stroke();
+    });
+    // Smoky lid (lifts when a spool is picked).
+    var lo = ease(hw.lid), top = 92 - lo * 40, front = 236 - lo * 150;
+    g.beginPath(); g.moveTo(100, front); g.lineTo(100, top + 22); g.quadraticCurveTo(100, top, 124, top); g.lineTo(540, top); g.quadraticCurveTo(564, top, 564, top + 22); g.lineTo(564, front); g.closePath();
+    fillStroke(g, lo > 0.6 ? "rgba(60,68,82,0.75)" : "rgba(60,68,82,0.38)", 4);
+    g.strokeStyle = "rgba(255,255,255,0.5)"; g.lineWidth = 5; g.lineCap = "round";
+    if (front - top > 60) { g.beginPath(); g.moveTo(120, top + 30); g.lineTo(120, front - 20); g.stroke(); }
+    g.beginPath(); g.moveTo(150, top + 8); g.lineTo(300, top + 8); g.stroke();
+    // The spool picked for printing gets a yellow frame.
+    rr(g, bayX(state.sel) - 50, 108, 100, 124, 12); g.lineWidth = 6; g.strokeStyle = "#FFC93C"; g.stroke();
+    // Lid handle: tap it to open or close the case.
+    // An arrow on the handle (up: open, down: close) instead of a printed label.
+    var hy = handleY() - 20, dir = hw.lidOpen ? 1 : -1;
+    rr(g, LID_HX - 78, hy, 156, 40, 20); fillStroke(g, "#FFC93C", 4);
+    g.beginPath(); g.moveTo(LID_HX - 16, hy + 20 - dir * 7); g.lineTo(LID_HX, hy + 20 + dir * 8); g.lineTo(LID_HX + 16, hy + 20 - dir * 7);
+    g.lineWidth = 6; g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = OUT; g.stroke();
+  }
+  var LID_HX = 332;
+  // Where the lid is now (design units), for taps.
+  function lidTop() { return 92 - ease(hw.lid) * 40; }
+  function handleY() { return lidTop() + 22 * ease(hw.lid); } // centre of the handle, kept on screen
+
+  // ----- Filament path: spool -> box -> outside tube -> toolhead -----
+  function tubePath(slot) {
+    var bx = bayX(slot), pts = [], k;
+    pts.push({ x: bx, y: 226, t: "box" }, { x: bx, y: 231, t: "box" }, { x: 664, y: 231, t: "box" });
+    [[690, 236], [712, 262], [716, 300], [700, 322]].forEach(function (p) { pts.push({ x: p[0], y: p[1], t: "out" }); });
+    var x0 = 636, y0 = 334, x3 = tipX(), y3 = tipY() - 122;
+    for (k = 0; k <= 14; k++) {
+      var t = k / 14, u = 1 - t;
+      var cx1 = 640, cy1 = 420, cx2 = x3 + 30, cy2 = y3 - 90;
+      pts.push({ x: u * u * u * x0 + 3 * u * u * t * cx1 + 3 * u * t * t * cx2 + t * t * t * x3, y: u * u * u * y0 + 3 * u * u * t * cy1 + 3 * u * t * t * cy2 + t * t * t * y3, t: "in" });
+    }
+    var L = 0;
+    pts.forEach(function (p, i) { if (i) L += Math.sqrt(Math.pow(p.x - pts[i - 1].x, 2) + Math.pow(p.y - pts[i - 1].y, 2)); p.d = L; });
+    return { pts: pts, len: L };
+  }
+  // Draw the tube shell for one stretch, and the colored filament inside it as far as it is loaded.
+  // Segment i (from point i-1 to point i) belongs to the stretch of point i.
+  function strokeSegs(g, p, tag, lim) {
+    var i, started = false;
+    g.beginPath();
+    for (i = 1; i < p.pts.length; i++) {
+      var a = p.pts[i - 1], b = p.pts[i];
+      if (b.t !== tag || a.d >= lim) { started = false; continue; }
+      if (!started) { g.moveTo(a.x, a.y); started = true; }
+      if (b.d <= lim) g.lineTo(b.x, b.y);
+      else { var t = (lim - a.d) / (b.d - a.d); g.lineTo(lerp(a.x, b.x, t), lerp(a.y, b.y, t)); started = false; }
+    }
+  }
+  function tubePart(g, tag) {
+    var main = tubePath(hw.loaded), i;
+    g.lineCap = "round"; g.lineJoin = "round";
+    strokeSegs(g, main, tag, Infinity);
+    g.strokeStyle = OUT; g.lineWidth = 12; g.stroke();
+    g.strokeStyle = "#D8E2EE"; g.lineWidth = 7; g.stroke();
+    if (tag === "box") {
+      for (i = 0; i < 4; i++) {
+        if (i === hw.loaded) continue;
+        g.strokeStyle = hexAt(state.slots[i], 0); g.lineWidth = 4;
+        g.beginPath(); g.moveTo(bayX(i), 222); g.lineTo(bayX(i), 233); g.stroke();
+      }
+    }
+    var feeds = hw.feed ? hw.feed : [{ slot: hw.loaded, frac: 1 }];
+    feeds.forEach(function (fd) {
+      var p = fd.slot === hw.loaded ? main : tubePath(fd.slot);
+      strokeSegs(g, p, tag, p.len * fd.frac);
+      g.strokeStyle = hexAt(state.slots[fd.slot], printT()); g.lineWidth = 4; g.stroke();
+    });
+  }
+
+  // ----- Build plate -----
+  function platePts(cx, cy, k, flex) {
+    var w = PW * k, d = PD * k, lift = flex * 26 * k;
+    return { fl: [cx - w, cy + d - lift], fr: [cx + w, cy + d - lift], br: [cx + w, cy - d - lift], bl: [cx - w, cy - d - lift], mid: lift };
+  }
+  function drawPlate(g, cx, cy, k, flex) {
+    var p = platePts(cx, cy, k, flex), th = 7 * k;
+    if (!speckPat) speckPat = g.createPattern(speckle, "repeat");
+    g.beginPath();
+    g.moveTo(p.fl[0], p.fl[1]); g.quadraticCurveTo(cx, p.fl[1] + p.mid * 2, p.fr[0], p.fr[1]);
+    g.lineTo(p.fr[0], p.fr[1] + th); g.quadraticCurveTo(cx, p.fr[1] + th + p.mid * 2, p.fl[0], p.fl[1] + th); g.closePath();
+    fillStroke(g, "#1E2126", 3);
+    g.beginPath();
+    g.moveTo(p.bl[0], p.bl[1]); g.quadraticCurveTo(cx, p.bl[1] + p.mid * 2, p.br[0], p.br[1]);
+    g.lineTo(p.fr[0], p.fr[1]); g.quadraticCurveTo(cx, p.fr[1] + p.mid * 2, p.fl[0], p.fl[1]); g.closePath();
+    g.fillStyle = speckPat; g.fill();
+    g.lineWidth = 3.5; g.strokeStyle = OUT; g.stroke();
+    g.strokeStyle = "rgba(255,240,200,0.35)"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(p.bl[0] + 14 * k, p.bl[1] + 8 * k); g.lineTo(p.br[0] - 14 * k, p.br[1] + 8 * k); g.stroke();
+    if (hw.purge && hw.purge.pts.length > 1) {
+      g.beginPath();
+      hw.purge.pts.forEach(function (q, i) { var x = cx + q[0] * MS * k, y = cy - (q[1] * K + (hw.purge.z || 0)) * MS * k; if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+      g.lineCap = "round"; g.strokeStyle = OUT; g.lineWidth = 6 * k; g.stroke();
+      g.strokeStyle = hexAt(hw.purge.f, 0); g.lineWidth = 3.5 * k; g.stroke();
+    }
+  }
+
+  // Test probe (off unless a test turns it on): records where the nozzle tip and the newest
+  // bit of filament really land on each canvas, in canvas pixels.
+  var probe = { on: false, main: {}, cam: {} };
+  function probePt(g, key, x, y) {
+    if (!probe.on || !g.getTransform) return;
+    var m = g.getTransform(), slot = g === ctx ? probe.main : (g.canvas && g.canvas.id === "camcv" ? probe.cam : null);
+    if (slot) slot[key] = [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f];
+  }
+
+  // ----- Toolhead -----
+  function drawToolhead(g, x, y) {
+    probePt(g, "tip", x, y);
+    rr(g, x - 30, y - 128, 60, 16, 5); fillStroke(g, "#3A3F48", 3);
+    rr(g, x - 44, y - 116, 88, 96, 13); fillStroke(g, "#2A2E35", 4);
+    rr(g, x - 37, y - 108, 74, 66, 10); fillStroke(g, "#363B44", 0);
+    g.save();
+    g.beginPath(); g.arc(x, y - 76, 25, 0, Math.PI * 2); fillStroke(g, "#14161A", 3);
+    g.translate(x, y - 76); g.rotate(hw.fanAng);
+    g.fillStyle = "#4B525E";
+    for (var b = 0; b < 5; b++) { g.rotate(Math.PI * 2 / 5); g.beginPath(); g.ellipse(0, -11, 6, 11, 0.5, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+    g.strokeStyle = "#5F6672"; g.lineWidth = 2;
+    [9, 17].forEach(function (r) { g.beginPath(); g.arc(x, y - 76, r, 0, Math.PI * 2); g.stroke(); });
+    g.beginPath(); g.moveTo(x - 25, y - 76); g.lineTo(x + 25, y - 76); g.moveTo(x, y - 101); g.lineTo(x, y - 51); g.stroke();
+    // Part-cooling duct pointing at the nozzle.
+    g.beginPath(); g.moveTo(x - 44, y - 40); g.lineTo(x - 18, y - 40); g.lineTo(x - 8, y - 14); g.lineTo(x - 30, y - 18); g.closePath();
+    fillStroke(g, "#4A505B", 3);
+    rr(g, x - 13, y - 26, 26, 12, 3); fillStroke(g, "#B9C0CA", 2.5);
+    g.beginPath(); g.moveTo(x - 7, y - 14); g.lineTo(x + 7, y - 14); g.lineTo(x + 2.5, y); g.lineTo(x - 2.5, y); g.closePath();
+    fillStroke(g, "#D9A532", 2.5);
+    if (hw.noz > 120) {
+      var a = clamp((hw.noz - 120) / 100, 0, 1) * 0.55;
+      var gl = g.createRadialGradient(x, y - 4, 1, x, y - 4, 22);
+      gl.addColorStop(0, "rgba(255,150,40," + a + ")"); gl.addColorStop(1, "rgba(255,150,40,0)");
+      g.fillStyle = gl; g.fillRect(x - 24, y - 28, 48, 48);
+    }
+    g.fillStyle = hw.light > 0.5 ? "#7CF27C" : "#555"; g.beginPath(); g.arc(x + 34, y - 108 + 4, 3, 0, Math.PI * 2); g.fill();
+  }
+
+  // ----- Inside the chamber -----
+  function railY(d) { return YTIP - 100 - d * K * MS; }
+  function drawChamber(g, inCam) {
+    var lt = hw.light;
+    var bg = g.createLinearGradient(0, CY0, 0, CY1);
+    bg.addColorStop(0, mix("#262A31", "#5C6370", lt * 0.6)); bg.addColorStop(1, mix("#16181D", "#2F343C", lt * 0.6));
+    g.fillStyle = bg; g.fillRect(CX0 - 40, CY0 - 40, CX1 - CX0 + 80, CY1 - CY0 + 80);
+    // Back wall edges for depth.
+    g.strokeStyle = "rgba(0,0,0,0.35)"; g.lineWidth = 3;
+    g.strokeRect(150, 352, 460, 520);
+    g.beginPath(); g.moveTo(CX0, CY0); g.lineTo(150, 352); g.moveTo(CX1, CY0); g.lineTo(610, 352);
+    g.moveTo(CX0, CY1); g.lineTo(150, 872); g.moveTo(CX1, CY1); g.lineTo(610, 872); g.stroke();
+    // Z rods and lead screw at the back.
+    [196, 564].forEach(function (x) {
+      g.fillStyle = OUT; g.fillRect(x - 5, 352, 10, 520);
+      g.fillStyle = "#AEB6C2"; g.fillRect(x - 3, 352, 6, 520);
+    });
+    g.fillStyle = "#6D737E"; g.fillRect(376, 352, 8, 520);
+    g.strokeStyle = "rgba(0,0,0,0.4)"; g.lineWidth = 1.5;
+    for (var hy = 356; hy < 870; hy += 7) { g.beginPath(); g.moveTo(376, hy); g.lineTo(384, hy + 4); g.stroke(); }
+    // Purge chute and waste tray at the back right.
+    var chx = tipXAt(CHUTE.x);
+    rr(g, chx - 17, 392, 34, 486, 6); fillStroke(g, "#6B7280", 3);
+    g.fillStyle = "#3F444D"; g.fillRect(chx - 10, 398, 20, 470);
+    rr(g, chx - 32, 876, 64, 50, 6); fillStroke(g, "#454A53", 3);
+    hw.pile.forEach(function (p) { if (Math.abs(p.x - chx) < 30 && p.y > 880) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.75, p.a || 0, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); } });
+    g.fillStyle = "#555B65"; g.fillRect(chx - 32, 906, 64, 20); g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(chx - 32, 906, 64, 20);
+    // Blobs heaped up on the floor beside the bin (a purge party spills over), drawn in front of it.
+    hw.pile.forEach(function (p) { if (!(Math.abs(p.x - chx) < 30 && p.y > 880)) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.75, p.a || 0, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); } });
+    // Bed (moves down one layer at a time) and the build plate.
+    var py = plateY();
+    g.beginPath(); g.moveTo(PCX - PW - 4, py - PD - 4); g.lineTo(PCX + PW + 4, py - PD - 4); g.lineTo(PCX + PW + 4, py + PD + 22); g.lineTo(PCX - PW - 4, py + PD + 22); g.closePath();
+    fillStroke(g, "#1D2025", 3);
+    g.fillStyle = "#2D3138"; g.fillRect(PCX - PW - 4, py + PD + 6, 2 * PW + 8, 16);
+    [196, 564].forEach(function (x) { rr(g, x - 16, py - PD - 14, 32, 20, 5); fillStroke(g, "#3A3F48", 3); });
+    if (hw.plateOut <= 0) drawPlateAndPrint(g, PCX, py, 1, 0, 0);
+    if (hw.ripple) {
+      var rp = hw.ripple, rx = PCX + rp.x * MS, ry = py - rp.y * K * MS;
+      g.strokeStyle = "rgba(255,230,120," + (1 - rp.t) + ")"; g.lineWidth = 4;
+      g.beginPath(); g.ellipse(rx, ry, 10 + rp.t * 40, (10 + rp.t * 40) * K, 0, 0, Math.PI * 2); g.stroke();
+    }
+    // Gantry: two side rails, the X rail riding on them, and the toolhead on the X rail.
+    g.lineCap = "round";
+    [[CX0 + 12, CX0 + 40], [CX1 - 12, CX1 - 40]].forEach(function (s) {
+      g.strokeStyle = OUT; g.lineWidth = 14; g.beginPath(); g.moveTo(s[0], railY(-150)); g.lineTo(s[1], railY(150)); g.stroke();
+      g.strokeStyle = "#9AA3AF"; g.lineWidth = 8; g.stroke();
+    });
+    var ry2 = railY(hw.y), f = (hw.y + 150) / 300, xl = CX0 + 12 + 28 * f, xr = CX1 - 12 - 28 * f;
+    rr(g, xl - 8, ry2 - 10, xr - xl + 16, 20, 8); fillStroke(g, "#2B2F36", 4);
+    g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(xl, ry2 - 6, xr - xl, 4);
+    rr(g, xl - 14, ry2 - 16, 26, 32, 6); fillStroke(g, "#3A3F48", 3);
+    rr(g, xr - 12, ry2 - 16, 26, 32, 6); fillStroke(g, "#3A3F48", 3);
+    tubePart(g, "in");
+    var tx = tipX(), ty = tipY();
+    if (hw.blob) { g.beginPath(); g.arc(tx, ty + hw.blob.r * 0.8, hw.blob.r, 0, Math.PI * 2); fillStroke(g, fil(hw.blob.f).hex, 2.5); }
+    drawToolhead(g, tx, ty);
+    if (hw.cut > 0) {
+      g.fillStyle = "rgba(255,255,255," + hw.cut + ")";
+      g.beginPath(); g.arc(tx + 30, ty - 120, 10 + 14 * (1 - hw.cut), 0, Math.PI * 2); g.fill();
+    }
+    hw.poops.forEach(function (p) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.8, p.a, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2); });
+    drawTumble(g);
+    // With the light off it is dark inside: plate and print too.
+    if (lt < 0.98) { g.fillStyle = "rgba(6,9,18," + (0.62 * (1 - lt)) + ")"; g.fillRect(CX0 - 40, CY0 - 40, CX1 - CX0 + 80, CY1 - CY0 + 80); }
+    // Light strip and its glow.
+    if (!inCam) {
+      g.fillStyle = mix("#3A3F48", "#FFF6DA", lt); g.fillRect(CX0 + 24, CY0 + 6, CX1 - CX0 - 48, 7);
+      if (lt > 0.02) {
+        var lg = g.createRadialGradient(PCX, CY0, 20, PCX, CY0 + 160, 520);
+        lg.addColorStop(0, "rgba(255,244,214," + 0.28 * lt + ")"); lg.addColorStop(1, "rgba(255,244,214,0)");
+        g.fillStyle = lg; g.fillRect(CX0, CY0, CX1 - CX0, CY1 - CY0);
+      }
+    }
+  }
+  // The plate with the print (and the layer being traced right now).
+  function drawPlateAndPrint(g, cx, cy, k, flex, popY) {
+    drawPlate(g, cx, cy, k, flex);
+    var pic = job ? job.pic : lastPic;
+    if (job && job.showcase && pic) {
+      // A soft spotlight behind the finished print.
+      var pulse = reduce ? 0.8 : 0.7 + 0.3 * Math.sin((job.showT || 0) * 1.6);
+      var hy2 = cy - 70 * k, sg = g.createRadialGradient(cx, hy2, 10 * k, cx, hy2, 190 * k);
+      sg.addColorStop(0, "rgba(255,244,200," + (0.55 * pulse) + ")"); sg.addColorStop(1, "rgba(255,244,200,0)");
+      g.fillStyle = sg; g.fillRect(cx - 200 * k, hy2 - 200 * k, 400 * k, 400 * k);
+    }
+    if (pic && !(hw.fly && hw.fly.started)) {
+      if (alive && alive.pic === pic) drawAlive(g, pic, cx, cy - flex * 26 * k - (popY || 0), k);
+      else pic.draw(g, cx, cy - flex * 26 * k - (popY || 0), k / picK(), 3 * k);
+    }
+    if (job && job.trace.length && hw.plateOut <= 0) {
+      var L = job.P.layers[job.L], zt = L ? L.z1 : 0;
+      // Where the print picture itself puts the top of the current layer under the nozzle.
+      if (probe.on && pic) { var pk = pic.sc * k / picK(); probePt(g, "part", cx + hw.x * pk, cy - (hw.y * K + zt) * pk); }
+      g.lineCap = "round"; g.lineJoin = "round";
+      job.trace.forEach(function (t) {
+        if (t.pts.length < 2) return;
+        g.beginPath();
+        t.pts.forEach(function (q, i) { var x = cx + q[0] * MS, y = cy - q[1] * K * MS - zt * MS; if (i) g.lineTo(x, y); else g.moveTo(x, y); if (i === t.pts.length - 1) probePt(g, "ink", x, y); });
+        g.strokeStyle = OUT; g.lineWidth = 5.5; g.stroke();
+        g.strokeStyle = topCol(t.f, L ? L.z0 / job.P.H : 0); g.lineWidth = 3; g.stroke();
+      });
+    }
+  }
+  // Pics are baked at device resolution; this converts back to design units.
+  // A pic is baked at picScale() pixels per model unit; drawing it scaled by 1 / picK() turns that
+  // into MS design units per model unit, the same scale the toolhead and the plate use.
+  function picK() { return picScale() / MS; }
+
+  // ----- Printer body -----
+  function drawPrinter(g) {
+    // Outside tube runs down the back right (behind the printer).
+    tubePart(g, "out");
+    g.fillStyle = "rgba(29,35,64,0.18)"; g.beginPath(); g.ellipse(380, 1000, 330, 14, 0, 0, Math.PI * 2); g.fill();
+    rr(g, PX0, PY0, PX1 - PX0, PY1 - PY0, 30); fillStroke(g, "#2C3037", 5);
+    g.fillStyle = "rgba(255,255,255,0.08)"; g.fillRect(PX0 + 8, PY0 + 6, PX1 - PX0 - 16, 6);
+    g.save();
+    rr(g, CX0, CY0, CX1 - CX0, CY1 - CY0, 16); g.clip();
+    drawChamber(g, false);
+    g.restore();
+    // Glass door, hinged on the left.
+    // Tinted glass that swings toward you on its left hinge: the free edge comes closer (taller)
+    // and the glass shows more reflection as it turns.
+    var od = ease(hw.door), th = od * 1.2, w = (CX1 - CX0 + 4) * Math.cos(th), grow = Math.sin(th) * 46;
+    var dx0 = CX0 - 2, dx1 = CX0 - 2 + w;
+    function doorPath() { g.beginPath(); g.moveTo(dx0, CY0 - 2); g.lineTo(dx1, CY0 - 2 - grow); g.lineTo(dx1, CY1 + 2 + grow); g.lineTo(dx0, CY1 + 2); g.closePath(); }
+    doorPath();
+    var gl = g.createLinearGradient(dx0, 0, dx1 + 1, 0);
+    // Almost clear glass (no tint over the print); it only shows a little as the door swings open.
+    gl.addColorStop(0, "rgba(40,58,80," + (0.03 + od * 0.25) + ")");
+    gl.addColorStop(1, "rgba(120,160,200," + (0.02 + od * 0.2) + ")");
+    g.fillStyle = gl; g.fill();
+    g.save(); g.clip();
+    // Just a faint glint near the edge so it still reads as glass.
+    g.strokeStyle = "rgba(255,255,255," + (0.07 + od * 0.25) + ")"; g.lineWidth = 8 + 16 * od;
+    g.beginPath(); g.moveTo(dx0 + w * 0.06, CY0 + 120 - grow); g.lineTo(dx0 + w * 0.16, CY0 - grow); g.stroke();
+    g.restore();
+    doorPath();
+    g.lineWidth = 4; g.strokeStyle = "rgba(22,24,28,0.75)"; g.stroke();
+    if (od > 0.02) {
+      // Bright glass edge along the swinging side.
+      g.strokeStyle = "rgba(200,230,255," + Math.min(1, od * 2) * 0.9 + ")"; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(dx1 - 3, CY0 + 4 - grow); g.lineTo(dx1 - 3, CY1 - 4 + grow); g.stroke();
+    }
+    // Handle on the right edge of the door.
+    var hx = dx1 - 22 * Math.cos(th);
+    rr(g, hx - 6, 520 - grow * 0.4, 12, 220 + grow * 0.8, 6); fillStroke(g, "#B9C0CA", 3.5);
+    // Bottom strip: small screen and buttons at the lower left, and a thermometer for the nozzle heat.
+    rr(g, 118, 940, 116, 40, 8); fillStroke(g, "#0F1A22", 3);
+    // The little screen glows and fills up as the print goes (no printed words or numbers).
+    var scr = job && job.done ? 1 : (job && job.printing ? progress() : 0);
+    if (scr > 0.005) { rr(g, 124, 946, 104 * scr, 28, 5); fillStroke(g, "#8FE3FF", 0); }
+    else { g.beginPath(); g.arc(176, 960, 6, 0, Math.PI * 2); g.fillStyle = "#8FE3FF"; g.fill(); }
+    [252, 280, 308].forEach(function (x, i) { g.beginPath(); g.arc(x, 960, 9, 0, Math.PI * 2); fillStroke(g, i === 0 ? "#5BD68A" : "#4A4F59", 3); });
+    var heat = clamp((hw.noz - 25) / 195, 0, 1);
+    rr(g, 356, 951, 240, 18, 9); fillStroke(g, "#E9EEF5", 3);
+    if (heat > 0.01) { rr(g, 358, 953, 236 * heat, 14, 7); fillStroke(g, mix("#FFB347", "#E63946", heat), 0); }
+    g.beginPath(); g.arc(352, 960, 15, 0, Math.PI * 2); fillStroke(g, heat > 0.05 ? mix("#FFB347", "#E63946", heat) : "#9AA3AF", 3);
+    [[PX0 + 30, 992], [PX1 - 70, 992]].forEach(function (f2) { rr(g, f2[0], f2[1] - 4, 40, 10, 4); fillStroke(g, "#1A1C20", 2); });
+  }
+
+  // ----- Shelf of finished prints -----
+  var shelfThumbs = {};
+  var shelfHits = [];
+  function shelfThumb(idx, e, w, h) {
+    var key = idx + "|" + Math.round(w) + "|" + Math.round(h) + "|" + e.t;
+    if (!shelfThumbs[key]) {
+      var P = prep(e.m, e.n);
+      shelfThumbs[key] = fitPic(P, e.c, P.yaw, w * LY.sc * LY.dpr, h * LY.sc * LY.dpr);
+    }
+    return shelfThumbs[key];
+  }
+  function drawShelf(g) {
+    shelfHits = [];
+    if (!LY.shelf) return;
+    var G = shelfGrid(), S = LY.shelf, r, list = shelf.slice().reverse();
+    if (hw.fly && hw.fly.hide) list = list.slice(1);
+    for (r = 0; r < G.rows; r++) {
+      var by = S.top + G.gap * (r + 1) - 12, i;
+      for (i = 0; i < G.per; i++) {
+        var idx = r * G.per + i, e = list[idx];
+        if (!e) continue;
+        var bw = G.slotW - 8, bh = G.bh, cvT = shelfThumb(idx, e, bw, bh), x = S.x + 5 + i * G.slotW + 4;
+        g.drawImage(cvT, x, by - bh, bw, bh);
+        shelfHits.push({ x: x, y: by - bh, w: bw, h: bh, e: e });
+      }
+      rr(g, S.x, by, S.w, 16, 4); fillStroke(g, "#C98B4E", 4);
+      [S.x + 30, S.x + S.w - 50].forEach(function (x) { g.beginPath(); g.moveTo(x, by + 16); g.lineTo(x + 20, by + 16); g.lineTo(x, by + 40); g.closePath(); fillStroke(g, "#A9713E", 3); });
+    }
+  }
+  // Where the next print lands on the shelf (design units).
+  function shelfTarget() {
+    if (!LY.shelf) return { x: (LY.W - LY.ox) / LY.sc - 60, y: -LY.oy / LY.sc + 40, k: 0.2 };
+    var S = LY.shelf, G = shelfGrid();
+    return { x: S.x + 5 + G.slotW / 2, y: S.top + G.gap - 22, k: 0.45 };
+  }
+  // Shelf rows and slots: two or three big prints per shelf, two or three shelves.
+  function shelfGrid() {
+    var S = LY.shelf, per = S.w >= 330 ? 3 : 2, slotW = (S.w - 10) / per, avail = 990 - S.top;
+    var rows = clamp(Math.floor(avail / Math.min(190, slotW + 40)), 1, 3), gap = avail / rows;
+    return { per: per, slotW: slotW, rows: rows, gap: gap, bh: Math.min(gap - 30, slotW * 1.15) };
+  }
+
+  var lastPic = null; // a paused (unfinished) print stays on the plate
+  function drawScene() {
+    var g = ctx;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.setTransform(LY.sc * LY.dpr, 0, 0, LY.sc * LY.dpr, LY.ox * LY.dpr, LY.oy * LY.dpr);
+    drawBg(g, (LY.W - LY.ox) / LY.sc);
+    drawShelf(g);
+    drawPrinter(g);
+    drawBox(g);
+    if (hw.plateOut > 0) {
+      var po = ease(hw.plateOut), py = plateY() + po * 150;
+      drawPlateAndPrint(g, PCX, py, 1 + po * 0.12, hw.flex, hw.popY || 0);
+    }
+    if (hw.fly && hw.fly.started) {
+      var f = hw.fly, t = ease(f.t), x = lerp(f.x0, f.x1, t), y = lerp(f.y0, f.y1, t) - Math.sin(t * Math.PI) * 160, k = lerp(f.k0, f.k1, t);
+      g.save(); g.translate(x, y); g.rotate(Math.sin(t * Math.PI) * 0.4); f.pic.draw(g, 0, 0, k / picK(), 3); g.restore();
+    }
+  }
+  // ---------- Printing ----------
+  var FONTF = '"Baloo 2", "Trebuchet MS", sans-serif';
+  var job = null;
+  var shelf = loadShelf();
+  function loadShelf() {
+    try {
+      var a = JSON.parse(localStorage.getItem(SHKEY) || "[]");
+      if (!Array.isArray(a)) return [];
+      return a.filter(function (e) {
+        return e && MODEL_BY[e.m] && Array.isArray(e.c) && e.c.length === MODEL_BY[e.m].parts.length && e.c.every(function (f) { return FIL[f]; });
+      }).map(function (e) { return { m: e.m, c: e.c, n: cleanName(e.n) || "TOYBOX", t: Number(e.t) || 0 }; }).slice(-SHELF_MAX);
+    } catch (e) { return []; }
+  }
+  function saveShelf() { try { localStorage.setItem(SHKEY, JSON.stringify(shelf)); } catch (e) { /* ignore */ } }
+
+  // Spools the current model will use (lit up on the filament box).
+  function planSlots() {
+    var s = job && !job.paused ? job.slotOf : slotsFor(MODEL_BY[state.model], state.multi, state.sel);
+    return s.filter(function (v, i) { return s.indexOf(v) === i; });
+  }
+  function picScale() { return MS * LY.sc * LY.dpr * 1.25; }
+  function rebuildPic() {
+    var p = new Pic(job.P, job.cols, job.yaw, picScale());
+    if (job.baked) p.bake(job.baked);
+    job.pic = p;
+  }
+  function spd() {
+    if (!job) return 1;
+    return (state.faster ? 1.8 : 1) * (job.skip ? 7 : 1) * (job.hurry ? 6 : 1);
+  }
+  function setPhase(t, hot) { if (job) { job.phase = t; job.hot = !!hot; } }
+
+  // Tasks: each takes job time dt and returns leftover time when finished, or -1 while still busy.
+  function T_wait(d, f) { var t = 0; return function (dt) { t += dt; if (f) f(Math.min(1, t / d)); return t >= d ? t - d : -1; }; }
+  function T_call(fn) { return function (dt) { fn(); return dt; }; }
+  function T_move(pts, speed, ext, fid, purge) {
+    var i = 0, first = true;
+    return function (dt) {
+      if (first && ext) {
+        if (purge) hw.purge = { f: fid, pts: [[hw.x, hw.y]], z: hw.bedZ };
+        else job.trace.push({ f: fid, pts: [[hw.x, hw.y]] });
+      }
+      first = false;
+      var sp = typeof speed === "function" ? speed() : speed, budget = dt * sp;
+      while (i < pts.length) {
+        var tx = pts[i][0], ty = pts[i][1], dx = tx - hw.x, dy = ty - hw.y, d = Math.sqrt(dx * dx + dy * dy);
+        var go = Math.min(d, budget);
+        if (d > 0.0001) { hw.x += dx / d * go; hw.y += dy / d * go; }
+        if (ext) {
+          var tr = purge ? hw.purge.pts : job.trace[job.trace.length - 1].pts;
+          tr.push([hw.x, hw.y]);
+          if (!purge) job.extDone += go;
+          hw.spoolAng[hw.loaded] += go * 0.04;
+        }
+        budget -= go;
+        if (d <= go + 0.0001) i++;
+        else { hw.ext = !!(ext && !purge); return -1; }
+      }
+      return budget / sp;
+    };
+  }
+
+  function rot(P, q) {
+    var cs = Math.cos(P.yaw), sn = Math.sin(P.yaw);
+    return [q[0] * cs - q[1] * sn, q[0] * sn + q[1] * cs];
+  }
+
+  function startPrint() {
+    if (job && !job.paused) return;
+    var m = MODEL_BY[state.model], P = prep(m.id, state.name);
+    var slotOf = slotsFor(m, state.multi, state.sel);
+    if (hw.idleFeed) { hw.loaded = hw.idleFeed.to; hw.feed = null; hw.idleFeed = null; }
+    hw.lidOpen = false; closePop();
+    job = { P: P, m: m, slotOf: slotOf, cols: slotOf.map(function (s) { return state.slots[s]; }), yaw: P.yaw,
+      L: 0, baked: 0, trace: [], tq: [], phase: "Heating", hot: true, extDone: 0, extTotal: 0, prepLeft: 9.5,
+      changesLeft: 0, skip: false, hurry: false, printing: false, done: false, paused: false, name: state.name };
+    hw.purge = null; hw.jog = null;
+    rebuildPic();
+    // Plan speeds so a print takes about 40 seconds (plus color changes): slow enough to watch.
+    var active = hw.loaded, changes = 0;
+    P.layers.forEach(function (L) {
+      job.extTotal += L.len;
+      var gs = layerSlots(L, slotOf, active);
+      gs.forEach(function (s) { if (s !== active) { changes++; active = s; } });
+    });
+    var first = layerSlots(P.layers[0], slotOf, hw.loaded)[0];
+    if (first !== hw.loaded) changes++;
+    job.changesLeft = changes;
+    var avail = Math.max(19, 40 - P.layers.length * 0.13);
+    job.v = clamp(job.extTotal / avail, 250, 4000);
+    job.tv = Math.max(job.v * 1.6, 1300);
+    job.active = hw.loaded;
+    var n0 = hw.noz, b0 = hw.bed, z0 = hw.bedZ;
+    var q = job.tq;
+    q.push(T_call(function () { setPhase("Heating", true); blip(); }));
+    q.push(T_move([[0, 0]], 900, false));
+    q.push(T_wait(4, function (f) {
+      hw.noz = lerp(n0, 220, ease(f)); hw.bed = lerp(b0, 55, ease(Math.min(1, f * 1.15)));
+      hw.bedZ = lerp(z0, 3, ease(f)); job.prepLeft = 4 * (1 - f) + 5.5;
+    }));
+    q.push(T_call(function () { setPhase("Leveling the bed"); }));
+    [[-90, -90], [0, -90], [90, -90], [90, 0], [0, 0], [-90, 0], [-90, 90], [0, 90], [90, 90]].forEach(function (p, i) {
+      q.push(T_move([p], function () { return job.tv; }, false));
+      q.push(T_wait(0.16, function (f) {
+        hw.bedZ = 3 - Math.sin(f * Math.PI) * 3;
+        if (f >= 1) { hw.ripple = { x: p[0], y: p[1], t: 0 }; tick1(); }
+        job.prepLeft = 5.5 - (i + f) / 9 * 3;
+      }));
+    });
+    q.push(T_call(function () {
+      var s = first;
+      if (s !== hw.loaded) { job.tq.splice.apply(job.tq, [1, 0].concat(changeTasks(s))); job.active = s; }
+      else job.tq.splice.apply(job.tq, [1, 0].concat(poopTasks(s)));
+    }));
+    q.push(T_call(function () { setPhase("Purge line"); hw.bedZ = P.layers[0].z1; }));
+    q.push(T_move([[-120, -112]], function () { return job.tv; }, false));
+    q.push(T_move([[30, -112]], 420, true, null, true));
+    q.push(T_call(function () { hw.purge.f = state.slots[hw.loaded]; job.prepLeft = 0; job.skip = false; job.printing = true; planLayer(0); }));
+    updateUI();
+  }
+  // The spools a layer needs, starting with the one already loaded.
+  function layerSlots(L, slotOf, active) {
+    var s = [];
+    L.polys.forEach(function (p) { var v = slotOf[p.pi]; if (!p.dark && s.indexOf(v) === -1) s.push(v); });
+    s.sort(function (a, b) { return (a === active ? -1 : 0) - (b === active ? -1 : 0) || a - b; });
+    return s;
+  }
+  function planLayer(Li) {
+    var P = job.P, L = P.layers[Li], q = job.tq;
+    var gs = layerSlots(L, job.slotOf, job.active);
+    q.push(T_call(function () { setPhase("Printing"); hw.fanT = Li >= 2 ? 1 : 0; }));
+    gs.forEach(function (s) {
+      if (s !== job.active) { [].push.apply(q, changeTasks(s)); job.active = s; }
+      L.polys.forEach(function (p) {
+        if (p.dark || job.slotOf[p.pi] !== s) return;
+        [p.pts].concat(p.holes || []).forEach(function (ring) {
+          var pts = ring.map(function (v) { return rot(P, v); });
+          pts.push(pts[0]);
+          q.push(T_move([pts[0]], function () { return job.tv; }, false));
+          q.push(T_move(pts.slice(1), function () { return job.v; }, true, state.slots[s]));
+        });
+      });
+    });
+    q.push(T_call(function () {
+      job.trace = [];
+      job.baked = Li + 1; job.L = Li + 1;
+      job.pic.bake(job.baked);
+    }));
+    if (Li + 1 < P.layers.length) {
+      var za = L.z1, zb = P.layers[Li + 1].z1;
+      q.push(T_wait(0.08, function (f) { hw.bedZ = lerp(za, zb, f); }));
+      q.push(T_call(function () { planLayer(Li + 1); }));
+    } else q.push(T_call(finishTasks));
+  }
+  function poopTasks(s) {
+    var out = [];
+    out.push(T_move([[CHUTE.x, CHUTE.y]], function () { return job.tv; }, false));
+    out.push(T_wait(0.6, function (f) { hw.blob = { f: state.slots[s], r: 3 + f * 9 }; }));
+    out.push(T_call(dropPoop));
+    out.push(T_move([[CHUTE.x - 16, CHUTE.y], [CHUTE.x, CHUTE.y], [CHUTE.x - 16, CHUTE.y]], 700, false));
+    return out;
+  }
+  function changeTasks(s) {
+    var old = -1, out = [];
+    out.push(T_call(function () { setPhase("Changing color", true); old = hw.loaded; }));
+    out.push(T_move([[CHUTE.x, CHUTE.y]], function () { return job.tv; }, false));
+    out.push(T_wait(0.3, function (f) { hw.cut = 1 - f; if (f >= 1) hw.cut = 0; }));
+    out.push(T_wait(0.55, function (f) { hw.feed = [{ slot: old, frac: 1 - f }]; hw.spoolAng[old] = (hw.spoolAng[old] || 0) - 1.5; whir(1 - f); }));
+    out.push(T_call(function () { hw.loaded = s; hw.lid = Math.max(hw.lid, 0); }));
+    out.push(T_wait(0.75, function (f) { hw.feed = [{ slot: s, frac: f }]; hw.spoolAng[s] += 1.5; whir(f); }));
+    out.push(T_call(function () { hw.feed = null; }));
+    [].push.apply(out, poopTasks(s));
+    out.push(T_call(function () { job.changesLeft = Math.max(0, job.changesLeft - 1); }));
+    return out;
+  }
+  function dropPoop() {
+    if (!hw.blob) return;
+    hw.poops.push({ x: tipX(), y: tipY() + hw.blob.r, vy: 0, r: hw.blob.r, f: hw.blob.f, a: rand(-0.6, 0.6) });
+    hw.blob = null;
+  }
+  function finishTasks() {
+    var q = job.tq, z0 = hw.bedZ;
+    job.printing = false; job.done = true;
+    q.push(T_call(function () { setPhase("Done!", true); hw.fanT = 0; chime(); job.skip = false; job.hurry = Toybox.timer.phase() === "ending"; updateUI(); }));
+    q.push(T_move([[CHUTE.x, CHUTE.y]], function () { return job.tv; }, false));
+    // Show it off: the print stays on the plate, lit and slowly turning, until the child taps
+    // "Take it off" (or picks another model). Time-up ending takes it off by itself.
+    q.push(T_call(function () { job.showcase = Toybox.timer.phase() !== "ending"; job.showT = 0; updateUI(); }));
+    q.push(function (dt) { return job.showcase && Toybox.timer.phase() !== "ending" ? -1 : dt; });
+    q.push(T_call(function () { job.showcase = false; setPhase("Off to the shelf!"); updateUI(); }));
+    q.push(T_wait(0.8, function (f) { hw.bedZ = z0 + 24 * ease(f); }));
+    q.push(T_wait(0.9, function (f) { hw.door = f; }));
+    q.push(T_wait(1.05, function (f) { hw.plateOut = f; }));
+    q.push(T_wait(0.9, function (f) {
+      hw.flex = Math.sin(Math.min(1, f * 1.6) * Math.PI);
+      hw.popY = f > 0.45 ? Math.sin((f - 0.45) / 0.55 * Math.PI) * 40 : 0;
+      if (f > 0.45 && !job.popped) { job.popped = true; tick1(); }
+    }));
+    q.push(T_call(function () {
+      hw.flex = 0; hw.popY = 0;
+      var e = { m: job.m.id, c: job.cols.slice(), n: job.name, t: Date.now() };
+      shelf.push(e);
+      if (shelf.length > SHELF_MAX) shelf.shift();
+      saveShelf();
+      shelfThumbs = {};
+      var to = shelfTarget();
+      hw.fly = { t: 0, started: true, hide: true, pic: job.pic, x0: PCX, y0: plateY() + 150, k0: 1.12, x1: to.x, y1: to.y, k1: to.k };
+    }));
+    q.push(T_wait(1.4, function (f) { if (hw.fly) hw.fly.t = f; }));
+    q.push(T_call(function () { hw.fly = null; renderPrints(); if (!LY.shelf) Toybox.toast("Saved in My prints"); }));
+    q.push(T_wait(0.8, function (f) { hw.plateOut = 1 - f; }));
+    q.push(T_wait(0.7, function (f) { hw.door = 1 - f; }));
+    q.push(T_wait(0.9, function (f) { hw.bedZ = lerp(z0 + 24, IDLE_Z, ease(f)); }));
+    q.push(T_call(function () { job = null; hw.purge = null; updateUI(); }));
+  }
+  // Timer is up partway through: park the toolhead and stop safely.
+  function pauseJob() {
+    if (!job || job.paused) return;
+    var z0 = hw.bedZ;
+    job.trace = [];
+    job.hurry = false; job.skip = false;
+    job.tq = [
+      T_call(function () { setPhase("Pausing"); hw.fanT = 1; }),
+      T_move([[CHUTE.x, CHUTE.y]], 1200, false),
+      T_wait(0.6, function (f) { hw.bedZ = z0 + 20 * ease(f); }),
+      T_call(function () { job.paused = true; job.phase = "Paused"; updateUI(); })
+    ];
+  }
+  function skip() {
+    if (!job || job.paused || job.done) return;
+    if (!job.printing) job.skip = true; else job.hurry = true;
+    updateUI();
+  }
+  function progress() {
+    if (!job) return 0;
+    return job.extTotal ? clamp(job.extDone / job.extTotal, 0, 1) : 0;
+  }
+
+  // ---------- Frame update ----------
+  function step(dt) {
+    hw.ext = false;
+    // The finished print turns slowly on the plate while it is shown off.
+    if (job && job.showcase && job.pic) {
+      job.showT = (job.showT || 0) + dt;
+      if (!reduce && !alive) {
+        job.yaw += dt * 0.4;
+        job.turnAcc = (job.turnAcc || 0) + dt;
+        if (job.turnAcc >= 0.033) { job.turnAcc = 0; job.pic.yaw = job.yaw; job.pic.clear(); job.pic.bake(job.P.layers.length); }
+      }
+    }
+    if (job && !job.paused) {
+      var jd = dt * spd(), guard = 0;
+      while (jd > 0 && job && job.tq.length && guard++ < 4000) {
+        var t0 = job.tq[0], r = t0(jd);
+        if (!job) break;
+        if (r < 0) jd = 0; else { if (job.tq[0] === t0) job.tq.shift(); jd = r; }
+      }
+    } else if (hw.jog) {
+      var dx = hw.jog.x - hw.x, dy = hw.jog.y - hw.y, d = Math.sqrt(dx * dx + dy * dy), go = Math.min(d, 900 * dt);
+      if (d > 0.5) { hw.x += dx / d * go; hw.y += dy / d * go; } else hw.jog = null;
+    }
+    var idle = !job || job.paused || job.done;
+    var ending = Toybox.timer.phase() === "ending", cool = ending ? 0.9 : 0.06;
+    if (idle) { hw.noz += (25 - hw.noz) * Math.min(1, dt * cool); hw.bed += (25 - hw.bed) * Math.min(1, dt * cool * 0.8); }
+    var fanT = ending && hw.noz > 50 ? 1 : (idle && !(job && job.done) ? 0 : hw.fanT || 0);
+    hw.fan += (fanT - hw.fan) * Math.min(1, dt * 3);
+    hw.fanAng += hw.fan * dt * 28;
+    var lidOpen = hw.lidOpen || !$("pop").hidden || performance.now() < hw.lidUntil || hw.swap.some(function (s) { return s > 0; });
+    // Picking a spool while idle: the box pulls the old filament back and feeds the new one to the toolhead.
+    if (hw.idleFeed && (!job || job.paused)) {
+      var fd = hw.idleFeed;
+      fd.t = Math.min(1, fd.t + dt / 1.4);
+      if (fd.t < 0.45) { hw.feed = [{ slot: fd.from, frac: 1 - fd.t / 0.45 }]; hw.spoolAng[fd.from] -= dt * 30; }
+      else { hw.loaded = fd.to; hw.feed = [{ slot: fd.to, frac: (fd.t - 0.45) / 0.55 }]; hw.spoolAng[fd.to] += dt * 30; }
+      whir(fd.t);
+      if (fd.t >= 1) { hw.feed = null; hw.idleFeed = null; }
+    }
+    hw.lid = clamp(hw.lid + (lidOpen ? 1 : -1) * dt * 2.4, 0, 1);
+    var i;
+    for (i = 0; i < 4; i++) if (hw.swap[i] > 0 && hw.lid > 0.7) hw.swap[i] = Math.max(0, hw.swap[i] - dt * 1.5);
+    hw.poops = hw.poops.filter(function (p) {
+      p.vy += 1600 * dt; p.y += p.vy * dt; p.x += (tipXAt(CHUTE.x) - p.x) * Math.min(1, dt * 6); p.a += dt * 4;
+      var floor = 902 - Math.min(18, hw.pile.length * 0.6);
+      if (p.y < floor) return true;
+      hw.pile.push({ x: tipXAt(CHUTE.x) + rand(-22, 22), y: floor + rand(-3, 3), r: p.r * 0.8, f: p.f, a: rand(-1, 1) });
+      if (hw.pile.length > 40) hw.pile.shift();
+      savePile(); plop();
+      return false;
+    });
+    stepSurprise(dt);
+    if (hw.ripple) { hw.ripple.t += dt * 2.5; if (hw.ripple.t >= 1) hw.ripple = null; }
+    hw.dryT += (65 - hw.dryT) * Math.min(1, dt * 0.25);
+    hw.hum += (9 - hw.hum) * Math.min(1, dt * 0.01);
+    var lightT = ending && lightsOut ? 0 : 1;
+    hw.light += (lightT - hw.light) * Math.min(1, dt * 2.2);
+    var mv = Math.sqrt(Math.pow(hw.x - (hw.px || 0), 2) + Math.pow(hw.y - (hw.py || 0), 2)) / Math.max(dt, 0.001);
+    hw.px = hw.x; hw.py = hw.y;
+    hw.speed += (mv - hw.speed) * Math.min(1, dt * 10);
+    updateSound();
+  }
+
+  // ---------- Controls ----------
+  MODELS.forEach(function (m) {
+    var b = document.createElement("button");
+    b.className = "btn model"; b.dataset.model = m.id;
+    var shortL = { name: "Name", dino: "Dino" }[m.id];
+    b.setAttribute("aria-label", m.label);
+    b.innerHTML = '<canvas aria-hidden="true"></canvas>' + (shortL ? '<span class="long">' + m.label + '</span><span class="short">' + shortL + "</span>" : "<span>" + m.label + "</span>");
+    $("models").appendChild(b);
+  });
+  for (var si = 0; si < 4; si++) {
+    var sb = document.createElement("button");
+    sb.className = "btn slot"; sb.dataset.slot = String(si);
+    $("slots").appendChild(sb);
+  }
+  function swatchCss(f) {
+    if (f.kind === "silk") return "linear-gradient(135deg, " + f.hex + " 20%, #FFFFFF 45%, " + f.hex + " 70%)";
+    if (f.stops) return "linear-gradient(180deg, " + f.stops.join(", ") + ")";
+    if (f.kind === "sparkle") {
+      return "radial-gradient(circle at 28% 30%, #FFFFFF 0 7%, transparent 9%), radial-gradient(circle at 66% 24%, #FFFFFF 0 4%, transparent 6%), " +
+        "radial-gradient(circle at 55% 62%, #FFFFFF 0 6%, transparent 8%), radial-gradient(circle at 30% 74%, rgba(255,255,255,0.7) 0 4%, transparent 6%), " +
+        "radial-gradient(circle at 78% 70%, rgba(255,255,255,0.8) 0 3%, transparent 5%), " + f.hex;
+    }
+    return f.hex;
+  }
+  FILS.forEach(function (fa) {
+    var f = FIL[fa[0]], b = document.createElement("button");
+    b.className = "swatch"; b.dataset.fil = f.id; b.style.background = swatchCss(f);
+    if (f.kind === "glow") b.style.boxShadow = "0 0 12px " + f.hex + ", 2px 2px 0 #1D2340";
+    b.setAttribute("aria-label", f.name); b.title = f.name;
+    $("swatches").appendChild(b);
+    var p = document.createElement("button");
+    p.className = "pswatch"; p.dataset.pfil = f.id; p.setAttribute("aria-label", f.name);
+    p.innerHTML = '<i style="background:' + swatchCss(f) + (f.kind === "glow" ? ";box-shadow:0 0 10px " + f.hex : "") + '"></i><span>' + f.name.replace("Benchy orange", "Benchy") + "</span>";
+    $("pgrid").appendChild(p);
+  });
+  for (var pi2 = 0; pi2 < SHELF_MAX; pi2++) {
+    var pb = document.createElement("button");
+    pb.className = "pslot"; pb.dataset.print = String(pi2); pb.disabled = true;  // an empty spot is not a button
+    $("prints").appendChild(pb);
+  }
+
+  var thumbKey = "", modeKey = "";
+  // The One color / Many colors buttons show the chosen model printed each way.
+  function renderModePics() {
+    var key = JSON.stringify([state.model, state.slots, state.sel, state.name]);
+    if (key === modeKey) return;
+    modeKey = key;
+    var m = MODEL_BY[state.model], P = prep(m.id, state.name);
+    [["oneBtn", false], ["manyBtn", true]].forEach(function (it) {
+      var c = $(it[0]).querySelector("canvas"), r = c.getBoundingClientRect();
+      var px = Math.max(36, Math.round((r.width || 40) * Math.min(2, window.devicePixelRatio || 1)));
+      c.width = px; c.height = px;
+      c.getContext("2d").drawImage(fitPic(P, colsFor(m, it[1], state.slots, state.sel), P.yaw, px, px), 0, 0);
+    });
+  }
+  function renderModelThumbs() {
+    renderModePics();
+    var key = JSON.stringify([state.slots, state.multi, state.sel, state.name]);
+    if (key === thumbKey) return;
+    thumbKey = key;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-model]"), function (b) {
+      var m = MODEL_BY[b.dataset.model], P = prep(m.id, state.name), c = b.querySelector("canvas");
+      var r = c.getBoundingClientRect(), px = Math.max(40, Math.round((r.width || 60) * Math.min(2, window.devicePixelRatio || 1)));
+      c.width = px; c.height = px;
+      var pic = fitPic(P, colsFor(m, state.multi, state.slots, state.sel), P.yaw, px, px);
+      c.getContext("2d").drawImage(pic, 0, 0);
+    });
+  }
+  function renderPrints() {
+    var list = shelf.slice().reverse();
+    Array.prototype.forEach.call(document.querySelectorAll("[data-print]"), function (b) {
+      var i = Number(b.dataset.print), e = list[i];
+      if (!e) { b.className = "pslot"; b.textContent = ""; b.removeAttribute("aria-label"); b.disabled = true; return; }
+      b.className = "pslot full"; b.disabled = false;
+      b.setAttribute("aria-label", MODEL_BY[e.m].label);
+      b.innerHTML = "<canvas></canvas>";
+      var c = b.firstChild, px = Math.max(40, Math.round((b.getBoundingClientRect().width || 60) * Math.min(2, window.devicePixelRatio || 1)));
+      c.width = px; c.height = px;
+      var P = prep(e.m, e.n);
+      c.getContext("2d").drawImage(fitPic(P, e.c, P.yaw, px, px), 0, 0);
+    });
+  }
+  function updateUI() {
+    var m = MODEL_BY[state.model];
+    Array.prototype.forEach.call(document.querySelectorAll("[data-model]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.model === state.model)); });
+    $("oneBtn").setAttribute("aria-pressed", String(!state.multi));
+    $("manyBtn").setAttribute("aria-pressed", String(state.multi));
+    Array.prototype.forEach.call(document.querySelectorAll("[data-slot]"), function (b) {
+      var i = Number(b.dataset.slot), f = fil(state.slots[i]);
+      b.setAttribute("aria-pressed", String(i === state.sel));
+      b.classList.toggle("used", state.multi && slotsFor(m, true, state.sel).indexOf(i) !== -1);
+      b.setAttribute("aria-label", "Spool " + (i + 1) + ": " + f.name);
+      b.innerHTML = '<span class="dot" style="background:' + swatchCss(f) + '"></span>';
+    });
+    var cur = state.slots[state.sel];
+    Array.prototype.forEach.call(document.querySelectorAll("[data-fil]"), function (b) {
+      var on = b.dataset.fil === cur;
+      b.setAttribute("aria-pressed", String(on));
+      b.textContent = on ? "✓" : "";
+    });
+    var busy = job && !job.paused;
+    var pb = $("printBtn");
+    if (!busy) { pb.textContent = "Print!"; pb.classList.remove("skip"); pb.disabled = false; }
+    else if (job.showcase) { pb.textContent = "Take it off"; pb.classList.add("skip"); pb.disabled = false; }
+    else if (job.done) { pb.textContent = "Done!"; pb.classList.add("skip"); pb.disabled = true; }
+    else { pb.textContent = (job.skip || job.hurry) ? "Zoom!" : "Skip ⏩"; pb.classList.add("skip"); pb.disabled = false; }
+    $("fastBtn").setAttribute("aria-pressed", String(state.faster));
+    renderModelThumbs();
+    save();
+  }
+
+  var lastStats = "";
+  function updateStats() {
+    var n = job ? job.P.layers.length : prep(state.model, state.name).layers.length;
+    var L = job ? Math.min(n, job.L + (job.printing ? 1 : 0)) : 0;
+    var pct = job ? Math.round(progress() * 100) : 0;
+    if (job && job.done) { L = n; pct = 100; }
+    var s = [L + "/" + n];
+    var ph = job ? job.phase : "Ready";
+    if (Toybox.timer.phase() === "ending" && (!job || job.paused)) ph = hw.noz > 45 ? "Cooling down" : "All cool";
+    var key = s.join("|") + pct + ph;
+    if (key === lastStats) return;
+    lastStats = key;
+    $("sBar").style.width = pct + "%";
+    $("phase").textContent = ph;
+    $("phase").classList.toggle("hot", !!(job && job.hot && !job.paused));
+  }
+
+  // Spool color picker over the printer.
+  var popSlot = 0;
+  function openPop(i) {
+    if (Toybox.timer.locked()) return;
+    popSlot = i;
+    $("popTitle").textContent = "Pick a color";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-pfil]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.pfil === state.slots[i])); });
+    $("pop").hidden = false;
+    blip();
+    updateUI();
+  }
+  function closePop() { $("pop").hidden = true; }
+  // Tap a spool (lid closed): use that spool. The feeder loads it when the printer is idle.
+  function selectBay(i) {
+    state.sel = i;
+    if ((!job || job.paused) && hw.loaded !== i) hw.idleFeed = { from: hw.loaded, to: i, t: hw.idleFeed ? 0.45 : 0 };
+    blip();
+    updateUI();
+  }
+  function setLid(open) { hw.lidOpen = !!open; if (!open) closePop(); blip(); }
+  function setSlotColor(i, fid) {
+    if (state.slots[i] === fid) return;
+    hw.swapOld[i] = state.slots[i];
+    state.slots[i] = fid;
+    hw.swap[i] = 1;
+    hw.lidUntil = performance.now() + 1600;
+    whir(0.6);
+    updateUI();
+  }
+
+  function sceneXY(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left - LY.ox) / LY.sc, y: (e.clientY - r.top - LY.oy) / LY.sc };
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    if (Toybox.timer.locked()) return;
+    if (!$("pop").hidden) { closePop(); return; }
+    var p = sceneXY(e);
+    // Lid: the handle and the lid itself. Open: tap a spool to change its color. Closed: tap a spool to use it.
+    var lt = lidTop(), onHandle = Math.abs(p.x - LID_HX) < 96 && Math.abs(p.y - handleY()) < 34;
+    if (onHandle || (hw.lidOpen && p.x > 96 && p.x < 568 && p.y > lt - 34 && p.y < 104) || (!hw.lidOpen && p.x > 96 && p.x < 568 && p.y > lt - 34 && p.y < 112)) { setLid(!hw.lidOpen); return; }
+    if (p.x > BAY0 && p.x < BAY0 + 4 * BAYW && p.y > lt && p.y < 300) {
+      var bay = Math.floor((p.x - BAY0) / BAYW);
+      if (hw.lidOpen) openPop(bay); else selectBay(bay);
+      return;
+    }
+    var hit = shelfHits.filter(function (h) { return p.x > h.x && p.x < h.x + h.w && p.y > h.y && p.y < h.y + h.h; })[0];
+    if (hit) { openViewer(hit.e); return; }
+    if (p.x > CX0 && p.x < CX1 && p.y > CY0 && p.y < CY1 && (!job || job.paused)) {
+      // Tap inside: the toolhead zooms over to your finger.
+      hw.jog = { x: clamp((p.x - PCX) / MS, -CHUTE.x, CHUTE.x), y: clamp((YTIP - p.y) / (K * MS), -128, 128) };
+      hw.ripple = { x: hw.jog.x, y: hw.jog.y, t: 0 };
+      blip();
+    }
+  });
+
+  // ---------- Viewer: look at one print big and turn it ----------
+  var view = null;
+  function openViewer(e) {
+    var P = prep(e.m, e.n);
+    view = { e: e, P: P, yaw: P.yaw, drag: null, spin: 0.5, pic: null };
+    $("vTitle").textContent = MODEL_BY[e.m].label + (e.m === "name" ? ": " + e.n : "");
+    var names = [];
+    e.c.forEach(function (f) { var nm = fil(f).name; if (names.indexOf(nm) === -1) names.push(nm); });
+    $("vSub").textContent = names.join(", ");
+    $("viewer").hidden = false;
+    sizeViewer();
+    blip();
+  }
+  function sizeViewer() {
+    if (!view) return;
+    var c = $("vcv"), r = c.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = Math.max(2, Math.round(r.width * dpr)); c.height = Math.max(2, Math.round(r.height * dpr));
+    var P = view.P, tw = 2 * P.R + 20, th = P.H + 2 * P.R * K + 20;
+    view.sc = Math.min(c.width / tw, c.height / th);
+    view.pic = new Pic(P, view.e.c, view.yaw, view.sc);
+  }
+  function drawViewer(dt) {
+    if (!view) return;
+    if (!view.drag) view.yaw += view.spin * dt;
+    var c = $("vcv"), g = c.getContext("2d"), pic = view.pic, P = view.P;
+    pic.yaw = view.yaw; pic.clear(); pic.bake(P.layers.length);
+    g.clearRect(0, 0, c.width, c.height);
+    var cy = c.height / 2 + (P.H + 2 * P.R * K) * view.sc / 2 - P.R * K * view.sc;
+    // Soft shadow the shape of the print's bottom layer, just under it.
+    var cs = Math.cos(view.yaw), sn = Math.sin(view.yaw), L0 = P.layers[0], sx = view.sc * 1.04;
+    g.fillStyle = "rgba(29,35,64,0.13)"; g.beginPath();
+    if (L0) L0.polys.forEach(function (p) {
+      if (p.dark) return;
+      p.pts.forEach(function (q, i) {
+        var x = c.width / 2 + (q[0] * cs - q[1] * sn) * sx, y = cy + 4 - (q[0] * sn + q[1] * cs) * K * sx;
+        if (i) g.lineTo(x, y); else g.moveTo(x, y);
+      });
+      g.closePath();
+    });
+    g.fill("nonzero");
+    pic.draw(g, c.width / 2, cy, 1, Math.max(3, c.width * 0.006));
+  }
+  $("vcv").addEventListener("pointerdown", function (e) { if (view) { view.drag = { x: e.clientX, yaw: view.yaw }; this.setPointerCapture(e.pointerId); } });
+  $("vcv").addEventListener("pointermove", function (e) { if (view && view.drag) view.yaw = view.drag.yaw - (e.clientX - view.drag.x) * 0.012; });
+  ["pointerup", "pointercancel"].forEach(function (ev) {
+    $("vcv").addEventListener(ev, function (e) { if (view && view.drag) { var d = e.clientX - view.drag.x; view.spin = Math.abs(d) > 4 ? -Math.sign(d) * 0.9 : view.spin; view.drag = null; } });
+  });
+  function closeViewer() { view = null; $("viewer").hidden = true; }
+
+  // ---------- Tabs, buttons ----------
+  var tab = "models";
+  function showTab(name) {
+    tab = name;
+    document.querySelector(".tb-panel").setAttribute("data-tab", name);
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === name)); });
+    if (name === "prints") renderPrints();
+    if (name === "colors") { modeKey = ""; renderModePics(); }
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.classList.contains("tab") && t.dataset.tab) { showTab(t.dataset.tab); return; }
+    if (t.id === "vClose") { closeViewer(); return; }
+    if (t.id === "popClose") { setLid(false); return; }
+    if (t.classList.contains("hold")) return;
+    if (t.dataset.print) { var e2 = shelf.slice().reverse()[Number(t.dataset.print)]; if (e2) openViewer(e2); return; }
+    if (Toybox.timer.locked()) return;
+    if (t.id === "printBtn") { if (job && job.showcase) job.showcase = false; else if (job && !job.paused) skip(); else startPrint(); updateUI(); return; }
+    if (t.id === "fastBtn") { state.faster = !state.faster; updateUI(); return; }
+    if (t.dataset.pfil) { setSlotColor(popSlot, t.dataset.pfil); setTimeout(closePop, 350); return; }
+    if (t.dataset.model) { state.model = t.dataset.model; if (job && job.showcase) job.showcase = false; blip(); }
+    else if (t.id === "oneBtn") { if (state.multi) Toybox.toast("All one color!"); state.multi = false; blip(); }
+    else if (t.id === "manyBtn") { if (!state.multi) Toybox.toast("Each part a new color!"); state.multi = true; blip(); }
+    else if (t.dataset.slot) { selectBay(Number(t.dataset.slot)); return; }
+    else if (t.dataset.fil) setSlotColor(state.sel, t.dataset.fil);
+    else return;
+    updateUI();
+  });
+  // The name sign letters changed on the home screen (another open page): redraw the thumbnails.
+  Toybox.settings.onChange(function (id) {
+    if (id !== "printer-name") return;
+    var n = printerName();
+    if (n !== state.name) { state.name = n; thumbKey = ""; updateUI(); }
+  });
+
+  // No pinch-zoom or double-tap zoom on iOS.
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+
+  // ---------- Surprise: a fun moment on the printer right now ----------
+  // Takes turns: (1) purge party: like a real color change, the toolhead goes to the chute at the back and
+  // purges a blob of every loaded color, then a whole pile of colorful blobs tumbles out of the chute into the
+  // waste bin, plop plop plop (while a print runs, only the tumble, so the print is never disturbed);
+  // (2) the print on the plate comes alive for a few seconds: the boat sails off and back, the rocket hops on
+  // its flames, the dinosaur waddles, the gear and the star spin, anything else hops and twirls. Nothing on
+  // the plate yet: the purge party instead. His print, colors and shelf never change.
+  var surpriseTurn = 0, party = null, alive = null;
+  function canAlive() { return !!(job && job.pic && job.pic.done && (job.paused || (job.done && job.showcase))); }
+  function surprise() {
+    if (Toybox.timer.locked()) return;
+    var pick = surpriseTurn % 2 === 0 ? "purge" : "alive";
+    if (pick === "alive" && (!canAlive() || alive)) pick = "purge";
+    if (pick === "purge" && party) {
+      if (canAlive() && !alive) pick = "alive";
+      else { party.extra += 4; blip(); return; }   // a party is already going: a few more blobs
+    }
+    surpriseTurn = pick === "purge" ? 1 : 0;
+    if (pick === "purge") startParty(); else startAlive();
+  }
+  $("surpriseBtn").addEventListener("click", surprise);
+
+  // ----- Purge party -----
+  function startParty() {
+    var head = !job || job.paused || (job.done && job.showcase), cols = [], i;
+    for (i = 0; i < 4; i++) { var f = state.slots[i]; if (f && cols.indexOf(f) === -1) cols.push(f); }
+    if (!cols.length) cols = ["orange"];
+    if (reduce) cols = cols.slice(0, 2);
+    party = { t: 0, head: head, cols: cols, step: -1, blob: 0, tumble: [], nT: 0, extra: 0, done: false };
+    if (head && (!job || job.paused)) hw.jog = { x: CHUTE.x, y: CHUTE.y };
+    hw.lidUntil = performance.now() + 1500;
+    blip();
+  }
+  var COL_T = reduce ? 1.2 : 1.5;
+  function stepSurprise(dt) {
+    if (party) {
+      var pt = party;
+      pt.t += dt;
+      if (pt.head && job && !job.paused && !job.done) { pt.head = false; hw.blob = null; pt.t = Math.max(pt.t, 0.3); }   // he started a print: only the tumble
+      if (pt.head) {
+        // One color after another: the box feeds it, the nozzle pushes out a blob, the blob drops in the chute.
+        var t1 = pt.t - 0.9, k = Math.floor(t1 / COL_T);
+        if (t1 >= 0 && k < pt.cols.length) {
+          var slot = state.slots.indexOf(pt.cols[k]), f2 = (t1 - k * COL_T) / COL_T;
+          if (k !== pt.step) { pt.step = k; tick1(); }
+          if (slot >= 0 && !hw.idleFeed) hw.spoolAng[slot] += dt * 6;
+          if (f2 < 0.7) hw.blob = { f: pt.cols[k], r: 3 + f2 / 0.7 * 15 };
+          else if (hw.blob) { dropPoop(); plop(); }
+        }
+      }
+      // Then the tumble: a pile of blobs comes down the chute and spills into the bin.
+      var tumbleAt = pt.head ? 0.9 + pt.cols.length * COL_T + 0.2 : 0.3, nMax = (reduce ? 6 : 12) + pt.extra;
+      if (pt.t >= tumbleAt && pt.nT < nMax && pt.t - tumbleAt >= pt.nT * (reduce ? 0.4 : 0.32)) {
+        var chx = tipXAt(CHUTE.x);
+        pt.tumble.push({ x: chx + rand(-4, 4), y: 404, vx: 0, vy: rand(60, 140), r: rand(11, 15), f: pt.cols[pt.nT % pt.cols.length], a: rand(0, 6), out: false, b: 0 });
+        pt.nT++;
+      }
+      pt.tumble = pt.tumble.filter(function (p) {
+        p.vy += 1500 * dt; p.y += p.vy * dt; p.x += p.vx * dt; p.a += dt * (p.out ? 6 : 2);
+        var cx = tipXAt(CHUTE.x);
+        // Out of the chute mouth: they pop out, bounce, and tumble onto a heap on the floor beside the bin.
+        if (!p.out && p.y > 868) { p.out = true; p.slot = nextSlot(); p.vy = -rand(240, 320); }
+        if (p.out) {
+          var sp2 = HEAP[p.slot], tx = cx + sp2[0];
+          p.x += (tx - p.x) * Math.min(1, dt * 3.2);
+          if (p.y > 914 + sp2[1] - p.r * 0.5 && p.vy > 0) {
+            if (p.b < (reduce ? 0 : 1)) { p.b++; p.vy = -p.vy * 0.38; plop(); sparks.push({ x: p.x, y: p.y + p.r * 0.5, t: 0, c: fil(p.f).hex }); return true; }
+            hw.pile = hw.pile.filter(function (q) { return q.s !== p.slot; });
+            hw.pile.push({ x: tx, y: 914 + sp2[1] - p.r * 0.3, r: p.r * 0.9, f: p.f, a: rand(-1, 1), s: p.slot });
+            if (hw.pile.length > 40) hw.pile.shift();
+            savePile(); plop();
+            return false;
+          }
+        }
+        return true;
+      });
+      if (pt.nT >= nMax && !pt.tumble.length && !hw.blob && pt.t > tumbleAt) party = null;
+    }
+    sparks = sparks.filter(function (sp) { sp.t += dt * 1.6; return sp.t < 1; });
+    if (alive) {
+      if (!canAlive() || alive.pic !== job.pic) { endAlive(); return; }
+      alive.t += dt;
+      var tf = aliveTf(alive);
+      if (tf.yaw !== alive.yawNow) {
+        alive.acc += dt;
+        if (alive.acc >= 0.04 || alive.t >= alive.dur) { alive.acc = 0; alive.yawNow = tf.yaw; rebakeYaw(alive.pic, alive.yaw0 + tf.yaw); }
+      }
+      if (alive.t >= alive.dur) endAlive();
+    }
+  }
+  var sparks = [];
+  // Spots on the heap beside the bin, bottom row first (x from the chute, y up from the floor).
+  var HEAP = (function () {
+    var out = [], rows = [6, 5, 4, 3, 2], r, i;
+    for (r = 0; r < rows.length; r++) for (i = 0; i < rows[r]; i++) out.push([-44 - r * 11 - i * 22, -r * 15]);
+    return out;
+  })();
+  var heapN = -1;
+  function nextSlot() {
+    if (heapN < 0) { heapN = 0; hw.pile.forEach(function (q) { if (q.s != null) heapN = Math.max(heapN, q.s + 1); }); }
+    var s2 = heapN % HEAP.length; heapN++;
+    return s2;
+  }
+  function drawTumble(g) {
+    if (party) party.tumble.forEach(function (p) { g.beginPath(); g.ellipse(p.x, p.y, p.r, p.r * 0.8, p.a, 0, Math.PI * 2); fillStroke(g, fil(p.f).hex, 2.5); });
+    sparks.forEach(function (sp) {
+      g.strokeStyle = sp.c; g.globalAlpha = 1 - sp.t; g.lineWidth = 3;
+      for (var i = 0; i < 5; i++) {
+        var a = -Math.PI * (0.1 + 0.8 * i / 4), r0 = 6 + sp.t * 10, r1 = 12 + sp.t * 22;
+        g.beginPath(); g.moveTo(sp.x + Math.cos(a) * r0, sp.y + Math.sin(a) * r0); g.lineTo(sp.x + Math.cos(a) * r1, sp.y + Math.sin(a) * r1); g.stroke();
+      }
+      g.globalAlpha = 1;
+    });
+  }
+
+  // ----- The print comes alive -----
+  function rebakeYaw(pic, yaw) { pic.yaw = yaw; pic.clear(); pic.bake(job.done ? job.P.layers.length : job.baked); }
+  function startAlive() {
+    var id = job.m.id;
+    var kind = { benchy: "sail", rocket: "hop", dino: "waddle", gear: "spin", star: "twirl" }[id] || "bounce";
+    var dur = { sail: 10, hop: 7, waddle: 8, spin: 6, twirl: 6.5, bounce: 6 }[kind];
+    if (reduce) { dur = Math.min(dur, 5); if (kind === "sail") kind = "bounce"; }
+    alive = { t: 0, dur: dur, kind: kind, pic: job.pic, yaw0: job.pic.yaw, yawNow: 0, acc: 0 };
+    chime();
+  }
+  function endAlive() {
+    if (!alive) return;
+    var a = alive;
+    alive = null;
+    if (job && job.pic === a.pic && a.yawNow) rebakeYaw(a.pic, job.yaw);
+  }
+  // How the print moves at time t: offset (design px at plate scale), tilt, squash, and extra turn (yaw).
+  function aliveTf(a) {
+    var t = a.t, D = a.dur, u = clamp(t / D, 0, 1), r = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, yaw: 0, flame: 0, wake: 0 };
+    var calm = reduce ? 0.5 : 1;
+    if (a.kind === "sail") {
+      // Off to the right (past the side of the printer), a moment away, then back, bobbing on little waves.
+      var out = ease(clamp(t / 4.6, 0, 1)), back = ease(clamp((t - 5.2) / 4.6, 0, 1));
+      r.dx = 330 * out * (1 - back);
+      r.sx = t > 4.8 && t < 9.85 ? -1 : 1;
+      r.dy = -6 - Math.sin(t * 3.2) * 4; r.rot = Math.sin(t * 2.6) * 0.07; r.wake = 1;
+    } else if (a.kind === "hop") {
+      // A little hop, then a big one on its flames, and a gentle landing.
+      var h1 = t < 1.6 ? Math.sin(t / 1.6 * Math.PI) * 45 : 0;
+      var h2 = t > 2.2 && t < 6.4 ? Math.sin((t - 2.2) / 4.2 * Math.PI) * 130 : 0;
+      r.dy = -(h1 + h2) * calm; r.flame = (h1 > 1 || h2 > 1) ? 1 : 0; r.rot = Math.sin(t * 5) * 0.03;
+    } else if (a.kind === "waddle") {
+      // Waddles over to the right on little steps, turns round and waddles back.
+      var go = ease(clamp(t / 3.6, 0, 1)), ret = ease(clamp((t - 4.2) / 3.6, 0, 1));
+      r.dx = 110 * go * (1 - ret) * calm;
+      r.sx = t > 3.9 && t < 7.8 ? -1 : 1;
+      var stepK = (t < 3.6 || (t > 4.2 && t < 7.8)) ? 1 : 0;
+      r.dy = -Math.abs(Math.sin(t * 5.2)) * 10 * stepK; r.rot = Math.sin(t * 5.2) * 0.08 * stepK;
+    } else if (a.kind === "spin") {
+      // Spins like a top, a bit faster in the middle, with a little hop.
+      r.yaw = Math.PI * 4 * ease(u) * calm; r.dy = -Math.sin(u * Math.PI) * 30 * calm;
+    } else if (a.kind === "twirl") {
+      // Rises a little, twirls round twice and floats back down.
+      r.yaw = Math.PI * 4 * ease(u) * calm; r.dy = -Math.sin(u * Math.PI) * 70 * calm; r.wake = 0;
+    } else {
+      // Three happy hops, a twirl on the middle one, a squash on each landing.
+      var ph = t / (D / 3), n = Math.floor(ph), f = ph - n, hgt = [40, 70, 40][Math.min(2, n)] * calm;
+      r.dy = -Math.sin(f * Math.PI) * hgt;
+      if (n === 1) r.yaw = Math.PI * 2 * ease(f) * calm;
+      if (f < 0.12 || f > 0.9) { r.sy = 0.88; r.sx = 1.08; }
+    }
+    return r;
+  }
+  function drawAlive(g, pic, x, y, k) {
+    var tf = aliveTf(alive), now = performance.now() / 1000;
+    if (tf.flame) {
+      // Puffy flames and smoke under the rocket.
+      var fx = x + tf.dx * k, fy = y + tf.dy * k + 6 * k;
+      for (var j = 0; j < 5; j++) {
+        var fr = (14 + 8 * Math.sin(now * 18 + j)) * k, ox = (j - 2) * 9 * k;
+        g.beginPath(); g.arc(fx + ox, fy + 12 * k + Math.abs(j - 2) * 4 * k, fr, 0, Math.PI * 2);
+        g.fillStyle = j % 2 ? "#FFB627" : "#FF6B3D"; g.fill();
+      }
+      g.beginPath(); g.arc(fx, fy + 6 * k, 10 * k, 0, Math.PI * 2); g.fillStyle = "#FFF3B0"; g.fill();
+    }
+    g.save();
+    g.translate(x + tf.dx * k, y + tf.dy * k);
+    g.rotate(tf.rot);
+    g.scale(tf.sx, tf.sy);
+    pic.draw(g, 0, 0, k / picK(), 3 * k);
+    g.restore();
+    if (tf.wake) {
+      // Little waves under the boat.
+      g.strokeStyle = "#5EC8FF"; g.lineWidth = 4 * k; g.lineCap = "round";
+      g.lineWidth = 6 * k;
+      for (var i = -3; i <= 3; i++) {
+        var wx = x + tf.dx * k + i * 32 * k + Math.sin(now * 2 + i) * 6 * k, wy = y + 2 * k + Math.sin(now * 3 + i) * 4 * k;
+        g.beginPath(); g.moveTo(wx - 16 * k, wy); g.quadraticCurveTo(wx, wy - 12 * k, wx + 16 * k, wy); g.stroke();
+      }
+    }
+    if (alive.kind === "twirl" || alive.kind === "spin") {
+      for (var s2 = 0; s2 < 6; s2++) {
+        var a2 = now * 2 + s2 * Math.PI / 3, rr2 = 90 * k;
+        var sx = x + tf.dx * k + Math.cos(a2) * rr2, sy = y + tf.dy * k - 60 * k + Math.sin(a2) * rr2 * 0.5;
+        g.fillStyle = s2 % 2 ? "#FFE14D" : "#FFFFFF"; g.globalAlpha = 0.85;
+        g.beginPath(); g.arc(sx, sy, 5 * k, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+      }
+    }
+  }
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
+  // starts the audio on a tap while sound is on. This page builds its own master gain and noise per context.
+  var sctx = null, master = null, noiseBuf = null, motor = null, fanN = null;
+  function out(ac) {
+    if (sctx !== ac) {
+      sctx = ac; motor = null; fanN = null;
+      master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
+      var len = Math.floor(ac.sampleRate * 1.5), d, last = 0, i;
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      d = noiseBuf.getChannelData(0);
+      for (i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
+    }
+    return master;
+  }
+  function tone(freq, dur, vol, type, slideTo) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function blip() { tone(rand(560, 700), 0.14, 0.04, "sine", 880); }
+  function tick1() { tone(1300, 0.05, 0.025, "triangle"); }
+  function plop() { tone(380, 0.18, 0.045, "sine", 140); }
+  function whir(f) { if (Math.random() < 0.15) tone(300 + f * 300, 0.12, 0.012, "triangle"); }
+  function chime() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.6, 0.05); }, i * 140); }); }
+  function updateSound() {
+    var ac = Toybox.sound.ready();
+    if (!ac) { if (motor) { motor.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.05); fanN.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.05); } return; }
+    out(ac);
+    if (!motor) {
+      var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = "triangle"; o.frequency.value = 200; f.type = "lowpass"; f.frequency.value = 900; g.gain.value = 0.0001;
+      o.connect(f); f.connect(g); g.connect(master); o.start();
+      motor = { o: o, g: g };
+      var src = ac.createBufferSource(), f2 = ac.createBiquadFilter(), g2 = ac.createGain();
+      src.buffer = noiseBuf; src.loop = true; f2.type = "lowpass"; f2.frequency.value = 500; g2.gain.value = 0.0001;
+      src.connect(f2); f2.connect(g2); g2.connect(master); src.start();
+      fanN = { g: g2 };
+    }
+    var sp = Math.min(hw.speed, 3000), t = ac.currentTime;
+    motor.o.frequency.setTargetAtTime(140 + sp * 0.12, t, 0.05);
+    motor.g.gain.setTargetAtTime(sp > 5 ? 0.012 + Math.min(0.012, sp / 200000) : 0.0001, t, 0.06);
+    fanN.g.gain.setTargetAtTime(Math.max(0.0001, hw.fan * 0.05), t, 0.2);
+  }
+  document.addEventListener("visibilitychange", function () { if (sctx && document.hidden) sctx.suspend(); });
+
+  // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
+  // Ending: a print more than half done finishes quickly, otherwise it pauses safely; the printer
+  // cools down. "Lights off" turns the chamber light off, then the printer rests.
+  var endingDone = null, lightsOut = false;
+  // Fuel gauge on the picture: the bar is the time left.
+  function drawTimer(info) {
+    var active = info.phase === "running" || info.phase === "ending";
+    $("fuel").hidden = !active;
+    if (!active) return;
+    var f = info.fraction;
+    $("fuelFill").style.width = (f * 100).toFixed(1) + "%";
+    $("fuelFill").style.background = f > 0.5 ? "#2E9E5B" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    $("fuelNum").hidden = !(info.showMinutes && info.phase === "running");
+    $("fuelNum").textContent = String(info.minutes);
+  }
+  function onEnding(done) {
+    endingDone = done;
+    endAlive(); party = null;
+    lightsOut = false;
+    closePop(); closeViewer();
+    // A print more than half done finishes quickly; otherwise it pauses safely.
+    if (job && !job.paused && !job.done) { if (job.printing && progress() >= 0.5) job.hurry = true; else pauseJob(); }
+    updateUI();
+  }
+  // Every frame while ending: done once the print has finished (or parked) and the printer is cool.
+  function endingFrame() {
+    if (endingDone && (!job || job.paused) && hw.noz <= 45) { endingDone(); endingDone = null; }
+  }
+  function drawRestArt() {
+    var c = $("restArt");
+    if (!c) return;
+    var r = c.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = Math.max(2, Math.round((r.width || 220) * dpr)); c.height = Math.max(2, Math.round((r.height || 275) * dpr));
+    var g = c.getContext("2d"), s = Math.min(c.width / 760, c.height / 1000), keep = hw.light;
+    hw.light = 0;
+    g.setTransform(s, 0, 0, s, (c.width - 760 * s) / 2, 0);
+    g.fillStyle = "#1B2A4A"; g.fillRect(-100, -100, 1000, 1200);
+    g.fillStyle = "#C98B4E"; g.fillRect(-100, 1000, 1000, 200);
+    drawPrinter(g); drawBox(g);
+    g.fillStyle = "#FFFFFF"; g.font = "800 70px " + FONTF; g.textAlign = "left";
+    g.fillText("z", 600, 80); g.font = "800 50px " + FONTF; g.fillText("z", 660, 40);
+    hw.light = keep;
+  }
+  // "Hold to clear My prints" is on the Toybox home screen: a press there clears the shelf and the purge bin once.
+  function clearShelfAndPile() {
+    shelf = []; saveShelf(); hw.pile = []; savePile(); shelfThumbs = {}; renderPrints();
+  }
+  $("viewer").addEventListener("click", function (e) { if (e.target === this) closeViewer(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || e.defaultPrevented || Toybox.sheetOpen()) return;
+    if (view) closeViewer();
+    else if (!$("pop").hidden) closePop();
+  });
+
+  // ---------- Main loop ----------
+  var lastT = performance.now(), needLayout = true;
+  function frame(t) {
+    var dt = Math.min(0.05, (t - lastT) / 1000);
+    lastT = t;
+    if (needLayout) { needLayout = false; layout(); if (view) sizeViewer(); }
+    step(dt);
+    drawScene();
+    if (view) drawViewer(dt);
+    updateStats();
+    if (Toybox.timer.phase() === "ending") endingFrame();
+    if (job) { var busyNow = !job.paused, lbl = $("printBtn").textContent; if ((busyNow && lbl === "Print!") || (!busyNow && lbl !== "Print!")) updateUI(); }
+    requestAnimationFrame(frame);
+  }
+  if (window.ResizeObserver) new ResizeObserver(function () { needLayout = true; }).observe($("scene"));
+  window.addEventListener("resize", function () { needLayout = true; thumbKey = ""; modeKey = ""; setTimeout(function () { renderModelThumbs(); if (tab === "prints") renderPrints(); }, 60); });
+
+  showTab(tab);
+  layout();
+  updateUI();
+  // ---------- Ghost hand ----------
+  // Page px of a point inside an element, as fractions of its box.
+  function ghostPt(elm, fx, fy) {
+    var r = elm.getBoundingClientRect();
+    return [r.left + r.width * fx, r.top + r.height * fy];
+  }
+  // Idle help: the ghost hand taps Print! (only when nothing is printing).
+  var ghost = Toybox.ghost({ max: 2, plan: function () {
+    var b = $("printBtn");
+    if (!b.offsetWidth || b.disabled || b.textContent !== "Print!") return null;
+    return { pts: [ghostPt(b, 0.5, 0.55)], tap: true };
+  } });
+  $("printBtn").addEventListener("click", function () { if (ghost) ghost.learned(); });
+  Toybox.init({
+    app: "3d-printer",
+    big: { button: $("bigToggle") },
+    timerIntro: "When time is up, the print finishes or pauses, the printer cools down and rests, and the controls lock.",
+    goodbyeOption: "End with a Lights off button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Lights off",
+    farewellDone: "Good night, printer!",
+    restLine: "The printer is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: function () { return '<canvas class="rest-art" id="restArt" aria-hidden="true"></canvas>'; },
+    soundNote: "Soft motor whirs, fan hum and a done chime. Hold for 2 seconds.",
+    legacy: { timer: "3dprinter-timer-v1", sound: "3dprinter-sound-v1", big: "3dprinter-big-v1" },
+    onEnding: onEnding,
+    onGoodbye: function () { lightsOut = true; },
+    onRest: function () { endingDone = null; drawRestArt(); },
+    onWake: function () { endingDone = null; lightsOut = false; updateUI(); },
+    onBig: function () { needLayout = true; },
+    onSound: function (on) { if (on) chime(); },
+    onTimer: drawTimer
+  });
+  Toybox.settings.action("printer-clear", clearShelfAndPile);
+  requestAnimationFrame(frame);
+
+  // Test hook, only with ?debug in the address: lets automated checks peek at the printer.
+  if (/[?&]debug\b/.test(location.search)) window.__printer = { job: function () { return job; }, surprise: surprise, sstate: function () { return { party: !!party, alive: alive ? alive.kind : null, pile: hw.pile.length }; }, hw: hw, state: state, ly: LY, timer: function () { return { phase: Toybox.timer.phase() }; }, shelf: function () { return shelf; }, probe: probe };
+})();

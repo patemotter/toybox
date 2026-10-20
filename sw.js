@@ -46,6 +46,7 @@ const CORE = [
   // Peg Drop
   "./peg-drop/",
   "./peg-drop/index.html",
+  "./peg-drop/index.js",
   "./peg-drop/manifest.webmanifest",
   "./peg-drop/icons/icon-180.png",
   "./peg-drop/icons/icon-192.png",
@@ -125,6 +126,7 @@ const CORE = [
   // 3D Printer
   "./3d-printer/",
   "./3d-printer/index.html",
+  "./3d-printer/index.js",
   "./3d-printer/manifest.webmanifest",
   "./3d-printer/icons/icon-180.png",
   "./3d-printer/icons/icon-192.png",
@@ -242,6 +244,7 @@ const CORE = [
   // Espresso Machine
   "./espresso-machine/",
   "./espresso-machine/index.html",
+  "./espresso-machine/index.js",
   "./espresso-machine/manifest.webmanifest",
   "./espresso-machine/icons/icon-180.png",
   "./espresso-machine/icons/icon-192.png",
