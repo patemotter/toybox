@@ -41,8 +41,6 @@
   const Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   const NAME = (Farm.NAMES && Farm.NAMES.ewe) || "Hello Ewe!";
   document.title = NAME; $("title").textContent = NAME;
-  const LW = () => Farm.LW;
-  const shine = (c, x1, y1, x2, y2, w) => Ln(c, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w);
   const noop = () => {};
 
   // =====================================================================================================
@@ -88,7 +86,7 @@
   // =====================================================================================================
   function wheel(c, cx, cy, r, rot, o) {
     o = o || {};
-    const n = Math.max(8, Math.round(r * 22)), l0 = LW();
+    const n = Math.max(8, Math.round(r * 22)), l0 = Farm.LW;
     c.save(); c.translate(cx, cy);
     for (let i = 0; i < n; i++) {
       const a = rot + i * TAU / n, co = Math.cos(a), s = Math.sin(a), c2 = Math.cos(a + 0.12), s2 = Math.sin(a + 0.12);
@@ -104,11 +102,11 @@
   function beacon(c, x, y, on, time) {
     const bc = on ? (Math.sin((time || 0) * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
     if (on) { c.save(); c.globalAlpha = 0.35 + 0.3 * Math.max(0, Math.sin(time * 9)); Cc(c, x, y - 0.08, 0.3, "#FFD34D", 0); c.restore(); }
-    c.beginPath(); c.arc(x, y, 0.11, PI, 0); c.closePath(); fs(c, bc, LW() * 0.7);
+    c.beginPath(); c.arc(x, y, 0.11, PI, 0); c.closePath(); fs(c, bc, Farm.LW * 0.7);
   }
   // Farmer Tom's head and shoulders behind a cab's glass (bald, light stubble; his fleece from Farm.tom)
   function cabTom(c, x, y) {
-    const l0 = LW(), T = Farm.tom;
+    const l0 = Farm.LW, T = Farm.tom;
     Rr(c, x - 0.24, y + 0.1, 0.48, 0.46, 0.15, T.top, l0 * 0.7);
     Pp(c, [x - 0.06, y + 0.12, x + 0.06, y + 0.12, x, y + 0.25], T.collar, 0);
     Cc(c, x, y, 0.16, "#EBC09A", l0 * 0.7);
@@ -132,7 +130,7 @@
     return [BT.A[0] + BT.LA * Math.cos(th), BT.A[1] + BT.LA * Math.sin(th)];
   }
   function bucketShape(c, fill) {
-    const l0 = LW();
+    const l0 = Farm.LW;
     if (fill > 0.01) {
       c.beginPath(); c.ellipse(0.32, -0.12, 0.4, 0.08 + 0.26 * fill, -0.4, PI, TAU); c.closePath(); fs(c, FEEDC[1], l0 * 0.7);
       for (let i = 0; i < 4; i++) Cc(c, 0.1 + i * 0.16, -0.16 - 0.16 * fill * (i % 2 ? 0.7 : 1) + i * 0.05, 0.06, FEEDC[i], 0);
@@ -144,7 +142,7 @@
     Ln(c, 0.06, -0.24, 0.06, 0.22, "rgba(255,255,255,0.3)", 0.04);
   }
   function blueTractor(c, st) {
-    const l0 = LW(), rot = st.wheel || 0;
+    const l0 = Farm.LW, rot = st.wheel || 0;
     // the rubber scraper on its links behind the rear wheel
     tube(c, -0.3, -0.78, -1.1, -0.62, 0.08, "#5E6A7A");
     tube(c, -0.3, -0.45, -1.1, -0.34, 0.08, "#5E6A7A");
@@ -160,7 +158,7 @@
     beacon(c, 0.1, -2.5, st.beacon, st.time);
     tube(c, 1.0, -1.45, 1.0, -2.05, 0.08, "#5D6675");
     Pp(c, [0.62, -0.92, 2.42, -0.92, 2.5, -1.34, 0.62, -1.46], BLUE, l0);
-    shine(c, 0.72, -1.38, 2.36, -1.3, 0.06);
+    Farm.shine(c, 0.72, -1.38, 2.36, -1.3, 0.06);
     Rr(c, 2.3, -1.28, 0.22, 0.34, 0.04, BLUED, l0 * 0.7);
     for (let i = 0; i < 3; i++) Ln(c, 2.34, -1.2 + i * 0.1, 2.48, -1.2 + i * 0.1, INK, 0.025);
     // fender over the rear wheel
@@ -179,7 +177,7 @@
   // the tractor's hitch, the PTO shaft, the round tub with the straw bale in it, the fan and the tall chute.
   // st = { wheel, spin (fan angle), bale (0..1 left), on }
   function chopper(c, st) {
-    const l0 = LW(), sp = st.spin || 0;
+    const l0 = Farm.LW, sp = st.spin || 0;
     tube(c, Farm.DRAWBAR[0], Farm.DRAWBAR[1], -2.55, -0.8, 0.12, "#7C8696");
     tube(c, -1.05, -0.78, -2.5, -1.08, 0.07, "#F2C230");
     Rr(c, -4.95, -0.78, 2.45, 0.22, 0.05, DARK, l0);
@@ -194,7 +192,7 @@
     Rr(c, -4.95, -2.08, 2.4, 1.36, 0.14, CHG, l0);
     const off = ((sp * 0.08) % 0.4 + 0.4) % 0.4;
     for (let x = -4.85 + off; x < -2.6; x += 0.4) Ln(c, x, -1.95, x, -0.85, CHGD, 0.04);
-    shine(c, -4.8, -1.98, -2.7, -1.98, 0.05);
+    Farm.shine(c, -4.8, -1.98, -2.7, -1.98, 0.05);
     Rr(c, -5.02, -2.16, 2.54, 0.14, 0.05, CHGD, l0);
     // the fan housing with its blades, and the chute
     Cc(c, -2.45, -1.15, 0.44, CHGD, l0);
@@ -212,7 +210,7 @@
   // st = { ph, gait (0..1 walking), head (0 up .. 1 down to eat), munch, foot (0..1 the near foreleg lifted),
   // blue (0..1 the spray on that foot) }
   function sheepShape(c, st) {
-    const l0 = LW(), g = st.gait || 0, s = Math.sin((st.ph || 0) * TAU), hd = clamp(st.head || 0, 0, 1);
+    const l0 = Farm.LW, g = st.gait || 0, s = Math.sin((st.ph || 0) * TAU), hd = clamp(st.head || 0, 0, 1);
     function leg(x, a, far, lift, blue) {
       let kx = x + a * 0.11, ky = -0.22, fx = x + a * 0.22, fy = 0;
       if (lift > 0) { kx = x + 0.1 * lift; ky = -0.24 - 0.06 * lift; fx = lerp(fx, x + 0.26, lift); fy = -0.3 * lift; }
@@ -248,7 +246,7 @@
   // A person in profile facing +x, origin at the feet (from Timberrrrr!): Farmer Tom, bald, in his fleece.
   // st = { walk, stride, hands: [[x, y], [x, y]] | null, bend (0..1) }
   function tomShape(c, st) {
-    const l0 = LW(), T = Farm.tom, wk = st.walk || 0, sd = st.stride || 0, bend = st.bend || 0, jum = T.top;
+    const l0 = Farm.LW, T = Farm.tom, wk = st.walk || 0, sd = st.stride || 0, bend = st.bend || 0, jum = T.top;
     const hip = [0, -0.9], sh = [0.04 + bend * 0.2, -1.38 + bend * 0.22], hd = [0.08 + bend * 0.3, -1.57 + bend * 0.24];
     function welly(x, y, front) {
       Pp(c, [x - 0.08, y - 0.32, x + 0.07, y - 0.32, x + 0.07, y - 0.08, x + 0.2, y - 0.06, x + 0.2, y, x - 0.09, y], front ? "#2F8F3A" : "#277A31", l0 * 0.8);
@@ -281,7 +279,7 @@
   }
   // The blue antiseptic spray can, its nozzle pointing along +x
   function sprayCan(c) {
-    const l0 = LW();
+    const l0 = Farm.LW;
     Rr(c, -0.1, -0.05, 0.22, 0.1, 0.03, SPRAY, l0 * 0.7);
     Rr(c, 0.12, -0.035, 0.05, 0.07, 0.015, "#E9EEF3", l0 * 0.5);
     Ln(c, -0.06, -0.02, 0.08, -0.02, "rgba(255,255,255,0.6)", 0.015);
@@ -305,7 +303,6 @@
     gate = { open: 0, to: 0 };
     dog = null; counted = 0; parts.length = 0; mo = null; drag = null; glow = 0;
   }
-  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
 
   // =====================================================================================================
   // The stage: camera and projection
@@ -401,7 +398,7 @@
   const ghost = Toybox.ghost({
     max: 3,
     plan: () => {
-      if (locked()) return null;
+      if (Farm.locked(ending)) return null;
       if (phase === "ready") { const p = targetPt(); if (!p) return null; return { pts: [[p.x, p.y]], tap: true, key: key() }; }
       if (phase === "done" && phaseT > 4) { const b = cv.getBoundingClientRect(); return { pts: [[b.left + W / 2, b.top + H * 0.62]], tap: true, key: "again" }; }
       return null;
@@ -445,7 +442,7 @@
   }
   function startNew() { resetWorld(); stepId = "scrape"; bringIn("scrape"); follow(0, true); }
   function startOver() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     startNew();
     coach.say("Farmer Tom cleans the sheep shed.", 3);
     save();
@@ -693,7 +690,7 @@
   // =====================================================================================================
   let surpriseN = 0;
   function surprise() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     const pick = surpriseN++ % 2 ? "hop" : "midge";
     const idle = sheep.filter((s) => arrived(s) && onStage(s.x, s.r, -20) && !(stepId === "foot" && s.i === 0 && phase !== "done"));
     if (pick === "hop" && idle.length) {
@@ -813,14 +810,14 @@
     parts: partList,
     dragStart: (part, e, s) => {
       drag = null;
-      if (locked() || phase !== "ready") return;
+      if (Farm.locked(ending) || phase !== "ready") return;
       const k = key(), p = part || "", w0 = wxAt(s.x0);
       if ((k === "scrape.scrape" || k === "scrape.scoop" || k === "scrape.heap") && BLUEP[p]) drag = { kind: "blue", off: w0 - bt.x, x0: bt.x };
       else if (k === "bed.drive" && REDP[p]) drag = { kind: "red", off: w0 - rt.x, x0: rt.x };
       else drag = { kind: "act", part };
     },
     move: (part, e, s) => {
-      if (!drag || locked() || phase !== "ready") return;
+      if (!drag || Farm.locked(ending) || phase !== "ready") return;
       if (drag.kind === "blue") {
         const rg = blueRange(), nx = clamp(wxAt(s.x) - drag.off, rg[0], rg[1]);
         bt.wheel += (nx - bt.x) * bt.dir; bt.x = nx;
@@ -832,7 +829,7 @@
     },
     up: (part) => {
       const d = drag; drag = null;
-      if (!d || locked() || phase !== "ready") return;
+      if (!d || Farm.locked(ending) || phase !== "ready") return;
       const k = key();
       if (d.kind === "act") { if (act(d.part)) { ghost.learned(k); glow = 0; } return; }
       ghost.learned(k);
@@ -840,7 +837,7 @@
       if (d.kind === "blue" && Math.abs(bt.x - d.x0) > 0.3) act("blue");
       if (d.kind === "red" && Math.abs(rt.x - d.x0) > 0.3) act("red");
     },
-    tap: (part) => { if (!locked()) tapPart(part); }
+    tap: (part) => { if (!Farm.locked(ending)) tapPart(part); }
   });
 
   // =====================================================================================================
@@ -1045,7 +1042,7 @@
       const c = ctx;
       for (let x = RAMP[1] + 0.2; x < PLAT_END; x += 0.34) tube(c, x, -PLAT_H, x, -PLAT_H - 1.05, 0.04, STEEL);
       tube(c, RAMP[1], -PLAT_H - 1.05, PLAT_END, -PLAT_H - 1.05, 0.06, STEEL);
-      Rr(c, RAMP[1], -PLAT_H - 0.55, PLAT_END - RAMP[1], 0.22, 0.05, "#DDE3EA", LW() * 0.8);
+      Rr(c, RAMP[1], -PLAT_H - 0.55, PLAT_END - RAMP[1], 0.22, 0.05, "#DDE3EA", Farm.LW * 0.8);
     });
     // the top of the platform and ramps, from the headlocks to its front edge
     const back = platformPts(RHL), front = platformPts(RPF);
@@ -1071,12 +1068,12 @@
   }
   function drawHeap() {
     put(HEAP, HEAP_R + 0.25, 1, () => {
-      Rr(ctx, -3.3, -1.3, 6.6, 1.3, 0.05, "#A7A399", LW());
+      Rr(ctx, -3.3, -1.3, 6.6, 1.3, 0.05, "#A7A399", Farm.LW);
       for (let x = -2.2; x < 3.3; x += 1.1) Ln(ctx, x, -1.3, x, 0, "rgba(29,35,64,0.3)", 0.03);
     });
     put(HEAP, HEAP_R, 1, () => {
       const c = ctx, w = 2.5 + 0.15 * heap.n, h = heapTop();
-      c.beginPath(); c.moveTo(-w, 0); c.bezierCurveTo(-w * 0.6, -h * 0.9, -w * 0.25, -h, 0, -h); c.bezierCurveTo(w * 0.3, -h, w * 0.6, -h * 0.85, w, 0); c.closePath(); fs(c, MUCK, LW());
+      c.beginPath(); c.moveTo(-w, 0); c.bezierCurveTo(-w * 0.6, -h * 0.9, -w * 0.25, -h, 0, -h); c.bezierCurveTo(w * 0.3, -h, w * 0.6, -h * 0.85, w, 0); c.closePath(); fs(c, MUCK, Farm.LW);
       for (let i = 0; i < 14; i++) { const x = (hash(i, 1) - 0.5) * w * 1.4, y = -h * (0.2 + 0.6 * hash(i, 2)) * (1 - Math.abs(x) / w); Ln(c, x, y, x + 0.25, y - 0.06, i % 3 ? "#B39A5A" : MUCKD, 0.05); }
     });
   }
@@ -1097,7 +1094,7 @@
     put(0, RBAR, 1, () => {
       const c = ctx, x0 = Math.max(SHED[0], V.x - W / V.k), x1 = Math.min(SHED[1], V.x + W / V.k);
       if (x1 <= x0) return;
-      Rr(c, x0, -0.3, x1 - x0, 0.3, 0.02, "#9C9890", LW() * 0.8);
+      Rr(c, x0, -0.3, x1 - x0, 0.3, 0.02, "#9C9890", Farm.LW * 0.8);
       for (let x = Math.ceil(x0 / 0.36) * 0.36; x < x1; x += 0.36) tube(c, x, -0.3, x + 0.14, -1.05, 0.035, "#7FAE5A");
       tube(c, x0, -1.08, x1, -1.08, 0.07, "#7FAE5A");
     });
@@ -1168,7 +1165,7 @@
     if (amt < 0.02) return;
     put(pile.x - pile.w / 2, 1.01, 1, () => {
       const c = ctx, w = pile.w / 2 * (0.5 + 0.5 * amt / Math.max(0.01, pile.amt)), h = 0.2 + 0.6 * Math.sqrt(amt);
-      c.beginPath(); c.moveTo(-w, 0); c.quadraticCurveTo(-w * 0.4, -h * 1.3, 0, -h); c.quadraticCurveTo(w * 0.5, -h * 1.2, w, 0); c.closePath(); fs(c, FEEDC[1], LW());
+      c.beginPath(); c.moveTo(-w, 0); c.quadraticCurveTo(-w * 0.4, -h * 1.3, 0, -h); c.quadraticCurveTo(w * 0.5, -h * 1.2, w, 0); c.closePath(); fs(c, FEEDC[1], Farm.LW);
       for (let i = 0; i < 6; i++) Cc(c, (hash(i, 3) - 0.5) * w * 1.3, -h * (0.2 + 0.5 * hash(i, 4)), 0.06, FEEDC[i % 4], 0);
     });
   }
@@ -1192,10 +1189,8 @@
   function drawRing() {
     if (phase !== "ready" || (drag && drag.kind !== "act")) return;
     const p = targetPt(); if (!p) return;
-    const b = cv.getBoundingClientRect(), x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 30 + k * 8;
-    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
-    ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
-    ctx.restore();
+    const b = cv.getBoundingClientRect();
+    Farm.drawRing(ctx, p.x - b.left, p.y - b.top, time, { glow: glow });
   }
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1245,7 +1240,6 @@
 
   Toybox.init({
     app: "farm",
-    big: { button: $("bigToggle") },
     badge: $("tbadge"),
     timerIntro: "When time is up, the machines stop and the controls lock. The timer carries on across the Tractor Ted pages.",
     goodbyeOption: "End with a “Goodnight, farm” button to press",

@@ -62,6 +62,15 @@
  *                               Farm.rear.hood(ctx, c, h, thick) a steel row hood.
  *   Farm.inUnits(ctx, x, y, s, lwPx, fn)  draw fn() in metres at screen (x, y), s px per metre, lwPx outlines.
  *   Farm.shape                  the drawing helpers (P, R, C, Ln, tube, fs, rr) for pages drawing in units.
+ *   Farm.LW                     the current outline width in units (read it while drawing inside put/inUnits).
+ *   Farm.shine(ctx, x1, y1, x2, y2, w)  a light translucent stripe along a panel's top.
+ *   Farm.band(ctx, sc, row, col)  fill a field row's strip (a row given to a page's own field painter) with col.
+ *   Farm.eachX(sc, row, sp, minPx, xa, xb, fn)  fn(x, sx, j) for world x on a grid of sp metres along a field row,
+ *                               from xa to xb, thinned out so neighbours stay at least minPx apart on screen.
+ *   Farm.drawRing(ctx, x, y, t, o)  the pulsing yellow ring on the next thing to tap, at canvas px (x, y), t = the
+ *                               page's clock (s). o = { r (radius at rest, 30), grow (8), alpha (faintest, 0.55),
+ *                               glow (> 0: nearly opaque) }.
+ *   Farm.locked(ending)         true while play input is ignored: the page's own ending flag or the timer's lock.
  *   Farm.MACHINES               { id: { name, len (m behind the hitch), work (m behind the hitch where it works),
  *                               trailed } } for the potato machines.
  *   Farm.draw.boom(..., kind) kind "belt" (potatoes riding), "belt-empty" (stopped belt), else the green auger.
@@ -1192,7 +1201,19 @@
       fn(x, a * x + b, j);
     }
   }
+  // Fills one field row's strip with col across the whole width of the scene.
   function band(ctx, sc, row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
+  // The pulsing yellow ring, edged in ink, that marks the next thing to tap. x, y are canvas px and t is the page's
+  // clock in seconds. o.r = radius at rest (30), o.grow = how much wider it pulses (8), o.alpha = its faintest
+  // opacity (0.55), o.glow > 0 makes it nearly opaque (the page sets glow after a hint).
+  function drawRing(ctx, x, y, t, o) {
+    var k = 0.5 + 0.5 * Math.sin(t * 4), rad = (o.r === undefined ? 30 : o.r) + k * (o.grow || 8);
+    ctx.save(); ctx.globalAlpha = o.glow > 0 ? 0.95 : (o.alpha || 0.55) + 0.25 * k;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+    ctx.restore();
+  }
+  // True while play input is ignored: the page is winding down (its own ending flag) or the shared timer locks it.
+  function locked(ending) { return ending || (window.Toybox && Toybox.timer.locked()); }
   var PAINT = {
     spuds: function (ctx, sc, row, stage, P, xa, xb) {
       // Calm, readable stages (the dad: the old dotted texture hid everything). Flat soil is one plain brown;
@@ -1493,6 +1514,11 @@
       boom: boom, cow: cow, telehandler: telehandler, dog: dog, hare: hare, deer: deer, gull: gull, hawk: hawk, tree: tree, farmstead: farmstead, potato: potatoBlob },
     rear: { bedformer: rearBedformer, destoner: rearDestoner, planter: rearPlanter, harvester: rearHarvester, trailer: rearTrailer, crossBelt: crossBelt, hood: rowHood },
     inUnits: inUnits,
+    shine: shine,
+    band: band,
+    eachX: eachX,
+    drawRing: drawRing,
+    locked: locked,
     shape: { P: P, R: R, C: C, Ln: Ln, tube: tube, fs: fs, rr: rr },
     pic: pic,
     restArt: restArt,

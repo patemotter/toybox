@@ -25,10 +25,6 @@
   color-scheme: light; box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
-}
-:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
 body {
@@ -46,7 +42,6 @@ body {
 body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -56,7 +51,6 @@ body.big #jobs { display: none; }
     <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to Tractor Ted"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Tractor Ted</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title" id="title">Combine Time</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body app">
     <div class="tb-stagecol">
@@ -151,7 +145,6 @@ body.big #jobs { display: none; }
 
   function cutX() { return cb.x + cb.dir * C.cut; }
   function pivotX() { return cb.x + cb.dir * C.pivot[0]; }
-  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function bounds(dir) { return dir > 0 ? [-6, L - C.cut + 1.2] : [C.cut - 1.2, L + 6]; }
   // Vehicles on the track are drawn at the machine line's size (a picture-book cheat: true perspective
   // would make the trailer hide the combine). TS = px per metre of the tractor and trailer; TF = world metres
@@ -295,7 +288,7 @@ body.big #jobs { display: none; }
   var ghost = Toybox.ghost({
     max: 3,
     plan: function () {
-      if (locked()) return null;
+      if (Farm.locked(ending)) return null;
       var b = cv.getBoundingClientRect();
       if (phase === "ready") { var p = wantPt(); if (!p) return null; return { pts: [[b.left + p[0], b.top + p[1]]], tap: true, key: key() }; }
       if (phase === "done" && phaseT > 5) return { pts: [[b.left + W * 0.5, b.top + (sc.hY + sc.gY) / 2]], tap: true, key: "again" };
@@ -403,14 +396,14 @@ body.big #jobs { display: none; }
     return true;
   }
   function switchJob(id) {
-    if (locked()) { jobs.set(job); return; }
+    if (Farm.locked(ending)) { jobs.set(job); return; }
     job = id === "sun" ? "sun" : "wheat";
     resetScene(false);
     bringIn("cut");
     save();
   }
   function startOver() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     resetScene(true);
     bringIn("cut");
     save();
@@ -495,7 +488,7 @@ body.big #jobs { display: none; }
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
   var surpriseN = 0;
   function surprise() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     var list = job === "sun" ? ["finches", "deer", "hawk"] : ["dog", "pony", "deer", "hawk"];
     var pick = list[surpriseN++ % list.length];
     if (pick === "dog") {
@@ -606,7 +599,7 @@ body.big #jobs { display: none; }
     return null;
   }
   function tapPart(part, px, py) {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     if (part === "inset") { part = insetPart(); if (!part) { if (phase === "work") busyHint(); else hint(); return; } }
     if (phase === "done") { if (part === "horn" || part === "pony") tagPart(part, px, py); else again(); return; }
     if (phase === "ready" && act(part)) return;
@@ -627,7 +620,7 @@ body.big #jobs { display: none; }
     hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
       grab = null;
-      if (locked() || phase !== "ready") return;
+      if (Farm.locked(ending) || phase !== "ready") return;
       var k = key();
       if (k === "cut.drive" && (part === "combine" || part === "header" || part === "tank")) {
         if (ghost) ghost.learned(k);
@@ -807,7 +800,7 @@ body.big #jobs { display: none; }
       if (T.t >= 1) { cb.dir = -T.from; cb.face = cb.dir; cb.turn = null; }
       return;
     }
-    if (locked()) { cb.v = 0; return; }
+    if (Farm.locked(ending)) { cb.v = 0; return; }
     var vt = 0;
     if (autoCut) {
       var dest = L - C.cut;
@@ -1032,7 +1025,7 @@ body.big #jobs { display: none; }
       if (d < 0.05) { bl.x = BL_START; bl.v = 0; bl.state = "wait"; }
     } else if (st === "wait" || st === "work") {
       var vt = 0;
-      if (!locked()) {
+      if (!Farm.locked(ending)) {
         if (held) { var ahead = sc.wx(grab.fx, 1) - grab.off - bl.x; vt = ahead > 0.1 ? clamp(ahead * 3, 0, BL_V * 1.3) : 0; }
         else if (autoBale) vt = clamp((BL_END - bl.x) * 2.2, 1.2, BL_V);
       }
@@ -1221,37 +1214,30 @@ body.big #jobs { display: none; }
   // The sunflower field, painted row by row like farm.js's field (the standing crop: tall stalks with heavy,
   // drooping heads; stubble: short stalks left standing). Stages: "golden" (ripe), "grow" (P.g 0..1: green,
   // then bright yellow flowers facing the sun, then drooping and brown), "stubble".
-  function eachX(row, sp, minPx, xa, xb, fn) {
-    var rg = sc.xRange(row.rc), a = rg[2], b = rg[3];
-    while (a * sp < minPx) sp *= 2;
-    var lo = Math.max(rg[0], xa - sp), hi = Math.min(rg[1], xb + sp);
-    for (var j = Math.floor(lo / sp); j <= Math.ceil(hi / sp); j++) { var x = (j + hash(j, row.i) * 0.6) * sp; fn(x, a * x + b, j); }
-  }
-  function band(row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
   function sunRow(row, stage, P, xa, xb, near) {
     var s = row.s, odd = row.i & 1, t = P.time || 0;
     if (stage === "stubble") {
-      band(row, odd ? "#8F7550" : "#876D49");
+      Farm.band(ctx, sc, row, odd ? "#8F7550" : "#876D49");
       if (s * 0.04 > 0.5) {
         var sh = s * 0.5 * (near ? 0.6 : 1);
         ctx.strokeStyle = "#C9AE74"; ctx.lineWidth = Math.max(1.2, s * 0.04); ctx.lineCap = "round"; ctx.beginPath();
-        eachX(row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.moveTo(sx, row.yc); ctx.lineTo(sx, row.yc - hh); });
+        Farm.eachX(sc, row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.moveTo(sx, row.yc); ctx.lineTo(sx, row.yc - hh); });
         ctx.stroke();
-        if (s * 0.04 > 1) { ctx.fillStyle = "#EEDCA8"; eachX(row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.fillRect(sx - s * 0.025, row.yc - hh - s * 0.012, s * 0.05, Math.max(1, s * 0.025)); }); }
+        if (s * 0.04 > 1) { ctx.fillStyle = "#EEDCA8"; Farm.eachX(sc, row, 0.5, 5, xa, xb, function (x, sx, j) { var hh = sh * (0.8 + 0.3 * hash(j, 4)); ctx.fillRect(sx - s * 0.025, row.yc - hh - s * 0.012, s * 0.05, Math.max(1, s * 0.025)); }); }
       }
       return;
     }
     var g = stage === "golden" ? 1 : clamp(P.g || 0, 0, 1);
     if (g < 0.08) {
-      band(row, odd ? "#8D5A36" : "#84532F");
-      if (g > 0.03 && row.fine) { ctx.fillStyle = "#6DBA45"; eachX(row, 0.5, 5, xa, xb, function (x, sx) { ctx.fillRect(sx - 1, row.yc - s * 0.05, Math.max(2, s * 0.04), Math.max(1.5, s * 0.05)); }); }
+      Farm.band(ctx, sc, row, odd ? "#8D5A36" : "#84532F");
+      if (g > 0.03 && row.fine) { ctx.fillStyle = "#6DBA45"; Farm.eachX(sc, row, 0.5, 5, xa, xb, function (x, sx) { ctx.fillRect(sx - 1, row.yc - s * 0.05, Math.max(2, s * 0.04), Math.max(1.5, s * 0.05)); }); }
       return;
     }
     var ripe = clamp((g - 0.78) / 0.22, 0, 1), bloom = clamp((g - 0.45) / 0.15, 0, 1);
     var h = lerp(0.1, SUN_H, clamp((g - 0.08) / 0.5, 0, 1)), hp = Math.min(h, near ? 0.65 : 9) * s;
     var leaf = U.mix("#4FA83A", "#8E9A44", ripe), dk = U.mix("#2F7A25", "#5F6B2C", ripe), stalk = U.mix("#5DAA45", "#B3AA66", ripe);
     var headCol = U.mix("#FFC93C", "#A97F45", ripe);
-    band(row, dk);
+    Farm.band(ctx, sc, row, dk);
     // the leafy canopy: a wall of leaves up to about three quarters of the plants' height
     var cTop = near ? hp : hp * 0.7, step = cTop < 10 ? 30 : Math.max(12, Math.min(20, s * 0.4)), off = sc.cam * sc.rate(row.rc);
     // only across this run's strip of the field (each run used to paint the whole width and clip)
@@ -1269,11 +1255,11 @@ body.big #jobs { display: none; }
       // far rows: the heads as dots along the top
       if (hr < 0.9) return;
       ctx.fillStyle = headCol;
-      eachX(row, 0.6, Math.max(4, hr * 4), xa, xb, function (x, sx, j) { ctx.beginPath(); ctx.arc(sx, row.yc - hp * (0.9 + 0.1 * hash(j, 3)), Math.max(1, hr * 0.6), 0, TAU); ctx.fill(); });
+      Farm.eachX(sc, row, 0.6, Math.max(4, hr * 4), xa, xb, function (x, sx, j) { ctx.beginPath(); ctx.arc(sx, row.yc - hp * (0.9 + 0.1 * hash(j, 3)), Math.max(1, hr * 0.6), 0, TAU); ctx.fill(); });
       return;
     }
     var lwH = Math.max(0.8, Math.min(sc.lw * 0.5, hr * 0.1));
-    eachX(row, 0.7, Math.max(8, hr * 2.1), xa, xb, function (x, sx, j) {
+    Farm.eachX(sc, row, 0.7, Math.max(8, hr * 2.1), xa, xb, function (x, sx, j) {
       var sw = Math.sin(t * 1.2 + x * 0.5 + row.i) * s * 0.02, top = row.yc - hp * (0.94 + 0.1 * hash(j, row.i + 2)), tx = sx + sw;
       // the top of the stalk above the leaves (it bends over when the head is ripe and heavy)
       ctx.beginPath(); ctx.moveTo(sx, row.yc - cTop * 0.8); ctx.quadraticCurveTo(sx, top + hp * 0.1, tx + ripe * hr * 0.6, top);
@@ -1619,7 +1605,7 @@ body.big #jobs { display: none; }
   }
   // The control the coach line names glows on the scene (a soft pulsing ring), faster when it flashes.
   function drawCue() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     var list = [];
     function add(id, p, r) { var f = flash[id] > 0, on = cue === id; if (f || on) list.push([p, r, f]); }
     var s = sc.S(1);

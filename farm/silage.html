@@ -25,10 +25,6 @@
   color-scheme: light; box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
-}
-:root[data-theme="dark"] { --bg: #13233F; --panel: #1C3157; --ink: #EEF3FF; --muted: #B4C1DE; --edge: #9FB8E8; --plate: #E6F2FF; --focus: #FFC93C; color-scheme: dark; }
 *, *::before, *::after { box-sizing: inherit; }
 html, body { height: 100%; }
 body {
@@ -43,11 +39,9 @@ body {
 .loads { font-variant-numeric: tabular-nums; }
 .loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
-body.big .tb-head > :not(.bigtoggle), body.big .tb-panel { display: none; }
 body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-body.big #jobs { display: none; }
 @media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
@@ -57,7 +51,6 @@ body.big #jobs { display: none; }
     <a class="btn tb-iconbtn tb-back mapbtn" id="mapbtn" href="./" aria-label="Back to Tractor Ted"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><svg class="tb-mapic" viewBox="0 0 40 40" aria-hidden="true"><path d="M3 33h34" stroke="#1D2340" stroke-width="3" stroke-linecap="round"/><path d="M8 33V18l8-8 8 8v15z" fill="#D2483D" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="22" width="8" height="11" fill="#A8352D" stroke="#1D2340" stroke-width="2"/><rect x="27" y="14" width="8" height="19" rx="2" fill="#D3DAE2" stroke="#1D2340" stroke-width="2.5"/></svg><span>Tractor Ted</span></a>
     <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
     <h1 class="tb-title" id="title">Glorious Grass</h1>
-    <button class="btn tb-iconbtn bigtoggle" id="bigToggle" aria-pressed="false" aria-label="Full screen: hide the controls"></button>
   </header>
   <div class="tb-body app">
     <div class="tb-stagecol">
@@ -98,8 +91,6 @@ body.big #jobs { display: none; }
   document.title = NAME; $("title").textContent = NAME;
   // the trailer's heap colours for chopped grass and maize (the shared trailer looks them up by crop)
   if (Farm.CROP) { if (!Farm.CROP.grass) Farm.CROP.grass = ["#86C04A", "#4E8F2E"]; if (!Farm.CROP.maize) Farm.CROP.maize = ["#C3CB55", "#7E9A2C"]; }
-  function LW() { return Farm.LW; }
-  function shine(ctx, x1, y1, x2, y2, w) { Ln(ctx, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
   var G = { body: "#3E9F3A", dark: "#2B7A2A", light: "#6CC65C", frame: "#2B3040", glass: "#BFE7FA", steel: "#C3CCD6", grey: "#7C8696" };
 
   // ---------- State ----------
@@ -117,7 +108,7 @@ body.big #jobs { display: none; }
   // ---------- Small drawing helpers (farm.js style, machine units: metres, y up negative) ----------
   function wheel(ctx, cx, cy, r, rot, o) {
     o = o || {};
-    var n = o.lugs || Math.round(r * 22), i, a, l0 = LW();
+    var n = o.lugs || Math.round(r * 22), i, a, l0 = Farm.LW;
     ctx.save(); ctx.translate(cx, cy);
     if (!o.smooth) {
       for (i = 0; i < n; i++) {
@@ -137,7 +128,7 @@ body.big #jobs { display: none; }
     ctx.restore();
   }
   function driver(ctx, x, y) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     Rr(ctx, x - 0.26, y + 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
     Cc(ctx, x, y, 0.17, "#F2C8A0", l0 * 0.7);
     Pp(ctx, [x - 0.18, y - 0.04, x - 0.16, y - 0.2, x + 0.16, y - 0.2, x + 0.3, y - 0.06], "#E8473B", l0 * 0.6);
@@ -150,14 +141,14 @@ body.big #jobs { display: none; }
   // st = { time, spin (disc angle), work (0..1) }. MOW.work = metres behind the hitch where it cuts.
   var MOW = { len: 3.6, work: 1.8 };
   function mower(ctx, st) {
-    var spin = st.spin || 0, Rd = "#D8403A", RD = "#A82E28", l0 = LW(), i;
+    var spin = st.spin || 0, Rd = "#D8403A", RD = "#A82E28", l0 = Farm.LW, i;
     tube(ctx, 0.15, -0.42, -0.95, -0.82, 0.1, "#F2C230");
     Pp(ctx, [0.06, 0.1, 0.06, -0.86, -0.18, -0.86, -0.46, -0.12, -0.46, 0.1], G.grey);
     Cc(ctx, 0, 0, 0.07, G.steel, l0 * 0.7); Cc(ctx, 0.04, -0.8, 0.07, G.steel, l0 * 0.7);
     tube(ctx, -0.3, -0.6, -1.1, -1.0, 0.15, G.grey);
     // the hood, with the conditioner rollers turning behind a window
     Pp(ctx, [-0.95, 0.16, -1.0, -0.72, -1.3, -1.08, -3.0, -1.08, -3.3, -0.72, -3.3, 0.16], Rd);
-    shine(ctx, -1.35, -0.97, -2.95, -0.97, 0.07);
+    Farm.shine(ctx, -1.35, -0.97, -2.95, -0.97, 0.07);
     Rr(ctx, -2.75, -0.82, 1.2, 0.6, 0.1, "#3A2E22", l0 * 0.7);
     ctx.save(); SH.rr(ctx, -2.75, -0.82, 1.2, 0.6, 0.1); ctx.clip();
     for (i = 0; i < 2; i++) {
@@ -187,11 +178,11 @@ body.big #jobs { display: none; }
   // The spout turns on FH.pivot; the page draws the spout tube (folded along the top, or out over a trailer).
   var FH = { pivot: [-0.85, -3.4], back: -5.35, front: { pickup: 4.0, maize: 4.85 } };
   function forage(ctx, st) {
-    var t = st.time || 0, rot = st.wheel || 0, spin = st.spin || 0, l0 = LW(), i;
+    var t = st.time || 0, rot = st.wheel || 0, spin = st.spin || 0, l0 = Farm.LW, i;
     // engine bay, with a dark lower band, the cooler grille at the back and the exhaust
     Pp(ctx, [-0.5, -0.85, -4.95, -0.85, -5.35, -1.4, -5.35, -2.6, -4.95, -3.05, -1.0, -3.1, -0.5, -2.75], G.body);
     Pp(ctx, [-0.5, -0.85, -4.95, -0.85, -5.35, -1.4, -5.35, -1.62, -0.5, -1.62], G.dark, l0 * 0.8);
-    shine(ctx, -1.1, -2.97, -4.85, -2.97, 0.08);
+    Farm.shine(ctx, -1.1, -2.97, -4.85, -2.97, 0.08);
     Rr(ctx, -5.2, -2.7, 0.55, 1.0, 0.06, "#2D3242", l0 * 0.7);
     for (i = 0; i < 5; i++) Ln(ctx, -5.12, -2.58 + i * 0.18, -4.73, -2.58 + i * 0.18, "#59607A", 0.04);
     Ln(ctx, -3.0, -2.95, -3.0, -1.75, G.dark, 0.05); Ln(ctx, -1.7, -3.0, -1.7, -1.75, G.dark, 0.05);
@@ -215,7 +206,7 @@ body.big #jobs { display: none; }
     Pp(ctx, [0.55, -4.12, 0.72, -4.12, 0.3, -2.85, 0.14, -2.85], "#FFFFFF", 0);
     ctx.restore();
     Rr(ctx, -0.72, -4.47, 2.1, 0.25, 0.09, G.body);
-    shine(ctx, -0.6, -4.41, 1.25, -4.41, 0.05);
+    Farm.shine(ctx, -0.6, -4.41, 1.25, -4.41, 0.05);
     var bc = st.beacon ? (Math.sin(t * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
     if (st.beacon) { ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * Math.max(0, Math.sin(t * 9)); Cc(ctx, 0.3, -4.55, 0.38, "#FFD34D", 0); ctx.restore(); }
     ctx.beginPath(); ctx.arc(0.3, -4.47, 0.13, Math.PI, 0); ctx.closePath(); fs(ctx, bc, l0 * 0.7);
@@ -234,10 +225,10 @@ body.big #jobs { display: none; }
     ctx.beginPath(); ctx.arc(-3.85, -0.65, 0.82, -Math.PI + 0.45, -0.45); ctx.arc(-3.85, -0.65, 0.72, -0.45, -Math.PI + 0.45, true); ctx.closePath(); fs(ctx, G.body);
   }
   function pickupHeader(ctx, st) {
-    var spin = st.spin || 0, l0 = LW(), i;
+    var spin = st.spin || 0, l0 = Farm.LW, i;
     // the auger trough, with the auger turning, and the frame out to the pickup
     Pp(ctx, [1.7, -1.6, 3.0, -1.4, 3.5, -0.95, 3.3, -0.4, 1.7, -0.45], "#D9DEE4");
-    shine(ctx, 1.85, -1.5, 2.95, -1.33, 0.06);
+    Farm.shine(ctx, 1.85, -1.5, 2.95, -1.33, 0.06);
     Cc(ctx, 2.45, -0.92, 0.33, "#B8C0CA", l0 * 0.8);
     for (i = 0; i < 3; i++) { var ox = ((spin * 0.25 + i * 0.22) % 0.66) - 0.33; Ln(ctx, 2.45 + ox - 0.1, -1.18, 2.45 + ox + 0.1, -0.66, "#7C8696", 0.06); }
     // the pickup drum: spring tines turning round it lift the swath
@@ -254,21 +245,21 @@ body.big #jobs { display: none; }
     Ln(ctx, 3.75 + Math.cos(spin) * 0.15, -0.82 + Math.sin(spin) * 0.15, 3.75 - Math.cos(spin) * 0.15, -0.82 - Math.sin(spin) * 0.15, "#5D6675", 0.04);
   }
   function maizeHeader(ctx, st) {
-    var spin = st.spin || 0, l0 = LW(), i;
+    var spin = st.spin || 0, l0 = Farm.LW, i;
     // a far crop divider (darker), the header body with its turning cutting drums, then the near divider
     Pp(ctx, [3.05, -1.35, 4.6, -0.42, 4.5, -0.32, 3.05, -0.8], "#C99A1A", l0 * 0.8);
     Pp(ctx, [1.7, -1.55, 3.55, -1.55, 3.85, -1.0, 3.6, -0.42, 1.7, -0.45], "#D9DEE4");
-    shine(ctx, 1.85, -1.45, 3.45, -1.45, 0.06);
+    Farm.shine(ctx, 1.85, -1.45, 3.45, -1.45, 0.06);
     Rr(ctx, 2.0, -1.3, 1.45, 0.5, 0.08, "#4A5466", l0 * 0.7);
     ctx.save(); SH.rr(ctx, 2.0, -1.3, 1.45, 0.5, 0.08); ctx.clip();
     for (i = 0; i < 9; i++) { var x = 2.0 + ((i * 0.22 + spin * 0.3) % 1.98); Pp(ctx, [x, -1.3, x + 0.1, -1.05, x - 0.02, -1.05], "#C3CCD6", 0); Pp(ctx, [x + 0.08, -0.8, x + 0.16, -1.02, x + 0.24, -0.8], "#C3CCD6", 0); }
     ctx.restore();
     Pp(ctx, [3.2, -1.05, 4.85, -0.14, 4.7, -0.02, 3.2, -0.45], "#F2C230");
-    shine(ctx, 3.35, -0.95, 4.6, -0.22, 0.05);
+    Farm.shine(ctx, 3.35, -0.95, 4.6, -0.22, 0.05);
   }
   // A green tractor with a front loader and a buck rake (it pushes the silage up the clamp). Tractor units.
   function loader(ctx, st) {
-    var lift = st.lift || 0, l0 = LW();
+    var lift = st.lift || 0, l0 = Farm.LW;
     D.tractor(ctx, { wheel: st.wheel, time: st.time, beacon: st.beacon, lights: st.lights });
     // the loader arms from the tower by the cab down to the tool at the front
     Rr(ctx, 1.05, -2.15, 0.36, 1.15, 0.08, G.dark, l0 * 0.8);
@@ -284,7 +275,7 @@ body.big #jobs { display: none; }
   }
   // The heavy tractor that rolls the clamp: the green tractor with dual rear wheels and a big front weight.
   function heavy(ctx, st) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     wheel(ctx, 0.14, -0.97, 0.97, (st.wheel || 0) / 0.97, { rim: 0.58, dual: true, rimCol: "#9AA5B4" });
     D.tractor(ctx, { wheel: st.wheel, time: st.time, beacon: st.beacon, lights: st.lights });
     Rr(ctx, 4.05, -1.75, 0.62, 1.05, 0.1, "#5D6675");
@@ -343,7 +334,6 @@ body.big #jobs { display: none; }
   var hare = null, dog = null, sheetT = 0, uncover = null;
 
   function cropStage(c) { return c === "maize" ? "maize" : "grass"; }
-  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
   function hitchOff() { return -Farm.HITCH[0]; }
   function mowX() { return rig.x - hitchOff() - MOW.work; }
   function frontX() { return rig.x + FH.front[crop === "maize" ? "maize" : "pickup"]; }
@@ -467,7 +457,7 @@ body.big #jobs { display: none; }
   var ghost = Toybox.ghost({
     max: 3,
     plan: function () {
-      if (locked()) return null;
+      if (Farm.locked(ending)) return null;
       var b = cv.getBoundingClientRect();
       if (heap.flap) { var f = ptOf("flap"); return { pts: [[b.left + f[0], b.top + f[1]]], tap: true, key: "flap" }; }
       if (phase === "ready") {
@@ -634,7 +624,7 @@ body.big #jobs { display: none; }
     tr.st = "away"; tr.x = -60; tr.lever = 0; ld.st = "away"; ld.x = XMAX + 10; ro.st = "away"; ro.x = XMAX + 10;
   }
   function startOver() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     parts.length = 0; hare = null; dog = null; tagged = {};
     settleClamp();
     field.stage = cropStage(crop); field.g = 1; field.wipe = null; swath.on = false;
@@ -644,7 +634,7 @@ body.big #jobs { display: none; }
     save();
   }
   function switchCrop(id) {
-    if (locked()) { jobs.set(crop); return; }
+    if (Farm.locked(ending)) { jobs.set(crop); return; }
     crop = id === "maize" ? "maize" : "grass";
     heap.crop = heap.V > 0 ? heap.crop : crop;
     parts.length = 0; hare = null; dog = null; tagged = {};
@@ -659,7 +649,7 @@ body.big #jobs { display: none; }
   // ---------- Surprise: a fun moment on the scene, taking turns ----------
   var surpriseN = 0;
   function surprise() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     var list = ["hare", "dog"];
     var idleClamp = heap.cover > 0.99 && !heap.flap && !uncover && ld.st === "away" && ro.st === "away" && !(stepId === "cover" && phase === "work");
     if (idleClamp) list.splice(1, 0, "wind");
@@ -818,7 +808,7 @@ body.big #jobs { display: none; }
     for (var i = 0; i < 6; i++) addPart({ kind: "bit", x: wx + (Math.random() - 0.5) * 0.6, h: Math.max(0, (sc.gY - (py - R.y)) / sc.k), r: 1, vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random(), g: 6, life: 0.8, size: 0.09, col: bitCol(crop), spin: 6 });
   }
   function tapPart(part, px, py) {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     if (part === "flap") { fixFlap(); return; }
     if (phase === "done") { again(); return; }
     if (phase === "ready" && act(part)) return;
@@ -836,7 +826,7 @@ body.big #jobs { display: none; }
     hit: function (x, y) { var b = cv.getBoundingClientRect(); return hitAt(x - b.left, y - b.top); },
     dragStart: function (part, e, s) {
       grab = null;
-      if (locked() || !part) return;
+      if (Farm.locked(ending) || !part) return;
       var k = key(), driving = (stepId === "mow" || stepId === "chop") && sub === "drive" && (phase === "ready" || phase === "work");
       if (driving && (part === "rig" || part === "mower" || part === "spout")) {
         if (ghost) ghost.learned(k);
@@ -1232,14 +1222,14 @@ body.big #jobs { display: none; }
   // The tipping lever on the back of the tractor, by the spool valves (tractor units): pulled back while it tips.
   function tipLeverShape(c, pull) {
     var bx = -0.72, by = -1.45, kx = lerp(-1.0, -1.42, pull), ky = lerp(-2.58, -2.4, pull);
-    Rr(c, -0.95, -1.62, 0.5, 0.3, 0.05, "#3A3F4E", LW() * 0.7);
+    Rr(c, -0.95, -1.62, 0.5, 0.3, 0.05, "#3A3F4E", Farm.LW * 0.7);
     Ln(c, bx, by, kx, ky, INK, 0.17); Ln(c, bx, by, kx, ky, "#59607A", 0.09);
-    Cc(c, kx, ky, 0.22, "#FFC93C", LW() * 0.8);
+    Cc(c, kx, ky, 0.22, "#FFC93C", Farm.LW * 0.8);
     Cc(c, kx - 0.06, ky - 0.07, 0.06, "rgba(255,255,255,0.75)", 0);
   }
   // The part the coach line names glows on the scene (a soft pulsing yellow ring), faster after a hint.
   function drawCue() {
-    if (locked() || phase !== "ready" || !cue) return;
+    if (Farm.locked(ending) || phase !== "ready" || !cue) return;
     var p = ptOf(cue); if (!p) return;
     var big = cue === "rig" || cue === "trailer" || cue === "loader" || cue === "roller";
     var r0 = big ? Math.max(40, radiusOf(cue) * 0.8) : Math.max(24, radiusOf(cue) * 0.75);
@@ -1330,7 +1320,7 @@ body.big #jobs { display: none; }
     if (sc.X(CL0 - 1, 1) > sc.W + 20 || sc.X(CL0 + HX, 1) < -20) return;
     var n = sc.night || 0;
     put(sc, CL0, 1, 1, function () {
-      var l0 = LW(), i;
+      var l0 = Farm.LW, i;
       // the far wall (concrete panels) and the end wall
       Rr(ctx, 0, -2.35, CLL, 2.35, 0.04, mix("#D5D9DE", "#3B4660", n * 0.5));
       for (i = 1; i < 6; i++) Ln(ctx, i * CLL / 6, -2.3, i * CLL / 6, -0.05, "rgba(29,35,64,0.25)", 0.04);
@@ -1410,13 +1400,6 @@ body.big #jobs { display: none; }
   }
 
   // ---------- The field: grass and maize (painted like farm.js's field, with this page's own crops) ----------
-  function eachX(sc, row, sp, minPx, xa, xb, fn) {
-    var rg = sc.xRange(row.rc), a = rg[2], b = rg[3];
-    while (a * sp < minPx) sp *= 2;
-    var lo = Math.max(rg[0], xa - sp), hi = Math.min(rg[1], xb + sp);
-    for (var j = Math.floor(lo / sp); j <= Math.ceil(hi / sp); j++) { var x = (j + hash(j, row.i) * 0.6) * sp; fn(x, a * x + b, j); }
-  }
-  function band(sc, row, col) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - 0.5, sc.W, row.y0 - row.y1 + 1); }
   function jagged(sc, row, hp, col, lt, t, k) {
     var step = Math.max(4, Math.min(10, hp * 0.5)), yc = row.yc, off = sc.cam * sc.k / row.rc;
     ctx.beginPath(); ctx.moveTo(-5, row.y0 + 0.5);
@@ -1432,10 +1415,10 @@ body.big #jobs { display: none; }
     grass: function (sc, row, stage, P, xa, xb, near) {
       var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1, t = P.time || 0;
       if (stage === "swaths" || stage === "stubble") {
-        band(sc, row, odd ? "#C6DE8E" : "#BEDA86");
+        Farm.band(ctx, sc, row, odd ? "#C6DE8E" : "#BEDA86");
         if (row.fine && s * 0.06 > 1.5) {
           ctx.strokeStyle = "#9CC765"; ctx.lineWidth = Math.max(1, s * 0.015); ctx.beginPath();
-          eachX(sc, row, 0.15, 5, xa, xb, function (x, sx, j) { var yy = row.y0 - hgt * hash(j, 3) * 0.8; ctx.moveTo(sx, yy); ctx.lineTo(sx + s * 0.01, yy - s * 0.06 * (0.6 + hash(j, 4))); });
+          Farm.eachX(sc, row, 0.15, 5, xa, xb, function (x, sx, j) { var yy = row.y0 - hgt * hash(j, 3) * 0.8; ctx.moveTo(sx, yy); ctx.lineTo(sx + s * 0.01, yy - s * 0.06 * (0.6 + hash(j, 4))); });
           ctx.stroke();
         }
         if (stage === "swaths" && !near && row.i % 4 === 0) {
@@ -1447,15 +1430,15 @@ body.big #jobs { display: none; }
         return;
       }
       var g = stage === "grass" ? 1 : clamp(P.g || 0, 0, 1);
-      if (g < 0.06) { band(sc, row, odd ? "#C6DE8E" : "#BEDA86"); return; }
+      if (g < 0.06) { Farm.band(ctx, sc, row, odd ? "#C6DE8E" : "#BEDA86"); return; }
       var h = lerp(0.06, 0.7, g) * (near ? 0.7 : 1), col = mix("#A9D26E", "#3F9A34", g), dk = mix("#93C35E", "#2E7A28", g), lt = mix("#C2E08E", "#7CC653", g);
-      band(sc, row, dk);
+      Farm.band(ctx, sc, row, dk);
       var hp = h * s;
       if (hp < 2 || !row.fine) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - hp, sc.W, hgt * 0.7 + hp); return; }
       jagged(sc, row, hp, col, lt, t, 0.25);
       if (g > 0.6 && s * 0.05 > 1.6) {
         // buttercups and clover in the meadow
-        eachX(sc, row, 0.7, 14, xa, xb, function (x, sx, j) {
+        Farm.eachX(sc, row, 0.7, 14, xa, xb, function (x, sx, j) {
           if (hash(j, row.i + 3) < 0.55) return;
           var fy = row.yc - hp * (0.9 + 0.2 * hash(j, 6)), fr = Math.max(1.5, s * 0.035);
           ctx.beginPath(); ctx.arc(sx, fy, fr, 0, TAU); ctx.fillStyle = hash(j, 8) > 0.5 ? "#FFD84D" : "#FFFFFF"; ctx.fill();
@@ -1465,18 +1448,18 @@ body.big #jobs { display: none; }
     maize: function (sc, row, stage, P, xa, xb, near) {
       var s = row.s, odd = row.i & 1, hgt = row.y0 - row.y1, t = P.time || 0;
       if (stage === "maizestub") {
-        band(sc, row, odd ? "#CDB774" : "#C5AE6A");
+        Farm.band(ctx, sc, row, odd ? "#CDB774" : "#C5AE6A");
         if (row.fine && s * 0.06 > 1.5) {
           ctx.strokeStyle = "#8E7C3E"; ctx.lineWidth = Math.max(1, s * 0.03); ctx.beginPath();
-          eachX(sc, row, 0.35, 6, xa, xb, function (x, sx, j) { ctx.moveTo(sx, row.yc); ctx.lineTo(sx, row.yc - s * 0.12); });
+          Farm.eachX(sc, row, 0.35, 6, xa, xb, function (x, sx, j) { ctx.moveTo(sx, row.yc); ctx.lineTo(sx, row.yc - s * 0.12); });
           ctx.stroke();
         }
         return;
       }
       var g = stage === "maize" ? 1 : clamp(P.g || 0, 0, 1);
-      if (g < 0.06) { band(sc, row, odd ? "#9C6B44" : "#94643F"); return; }
+      if (g < 0.06) { Farm.band(ctx, sc, row, odd ? "#9C6B44" : "#94643F"); return; }
       var h = lerp(0.1, 2.3, g), hp = Math.min(h, near ? 0.7 : 9) * s, col = mix("#7CC24F", "#4E9A34", g), dk = mix("#5DA03C", "#2F6E24", g);
-      band(sc, row, dk);
+      Farm.band(ctx, sc, row, dk);
       if (hp < 2 || !row.fine) { ctx.fillStyle = col; ctx.fillRect(0, row.y1 - hp, sc.W, hgt * 0.7 + hp); return; }
       // the standing maize is a tall green wall; the plants along its edge are drawn with the machines
       jagged(sc, row, hp, odd ? col : mix(col, dk, 0.35), null, t, 0.12);
@@ -1529,7 +1512,6 @@ body.big #jobs { display: none; }
 
   Toybox.init({
     app: "farm",
-    big: { button: $("bigToggle") },
     badge: $("tbadge"),
     timerIntro: "When time is up, the machines stop and park, and the controls lock. The timer carries on across the Tractor Ted pages.",
     goodbyeOption: "End with a “Goodnight, farm” button to press",

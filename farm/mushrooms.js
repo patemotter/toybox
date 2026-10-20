@@ -26,8 +26,6 @@
   var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   var NAME = (Farm.NAMES && Farm.NAMES.mushrooms) || "Mighty Mushrooms";
   document.title = NAME; $("title").textContent = NAME;
-  function LW() { return Farm.LW; }
-  function shine(c, x1, y1, x2, y2, w) { Ln(c, x1, y1, x2, y2, "rgba(255,255,255,0.45)", w); }
   function seg(t, a, b) { return ease(clamp((t - a) / (b - a), 0, 1)); }
   var Y1 = "#F2B33A", YD = "#C98A1A", CAB = "#3A7FC4", CABD = "#2A5F96", BINC = "#3E8E4A", BIND = "#2E6E38";
   var CR = "#E5612F", CRD = "#B54520";
@@ -67,7 +65,7 @@
   // Small drawing helpers (farm.js style)
   // =====================================================================================================
   function wheel(c, cx, cy, r, rot) {
-    var n = Math.round(r * 22), i, a, l0 = LW();
+    var n = Math.round(r * 22), i, a, l0 = Farm.LW;
     c.save(); c.translate(cx, cy);
     for (i = 0; i < n; i++) {
       a = rot + i * TAU / n;
@@ -82,7 +80,7 @@
     c.restore();
   }
   function driverFig(c, x, y) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     c.save(); c.translate(x, y);
     Rr(c, -0.26, 0.1, 0.52, 0.5, 0.16, "#3D6FB6", l0 * 0.7);
     Cc(c, 0, 0, 0.17, "#F2C8A0", l0 * 0.7);
@@ -92,7 +90,7 @@
   function beacon(c, x, y, on, time) {
     var bc = on ? (Math.sin((time || 0) * 9) > 0 ? "#FFD34D" : "#F08A1C") : "#F2A23A";
     if (on) { c.save(); c.globalAlpha = 0.35 + 0.3 * Math.max(0, Math.sin(time * 9)); Cc(c, x, y - 0.08, 0.32, "#FFD34D", 0); c.restore(); }
-    c.beginPath(); c.arc(x, y, 0.12, Math.PI, 0); c.closePath(); fs(c, bc, LW() * 0.7);
+    c.beginPath(); c.arc(x, y, 0.12, Math.PI, 0); c.closePath(); fs(c, bc, Farm.LW * 0.7);
   }
   // the colour of the compost: straw, mixed with the manure, wet, then dark after the bunker
   function compCol(m, w, k) { return mix(mix(mix(STRAW, MIXC, m), WETC, w), DARKC, k); }
@@ -109,7 +107,7 @@
       var f = i / n, b = (i % 2 ? 0.07 : 0) + (hash(i, seed) - 0.5) * 0.08;
       c.lineTo(xa + w * f, -h * Math.pow(Math.sin(f * PI), 0.7) - b * Math.min(1, h * 2));
     }
-    c.closePath(); fs(c, col, LW() * 0.8);
+    c.closePath(); fs(c, col, Farm.LW * 0.8);
     if (strands) {
       c.save(); c.clip();
       for (i = 0; i < Math.round(w * 5); i++) {
@@ -122,19 +120,19 @@
   // A button mushroom on a bed, its foot at the origin; g = growth 0 (nothing) .. 1 (a full white cap).
   function mushroom(c, g, wig) {
     if (g <= 0.01) return;
-    var l0 = LW();
+    var l0 = Farm.LW;
     if (g < 0.25) { var p = g / 0.25; Cc(c, 0, -0.04 * p, 0.03 + 0.04 * p, CAPC, l0 * 0.6); return; }
     var s = lerp(0.3, 1, ease((g - 0.25) / 0.75)), r = 0.3 * s, st = 0.15 * s;
     c.save(); c.rotate(Math.sin((wig || 0) * 18) * 0.25 * (wig || 0));
     Rr(c, -0.08 * s, -st - 0.02, 0.16 * s, st + 0.04, 0.03 * s, "#EFE8D8", l0 * 0.7);
     c.beginPath(); c.moveTo(-r, -st); c.bezierCurveTo(-r, -st - r * 1.25, r, -st - r * 1.25, r, -st); c.closePath(); fs(c, CAPC, l0 * 0.8);
     Ln(c, -r * 0.8, -st - r * 0.12, r * 0.8, -st - r * 0.12, CAPD, 0.035 * s);
-    shine(c, -r * 0.45, -st - r * 0.72, -r * 0.05, -st - r * 0.86, 0.05 * s);
+    Farm.shine(c, -r * 0.45, -st - r * 0.72, -r * 0.05, -st - r * 0.86, 0.05 * s);
     c.restore();
   }
   // a punnet (a blue tray) with n mushrooms in it, its foot at the origin
   function punnet(c, n) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     for (var i = 0; i < n; i++) { c.save(); c.translate(-0.14 + i * 0.095, -0.1); c.scale(0.42, 0.42); mushroom(c, 1); c.restore(); }
     Pp(c, [-0.22, -0.16, 0.22, -0.16, 0.19, 0, -0.19, 0], PUN, l0 * 0.8);
     Ln(c, -0.2, -0.1, 0.2, -0.1, PUND, 0.025);
@@ -147,7 +145,7 @@
   // axles. Origin on the ground under the front axle, facing +x. st = { wheel, tip (rad), gate (0..1), fill
   // (0..1), beacon, time }. The bin pivots at its rear bottom corner (BIN0, BINF).
   function lorryShape(c, st) {
-    var l0 = LW(), rot = (st.wheel || 0) / LWR, i, tip = st.tip || 0, fill = st.fill || 0;
+    var l0 = Farm.LW, rot = (st.wheel || 0) / LWR, i, tip = st.tip || 0, fill = st.fill || 0;
     Rr(c, -6.95, -1.3, 8.45, 0.38, 0.08, "#3A3F4E");
     if (tip > 0.01) {
       var rx = -3.6, ra = [rx - BIN0, -0.2], ca = Math.cos(-tip), sa = Math.sin(-tip);
@@ -165,7 +163,7 @@
     for (i = 1; i < 8; i++) Ln(c, BIN0 + i * 0.625, -BINT + 0.25, BIN0 + i * 0.625, -BINF - 0.1, BIND, 0.06);
     Rr(c, BIN0 - 0.05, -BINT - 0.12, BIN1 - BIN0 + 0.1, 0.16, 0.04, BIND, l0 * 0.8);
     Rr(c, BIN1 - 0.15, -BINT - 0.45, 0.22, BINT - BINF + 0.45, 0.04, BIND, l0 * 0.8);
-    shine(c, BIN0 + 0.2, -BINT + 0.12, BIN1 - 0.3, -BINT + 0.12, 0.06);
+    Farm.shine(c, BIN0 + 0.2, -BINT + 0.12, BIN1 - 0.3, -BINT + 0.12, 0.06);
     // the tailgate, hinged at the top
     c.save(); c.translate(BIN0, -BINT); c.rotate((st.gate || 0) * 0.95);
     Rr(c, -0.16, 0, 0.18, BINT - BINF, 0.04, BIND, l0 * 0.8);
@@ -180,7 +178,7 @@
     driverFig(c, 0.3, -2.62);
     c.save(); c.globalAlpha = 0.5; Pp(c, [0.55, -3.32, 0.85, -3.32, 0.4, -2.35, 0.2, -2.35], "#FFFFFF", 0); c.restore();
     Ln(c, -0.9, -2.12, 1.48, -2.12, CABD, 0.06);
-    shine(c, -0.6, -3.5, 0.9, -3.5, 0.05);
+    Farm.shine(c, -0.6, -3.5, 0.9, -3.5, 0.05);
     Rr(c, 1.3, -2.05, 0.26, 0.82, 0.05, "#3A3F4E", l0 * 0.7);
     Rr(c, 0.85, -1.3, 0.8, 0.3, 0.06, "#3A3F4E");
     Rr(c, 1.36, -1.64, 0.2, 0.22, 0.04, "#FFE98A", l0 * 0.6);
@@ -197,10 +195,10 @@
     return { ex: px + sg * Math.cos(a) * L1, eh: ph + Math.sin(a) * L1, sg: sg };
   }
   function craneShape(c, px, ph, tx, th, L1) {
-    var g = craneGeo(px, ph, tx, th, L1), l0 = LW(), ex = g.ex, ey = -g.eh;
+    var g = craneGeo(px, ph, tx, th, L1), l0 = Farm.LW, ex = g.ex, ey = -g.eh;
     tube(c, px + g.sg * 0.2, -ph + 0.55, lerp(px, ex, 0.55), lerp(-ph, ey, 0.55) + 0.05, 0.1, "#C3CCD6");
     tube(c, px, -ph, ex, ey, 0.32, CR);
-    shine(c, lerp(px, ex, 0.15), lerp(-ph, ey, 0.15) - 0.08, lerp(px, ex, 0.85), lerp(-ph, ey, 0.85) - 0.08, 0.05);
+    Farm.shine(c, lerp(px, ex, 0.15), lerp(-ph, ey, 0.15) - 0.08, lerp(px, ex, 0.85), lerp(-ph, ey, 0.85) - 0.08, 0.05);
     var sx = lerp(ex, tx, 0.55), sy = lerp(ey, -th, 0.55);
     tube(c, sx, sy, tx, -th, 0.16, "#8C97A6");
     tube(c, ex, ey, sx, sy, 0.26, CR);
@@ -210,7 +208,7 @@
   // The rotating grab hanging from the crane's tip (origin), jaws below: the rotator turns it round (rot), the two
   // jaws open (open 0..1) and close on a bite of straw (load).
   function grabShape(c, open, rot, load) {
-    var l0 = LW(), o = clamp(open, 0, 1), sp = 0.65 + 0.35 * Math.abs(Math.cos(rot));
+    var l0 = Farm.LW, o = clamp(open, 0, 1), sp = 0.65 + 0.35 * Math.abs(Math.cos(rot));
     tube(c, 0, 0, 0, 0.3, 0.09, "#5D6675");
     Rr(c, -0.2, 0.26, 0.4, 0.26, 0.08, "#3A3F4E", l0 * 0.8);
     for (var i = 0; i < 3; i++) { var yy = 0.3 + ((rot * 0.4 + i / 3) % 1) * 0.2; Ln(c, -0.18, yy, 0.18, yy, "#6E7887", 0.03); }
@@ -227,10 +225,10 @@
   // st = { wheel, lift (0..1), tilt (0 level .. 1 tipped), load (0..1), col, beacon, time }
   function loaderH(lift) { return lerp(0.5, 3.0, clamp(lift, 0, 1)); }
   function loaderShape(c, st) {
-    var l0 = LW(), rot = (st.wheel || 0) / 0.62, bh = loaderH(st.lift), tilt = st.tilt || 0;
+    var l0 = Farm.LW, rot = (st.wheel || 0) / 0.62, bh = loaderH(st.lift), tilt = st.tilt || 0;
     Pp(c, [-2.15, -0.95, -2.2, -2.0, -2.0, -2.15, -0.5, -2.15, -0.45, -0.95], Y1);
     for (var i = 0; i < 4; i++) Ln(c, -2.0 + i * 0.16, -1.95, -2.0 + i * 0.16, -1.25, YD, 0.06);
-    shine(c, -1.95, -2.05, -0.65, -2.05, 0.06);
+    Farm.shine(c, -1.95, -2.05, -0.65, -2.05, 0.06);
     tube(c, -0.9, -2.15, -0.9, -2.6, 0.1, "#4E5463");
     Rr(c, -2.05, -1.1, 3.4, 0.36, 0.08, "#3A3F4E");
     Pp(c, [-0.62, -1.95, -0.58, -3.12, 0.55, -3.12, 0.7, -1.95], "#2B3040");
@@ -253,7 +251,7 @@
   // The elevator: a steep belt from the hopper's foot (fx, fh) to its head (hx, hh) at the rack. run = belt
   // phase; col = what rides on it (null: empty)
   function elevatorShape(c, fx, fh, hx, hh, run, col) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     Rr(c, hx - 0.18, -4.1, 0.14, 4.1, 0.03, "#8C97A6", l0 * 0.8);
     Rr(c, hx - 0.06, -4.1, 0.14, 4.1, 0.03, "#A9B4C1", l0 * 0.8);
     Rr(c, hx - 0.55, -0.12, 0.9, 0.12, 0.03, "#5D6675", l0 * 0.7);
@@ -267,14 +265,14 @@
   }
   // the elevator's switch box on its mast: a yellow box with a big green button (lit while it runs)
   function switchBox(c, x, h, on, time) {
-    var l0 = LW();
+    var l0 = Farm.LW;
     Rr(c, x - 0.24, -h - 0.3, 0.48, 0.6, 0.06, Y1, l0);
     Cc(c, x, -h, 0.13, on ? (Math.sin(time * 8) > 0 ? "#7BE07B" : "#3DBA4E") : "#3DBA4E", l0 * 0.8);
   }
   // The picking platform: a scissor lift, origin on the ground under its middle; the deck at height dh. The
   // picker stands on the deck (drawn by the page); full punnets stack in a crate on the deck (stack).
   function platformShape(c, dh, stack, time) {
-    var l0 = LW(), lift = Math.max(0, dh - 0.35), n = Math.max(1, Math.round(lift / 0.5)), i;
+    var l0 = Farm.LW, lift = Math.max(0, dh - 0.35), n = Math.max(1, Math.round(lift / 0.5)), i;
     Rr(c, -0.85, -0.38, 1.4, 0.26, 0.05, "#E5612F", l0);
     [-0.6, 0.35].forEach(function (x) { Cc(c, x, -0.12, 0.12, "#33363F", l0 * 0.8); });
     if (lift > 0.02) {
@@ -296,7 +294,7 @@
   // The mushroom picker: white coat, white hairnet, blue gloves. Origin at the feet, facing +x. hand = [x, y] the
   // reaching hand (units, relative), bend 0..1.
   function picker(c, hand, bend) {
-    var l0 = LW(), b = bend || 0, hip = [0, -0.85], sh = [0.05 + b * 0.18, -1.38 + b * 0.25], hd = [0.1 + b * 0.28, -1.58 + b * 0.27];
+    var l0 = Farm.LW, b = bend || 0, hip = [0, -0.85], sh = [0.05 + b * 0.18, -1.38 + b * 0.25], hd = [0.1 + b * 0.28, -1.58 + b * 0.27];
     c.lineCap = "round"; c.lineJoin = "round";
     [[-0.08, "#2B3550"], [0.08, "#34406A"]].forEach(function (q) {
       c.beginPath(); c.moveTo(hip[0], hip[1]); c.lineTo(q[0] + 0.04, -0.45); c.lineTo(q[0], -0.06);
@@ -324,7 +322,7 @@
   // =====================================================================================================
   // the stable block behind the straw pile (no horses: they are out)
   function stableBlock(c) {
-    var l0 = LW(), i;
+    var l0 = Farm.LW, i;
     Rr(c, 0, -2.6, 16, 2.6, 0.02, "#B9634A", l0);
     for (i = 1; i < 9; i++) Ln(c, 0.1, -i * 0.29, 15.9, -i * 0.29, "#A55640", 0.03);
     Pp(c, [-0.4, -2.6, 16.4, -2.6, 15.6, -3.9, 0.4, -3.9], "#5E6B7A", l0);
@@ -338,7 +336,7 @@
   // The bunker shed: a concrete building with a roller door in its front wall (local x 0..BKL from BK0, at depth
   // BKR). Inside: the compost (fill, its colour col). door 0 open .. 1 shut. Two vents on the roof.
   function bunkerShape(c, st) {
-    var l0 = LW(), i;
+    var l0 = Farm.LW, i;
     Pp(c, [-0.3, -4.2, BKL + 0.3, -4.2, BKL, -4.75, 0, -4.75], "#6E7470", l0);
     [2.0, 5.6].forEach(function (x) {
       Rr(c, x - 0.2, -5.45, 0.4, 0.75, 0.04, "#8C97A6", l0 * 0.8);
@@ -393,7 +391,6 @@
   resetWorld();
   var stepId = "straw", sub = "grab", phase = "ready", phaseT = 0, mo = null, glow = 0, ending = false, dusk = 0, time = 0;
   var dog = null, birds = null;
-  function locked() { return ending || (window.Toybox && Toybox.timer.locked()); }
 
   // =====================================================================================================
   // The stage: one view
@@ -429,7 +426,7 @@
   function tag(text, x, h, r) { var p = scrPt(x, h, r); Toybox.nametag(text, p.x, p.y, 2400); }
   // a name tag once the camera has arrived (the place it names is still coming into view)
   var tagT = null;
-  function tagLater(text, x, h, r, ms) { clearTimeout(tagT); tagT = setTimeout(function () { if (!locked()) tag(text, x, h, r); }, ms || 1500); }
+  function tagLater(text, x, h, r, ms) { clearTimeout(tagT); tagT = setTimeout(function () { if (!Farm.locked(ending)) tag(text, x, h, r); }, ms || 1500); }
 
   // =====================================================================================================
   // The steps
@@ -460,7 +457,7 @@
   var ghost = Toybox.ghost({
     max: 3,
     plan: function () {
-      if (locked()) return null;
+      if (Farm.locked(ending)) return null;
       if (phase === "ready") { var p = targetPt(); if (!p) return null; return { pts: [[p.x, p.y]], tap: true, key: key() }; }
       if (phase === "done" && phaseT > 5) { var q = scrPt((RK0 + RK1) / 2, 1.6, 1); return { pts: [[q.x, q.y]], tap: true, key: "again" }; }
       return null;
@@ -514,7 +511,7 @@
     resetWorld(); bringIn("straw"); follow(0, true);
   }
   function startOver() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     resetScene();
     coach.say("The mushroom farm needs straw.", 3);
   }
@@ -766,7 +763,7 @@
   function indoors() { return stepId === "racks" || stepId === "grow"; }
   function viewX(f) { return sc.wx(W * f, 1); }
   function surprise() {
-    if (locked()) return;
+    if (Farm.locked(ending)) return;
     var pick2 = (indoors() ? ["dog", "mist"] : ["dog", "birds"])[surpriseN++ % 2];
     if (pick2 === "dog") {
       dog = { x: viewX(1.06), stop: viewX(0.5), t: 0, st: "run", ph: 0, flip: true };
@@ -888,21 +885,21 @@
     parts: partList,
     dragStart: function (part, e, s) {
       drag = null;
-      if (locked() || phase !== "ready") return;
+      if (Farm.locked(ending) || phase !== "ready") return;
       var k = key(), p = part || "";
       if (k === "straw.drive" && (p === "lorry" || p === "bin" || p === "grab")) drag = { kind: "lorry", off: wxAt(s.x0, LR) - lorry.x, x0: lorry.x };
       else if (k === "compost.load" && (p === "loader" || p === "bucket")) drag = { kind: "loader", off: wxAt(s.x0, 1) - loader.x, x0: loader.x };
       else drag = { kind: "act", part: part };
     },
     move: function (part, e, s) {
-      if (!drag || locked() || phase !== "ready") return;
+      if (!drag || Farm.locked(ending) || phase !== "ready") return;
       var nx;
       if (drag.kind === "lorry") { nx = clamp(wxAt(s.x, LR) - drag.off, LX0, LXC); lorry.wheel += nx - lorry.x; lorry.x = nx; craneRest(); }
       else if (drag.kind === "loader") { nx = clamp(wxAt(s.x, 1) - drag.off, LDX0, CX - 1.8 - LTIP + 0.4); loader.wheel += nx - loader.x; loader.x = nx; }
     },
     up: function () {
       var d = drag; drag = null;
-      if (!d || locked() || phase !== "ready") return;
+      if (!d || Farm.locked(ending) || phase !== "ready") return;
       var k = key();
       if (d.kind === "act") { if (act(d.part)) { if (ghost) ghost.learned(k); glow = 0; } return; }
       if (ghost) ghost.learned(k);
@@ -910,7 +907,7 @@
       if (d.kind === "lorry") { if (lorry.x > d.x0 + 0.5 || LXC - lorry.x < 3) driveLorry(); return; }
       if (d.kind === "loader" && loader.x > d.x0 + 0.4) loaderLoad();
     },
-    tap: function (part) { if (!locked()) tapPart(part); }
+    tap: function (part) { if (!Farm.locked(ending)) tapPart(part); }
   });
 
   // =====================================================================================================
@@ -1013,7 +1010,7 @@
     if (PX(CX + 12, 1) < -40 && PX(LPARK2 + 4, 1) < -40) return;
     // the water pipe: a standpipe with a red valve and a spray bar over the heap
     put(PIPEX, PIPER, -1, function () {
-      var l0 = LW();
+      var l0 = Farm.LW;
       tube(ctx, 0, 0, 0, -4.3, 0.14, "#8C97A6"); tube(ctx, 0, -4.3, 4.3, -4.3, 0.12, "#8C97A6");
       for (var i = 0; i < 5; i++) Rr(ctx, 0.5 + i * 0.9 - 0.06, -4.3, 0.12, 0.16, 0.03, "#5D6675", l0 * 0.6);
       Cc(ctx, 0, -1.2, 0.22, "#D8403A", l0 * 0.8); Ln(ctx, -0.22, -1.2, 0.22, -1.2, "#A82E28", 0.05); Ln(ctx, 0, -1.42, 0, -0.98, "#A82E28", 0.05);
@@ -1055,7 +1052,7 @@
     }
     // the climate control on the back wall, the air duct along under the roof
     put(CLX, RB - 0.02, 1, function () {
-      var l0 = LW();
+      var l0 = Farm.LW;
       tube(ctx, 0.2, -CLH - 0.45, 0.2, -4.6, 0.16, "#C3CCD6");
       Rr(ctx, -0.42, -CLH - 0.48, 0.84, 0.95, 0.06, "#D3DAE2", l0);
       Cc(ctx, -0.12, -CLH - 0.03, 0.2, "#FFFFFF", l0 * 0.8);
@@ -1065,12 +1062,12 @@
     });
     put(0, 1.3, 1, function () {
       var rad = lerp(0.09, 0.26, duct.inf), y = -4.6;
-      Rr(ctx, GH0 + 0.8, y - rad, GH1 - GH0 - 1.6, rad * 2, rad, "#E9EEF2", LW());
+      Rr(ctx, GH0 + 0.8, y - rad, GH1 - GH0 - 1.6, rad * 2, rad, "#E9EEF2", Farm.LW);
       for (var hx = GH0 + 1.2; hx < GH1 - 1; hx += 0.6) Cc(ctx, hx, y + rad * 0.5, 0.03, "#8C97A6", 0);
     });
     // the rack: posts and three shelves; the compost and peat on them; the mushrooms
     put(RK0, 1, 1, function () {
-      var l0 = LW(), L = RK1 - RK0;
+      var l0 = Farm.LW, L = RK1 - RK0;
       [0, L].forEach(function (x) { Rr(ctx, x - 0.06, -TB[NT - 1] - 0.75, 0.12, TB[NT - 1] + 0.75, 0.03, "#A9B4C1", l0 * 0.8); });
       for (var t = 0; t < NT; t++) {
         var y = -TB[t], s = shelf[t];
@@ -1085,7 +1082,7 @@
     });
     // the hopper under the peat bag's frame, the elevator up to the rack
     put(HOP, 0.98, 1, function () {
-      var l0 = LW();
+      var l0 = Farm.LW;
       [-1.05, 1.05].forEach(function (x) { Rr(ctx, x - 0.07, -3.7, 0.14, 3.7, 0.03, "#8C97A6", l0 * 0.8); });
       Rr(ctx, -1.2, -3.8, 2.4, 0.16, 0.03, "#5D6675", l0 * 0.8);
       if (bag.lvl > 0.02) {
@@ -1099,7 +1096,7 @@
       var lv = Math.max(hop.lvl, hop.peat);
       if (lv > 0.01) { ctx.save(); ctx.translate(0, -1.3); mound(ctx, 0, 1.5, 0.3 * lv, hop.peat > hop.lvl ? PEAT : DARKC, 51, null); ctx.restore(); }
       Pp(ctx, [-0.85, -1.35, 0.85, -1.35, 0.35, -0.55, -0.35, -0.55], "#7C8696", l0);
-      shine(ctx, -0.7, -1.25, 0.7, -1.25, 0.05);
+      Farm.shine(ctx, -0.7, -1.25, 0.7, -1.25, 0.05);
       [-0.3, 0.3].forEach(function (x) { Ln(ctx, x, -0.55, x * 1.4, 0, INK, 0.1); Ln(ctx, x, -0.55, x * 1.4, 0, "#8C97A6", 0.06); });
     });
     put(0, 0.98, 1, function () {
@@ -1132,10 +1129,8 @@
   function drawRing() {
     if (phase !== "ready" || (drag && drag.kind !== "act")) return;
     var p = targetPt(); if (!p) return;
-    var b = cv.getBoundingClientRect(), x = p.x - b.left, y = p.y - b.top, k = 0.5 + 0.5 * Math.sin(time * 4), rad = 26 + k * 7;
-    ctx.save(); ctx.globalAlpha = glow > 0 ? 0.95 : 0.55 + 0.25 * k;
-    ctx.beginPath(); ctx.arc(x, y, rad, 0, TAU); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
-    ctx.restore();
+    var b = cv.getBoundingClientRect();
+    Farm.drawRing(ctx, p.x - b.left, p.y - b.top, time, { r: 26, grow: 7, glow: glow });
   }
 
   // =====================================================================================================
@@ -1161,7 +1156,6 @@
 
   Toybox.init({
     app: "farm",
-    big: { button: $("bigToggle") },
     badge: $("tbadge"),
     timerIntro: "When time is up, the machines stop and the controls lock. The timer carries on across the Tractor Ted pages.",
     goodbyeOption: "End with a “Goodnight, farm” button to press",
