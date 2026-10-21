@@ -104,6 +104,19 @@ Combine Time's "Close-up" label. (The Farm's name tags looked small in downscale
   Concrete's mixer truck cab is still cut off at the right on upright screens (fitting it would shrink the form).
 
 ## 3. Questions for the dad (keep as is until he answers)
+
+**Answered 2026-10-21 (not built yet unless noted):**
+- One rule for every page: a tap on the ringed part does its next motion, so side buttons that play a job go
+  (Forklift "Move it!", Excavator Dig/Dump, Tower Crane "Lift!", Espresso "Do it!"). Concrete stays as it is.
+- One signal at a time: where a page shows a yellow ring, no ghost hand; the ghost hand only on pages with no ring.
+  (He and the dad couldn't tell the two apart.)
+- Sand Table's and Spirograph's Draw! stay. Spirograph: after a curve closes, more spinning (finger or Draw!)
+  shifts the gear to the next slot by itself and keeps drawing rotated copies until the picture is full; one pen
+  color per picture (Rainbow stays rainbow); Draw! no longer switches to the next color. The PLAN.md line that
+  credited the dad with "a new layer only when he picks a new pen" was an agent's wording, not his.
+- Busy panels (question 2): try picture tabs that show each group's current pick, with one group's choices open
+  above them (the dad: he and the child forget what they can't see). Pilot built on Kaleidoscope (phones only;
+  iPads already show every group); roll out to the other busy panels if it works.
 1. **Whole-job buttons**: Construction Site's "Move it!", Dig/Dump, "Lift!" and Concrete's step Go, Espresso's
    "Do it!", and the "Draw!" buttons in Spirograph and Sand Table play a whole job. Keep them as optional helpers, or
    make those pages hands-on like the Farm? (At least Espresso's button should say its step's verb.)
