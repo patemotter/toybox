@@ -27,7 +27,7 @@
   //   Fabric texture
   //   The machine's motion
   //   Actions
-  //   Coach, counter, ghost, tiles, bottom bar
+  //   Coach, ghost, tiles, bottom bar
   //   Surprise
   //   Sound
   //   Input
@@ -592,7 +592,7 @@
     puff(CUTTER.x - 1, CUTTER.y, "#FFFFFF", 6);
     save();
     if (done) {
-      S.pieces++; save(); setCount(true);
+      S.pieces++; save();
       const r = fabricRect();
       for (let i = 0; i < 16; i++) sparkle(r.x + Math.random() * r.w, r.y + Math.random() * r.h);
       snd.chime();
@@ -655,14 +655,9 @@
   function fabricRect() { return { x: F.x, y: F.top, w: FW, h: FH }; }
 
   // =====================================================================================================
-  // Coach, counter, ghost, tiles, bottom bar
+  // Coach, ghost, tiles, bottom bar
   // =====================================================================================================
   const coach = Toybox.coach($("coach"));
-  function setCount(pop) {
-    const el = $("pieces"); el.textContent = "Pieces: " + S.pieces;
-    if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
-  }
-  setCount(false);
   // What to do next, from what is on the machine: one line and the part it names (the ring on the scene).
   function want() {
     if (F.swap) return null;

@@ -1143,8 +1143,6 @@
     var t = coachLine();
     if (t !== coachText) { coachText = t; coachEl.textContent = t; }
   }
-  var counterEl = $("counter");
-  function updCounter() { counterEl.textContent = "Drinks: " + S.count; }
 
   function sv(inner, vb) { return '<svg viewBox="' + (vb || "0 0 60 60") + '" aria-hidden="true">' + inner + "</svg>"; }
   var SK = ' stroke="#1D2340" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
@@ -1723,7 +1721,7 @@
     tw(1200, function (e, k) { var sx = slot(); cup.x = lerp(cx0, sx, e); cup.y = lerp(cy0, TRAY_Y, e) - 1.3 * Math.sin(Math.PI * k); });
     call(function () {
       rec.x = cup.x; tray.push(rec); cup = null;
-      S.count++; updCounter(); save();
+      S.count++; save();
       clunk(); chime(); sparkle(rec.x, TRAY_Y - 1.6, 16);
       Toybox.kind();
     });
@@ -2595,7 +2593,6 @@
   // ---------- Start ----------
   canon();
   if (S.step === "whisk") whiskReset();
-  updCounter();
   layout();
   if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe(stage);
   window.addEventListener("resize", layout);

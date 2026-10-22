@@ -17,7 +17,7 @@
   //
   // Sections (search for the titles):
   //   State | The world | Small drawing helpers | Straw, compost and mushrooms | The machines | The buildings |
-  //   Machine and scene state | The stage | Coach, counter, name tags | The steps | The flow |
+  //   Machine and scene state | The stage | Coach, name tags | The steps | The flow |
   //   Straw: the crane lorry | Compost: the loading shovel and the bunker | Racks: the elevator |
   //   Grow and pick | Surprise | Particles | Input | Update | Drawing | Loop | Start
   var $ = function (id) { return document.getElementById(id); };
@@ -419,10 +419,8 @@
     Farm.inUnits(ctx, PX(x, r), sc.Y(r), sc.S(r), sc.lw, function () { ctx.scale(d, 1); fn(); });
   }
 
-  // ---------- Coach, counter, name tags ----------
+  // ---------- Coach, name tags ----------
   var coach = Toybox.coach($("coach"));
-  function setCount(pop) { var el = $("loads"); el.textContent = "Punnets: " + punnets; if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } }
-  setCount(false);
   function tag(text, x, h, r) { var p = scrPt(x, h, r); Toybox.nametag(text, p.x, p.y, 2400); }
   // a name tag once the camera has arrived (the place it names is still coming into view)
   var tagT = null;
@@ -743,7 +741,7 @@
   }
   function punnetFull() {
     coach.say("The punnet is full.", 3);
-    run(1.0, function (t) { if (t >= 0.5 && onceM("full")) { plat.n = 0; plat.stack = Math.min(4, plat.stack + 1); punnets++; save(); setCount(true); snd.chime(); } },
+    run(1.0, function (t) { if (t >= 0.5 && onceM("full")) { plat.n = 0; plat.stack = Math.min(4, plat.stack + 1); punnets++; save(); snd.chime(); } },
       function () { nextPick(); });
   }
   function nextPick() {

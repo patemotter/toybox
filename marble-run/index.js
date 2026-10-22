@@ -2415,7 +2415,7 @@
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
     var m = total();
-    if (m !== shownM) { shownM = m; $("mNum").textContent = String(m); saveDirty = true; }
+    if (m !== shownM) { shownM = m; saveDirty = true; }
     if (saveDirty && performance.now() - lastSave > 3000) save();
     updateRoll();
   }

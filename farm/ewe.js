@@ -23,7 +23,7 @@
   //   Sheep and Farmer Tom
   //   Scene state
   //   The stage: camera and projection
-  //   Coach, counter, ghost, bottom bar
+  //   Coach, ghost, bottom bar
   //   The flow
   //   Scrape
   //   Parlor
@@ -375,11 +375,9 @@
   function vp(x, h, r) { const b = cv.getBoundingClientRect(); return { x: b.left + X(x, r), y: b.top + Y(r) - h * S(r) }; }
 
   // =====================================================================================================
-  // Coach, counter, ghost, bottom bar
+  // Coach, ghost, bottom bar
   // =====================================================================================================
   const coach = Toybox.coach($("coach"));
-  function setCount(pop) { const el = $("loads"); el.textContent = "Beds: " + beds; if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } }
-  setCount(false);
   const SUB = {
     "scrape.scrape": { say: "Drive the blue tractor to scrape the passage.", part: "blue" },
     "scrape.scoop": { say: "Drive the blue tractor into the pile to fill the bucket.", part: "blue" },
@@ -430,7 +428,7 @@
   function stepDone(id) { const i = ORDER.indexOf(id); if (i < ORDER.length - 1) bringIn(ORDER[i + 1]); else finish(); }
   function finish() {
     setPhase("done"); mo = null;
-    beds++; save(); setCount(true); snd.chime(); Toybox.kind();
+    beds++; save(); snd.chime(); Toybox.kind();
     coach.say("The sheep are back in the clean shed.", 5);
     coach.step("Tap the shed to start again.");
   }

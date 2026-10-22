@@ -699,11 +699,8 @@
   // the best view to point at a world spot: the close-up when it shows it, else the whole view
   function bestPt(x, h, r) { if (split && inView(scC, x, h, r)) return scrPt(scC, x, h, r); return scrPt(scW, x, h, r); }
 
-  // ---------- Coach, counter, name tags ----------
+  // ---------- Coach, name tags ----------
   var coach = Toybox.coach($("coach"));
-  function counterText() { return job === "chip" ? "Loads: " + loads : "Posts: " + posts; }
-  function setCount(pop) { var el = $("loads"); el.textContent = counterText(); if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } }
-  setCount(false);
   function tag(text, x, h, r) { var p = bestPt(x, h, r); Toybox.nametag(text, p.x, p.y, 2400); }
 
   // =====================================================================================================
@@ -851,7 +848,7 @@
       loads++; coach.say("The trailer is full of chips!", 5);
       Farm.world.update(function (w) { w.chips = (typeof w.chips === "number" && isFinite(w.chips) ? w.chips : 0) + 1; });
     } else { coach.say("The sheep are safe in the field.", 5); fld.home = 0.01; }
-    save(); setCount(true); snd.chime(); Toybox.kind();
+    save(); snd.chime(); Toybox.kind();
     coach.step(job === "chip" ? "Tap the wood chipper to chip more branches." : "Tap the field to cut another tree.");
   }
   function again() {
@@ -895,7 +892,7 @@
   function switchJob(id) {
     if (Farm.locked(ending)) { jobs.set(job); return; }
     job = id === "chip" ? "chip" : "logs";
-    resetScene(false); finished = false; ghost.poke(); bringIn(firstStep()); follow(0, true); setCount(false);
+    resetScene(false); finished = false; ghost.poke(); bringIn(firstStep()); follow(0, true);
     coach.say(job === "chip" ? "Chip the branches!" : "Farmer Tom needs new fence posts.", 3);
     save();
   }
@@ -1158,7 +1155,7 @@
   function postsOut(q) {
     q.st = "gone";
     for (var i = 0; i < 2; i++) mposts.push({ x: CONV1 - 0.9, h: CONVH + 0.2 + i * 0.12, n: mposts.length });
-    posts += 2; save(); setCount(true); snd.clunk();
+    posts += 2; save(); snd.clunk();
     Farm.world.update(function (w) { w.posts = (typeof w.posts === "number" && isFinite(w.posts) ? w.posts : 0) + 2; });
     fld.pileN = Math.min(6, mposts.length);
   }

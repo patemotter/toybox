@@ -54,9 +54,6 @@ body {
 .tb-head a { text-decoration: none; }
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.loads { font-variant-numeric: tabular-nums; }
-.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
 /* Play-timer gauge: the time-left badge, top-right of the stage. */
 .fuel { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .fuel[hidden] { display: none; }
@@ -119,7 +116,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   .step span { display: inline; font-size: 0.95rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .loads.pop, .step.now.popin, .mainbtn.wiggle { animation: none; }
+  .step.now.popin, .mainbtn.wiggle { animation: none; }
 }
 /* The step strip is a progress strip, not buttons: no raised shadow, softer outline. */
 .step, .step.now { box-shadow: none; border-width: 2px; }
@@ -136,7 +133,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A concrete mixer truck next to an empty road form"></canvas>
       <div class="fuel" id="fuel" hidden><div class="fuel-bar"><span id="fuelFill"></span></div><span class="fuel-num" id="fuelNum" hidden></span></div>
-      <div class="tb-counter loads" id="loads">Roads: 0</div>
       <div class="tb-coach" id="hint" hidden></div>
     </main>
     <section class="tb-panel bar" id="bar">
@@ -187,7 +183,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function P(x, z, y) { return [x + z * DX, y + z * DY]; }
 
   var roads = 0;
-  // Opened from the Toybox home screen: the counter starts at 0 again.
+  // Opened from the Toybox home screen: back to the first road.
   var startFresh = !!(window.Toybox && Toybox.fresh());
   if (!startFresh) try { var so = JSON.parse(localStorage.getItem(STATEKEY) || "null"); if (so && typeof so.roads === "number" && so.roads >= 0) roads = Math.floor(so.roads); } catch (e) { /* ignore */ }
   function saveState() { try { localStorage.setItem(STATEKEY, JSON.stringify({ roads: roads })); } catch (e) { /* ignore */ } }
@@ -861,7 +857,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "paint") {
       F.paintT = Math.min(1, phaseT / 2.4);
       if (F.paintT >= 1) {
-        roads++; saveState(); showRoads(true);
+        roads++; saveState();
         burst();
         setPhase("done"); fanfare();
         cars.forEach(function (c) { c.wait = false; });
@@ -998,11 +994,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     else if (phase === "screed") hint("Drag the board across", 2600);
     else if (phase === "trowel") hint("Rub it round and round", 2600);
     else if (phase === "done") hint("Tap New road for another one", 2600);
-  }
-  function showRoads(pop) {
-    var el = $("loads");
-    el.textContent = "Roads: " + roads;
-    if (pop && !reduce) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   }
 
   // ---------- Input ----------
@@ -1192,7 +1183,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // ---------- Start ----------
   resize();
   truck.x = visRight() + 460;
-  showRoads(false);
   setPhase("arrive");
   hint("Beep beep! Here comes the mixer!", 2800);
   // ---------- Ghost hand ----------

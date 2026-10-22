@@ -36,13 +36,9 @@ body {
 .stage { background: #A9DCFF; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
-.loads { font-variant-numeric: tabular-nums; }
-.loads.pop { animation: pop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
-@keyframes pop { 0% { transform: scale(1.4); } 100% { transform: scale(1); } }
 body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .mapbtn { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(76vw, 340px, 46vh); aspect-ratio: 4 / 3; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 .mapbtn .tb-mapic { width: 30px; height: 30px; background: #FFFFFF; border-radius: 8px; }
-@media (prefers-reduced-motion: reduce) { .loads.pop { animation: none; } }
 </style>
 </head>
 <body>
@@ -56,7 +52,6 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     <div class="tb-stagecol">
       <main class="tb-stage stage" id="stage">
         <canvas id="cv" role="img" aria-label="A golden wheat field with a green combine harvester. Tap the lever in the cab to drop the header."></canvas>
-        <div class="tb-counter loads" id="loads">Loads: 0</div>
         <div id="coach"></div>
         <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
       </main>
@@ -190,15 +185,12 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     layoutScene();
     sc.follow(camTarget(), 0, true);
-    closeLayout();
   }
 
-  // ---------- Coach, counter, name tags ----------
+  // ---------- Coach, name tags ----------
   var coach = Toybox.coach($("coach"));
   // A passing line stays its full time even when the step changes underneath it (coach.step would cut it short).
   function say(text, sec) { coach.say(text, Math.max(3, sec || 3)); }
-  function setLoads() { var el = $("loads"); el.textContent = "Loads: " + loads; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
-  $("loads").textContent = "Loads: " + loads;
   // A part's name, only when he taps that part, for a moment: a small label with a pointer down to the part (the
   // pointer stays over the part when the label is nudged in from the screen edge).
   function tag(text, p) {
@@ -915,7 +907,7 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
   }
   function goBack() { tr.state = "back"; tr.v = 0; tr.lever = 0; tr.turn = { t: 0, from: 1 }; }
   function storedLoad() {
-    loads++; save(); setLoads();
+    loads++; save();
     Farm.world.update(function (w) { if (job === "sun") w.seeds = (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) + 1; else w.grain = (w.grain || 0) + 1; });
     snd.chime();
     if (fieldDone() && cb.tank < 0.02 && !doneSaid) {
@@ -1651,10 +1643,6 @@ body.ending .tb-panel, body.ending .tb-jobs, body.ending .homebtn, body.ending .
     if (stepId === "unload" || ((ts === "side" || ts === "drift") && (cb.tank > 0.02 || tr.load > 0.04))) return "pour";
     if (stepId === "cut" || (!fieldDone() && cb.hdr < 0.5 && !cb.hdrUp)) return "cut";
     return null;
-  }
-  function closeLayout() {
-    var el = $("loads");
-    cu.cY = el ? el.offsetTop + el.offsetHeight + 8 : 54;
   }
   // screen boxes the close-up must never cover: the machines he works, the control the coach names, the barn
   function closeAvoid() {

@@ -5597,15 +5597,8 @@
       rrect(g, x + 6, y + h * 0.42 + 4, 10, h * 0.5, 3); g.fillStyle = "#A9733F"; g.fill();
       rrect(g, x + w - 16, y + h * 0.42 + 4, 10, h * 0.5, 3); g.fill();
       g.restore();
-      // counter
+      // the label of a piece that just landed
       var fs2 = Math.round(clamp(w * 0.19, 13, 26));
-      g.font = "800 " + fs2 + "px " + FONT;
-      g.textAlign = "center"; g.textBaseline = "middle";
-      var t = "Pieces: " + app.pieces;
-      var tw = g.measureText(t).width + 18;
-      rrect(g, x + w / 2 - tw / 2, y - fs2 - 12, tw, fs2 + 10, (fs2 + 10) / 2);
-      g.fillStyle = b > 0.2 ? "#FFE58A" : "#FFFFFF"; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-      g.fillStyle = OUT; g.fillText(t, x + w / 2, y - fs2 / 2 - 6);
       if (this.pop && this.pop.t > 0 && this.pop.l1) {
         var a = clamp(this.pop.t, 0, 1), rise = (3 - this.pop.t) * 13;
         g.globalAlpha = a;

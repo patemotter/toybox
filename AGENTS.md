@@ -150,7 +150,13 @@ lb, kg, RPM, TPI, °, %, layer counts, tooth counts, ruler/scale numbers, depth/
 subtitles, numbered step badges, "+1" pop-ups. Show the effect visually instead; words like Slow/Medium/Fast,
 Straight/Angle, Shallow/Deep are fine.
 Keep only:
-- **Simple counters, one per page, never duplicated** ("Nails: 3", "Loads: 2", "Cars: 4", "Put away: 5 of 12").
+- **Almost no counters** (the dad, 2026-10-22: most "Loads: 3"-style tallies didn't make sense or add anything; all
+  were removed). Kept: progress through a job that has an end (Shadow Board "Put away: 5 of 12", Jigsaw "Pieces: 3
+  of 6", the Workshop project's "Parts: 2 of 6"), counting what is in the board where that is part of the job (Hammer
+  & Screws "Nails" and "Screws", Drill Press "Holes", Wrenches "Bolts out"), and Bubbles' "Bubbles" for the fun of
+  it. A new app gets no counter unless the dad asks.
+- **No number persists across launches**: every count starts again on a fresh visit (`Toybox.fresh()`); a reload
+  keeps it. Saved progress through steps (the Workshop project) is not a number and stays.
 - The **Measuring** station's readings and **Math Grid** (numbers are the point).
 - **Wrenches**: the size is the matching game, so once per bolt head and once per size button.
 - **Gear Box**: each gear shows its number of teeth (the dad asked for it), on the gear and on its picker tile.
@@ -351,7 +357,7 @@ Keep only:
 - Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
   tool/layout/mode, scroll position and counters go back to first-visit defaults.
 - **Kept**: his **collections** (3D Printer shelf and spool colors, Lathe and Router shelves, Fish Tank fish,
-  Color Mixing "My colors", My puzzles in Jigsaw, the Bubble Machine's "Bubbles" counter) and **grown-up settings** (timer, sound, Big, sheet
+  Color Mixing "My colors", My puzzles in Jigsaw) and **grown-up settings** (timer, sound, Big, sheet
   options such as Math Grid spoken numbers).
 - Reloading, or moving between pages of the same app (Tool Wall ↔ station), keeps the state.
 - Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.

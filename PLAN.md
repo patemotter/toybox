@@ -532,8 +532,8 @@ directs it where to go by tapping the wheel or the bed or the food."
 - Bubble colors/soap: picture tiles in the panel (clear rainbow, pink, blue, green, glitter). Surprise: a giant
   bubble that wobbles across the screen, or a bubble with a little rubber duck inside it.
 - Optional tilt: with "Tilt and shake" on, bubbles drift the way the device leans; shaking blows a gust.
-- Counter: **"Bubbles: N"**, every bubble blown (by the machine or the wand). The dad wants it to **persist across
-  visits** (kept like a collection, not reset on a fresh visit; localStorage, try/catch). No fail states.
+- Counter: **"Bubbles: N"**, every bubble blown (by the machine or the wand). It counts **this visit only** (the
+  dad, 2026-10-22: no number persists across launches; it was a kept collection before). No fail states.
 - Timer ending: the machine winds down, the last bubbles float away and pop softly. Rest line: "The bubbles are
   resting."
 
@@ -585,7 +585,7 @@ Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
   sound and fresh start. Offline-first; the only external file is the Baloo 2 font.
 - Sound off by default (2-second grown-up hold). Just as fun with sound off.
 - One screen, no page scroll, iPhone and iPad, touch and mouse. Phone header and two-rows-of-controls rules.
-- Numbers only where they're the point; one simple counter per page.
+- Numbers only where they're the point; no tally counters (AGENTS.md "Numbers").
 - Calm pace; results stay on screen. One obvious first action, a coach line, an idle ghost hand.
 - Fresh start from the home screen; collections and grown-up settings kept.
 - No fail states, real names, no brands. Never the child's name anywhere.
