@@ -147,6 +147,10 @@
  *      var mp = Toybox.map({ stage: el, places: [{ href, name, pic, rect: [x, y, w, h] as fractions of the stage
  *        or fn(W, H) -> px rect }], onPress: fn(place, a) }) -> mp.layout(), mp.places
  *        Station maps: the whole place is the hit area, a white picture + word label, Toybox.beforeLeave on go.
+ *      Toybox.done({ line: "The bales are in the barn!", again: fn, delay: 1500, backLabel, stage })
+ *        A station's job is finished: a card low on the stage with a star, the line, Again (calls again) and a
+ *        button back to the map (it clicks the page's a.tb-back and shows its picture and short name). Toybox.doneHide()
+ *        takes it away (call it when a new round starts some other way, e.g. a tap on the scene).
  *      Toybox.wiggle(el), Toybox.icon(name) (UI line icons: back, home, big, new, surprise, shelf, close),
  *      Toybox.pics.play / .again (Go pictures).
  * Rest timing: after time is up the module waits 6 s (or until the goodbye button was pressed and
@@ -1427,6 +1431,53 @@
   var PIC_AGAIN = '<svg viewBox="0 0 40 40"><path d="M31 20a11 11 0 1 1-3.3-7.8" fill="none" stroke="#1D2340" stroke-width="7.5" stroke-linecap="round"/><path d="M31 20a11 11 0 1 1-3.3-7.8" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/><path d="M33.5 6.5v9h-9z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5" stroke-linejoin="round"/></svg>';
   var TICK_SVG = '<svg class="tb-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.2 4.2 8.8-9.4" fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+  // ---------- Done card ----------
+  // At the end of a station's job: a card low on the stage with a star, what he finished, Again (orange, starts
+  // the job over) and a button back to the map (the page's own Back link, so its leave guard runs). It comes up
+  // after a moment so the finished result is seen first, stays until a button or Toybox.doneHide(), and never
+  // covers the top of the stage where the result is.
+  var doneTimer = null;
+  function doneHide() {
+    clearTimeout(doneTimer); doneTimer = null;
+    var el = $("tb-done");
+    if (el) el.classList.remove("show");
+  }
+  function doneCard(o) {
+    o = o || {};
+    doneHide();
+    var stage = o.stage || document.querySelector(".tb-stage") || document.body;
+    var back = document.querySelector("a.tb-back");
+    doneTimer = setTimeout(function () {
+      doneTimer = null;
+      if (timer.phase === "ending" || timer.phase === "resting") return;
+      var el = $("tb-done");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "tb-done"; el.className = "tb-done"; el.setAttribute("role", "status");
+        el.innerHTML = '<p class="tb-done-line"><i class="tb-done-art">' + KIND_ART.done + '</i><span></span></p>' +
+          '<div class="tb-done-btns"><button type="button" class="btn tb-new tb-done-again">' + uiIcon("new") +
+          '<span>Again</span></button><button type="button" class="btn tb-done-back"></button></div>';
+        ["pointerdown", "pointerup", "click", "touchstart"].forEach(function (t) {
+          el.addEventListener(t, function (e) { e.stopPropagation(); }, { passive: true });
+        });
+      }
+      if (el.parentNode !== stage) stage.appendChild(el);
+      el.querySelector(".tb-done-line span").textContent = o.line || "All done!";
+      var bb = el.querySelector(".tb-done-back"), pic = back && back.querySelector(".tb-mapic");
+      bb.hidden = !back;
+      if (back) {
+        bb.innerHTML = uiIcon("back") + (pic ? pic.outerHTML : "") + "<span></span>";
+        var name = back.querySelector("span");
+        bb.querySelector("span").textContent = o.backLabel || (name && name.textContent.trim()) || "Back";
+        bb.setAttribute("aria-label", back.getAttribute("aria-label") || "Back");
+      }
+      el.querySelector(".tb-done-again").onclick = function () { doneHide(); if (typeof o.again === "function") o.again(); };
+      bb.onclick = function () { doneHide(); if (back) back.click(); };
+      void el.offsetWidth;
+      el.classList.add("show");
+    }, typeof o.delay === "number" ? o.delay : 1500);
+  }
+
   // ---------- Palm guard ----------
   // Preschoolers rest their wrists on the bottom edge and keep a palm on the glass. A touch is a palm when it
   // starts within 20 px of the bottom edge, when another touch has rested still for over a second, or when the
@@ -2226,6 +2277,8 @@
     gate: gate,
     map: stationMap,
     wiggle: wiggle,
+    done: doneCard,
+    doneHide: doneHide,
     icon: uiIcon,
     pics: { play: PIC_PLAY, again: PIC_AGAIN }
   };
