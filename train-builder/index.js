@@ -640,7 +640,7 @@
       state.pieces.push(p);
       extendBack(run.d - runLen() - ROLL - 60);
     }
-    save(); updateGo(); updateCoach();
+    save(); bumpCount(); updateGo(); updateCoach();
     return true;
   }
   function screenOf(cp, h) { return { x: SX(cp.x), y: SY(cp.y, cp.z + (h || 26)) }; }
@@ -666,7 +666,7 @@
       for (var j = i; j < state.pieces.length; j++) state.pieces[j].extra += gap;
     }
     endSel();
-    save(); updateGo(); updateCoach();
+    save(); bumpCount(); updateGo(); updateCoach();
   }
   function coupled(i) {
     var poses = carPoses();
@@ -1749,7 +1749,7 @@
     state.pieces = []; state.go = false; kindGiven = false; sel = -1;
     startRun();
     setTab("engines");
-    save(); updateGo(); updateCoach();
+    save(); bumpCount(); updateGo(); updateCoach();
   });
   // ---------- Surprise: a fun moment on the train set, right now (his train and layout never change) ----------
   // They take turns, never the same twice in a row (starting at a random one): (1) a cow wanders onto the
@@ -2160,6 +2160,14 @@
   $("takeOff").addEventListener("click", function () { if (!Toybox.timer.locked() && sel >= 0) removeAt(sel); });
   $("selDone").addEventListener("click", function () { endSel(); });
 
+  function counterText() { return "Cars: " + carCount(); }
+  function bumpCount() {
+    var el = $("count"), txt = counterText();
+    if (el.textContent === txt) return;
+    el.textContent = txt;
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+  }
+
   // ---------- Coach line ----------
   function coachText() {
     if (!state.pieces.length) return "Tap an engine!";
@@ -2246,6 +2254,7 @@
   }
 
   // ---------- Start ----------
+  $("count").textContent = counterText();
   setTab(state.tab);
   resize();
   updateGo(); updateCoach();
