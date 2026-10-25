@@ -43,9 +43,12 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Older apps also have a `sw.js`:
   a retired stub (see Offline below); keep it, but a new app gets none.
 - `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). It
-  fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, seven on
-  phones held sideways), picture and name only; `fitGrid()` sizes the pictures to the rows. The `what` text
-  stays in `APPS` for grown-ups and tooling but isn't shown.
+  fits every tile on one screen with no scrolling, picture and name only. The stylesheet sets the usual columns
+  (four on tablets, three on upright phones, six on phones held sideways); `fitGrid()` also tries up to three
+  more, keeps the count with the biggest pictures where no word of a name splits, and sizes each picture to the
+  room left in its tile (never more, so nothing spills out on an iPhone with its safe areas). A long one-word
+  name gets a soft hyphen in `APPS` (`"Kaleido\u00ADscope"`); names break only there. The `what` text stays in
+  `APPS` for grown-ups and tooling but isn't shown.
   **Favorites**: the Grown-ups sheet's "Favorites" section (launcher only, `localStorage["toybox-favorites-v1"]`, a
   list of app hrefs) moves starred apps to the front of the grid, in the order they were picked, with a small star
   badge (not a button). Grown-ups only; the child can't change the order.

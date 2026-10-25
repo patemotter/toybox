@@ -138,13 +138,15 @@ h1 {
   /* The slot is as tall as the tallest name (set by fitGrid), so pictures line up across a row. */
   min-height: var(--name-h, 0px);
   align-content: center;
-  -webkit-hyphens: auto;
-  hyphens: auto;
+  /* Names only break at the soft hyphens in APPS; fitGrid picks columns where every word fits. */
+  -webkit-hyphens: manual;
+  hyphens: manual;
   overflow-wrap: break-word;
 }
 /* Just the picture and the name on every screen, so the home screen is calm and quick to scan.
    The descriptions stay in APPS (and in the README) for grown-ups. */
 .app .what { display: none; }
+.apps.whole-words .name { overflow-wrap: normal; }
 /* A favorite (picked by a grown-up in the Grown-ups sheet) wears a small star; it is not a button. */
 .apps li > .app { position: relative; }
 .app .fav { position: absolute; top: 4px; right: 4px; width: clamp(20px, 4.5vmin, 34px); height: auto; pointer-events: none; }
@@ -167,13 +169,13 @@ h1 {
   .app:active { transform: translate(3px, 3px); }
   .app .name { font-size: 0.86rem; }
 }
-/* Phones held sideways: seven tiles per row (four rows fit the short screen), and a smaller header so the tiles get the height. */
+/* Phones held sideways: six tiles per row (fitGrid may add more), and a smaller header so the tiles get the height. */
 @media (orientation: landscape) and (max-height: 520px) {
   .wrap { padding-top: 8px; padding-bottom: 8px; }
   header img { display: none; }
   h1 { font-size: 1.9rem; }
   header .grownbtn { min-height: 44px; font-size: 0.95rem; padding: 0.2rem 0.7rem; }
-  .apps { --cols: 7; --gap: 8px; margin-top: 8px; }
+  .apps { --cols: 6; --gap: 8px; margin-top: 8px; }
   .app { gap: 3px; padding: 6px 4px 4px; border-radius: 16px; --lip: var(--tb-lip-h-sm); }
   .app:active { transform: translate(3px, 3px); }
   .app .name { font-size: 0.8rem; }
@@ -234,7 +236,7 @@ h1 {
       icon: "spin-shop/icons/icon-512.png"
     },
     {
-      name: "Kaleidoscope",
+      name: "Kaleido\u00ADscope",
       what: "Draw with your fingers and every line is mirrored into a big spinning pattern.",
       href: "kaleidoscope/",
       icon: "kaleidoscope/icons/icon-512.png"
@@ -288,7 +290,7 @@ h1 {
       icon: "water-works/icons/icon-512.png"
     },
     {
-      name: "Construction Site",
+      name: "Construc\u00ADtion Site",
       what: "Gear up, then dig with an excavator, operate the forklift, lift with the tower crane, pour concrete, and swing the wrecking ball.",
       href: "construction-site/",
       icon: "construction-site/icons/icon-512.png"
@@ -330,7 +332,7 @@ h1 {
       icon: "kitchen/icons/icon-512.png"
     },
     {
-      name: "Spirograph",
+      name: "Spiro\u00ADgraph",
       what: "Roll the gear around the ring and draw perfect swirly patterns, or watch it draw.",
       href: "spirograph/",
       icon: "spirograph/icons/icon-512.png"
@@ -457,24 +459,44 @@ h1 {
   // Another open Toybox tab changed the favorites.
   window.addEventListener("storage", function (e) { if (e.key === FAVKEY) favChanged(); });
 
-  // Fit every app on one screen. The stylesheet picks the columns for the screen (--cols); this works
-  // out the rows, then sizes the pictures to the room left in a row after the tallest name, so nothing
-  // is cut off and the pictures are as big as they can be. Runs again when the screen turns or the
-  // font arrives (the names can wrap differently).
-  function fitGrid() {
-    var cols = parseInt(getComputedStyle(list).getPropertyValue("--cols"), 10) || 4;
+  // Fit every app on one screen. The stylesheet picks the usual columns for the screen (--cols); this
+  // also tries up to three more columns (fewer, taller rows help when many apps share a short phone
+  // screen) and keeps the count with the biggest pictures. A picture gets the room left in its tile after
+  // the tallest name, never more, so nothing spills out of a tile. A count that would split a word of a
+  // name across two lines isn't used. Runs again when the screen turns or the font arrives (the names can
+  // wrap differently).
+  function tryCols(cols) {
+    list.style.setProperty("--cols", String(cols));
     list.style.setProperty("--rows", String(Math.ceil(APPS.length / cols)));
     var tile = list.querySelector(".app");
-    if (!tile) return;
     // Every name gets the height of the tallest one, so the pictures line up across a row.
     list.style.removeProperty("--name-h");
     var names = list.querySelectorAll(".name");
+    // With word breaking off, a word too long for the tile sticks out of its name instead of splitting.
+    list.classList.add("whole-words");
+    var split = false;
+    for (var j = 0; j < names.length; j++) if (names[j].scrollWidth > names[j].clientWidth + 1) split = true;
+    list.classList.remove("whole-words");
+    if (split) return -1;
     var nameH = 0;
     for (var i = 0; i < names.length; i++) nameH = Math.max(nameH, names[i].offsetHeight);
     list.style.setProperty("--name-h", nameH + "px");
     var cs = getComputedStyle(tile);
-    var room = tile.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - (parseFloat(cs.rowGap) || 0) - nameH - 1;
-    list.style.setProperty("--icon", Math.max(40, Math.min(160, Math.floor(room))) + "px");
+    var roomH = tile.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - (parseFloat(cs.rowGap) || 0) - nameH - 1;
+    var roomW = tile.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    return Math.floor(Math.min(roomH, roomW));
+  }
+  function fitGrid() {
+    if (!list.querySelector(".app")) return;
+    list.style.removeProperty("--cols");
+    var base = parseInt(getComputedStyle(list).getPropertyValue("--cols"), 10) || 4;
+    var best = base, bestRoom = -1;
+    for (var cols = base; cols <= base + 3; cols++) {
+      var room = tryCols(cols);
+      if (room > bestRoom) { best = cols; bestRoom = room; }
+    }
+    bestRoom = tryCols(best);
+    list.style.setProperty("--icon", Math.max(16, Math.min(160, bestRoom)) + "px");
   }
   fitGrid();
   window.addEventListener("resize", function () { requestAnimationFrame(fitGrid); });
