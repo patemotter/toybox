@@ -43,7 +43,7 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Older apps also have a `sw.js`:
   a retired stub (see Offline below); keep it, but a new app gets none.
 - `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). It
-  fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, six on
+  fits every tile on one screen with no scrolling (four per row on tablets, three on upright phones, seven on
   phones held sideways), picture and name only; `fitGrid()` sizes the pictures to the rows. The `what` text
   stays in `APPS` for grown-ups and tooling but isn't shown.
   **Favorites**: the Grown-ups sheet's "Favorites" section (launcher only, `localStorage["toybox-favorites-v1"]`, a
