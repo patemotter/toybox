@@ -85,7 +85,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
   train-builder, bubble-machine (shown as "Bubbles"), hamster, garden, spinning-tops, kitchen,
   spirograph, jigsaw, sand-table, espresso-machine, farm (shown as "Tractor Ted"), sewing-machine (the family's
-  white computerized machine, no logo; script in `sewing-machine/index.js`).
+  white computerized machine, no logo; script in `sewing-machine/index.js`), garbage-truck (an automated side loader on a street of
+  bins, hands-on like the Farm stations; script in `garbage-truck/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.

@@ -123,7 +123,7 @@ ending with open questions for the dad; settle those before building.
   Combine Time pilot. Complex mechanics are only secondary; what he cares about most is whether the stations hit
   the key highlights of the Tractor Ted episodes (split stage, real machines, clear process). Stations will focus
   on authentic episode highlights rather than manual driving chores.
-- **On hold (the dad, 2026-10-10: "wait on the new apps"):** Garbage Truck, Play Dough (Sewing Machine was built 2026-10-17). Plans stay in
+- **On hold (the dad, 2026-10-10: "wait on the new apps"):** Play Dough (Sewing Machine was built 2026-10-17, Garbage Truck 2026-10-24). Plans stay in
   `plans/`; don't build them until he says so.
 - **Sewing Machine:** a proper full app, not a toy version: pedal, needle, presser foot, handwheel, stitch types,
   thread, guiding the fabric, making something.

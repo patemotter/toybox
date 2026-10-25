@@ -28,6 +28,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Espresso Machine: the family's real espresso routine: warm up, weigh 18 grams, grind, whisk, tamp, pull the shot on the scale, steam the milk and pour; lattes, cappuccinos and steamers | [`espresso-machine/`](espresso-machine/) |
 | Tractor Ted: hub map and 12 stations based on newer-series Tractor Ted episodes: Spuds in Mud, Combine Time, Brilliant Baler, Glorious Grass, Munchy Crunchy, Mucky Muck, Timberrrrr!, Juicy Squeezy, Moooovie Time, Come Bye, Feathered Friends, Caterpillar Hunt | [`farm/`](farm/) |
 | Sewing Machine: a white computerized sewing machine like the family's: Start/Stop or the foot pedal, steer the fabric, pick stitches (hearts, stars...), thread colors and fabrics, lift the presser foot, snip the threads | [`sewing-machine/`](sewing-machine/) |
+| Garbage Truck: Garbage Truck: an automated side loader: grab bins, pack, unload at the landfill. | [`garbage-truck/`](garbage-truck/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 

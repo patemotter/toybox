@@ -290,7 +290,17 @@ const CORE = [
   "./sewing-machine/icons/icon-180.png",
   "./sewing-machine/icons/icon-192.png",
   "./sewing-machine/icons/icon-512.png",
-  "./sewing-machine/icons/icon-maskable-512.png"
+  "./sewing-machine/icons/icon-maskable-512.png",
+
+  // Garbage Truck
+  "./garbage-truck/",
+  "./garbage-truck/index.html",
+  "./garbage-truck/index.js",
+  "./garbage-truck/manifest.webmanifest",
+  "./garbage-truck/icons/icon-180.png",
+  "./garbage-truck/icons/icon-192.png",
+  "./garbage-truck/icons/icon-512.png",
+  "./garbage-truck/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
