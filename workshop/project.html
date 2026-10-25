@@ -66,6 +66,12 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
 .step.done .tick { display: inline-block; }
 .step.now { background: var(--accent); color: var(--ink); border-color: var(--edge); box-shadow: 0 0 0 4px rgba(255, 201, 60, 0.45), 3px 3px 0 var(--edge); }
 
+/* Portrait: the six visits fit in two rows of three, so none is cut off at the edge. */
+@media (orientation: portrait) {
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; touch-action: manipulation; }
+  .steps .step { flex-direction: row; gap: 4px; min-width: 0; min-height: 44px; padding: 2px 4px; }
+  .steps .step svg { width: 22px; height: 22px; }
+}
 /* Landscape: the panel is a column, so the steps become a vertical list. */
 @media (orientation: landscape) {
   .steps { flex: 1 1 auto; flex-direction: column; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; min-height: 0; padding: 3px 6px 3px 3px; }
@@ -93,7 +99,7 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     <main class="tb-stage" id="stage">
       <svg class="scene" id="scene" role="img" aria-label="The workbench with the birdhouse parts"></svg>
       <div class="tb-counter" id="count" role="status" aria-live="polite">Parts: 0 of 6</div>
-      <div class="tb-coach" id="coach" role="status" aria-live="polite"></div>
+      <div class="tb-coach" id="coach" role="status" aria-live="polite" data-coach="info"></div>
     </main>
     <section class="tb-panel">
       <button class="btn tb-go" id="go">Go!</button>
@@ -157,18 +163,12 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   function refresh() { prog = PJ.progress(pid); }
   function isDone(id) { return !!prog.done[id]; }
 
-  var VERB = { plane: "Go plane it!", mark: "Go measure!", crosscut: "Go cut!", angle: "Go cut!", rip: "Go rip it!",
-    hole: "Go drill!", assemble: "Go nail it!", sand: "Go sand it!" };
-  var SHORT = { plane: "Plane", "back-mark": "Back 12", "back-cut": "Cut Back", "front-mark": "Front 9", "front-cut": "Cut Front",
-    "roof-mark": "Roof 7.5", "roof-cut": "Cut Roof", "blank-mark": "Blank 26", "blank-cut": "Cut Blank", "strip-rip": "Rip 4",
-    "side1-mark": "Side 10", "side1-cut": "Cut Side", "side2-mark": "Side 10", "side2-cut": "Cut Side", "floor-mark": "Floor 4",
-    "floor-cut": "Cut Floor", "side-angle": "Angle", "hole-mark": "Door 6", "hole-drill": "Drill", "floor-drill": "Drains",
-    build: "Build", sand: "Sand" };
-  // Small station icons for the step cards (stroke icons, 24x24).
+  // Small station icons for the visit chips (stroke icons, 24x24).
   var ICON = {
     measuring: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>',
     "saw-bench": '<svg viewBox="0 0 24 24"><path d="M3 15h11l3-5 3 5"/><path d="M4 15l1.5 3 1.5-3 1.5 3 1.5-3 1.5 3 1.5-3 1.5 3"/><path d="M14 15V9h4"/></svg>',
     "drill-press": '<svg viewBox="0 0 24 24"><path d="M6 3h12v6H6z"/><path d="M12 9v9l-2 3h4l-2-3"/><path d="M3 21h18"/></svg>',
+    sanding: '<svg viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="7" rx="2"/><path d="M4 17h16"/><path d="M7 20h2M12 20h2M17 20h1"/></svg>',
     "hammer-screws": '<svg viewBox="0 0 24 24"><path d="M4 8l5-4 6 6-5 4z"/><path d="M11.5 11.5 20 20"/></svg>',
     wall: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M3 12h18M8 7v10M16 7v10"/></svg>'
   };
@@ -179,7 +179,7 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     var html = "";
     P.steps.forEach(function (s) {
       html += '<button class="btn step" role="listitem" data-step="' + s.id + '" aria-label="' + esc(s.title) + '">' +
-        ICON[s.station] + '<span class="lbl"><span class="tick" aria-hidden="true">\u2713</span>' + esc(SHORT[s.id] || s.title) + '</span></button>';
+        ICON[s.station] + '<span class="lbl"><span class="tick" aria-hidden="true">✓</span>' + esc(s.name) + '</span></button>';
     });
     stepsEl.innerHTML = html;
   }
@@ -193,17 +193,11 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
       el.classList.toggle("now", n);
       if (n) { el.setAttribute("aria-current", "step"); nowEl = el; } else el.removeAttribute("aria-current");
     });
-    if (next) {
-      goBtn.textContent = VERB[next.job.kind] || "Go!";
-      goBtn.disabled = false;
-      coach(next.title);
-    } else {
-      goBtn.textContent = "Build another!";
-      goBtn.disabled = false;
-      coach("The birdhouse is finished!");
-    }
-    var parts = ["back-cut", "front-cut", "roof-cut", "side1-cut", "side2-cut", "floor-cut"].filter(isDone).length;
-    countEl.textContent = "Parts: " + parts + " of 6";
+    goBtn.textContent = next ? next.go : "Build another!";
+    goBtn.disabled = false;
+    // The story: what he is making and why, told one visit at a time.
+    coach(next ? next.title : "The birdhouse is finished. A bird lives in it now!");
+    countEl.textContent = "Done: " + prog.count + " of " + prog.total;
     if (nowEl) scrollTo(nowEl);
     $("tabPlan").setAttribute("aria-pressed", view === "plan" ? "true" : "false");
     $("tabShelf").setAttribute("aria-pressed", view === "shelf" ? "true" : "false");
@@ -225,7 +219,7 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     if (locked()) return;
     blip(660, 0.12, 0.06, "sine", 880);
     if (!prog.next) { PJ.reset(pid); refresh(); }
-    if (prog.next) location.href = PJ.stepUrl(prog.next);
+    location.href = PJ.stepUrl(prog.next);
   }
   goBtn.addEventListener("click", go);
 
@@ -236,10 +230,10 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     if (!s) return;
     if (prog.next && prog.next.id === s.id) { go(); return; }
     blip(520, 0.08, 0.04);
-    // The toast can already say the same words, so the tapped step itself always answers too.
+    // The toast can already say the same words, so the tapped chip itself always answers too.
     Toybox.wiggle(el);
-    if (isDone(s.id)) { Toybox.toast("Done: " + s.title); wiggle(s.part); }
-    else if (prog.next) Toybox.toast("First: " + prog.next.title);
+    if (isDone(s.id)) Toybox.toast("Done: " + s.done);
+    else if (prog.next) Toybox.toast("First: " + prog.next.name + ".");
   });
 
   $("tabPlan").addEventListener("click", function () { setView("plan"); });
@@ -265,14 +259,12 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     Toybox.toast("A new board! Start with the planer.");
     blip(440, 0.25, 0.06, "triangle", 330);
     updatePanel();
-    draw();
   });
 
   // ---------- the scene ----------
   var scene = $("scene"), stage = $("stage");
   var W = 0, H = 0;
-  var INK = "#1D2340", PINE = "#F3D69C", PINE_D = "#D9B46A", GRAIN = "#E2BE7A", ROUGH = "#C4A070", ROUGH_D = "#8F6B40";
-  var geo = {};   // part id -> screen box {x, y, w, h} in px, for taps and the celebration
+  var INK = "#1D2340", PINE = "#F3D69C", GRAIN = "#E2BE7A", ROUGH = "#C4A070", ROUGH_D = "#8F6B40";
 
   function resize() {
     var r = stage.getBoundingClientRect();
@@ -286,17 +278,15 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     return '<rect x="' + n(x) + '" y="' + n(y) + '" width="' + n(w) + '" height="' + n(h) + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="3" stroke-linejoin="round"' + (extra || "") + '/>';
   }
   function poly(pts, fill, extra) {
-    return '<polygon points="' + pts.map(function (p) { return n(p[0]) + "," + n(p[1]); }).join(" ") + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="3" stroke-linejoin="round"' + (extra || "") + '/>';
+    return '<polygon points="' + pts.map(function (p) { return n(p[0]) + "," + n(p[1]); }).join(" ") + '" fill="' + fill + '" stroke="' + INK + '" stroke-width="' + (extra || 3) + '" stroke-linejoin="round"/>';
   }
   function label(x, y, t, size) {
     size = size || 15;
     return '<text x="' + n(x) + '" y="' + n(y) + '" text-anchor="middle" font-size="' + size + '" fill="' + INK + '" stroke="#FFFFFF" stroke-width="4" paint-order="stroke" stroke-linejoin="round">' + esc(t) + '</text>';
   }
 
-  // A board drawn along the "along" axis. In portrait the bench is turned: along = down the screen.
-  // box: {a, c, la, lc} in inches (a = along, c = across), returns px box {x, y, w, h}.
-  // Landscape: the near end of every board is at the left. Portrait: the near end is at the bottom
-  // (the bench front), so the long board runs away from the viewer and off the far edge.
+  // Inches to px. Landscape: boards run left to right, the near end at the left. Portrait: the bench is
+  // turned and boards run up the screen, the near end at the bottom. box: along a, across c (inches).
   function toPx(L, a, c, la, lc) {
     if (L.vert) return { x: L.ox + c * L.ppi, y: L.oy + L.alongPx - (a + la) * L.ppi, w: lc * L.ppi, h: la * L.ppi };
     return { x: L.ox + a * L.ppi, y: L.oy + c * L.ppi, w: la * L.ppi, h: lc * L.ppi };
@@ -311,44 +301,33 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     }
     return g;
   }
+  // Little splinters along the edges of a freshly cut part (gone once it is sanded).
+  function fuzz(b) {
+    var s = "", step = 9, i, d = "";
+    for (i = 4; i < b.w - 3; i += step) d += "M" + n(b.x + i) + " " + n(b.y) + "l2 -4M" + n(b.x + i + 3) + " " + n(b.y + b.h) + "l2 4";
+    for (i = 4; i < b.h - 3; i += step) d += "M" + n(b.x) + " " + n(b.y + i) + "l-4 2M" + n(b.x + b.w) + " " + n(b.y + i + 3) + "l4 2";
+    s += '<path d="' + d + '" stroke="' + ROUGH_D + '" stroke-width="2" stroke-linecap="round" fill="none"/>';
+    return s;
+  }
   function board(id, b, opts) {
     opts = opts || {};
-    var fill = opts.rough ? ROUGH : PINE, s = "";
-    s += '<g class="part" data-part="' + id + '">';
-    if (opts.cutTop) {
-      // the Side with its roof angle: the far end (along) is sloped
-      var d = Math.tan(15 * Math.PI / 180) * (opts.vert ? b.w : b.h);
-      if (opts.vert) s += poly([[b.x, b.y + d], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], fill);
-      else s += poly([[b.x, b.y], [b.x + b.w - d, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]], fill);
-    } else s += rect(b.x, b.y, b.w, b.h, fill, ' rx="3"');
+    var s = '<g class="part" data-part="' + id + '">';
+    s += rect(b.x, b.y, b.w, b.h, opts.rough ? ROUGH : PINE, ' rx="3"');
     s += grainLines(b, opts.vert, opts.rough);
-    if (opts.line != null) {
-      // the pencil line, `line` inches from the near end
-      var p = opts.line * opts.ppi;
+    if (opts.fuzz) s += fuzz(b);
+    (opts.lines || []).forEach(function (v) {
+      // a pencil line, v inches from the near end
+      var p = v * opts.ppi;
       if (opts.vert) s += '<line x1="' + n(b.x) + '" y1="' + n(b.y + b.h - p) + '" x2="' + n(b.x + b.w) + '" y2="' + n(b.y + b.h - p) + '" stroke="#3A3F55" stroke-width="2.5"/>';
       else s += '<line x1="' + n(b.x + p) + '" y1="' + n(b.y) + '" x2="' + n(b.x + p) + '" y2="' + n(b.y + b.h) + '" stroke="#3A3F55" stroke-width="2.5"/>';
-    }
-    if (opts.x) {
-      var cx = opts.vert ? b.x + b.w / 2 : b.x + opts.x.y * opts.ppi, cy = opts.vert ? b.y + b.h - opts.x.y * opts.ppi : b.y + b.h / 2, r = Math.max(6, 0.5 * opts.ppi);
-      s += '<path d="M' + n(cx - r) + ' ' + n(cy - r) + 'L' + n(cx + r) + ' ' + n(cy + r) + 'M' + n(cx + r) + ' ' + n(cy - r) + 'L' + n(cx - r) + ' ' + n(cy + r) + '" stroke="#3A3F55" stroke-width="2.5" stroke-linecap="round"/>';
-    }
+    });
     if (opts.hole) {
-      var hx = opts.vert ? b.x + b.w / 2 : b.x + opts.hole.y * opts.ppi, hy = opts.vert ? b.y + b.h - opts.hole.y * opts.ppi : b.y + b.h / 2, hr = opts.hole.d / 2 * opts.ppi;
-      s += '<circle cx="' + n(hx) + '" cy="' + n(hy) + '" r="' + n(hr) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="3"/>';
+      // the door: 6 inches up from the bottom end of the Front
+      var hx = opts.vert ? b.x + b.w / 2 : b.x + 6 * opts.ppi, hy = opts.vert ? b.y + b.h - 6 * opts.ppi : b.y + b.h / 2;
+      s += '<circle cx="' + n(hx) + '" cy="' + n(hy) + '" r="' + n(0.75 * opts.ppi) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="3"/>';
     }
-    if (opts.holes) {
-      opts.holes.forEach(function (h) {
-        var qx = opts.vert ? b.x + h.x * opts.ppi : b.x + h.y * opts.ppi, qy = opts.vert ? b.y + b.h - h.y * opts.ppi : b.y + h.x * opts.ppi;
-        s += '<circle cx="' + n(qx) + '" cy="' + n(qy) + '" r="' + n(Math.max(3, 0.18 * opts.ppi)) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="2"/>';
-      });
-    }
-    if (opts.name) {
-      var lx = b.x + b.w / 2, ly = b.y + b.h / 2;
-      if (opts.nameAt) { if (opts.vert) ly = b.y + b.h - opts.nameAt * opts.ppi; else lx = b.x + opts.nameAt * opts.ppi; }
-      s += label(lx, ly + 5, opts.name, Math.max(14, Math.min(20, (opts.vert ? b.w : b.h) * 0.32)));
-    }
+    if (opts.name) s += label(b.x + b.w / 2, b.y + b.h / 2 + 5, opts.name, Math.max(14, Math.min(20, (opts.vert ? b.w : b.h) * 0.32)));
     s += '</g>';
-    geo[id] = b;
     return s;
   }
 
@@ -357,7 +336,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     var top = Math.round(H * 0.14), edge = Math.max(14, Math.round(H * 0.05));
     var s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#DCEFFF"/>';
     s += '<rect x="-4" y="' + top + '" width="' + (W + 8) + '" height="' + (H - top + 8) + '" fill="#D9A864" stroke="' + INK + '" stroke-width="4"/>';
-    // a few bench-top grain streaks
     var i;
     for (i = 0; i < 7; i++) {
       var y = top + 20 + i * ((H - top - edge - 30) / 7);
@@ -367,131 +345,96 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     return { html: s, top: top, edge: edge };
   }
 
-  // Inches to px. Rows across the bench: the long board (all of what is left of it fits on the bench),
-  // then Back/Front/Roof, then the Side blank (later the strip and its offcut), then the Sides and Floor.
-  var ROW = { stock: 0, a: 5.5 + 0.7, b: 5.5 + 0.7 + 5.5 + 0.7, c: 5.5 + 0.7 + 5.5 + 0.7 + 5.9 + 0.7 };
-  var ACROSS = ROW.c + 4, ALONG = 30;
-  function layout(b) {
-    var vert = H > W * 1.05;
-    var pad = 16, counterH = 44;
+  // Before the cut: the long board alone (the whole of it on the bench). After: two rows of parts.
+  var GAP = 0.8;
+  function layout(b, along, across) {
+    var vert = H > W * 1.05, pad = 16, counterH = 44;
     // On upright phones the coach pill sits at the bottom of the stage: keep the near row clear of it.
-    var coachPad = (vert && W < 600) ? 46 : 0;
-    var alongPx = (vert ? H - b.top - b.edge - counterH - pad * 2.5 - coachPad : W - pad * 2);
-    var acrossPx = (vert ? W - pad * 2 : H - b.top - b.edge - counterH - pad * 2.5);
-    var ppi = Math.min(alongPx / Math.max(ALONG, stockLeft() + 1), acrossPx / ACROSS);
-    var L = { vert: vert, ppi: ppi, pad: pad, ox: pad, oy: b.top + counterH + pad, alongPx: alongPx };
-    // centre the used area across the bench
-    var spare = Math.max(0, acrossPx - ACROSS * ppi) / 2;
-    if (vert) L.ox += spare; else L.oy += spare;
+    var coachPad = (vert && W < 600) ? 56 : 0;
+    var alongPx = vert ? H - b.top - b.edge - counterH - pad * 2.5 - coachPad : W - pad * 2;
+    var acrossPx = vert ? W - pad * 2 : H - b.top - b.edge - counterH - pad * 2.5 - 40;
+    var ppi = Math.min(alongPx / along, acrossPx / across);
+    var L = { vert: vert, ppi: ppi, ox: pad, oy: b.top + counterH + pad, alongPx: alongPx };
+    // center the used area on the bench
+    var spareC = Math.max(0, acrossPx - across * ppi) / 2, spareA = Math.max(0, alongPx - along * ppi) / 2;
+    if (vert) { L.ox += spareC; L.alongPx -= spareA; } else { L.oy += spareC; L.ox += spareA; }
     return L;
-  }
-
-  // The remaining stock after the crosscuts done so far.
-  function stockLeft() {
-    var l = P.board.l;
-    ["back", "front", "roof", "blank"].forEach(function (id) { if (isDone(id + "-cut")) l -= P.partBy[id].l; });
-    return l;
-  }
-  function stripLeft() {
-    var l = 26;
-    ["side1", "side2", "floor"].forEach(function (id) { if (isDone(id + "-cut")) l -= P.partBy[id].l; });
-    return l;
   }
 
   function draw() {
     if (!W) return;
-    geo = {};
     var b = bench(), s = b.html;
     if (view === "shelf") { s += shelfScene(b); scene.innerHTML = s; return; }
-    if (isDone("build")) { s += houseScene(b); scene.innerHTML = s; return; }
-
-    var L = layout(b), ppi = L.ppi, vert = L.vert, gap = 0.7;
-    var planed = isDone("plane");
-    s += '<clipPath id="benchClip"><rect x="0" y="' + (b.top + 2) + '" width="' + W + '" height="' + (H - b.top - b.edge - 2) + '"/></clipPath><g clip-path="url(#benchClip)">';
-    // Row 0: the long board (what is left of it), running off the bench.
-    var left = stockLeft(), lineOn = null, nextPart = ["back", "front", "roof", "blank"].filter(function (id) { return !isDone(id + "-cut"); })[0];
-    if (nextPart && isDone(nextPart + "-mark")) lineOn = P.partBy[nextPart].l;
-    if (left > 0.1) s += board("stock", toPx(L, 0, ROW.stock, left, 5.5), { rough: !planed, vert: vert, ppi: ppi, line: lineOn, name: planed ? (left > 20 ? "Pine board" : "") : "Rough board", nameAt: 12 });
-    // Row A: Back, Front, Roof.
-    var a = 0;
-    ["back", "front", "roof"].forEach(function (id) {
-      var q = P.partBy[id];
-      if (!isDone(id + "-cut")) return;
-      var o = { vert: vert, ppi: ppi, name: q.name };
-      if (id === "front") {
-        if (isDone("hole-drill")) o.hole = { y: 6, d: 1.5 };
-        else if (isDone("hole-mark")) o.x = { y: 6 };
-      }
-      s += board(id, toPx(L, a, ROW.a, q.l, q.w), o);
-      a += q.l + gap;
-    });
-    // Row B: the Side blank, then the strip (what is left of it) and the offcut.
-    if (isDone("blank-cut")) {
-      if (isDone("strip-rip")) {
-        var sl = stripLeft();
-        var nextS = ["side1", "side2", "floor"].filter(function (id) { return !isDone(id + "-cut"); })[0];
-        var lineS = nextS && isDone(nextS + "-mark") ? P.partBy[nextS].l : null;
-        if (sl > 0.1) s += board("strip", toPx(L, 0, ROW.b, sl, 4), { vert: vert, ppi: ppi, line: lineS, name: sl > 6 ? "Strip" : "" });
-        s += board("offcut", toPx(L, 0, ROW.b + 4.4, 26, 1.5), { vert: vert, ppi: ppi });
-      } else {
-        s += board("blank", toPx(L, 0, ROW.b, 26, 5.5), { vert: vert, ppi: ppi, name: "Side blank" });
-      }
+    if (isDone("nail")) { s += houseScene(b); scene.innerHTML = s; return; }
+    if (!isDone("cut")) {
+      // the long board: rough, then planed, then with every pencil line from the measuring bench
+      var L = layout(b, P.board.l + 1, P.board.w), lines = [], acc = 0;
+      if (isDone("measure")) P.parts.forEach(function (q) { acc += q.l; lines.push(acc); });
+      s += board("stock", toPx(L, 0.5, 0, P.board.l, P.board.w), { rough: !isDone("plane"), vert: L.vert, ppi: L.ppi, lines: lines,
+        name: isDone("plane") ? "Pine board" : "Rough board" });
+    } else {
+      // the six parts: Back, Front, Roof in one row; the two Sides and the Floor in the next
+      var rows = [["back", "front", "roof"], ["side1", "side2", "floor"]];
+      var along = 12 + 9 + 7.5 + GAP * 2, across = P.board.w * 2 + GAP * 1.6, L2 = layout(b, along, across);
+      rows.forEach(function (row, ri) {
+        var a = 0;
+        row.forEach(function (id) {
+          var q = P.partBy[id];
+          s += board(id, toPx(L2, a, ri * (P.board.w + GAP * 1.6), q.l, q.w), { vert: L2.vert, ppi: L2.ppi, name: q.name,
+            fuzz: !isDone("sand"), hole: id === "front" && isDone("drill") });
+          a += q.l + GAP;
+        });
+      });
     }
-    // Row C: the Sides and the Floor.
-    a = 0;
-    ["side1", "side2", "floor"].forEach(function (id) {
-      var q = P.partBy[id];
-      if (!isDone(id + "-cut")) return;
-      var o = { vert: vert, ppi: ppi, name: q.name };
-      if (id !== "floor" && isDone("side-angle")) o.cutTop = true;
-      if (id === "floor" && isDone("floor-drill")) o.holes = [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }];
-      s += board(id, toPx(L, a, ROW.c, q.l, q.w), o);
-      a += q.l + gap;
-    });
-    s += '</g>';
     scene.innerHTML = s;
   }
 
-  // The assembled birdhouse (an oblique view: the front face, one side going back-right, the sloped roof,
-  // the tall back poking up above the roof).
-  function house(cx, cy, size, finished) {
-    var u = size / 14;                                   // px per inch of the house
-    var fw = 5.5 * u, fh = 9 * u, dp = 4 * u * 0.55, sk = 0.42, rise = 1.07 * u;  // side depth foreshortened, skew, roof rise
-    var x0 = cx - (fw + dp) / 2, y0 = cy + fh / 2 + 0.6 * u;   // front face bottom-left
-    var backTop = y0 - dp * sk - 12 * u;
+  // The built birdhouse in a 3/4 view from the front right (the same build as the nail bench draws):
+  // x across (0 to 7 inches), y up, z from the front (0) to the back (5.5).
+  var BOX = {
+    back: [0.75, 6.25, 0, 12, 4.75, 5.5, "#D9B46A"],
+    side2: [0, 0.75, 0, 10, 0, 5.5, "#E6C080"],
+    floor: [0.75, 6.25, 0.25, 1, 0.75, 4.75, "#C98D48"],
+    side1: [6.25, 7, 0, 10, 0, 5.5, "#E6C080"],
+    front: [0.75, 6.25, 0, 9, 0, 0.75, "#F3D69C"],
+    roof: [-0.25, 7.25, 10, 10.75, -0.75, 4.75, "#E7C27A"]
+  };
+  function shade(hex, t) {
+    var v = [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16); });
+    return "rgb(" + v.map(function (x) { return Math.round(t > 0 ? x + (255 - x) * t : x * (1 + t)); }).join(",") + ")";
+  }
+  function house(cx, base, size, finished) {
+    var u = size / 14;
+    function P3(x, y, z) { return [cx + (x - 3.5) * u + (z - 2.75) * u * 0.42, base - y * u - z * u * 0.3]; }
     var s = '<g class="part house" data-part="house">';
-    // the Back: 12 tall, standing at the rear
-    s += rect(x0 + dp, backTop, fw, 12 * u, PINE_D, ' rx="3"');
-    // the Side (parallelogram going back-right), its top sloping up toward the back
-    s += poly([[x0 + fw, y0], [x0 + fw + dp, y0 - dp * sk], [x0 + fw + dp, y0 - dp * sk - 10 * u], [x0 + fw, y0 - 9 * u]], PINE_D);
-    // the Floor edge under the front
-    s += rect(x0, y0 - 0.75 * u, fw, 0.75 * u, PINE_D);
-    // the Front
-    s += rect(x0, y0 - fh, fw, fh, PINE, ' rx="2"');
-    s += grainLines({ x: x0, y: y0 - fh, w: fw, h: fh }, true, false);
-    // the door
-    s += '<circle cx="' + n(x0 + fw / 2) + '" cy="' + n(y0 - 6 * u) + '" r="' + n(0.75 * u) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="3"/>';
-    // the Roof: overhangs the front, sits against the Back, rises toward the back
-    var ov = 1.3 * u, rx0 = x0 - 0.5 * u, rx1 = x0 + fw + 0.5 * u, ry0 = y0 - fh - 0.2 * u;
-    var fy = ry0 + ov * sk;                              // the roof's front edge (overhanging toward us)
-    s += poly([[rx0 - ov, fy], [rx1 - ov, fy], [rx1 + dp, ry0 - dp * sk - rise], [rx0 + dp, ry0 - dp * sk - rise]], "#E7C27A");
-    s += rect(rx0 - ov, fy, rx1 - rx0, 0.75 * u, "#E7C27A");
-    // nails
-    var i, nails = "";
-    for (i = 0; i < 2; i++) {
-      nails += '<circle cx="' + n(x0 + 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
-      nails += '<circle cx="' + n(x0 + fw - 0.4 * u) + '" cy="' + n(y0 - 2 * u - i * 4 * u) + '" r="2.4" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
-    }
-    s += nails;
+    ["back", "side2", "floor", "side1", "front", "roof"].forEach(function (id) {
+      var q = BOX[id], x0 = q[0], x1 = q[1], y0 = q[2], y1 = q[3], z0 = q[4], z1 = q[5], col = q[6];
+      s += poly([P3(x1, y0, z0), P3(x1, y0, z1), P3(x1, y1, z1), P3(x1, y1, z0)], shade(col, -0.16), 2.5);
+      s += poly([P3(x0, y1, z0), P3(x1, y1, z0), P3(x1, y1, z1), P3(x0, y1, z1)], shade(col, 0.14), 2.5);
+      s += poly([P3(x0, y0, z0), P3(x1, y0, z0), P3(x1, y1, z0), P3(x0, y1, z0)], col, 2.5);
+    });
+    var door = P3(3.5, 6, 0);
+    s += '<circle cx="' + n(door[0]) + '" cy="' + n(door[1]) + '" r="' + n(0.75 * u) + '" fill="#2B2F45" stroke="' + INK + '" stroke-width="2.5"/>';
+    // the nail heads: through the right Side into the Back and the Front, and through the Roof into the Sides
+    [[7, 2.5, 5.12], [7, 7.5, 5.12], [7, 2.5, 0.37], [7, 6.5, 0.37]].forEach(function (p) {
+      var q = P3(p[0], p[1], p[2]);
+      s += '<ellipse cx="' + n(q[0]) + '" cy="' + n(q[1]) + '" rx="' + n(Math.max(1.5, 0.12 * u)) + '" ry="' + n(Math.max(2.2, 0.2 * u)) + '" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
+    });
+    [[0.37, 10.75, 2.4], [6.62, 10.75, 2.4]].forEach(function (p) {
+      var q = P3(p[0], p[1], p[2]);
+      s += '<ellipse cx="' + n(q[0]) + '" cy="' + n(q[1]) + '" rx="' + n(Math.max(2.2, 0.2 * u)) + '" ry="' + n(Math.max(1.5, 0.1 * u)) + '" fill="#8E97A6" stroke="' + INK + '" stroke-width="1.5"/>';
+    });
     s += '</g>';
+    var top = P3(3.5, 12, 5.1);
     if (finished) {
-      var sp = [[rx0 - ov - 22, fy - 30], [rx1 + dp + 26, ry0 - dp * sk - rise - 10], [x0 - 30, y0 - 3 * u], [x0 + fw + dp + 32, y0 - 1.5 * u]];
-      sp.forEach(function (p, k) {
-        s += '<path class="spark" style="animation-delay:' + (k * 0.45) + 's" d="M' + n(p[0]) + ' ' + n(p[1] - 11) + 'l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFC93C" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
+      var sp = [[P3(-1.5, 11, 0), 0], [P3(9, 12, 4), 1], [P3(-1.5, 3, 0), 2], [P3(9, 2, 2), 3]];
+      sp.forEach(function (q) {
+        var p = q[0];
+        s += '<path class="spark" style="animation-delay:' + (q[1] * 0.45) + 's" d="M' + n(p[0]) + ' ' + n(p[1] - 11) + 'l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#FFC93C" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
       });
     }
-    // where the bird perches: on top of the Back, a little left of centre
-    return { html: s, perch: [x0 + dp + fw * 0.4, backTop], u: u };
+    // where the bird perches: on top of the Back
+    return { html: s, perch: top, u: u };
   }
   function bird(u) {
     var r = Math.max(9, 0.8 * u);
@@ -507,11 +450,9 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   }
   var birdState = "none";   // none | flying | landed
   function houseScene(b) {
-    var finished = isDone("sand");
-    var size = Math.min(W * (H > W ? 0.8 : 0.62), (H - b.top - b.edge) * 0.74);
-    var cy = b.top + (H - b.top - b.edge) * (W < 600 && H > W ? 0.5 : 0.55);
-    var h = house(W / 2, cy, size, finished), s = h.html;
-    if (!finished) { birdState = "none"; return s; }
+    var size = Math.min(W * (H > W ? 0.8 : 0.55), (H - b.top - b.edge) * 0.72);
+    var base = H - b.edge - Math.max(30, (H - b.top - b.edge) * 0.12) - (W < 600 && H > W ? 46 : 0);
+    var h = house(W / 2, base, size, true), s = h.html;
     var perch = [h.perch[0], h.perch[1] - 1.75 * Math.max(9, 0.8 * h.u)];
     s += bird(h.u);
     // Place the bird after the markup is in the DOM: off the top-right corner, then a slow glide to the perch.
@@ -531,21 +472,17 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   }
   function shelfScene(b) {
     var k = prog.built, s = "", i;
-    var y = b.top + (H - b.top - b.edge) * 0.55, shelfH = 16;
+    var y = b.top + (H - b.top - b.edge) * 0.62, shelfH = 16;
     s += '<rect x="' + n(W * 0.06) + '" y="' + n(y) + '" width="' + n(W * 0.88) + '" height="' + shelfH + '" rx="4" fill="#B07A45" stroke="' + INK + '" stroke-width="4"/>';
     if (!k) {
       s += label(W / 2, y - 30, "Nothing on the shelf yet.", 22) + label(W / 2, y - 4, "Build the first birdhouse!", 22);
       return s;
     }
-    var per = Math.min(5, k), size = Math.min(W * 0.8 / per * 0.8, (H - b.top) * 0.45);
-    for (i = 0; i < per; i++) {
-      var cx = W * 0.1 + (W * 0.8) * (i + 0.5) / per;
-      s += house(cx, y - size * 0.42, size, false).html;
-    }
+    var per = Math.min(5, k), size = Math.min(W * 0.8 / per * 0.85, (H - b.top) * 0.45);
+    for (i = 0; i < per; i++) s += house(W * 0.1 + (W * 0.8) * (i + 0.5) / per, y - 2, size, false).html;
     if (k > per) s += label(W / 2, y + 44, "and more!", 20);
     return s;
   }
-
   function wiggle(part) {
     if (!part) return;
     var el = scene.querySelector('[data-part="' + part + '"]');
@@ -554,21 +491,27 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     void el.getBoundingClientRect();
     el.classList.add("wig");
   }
+  // Back from a visit: what he made pops on the bench, with the visit's line.
+  var POP = { plane: ["stock"], measure: ["stock"], cut: ["back", "front", "roof", "side1", "side2", "floor"], drill: ["front"],
+    sand: ["back", "front", "roof", "side1", "side2", "floor"], nail: ["house"] };
   function celebrate(stepId) {
     var s = P.stepBy[stepId];
     if (!s) return;
-    var target = s.part;
-    if (s.job.kind === "crosscut" || s.job.kind === "rip") target = s.part;
-    else if (s.job.kind === "mark") target = ["back", "front", "roof", "blank"].indexOf(s.part) !== -1 && !isDone(s.part + "-cut") ? "stock" : (isDone(s.part + "-cut") ? s.part : "strip");
-    else if (s.job.kind === "plane") target = "stock";
-    else if (s.job.kind === "assemble" || s.job.kind === "sand") target = "house";
-    var el = scene.querySelector('[data-part="' + target + '"]');
-    if (el) el.classList.add("pop");
+    (POP[s.id] || []).forEach(function (id) {
+      var el = scene.querySelector('[data-part="' + id + '"]');
+      if (el) el.classList.add("pop");
+    });
     Toybox.toast(s.done);
     blip(880, 0.18, 0.06, "sine", 1320);
+    // the whole birdhouse is finished: sometimes a kind-words card (the shared layer decides)
+    if (!prog.next) setTimeout(function () { Toybox.kind(); }, 6000);
   }
+  // What each part is for, from the cutting visit's story ("The Roof keeps the rain off the bird.").
+  var PURPOSE = {};
+  P.stepBy.cut.job.cuts.forEach(function (c) { if (!PURPOSE[c.part]) PURPOSE[c.part] = c.say.slice(c.say.indexOf(". ") + 2); });
+  PURPOSE.side2 = PURPOSE.side1;
 
-  // Tapping a part on the bench wiggles it (strong response to every touch).
+  // Tapping a part on the bench wiggles it and says what it is for (strong response to every touch).
   scene.addEventListener("pointerdown", function (e) {
     if (locked()) return;
     var g = e.target.closest ? e.target.closest(".part") : null;
@@ -576,11 +519,11 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     e.preventDefault();
     wiggle(g.dataset.part);
     blip(520 + Math.random() * 120, 0.09, 0.04);
-    var q = P.partBy[g.dataset.part];
-    if (q) coach(q.name + "!");
-    else if (g.dataset.part === "house") coach(isDone("sand") ? "Tweet tweet!" : "Almost done!");
-    else if (g.dataset.part === "stock") coach(isDone("plane") ? "The board" : "A rough board");
-    if (prog.next) setTimeout(function () { if (prog.next) coach(prog.next.title); }, 2600);
+    var id = g.dataset.part;
+    if (PURPOSE[id]) coach(PURPOSE[id]);
+    else if (id === "house") coach("A bird lives in the birdhouse.");
+    else if (id === "stock") coach(isDone("plane") ? "The board is smooth." : "The board is rough.");
+    if (prog.next) setTimeout(function () { if (prog.next) coach(prog.next.title); }, 3200);
   });
   stage.addEventListener("gesturestart", function (e) { e.preventDefault(); });
 

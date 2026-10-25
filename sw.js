@@ -76,6 +76,7 @@ const CORE = [
   "./workshop/measuring.html",
   "./workshop/measuring.js",
   "./workshop/shadow-board.html",
+  "./workshop/sanding.html",
   "./workshop/project.html",
   "./workshop/projects.js",
   "./workshop/index.js",

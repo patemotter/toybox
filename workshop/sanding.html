@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Sanding</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#CDE9FF">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Workshop">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../common/toybox.css">
+<script>
+  // Safety gear first (the Tool Wall puts it on). A project visit keeps its project and step through the gear-up.
+  (function () {
+    try {
+      if (sessionStorage.getItem("workshop-gear") === "on") return;
+      var pj = /[?&]project=([a-z0-9-]+)/.exec(location.search), st = /[?&]step=([a-z0-9-]+)/.exec(location.search);
+      window.__sandRedirect = true;
+      location.replace("./?next=sanding" + (pj && st ? "&project=" + pj[1] + "&step=" + st[1] : ""));
+    } catch (e) { /* storage unavailable: treat the gear as on */ }
+  })();
+</script>
+<script src="../common/toybox.js"></script>
+<script src="projects.js"></script>
+<style>
+:root {
+  --bg: #CDE9FF;
+  --panel: #FFFFFF;
+  --ink: #1D2340;
+  --muted: #4A5578;
+  --edge: #1D2340;
+  --accent: #FFC93C;
+  --font: "Baloo 2", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+}
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); overflow: hidden; }
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tb-head a { text-decoration: none; }
+.tb-stage { background: #D9A864; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* The story line at the top of the stage (information); the instruction is the shared coach pill. */
+.pj-banner { top: 10px; bottom: auto; white-space: normal; text-align: center; max-width: calc(100% - 20px); }
+.tb-counter { top: 76px; left: 12px; }
+@media (orientation: landscape) { .tb-counter { top: auto; bottom: 12px; } }
+.pj-banner[hidden], .pj-done[hidden] { display: none; }
+.pj-done { position: absolute; inset: 0; z-index: 6; display: flex; align-items: flex-end; justify-content: center; padding: 14px; pointer-events: none; }
+.pj-card { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: min(92%, 460px); padding: 14px 22px 18px; text-align: center;
+  background: var(--panel); color: var(--ink); border: 4px solid var(--edge); border-radius: 24px; box-shadow: 0 6px 0 var(--edge);
+  animation: pj-in 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+.pj-card h2 { margin: 0; font-size: clamp(1.8rem, 6vw, 2.8rem); line-height: 1.05; font-weight: 800; }
+.pj-card p { margin: 0; font-size: clamp(1.05rem, 3.6vw, 1.5rem); font-weight: 700; line-height: 1.2; }
+.pj-card .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0.3rem 1.4rem; font-size: 1.35rem; text-decoration: none; }
+@keyframes pj-in { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pj-card { animation: none; } }
+.rest-art { width: min(60vw, 240px); }
+</style>
+</head>
+<body>
+<div class="tb-app-shell wrap">
+  <header class="tb-head">
+    <a class="btn tb-iconbtn tb-back" id="planBtn" href="project.html" aria-label="Back to the plan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg><span>Plan</span></a>
+    <a class="btn tb-iconbtn homebtn" href="../" aria-label="Back to Toybox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg></a>
+    <h1 class="tb-title">Sanding</h1>
+  </header>
+  <div class="tb-body">
+    <main class="tb-stage" id="stage">
+      <canvas id="cv" role="img" aria-label="The birdhouse parts on the bench and a sanding block"></canvas>
+      <div class="tb-coach pj-banner" id="pjBanner" data-coach="info"></div>
+      <div class="tb-counter" id="count" role="status" aria-live="polite">Smooth: 0 of 6</div>
+      <div id="coach"></div>
+      <div class="pj-done" id="pjDone" role="dialog" aria-labelledby="pjDoneTitle" hidden>
+        <div class="pj-card">
+          <h2 id="pjDoneTitle">Done! ✓</h2>
+          <p id="pjDoneLine"></p>
+          <a class="btn tb-go" id="pjBack" href="project.html">Back to the plan</a>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// The Birdhouse's sanding visit: the six cut parts lie on the bench with splintery edges; he rubs the sanding
+// block over the edges (or taps a part, and the block goes around it once) until every part is smooth. A real
+// shop sands the parts before they are nailed together.
+(function () {
+  "use strict";
+  if (window.__sandRedirect) return;
+  var PJ = window.ToyboxProjects, STEP = PJ.fromQuery();
+  if (!STEP || STEP.job.kind !== "sand") { location.replace("project.html"); return; }
+  var P = PJ.get(STEP.project);
+
+  var $ = function (id) { return document.getElementById(id); };
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var cv = $("cv"), g = cv.getContext("2d"), stage = $("stage");
+  var coach = Toybox.coach($("coach"));
+  var INK = "#1D2340", PINE = "#F3D69C", PINE_SMOOTH = "#F8E2B4", GRAIN = "#E2BE7A", ROUGH_D = "#8F6B40";
+  $("pjBanner").textContent = STEP.title;
+  $("planBtn").href = PJ.planUrl(P.id);
+  coach.step(STEP.coach);
+
+  // ---------- the parts ----------
+  // Each part has four edges (top, right, bottom, left), each with its roughness from 1 (splinters) to 0.
+  var parts = P.parts.map(function (q) { return { id: q.id, name: q.name, l: q.l, w: q.w, r: [1, 1, 1, 1], done: false, shine: 0, box: null }; });
+  var W = 0, H = 0, DPR = 1, ppi = 10;
+  function layout() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(200, r.width); H = Math.max(200, r.height);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // a row of six on a wide stage, two rows of three on an upright one; room above for the story line
+    var cols = W > H * 1.3 ? 6 : 3, rows = 6 / cols, top = Math.min(110, H * 0.18), bot = Math.min(70, H * 0.12), pad = 14;
+    var cw = (W - pad * 2) / cols, ch = (H - top - bot) / rows;
+    ppi = Math.min(cw / (5.5 + 1.6), ch / (12 + 1.4));
+    parts.forEach(function (p, i) {
+      var c = i % cols, rw = Math.floor(i / cols), w = p.w * ppi, h = p.l * ppi;
+      p.box = { x: pad + cw * (c + 0.5) - w / 2, y: top + ch * (rw + 0.5) - h / 2, w: w, h: h };
+    });
+    // the block waits in the near right corner, all of it on the bench
+    if (!block.moved) { var bs = blockSize(); block.x = W - bs.w / 2 - 16; block.y = H - bs.h / 2 - 16; }
+  }
+  // edge e of part p as a segment [x0, y0, x1, y1]
+  function edge(p, e) {
+    var b = p.box;
+    if (e === 0) return [b.x, b.y, b.x + b.w, b.y];
+    if (e === 1) return [b.x + b.w, b.y, b.x + b.w, b.y + b.h];
+    if (e === 2) return [b.x, b.y + b.h, b.x + b.w, b.y + b.h];
+    return [b.x, b.y, b.x, b.y + b.h];
+  }
+
+  // ---------- the sanding block ----------
+  var block = { x: 0, y: 0, ptr: null, auto: null, rub: 0, moved: false };
+  function blockSize() { return { w: Math.max(70, 3.4 * ppi), h: Math.max(40, 1.9 * ppi) }; }
+  // Does the edge run under the block (a little extra so a near miss still sands)?
+  function under(seg) {
+    var s = blockSize(), m = 8, x0 = block.x - s.w / 2 - m, x1 = block.x + s.w / 2 + m, y0 = block.y - s.h / 2 - m, y1 = block.y + s.h / 2 + m;
+    var ex0 = Math.min(seg[0], seg[2]), ex1 = Math.max(seg[0], seg[2]), ey0 = Math.min(seg[1], seg[3]), ey1 = Math.max(seg[1], seg[3]);
+    return ex1 >= x0 && ex0 <= x1 && ey1 >= y0 && ey0 <= y1;
+  }
+  // The block moved by d px: every edge under it gets smoother (about five inches of rubbing does an edge).
+  function sandAt(d) {
+    if (!d) return;
+    var any = false;
+    parts.forEach(function (p) {
+      if (p.done) return;
+      for (var e = 0; e < 4; e++) {
+        if (p.r[e] <= 0 || !under(edge(p, e))) continue;
+        p.r[e] = Math.max(0, p.r[e] - d / (ppi * 5));
+        any = true;
+      }
+      if (p.r.every(function (v) { return v <= 0; })) partDone(p);
+    });
+    if (any) { block.rub = 1; puff(); }
+  }
+  var smoothCount = 0, finished = false;
+  function partDone(p) {
+    if (p.done) return;
+    p.done = true; p.shine = 1;
+    smoothCount++;
+    $("count").textContent = "Smooth: " + smoothCount + " of " + parts.length;
+    blip(880 + smoothCount * 60, 0.16, 0.06, "sine", 1320);
+    coach.say("The " + p.name + " is smooth.", 3);
+    if (smoothCount === parts.length && !finished) {
+      finished = true;
+      coach.clear();
+      PJ.doneLink($("pjBack"), STEP);
+      $("pjDoneLine").textContent = STEP.done;
+      // the smooth parts stay in view a moment before the card
+      setTimeout(function () { $("pjDone").hidden = false; }, 1400);
+    }
+  }
+
+  // ---------- dust: a puff where the block rubs, gone within a second ----------
+  var dust = [];
+  function puff() {
+    if (dust.length > (reduce ? 12 : 36)) return;
+    var s = blockSize();
+    for (var i = 0; i < 2; i++) {
+      dust.push({ x: block.x + (Math.random() - 0.5) * s.w, y: block.y + s.h / 2 * (Math.random() < 0.5 ? -1 : 1),
+        vx: (Math.random() - 0.5) * 60, vy: -10 - Math.random() * 30, r: 2 + Math.random() * 3, life: 0.9 });
+    }
+  }
+
+  // ---------- sound (soft; only through the shared setting) ----------
+  function blip(f, dur, gain, type, f2) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    try {
+      var o = ac.createOscillator(), gn = ac.createGain(), t = ac.currentTime;
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f, t);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      gn.gain.setValueAtTime(0.0001, t);
+      gn.gain.exponentialRampToValueAtTime(gain || 0.06, t + 0.02);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(gn); gn.connect(ac.destination);
+      o.start(t); o.stop(t + dur + 0.05);
+    } catch (e) { /* ignore */ }
+  }
+  // The rasp of sandpaper: a short burst of soft filtered noise, now and then while he rubs.
+  var raspAt = 0;
+  function rasp() {
+    var ac = Toybox.sound.ready(), now = performance.now();
+    if (!ac || now - raspAt < 140) return;
+    raspAt = now;
+    try {
+      var len = Math.floor(ac.sampleRate * 0.12), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain();
+      src.buffer = buf; f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 0.8; gn.gain.value = 0.05;
+      src.connect(f); f.connect(gn); gn.connect(ac.destination); src.start();
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- input: drag the block, or tap a part ----------
+  function locked() { return Toybox.timer.locked(); }
+  function local(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function partAt(x, y) {
+    for (var i = 0; i < parts.length; i++) {
+      var b = parts[i].box, m = 14;
+      if (x > b.x - m && x < b.x + b.w + m && y > b.y - m && y < b.y + b.h + m) return parts[i];
+    }
+    return null;
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (locked() || block.ptr != null || finished) return;
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var pt = local(e);
+    block.ptr = { id: e.pointerId, sx: pt.x, sy: pt.y, t: performance.now(), moved: 0 };
+    block.auto = null;
+    block.x = pt.x; block.y = pt.y; block.moved = true;
+    ghost.learned();
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var q = block.ptr;
+    if (!q || q.id !== e.pointerId || locked()) return;
+    var pt = local(e), d = Math.hypot(pt.x - block.x, pt.y - block.y);
+    q.moved += d;
+    block.x = pt.x; block.y = pt.y;
+    sandAt(d);
+    if (d > 2 && block.rub) rasp();
+  });
+  function up(e) {
+    var q = block.ptr;
+    if (!q || q.id !== e.pointerId) return;
+    block.ptr = null;
+    if (q.moved > 12 || performance.now() - q.t > 350 || locked()) return;
+    // a tap: the block goes around that part once and sands every edge
+    var p = partAt(q.sx, q.sy);
+    if (p && !p.done) autoSand(p);
+    else if (p) coach.say("The " + p.name + " is smooth already.", 3);
+    else coach.say("Rub the block on a rough edge!", 3);
+  }
+  cv.addEventListener("pointerup", up);
+  cv.addEventListener("pointercancel", up);
+  stage.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  // One lap around the part's edges, at a calm pace.
+  function autoSand(p) {
+    var b = p.box;
+    block.moved = true;
+    block.auto = { p: p, t: 0, dur: reduce ? 0.6 : 2.2, pts: [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h], [b.x, b.y]] };
+  }
+  function stepAuto(dt) {
+    var a = block.auto;
+    if (!a) return;
+    a.t = Math.min(1, a.t + dt / a.dur);
+    var seg = Math.min(3, Math.floor(a.t * 4)), f = a.t * 4 - seg, p0 = a.pts[seg], p1 = a.pts[seg + 1];
+    var x = p0[0] + (p1[0] - p0[0]) * f, y = p0[1] + (p1[1] - p0[1]) * f;
+    var d = Math.hypot(x - block.x, y - block.y);
+    block.x = x; block.y = y;
+    // the edge it is on gets smooth as it passes; earlier edges are done
+    for (var e = 0; e < 4; e++) a.p.r[e] = e < seg ? 0 : (e === seg ? Math.min(a.p.r[e], 1 - f) : a.p.r[e]);
+    if (d) { block.rub = 1; puff(); rasp(); }
+    if (a.t >= 1) { a.p.r = [0, 0, 0, 0]; partDone(a.p); block.auto = null; }
+  }
+
+  // ---------- drawing ----------
+  function rr(x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+  function drawBench() {
+    g.fillStyle = "#D9A864"; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "rgba(196,142,78,0.6)"; g.lineWidth = 2;
+    for (var i = 0; i < 8; i++) {
+      var y = 20 + i * (H - 30) / 8;
+      g.beginPath(); g.moveTo(0, y); g.quadraticCurveTo(W * 0.3, y + 6, W * 0.6, y - 4); g.quadraticCurveTo(W * 0.8, y - 8, W, y + 2); g.stroke();
+    }
+  }
+  function drawPart(p) {
+    var b = p.box, i;
+    g.save();
+    rr(b.x, b.y, b.w, b.h, 3);
+    g.fillStyle = p.done ? PINE_SMOOTH : PINE; g.fill();
+    g.save(); g.clip();
+    g.strokeStyle = GRAIN; g.lineWidth = 2;
+    var k = Math.max(2, Math.floor(b.w / 11));
+    for (i = 1; i < k; i++) { var x = b.x + b.w * i / k; g.beginPath(); g.moveTo(x, b.y + 6); g.lineTo(x, b.y + b.h - 6); g.stroke(); }
+    if (p.shine > 0) {
+      // a soft shine sweeps across a part the moment it is smooth
+      var sx = b.x - b.w + (b.w * 3) * (1 - p.shine);
+      g.fillStyle = "rgba(255,255,255,0.55)";
+      g.beginPath(); g.moveTo(sx, b.y + b.h); g.lineTo(sx + b.w * 0.5, b.y + b.h); g.lineTo(sx + b.w * 1.2, b.y); g.lineTo(sx + b.w * 0.7, b.y); g.closePath(); g.fill();
+    }
+    g.restore();
+    g.strokeStyle = INK; g.lineWidth = 3; rr(b.x, b.y, b.w, b.h, 3); g.stroke();
+    if (p.id === "front") {
+      // the door, drilled 6 inches up from the bottom end
+      g.fillStyle = "#2B2F45"; g.beginPath(); g.arc(b.x + b.w / 2, b.y + b.h - 6 * ppi, 0.75 * ppi, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    // splinters along each rough edge, fading as the edge gets smooth
+    g.strokeStyle = ROUGH_D; g.lineWidth = 2; g.lineCap = "round";
+    for (var e = 0; e < 4; e++) {
+      if (p.r[e] <= 0) continue;
+      g.globalAlpha = Math.min(1, p.r[e] * 1.3);
+      var s = edge(p, e), len = Math.hypot(s[2] - s[0], s[3] - s[1]), nx = e === 1 ? 1 : e === 3 ? -1 : 0, ny = e === 0 ? -1 : e === 2 ? 1 : 0;
+      for (var t = 5; t < len - 3; t += 8) {
+        var f = t / len, px = s[0] + (s[2] - s[0]) * f, py = s[1] + (s[3] - s[1]) * f, j = ((t * 7) % 5) - 2;
+        g.beginPath(); g.moveTo(px, py); g.lineTo(px + nx * 5 + ny * j, py + ny * 5 + nx * j); g.stroke();
+      }
+    }
+    g.globalAlpha = 1;
+    // the part's name
+    var fs = Math.max(14, Math.min(20, b.w * 0.28));
+    g.font = "800 " + fs + "px " + getComputedStyle(document.body).fontFamily;
+    g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+    g.lineWidth = 4; g.strokeStyle = "#FFFFFF"; g.strokeText(p.name, b.x + b.w / 2, b.y + b.h - Math.min(1.6 * ppi, b.h * 0.3));
+    g.fillStyle = INK; g.fillText(p.name, b.x + b.w / 2, b.y + b.h - Math.min(1.6 * ppi, b.h * 0.3));
+    g.restore();
+  }
+  function drawBlock() {
+    var s = blockSize(), x = block.x - s.w / 2, y = block.y - s.h / 2, lift = block.ptr || block.auto ? 0 : 4;
+    g.save();
+    g.fillStyle = "rgba(40,20,5,0.22)"; rr(x + 5, y + 7, s.w, s.h, 8); g.fill();
+    // the sandpaper underneath, then the cork block on top
+    g.fillStyle = "#B9945C"; g.strokeStyle = INK; g.lineWidth = 2.5;
+    rr(x - 3, y + s.h * 0.55 - lift, s.w + 6, s.h * 0.45 + 3, 5); g.fill(); g.stroke();
+    g.fillStyle = "#C46A3A"; rr(x, y - lift, s.w, s.h * 0.7, 8); g.fill(); g.stroke();
+    g.fillStyle = "rgba(255,255,255,0.35)"; rr(x + 6, y + 4 - lift, s.w - 12, s.h * 0.18, 4); g.fill();
+    g.restore();
+  }
+  var last = 0;
+  function frame(t) {
+    var dt = last ? Math.min(0.05, (t - last) / 1000) : 0.016;
+    last = t;
+    if (!locked()) stepAuto(dt);
+    parts.forEach(function (p) { if (p.shine > 0) p.shine = Math.max(0, p.shine - dt / 0.9); });
+    block.rub = Math.max(0, block.rub - dt * 4);
+    dust = dust.filter(function (d) { d.life -= dt; d.x += d.vx * dt; d.y += d.vy * dt; return d.life > 0; });
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawBench();
+    parts.forEach(drawPart);
+    dust.forEach(function (d) { g.fillStyle = "rgba(247,225,172," + Math.max(0, d.life / 0.9).toFixed(2) + ")"; g.beginPath(); g.arc(d.x, d.y, d.r, 0, Math.PI * 2); g.fill(); });
+    drawBlock();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- ghost hand: rub the first rough part's top edge ----------
+  var ghost = Toybox.ghost({ plan: function () {
+    if (finished) return null;
+    var p = parts.filter(function (q) { return !q.done; })[0];
+    if (!p) return null;
+    var r = cv.getBoundingClientRect(), b = p.box;
+    return { pts: [[r.left + b.x - 10, r.top + b.y], [r.left + b.x + b.w + 10, r.top + b.y]] };
+  } });
+
+  layout();
+  window.addEventListener("resize", layout);
+  if (window.ResizeObserver) { try { new ResizeObserver(layout).observe(stage); } catch (e) { /* ignore */ } }
+  requestAnimationFrame(frame);
+
+  Toybox.init({
+    app: "workshop-sanding",
+    timerIntro: "When time is up, the sanding block goes down and the bench locks. The timer carries on across Workshop pages.",
+    goodbyeOption: "End with a “Put the block away” button to press",
+    farewellText: "Time to put the sanding block away",
+    goodbyeLabel: "Put the block away",
+    farewellDone: "All tidy!",
+    restLine: "The birdhouse parts are resting.",
+    restLine2: "They will be right here next time.",
+    restArt: function () {
+      return '<svg class="rest-art" viewBox="0 0 240 160" aria-hidden="true">' +
+        '<rect x="40" y="60" width="160" height="70" rx="6" fill="#F3D69C" stroke="#1D2340" stroke-width="4"/>' +
+        '<rect x="80" y="30" width="80" height="34" rx="8" fill="#C46A3A" stroke="#1D2340" stroke-width="4"/>' +
+        '<text x="176" y="34" font-family="Baloo 2, sans-serif" font-weight="800" font-size="18" fill="#2D5BD7">z</text>' +
+        '<text x="190" y="24" font-family="Baloo 2, sans-serif" font-weight="800" font-size="13" fill="#2D5BD7">z</text></svg>';
+    },
+    soundNote: "Soft sanding sounds. Hold for 2 seconds.",
+    onEnding: function (done) { block.ptr = null; block.auto = null; setTimeout(done, 800); }
+  });
+
+  if (/[?&]debug\b/.test(location.search)) {
+    window.__sand = { parts: parts, sandAll: function () { parts.forEach(function (p) { p.r = [0, 0, 0, 0]; partDone(p); }); }, tap: function (i) { autoSand(parts[i]); } };
+  }
+})();
+</script>
+</body>
+</html>

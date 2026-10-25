@@ -1844,7 +1844,7 @@
     jBack.innerHTML = ""; jWork.innerHTML = ""; jFront.innerHTML = ""; jUI.innerHTML = "";
     if (K.init) K.init(J, cfg);
     if (K.sw) armSwitch(J, keepOn);
-    if (pj && pj.coach) coach(pj.job && pj.job.kind === "sand" ? "Sand every edge smooth!" : pj.coach);
+    if (pj && pj.coach) coach(pj.coach);
     jBack.innerHTML = K.back ? K.back(J, cfg) : sceneBack(220);
     renderJob();
   }
@@ -3169,14 +3169,13 @@
   // ----- Sanders: scrub the board until it is smooth; finer grit makes it smoother -----
   KINDS.scrub = {
     init: function (J, c) {
-      var pj = J.pj && J.pj.job && J.pj.job.kind === "sand";
       var g = { x0: 36, y0: 252, W: 250, Dp: 180, Th: 26, nu: 10, nv: 5 };
-      g.grits = pj ? [120] : c.grits; g.st = 0; g.cells = []; g.lv = [];
+      g.grits = c.grits; g.st = 0; g.cells = []; g.lv = [];
       for (var i = 0; i < g.nu * g.nv; i++) { g.cells.push(0); g.lv.push(0); }
       J.g = g; J.u = g.W * 0.75; J.v = g.Dp * 0.4;
       var tl = J.tl; tl.s = c.s || 0.8; tl.ax = c.anchor[0]; tl.ay = c.anchor[1];
       J.s.grit = g.grits[0]; setArt(J.t.f(J.s, "j" + D.u));
-      coach(pj ? "Sand every edge smooth!" : (c.coach || "Scrub the sandpaper all over the board."));
+      coach(c.coach || "Scrub the sandpaper all over the board.");
       KINDS.scrub.place(J);
       hint({ k: "drag", x: J.tl.x, y: J.tl.y - 20, dx: -120, dy: 20, back: true });
       readout(g.grits[0] + " grit · 0%");
@@ -4318,10 +4317,14 @@
   })();
   var NEXT = (function () {
     var q = QUERY;
-    var page = ["drill-press", "saw-bench", "hammer-screws", "lathe", "router-table", "wrenches", "measuring", "shadow-board", "project"].indexOf(q.next) !== -1 ? q.next : "";
+    var page = ["drill-press", "saw-bench", "hammer-screws", "lathe", "router-table", "wrenches", "measuring", "shadow-board", "project", "sanding"].indexOf(q.next) !== -1 ? q.next : "";
     if (!page) return "";
     var tool = /^[a-z]{2,24}$/.test(q.tool || "") ? q.tool : "", bit = /^[a-z]{2,24}$/.test(q.bit || "") ? q.bit : "";
-    return page + ".html" + (tool ? "?tool=" + tool : bit ? "?bit=" + bit : "");
+    var args = tool ? ["tool=" + tool] : bit ? ["bit=" + bit] : [];
+    // A project visit keeps its project and step, so the gear-up sends him straight back into the project.
+    if (/^[a-z0-9-]{2,40}$/.test(q.project || "")) args.push("project=" + q.project);
+    if (/^[a-z0-9-]{2,40}$/.test(q.step || "")) args.push("step=" + q.step);
+    return page + ".html" + (args.length ? "?" + args.join("&") : "");
   })();
   function openInitialTool() {
     var tid = PSTEP ? PSTEP.tool : (/^[a-z]{2,24}$/.test(QUERY.tool || "") ? QUERY.tool : "");

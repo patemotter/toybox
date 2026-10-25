@@ -27,11 +27,10 @@
   var gearOn = true;
   try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
   if (!gearOn) {
-    // A project step (a plan sent us here): gear up through the plan page, which keeps the step.
-    var projArg = (location.search.match(/[?&]project=([a-z0-9-]+)/) || [])[1];
-    if (projArg) { location.replace("project.html?project=" + projArg); return; }
+    // A project visit keeps its project and step, so the gear-up sends him straight back to this visit.
+    var projArg = (location.search.match(/[?&]project=([a-z0-9-]+)/) || [])[1], stepArg = (location.search.match(/[?&]step=([a-z0-9-]+)/) || [])[1];
     var toolArg = (location.search.match(/[?&]tool=([a-z]+)/) || [])[1];
-    location.replace("./?next=measuring" + (toolArg ? "&tool=" + toolArg : ""));
+    location.replace("./?next=measuring" + (toolArg ? "&tool=" + toolArg : "") + (projArg && stepArg ? "&project=" + projArg + "&step=" + stepArg : ""));
     return;
   }
 
@@ -163,19 +162,9 @@
     layoutCaliper();
   }
 
-  // The step banner: one line that must fit the stage width (shrink the font rather than wrap or cut).
-  function fitBanner() {
-    var el = $("pjstep");
-    if (!PJ || el.hidden) return;
-    var small = window.matchMedia && (matchMedia("(max-width: 700px)").matches || matchMedia("(orientation: landscape) and (max-height: 520px)").matches);
-    var size = small ? 17.6 : 22.4;
-    el.style.fontSize = size + "px";
-    while (el.scrollWidth > el.clientWidth + 1 && size > 11) { size -= 1; el.style.fontSize = size + "px"; }
-  }
   // Project mode: the project board alone, lying with its left end at the tape hook (or under the 12-inch
   // combination square rule).
   function layoutProject() {
-    fitBanner();
     var isCombo = PJ.tool === "combosquare";
     var cs = clamp(U * 0.2, 74, 150);
     var xL = isCombo ? PAD + 84 : PAD + cs + 12;   // combination square: room for its head hooked on the left end

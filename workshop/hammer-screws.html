@@ -7,15 +7,18 @@
 <script>
   // Safety gear first: the Tool Wall puts on goggles and ear muffs once per visit.
   (function () {
-    var tool = "", pj = "";
+    var tool = "", pj = "", st = "";
     try {
       var sp = new URLSearchParams(location.search);
       tool = sp.get("tool") || "";
       pj = sp.get("project") || "";
+      st = sp.get("step") || "";
     } catch (e) { tool = ""; }
     try {
-      if (!pj && sessionStorage.getItem("workshop-gear") !== "on") {
-        location.replace("./?next=hammer-screws" + (tool ? "&tool=" + encodeURIComponent(tool) : ""));
+      // A project visit keeps its project and step, so the gear-up sends him straight back to this visit.
+      if (sessionStorage.getItem("workshop-gear") !== "on") {
+        location.replace("./?next=hammer-screws" + (tool ? "&tool=" + encodeURIComponent(tool) : "") +
+          (pj && st ? "&project=" + encodeURIComponent(pj) + "&step=" + encodeURIComponent(st) : ""));
       }
     } catch (e) { /* storage unavailable: treat gear as on */ }
   })();
@@ -526,15 +529,9 @@ body.ending .trigger { pointer-events: none; opacity: 0.4; }
 body.ending .camout { display: none; }
 
 /* ---------- Project mode (guided build from the Tool Wall) ---------- */
-.pj-banner {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
-  padding: 4px 16px; border-radius: 999px;
-  background: #FFE9A8; color: #1D2340;
-  border: 3px solid #1D2340; box-shadow: 0 3px 0 #1D2340;
-  font-weight: 800; font-size: clamp(0.95rem, 2.2vw, 1.25rem);
-  white-space: nowrap; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
-  pointer-events: none;
-}
+/* The story line of the join he is on: information at the top of the stage (a shared coach pill). */
+.pj-banner { top: 10px; bottom: auto; z-index: 5; white-space: normal; text-align: center; max-width: calc(100% - 20px); pointer-events: none; }
+.pj-banner[hidden] { display: none; }
 .pj-done {
   position: absolute; inset: 0; z-index: 20;
   display: flex; align-items: flex-end; justify-content: center;
@@ -587,7 +584,7 @@ body.project .pane:not(.off) > .tools { visibility: visible !important; pointer-
   <main class="tb-body">
     <div class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="Workbench"></canvas>
-      <div class="pj-banner" id="pjBanner" hidden></div>
+      <div class="tb-coach pj-banner" id="pjBanner" data-coach="info" hidden></div>
       <div class="ov tl"><span class="pill toolname" id="toolName"></span></div>
       <div class="ov tr"><div class="pill readout" aria-live="polite"><b id="readBig"></b><span id="readSmall"></span></div><svg class="tring" id="tring" viewBox="-28 -28 56 56" hidden aria-hidden="true"></svg></div>
       <div id="coach"></div>

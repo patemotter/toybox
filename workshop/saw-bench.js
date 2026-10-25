@@ -1230,8 +1230,9 @@
         wk.w = Math.round(PJ.job.board.w * 20); wk.h = 19; wk.ease = 2; wk.grain = "y";
         wk.pith = [-wk.w / 2 - 90, wk.h * 0.25];
         wk.pts = sectionPts(wk);
-        wk.L = Math.round(PJ.job.board.l * 20);
-        wk.cuts = [Math.round(PJ.job.line * 20)];
+        // what is left of the board, and the lines still to cut (each from the end left by the cut before)
+        wk.L = Math.round((PJ.job.board.l - pjCutOff()) * 20);
+        wk.cuts = pjCutList().slice(PJ.cuts).map(function (k) { return Math.round(k.line * 20); });
       }
       this.wk = wk; this.mat = MATS[wk.mat];
       this.L = wk.L; this.cuts = wk.cuts.slice();
@@ -1665,12 +1666,12 @@
       // re-base the board: what's left starts at the cut
       this.L -= c + this.saw.kerf;
       this.cView = 0;
-      if (PJ && PJ.kind === "crosscut") {
+      // project: after the last part the board stays put; before it, the next line slides under the saw
+      if (PJ && PJ.kind === "crosscut" && pjCutDone(2000)) {
         this.c = 0; this.waitNew = 0;
         this.depth = 0; this.groove = false;
         this.resetTool();
         this.lift = 40;
-        if (!PJ.done) { PJ.cuts++; if (PJ.cuts >= PJ.count) pjComplete(2000); }
         return;
       }
       var next = this.cuts.shift();
@@ -4194,11 +4195,10 @@
           dropPiece(spr, -rnd(160, 260), -rnd(320, 420), -rnd(1.5, 3));
         }
         this.strips++;
-        if (PJ && PJ.kind === "crosscut") {
+        if (PJ && PJ.kind === "crosscut" && pjCutDone(2200)) {
           this.cpoly = left;
           this.kerfLen = 0; this.kerfTop = 0;
           this.state = "return";
-          if (!PJ.done) { PJ.cuts++; if (PJ.cuts >= PJ.count) pjComplete(2200); }
           return;
         }
         var us = left.map(function (p) { return p[0]; });
@@ -4637,9 +4637,9 @@
       var pj = this.pj, S = pj.S, b = pj.job.board, t = Math.tan(this.set.angle * Math.PI / 180);
       this.mat = MATS.pine;
       this.sec = { w: b.w * S, h: Math.round(0.75 * S) };
-      // crosscut: the line is job.line from the measured (left) end; angle: across the right end at the saw's angle
-      var lineF = (pj.kind === "angle" ? b.l - b.w * t : pj.job.line) * S;
-      this.pb = { L: b.l * S, ls: 0, lineF: lineF, hasLine: true, target: -45 * t - lineF, bx: 0,
+      // crosscut: the next line from the measured (left) end of what is left; angle: across the right end at the saw's angle
+      var lineF = (pj.kind === "angle" ? b.l - b.w * t : pjCutList()[pj.cuts].line) * S;
+      this.pb = { L: (pj.kind === "angle" ? b.l : b.l - pjCutOff()) * S, ls: 0, lineF: lineF, hasLine: true, target: -45 * t - lineF, bx: 0,
         glide: false, drag: null, slideIn: 0, missed: false, snapped: false, next: 0, hit: null };
       this.pb.bx = this.pb.target - PJ_START;
       if (!instant) { this.pb.bx -= 520; this.pb.slideIn = 1; }
@@ -4682,7 +4682,15 @@
       if (b.next > 0) { b.next -= dt; if (b.next <= 0) this.pjNextPiece(); }
     },
     pjNextPiece: function () {
-      var b = this.pb, e = this.cam.P(b.bx + b.L / 2, -this.sec.w / 2, this.sec.h);
+      var b = this.pb;
+      if (this.pj.kind === "crosscut") {
+        // the next pencil line on the same board: he slides it under the blade again
+        b.lineF = pjCutList()[this.pj.cuts].line * this.pj.S;
+        b.target = -45 * Math.tan(this.theta * Math.PI / 180) - b.lineF;
+        b.hasLine = true; b.snapped = false; b.missed = false;
+        return;
+      }
+      var e = this.cam.P(b.bx + b.L / 2, -this.sec.w / 2, this.sec.h);
       // the off-cut is swept away and the next Side slides in
       puff(e[0], e[1]);
       b.L = this.pj.job.board.l * this.pj.S; b.ls = 0; b.hasLine = true; b.snapped = false;
@@ -4710,6 +4718,7 @@
       // the stock now starts at the cut
       b.L = b.bx + b.L - cut0; b.bx = cut0; b.ls = cut1 - cut0; b.hasLine = false; b.snapped = false;
       this.cut = true;
+      if (this.pj.kind === "crosscut") { if (!pjCutDone(2400)) b.next = 1.8; return; }
       this.pj.cuts++;
       if (this.pj.cuts >= this.pj.count) pjComplete(2400);
       else { b.next = 1.8; pjSay("Now the other Side!", 3500); }
@@ -5134,10 +5143,12 @@
           });
         });
         b.hit = hb;
-        // the other pencil lines from the measuring bench (cut on the next steps); they stay on the stock
-        var oth = this.pj.job.others || [];
-        for (var oi = 0; oi < oth.length; oi++) {
-          var ox = b.bx + (oth[oi] - (b.hasLine ? 0 : this.pj.job.line)) * this.pj.S;
+        // the other pencil lines from the measuring bench (the parts still to cut), lighter than this cut's line
+        var cl = pjCutList(), acc = 0, cutOff = pjCutOff();
+        for (var oi = 0; oi < cl.length; oi++) {
+          acc += cl[oi].line;
+          if (oi < this.pj.cuts || (b.hasLine && oi === this.pj.cuts)) continue;
+          var ox = b.bx + (acc - cutOff) * this.pj.S;
           if (ox <= b.bx + 2 || ox >= b.bx + b.L - 2) continue;
           var o0 = c.P(ox, 0, sec.h + 0.5), o1 = c.P(ox, -sec.w, sec.h + 0.5);
           line(g, o0[0], o0[1], o1[0], o1[1], "rgba(58,63,75,0.4)", 2.5);   // lighter: not this cut
@@ -5726,7 +5737,25 @@
       Sound.clack();
     }, delayMs || 0);
   }
-  // The step banner: one line; the font shrinks until it fits.
+  // The Cut visit cuts several parts from one board (job.cuts, in order); other crosscut jobs have one line.
+  function pjCutList() { return PJ.job.cuts || [{ line: PJ.job.line }]; }
+  // Inches already cut off the left end of the board (the parts cut so far).
+  function pjCutOff() {
+    var cl = pjCutList(), i, s = 0;
+    for (i = 0; i < PJ.cuts && i < cl.length; i++) s += cl[i].line;
+    return s;
+  }
+  // A part is cut: the banner tells the next part's story. True once the last part is cut (the job is done).
+  function pjCutDone(delayMs) {
+    if (!PJ || PJ.done) return true;
+    PJ.cuts++;
+    if (PJ.cuts >= PJ.count) { pjComplete(delayMs); return true; }
+    var next = pjCutList()[PJ.cuts];
+    if (next && next.say) { $("pjBanner").textContent = next.say; pjFitBanner(); }
+    pjSay("Slide the next line under the blade!", 3500);
+    return false;
+  }
+  // The step banner wraps onto a second line when it needs to.
   function pjFitBanner() {
     if (!PJ) return;
     var el = $("pjBanner");
@@ -6278,7 +6307,7 @@
   if (PSTEP && (PSTEP.job.kind === "crosscut" || PSTEP.job.kind === "angle" || PSTEP.job.kind === "rip")) {
     var xSaws = PSTEP.job.kind === "crosscut" ? ["ryoba", "kataba", "panel", "backsaw", "mitersaw", "tablesaw", "circular", "tracksaw"] : null;
     PJ = { step: PSTEP, job: PSTEP.job, kind: PSTEP.job.kind, sawId: PSTEP.tool === "table" ? "tablesaw" : "mitersaw",
-      saws: xSaws, S: PSTEP.tool === "table" ? 16 : 20, count: PSTEP.job.count || 1, cuts: 0, misses: 0,
+      saws: xSaws, S: PSTEP.tool === "table" ? 16 : 20, count: PSTEP.job.cuts ? PSTEP.job.cuts.length : (PSTEP.job.count || 1), cuts: 0, misses: 0,
       done: false, over: false, intro: true, topPad: 0, fenceInit: false };
     app.saw = (xSaws && want && xSaws.indexOf(want) !== -1) ? want : PJ.sawId;
     document.body.classList.add("project");

@@ -267,13 +267,10 @@
   var PSTEP = window.ToyboxProjects && ToyboxProjects.fromQuery();
   if (PSTEP && (PSTEP.station !== "hammer-screws" || !PSTEP.job || PSTEP.job.kind !== "assemble")) PSTEP = null;
   var PJ = PSTEP ? {
-    joins: PSTEP.job.joins || [
-      ["back", "side1"],
-      ["back", "side2"],
-      ["sides", "floor"],
-      ["sides", "front"],
-      ["box", "roof"]
-    ],
+    joins: PSTEP.job.joins,
+    left: false,       // the house is seen from the front left (it has turned around)
+    sq: 1,             // sideways squash while the house turns around
+    turnT: 0,
     step: 0,
     joinIdx: 0,
     phase: "glue", // "glue" -> "slide" -> "nails" -> "pause" -> "done"
@@ -304,7 +301,7 @@
       if (wsp) wsp.textContent = "Plan";
     }
     var pjb = $("pjBanner");
-    if (pjb) { pjb.textContent = PSTEP.title; pjb.hidden = false; }
+    if (pjb) { pjb.hidden = false; pjSayJoin(); }
   }
 
   // ---------- Tool drawings (millimetres; hammers: striking face at 0,0 pointing down, handle to the right) ----------
@@ -573,18 +570,10 @@
     LY.logTop = LY.stumpTop - 300 * k;
     // Assemble (Project Mode birdhouse):
     k = Math.min(W * 0.88 / 360, H / 410);
-    LA = { k: k, cx: W * 0.5, cy: H * 0.58, benchY: H * 0.50 };
-    if (PSTEP) {
-      var pjb = $("pjBanner");
-      if (pjb && !pjb.hidden) {
-        pjb.style.fontSize = "";
-        var fs = parseFloat(getComputedStyle(pjb).fontSize) || 16;
-        while (pjb.scrollWidth > pjb.clientWidth + 1 && fs > 11) {
-          fs -= 0.5;
-          pjb.style.fontSize = fs + "px";
-        }
-      }
-    }
+    // u: px per inch of the birdhouse; oy: where it stands on the bench. Room above for the banner and the
+    // Roof waiting to drop on, and beside it for a Side waiting to slide in.
+    var u = Math.min(W / 19, (H - 90) / 17.5), oy = H - 14 - 1.1 * u;
+    LA = { k: k, u: u, ox: W * 0.5, oy: oy, cx: W * 0.5, cy: oy - 6 * u, benchY: oy - 3.5 * u };
   }
 
   // ---------- Painting helpers ----------
@@ -1442,7 +1431,7 @@
   var ham = { theta: 0.55, phase: "rest", t: 0, from: 0, dur: 0, s: 1, g: null, tgt: null, pos: null, mir: false, slosh: 0, side: 0, peak: 0 };
   function hamScale() {
     var sc = sceneName();
-    if (sc === "assemble") return LA.k * 0.72;
+    if (sc === "assemble") return LA.k * 0.62;
     if (sc === "board") return LB.k * 0.66;
     if (sc === "metal") return LM.k * 0.5;
     if (sc === "joint") return LJ.k * 0.62;
@@ -1463,64 +1452,114 @@
   }
 
   // ---------- Assemble scene (Project mode birdhouse) ----------
-  function pjSeamInfo(step) {
-    var k = LA.k, cx = LA.cx, cy = LA.cy + 14 * k;
-    var bw = 128 * k, bh = 136 * k;
-    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
-    if (step === 0) {
-      return {
-        x0: xL + 8 * k, y0: yT + 14 * k, x1: xL + 8 * k, y1: yB - 14 * k,
-        nx0: xL, ny0: yT + 28 * k, nx1: xL, ny1: yB - 28 * k,
-        dx: -42 * k, dy: 0
-      };
+  // The birdhouse goes together on the bench like a real one: for each join, glue on the joint, the part slides
+  // into place, then nails go through that part into the edge of the other one, along the join. The house is
+  // drawn in a 3/4 view from the front right (or the front left, after it turns around), in inches:
+  // x across (0 to 7), y up from the bench, z from the front (0) to the back (5.5). The Sides stand outside the
+  // Front and the Back; the Floor sits between them.
+  var PJ_BOX = {
+    back: [0.75, 6.25, 0, 12, 4.75, 5.5],
+    side1: [6.25, 7, 0, 10, 0, 5.5],          // the right Side
+    side2: [0, 0.75, 0, 10, 0, 5.5],          // the left Side
+    floor: [0.75, 6.25, 0.25, 1, 0.75, 4.75],
+    front: [0.75, 6.25, 0, 9, 0, 0.75],
+    roof: [-0.25, 7.25, 10, 10.75, -0.75, 4.75]
+  };
+  var PJ_FILL = { back: "#D89F5B", side1: "#E6B474", side2: "#E6B474", floor: "#C98D48", front: "#F2CA92", roof: "#DE9B52" };
+  // Per join: the side it is seen from (left: the house has turned around), where the part waits before it
+  // slides in, the glue lines, and the nails (a point on the face they go into and the way that face points).
+  var PJ_JOIN = {
+    side1: { left: false, from: [3, 0, 0], glue: [[[6.25, 0.6, 5.12], [6.25, 9.4, 5.12]]],
+      nails: [{ p: [7, 2.5, 5.12], d: [1, 0, 0] }, { p: [7, 7.5, 5.12], d: [1, 0, 0] }] },
+    side2: { left: true, from: [-3, 0, 0], glue: [[[0.75, 0.6, 5.12], [0.75, 9.4, 5.12]]],
+      nails: [{ p: [0, 2.5, 5.12], d: [-1, 0, 0] }, { p: [0, 7.5, 5.12], d: [-1, 0, 0] }] },
+    floor: { left: true, from: [0, 0, -5], glue: [[[1, 0.62, 4.75], [6, 0.62, 4.75]]],
+      nails: [{ p: [0, 0.62, 1.7], d: [-1, 0, 0] }, { p: [0, 0.62, 3.8], d: [-1, 0, 0] }] },
+    front: { left: false, from: [0, 0, -4], glue: [[[1, 1, 0.75], [6, 1, 0.75]]],
+      nails: [{ p: [7, 2.5, 0.37], d: [1, 0, 0] }, { p: [7, 6.5, 0.37], d: [1, 0, 0] }] },
+    roof: { left: false, from: [0, 3, 0], glue: [[[0.37, 10, 0.3], [0.37, 10, 5.2]], [[6.62, 10, 0.3], [6.62, 10, 5.2]]],
+      nails: [{ p: [0.37, 10.75, 2.4], d: [0, 1, 0] }, { p: [6.62, 10.75, 2.4], d: [0, 1, 0] }] }
+  };
+  var PJ_KX = 0.42, PJ_KY = 0.3;      // the oblique view: how far one inch of depth moves right (or left) and up
+  function pjJoin(i) { var j = PJ.joins[i == null ? PJ.step : i]; return j ? PJ_JOIN[j.part] : null; }
+  // Screen point of a house point. The view squashes sideways while the house turns around.
+  function hp(x, y, z) {
+    var u = LA.u, s = PJ.left ? -1 : 1, sx = (x - 3.5) * u + s * (z - 2.75) * u * PJ_KX;
+    // the house sits a little toward the far side, so the hammer has room beside the near Side
+    return { x: LA.ox + (sx - s * 1.4 * u) * PJ.sq, y: LA.oy - y * u - z * u * PJ_KY };
+  }
+  function hpv(v) { return hp(v[0], v[1], v[2]); }
+  function quad(c, pts, fill) {
+    c.fillStyle = fill; c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    c.closePath(); c.fill(); c.stroke();
+  }
+  // One part: its front face, the side face toward us and its top, shifted by off (inches).
+  function drawPjPart(c, id, off) {
+    var b = PJ_BOX[id], o = off || [0, 0, 0], col = PJ_FILL[id];
+    var x0 = b[0] + o[0], x1 = b[1] + o[0], y0 = b[2] + o[1], y1 = b[3] + o[1], z0 = b[4] + o[2], z1 = b[5] + o[2];
+    var xs = PJ.left ? x0 : x1;
+    c.save();
+    c.lineJoin = "round"; c.strokeStyle = OUT; c.lineWidth = 2.5;
+    quad(c, [hp(xs, y0, z0), hp(xs, y0, z1), hp(xs, y1, z1), hp(xs, y1, z0)], shade(col, -0.16));
+    quad(c, [hp(x0, y1, z0), hp(x1, y1, z0), hp(x1, y1, z1), hp(x0, y1, z1)], shade(col, 0.14));
+    quad(c, [hp(x0, y0, z0), hp(x1, y0, z0), hp(x1, y1, z0), hp(x0, y1, z0)], col);
+    if (id === "front") {
+      // the door the drill press made
+      var dc = hp(3.5 + o[0], 6 + o[1], z0);
+      c.fillStyle = "#4A2E14"; c.beginPath(); c.ellipse(dc.x, dc.y, Math.max(1, 0.75 * LA.u * PJ.sq), 0.75 * LA.u, 0, 0, Math.PI * 2); c.fill(); c.stroke();
     }
-    if (step === 1) {
-      return {
-        x0: xR - 8 * k, y0: yT + 14 * k, x1: xR - 8 * k, y1: yB - 14 * k,
-        nx0: xR, ny0: yT + 28 * k, nx1: xR, ny1: yB - 28 * k,
-        dx: 42 * k, dy: 0
-      };
-    }
-    if (step === 2) {
-      return {
-        x0: xL + 14 * k, y0: yB - 6 * k, x1: xR - 14 * k, y1: yB - 6 * k,
-        nx0: xL + 24 * k, ny0: yB, nx1: xR - 24 * k, ny1: yB,
-        dx: 0, dy: 38 * k
-      };
-    }
-    if (step === 3) {
-      return {
-        x0: xL + 10 * k, y0: yT + 20 * k, x1: xR - 10 * k, y1: yT + 20 * k,
-        nx0: xL + 20 * k, ny0: cy, nx1: xR - 20 * k, ny1: cy,
-        dx: 0, dy: -40 * k
-      };
-    }
-    var roofPeakY = yT - 54 * k;
-    return {
-      x0: cx - 44 * k, y0: (roofPeakY + yT) * 0.5, x1: cx + 44 * k, y1: (roofPeakY + yT) * 0.5,
-      nx0: cx - 36 * k, ny0: yT - 18 * k, nx1: cx + 36 * k, ny1: yT - 18 * k,
-      dx: 0, dy: -46 * k
-    };
+    c.restore();
+  }
+  function shade(hex, t) {
+    var v = [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16); });
+    return "rgb(" + v.map(function (x) { return Math.round(t > 0 ? x + (255 - x) * t : x * (1 + t)); }).join(",") + ")";
+  }
+  // Which parts are on the house so far (the Back stands from the start).
+  function pjOnParts() {
+    var on = { back: true };
+    for (var i = 0; i < PJ.step; i++) on[PJ.joins[i].part] = true;
+    return on;
+  }
+  // Back to front, so nearer parts cover farther ones. The near Side is the one the view looks at.
+  function pjOrder() { return PJ.left ? ["back", "side1", "floor", "side2", "front", "roof"] : ["back", "side2", "floor", "side1", "front", "roof"]; }
+  // A nail's screen entry point and the screen direction it sticks out in.
+  function pjNailGeo(n) {
+    var a = hpv(n.p), b = hp(n.p[0] + n.d[0], n.p[1] + n.d[1], n.p[2] + n.d[2]);
+    var dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+    return { x: a.x, y: a.y, dx: dx / l, dy: dy / l, rot: Math.atan2(dy / l, dx / l) + Math.PI / 2 };
+  }
+  // A nail's face is seen when it points toward the viewer's side (or up).
+  function pjNailSeen(n) { return n.d[1] > 0 || (n.d[0] > 0) !== PJ.left; }
+  // The hammer or driver turns to strike along the nail that is being driven (0 = straight down).
+  function pjToolRot() {
+    if (!PJ || PJ.phase !== "nails") return 0;
+    var i = pjNextNailIdx(), idx = (PJ.activeIdx != null && (PJ.fasteners[PJ.activeIdx] || 0) < 0.999) ? PJ.activeIdx : i;
+    return idx >= 0 && PJ.nails[idx] ? pjNailGeo(PJ.nails[idx]).rot : 0;
+  }
+  function pjPartName(id) { var q = ToyboxProjects.get(PSTEP.project).partBy[id]; return q ? q.name : "part"; }
+  function pjGlueMid() {
+    var g = pjJoin().glue[0], a = hpv(g[0]), b = hpv(g[1]);
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   }
   function pjSpawnNails() {
     if (!PJ) return;
-    var s = pjSeamInfo(PJ.step);
     PJ.fasteners = [0, 0];
     PJ.activeIdx = 0;
     PJ.powerBurst = 0;
     PJ.impT = 0;
-    PJ.nails = [
-      { x: s.nx0, y: s.ny0, hits: 0, maxHits: 3, prog: 0, a: 0, step: PJ.step },
-      { x: s.nx1, y: s.ny1, hits: 0, maxHits: 3, prog: 0, a: 0, step: PJ.step }
-    ];
+    PJ.nails = pjJoin().nails.map(function (q) {
+      var g = pjNailGeo(q);
+      return { p: q.p, d: q.d, x: g.x, y: g.y, hits: 0, maxHits: 3, prog: 0, a: 0, step: PJ.step };
+    });
     ham.tgt = { kind: "pjnail", idx: 0 };
   }
   function pjNailTop(idx) {
     if (!PJ || !PJ.nails[idx]) return { x: LA.cx, y: LA.cy };
-    var n = PJ.nails[idx], k = LA.k;
+    var n = PJ.nails[idx], k = LA.k, g = pjNailGeo(n);
     var prog = clamp(PJ.fasteners[idx] || 0, 0, 1);
-    var stickOut = Math.max(0, 1 - prog) * 28 * k;
-    return { x: n.x, y: n.y - stickOut - (state.mode === "screw" ? 0 : 3 * k) };
+    var out = Math.max(0, 1 - prog) * 28 * k + (state.mode === "screw" ? 0 : 3 * k);
+    return { x: g.x + g.dx * out, y: g.y + g.dy * out };
   }
   function pjNextNailIdx() {
     if (!PJ) return -1;
@@ -1557,7 +1596,7 @@
         PJ.pauseT = 0;
         if (trig.on) setTrigger(false, null);
         motorSet(0);
-        pop("Joined!", LA.cx, LA.cy - 90 * LA.k, 26, "#FFC93C");
+        pop("Joined!", LA.cx, LA.oy - 13 * LA.u, 26, "#FFC93C");
       }
     }
   }
@@ -1565,52 +1604,6 @@
     var yB = LA.benchY;
     pegboard(c, 0, 0, W, yB);
     benchTop(c, yB, H);
-  }
-  function drawBirdhousePiece(c, kind, ox, oy) {
-    var k = LA.k, cx = LA.cx + (ox || 0), cy = LA.cy + 14 * k + (oy || 0);
-    var bw = 128 * k, bh = 136 * k;
-    var xL = cx - bw / 2, xR = cx + bw / 2, yT = cy - bh / 2, yB = cy + bh / 2;
-    var peakY = yT - 54 * k;
-    c.save();
-    c.lineJoin = "round"; c.lineCap = "round";
-    if (kind === "back") {
-      c.fillStyle = "rgba(40,20,5,0.28)";
-      c.fillRect(xL + 8 * k, yT + 8 * k, bw, bh);
-      c.fillStyle = "#D89F5B"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath();
-      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
-      c.fill(); c.stroke();
-    } else if (kind === "side1") {
-      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath(); c.rect(xL - 12 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
-    } else if (kind === "side2") {
-      c.fillStyle = "#E6B474"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath(); c.rect(xR - 10 * k, yT + 4 * k, 22 * k, bh - 4 * k); c.fill(); c.stroke();
-    } else if (kind === "floor") {
-      c.fillStyle = "#C98D48"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath(); c.rect(xL - 12 * k, yB - 6 * k, bw + 24 * k, 18 * k); c.fill(); c.stroke();
-    } else if (kind === "front") {
-      c.fillStyle = "#F2CA92"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath();
-      c.moveTo(xL, yB); c.lineTo(xL, yT); c.lineTo(cx, peakY); c.lineTo(xR, yT); c.lineTo(xR, yB); c.closePath();
-      c.fill(); c.stroke();
-      // Round entry door hole
-      c.fillStyle = "#4A2E14"; c.strokeStyle = OUT; c.lineWidth = 3;
-      c.beginPath(); c.arc(cx, cy - 12 * k, 24 * k, 0, Math.PI * 2); c.fill(); c.stroke();
-    } else if (kind === "roof") {
-      c.fillStyle = "#DE9B52"; c.strokeStyle = OUT; c.lineWidth = 3;
-      var rw = bw * 0.68;
-      c.beginPath();
-      c.moveTo(cx, peakY - 12 * k);
-      c.lineTo(cx - rw, yT + 14 * k);
-      c.lineTo(cx - rw + 10 * k, yT + 26 * k);
-      c.lineTo(cx, peakY + 4 * k);
-      c.lineTo(cx + rw - 10 * k, yT + 26 * k);
-      c.lineTo(cx + rw, yT + 14 * k);
-      c.closePath();
-      c.fill(); c.stroke();
-    }
-    c.restore();
   }
   function drawGlueBottle(c, x, y, tilt) {
     var k = LA.k * 0.9;
@@ -1626,16 +1619,28 @@
     c.fillRect(-15 * k, -54 * k, 30 * k, 22 * k);
     c.restore();
   }
+  // The banner tells the story of the join he is on.
+  function pjSayJoin() {
+    var j = PJ.joins[PJ.step], el = $("pjBanner");
+    if (el && j && j.say) el.textContent = j.say;
+  }
+  // The next join: turn the house round first when it is nailed from the other side.
+  function pjStartJoin() {
+    PJ.glueProg = 0; PJ.slideProg = 0; PJ.pauseT = 0;
+    pjSayJoin();
+    if (pjJoin().left !== PJ.left) { PJ.phase = "turn"; PJ.turnT = 0; } else PJ.phase = "glue";
+  }
   function updateAssemble(dt) {
     if (!PJ || PJ.finished) return;
-    if (PJ.phase === "glue") {
+    if (PJ.phase === "turn") {
+      // about a second: the house squashes to its edge, swaps sides and opens out again
+      PJ.turnT = Math.min(1, PJ.turnT + dt / (reduce ? 0.2 : 1.1));
+      if (PJ.turnT >= 0.5 && PJ.left !== pjJoin().left) PJ.left = pjJoin().left;
+      PJ.sq = Math.max(0.04, Math.abs(Math.cos(PJ.turnT * Math.PI)));
+      if (PJ.turnT >= 1) { PJ.sq = 1; PJ.phase = "glue"; }
+    } else if (PJ.phase === "glue") {
       if (PJ.glueHeld || PJ.glueAuto) {
-        PJ.glueProg = Math.min(1, PJ.glueProg + dt * 1.35);
-        if (Math.random() < 0.35) {
-          var s = pjSeamInfo(PJ.step);
-          var gx = lerp(s.x0, s.x1, PJ.glueProg), gy = lerp(s.y0, s.y1, PJ.glueProg);
-          ring(gx, gy, 10 * LA.k, "255,250,230");
-        }
+        PJ.glueProg = Math.min(1, PJ.glueProg + dt * 0.9);
         if (PJ.glueProg >= 1) {
           PJ.glueHeld = false; PJ.glueAuto = false;
           PJ.phase = "slide"; PJ.slideProg = 0;
@@ -1643,7 +1648,7 @@
         }
       }
     } else if (PJ.phase === "slide") {
-      PJ.slideProg = Math.min(1, PJ.slideProg + dt * 2.5);
+      PJ.slideProg = Math.min(1, PJ.slideProg + dt * 1.6);
       if (PJ.slideProg >= 1) {
         PJ.phase = "nails";
         pjSpawnNails();
@@ -1689,122 +1694,119 @@
     } else if (PJ.phase === "pause") {
       motorSet(0);
       PJ.pauseT += dt;
-      if (PJ.pauseT >= 0.55) {
+      if (PJ.pauseT >= 0.8) {
         PJ.nails.forEach(function (n) {
-          PJ.doneNails.push({ x: n.x, y: n.y, kind: n.doneKind || "nail", head: n.head || "phillips", a: n.a || 0 });
+          PJ.doneNails.push({ p: n.p, d: n.d, kind: n.doneKind || "nail", head: n.head || "phillips", a: n.a || 0 });
         });
         PJ.nails = [];
         if (PJ.step + 1 < PJ.joins.length) {
           PJ.step++;
           PJ.joinIdx = PJ.step;
-          PJ.phase = "glue";
-          PJ.glueProg = 0; PJ.slideProg = 0; PJ.pauseT = 0;
+          pjStartJoin();
         } else {
+          PJ.step = PJ.joins.length;
           PJ.phase = "done";
           PJ.finished = true;
-          stars(LA.cx, LA.cy, 24);
+          stars(LA.cx, LA.oy - 6 * LA.u, 24);
           sndChime();
           var pjb = $("pjBack"), pjdt = $("pjDoneText"), pjd = $("pjDone");
           ToyboxProjects.doneLink(pjb, PSTEP);
           if (pjdt) pjdt.textContent = PSTEP.done;
-          if (pjd) pjd.hidden = false;
+          // the house stays in view a moment before the card
+          setTimeout(function () { if (pjd) pjd.hidden = false; }, 1200);
         }
       }
     }
   }
+  // A nail or screw in its own frame: (0, 0) where it enters the wood, sticking out by `stick` px toward -y.
+  function drawPjFastener(c, n, g, stick, active) {
+    var k = LA.k;
+    c.save();
+    c.translate(g.x, g.y); c.rotate(g.rot);
+    if (state.mode === "screw") {
+      var sh = DRIVERS[state.driver].head || state.bit || "phillips";
+      var scol = HEADS[sh] ? HEADS[sh].color : "#CDD3DB";
+      var sw = 4.2 * k, hr = 6.5 * k, cone = 4.2 * k, headY = -stick;
+      if (stick > 1) {
+        var coneB = Math.min(0, headY + cone);
+        if (coneB < 0) {
+          c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
+          c.beginPath(); c.rect(-sw / 2, coneB, sw, -coneB); c.fill(); c.stroke();
+          c.lineWidth = Math.max(1.8, 1.6 * k);
+          for (var ty = -2 * k; ty > coneB + 1.5 * k; ty -= 3.8 * k) {
+            c.beginPath(); c.moveTo(-sw * 0.72, ty); c.lineTo(sw * 0.72, ty - 1.8 * k); c.stroke();
+          }
+        }
+        c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(-hr, headY); c.lineTo(hr, headY); c.lineTo(sw / 2, coneB); c.lineTo(-sw / 2, coneB); c.closePath(); c.fill(); c.stroke();
+      }
+      drawScrewHead(c, 0, headY, hr, scol, { h: sh, a: n.a || 0 });
+      if (active) { c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3; ellipse(c, 0, headY, 12 * k, 6 * k); c.stroke(); }
+    } else {
+      c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+      if (stick > 1) { c.beginPath(); c.rect(-2.2 * k, -stick, 4.4 * k, stick); c.fill(); c.stroke(); }
+      ellipse(c, 0, -stick, 5.5 * k, 2.8 * k); c.fill(); c.stroke();
+      if (active) { c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3; ellipse(c, 0, -stick, 12 * k, 6 * k); c.stroke(); }
+    }
+    c.restore();
+  }
   function drawAssembleDyn(c, dt) {
     if (!PJ) return;
     updateAssemble(dt);
-    var k = LA.k, step = PJ.step, s = pjSeamInfo(step);
-    // Always draw back piece first
-    drawBirdhousePiece(c, "back", 0, 0);
-    var order = ["side1", "side2", "floor", "front", "roof"];
-    for (var i = 0; i < step; i++) {
-      drawBirdhousePiece(c, order[i], 0, 0);
+    var k = LA.k, on = pjOnParts(), cur = PJ.joins[PJ.step], J = pjJoin(), off = null, i;
+    if (cur && J) {
+      if (PJ.phase === "glue" || PJ.phase === "turn") off = J.from;
+      else if (PJ.phase === "slide") { var f = 1 - Math.pow(1 - PJ.slideProg, 3); off = J.from.map(function (v) { return v * (1 - f); }); }
+      else off = [0, 0, 0];
     }
-    var curKind = order[step];
-    if (curKind) {
-      if (PJ.phase === "glue") {
-        // Show the new piece waiting slightly offset
-        c.save(); c.globalAlpha = 0.85;
-        drawBirdhousePiece(c, curKind, s.dx, s.dy);
-        c.restore();
-        // Dashed seam guide
-        c.save();
-        c.strokeStyle = "rgba(255,201,60,0.85)"; c.lineWidth = 6 * k; c.lineCap = "round"; c.setLineDash([8 * k, 8 * k]);
-        c.beginPath(); c.moveTo(s.x0, s.y0); c.lineTo(s.x1, s.y1); c.stroke();
-        c.restore();
-        if (PJ.glueProg > 0) {
-          c.save();
-          c.strokeStyle = "#FFFDF6"; c.lineWidth = 9 * k; c.lineCap = "round";
-          c.beginPath(); c.moveTo(s.x0, s.y0);
-          c.lineTo(lerp(s.x0, s.x1, PJ.glueProg), lerp(s.y0, s.y1, PJ.glueProg));
-          c.stroke();
-          c.restore();
-        }
-        var bx = lerp(s.x0, s.x1, PJ.glueProg), by = lerp(s.y0, s.y1, PJ.glueProg);
-        drawGlueBottle(c, bx, by - 4 * k, 0.25);
-      } else if (PJ.phase === "slide") {
-        var f = 1 - Math.pow(1 - PJ.slideProg, 3);
-        drawBirdhousePiece(c, curKind, s.dx * (1 - f), s.dy * (1 - f));
-      } else {
-        drawBirdhousePiece(c, curKind, 0, 0);
-      }
-    }
-    // Draw previously driven fasteners
-    PJ.doneNails.forEach(function (dn) {
-      if (dn.kind === "screw") {
-        var dh = dn.head || "phillips";
-        drawScrewHead(c, dn.x, dn.y, 6 * k, HEADS[dh] ? HEADS[dh].color : "#CDD3DB", { h: dh, a: dn.a || 0 });
-      } else {
-        c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
-        ellipse(c, dn.x, dn.y, 5 * k, 2.6 * k); c.fill(); c.stroke();
-      }
+    // the parts on the house, back to front; the part being joined at its place in that order
+    pjOrder().forEach(function (id) {
+      if (on[id]) drawPjPart(c, id);
+      else if (cur && cur.part === id && (PJ.phase !== "glue" && PJ.phase !== "turn")) drawPjPart(c, id, off);
     });
-    // Draw active fasteners for current join
-    if (PJ.phase === "nails" || PJ.phase === "pause") {
-      var actIdx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
-      PJ.nails.forEach(function (n, idx) {
-        var prog = clamp(PJ.fasteners[idx] || 0, 0, 1);
-        var stick = Math.max(0, 1 - prog) * 28 * k;
-        if (state.mode === "screw") {
-          var sh = DRIVERS[state.driver].head || state.bit || "phillips";
-          var scol = HEADS[sh] ? HEADS[sh].color : "#CDD3DB";
-          var sw = 4.2 * k, hr = 6.5 * k, cone = 4.2 * k;
-          var headY = n.y - stick;
-          if (stick > 1) {
-            var coneB = Math.min(n.y, headY + cone);
-            if (coneB < n.y) {
-              c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
-              c.beginPath(); c.rect(n.x - sw / 2, coneB, sw, n.y - coneB); c.fill(); c.stroke();
-              c.strokeStyle = OUT; c.lineWidth = Math.max(1.8, 1.6 * k);
-              for (var ty = n.y - 2 * k; ty > coneB + 1.5 * k; ty -= 3.8 * k) {
-                c.beginPath(); c.moveTo(n.x - sw * 0.72, ty); c.lineTo(n.x + sw * 0.72, ty - 1.8 * k); c.stroke();
-              }
-            }
-            c.fillStyle = scol; c.strokeStyle = OUT; c.lineWidth = 2;
-            c.beginPath();
-            c.moveTo(n.x - hr, headY); c.lineTo(n.x + hr, headY);
-            c.lineTo(n.x + sw / 2, coneB); c.lineTo(n.x - sw / 2, coneB);
-            c.closePath(); c.fill(); c.stroke();
-          }
-          drawScrewHead(c, n.x, headY, hr, scol, { h: sh, a: n.a || 0 });
-          if (PJ.phase === "nails" && idx === actIdx) {
-            c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3;
-            ellipse(c, n.x, headY, 12 * k, 6 * k); c.stroke();
-          }
-        } else {
-          c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
-          if (stick > 1) {
-            c.beginPath(); c.rect(n.x - 2.2 * k, n.y - stick, 4.4 * k, stick); c.fill(); c.stroke();
-          }
-          ellipse(c, n.x, n.y - stick, 5.5 * k, 2.8 * k); c.fill(); c.stroke();
-          if (PJ.phase === "nails" && idx === actIdx) {
-            c.strokeStyle = "rgba(255,201,60,0.95)"; c.lineWidth = 3;
-            ellipse(c, n.x, n.y - stick, 12 * k, 6 * k); c.stroke();
-          }
+    // the glue line along the join, and the bottle squeezing it on
+    if (cur && J && PJ.phase === "glue") {
+      c.save();
+      c.lineCap = "round";
+      J.glue.forEach(function (seg) {
+        var a = hpv(seg[0]), b = hpv(seg[1]);
+        c.strokeStyle = "rgba(255,201,60,0.85)"; c.lineWidth = 6 * k; c.setLineDash([8 * k, 8 * k]);
+        c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+        c.setLineDash([]);
+        if (PJ.glueProg > 0) {
+          c.strokeStyle = "#FFFDF6"; c.lineWidth = 7 * k;
+          c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(lerp(a.x, b.x, PJ.glueProg), lerp(a.y, b.y, PJ.glueProg)); c.stroke();
         }
       });
+      c.restore();
+      var g0 = J.glue[0], ga = hpv(g0[0]), gb = hpv(g0[1]);
+      drawGlueBottle(c, lerp(ga.x, gb.x, PJ.glueProg), lerp(ga.y, gb.y, PJ.glueProg) - 4 * k, 0.25);
+    }
+    // the waiting part sits beside the house, in front of everything, while the glue goes on
+    if (cur && (PJ.phase === "glue" || PJ.phase === "turn")) {
+      c.save(); c.globalAlpha = 0.9; drawPjPart(c, cur.part, off); c.restore();
+    }
+    // nails already driven: their heads on the faces that are in view
+    PJ.doneNails.forEach(function (dn) {
+      if (!pjNailSeen(dn)) return;
+      var p = hpv(dn.p);
+      if (dn.kind === "screw") {
+        var dh = dn.head || "phillips";
+        drawScrewHead(c, p.x, p.y, 5.5 * k, HEADS[dh] ? HEADS[dh].color : "#CDD3DB", { h: dh, a: dn.a || 0 });
+      } else {
+        c.fillStyle = "#C6CED9"; c.strokeStyle = OUT; c.lineWidth = 2;
+        ellipse(c, p.x, p.y, 4.5 * k * (dn.d[0] ? 0.6 : 1), 4.5 * k * (dn.d[0] ? 1 : 0.5)); c.fill(); c.stroke();
+      }
+    });
+    // the nails of this join, sticking out until they are driven
+    if (PJ.phase === "nails" || PJ.phase === "pause") {
+      var actIdx = (PJ.activeIdx != null && PJ.fasteners[PJ.activeIdx] < 0.999) ? PJ.activeIdx : pjNextNailIdx();
+      for (i = 0; i < PJ.nails.length; i++) {
+        var n = PJ.nails[i], g = pjNailGeo(n);
+        n.x = g.x; n.y = g.y;
+        var stick = Math.max(0, 1 - clamp(PJ.fasteners[i] || 0, 0, 1)) * 28 * k;
+        drawPjFastener(c, n, g, stick, PJ.phase === "nails" && i === actIdx);
+      }
       if (PJ.phase === "nails") {
         if (state.mode === "screw") drawDriverTool(c, dt);
         else drawHammerTool(c);
@@ -2692,10 +2694,14 @@
       ham.pos.x = lerp(ham.pos.x, T.x, 0.25); ham.pos.y = lerp(ham.pos.y, T.y, 0.25);
     } else { ham.pos.x = T.x; ham.pos.y = T.y; }
     var mirNow = ham.pos.x > W * 0.56;
-    if (ham.phase === "rest" || ham.phase === "settle") ham.mir = mirNow;
+    // On the birdhouse a nail can go in sideways: the hammer turns to hit along it, its handle kept up.
+    var rot = sceneName() === "assemble" ? pjToolRot() * (1 - endPose) : 0;
+    if (Math.abs(Math.sin(rot)) > 0.5) mirNow = Math.sin(rot) > 0;
+    if (ham.phase === "rest" || ham.phase === "settle" || rot) ham.mir = mirNow;
     var flip = id === "ballpeen" && state.face === "ball";
     var P0 = hamPivot();
     var th = ham.theta + (ham.phase === "rest" && !reduce ? Math.sin(nowMs() / 600) * 0.02 : 0);
+    if (rot) th *= 0.5;     // a sideways swing lifts less, so the head stays on the stage
     var x = ham.pos.x, y = ham.pos.y;
     var sy = 1;
     if (endPose > 0) {
@@ -2705,6 +2711,7 @@
     c.save();
     c.translate(x, y);
     if (sy !== 1) c.scale(1, sy);
+    if (rot) c.rotate(rot);
     if (ham.mir) c.scale(-1, 1);
     c.translate(P0.x, P0.y); c.rotate(th); c.translate(-P0.x, -P0.y);
     c.scale(ts, ts);
@@ -2772,7 +2779,7 @@
     if (!drv.pos) drv.pos = { x: T.x, y: T.y };
     drv.pos.x = lerp(drv.pos.x, T.x, Math.min(1, dt * 16)); drv.pos.y = lerp(drv.pos.y, T.y, Math.min(1, dt * 16));
     drv.cam *= Math.pow(0.004, dt);
-    var x = drv.pos.x, y = drv.pos.y - drv.cam * 9 * ts, rot = drv.cam * 0.12 * Math.sin(nowMs() / 22);
+    var x = drv.pos.x, y = drv.pos.y - drv.cam * 9 * ts, rot = drv.cam * 0.12 * Math.sin(nowMs() / 22) + (isPj ? pjToolRot() : 0);
     var sy = 1;
     if (endPose > 0) {
       var e = endPose;
@@ -2896,10 +2903,11 @@
   function coachInfo() {
     var sc = sceneName(), Dv = DRIVERS[state.driver];
     if (sc === "assemble" && PJ) {
-      if (PJ.finished) return { n: "✓", ok: true, t: "Birdhouse built!", s: "" };
-      if (PJ.phase === "glue") return { n: "1", t: "Tap to squeeze wood glue!", s: "" };
-      if (PJ.phase === "slide") return { n: "1", t: "Putting the wood together…", s: "" };
-      return { n: "2", t: state.mode === "screw" ? "Drive both screws in!" : "Tap each nail 3 times!", s: "" };
+      if (PJ.finished) return { n: "✓", ok: true, t: "The birdhouse is built!", s: "" };
+      if (PJ.phase === "turn") return { n: "1", t: "The house turns around.", s: "" };
+      if (PJ.phase === "glue") return { n: "1", t: "Tap the glue bottle!", s: "" };
+      if (PJ.phase === "slide") return { n: "1", t: "The " + pjPartName(PJ.joins[PJ.step].part) + " goes on the glue.", s: "" };
+      return { n: "2", t: state.mode === "screw" ? "Drive each screw in!" : "Hammer each nail in!", s: "" };
     }
     if (state.mode === "hammer") {
       if (sc === "board") {
@@ -2968,7 +2976,7 @@
     var sc = sceneName(), Hm = HAMMERS[state.hammer], Dv = DRIVERS[state.driver];
     if (sc === "assemble" && PJ) {
       setName(state.mode === "hammer" ? Hm.name : Dv.name, "");
-      setRead("Joined: " + (PJ.finished ? PJ.joins.length : PJ.step) + " of " + PJ.joins.length, "");
+      setRead("Joined: " + PJ.step + " of " + PJ.joins.length, "");
     } else if (state.mode === "hammer") {
       setName(Hm.name, "");
       if (sc === "board") setRead("Nails: " + state.board.nails.length, "");
@@ -3000,10 +3008,10 @@
   function ghostMove() {
     var sc = sceneName(), t, p;
     if (sc === "assemble" && PJ) {
-      if (PJ.finished || PJ.phase === "slide" || PJ.phase === "pause") return null;
+      if (PJ.finished || PJ.phase === "slide" || PJ.phase === "pause" || PJ.phase === "turn") return null;
       if (PJ.phase === "glue") {
-        var gs = pjSeamInfo(PJ.step);
-        return gTap("glue", (gs.x0 + gs.x1) / 2, (gs.y0 + gs.y1) / 2);
+        var gs = pjGlueMid();
+        return gTap("glue", gs.x, gs.y);
       }
       var ni = pjNextNailIdx();
       if (ni < 0) return null;

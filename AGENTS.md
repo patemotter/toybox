@@ -52,8 +52,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
 - `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
   hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
 - Multi-page apps: `workshop/` (Tool Wall `index.html`; `tool-wall.html` only redirects to it + stations: `drill-press`, `saw-bench`, `hammer-screws`,
-  `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`; plus `project.html`, the Birdhouse project plan that
-  sends him through the stations in a real shop's order, with its data and progress API in `workshop/projects.js`,
+  `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`, `sanding` (the Birdhouse's sanding visit only); plus `project.html`, the Birdhouse
+  project plan: six visits (Plane, Measure, Cut, Drill, Sand, Nail), each with a short story line, with its data and progress API in `workshop/projects.js`,
   documented in its header) and `construction-site/` (site map +
   `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
   and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + one station per newer-series episode he knows: `spuds` ("Spuds in Mud"), `combine` ("Combine

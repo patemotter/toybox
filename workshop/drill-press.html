@@ -97,8 +97,8 @@ body.ending .toolbar { pointer-events: none; opacity: 0.4; }
 /* ---------- Project mode (drill-press.html?project=..&step=..): one step of a Workshop project ---------- */
 body.project #holesCount,
 body.project #tabsRow { display: none; }
-.pj-banner { top: 10px; bottom: auto; white-space: nowrap; overflow: hidden; max-width: calc(100% - 20px); }
-body.project .coach { top: 66px; }
+/* The story line sits at the top as information; the shared coach pill (#coach) keeps its shared place. */
+.pj-banner { top: 10px; bottom: auto; white-space: normal; text-align: center; max-width: calc(100% - 20px); }
 .pj-banner[hidden], .pj-done[hidden] { display: none; }
 .pj-done { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(29, 35, 64, 0.3); pointer-events: none; }
 .pj-card { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: min(92%, 460px); padding: 14px 22px 18px; text-align: center;
@@ -109,8 +109,7 @@ body.project .coach { top: 66px; }
 .pj-card .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0.3rem 1.4rem; font-size: 1.35rem; text-decoration: none; }
 @keyframes pj-in { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 600px), (orientation: landscape) and (max-height: 520px) {
-  .pj-banner { top: 8px; bottom: auto; font-size: 1rem; }
-  body.project .coach { top: auto; bottom: 10px; }
+  .pj-banner { top: 8px; bottom: auto; }
   .pj-card { padding: 10px 16px 14px; gap: 8px; }
   .pj-card .btn { min-height: 50px; font-size: 1.15rem; }
 }
@@ -128,7 +127,7 @@ body.project .coach { top: 66px; }
     <main class="tb-stage stage" id="stage">
       <canvas id="cv" role="img" aria-label="A drill press seen from the front"></canvas>
       <div class="tb-counter" id="holesCount">Holes: 0</div>
-      <div class="tb-coach pj-banner" id="pjBanner" hidden></div>
+      <div class="tb-coach pj-banner" id="pjBanner" data-coach="info" hidden></div>
       <div class="coach" id="coach"></div>
       <div class="pj-done" id="pjDone" role="dialog" aria-labelledby="pjDoneTitle" hidden>
         <div class="pj-card">
@@ -169,7 +168,9 @@ body.project .coach { top: 66px; }
   try { gearOn = sessionStorage.getItem("workshop-gear") === "on"; } catch (e) { gearOn = true; }
   if (!gearOn) {
     var toolArg = linkTool || linkBit;
-    location.replace("./?next=drill-press" + (toolArg ? "&tool=" + encodeURIComponent(toolArg) : ""));
+    // A project visit keeps its project and step, so the gear-up sends him straight back to this visit.
+    var pjArgs = params.project && params.step ? "&project=" + encodeURIComponent(params.project) + "&step=" + encodeURIComponent(params.step) : "";
+    location.replace("./?next=drill-press" + (toolArg ? "&tool=" + encodeURIComponent(toolArg) : "") + pjArgs);
     return;
   }
 
@@ -451,14 +452,6 @@ body.project .coach { top: 66px; }
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
     layout();
     buildBg();
-    if (PJ) {
-      var pjb = $("pjBanner"), px;
-      if (pjb && !pjb.hidden) {
-        pjb.style.fontSize = "";
-        px = parseFloat(getComputedStyle(pjb).fontSize) || 20;
-        while (pjb.scrollWidth > pjb.clientWidth + 1 && px > 11) { px -= 1; pjb.style.fontSize = px + "px"; }
-      }
-    }
   }
 
   // ---------- Drawing helpers ----------
@@ -1635,7 +1628,7 @@ body.project .coach { top: 66px; }
             var nxtAfter = pjNextTarget();
             if (!nxtAfter && !PJ.finished) {
               PJ.finished = true;
-              ToyboxProjects.doneLink($("pjBack"), PSTEP, 3650);
+              ToyboxProjects.doneLink($("pjBack"), PSTEP);
               setTimeout(function () {
                 var dLine = $("pjDoneLine") || $("pjDoneText");
                 if (dLine) dLine.textContent = PSTEP.done || "All done!";
@@ -1681,7 +1674,7 @@ body.project .coach { top: 66px; }
       if (PJ.finished) return "";
       if (!R.running) return (PSTEP.coach && PSTEP.coach.indexOf("Switch on") === 0) ? PSTEP.coach : "Switch on the drill press!";
       if (!pjNearTarget(S.px, S.py, 26)) return "Slide an X under the bit!";
-      return PSTEP.id === "floor-drill" ? PSTEP.coach : "Pull the handle down!";
+      return "Pull the handle down!";
     }
     if (!S.holes.length) return R.running ? "Pull the handle down!" : "Switch on the drill press!";
     if (!S.slid) return "Slide the board!";

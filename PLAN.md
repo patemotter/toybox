@@ -547,27 +547,24 @@ not kept across visits.
 
 ## Workshop Projects
 
-An end-to-end build with the real methods: plane, measure, mark, square, cut, rip, drill, nail, sand. First
-project: **a birdhouse** from one long pine board (a nominal 1x6). Units: inches with decimals ("7.5"), never
-fractions; numbers appear only inside project steps that measure or set a machine.
+A build he does hands-on at the real stations, one visit per station, with a short story on every visit (what part
+he is making and what it is for). First project: **a birdhouse**. The dad, 2026-10-24: measuring and cutting every
+part in a real shop's order (the 22-step version) "is not really fun", so it went back to six visits.
 
-- `workshop/projects.js`: the shared data and progress API (read its header: step shape, job kinds, deep links,
-  `localStorage["workshop-projects-v1"]`, kept across launches like a collection; only New on the project page
-  clears it).
-- `workshop/project.html`: the plan. The bench with the parts accumulating as steps complete, one green Go
-  ("Go measure!", "Go cut!") that deep-links the next station visit `<station>?project=birdhouse&step=<id>`,
-  the step list, a Shelf of finished houses, hold-to-reset New.
-- Each station in project mode: locks to the step's tool and the project board, shows the step banner and coach,
-  hides unrelated choices, and when the job is done shows "Done! ✓" with one **Back to the plan** button
-  (`ToyboxProjects.finish(step)`), never automatic.
-- Steps (22 visits): plane (Tool Wall) → Back 12 / Front 9 / Roof 7.5 / Side blank 26: measure + square (Measuring),
-  crosscut on the line (miter saw) → rip the blank to 4 (table saw, draggable fence with the only numeric readout)
-  → Side 10, Side 10, Floor 4 → roof angle on both Sides (miter saw pre-swung, "roof angle", no degrees) → mark the
-  door 6 up (X) → hole saw (Drill Press) → four drain holes → glue + two nails per join (Hammer & Screws) → sand
-  (Tool Wall) → the house on the shelf, a bird lands.
-- Status (2026-10-20): the project page, the data and project modes on Measuring, Saw Bench (miter and table saw),
-  Drill Press and Hammer & Screws work; the Tool Wall has a "Build a birdhouse" card and the planer/sander deep
-  links. Project two candidates: a tool tote, a wooden toy train engine.
+- `workshop/projects.js`: the shared data and progress API (read its header: visit shape, story lines in `title`,
+  deep links, `localStorage["workshop-projects-v1"]`, kept across launches like a collection; only New on the
+  project page clears it). Old saves and old `?step=` ids map to the nearest visit.
+- `workshop/project.html`: the plan. The bench with the parts accumulating, one green button that opens the next
+  station `<station>?project=birdhouse&step=<id>`, the six visit chips, a Shelf of finished houses, hold-to-reset New.
+- Each station in project mode: locks to the visit's job, shows the story line as an info banner at the top, and
+  when the job is done shows a Done card with one **Back to the plan** button. A gear-up during a project
+  returns to the same visit (`project` and `step` ride along in the Tool Wall's `next` link).
+- Visits: Plane (Tool Wall planer) → Measure (Measuring, the tape to the Back's line; the other lines appear) → Cut
+  (Saw Bench, six crosscuts with any saw: Back, Front, Roof, Side, Side, Floor) → Drill (Drill Press, the door) →
+  Sand (`sanding.html`: rub the block over each part's rough edges; the parts are sanded before assembly) → Nail
+  (Hammer & Screws: glue, then two nails along each join: Sides to the Back, Floor, Front, Roof) → the house on the
+  shelf, a bird lands. Dropped with the 22-step version: the table-saw rip, the roof-angle cut and the four drain
+  holes (questions for the dad). Project two candidates: a tool tote, a wooden toy train engine.
 
 ## Two shared cards (common/toybox.js)
 
