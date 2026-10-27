@@ -1,8 +1,8 @@
 (function () {
   "use strict";
   // Glow Board: a black board of round light-up buttons, like the light-up peg toys with touch buttons. Three jobs:
-  //   Draw:       pick a color, then tap or drag across buttons to light them. A press that starts on a button
-  //               already lit in the picked color turns buttons off instead, so no eraser is needed.
+  //   Draw:       pick a color, then tap or drag across buttons to light them. Like the real toy, each tap on a lit
+  //               button steps it to the next color, and to off after the last one.
   //   Fill:       tap any button and the whole board floods to the picked color, outward from that button.
   //   Light show: tap any button and an effect plays from it over the picture (rainbow line, ripple, firework,
   //               sparkle, spin, beams). Effects only light buttons for a moment; the picture stays.
@@ -187,23 +187,25 @@
   const rnd = (a, b) => a + Math.random() * (b - a);
   function flash(e, t, put) { if (t < 0.4) put(e.x, e.y, "#FFFFFF", 1 - t / 0.4); }
   const RUN = {
-    // A rainbow line across the board falls from the top down to the button's row, then fades there.
+    // A rainbow streak falls down the button's column from the top edge and splashes on the button.
     rainbow(e, t, put) {
       flash(e, t, put);
-      const fall = 0.35 + 1.2 * (e.y + 1) / N;
-      const hue = (x) => RAINBOW[(Math.floor(x * 12 / N) + e.hue) % 12];
+      const fall = 0.35 + 1.0 * (e.y + 1) / N, TAIL = 5;
+      const hue = (k) => RAINBOW[(e.hue + k * 2) % 12];
       if (t < fall) {
         const head = Math.round(-1 + (e.y + 1) * t / fall);
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < TAIL; k++) {
           const r = head - k;
-          if (r >= 0 && r <= e.y) for (let x = 0; x < N; x++) put(x, r, hue(x), 1 - k * 0.35);
+          if (r >= 0 && r <= e.y) put(e.x, r, hue(k), 1 - k * 0.17);
         }
         return true;
       }
       const u = (t - fall) / 0.8;
       if (u >= 1) return false;
-      for (let x = 0; x < N; x++) put(x, e.y, hue(x), 1 - u);
       put(e.x, e.y, "#FFFFFF", 1 - u);
+      put(e.x - 1, e.y, hue(1), 0.8 * (1 - u));
+      put(e.x + 1, e.y, hue(2), 0.8 * (1 - u));
+      put(e.x, e.y - 1, hue(3), 0.5 * (1 - u));
       return true;
     },
     // Three rings of light spread out from the button.
@@ -394,9 +396,13 @@
   // =====================================================================================================
   // Buttons waiting to change color at a set time: the outward flood of Fill and the sweep of New.
   let pending = [];
+  // The color each button was lit with (by a tap, a drag or Fill), where its color cycle ends.
+  const cycleFrom = Int8Array.from(board);
+  let cycling = false;
   function setCell(i, c) {
     if (board[i] === c) return false;
     board[i] = c; pop(i); dirty = true; saveSoon();
+    if (c >= 0 && !cycling) cycleFrom[i] = c;
     return true;
   }
   function fillFrom(i) {
@@ -426,12 +432,17 @@
   // =====================================================================================================
   // Input
   // =====================================================================================================
-  // Several fingers at once: each remembers the last button it crossed and, in Draw, whether it lights or turns off.
+  // Several fingers at once: each remembers the last button it crossed.
   const fingers = new Map();
   function local(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-  function drawAt(f, i) {
-    if (f.erase) { if (board[i] >= 0 && setCell(i, -1)) snd.off(); }
-    else if (setCell(i, color)) snd.blip(Math.floor(i / N));
+  function paintAt(i) { if (setCell(i, color)) snd.blip(Math.floor(i / N)); }
+  // A press on a lit button steps it to the next color, wrapping round, and turns it off once every color has
+  // shown since it was lit.
+  function cycleAt(i) {
+    let next = (board[i] + 1) % COLORS.length;
+    if (next === cycleFrom[i]) next = -1;
+    cycling = true; setCell(i, next); cycling = false;
+    if (next < 0) snd.off(); else { lastBlip = 0; snd.blip(Math.floor(i / N)); }
   }
   function showAt(i) {
     addEffect(effect, i % N, Math.floor(i / N));
@@ -444,9 +455,9 @@
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     const pt = local(e), i = cellAt(pt.x, pt.y);
     if (i < 0) { coach.say("Tap a button on the board.", 3); return; }
-    const f = { last: i, x: pt.x, y: pt.y, t: now(), erase: false, moved: false };
+    const f = { last: i, x: pt.x, y: pt.y, t: now(), moved: false };
     fingers.set(e.pointerId, f);
-    if (job === "draw") { f.erase = board[i] === color; drawAt(f, i); }
+    if (job === "draw") { if (board[i] >= 0) cycleAt(i); else paintAt(i); }
     else if (job === "fill") fillFrom(i);
     else showAt(i);
     // The tab's instruction goes away once he has done it, so it never covers the bottom row.
@@ -461,7 +472,7 @@
       const i = cellAt(f.x + (pt.x - f.x) * s / steps, f.y + (pt.y - f.y) * s / steps);
       if (i < 0 || i === f.last) continue;
       f.last = i; f.moved = true;
-      if (job === "draw") drawAt(f, i);
+      if (job === "draw") paintAt(i);
       else if (now() - f.t > 150) { f.t = now(); showAt(i); }
     }
     f.x = pt.x; f.y = pt.y;
@@ -511,7 +522,7 @@
     draw: ["y....", ".y...", "..y..", "...y.", "....y"],
     fill: ["bbbbb", "bbbbb", "bbbbb", "bbbbb", "bbbbb"],
     show: ["y.y.y", ".ywy.", "yy.yy", ".y.y.", "y...y"],
-    rainbow: [".....", "roygb", ".....", ".....", "..w.."],
+    rainbow: ["..r..", "..o..", "..y..", "..g..", ".bwb."],
     ripple: [".bbb.", "b...b", "b.w.b", "b...b", ".bbb."],
     firework: ["r.r.r", ".rwr.", "r.r.r", "..y..", "..y.."],
     sparkle: ["w...y", "..k..", ".y..w", "w..k.", "..w.."],
@@ -618,6 +629,7 @@
       state: () => ({ n: N, job, color: COLORS[color].id, effect, lit: board.filter((v) => v >= 0).length, effects: effects.length,
         pending: pending.length, coach: coach.text() }),
       pt: (x, y) => vp(cellX(x), cellY(y)),
+      cell: (x, y) => (board[y * N + x] >= 0 ? COLORS[board[y * N + x]].id : null),
       ghost: () => ghost.show()
     };
   }
