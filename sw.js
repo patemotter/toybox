@@ -301,7 +301,17 @@ const CORE = [
   "./garbage-truck/icons/icon-180.png",
   "./garbage-truck/icons/icon-192.png",
   "./garbage-truck/icons/icon-512.png",
-  "./garbage-truck/icons/icon-maskable-512.png"
+  "./garbage-truck/icons/icon-maskable-512.png",
+
+  // Glow Board
+  "./glow-board/",
+  "./glow-board/index.html",
+  "./glow-board/index.js",
+  "./glow-board/manifest.webmanifest",
+  "./glow-board/icons/icon-180.png",
+  "./glow-board/icons/icon-192.png",
+  "./glow-board/icons/icon-512.png",
+  "./glow-board/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
