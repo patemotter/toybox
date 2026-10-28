@@ -1,8 +1,8 @@
 (function () {
   "use strict";
   // Glow Board: a black board of round light-up buttons, like the light-up peg toys with touch buttons. Three jobs:
-  //   Draw:       pick a color, then tap or drag across buttons to light them. Like the real toy, each tap on a lit
-  //               button steps it to the next color, and to off after the last one.
+  //   Draw:       pick a color, then tap or drag across buttons to light them; with Off picked they turn off.
+  //               Like the real toy, each tap on a lit button steps it to the next color, and to off after the last.
   //   Fill:       tap any button and the whole board floods to the picked color, outward from that button.
   //   Light show: tap any button and an effect plays from it over the picture (rainbow line, ripple, firework,
   //               sparkle, spin, beams). Effects only light buttons for a moment; the picture stays.
@@ -71,14 +71,16 @@
     saved.board.forEach((v, i) => { board[i] = Number.isInteger(v) && v >= -1 && v < COLORS.length ? v : -1; });
   }
   let job = JOBS.includes(saved.job) ? saved.job : "draw";
-  let color = COLORS.some((c) => c.id === saved.color) ? COLORS.findIndex((c) => c.id === saved.color) : 2;
+  // The picked color: a COLORS index, or -1 for Off (taps and drags turn buttons off, Fill clears the board).
+  let color = saved.color === "off" ? -1 : COLORS.some((c) => c.id === saved.color) ? COLORS.findIndex((c) => c.id === saved.color) : 2;
+  const colorId = () => (color < 0 ? "off" : COLORS[color].id);
   let effect = EFFECTS.some((f) => f.id === saved.effect) ? saved.effect : "rainbow";
 
   let saveTimer = 0;
   function save() {
     clearTimeout(saveTimer); saveTimer = 0;
     try {
-      localStorage.setItem(KEY, JSON.stringify({ n: N, board: Array.from(board), job, color: COLORS[color].id, effect }));
+      localStorage.setItem(KEY, JSON.stringify({ n: N, board: Array.from(board), job, color: colorId(), effect }));
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 400); }
@@ -137,7 +139,7 @@
   // The board: its outer square (bx, by, bs), the button grid's corner (gx, gy) and the button pitch p.
   let bx = 0, by = 0, bs = 0, gx = 0, gy = 0, p = 0;
   let sprites = new Map();
-  // The tray of pickers next to the board: eight slots for the colors; the six light shows share the same box, so
+  // The tray of pickers next to the board: nine slots for the colors and Off; the six light shows share the same box, so
   // switching tabs never moves the board. It goes under the board or beside it, whichever leaves the bigger board.
   let tray = { x: 0, y: 0, w: 0, h: 0, cols: 4, rows: 2 };
   const SLOT_MIN = N === 8 ? 70 : 96, SLOT_MAX = N === 8 ? 96 : 128, M = 8, GAP = 12;
@@ -146,12 +148,12 @@
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    // Try the tray under the board (8 x 1 or 4 x 2) and beside it (2 x 4 or 4 x 2). Each slot gets the room the
+    // Try the tray under the board (9 x 1 or 5 x 2) and beside it (2 x 5, 3 x 3 or 5 x 2). Each slot gets the room the
     // board leaves, between SLOT_MIN and SLOT_MAX; keep the shape that leaves the biggest board, with slots no
     // smaller than SLOT_MIN unless no shape fits that.
     const aw = W - 2 * M, ah = H - 2 * M;
     let best = null;
-    [[8, 1, "under"], [4, 2, "under"], [2, 4, "beside"], [4, 2, "beside"]].forEach(([cols, rows, side]) => {
+    [[9, 1, "under"], [5, 2, "under"], [2, 5, "beside"], [3, 3, "beside"], [5, 2, "beside"]].forEach(([cols, rows, side]) => {
       const fit = side === "under" ? aw / cols : ah / rows;
       const room = side === "under" ? (ah - GAP - aw) / rows : (aw - GAP - ah) / cols;
       const slot = Math.min(fit, SLOT_MAX, Math.max(SLOT_MIN, room));
@@ -431,10 +433,11 @@
 
   // ---------- The tray ----------
   // The slots of the current tab: the colors in tray.cols x tray.rows, the light shows in 6 x 1, 3 x 2 or 2 x 3.
-  function trayItems() { return job === "show" ? EFFECTS : COLORS; }
+  const PICKS = COLORS.concat([{ id: "off", name: "Off", hex: null }]);
+  function trayItems() { return job === "show" ? EFFECTS : PICKS; }
   function slotRect(k) {
     const n = trayItems().length;
-    const cols = n === COLORS.length ? tray.cols : tray.cols === 8 ? 6 : tray.cols === 4 ? 3 : 2, rows = Math.ceil(n / cols);
+    const cols = n === PICKS.length ? tray.cols : tray.cols >= 6 ? 6 : tray.cols >= 3 ? 3 : 2, rows = Math.ceil(n / cols);
     const w = tray.w / cols, h = tray.h / rows;
     return { x: tray.x + (k % cols) * w, y: tray.y + Math.floor(k / cols) * h, w, h };
   }
@@ -445,18 +448,19 @@
     }
     return -1;
   }
-  const trayPopAt = new Float64Array(8).fill(-1e9);
+  const trayPopAt = new Float64Array(PICKS.length).fill(-1e9);
   function drawTray(t) {
     roundRect(tray.x - 4, tray.y - 4, tray.w + 8, tray.h + 8, 18);
     ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.fill();
-    const show = job === "show", picked = show ? EFFECTS.findIndex((f) => f.id === effect) : color;
+    const show = job === "show", picked = show ? EFFECTS.findIndex((f) => f.id === effect) : color < 0 ? COLORS.length : color;
     trayItems().forEach((it, k) => {
       const r = slotRect(k), u = (t - trayPopAt[k]) / POP_MS, sc = u >= 0 && u < 1 ? 1 + 0.15 * (1 - u) * (1 - u) : 1;
       const fs = Math.max(14, Math.min(17, r.h * 0.17)), cx = r.x + r.w / 2, size = Math.min(r.w - 10, r.h - fs - 14);
       const cy = r.y + 5 + size / 2;
       ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc);
       if (show) drawDots(PICS[it.id], size * 0.86);
-      else drawLamp(it.hex, size * 0.4);
+      else if (it.hex) drawLamp(it.hex, size * 0.4);
+      else drawOffLamp(size * 0.4);
       ctx.restore();
       ctx.font = "700 " + fs + "px 'Baloo 2', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
       ctx.fillStyle = "#FFFFFF"; ctx.fillText(it.name, cx, r.y + r.h - 6);
@@ -483,6 +487,15 @@
     ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.42, r * 0.34, r * 0.18, -0.5, 0, TAU);
     ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fill();
   }
+  // Off: a big unlit button, centered on the origin.
+  function drawOffLamp(r) {
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    g.addColorStop(0, "#80868F"); g.addColorStop(0.55, "#4E535B"); g.addColorStop(1, "#33363C");
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#1D2340"; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.42, r * 0.34, r * 0.18, -0.5, 0, TAU);
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fill();
+  }
   // A light show's picture: a small board with a 5 x 5 pattern of lit dots, centered on the origin.
   function drawDots(rows, size) {
     roundRect(-size / 2, -size / 2, size, size, size * 0.14);
@@ -494,9 +507,9 @@
     }));
   }
   function pickSlot(k) {
-    if (job === "show") effect = EFFECTS[k].id; else color = k;
+    if (job === "show") effect = EFFECTS[k].id; else color = k < COLORS.length ? k : -1;
     if (!reduce) { trayPopAt[k] = now(); popUntil = Math.max(popUntil, trayPopAt[k] + POP_MS); }
-    if (job === "show") snd.show(effect); else snd.blip(2);
+    if (job === "show") snd.show(effect); else if (color < 0) snd.off(); else snd.blip(2);
     dirty = true; saveSoon();
   }
 
@@ -544,7 +557,10 @@
   // Several fingers at once: each remembers the last button it crossed.
   const fingers = new Map();
   function local(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-  function paintAt(i) { if (setCell(i, color)) snd.blip(Math.floor(i / N)); }
+  function paintAt(i) {
+    if (!setCell(i, color)) return;
+    if (color < 0) snd.off(); else snd.blip(Math.floor(i / N));
+  }
   // A press on a lit button steps it to the next color, wrapping round, and turns it off once every color has
   // shown since it was lit.
   function cycleAt(i) {
@@ -568,7 +584,7 @@
     if (i < 0) { coach.say("Tap a button on the board.", 3); return; }
     const f = { last: i, x: pt.x, y: pt.y, t: now(), moved: false };
     fingers.set(e.pointerId, f);
-    if (job === "draw") { if (board[i] >= 0) cycleAt(i); else paintAt(i); }
+    if (job === "draw") { if (board[i] >= 0 && color >= 0) cycleAt(i); else paintAt(i); }
     else if (job === "fill") fillFrom(i);
     else showAt(i);
     // The tab's instruction goes away once he has done it, so it never covers the bottom row.
@@ -714,7 +730,7 @@
   // Test hooks, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) {
     window.__glow = {
-      state: () => ({ n: N, job, color: COLORS[color].id, effect, lit: board.filter((v) => v >= 0).length, effects: effects.length,
+      state: () => ({ n: N, job, color: colorId(), effect, lit: board.filter((v) => v >= 0).length, effects: effects.length,
         pending: pending.length, coach: coach.text() }),
       pt: (x, y) => vp(cellX(x), cellY(y)),
       slot: (k) => { const r = slotRect(k); return vp(r.x + r.w / 2, r.y + r.h / 2); },
