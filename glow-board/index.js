@@ -17,7 +17,7 @@
   //   Drawing
   //   Draw, fill and clear
   //   Input
-  //   Coach, ghost hand and panel
+  //   Coach, ghost hand and tabs
   //   Surprise
   //   Loop, timer, start and debug hook
 
@@ -45,6 +45,19 @@
     { id: "sparkle", name: "Sparkle" }, { id: "spin", name: "Spin" }, { id: "beams", name: "Beams" }
   ];
   const JOBS = ["draw", "fill", "show"];
+  // The pictures of the tabs and light shows: 5 x 5 dots, one letter per lit dot's color.
+  const DOT = { r: "#FF4D4D", o: "#FF9A2E", y: "#FFE14D", g: "#4CD964", b: "#3D8BFF", p: "#A66BFF", k: "#FF6FC8", w: "#FFFFFF" };
+  const PICS = {
+    draw: ["y....", ".y...", "..y..", "...y.", "....y"],
+    fill: ["bbbbb", "bbbbb", "bbbbb", "bbbbb", "bbbbb"],
+    show: ["y.y.y", ".ywy.", "yy.yy", ".y.y.", "y...y"],
+    rainbow: ["..r..", "..o..", "..y..", "..g..", ".bwb."],
+    ripple: [".bbb.", "b...b", "b.w.b", "b...b", ".bbb."],
+    firework: ["r.r.r", ".rwr.", "r.r.r", "..y..", "..y.."],
+    sparkle: ["w...y", "..k..", ".y..w", "w..k.", "..w.."],
+    spin: [".kkk.", "k.w.k", "k.w.k", "k...k", ".kkk."],
+    beams: ["..g..", "..g..", "ggwgg", "..g..", "..g.."]
+  };
 
   const N = Math.min(innerWidth, innerHeight) < 600 ? 8 : 16;
   const KEY = "glow-board-v1";
@@ -124,13 +137,37 @@
   // The board: its outer square (bx, by, bs), the button grid's corner (gx, gy) and the button pitch p.
   let bx = 0, by = 0, bs = 0, gx = 0, gy = 0, p = 0;
   let sprites = new Map();
+  // The tray of pickers next to the board: eight slots for the colors; the six light shows share the same box, so
+  // switching tabs never moves the board. It goes under the board or beside it, whichever leaves the bigger board.
+  let tray = { x: 0, y: 0, w: 0, h: 0, cols: 4, rows: 2 };
+  const SLOT_MIN = N === 8 ? 70 : 96, SLOT_MAX = N === 8 ? 96 : 128, M = 8, GAP = 12;
   function resize() {
     const r = stage.getBoundingClientRect();
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    bs = Math.max(40, Math.min(W, H) - 16);
-    bx = (W - bs) / 2; by = (H - bs) / 2;
+    // Try the tray under the board (8 x 1 or 4 x 2) and beside it (2 x 4 or 4 x 2). Each slot gets the room the
+    // board leaves, between SLOT_MIN and SLOT_MAX; keep the shape that leaves the biggest board, with slots no
+    // smaller than SLOT_MIN unless no shape fits that.
+    const aw = W - 2 * M, ah = H - 2 * M;
+    let best = null;
+    [[8, 1, "under"], [4, 2, "under"], [2, 4, "beside"], [4, 2, "beside"]].forEach(([cols, rows, side]) => {
+      const fit = side === "under" ? aw / cols : ah / rows;
+      const room = side === "under" ? (ah - GAP - aw) / rows : (aw - GAP - ah) / cols;
+      const slot = Math.min(fit, SLOT_MAX, Math.max(SLOT_MIN, room));
+      const board = side === "under" ? Math.min(aw, ah - GAP - slot * rows) : Math.min(ah, aw - GAP - slot * cols);
+      const score = board - (slot < SLOT_MIN ? 1e4 : 0);
+      if (!best || score > best.score) best = { cols, rows, side, slot, board, score };
+    });
+    bs = Math.max(40, best.board);
+    tray = { cols: best.cols, rows: best.rows, w: best.slot * best.cols, h: best.slot * best.rows };
+    if (best.side === "beside") {
+      bx = (W - bs - GAP - tray.w) / 2; by = (H - bs) / 2;
+      tray.x = bx + bs + GAP; tray.y = (H - tray.h) / 2;
+    } else {
+      bx = (W - bs) / 2; by = (H - bs - GAP - tray.h) / 2;
+      tray.x = (W - tray.w) / 2; tray.y = by + bs + GAP;
+    }
     const pad = bs * 0.055;
     p = (bs - pad * 2) / N; gx = bx + pad; gy = by + pad;
     sprites = new Map();
@@ -382,14 +419,86 @@
       ctx.drawImage(base ? sprite("lit", base) : sprite("off", ""), x - bsz / 2, y - bsz / 2, bsz, bsz);
       if (a > 0) { ctx.globalAlpha = a; ctx.drawImage(sprite("lit", ovHex[i]), x - p / 2, y - p / 2, p, p); ctx.globalAlpha = 1; }
     }
-    // Winding down at the end of play time: the whole board dims.
-    if (dim < 1) { roundRect(bx, by, bs, bs, bs * 0.05); ctx.fillStyle = "rgba(10,12,24," + (1 - dim) * 0.75 + ")"; ctx.fill(); }
+    drawTray(t);
+    // Winding down at the end of play time: the whole stage dims.
+    if (dim < 1) { ctx.fillStyle = "rgba(10,12,24," + (1 - dim) * 0.75 + ")"; ctx.fillRect(0, 0, W, H); }
   }
   function popScale(i, t) {
     const u = (t - popAt[i]) / POP_MS;
     return u >= 0 && u < 1 ? 1 + 0.22 * (1 - u) * (1 - u) : 1;
   }
   function pop(i) { if (reduce) return; const t = now(); popAt[i] = t; popUntil = Math.max(popUntil, t + POP_MS); }
+
+  // ---------- The tray ----------
+  // The slots of the current tab: the colors in tray.cols x tray.rows, the light shows in 6 x 1, 3 x 2 or 2 x 3.
+  function trayItems() { return job === "show" ? EFFECTS : COLORS; }
+  function slotRect(k) {
+    const n = trayItems().length;
+    const cols = n === COLORS.length ? tray.cols : tray.cols === 8 ? 6 : tray.cols === 4 ? 3 : 2, rows = Math.ceil(n / cols);
+    const w = tray.w / cols, h = tray.h / rows;
+    return { x: tray.x + (k % cols) * w, y: tray.y + Math.floor(k / cols) * h, w, h };
+  }
+  function trayAt(x, y) {
+    for (let k = 0; k < trayItems().length; k++) {
+      const r = slotRect(k);
+      if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return k;
+    }
+    return -1;
+  }
+  const trayPopAt = new Float64Array(8).fill(-1e9);
+  function drawTray(t) {
+    roundRect(tray.x - 4, tray.y - 4, tray.w + 8, tray.h + 8, 18);
+    ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.fill();
+    const show = job === "show", picked = show ? EFFECTS.findIndex((f) => f.id === effect) : color;
+    trayItems().forEach((it, k) => {
+      const r = slotRect(k), u = (t - trayPopAt[k]) / POP_MS, sc = u >= 0 && u < 1 ? 1 + 0.15 * (1 - u) * (1 - u) : 1;
+      const fs = Math.max(14, Math.min(17, r.h * 0.17)), cx = r.x + r.w / 2, size = Math.min(r.w - 10, r.h - fs - 14);
+      const cy = r.y + 5 + size / 2;
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc);
+      if (show) drawDots(PICS[it.id], size * 0.86);
+      else drawLamp(it.hex, size * 0.4);
+      ctx.restore();
+      ctx.font = "700 " + fs + "px 'Baloo 2', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = "#FFFFFF"; ctx.fillText(it.name, cx, r.y + r.h - 6);
+      if (k === picked) {
+        // Picked: a yellow ring round the slot and a tick badge, like the Toybox's picked tiles.
+        roundRect(r.x + 3, r.y + 1, r.w - 6, r.h - 2, 14);
+        ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
+        const tx = r.x + r.w - 14, ty = r.y + 13;
+        ctx.beginPath(); ctx.arc(tx, ty, 10, 0, TAU); ctx.fillStyle = "#1D2340"; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(tx - 4.5, ty); ctx.lineTo(tx - 1, ty + 3.5); ctx.lineTo(tx + 5, ty - 3.5);
+        ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#FFFFFF"; ctx.stroke();
+      }
+    });
+  }
+  // A big lit button of one color, centered on the origin.
+  function drawLamp(hex, r) {
+    const h = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, r * 1.45);
+    h.addColorStop(0, rgba(hex, 0.5)); h.addColorStop(1, rgba(hex, 0));
+    ctx.fillStyle = h; ctx.fillRect(-r * 1.5, -r * 1.5, r * 3, r * 3);
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    g.addColorStop(0, mix(hex, "#FFFFFF", 0.75)); g.addColorStop(0.5, hex); g.addColorStop(1, mix(hex, "#000000", 0.2));
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#1D2340"; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.42, r * 0.34, r * 0.18, -0.5, 0, TAU);
+    ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fill();
+  }
+  // A light show's picture: a small board with a 5 x 5 pattern of lit dots, centered on the origin.
+  function drawDots(rows, size) {
+    roundRect(-size / 2, -size / 2, size, size, size * 0.14);
+    ctx.fillStyle = "#16171B"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#1D2340"; ctx.stroke();
+    const q = size / 5.6;
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      ctx.beginPath(); ctx.arc((x - 2) * q, (y - 2) * q, q * 0.36, 0, TAU);
+      ctx.fillStyle = DOT[ch] || "#4E535B"; ctx.fill();
+    }));
+  }
+  function pickSlot(k) {
+    if (job === "show") effect = EFFECTS[k].id; else color = k;
+    if (!reduce) { trayPopAt[k] = now(); popUntil = Math.max(popUntil, trayPopAt[k] + POP_MS); }
+    if (job === "show") snd.show(effect); else snd.blip(2);
+    dirty = true; saveSoon();
+  }
 
   // =====================================================================================================
   // Draw, fill and clear
@@ -453,7 +562,9 @@
     if (locked() || Toybox.isPalm(e)) return;
     e.preventDefault();
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-    const pt = local(e), i = cellAt(pt.x, pt.y);
+    const pt = local(e), k = trayAt(pt.x, pt.y);
+    if (k >= 0) { pickSlot(k); return; }
+    const i = cellAt(pt.x, pt.y);
     if (i < 0) { coach.say("Tap a button on the board.", 3); return; }
     const f = { last: i, x: pt.x, y: pt.y, t: now(), moved: false };
     fingers.set(e.pointerId, f);
@@ -488,7 +599,7 @@
   ["gesturestart", "gesturechange"].forEach((n) => document.addEventListener(n, (e) => e.preventDefault()));
 
   // =====================================================================================================
-  // Coach, ghost hand and panel
+  // Coach, ghost hand and tabs
   // =====================================================================================================
   const coach = Toybox.coach($("coach"));
   const LINES = {
@@ -511,24 +622,12 @@
     }
   });
   function pic(rows) {
-    const map = { r: "#FF4D4D", o: "#FF9A2E", y: "#FFE14D", g: "#4CD964", b: "#3D8BFF", p: "#A66BFF", k: "#FF6FC8", w: "#FFFFFF" };
     let s = '<svg viewBox="0 0 50 50"><rect x="1" y="1" width="48" height="48" rx="7" fill="#16171B" stroke="#1D2340" stroke-width="2"/>';
     rows.forEach((row, y) => [...row].forEach((ch, x) => {
-      s += '<circle cx="' + (9 + x * 8) + '" cy="' + (9 + y * 8) + '" r="3.2" fill="' + (map[ch] || "#4E535B") + '"/>';
+      s += '<circle cx="' + (9 + x * 8) + '" cy="' + (9 + y * 8) + '" r="3.2" fill="' + (DOT[ch] || "#4E535B") + '"/>';
     }));
     return s + "</svg>";
   }
-  const PICS = {
-    draw: ["y....", ".y...", "..y..", "...y.", "....y"],
-    fill: ["bbbbb", "bbbbb", "bbbbb", "bbbbb", "bbbbb"],
-    show: ["y.y.y", ".ywy.", "yy.yy", ".y.y.", "y...y"],
-    rainbow: ["..r..", "..o..", "..y..", "..g..", ".bwb."],
-    ripple: [".bbb.", "b...b", "b.w.b", "b...b", ".bbb."],
-    firework: ["r.r.r", ".rwr.", "r.r.r", "..y..", "..y.."],
-    sparkle: ["w...y", "..k..", ".y..w", "w..k.", "..w.."],
-    spin: [".kkk.", "k.w.k", "k.w.k", "k...k", ".kkk."],
-    beams: ["..g..", "..g..", "ggwgg", "..g..", "..g.."]
-  };
 
   Toybox.jobs($("jobs"), {
     jobs: [{ id: "draw", name: "Draw", pic: pic(PICS.draw) }, { id: "fill", name: "Fill", pic: pic(PICS.fill) },
@@ -536,20 +635,9 @@
     value: job,
     onPick: (id) => pickJob(id)
   });
-  Toybox.tiles($("colors"), {
-    kind: "swatch", rows: 2, value: COLORS[color].id,
-    items: COLORS.map((c) => ({ id: c.id, name: c.name, color: c.hex })),
-    onPick: (id) => { color = COLORS.findIndex((c) => c.id === id); saveSoon(); }
-  });
-  Toybox.tiles($("effects"), {
-    rows: 2, value: effect,
-    items: EFFECTS.map((f) => ({ id: f.id, name: f.name, pic: pic(PICS[f.id]) })),
-    onPick: (id) => { effect = id; saveSoon(); }
-  });
   function pickJob(id) {
     job = id;
-    $("colors").hidden = job === "show";
-    $("effects").hidden = job !== "show";
+    dirty = true;
     coach.step(LINES[job]);
     ghost.poke();
     saveSoon();
@@ -629,6 +717,7 @@
       state: () => ({ n: N, job, color: COLORS[color].id, effect, lit: board.filter((v) => v >= 0).length, effects: effects.length,
         pending: pending.length, coach: coach.text() }),
       pt: (x, y) => vp(cellX(x), cellY(y)),
+      slot: (k) => { const r = slotRect(k); return vp(r.x + r.w / 2, r.y + r.h / 2); },
       cell: (x, y) => (board[y * N + x] >= 0 ? COLORS[board[y * N + x]].id : null),
       ghost: () => ghost.show()
     };

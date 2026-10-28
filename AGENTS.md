@@ -90,7 +90,8 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   spirograph, jigsaw, sand-table, espresso-machine, farm (shown as "Tractor Ted"), sewing-machine (the family's
   white computerized machine, no logo; script in `sewing-machine/index.js`), garbage-truck (an automated side loader on a street of
   bins, hands-on like the Farm stations; script in `garbage-truck/index.js`), glow-board (a board of round light-up
-  buttons modeled on his light-up touch-button toy, drawn without its logo: Draw | Fill | Light show; 8 x 8 on phones, 16 x 16 on
+  buttons modeled on his light-up touch-button toy, drawn without its logo: Draw | Fill | Light show; the colors and light shows are a tray of drawn
+  buttons on the stage next to the board, so the panel holds only New and Surprise; 8 x 8 on phones, 16 x 16 on
   tablets, chosen once from the screen's short side; script in `glow-board/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
