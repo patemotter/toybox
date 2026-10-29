@@ -166,6 +166,7 @@ async function runPage(browser, url, size) {
       sessionStorage.setItem('workshop-gear', 'on');
       sessionStorage.setItem('workshop-check-skip', '1');
       sessionStorage.setItem('site-gear', 'on');
+      sessionStorage.setItem('forge-gear', 'on');
       sessionStorage.setItem('kitchen-ready', 'on');
       sessionStorage.setItem('toybox-launch', 'fit' + Date.now() + Math.random());
       ['train-builder', 'construction-site', 'concrete', 'workshop', 'kitchen'].forEach(a => sessionStorage.setItem('toybox-turn-ok:' + a, '1'));

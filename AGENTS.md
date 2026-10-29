@@ -92,7 +92,12 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   bins, hands-on like the Farm stations; script in `garbage-truck/index.js`), glow-board (a board of round light-up
   buttons modeled on his light-up touch-button toy, drawn without its logo: Draw | Fill | Light show; the colors and light shows are a tray of drawn
   buttons on the stage next to the board, so the panel holds only New and Surprise; 8 x 8 on phones, 16 x 16 on
-  tablets, chosen once from the screen's short side; script in `glow-board/index.js`).
+  tablets, chosen once from the screen's short side; script in `glow-board/index.js`), forge (a blacksmith's corner: the blower, a
+  steel bar that moves only where he hammers it and only while hot, the vise's twisting wrench, the tub; makes the
+  dad's real copper coffee spoon as a saved project, an S-hook, a fire poker or a free bar; finished pieces hang on a
+  rack; gear-up flag `forge-gear`; plan `plans/forge.md`, script `forge/index.js`), circuits (snap parts on a pegboard
+  with a small circuit solver, or wire a house at night: Board | House; plan `plans/circuits.md`, script
+  `circuits/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
@@ -373,6 +378,7 @@ Keep only:
 ### Safety rituals
 - **The dad toned these down** (they got in the way): gear up when he first starts, then again only every
   **10 minutes**. No quick "Safety check!" cards on stations or tool changes, and no "switch it off first" card.
+- **Forge**: Eye protection, Ear protection, Leather apron, Gloves (`forge-gear`).
 - **Workshop**: the child puts **"Eye protection"** and **"Ear protection"** on a worker (use exactly those names;
   they're the words used at home); flag sessionStorage `workshop-gear`.
 - **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`).

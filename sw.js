@@ -311,7 +311,27 @@ const CORE = [
   "./glow-board/icons/icon-180.png",
   "./glow-board/icons/icon-192.png",
   "./glow-board/icons/icon-512.png",
-  "./glow-board/icons/icon-maskable-512.png"
+  "./glow-board/icons/icon-maskable-512.png",
+
+  // Circuits
+  "./circuits/",
+  "./circuits/index.html",
+  "./circuits/index.js",
+  "./circuits/manifest.webmanifest",
+  "./circuits/icons/icon-180.png",
+  "./circuits/icons/icon-192.png",
+  "./circuits/icons/icon-512.png",
+  "./circuits/icons/icon-maskable-512.png",
+
+  // Forge
+  "./forge/",
+  "./forge/index.html",
+  "./forge/index.js",
+  "./forge/manifest.webmanifest",
+  "./forge/icons/icon-180.png",
+  "./forge/icons/icon-192.png",
+  "./forge/icons/icon-512.png",
+  "./forge/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

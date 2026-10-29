@@ -25,6 +25,7 @@ intuitive UI, fresh start, safety rituals, architecture, testing, deploy). "Ever
 | 14 | Bubble Machine | Done |
 | 15 | Spinning Tops, Spirograph, Sand Table, Espresso Machine | Done |
 | 16 | Farm (episode stations) | Done (14 stations; authentic Tractor Ted episode highlights as in Spuds in Mud) |
+| 17 | Forge, Circuits | Done 2026-10-29 (plans and open questions in `plans/forge.md` and `plans/circuits.md`) |
 
 Also built (the dad's later picks): **Spinning Tops** (done; questions: a fast pull spins about 45 s, too long?
 should Surprise keep the tops already spinning? should fallen tops clear themselves?), **Spirograph** (done; can't go wrong: any finger

@@ -1266,13 +1266,13 @@
   })();
 
   // ---------- Safety gear ----------
-  // The Workshop, the Construction Site and the Kitchen ask for their gear (getting ready) on the first
+  // The Workshop, the Construction Site, the Kitchen and the Forge ask for their gear (getting ready) on the first
   // visit; their pages read the sessionStorage flags below and send him to the gear-up when the flag is off.
   // The dad: gear up when you first start, then again only every 10 minutes. So the flag is remembered with
   // the time it was put on ("toybox-gear-v1" in localStorage): it comes back when he leaves and returns (the
   // home screen, or closing and reopening the Toybox), and is taken off once it is 10 minutes old. That
   // happens as a page loads, so the gear-up comes on his next page, never in the middle of a job.
-  var GEAR_FLAGS = ["workshop-gear", "site-gear", "kitchen-ready"], GEAR_KEY = "toybox-gear-v1", GEAR_MS = 10 * 60000;
+  var GEAR_FLAGS = ["workshop-gear", "site-gear", "kitchen-ready", "forge-gear"], GEAR_KEY = "toybox-gear-v1", GEAR_MS = 10 * 60000;
   (function () {
     try {
       var on = readJSON(GEAR_KEY), t = now(), changed = false;
@@ -1585,7 +1585,7 @@
     "tighten loosen measure mark saw sand drill plane clamp glue nail wipe wash dry dress pop catch throw launch fly steer " +
     "load tip dump dig scrape spread wrap stack bale mow chop rake send gather pen line sort crank wind pump squeeze flick " +
     "fling aim shoot ring knock sow cover peel slice dice whisk beat knead serve plate set place connect join attach color " +
-    "colour print grab carry bounce blow follow hang keep sharpen scrub walk shut hook cook use pat rub tickle pet").split(" ");
+    "colour print grab carry bounce blow follow hang keep sharpen scrub walk shut hook cook use pat rub tickle pet dunk").split(" ");
   var DO_SET = {};
   DO_WORDS.forEach(function (w) { DO_SET[w] = 1; });
   // An instruction if any sentence in the line starts with a doing word ("A big rock is stuck. Tap it!").

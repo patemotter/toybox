@@ -284,6 +284,7 @@ async function openPage(browser, url) {
       sessionStorage.setItem('workshop-gear', 'on');
       sessionStorage.setItem('workshop-check-skip', '1');
       sessionStorage.setItem('site-gear', 'on');
+      sessionStorage.setItem('forge-gear', 'on');
       sessionStorage.setItem('kitchen-ready', 'on');
       // Every load is a fresh visit (as if opened from the home screen), so a reload brings back the
       // first screen (picture choosers, the first tab) for the buttons a previous tap hid.

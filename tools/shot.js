@@ -66,6 +66,7 @@ function point(vp, x, y) {
         sessionStorage.setItem('workshop-gear', 'on');
         sessionStorage.setItem('workshop-check-skip', '1');
         sessionStorage.setItem('site-gear', 'on');
+        sessionStorage.setItem('forge-gear', 'on');
         sessionStorage.setItem('kitchen-ready', 'on');
         if (fresh) sessionStorage.setItem('toybox-launch', 'shot' + Date.now());
         ['train-builder', 'construction-site', 'concrete', 'workshop', 'kitchen', 'farm'].forEach(a => sessionStorage.setItem('toybox-turn-ok:' + a, '1'));
