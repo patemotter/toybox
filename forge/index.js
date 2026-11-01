@@ -336,12 +336,14 @@
   // workable for about 13 s), and heat spreads a little to its neighbors.
   function heatStep(dt) {
     const h = P.bar.heat, inFire = B.where === "fire" && !B.fly && !ending;
-    const rate = ending ? 0 : 0.05 + 0.25 * F.fire, tau = ending ? 1.2 : B.quench ? 0.18 : 12;
+    // A heat lasts a long while out of the fire (about 45 s of working heat from orange), and even a low fire
+    // heats the bar in a few seconds (the dad, 2026-11-01: it needed far too much reheating).
+    const rate = ending ? 0 : 0.18 + 0.5 * F.fire, tau = ending ? 1.2 : B.quench ? 0.18 : 50;
     for (let i = 0; i < N; i++) {
       if (inFire && B.inCoal[i]) h[i] += dt * rate * (1.05 - h[i]);
       else h[i] *= Math.exp(-dt / tau);
     }
-    const k = Math.min(0.4, 0.8 * dt);
+    const k = Math.min(0.4, 0.2 * dt);
     let prev = h[0];
     for (let i = 0; i < N; i++) {
       const l = i > 0 ? prev : h[i], r = i < N - 1 ? h[i + 1] : h[i];
@@ -372,8 +374,8 @@
       reg = freeReg();
     }
     const rc = (reg[0] + reg[1] + 1) / 2;
-    if (where === "fire") return poseFor(b, held, PI, rc, g.coalX, g.coalY - 1);
-    if (where === "tub") return poseFor(b, held, 0.95, rc, g.tubX - 2, g.tubY + 24);
+    if (where === "fire") return fitPose(b, held, [PI, 0], rc, g.coalX, g.coalY - 1);
+    if (where === "tub") return fitPose(b, held, [0.95, PI - 0.95], rc, g.tubX - 2, g.tubY + 24);
     if (where === "vise") {
       if (st && st.kind === "dish") { B.vise = [9, 24]; return poseFor(b, 0, -PI / 2, 9, g.viseX, g.jawY); }
       const s = st && st.kind === "twist" ? TWIST_REG[0] : clamp(hottest(14)[0] - 1, 1, N - 17);
@@ -388,6 +390,20 @@
       return poseFor(b, a ? 0 : N - 1, PI, a ? reg[0] : reg[1] + 1, g.faceL - 6, g.ay - 3);
     }
     return poseFor(b, held, 0, rc, g.ax + 6, g.ay - 4);
+  }
+  // The first of the directions that keeps the tongs (the held end) on screen, where he can grab them; on an
+  // upright phone the forge is at the left edge, so the bar in the fire points the other way (the dad, 2026-11-01:
+  // dragging didn't work, because the tongs were off the screen).
+  function fitPose(b, held, angs, rc, tx, ty) {
+    let best = null, bm = -Infinity;
+    for (const ang of angs) {
+      const pose = poseFor(b, held, ang, rc, tx, ty), pts = shape(b, pose);
+      const e = pts[held === 0 ? 0 : N], f = pts[held === 0 ? 1 : N - 1], l = Math.hypot(e[0] - f[0], e[1] - f[1]) || 1;
+      const gx = e[0] + (e[0] - f[0]) / l * 30, m = Math.min(gx, L.w - gx, e[0], L.w - e[0]);
+      if (m >= 16) return pose;
+      if (m > bm) { bm = m; best = pose; }
+    }
+    return best;
   }
   function freeReg() {
     const reg = B.flip ? hottest(10, 0, N - 13) : hottest(10, 12, N - 1);
@@ -443,7 +459,7 @@
   }
   // Dragging the tongs: the bar follows the finger and lands on the place it is let go over.
   function startCarry(w) {
-    if (!movable() || B.where === "vise" || B.where === "assembled") return false;
+    if (!movable() || B.where === "assembled" || B.fly) return false;
     const ang = Math.cos(B.pose.ang) >= 0 ? 0 : PI;
     B.pose = { x: B.pose.x, y: B.pose.y, ang, held: B.pose.held };
     B.carry = { ox: B.pose.x - w.x, oy: B.pose.y - w.y };
@@ -458,8 +474,20 @@
     if (Math.abs(w.x - t.x) < t.w * 0.7 && w.y > t.y - 60 && w.y < t.base) return "tub";
     return null;
   }
+  // Where a carried bar lands: the place under the finger, or else the nearest place within reach, so a drop a
+  // little beside the anvil or above the forge still counts.
+  function dropPlace(w) {
+    const at = placeAt(w);
+    if (at) return at;
+    let best = null, bd = 170;
+    [["fire", g.coalX, g.coalY - 10], ["anvil", g.ax, g.ay - 10], ["vise", g.viseX, g.jawY], ["tub", g.tubX, g.tubY]].forEach(([id, x, y]) => {
+      const d = Math.hypot(w.x - x, w.y - y);
+      if (d < bd) { bd = d; best = id; }
+    });
+    return best;
+  }
   function dropCarry(w) {
-    const where = placeAt(w) || B.prev;
+    const where = dropPlace(w) || B.prev;
     B.fly = { from: B.pts.map((p) => p.slice()), t0: now(), dur: 0.4 };
     B.where = where; B.carry = null; B.prev = where;
     // With the plain Bar, the fire and the anvil keep the spot he dropped it on.
@@ -470,6 +498,9 @@
       for (let i = 0; i < N; i++) { const m = segMid(pts, i), d = Math.abs(m.x - tx); if (d < bd) { bd = d; bi = i; } }
       const m = segMid(pts, bi);
       B.pose = { x: B.pose.x + (bd > 30 ? tx - m.x : 0), y: B.pose.y + ty - m.y, ang: B.pose.ang, held: B.pose.held };
+      // Never leave the tongs off the screen.
+      const e = shape(P.bar, B.pose)[B.pose.held === 0 ? 0 : N];
+      if (e[0] < 16 || e[0] > L.w - 16) B.pose = placeFor(where);
     } else B.pose = placeFor(where);
     snd.place();
   }
@@ -507,7 +538,7 @@
   }
   function fireStep(dt) {
     if (F.auto > 0) { const d = Math.min(F.auto * TAU, dt * TAU * 1.3); F.auto -= d / TAU; crankBy(d); }
-    F.fire = Math.max(ending ? 0.02 : 0.12, F.fire - dt * (ending ? 0.3 : 0.035));
+    F.fire = Math.max(ending ? 0.02 : 0.12, F.fire - dt * (ending ? 0.3 : 0.015));
     F.spin = Math.max(0, F.spin - dt * 1.5);
     F.flare = Math.max(0, F.flare - dt * 0.35);
   }
@@ -517,7 +548,7 @@
   // =====================================================================================================
   // HM: the hammer. It hangs raised over the work and swings down at each blow.
   const HM = { x: 0, y: 0, t0: -9, cold: false };
-  // WR: the twisting wrench's angle and a tap's quarter turn still to play.
+  // WR: the twisting wrench's angle and a tap's half turn still to play.
   const WR = { ang: 0, left: 0, dir: 1 };
   let coldSaid = 0;
   function swing(x, y, cold) { HM.x = x; HM.y = y; HM.t0 = now(); HM.cold = cold; }
@@ -576,16 +607,16 @@
       while (j !== free && segMid(B.pts, j).x <= g.faceR) j += step;
       // The spoon's neck stops at a gentle angle; a plain bar can be bent to a right angle.
       const cap = P.make === "spoon" ? 0.7 : 1.5;
-      b.bd[j] = clamp(b.bd[j] + sgn * 0.2 * Math.max(soft(j), soft(i) * 0.6), -cap, cap);
+      b.bd[j] = clamp(b.bd[j] + sgn * 0.28 * Math.max(soft(j), soft(i) * 0.6), -cap, cap);
     } else if (m.x < g.faceL && !freeRight) {
       // Over the horn: the hot end beyond the blow curls round.
-      for (let k = i; k !== free + step; k += step) b.bd[k] = clamp(b.bd[k] + sgn * 0.075 * soft(k), -0.55, 0.55);
+      for (let k = i; k !== free + step; k += step) b.bd[k] = clamp(b.bd[k] + sgn * 0.11 * soft(k), -0.55, 0.55);
     } else {
       const point = st && st.kind === "point";
       [0.25, 0.55, 0.85, 1, 0.85, 0.55, 0.25].forEach((wt, n) => {
         const k = i - 3 + n;
         if (k < 0 || k >= N) return;
-        const r = 0.2 * soft(k) * wt;
+        const r = 0.36 * soft(k) * wt;
         if (r <= 0) return;
         if (point) {
           // Pointing: both sides are hammered, so the end tapers toward its tip.
@@ -624,7 +655,7 @@
   function wrenchTap() {
     if (B.where !== "vise" || B.fly) return;
     if (WR.left) return;
-    WR.left = PI / 2;
+    WR.left = PI;
   }
   function wrenchStep(dt) {
     if (!WR.left) return;
@@ -643,7 +674,7 @@
     const d = Math.hypot(u, v);
     if (d > 0.9) { u *= 0.9 / d; v *= 0.9 / d; }
     P.disc.dm.push([u, v]); if (P.disc.dm.length > 40) P.disc.dm.shift();
-    P.disc.depth = Math.min(1.2, P.disc.depth + 0.14);
+    P.disc.depth = Math.min(1.2, P.disc.depth + 0.22);
     swing(c.x + u * R * 0.8, c.y - 6 - P.disc.depth * 10 + v * 6, false);
     snd.copper();
     puff("ring", c.x + u * R * 0.8, c.y - 4, 1);
@@ -1444,7 +1475,7 @@
     if (!part || press.active()) return;
     const p = partPt(part);
     if (!p) return;
-    const r = p.r + 3 * Math.sin(t * 4);
+    const r = Math.max(p.r, RING_MIN / vs) + 3 * Math.sin(t * 4);
     ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU);
     ctx.lineWidth = 7; ctx.strokeStyle = "rgba(29,35,64,0.55)"; ctx.stroke();
     ctx.lineWidth = 4; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
@@ -1485,12 +1516,27 @@
   // =====================================================================================================
   // Input
   // =====================================================================================================
+  // The part the yellow ring marks right now (a passing glow, or the next thing to do).
+  const RING_MIN = 26;
+  function ringed() {
+    if (ringPart && now() < ringUntil) return ringPart;
+    const w = want();
+    return w && w.part;
+  }
   // The part under a press, in world units, with at least a finger-sized target.
   function hitPart(cx, cy) {
     if (locked()) return null;
-    const w = wpt(cx, cy), minR = 26 / vs;
+    const w = wpt(cx, cy), minR = 34 / vs;
     const near = (x, y, r) => Math.hypot(w.x - x, w.y - y) <= Math.max(r, minR);
     const st = curStep(), kind = st && st.kind;
+    // The yellow ring always works (the dad, 2026-11-01: "the yellow circles rarely work"): a press on the ring or
+    // a finger's width outside it is the part it marks, before anything else drawn there (the bar or the tongs
+    // lying across the forge, the blower beside it).
+    const rp = ringed(), q = rp && partPt(rp);
+    if (q && Math.hypot(w.x - q.x, w.y - q.y) <= Math.max(q.r, RING_MIN / vs) + 30 / vs) {
+      if (rp === "work") return B.where === "anvil" ? "bar" : "";
+      if (rp !== "crankhub" && rp !== "wrenchc") return rp;
+    }
     if (kind === "rivet") {
       if (!P.rivet && !rivetFly && near(g.tinX, g.tinY - 4, 18)) return "rivet";
       if ((P.rivet || rivetFly) && near(g.tabX, g.tabY, 18)) return "rivethead";
@@ -1507,7 +1553,7 @@
       const tg = tongsGrip();
       if (near(tg.gx, tg.gy, 16) || near(lerp(tg.jx, tg.gx, 0.5), lerp(tg.jy, tg.gy, 0.5), 12)) return "tongs";
     }
-    if (t0Shown() && B.pts.length && B.where !== "assembled" && nearestSeg(B.pts, w.x, w.y).d * vs < Math.max(14, 12 * vs)) return "bar";
+    if (t0Shown() && B.pts.length && B.where !== "assembled" && nearestSeg(B.pts, w.x, w.y).d * vs < 24) return "bar";
     const place = placeAt(w);
     if (place) return place;
     const R = L.rack;
@@ -1539,22 +1585,23 @@
   const press = Toybox.press(cv, {
     any: true,
     hit: (x, y) => hitPart(x, y),
-    down: (part, e, s) => {
-      drag = null;
-      if (locked() || !isHammer(part)) return;
-      strike(part, wpt(s.x0, s.y0));
-      // Holding keeps hammering at a calm, steady beat where the finger is.
-      stopHold();
-      holdTimer = setInterval(() => { if (locked()) { stopHold(); return; } const w = wpt(s.x, s.y), p = hitPart(s.x, s.y); strike(isHammer(p) ? p : part, w); }, 620);
-    },
+    down: () => { drag = null; stopHold(); },
+    // A press that is held still on the bar on the anvil keeps hammering; a press that moves on the bar (or the
+    // tongs, or the anvil right by the bar) picks the bar up and carries it (the dad, 2026-11-01: "dragging
+    // doesn't work": a drag on the bar used to hammer it instead).
     dragStart: (part, e, s) => {
       if (locked()) return;
-      const w = wpt(s.x, s.y);
+      const w = wpt(s.x, s.y), w0 = wpt(s.x0, s.y0), still = Math.hypot(s.dx, s.dy) <= 12;
       const bl = L.blower;
-      if (part === "crank") drag = { k: "crank", a: Math.atan2(w.y - bl.y, w.x - bl.x) };
+      if (isHammer(part) && still) {
+        strike(part, w0);
+        // Holding keeps hammering at a calm, steady beat where the finger is.
+        holdTimer = setInterval(() => { if (locked()) { stopHold(); return; } const wh = wpt(s.x, s.y), p = hitPart(s.x, s.y); strike(isHammer(p) ? p : part, wh); }, 620);
+      } else if (part === "crank") drag = { k: "crank", a: Math.atan2(w.y - bl.y, w.x - bl.x) };
       else if (part === "wrench") { const c = wrenchCenter(); drag = { k: "wrench", a: Math.atan2((w.y - c.y) / WR_Y, w.x - c.x) }; }
-      else if (part === "tongs" || (part === "bar" && (B.where === "fire" || B.where === "tub"))) { if (startCarry(w)) drag = { k: "carry" }; }
-      else if (part === "rivet") drag = { k: "rivet" };
+      else if (part === "tongs" || part === "bar" || (part === "anvil" && B.where === "anvil" && B.pts.length && nearestSeg(B.pts, w0.x, w0.y).d < 40)) {
+        if (startCarry(w0)) { drag = { k: "carry" }; B.pose = { x: w.x + B.carry.ox, y: w.y + B.carry.oy, ang: B.pose.ang, held: B.pose.held }; }
+      } else if (part === "rivet") drag = { k: "rivet" };
       else if (part === "cloth") { CL.rub = 0; CL.drag = true; drag = { k: "cloth", x: w.x, y: w.y }; }
     },
     move: (part, e, s) => {
@@ -1588,13 +1635,15 @@
       else if (d.k === "rivet") { if (Math.hypot(w.x - g.tabX, w.y - g.tabY) < 40) rivetIn(); else hint(); }
       else if (d.k === "cloth") CL.drag = false;
     },
-    tap: (part) => {
-      if (locked() || isHammer(part)) return;
-      const st = curStep();
+    tap: (part, x, y) => {
+      if (locked()) return;
+      if (isHammer(part)) { strike(part, wpt(x, y)); return; }
+      const st = curStep(), goal = want(), place = goal && ["fire", "anvil", "vise", "tub"].includes(goal.part) ? goal.part : null;
       if (part === "crank") { F.auto += 1; ghost.learned("crank"); }
       else if (part === "wrench") wrenchTap();
       else if (part === "rivet") rivetIn();
       else if (part === "cloth") polishTap();
+      else if ((part === "tongs" || part === "bar") && place && place !== B.where) moveBar(place);
       else if (part === "tongs") {
         // With the plain Bar, a tap on the tongs turns the bar round so the other end can be worked.
         if (!st && B.where !== "tub") { B.flip = !B.flip; const wh = B.where; B.where = ""; moveBar(wh); }
@@ -1793,6 +1842,7 @@
       },
       make: (id) => { pickMake(id); tiles.set(id); },
       tongs: () => { const t = tongsGrip(); return vp(t.gx, t.gy); },
+      hit: (x, y) => hitPart(x, y),
       ghost: () => ghost.show()
     };
   }

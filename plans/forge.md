@@ -38,7 +38,8 @@ The steel bar is a chain of short segments (about 40 to 60). Each segment has a 
 twist angle and a bend angle, and is drawn from those (a ribbon seen from the front and a little above, with a
 hammered texture on flattened parts).
 - Segments inside the fire heat at a rate set by the fire's brightness; heat spreads a little to neighbors and
-  fades over time everywhere. A heat stays workable for about 12 to 15 s on the anvil (calm pace).
+  fades slowly everywhere. A heat stays workable for about 45 s out of the fire, and even a low fire heats the bar in
+  a few seconds (the dad, 2026-11-01: it needed far too much reheating; one heat now does a whole step).
 - A hammer tap on a hot segment makes the segments under the hammer thinner and wider and the bar a little longer
   (the metal has to go somewhere). Sparks and scale flakes fly and are gone within about 1 s.
 - Tap on cold metal: a clink, a small bounce, and the coach line "The bar is cold. Put the bar in the fire."
@@ -49,10 +50,14 @@ hammered texture on flattened parts).
 - **Blower crank**: drag in a circle or tap for one turn. The fire never goes fully out, so a bar in a low fire
   still heats, just slowly. If he puts the bar in a low fire, the crank glows and the coach says "Turn the blower
   crank to make the fire hot."; on the second time the blower gives a few turns by itself.
-- **Moving the bar**: drag the tongs to the fire, the anvil, the vise or the tub; or tap one of those places and
-  the bar goes there.
-- **Hammer**: tap the bar where it lies on the anvil or stake. Holding keeps hammering at a steady calm beat.
-- **Twisting wrench**: drag round, or tap for a quarter turn.
+- **Moving the bar**: drag the bar or the tongs to the fire, the anvil, the vise or the tub (a drop near a place
+  counts); or tap one of those places, or tap the bar or tongs, and the bar goes where the ring points. The tongs
+  always stay on screen (in the fire the bar points away from the screen's edge).
+- **Hammer**: tap the bar where it lies on the anvil or stake (the blow lands on release, so a drag on the bar
+  carries it instead). Holding still keeps hammering at a steady calm beat.
+- **The yellow ring always works** (the dad, 2026-11-01: "the yellow circles rarely work"): a press on the ring or a
+  finger's width outside it is the part it marks, before anything else drawn there; the ring is finger-sized.
+- **Twisting wrench**: drag round, or tap for a half turn.
 
 ### 3.3 What to make (tiles: picture + word)
 1. **Spoon** (the project, the dad's real spoon; steps in this order):
