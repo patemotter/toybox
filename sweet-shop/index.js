@@ -1,20 +1,24 @@
 (function () {
   "use strict";
   // Sweet Shop: a sweet shop counter seen from where the candy maker stands. Gummies for now (donuts or cookies
-  // may come later as their own jobs). He makes a batch of gummies the real way, one hands-on step at a time:
-  //   1. Pour a flavor (a bottle from the shelf) into the saucepan: drag the bottle to the pot, or tap it.
-  //   2. Tip the gelatin and sugar into the pot: the mix goes cloudy.
-  //   3. Turn the hot plate's knob: the flame comes on.
-  //   4. Stir with the whisk (drag round the pot, or tap for one stir) until the mix is clear and glossy; the
-  //      knob turns off by itself.
-  //   5. Fill the silicone mold with the candy dropper: tap a shape (or the dropper) to fill it, or drag the
-  //      dropper over the shapes.
-  //   6. Put the mold in the fridge (tap it, or drag it there): the door shuts, frost, the gummies are firm.
-  //   7. Push the mold to pop the gummies out onto the tray.
-  //   8. Pick a coating bowl: Sour sugar, Sugar or Shiny (a little oil); they are tossed in it.
-  //   9. Put the gummies in the candy jar (tap the jar, or tap or drag each gummy).
-  // A yellow ring and one instruction show the next part; other parts say their name when tapped. Every gummy
-  // jiggles when touched. The molds (Bears, Worms, Fruits) are tiles in the panel. The candy jar on the shelf
+  // may come later as their own jobs). He makes a batch of gummies the real way, one hands-on step at a time.
+  // Every step is done with his hands on the scene: a drag does the real thing for as long as he keeps doing it,
+  // and a tap on the same part plays that part's whole motion once (the dad, 2026-11-01: the first version was
+  // mostly pushing the yellow ring).
+  //   1. Pour a flavor: carry a bottle over the pot and it tips and pours while he holds it there (tap: it pours).
+  //   2. Tip the gelatin and sugar: carry the bowl over the pot and the powder falls while he holds it there.
+  //   3. Turn the hot plate's knob round (tap: on or off; it works at any time and the flame follows it).
+  //   4. Stir: the whisk follows his finger round the pot; the mix clears while the pot is hot (tap: one stir).
+  //      Off the heat the knob turns off by itself.
+  //   5. Fill the silicone mold: touch a shape and the candy dropper comes to his finger; the shape fills while
+  //      he holds it there, and he moves on to the next (tap: that shape fills).
+  //   6. Put the mold in the fridge (drag it there: the door opens as it comes near; or tap it).
+  //   7. Push the gummies out: tap each one and it pops out, or push the mold to turn it over.
+  //   8. Coat each gummy: drag it into Sour sugar, Sugar or Shiny (a little oil), or tap a bowl for all the rest.
+  //   9. Put the gummies in the candy jar (drag them, tap each, or tap the jar).
+  // A yellow ring and one instruction show the next part; parts not needed right now still answer (a wiggle and
+  // their name, the fridge door opens, the pot sloshes). Every gummy jiggles when touched, and gummies can be
+  // moved round the tray. The molds (Bears, Worms, Fruits) are tiles in the panel. The candy jar on the shelf
   // is his collection, kept across visits; the Jar button (or a tap on the jar) shows it big.
   // Units: the scene is drawn in world units (the TALL or WIDE layout, picked from the stage's shape) and scaled
   // to fit the stage; x to the right, y down.
@@ -103,7 +107,7 @@
     try {
       localStorage.setItem(KEY, JSON.stringify({
         jar,
-        batch: { step: B.step, flavor: B.flavor, mold: B.mold, next: nextMold, fill: B.fill, coat: B.coat }
+        batch: { step: B.step, flavor: B.flavor, mold: B.mold, next: nextMold, fill: B.fill, coats: B.coats }
       }));
     } catch (e) { /* ignore */ }
   }
@@ -250,43 +254,54 @@
   // =====================================================================================================
   // The batch
   // =====================================================================================================
-  // Steps in order; the batch stays at a step until its motion has finished.
+  // Steps in order. Each step is done by hand on the scene: a drag does the real thing for as long as he keeps
+  // doing it (a bottle pours while it is tipped over the pot, the dropper fills the shape it is held over), and
+  // a tap on the same part plays that part's whole motion once.
   const STEPS = ["flavor", "gel", "heat", "stir", "fill", "chill", "pop", "coat", "jar", "done"];
   let nextMold = MOLD_BY[saved.batch && saved.batch.next] && !fresh ? saved.batch.next : null;
   function newBatch(mold) {
     const m = MOLD_BY[mold] ? mold : "bears";
-    return { step: "flavor", flavor: -1, mold: m, fill: MOLD_BY[m].cav.map(() => false), coat: "", gum: [] };
+    return { step: "flavor", flavor: -1, mold: m, fill: MOLD_BY[m].cav.map(() => false), coats: MOLD_BY[m].cav.map(() => ""), gum: [] };
   }
+  const okCoat = (c) => c === "" || COATS.some((q) => q.id === c);
   let B = newBatch(sb && sb.mold);
   if (sb && STEPS.includes(sb.step) && sb.step !== "done") {
     B.step = sb.step;
     if (Number.isInteger(sb.flavor) && sb.flavor >= 0 && sb.flavor < FLAVORS.length) B.flavor = sb.flavor;
     if (Array.isArray(sb.fill) && sb.fill.length === B.fill.length) B.fill = sb.fill.map((v) => !!v);
-    if (COATS.some((c) => c.id === sb.coat)) B.coat = sb.coat;
+    if (Array.isArray(sb.coats) && sb.coats.length === B.coats.length) B.coats = sb.coats.map((c) => (okCoat(c) ? c : ""));
+    else if (okCoat(sb.coat) && sb.step === "jar") B.coats = B.coats.map(() => sb.coat);
     if (B.flavor < 0 && B.step !== "flavor") B = newBatch(B.mold);
   }
   const at = (step) => STEPS.indexOf(B.step) >= STEPS.indexOf(step);
   const hex = () => (B.flavor >= 0 ? FLAVORS[B.flavor].hex : "#FFFFFF");
 
   // What is on screen. Rebuilt from the batch (placeAll) when a page loads, a batch starts or the layout changes.
-  let busy = false;
+  let busy = false, drag = null;
   const V = {
-    level: 0, cloud: 0, clear: 0, heat: 0, knob: 0, flame: 0, gelShow: 1,
-    carry: null, gelPose: null, stream: null, whiskA: 0.6, whiskShow: 0,
-    drop: { x: 0, y: 0, show: 0, squeeze: 0, fillAmt: 0 }, cavLevel: [], fillQ: [], filling: false,
+    level: 0, cloud: 0, clear: 0, heat: 0, knob: 0, gelShow: 1,
+    carry: null, gelPose: null, stream: null, whisk: { x: 0, y: 0 }, whiskShow: 0, swirl: 0, swirlV: 0, slosh: 0,
+    drop: { x: 0, y: 0, show: 0, squeeze: 0, fillAmt: 0, held: false }, cavLevel: [], fillQ: [], filling: false,
     mold: { x: 0, y: 0, k: 1, flip: 1, alpha: 1, show: 1, inFridge: false, lift: 0 }, set: false,
-    door: 0, frost: 0, tray: 0, bowls: 0, bowlShake: -1, shakeAmt: 0, lid: 0, jarBounce: 0
+    door: 0, frost: 0, tray: 0, bowls: 0, bowlShake: -1, shakeAmt: 0, lid: 0, jarBounce: 0,
+    bwob: FLAVORS.map(() => 0), gelWob: 0, knobTw: null, doorTw: false
   };
+  function newGum(k, where) {
+    const c = MOLD_BY[B.mold].cav[k], p = cavPos(k);
+    return { k, sh: c.sh, s: c.s, x: p.x, y: p.y, hx: p.x, hy: p.y, wob: 0, ph: 0, rot: 0, coat: B.coats[k] || "", where, sc: 1 };
+  }
   function placeAll() {
     const st = B.step;
-    V.level = at("gel") ? 1 : 0;
+    V.level = at("gel") || (st === "flavor" && B.flavor >= 0) ? 1 : 0;
+    if (st === "flavor" && B.flavor >= 0) V.level = 0.5;
     V.cloud = at("gel") && !at("fill") ? 1 : 0;
     V.clear = at("fill") ? 1 : 0;
     V.knob = st === "stir" ? 1 : 0; V.heat = V.knob;
     V.gelShow = at("heat") ? 0 : 1;
     V.whiskShow = st === "stir" ? 1 : 0;
+    V.whisk = { x: L.pot.x + L.pot.w * 0.22, y: surfY() };
     V.carry = null; V.gelPose = null; V.stream = null;
-    V.drop = { x: L.dropRest.x, y: L.dropRest.y, show: st === "fill" ? 1 : 0, squeeze: 0, fillAmt: 1 };
+    V.drop = { x: L.dropRest.x, y: L.dropRest.y, show: st === "fill" ? 1 : 0, squeeze: 0, fillAmt: 1, held: false };
     V.fillQ = []; V.filling = false;
     V.cavLevel = B.fill.map((f) => (f ? 1 : 0));
     if (at("fill")) V.level = 1 - 0.75 * B.fill.filter(Boolean).length / B.fill.length;
@@ -295,15 +310,13 @@
     V.door = 0; V.frost = 0;
     V.tray = at("coat") ? 1 : 0;
     V.bowls = st === "coat" ? 1 : 0; V.bowlShake = -1;
-    V.lid = st === "jar" ? 1 : 0;
-    // Gummies on the tray once popped.
-    B.gum = at("coat") && st !== "done" ? MOLD_BY[B.mold].cav.map((c, k) => {
-      const p = cavPos(k);
-      return { k, sh: c.sh, s: c.s, x: p.x, y: p.y, hx: p.x, hy: p.y, wob: 0, ph: 0, rot: 0, coat: st === "jar" ? B.coat : "", where: "tray", sc: 1 };
-    }) : [];
+    V.lid = st === "coat" || st === "jar" ? 1 : 0;
+    // The gummies: still in the mold while it is popped, then on the tray.
+    if (st === "pop") B.gum = MOLD_BY[B.mold].cav.map((c, k) => newGum(k, "mold"));
+    else B.gum = at("coat") && st !== "done" ? MOLD_BY[B.mold].cav.map((c, k) => newGum(k, "tray")) : [];
   }
   function startBatch() {
-    tweens = []; busy = false; parts = [];
+    tweens = []; busy = false; parts = []; drag = null;
     B = newBatch(nextMold || B.mold);
     nextMold = null;
     placeAll();
@@ -319,99 +332,177 @@
     lastWant = "";
     ghost.poke();
     saveSoon();
+    if (step === "pop") B.gum = MOLD_BY[B.mold].cav.map((c, k) => newGum(k, "mold"));
+    // The knob may already be on when the gelatin is in: then the stirring starts at once.
+    if (step === "heat" && V.knob > 0.5) heatReached();
   }
+  // A gentle "not this one": the part wiggles and says its name.
+  function wiggleTag(name, x, y) { tag(name, x, y); snd.boing(); }
 
   // =====================================================================================================
   // Steps: pour, gelatin, heat, stir
   // =====================================================================================================
   function bottleHome(i) { const [x, y] = L.bottles[i]; return { x, y }; }
-  // Pour bottle i from where it is (its shelf spot, or where his finger left it) into the pot.
+  // The bottle's mouth for a bottle standing at (x, y) and tipped by ang (it turns about its bottom).
+  const mouthOf = (x, y, ang) => ({ x: x + Math.sin(ang) * L.bh, y: y - Math.cos(ang) * L.bh });
+  // A carried bottle or bowl is "over the pot" anywhere in a big zone above it, so tipping is easy to find.
+  function overPot(x, y, reach) {
+    return Math.abs(x - L.pot.x) < L.pot.w * 0.5 + reach && y > potRim() - 250 && y < potRim() + 50;
+  }
+  // Only the flavor already in the pot can be poured on; any bottle can start an empty pot.
+  const pourable = (i) => B.step === "flavor" && (B.flavor < 0 || B.flavor === i);
+  function pourLine() { return B.flavor >= 0 ? "Pour the " + FLAVORS[B.flavor].name.toLowerCase() + " bottle into the pot." : "Pour a flavor into the pot."; }
+  let pourSnd = 0;
+  // Each frame while he holds a bottle: over the pot it tips toward it and pours for as long as he holds it there.
+  function stepPour(dt) {
+    const c = V.carry;
+    if (!c || !c.held) return;
+    const over = pourable(c.i) && overPot(c.x, c.y - L.bh / 2, L.bh), side = c.x >= L.pot.x ? -1 : 1;
+    c.ang += ((over ? 2.0 * side : 0) - c.ang) * Math.min(1, dt * 7);
+    if (over && Math.abs(c.ang) > 1.2) {
+      if (B.flavor < 0) { B.flavor = c.i; const tg = vp(L.pot.x, potRim() - 30); Toybox.nametag(FLAVORS[c.i].name, tg.x, tg.y, 2200); }
+      V.level = Math.min(1, V.level + dt * 0.55);
+      const m = mouthOf(c.x, c.y, c.ang);
+      V.stream = { x: m.x, y: m.y, a: 1 };
+      if (now() > pourSnd) { pourSnd = now() + 1.1; snd.pour(); }
+      if (Math.random() < dt * 12) puff("drop", L.pot.x, surfY(), 1, hex());
+      if (V.level >= 1) pourDone();
+    } else V.stream = null;
+  }
+  function pourDone() {
+    const c = V.carry;
+    V.stream = null; drag = null;
+    if (c) bottleBack(c.i, { x: c.x, y: c.y }, c.ang);
+    advance("gel");
+  }
+  // A tap on a bottle (or a bottle let go over the pot): it goes over the pot, tips, pours until the pot is
+  // full, and goes back.
   function pour(i, from) {
-    if (busy || B.step !== "flavor") return;
+    if (busy || !pourable(i)) return;
     busy = true;
-    const home = bottleHome(i), f0 = from || home;
-    const over = { x: L.pot.x + L.pot.w * 0.42, y: potRim() - 20 };
-    V.carry = { i, x: f0.x, y: f0.y, ang: 0 };
-    tween(0.6, (p) => { const e = ease(p); V.carry.x = lerp(f0.x, over.x, e); V.carry.y = lerp(f0.y, over.y, e) - Math.sin(p * Math.PI) * 30; }, () => {
-      B.flavor = i;
-      tween(0.35, (p) => { V.carry.ang = -2.1 * ease(p); }, () => {
+    const home = bottleHome(i), f0 = from || { x: home.x, y: home.y, ang: 0 }, over = { x: L.pot.x + L.pot.w * 0.42 + L.bh * 0.5, y: potRim() - 10 };
+    V.carry = { i, x: f0.x, y: f0.y, ang: f0.ang || 0, held: false };
+    tween(from ? 0.3 : 0.6, (p) => { const e = ease(p); V.carry.x = lerp(f0.x, over.x, e); V.carry.y = lerp(f0.y, over.y, e) - Math.sin(p * Math.PI) * (from ? 0 : 30); }, () => {
+      if (B.flavor < 0) { B.flavor = i; const tg = vp(L.pot.x, potRim() - 30); Toybox.nametag(FLAVORS[i].name, tg.x, tg.y, 2200); }
+      const a0 = V.carry.ang;
+      tween(0.35, (p) => { V.carry.ang = lerp(a0, -2.0, ease(p)); }, () => {
         snd.pour();
+        const l0 = V.level;
         tween(1.1, (p) => {
-          V.stream = { x: V.carry.x - 30, y: V.carry.y - 6, a: p < 0.85 ? 1 : (1 - p) / 0.15 };
-          V.level = Math.max(V.level, ease(p));
+          const m = mouthOf(V.carry.x, V.carry.y, V.carry.ang);
+          V.stream = { x: m.x, y: m.y, a: p < 0.85 ? 1 : (1 - p) / 0.15 };
+          V.level = Math.max(V.level, lerp(l0, 1, ease(p)));
           if (Math.random() < 0.3) puff("drop", L.pot.x, surfY(), 1, hex());
-        }, () => {
-          V.stream = null;
-          const tag = vp(L.pot.x, potRim() - 30); Toybox.nametag(FLAVORS[i].name, tag.x, tag.y, 2200);
-          tween(0.35, (p) => { V.carry.ang = -2.1 * (1 - ease(p)); }, () => {
-            const from2 = { x: V.carry.x, y: V.carry.y };
-            tween(0.6, (p) => { const e = ease(p); V.carry.x = lerp(from2.x, home.x, e); V.carry.y = lerp(from2.y, home.y, e) - Math.sin(p * Math.PI) * 30; }, () => {
-              V.carry = null; busy = false; advance("gel");
-            });
-          });
-        });
+        }, () => { V.stream = null; busy = false; bottleBack(i, { x: V.carry.x, y: V.carry.y }, V.carry.ang); advance("gel"); });
       });
     });
   }
-  function bottleBack(i, from) {
-    const home = bottleHome(i);
-    V.carry = { i, x: from.x, y: from.y, ang: 0 };
-    tween(0.45, (p) => { const e = ease(p); V.carry.x = lerp(from.x, home.x, e); V.carry.y = lerp(from.y, home.y, e); }, () => { V.carry = null; });
+  function bottleBack(i, from, ang) {
+    const home = bottleHome(i), a0 = ang || 0;
+    V.carry = { i, x: from.x, y: from.y, ang: a0, held: false };
+    const c = V.carry;
+    tween(0.5, (p) => { const e = ease(p); c.x = lerp(from.x, home.x, e); c.y = lerp(from.y, home.y, e) - Math.sin(p * Math.PI) * 20; c.ang = lerp(a0, 0, e); }, () => { if (V.carry === c) V.carry = null; });
   }
+  // Each frame while he holds the gelatin bowl: over the pot it tips and the powder falls while he holds it there.
+  function stepGel(dt) {
+    const g = V.gelPose;
+    if (!g || !g.held) return;
+    const over = B.step === "gel" && overPot(g.x, g.y, 50), side = g.x >= L.pot.x ? -1 : 1;
+    g.ang += ((over ? 1.9 * side : 0) - g.ang) * Math.min(1, dt * 7);
+    if (over && Math.abs(g.ang) > 1.0) {
+      if (Math.random() < dt * 30) puff("powder", g.x + side * 26, g.y + 4, 1);
+      if (now() > pourSnd) { pourSnd = now() + 0.8; snd.sprinkle(); }
+      V.cloud = Math.min(1, V.cloud + dt * 0.7);
+      if (V.cloud >= 1) gelDone();
+    }
+  }
+  function gelDone() {
+    drag = null;
+    const g = V.gelPose || { x: L.gel.x, y: L.gel.y, ang: 0 };
+    busy = true;
+    tween(0.4, (p) => { V.gelShow = 1 - p; g.ang *= 0.9; }, () => { V.gelPose = null; busy = false; advance("heat"); });
+    V.gelPose = g; g.held = false;
+  }
+  // A tap on the bowl (or the bowl let go over the pot): it goes over the pot and tips the gelatin and sugar in.
   function tipGel(from) {
     if (busy || B.step !== "gel") return;
     busy = true;
     const f0 = from || { x: L.gel.x, y: L.gel.y }, over = { x: L.pot.x + 30, y: potRim() - 34 };
-    V.gelPose = { x: f0.x, y: f0.y, ang: 0 };
+    V.gelPose = { x: f0.x, y: f0.y, ang: 0, held: false };
     tween(0.55, (p) => { const e = ease(p); V.gelPose.x = lerp(f0.x, over.x, e); V.gelPose.y = lerp(f0.y, over.y, e) - Math.sin(p * Math.PI) * 26; }, () => {
       snd.sprinkle();
+      const c0 = V.cloud;
       tween(1.0, (p) => {
         V.gelPose.ang = -1.9 * ease(Math.min(1, p * 2.5));
         if (p > 0.25 && Math.random() < 0.7) puff("powder", V.gelPose.x - 22, V.gelPose.y + 4, 2);
-        V.cloud = Math.max(V.cloud, ease((p - 0.2) / 0.8));
-      }, () => {
-        tween(0.4, (p) => { V.gelShow = 1 - p; }, () => { V.gelPose = null; busy = false; advance("heat"); });
-      });
+        V.cloud = Math.max(V.cloud, lerp(c0, 1, ease((p - 0.2) / 0.8)));
+      }, () => { busy = false; gelDone(); });
     });
   }
   function gelBack(from) {
-    V.gelPose = { x: from.x, y: from.y, ang: 0 };
-    tween(0.4, (p) => { const e = ease(p); V.gelPose.x = lerp(from.x, L.gel.x, e); V.gelPose.y = lerp(from.y, L.gel.y, e); }, () => { V.gelPose = null; });
+    const g = { x: from.x, y: from.y, ang: from.ang || 0, held: false };
+    V.gelPose = g;
+    tween(0.4, (p) => { const e = ease(p); g.x = lerp(from.x, L.gel.x, e); g.y = lerp(from.y, L.gel.y, e); g.ang = lerp(from.ang || 0, 0, e); }, () => { if (V.gelPose === g) V.gelPose = null; });
   }
-  function heatOn() {
-    if (busy || B.step !== "heat") return;
-    snd.click();
-    busy = true;
-    tween(0.4, (p) => { V.knob = ease(p); }, () => {
-      tween(0.5, (p) => { V.heat = ease(p); V.whiskShow = ease(p); }, () => { busy = false; advance("stir"); });
-    });
+  // The knob works at any time: a tap turns it on or off, a drag turns it as far as he turns it. The flame
+  // follows the knob.
+  function setKnob(v) {
+    const was = V.knob;
+    V.knob = clamp(v, 0, 1);
+    if ((was < 0.5) !== (V.knob < 0.5)) snd.click();
+    if (V.knob > 0.5 && B.step === "heat" && !busy) heatReached();
   }
-  // Stirring: the whisk goes round the pot; the mix clears as it travels (about three laps, or three taps).
-  // da: how far round the whisk went (radians); dist: how far a dragging finger moved (world units), so any
-  // circling or scribbling over the pot stirs.
-  function stirBy(da, dist) {
+  function knobTap() {
+    if (V.knobTw) return;
+    const from = V.knob, to = from > 0.5 ? 0 : 1;
+    V.knobTw = tween(0.35, (p) => { setKnob(lerp(from, to, ease(p))); }, () => { V.knobTw = null; });
+  }
+  function heatReached() {
+    if (B.step !== "heat") return;
+    V.whisk = { x: L.pot.x + L.pot.w * 0.22, y: surfY() };
+    tween(0.5, (p) => { V.whiskShow = Math.max(V.whiskShow, ease(p)); });
+    advance("stir");
+  }
+  // Stirring clears the mix while the pot is hot: about two good circles round the pot, or three taps.
+  let coldSaid = 0;
+  function stirBy(dist) {
     if (B.step !== "stir" || busy) return;
-    V.whiskA += da;
+    V.swirl += dist * 0.04; V.swirlV = Math.min(1, V.swirlV + dist * 0.02);
+    if (V.knob < 0.5) {
+      if (now() > coldSaid) { coldSaid = now() + 4; coach.say("Turn the knob to heat the pot.", 3); }
+      return;
+    }
     const before = V.clear;
-    V.clear = Math.min(1, V.clear + (dist == null ? Math.abs(da) / (TAU * 2.6) : dist / 450));
+    V.clear = Math.min(1, V.clear + dist / 360);
     V.cloud = 1 - V.clear;
     if (Math.floor(before * 6) !== Math.floor(V.clear * 6)) snd.stir();
     if (V.clear >= 1) clearDone();
   }
+  // Puts the whisk where his finger is, inside the pot.
+  function whiskTo(x, y) {
+    const rx = L.pot.w / 2 - 16, sy = surfY();
+    V.whisk = { x: clamp(x, L.pot.x - rx, L.pot.x + rx), y: sy + clamp((y - sy) * 0.15, -5, 5) };
+  }
   let stirTw = null;
   function stirTap() {
     if (B.step !== "stir" || busy || stirTw) return;
+    if (V.knob < 0.5) { stirBy(0); return; }
     snd.stir();
-    let last = 0;
-    stirTw = tween(0.9, (p) => { const e = ease(p) * TAU; stirBy(e - last); last = e; }, () => { stirTw = null; });
+    let last = { x: V.whisk.x, y: V.whisk.y };
+    stirTw = tween(0.9, (p) => {
+      const a = p * TAU, x = L.pot.x + Math.cos(a) * L.pot.w * 0.28, y = surfY() + Math.sin(a) * 5;
+      whiskTo(x, y); stirBy(Math.hypot(x - last.x, y - last.y) * 0.85); last = { x, y };
+    }, () => { stirTw = null; });
   }
   function clearDone() {
-    busy = true;
+    busy = true; drag = null;
     if (stirTw) { tweens.splice(tweens.indexOf(stirTw), 1); stirTw = null; }
     snd.clear();
     puff("spark", L.pot.x, surfY(), 10);
-    tween(0.4, (p) => { V.knob = 1 - ease(p); }, () => {
-      tween(0.6, (p) => { V.heat = 1 - ease(p); V.whiskShow = 1 - ease(p); }, () => { busy = false; startFill(); });
+    coach.say("The mix is clear and glossy.", 3);
+    // Off the heat: the knob turns off by itself.
+    tween(0.4, (p) => { setKnob(1 - ease(p)); }, () => {
+      tween(0.6, (p) => { V.whiskShow = 1 - ease(p); }, () => { busy = false; startFill(); });
     });
   }
 
@@ -423,7 +514,7 @@
     advance("fill");
     busy = true;
     const d = V.drop, dip = { x: L.pot.x + 10, y: surfY() + 4 };
-    d.x = dip.x; d.y = dip.y - 80; d.fillAmt = 0;
+    d.x = dip.x; d.y = dip.y - 80; d.fillAmt = 0; d.held = false;
     tween(0.35, (p) => { d.show = p; d.y = lerp(dip.y - 80, dip.y, ease(p)); }, () => {
       tween(0.6, (p) => { d.squeeze = Math.sin(p * Math.PI); d.fillAmt = ease(p); }, () => {
         tween(0.7, (p) => { const e = ease(p); d.x = lerp(dip.x, L.dropRest.x, e); d.y = lerp(dip.y, L.dropRest.y, e) - Math.sin(p * Math.PI) * 50; }, () => {
@@ -435,7 +526,29 @@
     });
   }
   const nextEmpty = () => B.fill.findIndex((f, k) => !f && !V.fillQ.includes(k));
-  // A shape to fill: queued, so quick taps all count (also while the dropper is still dipping).
+  const filledCount = () => B.fill.filter(Boolean).length;
+  function cavFull(k) {
+    B.fill[k] = true; V.cavLevel[k] = 1;
+    V.level = 1 - 0.75 * filledCount() / B.fill.length;
+    V.drop.fillAmt = 1 - filledCount() / B.fill.length * 0.8;
+    const c = cavPos(k); puff("spark", c.x, c.y - c.s * 0.6, 4);
+    saveSoon(); lastWant = "";
+  }
+  // Each frame while he holds the dropper: over a shape that is not full yet, the bulb squeezes and the shape
+  // fills for as long as he holds it there.
+  let dripAt = 0;
+  function stepFill(dt) {
+    const d = V.drop;
+    if (!d.held || B.step !== "fill" || busy) { if (!V.filling) d.squeeze = Math.max(0, d.squeeze - dt * 4); return; }
+    let k = -1;
+    B.fill.forEach((f, j) => { if (!f && k < 0) { const c = cavPos(j); if (Math.hypot(d.x - c.x, d.y - (c.y - c.s * 0.3)) < c.s * 1.4) k = j; } });
+    if (k < 0) { d.squeeze = Math.max(0, d.squeeze - dt * 4); return; }
+    d.squeeze = Math.min(1, d.squeeze + dt * 6);
+    if (now() > dripAt) { dripAt = now() + 0.35; snd.drip(); }
+    V.cavLevel[k] = Math.min(1, (V.cavLevel[k] || 0) + dt * 1.6);
+    if (V.cavLevel[k] >= 1) { cavFull(k); if (B.fill.every(Boolean)) { drag = null; d.held = false; fillDone(); } }
+  }
+  // A shape to fill by tapping: queued, so quick taps all count (also while the dropper is still dipping).
   function fillCav(k) {
     if (B.step !== "fill" || k < 0 || B.fill[k] || V.fillQ.includes(k)) return;
     V.fillQ.push(k);
@@ -445,18 +558,17 @@
     const k = V.fillQ[0];
     if (k == null) { V.filling = false; return; }
     V.filling = true;
-    const d = V.drop, c = cavPos(k), x0 = d.x, y0 = d.y, tx = c.x, ty = c.y - c.s * 0.4;
+    const d = V.drop, c = cavPos(k), x0 = d.x, y0 = d.y, tx = c.x, ty = c.y - c.s * 0.3;
     const go = Math.hypot(tx - x0, ty - y0) > 4 ? 0.3 : 0.01;
     tween(go, (p) => { const e = ease(p); d.x = lerp(x0, tx, e); d.y = lerp(y0, ty, e); }, () => {
       snd.drip();
-      tween(0.55, (p) => {
+      const l0 = V.cavLevel[k] || 0;
+      tween(0.55 * (1 - l0) + 0.05, (p) => {
         d.squeeze = Math.sin(Math.min(1, p * 1.3) * Math.PI);
-        V.cavLevel[k] = ease(p);
+        V.cavLevel[k] = lerp(l0, 1, ease(p));
       }, () => {
-        B.fill[k] = true; V.fillQ.shift();
-        V.level = 1 - 0.75 * B.fill.filter(Boolean).length / B.fill.length;
-        d.fillAmt = 1 - B.fill.filter(Boolean).length / B.fill.length * 0.8;
-        saveSoon(); lastWant = "";
+        V.fillQ.shift();
+        if (!B.fill[k]) cavFull(k);
         if (B.fill.every(Boolean)) { V.fillQ = []; V.filling = false; fillDone(); }
         else fillNext();
       });
@@ -469,13 +581,14 @@
       busy = false; advance("chill");
     });
   }
+  const nearFridge = (x) => x + MOLD_W * 0.3 > L.fridge.x - 10;
   function chill() {
     if (busy || B.step !== "chill") return;
-    busy = true;
-    const m = V.mold, fi = fridgeIn(), k1 = (L.fridge.w * 0.78) / MOLD_W, x0 = m.x, y0 = m.y;
+    busy = true; drag = null;
+    const m = V.mold, fi = fridgeIn(), k1 = (L.fridge.w * 0.78) / MOLD_W, x0 = L.work.x, y0 = L.work.y, mx = m.x, my = m.y, d0 = V.door;
     snd.door();
-    tween(0.45, (p) => { V.door = ease(p); }, () => {
-      tween(0.9, (p) => { const e = ease(p); m.x = lerp(x0, fi.x, e); m.y = lerp(y0, fi.y, e) - Math.sin(p * Math.PI) * 40; m.k = lerp(1, k1, e); }, () => {
+    tween(0.45 * (1 - d0) + 0.01, (p) => { V.door = lerp(d0, 1, ease(p)); }, () => {
+      tween(0.9, (p) => { const e = ease(p); m.x = lerp(mx, fi.x, e); m.y = lerp(my, fi.y, e) - Math.sin(p * Math.PI) * 40; m.k = lerp(1, k1, e); }, () => {
         m.inFridge = true;
         tween(0.45, (p) => { V.door = 1 - ease(p); }, () => {
           snd.door(); snd.hum();
@@ -498,63 +611,95 @@
     });
   }
   function moldBack(from) {
-    const m = V.mold;
-    tween(0.4, (p) => { m.x = lerp(from.x, L.work.x, ease(p)); m.y = lerp(from.y, L.work.y, ease(p)); });
+    const m = V.mold, d0 = V.door;
+    tween(0.4, (p) => { m.x = lerp(from.x, L.work.x, ease(p)); m.y = lerp(from.y, L.work.y, ease(p)); V.door = d0 * (1 - p); });
+  }
+  // Out of turn, a tap on the fridge opens its door for a look inside.
+  function fridgePeek() {
+    if (busy || V.doorTw || drag) return;
+    V.doorTw = true; snd.door();
+    tween(0.4, (p) => { V.door = ease(p); }, () => {
+      later(2.2, () => { tween(0.4, (p) => { V.door = 1 - ease(p); }, () => { V.doorTw = false; snd.door(); }); });
+    });
+  }
+  // Popping: a push on one shape pops that gummy out with a boing; a push on the mold itself turns it over and
+  // they all pop out. When the last one is out, the mold slides away and they sit on the tray.
+  const inMold = () => B.gum.filter((g) => g.where === "mold");
+  function popOne(k) {
+    if (busy || B.step !== "pop") return;
+    const g = B.gum[k];
+    if (!g || g.where !== "mold") return;
+    g.where = "air";
+    snd.boing();
+    ghost.learned("pop");
+    tween(0.55, (p) => { g.y = g.hy - Math.sin(p * Math.PI) * 60; g.rot = Math.sin(p * Math.PI) * 0.6 * (k % 2 ? 1 : -1); }, () => {
+      g.y = g.hy; g.rot = 0; g.where = "out"; g.wob = 0.4; g.ph = 0;
+      if (!inMold().length && !B.gum.some((q) => q.where === "air")) moldAway();
+    });
+    lastWant = "";
   }
   function pop() {
     if (busy || B.step !== "pop") return;
+    const rest = inMold();
+    if (!rest.length) return;
     busy = true;
     const m = V.mold;
-    B.gum = MOLD_BY[B.mold].cav.map((c, k) => {
-      const p = cavPos(k);
-      return { k, sh: c.sh, s: c.s, x: p.x, y: p.y, hx: p.x, hy: p.y, wob: 0, ph: 0, rot: 0, coat: "", where: "air", sc: 1, hide: true };
-    });
-    tween(0.3, (p) => { V.tray = ease(p); });
+    rest.forEach((g) => { g.where = "air"; g.hide = true; });
     tween(0.45, (p) => { m.lift = ease(p) * 34; m.flip = Math.cos(p * Math.PI); }, () => {
       snd.boing();
-      B.gum.forEach((g, i) => {
+      rest.forEach((g, i) => {
         g.hide = false;
         const y0 = g.hy - 40;
         tween(0.5, (p) => { g.y = y0 + (g.hy - y0) * (p < 0.7 ? (p / 0.7) ** 2 : 1 - Math.sin((p - 0.7) / 0.3 * Math.PI) * 0.12); }, () => {
-          g.y = g.hy; g.where = "tray"; g.wob = 0.35; g.ph = 0;
+          g.y = g.hy; g.where = "out"; g.wob = 0.35; g.ph = 0;
         }, i * 0.06);
       });
-      const x0 = m.x;
-      tween(0.55, (p) => { m.x = x0 + ease(p) * 120; m.lift = 34 + ease(p) * 60; m.alpha = 1 - ease(p); }, () => {
-        m.show = 0; m.alpha = 1; m.flip = 1; m.lift = 0; m.x = x0;
-        busy = false;
-        advance("coat");
-        tween(0.5, (p) => { V.bowls = ease(p); });
-      }, 0.3);
+      later(0.3 + rest.length * 0.06, () => { busy = false; moldAway(); });
+    });
+  }
+  function moldAway() {
+    busy = true;
+    const m = V.mold, x0 = m.x, l0 = m.lift;
+    tween(0.3, (p) => { V.tray = ease(p); });
+    tween(0.55, (p) => { m.x = x0 + ease(p) * 140; m.lift = l0 + ease(p) * 40; m.alpha = 1 - ease(p); }, () => {
+      m.show = 0; m.alpha = 1; m.flip = 1; m.lift = 0; m.x = x0;
+      B.gum.forEach((g) => { g.where = "tray"; });
+      busy = false;
+      advance("coat");
+      tween(0.5, (p) => { V.bowls = ease(p); V.lid = Math.max(V.lid, ease(p)); });
     });
   }
 
   // =====================================================================================================
   // Steps: coat and jar
   // =====================================================================================================
+  // Each gummy can have its own coating: drag one into a bowl, or tap a bowl and the gummies that have none yet
+  // all go in (all of them if every one has one). The gummies can go in the candy jar at any time after this.
   function bowlPos(i) { return { x: L.bowls.xs[i], y: L.bowls.y }; }
-  function coatIn(i) {
+  const onTray = () => B.gum.filter((g) => g.where === "tray");
+  function coatIn(i, list) {
     if (busy || B.step !== "coat") return;
-    busy = true;
     const c = COATS[i], b = bowlPos(i);
-    B.coat = c.id;
-    const n = B.gum.length;
-    B.gum.forEach((g, j) => {
+    if (!list) { const bare = onTray().filter((g) => !g.coat); list = bare.length ? bare : onTray(); }
+    if (!list.length) return;
+    busy = true;
+    const n = list.length;
+    list.forEach((g, j) => {
       const x0 = g.x, y0 = g.y, tx = b.x + (j - (n - 1) / 2) * 12, ty = b.y - 6;
-      g.where = "air";
+      g.where = "air"; g.bj = j;
       tween(0.5, (p) => { const e = ease(p); g.x = lerp(x0, tx, e); g.y = lerp(y0, ty, e) - Math.sin(p * Math.PI) * 50; g.sc = lerp(1, 0.5, e); }, () => { g.where = "bowl"; }, j * 0.07);
     });
     later(0.5 + n * 0.07, () => {
       snd.shake();
       V.bowlShake = i;
-      tween(1.4, (p) => {
+      tween(1.2, (p) => {
         V.shakeAmt = Math.sin(p * Math.PI * 7) * (1 - p);
         if (Math.random() < 0.5) puff(c.id === "shiny" ? "spark" : "crystal", b.x + (Math.random() - 0.5) * 50, b.y - 10, 1, c.id === "shiny" ? "#FFF3B0" : "#FFFFFF");
-        if (p > 0.5) B.gum.forEach((g) => { g.coat = c.id; });
+        if (p > 0.5) list.forEach((g) => { g.coat = c.id; B.coats[g.k] = c.id; });
       }, () => {
         V.bowlShake = -1; V.shakeAmt = 0;
         coach.say(c.line, 3.5);
-        B.gum.forEach((g, j) => {
+        list.forEach((g, j) => {
           const x0 = g.x, y0 = g.y;
           g.where = "air";
           tween(0.5, (p) => { const e = ease(p); g.x = lerp(x0, g.hx, e); g.y = lerp(y0, g.hy, e) - Math.sin(p * Math.PI) * 50; g.sc = lerp(0.5, 1, e); }, () => {
@@ -562,12 +707,16 @@
           }, j * 0.07);
         });
         later(0.5 + n * 0.07, () => {
-          tween(0.4, (p) => { V.bowls = 1 - ease(p); });
-          tween(0.4, (p) => { V.lid = ease(p); });
-          busy = false; advance("jar");
+          busy = false; saveSoon(); lastWant = "";
+          if (B.gum.every((g) => g.coat || g.where === "jar")) toJarStep();
         });
       });
     });
+  }
+  function toJarStep() {
+    if (B.step !== "coat") return;
+    tween(0.4, (p) => { V.bowls = 1 - ease(p); });
+    advance("jar");
   }
   // A gummy hops from the tray into the candy jar.
   function hopToJar(g, delay) {
@@ -585,13 +734,13 @@
     }, delay || 0);
   }
   function allToJar() {
-    if (busy || B.step !== "jar") return;
-    B.gum.filter((g) => g.where === "tray").forEach((g, j) => hopToJar(g, j * 0.3));
+    if (busy || (B.step !== "jar" && B.step !== "coat")) return;
+    onTray().forEach((g, j) => hopToJar(g, j * 0.3));
   }
   function finishBatch() {
     advance("done");
     busy = true;
-    tween(0.4, (p) => { V.lid = 1 - ease(p); });
+    tween(0.4, (p) => { V.lid = 1 - ease(p); V.bowls = Math.min(V.bowls, 1 - ease(p)); });
     snd.chime();
     const m = jarMouth();
     puff("spark", m.x, m.y + 30, 12);
@@ -824,7 +973,7 @@
   function drawBottles(t) {
     L.bottles.forEach(([x, y], i) => {
       if (V.carry && V.carry.i === i) return;
-      drawBottle(i, x, y, 0, t);
+      drawBottle(i, x, y, Math.sin(t * 30) * 0.15 * V.bwob[i], t);
     });
   }
   function drawPlate() {
@@ -861,7 +1010,7 @@
     ell(P.x, rim, rx, ry); fs("#9AA5B4");
     ell(P.x, rim + 3, rx - 6, ry - 4); ctx.fillStyle = "#5B6573"; ctx.fill();
     if (V.level > 0.02) {
-      const sy = surfY(), srx = (rx - 8) * (0.85 + 0.15 * V.level), sry = ry - 5;
+      const sy = surfY() + Math.sin(t * 14) * 3 * V.slosh, srx = (rx - 8) * (0.85 + 0.15 * V.level), sry = ry - 5;
       const col = mixHex(hex(), "#F3EEE6", V.cloud * 0.6);
       ctx.save();
       ell(P.x, rim + 3, rx - 6, ry - 4); ctx.clip();
@@ -880,6 +1029,14 @@
       }
       ctx.fillStyle = "rgba(255,255,255," + (0.2 + 0.4 * V.clear) + ")";
       ctx.beginPath(); ctx.ellipse(P.x - srx * 0.35, sy - 1, srx * 0.3, 2.5, 0, 0, TAU); ctx.fill();
+      // The swirl the whisk leaves while he stirs.
+      if (V.swirlV > 0.02) {
+        ctx.strokeStyle = "rgba(255,255,255," + (0.7 * V.swirlV) + ")"; ctx.lineWidth = 2;
+        for (let k = 0; k < 3; k++) {
+          const a0 = V.swirl + k * TAU / 3, rr0 = srx * (0.35 + 0.18 * k);
+          ctx.beginPath(); ctx.ellipse(P.x, sy, rr0, rr0 * sry / srx, 0, a0, a0 + 1.6); ctx.stroke();
+        }
+      }
       ctx.restore();
     }
     if (V.whiskShow > 0.01) drawWhisk();
@@ -890,10 +1047,7 @@
     fs("#B8C2CF");
     ctx.fillStyle = "rgba(255,255,255,0.45)"; rr(P.x - rx + 10, rim + 18, 10, P.h - 36, 5); ctx.fill();
   }
-  function whiskPt() {
-    const sy = surfY(), a = V.whiskA;
-    return { x: L.pot.x + Math.cos(a) * L.pot.w * 0.24, y: sy + Math.sin(a) * 5 };
-  }
+  function whiskPt() { return { x: V.whisk.x, y: V.whisk.y }; }
   function drawWhisk() {
     const w = whiskPt(), al = V.whiskShow, hx = w.x + 26, hy = w.y - 76;
     ctx.globalAlpha = al;
@@ -910,10 +1064,10 @@
   function drawGel() {
     const p = V.gelPose || { x: L.gel.x, y: L.gel.y, ang: 0 }, al = V.gelPose ? 1 : V.gelShow;
     if (al <= 0.01) return;
-    ctx.save(); ctx.globalAlpha = al; ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+    ctx.save(); ctx.globalAlpha = al; ctx.translate(p.x, p.y); ctx.rotate(p.ang + Math.sin(now() * 30) * 0.15 * V.gelWob);
     // A small bowl heaped with gelatin and sugar.
     ctx.beginPath(); ctx.ellipse(0, -10, 34, 9, 0, 0, TAU); fs("#FFFFFF");
-    if (!V.gelPose || p.ang > -0.8) { ctx.beginPath(); ctx.moveTo(-26, -10); ctx.quadraticCurveTo(0, -36, 26, -10); ctx.closePath(); fs("#FFF8E6", 1.8); ctx.fillStyle = "#E9DFC8"; for (let k = 0; k < 8; k++) ctx.fillRect(-16 + k * 4.5, -14 - (k % 3) * 4, 2, 2); }
+    if (!V.gelPose || Math.abs(p.ang) < 0.8) { ctx.beginPath(); ctx.moveTo(-26, -10); ctx.quadraticCurveTo(0, -36, 26, -10); ctx.closePath(); fs("#FFF8E6", 1.8); ctx.fillStyle = "#E9DFC8"; for (let k = 0; k < 8; k++) ctx.fillRect(-16 + k * 4.5, -14 - (k % 3) * 4, 2, 2); }
     ctx.beginPath(); ctx.moveTo(-34, -10); ctx.quadraticCurveTo(-30, 14, 0, 14); ctx.quadraticCurveTo(30, 14, 34, -10); ctx.ellipse(0, -10, 34, 9, 0, 0, Math.PI); ctx.closePath();
     fs("#6EC6F0");
     ctx.restore();
@@ -941,7 +1095,8 @@
         gummyPath(c.sh, c.s * 1.08);
         ctx.fillStyle = "#6FBFAD"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#3E8F7E"; ctx.stroke();
         ctx.restore();
-        const lv = V.cavLevel[k] || 0;
+        const lv = V.cavLevel[k] || 0, gk = B.gum[k];
+        if (gk && gk.where !== "mold") return;
         if (V.set && lv > 0) drawGummy(c.sh, c.dx, c.dy, c.s, hex(), { t, seed: k * 0.3 });
         else if (lv > 0.01) drawGummy(c.sh, c.dx, c.dy, c.s * (0.7 + 0.3 * lv), hex(), { liquid: lv });
       });
@@ -960,7 +1115,8 @@
   }
   function drawGummies(where, t) {
     B.gum.forEach((g, i) => {
-      if (g.hide || g.where === "jar" || (where === "air") !== (g.where === "air") || (where === "bowl") !== (g.where === "bowl")) return;
+      if (g.hide || g.where === "jar" || g.where === "mold" || g.where === "bowl") return;
+      if ((where === "air") !== (g.where === "air" || g.where === "drag")) return;
       drawGummy(g.sh, g.x, g.y, g.s, hex(), { wob: g.wob, ph: g.ph, rot: g.rot, k: g.sc, coat: g.coat, t, seed: i * 0.27 });
     });
   }
@@ -986,9 +1142,10 @@
   }
   // Gummies being tossed in the shaking bowl, drawn in the bowl's own frame.
   function drawGummiesIn(t) {
+    const n = B.gum.filter((g) => g.where === "bowl").length;
     B.gum.forEach((g, i) => {
       if (g.where !== "bowl") return;
-      const n = B.gum.length, x = (i - (n - 1) / 2) * 13, y = -6 - Math.abs(Math.sin(t * 12 + i * 1.3)) * 10 * Math.abs(V.shakeAmt);
+      const x = ((g.bj || 0) - (n - 1) / 2) * 13, y = -6 - Math.abs(Math.sin(t * 12 + i * 1.3)) * 10 * Math.abs(V.shakeAmt);
       drawGummy(g.sh, x, y, g.s, hex(), { k: 0.5, rot: Math.sin(t * 9 + i) * 0.5, coat: g.coat, t });
     });
   }
@@ -1151,14 +1308,14 @@
   function want() {
     if (busy || jarOpen) return null;
     switch (B.step) {
-      case "flavor": return { line: "Pour a flavor into the pot.", part: "bottles" };
+      case "flavor": return { line: pourLine(), part: B.flavor >= 0 ? "bottle" + B.flavor : "bottles" };
       case "gel": return { line: "Tip the gelatin and sugar into the pot.", part: "gel" };
       case "heat": return { line: "Turn the knob to heat the pot.", part: "knob" };
-      case "stir": return { line: "Stir the pot with the whisk.", part: "whisk" };
+      case "stir": return V.knob < 0.5 ? { line: "Turn the knob to heat the pot.", part: "knob" } : { line: "Stir the pot with the whisk.", part: "whisk" };
       case "fill": { const k = nextEmpty(); return k < 0 ? null : { line: "Fill the mold with the candy dropper.", part: "cav" + k }; }
       case "chill": return { line: "Put the mold in the fridge.", part: "mold" };
-      case "pop": return { line: "Push the mold to pop out the gummies.", part: "mold" };
-      case "coat": return { line: "Pick a bowl: sour, sugar or shiny.", part: "bowls" };
+      case "pop": { const g = inMold()[0]; return g ? { line: "Push the gummies out of the mold.", part: "pop" + g.k } : null; }
+      case "coat": return { line: "Put the gummies in a bowl: sour, sugar or shiny.", part: "bowls" };
       case "jar": return { line: "Put the gummies in the candy jar.", part: "jar" };
     }
     return null;
@@ -1173,7 +1330,7 @@
     if (part === "jar") return { x: L.jar.x, y: L.jar.y - L.jar.h / 2, r: L.jar.w * 0.65 };
     if (part === "dropper") return { x: V.drop.x, y: V.drop.y - 40, r: 30 };
     if (part === "bowls") return { x: L.bowls.xs[1], y: L.bowls.y, r: 40 };
-    if (/^cav\d$/.test(part)) { const c = cavPos(+part.slice(3)); return { x: c.x, y: c.y, r: c.s * 1.1 }; }
+    if (/^(cav|pop)\d$/.test(part)) { const c = cavPos(+part.slice(3)); return { x: c.x, y: c.y, r: c.s * 1.1 }; }
     if (/^bottle\d$/.test(part)) { const [x, y] = L.bottles[+part.slice(6)]; return { x, y: y - L.bh * 0.45, r: L.bw * 0.7 }; }
     if (/^bowl\d$/.test(part)) { const b = bowlPos(+part.slice(4)); return { x: b.x, y: b.y + 8, r: 40 }; }
     if (/^gum\d$/.test(part)) { const g = B.gum[+part.slice(3)]; return g ? { x: g.x, y: g.y, r: g.s } : null; }
@@ -1181,7 +1338,7 @@
   }
   function drawRing(t) {
     const w = want();
-    if (!w || locked()) return;
+    if (!w || locked() || drag) return;
     const pulse = 0.5 + 0.5 * Math.sin(t * 4);
     const ring = (x, y, r) => {
       ctx.beginPath(); ctx.arc(x, y, r + 4 + pulse * 4, 0, TAU);
@@ -1203,7 +1360,8 @@
   const coach = Toybox.coach($("coach"));
   let lastWant = "";
   function updateCoach() {
-    if (jarOpen) return;
+    // While he holds something the line stays as it is, so a new instruction never pops up over his work.
+    if (jarOpen || drag) return;
     const w = want(), line = w ? w.line : "";
     if (line === lastWant) return;
     lastWant = line;
@@ -1212,22 +1370,40 @@
     const p = w.part === "bottles" ? { x: L.pot.x, y: L.bottles[0][1] - L.bh / 2 } : partPt(w.part);
     if (p) { const v = vp(p.x, p.y); coach.avoid(v.x, v.y); }
   }
+  // The ghost hand shows a tap first and the real move (a drag) after that.
   const ghost = Toybox.ghost({
     max: 3,
     plan: () => {
-      if (locked() || press.active()) return null;
+      if (locked() || press.active() || drag) return null;
       const w = want();
       if (!w) return null;
-      if (w.part === "bottles") {
-        const b = vp(L.bottles[2][0], L.bottles[2][1] - L.bh * 0.4), p = vp(L.pot.x, potRim());
-        if (ghost.shown("flavor") < 1) return { pts: [[b.x, b.y]], tap: true, key: "flavor" };
-        return { pts: [[b.x, b.y], [p.x, p.y]], dur: 1600, key: "flavor" };
+      const key = w.part.replace(/\d$/, "").replace(/^bottle$/, "bottles"), first = ghost.shown(key) < 1;
+      const P = (x, y) => { const v = vp(x, y); return [v.x, v.y]; };
+      const potTop = P(L.pot.x + L.pot.w * 0.6, potRim() - 40);
+      if (w.part === "bottles" || /^bottle\d$/.test(w.part)) {
+        const i = B.flavor >= 0 ? B.flavor : 2, b = P(L.bottles[i][0], L.bottles[i][1] - L.bh * 0.4);
+        return first ? { pts: [b], tap: true, key } : { pts: [b, potTop], dur: 1600, key };
       }
-      if (w.part === "bowls") { const b = vp(L.bowls.xs[0], L.bowls.y); return { pts: [[b.x, b.y]], tap: true, key: "bowls" }; }
+      if (w.part === "gel") { const g = P(L.gel.x, L.gel.y - 10); return first ? { pts: [g], tap: true, key } : { pts: [g, potTop], dur: 1500, key }; }
+      if (w.part === "whisk" && !first) {
+        const pts = [];
+        for (let k = 0; k <= 12; k++) { const a = k / 12 * TAU; pts.push(P(L.pot.x + Math.cos(a) * L.pot.w * 0.28, surfY() - 20 + Math.sin(a) * 10)); }
+        return { pts, dur: 2000, key };
+      }
+      if (/^cav\d$/.test(w.part) && !first) {
+        const pts = [P(V.drop.x, V.drop.y - 30)];
+        B.fill.forEach((f, k) => { if (!f) { const c = cavPos(k); pts.push(P(c.x, c.y - c.s * 0.3)); } });
+        return { pts, dur: 600 * pts.length, key };
+      }
+      if (w.part === "mold" && B.step === "chill" && !first) return { pts: [P(V.mold.x, V.mold.y), P(L.fridge.x + L.fridge.w / 2, fridgeIn().y)], dur: 1600, key };
+      if (w.part === "bowls") {
+        const g = onTray().find((q) => !q.coat) || onTray()[0], b = P(L.bowls.xs[1], L.bowls.y);
+        return first || !g ? { pts: [b], tap: true, key } : { pts: [P(g.x, g.y), b], dur: 1500, key };
+      }
+      if (w.part === "jar" && !first) { const g = onTray()[0]; if (g) return { pts: [P(g.x, g.y), P(L.jar.x, L.jar.y - L.jar.h / 2)], dur: 1600, key }; }
       const p = partPt(w.part);
       if (!p) return null;
-      const v = vp(p.x, p.y);
-      return { pts: [[v.x, v.y]], tap: true, key: w.part.replace(/\d$/, "") };
+      return { pts: [P(p.x, p.y)], tap: true, key };
     }
   });
 
@@ -1237,29 +1413,41 @@
   const NAMES = { gel: "Gelatin and sugar", knob: "Stove knob", whisk: "Whisk", pot: "Saucepan", mold: "Silicone mold",
     fridge: "Fridge", jar: "Candy jar", dropper: "Candy dropper", tray: "Tray" };
   function tag(name, x, y) { const v = vp(x, y); Toybox.nametag(name, v.x, v.y - 10, 1800); }
-  // The part under a press (client px), nearest first among those that can be pressed now.
+  const inRect = (w, x, y, hw, hh) => Math.abs(w.x - x) <= hw && Math.abs(w.y - y) <= hh;
+  // The part under a press (client px). Every target is at least a fingertip wide, and the things he works
+  // with right now (the dropper and the shapes, the gummies, the bowls) come before the scenery behind them.
   function hitPart(cx, cy) {
     if (locked()) return null;
     if (jarOpen) { const r = cv.getBoundingClientRect(), i = jvHit(cx - r.left, cy - r.top); return i >= 0 ? "jv" + i : "jvout"; }
-    const w = wpt(cx, cy), minR = 22 / vs;
+    const w = wpt(cx, cy), minR = 30 / vs;
     let best = null, bd = Infinity;
     const cand = (id, x, y, r) => { const d = Math.hypot(w.x - x, w.y - y); if (d <= Math.max(r, minR) && d - r * 0.3 < bd) { bd = d - r * 0.3; best = id; } };
     const st = B.step;
     if (st === "fill") {
-      const d = V.drop; if (d.show > 0.5) cand("dropper", d.x, d.y - 40, 34);
-      B.fill.forEach((f, k) => { const c = cavPos(k); cand("cav" + k, c.x, c.y, c.s * 1.05); });
+      const d = V.drop; if (d.show > 0.5) cand("dropper", d.x, d.y - 36, 40);
+      B.fill.forEach((f, k) => { const c = cavPos(k); cand("cav" + k, c.x, c.y, c.s * 1.1); });
+      if (best) return best;
+      if (inRect(w, V.mold.x, V.mold.y, MOLD_W / 2 + 10, MOLD_H / 2 + 10)) return "moldfill";
     }
-    if ((st === "coat" || st === "jar") && !busy) B.gum.forEach((g, i) => { if (g.where === "tray") cand("gum" + i, g.x, g.y, g.s * 1.1); });
-    if (st === "coat" && V.bowls > 0.5) L.bowls.xs.forEach((x, i) => cand("bowl" + i, x, L.bowls.y + 8, 42));
-    L.bottles.forEach(([x, y], i) => cand("bottle" + i, x, y - L.bh * 0.45, L.bw * 0.6));
-    if (V.gelShow > 0.5) cand("gel", L.gel.x, L.gel.y - 10, 38);
-    const k = knobPt(); cand("knob", k.x, k.y, k.r);
-    if (st === "stir") { const wh = whiskPt(); cand("whisk", wh.x + 14, wh.y - 24, 36); }
-    cand("pot", L.pot.x, L.pot.y - L.pot.h * 0.5, L.pot.w * 0.5);
-    if (V.mold.show && !V.mold.inFridge && st !== "fill") cand("mold", V.mold.x, V.mold.y, MOLD_W * 0.42);
-    if (V.tray > 0.5 && st !== "coat" && st !== "jar") cand("tray", L.work.x, L.work.y, MOLD_W * 0.42);
+    if (st === "pop") {
+      B.gum.forEach((g, k) => { if (g.where === "mold") cand("pop" + k, g.x, g.y, g.s * 1.1); });
+      if (best) return best;
+    }
+    if (st === "coat" || st === "jar" || st === "pop") B.gum.forEach((g, i) => { if (g.where === "tray" || g.where === "out") cand("gum" + i, g.x, g.y, g.s * 1.25); });
+    if (st === "coat" && V.bowls > 0.5) L.bowls.xs.forEach((x, i) => cand("bowl" + i, x, L.bowls.y + 8, 46));
+    if (best) return best;
+    L.bottles.forEach(([x, y], i) => cand("bottle" + i, x, y - L.bh * 0.45, L.bw * 0.62));
+    if (V.gelShow > 0.5) cand("gel", L.gel.x, L.gel.y - 10, 42);
+    // The knob sits right under the pot: near it, it wins.
+    const k = knobPt();
+    if (Math.hypot(w.x - k.x, w.y - k.y) <= Math.max(k.r * 1.2, minR)) return "knob";
+    if (st === "stir") { const wh = whiskPt(); cand("whisk", wh.x + 14, wh.y - 24, 40); }
+    // The whole pot, from its rim to its bottom, is one big target (stirring happens anywhere in it).
+    if (inRect(w, L.pot.x, L.pot.y - L.pot.h * 0.55, L.pot.w * 0.6, L.pot.h * 0.75)) cand("pot", w.x, w.y, 1);
+    if (V.mold.show && !V.mold.inFridge && inRect(w, V.mold.x, V.mold.y, MOLD_W / 2 + 8, MOLD_H / 2 + 8)) cand("mold", w.x, w.y, 2);
+    if (V.tray > 0.5 && st !== "coat" && st !== "jar" && inRect(w, L.work.x, L.work.y, MOLD_W / 2, MOLD_H / 2)) cand("tray", w.x, w.y, 3);
     const F = L.fridge;
-    if (w.x > F.x && w.x < F.x + F.w && w.y > F.y && w.y < F.y + F.h) cand("fridge", w.x, w.y, F.w);
+    if (inRect(w, F.x + F.w / 2, F.y + F.h / 2, F.w / 2, F.h / 2)) cand("fridge", w.x, w.y, F.w);
     cand("jar", L.jar.x, L.jar.y - L.jar.h / 2, L.jar.w * 0.6);
     return best;
   }
@@ -1269,7 +1457,8 @@
     coach.say(w.line, 3);
     ghost.poke();
   }
-  // A tap: each part does its own one motion.
+  // A tap: each part does its own one motion. Parts that are not needed right now still answer (a wiggle and
+  // their name, the knob turns, the fridge door opens).
   function doTap(part) {
     if (locked() || part == null) return;
     if (jarOpen) {
@@ -1280,30 +1469,37 @@
     const st = B.step;
     if (/^bottle\d$/.test(part)) {
       const i = +part.slice(6);
-      if (st === "flavor" && !busy) { ghost.learned("flavor"); pour(i); }
-      else { const p = partPt(part); tag(FLAVORS[i].name, p.x, p.y - L.bh * 0.5); }
-    } else if (part === "gel") { if (st === "gel" && !busy) { ghost.learned("gel"); tipGel(); } else tag(NAMES.gel, L.gel.x, L.gel.y - 30); }
-    else if (part === "knob") { if (st === "heat" && !busy) { ghost.learned("knob"); heatOn(); } else { const k = knobPt(); tag(NAMES.knob, k.x, k.y - k.r); if (st !== "stir") hint(); } }
-    else if (part === "whisk" || (part === "pot" && st === "stir")) { if (st === "stir" && !busy) { ghost.learned("whisk"); stirTap(); } }
-    else if (part === "pot") { tag(NAMES.pot, L.pot.x, potRim() - 16); hint(); }
+      if (pourable(i) && !busy) { ghost.learned("bottles"); pour(i); }
+      else {
+        V.bwob[i] = 1; const p = partPt(part); wiggleTag(FLAVORS[i].name, p.x, p.y - L.bh * 0.5);
+        if (st === "flavor") coach.say(pourLine(), 3);
+      }
+    } else if (part === "gel") {
+      if (st === "gel" && !busy) { ghost.learned("gel"); tipGel(); }
+      else { V.gelWob = 1; wiggleTag(NAMES.gel, L.gel.x, L.gel.y - 30); }
+    } else if (part === "knob") { if (!(busy && st === "stir")) { ghost.learned("knob"); knobTap(); } }
+    else if (part === "whisk" || (part === "pot" && st === "stir")) { if (!busy) { ghost.learned("whisk"); stirTap(); } }
+    else if (part === "pot") { V.slosh = 1; tag(NAMES.pot, L.pot.x, potRim() - 16); }
     else if (part === "dropper") fillCav(nextEmpty());
+    else if (part === "moldfill") fillCav(nextEmpty());
     else if (/^cav\d$/.test(part)) { ghost.learned("cav"); const k = +part.slice(3); if (B.fill[k] || V.fillQ.includes(k)) fillCav(nextEmpty()); else fillCav(k); }
+    else if (/^pop\d$/.test(part)) popOne(+part.slice(3));
     else if (part === "mold") {
       if (busy) return;
       if (st === "chill") { ghost.learned("mold"); chill(); }
-      else if (st === "pop") { ghost.learned("mold"); pop(); }
-      else { pokeMold(); hint(); }
+      else if (st === "pop") { ghost.learned("pop"); pop(); }
+      else { pokeMold(); if (st !== "fill") hint(); }
     } else if (part === "fridge") {
-      if (st === "chill" && !busy) chill();
-      else { tag(NAMES.fridge, L.fridge.x + L.fridge.w / 2, L.fridge.y + 20); if (!busy) hint(); }
+      if (st === "chill" && !busy) { ghost.learned("mold"); chill(); }
+      else fridgePeek();
     } else if (/^bowl\d$/.test(part)) { ghost.learned("bowls"); coatIn(+part.slice(4)); }
     else if (/^gum\d$/.test(part)) {
       const g = B.gum[+part.slice(3)];
       if (!g) return;
       if (st === "jar" && !busy) { ghost.learned("jar"); hopToJar(g); }
-      else { g.wob = 0.4; g.ph = 0; snd.boing(); }
+      else { g.wob = 0.45; g.ph = 0; snd.boing(); }
     } else if (part === "jar") {
-      if (st === "jar" && !busy) { ghost.learned("jar"); allToJar(); }
+      if ((st === "jar" || st === "coat") && !busy) { ghost.learned("jar"); allToJar(); }
       else openJar(true);
     } else if (part === "tray") tag(NAMES.tray, L.work.x, L.work.y - MOLD_H / 2);
   }
@@ -1311,80 +1507,111 @@
   let moldWob = 0;
   function pokeMold() { moldWob = 1; tag(NAMES.mold, V.mold.x, V.mold.y - MOLD_H / 2); }
 
-  let drag = null;
+  // Drags: the part follows his finger, and the real thing happens while he does it.
+  const isFillPart = (part) => part === "dropper" || part === "moldfill" || /^cav\d$/.test(part);
   const press = Toybox.press(cv, {
     any: true,
     hit: (x, y) => hitPart(x, y),
+    // The dropper comes to his finger as soon as he touches a shape, so a finger held still on a shape fills it
+    // (a still finger sends no moves).
+    down: (part, e, s) => {
+      drag = null;
+      if (locked() || jarOpen || B.step !== "fill" || busy || !isFillPart(part)) return;
+      const w = wpt(s.x0, s.y0);
+      drag = { k: "dropper" };
+      V.drop.held = true; V.drop.x = w.x; V.drop.y = w.y - 12;
+      ghost.learned("cav");
+    },
     dragStart: (part, e, s) => {
+      if (drag && drag.k === "dropper") return;
       drag = null;
       if (locked() || part == null || jarOpen) return;
-      const w = wpt(s.x, s.y), st = B.step;
-      if (/^bottle\d$/.test(part) && st === "flavor" && !busy) {
+      const w = wpt(s.x, s.y), w0 = wpt(s.x0, s.y0), st = B.step;
+      if (/^bottle\d$/.test(part)) {
         const i = +part.slice(6), h = bottleHome(i);
-        V.carry = { i, x: h.x, y: h.y, ang: 0 };
-        drag = { k: "bottle", i, ox: h.x - w.x, oy: h.y - w.y };
-      } else if (part === "gel" && st === "gel" && !busy) {
-        V.gelPose = { x: L.gel.x, y: L.gel.y, ang: 0 };
-        drag = { k: "gel", ox: L.gel.x - w.x, oy: L.gel.y - w.y };
-      } else if (part === "knob" && st === "heat" && !busy) { ghost.learned("knob"); heatOn(); }
-      else if ((part === "whisk" || part === "pot") && st === "stir" && !busy) {
-        drag = { k: "stir", a: Math.atan2((w.y - surfY()) * 3, w.x - L.pot.x), x: w.x, y: w.y };
+        if (busy || (V.carry && V.carry.i !== i)) return;
+        if (!pourable(i)) { V.bwob[i] = 1; const p = partPt(part); wiggleTag(FLAVORS[i].name, p.x, p.y - L.bh * 0.5); if (st === "flavor") coach.say(pourLine(), 3); return; }
+        V.carry = { i, x: h.x + (w.x - w0.x), y: h.y + (w.y - w0.y), ang: 0, held: true };
+        drag = { k: "bottle", i, ox: h.x - w0.x, oy: h.y - w0.y };
+        ghost.learned("bottles");
+      } else if (part === "gel") {
+        if (st !== "gel" || busy) { V.gelWob = 1; wiggleTag(NAMES.gel, L.gel.x, L.gel.y - 30); return; }
+        V.gelPose = { x: L.gel.x + (w.x - w0.x), y: L.gel.y + (w.y - w0.y), ang: 0, held: true };
+        drag = { k: "gel", ox: L.gel.x - w0.x, oy: L.gel.y - w0.y };
+        ghost.learned("gel");
+      } else if (part === "knob") {
+        if (busy && st === "stir") return;
+        if (V.knobTw) { tweens.splice(tweens.indexOf(V.knobTw), 1); V.knobTw = null; }
+        drag = { k: "knob" }; ghost.learned("knob");
+        knobDrag(w);
+      } else if ((part === "whisk" || part === "pot") && st === "stir" && !busy) {
+        drag = { k: "stir", x: w.x, y: w.y };
+        whiskTo(w.x, w.y);
         ghost.learned("whisk");
-      } else if ((part === "dropper" || /^cav\d$/.test(part)) && st === "fill" && !busy) {
-        drag = { k: "dropper", ox: V.drop.x - w.x, oy: V.drop.y - w.y };
+      } else if (isFillPart(part) && st === "fill" && !busy) {
+        // The dropper comes to his finger, its tip just above the fingertip so he can see the shape fill.
+        drag = { k: "dropper" };
+        V.drop.held = true;
+        V.drop.x = w.x; V.drop.y = w.y - 12;
         ghost.learned("cav");
       } else if (part === "mold" && st === "chill" && !busy) {
-        drag = { k: "mold", ox: V.mold.x - w.x, oy: V.mold.y - w.y };
-      } else if (part === "mold" && st === "pop" && !busy) { ghost.learned("mold"); pop(); }
+        drag = { k: "mold", ox: V.mold.x - w0.x, oy: V.mold.y - w0.y };
+      } else if (part === "mold" && st === "pop" && !busy) { ghost.learned("pop"); pop(); }
+      else if (/^pop\d$/.test(part)) popOne(+part.slice(3));
       else if (/^gum\d$/.test(part) && (st === "coat" || st === "jar") && !busy) {
         const g = B.gum[+part.slice(3)];
-        if (g && g.where === "tray") { g.where = "drag"; drag = { k: "gum", g, ox: g.x - w.x, oy: g.y - w.y }; }
+        if (g && g.where === "tray") { g.where = "drag"; drag = { k: "gum", g, ox: g.x - w0.x, oy: g.y - w0.y }; g.x = w.x + drag.ox; g.y = w.y + drag.oy; }
       } else if (/^bowl\d$/.test(part)) { ghost.learned("bowls"); coatIn(+part.slice(4)); }
     },
     move: (part, e, s) => {
       if (!drag || locked()) return;
       const w = wpt(s.x, s.y);
-      if (drag.k === "bottle") { V.carry.x = w.x + drag.ox; V.carry.y = w.y + drag.oy; }
-      else if (drag.k === "gel") { V.gelPose.x = w.x + drag.ox; V.gelPose.y = w.y + drag.oy; }
+      if (drag.k === "bottle" && V.carry && V.carry.held) { V.carry.x = w.x + drag.ox; V.carry.y = w.y + drag.oy; }
+      else if (drag.k === "gel" && V.gelPose && V.gelPose.held) { V.gelPose.x = w.x + drag.ox; V.gelPose.y = w.y + drag.oy; }
+      else if (drag.k === "knob") knobDrag(w);
       else if (drag.k === "stir") {
-        const a = Math.atan2((w.y - surfY()) * 3, w.x - L.pot.x), dist = Math.hypot(w.x - drag.x, w.y - drag.y);
-        let d = a - drag.a; d = Math.atan2(Math.sin(d), Math.cos(d));
-        drag.a = a; drag.x = w.x; drag.y = w.y;
-        stirBy(d || dist / 40, Math.min(dist, 40));
-        if (busy) drag = null;
-      } else if (drag.k === "dropper") {
-        V.drop.x = w.x + drag.ox; V.drop.y = w.y + drag.oy;
-        if (!V.filling) {
-          // The dropper fills any empty shape its tip passes over.
-          B.fill.forEach((f, k) => { if (!f) { const c = cavPos(k); if (Math.hypot(V.drop.x - c.x, V.drop.y - c.y) < c.s * 0.9) { drag = null; fillCav(k); } } });
-        }
-      } else if (drag.k === "mold") { V.mold.x = w.x + drag.ox; V.mold.y = w.y + drag.oy; }
+        const dist = Math.hypot(w.x - drag.x, w.y - drag.y);
+        drag.x = w.x; drag.y = w.y;
+        whiskTo(w.x, w.y);
+        stirBy(Math.min(dist, 40));
+      } else if (drag.k === "dropper") { V.drop.x = w.x; V.drop.y = w.y - 12; }
+      else if (drag.k === "mold") { V.mold.x = w.x + drag.ox; V.mold.y = w.y + drag.oy; }
       else if (drag.k === "gum") { drag.g.x = w.x + drag.ox; drag.g.y = w.y + drag.oy; drag.g.wob = 0.12; drag.g.ph += 0.4; }
     },
     up: (part, e, s) => {
       const d = drag; drag = null;
       if (!d) return;
-      const w = wpt(s.x, s.y), near = (p, r) => p && Math.hypot(w.x - p.x, w.y - p.y) < r;
-      if (d.k === "bottle") {
-        ghost.learned("flavor");
-        const at2 = { x: V.carry.x, y: V.carry.y };
-        if (!locked() && near({ x: L.pot.x, y: potRim() - 30 }, 120)) { V.carry = null; pour(d.i, at2); }
-        else { bottleBack(d.i, at2); hint(); }
-      } else if (d.k === "gel") {
-        ghost.learned("gel");
-        const at2 = { x: V.gelPose.x, y: V.gelPose.y };
-        if (!locked() && near({ x: L.pot.x, y: potRim() - 20 }, 120)) { V.gelPose = null; tipGel(at2); }
-        else { gelBack(at2); hint(); }
+      const w = wpt(s.x, s.y);
+      if (d.k === "bottle" && V.carry && V.carry.held) {
+        // Let go over the pot, the bottle finishes the pour by itself; anywhere else it goes back to the shelf.
+        const c = V.carry; V.stream = null;
+        if (!locked() && pourable(c.i) && overPot(c.x, c.y - L.bh / 2, L.bh)) pour(c.i, { x: c.x, y: c.y, ang: c.ang });
+        else { bottleBack(c.i, { x: c.x, y: c.y }, c.ang); if (B.step === "flavor" && V.level < 0.05) hint(); }
+      } else if (d.k === "gel" && V.gelPose && V.gelPose.held) {
+        const g = V.gelPose;
+        if (!locked() && B.step === "gel" && overPot(g.x, g.y, 50)) tipGel({ x: g.x, y: g.y });
+        else { gelBack({ x: g.x, y: g.y, ang: g.ang }); if (B.step === "gel" && V.cloud < 0.05) hint(); }
+      } else if (d.k === "dropper") {
+        V.drop.held = false;
+        // Let go over a shape that is not full yet, that shape finishes filling.
+        const k = B.fill.findIndex((f, j) => { if (f) return false; const c = cavPos(j); return Math.hypot(V.drop.x - c.x, V.drop.y - (c.y - c.s * 0.3)) < c.s * 1.4; });
+        if (k >= 0 && !locked()) fillCav(k);
+        // Let go away from the mold, the dropper floats back beside it.
+        if (!inRect(V.drop, V.mold.x, V.mold.y, MOLD_W / 2 + 30, MOLD_H / 2 + 60)) {
+          const d0 = { x: V.drop.x, y: V.drop.y };
+          tween(0.35, (p) => { V.drop.x = lerp(d0.x, L.dropRest.x, ease(p)); V.drop.y = lerp(d0.y, L.dropRest.y, ease(p)); });
+        }
       } else if (d.k === "mold") {
-        const F = L.fridge, at2 = { x: V.mold.x, y: V.mold.y };
-        if (!locked() && V.mold.x + MOLD_W * 0.3 > F.x) { ghost.learned("mold"); V.mold.x = L.work.x; V.mold.y = L.work.y; chill(); }
-        else { moldBack(at2); hint(); }
+        if (!locked() && nearFridge(V.mold.x)) { ghost.learned("mold"); chill(); }
+        else { moldBack({ x: V.mold.x, y: V.mold.y }); hint(); }
       } else if (d.k === "gum") {
         const g = d.g;
         g.where = "tray";
-        const bi = L.bowls.xs.findIndex((x) => Math.hypot(g.x - x, g.y - L.bowls.y) < 50);
-        if (!locked() && B.step === "coat" && bi >= 0) { g.x = g.hx; g.y = g.hy; ghost.learned("bowls"); coatIn(bi); }
-        else if (!locked() && B.step === "jar" && near({ x: L.jar.x, y: L.jar.y - L.jar.h / 2 }, L.jar.w)) { ghost.learned("jar"); hopToJar(g); }
+        const bi = L.bowls.xs.findIndex((x) => Math.hypot(g.x - x, g.y - L.bowls.y) < 56);
+        const tray = { x: L.work.x, y: L.work.y };
+        if (!locked() && B.step === "coat" && V.bowls > 0.5 && bi >= 0) { g.x = g.hx; g.y = g.hy; ghost.learned("bowls"); coatIn(bi, [g]); }
+        else if (!locked() && Math.hypot(w.x - L.jar.x, w.y - (L.jar.y - L.jar.h / 2)) < L.jar.w) { ghost.learned("jar"); hopToJar(g); }
+        else if (inRect(g, tray.x, tray.y, MOLD_W / 2 - 14, MOLD_H / 2 - 14)) { g.hx = g.x; g.hy = g.y; g.wob = 0.35; g.ph = 0; snd.boing(); }
         else {
           const x0 = g.x, y0 = g.y;
           g.where = "air";
@@ -1394,6 +1621,13 @@
     },
     tap: (part) => doTap(part)
   });
+  // Turning the knob: the pointer follows his finger round, from up (off) to the right (full on).
+  function knobDrag(w) {
+    const k = knobPt(), dx = w.x - k.x, dy = w.y - k.y;
+    if (Math.hypot(dx, dy) < 4) return;
+    const a = Math.atan2(dx, -dy);
+    setKnob(a / (Math.PI / 2));
+  }
   ["gesturestart", "gesturechange"].forEach((n) => document.addEventListener(n, (e) => e.preventDefault()));
 
   // =====================================================================================================
@@ -1486,6 +1720,14 @@
       if (w.v || w.hop > 0) { w.hop += w.v * dt; w.v -= 900 * dt; if (w.hop <= 0) { w.hop = 0; w.v = w.v < -80 ? -w.v * 0.35 : 0; if (w.v) w.wob = 0.25; } }
     });
     V.jarBounce = Math.max(0, V.jarBounce - dt * 2.5);
+    // The things he is holding do their work while he holds them.
+    stepPour(dt); stepGel(dt); stepFill(dt);
+    V.heat += (V.knob - V.heat) * Math.min(1, dt * 5);
+    if (drag && drag.k === "mold") V.door += ((nearFridge(V.mold.x) ? 1 : 0) - V.door) * Math.min(1, dt * 6);
+    V.bwob = V.bwob.map((v) => Math.max(0, v - dt * 1.6));
+    V.gelWob = Math.max(0, V.gelWob - dt * 1.6);
+    V.slosh = Math.max(0, V.slosh - dt * 1.2);
+    V.swirlV = Math.max(0, V.swirlV - dt * 0.8);
     moldWob = Math.max(0, moldWob - dt * 2);
     if (V.heat > 0.5 && t > steamAt) { steamAt = t + 0.35; puff("steam", L.pot.x, potRim() - 6, 1); }
     updateCoach();
@@ -1561,7 +1803,7 @@
       state: () => {
         const w = want();
         return { step: B.step, flavor: B.flavor >= 0 ? FLAVORS[B.flavor].id : null, mold: B.mold, next: nextMold,
-          filled: B.fill.filter(Boolean).length, coat: B.coat, jar: jar.length, busy, jarOpen, wanted: w && w.part, coach: coach.text() };
+          filled: B.fill.filter(Boolean).length, coats: B.coats.join(","), level: +V.level.toFixed(2), knob: +V.knob.toFixed(2), jar: jar.length, busy, jarOpen, wanted: w && w.part, coach: coach.text() };
       },
       tap: (part) => doTap(part),
       cavs: () => B.fill.length,

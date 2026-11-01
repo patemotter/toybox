@@ -13,18 +13,26 @@ can join later as jobs (`Toybox.jobs` tabs) or as their own counters.
 ## 2. The real thing, step by step (hands-on like the Farm stations)
 
 A yellow ring and one instruction show the next part; other parts say their name when tapped. No step row, no Go.
+**Every step is done by hand** (the dad, 2026-11-01: the first version was mostly pushing the yellow ring, and the
+real actions were hard to do): a drag does the real thing for as long as he keeps doing it, and a tap on the same
+part plays that part's whole motion once. Letting go in the right place finishes the job (a bottle over the pot
+pours, the dropper over a shape fills it).
 
-| Step | Real action | He does | Shown happening |
-| --- | --- | --- | --- |
-| Flavor | Juice or flavoring into a saucepan | Drags a flavor bottle to the pot, or taps it | The bottle tips; the pot fills with that color |
-| Gelatin | Gelatin and sugar into the pot | Tips the bowl (tap or drag) | Powder falls; the mix goes cloudy |
-| Heat | Hot plate on | Turns the knob (tap or drag) | Blue flame, steam, bubbles |
-| Stir | Whisk until dissolved | Drags round the pot, or taps for one stir (three stirs) | Cloudy turns clear and glossy; the knob turns off by itself |
-| Fill | Candy dropper into a silicone mold | Taps a shape (or the dropper), or drags the dropper over the shapes | The dropper dips into the pot by itself; each shape fills with a wobble |
-| Chill | Into the fridge to set | Taps the mold (or the fridge), or drags it there | The door opens, the mold goes in, frost, it comes back firm |
-| Pop | Push the gummies out | Taps or drags the mold | The mold flips; the gummies bounce onto the tray |
-| Coat | Toss in sour sugar, sugar or a little oil | Taps a bowl, or drags a gummy into one | The bowl shakes; the coating sticks |
-| Jar | Into the candy jar | Taps the jar (all hop in), or taps or drags each gummy | The lid lifts; they drop in; the next batch starts |
+| Step | Real action | He does (drag) | Tap | Shown happening |
+| --- | --- | --- | --- | --- |
+| Flavor | Juice or flavoring into a saucepan | Carries a bottle over the pot: it tips and pours while he holds it there | The bottle pours | The pot fills with that color |
+| Gelatin | Gelatin and sugar into the pot | Carries the bowl over the pot: it tips and the powder falls while he holds it | The bowl tips | The mix goes cloudy |
+| Heat | Hot plate on | Turns the knob round (works at any time; the flame follows the knob) | On or off | Blue flame, steam, bubbles |
+| Stir | Whisk until dissolved | The whisk follows his finger round the pot; it clears only while the pot is hot | One stir | A swirl; cloudy turns clear and glossy; the knob turns off by itself |
+| Fill | Candy dropper into a silicone mold | Touches a shape: the dropper comes to his finger and the shape fills while he holds it there | That shape fills | The dropper dips into the pot by itself |
+| Chill | Into the fridge to set | Drags the mold to the fridge (the door opens as it comes near) | The mold goes in | Frost; the mold comes back firm |
+| Pop | Push the gummies out | Pushes the mold over: they all pop out | One gummy pops out | Each gummy jumps out with a boing |
+| Coat | Toss in sour sugar, sugar or a little oil | Drags a gummy into a bowl (each gummy can have its own coating) | A bowl takes all the uncoated ones | The bowl shakes; the coating sticks |
+| Jar | Into the candy jar | Drags a gummy to the jar | A gummy, or the jar for all | The lid lifts; they drop in; the next batch starts |
+
+- Parts that aren't needed right now still answer: bottles and the bowl wiggle and say their name, the pot sloshes,
+  the fridge door opens for a look, the empty mold wobbles, the knob turns.
+- Gummies on the tray can be moved round it; every gummy jiggles when touched.
 
 - Flavors (bottles with a fruit on the label, one color each): Cherry, Orange, Lemon, Lime, Blue raspberry, Grape,
   Strawberry.
@@ -45,3 +53,4 @@ A yellow ring and one instruction show the next part; other parts say their name
 - More shapes (rings, sharks, dinosaurs)?
 - A getting-ready screen (wash hands, apron) like the Kitchen?
 - Is the batch the right length (nine short steps), or should something happen by itself?
+- Should a second flavor poured into the pot mix into a new color? (For now only the first flavor pours on.)
