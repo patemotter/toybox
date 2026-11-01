@@ -97,7 +97,11 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   dad's real copper coffee spoon as a saved project, an S-hook, a fire poker or a free bar; finished pieces hang on a
   rack; gear-up flag `forge-gear`; plan `plans/forge.md`, script `forge/index.js`), circuits (snap parts on a pegboard
   with a small circuit solver, or wire a house at night: Board | House; plan `plans/circuits.md`, script
-  `circuits/index.js`).
+  `circuits/index.js`), sweet-shop (a sweet shop counter; gummies for now, donuts or cookies may come later as
+  jobs: pour a flavor, tip in gelatin and sugar, turn the hot plate's knob, stir until clear, fill a Bears | Worms |
+  Fruits silicone mold with the candy dropper, chill it in the fridge, pop them out, coat them Sour sugar | Sugar |
+  Shiny, put them in the candy jar; hands-on like the Farm stations, every gummy jiggles; the jar is his collection
+  (`sweet-shop-v1`); plan `plans/sweet-shop.md`, script `sweet-shop/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.

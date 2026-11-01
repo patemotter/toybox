@@ -331,7 +331,17 @@ const CORE = [
   "./forge/icons/icon-180.png",
   "./forge/icons/icon-192.png",
   "./forge/icons/icon-512.png",
-  "./forge/icons/icon-maskable-512.png"
+  "./forge/icons/icon-maskable-512.png",
+
+  // Sweet Shop
+  "./sweet-shop/",
+  "./sweet-shop/index.html",
+  "./sweet-shop/index.js",
+  "./sweet-shop/manifest.webmanifest",
+  "./sweet-shop/icons/icon-180.png",
+  "./sweet-shop/icons/icon-192.png",
+  "./sweet-shop/icons/icon-512.png",
+  "./sweet-shop/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {
