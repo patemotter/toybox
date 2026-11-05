@@ -130,7 +130,8 @@
  *        any: false, down: fn(part, e, s), dragStart: fn(part, e, s), move: fn(part, e, s), up: fn(part, e, s),
  *        tap: fn(part, x, y, e), slop: 12, tapMs: 350, minHit: px })
  *        One press is always enough: a press that moves under 12 px and lasts under 350 ms is a tap (s.tap), and
- *        tap(part) should play the whole motion; anything longer is a drag (move after dragStart). parts are
+ *        tap(part) should play the whole motion; anything longer is a drag (move after dragStart; a still hold
+ *        gets dragStart after tapMs too, with dx = dy = 0). parts are
  *        circles in viewport px; each gets at least the 2 cm key target (--tb-key) as its hit radius, nearest
  *        wins. any: true also takes presses that hit no part (part null). Several fingers at once; palms
  *        ignored. s = { part, x0, y0, x, y, dx, dy, ms, drag, tap }. pr.active() = fingers down.
@@ -2046,6 +2047,12 @@
       try { target.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
       var s = ptrs[e.pointerId] = { part: part, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, dx: 0, dy: 0, t0: now(), ms: 0, drag: false, tap: false };
       call(o.down, part, e, s);
+      // A finger held perfectly still sends no moves, so the hold becomes a drag on a timer as well. Without it a
+      // slow, still press would end as neither a tap nor a drag and do nothing.
+      s.holdT = setTimeout(function () {
+        if (ptrs[e.pointerId] !== s || s.drag || locked()) return;
+        s.ms = now() - s.t0; s.drag = true; call(o.dragStart, s.part, e, s);
+      }, TAP_MS + 10);
     });
     target.addEventListener("pointermove", function (e) {
       var s = ptrs[e.pointerId]; if (!s) return;
@@ -2056,6 +2063,7 @@
     function end(e, cancel) {
       var s = ptrs[e.pointerId]; if (!s) return;
       delete ptrs[e.pointerId];
+      clearTimeout(s.holdT);
       info(s, e);
       s.tap = !cancel && !s.drag && Math.hypot(s.dx, s.dy) <= SLOP && s.ms <= TAP_MS;
       s.cancel = !!cancel;
