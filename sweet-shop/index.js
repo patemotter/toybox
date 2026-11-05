@@ -345,19 +345,25 @@
   function bottleHome(i) { const [x, y] = L.bottles[i]; return { x, y }; }
   // The bottle's mouth for a bottle standing at (x, y) and tipped by ang (it turns about its bottom).
   const mouthOf = (x, y, ang) => ({ x: x + Math.sin(ang) * L.bh, y: y - Math.cos(ang) * L.bh });
-  // A carried bottle or bowl is "over the pot" anywhere in a big zone above it, so tipping is easy to find.
+  // A carried bottle or bowl is "over the pot" when its bottom (x, y) is level with the rim or a little above
+  // it, and close enough at the side for its mouth to reach the pot. Higher up it would pour from the shelf.
   function overPot(x, y, reach) {
-    return Math.abs(x - L.pot.x) < L.pot.w * 0.5 + reach && y > potRim() - 250 && y < potRim() + 50;
+    return Math.abs(x - L.pot.x) < L.pot.w * 0.5 + reach && y > potRim() - 100 && y < potRim() + 50;
   }
   // Only the flavor already in the pot can be poured on; any bottle can start an empty pot.
   const pourable = (i) => B.step === "flavor" && (B.flavor < 0 || B.flavor === i);
+  // The lower shelf sits just above the pot in the upright layout, so a bottle must also leave its spot first.
+  function bottleOver(c) {
+    const h = bottleHome(c.i);
+    return pourable(c.i) && Math.hypot(c.x - h.x, c.y - h.y) > L.bh * 0.5 && overPot(c.x, c.y, L.bh);
+  }
   function pourLine() { return B.flavor >= 0 ? "Pour the " + FLAVORS[B.flavor].name.toLowerCase() + " bottle into the pot." : "Pour a flavor into the pot."; }
   let pourSnd = 0;
   // Each frame while he holds a bottle: over the pot it tips toward it and pours for as long as he holds it there.
   function stepPour(dt) {
     const c = V.carry;
     if (!c || !c.held) return;
-    const over = pourable(c.i) && overPot(c.x, c.y - L.bh / 2, L.bh), side = c.x >= L.pot.x ? -1 : 1;
+    const over = bottleOver(c), side = c.x >= L.pot.x ? -1 : 1;
     c.ang += ((over ? 2.0 * side : 0) - c.ang) * Math.min(1, dt * 7);
     if (over && Math.abs(c.ang) > 1.2) {
       if (B.flavor < 0) { B.flavor = c.i; const tg = vp(L.pot.x, potRim() - 30); Toybox.nametag(FLAVORS[c.i].name, tg.x, tg.y, 2200); }
@@ -546,7 +552,7 @@
     d.squeeze = Math.min(1, d.squeeze + dt * 6);
     if (now() > dripAt) { dripAt = now() + 0.35; snd.drip(); }
     V.cavLevel[k] = Math.min(1, (V.cavLevel[k] || 0) + dt * 1.6);
-    if (V.cavLevel[k] >= 1) { cavFull(k); if (B.fill.every(Boolean)) { drag = null; d.held = false; fillDone(); } }
+    if (V.cavLevel[k] >= 1) { if (drag && drag.k === "dropper") drag.filled = true; cavFull(k); if (B.fill.every(Boolean)) { drag = null; d.held = false; fillDone(); } }
   }
   // A shape to fill by tapping: queued, so quick taps all count (also while the dropper is still dipping).
   function fillCav(k) {
@@ -731,6 +737,7 @@
       snd.plink(jar.length);
       saveSoon();
       if (B.gum.every((q) => q.where === "jar")) finishBatch();
+      else if (B.gum.every((q) => q.coat || q.where === "jar")) toJarStep();
     }, delay || 0);
   }
   function allToJar() {
@@ -1434,7 +1441,7 @@
       if (best) return best;
     }
     if (st === "coat" || st === "jar" || st === "pop") B.gum.forEach((g, i) => { if (g.where === "tray" || g.where === "out") cand("gum" + i, g.x, g.y, g.s * 1.25); });
-    if (st === "coat" && V.bowls > 0.5) L.bowls.xs.forEach((x, i) => cand("bowl" + i, x, L.bowls.y + 8, 46));
+    if (st === "coat") L.bowls.xs.forEach((x, i) => cand("bowl" + i, x, L.bowls.y + 8, 46));
     if (best) return best;
     L.bottles.forEach(([x, y], i) => cand("bottle" + i, x, y - L.bh * 0.45, L.bw * 0.62));
     if (V.gelShow > 0.5) cand("gel", L.gel.x, L.gel.y - 10, 42);
@@ -1507,7 +1514,11 @@
   let moldWob = 0;
   function pokeMold() { moldWob = 1; tag(NAMES.mold, V.mold.x, V.mold.y - MOLD_H / 2); }
 
-  // Drags: the part follows his finger, and the real thing happens while he does it.
+  // Drags: the part follows his finger, and the real thing happens while he does it. One finger owns the drag
+  // (drag.pid); other fingers are ignored until it lifts, so a second touch never leaves a part half carried.
+  // A press held still and let go within the tap slop (drag.far) counts as that part's tap.
+  const SLOP = 12, LIFT = 14;
+  let skipTap = false;
   const isFillPart = (part) => part === "dropper" || part === "moldfill" || /^cav\d$/.test(part);
   const press = Toybox.press(cv, {
     any: true,
@@ -1515,60 +1526,28 @@
     // The dropper comes to his finger as soon as he touches a shape, so a finger held still on a shape fills it
     // (a still finger sends no moves).
     down: (part, e, s) => {
-      drag = null;
+      if (drag) return;
       if (locked() || jarOpen || B.step !== "fill" || busy || !isFillPart(part)) return;
       const w = wpt(s.x0, s.y0);
-      drag = { k: "dropper" };
+      drag = { k: "dropper", pid: e.pointerId, far: 0 };
       V.drop.held = true; V.drop.x = w.x; V.drop.y = w.y - 12;
       ghost.learned("cav");
     },
     dragStart: (part, e, s) => {
-      if (drag && drag.k === "dropper") return;
-      drag = null;
-      if (locked() || part == null || jarOpen) return;
-      const w = wpt(s.x, s.y), w0 = wpt(s.x0, s.y0), st = B.step;
-      if (/^bottle\d$/.test(part)) {
-        const i = +part.slice(6), h = bottleHome(i);
-        if (busy || (V.carry && V.carry.i !== i)) return;
-        if (!pourable(i)) { V.bwob[i] = 1; const p = partPt(part); wiggleTag(FLAVORS[i].name, p.x, p.y - L.bh * 0.5); if (st === "flavor") coach.say(pourLine(), 3); return; }
-        V.carry = { i, x: h.x + (w.x - w0.x), y: h.y + (w.y - w0.y), ang: 0, held: true };
-        drag = { k: "bottle", i, ox: h.x - w0.x, oy: h.y - w0.y };
-        ghost.learned("bottles");
-      } else if (part === "gel") {
-        if (st !== "gel" || busy) { V.gelWob = 1; wiggleTag(NAMES.gel, L.gel.x, L.gel.y - 30); return; }
-        V.gelPose = { x: L.gel.x + (w.x - w0.x), y: L.gel.y + (w.y - w0.y), ang: 0, held: true };
-        drag = { k: "gel", ox: L.gel.x - w0.x, oy: L.gel.y - w0.y };
-        ghost.learned("gel");
-      } else if (part === "knob") {
-        if (busy && st === "stir") return;
-        if (V.knobTw) { tweens.splice(tweens.indexOf(V.knobTw), 1); V.knobTw = null; }
-        drag = { k: "knob" }; ghost.learned("knob");
-        knobDrag(w);
-      } else if ((part === "whisk" || part === "pot") && st === "stir" && !busy) {
-        drag = { k: "stir", x: w.x, y: w.y };
-        whiskTo(w.x, w.y);
-        ghost.learned("whisk");
-      } else if (isFillPart(part) && st === "fill" && !busy) {
-        // The dropper comes to his finger, its tip just above the fingertip so he can see the shape fill.
-        drag = { k: "dropper" };
-        V.drop.held = true;
-        V.drop.x = w.x; V.drop.y = w.y - 12;
-        ghost.learned("cav");
-      } else if (part === "mold" && st === "chill" && !busy) {
-        drag = { k: "mold", ox: V.mold.x - w0.x, oy: V.mold.y - w0.y };
-      } else if (part === "mold" && st === "pop" && !busy) { ghost.learned("pop"); pop(); }
-      else if (/^pop\d$/.test(part)) popOne(+part.slice(3));
-      else if (/^gum\d$/.test(part) && (st === "coat" || st === "jar") && !busy) {
-        const g = B.gum[+part.slice(3)];
-        if (g && g.where === "tray") { g.where = "drag"; drag = { k: "gum", g, ox: g.x - w0.x, oy: g.y - w0.y }; g.x = w.x + drag.ox; g.y = w.y + drag.oy; }
-      } else if (/^bowl\d$/.test(part)) { ghost.learned("bowls"); coatIn(+part.slice(4)); }
+      if (drag || locked() || part == null) return;
+      const answered = jarOpen ? false : startDrag(part, s);
+      // A part with no drag of its own waits for the release: let go in place, it gets its tap.
+      if (!drag && !answered) drag = { k: "hold", part };
+      if (drag) { drag.pid = e.pointerId; drag.far = Math.hypot(s.dx, s.dy); }
     },
     move: (part, e, s) => {
-      if (!drag || locked()) return;
+      if (!drag || drag.pid !== e.pointerId || locked()) return;
+      drag.far = Math.max(drag.far, Math.hypot(s.dx, s.dy));
       const w = wpt(s.x, s.y);
       if (drag.k === "bottle" && V.carry && V.carry.held) { V.carry.x = w.x + drag.ox; V.carry.y = w.y + drag.oy; }
       else if (drag.k === "gel" && V.gelPose && V.gelPose.held) { V.gelPose.x = w.x + drag.ox; V.gelPose.y = w.y + drag.oy; }
-      else if (drag.k === "knob") knobDrag(w);
+      // The knob turns only once the finger really moves, so a press held on it can still be a tap.
+      else if (drag.k === "knob") { if (drag.far > SLOP) knobDrag(w); }
       else if (drag.k === "stir") {
         const dist = Math.hypot(w.x - drag.x, w.y - drag.y);
         drag.x = w.x; drag.y = w.y;
@@ -1579,37 +1558,46 @@
       else if (drag.k === "gum") { drag.g.x = w.x + drag.ox; drag.g.y = w.y + drag.oy; drag.g.wob = 0.12; drag.g.ph += 0.4; }
     },
     up: (part, e, s) => {
-      const d = drag; drag = null;
-      if (!d) return;
-      const w = wpt(s.x, s.y);
-      if (d.k === "bottle" && V.carry && V.carry.held) {
-        // Let go over the pot, the bottle finishes the pour by itself; anywhere else it goes back to the shelf.
+      const d = drag;
+      if (!d || d.pid !== e.pointerId) return;
+      drag = null;
+      const w = wpt(s.x, s.y), still = d.far <= SLOP && Math.hypot(s.dx, s.dy) <= SLOP;
+      if (d.k === "hold") { if (still && !locked()) doTap(d.part); }
+      else if (d.k === "knob") { if (still && !locked()) knobTap(); }
+      else if (d.k === "stir") { if (still && !locked()) stirTap(); }
+      else if (d.k === "bottle" && V.carry && V.carry.held) {
+        // Let go over the pot (or in place after a still hold), the bottle finishes the pour by itself;
+        // anywhere else it goes back to the shelf.
         const c = V.carry; V.stream = null;
-        if (!locked() && pourable(c.i) && overPot(c.x, c.y - L.bh / 2, L.bh)) pour(c.i, { x: c.x, y: c.y, ang: c.ang });
+        if (!locked() && (bottleOver(c) || (still && pourable(c.i)))) pour(c.i, { x: c.x, y: c.y, ang: c.ang });
         else { bottleBack(c.i, { x: c.x, y: c.y }, c.ang); if (B.step === "flavor" && V.level < 0.05) hint(); }
       } else if (d.k === "gel" && V.gelPose && V.gelPose.held) {
         const g = V.gelPose;
-        if (!locked() && B.step === "gel" && overPot(g.x, g.y, 50)) tipGel({ x: g.x, y: g.y });
+        if (!locked() && B.step === "gel" && (still || overPot(g.x, g.y, 50))) tipGel({ x: g.x, y: g.y });
         else { gelBack({ x: g.x, y: g.y, ang: g.ang }); if (B.step === "gel" && V.cloud < 0.05) hint(); }
       } else if (d.k === "dropper") {
         V.drop.held = false;
-        // Let go over a shape that is not full yet, that shape finishes filling.
+        // The press is handled here, so its tap must not fill another shape.
+        skipTap = s.tap;
+        // Let go over a shape that is not full yet, that shape finishes filling. A quick press that filled
+        // nothing and is over no empty shape fills the next one, as a tap on a full shape does.
         const k = B.fill.findIndex((f, j) => { if (f) return false; const c = cavPos(j); return Math.hypot(V.drop.x - c.x, V.drop.y - (c.y - c.s * 0.3)) < c.s * 1.4; });
-        if (k >= 0 && !locked()) fillCav(k);
+        if (!locked()) { if (k >= 0) fillCav(k); else if (still && !d.filled) fillCav(nextEmpty()); }
         // Let go away from the mold, the dropper floats back beside it.
         if (!inRect(V.drop, V.mold.x, V.mold.y, MOLD_W / 2 + 30, MOLD_H / 2 + 60)) {
           const d0 = { x: V.drop.x, y: V.drop.y };
           tween(0.35, (p) => { V.drop.x = lerp(d0.x, L.dropRest.x, ease(p)); V.drop.y = lerp(d0.y, L.dropRest.y, ease(p)); });
         }
       } else if (d.k === "mold") {
-        if (!locked() && nearFridge(V.mold.x)) { ghost.learned("mold"); chill(); }
+        if (!locked() && (still || nearFridge(V.mold.x))) { ghost.learned("mold"); chill(); }
         else { moldBack({ x: V.mold.x, y: V.mold.y }); hint(); }
       } else if (d.k === "gum") {
         const g = d.g;
         g.where = "tray";
         const bi = L.bowls.xs.findIndex((x) => Math.hypot(g.x - x, g.y - L.bowls.y) < 56);
         const tray = { x: L.work.x, y: L.work.y };
-        if (!locked() && B.step === "coat" && V.bowls > 0.5 && bi >= 0) { g.x = g.hx; g.y = g.hy; ghost.learned("bowls"); coatIn(bi, [g]); }
+        if (still && !locked()) { g.x = g.hx; g.y = g.hy; doTap("gum" + B.gum.indexOf(g)); }
+        else if (!locked() && B.step === "coat" && bi >= 0) { g.x = g.hx; g.y = g.hy; ghost.learned("bowls"); coatIn(bi, [g]); }
         else if (!locked() && Math.hypot(w.x - L.jar.x, w.y - (L.jar.y - L.jar.h / 2)) < L.jar.w) { ghost.learned("jar"); hopToJar(g); }
         else if (inRect(g, tray.x, tray.y, MOLD_W / 2 - 14, MOLD_H / 2 - 14)) { g.hx = g.x; g.hy = g.y; g.wob = 0.35; g.ph = 0; snd.boing(); }
         else {
@@ -1619,8 +1607,53 @@
         }
       }
     },
-    tap: (part) => doTap(part)
+    tap: (part) => {
+      if (skipTap) { skipTap = false; return; }
+      // While another finger carries something, a tap is ignored.
+      if (!drag) doTap(part);
+    }
   });
+  // Starts the drag for a part (sets drag), or answers at once. True when the part already answered (a wiggle,
+  // a pop, a bowl that coats) and needs no tap on release.
+  function startDrag(part, s) {
+    const w = wpt(s.x, s.y), w0 = wpt(s.x0, s.y0), st = B.step;
+    if (/^bottle\d$/.test(part)) {
+      const i = +part.slice(6), h = bottleHome(i);
+      if (busy || (V.carry && V.carry.i !== i)) return false;
+      if (!pourable(i)) { V.bwob[i] = 1; const p = partPt(part); wiggleTag(FLAVORS[i].name, p.x, p.y - L.bh * 0.5); if (st === "flavor") coach.say(pourLine(), 3); return true; }
+      // The bottle lifts off the shelf as he picks it up, so a finger held still on it shows it in his hand.
+      drag = { k: "bottle", i, ox: h.x - w0.x, oy: h.y - w0.y - LIFT };
+      V.carry = { i, x: w.x + drag.ox, y: w.y + drag.oy, ang: 0, held: true };
+      ghost.learned("bottles");
+    } else if (part === "gel") {
+      if (st !== "gel" || busy) { V.gelWob = 1; wiggleTag(NAMES.gel, L.gel.x, L.gel.y - 30); return true; }
+      drag = { k: "gel", ox: L.gel.x - w0.x, oy: L.gel.y - w0.y - LIFT };
+      V.gelPose = { x: w.x + drag.ox, y: w.y + drag.oy, ang: 0, held: true };
+      ghost.learned("gel");
+    } else if (part === "knob") {
+      if (busy && st === "stir") return false;
+      if (V.knobTw) { tweens.splice(tweens.indexOf(V.knobTw), 1); V.knobTw = null; }
+      drag = { k: "knob" }; ghost.learned("knob");
+    } else if ((part === "whisk" || part === "pot") && st === "stir" && !busy) {
+      drag = { k: "stir", x: w.x, y: w.y };
+      whiskTo(w.x, w.y);
+      ghost.learned("whisk");
+    } else if (isFillPart(part) && st === "fill" && !busy) {
+      // The dropper comes to his finger, its tip just above the fingertip so he can see the shape fill.
+      drag = { k: "dropper" };
+      V.drop.held = true;
+      V.drop.x = w.x; V.drop.y = w.y - 12;
+      ghost.learned("cav");
+    } else if (part === "mold" && st === "chill" && !busy) {
+      drag = { k: "mold", ox: V.mold.x - w0.x, oy: V.mold.y - w0.y };
+    } else if (part === "mold" && st === "pop" && !busy) { ghost.learned("pop"); pop(); return true; }
+    else if (/^pop\d$/.test(part)) { popOne(+part.slice(3)); return true; }
+    else if (/^gum\d$/.test(part) && (st === "coat" || st === "jar") && !busy) {
+      const g = B.gum[+part.slice(3)];
+      if (g && g.where === "tray") { g.where = "drag"; drag = { k: "gum", g, ox: g.x - w0.x, oy: g.y - w0.y }; g.x = w.x + drag.ox; g.y = w.y + drag.oy; }
+    } else if (/^bowl\d$/.test(part)) { ghost.learned("bowls"); coatIn(+part.slice(4)); return true; }
+    return false;
+  }
   // Turning the knob: the pointer follows his finger round, from up (off) to the right (full on).
   function knobDrag(w) {
     const k = knobPt(), dx = w.x - k.x, dy = w.y - k.y;
@@ -1628,7 +1661,6 @@
     const a = Math.atan2(dx, -dy);
     setKnob(a / (Math.PI / 2));
   }
-  ["gesturestart", "gesturechange"].forEach((n) => document.addEventListener(n, (e) => e.preventDefault()));
 
   // =====================================================================================================
   // Panel and surprise
@@ -1672,14 +1704,16 @@
   const bar = Toybox.bar($("bottom"), { shelf: () => openJar(!jarOpen), onNew: newBatchTap, onSurprise: surprise });
   if (bar.shelf) { const sp = bar.shelf.querySelector("span"); if (sp) sp.textContent = "Jar"; bar.shelf.setAttribute("aria-label", "Candy jar"); }
 
-  // Takes turns between three moments on the counter: every gummy bounces, a giant gummy bear wobbles across the
-  // counter, and a long gummy worm inches across.
+  // Takes turns between three moments on the counter: everything on it bounces (the bottles, the gelatin bowl,
+  // the pot, the mold and any gummies), a giant gummy bear wobbles across the counter, and a long gummy worm
+  // inches across.
   let surpriseNext = 0, actor = null;
   function surprise() {
     if (locked()) return;
     const k = surpriseNext; surpriseNext = (surpriseNext + 1) % 3;
     if (k === 0) {
       B.gum.forEach((g) => { g.wob = 0.45; g.ph = 0; });
+      V.bwob = V.bwob.map(() => 1); V.gelWob = 1; V.slosh = 1; moldWob = 1;
       V.jarBounce = 1;
       jv.wobs.forEach((w) => { w.wob = 0.4; w.ph = Math.random() * 3; w.v = 120 + Math.random() * 80; });
       snd.boing(); setTimeout(() => snd.boing(), 250);
@@ -1760,10 +1794,17 @@
     drawRing(t);
     drawJarView(t);
   }
+  // The hot plate goes off by itself: when the shop closes and when he leaves the page.
+  function knobOff() {
+    if (V.knobTw) { tweens.splice(tweens.indexOf(V.knobTw), 1); V.knobTw = null; }
+    const from = V.knob;
+    if (from > 0) V.knobTw = tween(0.4, (p) => { setKnob(from * (1 - ease(p))); }, () => { V.knobTw = null; });
+  }
   function onEnding(done) {
     ending = true;
     drag = null; press.cancel();
     if (jarOpen) openJar(false);
+    knobOff();
     setTimeout(done, 1500);
   }
   function restArt() {
@@ -1795,6 +1836,7 @@
     onWake: () => { ending = false; },
     onSound: (on) => { if (on) snd.chime(); }
   });
+  Toybox.offFirst({ running: () => V.knob > 0.01, off: (done) => { knobOff(); done(); } });
   requestAnimationFrame(frame);
 
   // Test hooks, only with ?debug in the address.

@@ -16,7 +16,8 @@ A yellow ring and one instruction show the next part; other parts say their name
 **Every step is done by hand** (the dad, 2026-11-01: the first version was mostly pushing the yellow ring, and the
 real actions were hard to do): a drag does the real thing for as long as he keeps doing it, and a tap on the same
 part plays that part's whole motion once. Letting go in the right place finishes the job (a bottle over the pot
-pours, the dropper over a shape fills it).
+pours, the dropper over a shape fills it). A press held still and let go in place counts as that part's tap; while one
+finger carries something, other fingers are ignored.
 
 | Step | Real action | He does (drag) | Tap | Shown happening |
 | --- | --- | --- | --- | --- |
