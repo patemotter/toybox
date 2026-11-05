@@ -198,7 +198,18 @@
       if (!changed) break;
     }
     const cur = el.map((e, i) => (e.k === "src" ? g[i] * (e.emf - (v[e.b] - v[e.a])) : g[i] * (v[e.a] - v[e.b])));
-    const short = el.map((e) => e.k === "src" && e.emf > 0.02 && v[e.b] - v[e.a] < 0.35 * e.emf);
+    // A source is shorted when its own voltage collapses, or when its ends are joined with no load between them.
+    // A resting crank counts as a plain wire there: it conducts like one, but splits the voltage with the
+    // battery, so the collapse test alone misses a battery wired straight across it.
+    const dead = (e) => e.k === "wire" || (e.k === "src" && e.emf <= 0.02);
+    const short = el.map((e, i) => {
+      if (e.k !== "src" || e.emf <= 0.02) return false;
+      if (v[e.b] - v[e.a] < 0.35 * e.emf) return true;
+      const root = Array.from({ length: n }, (_, k) => k);
+      const find = (k) => { while (root[k] !== k) k = root[k] = root[root[k]]; return k; };
+      el.forEach((o, j) => { if (j !== i && dead(o)) root[find(o.a)] = find(o.b); });
+      return find(e.a) === find(e.b);
+    });
     return { v, cur, short };
   }
   // Gaussian elimination with partial pivoting; A and z are overwritten.
@@ -236,6 +247,7 @@
     const sh = solve(3, [src(0, 1), w(1, 2), w(2, 0)]).short[0];
     const open = solve(4, [src(0, 1), { a: 1, b: 2, k: "open" }, load(2, 3), w(3, 0)]).cur[2];
     const still = solve(4, [src(0, 1, 0), w(1, 2), load(2, 3), w(3, 0)]).cur[2];
+    const across = solve(4, [src(0, 1), src(2, 3, 0), w(1, 3), w(0, 2), load(1, 0)]).short[0];
     const I1 = one.cur[2];
     const checks = [
       ["one bulb lights", I1 / I_FULL > 0.9],
@@ -246,7 +258,8 @@
       ["a wire-only loop is a short", sh === true],
       ["a bulb loop is not a short", one.short[0] === false],
       ["an open switch stops the current", Math.abs(open) < 1e-4],
-      ["a crank at rest makes nothing", Math.abs(still) < 1e-6]
+      ["a crank at rest makes nothing", Math.abs(still) < 1e-6],
+      ["a battery across a resting crank is a short", across === true]
     ].map(([name, ok]) => ({ name, ok }));
     return { ok: checks.every((c) => c.ok), checks };
   }
@@ -341,6 +354,11 @@
       tray.x = (W - tray.w) / 2; tray.y = by + bs + GAP;
     }
     p = bs / N;
+    // With the tray beside the board, the coach line stays over the board's side of the stage, so it never covers
+    // the tray part it tells him to drag.
+    const cs = $("coach").style;
+    cs.left = best.side === "beside" ? (M + bx + bs) / 2 + "px" : "";
+    cs.maxWidth = best.side === "beside" ? bx + bs - M - 8 + "px" : "";
   }
   // A spot's two ends in stage px: [x1, y1, x2, y2] with (x1, y1) at its a end.
   function spotXY(s, jb) {
@@ -432,7 +450,11 @@
       if (q.t === "buzzer" && r > ON) buzz = Math.max(buzz, r);
       if (CONDUCTORS.includes(q.t) || q.t === "battery" || q.t === "crank") q.ph += dt * Math.sign(q.cur) * Math.min(3, q.r) * 0.9 * power;
       if (isLoad(q) && q.r > ON) n++;
-      if (job === "house" && q.gap && q.r > 0.3 && !q.used) { q.used = true; saveSoon(); }
+      if (job === "house" && q.gap && q.r > 0.3 && !q.used) {
+        q.used = true; saveSoon();
+        // The kind words come when he gets the last of the four working, not on a reload or a tab change.
+        if (HOUSE_LOADS.every((L) => L.used)) Toybox.kind();
+      }
     });
     HOUSE_LOADS.forEach((L) => { L.ph += dt * Math.min(3, L.r) * 0.9 * power; });
     voice("buzz", "square", 190 + buzz * 40, buzz * 0.02);
@@ -1022,7 +1044,8 @@
     if (q.t === "switch") { q.on = !q.on; snd.click(); ghost.learned("switch"); saveSoon(); }
     else if (q.t === "button") { q.held = true; q.until = Math.max(q.until, now() + 600); snd.click(); ghost.learned("button"); }
     else if (q.t === "crank") { q.tapTurn = TAU; ghost.learned("crank"); }
-    else if (q.t === "led") { q.f = !q.f; q.born = now(); snd.flip(); ghost.learned("led"); saveSoon(); }
+    // The house's battery box has one way round (saved house parts are never flipped), so only board batteries turn.
+    else if (q.t === "led" || (q.t === "battery" && job === "board")) { q.f = !q.f; q.born = now(); snd.flip(); ghost.learned(q.t); saveSoon(); }
     else snd.lift();
     if (!q.tagged || !["switch", "button", "crank"].includes(q.t)) Toybox.nametag(NAMES[q.t], v[0], v[1] - 30);
     q.tagged = true;
@@ -1064,6 +1087,12 @@
     });
     return best;
   }
+  // What a tap on an empty part of the scene says: something he can do there now.
+  function emptyTapLine() {
+    if (job === "board") return "Drag a part from the tray onto the board.";
+    if (HOUSE_LOADS.some((L) => !partOn(L.gap))) return "Drag a part from the tray into a gap.";
+    return cur().some((q) => q.t === "switch") ? "Tap a switch in the wall." : "Drag a switch onto a part in the wall.";
+  }
   cv.addEventListener("pointerdown", (e) => {
     if (locked() || Toybox.isPalm(e)) return;
     e.preventDefault();
@@ -1081,7 +1110,7 @@
         const L = loadAt(pt.x, pt.y), v = vp(hx(L.at[0]), hy(L.at[1]));
         Toybox.nametag(L.name, v[0], v[1] - 30);
         return;
-      } else { coach.say(job === "board" ? "Drag a part from the tray onto the board." : "Drag a part from the tray into a gap.", 3); return; }
+      } else { coach.say(emptyTapLine(), 3); return; }
     }
     fingers.set(e.pointerId, f);
   });
@@ -1200,12 +1229,18 @@
       for (let s = 0; s < spots.length && gap < 0; s++) if (!partOn(s) && working({ ideal: true, extra: [mk("wire", s)] }) > ideal) gap = s;
       const bulb = list.some((q) => q.t === "bulb");
       if (gap >= 0) return { line: "Drag a wire into the gap to " + (bulb ? "light the bulb." : "close the loop."), need: "wire", spot: gap, key: "place" };
+      // A closed loop can still stay dark: an LED or a battery the wrong way round. A resting crank gives no
+      // voltage to show which way an LED faces, so each is tried turned round with the controls in use.
+      const turned = list.find((q) => (q.t === "led" || q.t === "battery") &&
+        working({ ideal: true, change: (x) => (x === q ? elOf(Object.assign({}, q, { f: !q.f }), true) : null) }) > ideal);
+      if (turned) return { line: "Tap the " + (turned.t === "led" ? "LED" : "battery") + " to turn it around.", part: turned, key: turned.t };
       return { line: "Connect both ends of the " + srcName(srcs[0]) + " in a loop.", key: "loop" };
     }
     const lit = list.filter((q) => q.t === "bulb" && q.r > ON);
     if (lit.length >= 2 && lit.every((q) => q.r < 0.65)) return { info: "Two bulbs in a row share the electricity. They glow less." };
     return null;
   }
+  const closedGap = (g) => g.t === "wire" || (g.t === "switch" && g.on) || (g.t === "button" && g.held);
   function houseHint() {
     const src = partOn(0);
     for (const L of HOUSE_LOADS) {
@@ -1220,17 +1255,18 @@
         return { line: lines[L.id], need: L.part, spot: L.gap, key: "place" };
       }
       if (L.used) continue;
-      const closed = g.t === "wire" || (g.t === "switch" && g.on) || (g.t === "button" && g.held);
-      if (!closed) {
+      if (!closedGap(g)) {
         if (g.t === "button") return { line: L.id === "bell" ? "Hold the doorbell button to ring the bell." : "Hold the button to close the loop.", part: g, key: "button" };
         const what = { porch: "porch light", bell: "doorbell", fan: "ceiling fan", lamp: "bedroom lamp" }[L.id];
         return { line: "Tap the switch to turn on the " + what + ".", part: g, key: "switch" };
       }
       if (src && src.t === "crank") return { line: "Turn the crank to make electricity.", part: src, key: "crank" };
     }
+    // Every loop has been used, but a crank swapped in later still needs turning before anything works.
+    if (src && src.t === "crank" && !HOUSE_LOADS.some((L) => L.r > ON) && HOUSE_LOADS.some((L) => closedGap(partOn(L.gap))))
+      return { line: "Turn the crank to make electricity.", part: src, key: "crank" };
     return null;
   }
-  let houseDone = false;
   function refreshHint(force) {
     if (locked()) return;
     // The hint is worked out again when the parts change or when the number of working loads does (a crank
@@ -1250,11 +1286,11 @@
       if (!e && h.need) { const r = slotRect(TRAY[job].indexOf(h.need)); e = [r.x + r.w / 2, r.y + r.h / 2]; }
       if (e) { const v = vp(e[0], e[1]); coach.avoid(v[0], v[1]); } else coach.avoid(null);
     } else {
-      coach.clear();
+      // busy() drops the instruction but lets a passing line (an information line, a hint) finish its time.
+      coach.busy();
       if (h && h.info && infoSaid !== h.info) coach.say(h.info, 5);
     }
     infoSaid = h && h.info ? h.info : "";
-    if (job === "house" && !h && !houseDone && HOUSE_LOADS.every((L) => L.used)) { houseDone = true; Toybox.kind(); }
     ghost.poke();
   }
   const ghost = Toybox.ghost({
@@ -1283,14 +1319,18 @@
       '<rect x="10" y="22" width="30" height="22" fill="#3A4470" stroke="#1D2340" stroke-width="2"/>' +
       '<rect x="14" y="26" width="9" height="8" fill="#FFE58A" stroke="#1D2340" stroke-width="1.5"/><rect x="28" y="31" width="7" height="13" fill="#2F8F6A" stroke="#1D2340" stroke-width="1.5"/></svg>';
   }
-  Toybox.jobs($("jobs"), {
+  const jobBar = Toybox.jobs($("jobs"), {
     jobs: [{ id: "board", name: "Board", pic: pic("board") }, { id: "house", name: "House", pic: pic("house") }],
     value: job,
     onPick: (id) => pickJob(id)
   });
-  // A part lifted by a finger goes back to its spot (tab change, play time up).
+  // A part lifted by a finger goes back to its spot, and a push button under a finger lets go (tab change, play
+  // time up): the finger stops being tracked, and a button only lets go once no finger holds it.
   function dropAll() {
-    fingers.forEach((f) => { if (f.drag && f.held && f.from != null) { f.held.s = f.from; parts[job].push(f.held); } });
+    fingers.forEach((f) => {
+      if (f.drag && f.held && f.from != null) { f.held.s = f.from; parts[job].push(f.held); }
+      if (!f.drag && f.part && f.part.t === "button") { f.part.finger = false; f.part.held = false; }
+    });
     fingers.clear();
   }
   function pickJob(id) {
@@ -1393,7 +1433,7 @@
       hold: (id, on) => { const q = cur().find((x) => x.id === id); if (q) { q.held = !!on; q.finger = !!on; lastAction = now(); } return !!q; },
       remove: (id) => { const q = cur().find((x) => x.id === id); if (q) { parts[job].splice(parts[job].indexOf(q), 1); refreshHint(true); } return !!q; },
       clear: () => { parts[job] = job === "board" ? [] : startHouse(); refreshHint(true); },
-      job: (id) => { pickJob(id); },
+      job: (id) => { jobBar.set(id); pickJob(id); },
       pt: (x, y) => vp(bx + (x + 0.5) * p, by + (y + 0.5) * p),
       spot: (s) => { const e = mid(spotXY(s)); return vp(e[0], e[1]); },
       slot: (type) => { const r = slotRect(TRAY[job].indexOf(type)); return vp(r.x + r.w / 2, r.y + r.h * 0.4); },

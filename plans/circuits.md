@@ -38,7 +38,7 @@ a cutaway house at night: the porch light, the doorbell, the fan and the lamp ea
   and buzzer as fixed resistances, the LED as a one-way part, the source as a voltage). Current through each part
   sets its glow, spin or buzz and the speed of the dots on its wires. Series dimming and parallel brightness come
   out of the solver, not special cases.
-- **Short circuit** (the source connected straight back to itself through wires only): the wires glow orange and
+- **Short circuit** (the source connected straight back to itself through wires only; a resting crank counts as a wire): the wires glow orange and
   the coach says "The wire goes straight back to the battery. Put a bulb in the loop." Nothing breaks, nothing is
   scary.
 - **Fresh visit** starts with a battery, a bulb and wires in a loop with one gap; coach: "Drag a wire into the gap
@@ -75,6 +75,7 @@ Test at 390x844, 844x390, 820x1180, 1180x820, 1024x1366.
 - Keep his board across fresh visits as a collection, or start fresh each time (built: fresh)?
 - Built differently from section 2 and 3.1: no corner wire block (every snap point joins what meets there); a part
   is turned by dragging it to a spot that runs the other way; each new colored light takes the next color (no
-  picker). Wanted the other way?
+  picker); a battery on the board turns around with a tap, like the colored light, so two batteries pushing
+  against each other can be fixed (the coach says "Tap the battery to turn it around."). Wanted the other way?
 - Any part fits any house gap, so a wire in the doorbell gap rings it nonstop. Should that gap take only the button?
 - On a phone held sideways the house parts are small (about 35 px). Acceptable?
