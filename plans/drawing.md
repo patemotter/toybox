@@ -70,8 +70,10 @@ nothing is ever marked wrong.
   stays on screen, and the next one is one tap away (a Next arrow, or tap the finished word).
 - Stuck: after about 4.5 s without progress the ghost hand traces the stroke; after another try without progress
   the stroke finishes along with his finger (the "auto-assist after a few misses" rule).
-- Content order, picked in the drawer: **Capitals** (straight-line letters first: L, T, I, H, E, F, then the rest),
-  **Numbers** (0 to 9), **Words**. Lowercase is a question below.
+- Content, picked in the drawer: **Capitals** (straight-line letters first: L, T, I, H, E, F, then the rest),
+  **Lowercase** (the dad, 2026-11-12: both cases; grouped by shape: c, o, a, d, g, q first, then l, i, t, then n,
+  m, r, h, b, p, then the rest), **Numbers** (0 to 9), **Words**.
+- Words come in either case: an "ABC | abc" switch in the drawer, next to the word choice, capitals by default.
 - Words: real words of any length (the dad, 2026-11-12: he knows lots of words, so no need to stick to short ones):
   DRILL, GEAR, TRACTOR, EXCAVATOR, SCREWDRIVER, COMBINE HARVESTER, CEMENT MIXER, MARBLE RUN.
 - A long word doesn't shrink to fit: the letters stay big enough to trace, and the word slides along as he goes,
@@ -91,7 +93,6 @@ along every line. No faces on anything drawn on a coloring page.
 ## 3. Open questions for the dad
 
 - Which coloring pages first, and how many? (Proposed: the nine above.)
-- Write: lowercase letters too, or capitals only for now?
 - Write: any family words like MOM and DAD, besides words from his interests? (The child's own name can never go
   in the code.)
 - Drawer on the right edge (the guess) or the left? It may depend on which hand he draws with.
