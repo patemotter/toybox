@@ -143,6 +143,9 @@ a picture behind it, with New swapping the set); a **how things work** section, 
 per item (cheaper ideas: see-through latches on the busy board, or a see-inside view of machines already drawn). Set
 aside: bowling, trebuchet, mini golf (too much for a 3-year-old), music box, yo-yo, Mars rover (too close to the
 construction apps), floor robot (boring), paper airplane (for older kids), barber shop.
+**Drawing (the dad, 2026-11-12):** Color | Draw | Write (coloring book, free drawing, guided letter tracing), no
+shelf; plan in `plans/drawing.md`, open questions at its end. The dad turned down a how-things-work app: his books
+already cover it.
 
 ---
 
