@@ -59,8 +59,8 @@ a small pull-out bar on the side.
 
 ### Write (tracing)
 Guided but forgiving (the dad, 2026-11-12, after talking it through): the start point and direction of each stroke
-matter, because those habits stick, but a 3-year-old's finger control is still growing, so wobbles count and
-nothing is ever marked wrong.
+matter, because those habits stick [1], but a 3-year-old's finger control is still growing [4], so wobbles count
+and nothing is ever marked wrong. Sources are in section 3.
 - One stroke at a time: the letter shows as a dotted outline, the current stroke has a green start dot and an arrow
   along its direction, and the coach line says what to do ("Trace the line down from the green dot.").
 - His ink snaps onto the stroke within a wide margin (about 2 cm on either side). The stroke only grows when his
@@ -70,17 +70,27 @@ nothing is ever marked wrong.
   stays on screen, and the next one is one tap away (a Next arrow, or tap the finished word).
 - Stuck: after about 4.5 s without progress the ghost hand traces the stroke; after another try without progress
   the stroke finishes along with his finger (the "auto-assist after a few misses" rule).
-- Content, picked in the drawer: **Capitals** (straight-line letters first: L, T, I, H, E, F, then the rest),
-  **Lowercase** (the dad, 2026-11-12: both cases; grouped by shape: c, o, a, d, g, q first, then l, i, t, then n,
-  m, r, h, b, p, then the rest), **Numbers** (0 to 9), **Words**.
+- Content, picked in the drawer, each in the Learning Without Tears teaching order [2]:
+  - **Capitals**: straight-line letters L, F, E, H, T, I; then U, C, O, Q, G, S, J, D, P, B, R; then the diagonal
+    letters K, A, N, M, V, W, X, Y, Z.
+  - **Lowercase** (the dad, 2026-11-12: both cases): c, o, s, v, w, t; a, g, d (the "magic c" letters, which start
+    with a c stroke); u, i, e; l, k, y, j; p, r, n, m, h, b; f, q, x, z.
+  - **Numbers**: 1 to 5 first, then 6 to 9 and 0 [3]. Every digit starts at the top; 0 goes counterclockwise.
+  - **Words**: see below.
+- Diagonal strokes come last because children usually manage them about two years after lines and circles [4];
+  the wide margin and the ghost hand (which a child can imitate, an earlier skill than copying from a picture [4])
+  matter most there.
 - Words come in either case: an "ABC | abc" switch in the drawer, next to the word choice, capitals by default.
-- Words: real words of any length (the dad, 2026-11-12: he knows lots of words, so no need to stick to short ones):
-  DRILL, GEAR, TRACTOR, EXCAVATOR, SCREWDRIVER, COMBINE HARVESTER, CEMENT MIXER, MARBLE RUN.
+- Words: the **Fry 1000 Instant Words** [5] (the dad, 2026-11-12: "grab a set of common words for kids to learn,
+  top 1000"; words of any length are fine), most frequent hundred first. The list is in `plans/drawing-words.txt`;
+  the build copies it, minus the exclusions, into `drawing/words.js`.
+- Left out for a 3-year-old (a proposal for the dad): war, died, fight, killed, army, blood, soldiers, dead, death,
+  gun. Kept unless he says otherwise: God, church, beat, hit, lie, fear, bones, fire, wife, sir.
 - A long word doesn't shrink to fit: the letters stay big enough to trace, and the word slides along as he goes,
   with the whole word shown small along the top so he can read it. When it's done the whole word shows at once.
 - Stroke data: each glyph is a list of strokes, each a polyline of points in a unit box with its direction, written
-  by hand to match how handwriting is commonly taught (top to bottom, left to right, circles counterclockwise from
-  the top). Words are built from the letter glyphs.
+  by hand: strokes start at the top and go top to bottom [1][3]; circles and the c stroke go counterclockwise. Words
+  are built from the letter glyphs.
 - Numbers here pass the Numbers rule (tracing them is the point).
 
 ### Surprise (a moment on the current page, then play goes on)
@@ -90,11 +100,35 @@ along every line. No faces on anything drawn on a coloring page.
 ### Kind words
 `Toybox.kind()` when he finishes a coloring page (most areas filled) or a traced word.
 
-## 3. Open questions for the dad
+## 3. Sources (checked 2026-11-12)
+
+1. Letter formation and stroke order: The OT Toolbox, "Letter formation",
+   https://www.theottoolbox.com/letter-formation/ ("A child who is demonstrating a bottom to top orientation or
+   sequence of strokes, when writing may have a significantly harder time learning to form letters correctly and
+   fluidly.")
+2. Teaching order: Learning Without Tears, https://www.lwtears.com/support/product-information/why-handwriting-without-tears-teaching-order-different-how-does-it-work
+   ("We teach easy letters first, beginning with capitals, and then teach lowercase letters in groups of similar
+   stroke sequence"; the page doesn't list the groups). The groups above come from The OT Toolbox's summary of the
+   program: https://www.theottoolbox.com/handwriting-without-tears-letter-order/
+3. Numbers: The OT Toolbox, "How to teach number formation", https://www.theottoolbox.com/how-to-teach-number-formation/
+   ("Work on numbers 1 to 5 first ... we move on to number 6 to 10"; "All of the numbers start at the top";
+   anti-clockwise circles "to prevent letter reversals").
+4. Shape milestones (from the Beery VMI): Growing Hands-On Kids,
+   https://www.growinghandsonkids.com/typical-visual-motor-development-in-children.html (imitates a single circle at
+   30-36 months, a cross at 36-41 months, a square and diagonal lines at 54-59 months).
+5. Fry, E. (1980). "The New Instant Word List." The Reading Teacher, 34(3), 284-289. Full list copied from
+   https://sightwords.com/sight-words/fry/. Copyright of the list itself is unclear: no source found says it is free
+   to use. It's widely reprinted by schools. The Dolch list (Dolch, 1936; about 315 words) is the older alternative.
+
+Not sourced: that tracing with a finger on a screen is easier than writing with a pencil, and the 2 cm margin
+(a starting guess to tune in testing).
+
+## 4. Open questions for the dad
 
 - Which coloring pages first, and how many? (Proposed: the nine above.)
-- Write: any family words like MOM and DAD, besides words from his interests? (The child's own name can never go
-  in the code.)
+- Write: the Fry exclusions above: right, too many or too few?
+- Write: also his machine words (EXCAVATOR, COMBINE HARVESTER...) besides the Fry list?
+- The Fry list's copyright is unclear (source 5): fine for a family site, or use the older Dolch list?
 - Drawer on the right edge (the guess) or the left? It may depend on which hand he draws with.
 - Undo: wanted, or are New and the Eraser enough?
 - Apple Pencil: does he use one? (Pointer events support it either way; the question is whether to tune for it.)
