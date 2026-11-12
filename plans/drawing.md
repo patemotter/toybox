@@ -8,7 +8,7 @@ learning comes from doing it (AGENTS.md §1). No shelf (the dad, 2026-11-12: it 
 
 - Folder `drawing/`: `index.html` + `index.js` (script with a "Sections" list), manifest, icons. No `sw.js`.
 - `Toybox.init({ app: "drawing" })`, both orientations. Storage key `drawing-v1` holds only the current page of
-  each job, so a reload keeps it; a visit from the home screen starts fresh (`Toybox.fresh()`).
+  each job and the drawer's picks, so a reload keeps it; a visit from the home screen starts fresh (`Toybox.fresh()`).
 - Shown on the home screen as "Drawing" (the dad, 2026-11-12).
 - Jobs: **Color | Draw | Write**.
 
@@ -49,7 +49,10 @@ a small pull-out bar on the side.
   in the Toybox where that is quicker. Chunky ink outlines with closed areas big enough for the bucket.
 - The pages are picture tiles in the drawer; picking one swaps it in.
 - Line art sits on a layer above the color, so crayon and paint never cover the lines.
-- Default guess (see questions): ink stays inside the area where the stroke started.
+- **"Stay in the lines" switch** in the drawer (the dad, 2026-11-12): a real-looking toggle with a picture (a crayon
+  stroke stopping at a line vs crossing it) and the words "Stay in the lines". On: crayon, marker and paint stay
+  inside the area where the stroke started. Off: ink goes wherever his finger goes, like a real crayon. On by
+  default; a visit from the home screen sets it back to on, a reload keeps it.
 
 ### Draw (free drawing)
 - A blank white page with the same tools minus the bucket. New clears it (the shared New, orange).
@@ -87,7 +90,6 @@ along every line. No faces on anything drawn on a coloring page.
 
 ## 3. Open questions for the dad
 
-- Coloring: should ink stay inside the lines (the default guess), or go wherever his finger goes?
 - Which coloring pages first, and how many? (Proposed: the nine above.)
 - Write: lowercase letters too, or capitals only for now?
 - Write: any family words like MOM and DAD, besides words from his interests? (The child's own name can never go
