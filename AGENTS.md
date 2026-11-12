@@ -162,11 +162,19 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Draw with SVG/canvas. The only external file is the Baloo 2 font.
 
 ### Numbers
-Remove every measurement, spec or live readout a child sees, in DOM text and drawn on canvas/SVG: mm, cm, in, ft,
-lb, kg, RPM, TPI, °, %, layer counts, tooth counts, ruler/scale numbers, depth/speed readouts, sizes in tool
-subtitles, numbered step badges, "+1" pop-ups. Show the effect visually instead; words like Slow/Medium/Fast,
-Straight/Angle, Shallow/Deep are fine.
-Keep only:
+A number is shown only when it has a **real, obvious benefit**: it enriches the play, and he uses it to read,
+count, compare, match or aim for something (the dad, 2026-11-12: numbers are fine in general; the problem was
+counters and readouts that were there only for the sake of being there). A measurement passes only when it helps:
+the lathe's RPM doesn't (he does nothing with it), the coffee scale's grams do (he aims for the target). This
+covers DOM text and anything drawn on canvas/SVG. When a number would only decorate, show the effect visually
+instead; words like Slow/Medium/Fast, Straight/Angle, Shallow/Deep are fine.
+- Numbers that pass: the **Measuring** station's readings, **Math Grid**, letters-and-numbers tracing, **Wrenches**
+  sizes (the matching game, once per bolt head and once per size button), **Gear Box** tooth counts (the dad asked
+  for them, on the gear and its picker tile), the **Espresso Machine**'s coffee scale (seconds and grams: the
+  family's real targets, 18.0 g of beans and about 36 g in about 28 s), and counts the child chooses or watches
+  (Kaleidoscope "How many", Spin Shop spokes, Peg Drop per-bin counts and Total, the Jigsaw piece count).
+- Numbers that don't: decorative specs and readouts (RPM, TPI, depth and speed readouts, sizes in tool subtitles),
+  numbered step badges, "+1" pop-ups, scores.
 - **Almost no counters** (the dad, 2026-10-22: most "Loads: 3"-style tallies didn't make sense or add anything; all
   were removed). Kept: progress through a job that has an end (Shadow Board "Put away: 5 of 12", Jigsaw "Pieces: 3
   of 6", the Workshop project's "Parts: 2 of 6"), counting what is in the board where that is part of the job (Hammer
@@ -175,13 +183,8 @@ Keep only:
   times something was done is not kept. A new app gets no counter unless the dad asks.
 - **No number persists across launches**: every count starts again on a fresh visit (`Toybox.fresh()`); a reload
   keeps it. Saved progress through steps (the Workshop project) is not a number and stays.
-- The **Measuring** station's readings and **Math Grid** (numbers are the point).
-- **Wrenches**: the size is the matching game, so once per bolt head and once per size button.
-- **Gear Box**: each gear shows its number of teeth (the dad asked for it), on the gear and on its picker tile.
-- **Espresso Machine**: the coffee scale's display (seconds and grams, e.g. "18.0 g") is the real tool and the
-  family's real targets (18.0 g of beans, about 36 g in about 28 s), so it stays.
-- Counts the child chooses or watches: Kaleidoscope "How many", Spin Shop spokes, Peg Drop per-bin counts and
-  Total, the Jigsaw piece count. If unsure, remove it.
+- Readouts removed under the older, stricter rule stay removed unless the dad asks for one back. If a number's
+  benefit isn't obvious, leave it out or ask the dad.
 
 ### Pace
 - Everything that plays by itself runs calm: about a third slower than "natural" (auto sequences, transitions,

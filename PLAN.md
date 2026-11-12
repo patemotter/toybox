@@ -378,7 +378,8 @@ scenes on upright phones.
 ### Number rules
 
 Superseded by the "Numbers" rules in `AGENTS.md` (the dad tightened them after using the apps: sizes, fence and
-angle values, bit sizes and nail lengths are no longer shown).
+angle values, bit sizes and nail lengths are no longer shown; on 2026-11-12 he narrowed them to numbers without a
+real benefit).
 
 ---
 
@@ -591,7 +592,7 @@ Summary only; the full rules are in [`AGENTS.md`](AGENTS.md).
   sound and fresh start. Offline-first; the only external file is the Baloo 2 font.
 - Sound off by default (2-second grown-up hold). Just as fun with sound off.
 - One screen, no page scroll, iPhone and iPad, touch and mouse. Phone header and two-rows-of-controls rules.
-- Numbers only where they're the point; no tally counters (AGENTS.md "Numbers").
+- Numbers only with a real, obvious benefit; no tally counters (AGENTS.md "Numbers").
 - Calm pace; results stay on screen. One obvious first action, a coach line, an idle ghost hand.
 - Fresh start from the home screen; collections and grown-up settings kept.
 - No fail states, real names, no brands. Never the child's name anywhere.
