@@ -22,7 +22,7 @@ a small pull-out bar on the side.
   showing the current color as a big swatch and the current tool's picture, so the picked state is never hidden.
   A tap on the handle (or a drag out from it) slides the drawer open over the page's edge.
 - The drawer holds, top to bottom: the jobs (Color | Draw | Write), the tools, the colors, the job's own choices
-  (coloring pages, or Capitals | Numbers | Words), then New (orange) and Surprise. Picked items are yellow with a
+  (coloring pages, or Write's four sets), then New (orange) and Surprise. Picked items are yellow with a
   tick badge, as everywhere.
 - The drawer stays open while he picks; a touch on the page closes it, and that touch also draws, so no tap is
   wasted. The handle closes it too.
@@ -67,22 +67,25 @@ and nothing is ever marked wrong. Sources are in section 3.
   finger moves forward along it; going backwards or off the path doesn't grow it and shows no error.
 - Lifting the finger keeps the progress; the next touch carries on from there.
 - A finished stroke turns solid and the next stroke's dot appears. A finished letter or word gets a short sparkle,
-  stays on screen, and the next one is one tap away (a Next arrow, or tap the finished word).
+  stays on screen, and the next one is one tap away (a Next arrow: the next letter or digit in order, or the next
+  word in the list).
 - Stuck: after about 4.5 s without progress the ghost hand traces the stroke; after another try without progress
   the stroke finishes along with his finger (the "auto-assist after a few misses" rule).
-- Content, picked in the drawer, each in the Learning Without Tears teaching order [2]:
-  - **Capitals**: straight-line letters L, F, E, H, T, I; then U, C, O, Q, G, S, J, D, P, B, R; then the diagonal
-    letters K, A, N, M, V, W, X, Y, Z.
-  - **Lowercase** (the dad, 2026-11-12: both cases): c, o, s, v, w, t; a, g, d (the "magic c" letters, which start
-    with a c stroke); u, i, e; l, k, y, j; p, r, n, m, h, b; f, q, x, z.
-  - **Numbers**: 1 to 5 first, then 6 to 9 and 0 [3]. Every digit starts at the top; 0 goes counterclockwise.
-  - **Words**: see below.
-- Diagonal strokes come last because children usually manage them about two years after lines and circles [4];
-  the wide margin and the ghost hand (which a child can imitate, an earlier skill than copying from a picture [4])
-  matter most there.
-- Words come in either case: an "ABC | abc" switch in the drawer, next to the word choice, capitals by default.
+- **Picking what to write** (the dad, 2026-11-12: he picks it himself, straight from the set). Write shows four big
+  picture tiles: **A-Z**, **a-z**, **0-9** and **Words**. A tile opens a picker over the page with the whole set
+  in order: A-Z shows the capital alphabet A to Z, a-z the lowercase alphabet, 0-9 the digits 0 to 9; he taps the
+  one he wants and it comes up big, ready to trace. The four tiles stay in the drawer to pick again.
+- Words picker: the 1000 words don't fit one screen, so it shows the alphabet first; a letter opens the words that
+  start with it, in the list's order, in a picker that scrolls inside itself (a guess; see the questions).
+- Words are shown as the list writes them (lowercase, with capitals only on names like France).
+- The order children are usually taught [2] (capitals L, F, E, H, T, I first, then the curved letters, then the
+  diagonal ones; lowercase c, o, s, v, w, t first; digits 1 to 5 before 6 to 9 and 0 [3]) no longer decides what he
+  writes, since he picks. It still guides the build: test the stroke data in that order, and the diagonal letters
+  (K, A, N, M, V, W, X, Y, Z), which children usually manage about two years after lines and circles [4], need the
+  wide margin and the ghost hand most (a child can imitate a move he watches before he can copy it from a picture
+  [4]). Every digit starts at the top; 0 goes counterclockwise [3].
 - Words: the **Fry 1000 Instant Words** [5] (the dad, 2026-11-12: "grab a set of common words for kids to learn,
-  top 1000"; words of any length are fine), most frequent hundred first. The list is in `plans/drawing-words.txt`;
+  top 1000"; words of any length are fine; the dad, 2026-11-12, on its unclear copyright: "That's probably fine"). The list is in `plans/drawing-words.txt`;
   the build copies it, minus the exclusions, into `drawing/words.js`.
 - Left out for a 3-year-old (a proposal for the dad): war, died, fight, killed, army, blood, soldiers, dead, death,
   gun. Kept unless he says otherwise: God, church, beat, hit, lie, fear, bones, fire, wife, sir.
@@ -128,7 +131,7 @@ Not sourced: that tracing with a finger on a screen is easier than writing with 
 - Which coloring pages first, and how many? (Proposed: the nine above.)
 - Write: the Fry exclusions above: right, too many or too few?
 - Write: also his machine words (EXCAVATOR, COMBINE HARVESTER...) besides the Fry list?
-- The Fry list's copyright is unclear (source 5): fine for a family site, or use the older Dolch list?
+- Words picker: the alphabet first, then the words for one letter (the guess), or another way in?
 - Drawer on the right edge (the guess) or the left? It may depend on which hand he draws with.
 - Undo: wanted, or are New and the Eraser enough?
 - Apple Pencil: does he use one? (Pointer events support it either way; the question is whether to tune for it.)
