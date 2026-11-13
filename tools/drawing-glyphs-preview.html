@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing glyphs preview</title>
+<!--
+  Grown-up preview of drawing/glyphs.js: every glyph on its guide lines, each stroke in its own color with a
+  numbered start dot and arrowheads for its direction, and a row of sample words to check the spacing.
+  Query: ?set=upper|lower|digits|words|all (default all). Everything is sized to fit the window without scrolling.
+  A line under the title lists any stroke whose points are more than 0.04 apart or any glyph outside its box.
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #fff; font-family: system-ui, sans-serif; }
+  #bar { height: 28px; padding: 4px 10px; font-size: 14px; color: #1D2340; }
+  #bar a { margin-right: 10px; }
+  #issues { color: #c0392b; margin-left: 12px; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <a href="?set=all">All</a><a href="?set=upper">A-Z</a><a href="?set=lower">a-z</a><a href="?set=digits">0-9</a><a href="?set=words">Words</a>
+  <span id="issues"></span>
+</div>
+<canvas id="c"></canvas>
+<script src="../drawing/glyphs.js"></script>
+<script>
+"use strict";
+(function () {
+  const G = window.DrawingGlyphs;
+  const M = G.metrics;
+  const COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080"];
+  const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const LOWER = "abcdefghijklmnopqrstuvwxyz".split("");
+  const DIGITS = "0123456789'".split("");
+  const WORDS = ["Tractor", "excavator", "COMBINE", "don't", "2026"];
+  const set = new URLSearchParams(location.search).get("set") || "all";
+
+  // Data checks: point spacing and the glyph box.
+  const issues = [];
+  const want = UPPER.concat(LOWER, DIGITS);
+  for (const ch of want) if (!G.glyphs[ch]) issues.push("missing " + ch);
+  for (const [ch, gl] of Object.entries(G.glyphs)) {
+    gl.strokes.forEach((s, si) => {
+      for (let i = 0; i < s.length; i++) {
+        const [x, y] = s[i];
+        if (x < 0 || x > gl.w || y < -0.02 || y > M.descender + 0.01) { issues.push(ch + " stroke " + (si + 1) + " leaves the box"); break; }
+        if (i && Math.hypot(x - s[i - 1][0], y - s[i - 1][1]) > 0.0401) { issues.push(ch + " stroke " + (si + 1) + " gap"); break; }
+      }
+    });
+  }
+  document.getElementById("issues").textContent = issues.length ? "Problems: " + issues.join(", ") : "Data checks pass.";
+
+  const cv = document.getElementById("c");
+  const ctx = cv.getContext("2d");
+  const W = innerWidth, H = innerHeight - 36;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.scale(dpr, dpr);
+
+  // A glyph row is TOP + 1.35 + BOTTOM units tall (room for the label under the descender line).
+  const TOP = 0.12, BOTTOM = 0.3, ROW = TOP + M.descender + BOTTOM;
+
+  function guides(x0, y0, width, s) {
+    const lines = [[M.cap, "#9aa4c4", []], [M.xHeight, "#9aa4c4", [6, 5]], [M.baseline, "#1D2340", []], [M.descender, "#c4cbe0", [3, 4]]];
+    for (const [y, col, dash] of lines) {
+      ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash);
+      ctx.beginPath(); ctx.moveTo(x0, y0 + y * s); ctx.lineTo(x0 + width, y0 + y * s); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  function arrowAt(s, i, ox, oy, sc, col) {
+    const a = s[Math.max(0, i - 1)], b = s[Math.min(s.length - 1, i + 1)];
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const [x, y] = [ox + s[i][0] * sc, oy + s[i][1] * sc];
+    const k = Math.max(6, sc * 0.06);
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(ang) * k, y + Math.sin(ang) * k);
+    ctx.lineTo(x + Math.cos(ang + 2.5) * k, y + Math.sin(ang + 2.5) * k);
+    ctx.lineTo(x + Math.cos(ang - 2.5) * k, y + Math.sin(ang - 2.5) * k);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawGlyph(ch, ox, oy, sc, detail) {
+    const gl = G.glyphs[ch];
+    if (!gl) return;
+    gl.strokes.forEach((s, si) => {
+      const col = detail ? COLORS[si % COLORS.length] : "#1D2340";
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, sc * (detail ? 0.035 : 0.06));
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath();
+      s.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, ox + x * sc, oy + y * sc));
+      ctx.stroke();
+      if (!detail) return;
+      // Arrowheads about every 0.22 units along the stroke, and one near the end.
+      let run = 0;
+      for (let i = 1; i < s.length; i++) {
+        run += Math.hypot(s[i][0] - s[i - 1][0], s[i][1] - s[i - 1][1]);
+        if (run >= 0.22 && i < s.length - 2) { arrowAt(s, i, ox, oy, sc, col); run = 0; }
+      }
+      if (s.length > 3) arrowAt(s, s.length - 2, ox, oy, sc, col);
+      const r = Math.max(7, sc * 0.065);
+      const [sx, sy] = [ox + s[0][0] * sc, oy + s[0][1] * sc];
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = "bold " + Math.round(r * 1.4) + "px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(si + 1), sx, sy + 1);
+    });
+  }
+
+  // Lays the glyph cells out in rows, choosing the scale that fits the area.
+  function layoutGlyphs(chars, x0, y0, width, height) {
+    const pad = 0.25;
+    let best = null;
+    for (let rows = 1; rows <= chars.length; rows++) {
+      const per = Math.ceil(chars.length / rows);
+      let widest = 0;
+      for (let r = 0; r < rows; r++) {
+        const row = chars.slice(r * per, (r + 1) * per);
+        widest = Math.max(widest, row.reduce((t, ch) => t + G.glyphs[ch].w + pad, 0));
+      }
+      const sc = Math.min(width / widest, height / (rows * ROW));
+      if (!best || sc > best.sc) best = { rows, per, sc };
+    }
+    const { per, sc } = best;
+    for (let r = 0; r * per < chars.length; r++) {
+      const row = chars.slice(r * per, (r + 1) * per);
+      let x = x0;
+      const oy = y0 + r * ROW * sc + TOP * sc;
+      for (const ch of row) {
+        const cw = (G.glyphs[ch].w + pad) * sc;
+        guides(x + pad * sc * 0.25, oy, cw - pad * sc * 0.5, sc);
+        drawGlyph(ch, x + pad * sc / 2, oy, sc, true);
+        ctx.fillStyle = "#1D2340"; ctx.font = Math.round(Math.max(11, sc * 0.16)) + "px system-ui";
+        ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillText(ch, x + cw / 2, oy + (M.descender + 0.04) * sc);
+        x += cw;
+      }
+    }
+  }
+
+  // The sample words, laid end to end from the advance widths with a word gap of 0.5.
+  function layoutWords(x0, y0, width, height) {
+    const gap = 0.5;
+    const total = WORDS.reduce((t, wd) => t + wd.split("").reduce((u, ch) => u + G.glyphs[ch].w, 0), 0) + gap * (WORDS.length - 1);
+    const rows = width / height > 3 ? 1 : 2;
+    const half = Math.ceil(WORDS.length / rows);
+    const lines = [WORDS.slice(0, half), WORDS.slice(half)].filter((l) => l.length);
+    const lineW = (l) => l.reduce((t, wd) => t + wd.split("").reduce((u, ch) => u + G.glyphs[ch].w, 0), 0) + gap * (l.length - 1);
+    const sc = Math.min(width / Math.max(...lines.map(lineW)), height / (lines.length * (TOP + M.descender + 0.1)), width / total * rows);
+    lines.forEach((l, li) => {
+      const oy = y0 + li * (TOP + M.descender + 0.1) * sc + TOP * sc;
+      guides(x0, oy, lineW(l) * sc, sc);
+      let x = x0;
+      for (const wd of l) {
+        for (const ch of wd) { drawGlyph(ch, x, oy, sc, false); x += G.glyphs[ch].w * sc; }
+        x += gap * sc;
+      }
+    });
+  }
+
+  const m = 10;
+  if (set === "upper") layoutGlyphs(UPPER, m, 0, W - 2 * m, H);
+  else if (set === "lower") layoutGlyphs(LOWER, m, 0, W - 2 * m, H);
+  else if (set === "digits") layoutGlyphs(DIGITS, m, 0, W - 2 * m, H);
+  else if (set === "words") layoutWords(m, 0, W - 2 * m, H);
+  else {
+    const all = UPPER.concat(LOWER, DIGITS);
+    layoutGlyphs(all, m, 0, W - 2 * m, H * 0.8);
+    layoutWords(m, H * 0.8, W - 2 * m, H * 0.2);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing: coloring pages check</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #f4f6fb; color: #1D2340; font: 14px/1.35 system-ui, sans-serif; }
+  header { padding: 6px 12px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  header a { color: #1D2340; }
+  .ok { color: #17803d; font-weight: 700; }
+  .bad { color: #c62828; font-weight: 700; }
+  /* The overview fits all nine pages on one screen; ?id=<page> shows one page big. */
+  #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 8px 8px; }
+  .card { background: #fff; border-radius: 10px; padding: 6px; display: flex; gap: 8px; min-width: 0; }
+  .card canvas { width: min(26vh, 15vw); height: min(26vh, 15vw); border: 1px solid #ccd; border-radius: 6px; flex: none; }
+  .card .txt { font-size: 12px; min-width: 0; overflow: hidden; }
+  .card .txt b { font-size: 14px; }
+  #one { display: flex; gap: 12px; padding: 0 12px 12px; flex-wrap: wrap; align-items: flex-start; }
+  #one canvas { width: min(46vw, 86vh); height: min(46vw, 86vh); border: 1px solid #ccd; background: #fff; }
+  #one .txt { font-size: 14px; max-width: 420px; }
+  .crumbs { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 11px; }
+</style>
+</head>
+<body>
+<!-- Grown-up tool, not published (tools/ stays out of the site). It renders every coloring page of
+     drawing/pages.js the way the app does (through an SVG data URL into a canvas) and checks that the line art
+     is closed: the outside is flood filled from a corner, every other area is colored a random light color, and
+     areas too small to color are listed. A leak shows as a probe point in the outside or as fewer areas than the
+     page had when last checked (AREAS). Open tools/drawing-pages-preview.html, or ?id=<page id> for one page. -->
+<header><h1>Coloring pages check</h1><span id="sum">Checking...</span><a href="?">All pages</a></header>
+<div id="grid"></div>
+<div id="one" hidden></div>
+<script src="../drawing/pages.js"></script>
+<script>
+"use strict";
+(() => {
+  const N = 1000;            // Analysis resolution: one pixel per unit of the page's 1000 x 1000 box.
+  const WALL = 128;          // A pixel whose line alpha reaches this blocks the flood fill.
+  const MIN_ACROSS = 30;     // An area that can't hold a 30-unit circle is a crumb, too small to color.
+
+  // Points that must land inside the subject, never in the outside area: a leak in the outline lets the
+  // outside flood reach them. Each is [x, y, what it is].
+  const PROBES = {
+    tractor: [[340, 400, "cab"], [600, 520, "hood"], [330, 560, "rear tire"], [790, 680, "front tire"], [500, 900, "ground"]],
+    excavator: [[460, 600, "house"], [640, 330, "boom"], [800, 400, "stick"], [860, 680, "bucket"], [300, 760, "track"], [500, 900, "ground"]],
+    rocket: [[500, 250, "nose"], [500, 470, "body"], [500, 780, "flame"], [300, 930, "pad"], [855, 320, "tower"]],
+    train: [[150, 650, "coach"], [530, 600, "cab"], [640, 520, "boiler"], [500, 825, "rail"]],
+    gears: [[310, 560, "big gear"], [545, 280, "middle gear"], [794, 460, "small gear"], [500, 870, "board"]],
+    printer: [[500, 450, "chamber"], [500, 200, "AMS"], [500, 840, "front panel"]],
+    "water-table": [[500, 700, "tub"], [500, 560, "water"], [500, 300, "board"], [300, 290, "wheel"]],
+    "garbage-truck": [[380, 520, "body"], [800, 520, "cab"], [600, 820, "bin"]],
+    "marble-run": [[500, 900, "base"], [400, 250, "ramp"], [200, 500, "post"]]
+  };
+
+
+  // How many closed areas each page had when it was last checked by eye. A gap in an outline merges an area into
+  // the outside (or into its neighbor), so the count drops; update the number after a deliberate change.
+  const AREAS = {
+    tractor: 21, excavator: 17, rocket: 21, train: 40, gears: 22, printer: 16, "water-table": 30,
+    "garbage-truck": 24, "marble-run": 19
+  };
+
+  const pages = window.DrawingPages || [];
+  const params = new URLSearchParams(location.search);
+  const only = params.get("id");
+  const results = [];
+
+  function render(svg) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("SVG did not load"));
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">' + svg + "</svg>");
+    });
+  }
+
+  // Labels every non-line pixel with its 4-connected area. Area 0 is the outside (filled from the corner).
+  function label(wall) {
+    const lab = new Int32Array(N * N).fill(-1);
+    const stack = new Int32Array(N * N);
+    let count = 0;
+    const fill = (start, id) => {
+      let sp = 0, n = 0;
+      stack[sp++] = start; lab[start] = id;
+      while (sp) {
+        const p = stack[--sp]; n++;
+        const x = p % N, y = (p - x) / N;
+        if (x > 0 && !wall[p - 1] && lab[p - 1] < 0) { lab[p - 1] = id; stack[sp++] = p - 1; }
+        if (x < N - 1 && !wall[p + 1] && lab[p + 1] < 0) { lab[p + 1] = id; stack[sp++] = p + 1; }
+        if (y > 0 && !wall[p - N] && lab[p - N] < 0) { lab[p - N] = id; stack[sp++] = p - N; }
+        if (y < N - 1 && !wall[p + N] && lab[p + N] < 0) { lab[p + N] = id; stack[sp++] = p + N; }
+      }
+      return n;
+    };
+    const sizes = [];
+    if (wall[0]) throw new Error("the top-left corner is covered by a line");
+    sizes.push(fill(0, count++));
+    for (let p = 0; p < N * N; p++) if (!wall[p] && lab[p] < 0) sizes.push(fill(p, count++));
+    return { lab, sizes };
+  }
+
+  // Distance of every pixel to the nearest pixel outside its own area (3-4 chamfer, in units).
+  function depth(lab) {
+    const d = new Float32Array(N * N);
+    const BIG = 1e9;
+    for (let p = 0; p < N * N; p++) d[p] = lab[p] < 0 ? 0 : BIG;
+    const edge = (p, q) => lab[q] !== lab[p];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const p = y * N + x; if (!d[p]) continue;
+      let v = d[p];
+      if (x === 0 || y === 0 || x === N - 1 || y === N - 1) v = 1;
+      if (x > 0) v = Math.min(v, edge(p, p - 1) ? 1 : d[p - 1] + 1);
+      if (y > 0) v = Math.min(v, edge(p, p - N) ? 1 : d[p - N] + 1);
+      if (x > 0 && y > 0) v = Math.min(v, edge(p, p - N - 1) ? 1.4 : d[p - N - 1] + 1.4);
+      if (x < N - 1 && y > 0) v = Math.min(v, edge(p, p - N + 1) ? 1.4 : d[p - N + 1] + 1.4);
+      d[p] = v;
+    }
+    for (let y = N - 1; y >= 0; y--) for (let x = N - 1; x >= 0; x--) {
+      const p = y * N + x; if (!d[p]) continue;
+      let v = d[p];
+      if (x < N - 1) v = Math.min(v, d[p + 1] + 1);
+      if (y < N - 1) v = Math.min(v, d[p + N] + 1);
+      if (x < N - 1 && y < N - 1) v = Math.min(v, d[p + N + 1] + 1.4);
+      if (x > 0 && y < N - 1) v = Math.min(v, d[p + N - 1] + 1.4);
+      d[p] = v;
+    }
+    return d;
+  }
+
+  async function check(page) {
+    const img = await render(page.svg);
+    const line = document.createElement("canvas");
+    line.width = line.height = N;
+    const lc = line.getContext("2d");
+    lc.drawImage(img, 0, 0, N, N);
+    const px = lc.getImageData(0, 0, N, N).data;
+    const wall = new Uint8Array(N * N);
+    for (let p = 0; p < N * N; p++) wall[p] = px[p * 4 + 3] >= WALL ? 1 : 0;
+    const { lab, sizes } = label(wall);
+    const d = depth(lab);
+    const areas = sizes.map((n, id) => ({ id, n, deep: 0, x: 0, y: 0 }));
+    for (let p = 0; p < N * N; p++) {
+      const a = lab[p]; if (a < 0) continue;
+      if (d[p] > areas[a].deep) { areas[a].deep = d[p]; areas[a].x = p % N; areas[a].y = (p - p % N) / N; }
+    }
+    // Inscribed diameter: twice the deepest point's distance to the area's edge.
+    const crumbs = areas.slice(1).filter(a => a.deep * 2 < MIN_ACROSS);
+    const leaks = (PROBES[page.id] || []).filter(([x, y]) => lab[y * N + x] === 0).map(p => p[2]);
+    const lineHits = (PROBES[page.id] || []).filter(([x, y]) => lab[y * N + x] < 0).map(p => p[2]);
+    // Paint the result: outside light grey, each area its own light color, crumbs red with a ring.
+    const out = document.createElement("canvas");
+    out.width = out.height = N;
+    const oc = out.getContext("2d");
+    const im = oc.createImageData(N, N);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const cols = areas.map((a, i) => {
+      if (i === 0) return [236, 238, 242];
+      if (a.deep * 2 < MIN_ACROSS) return [255, 40, 40];
+      const h = rnd() * 360, s = 0.55 + rnd() * 0.3, l = 0.78 + rnd() * 0.1;
+      const k = n => (n + h / 30) % 12, f = n => l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+      return [f(0) * 255, f(8) * 255, f(4) * 255];
+    });
+    for (let p = 0; p < N * N; p++) {
+      const a = lab[p], c = a < 0 ? [29, 35, 64] : cols[a];
+      im.data[p * 4] = c[0]; im.data[p * 4 + 1] = c[1]; im.data[p * 4 + 2] = c[2]; im.data[p * 4 + 3] = 255;
+    }
+    oc.putImageData(im, 0, 0);
+    oc.lineWidth = 6;
+    oc.strokeStyle = "#ff1744";
+    crumbs.forEach(a => { oc.beginPath(); oc.arc(a.x, a.y, 34, 0, Math.PI * 2); oc.stroke(); });
+    oc.fillStyle = "#ff1744";
+    leaks.forEach(name => { const [x, y] = PROBES[page.id].find(p => p[2] === name); oc.fillRect(x - 14, y - 14, 28, 28); });
+    const r = {
+      id: page.id, name: page.name, areas: areas.length - 1,
+      outside: Math.round(sizes[0] / (N * N) * 100),
+      leaks, lineHits, expected: AREAS[page.id],
+      crumbs: crumbs.map(a => ({ x: a.x, y: a.y, across: Math.round(a.deep * 2), px: a.n })),
+      fine: !leaks.length && !crumbs.length && (AREAS[page.id] === undefined || AREAS[page.id] === areas.length - 1)
+    };
+    return { r, line, out };
+  }
+
+  function text(r, long) {
+    const t = document.createElement("div");
+    t.className = "txt";
+    const list = r.crumbs.slice(0, long ? 60 : 4).map(c => `at ${c.x},${c.y}: ${c.across} across, ${c.px} px`).join("\n");
+    t.innerHTML = `<b><a href="?id=${encodeURIComponent(r.id)}">${r.name}</a></b> <span class="${r.fine ? "ok" : "bad"}">${r.fine ? "clean" : "check"}</span><br>` +
+      `id: ${r.id}<br>Areas: ${r.areas}` +
+      (r.expected !== undefined && r.expected !== r.areas ? ` <span class="bad">(expected ${r.expected})</span>` : "") + `<br>Outside: ${r.outside}% of the page<br>` +
+      `Leak: ${r.leaks.length ? '<span class="bad">into ' + r.leaks.join(", ") + "</span>" : "none"}` +
+      (r.lineHits.length ? `<br>Probe on a line: ${r.lineHits.join(", ")}` : "") +
+      `<br>Crumbs: ${r.crumbs.length ? '<span class="bad">' + r.crumbs.length + "</span>" : "none"}` +
+      (r.crumbs.length ? `<div class="crumbs">${list}${r.crumbs.length > (long ? 60 : 4) ? "\n..." : ""}</div>` : "");
+    return t;
+  }
+
+  function white(line) {
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, N, N); x.drawImage(line, 0, 0);
+    return c;
+  }
+
+  (async () => {
+    const grid = document.getElementById("grid"), one = document.getElementById("one");
+    const list = only ? pages.filter(p => p.id === only) : pages;
+    if (only) { grid.hidden = true; one.hidden = false; }
+    for (const page of list) {
+      try {
+        const { r, line, out } = await check(page);
+        results.push(r);
+        if (only) { one.append(white(line), out, text(r, true)); }
+        else { const card = document.createElement("div"); card.className = "card"; card.append(out, text(r, false)); grid.append(card); }
+      } catch (e) {
+        results.push({ id: page.id, name: page.name, error: e.message, fine: false });
+        const t = document.createElement("div"); t.className = "card bad"; t.textContent = page.id + ": " + e.message;
+        (only ? one : grid).append(t);
+      }
+    }
+    const bad = results.filter(r => !r.fine).length;
+    document.getElementById("sum").innerHTML = `${results.length} pages: ` +
+      (bad ? `<span class="bad">${bad} to check</span>` : '<span class="ok">all clean</span>');
+    window.__pagesCheck = results;
+  })();
+})();
+</script>
+</body>
+</html>

@@ -18,7 +18,8 @@ a small pull-out bar on the side.
 - The header stays (Home, the title on iPad only), and the page fills everything under it, edge to edge inside the
   safe areas. No panel under or beside the stage, no job bar, no bottom bar: this app leaves the `tb-v2` panel
   layout on purpose.
-- **The drawer**: a slim handle on the right edge of the page (about 56 px wide, the height of a few fingers),
+- **The drawer** (the dad, 2026-11-12: "right or bottom is fine"): on the right edge in landscape and on the bottom
+  edge on an upright phone, so it opens along the page's long side. A slim handle on that edge of the page (about 56 px wide, the height of a few fingers),
   showing the current color as a big swatch and the current tool's picture, so the picked state is never hidden.
   A tap on the handle (or a drag out from it) slides the drawer open over the page's edge.
 - The drawer holds, top to bottom: the jobs (Color | Draw | Write), the tools, the colors, the job's own choices
@@ -28,8 +29,8 @@ a small pull-out bar on the side.
   wasted. The handle closes it too.
 - New lives in the drawer. Reading of "nothing traps him: always a visible way to start over": the handle is always
   on screen and New is one tap behind it.
-- On an upright phone the drawer opens over the right part of the page (about 40% of its width), in two columns if
-  it needs them; on iPad and in landscape it is a single column.
+- On an upright phone the drawer opens up over the bottom part of the page (at most about 45% of its height); in
+  landscape it opens over the right part, in one or two columns.
 - The first visit opens the drawer once by itself for a moment, so he sees it is there; the idle ghost hand points
   at the handle when he hasn't found it.
 
@@ -42,6 +43,8 @@ a small pull-out bar on the side.
 - Several fingers draw at once; the palm guard ignores a resting hand. Strokes are smoothed so a wobbly finger
   still draws a clean line.
 - Canvas at devicePixelRatio capped at 2. Undo isn't planned (New clears; the Eraser fixes); ask if wanted.
+- Made for fingers (the dad, 2026-11-12: don't assume an Apple Pencil): every pointer draws the same way, no
+  pressure or tilt, no Pencil-only features.
 
 ### Color (coloring book)
 - Line-art pages of things he loves: tractor, excavator, rocket, train, gears, the 3D printer (a P1S without
@@ -108,6 +111,15 @@ along every line. No faces on anything drawn on a coloring page.
 ### Kind words
 `Toybox.kind()` when he finishes a coloring page (most areas filled) or a traced word.
 
+### Files
+- `drawing/index.html` + `drawing/index.js`: the page, the drawer, the tools, Color, Draw and the tracing.
+- `drawing/pages.js`: the coloring pages' line art (`window.DrawingPages`, format in its header).
+- `drawing/glyphs.js`: the stroke data for every letter and digit (`window.DrawingGlyphs`, format in its header).
+- `drawing/words.js`: the word lists (`window.DrawingWords`), generated from the two `plans/drawing-word*.txt`
+  files.
+- `tools/drawing-pages-preview.html`, `tools/drawing-glyphs-preview.html`: grown-up previews of every page and
+  every glyph with its strokes, for checking edits.
+
 ## 3. Sources (checked 2026-11-12)
 
 1. Letter formation and stroke order: The OT Toolbox, "Letter formation",
@@ -133,9 +145,14 @@ Not sourced: that tracing with a finger on a screen is easier than writing with 
 
 ## 4. Open questions for the dad
 
+- Upright phone: the square coloring page leaves empty table above and below it. Taller pages for upright screens?
+- Should the tracing ink follow the drawer's color (as built), or always be one color?
+- Phone held sideways: words trace at a smaller size because the stage is short. Fine?
+- Weak spots in the first pages: the water wheels look a bit like snowflakes, the garbage truck's arm is mostly
+  hidden behind the bin, the 3D printer's spools are plain.
+- Phone, Color job: the drawer scrolls to reach the coloring pages (Draw and Write fit without scrolling).
+
 - Which coloring pages first, and how many? (Proposed: the nine above.)
 - Write: the Fry exclusions above: right, too many or too few?
 - Word categories: anything to add, drop or rename? (Lists in `plans/drawing-word-groups.txt`.)
-- Drawer on the right edge (the guess) or the left? It may depend on which hand he draws with.
 - Undo: wanted, or are New and the Eraser enough?
-- Apple Pencil: does he use one? (Pointer events support it either way; the question is whether to tune for it.)

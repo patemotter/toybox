@@ -341,7 +341,20 @@ const CORE = [
   "./sweet-shop/icons/icon-180.png",
   "./sweet-shop/icons/icon-192.png",
   "./sweet-shop/icons/icon-512.png",
-  "./sweet-shop/icons/icon-maskable-512.png"
+  "./sweet-shop/icons/icon-maskable-512.png",
+
+  // Drawing
+  "./drawing/",
+  "./drawing/index.html",
+  "./drawing/pages.js",
+  "./drawing/glyphs.js",
+  "./drawing/words.js",
+  "./drawing/index.js",
+  "./drawing/manifest.webmanifest",
+  "./drawing/icons/icon-180.png",
+  "./drawing/icons/icon-192.png",
+  "./drawing/icons/icon-512.png",
+  "./drawing/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

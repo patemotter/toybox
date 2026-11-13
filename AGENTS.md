@@ -102,7 +102,12 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   Fruits silicone mold with the candy dropper, chill it in the fridge, pop them out, coat them Sour sugar | Sugar |
   Shiny, put them in the candy jar; hands-on like the Farm stations, and every step works by hand (a drag does the
   real thing while he holds it: pour, tip, turn, stir, fill; a tap plays that part once); every gummy jiggles; the jar is his collection
-  (`sweet-shop-v1`); plan `plans/sweet-shop.md`, script `sweet-shop/index.js`).
+  (`sweet-shop-v1`); plan `plans/sweet-shop.md`, script `sweet-shop/index.js`), drawing (Color | Draw | Write: a
+  coloring book, free drawing, and guided letter, number and word tracing; the page fills the stage and everything
+  else lives in a pull-out drawer on its edge (right in landscape, bottom when upright); no shelf; plan
+  `plans/drawing.md` with its sources, script `drawing/index.js`, data in `drawing/pages.js`, `glyphs.js` and
+  `words.js` (generated from `plans/drawing-word*.txt`), previews `tools/drawing-pages-preview.html` and
+  `tools/drawing-glyphs-preview.html`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
