@@ -75,8 +75,13 @@ and nothing is ever marked wrong. Sources are in section 3.
   picture tiles: **A-Z**, **a-z**, **0-9** and **Words**. A tile opens a picker over the page with the whole set
   in order: A-Z shows the capital alphabet A to Z, a-z the lowercase alphabet, 0-9 the digits 0 to 9; he taps the
   one he wants and it comes up big, ready to trace. The four tiles stay in the drawer to pick again.
-- Words picker: the 1000 words don't fit one screen, so it shows the alphabet first; a letter opens the words that
-  start with it, in the list's order, in a picker that scrolls inside itself (a guess; see the questions).
+- Words picker (the dad, 2026-11-12: sort the words into categories): a screen of category tiles, each a picture and
+  its name: Animals, Farm, Colors, Shapes, Feelings, People, Body, Food, Nature, Home, Machines, Tools, Space,
+  Places, Numbers, Time, Doing words, plus **Most used** (Fry's first hundred: the, and, you...) and **A-Z** (every
+  word, by first letter, so nothing in the list is out of reach). A category opens its words as big word tiles;
+  the long ones (Nature, Machines, Doing words, each letter of A-Z) scroll inside the picker. Lists are in
+  `plans/drawing-word-groups.txt`.
+- Categories may grow with words he likes beyond the two lists (the dad, 2026-11-12); those are marked (+) there.
 - Words are shown as the list writes them (lowercase, with capitals only on names like France).
 - The order children are usually taught [2] (capitals L, F, E, H, T, I first, then the curved letters, then the
   diagonal ones; lowercase c, o, s, v, w, t first; digits 1 to 5 before 6 to 9 and 0 [3]) no longer decides what he
@@ -130,8 +135,7 @@ Not sourced: that tracing with a finger on a screen is easier than writing with 
 
 - Which coloring pages first, and how many? (Proposed: the nine above.)
 - Write: the Fry exclusions above: right, too many or too few?
-- Write: also his machine words (EXCAVATOR, COMBINE HARVESTER...) besides the Fry list?
-- Words picker: the alphabet first, then the words for one letter (the guess), or another way in?
+- Word categories: anything to add, drop or rename? (Lists in `plans/drawing-word-groups.txt`.)
 - Drawer on the right edge (the guess) or the left? It may depend on which hand he draws with.
 - Undo: wanted, or are New and the Eraser enough?
 - Apple Pencil: does he use one? (Pointer events support it either way; the question is whether to tune for it.)
