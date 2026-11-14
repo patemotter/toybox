@@ -6,8 +6,9 @@
   //          on, a stroke only colors the area where it started.
   //   Draw:  a blank page.
   //   Write: tracing a letter, digit or word (drawing/glyphs.js, drawing/words.js) one stroke at a time.
-  // The drawer on the page's edge (right in landscape, bottom when upright) holds the jobs, tools, colors, the
-  // job's choices, New and Surprise. Design: plans/drawing.md.
+  // The header names the Toybox and the app and holds the three jobs as tabs. A bar of buttons on the page's edge
+  // (bottom when upright, right in landscape) picks the tool, size, color and page, each in its own tray, and holds
+  // New and Surprise. Design: plans/drawing.md.
   //
   // Sections:
   //   Setup and saved state
@@ -21,7 +22,7 @@
   //   Write: drawing the guide
   //   Effects and Surprise
   //   Input
-  //   Drawer
+  //   Button bar and trays
   //   Write picker
   //   Coach and ghost hand
   //   Jobs, New and saving
@@ -53,6 +54,8 @@
     { id: "marker", name: "Marker" }, { id: "crayon", name: "Crayon" }, { id: "brush", name: "Paint brush" },
     { id: "bucket", name: "Paint bucket" }, { id: "eraser", name: "Eraser" }
   ];
+  // Size scales the stroke width of every drawing tool; the trace ink in Write keeps its own width.
+  const SIZES = [{ id: "small", name: "Small", k: 0.55 }, { id: "medium", name: "Medium", k: 1 }, { id: "big", name: "Big", k: 1.9 }];
   const JOBS = [{ id: "color", name: "Color" }, { id: "draw", name: "Draw" }, { id: "write", name: "Write" }];
   const UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), LOWER = "abcdefghijklmnopqrstuvwxyz".split("");
   const DIGITS = "0123456789".split("");
@@ -79,6 +82,7 @@
   let tool = has(TOOLS, saved.tool) ? saved.tool : "marker";
   let color = has(COLORS, saved.color) ? saved.color : "red";
   let stay = saved.stay !== false;
+  let size = has(SIZES, saved.size) ? saved.size : "medium";
   let pageId = PAGES.some((p) => p.id === saved.page) ? saved.page : (PAGES[0] ? PAGES[0].id : "");
   const sw = saved.write && typeof saved.write === "object" ? saved.write : {};
   let wSet = has(SETS, sw.set) ? sw.set : "upper";
@@ -90,7 +94,7 @@
   function save() {
     clearTimeout(saveTimer); saveTimer = 0;
     try {
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, job, tool, color, stay, page: pageId,
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, job, tool, color, stay, size, page: pageId,
         write: { set: wSet, item: wItem, list: wList } }));
     } catch (e) { /* storage blocked */ }
   }
@@ -234,12 +238,11 @@
     side = W > H * 1.05;
     document.body.classList.toggle("dr-side", side);
     document.body.classList.toggle("dr-low", !side);
-    drawerEl.classList.toggle("side", side);
-    drawerEl.classList.toggle("low", !side);
-    const pad = 16, hw = handleSize() + 8;
-    const aw = W - pad * 2 - (side ? hw * 2 : 0), ah = H - pad * 2 - (side ? 0 : hw);
+    // Color's page fits the part of the stage the button bar leaves free.
+    const pad = 16, bar = barSize();
+    const aw = W - pad * 2 - (side ? bar : 0), ah = H - pad * 2 - (side ? 0 : bar);
     const s = Math.max(80, Math.min(aw, ah));
-    colorRect = { x: (W - s) / 2, y: pad + (ah - s) / 2, s };
+    colorRect = { x: pad + (aw - s) / 2, y: pad + (ah - s) / 2, s };
     place(colorSheet, colorRect);
     const ds = Math.max(W, H);
     drawRect = { x: (W - ds) / 2, y: (H - ds) / 2, s: ds };
@@ -259,7 +262,7 @@
     const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
     return v > 0 ? v : fb;
   }
-  const handleSize = () => cssPx("--dr-handle", 56);
+  const barSize = () => cssPx("--bar", 76);
   const vp = (x, y) => [stageBox.left + x, stageBox.top + y];
 
   // =====================================================================================================
@@ -391,7 +394,8 @@
   const toSheet = (sh, x, y) => [(x - sh.rect.x) * sh.K / sh.rect.s, (y - sh.rect.y) * sh.K / sh.rect.s];
   function startStroke(id, x, y) {
     const sh = sheetNow(), k = sh.K / sh.rect.s, p = toSheet(sh, x, y);
-    const f = { sh, k, tool, hex: colorHex(), w: toolWidth(tool) * k, f: p.slice(), last: p.slice(), mid: p.slice(), raw: p.slice(),
+    const sizeK = (SIZES.find((z) => z.id === size) || SIZES[1]).k;
+    const f = { sh, k, tool, hex: colorHex(), w: toolWidth(tool) * sizeK * k, f: p.slice(), last: p.slice(), mid: p.slice(), raw: p.slice(),
       mask: null, carry: 0, moved: false };
     if (job === "color" && stay && lab) {
       const l = labelNear(p, 10 * k);
@@ -716,7 +720,7 @@
   }
   // The writing area and the view (u, camX) it wants now.
   function writeArea() {
-    const hs = handleSize() + 10, top = 16 + (isWordItem() ? 40 : 0);
+    const hs = barSize() + 10, top = 16 + (isWordItem() ? 40 : 0);
     const bottom = H - (H < 450 ? 48 : 84) - (side ? 0 : hs), left = 20, right = W - 20 - (side ? hs : 0);
     return { x: left, y: top, w: Math.max(60, right - left), h: Math.max(60, bottom - top) };
   }
@@ -1067,7 +1071,7 @@
   let surpriseNext = 0;
   function surprise() {
     if (locked()) return;
-    closeDrawer();
+    closeTray();
     const k = surpriseNext; surpriseNext = (surpriseNext + 1) % 3;
     const el = job === "write" ? guide : job === "color" ? colorSheet : drawSheet;
     const inked = job === "write" ? !!T && (T.done || T.li > 0 || T.si > 0 || T.prog > 0) : job === "color" ? colorPainted : drawPainted;
@@ -1087,8 +1091,8 @@
     e.preventDefault();
     try { touchEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     measure();
-    // A touch on the page closes the drawer, and the same touch draws.
-    if (drawerOpen) closeDrawer();
+    // A touch on the page closes an open tray, and the same touch draws.
+    if (trayName) closeTray();
     const [x, y] = local(e);
     if (job === "write") { if (T) traceDown(e.pointerId, x, y); return; }
     // Once he is coloring or drawing, the instruction goes away so it never covers the page; it comes back with
@@ -1123,48 +1127,38 @@
   ["gesturestart", "gesturechange"].forEach((n) => document.addEventListener(n, (e) => e.preventDefault()));
 
   // =====================================================================================================
-  // Drawer
+  // Button bar and trays
   // =====================================================================================================
-  const drawerEl = $("drawer"), handle = $("handle");
-  let drawerOpen = false, handleFound = false, drawerTouched = false;
-  function openDrawer(byHim) {
+  // Each bar button opens its own tray with only its choices; a choice applies at once and closes the tray, and a
+  // touch on the page closes it too (that touch also draws).
+  const trayEl = $("tray"), barEl = $("dbar");
+  const BTN = { tool: $("bTool"), size: $("bSize"), color: $("bColor"), pick: $("bPick") };
+  let trayName = null, trayFound = false;
+  function openTray(name, byHim) {
     if (locked()) return;
-    if (byHim) { handleFound = true; ghost.learned("handle"); }
-    if (drawerOpen) return;
-    drawerOpen = true;
-    drawerEl.classList.remove("closing");
-    drawerEl.classList.add("open");
-    handle.setAttribute("aria-expanded", "true");
+    if (byHim !== false) { trayFound = true; ghost.learned("tray"); }
+    if (trayName === name) { closeTray(); return; }
+    trayName = name;
+    buildTray();
+    trayEl.hidden = false;
+    trayEl.scrollTop = 0;
+    document.body.classList.add("tray-open");
+    Object.keys(BTN).forEach((k) => BTN[k].setAttribute("aria-expanded", String(k === name)));
     snd.open();
   }
-  let closingTimer = 0;
-  function closeDrawer() {
-    if (!drawerOpen) return;
-    drawerOpen = false;
-    drawerEl.classList.remove("open");
-    // While it slides away, touches go through to the page instead of landing on the moving drawer.
-    drawerEl.classList.add("closing");
-    clearTimeout(closingTimer);
-    closingTimer = setTimeout(() => drawerEl.classList.remove("closing"), 380);
-    handle.setAttribute("aria-expanded", "false");
+  function closeTray() {
+    if (!trayName) return;
+    trayName = null;
+    trayEl.hidden = true;
+    trayEl.innerHTML = "";
+    document.body.classList.remove("tray-open");
+    Object.keys(BTN).forEach((k) => BTN[k].setAttribute("aria-expanded", "false"));
   }
-  // A tap on the handle opens or closes the drawer; a drag out from it opens it at once.
-  let hdrag = null;
-  handle.addEventListener("pointerdown", (e) => { hdrag = { x: e.clientX, y: e.clientY, opened: false }; });
-  handle.addEventListener("pointermove", (e) => {
-    if (!hdrag || drawerOpen) return;
-    const inward = side ? hdrag.x - e.clientX : hdrag.y - e.clientY;
-    if (inward > 16) { hdrag.opened = true; openDrawer(true); }
-  });
-  handle.addEventListener("click", () => {
-    if (locked()) return;
-    const dragged = hdrag && hdrag.opened;
-    hdrag = null;
-    if (dragged) return;
-    if (drawerOpen) closeDrawer(); else openDrawer(true);
-  });
-  drawerEl.addEventListener("pointerdown", () => { drawerTouched = true; });
-  Toybox.palmGuard($("drScroll"));
+  Object.keys(BTN).forEach((k) => BTN[k].addEventListener("click", () => openTray(k)));
+  $("bNew").addEventListener("click", () => { if (!locked()) newPage(); });
+  $("bSurprise").addEventListener("click", () => { if (!locked()) surprise(); });
+  Toybox.palmGuard(barEl);
+  Toybox.palmGuard(trayEl);
 
   function tile(cls, pic, word, onTap) {
     const b = document.createElement("button");
@@ -1177,72 +1171,98 @@
     b.addEventListener("click", () => { if (!locked()) onTap(b); });
     return b;
   }
-  function buildDrawer() {
-    const jobs = $("drJobs");
-    JOBS.forEach((j) => {
-      const b = tile("dr-job", PIC[j.id](), j.name, () => { if (job !== j.id) { setJob(j.id); snd.pick(); } });
-      b.dataset.id = j.id; jobs.appendChild(b);
-    });
-    const tools = $("drTools");
-    TOOLS.forEach((t) => {
-      const b = tile("dr-tool", "", t.name, () => { if (tool !== t.id) { setTool(t.id); snd.pick(); } });
-      b.dataset.id = t.id; tools.appendChild(b);
-    });
-    const colors = $("drColors");
-    COLORS.forEach((c) => {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "sw"; b.dataset.id = c.id;
-      b.style.setProperty("--sw", c.hex);
-      b.setAttribute("aria-label", c.name);
-      b.addEventListener("click", () => { if (!locked() && color !== c.id) { color = c.id; snd.pick(); refreshDrawer(); saveSoon(); } });
-      colors.appendChild(b);
-    });
-    $("drStay").addEventListener("click", () => {
-      if (locked()) return;
-      stay = !stay; snd.pick(); refreshDrawer(); saveSoon();
-    });
-    Toybox.bar($("drBar"), { onNew: newPage, onSurprise: surprise });
-  }
-  function buildChoices() {
-    const el = $("drChoices");
-    el.innerHTML = "";
-    el.classList.toggle("dr-pages", job === "color");
-    el.hidden = job === "draw";
-    if (job === "color") {
+  const sizeDot = (id, hex, scale) => {
+    const d = Math.round({ small: 10, medium: 18, big: 30 }[id] * (scale || 1));
+    return '<span class="size-dot" style="width:' + d + "px;height:" + d + "px;--sw:" + hex + '"></span>';
+  };
+  function grid(cls) { const g = document.createElement("div"); g.className = cls; trayEl.appendChild(g); return g; }
+  // The tray's contents for the button that opened it.
+  function buildTray() {
+    trayEl.innerHTML = "";
+    const hex = colorHex();
+    if (trayName === "tool") {
+      const g = grid("tray-grid");
+      TOOLS.forEach((t) => {
+        if (t.id === "bucket" && job === "write") return;
+        const b = tile("dr-tool", toolPic(t.id, hex), t.name, () => { if (tool !== t.id) setTool(t.id); snd.pick(); closeTray(); });
+        b.setAttribute("aria-pressed", String(t.id === tool));
+        g.appendChild(b);
+      });
+      if (job === "color") {
+        // The switch stays in its open tray so he sees it flip.
+        const st = document.createElement("button");
+        st.type = "button"; st.className = "btn dr-switch"; st.setAttribute("role", "switch");
+        st.innerHTML = '<span class="tb-pic" aria-hidden="true"></span><span class="dr-word">Stay in the lines</span>' +
+          '<span class="dr-track" aria-hidden="true"><span class="dr-knob"></span></span>';
+        const paint = () => { st.setAttribute("aria-checked", String(stay)); st.firstElementChild.innerHTML = PIC.stay(stay); };
+        paint();
+        st.addEventListener("click", () => { if (locked()) return; stay = !stay; snd.pick(); paint(); saveSoon(); });
+        trayEl.appendChild(st);
+      }
+    } else if (trayName === "size") {
+      const g = grid("tray-grid");
+      SIZES.forEach((z) => {
+        const b = tile("dr-size", sizeDot(z.id, hex, 1.3), z.name, () => { size = z.id; snd.pick(); refreshBar(); saveSoon(); closeTray(); });
+        b.setAttribute("aria-pressed", String(z.id === size));
+        g.appendChild(b);
+      });
+    } else if (trayName === "color") {
+      const g = grid("tray-colors");
+      COLORS.forEach((c) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "sw";
+        b.style.setProperty("--sw", c.hex);
+        b.setAttribute("aria-label", c.name);
+        b.setAttribute("aria-pressed", String(c.id === color));
+        b.addEventListener("click", () => { if (locked()) return; color = c.id; snd.pick(); refreshBar(); saveSoon(); closeTray(); });
+        g.appendChild(b);
+      });
+    } else if (trayName === "pick" && job === "color") {
+      const g = grid("tray-grid dr-pages");
       PAGES.forEach((p) => {
         const b = tile("dr-page", '<img alt="" src="' + svgUrl(p.svg, 120) + '">', p.name || p.id, () => {
-          if (pageId !== p.id) { setPage(p.id); snd.pick(); }
+          if (pageId !== p.id) setPage(p.id);
+          snd.pick(); closeTray();
         });
-        b.dataset.id = p.id; el.appendChild(b);
+        b.setAttribute("aria-pressed", String(p.id === pageId));
+        g.appendChild(b);
       });
-    } else if (job === "write") {
-      SETS.forEach((s) => {
-        const b = tile("dr-set", PIC[s.id](), s.name, () => { closeDrawer(); openPicker(s.id); snd.pick(); });
-        b.dataset.id = s.id; el.appendChild(b);
+    } else if (trayName === "pick" && job === "write") {
+      const g = grid("tray-grid");
+      SETS.forEach((q) => {
+        const b = tile("dr-set", PIC[q.id](), q.name, () => { closeTray(); openPicker(q.id); snd.pick(); });
+        b.setAttribute("aria-pressed", String(q.id === wSet));
+        g.appendChild(b);
       });
     }
   }
-  // Marks what is picked (yellow with a tick) and updates the pictures that show the current color.
-  function refreshDrawer() {
-    const hex = colorHex();
-    document.querySelectorAll("#drJobs .dr-tile").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === job)));
-    $("drTools").hidden = job === "write";
-    document.querySelectorAll("#drTools .dr-tile").forEach((b) => {
-      const id = b.dataset.id;
-      b.hidden = id === "bucket" && job === "write";
-      b.firstChild.innerHTML = toolPic(id, hex);
-      b.setAttribute("aria-pressed", String(id === tool));
+  // The header's job tabs.
+  function buildTabs() {
+    const el = $("jobTabs");
+    JOBS.forEach((j) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn dr-tab"; b.dataset.id = j.id;
+      b.innerHTML = '<span class="tb-pic" aria-hidden="true">' + PIC[j.id]() + "</span><span></span>";
+      b.lastChild.textContent = j.name;
+      b.addEventListener("click", () => { if (!locked() && job !== j.id) { setJob(j.id); snd.pick(); } });
+      el.appendChild(b);
     });
-    document.querySelectorAll("#drColors .sw").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === color)));
-    const st = $("drStay");
-    st.hidden = job !== "color";
-    st.setAttribute("aria-checked", String(stay));
-    st.firstElementChild.innerHTML = PIC.stay(stay);
-    document.querySelectorAll("#drChoices .dr-page").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === pageId)));
-    document.querySelectorAll("#drChoices .dr-set").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === wSet)));
-    $("hSw").style.setProperty("--sw", hex);
-    $("hTool").innerHTML = job === "write" ? PIC.write() : toolPic(tool, hex);
-    if (!handle.querySelector(".tb-ui-ic")) handle.insertAdjacentHTML("beforeend", Toybox.icon("back"));
+    $("bNew").firstChild.innerHTML = Toybox.icon("new");
+    $("bSurprise").firstChild.innerHTML = Toybox.icon("surprise");
+  }
+  // Shows which buttons this job has, and what is picked on each button's own picture.
+  function refreshBar() {
+    const hex = colorHex();
+    document.querySelectorAll("#jobTabs .dr-tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === job)));
+    BTN.tool.hidden = BTN.size.hidden = job === "write";
+    BTN.pick.hidden = job === "draw";
+    BTN.tool.firstChild.innerHTML = toolPic(tool, hex);
+    BTN.size.firstChild.innerHTML = sizeDot(size, hex, 1.1);
+    BTN.color.firstChild.innerHTML = '<span class="dot" style="display:block;width:30px;height:30px;--sw:' + hex + '"></span>';
+    $("bPickWord").textContent = job === "write" ? "Letters" : "Pages";
+    const page = PAGES.find((p) => p.id === pageId);
+    BTN.pick.firstChild.innerHTML = job === "write" ? PIC[wSet]() : page ? '<img alt="" src="' + svgUrl(page.svg, 120) + '">' : "";
+    if (trayName) buildTray();
   }
 
   // =====================================================================================================
@@ -1277,7 +1297,7 @@
   function closePicker() { picker.hidden = true; pickerOpen = false; }
   const textSpan = (cls, s) => { const sp = document.createElement("span"); sp.className = cls; sp.textContent = s; return sp.outerHTML; };
   function openPicker(set) {
-    closeDrawer();
+    closeTray();
     if (job !== "write") setJob("write");
     if (set === "words") { openCategories(); return; }
     const s = SETS.find((q) => q.id === set);
@@ -1314,7 +1334,7 @@
     wSet = set; wItem = item; wList = list;
     closePicker();
     startTrace();
-    refreshDrawer(); saveSoon(); snd.pick();
+    refreshBar(); saveSoon(); snd.pick();
   }
 
   // =====================================================================================================
@@ -1334,7 +1354,7 @@
   const ghost = Toybox.ghost({
     max: 3,
     plan: () => {
-      if (locked() || drawerOpen || pickerOpen || fingers.size || traceFinger != null) return null;
+      if (locked() || trayName || pickerOpen || fingers.size || traceFinger != null) return null;
       measure();
       if (job === "write") {
         const st = curStroke();
@@ -1344,9 +1364,9 @@
         if (st.len - T.prog < 0.1) return { pts: [pts[0]], tap: true, key: strokeKey() };
         return { pts, dur: clamp((st.len - T.prog) * T.view.u * 9, 2600, 5200), key: strokeKey() };
       }
-      if (!handleFound) {
-        const r = handle.getBoundingClientRect();
-        return { pts: [[r.left + r.width / 2, r.top + r.height / 2]], tap: true, key: "handle" };
+      if (!trayFound) {
+        const r = BTN.color.getBoundingClientRect();
+        return { pts: [[r.left + r.width / 2, r.top + r.height / 2]], tap: true, key: "tray" };
       }
       if (job === "color" && tool === "bucket") {
         const l = regions.findIndex((r) => r && !r.border && !r.filled && r.area > KC * KC * 0.004);
@@ -1370,18 +1390,18 @@
   // =====================================================================================================
   function setJob(id) {
     job = id;
-      JOBS.forEach((j) => document.body.classList.toggle("job-" + j.id, j.id === job));
+    JOBS.forEach((j) => document.body.classList.toggle("job-" + j.id, j.id === job));
     fingers.clear(); traceFinger = null;
     if (job !== "write") { closePicker(); $("next").hidden = true; }
     else if (T && T.done) $("next").hidden = false;
     if (job === "write" && !T) startTrace();
     if (T) T.snap = true;
-    buildChoices(); refreshDrawer(); jobLine(); ghost.poke(); saveSoon();
+    closeTray(); refreshBar(); jobLine(); ghost.poke(); saveSoon();
   }
   function setTool(id) {
     const was = tool;
     tool = id;
-    refreshDrawer(); saveSoon();
+    refreshBar(); saveSoon();
     const kind = (t) => (t === "bucket" || t === "eraser" ? t : "paint");
     if (kind(was) !== kind(id)) jobLine();
   }
@@ -1389,13 +1409,13 @@
     snapPage();
     pageId = id;
     loadPage(id, true);
-    refreshDrawer(); saveSoon();
+    refreshBar(); saveSoon();
   }
   // New: a yellow band sweeps down the page and wipes it clean behind it (Write starts the item over).
   let wipe = null;
   function newPage() {
     if (locked()) return;
-    closeDrawer();
+    closeTray();
     snd.wipe();
     if (job === "write") { startTrace(); sparkleLines(); return; }
     const r = job === "color" ? colorRect : drawRect, y0 = Math.max(0, r.y), y1 = Math.min(H, r.y + r.s);
@@ -1433,7 +1453,7 @@
   function onEnding(done) {
     ending = true;
     fingers.clear(); traceFinger = null;
-    closeDrawer(); closePicker();
+    closeTray(); closePicker();
     setTimeout(done, 1200);
   }
   function restArt() {
@@ -1443,21 +1463,16 @@
       '<g transform="rotate(-40 70 34)" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"><path d="M52 28h26v12H52z" fill="#FFD21F"/><path d="M78 28l9 6-9 6z" fill="#FFD21F"/></g></svg>';
   }
 
-  buildDrawer();
+  buildTabs();
   resize();
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
-  // The stage never scrolls: focusing a control in the closed drawer could otherwise slide the whole page sideways.
+  // The stage never scrolls, so focusing a control can never slide the page out of place.
   stage.addEventListener("scroll", () => { stage.scrollTop = 0; stage.scrollLeft = 0; });
   document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
   window.addEventListener("pagehide", save);
   if (pageId) loadPage(pageId, false);
   setJob(job);
-  // First visit: the drawer slides open by itself for a moment, so he sees it is there.
-  if (firstVisit) {
-    setTimeout(() => { if (!drawerOpen && !locked()) openDrawer(false); }, 700);
-    setTimeout(() => { if (!drawerTouched && !handleFound) closeDrawer(); }, 3400);
-  }
   Toybox.init({
     app: "drawing",
     badge: $("tbadge"),
@@ -1479,17 +1494,18 @@
   // Test hooks, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) {
     window.__drawing = {
-      state: () => ({ job, tool, color, stay, page: pageId, drawerOpen, pickerOpen, handleFound, colorPainted, drawPainted,
+      state: () => ({ job, tool, color, size, stay, page: pageId, tray: trayName, pickerOpen, trayFound, colorPainted, drawPainted,
         regions: regions.length - 1, filled: regions.filter((r) => r && r.filled).length, pageReady: !!lab, finished: kindGiven.has(pageId),
         write: T ? { set: wSet, item: wItem, letter: T.li, stroke: T.si, prog: +T.prog.toFixed(3), done: T.done, assist: T.assist,
           letters: T.letters.length } : null, coach: coach.text() }),
       job: (id) => setJob(id),
       tool: (id) => setTool(id),
-      color: (id) => { color = id; refreshDrawer(); },
-      stay: (on) => { stay = !!on; refreshDrawer(); },
+      color: (id) => { color = id; refreshBar(); },
+      stay: (on) => { stay = !!on; refreshBar(); },
       page: (id) => setPage(id),
-      open: () => openDrawer(true),
-      close: () => closeDrawer(),
+      size: (id) => { size = id; refreshBar(); },
+      tray: (name) => openTray(name),
+      closeTray: () => closeTray(),
       picker: (set) => openPicker(set),
       write: (set, item, list) => pickItem(set, item, list || null),
       // Viewport point of a page point given as fractions of the coloring page (or of the stage elsewhere).

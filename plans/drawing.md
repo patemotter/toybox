@@ -8,36 +8,33 @@ learning comes from doing it (AGENTS.md §1). No shelf (the dad, 2026-11-12: it 
 
 - Folder `drawing/`: `index.html` + `index.js` (script with a "Sections" list), manifest, icons. No `sw.js`.
 - `Toybox.init({ app: "drawing" })`, both orientations. Storage key `drawing-v1` holds only the current page of
-  each job and the drawer's picks, so a reload keeps it; a visit from the home screen starts fresh (`Toybox.fresh()`).
+  each job and the bar's picks (tool, size, color, stay), so a reload keeps it; a visit from the home screen starts fresh (`Toybox.fresh()`).
 - Shown on the home screen as "Drawing" (the dad, 2026-11-12).
 - Jobs: **Color | Draw | Write**.
 
 ### Layout: the page is nearly the whole screen
 The dad (2026-11-12): give as much of the screen as possible to the drawing area; the colors and tools can live in
 a small pull-out bar on the side.
-- The header stays (Home, the title on iPad only), and the page fills everything under it, edge to edge inside the
-  safe areas. No panel under or beside the stage, no job bar, no bottom bar: this app leaves the `tb-v2` panel
-  layout on purpose.
-- **The drawer** (the dad, 2026-11-12: "right or bottom is fine"): on the right edge in landscape and on the bottom
-  edge on an upright phone, so it opens along the page's long side. A slim handle on that edge of the page (about 56 px wide, the height of a few fingers),
-  showing the current color as a big swatch and the current tool's picture, so the picked state is never hidden.
-  A tap on the handle (or a drag out from it) slides the drawer open over the page's edge.
-- The drawer holds, top to bottom: the jobs (Color | Draw | Write), the tools, the colors, the job's own choices
-  (coloring pages, or Write's four sets), then New (orange) and Surprise. Picked items are yellow with a
-  tick badge, as everywhere.
-- The drawer stays open while he picks; a touch on the page closes it, and that touch also draws, so no tap is
-  wasted. The handle closes it too.
-- New lives in the drawer. Reading of "nothing traps him: always a visible way to start over": the handle is always
-  on screen and New is one tap behind it.
-- On an upright phone the drawer opens up over the bottom part of the page (at most about 45% of its height); in
-  landscape it opens over the right part, in one or two columns.
-- The first visit opens the drawer once by itself for a moment, so he sees it is there; the idle ghost hand points
-  at the handle when he hasn't found it.
+- **Header** (the dad, 2026-11-14: say clearly that this is the Toybox and which app and job he is in): Home, then
+  "Toybox" small over "Drawing" on every size, then the three jobs Color | Draw | Write as tabs (picked = yellow
+  with a tick). The page fills everything under it.
+- **Button bar** (the dad, 2026-11-14: one button for everything was the wrong idea; split it into color, what he
+  draws with, and a new size): along the bottom on upright screens, down the right side in landscape (two columns
+  on a phone held sideways, which is short). Buttons: Tool (shows the picked tool), Size (a dot of the picked
+  size), Color (the picked swatch), Pages in Color or Letters in Write (the picked page or set), New (orange) and
+  Surprise. Write has no Tool or Size; Draw has no Pages.
+- Each button opens its own small tray next to the bar with only its choices. A choice applies at once and closes
+  the tray; tapping the same button again closes it; a touch on the page closes it and that touch also draws. The
+  "Stay in the lines" switch sits in Color's Tool tray and doesn't close it, so he sees the switch flip. An open
+  tray hides the coach line.
+- **Size**: Small, Medium (the default) and Big scale the stroke width of every drawing tool; the trace ink in
+  Write keeps its own width. Saved with the other picks; a visit from the home screen resets it to Medium.
+- The idle ghost hand taps the Color button until he has opened a tray himself.
 
 ## 2. The jobs
 
 ### Shared tools (Color and Draw)
-- In the drawer: Marker (smooth, solid; the default, the dad, 2026-11-14), Crayon (waxy, slightly grainy edge),
+- In the Tool tray: Marker (smooth, solid; the default, the dad, 2026-11-14), Crayon (waxy, slightly grainy edge),
   Paint brush (soft, wide), Paint bucket (one tap fills an area; in Draw it fills any closed space he has drawn, like a paint
   program, and a shape with a gap lets the paint out over the page; the dad, 2026-11-14), Eraser.
 - Colors: about 12 bright swatches plus white and black. The picked tool and color are yellow with a tick badge.
@@ -51,9 +48,9 @@ a small pull-out bar on the side.
 - Line-art pages of things he loves: tractor, excavator, rocket, train, gears, the 3D printer (a P1S without
   logos), the water table, a garbage truck, a marble run. Drawn as SVG paths, reusing the shapes of drawings already
   in the Toybox where that is quicker. Chunky ink outlines with closed areas big enough for the bucket.
-- The pages are picture tiles in the drawer; picking one swaps it in.
+- The pages are picture tiles in the Pages tray; picking one swaps it in.
 - Line art sits on a layer above the color, so crayon and paint never cover the lines.
-- **"Stay in the lines" switch** in the drawer (the dad, 2026-11-12): a real-looking toggle with a picture (a crayon
+- **"Stay in the lines" switch** in the Tool tray (the dad, 2026-11-12): a real-looking toggle with a picture (a crayon
   stroke stopping at a line vs crossing it) and the words "Stay in the lines". On: crayon, marker and paint stay
   inside the area where the stroke started. Off: ink goes wherever his finger goes, like a real crayon. On by
   default; a visit from the home screen sets it back to on, a reload keeps it.
@@ -78,7 +75,7 @@ and nothing is ever marked wrong. Sources are in section 3.
 - **Picking what to write** (the dad, 2026-11-12: he picks it himself, straight from the set). Write shows four big
   picture tiles: **A-Z**, **a-z**, **0-9** and **Words**. A tile opens a picker over the page with the whole set
   in order: A-Z shows the capital alphabet A to Z, a-z the lowercase alphabet, 0-9 the digits 0 to 9; he taps the
-  one he wants and it comes up big, ready to trace. The four tiles stay in the drawer to pick again.
+  one he wants and it comes up big, ready to trace. The four tiles stay in the Letters tray to pick again.
 - Words picker (the dad, 2026-11-12: sort the words into categories): a screen of category tiles, each a picture and
   its name: Animals, Farm, Colors, Shapes, Feelings, People, Body, Food, Nature, Home, Machines, Tools, Space,
   Places, Numbers, Time, Doing words, plus **Most used** (Fry's first hundred: the, and, you...) and **A-Z** (every
@@ -113,7 +110,8 @@ along every line. No faces on anything drawn on a coloring page.
 `Toybox.kind()` when he finishes a coloring page (most areas filled) or a traced word.
 
 ### Files
-- `drawing/index.html` + `drawing/index.js`: the page, the drawer, the tools, Color, Draw and the tracing.
+- `drawing/index.html` + `drawing/index.js`: the page, the header, the button bar and trays, the tools, Color, Draw and
+  the tracing.
 - `drawing/pages.js`: the coloring pages' line art (`window.DrawingPages`, format in its header).
 - `drawing/glyphs.js`: the stroke data for every letter and digit (`window.DrawingGlyphs`, format in its header).
 - `drawing/words.js`: the word lists (`window.DrawingWords`), generated from the two `plans/drawing-word*.txt`
@@ -147,11 +145,10 @@ Not sourced: that tracing with a finger on a screen is easier than writing with 
 ## 4. Open questions for the dad
 
 - Upright phone: the square coloring page leaves empty table above and below it. Taller pages for upright screens?
-- Should the tracing ink follow the drawer's color (as built), or always be one color?
+- Should the tracing ink follow the picked color (as built), or always be one color?
 - Phone held sideways: words trace at a smaller size because the stage is short. Fine?
 - Weak spots in the first pages: the water wheels look a bit like snowflakes, the garbage truck's arm is mostly
   hidden behind the bin, the 3D printer's spools are plain.
-- Phone, Color job: the drawer scrolls to reach the coloring pages (Draw and Write fit without scrolling).
 
 - Which coloring pages first, and how many? (Proposed: the nine above.)
 - Write: the Fry exclusions above: right, too many or too few?
