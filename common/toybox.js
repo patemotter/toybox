@@ -1339,9 +1339,26 @@
       }
       return out;
     }
+    // The header title ("Workshop · Drill Press") stays on one line on every size: a title wider than its room is
+    // shrunk as a whole, down to 60%, so the app and station names keep the same size as each other.
+    function fitTitles() {
+      var ts = document.querySelectorAll(".tb-head .tb-title");
+      for (var i = 0; i < ts.length; i++) {
+        var t = ts[i];
+        t.style.fontSize = "";
+        if (!t.clientWidth || t.scrollWidth <= t.clientWidth + 1) continue;
+        var base = parseFloat(getComputedStyle(t).fontSize), px = base;
+        // Text doesn't narrow exactly in step with its size, so shrink again until it fits.
+        for (var k = 0; k < 5 && t.scrollWidth > t.clientWidth + 1 && px > base * 0.6; k++) {
+          px = Math.max(base * 0.6, px * t.clientWidth / t.scrollWidth * 0.97);
+          t.style.fontSize = px + "px";
+        }
+      }
+    }
     function fit() {
       timer = 0;
       var i, k, list;
+      fitTitles();
       for (i = 0; i < touched.length; i++) touched[i].style.fontSize = touched[i].getAttribute("data-tbfit") || "";
       for (i = 0; i < touched.length; i++) touched[i].removeAttribute("data-tbfit");
       touched = [];

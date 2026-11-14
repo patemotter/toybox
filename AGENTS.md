@@ -200,9 +200,15 @@ instead; words like Slow/Medium/Fast, Straight/Angle, Shallow/Deep are fine.
 
 ### Layout (iPhone first, iPad must stay good)
 - One screen, **no page scroll**. Test at 390x844, 844x390 and 820x1180 (also 1180x820 and 1024x1366 for iPad).
-- **Phone header**: Back (stations only, e.g. "‹ Tool Wall", "‹ All machines"), Home as an icon, a short title
-  that fits without "…" (drop it rather than truncate), Big as an icon. Decorative badges ("Gear on", "Hard hat
-  on") are hidden on phones. iPad may show words.
+- **Phone header**: Back (stations only, e.g. "‹ Tool Wall", "‹ All machines"; just the arrow on phones), Home as
+  an icon, then the title. Decorative badges ("Gear on", "Hard hat on") are hidden on phones. iPad may show words.
+- **The title always says where he is, on one line** (the dad, 2026-11-14): an app's own pages show the app's name;
+  a station shows "App · Station" (`<h1 class="tb-title"><span class="tb-app">Workshop · </span><span
+  class="tb-station">Drill Press</span></h1>`), and on an upright phone only the station's name (`common/toybox.css`
+  hides `.tb-app` there). The title is never dropped and never cut off: `common/toybox.js` shrinks one that doesn't
+  fit, down to 60%; a new title that still doesn't fit at 390x844 and 844x390 gets a shorter name. "Toybox" itself
+  isn't in the header (the dad: the app and station are enough). A script that changes the title changes only
+  `.tb-station`.
 - **Grown-ups lives only on the home screen** (the launcher): timer, sound and an "App settings" section for every
   app's grown-up options. Apps have no Grown-ups button or sheet. A new app setting goes in the `SETTINGS` list in
   `common/toybox.js` and is read with `Toybox.settings.get(id)`.
