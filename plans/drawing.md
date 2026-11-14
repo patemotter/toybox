@@ -37,8 +37,8 @@ a small pull-out bar on the side.
 ## 2. The jobs
 
 ### Shared tools (Color and Draw)
-- In the drawer: Crayon (waxy, slightly grainy edge),
-  Marker (smooth, solid), Paint brush (soft, wide), Paint bucket (Color only: one tap fills an area), Eraser.
+- In the drawer: Marker (smooth, solid; the default, the dad, 2026-11-14), Crayon (waxy, slightly grainy edge),
+  Paint brush (soft, wide), Paint bucket (Color only: one tap fills an area), Eraser.
 - Colors: about 12 bright swatches plus white and black. The picked tool and color are yellow with a tick badge.
 - Several fingers draw at once; the palm guard ignores a resting hand. Strokes are smoothed so a wobbly finger
   still draws a clean line.

@@ -50,7 +50,7 @@
     { id: "white", name: "White", hex: "#FFFFFF" }, { id: "black", name: "Black", hex: "#16181F" }
   ];
   const TOOLS = [
-    { id: "crayon", name: "Crayon" }, { id: "marker", name: "Marker" }, { id: "brush", name: "Paint brush" },
+    { id: "marker", name: "Marker" }, { id: "crayon", name: "Crayon" }, { id: "brush", name: "Paint brush" },
     { id: "bucket", name: "Paint bucket" }, { id: "eraser", name: "Eraser" }
   ];
   const JOBS = [{ id: "color", name: "Color" }, { id: "draw", name: "Draw" }, { id: "write", name: "Write" }];
@@ -76,7 +76,7 @@
   if (firstVisit) saved = {};
   const has = (list, id) => list.some((x) => x.id === id);
   let job = has(JOBS, saved.job) ? saved.job : "color";
-  let tool = has(TOOLS, saved.tool) ? saved.tool : "crayon";
+  let tool = has(TOOLS, saved.tool) ? saved.tool : "marker";
   let color = has(COLORS, saved.color) ? saved.color : "red";
   let stay = saved.stay !== false;
   let pageId = PAGES.some((p) => p.id === saved.page) ? saved.page : (PAGES[0] ? PAGES[0].id : "");
@@ -85,7 +85,7 @@
   let wItem = typeof sw.item === "string" && sw.item && sw.item.length <= 30 ? sw.item : "A";
   // The word list Next walks through: { cat: category id | "most" | "az", letter: "a".."z" for "az" }.
   let wList = sw.list && typeof sw.list === "object" ? { cat: String(sw.list.cat || ""), letter: String(sw.list.letter || "") } : null;
-  if (job === "draw" && tool === "bucket") tool = "crayon";
+  if (job === "draw" && tool === "bucket") tool = "marker";
 
   let saveTimer = 0;
   function save() {
@@ -1280,7 +1280,7 @@
   // =====================================================================================================
   function setJob(id) {
     job = id;
-    if (job === "draw" && tool === "bucket") tool = "crayon";
+    if (job === "draw" && tool === "bucket") tool = "marker";
     JOBS.forEach((j) => document.body.classList.toggle("job-" + j.id, j.id === job));
     fingers.clear(); traceFinger = null;
     if (job !== "write") { closePicker(); $("next").hidden = true; }
