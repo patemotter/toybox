@@ -38,7 +38,8 @@ a small pull-out bar on the side.
 
 ### Shared tools (Color and Draw)
 - In the drawer: Marker (smooth, solid; the default, the dad, 2026-11-14), Crayon (waxy, slightly grainy edge),
-  Paint brush (soft, wide), Paint bucket (Color only: one tap fills an area), Eraser.
+  Paint brush (soft, wide), Paint bucket (one tap fills an area; in Draw it fills any closed space he has drawn, like a paint
+  program, and a shape with a gap lets the paint out over the page; the dad, 2026-11-14), Eraser.
 - Colors: about 12 bright swatches plus white and black. The picked tool and color are yellow with a tick badge.
 - Several fingers draw at once; the palm guard ignores a resting hand. Strokes are smoothed so a wobbly finger
   still draws a clean line.
@@ -58,7 +59,7 @@ a small pull-out bar on the side.
   default; a visit from the home screen sets it back to on, a reload keeps it.
 
 ### Draw (free drawing)
-- A blank white page with the same tools minus the bucket. New clears it (the shared New, orange).
+- A blank white page with the same tools. New clears it (the shared New, orange).
 
 ### Write (tracing)
 Guided but forgiving (the dad, 2026-11-12, after talking it through): the start point and direction of each stroke

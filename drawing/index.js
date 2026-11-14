@@ -85,7 +85,6 @@
   let wItem = typeof sw.item === "string" && sw.item && sw.item.length <= 30 ? sw.item : "A";
   // The word list Next walks through: { cat: category id | "most" | "az", letter: "a".."z" for "az" }.
   let wList = sw.list && typeof sw.list === "object" ? { cat: String(sw.list.cat || ""), letter: String(sw.list.letter || "") } : null;
-  if (job === "draw" && tool === "bucket") tool = "marker";
 
   let saveTimer = 0;
   function save() {
@@ -530,7 +529,7 @@
     cx.fillStyle = colorHex(); cx.fillRect(0, 0, m.w, m.h);
     const far = Math.max(Math.hypot(p[0] - m.x, p[1] - m.y), Math.hypot(p[0] - m.x - m.w, p[1] - m.y),
       Math.hypot(p[0] - m.x, p[1] - m.y - m.h), Math.hypot(p[0] - m.x - m.w, p[1] - m.y - m.h));
-    fills.push({ c, m, cx: p[0], cy: p[1], far, t0: now(), dur: reduce ? 1 : 700 });
+    fills.push({ ctx: cpx, op: "source-over", c, m, cx: p[0], cy: p[1], far, t0: now(), dur: reduce ? 1 : 700 });
     colorPainted = true;
     regions[l].filled = true;
     addFx({ kind: "ring", x, y, color: colorHex(), life: 0.9 });
@@ -541,11 +540,101 @@
   function runFills(t) {
     fills = fills.filter((f) => {
       const u = clamp((t - f.t0) / f.dur, 0, 1), r = f.far * (1 - (1 - u) * (1 - u)) + 2;
-      cpx.save(); cpx.beginPath(); cpx.arc(f.cx, f.cy, r, 0, TAU); cpx.clip();
-      cpx.drawImage(f.c, f.m.x, f.m.y);
-      cpx.restore();
+      const g = f.ctx;
+      g.save(); g.beginPath(); g.arc(f.cx, f.cy, r, 0, TAU); g.clip();
+      g.globalCompositeOperation = f.op;
+      g.drawImage(f.c, f.m.x, f.m.y);
+      g.restore();
       return u < 1;
     });
+  }
+  // Draw's bucket fills the space under the tap the way a paint program does: every pixel joined to the tapped
+  // one that has about the same color. Pixels of another color are walls, thickened by 2 px so the bare specks in
+  // a crayon line don't let the paint through. The filled shape then grows back 3 px so it reaches under the soft
+  // edges of the lines. On blank paper the paint goes behind what is there ("destination-over"), so a line is never
+  // painted over; on a colored space it replaces the old color.
+  function drawBucketAt(x, y) {
+    const K = KD, p = toSheet({ rect: drawRect, K }, x, y), sx0 = Math.floor(p[0]), sy0 = Math.floor(p[1]);
+    if (sx0 < 0 || sy0 < 0 || sx0 >= K || sy0 >= K) return;
+    const img = dpx.getImageData(0, 0, K, K).data, N = K * K;
+    const s0 = (sy0 * K + sx0) * 4, sa = img[s0 + 3], blank = sa < 40;
+    const hex = colorHex();
+    const want = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    if (!blank && Math.abs(img[s0] - want[0]) + Math.abs(img[s0 + 1] - want[1]) + Math.abs(img[s0 + 2] - want[2]) < 24) {
+      sparkleAt(x, y, 8); return;
+    }
+    const same = new Uint8Array(N);
+    for (let i = 0, j = 0; i < N; i++, j += 4) {
+      same[i] = blank ? (img[j + 3] < 40 ? 1 : 0)
+        : (img[j + 3] > 200 && Math.abs(img[j] - img[s0]) + Math.abs(img[j + 1] - img[s0 + 1]) + Math.abs(img[j + 2] - img[s0 + 2]) < 60 ? 1 : 0);
+    }
+    const open = grow(same, K, -2);
+    if (!open[sy0 * K + sx0]) open[sy0 * K + sx0] = 1;
+    // A scanline flood fill over the open pixels.
+    const hit = new Uint8Array(N), stack = [sx0, sy0];
+    let x0 = K, y0 = K, x1 = -1, y1 = -1;
+    while (stack.length) {
+      const yy = stack.pop(); let xx = stack.pop();
+      let i = yy * K + xx;
+      if (hit[i] || !open[i]) continue;
+      while (xx > 0 && open[i - 1] && !hit[i - 1]) { xx--; i--; }
+      let up = false, dn = false;
+      for (; xx < K && open[i] && !hit[i]; xx++, i++) {
+        hit[i] = 1;
+        if (xx < x0) x0 = xx; if (xx > x1) x1 = xx;
+        if (yy > 0) { const u = open[i - K] && !hit[i - K]; if (u && !up) stack.push(xx, yy - 1); up = u; }
+        if (yy < K - 1) { const d = open[i + K] && !hit[i + K]; if (d && !dn) stack.push(xx, yy + 1); dn = d; }
+      }
+      if (yy < y0) y0 = yy; if (yy > y1) y1 = yy;
+    }
+    if (x1 < 0) return;
+    const fill = grow(hit, K, 3);
+    const pad = 4;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(K - 1, x1 + pad); y1 = Math.min(K - 1, y1 + pad);
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const cx = c.getContext("2d"), id = cx.createImageData(w, h), d = id.data;
+    for (let yy = 0; yy < h; yy++) {
+      for (let xx = 0; xx < w; xx++) {
+        const i = (y0 + yy) * K + x0 + xx;
+        // On a colored space, stop at pixels that belong to a line of another color.
+        if (!fill[i] || (!blank && !same[i] && !hit[i] && img[i * 4 + 3] > 250)) continue;
+        const o = (yy * w + xx) * 4;
+        d[o] = want[0]; d[o + 1] = want[1]; d[o + 2] = want[2]; d[o + 3] = 255;
+      }
+    }
+    cx.putImageData(id, 0, 0);
+    const m = { x: x0, y: y0, w, h };
+    const far = Math.max(Math.hypot(p[0] - x0, p[1] - y0), Math.hypot(p[0] - x1, p[1] - y0),
+      Math.hypot(p[0] - x0, p[1] - y1), Math.hypot(p[0] - x1, p[1] - y1));
+    fills.push({ ctx: dpx, op: blank ? "destination-over" : "source-over", c, m, cx: p[0], cy: p[1], far, t0: now(), dur: reduce ? 1 : 700 });
+    drawPainted = true;
+    addFx({ kind: "ring", x, y, color: hex, life: 0.9 });
+    snd.fill();
+    saveSoon();
+  }
+  // Grows the set pixels of a K x K mask by r px (a square reach), or shrinks them for r < 0. Each pass keeps a
+  // running count of set pixels in the window, so the cost doesn't depend on r.
+  function grow(src, K, r) {
+    const R = Math.abs(r), shrink = r < 0;
+    const a = new Uint8Array(src.length), out = new Uint8Array(src.length);
+    const pass = (from, to, stride, step) => {
+      for (let line = 0; line < K; line++) {
+        const base = line * stride;
+        let n = 0;
+        for (let k = 0; k < R && k < K; k++) n += from[base + k * step];
+        for (let x = 0; x < K; x++) {
+          if (x + R < K) n += from[base + (x + R) * step];
+          if (x - R - 1 >= 0) n -= from[base + (x - R - 1) * step];
+          // Near the edge the window is cut short; the missing pixels count as set, so shrinking doesn't eat the edge.
+          const win = Math.min(K - 1, x + R) - Math.max(0, x - R) + 1;
+          to[base + x * step] = shrink ? (n === win ? 1 : 0) : (n > 0 ? 1 : 0);
+        }
+      }
+    };
+    pass(src, a, K, 1);
+    pass(a, out, 1, K);
+    return out;
   }
   // A rough count of how much of each area has been colored: each stroke piece adds its length times its width to
   // the area under it. The page counts as finished when most of its real areas are colored.
@@ -1005,7 +1094,7 @@
     // Once he is coloring or drawing, the instruction goes away so it never covers the page; it comes back with
     // the next job or tool.
     coach.clear();
-    if (job === "color" && tool === "bucket") { bucketAt(x, y); ghost.learned("bucket"); return; }
+    if (tool === "bucket") { if (job === "color") bucketAt(x, y); else drawBucketAt(x, y); ghost.learned("bucket"); return; }
     startStroke(e.pointerId, x, y);
   });
   touchEl.addEventListener("pointermove", (e) => {
@@ -1140,7 +1229,7 @@
     $("drTools").hidden = job === "write";
     document.querySelectorAll("#drTools .dr-tile").forEach((b) => {
       const id = b.dataset.id;
-      b.hidden = id === "bucket" && job !== "color";
+      b.hidden = id === "bucket" && job === "write";
       b.firstChild.innerHTML = toolPic(id, hex);
       b.setAttribute("aria-pressed", String(id === tool));
     });
@@ -1236,7 +1325,8 @@
   function jobLine() {
     if (job === "write") { if (T && T.done) finishItem(true); else traceLine(); return; }
     coach.avoid();
-    if (job === "draw") coachLine(tool === "eraser" ? "Rub out the drawing with the eraser." : "Draw with your finger.");
+    if (job === "draw") coachLine(tool === "eraser" ? "Rub out the drawing with the eraser."
+      : tool === "bucket" ? "Tap inside a shape to fill it with paint." : "Draw with your finger.");
     else if (tool === "bucket") coachLine("Tap a space to fill it with paint.");
     else if (tool === "eraser") coachLine("Rub out the color with the eraser.");
     else coachLine("Color the picture with your finger.");
@@ -1280,8 +1370,7 @@
   // =====================================================================================================
   function setJob(id) {
     job = id;
-    if (job === "draw" && tool === "bucket") tool = "marker";
-    JOBS.forEach((j) => document.body.classList.toggle("job-" + j.id, j.id === job));
+      JOBS.forEach((j) => document.body.classList.toggle("job-" + j.id, j.id === job));
     fingers.clear(); traceFinger = null;
     if (job !== "write") { closePicker(); $("next").hidden = true; }
     else if (T && T.done) $("next").hidden = false;
