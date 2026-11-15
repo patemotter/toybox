@@ -260,9 +260,12 @@ instead; words like Slow/Medium/Fast, Straight/Angle, Shallow/Deep are fine.
   button that a page still passes as `big:` and keeps Big mode off (`Toybox.setBig` / `isBig` are no-op stubs, and
   `onBig` is called once with false). Don't add one; when you touch a page that still wires one, remove it.
 - **Instructions sit big in the middle of the stage on every size** (the dad, 2026-10-15: he missed them at the top,
-  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every new `is-do` coach line; at
-  his first touch it drops to the bottom of the stage (`is-seen`) so it never hides the work (the dad, 2026-10-15: left in
-  the middle it covered what he was doing), and the next new instruction pops up in the middle again. Information lines (`is-info`) stay small at the bottom.
+  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every new `is-do` coach line.
+  **Instructions are not persistent** (the dad, 2026-11-15: they "never ever leave and take up a ton of space"; on
+  2026-10-15 left in the middle it covered what he was doing): after his first touch (at least 2 s after it appeared)
+  or after 8 s it fades away (`is-seen`), it comes back with the idle ghost hand, and the next new instruction pops up
+  in the middle again. So the scene itself must keep showing what to do next (a yellow ring, a glow). Information
+  lines (`is-info`) stay small at the bottom.
   Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
 - **Instructions look different from information** (the dad, 2026-10-11: on the iPad they looked the same and were easy
   to miss). `common/toybox.js` watches every `.tb-coach` and marks it `is-do` when a sentence starts with an action

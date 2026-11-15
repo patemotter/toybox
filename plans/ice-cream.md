@@ -42,8 +42,6 @@ a bowl of cherries. A yellow ring and one instruction show the next part. No ste
   itself with what the customer asked for. Tapping the customer repeats the order.
 - New: this ice cream starts again (the customer stays). Surprise takes turns: sprinkles rain over the shop, a dog
   peeks over the counter, a bird lands on the window sill, the customer does a happy hop. No faces on objects.
-- Upright, the scene keeps clear of the bottom strip where the coach line rests after his first touch, so it never
-  covers the cone.
 - No numbers on screen (the order's words may say "two scoops").
 
 ## 3. Open questions for the dad

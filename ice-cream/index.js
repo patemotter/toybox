@@ -161,11 +161,8 @@
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const was = L;
     L = W / H > 1.05 ? WIDE : TALL;
-    // Upright, the coach line rests at the bottom of the stage after his first touch: the scene keeps clear of
-    // that strip so the line never covers the cone in the holder. (Sideways, the strip under the cabinet is free.)
-    const strip = L === TALL ? clamp(H * 0.085, 56, 92) : 0;
-    vs = Math.min(W / L.w, (H - strip) / L.h) * 0.98;
-    vox = (W - L.w * vs) / 2; voy = (H - strip - L.h * vs) / 2;
+    vs = Math.min(W / L.w, H / L.h) * 0.98;
+    vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) / 2;
     if (was !== L) placeAll();
   }
   function vp(x, y) { const r = cv.getBoundingClientRect(); return { x: r.left + vox + x * vs, y: r.top + voy + y * vs }; }

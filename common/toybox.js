@@ -118,7 +118,9 @@
  *        finish), coach.avoid(x, y) (viewport px: a new instruction in the
  *        middle of the stage moves to the other half if it would cover that point, e.g. the part it names),
  *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
- *        home screen's App setting "coach-voice" is on and sound is on.
+ *        home screen's App setting "coach-voice" is on and sound is on. Instructions are not persistent: one
+ *        fades away after his first touch (at least 2 s after it appeared) or after 8 s, and comes back with the
+ *        idle ghost hand; so the scene itself (a ring, a glow) must keep showing what to do next.
  *      var ghost = Toybox.ghost({ plan: fn, max: 3, idleMs: 4500, ok: fn, onShow: fn(plan, on) })
  *        The idle ghost hand (the master look). plan() returns null or { pts: [[x, y], ...] (viewport px),
  *        tap: true | hold: true | (two or more points = a drag), carry: { html, size }, dur: ms, key: "pour" }.
@@ -1626,7 +1628,9 @@
       var forced = el.getAttribute("data-coach"), text = el.textContent, kind = forced || coachKind(text);
       if (text === last) return;
       last = text;
-      if (text !== el.__tbSeen) el.classList.remove("is-seen");   // a short note and back: still seen
+      // A short note and back to the instruction he has already seen: it stays away.
+      if (el.__tbSeen && text === el.__tbSeen) { clearTimeout(el.__tbSeenT); el.classList.add("is-seen"); }
+      else coachUnseen(el);
       el.classList.toggle("is-do", kind === "do");
       el.classList.toggle("is-info", kind === "info");
       if (kind === "do") { el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new"); }
@@ -1635,11 +1639,28 @@
     apply();
   }
   function watchAllCoaches() { Array.prototype.forEach.call(document.querySelectorAll(".tb-coach"), watchCoach); }
-  // A new instruction sits in the middle of the stage; once he touches anything (the stage or a button) it has been seen and moves down to
-  // the bottom (is-seen), out of the way of the work. A new instruction line clears it again (watchCoach).
-  document.addEventListener("pointerdown", function (e) {
+  // Instructions are not persistent (the dad, 2026-11-15: "the instructions never ever leave and take up a ton of
+  // space"). A new instruction pops up in the middle of the stage; once he touches anything it has been seen and
+  // fades away (is-seen), at the earliest COACH_READ ms after it appeared so a quick tap doesn't whisk it away
+  // unread, and by itself after COACH_STAY ms. The yellow ring on the scene keeps pointing at the next part. It
+  // comes back with the idle ghost hand (he is stuck), and a new instruction line shows again (watchCoach).
+  var COACH_READ = 2000, COACH_STAY = 8000;
+  function coachSeen(c) {
+    clearTimeout(c.__tbSeenT); c.__tbSeenT = 0;
+    if (!c.classList.contains("is-do")) return;
+    c.classList.add("is-seen"); c.__tbSeen = c.textContent;
+  }
+  function coachUnseen(c) {
+    c.classList.remove("is-seen");
+    c.__tbShownAt = now();
+    clearTimeout(c.__tbSeenT);
+    c.__tbSeenT = setTimeout(function () { coachSeen(c); }, COACH_STAY);
+  }
+  document.addEventListener("pointerdown", function () {
     Array.prototype.forEach.call(document.querySelectorAll(".tb-coach.is-do:not(.is-seen)"), function (c) {
-      c.classList.add("is-seen"); c.__tbSeen = c.textContent;
+      var wait = (c.__tbShownAt || 0) + COACH_READ - now();
+      clearTimeout(c.__tbSeenT);
+      if (wait <= 0) coachSeen(c); else c.__tbSeenT = setTimeout(function () { coachSeen(c); }, wait);
     });
   }, true);
 
@@ -2005,6 +2026,8 @@
         carryEl.style.cssText = "position:absolute;left:" + (24 * s - c / 2) + "px;top:" + (18 * s - c / 2) + "px;width:" + c + "px;height:" + c + "px";
       }
       run = { p: p, s: s, t0: now(), dur: p.dur || (p.hold ? 3200 : (p.tap ? 2400 : 3200)) };
+      // He is stuck: the instruction that went away comes back with the hand.
+      Array.prototype.forEach.call(document.querySelectorAll(".tb-coach.is-do.is-seen"), function (c) { c.__tbSeen = null; coachUnseen(c); });
       call(o.onShow, p, true);
       requestAnimationFrame(frame);
     }
