@@ -137,7 +137,7 @@ light lab, flashlight cave, ice resurfacer, pottery wheel, stamps, weather, goo 
 Also set aside: the "learning" round (sawmill, sheep to sweater, recycling plant, crayon factory, beekeeping, water
 works, simple machines, word crane, coin machine). The dad: he likes learning, but not these ideas.
 **Brainstorm 2026-10-27** (ideas from anywhere, not only his interests): built **Glow Board** (he loves his light-up
-touch-button toy, a 10 x 10 grid of buttons). Liked, to plan next: an **ice cream or sandwich shop** with customers.
+touch-button toy, a 10 x 10 grid of buttons). Liked: an **ice cream or sandwich shop** with customers (**Ice Cream Shop built 2026-11-15**, `plans/ice-cream.md`).
 Open: a **busy board**, but only if it fits one screen (idea: a latch board of six doors, each with a real latch and
 a picture behind it, with New swapping the set); a **how things work** section, which may be too much separate design
 per item (cheaper ideas: see-through latches on the busy board, or a see-inside view of machines already drawn). Set

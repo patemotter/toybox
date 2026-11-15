@@ -34,6 +34,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Forge: a blacksmith's forge: crank the blower, heat a steel bar until it glows and hammer it on the anvil; make the copper coffee spoon, an S-hook or a fire poker | [`forge/`](forge/) |
 | Sweet Shop: a sweet shop counter for making gummies the real way: pour a flavor, tip in gelatin, heat and stir, fill a bear, worm or fruit mold with the candy dropper, chill it in the fridge, pop them out, coat them sour, sugary or shiny, and fill the candy jar (kept across visits) | [`sweet-shop/`](sweet-shop/) |
 | Drawing: a coloring book, free drawing and letter tracing (Color, Draw, Write); pages, glyphs and words in their own scripts | [`drawing/`](drawing/) |
+| Ice Cream Shop: customers come to the counter with an order in a speech bubble; put a cone or cup in the holder, scoop the flavors, add sauce, sprinkles or a cherry, and hand it over; script in `index.js` | [`ice-cream/`](ice-cream/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 

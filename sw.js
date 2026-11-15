@@ -354,7 +354,17 @@ const CORE = [
   "./drawing/icons/icon-180.png",
   "./drawing/icons/icon-192.png",
   "./drawing/icons/icon-512.png",
-  "./drawing/icons/icon-maskable-512.png"
+  "./drawing/icons/icon-maskable-512.png",
+
+  // Ice Cream Shop
+  "./ice-cream/",
+  "./ice-cream/index.html",
+  "./ice-cream/index.js",
+  "./ice-cream/manifest.webmanifest",
+  "./ice-cream/icons/icon-180.png",
+  "./ice-cream/icons/icon-192.png",
+  "./ice-cream/icons/icon-512.png",
+  "./ice-cream/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

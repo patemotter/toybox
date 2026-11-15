@@ -107,7 +107,13 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   else lives in a pull-out drawer on its edge (right in landscape, bottom when upright); no shelf; plan
   `plans/drawing.md` with its sources, script `drawing/index.js`, data in `drawing/pages.js`, `glyphs.js` and
   `words.js` (generated from `plans/drawing-word*.txt`), previews `tools/drawing-pages-preview.html` and
-  `tools/drawing-glyphs-preview.html`).
+  `tools/drawing-glyphs-preview.html`), ice-cream (shown as "Ice Cream Shop": customers, mostly people and sometimes an
+  animal, come to the counter one at a time with an order in a speech bubble, a picture plus words; he makes it by
+  hand: a cone or cup into the holder, scoops from six tubs, chocolate sauce, sprinkles or a cherry, then hands it
+  over. Each matching part gets a green tick in the bubble; something different is never wrong: the customer gently
+  says what they wanted, or is pleased with an extra, and always takes it happily. No paying, no counters; orders grow
+  from one plain scoop to three scoops and two toppings. New starts this ice cream again; the panel holds only New and
+  Surprise; plan `plans/ice-cream.md`, script `ice-cream/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
