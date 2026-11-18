@@ -108,12 +108,18 @@ history. Say "the child" or "he". The history was rewritten twice to remove it; 
   `plans/drawing.md` with its sources, script `drawing/index.js`, data in `drawing/pages.js`, `glyphs.js` and
   `words.js` (generated from `plans/drawing-word*.txt`), previews `tools/drawing-pages-preview.html` and
   `tools/drawing-glyphs-preview.html`), ice-cream (shown as "Ice Cream Shop": customers, mostly people and sometimes an
-  animal, come to the counter one at a time with an order in a speech bubble, a picture plus words; he makes it by
-  hand: a cone or cup into the holder, scoops from six tubs, chocolate sauce, sprinkles or a cherry, then hands it
-  over. Each matching part gets a green tick in the bubble; something different is never wrong: the customer gently
-  says what they wanted, or is pleased with an extra, and always takes it happily. No paying, no counters; orders grow
-  from one plain scoop to three scoops and two toppings. New starts this ice cream again; the panel holds only New and
-  Surprise; plan `plans/ice-cream.md`, script `ice-cream/index.js`).
+  animal, come to the counter one at a time with an order in a speech bubble, a picture plus words: a cone (or cup), a
+  sundae or a milkshake; every few customers one has no preference ("Anything you like, please!") and is happy with
+  whatever he makes. One shop, no job tabs (the dad, 2026-11-17): all four starts (cones, cups, sundae dishes, steel
+  milkshake cups) are always on the counter in the same places; he scoops from six tubs, a milkshake gets milk, goes on
+  the spindle mixer and is poured into a glass, toppings are whipped cream, chocolate sauce, sprinkles and a cherry.
+  Each matching part gets a green tick; something different is never wrong. The ice cream maker on the counter (the
+  family's freezer-bowl churn) is an option, never required: a tap zooms in (title "Ice Cream Shop · Ice Cream
+  Maker", a header Back button): frozen bowl out of the freezer, switch on, milk, cream, sugar and a flavor, watch it
+  churn, spoon it into a tub, carry the tub to the shop, where that tub is heaped up and customers ask for it. A step's
+  instruction pops up only until he has done it twice (`known` in `ice-cream-v1`, kept across visits); then the ring
+  alone shows it. The layout is computed from the stage's shape so the scene fills every screen. No paying, no
+  counters; New starts what is being made again; plan `plans/ice-cream.md`, script `ice-cream/index.js`).
   **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
   screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
   To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
