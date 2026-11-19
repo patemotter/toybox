@@ -48,8 +48,8 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const { ensureServer } = require('./serve');
 
-const port = process.env.PORT || 8120;
 const [W, H] = (process.env.SIZE || '1180x820').split('x').map(Number);
 const MOBILE = process.env.MOBILE === '1';
 const CONC = +(process.env.CONC || 3);
@@ -59,7 +59,7 @@ const MAXBTN = +(process.env.MAXBTN || 60);
 const VERBOSE = process.env.VERBOSE === '1';
 const SHOTS = process.env.SHOTS || '';
 const DOM_OK = process.env.DOM_OK === '1';  // count a DOM-only change as alive (the old, lenient rule)
-const BASE = `http://localhost:${port}/`;
+let BASE = '';
 
 function corePages() {
   const src = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
@@ -429,25 +429,32 @@ async function testPage(browser, helper, url) {
 }
 
 (async () => {
-  const browser = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
+  const srv = await ensureServer();
+  BASE = srv.url + '/';
+  let browser = null;
   const results = [];
   let i = 0;
-  async function worker() {
-    const hctx = await browser.newContext();
-    const helper = await hctx.newPage();
-    await helper.setContent('<html><body></body></html>');
-    while (i < pages.length) {
-      const url = pages[i++];
-      const r = await testPage(browser, helper, url);
-      results.push(r);
-      console.log(`${r.dead.length ? 'DEAD?' : 'ok   '} ${url || '(launcher)'}  tapped ${r.tapped}, alive ${r.alive}, links ${r.links}` +
-        (r.notReached.length ? `, not reached ${r.notReached.length}` : '') + (r.errs.length ? `  ERR ${r.errs.join(' | ')}` : '') +
-        (r.dead.length ? '  -> ' + r.dead.map(d => `[${d.label}]`).join(' ') : ''));
+  try {
+    browser = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
+    async function worker() {
+      const hctx = await browser.newContext();
+      const helper = await hctx.newPage();
+      await helper.setContent('<html><body></body></html>');
+      while (i < pages.length) {
+        const url = pages[i++];
+        const r = await testPage(browser, helper, url);
+        results.push(r);
+        console.log(`${r.dead.length ? 'DEAD?' : 'ok   '} ${url || '(launcher)'}  tapped ${r.tapped}, alive ${r.alive}, links ${r.links}` +
+          (r.notReached.length ? `, not reached ${r.notReached.length}` : '') + (r.errs.length ? `  ERR ${r.errs.join(' | ')}` : '') +
+          (r.dead.length ? '  -> ' + r.dead.map(d => `[${d.label}]`).join(' ') : ''));
+      }
+      await hctx.close();
     }
-    await hctx.close();
+    await Promise.all(Array.from({ length: Math.min(CONC, pages.length) }, worker));
+  } finally {
+    if (browser) await browser.close();
+    await srv.close();
   }
-  await Promise.all(Array.from({ length: Math.min(CONC, pages.length) }, worker));
-  await browser.close();
   results.sort((a, b) => pages.indexOf(a.url) - pages.indexOf(b.url));
   const rows = [];
   results.forEach(r => r.dead.forEach(d => rows.push([r.url, r.size, d.label, d.note, d.path])));

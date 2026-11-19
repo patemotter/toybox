@@ -1,0 +1,1902 @@
+// Script of kitchen/stove.html, loaded by a plain <script src> at the same place in the page.
+// Sections, in order (search for the title to jump to one):
+//   - Getting ready (once per visit, on the kitchen page)
+//   - Food
+//   - Small SVG pictures (panel tiles, the dragged thing, the ghost hand)
+//   - Saved state
+//   - Canvas and layout
+//   - The stove's state
+//   - Sound (off by default; soft and synthesized)
+//   - Coach and counter
+//   - Panel: what to cook, then the food or the toppings
+//   - Picking what to cook: the pan and the pot change places on the burner
+//   - The knob
+//   - Pancakes
+//   - The pot
+//   - Surprise: a fun moment on the scene, right now (the moments take turns)
+//   - New and Surprise
+//   - Touch on the stage
+//   - Particles
+//   - Update
+//   - Drawing
+//   - Pancakes
+//   - The pot
+//   - Timer
+//   - Ghost hand (Toybox.ghost)
+//   - Start
+(function () {
+  "use strict";
+
+  // ---------- Getting ready (once per visit, on the kitchen page) ----------
+  var readyOn = true;
+  try { readyOn = sessionStorage.getItem("kitchen-ready") === "on"; } catch (e) { readyOn = true; }
+  if (!readyOn) { location.replace("./?next=stove"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function ease(t) { t = clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function now() { return performance.now() / 1000; }
+  function wrapA(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var INK = "#1D2340", TAU = Math.PI * 2;
+
+  var STATEKEY = "kitchen-stove-v1";
+  // The kitchen table (his collection, kept across visits). Each entry: { k, c: "#rrggbb" (the food's color),
+  // s: "#rrggbb" (here: the last topping's color), t: ms timestamp }. This page adds "pancakes", "soup", "pasta".
+  var TABLEKEY = "kitchen-table-v1", TABLE_MAX = 12;
+
+  // ---------- Food ----------
+  var BATTER = "#F7E2A4", GOLD = "#D8963C", GOLD_LT = "#ECBE68";
+  var RECIPES = [{ id: "pancakes", name: "Pancakes" }, { id: "soup", name: "Soup" }, { id: "pasta", name: "Pasta" }];
+  // n: pieces in the pot; r: piece size; veg: makes it a soup.
+  var FOOD = {
+    carrot:    { name: "Carrot",    col: "#FF8A1F", n: 6,  r: 0.05,  veg: true },
+    peas:      { name: "Peas",      col: "#5DBB3F", n: 10, r: 0.026, veg: true },
+    corn:      { name: "Corn",      col: "#FFD23F", n: 10, r: 0.026, veg: true },
+    tomato:    { name: "Tomato",    col: "#E8352E", n: 5,  r: 0.055, veg: true },
+    potato:    { name: "Potato",    col: "#F1DC9C", n: 5,  r: 0.05,  veg: true },
+    spaghetti: { name: "Spaghetti", col: "#F2D27A", n: 7,  r: 0.085 },
+    shells:    { name: "Shells",    col: "#F2D27A", n: 7,  r: 0.045 },
+    bowties:   { name: "Bow ties",  col: "#F2D27A", n: 6,  r: 0.05 }
+  };
+  var SOUP_FOODS = ["carrot", "peas", "corn", "tomato", "potato"], PASTA_FOODS = ["spaghetti", "shells", "bowties"];
+  var TOPS = { syrup: { name: "Syrup", col: "#A8561C" }, butter: { name: "Butter", col: "#FFE27A" }, berries: { name: "Berries", col: "#4B4FA8" } };
+  var TOP_ORDER = ["syrup", "butter", "berries"];
+  var POT_MAX = 6, STACK_MAX = 5;
+
+  // ---------- Small SVG pictures (panel tiles, the dragged thing, the ghost hand) ----------
+  function sv(inner) { return '<svg viewBox="0 0 60 60" aria-hidden="true">' + inner + "</svg>"; }
+  var ST = ' stroke="#1D2340" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+  var ICON = {
+    pancakes: sv('<ellipse cx="30" cy="50" rx="26" ry="7" fill="#FFFFFF"' + ST + '/><path d="M8 44 L8 38 Q30 30 52 38 L52 44 Q30 52 8 44 Z" fill="#D8963C"' + ST + '/><path d="M8 36 L8 30 Q30 22 52 30 L52 36 Q30 44 8 36 Z" fill="#D8963C"' + ST + '/><path d="M8 28 L8 22 Q30 14 52 22 L52 28 Q30 36 8 28 Z" fill="#D8963C"' + ST + '/><ellipse cx="30" cy="22" rx="22" ry="6" fill="#ECBE68" stroke="none"/><path d="M22 18 L34 16 L38 20 L26 23 Z" fill="#FFE27A"' + ST + '/>'),
+    soup: sv('<path d="M10 22 L50 22 L47 50 Q30 56 13 50 Z" fill="#E63946"' + ST + '/><ellipse cx="30" cy="22" rx="20" ry="6" fill="#F4A340"' + ST + '/><circle cx="24" cy="21" r="3" fill="#FF8A1F" stroke="#1D2340" stroke-width="1.5"/><circle cx="35" cy="22" r="2.5" fill="#5DBB3F" stroke="#1D2340" stroke-width="1.5"/><rect x="2" y="26" width="9" height="5" rx="2.5" fill="#3B4256"' + ST + '/><rect x="49" y="26" width="9" height="5" rx="2.5" fill="#3B4256"' + ST + '/><path d="M22 12 Q19 8 22 4 M32 12 Q29 8 32 4" fill="none" stroke="#9AA5B8" stroke-width="2.5" stroke-linecap="round"/>'),
+    pasta: sv('<path d="M6 30 L54 30 Q52 52 30 54 Q8 52 6 30 Z" fill="#3DB4FF"' + ST + '/><path d="M12 30 Q14 14 30 14 Q46 14 48 30 Z" fill="#F2D27A"' + ST + '/><path d="M16 26 Q22 18 28 24 Q34 30 40 20 M18 22 Q26 14 34 22 Q38 26 44 24" fill="none" stroke="#C99A2E" stroke-width="2.2" stroke-linecap="round"/><circle cx="26" cy="20" r="4" fill="#E8352E" stroke="#1D2340" stroke-width="2"/>'),
+    carrot: sv('<path d="M8 54 Q26 38 42 18 Q50 12 50 22 Q36 40 8 54 Z" fill="#FF8A1F"' + ST + '/><path d="M24 40 L30 42 M32 32 L37 34 M18 46 L22 48" stroke="#C8600F" stroke-width="2.5" stroke-linecap="round"/><path d="M45 16 L52 4 M47 18 L58 12 M43 15 L42 4" stroke="#2EA05A" stroke-width="4.5" stroke-linecap="round"/>'),
+    peas: sv('<path d="M4 36 Q28 10 56 24 Q32 54 4 36 Z" fill="#8BD17C"' + ST + '/><circle cx="18" cy="33" r="6" fill="#4CAF3F" stroke="#1D2340" stroke-width="2"/><circle cx="30" cy="30" r="6" fill="#4CAF3F" stroke="#1D2340" stroke-width="2"/><circle cx="42" cy="28" r="6" fill="#4CAF3F" stroke="#1D2340" stroke-width="2"/>'),
+    corn: sv('<g transform="rotate(-35 30 30)"><path d="M30 6 Q42 12 42 32 Q42 50 30 54 Q18 50 18 32 Q18 12 30 6 Z" fill="#FFD23F"' + ST + '/><path d="M22 18 L38 18 M20 26 L40 26 M20 34 L40 34 M21 42 L39 42 M30 8 L30 52" stroke="#E0A800" stroke-width="2"/><path d="M18 36 Q10 46 22 56 Q24 46 24 40 Z" fill="#7ED957"' + ST + '/><path d="M42 36 Q50 46 38 56 Q36 46 36 40 Z" fill="#5DBB3F"' + ST + '/></g>'),
+    tomato: sv('<circle cx="30" cy="34" r="20" fill="#E8352E"' + ST + '/><path d="M20 16 L26 20 L30 13 L34 20 L40 16 L36 23 L24 23 Z" fill="#2EA05A"' + ST + '/><ellipse cx="22" cy="30" rx="4" ry="6" fill="rgba(255,255,255,0.4)"/>'),
+    potato: sv('<path d="M8 34 Q8 16 28 14 Q50 12 52 30 Q54 48 32 50 Q8 52 8 34 Z" fill="#D9B47A"' + ST + '/><circle cx="22" cy="28" r="2" fill="#8A5A2B"/><circle cx="36" cy="24" r="2" fill="#8A5A2B"/><circle cx="40" cy="38" r="2" fill="#8A5A2B"/><circle cx="24" cy="40" r="2" fill="#8A5A2B"/>'),
+    spaghetti: sv('<g stroke="#1D2340" stroke-width="5.5" stroke-linecap="round"><path d="M16 54 L38 6"/><path d="M22 56 L44 8"/><path d="M28 56 L48 12"/><path d="M12 50 L32 6"/></g><g stroke="#F2D27A" stroke-width="2.5" stroke-linecap="round"><path d="M16 54 L38 6"/><path d="M22 56 L44 8"/><path d="M28 56 L48 12"/><path d="M12 50 L32 6"/></g><path d="M16 36 L40 46" stroke="#1D2340" stroke-width="9" stroke-linecap="round"/><path d="M16 36 L40 46" stroke="#2D7BE5" stroke-width="5" stroke-linecap="round"/>'),
+    shells: sv('<path d="M30 52 Q8 44 10 24 Q14 8 30 8 Q46 8 50 24 Q52 44 30 52 Z" fill="#F2D27A"' + ST + '/><path d="M30 50 L18 16 M30 50 L30 10 M30 50 L42 16 M30 50 L12 30 M30 50 L48 30" stroke="#C99A2E" stroke-width="2.2" stroke-linecap="round"/>'),
+    bowties: sv('<path d="M30 30 L8 14 Q4 30 8 46 Z" fill="#F2D27A"' + ST + '/><path d="M30 30 L52 14 Q56 30 52 46 Z" fill="#F2D27A"' + ST + '/><rect x="25" y="24" width="10" height="12" rx="4" fill="#E8C35A"' + ST + '/><path d="M12 22 L20 26 M12 38 L20 34 M48 22 L40 26 M48 38 L40 34" stroke="#C99A2E" stroke-width="2" stroke-linecap="round"/>'),
+    syrup: sv('<rect x="22" y="2" width="16" height="9" rx="3" fill="#E63946"' + ST + '/><path d="M24 11 L36 11 L38 18 Q48 22 48 32 L48 52 Q48 57 43 57 L17 57 Q12 57 12 52 L12 32 Q12 22 22 18 Z" fill="#A8561C"' + ST + '/><rect x="16" y="32" width="28" height="14" rx="4" fill="#FFF1D6"' + ST + '/><path d="M24 39 Q30 34 36 39" fill="none" stroke="#A8561C" stroke-width="2.5" stroke-linecap="round"/>'),
+    butter: sv('<ellipse cx="30" cy="44" rx="26" ry="9" fill="#BFE3FF"' + ST + '/><path d="M14 38 L14 26 L36 20 L48 26 L48 38 L26 44 Z" fill="#FFD84D"' + ST + '/><path d="M14 26 L26 32 L48 26 M26 32 L26 44" fill="none"' + ST + '/>'),
+    berries: sv('<path d="M38 54 Q22 44 24 30 Q26 22 38 24 Q50 22 52 30 Q54 44 38 54 Z" fill="#E8344E"' + ST + '/><path d="M30 24 L34 18 L38 22 L42 18 L46 24 L38 27 Z" fill="#3E9B3A"' + ST + '/><circle cx="16" cy="40" r="9" fill="#4B4FA8"' + ST + '/><circle cx="18" cy="22" r="9" fill="#5458B8"' + ST + '/><circle cx="34" cy="38" r="1.6" fill="#FFE68A"/><circle cx="42" cy="34" r="1.6" fill="#FFE68A"/><circle cx="40" cy="44" r="1.6" fill="#FFE68A"/>')
+  };
+
+  // ---------- Saved state ----------
+  // recipe: what is on the stove. pc: the pancake in the pan ({ r size, x place in the pan, c1/c2 how cooked
+  // each side is, flipped }). stack: the pancakes on the plate, its toppings and whether it went to the table.
+  // pot: the food in the pot, how stirred (cooked) it is and the water level. bowl: the bowl being filled.
+  // nP / nB: pancakes and bowls made this visit.
+  function blankStack() { return { list: [], tops: [], done: false, t: 0 }; }
+  function blankBowl() { return { fill: 0, c: "", k: "", bits: [], done: false }; }
+  var S = { recipe: "pancakes", pc: null, stack: blankStack(), pot: { items: [], stir: 0, level: 1 }, bowl: blankBowl(), nP: 0, nB: 0 };
+  function okCol(c) { return /^#[0-9a-fA-F]{6}$/.test(c || ""); }
+  function load() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(STATEKEY) || "null"); } catch (e) { o = null; }
+    if (!o || typeof o !== "object") return;
+    if (o.recipe === "pancakes" || o.recipe === "soup" || o.recipe === "pasta") S.recipe = o.recipe;
+    if (o.pc && typeof o.pc === "object") {
+      S.pc = { ph: "pan", r: clamp(+o.pc.r || 0.3, 0.2, 0.56), x: clamp(+o.pc.x || 0, -0.3, 0.3), c1: clamp(+o.pc.c1 || 0, 0, 1), c2: clamp(+o.pc.c2 || 0, 0, 1), flipped: !!o.pc.flipped };
+    }
+    if (o.stack && typeof o.stack === "object") {
+      var st = o.stack;
+      if (Array.isArray(st.list)) S.stack.list = st.list.filter(function (p) { return p && typeof p === "object"; }).slice(0, STACK_MAX).map(function (p) { return { r: clamp(+p.r || 0.3, 0.2, 0.56), j: clamp(+p.j || 0, -0.05, 0.05) }; });
+      if (Array.isArray(st.tops)) st.tops.forEach(function (id) { if (TOPS[id] && S.stack.tops.indexOf(id) < 0) S.stack.tops.push(id); });
+      S.stack.done = !!st.done && S.stack.list.length > 0;
+      S.stack.t = +st.t || 0;
+    }
+    if (o.pot && typeof o.pot === "object") {
+      if (Array.isArray(o.pot.items)) S.pot.items = o.pot.items.filter(function (id) { return FOOD[id]; }).slice(0, POT_MAX);
+      S.pot.stir = clamp(+o.pot.stir || 0, 0, 1);
+      S.pot.level = clamp(o.pot.level == null ? 1 : +o.pot.level || 0, 0.2, 1);
+    }
+    if (o.bowl && typeof o.bowl === "object") {
+      var b = o.bowl;
+      S.bowl = { fill: clamp(+b.fill || 0, 0, 1), c: okCol(b.c) ? b.c : "", k: b.k === "pasta" ? "pasta" : "soup", bits: Array.isArray(b.bits) ? b.bits.filter(function (id) { return FOOD[id]; }).slice(0, 12) : [], done: !!b.done };
+      if (!S.bowl.c) S.bowl.fill = 0;
+    }
+    S.nP = Math.max(0, Math.floor(+o.nP || 0));
+    S.nB = Math.max(0, Math.floor(+o.nB || 0));
+  }
+  var saveT = 0;
+  function save() {
+    clearTimeout(saveT);
+    saveT = setTimeout(function () {
+      var pc = S.pc && S.pc.ph !== "pour" ? { r: +S.pc.r.toFixed(3), x: +S.pc.x.toFixed(3), c1: +S.pc.c1.toFixed(3), c2: +S.pc.c2.toFixed(3), flipped: S.pc.flipped } : null;
+      if (S.pc && S.pc.ph === "pour") pc = { r: Math.max(0.24, S.pc.r), x: S.pc.x, c1: 0, c2: 0, flipped: false };
+      try {
+        localStorage.setItem(STATEKEY, JSON.stringify({ v: 1, recipe: S.recipe, pc: pc, stack: S.stack, pot: { items: S.pot.items, stir: +S.pot.stir.toFixed(3), level: +S.pot.level.toFixed(3) }, bowl: S.bowl, nP: S.nP, nB: S.nB }));
+      } catch (e) { /* ignore */ }
+    }, 200);
+  }
+  if (window.Toybox && Toybox.fresh()) { try { localStorage.removeItem(STATEKEY); } catch (e) { /* ignore */ } }
+  else load();
+  function readTable() {
+    var arr = [];
+    try { arr = JSON.parse(localStorage.getItem(TABLEKEY) || "[]"); } catch (e) { arr = []; }
+    return Array.isArray(arr) ? arr : [];
+  }
+  function writeTable(arr) {
+    while (arr.length > TABLE_MAX) arr.shift();
+    try { localStorage.setItem(TABLEKEY, JSON.stringify(arr)); } catch (e) { /* ignore */ }
+  }
+  function addToTable(entry) { var arr = readTable(); arr.push(entry); writeTable(arr); }
+  // A topping added after the stack went to the table: the same plate on the table gets it too.
+  function updateTable(t, s) {
+    var arr = readTable();
+    for (var i = arr.length - 1; i >= 0; i--) if (arr[i] && arr[i].t === t && arr[i].k === "pancakes") { arr[i].s = s; writeTable(arr); return; }
+  }
+
+  // ---------- Canvas and layout ----------
+  // The scene is drawn in "stove units": B px each, origin at the middle of the cooktop's front edge, y down.
+  // The cooktop runs from y = BACK (the wall) to 0; the stove's front with the knob is below 0.
+  var stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+  var cw = 300, ch = 300, dpr = 1, B = 100, ox = 150, oy = 250, LW = 0.03;
+  var X_L = -1.48, X_R = 1.47, H_UP = 1.8, H_DN = 0.62, tall = false, phone = false;
+  var BACK = -0.7;
+  var PAN = { x: 0, y: -0.42, rx: 0.6, ry: 0.2, fx: 0.52, fy: 0.172 };
+  var POT = { x: 0, ty: -1.02, by: -0.36, rx: 0.5, ry: 0.16 };
+  var BURN = { x: 0, y: -0.2 };
+  var KNOB = { x: 0, y: 0.27, r: 0.15 }, KNOB_SWEEP = 3.6;
+  var JUG = { x: -1.12, y: -0.2 };          // where the jug stands (bottom middle)
+  var PLATE = { x: 1.08, y: -0.2, rx: 0.38, ry: 0.125 };
+  var BOWL = { x: 1.08, y: -0.16, rx: 0.34, ry: 0.11 };
+  var RAIL = { x: 1.06, y: -1.32 };
+  var FAUCET = { x: -0.14, y: -1.4 };      // the pot filler's spout
+  function layout() {
+    var r = stage.getBoundingClientRect();
+    cw = Math.max(50, r.width); ch = Math.max(50, r.height);
+    tall = ch > cw * 1.08;
+    // Wide stages reach up to the pot filler's lever and down past the oven door's window, so the whole stove shows.
+    H_UP = tall ? 2.3 : 1.8;
+    // Upright stages: the batter jug waits on a little wall shelf and the plate stands closer to the stove,
+    // so the scene is narrower and everything can be bigger.
+    JUG.x = tall ? -0.62 : -1.08; JUG.y = tall ? -1.4 : -0.2;
+    PLATE.x = BOWL.x = tall ? 0.99 : 1.08; RAIL.x = tall ? 0.98 : 1.06;
+    X_L = tall ? -1.02 : -1.48; X_R = tall ? 1.4 : 1.47;
+    JUG_HOME.x = JUG.x; JUG_HOME.y = JUG.y - 0.27;
+    if (jug.st === "home") { jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; }
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    phone = Math.min(innerWidth, innerHeight) < 560;
+    // On phones the coach line sits at the bottom of the stage: leave room so it doesn't cover the knob.
+    var dn = H_DN + (phone ? (tall ? 0.3 : 0.22) : 0);
+    if (!tall) dn = Math.max(dn, 1.3);
+    B = Math.min((cw - 12) / (X_R - X_L), (ch - 10) / (H_UP + dn));
+    B = Math.max(30, Math.min(B, 400));
+    ox = cw / 2 - B * (X_L + X_R) / 2;
+    var spare = ch - B * (H_UP + dn);
+    oy = ch - B * dn - Math.max(0, spare) * 0.4;
+    LW = 3.4 / B;
+  }
+  function toLocal(px, py) { var r = cv.getBoundingClientRect(); return { x: (px - r.left - ox) / B, y: (py - r.top - oy) / B }; }
+  function toPage(x, y) { var r = cv.getBoundingClientRect(); return [r.left + ox + x * B, r.top + oy + y * B]; }
+
+  // ---------- The stove's state ----------
+  // Knob: v 0 (off) .. 1 (high). flame: the flames' size (smoothed). hot: how hot the pan or pot is.
+  var K = { v: 0, anim: null, drag: null, flashUntil: 0, wig: 0, tries: 0 };
+  var flame = 0, hot = 0;
+  function on() { return K.v > 0.08; }
+  var swap = null;               // the pan and pot changing places: { from, to, t0, dur }
+  var jug = { x: JUG.x, y: JUG.y - 0.27, tilt: 0, st: "home", auto: null, from: null, t0: 0, wig: 0, pouring: false };
+  var JUG_HOME = { x: JUG.x, y: JUG.y - 0.27 };
+  var plate = { off: 0, wig: 0 }, bowlV = { off: 0, wig: 0 };
+  var away = null;               // the finished plate or bowl sliding off to the table: { which, t0, dur, swapped }
+  // Tools: drawn where they are; when nobody holds them they glide back to their hooks on the rail.
+  var spat = { x: 0, y: 0, a: Math.PI, held: false, until: 0 };
+  var ladle = { x: 0, y: 0, a: 0, st: "home", full: false, t0: 0, from: null, path: null, wig: 0 };
+  var spoon = { x: 0.24, y: 0, a: 0.5, drag: false, wig: 0 };
+  var faucet = { run: null };
+  var pieces = [];               // food in the pot: { id, rho, phi, bob, rot, fy, vy }
+  var potBub = [], ripples = [];
+  var potSwirl = 0;
+  var tops = {};                 // topping animations: id -> start time
+  var parts = [];                // sparkles, drops and steam (scene coords)
+  var sayUntil = 0, sayCut = false;
+  function spatHome() { return { x: RAIL.x - 0.17, y: RAIL.y + 0.62, a: Math.PI }; }
+  function ladleHome() { return { x: RAIL.x + 0.17, y: RAIL.y + 0.6, a: 0 }; }
+  (function () { var h = spatHome(); spat.x = h.x; spat.y = h.y; h = ladleHome(); ladle.x = h.x; ladle.y = h.y; })();
+
+  function isPan() { return S.recipe === "pancakes"; }
+  function wareNow() { if (swap) return (now() - swap.t0) / swap.dur < 0.5 ? swap.from : swap.to; return isPan() ? "pan" : "pot"; }
+  function waterY() { return POT.ty + 0.07 + (1 - S.pot.level) * 0.4; }
+  function cooked() { return S.pot.items.length > 0 && S.pot.stir >= 1; }
+  function hasVeg() { for (var i = 0; i < S.pot.items.length; i++) if (FOOD[S.pot.items[i]].veg) return true; return false; }
+  function pcReady1() { var pc = S.pc; return pc && pc.ph === "pan" && !pc.flipped && pc.c1 >= 1; }
+  function pcReady2() { var pc = S.pc; return pc && pc.ph === "pan" && pc.c1 >= 1 && pc.c2 >= 1; }
+  function stackFull() { return S.stack.list.length >= STACK_MAX && !S.stack.done; }
+  function canPour() { return !S.pc && jug.st === "home" && !stackFull() && !swap; }
+
+  function phase() {
+    if (isPan()) {
+      var pc = S.pc;
+      if (pc) {
+        if (pc.ph === "pour") return "pouring";
+        if (pc.ph === "fly") return "fly";
+        if (pc.ph === "carry" || pc.ph === "toplate") return "carry";
+        if (pc.c1 >= 1 && pc.c2 >= 1) return "plate";
+        if (!on()) return "knob";
+        if (!pc.flipped) return pc.c1 >= 1 ? "flip" : "bubbles";
+        return "cook2";
+      }
+      if (jug.st === "auto") return "pouring";
+      if (S.stack.list.length && !S.stack.done && (S.stack.list.length >= 3)) return "top";
+      if (!on()) return "knob";
+      if (S.stack.done) return "more";
+      return S.stack.list.length ? "again" : "pour";
+    }
+    if (ladle.st !== "home") return "ladling";
+    if (cooked()) return "fill";
+    if (!on()) return "knob";
+    if (!S.pot.items.length) return S.bowl.done ? "more" : "add";
+    if (hot < 0.55) return "heat";
+    return "stir";
+  }
+  function coachFor(ph) {
+    switch (ph) {
+      case "knob": return "Turn the knob!";
+      case "pour": case "pouring": return "Pour the batter!";
+      case "bubbles": return "Wait for the bubbles!";
+      case "flip": return "Flip it!";
+      case "fly": return "Wheee!";
+      case "cook2": return "Almost ready!";
+      case "plate": case "carry": return "Slide it onto the plate!";
+      case "again": return "Pour another one!";
+      case "top": return "Add a topping!";
+      case "more": return isPan() ? "Yum! Pour another one!" : "Yum! Cook some more!";
+      case "add": return S.recipe === "pasta" ? "Drop in the pasta!" : "Drop in some food!";
+      case "heat": return "Wait for the bubbles!";
+      case "stir": return "Stir the pot!";
+      case "fill": case "ladling": return "Fill the bowl!";
+    }
+    return "";
+  }
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  var master = null, masterCtx = null, loops = null, noiseBuf = null;
+  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; loops = null; noiseBuf = null; } return master; }
+  function noise(ac) {
+    if (noiseBuf) return noiseBuf;
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function tone(freq, dur, vol, type, slideTo, delay) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function puff(dur, vol, freq) {
+    // A soft filtered noise burst: the gas lighting, a flip whoosh.
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noise(ac); f.type = "lowpass"; f.frequency.value = freq || 700;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(out(ac)); s.start(t, Math.random()); s.stop(t + dur + 0.05);
+  }
+  function plop() { tone(rand(300, 420), 0.16, 0.05, "sine", 160); }
+  function click() { tone(900, 0.05, 0.04, "square", 600); tone(1100, 0.04, 0.03, "square", 700, 0.07); }
+  function pat() { tone(180, 0.12, 0.06, "sine", 110); }
+  function blub() { tone(rand(140, 220), 0.1, 0.018, "sine", rand(260, 340)); }
+  function pip() { tone(rand(1300, 1700), 0.05, 0.012, "sine", 900); }
+  function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
+  function gentle() { tone(330, 0.14, 0.04, "triangle", 300); }
+  // Loops: the gas hiss and the sizzle of batter in the pan.
+  function updateLoops(sizzle) {
+    var ac = Toybox.sound.ready();
+    if (!ac) { if (loops) { try { loops.gG.gain.value = 0; loops.sG.gain.value = 0; } catch (e) { /* ignore */ } } return; }
+    if (!loops || masterCtx !== ac) {
+      out(ac);
+      var mk = function (type, f0, q) {
+        var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+        s.buffer = noise(ac); s.loop = true; f.type = type; f.frequency.value = f0; f.Q.value = q; g.gain.value = 0;
+        s.connect(f); f.connect(g); g.connect(out(ac)); s.start();
+        return g;
+      };
+      loops = { gG: mk("lowpass", 500, 0.7), sG: mk("bandpass", 4200, 0.8) };
+    }
+    var t = ac.currentTime;
+    loops.gG.gain.setTargetAtTime(flame * 0.012, t, 0.1);
+    loops.sG.gain.setTargetAtTime(sizzle * 0.02, t, 0.15);
+  }
+
+  // ---------- Coach and counter ----------
+  var coachEl = $("coach"), coach = Toybox.coach(coachEl);
+  // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
+  // step line would cut it short in the shared coach.
+  function say(msg, ms) { ms = Math.max(3000, ms || 3000); sayUntil = Date.now() + ms; sayCut = false; coach.say(msg, ms / 1000); }
+  // Ends a running passing line; the next frame swaps it for the step line.
+  function hush() { if (Date.now() < sayUntil) sayCut = true; sayUntil = 0; }
+  function updateCoach() {
+    if (Date.now() >= sayUntil) {
+      var line = coachFor(phase());
+      // The shared coach can only end a passing line by clearing; skip it when the text stays the same.
+      if (sayCut && coach.text() !== line) coach.clear();
+      sayCut = false;
+      coach.step(line);
+    }
+  }
+
+  // ---------- Panel: what to cook, then the food or the toppings ----------
+  var choicesEl = $("choices"), choiceMode = "";
+  function renderChoices() {
+    var mode = S.recipe;
+    if (mode === choiceMode) return;
+    choiceMode = mode;
+    var h = "";
+    RECIPES.forEach(function (r) {
+      h += '<button class="btn tb-tile recipe" data-recipe="' + r.id + '" aria-pressed="' + (r.id === S.recipe) + '" aria-label="Cook ' + r.name + '">' + ICON[r.id] + "<span>" + r.name + "</span></button>";
+    });
+    if (mode === "pancakes") TOP_ORDER.forEach(function (id) { h += '<button class="btn tb-tile" data-top="' + id + '" aria-label="' + TOPS[id].name + '">' + ICON[id] + "<span>" + TOPS[id].name + "</span></button>"; });
+    else (mode === "pasta" ? PASTA_FOODS : SOUP_FOODS).forEach(function (id) { h += '<button class="btn tb-tile" data-food="' + id + '" aria-label="' + FOOD[id].name + '">' + ICON[id] + "<span>" + FOOD[id].name + "</span></button>"; });
+    choicesEl.innerHTML = h;
+  }
+
+  // Dragging a tile out of the panel: a floating copy follows the finger; let go anywhere on the
+  // stage and it goes in (the pot, or onto the pancakes). A tap sends it in too.
+  var tileDrags = {};
+  function floatAt(el, x, y, sc) { el.style.transform = "translate(" + (x - 42) + "px," + (y - 42) + "px) scale(" + (sc || 1) + ")"; }
+  function flyFloat(el, x0, y0, x1, y1, ms, cb) {
+    var t0 = performance.now();
+    (function step(t) {
+      var k = Math.min(1, (t - t0) / ms), e = ease(k);
+      floatAt(el, lerp(x0, x1, e), lerp(y0, y1, e) - Math.sin(k * Math.PI) * 40, 1 - 0.2 * k);
+      if (k < 1) requestAnimationFrame(step); else { if (el.parentNode) el.parentNode.removeChild(el); if (cb) cb(); }
+    })(t0);
+  }
+  choicesEl.addEventListener("pointerdown", function (e) {
+    var b = e.target.closest && e.target.closest(".tb-tile");
+    if (!b || locked()) return;
+    e.preventDefault();
+    var rid = b.getAttribute("data-recipe");
+    if (rid) { pickRecipe(rid); return; }
+    try { b.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var f = document.createElement("div");
+    f.className = "float";
+    f.innerHTML = b.querySelector("svg").outerHTML;
+    f.style.display = "none";
+    document.body.appendChild(f);
+    tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, food: b.getAttribute("data-food"), top: b.getAttribute("data-top") };
+    tone(620, 0.08, 0.03, "sine", 820);
+  });
+  function tileMove(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 10) { d.moved = true; d.f.style.display = ""; d.b.classList.add("picked"); }
+    if (d.moved) floatAt(d.f, e.clientX, e.clientY - 20, 1.1);
+  }
+  function tileUp(e) {
+    var d = tileDrags[e.pointerId];
+    if (!d) return;
+    delete tileDrags[e.pointerId];
+    d.b.classList.remove("picked");
+    var r = stage.getBoundingClientRect();
+    var onStage = e.type !== "pointercancel" && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    var br = d.b.getBoundingClientRect(), x0 = d.moved ? e.clientX : br.left + br.width / 2, y0 = d.moved ? e.clientY - 20 : br.top + br.height / 2;
+    d.f.style.display = "";
+    var back = function (ms) { flyFloat(d.f, x0, y0, br.left + br.width / 2, br.top + br.height / 2, ms || 300); };
+    if (locked() || (d.moved && !onStage) || swap) { back(); return; }
+    if (d.food) dropFood(d.food, d.f, x0, y0, back);
+    else if (d.top) dropTop(d.top, d.f, x0, y0, back);
+  }
+  choicesEl.addEventListener("pointermove", tileMove);
+  choicesEl.addEventListener("pointerup", tileUp);
+  choicesEl.addEventListener("pointercancel", tileUp);
+  choicesEl.addEventListener("click", function (e) { e.preventDefault(); });
+
+  // ---------- Picking what to cook: the pan and the pot change places on the burner ----------
+  function pickRecipe(id) {
+    if (id === S.recipe || swap) { if (id === S.recipe) plate.wig = 0.6; return; }
+    var from = isPan() ? "pan" : "pot", to = id === "pancakes" ? "pan" : "pot";
+    cancelDrags();
+    S.recipe = id;
+    if (from !== to) { swap = { from: from, to: to, t0: now(), dur: reduce ? 0.2 : 1.1 }; tone(520, 0.12, 0.035, "sine", 700); }
+    else tone(700, 0.08, 0.03, "sine", 900);
+    learned("recipe");
+    hush();
+    save();
+  }
+  function cancelDrags() {
+    Object.keys(stageDrags).forEach(function (k) { stageUp({ pointerId: +k, type: "pointercancel" }); });
+    stageDrags = {};
+  }
+
+  // ---------- The knob ----------
+  function knobTo(v) {
+    var was = on();
+    K.anim = { from: K.v, to: v, t0: now(), dur: reduce ? 0.1 : 0.45 };
+    click();
+    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); learned("knob"); if (coach.text() === "Turn on the stove!") hush(); }
+  }
+  // Two-step rule: cooking with the stove off says "Turn on the stove!" and flashes the knob;
+  // the second try turns it on for him.
+  function needHeat() {
+    if (on()) return true;
+    K.tries++;
+    if (K.tries >= 2) { K.tries = 0; hush(); knobTo(0.75); return true; }
+    say("Turn on the stove!");
+    K.flashUntil = now() + 3; K.wig = 1;
+    gentle();
+    return false;
+  }
+  function knobAngle(p) { return Math.atan2(p.x - KNOB.x, -(p.y - KNOB.y)); }
+
+  // ---------- Pancakes ----------
+  function makeBubbles() {
+    var b = [];
+    for (var i = 0; i < 18; i++) {
+      var a = rand(0, TAU), d = Math.sqrt(Math.random()) * 0.78, ap = rand(0.06, 0.5);
+      b.push({ u: Math.cos(a) * d, v: Math.sin(a) * d, a: ap, p: Math.min(0.95, ap + rand(0.18, 0.45)), s: rand(0.6, 1.25), popped: false });
+    }
+    return b;
+  }
+  function newPancake(x) {
+    S.pc = { ph: "pour", r: 0.05, x: x, c1: 0, c2: 0, flipped: false, z: 0, th: 0, bub: makeBubbles(), wig: 0, sqT: -9 };
+    if (S.stack.done) sendAway("plate");
+    learned("pour");
+  }
+  function fitPc() { var pc = S.pc; var m = Math.max(0, PAN.fx - pc.r - 0.01); pc.x = clamp(pc.x, -m, m); }
+  function jugSpout() {
+    var a = jug.tilt * 1.55, c = Math.cos(a), s = Math.sin(a), sx = 0.2, sy = -0.27;
+    return { x: jug.x + sx * c - sy * s, y: jug.y + sx * s + sy * c };
+  }
+  function overPan(sp) { return Math.abs(sp.x - PAN.x) < PAN.fx - 0.04 && sp.y < PAN.y + 0.12 && sp.y > PAN.y - 1.6; }
+  function autoPour(target) {
+    if (!canPour()) return;
+    jug.st = "auto"; jug.t0 = now(); jug.from = { x: jug.x, y: jug.y }; jug.auto = { target: target, done: false, tUn: 0 };
+  }
+  function launch(s, magic) {
+    var pc = S.pc;
+    if (!pc || (pc.ph !== "pan" && pc.ph !== "lift")) return;
+    var h = 0.45 + 1.0 * s, turns = s > 0.5 ? 3 : 1, dur = 0.9 + 0.5 * s;
+    if (magic) {
+      // Surprise: as high as the kitchen goes, with lots of spins.
+      h = Math.max(1.1, oy / B + PAN.y - 0.45 - (pc.z || 0)); turns = 6; dur = reduce ? 1 : 2.6;
+    }
+    if (reduce && !magic) { dur = 0.6; }
+    pc.fly = { t0: now(), dur: dur, h: h, turns: turns, z0: pc.z || 0, x0: pc.x, x1: clamp(pc.x * 0.6 + rand(-0.04, 0.04), -0.2, 0.2), magic: !!magic, wasFlipped: pc.flipped };
+    pc.ph = "fly";
+    spat.held = false; spat.until = now() + 0.7;
+    puff(0.35, 0.03 + 0.03 * s, 1200);
+    tone(400, 0.3 + s * 0.3, 0.03, "sine", 900);
+    if (!magic) learned("flip");
+  }
+  function landPancake() {
+    var pc = S.pc, f = pc.fly;
+    pc.ph = "pan"; pc.z = 0; pc.th = 0; pc.x = f.x1;
+    if (!f.magic) pc.flipped = !pc.flipped;
+    pc.fly = null; pc.sqT = now();
+    fitPc();
+    pat();
+    burst(PAN.x + pc.x, PAN.y, f.magic ? 22 : 8, f.magic ? null : "#FFF3C4", f.magic);
+    save();
+  }
+  function stackTopY() { return PLATE.y - 0.03 - S.stack.list.length * 0.052; }
+  function toPlate() {
+    var pc = S.pc;
+    if (!pc) return;
+    var x0 = pc.ph === "carry" ? pc.wx : PAN.x + pc.x, y0 = pc.ph === "carry" ? pc.wy : PAN.y;
+    pc.ph = "toplate";
+    pc.to = { t0: now(), dur: reduce ? 0.2 : 0.6, x0: x0, y0: y0 };
+    spat.held = true;
+    learned("plate");
+  }
+  function addToStack() {
+    var pc = S.pc;
+    S.stack.list.push({ r: pc.r, j: rand(-0.025, 0.025) });
+    S.pc = null;
+    S.nP++;
+    pat(); tone(520, 0.12, 0.03, "sine", 780, 0.05);
+    burst(PLATE.x, stackTopY(), 10, null, true);
+    spat.held = false; spat.until = now() + 0.3;
+    save();
+  }
+  function dropTop(id, floatEl, x0, y0, back) {
+    if (!isPan()) { back(); return; }
+    if (!S.stack.list.length) { say("Make a pancake first!"); plate.wig = 1; back(320); return; }
+    var top = toPage(PLATE.x, stackTopY() - 0.35);
+    flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 380, function () { addTop(id); });
+  }
+  function addTop(id) {
+    if (!S.stack.list.length || !TOPS[id]) return;
+    if (S.stack.tops.indexOf(id) >= 0) { burst(PLATE.x, stackTopY() - 0.1, 10, null, true); tone(880, 0.12, 0.03); return; }
+    S.stack.tops.push(id);
+    tops[id] = now();
+    learned("top");
+    if (id === "berries") { plop(); setTimeout(plop, 120); } else if (id === "butter") pat(); else tone(300, 0.6, 0.03, "sine", 200);
+    if (!S.stack.done) {
+      S.stack.done = true; S.stack.t = Date.now();
+      addToTable({ k: "pancakes", c: GOLD, s: TOPS[id].col, t: S.stack.t });
+      if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
+      setTimeout(chime, 500);
+      for (var i = 0; i < 3; i++) setTimeout(function () { burst(PLATE.x, stackTopY() - 0.1, 14, null, true); }, 600 + i * 260);
+    } else updateTable(S.stack.t, TOPS[id].col);
+    save();
+  }
+  function sendAway(which) {
+    if (away) { finishAway(); }
+    away = { which: which, t0: now(), dur: reduce ? 0.3 : 1.6, swapped: false };
+  }
+  function finishAway() {
+    if (!away) return;
+    if (!away.swapped) { if (away.which === "plate") S.stack = blankStack(); else S.bowl = blankBowl(); tops = {}; }
+    away = null; plate.off = 0; bowlV.off = 0;
+    save();
+  }
+
+  // ---------- The pot ----------
+  function addPieces(id, falling) {
+    var g = FOOD[id];
+    for (var i = 0; i < g.n; i++) {
+      pieces.push({ id: id, rho: Math.sqrt(Math.random()) * 0.85, phi: rand(0, TAU), bob: rand(0, TAU), rot: rand(0, TAU), spin: rand(-1, 1),
+        fy: falling ? -rand(0.5, 0.75) - i * 0.04 : 0, vy: 0, r: g.r * rand(0.85, 1.15), soft: falling ? 0 : 1 });
+    }
+  }
+  function rebuildPieces() { pieces = []; S.pot.items.forEach(function (id) { addPieces(id, false); }); }
+  function dropFood(id, floatEl, x0, y0, back) {
+    if (isPan()) { back(); return; }
+    if (S.pot.items.length >= POT_MAX) { say(cooked() ? "The pot is full! Fill the bowl!" : "The pot is full! Stir it!"); spoon.wig = 1; back(320); return; }
+    if (ladle.st !== "home") { back(); return; }
+    var top = toPage(POT.x, POT.ty - 0.3);
+    flyFloat(floatEl, x0, y0, top[0], top[1], reduce ? 120 : 360, function () { putFood(id); });
+    learned("add");
+  }
+  function putFood(id) {
+    if (S.pot.items.length >= POT_MAX || isPan()) return;
+    if (S.bowl.done) sendAway("bowl");
+    S.pot.items.push(id);
+    addPieces(id, true);
+    if (S.pot.stir >= 1) S.pot.stir = 0.6;
+    save();
+  }
+  function potColor() {
+    // The water takes the color of the vegetables as it cooks; pasta water just goes a little cloudy.
+    var acc = [0, 0, 0], n = 0;
+    S.pot.items.forEach(function (id) { if (FOOD[id].veg) { var c = hex(FOOD[id].col); acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; } });
+    var water = "#BFE6FF", k = clamp(S.pot.stir, 0, 1);
+    if (!n) return S.pot.items.length ? mixHex(water, "#EDEBD2", 0.3 + 0.5 * k) : water;
+    var avg = acc.map(function (v) { return v / n; }), m = (avg[0] + avg[1] + avg[2]) / 3;
+    var veg = toHex(avg.map(function (v) { return m + (v - m) * 1.5 + 12; }));
+    return mixHex(water, veg, 0.25 + 0.6 * k);
+  }
+  function runFaucet(fill) {
+    if (faucet.run) return;
+    faucet.run = { t0: now(), dur: reduce ? 0.5 : (fill ? 2.2 : 0.9), from: S.pot.level, fill: !!fill };
+    tone(500, 0.08, 0.03, "sine", 650);
+  }
+  // Ladle: fill it in the pot, pour it in the bowl. Two ladles fill the bowl.
+  function ladleTo(path) { ladle.path = path; ladle.pi = 0; ladle.t0 = now(); ladle.from = { x: ladle.x, y: ladle.y, a: ladle.a }; }
+  // Over the bowl, handle up toward the pot, tipped so the soup runs out of the near lip.
+  function ladlePourAt() { return { x: BOWL.x + 0.1, y: BOWL.y - 0.47, a: -1.05 }; }
+  function startLadlePour() {
+    ladle.st = "pour";
+    ladleTo([{ p: ladlePourAt(), dur: 0.4 }, { p: ladlePourAt(), dur: 0.9, pour: true }, { p: ladleHome(), dur: 0.7, home: true }]);
+  }
+  function autoLadle() {
+    if (!cooked() || ladle.st !== "home") return;
+    ladle.st = "auto";
+    var dip = { x: POT.x + 0.12, y: waterY() + 0.02, a: -0.35 };
+    ladleTo([{ p: { x: dip.x, y: POT.ty - 0.35, a: -0.35 }, dur: 0.6 }, { p: dip, dur: 0.35, dip: true }, { p: { x: BOWL.x - 0.2, y: POT.ty - 0.2, a: -0.35 }, dur: 0.6 },
+      { p: ladlePourAt(), dur: 0.4 }, { p: ladlePourAt(), dur: 0.9, pour: true }, { p: ladleHome(), dur: 0.7, home: true }]);
+    learned("fill");
+  }
+  function ladleScoop() {
+    if (ladle.full) return;
+    ladle.full = true;
+    var x = ladle.x, y = waterY();
+    ripples.push({ x: x, y: y, t0: now() });
+    for (var i = 0; i < 5; i++) drip(x, y, potColor());
+    plop();
+  }
+  function pourIntoBowl() {
+    // One ladle of soup lands in the bowl.
+    if (!ladle.full) return;
+    ladle.full = false;
+    if (!S.bowl.c) { S.bowl.c = hasVeg() ? potColor() : "#F2D27A"; S.bowl.k = hasVeg() ? "soup" : "pasta"; }
+    var fl = S.bowl.fill;
+    S.bowl.fill = Math.min(1, fl + 0.5);
+    // A few pieces of food go along.
+    for (var i = 0; i < 4 && pieces.length; i++) {
+      var k = Math.floor(Math.random() * pieces.length);
+      S.bowl.bits.push(pieces[k].id); pieces.splice(k, 1);
+    }
+    while (S.bowl.bits.length > 12) S.bowl.bits.shift();
+    S.pot.level = Math.max(0.25, S.pot.level - 0.37);
+    burst(BOWL.x, BOWL.y - 0.2, 5, S.bowl.c);
+    plop();
+    if (S.bowl.fill >= 0.999) finishBowl();
+    save();
+  }
+  function finishBowl() {
+    S.bowl.done = true;
+    S.nB++;
+    addToTable({ k: S.bowl.k || "soup", c: S.bowl.c || "#F4A340", s: "", t: Date.now() });
+    if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
+    chime();
+    for (var i = 0; i < 3; i++) setTimeout(function () { burst(BOWL.x, BOWL.y - 0.25, 14, null, true); }, i * 260);
+    S.pot.items = []; S.pot.stir = 0; pieces = [];
+    setTimeout(function () { if (!isPan() && S.pot.level < 0.99) runFaucet(true); }, reduce ? 200 : 1300);
+    say("Yum! Cook some more!", 4000);
+    save();
+  }
+
+  // ---------- Surprise: a fun moment on the scene, right now (the moments take turns) ----------
+  // FUN.cur[kind] = { t0, dur } while a moment plays. Nothing here changes his food or his progress.
+  var FUN = { cur: {}, last: "", i: 0 }, MAMP = reduce ? 0.35 : 1;
+  function funStart(kind, dur) { FUN.cur[kind] = { t0: now(), dur: dur }; FUN.last = kind; }
+  function funK(kind) {
+    var m = FUN.cur[kind];
+    if (!m) return -1;
+    var k = (now() - m.t0) / m.dur;
+    if (k >= 1) { delete FUN.cur[kind]; return -1; }
+    return k;
+  }
+  function funEnv(k, a) { a = a || 0.12; return k < 0 ? 0 : clamp(Math.min(k / a, (1 - k) / a), 0, 1); }
+  // The next moment in turn that can happen now; the one just played only when nothing else can.
+  function funPick(order, ok) {
+    for (var pass = 0; pass < 2; pass++) {
+      for (var j = 0; j < order.length; j++) {
+        var id = order[(FUN.i + j) % order.length];
+        if (FUN.cur[id] || (!pass && id === FUN.last) || !ok(id)) continue;
+        FUN.i = (FUN.i + j + 1) % order.length;
+        return id;
+      }
+    }
+    return "";
+  }
+
+  // ---------- New and Surprise ----------
+  function newCook() {
+    if (locked()) return;
+    cancelDrags();
+    if (isPan()) {
+      if (S.pc && S.pc.ph !== "fly") { burst(PAN.x + S.pc.x, PAN.y, 10, "#FFF3C4"); S.pc = null; }
+      else if (S.pc) S.pc = null;
+      jug.st = jug.st === "home" ? "home" : "back"; jug.t0 = now(); jug.from = { x: jug.x, y: jug.y }; jug.auto = null; jug.pouring = false;
+      if (S.stack.done) sendAway("plate");
+      else if (S.stack.list.length) { burst(PLATE.x, stackTopY(), 12, "#ECBE68"); S.stack = blankStack(); tops = {}; }
+    } else {
+      pieces.forEach(function (p, i) { if (i % 3 === 0) burst(POT.x + Math.cos(p.phi) * p.rho * 0.35, waterY(), 1, FOOD[p.id].col); });
+      pieces = []; S.pot.items = []; S.pot.stir = 0;
+      ladle.full = false; if (ladle.st !== "home") { ladle.st = "back"; ladleTo([{ p: ladleHome(), dur: 0.5, home: true }]); }
+      if (S.bowl.done) sendAway("bowl");
+      else if (S.bowl.fill > 0) { burst(BOWL.x, BOWL.y - 0.2, 10, S.bowl.c || "#FFFFFF"); S.bowl = blankBowl(); }
+      if (S.pot.level < 0.99) runFaucet(true);
+    }
+    K.tries = 0; hush();
+    save();
+    tone(500, 0.2, 0.04, "sine", 300);
+  }
+  // Stove moments. The pan: the magic flip (the pancake spins way up and lands the same side up, so it
+  // changes nothing), the tools swing on the rail. The pot: the lid rattles and pops up with a puff of
+  // steam; big bubbles burble up and float away.
+  var FUN_ORDER = ["flip", "lid", "bubbles", "swing"];
+  function toolsHome() {
+    var pc = S.pc, h = spatHome();
+    return ladle.st === "home" && !spat.held && Math.abs(spat.x - h.x) < 0.02 && Math.abs(spat.y - h.y) < 0.02 && !(pc && (pc.ph === "lift" || pc.ph === "carry" || pc.ph === "toplate"));
+  }
+  function funOk(id) {
+    if (swap) return false;
+    if (id === "flip") return isPan() && !!S.pc && S.pc.ph === "pan";
+    if (id === "lid") return !isPan() && ladle.st === "home" && !spoon.drag;
+    if (id === "bubbles") return !isPan();
+    if (id === "swing") return toolsHome();
+    return true;
+  }
+  function surprise() {
+    if (locked() || swap) return;
+    var id = funPick(FUN_ORDER, funOk);
+    if (!id) { burst(isPan() ? PAN.x : POT.x, isPan() ? PAN.y - 0.3 : POT.ty - 0.1, 14, null, true); return; }
+    if (id === "flip") { funStart("flip", 3); launch(1, true); say("Magic flip!"); }
+    else if (id === "lid") { funStart("lid", reduce ? 4.5 : 5.6); FUN.popped = false; say("Pop goes the lid!"); tone(500, 0.1, 0.03, "sine", 650); }
+    else if (id === "bubbles") {
+      funStart("bubbles", reduce ? 5 : 6.5);
+      FUN.bub = [];
+      for (var i = 0; i < 7; i++) FUN.bub.push({ u: rand(-0.7, 0.7), v: rand(-0.5, 0.6), d: i * (reduce ? 0.4 : 0.42), r: rand(0.08, 0.14), w: rand(0, TAU), h: rand(0.55, 1.15), popped: false });
+      say("Big bubbles!");
+    } else { funStart("swing", reduce ? 3 : 4.2); say("Swing, swing!"); tone(1500, 0.2, 0.02, "triangle", 1400); tone(1700, 0.2, 0.02, "triangle", 1600, 0.6); }
+  }
+  // The tools' swing on the rail (radians), 0 when they are still.
+  function swingA(ph) {
+    var k = funK("swing");
+    if (k < 0 || !toolsHome()) return 0;
+    return Math.sin(k * FUN.cur.swing.dur * TAU * 0.8 + ph) * 0.38 * funEnv(k, 0.15) * MAMP;
+  }
+  // The pot lid: comes down, rattles, pops up with a puff of steam, settles, then lifts away.
+  function drawLid() {
+    var k = funK("lid");
+    if (k < 0) return;
+    if (ladle.st !== "home" || spoon.drag || isPan()) { delete FUN.cur.lid; return; }
+    var T = FUN.cur.lid.dur, tt = k * T, t = now(), ty = POT.ty - 0.03, y = ty, x = POT.x, a = 0, al = 1;
+    var down = 0.8, rat = 2.6, pop = 3.3, set = 3.9, rest = T - 1.0;
+    if (tt < down) { var e = ease(tt / down); y = lerp(ty - 1.3, ty, e); al = Math.min(1, tt / 0.3); }
+    else if (tt < rat) {
+      var r = MAMP * Math.min(1, (tt - down) / 0.5);
+      x += Math.sin(t * 40) * 0.012 * r; a = Math.sin(t * 33) * 0.045 * r; y -= Math.abs(Math.sin(t * 18)) * 0.03 * r;
+      if (Math.random() < 0.25) steam(x + (Math.random() < 0.5 ? -0.45 : 0.45), ty - 0.02, 0.04, 1);
+    } else if (tt < pop) {
+      if (!FUN.popped) {
+        FUN.popped = true;
+        for (var i = 0; i < (reduce ? 4 : 16); i++) parts.push({ x: x + rand(-0.45, 0.45), y: ty - rand(0, 0.08), vx: rand(-0.25, 0.25), vy: rand(-0.7, -0.35), life: 0, max: rand(1.4, 2.2), r: rand(0.06, 0.1), steam: true });
+        puff(0.6, 0.05, 900); tone(700, 0.2, 0.03, "sine", 1100);
+      }
+      var u = (tt - rat) / (pop - rat);
+      y = ty - 4 * u * (1 - u) * 0.55 * MAMP; a = Math.sin(u * Math.PI) * 0.25 * MAMP;
+    } else if (tt < set) { var v = (tt - pop) / (set - pop); y = ty - Math.abs(Math.sin(v * Math.PI * 2)) * 0.05 * (1 - v); if (!FUN.landed) { FUN.landed = true; tone(900, 0.08, 0.03, "triangle", 700); } }
+    else if (tt > rest) { var w = ease((tt - rest) / (T - rest)); y = lerp(ty, ty - 1.4, w); al = 1 - w; FUN.landed = false; }
+    ctx.save(); ctx.globalAlpha *= al; ctx.translate(x, y); ctx.rotate(a);
+    ell(0, 0, POT.rx + 0.03, POT.ry + 0.01); fs("#AEB8C6", 1.1);
+    ctx.beginPath(); ctx.moveTo(-POT.rx - 0.03, 0); ctx.bezierCurveTo(-POT.rx + 0.02, -0.24, POT.rx - 0.02, -0.24, POT.rx + 0.03, 0);
+    ctx.ellipse(0, 0, POT.rx + 0.03, POT.ry + 0.01, 0, 0, Math.PI, false); ctx.closePath(); fs("#DCE3EC", 1.1);
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 0.025; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-0.32, -0.08); ctx.quadraticCurveTo(-0.2, -0.16, -0.05, -0.17); ctx.stroke();
+    rr(-0.08, -0.26, 0.16, 0.09, 0.04); fs("#3B4256", 1);
+    ctx.restore();
+  }
+  // Big bubbles burble up on the soup, float away and pop.
+  function drawBigBubbles() {
+    var k = funK("bubbles");
+    if (k < 0 || !FUN.bub || isPan()) return;
+    var tt = k * FUN.cur.bubbles.dur, wy = waterY(), tint = mixHex(potColor(), "#FFFFFF", 0.55), top = -oy / B + 0.2, t = now();
+    FUN.bub.forEach(function (b) {
+      var lt = tt - b.d;
+      if (lt < 0 || b.popped) return;
+      var bx = POT.x + b.u * POT.rx * 0.8, by = wy + b.v * POT.ry * 0.7, r = b.r, rise = 0;
+      if (lt < 0.6) { r = b.r * ease(lt / 0.6); }
+      else {
+        rise = (lt - 0.6) * 0.32;
+        bx += Math.sin(t * 2.2 + b.w) * 0.05 * Math.min(1, rise * 3);
+        by -= rise;
+        if (rise > b.h || by - r < top) {
+          b.popped = true; blub();
+          for (var i = 0; i < 6; i++) { var an = i * TAU / 6; parts.push({ x: bx + Math.cos(an) * r, y: by + Math.sin(an) * r, vx: Math.cos(an) * 0.6, vy: Math.sin(an) * 0.6 - 0.2, life: 0, max: 0.5, col: "#FFFFFF", r: 0.018, star: false }); }
+          burst(bx, by, 3, null, true);
+          return;
+        }
+      }
+      if (lt < 0.6) { ctx.save(); ctx.beginPath(); ctx.rect(bx - 1, by - 1, 2, 1); ctx.clip(); }
+      circ(bx, by, r); ctx.fillStyle = tint; ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineWidth = LW * 0.7; ctx.strokeStyle = "rgba(29,35,64,0.55)"; ctx.stroke();
+      ctx.lineWidth = 0.014; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(bx, by, r * 0.72, Math.PI * 1.1, Math.PI * 1.45); ctx.stroke();
+      circ(bx + r * 0.35, by - r * 0.4, r * 0.12); ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fill();
+      if (lt < 0.6) ctx.restore();
+    });
+  }
+  $("newBtn").addEventListener("click", newCook);
+  $("surpriseBtn").addEventListener("click", surprise);
+
+  // ---------- Touch on the stage ----------
+  var stageDrags = {};
+  function nearKnob(p) { return Math.hypot(p.x - KNOB.x, p.y - KNOB.y) < 0.3; }
+  function inPan(p) { var dx = (p.x - PAN.x) / 0.72, dy = (p.y - PAN.y + 0.04) / 0.34; return dx * dx + dy * dy < 1; }
+  function onPancake(p) { var pc = S.pc; if (!pc) return false; var dx = (p.x - PAN.x - pc.x) / (pc.r + 0.12), dy = (p.y - PAN.y + (pc.z || 0)) / (pc.r * 0.36 + 0.16); return dx * dx + dy * dy < 1; }
+  function onJug(p) { return Math.abs(p.x - jug.x) < 0.3 && Math.abs(p.y - jug.y) < 0.36; }
+  function onPlate(p) { return Math.abs(p.x - PLATE.x) < PLATE.rx + 0.06 && p.y > stackTopY() - 0.3 && p.y < PLATE.y + 0.14; }
+  function onSpatRest(p) { var h = spatHome(); return !spat.held && Math.abs(p.x - h.x) < 0.17 && p.y > h.y - 0.7 && p.y < h.y + 0.16; }
+  function onLadleRest(p) { var h = ladleHome(); return ladle.st === "home" && Math.abs(p.x - h.x) < 0.17 && p.y > h.y - 0.65 && p.y < h.y + 0.14; }
+  function inPot(p) { return Math.abs(p.x - POT.x) < POT.rx + 0.1 && p.y > POT.ty - 0.28 && p.y < POT.by + 0.12; }
+  function onBowl(p) { return Math.abs(p.x - BOWL.x) < BOWL.rx + 0.08 && p.y > BOWL.y - 0.45 && p.y < BOWL.y + 0.1; }
+  function onFaucet(p) { return p.x > FAUCET.x - 0.5 && p.x < FAUCET.x + 0.12 && p.y > FAUCET.y - 0.2 && p.y < FAUCET.y + 0.14; }
+  function potAngle(p) { return Math.atan2((p.y - waterY()) / (POT.ry * 0.9), (p.x - POT.x) / (POT.rx * 0.93)); }
+
+  cv.addEventListener("pointerdown", function (e) {
+    if (locked()) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var p = toLocal(e.clientX, e.clientY), t = now();
+    var d = { kind: "", sx: p.x, sy: p.y, moved: false, t0: t, samples: [[p.x, p.y, t]], id: e.pointerId };
+    stageDrags[e.pointerId] = d;
+    if (nearKnob(p) && K.drag == null) {
+      d.kind = "knob"; d.pa = knobAngle(p); d.turn = 0; K.drag = e.pointerId; K.anim = null;
+      return;
+    }
+    if (!swap) { if (wareNow() === "pan") downPan(p, d); else downPot(p, d); }
+    if (!d.kind) delete stageDrags[e.pointerId];
+  });
+  function downPan(p, d) {
+    var pc = S.pc;
+    if (pc && pc.ph === "pan" && (onPancake(p) || inPan(p) || onSpatRest(p))) {
+      if (pcReady1()) {
+        // Spatula under the pancake; a flick up flips it.
+        d.kind = "flip"; d.px0 = pc.x; pc.ph = "lift"; pc.z = 0; spat.held = true; tone(420, 0.08, 0.03, "sine", 520);
+      } else if (pcReady2()) {
+        d.kind = "slide"; pc.ph = "carry"; pc.wx = PAN.x + pc.x; pc.wy = PAN.y; d.dx = pc.wx - p.x; d.dy = pc.wy - p.y; spat.held = true;
+      } else {
+        pc.wig = 1; d.kind = "tap";
+        if (!on()) { say("Turn on the stove!"); K.flashUntil = now() + 3; K.wig = 1; }
+        else say(pc.flipped ? "Almost ready!" : "Wait for the bubbles!");
+      }
+      return;
+    }
+    if (onPlate(p)) {
+      d.kind = "tap";
+      if (pcReady2()) toPlate();
+      else if (S.stack.done) { burst(PLATE.x, stackTopY() - 0.1, 8, null, true); plate.wig = 0.6; }
+      else plate.wig = 1;
+      return;
+    }
+    if (jug.st === "home" && onJug(p)) {
+      d.kind = "tap";
+      if (!canPour()) { jug.wig = 1; if (stackFull()) say("Add a topping!"); return; }
+      if (!needHeat()) { jug.wig = 1; return; }
+      d.kind = "jug"; jug.st = "drag"; d.dx = jug.x - p.x; d.dy = jug.y - p.y; tone(420, 0.1, 0.03, "sine", 520);
+      return;
+    }
+    if (!pc && inPan(p) && jug.st === "home") {
+      // A tap on the empty pan pours a pancake too.
+      d.kind = "tap";
+      if (!canPour()) { jug.wig = 1; if (stackFull()) say("Add a topping!"); return; }
+      if (!needHeat()) { jug.wig = 1; return; }
+      autoPour(0.32);
+    }
+  }
+  function downPot(p, d) {
+    if (onFaucet(p)) { d.kind = "tap"; runFaucet(S.pot.level < 0.99); return; }
+    if (cooked() && ladle.st === "home" && (inPot(p) || onLadleRest(p))) {
+      d.kind = "ladle"; d.fromRest = onLadleRest(p); ladle.st = "drag"; ladle.path = null;
+      if (!d.fromRest) { ladle.x = p.x; ladle.y = Math.max(p.y, waterY() - 0.05); ladle.a = -0.35; ladleScoop(); }
+      learned("fill");
+      return;
+    }
+    if (inPot(p) && ladle.st === "home") {
+      if (S.pot.items.length && !on() && !needHeat()) { spoon.wig = 1; d.kind = "tap"; return; }
+      d.kind = "stir"; spoon.drag = true; d.pa = potAngle(p); d.lt = now();
+      return;
+    }
+    if (onBowl(p)) {
+      d.kind = "tap";
+      if (cooked()) autoLadle();
+      else if (S.bowl.done) { burst(BOWL.x, BOWL.y - 0.2, 8, null, true); bowlV.wig = 0.6; }
+      else bowlV.wig = 1;
+    }
+  }
+  cv.addEventListener("pointermove", function (e) {
+    var d = stageDrags[e.pointerId];
+    if (!d) return;
+    var p = toLocal(e.clientX, e.clientY), t = now(), pc = S.pc;
+    if (Math.hypot(p.x - d.sx, p.y - d.sy) > 0.08) d.moved = true;
+    d.samples.push([p.x, p.y, t]);
+    while (d.samples.length > 2 && t - d.samples[0][2] > 0.12) d.samples.shift();
+    if (d.kind === "knob") {
+      var a = knobAngle(p), da = wrapA(a - d.pa);
+      d.pa = a; d.turn += Math.abs(da);
+      if (d.turn > 0.15) d.moved = true;
+      var was = on();
+      K.v = clamp(K.v + da / KNOB_SWEEP, 0, 1);
+      if (!was && on()) { click(); puff(0.5, 0.05, 900); learned("knob"); K.tries = 0; hush(); }
+      else if (was && !on()) click();
+    } else if (d.kind === "jug") {
+      jug.x = clamp(p.x + d.dx, X_L + 0.1, X_R - 0.1); jug.y = clamp(p.y + d.dy, -H_UP + 0.3, -0.25);
+    } else if (d.kind === "flip" && pc && pc.ph === "lift") {
+      pc.z = clamp(d.sy - p.y, 0, 0.35);
+      var m = Math.max(0, PAN.fx - pc.r - 0.01);
+      pc.x = clamp(d.px0 + (p.x - d.sx) * 0.5, -m, m);
+      var s0 = d.samples[0], dt = t - s0[2];
+      if (dt > 0.02) {
+        // Speed in screens per second, so a flick feels the same on a phone and on an iPad.
+        var vUp = (s0[1] - p.y) * B / dt / Math.max(300, Math.min(innerWidth, innerHeight));
+        if (vUp > 0.6 && d.sy - p.y > 0.05) { d.kind = "done"; launch(clamp((vUp - 0.6) / 2.4, 0, 1)); }
+      }
+    } else if (d.kind === "slide" && pc && pc.ph === "carry") {
+      pc.wx = clamp(p.x + d.dx, X_L, X_R); pc.wy = clamp(p.y + d.dy, -H_UP + 0.2, 0.1);
+    } else if (d.kind === "stir") {
+      var pa = potAngle(p), dp = wrapA(pa - d.pa), dts = Math.max(0.008, t - d.lt);
+      d.pa = pa; d.lt = t;
+      potSwirl = clamp(lerp(potSwirl, dp / dts, 0.3), -7, 7);
+      if (Math.abs(dp) > 0.01) learned("stir");
+      if (S.pot.items.length && hot > 0.35 && S.pot.stir < 1) {
+        S.pot.stir = Math.min(1, S.pot.stir + Math.abs(dp) / (TAU * 3) * Math.min(1, hot * 1.3));
+        if (S.pot.stir >= 1) potCooked();
+      }
+    } else if (d.kind === "ladle" && ladle.st === "drag") {
+      ladle.x = p.x; ladle.y = p.y; ladle.a = -0.35;
+      if (!ladle.full && inPot(p) && p.y > waterY() - 0.15) { ladle.y = Math.max(p.y, waterY() - 0.05); ladleScoop(); }
+    }
+  });
+  function potCooked() {
+    chime();
+    burst(POT.x, waterY(), 16, null, true);
+    save();
+  }
+  function stageUp(e) {
+    var d = stageDrags[e.pointerId];
+    if (!d) return;
+    delete stageDrags[e.pointerId];
+    var pc = S.pc, cancel = e.type === "pointercancel";
+    if (d.kind === "knob") {
+      K.drag = null;
+      if (!d.moved && !cancel) knobTo(on() ? 0 : 0.75);
+      else if (on()) K.tries = 0;
+    } else if (d.kind === "jug") {
+      if (!d.moved && !cancel) { jug.st = "home"; jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; autoPour(0.32); }
+      else { endPour(); jug.st = "back"; jug.t0 = now(); jug.from = { x: jug.x, y: jug.y }; }
+    } else if (d.kind === "flip") {
+      if (pc && pc.ph === "lift") { if (cancel) { pc.ph = "pan"; pc.z = 0; spat.held = false; } else launch(0.15); }
+    } else if (d.kind === "slide") {
+      if (pc && pc.ph === "carry") {
+        var nearPlate = Math.hypot(pc.wx - PLATE.x, pc.wy - PLATE.y) < 0.7 || pc.wx > PAN.x + PAN.rx;
+        var inside = Math.abs(pc.wx - PAN.x) < PAN.fx && Math.abs(pc.wy - PAN.y) < 0.3;
+        if (cancel) { pc.ph = "pan"; spat.held = false; }
+        else if (!d.moved || nearPlate || !inside) toPlate();
+        else { pc.ph = "pan"; pc.x = pc.wx - PAN.x; fitPc(); spat.held = false; pat(); }
+      }
+    } else if (d.kind === "stir") {
+      spoon.drag = false;
+    } else if (d.kind === "ladle" && ladle.st === "drag") {
+      var nearBowl = Math.hypot(ladle.x - BOWL.x, ladle.y - BOWL.y) < 0.75 || ladle.x > POT.x + POT.rx + 0.15;
+      if (ladle.full && nearBowl && !cancel) startLadlePour();
+      else if (!d.moved && !cancel) { ladle.st = "home"; ladle.full = false; autoLadle(); }
+      else { ladle.st = "back"; ladle.full = false; ladleTo([{ p: ladleHome(), dur: 0.5, home: true }]); }
+    }
+  }
+  function endPour() {
+    var pc = S.pc;
+    jug.pouring = false;
+    if (pc && pc.ph === "pour") { pc.ph = "pan"; pc.spread = true; save(); }
+  }
+  cv.addEventListener("pointerup", stageUp);
+  cv.addEventListener("pointercancel", stageUp);
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+  // ---------- Particles ----------
+  function burst(x, y, n, col, star) {
+    if (reduce) n = Math.min(n, 4);
+    var cols = ["#FFC93C", "#FF6FB5", "#3DB4FF", "#4CD964", "#FFFFFF"];
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, TAU), sp = rand(0.4, 1.3);
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, life: 0, max: rand(0.9, 1.5), col: col || cols[i % cols.length], r: rand(0.025, 0.05), star: !!star });
+    }
+  }
+  function drip(x, y, col) { parts.push({ x: x, y: y, vx: rand(-0.4, 0.4), vy: rand(-0.9, -0.3), life: 0, max: 0.6, col: col, r: rand(0.015, 0.03), star: false }); }
+  function steam(x, y, w, k) {
+    if (reduce || Math.random() > k) return;
+    parts.push({ x: x + rand(-w, w), y: y, vx: rand(-0.04, 0.04), vy: rand(-0.38, -0.24), life: 0, max: rand(1.6, 2.4), r: rand(0.035, 0.06), steam: true });
+  }
+
+  // ---------- Update ----------
+  var lastT = now();
+  function update() {
+    var t = now(), dt = Math.min(0.05, t - lastT), i;
+    lastT = t;
+    // Knob, flames and heat.
+    if (K.anim) {
+      var kk = (t - K.anim.t0) / K.anim.dur;
+      K.v = lerp(K.anim.from, K.anim.to, ease(kk));
+      if (kk >= 1) { K.v = K.anim.to; K.anim = null; }
+    }
+    var fl = on() ? 0.45 + 0.55 * K.v : 0;
+    flame += (fl - flame) * Math.min(1, dt * (fl > flame ? 7 : 3.5));
+    if (flame < 0.004) flame = 0;
+    if (on()) hot = Math.min(1, hot + dt * 0.36 * (0.6 + 0.4 * K.v)); else hot = Math.max(0, hot - dt * 0.12);
+    K.wig = Math.max(0, K.wig - dt * 1.4);
+
+    // The pan and the pot changing places.
+    if (swap && t - swap.t0 >= swap.dur) swap = null;
+
+    updatePan(t, dt);
+    updatePot(t, dt);
+
+    // Tools glide back to the rail when nobody holds them.
+    var sh = spatHome(), pc = S.pc, tgt = sh, follow = false;
+    if (pc && (pc.ph === "lift" || pc.ph === "carry" || pc.ph === "toplate")) {
+      var px = pc.ph === "lift" ? PAN.x + pc.x : pc.wx, py = pc.ph === "lift" ? PAN.y - pc.z : pc.wy;
+      tgt = { x: px + 0.04, y: py + 0.035, a: -0.95 }; follow = true;
+    } else if (t < spat.until && pc) tgt = { x: spat.x, y: spat.y, a: spat.a };
+    if (follow) { spat.x = tgt.x; spat.y = tgt.y; spat.a += (tgt.a - spat.a) * Math.min(1, dt * 14); }
+    else { var ks = Math.min(1, dt * 6); spat.x += (tgt.x - spat.x) * ks; spat.y += (tgt.y - spat.y) * ks; spat.a += (tgt.a - spat.a) * ks; }
+    updateLadle(t, dt);
+
+    // The finished plate or bowl slides off to the table and a clean one slides in.
+    if (away) {
+      var ak = (t - away.t0) / away.dur, dist = (cw - ox) / B - PLATE.x + 0.5, off;
+      if (ak < 0.5) off = ease(ak * 2) * dist;
+      else {
+        if (!away.swapped) { away.swapped = true; if (away.which === "plate") { S.stack = blankStack(); tops = {}; } else S.bowl = blankBowl(); save(); }
+        off = (1 - ease((ak - 0.5) * 2)) * dist;
+      }
+      if (away.which === "plate") plate.off = off; else bowlV.off = off;
+      if (ak >= 1) { away = null; plate.off = 0; bowlV.off = 0; }
+    }
+    plate.wig = Math.max(0, plate.wig - dt * 1.6);
+    bowlV.wig = Math.max(0, bowlV.wig - dt * 1.6);
+    jug.wig = Math.max(0, jug.wig - dt * 1.6);
+    spoon.wig = Math.max(0, spoon.wig - dt * 1.6);
+    if (pc) pc.wig = Math.max(0, (pc.wig || 0) - dt * 1.6);
+
+    // Steam: from the pot, from a cooking pancake, from fresh food.
+    var w = wareNow();
+    if (w === "pot" && !swap) steam(POT.x, waterY() - 0.02, POT.rx * 0.7, hot > 0.3 ? dt * 7 * hot : 0);
+    if (w === "pan" && pc && pc.ph === "pan" && hot > 0.3) steam(PAN.x + pc.x, PAN.y - 0.03, pc.r * 0.6, dt * 3 * hot);
+    if (w === "pot" && S.bowl.fill > 0) steam(BOWL.x + bowlV.off, BOWL.y - 0.18, 0.18, dt * (S.bowl.done ? 1.5 : 1));
+    if (w === "pan" && S.stack.list.length) steam(PLATE.x + plate.off, stackTopY() - 0.04, 0.15, dt * 0.9);
+    for (i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i];
+      q.life += dt;
+      if (q.steam) { q.x += q.vx * dt + Math.sin(q.life * 3 + q.r * 50) * 0.04 * dt; q.y += q.vy * dt; q.r += dt * 0.05; }
+      else { q.vy += (q.star ? 1.2 : 4) * dt; q.x += q.vx * dt; q.y += q.vy * dt; }
+      if (q.life >= q.max) parts.splice(i, 1);
+    }
+    if (parts.length > 320) parts.splice(0, parts.length - 320);
+    updateLoops(w === "pan" && pc && (pc.ph === "pan" || pc.ph === "pour" || pc.ph === "lift") ? hot : 0);
+    renderChoices();
+    updateCoach();
+    updateGhostPhase();
+  }
+
+  function updatePan(t, dt) {
+    var pc = S.pc, i;
+    // The jug: dragged, pouring by itself, or going home.
+    if (jug.st === "drag") {
+      var spd = jugSpout(), over = overPan(spd) && (!pc || pc.ph === "pour");
+      jug.tilt += ((over ? 1 : 0) - jug.tilt) * Math.min(1, dt * 7);
+      jug.pouring = over && jug.tilt > 0.7;
+    } else if (jug.st === "auto") {
+      var el = t - jug.t0, A = jug.auto, ps = pourSpot();
+      var mv = reduce ? 0.15 : 0.6;
+      if (el < mv) { var e = ease(el / mv); jug.x = lerp(jug.from.x, ps.x, e); jug.y = lerp(jug.from.y, ps.y, e) - Math.sin(e * Math.PI) * 0.15; jug.tilt = 0; jug.pouring = false; }
+      else if (!A.done) {
+        jug.x = ps.x; jug.y = ps.y;
+        jug.tilt = Math.min(1, (el - mv) / 0.3);
+        jug.pouring = jug.tilt > 0.75;
+        if (S.pc && S.pc.r >= A.target - 0.003) { A.done = true; A.tUn = t; endPour(); }
+      } else {
+        var u = (t - A.tUn) / (reduce ? 0.1 : 0.3);
+        jug.tilt = Math.max(0, 1 - u);
+        if (u >= 1) { jug.st = "back"; jug.t0 = t; jug.from = { x: jug.x, y: jug.y }; }
+      }
+    } else if (jug.st === "back") {
+      var kb = (t - jug.t0) / (reduce ? 0.15 : 0.55), eb = ease(kb);
+      jug.x = lerp(jug.from.x, JUG_HOME.x, eb); jug.y = lerp(jug.from.y, JUG_HOME.y, eb);
+      jug.tilt = Math.max(0, jug.tilt - dt * 5);
+      if (kb >= 1) { jug.st = "home"; jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; jug.tilt = 0; }
+    } else { jug.x = JUG_HOME.x; jug.y = JUG_HOME.y; jug.tilt = 0; jug.pouring = false; }
+    if (jug.st !== "drag" && jug.st !== "auto") jug.pouring = false;
+    // Batter: a pouring stream makes a growing circle where it lands.
+    if (jug.pouring && wareNow() === "pan") {
+      var sp = jugSpout(), lx = clamp(sp.x - PAN.x, -0.4, 0.4);
+      if (!S.pc) newPancake(lx);
+      pc = S.pc;
+      if (pc.ph === "pour") {
+        var cap = jug.st === "auto" ? jug.auto.target : 0.46;
+        var rate = 0.075;
+        pc.r = Math.min(cap, Math.sqrt(pc.r * pc.r + dt * rate));
+        pc.x += (lx - pc.x) * Math.min(1, dt * 0.8);
+        fitPc();
+      }
+    }
+    if (!pc) return;
+    // A small pour still spreads out to a proper pancake.
+    if (pc.ph !== "pour" && pc.spread) { pc.r = Math.min(Math.max(pc.r, 0.24), pc.r + dt * 0.15); if (pc.r >= 0.24) pc.spread = false; fitPc(); }
+    // Cooking: the side facing down cooks (only while the burner is on). Nothing burns: it stops at golden.
+    if ((pc.ph === "pan" || pc.ph === "pour") && hot > 0.05 && !swap && isPan()) {
+      var rate2 = hot * (0.6 + 0.4 * Math.max(K.v, 0.3)) * (reduce ? 2 : 1);
+      if (!pc.flipped) {
+        var before = pc.c1;
+        pc.c1 = Math.min(1, pc.c1 + dt * rate2 / 6.5);
+        if (pc.bub) for (i = 0; i < pc.bub.length; i++) {
+          var b = pc.bub[i];
+          if (!b.popped && before < b.p && pc.c1 >= b.p) { b.popped = true; pip(); }
+        }
+        if (before < 1 && pc.c1 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 6, "#FFF3C4"); save(); }
+      } else {
+        var b2 = pc.c2;
+        pc.c2 = Math.min(1, pc.c2 + dt * rate2 / 4.5);
+        if (b2 < 1 && pc.c2 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 10, null, true); tone(880, 0.2, 0.03); save(); }
+      }
+    }
+    if (pc.ph === "fly") {
+      var f = pc.fly, k = (t - f.t0) / f.dur;
+      if (k >= 1) landPancake();
+      else {
+        pc.z = f.z0 * (1 - k) + f.h * 4 * k * (1 - k);
+        pc.th = f.turns * Math.PI * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2) * 0.35 + f.turns * Math.PI * k * 0.65;
+        pc.x = lerp(f.x0, f.x1, k);
+      }
+    } else if (pc.ph === "toplate") {
+      var tk = (t - pc.to.t0) / pc.to.dur, te = ease(tk), ty = stackTopY();
+      pc.wx = lerp(pc.to.x0, PLATE.x, te); pc.wy = lerp(pc.to.y0, ty, te) - Math.sin(clamp(tk, 0, 1) * Math.PI) * 0.25;
+      if (tk >= 1) addToStack();
+    }
+  }
+  function pourSpot() {
+    // Where the jug stands when it pours by itself: spout over the middle of the pan.
+    var a = 1.55, c = Math.cos(a), s = Math.sin(a), sx = 0.2, sy = -0.27;
+    var rx = sx * c - sy * s, ry = sx * s + sy * c;
+    return { x: PAN.x - 0.04 - rx, y: PAN.y - 0.62 - ry };
+  }
+
+  function updatePot(t, dt) {
+    var i, wy = waterY(), boil = hot > 0.55 && wareNow() === "pot";
+    // Faucet (pot filler): fills the pot back up.
+    if (faucet.run) {
+      var fk = (t - faucet.run.t0) / faucet.run.dur;
+      if (faucet.run.fill) S.pot.level = Math.max(S.pot.level, lerp(faucet.run.from, 1, clamp((fk - 0.15) / 0.8, 0, 1)));
+      if (Math.random() < 0.3 && fk > 0.1 && fk < 0.95) ripples.push({ x: FAUCET.x, y: wy, t0: t });
+      if (fk >= 1) { faucet.run = null; save(); }
+    }
+    // Swirl: the stirring sets the food going round; boiling keeps it moving a little.
+    if (!spoon.drag) potSwirl *= Math.pow(0.35, dt);
+    var drift = boil ? 0.25 : 0.05;
+    for (i = pieces.length - 1; i >= 0; i--) {
+      var p = pieces[i];
+      if (p.fy < 0) {
+        p.vy += 5 * dt; p.fy += p.vy * dt;
+        if (p.fy >= 0) { p.fy = 0; ripples.push({ x: POT.x + Math.cos(p.phi) * p.rho * POT.rx * 0.8, y: wy + Math.sin(p.phi) * p.rho * POT.ry * 0.75, t0: t }); if (Math.random() < 0.4) plop(); }
+        continue;
+      }
+      p.phi += (potSwirl * (0.4 + 0.6 * p.rho) + drift * (0.5 + p.rho)) * dt;
+      p.bob += dt * (boil ? 6 : 1.5);
+      p.rot += dt * (p.spin + potSwirl * 0.3);
+      if (hot > 0.5) p.soft = Math.min(1, p.soft + dt * 0.12);
+    }
+    // Cooking by itself slowly while it boils (stirring is quicker).
+    if (boil && S.pot.items.length && S.pot.stir < 1) {
+      S.pot.stir = Math.min(1, S.pot.stir + dt * 0.012);
+      if (S.pot.stir >= 1) potCooked();
+    }
+    // Bubbles while it boils. It never boils over.
+    if (boil && !reduce && Math.random() < dt * (hot - 0.45) * 40) {
+      var a = rand(0, TAU), d = Math.sqrt(Math.random()) * 0.85;
+      potBub.push({ u: Math.cos(a) * d, v: Math.sin(a) * d, t0: t, life: rand(0.4, 0.8), r: rand(0.015, 0.035) * (1 + Math.abs(potSwirl) * 0.08) });
+      if (Math.random() < 0.15) blub();
+    }
+    for (i = potBub.length - 1; i >= 0; i--) if (t - potBub[i].t0 > potBub[i].life) potBub.splice(i, 1);
+    if (potBub.length > 60) potBub.splice(0, potBub.length - 60);
+    for (i = ripples.length - 1; i >= 0; i--) if (t - ripples[i].t0 > 0.8) ripples.splice(i, 1);
+    // Spoon: in the finger when stirring, otherwise leaning in the pot.
+    var rest = { x: POT.x + 0.26, y: wy + 0.02, a: 0.5 };
+    if (spoon.drag) {
+      var ids = Object.keys(stageDrags), dd = null;
+      ids.forEach(function (k) { if (stageDrags[k].kind === "stir") dd = stageDrags[k]; });
+      if (dd && dd.samples.length) {
+        var last = dd.samples[dd.samples.length - 1], ux = (last[0] - POT.x) / (POT.rx * 0.82), uy = (last[1] - wy) / (POT.ry * 0.8), ul = Math.hypot(ux, uy);
+        if (ul > 1) { ux /= ul; uy /= ul; }
+        rest = { x: POT.x + ux * POT.rx * 0.82, y: wy + uy * POT.ry * 0.8, a: 0.3 + 0.35 * ux };
+        spoon.x = rest.x; spoon.y = rest.y; spoon.a = rest.a;
+      }
+    } else {
+      var kq = Math.min(1, dt * 5);
+      spoon.x += (rest.x - spoon.x) * kq; spoon.y += (rest.y - spoon.y) * kq; spoon.a += (rest.a - spoon.a) * kq;
+    }
+  }
+  function updateLadle(t, dt) {
+    if (ladle.path) {
+      var st = ladle.path[ladle.pi], k = (t - ladle.t0) / (reduce ? Math.min(st.dur, 0.2) : st.dur), e = ease(k);
+      ladle.x = lerp(ladle.from.x, st.p.x, e); ladle.y = lerp(ladle.from.y, st.p.y, e); ladle.a = lerp(ladle.from.a, st.p.a, e);
+      if (st.pour && k > 0.3 && Math.random() < 0.5) drip(BOWL.x - 0.02 + bowlV.off, BOWL.y - 0.2, S.bowl.c || potColor());
+      if (k >= 1) {
+        if (st.dip) ladleScoop();
+        if (st.pour) pourIntoBowl();
+        if (st.home) { ladle.st = "home"; ladle.path = null; ladle.full = false; return; }
+        ladle.pi++; ladle.t0 = t; ladle.from = { x: ladle.x, y: ladle.y, a: ladle.a };
+        if (ladle.pi >= ladle.path.length) { ladle.path = null; ladle.st = "home"; }
+      }
+    } else if (ladle.st === "home") {
+      var h = ladleHome(), kk = Math.min(1, dt * 6);
+      ladle.x += (h.x - ladle.x) * kk; ladle.y += (h.y - ladle.y) * kk; ladle.a += (h.a - ladle.a) * kk;
+    }
+  }
+
+  // ---------- Drawing ----------
+  function rr(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  function fs(fill, lw) { if (fill) { ctx.fillStyle = fill; ctx.fill(); } ctx.lineWidth = (lw || 1) * LW; ctx.strokeStyle = INK; ctx.stroke(); }
+  function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); }
+  function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.001, rx), Math.max(0.001, ry), 0, 0, TAU); }
+  function hex(h) { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+  function toHex(c) { return "#" + c.map(function (v) { var s = Math.round(clamp(v, 0, 255)).toString(16); return s.length < 2 ? "0" + s : s; }).join(""); }
+  function mixHex(a, b, k) { var x = hex(a), y = hex(b); return toHex([lerp(x[0], y[0], k), lerp(x[1], y[1], k), lerp(x[2], y[2], k)]); }
+  function shade(h, k) { var c = hex(h); return toHex(c.map(function (v) { return k < 0 ? v * (1 + k) : v + (255 - v) * k; })); }
+  // Text in scene units (drawn without the scale so it stays crisp).
+  function text(s, x, y, size, col) {
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = "800 " + Math.max(10, size * B).toFixed(1) + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = col || "#FFFFFF";
+    ctx.fillText(s, ox + x * B, oy + y * B);
+    ctx.restore();
+  }
+
+  function drawRoom() {
+    var L = -ox / B - 0.1, R = (cw - ox) / B + 0.1, T = -oy / B - 0.1, Bt = (ch - oy) / B + 0.1;
+    // Wall with a tiled backsplash.
+    ctx.fillStyle = "#FFF3DC"; ctx.fillRect(L, T, R - L, BACK - T);
+    var tile = 0.3, top = Math.max(T, -1.62);
+    ctx.fillStyle = "#E3F1FB"; ctx.fillRect(L, top, R - L, BACK - top);
+    ctx.strokeStyle = "#BFD9EC"; ctx.lineWidth = LW * 0.7;
+    ctx.beginPath();
+    for (var y = BACK - tile; y > top; y -= tile) { ctx.moveTo(L, y); ctx.lineTo(R, y); }
+    for (var x = Math.floor(L / tile) * tile; x < R; x += tile) { ctx.moveTo(x, top); ctx.lineTo(x, BACK); }
+    ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L, top); ctx.lineTo(R, top); ctx.stroke();
+    // A range hood over the stove, when there is room above it.
+    if (T < -2.25 && wareNow() === "pot") {
+      var hy = -2.02;
+      rr(-0.22, T - 0.1, 0.44, hy - 0.55 - T + 0.12, 0.02); fs("#C9D3E0");
+      ctx.beginPath(); ctx.moveTo(-0.5, hy - 0.55); ctx.lineTo(0.5, hy - 0.55); ctx.lineTo(0.86, hy); ctx.lineTo(-0.86, hy); ctx.closePath(); fs("#DDE3EC");
+      ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.moveTo(-0.38, hy - 0.48); ctx.lineTo(-0.66, hy - 0.06); ctx.stroke();
+      rr(-0.9, hy - 0.02, 1.8, 0.1, 0.04); fs("#9AA5B8");
+      ell(-0.45, hy + 0.09, 0.08, 0.02); ctx.fillStyle = "rgba(255,240,170,0.9)"; ctx.fill();
+      ell(0.45, hy + 0.09, 0.08, 0.02); ctx.fill();
+    }
+    // Counter top, seen from a little above; the cooktop in the middle.
+    ctx.fillStyle = "#F1C98E"; ctx.fillRect(L, BACK, R - L, -BACK);
+    ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L, BACK); ctx.lineTo(R, BACK); ctx.stroke();
+    rr(-0.84, BACK - 0.16, 1.68, 0.2, 0.04); fs("#C9D3E0");
+    rr(-0.84, BACK, 1.68, -BACK + 0.02, 0.03); fs("#E3E8EF");
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(-0.78, BACK + 0.04, 1.56, 0.03);
+    // Counter edge and the cupboards under it.
+    rr(L - 0.1, -0.02, R - L + 0.2, 0.08, 0.03); fs("#E7B77A");
+    ctx.fillStyle = "#6FB1E8"; ctx.fillRect(L - 0.1, 0.06, R - L + 0.2, Bt);
+    ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(L - 0.1, 0.06); ctx.lineTo(R + 0.1, 0.06); ctx.stroke();
+    var dw = 0.62;
+    for (var d = -0.86 - dw; d > L - dw; d -= dw) { rr(d + 0.04, 0.12, dw - 0.08, Math.max(0.05, Bt), 0.05); fs("#86C1F0", 0.8); rr(d + dw - 0.16, 0.18, 0.05, 0.16, 0.025); fs("#FFFFFF", 0.7); }
+    for (d = 0.86; d < R; d += dw) { rr(d + 0.04, 0.12, dw - 0.08, Math.max(0.05, Bt), 0.05); fs("#86C1F0", 0.8); rr(d + 0.11, 0.18, 0.05, 0.16, 0.025); fs("#FFFFFF", 0.7); }
+    // The stove's front: the control strip with the knob, the oven door below.
+    rr(-0.84, 0.0, 1.68, Bt + 0.2, 0.03); fs("#E9EEF4");
+    rr(-0.84, 0.0, 1.68, 0.55, 0.03); fs("#D5DCE6");
+    rr(-0.72, 0.68, 1.44, Bt + 0.2, 0.06); fs("#3B4256");
+    rr(-0.56, 0.8, 1.12, 0.42, 0.05); fs("#1F2638", 0.8);
+    rr(-0.62, 0.6, 1.24, 0.05, 0.025); fs("#9AA5B8", 0.8);
+    // The "on" light (a little lamp, not a button).
+    circ(0.52, 0.27, 0.035);
+    fs(on() ? "#FF8A1F" : "#9AA5B8", 0.8);
+    if (on()) { ctx.fillStyle = "rgba(255,170,60,0.35)"; circ(0.52, 0.27, 0.07); ctx.fill(); }
+    drawKnob();
+  }
+
+  function drawKnob() {
+    var t = now(), x = KNOB.x, y = KNOB.y, r = KNOB.r;
+    var flash = t < K.flashUntil && Math.sin(t * 9) > 0;
+    var wig = K.wig > 0 ? Math.sin(t * 28) * 0.15 * K.wig : 0;
+    if (flash) { ctx.fillStyle = "rgba(255,201,60,0.85)"; circ(x, y, r * 2.1); ctx.fill(); }
+    // The dial around the knob: OFF at the top, a small flame and a big flame round the way.
+    circ(x, y, r * 1.62); fs("#F4F6FA");
+    ctx.lineCap = "round";
+    ctx.lineWidth = 0.022;
+    for (var i = 0; i < 12; i++) {
+      var a0 = 0.35 + i / 12 * (KNOB_SWEEP - 0.35), a1 = 0.35 + (i + 1) / 12 * (KNOB_SWEEP - 0.35) - 0.05;
+      ctx.strokeStyle = mixHex("#3D7BFF", "#FF8A1F", i / 11);
+      ctx.beginPath(); ctx.arc(x, y, r * 1.36, a0 - Math.PI / 2, a1 - Math.PI / 2); ctx.stroke();
+    }
+    smallFlame(x + Math.sin(1.25) * r * 1.36, y - Math.cos(1.25) * r * 1.36, 0.028);
+    smallFlame(x + Math.sin(KNOB_SWEEP) * r * 1.36, y - Math.cos(KNOB_SWEEP) * r * 1.36, 0.045);
+    text("OFF", x - r * 0.02, y - r * 1.34, 0.055, "#4A5578");
+    // The knob itself, with a grip that points at the setting.
+    ctx.fillStyle = "rgba(29,35,64,0.2)"; circ(x + 0.015, y + 0.02, r); ctx.fill();
+    circ(x, y, r); fs("#3B4256", 1.1);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(K.v * KNOB_SWEEP + wig);
+    rr(-r * 0.24, -r * 1.02, r * 0.48, r * 2.04, r * 0.22); fs("#5B6276");
+    circ(0, -r * 0.72, r * 0.13); ctx.fillStyle = on() ? "#FFC93C" : "#FFFFFF"; ctx.fill();
+    ctx.restore();
+  }
+  function smallFlame(x, y, s) {
+    ctx.beginPath(); ctx.moveTo(x, y - s * 1.3); ctx.quadraticCurveTo(x + s, y, x, y + s * 0.7); ctx.quadraticCurveTo(x - s, y, x, y - s * 1.3); ctx.closePath();
+    fs("#FF8A1F", 0.6);
+  }
+
+  function drawBurner() {
+    var x = BURN.x, y = BURN.y;
+    ell(x, y, 0.64, 0.205); fs("#3B4256");
+    var glow = Math.max(hot * 0.5, flame);
+    if (glow > 0.02) { ctx.fillStyle = "rgba(255,140,40," + (0.3 * glow).toFixed(3) + ")"; ell(x, y, 0.5, 0.16); ctx.fill(); }
+    ell(x, y - 0.01, 0.31, 0.1); fs("#4A5066", 0.8);
+    if (flame > 0.01) drawFlames(x, y, true);
+    ell(x, y - 0.03, 0.21, 0.065); fs("#2B3045", 0.7);
+    if (flame > 0.01) drawFlames(x, y, false);
+    // The cast iron grate the pan sits on.
+    ctx.lineCap = "round";
+    var arms = function (w, col) {
+      ctx.strokeStyle = col; ctx.lineWidth = w;
+      ell(x, y - 0.01, 0.6, 0.19); ctx.stroke();
+      ctx.beginPath();
+      [0.5, 2.64, 3.64, 5.78].forEach(function (a) { ctx.moveTo(x + Math.cos(a) * 0.25, y - 0.02 + Math.sin(a) * 0.08); ctx.lineTo(x + Math.cos(a) * 0.6, y - 0.01 + Math.sin(a) * 0.19); });
+      ctx.stroke();
+    };
+    arms(0.05 + 2 * LW, INK); arms(0.05, "#2B3045");
+  }
+  function drawFlames(x, y, back) {
+    var t = now(), n = 18;
+    for (var i = 0; i < n; i++) {
+      var a = i / n * TAU + 0.17, s = Math.sin(a);
+      if ((s < 0) !== back) continue;
+      var bx = x + Math.cos(a) * 0.3, by = y - 0.01 + s * 0.095;
+      var h = (0.06 + 0.07 * flame) * flame * (0.85 + 0.2 * Math.sin(t * 17 + i * 2.3)), w = 0.032;
+      var tx = bx + Math.cos(a) * h * 0.4, ty = by - h;
+      ctx.beginPath(); ctx.moveTo(bx - w, by); ctx.quadraticCurveTo(bx - w * 0.7, by - h * 0.6, tx, ty); ctx.quadraticCurveTo(bx + w * 0.7, by - h * 0.6, bx + w, by); ctx.closePath();
+      ctx.fillStyle = "rgba(61,123,255,0.9)"; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(bx - w * 0.45, by); ctx.quadraticCurveTo(bx - w * 0.3, by - h * 0.35, bx + (tx - bx) * 0.5, by - h * 0.55); ctx.quadraticCurveTo(bx + w * 0.3, by - h * 0.35, bx + w * 0.45, by); ctx.closePath();
+      ctx.fillStyle = "#B8E2FF"; ctx.fill();
+      if (i % 3 === 0 && flame > 0.5) { ctx.fillStyle = "rgba(255,170,60,0.85)"; circ(tx, ty + 0.01, 0.012); ctx.fill(); }
+    }
+  }
+
+  // ---------- Pancakes ----------
+  var EL = Math.asin(0.34);
+  function cakeCol(c) { return mixHex(BATTER, GOLD, clamp(c, 0, 1)); }
+  var LACE = [[-0.4, -0.2, 0.22], [0.3, -0.35, 0.16], [0.15, 0.3, 0.24], [-0.25, 0.4, 0.14], [0.55, 0.1, 0.12], [-0.6, 0.15, 0.12]];
+  // A pancake drawn at (x, y): r its size, th how far it has turned over (0 = lying flat), pc the pancake in
+  // the pan (for its two sides and the bubbles) or null for a golden one on the plate; sq a landing squash.
+  function drawCake(x, y, r, th, pc, sq) {
+    var f = Math.sin(EL + th), g = Math.cos(EL + th);
+    var sx = 1 + 0.08 * (sq || 0), sy = 1 - 0.3 * (sq || 0);
+    var rx = r * sx, ry = Math.max(0.006, r * Math.abs(f) * sy), thick = 0.042 * (0.55 + r) * Math.abs(g) * sy;
+    var cA = pc ? cakeCol(pc.c1) : GOLD, cB = pc ? cakeCol(Math.max(pc.c2, pc.c1 * 0.15)) : GOLD;
+    var upIsA = pc ? pc.flipped : true;
+    var showA = f >= 0 ? upIsA : !upIsA;
+    var face = showA ? cA : cB, faceCook = pc ? (showA ? pc.c1 : pc.c2) : 1;
+    var off = f >= 0 ? thick : -thick, edge = shade(mixHex(cA, cB, 0.5), -0.1);
+    ell(x, y + off, rx, ry); fs(edge, 0.9);
+    ctx.fillStyle = edge; ctx.fillRect(x - rx, Math.min(y, y + off), rx * 2, Math.abs(off));
+    ctx.strokeStyle = INK; ctx.lineWidth = LW * 0.9; ctx.beginPath(); ctx.moveTo(x - rx, y); ctx.lineTo(x - rx, y + off); ctx.moveTo(x + rx, y); ctx.lineTo(x + rx, y + off); ctx.stroke();
+    ell(x, y, rx, ry); fs(face, 0.9);
+    if (faceCook > 0.45) {
+      ctx.save(); ell(x, y, rx, ry); ctx.clip();
+      ctx.globalAlpha = Math.min(1, (faceCook - 0.45) * 2) * 0.85;
+      ctx.fillStyle = GOLD_LT;
+      LACE.forEach(function (l) { ell(x + l[0] * rx, y + l[1] * ry, l[2] * rx, l[2] * ry); ctx.fill(); });
+      ctx.fillStyle = shade(GOLD, -0.12);
+      ell(x, y, rx, ry); ctx.lineWidth = 0.035 * r / 0.3; ctx.strokeStyle = shade(GOLD, -0.15); ctx.stroke();
+      ctx.restore();
+    }
+    // Bubbles come up on the raw top while the bottom cooks, then pop and leave little holes.
+    if (pc && pc.bub && !showA && pc.c2 < 0.95) {
+      var c1 = pc.c1, al = 1 - pc.c2;
+      ctx.save(); ctx.globalAlpha = al;
+      pc.bub.forEach(function (b) {
+        if (c1 < b.a) return;
+        var bx = x + b.u * rx, by = y + b.v * ry, rb = 0.022 * b.s * r / 0.3;
+        if (c1 < b.p) {
+          var k = Math.min(1, (c1 - b.a) / 0.08);
+          ell(bx, by, rb * k, rb * k * 0.75); ctx.fillStyle = "#FFF6D8"; ctx.fill();
+          ctx.lineWidth = LW * 0.6; ctx.strokeStyle = "#C9A45A"; ctx.stroke();
+          ell(bx - rb * 0.3 * k, by - rb * 0.25 * k, rb * 0.3 * k, rb * 0.2 * k); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+        } else { ell(bx, by, rb * 0.45, rb * 0.32); ctx.fillStyle = "#B88F45"; ctx.fill(); }
+      });
+      ctx.restore();
+    }
+  }
+  function pcSquash(pc) { var k = (now() - (pc.sqT || -9)) / 0.35; return k >= 0 && k < 1 ? Math.sin(k * Math.PI) * 0.7 * (1 - k * 0.5) : 0; }
+  function pcWig(pc) { return pc.wig > 0 ? Math.sin(now() * 28) * 0.025 * pc.wig : 0; }
+
+  function drawPan(dy) {
+    var x = PAN.x, y = PAN.y + dy, rimY = y - 0.04, botY = y + 0.07, pc = S.pc;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x - 0.5, rimY - 0.07); ctx.lineTo(x - 0.9, rimY - 0.26);
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.1; ctx.stroke(); ctx.strokeStyle = "#2B3045"; ctx.lineWidth = 0.1 - 2 * LW; ctx.stroke();
+    circ(x - 0.85, rimY - 0.245, 0.018); ctx.fillStyle = "#9AA5B8"; ctx.fill();
+    ell(x, rimY, PAN.rx, PAN.ry); fs("#3B4256", 1.1);
+    ell(x, y, PAN.fx, PAN.fy); ctx.fillStyle = mixHex("#4F566C", "#6A5A55", hot * 0.5); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.16)"; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.ellipse(x, y, PAN.fx * 0.7, PAN.fy * 0.6, 0, 3.6, 4.6); ctx.stroke();
+    if (pc && (pc.ph === "pour" || pc.ph === "pan" || (pc.ph === "lift" && pc.z < 0.02))) drawCake(x + pc.x + pcWig(pc), y - (pc.z || 0), pc.r, 0, pc, pcSquash(pc));
+    ctx.beginPath(); ctx.moveTo(x - PAN.rx, rimY); ctx.lineTo(x - PAN.rx + 0.03, botY);
+    ctx.ellipse(x, botY, PAN.rx - 0.03, PAN.ry - 0.01, 0, Math.PI, 0, true);
+    ctx.lineTo(x + PAN.rx, rimY);
+    ctx.ellipse(x, rimY, PAN.rx, PAN.ry, 0, 0, Math.PI, false);
+    ctx.closePath(); fs("#2B3045", 1.1);
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 0.022; ctx.beginPath(); ctx.ellipse(x, rimY + 0.05, PAN.rx - 0.05, PAN.ry, 0, 2.0, 2.7); ctx.stroke();
+    ctx.strokeStyle = "#5B6276"; ctx.lineWidth = 0.02; ell(x, rimY, PAN.rx - 0.012, PAN.ry - 0.006); ctx.stroke();
+  }
+  function drawBatterStream() {
+    if (!jug.pouring) return;
+    var sp = jugSpout(), pc = S.pc, lx = clamp(sp.x, PAN.x - PAN.fx + 0.05, PAN.x + PAN.fx - 0.05), ly = PAN.y - 0.01;
+    if (pc) lx = PAN.x + clamp(sp.x - PAN.x, pc.x - pc.r * 0.8, pc.x + pc.r * 0.8);
+    var t = now();
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.quadraticCurveTo(sp.x + 0.03 + Math.sin(t * 9) * 0.01, (sp.y + ly) / 2, lx, ly);
+    ctx.lineWidth = 0.055 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = 0.055; ctx.strokeStyle = BATTER; ctx.stroke();
+  }
+  function drawShelf() {
+    // The jug's wall shelf (upright stages).
+    if (!tall) return;
+    var x = JUG.x, y = JUG.y + 0.005;
+    rr(x - 0.24, y, 0.07, 0.22, 0.02); fs("#C98B4F", 0.8); rr(x + 0.17, y, 0.07, 0.22, 0.02); fs("#C98B4F", 0.8);
+    rr(x - 0.4, y, 0.8, 0.07, 0.03); fs("#E7B77A");
+  }
+  function drawJug() {
+    var t = now(), wig = jug.wig > 0 ? Math.sin(t * 26) * 0.1 * jug.wig : 0, a = jug.tilt * 1.55;
+    if (jug.st === "home") { ctx.fillStyle = "rgba(29,35,64,0.15)"; ell(JUG.x, JUG.y + 0.01, 0.22, 0.045); ctx.fill(); }
+    ctx.save(); ctx.translate(jug.x, jug.y); ctx.rotate(a + wig);
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-0.15, -0.17); ctx.quadraticCurveTo(-0.34, -0.16, -0.31, 0.0); ctx.quadraticCurveTo(-0.28, 0.13, -0.15, 0.13);
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.075; ctx.stroke(); ctx.strokeStyle = "#E9EEF4"; ctx.lineWidth = 0.075 - 2 * LW; ctx.stroke();
+    var body = function () {
+      ctx.beginPath(); ctx.moveTo(-0.17, -0.27); ctx.lineTo(0.12, -0.27); ctx.lineTo(0.23, -0.32); ctx.lineTo(0.18, -0.19);
+      ctx.lineTo(0.16, 0.24); ctx.quadraticCurveTo(0.16, 0.27, 0.13, 0.27); ctx.lineTo(-0.13, 0.27); ctx.quadraticCurveTo(-0.16, 0.27, -0.16, 0.24); ctx.closePath();
+    };
+    body(); ctx.fillStyle = "rgba(214,238,255,0.75)"; ctx.fill();
+    ctx.save(); body(); ctx.clip();
+    ctx.rotate(-a);
+    var lv = lerp(-0.06, 0.02, jug.tilt);
+    ctx.fillStyle = BATTER; ctx.fillRect(-1, lv, 2, 2);
+    ctx.strokeStyle = "#D9B866"; ctx.lineWidth = LW; ctx.beginPath(); ctx.moveTo(-1, lv); ctx.lineTo(1, lv); ctx.stroke();
+    ctx.restore();
+    body(); ctx.lineWidth = LW * 1.1; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 0.028; ctx.beginPath(); ctx.moveTo(0.1, -0.2); ctx.lineTo(0.09, 0.18); ctx.stroke();
+    ctx.restore();
+  }
+  function drawPlate() {
+    var x = PLATE.x + plate.off, y = PLATE.y, t = now();
+    var wig = plate.wig > 0 ? Math.sin(t * 26) * 0.04 * plate.wig : 0;
+    ctx.save(); ctx.translate(x + wig, 0);
+    ctx.fillStyle = "rgba(29,35,64,0.15)"; ell(0.02, y + 0.03, PLATE.rx + 0.02, PLATE.ry * 0.6); ctx.fill();
+    ell(0, y, PLATE.rx, PLATE.ry); fs("#FFFFFF");
+    ell(0, y - 0.004, PLATE.rx * 0.68, PLATE.ry * 0.62); ctx.fillStyle = "#EEF6FD"; ctx.fill(); ctx.strokeStyle = "#BFD9EC"; ctx.lineWidth = LW * 0.8; ctx.stroke();
+    var list = S.stack.list, i;
+    for (i = 0; i < list.length; i++) drawCake(list[i].j, y - 0.03 - i * 0.052, Math.min(list[i].r, 0.52) * 0.78, 0, null, 0);
+    if (list.length) { var lt = list[list.length - 1]; drawToppings(lt.j, y - 0.03 - (list.length - 1) * 0.052, Math.min(lt.r, 0.52) * 0.78, list.length); }
+    ctx.restore();
+  }
+  function topK(id, dur) { var t0 = tops[id]; if (t0 == null) return 1; return clamp((now() - t0) / (reduce ? 0.1 : dur), 0, 1); }
+  function drawToppings(x, y, r, n) {
+    var st = S.stack.tops, ry = r * 0.34, t = now(), k;
+    if (st.indexOf("syrup") >= 0) {
+      k = topK("syrup", 1.6);
+      var g = clamp(k * 1.4, 0, 1);
+      ell(x, y + ry * 0.05, r * 0.82 * g, ry * 0.8 * g); fs("rgba(168,86,28,0.92)", 0.6);
+      ctx.fillStyle = "rgba(255,230,190,0.5)"; ell(x - r * 0.25 * g, y - ry * 0.25 * g, r * 0.22 * g, ry * 0.18 * g); ctx.fill();
+      // Drips down the front of the stack.
+      var dk = clamp((k - 0.4) / 0.6, 0, 1), H = Math.min(0.05 + n * 0.052, 0.3);
+      [[-0.55, 0.7], [0.05, 1], [0.5, 0.55]].forEach(function (dd) {
+        var xx = x + dd[0] * r, yy = y + ry * Math.sqrt(1 - dd[0] * dd[0]) * 0.92, L = H * dd[1] * dk;
+        if (L < 0.005) return;
+        ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(xx, yy - 0.01); ctx.lineTo(xx, yy + L);
+        ctx.lineWidth = 0.032 + 2 * LW * 0.6; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.032; ctx.strokeStyle = "#B5651D"; ctx.stroke();
+      });
+      if (k < 0.75) {
+        // The syrup bottle pours from above.
+        var by = y - 0.55, bx = x + 0.12;
+        ctx.save(); ctx.translate(bx, by); ctx.rotate(-2.3);
+        rr(-0.07, -0.13, 0.14, 0.26, 0.05); fs("#A8561C"); rr(-0.035, -0.19, 0.07, 0.07, 0.02); fs("#E63946", 0.8);
+        ctx.restore();
+        ctx.beginPath(); ctx.moveTo(bx + 0.13, by + 0.11); ctx.quadraticCurveTo(x + 0.05, by + 0.3, x, y);
+        ctx.lineWidth = 0.025 + 2 * LW * 0.6; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.025; ctx.strokeStyle = "#B5651D"; ctx.stroke();
+      }
+    }
+    if (st.indexOf("butter") >= 0) {
+      k = topK("butter", 0.6);
+      var e = ease(k), fy = -(1 - e) * 0.6;
+      if (k >= 1) { ell(x + 0.01, y + 0.012, r * 0.32, ry * 0.32); ctx.fillStyle = "rgba(255,226,122,0.85)"; ctx.fill(); }
+      ctx.save(); ctx.translate(x, y + fy);
+      ctx.beginPath(); ctx.moveTo(-0.08, -0.02); ctx.lineTo(0.03, -0.05); ctx.lineTo(0.09, -0.025); ctx.lineTo(-0.02, 0.005); ctx.closePath(); fs("#FFE27A", 0.8);
+      ctx.beginPath(); ctx.moveTo(-0.08, -0.02); ctx.lineTo(-0.02, 0.005); ctx.lineTo(-0.02, 0.035); ctx.lineTo(-0.08, 0.01); ctx.closePath(); fs("#F2C94C", 0.8);
+      ctx.beginPath(); ctx.moveTo(-0.02, 0.005); ctx.lineTo(0.09, -0.025); ctx.lineTo(0.09, 0.005); ctx.lineTo(-0.02, 0.035); ctx.closePath(); fs("#F7D35C", 0.8);
+      ctx.restore();
+    }
+    if (st.indexOf("berries") >= 0) {
+      var B5 = [[-0.5, -0.1, 0], [0.42, 0.25, 0], [0.05, 0.45, 0], [-0.15, -0.45, 1], [0.55, -0.25, 1], [-0.4, 0.35, 1]];
+      B5.forEach(function (b, i) {
+        var kb = clamp((t - (tops.berries == null ? -99 : tops.berries) - i * 0.12) / (reduce ? 0.1 : 0.5), 0, 1), eb = ease(kb);
+        var bx = x + b[0] * r * 0.85, by = y + b[1] * ry * 0.85 - (1 - eb) * 0.6 - 0.015;
+        if (b[2]) {
+          ctx.beginPath(); ctx.moveTo(bx, by + 0.03); ctx.bezierCurveTo(bx - 0.045, by + 0.005, bx - 0.035, by - 0.03, bx, by - 0.022); ctx.bezierCurveTo(bx + 0.035, by - 0.03, bx + 0.045, by + 0.005, bx, by + 0.03); ctx.closePath();
+          fs("#E8344E", 0.7);
+          ctx.fillStyle = "#FFB3C0"; ell(bx, by, 0.012, 0.01); ctx.fill();
+        } else {
+          circ(bx, by, 0.026); fs("#4B4FA8", 0.7);
+          ctx.fillStyle = "rgba(255,255,255,0.45)"; circ(bx - 0.008, by - 0.008, 0.008); ctx.fill();
+        }
+      });
+    }
+  }
+
+  // ---------- The pot ----------
+  function drawFood(id, x, y, r, rot, soft) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    var lw = 0.6;
+    if (id === "carrot") { circ(0, 0, r); fs("#FF8A1F", lw); circ(0, 0, r * 0.5); ctx.fillStyle = "#FFB347"; ctx.fill(); }
+    else if (id === "peas") { circ(0, 0, r); fs("#5DBB3F", lw); circ(-r * 0.3, -r * 0.3, r * 0.3); ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill(); }
+    else if (id === "corn") { rr(-r, -r * 0.85, r * 2, r * 1.7, r * 0.5); fs("#FFD23F", lw); }
+    else if (id === "tomato") { ctx.beginPath(); ctx.moveTo(-r, r * 0.4); ctx.quadraticCurveTo(0, -r * 1.5, r, r * 0.4); ctx.closePath(); fs("#E8352E", lw); ctx.fillStyle = "#FFD9A0"; circ(-r * 0.3, 0, r * 0.12); ctx.fill(); circ(r * 0.3, 0, r * 0.12); ctx.fill(); }
+    else if (id === "potato") { rr(-r, -r, r * 2, r * 2, r * 0.35); fs("#F1DC9C", lw); }
+    else if (id === "spaghetti") {
+      var amp = 0.3 * r * (soft == null ? 1 : soft);
+      ctx.beginPath(); ctx.moveTo(-r, 0);
+      for (var s = 1; s <= 10; s++) ctx.lineTo(-r + 2 * r * s / 10, Math.sin(s * 1.4) * amp);
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.lineWidth = r * 0.26 + LW * 1.2; ctx.strokeStyle = INK; ctx.stroke();
+      ctx.lineWidth = r * 0.26; ctx.strokeStyle = "#F2D27A"; ctx.stroke();
+    } else if (id === "shells") {
+      ctx.beginPath(); ctx.moveTo(0, r); ctx.quadraticCurveTo(-r * 1.3, 0, -r * 0.5, -r * 0.8); ctx.quadraticCurveTo(0, -r * 1.1, r * 0.5, -r * 0.8); ctx.quadraticCurveTo(r * 1.3, 0, 0, r); ctx.closePath();
+      fs("#F2D27A", lw);
+      ctx.strokeStyle = "#C99A2E"; ctx.lineWidth = LW * 0.6; ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.lineTo(0, -r * 0.8); ctx.moveTo(0, r * 0.9); ctx.lineTo(-r * 0.5, -r * 0.6); ctx.moveTo(0, r * 0.9); ctx.lineTo(r * 0.5, -r * 0.6); ctx.stroke();
+    } else if (id === "bowties") {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-r, -r * 0.7); ctx.lineTo(-r, r * 0.7); ctx.closePath(); fs("#F2D27A", lw);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, -r * 0.7); ctx.lineTo(r, r * 0.7); ctx.closePath(); fs("#F2D27A", lw);
+      rr(-r * 0.2, -r * 0.3, r * 0.4, r * 0.6, r * 0.15); fs("#E8C35A", lw);
+    }
+    ctx.restore();
+  }
+  function drawPot(dy) {
+    var x = POT.x, ty = POT.ty + dy, by = POT.by + dy, rx = POT.rx, ry = POT.ry, t = now(), i;
+    var wy = waterY() + dy, wrx = rx * 0.95, wry = ry * 0.9;
+    rr(x - rx - 0.13, ty + 0.06, 0.17, 0.07, 0.035); fs("#3B4256");
+    rr(x + rx - 0.04, ty + 0.06, 0.17, 0.07, 0.035); fs("#3B4256");
+    ell(x, ty, rx, ry); fs("#AEB8C6", 1.1);
+    ctx.save(); ell(x, ty, rx - 0.015, ry - 0.006); ctx.clip();
+    ctx.fillStyle = "rgba(29,35,64,0.18)"; ell(x, wy - 0.035, wrx, wry); ctx.fill();
+    ell(x, wy, wrx, wry); ctx.fillStyle = potColor(); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 0.02; ctx.beginPath(); ctx.ellipse(x, wy, wrx * 0.8, wry * 0.6, 0, 3.5, 4.4); ctx.stroke();
+    ripples.forEach(function (rp) {
+      var k = (t - rp.t0) / 0.8;
+      ctx.strokeStyle = "rgba(255,255,255," + (0.7 * (1 - k)).toFixed(3) + ")"; ctx.lineWidth = LW;
+      ell(rp.x, rp.y + dy, 0.03 + k * 0.12, (0.03 + k * 0.12) * 0.32); ctx.stroke();
+    });
+    for (i = 0; i < pieces.length; i++) {
+      var p = pieces[i];
+      if (p.fy < 0) continue;
+      var px = x + Math.cos(p.phi) * p.rho * wrx * 0.82, py = wy + Math.sin(p.phi) * p.rho * wry * 0.78 + Math.sin(p.bob) * 0.006;
+      ctx.save(); ctx.translate(px, py); ctx.scale(1, 0.62); drawFood(p.id, 0, 0, p.r, p.rot, p.soft); ctx.restore();
+    }
+    potBub.forEach(function (b) {
+      var k = (t - b.t0) / b.life, bx = x + b.u * wrx * 0.9, bby = wy + b.v * wry * 0.85;
+      if (k < 0.8) { var rb = b.r * (k / 0.8); ell(bx, bby, rb, rb * 0.7); ctx.fillStyle = "rgba(255,255,255,0.45)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = LW * 0.6; ctx.stroke(); }
+      else { var rp = b.r * (1 + (k - 0.8) * 4); ell(bx, bby, rp, rp * 0.5); ctx.strokeStyle = "rgba(255,255,255," + (1 - k) * 3 + ")"; ctx.lineWidth = LW * 0.5; ctx.stroke(); }
+    });
+    // The wooden spoon's bowl, down in the soup.
+    var sw = spoon.wig > 0 ? Math.sin(t * 26) * 0.12 * spoon.wig : 0;
+    ctx.save(); ctx.translate(spoon.x, spoon.y + dy); ctx.rotate(spoon.a + sw);
+    ell(0, 0, 0.065, 0.04); ctx.globalAlpha = 0.75; fs("#C98B4F", 0.8); ctx.globalAlpha = 1;
+    ctx.restore();
+    ctx.restore();
+    // The pot's front, then its rim.
+    ctx.beginPath(); ctx.moveTo(x - rx, ty); ctx.lineTo(x - rx, by);
+    ctx.ellipse(x, by, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, ty);
+    ctx.ellipse(x, ty, rx, ry, 0, 0, Math.PI, false);
+    ctx.closePath(); fs("#E63946", 1.1);
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 0.04; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x - rx * 0.7, ty + ry + 0.08); ctx.lineTo(x - rx * 0.7, by + ry * 0.6); ctx.stroke();
+    ctx.strokeStyle = "#B8323E"; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.ellipse(x, ty + 0.1, rx - 0.012, ry, 0, 0.25, Math.PI - 0.25); ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = LW * 1.1; ell(x, ty, rx, ry); ctx.stroke();
+    ctx.strokeStyle = "#E9EEF4"; ctx.lineWidth = 0.022; ell(x, ty, rx - 0.018, ry - 0.008); ctx.stroke();
+    // The spoon's handle sticks up out of the pot.
+    ctx.save(); ctx.translate(spoon.x, spoon.y + dy); ctx.rotate(spoon.a + sw);
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, -0.035); ctx.lineTo(0, -0.78);
+    ctx.lineWidth = 0.05 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.05; ctx.strokeStyle = "#D9A066"; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 0.012; ctx.beginPath(); ctx.moveTo(-0.01, -0.1); ctx.lineTo(-0.01, -0.72); ctx.stroke();
+    ctx.restore();
+    // Food on its way in.
+    for (i = 0; i < pieces.length; i++) {
+      var q = pieces[i];
+      if (q.fy >= 0) continue;
+      drawFood(q.id, x + Math.cos(q.phi) * q.rho * wrx * 0.82, wy + q.fy, q.r, q.rot, 0);
+    }
+  }
+  function drawFaucet() {
+    var x = FAUCET.x, y = FAUCET.y, run = faucet.run, t = now();
+    var mx = x - 0.44;
+    // Water stream first, so the spout covers its top.
+    if (run) {
+      var k = (t - run.t0) / run.dur, w = 0.035 * Math.min(1, Math.min(k, 1 - k) * 8);
+      if (w > 0.002) {
+        var wy = waterY();
+        ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x, y + 0.02); ctx.lineTo(x + Math.sin(t * 20) * 0.003, wy);
+        ctx.lineWidth = w + 2 * LW * 0.7; ctx.strokeStyle = "rgba(29,35,64,0.6)"; ctx.stroke();
+        ctx.lineWidth = w; ctx.strokeStyle = "#9ED8FF"; ctx.stroke();
+        ctx.lineWidth = w * 0.3; ctx.strokeStyle = "#FFFFFF"; ctx.stroke();
+      }
+    }
+    rr(mx - 0.06, y - 0.2, 0.12, 0.2, 0.03); fs("#9AA5B8");
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    var pipe = function (w, col) { ctx.beginPath(); ctx.moveTo(mx, y - 0.12); ctx.lineTo(x - 0.04, y - 0.12); ctx.quadraticCurveTo(x, y - 0.12, x, y - 0.06); ctx.lineTo(x, y + 0.01); ctx.lineWidth = w; ctx.strokeStyle = col; ctx.stroke(); };
+    pipe(0.05 + 2 * LW, INK); pipe(0.05, "#C9D3E0");
+    // The tap lever on the wall mount: turned when the water runs.
+    ctx.save(); ctx.translate(mx, y - 0.1); ctx.rotate(run ? -1.0 : -0.1);
+    rr(-0.02, -0.17, 0.04, 0.17, 0.02); fs("#3B4256", 0.8);
+    ctx.restore();
+    circ(mx, y - 0.1, 0.035); fs("#C9D3E0", 0.8);
+  }
+  function drawBowl() {
+    var x = BOWL.x + bowlV.off, y = BOWL.y, t = now(), rx = BOWL.rx, ry = BOWL.ry, rimY = y - 0.2;
+    var wig = bowlV.wig > 0 ? Math.sin(t * 26) * 0.04 * bowlV.wig : 0;
+    ctx.save(); ctx.translate(wig, 0);
+    ctx.fillStyle = "rgba(29,35,64,0.15)"; ell(x + 0.02, y + 0.02, rx * 0.75, 0.05); ctx.fill();
+    ell(x, rimY, rx, ry); fs("#FFFFFF", 1.1);
+    var b = S.bowl;
+    if (b.fill > 0.001 && b.c) {
+      var f = b.fill, sy = rimY + (1 - f) * 0.09 + 0.012, srx = rx * (0.92 - (1 - f) * 0.25), sry = ry * (0.86 - (1 - f) * 0.25);
+      ctx.save(); ell(x, rimY, rx - 0.01, ry - 0.004); ctx.clip();
+      ell(x, sy, srx, sry); fs(b.c, 0.7);
+      b.bits.forEach(function (id, i) {
+        var u = Math.sin(i * 2.4 + 0.5) * 0.65, v = Math.cos(i * 3.1 + 0.2) * 0.55;
+        ctx.save(); ctx.translate(x + u * srx, sy + v * sry); ctx.scale(1, 0.62); drawFood(id, 0, 0, FOOD[id].r * 0.85, i * 1.3, 1); ctx.restore();
+      });
+      ctx.fillStyle = "rgba(255,255,255,0.35)"; ell(x - srx * 0.3, sy - sry * 0.3, srx * 0.25, sry * 0.18); ctx.fill();
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.moveTo(x - rx, rimY); ctx.quadraticCurveTo(x - rx + 0.02, y - 0.02, x - 0.13, y - 0.01); ctx.lineTo(x + 0.13, y - 0.01);
+    ctx.quadraticCurveTo(x + rx - 0.02, y - 0.02, x + rx, rimY);
+    ctx.ellipse(x, rimY, rx, ry, 0, 0, Math.PI, false); ctx.closePath(); fs("#3DB4FF", 1.1);
+    ctx.fillStyle = "#FFFFFF"; [-0.2, -0.07, 0.07, 0.2].forEach(function (u) { circ(x + u, rimY + ry + 0.06 - Math.abs(u) * 0.12, 0.018); ctx.fill(); });
+    rr(x - 0.14, y - 0.025, 0.28, 0.04, 0.02); fs("#2D8BD8", 0.8);
+    ctx.restore();
+  }
+  function drawRail() {
+    var x = RAIL.x, y = RAIL.y;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x - 0.36, y); ctx.lineTo(x + 0.36, y);
+    ctx.lineWidth = 0.035 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.035; ctx.strokeStyle = "#C9D3E0"; ctx.stroke();
+    rr(x - 0.42, y - 0.04, 0.06, 0.08, 0.02); fs("#9AA5B8", 0.8); rr(x + 0.36, y - 0.04, 0.06, 0.08, 0.02); fs("#9AA5B8", 0.8);
+    [-0.17, 0.17].forEach(function (u) { ctx.beginPath(); ctx.moveTo(x + u, y - 0.01); ctx.quadraticCurveTo(x + u + 0.04, y + 0.03, x + u, y + 0.06); ctx.lineWidth = LW * 1.4; ctx.strokeStyle = INK; ctx.stroke(); });
+  }
+  function drawSpatula() {
+    ctx.save();
+    var sa = swingA(0);
+    if (sa) { ctx.translate(spat.x, spat.y - 0.6); ctx.rotate(sa); ctx.translate(-spat.x, -(spat.y - 0.6)); }
+    ctx.translate(spat.x, spat.y); ctx.rotate(spat.a);
+    rr(-0.032, 0.14, 0.064, 0.48, 0.03); fs("#E63946");
+    circ(0, 0.56, 0.014); ctx.fillStyle = INK; ctx.fill();
+    rr(-0.016, 0.06, 0.032, 0.1, 0.01); fs("#9AA5B8", 0.8);
+    rr(-0.13, -0.11, 0.26, 0.19, 0.045); fs("#C9D3E0");
+    ctx.strokeStyle = "#7C8798"; ctx.lineWidth = 0.014; ctx.lineCap = "round"; ctx.beginPath();
+    [-0.06, 0, 0.06].forEach(function (u) { ctx.moveTo(u, -0.07); ctx.lineTo(u, 0.03); });
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawLadle() {
+    var t = now(), wig = ladle.wig > 0 ? Math.sin(t * 26) * 0.1 * ladle.wig : 0;
+    ctx.save();
+    var la = swingA(2.4);
+    if (la) { ctx.translate(ladle.x, ladle.y - 0.585); ctx.rotate(la); ctx.translate(-ladle.x, -(ladle.y - 0.585)); }
+    ctx.translate(ladle.x, ladle.y); ctx.rotate(ladle.a + wig);
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, -0.05); ctx.quadraticCurveTo(0.02, -0.3, 0, -0.56);
+    ctx.lineWidth = 0.035 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.035; ctx.strokeStyle = "#C9D3E0"; ctx.stroke();
+    circ(0, -0.585, 0.025); ctx.lineWidth = LW * 1.2; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 0.11, 0.085, 0, 0, Math.PI); ctx.closePath(); fs("#C9D3E0");
+    ell(0, 0, 0.11, 0.035); fs(ladle.full ? (S.bowl.c && ladle.st === "pour" ? S.bowl.c : potColor()) : "#8D97A8", 0.9);
+    ctx.restore();
+    // Pouring into the bowl.
+    var st = ladle.path && ladle.path[ladle.pi];
+    if (st && st.pour && ladle.full) {
+      var c = Math.cos(ladle.a), s = Math.sin(ladle.a), lx = ladle.x - 0.11 * c, ly = ladle.y - 0.11 * s;
+      var bx = BOWL.x + bowlV.off + 0.02, by = BOWL.y - 0.2 + (1 - S.bowl.fill) * 0.09;
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.quadraticCurveTo(lx - 0.01, (ly + by) / 2, bx, by);
+      ctx.lineWidth = 0.045 + 2 * LW; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 0.045; ctx.strokeStyle = S.bowl.c || potColor(); ctx.stroke();
+    }
+  }
+  function drawLoosePancake() {
+    var pc = S.pc;
+    if (!pc) return;
+    if (pc.ph === "fly" || (pc.ph === "lift" && pc.z >= 0.02)) {
+      var z = pc.z || 0;
+      ctx.fillStyle = "rgba(29,35,64," + (0.18 * Math.max(0, 1 - z)).toFixed(3) + ")"; ell(PAN.x + pc.x, PAN.y + 0.02, pc.r * 0.9, pc.r * 0.3); ctx.fill();
+      drawCake(PAN.x + pc.x, PAN.y - z, pc.r, pc.th || 0, pc, 0);
+    } else if (pc.ph === "carry" || pc.ph === "toplate") {
+      drawCake(pc.wx, pc.wy, pc.r * (pc.ph === "toplate" ? lerp(1, 0.78, ease((now() - pc.to.t0) / pc.to.dur)) : 1), 0, pc, 0);
+    }
+  }
+  function drawParts() {
+    parts.forEach(function (q) {
+      var a = 1 - q.life / q.max;
+      if (q.steam) {
+        var al = 0.42 * a * Math.min(1, q.life * 3);
+        circ(q.x, q.y, q.r); ctx.fillStyle = "rgba(255,255,255," + al.toFixed(3) + ")"; ctx.fill();
+        ctx.strokeStyle = "rgba(150,170,200," + (al * 0.5).toFixed(3) + ")"; ctx.lineWidth = LW * 0.6; ctx.stroke();
+        return;
+      }
+      ctx.globalAlpha = Math.max(0, a);
+      if (q.star) {
+        ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.life * 3);
+        ctx.beginPath();
+        for (var i = 0; i < 8; i++) { var r = i % 2 ? q.r * 0.45 : q.r * 1.4, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+        ctx.closePath(); fs(q.col, 0.6); ctx.restore();
+      } else { circ(q.x, q.y, q.r); ctx.fillStyle = q.col; ctx.fill(); }
+      ctx.globalAlpha = 1;
+    });
+  }
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.setTransform(dpr * B, 0, 0, dpr * B, dpr * ox, dpr * oy);
+    ctx.lineJoin = "round";
+    drawRoom();
+    drawRail();
+    var w = wareNow(), dy = 0, al = 1;
+    if (swap) {
+      var sk = (now() - swap.t0) / swap.dur;
+      if (sk < 0.5) { dy = -ease(sk * 2) * 0.6; al = 1 - ease(sk * 2); } else { dy = -(1 - ease((sk - 0.5) * 2)) * 0.6; al = ease((sk - 0.5) * 2); }
+    }
+    if (w === "pot") { ctx.globalAlpha = al; drawFaucet(); ctx.globalAlpha = 1; }
+    drawBurner();
+    ctx.globalAlpha = al;
+    if (w === "pan") { drawShelf(); drawPan(dy); drawPlate(); drawBatterStream(); drawJug(); }
+    else { drawPot(dy); drawBigBubbles(); drawLid(); drawBowl(); }
+    ctx.globalAlpha = 1;
+    drawSpatula();
+    if (w === "pan") drawLoosePancake();
+    drawLadle();
+    drawParts();
+  }
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Timer ----------
+  function locked() { return Toybox.timer.locked(); }
+  function onEnding(done) {
+    // The burner switches off, the flames go out and the steam fades away.
+    FUN.cur = {};
+    if (on() || (K.anim && K.anim.to > 0)) knobTo(0);
+    K.drag = null;
+    cancelDrags();
+    Object.keys(tileDrags).forEach(function (k) { var d = tileDrags[k]; if (d.f.parentNode) d.f.parentNode.removeChild(d.f); d.b.classList.remove("picked"); });
+    tileDrags = {};
+    setTimeout(done, reduce ? 300 : 3200);
+  }
+  function restArt() {
+    var o = '<rect width="400" height="300" fill="#2B3A67"/>';
+    o += '<rect x="40" y="30" width="120" height="100" rx="8" fill="#1B2550" stroke="#1D2340" stroke-width="4"/><circle cx="120" cy="66" r="18" fill="#FFF4CC"/><circle cx="130" cy="60" r="16" fill="#1B2550"/>';
+    o += '<circle cx="60" cy="50" r="2.5" fill="#FFF4CC"/><circle cx="80" cy="100" r="2.5" fill="#FFF4CC"/><circle cx="145" cy="110" r="2" fill="#FFF4CC"/>';
+    o += '<rect y="214" width="400" height="86" fill="#4C77A6"/><rect y="204" width="400" height="14" fill="#C9A06A" stroke="#1D2340" stroke-width="4"/>';
+    o += '<rect x="140" y="216" width="130" height="84" fill="#AEB8C6" stroke="#1D2340" stroke-width="4"/><circle cx="205" cy="240" r="10" fill="#3B4256" stroke="#1D2340" stroke-width="3"/><rect x="152" y="262" width="106" height="38" rx="6" fill="#3B4256" stroke="#1D2340" stroke-width="3"/>';
+    o += '<g transform="translate(205 204)"><rect x="-58" y="-56" width="14" height="8" rx="4" fill="#3B4256" stroke="#1D2340" stroke-width="3"/><rect x="44" y="-56" width="14" height="8" rx="4" fill="#3B4256" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M-46 -62 L46 -62 L46 -6 Q0 4 -46 -6 Z" fill="#B8323E" stroke="#1D2340" stroke-width="4"/><ellipse cx="0" cy="-62" rx="46" ry="10" fill="#8C97A8" stroke="#1D2340" stroke-width="4"/>' +
+      '<path d="M18 -64 L46 -118" stroke="#1D2340" stroke-width="10" stroke-linecap="round"/><path d="M18 -64 L46 -118" stroke="#D9A066" stroke-width="5" stroke-linecap="round"/></g>';
+    o += '<g transform="translate(320 204)"><ellipse cx="0" cy="-4" rx="36" ry="9" fill="#FFFFFF" stroke="#1D2340" stroke-width="3"/>' +
+      '<ellipse cx="0" cy="-14" rx="28" ry="8" fill="#C98535" stroke="#1D2340" stroke-width="3"/><ellipse cx="0" cy="-22" rx="28" ry="8" fill="#C98535" stroke="#1D2340" stroke-width="3"/><ellipse cx="0" cy="-30" rx="28" ry="8" fill="#D8963C" stroke="#1D2340" stroke-width="3"/>' +
+      '<path d="M-8 -36 L4 -38 L10 -33 L-2 -30 Z" fill="#FFE27A" stroke="#1D2340" stroke-width="2.5"/></g>';
+    o += '<text x="250" y="110" font-family="Baloo 2, sans-serif" font-weight="800" font-size="30" fill="#FFFFFF">z</text><text x="274" y="86" font-family="Baloo 2, sans-serif" font-weight="800" font-size="22" fill="#FFFFFF">z</text><text x="294" y="66" font-family="Baloo 2, sans-serif" font-weight="800" font-size="15" fill="#FFFFFF">z</text>';
+    return '<svg class="rest-art" viewBox="0 0 400 300" aria-hidden="true">' + o + "</svg>";
+  }
+
+  // ---------- Ghost hand (Toybox.ghost) ----------
+  function ghostPt(elm, fx, fy) { var r = elm.getBoundingClientRect(); return [r.left + r.width * fx, r.top + r.height * fy]; }
+  // One hint per kind of move; once he has done a move, its hint never shows again this visit.
+  var doneMoves = {}, ghostPhase = "";
+  var MOVES = { knob: "knob", pour: "pour", again: "pour", flip: "flip", plate: "plate", top: "top", add: "add", stir: "stir", fill: "fill" };
+  function moveFor(ph) { if (ph === "more") return isPan() ? "pour" : "add"; return MOVES[ph] || ""; }
+  function learned(m) { doneMoves[m] = true; if (moveFor(ghostPhase) === m) ghost.learned(); }
+  function updateGhostPhase() {
+    var ph = phase();
+    if (ph === ghostPhase) return;
+    ghostPhase = ph;
+    var m = moveFor(ph);
+    if (!m || doneMoves[m]) ghost.learned(); else ghost.again();
+  }
+  var ghost = Toybox.ghost({ max: 2, plan: function () {
+    if (Object.keys(tileDrags).length || Object.keys(stageDrags).length || swap) return null;
+    var ph = phase(), tile, i;
+    if (ph === "knob") {
+      var pts = [];
+      for (i = 0; i <= 8; i++) { var a = i / 8 * 2.4; pts.push(toPage(KNOB.x + Math.sin(a) * KNOB.r * 0.75, KNOB.y - Math.cos(a) * KNOB.r * 0.75)); }
+      return { pts: pts };
+    }
+    if ((ph === "pour" || ph === "again" || ph === "more") && isPan() && jug.st === "home") { var ps = pourSpot(); return { pts: [toPage(jug.x, jug.y), toPage(ps.x, ps.y)] }; }
+    if (ph === "flip" && S.pc) { var c = toPage(PAN.x + S.pc.x, PAN.y); return { pts: [c, [c[0], c[1] - 0.75 * B]], dur: 2600 }; }
+    if (ph === "plate" && S.pc) return { pts: [toPage(PAN.x + S.pc.x, PAN.y), toPage(PLATE.x, stackTopY() - 0.04)] };
+    if (ph === "top" && (tile = choicesEl.querySelector('[data-top="syrup"]'))) return { pts: [ghostPt(tile, 0.5, 0.45), toPage(PLATE.x, stackTopY() - 0.1)], carry: { html: ICON.syrup, size: 64 } };
+    if ((ph === "add" || ph === "more") && !isPan() && (tile = choicesEl.querySelector("[data-food]"))) return { pts: [ghostPt(tile, 0.5, 0.45), toPage(POT.x, POT.ty - 0.1)], carry: { html: tile.querySelector("svg").outerHTML, size: 64 } };
+    if (ph === "stir") {
+      var wy = waterY(), p2 = [];
+      for (i = 0; i <= 16; i++) { var b = i / 8 * TAU; p2.push(toPage(POT.x + Math.cos(b) * POT.rx * 0.55, wy + Math.sin(b) * POT.ry * 0.55)); }
+      return { pts: p2, dur: 3600 };
+    }
+    if (ph === "fill") return { pts: [toPage(POT.x + 0.1, waterY()), toPage(BOWL.x, BOWL.y - 0.25)] };
+    return null;
+  } });
+
+  // ---------- Start ----------
+  rebuildPieces();
+  renderChoices();
+  layout();
+  (function () { var h = spatHome(); spat.x = h.x; spat.y = h.y; spoon.y = waterY() + 0.02; })();
+  var resizeT = 0;
+  function onResize() { clearTimeout(resizeT); resizeT = setTimeout(layout, 60); layout(); }
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", function () { setTimeout(layout, 250); });
+  Toybox.init({
+    app: "kitchen",
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the stove switches off, the steam fades away and the controls lock. The timer carries on across the kitchen pages.",
+    goodbyeOption: "End with a “Clean up” button to press",
+    farewellText: "Time to finish cooking",
+    goodbyeLabel: "Clean up",
+    farewellDone: "Bye bye, kitchen!",
+    restLine: "The kitchen is resting.",
+    restLine2: "Your food will be on the table next time.",
+    restArt: restArt,
+    soundNote: "Soft sizzles, bubbles and clicks. Hold for 2 seconds.",
+    onEnding: onEnding,
+    onRest: function () { K.anim = null; K.v = 0; },
+    onWake: function () { lastT = now(); },
+    onSound: function (on) { if (on) chime(); }
+  });
+  setTimeout(layout, 30);
+  Toybox.offFirst({
+    running: function () { return on() || flame > 0.05; },
+    name: "stove",
+    off: function (done) {
+      knobTo(0);
+      var t0 = performance.now();
+      var iv = setInterval(function () {
+        if (flame <= 0.05 || performance.now() - t0 > 1500) { clearInterval(iv); done(); }
+      }, 40);
+    },
+    flash: function () { K.flashUntil = now() + 3; K.wig = 1; }
+  });
+  requestAnimationFrame(loop);
+
+  // Test hooks, only with ?debug in the address.
+  if (/[?&]debug\b/.test(location.search)) {
+    window.__stove = {
+      state: function () {
+        var pc = S.pc;
+        return { recipe: S.recipe, phase: phase(), coach: coachEl.textContent, knob: +K.v.toFixed(2), on: on(), hot: +hot.toFixed(2), flame: +flame.toFixed(2),
+          pc: pc ? { ph: pc.ph, r: +pc.r.toFixed(3), x: +pc.x.toFixed(3), c1: +pc.c1.toFixed(2), c2: +pc.c2.toFixed(2), flipped: pc.flipped, z: +(pc.z || 0).toFixed(2), turns: pc.fly ? pc.fly.turns : 0, h: pc.fly ? +pc.fly.h.toFixed(2) : 0 } : null,
+          stack: JSON.parse(JSON.stringify(S.stack)), pot: { items: S.pot.items.slice(), stir: +S.pot.stir.toFixed(2), level: +S.pot.level.toFixed(2), pieces: pieces.length, cooked: cooked() },
+          bowl: JSON.parse(JSON.stringify(S.bowl)), nP: S.nP, nB: S.nB, jug: jug.st, ladle: ladle.st, swap: !!swap, away: !!away };
+      },
+      pt: function (name) {
+        var pc = S.pc;
+        if (name === "knob") return toPage(KNOB.x, KNOB.y);
+        if (name === "jug") return toPage(jug.x, jug.y);
+        if (name === "pourSpot") { var ps = pourSpot(); return toPage(ps.x, ps.y); }
+        if (name === "pan") return toPage(PAN.x, PAN.y);
+        if (name === "pancake") return pc ? toPage(PAN.x + pc.x, PAN.y - (pc.z || 0)) : null;
+        if (name === "plate") return toPage(PLATE.x, PLATE.y - 0.05);
+        if (name === "stackTop") return toPage(PLATE.x, stackTopY() - 0.05);
+        if (name === "pot") return toPage(POT.x, waterY());
+        if (name === "bowl") return toPage(BOWL.x, BOWL.y - 0.2);
+        if (name === "ladle") return toPage(ladle.x, ladle.y);
+        if (name === "spatula") return toPage(spat.x, spat.y);
+        if (name === "faucet") return toPage(FAUCET.x - 0.2, FAUCET.y - 0.12);
+        if (name === "B") return B;
+        return null;
+      },
+      potPt: function (u, v) { return toPage(POT.x + u * POT.rx * 0.7, waterY() + v * POT.ry * 0.7); },
+      ghost: function () { return ghost.show(); },
+      fun: function () { return { cur: Object.keys(FUN.cur), last: FUN.last }; },
+      table: function () { return readTable(); }
+    };
+  }
+})();

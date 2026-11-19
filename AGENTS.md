@@ -1,577 +1,137 @@
 # Toybox: guide for agents
 
-Read this before changing anything. It holds every rule and decision made so far, so you can work on the Toybox
-without the history of the conversations that built it. `PLAN.md` holds the backlog and the plans for new apps;
-`common/toybox.js` documents the shared grown-up layer in its header comment.
+Read this before changing anything. It holds every universal rule and decision for the Toybox.
+
+| Working on… | Also read |
+|---|---|
+| Shared `Toybox`, `Farm`, or `ToyboxProjects` APIs & CSS tokens | [`common/API.md`](common/API.md) |
+| Tractor Ted / Farm map or any Farm station | [`farm/AGENTS.md`](farm/AGENTS.md) |
+| Workshop Tool Wall, stations, or Birdhouse project | [`workshop/AGENTS.md`](workshop/AGENTS.md) |
+| Specific apps, `archive/`, retired `sw.js` stubs, or `tb-v2` notes | [`docs/app-catalog.md`](docs/app-catalog.md) |
+| Backlog, new app plans, or history | [`PLAN.md`](PLAN.md) |
+| Repeatable workflows (new app, verifying changes, farm stations) | `.agents/skills/` (`new-app`, `verify-change`, `farm-station`) |
 
 ---
 
 ## 1. Who it is for
 
-- A 3-year-old boy. He **reads well** (the dad: "he can read almost anything"): real words on buttons and in coach
-  lines are fine and useful; he is not a pre-reader. He is autistic and **sensory seeking**: big visuals, lots of color and
-  motion, touching and dragging, strong responses to every touch, predictable behavior.
-- He loves real workshop tools, machines and construction vehicles, math (times and plus tables), marble runs,
-  gears and anything that spins, trains, rockets, his 3D printer (a P1S with an AMS 2 Pro, drawn without logos)
-  and a water play table the family owns.
-- Don't invent other traits. Don't "dumb it down": real tool names and real mechanics are wanted. But nothing
-  should be complex or unintuitive for a bright 3-year-old.
-- **Learning comes from doing the real thing** (the dad: the Workshop "is full of learning info even though it's not a
-  traditional learning thing for a 3yo"). Real tools, real names, real steps and real mechanics, done hands-on, teach
-  how the world works. Don't frame apps as lessons, quizzes or "educational" activities; make the real activity
-  accurate and let the learning come with it.
-- **New app ideas** can come from anywhere: any toy, machine, activity or game that would be fun, sensory and
-  intuitive for him. His interests (the list above) are one good source, not a limit, and ideas don't have to be
-  typical preschool themes either. Don't design from stereotypes about autism (e.g. assuming spinning, sorting or
-  lining things up); ask the dad when unsure.
-- Devices: an **iPad** (used offline on flights) and an **iPhone**. Both run the site as a home-screen web app.
-- The grown-up (the dad) is a software engineer; grown-up controls live behind a 2-second press-and-hold.
+- A 3-year-old boy who **reads well** ("he can read almost anything"): real words on buttons and coach lines are useful. He is autistic and **sensory seeking**: big visuals, color and motion, touching and dragging, strong responses to every touch, predictable behavior.
+- Interests: real workshop tools, machines and construction vehicles, math (times and plus tables), marble runs, gears and spinning things, trains, rockets, his 3D printer (P1S + AMS 2 Pro, no logos), and the family's water play table.
+- Don't invent traits or "dumb it down": real tool names and real mechanics are wanted, kept intuitive for a bright 3-year-old.
+- **Learning comes from doing the real thing.** Never frame apps as lessons, quizzes, or "educational" activities; make the real activity accurate.
+- **New app ideas** can come from anywhere — don't design from stereotypes about autism (assuming spinning, sorting, or lining things up); ask the dad when unsure.
+- Devices: **iPad** (offline on flights) and **iPhone**, both as home-screen web apps.
+- The dad is a software engineer; grown-up controls live behind a 2-second press-and-hold on the home screen.
 
-### Privacy (hard rule)
-**Never write the child's name anywhere**: not in code, comments, files, filenames, commit messages, PR text or
-history. Say "the child" or "he". The history was rewritten twice to remove it; don't reintroduce it.
+### Privacy (hard invariant)
+**Never write the child's name anywhere** — not in code, comments, files, filenames, commit messages, PR text, or git history. Always say "the child" or "he".
 
 ---
 
-## 2. Repository and architecture
+## 2. Repository, offline & deploy
 
-- Repo `patemotter/toybox`. No build step, no frameworks: each app is one folder with an `index.html`
-  (CSS + JS inline, or in plain `.js`/`.css` files next to the page, see "Code style and structure" in §4).
-  The architecture (a home-screen web app, plain JS drawing on canvas/SVG, one service worker, GitHub Pages)
-  was reviewed on 2026-10-12 and stays: no rewrite, no framework, no native app.
-- Every app folder: `index.html` (plus extra pages for multi-page apps), `manifest.webmanifest`,
-  `icons/icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`. Older apps also have a `sw.js`:
-  a retired stub (see Offline below); keep it, but a new app gets none.
-- `index.html` at the top is the **launcher**: an `APPS` array (order matters: Workshop and Spin Shop first). It
-  fits every tile on one screen with no scrolling, picture and name only. The stylesheet sets the usual columns
-  (four on tablets, three on upright phones, six on phones held sideways); `fitGrid()` also tries up to three
-  more, keeps the count with the biggest pictures where no word of a name splits, and sizes each picture to the
-  room left in its tile (never more, so nothing spills out on an iPhone with its safe areas). A long one-word
-  name gets a soft hyphen in `APPS` (`"Kaleido\u00ADscope"`); names break only there. The `what` text stays in
-  `APPS` for grown-ups and tooling but isn't shown.
-  **Favorites**: the Grown-ups sheet's "Favorites" section (launcher only, `localStorage["toybox-favorites-v1"]`, a
-  list of app hrefs) moves starred apps to the front of the grid, in the order they were picked, with a small star
-  badge (not a button). Grown-ups only; the child can't change the order.
-- `common/toybox.js` + `common/toybox.css`: the shared **grown-up layer** used by every app: play timer, sound
-  hold-toggle, Big button, rest screen, toasts, press-and-hold buttons, fresh-visit detection. Read its header.
-- Multi-page apps: `workshop/` (Tool Wall `index.html`; `tool-wall.html` only redirects to it + stations: `drill-press`, `saw-bench`, `hammer-screws`,
-  `lathe`, `router-table`, `wrenches`, `measuring`, `shadow-board`, `sanding` (the Birdhouse's sanding visit only); plus `project.html`, the Birdhouse
-  project plan: six visits (Plane, Measure, Cut, Drill, Sand, Nail), each with a short story line, with its data and progress API in `workshop/projects.js`,
-  documented in its header) and `construction-site/` (site map +
-  `excavator`, `concrete`, `forklift`, `wrecking-ball`, `tower-crane`) and `kitchen/` (kitchen page with the hand-washing gate
-  and the table + `blender`, `cutting-board`, `stand-mixer`, `stove`) and `farm/` (farm map + one station per newer-series episode he knows: `spuds` ("Spuds in Mud"), `combine` ("Combine
-  Time": Wheat | Sunflowers, the Sunny Seeds episode), `bales` ("Brilliant Baler": Hay | Haylage), `silage` ("Glorious
-  Grass": Grass | Maize), `carrots` ("Munchy Crunchy"), `muck` ("Mucky Muck": Spreader | Slurry tanker), `woods`
-  ("Timberrrrr!": Logs | Chipper; script in `farm/woods.js`. Logs follows the whole episode, five steps he does himself:
-  Fell, Logs, Lorry (drive it to the weighbridge, count its six wheels, crane the logs off), Sawmill (drive the
-  loader, then each log through the squaring and splitting saws), Fence (Farmer Tom stands the post, the
-  tractor's post knocker knocks it in, Farmer Tom fixes the netting, the sheep are safe). **No step row and one view**
-  (the dad, 2026-10-14: the close-up below "added nothing" and the green step chips looked like buttons): the coach
-  line and a yellow ring on the scene point at the next thing to tap or drag; at the end a tap on the scene starts
-  again. Chipper is played the same way, by tapping the machine), `berries` ("Juicy Squeezy"), `cows` ("Moooovie Time": the cows walk into the
-  parlor, no milking), `sheep` ("Come Bye": Gather | Foot bath), `hens` ("Feathered Friends"), `tracks` ("Caterpillar
-  Hunt"), `ewe` ("Hello Ewe!": scrape the shed passage, count four sheep onto the parlor platform, the blue foot
-  spray, the straw chopper beds the shed; script `farm/ewe.js`), `mushrooms` ("Mighty Mushrooms": the crane lorry's straw,
-  the steaming compost bunker, filling the growing shelves, picking; script `farm/mushrooms.js`); both built hands-on like
-  Timberrrrr! (2026-10-15); `field.html` only redirects to spuds. **Every station is hands-on like Timberrrrr!** (rebuilt
-  2026-10-15/16): no step row and no Go; he works each machine on the scene, a yellow ring and the instruction show
-  the next part, other parts show their name, a tap after the last step starts again; job tabs stay; a `?debug`
-  hook `window.__farm` (`state()` with the wanted part, `tap(part)`) plays each station in tests. The panel holds only
-  the bottom bar (`tb-panel-bar`: a slim column of New and Surprise in landscape). One view framed on the work, the
-  split close-up only where it shows something the main view can't (the dad, 2026-10-15: "some dual views add something, Timberrr did
-  not"). Kept: Spuds in Mud, Combine Time (corner inset), Brilliant Baler, Glorious Grass, Munchy Crunchy, Juicy
-  Squeezy, Feathered Friends (inside the hen house), Caterpillar Hunt (under the wheel). One view: Timberrrrr!,
-  Mucky Muck, Moooovie Time, Come Bye (they only repeated the main view bigger). Shared
-  code in `farm/farm.js` (`Farm.NAMES`, scene, tractor, combine, telehandler, cow...), documented in its header,
-  world state in `farm-world-v1`; a map lot is one `STATIONS` entry in `farm/index.html`).
-- Apps: workshop, spin-shop, kaleidoscope, peg-drop, rocket-builder, gear-box,
-  marble-run, car-builder, math-grid, 3d-printer, water-works (shown as "Water Table"), construction-site,
-  train-builder, bubble-machine (shown as "Bubbles"), hamster, garden, spinning-tops, kitchen,
-  spirograph, jigsaw, sand-table, espresso-machine, farm (shown as "Tractor Ted"), sewing-machine (the family's
-  white computerized machine, no logo; script in `sewing-machine/index.js`), garbage-truck (an automated side loader on a street of
-  bins, hands-on like the Farm stations; script in `garbage-truck/index.js`), glow-board (a board of round light-up
-  buttons modeled on his light-up touch-button toy, drawn without its logo: Draw | Fill | Light show; the colors and light shows are a tray of drawn
-  buttons on the stage next to the board, so the panel holds only New and Surprise; 8 x 8 on phones, 16 x 16 on
-  tablets, chosen once from the screen's short side; script in `glow-board/index.js`), forge (a blacksmith's corner: the blower, a
-  steel bar that moves only where he hammers it and only while hot, the vise's twisting wrench, the tub; makes the
-  dad's real copper coffee spoon as a saved project, an S-hook, a fire poker or a free bar; finished pieces hang on a
-  rack; gear-up flag `forge-gear`; plan `plans/forge.md`, script `forge/index.js`), circuits (snap parts on a pegboard
-  with a small circuit solver, or wire a house at night: Board | House; plan `plans/circuits.md`, script
-  `circuits/index.js`), sweet-shop (a sweet shop counter; gummies for now, donuts or cookies may come later as
-  jobs: pour a flavor, tip in gelatin and sugar, turn the hot plate's knob, stir until clear, fill a Bears | Worms |
-  Fruits silicone mold with the candy dropper, chill it in the fridge, pop them out, coat them Sour sugar | Sugar |
-  Shiny, put them in the candy jar; hands-on like the Farm stations, and every step works by hand (a drag does the
-  real thing while he holds it: pour, tip, turn, stir, fill; a tap plays that part once); every gummy jiggles; the jar is his collection
-  (`sweet-shop-v1`); plan `plans/sweet-shop.md`, script `sweet-shop/index.js`), drawing (Color | Draw | Write: a
-  coloring book, free drawing, and guided letter, number and word tracing; the page fills the stage and everything
-  else lives in a pull-out drawer on its edge (right in landscape, bottom when upright); no shelf; plan
-  `plans/drawing.md` with its sources, script `drawing/index.js`, data in `drawing/pages.js`, `glyphs.js` and
-  `words.js` (generated from `plans/drawing-word*.txt`), previews `tools/drawing-pages-preview.html` and
-  `tools/drawing-glyphs-preview.html`), ice-cream (shown as "Ice Cream Shop": customers, mostly people and sometimes an
-  animal, come to the counter one at a time with an order in a speech bubble, a picture plus words: a cone (or cup), a
-  sundae or a milkshake; every few customers one has no preference ("Anything you like, please!") and is happy with
-  whatever he makes. One shop, no job tabs (the dad, 2026-11-17): all four starts (cones, cups, sundae dishes, steel
-  milkshake cups) are always on the counter in the same places; he scoops from six tubs, a milkshake gets milk, goes on
-  the spindle mixer and is poured into a glass, toppings are whipped cream, chocolate sauce, sprinkles and a cherry.
-  Each matching part gets a green tick; something different is never wrong. The ice cream maker on the counter (the
-  family's freezer-bowl churn) is an option, never required: a tap zooms in (title "Ice Cream Shop · Ice Cream
-  Maker", a header Back button): frozen bowl out of the freezer, switch on, milk, cream, sugar and a flavor, watch it
-  churn, spoon it into a tub, carry the tub to the shop, where that tub is heaped up and customers ask for it. A step's
-  instruction pops up only until he has done it twice (`known` in `ice-cream-v1`, kept across visits); then the ring
-  alone shows it. The layout is computed from the stage's shape so the scene fills every screen. No paying, no
-  counters; New starts what is being made again; plan `plans/ice-cream.md`, script `ice-cream/index.js`).
-  **`archive/`** holds apps the dad shelved (`archive/fish-tank/`, `archive/color-mixing/`): no tile on the home
-  screen, not in the top-level `sw.js`, paths adjusted (`../../common/`, Home goes to `../../`); don't delete them.
-  To bring one back, move it to the top level, undo those paths, and add it with `tools/add-app.py`.
-- `tools/`: `smoke.js` (load + drag + error/scroll check), `lint.js` (ESLint correctness rules on every published
-  script, inline ones included; errors block the deploy, unused variables are warnings), `buttons.js` (taps every
-  button on every page and flags any whose tap changes nothing on screen; run it after UI changes, see its header), `fit.js` (finds labels
-  cut off by their button or tile at every test size, with the real font; `common/toybox.js` shrinks an overflowing
-  label down to 70% as a safety net, so fix the layout when it reports something), `shot.js` (screenshots of one
-  page at named sizes, with tap/drag/click steps; the everyday check), `changed-pages.js` (the pages a git range
-  touched; used by the CI report job), `add-app.py` (add an app to launcher, top-level
-  `sw.js` and README), `shell-demo.html` (every shared component).
+- **Architecture:** `patemotter/toybox`. No build step, no frameworks (reviewed 2026-10-12: home-screen web app, plain JS on canvas/SVG, one service worker, GitHub Pages). Each app folder holds `index.html` (+ stations and local `.js`/`.css`), `manifest.webmanifest`, and `icons/icon-{180,192,512,maskable-512}.png`. New apps get **no** per-app `sw.js` (keep retired stubs on older apps; see [`docs/app-catalog.md`](docs/app-catalog.md)).
+- **Launcher (`index.html`):** `APPS` array (**Workshop** and **Spin Shop** first). Fits every tile on one screen with no scroll (picture + name; `what` stays for grown-ups/tooling). Usual columns: 4 tablet, 3 upright phone, 6 sideways phone; `fitGrid()` tries up to +3 for biggest pictures without splitting words. Long single words use a soft hyphen (`"Kaleido\u00ADscope"`). Grown-ups **Favorites** (`localStorage["toybox-favorites-v1"]`) pins starred apps to the front with a star badge.
+- **Shared layer & apps:** `common/toybox.js` + `common/toybox.css` ([`common/API.md`](common/API.md)). App details and `archive/` live in [`farm/AGENTS.md`](farm/AGENTS.md), [`workshop/AGENTS.md`](workshop/AGENTS.md), and [`docs/app-catalog.md`](docs/app-catalog.md).
 
-### Offline (service workers)
-- **One service worker for the whole Toybox**: the top-level `sw.js` (`CACHE = "toybox-v<number>"`, stamped by the deploy). `common/toybox.js`
-  registers it from every page (scope = the Toybox root) and unregisters any narrower worker it finds; pages have
-  no registration code of their own. It caches the launcher and **every page of every app**, so one visit makes
-  everything work offline. A new page must be added to its `CORE`.
-- Strategy: pages, scripts, styles and manifests are **network first** (`cache: "no-cache"`, so a deploy shows on
-  the next open), falling back to the cached copy if the network fails or takes over 3 s (plane wifi); icons and
-  the Baloo 2 font are stale-while-revalidate. Install fetches `CORE` with `cache: "reload"`. Pages also call
-  `update()` when they come back to the front (the home-screen app can stay open for days). Cache entries are
-  keyed without the query string and matched with `ignoreSearch` (so `?tool=` links work offline).
-- **Why** (don't undo it): each app used to have its own worker; inside its folder that worker won over the
-  launcher's and kept serving its own stale copy, so an app showed an old version until it was opened twice.
-  Those `<folder>/sw.js` files are now **retire stubs** (all identical except `PREFIX`): they delete their
-  `"<folder>-"` caches, reload the open page once, serve the folder network-first until the Toybox-wide worker
-  (v119 or later) runs, then unregister. Keep the stubs; never give an app a worker again.
-- The Grown-ups sheet's "Offline (for the plane)" section asks the worker which files are saved
-  (`toybox-offline-check` / `toybox-offline-fill` messages) and names any app that isn't ready.
-- **Don't bump the cache version**: the repo's `sw.js` says `"toybox-v0"` and the deploy stamps `toybox-v<1000 + the
-  number of commits that changed a published file>`, so every real change re-downloads every file and a docs-only
-  commit doesn't. Keep the `"toybox-v<digits>"` shape: the retire stubs look for it. Every published file must be
-  in `CORE`; `node tools/check-site.js` checks it (the deploy runs it).
+### Offline (service worker)
+- **One top-level `sw.js`:** Registered at Toybox root by `common/toybox.js` (unregisters narrower workers; pages have no SW code). One visit caches every page of every app.
+- **Strategy:** Network-first (`cache: "no-cache"`, 3 s timeout for plane wifi) for pages/scripts/styles/manifests; stale-while-revalidate for icons and Baloo 2; `cache: "reload"` on install; `update()` on foreground return; `ignoreSearch` so `?tool=` works offline. Grown-ups' "Offline (for the plane)" checks/fills cache (`toybox-offline-check`/`fill`).
+- **Never bump `CACHE` manually:** `sw.js` stays `"toybox-v0"` in git; deploy stamps `toybox-v<1000 + published-file commits>` (keep `"toybox-v<digits>"` for retired stubs). Every published file must be in `CORE` (`node tools/sync-core.js --write` + `node tools/check-site.js`).
 
 ### Deploy
-- GitHub Pages is published by `.github/workflows/pages.yml` (GitHub Actions, on every push to `main`, plus
-  "Run workflow" by hand). Live at `https://patemotter.com/toybox/`. (The old branch-based Pages build stopped
-  triggering after a history rewrite; that's why the workflow exists.)
-- The owner asked for direct pushes: commit to the working branch and push the same commit to `main`
-  (`git push origin HEAD:<branch> HEAD:main`). No PR needed. Never force-push unless the owner explicitly asks.
-- Check a deploy: the "Deploy to GitHub Pages" run on the Actions tab, or `curl -sSL <live>/sw.js | grep CACHE`.
-- **The deploy checks first** (the `check` job): it builds `_site` from the tracked files minus `tools/`, `archive/`,
-  `plans/`, `.github/` and Markdown (those stay in the repo but aren't published, so archived apps have no live URL), stamps
-  the cache version, runs `tools/check-site.js` and `tools/lint.js`, then `tools/smoke.js` on every page at 1180x820
-  and at 390x844 as a phone. Any failure publishes nothing and the live Toybox stays as it was: fix it and push again. Pull requests
-  run the same checks without publishing.
+- `.github/workflows/pages.yml` publishes pushes to `main` (`https://patemotter.com/toybox/`).
+- **Direct pushes:** commit to working branch and push to `main` (`git push origin HEAD:<branch> HEAD:main`). No PR needed.
+- **CI `check` (blocking):** stages `_site` (minus `tools/`, `archive/`, `plans/`, `docs/`, `.github/`, `.agents/`, Markdown), stamps `CACHE`, runs `check-site.js`, `check-rules.js`, `lint.js`, and `smoke.js` across sizes.
+- **CI `report` (non-blocking):** runs `fit.js` and `buttons.js` on changed pages (`changed-pages.js`) and uploads `toybox-report`. Check via `gh run view --log` or `curl -sSL https://patemotter.com/toybox/sw.js | grep CACHE`.
 
 ---
 
-## 3. Product rules (the dad's decisions; follow all of them)
+## 3. Product rules
 
-### Sound and plane-safety
-- **Sound is OFF by default**, toggled only by a 2-second hold in the Grown-ups sheet on the home screen.
-  All sound is synthesized with Web Audio, soft, never harsh. Create/resume audio only in a user gesture.
-- With sound off, every app must be just as fun: every action has a strong visual response.
-- Everything works with zero network after the first load: no CDN scripts, no runtime images or audio files.
-  Draw with SVG/canvas. The only external file is the Baloo 2 font.
+### Hard invariants
+Never violate these without explicit approval from the dad:
+- **Privacy:** Never write the child's name anywhere.
+- **Offline-first & plane-safe:** Zero network after first load. No CDN scripts, runtime images, or audio files — draw everything with SVG/canvas. Only external asset is Baloo 2.
+- **Sound OFF by default:** Toggled only via 2 s hold in the home-screen Grown-ups sheet. Soft Web Audio via `Toybox.sound.ready()` inside user gestures only. Every action must be equally fun with sound off.
+- **No fail states, no decreasing scores, no "wrong" buzzers:** Wrong tries get a gentle hint in words.
+- **Never remove an existing feature, option, mode, or interaction without the dad's OK:** Decluttering = rearranging, merging duplicates, or automating chores — never cutting choices he can use. List proposed cuts as open questions first.
+- **No tilt or shake anywhere:** All motion controls were removed; never add them.
+- **No sudden faces appearing on objects:** Never make eyes/smiles pop up on machines, tools, food, crops, or objects (scared him). Permanent character faces (Garden sun, worms, bear latte art, alien, real people/animals) are fine.
+- **Real names, no brand names or logos:** Only exception is Tractor Ted theming in `farm/` ([`farm/AGENTS.md`](farm/AGENTS.md)).
+- **Never force-push** unless asked.
 
 ### Numbers
-A number is shown only when it has a **real, obvious benefit**: it enriches the play, and he uses it to read,
-count, compare, match or aim for something (the dad, 2026-11-12: numbers are fine in general; the problem was
-counters and readouts that were there only for the sake of being there). A measurement passes only when it helps:
-the lathe's RPM doesn't (he does nothing with it), the coffee scale's grams do (he aims for the target). This
-covers DOM text and anything drawn on canvas/SVG. When a number would only decorate, show the effect visually
-instead; words like Slow/Medium/Fast, Straight/Angle, Shallow/Deep are fine.
-- Numbers that pass: the **Measuring** station's readings, **Math Grid**, letters-and-numbers tracing, **Wrenches**
-  sizes (the matching game, once per bolt head and once per size button), **Gear Box** tooth counts (the dad asked
-  for them, on the gear and its picker tile), the **Espresso Machine**'s coffee scale (seconds and grams: the
-  family's real targets, 18.0 g of beans and about 36 g in about 28 s), and counts the child chooses or watches
-  (Kaleidoscope "How many", Spin Shop spokes, Peg Drop per-bin counts and Total, the Jigsaw piece count).
-- Numbers that don't: decorative specs and readouts (RPM, TPI, depth and speed readouts, sizes in tool subtitles),
-  numbered step badges, "+1" pop-ups, scores.
-- **Almost no counters** (the dad, 2026-10-22: most "Loads: 3"-style tallies didn't make sense or add anything; all
-  were removed). Kept: progress through a job that has an end (Shadow Board "Put away: 5 of 12", Jigsaw "Pieces: 3
-  of 6", the Workshop project's "Parts: 2 of 6"), counting what is in the board where that is part of the job (Hammer
-  & Screws "Nails" and "Screws", Drill Press "Holes", Wrenches "Bolts out"), **quantities of what is on screen
-  now** (Marble Run "Marbles", Train Builder "Cars"), and Bubbles' "Bubbles" for the fun of it. A tally of how many
-  times something was done is not kept. A new app gets no counter unless the dad asks.
-- **No number persists across launches**: every count starts again on a fresh visit (`Toybox.fresh()`); a reload
-  keeps it. Saved progress through steps (the Workshop project) is not a number and stays.
-- Readouts removed under the older, stricter rule stay removed unless the dad asks for one back. If a number's
-  benefit isn't obvious, leave it out or ask the dad.
+Show a number only when it has a **real, obvious benefit** — he reads, counts, compares, matches, or aims with it (DOM and canvas/SVG). Otherwise show the effect visually or use words (`Slow`/`Medium`/`Fast`, `Shallow`/`Deep`).
+- **Passes:** Measuring readings, Math Grid, letter/number tracing, Wrenches sizes (bolt head + button), Gear Box tooth counts, Espresso scale (`18.0 g` beans, `~36 g` in `~28 s`), child-chosen/watched counts (Kaleidoscope `"How many"`, Spin Shop spokes, Peg Drop bins + Total, Jigsaw piece count).
+- **Doesn't pass:** Decorative specs/readouts (RPM, TPI, depth/speed readouts, sizes in tool subtitles), numbered step badges, `"+1"` pop-ups, scores.
+- **Counters:** Almost none. Kept only for finite job progress (Shadow Board, Jigsaw, Workshop project), board counts part of the job (Hammer & Screws, Drill Press, Wrenches), quantities on screen now (Marble Run, Train Builder), and Bubbles. No tallies of how many times something was done; no counter on a new app unless asked.
+- **No number persists across launches:** Reset counts on `Toybox.fresh()` (reload keeps them). Saved step progress (Workshop project) is not a number and stays.
 
 ### Pace
-- Everything that plays by itself runs calm: about a third slower than "natural" (auto sequences, transitions,
-  celebrations, demos, default machine speeds). A child-picked "Fast" is still not frantic.
-- Taps respond immediately; only the motion afterwards is slower. Dragging/flinging stays responsive.
-- **Results stay on screen** until the child moves on (a finished print, cut piece, road, build); never whisked
-  away after a second or two. Toasts and banners show at least ~3 s.
+- Auto-playing motion (sequences, transitions, celebrations, demos, default machine speeds) runs **calm** (~1/3 slower than "natural"; child-picked `"Fast"` stays unfrantic).
+- Taps respond immediately; dragging and flinging stay responsive.
+- **Results stay on screen** until he moves on. Toasts and banners show >= ~3 s.
 
 ### Layout (iPhone first, iPad must stay good)
-- One screen, **no page scroll**. Test at 390x844, 844x390 and 820x1180 (also 1180x820 and 1024x1366 for iPad).
-- **Phone header**: Back (stations only, e.g. "‹ Tool Wall", "‹ All machines"; just the arrow on phones), Home as
-  an icon, then the title. Decorative badges ("Gear on", "Hard hat on") are hidden on phones. iPad may show words.
-- **The title always says where he is, on one line** (the dad, 2026-11-14): an app's own pages show the app's name;
-  a station shows "App · Station" (`<h1 class="tb-title"><span class="tb-app">Workshop · </span><span
-  class="tb-station">Drill Press</span></h1>`), and on an upright phone only the station's name (`common/toybox.css`
-  hides `.tb-app` there). The title is never dropped and never cut off: `common/toybox.js` shrinks one that doesn't
-  fit, down to 60%; a new title that still doesn't fit at 390x844 and 844x390 gets a shorter name. "Toybox" itself
-  isn't in the header (the dad: the app and station are enough). A script that changes the title changes only
-  `.tb-station`.
-- **Grown-ups lives only on the home screen** (the launcher): timer, sound and an "App settings" section for every
-  app's grown-up options. Apps have no Grown-ups button or sheet. A new app setting goes in the `SETTINGS` list in
-  `common/toybox.js` and is read with `Toybox.settings.get(id)`.
-- **The redesign was reverted (the dad, 2026-10-10: "Revert").** It cut choices and replaced hands-on play with a
-  green Go button he just pressed over and over. Every app except the Farm is back to its version from before its
-  "Redesign batch" commit (they keep only the cleaner shared look from `common/toybox.css`). `plans/restore.md` lists
-  what the redesign had removed. Don't migrate any app to the components below again without the dad asking; the
-  Farm still uses them and is being reworked to hands-on play (see "He does the work").
-- **The design system (`plans/redesign.md` sections 1 and 2; now used only by the Farm):** see `tools/shell-demo.html` (views `?view=steps|tiles|gate|map`), the "App shell" and "Shared
-  components" parts of `common/toybox.css`, and the component API in the header of `common/toybox.js`. The pilot
-  page every migration copies is `construction-site/concrete.html`. A page built from the components adds `tb-v2` to
-  its shell (`<div class="tb-app-shell tb-v2">`): that switches on the token sizes for its chrome; pages without it
-  keep their old sizes (they get only the cleaner look) until their batch moves them.
-  - Header: [‹ Back (stations: `‹` + a small picture of the map, its name on iPad)] [Home] [Title] … [Big at the
-    right edge]; all white with ink line icons.
-  - Stage: the play area, the star of the screen (keeps at least about 60% of an upright phone), with only the
-    counter (top-left), one coach line (`Toybox.coach`: top-center on tablets, bottom-center on phones), the
-    time-left badge, name tags and the ghost hand on top; no floating buttons.
-  - Panel (under the stage in portrait, the right column in landscape), top to bottom: the **job bar** if the page
-    has 2–4 jobs (`Toybox.jobs`: folder tabs hanging from the stage), then EITHER the **step row** (`Toybox.steps`:
-    done steps as green tick chips, the current step IS the green Go pill with its verb, coming steps as faded
-    chips with their word) OR the one green **Go** (`Toybox.go`) and up to two rows of **choice tiles**
-    (`Toybox.tiles`: picture + word, picked = yellow + a tick badge), then the **bottom bar** (`Toybox.bar`): Shelf
-    (blue, only apps with a collection), **New** (orange, circular arrow) and **Surprise** (rainbow outline and a
-    gift, `tb-surprise`, never a dashed line), in that order. No section tabs anywhere; no text-only buttons in
-    the panel (an icon + a real word each).
-  - Which pattern: ordered steps of one job → the step row (max 6 steps; waiting and fiddling are automatic and
-    shown happening); different jobs on one machine → the job bar; jobs with their own machine → stations on a map
-    (`Toybox.map`); building from parts → tap a part on the scene and the tiles show its options; everything else he
-    picks → tiles (max 8).
-  - Shared behavior: `Toybox.press` for every drawn control (a press under 12 px and 350 ms is a tap that plays the
-    whole motion; anything longer is the drag; 2 cm minimum hit radius), `Toybox.ghost` (tap first, the real move on
-    its second showing), the palm guard (`Toybox.palmGuard`, built into every component), `Toybox.gate` for the
-    gear-up and getting-ready screens (one tap dresses everything), `Toybox.nametag` for real part names.
-- Controls under the play area: on an upright phone the panel uses at most about 300 px of 844 (job bar 64 + step
-  row 90 + bottom bar 60, or Go 72 + one tile row 84 + bottom bar 60) and at most 12 tappable controls. If more
-  seems needed, something gets cut or moves onto the stage. No duplicate controls. No label cut off: shorten it.
-  Targets from the tokens: Go 72 px tall (84 iPad), tiles 84 px (112), bottom bar 60 (68), job tabs 64 (72), header
-  icons 52 (60); at least 12 px between controls and 24 px between New and anything he taps often; the bottom row
-  at least 16 px above the safe area. Text at least 14 px anywhere he looks. `tools/fit.js` and `tools/buttons.js`
-  report small tiles, small targets and text-only buttons (problems on `tb-v2` pages, warnings elsewhere).
-- **No Big button** (the dad, 2026-10-10: it rarely changed what he could see): `common/toybox.js` hides every Big
-  button that a page still passes as `big:` and keeps Big mode off (`Toybox.setBig` / `isBig` are no-op stubs, and
-  `onBig` is called once with false). Don't add one; when you touch a page that still wires one, remove it.
-- **Instructions sit big in the middle of the stage on every size** (the dad, 2026-10-15: he missed them at the top,
-  then at the bottom; "just put it in the middle"). `common/toybox.css` centers every new `is-do` coach line.
-  **Instructions are not persistent** (the dad, 2026-11-15: they "never ever leave and take up a ton of space"; on
-  2026-10-15 left in the middle it covered what he was doing): after his first touch (at least 2 s after it appeared)
-  or after 8 s it fades away (`is-seen`), it comes back with the idle ghost hand, and the next new instruction pops up
-  in the middle again. So the scene itself must keep showing what to do next (a yellow ring, a glow). Information
-  lines (`is-info`) stay small at the bottom.
-  Also make the thing it names stand out on the scene (a glow on the lever it tells him to pull).
-- **Instructions look different from information** (the dad, 2026-10-11: on the iPad they looked the same and were easy
-  to miss). `common/toybox.js` watches every `.tb-coach` and marks it `is-do` when a sentence starts with an action
-  verb (`DO_WORDS`; "Tap the lever.", "A rock is stuck. Tap it!") and `is-info` otherwise ("The destoner takes out the
-  stones."). `is-do` = dark pill, white bold text, yellow finger, yellow glow and a gentle pulse; `is-info` = smaller,
-  quiet white pill. Write instructions starting with the verb; force a kind with `data-coach="do"|"info"` if needed.
-- Prefer making the play area bigger over fitting more buttons. On upright phones, frame scenes tightly (pan with
-  the action, turn wide layouts upright) rather than leaving empty sky.
-- **No picture-in-picture insets** unless they show something unique (kept: the Router Table end view, now a
-  small corner panel). Alternate full views behind a button are fine. **No split stage of two equal views** (the dad,
-  2026-10-10: it must be clear what is an inset and what he controls; controls on top with the view below is
-  backwards): one main view he controls fills the stage, the things he touches low near his hands; a close-up is a
-  small, clearly framed and labeled corner inset at most.
-- **An app may prefer one orientation**: `Toybox.init({ orientation: "landscape" })` (or `"portrait"`). Held the
-  other way, the shared layer covers the app with a "Turn it sideways!" / "Turn it upright!" card (a turning
-  tablet picture and a small "Play like this" button, so rotation lock never traps him; remembered for the session).
-  The app must still work in the other orientation behind that button; it just needn't be framed as carefully.
-  Use it **only when the app really needs it** (the dad prefers upright on the iPhone and doesn't want to be asked to
-  turn otherwise). Current user: Concrete (portrait). Everything else, Train Builder included, is both ways.
-- **A tab or panel change never re-lays out the stage** (Train Builder flipped its track when Cars was tapped): pick
-  layouts from the device orientation, and keep the panel the same height for every tab.
+- **One screen, no page scroll.** Test at `390x844`, `844x390`, `820x1180`, `1180x820`, `1024x1366`.
+- **Header:** Back (stations only; arrow only on phones), Home icon, one-line Title (`<h1 class="tb-title"><span class="tb-app">App · </span><span class="tb-station">Station</span></h1>`; `.tb-app` hides on upright phones). Never drop or clip the title (`common/toybox.js` shrinks down to 60%; shorten if it still overflows). Never put `"Toybox"` in the header; scripts change only `.tb-station`. Hide decorative badges on phones.
+- **Grown-ups lives only on the home screen.** Apps have no Grown-ups button/sheet; add app settings to `SETTINGS` (`common/toybox.js`) and read via `Toybox.settings.get(id)`.
+- **No Big button:** `common/toybox.js` hides legacy `big:` buttons. Don't add one; remove when touching old pages.
+- **Coach line (`Toybox.coach` / `.tb-coach`):** Instructions (`is-do`, verb-first per `DO_WORDS`, dark pill + yellow glow) sit big in the **middle of the stage** and fade (`is-seen`) after first touch (>= 2 s) or 8 s, returning with the idle ghost hand — so the scene (yellow ring/glow) must keep showing what's next. Info lines (`is-info`, quiet white pill) stay small at the bottom. Force kind via `data-coach="do"|"info"`.
+- **Stage & panel:** Prefer a bigger play area; frame upright phones tightly. Upright phone panel <= ~300 px of 844 and <= 12 tappable controls; no duplicates, no clipped labels, text >= 14 px, token targets/gaps (`--tb-*`). Tab/panel changes never re-layout the stage.
+- **Views & orientation:** One main view he controls fills the stage, controls low near his hands. No split stage of two equal views; corner insets only when unique (Router Table end view, select Farm close-ups). Use `orientation: "landscape"|"portrait"` only when truly needed (only Concrete uses `"portrait"`; dismissible `"Play like this"` card).
+- **Reverted `tb-v2` redesign:** Don't migrate older apps to `tb-v2` Go/step rows without asking ([`docs/app-catalog.md`](docs/app-catalog.md)).
 
-### Making things intuitive
-- **One obvious first action** per screen: the main object is big and reacts to touch, plus at most **one short
-  coach line** in a pill in the middle of the stage ("Drag the bucket!", "Switch on the lathe!", "Tap a paint pot!").
-- **Direct manipulation**: drag the saw, turn the wheel, pull the tape, spin the toy with a finger. If a control
-  is drawn on a machine, it must work (switches, height wheels, handles); don't draw fake controls. Remove HTML
-  buttons that duplicate a working on-machine control.
-- **Operator's view**: draw every machine and tool from where you'd stand to use it (the drill press from the
-  front, a little above, with the table and board top visible), not a side elevation.
-- **No procedural extras**: keep the fun core of each tool and drop steps that only add waiting or fiddling:
-  material pickers, size pickers, chuck keys, waiting for a spindle to stop, setup sequences. If something like
-  that stays, it happens automatically or with one tap.
-- **Short and direct** (the dad, 2026-10-09: "way too tedious"; but see "He does the work": short means no chores,
-  not fewer things for him to do or choose; "so many little things that don't really matter and
-  get in the way"): the fun payoff comes within seconds of his first touch. No repeated chores before a payoff
-  (several passes over the same field, filling twelve cups, step after step), no extra taps or choices that don't
-  change anything he cares about, no little side features that clutter the scene or the panel. Real names and real
-  mechanics stay; the number of steps and things on screen goes down. When in doubt, cut it or make it automatic.
-- **Never remove a feature or choice without the dad's OK** (the dad, 2026-10-10: the redesign removed things he
-  wanted, e.g. Marble Run's lift style): decluttering means rearranging, merging duplicates and making chores
-  automatic, never taking away an option, item, mode or interaction he can use. If something seems worth cutting,
-  list it as a question for the dad and keep it until he answers.
-- **He does the work** (the dad, 2026-10-10: "He is just clicking a green button over and over watching things
-  happen"): he drives, steers, lifts, pours and turns things himself, on the machine. No button that plays a whole
-  job or step for him; a step row may guide what comes next but never does it. Choices (colors, styles, machines,
-  implements, what to make) are part of the fun: keep and add them.
-- **One press is always enough** (the dad, 2026-10-09): every real control (a drag, a turn, a hold, a pull, a
-  flick on a drawn machine part) also works with a single tap on it. The tap does **that one control's** real
-  motion (tap the crank and it turns once; tap the valve and it opens; tap the lever and the plow drops), never the
-  whole job. Dragging stays as the richer way to play, never the only way. Holds keep working as taps too.
-- **Plain, correct English** (the dad: "It just says 'Beds!'. This is dumb"): the Go button says what will happen as
-  a short verb phrase ("Make the rows", "Pull a shot", "Pour!"), never a bare noun with "!" ("Beds!", "Milk!",
-  "Stones!"). Coach lines are short, natural sentences that describe what he sees or does ("The destoner takes out
-  the stones."), never filler ("Out it pops!"). Step chips under or beside Go may be one short word. Read every
-  label aloud before shipping.
-- **Literal, complete instructions** (the dad, 2026-10-10: "not clear in an autistic processing way. 'Drive to the
-  grain store' drive what to the grain store?"): every instruction names who does what to what, one action, no
-  pronouns or implied subject/object ("Drive the tractor to the grain barn.", "Tap the lever to drop the combine's
-  header."). Show status on the scene rather than in words where possible.
-- **Few labels, and they look different from instructions** (the dad: "not everything needs to be explicitly labeled";
-  the same oval bubble and font for instructions and info is confusing): no name tags shown by themselves; a part's
-  name appears briefly when he taps it, as a small plain label, never in the coach pill's style.
-- **Choices only where they matter to him** (the dad: in a scene like Combine Time the crop matters, wheels/tracks and
-  trailer type don't). When a choice is offered it must be obvious that it's "pick one of these".
-- **The whole machine stays on screen** (the dad keeps seeing machines cut off): at every size and every moment, the
-  machine he is working (tractor plus implement, forklift, combine...) and the thing it works on are fully visible
-  with a margin. Zoom out or reframe rather than crop; a smaller whole machine beats a big cut-off one.
-- **Debris never hides the work** (the dad: so many shavings "I can't see what I'm doing"): wood shavings, sawdust,
-  chips, curls, dust, crumbs and similar particles fly for the visible moment and then fade away quickly (gone within
-  about 1-1.5 s; nothing piles up on or around the workpiece, and a cap keeps the count low). Never draw them over
-  the cut, the hole, the bit or the part he's working on for longer than a moment. A small tidy pile out of the way
-  (on the floor, in a bin) may stay.
-- Draggable things look grabbable; decorations don't look like buttons; no hidden modes.
-- **No dead buttons** (the dad: "lots of buttons look pressed but don't do anything"): every tap gives a visible
-  answer, also when there is nothing to do (a hint like "Draw a line first!", a sparkle). Empty slots that do
-  nothing are disabled, holds show their fill, quick taps on hold-to-move controls still move visibly. Re-tapping
-  the tile already picked gets a shared wiggle from `common/` (mark picked tiles with `aria-pressed`/`aria-selected`).
-- Forgiving input: big hit areas, snapping, auto-assist after a few misses. Two-step machines (switch on, then
-  work): if he pushes while it's off, say "Switch it on!" and flash the switch; on the second try switch it on
-  for him.
-- **Idle ghost hand**: after ~4.5 s without a touch, a see-through hand shows the next move, at most 2–3 times
-  per visit, never again once he has done it, never while the sheet is open or the timer is ending/resting.
-  Use `Toybox.ghost` (same look everywhere; every page uses it).
-  Coach line: `Toybox.coach` (the `.tb-coach` pill).
-- Nothing traps him: always a visible way to start over ("New", "Clear"), no dead-end overlays.
-- **Surprise = a fun moment, right now, on the current scene** (the dad's rule): something happens to what is on
-  screen (the hamster somersaults, a giant bubble wobbles across, a cow waits at the crossing), then play goes on.
-  Not randomizing choices he could pick himself, and not unlocking content (new foods, pens, patterns, trains):
-  anything worth having becomes a real option instead. Take turns between a few moments so it stays fresh.
-  **No sudden faces on objects** (the dad, 2026-10-10: faces suddenly appearing on random things, like the ceiling
-  fan, scared him): never make eyes or a smile appear on a machine, tool, food, crop or other object, as a Surprise or
-  otherwise. Faces that are always part of something are fine (the Garden sun, the worms, the bear latte art, the
-  saucer's alien, real animals and people).
-- **Kind words** (the dad's idea): the shared layer shows a card with a gentle reminder ("You are doing great!", a
-  smiling sun), a congratulation ("You did it!", a star) or love from Dad ("Dad loves you!", a heart) every few
-  minutes of play and sometimes on returning to the home screen. Never first person ("I'm proud..."): the device
-  isn't the one talking; hearts only for love lines. When he finishes something real
-  (a build, a puzzle, a floor, a print), call `Toybox.kind()`; it shows only sometimes. Grown-ups have **full
-  control** in the home screen's Grown-ups sheet (`KIND_SET` in `common/toybox.js`): on/off, how often
-  (Rarely/Sometimes/Often), when (while playing, after finishing something, back on the home screen), how long a
-  card stays, every usual line on or off, and their own lines, each with a sun, star or heart ("Show one now"
-  previews). Never invent family members in the built-in lines.
-- No fail states, no scores that go down, no "wrong" buzzers. Wrong tries get a gentle hint in words.
-- **Farm stations are built around the episode's moments** (the dad, 2026-10-11): he knows each episode by heart.
-  **`plans/tractor-ted-episodes.md`** (the dad's scene-by-scene guide, 2026-10-14) is the reference: take an episode's
-  main machine moments and skip its tangents (children's scenes, mishaps, side trips; the dad: "we don't have to
-  follow every single piece"), hands-on like Timberrrrr!. **Nothing that isn't rooted in the episode** (no invented
-  steps, machines or places; settings look like the episode, e.g. the sawmill is indoors). Never build Let's Go Racing.
-  Testing confirmed he strongly preferred Spuds in Mud over the manual-driving Combine Time pilot: complex mechanics
-  are only part of what he cares about; what matters most to him is that the station hits the main highlights of the
-  actual Tractor Ted episodes they are designed around (real machines and processes shown clearly, like Spuds in
-  Mud's bed former → destoner → planter → harvester sequence with the split-view close-up of the work). Make those
-  moments big, visually clear and faithful to the episode; do not replace the authentic highlights with manual driving
-  chores or complex steering controls. When unsure, follow the guide (the dad, 2026-10-15: "when in doubt just default to the episode guide"); change
-  an existing station only when it is very obviously different from its episode and misses key pieces.
-- Real names, no brand names or logos. Exception (the dad, 2026-10-11): the Farm app is specifically Tractor Ted
-  themed: the app is shown as "Tractor Ted" and the 12 stations follow the actual episodes he has memorized.
-  **Tractor Ted himself is never drawn** (the dad, 2026-10-14: he is the show's cartoon narrator and doesn't do the
-  farm work; the drawn version was scary and "unless it's 1:1 we are better off not including him"). Every working
-  tractor is an ordinary red tractor (`Farm.draw.tractor`: no face, no badge); coach lines say "the tractor".
-  **Farmer Tom** (from the dad's photos): bald, light stubble; his clothes change like in the show (`Farm.tom`, set in
-  `farm/farm.js` by page): a pale pink short-sleeved shirt in the summer episodes (Combine Time, Brilliant Baler,
-  Glorious Grass, Juicy Squeezy, Come Bye, Feathered Friends), a dark olive-brown zip fleece over a pale shirt collar
-  in the others. He drives the tractors and, in the episodes, also the combine, the baler's tractor, the muck telehandler and the
-  mower (see `plans/tractor-ted-episodes.md`); the forestry harvester, lorry and loader have their own drivers. **Midge** (same photo): a wire-haired miniature dachshund, wiry ginger-tan coat, long low
-  body, short legs, floppy ears, scruffy beard and eyebrows (`Farm.draw.dog`). The pony is Merlin.
+### Making things intuitive & hands-on
+- **One obvious first action** + at most one short coach line.
+- **He does the work:** Direct manipulation on the machine from the **operator's view**. Every drawn control works; remove duplicate HTML buttons. No green button playing a whole job for him.
+- **One press is always enough:** Every drag, turn, hold, pull, or flick on a drawn control also works with a single tap (that control's motion, never the whole job); dragging stays richer (`Toybox.press`).
+- **Short and direct:** Fun payoff within seconds. Drop procedural extras/chores (material/size pickers, chuck keys, waiting for spindle stop, repeated passes) or automate them.
+- **Plain, literal, complete English:** Action buttons use verb phrases (`"Make the rows"`, never `"Beds!"`). Instructions name who does what to what with no vague pronouns (`"Drive the tractor to the grain barn."`). Read labels aloud.
+- **Few labels, distinct from instructions:** No persistent name tags; tapping a part briefly shows a plain label (`Toybox.nametag`).
+- **Choices only where they matter**, clearly "pick one of these".
+- **Whole machine stays on screen** with margin at every size (zoom out rather than crop).
+- **Debris never hides the work:** Shavings/sawdust/chips/dust fade within ~1–1.5 s (capped), never obscuring the active cut, hole, or bit.
+- **No dead buttons:** Every tap gives visible feedback (hint, sparkle, wiggle on re-tapped selected tiles with `aria-pressed`/`aria-selected`; disable empty slots).
+- **Forgiving input:** Big hit areas, snapping, auto-assist. Two-step machines: first push while off says `"Switch it on!"` + flashes switch; second push auto-switches on.
+- **Idle ghost hand (`Toybox.ghost`):** After ~4.5 s idle, max 2–3 times/visit, stops once learned, never during sheet/timer/turn card.
+- **Nothing traps him:** Always visible `"New"`/`"Clear"`; no dead-end overlays.
+- **Surprise:** A live fun moment on the current scene, rotating between a few moments. Never randomizes choices or gates/unlocks content.
+- **Kind words (`Toybox.kind()`):** Call on real completions; shows occasionally. Never first-person (`"I'm proud..."`), hearts only for love lines, never invent family members. Full grown-up control on home screen.
 
-### Fresh start
-- Opening an app **from the home screen** starts it fresh: the current build/drawing/board, selected
-  tool/layout/mode, scroll position and counters go back to first-visit defaults.
-- **Kept**: his **collections** (3D Printer shelf and spool colors, Lathe and Router shelves, Fish Tank fish,
-  Color Mixing "My colors", My puzzles in Jigsaw) and **grown-up settings** (timer, sound, Big, sheet
-  options such as Math Grid spoken numbers).
-- Reloading, or moving between pages of the same app (Tool Wall ↔ station), keeps the state.
-- Implemented with `Toybox.fresh()` (see §4). Call it where the page loads its saved state.
-
-### Safety rituals
-- **The dad toned these down** (they got in the way): gear up when he first starts, then again only every
-  **10 minutes**. No quick "Safety check!" cards on stations or tool changes, and no "switch it off first" card.
-- **Forge**: Eye protection, Ear protection, Leather apron, Gloves (`forge-gear`).
-- **Workshop**: the child puts **"Eye protection"** and **"Ear protection"** on a worker (use exactly those names;
-  they're the words used at home); flag sessionStorage `workshop-gear`.
-- **Construction Site**: hard hat, safety vest, eye protection, ear protection (`site-gear`).
-- **Kitchen**: one getting-ready screen (`kitchen-ready`): Wash hands (one tap plays a short wash), Apron and Chef
-  hat, in any order (the dad didn't want a whole interactive hand-washing scene).
-- `common/toybox.js` ("Safety gear") remembers when each flag was put on (`toybox-gear-v1` in localStorage): the
-  flag comes back after leaving the app or reopening the Toybox, and is taken off on the first page load after
-  10 minutes, so the gear-up comes on his next page, never mid-job. The launcher no longer clears the flags.
-- **Machines keep running** between goes on the same screen: a finished job ("Done!", "Again") does not switch the
-  machine off; only his tap on the red paddle, the timer, or leaving the page does.
-- **Leaving with a machine on**: pages register their machine with `Toybox.offFirst({ running, off })`; leaving the
-  page (a link or `Toybox.beforeLeave(fn)`) switches it off quietly and goes at once.
-- **No "switch it off first" step inside a station either**: an action that needs the machine stopped (pouring
-  from the Blender, lifting the Stand Mixer head, changing its beater, taking the bowl) switches it off by itself
-  and carries on. (Switching ON for him on the second try stays, see "Two-step machines".)
-
-### Timer (shared)
-- The grown-up sets a play timer (shared across all apps, `toybox-timer-v1`). When time is up the app winds its
-  motion down in an app-appropriate way (`onEnding`), optionally waits for a Goodbye button, then shows a rest
-  screen with an app picture and a line ("The rocket is resting."), unlocked by a 4-second hold.
+### Fresh start, safety rituals & timer
+- **Fresh start (`Toybox.fresh()`):** Launching from the home screen resets current build/board/tool/mode/scroll/counters; keeps **collections** (shelves, spools, puzzles, candy jar, Workshop project progress, etc.) and **grown-up settings**. Reloads and intra-app navigation keep state.
+- **Safety rituals:** Gear up on first start, then only every **10 minutes** (`toybox-gear-v1`, cleared on next page load after 10 min, never mid-job). No mid-station "Safety check!" cards. Flags: `workshop-gear` (`"Eye protection"`, `"Ear protection"`), `site-gear`, `kitchen-ready`, `forge-gear`.
+- **Running machines:** Keep running between goes on the same screen. Leaving (`Toybox.offFirst` + `Toybox.beforeLeave`) quietly stops registered machines and navigates immediately. In-station actions needing a stop auto-stop and continue.
+- **Shared timer (`toybox-timer-v1`):** Winds down via `onEnding`, optional Goodbye button, rest screen unlocked by 4 s hold.
 
 ---
 
-## 4. Technical patterns
+## 4. Technical patterns & defaults
 
-### `common/toybox.js` essentials
-- `Toybox.init({ app, grownButton, big, sections, restArt, restLine, onEnding(done, info), endingMaxMs, ... })`.
-  `info.goodbye` says whether the Goodbye button will show. `endingMaxMs` (default 15000) for long goodbye
-  animations (Rocket Builder uses ~36000).
-- `Toybox.timer.locked()` (ignore play input while ending/resting), `Toybox.sound.ready()` (AudioContext or null;
-  play sound only through it), `Toybox.makeHold(btn, ms, onDone)`, `Toybox.toast(msg)`.
-- `Toybox.settings.get(id)` / `.onChange(fn)` / `.action(id, fn)`: app settings chosen on the home screen (stored in
-  `toybox-settings-v1`). `home: true` in `Toybox.init` is for the launcher only.
-- `Toybox.fresh()`: true on the first load of a page under a new launch id. The launcher stores
-  `sessionStorage["toybox-launch"]` when a tile is tapped; each page records `toybox-seen:<path>`.
-- `orientation: "landscape"|"portrait"` in `Toybox.init` shows the turn-the-device card (`Toybox.turning()`,
-  `onTurn(shown)`; bypass in tests with `sessionStorage["toybox-turn-ok:<app>"]="1"`). `Toybox.offFirst({ running,
-  name, off(done), flash })` registers the "switch it off first" card; `Toybox.beforeLeave(fn)` for script-driven
-  navigation; `data-tb-noguard` on a link exempts it.
-- The module swallows the click that follows a finished hold, syncs timer/sound/Big across open tabs, and
-  re-reads state on back/forward restore. Don't copy timer/sound code into apps; extend `common/` instead.
-- Keys: `toybox-timer-v1`, `toybox-sound-v1` ("1"/"0"). App state uses an app-prefixed
-  localStorage key. Wrap every storage access in try/catch. Keep saved formats backward compatible.
-- `common/toybox.js` calls `navigator.storage.persist()` on every page so iOS doesn't clear saved data
-  (collections, settings, the offline cache) when the device is low on space. Keep it.
-
-### Code style and structure (decided 2026-10-12; apply when you are already in a file, no mass rewrites)
-- **Modern JavaScript is allowed** in new and changed code: `let`/`const`, arrow functions, classes,
-  template strings. Every iOS Safari the family uses supports them. Keep `"use strict"` and the IIFE (or use
-  `<script type="module">`, which also needs no build step). Don't convert untouched old code just for style.
-- **Split big pages**: when you work substantially on a page over about 2500 lines, move its script into a plain
-  `.js` file next to it with the page's name (`saw-bench.html` → `saw-bench.js`), loaded with `<script src>` at
-  the same place, with a "Sections" list at its top (the titles of its section comments). No bundler. Add every
-  new file to `CORE` in the top-level `sw.js` (`node tools/check-site.js` checks it). Done so far: Saw Bench,
-  Tool Wall (`workshop/index.js`), Hammer & Screws, Measuring, Car Builder, Marble Run, Rocket Builder, Train Builder,
-  3D Printer, Espresso Machine, Peg Drop, Timberrrrr! (`farm/woods.js`). Keep each Sections list current
-  when you add or rename a section.
-- **Shared, not pasted**: when you touch a page that still carries a pasted copy of something `common/`
-  provides (the ghost hand, the coach pill, audio setup), switch it to the shared version
-  (`Toybox.ghost`, `Toybox.coach`, `Toybox.sound.ready()`) in the same change. When two or more apps need the
-  same helper, add it to `common/` instead of copying it.
-
-### Browser/iOS findings
-- Play surfaces: pointer events, `touch-action: none`, prevent `gesturestart`, no text selection or long-press
-  callout; support several fingers at once.
-- **No page bounce:** `common/toybox.css` pins `html, body` (`position: fixed; inset: 0; overflow: hidden;
-  overscroll-behavior: none`) because iOS rubber-bands the whole page in the home-screen app (the dad saw it in
-  Bubbles). Don't undo it; inner scroll areas (Grown-ups sheet, Tool Wall) still scroll. Chromium tests can't show it.
-- Canvas: scale by devicePixelRatio capped at 2; aim for 60fps on iPad.
-- Don't paint a pattern with `background-attachment: local` on a scrolling box: it lags on iOS (the Tool Wall's
-  pegboard holes now live on the scrolling content element).
-- **Keep the Grown-ups list current:** "Good to know" in `SETTINGS` (common/toybox.js) lists every app that asks for
-  something special (turning the device, sound). Update it when an app starts or stops (the dad wants it very clear).
-- **No tilt or shake anywhere** (the dad removed it: none of the uses were good). The setting, `Toybox.tiltReady` and every
-  app's motion code are gone; don't add motion features.
-- Respect `prefers-reduced-motion` and safe-area insets. Light/dark theming via `:root` tokens.
-- Test hooks only behind `?debug` (read-only `navigator.webdriver` hooks exist in a few Workshop pages).
-
-### Look
-- **Chrome** (header, panel, buttons, tiles, coach, counter, map labels; `plans/redesign.md` 1.10 and 1.14, tokens at
-  the top of `common/toybox.css`): Baloo 2, the ink color #1D2340, bright flat fills, rounded shapes, and a calm,
-  tactile style: **2 px outlines** (3 px frame on the stage, where it meets the drawn scene), a short **bottom lip**
-  under pressable things (pressed = it moves down by the lip), no hard offset shadows; the panel is a white card
-  with a soft shadow and no outline; counter, coach and name tags have a 2 px outline and no lip. Type scale, spacing
-  (4/8/12/16/24/32), radii and timing come from the `--tb-*` tokens; don't set page-local outlines, shadows, cream or
-  dashed tiles or font sizes on chrome.
-- **One meaning per color** in the chrome: green `--tb-go` = Go and done ticks; yellow `--tb-pick` = picked (always
-  with a tick badge) and the coach's step dot; orange `--tb-new` = New only; blue `--tb-shelf` = Shelf only; the
-  rainbow outline = Surprise only; light blue `--tb-job` = job tabs not picked; grey `--tb-off` = coming steps.
-  Back, Home and Big are white. Red is never chrome (only on a real machine's switch or paddle). Never color alone.
-- **Machines and scenes** keep their own style: drawn big and accurately with chunky ink outlines; they are the star.
-- **Icons in the UI**: one line family (24 px grid, 2.5 px rounded stroke, no fill: Home, Back, Big, New, Surprise,
-  Shelf, close; `Toybox.icon(name)`). Content pictures (tiles, job tabs, chips, Go) are small flat drawings with a
-  2 px ink outline, one picture per thing, reused wherever it appears (the chip and the Go of a step share it).
-- Icons: flat, full-bleed #CDE9FF background, chunky outlines, one clear subject; render an SVG with Playwright
-  and screenshot at each size; the maskable icon keeps the subject in the central 80%.
+- **Shared layer:** Don't copy timer, sound, ghost, coach, or hold logic — use or extend `common/` ([`common/API.md`](common/API.md)). Wrap every storage call in `try/catch`, prefix app keys, keep save formats backward compatible, and keep `navigator.storage.persist()` in `common/toybox.js`.
+- **Code style & structure (defaults; use judgment):** Modern JS (`let`/`const`, arrows, classes, template strings, `<script type="module">` or `"use strict"` IIFE) is encouraged in new/changed code; don't reformat untouched legacy code just for style. Split large scripts (> ~2500 lines, or sooner when modularizing improves clarity) into plain `.js` files with a top **"Sections"** list and add them to `sw.js` `CORE`. Extract logic shared by 2+ apps into `common/`.
+- **Browser / iOS:** Pointer events, `touch-action: none`, prevent `gesturestart`, multi-touch, no text selection/callouts. Keep `common/toybox.css`'s pinned `html, body` (`position: fixed; inset: 0; overscroll-behavior: none`) to stop iOS bounce. Cap canvas DPR at 2 (target 60 fps on iPad). Never use `background-attachment: local` on scrolling boxes (lags on iOS). Respect `prefers-reduced-motion`, safe-area insets, and light/dark `:root` tokens. Keep `"Good to know"` (`uses-info` in `SETTINGS`) accurate. Put test hooks behind `?debug` (a few legacy Workshop pages also keep read-only `navigator.webdriver` hooks).
+- **Look:** Baloo 2, ink `#1D2340`, bright flat fills, 2 px outlines (3 px stage frame), short bottom lip on pressables, no hard offset shadows, white panel card, `--tb-*` tokens. One meaning per chrome color: green `--tb-go` (Go/ticks), yellow `--tb-pick` (picked + tick badge), orange `--tb-new` (New), blue `--tb-shelf` (Shelf), rainbow (Surprise), light blue `--tb-job` (unpicked job tabs), grey `--tb-off` (coming steps), white (Back/Home); red only on real machine switches/paddles; never color alone. UI icons via `Toybox.icon(name)`; content pictures flat with 2 px outlines; app icons flat `#CDE9FF` background, chunky outlines, maskable keeps subject in central 80%.
 
 ---
 
 ## 5. Working on it
 
-Only agents change this repo (Claude Code, Antigravity and others); the dad doesn't edit code. Optimise for agents:
-small changes should take minutes, not tens of minutes.
+Only agents edit this repo; keep small changes fast and focused.
 
-### How to work (decided 2026-10-12)
-- **Do small changes yourself, in one agent.** A fix, a tweak, a new option or anything in one or two pages: no
-  subagents. Read only the files the change needs (big pages have a "Sections" list at the top of their `.js`:
-  search for a section title instead of reading the whole file).
-- **Subagents only for big, independent work**: a new app or station, or several unrelated jobs at once. Run as
-  many at a time as the work splits into (no limit, the dad 2026-10-19); each owns specific files and doesn't edit
-  outside them, and no two own the same file; shared files
-  (`common/`, the launcher, top-level `sw.js`, `README.md`, `PLAN.md`) are the coordinator's; subagents don't
-  commit or push; they report what works, what changed, open questions for the dad and screenshot paths.
-- **Never run `git stash`, `git checkout -- .`, `git reset` or anything else that rewrites the shared working
-  tree** while other agents may have uncommitted work in it. To compare with an older version, export it with
-  `git show HEAD:<path> > <scratch file>` (or a `git worktree` outside the repo).
-- `PLAN.md` (backlog, plans for new apps, history) only needs reading when the task is about the backlog, a new
-  app or something it names; it isn't needed for a fix.
-
-### Checking a change (match the checks to the change)
-- **Every change**: `node tools/check-site.js` (when files were added or renamed), `node tools/lint.js <changed
-  files>` (zero errors; don't add warnings) and `node tools/smoke.js <changed pages>`, then `node tools/shot.js
-  <page>` and **look at** the picture of what changed (upright phone by default; add `--sizes` for layout work). Drive the real action with `--do` steps (`tap:`, `drag:`, `click:`,
-  `wait:`, `eval:`, `shot:`; see its header) instead of writing a new Playwright script.
-- **Layout or new UI** (panel, tiles, header, a new control): also `--sizes all` in `shot.js`.
-- **The slow finders run on GitHub, not locally**: after the push, the deploy workflow's **report** job runs
-  `tools/fit.js` (cut-off labels, five sizes) and `tools/buttons.js` (taps that change nothing, phone and iPad) on
-  the pages the push changed, and shows the results in the run's summary and log (artifact `toybox-report` has the
-  pictures). It never blocks the deploy. Read it when it finishes (Claude: the GitHub tools `actions_list` /
-  `get_job_logs`; elsewhere `gh run view --log`) and fix what it lists in a follow-up commit. Run `fit.js` or
-  `buttons.js` locally only when you are fixing something they reported.
-- The deploy's **check** job (blocking) lints every script and smoke-tests every page at four sizes; if it fails
-  nothing is published.
-
-### Testing setup
-- Serve: `npx http-server . -p <your port> -c-1 -s` (a unique port per agent); tools take `PORT=<port>`.
-- Playwright: with a global install, scripts need `NODE_PATH=$(npm root -g)`. If its own Chromium isn't
-  available, `CHANNEL=chrome` drives an installed Google Chrome. Don't run `playwright install` unless the
-  download actually works. The tools block Google Fonts themselves.
-- Lint: `tools/lint.js` needs ESLint 9 and `globals`; install them outside the repo (e.g. `npm install --prefix
-  /tmp/toybox-lint eslint@9 globals`) and run with `NODE_PATH=/tmp/toybox-lint/node_modules`.
-- The tools set the gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`) so stations don't redirect to the
-  gear-up; in your own scripts set them in sessionStorage (and `"workshop-check-skip"="1"`).
-
-### Adding a new app
-1. Build the folder (see §2), using `common/` for the grown-up layer, following every rule in §3.
-2. `python3 tools/add-app.py <folder> "<Name>" "<tile line>" "<README line>" [extra pages]`.
-3. `node tools/check-site.js`, smoke-test the launcher and the app, commit, push to the branch and `main`.
+- **Workflow & subagents:** Do 1–2 page changes in one agent (use a script's top "Sections" list). Use subagents for large independent work with disjoint owned files; coordinator owns shared files (`common/`, `index.html`, `sw.js`, `README.md`, `PLAN.md`). Subagents never commit or push. Never run `git stash`, `git checkout -- .`, or `git reset` in a shared working tree (use `git show HEAD:<path>` or an external worktree). Read `PLAN.md` only for backlog/new apps/named plans.
+- **Checking a change (`.agents/skills/verify-change/SKILL.md`):** Tools auto-serve locally (no separate `http-server`; `PORT=` overrides) and pre-set gear flags. Run `node tools/verify.js <changed pages>` (runs `check-site.js`, `check-rules.js`, `lint.js`, `smoke.js`, `shot.js`; add `--all-sizes` for layout/UI) and **inspect screenshots**. Also available: `shot.js --do ...` and `playtest.js` (`?debug` hooks). Global Playwright uses `NODE_PATH=$(npm root -g)` and optional `CHANNEL=chrome`. After push, check CI `check` and `report` (`fit.js` + `buttons.js`) via `gh run view --log`.
+- **Adding a new app (`.agents/skills/new-app/SKILL.md`):** `scaffold-app.py` → build with `common/toybox.js` + `?debug` `window.__toybox` → `render-icons.js` → `add-app.py` → `sync-core.js --write` → `verify.js --all-sizes <folder>/index.html index.html`.
 
 ---
 
 ## 6. Open questions for the dad (decide before changing)
 
 - Saw Bench's idle hand can show again for each newly picked saw (max 2 per saw). Too much?
-- Math Grid squares are ~28px on iPhone; bigger means a larger rewrite.
-- Math Grid "0 to 10 / 0 to 12" resets on a fresh visit (treated as the child's choice, not a grown-up setting).
-- Spin Shop's "Zoom" speed label might read as camera zoom.
+- Math Grid squares are ~28 px on iPhone; bigger means a larger rewrite.
+- Math Grid `"0 to 10 / 0 to 12"` resets on a fresh visit (treated as the child's choice, not a grown-up setting).
+- Spin Shop's `"Zoom"` speed label might read as camera zoom.
 
-Decided (kept here so nobody reopens them): the two-step machines (switch on, then push/feed/press; the second
-push while off switches on for him) stay as they are everywhere, lathe and planer included. Concrete uses `orientation: "portrait"`
-instead of a bigger landscape scene. Engine Room was deleted (the dad didn't like it); don't rebuild it unasked. The Bulldozer station was deleted too
-(it didn't fit the other stations' look); the Construction Site's new stations are listed in `PLAN.md`.
+**Decided (do not reopen):** Two-step machines (switch on, then push/feed/press; second push while off auto-switches on) stay everywhere, lathe and planer included. Concrete uses `orientation: "portrait"`. Engine Room and Construction Site's Bulldozer were deleted — don't rebuild unasked.

@@ -22,11 +22,11 @@ try {
   files = execFileSync('git', ['diff', '--name-only', base, head], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
 } catch (e) { all(); }
 
-if (files.some(f => f.startsWith('common/') || f === 'sw.js')) all();
+if (files.some(f => (f.startsWith('common/') && !/\.md$/.test(f)) || f === 'sw.js')) all();
 const folders = new Set();
 let launcher = false;
 for (const f of files) {
-  if (/\.md$/.test(f) || /^(tools|plans|archive|\.github)\//.test(f)) continue;
+  if (/\.md$/.test(f) || /^(tools|plans|archive|docs|\.github|\.agents)\//.test(f)) continue;
   if (!f.includes('/')) { if (f === 'index.html') launcher = true; continue; }
   folders.add(f.split('/')[0]);
 }

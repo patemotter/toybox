@@ -1,0 +1,1919 @@
+// Script of water-works/index.html, loaded by a plain <script src> at the same place in the page.
+// Sections, in order (search for the title to jump to one):
+//   - Canvas and view
+//   - Table geometry
+//   - Layouts
+//   - Streams of falling water
+//   - Splashes, ripples and droplets on the panel
+//   - Floating toys and scoops
+//   - Squeegee and spray bottle
+//   - Drawing the table
+//   - Thumbnails for the layout picker
+//   - Update
+//   - Save and load
+//   - Layout
+//   - Touch
+//   - Sound (off by default; soft and synthesized)
+//   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
+//   - Main loop
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var OUT = "#1D2340";
+  var NAVY = "#203B5E", NAVY_L = "#34567F";
+  var YEL = "#FFCB2E", YEL_D = "#D9A10E";
+  var ORA = "#F47B2A", ORA_D = "#D3561A", ORA_L = "#FF9F4D";
+  var WOOD = "#EDCB92", WOOD_D = "#C99A5B";
+  var CREAM = "#F8F0DF", CREAM_D = "#E7D9BD";
+  var GREEN = "#2FA24A";
+  var WATER = "rgba(64,166,236,0.88)";
+  var TAU = Math.PI * 2, GR = 1150, SPEED = 270;   // calmer: water falls and runs through the pipes more slowly
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* ignore */ }
+
+  var KEY = "waterworks-v3";
+  // Opening Water Table from the Toybox home screen (Toybox.fresh) starts the first-visit layout with
+  // its valves as they come; a reload keeps them.
+  if (window.Toybox && Toybox.fresh()) {
+    try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+  }
+  var now = 0;
+  var flowOn = true;
+
+  // ---------- Canvas and view ----------
+  // The table is laid out in a virtual box VW wide and VH tall (both follow the screen shape),
+  // then scaled to fit the free area under the top bar.
+  var cv = $("works"), ctx = cv.getContext("2d");
+  var CW = 0, CH = 0, DPR = 1;
+  var view = { x: 0, y: 0, s: 1, VW: 1000, VH: 800 };
+  function ext() { return { l: -view.x / view.s, r: (CW - view.x) / view.s, t: -view.y / view.s, b: (CH - view.y) / view.s }; }
+  function toWorld(cx, cy) { return { x: (cx - view.x) / view.s, y: (cy - view.y) / view.s }; }
+  function rr(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function hitR(r) { return Math.max(r, 28 / view.s); }
+
+  // ---------- Table geometry ----------
+  var g = null, U = 1;
+  function geom(VW, VH) {
+    var o = { VW: VW, VH: VH };
+    o.floor = VH - 6;
+    var tall = VH / VW > 1.6;
+    o.legH = VH * (VH < 900 ? 0.11 : (tall ? 0.1 : 0.15));
+    o.apronH = clamp(VH * 0.1, 64, 130);
+    o.surfD = clamp(VH * (tall ? 0.1 : 0.085), 52, tall ? 160 : 110);
+    o.apronBot = o.floor - o.legH;
+    o.yr = o.apronBot - o.apronH;          // front rim of the bin
+    o.rimBack = o.yr - o.surfD - 14;        // back rim of the bin
+    o.yb = o.rimBack + 9; o.yf = o.yr - 7;  // water surface: back and front edges
+    o.fx0 = VW * 0.055; o.fx1 = VW * 0.945; // front rim x
+    o.bx0 = VW * 0.1; o.bx1 = VW * 0.9;     // back rim x
+    o.px0 = VW * 0.125; o.px1 = VW * 0.875; o.py0 = 8; // clear panel
+    o.gx0 = o.px0 + (o.px1 - o.px0) * 0.06; o.gw = (o.px1 - o.px0) * 0.88 / 8;
+    o.gy0 = o.py0 + 6; o.gh = (o.rimBack - o.gy0) / 6;
+    o.cell = Math.min(o.gw, o.gh);
+    o.land = o.yb + (o.yf - o.yb) * 0.22;
+    return o;
+  }
+  function edgeL(y) { var k = clamp((y - g.rimBack) / (g.yr - g.rimBack), 0, 1); return lerp(g.bx0 + 8 * U, g.fx0 + 14 * U, k); }
+  function edgeR(y) { var k = clamp((y - g.rimBack) / (g.yr - g.rimBack), 0, 1); return lerp(g.bx1 - 8 * U, g.fx1 - 14 * U, k); }
+  function inWater(x, y, pad) { pad = pad || 0; return y >= g.yb - pad && y <= g.yf + pad && x >= edgeL(y) - pad && x <= edgeR(y) + pad; }
+
+  // ---------- Layouts ----------
+  // Each layout is built in world units from the table geometry, so one design fits both
+  // landscape and portrait. P() maps the panel's hole grid (8 across, 6 down) to the world.
+  function P(gx, gy) { return { x: g.gx0 + gx * g.gw, y: g.gy0 + gy * g.gh }; }
+  function spinR() { return clamp(g.cell * 0.72, 32 * U, 64 * U); }
+  function mkBowls() {
+    return {
+      funnels: [["f1", P(2, 1.25)], ["f2", P(6, 1.25)]],
+      valves: [["v1", P(2, 2.4), 1, 0], ["v2", P(6, 2.8), 1, 0]],
+      spouts: [["s1", P(0.9, 3.5)], ["s2", P(3.2, 3.9)], ["s3", P(4.8, 3.7)], ["s4", P(7.1, 3.4)]],
+      pipes: [["f1", "v1"], ["v1", "s1", "L", [P(0.9, 2.4)]], ["v1", "s2", "R", [P(3.2, 2.4)]],
+              ["f2", "v2"], ["v2", "s3", "L", [P(4.8, 2.8)]], ["v2", "s4", "R", [P(7.1, 2.8)]]],
+      spins: [["flower", P(0.55, 4.75)], ["prop", P(3.55, 5.0)], ["flower", P(7.45, 4.7)]]
+    };
+  }
+  // One funnel, one very long pipe back and forth across the panel. Two corner knobs send the
+  // water down the sides instead; paddle wheels in the pipe turn as the water rushes past.
+  function mkZig() {
+    var A = 1.7, B = 2.6, C = 3.5, D = 4.4, L = 0.6, R = 7.4;
+    return {
+      funnels: [["f1", P(L, 1.1)]],
+      valves: [["v1", P(R, A), 1, 1], ["v2", P(L, B), 1, 1]],
+      spouts: [["s1", P(7.9, A + 0.3)], ["s2", P(0.1, B + 0.3)], ["s3", P(2.2, D)]],
+      pipes: [["f1", "v1", "", [P(L, A)]],
+              ["v1", "v2", "L", [P(R, B)]],
+              ["v1", "s1", "R", [P(7.9, A)]],
+              ["v2", "s3", "L", [P(L, C), P(R, C), P(R, D)]],
+              ["v2", "s2", "R", [P(0.1, B)]]],
+      spins: [["prop", P(7.55, 5.32), 0.75], ["flower", P(0.42, 5.32), 0.75], ["pin", P(2.55, 5.32), 0.8]],
+      inline: [[0, P(2.6, A)], [0, P(5.2, A)], [1, P(4.0, B)], [3, P(2.4, C)], [3, P(5.6, C)], [3, P(4.6, D)]]
+    };
+  }
+  // Water wheels in a staircase: each one flings its water onto the next one down.
+  function mkWheels() {
+    var row = P(0, 1.5).y, sy = P(0, 1.95).y, avail = g.rimBack - 8 * U - (sy + 18 * U), n = 6, r = 0;
+    var opts = [6, 5, 4];
+    for (var k = 0; k < opts.length; k++) {
+      n = opts[k]; r = Math.min(g.cell * 0.66, avail / ((n - 1) * 1.2 + 1.85));
+      if (r >= g.cell * 0.55 || n === 4) break;
+    }
+    var x1 = P(6.5, 0).x, y1 = sy + 18 * U + 0.85 * r, wheels = [];
+    for (k = 0; k < n; k++) wheels.push({ x: x1 - k * 1.75 * r, y: y1 + k * 1.2 * r, r: r });
+    var sx = x1 + 0.5 * r;
+    return {
+      funnels: [["f1", P(1.0, 1.05)]],
+      valves: [["v1", { x: sx, y: row }, 1, 1]],
+      spouts: [["s1", { x: sx, y: sy }], ["s2", P(7.88, 4.2)]],
+      pipes: [["f1", "v1", "", [P(1.0, 1.5)]], ["v1", "s1", "L"], ["v1", "s2", "R", [P(7.88, 1.5)]]],
+      spins: [["flower", P(7.55, 5.2), 0.75]],
+      wheels: wheels
+    };
+  }
+  // A water wheel on a big gear, driving a train of meshing gears to a fast propeller.
+  // The knob picks which side the water lands on, so it can turn the whole train either way.
+  function mkGears() {
+    var vgy = g.gh > 100 * U ? 2.3 : 1.55;
+    var vx = P(1.5, 0).x, vy = P(0, vgy).y, sy = P(0, vgy + 0.4).y;
+    var ns = [20, 12, 24, 10, 16, 8], deg = [25, -20, 15, -10, 5], ph = deg.map(function (d) { return d * Math.PI / 180; });
+    var sum = 0;
+    for (var k = 0; k < ph.length; k++) sum += (ns[k] + ns[k + 1]) / 2 * Math.cos(ph[k]);
+    var m = Math.min((P(7.6, 0).x - vx) / (sum + ns[ns.length - 1] / 2 + 1), g.cell * 0.095);
+    var r0 = m * ns[0] / 2, off = Math.max(0.62 * r0, 36 * U), wy = sy + 18 * U + 0.92 * r0;
+    return {
+      funnels: [["f1", P(1.5, 1.05)]],
+      valves: [["v1", { x: vx, y: vy }, 1, 2]],
+      spouts: [["sL", { x: vx - off, y: sy }], ["sR", { x: vx + off, y: sy }]],
+      pipes: [["f1", "v1"], ["v1", "sL", "L", [{ x: vx - off, y: vy }]], ["v1", "sR", "R", [{ x: vx + off, y: vy }]]],
+      wheels: [{ x: vx, y: wy, r: r0 * 0.92, gear: true }],
+      gears: { driver: 0, n: ns, phis: ph, m: m, prop: true }
+    };
+  }
+  // A spray bar with six nozzles over a forest of pinwheels, propellers and sunflowers.
+  function mkForest() {
+    var by = P(0, 1.65).y, sy = P(0, 1.95).y, cx = P(4, 0).x;
+    var xsL = [3.0, 1.75, 0.5], xsR = [5.0, 6.25, 7.5];
+    var d = { funnels: [["f1", P(4, 1.1)]], valves: [["v1", { x: cx, y: by }, 1, 0]], joins: [], spouts: [], pipes: [["f1", "v1"]], spins: [] };
+    [[xsL, "L"], [xsR, "R"]].forEach(function (sd) {
+      var prev = "v1";
+      sd[0].forEach(function (gx, k) {
+        var x = P(gx, 0).x, sid = "s" + sd[1] + k, jid = "j" + sd[1] + k, port = prev === "v1" ? sd[1] : "";
+        d.spouts.push([sid, { x: x, y: sy }]);
+        if (k === sd[0].length - 1) d.pipes.push([prev, sid, port, [{ x: x, y: by }]]);
+        else { d.joins.push([jid, { x: x, y: by }]); d.pipes.push([prev, jid, port]); d.pipes.push([jid, sid]); prev = jid; }
+      });
+    });
+    var top = sy + 21 * U, bot = g.rimBack - 6 * U, H = bot - top, base = spinR(), kinds = ["pin", "prop", "flower"];
+    xsL.slice().reverse().concat(xsR).forEach(function (gx, c) {
+      var x = P(gx, 0).x, s1 = c % 2 === 0 ? 1 : -1, sides = [s1, -s1, s1];
+      var mul = c % 2 === 0 ? [0.8, 0.7, 0.85] : [0.7, 0.85, 0.75];
+      var rs = mul.map(function (mm) { return Math.min(base * mm, H / 6.6); });
+      var sumR = rs[0] + rs[1] + rs[2], gap = Math.max(2 * U, (H - 2 * sumR) / 2.6);
+      var y = top + (c % 2 ? gap * 0.5 : 0), xs = x;
+      for (var t = 0; t < 3; t++) {
+        var r = rs[t], cxx = xs + sides[t] * 0.42 * r;
+        y += r; d.spins.push([kinds[(c + t) % 3], { x: cxx, y: y }, r / base]);
+        xs = cxx - sides[t] * 0.95 * r; y += r + gap;
+      }
+    });
+    return d;
+  }
+  // Stepped trays: each fills up and spills over its lip into the next one.
+  function mkSteps() {
+    var sy = P(0, 1.65).y, n = 4, top0 = sy + 29 * U, bot = g.rimBack - 10 * U;
+    var dd = clamp(g.gh * 0.42, 24 * U, 46 * U), step = (bot - top0 - dd) / (n - 1), trays = [];
+    for (var k = 0; k < n; k++) trays.push({ x0: P(0.25 + k * 1.75, 0).x, x1: P(2.25 + k * 1.75, 0).x, top: top0 + k * step, d: dd, lip: 1 });
+    return {
+      funnels: [["f1", P(0.85, 1.1)], ["f2", P(7.2, 1.1)]],
+      valves: [["v2", P(7.2, 1.55), 0, 0]],
+      spouts: [["s1", P(0.85, 1.65)], ["s2", P(7.2, 2.0)]],
+      pipes: [["f1", "s1"], ["f2", "v2"], ["v2", "s2"]],
+      spins: [["prop", P(6.95, 2.9), 0.85]],
+      trays: trays
+    };
+  }
+  var LAYOUTS = [
+    { id: "bowls", name: "Bowls", make: mkBowls },
+    { id: "zigzag", name: "Zigzag", make: mkZig },
+    { id: "wheels", name: "Wheels", make: mkWheels },
+    { id: "gears", name: "Gears", make: mkGears },
+    { id: "spinners", name: "Spinners", make: mkForest },
+    { id: "steps", name: "Steps", make: mkSteps }
+  ];
+  var lay = 0;
+  var valveStates = {};
+  var W = null;
+
+  function Stream(kind) { return { kind: kind, act: false, q: 0, x: 0, y: 0, top: 0, bot: 0, vt: 0, vb: 0, tg: null, fx: 0 }; }
+  function segAng(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
+  function buildWorld(idx, old) {
+    var L = LAYOUTS[idx], d = L.make(), same = old && old.lay === idx, vs = valveStates[L.id] || [];
+    var w = { funnels: [], valves: [], joins: [], spouts: [], pipes: [], spins: [], wheels: [], gears: [], trays: [], inl: [], by: {}, gearDrv: null, gearProp: false };
+    (d.funnels || []).forEach(function (f0) {
+      var p = f0[1], stem = 14 * U, bh = clamp(g.gh * 0.95, 44 * U, 120 * U);
+      var R = clamp(bh * 1.0, 40 * U, Math.min(g.gw * 1.05, 96 * U));
+      var f = { kind: "funnel", id: f0[0], x: p.x, y: p.y, bot: p.y - stem, top: p.y - stem - bh, bh: bh, R: R,
+        level: 0, q: 0, magic: 0, swirl: 0, st: Stream("magic"), out: null, outs: [] };
+      if (same && old.by[f0[0]]) f.level = old.by[f0[0]].level;
+      w.funnels.push(f); w.by[f0[0]] = f;
+    });
+    (d.valves || []).forEach(function (v0, i) {
+      var p = v0[1], st = vs[i];
+      var v = { kind: "valve", id: v0[0], t: !!v0[2], x: p.x, y: p.y, state: 0, ang: 0, pop: 0, inQ: 0, outs: [], idx: i, dirs: {}, inDir: Math.PI / 2 };
+      v.state = (typeof st === "number" && st >= 0 && st < (v.t ? 4 : 2)) ? st : (v0[3] || 0);
+      w.valves.push(v); w.by[v0[0]] = v;
+    });
+    (d.joins || []).forEach(function (j0) {
+      var j = { kind: "join", id: j0[0], x: j0[1].x, y: j0[1].y, inQ: 0, outs: [] };
+      w.joins.push(j); w.by[j0[0]] = j;
+    });
+    (d.spouts || []).forEach(function (s0) {
+      var s = { kind: "spout", id: s0[0], x: s0[1].x, y: s0[1].y, inQ: 0, st: Stream("spout"), outs: [] };
+      w.spouts.push(s); w.by[s0[0]] = s;
+    });
+    (d.pipes || []).forEach(function (p0) {
+      var a = w.by[p0[0]], b = w.by[p0[1]], pts = [{ x: a.x, y: a.y }];
+      (p0[3] || []).forEach(function (v) { pts.push({ x: v.x, y: v.y }); });
+      pts.push({ x: b.x, y: b.y });
+      var cum = [0];
+      for (var i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      var pp = { from: a, to: b, port: p0[2] || "", pts: pts, cum: cum, len: cum[cum.length - 1], slugs: [], open: true };
+      w.pipes.push(pp);
+      if (a.kind === "funnel") a.out = pp; else a.outs.push(pp);
+      if (a.kind === "valve") a.dirs[pp.port || "_"] = segAng(pts[0], pts[1]);
+      if (b.kind === "valve") b.inDir = segAng(pts[pts.length - 2], pts[pts.length - 1]);
+    });
+    w.valves.forEach(function (v) { v.ang = valveAngle(v); });
+    var base = spinR();
+    (d.spins || []).forEach(function (s0, i) {
+      var r = base * (s0[2] || 1) * (s0[0] === "prop" ? 1.05 : 1);
+      var s = { kind: s0[0], x: s0[1].x, y: s0[1].y, r: r, ang: rand(0, TAU), om: 0, hit: 0 };
+      if (same && old.spins[i]) { s.ang = old.spins[i].ang; s.om = old.spins[i].om; }
+      w.spins.push(s);
+    });
+    (d.wheels || []).forEach(function (o, i) {
+      var wh = { kind: "wheel", x: o.x, y: o.y, r: o.r, gear: !!o.gear, ang: rand(0, TAU), om: 0, hit: 0, acc: 0, inQ: 0, carry: 0, side: 1, st: Stream("wheel") };
+      if (same && old.wheels[i]) { wh.ang = old.wheels[i].ang; wh.om = old.wheels[i].om; }
+      w.wheels.push(wh);
+    });
+    if (d.gears) {
+      var gs = d.gears, drv = w.wheels[gs.driver], gx = drv.x, gy = drv.y, rho = 1;
+      var cols = [ORA, YEL, "#5DB8A0", "#45AEF2", ORA, YEL];
+      gs.n.forEach(function (n, k) {
+        if (k > 0) {
+          var dist = gs.m * (gs.n[k - 1] + n) / 2;
+          gx += Math.cos(gs.phis[k - 1]) * dist; gy += Math.sin(gs.phis[k - 1]) * dist;
+          rho = -rho * gs.n[k - 1] / n;
+        }
+        w.gears.push({ x: gx, y: gy, n: n, m: gs.m, r: gs.m * n / 2, rho: rho, ang: 0, phi: k < gs.phis.length ? gs.phis[k] : 0, col: cols[k % cols.length] });
+      });
+      w.gearDrv = drv; w.gearProp = !!gs.prop;
+    }
+    (d.trays || []).forEach(function (t) {
+      w.trays.push({ x0: t.x0, x1: t.x1, top: t.top, d: t.d, lip: t.lip || 1, level: 0, acc: 0, inQ: 0, st: Stream("tray"), dump: 0, tilt: 0 });
+    });
+    (d.inline || []).forEach(function (o, i) {
+      var p = w.pipes[o[0]], pt = o[1], best = null;
+      for (var k = 1; k < p.pts.length; k++) {
+        var a = p.pts[k - 1], b = p.pts[k], L2 = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        var ux = (b.x - a.x) / L2, uy = (b.y - a.y) / L2, tt = clamp((pt.x - a.x) * ux + (pt.y - a.y) * uy, 0, L2);
+        var qx = a.x + ux * tt, qy = a.y + uy * tt, dd = Math.hypot(pt.x - qx, pt.y - qy);
+        if (!best || dd < best.d) best = { d: dd, x: qx, y: qy, ux: ux, uy: uy, s: p.cum[k - 1] + tt };
+      }
+      var r = clamp(Math.min(g.cell * 0.36, g.gh * 0.27), 15 * U, 34 * U), nx = 0, ny = -1;
+      if (Math.abs(best.uy) > Math.abs(best.ux)) { nx = -1; ny = 0; }
+      var cxx = best.x + nx * r * 0.55, cyy = best.y + ny * r * 0.55, rx = best.x - cxx, ry = best.y - cyy;
+      var iw = { kind: "inline", pipe: o[0], s: best.s, x: cxx, y: cyy, r: r, sg: (rx * best.uy - ry * best.ux) >= 0 ? 1 : -1, ang: rand(0, TAU), om: 0, hit: 0 };
+      if (same && old.inl[i]) { iw.ang = old.inl[i].ang; iw.om = old.inl[i].om; }
+      w.inl.push(iw);
+    });
+    w.lay = idx;
+    gearAngles(w);
+    return w;
+  }
+  // Meshing gears: each gear's angle follows from the one before, so teeth always fit
+  // into gaps, neighbors turn opposite ways, and small gears spin faster.
+  function gearAngles(w) {
+    if (!w.gears.length) return;
+    var th = w.gearDrv.ang;
+    w.gears[0].ang = th;
+    for (var k = 1; k < w.gears.length; k++) {
+      var a = w.gears[k - 1], b = w.gears[k], ph = a.phi;
+      th = ph + Math.PI + Math.PI / b.n - (th - ph) * a.n / b.n;
+      b.ang = th;
+    }
+  }
+  function valveAngle(v) {
+    var d = v.dirs;
+    if (!v.t) { var od = d._ !== undefined ? d._ : (d.L !== undefined ? d.L : Math.PI / 2); return v.state === 0 ? od : od + Math.PI / 2; }
+    var dl = d.L !== undefined ? d.L : Math.PI, dr = d.R !== undefined ? d.R : 0;
+    if (v.state === 1) return dl;
+    if (v.state === 2) return dr;
+    if (v.state === 3) return v.inDir + Math.PI;
+    var bx = Math.cos(dl) + Math.cos(dr), byy = Math.sin(dl) + Math.sin(dr);
+    return Math.hypot(bx, byy) < 0.3 ? v.inDir : Math.atan2(byy, bx);
+  }
+  function allows(v, port) {
+    if (!v.t) return v.state === 0;
+    if (v.state === 0) return true;
+    if (v.state === 1) return port === "L";
+    if (v.state === 2) return port === "R";
+    return false;
+  }
+  function nodeOpen(n) {
+    if (n.kind === "spout") return true;
+    for (var i = 0; i < n.outs.length; i++) {
+      var o = n.outs[i];
+      if ((n.kind !== "valve" || allows(n, o.port)) && o.open) return true;
+    }
+    return false;
+  }
+  function valveShare(v, p) {
+    if (!allows(v, p.port) || !p.open) return 0;
+    var k = 0;
+    v.outs.forEach(function (o) { if (allows(v, o.port) && o.open) k++; });
+    return k > 1 ? Math.min(1, v.inQ * 0.65) : v.inQ;
+  }
+  // Water travels through a pipe as "slugs": stretches [t, h] along its length.
+  function stepPipe(p, inflow, dt) {
+    var v = SPEED * dt, L = p.len, sl = p.slugs, i, s;
+    var fed = inflow > 0.01;
+    if (fed) {
+      var last = sl[sl.length - 1];
+      if (!last || last.t > 0.5) { last = { t: 0, h: 0, q: inflow }; sl.push(last); }
+      last.q += (inflow - last.q) * Math.min(1, dt * 6);
+    }
+    for (i = 0; i < sl.length; i++) {
+      s = sl[i];
+      var lim = i === 0 ? L : sl[i - 1].t;
+      s.h = Math.min(lim, s.h + v);
+      if (fed && i === sl.length - 1) { s.t = 0; continue; }
+      var blocked = s.h >= lim - 0.01 && (i > 0 || !p.open);
+      if (!blocked) s.t = Math.min(s.h, s.t + v);
+    }
+    for (i = sl.length - 1; i > 0; i--) {
+      if (sl[i].h >= sl[i - 1].t - 0.5) { sl[i - 1].t = sl[i].t; sl[i - 1].q = Math.max(sl[i - 1].q, sl[i].q); sl.splice(i, 1); }
+    }
+    for (i = sl.length - 1; i >= 0; i--) {
+      s = sl[i];
+      if (s.t >= L - 0.01 || (s.h - s.t < 0.3 && !(fed && i === sl.length - 1))) sl.splice(i, 1);
+    }
+  }
+  function pipeOut(p) { var s = p.slugs[0]; return p.open && s && s.h >= p.len - 0.5 ? s.q : 0; }
+  function stepFlow(dt) {
+    var i, p;
+    for (i = W.pipes.length - 1; i >= 0; i--) { p = W.pipes[i]; p.open = nodeOpen(p.to); }
+    W.valves.forEach(function (v) { v.inQ = 0; });
+    W.joins.forEach(function (j) { j.inQ = 0; });
+    W.spouts.forEach(function (s) { s.inQ = 0; });
+    W.funnels.forEach(function (f) {
+      var can = flowOn && f.out && f.out.open && f.level > 0.01;
+      f.q = can ? clamp(0.35 + f.level * 0.8, 0, 1) : 0;
+      f.level = Math.max(0, f.level - f.q * 0.3 * dt);
+      if (!flowOn) f.level = Math.max(0, f.level - 0.5 * dt);
+      f.swirl += dt * (1 + f.q * 5);
+      if (f.level > 1.1) {
+        f.level = Math.min(f.level, 1.18);
+        if (Math.random() < dt * 30) {
+          var side = Math.random() < 0.5 ? -1 : 1;
+          addPart(f.x + side * f.R * 0.95, f.top + 2, side * rand(30, 120), rand(-80, 20), rand(2.5, 4.5) * U, g.land + rand(-4, 10));
+        }
+      }
+    });
+    for (i = 0; i < W.pipes.length; i++) {
+      p = W.pipes[i];
+      var a = p.from, inflow = 0;
+      if (a.kind === "funnel") inflow = a.q;
+      else if (a.kind === "join") inflow = a.inQ;
+      else if (a.kind === "valve") inflow = valveShare(a, p);
+      stepPipe(p, p.open ? inflow : 0, dt);
+      p.to.inQ += pipeOut(p);
+    }
+    W.valves.forEach(function (v) {
+      var tgt = valveAngle(v), d = tgt - v.ang;
+      while (d > Math.PI) d -= TAU;
+      while (d < -Math.PI) d += TAU;
+      v.ang += d * Math.min(1, dt * 12);
+      v.pop = Math.max(0, v.pop - dt * 3);
+    });
+  }
+
+  // ---------- Streams of falling water ----------
+  // A stream falls straight down. A spinner it hits turns (the side it lands on sets the
+  // direction) and the water runs off that side and keeps falling. Wheels, trays and bowls
+  // catch the water. Anything else lands in the bin.
+  function funnelSurf(f) { return f.bot - clamp(f.level, 0, 1) * f.bh * 0.9; }
+  function traySurf(t) { return t.top + t.d - 2 * U - clamp(t.level, 0, 1) * t.d * 0.88; }
+  function streamTarget(x, y, catchFunnels, self) {
+    var t = { segs: [], hits: [], end: null, len: 0, lx: x, land: g.land };
+    var cx = x, cy = y, used = [], i, dx, yh;
+    for (var hop = 0; hop < 6; hop++) {
+      var best = 1e9, bo = null, bt = "", bd = 1;
+      if (catchFunnels) {
+        for (i = 0; i < W.funnels.length; i++) {
+          var f = W.funnels[i];
+          if (Math.abs(cx - f.x) < f.R * 0.85 && cy < f.top + 6) { var fy = Math.max(cy + 1, funnelSurf(f)); if (fy < best) { best = fy; bo = f; bt = "fun"; } }
+        }
+      }
+      for (i = 0; i < W.spins.length; i++) {
+        var s = W.spins[i];
+        if (used.indexOf(s) >= 0) continue;
+        dx = cx - s.x;
+        if (Math.abs(dx) < s.r * 0.92 && s.y > cy) {
+          yh = s.y - Math.sqrt(s.r * s.r - dx * dx) * 0.88;
+          if (yh > cy && yh < best) { best = yh; bo = s; bt = "spin"; bd = dx >= 0 ? 1 : -1; }
+        }
+      }
+      for (i = 0; i < W.wheels.length; i++) {
+        var wh = W.wheels[i];
+        if (wh === self) continue;
+        dx = cx - wh.x;
+        if (Math.abs(dx) < wh.r * 0.95 && wh.y > cy) {
+          yh = wh.y - Math.sqrt(wh.r * wh.r - dx * dx) * 0.9;
+          if (yh > cy && yh < best) { best = yh; bo = wh; bt = "wheel"; bd = dx >= 0 ? 1 : -1; }
+        }
+      }
+      for (i = 0; i < W.trays.length; i++) {
+        var tr = W.trays[i];
+        if (tr === self) continue;
+        if (cx > tr.x0 + 2 * U && cx < tr.x1 - 2 * U && tr.top > cy - 2) {
+          yh = traySurf(tr);
+          if (yh > cy && yh < best) { best = yh; bo = tr; bt = "tray"; }
+        }
+      }
+      if (!bo) break;
+      t.segs.push([cx, cy, best]); t.len += best - cy;
+      if (bt === "spin") {
+        t.hits.push({ o: bo, dir: bd, d: t.len, x: cx, y: best });
+        used.push(bo); cx = bo.x + bd * bo.r * 0.95; cy = bo.y;
+        continue;
+      }
+      t.end = { o: bo, t: bt, dir: bd }; t.land = best; t.lx = cx;
+      return t;
+    }
+    var land;
+    if (cx < g.bx0 || cx > g.bx1) land = g.floor - 4;
+    else if (cy > g.yb) land = Math.max(cy + 10, g.land);
+    else land = g.land;
+    t.segs.push([cx, cy, land]); t.len += land - cy; t.land = land; t.lx = cx;
+    return t;
+  }
+  function spinKick(sp, dir, qq, dt, x, y) {
+    sp.om += dir * qq * 16 * dt;
+    sp.om = clamp(sp.om, -9, 9);
+    sp.hit = 0.3;
+    if (Math.random() < dt * 30 * qq) addPart(x, y, dir * rand(60, 220), rand(-200, -40), rand(2, 4) * U, g.land + rand(-4, 10));
+    if (Math.random() < dt * 4 * qq) addDrop(sp.x + rand(-1.4, 1.4) * sp.r, sp.y + rand(-1.4, 1.4) * sp.r, rand(2.5, 5.5) * U);
+  }
+  function stepStream(st, x, y, q, dt, catchFunnels, self) {
+    st.x = x; st.y = y;
+    if (q > 0.02) {
+      if (!st.act) { st.act = true; st.bot = 0; st.vb = 160; }
+      st.top = 0; st.vt = 0;
+      st.q += (q - st.q) * Math.min(1, dt * 8);
+    } else if (st.act) {
+      st.vt += GR * dt; st.top += st.vt * dt;
+    }
+    if (!st.act) { st.q = 0; return; }
+    st.tg = streamTarget(x, y, catchFunnels, self);
+    st.vb += GR * dt; st.bot += st.vb * dt;
+    var t = st.tg, len = t.len;
+    if (st.bot >= len) st.bot = len;
+    if (st.top >= st.bot - 1) { st.act = false; st.q = 0; return; }
+    var qq = st.q;
+    t.hits.forEach(function (h) { if (st.bot >= h.d && st.top < h.d) spinKick(h.o, h.dir, qq, dt, h.x, h.y); });
+    if (st.bot >= len - 1) {
+      var lx = t.lx, e = t.end;
+      if (e && e.t === "fun") {
+        e.o.level += qq * 0.55 * dt;
+        if (Math.random() < dt * 20) addPart(lx + rand(-6, 6), t.land, rand(-60, 60), rand(-160, -60), rand(2, 3.5) * U, t.land + 2);
+      } else if (e && e.t === "wheel") {
+        e.o.acc += qq; e.o.side = e.dir;
+        spinKick(e.o, e.dir, qq, dt, lx, t.land);
+      } else if (e && e.t === "tray") {
+        e.o.acc += qq;
+        if (Math.random() < dt * 14) addPart(lx + rand(-6, 6), t.land, rand(-70, 70), rand(-170, -60), rand(2, 3.5) * U, t.land + 2);
+      } else {
+        var n = reduceMotion ? 0.5 : 1;
+        if (Math.random() < dt * 50 * qq * n) addPart(lx + rand(-5, 5) * U, t.land, rand(-140, 140), rand(-360, -140) * (0.6 + qq * 0.6), rand(2, 4.5) * U, t.land + rand(-3, 14));
+        st.fx += dt;
+        if (st.fx > 0.2) {
+          st.fx = 0;
+          if (t.land < g.floor - 20) { ring(lx, t.land, 0.6 + qq * 0.5); push(lx, t.land, qq * 0.35); }
+        }
+      }
+    }
+  }
+  function drawStream(st) {
+    if (!st.act || !st.tg) return;
+    var t = st.tg, w = (7 + st.q * 10) * U, c = 0, segs = [];
+    t.segs.forEach(function (s) {
+      var L = s[2] - s[1], a = Math.max(st.top, c), b = Math.min(st.bot, c + L);
+      if (b - a > 0.5) segs.push([s[0], s[1] + a - c, s[1] + b - c]);
+      c += L;
+    });
+    ctx.lineCap = "round";
+    segs.forEach(function (s) {
+      ctx.strokeStyle = "rgba(58,158,236,0.78)"; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[0], s[2]); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = w * 0.28;
+      ctx.beginPath(); ctx.moveTo(s[0] - w * 0.18, s[1]); ctx.lineTo(s[0] - w * 0.18, s[2]); ctx.stroke();
+      if (!reduceMotion) {
+        ctx.setLineDash([5 * U, 16 * U]); ctx.lineDashOffset = -now * 520;
+        ctx.strokeStyle = "rgba(220,244,255,0.8)"; ctx.lineWidth = w * 0.45;
+        ctx.beginPath(); ctx.moveTo(s[0] + w * 0.1, s[1]); ctx.lineTo(s[0] + w * 0.1, s[2]); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+  }
+  // Wheels carry the water they catch and fling it off the bottom on the side they turn toward.
+  function wheelDump(wh) { return { x: wh.x - wh.side * 0.88 * wh.r, y: wh.y + 0.32 * wh.r }; }
+  function trayLip(t) { return { x: t.lip > 0 ? t.x1 + 7 * U : t.x0 - 7 * U, y: t.top + 2 * U }; }
+  function updateMachines(dt) {
+    W.wheels.forEach(function (wh) {
+      wh.carry += (wh.inQ - wh.carry) * Math.min(1, dt * 3);
+      var dp = wheelDump(wh);
+      stepStream(wh.st, dp.x, dp.y, flowOn && wh.carry > 0.04 ? Math.min(1, wh.carry) : 0, dt, false, wh);
+    });
+    W.trays.forEach(function (t) {
+      if (!flowOn) t.level = Math.max(0, t.level - 0.4 * dt);
+      t.level += t.inQ * 0.4 * dt;
+      var out = 0;
+      if (t.dump > 0) {
+        t.dump -= dt;
+        if (t.level > 0.02) { out = 1; t.level = Math.max(0, t.level - 1.5 * dt); }
+      }
+      if (t.level >= 1) { t.level = 1; out = Math.max(out, t.inQ); }
+      else t.level = Math.max(0, t.level - 0.012 * dt);
+      t.tilt += ((t.dump > 0 && t.level > 0.02 ? 1 : 0) - t.tilt) * Math.min(1, dt * 8);
+      var lp = trayLip(t);
+      stepStream(t.st, lp.x, lp.y, flowOn && out > 0.02 ? Math.max(0.3, Math.min(1, out)) : 0, dt, false, t);
+    });
+    W.inl.forEach(function (iw) {
+      var p = W.pipes[iw.pipe], q = 0;
+      if (p.open) p.slugs.forEach(function (s) { if (s.t <= iw.s && s.h >= iw.s) q = Math.max(q, s.q); });
+      if (q > 0.02 && flowOn) { iw.om += (iw.sg * (4 + 8 * q) - iw.om) * Math.min(1, dt * 4); iw.hit = 0.3; }
+      else iw.om *= Math.exp(-dt * 0.9);
+      iw.ang += iw.om * dt;
+      iw.hit = Math.max(0, iw.hit - dt);
+    });
+  }
+
+  // ---------- Splashes, ripples and droplets on the panel ----------
+  var parts = [], rings = [], drops = [];
+  function addPart(x, y, vx, vy, r, floor, toPanel) {
+    if (parts.length > 520) parts.shift();
+    parts.push({ x: x, y: y, vx: vx, vy: vy, r: r, floor: floor, life: toPanel ? 0.2 : 3, mist: !!toPanel });
+  }
+  function updateParts(dt) {
+    var keep = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      p.life -= dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.mist) {
+        if (p.life <= 0) { if (p.x > g.px0 && p.x < g.px1 && p.y > g.py0 && p.y < g.rimBack - 8) addDrop(p.x, p.y, p.r * 1.4); continue; }
+      } else {
+        p.vy += GR * 0.85 * dt;
+        if ((p.vy > 0 && p.y >= p.floor) || p.life <= 0) {
+          if (p.r > 3.4 * U && p.floor < g.floor - 20 && Math.random() < 0.25) ring(p.x, p.floor, 0.3);
+          continue;
+        }
+      }
+      keep.push(p);
+    }
+    parts = keep;
+  }
+  function drawParts() {
+    if (!parts.length) return;
+    ctx.fillStyle = "rgba(110,195,250,0.85)";
+    ctx.beginPath();
+    parts.forEach(function (p) { ctx.moveTo(p.x + p.r, p.y); ctx.arc(p.x, p.y, p.r, 0, TAU); });
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath();
+    parts.forEach(function (p) { if (p.r > 2.4 * U) { ctx.moveTo(p.x - p.r * 0.2, p.y - p.r * 0.3); ctx.arc(p.x - p.r * 0.3, p.y - p.r * 0.3, p.r * 0.35, 0, TAU); } });
+    ctx.fill();
+  }
+  function ring(x, y, s) { if (rings.length > 46) rings.shift(); rings.push({ x: x, y: y, t: 0, s: s || 1 }); }
+  function updateRings(dt) { rings = rings.filter(function (r) { r.t += dt; return r.t < 1.1; }); }
+  function drawRings() {
+    ctx.lineWidth = 2.5 * U;
+    rings.forEach(function (r) {
+      var k = r.t / 1.1, rad = (10 + r.t * 95) * U * r.s;
+      ctx.strokeStyle = "rgba(255,255,255," + (0.75 * (1 - k)).toFixed(3) + ")";
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, rad, rad * 0.3, 0, 0, TAU); ctx.stroke();
+    });
+  }
+  function addDrop(x, y, r) {
+    if (x < g.px0 + 4 || x > g.px1 - 4 || y < g.py0 + 4 || y > g.rimBack - 6) return;
+    if (drops.length > 260) drops.shift();
+    drops.push({ x: x, y: y, r: r, ty: y, v: 0, pause: rand(0.2, 2) });
+  }
+  function updateDrops(dt) {
+    var keep = [];
+    for (var i = 0; i < drops.length; i++) {
+      var d = drops[i];
+      if (d.r > 4.2 * U) {
+        d.pause -= dt;
+        if (d.pause <= 0) {
+          d.v = (d.r / U - 3.6) * 34 * U;
+          d.y += d.v * dt;
+          d.r -= dt * 0.35 * U;
+          if (Math.random() < dt * 0.6) d.pause = rand(0.1, 0.8);
+        }
+      }
+      d.ty += (d.y - d.ty) * Math.min(1, dt * 0.35);
+      if (d.y > g.rimBack - 4) continue;
+      keep.push(d);
+    }
+    drops = keep;
+  }
+  function drawDrops() {
+    if (!drops.length) return;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(200,232,250,0.45)";
+    ctx.lineWidth = 3 * U;
+    ctx.beginPath();
+    drops.forEach(function (d) { if (d.y - d.ty > 4) { ctx.moveTo(d.x, d.ty); ctx.lineTo(d.x, d.y); } });
+    ctx.stroke();
+    ctx.fillStyle = "rgba(40,110,170,0.22)";
+    ctx.beginPath();
+    drops.forEach(function (d) { ctx.moveTo(d.x + d.r + 1, d.y + 1.2); ctx.arc(d.x + 0.8, d.y + 1.4, d.r, 0, TAU); });
+    ctx.fill();
+    ctx.fillStyle = "rgba(190,228,250,0.75)";
+    ctx.beginPath();
+    drops.forEach(function (d) { ctx.moveTo(d.x + d.r, d.y); ctx.arc(d.x, d.y, d.r, 0, TAU); });
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.beginPath();
+    drops.forEach(function (d) { var hr = d.r * 0.33; ctx.moveTo(d.x - d.r * 0.3 + hr, d.y - d.r * 0.35); ctx.arc(d.x - d.r * 0.3, d.y - d.r * 0.35, hr, 0, TAU); });
+    ctx.fill();
+  }
+  function wipeAt(x, y, hw, hh) {
+    var n = 0;
+    drops = drops.filter(function (d) {
+      if (Math.abs(d.x - x) < hw && Math.abs(d.y - y) < hh) { n++; return false; }
+      return true;
+    });
+    return n;
+  }
+
+  // ---------- Floating toys and scoops ----------
+  var toys = [], scoops = [];
+  function makeToys() {
+    toys = [
+      { kind: "duck", fx: 0.18, fy: 0.55 }, { kind: "boat", fx: 0.5, fy: 0.75 }, { kind: "ball", fx: 0.82, fy: 0.45 }
+    ].map(function (t, i) { return { kind: t.kind, fx: t.fx, fy: t.fy, x: 0, y: 0, vx: 0, vy: 0, rot: 0, ph: i * 1.7, face: 1 }; });
+    scoops = [
+      { kind: "cup", fx: 0.34, fy: 0.4 }, { kind: "pitcher", fx: 0.68, fy: 0.62 }
+    ].map(function (s, i) {
+      return { kind: s.kind, fx: s.fx, fy: s.fy, x: 0, y: 0, vx: 0, vy: 0, ph: 0.8 + i * 2.1, state: "float", w: 1, tilt: 0,
+        hx: 0, hy: 0, auto: null, st: Stream("cup"), fallV: 0 };
+    });
+  }
+  function placeFloaters() {
+    toys.concat(scoops).forEach(function (t) {
+      t.y = lerp(g.yb + 10, g.yf - 6, t.fy);
+      t.x = lerp(edgeL(t.y) + 30 * U, edgeR(t.y) - 30 * U, t.fx);
+      t.hx = t.x; t.hy = t.y;
+      if (t.state && t.state !== "float") t.state = "float";
+    });
+  }
+  function floaters() {
+    var a = toys.slice();
+    scoops.forEach(function (s) { if (s.state === "float") a.push(s); });
+    return a;
+  }
+  function push(x, y, str) {
+    floaters().forEach(function (t) {
+      var dx = t.x - x, dy = (t.y - y) * 2.5, d = Math.hypot(dx, dy);
+      if (d < 150 * U && d > 0.01) {
+        var f = str * (1 - d / (150 * U));
+        t.vx += dx / d * f * 90 * U; t.vy += dy / d * f * 30 * U;
+      }
+    });
+  }
+  function updateFloaters(dt) {
+    var a = floaters(), i, j;
+    for (i = 0; i < a.length; i++) {
+      var t = a[i];
+      t.vx += Math.sin(now * 0.31 + t.ph * 3) * 5 * U * dt;
+      t.vy += Math.cos(now * 0.23 + t.ph) * 2 * U * dt;
+      for (j = i + 1; j < a.length; j++) {
+        var o = a[j], dx = o.x - t.x, dy = (o.y - t.y) * 2.2, d = Math.hypot(dx, dy), md = 52 * U;
+        if (d < md && d > 0.01) {
+          var f = (md - d) / md * 40 * U * dt * 3;
+          t.vx -= dx / d * f; o.vx += dx / d * f; t.vy -= dy / d * f * 0.4; o.vy += dy / d * f * 0.4;
+        }
+      }
+      var damp = Math.exp(-dt * 0.9);
+      t.vx *= damp; t.vy *= damp;
+      t.x += t.vx * dt; t.y += t.vy * dt;
+      var y0 = g.yb + 12 * U, y1 = g.yf - 6 * U;
+      if (t.y < y0) { t.y = y0; t.vy = Math.abs(t.vy) * 0.5; }
+      if (t.y > y1) { t.y = y1; t.vy = -Math.abs(t.vy) * 0.5; }
+      var l = edgeL(t.y) + 26 * U, r = edgeR(t.y) - 26 * U;
+      if (t.x < l) { t.x = l; t.vx = Math.abs(t.vx) * 0.5; }
+      if (t.x > r) { t.x = r; t.vx = -Math.abs(t.vx) * 0.5; }
+      if (Math.abs(t.vx) > 3) t.face = t.vx > 0 ? 1 : -1;
+      t.rot += t.vx * dt * 0.03;
+    }
+  }
+  function depthScale(y) { return 0.82 + 0.3 * clamp((y - g.yb) / (g.yf - g.yb), 0, 1); }
+  function bob(t) { return Math.sin(now * 2.1 + t.ph) * 2.2 * U; }
+  function waterOver(x, y, w, h) {
+    // A translucent water band over the lower part of a floating thing.
+    ctx.fillStyle = "rgba(70,165,235,0.5)";
+    ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 2 * U;
+    ctx.beginPath(); ctx.ellipse(x, y, w, h * 0.35, 0, 0, TAU); ctx.stroke();
+  }
+  function drawToy(t) {
+    var s = depthScale(t.y) * U, x = t.x, y = t.y + bob(t);
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    if (t.kind === "duck") {
+      ctx.scale(t.face, 1);
+      ctx.fillStyle = "#FFD23F";
+      ctx.beginPath(); ctx.ellipse(-2, -6, 25, 15, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-26, -12); ctx.lineTo(-34, -22); ctx.lineTo(-20, -18); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(14, -24, 12, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ORA; ctx.beginPath(); ctx.ellipse(28, -22, 8, 4.5, 0.1, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(17, -27, 2.6, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#E3B21F"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(-4, -8, 9, 0.2, 2.2); ctx.stroke();
+    } else if (t.kind === "boat") {
+      ctx.scale(t.face, 1);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(0, -10); ctx.lineTo(24, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#FF6B6B";
+      ctx.beginPath(); ctx.moveTo(-3, -46); ctx.lineTo(-3, -12); ctx.lineTo(-20, -12); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#E63946";
+      ctx.beginPath(); ctx.moveTo(-30, -10); ctx.lineTo(30, -10); ctx.lineTo(22, 6); ctx.lineTo(-22, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.rotate(t.rot);
+      var cols = ["#E63946", "#FFFFFF", "#45AEF2", "#FFD23F", "#FFFFFF", "#2FA24A"];
+      for (var i = 0; i < 6; i++) {
+        ctx.fillStyle = cols[i];
+        ctx.beginPath(); ctx.moveTo(0, -8); ctx.arc(0, -8, 17, i * TAU / 6, (i + 1) * TAU / 6); ctx.closePath(); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(0, -8, 17, 0, TAU); ctx.stroke();
+      ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(0, -8, 4, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+    waterOver(x, y, (t.kind === "ball" ? 20 : 30) * s, 9 * s);
+  }
+  // Scoop shape in its own frame: centre at 0,0; the pouring lip is on the left.
+  function scoopDims(sc) { return sc.kind === "cup" ? { tw: 46, bw: 36, h: 44 } : { tw: 50, bw: 44, h: 58 }; }
+  var SK = 1.3;   // the cup and the pitcher are drawn a bit bigger than the toys, so they're easy to grab
+  function lipPoint(sc) {
+    var d = scoopDims(sc), a = -sc.tilt * 1.85, s = U * SK * (sc.state === "float" ? depthScale(sc.y) : 1.1);
+    var lx = (-d.tw / 2 - (sc.kind === "pitcher" ? 10 : 2)) * s, ly = (-d.h / 2) * s;
+    return { x: sc.x + lx * Math.cos(a) - ly * Math.sin(a), y: sc.y + lx * Math.sin(a) + ly * Math.cos(a) };
+  }
+  function drawScoop(sc) {
+    var d = scoopDims(sc), fl = sc.state === "float", s = U * SK * (fl ? depthScale(sc.y) : 1.1);
+    var x = sc.x, y = sc.y + (fl ? bob(sc) - 6 * U : 0);
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(-sc.tilt * 1.85);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    var body = sc.kind === "cup" ? ORA : YEL;
+    if (sc.kind === "pitcher") {
+      ctx.beginPath(); ctx.moveTo(d.tw / 2 - 2, -d.h / 2 + 10);
+      ctx.bezierCurveTo(d.tw / 2 + 22, -d.h / 2 + 8, d.tw / 2 + 22, d.h / 2 - 12, d.bw / 2, d.h / 2 - 12);
+      ctx.lineWidth = 9; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = 4.5; ctx.strokeStyle = YEL; ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT;
+    }
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.moveTo(-d.tw / 2, -d.h / 2);
+    if (sc.kind === "pitcher") ctx.lineTo(-d.tw / 2 - 10, -d.h / 2 - 6);
+    ctx.lineTo(d.tw / 2, -d.h / 2); ctx.lineTo(d.bw / 2, d.h / 2 - 6);
+    ctx.quadraticCurveTo(d.bw / 2, d.h / 2, d.bw / 2 - 6, d.h / 2);
+    ctx.lineTo(-d.bw / 2 + 6, d.h / 2); ctx.quadraticCurveTo(-d.bw / 2, d.h / 2, -d.bw / 2, d.h / 2 - 6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    rr(-d.tw / 2 + 7, -d.h / 2 + 8, 6, d.h - 20, 3); ctx.fill();
+    // Opening at the top, with water in it.
+    ctx.fillStyle = sc.w > 0.08 ? "#5BB8F0" : (sc.kind === "cup" ? ORA_D : YEL_D);
+    ctx.beginPath(); ctx.ellipse(0, -d.h / 2, d.tw / 2 - 1, 6, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    if (sc.w > 0.08) { ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.ellipse(-6, -d.h / 2 - 1, 8, 2, 0, 0, TAU); ctx.fill(); }
+    ctx.restore();
+    if (fl) waterOver(x, sc.y + bob(sc), (d.bw / 2 + 10) * s, 9 * s);
+  }
+  function updateScoops(dt) {
+    scoops.forEach(function (sc) {
+      var want = false;
+      if (sc.state === "drag") {
+        // Carried up, the cup keeps its water on the way (it used to pour all the way up and arrive empty).
+        // Near a bowl it slides onto the bowl's pouring spot by itself and pours in: a generous magnet.
+        var bf = snapFunnel(sc.rx, sc.ry), tx = sc.rx, ty = sc.ry;
+        sc.snap = bf;
+        if (bf) { var ps = pourSpot(sc, bf); tx = ps.x; ty = ps.y; }
+        var kk = Math.min(1, dt * (bf ? 12 : 30));
+        sc.x += (tx - sc.x) * kk; sc.y += (ty - sc.y) * kk;
+        want = !!bf && sc.w > 0.02 && Math.hypot(tx - sc.x, ty - sc.y) < 20 * U;
+      }
+      else if (sc.state === "auto") {
+        var A = sc.auto;
+        A.t += dt;
+        if (A.phase === "up") {
+          var k = clamp(A.t / 0.7, 0, 1), e = k * k * (3 - 2 * k);
+          sc.x = lerp(A.xs, A.x1, e); sc.y = lerp(A.ys, A.y1, e) - Math.sin(k * Math.PI) * 40 * U;
+          if (k >= 1) { A.phase = "pour"; A.t = 0; }
+        } else if (A.phase === "pour") {
+          want = sc.w > 0.02;
+          if (!want && sc.tilt < 0.1) { A.phase = "back"; A.t = 0; A.x2 = sc.x; A.y2 = sc.y; }
+        } else {
+          var k2 = clamp(A.t / 0.7, 0, 1), e2 = k2 * k2 * (3 - 2 * k2);
+          sc.x = lerp(A.x2, A.x0, e2); sc.y = lerp(A.y2, A.y0, e2);
+          if (k2 >= 1) { sc.state = "float"; sc.auto = null; sc.w = 1; ring(sc.x, sc.y, 0.8); splashAt(sc.x, sc.y, 6); }
+        }
+      } else if (sc.state === "fall") {
+        sc.fallV += GR * dt; sc.y += sc.fallV * dt;
+        if (sc.y >= sc.hy) {
+          sc.y = sc.hy;
+          if (sc.x < edgeL(sc.y) + 26 * U || sc.x > edgeR(sc.y) - 26 * U) sc.x = clamp(sc.x, edgeL(sc.y) + 26 * U, edgeR(sc.y) - 26 * U);
+          sc.state = "float"; sc.vx = 0; sc.vy = 0; sc.w = 1;
+          ring(sc.x, sc.y, 1.1); splashAt(sc.x, sc.y, 12); push(sc.x, sc.y, 0.6); plip();
+        }
+      }
+      if (sc.state === "float" || (sc.state === "drag" && inWater(sc.x, sc.y + 14 * U))) sc.w = 1;
+      sc.tilt += ((want ? 1 : 0) - sc.tilt) * Math.min(1, dt * (want ? 5 : 7));
+      var pouring = sc.tilt > 0.5 && sc.w > 0.02 && flowOn;
+      if (pouring) sc.w = Math.max(0, sc.w - dt * 0.5);
+      var lp = lipPoint(sc);
+      stepStream(sc.st, lp.x, lp.y, pouring ? 1 : 0, dt, true);
+    });
+  }
+  // Where a cup sits to pour into a bowl (its lip, on the left, over the bowl's middle).
+  function pourSpot(sc, f) {
+    var d = scoopDims(sc), off = (d.tw / 2 + (sc.kind === "pitcher" ? 14 : 6)) * 1.1 * SK * U;
+    // Kept on screen: where the stage is short (phones held sideways) the bowls sit near its top edge.
+    var vis = -view.y / view.s + (d.h * 0.5 * 1.1 * SK + 8) * U;
+    // (the tipped cup's lip is its lowest point, well under its middle, and must stay over the bowl)
+    var lipDown = ((d.tw / 2 + (sc.kind === "pitcher" ? 10 : 2)) * Math.sin(1.85) - d.h / 2 * Math.cos(1.85)) * 1.1 * SK * U;
+    var base = f.top - 46 * SK * U - (sc.kind === "pitcher" ? 14 * U : 0);
+    return { x: f.x + off * 0.55, y: Math.max(base, Math.min(vis, f.top - 4 * U - lipDown)) };
+  }
+  // The bowl a carried cup is close enough to (a big area around each bowl, from the top of the panel down
+  // to well below the bowl), or null.
+  function snapFunnel(x, y) {
+    var best = null, bd = 1e9;
+    W.funnels.forEach(function (f) {
+      var dx = Math.abs(x - f.x), top = Math.min(g.py0, f.top - 120 * U), bot = f.bot + 110 * U;
+      if (dx < f.R + 95 * U && y > top && y < bot && dx < bd) { bd = dx; best = f; }
+    });
+    return best;
+  }
+  function splashAt(x, y, n) {
+    for (var i = 0; i < n; i++) addPart(x + rand(-10, 10) * U, y, rand(-150, 150), rand(-380, -120), rand(2, 4.5) * U, y + rand(-3, 12));
+  }
+
+  // ---------- Squeegee and spray bottle ----------
+  var sq = { x: 0, y: 0, hx: 0, hy: 0, held: false, back: 0, px: 0, py: 0, rot: 0 };
+  var spr = { x: 0, y: 0, hx: 0, hy: 0, held: false, back: 0, squeeze: 0, acc: 0 };
+  function placeTools() {
+    sq.hx = g.fx0 + 34 * U; sq.hy = g.yr + g.apronH * 0.34;
+    spr.hx = g.fx1 - 14 * U; spr.hy = g.yr - 8 * U;
+    if (!sq.held) { sq.x = sq.hx; sq.y = sq.hy; }
+    if (!spr.held) { spr.x = spr.hx; spr.y = spr.hy; }
+  }
+  function updateTools(dt) {
+    if (!sq.held) { sq.x += (sq.hx - sq.x) * Math.min(1, dt * 7); sq.y += (sq.hy - sq.y) * Math.min(1, dt * 7); }
+    sq.rot += ((sq.held ? 0 : -0.25) - sq.rot) * Math.min(1, dt * 8);
+    if (!spr.held) { spr.x += (spr.hx - spr.x) * Math.min(1, dt * 7); spr.y += (spr.hy - spr.y) * Math.min(1, dt * 7); }
+    spr.squeeze = Math.max(0, spr.squeeze - dt * 5);
+    if (spr.held) { spr.acc += dt; if (spr.acc > 0.5) { spr.acc = 0; squirt(); } }
+  }
+  function squeegeeWipe(x0, y0, x1, y1) {
+    var n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (10 * U))), got = 0;
+    for (var i = 1; i <= n; i++) got += wipeAt(lerp(x0, x1, i / n), lerp(y0, y1, i / n) - 22 * U, 56 * U, 12 * U);
+    if (got) {
+      for (var k = 0; k < Math.min(3, got); k++) addPart(x1 + (Math.random() < 0.5 ? -54 : 54) * U, y1 - 20 * U, rand(-20, 20), rand(0, 60), rand(2.5, 4) * U, g.land + rand(0, 10));
+      if (Math.random() < 0.4) squeak();
+    }
+  }
+  function nozzle() { return { x: spr.x - 32 * U, y: spr.y - 44 * U }; }
+  function squirt() {
+    if (!flowOn) return;
+    var n = nozzle();
+    var tx = clamp(n.x - 230 * U, g.px0 + 40 * U, g.px1 - 40 * U), ty = clamp(n.y - 170 * U, g.py0 + 40 * U, g.rimBack - 50 * U);
+    spr.squeeze = 1;
+    var cnt = reduceMotion ? 12 : 22;
+    for (var i = 0; i < cnt; i++) {
+      var a = rand(0, TAU), rr2 = Math.sqrt(Math.random()) * 75 * U;
+      var ex = tx + Math.cos(a) * rr2, ey = ty + Math.sin(a) * rr2 * 0.8, life = rand(0.14, 0.24);
+      parts.push({ x: n.x, y: n.y, vx: (ex - n.x) / life, vy: (ey - n.y) / life, r: rand(1.6, 3.6) * U, floor: 0, life: life, mist: true });
+    }
+    spray();
+  }
+  function drawSqueegee() {
+    ctx.save();
+    ctx.translate(sq.x, sq.y); ctx.rotate(sq.rot); ctx.scale(U, U);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    ctx.fillStyle = "#2B2F3A"; rr(-58, -27, 116, 9, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = NAVY;
+    ctx.beginPath(); ctx.moveTo(-54, -19); ctx.lineTo(54, -19); ctx.bezierCurveTo(54, 18, 30, 34, 0, 34); ctx.bezierCurveTo(-30, 34, -54, 18, -54, -19); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = CREAM; ctx.beginPath(); ctx.ellipse(0, 10, 22, 9, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-40, -10); ctx.bezierCurveTo(-40, 8, -28, 20, -14, 25); ctx.stroke();
+    ctx.restore();
+  }
+  function drawSpray() {
+    ctx.save();
+    ctx.translate(spr.x, spr.y); ctx.scale(U, U);
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    ctx.fillStyle = "rgba(225,245,255,0.75)";
+    rr(-18, -12, 36, 66, 10); ctx.fill();
+    ctx.fillStyle = "rgba(90,180,240,0.6)"; rr(-16, 16, 32, 36, 8); ctx.fill();
+    ctx.strokeStyle = OUT; rr(-18, -12, 36, 66, 10); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.7)"; rr(-12, -4, 5, 44, 3); ctx.fill();
+    ctx.fillStyle = NAVY; rr(-9, -20, 18, 10, 3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, -20); ctx.lineTo(14, -20); ctx.lineTo(12, -44); ctx.lineTo(-30, -48); ctx.lineTo(-30, -40); ctx.lineTo(-14, -36); ctx.closePath(); ctx.fill(); ctx.stroke();
+    var sqz = spr.squeeze * 6;
+    ctx.fillStyle = NAVY_L; ctx.beginPath(); ctx.moveTo(-14, -34); ctx.lineTo(-22 + sqz, -16); ctx.lineTo(-16 + sqz, -14); ctx.lineTo(-10, -30); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Drawing the table ----------
+  var waterGrad = null, panelGrad = null;
+  function makeGrads() {
+    waterGrad = ctx.createLinearGradient(0, g.yb, 0, g.yf);
+    waterGrad.addColorStop(0, "rgba(140,212,246,0.92)");
+    waterGrad.addColorStop(1, "rgba(66,160,232,0.92)");
+    panelGrad = ctx.createLinearGradient(g.px0, g.py0, g.px1, g.rimBack);
+    panelGrad.addColorStop(0, "rgba(255,255,255,0.42)");
+    panelGrad.addColorStop(0.5, "rgba(235,248,255,0.22)");
+    panelGrad.addColorStop(1, "rgba(255,255,255,0.36)");
+  }
+  function woodRect(x, y, w, h, r, col) {
+    ctx.fillStyle = col || WOOD; rr(x, y, w, h, r); ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3 * U; ctx.stroke();
+  }
+  function foot(x, y, w) {
+    ctx.fillStyle = GREEN; rr(x - 2 * U, y - 20 * U, w + 4 * U, 22 * U, 6 * U); ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3 * U; ctx.stroke();
+  }
+  function peg(x, y) {
+    ctx.fillStyle = GREEN; rr(x, y, 11 * U, 13 * U, 3 * U); ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.stroke();
+  }
+  function drawBack() {
+    var VW = g.VW, lw = VW * 0.045;
+    // Floor shadow.
+    ctx.fillStyle = "rgba(29,35,64,0.12)";
+    ctx.beginPath(); ctx.ellipse(VW / 2, g.floor - 4, VW * 0.46, 16 * U, 0, 0, TAU); ctx.fill();
+    // Back legs.
+    woodRect(g.bx0 + 4, g.apronBot - 10, lw * 0.85, g.floor - 24 * U - g.apronBot + 10, 4 * U, WOOD_D);
+    woodRect(g.bx1 - 4 - lw * 0.85, g.apronBot - 10, lw * 0.85, g.floor - 24 * U - g.apronBot + 10, 4 * U, WOOD_D);
+    foot(g.bx0 + 4, g.floor - 22 * U, lw * 0.85);
+    foot(g.bx1 - 4 - lw * 0.85, g.floor - 22 * U, lw * 0.85);
+    // The clear panel.
+    var ph = g.rimBack + 6 - g.py0;
+    ctx.fillStyle = panelGrad; rr(g.px0, g.py0, g.px1 - g.px0, ph, 10 * U); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = 4 * U; ctx.stroke();
+    ctx.strokeStyle = "rgba(80,140,180,0.35)"; ctx.lineWidth = 1.5 * U;
+    rr(g.px0 + 4 * U, g.py0 + 4 * U, g.px1 - g.px0 - 8 * U, ph - 8 * U, 8 * U); ctx.stroke();
+    // Reflections.
+    var pw = g.px1 - g.px0;
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.beginPath(); ctx.moveTo(g.px0 + pw * 0.08, g.py0 + 4); ctx.lineTo(g.px0 + pw * 0.2, g.py0 + 4); ctx.lineTo(g.px0 + 6, g.py0 + ph * 0.42); ctx.lineTo(g.px0 + 6, g.py0 + ph * 0.24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.beginPath(); ctx.moveTo(g.px1 - 4, g.py0 + ph * 0.5); ctx.lineTo(g.px1 - 4, g.py0 + ph * 0.62); ctx.lineTo(g.px1 - pw * 0.16, g.rimBack); ctx.lineTo(g.px1 - pw * 0.24, g.rimBack); ctx.closePath(); ctx.fill();
+    // Mounting holes.
+    ctx.fillStyle = "rgba(60,110,150,0.13)";
+    ctx.beginPath();
+    for (var i = 0; i <= 8; i++) for (var j = 0; j <= 5; j++) {
+      var hx = g.gx0 + i * g.gw, hy = g.gy0 + (j + 0.5) * g.gh;
+      ctx.moveTo(hx + 4 * U, hy); ctx.arc(hx, hy, 4 * U, 0, TAU);
+    }
+    ctx.fill();
+    // Wooden posts holding the panel.
+    var postW = VW * 0.032, postTop = g.py0 + ph * 0.4;
+    woodRect(g.px0 - postW * 0.75, postTop, postW, g.rimBack + 10 - postTop, postW / 2);
+    woodRect(g.px1 - postW * 0.25, postTop, postW, g.rimBack + 10 - postTop, postW / 2);
+  }
+  function subPath(p, a, b) {
+    var pts = p.pts, cum = p.cum, i, k;
+    ctx.beginPath();
+    for (i = 1; i < pts.length; i++) {
+      if (cum[i] >= a) {
+        k = (a - cum[i - 1]) / Math.max(0.001, cum[i] - cum[i - 1]);
+        ctx.moveTo(lerp(pts[i - 1].x, pts[i].x, k), lerp(pts[i - 1].y, pts[i].y, k));
+        break;
+      }
+    }
+    for (; i < pts.length; i++) {
+      if (cum[i] >= b) {
+        k = (b - cum[i - 1]) / Math.max(0.001, cum[i] - cum[i - 1]);
+        ctx.lineTo(lerp(pts[i - 1].x, pts[i].x, k), lerp(pts[i - 1].y, pts[i].y, k));
+        break;
+      }
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+  }
+  function polyPath(pts, ox, oy) {
+    ctx.beginPath(); ctx.moveTo(pts[0].x + ox, pts[0].y + oy);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + ox, pts[i].y + oy);
+  }
+  function block(x, y, s) { ctx.fillStyle = NAVY; rr(x - s / 2, y - s / 2, s, s, s * 0.28); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.stroke(); ctx.fillStyle = "rgba(255,255,255,0.18)"; rr(x - s / 2 + 3 * U, y - s / 2 + 3 * U, s - 6 * U, s * 0.3, s * 0.12); ctx.fill(); }
+  function drawPipes() {
+    var pw = 20 * U;
+    ctx.lineJoin = "round"; ctx.lineCap = "butt";
+    W.pipes.forEach(function (p) { ctx.strokeStyle = "#3E9C86"; ctx.lineWidth = pw + 6 * U; polyPath(p.pts, 0, 0); ctx.stroke(); });
+    W.pipes.forEach(function (p) { ctx.strokeStyle = "rgba(178,238,220,0.92)"; ctx.lineWidth = pw; polyPath(p.pts, 0, 0); ctx.stroke(); });
+    // Water inside, visible through the pipe.
+    ctx.strokeStyle = WATER; ctx.lineWidth = pw * 0.62;
+    W.pipes.forEach(function (p) { p.slugs.forEach(function (s) { if (s.h - s.t > 0.5) { subPath(p, s.t, s.h); ctx.stroke(); } }); });
+    if (!reduceMotion) {
+      ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = pw * 0.2; ctx.lineCap = "round";
+      ctx.setLineDash([7 * U, 20 * U]);
+      W.pipes.forEach(function (p) { p.slugs.forEach(function (s) { if (s.h - s.t > 2) { ctx.lineDashOffset = s.t - now * SPEED * 0.6; subPath(p, s.t, s.h); ctx.stroke(); } }); });
+      ctx.setLineDash([]);
+    }
+    ctx.lineCap = "butt";
+    ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 3 * U;
+    W.pipes.forEach(function (p) { polyPath(p.pts, -pw * 0.26, -pw * 0.26); ctx.stroke(); });
+    // Navy elbows.
+    W.pipes.forEach(function (p) { for (var i = 1; i < p.pts.length - 1; i++) block(p.pts[i].x, p.pts[i].y, 30 * U); });
+    W.joins.forEach(function (j) { block(j.x, j.y, 36 * U); });
+    W.spouts.forEach(function (s) {
+      ctx.fillStyle = NAVY; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U;
+      ctx.beginPath(); ctx.moveTo(s.x - 15 * U, s.y - 8 * U); ctx.lineTo(s.x + 15 * U, s.y - 8 * U); ctx.lineTo(s.x + 10 * U, s.y + 15 * U); ctx.lineTo(s.x - 10 * U, s.y + 15 * U); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#0F1E33"; ctx.beginPath(); ctx.ellipse(s.x, s.y + 15 * U, 8 * U, 3 * U, 0, 0, TAU); ctx.fill();
+    });
+    W.valves.forEach(function (v) {
+      block(v.x, v.y, (v.t ? 38 : 32) * U);
+      var r = (v.t ? 17 : 15) * U * (1 + v.pop * 0.25);
+      ctx.fillStyle = YEL; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U;
+      ctx.beginPath(); ctx.arc(v.x, v.y, r, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = YEL_D; ctx.lineWidth = 2 * U; ctx.beginPath(); ctx.arc(v.x, v.y, r * 0.72, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = NAVY; ctx.lineWidth = 6 * U; ctx.lineCap = "round";
+      var c = Math.cos(v.ang), sn = Math.sin(v.ang);
+      ctx.beginPath(); ctx.moveTo(v.x - c * r * 0.25, v.y - sn * r * 0.25); ctx.lineTo(v.x + c * r * 0.82, v.y + sn * r * 0.82); ctx.stroke();
+      ctx.fillStyle = NAVY; ctx.beginPath(); ctx.arc(v.x + c * r * 0.82, v.y + sn * r * 0.82, 4 * U, 0, TAU); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.beginPath(); ctx.arc(v.x - r * 0.4, v.y - r * 0.45, r * 0.2, 0, TAU); ctx.fill();
+      ctx.lineCap = "butt";
+    });
+  }
+  function bowlPath(f) {
+    var R = f.R, top = f.top, bot = f.bot, bh = f.bh, x = f.x, nw = 10 * U;
+    ctx.beginPath();
+    ctx.moveTo(x - R, top);
+    ctx.bezierCurveTo(x - R, top + bh * 0.8, x - nw * 1.4, bot - bh * 0.12, x - nw, bot);
+    ctx.lineTo(x + nw, bot);
+    ctx.bezierCurveTo(x + nw * 1.4, bot - bh * 0.12, x + R, top + bh * 0.8, x + R, top);
+    ctx.closePath();
+  }
+  function drawFunnels() {
+    W.funnels.forEach(function (f) {
+      // Stem collar.
+      ctx.fillStyle = NAVY; rr(f.x - 13 * U, f.bot - 3 * U, 26 * U, f.y - f.bot + 8 * U, 5 * U); ctx.fill();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.stroke();
+      bowlPath(f);
+      ctx.fillStyle = "rgba(170,236,216,0.55)"; ctx.fill();
+      var lv = clamp(f.level, 0, 1.05);
+      if (lv > 0.01) {
+        ctx.save(); bowlPath(f); ctx.clip();
+        var sy = funnelSurf(f);
+        ctx.fillStyle = "rgba(70,168,236,0.8)"; ctx.fillRect(f.x - f.R, sy, f.R * 2, f.bot - sy + 2);
+        var hw = 10 * U + (f.R - 10 * U) * Math.pow(clamp(lv, 0, 1), 0.6);
+        ctx.fillStyle = "rgba(160,220,250,0.95)"; ctx.beginPath(); ctx.ellipse(f.x, sy, hw, Math.max(2, hw * 0.16), 0, 0, TAU); ctx.fill();
+        if (f.q > 0.05 && !reduceMotion) {
+          ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2.5 * U;
+          ctx.beginPath(); ctx.ellipse(f.x, sy + 1, hw * 0.45, hw * 0.08, 0, f.swirl * 3, f.swirl * 3 + 2.2); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      bowlPath(f);
+      ctx.strokeStyle = "#3E9C86"; ctx.lineWidth = 3 * U; ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4 * U;
+      ctx.beginPath(); ctx.moveTo(f.x - f.R * 0.78, f.top + f.bh * 0.12); ctx.quadraticCurveTo(f.x - f.R * 0.72, f.top + f.bh * 0.6, f.x - f.R * 0.3, f.top + f.bh * 0.8); ctx.stroke();
+      ctx.fillStyle = "rgba(200,245,232,0.7)"; ctx.strokeStyle = "#3E9C86"; ctx.lineWidth = 3 * U;
+      ctx.beginPath(); ctx.ellipse(f.x, f.top, f.R, Math.max(5 * U, f.R * 0.16), 0, 0, TAU); ctx.fill(); ctx.stroke();
+    });
+  }
+  function drawSpinner(s) {
+    var r = s.r;
+    ctx.save(); ctx.translate(s.x, s.y);
+    if (Math.abs(s.om) > 4 && !reduceMotion) {
+      ctx.fillStyle = s.kind === "prop" ? "rgba(255,210,63,0.25)" : (s.kind === "pin" ? "rgba(255,111,168,0.2)" : "rgba(244,123,42,0.22)");
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+    }
+    ctx.rotate(s.ang);
+    ctx.lineJoin = "round"; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U;
+    var i, a;
+    if (s.kind === "pin") drawPin(r);
+    else if (s.kind === "flower") {
+      var n = 12;
+      ctx.fillStyle = ORA;
+      ctx.beginPath();
+      for (i = 0; i < n * 2; i++) {
+        a = i * Math.PI / n;
+        var rad = i % 2 === 0 ? r : r * 0.66;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad); else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ORA_L; ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = ORA_D; ctx.lineWidth = 2 * U;
+      ctx.beginPath(); for (i = 0; i < 6; i++) { a = i * TAU / 6; ctx.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2); ctx.lineTo(Math.cos(a) * r * 0.44, Math.sin(a) * r * 0.44); } ctx.stroke();
+      ctx.fillStyle = ORA_D; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, TAU); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.fillStyle = YEL;
+      for (i = 0; i < 3; i++) {
+        ctx.save(); ctx.rotate(i * TAU / 3);
+        ctx.beginPath(); ctx.ellipse(r * 0.52, 0, r * 0.5, r * 0.2, 0.25, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.fillStyle = NAVY; ctx.beginPath(); ctx.arc(0, 0, r * 0.24, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = YEL; ctx.beginPath(); ctx.arc(0, 0, r * 0.1, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function gearPath(n, rp, m) {
+    var ra = rp + m * 0.95, rd = rp - m * 1.15, pa = TAU / n, k, pts = [];
+    for (k = 0; k < n; k++) {
+      var a0 = k * pa;
+      pts.push([rd, a0 - 0.5 * pa], [rd, a0 - 0.28 * pa], [ra, a0 - 0.15 * pa], [ra, a0 + 0.15 * pa], [rd, a0 + 0.28 * pa]);
+    }
+    return pts;
+  }
+  function drawGear(gr) {
+    ctx.save(); ctx.translate(gr.x, gr.y); ctx.rotate(gr.ang);
+    var pts = gearPath(gr.n, gr.r, gr.m);
+    ctx.beginPath();
+    pts.forEach(function (p, i) { var x = Math.cos(p[1]) * p[0], y = Math.sin(p[1]) * p[0]; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.closePath();
+    ctx.fillStyle = gr.col; ctx.fill();
+    ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.lineJoin = "round"; ctx.stroke();
+    var rd = gr.r - gr.m * 1.15;
+    ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 3 * U;
+    ctx.beginPath(); ctx.arc(0, 0, rd * 0.82, 0, TAU); ctx.stroke();
+    // Holes (or a stripe on small gears) so the turning is easy to see.
+    ctx.fillStyle = "rgba(29,35,64,0.32)";
+    if (gr.n >= 14) {
+      ctx.beginPath();
+      for (var k = 0; k < 5; k++) { var a = k * TAU / 5, hx = Math.cos(a) * rd * 0.55, hy = Math.sin(a) * rd * 0.55; ctx.moveTo(hx + rd * 0.16, hy); ctx.arc(hx, hy, rd * 0.16, 0, TAU); }
+      ctx.fill();
+    } else { rr(rd * 0.25, -rd * 0.13, rd * 0.6, rd * 0.26, rd * 0.12); ctx.fill(); }
+    var hr = Math.max(7 * U, gr.r * 0.2);
+    ctx.fillStyle = NAVY; ctx.beginPath(); ctx.arc(0, 0, hr, 0, TAU); ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U; ctx.stroke();
+    ctx.fillStyle = YEL; ctx.beginPath(); ctx.arc(0, 0, hr * 0.4, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawWheel(wh) {
+    var r = wh.r, n = 8, i, a;
+    ctx.save(); ctx.translate(wh.x, wh.y);
+    if (Math.abs(wh.om) > 4 && !reduceMotion) { ctx.fillStyle = "rgba(93,184,160,0.2)"; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill(); }
+    ctx.rotate(wh.ang);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (!wh.gear) {
+      ctx.strokeStyle = OUT; ctx.lineWidth = 10 * U; ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = WOOD; ctx.lineWidth = 5.5 * U; ctx.stroke();
+      ctx.beginPath();
+      for (i = 0; i < n; i++) { a = i * TAU / n; ctx.moveTo(Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18); ctx.lineTo(Math.cos(a) * r * 0.58, Math.sin(a) * r * 0.58); }
+      ctx.strokeStyle = OUT; ctx.lineWidth = 7 * U; ctx.stroke();
+      ctx.strokeStyle = CREAM; ctx.lineWidth = 3.5 * U; ctx.stroke();
+    }
+    var wet = wh.carry > 0.05;
+    for (i = 0; i < n; i++) {
+      a = i * TAU / n;
+      ctx.save(); ctx.rotate(a);
+      ctx.fillStyle = "#7FD3BC"; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U;
+      rr(r * 0.48, -r * 0.1, r * 0.52, r * 0.2, r * 0.07); ctx.fill(); ctx.stroke();
+      var wa = wh.ang + a;
+      if (wet && Math.cos(wa) * wh.side > -0.25 && Math.sin(wa) > -0.7) {
+        ctx.fillStyle = "rgba(64,166,236,0.95)"; ctx.beginPath(); ctx.arc(r * 0.86, -r * 0.13 * wh.side, r * 0.11, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.fillStyle = NAVY; ctx.strokeStyle = OUT; ctx.lineWidth = 2.5 * U;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = YEL; ctx.beginPath(); ctx.arc(0, 0, r * 0.08, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawInline(iw) {
+    var r = iw.r;
+    ctx.save(); ctx.translate(iw.x, iw.y);
+    ctx.fillStyle = "rgba(200,245,232,0.55)"; ctx.strokeStyle = "#3E9C86"; ctx.lineWidth = 3 * U;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.1, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.rotate(iw.ang);
+    ctx.fillStyle = ORA; ctx.strokeStyle = OUT; ctx.lineWidth = 2 * U; ctx.lineJoin = "round";
+    for (var i = 0; i < 6; i++) { ctx.save(); ctx.rotate(i * TAU / 6); rr(r * 0.2, -r * 0.13, r * 0.8, r * 0.26, r * 0.08); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    ctx.fillStyle = NAVY; ctx.beginPath(); ctx.arc(0, 0, r * 0.26, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  function drawTray(t) {
+    var x0 = t.x0, x1 = t.x1, y0 = t.top, y1 = t.top + t.d;
+    ctx.save();
+    var px = t.lip > 0 ? x0 : x1;
+    ctx.translate(px, y1); ctx.rotate(-t.lip * t.tilt * 0.1); ctx.translate(-px, -y1);
+    block((x0 + x1) / 2, y1 + 6 * U, 20 * U);
+    ctx.fillStyle = "rgba(170,236,216,0.5)"; ctx.fillRect(x0, y0, x1 - x0, t.d);
+    if (t.level > 0.01) {
+      var sy = traySurf(t);
+      ctx.fillStyle = "rgba(70,168,236,0.85)"; ctx.fillRect(x0 + 2 * U, sy, x1 - x0 - 4 * U, y1 - sy - 2 * U);
+      ctx.strokeStyle = "rgba(220,244,255,0.9)"; ctx.lineWidth = 2.5 * U;
+      ctx.beginPath(); ctx.moveTo(x0 + 4 * U, sy + 1); ctx.lineTo(x1 - 4 * U, sy + 1); ctx.stroke();
+    }
+    var lx = t.lip > 0 ? x1 : x0;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y0); ctx.lineTo(lx + t.lip * 9 * U, y0 - 3 * U);
+    ctx.strokeStyle = OUT; ctx.lineWidth = 8 * U; ctx.stroke();
+    ctx.strokeStyle = "#5DB8A0"; ctx.lineWidth = 4 * U; ctx.stroke();
+    ctx.restore();
+  }
+  function drawPin(r) {
+    var cols = ["#FF6FA8", "#45AEF2", "#FFD23F", "#2FA24A"];
+    for (var i = 0; i < 4; i++) {
+      ctx.save(); ctx.rotate(i * TAU / 4);
+      ctx.fillStyle = cols[i];
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, -r * 0.08); ctx.quadraticCurveTo(r * 0.78, r * 0.5, r * 0.12, r * 0.42); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.arc(0, 0, r * 0.14, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  function drawMachines() {
+    W.trays.forEach(drawTray);
+    W.gears.forEach(drawGear);
+    W.wheels.forEach(drawWheel);
+    if (W.gearProp && W.gears.length) {
+      var lg = W.gears[W.gears.length - 1];
+      drawSpinner({ kind: "prop", x: lg.x, y: lg.y, r: lg.r * 1.7, ang: lg.ang, om: lg.rho * W.gearDrv.om });
+    }
+    W.inl.forEach(drawInline);
+  }
+
+  // ---------- Thumbnails for the layout picker ----------
+  function thumbSVG(idx) {
+    var sg = g, sU = U, out = [];
+    g = geom(1000, 780); U = clamp(g.gw / 80, 0.72, 1.08);
+    var w = buildWorld(idx, null);
+    var vx = g.px0, vy = g.py0, vw = g.px1 - g.px0, vh = g.rimBack + 50 - g.py0;
+    function f(n) { return Math.round(n); }
+    function circ(x, y, r, fill, st, sw) { out.push('<circle cx="' + f(x) + '" cy="' + f(y) + '" r="' + f(r) + '" fill="' + fill + '"' + (st ? ' stroke="' + st + '" stroke-width="' + sw + '"' : "") + "/>"); }
+    function poly(pts, fill, st, sw, closed) {
+      out.push("<" + (closed ? "polygon" : "polyline") + ' points="' + pts.map(function (p) { return f(p.x) + "," + f(p.y); }).join(" ") + '" fill="' + (fill || "none") + '"' + (st ? ' stroke="' + st + '" stroke-width="' + sw + '" stroke-linejoin="round"' : "") + "/>");
+    }
+    out.push('<rect x="' + f(vx) + '" y="' + f(vy) + '" width="' + f(vw) + '" height="' + f(vh) + '" rx="30" fill="#EAF6FF"/>');
+    out.push('<rect x="' + f(vx) + '" y="' + f(g.rimBack + 6) + '" width="' + f(vw) + '" height="' + f(vh - (g.rimBack + 6 - vy)) + '" fill="#5BB8F0"/>');
+    w.pipes.forEach(function (p) { poly(p.pts, null, "#2E8A74", 34); });
+    w.pipes.forEach(function (p) { poly(p.pts, null, "#B2EEDC", 19); });
+    w.funnels.forEach(function (fn) { poly([{ x: fn.x - fn.R, y: fn.top }, { x: fn.x + fn.R, y: fn.top }, { x: fn.x + 14, y: fn.bot }, { x: fn.x - 14, y: fn.bot }], "#AAECD8", "#2E8A74", 10, true); });
+    w.spouts.forEach(function (s) { out.push('<rect x="' + f(s.x - 14) + '" y="' + f(s.y - 6) + '" width="28" height="24" rx="5" fill="' + NAVY + '"/>'); });
+    w.trays.forEach(function (t) {
+      out.push('<rect x="' + f(t.x0) + '" y="' + f(t.top) + '" width="' + f(t.x1 - t.x0) + '" height="' + f(t.d) + '" fill="#AAECD8" stroke="#2E8A74" stroke-width="10"/>');
+      out.push('<rect x="' + f(t.x0 + 6) + '" y="' + f(t.top + t.d * 0.4) + '" width="' + f(t.x1 - t.x0 - 12) + '" height="' + f(t.d * 0.55) + '" fill="#5BB8F0"/>');
+    });
+    w.gears.forEach(function (gr) {
+      var pts = gearPath(gr.n, gr.r, gr.m).map(function (p) { return { x: gr.x + Math.cos(p[1] + gr.ang) * p[0], y: gr.y + Math.sin(p[1] + gr.ang) * p[0] }; });
+      poly(pts, gr.col, OUT, 6, true);
+      circ(gr.x, gr.y, Math.max(8, gr.r * 0.22), NAVY);
+    });
+    w.wheels.forEach(function (wh) {
+      if (!wh.gear) circ(wh.x, wh.y, wh.r * 0.6, "none", WOOD_D, 10);
+      for (var k = 0; k < 8; k++) {
+        var a = k * TAU / 8;
+        out.push('<line x1="' + f(wh.x + Math.cos(a) * wh.r * 0.2) + '" y1="' + f(wh.y + Math.sin(a) * wh.r * 0.2) + '" x2="' + f(wh.x + Math.cos(a) * wh.r) + '" y2="' + f(wh.y + Math.sin(a) * wh.r) + '" stroke="#2E8A74" stroke-width="12" stroke-linecap="round"/>');
+      }
+      circ(wh.x, wh.y, wh.r * 0.22, NAVY);
+    });
+    w.spins.concat(w.gearProp ? [{ kind: "prop", x: w.gears[w.gears.length - 1].x, y: w.gears[w.gears.length - 1].y, r: w.gears[w.gears.length - 1].r * 1.7 }] : []).forEach(function (s) {
+      if (s.kind === "flower") {
+        var pts = [];
+        for (var k = 0; k < 24; k++) { var a = k * Math.PI / 12, rd = k % 2 ? s.r * 0.66 : s.r; pts.push({ x: s.x + Math.cos(a) * rd, y: s.y + Math.sin(a) * rd }); }
+        poly(pts, ORA, OUT, 6, true); circ(s.x, s.y, s.r * 0.45, ORA_L, OUT, 5);
+      } else if (s.kind === "pin") {
+        var cols = ["#FF6FA8", "#45AEF2", "#FFD23F", "#2FA24A"];
+        for (var q = 0; q < 4; q++) {
+          var b = q * TAU / 4 + 0.3;
+          poly([{ x: s.x, y: s.y }, { x: s.x + Math.cos(b) * s.r, y: s.y + Math.sin(b) * s.r }, { x: s.x + Math.cos(b + 1.1) * s.r * 0.6, y: s.y + Math.sin(b + 1.1) * s.r * 0.6 }], cols[q], OUT, 5, true);
+        }
+      } else {
+        for (var j = 0; j < 3; j++) {
+          var c = j * TAU / 3 + 0.4;
+          out.push('<ellipse cx="' + f(s.x + Math.cos(c) * s.r * 0.5) + '" cy="' + f(s.y + Math.sin(c) * s.r * 0.5) + '" rx="' + f(s.r * 0.5) + '" ry="' + f(s.r * 0.22) + '" transform="rotate(' + f(c * 180 / Math.PI) + " " + f(s.x + Math.cos(c) * s.r * 0.5) + " " + f(s.y + Math.sin(c) * s.r * 0.5) + ')" fill="' + YEL + '" stroke="' + OUT + '" stroke-width="5"/>');
+        }
+        circ(s.x, s.y, s.r * 0.22, NAVY);
+      }
+    });
+    w.inl.forEach(function (iw) { circ(iw.x, iw.y, iw.r * 1.1, ORA, OUT, 5); });
+    w.joins.forEach(function (j) { out.push('<rect x="' + f(j.x - 18) + '" y="' + f(j.y - 18) + '" width="36" height="36" rx="8" fill="' + NAVY + '"/>'); });
+    w.pipes.forEach(function (p) { for (var k = 1; k < p.pts.length - 1; k++) out.push('<rect x="' + f(p.pts[k].x - 17) + '" y="' + f(p.pts[k].y - 17) + '" width="34" height="34" rx="8" fill="' + NAVY + '"/>'); });
+    w.valves.forEach(function (v) { circ(v.x, v.y, 24, YEL, OUT, 7); });
+    g = sg; U = sU;
+    return '<svg viewBox="' + f(vx) + " " + f(vy) + " " + f(vw) + " " + f(vh) + '" aria-hidden="true" preserveAspectRatio="xMidYMid meet">' + out.join("") + "</svg>";
+  }
+  function drawWater() {
+    // Bin rim (back) and inner walls.
+    ctx.fillStyle = CREAM; ctx.strokeStyle = OUT; ctx.lineWidth = 3 * U; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(g.bx0 - 6 * U, g.rimBack - 6 * U); ctx.lineTo(g.bx1 + 6 * U, g.rimBack - 6 * U); ctx.lineTo(g.fx1, g.yr); ctx.lineTo(g.fx0, g.yr); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = CREAM_D;
+    ctx.beginPath(); ctx.moveTo(edgeL(g.rimBack), g.rimBack); ctx.lineTo(edgeR(g.rimBack), g.rimBack); ctx.lineTo(edgeR(g.yr - 2), g.yr - 2); ctx.lineTo(edgeL(g.yr - 2), g.yr - 2); ctx.closePath(); ctx.fill();
+    // Water.
+    ctx.fillStyle = waterGrad;
+    ctx.beginPath(); ctx.moveTo(edgeL(g.yb), g.yb); ctx.lineTo(edgeR(g.yb), g.yb); ctx.lineTo(edgeR(g.yf), g.yf); ctx.lineTo(edgeL(g.yf), g.yf); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 2.5 * U;
+    ctx.beginPath(); ctx.moveTo(edgeL(g.yb), g.yb + 1); ctx.lineTo(edgeR(g.yb), g.yb + 1); ctx.stroke();
+    // Gentle shimmer lines.
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 2.2 * U; ctx.lineCap = "round";
+    ctx.setLineDash([26 * U, 44 * U]);
+    for (var k = 0; k < 5; k++) {
+      var y = lerp(g.yb, g.yf, (k + 0.6) / 5.4), l = edgeL(y) + 12 * U, r = edgeR(y) - 12 * U;
+      ctx.lineDashOffset = (reduceMotion ? 0 : now * (14 + k * 4)) + k * 37;
+      ctx.beginPath();
+      for (var x = l; x <= r; x += 24 * U) {
+        var yy = y + Math.sin(x * 0.025 + now * 1.6 + k * 1.3) * 2 * U;
+        if (x === l) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    drawRings();
+  }
+  function drawFront() {
+    var VW = g.VW, lw = VW * 0.045, wallH = g.apronH * 0.42;
+    // Bin front wall and lip.
+    ctx.fillStyle = CREAM; ctx.strokeStyle = OUT; ctx.lineWidth = 3 * U;
+    rr(g.fx0 + 6 * U, g.yr - 2, g.fx1 - g.fx0 - 12 * U, wallH + 8 * U, 6 * U); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(g.fx0 + 8 * U, g.yr + wallH * 0.55, g.fx1 - g.fx0 - 16 * U, wallH * 0.45);
+    ctx.fillStyle = CREAM; rr(g.fx0 - 4 * U, g.yr - 7 * U, g.fx1 - g.fx0 + 8 * U, 13 * U, 6 * U); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2.5 * U;
+    ctx.beginPath(); ctx.moveTo(g.fx0 + 10 * U, g.yr - 3 * U); ctx.lineTo(g.fx1 - 10 * U, g.yr - 3 * U); ctx.stroke();
+    // Wooden rail.
+    var ry = g.yr + wallH;
+    woodRect(g.fx0 - 4 * U, ry, g.fx1 - g.fx0 + 8 * U, g.apronBot - ry, 6 * U);
+    ctx.strokeStyle = "rgba(160,110,50,0.35)"; ctx.lineWidth = 2 * U;
+    ctx.beginPath(); ctx.moveTo(g.fx0 + 30 * U, ry + (g.apronBot - ry) * 0.4); ctx.lineTo(g.fx1 - 120 * U, ry + (g.apronBot - ry) * 0.4);
+    ctx.moveTo(g.fx0 + 160 * U, ry + (g.apronBot - ry) * 0.72); ctx.lineTo(g.fx1 - 40 * U, ry + (g.apronBot - ry) * 0.72); ctx.stroke();
+    // Front legs.
+    var lx0 = g.fx0 - 14 * U, lx1 = g.fx1 + 14 * U - lw;
+    [lx0, lx1].forEach(function (lx) {
+      woodRect(lx, g.yr - 18 * U, lw, g.floor - g.yr + 18 * U, 5 * U);
+      ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(lx + 5 * U, g.yr - 12 * U, 4 * U, g.floor - g.yr - 10 * U);
+      foot(lx, g.floor, lw);
+      peg(lx + lw - 2 * U, g.apronBot + g.legH * 0.25);
+      peg(lx + lw - 2 * U, g.apronBot + g.legH * 0.45);
+    });
+    drawHolder();
+  }
+  var brushWig = 0;
+  function holderPos() { return { x: g.VW * 0.63, y: g.yr + g.apronH * 0.18 }; }
+  function drawHolder() {
+    var h = holderPos(), x = h.x, y = h.y, wig = Math.sin(now * 30) * brushWig * 0.25;
+    ctx.save(); ctx.translate(x, y); ctx.scale(U, U);
+    ctx.lineWidth = 2.5; ctx.strokeStyle = OUT; ctx.lineJoin = "round";
+    var cols = [["#FF6FA8", "#FFE066"], ["#45AEF2", "#FF9F4D"], ["#FFD23F", "#2FA24A"]];
+    cols.forEach(function (c, i) {
+      ctx.save(); ctx.translate(-10 + i * 10, 20); ctx.rotate((i - 1) * 0.22 + wig * (i - 1 || 1));
+      ctx.fillStyle = c[0]; rr(-4, -62, 8, 62, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c[1]; rr(-6, -76, 12, 16, 5); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+    ctx.fillStyle = "rgba(170,236,216,0.75)";
+    ctx.beginPath(); ctx.moveTo(-24, -6); ctx.lineTo(24, -6); ctx.lineTo(20, 48); ctx.quadraticCurveTo(0, 54, -20, 48); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#3E9C86"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-15, 2); ctx.lineTo(-13, 38); ctx.stroke();
+    ctx.restore();
+  }
+  function drawScene() {
+    drawBack();
+    drawDrops();
+    drawPipes();
+    drawFunnels();
+    drawMachines();
+    W.spins.forEach(drawSpinner);
+    drawWater();
+    W.spouts.forEach(function (s) { drawStream(s.st); });
+    W.funnels.forEach(function (f) { drawStream(f.st); });
+    W.wheels.forEach(function (wh) { drawStream(wh.st); });
+    W.trays.forEach(function (t) { drawStream(t.st); });
+    var fl = floaters().sort(function (a, b) { return a.y - b.y; });
+    fl.forEach(function (t) { if (t.state) drawScoop(t); else drawToy(t); });
+    drawFront();
+    if (!sq.held) drawSqueegee();
+    if (!spr.held) drawSpray();
+    scoops.forEach(function (sc) { drawStream(sc.st); });
+    drawParts();
+    scoops.forEach(function (sc) { if (sc.state !== "float") drawScoop(sc); });
+    if (sq.held) drawSqueegee();
+    if (spr.held) drawSpray();
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    stepFlow(dt);
+    W.wheels.forEach(function (wh) { wh.inQ = wh.acc; wh.acc = 0; });
+    W.trays.forEach(function (t) { t.inQ = t.acc; t.acc = 0; });
+    W.spouts.forEach(function (s) { stepStream(s.st, s.x, s.y + 15 * U, flowOn ? s.inQ : 0, dt, false); });
+    W.funnels.forEach(function (f) {
+      f.magic = Math.max(0, f.magic - dt);
+      stepStream(f.st, f.x + 4 * U, ext().t - 20, f.magic > 0 && flowOn ? 1 : 0, dt, true);
+    });
+    updateMachines(dt);
+    W.spins.concat(W.wheels).forEach(function (s) {
+      var fr = flowOn ? 0.45 : 1.2;
+      s.om *= Math.exp(-dt * fr);
+      if (Math.abs(s.om) < 0.02) s.om = 0;
+      s.ang += s.om * dt;
+      s.hit = Math.max(0, s.hit - dt);
+    });
+    gearAngles(W);
+    updateScoops(dt);
+    updateFloaters(dt);
+    updateTools(dt);
+    updateParts(dt);
+    updateRings(dt);
+    updateDrops(dt);
+    brushWig = Math.max(0, brushWig - dt * 1.5);
+  }
+  function totalFlow() {
+    var q = 0;
+    W.spouts.forEach(function (s) { if (s.st.act) q += s.st.q; });
+    scoops.forEach(function (s) { if (s.st.act) q += s.st.q; });
+    W.funnels.forEach(function (f) { if (f.st.act) q += f.st.q; });
+    W.wheels.forEach(function (f) { if (f.st.act) q += f.st.q * 0.5; });
+    W.trays.forEach(function (f) { if (f.st.act) q += f.st.q * 0.5; });
+    return Math.min(1.5, q * 0.5);
+  }
+  function bigSplash() {
+    for (var i = 0; i < 9; i++) {
+      var y = lerp(g.yb, g.yf, 0.5), x = lerp(edgeL(y) + 20, edgeR(y) - 20, (i + 0.5) / 9);
+      splashAt(x, y, 14); ring(x, y, 1.4);
+    }
+    push(g.VW / 2, lerp(g.yb, g.yf, 0.5), 1.2);
+  }
+
+  // ---------- Save and load ----------
+  function save() {
+    var d = { lay: LAYOUTS[lay].id, v: valveStates };
+    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { /* ignore */ }
+  }
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!d || typeof d !== "object") return;
+      LAYOUTS.forEach(function (L, i) {
+        if (d.lay === L.id) lay = i;
+        if (d.v && typeof d.v === "object" && Array.isArray(d.v[L.id])) valveStates[L.id] = d.v[L.id].filter(function (x) { return typeof x === "number"; }).slice(0, 8);
+      });
+    } catch (e) { /* storage unavailable or bad data */ }
+  }
+  // The layout picker: a row of picture buttons, one per layout.
+  function buildPicker() {
+    var pk = $("picker");
+    pk.innerHTML = "";
+    LAYOUTS.forEach(function (L, i) {
+      var b = document.createElement("button");
+      b.className = "btn pick"; b.dataset.lay = String(i);
+      b.setAttribute("aria-label", L.name);
+      b.innerHTML = thumbSVG(i) + "<span>" + L.name + "</span>";
+      pk.appendChild(b);
+    });
+  }
+  // Fade the strip's edge where more pictures are hidden, so it reads as "swipe for more".
+  function markScroll() {
+    var pk = $("picker"), w = $("pickwrap");
+    var h = pk.scrollWidth > pk.clientWidth + 2, v = pk.scrollHeight > pk.clientHeight + 2;
+    w.classList.toggle("more-end", h ? pk.scrollLeft + pk.clientWidth < pk.scrollWidth - 4 : v && pk.scrollTop + pk.clientHeight < pk.scrollHeight - 4);
+    w.classList.toggle("more-start", h ? pk.scrollLeft > 4 : v && pk.scrollTop > 4);
+    w.classList.toggle("vert", v && !h);
+  }
+  $("picker").addEventListener("scroll", markScroll, { passive: true });
+  window.addEventListener("resize", function () { requestAnimationFrame(markScroll); });
+  function markPicker() {
+    var pk = $("picker"), sel = null;
+    Array.prototype.forEach.call(pk.querySelectorAll(".pick"), function (b) {
+      var on = Number(b.dataset.lay) === lay;
+      b.setAttribute("aria-pressed", String(on));
+      if (on) sel = b;
+    });
+    if (sel) {
+      if (pk.scrollWidth > pk.clientWidth + 2 && (sel.offsetLeft < pk.scrollLeft || sel.offsetLeft + sel.offsetWidth > pk.scrollLeft + pk.clientWidth)) pk.scrollLeft = sel.offsetLeft - (pk.clientWidth - sel.offsetWidth) / 2;
+      if (pk.scrollHeight > pk.clientHeight + 2 && (sel.offsetTop < pk.scrollTop || sel.offsetTop + sel.offsetHeight > pk.scrollTop + pk.clientHeight)) pk.scrollTop = sel.offsetTop - (pk.clientHeight - sel.offsetHeight) / 2;
+    }
+    markScroll();
+  }
+  function setLayout(i) {
+    if (i === lay) { W.funnels.forEach(function (f) { f.magic = Math.max(f.magic, 1.0); }); plip(); return; }
+    lay = i;
+    W = buildWorld(lay, null);
+    parts = []; rings = [];
+    markPicker(); save();
+    blip();
+  }
+
+  // ---------- Layout ----------
+  var stageEl = $("stage");
+  // Page position of the canvas (it sits in the stage, under the header).
+  function cvOff() { var r = cv.getBoundingClientRect(); return { x: r.left, y: r.top }; }
+  function layout() {
+    CW = Math.max(100, stageEl.clientWidth); CH = Math.max(100, stageEl.clientHeight);
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    var top = 6, left = 6, right = CW - 6, bottom = CH - 4;
+    var rw = Math.max(100, right - left), rh = Math.max(100, bottom - top);
+    var VW = Math.round(clamp(rw * 1.35, 680, 1000));
+    var VH = Math.round(clamp(VW * rh / rw, 600, 1800));
+    var s = Math.min(rw / VW, rh / VH);
+    view = { s: s, VW: VW, VH: VH, x: left + (rw - VW * s) / 2, y: top + (rh - VH * s) / 2 };
+    var keepS = g && g.VW === VW && g.VH === VH;
+    g = geom(VW, VH);
+    U = clamp(g.gw / 80, 0.72, 1.08);
+    makeGrads();
+    if (!keepS) {
+      W = buildWorld(lay, W);
+      placeFloaters();
+      placeTools();
+      drops = []; parts = []; rings = [];
+    }
+    try { bgColor = getComputedStyle(stageEl).backgroundColor || "#CDE9FF"; } catch (e) { /* ignore */ }
+  }
+  var bgColor = "#CDE9FF";
+  window.addEventListener("resize", layout);
+  if ("ResizeObserver" in window) new ResizeObserver(function () { layout(); }).observe(stageEl);
+  window.addEventListener("orientationchange", function () { setTimeout(layout, 200); });
+
+  // ---------- Touch ----------
+  var ptrs = {};
+  function hitThing(w) {
+    var i, best = null, bd = 1e9;
+    for (i = 0; i < scoops.length; i++) {
+      var sc = scoops[i];
+      if (sc.state === "auto" || sc.held) continue;
+      var d = Math.hypot(w.x - sc.x, w.y - (sc.y - 8 * U));
+      if (d < hitR(56 * U) && d < bd) { bd = d; best = { type: "scoop", o: sc }; }
+    }
+    if (best) return best;
+    if (!sq.held && Math.abs(w.x - sq.x) < hitR(60 * U) && w.y > sq.y - 34 * U && w.y < sq.y + 40 * U) return { type: "sq" };
+    if (!spr.held && Math.abs(w.x - (spr.x - 6 * U)) < hitR(32 * U) && w.y > spr.y - 54 * U && w.y < spr.y + 58 * U) return { type: "spray" };
+    for (i = 0; i < W.valves.length; i++) {
+      var v = W.valves[i], dv = Math.hypot(w.x - v.x, w.y - v.y);
+      if (dv < hitR(30 * U) && dv < bd) { bd = dv; best = { type: "valve", o: v }; }
+    }
+    if (best) return best;
+    for (i = 0; i < W.funnels.length; i++) {
+      var f = W.funnels[i];
+      if (Math.abs(w.x - f.x) < f.R + 8 * U && w.y > f.top - 24 * U && w.y < f.y + 6 * U) return { type: "funnel", o: f };
+    }
+    var sp2 = W.wheels.concat(W.inl, W.spins);
+    for (i = 0; i < sp2.length; i++) {
+      var s = sp2[i];
+      if (Math.hypot(w.x - s.x, w.y - s.y) < hitR(s.r + 6 * U)) return { type: "spin", o: s };
+    }
+    for (i = 0; i < W.gears.length; i++) {
+      var gr = W.gears[i];
+      if (Math.hypot(w.x - gr.x, w.y - gr.y) < hitR(gr.r + gr.m)) return { type: "gear", o: gr };
+    }
+    for (i = 0; i < W.trays.length; i++) {
+      var tr = W.trays[i];
+      if (w.x > tr.x0 - 8 * U && w.x < tr.x1 + 8 * U && w.y > tr.top - 16 * U && w.y < tr.top + tr.d + 14 * U) return { type: "tray", o: tr };
+    }
+    var h = holderPos();
+    if (Math.abs(w.x - h.x) < 34 * U && w.y > h.y - 60 * U && w.y < h.y + 56 * U) return { type: "brush" };
+    if (inWater(w.x, w.y, 10 * U)) return { type: "water" };
+    if (w.x > g.px0 && w.x < g.px1 && w.y > g.py0 && w.y < g.rimBack) return { type: "panel" };
+    return null;
+  }
+  function stepValve(v, dir) {
+    var n = v.t ? 4 : 2;
+    v.state = (v.state + dir + n) % n;
+    v.pop = 1;
+    (valveStates[LAYOUTS[lay].id] = valveStates[LAYOUTS[lay].id] || [])[v.idx] = v.state;
+    save(); click(v.state);
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (Toybox.timer.phase() === "resting") return;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    var o = cvOff(), w = toWorld(e.clientX - o.x, e.clientY - o.y);
+    var ending = Toybox.timer.phase() === "ending";
+    var h = hitThing(w);
+    if (ending && (!h || h.type !== "water")) { ptrs[e.pointerId] = { none: true }; return; }
+    var p = { type: h ? h.type : "none", o: h && h.o, x: w.x, y: w.y, sx: w.x, sy: w.y, t0: performance.now(), moved: 0 };
+    ptrs[e.pointerId] = p;
+    if (!h) return;
+    if (++touches > 8) $("coach").classList.add("off");
+    if (h.type === "scoop") {
+      $("coach").classList.add("off"); ghost.learned();
+      var sc = h.o; sc.held = true; sc.state = "drag"; p.ox = w.x - sc.x; p.oy = w.y - sc.y; sc.rx = sc.x; sc.ry = sc.y; sc.snap = null;
+      if (inWater(sc.x, sc.y)) { sc.w = 1; ring(sc.x, sc.y, 0.7); }
+      plip();
+    } else if (h.type === "sq") { sq.held = true; p.ox = w.x - sq.x; p.oy = w.y - sq.y; sq.px = sq.x; sq.py = sq.y; blip(); }
+    else if (h.type === "spray") { spr.held = true; spr.acc = 0; p.ox = w.x - spr.x; p.oy = w.y - spr.y; squirt(); }
+    else if (h.type === "valve") { p.a = Math.atan2(w.y - h.o.y, w.x - h.o.x); p.acc = 0; p.turned = false; h.o.pop = 0.6; }
+    else if (h.type === "funnel") { h.o.magic = Math.max(h.o.magic, 1.3); whooshSoft(); }
+    else if (h.type === "spin") { var sp = h.o; p.a = Math.atan2(w.y - sp.y, w.x - sp.x); p.lt = performance.now(); sp.om += (w.x < sp.x ? -1 : 1) * 3; blip(); }
+    else if (h.type === "gear") { var gq = h.o, dv2 = W.gearDrv; p.a = Math.atan2(w.y - gq.y, w.x - gq.x); p.lt = performance.now(); dv2.om = clamp(dv2.om + (w.x < gq.x ? -1 : 1) * 3 / gq.rho, -14, 14); blip(); }
+    else if (h.type === "tray") { var tq = h.o; if (tq.level > 0.05) { tq.dump = 0.9; whooshSoft(); } else { ring(w.x, w.y, 0.5); plip(); } }
+    else if (h.type === "brush") { brushWig = 1; blip(); }
+    else if (h.type === "water") { ring(w.x, w.y, 1); splashAt(w.x, w.y, 8); push(w.x, w.y, 0.8); plip(); }
+    else if (h.type === "panel") { ring(w.x, w.y, 0.4); wipeAt(w.x, w.y, 24 * U, 24 * U); }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var p = ptrs[e.pointerId];
+    if (!p || p.none) return;
+    var o = cvOff(), w = toWorld(e.clientX - o.x, e.clientY - o.y);
+    p.moved += Math.hypot(w.x - p.x, w.y - p.y);
+    var ending = Toybox.timer.phase() === "ending";
+    if (p.type === "scoop") { p.o.rx = w.x - p.ox; p.o.ry = w.y - p.oy; }
+    else if (p.type === "sq") { var x0 = sq.x, y0 = sq.y; sq.x = w.x - p.ox; sq.y = w.y - p.oy; squeegeeWipe(x0, y0, sq.x, sq.y); }
+    else if (p.type === "spray") { spr.x = w.x - p.ox; spr.y = w.y - p.oy; }
+    else if (p.type === "valve" && !ending) {
+      var v = p.o, a = Math.atan2(w.y - v.y, w.x - v.x), da = a - p.a;
+      while (da > Math.PI) da -= TAU;
+      while (da < -Math.PI) da += TAU;
+      p.a = a; p.acc += da;
+      if (Math.abs(p.acc) > 1.0) { stepValve(v, p.acc > 0 ? 1 : -1); p.acc = 0; p.turned = true; }
+    } else if (p.type === "spin") {
+      var s = p.o, a2 = Math.atan2(w.y - s.y, w.x - s.x), d2 = a2 - p.a, tnow = performance.now();
+      while (d2 > Math.PI) d2 -= TAU;
+      while (d2 < -Math.PI) d2 += TAU;
+      var dts = Math.max(0.008, (tnow - p.lt) / 1000);
+      s.om = clamp(s.om * 0.5 + (d2 / dts) * 0.5, -14, 14); s.ang += d2;
+      p.a = a2; p.lt = tnow;
+    } else if (p.type === "gear") {
+      var gq = p.o, dv = W.gearDrv, a3 = Math.atan2(w.y - gq.y, w.x - gq.x), d3 = a3 - p.a, t3 = performance.now();
+      while (d3 > Math.PI) d3 -= TAU;
+      while (d3 < -Math.PI) d3 += TAU;
+      var dts3 = Math.max(0.008, (t3 - p.lt) / 1000);
+      var gom = clamp(gq.rho * dv.om * 0.5 + (d3 / dts3) * 0.5, -20, 20);
+      dv.om = clamp(gom / gq.rho, -14, 14); dv.ang += d3 / gq.rho; gearAngles(W);
+      p.a = a3; p.lt = t3;
+    } else if (p.type === "water") {
+      if (Math.hypot(w.x - p.sx, w.y - p.sy) > 26 * U) {
+        p.sx = w.x; p.sy = w.y;
+        if (inWater(w.x, w.y, 6 * U)) { ring(w.x, w.y, 0.7); push(w.x, w.y, 0.5); if (Math.random() < 0.5) splashAt(w.x, w.y, 2); }
+      }
+    } else if (p.type === "panel") {
+      wipeAt(w.x, w.y, 24 * U, 24 * U);
+    }
+    p.x = w.x; p.y = w.y;
+  });
+  function ptrEnd(e) {
+    var p = ptrs[e.pointerId];
+    delete ptrs[e.pointerId];
+    if (!p || p.none) return;
+    var quick = p.moved < 14 * U && performance.now() - p.t0 < 450;
+    if (p.type === "scoop") {
+      var sc = p.o; sc.held = false;
+      if (quick && Toybox.timer.phase() !== "ending") { autoPour(sc); return; }
+      if (inWater(sc.x, sc.y, 4 * U)) { sc.state = "float"; sc.vx = 0; sc.vy = 0; ring(sc.x, sc.y, 0.8); return; }
+      // Let go up high with water still in it: the cup finishes the job by itself (goes to the nearest bowl,
+      // pours, and floats back home), so a lift that ends a bit off still fills a bowl.
+      if (sc.w > 0.02 && sc.y < g.rimBack && Toybox.timer.phase() !== "ending") { autoPour(sc, sc.snap || nearFunnel(sc.x)); return; }
+      sc.state = "fall"; sc.fallV = 0;
+      sc.hy = clamp(lerp(g.yb, g.yf, 0.55), g.yb + 12 * U, g.yf - 8 * U);
+      if (sc.y > sc.hy) sc.hy = Math.min(sc.y, g.yf - 8 * U);
+      sc.x = clamp(sc.x, edgeL(sc.hy) + 26 * U, edgeR(sc.hy) - 26 * U);
+    } else if (p.type === "sq") sq.held = false;
+    else if (p.type === "spray") spr.held = false;
+    else if (p.type === "valve" && !p.turned && e.type === "pointerup" && Toybox.timer.phase() !== "ending") stepValve(p.o, 1);
+  }
+  // Idle help: the ghost hand lifts a cup out of the water up to a bowl.
+  var touches = 0;
+  var ghost = Toybox.ghost({ max: 2, plan: function () {
+    var sc = scoops.filter(function (o) { return o.state === "float"; })[0], f = W.funnels[0];
+    if (!sc || !f) return null;
+    var o = cvOff();
+    var p0 = [o.x + view.x + sc.x * view.s, o.y + view.y + (sc.y - 8 * U) * view.s], p1 = [o.x + view.x + f.x * view.s, o.y + view.y + (f.top - 40 * U) * view.s];
+    return { pts: [p0, [p0[0], p1[1] + (p0[1] - p1[1]) * 0.35], p1] };
+  } });
+  function nearFunnel(x) {
+    var best = W.funnels[0];
+    W.funnels.forEach(function (f) { if (Math.abs(f.x - x) < Math.abs(best.x - x)) best = f; });
+    return best;
+  }
+  function autoPour(sc, to) {
+    // Scoop, lift to the bowl with the most room (or the bowl it was carried to), pour, and float back.
+    var best = W.funnels[0];
+    W.funnels.forEach(function (f) { if (f.level < best.level - 0.05) best = f; });
+    if (W.funnels.length > 1 && Math.abs(W.funnels[0].level - W.funnels[1].level) < 0.05) best = sc.x < g.VW / 2 ? W.funnels[0] : W.funnels[1];
+    if (to) best = to;
+    var air = !inWater(sc.x, sc.y, 4 * U), ps = pourSpot(sc, best);
+    // From the air, it floats back to the water below where it was let go.
+    var hy = clamp(lerp(g.yb, g.yf, 0.55), g.yb + 12 * U, g.yf - 8 * U), hx = clamp(sc.x, edgeL(hy) + 26 * U, edgeR(hy) - 26 * U);
+    sc.state = "auto";
+    if (!air) sc.w = 1;
+    sc.auto = { phase: "up", t: 0, x0: air ? hx : sc.x, y0: air ? hy : sc.y, xs: sc.x, ys: sc.y, x1: ps.x, y1: ps.y };
+    if (!air) { splashAt(sc.x, sc.y, 6); ring(sc.x, sc.y, 0.8); }
+    plip();
+  }
+  cv.addEventListener("pointerup", ptrEnd);
+  cv.addEventListener("pointercancel", ptrEnd);
+  cv.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+  document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
+
+  // ---------- Sound (off by default; soft and synthesized) ----------
+  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
+  // starts the audio on a tap while sound is on. This page builds its own master gain and noise per context.
+  var sctx = null, master = null, noiseBuf = null, flowSnd = null, humSnd = null;
+  function out(ac) {
+    if (sctx !== ac) {
+      sctx = ac; flowSnd = null; humSnd = null;
+      master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
+      var len = Math.floor(ac.sampleRate * 2);
+      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+      var d = noiseBuf.getChannelData(0), last = 0;
+      for (var i = 0; i < len; i++) { last = (last + 0.05 * (Math.random() * 2 - 1)) / 1.05; d[i] = last * 3.2; }
+    }
+    return master;
+  }
+  function tone(freq, dur, vol, type, slideTo) {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(out(ac));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function plip() { tone(rand(500, 700), 0.12, 0.05, "sine", rand(1100, 1500)); }
+  function blip() { tone(660, 0.14, 0.04, "sine", 880); }
+  function click(kind) { if (kind === 0) tone(180, 0.18, 0.06, "triangle", 120); else tone(420, 0.08, 0.05, "triangle", 300); }
+  function whooshSoft() {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain();
+    src.buffer = noiseBuf; f.type = "lowpass"; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(400, t + 1.2);
+    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.1, t + 0.12); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    src.connect(f); f.connect(g2); g2.connect(mst); src.start(t); src.stop(t + 1.4);
+  }
+  function spray() {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain();
+    src.buffer = noiseBuf; f.type = "highpass"; f.frequency.value = 2500;
+    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.09, t + 0.02); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    src.connect(f); f.connect(g2); g2.connect(mst); src.start(t, Math.random()); src.stop(t + 0.3);
+  }
+  function squeak() { tone(rand(900, 1100), 0.12, 0.025, "sine", rand(1300, 1500)); }
+  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
+  function whoosh() {
+    var ac = Toybox.sound.ready();
+    if (!ac) return;
+    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = noiseBuf; f.type = "bandpass"; f.Q.value = 0.9;
+    f.frequency.setValueAtTime(1200, t); f.frequency.exponentialRampToValueAtTime(300, t + 1.6);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.14, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    src.connect(f); f.connect(g); g.connect(mst); src.start(t); src.stop(t + 1.9);
+  }
+  function loops(flow, pump) {
+    var ac = Toybox.sound.ready();
+    if (!ac) { stopLoops(); return; }
+    var t = ac.currentTime, mst = out(ac);
+    if (!flowSnd) {
+      var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = noiseBuf; src.loop = true; f.type = "bandpass"; f.Q.value = 0.8; f.frequency.value = 800; g.gain.value = 0.0001;
+      src.connect(f); f.connect(g); g.connect(mst); src.start();
+      flowSnd = { src: src, f: f, g: g };
+      var o1 = ac.createOscillator(), lp = ac.createBiquadFilter(), g2 = ac.createGain();
+      o1.type = "triangle"; o1.frequency.value = 55; lp.type = "lowpass"; lp.frequency.value = 300; g2.gain.value = 0.0001;
+      o1.connect(lp); lp.connect(g2); g2.connect(mst); o1.start();
+      humSnd = { o: o1, g: g2 };
+    }
+    flowSnd.g.gain.setTargetAtTime(Math.max(0.0001, flow * 0.07), t, 0.25);
+    flowSnd.f.frequency.setTargetAtTime(600 + Math.random() * 700, t, 0.3);
+    humSnd.g.gain.setTargetAtTime(Math.max(0.0001, pump * 0.04), t, 0.25);
+    humSnd.o.frequency.setTargetAtTime(45 + pump * 35, t, 0.3);
+  }
+  function stopLoops() {
+    if (!flowSnd) return;
+    try {
+      flowSnd.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.1); flowSnd.src.stop(sctx.currentTime + 0.5);
+      humSnd.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.1); humSnd.o.stop(sctx.currentTime + 0.5);
+    } catch (e) { /* ignore */ }
+    flowSnd = null; humSnd = null;
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { save(); if (sctx) sctx.suspend(); }
+  });
+  window.addEventListener("pagehide", save);
+
+  // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
+  // A little pie clock at the top: the blue wedge is the time left.
+  function drawTimer(info) {
+    var el = $("tbadge");
+    var active = info.phase === "running" || info.phase === "ending";
+    el.hidden = !active;
+    if (!active) return;
+    var f = info.fraction;
+    var col = f > 0.5 ? "#45AEF2" : (f > 0.2 ? "#FFC93C" : "#F77F00");
+    var wedge = "";
+    if (f >= 0.999) wedge = '<circle cx="30" cy="30" r="21" fill="' + col + '"/>';
+    else if (f > 0.001) {
+      var a = f * TAU, x = 30 + 21 * Math.sin(a), y = 30 - 21 * Math.cos(a);
+      wedge = '<path d="M30 30L30 9A21 21 0 ' + (f > 0.5 ? 1 : 0) + ' 1 ' + x.toFixed(2) + " " + y.toFixed(2) + 'Z" fill="' + col + '"/>';
+    }
+    var num = (info.showMinutes && info.phase === "running") ?
+      '<text x="30" y="32" text-anchor="middle" dominant-baseline="middle" font-size="24" font-weight="800" font-family="Baloo 2, sans-serif" fill="#1D2340" stroke="#FFFFFF" stroke-width="5" paint-order="stroke">' + info.minutes + "</text>" : "";
+    el.innerHTML = '<circle cx="30" cy="30" r="27" fill="#FFFFFF" stroke="#1D2340" stroke-width="4"/>' + wedge + num;
+  }
+  // Ending: no new water; the pipes drain and the flowers slow down.
+  function settle() {
+    ptrs = {};
+    scoops.forEach(function (sc) { sc.held = false; if (sc.state === "drag" || sc.state === "auto") { sc.state = "fall"; sc.fallV = 0; sc.auto = null; sc.hy = clamp(lerp(g.yb, g.yf, 0.55), g.yb + 12 * U, g.yf - 8 * U); sc.x = clamp(sc.x, edgeL(sc.hy) + 26 * U, edgeR(sc.hy) - 26 * U); } });
+    sq.held = false; spr.held = false;
+  }
+  function lastSplash() {
+    bigSplash();
+    whoosh();
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true"><rect x="0" y="0" width="240" height="200" rx="20" fill="#2B3A6B"/>' +
+      '<circle cx="204" cy="34" r="16" fill="#FFE8A3"/><circle cx="196" cy="29" r="15" fill="#2B3A6B"/>' +
+      '<rect x="52" y="22" width="136" height="96" rx="8" fill="rgba(255,255,255,0.16)" stroke="#E6F2FF" stroke-width="3"/>' +
+      '<path d="M98 34q-22 0-22 10q4 18 18 22h8q14-4 18-22q0-10-22-10z" fill="rgba(170,236,216,0.7)" stroke="#3E9C86" stroke-width="3"/>' +
+      '<path d="M98 66v18h40v16" fill="none" stroke="#3E9C86" stroke-width="11" stroke-linejoin="round"/><path d="M98 66v18h40v16" fill="none" stroke="#B2EEDC" stroke-width="6" stroke-linejoin="round"/>' +
+      '<rect x="90" y="76" width="16" height="16" rx="4" fill="#203B5E"/><circle cx="98" cy="84" r="6" fill="#FFCB2E" stroke="#1D2340" stroke-width="2"/>' +
+      '<g transform="translate(160 92)"><path d="M0-16L4-6L14-10L8 0L14 10L4 6L0 16L-4 6L-14 10L-8 0L-14-10L-4-6Z" fill="#F47B2A" stroke="#1D2340" stroke-width="2"/><circle r="5" fill="#FF9F4D"/></g>' +
+      '<path d="M36 112h168l-10 22H46z" fill="#F8F0DF" stroke="#1D2340" stroke-width="4" stroke-linejoin="round"/>' +
+      '<path d="M48 116h144l-6 12H54z" fill="#5BB8F0"/>' +
+      '<rect x="34" y="134" width="172" height="22" rx="5" fill="#EDCB92" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="38" y="120" width="14" height="66" rx="4" fill="#EDCB92" stroke="#1D2340" stroke-width="4"/><rect x="188" y="120" width="14" height="66" rx="4" fill="#EDCB92" stroke="#1D2340" stroke-width="4"/>' +
+      '<rect x="36" y="178" width="18" height="10" rx="3" fill="#2FA24A" stroke="#1D2340" stroke-width="3"/><rect x="186" y="178" width="18" height="10" rx="3" fill="#2FA24A" stroke="#1D2340" stroke-width="3"/>' +
+      '<text x="30" y="44" font-size="26" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text>' +
+      '<text x="18" y="26" font-size="18" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text></svg>';
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, a");
+    if (!t) return;
+    if (t.dataset.lay) { if (!Toybox.timer.locked()) setLayout(Number(t.dataset.lay)); return; }
+    if (t.classList.contains("homebtn") && Toybox.timer.phase() === "ending") e.preventDefault();
+  });
+
+  // ---------- Main loop ----------
+  var last = 0, sndAcc = 0;
+  function draw() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = bgColor; ctx.fillRect(0, 0, CW, CH);
+    var s = view.s * DPR;
+    ctx.setTransform(s, 0, 0, s, view.x * DPR, view.y * DPR);
+    drawScene();
+  }
+  function frame(t) {
+    requestAnimationFrame(frame);
+    var dt = last ? Math.min(0.05, (t - last) / 1000) : 0.016;
+    last = t; now = t / 1000;
+    var phase = Toybox.timer.phase();
+    flowOn = !Toybox.timer.locked();
+    if (phase !== "resting") update(dt);
+    draw();
+    sndAcc += dt; if (sndAcc > 0.15) { sndAcc = 0; if (Toybox.sound.on()) loops(phase === "resting" ? 0 : totalFlow(), 0); }
+  }
+
+  load();
+  buildPicker();
+  layout();
+  makeToys();
+  placeFloaters();
+  markPicker();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layout(); });
+  Toybox.init({
+    app: "water-works",
+    timerIntro: "When time is up, the water stops, the flowers slow down, and the screen locks.",
+    goodbyeOption: "End with a Last splash button to press",
+    farewellText: "Time to let the water rest",
+    goodbyeLabel: "Last splash",
+    farewellDone: "Bye bye, water!",
+    restLine: "The water is resting.",
+    restLine2: "It will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft trickles, plips, splashes and squirts. Hold for 2 seconds.",
+    legacy: { timer: "waterworks-timer-v1", sound: "waterworks-sound-v1" },
+    onEnding: function (done) { settle(); done(); },
+    onGoodbye: lastSplash,
+    onRest: function () { settle(); save(); },
+    onSound: function (on) { if (on) chime(); else stopLoops(); },
+    onTimer: drawTimer
+  });
+  requestAnimationFrame(frame);
+
+  // Test hook, only with ?debug in the address: lets automated checks peek at the table.
+  if (/[?&]debug\b/.test(location.search)) window.__water = {
+    world: function () { return W; }, view: function () { return view; }, geom: function () { return g; },
+    scoops: scoops, toys: function () { return toys; }, sq: sq, spr: spr,
+    setLayout: function (i) { setLayout(i); }, layouts: LAYOUTS.length, drops: function () { return drops.length; }, parts: function () { return parts.length; }, layout: function () { return lay; },
+    toScreen: function (x, y) { var o = cvOff(); return { x: o.x + view.x + x * view.s, y: o.y + view.y + y * view.s }; }
+  };
+})();

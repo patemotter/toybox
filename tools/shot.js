@@ -24,9 +24,9 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const { ensureServer } = require('./serve');
 
 const SIZES = { phone: '390x844', 'phone-wide': '844x390', ipad: '820x1180', 'ipad-wide': '1180x820', 'ipad-pro': '1024x1366' };
-const PORT = process.env.PORT || 8120;
 
 function parseArgs(argv) {
   const o = { page: null, sizes: ['phone'], steps: [], out: '/tmp/toybox-shots', query: '', fresh: false };
@@ -54,82 +54,88 @@ function point(vp, x, y) {
   const o = parseArgs(process.argv.slice(2));
   fs.mkdirSync(o.out, { recursive: true });
   const slug = o.page.replace(/\/$/, '/index').replace(/\.html$/, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
-  const b = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
+  const srv = await ensureServer();
+  let b = null;
   let bad = 0;
-  for (const sz of o.sizes) {
-    const [w, h] = (SIZES[sz] || sz).split('x').map(Number);
-    const mobile = w < 600 || h < 600;
-    const ctx = await b.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: mobile, deviceScaleFactor: 1 });
-    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
-    await ctx.addInitScript((fresh) => {
+  try {
+    b = await chromium.launch(process.env.CHANNEL ? { channel: process.env.CHANNEL } : {});
+    for (const sz of o.sizes) {
+      const [w, h] = (SIZES[sz] || sz).split('x').map(Number);
+      const mobile = w < 600 || h < 600;
+      const ctx = await b.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: mobile, deviceScaleFactor: 1 });
+      await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+      await ctx.addInitScript((fresh) => {
+        try {
+          sessionStorage.setItem('workshop-gear', 'on');
+          sessionStorage.setItem('workshop-check-skip', '1');
+          sessionStorage.setItem('site-gear', 'on');
+          sessionStorage.setItem('forge-gear', 'on');
+          sessionStorage.setItem('kitchen-ready', 'on');
+          if (fresh) sessionStorage.setItem('toybox-launch', 'shot' + Date.now());
+          ['train-builder', 'construction-site', 'concrete', 'workshop', 'kitchen', 'farm'].forEach(a => sessionStorage.setItem('toybox-turn-ok:' + a, '1'));
+          const s = JSON.parse(localStorage.getItem('toybox-settings-v1') || '{}');
+          s['kind-words'] = false;
+          localStorage.setItem('toybox-settings-v1', JSON.stringify(s));
+        } catch (e) { /* ignore */ }
+        const st = document.createElement('style');
+        st.textContent = '.ghosthand{visibility:hidden!important}';
+        document.addEventListener('DOMContentLoaded', () => document.head.appendChild(st));
+      }, o.fresh);
+      const p = await ctx.newPage();
+      const errs = [];
+      const shots = [];
+      p.on('pageerror', e => errs.push(e.message.slice(0, 200)));
+      const vp = { width: w, height: h };
+      const tag = `${slug}-${w}x${h}`;
       try {
-        sessionStorage.setItem('workshop-gear', 'on');
-        sessionStorage.setItem('workshop-check-skip', '1');
-        sessionStorage.setItem('site-gear', 'on');
-        sessionStorage.setItem('forge-gear', 'on');
-        sessionStorage.setItem('kitchen-ready', 'on');
-        if (fresh) sessionStorage.setItem('toybox-launch', 'shot' + Date.now());
-        ['train-builder', 'construction-site', 'concrete', 'workshop', 'kitchen', 'farm'].forEach(a => sessionStorage.setItem('toybox-turn-ok:' + a, '1'));
-        const s = JSON.parse(localStorage.getItem('toybox-settings-v1') || '{}');
-        s['kind-words'] = false;
-        localStorage.setItem('toybox-settings-v1', JSON.stringify(s));
-      } catch (e) { /* ignore */ }
-      const st = document.createElement('style');
-      st.textContent = '.ghosthand{visibility:hidden!important}';
-      document.addEventListener('DOMContentLoaded', () => document.head.appendChild(st));
-    }, o.fresh);
-    const p = await ctx.newPage();
-    const errs = [];
-    const shots = [];
-    p.on('pageerror', e => errs.push(e.message.slice(0, 200)));
-    const vp = { width: w, height: h };
-    const tag = `${slug}-${w}x${h}`;
-    try {
-      await p.goto(`http://localhost:${PORT}/${o.page}${o.query ? (o.page.includes('?') ? '&' : '?') + o.query : ''}`, { waitUntil: 'load', timeout: 20000 });
-      await p.waitForTimeout(1500);
-      const play = await p.$('.tb-turn:not([hidden]) button');
-      if (play) { await play.click().catch(() => {}); await p.waitForTimeout(400); }
-      for (const step of o.steps) {
-        const i = step.indexOf(':');
-        const kind = i < 0 ? step : step.slice(0, i);
-        const arg = i < 0 ? '' : step.slice(i + 1);
-        if (kind === 'tap') {
-          const [x, y] = point(vp, ...arg.split(','));
-          await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up();
-          await p.waitForTimeout(300);
-        } else if (kind === 'drag') {
-          const c = arg.split(',');
-          const [x1, y1] = point(vp, c[0], c[1]);
-          const [x2, y2] = point(vp, c[2], c[3]);
-          await p.mouse.move(x1, y1); await p.mouse.down();
-          await p.mouse.move(x2, y2, { steps: 12 }); await p.mouse.up();
-          await p.waitForTimeout(300);
-        } else if (kind === 'click') {
-          const el = await p.$(arg);
-          if (!el) { errs.push('no element for click:' + arg); break; }
-          await el.click({ force: true });
-          await p.waitForTimeout(300);
-        } else if (kind === 'wait') {
-          await p.waitForTimeout(Number(arg) || 0);
-        } else if (kind === 'eval') {
-          await p.evaluate(arg);
-        } else if (kind === 'shot') {
-          const f = path.join(o.out, `${tag}-${arg || shots.length}.png`);
-          await p.screenshot({ path: f }); shots.push(f);
-        } else {
-          errs.push('unknown step: ' + step); break;
+        await p.goto(`${srv.url}/${o.page}${o.query ? (o.page.includes('?') ? '&' : '?') + o.query : ''}`, { waitUntil: 'load', timeout: 20000 });
+        await p.waitForTimeout(1500);
+        const play = await p.$('.tb-turn:not([hidden]) button');
+        if (play) { await play.click().catch(() => {}); await p.waitForTimeout(400); }
+        for (const step of o.steps) {
+          const i = step.indexOf(':');
+          const kind = i < 0 ? step : step.slice(0, i);
+          const arg = i < 0 ? '' : step.slice(i + 1);
+          if (kind === 'tap') {
+            const [x, y] = point(vp, ...arg.split(','));
+            await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up();
+            await p.waitForTimeout(300);
+          } else if (kind === 'drag') {
+            const c = arg.split(',');
+            const [x1, y1] = point(vp, c[0], c[1]);
+            const [x2, y2] = point(vp, c[2], c[3]);
+            await p.mouse.move(x1, y1); await p.mouse.down();
+            await p.mouse.move(x2, y2, { steps: 12 }); await p.mouse.up();
+            await p.waitForTimeout(300);
+          } else if (kind === 'click') {
+            const el = await p.$(arg);
+            if (!el) { errs.push('no element for click:' + arg); break; }
+            await el.click({ force: true });
+            await p.waitForTimeout(300);
+          } else if (kind === 'wait') {
+            await p.waitForTimeout(Number(arg) || 0);
+          } else if (kind === 'eval') {
+            await p.evaluate(arg);
+          } else if (kind === 'shot') {
+            const f = path.join(o.out, `${tag}-${arg || shots.length}.png`);
+            await p.screenshot({ path: f }); shots.push(f);
+          } else {
+            errs.push('unknown step: ' + step); break;
+          }
         }
-      }
-      await p.waitForTimeout(500);
-      const f = path.join(o.out, `${tag}.png`);
-      await p.screenshot({ path: f }); shots.push(f);
-      const scroll = await p.evaluate(() => [document.documentElement.scrollWidth > innerWidth, document.documentElement.scrollHeight > innerHeight]);
-      if (scroll[0] || scroll[1]) errs.push('page scrolls ' + JSON.stringify(scroll));
-    } catch (e) { errs.push('FAIL ' + e.message.split('\n')[0].slice(0, 160)); }
-    if (errs.length) bad++;
-    console.log(`${errs.length ? 'ERR' : 'ok '} ${w}x${h}  ${shots.join('  ')}${errs.length ? '\n    ' + errs.join('\n    ') : ''}`);
-    await ctx.close();
+        await p.waitForTimeout(500);
+        const f = path.join(o.out, `${tag}.png`);
+        await p.screenshot({ path: f }); shots.push(f);
+        const scroll = await p.evaluate(() => [document.documentElement.scrollWidth > innerWidth, document.documentElement.scrollHeight > innerHeight]);
+        if (scroll[0] || scroll[1]) errs.push('page scrolls ' + JSON.stringify(scroll));
+      } catch (e) { errs.push('FAIL ' + e.message.split('\n')[0].slice(0, 160)); }
+      if (errs.length) bad++;
+      console.log(`${errs.length ? 'ERR' : 'ok '} ${w}x${h}  ${shots.join('  ')}${errs.length ? '\n    ' + errs.join('\n    ') : ''}`);
+      await ctx.close();
+    }
+  } finally {
+    if (b) await b.close();
+    await srv.close();
   }
-  await b.close();
   process.exit(bad ? 1 : 0);
 })().catch(e => { console.error(e.message); process.exit(2); });

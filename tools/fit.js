@@ -23,9 +23,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const { ensureServer } = require('./serve');
 
-const PORT = process.env.PORT || 8120;
-const BASE = 'http://localhost:' + PORT + '/';
+let BASE = '';
 const SIZES = (process.env.SIZES || '390x844,844x390,820x1180,1180x820,1024x1366').split(',');
 const SHOTS = process.env.SHOTS || '';
 
@@ -220,28 +220,35 @@ async function runPage(browser, url, size) {
 (async () => {
   const pages = process.argv.slice(2).length ? process.argv.slice(2) : allPages();
   if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
+  const srv = await ensureServer();
+  BASE = srv.url + '/';
   const opts = process.env.CHANNEL ? { channel: process.env.CHANNEL } : {};
-  const browser = await chromium.launch(opts);
+  let browser = null;
   let total = 0, uiProblems = 0, uiWarnPages = 0;
-  for (const url of pages) {
-    for (const size of SIZES) {
-      const { fits, ui } = await runPage(browser, url, size);
-      for (const f of fits) {
-        total++;
-        console.log([url, size, f.tab ? 'tab ' + f.tab : '-', f.kind, f.by + 'px', JSON.stringify(f.text), f.el].join('  '));
-      }
-      if (!ui.out.length) continue;
-      if (ui.v2) {
-        for (const f of ui.out) { uiProblems++; console.log([url, size, f.tab ? 'tab ' + f.tab : '-', 'ui PROBLEM', f.kind, f.by ? f.by + 'px' : '', JSON.stringify(f.el)].join('  ')); }
-      } else {
-        uiWarnPages++;
-        const by = {};
-        ui.out.forEach(f => { (by[f.kind] = by[f.kind] || []).push(f.el + (f.by ? ' ' + f.by + 'px' : '')); });
-        console.log([url, size, '-', 'ui warn', Object.keys(by).map(k => k + ' x' + by[k].length + ': ' + by[k].slice(0, 6).join(', ') + (by[k].length > 6 ? ', ...' : '')).join(' | ')].join('  '));
+  try {
+    browser = await chromium.launch(opts);
+    for (const url of pages) {
+      for (const size of SIZES) {
+        const { fits, ui } = await runPage(browser, url, size);
+        for (const f of fits) {
+          total++;
+          console.log([url, size, f.tab ? 'tab ' + f.tab : '-', f.kind, f.by + 'px', JSON.stringify(f.text), f.el].join('  '));
+        }
+        if (!ui.out.length) continue;
+        if (ui.v2) {
+          for (const f of ui.out) { uiProblems++; console.log([url, size, f.tab ? 'tab ' + f.tab : '-', 'ui PROBLEM', f.kind, f.by ? f.by + 'px' : '', JSON.stringify(f.el)].join('  ')); }
+        } else {
+          uiWarnPages++;
+          const by = {};
+          ui.out.forEach(f => { (by[f.kind] = by[f.kind] || []).push(f.el + (f.by ? ' ' + f.by + 'px' : '')); });
+          console.log([url, size, '-', 'ui warn', Object.keys(by).map(k => k + ' x' + by[k].length + ': ' + by[k].slice(0, 6).join(', ') + (by[k].length > 6 ? ', ...' : '')).join(' | ')].join('  '));
+        }
       }
     }
+    console.log(total ? total + ' text-fit problem(s).' : 'Every label fits.');
+    if (process.env.UI !== '0') console.log(uiProblems + ' size/label problem(s) on pages using the new system (tb-v2); ' + uiWarnPages + ' page/size(s) with warnings on pages not moved yet.');
+  } finally {
+    if (browser) await browser.close();
+    await srv.close();
   }
-  console.log(total ? total + ' text-fit problem(s).' : 'Every label fits.');
-  if (process.env.UI !== '0') console.log(uiProblems + ' size/label problem(s) on pages using the new system (tb-v2); ' + uiWarnPages + ' page/size(s) with warnings on pages not moved yet.');
-  await browser.close();
 })();

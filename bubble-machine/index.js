@@ -1,0 +1,1940 @@
+// Script of bubble-machine/index.html, loaded by a plain <script src> at the same place in the page.
+// Sections, in order (search for the title to jump to one):
+//   - Constants
+//   - Saved state
+//   - Bubble sprites (pre-rendered; a bubble is two or three drawImage calls)
+//   - Canvas and layout
+//   - Machine
+//   - Bubbles
+//   - Pops: a splash ring and droplets
+//   - Ducks (Surprise): a rubber duck inside a bubble; it drops to the grass when the bubble pops
+//   - Wand
+//   - Surprise: a giant wobbly bubble, a bubble with a rubber duck inside, or a bubble train
+//   - Sound (off by default; soft synthesized pops, a quiet motor)
+//   - Machine controls
+//   - Coach line and ghost hand
+//   - Touch: switch, dial, wand, bubbles (several fingers at once)
+//   - Simulation
+//   - Frame loop
+//   - Panel: soaps, New, Surprise
+//   - Timer ending, goodbye and rest
+//   - Debug hooks (?debug only)
+//   - Start
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  var KEY = "bubble-machine-v1";      // { count, soap, speed, on, wand }: count is this visit's bubbles
+  var OUT = "#1D2340";
+  var TAU = Math.PI * 2;
+  var DEBUG = /[?&]debug\b/.test(location.search);
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var SPEED_NAMES = ["Slow", "Medium", "Fast"];
+  // Wheel turns per second for Slow / Medium / Fast (6 wands; each makes a bubble or two at the top).
+  var WHEEL = [TAU / 5.6, TAU / 3.8, TAU / 2.7];
+  var PER_WAND = [1, 1.5, 2];
+  var DIAL_ANG = [-150, -90, -30];      // the dial's pointer for each speed (degrees, -90 = up)
+  var WAND_COLORS = ["#FF4D6D", "#FFB627", "#4CD964", "#3DB4FF", "#8E6CFF", "#FF6FD8"];
+
+  // Soaps: tint of the film, the hue range of the shimmer, the colors of the splash.
+  var SOAPS = [
+    { id: "rainbow", label: "Rainbow", tint: [225, 240, 255], a0: 0.05, hues: null, bands: [300, 190, 50, 130, 250],
+      splash: null, liquid: "#BFE6FF", liquid2: "#E9F7FF" },
+    { id: "pink", label: "Pink", tint: [255, 120, 190], a0: 0.12, hues: [290, 410], bands: [320, 345, 40, 290, 330],
+      splash: ["#FF6FB5", "#FFB3D9", "#FFC93C"], liquid: "#FF8CC6", liquid2: "#FFD0E8" },
+    { id: "blue", label: "Blue", tint: [80, 160, 255], a0: 0.12, hues: [175, 280], bands: [200, 240, 175, 270, 215],
+      splash: ["#4DA8FF", "#8ED1FF", "#8E6CFF"], liquid: "#5FAEFF", liquid2: "#CFE8FF" },
+    { id: "green", label: "Green", tint: [90, 215, 120], a0: 0.12, hues: [65, 175], bands: [100, 150, 60, 170, 120],
+      splash: ["#4CD964", "#A7E86B", "#3DB4FF"], liquid: "#6FD883", liquid2: "#D4F7DB" },
+    { id: "glitter", label: "Glitter", tint: [255, 230, 170], a0: 0.07, hues: null, bands: [45, 320, 190, 50, 280],
+      splash: ["#FFC93C", "#FFFFFF", "#FF6FD8"], liquid: "#FFDE6B", liquid2: "#FFF4C4", glitter: true }
+  ];
+  var SOAP_BY = {};
+  SOAPS.forEach(function (s) { SOAP_BY[s.id] = s; });
+
+  // Wands: the loop's shape is the shape of the bubbles it blows (the dad's idea). Shape wands spin their bubbles
+  // slowly; animal bubbles stay upright and just wobble. The machine's wand wheel takes the picked shape too, so
+  // its rings and the bubbles it blows match the hand wand.
+  var WANDS = [
+    { id: "round", label: "Round" }, { id: "hexagon", label: "Hexagon" }, { id: "star", label: "Star" },
+    { id: "heart", label: "Heart" }, { id: "bunny", label: "Bunny", animal: true }, { id: "cat", label: "Cat", animal: true },
+    { id: "fish", label: "Fish", animal: true }
+  ];
+  var WAND_BY = {};
+  WANDS.forEach(function (w) { WAND_BY[w.id] = w; });
+  // Traces a wand/bubble shape centered on (cx, cy), fitting inside a circle of radius R (y down).
+  function shapePath(x, cx, cy, R, id) {
+    var i, a;
+    x.beginPath();
+    if (id === "hexagon") {
+      for (i = 0; i < 6; i++) { a = i * TAU / 6 - Math.PI / 2; x[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * R, cy + Math.sin(a) * R); }
+    } else if (id === "star") {
+      for (i = 0; i < 10; i++) { a = i * TAU / 10 - Math.PI / 2; var rr2 = i % 2 ? R * 0.52 : R; x[i ? "lineTo" : "moveTo"](cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2 + R * 0.08); }
+    } else if (id === "heart") {
+      var hy = cy + R * 0.08;
+      x.moveTo(cx, hy + R * 0.86);
+      x.bezierCurveTo(cx - R * 1.22, hy + R * 0.05, cx - R * 0.82, hy - R * 1.02, cx, hy - R * 0.5);
+      x.bezierCurveTo(cx + R * 0.82, hy - R * 1.02, cx + R * 1.22, hy + R * 0.05, cx, hy + R * 0.86);
+    } else if (id === "bunny") {
+      var by = cy + R * 0.3, br = R * 0.66, d = Math.PI / 180;
+      x.arc(cx, by, br, -65 * d, 245 * d);
+      x.bezierCurveTo(cx - R * 0.56, cy - R * 0.62, cx - R * 0.6, cy - R * 0.98, cx - R * 0.37, cy - R * 0.98);
+      x.bezierCurveTo(cx - R * 0.16, cy - R * 0.98, cx - R * 0.1, cy - R * 0.6, cx + Math.cos(-100 * d) * br, by + Math.sin(-100 * d) * br);
+      x.arc(cx, by, br, -100 * d, -80 * d);
+      x.bezierCurveTo(cx + R * 0.1, cy - R * 0.6, cx + R * 0.16, cy - R * 0.98, cx + R * 0.37, cy - R * 0.98);
+      x.bezierCurveTo(cx + R * 0.6, cy - R * 0.98, cx + R * 0.56, cy - R * 0.62, cx + Math.cos(-65 * d) * br, by + Math.sin(-65 * d) * br);
+    } else if (id === "cat") {
+      var ky = cy + R * 0.18, kr = R * 0.76, e = Math.PI / 180;
+      x.arc(cx, ky, kr, -20 * e, 200 * e);
+      x.lineTo(cx - R * 0.66, cy - R * 0.92);
+      x.lineTo(cx + Math.cos(-108 * e) * kr, ky + Math.sin(-108 * e) * kr);
+      x.arc(cx, ky, kr, -108 * e, -72 * e);
+      x.lineTo(cx + R * 0.66, cy - R * 0.92);
+    } else if (id === "fish") {
+      var fx = cx + R * 0.14, f = Math.PI / 180;
+      x.ellipse(fx, cy, R * 0.78, R * 0.6, 0, -158 * f, 158 * f);
+      x.lineTo(cx - R * 0.98, cy + R * 0.56);
+      x.lineTo(cx - R * 0.74, cy);
+      x.lineTo(cx - R * 0.98, cy - R * 0.56);
+    } else {
+      x.arc(cx, cy, R, 0, TAU);
+    }
+    x.closePath();
+  }
+  // How far the outline of a shape (R = 1) reaches from its center in a direction (y down): the machine's arms
+  // end on the loop. Sampled once per shape with isPointInPath.
+  var reachCache = {};
+  function shapeReach(id, ang) {
+    if (id === "round") return 1;
+    var p = reachCache[id], i, k;
+    if (!p) {
+      p = reachCache[id] = [];
+      var z = mkCanvas(4).getContext("2d");
+      shapePath(z, 0, 0, 100, id);
+      for (i = 0; i < 72; i++) {
+        var a = i * TAU / 72, lo = 0, hi = 1.2;
+        for (k = 0; k < 12; k++) {
+          var m = (lo + hi) / 2;
+          if (z.isPointInPath(Math.cos(a) * m * 100, Math.sin(a) * m * 100)) lo = m; else hi = m;
+        }
+        p.push(lo);
+      }
+    }
+    return p[Math.round((((ang % TAU) + TAU) % TAU) / TAU * 72) % 72];
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function hsl(h, s, l, a) { return "hsla(" + Math.round(h) + "," + s + "%," + l + "%," + a + ")"; }
+  function mkCanvas(w, h) { var c = document.createElement("canvas"); c.width = w; c.height = h || w; return c; }
+
+  // ---------- Saved state ----------
+  // Fresh visit from the home screen: the machine starts switched off with the first-visit soap and speed;
+  // the Bubbles counter starts at 0 again too (it counts this visit only).
+  function defaults() { return { count: 0, soap: "rainbow", speed: 1, on: false, wand: "round" }; }
+  function load() {
+    var s = defaults();
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (o && typeof o === "object") {
+        if (typeof o.count === "number" && o.count >= 0 && isFinite(o.count)) s.count = Math.floor(o.count);
+        if (SOAP_BY[o.soap]) s.soap = o.soap;
+        if (WAND_BY[o.wand]) s.wand = o.wand;
+        if (o.speed === 0 || o.speed === 1 || o.speed === 2) s.speed = o.speed;
+        if (typeof o.on === "boolean") s.on = o.on;
+      }
+    } catch (e) { /* storage unavailable or bad data: defaults */ }
+    return s;
+  }
+  var S = load();
+  // Opened from the home screen: everything starts over, the bubble count too (it counts this visit only).
+  if (window.Toybox && Toybox.fresh()) S = defaults();
+  var saveId = null;
+  function saveNow() {
+    clearTimeout(saveId); saveId = null;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
+  }
+  function saveSoon() { if (!saveId) saveId = setTimeout(saveNow, 800); }
+  saveNow();
+  document.addEventListener("visibilitychange", function () { if (document.hidden && saveId) saveNow(); });
+  window.addEventListener("pagehide", function () { if (saveId) saveNow(); });
+
+  // ---------- Bubble sprites (pre-rendered; a bubble is two or three drawImage calls) ----------
+  // film: the tinted body with swirling thin-film colors and an iridescent rim (it turns: the sheen swirls)
+  // hl:   the highlights (they stay put: the light comes from the top left)
+  // gl:   glitter sparkles (Glitter soap only; it turns the other way)
+  var spriteCache = {};
+  function rimHue(soap, f) {
+    if (!soap.hues) return f * 360;
+    return soap.hues[0] + (soap.hues[1] - soap.hues[0]) * (0.5 - 0.5 * Math.cos(f * TAU));
+  }
+  function buildSprites(soap, size, shape) {
+    var c = size / 2, R = size * 0.47, i;
+    shape = shape || "round";
+    var round = shape === "round";
+    // The outline at a given radius: a circle for round bubbles, the wand's shape for the others.
+    function outline(z, rad) { if (round) { z.beginPath(); z.arc(c, c, rad, 0, TAU); } else shapePath(z, c, c, rad, shape); }
+    var t = soap.tint;
+    function tc(a) { return "rgba(" + t[0] + "," + t[1] + "," + t[2] + "," + a.toFixed(3) + ")"; }
+    var film = mkCanvas(size), x = film.getContext("2d");
+    var g = x.createRadialGradient(c, c, 0, c, c, R);
+    g.addColorStop(0, tc(soap.a0));
+    g.addColorStop(0.62, tc(soap.a0 * 1.5));
+    g.addColorStop(0.88, tc(Math.min(0.5, soap.a0 * 3.2)));
+    g.addColorStop(0.975, tc(0.55));
+    g.addColorStop(1, tc(0));
+    x.fillStyle = g;
+    outline(x, R); x.fill();
+    if (!round) {
+      // Shaped films get an even tint near the edge too (the radial glow above is round).
+      x.lineJoin = "round"; x.lineWidth = R * 0.16; x.strokeStyle = tc(Math.min(0.4, soap.a0 * 3)); x.stroke();
+    }
+    x.save();
+    outline(x, R); x.clip();
+    // Swirling bands of thin-film color.
+    soap.bands.forEach(function (h, k) {
+      var a = k * TAU / soap.bands.length + 0.4, d = R * (k % 2 ? 0.52 : 0.66);
+      x.save();
+      x.translate(c + Math.cos(a) * d, c + Math.sin(a) * d);
+      x.rotate(a + Math.PI / 2 + 0.5);
+      x.scale(1, 0.4);
+      var gg = x.createRadialGradient(0, 0, 0, 0, 0, R * 0.6);
+      gg.addColorStop(0, hsl(h, 95, 62, 0.38));
+      gg.addColorStop(0.6, hsl(h, 95, 62, 0.16));
+      gg.addColorStop(1, hsl(h, 95, 62, 0));
+      x.fillStyle = gg;
+      x.beginPath(); x.arc(0, 0, R * 0.6, 0, TAU); x.fill();
+      x.restore();
+    });
+    // Iridescent rim: a ring of shifting hues, and a thinner inner ring.
+    var N = 48;
+    function ring(rad, lw, shift, dh, light, alpha) {
+      x.lineWidth = lw;
+      if (x.createConicGradient) {
+        var cg = x.createConicGradient(0, c, c);
+        for (var q = 0; q <= N; q++) cg.addColorStop(q / N, hsl(rimHue(soap, ((q / N) + shift) % 1) + dh, 95, light, alpha));
+        x.strokeStyle = cg;
+        x.lineJoin = "round";
+        outline(x, rad); x.stroke();
+        return;
+      }
+      if (!round) { x.strokeStyle = hsl(rimHue(soap, shift) + dh, 95, light, alpha); outline(x, rad); x.stroke(); return; }
+      // Older browsers: abutting arcs (no overlap, so no darker seams).
+      var M2 = Math.max(96, Math.round(size / 3));
+      for (var q2 = 0; q2 < M2; q2++) {
+        x.strokeStyle = hsl(rimHue(soap, ((q2 / M2) + shift) % 1) + dh, 95, light, alpha);
+        x.beginPath(); x.arc(c, c, rad, q2 / M2 * TAU, (q2 + 1.02) / M2 * TAU); x.stroke();
+      }
+    }
+    ring(R * 0.955, R * 0.085, 0, 0, 60, 0.6);
+    ring(R * 0.85, R * 0.035, 0.37, 40, 65, 0.3);
+    x.restore();
+    // A thin edge so bubbles read against the light sky.
+    x.lineWidth = Math.max(1.4, R * 0.022);
+    x.strokeStyle = "rgba(29,50,110,0.32)";
+    x.lineJoin = "round";
+    outline(x, R - x.lineWidth / 2); x.stroke();
+
+    var hl = mkCanvas(size), y = hl.getContext("2d");
+    if (!round) { y.save(); outline(y, R * 0.97); y.clip(); }
+    y.save();
+    y.translate(c - R * 0.4, c - R * 0.44);
+    y.rotate(-Math.PI / 4);
+    y.scale(1, 0.52);
+    var hg = y.createRadialGradient(0, 0, 0, 0, 0, R * 0.34);
+    hg.addColorStop(0, "rgba(255,255,255,0.97)");
+    hg.addColorStop(0.45, "rgba(255,255,255,0.75)");
+    hg.addColorStop(1, "rgba(255,255,255,0)");
+    y.fillStyle = hg;
+    y.beginPath(); y.arc(0, 0, R * 0.34, 0, TAU); y.fill();
+    y.restore();
+    y.fillStyle = "rgba(255,255,255,0.9)";
+    y.beginPath(); y.arc(c - R * 0.08, c - R * 0.68, R * 0.06, 0, TAU); y.fill();
+    y.strokeStyle = "rgba(255,255,255,0.55)";
+    y.lineCap = "round";
+    y.lineWidth = R * 0.065;
+    y.beginPath(); y.arc(c, c, R * 0.78, 0.3, 1.2); y.stroke();
+    if (!round) y.restore();
+
+    var gl = null;
+    if (soap.glitter) {
+      gl = mkCanvas(size);
+      var z = gl.getContext("2d"), cols = ["#FFC93C", "#FFFFFF", "#FF6FD8", "#3DB4FF", "#FFE14D"];
+      if (!round) { outline(z, R * 0.95); z.clip(); }
+      for (i = 0; i < 34; i++) {
+        var a2 = Math.random() * TAU, d2 = Math.sqrt(Math.random()) * R * 0.86;
+        z.fillStyle = cols[i % cols.length];
+        z.beginPath(); z.arc(c + Math.cos(a2) * d2, c + Math.sin(a2) * d2, R * rnd(0.016, 0.034), 0, TAU); z.fill();
+      }
+      for (i = 0; i < 7; i++) {
+        var a3 = Math.random() * TAU, d3 = Math.sqrt(Math.random()) * R * 0.75, s3 = R * rnd(0.06, 0.1);
+        star(z, c + Math.cos(a3) * d3, c + Math.sin(a3) * d3, s3, i % 2 ? "#FFFFFF" : "#FFE14D");
+      }
+    }
+    return { film: film, hl: hl, gl: gl, half: c, R: R };
+  }
+  function star(z, x, y, s, col) {
+    z.fillStyle = col;
+    z.beginPath();
+    z.moveTo(x, y - s); z.quadraticCurveTo(x, y, x + s, y); z.quadraticCurveTo(x, y, x, y + s);
+    z.quadraticCurveTo(x, y, x - s, y); z.quadraticCurveTo(x, y, x, y - s);
+    z.fill();
+  }
+  function sprites(soapId, devR, shape) {
+    // The sprite closest above the drawn size: little scaling work per bubble.
+    var need = devR * 2.15, lod = need <= 64 ? 64 : (need <= 128 ? 128 : (need <= 256 ? 256 : (need <= 512 ? 512 : 768)));
+    shape = shape || "round";
+    var k = soapId + lod + shape;
+    if (!spriteCache[k]) spriteCache[k] = buildSprites(SOAP_BY[soapId], lod, shape);
+    return spriteCache[k];
+  }
+
+  // ---------- Canvas and layout ----------
+  var stage = $("stage"), view = $("view"), ctx = view.getContext("2d"), sky = $("sky");
+  var W = 0, H = 0, DPR = 1, rect = { left: 0, top: 0 };
+  var G = 40, groundY = 0;           // grass height and the line where the grass starts
+  var M = { x: 0, y: 0, s: 1 };       // machine: bottom-left corner and scale (base drawing is 200 x 235)
+  var J = { x: 0, y: 0, s: 1, b: 1, stand: 0 }; // the soap jar the wand stands in (b: bubble size scale for the wand)
+  var BS = 1;                         // bubble size scale
+  var CAP = 20, lowQ = 0;   // room in the sky (big bubbles take more of it, see weight())
+  var bg = null;
+
+  function resize() {
+    var w = view.clientWidth, h = view.clientHeight;
+    if (w < 20 || h < 20) return;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    var changed = w !== W || h !== H;
+    W = w; H = h;
+    view.width = Math.round(W * DPR);
+    view.height = Math.round(H * DPR);
+    var r = view.getBoundingClientRect();
+    rect = { left: r.left, top: r.top };
+    // The machine and the wand jar are small and tucked into the bottom corners, so most of the stage is open
+    // sky for bubbles (the dad: they were far too big). The switch, dial, jar and wand keep big touch areas.
+    if (H > W && W < 600) {
+      // Upright phone: both stand on the grass line, above the coach line.
+      G = clamp(H * 0.1, 40, 64);
+      groundY = H - G;
+      M.s = Math.min(W * 0.3 / 200, (H - G) * 0.22 / 235);
+      M.x = Math.max(6, W * 0.02);
+      M.y = groundY + 3;
+      J.s = clamp(W / 390, 0.82, 1.1) * 0.62;
+      J.b = clamp(W / 390, 0.82, 1.1);
+      J.stand = 0;
+      J.x = W - 34 * J.s - 10;
+      J.y = groundY + 3;
+    } else {
+      G = clamp(H * 0.085, 24, 64);
+      groundY = H - G;
+      M.s = Math.min(W * 0.22 / 200, (H - G) * 0.36 / 235, 0.95);
+      M.x = Math.max(8, W * 0.02);
+      // Standing on the grass, clear of the coach line (bottom-center on phones).
+      M.y = groundY + G * 0.2;
+      J.s = clamp(Math.min(W, H) / 560, 0.6, 0.95);
+      J.b = clamp(Math.min(W, H) / 390, 0.85, 1.5);
+      J.stand = 0;
+      J.x = W - Math.max(40 * J.s, W * 0.04) - 6;
+      J.y = groundY + G * 0.25;
+    }
+    BS = clamp(Math.min(W, H) / 470, 0.85, 1.7);
+    CAP = Math.round((W * H > 450000 ? 30 : 20) * (lowQ === 2 ? 0.7 : (lowQ === 1 ? 0.85 : 1)));
+    layoutWand();
+    buildBackground();
+    if (changed) {
+      bubbles.forEach(function (b) { b.x = clamp(b.x, b.r, W - b.r); b.y = clamp(b.y, b.r, groundY - b.r * 0.5); });
+      ducks.forEach(function (d) { d.x = clamp(d.x, 30, W - 30); if (d.state === "sit") d.y = duckGround(); });
+    }
+  }
+
+  // Sky, sun, clouds and grass: drawn once per size on their own canvas under the play canvas.
+  function buildBackground() {
+    bg = sky;
+    sky.width = Math.round(W * DPR); sky.height = Math.round(H * DPR);
+    var x = sky.getContext("2d");
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var g = x.createLinearGradient(0, 0, 0, groundY);
+    g.addColorStop(0, "#6EC3F7");
+    g.addColorStop(0.6, "#A9DCFF");
+    g.addColorStop(1, "#D9F1FF");
+    x.fillStyle = g;
+    x.fillRect(0, 0, W, H);
+    var sx = W * 0.8, sy = Math.min(H * 0.17, 110), sr = clamp(Math.min(W, H) * 0.07, 22, 60);
+    var sg = x.createRadialGradient(sx, sy, sr * 0.6, sx, sy, sr * 2.6);
+    sg.addColorStop(0, "rgba(255,240,170,0.55)");
+    sg.addColorStop(1, "rgba(255,240,170,0)");
+    x.fillStyle = sg;
+    x.fillRect(sx - sr * 3, sy - sr * 3, sr * 6, sr * 6);
+    x.fillStyle = "#FFE066";
+    x.strokeStyle = "#F5B82E";
+    x.lineWidth = 3;
+    x.beginPath(); x.arc(sx, sy, sr, 0, TAU); x.fill(); x.stroke();
+    function cloud(cx, cy, s) {
+      x.fillStyle = "rgba(255,255,255,0.85)";
+      x.beginPath();
+      x.arc(cx, cy, 22 * s, 0, TAU); x.arc(cx + 26 * s, cy - 10 * s, 26 * s, 0, TAU);
+      x.arc(cx + 54 * s, cy, 20 * s, 0, TAU); x.rect(cx, cy, 54 * s, 20 * s);
+      x.fill();
+    }
+    var cs = clamp(Math.min(W, H) / 500, 0.6, 1.4);
+    cloud(W * 0.3, H * 0.18, cs);
+    cloud(W * 0.58, H * 0.36, cs * 0.75);
+    cloud(W * 0.08, H * 0.42, cs * 0.6);
+    // Grass.
+    x.fillStyle = "#6CCB5F";
+    x.fillRect(0, groundY, W, G + 2);
+    x.fillStyle = "#58B84D";
+    x.fillRect(0, groundY + G * 0.55, W, G);
+    x.strokeStyle = OUT;
+    x.lineWidth = 3;
+    x.beginPath(); x.moveTo(0, groundY); x.lineTo(W, groundY); x.stroke();
+    x.fillStyle = "#4FAE45";
+    for (var i = 0; i < W / 22; i++) {
+      var gx = i * 22 + (i % 3) * 5;
+      x.beginPath(); x.moveTo(gx, groundY + 1); x.lineTo(gx + 4, groundY - 7); x.lineTo(gx + 8, groundY + 1); x.fill();
+    }
+    var fl = ["#FF6FD8", "#FFE14D", "#FFFFFF", "#FF9A4D"];
+    for (i = 0; i < W / 90; i++) {
+      var fx = 40 + i * 90 + (i % 2) * 30, fy = groundY + G * (0.3 + (i % 3) * 0.18);
+      x.fillStyle = fl[i % fl.length];
+      x.beginPath(); x.arc(fx, fy, 4, 0, TAU); x.fill();
+      x.fillStyle = "#FFC93C";
+      x.beginPath(); x.arc(fx, fy, 1.6, 0, TAU); x.fill();
+    }
+  }
+
+  // ---------- Machine ----------
+  // Base drawing: 200 wide, 235 tall, origin at the bottom-left, y up is negative.
+  var WC = { x: 100, y: -162, arm: 54, ring: 15 };         // wand wheel
+  var SW = { x: 30, y: -86, w: 56, h: 62 };                // the on/off switch
+  var DIAL = { x: 142, y: -55, r: 22 };                    // the speed dial
+  var mach = {
+    wheel: 0, wheelV: 0, fan: 0, film: [true, true, true, true, true, true],
+    flashUntil: 0, hintCount: 0, speedLabelAt: -1e9, puffAt: -1e9, spill: 0
+  };
+  function mx(lx) { return M.x + lx * M.s; }
+  function my(ly) { return M.y + ly * M.s; }
+  function inMachine(px, py) {
+    return px > mx(4) && px < mx(196) && py > my(-236) && py < my(0);
+  }
+  function hitSwitch(px, py) {
+    var pad = Math.max(10 * M.s, (52 - SW.w * M.s) / 2);
+    return px > mx(SW.x) - pad && px < mx(SW.x + SW.w) + pad && py > my(SW.y) - pad && py < my(SW.y + SW.h) + pad * 0.6;
+  }
+  function hitDial(px, py) {
+    var r = Math.max(36 * M.s, 30);
+    return Math.hypot(px - mx(DIAL.x), py - my(DIAL.y)) < r;
+  }
+  function rr(x, X, Y, w, h, r) {
+    x.beginPath();
+    x.moveTo(X + r, Y); x.lineTo(X + w - r, Y); x.quadraticCurveTo(X + w, Y, X + w, Y + r);
+    x.lineTo(X + w, Y + h - r); x.quadraticCurveTo(X + w, Y + h, X + w - r, Y + h);
+    x.lineTo(X + r, Y + h); x.quadraticCurveTo(X, Y + h, X, Y + h - r);
+    x.lineTo(X, Y + r); x.quadraticCurveTo(X, Y, X + r, Y);
+    x.closePath();
+  }
+  function fillStroke(x, fill, lw) { x.fillStyle = fill; x.fill(); x.lineWidth = lw || 4; x.strokeStyle = OUT; x.stroke(); }
+
+  function drawMachine(now) {
+    var x = ctx, soap = SOAP_BY[S.soap], i, a;
+    x.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.x, DPR * M.y);
+    x.lineJoin = "round";
+    x.lineCap = "round";
+    // Shadow on the grass.
+    x.fillStyle = "rgba(29,35,64,0.18)";
+    x.beginPath(); x.ellipse(100, 0, 104, 9, 0, 0, TAU); x.fill();
+    // Fan housing (behind the wheel).
+    x.beginPath(); x.arc(WC.x, WC.y, 68, 0, TAU); fillStroke(x, "#5B5FE0", 4);
+    x.beginPath(); x.arc(WC.x, WC.y, 58, 0, TAU); fillStroke(x, "#DDE6FF", 3);
+    // Fan blades, turning fast when the machine runs.
+    x.save();
+    x.translate(WC.x, WC.y);
+    x.rotate(mach.fan);
+    var blur = Math.min(1, Math.abs(mach.wheelV) / WHEEL[2]);
+    for (i = 0; i < 4; i++) {
+      x.rotate(TAU / 4);
+      x.beginPath();
+      x.moveTo(0, 0);
+      x.bezierCurveTo(14, -12, 30, -46, 8, -54);
+      x.bezierCurveTo(-6, -40, -8, -16, 0, 0);
+      x.fillStyle = blur > 0.4 ? "rgba(150,165,225,0.55)" : "#A9B5EA";
+      x.fill();
+      x.lineWidth = 2.5; x.strokeStyle = "rgba(29,35,64," + (0.7 - blur * 0.45).toFixed(2) + ")"; x.stroke();
+    }
+    x.restore();
+    if (blur > 0.3) {
+      x.fillStyle = "rgba(169,181,234," + (0.35 * blur).toFixed(2) + ")";
+      x.beginPath(); x.arc(WC.x, WC.y, 54, 0, TAU); x.fill();
+    }
+    // Grille rings.
+    x.strokeStyle = "rgba(29,35,64,0.3)";
+    x.lineWidth = 2;
+    x.beginPath(); x.arc(WC.x, WC.y, 24, 0, TAU); x.stroke();
+    x.beginPath(); x.arc(WC.x, WC.y, 42, 0, TAU); x.stroke();
+
+    // Body.
+    rr(x, 8, -100, 184, 92, 20); fillStroke(x, "#FF5C7A", 4);
+    rr(x, 8, -100, 184, 16, 8); x.fillStyle = "#FFC93C"; x.fill();
+    rr(x, 8, -100, 184, 92, 20); x.lineWidth = 4; x.strokeStyle = OUT; x.stroke();
+    rr(x, 20, -90, 160, 74, 14); fillStroke(x, "#FFF6DD", 3);
+    // Feet.
+    rr(x, 18, -10, 32, 12, 5); fillStroke(x, "#3A3F63", 3);
+    rr(x, 150, -10, 32, 12, 5); fillStroke(x, "#3A3F63", 3);
+
+    // Wand wheel: arms, then the wands (loops with soap film, in the picked wand's shape, always upright like
+    // the seats of a big wheel), then the hub.
+    var top = 1.5 * Math.PI, shape = S.wand, ringR = ringSize();
+    for (i = 0; i < 6; i++) {
+      a = mach.wheel + i * TAU / 6;
+      var wx = WC.x + Math.cos(a) * WC.arm, wy = WC.y + Math.sin(a) * WC.arm, rch = ringR * shapeReach(shape, a + Math.PI);
+      x.beginPath(); x.moveTo(WC.x, WC.y); x.lineTo(wx - Math.cos(a) * rch, wy - Math.sin(a) * rch);
+      x.lineWidth = 9; x.strokeStyle = OUT; x.stroke();
+      x.lineWidth = 4.5; x.strokeStyle = "#FFFFFF"; x.stroke();
+    }
+    for (i = 0; i < 6; i++) {
+      a = mach.wheel + i * TAU / 6;
+      var cx = WC.x + Math.cos(a) * WC.arm, cy = WC.y + Math.sin(a) * WC.arm;
+      if (mach.film[i]) {
+        // Soap film in the ring; it bulges into a bubble as the wand nears the top and the fan blows.
+        var rel = ((a - top) % TAU + TAU) % TAU;   // 0 at the top, growing clockwise
+        var toTop = TAU - rel;                     // how far before the top
+        var grow = toTop < 1.2 ? (1 - toTop / 1.2) * Math.min(1, Math.abs(mach.wheelV) / WHEEL[0]) : 0;
+        drawFilm(cx, cy, ringR - 2, soap, now, M.s, shape);
+        if (grow > 0.05) {
+          var pr = ringR * (0.6 + 0.9 * grow);
+          var pb = { x: cx, y: cy - pr * 0.75, r: pr, soap: S.soap, shape: shape, sw: shape === "round" ? now / 900 + i : 0, ax: 0,
+            wa: 0.06 * grow, wp: now / 140, grow: 1 };
+          ctx.save();
+          drawBubbleAt(pb, M.s, M.x, M.y);
+          ctx.restore();
+          x.setTransform(DPR * M.s, 0, 0, DPR * M.s, DPR * M.x, DPR * M.y);
+        }
+      }
+      shapePath(x, cx, cy, ringR, shape);
+      x.lineWidth = 8; x.strokeStyle = OUT; x.stroke();
+      x.lineWidth = 4; x.strokeStyle = WAND_COLORS[i]; x.stroke();
+    }
+    x.beginPath(); x.arc(WC.x, WC.y, 13, 0, TAU); fillStroke(x, "#FFC93C", 4);
+    x.beginPath(); x.arc(WC.x, WC.y, 4, 0, TAU); x.fillStyle = OUT; x.fill();
+
+    // Soap tray in front of the bottom of the wheel: the wands dip in here.
+    x.beginPath();
+    x.moveTo(36, -122);
+    x.lineTo(164, -122);
+    x.quadraticCurveTo(162, -96, 150, -96);
+    x.lineTo(50, -96);
+    x.quadraticCurveTo(38, -96, 36, -122);
+    x.closePath();
+    x.fillStyle = soap.liquid;
+    x.globalAlpha = 0.9; x.fill(); x.globalAlpha = 1;
+    x.lineWidth = 4; x.strokeStyle = OUT; x.stroke();
+    x.beginPath(); x.ellipse(100, -118, 58, 3.5, 0, 0, TAU); x.fillStyle = soap.liquid2; x.fill();
+    if (soap.glitter) {
+      x.fillStyle = "#FFFFFF";
+      for (i = 0; i < 6; i++) { star(x, 52 + i * 19, -108 + (i % 2) * 5, 3.2 + Math.sin(now / 300 + i) * 1.2, i % 2 ? "#FFFFFF" : "#FF6FD8"); }
+    } else if (soap.id === "rainbow") {
+      for (i = 0; i < 5; i++) { x.fillStyle = hsl(i * 70 + now / 30, 90, 70, 0.6); x.beginPath(); x.ellipse(56 + i * 22, -106, 7, 2.2, 0, 0, TAU); x.fill(); }
+    }
+    // A tiny drip splash when a wand comes out of the soap.
+    if (mach.spill > 0) {
+      x.fillStyle = soap.liquid2;
+      x.beginPath(); x.arc(70, -124 - mach.spill * 10, 3, 0, TAU); x.fill();
+      x.beginPath(); x.arc(78, -122 - mach.spill * 6, 2.2, 0, TAU); x.fill();
+    }
+
+    // The switch: green ON lit when running, red OFF paddle.
+    var on = S.on;
+    if (now < mach.flashUntil && Math.floor(now / 260) % 2 === 0) {
+      rr(x, SW.x - 8, SW.y - 8, SW.w + 16, SW.h + 16, 16);
+      x.fillStyle = "rgba(255,201,60,0.85)"; x.fill();
+    }
+    rr(x, SW.x, SW.y, SW.w, SW.h, 11); fillStroke(x, "#2B2F4A", 3.5);
+    rr(x, SW.x + 5, SW.y + 5 + (on ? 2 : 0), SW.w - 10, 26, 7);
+    fillStroke(x, on ? "#3DDC84" : "#1E7A45", 3);
+    rr(x, SW.x + 5, SW.y + 35 + (on ? 0 : 2), SW.w - 10, 22, 7);
+    fillStroke(x, on ? "#8E2A35" : "#E63946", 3);
+    if (on) {
+      rr(x, SW.x + 2, SW.y + 3, SW.w - 4, 32, 9);
+      x.lineWidth = 3; x.strokeStyle = "rgba(120,255,170,0.9)"; x.stroke();
+    }
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = '800 15px "Baloo 2", "Trebuchet MS", sans-serif';
+    x.fillStyle = on ? "#FFFFFF" : "rgba(255,255,255,0.6)";
+    x.fillText("ON", SW.x + SW.w / 2, SW.y + 20 + (on ? 2 : 0));
+    x.font = '800 13px "Baloo 2", "Trebuchet MS", sans-serif';
+    x.fillStyle = on ? "rgba(255,255,255,0.55)" : "#FFFFFF";
+    x.fillText("OFF", SW.x + SW.w / 2, SW.y + 47 + (on ? 0 : 2));
+
+    // The speed dial: one, two or three little bubbles mark Slow, Medium and Fast.
+    for (i = 0; i < 3; i++) {
+      a = DIAL_ANG[i] * Math.PI / 180;
+      var ix = DIAL.x + Math.cos(a) * 31, iy = DIAL.y + Math.sin(a) * 31, n = i + 1;
+      for (var k = 0; k < n; k++) {
+        var ox = (k - (n - 1) / 2) * 6.5, oy = (k % 2) * -3;
+        x.beginPath(); x.arc(ix + ox * Math.cos(a + Math.PI / 2), iy + oy + ox * Math.sin(a + Math.PI / 2), 3.6, 0, TAU);
+        x.fillStyle = i === S.speed ? ["#4CD964", "#FFC93C", "#FF9A4D"][i] : "#DDE3F2";
+        x.fill(); x.lineWidth = 1.8; x.strokeStyle = OUT; x.stroke();
+      }
+    }
+    x.beginPath(); x.arc(DIAL.x, DIAL.y, DIAL.r, 0, TAU); fillStroke(x, "#FFFFFF", 4);
+    x.beginPath(); x.arc(DIAL.x, DIAL.y, DIAL.r - 7, 0, TAU); fillStroke(x, "#E9EEFA", 2.5);
+    var da = dialAngle * Math.PI / 180;
+    x.beginPath(); x.moveTo(DIAL.x, DIAL.y); x.lineTo(DIAL.x + Math.cos(da) * (DIAL.r - 3), DIAL.y + Math.sin(da) * (DIAL.r - 3));
+    x.lineWidth = 6; x.strokeStyle = "#FF5C7A"; x.stroke();
+    x.beginPath(); x.arc(DIAL.x, DIAL.y, 5, 0, TAU); x.fillStyle = OUT; x.fill();
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  var dialAngle = DIAL_ANG[S.speed];
+  // The machine's loops: shapes are drawn a little bigger than the round ring so a bunny or a fish reads clearly.
+  function ringSize() { return S.wand === "round" ? WC.ring : 18; }
+
+  // The word for the speed floats over the dial for a few seconds after a change.
+  function drawSpeedLabel(now) {
+    var t = (now - mach.speedLabelAt) / 3200;
+    if (t < 0 || t > 1) return;
+    var a = t < 0.08 ? t / 0.08 : (t > 0.85 ? (1 - t) / 0.15 : 1);
+    var fs = clamp(20 * M.s, 18, 30), txt = SPEED_NAMES[S.speed] + "!";
+    var px = mx(DIAL.x), py = my(DIAL.y - 52) - (1 - a) * 6;
+    ctx.globalAlpha = a;
+    ctx.font = "800 " + fs + 'px "Baloo 2", "Trebuchet MS", sans-serif';
+    var tw = ctx.measureText(txt).width + fs * 1.1;
+    px = clamp(px, tw / 2 + 6, W - tw / 2 - 6);
+    rr(ctx, px - tw / 2, py - fs * 0.75, tw, fs * 1.5, fs * 0.75);
+    ctx.fillStyle = "#FFFFFF"; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    ctx.fillStyle = OUT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(txt, px, py + fs * 0.06);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Bubbles ----------
+  var bubbles = [], parts = [], ducks = [];
+  var clock = 0;
+  // A soap film (wand rings, machine wands): the bubble sprite drawn flat and a little see-through.
+  function drawFilm(cx, cy, r, soap, now, scale, shape) {
+    var sp = sprites(soap.id, r * DPR * scale, shape);
+    var k = r / sp.R, rot = shape && shape !== "round" ? 0 : now / 1300;
+    var c = Math.cos(rot) * k, s = Math.sin(rot) * k;
+    var t = ctx.getTransform();
+    ctx.globalAlpha = 0.85;
+    ctx.transform(c, s, -s, c, cx, cy);
+    ctx.drawImage(sp.film, -sp.half, -sp.half);
+    ctx.setTransform(t);
+    ctx.globalAlpha = 1;
+  }
+  // Draws a bubble. Wobble: squash along a slowly turning axis; sheen: the film sprite turns (swirls);
+  // the highlight stays put. (sc, ox, oy) map the bubble's coordinates to the stage (machine space or 1,0,0).
+  function drawBubbleAt(b, sc, ox, oy) {
+    var g = b.grow < 1 ? 0.35 + 0.65 * easeOut(b.grow) : 1;
+    var r = b.r * g * sc, px = ox + b.x * sc, py = oy + b.y * sc;
+    var shaped = b.shape && b.shape !== "round";
+    var sp = sprites(b.soap, r * DPR, b.shape);
+    var k = r / sp.R * DPR;
+    var w = Math.sin(b.wp) * b.wa, sx = 1 + w, sy = 1 - w;
+    var ct = Math.cos(b.ax), st = Math.sin(b.ax);
+    if (b.duck) drawDuck(px, py + Math.sin(b.wp * 0.5) * r * 0.05, r * 0.62, Math.sin(b.wp * 0.3) * 0.25, b.duck.c);
+    setM(ct, st, sx, sy, b.sw - b.ax, k, px, py);
+    ctx.drawImage(sp.film, -sp.half, -sp.half);
+    if (sp.gl) {
+      ctx.globalAlpha = 0.65 + 0.35 * Math.sin(clock * 3 + b.seed);
+      setM(ct, st, sx, sy, shaped ? b.sw - b.ax : -b.sw * 0.7 - b.ax, k, px, py);
+      ctx.drawImage(sp.gl, -sp.half, -sp.half);
+      ctx.globalAlpha = 1;
+    }
+    // A shaped bubble's highlight turns with its shape (it is cut to the outline).
+    if (!shaped) setM(ct, st, sx, sy, -b.ax, k, px, py);
+    ctx.drawImage(sp.hl, -sp.half, -sp.half);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  // Transform = translate(px, py) * rotate(theta) * scale(sx, sy) * rotate(phi) * scale(k), in device pixels.
+  function setM(ct, st, sx, sy, phi, k, px, py) {
+    // Low quality (a slow device): a plain squash with no turning, which is much cheaper to draw.
+    if (lowQ === 2 || (lowQ === 1 && k < 0.5)) { ctx.setTransform(k * sx, 0, 0, k * sy, px * DPR, py * DPR); return; }
+    var cp = Math.cos(phi), sp = Math.sin(phi);
+    var a = (ct * sx * cp - st * sy * sp) * k;
+    var b = (st * sx * cp + ct * sy * sp) * k;
+    var c = (-ct * sx * sp - st * sy * cp) * k;
+    var d = (-st * sx * sp + ct * sy * cp) * k;
+    ctx.setTransform(a, b, c, d, px * DPR, py * DPR);
+  }
+  function easeOut(t) { return 1 - (1 - t) * (1 - t) * (1 - t); }
+
+  function makeBubble(x, y, r, vx, vy, soap) {
+    return {
+      x: x, y: y, r: r, vx: vx, vy: vy, soap: soap || S.soap,
+      grow: 0, age: 0, life: rnd(9, 14), seed: Math.random() * 100,
+      rise: rnd(20, 34) * BS * (r < 18 * BS ? 1.15 : 0.9),
+      sw: Math.random() * TAU, ss: rnd(0.35, 0.8) * (Math.random() < 0.5 ? -1 : 1),
+      ax: Math.random() * TAU, wa: 0.1, wb: 0.025 + Math.min(0.05, r / 1500), wp: Math.random() * TAU, wf: rnd(5, 7.5),
+      kind: "n", dead: false, shape: "round"
+    };
+  }
+  function addBubble(b) {
+    bubbles.push(b);
+    S.count++;
+    countDirty = true;
+    saveSoon();
+    // Keep the sky calm: while there is too much, the oldest everyday bubble pops softly to make room.
+    var guard = 0;
+    while (skyLoad() > CAP && guard++ < 12) {
+      var oldest = null;
+      for (var i = 0; i < bubbles.length; i++) {
+        var o = bubbles[i];
+        if (!o.dead && o !== b && o.kind === "n" && (!oldest || o.age > oldest.age)) oldest = o;
+      }
+      if (!oldest) break;
+      popBubble(oldest, true);
+    }
+    return b;
+  }
+  // How much room a bubble takes: a small one counts 1, a big wand bubble up to 3.5, the giant 4, a duck 2.
+  function weight(b) {
+    if (b.kind === "giant") return 4;
+    if (b.kind === "duck") return 2;
+    return clamp(b.r / (20 * BS), 1, 3.5);
+  }
+  function skyLoad() {
+    var t = 0;
+    for (var i = 0; i < bubbles.length; i++) if (!bubbles[i].dead) t += weight(bubbles[i]);
+    return t;
+  }
+
+  // ---------- Pops: a splash ring and droplets ----------
+  var lastPopSound = 0;
+  function splashColor(soapId) {
+    var s = SOAP_BY[soapId];
+    if (!s.splash) return hsl(Math.random() * 360, 90, 62, 1);
+    return s.splash[Math.floor(Math.random() * s.splash.length)];
+  }
+  function popBubble(b, soft) {
+    if (b.dead) return;
+    b.dead = true;
+    var r = b.r * (b.grow < 1 ? 0.35 + 0.65 * b.grow : 1);
+    parts.push({ t: "ring", x: b.x, y: b.y, r: r, life: 0, max: soft ? 0.5 : 0.42, col: splashColor(b.soap), soft: soft });
+    var n = Math.round((soft ? 4 : 7) + Math.min(14, r / 5));
+    if (reduce) n = Math.min(n, 4);
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * TAU, sp = rnd(70, 200) * (soft ? 0.5 : 1) * Math.sqrt(BS) * (r > 60 ? 1.5 : 1);
+      parts.push({ t: "drop", x: b.x + Math.cos(a) * r * 0.9, y: b.y + Math.sin(a) * r * 0.9, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        r: rnd(1.6, 3.6) * Math.sqrt(BS), life: 0, max: rnd(0.45, 0.8), col: splashColor(b.soap) });
+    }
+    if (parts.length > 500) parts.splice(0, parts.length - 500);
+    if (b.duck) dropDuck(b);
+    if (b.kind === "giant") bigPopSound(); else popSound(r, soft);
+  }
+
+  // ---------- Ducks (Surprise): a rubber duck inside a bubble; it drops to the grass when the bubble pops ----------
+  var DUCK_COLORS = ["#FFD23F", "#FFD23F", "#FF9ECF", "#7CD4FF"];
+  function drawDuck(px, py, s, rot, col) {
+    var x = ctx;
+    x.setTransform(DPR, 0, 0, DPR, px * DPR, py * DPR);
+    x.rotate(rot);
+    x.lineJoin = "round";
+    x.lineWidth = Math.max(2, s * 0.07);
+    x.strokeStyle = OUT;
+    // body
+    x.beginPath();
+    x.moveTo(-0.62 * s, -0.05 * s);
+    x.quadraticCurveTo(-0.7 * s, 0.48 * s, 0, 0.5 * s);
+    x.quadraticCurveTo(0.62 * s, 0.5 * s, 0.6 * s, 0.05 * s);
+    x.quadraticCurveTo(0.3 * s, 0.05 * s, 0.1 * s, -0.02 * s);
+    x.quadraticCurveTo(-0.3 * s, -0.25 * s, -0.62 * s, -0.05 * s);
+    x.closePath();
+    x.fillStyle = col; x.fill(); x.stroke();
+    // wing
+    x.beginPath(); x.ellipse(-0.08 * s, 0.17 * s, 0.24 * s, 0.13 * s, -0.2, 0, TAU);
+    x.fillStyle = "rgba(255,255,255,0.35)"; x.fill(); x.stroke();
+    // head
+    x.beginPath(); x.arc(0.28 * s, -0.3 * s, 0.27 * s, 0, TAU); x.fillStyle = col; x.fill(); x.stroke();
+    // beak
+    x.beginPath();
+    x.moveTo(0.5 * s, -0.33 * s); x.quadraticCurveTo(0.78 * s, -0.36 * s, 0.76 * s, -0.24 * s);
+    x.quadraticCurveTo(0.62 * s, -0.16 * s, 0.48 * s, -0.22 * s); x.closePath();
+    x.fillStyle = "#FF8A3D"; x.fill(); x.stroke();
+    // eye
+    x.fillStyle = OUT;
+    x.beginPath(); x.arc(0.34 * s, -0.38 * s, 0.055 * s, 0, TAU); x.fill();
+    x.fillStyle = "#FFFFFF";
+    x.beginPath(); x.arc(0.355 * s, -0.4 * s, 0.02 * s, 0, TAU); x.fill();
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  function duckSize() { return clamp(Math.min(W, H) * 0.075, 26, 56); }
+  function duckGround() { return groundY + G * 0.3 - duckSize() * 0.5; }
+  function dropDuck(b) {
+    ducks.push({ x: b.x, y: b.y, vy: -60, vx: b.vx * 0.3, state: "fall", rot: 0, vr: rnd(-3, 3), hop: 0, s: duckSize(), c: b.duck.c, fade: 1, gone: false });
+    while (ducks.length > 6) ducks.shift();
+  }
+  function updateDucks(dt) {
+    var gy = duckGround();
+    ducks.forEach(function (d) {
+      if (d.gone) { d.fade -= dt * 1.6; d.y -= dt * 40; return; }
+      if (d.state === "fall") {
+        d.vy += 900 * dt;
+        d.y += d.vy * dt; d.x = clamp(d.x + d.vx * dt, d.s, W - d.s);
+        d.rot += d.vr * dt;
+        if (d.y >= gy) {
+          d.y = gy;
+          if (d.vy > 160) { d.vy = -d.vy * 0.38; d.vr *= -0.5; squeak(0.5); }
+          else { d.vy = 0; d.state = "sit"; }
+        }
+      } else {
+        d.rot += (0 - d.rot) * Math.min(1, dt * 6);
+        if (d.hop > 0) { d.hop = Math.max(0, d.hop - dt * 1.6); }
+        d.y = gy - Math.sin(d.hop * Math.PI) * d.s * 1.6;
+      }
+    });
+    ducks = ducks.filter(function (d) { return d.fade > 0; });
+  }
+  function drawDucks() {
+    ducks.forEach(function (d) {
+      ctx.globalAlpha = clamp(d.fade, 0, 1);
+      if (d.state === "sit" && d.hop === 0) {
+        ctx.fillStyle = "rgba(29,35,64,0.18)";
+        ctx.beginPath(); ctx.ellipse(d.x, d.y + d.s * 0.5, d.s * 0.6, d.s * 0.1, 0, 0, TAU); ctx.fill();
+      }
+      drawDuck(d.x, d.y, d.s, d.rot, d.c);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // ---------- Wand ----------
+  var wand = { x: 0, y: 0, rx: 0, ry: 0, ring: 30, bub: 30, stick: 96, lean: 0, held: null, ox: 0, oy: 0,
+    v: 0, dx: 0, dy: -1, pend: 0, lastMove: 0, back: null, used: false, filmAt: 0,
+    home: true, soap: 1, emptyAt: 0, moved: 0, touchedAt: 0 };
+  // The wand starts in the jar (its spot in the sky is not saved). Dropped anywhere else, it stays there.
+  function layoutWand() {
+    wand.ring = 30 * J.s;
+    wand.bub = 30 * J.b;      // bubble sizes stay as big as before the wand got smaller
+    wand.stick = 92 * J.s;
+    wand.rx = J.x;
+    wand.ry = J.y - 50 * J.s - wand.stick * 0.55 - wand.ring;
+    if (wand.held === null && wand.home && !wand.back) { wand.x = wand.rx; wand.y = wand.ry; }
+    else if (wand.held === null && !wand.back) placeInSky();
+    else { wand.x = clamp(wand.x, wand.ring, W - wand.ring); wand.y = clamp(wand.y, wand.ring, groundY); }
+  }
+  // A wand left in the sky stays whole inside the stage, its handle no lower than the grass.
+  function placeInSky() {
+    wand.x = clamp(wand.x, wand.ring + 4, W - wand.ring - 4);
+    wand.y = clamp(wand.y, wand.ring + 4, Math.max(wand.ring + 4, groundY + G * 0.2 - wand.ring - wand.stick));
+    clearOfControls();
+  }
+  // Never leave the wand over the machine's switch and dial: nudge it above the control panel or past its
+  // right side, whichever is the shorter move.
+  function clearOfControls() {
+    var L = mx(14), R = mx(188), T = my(-96), B = my(-10), r = wand.ring + 6;
+    var top = wand.y - r, bot = wand.y + wand.ring + wand.stick;
+    if (!(wand.x + r > L && wand.x - r < R && bot > T && top < B)) return;
+    var upY = T - 8 - wand.ring - wand.stick, rightX = R + r + 4;
+    var canUp = upY >= wand.ring + 4, canRight = rightX <= W - wand.ring - 4;
+    if (canUp && (!canRight || wand.y - upY <= rightX - wand.x)) wand.y = upY;
+    else if (canRight) wand.x = rightX;
+    else { wand.home = false; sendHome(false); }
+  }
+  function jarBox() { var w = 64 * J.s, h = 54 * J.s; return { x: J.x - w / 2, y: J.y - h, w: w, h: h }; }
+  function hitJar(px, py) {
+    var b = jarBox(), pad = Math.max(12, (52 - b.w) / 2);
+    return px > b.x - pad && px < b.x + b.w + pad && py > b.y - pad && py < b.y + b.h + J.stand + pad;
+  }
+  // The ring dipped into the jar's mouth.
+  function ringInJar() {
+    var b = jarBox();
+    return Math.abs(wand.x - J.x) < b.w * 0.55 && wand.y > b.y - wand.ring * 1.2 && wand.y < J.y;
+  }
+  // slow: the calm glide home after the wand has been left alone for a while.
+  function sendHome(slow) {
+    if (wand.held !== null || (wand.home && !wand.back)) return;
+    wand.home = true;
+    wand.drop = null;
+    wand.back = { t0: performance.now(), x0: wand.x, y0: wand.y, lean0: wand.lean, dur: slow ? 2100 : 900, slow: !!slow };
+  }
+  function refill(splash) {
+    var was = wand.soap;
+    wand.soap = 1; wand.emptyAt = 0;
+    if (was < 1 || splash) wand.filmAt = performance.now();
+    if (splash) {
+      var b = jarBox(), col = SOAP_BY[S.soap].liquid;
+      for (var i = 0; i < 6; i++) parts.push({ t: "drop", x: J.x + rnd(-b.w * 0.3, b.w * 0.3), y: b.y, vx: rnd(-60, 60), vy: -rnd(90, 170), r: rnd(2, 3.5), life: 0, max: rnd(0.4, 0.6), col: col });
+    }
+  }
+  // Each bubble uses some of the soap film; when it is used up the ring is empty for a moment, then the film
+  // comes back by itself (or at once with a dip in the jar).
+  function useSoap(r) {
+    wand.soap -= 0.05 + 0.25 * Math.min(1, r / (wand.bub * 2.9));
+    if (wand.soap <= 0.001) {
+      wand.soap = 0; wand.emptyAt = performance.now(); wand.pend = 0;
+      parts.push({ t: "ring", x: wand.x, y: wand.y, r: wand.ring * 0.8, life: 0, max: 0.4, col: SOAP_BY[S.soap].liquid, soft: true });
+    }
+  }
+  function hitWand(px, py) {
+    if (Math.hypot(px - wand.x, py - wand.y) < wand.ring + 24) return true;
+    // the handle: a segment below the ring
+    var ax = wand.x - Math.sin(wand.lean) * wand.ring, ay = wand.y + Math.cos(wand.lean) * wand.ring;
+    var bx = ax - Math.sin(wand.lean) * wand.stick, by = ay + Math.cos(wand.lean) * wand.stick;
+    var vx = bx - ax, vy = by - ay, t = clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy), 0, 1);
+    return Math.hypot(px - (ax + vx * t), py - (ay + vy * t)) < 24;
+  }
+  function wandMove(px, py, now) {
+    var nx = clamp(px + wand.ox, wand.ring, W - wand.ring), ny = clamp(py + wand.oy, wand.ring, groundY - 6);
+    var dx = nx - wand.x, dy = ny - wand.y, d = Math.hypot(dx, dy), dt = Math.max(0.008, (now - wand.lastMove) / 1000);
+    wand.x = nx; wand.y = ny;
+    if (d < 0.5) return;
+    wand.lastMove = now;
+    var sp = Math.min(4000, d / dt);
+    wand.v = wand.v * 0.6 + sp * 0.4;
+    wand.dx = wand.dx * 0.6 + dx / d * 0.4;
+    wand.dy = wand.dy * 0.6 + dy / d * 0.4;
+    var n = Math.hypot(wand.dx, wand.dy) || 1;
+    wand.dx /= n; wand.dy /= n;
+    wand.moved += d;
+    if (ringInJar()) refill(wand.soap < 0.95);
+    if (wand.soap <= 0) return;
+    // Slow drags grow one big bubble; fast drags let go of a stream of small ones.
+    wand.pend += d * 0.17;
+    var f = clamp((wand.v - 260 * J.b) / (1000 * J.b), 0, 1);
+    var rel = lerp(wand.bub * 2.7, wand.bub * 0.4, f);
+    var guard = 0;
+    while (wand.pend >= rel && guard++ < 4 && wand.soap > 0) {
+      releaseWandBubble(Math.min(wand.pend, wand.bub * 2.9), f);
+      wand.pend = Math.max(0, wand.pend - rel);
+      if (f > 0.5) wand.pend = 0;
+    }
+  }
+  function releaseWandBubble(r, fast) {
+    if (r < 5) return;
+    var off = r * 0.85;
+    var bx = wand.x - wand.dx * off, by = wand.y - wand.dy * off;
+    var sp = Math.min(260, wand.v * 0.16);
+    var b = makeBubble(bx, by, r, wand.dx * sp + rnd(-30, 30), wand.dy * sp + rnd(-30, 20), S.soap);
+    b.grow = 0.8;
+    setShape(b, S.wand);
+    b.wa = r > wand.bub * 1.3 ? 0.16 : 0.08;
+    b.wb = r > wand.bub * 1.3 ? 0.05 : b.wb;
+    b.wf = r > wand.bub * 1.3 ? rnd(3.5, 4.5) : b.wf;
+    b.life = r > wand.bub * 1.3 ? rnd(10, 14) : b.life;
+    addBubble(b);
+    useSoap(r);
+    if (!fast || fast < 0.5) blowSound(r);
+    if (!learned.wand) { learned.wand = true; coachUpdate(); }
+  }
+  // Where the handle meets the loop (the fish's belly is higher than the others' bottoms).
+  function loopBottom(id) { return id === "fish" ? 0.58 : (id === "round" || id === "hexagon" ? 1 : 0.92); }
+  // Shaped bubbles: shapes turn slowly; animals stay upright and just wobble.
+  function setShape(b, id) {
+    b.shape = id;
+    if (id === "round") return;
+    var wd = WAND_BY[id];
+    b.ax = 0;
+    // (the drawn turn of a bubble is its sw: the wobble axis ax and the film's own turn cancel out)
+    if (wd.animal) { b.sw = rnd(-0.12, 0.12); b.ss = 0; }
+    else { b.sw = Math.random() * TAU; b.ss = rnd(0.12, 0.25) * (Math.random() < 0.5 ? -1 : 1); }
+  }
+  function wandRelease() {
+    if (wand.pend > wand.bub * 0.6 && wand.soap > 0) releaseWandBubble(wand.pend, 0);
+    wand.pend = 0;
+    wand.held = null;
+    wand.touchedAt = performance.now();
+    // Let go over the jar (or a tap without moving it out): it goes back in. Anywhere else: it stays there.
+    if (ringInJar() || (wand.home && wand.moved < 12)) { wand.home = false; sendHome(); return; }
+    wand.home = false;
+    wand.drop = { t0: performance.now(), x0: wand.x, y0: wand.y, lean0: wand.lean };
+    placeInSky();
+    if (!wand.drop) return;   // no room beside the controls: it went home instead
+    wand.drop.x1 = wand.x; wand.drop.y1 = wand.y;
+    wand.x = wand.drop.x0; wand.y = wand.drop.y0;
+  }
+  function updateWand(now, dt) {
+    if (wand.held !== null) {
+      // Standing still: a big bubble lets go by itself.
+      if (now - wand.lastMove > 260) {
+        wand.v *= Math.max(0, 1 - dt * 6);
+        if (wand.pend > wand.bub * 0.75) { releaseWandBubble(wand.pend, 0); wand.pend = 0; }
+      }
+      var target = clamp(wand.dx * Math.min(1, wand.v / 900) * 0.45, -0.5, 0.5);
+      wand.lean += (target - wand.lean) * Math.min(1, dt * 8);
+    } else if (wand.back) {
+      var t = Math.min(1, (now - wand.back.t0) / wand.back.dur);
+      var e = wand.back.slow ? (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2) : 1 - Math.pow(1 - t, 3);
+      wand.x = lerp(wand.back.x0, wand.rx, e);
+      wand.y = lerp(wand.back.y0, wand.ry, e) - Math.sin(t * Math.PI) * (wand.back.slow ? 40 : 20) * J.s;
+      wand.lean = lerp(wand.back.lean0, 0, e);
+      if (t >= 1) { wand.back = null; refill(true); }
+    } else if (wand.home) {
+      wand.x = wand.rx; wand.y = wand.ry;
+      wand.lean = Math.sin(now / 900) * 0.04;
+    } else {
+      // Left in the sky: it settles where he let go (nudged up if the handle would sink into the grass)
+      // and sways a little.
+      var dr = wand.drop;
+      if (dr) {
+        var u = Math.min(1, (now - dr.t0) / 400), k = 1 - Math.pow(1 - u, 3);
+        wand.x = lerp(dr.x0, dr.x1, k); wand.y = lerp(dr.y0, dr.y1, k);
+        wand.lean = lerp(dr.lean0, 0, k);
+        if (u >= 1) wand.drop = null;
+      } else wand.lean = Math.sin(now / 1100) * 0.05;
+      // Left alone for a while: it glides calmly back into the jar by itself.
+      if (now - wand.touchedAt > 8000 && !Toybox.timer.locked()) sendHome(true);
+    }
+    if (wand.soap <= 0 && wand.emptyAt && now - wand.emptyAt > 1000) refill(false);
+    else if (wand.soap > 0 && wand.soap < 1 && (wand.held === null || now - wand.lastMove > 600)) wand.soap = Math.min(1, wand.soap + dt * 0.5);
+  }
+  function drawWand(now) {
+    var x = ctx, soap = SOAP_BY[S.soap], s = J.s;
+    var rb = loopBottom(S.wand) * wand.ring;
+    var ax = wand.x - Math.sin(wand.lean) * rb, ay = wand.y + Math.cos(wand.lean) * rb;
+    var bx = ax - Math.sin(wand.lean) * (wand.stick + wand.ring - rb), by = ay + Math.cos(wand.lean) * (wand.stick + wand.ring - rb);
+    x.lineCap = "round";
+    x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by);
+    x.lineWidth = 15 * s; x.strokeStyle = OUT; x.stroke();
+    x.lineWidth = 9 * s; x.strokeStyle = "#8E6CFF"; x.stroke();
+    // handle stripes
+    x.lineWidth = 9 * s; x.strokeStyle = "#B7A3FF";
+    x.beginPath(); x.moveTo(lerp(ax, bx, 0.45), lerp(ay, by, 0.45)); x.lineTo(lerp(ax, bx, 0.52), lerp(ay, by, 0.52)); x.stroke();
+    // the pending bubble trails behind the ring
+    if (wand.held !== null && wand.pend > 4) {
+      var pr = Math.min(wand.pend, wand.bub * 2.9);
+      var pax = Math.atan2(wand.dy, wand.dx), shp = S.wand !== "round";
+      drawBubbleAt({ x: wand.x - wand.dx * pr * 0.85, y: wand.y - wand.dy * pr * 0.85, r: pr, soap: S.soap, shape: S.wand,
+        sw: shp ? 0 : now / 700, ax: pax, wa: 0.08 + 0.05 * Math.sin(now / 90), wp: Math.PI / 2, grow: 1 }, 1, 0, 0);
+    }
+    // the film in the ring (it shimmers in fresh after a dip)
+    var fresh = wand.soap <= 0 ? 0 : (wand.filmAt ? clamp((now - wand.filmAt) / 500, 0, 1) : 1);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (fresh > 0.05) {
+      ctx.globalAlpha = fresh;
+      drawFilm(wand.x, wand.y, wand.ring - 3 * s, soap, now, 1, S.wand);
+      ctx.globalAlpha = 1;
+    }
+    // The loop, in the wand's shape (the shape its bubbles will have).
+    x.lineJoin = "round";
+    shapePath(x, wand.x, wand.y, wand.ring, S.wand);
+    x.lineWidth = 13 * s; x.strokeStyle = OUT; x.stroke();
+    x.lineWidth = 7 * s; x.strokeStyle = "#FF9A4D"; x.stroke();
+    if (S.wand === "round") {
+      x.beginPath(); x.arc(wand.x, wand.y, wand.ring, -2.4, -1.6);
+      x.lineWidth = 2.5 * s; x.strokeStyle = "rgba(255,255,255,0.8)"; x.stroke();
+    }
+  }
+  function drawJar(front) {
+    var x = ctx, s = J.s, soap = SOAP_BY[S.soap];
+    var w = 64 * s, h = 54 * s, X = J.x - w / 2, Y = J.y - h;
+    if (!front) {
+      if (J.stand > 0) {
+        // A little wooden stool for the jar (upright phones).
+        var sw2 = 92 * s, gy = J.y + J.stand, lx = J.x - sw2 * 0.36, rx2 = J.x + sw2 * 0.36;
+        x.fillStyle = "rgba(29,35,64,0.18)";
+        x.beginPath(); x.ellipse(J.x, gy, sw2 * 0.55, 6 * s, 0, 0, TAU); x.fill();
+        x.lineJoin = "round";
+        rr(x, J.x - sw2 * 0.4, J.y + J.stand * 0.55, sw2 * 0.8, 7 * s, 3 * s); fillStroke(x, "#C98A4B", 3);
+        rr(x, lx - 6 * s, J.y + 6 * s, 12 * s, J.stand - 6 * s, 4 * s); fillStroke(x, "#D99A5B", 3);
+        rr(x, rx2 - 6 * s, J.y + 6 * s, 12 * s, J.stand - 6 * s, 4 * s); fillStroke(x, "#D99A5B", 3);
+        rr(x, J.x - sw2 / 2, J.y - 2 * s, sw2, 12 * s, 5 * s); fillStroke(x, "#E8A866", 3.5);
+      }
+      x.fillStyle = "rgba(29,35,64,0.18)";
+      x.beginPath(); x.ellipse(J.x, J.y, w * 0.62, 6 * s, 0, 0, TAU); x.fill();
+      // back rim
+      x.beginPath(); x.ellipse(J.x, Y, w / 2, 7 * s, 0, Math.PI, TAU);
+      x.lineWidth = 4; x.strokeStyle = OUT; x.stroke();
+      return;
+    }
+    rr(x, X, Y, w, h, 12 * s);
+    x.fillStyle = "rgba(255,255,255,0.55)"; x.fill();
+    // soap inside
+    rr(x, X + 3, Y + h * 0.28, w - 6, h * 0.72 - 3, 10 * s);
+    x.fillStyle = soap.liquid; x.globalAlpha = 0.9; x.fill(); x.globalAlpha = 1;
+    rr(x, X, Y, w, h, 12 * s);
+    x.lineWidth = 4; x.strokeStyle = OUT; x.stroke();
+    // a little bubble on the label
+    x.beginPath(); x.arc(J.x, Y + h * 0.62, 9 * s, 0, TAU);
+    x.fillStyle = "#FFFFFF"; x.fill(); x.lineWidth = 2.5; x.strokeStyle = OUT; x.stroke();
+    x.beginPath(); x.arc(J.x - 3 * s, Y + h * 0.62 - 3 * s, 2.6 * s, 0, TAU); x.fillStyle = soap.glitter ? "#FFC93C" : soap.liquid; x.fill();
+    // front rim and shine
+    x.beginPath(); x.ellipse(J.x, Y, w / 2, 7 * s, 0, 0, Math.PI);
+    x.lineWidth = 4; x.strokeStyle = OUT; x.stroke();
+    x.beginPath(); x.moveTo(X + 9 * s, Y + 12 * s); x.lineTo(X + 9 * s, Y + h - 12 * s);
+    x.lineWidth = 4 * s; x.lineCap = "round"; x.strokeStyle = "rgba(255,255,255,0.75)"; x.stroke();
+  }
+
+  // ---------- Surprise: a giant wobbly bubble, a bubble with a rubber duck inside, or a bubble train ----------
+  // They take turns (never the same twice in a row), on whatever is in the sky now.
+  var surpriseNext = ["giant", "duck", "train"][Math.floor(Math.random() * 3)];
+  var growing = null;   // a surprise bubble being blown at the top of the machine
+  function surprise() {
+    if (Toybox.timer.locked() || growing) return;
+    var kind = surpriseNext;
+    var hasGiant = bubbles.some(function (b) { return b.kind === "giant" && !b.dead; });
+    if (kind === "giant" && hasGiant) kind = "duck";
+    if (kind === "train" && train) kind = hasGiant ? "duck" : "giant";
+    surpriseNext = kind === "giant" ? "duck" : (kind === "duck" ? "train" : "giant");
+    if (kind === "train") { startTrain(); return; }
+    var r = kind === "giant" ? clamp(Math.min(W, H) * 0.25, 70, 240) : clamp(Math.min(W, H) * 0.12, 44, 110);
+    var b = makeBubble(mx(WC.x), my(WC.y - WC.arm), r, 0, 0, S.soap);
+    b.kind = kind;
+    b.grow = 0;
+    b.wa = 0.04; b.wb = kind === "giant" ? 0.06 : 0.04; b.wf = kind === "giant" ? 2.6 : 4;
+    b.life = kind === "giant" ? 60 : 22;
+    if (kind === "duck") b.duck = { c: DUCK_COLORS[Math.floor(Math.random() * DUCK_COLORS.length)] };
+    growing = { b: b, t0: performance.now(), dur: kind === "giant" ? 2200 : 1500 };
+    inflateSound(kind === "giant");
+  }
+
+  // Surprise: a bubble train. A chain of linked bubbles comes out of the top of the machine one by one, snakes
+  // across the sky, and when the front one reaches the far side they pop end to end, front to back.
+  var train = null;
+  function startTrain() {
+    var x0 = mx(WC.x), y0 = my(WC.y - WC.arm);
+    var dir = x0 < W / 2 ? 1 : -1;
+    var r = clamp(Math.min(W, H) * 0.055, 20, 46);
+    var gap = r * 2.25;   // centre to centre along the path
+    var top = Math.max(r * 1.6, H * 0.1), bot = Math.max(top + r * 3, Math.min(y0 - r * 2, groundY - r * 3));
+    var mid = (top + bot) / 2, amp = Math.max(r, Math.min((bot - top) / 2 - r * 0.5, Math.max(W, H) * 0.16));
+    var xEnd = dir > 0 ? W - r * 1.4 : r * 1.4;
+    // the path: up out of the machine, then an S-shaped wiggle across the sky (more wiggles on a wide screen)
+    var waves = W > H ? 1.25 : 1, pts = [], n = 160, i;
+    for (i = 0; i <= n; i++) {
+      var u = i / n, e = Math.min(1, u * 4), ee = e * e * (3 - 2 * e);
+      var x = lerp(x0, xEnd, u), y = lerp(y0 - r, mid, ee) - Math.sin((u - 0.25) / 0.75 * TAU * waves) * amp * ee;
+      pts.push({ x: x, y: y });
+    }
+    var cum = [0];
+    for (i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    var L = cum[cum.length - 1];
+    var N = clamp(Math.floor(L * 0.6 / gap), 5, 9);
+    var cars = [];
+    for (i = 0; i < N; i++) {
+      var b = makeBubble(x0, y0, r * (i === 0 ? 1.12 : 1), 0, 0, S.soap);
+      b.kind = "train"; b.grow = 0; b.wa = 0.05; b.wb = 0.05; b.wf = 4.5;
+      var j = makeBubble(x0, y0, r * 0.34, 0, 0, S.soap);
+      j.kind = "train"; j.grow = 0; j.wa = 0.04; j.wb = 0.04;
+      cars.push({ b: b, j: j, out: false });
+    }
+    // calm: the front bubble crosses in about 9 s on any screen (45 to 110 px a second)
+    var speed = clamp(L / 9, 45, 110) * (reduce ? 0.7 : 1);
+    train = { pts: pts, cum: cum, L: L, gap: gap, r: r, cars: cars, s: 0, speed: speed, popAt: 0, popped: 0, t: 0 };
+    inflateSound(false);
+  }
+  function trainPoint(s) {
+    var tr = train, c = tr.cum, lo = 0, hi = c.length - 1;
+    if (s <= 0) return tr.pts[0];
+    if (s >= tr.L) return tr.pts[tr.pts.length - 1];
+    while (hi - lo > 1) { var m = (lo + hi) >> 1; if (c[m] < s) lo = m; else hi = m; }
+    var f = (s - c[lo]) / (c[hi] - c[lo] || 1), a = tr.pts[lo], b = tr.pts[hi];
+    return { x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f) };
+  }
+  // Pop from the front: the chain reaction runs back along the train.
+  function trainPop(soft) {
+    if (!train || train.popAt) return;
+    train.popAt = performance.now();
+    train.soft = !!soft;
+  }
+  function updateTrain(dt, now) {
+    if (!train) return;
+    var tr = train, i;
+    tr.t += dt;
+    if (!tr.popAt) tr.s += tr.speed * dt;
+    else tr.s += tr.speed * 0.4 * dt;
+    if (!tr.popAt && tr.s >= tr.L) trainPop(false);
+    if (ending && !tr.popAt) trainPop(true);
+    for (i = 0; i < tr.cars.length; i++) {
+      var car = tr.cars[i], b = car.b, si = tr.s - i * tr.gap;
+      var p = trainPoint(si), q = trainPoint(si - tr.gap * 0.5);
+      if (!car.out && si > -tr.gap) {
+        car.out = true;
+        S.count++; countDirty = true; saveSoon();
+      }
+      var bob = Math.sin(tr.t * 3 + i * 0.9) * tr.r * 0.08;
+      b.x = p.x; b.y = p.y + bob;
+      b.grow = si >= 0 ? Math.min(1, b.grow + dt / 0.35) : clamp(1 + si / tr.gap, 0, 1) * 0.6;
+      b.wp += b.wf * dt; b.ax += 0.35 * dt; b.sw += b.ss * dt;
+      b.wa += (b.wb - b.wa) * Math.min(1, dt * 1.1);
+      car.j.x = q.x; car.j.y = q.y + Math.sin(tr.t * 3 + i * 0.9 - 0.45) * tr.r * 0.08;
+      car.j.grow = si - tr.gap * 0.5 >= 0 ? Math.min(1, car.j.grow + dt / 0.35) : 0;
+      car.j.wp += car.j.wf * dt; car.j.sw += car.j.ss * dt;
+    }
+    if (tr.popAt) {
+      var k = Math.floor((now - tr.popAt) / (reduce ? 320 : 240)) + 1;
+      while (tr.popped < Math.min(k, tr.cars.length)) {
+        var c2 = tr.cars[tr.popped++];
+        if (c2.b.grow > 0.05) popBubble(c2.b, tr.soft); else c2.b.dead = true;
+        if (c2.j.grow > 0.05) popBubble(c2.j, true); else c2.j.dead = true;
+      }
+      if (tr.popped >= tr.cars.length) train = null;
+    }
+  }
+  function drawTrain() {
+    if (!train) return;
+    for (var i = train.cars.length - 1; i >= 0; i--) {
+      var car = train.cars[i];
+      if (i > 0 && !train.cars[i - 1].b.dead && !car.j.dead && car.j.grow > 0) drawBubbleAt(car.j, 1, 0, 0);
+      if (!car.b.dead && car.b.grow > 0) drawBubbleAt(car.b, 1, 0, 0);
+    }
+  }
+  function trainAt(px, py) {
+    if (!train) return false;
+    for (var i = 0; i < train.cars.length; i++) {
+      var b = train.cars[i].b;
+      if (!b.dead && b.grow > 0.3 && Math.hypot(px - b.x, py - b.y) < b.r + Math.max(14, b.r * 0.2)) return true;
+    }
+    return false;
+  }
+  function updateGrowing(now) {
+    if (!growing) return;
+    var g = growing, t = clamp((now - g.t0) / g.dur, 0, 1), b = g.b;
+    b.grow = t;
+    var rNow = b.r * (0.35 + 0.65 * easeOut(t));
+    b.x = mx(WC.x) + rNow * 0.25;
+    b.y = my(WC.y - WC.arm) - rNow * 0.9;
+    b.wp += 0.12; b.sw += 0.01;
+    if (t >= 1) {
+      growing = null;
+      b.grow = 1;
+      b.vx = b.kind === "giant" ? 30 * BS : 20 * BS;
+      b.vy = -20;
+      b.wa = 0.14;
+      addBubble(b);
+    }
+  }
+
+  // ---------- Sound (off by default; soft synthesized pops, a quiet motor) ----------
+  var master = null, masterCtx = null, hum = null;
+  function audio() {
+    var ac = Toybox.sound.ready();
+    if (!ac) return null;
+    if (masterCtx !== ac) {
+      try {
+        var comp = ac.createDynamicsCompressor();
+        master = ac.createGain();
+        master.gain.value = 0.7;
+        master.connect(comp); comp.connect(ac.destination);
+        masterCtx = ac; hum = null;
+      } catch (e) { return null; }
+    }
+    return ac;
+  }
+  function tone(ac, type, f0, f1, dur, vol, when) {
+    var t = ac.currentTime + (when || 0);
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+  function popSound(r, soft) {
+    var now = performance.now();
+    if (now - lastPopSound < 45) return;
+    lastPopSound = now;
+    var ac = audio();
+    if (!ac) return;
+    var f = clamp(1300 - r * 9, 380, 1300) * rnd(0.92, 1.08);
+    tone(ac, "sine", f, f * 0.45, soft ? 0.07 : 0.09, soft ? 0.035 : 0.07);
+  }
+  function bigPopSound() {
+    var ac = audio();
+    if (!ac) return;
+    tone(ac, "sine", 420, 120, 0.25, 0.1);
+    tone(ac, "sine", 900, 300, 0.12, 0.04, 0.02);
+  }
+  function blowSound(r) {
+    var now = performance.now();
+    if (now - lastPopSound < 60) return;
+    var ac = audio();
+    if (!ac) return;
+    tone(ac, "sine", 260 + 2000 / (r + 10), 520, 0.22, 0.035);
+  }
+  function inflateSound(big) {
+    var ac = audio();
+    if (!ac) return;
+    tone(ac, "sine", 200, big ? 520 : 640, big ? 1.6 : 1.1, 0.04);
+  }
+  function clickSound(on) {
+    var ac = audio();
+    if (!ac) return;
+    tone(ac, "triangle", on ? 520 : 360, on ? 700 : 240, 0.06, 0.06);
+  }
+  function tickSound(i) {
+    var ac = audio();
+    if (!ac) return;
+    tone(ac, "sine", 700 + i * 220, 700 + i * 220, 0.05, 0.05);
+  }
+  function squeak(v) {
+    var ac = audio();
+    if (!ac) return;
+    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(900, t); o.frequency.linearRampToValueAtTime(1400, t + 0.07); o.frequency.linearRampToValueAtTime(1000, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * (v || 1), t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.2);
+  }
+  // A quiet whirr while the fan turns (follows the wheel speed).
+  function updateHum() {
+    var ac = Toybox.sound.on() ? audio() : null;
+    var lvl = Math.abs(mach.wheelV) / WHEEL[2];
+    if (!ac) { if (hum) stopHum(); return; }
+    if (!hum && lvl > 0.02) {
+      try {
+        var len = ac.sampleRate, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        var src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+        var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
+        var g = ac.createGain(); g.gain.value = 0;
+        src.connect(lp); lp.connect(g); g.connect(master); src.start();
+        hum = { src: src, g: g, lp: lp };
+      } catch (e) { hum = null; }
+    }
+    if (hum) {
+      hum.g.gain.setTargetAtTime(0.02 * lvl, ac.currentTime, 0.1);
+      hum.lp.frequency.setTargetAtTime(260 + 400 * lvl, ac.currentTime, 0.1);
+      if (lvl < 0.01) stopHum();
+    }
+  }
+  function stopHum() {
+    if (!hum) return;
+    try { hum.g.gain.value = 0; hum.src.stop(); } catch (e) { /* ignore */ }
+    hum = null;
+  }
+
+  // ---------- Machine controls ----------
+  var learned = { sw: false, pop: false, wand: false };
+  var tempCoach = null;
+  function setOn(on) {
+    if (S.on === on) return;
+    S.on = on;
+    saveNow();
+    clickSound(on);
+    if (on) { learned.sw = true; mach.flashUntil = 0; }
+    coachUpdate();
+  }
+  function setSpeed(i) {
+    i = (i + 3) % 3;
+    if (i !== S.speed) tickSound(i);
+    S.speed = i;
+    mach.speedLabelAt = performance.now();
+    saveNow();
+  }
+  // A tap on the machine itself: while it's off, show the switch; on the second try switch it on for him.
+  function machineTap() {
+    if (!S.on) {
+      mach.hintCount++;
+      if (mach.hintCount >= 2) { setOn(true); mach.hintCount = 0; return; }
+      mach.flashUntil = performance.now() + 3200;
+      tempCoach = { text: "Switch it on!", until: performance.now() + 3200 };
+      coachUpdate();
+    } else {
+      // Running: a puff of extra bubbles from the top.
+      for (var i = 0; i < 3; i++) machineBubble(1.2);
+    }
+  }
+  function machineBubble(boost) {
+    var tx = mx(WC.x), ty = my(WC.y - WC.arm) - ringSize() * M.s;
+    var big = Math.random() < 0.15 ? 1.5 : 1;
+    var r = (11 + Math.random() * 13) * BS * big;
+    // A wide fan of directions, so the bubbles spread across the sky instead of queueing in one column.
+    var ang = rnd(-1.45, -0.25), sp = rnd(110, 210) * BS * (boost || 1);
+    var b = makeBubble(tx + rnd(-6, 6), ty - r * 0.6, r, Math.cos(ang) * sp, Math.sin(ang) * sp, S.soap);
+    // The bubbles take the shape of the machine's loops (the picked wand), like the hand wand's.
+    setShape(b, S.wand);
+    addBubble(b);
+  }
+
+  // ---------- Coach line and ghost hand ----------
+  var coachEl = $("coach"), lastCoach = null;
+  function coachText() {
+    var now = performance.now();
+    if (tempCoach && now < tempCoach.until) return tempCoach.text;
+    if (!S.on && !learned.sw) return "Switch on the bubble machine!";
+    if (!learned.pop && liveCount() > 0) return "Pop the bubbles!";
+    if (!learned.wand) return "Drag the wand!";
+    return null;
+  }
+  function coachUpdate() {
+    var t = coachText();
+    if (t === lastCoach) return;
+    lastCoach = t;
+    if (t) { coachEl.textContent = t; coachEl.classList.remove("off"); }
+    else coachEl.classList.add("off");
+  }
+  function liveCount() { var n = 0; for (var i = 0; i < bubbles.length; i++) if (!bubbles[i].dead) n++; return n; }
+
+  // Idle help shows the next move: the switch, then a bubble to pop, then the wand.
+  var ghost = Toybox.ghost({ plan: function () {
+    var r = view.getBoundingClientRect();
+    if (!S.on && !learned.sw) {
+      return { pts: [[r.left + mx(SW.x + SW.w / 2), r.top + my(SW.y + 18)]], tap: true };
+    }
+    if (!learned.pop) {
+      var best = null;
+      bubbles.forEach(function (b) {
+        if (b.dead || b.kind !== "n" || b.grow < 1) return;
+        var fy = b.y + b.vy * 0.9;
+        if (fy < b.r + 40 || b.x < 40 || b.x > W - 40) return;
+        if (!best || b.r > best.r) best = b;
+      });
+      if (best) return { pts: [[r.left + best.x + best.vx * 0.9, r.top + best.y + best.vy * 0.9]], tap: true, dur: 2000 };
+    }
+    if (!learned.wand && wand.held === null) {
+      // From wherever the wand is, a slow wavy drag toward the middle of the sky.
+      var x0 = r.left + wand.x, y0 = r.top + wand.y, x1 = r.left + W * 0.5, y1 = r.top + H * 0.35;
+      return { pts: [[x0, y0], [lerp(x0, x1, 0.35), lerp(y0, y1, 0.35) - H * 0.06], [lerp(x0, x1, 0.7), lerp(y0, y1, 0.7) + H * 0.04], [x1, y1]] };
+    }
+    return null;
+  }, max: 3 });
+
+  // ---------- Touch: switch, dial, wand, bubbles (several fingers at once) ----------
+  var ptrs = {};
+  function local(e) { return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+  function bubbleAt(px, py) {
+    var best = null, bd = 1e9;
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i];
+      if (b.dead) continue;
+      var d = Math.hypot(px - b.x, py - b.y), reach = b.r + Math.max(14, b.r * 0.2);
+      if (d < reach && d - b.r < bd) { bd = d - b.r; best = b; }
+    }
+    return best;
+  }
+  function duckAt(px, py) {
+    for (var i = ducks.length - 1; i >= 0; i--) {
+      var d = ducks[i];
+      if (!d.gone && Math.hypot(px - d.x, py - d.y) < d.s * 0.9) return d;
+    }
+    return null;
+  }
+  function tapPop(b) {
+    popBubble(b, false);
+    if (!learned.pop) { learned.pop = true; coachUpdate(); }
+  }
+  // A touch on empty sky: a soft puff of air pushes nearby bubbles away.
+  function puff(px, py) {
+    parts.push({ t: "puff", x: px, y: py, r: 10, life: 0, max: 0.5 });
+    var R = 140 * BS;
+    bubbles.forEach(function (b) {
+      if (b.dead) return;
+      var dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy);
+      if (d > R + b.r || d < 1) return;
+      var f = (1 - d / (R + b.r)) * 220 * (b.kind === "giant" ? 0.3 : 1);
+      b.vx += dx / d * f; b.vy += dy / d * f;
+      b.wa += 0.06;
+    });
+  }
+  view.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (Toybox.timer.locked()) return;
+    var r = view.getBoundingClientRect();
+    rect = { left: r.left, top: r.top };
+    var p = local(e), now = performance.now();
+    try { view.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+    var info = { mode: "pop", x: p.x, y: p.y, x0: p.x, y0: p.y, moved: 0 };
+    ptrs[e.pointerId] = info;
+    if (hitSwitch(p.x, p.y)) { info.mode = "none"; setOn(!S.on); return; }
+    if (hitDial(p.x, p.y)) { info.mode = "dial"; info.speed0 = S.speed; return; }
+    var b = bubbleAt(p.x, p.y);
+    var onRing = Math.hypot(p.x - wand.x, p.y - wand.y) < wand.ring + 8;
+    if (wand.held === null && (onRing || (!b && hitWand(p.x, p.y)))) {
+      info.mode = "wand";
+      wand.held = e.pointerId;
+      if (wand.back) { wand.home = false; wand.back = null; }
+      wand.drop = null;
+      wand.ox = wand.x - p.x; wand.oy = wand.y - p.y;
+      wand.lastMove = now; wand.v = 0; wand.pend = 0; wand.moved = 0; wand.touchedAt = now;
+      return;
+    }
+    if (b) { tapPop(b); return; }
+    if (trainAt(p.x, p.y)) { info.mode = "none"; trainPop(false); if (!learned.pop) { learned.pop = true; coachUpdate(); } return; }
+    if (hitJar(p.x, p.y)) { info.mode = "none"; if (!wand.home && wand.held === null) sendHome(); else refill(true); return; }
+    var d = duckAt(p.x, p.y);
+    if (d) { if (d.state === "sit") { d.hop = 1; squeak(1); } info.mode = "none"; return; }
+    if (inMachine(p.x, p.y)) { info.mode = "none"; machineTap(); return; }
+    puff(p.x, p.y);
+  });
+  view.addEventListener("pointermove", function (e) {
+    var info = ptrs[e.pointerId];
+    if (!info) return;
+    e.preventDefault();
+    if (Toybox.timer.locked()) { endPtr(e); return; }
+    var list = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    if (!list.length) list = [e];
+    var now = performance.now();
+    for (var i = 0; i < list.length; i++) {
+      var p = local(list[i]);
+      info.moved += Math.hypot(p.x - info.x, p.y - info.y);
+      if (info.mode === "wand") wandMove(p.x, p.y, now - (list.length - 1 - i) * 4);
+      else if (info.mode === "dial") {
+        var a = Math.atan2(p.y - my(DIAL.y), p.x - mx(DIAL.x)) * 180 / Math.PI;
+        if (info.moved > 10 && a < 10 && a > -190) {
+          var bi = 0, bd = 999;
+          for (var k = 0; k < 3; k++) { var dd = Math.abs(a - DIAL_ANG[k]); if (dd < bd) { bd = dd; bi = k; } }
+          if (bi !== S.speed) setSpeed(bi);
+        }
+      } else if (info.mode === "pop") {
+        // A finger sweeping across the sky pops every bubble it touches.
+        var b = segmentBubble(info.x, info.y, p.x, p.y);
+        if (b) tapPop(b);
+      }
+      info.x = p.x; info.y = p.y;
+    }
+  });
+  function segmentBubble(x0, y0, x1, y1) {
+    var vx = x1 - x0, vy = y1 - y0, l2 = vx * vx + vy * vy || 1;
+    for (var i = bubbles.length - 1; i >= 0; i--) {
+      var b = bubbles[i];
+      if (b.dead || b.grow < 0.5) continue;
+      var t = clamp(((b.x - x0) * vx + (b.y - y0) * vy) / l2, 0, 1);
+      if (Math.hypot(b.x - (x0 + vx * t), b.y - (y0 + vy * t)) < b.r + 8) return b;
+    }
+    return null;
+  }
+  function endPtr(e) {
+    var info = ptrs[e.pointerId];
+    if (!info) return;
+    delete ptrs[e.pointerId];
+    if (info.mode === "wand" && wand.held === e.pointerId) wandRelease();
+    if (info.mode === "dial" && info.moved <= 10 && e.type === "pointerup" && !Toybox.timer.locked()) setSpeed(S.speed + 1);
+    else if (info.mode === "dial" && info.speed0 === S.speed && e.type === "pointerup") mach.speedLabelAt = performance.now();
+  }
+  view.addEventListener("pointerup", endPtr);
+  view.addEventListener("pointercancel", endPtr);
+  view.addEventListener("lostpointercapture", endPtr);
+  view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); });
+
+  // ---------- Simulation ----------
+  var ending = false, endingDone = null, endingT0 = 0, lastSoftPop = 0;
+  var countDirty = true, countEl = $("counter");
+  function update(dt, now) {
+    clock += dt;
+    var locked = Toybox.timer.locked();
+    // Machine: the wheel eases to the dial's speed (a gentle wind-down when switched off).
+    var target = S.on && !ending ? WHEEL[S.speed] : 0;
+    var rate = target > Math.abs(mach.wheelV) ? 1.4 : (ending ? 0.5 : 0.9);
+    mach.wheelV += (target - mach.wheelV) * Math.min(1, dt * rate);
+    if (target === 0 && mach.wheelV < 0.01) mach.wheelV = 0;
+    var dTh = mach.wheelV * dt;
+    if (dTh > 0) {
+      var top = 1.5 * Math.PI, bottom = 0.5 * Math.PI;
+      for (var i = 0; i < 6; i++) {
+        var a0 = mach.wheel + i * TAU / 6;
+        var nt = ((a0 - top) % TAU + TAU) % TAU, nb = ((a0 - bottom) % TAU + TAU) % TAU;
+        if (nb + dTh >= TAU) { mach.film[i] = true; mach.spill = 1; }
+        if (nt + dTh >= TAU && mach.film[i]) {
+          mach.film[i] = false;
+          if (S.on && !ending && !locked && mach.wheelV > WHEEL[0] * 0.5) {
+            var n = PER_WAND[S.speed];
+            n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
+            for (var k = 0; k < n; k++) machineBubble(1);
+          }
+        }
+      }
+    }
+    mach.wheel = (mach.wheel + dTh) % TAU;
+    mach.fan += mach.wheelV * 7 * dt;
+    if (mach.spill > 0) mach.spill = Math.max(0, mach.spill - dt * 2.5);
+    dialAngle += (DIAL_ANG[S.speed] - dialAngle) * Math.min(1, dt * 10);
+
+    updateWand(now, dt);
+    updateGrowing(now);
+    updateTrain(dt, now);
+
+
+    var n2 = bubbles.length, b, j;
+    for (i = 0; i < n2; i++) {
+      b = bubbles[i];
+      if (b.dead) continue;
+      b.age += dt;
+      if (b.grow < 1) b.grow = Math.min(1, b.grow + dt / 0.25);
+      var tvx, tvy, k2 = 0.9;
+      if (b.kind === "giant") {
+        // Wobbles slowly across the sky.
+        tvx = 26 * BS;
+        tvy = (H * 0.38 + Math.sin(b.age * 0.6) * H * 0.06 - b.y) * 0.5;
+        k2 = 0.6;
+      } else {
+        // Their own gentle breeze.
+        tvx = Math.sin(clock * 0.23 + b.seed) * 10 * BS + Math.sin(clock * 0.071 + b.seed * 2) * 7 * BS;
+        tvy = -b.rise * (ending ? 3.2 : 1);
+        if (b.kind === "duck") { tvy *= 0.65; tvx += (W * 0.5 - b.x) * 0.05; }
+      }
+      b.vx += (tvx - b.vx) * Math.min(1, dt * k2);
+      b.vy += (tvy - b.vy) * Math.min(1, dt * k2);
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.wa += (b.wb - b.wa) * Math.min(1, dt * 1.1);
+      b.wp += b.wf * dt;
+      b.ax += 0.35 * dt;
+      b.sw += b.ss * dt;
+      // the grass: a soft bounce
+      if (b.y > groundY - b.r * 0.6) { b.y = groundY - b.r * 0.6; b.vy = -Math.abs(b.vy) * 0.4; }
+      // pops: touching the left or right side or the top of the sky, or softly after a calm drift
+      var re = b.r * (b.grow < 1 ? 0.35 + 0.65 * b.grow : 1) * 0.85;
+      if (b.x - re < 0 || b.x + re > W) popBubble(b, false);
+      else if (b.kind === "giant") { if (b.y - b.r < 0) b.y = b.r; }
+      else if (b.y - b.r * 0.75 < 0) popBubble(b, ending);
+      else if (b.age > b.life && b.kind !== "giant") popBubble(b, true);
+    }
+    // Gentle bumps between bubbles (big ones push small ones more).
+    for (i = 0; i < n2; i++) {
+      b = bubbles[i];
+      if (b.dead || b.grow < 0.6) continue;
+      for (j = i + 1; j < n2; j++) {
+        var c = bubbles[j];
+        if (c.dead || c.grow < 0.6) continue;
+        var dx = c.x - b.x, dy = c.y - b.y, rs = (b.r + c.r) * 0.92;
+        if (dx > rs || dx < -rs || dy > rs || dy < -rs) continue;
+        var d2 = dx * dx + dy * dy;
+        if (d2 >= rs * rs || d2 < 0.01) continue;
+        var d = Math.sqrt(d2), nx = dx / d, ny = dy / d, ov = rs - d;
+        var mb = b.r * b.r, mc = c.r * c.r, tot = mb + mc;
+        var fb = mc / tot, fc = mb / tot;
+        b.x -= nx * ov * fb * 0.5; b.y -= ny * ov * fb * 0.5;
+        c.x += nx * ov * fc * 0.5; c.y += ny * ov * fc * 0.5;
+        var rv = (c.vx - b.vx) * nx + (c.vy - b.vy) * ny;
+        if (rv < 0) {
+          var imp = -rv * 0.7;
+          b.vx -= nx * imp * fb; b.vy -= ny * imp * fb;
+          c.vx += nx * imp * fc; c.vy += ny * imp * fc;
+          b.wa = Math.min(0.2, b.wa + 0.03 * fb); c.wa = Math.min(0.2, c.wa + 0.03 * fc);
+        }
+      }
+    }
+    // Timer ending: the last bubbles float away; any left after a while pop softly one by one.
+    if (ending && now - endingT0 > 6000 && now - lastSoftPop > 140) {
+      for (i = 0; i < bubbles.length; i++) if (!bubbles[i].dead) { popBubble(bubbles[i], true); lastSoftPop = now; break; }
+    }
+    bubbles = bubbles.filter(function (q) { return !q.dead; });
+
+    // Splash rings, droplets and puffs.
+    for (i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      p.life += dt;
+      if (p.t === "drop") { p.vy += 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - dt * 1.5; }
+    }
+    parts = parts.filter(function (q) { return q.life < q.max; });
+    updateDucks(dt);
+
+    if (ending && endingDone && !growing && !train && liveCount() === 0 && mach.wheelV < 0.05 && now - endingT0 > 2500) {
+      var fn = endingDone; endingDone = null; fn();
+    }
+    if (countDirty) { countDirty = false; countEl.textContent = "Bubbles: " + S.count; }
+    if (tempCoach && now > tempCoach.until) { tempCoach = null; coachUpdate(); }
+    else if (!learned.pop && lastCoach !== coachText()) coachUpdate();
+  }
+
+  function render(now) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, view.width, view.height);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    drawMachine(now);
+    drawJar(false);
+    var inJar = wand.held === null && (wand.home && (!wand.back || (now - wand.back.t0) / wand.back.dur > 0.7));
+    if (inJar) { drawWand(now); drawJar(true); }
+    else drawJar(true);
+    drawDucks();
+    for (var i = 0; i < bubbles.length; i++) drawBubbleAt(bubbles[i], 1, 0, 0);
+    if (growing) drawBubbleAt(growing.b, 1, 0, 0);
+    drawTrain();
+    if (!inJar) drawWand(now);
+    drawParts();
+    drawSpeedLabel(now);
+  }
+  function drawParts() {
+    var x = ctx;
+    x.setTransform(DPR, 0, 0, DPR, 0, 0);
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i], f = p.life / p.max;
+      if (p.t === "ring") {
+        x.globalAlpha = (1 - f) * (p.soft ? 0.5 : 0.9);
+        x.lineWidth = (p.soft ? 2 : 4) * (1 - f) + 1;
+        x.strokeStyle = p.col;
+        x.beginPath(); x.arc(p.x, p.y, p.r * (1 + 0.45 * easeOut(f)), 0, TAU); x.stroke();
+        x.strokeStyle = "rgba(255,255,255,0.9)";
+        x.lineWidth = 1.5;
+        x.beginPath(); x.arc(p.x, p.y, p.r * (0.8 + 0.6 * easeOut(f)), 0, TAU); x.stroke();
+      } else if (p.t === "drop") {
+        x.globalAlpha = 1 - f * f;
+        x.fillStyle = p.col;
+        x.beginPath(); x.arc(p.x, p.y, p.r, 0, TAU); x.fill();
+      } else if (p.t === "puff") {
+        x.globalAlpha = (1 - f) * 0.7;
+        x.strokeStyle = "#FFFFFF";
+        x.lineWidth = 4 * (1 - f) + 1;
+        x.beginPath(); x.arc(p.x, p.y, 12 + 60 * easeOut(f) * BS, 0, TAU); x.stroke();
+      }
+    }
+    x.globalAlpha = 1;
+  }
+
+  // ---------- Frame loop ----------
+  var lastT = performance.now();
+  var perf = { n: 0, sum: 0, max: 0, work: 0, workMax: 0, frames: [] };
+  // Quality guard: if frames stay slow while the sky is full, draw bubbles more simply (and fewer of them).
+  var qa = { sum: 0, n: 0, t0: 0 };
+  function watchQuality(ms, now) {
+    if (lowQ >= 2 || document.hidden) return;
+    if (!qa.t0) qa.t0 = now;
+    qa.sum += Math.min(ms, 100); qa.n++;
+    if (now - qa.t0 < 2500) return;
+    var avg = qa.sum / qa.n;
+    qa.sum = 0; qa.n = 0; qa.t0 = now;
+    if (avg > 24 && liveCount() > 25) { lowQ++; resize(); }
+  }
+  function frame(t) {
+    watchQuality(t - lastT, t);
+    var dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    if (DEBUG) {
+      var ft = t - lastT;
+      perf.frames.push(ft); if (perf.frames.length > 240) perf.frames.shift();
+    }
+    lastT = t;
+    var w0 = DEBUG ? performance.now() : 0;
+    if (W && bg) {
+      var now = performance.now();
+      update(dt, now);
+      render(now);
+      updateHum();
+    }
+    if (DEBUG) {
+      var wk = performance.now() - w0;
+      perf.n++; perf.work += wk; perf.workMax = Math.max(perf.workMax, wk);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Panel: soaps, New, Surprise ----------
+  function soapIcon(s) {
+    var id = "sg-" + s.id, t = s.tint, i, rim = "";
+    var stops = "";
+    for (i = 0; i <= 6; i++) stops += '<stop offset="' + (i / 6).toFixed(2) + '" stop-color="' + hsl(rimHue(s, i / 6), 95, 58, 1) + '"/>';
+    var extra = "";
+    if (s.glitter) {
+      extra = '<path d="M38 18q0 4 4 4q-4 0-4 4q0-4-4-4q4 0 4-4z" fill="#FFC93C" stroke="#1D2340" stroke-width="1"/>' +
+        '<circle cx="22" cy="38" r="2" fill="#FF6FD8"/><circle cx="36" cy="40" r="1.8" fill="#FFC93C"/><circle cx="27" cy="27" r="1.5" fill="#3DB4FF"/>' +
+        '<path d="M44 42q0 3 3 3q-3 0-3 3q0-3-3-3q3 0 3-3z" fill="#FFFFFF" stroke="#1D2340" stroke-width="0.8"/>';
+    }
+    rim = '<linearGradient id="' + id + 'r" x1="0" y1="0" x2="1" y2="1">' + stops + "</linearGradient>";
+    return '<svg viewBox="0 0 60 60" aria-hidden="true"><defs>' + rim +
+      '<radialGradient id="' + id + 'b"><stop offset="0.55" stop-color="rgb(' + t.join(",") + ')" stop-opacity="' + (s.a0 * 2.4).toFixed(2) + '"/>' +
+      '<stop offset="1" stop-color="rgb(' + t.join(",") + ')" stop-opacity="0.75"/></radialGradient></defs>' +
+      '<circle cx="30" cy="30" r="25" fill="url(#' + id + 'b)"/>' +
+      '<circle cx="30" cy="30" r="23.5" fill="none" stroke="url(#' + id + 'r)" stroke-width="5"/>' +
+      '<circle cx="30" cy="30" r="26.5" fill="none" stroke="#1D2340" stroke-width="2.5"/>' + extra +
+      '<ellipse cx="20" cy="19" rx="7" ry="3.6" transform="rotate(-40 20 19)" fill="#FFFFFF" opacity="0.95"/>' +
+      '<circle cx="27" cy="12.5" r="1.8" fill="#FFFFFF"/></svg>';
+  }
+  // Wand tiles: each shows its loop, so he can see what it will blow. The SVG outline is traced with the same
+  // shapePath() the canvas uses (a tiny recorder turns its moves, lines, curves and arcs into an SVG path).
+  function svgPath(id, cx, cy, R) {
+    var d = "";
+    function P(v) { return v.toFixed(2); }
+    function pt(cmd, x2, y2) { d += (d && cmd === "M" ? "L" : cmd) + P(x2) + " " + P(y2); }
+    function arcPts(ex, ey, rx, ry, a0, a1, ccw) {
+      if (ccw) { while (a1 > a0) a1 -= TAU; } else { while (a1 < a0) a1 += TAU; }
+      var n = Math.max(4, Math.ceil(Math.abs(a1 - a0) / 0.2));
+      for (var i = 0; i <= n; i++) { var a = a0 + (a1 - a0) * i / n; pt(i || d ? "L" : "M", ex + Math.cos(a) * rx, ey + Math.sin(a) * ry); }
+    }
+    var rec = {
+      beginPath: function () { d = ""; },
+      moveTo: function (x2, y2) { d += "M" + P(x2) + " " + P(y2); },
+      lineTo: function (x2, y2) { pt("L", x2, y2); },
+      bezierCurveTo: function (a, b2, c2, e, x2, y2) { d += "C" + [a, b2, c2, e, x2, y2].map(P).join(" "); },
+      arc: function (ex, ey, r, a0, a1, ccw) { arcPts(ex, ey, r, r, a0, a1, ccw); },
+      ellipse: function (ex, ey, rx, ry, rot, a0, a1, ccw) { arcPts(ex, ey, rx, ry, a0, a1, ccw); },
+      closePath: function () { d += "Z"; }
+    };
+    shapePath(rec, cx, cy, R, id);
+    return d;
+  }
+  function wandIcon(w) {
+    var R = 17, cy = 23, d = svgPath(w.id, 30, cy, R), y0 = cy + R * loopBottom(w.id);
+    return '<svg viewBox="0 0 60 60" aria-hidden="true">' +
+      '<path d="M30 ' + y0.toFixed(1) + 'V57" stroke="#1D2340" stroke-width="8" stroke-linecap="round"/>' +
+      '<path d="M30 ' + y0.toFixed(1) + 'V57" stroke="#8E6CFF" stroke-width="4" stroke-linecap="round"/>' +
+      '<path d="' + d + '" fill="rgba(160,215,255,0.55)" stroke="#1D2340" stroke-width="6" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="#FF9A4D" stroke-width="3" stroke-linejoin="round"/></svg>';
+  }
+  WANDS.forEach(function (w) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile wandt";
+    b.dataset.wand = w.id;
+    b.setAttribute("aria-label", w.label + " wand");
+    b.innerHTML = wandIcon(w) + '<span class="nm">' + w.label + "</span>";
+    $("wands").appendChild(b);
+  });
+  function renderWands() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-wand]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.wand === S.wand));
+    });
+  }
+  function pickWand(id, quiet) {
+    if (!WAND_BY[id]) return;
+    S.wand = id;
+    saveNow();
+    renderWands();
+    wand.filmAt = performance.now();
+    wand.pend = 0;
+    // The machine's loops change shape too and dip in fresh soap.
+    mach.film = [true, true, true, true, true, true];
+    mach.spill = 1;
+    if (!quiet) tickSound(1);
+  }
+  renderWands();
+  SOAPS.forEach(function (s) {
+    var b = document.createElement("button");
+    b.className = "btn tb-tile soap";
+    b.dataset.soap = s.id;
+    b.setAttribute("aria-label", s.label + " bubbles");
+    b.innerHTML = soapIcon(s) + '<span class="nm">' + s.label + "</span>";
+    $("soaps").appendChild(b);
+  });
+  function renderSoaps() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-soap]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.soap === S.soap));
+    });
+  }
+  function pickSoap(id) {
+    if (!SOAP_BY[id]) return;
+    S.soap = id;
+    saveNow();
+    renderSoaps();
+    // fresh film everywhere: the machine's wands dip again, the wand shimmers in
+    mach.film = [true, true, true, true, true, true];
+    mach.spill = 1;
+    wand.filmAt = performance.now();
+    tickSound(1);
+  }
+  // Start over: every bubble pops in a quick ripple from the bottom up, and the ducks waddle off.
+  function newSky() {
+    var list = bubbles.filter(function (b) { return !b.dead; }).sort(function (a, b) { return b.y - a.y; });
+    if (growing) { growing = null; }
+    trainPop(false);
+    list.forEach(function (b, i) { setTimeout(function () { popBubble(b, false); }, Math.min(2200, i * 45)); });
+    ducks.forEach(function (d) { d.gone = true; });
+    sendHome();
+    // Already a clear sky: still answer the tap (fresh soap on the wand and a short line), never a dead tap.
+    if (!list.length) {
+      refill(true);
+      tempCoach = { text: "A fresh sky! Blow bubbles!", until: performance.now() + 3200 };
+      coachUpdate();
+    }
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.closest(".modal, .farewell, .rest")) return;
+    if (Toybox.timer.locked()) return;
+    if (t.classList.contains("tab")) {
+      $("panel").dataset.tab = t.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll(".tb-tabs .tab"), function (b) { b.setAttribute("aria-pressed", String(b === t)); });
+      tickSound(0);
+    }
+    else if (t.dataset.wand) pickWand(t.dataset.wand);
+    else if (t.dataset.soap) pickSoap(t.dataset.soap);
+    else if (t.id === "newBtn") newSky();
+    else if (t.id === "surpriseBtn") surprise();
+  });
+
+  // ---------- Timer ending, goodbye and rest ----------
+  function onEnding(done) {
+    ending = true;
+    endingT0 = performance.now();
+    endingDone = done;
+    Object.keys(ptrs).forEach(function (id) { delete ptrs[id]; });
+    if (wand.held !== null) wandRelease();
+    sendHome();
+    if (S.on) { S.on = false; saveNow(); }
+    growing = null;
+  }
+  function onGoodbye() {
+    // A last little fountain of bubbles that floats away.
+    for (var i = 0; i < 10; i++) {
+      (function (k) { setTimeout(function () { machineBubble(1.3); }, k * 120); })(i);
+    }
+  }
+  function restArt() {
+    return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true">' +
+      '<rect x="0" y="0" width="240" height="200" rx="20" fill="#2B3A6B"/>' +
+      '<circle cx="204" cy="34" r="16" fill="#FFE8A3"/><circle cx="196" cy="29" r="15" fill="#2B3A6B"/>' +
+      '<rect x="0" y="164" width="240" height="36" fill="#3E7D4A"/>' +
+      '<g stroke="#1D2340" stroke-width="3" stroke-linejoin="round">' +
+      '<circle cx="78" cy="96" r="30" fill="#5B5FE0"/><circle cx="78" cy="96" r="24" fill="#AEB9E8"/>' +
+      '<rect x="40" y="118" width="76" height="46" rx="10" fill="#FF5C7A"/>' +
+      '<rect x="48" y="128" width="60" height="28" rx="6" fill="#FFF6DD"/>' +
+      '<circle cx="78" cy="96" r="6" fill="#FFC93C"/></g>' +
+      '<g fill="rgba(200,230,255,0.25)" stroke="#BFE6FF" stroke-width="2.5">' +
+      '<circle cx="150" cy="70" r="22"/><circle cx="182" cy="112" r="15"/><circle cx="128" cy="124" r="11"/></g>' +
+      '<g fill="#FFFFFF"><ellipse cx="142" cy="61" rx="6" ry="3" transform="rotate(-40 142 61)"/>' +
+      '<ellipse cx="177" cy="106" rx="4" ry="2" transform="rotate(-40 177 106)"/></g>' +
+      '<g fill="none" stroke="#1D2340" stroke-width="2.5" stroke-linecap="round"><path d="M142 72q4 3 8 0M154 72q4 3 8 0"/></g>' +
+      '<text x="30" y="44" font-size="26" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text>' +
+      '<text x="18" y="26" font-size="18" font-weight="800" fill="#FFFFFF" font-family="Baloo 2, sans-serif">z</text></svg>';
+  }
+
+  // ---------- Debug hooks (?debug only) ----------
+  if (DEBUG) {
+    window.BM = {
+      state: function () { return { lowQ: lowQ, count: S.count, soap: S.soap, speed: S.speed, on: S.on, bubbles: liveCount(), ducks: ducks.length, wheelV: mach.wheelV, coach: lastCoach, learned: learned, W: W, H: H, CAP: CAP, load: skyLoad() }; },
+      spawn: function (n) { for (var i = 0; i < n; i++) addBubble(makeBubble(rnd(40, W - 40), rnd(H * 0.2, groundY - 30), (11 + Math.random() * 13) * BS, rnd(-40, 40), rnd(-40, 0))); },
+      bubbles: function () { return bubbles.filter(function (b) { return !b.dead; }).map(function (b) { return { x: b.x, y: b.y, r: b.r, kind: b.kind }; }); },
+      points: function () {
+        return { sw: [rect.left + mx(SW.x + SW.w / 2), rect.top + my(SW.y + 20)], dial: [rect.left + mx(DIAL.x), rect.top + my(DIAL.y)],
+          wand: [rect.left + wand.x, rect.top + wand.y], wandHome: wand.home && !wand.back && wand.held === null, wandHeld: wand.held !== null, wandGlide: !!wand.back, wandSoap: wand.soap,
+          jar: [rect.left + J.x, rect.top + J.y - 20 * J.s], machine: [rect.left + mx(WC.x), rect.top + my(WC.y)] };
+      },
+      perf: function () {
+        var f = perf.frames.slice().sort(function (a, b) { return a - b; });
+        var r = { avgWork: perf.n ? perf.work / perf.n : 0, maxWork: perf.workMax, frames: f.length,
+          medFrame: f[Math.floor(f.length / 2)], p95Frame: f[Math.floor(f.length * 0.95)] };
+        perf.n = 0; perf.work = 0; perf.workMax = 0; perf.frames = [];
+        return r;
+      },
+      ghost: function () { return ghost.show(); },
+      spawnAt: function (x, y, vx, vy, r) { var b = makeBubble(x, y, r || 20 * BS, vx, vy); b.grow = 1; addBubble(b); return true; },
+      rings: function () { return parts.filter(function (q) { return q.t === "ring"; }).map(function (q) { return [Math.round(q.x), Math.round(q.y), q.soft]; }); },
+      // true when the wand (ring and handle) is clear of the switch and dial panel, or in the jar
+      wandClear: function () {
+        if (wand.home) return true;
+        var L = mx(14), R = mx(188), T = my(-96), B = my(-10), r = wand.ring + 6;
+        return !(wand.x + r > L && wand.x - r < R && wand.y + wand.ring + wand.stick > T && wand.y - r < B);
+      },
+      surprise: surprise,
+      surpriseNext: function (k) { if (k) surpriseNext = k; return surpriseNext; },
+      train: function () { return train ? { cars: train.cars.length, s: train.s, L: train.L, popping: !!train.popAt } : null; },
+      wand: function (id) { pickWand(id); return S.wand; },
+      shapes: function () { var m = {}; bubbles.forEach(function (b) { if (!b.dead) m[b.shape] = (m[b.shape] || 0) + 1; }); return m; }
+    };
+  }
+
+  // ---------- Start ----------
+  renderSoaps();
+  resize();
+  if (window.ResizeObserver) new ResizeObserver(function () { resize(); }).observe(view);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", function () { setTimeout(resize, 200); });
+  if (S.on) { learned.sw = true; mach.wheelV = WHEEL[S.speed] * 0.5; }
+  coachUpdate();
+  Toybox.init({
+    app: "bubble-machine",
+    badge: $("tbadge"),
+    timerIntro: "When time is up, the bubble machine winds down and the last bubbles float away.",
+    goodbyeOption: "End with a Goodbye bubbles button to press",
+    farewellText: "Time to say goodbye",
+    goodbyeLabel: "Goodbye, bubbles",
+    farewellDone: "Bye bye, bubbles!",
+    restLine: "The bubbles are resting.",
+    restLine2: "They will be right here next time.",
+    restArt: restArt,
+    soundNote: "Soft pops and a quiet machine whirr. Hold for 2 seconds.",
+    onEnding: onEnding,
+    endingMaxMs: 16000,
+    onGoodbye: onGoodbye,
+    onRest: function () { endingDone = null; stopHum(); },
+    onWake: function () { ending = false; endingDone = null; coachUpdate(); },
+    onSound: function (on) { if (!on) stopHum(); }
+  });
+  stage.appendChild($("tb-toast"));
+  stage.appendChild($("tb-farewell"));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { /* canvas text redraws every frame */ });
+  requestAnimationFrame(frame);
+})();

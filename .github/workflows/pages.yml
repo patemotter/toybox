@@ -41,19 +41,22 @@ jobs:
       - name: Build _site (published files only)
         run: |
           mkdir _site
-          git ls-files -z | grep -zvE '^(tools|archive|plans|\.github)/|\.md$|^\.' | xargs -0 cp --parents -t _site
+          git ls-files -z | grep -zvE '^(tools|archive|plans|docs|\.github)/|\.md$|^\.' | xargs -0 cp --parents -t _site
 
       # The cache version goes up by one with every commit that changes a published file, so devices download
       # a fresh offline copy after each real change (and not after a change to the docs or tools only).
       - name: Stamp the offline cache version
         run: |
-          n=$(( 1000 + $(git rev-list --count HEAD -- . ':(exclude)tools' ':(exclude)archive' ':(exclude)plans' ':(exclude).github' ':(exclude)*.md') ))
+          n=$(( 1000 + $(git rev-list --count HEAD -- . ':(exclude)tools' ':(exclude)archive' ':(exclude)plans' ':(exclude)docs' ':(exclude).github' ':(exclude).agents' ':(exclude)*.md') ))
           sed -i 's/^const CACHE = "toybox-v0";/const CACHE = "toybox-v'"$n"'";/' _site/sw.js
           grep -q "^const CACHE = \"toybox-v$n\";" _site/sw.js || { echo "sw.js has no 'const CACHE = \"toybox-v0\";' line to stamp"; exit 1; }
           echo "Offline cache: toybox-v$n"
 
       - name: Every published file is cached offline
         run: node tools/check-site.js _site
+
+      - name: Check Toybox static rules
+        run: node tools/check-rules.js
 
       # Correctness rules only (undefined names, unreachable code, redeclared names); unused variables are warnings.
       - name: Lint every published script
