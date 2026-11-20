@@ -10,7 +10,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const SKIP_DIRS = new Set(['tools', 'archive', 'plans', 'docs', 'node_modules']);
+// _site is the deploy's build of the published files; it repeats every page under another path.
+const SKIP_DIRS = new Set(['tools', 'archive', 'plans', 'docs', 'node_modules', '_site']);
 
 const ALLOWED_URL_HOSTS = new Set([
   'fonts.googleapis.com',
