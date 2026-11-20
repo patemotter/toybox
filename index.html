@@ -150,16 +150,18 @@ h1 {
 /* A favorite (picked by a grown-up in the Grown-ups sheet) wears a small star; it is not a button. */
 .apps li > .app { position: relative; }
 .app .fav { position: absolute; top: 4px; right: 4px; width: clamp(20px, 4.5vmin, 34px); height: auto; pointer-events: none; }
-/* Grown-ups sheet: the Favorites picker */
-#favs .favgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-#favs .favgrid .btn { display: flex; align-items: center; gap: 6px; justify-content: flex-start; text-align: left;
+/* Grown-ups sheet: the Favorites and Hide apps pickers */
+.favgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.favgrid .btn { display: flex; align-items: center; gap: 6px; justify-content: flex-start; text-align: left;
   min-height: 48px; min-width: 0; padding: 4px 6px; font-size: 0.9rem; line-height: 1.1; }
-#favs .favgrid img { width: 30px; height: 30px; border-radius: 8px; flex: none; }
-#favs .favgrid .nm { flex: 1 1 auto; min-width: 0; }
+.favgrid img { width: 30px; height: 30px; border-radius: 8px; flex: none; }
+.favgrid .nm { flex: 1 1 auto; min-width: 0; }
 #favs .favgrid .star { font-size: 1rem; flex: none; opacity: 0.25; }
 #favs .favgrid .btn[aria-pressed="true"] .star { opacity: 1; }
 /* Upright phones: two narrow columns; the yellow (pressed) button alone marks a favorite. */
 @media (max-width: 440px) { #favs .favgrid .star { display: none; } }
+/* A hidden app's picture fades in the Hide apps picker. */
+#hide .favgrid .btn[aria-pressed="true"] img { opacity: 0.35; }
 /* Upright phones: three tiles per row. */
 @media (max-width: 600px) {
   .wrap { padding-top: 12px; padding-bottom: 10px; }
@@ -202,6 +204,14 @@ h1 {
   <p class="sub">Tap an app to make it a favorite. Favorites move to the front of the home screen, in the order you pick them, and wear a small star.</p>
   <div class="favgrid" id="favGrid"></div>
   <div class="sheet-actions"><button class="btn" id="favClear">Clear favorites</button></div>
+</section>
+
+<!-- Grown-ups sheet: apps a grown-up hides have no tile on the home screen. -->
+<section id="hide" hidden>
+  <h3>Hide apps</h3>
+  <p class="sub">Tap an app to hide it from the home screen. It stays saved on this device; tap it again to bring it back.</p>
+  <div class="favgrid" id="hideGrid"></div>
+  <div class="sheet-actions"><button class="btn" id="hideClear">Show all apps</button></div>
 </section>
 
 <!-- Grown-ups sheet: is every app saved on this device for use with no network (e.g. on a plane)? -->
@@ -427,11 +437,27 @@ h1 {
   function saveFavs(f) { try { localStorage.setItem(FAVKEY, JSON.stringify(f)); } catch (e) { /* ignore */ } }
   var STAR_SVG = '<svg class="fav" viewBox="-12 -12 24 24" aria-hidden="true"><path d="M0 -10.5 L3 -3.6 L10.3 -3.2 L4.7 1.6 L6.4 8.8 L0 4.9 L-6.4 8.8 L-4.7 1.6 L-10.3 -3.2 L-3 -3.6 Z" fill="#FFC93C" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/></svg>';
 
+  // ---------- Hidden apps (chosen by a grown-up in the Grown-ups sheet) ----------
+  // A list of app hrefs that get no tile on the home screen. At least one app always stays visible.
+  var HIDEKEY = "toybox-hidden-v1";
+  function readHidden() {
+    var out = [];
+    try {
+      var o = JSON.parse(localStorage.getItem(HIDEKEY) || "[]");
+      if (Array.isArray(o)) o.forEach(function (h) {
+        if (out.indexOf(h) === -1 && APPS.some(function (a) { return a.href === h; })) out.push(h);
+      });
+    } catch (e) { /* storage blocked or bad data: nothing hidden */ }
+    return out.length < APPS.length ? out : [];
+  }
+  function saveHidden(h) { try { localStorage.setItem(HIDEKEY, JSON.stringify(h)); } catch (e) { /* ignore */ } }
+
   var list = document.getElementById("apps");
   function renderApps() {
-    var favs = readFavs();
+    var favs = readFavs(), hidden = readHidden();
     var order = favs.map(function (h) { return APPS.filter(function (a) { return a.href === h; })[0]; })
-      .concat(APPS.filter(function (a) { return favs.indexOf(a.href) === -1; }));
+      .concat(APPS.filter(function (a) { return favs.indexOf(a.href) === -1; }))
+      .filter(function (a) { return hidden.indexOf(a.href) === -1; });
     list.innerHTML = "";
     order.forEach(function (app) {
       var li = document.createElement("li");
@@ -492,8 +518,43 @@ h1 {
   function favChanged() { paintFavPicker(); renderApps(); fitGrid(); }
   document.getElementById("favClear").addEventListener("click", function () { saveFavs([]); favChanged(); });
   paintFavPicker();
-  // Another open Toybox tab changed the favorites.
-  window.addEventListener("storage", function (e) { if (e.key === FAVKEY) favChanged(); });
+
+  // The Hide apps picker: one button per app; a pressed (yellow) button is hidden from the home screen.
+  var hideGrid = document.getElementById("hideGrid");
+  APPS.forEach(function (app) {
+    var b = document.createElement("button");
+    b.className = "btn";
+    b.type = "button";
+    b.setAttribute("data-hide", app.href);
+    b.innerHTML = '<img src="' + app.icon + '" alt=""><span class="nm"></span>';
+    b.children[1].textContent = app.name;
+    b.addEventListener("click", function () {
+      var hidden = readHidden(), i = hidden.indexOf(app.href);
+      if (i === -1) {
+        if (hidden.length >= APPS.length - 1) { Toybox.toast("Keep at least one app on the home screen."); return; }
+        hidden.push(app.href);
+      } else hidden.splice(i, 1);
+      saveHidden(hidden);
+      hideChanged();
+    });
+    hideGrid.appendChild(b);
+  });
+  function paintHidePicker() {
+    var hidden = readHidden();
+    Array.prototype.forEach.call(hideGrid.querySelectorAll("[data-hide]"), function (b) {
+      b.setAttribute("aria-pressed", String(hidden.indexOf(b.getAttribute("data-hide")) !== -1));
+    });
+    document.getElementById("hideClear").disabled = !hidden.length;
+  }
+  function hideChanged() { paintHidePicker(); renderApps(); fitGrid(); }
+  document.getElementById("hideClear").addEventListener("click", function () { saveHidden([]); hideChanged(); });
+  paintHidePicker();
+
+  // Another open Toybox tab changed the favorites or the hidden apps.
+  window.addEventListener("storage", function (e) {
+    if (e.key === FAVKEY) favChanged();
+    if (e.key === HIDEKEY) hideChanged();
+  });
 
   // Fit every app on one screen. The stylesheet picks the usual columns for the screen (--cols); this
   // also tries up to three more columns (fewer, taller rows help when many apps share a short phone
@@ -503,7 +564,7 @@ h1 {
   // wrap differently).
   function tryCols(cols) {
     list.style.setProperty("--cols", String(cols));
-    list.style.setProperty("--rows", String(Math.ceil(APPS.length / cols)));
+    list.style.setProperty("--rows", String(Math.ceil(list.children.length / cols)));
     var tile = list.querySelector(".app");
     // Every name gets the height of the tallest one, so the pictures line up across a row.
     list.style.removeProperty("--name-h");
@@ -623,7 +684,7 @@ h1 {
   Toybox.init({
     app: "launcher",
     home: true,
-    sections: [document.getElementById("favs"), document.getElementById("offline")],
+    sections: [document.getElementById("favs"), document.getElementById("hide"), document.getElementById("offline")],
     onOpen: function () { offCheck(false); },
     grownButton: document.getElementById("grownbtn"),
     grownLabel: ["Grown-ups", "⏱ Grown-ups"],

@@ -23,7 +23,7 @@ Order in `index.html` (`APPS` array) matters: **Workshop** and **Spin Shop** sta
 - **`gear-box/`** (Gear Box) — Tooth counts on gears and picker tiles (explicitly requested by the dad).
 - **`marble-run/`** (`marble-run/index.js`) — Counter `"Marbles"` (on-screen quantity). Keep lift-style choices.
 - **`car-builder/`** (`car-builder/index.js`) — Split into `index.js`.
-- **`math-grid/`** (Math Grid) — Times and plus tables; numbers allowed; home-screen grown-up setting `mathgrid-voice`. Open questions: ~28 px squares on iPhone; `"0 to 10 / 0 to 12"` resets on `Toybox.fresh()`.
+- **`math-grid/`** (Math Grid) — Times and plus tables; numbers allowed; home-screen grown-up setting `mathgrid-voice`. Open questions: ~28 px squares on iPhone; `"1 to 10 / 1 to 12"` (no 0 row or column) resets on `Toybox.fresh()`.
 - **`3d-printer/`** (`3d-printer/index.js`) — Modeled on the family's P1S + AMS 2 Pro (no logos). Shelf and spool colors kept across `Toybox.fresh()`. Grown-up settings: `printer-name`, `printer-clear`.
 - **`water-works/`** (shown as "Water Table"; `water-works/index.js`) — Modeled on the family's water play table.
 - **`train-builder/`** (`train-builder/index.js`) — Works both portrait and landscape; counter `"Cars"` (on-screen quantity). Tab changes must never re-layout the track.

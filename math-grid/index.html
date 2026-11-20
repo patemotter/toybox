@@ -175,8 +175,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
             <button class="btn" data-mode="times" aria-pressed="true"><span class="op">×</span>Times</button>
           </div>
           <div class="seg">
-            <button class="btn" data-size="10" aria-pressed="true">0 to 10</button>
-            <button class="btn" data-size="12" aria-pressed="false">0 to 12</button>
+            <button class="btn" data-size="10" aria-pressed="true">1 to 10</button>
+            <button class="btn" data-size="12" aria-pressed="false">1 to 12</button>
           </div>
         </div>
         <div class="pats" data-pane="pats">
@@ -226,7 +226,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // ---------- State ----------
   var KEY = "mathgrid-state-v1";
   // Opening Math Grid from the Toybox home screen (Toybox.fresh) starts the first-visit grid (Times,
-  // 0 to 10, nothing picked, no pattern or blocks); a reload keeps it. The grown-up setting
+  // 1 to 10, nothing picked, no pattern or blocks); a reload keeps it. The grown-up setting
   // (spoken numbers) lives on the Toybox home screen and is kept.
   if (window.Toybox && Toybox.fresh()) {
     try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
@@ -243,10 +243,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (!o || typeof o !== "object") return;
       if (o.mode === "add" || o.mode === "times") mode = o.mode;
       if (o.N === 10 || o.N === 12) N = o.N;
-      if (o.sel && typeof o.sel.r === "number" && typeof o.sel.c === "number") sel = { r: clamp(o.sel.r | 0, 0, N), c: clamp(o.sel.c | 0, 0, N) };
+      if (o.sel && typeof o.sel.r === "number" && typeof o.sel.c === "number") sel = { r: clamp(o.sel.r | 0, 1, N), c: clamp(o.sel.c | 0, 1, N) };
       if (["", "mult", "dbl", "sq", "same"].indexOf(o.pat) !== -1) pat = o.pat;
       if (typeof o.multN === "number") multN = clamp(o.multN | 0, 1, 12);
-      if (typeof o.sameV === "number") sameV = clamp(o.sameV | 0, 0, 144);
+      if (typeof o.sameV === "number") sameV = clamp(o.sameV | 0, 1, 144);
       hasBlocks = !!o.blocks;
     } catch (e) { /* defaults */ }
   }
@@ -259,16 +259,16 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     CW = Math.max(1, r.width - 6); CH = Math.max(1, r.height - 6);
     DPR = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
-    var n = N + 2;
+    var n = N + 1;
     cs = Math.min(CW / n, CH / n);
     OX = (CW - cs * n) / 2; OY = (CH - cs * n) / 2;
   }
   window.addEventListener("resize", resize);
-  // Grid index (0 = header, 1 = number 0, ...) under a client point.
+  // Grid index (0 = header, then 1 = number 1, ...) under a client point. The grid has no 0 row or column.
   function hit(cx, cy, clampBody) {
     var r = cv.getBoundingClientRect();
     var gx = (cx - r.left - OX) / cs, gy = (cy - r.top - OY) / cs;
-    var n = N + 2;
+    var n = N + 1;
     if (clampBody) return { ci: clamp(Math.floor(gx), 1, n - 1), ri: clamp(Math.floor(gy), 1, n - 1) };
     if (gx < 0 || gy < 0 || gx >= n || gy >= n) return null;
     return { ci: Math.floor(gx), ri: Math.floor(gy) };
@@ -306,7 +306,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function waysCount() {
     var n = 0;
-    for (var r = 0; r <= N; r++) for (var c = 0; c <= N; c++) if (val(r, c) === sameV) n++;
+    for (var r = 1; r <= N; r++) for (var c = 1; c <= N; c++) if (val(r, c) === sameV) n++;
     return n;
   }
   function patText() {
@@ -342,13 +342,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var list = [], i, j, k;
     if (mode === "times") {
       for (i = 1; i <= r; i++) for (j = 1; j <= c; j++) {
-        list.push({ key: "t" + i + "," + j, hx: j + 1, hy: i + 1, col: colorOf(i), n: (i - 1) * c + j });
+        list.push({ key: "t" + i + "," + j, hx: j, hy: i, col: colorOf(i), n: (i - 1) * c + j });
       }
     } else {
       var tot = r + c, second = c === r ? colorOf((c + 4) % 12 + 1) : colorOf(c);
       for (k = 0; k < tot; k++) {
         var col = k < r ? colorOf(r) : second;
-        list.push({ key: "a" + k + col, hx: 2 + (k % N), hy: 2 + Math.floor(k / N), col: col, n: k + 1 });
+        list.push({ key: "a" + k + col, hx: 1 + (k % N), hy: 1 + Math.floor(k / N), col: col, n: k + 1 });
       }
     }
     return list;
@@ -378,9 +378,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function startBuild() {
     if (ending) return;
     if (!sel) sel = { r: 3, c: 4 };
-    if (sel.r === 0 || sel.c === 0) {
-      if (mode === "times" || sel.r + sel.c === 0) { sel = { r: sel.r || 3, c: sel.c || 4 }; }
-    }
     clearBlocks(false);
     var plan = blockPlan(sel.r, sel.c);
     var iv = plan.length <= 12 ? 0.6 : Math.max(0.1, 7.2 / plan.length);
@@ -407,7 +404,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (build && build.i >= build.plan.length && t >= build.next + 0.25) {
       build = null;
       setEq(eqText(sel.r, sel.c) + "!", true);
-      var cc = cellCenter(sel.r + 1, sel.c + 1);
+      var cc = cellCenter(sel.r, sel.c);
       burst(cc.x, cc.y, 30, null);
       ring(cc.x, cc.y, cs * 2, "#FFC93C");
       chime();
@@ -438,7 +435,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Timer ending: blocks settle into a neat pile at the bottom.
   function settleBlocks() {
     build = null;
-    var n = N + 2, maxY = (CH - OY) / cs - 1;
+    var n = N + 1, maxY = (CH - OY) / cs - 1;
     var order = blocks.slice().sort(function (a, b) { return a.x - b.x; });
     var cols = Math.floor(CW / cs) || n, x0 = -OX / cs + (CW / cs - cols) / 2;
     order.forEach(function (b, k) {
@@ -460,7 +457,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function crossList() {
     var l = [];
-    Object.keys(ptrs).forEach(function (k) { var p = ptrs[k]; if (p.cur && p.cur.ri > 0 && p.cur.ci > 0) l.push({ r: p.cur.ri - 1, c: p.cur.ci - 1, col: crossCols[p.slot % crossCols.length] }); });
+    Object.keys(ptrs).forEach(function (k) { var p = ptrs[k]; if (p.cur && p.cur.ri > 0 && p.cur.ci > 0) l.push({ r: p.cur.ri, c: p.cur.ci, col: crossCols[p.slot % crossCols.length] }); });
     if (sel && !l.length) l.push({ r: sel.r, c: sel.c, col: "#FFC93C" });
     return l;
   }
@@ -468,7 +465,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = "#24305E"; ctx.fillRect(0, 0, CW, CH);
-    var n = N + 2, g = Math.max(1.5, cs * 0.07), rad = cs * 0.2;
+    var n = N + 1, g = Math.max(1.5, cs * 0.07), rad = cs * 0.2;
     var crosses = crossList();
     var fade = ending ? clamp((now - endingStartedAt) / 1500, 0, 1) : 0;
     var selPop = clamp((now - selT) / 350, 0, 1);
@@ -478,7 +475,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
     for (var ri = 0; ri < n; ri++) {
       for (var ci = 0; ci < n; ci++) {
-        var r = ri - 1, c = ci - 1;
+        var r = ri, c = ci;
         var x = OX + ci * cs, y = OY + ri * cs, s = 1, fill, ink, label, fsz = cs * 0.42;
         if (jg > 0) { x += Math.sin(now * 0.05 + ri * 1.7 + ci * 2.3) * jg * cs * 0.12; y += Math.cos(now * 0.047 + ri * 2.1 + ci * 1.3) * jg * cs * 0.12; }
         var inRow = false, inCol = false, rowCol = null, colCol = null;
@@ -496,7 +493,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           if (lit) s = 1 + 0.18 * (fade ? 1 - fade : 1);
         } else {
           var v = val(r, c);
-          fill = ((Math.floor(r / 5) + Math.floor(c / 5)) % 2) ? "#EEF3FF" : "#FFFFFF";
+          fill = ((Math.floor((r - 1) / 5) + Math.floor((c - 1) / 5)) % 2) ? "#EEF3FF" : "#FFFFFF";
           ink = "#4A5578"; label = String(v); fsz = cs * (v >= 100 ? 0.34 : 0.42);
           if (inRow || inCol) {
             fill = inRow && inCol ? "#FFC93C" : (inRow ? mixA(rowCol || colorOf(r)) : mixA(colCol || colorOf(c)));
@@ -519,7 +516,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     // The tapped square pops big.
     crosses.forEach(function (X) {
       if (blocks.length && sel && X.r === sel.r && X.c === sel.c) return;
-      var cc = cellCenter(X.r + 1, X.c + 1), pop = sel && X.r === sel.r && X.c === sel.c && !Object.keys(ptrs).length ? selPop : 1;
+      var cc = cellCenter(X.r, X.c), pop = sel && X.r === sel.r && X.c === sel.c && !Object.keys(ptrs).length ? selPop : 1;
       var s = 1 + 0.45 * easeOutBack(pop), w = cs * s;
       rr(cc.x - w / 2, cc.y - w / 2, w, w, rad * s); ctx.fillStyle = X.col; ctx.fill();
       ctx.lineWidth = Math.max(3, cs * 0.12); ctx.strokeStyle = "#1D2340"; ctx.stroke();
@@ -579,7 +576,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 
   // Idle help: the ghost hand taps a number in the grid.
   var ghost = Toybox.ghost({ max: 2, plan: function () {
-    var rc = cv.getBoundingClientRect(), cc = cellCenter(4, 5);
+    var rc = cv.getBoundingClientRect(), cc = cellCenter(3, 4);
     return { pts: [[rc.left + cc.x, rc.top + cc.y]], tap: true };
   } });
   // ---------- Pointer input (several fingers at once) ----------
@@ -596,8 +593,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (h.ri > 0 && h.ci > 0) {
       var cc = cellCenter(h.ri, h.ci);
       ring(cc.x, cc.y, cs, crossCols[p.slot % crossCols.length]);
-      note(val(h.ri - 1, h.ci - 1), 0.04);
-      setEq(eqText(h.ri - 1, h.ci - 1), true);
+      note(val(h.ri, h.ci), 0.04);
+      setEq(eqText(h.ri, h.ci), true);
     }
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
   });
@@ -617,7 +614,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       if (pat) { pat = ""; updateButtons(); }
     }
     // Drag: a rectangle of blocks fills in from the corner to this square.
-    sel = { r: h.ri - 1, c: h.ci - 1 };
+    sel = { r: h.ri, c: h.ci };
     var added = fillBlocks(sel.r, sel.c, true);
     if (added) note(val(sel.r, sel.c), 0.03);
     setEq(mode === "times" ? sel.r + (sel.r === 1 ? " row" : " rows") + " of " + sel.c + " = " + val(sel.r, sel.c) : eqText(sel.r, sel.c), false);
@@ -638,8 +635,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       return;
     }
     if (h.ri === 0 && h.ci === 0) { setMode(mode === "times" ? "add" : "times"); return; }
-    if (h.ri === 0 || h.ci === 0) { tapHeader(h.ri === 0 ? h.ci - 1 : h.ri - 1, h); return; }
-    tapCell(h.ri - 1, h.ci - 1);
+    if (h.ri === 0 || h.ci === 0) { tapHeader(h.ri === 0 ? h.ci : h.ri, h); return; }
+    tapCell(h.ri, h.ci);
   }
   cv.addEventListener("pointerup", endPtr);
   cv.addEventListener("pointercancel", endPtr);
@@ -651,7 +648,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     selT = now;
     var v = val(r, c);
     if (pat === "same") { sameV = v; patT = now; }
-    var cc = cellCenter(r + 1, c + 1);
+    var cc = cellCenter(r, c);
     burst(cc.x, cc.y, 18, null);
     ring(cc.x, cc.y, cs * 1.4, "#FFC93C");
     setEq(pat === "same" ? patText() : eqText(r, c), true);
@@ -661,7 +658,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function tapHeader(v, h) {
     var cc = cellCenter(h.ri, h.ci);
     burst(cc.x, cc.y, 12, colorOf(v));
-    if (v < 1) { blip(); setEq(String(v), true); say(String(v)); return; }
     multN = v;
     setPat("mult", true);
   }
@@ -692,7 +688,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     pat = p;
     if (p === "dbl" && mode !== "add") setMode("add");
     if (p === "sq" && mode !== "times") setMode("times");
-    if (p === "same") { sameV = sel ? val(sel.r, sel.c) : 12; if (sameV === 0 && mode === "times") sameV = 12; }
+    if (p === "same") sameV = sel ? val(sel.r, sel.c) : 12;
     patT = now;
     clearBlocks(true); build = null;
     sel = null;
@@ -708,7 +704,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // The block-counting button names the sum it will count (the tapped square, or 3 × 4).
   function buildLabel() {
     var r = sel ? sel.r : 3, c = sel ? sel.c : 4;
-    if (r === 0 || c === 0) { r = r || 3; c = c || 4; }
     var el = $("buildEq");
     if (el) el.textContent = r + " " + opSym() + " " + c;
   }
@@ -890,7 +885,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   // Test hook, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) window.__math = {
     state: function () { return { mode: mode, N: N, sel: sel, pat: pat, multN: multN, sameV: sameV, blocks: blocks.length, building: !!build, eq: eqEl.textContent, ending: ending }; },
-    cell: function (r, c) { var rc = cv.getBoundingClientRect(), p = cellCenter(r + 1, c + 1); return { x: rc.left + p.x, y: rc.top + p.y }; }
+    cell: function (r, c) { var rc = cv.getBoundingClientRect(), p = cellCenter(r, c); return { x: rc.left + p.x, y: rc.top + p.y }; }
   };
 })();
 </script>

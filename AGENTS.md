@@ -31,7 +31,7 @@ Read this before changing anything. It holds every universal rule and decision f
 ## 2. Repository, offline & deploy
 
 - **Architecture:** `patemotter/toybox`. No build step, no frameworks (reviewed 2026-10-12: home-screen web app, plain JS on canvas/SVG, one service worker, GitHub Pages). Each app folder holds `index.html` (+ stations and local `.js`/`.css`), `manifest.webmanifest`, and `icons/icon-{180,192,512,maskable-512}.png`. New apps get **no** per-app `sw.js` (keep retired stubs on older apps; see [`docs/app-catalog.md`](docs/app-catalog.md)).
-- **Launcher (`index.html`):** `APPS` array (**Workshop** and **Spin Shop** first). Fits every tile on one screen with no scroll (picture + name; `what` stays for grown-ups/tooling). Usual columns: 4 tablet, 3 upright phone, 6 sideways phone; `fitGrid()` tries up to +3 for biggest pictures without splitting words. Long single words use a soft hyphen (`"Kaleido\u00ADscope"`). Grown-ups **Favorites** (`localStorage["toybox-favorites-v1"]`) pins starred apps to the front with a star badge.
+- **Launcher (`index.html`):** `APPS` array (**Workshop** and **Spin Shop** first). Fits every tile on one screen with no scroll (picture + name; `what` stays for grown-ups/tooling). Usual columns: 4 tablet, 3 upright phone, 6 sideways phone; `fitGrid()` tries up to +3 for biggest pictures without splitting words. Long single words use a soft hyphen (`"Kaleido\u00ADscope"`). Grown-ups **Favorites** (`localStorage["toybox-favorites-v1"]`) pins starred apps to the front with a star badge. Grown-ups **Hide apps** (`localStorage["toybox-hidden-v1"]`) takes apps' tiles off the home screen (still cached offline; at least one app always stays).
 - **Shared layer & apps:** `common/toybox.js` + `common/toybox.css` ([`common/API.md`](common/API.md)). App details and `archive/` live in [`farm/AGENTS.md`](farm/AGENTS.md), [`workshop/AGENTS.md`](workshop/AGENTS.md), and [`docs/app-catalog.md`](docs/app-catalog.md).
 
 ### Offline (service worker)
@@ -131,7 +131,7 @@ Only agents edit this repo; keep small changes fast and focused.
 
 - Saw Bench's idle hand can show again for each newly picked saw (max 2 per saw). Too much?
 - Math Grid squares are ~28 px on iPhone; bigger means a larger rewrite.
-- Math Grid `"0 to 10 / 0 to 12"` resets on a fresh visit (treated as the child's choice, not a grown-up setting).
+- Math Grid `"1 to 10 / 1 to 12"` (no 0 row or column since 2026-11-20) resets on a fresh visit (treated as the child's choice, not a grown-up setting).
 - Spin Shop's `"Zoom"` speed label might read as camera zoom.
 
 **Decided (do not reopen):** Two-step machines (switch on, then push/feed/press; second push while off auto-switches on) stay everywhere, lathe and planer included. Concrete uses `orientation: "portrait"`. Engine Room and Construction Site's Bulldozer were deleted — don't rebuild unasked.
