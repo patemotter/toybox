@@ -20,7 +20,7 @@ Do not add Grown-ups sheet, toast, farewell, or rest markup in HTML — `Toybox.
   - Orientation: `orientation: "landscape" | "portrait"` (only when truly needed; dismissible card; tests skip via `sessionStorage["toybox-turn-ok:<app>"]="1"`).
   - Hooks (all optional): `onEnding(done, info)` (`info.goodbye`, `endingMaxMs` default `15000`), `onGoodbye()`, `onRest()`, `onWake()`, `onSound(on)`, `onOpen()`, `onTimer({ phase, remainingMs, fraction, minutes, showMinutes })`, `onTurn(shown)`.
   - Legacy no-ops (don't add): `big`, `onBig`, `Toybox.setBig()`, `Toybox.isBig()`.
-- **`Toybox.fresh()`** — `true` on first load of a page under a new launcher tap (`toybox-launch` vs `toybox-seen:<path>`). Safe to call before `init()`. Reset play state/counters; keep collections & grown-up settings.
+- **`Toybox.fresh()`** — `true` on first load of a page under a new launcher tap (`toybox-launch` vs `toybox-seen:<path>`). Safe to call before `init()`. Reset play state/counters; keep collections & grown-up settings. The launcher skips the new launch id on the first tile tap after the Grown-ups sheet was opened, so returning to the app just left is not fresh.
 - **`Toybox.timer`**:
   - `.phase()` → `"idle" | "running" | "ending" | "resting"`
   - `.locked()` → `true` while ending or resting (ignore play input)

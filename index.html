@@ -452,6 +452,8 @@ h1 {
   }
   function saveHidden(h) { try { localStorage.setItem(HIDEKEY, JSON.stringify(h)); } catch (e) { /* ignore */ } }
 
+  // True once the Grown-ups sheet was opened on this visit to the home screen (see the tile click below).
+  var keepPlace = false;
   var list = document.getElementById("apps");
   function renderApps() {
     var favs = readFavs(), hidden = readHidden();
@@ -464,9 +466,14 @@ h1 {
       var a = document.createElement("a");
       a.className = "app";
       a.href = app.href;
-      // Opening an app from here starts it fresh (see Toybox.fresh in common/toybox.js).
+      // Opening an app from here starts it fresh (see Toybox.fresh in common/toybox.js), except right after
+      // a grown-up opened the Grown-ups sheet (keepPlace): then the launch id stays the same, so the app he
+      // just left comes back as he left it (set a timer without losing his build). Other apps still start fresh.
       a.addEventListener("click", function () {
-        try { sessionStorage.setItem("toybox-launch", String(Date.now())); } catch (e) { /* storage blocked: apps keep their state */ }
+        try {
+          if (keepPlace && sessionStorage.getItem("toybox-launch")) keepPlace = false;
+          else sessionStorage.setItem("toybox-launch", String(Date.now()));
+        } catch (e) { /* storage blocked: apps keep their state */ }
       });
 
       var img = document.createElement("img");
@@ -685,7 +692,7 @@ h1 {
     app: "launcher",
     home: true,
     sections: [document.getElementById("favs"), document.getElementById("hide"), document.getElementById("offline")],
-    onOpen: function () { offCheck(false); },
+    onOpen: function () { keepPlace = true; offCheck(false); },
     grownButton: document.getElementById("grownbtn"),
     grownLabel: ["Grown-ups", "⏱ Grown-ups"],
     timerIntro: "When time is up, the app he is playing winds down and rests, and the controls lock.",
