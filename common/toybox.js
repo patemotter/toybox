@@ -1,10 +1,10 @@
-/* Toybox shared layer: play timer, sound setting, and the shared components every app is built
+/* Toybox shared layer: play timer, and the shared components every app is built
  * from (Go, step row, job bar, tiles, bottom bar, coach, ghost hand, tap-or-drag, palm guard, gate, map: 6.).
  *
- * One timer and one sound setting for the whole Toybox (same origin, same localStorage):
+ * One timer for the whole Toybox (same origin, same localStorage):
  *   toybox-timer-v1  the play timer (wall-clock endAt, so it counts across apps and reloads)
- *   toybox-sound-v1  "1" or "0" (sound is OFF by default)
  * A change made in one open page reaches the others through the `storage` event.
+ * The Toybox makes no sound at all (the dad, 2026-11-26): no audio, no spoken lines.
  *
  * HOW AN APP ADOPTS IT
  * 1. In <head>, before the app's own <style> and <script>:
@@ -31,10 +31,9 @@
  *        restLine: "The fish are resting.",
  *        restLine2: "They will be right here next time.",
  *        restArt: function () { return '<svg class="rest-art" viewBox="..">..</svg>'; },
- *        soundNote: "Soft bubble sounds. Hold for 2 seconds.",
  *        sections: [el],                          // extra sheet sections (e.g. offline); moved in, unhidden
  *        big: { button: el },                     // removed feature: the button is only hidden (don't add one)
- *        legacy: { timer: "fishtank-timer-v1", sound: "fishtank-prefs-v1" },
+ *        legacy: { timer: "fishtank-timer-v1" },
  *        orientation: "landscape",                // optional: "landscape" or "portrait". Held the other way,
  *                                                 // the app is covered by a "Turn it sideways!" / "Turn it
  *                                                 // upright!" card with a turning tablet and a small "Play
@@ -50,7 +49,6 @@
  *        onRest: function () {},        // the rest screen is up (pause the loop if you like)
  *        onWake: function () {},        // back to idle after ending/rest (stop or unlock): wake things up
  *        onBig: function (on) {},       // removed feature: called once at init with false
- *        onSound: function (on) {},     // sound setting changed (also from another page)
  *        onOpen: function () {},        // the grown-up sheet opened (refresh the app's own sections)
  *        onTimer: function (info) {},   // badge-style updates: {phase, remainingMs, fraction, minutes, showMinutes}
  *        onTurn: function (shown) {}    // the "turn the device" card was shown (true) or went away (false)
@@ -58,13 +56,9 @@
  * 4. Ask the module instead of keeping your own state:
  *      Toybox.timer.locked()   true while ending or resting: ignore play input then
  *      Toybox.timer.phase()    "idle" | "running" | "ending" | "resting"
- *      Toybox.sound.on()       is sound on?
- *      Toybox.sound.ready()    the AudioContext if sound is on and running, else null (use it to play)
- *      Toybox.sound.unlock()   create/resume the AudioContext; call inside a user gesture. The module
- *                              already does this on every pointerdown/click/keydown while sound is on.
  *      Toybox.setBig() / Toybox.isBig() are no-op stubs (Big is gone); Toybox.makeHold(btn, ms, onDone, onPress), Toybox.toast(msg)
  *      Toybox.settings.get(id) an app setting chosen on the home screen (ids in SETTINGS below:
- *                              "mathgrid-voice", "printer-name", ...).
+ *                              "printer-name", ...).
  *      Toybox.settings.onChange(fn(id, value)), Toybox.settings.action(id, fn) (runs fn once per
  *                              home-screen press, e.g. "printer-clear").
  *      Toybox.kind([type])     he finished something: sometimes shows a kind-words card, mostly a star
@@ -117,8 +111,7 @@
  *        3 s, then back to the step line), coach.clear(), coach.busy() (drops the step line and lets a passing line
  *        finish), coach.avoid(x, y) (viewport px: a new instruction in the
  *        middle of the stage moves to the other half if it would cover that point, e.g. the part it names),
- *        coach.text(). One line at a time, at most about 5 words, verb first. A new line is spoken when the
- *        home screen's App setting "coach-voice" is on and sound is on. Instructions are not persistent: one
+ *        coach.text(). One line at a time, at most about 5 words, verb first. Instructions are not persistent: one
  *        fades away after his first touch (at least 2 s after it appeared) or after 8 s, and comes back with the
  *        idle ghost hand; so the scene itself (a ring, a glow) must keep showing what to do next.
  *      var ghost = Toybox.ghost({ plan: fn, max: 3, idleMs: 4500, ok: fn, onShow: fn(plan, on) })
@@ -168,7 +161,6 @@
   var SCRIPT_SRC = document.currentScript && document.currentScript.src;
 
   var TKEY = "toybox-timer-v1";
-  var SKEY = "toybox-sound-v1";
   var MINUTE_CHOICES = [5, 10, 15, 20, 30];
   var HOLD_MS = 2000;
   var UNLOCK_MS = 4000;
@@ -186,7 +178,7 @@
 
   var opts = {};
   var inited = false;
-  // Runs the init option `name` (onSound, onBig, ...) if the page gave one.
+  // Runs the init option `name` (onBig, onOpen, ...) if the page gave one.
   function hook(name) { call.apply(null, [opts[name]].concat(Array.prototype.slice.call(arguments, 1))); }
 
   // ---------- Grown-up settings (kept on the home screen) ----------
@@ -198,17 +190,13 @@
       listTitle: "Which apps ask for something special",
       list: [
         "Turn the device: only Concrete prefers upright; a card asks him to turn it, with a \"Play like this\" button to skip",
-        "Sound: every app except Spin Shop has soft sound effects, all off until you turn sound on above",
+        "Sound: the Toybox makes no sound at all",
         "Motion (tilt and shake): no app uses it; the Toybox never asks for motion access",
         "Nothing uses the camera, the microphone or location; after the first visit nothing needs the internet (it only checks for updates when online)"
       ] },
     // Kind words has its own controls (kindBuildSettings below); its other ids are listed in KIND_SET.
     { id: "kind-words", app: "Kind words", type: "custom", def: true,
       build: function (row) { kindBuildSettings(row); }, refresh: function (row) { kindRefreshSettings(row); } },
-    { id: "coach-voice", app: "Coach line", label: "Read the coach line out loud", type: "bool", def: false, hold: true,
-      note: "In the apps built from the new layout. Uses the device's voice, so it only speaks when sound is on (headphones on the plane)." },
-    { id: "mathgrid-voice", app: "Math Grid", label: "Say the numbers out loud", type: "bool", def: false, hold: true,
-      note: "Uses the device's voice, so it only speaks when sound is on." },
     { id: "printer-name", app: "3D Printer", label: "Name sign letters", type: "text", def: "TOYBOX", max: 8 },
     { id: "printer-clear", app: "3D Printer", label: "Hold to clear My prints", type: "action" }
   ];
@@ -265,31 +253,6 @@
   function minutesText(ms) {
     var m = Math.ceil(ms / 60000);
     return m === 1 ? "1 minute" : m + " minutes";
-  }
-
-  // ---------- Sound ----------
-  var soundOn = get(SKEY) === "1";
-  var actx = null;
-  var soundListeners = [];
-  // Create (once) and resume the shared AudioContext. Call inside a user gesture (iOS needs that).
-  function audioContext() {
-    if (!actx) {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      try { actx = new AC(); } catch (e) { actx = null; return null; }
-    }
-    try { if (actx.state === "suspended") actx.resume(); } catch (e) { /* ignore */ }
-    return actx;
-  }
-  function unlockSound() { return soundOn ? audioContext() : null; }
-  function setSound(on, fromStorage) {
-    on = !!on;
-    if (on === soundOn && !fromStorage) return;
-    soundOn = on;
-    if (!fromStorage) put(SKEY, on ? "1" : "0");
-    updateSoundUI();
-    soundListeners.forEach(function (fn) { try { fn(on); } catch (e) { /* ignore */ } });
-    hook("onSound", on);
   }
 
   // ---------- No page zoom ----------
@@ -377,11 +340,6 @@
               '<div class="sheet-actions">' + holdBtn("tb-holdAdd", "Add 5 minutes") + holdBtn("tb-holdStop", "Stop timer") + "</div>" +
             "</div>" +
           "</section>" +
-          '<section id="tb-sound"><h3>Sound</h3>' +
-            '<p class="status" id="tb-soundStatus">Sound is off.</p>' +
-            '<div class="sheet-actions" style="margin-top:0">' + holdBtn("tb-holdSound", "Hold to turn sound on", "tb-soundLabel") + "</div>" +
-            '<p class="sub" style="margin-top:8px">' + esc(opts.soundNote || "Soft sounds. Hold for 2 seconds.") + "</p>" +
-          "</section>" +
           '<div class="sheet-actions" id="tb-closeRow"><button class="btn" id="tb-close">Close</button></div>' +
         "</div>" +
       "</div>" +
@@ -453,8 +411,6 @@
     makeHold($("tb-holdAdd"), HOLD_MS, addFive);
     makeHold($("tb-holdStop"), HOLD_MS, stopTimer);
     makeHold($("tb-unlock"), UNLOCK_MS, unlock);
-    // Pressing the sound button is a user gesture, so the audio engine can be started then.
-    makeHold($("tb-holdSound"), HOLD_MS, function () { setSound(!soundOn); }, audioContext);
 
     if (opts.grownButton) {
       if (opts.home) opts.grownButton.addEventListener("click", openSheet);
@@ -527,7 +483,7 @@
 
   // ---------- Sheet ----------
   function sheetOpen() { return !!$("tb-modal") && !$("tb-modal").hidden; }
-  function openSheet() { updateTimerUI(); updateSoundUI(); refreshAppSettings(); hook("onOpen"); $("tb-modal").hidden = false; }
+  function openSheet() { updateTimerUI(); refreshAppSettings(); hook("onOpen"); $("tb-modal").hidden = false; }
   function closeSheet() { if ($("tb-modal")) $("tb-modal").hidden = true; }
 
   function updateTimerUI() {
@@ -550,11 +506,6 @@
     $("tb-optMinutes").checked = timer.showMinutes;
     $("tb-optWarnings").checked = timer.warnings;
     $("tb-optGoodbye").checked = timer.goodbye;
-  }
-  function updateSoundUI() {
-    if (!inited) return;
-    $("tb-soundStatus").textContent = soundOn ? "Sound is on." : "Sound is off.";
-    $("tb-soundLabel").textContent = soundOn ? "Hold to turn sound off" : "Hold to turn sound on";
   }
 
   // ---------- Badge: the colored arc is the time left, shrinking back toward the top ----------
@@ -781,12 +732,6 @@
         drop(legacy.timer);
       }
     }
-    if (legacy.sound && get(SKEY) === null) {
-      var s = get(legacy.sound), on = false;
-      if (s === "1" || s === "true" || s === "on") on = true;
-      else { try { var o = JSON.parse(s || "null"); on = !!(o && o[legacy.soundField || "sound"] === true); } catch (e) { /* ignore */ } }
-      if (on) put(SKEY, "1");
-    }
   }
 
   // ---------- Orientation: an app may prefer landscape or portrait (opts.orientation) ----------
@@ -977,16 +922,6 @@
     clearTimeout(kindTimer);
     kindTimer = setTimeout(function () { el.classList.add("hide"); kindTimer = setTimeout(function () { el.classList.remove("show", "hide"); }, 700); },
       KIND_STAYS[kset("kind-stay")] || KIND_STAYS.medium);
-    // A soft two-note chime, only when the shared sound is on and running.
-    try {
-      var a = soundOn && actx && actx.state === "running" ? actx : null;
-      if (a) [659, 880].forEach(function (f, i) {
-        var o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + i * 0.14;
-        o.type = "sine"; o.frequency.value = f;
-        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.03, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
-        o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0 + 0.55);
-      });
-    } catch (e) { /* no sound */ }
     return true;
   }
   function kindState() { return readJSON(KKEY); }
@@ -1189,21 +1124,15 @@
     opts = o || {};
     migrate(opts.legacy);
     timer = parseTimer(get(TKEY));
-    soundOn = get(SKEY) === "1";
     build();
     inited = true;
     watchAllCoaches();
     if (opts.big) setBig(false, false);
-    updateSoundUI();
     sync();
     wireTurn();
     setInterval(tick, 250);
     kindStart();
 
-    // While sound is on, any touch, click or key press starts/resumes audio (iOS needs a gesture).
-    ["pointerdown", "click", "keydown"].forEach(function (ev) {
-      document.addEventListener(ev, function () { if (soundOn) audioContext(); }, true);
-    });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && sheetOpen()) { e.preventDefault(); closeSheet(); }
     });
@@ -1211,16 +1140,13 @@
     window.addEventListener("pageshow", function (e) {
       if (!e.persisted) return;
       timer = parseTimer(get(TKEY));
-      var on = get(SKEY) === "1";
-      if (on !== soundOn) setSound(on, true);
       sync();
       // Settings may have changed on the home screen while this page was frozen.
       SETTINGS.forEach(function (d) { setListeners.forEach(function (fn) { try { fn(d.id, settingGet(d.id)); } catch (er) { /* ignore */ } }); });
     });
-    // Another open Toybox page changed the shared timer or sound.
+    // Another open Toybox page changed the shared timer or the settings.
     window.addEventListener("storage", function (e) {
       if (e.key === TKEY || e.key === null) { timer = parseTimer(get(TKEY)); sync(); }
-      if (e.key === SKEY || e.key === null) { var on = get(SKEY) === "1"; if (on !== soundOn) setSound(on, true); }
       if (e.key === SETKEY || e.key === null) SETTINGS.forEach(function (d) { setListeners.forEach(function (fn) { try { fn(d.id, settingGet(d.id)); } catch (er) { /* ignore */ } }); });
     });
   }
@@ -1583,16 +1509,6 @@
   }
 
   // ---------- Coach line ----------
-  // The optional spoken coach (App setting "coach-voice", off by default; only while sound is on).
-  function speak(line) {
-    if (!soundOn || !settingGet("coach-voice") || !window.speechSynthesis || locked() || document.hidden) return;
-    try {
-      speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(line);
-      u.rate = 0.95; u.pitch = 1.05;
-      speechSynthesis.speak(u);
-    } catch (e) { /* no voice */ }
-  }
   // ---------- Instruction or information? (the dad, 2026-10-11) ----------
   // Every coach pill (.tb-coach) is watched: a line that asks him to do something ("Drag fruit into the jar!",
   // "Tap the lever to drop the combine's header.") gets the instruction look (is-do: dark pill, white bold text, a
@@ -1695,7 +1611,6 @@
         shown = line;
         txt.textContent = line;
         el.classList.remove("is-new"); void el.offsetWidth; el.classList.add("is-new");
-        speak(line);
         // After the instruction/information sorting, which runs when the text changes.
         requestAnimationFrame(place);
       }
@@ -2292,13 +2207,6 @@
       phase: function () { return timer.phase; },
       locked: function () { return timer.phase === "ending" || timer.phase === "resting"; },
       remainingMs: function () { return timer.phase === "running" ? remainingMs() : 0; }
-    },
-    sound: {
-      on: function () { return soundOn; },
-      onChange: function (fn) { if (typeof fn === "function") soundListeners.push(fn); },
-      unlock: unlockSound,
-      context: audioContext,
-      ready: function () { return soundOn && actx && actx.state === "running" ? actx : null; }
     },
     setBig: function (on) { setBig(on); },
     isBig: isBig,

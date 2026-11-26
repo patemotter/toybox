@@ -127,10 +127,10 @@ function checkFile(rel, issues) {
     issues.push(`${rel}:${lineAt(code, m.index)}: tilt/shake motion API "${m[1]}" is not allowed`);
   }
 
-  // d) No direct new AudioContext / webkitAudioContext outside common/
-  if (/\.(html|js)$/.test(rel) && !rel.startsWith('common/')) {
-    for (const m of code.matchAll(/\bnew\s+(?:window\.)?(?:webkit)?AudioContext\b/g)) {
-      issues.push(`${rel}:${lineAt(code, m.index)}: direct "${m[0]}" outside common/ (use Toybox.sound.ready())`);
+  // d) No sound at all (the dad, 2026-11-26): no Web Audio, no spoken lines, no <audio>, no Toybox.sound
+  if (/\.(html|js)$/.test(rel)) {
+    for (const m of code.matchAll(/\b(?:webkit)?AudioContext\b|\bspeechSynthesis\b|\bSpeechSynthesisUtterance\b|\bnew\s+Audio\s*\(|<audio\b|\b(?:Toybox|Farm)\.sound\b/g)) {
+      issues.push(`${rel}:${lineAt(code, m.index)}: "${m[0]}": the Toybox makes no sound`);
     }
   }
 

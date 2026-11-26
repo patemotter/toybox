@@ -95,11 +95,10 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
   // Sections:
   //   1. State and persistence
   //   2. Canvas sizing and layout
-  //   3. Sound
-  //   4. Interaction and actions
-  //   5. Coach, ghost hand and bottom bar
-  //   6. Render loop
-  //   7. Toybox init and debug hook
+  //   3. Interaction and actions
+  //   4. Coach, ghost hand and bottom bar
+  //   5. Render loop
+  //   6. Toybox init and debug hook
 
   const $ = (id) => document.getElementById(id);
   const cv = $("cv");
@@ -164,27 +163,7 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
   }}
 
   // =========================================================================
-  // 3. Sound
-  // =========================================================================
-  function chime(freq) {{
-    const ac = Toybox.sound.ready();
-    if (!ac) return;
-    const t = ac.currentTime;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.001, t);
-    gain.gain.linearRampToValueAtTime(0.14, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.35);
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.38);
-  }}
-
-  // =========================================================================
-  // 4. Interaction and actions
+  // 3. Interaction and actions
   // =========================================================================
   function locked() {{
     return state.ending || state.resting;
@@ -203,7 +182,6 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
       alpha: 1,
       color: COLORS[state.colorIndex]
     }});
-    chime(330 + (state.colorIndex * 55));
     coach.step("Tap again for the next color.");
     ghost.poke();
     saveState();
@@ -234,7 +212,6 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
     }}
     state.step += 1;
     state.colorIndex = (state.colorIndex + 2) % COLORS.length;
-    chime(523.25);
     ghost.poke();
     saveState();
   }}
@@ -245,7 +222,7 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
   }});
 
   // =========================================================================
-  // 5. Coach, ghost hand and bottom bar
+  // 4. Coach, ghost hand and bottom bar
   // =========================================================================
   const coach = Toybox.coach($("coach"));
   coach.step({js_prompt});
@@ -262,7 +239,7 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
   Toybox.bar($("bottom"), {{ onNew: resetPlay, onSurprise: surprise }});
 
   // =========================================================================
-  // 6. Render loop
+  // 5. Render loop
   // =========================================================================
   let lastTs = 0;
 
@@ -315,7 +292,7 @@ def build_js(folder: str, name: str, subtitle: str) -> str:
   }}
 
   // =========================================================================
-  // 7. Toybox init and debug hook
+  // 6. Toybox init and debug hook
   // =========================================================================
   loadState();
   resize();

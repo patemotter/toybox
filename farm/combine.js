@@ -27,7 +27,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash;
-  var D = Farm.draw, snd = Farm.sound, C = Farm.COMBINE, SH = Farm.shape;
+  var D = Farm.draw, C = Farm.COMBINE, SH = Farm.shape;
   var TAU = Math.PI * 2, INK = U.INK, picCache = {};
   var NAME = Farm.NAMES.combine;
   document.title = NAME; $("title").textContent = NAME;
@@ -186,23 +186,23 @@
   // ---------- Controls: what each one does (one press is always enough) ----------
   function setHeader(up) {
     if (cb.hdrUp === up) return;
-    cb.hdrUp = up; snd.clunk(); flash.lever = 0;
+    cb.hdrUp = up; flash.lever = 0;
   }
   // The horn is just for fun: nothing waits on it.
   function toot() {
-    snd.horn(); cb.horn = 1.4;
+    cb.horn = 1.4;
     if (tr.state === "drift") bringBack();
   }
   function callTractor() {
     tr.state = "in"; tr.face = 1; tr.turn = null; tr.tip = 0; tr.lever = 0; tr.callT = 0;
     tr.x = Math.min(spotX() - 6, sc.wx(-30, sc.TRACK) - 6.5 * TF()); tr.v = 9;
   }
-  function bringBack() { if (tr.state !== "drift") return; tr.state = "side"; tr.heldT = 0; snd.horn(); }
+  function bringBack() { if (tr.state !== "drift") return; tr.state = "side"; tr.heldT = 0; }
   // the tractor leaves for the grain barn and drives all the way there (one tap is enough)
   function startRoad() { tr.state = "road"; tr.to = storeSpot(); tr.heldT = 0; }
   function startTip() {
     if (tr.state !== "store") return;
-    tr.state = "tip"; tr.t = 0; snd.clunk();
+    tr.state = "tip"; tr.t = 0;
   }
 
   // ---------- The steps: what he does, in order ----------
@@ -255,7 +255,7 @@
     onPick: switchJob
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
-  function busyHint() { snd.horn(); coach.say(BUSY[stepId] || "Wait a moment.", 3); }
+  function busyHint() { coach.say(BUSY[stepId] || "Wait a moment.", 3); }
   function hint() { var t = sayFor(key()); if (t) coach.say(t, 3); if (cue && cue in flash) flash[cue] = 3; if (ghost) ghost.poke(); }
 
   // =====================================================================================================
@@ -302,7 +302,7 @@
     }
     if (k === "cut.drive") { startCut(); return true; }
     if (k === "unload.swing") {
-      cb.augerTo = 1; snd.clunk();
+      cb.augerTo = 1;
       working("The grain spout swings out over the trailer.");
       return true;
     }
@@ -312,12 +312,12 @@
       return true;
     }
     if (k === "store.drive") {
-      startRoad(); snd.horn();
+      startRoad();
       working(job === "sun" ? "The tractor takes the seeds to the grain barn." : "The tractor takes the grain to the grain barn.");
       return true;
     }
     if (k === "bale.drive") {
-      autoBale = true; snd.horn();
+      autoBale = true;
       working("The baler picks up the straw and makes square bales.");
       return true;
     }
@@ -330,7 +330,7 @@
   }
   function startCut() {
     if (cb.hdrUp) setHeader(false);
-    autoCut = true; snd.horn();
+    autoCut = true;
     working(job === "sun" ? "The combine cuts the sunflowers." : "The combine cuts the wheat.");
   }
   function finish() {
@@ -437,7 +437,6 @@
     if (pick === "pony") {
       pony.eat = 5.0;
       coach.say("Merlin enjoys a straw snack!", 3);
-      snd.clunk();
       return;
     }
     if (pick === "finches") {
@@ -518,16 +517,16 @@
   // a part's real name, as a small tag, when he taps it (px, py: where he tapped, canvas px)
   function tagPart(part, px, py) {
     var n;
-    if (part === "pony") { pony.nod = 1.2; snd.tick(); tag("Merlin", ponyScreen()); return true; }
-    if (part === "lever") { snd.tick(); tag("Header lever", leverPt()); return true; }
+    if (part === "pony") { pony.nod = 1.2; tag("Merlin", ponyScreen()); return true; }
+    if (part === "lever") { tag("Header lever", leverPt()); return true; }
     if (part === "horn") { tag("Horn", hornPt()); toot(); return true; }
-    if (part === "auger") { snd.tick(); tag("Grain spout", augerPt()); return true; }
-    if (part === "tiplever") { snd.tick(); tag("Tipping lever", tipLeverPt()); return true; }
-    if (part === "combine" || part === "tank" || part === "header") { n = cbPartName(px, py); snd.tick(); tag(n[0], n[1]); return true; }
-    if (part === "rig") { n = rigPartName(px); snd.tick(); tag(n[0], n[1]); return true; }
-    if (part === "baler") { n = balerPartName(px, py); snd.tick(); tag(n[0], n[1]); return true; }
-    if (part === "bale") { var bi = baleAt(px, py), bb = fieldBales[bi]; if (!bb) return false; snd.tick(); tag("Straw bale", [sc.X(bb.x, 1), sc.Y(1) - 1.0 * sc.S(1)]); return true; }
-    if (part === "barn") { var sx = sc.X(STORE_X, 1.02); snd.tick(); tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]); return true; }
+    if (part === "auger") { tag("Grain spout", augerPt()); return true; }
+    if (part === "tiplever") { tag("Tipping lever", tipLeverPt()); return true; }
+    if (part === "combine" || part === "tank" || part === "header") { n = cbPartName(px, py); tag(n[0], n[1]); return true; }
+    if (part === "rig") { n = rigPartName(px); tag(n[0], n[1]); return true; }
+    if (part === "baler") { n = balerPartName(px, py); tag(n[0], n[1]); return true; }
+    if (part === "bale") { var bi = baleAt(px, py), bb = fieldBales[bi]; if (!bb) return false; tag("Straw bale", [sc.X(bb.x, 1), sc.Y(1) - 1.0 * sc.S(1)]); return true; }
+    if (part === "barn") { var sx = sc.X(STORE_X, 1.02); tag("Grain barn", [sx, sc.Y(1.02) - 7.3 * sc.S(1.02)]); return true; }
     return false;
   }
   // the close-up shows the moment he is working: a tap on it is a tap on the part the ring marks
@@ -718,8 +717,6 @@
     var lvl = Math.max(Math.abs(cb.v) / VMAX, cb.hdr < 0.5 ? 0.35 : 0.15, tr.state === "road" || tr.state === "in" || tr.state === "back" ? 0.6 : 0,
       bl.v > 0.1 ? 0.6 : (bl.state === "wait" || bl.state === "work" ? 0.3 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending ? -1 : engLevel);
-    snd.pour(cb.pouring || tr.flow ? 0.8 : 0);
   }
 
   // He drives: the combine's middle follows his finger (held ahead of it, it keeps driving), a tap drives it a
@@ -843,7 +840,7 @@
     } else if (ts === "dock") {
       var dk = storeSpot() - tr.x;
       tr.v = clamp(dk * 2.2, 0.5, 9); tr.x += Math.min(tr.v * dt, Math.max(dk, 0.005));
-      if (dk < 0.03) { tr.x = storeSpot(); tr.v = 0; tr.state = "store"; snd.clunk(); }
+      if (dk < 0.03) { tr.x = storeSpot(); tr.v = 0; tr.state = "store"; }
     } else if (ts === "drift") {
       // Surprise: it rolls on a little way, then comes back by itself
       tr.t += dt; if (tr.t < 1.4) { tr.v = 1.6; tr.x += tr.v * dt; } else tr.v = 0;
@@ -868,7 +865,6 @@
   function storedLoad() {
     loads++; save();
     Farm.world.update(function (w) { if (job === "sun") w.seeds = (typeof w.seeds === "number" && isFinite(w.seeds) ? w.seeds : 0) + 1; else w.grain = (w.grain || 0) + 1; });
-    snd.chime();
     if (fieldDone() && cb.tank < 0.02 && !doneSaid) {
       doneSaid = true;
       Toybox.kind();
@@ -992,7 +988,7 @@
     while (bl.n < BALE_N && raw >= bl.n + 1 - 1e-6) dropBale();
     var tie = Math.min(BALE_N, Math.floor(raw + 1e-6) + 1);
     if (raw > 0.001 && bl.tied < tie) {
-      bl.tied = tie; bl.knotT = 0.7; snd.tick();
+      bl.tied = tie; bl.knotT = 0.7;
       if (tie === 1) say("The knotters tie the bale with twine.", 3);
     }
     bl.p = bl.n < BALE_N ? clamp(raw - bl.n, 0, 1) : 0;
@@ -1001,7 +997,6 @@
     bl.n++;
     var q = chutePose(1), ax = EMIT0 + bl.n * BALE_EVERY;
     fieldBales.push({ x: ax + Farm.DRAWBAR[0] + q[0], h0: -(Farm.DRAWBAR[1] + q[1]), a0: q[2], t: 0 });
-    snd.clunk();
   }
   function strawBale(c) {
     SH.R(c, -1.2, -0.9, 2.4, 0.9, 0.08, "#F0D27E");
@@ -1283,7 +1278,7 @@
         if (f >= 1) { b.st = "sit"; b.t = 0; }
       } else if (b.st === "sit") {
         var near = Math.abs(cb.x + cb.dir * 2 - b.x) < 5.5 || Math.abs(cx - b.x) < 3.5;
-        if (near || b.t > 9 + hash(b.tx, 3) * 2 || (b.th > 1 && !standing(b.x))) { b.st = "off"; b.t = 0; b.vx = (b.x < cx ? -1 : 1) * (5 + hash(b.tx, 4) * 3); b.vh = 4 + hash(b.tx, 5) * 2; b.flip = b.vx < 0; if (near) snd.tick(); }
+        if (near || b.t > 9 + hash(b.tx, 3) * 2 || (b.th > 1 && !standing(b.x))) { b.st = "off"; b.t = 0; b.vx = (b.x < cx ? -1 : 1) * (5 + hash(b.tx, 4) * 3); b.vh = 4 + hash(b.tx, 5) * 2; b.flip = b.vx < 0; }
       } else if (b.st === "off") {
         b.x += b.vx * dt; b.h += b.vh * dt; b.vh += dt * 1.5;
         if (b.t > 3) b.st = "gone";
@@ -2054,7 +2049,7 @@
   function onEnding(done) {
     ending = true; grab = null; cb.to = null; cb.hold = false; cb.pour = 0; tr.to = null; autoBale = false;
     coach.clear();
-    setTimeout(function () { cb.augerTo = 0; snd.engine(-1); done(); }, 2600);
+    setTimeout(function () { cb.augerTo = 0; done(); }, 2600);
   }
   function onWake() {
     ending = false; dusk = 0;
@@ -2092,16 +2087,14 @@
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine and grain sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   // leaving the page while a machine works switches it off quietly
   Toybox.offFirst({
     running: function () { return autoCut || autoBale || Math.abs(cb.v) > 0.05 || bl.v > 0.05 || cb.pouring || tr.state === "road" || tr.state === "tip"; },
-    off: function (done) { autoCut = false; autoBale = false; grab = null; cb.v = 0; bl.v = 0; cb.pour = 0; tr.to = null; snd.engine(-1); snd.pour(0); done(); }
+    off: function (done) { autoCut = false; autoBale = false; grab = null; cb.v = 0; bl.v = 0; cb.pour = 0; tr.to = null; done(); }
   });
   requestAnimationFrame(loop);
 

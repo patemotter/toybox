@@ -19,7 +19,7 @@
   // the stage is split: the whole job on top (every machine fully in view) and a close-up of the work below.
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2, PI = Math.PI;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2, PI = Math.PI;
   var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   var NAME = (Farm.NAMES && Farm.NAMES.woods) || "Timberrrrr!";
   document.title = NAME; $("title").textContent = NAME;
@@ -792,9 +792,9 @@
 
   var BUSYL = { fell: "The harvester is working.", logs: "The harvester head is cutting.", lorry: "The timber lorry is working.", saw: "The loader and the saws are working.", fence: "Farmer Tom is working." };
   function busyHint() {
-    if (job === "logs") { snd.horn(); coach.say(BUSYL[stepId] || "Wait a moment.", 3); return; }
+    if (job === "logs") { coach.say(BUSYL[stepId] || "Wait a moment.", 3); return; }
     if (phase === "arrive") { coach.say("Here comes the harvester.", 3); return; }
-    if (phase === "work") { snd.horn(); coach.say(BUSY[stepId], 3); }
+    if (phase === "work") { coach.say(BUSY[stepId], 3); }
   }
   function hint() { var d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
 
@@ -831,7 +831,7 @@
   function go() {
     if (phase !== "ready") return false;
     if (ghost) ghost.learned("go");
-    setPhase("work"); snd.horn();
+    setPhase("work");
     wk = { t: 0, ev: {}, from: { x: head.x, h: head.h, r: head.r, rot: head.rot } };
     if (stepId === "turn") coach.say("The seat turns round.", 3);
     else if (stepId === "feed" || stepId === "chips") { wk.amt = stepId === "feed" ? 0.5 : ch.pile; wk.feedDur = stepId === "feed" ? 1.5 : 1.8; wk.load0 = ch.load; wk.g0 = { x: grp.x, h: grp.h }; coach.say("The crane grabs the branches.", 3); }
@@ -848,7 +848,7 @@
       loads++; coach.say("The trailer is full of chips!", 5);
       Farm.world.update(function (w) { w.chips = (typeof w.chips === "number" && isFinite(w.chips) ? w.chips : 0) + 1; });
     } else { coach.say("The sheep are safe in the field.", 5); fld.home = 0.01; }
-    save(); snd.chime(); Toybox.kind();
+    save(); Toybox.kind();
     coach.step(job === "chip" ? "Tap the wood chipper to chip more branches." : "Tap the field to cut another tree.");
   }
   function again() {
@@ -923,9 +923,8 @@
   function syncHead() { head.x = harv.x - HV0 + PARK.x; head.h = PARK.h; head.r = 1; head.rot = 0; }
   function driveHarv() {
     var x0 = harv.x, dur = Math.max(0.6, (HV0 - x0) / 3.0);
-    snd.horn();
     run(dur, function (t) { var nx = lerp(x0, HV0, ease(t / dur)); harv.wheel += nx - harv.x; harv.x = nx; syncHead(); },
-      function () { harv.x = HV0; syncHead(); snd.clunk(); coach.say("The harvester has six big wheels.", 3); setSub("grip"); });
+      function () { harv.x = HV0; syncHead(); coach.say("The harvester has six big wheels.", 3); setSub("grip"); });
   }
   function gripTree() {
     var from = { x: head.x, h: head.h, r: head.r, rot: head.rot };
@@ -933,7 +932,6 @@
     run(1.5, function (t) {
       setHead(track([[0, from], [1.1, pose(0, SG, 1, 0)]], t));
       head.grip = clamp((t - 1.1) / 0.3, 0, 1);
-      if (t > 1.2 && onceM("grip")) snd.clunk();
     }, function () { head.grip = 1; setSub("saw"); });
   }
   function sawTree() {
@@ -948,12 +946,12 @@
     if (t > 1.45 && t < 2.5 && Math.random() < dt * 40) addPart({ kind: "dust", x: 0.2 + Math.random() * 0.2, h: CUT_H + (Math.random() - 0.3) * 0.1, vx: 1.2 + Math.random() * 2.2, vh: Math.random() * 1.6, g: 6, life: 0.6 + Math.random() * 0.3, size: 0.035 + Math.random() * 0.03, col: Math.random() < 0.5 ? WOOD : "#F6E2B5" });
     if (t >= 2.5 && onceM("cut")) { tree.cut = true; tree.s0 = CUT_H; tree.cutP = 0; }
     if (t > 2.8) {
-      if (onceM("timber")) { coach.say("Timber!", 3); snd.horn(); }
+      if (onceM("timber")) { coach.say("Timber!", 3); }
       var u = clamp((t - 2.8) / 1.4, 0, 1), rot = PI / 2 * u * u;
       if (t > 4.2) rot = PI / 2 - 0.05 * Math.sin(PI * clamp((t - 4.2) / 0.4, 0, 1));
       treeAt(rot); head.rot = rot;
       if (t >= 4.2 && onceM("land")) {
-        shake = 0.45; snd.clunk(); snd.clunk();
+        shake = 0.45;
         for (var i = 0; i < 16; i++) addPart({ kind: "puff", x: 1 + Math.random() * 7, h: 0.2 + Math.random() * 0.6, vx: (Math.random() - 0.5) * 1.2, vh: 0.4 + Math.random() * 0.6, life: 1.1, size: 0.18, grow: 0.5, col: "#E6E0C8", alpha: 0.5 });
         for (i = 0; i < 10; i++) addPart({ kind: "bough", x: 2 + Math.random() * 6, h: 1.0, vx: (Math.random() - 0.5) * 3, vh: 1.5 + Math.random() * 2, g: 9, life: 0.8, size: 0.12, col: NEEDLE2, spin: 5, floor: 0.1 });
       }
@@ -982,7 +980,6 @@
       if (w.off || tree.px + w.s > knife) return;
       w.off = true; brash.n++;
       for (var j = 0; j < 2; j++) addPart({ kind: "bough", x: knife + 0.1, h: SG + (j ? -0.3 : 0.4), vx: 0.6 + Math.random() * 1.6, vh: Math.random() * 1.5, g: 9, life: 0.55, size: 0.2 + w.w * 0.12, col: j ? NEEDLE : NEEDLE2, spin: (Math.random() - 0.5) * 8, floor: 0.2 });
-      snd.tick();
     });
     if (cutting && Math.random() < dt * 30) addPart({ kind: "dust", x: -0.5 + (Math.random() - 0.5) * 0.1, h: SG - 0.1, vx: (Math.random() - 0.5) * 2, vh: -Math.random() * 1.5, g: 6, life: 0.6, size: 0.04, col: WOOD });
     if (k >= 2 && t > 2.2) {
@@ -990,7 +987,6 @@
         tree.top = false; tree.on = false; brash.n += 3;
         addPart({ kind: "stick", x: 1.0, h: SG, vx: 0.8, vh: 0.5, g: 9, life: 0.6, size: 0.35, col: BARK, spin: 2, floor: 0.3 });
         for (var j = 0; j < 4; j++) addPart({ kind: "bough", x: 1.2 + j * 0.3, h: SG + 0.2, vx: 0.8 + Math.random(), vh: Math.random(), g: 9, life: 0.55, size: 0.18, col: NEEDLE2, spin: 5, floor: 0.25 });
-        snd.clunk();
       }
       head.grip = 1 - clamp((t - 2.2) / 0.3, 0, 1);
     }
@@ -1002,13 +998,12 @@
     logs.push({ k: k, len: LOGL, d: d, x: tree.px + (sA + sB) / 2, h: SG, r: 1, st: "fall", vh: 0, tx: STKA_X + slot, th: below + d / 2 });
     tree.s0 = sB;
     if (k === 0) coach.say("The saw cuts a log.", 3);
-    snd.tick();
   }
   function updateLogs(dt) {
     logs.forEach(function (L) {
       if (L.st === "fall") {
         L.vh -= 9 * dt; L.h += L.vh * dt; L.x += (L.tx - L.x) * Math.min(1, dt * 5);
-        if (L.h <= L.th) { L.h = L.th; L.x = L.tx; L.st = "stack"; snd.clunk(); }
+        if (L.h <= L.th) { L.h = L.th; L.x = L.tx; L.st = "stack"; }
       } else if (L.st === "lorry") L.x = lorry.x + LBUNK;
       else if (L.st === "deckroll") {
         var e = Math.min(1, dt * 4);
@@ -1032,7 +1027,7 @@
     var x0 = lorry.x;
     coach.say("Here comes the timber lorry.", 4);
     run(4.0, function (t) { var nx = lerp(x0, LXF, ease(t / 4)); lorry.wheel += nx - lorry.x; lorry.x = nx; craneRest(); },
-      function () { snd.clunk(); coach.say("The lorry's crane loads the logs.", 4); loadLorry(); });
+      function () { coach.say("The lorry's crane loads the logs.", 4); loadLorry(); });
   }
   function loadLorry() {
     var R0 = restPt(), top = 0.08 + totD();
@@ -1042,8 +1037,8 @@
       var p = track([[0, R0], [1.0, above], [1.4, at], [1.6, at], [2.6, up], [3.05, bunk], [3.3, bunk], [4.4, R0]], t);
       lorry.crane.x = p.x; lorry.crane.h = p.h;
       lorry.crane.open = t < 1.4 ? 1 : (t < 1.6 ? 1 - (t - 1.4) / 0.2 : (t < 3.15 ? 0 : clamp((t - 3.15) / 0.2, 0, 1)));
-      if (t >= 1.55 && t < 3.15) { stackLogs(p.x, p.h - 0.5 - totD(), LR, "held"); if (onceM("g")) snd.clunk(); }
-      if (t >= 3.15 && onceM("put")) { stackLogs(lorry.x + LBUNK, LBED + 0.2, LR, "lorry"); snd.clunk(); }
+      if (t >= 1.55 && t < 3.15) { stackLogs(p.x, p.h - 0.5 - totD(), LR, "held"); }
+      if (t >= 3.15 && onceM("put")) { stackLogs(lorry.x + LBUNK, LBED + 0.2, LR, "lorry"); }
     }, function () { craneRest(); setSub("drive"); tag("Timber lorry", lorry.x - 1.5, 4.2, LR); });
   }
   function driveLorry() {
@@ -1052,7 +1047,7 @@
     run(dur, function (t) { var nx = lerp(x0, LXW, ease(t / dur)); lorry.wheel += nx - lorry.x; lorry.x = nx; craneRest(); }, onWeigh);
   }
   function onWeigh() {
-    lorry.x = LXW; craneRest(); snd.clunk();
+    lorry.x = LXW; craneRest();
     coach.say("The weighbridge weighs the lorry.", 4);
     setSub("count");
   }
@@ -1061,10 +1056,10 @@
     var idx = /^wheel\d$/.test(p) ? +p.slice(5) : -1, i;
     if (idx < 0 || lorry.pop.indexOf(idx) >= 0) { idx = -1; for (i = 0; i < LWHEELS.length; i++) if (lorry.pop.indexOf(i) < 0) { idx = i; break; } }
     if (idx < 0) return;
-    lorry.pop.push(idx); lorry.popT.push(time); snd.tick();
+    lorry.pop.push(idx); lorry.popT.push(time);
     var n = lorry.pop.length;
     coach.say(NUMW[n - 1], 3);
-    if (n >= LWHEELS.length) { snd.chime(); run(1.8, function () {}, function () { coach.say("The lorry has six wheels.", 3); setSub("grab"); }); }
+    if (n >= LWHEELS.length) { run(1.8, function () {}, function () { coach.say("The lorry has six wheels.", 3); setSub("grab"); }); }
   }
   function craneGrab() {
     var R0 = { x: lorry.crane.x, h: lorry.crane.h }, above = { x: lorry.x + LBUNK, h: 4.8 }, at = { x: lorry.x + LBUNK, h: LBED + 0.2 + totD() + 0.5 };
@@ -1072,7 +1067,6 @@
     run(1.8, function (t) {
       var p = track([[0, R0], [0.9, above], [1.3, at]], t);
       lorry.crane.x = p.x; lorry.crane.h = p.h; lorry.crane.open = t < 1.3 ? 1 : 1 - clamp((t - 1.3) / 0.3, 0, 1);
-      if (t > 1.5 && onceM("g")) snd.clunk();
     }, function () { lorry.crane.open = 0; logs.forEach(function (L) { if (L.st === "lorry") L.st = "held"; }); setSub("drop"); });
   }
   function craneDrop() {
@@ -1083,7 +1077,7 @@
       if (t < 2.0) { lorry.crane.open = 0; stackLogs(p.x, p.h - 0.5 - totD(), lerp(LR, 1, clamp((t - 0.5) / 1.4, 0, 1)), "held"); }
       else {
         lorry.crane.open = clamp((t - 2.0) / 0.2, 0, 1);
-        if (onceM("put")) { stackLogs(STK2, 0.08, 1, "stack2"); snd.clunk(); coach.say("The logs go on the holding pile.", 3); }
+        if (onceM("put")) { stackLogs(STK2, 0.08, 1, "stack2"); coach.say("The logs go on the holding pile.", 3); }
       }
     }, function () { craneRest(); stepDone("lorry"); });
   }
@@ -1096,14 +1090,14 @@
       if (t < turn) loader.dir = lerp(d0, dir, ease(t / turn));
       else { loader.dir = dir; var nx = lerp(x0, target, ease((t - turn) / Math.max(0.01, dur - turn))); loader.wheel += (nx - loader.x) * dir; loader.x = nx; }
       loader.tdir = loader.dir; carryLogs();
-    }, function () { loader.x = target; loader.dir = loader.tdir = dir; carryLogs(); snd.clunk(); setSub(next); });
+    }, function () { loader.x = target; loader.dir = loader.tdir = dir; carryLogs(); setSub(next); });
   }
   function loaderGrab() {
     var l0 = loader.lift;
     run(2.0, function (t) {
       loader.lift = t < 0.6 ? lerp(l0, 0, t / 0.6) : (t < 1.0 ? 0 : lerp(0, 0.38, (t - 1.0) / 1.0));
       loader.clamp = clamp((t - 0.6) / 0.35, 0, 1);
-      if (t >= 0.9) { loader.carry = true; carryLogs(); if (onceM("g")) { snd.clunk(); coach.say("The grab picks up the logs.", 3); } }
+      if (t >= 0.9) { loader.carry = true; carryLogs(); if (onceM("g")) { coach.say("The grab picks up the logs.", 3); } }
     }, function () { setSub("drive2"); });
   }
   function loaderDrop() {
@@ -1112,7 +1106,7 @@
       loader.lift = t < 0.8 ? lerp(0.38, 0.6, t / 0.8) : (t < 2.0 ? 0.6 : lerp(0.6, 0.2, (t - 2.0) / 1.0));
       loader.clamp = t < 0.8 ? 1 : 1 - clamp((t - 0.8) / 0.3, 0, 1);
       if (t < 1.0) carryLogs();
-      else if (onceM("drop")) { loader.carry = false; deckLogs(); snd.clunk(); coach.say("The logs roll down the log deck.", 3); }
+      else if (onceM("drop")) { loader.carry = false; deckLogs(); coach.say("The logs roll down the log deck.", 3); }
       if (t > 1.9) { var nx = lerp(x0, x0 - 2.4, ease((t - 1.9) / 1.1)); loader.wheel += (nx - loader.x); loader.x = nx; }
     }, function () { setSub("feed"); });
   }
@@ -1141,8 +1135,8 @@
         if (Math.random() < dt * 30) addPart({ kind: "dust", x: SAW1 + 0.2, h: CONVH + q.d / 2 + (Math.random() - 0.5) * q.d, vx: 0.5 + Math.random() * 1.5, vh: (Math.random() - 0.5) * 1.2, g: 4, life: 0.6, size: 0.035, col: WOOD });
       }
       if (q.sp > 0 && q.sp < q.len && Math.random() < dt * 24) addPart({ kind: "dust", x: SAW2 + 0.2, h: CONVH + q.d / 2, vx: 0.4 + Math.random() * 1.2, vh: (Math.random() - 0.5) * 0.8, g: 4, life: 0.6, size: 0.035, col: WOOD });
-      if (q.sq > 0.2 && onceM("sq")) { coach.say("The saws cut off the round sides.", 3); mill.inset = { st: "square", t: 0 }; snd.tick(); }
-      if (q.sp > 0.2 && onceM("sp")) { coach.say("The saw cuts it into two posts.", 3); mill.inset = { st: "split", t: 0 }; snd.tick(); }
+      if (q.sq > 0.2 && onceM("sq")) { coach.say("The saws cut off the round sides.", 3); mill.inset = { st: "square", t: 0 }; }
+      if (q.sp > 0.2 && onceM("sp")) { coach.say("The saw cuts it into two posts.", 3); mill.inset = { st: "split", t: 0 }; }
       if (x >= x1 && onceM("off")) postsOut(q);
     }, function () {
       if (q.st !== "gone") postsOut(q);
@@ -1155,7 +1149,7 @@
   function postsOut(q) {
     q.st = "gone";
     for (var i = 0; i < 2; i++) mposts.push({ x: CONV1 - 0.9, h: CONVH + 0.2 + i * 0.12, n: mposts.length });
-    posts += 2; save(); snd.clunk();
+    posts += 2; save();
     Farm.world.update(function (w) { w.posts = (typeof w.posts === "number" && isFinite(w.posts) ? w.posts : 0) + 2; });
     fld.pileN = Math.min(6, mposts.length);
   }
@@ -1171,9 +1165,9 @@
     coach.say("Farmer Tom carries a post to the hole.", 3);
     run(3.4, function (t) {
       if (t < 0.9) { T.x = lerp(x0, pickX, ease(t / 0.9)); T.flip = pickX < x0; T.bend = 0; }
-      else if (t < 1.4) { T.bend = Math.sin(PI * (t - 0.9) / 0.5) * 0.8; if (t > 1.15 && onceM("pick")) { fld.post.st = "held"; fld.pileN = Math.max(0, fld.pileN - 1); snd.tick(); } }
+      else if (t < 1.4) { T.bend = Math.sin(PI * (t - 0.9) / 0.5) * 0.8; if (t > 1.15 && onceM("pick")) { fld.post.st = "held"; fld.pileN = Math.max(0, fld.pileN - 1); } }
       else if (t < 2.6) { T.flip = false; T.bend = 0; T.x = lerp(pickX, holdX, ease((t - 1.4) / 1.2)); }
-      else if (onceM("stand")) { fld.post.st = "stand"; fld.post.tilt = 0; fld.post.sink = SINK[0]; snd.clunk(); }
+      else if (onceM("stand")) { fld.post.st = "stand"; fld.post.tilt = 0; fld.post.sink = SINK[0]; }
       T.hands = fld.post.st === "held" ? [[0.25, -1.25], [0.1, -1.0]] : (fld.post.st === "stand" ? [[0.45, -1.3], [0.42, -1.02]] : null);
     }, function () { setSub("ted"); });
   }
@@ -1183,7 +1177,7 @@
     run(dur, function (t) {
       var nx = lerp(x0, TEDK, ease(t / dur)); fld.ted.wheel += nx - fld.ted.x; fld.ted.x = nx;
       fld.tom.x = lerp(tx, HOLE - 1.8, ease(t / dur)); fld.tom.hands = null;
-    }, function () { fld.ted.x = TEDK; snd.clunk(); setSub("knock"); });
+    }, function () { fld.ted.x = TEDK; setSub("knock"); });
   }
   var SINK = [0.3, 0.6, 0.9, 1.2], KNOCKSAY = ["The weight drops on the post.", "The post goes down.", "The post is in the ground."];
   function knock() {
@@ -1193,7 +1187,7 @@
       else {
         fld.lift = Math.max(0, 1 - (t - 0.95) / 0.12);
         if (fld.lift <= 0 && onceM("bang")) {
-          fld.knocks++; fld.post.sink = SINK[Math.min(3, fld.knocks)]; shake = 0.25; snd.clunk(); snd.clunk();
+          fld.knocks++; fld.post.sink = SINK[Math.min(3, fld.knocks)]; shake = 0.25;
           for (var i = 0; i < 8; i++) addPart({ kind: "puff", x: HOLE + (Math.random() - 0.5) * 0.6, h: 0.05, vx: (Math.random() - 0.5) * 1.4, vh: 0.3 + Math.random() * 0.5, life: 0.9, size: 0.1, grow: 0.3, col: "#C9B38A", alpha: 0.6 });
           coach.say(KNOCKSAY[Math.min(2, n)], 3);
         }
@@ -1214,7 +1208,7 @@
         fld.wire = clamp((t - 1.0) / 1.7, 0, 1);
         var hit = Math.floor((t - 1.0) * 3);
         T.hands = [[0.42, -1.05 - Math.abs(Math.sin((t - 1.0) * PI * 3)) * 0.25], [0.4, -0.85]];
-        if (hit > taps) { taps = hit; snd.tick(); }
+        if (hit > taps) { taps = hit; }
       }
     }, function () { fld.wire = 1; T.hands = null; stepDone("fence"); });
   }
@@ -1348,14 +1342,13 @@
   // A real part's name pops up when he taps it (a small plain label)
   var NAMESL = { lorry: "Timber lorry", lorrylogs: "Logs", crane: "Crane", weigh: "Weighbridge", stack2: "Log pile", loader: "Log loader", grab: "Log grab", deck: "Log deck", saw: "Saws", postpile: "Fence posts", ppile: "Fence posts", post: "Fence post", hole: "Post hole", ted: "Tractor", knocker: "Post knocker", wire: "Sheep fence", tom: "Farmer Tom" };
   function tagLogs(part) {
-    if (part === "harv") { snd.horn(); tag("Forestry harvester", harv.x, 3.4); return true; }
-    if (part === "head") { snd.tick(); head.roll += 2; tag("Harvester head", head.x, head.h + 0.7, head.r); return true; }
-    if (part === "tree") { tree.sway = 1; snd.tick(); tag(tree.rot < 0.1 ? "Spruce tree" : "Trunk", tree.rot < 0.1 ? 0 : head.x + 2.5, tree.rot < 0.1 ? 4.5 : 1.6); return true; }
-    if (part === "stack") { snd.clunk(); tag("Logs", STKA_X, 1.2); return true; }
-    if (part === "brash") { snd.tick(); tag("Brash", 1.8, 0.9); return true; }
-    if (part && /^wheel\d$/.test(part)) { snd.tick(); tag("Wheel", lorry.x + LWHEELS[+part.slice(5)], 1.4, LR); return true; }
+    if (part === "harv") { tag("Forestry harvester", harv.x, 3.4); return true; }
+    if (part === "head") { head.roll += 2; tag("Harvester head", head.x, head.h + 0.7, head.r); return true; }
+    if (part === "tree") { tree.sway = 1; tag(tree.rot < 0.1 ? "Spruce tree" : "Trunk", tree.rot < 0.1 ? 0 : head.x + 2.5, tree.rot < 0.1 ? 4.5 : 1.6); return true; }
+    if (part === "stack") { tag("Logs", STKA_X, 1.2); return true; }
+    if (part === "brash") { tag("Brash", 1.8, 0.9); return true; }
+    if (part && /^wheel\d$/.test(part)) { tag("Wheel", lorry.x + LWHEELS[+part.slice(5)], 1.4, LR); return true; }
     if (part && NAMESL[part]) {
-      if (part === "lorry" || part === "loader" || part === "ted") snd.horn(); else snd.tick();
       var p = { lorry: [lorry.x - 1, 4.2, LR], lorrylogs: [lorry.x + LBUNK, 3.0, LR], crane: [lorry.crane.x, lorry.crane.h + 0.3, LR], weigh: [HUT[0], 3.4, HUT[1]], stack2: [STK2, 1.6, 1],
         loader: [loader.x, 4.0, 1], grab: [grabPt().x, grabPt().h + 1.4, 1], deck: [DECK + 0.3, 2.2, 1.15], saw: [SAW1, 3.4, 1], postpile: [PSTK, 1.8, 1], ppile: [PPILE, 1.0, 0.95],
         post: [HOLE, postTop() + 0.4, 1], hole: [HOLE, 0.6, 1], ted: [fld.ted.x + 0.5, 3.6, 1], knocker: [fld.ted.x + KX, 4.7, 1], wire: [HOLE + 1.8, 1.5, 1], tom: [fld.tom.x, 2.0, 0.97] }[part];
@@ -1425,12 +1418,12 @@
       else if (stepId === "feed" || stepId === "chips") mine = part === "pile" || part === "grapple" || part === "chipper" || part === "tractor";
       if (phase === "done") { again(); return; }
       if (mine && phase === "ready") { go(); return; }
-      if (part === "spout") { ch.kick = 1; snd.pop(); tag("Spout", NOZ[0], NOZ[1] + 0.3); if (phase !== "work") coach.say("The spout aims the chips.", 3); return; }
-      if (part === "tractor") { snd.horn(); tag("Swivel seat", -0.3, 3.1); return; }
-      if (part === "chipper") { snd.tick(); tag("Wood chipper", 2.2, 2.6); return; }
-      if (part === "grapple") { grp.open = 1; snd.tick(); tag("Crane", grp.x, grp.h + 0.9); return; }
-      if (part === "pile") { snd.tick(); tag("Branches", (PILE0 + PILE1) / 2, 1.5); return; }
-      if (part === "trailer") { snd.clunk(); tag("Trailer", TRC, 3.9); return; }
+      if (part === "spout") { ch.kick = 1; tag("Spout", NOZ[0], NOZ[1] + 0.3); if (phase !== "work") coach.say("The spout aims the chips.", 3); return; }
+      if (part === "tractor") { tag("Swivel seat", -0.3, 3.1); return; }
+      if (part === "chipper") { tag("Wood chipper", 2.2, 2.6); return; }
+      if (part === "grapple") { grp.open = 1; tag("Crane", grp.x, grp.h + 0.9); return; }
+      if (part === "pile") { tag("Branches", (PILE0 + PILE1) / 2, 1.5); return; }
+      if (part === "trailer") { tag("Trailer", TRC, 3.9); return; }
       if (phase === "done") { again(); return; } else if (phase === "ready") sayStep(); else busyHint();
       if (ghost) ghost.poke();
     }
@@ -1463,7 +1456,7 @@
     var p = track([[1.0, GFOLD], [1.8, { x: 4.4, h: 3.5 }], [2.6, GREADY]], t);
     grp.x = p.x; grp.h = p.h; grp.open = lerp(0.3, 0.6, ch.unfold);
     if (t > 1.0 && once("crane")) coach.say("The crane unfolds.", 3);
-    if (t > 2.5) { ch.fly = Math.min(1, ch.fly + dt * 0.9); if (once("start")) { coach.say("The chipper starts up.", 3); snd.clunk(); } }
+    if (t > 2.5) { ch.fly = Math.min(1, ch.fly + dt * 0.9); if (once("start")) { coach.say("The chipper starts up.", 3); } }
     if (t > 3.9) stepDone("turn");
   }
   // Feed / Chips: the crane grabs the branches, lays them on the infeed table; rollers pull them in; chips fly.
@@ -1474,9 +1467,9 @@
     var p = track([[0, wk.g0], [0.8, wk.pl], [1.1, wk.pl], [1.6, GUP], [2.1, GTUP], [2.5, GTAB], [2.75, GTAB], [3.4, GREADY]], t);
     grp.x = p.x; grp.h = p.h;
     grp.open = t < 0.8 ? lerp(0.6, 1, t / 0.8) : (t < 1.1 ? 1 - (t - 0.8) / 0.3 : (t < 2.5 ? 0 : (t < 2.75 ? (t - 2.5) / 0.25 : lerp(1, 0.6, clamp((t - 2.75) / 0.6, 0, 1)))));
-    if (t >= 1.05 && once("grab")) { bnd = { st: "held", amt: amt, seed: Math.floor(Math.random() * 50), feed: 0 }; ch.pile = Math.max(0, ch.pile - amt); snd.clunk(); for (var i = 0; i < 4; i++) addPart({ kind: "bough", x: 6.5 + (Math.random() - 0.5), h: pileTop(), vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random(), g: 9, life: 0.5, size: 0.15, col: NEEDLE2, spin: 5, floor: 0.2 }); }
+    if (t >= 1.05 && once("grab")) { bnd = { st: "held", amt: amt, seed: Math.floor(Math.random() * 50), feed: 0 }; ch.pile = Math.max(0, ch.pile - amt); for (var i = 0; i < 4; i++) addPart({ kind: "bough", x: 6.5 + (Math.random() - 0.5), h: pileTop(), vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random(), g: 9, life: 0.5, size: 0.15, col: NEEDLE2, spin: 5, floor: 0.2 }); }
     if (bnd && bnd.st === "held") { bnd.x = grp.x; bnd.h = grp.h - 0.55; }
-    if (t >= 2.62 && once("drop")) { bnd.st = "table"; bnd.x = GTAB.x; bnd.h = 1.02; snd.clunk(); coach.say("The rollers pull them in.", 3); }
+    if (t >= 2.62 && once("drop")) { bnd.st = "table"; bnd.x = GTAB.x; bnd.h = 1.02; coach.say("The rollers pull them in.", 3); }
     if (bnd && bnd.st === "table") {
       bnd.feed = clamp((t - 2.75) / fd, 0, 1); bnd.x = GTAB.x - 1.75 * bnd.feed; ch.roll += dt * 9;
       if (bnd.feed >= 1) bnd = null;
@@ -1624,17 +1617,13 @@
     updateParts(dt);
     follow(dt);
     engLevel += (work - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending ? -1 : 0.15 + engLevel * 0.85);
-    var buzz = (head.saw > 0.1 && job === "logs") || (mill.run > 0.5 && job === "logs") ? 0.6 : (ch.rate > 0 ? 0.7 : 0);
-    snd.pour(ending ? 0 : buzz);
-    snd.soil(job === "chip" && ch.fly > 0 && !ending ? 0.25 + ch.rate * 0.4 : 0);
   }
   function updateDog(dt) {
     var g = dog; g.t += dt;
     if (g.st === "run") { var dx = g.stop - g.x; g.x += clamp(dx * 2.2, -8, 8) * dt; g.ph += dt * 3; if (Math.abs(dx) < 0.25) { g.st = "sniff"; g.t = 0; } }
     else if (g.st === "sniff") {
       g.ph += dt * 0.6;
-      if (g.t > 0.8 && !g.stick && g.forest) { g.stick = true; snd.pop(); coach.say("Midge takes a branch!", 3); }
+      if (g.t > 0.8 && !g.stick && g.forest) { g.stick = true; coach.say("Midge takes a branch!", 3); }
       if (g.t > 1.3) { g.st = "go"; g.t = 0; g.flip = false; }
     } else {
       g.x += (job === "chip" ? 7 : -7) * dt; g.flip = job === "chip"; g.ph += dt * 3.4;
@@ -1644,7 +1633,7 @@
   function updateSq(dt) {
     var s = sq; s.t += dt; s.ph += dt * 3;
     if (s.st === "run") { s.x += 3.2 * dt; if (s.x >= s.tx) { s.x = s.tx; s.st = "up"; s.t = 0; } }
-    else if (s.st === "up") { s.h += 2.6 * dt; if (s.h >= 4.4) { s.h = 4.4; s.st = "sit"; s.t = 0; snd.tick(); } }
+    else if (s.st === "up") { s.h += 2.6 * dt; if (s.h >= 4.4) { s.h = 4.4; s.st = "sit"; s.t = 0; } }
     else if (s.st === "sit") { s.ph -= dt * 2.2; if (s.t > 2.6) { s.st = "top"; s.t = 0; } }
     else { s.h += 2.4 * dt; if (s.t > 1.4) sq = null; }
   }
@@ -2011,7 +2000,7 @@
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; ch.rate = 0; setTimeout(function () { ch.fly = 0; mill.run = 0; snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; ch.rate = 0; setTimeout(function () { ch.fly = 0; mill.run = 0; done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -2033,11 +2022,9 @@
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine, saw and chipper sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   requestAnimationFrame(loop);
 

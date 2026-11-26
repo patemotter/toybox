@@ -12,7 +12,6 @@
   //
   // Sections:
   //   Setup and saved state
-  //   Sound
   //   Pictures
   //   Layout
   //   Coloring pages and line art
@@ -100,51 +99,6 @@
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 400); }
   const colorHex = () => (COLORS.find((c) => c.id === color) || COLORS[0]).hex;
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 1.2;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  let lastScratch = 0;
-  const snd = {
-    // A soft scratch while a tool moves on the paper: crayon is grainy, marker smooth, brush and eraser hushed.
-    scratch(t) {
-      const n = now(); if (n - lastScratch < 120) return; lastScratch = n;
-      if (t === "crayon") noise(0.11, 2600, 0.03);
-      else if (t === "marker") noise(0.1, 4200, 0.018);
-      else if (t === "eraser") noise(0.12, 1200, 0.025);
-      else noise(0.14, 900, 0.015);
-    },
-    pick() { tone(660, 660, 0.12, "sine", 0.04); },
-    fill() { tone(300, 600, 0.35, "sine", 0.05); tone(600, 900, 0.3, "sine", 0.03, 0.12); },
-    stroke() { tone(784, 784, 0.18, "sine", 0.045); tone(1047, 1047, 0.22, "sine", 0.035, 0.1); },
-    done() { [523, 659, 784, 1047].forEach((f, k) => tone(f, f, 0.35, "sine", 0.04, k * 0.13)); },
-    wipe() { noise(0.6, 1500, 0.03); tone(700, 300, 0.6, "sine", 0.02); },
-    sparkle() { for (let k = 0; k < 5; k++) tone(1600 + k * 240, 1600 + k * 240, 0.12, "sine", 0.022, k * 0.2); },
-    wobble() { tone(300, 450, 0.5, "triangle", 0.03); tone(450, 300, 0.5, "triangle", 0.03, 0.5); },
-    open() { tone(440, 560, 0.15, "sine", 0.03); },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); }
-  };
 
   // =====================================================================================================
   // Pictures (small flat drawings with a 2 px ink outline, one per thing)
@@ -414,7 +368,6 @@
     const mid = [(f.last[0] + f.f[0]) / 2, (f.last[1] + f.f[1]) / 2];
     segment(f, f.mid, f.last, mid);
     f.mid = mid; f.last = f.f.slice(); f.moved = true;
-    snd.scratch(f.tool);
   }
   function endStroke(f) {
     if (f.moved) segment(f, f.mid, f.last, f.raw);
@@ -537,7 +490,6 @@
     colorPainted = true;
     regions[l].filled = true;
     addFx({ kind: "ring", x, y, color: colorHex(), life: 0.9 });
-    snd.fill();
     checkPageDone();
   }
   // The fill spreads out from the tap as a growing circle.
@@ -614,7 +566,6 @@
     fills.push({ ctx: dpx, op: blank ? "destination-over" : "source-over", c, m, cx: p[0], cy: p[1], far, t0: now(), dur: reduce ? 1 : 700 });
     drawPainted = true;
     addFx({ kind: "ring", x, y, color: hex, life: 0.9 });
-    snd.fill();
     saveSoon();
   }
   // Grows the set pixels of a K x K mask by r px (a square reach), or shrinks them for r < 0. Each pass keeps a
@@ -659,7 +610,7 @@
     const done = real.filter((r) => r.filled).length;
     if (done / real.length >= 0.75) {
       kindGiven.add(pageId);
-      setTimeout(() => { sparkleLines(); snd.done(); Toybox.kind(); }, 500);
+      setTimeout(() => { sparkleLines(); Toybox.kind(); }, 500);
     }
   }
 
@@ -783,11 +734,11 @@
       if (best >= 0 && c[best] > T.prog) T.prog = c[best];
     }
     const gain = T.prog - before;
-    if (gain > 0) { T.gain += gain; snd.scratch("marker"); }
+    if (gain > 0) { T.gain += gain; }
     if (st.len - T.prog < 0.03) finishStroke();
   }
   function traceDown(id, x, y) {
-    if (T.done) { sparkleAt(x, y, 10); snd.sparkle(); return; }
+    if (T.done) { sparkleAt(x, y, 10); return; }
     if (traceFinger != null) return;
     traceFinger = id; T.gain = 0; T.last = [x, y];
     advance(x, y, 0);
@@ -822,7 +773,7 @@
     const li = T.li;
     skipEmpty(T);
     if (T.done) { finishItem(false); return; }
-    if (T.li !== li) { letterSparkle(T.letters[li]); snd.done(); } else snd.stroke();
+    if (T.li !== li) { letterSparkle(T.letters[li]); }
     stripUpdate();
     traceLine();
   }
@@ -832,7 +783,6 @@
     stripUpdate();
     if (!quiet) {
       T.letters.forEach((L, k) => setTimeout(() => letterSparkle(L), k * 160));
-      snd.done();
       if (isWordItem() && T.letters.length > 1) Toybox.kind();
     }
     const next = $("next");
@@ -900,7 +850,7 @@
     if (!seq || !seq.length) return;
     const i = seq.indexOf(wItem);
     wItem = seq[(i + 1) % seq.length];
-    startTrace(); saveSoon(); snd.pick();
+    startTrace(); saveSoon();
   }
 
   // =====================================================================================================
@@ -1060,7 +1010,6 @@
     if (!pts.length) for (let i = 0; i < 60; i++) pts.push([W * (0.1 + 0.8 * i / 60), H * (0.3 + 0.4 * Math.sin(i / 4) * 0.5 + 0.2)]);
     if (job === "write") pts = pts.filter((_, i) => i % Math.max(1, Math.ceil(pts.length / 200)) === 0);
     sparkleRun(pts, 2.4);
-    snd.sparkle();
   }
   function replay(el, cls) {
     el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
@@ -1075,8 +1024,8 @@
     const k = surpriseNext; surpriseNext = (surpriseNext + 1) % 3;
     const el = job === "write" ? guide : job === "color" ? colorSheet : drawSheet;
     const inked = job === "write" ? !!T && (T.done || T.li > 0 || T.si > 0 || T.prog > 0) : job === "color" ? colorPainted : drawPainted;
-    if (k === 0 && inked) { replay(el, "shimmer"); snd.sparkle(); }
-    else if (k === 1 && (inked || job !== "draw")) { replay(el, "wiggle"); snd.wobble(); }
+    if (k === 0 && inked) { replay(el, "shimmer"); }
+    else if (k === 1 && (inked || job !== "draw")) { replay(el, "wiggle"); }
     else sparkleLines();
   }
 
@@ -1144,7 +1093,6 @@
     trayEl.scrollTop = 0;
     document.body.classList.add("tray-open");
     Object.keys(BTN).forEach((k) => BTN[k].setAttribute("aria-expanded", String(k === name)));
-    snd.open();
   }
   function closeTray() {
     if (!trayName) return;
@@ -1184,7 +1132,7 @@
       const g = grid("tray-grid");
       TOOLS.forEach((t) => {
         if (t.id === "bucket" && job === "write") return;
-        const b = tile("dr-tool", toolPic(t.id, hex), t.name, () => { if (tool !== t.id) setTool(t.id); snd.pick(); closeTray(); });
+        const b = tile("dr-tool", toolPic(t.id, hex), t.name, () => { if (tool !== t.id) setTool(t.id); closeTray(); });
         b.setAttribute("aria-pressed", String(t.id === tool));
         g.appendChild(b);
       });
@@ -1196,13 +1144,13 @@
           '<span class="dr-track" aria-hidden="true"><span class="dr-knob"></span></span>';
         const paint = () => { st.setAttribute("aria-checked", String(stay)); st.firstElementChild.innerHTML = PIC.stay(stay); };
         paint();
-        st.addEventListener("click", () => { if (locked()) return; stay = !stay; snd.pick(); paint(); saveSoon(); });
+        st.addEventListener("click", () => { if (locked()) return; stay = !stay; paint(); saveSoon(); });
         trayEl.appendChild(st);
       }
     } else if (trayName === "size") {
       const g = grid("tray-grid");
       SIZES.forEach((z) => {
-        const b = tile("dr-size", sizeDot(z.id, hex, 1.3), z.name, () => { size = z.id; snd.pick(); refreshBar(); saveSoon(); closeTray(); });
+        const b = tile("dr-size", sizeDot(z.id, hex, 1.3), z.name, () => { size = z.id; refreshBar(); saveSoon(); closeTray(); });
         b.setAttribute("aria-pressed", String(z.id === size));
         g.appendChild(b);
       });
@@ -1214,7 +1162,7 @@
         b.style.setProperty("--sw", c.hex);
         b.setAttribute("aria-label", c.name);
         b.setAttribute("aria-pressed", String(c.id === color));
-        b.addEventListener("click", () => { if (locked()) return; color = c.id; snd.pick(); refreshBar(); saveSoon(); closeTray(); });
+        b.addEventListener("click", () => { if (locked()) return; color = c.id; refreshBar(); saveSoon(); closeTray(); });
         g.appendChild(b);
       });
     } else if (trayName === "pick" && job === "color") {
@@ -1222,7 +1170,7 @@
       PAGES.forEach((p) => {
         const b = tile("dr-page", '<img alt="" src="' + svgUrl(p.svg, 120) + '">', p.name || p.id, () => {
           if (pageId !== p.id) setPage(p.id);
-          snd.pick(); closeTray();
+          closeTray();
         });
         b.setAttribute("aria-pressed", String(p.id === pageId));
         g.appendChild(b);
@@ -1230,7 +1178,7 @@
     } else if (trayName === "pick" && job === "write") {
       const g = grid("tray-grid");
       SETS.forEach((q) => {
-        const b = tile("dr-set", PIC[q.id](), q.name, () => { closeTray(); openPicker(q.id); snd.pick(); });
+        const b = tile("dr-set", PIC[q.id](), q.name, () => { closeTray(); openPicker(q.id); });
         b.setAttribute("aria-pressed", String(q.id === wSet));
         g.appendChild(b);
       });
@@ -1244,7 +1192,7 @@
       b.type = "button"; b.className = "btn dr-tab"; b.dataset.id = j.id;
       b.innerHTML = '<span class="tb-pic" aria-hidden="true">' + PIC[j.id]() + "</span><span></span>";
       b.lastChild.textContent = j.name;
-      b.addEventListener("click", () => { if (!locked() && job !== j.id) { setJob(j.id); snd.pick(); } });
+      b.addEventListener("click", () => { if (!locked() && job !== j.id) { setJob(j.id); } });
       el.appendChild(b);
     });
     $("bNew").firstChild.innerHTML = Toybox.icon("new");
@@ -1334,7 +1282,7 @@
     wSet = set; wItem = item; wList = list;
     closePicker();
     startTrace();
-    refreshBar(); saveSoon(); snd.pick();
+    refreshBar(); saveSoon();
   }
 
   // =====================================================================================================
@@ -1416,7 +1364,6 @@
   function newPage() {
     if (locked()) return;
     closeTray();
-    snd.wipe();
     if (job === "write") { startTrace(); sparkleLines(); return; }
     const r = job === "color" ? colorRect : drawRect, y0 = Math.max(0, r.y), y1 = Math.min(H, r.y + r.s);
     wipe = { job, t0: now(), dur: reduce ? 1 : 800 };
@@ -1484,10 +1431,8 @@
     restLine: "The crayons are resting.",
     restLine2: "The page will be here next time.",
     restArt,
-    soundNote: "Soft scratchy crayon sounds and chimes. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; }
   });
   requestAnimationFrame(loop);
 

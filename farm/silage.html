@@ -80,7 +80,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // they can move into farm.js later: mower (at the hitch pin), forage (front axle), loader / heavy (tractor).
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2;
   var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   var NAME = (Farm.NAMES && Farm.NAMES.silage) || "Glorious Grass";
   document.title = NAME; $("title").textContent = NAME;
@@ -480,7 +480,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "haul") { coach.say(BUSY.haul, 3); return; }
     if (phase === "work") {
       var k = stepId === "clamp" ? (ld.st !== "away" ? "push" : "clamp") : stepId;
-      if ((stepId === "mow" || stepId === "chop") && sub === "drive") { snd.horn(); rig.flash = 1.2; }
+      if ((stepId === "mow" || stepId === "chop") && sub === "drive") { rig.flash = 1.2; }
       coach.say(BUSY[k] || "Wait a moment.", 3);
     }
   }
@@ -518,7 +518,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     }
   }
   function arrived() {
-    rig.v = 0; snd.clunk();
+    rig.v = 0;
     if (stepId === "mow") { setSub("lower"); tagW(scA, "Disc mower", mowX(), 1.9); }
     else if (stepId === "chop") { setSub("spout"); tagW(scA, "Forage harvester", rig.x - 1.5, 4.9); }
     else if (stepId === "roll") { setSub("drive"); tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); }
@@ -528,27 +528,27 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var k = key(), ok = ALSO[k] && ALSO[k].indexOf(part) >= 0;
     if (!ok || phase !== "ready") return false;
     if (ghost) ghost.learned(k);
-    if (k === "mow.lower") { snd.clunk(); working("The mower drops onto the grass."); return true; }
+    if (k === "mow.lower") { working("The mower drops onto the grass."); return true; }
     if (k === "mow.drive" || k === "chop.drive") { startPass(); auto = true; return true; }
-    if (k === "chop.spout") { snd.clunk(); working("The spout swings out over the trailer."); return true; }
+    if (k === "chop.spout") { working("The spout swings out over the trailer."); return true; }
     if (k === "chop.haul") { startHaul(); return true; }
     if (k === "clamp.tip") {
-      tr.st = "tip"; tr.t = 0; heap.hb = heap.h.slice(); heap.lump = 0; snd.clunk();
+      tr.st = "tip"; tr.t = 0; heap.hb = heap.h.slice(); heap.lump = 0;
       working("The trailer tips the " + cropWord() + " out at the silage clamp.");
       return true;
     }
     if (k === "clamp.push") {
-      ld.st = "push"; ld.t = 0; heap.before = heap.h.slice(); snd.horn();
+      ld.st = "push"; ld.t = 0; heap.before = heap.h.slice();
       working("The buck rake pushes the " + cropWord() + " up the heap.");
       return true;
     }
     if (k === "roll.drive") {
-      ro.st = "legs"; ro.leg = 0; ro.t = 0; ro.from = ro.x; snd.horn();
+      ro.st = "legs"; ro.leg = 0; ro.t = 0; ro.from = ro.x;
       working("The heavy tractor squashes the air out.");
       return true;
     }
     if (k === "cover.sheet") {
-      sheetT = 0; heap.tires = makeTires(); snd.pop();
+      sheetT = 0; heap.tires = makeTires();
       working("The sheet keeps the air out.");
       return true;
     }
@@ -559,7 +559,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "work" && sub === "drive") return;
     field.wipe = { bx: workX(), dir: 1, to: stepId === "mow" ? "swaths" : (crop === "maize" ? "maizestub" : "stubble") };
     if (stepId === "mow") { swath.on = true; swath.a = 0; swath.b = 0; }
-    snd.horn();
     working(stepId === "mow" ? "The mower cuts the grass." : (crop === "maize" ? "Chopped maize flies into the trailer." : "Chopped grass flies into the trailer."));
     if (stepId === "chop") tagW(scA, crop === "maize" ? "Maize header" : "Pickup", frontX() - 0.8, 1.9);
   }
@@ -571,14 +570,14 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     setSub("haul");
   }
   function startHaul() {
-    tr.st = "haul"; tr.t = 0; snd.horn();
+    tr.st = "haul"; tr.t = 0;
     if (heap.cover > 0.02) { uncover = { t: 0 }; heap.flap = null; }
     working("The tractor takes the " + cropWord() + " to the silage clamp.", "haul");
   }
   // the trailer has backed up to the clamp: his turn to tip it
   function atClamp() { stepId = "clamp"; setSub("tip"); tagW(clampSc(), "Trailer", tr.x - 3, 3.8, 1); }
   function tipped() {
-    loads++; save(); snd.chime();
+    loads++; save();
     Farm.world.update(function (w) { w.clamp = (typeof w.clamp === "number" && isFinite(w.clamp) ? w.clamp : 0) + 1; w.season = "summer"; });
     coach.step("The loader comes with its buck rake.");
   }
@@ -587,7 +586,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function rolled() { bringIn("cover"); }
   function covered() {
     setPhase("done"); cue = null;
-    save(); snd.chime();
+    save();
     coach.step("Tap the silage clamp to start again.");
     coach.say("The silage is safe for the winter!", 5);
     Toybox.kind();
@@ -648,7 +647,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (idleClamp) list.splice(1, 0, "wind");
     var pick = list[surpriseN++ % list.length];
     if (pick === "wind") {
-      heap.flap = { t: 0 }; snd.pop();
+      heap.flap = { t: 0 };
       coach.say("The wind lifts the sheet. Tap it!", 4);
       if (ghost) ghost.again("flap");
       return;
@@ -670,7 +669,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!heap.flap) return;
     var e = rampEnd() - CL0;
     heap.tires.push({ x: Math.max(0.5, e - 1.0), t: 0, at: 0, st: "fall", y0: 0, extra: true });
-    heap.flap = null; snd.pop();
+    heap.flap = null;
     coach.say("One more tire holds it down.", 3);
     if (ghost) ghost.learned("flap");
   }
@@ -780,16 +779,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function wantPt() { var w = wantPart(); return w ? ptOf(w) : null; }
   // a part's real name, as a small tag, when he taps it
   function tagPart(part) {
-    if (part === "mower") { snd.tick(); tagW(scA, "Disc mower", mowX(), 1.9); return true; }
-    if (part === "rig") { snd.horn(); rig.flash = 1.2; tagW(scA, rig.m === "mower" ? "Tractor" : "Forage harvester", rig.m === "mower" ? rig.x + 1.7 : rig.x - 1.5, rig.m === "mower" ? 3.6 : 4.9); return true; }
-    if (part === "spout") { snd.tick(); tagW(scA, "Spout", rig.x - 2.4, 5.6); return true; }
-    if (part === "trailer") { snd.horn(); tagW(scAt(tr.x), "Trailer", tr.x - 3, 3.8, tr.r); return true; }
-    if (part === "tiplever") { snd.tick(); tagW(scAt(tr.x), "Tipping lever", tr.x + 0.3, 3.2, tr.r); return true; }
-    if (part === "loader") { snd.horn(); tagW(clampSc(), "Buck rake", ld.x - 5.4, hAt(ld.x - 5) + 1.8); return true; }
-    if (part === "roller") { snd.horn(); tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); return true; }
-    if (part === "sheet") { snd.tick(); tagW(clampSc(), "Black sheet", CL0 + 0.4, hAt(CL0 + 0.4) + 1.2); return true; }
+    if (part === "mower") { tagW(scA, "Disc mower", mowX(), 1.9); return true; }
+    if (part === "rig") { rig.flash = 1.2; tagW(scA, rig.m === "mower" ? "Tractor" : "Forage harvester", rig.m === "mower" ? rig.x + 1.7 : rig.x - 1.5, rig.m === "mower" ? 3.6 : 4.9); return true; }
+    if (part === "spout") { tagW(scA, "Spout", rig.x - 2.4, 5.6); return true; }
+    if (part === "trailer") { tagW(scAt(tr.x), "Trailer", tr.x - 3, 3.8, tr.r); return true; }
+    if (part === "tiplever") { tagW(scAt(tr.x), "Tipping lever", tr.x + 0.3, 3.2, tr.r); return true; }
+    if (part === "loader") { tagW(clampSc(), "Buck rake", ld.x - 5.4, hAt(ld.x - 5) + 1.8); return true; }
+    if (part === "roller") { tagW(clampSc(), "Heavy tractor", ro.x - 2, hAt(ro.x) + 3.8); return true; }
+    if (part === "sheet") { tagW(clampSc(), "Black sheet", CL0 + 0.4, hAt(CL0 + 0.4) + 1.2); return true; }
     if (part === "heap") {
-      var e2 = rampEnd(), m = (CL0 + e2) / 2; snd.tick();
+      var e2 = rampEnd(), m = (CL0 + e2) / 2;
       tagW(clampSc(), heap.cover > 0.5 ? (heap.tires.length ? "Tires" : "Black sheet") : "Silage clamp", m, hAt(m) + 1.2);
       return true;
     }
@@ -905,11 +904,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else if (phase === "work" && stepId === "mow" && sub === "lower") {
       // the hitch lowers the mower onto the grass
       rig.lift = 1 - ease(phaseT / 0.9);
-      if (phaseT >= 0.9) { rig.lift = 0; snd.tick(); setSub("drive"); }
+      if (phaseT >= 0.9) { rig.lift = 0; setSub("drive"); }
     } else if (phase === "work" && stepId === "chop" && sub === "spout") {
       // the spout swings out over the trailer
       rig.spout = Math.min(1, rig.spout + dt * 0.9);
-      if (rig.spout >= 1) { snd.tick(); setSub("drive"); }
+      if (rig.spout >= 1) { setSub("drive"); }
     } else if (phase === "work" && (stepId === "mow" || stepId === "chop")) {
       var vt = 0;
       if (grab && grab.to !== undefined) vt = clamp((grab.to - rig.x) * 3, 0, VPASS * 1.4);
@@ -946,9 +945,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     follow(dt);
     var lvl = working ? 0.3 + drive * 0.7 : (phase === "arrive" || phase === "leave" || phase === "haul" || ld.st === "push" || ro.st === "legs" ? 0.6 : (rig.m ? 0.15 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending ? -1 : engLevel);
-    snd.soil(working ? drive * 0.8 : 0);
-    snd.pour(working && rig.m === "forage" ? 0.7 : (tr.st === "tip" ? 0.6 : 0));
   }
   function workEffects(dt) {
     if (rig.v < 0.4) return;
@@ -980,7 +976,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var rear = tr.x - 7.6 * unitW(tr.r);
       if (tr.x < CL1 + 6) { if (rear > L + 1.2 || tr.r < TR_FAR - 0.01) tr.r = Math.max(0.77, tr.r - dt * 1.1); }
       else tr.r = Math.min(1, tr.r + dt * 0.5);
-      if (d < 0.05 && tr.r >= 0.999) { tr.x = WAIT_X; tr.r = 1; tr.v = 0; tr.st = "wait"; tr.t = 0; snd.clunk(); }
+      if (d < 0.05 && tr.r >= 0.999) { tr.x = WAIT_X; tr.r = 1; tr.v = 0; tr.st = "wait"; tr.t = 0; }
       if (tr.x > CL0 - 6) tagOnce("clamp" + loads, clampSc(), "Silage clamp", (CL0 + CL1) / 2, 2.9);
     } else if (s === "wait") {
       // a moment for the camera to settle, then it backs up to the clamp by itself
@@ -988,7 +984,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     } else if (s === "back") {
       tr.t += dt; var db = tr.x - TIP_X;
       tr.v = -clamp(db * 2, 0.8, 3); tr.x += Math.max(tr.v * dt, -db);
-      if (db < 0.02) { tr.x = TIP_X; tr.v = 0; tr.st = "park"; tr.t = 0; snd.clunk(); if (phase === "haul") atClamp(); }
+      if (db < 0.02) { tr.x = TIP_X; tr.v = 0; tr.st = "park"; tr.t = 0; if (phase === "haul") atClamp(); }
     } else if (s === "tip") {
       tr.t += dt; tr.tip = ease(tr.t / 0.9); tr.lever = Math.min(1, tr.t / 0.3);
       if (tr.t > 0.55) {
@@ -1013,7 +1009,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     PUSH_FROM = CL0 + CLL + 2.0 + 6.45; PUSH_TO = CL0 + 0.9 + 6.45;
     if (s === "in") {
       var d = ld.x - PUSH_FROM; ld.v = -clamp(d * 2.2, 1.2, 10); ld.x += Math.max(ld.v * dt, -d);
-      if (d < 0.03) { ld.x = PUSH_FROM; ld.v = 0; ld.st = "wait"; ld.t = 0; snd.clunk(); loaderIn(); }
+      if (d < 0.03) { ld.x = PUSH_FROM; ld.v = 0; ld.st = "wait"; ld.t = 0; loaderIn(); }
     } else if (s === "push") {
       ld.t += dt; var PT = 2.6, f = ease(clamp(ld.t / PT, 0, 1)), nv = Math.min(4, heap.V + 1);
       var nx = lerp(PUSH_FROM, PUSH_TO, f); ld.v = (nx - ld.x) / Math.max(dt, 0.001); ld.x = nx;
@@ -1081,7 +1077,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function updateHeapBits(dt) {
     heap.tires.forEach(function (q) {
-      if (q.st === "fall") { q.t += dt; if (q.t >= 0.45) { q.st = "on"; q.t = 1; snd.tick(); } }
+      if (q.st === "fall") { q.t += dt; if (q.t >= 0.45) { q.st = "on"; q.t = 1; } }
       else if (q.st === "hop") { q.t += dt; }
     });
     if (uncover) {
@@ -1473,7 +1469,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); placeCoach(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; setTimeout(function () { done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -1503,18 +1499,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine and grass sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   requestAnimationFrame(loop);
 
   // leaving the page while a machine works switches it off quietly
   Toybox.offFirst({
     running: function () { return auto || !!grab || phase === "haul" || tr.st === "tip" || ld.st === "push" || ro.st === "legs"; },
-    off: function (done) { auto = false; grab = null; rig.v = 0; snd.engine(-1); snd.soil(0); snd.pour(0); done(); }
+    off: function (done) { auto = false; grab = null; rig.v = 0; done(); }
   });
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {

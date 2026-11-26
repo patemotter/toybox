@@ -13,7 +13,6 @@
 //   - Taps
 //   - Treat picture in the "Give a treat" button (shows the next treat)
 //   - Coach line and ghost hand
-//   - Sound (off by default; soft and synthesized)
 //   - Timer ending: a yawn, a walk to the house, and to sleep
 //   - Resize: keep the hamster where it was
 //   - Main loop
@@ -873,13 +872,11 @@
   }
   function hopIn() {
     var w = G.wheel;
-    sHop();
     act("hop", { x0: ham.x, y0: ham.y, x1: w.x, y1: w.y + w.Ri, h: 0.6 * w.R, dur: 0.62, where: "wheel", lvl: w.lvl });
     turnTo(sign(w.x - ham.x));
   }
   function hopOut(side) {
     var w = G.wheel, s = spotWheel(side);
-    sHop();
     turnTo(side);
     act("hop", { x0: ham.x, y0: ham.y, x1: s.x, y1: w.surf, h: 0.45 * w.R, dur: 0.62, where: "surf", lvl: w.lvl });
   }
@@ -1009,7 +1006,6 @@
     if (a.sup) { a.sup.dur = Math.min(SUPER_MAX, a.sup.dur + 0.8); return; }
     if (a.after) return;
     a.level = Math.min(4, (a.level || 0) + 1); a.quiet = 0; a.dur = Math.max(a.dur, a.t + 6);
-    sWhirUp(a.level);
     var w = G.wheel;
     for (var i = 0; i < 2 + a.level; i++) spawn("spark", w.x + rand(-1, 1) * w.R, w.y + rand(-1, 1) * w.R, { life: 0.7 });
     if (a.level >= 4) startSuper(a);
@@ -1018,7 +1014,6 @@
     a.sup = { t: 0, dur: SUPER_DUR };
     ham.wasSuper = true;
     superMsgUntil = clock + 3.2;
-    sSuper();
     updateCoach();
   }
   function endSuper(a) { a.sup = null; a.after = true; a.level = 0; a.dur = a.t + 3.0; }
@@ -1056,7 +1051,7 @@
   };
   // Hopping out after super duper fast: a little dizzy, stars going round its head.
   ACT.dizzy = function (a) {
-    if (!a.snd) { a.snd = true; sSqueak(); }
+    if (!a.snd) { a.snd = true; }
     P.eye = "swirl"; P.wig = Math.sin(a.t * 3.2) * 0.13; P.sy = 1 + 0.03 * Math.sin(a.t * 6); P.rear = 0.15;
     return a.t >= a.dur;
   };
@@ -1065,7 +1060,7 @@
     if (a.eaten < 0.34 && food > 0) { var d = Math.min(food, dt * 0.34 / (a.dur - 0.4)); food -= d; a.eaten += d; dirty = true; }
     ham.cheeks = Math.min(1, ham.cheeks + dt * 0.24);
     a.n -= dt;
-    if (a.n <= 0) { a.n = 0.32; sNibble(); spawn("crumb", ham.x + ham.f * 0.45 * G.L, ham.y - 0.45 * G.L, { vx: ham.f * rand(-0.5, 0.5) * G.L, vy: -rand(0.3, 0.8) * G.L, life: 0.7 }); }
+    if (a.n <= 0) { a.n = 0.32; spawn("crumb", ham.x + ham.f * 0.45 * G.L, ham.y - 0.45 * G.L, { vx: ham.f * rand(-0.5, 0.5) * G.L, vy: -rand(0.3, 0.8) * G.L, life: 0.7 }); }
     if (food <= 0) { food = 0; if (a.t > 1) return true; }
     return a.t >= a.dur;
   };
@@ -1087,7 +1082,7 @@
     if (a.t > 0.4) {
       a.n -= dt;
       if (a.n <= 0 && water > 0.01) {
-        a.n = 0.45; sBlip();
+        a.n = 0.45;
         bubbles.push({ u: rand(-0.12, 0.12), h: 0.1, r: rand(0.035, 0.06), v: rand(0.5, 0.8) });
       }
       if (a.drunk < 0.34 && water > 0) { var d = Math.min(water, dt * 0.34 / (a.dur - 0.5)); water -= d; a.drunk += d; dirty = true; }
@@ -1117,16 +1112,16 @@
     a.z -= dt;
     if (a.z <= 0) { a.z = 1.9; spawn("z", G.bed.x + 0.25 * G.L, G.floorY - 0.85 * G.L, { vx: 0.25 * G.L, vy: -0.45 * G.L, life: 2.6 }); }
     a.hum -= dt;
-    if (a.hum <= 0) { a.hum = 3.4; sHum(); }
+    if (a.hum <= 0) { a.hum = 3.4; }
     if (a.onAsleep && !a.told && a.t > 1.4) { a.told = true; a.onAsleep(); }
     return !!a.dur && a.t >= a.dur;
   };
   ACT.wake = function (a) {
     ham.where = "house"; ham.x = G.bed.x; ham.y = G.floorY; ham.asleep = false;
-    if (!a.snd) { a.snd = true; sSqueak(); }
+    if (!a.snd) { a.snd = true; }
     var t = a.t;
     if (t < 0.9) { P.curl = 1 - t / 0.9; P.eye = "closed"; P.sx = 1 + 0.16 * Math.sin(Math.PI * t / 0.9); P.sy = 1 - 0.1 * Math.sin(Math.PI * t / 0.9); P.paws = "down"; }
-    else { P.rear = 0.3; P.yawn = Math.sin(Math.PI * clamp((t - 0.9) / 1.0, 0, 1)); P.eye = P.yawn > 0.3 ? "closed" : "open"; P.paws = "mouth"; if (!a.y && t > 1) { a.y = true; sYawn(); } }
+    else { P.rear = 0.3; P.yawn = Math.sin(Math.PI * clamp((t - 0.9) / 1.0, 0, 1)); P.eye = P.yawn > 0.3 ? "closed" : "open"; P.paws = "mouth"; if (!a.y && t > 1) { a.y = true; } }
     P.k = 0.94;
     return t >= 2.0;
   };
@@ -1141,7 +1136,7 @@
   };
   ACT.happy = function (a, dt) {
     var u = a.t / a.dur;
-    if (!a.snd) { a.snd = true; sSqueak(); a.h = 0; }
+    if (!a.snd) { a.snd = true; a.h = 0; }
     P.wig = Math.sin(a.t * 15) * 0.1 * (1 - u); P.lift = a.t < 1.0 ? Math.abs(Math.sin(a.t * 8)) * 0.12 : 0;
     P.eye = "happy"; P.rear = 0.12;
     if (a.proud) { P.lift = Math.abs(Math.sin(a.t * 6)) * 0.22 * (1 - u); P.rear = 0.35; }
@@ -1157,7 +1152,7 @@
     if (!t.landed) { P.rear = 0.3; P.sniff = 1; a.t = Math.min(a.t, 0.01); return false; }
     P.rear = 0.32; P.paws = "mouth"; P.chew = 1;
     if (a.t < 0.6) P.hold = t.kind === "berry" ? "pea" : t.kind === "carrot" ? "carrot" : "sun";
-    if (a.t > 0.25 && !t.gone) { t.gone = true; sTreat(); dirty = true; }
+    if (a.t > 0.25 && !t.gone) { t.gone = true; dirty = true; }
     if (a.t > 0.6) { ham.cheeks = Math.min(1.35, ham.cheeks + dt * 1.4); P.eye = "happy"; }
     if (a.t > 0.9 && !a.hh) { a.hh = true; heart(); heart(); }
     return a.t >= a.dur;
@@ -1167,20 +1162,20 @@
     if (t < 0.3) { P.sy = 1 - 0.15 * Math.sin(Math.PI * t / 0.3); P.sx = 1 + 0.1 * Math.sin(Math.PI * t / 0.3); }
     else if (t < 1.3) {
       var u = (t - 0.3) / 1.0;
-      if (!a.snd) { a.snd = true; sBoing(); }
+      if (!a.snd) { a.snd = true; }
       P.lift = Math.sin(Math.PI * u) * 1.0; P.rot = TAU * ease(u); P.ears = 1; P.eye = "happy";
     } else if (!a.land) { a.land = true; ham.squash = 1; puff(ham.x, ham.y); spawn("spark", ham.x, ham.y - 0.9 * G.L, { life: 0.8 }); }
     return t >= 1.5;
   };
   ACT.wave = function (a, dt) {
     P.rear = 1.0; P.paws = "wave"; P.eye = (a.t % 1.4) < 0.9 ? "happy" : "open";
-    if (!a.snd) { a.snd = true; sSqueak(); a.h = 0.4; }
+    if (!a.snd) { a.snd = true; a.h = 0.4; }
     a.h -= dt;
     if (a.h <= 0) { a.h = 0.6; heart(); }
     return a.t >= a.dur;
   };
   ACT.yawn = function (a) {
-    if (!a.snd) { a.snd = true; sYawn(); }
+    if (!a.snd) { a.snd = true; }
     P.rear = 0.25; P.yawn = Math.sin(Math.PI * clamp(a.t / 1.6, 0, 1)); P.eye = "closed"; P.paws = "mouth";
     return a.t >= 1.8;
   };
@@ -1285,7 +1280,7 @@
   function pourSpot() { var g = bowlGeom(), d = sign(G.bag.x - G.bowl.x); return { x: g.x + d * 0.42 * G.L, y: g.top - 0.85 * G.L, d: d }; }
   function grabScoop(x, y) {
     if (scoop.state !== "home" || ending) return false;
-    tried.bag = true; items.bag.b = 1; sTap();
+    tried.bag = true; items.bag.b = 1;
     scoop.state = "drag"; scoop.full = true; scoop.x = x; scoop.y = y; scoop.tilt = 0; scoop.t = 0; scoop.moved = 0; scoop.gx = x; scoop.gy = y;
     return true;
   }
@@ -1324,8 +1319,7 @@
         var g = bowlGeom(), lipX = ps.x - ps.d * 0.3 * L, lipY = ps.y - 0.02 * L;
         var kinds = ["sun", "sun", "pellet", "corn", "pellet", "pea", "carrot"];
         spawn("seed", lipX + rand(-0.06, 0.06) * L, lipY, { vx: rand(-0.5, 0.5) * L - ps.d * 0.3 * L, vy: rand(0, 0.4) * L, ty: g.top - 0.05 * L + rand(-0.04, 0.04) * L, k: kinds[pour.spawned % kinds.length], life: 3,
-          land: function () { if (pour) pour.landed++; food = Math.min(1, food + (1 - (pour ? pour.f0 : 0)) / 20); dirty = true; items.bowl.b = Math.max(items.bowl.b, 0.35); if (Math.random() < 0.5) sPing(); } });
-        if (pour.spawned % 3 === 0) sTick(0.012);
+          land: function () { if (pour) pour.landed++; food = Math.min(1, food + (1 - (pour ? pour.f0 : 0)) / 20); dirty = true; items.bowl.b = Math.max(items.bowl.b, 0.35); } });
       }
       if (scoop.t > 1.3) scoop.full = false;
       if (scoop.t > 1.8) flyScoop("back");
@@ -1341,7 +1335,6 @@
     if (jug || ending) return;
     tried.fill = true; items.bottle.b = 1;
     jug = { t: 0, w0: water };
-    sWater();
   }
   function updateJug(dt) {
     if (!jug) return;
@@ -1374,7 +1367,6 @@
     if (G.tall) drop = Math.min(drop, (G.floorY - G.shelfTop) / G.L - 0.6);
     var t = { id: treatId++, kind: kind, lvl: "floor", u: u, h: drop, vh: 0, landed: false, rot: rand(-0.3, 0.3), gone: false, claimed: false };
     treats.push(t);
-    sDrop();
     spawn("spark", uToX("floor", u), G.floorY - drop * G.L, { life: 0.7 });
     var a = ham.mission;
     if (a !== "treat") command("treat", missionTreat(), treatX(t), "floor");
@@ -1387,7 +1379,7 @@
       t.vh -= 9 * dt; t.h += t.vh * dt;
       if (t.h <= 0) {
         t.h = 0;
-        if (t.vh < -1.5) { t.vh = -t.vh * 0.32; sLand(); } else { t.vh = 0; t.landed = true; }
+        if (t.vh < -1.5) { t.vh = -t.vh * 0.32; } else { t.vh = 0; t.landed = true; }
       }
     }
     if (ball) {
@@ -1487,7 +1479,7 @@
     if (what === "pet" && ham.where === "wheel" && ham.act && ham.act.name === "wheel") what = "wheel";
     if (what === "pet") {
       tried.pet = true;
-      if (ham.act && ham.act.name === "happy") { ham.act.dur = Math.max(ham.act.dur, ham.act.t + 1.2); heart(); sSqueak(); return; }
+      if (ham.act && ham.act.name === "happy") { ham.act.dur = Math.max(ham.act.dur, ham.act.t + 1.2); heart(); return; }
       if (ham.where === "wheel") { command("pet", missionPet(), G.wheel.x + (G.tall ? 1 : -1) * G.wheel.R, G.wheel.lvl); return; }
       command("pet", missionPet());
       return;
@@ -1496,26 +1488,26 @@
     if (what === "bottle") {
       tried.water = true;
       if (water < 0.3) refillWater();
-      items.bottle.b = 1; sBlip();
+      items.bottle.b = 1;
       if (ham.mission === "water" && ham.act && (ham.act.name === "drink" || ham.act.name === "walk")) return;
       command("water", missionWater(), G.bottle.x, "floor");
       return;
     }
     if (what === "bowl") {
-      tried.food = true; items.bowl.b = 1; sTap();
+      tried.food = true; items.bowl.b = 1;
       if (ham.mission === "food" && ham.act && ham.act.name === "eat") { ham.act.dur = Math.max(ham.act.dur, ham.act.t + 2); return; }
       command("food", missionFood(), G.bowl.x, "floor");
       return;
     }
     if (what === "bed") {
-      tried.bed = true; items.bed.b = 1; sTap();
+      tried.bed = true; items.bed.b = 1;
       if (ham.where === "house" && ham.asleep) { command("wake", [function () { act("happy", { dur: 1.6 }); }], G.bed.x + L, "floor"); return; }
       if (ham.mission === "bed") return;
       command("bed", missionBed(), G.bed.x, "floor");
       return;
     }
     if (what === "wheel") {
-      tried.wheel = true; items.wheel.b = 1; sTap();
+      tried.wheel = true; items.wheel.b = 1;
       ghost.learned();
       // winding down after super duper fast: the taps sparkle, and the dizzy, proud finish still plays
       if (ham.wasSuper && ham.act && ((ham.act.name === "wheel" && ham.act.after) || ham.act.name === "hop")) {
@@ -1611,57 +1603,6 @@
     return null;
   }, max: 3, ok: function () { return !ending; } });
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null, noiseBuf = null;
-  function out(ac) {
-    if (masterCtx !== ac) {
-      master = ac.createGain(); master.gain.value = 0.75; master.connect(ac.destination); masterCtx = ac;
-      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 1.2), ac.sampleRate);
-      var d = noiseBuf.getChannelData(0);
-      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.03, dur * 0.3));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, vol, freq, q, delay, type) {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    var dest = out(ac), t = ac.currentTime + (delay || 0), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    src.buffer = noiseBuf; f.type = type || "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.15, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(dest);
-    src.start(t, rand(0, 0.1)); src.stop(t + dur + 0.05);
-  }
-  function sSqueak() { tone(1500, 0.08, 0.025, "sine", 2100); tone(1900, 0.1, 0.022, "sine", 2500, 0.1); }
-  function sNibble() { noise(0.04, 0.05, rand(2600, 4200), 3); }
-  function sBlip() { tone(rand(620, 760), 0.1, 0.03, "sine", 1150); }
-  function sTick(v) { tone(rand(1100, 1300), 0.025, v || 0.01, "triangle"); }
-  function sPing() { tone(rand(1800, 2500), 0.03, 0.01, "triangle"); }
-  function sHop() { tone(330, 0.18, 0.025, "sine", 620); }
-  function sLand() { tone(260, 0.08, 0.02, "sine", 180); }
-  function sTap() { tone(520, 0.1, 0.025, "sine", 700); }
-  function sTreat() { tone(660, 0.12, 0.03, "sine", 990); tone(990, 0.16, 0.025, "sine", 1320, 0.1); }
-  function sDrop() { tone(1100, 0.35, 0.02, "sine", 500); }
-  function sBoing() { tone(300, 0.35, 0.03, "sine", 820); }
-  function sYawn() { tone(520, 0.7, 0.018, "sine", 300); }
-  function sWater() { noise(1.4, 0.03, 900, 0.8, 0.4, "lowpass"); tone(500, 0.2, 0.02, "sine", 800, 0.5); tone(600, 0.2, 0.02, "sine", 900, 1.0); }
-  var lull = [392, 330, 349, 294, 330, 262], lullI = 0;
-  function sHum() { tone(lull[lullI % lull.length], 1.2, 0.016, "triangle"); lullI++; }
-  function sWhirUp(level) { tone(240 + level * 90, 0.5, 0.02, "triangle", 400 + level * 150); }
-  function sSuper() { tone(380, 1.1, 0.02, "triangle", 1250); tone(1800, 0.09, 0.024, "sine", 2600, 0.7); tone(2200, 0.13, 0.024, "sine", 3000, 0.82); }
-  function sChime() { tone(523, 0.4, 0.03); tone(784, 0.6, 0.03, "sine", 0, 0.12); }
   var wheelTickAcc = 0;
 
   // ---------- Timer ending: a yawn, a walk to the house, and to sleep ----------
@@ -1766,7 +1707,7 @@
     wheel.a += wheel.w * dt;
     if (Math.abs(wheel.w) > 0.6) {
       wheelTickAcc += Math.abs(wheel.w) * dt;
-      if (wheelTickAcc > 0.9) { wheelTickAcc = 0; sTick(0.004 + 0.002 * Math.min(4, Math.abs(wheel.w))); }
+      if (wheelTickAcc > 0.9) { wheelTickAcc = 0; }
     }
     for (var n in items) if (items[n].b > 0) items[n].b = Math.max(0, items[n].b - dt * 1.7);
     if (trail) trail.t += dt;
@@ -1844,12 +1785,10 @@
     restLine: "The hamster is sleeping.",
     restLine2: "It will be right here next time.",
     restArt: restSVG,
-    soundNote: "Soft squeaks, nibbles, a wheel whir and a sleepy hum. Hold for 2 seconds.",
     endingMaxMs: 20000,
     onEnding: onEnding,
-    onGoodbye: function () { heart(); heart(); spawn("z", G.bed.x + 0.25 * G.L, G.floorY - 0.85 * G.L, { vx: 0.25 * G.L, vy: -0.45 * G.L, life: 2.6 }); sSqueak(); },
-    onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(sChime, 60); }
+    onGoodbye: function () { heart(); heart(); spawn("z", G.bed.x + 0.25 * G.L, G.floorY - 0.85 * G.L, { vx: 0.25 * G.L, vy: -0.45 * G.L, life: 2.6 }); },
+    onWake: onWake
   });
   setTimeout(resize, 30);
 

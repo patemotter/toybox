@@ -16,14 +16,14 @@ Order in `index.html` (`APPS` array) matters: **Workshop** and **Spin Shop** sta
 - **`kitchen/`** (Kitchen) — Kitchen page with one getting-ready screen (`kitchen-ready`: Wash hands, Apron, Chef hat in any order; one tap plays a short wash — no full interactive hand-washing scene) + table + `blender`, `cutting-board`, `stand-mixer`, `stove`. Actions needing a stopped machine (pouring from Blender, lifting Stand Mixer head, changing beater, taking bowl) auto-switch it off and continue.
 
 ### Single-page apps (with notable specifics)
-- **`spin-shop/`** (Spin Shop) — Spokes count allowed; only app without sound effects (noted in `SETTINGS` "Good to know"). Open question: whether the `"Zoom"` speed label reads like camera zoom.
+- **`spin-shop/`** (Spin Shop) — Spokes count allowed. Open question: whether the `"Zoom"` speed label reads like camera zoom.
 - **`kaleidoscope/`** (Kaleido­scope; uses soft hyphen `\u00AD` in `APPS`) — `"How many"` count allowed.
 - **`peg-drop/`** (`peg-drop/index.js`) — Per-bin counts and Total allowed.
 - **`rocket-builder/`** (`rocket-builder/index.js`) — Uses long `endingMaxMs` (~36000 ms) for its goodbye launch animation.
 - **`gear-box/`** (Gear Box) — Tooth counts on gears and picker tiles (explicitly requested by the dad).
 - **`marble-run/`** (`marble-run/index.js`) — Counter `"Marbles"` (on-screen quantity). Keep lift-style choices.
 - **`car-builder/`** (`car-builder/index.js`) — Split into `index.js`.
-- **`math-grid/`** (Math Grid) — Times and plus tables; numbers allowed; home-screen grown-up setting `mathgrid-voice`. Open questions: ~28 px squares on iPhone; `"1 to 10 / 1 to 12"` (no 0 row or column) resets on `Toybox.fresh()`.
+- **`math-grid/`** (Math Grid) — Times and plus tables; numbers allowed. Open questions: ~28 px squares on iPhone; `"1 to 10 / 1 to 12"` (no 0 row or column) resets on `Toybox.fresh()`.
 - **`3d-printer/`** (`3d-printer/index.js`) — Modeled on the family's P1S + AMS 2 Pro (no logos). Shelf and spool colors kept across `Toybox.fresh()`. Grown-up settings: `printer-name`, `printer-clear`.
 - **`water-works/`** (shown as "Water Table"; `water-works/index.js`) — Modeled on the family's water play table.
 - **`train-builder/`** (`train-builder/index.js`) — Works both portrait and landscape; counter `"Cars"` (on-screen quantity). Tab changes must never re-layout the track.

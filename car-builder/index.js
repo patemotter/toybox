@@ -27,8 +27,6 @@
 //   - drawing
 //   - open / close
 //   - Ghost hand
-//   - Sound (off by default; soft and synthesized)
-//   - vehicle sounds (only when sound is on)
 //   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
 (function () {
   "use strict";
@@ -1550,11 +1548,10 @@
     if (onV && !Toybox.timer.locked()) {
       var tl = e.target.closest('[data-part="tool"]');
       var id = tl && colorable(state.kind).length > 1 ? "tool" : "body";
-      if (id !== picking) { setPicking(id); blip(); }
+      if (id !== picking) { setPicking(id); }
     } else if (picking) setPicking("");
     restartAnim($("rocketG"), "hop");
     if (lastBB) puffs(lastBB.x + lastBB.w * 0.15, 0, 5);
-    honk();
   });
 
   var tab = state.tab;
@@ -1747,7 +1744,7 @@
         if (t > T4 + 0.3 && dripT < 3 && t > T4 + 0.3 + dripT * 0.55) {
           dripT++;
           sparkles(B.x + W * (0.2 + Math.random() * 0.6), B.y + H * (0.2 + Math.random() * 0.5), 5, Math.min(W, H) * 0.35);
-          if (dripT === 1) { restartAnim($("rocketG"), "pop"); chime(); }
+          if (dripT === 1) { restartAnim($("rocketG"), "pop"); }
         }
       },
       cleanup: function () {}
@@ -1796,7 +1793,7 @@
           }
         } else if (t < T4) {
           dx = x2;
-          if (!landed) { landed = true; puffs(land, 0, 6); honk(); }
+          if (!landed) { landed = true; puffs(land, 0, 6); }
           var b = seg(t, T3, T4);
           dy = -H * 0.12 * Math.abs(Math.sin(b * Math.PI * 2)) * (1 - b);
           var sq = Math.max(0, 1 - b * 3) * 0.08;
@@ -1841,7 +1838,7 @@
         ride = rideD * (easeIO(seg(t, T3 + 0.1, T4)) - easeIO(seg(t, T5, T6)));
         if (t > T8 + 0.5) x = tx + (txStart - tx + TL) * easeIO(seg(t, T9 - 1.2, T9 + 0.2));
         x += ride;
-        if (t > T3 && !tooted) { tooted = 1; honk(); }
+        if (t > T3 && !tooted) { tooted = 1; }
         tr.setAttribute("transform", "translate(" + n2(x) + " 0)");
         carMove(ride, 0, -lift * ang, B.x, 0);
         // the camera: zoomed out a little, centred between his vehicle and the tow truck
@@ -1910,7 +1907,6 @@
     render();
     if (changed) {
       celebrate();
-      blip();
       if (t.dataset.color) restartAnim(t, "pop");
     }
   });
@@ -2180,7 +2176,6 @@
           dv.objs.forEach(function (o) { if (o.type === "pile" && Math.abs(o.x - p.x) < o.s) { o.hgt *= 0.7; o.s = o.hgt * 1.7; } });
           dv.objs = dv.objs.filter(function (o) { return o.type !== "pile" || o.hgt > 22; });
           dv.loaded = true;
-          sfxThud();
         } },
         { to: { boom: -0.4, stick: -0.05 }, dur: 0.55 }
       ]);
@@ -2192,7 +2187,7 @@
           var h = v.hooks.load || v.hooks.tip, p = hookWorld(h);
           if (dv.loaded || true) for (var i = 0; i < 26; i++) addP("dot", p.x + rand(-25, 25), p.y + rand(-10, 20), rand(-60, 60), rand(-80, 80), rand(9, 18), 1.6, Math.random() < 0.5 ? DIRT_L : DIRT);
           dv.loaded = false;
-        }, done: function () { var h = v.hooks.load || v.hooks.tip, p = hookWorld(h); pileAt(p.x, 46); sfxThud(); } },
+        }, done: function () { var h = v.hooks.load || v.hooks.tip, p = hookWorld(h); pileAt(p.x, 46); } },
         { to: { boom: 0, stick: 0, tool: 0 }, dur: 0.6 }
       ]);
     } else if (id === "lift") {
@@ -2208,13 +2203,12 @@
       dirtBurst(bp.x, 10, 22, DIRT_L, 1.2);
       dv.objs.forEach(function (o) { if (o.type === "pile" && o.x > dv.x && o.x - o.s < bp.x + 300) o.vx = 520; });
       dv.shake = 0.3;
-      sfxThud();
     } else if (id === "load") {
       if (busy() || (dv.pose.bed || 0) < -0.05) return;
       queue([{ to: {}, dur: 1.0, during: function (f, dt) {
         dv.bedFill = Math.min(1, dv.bedFill + dt * 1.2);
         if (Math.random() < 0.8) { var bx = rand(v.bed.x0 + 20, v.bed.x1 - 20), p = toWorld(bx, v.bed.y - 260); addP("dot", p.x, p.y, rand(-20, 20), -100, rand(9, 16), 0.5, Math.random() < 0.5 ? DIRT_L : DIRT); }
-      }, done: function () { dv.bedFill = 1; sfxThud(); } }]);
+      }, done: function () { dv.bedFill = 1; } }]);
     } else if (id === "tip") {
       if (busy()) return;
       var pour = function (f, dt) {
@@ -2226,7 +2220,7 @@
       var had = dv.bedFill;
       queue([
         { to: { bed: -0.85 }, dur: 0.9, during: pour },
-        { to: { bed: -0.85 }, dur: 0.7, during: pour, done: function () { if (had > 0.2) { var p = toWorld(v.bed.x0 - 70, 0); pileAt(p.x, 40 + 40 * had); sfxThud(); } } },
+        { to: { bed: -0.85 }, dur: 0.7, during: pour, done: function () { if (had > 0.2) { var p = toWorld(v.bed.x0 - 70, 0); pileAt(p.x, 40 + 40 * had); } } },
         { to: { bed: 0 }, dur: 0.8 }
       ]);
     } else if (id === "spin") {
@@ -2340,7 +2334,6 @@
           dv.shake = 0.35;
           banner("Crunch!", 900);
           setHud();
-          sfxCrunch();
         }
       });
     }
@@ -2362,7 +2355,6 @@
           dirtBurst(dv.x + VB.xr, gy, 14, dv.fam === "fast" ? "#9AA3AF" : DIRT_L);
           dirtBurst(dv.x + VB.xf, gy, 14, dv.fam === "fast" ? "#9AA3AF" : DIRT_L);
           dv.shake = Math.min(0.5, impact / 1500);
-          sfxThud();
         }
       }
     } else {
@@ -2394,7 +2386,6 @@
         confetti(dv.x + 600, 300, 60);
         banner("Another lap!", 3000);
         setHud();
-        sfxCheer();
       }
     }
     // exhaust smoke
@@ -2416,7 +2407,6 @@
       }
     }
     updateParts(dt);
-    setEngine(dv.speed / P.max);
   }
 
   // ---- drawing ----
@@ -2834,7 +2824,6 @@
     updatePedal();
     setHud();
     if (park) startPark();
-    startEngine();
     if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
   }
   function closeDrive() {
@@ -2870,8 +2859,8 @@
     var b = e.target.closest ? e.target.closest("button") : null;
     if (b) {
       if (b.id === "pedal") { if (!dv.park) { ghost.learned(); dv.go = !dv.go; updatePedal(); if (dv.go) dirtBurst(dv.x + VB.xr, 0, 8, dv.fam === "fast" ? "#9AA3AF" : DIRT_L, 0.6); } }
-      else if (b.id === "horn") { honk(); var hp = toWorld(VB.v.head ? VB.v.head.x : 100, VB.v.head ? VB.v.head.y - dv.susp : -60); starBurst(hp.x + 60, hp.y, 6, 300, ["#FFC93C", "#FFFFFF"]); }
-      else if (b.dataset.act) { doAction(b.dataset.act); if (b.dataset.act !== "turbo") sfxClick(); }
+      else if (b.id === "horn") { var hp = toWorld(VB.v.head ? VB.v.head.x : 100, VB.v.head ? VB.v.head.y - dv.susp : -60); starBurst(hp.x + 60, hp.y, 6, 300, ["#FFC93C", "#FFFFFF"]); }
+      else if (b.dataset.act) { doAction(b.dataset.act); }
       return;
     }
     // tap anywhere: sparkles, and a little hop
@@ -2879,99 +2868,9 @@
     starBurst(wx, wy, 7, 400);
     if (!dv.air && !dv.park) { dv.suspV -= 160; }
   });
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. Car Builder builds its own master gain and
-  // noise buffer once per context.
-  var actx = null, master = null, noiseBuf = null;
-  function canPlay() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return false;
-    if (ac !== actx) {
-      try {
-        master = ac.createGain();
-        master.gain.value = 0.8;
-        master.connect(ac.destination);
-        var len = Math.floor(ac.sampleRate * 1.5);
-        noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
-        var d = noiseBuf.getChannelData(0), last = 0;
-        for (var i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
-        actx = ac; engine = null;
-      } catch (e) { return false; }
-    }
-    return true;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    if (!canPlay()) return;
-    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
-  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
+  var actx = null;
 
-  // ---- vehicle sounds (only when sound is on) ----
-  function honk() {
-    if (!canPlay()) return;
-    var t = actx.currentTime, f = actx.createBiquadFilter(), g = actx.createGain();
-    f.type = "lowpass"; f.frequency.value = 1300;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
-    g.gain.setValueAtTime(0.06, t + 0.3);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
-    f.connect(g); g.connect(master);
-    [349, 440].forEach(function (fr) {
-      var o = actx.createOscillator();
-      o.type = "square"; o.frequency.value = fr;
-      o.connect(f); o.start(t); o.stop(t + 0.45);
-    });
-  }
-  function noiseHit(freq, dur, vol) {
-    if (!canPlay()) return;
-    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = noiseBuf;
-    f.type = "lowpass"; f.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start(t); src.stop(t + dur + 0.05);
-  }
-  function sfxThud() { noiseHit(380, 0.35, 0.22); tone(90, 0.25, 0.05, "sine", 55); }
-  function sfxCrunch() { noiseHit(1600, 0.4, 0.16); setTimeout(function () { noiseHit(900, 0.3, 0.12); }, 90); }
-  function sfxCheer() { chime(); }
-  function sfxClick() { tone(660, 0.08, 0.03, "sine"); }
   var engine = null;
-  function startEngine() {
-    if (!canPlay() || engine) return;
-    var t = actx.currentTime, f = actx.createBiquadFilter(), g = actx.createGain();
-    f.type = "lowpass"; f.frequency.value = 400; f.Q.value = 2;
-    g.gain.value = 0.0001;
-    g.gain.setTargetAtTime(0.035, t, 0.3);
-    f.connect(g); g.connect(master);
-    var o1 = actx.createOscillator(), o2 = actx.createOscillator();
-    o1.type = "sawtooth"; o2.type = "triangle";
-    o1.frequency.value = 55; o2.frequency.value = 56.5;
-    o1.connect(f); o2.connect(f);
-    o1.start(); o2.start();
-    engine = { f: f, g: g, o1: o1, o2: o2 };
-  }
-  function setEngine(frac) {
-    if (!engine && dv && Toybox.sound.on()) startEngine();
-    if (!engine || !actx) return;
-    var t = actx.currentTime, base = dv && dv.fam === "fast" ? 70 : (dv && dv.fam === "monster" ? 48 : 42);
-    var fr = base + frac * base * 1.8;
-    engine.o1.frequency.setTargetAtTime(fr, t, 0.1);
-    engine.o2.frequency.setTargetAtTime(fr * 1.02, t, 0.1);
-    engine.f.frequency.setTargetAtTime(300 + frac * 900, t, 0.1);
-    engine.g.gain.setTargetAtTime(0.03 + frac * 0.035, t, 0.15);
-  }
   function stopEngine() {
     if (!engine) return;
     var e = engine;
@@ -3044,8 +2943,6 @@
 
   showTab(tab);
   render();
-  // The old Car Builder sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("carbuilder-sound-v1") === "on") localStorage.setItem("carbuilder-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "car-builder",
     timerIntro: "When time is up, the vehicle drives into its garage and rests, and the controls lock.",
@@ -3056,13 +2953,11 @@
     restLine: "The car is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft engine hum and horn. Hold for 2 seconds.",
-    legacy: { timer: "carbuilder-timer-v1", sound: "carbuilder-sound-v1" },
+    legacy: { timer: "carbuilder-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyeLaunch,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(chime, 60); else { stopEngine(); } },
     onTimer: drawFuel
   });
 

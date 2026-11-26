@@ -18,12 +18,12 @@ Before starting, read [`AGENTS.md`](../../../AGENTS.md), [`common/API.md`](../..
 2. **Build the app**
    - Include `../common/toybox.css` and `../common/toybox.js` before app styles/scripts, and call `Toybox.init({ app: "<folder>", restArt, restLine, onEnding, ... })`.
    - Follow all hard invariants and product rules in `AGENTS.md`:
-     - Offline-first (no CDN/runtime assets; draw on canvas/SVG; soft Web Audio via `Toybox.sound.ready()`).
+     - Offline-first (no CDN/runtime assets; draw on canvas/SVG; no sound at all).
      - Hands-on play: direct manipulation (`Toybox.press`), one press always enough, whole machine/scene on screen, calm pace, results stay on screen, Surprise = live moment on current scene, no fail states/scores, no decorative numbers/counters.
      - Reset play state on `Toybox.fresh()`; keep any collections across launches in a prefixed `localStorage` key wrapped in `try/catch`.
      - Add a top **"Sections"** index comment in `<folder>/index.js`.
    - Add a `?debug` test hook (`if (/[?&]debug\b/.test(location.search)) window.__toybox = { state, ... };`) so `tools/playtest.js` and `tools/shot.js` can inspect and drive the app.
-   - If the app has special sound or orientation behavior, update `"Good to know"` (`uses-info`) in `common/toybox.js`.
+   - If the app has special orientation behavior, update `"Good to know"` (`uses-info`) in `common/toybox.js`.
 
 3. **Render the app icons**
    - Draw a flat, full-bleed `#CDE9FF` icon SVG with chunky `#1D2340` outlines and one clear subject (keeping the subject in the central 80% for the maskable icon).

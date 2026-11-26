@@ -489,7 +489,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function ring(x, y, r, col) { rings.push({ x: x, y: y, r: r, life: 0, col: col || "#FFFFFF" }); }
 
   // ---------- Simulation ----------
-  var now = 0, lastT = 0, cranking = null, crankW = 0, jamWob = 0, lastHint = 0, clickAcc = 0, lastClick = 0;
+  var now = 0, lastT = 0, cranking = null, crankW = 0, jamWob = 0, lastHint = 0;
   var ending = false, coastBoost = 0, endingDone = null;
   // Calmer speeds: the motor dial's top setting turns the driver at 24 RPM (dial value x 0.4),
   // and a flicked crank coasts no faster than that.
@@ -518,11 +518,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var g = c.order[i], p = c.parent[g.id];
         g.a = lockAngle(p, g);
         g.w = jammed ? 0 : -p.w * p.T / g.T;
-      }
-      // tooth clicks
-      if (!jammed && Toybox.sound.on()) {
-        clickAcc += Math.abs(d.w) * dt * d.T / TAU;
-        if (clickAcc >= 1) { clickAcc %= 1; if (now - lastClick > 70) { lastClick = now; tick(); } }
       }
     }
     comps.forEach(function (c) {
@@ -617,7 +612,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (now - lastHint < 2600) return;
     lastHint = now;
     hint("Three gears in a circle get stuck!", 2800);
-    bonk();
   }
 
   // Two gears picked: say in words how fast the second turns next to the first (no tooth counts).
@@ -738,11 +732,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       gears.splice(gears.indexOf(p.gear), 1);
       rebuild();
       showGhost(p);
-      pop();
     } else if (p.kind === "new" && !p.started && moved) {
       p.started = true;
       showGhost(p);
-      pop();
     }
     if (p.kind === "drag" || (p.kind === "new" && p.started)) {
       moveGhost(p);
@@ -797,16 +789,14 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var x = OX + g.x * S, y = OY + g.y * S;
     ring(x, y, (R(g.T) + 1) * S, meshes ? "#FFC93C" : "#FFFFFF");
     burst(x, y, meshes ? 16 : 8, null);
-    if (meshes) clack(); else pop();
   }
-  function poof(x, y, T) { burst(x, y, 14, COLORS[T]); whooshSnd(); }
+  function poof(x, y, T) { burst(x, y, 14, COLORS[T]); }
 
   function tapGear(g) {
     var i = selected.indexOf(g.id);
     if (i !== -1) selected.splice(i, 1);
     else { selected.push(g.id); if (selected.length > 2) selected.shift(); }
     ring(OX + g.x * S, OY + g.y * S, (R(g.T) + 1) * S, "#FFC93C");
-    blip();
     updateInfo(true);
   }
   function tapTray(p) {
@@ -826,7 +816,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     g.w = 0;
     save();
     ring(OX + g.x * S, OY + g.y * S, (R(g.T) + 1.4) * S, "#E63946");
-    chime();
     updateInfo(true);
   });
 
@@ -898,7 +887,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var a = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
     var v = clamp((a + 135) / 270 * 60, 0, 60);
     var nv = Math.round(v / 5) * 5;
-    if (nv !== motorRpm) { motorRpm = nv; drawDial(); blip(); save(); }
+    if (nv !== motorRpm) { motorRpm = nv; drawDial(); save(); }
   }
   $("dial").addEventListener("pointerdown", function (e) { e.preventDefault(); dialPtr = e.pointerId; try { this.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } dialSet(e); });
   $("dial").addEventListener("pointermove", function (e) { if (dialPtr === e.pointerId) dialSet(e); });
@@ -925,14 +914,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     driverId = gears.length ? gears[0].id : 0;
     rebuild(); save();
     gears.forEach(function (g) { burst(OX + g.x * S, OY + g.y * S, 6, COLORS[g.T]); });
-    if (name === "clear") whooshSnd(); else chime();
   }
 
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
     if (!t) return;
     if (Toybox.timer.locked()) return;
-    if (t.dataset.mode) { setMode(t.dataset.mode); blip(); }
+    if (t.dataset.mode) { setMode(t.dataset.mode); }
     else if (t.dataset.ex) example(t.dataset.ex);
   });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
@@ -978,12 +966,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       superT = SUPER_S;
       driverComp.order.forEach(function (g) { burst(OX + g.x * S, OY + g.y * S, 5, COLORS[g.T]); });
       hint("Super fast!", 3200);
-      whooshSnd();
     } else startRoller();
   }
   function startRoller() {
     roller = { T: 20, x: -R(20) - 1, a: 0, w: 0, t: 0, dur: reduceMotion ? 6 : 8 };
-    blip();
   }
   $("surpriseBtn").addEventListener("click", surprise);
 
@@ -1012,35 +998,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. Gear Box keeps its own master gain.
-  var master = null, masterCtx = null;
-  function out(ac) {
-    if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    var actx = Toybox.sound.ready();
-    if (!actx) return;
-    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(actx));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function tick() { tone(rand(1500, 1800), 0.035, 0.018, "triangle"); }
-  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
-  function pop() { tone(380, 0.12, 0.04, "sine", 620); }
-  function clack() { tone(660, 0.06, 0.05, "triangle"); setTimeout(function () { tone(990, 0.08, 0.04, "triangle"); }, 60); }
-  function bonk() { tone(220, 0.25, 0.05, "sine", 180); }
-  function whooshSnd() { tone(700, 0.25, 0.035, "sine", 250); }
-  function chime() { tone(523, 0.4, 0.04); setTimeout(function () { tone(784, 0.6, 0.04); }, 120); }
-
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   // The fuel gauge in the plate's corner shows the time left.
   function drawFuel(info) {
@@ -1067,7 +1024,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function goodbyeSpin() {
     var d = byId(driverId);
     if (d && !jammed) { d.w = 9; coastBoost = 1.6; }
-    chime();
   }
   function onRest() {
     ending = false; endingDone = null; coastBoost = 0;
@@ -1089,8 +1045,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   resize();
   rebuild();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { plateKey = ""; });
-  // Old Gear Box sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("gearbox-sound-v1") === "on") localStorage.setItem("gearbox-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "gear-box",
     timerIntro: "When time is up, the gears coast to a stop and rest, and the controls lock.",
@@ -1101,13 +1055,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine: "The gears are resting.",
     restLine2: "They will be right here next time.",
     restArt: restSVG,
-    soundNote: "Soft tooth clicks. Hold for 2 seconds.",
-    legacy: { timer: "gearbox-timer-v1", sound: "gearbox-sound-v1" },
+    legacy: { timer: "gearbox-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyeSpin,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(chime, 60); },
     onTimer: drawFuel
   });
   resize();

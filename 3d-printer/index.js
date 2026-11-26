@@ -12,7 +12,6 @@
 //   - Viewer: look at one print big and turn it
 //   - Tabs, buttons
 //   - Surprise: a fun moment on the printer right now
-//   - Sound (off by default; soft and synthesized)
 //   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
 //   - Main loop
 //   - Ghost hand
@@ -1224,7 +1223,7 @@
     job.active = hw.loaded;
     var n0 = hw.noz, b0 = hw.bed, z0 = hw.bedZ;
     var q = job.tq;
-    q.push(T_call(function () { setPhase("Heating", true); blip(); }));
+    q.push(T_call(function () { setPhase("Heating", true); }));
     q.push(T_move([[0, 0]], 900, false));
     q.push(T_wait(4, function (f) {
       hw.noz = lerp(n0, 220, ease(f)); hw.bed = lerp(b0, 55, ease(Math.min(1, f * 1.15)));
@@ -1235,7 +1234,7 @@
       q.push(T_move([p], function () { return job.tv; }, false));
       q.push(T_wait(0.16, function (f) {
         hw.bedZ = 3 - Math.sin(f * Math.PI) * 3;
-        if (f >= 1) { hw.ripple = { x: p[0], y: p[1], t: 0 }; tick1(); }
+        if (f >= 1) { hw.ripple = { x: p[0], y: p[1], t: 0 }; }
         job.prepLeft = 5.5 - (i + f) / 9 * 3;
       }));
     });
@@ -1297,9 +1296,9 @@
     out.push(T_call(function () { setPhase("Changing color", true); old = hw.loaded; }));
     out.push(T_move([[CHUTE.x, CHUTE.y]], function () { return job.tv; }, false));
     out.push(T_wait(0.3, function (f) { hw.cut = 1 - f; if (f >= 1) hw.cut = 0; }));
-    out.push(T_wait(0.55, function (f) { hw.feed = [{ slot: old, frac: 1 - f }]; hw.spoolAng[old] = (hw.spoolAng[old] || 0) - 1.5; whir(1 - f); }));
+    out.push(T_wait(0.55, function (f) { hw.feed = [{ slot: old, frac: 1 - f }]; hw.spoolAng[old] = (hw.spoolAng[old] || 0) - 1.5; }));
     out.push(T_call(function () { hw.loaded = s; hw.lid = Math.max(hw.lid, 0); }));
-    out.push(T_wait(0.75, function (f) { hw.feed = [{ slot: s, frac: f }]; hw.spoolAng[s] += 1.5; whir(f); }));
+    out.push(T_wait(0.75, function (f) { hw.feed = [{ slot: s, frac: f }]; hw.spoolAng[s] += 1.5; }));
     out.push(T_call(function () { hw.feed = null; }));
     [].push.apply(out, poopTasks(s));
     out.push(T_call(function () { job.changesLeft = Math.max(0, job.changesLeft - 1); }));
@@ -1313,7 +1312,7 @@
   function finishTasks() {
     var q = job.tq, z0 = hw.bedZ;
     job.printing = false; job.done = true;
-    q.push(T_call(function () { setPhase("Done!", true); hw.fanT = 0; chime(); job.skip = false; job.hurry = Toybox.timer.phase() === "ending"; updateUI(); }));
+    q.push(T_call(function () { setPhase("Done!", true); hw.fanT = 0; job.skip = false; job.hurry = Toybox.timer.phase() === "ending"; updateUI(); }));
     q.push(T_move([[CHUTE.x, CHUTE.y]], function () { return job.tv; }, false));
     // Show it off: the print stays on the plate, lit and slowly turning, until the child taps
     // "Take it off" (or picks another model). Time-up ending takes it off by itself.
@@ -1326,7 +1325,7 @@
     q.push(T_wait(0.9, function (f) {
       hw.flex = Math.sin(Math.min(1, f * 1.6) * Math.PI);
       hw.popY = f > 0.45 ? Math.sin((f - 0.45) / 0.55 * Math.PI) * 40 : 0;
-      if (f > 0.45 && !job.popped) { job.popped = true; tick1(); }
+      if (f > 0.45 && !job.popped) { job.popped = true; }
     }));
     q.push(T_call(function () {
       hw.flex = 0; hw.popY = 0;
@@ -1404,7 +1403,6 @@
       fd.t = Math.min(1, fd.t + dt / 1.4);
       if (fd.t < 0.45) { hw.feed = [{ slot: fd.from, frac: 1 - fd.t / 0.45 }]; hw.spoolAng[fd.from] -= dt * 30; }
       else { hw.loaded = fd.to; hw.feed = [{ slot: fd.to, frac: (fd.t - 0.45) / 0.55 }]; hw.spoolAng[fd.to] += dt * 30; }
-      whir(fd.t);
       if (fd.t >= 1) { hw.feed = null; hw.idleFeed = null; }
     }
     hw.lid = clamp(hw.lid + (lidOpen ? 1 : -1) * dt * 2.4, 0, 1);
@@ -1416,7 +1414,7 @@
       if (p.y < floor) return true;
       hw.pile.push({ x: tipXAt(CHUTE.x) + rand(-22, 22), y: floor + rand(-3, 3), r: p.r * 0.8, f: p.f, a: rand(-1, 1) });
       if (hw.pile.length > 40) hw.pile.shift();
-      savePile(); plop();
+      savePile();
       return false;
     });
     stepSurprise(dt);
@@ -1428,7 +1426,6 @@
     var mv = Math.sqrt(Math.pow(hw.x - (hw.px || 0), 2) + Math.pow(hw.y - (hw.py || 0), 2)) / Math.max(dt, 0.001);
     hw.px = hw.x; hw.py = hw.y;
     hw.speed += (mv - hw.speed) * Math.min(1, dt * 10);
-    updateSound();
   }
 
   // ---------- Controls ----------
@@ -1567,7 +1564,6 @@
     $("popTitle").textContent = "Pick a color";
     Array.prototype.forEach.call(document.querySelectorAll("[data-pfil]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.pfil === state.slots[i])); });
     $("pop").hidden = false;
-    blip();
     updateUI();
   }
   function closePop() { $("pop").hidden = true; }
@@ -1575,17 +1571,15 @@
   function selectBay(i) {
     state.sel = i;
     if ((!job || job.paused) && hw.loaded !== i) hw.idleFeed = { from: hw.loaded, to: i, t: hw.idleFeed ? 0.45 : 0 };
-    blip();
     updateUI();
   }
-  function setLid(open) { hw.lidOpen = !!open; if (!open) closePop(); blip(); }
+  function setLid(open) { hw.lidOpen = !!open; if (!open) closePop(); }
   function setSlotColor(i, fid) {
     if (state.slots[i] === fid) return;
     hw.swapOld[i] = state.slots[i];
     state.slots[i] = fid;
     hw.swap[i] = 1;
     hw.lidUntil = performance.now() + 1600;
-    whir(0.6);
     updateUI();
   }
 
@@ -1611,7 +1605,6 @@
       // Tap inside: the toolhead zooms over to your finger.
       hw.jog = { x: clamp((p.x - PCX) / MS, -CHUTE.x, CHUTE.x), y: clamp((YTIP - p.y) / (K * MS), -128, 128) };
       hw.ripple = { x: hw.jog.x, y: hw.jog.y, t: 0 };
-      blip();
     }
   });
 
@@ -1626,7 +1619,6 @@
     $("vSub").textContent = names.join(", ");
     $("viewer").hidden = false;
     sizeViewer();
-    blip();
   }
   function sizeViewer() {
     if (!view) return;
@@ -1685,9 +1677,9 @@
     if (t.id === "printBtn") { if (job && job.showcase) job.showcase = false; else if (job && !job.paused) skip(); else startPrint(); updateUI(); return; }
     if (t.id === "fastBtn") { state.faster = !state.faster; updateUI(); return; }
     if (t.dataset.pfil) { setSlotColor(popSlot, t.dataset.pfil); setTimeout(closePop, 350); return; }
-    if (t.dataset.model) { state.model = t.dataset.model; if (job && job.showcase) job.showcase = false; blip(); }
-    else if (t.id === "oneBtn") { if (state.multi) Toybox.toast("All one color!"); state.multi = false; blip(); }
-    else if (t.id === "manyBtn") { if (!state.multi) Toybox.toast("Each part a new color!"); state.multi = true; blip(); }
+    if (t.dataset.model) { state.model = t.dataset.model; if (job && job.showcase) job.showcase = false; }
+    else if (t.id === "oneBtn") { if (state.multi) Toybox.toast("All one color!"); state.multi = false; }
+    else if (t.id === "manyBtn") { if (!state.multi) Toybox.toast("Each part a new color!"); state.multi = true; }
     else if (t.dataset.slot) { selectBay(Number(t.dataset.slot)); return; }
     else if (t.dataset.fil) setSlotColor(state.sel, t.dataset.fil);
     else return;
@@ -1720,7 +1712,7 @@
     if (pick === "alive" && (!canAlive() || alive)) pick = "purge";
     if (pick === "purge" && party) {
       if (canAlive() && !alive) pick = "alive";
-      else { party.extra += 4; blip(); return; }   // a party is already going: a few more blobs
+      else { party.extra += 4; return; }   // a party is already going: a few more blobs
     }
     surpriseTurn = pick === "purge" ? 1 : 0;
     if (pick === "purge") startParty(); else startAlive();
@@ -1736,7 +1728,6 @@
     party = { t: 0, head: head, cols: cols, step: -1, blob: 0, tumble: [], nT: 0, extra: 0, done: false };
     if (head && (!job || job.paused)) hw.jog = { x: CHUTE.x, y: CHUTE.y };
     hw.lidUntil = performance.now() + 1500;
-    blip();
   }
   var COL_T = reduce ? 1.2 : 1.5;
   function stepSurprise(dt) {
@@ -1749,10 +1740,10 @@
         var t1 = pt.t - 0.9, k = Math.floor(t1 / COL_T);
         if (t1 >= 0 && k < pt.cols.length) {
           var slot = state.slots.indexOf(pt.cols[k]), f2 = (t1 - k * COL_T) / COL_T;
-          if (k !== pt.step) { pt.step = k; tick1(); }
+          if (k !== pt.step) { pt.step = k; }
           if (slot >= 0 && !hw.idleFeed) hw.spoolAng[slot] += dt * 6;
           if (f2 < 0.7) hw.blob = { f: pt.cols[k], r: 3 + f2 / 0.7 * 15 };
-          else if (hw.blob) { dropPoop(); plop(); }
+          else if (hw.blob) { dropPoop(); }
         }
       }
       // Then the tumble: a pile of blobs comes down the chute and spills into the bin.
@@ -1771,11 +1762,11 @@
           var sp2 = HEAP[p.slot], tx = cx + sp2[0];
           p.x += (tx - p.x) * Math.min(1, dt * 3.2);
           if (p.y > 914 + sp2[1] - p.r * 0.5 && p.vy > 0) {
-            if (p.b < (reduce ? 0 : 1)) { p.b++; p.vy = -p.vy * 0.38; plop(); sparks.push({ x: p.x, y: p.y + p.r * 0.5, t: 0, c: fil(p.f).hex }); return true; }
+            if (p.b < (reduce ? 0 : 1)) { p.b++; p.vy = -p.vy * 0.38; sparks.push({ x: p.x, y: p.y + p.r * 0.5, t: 0, c: fil(p.f).hex }); return true; }
             hw.pile = hw.pile.filter(function (q) { return q.s !== p.slot; });
             hw.pile.push({ x: tx, y: 914 + sp2[1] - p.r * 0.3, r: p.r * 0.9, f: p.f, a: rand(-1, 1), s: p.slot });
             if (hw.pile.length > 40) hw.pile.shift();
-            savePile(); plop();
+            savePile();
             return false;
           }
         }
@@ -1828,7 +1819,6 @@
     var dur = { sail: 10, hop: 7, waddle: 8, spin: 6, twirl: 6.5, bounce: 6 }[kind];
     if (reduce) { dur = Math.min(dur, 5); if (kind === "sail") kind = "bounce"; }
     alive = { t: 0, dur: dur, kind: kind, pic: job.pic, yaw0: job.pic.yaw, yawNow: 0, acc: 0 };
-    chime();
   }
   function endAlive() {
     if (!alive) return;
@@ -1910,58 +1900,7 @@
     }
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts the audio on a tap while sound is on. This page builds its own master gain and noise per context.
-  var sctx = null, master = null, noiseBuf = null, motor = null, fanN = null;
-  function out(ac) {
-    if (sctx !== ac) {
-      sctx = ac; motor = null; fanN = null;
-      master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
-      var len = Math.floor(ac.sampleRate * 1.5), d, last = 0, i;
-      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
-      d = noiseBuf.getChannelData(0);
-      for (i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
-    }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function blip() { tone(rand(560, 700), 0.14, 0.04, "sine", 880); }
-  function tick1() { tone(1300, 0.05, 0.025, "triangle"); }
-  function plop() { tone(380, 0.18, 0.045, "sine", 140); }
-  function whir(f) { if (Math.random() < 0.15) tone(300 + f * 300, 0.12, 0.012, "triangle"); }
-  function chime() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { tone(f, 0.6, 0.05); }, i * 140); }); }
-  function updateSound() {
-    var ac = Toybox.sound.ready();
-    if (!ac) { if (motor) { motor.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.05); fanN.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.05); } return; }
-    out(ac);
-    if (!motor) {
-      var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      o.type = "triangle"; o.frequency.value = 200; f.type = "lowpass"; f.frequency.value = 900; g.gain.value = 0.0001;
-      o.connect(f); f.connect(g); g.connect(master); o.start();
-      motor = { o: o, g: g };
-      var src = ac.createBufferSource(), f2 = ac.createBiquadFilter(), g2 = ac.createGain();
-      src.buffer = noiseBuf; src.loop = true; f2.type = "lowpass"; f2.frequency.value = 500; g2.gain.value = 0.0001;
-      src.connect(f2); f2.connect(g2); g2.connect(master); src.start();
-      fanN = { g: g2 };
-    }
-    var sp = Math.min(hw.speed, 3000), t = ac.currentTime;
-    motor.o.frequency.setTargetAtTime(140 + sp * 0.12, t, 0.05);
-    motor.g.gain.setTargetAtTime(sp > 5 ? 0.012 + Math.min(0.012, sp / 200000) : 0.0001, t, 0.06);
-    fanN.g.gain.setTargetAtTime(Math.max(0.0001, hw.fan * 0.05), t, 0.2);
-  }
+  var sctx = null;
   document.addEventListener("visibilitychange", function () { if (sctx && document.hidden) sctx.suspend(); });
 
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
@@ -2061,13 +2000,11 @@
     restLine: "The printer is resting.",
     restLine2: "It will be right here next time.",
     restArt: function () { return '<canvas class="rest-art" id="restArt" aria-hidden="true"></canvas>'; },
-    soundNote: "Soft motor whirs, fan hum and a done chime. Hold for 2 seconds.",
-    legacy: { timer: "3dprinter-timer-v1", sound: "3dprinter-sound-v1" },
+    legacy: { timer: "3dprinter-timer-v1" },
     onEnding: onEnding,
     onGoodbye: function () { lightsOut = true; },
     onRest: function () { endingDone = null; drawRestArt(); },
     onWake: function () { endingDone = null; lightsOut = false; updateUI(); },
-    onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
   Toybox.settings.action("printer-clear", clearShelfAndPile);

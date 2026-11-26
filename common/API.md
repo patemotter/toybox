@@ -13,26 +13,22 @@ Load before app styles and scripts:
 ```
 Do not add Grown-ups sheet, toast, farewell, or rest markup in HTML — `Toybox.init` builds them.
 
-### Init, timer, sound & settings
+### Init, timer & settings
 - **`Toybox.init(opts)`** — call once the scene is ready:
-  - Identity: `app` (folder name), `home: true` (launcher only), `grownButton` (launcher only; hidden in apps), `grownLabel: [idle, active]`, `badge` (`<svg class="tbadge" viewBox="0 0 60 60" hidden>`), `sections: [el]`, `legacy: { timer, sound }`.
-  - Rest & farewell copy: `timerIntro`, `goodbyeOption`, `farewellText`, `goodbyeLabel`, `farewellDone`, `restLine`, `restLine2`, `restArt: () => svgHtml`, `soundNote`.
+  - Identity: `app` (folder name), `home: true` (launcher only), `grownButton` (launcher only; hidden in apps), `grownLabel: [idle, active]`, `badge` (`<svg class="tbadge" viewBox="0 0 60 60" hidden>`), `sections: [el]`, `legacy: { timer }`.
+  - Rest & farewell copy: `timerIntro`, `goodbyeOption`, `farewellText`, `goodbyeLabel`, `farewellDone`, `restLine`, `restLine2`, `restArt: () => svgHtml`.
   - Orientation: `orientation: "landscape" | "portrait"` (only when truly needed; dismissible card; tests skip via `sessionStorage["toybox-turn-ok:<app>"]="1"`).
-  - Hooks (all optional): `onEnding(done, info)` (`info.goodbye`, `endingMaxMs` default `15000`), `onGoodbye()`, `onRest()`, `onWake()`, `onSound(on)`, `onOpen()`, `onTimer({ phase, remainingMs, fraction, minutes, showMinutes })`, `onTurn(shown)`.
+  - Hooks (all optional): `onEnding(done, info)` (`info.goodbye`, `endingMaxMs` default `15000`), `onGoodbye()`, `onRest()`, `onWake()`, `onOpen()`, `onTimer({ phase, remainingMs, fraction, minutes, showMinutes })`, `onTurn(shown)`.
   - Legacy no-ops (don't add): `big`, `onBig`, `Toybox.setBig()`, `Toybox.isBig()`.
 - **`Toybox.fresh()`** — `true` on first load of a page under a new launcher tap (`toybox-launch` vs `toybox-seen:<path>`). Safe to call before `init()`. Reset play state/counters; keep collections & grown-up settings. The launcher skips the new launch id on the first tile tap after the Grown-ups sheet was opened, so returning to the app just left is not fresh.
 - **`Toybox.timer`**:
   - `.phase()` → `"idle" | "running" | "ending" | "resting"`
   - `.locked()` → `true` while ending or resting (ignore play input)
   - `.remainingMs()` → remaining ms while running, else `0`
-- **`Toybox.sound`**:
-  - `.on()` → boolean; `.onChange(fn(on))`
-  - `.unlock()` → creates/resumes `AudioContext` (auto-called on gestures when on)
-  - `.context()` → raw `AudioContext` or `null`
-  - `.ready()` → `AudioContext` if sound is on and running, else `null` (only play through this)
+- **No `Toybox.sound`:** the Toybox makes no sound (removed 2026-11-26).
 - **`Toybox.settings`**:
   - `.get(id)`, `.set(id, v)`, `.onChange(fn(id, v))`, `.action(id, fn)` (runs once per home-screen press), `.list()`.
-  - Current `SETTINGS` IDs: `uses-info`, `kind-words`, `coach-voice`, `mathgrid-voice`, `printer-name`, `printer-clear`.
+  - Current `SETTINGS` IDs: `uses-info`, `kind-words`, `printer-name`, `printer-clear`.
 - **`Toybox.offFirst({ running: () => bool, off: (done) => void })`** — registers a powered machine so leaving via links or **`Toybox.beforeLeave(fn)`** switches it off quietly and navigates immediately. Add `data-tb-noguard` to exempt a link.
 - **`Toybox.makeHold(btn, ms, onDone, onPress)`** — press-and-hold confirmation (swallows trailing click).
 - **`Toybox.toast(msg)`** — shared toast banner (~3 s+).
@@ -64,7 +60,7 @@ All components respect `Toybox.timer.locked()` and include palm guarding.
 - **`Toybox.wiggle(el)`**, **`Toybox.icon(name)`** (`back|home|big|new|surprise|shelf|close`), **`Toybox.pics`** (`{ play, again }`).
 
 ### Storage keys & CSS conventions (`common/toybox.css`)
-- **`localStorage`:** `toybox-timer-v1`, `toybox-sound-v1`, `toybox-settings-v1`, `toybox-settings-done-v1`, `toybox-kind-v1`, `toybox-gear-v1`, `toybox-favorites-v1` (launcher).
+- **`localStorage`:** `toybox-timer-v1`, `toybox-settings-v1`, `toybox-settings-done-v1`, `toybox-kind-v1`, `toybox-gear-v1`, `toybox-favorites-v1` (launcher).
 - **`sessionStorage`:** `toybox-launch`, `toybox-seen:<path>`, `toybox-turn-ok:<app>`, gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`, `forge-gear`).
 - **Tokens:** `--tb-ink` (`#1D2340`), `--tb-bg` (`#CDE9FF`), `--tb-surface`, `--tb-go`, `--tb-pick`, `--tb-new`, `--tb-shelf`, `--tb-job`, `--tb-off`, `--tb-outline` (`2px`), `--tb-frame` (`3px`), `--tb-key`, `--tb-s1..s6`, `--tb-fs-*`.
 - **Classes:** `.tb-app-shell` (+ `.tb-v2`), `.tb-head`, `.tb-title` (`<span class="tb-app">App · </span><span class="tb-station">Station</span>`), `.tb-stage`, `.tb-panel` (+ `.tb-panel-bar` for New/Surprise-only landscape rail), `.tb-coach` (`is-do`, `is-info`, `is-seen`), `.tb-counter`, `.btn` (`[aria-pressed="true"]`), `.tbadge`, `body.ending` / `.resting` / `.turn`.
@@ -83,7 +79,6 @@ Load after `../common/toybox.js`. Plain ES5; draws in metres (`y` up is negative
   - Layers: `.sky(ctx, o)`, `.hedge(ctx, o)`, `.field(ctx, "far"|"near", paint)`, `.verge(ctx, o)`, `.store(ctx, level, o)`, `.put(ctx, x, r, dir, fn)`.
 - **`Farm.draw`** — `tractor`, `bedformer`, `destoner`, `planter`, `harvester`, `trailer`, `combine`, `boom`, `cow`, `telehandler`, `dog` (Midge), `hare`, `deer`, `gull`, `hawk`, `tree`, `farmstead`, `potato`.
 - **`Farm.rear`** — rear close-up drawers: `bedformer`, `destoner`, `planter`, `harvester`, `trailer`, `crossBelt`, `hood`.
-- **`Farm.sound`** — soft Web Audio via `Toybox.sound.ready()`: `engine(0..1|-1)`, `soil(l)`, `pour(l)`, `horn()`, `clunk()`, `tick()`, `pop()`, `chime()`, `stop()`.
 - **`new Farm.Particles()`** — world-space particle pool: `.add(p)`, `.update(dt)`, `.draw(ctx, scene)`, `.clear()`, `.count()`.
 - **Drawing & interaction helpers:** `Farm.inUnits(ctx, x, y, s, lwPx, fn)`, `Farm.shape` (`P`, `R`, `C`, `Ln`, `tube`, `fs`, `rr`), `Farm.LW` (getter), `Farm.shine`, `Farm.band`, `Farm.eachX`, `Farm.drawRing(ctx, x, y, t, o)`, `Farm.avoid(coach, x, y, r)`, `Farm.locked(ending)`, `Farm.pic(id)`, `Farm.restArt()`.
 - **Constants & math:** `Farm.MACHINES`, `Farm.HITCH`, `Farm.DRAWBAR`, `Farm.COMBINE`, `Farm.CROP`, `Farm.u` (`clamp`, `lerp`, `ease`, `hash`, `mix`, `INK`, `reduceMotion`).

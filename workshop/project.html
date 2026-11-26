@@ -140,23 +140,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   var view = "plan";
   try { if (!(window.Toybox && Toybox.fresh())) view = localStorage.getItem(VKEY) === "shelf" ? "shelf" : "plan"; } catch (e) { view = "plan"; }
 
-  // ---------- sound (soft, only through the shared setting) ----------
-  function blip(f, dur, gain, type, f2) {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    try {
-      var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(f, t);
-      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(gain || 0.08, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(ac.destination);
-      o.start(t); o.stop(t + dur + 0.05);
-    } catch (e) { /* ignore */ }
-  }
-
   // ---------- state ----------
   var prog = PJ.progress(pid);
   var just = PJ.justFinished();
@@ -217,7 +200,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
 
   function go() {
     if (locked()) return;
-    blip(660, 0.12, 0.06, "sine", 880);
     if (!prog.next) { PJ.reset(pid); refresh(); }
     location.href = PJ.stepUrl(prog.next);
   }
@@ -229,7 +211,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     var s = P.stepBy[el.dataset.step];
     if (!s) return;
     if (prog.next && prog.next.id === s.id) { go(); return; }
-    blip(520, 0.08, 0.04);
     // The toast can already say the same words, so the tapped chip itself always answers too.
     Toybox.wiggle(el);
     if (isDone(s.id)) Toybox.toast("Done: " + s.done);
@@ -241,7 +222,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
   function setView(v) {
     view = v;
     try { localStorage.setItem(VKEY, v); } catch (e) { /* ignore */ }
-    blip(520, 0.08, 0.04);
     updatePanel();
   }
 
@@ -257,7 +237,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     refresh();
     just = null;
     Toybox.toast("A new board! Start with the planer.");
-    blip(440, 0.25, 0.06, "triangle", 330);
     updatePanel();
   });
 
@@ -466,7 +445,7 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
       el.style.transition = "";
       el.style.transform = "translate(" + n(perch[0]) + "px," + n(perch[1]) + "px)";
       birdState = "flying";
-      setTimeout(function () { birdState = "landed"; blip(1320, 0.12, 0.05, "sine", 1760); setTimeout(function () { blip(1480, 0.1, 0.05); }, 160); }, 5300);
+      setTimeout(function () { birdState = "landed"; }, 5300);
     }, 30);
     return s;
   }
@@ -502,7 +481,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
       if (el) el.classList.add("pop");
     });
     Toybox.toast(s.done);
-    blip(880, 0.18, 0.06, "sine", 1320);
     // the whole birdhouse is finished: sometimes a kind-words card (the shared layer decides)
     if (!prog.next) setTimeout(function () { Toybox.kind(); }, 6000);
   }
@@ -518,7 +496,6 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     if (!g) return;
     e.preventDefault();
     wiggle(g.dataset.part);
-    blip(520 + Math.random() * 120, 0.09, 0.04);
     var id = g.dataset.part;
     if (PURPOSE[id]) coach(PURPOSE[id]);
     else if (id === "house") coach("A bird lives in the birdhouse.");
@@ -571,10 +548,8 @@ body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none
     restLine: "The birdhouse is resting.",
     restLine2: "The plan will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft pops and a bird. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
-    onEnding: function (done) { setTimeout(done, 800); },
-    onSound: function (on) { if (on) blip(660, 0.15, 0.08, "sine", 880); }
+    legacy: { timer: "workshop-timer-v1" },
+    onEnding: function (done) { setTimeout(done, 800); }
   });
 
   if (debug) {

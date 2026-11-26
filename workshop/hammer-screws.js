@@ -17,7 +17,6 @@
 //   - Joint scene (mallet, dead-blow)
 //   - Yard scene (sledgehammer)
 //   - Particles
-//   - Sound (off by default; soft synth only)
 //   - Overlays: tool name, readout, hint, cam-out help
 //   - Board contents
 //   - Hammers: swinging
@@ -1164,81 +1163,6 @@
     }
   }
 
-  // ---------- Sound (off by default; soft synth only) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. This page keeps its own master gain and
-  // noise buffer, built once per context.
-  var AC = null, master = null, noiseBuf = null;
-  function A() {
-    var a = Toybox.sound.ready();
-    if (!a) return null;
-    if (a !== AC) {
-      try {
-        master = a.createGain(); master.gain.value = 0.5; master.connect(a.destination);
-        noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.5), a.sampleRate);
-        var d = noiseBuf.getChannelData(0);
-        for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        AC = a; motor = null;
-      } catch (e) { return null; }
-    }
-    return AC;
-  }
-  function ensureAudio() { A(); }
-  function tone(freq, dur, type, gain, freqEnd, delay) {
-    var ac = A(); if (!ac) return;
-    try {
-      var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-      o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
-      if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + dur);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function noise(dur, ftype, freq, gain, delay, q) {
-    var ac = A(); if (!ac) return;
-    try {
-      var t = ac.currentTime + (delay || 0), s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-      s.buffer = noiseBuf; f.type = ftype; f.frequency.value = freq; f.Q.value = q || 1;
-      g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function sndHit(kind, s) {
-    s = clamp(s || 1, 0.6, 2.2);
-    if (kind === "nail") { noise(0.035, "bandpass", 2600, 0.1 * s, 0, 1.2); tone(170, 0.09, "sine", 0.16 * s, 80); tone(1900, 0.14, "sine", 0.025); }
-    else if (kind === "metal") { tone(1250, 0.5, "sine", 0.05); tone(2710, 0.35, "sine", 0.025); tone(4100, 0.2, "sine", 0.012); noise(0.02, "highpass", 3000, 0.05); }
-    else if (kind === "rubber") { tone(140, 0.12, "sine", 0.18, 100); noise(0.05, "lowpass", 700, 0.07); tone(300, 0.16, "sine", 0.035, 430, 0.03); }
-    else if (kind === "dead") { noise(0.12, "lowpass", 280, 0.22); tone(90, 0.12, "sine", 0.18, 60); }
-    else if (kind === "sledge") { tone(70, 0.32, "sine", 0.28, 40); noise(0.22, "lowpass", 420, 0.22); }
-    else if (kind === "wood") { tone(220, 0.08, "triangle", 0.1, 160); noise(0.04, "bandpass", 1200, 0.1); }
-  }
-  function sndTick() { noise(0.01, "bandpass", 2600, 0.05, 0, 2); }
-  function sndClick() { noise(0.007, "highpass", 3800, 0.11); tone(2200, 0.02, "square", 0.008); }
-  function sndImpact() { noise(0.014, "bandpass", 1700, 0.13, 0, 1.5); tone(150, 0.03, "square", 0.025); }
-  function sndSqueak(t) { tone(650 + 500 * t, 0.07, "sine", 0.02); }
-  function sndPop() { tone(480, 0.14, "sine", 0.07, 1150); }
-  function sndSlip() { tone(720, 0.14, "triangle", 0.05, 260); noise(0.05, "highpass", 2500, 0.04); }
-  function sndChime() { tone(660, 0.26, "triangle", 0.05); tone(990, 0.36, "triangle", 0.045, null, 0.09); }
-  function sndCrack() { noise(0.28, "bandpass", 900, 0.22, 0, 0.8); tone(80, 0.22, "sine", 0.2, 50); }
-
-  function sndPlace() { tone(900, 0.05, "sine", 0.03, 1300); noise(0.015, "bandpass", 4000, 0.03); }
-  var motor = null;
-  function motorSet(level, kind) {
-    var ac = A();
-    if (!ac || level < 0.02) { if (motor) { try { motor.g.gain.setTargetAtTime(0.0001, AC.currentTime, 0.05); var m = motor; setTimeout(function () { try { m.o.stop(); } catch (e) { } }, 300); } catch (e) { } motor = null; } return; }
-    try {
-      if (!motor) {
-        var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-        o.type = "sawtooth"; f.type = "lowpass"; f.frequency.value = 700; g.gain.value = 0.0001;
-        o.connect(f); f.connect(g); g.connect(master); o.start();
-        motor = { o: o, f: f, g: g };
-      }
-      var base = kind === "impact" ? 140 : 110;
-      motor.o.frequency.setTargetAtTime(base + level * 160, ac.currentTime, 0.05);
-      motor.g.gain.setTargetAtTime(0.03 * level, ac.currentTime, 0.05);
-    } catch (e) { /* ignore */ }
-  }
-
   // ---------- Overlays: tool name, readout, hint, cam-out help ----------
   var lastName = "", lastBig = "", lastSmall = "";
   function setName(name, sub) {
@@ -1307,7 +1231,6 @@
     state.board.nails.push(n);
     sortBoard();
     activeNail = n;
-    sndPlace();
     var p = bpt(n.u, n.v);
     ring(p.x, p.y, 26 * LB.k, "255,201,60");
     if (state.mode === "hammer" && state.act === "hit") {
@@ -1323,7 +1246,6 @@
     n.d = Math.min(N.len, n.d + 3); n.vd = 30;
     ring(p.x, p.y - 4, 14 * LB.k, "255,255,255");
     fibers(p.x, p.y, 3, 0.4);
-    sndHit("nail", 0.6);
     shakeAmp = Math.max(shakeAmp, reduce ? 0.2 : 1);
     pop("tap", p.x + (ham.tapK % 2 ? 34 : -34) * LB.k * 0.8, p.y - N.len * LB.k * 0.5, 16, "#FFFFFF");
   }
@@ -1334,7 +1256,6 @@
     sortBoard();
     activeScrew = q; drv.camT = 0;
     if (state.dir !== "fwd") { state.dir = "fwd"; render(); }
-    sndPlace();
     var p = bpt(q.u, q.v);
     ring(p.x, p.y, 26 * LB.k, "255,201,60");
     saveSoon(); updateCounts();
@@ -1586,7 +1507,6 @@
       PJ.powerBurst = 0;
       stars(n.x, n.y, 10);
       pop("In!", n.x, n.y - 36 * LA.k, 22, "#7CFF8A");
-      sndChime();
       var nextIdx = pjNextNailIdx();
       if (nextIdx >= 0) {
         PJ.activeIdx = nextIdx;
@@ -1595,7 +1515,6 @@
         PJ.phase = "pause";
         PJ.pauseT = 0;
         if (trig.on) setTrigger(false, null);
-        motorSet(0);
         pop("Joined!", LA.cx, LA.oy - 13 * LA.u, 26, "#FFC93C");
       }
     }
@@ -1644,7 +1563,6 @@
         if (PJ.glueProg >= 1) {
           PJ.glueHeld = false; PJ.glueAuto = false;
           PJ.phase = "slide"; PJ.slideProg = 0;
-          sndPop();
         }
       }
     } else if (PJ.phase === "slide") {
@@ -1652,7 +1570,6 @@
       if (PJ.slideProg >= 1) {
         PJ.phase = "nails";
         pjSpawnNails();
-        sndPlace();
       }
     } else if (PJ.phase === "nails" && state.mode === "screw") {
       var kind = DRIVERS[state.driver].kind;
@@ -1661,7 +1578,6 @@
         var on = (trig.on || PJ.powerBurst > 0) && !locked() && idx >= 0;
         if (PJ.powerBurst > 0) PJ.powerBurst = Math.max(0, PJ.powerBurst - dt);
         pw.lvl += ((on ? 1 : 0) - pw.lvl) * Math.min(1, dt * 8);
-        motorSet(pw.lvl, state.driver);
         if (on && idx >= 0) {
           var n = PJ.nails[idx];
           var delta = dt * 1.65;
@@ -1670,7 +1586,6 @@
           PJ.impT = (PJ.impT || 0) + dt;
           if (PJ.impT > 0.075) {
             PJ.impT = 0;
-            if (state.driver === "impact") sndImpact(); else sndTick();
             shakeAmp = Math.max(shakeAmp, reduce ? 0.4 : 1.8);
             fibers(n.x, n.y, 2, 0.5);
             dust(n.x, n.y - 2, 2, 0.5);
@@ -1678,7 +1593,6 @@
           pjAdvanceFastener(idx, delta, true);
         }
       } else {
-        motorSet(0);
         if (drv.g && !drv.g.circling && !locked() && idx >= 0) {
           drv.g.holdT = (drv.g.holdT || 0) + dt;
           if (drv.g.holdT > 0.25) {
@@ -1686,13 +1600,12 @@
             var d2 = dt * 1.35;
             drv.ang += d2 * 720;
             n2.a = (n2.a || 0) + d2 * 720;
-            if (Math.random() < 0.35) { sndTick(); fibers(n2.x, n2.y, 1, 0.4); }
+            if (Math.random() < 0.35) { fibers(n2.x, n2.y, 1, 0.4); }
             pjAdvanceFastener(idx, d2, true);
           }
         }
       }
     } else if (PJ.phase === "pause") {
-      motorSet(0);
       PJ.pauseT += dt;
       if (PJ.pauseT >= 0.8) {
         PJ.nails.forEach(function (n) {
@@ -1708,7 +1621,6 @@
           PJ.phase = "done";
           PJ.finished = true;
           stars(LA.cx, LA.oy - 6 * LA.u, 24);
-          sndChime();
           var pjb = $("pjBack"), pjdt = $("pjDoneText"), pjd = $("pjDone");
           ToyboxProjects.doneLink(pjb, PSTEP);
           if (pjdt) pjdt.textContent = PSTEP.done;
@@ -1820,7 +1732,6 @@
       if (ni >= 0) idx = ni; else return;
     }
     var n = PJ.nails[idx];
-    sndHit(HAMMERS[state.hammer].snd, s);
     fibers(n.x, n.y, 5, 0.7);
     dust(n.x, n.y - 2, 3, 0.6);
     pjAdvanceFastener(idx, 1 / 3, false);
@@ -1929,7 +1840,7 @@
     shakeAmp = Math.max(shakeAmp, (reduce ? 0.3 : 1) * h.shake * s);
     ring(T.x, T.y, (26 + 16 * s) * hamScale() / 1.3 + 10, state.hammer === "sledge" ? "255,240,200" : "255,255,255");
     if (s > 1.45) pop("Big hit!", T.x, T.y - 40, 22, "#FFC93C");
-    if (!tg) { sndHit("wood", s); return; }
+    if (!tg) { return; }
     switch (tg.kind) {
       case "pjnail": hitPjNail(tg.idx || 0, s); break;
       case "nail": hitNail(tg.ref, s, side); break;
@@ -1947,7 +1858,6 @@
   function hitNail(n, s, side) {
     var N = NAILS[n.t], h = HAMMERS[state.hammer], p = bpt(n.u, n.v), T = nailTop(n);
     n.hits++;
-    sndHit("nail", s);
     if (n.bent) {
       n.bent = clamp(n.bent * 1.25, -1.4, 1.4);
       fibers(p.x, p.y, 4, 0.6);
@@ -1981,7 +1891,6 @@
       bgDirty = true;
       stars(p.x, p.y - 6, 12);
       pop("All the way in!", p.x, p.y - 60, 24, "#7CFF8A");
-      sndChime();
     }
   }
   function hitPlate(tg, s) {
@@ -1990,18 +1899,16 @@
     M.dents.push(d);
     if (M.dents.length > 220) { M.dents.shift(); bgDirty = true; }
     else if (!bgDirty) drawDentOnBg(d);
-    sndHit("metal", s);
     sparks(p.x, p.y, Math.round(6 + 6 * s));
   }
   function drawDentOnBg(d) { bgx.setTransform(DPR, 0, 0, DPR, 0, 0); drawDent(bgx, d); }
   function hitRivet(i, s) {
     var R = state.metal.rivets[i], p = rivetTop(i);
-    sndHit("metal", s);
     sparks(p.x, p.y, Math.round(5 + 5 * s));
     if (R.s < 4) {
       R.s = Math.min(4, R.s + (s > 1.5 ? 2 : 1)); R.f = state.face;
       if (R.s >= 4) {
-        stars(p.x, p.y, 12); pop("Rivet set!", p.x, p.y - 50, 24, "#7CFF8A"); sndChime();
+        stars(p.x, p.y, 12); pop("Rivet set!", p.x, p.y - 50, 24, "#7CFF8A");
         if (state.metal.rivets.every(function (r) { return r.s >= 4; })) { newRivetsAt = nowMs() + 6000; pop("All set!", W / 2, LM.yBack - 30, 30, "#7CFF8A"); stars(W / 2, LM.yBack, 16); }
       }
       else pop(state.face === "ball" ? "Rounder" : "Flatter", p.x, p.y - 44, 20, "#FFFFFF");
@@ -2012,8 +1919,6 @@
   }
   function hitChisel(s) {
     var J = state.joint, k = LJ.k, cx = chiselX();
-    sndHit(state.hammer === "mallet" ? "rubber" : "dead", s);
-    sndHit("wood", 0.7);
     J.cd = Math.min(18, J.cd + (state.hammer === "mallet" ? 5 : 6.5) * s);
     fibers(cx, LJ.mid, 5, 0.8);
     if (J.cd >= 18) {
@@ -2028,7 +1933,6 @@
   }
   function hitPost(s) {
     var J = state.joint, k = LJ.k, T = postTop(), dead = state.hammer === "deadblow";
-    sndHit(dead ? "dead" : "rubber", s);
     if (J.gap <= 0 || newJointAt) { pop("Snug!", T.x, T.y - 30, 22, "#7CFF8A"); if (newJointAt) newJointAt = Math.min(newJointAt, nowMs() + 400); return; }
     J.hits++;
     if (J.hits === 1) pop("No dents!", T.x, T.y - 46, 20, "#7CFF8A");
@@ -2038,13 +1942,11 @@
       J.joints++;
       stars(postX(), LJ.mid - 40 * k, 14);
       pop("Snug fit!", postX(), LJ.mid - 170 * k, 26, "#7CFF8A");
-      sndChime();
       newJointAt = nowMs() + 5000;
     }
   }
   function hitWedge(s) {
     var Y = state.yard, k = LY.k, T = wedgeTop();
-    sndHit("sledge", s);
     if (logSplit || newLogAt) { if (newLogAt && !logSplit) newLogAt = Math.min(newLogAt, nowMs() + 300); return; }
     Y.hits++;
     sparks(T.x, T.y, 6);
@@ -2054,17 +1956,14 @@
       Y.logs++; Y.wedge = 30; Y.hits = 0;
       Y.pile = Math.min(8, Y.pile + 1);
       logSplit = { t: 0 };
-      sndCrack();
       chips(LY.sx, LY.logTop + 60 * k, 10, 1.4);
       dust(LY.sx, LY.stumpTop, 10, 1.5, "200,160,110");
       pop("Split!", LY.sx, LY.logTop - 60 * k, 34, "#FFC93C");
       newLogAt = nowMs() + 5000;
-      sndChime();
     }
   }
   function hitStake(s) {
     var Y = state.yard, k = LY.k;
-    sndHit("sledge", s);
     if (newStakeAt) { newStakeAt = Math.min(newStakeAt, nowMs() + 400); return; }
     Y.shits++;
     Y.stake = Math.max(90, Y.stake - 55 * s);
@@ -2074,7 +1973,6 @@
       Y.stakes++;
       stars(LY.kx, LY.ground - 100 * k, 12);
       pop("Stake in!", LY.kx, LY.ground - 200 * k, 28, "#7CFF8A");
-      sndChime();
       newStakeAt = nowMs() + 5000;
     }
   }
@@ -2237,7 +2135,6 @@
     if (!n) { flashHint("No nails to pull. Back to hitting!", 3); setAct("hit"); g.dead = true; return; }
     activeNail = n;
     gripNail(g, n);
-    sndTick();
   }
   function gripNail(g, n) {
     var N = NAILS[n.t], k = LB.k, ts = hamScale() / k, e = (N.len - n.d);
@@ -2266,7 +2163,7 @@
     if (prog >= 1) {
       // The claw has gone as far as it goes: grip again lower down and keep pulling.
       pull.top += dt;
-      if (pull.top > 0.15) { gripNail(g, n); pull.held = 0.2; sndTick(); }
+      if (pull.top > 0.15) { gripNail(g, n); pull.held = 0.2; }
       return;
     }
     var a = pull.a0 + prog * (pull.amax - pull.a0);
@@ -2275,13 +2172,11 @@
     var ts = hamScale() / LB.k;
     var nd = N.len - (pull.block + clawH(a) * ts);
     if (nd < n.d) {
-      if (n.d - nd > 1.2 || Math.random() < 0.3) { sndSqueak(prog); }
       var p = bpt(n.u, n.v);
       if (Math.random() < 0.4) fibers(p.x, p.y, 2, 0.4);
       n.d = Math.max(0, nd); n.dd = n.d; n.vd = 0;
       if (n.d <= 9) {
         flyer("nail", n.t, p.x, p.y - (N.len - n.d) * LB.k / 2);
-        sndPop();
         state.pulled++;
         pop("Pulled out!", p.x, p.y - 70, 26, "#FFC93C");
         stars(p.x, p.y, 8);
@@ -2394,7 +2289,7 @@
   }
   function turnFx(q, deg, before) {
     drv.tickAcc += Math.abs(deg);
-    while (drv.tickAcc >= 30) { drv.tickAcc -= 30; sndTick(); }
+    while (drv.tickAcc >= 30) { drv.tickAcc -= 30; }
     var p = bpt(q.u, q.v);
     if (deg > 0 && Math.random() < Math.min(0.9, Math.abs(deg) / 25)) {
       addP({ t: "fiber", x: p.x + rnd(-6, 6), y: p.y, vx: rnd(-90, 90), vy: rnd(-160, -40), g: 0.6, max: 0.5, len: rnd(4, 8), w: 2, rot: rnd(0, 6), vr: rnd(-12, 12), c: pick(["#FFF0D2", "#F6D9A6"]) });
@@ -2411,14 +2306,12 @@
     ghost.learned(DRIVERS[state.driver].kind === "power" ? "trigger" : "turn");
     stars(p.x, p.y, 12);
     pop("All the way in!", p.x, p.y - 60, 24, "#7CFF8A");
-    sndChime();
     saveSoon();
   }
   function screwOut(q) {
     var p = bpt(q.u, q.v);
     ghost.learned(DRIVERS[state.driver].kind === "power" ? "trigger" : "turn");
     flyer("screw", q.len, p.x, p.y - q.len * LB.k / 2);
-    sndPop();
     pop("Out!", p.x, p.y - 60, 26, "#FFC93C");
     removeScrew(q);
     drv.pend = 0;
@@ -2429,7 +2322,6 @@
     drv.cam = 1;
     var T = screwTop(q);
     sparks(T.x, T.y, 4);
-    sndSlip();
     pop("Slip!", T.x - 40, T.y - 30, 22, "#FFC93C");
     showCamout(q.h, isBit);
   }
@@ -2453,7 +2345,7 @@
     trig.on = on; trig.src = on ? src : null;
     $("trigger").classList.toggle("on", on);
     if (!on) { pw.wasSlip = false; pw.stall = false; saveSoon(); }
-    else { pw.brk = 0; ensureAudio(); }
+    else { pw.brk = 0; }
   }
   function torqueNeed(q) {
     if (q.d < q.len - 0.01) return 1 + 13 * (q.d / q.len);
@@ -2464,7 +2356,6 @@
     pw.lvl += ((on ? 1 : 0) - pw.lvl) * Math.min(1, dt * (on ? 6 : 8));
     var q = activeScrew, dir = state.dir === "fwd" ? 1 : -1;
     var rps = (kind === "impact" ? 4.5 : 3.8) * pw.lvl;
-    motorSet(pw.lvl, kind);
     if (!on) { pw.spin += rps * 360 * dt * dir; return; }
     if (!q) { pw.spin += rps * 360 * dt * dir; return; }
     if (!driverMatches(q)) {
@@ -2480,7 +2371,6 @@
           pw.clickT += dt;
           while (pw.clickT > 1 / 15) {
             pw.clickT -= 1 / 15;
-            sndClick();
             shakeAmp = Math.max(shakeAmp, reduce ? 0.5 : 2.2);
             drv.cam = 0.25;
             if (Math.random() < 0.3) pop("click", T.x + rnd(-40, 40), T.y - rnd(30, 70), 16, "#FFFFFF");
@@ -2506,7 +2396,6 @@
           pw.impT += dt;
           while (pw.impT > 1 / 14) {
             pw.impT -= 1 / 14;
-            sndImpact();
             shakeAmp = Math.max(shakeAmp, reduce ? 0.5 : 2.6);
             ring(T.x, T.y, 22, "255,201,60");
             if (q.d < q.len + 1.5) q.d = Math.min(q.len + 1.5, q.d + 0.9);
@@ -2522,7 +2411,7 @@
     } else {
       if (kind === "impact" && pw.brk < 0.35 && q.d > q.len - 4) {
         pw.brk += dt; pw.impT += dt;
-        while (pw.impT > 1 / 14) { pw.impT -= 1 / 14; sndImpact(); shakeAmp = Math.max(shakeAmp, 2); ring(T.x, T.y, 22, "255,201,60"); }
+        while (pw.impT > 1 / 14) { pw.impT -= 1 / 14; shakeAmp = Math.max(shakeAmp, 2); ring(T.x, T.y, 22, "255,201,60"); }
         return;
       }
       q.d = Math.max(0, q.d - mm);
@@ -2558,8 +2447,6 @@
       n.a = (n.a || 0) + 240;
       fibers(n.x, n.y, 4, 0.5);
       dust(n.x, n.y - 2, 2, 0.5);
-      sndTick();
-      sndHit("wood", 0.45);
       pjAdvanceFastener(best, 1 / 3, true);
       drv.g = g; g.turner = true; g.holdT = 0;
     }
@@ -2583,7 +2470,7 @@
     var n = PJ.nails[idx];
     drv.ang += deg;
     n.a = (n.a || 0) + deg;
-    if (Math.random() < 0.35) { sndTick(); fibers(n.x, n.y, 1, 0.4); }
+    if (Math.random() < 0.35) { fibers(n.x, n.y, 1, 0.4); }
     pjAdvanceFastener(idx, deg / 720, true);
   }
   function pjScrewUp(g) {
@@ -2598,7 +2485,6 @@
   cv.addEventListener("pointerdown", function (e) {
     e.preventDefault();
     if (locked()) return;
-    ensureAudio();
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     var p = toLocal(e), t = nowMs();
     var g = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y, t0: t, moved: 0, samples: [{ x: p.x, y: p.y, t: t }] };
@@ -2664,7 +2550,7 @@
   }
   function trigPress() {
     if (locked()) return;
-    acted(); ensureAudio();
+    acted();
     clearTimeout(trigLate); trigAt = Date.now();
     if (trig.on) return;
     ensureScrew(null, null);
@@ -3101,7 +2987,7 @@
     state.board.screws.forEach(function (q) { if (q.dd < q.d) q.dd = Math.min(q.d, q.dd + dt * 120); else q.dd = q.d; });
     if (state.mode === "hammer") { updateHammer(dt); updatePull(dt); }
     if (state.mode === "screw" && DRIVERS[state.driver].kind === "power") { if (sc !== "assemble") updatePower(dt); }
-    else { motorSet(0); if (state.mode === "screw" && sc !== "assemble") updateHand(dt); }
+    else { if (state.mode === "screw" && sc !== "assemble") updateHand(dt); }
     var nowT = nowMs();
     if (autoPullAt && nowT > autoPullAt) {
       autoPullAt = 0;
@@ -3120,7 +3006,7 @@
     if (newRivetsAt && nowT > newRivetsAt) {
       newRivetsAt = 0;
       state.metal.rivets = freshMetal().rivets;
-      if (sc === "metal") { pop("New rivets!", W / 2, LM.yBack - 30, 28, "#FFC93C"); sndPlace(); }
+      if (sc === "metal") { pop("New rivets!", W / 2, LM.yBack - 30, 28, "#FFC93C"); }
       saveSoon();
     }
     if (logSplit) { logSplit.t += dt; if (logSplit.t > 1.9) { logSplit = null; bgDirty = true; } }
@@ -3251,7 +3137,6 @@
     if (!t) return;
     if (t.classList.contains("hold") || t.id === "trigger" || t.closest(".sheet, .rest, .farewell")) return;
     if (locked()) return;
-    ensureAudio();
     acted();
     var oldScene = sceneName(), oldMode = state.mode;
     if (t.dataset.mode) { state.mode = t.dataset.mode === "driver" ? "screw" : t.dataset.mode; }
@@ -3259,16 +3144,16 @@
     else if (t.dataset.driver) { state.mode = "screw"; pickDriver(t.dataset.driver); }
     else if (t.dataset.nail) { state.nail = t.dataset.nail; }
     else if (t.dataset.act) {
-      if (t.dataset.act === "pull" && !state.board.nails.length) { flashHint("No nails yet! Hit one in first.", 3); sndClick(); }
+      if (t.dataset.act === "pull" && !state.board.nails.length) { flashHint("No nails yet! Hit one in first.", 3); }
       else setAct(t.dataset.act);
     }
-    else if (t.dataset.job) { ham.tgt = { kind: t.dataset.job }; ham.queue = 0; if (ham.phase === "follow") ham.phase = "rest"; sndClick(); }
+    else if (t.dataset.job) { ham.tgt = { kind: t.dataset.job }; ham.queue = 0; if (ham.phase === "follow") ham.phase = "rest"; }
     else if (t.dataset.face) { state.face = t.dataset.face; ham.pos = null; }
     else if (t.dataset.head) { pickHead(t.dataset.head); }
-    else if (t.dataset.hdir) { state.dir = t.dataset.hdir; drv.pend = 0; sndClick(); }
+    else if (t.dataset.hdir) { state.dir = t.dataset.hdir; drv.pend = 0; }
     else if (t.dataset.len) { pickLen(Number(t.dataset.len)); }
     else if (t.dataset.bit) { state.bit = t.dataset.bit; hideCamout(); }
-    else if (t.id === "dirBtn") { state.dir = state.dir === "fwd" ? "rev" : "fwd"; sndClick(); }
+    else if (t.id === "dirBtn") { state.dir = state.dir === "fwd" ? "rev" : "fwd"; }
     else if (t.dataset.pick) { var pk = t.dataset.pick.split(":"); state.mode = pk[0]; sub = pk[1]; }
     else if (t.id === "camFix") {
       if (camFixTo && camFixTo.driver) { state.driver = camFixTo.driver; }
@@ -3324,7 +3209,7 @@
       if (q.h !== state.head || q.len !== state.len) {
         q.h = state.head; q.len = state.len; drv.camT = 0;
         var p = bpt(q.u, q.v);
-        ring(p.x, p.y, 26 * LB.k, "255,201,60"); sndPlace(); saveSoon();
+        ring(p.x, p.y, 26 * LB.k, "255,201,60"); saveSoon();
       }
       return;
     }
@@ -3339,7 +3224,6 @@
     dust(W / 2, LB.yBack + LB.dTop / 2, 16, 1.5);
     stars(W / 2, LB.yBack + LB.dTop / 2, 14);
     pop("New board!", W / 2, LB.yBack - 10, 30, "#FFC93C");
-    sndChime();
     updateCounts(); saveSoon();
   }
   function resetScene(which) {
@@ -3347,7 +3231,6 @@
     else if (which === "joint") { state.joint = freshJoint(); jointDrop = 220; newJointAt = 0; pop("New wood!", W / 2, LJ.yBack - 40, 28, "#FFC93C"); }
     else if (which === "log") { state.yard.wedge = 30; state.yard.hits = 0; logSplit = null; newLogAt = 0; logDrop = 300; pop("New log!", LY.sx, LY.logTop - 30 * LY.k, 28, "#FFC93C"); }
     else if (which === "stake") { state.yard.stake = 430; state.yard.shits = 0; newStakeAt = 0; stakeDrop = 400; pop("New stake!", LY.kx, LY.logTop - 30 * LY.k, 28, "#FFC93C"); }
-    sndPlace();
     bgDirty = true; saveSoon();
   }
 
@@ -3395,7 +3278,6 @@
   function goodbyeTap() {
     stars(W / 2, H / 2, 26);
     dust(W / 2, H * 0.7, 14, 1.4);
-    sndChime();
   }
   function restArtSVG() {
     var s = '<rect x="0" y="0" width="400" height="150" rx="18" fill="#C79A64"/>', x, y;
@@ -3419,7 +3301,7 @@
   function onRest() { endingDone = null; setNavDisabled(true); endPose = 1; }
   function onWake() { endingDone = null; setNavDisabled(false); }
   window.addEventListener("pagehide", function () { if (saveWanted) save(); });
-  document.addEventListener("visibilitychange", function () { if (document.hidden) { if (saveWanted) save(); if (trig.on) setTrigger(false, null); motorSet(0); } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { if (saveWanted) save(); if (trig.on) setTrigger(false, null); } });
 
   // ---------- Start ----------
   if (state.mode === "hammer" && HAMMERS[state.hammer].scene === "board" && state.board.nails.length) {
@@ -3434,8 +3316,6 @@
   setScene();
   resize();
   autoScrew(false);
-  // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-hammer",
     timerIntro: "When time is up, the tools are put down, the workshop rests, and the controls lock. The timer carries over to every Workshop page.",
@@ -3446,13 +3326,11 @@
     restLine: "The workshop is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArtSVG,
-    soundNote: "Soft taps, clicks and a motor hum. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyeTap,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) sndChime(); else motorSet(0); },
     onTimer: drawTimer
   });
   requestAnimationFrame(function (t) { last = t; frame(t); });

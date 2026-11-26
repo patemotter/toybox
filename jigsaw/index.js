@@ -18,7 +18,6 @@
 //   - Puzzle pieces: real tab-and-blank edges, seeded per puzzle (so a saved puzzle rebuilds the same).
 //   - State
 //   - Stage, layout and drawing
-//   - Sound (soft, synthesized; only when the grown-up turned it on)
 //   - Play
 //   - Surprise: a fun moment on the puzzle, right now
 //   - Animation loop
@@ -1365,42 +1364,6 @@
   }
 
   // ======================================================================
-  // Sound (soft, synthesized; only when the grown-up turned it on)
-  // ======================================================================
-  function tone(ac, f0, f1, dur, vol, type, when) {
-    var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + (when || 0);
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(f0, t);
-    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(ac.destination);
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function click(ac, vol) {
-    var len = Math.floor(ac.sampleRate * 0.04), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    f.type = "bandpass"; f.frequency.value = 1700; f.Q.value = 2.5;
-    g.gain.value = vol;
-    src.buffer = buf; src.connect(f); f.connect(g); g.connect(ac.destination);
-    src.start();
-  }
-  function snd(kind) {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    try {
-      if (kind === "pick") tone(ac, 520, 600, 0.08, 0.05);
-      else if (kind === "drop") tone(ac, 260, 220, 0.1, 0.05);
-      else if (kind === "snap") { click(ac, 0.35); tone(ac, 660, 660, 0.25, 0.07, "triangle", 0.03); tone(ac, 990, 990, 0.3, 0.04, "sine", 0.07); }
-      else if (kind === "peek") { tone(ac, 440, 660, 0.35, 0.04, "sine"); tone(ac, 660, 880, 0.35, 0.03, "sine", 0.12); }
-      else if (kind === "tap") tone(ac, 600, 700, 0.09, 0.05);
-      else if (kind === "done") [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(ac, f, f, 0.5, 0.06, "triangle", i * 0.16); });
-    } catch (e) { /* ignore */ }
-  }
-
-  // ======================================================================
   // Play
   // ======================================================================
   var counter = $("counter"), coach = $("coach"), goBtn = $("goBtn");
@@ -1486,11 +1449,11 @@
   cv.addEventListener("pointerdown", function (e) {
     if (window.Toybox && Toybox.timer.locked()) return;
     var pt = stagePt(e);
-    if (st.mode === "shelf" && view) { closeView(); snd("tap"); return; }
+    if (st.mode === "shelf" && view) { closeView(); return; }
     if (st.mode !== "play" || !puz || !LY) return;
     if (st.cur.done) {
       var dr = doneRect(now());
-      if (pt[0] > dr.x && pt[0] < dr.x + dr.w && pt[1] > dr.y && pt[1] < dr.y + dr.h && now() - aliveT0 > 600) { aliveT0 = now(); snd("tap"); }
+      if (pt[0] > dr.x && pt[0] < dr.x + dr.w && pt[1] > dr.y && pt[1] < dr.y + dr.h && now() - aliveT0 > 600) { aliveT0 = now(); }
       return;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1504,7 +1467,6 @@
     var lift = e.pointerType === "mouse" ? 0 : Math.min(26, puz.ch * LY.s * 0.28);
     held[e.pointerId] = { p: p, dx: p.x - pt[0], dy: p.y - pt[1], lift: lift, t0: now() };
     order.splice(order.indexOf(p), 1); order.push(p);
-    snd("pick");
     dirty = true;
   });
   cv.addEventListener("pointermove", function (e) {
@@ -1540,7 +1502,6 @@
       p.misses = (p.misses || 0) + 1;
       if (p.misses >= 2) p.glowUntil = now() + 3200;
     }
-    snd("drop");
     dirty = true;
   }
   function snapPiece(p) {
@@ -1550,7 +1511,6 @@
     p.tsc = 1;
     st.cur.placed[p.i] = 1;
     save();
-    snd("snap");
     ghost.learned();
     updateCounter();
     if (placedCount() === puz.pieces.length) finishPuzzle();
@@ -1564,7 +1524,6 @@
     growT0 = finishT0 + 300;
     shineT0 = growT0 + GROW_MS;
     aliveT0 = shineT0 + 1100;
-    setTimeout(function () { snd("done"); }, 300);
     // My puzzles: one spot per picture, remembering every size he finished
     var e = null;
     st.shelf.forEach(function (x) { if (x.p === st.cur.pic) e = x; });
@@ -1594,7 +1553,6 @@
   }
   function surprise() {
     if (window.Toybox && Toybox.timer.locked()) return;
-    snd("tap");
     if (st.mode !== "play") { cardSurprise(); return; }
     if (!puz || !LY || !big) { domSparkles(stage.clientWidth / 2, stage.clientHeight / 2, 6); return; }
     var t = now();
@@ -1903,24 +1861,24 @@
     var t = e.target.closest("button");
     if (!t || t.closest(".modal, .farewell, .rest, .sheet")) return;
     if (window.Toybox && Toybox.timer.locked()) return;
-    if (t.classList.contains("card") && t.parentNode === chooser) { snd("tap"); choosePicture(t.dataset.pic); return; }
-    if (t.classList.contains("card") && t.parentNode === shelfEl) { snd("tap"); openView(t.dataset.pic); return; }
+    if (t.classList.contains("card") && t.parentNode === chooser) { choosePicture(t.dataset.pic); return; }
+    if (t.classList.contains("card") && t.parentNode === shelfEl) { openView(t.dataset.pic); return; }
     if (t.dataset.size) {
       var n = Number(t.dataset.size);
-      st.size = n; syncSizes(); save(); snd("tap");
+      st.size = n; syncSizes(); save();
       if (st.mode === "play" && st.cur && (st.cur.n !== n || st.cur.done)) startPuzzle(st.cur.pic, n, newSeed(), null, false, true);
       return;
     }
     if (t === goBtn) {
-      if (st.cur && st.cur.done) { snd("tap"); setMode("choose"); return; }
-      peekT0 = now(); goBtn.setAttribute("aria-pressed", "true"); snd("peek"); dirty = true;
+      if (st.cur && st.cur.done) { setMode("choose"); return; }
+      peekT0 = now(); goBtn.setAttribute("aria-pressed", "true"); dirty = true;
       return;
     }
-    if (t === tabPics) { snd("tap"); setMode("choose"); return; }
-    if (t === tabShelf) { snd("tap"); if (st.mode === "shelf" && view) closeView(); else setMode("shelf"); return; }
+    if (t === tabPics) { setMode("choose"); return; }
+    if (t === tabShelf) { if (st.mode === "shelf" && view) closeView(); else setMode("shelf"); return; }
     if (t === newBtn) {
       // start over: the same picture and size, newly cut
-      if (st.cur) { snd("tap"); startPuzzle(st.cur.pic, st.cur.n, newSeed(), null, false, true); }
+      if (st.cur) { startPuzzle(st.cur.pic, st.cur.n, newSeed(), null, false, true); }
       return;
     }
     if (t === surpriseBtn) { surprise(); return; }
@@ -2013,7 +1971,6 @@
     restLine: "The puzzle is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft clicks when a piece fits. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: function () {
       if (LY && st.mode === "play") for (var i = 0; i < 4; i++) fx.push({ kind: "snap", x: LY.bx + LY.bw * (0.2 + 0.2 * i), y: LY.by + LY.bh * 0.5, s: Math.min(LY.bw, LY.bh) * 0.4, t0: now() + i * 250, dur: 900, seed: i + 5 });

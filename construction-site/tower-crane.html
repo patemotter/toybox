@@ -354,7 +354,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     carried = l;
     var r = ringOf(l);
     rings.push({ x: r.x, y: r.y, t: 0 });
-    clunk(0.8);
     if (drag) { drag.ox = 0; drag.oy = 0; }
     tgt.x = cr.x; tgt.y = hookY();
   }
@@ -379,7 +378,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     l.x = hookX();
     l.y = groundAt(l.x - l.w / 2, l.x + l.w / 2, l);
     puff(l.x, l.y + 4, 0.6, 1);
-    clunk(0.4);
   }
 
   // ---------- The building grows ----------
@@ -391,7 +389,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var i = loads.indexOf(l); if (i >= 0) loads.splice(i, 1);
     var k = l.kind, b = targetBottom(k);
     if (!allowed(k)) { loads.push(l); l.x = l.x || KIND[k].home; return; }
-    clunk(1);
     puff(BC - 90, b + 4, 0.8, 2); puff(BC + 90, b + 4, 0.8, 2);
     if (k === "bricks") { cur.bricks = true; anim.bricks = clock; }
     else if (k === "window") { cur.window = true; anim.window = clock; }
@@ -407,7 +404,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cur.bricks = false; cur.window = false;
     anim.floor = clock;
     flashCoach("Floor done!", 3200);
-    setTimeout(chime, 250);
     sparkles(BC, baseY() - 6, 12);
     spawnIn = 1.8;
     if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
@@ -416,7 +412,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     topped = true;
     anim.top = clock;
     flashCoach("Topped out!", 6000);
-    fanfare();
     confetti(BC, roofY() + 70, reduce ? 20 : 90);
     loads = [];
     if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 2500);
@@ -432,7 +427,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     spawnLoads(false);
     tgt.y = Math.max(tgt.y, 200); tgt.x = cr.x;
     saveState();
-    chime();
     coachAgain();
   }
 
@@ -487,7 +481,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     byHand = false;
     auto = true;
     if (!jobs.length) planAuto();
-    whirr();
   }
   function wiggleNew() {
     var b = $("newBtn");
@@ -1053,43 +1046,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (t !== coachShown) { coachShown = t; coach.say(t, Math.max(6000, now < flashUntil ? flashUntil - now : 0) / 1000); }
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; hum = null; } return master; }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function clunk(p) { tone(150, 0.2, 0.05 * p + 0.01, "triangle", 70); tone(620, 0.06, 0.012 * p, "square", 420); }
-  function whirr() { tone(200, 0.35, 0.015, "sine", 320); }
-  function chime() { tone(523, 0.4, 0.035); tone(659, 0.4, 0.035, "sine", 0, 0.14); tone(784, 0.6, 0.035, "sine", 0, 0.28); }
-  function fanfare() { [523, 659, 784, 1047, 784, 1047].forEach(function (f, i) { tone(f, i === 5 ? 0.9 : 0.3, 0.035, "triangle", 0, i * 0.17); }); }
-  // The motor hum follows how fast the trolley and the winch move.
-  var hum = null;
-  function humTick() {
-    var ac = Toybox.sound.ready();
-    var level = clamp(Math.abs(cr.vx) / 260 + Math.abs(cr.vL) / 260, 0, 1);
-    if (!ac) { if (hum) { try { hum.o.stop(); } catch (e) { /* ignore */ } hum = null; } return; }
-    if (!hum) {
-      if (level < 0.05) return;
-      var dest = out(ac), o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      o.type = "sawtooth"; o.frequency.value = 55; f.type = "lowpass"; f.frequency.value = 240; g.gain.value = 0;
-      o.connect(f); f.connect(g); g.connect(dest); o.start();
-      hum = { o: o, g: g };
-    }
-    hum.g.gain.setTargetAtTime(level * 0.022, ac.currentTime, 0.08);
-    hum.o.frequency.setTargetAtTime(52 + level * 30, ac.currentTime, 0.1);
-  }
-
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   function drawTimer(info) {
     var active = info.phase === "running" || info.phase === "ending";
@@ -1109,7 +1065,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     coach.clear();
     if (!info.goodbye) parking = true;
   }
-  function goodbyePark() { parking = true; chime(); }
+  function goodbyePark() { parking = true; }
   function restSVG() {
     var o = '<rect width="240" height="200" fill="#2B3A67"/>';
     o += '<circle cx="206" cy="30" r="14" fill="#FFF4CC" stroke="#1D2340" stroke-width="2.5"/><circle cx="212" cy="26" r="12" fill="#2B3A67"/>';
@@ -1150,7 +1106,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase !== "resting") step(dt);
     draw(clock);
     coachTick();
-    humT += dt; if (humT > 0.1) { humT = 0; humTick(); }
+    humT += dt; if (humT > 0.1) { humT = 0; }
     requestAnimationFrame(loop);
   }
 
@@ -1196,13 +1152,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The crane is resting.",
     restLine2: "The crane will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft motor hums and clunks. Hold for 2 seconds.",
-    legacy: { timer: "site-timer-v1", sound: "site-sound-v1" },
+    legacy: { timer: "site-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyePark,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
   resize(); requestAnimationFrame(resize);

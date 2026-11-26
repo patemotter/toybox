@@ -29,7 +29,6 @@
   //   Actions
   //   Coach, ghost, tiles, bottom bar
   //   Surprise
-  //   Sound
   //   Input
   //   Drawing helpers
   //   Drawing the scene
@@ -308,7 +307,6 @@
   }
   function drop() {
     // the needle goes into the fabric: one stitch
-    snd.tick();
     // no stitch forms without the top thread and the bobbin thread
     if (!under() || S.thread < 0 || B.inCase < 0) return;
     const u = needleU(), w = needleW();
@@ -407,7 +405,6 @@
     if (M.wind || locked()) return;
     if (S.thread < 0) { needBlocked(src === "pedal" ? "pedal" : "start"); M.pedal = false; return; }
     M.wind = true; M.windSrc = src; M.windStop = 0;
-    snd.motor(true);
     ghost.learned("start");
   }
   function stopWind() { if (M.wind) { M.wind = false; saveSoon(); } }
@@ -415,18 +412,16 @@
     // the winder stops by itself when the bobbin is full
     stopWind();
     M.pedal = false;
-    snd.chime();
     for (let i = 0; i < 10; i++) sparkle(WINDER.x, WINDER.y - 2);
     save();
   }
   function tapBox() {
-    snd.click(); flashPart("bobbox");
+    flashPart("bobbox");
     if (B.win || B.load) { tagPart("bobbox"); return; }
     // an empty bobbin goes onto the winder's spindle
     const t = now();
     B.win = { r: [], fill: 0, at: t + 0.8 };
-    bflights.push({ r: [], fill: 0, x0: BOXB.x + BOXB.w / 2, y0: BOXB.y + 3, x1: WINDER.x, y1: WINDER.y, t0: t, dur: 0.8, done: () => { snd.clunk(); save(); } });
-    snd.pop();
+    bflights.push({ r: [], fill: 0, x0: BOXB.x + BOXB.w / 2, y0: BOXB.y + 3, x1: WINDER.x, y1: WINDER.y, t0: t, dur: 0.8, done: () => { save(); } });
     ghost.learned("bobbox");
   }
   function tapWinder() {
@@ -448,7 +443,7 @@
     const from = B.drag ? { x: B.drag.x, y: B.drag.y } : w ? { x: WINDER.x, y: WINDER.y } : { x: BOXB.x + BOXB.w / 2, y: BOXB.y + 3 };
     // the fabric is in the way: lift the foot and slide it toward him, and back again afterwards
     let fab = null;
-    if (coverHidden() && !F.swap) { fab = { x: F.x, top: F.top, foot: M.foot }; M.foot = false; snd.clunk(); slideTo(F.x, 12); }
+    if (coverHidden() && !F.swap) { fab = { x: F.x, top: F.top, foot: M.foot }; M.foot = false; slideTo(F.x, 12); }
     // opening the bobbin cover ends the seam
     if (cur) { cur = null; M.pi = -1; }
     B.load = { t0: now(), w, r, fill: w ? w.fill : 1, c, from, old: B.inCase, fab, step: 0 };
@@ -462,7 +457,7 @@
     const a = l.fab ? 0.9 : 0, u = t - l.t0;
     B.cover = clamp((u - a + 0.3) / 0.6, 0, 1) * (1 - clamp((u - a - 1.9) / 0.5, 0, 1));
     if (l.step === 0 && u >= a + 0.3) {
-      l.step = 1; snd.click();
+      l.step = 1;
       if (l.old >= 0) bflights.push({ r: [[l.old, 0.6]], fill: 0.6, x0: CASE.x, y0: CASE.y, x1: BOXB.x + BOXB.w / 2, y1: BOXB.y + 3, t0: t, dur: 0.8 });
       B.inCase = -1;
     }
@@ -470,10 +465,10 @@
       l.step = 2;
       if (l.w && B.win === l.w) B.win = null;
       bflights.push({ r: l.r, fill: l.fill, x0: l.from.x, y0: l.from.y, x1: CASE.x, y1: CASE.y, t0: t, dur: 1.0,
-        done: () => { B.inCase = l.c; B.caseT = now(); snd.pop(); } });
+        done: () => { B.inCase = l.c; B.caseT = now(); } });
     }
     if (l.step === 2 && u >= a + 2.4) {
-      l.step = 3; snd.clunk();
+      l.step = 3;
       if (l.fab) slideTo(l.fab.x, l.fab.top); else { B.load = null; save(); }
     }
     if (l.step === 3 && u >= a + 3.3) {
@@ -508,7 +503,6 @@
       return;
     }
     M.run = true; M.src = src; M.goal = null; M.everSewn = true; M.footTries = 0;
-    snd.motor(true);
     ghost.learned("start");
   }
   function stopRun() {
@@ -519,7 +513,6 @@
     saveSoon();
   }
   function tapStart() {
-    snd.click();
     flashPart("start");
     if (M.wind) { stopWind(); return; }
     if (M.run) { stopRun(); return; }
@@ -541,7 +534,7 @@
     M.everSewn = true;
   }
   function tapReverse() {
-    snd.click(); flashPart("rev");
+    flashPart("rev");
     if (winderOn()) { winderHint("rev"); return; }
     if (M.wind || B.load || needBlocked("rev")) return;
     if (!M.foot && footBlocked("rev")) return;
@@ -549,7 +542,7 @@
     if (!M.run) sewSome(4, "rev");
   }
   function tapNeedle() {
-    snd.click(); flashPart("ndl");
+    flashPart("ndl");
     if (M.run || M.wind || B.load) return;
     if (M.goal != null) return;
     // needle up -> down into the fabric; down -> up again (finishing the stitch)
@@ -560,7 +553,6 @@
   function setFoot(down) {
     if (M.foot === down) return;
     M.foot = down;
-    snd.clunk();
     if (!down && M.run) stopRun();
     if (down) M.footTries = 0;
     saveSoon();
@@ -568,7 +560,6 @@
   function tapLever() { if (B.load) return; setFoot(!M.foot); ghost.learned("lever"); }
   function setSpeed(i, tag) {
     i = clamp(i, 0, 2);
-    if (i !== S.speed) snd.click();
     S.speed = i; saveSoon();
     if (tag) { const p = vp(SLIDER.l + (SLIDER.r - SLIDER.l) * i / 2, SLIDER.y - 3); Toybox.nametag(SPEED_NAME[i], p.x, p.y, 1800); }
   }
@@ -576,7 +567,6 @@
     if (!ST[id]) return;
     if (S.stitch !== id) { S.stitch = id; M.pi = -1; saveSoon(); }
     if (from !== "tile") tiles.set(id);
-    snd.click();
   }
   function stepStitch(d) {
     const i = STITCHES.findIndex((s) => s.id === S.stitch);
@@ -584,7 +574,6 @@
     flashPart(d < 0 ? "left" : "right");
   }
   function snip() {
-    snd.snip();
     flashPart("cutter");
     if (!attached()) { tagPart("cutter"); return; }
     const done = !under() && cur.p.length >= 12;
@@ -595,7 +584,6 @@
       S.pieces++; save();
       const r = fabricRect();
       for (let i = 0; i < 16; i++) sparkle(r.x + Math.random() * r.w, r.y + Math.random() * r.h);
-      snd.chime();
       if (window.Toybox) Toybox.kind();
     }
     ghost.learned("cutter");
@@ -608,7 +596,6 @@
     S.thread = i;
     // a new spool means threading again: the old thread is cut at the needle
     if (cur) { cur = null; M.pi = -1; }
-    snd.pop();
     const p = vp(from.x, from.y - 12);
     Toybox.nametag(THREADS[i].name + " thread", p.x, p.y, 2000);
     M.needTries.spool = 0;
@@ -619,7 +606,6 @@
     if (M.run) stopRun();
     const r = L.fabs[i], p = vp(r.x + r.w / 2, r.y - 1);
     Toybox.nametag(FABRICS[i].name, p.x, p.y, 2000);
-    snd.pop();
     F.swap = { i, t0: now() - swapSkip(), from: { x: F.x, top: F.top }, fab: { x: r.x, y: r.y, w: r.w, h: r.h }, done: false };
     M.foot = false;
   }
@@ -634,12 +620,11 @@
     save();
   }
   function startOver() {
-    if (B.load || F.swap) { snd.pop(); return; }
+    if (B.load || F.swap) { return; }
     if (M.run) stopRun();
     M.rev = 0;
     F.swap = { i: S.fabric, t0: now() - swapSkip(), from: { x: F.x, top: F.top }, fab: null, done: false };
     M.foot = false;
-    snd.pop();
   }
   function tapFabric() {
     if (!M.foot) {
@@ -746,62 +731,9 @@
     if (k === "buttons") {
       const cols = ["#E23B4E", "#FFD21F", "#2F6FE0", "#2FAE57", "#FF8A1F", "#8A4FD8", "#FF6FB1", "#FFFFFF", "#43C6D9"];
       fx.items = cols.map((c, i) => ({ c, x1: L.jar.x + (tall ? 8 + (i % 5) * 2.6 : 8 + i * 6.5), y1: tall ? L.jar.y - 1.8 - Math.floor(i / 5) * 2.8 : L.jar.y + 22 + (i % 3) * 3, r: 1.8 + (i % 3) * 0.4, spin: Math.random() * TAU }));
-      snd.rattle();
-    } else if (k === "yarn") snd.pop();
-    else snd.chime();
+    }
   }
   function fxDone(t) { return (fx.k === "buttons" && t > 6) || (fx.k === "yarn" && t > 7) || (fx.k === "butterfly" && t > 8); }
-
-  // =====================================================================================================
-  // Sound (Web Audio, soft; only through Toybox.sound.ready(), so nothing plays with sound off)
-  // =====================================================================================================
-  const snd = (() => {
-    let hum = null;
-    const ac = () => (window.Toybox ? Toybox.sound.ready() : null);
-    function tone(f, d, type, g, f2) {
-      const a = ac(); if (!a) return;
-      const o = a.createOscillator(), v = a.createGain(), t = a.currentTime;
-      o.type = type || "sine"; o.frequency.setValueAtTime(f, t);
-      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
-      v.gain.setValueAtTime(0.0001, t); v.gain.exponentialRampToValueAtTime(g || 0.05, t + 0.01); v.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(v).connect(a.destination); o.start(t); o.stop(t + d + 0.02);
-    }
-    function noise(d, f, g) {
-      const a = ac(); if (!a) return;
-      const n = Math.floor(a.sampleRate * d), b = a.createBuffer(1, n, a.sampleRate), ch = b.getChannelData(0);
-      for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
-      const s = a.createBufferSource(), fl = a.createBiquadFilter(), v = a.createGain();
-      s.buffer = b; fl.type = "bandpass"; fl.frequency.value = f; fl.Q.value = 1.2; v.gain.value = g;
-      s.connect(fl).connect(v).connect(a.destination); s.start();
-    }
-    return {
-      tick() { noise(0.03, 2600, 0.12); },
-      click() { tone(880, 0.05, "sine", 0.04); },
-      clunk() { tone(220, 0.09, "triangle", 0.06, 140); },
-      snip() { noise(0.04, 4200, 0.2); setTimeout(() => noise(0.04, 3600, 0.16), 90); },
-      pop() { tone(420, 0.14, "sine", 0.05, 820); },
-      rattle() { for (let i = 0; i < 8; i++) setTimeout(() => tone(1200 + Math.random() * 900, 0.04, "sine", 0.03), i * 70); },
-      chime() { tone(784, 0.25, "sine", 0.05); setTimeout(() => tone(1175, 0.35, "sine", 0.05), 140); },
-      motor(on) {
-        const a = ac();
-        if (!a) { hum = null; return; }
-        if (!hum) {
-          const o = a.createOscillator(), fl = a.createBiquadFilter(), v = a.createGain();
-          o.type = "sawtooth"; o.frequency.value = 70; fl.type = "lowpass"; fl.frequency.value = 380; v.gain.value = 0.0001;
-          o.connect(fl).connect(v).connect(a.destination); o.start();
-          hum = { o, v, a };
-        }
-        if (!on) hum.v.gain.setTargetAtTime(0.0001, a.currentTime, 0.08);
-      },
-      update(v) {
-        if (!hum) { if (v > 0.1) this.motor(true); return; }
-        const a = ac();
-        if (!a || a !== hum.a) { try { hum.o.stop(); } catch (e) { /* ignore */ } hum = null; return; }
-        hum.v.gain.setTargetAtTime(v > 0.05 ? 0.035 + v * 0.004 : 0.0001, a.currentTime, 0.08);
-        hum.o.frequency.setTargetAtTime(60 + v * 14, a.currentTime, 0.1);
-      }
-    };
-  })();
 
   // =====================================================================================================
   // Input
@@ -868,7 +800,7 @@
     down: (part, e, s) => {
       drag = null;
       if (locked()) return;
-      if (part === "pedal") { M.pedal = true; M.pedalT = now(); flashPart("pedal"); snd.click(); ghost.learned("start"); }
+      if (part === "pedal") { M.pedal = true; M.pedalT = now(); flashPart("pedal"); ghost.learned("start"); }
     },
     dragStart: (part, e, s) => {
       if (locked()) return;
@@ -947,7 +879,7 @@
       else if (/^spool\d$/.test(part)) pickThread(+part.slice(5));
       else if (/^fab\d$/.test(part)) pickFabric(+part.slice(3));
       else if (part === "fabric") tapFabric();
-      else if (part === "jar") { tagPart("jar"); snd.rattle(); }
+      else if (part === "jar") { tagPart("jar"); }
       else if (part === "bobbox") tapBox();
       else if (part === "bobwin") tapWinder();
       else if (part) tagPart(part);
@@ -1155,7 +1087,7 @@
       if (!s.done) { s.done = true; newPiece(s.i); }
       const k = ease((u - 0.45) / 0.55), from = s.fab ? { x: s.fab.x, top: s.fab.y } : { x: -FW / 2, top: 70 };
       F.x = lerp(from.x, -FW / 2, k); F.top = lerp(from.top, START_TOP, k);
-      if (u >= 1) { F.swap = null; M.foot = true; snd.clunk(); save(); }
+      if (u >= 1) { F.swap = null; M.foot = true; save(); }
     }
   }
   function drawMachineBack() {
@@ -1451,7 +1383,6 @@
     }
     if (F.swap) drawSwapFabric();
     stepLoad(t);
-    snd.update(M.wind ? 3.2 : M.v);
     updCoach();
     draw(t, dt);
     requestAnimationFrame(loop);
@@ -1493,10 +1424,8 @@
     restLine: "The sewing machine is resting.",
     restLine2: "The sewing will be right here next time.",
     restArt,
-    soundNote: "Soft motor hum, needle ticks and snips. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { last = now(); },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { last = now(); }
   });
   Toybox.offFirst({ running: () => M.run || M.wind, off: (done) => { M.pedal = false; stopRun(); stopWind(); setTimeout(done, 300); } });
   requestAnimationFrame(loop);

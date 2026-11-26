@@ -14,7 +14,6 @@
 //   - Bits
 //   - The board and its holes
 //   - Chips and dust (3D, drawn in view)
-//   - Sound (off by default; soft synthesized)
 //   - Machine logic
 //   - Changing the bit: tap one in the case
 //   - Drilling
@@ -1264,60 +1263,6 @@
     }
   }
 
-  // ---------- Sound (off by default; soft synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js). The drill press
-  // builds its motor hum and drilling noise once per context.
-  var AC = null, master = null, humG = null, humO1 = null, humO2 = null, grindG = null, grindF = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
-      humG = a.createGain(); humG.gain.value = 0;
-      humO1 = a.createOscillator(); humO1.type = "sawtooth"; humO1.frequency.value = 55;
-      humO2 = a.createOscillator(); humO2.type = "triangle"; humO2.frequency.value = 110;
-      humO1.connect(lp); humO2.connect(lp); lp.connect(humG); humG.connect(master);
-      humO1.start(); humO2.start();
-      var buf = a.createBuffer(1, a.sampleRate, a.sampleRate), data = buf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      var noise = a.createBufferSource(); noise.buffer = buf; noise.loop = true;
-      grindF = a.createBiquadFilter(); grindF.type = "bandpass"; grindF.frequency.value = 900; grindF.Q.value = 1.2;
-      grindG = a.createGain(); grindG.gain.value = 0;
-      noise.connect(grindF); grindF.connect(grindG); grindG.connect(master);
-      noise.start();
-      AC = a;
-    } catch (e) { /* audio unavailable */ }
-  }
-  function updateSound() {
-    ensureAudio();
-    if (!AC) return;
-    var t = AC.currentTime;
-    var on = Toybox.sound.on() && Toybox.timer.phase() !== "resting";
-    var f = Math.min(1, R.rpm / RPM);
-    humG.gain.setTargetAtTime(on && R.rpm > 20 ? 0.035 + 0.03 * f : 0, t, 0.08);
-    humO1.frequency.setTargetAtTime(40 + f * 25, t, 0.1);
-    humO2.frequency.setTargetAtTime(90 + f * 110, t, 0.1);
-    grindG.gain.setTargetAtTime(on ? R.cutting * 0.06 : 0, t, 0.05);
-    grindF.frequency.setTargetAtTime(900 * (0.7 + 0.6 * f), t, 0.1);
-  }
-  function blip(freq, dur, vol, type, freq2) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime;
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-
   // ---------- Machine logic ----------
   // A passing line over the coach's step line; sayEnd keeps the step line from cutting it short.
   var sayEnd = 0;
@@ -1334,13 +1279,12 @@
   function switchOn() {
     if (R.running) return;
     R.running = true; R.offTries = 0;
-    blip(160, 0.12, 0.12, "sine", 90);
   }
   function toggleSwitch() {
     if (busy()) return;
     if (R.swap) { R.swap.turnOn = true; return; }
     if (!R.running) switchOn();
-    else { R.running = false; blip(120, 0.1, 0.1, "sine", 70); }
+    else { R.running = false; }
   }
   // He pulled the handle while it was off: say so and flash the switch; the second time, switch it on for him.
   function offPull() {
@@ -1377,10 +1321,9 @@
     }
     if (S.chuck && S.chuck.id === id) { say(BITS[id].name + " bit!"); R.flash.chuck = now + 1.4; return; }
     R.swap = { phase: "stop", t: 0, target: id, old: S.chuck ? S.chuck.id : null, next: null, turnOn: false };
-    if (R.running) { R.running = false; blip(120, 0.1, 0.1, "sine", 70); }
+    if (R.running) { R.running = false; }
     releaseFeed();
     R.curHole = null;
-    blip(500, 0.05, 0.05, "triangle");
     updateTiles();
     say(BITS[id].name + " bit");
   }
@@ -1393,15 +1336,15 @@
       if ((R.rpm < 40 && R.q < 2) || W.t > 1.4) { R.rpm = 0; go("open"); }
     } else if (W.phase === "open") {
       R.jaw = ease(W.t / 0.3);
-      if (W.t >= 0.3) { R.jaw = 1; W.from = W.old ? chuckCenter(W.old) : null; S.chuck = null; go("out"); blip(400, 0.06, 0.06, "triangle"); }
+      if (W.t >= 0.3) { R.jaw = 1; W.from = W.old ? chuckCenter(W.old) : null; S.chuck = null; go("out"); }
     } else if (W.phase === "out") {
       if (!W.old || W.t >= 0.45) go("in");
     } else if (W.phase === "in") {
-      if (W.t >= 0.5) { S.chuck = { id: W.target, si: 0 }; go("close"); blip(520, 0.06, 0.07, "triangle"); }
+      if (W.t >= 0.5) { S.chuck = { id: W.target, si: 0 }; go("close"); }
     } else if (W.phase === "close") {
       R.jaw = 1 - ease(W.t / 0.3);
       if (W.t >= 0.3) {
-        R.jaw = 0; blip(700, 0.06, 0.08, "square", 900);
+        R.jaw = 0;
         autoTable(); save();
         var nx = W.next, on = W.turnOn;
         R.swap = null;
@@ -1493,7 +1436,6 @@
         }
         if (!wasThr && holeThrough(h)) {
           R.thruAt = now;
-          blip(660, 0.12, 0.08, "sine", 990);
           if (b.id === "holesaw") {
             // the round slug drops out under the board
             addPart({ type: "disc", x: 0, y: boardTopW() + 6, z: 0, vx: rnd(-40, 40), vy: 60, vz: 140, sz: (b.mm - 2) * DS / 2, col: WOOD.col, vr: 0, rot: 0.01 });
@@ -1696,7 +1638,6 @@
   function onDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-    ensureAudio();
     if (busy()) return;
     var p = localPt(e), w = toView(p.x, p.y), d = machineDown(w);
     if (!d) return;
@@ -1816,7 +1757,6 @@
     $("toolbar").addEventListener("click", function (e) {
       var t = e.target.closest("button");
       if (!t) return;
-      ensureAudio();
       if (t.dataset.bit) startSwap(t.dataset.bit);
       else if (t.id === "newBoard") newBoard();
     });
@@ -1837,7 +1777,6 @@
     parts = parts.filter(function (p) { return !(p.settled && p.on === "board"); });
     buildBoardTex();
     R.boardSlide = 420;
-    blip(350, 0.12, 0.06, "triangle", 700);
     save();
   }
 
@@ -1859,7 +1798,6 @@
     }
   }
   function goodbye() {
-    if (R.running) blip(120, 0.1, 0.1, "sine", 70);
     R.running = false;
   }
   function endingFrame() {
@@ -1903,8 +1841,6 @@
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
 
-  // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-drill",
     timerIntro: "When time is up, the drill press switches off, spins down and rests, and the controls lock. The timer carries on across Workshop pages.",
@@ -1915,13 +1851,11 @@
     restLine: "The workshop is resting.",
     restLine2: "The drill press will be right here next time.",
     restArt: restArt,
-    soundNote: "Motor hum and a soft drilling sound. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
     onTimer: function (info) { TI = info; }
   });
   if (Toybox.offFirst) {
@@ -1933,7 +1867,6 @@
         if (R.swap) R.swap.turnOn = false;
         R.running = false;
         R.fastStop = true;
-        blip(120, 0.1, 0.1, "sine", 70);
         var t0 = Date.now();
         var iv = setInterval(function () {
           if (R.rpm < 8 || Date.now() - t0 > 900) {
@@ -1970,7 +1903,6 @@
       draw();
       if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
     }
-    updateSound();
     requestAnimationFrame(frame);
   }
   if (params.debug === "1") {

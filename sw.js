@@ -21,7 +21,7 @@ const CORE = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
 
-  // The shared layer every page loads (timer, sound, components)
+  // The shared layer every page loads (timer, components)
   "./common/toybox.css",
   "./common/toybox.js",
 

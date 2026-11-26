@@ -83,7 +83,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // at the hitch pin / drawbar eye with the ground at y = +0.5, facing +x) so they can move into farm.js later.
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2;
   var P = SH.P, R = SH.R, C = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs, rr = SH.rr;
   var NAME = (Farm.NAMES && Farm.NAMES.carrots) || "Munchy Crunchy";
   document.title = NAME; $("title").textContent = NAME;
@@ -425,34 +425,31 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function arrived() {
     rig.v = 0;
-    tagRig(); snd.clunk();
+    tagRig();
     setSub(SUBS[job][0]);
   }
   // the one-control motions
   function lowerIt() {
-    snd.clunk();
-    runSet(1.0, function (f) { rig.lift = 1 - ease(f); }, function () { rig.lift = 0; rig.on = true; snd.tick(); nextSub(); });
+    runSet(1.0, function (f) { rig.lift = 1 - ease(f); }, function () { rig.lift = 0; rig.on = true; nextSub(); });
   }
   function swingElev() {
-    snd.clunk();
-    runSet(1.3, function (f) { rig.out = ease(f); }, function () { rig.out = 1; snd.tick(); nextSub(); });
+    runSet(1.3, function (f) { rig.out = ease(f); }, function () { rig.out = 1; nextSub(); });
   }
   function go() {
     if (phase === "ready" && sub === "drive") {
       setPhase("drive"); var J = JOBS[job];
       field.wipe = { bx: workX(), dir: 1, to: J.to };
-      snd.horn();
       coach.step(J.work);
     } else if (!(phase === "drive" && !auto)) return false;
     if (jam) return true;
     auto = true;
     return true;
   }
-  function haul() { tr.state = "go"; tr.t = 0; setPhase("out"); snd.horn(); coach.step("The trailer goes to the packhouse."); }
+  function haul() { tr.state = "go"; tr.t = 0; setPhase("out"); coach.step("The trailer goes to the packhouse."); }
   // the forklift takes one crate off the trailer and stacks it in the packhouse
-  function forkGo() { setPhase("stack"); fk.t = 0; snd.horn(); coach.step(JOBS.stack.work); }
+  function forkGo() { setPhase("stack"); fk.t = 0; coach.step(JOBS.stack.work); }
   // the wash plant switch turns on: the plant washes the trailer's carrots (see updateWash)
-  function washGo() { setPhase("wash"); wsh.t = 0; wsh.on = true; snd.clunk(); coach.step(WASH_SAY[0]); }
+  function washGo() { setPhase("wash"); wsh.t = 0; wsh.on = true; coach.step(WASH_SAY[0]); }
   function passDone() {
     auto = false; var J = JOBS[job];
     field.stage = J.to; field.wipe = null;
@@ -516,13 +513,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function busyHint() {
     if (jam) { popJam(); return; }
     if (phase === "grow") coach.say("The carrots are growing.", 3);
-    else if (phase === "drive") { snd.horn(); rig.flash = 1.2; coach.say(JOBS[job].busy, 3); }
+    else if (phase === "drive") { rig.flash = 1.2; coach.say(JOBS[job].busy, 3); }
     else if (phase === "arrive") coach.say("Here comes the " + JOBS[job].tag.toLowerCase() + ".", 3);
     else if (phase === "leave") coach.say("Here comes the carrot harvester.", 3);
     else if (phase === "out") coach.say("The trailer is going to the packhouse.", 3);
     else if (phase === "stack") coach.say(JOBS.stack.busy, 3);
     else if (phase === "wash") coach.say("The wash plant is washing the carrots.", 3);
-    else if (phase === "set") { snd.tick(); rig.flash = 1.2; }
+    else if (phase === "set") { rig.flash = 1.2; }
   }
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
 
@@ -547,7 +544,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "drive" && job === "lift" && !jam && progress() > 0.08 && progress() < 0.8) list.unshift("jam");
     var pick = list[surpriseN++ % list.length];
     if (pick === "jam") {
-      jam = { t: 0, f: 0.45 }; auto = false; rig.flash = 99; snd.clunk();
+      jam = { t: 0, f: 0.45 }; auto = false; rig.flash = 99;
       coach.say("A giant carrot is stuck. Tap it!", 4); return;
     }
     if (pick === "hare") {
@@ -560,7 +557,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!jam) return;
     riders.push({ s: "web", t: 0.45 * 1.3, k: 77, giant: true });
     for (var i = 0; i < 8; i++) bits.push({ kind: "spark", x: webAt(jam.f).x, y: webAt(jam.f).y - 0.2, vx: (Math.random() - 0.5) * 3, vy: -1.5 - Math.random() * 1.5, g: 5, life: 0.7, r: 0.04 });
-    jam = null; rig.flash = 0; snd.pop(); coach.say("The giant carrot pops free.", 3);
+    jam = null; rig.flash = 0; coach.say("The giant carrot pops free.", 3);
     if (ghost) ghost.learned("jam");
     if (phase === "drive") auto = true;
   }
@@ -607,7 +604,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         if (wk && cWX(cutIdx) > 0) {
           // the chopped leaves fly up out of the rotor and back into the row (gone in about a second)
           for (var q = 0; q < 3; q++) bits.push({ kind: "leaf", x: RX + (Math.random() - 0.7) * 0.3, y: -0.42 - Math.random() * 0.2, vx: -1.6 - Math.random() * 1.8, vy: -1.4 - Math.random() * 1.4, g: 5, life: 0.75 + Math.random() * 0.3, r: 0.07, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 14 });
-          if (Math.random() < 0.3) snd.tick();
         }
         cutIdx++;
       }
@@ -628,7 +624,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       r.t += dt;
       if (r.s === "lift" && r.t >= 0.4) { r.s = "web"; r.t = 0; }
       else if (r.s === "web") {
-        if (r.wonky && r.t >= 0.75) { r.s = "gone"; wonky.s = "hop"; wonky.t = 0; snd.pop(); }
+        if (r.wonky && r.t >= 0.75) { r.s = "gone"; wonky.s = "hop"; wonky.t = 0; }
         else if (r.t >= 1.3) { r.s = "gone"; }
       }
       if (wk && r.s === "web" && Math.random() < dt * 3) bits.push({ kind: "crumb", x: webAt(r.t / 1.3).x, y: webAt(r.t / 1.3).y + 0.05, vx: 0, vy: 0.4, g: 6, life: 0.5, r: 0.025 });
@@ -906,7 +902,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!wonky || wonky.s !== "ledge") return;
     var a = wonkyScreen(), b = troughScreen();
     fly = { t: 0, dur: 1.1, x0: a.x, y0: a.y, x1: b.x, y1: b.y };
-    wonky.s = "fed"; snd.pop();
+    wonky.s = "fed";
     coach.say(auto2 ? "Merlin gets the wonky carrot." : "Off it goes to Merlin!", 3);
     if (ghost && !auto2) ghost.learned("wonky");
   }
@@ -1011,7 +1007,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var ld = washLoad();
     for (var i = 0; i < 3; i++) tr.mud[i] = 1 - clamp(ld * 3 - i, 0, 1);
     if (t0 < WT && wsh.t >= WT) {
-      tr.mud = [0, 0, 0]; wsh.target = 0; snd.chime();
+      tr.mud = [0, 0, 0]; wsh.target = 0;
       setSub("fork");
     }
   }
@@ -1024,7 +1020,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     wsh.rot += dt * run * 1.6;
     for (var i = wsh.list.length - 1; i >= 0; i--) {
       var c = wsh.list[i]; c.f += dt / WASH_RIDE;
-      if (c.f >= 1) { wsh.list.splice(i, 1); wsh.done++; if (wsh.done % 4 === 1) snd.tick(); continue; }
+      if (c.f >= 1) { wsh.list.splice(i, 1); wsh.done++; continue; }
       // mud shaking off on the rollers, water dripping out of the barrel
       if (c.f > 0.1 && c.f < 0.4 && Math.random() < dt * 5) wsh.fx.push({ kind: "mud", x: washAt(c.f, c.k).x, y: ROLL[1] + 0.15, vx: 0, vy: 0.5, t: 0, life: 0.55 });
     }
@@ -1176,7 +1172,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var p = partList().filter(function (q) { return q.id === part; })[0];
     var name = part === "imp" || part === "close" ? (rig.m ? JOBS[job].tag : null) : TAGS[part];
     if (!p || !name) return false;
-    if (part === "tractor" || part === "trailer" || part === "fork") snd.horn(); else snd.tick();
     if (part === "barrel" || part === "rollers" || part === "hopper" || part === "switch") wsh.flash = 1.2;
     if (part === "tractor" || part === "imp") rig.flash = 1.2;
     if (part === "pony") pony.nod = 1.2;
@@ -1300,7 +1295,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (pony.nod > 0) pony.nod = Math.max(0, pony.nod - dt);
     if (fly) {
       fly.t += dt;
-      if (fly.t >= fly.dur) { fly = null; pony.eat = 4.5; pony.fed++; snd.clunk(); coach.say("Merlin crunches the carrot.", 3); }
+      if (fly.t >= fly.dur) { fly = null; pony.eat = 4.5; pony.fed++; coach.say("Merlin crunches the carrot.", 3); }
     }
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
     parts.update(dt);
@@ -1308,9 +1303,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     sc.follow(camTarget(), dt);
     var lvl = phase === "drive" ? 0.2 + drive * 0.8 : (phase === "arrive" || phase === "leave" || phase === "out" ? 0.6 : (rig.m ? 0.15 : 0));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending || (!rig.m && tr.state === "away") ? -1 : engLevel);
-    snd.soil(phase === "drive" ? drive : 0);
-    snd.pour(phase === "drive" && job === "lift" && working() ? 0.5 : (phase === "wash" && wsh.t < 6.4 ? 0.35 : 0));
   }
   // what each machine does in the field view
   function workEffects(dt) {
@@ -1362,7 +1354,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
         job = "stack"; fk.i = 0; fk.t = 0; fk.done = false; shed.target = 1;
         setZoom(JOBS.stack.span);
         tagAt("Packhouse", sc.X(STORE_X, 1.02), sc.Y(1.02) - 6.6 * sc.S(1.02));
-        snd.clunk();
         wsh.target = 1;
         setSub("wash");
       }
@@ -1373,10 +1364,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var before = fk.t;
     fk.t += dt;
     var tUp = FK.app;                                       // the crate leaves the trailer
-    if (before < tUp && fk.t >= tUp) { tr.crates[fk.i] = -1; snd.clunk(); }
+    if (before < tUp && fk.t >= tUp) { tr.crates[fk.i] = -1; }
     var tPlace = FK.app + FK.up + FK.inn + FK.down;
     if (before < tPlace && fk.t >= tPlace) {
-      count++; save(); snd.chime();
+      count++; save();
       world(function (w) { w.crates = (typeof w.crates === "number" && isFinite(w.crates) ? w.crates : 0) + 1; });
     }
     if (fk.t >= FKT) {
@@ -1614,7 +1605,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.on = false; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.on = false; setTimeout(function () { done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -1638,11 +1629,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine and soil sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   // leaving with the tractor driving or the topper's flails turning: it stops quietly and the link goes at once
   Toybox.offFirst({ running: function () { return phase === "drive" || rig.on; }, name: "tractor", off: function (done) { auto = false; grab = null; rig.v = 0; rig.on = false; done(); } });

@@ -19,7 +19,6 @@
   // Sections:
   //   Setup and saved state
   //   Makes and steps
-  //   Sound
   //   Layout
   //   The bar model
   //   Moving the bar
@@ -177,46 +176,6 @@
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 600); }
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain, delay, q) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 0.9;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  const snd = {
-    clang() { tone(820, 800, 0.35, "triangle", 0.05); tone(2350, 2300, 0.25, "sine", 0.02); noise(0.06, 2500, 0.03); },
-    clink() { tone(2100, 2080, 0.45, "sine", 0.045); tone(3150, 3120, 0.3, "sine", 0.018); },
-    copper() { tone(1250, 1200, 0.22, "triangle", 0.045); tone(1900, 1880, 0.15, "sine", 0.015); },
-    whoosh() { noise(0.55, 420, 0.05); },
-    hiss() { noise(1.3, 4200, 0.05); noise(0.7, 1600, 0.025, 0.05); },
-    splash() { noise(0.35, 900, 0.04); },
-    creak() { tone(150, 120, 0.3, "triangle", 0.03); },
-    clamp() { tone(500, 380, 0.15, "square", 0.015); },
-    place() { tone(600, 560, 0.18, "triangle", 0.03); },
-    rub() { noise(0.4, 2600, 0.02); },
-    chirp() { tone(3200, 4200, 0.09, "sine", 0.03); tone(3600, 4500, 0.09, "sine", 0.03, 0.13); },
-    crackle() { for (let k = 0; k < 6; k++) noise(0.05, 3000 + Math.random() * 2000, 0.03, k * 0.12 + Math.random() * 0.05, 3); },
-    chime() { tone(660, 660, 0.3, "sine", 0.05); tone(990, 990, 0.35, "sine", 0.04, 0.14); }
-  };
 
   // =====================================================================================================
   // Layout
@@ -431,14 +390,12 @@
     B.where = where; B.carry = null;
     B.pose = placeFor(where);
     if (where !== "carry") B.prev = where;
-    snd.place();
   }
   function arrive(where) {
     const st = curStep();
     if (where === "fire") {
       B.hotSaid = false;
       ghost.learned("fire");
-      snd.whoosh();
       puff("ember", g.coalX, g.coalY - 6, 6);
       const reg = st && PLACE[st.kind] ? heatRegion(st) : hottest(10);
       if (F.fire < 0.35 && avgHeat(reg[0], reg[1]) < HOT) {
@@ -452,7 +409,7 @@
       quench();
     } else if (where === "vise") {
       ghost.learned("vise");
-      snd.clamp(); WR.ang = 0;
+      WR.ang = 0;
     } else if (where === "anvil") {
       ghost.learned("anvil");
     }
@@ -502,7 +459,6 @@
       const e = shape(P.bar, B.pose)[B.pose.held === 0 ? 0 : N];
       if (e[0] < 16 || e[0] > L.w - 16) B.pose = placeFor(where);
     } else B.pose = placeFor(where);
-    snd.place();
   }
   function updateBar(t) {
     if (B.where === "carry" && B.carry) {
@@ -534,7 +490,7 @@
     F.crank += d;
     F.spin = Math.min(3, F.spin + Math.abs(d) * 0.6);
     F.fire = Math.min(1, F.fire + Math.abs(d) / TAU * 0.22);
-    if (Math.floor((F.crank - d) / TAU) !== Math.floor(F.crank / TAU)) { snd.whoosh(); puff("ember", g.coalX + (Math.random() - 0.5) * 30, g.coalY - 8, 3); }
+    if (Math.floor((F.crank - d) / TAU) !== Math.floor(F.crank / TAU)) { puff("ember", g.coalX + (Math.random() - 0.5) * 30, g.coalY - 8, 3); }
   }
   function fireStep(dt) {
     if (F.auto > 0) { const d = Math.min(F.auto * TAU, dt * TAU * 1.3); F.auto -= d / TAU; crankBy(d); }
@@ -564,7 +520,7 @@
     return { i: bi, d: bd };
   }
   function coldHint(x, y) {
-    swing(x, y, true); snd.clink();
+    swing(x, y, true);
     puff("ring", x, y, 1);
     const t = now();
     if (t - coldSaid > 3) { coldSaid = t; coach.say("The bar is cold. Put the bar in the fire.", 3.5); glowPart("fire"); }
@@ -589,12 +545,10 @@
     if (m.x < g.hornTip - 4 || (m.x > g.faceR + 2 && !freeRight)) {
       B.fly = { from: B.pts.map((q) => q.slice()), t0: now(), dur: 0.4 };
       B.pose = { x: B.pose.x + g.ax - m.x, y: B.pose.y, ang: B.pose.ang, held };
-      snd.place();
       return;
     }
     if (soft(i) < 0.05) { coldHint(m.x, m.y); return; }
     swing(m.x, m.y, false);
-    snd.clang();
     puff("spark", m.x, m.y - 2, 9);
     puff("scale", m.x, m.y, 4);
     puff("ring", m.x, m.y, 1);
@@ -647,7 +601,6 @@
     let acc = 0;
     for (let i = j0 + 1; i < N; i++) { if (i <= j1) acc += soft(i) / sum; b.tw[i] += d * acc; }
     WR.ang += d;
-    if (Math.floor((WR.ang - d) / (PI / 2)) !== Math.floor(WR.ang / (PI / 2))) snd.creak();
     ghost.learned("wrench");
     saveSoon();
     return true;
@@ -676,7 +629,6 @@
     P.disc.dm.push([u, v]); if (P.disc.dm.length > 40) P.disc.dm.shift();
     P.disc.depth = Math.min(1.2, P.disc.depth + 0.22);
     swing(c.x + u * R * 0.8, c.y - 6 - P.disc.depth * 10 + v * 6, false);
-    snd.copper();
     puff("ring", c.x + u * R * 0.8, c.y - 4, 1);
     ghost.learned("disc");
     saveSoon();
@@ -686,13 +638,11 @@
   function rivetIn() {
     if (P.rivet || rivetFly) return;
     rivetFly = { t0: now(), dur: 0.5 };
-    snd.place();
     ghost.learned("rivet");
   }
   function rivetHit() {
     if (!P.rivet) return;
     swing(g.tabX, g.tabY - 2, false);
-    snd.copper();
     puff("ring", g.tabX, g.tabY, 1);
     if (P.rivet < 4) P.rivet++;
     ghost.learned("rivethead");
@@ -700,14 +650,14 @@
   }
   // The polishing cloth: a tap rubs the spoon all over; dragging it over the spoon rubs where it goes.
   const CL = { x: 0, y: 0, rub: 0, drag: false };
-  function polishTap() { if (!CL.rub) CL.rub = now(); ghost.learned("cloth"); snd.rub(); }
+  function polishTap() { if (!CL.rub) CL.rub = now(); ghost.learned("cloth"); }
   function polishBy(dist) { P.shine = Math.min(1, P.shine + dist / 300); if (Math.random() < 0.3) puff("shine", g.bowlX + (Math.random() - 0.5) * 40, g.bowlY + (Math.random() - 0.5) * 16, 1); }
   function clothStep(t, dt) {
     if (!CL.rub) return;
     const u = (t - CL.rub) / 1.8;
     if (u >= 1) { CL.rub = 0; return; }
     P.shine = Math.min(1, P.shine + dt * 0.6);
-    if (Math.random() < dt * 8) { snd.rub(); puff("shine", g.bowlX + (Math.random() - 0.5) * 44, g.bowlY + (Math.random() - 0.5) * 18, 1); }
+    if (Math.random() < dt * 8) { puff("shine", g.bowlX + (Math.random() - 0.5) * 44, g.bowlY + (Math.random() - 0.5) * 18, 1); }
   }
   // The slack tub: the hot bar hisses, steam rises and the bar turns dark grey.
   function quench() {
@@ -715,9 +665,8 @@
     B.quench = true;
     setTimeout(() => { B.quench = false; }, 900);
     if (hot) {
-      snd.hiss();
       for (let k = 0; k < 9; k++) setTimeout(() => puff("steam", g.tubX + (Math.random() - 0.5) * g.tubW * 0.6, g.tubY, 1), k * 90);
-    } else snd.splash();
+    }
     puff("drop", g.tubX, g.tubY + 2, 6);
     P.quenched = true;
     // A worked plain bar is finished when it is dunked.
@@ -752,7 +701,6 @@
   function completeStep() {
     const st = curStep();
     if (!st) return;
-    snd.chime();
     const at = workPoint();
     if (at) puff("shine", at.x, at.y, 6);
     P.step++; P.quenched = false;
@@ -780,7 +728,6 @@
     while (rack.length > RACK_MAX) rack.shift();
     finishing = now() + 1.6;
     coach.say(line || "The bar hangs on the rack.", 4);
-    snd.chime();
     Toybox.kind();
     pieces[make] = P = newPiece(make);
     B.hideUntil = finishing;
@@ -1575,7 +1522,7 @@
     else if (part === "anvil") {
       // A blow on the anvil near the bar lands on the bar.
       if (nearestSeg(B.pts, w.x, w.y).d < 50) hammerAt(w.x, w.y);
-      else { swing(w.x, g.ay - 4, true); snd.clink(); }
+      else { swing(w.x, g.ay - 4, true); }
     } else hammerAt(w.x, w.y);
   }
   let drag = null, holdTimer = 0;
@@ -1690,7 +1637,6 @@
     B.flip = false; doneAt = 0; rivetFly = null; CL.rub = 0; WR.left = 0; finishing = 0; B.hideUntil = 0;
     placeRest(true);
     for (let i = 4; i < N; i += 8) puff("shine", B.pts[i][0], B.pts[i][1], 1);
-    snd.place();
     lastWant = "";
     saveSoon();
   }
@@ -1705,10 +1651,10 @@
     const k = surpriseNext; surpriseNext = (surpriseNext + 1) % 3;
     if (k === 0) {
       for (let n = 0; n < 7; n++) setTimeout(() => puff("shower", g.coalX + (Math.random() - 0.5) * g.coalHalf, g.coalY - 6, 14), n * 200);
-      F.flare = Math.max(F.flare, 0.6); snd.crackle();
+      F.flare = Math.max(F.flare, 0.6);
     } else if (k === 1) {
       robin = { t0: now() };
-      setTimeout(() => snd.chirp(), 1500); setTimeout(() => snd.chirp(), 2900);
+
     } else {
       F.auto += 3; F.flare = 1;
     }
@@ -1754,7 +1700,7 @@
     updateBar(t);
     heatStep(dt);
     clothStep(t, dt);
-    if (rivetFly && t - rivetFly.t0 >= rivetFly.dur) { rivetFly = null; P.rivet = Math.max(1, P.rivet); snd.copper(); saveSoon(); }
+    if (rivetFly && t - rivetFly.t0 >= rivetFly.dur) { rivetFly = null; P.rivet = Math.max(1, P.rivet); saveSoon(); }
     if (finishing && t >= finishing) { finishing = 0; lastWant = ""; }
     // Once, when the part he needs glows orange in the fire.
     if (B.where === "fire" && !B.fly && !B.hotSaid) {
@@ -1801,10 +1747,8 @@
     restLine: "The forge is resting.",
     restLine2: "The rack and the spoon will be right here next time.",
     restArt,
-    soundNote: "Soft hammer rings, whooshes and hisses. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; lastT = now(); },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; lastT = now(); }
   });
   requestAnimationFrame(loop);
 

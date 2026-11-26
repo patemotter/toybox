@@ -652,7 +652,7 @@ body.ending #view { cursor: default; }
     var t = Math.floor(st.u / (G.S.P / G.N));
     if (mo.lastTooth !== null && t !== mo.lastTooth) {
       var n = now();
-      if (n - mo.lastClick > 45) { mo.lastClick = n; clickSound(); }
+      if (n - mo.lastClick > 45) { mo.lastClick = n; }
     }
     mo.lastTooth = t;
   }
@@ -671,14 +671,13 @@ body.ending #view { cursor: default; }
     st.rig.ph += k;
     st.cur = -1;
     mo.reseat = { t0: now(), dur: reduce ? 400 : 900, k: k };
-    liftSound();
     dirty = true;
     scheduleSave();
   }
 
   function update(dt) {
     if (mo.reseat) { if (now() - mo.reseat.t0 >= mo.reseat.dur) mo.reseat = null; dirty = true; }
-    if (surp) { mo.uT = st.u; mo.v = 0; scratchSound(0); return; }   // a Surprise never draws
+    if (surp) { mo.uT = st.u; mo.v = 0; return; }   // a Surprise never draws
     var P = geoNow().S.P;
     if (mo.ending) {
       // Time is up: the wheel rolls to a stop, then the pen lifts.
@@ -707,7 +706,6 @@ body.ending #view { cursor: default; }
     if ((lead >= 0 && step > lead) || (lead <= 0 && step < lead)) step = lead;
     if (Math.abs(step) > 1e-6) advance(step);
     else mo.v = 0;
-    scratchSound(Math.abs(mo.v) / P);
   }
 
   // ---------- Finger input ----------
@@ -771,7 +769,6 @@ body.ending #view { cursor: default; }
   function ripple(x, y) { fx.ripples.push({ x: x, y: y, t0: now() }); dirty = true; }
   function celebrate(p) {
     fx.sparkle = { p: p, G: patGeo(p), t0: now(), dur: reduce ? 1200 : 3000 };
-    chimeSound();
     // once a visit, a soft hint that a new pen makes a new layer (nothing stops: the wheel keeps going)
     if (!mo.saidPen) { mo.saidPen = true; coachSay("Pick a new pen!", 3500); }
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 4500);
@@ -1219,7 +1216,7 @@ body.ending #view { cursor: default; }
   }
   function surprise() {
     if (locked()) return;
-    if (surp) { starsAround(5, 1.2); clickSound(); return; }
+    if (surp) { starsAround(5, 1.2); return; }
     // First pass: a different moment from last time; second pass: the same one again if nothing else can play.
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < MOMENTS.length; i++) {
@@ -1235,7 +1232,6 @@ body.ending #view { cursor: default; }
   function surpStart(kind) {
     mo.auto = false; renderGo(); mo.uT = st.u; mo.v = 0;
     surp = { kind: kind, t0: now(), dur: kind === "roll" ? 7600 : (reduce ? 2400 : 5200), clicked: false };
-    if (kind === "roll") liftSound();
     coach.clear();
     dirty = true;
   }
@@ -1260,7 +1256,7 @@ body.ending #view { cursor: default; }
     }
     if (surp.kind === "roll" && !surp.clicked && t - surp.t0 > surp.dur - 450) {
       // the wheel clicks back into its place
-      surp.clicked = true; clickSound();
+      surp.clicked = true;
       var w = wheelScreen(); ripple(w.x, w.y);
     }
   }
@@ -1307,7 +1303,7 @@ body.ending #view { cursor: default; }
     if (t.id === "surpriseBtn") { surprise(); return; }
   });
   // A choice answers with a little hop of the wheel.
-  function wiggle() { mo.lift = Math.max(mo.lift, 0.6); dirty = true; clickSound(); }
+  function wiggle() { mo.lift = Math.max(mo.lift, 0.6); dirty = true; }
 
   // ---------- Coach ----------
   var coach = Toybox.coach($("coach")), coachT = 0, learned = false;
@@ -1323,57 +1319,6 @@ body.ending #view { cursor: default; }
     learned = true;
     ghost.learned();
     if (!quiet) coachT = setTimeout(coach.clear, 2500);
-  }
-
-  // ---------- Sound (only when the grown-up turned it on) ----------
-  var noiseBuf = null, scr = null;
-  function audio() { return Toybox.sound.ready(); }
-  function noise(ac) {
-    if (noiseBuf && noiseBuf.sampleRate === ac.sampleRate) return noiseBuf;
-    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
-    var d = noiseBuf.getChannelData(0);
-    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    return noiseBuf;
-  }
-  function clickSound() {
-    var ac = audio(); if (!ac) return;
-    var t = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    s.buffer = noise(ac); f.type = "bandpass"; f.frequency.value = 2600 + Math.random() * 500; f.Q.value = 4;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
-    s.connect(f); f.connect(g); g.connect(ac.destination);
-    s.start(t, Math.random() * 0.5, 0.06);
-  }
-  function scratchSound(lapsPerS) {
-    var ac = audio();
-    var level = ac && !mo.ending ? clamp(lapsPerS * 0.05, 0, 0.035) : 0;
-    if (!ac) { if (scr) { try { scr.s.stop(); } catch (e) { /* ignore */ } scr = null; } return; }
-    if (!scr && level > 0.002) {
-      var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-      s.buffer = noise(ac); s.loop = true; f.type = "bandpass"; f.frequency.value = 1500; f.Q.value = 0.8; g.gain.value = 0;
-      s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
-      scr = { s: s, g: g, idle: 0 };
-    }
-    if (scr) {
-      scr.g.gain.setTargetAtTime(level, ac.currentTime, 0.05);
-      if (level < 0.002) { scr.idle++; if (scr.idle > 90) { try { scr.s.stop(ac.currentTime + 0.2); } catch (e) { /* ignore */ } scr = null; } }
-      else scr.idle = 0;
-    }
-  }
-  function tone(ac, f, t, dur, vol) {
-    var o = ac.createOscillator(), g = ac.createGain();
-    o.type = "sine"; o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function chimeSound() {
-    var ac = audio(); if (!ac) return;
-    var t = ac.currentTime + 0.02;
-    [1046.5, 1318.5, 1568, 2093].forEach(function (f, i) { tone(ac, f, t + i * 0.16, 1.4, 0.07); tone(ac, f * 2.01, t + i * 0.16, 0.5, 0.015); });
-  }
-  function liftSound() {
-    var ac = audio(); if (!ac) return;
-    var t = ac.currentTime;
-    tone(ac, 660, t, 0.25, 0.05); tone(ac, 880, t + 0.5, 0.3, 0.05);
   }
 
   // The hand circles a finger round the paper, the way the wheel goes.
@@ -1480,12 +1425,10 @@ body.ending #view { cursor: default; }
     restLine: "The gears are resting.",
     restLine2: "They will be right here next time.",
     restArt: drawRestArt,
-    soundNote: "Soft gear clicks, a quiet pen and a chime. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: onGoodbye,
     onRest: function () { mo.endDone = null; mo.v = 0; },
-    onWake: function () { mo.ending = false; mo.goodbye = null; mo.endDone = null; st.cur = -1; mo.uT = st.u; dirty = true; },
-    onSound: function (on) { if (on) clickSound(); }
+    onWake: function () { mo.ending = false; mo.goodbye = null; mo.endDone = null; st.cur = -1; mo.uT = st.u; dirty = true; }
   });
   $("stage").appendChild($("tb-toast"));
   $("stage").appendChild($("tb-farewell"));

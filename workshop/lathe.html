@@ -429,58 +429,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     [[14, 14], [pw - 14, 14], [14, ph - 14], [pw - 14, ph - 14]].forEach(function (q) { c.beginPath(); c.arc(q[0], q[1], 4, 0, TAU); c.fill(); });
   }
 
-  // ---------- Sound (only when the grown-up turned it on) ----------
-  var AC = null, master = null, humG = null, humO1 = null, humO2 = null, grindG = null, grindF = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
-      humG = a.createGain(); humG.gain.value = 0;
-      humO1 = a.createOscillator(); humO1.type = "sawtooth"; humO1.frequency.value = 50;
-      humO2 = a.createOscillator(); humO2.type = "triangle"; humO2.frequency.value = 100;
-      humO1.connect(lp); humO2.connect(lp); lp.connect(humG); humG.connect(master);
-      humO1.start(); humO2.start();
-      var buf = a.createBuffer(1, a.sampleRate, a.sampleRate), data = buf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      var noise = a.createBufferSource(); noise.buffer = buf; noise.loop = true;
-      grindF = a.createBiquadFilter(); grindF.type = "bandpass"; grindF.frequency.value = 900; grindF.Q.value = 1.4;
-      grindG = a.createGain(); grindG.gain.value = 0;
-      noise.connect(grindF); grindF.connect(grindG); grindG.connect(master);
-      noise.start();
-      AC = a;
-    } catch (e) { /* audio unavailable */ }
-  }
-  function updateSound() {
-    ensureAudio();
-    if (!AC) return;
-    var t = AC.currentTime;
-    var on = Toybox.sound.on() && Toybox.timer.phase() !== "resting";
-    var f = Math.min(1, R.spin / SPEEDS[3]);
-    humG.gain.setTargetAtTime(on && R.spin > 0.1 ? 0.03 + 0.04 * f : 0, t, 0.08);
-    humO1.frequency.setTargetAtTime(38 + f * 30, t, 0.1);
-    humO2.frequency.setTargetAtTime(80 + f * 120, t, 0.1);
-    grindG.gain.setTargetAtTime(on ? R.cutting * 0.06 + (R.sand ? 0.03 : 0) : 0, t, 0.05);
-    grindF.frequency.setTargetAtTime(R.sand ? 2600 : (S.tool === "parting" ? 1500 : (S.tool === "skew" ? 1900 : 900 + 400 * f)), t, 0.1);
-  }
-  function blip(freq, dur, vol, type, freq2) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime;
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-
   // ---------- Prompts ----------
   var now = 0;
   function say(msg, flashKey) {
@@ -693,7 +641,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (R.spin < 0.5) { say(R.on && S.speed === 0 ? "Turn the dial, then sand" : "Switch on, then sand", R.on ? "dial" : "switch"); return; }
     R.sand = { t: 0, dur: 4.3 };
     R.toolHeld = false;
-    blip(1200, 0.08, 0.04, "triangle", 900);
   }
   function updateSand(dt) {
     var q = R.sand;
@@ -706,7 +653,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var W = WOODS[S.wood];
       for (var k = 0; k < (reduce ? 6 : 16); k++) spawn("star", rnd(WX0 + 20, WX1 - 20), AXY + rnd(-50, 30), W);
       say("Shiny!");
-      blip(880, 0.12, 0.06, "sine", 1320);
       save();
       return;
     }
@@ -736,7 +682,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     R.sand = null;
     releaseTool();
     resetBlank(kind === "new" ? wood : S.wood);
-    blip(kind === "done" ? 520 : 300, 0.12, 0.06, "triangle", kind === "done" ? 780 : 200);
   }
   function doneBtn() {
     if (busy() || R.seq) return;
@@ -766,13 +711,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
           S.shelf.push(q.piece);
           S.shelf = S.shelf.slice(-8);
           R.flash.shelf = now + 1.8;
-          blip(990, 0.1, 0.06, "sine", 1480);
           for (var k = 0; k < (reduce ? 4 : 10); k++) spawnScreenStar();
         }
         q.stage = "in"; q.t = 0;
       }
     } else if (q.stage === "in") {
-      if (q.t >= 0.75) { R.seq = null; R.fastStop = false; save(); blip(220, 0.08, 0.06, "triangle", 330); }
+      if (q.t >= 0.75) { R.seq = null; R.fastStop = false; save(); }
     }
   }
   function avg(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
@@ -1332,7 +1276,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     R.on = !R.on;
     if (R.on) coach.clear();
     if (R.on && S.speed === 0) { S.speed = 1; save(); }
-    blip(R.on ? 440 : 160, 0.1, 0.08, "triangle", R.on ? 660 : 90);
     R.flash.switch = 0;
   }
   function setSpeed(k) {
@@ -1340,7 +1283,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (S.speed === k) return;
     S.speed = k; save();
     R.flash.dial = 0;
-    blip(300 + k * 160, 0.06, 0.06, "triangle");
   }
   function dialAngleToSpeed(a) {
     var best = 0, bd = 9;
@@ -1350,7 +1292,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function onDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-    ensureAudio();
     if (busy()) return;
     var p = localPt(e), d = null, i, z;
     for (i = hits.length - 1; i >= 0 && !d; i--) {
@@ -1483,7 +1424,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
   function selectTool(id) {
     if (busy() || !TOOLS[id]) return;
-    if (S.tool !== id) { S.tool = id; R.toolPop = 1; setToolX(R.tipX, true); save(); blip(640, 0.05, 0.05, "triangle"); }
+    if (S.tool !== id) { S.tool = id; R.toolPop = 1; setToolX(R.tipX, true); save(); }
     updateToolbar();
   }
   function showPicker() { if (busy() || R.seq) return; $("picker").hidden = false; }
@@ -1521,7 +1462,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
   }
   function goodbye() {
-    if (R.on) blip(140, 0.12, 0.08, "sine", 80);
     R.on = false;
   }
   function endingFrame() {
@@ -1553,8 +1493,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
-
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-lathe",
     timerIntro: "When time is up, the lathe switches off, spins down to a stop and rests, and the controls lock. The timer carries on across Workshop pages.",
@@ -1565,20 +1503,17 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     restLine: "The lathe is resting.",
     restLine2: "Your piece will be right here next time.",
     restArt: restArt,
-    soundNote: "Motor hum and a soft cutting sound. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
     onTimer: function (info) { TI = info; }
   });
   Toybox.offFirst({
     running: function () { return R.on || R.spin > 0.05; },
     name: "wood lathe",
     off: function (done) {
-      if (R.on) blip(160, 0.1, 0.08, "triangle", 90);
       R.on = false; R.fastStop = true; R.sand = null; releaseTool();
       var t0 = performance.now();
       var iv = setInterval(function () {
@@ -1615,7 +1550,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
       doneEl.classList.toggle("is-off", !cutSomething());
     }
-    updateSound();
     requestAnimationFrame(frame);
   }
   if (params.debug === "1") window.__lathe = { S: function () { return S; }, R: R, M: function () { return M; }, P: function () { return P; }, hits: function () { return hits; }, parts: function () { return parts.length; } };

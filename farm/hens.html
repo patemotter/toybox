@@ -89,7 +89,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // eggTable, henU (a hen or the cockerel, origin at its feet), chickU, cartonOpen / cartonShut.
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2;
   var P = SH.P, R = SH.R, C = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs, rr = SH.rr;
   var NAME = (Farm.NAMES && Farm.NAMES.hens) || "Feathered Friends";
   document.title = NAME; $("title").textContent = NAME;
@@ -135,7 +135,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var fd = { t: 0, stop: 0 }, eg = { t: 0, stop: 0 }, feedOn = false, panLvl = 0, binLvl = 0.15, swing = 0, augRun = 0, flow = 0, lid = 0, beltRun = 0;
   var crowS = null, chicks = null, perch = null;
 
-  function driving() { return phase === "drive" && Math.abs(tr.v) > 0.2; }
 
   // ---------- The stage: the wide view and the close-up ----------
   var phoneCoach = window.matchMedia ? matchMedia("(max-width: 600px), (orientation: landscape) and (max-height: 520px)") : null;
@@ -618,7 +617,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function henTap(h) {
     if (h.jt > 0) return;
-    h.jt = 0.45; h.flap = 1; snd.tick();
+    h.jt = 0.45; h.flap = 1;
     var p = henScreen(scC, h);
     if (h === ROOSTER) crow(); else tagAt("Hen", RG.c.x + p.x, RG.c.y + p.y - 40);
   }
@@ -655,7 +654,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function startDrive() {
     setPhase("drive"); auto = true;
-    snd.horn(); coach.say("The tracks glide over the mud.", 4);
+    coach.say("The tracks glide over the mud.", 4);
     prints.a = Math.min(prints.a, tr.x);
   }
   // the part he touched is the next thing: play its motion and say what happens
@@ -664,22 +663,22 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     var k = key(), p = part || "";
     if (k === "drive.drive" && (p === "rig" || p === "trackC")) { startDrive(); return true; }
     if (k === "feed.swing" && (p === "auger" || p === "trailer" || p === "bin")) {
-      setPhase("feed"); fd.stop = F_UP; snd.clunk(); coach.say("The auger swings up over the feed bin.", 3); return true;
+      setPhase("feed"); fd.stop = F_UP; coach.say("The auger swings up over the feed bin.", 3); return true;
     }
     if (k === "feed.pour" && (p === "auger" || p === "trailer" || p === "bin")) {
-      setPhase("feed"); fd.stop = F_END; snd.clunk(); coach.say("The grain pours into the feeders.", 4); return true;
+      setPhase("feed"); fd.stop = F_END; coach.say("The grain pours into the feeders.", 4); return true;
     }
     if (k === "eggs.lid" && (p === "nest" || p === "belt" || p === "house")) {
-      setPhase("eggs"); eg.stop = LID_T; snd.tick(); coach.say("The hens lay their eggs in the nest boxes.", 3); return true;
+      setPhase("eggs"); eg.stop = LID_T; coach.say("The hens lay their eggs in the nest boxes.", 3); return true;
     }
     if (k === "eggs.belt" && (p === "belt" || p === "nest" || p === "carton" || p === "house")) {
-      setPhase("eggs"); eg.stop = EGG_END; snd.clunk(); coach.say("The eggs roll into the carton.", 4); return true;
+      setPhase("eggs"); eg.stop = EGG_END; coach.say("The eggs roll into the carton.", 4); return true;
     }
     return false;
   }
   function parked() {
     auto = false; tr.v = 0; tr.x = TX_PARK; grab = null;
-    camC.mode = "feed"; snd.clunk();
+    camC.mode = "feed";
     var p = housePt(scF, 0, -3.1); tagAt("Hen house", p.x, p.y);
     setSub("feed", "swing");
   }
@@ -691,7 +690,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     setPhase("done");
     coach.say("Look at all the eggs!", 5);
     coach.step("Tap the hen house to start again.");
-    snd.chime();
     Toybox.kind();
   }
   var NIGHT_T = 3.2, nightReset = false;
@@ -720,7 +718,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function hint() { var d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function busyHint() {
     if (phase === "night") { coach.say("It is nearly morning.", 3); return; }
-    if (phase === "drive") { snd.horn(); tr.flash = 1.2; }
+    if (phase === "drive") { tr.flash = 1.2; }
     coach.say(BUSY[job] || "Wait a moment.", 3);
   }
   var ghost = Toybox.ghost({
@@ -778,21 +776,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return { rig: true };
   }
   function postAt(to) { return to.rig ? { x: tr.x + DBAR[0] - 3.3, r: TL, h: 2.6 } : to; }
-  function crowSound() {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    try {
-      var o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter(), t0 = ac.currentTime;
-      o.type = "sawtooth"; f.type = "lowpass"; f.frequency.value = 1800;
-      o.connect(f); f.connect(g); g.connect(ac.destination);
-      var fr = [[0, 520], [0.18, 760], [0.32, 680], [0.5, 900], [0.95, 640], [1.2, 470]];
-      fr.forEach(function (p) { o.frequency.linearRampToValueAtTime(p[1], t0 + p[0]); });
-      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.05, t0 + 0.05);
-      g.gain.setValueAtTime(0.05, t0 + 0.3); g.gain.linearRampToValueAtTime(0.02, t0 + 0.38); g.gain.linearRampToValueAtTime(0.05, t0 + 0.48);
-      g.gain.linearRampToValueAtTime(0.04, t0 + 1.0); g.gain.linearRampToValueAtTime(0, t0 + 1.3);
-      o.start(t0); o.stop(t0 + 1.4);
-    } catch (e) { /* ignore */ }
-  }
   // A hen runs to the tractor, hops onto its bonnet, sits for a bit and hops down again.
   function startPerch() {
     var best = null, bd = 1e9;
@@ -808,20 +791,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (p.stage === "run") {
       var fx = tr.x + 3.4;
       h.flip = fx < h.x;
-      if (moveHen(h, fx, 0.93, 3.6, dt) || p.t > 5) { p.stage = "up"; p.t = 0; p.from = { x: h.x, r: h.r }; h.flap = 1; snd.tick(); }
+      if (moveHen(h, fx, 0.93, 3.6, dt) || p.t > 5) { p.stage = "up"; p.t = 0; p.from = { x: h.x, r: h.r }; h.flap = 1; }
     } else if (p.stage === "up" || p.stage === "down") {
       var f = clamp(p.t / 0.8, 0, 1), a = p.from, b = { x: tr.x + PERCH[0], r: TL, h: PERCH[1] };
       if (p.stage === "down") { a = { x: tr.x + PERCH[0], r: TL, h: PERCH[1] }; b = { x: tr.x + 3.6, r: 0.93, h: 0 }; }
       h.x = lerp(a.x, b.x, f); h.r = lerp(a.r, b.r, ease(f)); h.h = lerp(a.h || 0, b.h, f) + Math.sin(f * Math.PI) * 0.6;
       h.flap = 1; h.walk = 0; h.flip = b.x < a.x;
       if (f >= 1) {
-        if (p.stage === "up") { p.stage = "sit"; p.t = 0; h.sit = true; snd.pop(); }
+        if (p.stage === "up") { p.stage = "sit"; p.t = 0; h.sit = true; }
         else { h.h = 0; h.r = 0.93; h.st = feedOn ? "feed" : "idle"; h.t = 1; h.sit = false; if (feedOn) { h.slot = slotFor(HENS.indexOf(h)); } perch = null; }
       }
     } else if (p.stage === "sit") {
       h.x = tr.x + PERCH[0]; h.r = TL; h.h = PERCH[1]; h.flip = false; h.walk = 0;
       h.peck = Math.sin(p.t * 2) > 0.7 ? 0.3 : 0;
-      if (p.t > 3.4) { p.stage = "down"; p.t = 0; h.sit = false; h.flap = 1; snd.tick(); }
+      if (p.t > 3.4) { p.stage = "down"; p.t = 0; h.sit = false; h.flap = 1; }
     }
   }
   function updatePost(dt) {
@@ -1082,7 +1065,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (var i = 0; i < L.length; i++) if (L[i].id === part) p = L[i];
     var name = PNAMES[part];
     if (!p || !name) return false;
-    if (part === "rig" || part === "trackC") { snd.horn(); tr.flash = 1.2; } else snd.tick();
+    if (part === "rig" || part === "trackC") { tr.flash = 1.2; }
     tagAt(name, p.x - b.left, p.y - b.top - Math.min(60, p.r * 0.6));
     return true;
   }
@@ -1154,11 +1137,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       var b0 = eg.t; eg.t = Math.min(eg.stop, eg.t + dt);
       lid = clamp(eg.t / 0.5, 0, 1) * (1 - clamp((eg.t - (EGG_END - 0.6)) / 0.5, 0, 1));
       if (eg.t > LID_T && eg.t < EGG_END - 0.6) beltRun += dt;
-      for (i = 0; i < NEGG; i++) { var tl = eggLand(i); if (b0 < tl && eg.t >= tl) { count++; save(); snd.pop(); world(function (w) { w.eggs = num(w.eggs) + 1; }); } }
+      for (i = 0; i < NEGG; i++) { var tl = eggLand(i); if (b0 < tl && eg.t >= tl) { count++; save(); world(function (w) { w.eggs = num(w.eggs) + 1; }); } }
       for (i = 0; i < 2; i++) {
-        if (b0 < FULL[i] && eg.t >= FULL[i]) snd.tick();
         var ts = FULL[i] + 0.95;
-        if (b0 < ts && eg.t >= ts) { cartons++; save(); snd.clunk(); }
+        if (b0 < ts && eg.t >= ts) { cartons++; save(); }
       }
       if (eg.t >= eg.stop) { if (eg.stop < EGG_END) setSub("eggs", "belt"); else finishJob(); }
     } else if (phase === "night") {
@@ -1173,7 +1155,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (crowS) {
       var c0 = crowS.t; crowS.t += dt;
       if (c0 < 0 && crowS.t >= 0) { /* landed on the post */ }
-      if (c0 < 0.1 && crowS.t >= 0.1) crowSound();
       ROOSTER.crow = crowS.t > 0 ? Math.min(1, crowS.t / 0.25, (2.6 - crowS.t) / 0.3) : 0;
       if (ROOSTER.crow > 0.3) ROOSTER.flap = Math.max(ROOSTER.flap, 0.6);
       if (crowS.t > 3.2) { crowS = null; ROOSTER.crow = 0; if (ROOSTER.st !== "post" && feedOn) { ROOSTER.st = "feed"; ROOSTER.slot = slotFor(7); } }
@@ -1185,9 +1166,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     calE += ((camC.mode === "eggs" ? 1 : 0) - calE) * Math.min(1, dt * 3.2);
     var lvl = phase === "drive" ? 0.3 + drive * 0.7 : (phase === "feed" && swing > 0.05 ? 0.45 : (phase === "night" ? 0 : 0.15));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending || phase === "night" ? -1 : engLevel);
-    snd.soil(driving() && inMud(tr.x + 1.5) ? 0.45 * drive : 0);
-    snd.pour(phase === "feed" && augRun > 0 && fd.t > 1.1 && fd.t < 4.2 ? 0.4 : 0);
   }
   var calE = 0;
   // the feed run: the auger swings up, pours into the bin, the grain runs down to the feeders, the auger folds
@@ -1462,7 +1440,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     ending = true; auto = false; grab = null; tr.v = 0;
     if (phase === "drive") { phase = "ready"; }
     HENS.forEach(function (h) { if (h.st === "perch" || h.st === "post") return; h.st = "home"; h.slot = null; });
-    setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600);
+    setTimeout(function () { done(); }, 2600);
   }
   function onWake() {
     ending = false; dusk = 0;
@@ -1485,13 +1463,11 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The farm is resting.",
     restLine2: "The hens are asleep in their house.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine, mud, grain and clucking sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
-  Toybox.offFirst({ running: function () { return phase === "feed" && augRun > 0; }, off: function (done) { augRun = 0; flow = 0; snd.pour(0); if (done) done(); } });
+  Toybox.offFirst({ running: function () { return phase === "feed" && augRun > 0; }, off: function (done) { augRun = 0; flow = 0; if (done) done(); } });
   requestAnimationFrame(loop);
   if (/[?&]debug\b/.test(location.search)) window.__farm = {
     state: function () { return { phase: phase, job: job, sub: sub, key: key(), part: (SUB[key()] || {}).part || null, x: tr.x, count: count, cartons: cartons, coach: coach.text(), cmode: camC.mode, feedOn: feedOn, pans: panLvl, swing: swing, bin: binLvl, lid: lid, k: camF.k, cam: camF.cam, hard: camF.hard, perch: perch ? perch.stage : null, crow: !!crowS, chicks: !!chicks }; },

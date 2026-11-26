@@ -3,7 +3,6 @@
 // Sections, in order (search for the title to jump to one):
 //   - Basics
 //   - Saved settings for this page (last saw, materials, settings, pieces)
-//   - Sound: soft and synthesized. The on/off setting and the AudioContext are shared Toybox-wide
 //   - Materials
 //   - The saws. Ids are the Workshop's canonical ids.
 //   - Drawing helpers. Saw drawings use millimetres; PX is mm per screen pixel,
@@ -110,102 +109,7 @@
   }
 
   // ===================================================================
-  // Sound: soft and synthesized. The on/off setting and the AudioContext are shared Toybox-wide
-  // (common/toybox.js), which starts/resumes audio on every touch while sound is on. The saw bench
-  // builds its own master gain and noise once per context.
   // ===================================================================
-  var Sound = (function () {
-    var ac = null, master = null, noise = null;
-    var rasp = null, motor = null;
-    function makeNoise() {
-      var len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), i, last = 0;
-      for (i = 0; i < len; i++) { var w = Math.random() * 2 - 1; last = last * 0.55 + w * 0.45; d[i] = last; }
-      return buf;
-    }
-    function unlock() {
-      var a = Toybox.sound.ready();
-      if (!a) return false;
-      if (a !== ac) {
-        try {
-          ac = a;
-          master = ac.createGain();
-          master.gain.value = 0.5;
-          master.connect(ac.destination);
-          noise = makeNoise();
-          rasp = null; motor = null;
-        } catch (e) { ac = null; return false; }
-      }
-      return true;
-    }
-    function ready() { return unlock(); }
-    function buildRasp() {
-      var src = ac.createBufferSource();
-      src.buffer = noise; src.loop = true;
-      var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 0.9;
-      var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200;
-      var g = ac.createGain(); g.gain.value = 0;
-      src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(master);
-      src.start();
-      rasp = { src: src, bp: bp, lp: lp, g: g };
-    }
-    function buildMotor() {
-      var o1 = ac.createOscillator(), o2 = ac.createOscillator();
-      o1.type = "sawtooth"; o2.type = "triangle";
-      o1.frequency.value = 60; o2.frequency.value = 121;
-      var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 520; lp.Q.value = 0.7;
-      var g = ac.createGain(); g.gain.value = 0;
-      var n = ac.createBufferSource(); n.buffer = noise; n.loop = true;
-      var nb = ac.createBiquadFilter(); nb.type = "bandpass"; nb.frequency.value = 900; nb.Q.value = 0.6;
-      var ng = ac.createGain(); ng.gain.value = 0;
-      o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master);
-      n.connect(nb); nb.connect(ng); ng.connect(master);
-      o1.start(); o2.start(); n.start();
-      motor = { o1: o1, o2: o2, lp: lp, g: g, ng: ng, nb: nb };
-    }
-    // level 0..1 how fast the stroke is; kind "wood" | "metal"
-    function setRasp(level, kind) {
-      if (!ready()) return;
-      if (!rasp) buildRasp();
-      var t = ac.currentTime;
-      rasp.bp.frequency.setTargetAtTime(kind === "metal" ? 4200 : (kind === "drywall" ? 2400 : 1400 + level * 500), t, 0.03);
-      rasp.bp.Q.value = kind === "metal" ? 4 : 0.9;
-      rasp.g.gain.setTargetAtTime(clamp(level, 0, 1) * (kind === "metal" ? 0.18 : 0.28), t, 0.04);
-    }
-    // spin 0..1 motor speed, load 0..1 cutting
-    function setMotor(spin, load, pitch) {
-      if (!ready()) { return; }
-      if (!motor) buildMotor();
-      var t = ac.currentTime, base = (pitch || 1) * (40 + spin * 70 - load * 12);
-      motor.o1.frequency.setTargetAtTime(base, t, 0.08);
-      motor.o2.frequency.setTargetAtTime(base * 2.01, t, 0.08);
-      motor.lp.frequency.setTargetAtTime(300 + spin * 500, t, 0.1);
-      motor.g.gain.setTargetAtTime(spin * 0.11, t, 0.08);
-      motor.nb.frequency.setTargetAtTime(700 + spin * 900, t, 0.1);
-      motor.ng.gain.setTargetAtTime(spin * 0.05 + load * 0.12, t, 0.06);
-    }
-    function blip(freq, dur, vol, type) {
-      if (!ready()) return;
-      var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-      o.type = type || "triangle";
-      o.frequency.setValueAtTime(freq, t);
-      o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol || 0.2, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.05);
-    }
-    function clack() { blip(330, 0.12, 0.22, "triangle"); setTimeout(function () { blip(220, 0.1, 0.12, "triangle"); }, 60); }
-    function click() { blip(900, 0.05, 0.08, "square"); }
-    function quiet() {
-      if (!ac) return;
-      var t = ac.currentTime;
-      if (rasp) rasp.g.gain.setTargetAtTime(0, t, 0.05);
-      if (motor) { motor.g.gain.setTargetAtTime(0, t, 0.1); motor.ng.gain.setTargetAtTime(0, t, 0.1); }
-    }
-    return { unlock: unlock, setRasp: setRasp, setMotor: setMotor, clack: clack, click: click, quiet: quiet,
-      isOn: function () { return Toybox.sound.on(); } };
-  })();
 
   // ===================================================================
   // Materials
@@ -1588,7 +1492,6 @@
     up: function (pt) {
       if (pt.id !== this.pid) return;
       this.pid = null; this.held = false; this.pushing = false;
-      Sound.setRasp(0);
     },
     // Gesture gain: the whole slide through the board (or the whole plunge of the recip saw) takes about
     // 160 px of finger travel on any screen, so the big iPad bench doesn't need a long reach.
@@ -1662,7 +1565,6 @@
         self.extrude(g, 0, c, function (x, y, z) { var p = self.P(x, y, z); return [p[0] + ox, p[1] + oy]; }, {});
       }, this.hullBox(0, c));
       dropPiece(spr, (this.op || this.kind === "hand" ? 1 : -1) * rnd(40, 90), rnd(-60, -10), rnd(-3, 3), mmText(c), inchText(c));
-      Sound.setRasp(0);
       // re-base the board: what's left starts at the cut
       this.L -= c + this.saw.kerf;
       this.cView = 0;
@@ -1705,7 +1607,6 @@
       this.lift = Math.max(0, this.lift - dt * 120);
       this.strokeEnergy = Math.max(0, (this.strokeEnergy || 0) - dt * 2.5);
       if (this.kind === "hand") {
-        Sound.setRasp(this.cutting && this.held ? this.strokeEnergy : 0, this.mat.kind);
         if (!this.held) this.cutting = false;
       } else {
         var running = this.held && !endingNow();
@@ -1755,7 +1656,6 @@
       }
       this.wob *= Math.pow(0.4, dt);
       this.guard = clamp((this.xs + R - (-wk.w / 2)) / 60, 0, 1) * (this.xs - R < wk.w / 2 ? 1 : clamp(1 - (this.xs - R - wk.w / 2) / 40, 0, 1));
-      Sound.setMotor(this.speed, cuttingNow ? 1 : 0, track ? 1.15 : 1);
       if (this.hint) this.hint = Math.max(0, this.hint - dt);
       if (this.xpBot >= wk.w / 2 - 0.5 && D >= h) this.release();
     },
@@ -1773,7 +1673,6 @@
       }
       this.cutting = cutting;
       this.toolDepth = Math.min(want, this.depth);
-      Sound.setMotor(this.speed, cutting ? 1 : 0, 1.3);
       if (this.depth >= wk.h - 0.01) this.release();
     },
     // ---------- draw ----------
@@ -2868,7 +2767,6 @@
       if (pt.id !== this.pid) return;
       this.pid = null; this.held = false;
       if (this.saw.power) this.path = []; // the motor stops; a hand saw finishes the last bit of the stroke
-      Sound.setRasp(0);
     },
     // Forgiving steering: near the drawn line, the blade is drawn onto it.
     magnet: function (x, y) {
@@ -2936,8 +2834,6 @@
         var s = this.toScreen(B[0], B[1]);
         emitPlan(s[0], s[1], power ? 1.2 : Math.min(4, moved * 0.9), this.mat, 0, 0, power);
       }
-      if (power) Sound.setMotor(this.speed, cutting ? 1 : 0, 1.6);
-      else Sound.setRasp(this.cutting ? clamp(moved * 2, 0, 1) : 0, this.mat.kind);
     },
     boardM: function () { return [this.S, 0, 0, this.S, this.ox + this.slide * W, this.oy]; },
     // What hangs under the board (the handle, the lower blade) is drawn before the board, so it shows
@@ -3394,14 +3290,14 @@
       if (this.pid2 != null && !downIds[this.pid2]) this.pid2 = null;
       var hit = switchHit(this.sw, pt, this.on);
       if (hit) {
-        if (!endingNow() && (hit === "on") !== this.on) { this.on = hit === "on"; this.needOn = 0; Sound.click(); }
+        if (!endingNow() && (hit === "on") !== this.on) { this.on = hit === "on"; this.needOn = 0; }
         return;
       }
       var kn = this.knob;
       if (kn && dist(pt.x, pt.y, kn[0], kn[1]) < kn[2]) {
         // the scroll saw's speed knob: each tap turns it on a click
         this.set.spd = (this.set.spd + 1) % SCROLL_SPEEDS.length; this.spdTag = 2.2;
-        Sound.click(); saveApp();
+        saveApp();
         return;
       }
       if (this.pid == null && vb && pt.x >= vb[0] - 6 && pt.x <= vb[0] + vb[2] + 6 && pt.y >= vb[1] - 6 && pt.y <= vb[1] + vb[3] + 6) {
@@ -3420,7 +3316,6 @@
       this.top = !this.top;
       this.set.view = this.top ? "top" : "front";
       saveApp();
-      Sound.click();
       particles = [];
       clearDust();
       this.queue = null;
@@ -3515,7 +3410,6 @@
         emitPlan(bp[0], bp[1] + (this.top ? 4 : 0), 1.6, this.mat, 0, 1, true);
       }
       this.cutting = cutting;
-      Sound.setMotor(this.speed, cutting ? 1 : 0, this.band ? 0.9 : 1.4);
     },
     draw: function (g) {
       var self = this;
@@ -3952,7 +3846,6 @@
       if (endingNow() || v === this.on) return;
       this.on = v; this.needOn = 0;
       if (PJ && PJ.kind === "crosscut") pjCoachDone();
-      Sound.click();
     },
     down: function (pt) {
       var k;
@@ -3960,7 +3853,7 @@
       for (k in this.ptrs) if (!downIds[k]) delete this.ptrs[k];
       k = this.hitTest(pt);
       if (k === "on" || k === "off") { this.setOn(k === "on"); return; }
-      if (k === "fencelock") { this.fenceLocked = !this.fenceLocked; this.lockTag = 1.8; Sound.click(); return; }
+      if (k === "fencelock") { this.fenceLocked = !this.fenceLocked; this.lockTag = 1.8; return; }
       var p = { kind: k, x0: pt.x, y0: pt.y, mode: null };
       if (k === "wheel") p.a = Math.atan2(pt.y - this.hitWheel[1], pt.x - this.hitWheel[0]);
       else if (k === "fence") { var wf = this.cam.onZ(pt.x, pt.y, 0); p.wx = wf ? wf[0] : null; }
@@ -4055,7 +3948,7 @@
           var fin = set.fence / this.pj.S, want = this.pj.job.fence;
           fin = Math.abs(fin - want) < 0.5 ? want : Math.round(fin * 4) / 4;
           set.fence = clamp(fin * this.pj.S, TBL.fMin, TBL.fMax);
-          if (this.pjFenceOk()) { this.fenceLocked = true; this.lockTag = 1.8; Sound.click(); }
+          if (this.pjFenceOk()) { this.fenceLocked = true; this.lockTag = 1.8; }
           this.pjFenceMoved = true;
           return;
         }
@@ -4066,7 +3959,7 @@
         var deg = this.theta * 180 / Math.PI, best = 0;
         TBL.gauges.forEach(function (gd) { if (Math.abs(gd - deg) < Math.abs(best - deg)) best = gd; });
         set.gauge = best; this.turning = false; this.angleTag = 2.2;
-        Sound.click(); saveApp();
+        saveApp();
         return;
       }
       // a flick keeps the board going through the cut
@@ -4129,7 +4022,7 @@
             this.pjMissed = true; this.pj.misses++;
             pjSay("Slide the fence to " + ToyboxProjects.fmt(this.pj.job.fence) + "!", 3500);
             // the third try: the fence slides itself to the width
-            if (this.pj.misses > 2) { set.fence = this.pj.job.fence * this.pj.S; this.pjFenceMoved = true; this.fenceLocked = true; this.lockTag = 1.8; Sound.click(); }
+            if (this.pj.misses > 2) { set.fence = this.pj.job.fence * this.pj.S; this.pjFenceMoved = true; this.fenceLocked = true; this.lockTag = 1.8; }
           }
         } else if (gap > free) {
           // in the wood: the blade sets the pace; a stopped blade stops the board
@@ -4156,7 +4049,6 @@
         if (this.y0 > this.endY()) this.finishPass();
       }
       this.cutting = cutting;
-      Sound.setMotor(this.speed, cutting ? 1 : 0, 0.95);
       void self;
     },
     // Project rip: the fence is within a quarter inch of the step's width.
@@ -4676,7 +4568,7 @@
         b.bx += (b.target - b.bx) * Math.min(1, dt * 6);
         if (Math.abs(b.bx - b.target) < 0.3) {
           b.bx = b.target; b.glide = false;
-          if (!b.snapped) { b.snapped = true; Sound.click(); }
+          if (!b.snapped) { b.snapped = true; }
         }
       }
       if (b.next > 0) { b.next -= dt; if (b.next <= 0) this.pjNextPiece(); }
@@ -4854,7 +4746,6 @@
         else if (mv < -8) best = best > 0 ? 0 : -45;
         this.tid = null; this.turning = false; this.angleTag = 2.2;
         if (best !== this.set.angle) { this.set.angle = best; saveApp(); }
-        Sound.click();
         return;
       }
       if (pt.id !== this.pid) return; this.pid = null; this.held = false;
@@ -4902,7 +4793,6 @@
         }
       }
       this.cutting = cutting;
-      Sound.setMotor(this.speed, cutting ? 1 : 0, 1.1);
     },
     alphaAtTop: function () {
       // arm angle where the blade just touches the top of the board
@@ -5279,7 +5169,6 @@
       if (this.cut && this.alpha > MITER.up - 0.05) { this.cut = false; this.endA = Math.tan(this.theta * Math.PI / 180); this.endB = this.lens[0]; this.shift = this.lens[0]; }
       if (this.off) { this.off.t += dt; if (this.off.t > 1.2) this.off = null; }
       this.cutting = cutting;
-      Sound.setMotor(this.speed, cutting ? 1 : 0, 1.1);
     },
     alphaAtTop: function () {
       // arm angle where the blade just touches the top of the board
@@ -5578,7 +5467,6 @@
       app.pieces++; saveApp();
       this.bump = 1;
       this.pop = { l1: f.l1, l2: f.l2, t: 3 };
-      Sound.clack();
     },
     drawBack: function (g) {
       rrect(g, this.x, this.y, this.w, this.h, 8);
@@ -5633,7 +5521,6 @@
         if (f.t > 0.75 || f.y + Math.min(f.spr.h, f.spr.w) * 0.4 > floorY) {
           f.phase = "fly"; f.t = 0; f.x0 = f.x; f.y0 = f.y; f.r0 = f.rot;
           f.s1 = Math.min(1, bin.w * 0.55 / Math.max(f.spr.w, f.spr.h));
-          if (f.y > floorY - 10) Sound.clack();
         }
       } else {
         var u = clamp(f.t / 0.6, 0, 1), e = ease(u);
@@ -5734,7 +5621,6 @@
       pjCoach.clear();
       $("pjDone").hidden = false;
       if (scene && scene.pid != null) scene.up({ id: scene.pid, x: 0, y: 0 });
-      Sound.clack();
     }, delayMs || 0);
   }
   // The Cut visit cuts several parts from one board (job.cuts, in order); other crosscut jobs have one line.
@@ -5898,7 +5784,7 @@
     sc.offTries = (sc.offTries || 0) + 1;
     if (sc.offTries >= 2) {
       sc.offTries = 0; sc.needOn = 0;
-      if (sc.setOn) sc.setOn(true); else { sc.on = true; Sound.click(); }
+      if (sc.setOn) sc.setOn(true); else { sc.on = true; }
     }
   }
   var SCENES = { end: End, curve: Curve, band: Machine, scroll: Machine, table: Table, miter: Miter, miterSide: MiterSide };
@@ -5907,7 +5793,6 @@
     if (!SAW[id]) id = "ryoba";
     var s = SAW[id];
     if (scene && scene.leave) scene.leave();
-    Sound.quiet();
     curSaw = s;
     app.saw = id;
     if (app.group !== s.group) { app.group = s.group; buildRack(); }
@@ -6094,14 +5979,12 @@
   $("racktabs").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b || b.dataset.act !== "new" || endingNow()) return;
-    Sound.unlock(); Sound.click();
     scene.newWork(false);
   });
   $("ctrlbar").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b || endingNow()) return;
     var s = curSaw, set = sawSettings(s.id), act = b.dataset.act, v = b.dataset.v, list, i;
-    Sound.unlock(); Sound.click();
     if (act === "new") { scene.newWork(false); return; }
     if (act === "view" && s.scene === "end") { set.view = set.view === "side" ? "op" : "side"; if (scene.setView) scene.setView(); changed(); return; }
     if (act === "mat") {
@@ -6136,7 +6019,6 @@
   }
   canvas.addEventListener("pointerdown", function (e) {
     e.preventDefault();
-    Sound.unlock();
     crect = canvas.getBoundingClientRect();
     if (endingNow() || !scene) return;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -6160,7 +6042,6 @@
   canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
-  document.addEventListener("touchend", function () { Sound.unlock(); }, { passive: true });
 
   // ---------- Layout ----------
   function resize() {
@@ -6194,7 +6075,6 @@
     if (endingNow()) return;
     if (t.dataset.group) { app.group = t.dataset.group; saveApp(); buildRack(); return; }
     if (t.dataset.saw) {
-      Sound.unlock(); Sound.click();
       var sid = t.dataset.saw;
       if (curSaw && curSaw.id === sid) return;
       Toybox.beforeLeave(function () { selectSaw(sid); });
@@ -6242,7 +6122,6 @@
     if (hungAt) return;
     hungAt = performance.now();
     awayOn = true;
-    Sound.quiet();
   }
   function endingFrame() {
     if (!endingDone) return;
@@ -6261,7 +6140,7 @@
     c.setAttribute("aria-hidden", "true");
     return c;
   }
-  function onRest() { endingDone = null; away = 1; Sound.quiet(); drawRestArt(); }
+  function onRest() { endingDone = null; away = 1; drawRestArt(); }
   function onWake() { endingDone = null; hungAt = 0; awayOn = false; away = 0; }
 
   function drawRestArt() {
@@ -6293,7 +6172,6 @@
   }
 
 
-  document.addEventListener("visibilitychange", function () { if (document.hidden) Sound.quiet(); });
 
   // ===================================================================
   // Start up
@@ -6329,8 +6207,6 @@
   buildRack();
   resize();
   selectSaw(app.saw, true);
-  // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-saw",
     timerIntro: "When time is up, the saws stop and go back on the rack, and the bench locks.",
@@ -6341,13 +6217,11 @@
     restLine: "The workshop is resting.",
     restLine2: "The saws are back on the rack.",
     restArt: restCanvas,
-    soundNote: "Soft saw and motor sounds. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: hangUp,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) { Sound.unlock(); Sound.clack(); } else Sound.quiet(); },
     onTimer: function (info) { TI = info; }
   });
   Toybox.offFirst({
@@ -6357,12 +6231,10 @@
       if (scene && (scene === Table || scene === Machine)) {
         scene.on = false;
         scene.needOn = 0;
-        Sound.click();
       }
       var t0 = performance.now();
       (function waitOff() {
         if (!scene || !(scene === Table || scene === Machine) || scene.speed <= 0.08 || performance.now() - t0 > 900) {
-          Sound.quiet();
           done();
         } else {
           requestAnimationFrame(waitOff);

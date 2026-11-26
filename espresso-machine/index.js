@@ -19,7 +19,6 @@
 //   - Milk jug, syrups, carton, cocoa shaker
 //   - Knock box and tray
 //   - Particles
-//   - Sound (only when the shared sound is on; soft)
 //   - Coach line, counter, progress pictures, panel
 //   - The machine
 //   - Steps
@@ -1043,69 +1042,6 @@
   }
   function puff(x, y, r) { addPart({ k: "puff", x: x + rand(-0.2, 0.2), y: y, vx: rand(-0.25, 0.25), vy: rand(-0.9, -0.5), life: 0, max: rand(1.2, 1.9), r: r || rand(0.2, 0.35) }); }
 
-  // ---------- Sound (only when the shared sound is on; soft) ----------
-  function A() { return Toybox.sound.ready(); }
-  var nbuf = null;
-  function noiseBuf(a) {
-    if (!nbuf || nbuf.sampleRate !== a.sampleRate) {
-      nbuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      var d = nbuf.getChannelData(0);
-      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    return nbuf;
-  }
-  function blip(f, dur, vol, type, f2) {
-    var a = A(); if (!a) return;
-    var t = a.currentTime, o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function burst(dur, vol, type, freq, qv) {
-    var a = A(); if (!a) return;
-    var t = a.currentTime, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf(a); f.type = type; f.frequency.value = freq; f.Q.value = qv || 1;
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
-  }
-  function beep() { blip(1900, 0.11, 0.025); }
-  function click() { blip(1100, 0.05, 0.035, "triangle", 500); }
-  function clunk() { blip(160, 0.25, 0.1, "sine", 55); burst(0.08, 0.04, "lowpass", 900); }
-  function thunk() { blip(110, 0.35, 0.14, "sine", 40); burst(0.15, 0.06, "lowpass", 500); }
-  function rattle() { for (var i = 0; i < 5; i++) setTimeout(function () { burst(0.04, 0.025, "bandpass", 2500 + Math.random() * 1500, 3); }, i * 60 + Math.random() * 30); }
-  function chime() { blip(784, 0.5, 0.035); setTimeout(function () { blip(1047, 0.6, 0.035); }, 150); }
-  var loops = {};
-  function startLoop(name) {
-    var a = A(); if (!a) return null;
-    var t = a.currentTime, out = a.createGain(), nodes = [], vol = 0.04;
-    out.gain.setValueAtTime(0.0001, t); out.connect(a.destination);
-    if (name !== "pump") {
-      var s = a.createBufferSource(); s.buffer = noiseBuf(a); s.loop = true;
-      var f = a.createBiquadFilter();
-      if (name === "grind") { f.type = "bandpass"; f.frequency.value = 650; f.Q.value = 0.8; vol = 0.05; }
-      else if (name === "steam") { f.type = "highpass"; f.frequency.value = 2600; vol = 0.025; }
-      else { f.type = "lowpass"; f.frequency.value = 700; vol = 0.02; }
-      s.connect(f); f.connect(out); s.start(); nodes.push(s);
-    }
-    if (name === "grind" || name === "pump") {
-      var o = a.createOscillator(); o.type = name === "grind" ? "sawtooth" : "triangle"; o.frequency.value = name === "grind" ? 95 : 64;
-      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 300;
-      var og = a.createGain(); og.gain.value = name === "grind" ? 0.4 : 1;
-      o.connect(lp); lp.connect(og); og.connect(out); o.start(); nodes.push(o);
-    }
-    out.gain.exponentialRampToValueAtTime(vol, t + 0.2);
-    return function () {
-      var t2 = a.currentTime;
-      try { out.gain.cancelScheduledValues(t2); out.gain.setValueAtTime(Math.max(0.0001, out.gain.value), t2); out.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.25); } catch (e) { /* ignore */ }
-      nodes.forEach(function (n) { try { n.stop(t2 + 0.3); } catch (e) { /* ignore */ } });
-    };
-  }
-  function setLoop(name, on) {
-    if (on) { if (!loops[name]) { var st = startLoop(name); if (st) loops[name] = st; } }
-    else if (loops[name]) { loops[name](); delete loops[name]; }
-  }
-  function stopLoops() { Object.keys(loops).forEach(function (k) { setLoop(k, false); }); }
-
   // ---------- Coach line, counter, progress pictures, panel ----------
   var coachEl = $("coach"), coachText = "", say = { text: "", until: 0 };
   function sayNow(t, secs) { say.text = t; say.until = now() + (secs || 3); }
@@ -1223,7 +1159,7 @@
   function powerOn() {
     if (M.on) return;
     M.on = true; S.on = true; M.heat = 0; M.offTries = 0; M.press = now() + 0.2; S.flushed = false;
-    click(); save();
+    save();
   }
   function powerOff(quiet) {
     if (!M.on) return;
@@ -1231,7 +1167,6 @@
     if (M.pump && M.pump.k !== "flush") M.pump = null;
     if (SH.ph === "soak" || SH.ph === "pour") finishShot();
     if (STM) finishSteam();
-    if (!quiet) click();
     save();
   }
   // Two-step machines: pressing while off asks him to switch the machine on; the second time it switches on for him.
@@ -1282,13 +1217,12 @@
     weigh: function () {
       WG.g = 0; WG.done = false; WG.right = false; scale.ok = 0;
       move(dcup, XSW, function () { return scale.y - SCALE_H; }, 700, 1.0);
-      call(function () { beep(); });
     },
     whisk: function () { whiskReset(); },
     tamp: function () {
       tamper.press = 0;
       move(tamper, function () { return pf.x; }, function () { return pf.y - 0.06; }, 750, 1.4);
-      call(function () { tamper.at = "bed"; click(); });
+      call(function () { tamper.at = "bed"; });
     },
     shot: function () { resetShot(); scale.ok = 0; },
     pour: function () { cupToPourSpot(); },
@@ -1310,7 +1244,7 @@
     if (d === "steamer") { cup.x = POUR_X; cup.y = BASE; } else { cup.x = XGR; cup.y = DRIP; }
     cup.pop = 0;
     tw(400, function (e, k) { cup.pop = k; });
-    call(function () { cup.pop = 1; click(); });
+    call(function () { cup.pop = 1; });
     var list = seq(), i = 0;
     while (i < list.length && skipStep(list[i])) i++;
     enter(list[i]);
@@ -1329,7 +1263,7 @@
     });
   }
   function flushSeq() {
-    call(function () { M.pump = { k: "flush" }; click(); });
+    call(function () { M.pump = { k: "flush" }; });
     tw(600, function (e) { if (cup) cup.water = 0.42 * e; });
     call(function () { M.pump = null; });
     wait(100);
@@ -1342,17 +1276,16 @@
       for (var i = 0; i < 2; i++) addPart({ k: "drop", x: cup.x + lx, y: cup.y - C.h / 2 + ly, vx: rand(0.2, 0.6), vy: rand(0, 0.5), g: 9, life: 0, max: 1, floor: DRIP - 0.05, r: rand(0.04, 0.07) });
     });
     tw(300, function (e) { if (cup) { cup.rot = 1.75 * (1 - e); cup.y = DRIP - 0.5 * (1 - e); } });
-    call(function () { if (cup) { cup.water = 0; cup.rot = 0; cup.y = DRIP; } click(); S.flushed = true; save(); });
+    call(function () { if (cup) { cup.water = 0; cup.rot = 0; cup.y = DRIP; } S.flushed = true; save(); });
   }
   function pfToStand() {
     tw(300, function (e) { pf.twist = 1 - e; });
-    call(function () { clunk(); pf.at = "free"; spawn(function () { move(funnel, XST, STAND_RING - 1.1, 300); }); });
+    call(function () { pf.at = "free"; spawn(function () { move(funnel, XST, STAND_RING - 1.1, 300); }); });
     move(pf, XGR, GROUP_RIM + 0.7, 240);
     move(pf, XST, STAND_TOP, 800, 1.0);
     call(function () { pf.at = "stand"; pf.wet = 1; });
     tw(220, function (e) { pf.twist = STAND_TWIST * e; });
     move(funnel, XST, STAND_TOP, 260);
-    call(function () { click(); });
   }
 
   // Weigh: scoops of beans into the dosing cup on the scale. Close to 18.0 lands on 18.0; over hops back.
@@ -1363,7 +1296,6 @@
     move(scoop, d.x, d.y, 220);
     tw(340, function (e) { scoop.rot = -2.0 * e; });
     call(function () {
-      rattle();
       for (var i = 0; i < 9; i++) addPart({ k: "bean", x: scoop.x - 0.2 + rand(-0.15, 0.15), y: scoop.y + rand(-0.1, 0.1), vx: rand(-0.3, 0.4), vy: rand(0, 1), g: 12, life: 0, max: 2, floor: scale.y - SCALE_H - DC_H + 0.05, rot: rand(0, 3), vr: rand(-6, 6), col: i % 2 ? "#6A3D20" : "#56301A" });
       scoop.load = 0;
     });
@@ -1382,7 +1314,6 @@
       wait(700);
       call(function () {
         for (var i = 0; i < 4; i++) addPart({ k: "bean", x: scale.x + rand(-0.2, 0.2), y: scale.y - SCALE_H - DC_H, vx: (XB - scale.x) * rand(0.75, 0.9), vy: -4.2 - rand(0, 0.4), g: 6.5, life: 0, max: 1.1, rot: 0, vr: 8, col: "#6A3D20" });
-        rattle();
       });
       var g0 = ng;
       tw(900, function (e) { WG.g = lerp(g0, 18, e); });
@@ -1393,7 +1324,7 @@
   }
   function justRight() {
     if (WG.right) return;
-    WG.right = true; WG.done = true; scale.ok = 0.01; chime();
+    WG.right = true; WG.done = true; scale.ok = 0.01;
     sparkle(scale.x, scale.y - SCALE_H - DC_H - 0.3, 16);
     sayNow("Just right!", 3);
     wait(800);
@@ -1403,7 +1334,7 @@
     if (S.step !== "weigh" || WG.done) return;
     scoop.inBag = false;
     move(scoop, XB + 0.2, -4.6, 360, 0);
-    call(function () { scoop.load = 1; rattle(); });
+    call(function () { scoop.load = 1; });
     dumpScoop(auto);
   }
   function goWeigh() {
@@ -1416,7 +1347,6 @@
   function pourBeans() {
     move(dcup, XG - 0.75, -10.5, 600, 0.3);
     tw(340, function (e) { dcup.rot = 1.9 * e; });
-    call(function () { rattle(); });
     tw(750, function (e) {
       dcup.beans = 1 - e; hopper.beans = 0.35 * e;
       if (Math.random() < 0.6) { var lp = dcupLip(); addPart({ k: "bean", x: lp.x + rand(-0.1, 0.1), y: lp.y, vx: rand(-0.3, 0.3), vy: 1, g: 10, life: 0, max: 2, floor: -6.2 - 0.8 * hopper.beans, rot: rand(0, 3), vr: rand(-6, 6), col: "#6A3D20" }); }
@@ -1424,7 +1354,6 @@
     call(function () { WG.g = 0; scale.ok = 0; });
     tw(280, function (e) { dcup.rot = 1.9 * (1 - e); });
     move(dcup, XG, GRB, 800, 0.6);
-    call(function () { click(); });
     call(adv());
   }
   function startGrind(byHand) {
@@ -1432,7 +1361,6 @@
     if (byHand) learned("grind");
     G = { t: 0, dur: 2.8 * PACE };
     cuParts.length = 0;
-    click();
   }
   // Tip the grounds into the funnel.
   function pourGrounds() {
@@ -1531,19 +1459,19 @@
     if (WH.done || S.step !== "whisk") return;
     WH.done = true; WH.auto = false; pf.fluff = 1;
     for (var i = 0; i < WH.cells.length; i++) WH.cells[i] = Math.max(1, WH.cells[i]);
-    paintAll(); chime(); sayNow("Fluffy!", 2.8); WH.spark = now();
+    paintAll(); sayNow("Fluffy!", 2.8); WH.spark = now();
     wait(850);
     call(function () { WH.leave = true; });
     wait(420);
     // The funnel comes off by itself.
     call(function () { funnel.at = "free"; });
     move(funnel, XFP, BASE, 750, 0.9);
-    call(function () { funnel.at = "park"; click(); });
+    call(function () { funnel.at = "park"; });
     call(adv());
   }
   function tampDone(force) {
     if (S.step !== "tamp" || (busy() && !force)) return;
-    tamper.press = 1; pf.tamped = 1; clunk(); sparkle(pf.x, pf.y - 0.3, 10);
+    tamper.press = 1; pf.tamped = 1; sparkle(pf.x, pf.y - 0.3, 10);
     sayNow("Flat and firm!", 3);
     wait(400);
     call(function () { tamper.at = "free"; tamper.y = pf.y - 0.06 + 0.2; });
@@ -1568,7 +1496,7 @@
     move(pf, XGR, GROUP_RIM, 240);
     tw(420, function (e) { pf.twist = e; });
     call(function () {
-      pf.at = "group"; clunk(); sayNow("Locked in!", 2.5);
+      pf.at = "group"; sayNow("Locked in!", 2.5);
       if (funnel.at === "park") spawn(function () { call(function () { funnel.at = "free"; }); move(funnel, XST, STAND_RING, 800, 0.8); call(function () { funnel.at = "stand"; }); });
     });
     if (isCoffee() && cup) {
@@ -1576,7 +1504,7 @@
       tw(360, function (e) { cup.y = cy - 0.95 * e; });
       move(scale, XGR, DRIP, 1200, 0.2);
       tw(360, function (e) { cup.y = lerp(cy - 0.95, DRIP - SCALE_H, e); });
-      call(function () { beep(); SH.w = 0; });
+      call(function () { SH.w = 0; });
     }
     call(adv());
   }
@@ -1587,10 +1515,9 @@
     if (!needHot(function () { shotPress(false); SH.autoLet = 0.1; })) return;
     if (byHand) learned("shot");
     SH.ph = "soak"; SH.soakT = 0; SH.held = !!byHand; SH.letGo = false; SH.autoLet = byHand ? 0 : 3;
-    if (!SH.tOn || SH.disp > 3) { SH.disp = 0; beep(); }
+    if (!SH.tOn || SH.disp > 3) { SH.disp = 0; }
     SH.tOn = true;
     M.pump = { k: "soak" };
-    click();
   }
   function shotRelease() { if (SH.ph === "soak") SH.letGo = true; SH.held = false; }
   function startPouring() {
@@ -1604,7 +1531,7 @@
     SH.ph = "done"; SH.tOn = false; SH.held = false; M.pump = null;
     if (SH.disp < 25) SH.disp = 28.2;
     if (!(SH.finalW > 30)) SH.finalW = 35.4;
-    SH.w = SH.finalW; scale.ok = 0.01; chime(); sparkle(scale.x + 0.4, scale.y - SCALE_H - 1.5, 10);
+    SH.w = SH.finalW; scale.ok = 0.01; sparkle(scale.x + 0.4, scale.y - SCALE_H - 1.5, 10);
     if (cup) cup.esp = Math.min(1, SH.w / 36);
     wait(950);
     call(function () { if (S.step === "shot") nextStep(); });
@@ -1622,7 +1549,7 @@
     move(carton, tg.x, tg.y, 600, 0.4, th);
     call(function () { carton.pouring = 1; carton.up = true; });
     tw(1100, function (e) { jug.milk = 0.55 * e; carton.up = true; });
-    call(function () { carton.pouring = 0; jug.milk = 0.55; chime(); sayNow("Just right!", 2.5); sparkle(JUG_HX, MT - JUG_H - 0.5, 10); });
+    call(function () { carton.pouring = 0; jug.milk = 0.55; sayNow("Just right!", 2.5); sparkle(JUG_HX, MT - JUG_H - 0.5, 10); });
     move(carton, CARTON_X, MT, 650, 0.4, 0);
     call(function () { carton.up = false; carton.rot = 0; });
     wait(250);
@@ -1632,7 +1559,7 @@
     if (S.step !== "jug" || busy()) return;
     jug.at = "free";
     move(jug, JUG_WX, DRIP, 950, 0.9);
-    call(function () { jug.at = "wand"; click(); });
+    call(function () { jug.at = "wand"; });
     call(adv());
   }
   function startSteam(mode, byHand) {
@@ -1642,7 +1569,6 @@
     if (byHand) learned("steam");
     STM = { t: 0, dur: 3.6 * PACE, mode: mode, target: CUPS[S.drink].foam, hand: 0 };
     M.pump = { k: "steam" };
-    click();
   }
   function finishSteam() {
     var tgt = CUPS[S.drink || "latte"].foam;
@@ -1661,7 +1587,7 @@
     call(function () { cx0 = cup.x; cy0 = cup.y; cup.up = true; });
     tw(850, function (e, k) { cup.x = lerp(cx0, POUR_X, e); cup.y = lerp(cy0, BASE, e) - 2.2 * Math.sin(Math.PI * k); });
     call(function () {
-      cup.up = false; click();
+      cup.up = false;
       if (isCoffee() && Math.abs(scale.x - XSW) > 0.1) spawn(function () { move(scale, XSW, BASE, 1500, 0.25); call(function () { scale.ok = 0; }); });
     });
   }
@@ -1684,12 +1610,12 @@
       if (cup.k === "cappuccino") cup.foam = clamp((k - 0.45) / 0.55, 0, 1);
       jug.milk = m0 * (1 - k * 0.9); jug.foam = f0 * (1 - k * 0.8);
     });
-    call(function () { jug.pouring = 0; cup.artP = 1; cup.milk = 1; chime(); sparkle(cup.x, cup.y - CUPS[cup.k].h - 0.3, 12); });
+    call(function () { jug.pouring = 0; cup.artP = 1; cup.milk = 1; sparkle(cup.x, cup.y - CUPS[cup.k].h - 0.3, 12); });
     move(jug, pp.x + 0.3, pp.y - 0.3, 400, 0, 0);
     if (S.cocoa) sprinkle();
     call(function () { jug.at = "free"; });
     move(jug, JUG_HX, MT, 800, 0.8, 0);
-    call(function () { jug.at = "top"; jug.milk = 0; jug.foam = 0; jug.swirlA = 0; click(); });
+    call(function () { jug.at = "top"; jug.milk = 0; jug.foam = 0; jug.swirlA = 0; });
     call(adv());
   }
   function sprinkle() {
@@ -1722,7 +1648,7 @@
     call(function () {
       rec.x = cup.x; tray.push(rec); cup = null;
       S.count++; save();
-      clunk(); chime(); sparkle(rec.x, TRAY_Y - 1.6, 16);
+      sparkle(rec.x, TRAY_Y - 1.6, 16);
       Toybox.kind();
     });
     wait(400);
@@ -1731,13 +1657,12 @@
   // Clean up, by itself: the portafilter bangs on the knock box bar and the puck drops in; then a rinse.
   function knockPos() { return { x: XK - 0.1, y: -3.0 }; }
   function knockSeq() {
-    if (pf.at === "group") { tw(380, function (e) { pf.twist = 1 - e; }); call(function () { pf.at = "free"; click(); }); move(pf, XGR, GROUP_RIM + 0.6, 280); }
+    if (pf.at === "group") { tw(380, function (e) { pf.twist = 1 - e; }); call(function () { pf.at = "free"; }); move(pf, XGR, GROUP_RIM + 0.6, 280); }
     var kp = knockPos();
     call(function () { pf.at = "free"; });
     move(pf, kp.x, kp.y, 750, 0.8, 2.6);
     move(pf, kp.x, kp.y + 0.55, 160);
     call(function () {
-      thunk();
       pf.spent = false; pf.grounds = 0; pf.tamped = 0; pf.fluff = 0; pf.wet = 0.6;
       puckFall = { x: kp.x - 0.05, y: kp.y + 0.55 - 0.1, vy: 0 };
       S.pucks++; save();
@@ -1751,9 +1676,9 @@
     move(pf, XGR, GROUP_RIM + 0.45, 750, 0.6, 0);
     move(pf, XGR, GROUP_RIM, 240);
     tw(380, function (e) { pf.twist = e; });
-    call(function () { pf.at = "group"; clunk(); if (M.on) M.pump = { k: "rinse" }; });
+    call(function () { pf.at = "group"; if (M.on) M.pump = { k: "rinse" }; });
     wait(M.on ? 900 : 200);
-    call(function () { M.pump = null; pf.wet = 0; sayNow("All clean!", 3); chime(); });
+    call(function () { M.pump = null; pf.wet = 0; sayNow("All clean!", 3); });
     wait(300);
     call(adv());
   }
@@ -1772,7 +1697,6 @@
       move(b, function () { return target().x; }, function () { return target().y; }, 800, 1.2, 0);
       tw(260, function (e) { b.pump = e; });
       call(function () {
-        click();
         for (var i = 0; i < 5; i++) addPart({ k: "drop", x: b.x - 0.55 + rand(-0.03, 0.03), y: b.y - 1.9, vx: rand(-0.1, 0.1), vy: rand(0.5, 1), g: 8, life: 0, max: 1, floor: cup ? cupSurface(cup).y : 0, r: 0.06, col: b.liq });
       });
       tw(260, function (e) { b.pump = 1 - e; });
@@ -1819,7 +1743,7 @@
   }
   function surprise() {
     if (Toybox.timer.locked()) return;
-    if (SM) { var w = SM.where === "hopper" ? { x: XG, y: -8.2 } : { x: XB, y: -5.4 }; sparkle(w.x, w.y, 6); click(); return; }
+    if (SM) { var w = SM.where === "hopper" ? { x: XG, y: -8.2 } : { x: XB, y: -5.4 }; sparkle(w.x, w.y, 6); return; }
     for (var pass = 0; pass < 2; pass++) {
       for (var i = 0; i < MOMENTS.length; i++) {
         var k = MOMENTS[(momentAt + i) % MOMENTS.length];
@@ -1831,7 +1755,7 @@
     }
     // nothing fits right now (a close-up is showing): a little sparkle
     var c = cup ? { x: cup.x, y: cup.y - 1.4 } : { x: cam.cx, y: cam.cy };
-    sparkle(c.x, c.y, 8); click();
+    sparkle(c.x, c.y, 8);
   }
   function startMoment(k) {
     var t = now();
@@ -1844,7 +1768,7 @@
       if (cup.artP >= 1) {
         // already poured: the new picture forms in the cup
         cup.artP = 0;
-        spawn(function () { tw(reduce ? 300 : 1500, function (e) { if (cup) cup.artP = e; }); call(function () { if (cup) { cup.artP = 1; sparkle(cup.x, cup.y - C.h - 0.2, 12); chime(); } }); });
+        spawn(function () { tw(reduce ? 300 : 1500, function (e) { if (cup) cup.artP = e; }); call(function () { if (cup) { cup.artP = 1; sparkle(cup.x, cup.y - C.h - 0.2, 12); } }); });
       }
       sparkle(cup.x, cup.y - C.h - 0.2, 10);
       Toybox.toast(S.drink === "steamer" ? "A surprise in the milk!" : "Surprise art on top!");
@@ -1874,7 +1798,7 @@
       if (ts < t0 + 0.6) {
         var u = sm01((ts - t0) / 0.6);
         x = hx + (dx - hx) * u; y = hy + (dy - hy) * u - Math.sin(u * Math.PI) * 0.7; rot = u * TAU * (i % 2 ? 1 : -1);
-        if (ts - t0 < 0.05 && !SM.hops["o" + i]) { SM.hops["o" + i] = 1; blip(560 + i * 70, 0.08, 0.03, "sine", 760 + i * 70); }
+        if (ts - t0 < 0.05 && !SM.hops["o" + i]) { SM.hops["o" + i] = 1; }
       } else if (ts < t1) {
         var td = ts - t0 - 0.6, amp = reduce ? 0.12 : 0.42;
         x = dx + Math.sin(td * 2.6 + i) * 0.08;
@@ -1886,7 +1810,7 @@
         var v = sm01((ts - t1) / 0.6);
         x = dx + (hx - dx) * v; y = dy + (hy - dy) * v - Math.sin(v * Math.PI) * 0.6; rot = v * TAU * (i % 2 ? -1 : 1);
         al = 1 - Math.max(0, (v - 0.75) / 0.25);
-        if (!SM.hops["b" + i]) { SM.hops["b" + i] = 1; blip(760 - i * 60, 0.08, 0.03, "sine", 520 - i * 40); }
+        if (!SM.hops["b" + i]) { SM.hops["b" + i] = 1; }
       } else continue;
       ctx.save(); ctx.globalAlpha = al;
       // a soft shadow under the dancers
@@ -2240,7 +2164,7 @@
       else if (S.step !== "power" && S.step !== "ready" && !M.pump && !G && !STM && !busy()) powerOff();
     } },
     scoop: {
-      down: function (d, w) { scoop.inBag = false; scoop.up = true; scoop.load = 1; scoop.x = w.x; scoop.y = w.y; scoop.rot = 0; rattle(); },
+      down: function (d, w) { scoop.inBag = false; scoop.up = true; scoop.load = 1; scoop.x = w.x; scoop.y = w.y; scoop.rot = 0; },
       move: function (d, w) {
         if (d.done) return;
         scoop.x = w.x; scoop.y = w.y - 0.2;
@@ -2254,7 +2178,7 @@
         call(function () { scoop.inBag = true; scoop.load = 0; });
       }
     },
-    timerBtn: { up: function () { if (!SH.tOn) { SH.tOn = true; SH.disp = 0; beep(); } } },
+    timerBtn: { up: function () { if (!SH.tOn) { SH.tOn = true; SH.disp = 0; } } },
     shot: { down: function () { shotPress(true); }, up: function () { shotRelease(); } },
     grind: { down: function () { startGrind(true); } },
     milkBtn: { down: function () { startSteam("auto", true); } },
@@ -2361,7 +2285,7 @@
     else if (st === "pour") pourSeq();
     updPanel();
   });
-  $("newBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) { newDrink(); click(); } });
+  $("newBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) { newDrink(); } });
   $("surpriseBtn").addEventListener("click", function () { if (!Toybox.timer.locked()) surprise(); });
 
   // ---------- Every frame ----------
@@ -2374,7 +2298,7 @@
       M.heat = Math.min(1, M.heat + dt / (HEAT_S * PACE));
       M.purging = M.heat > 0.3 && M.heat < 0.75;
       if (M.purging && Math.random() < dt * 16) puff(WTIP.x + rand(-0.1, 0.25), WTIP.y + 0.15, rand(0.15, 0.32));
-      if (M.heat >= 1) { beep(); M.purging = false; }
+      if (M.heat >= 1) { M.purging = false; }
     } else M.purging = false;
     if (M.pending && M.on && M.heat >= 1 && !busy()) { var fn = M.pending; M.pending = null; fn(); }
     if (S.step === "power" && M.on && !busy()) nextStep();
@@ -2382,7 +2306,7 @@
     if (G) {
       G.t += dt; var gf = clamp(G.t / G.dur, 0, 1);
       hopper.beans = 0.35 * (1 - gf); dcup.grounds = gf;
-      if (gf >= 1) { G = null; CU.gUntil = now() + 0.7; click(); wait(650); call(function () { if (S.step === "grind") nextStep(); }); }
+      if (gf >= 1) { G = null; CU.gUntil = now() + 0.7; wait(650); call(function () { if (S.step === "grind") nextStep(); }); }
     }
     // Whisking by itself (hold still, or Do it!): a spiral over the whole bed.
     if (S.step === "whisk" && !WH.done) {
@@ -2441,11 +2365,6 @@
     CU.a = clamp(CU.a + (ct ? 1 : -1) * dt / 0.35, 0, 1);
     if (!ct && CU.a <= 0) CU.k = null;
     updCuParts(dt);
-    // Sounds.
-    setLoop("grind", !!G);
-    setLoop("pump", !!(M.pump && M.pump.k !== "steam"));
-    setLoop("steam", !!STM || M.purging);
-    setLoop("pour", !!jug.pouring || !!carton.pouring);
     // Camera.
     if (SM && now() - SM.t0 > SM.dur) { SM = null; camHold = null; }
     var tg = fit(camHold || region()), kk = 1 - Math.exp(-dt * (reduce ? 20 : 2.8));
@@ -2544,7 +2463,6 @@
     if (STM) { STM = null; jug.foam = CUPS[S.drink || "latte"].foam; }
     M.pump = null; M.pending = null;
     jug.pouring = 0; carton.pouring = 0;
-    stopLoops();
     canon();
     setTimeout(function () { powerOff(true); }, 900);
     setTimeout(function () { ending = false; done(); }, 2200);
@@ -2610,11 +2528,8 @@
     restLine: "The espresso machine is resting.",
     restLine2: "The drinks will be on the tray next time.",
     restArt: restArt,
-    soundNote: "Soft grinder whirrs, pump hums, steam hisses and clunks. Hold for 2 seconds.",
     onEnding: onEnding,
-    onRest: function () { stopLoops(); },
-    onWake: function () { last = now(); },
-    onSound: function (on) { if (on) chime(); else stopLoops(); }
+    onWake: function () { last = now(); }
   });
   Toybox.offFirst({
     running: function () { return M.on; },

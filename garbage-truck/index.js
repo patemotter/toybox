@@ -18,7 +18,6 @@
   // Sections:
   //   Setup and saved state
   //   The world and the projection
-  //   Sound
   //   Drawing helpers
   //   Backdrop: street, road, landfill
   //   Bins and trash
@@ -132,45 +131,6 @@
     const a = -ul.ta * 1.75, hx = BODY0 + 0.02, hz = ROOF + 0.02, dx = x - hx, dz = z - hz;
     return bodyPt(hx + dx * Math.cos(a) - dz * Math.sin(a), hz + dx * Math.sin(a) + dz * Math.cos(a));
   }
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, type, freq, gain, delay, q) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = type; f.frequency.value = freq; f.Q.value = q || 0.8;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.05, dur / 3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  const snd = {
-    clunk() { tone(120, 60, 0.18, "sine", 0.22); noise(0.05, "highpass", 2500, 0.04); },
-    whine() { noise(0.7, "bandpass", 650, 0.025, 0, 5); },
-    tumble() { for (let i = 0; i < 4; i++) noise(0.12, "lowpass", 380 + i * 90, 0.1, 0.12 + i * 0.13); },
-    groan() { noise(1.5, "lowpass", 230, 0.07); tone(72, 56, 1.5, "triangle", 0.05); },
-    crunch() { for (let i = 0; i < 5; i++) noise(0.05, "bandpass", 1700, 0.05, i * 0.06, 2); },
-    pssh() { noise(0.35, "highpass", 3200, 0.04); },
-    beep() { tone(900, 900, 0.2, "sine", 0.05); },
-    horn() { [0, 0.35].forEach((d) => { tone(330, 330, 0.25, "triangle", 0.07, d); tone(392, 392, 0.25, "triangle", 0.05, d); }); },
-    gull() { tone(1400, 900, 0.18, "sine", 0.04); tone(1500, 1000, 0.16, "sine", 0.03, 0.22); },
-    thud() { tone(90, 45, 0.3, "sine", 0.22); noise(0.3, "lowpass", 300, 0.1); },
-    tick() { tone(700, 500, 0.06, "triangle", 0.05); },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); }
-  };
 
   // =====================================================================================================
   // Drawing helpers (metres, in the world() frame)
@@ -634,7 +594,6 @@
   }
   function spookGulls(roof) {
     gulls.forEach((g, i) => { g.st = "fly"; g.t = 0; g.ang = i * TAU / gulls.length; g.roof = !!roof; });
-    snd.gull();
   }
   function updateGulls(dt) {
     const cx = U - 3;
@@ -667,7 +626,7 @@
     truck.pend = { tx: tx, vmax: vmax, arrive: arrive };
     if (Math.abs(arm.s) > 0.02) { arm.target = 0; arm.auto = true; }
   }
-  function brake() { snd.pssh(); dust(truck.x + WHEELS[1], 0.2, -0.2, reduce ? 1 : 3); }
+  function brake() { dust(truck.x + WHEELS[1], 0.2, -0.2, reduce ? 1 : 3); }
   function goLandfill() {
     if (hopperCount() > 0 && pk.st === "idle") startPack(false);   // the last trash gets packed on the way
     ph = "go-lf";
@@ -704,7 +663,7 @@
       if (truck.arrive) { const f = truck.arrive; truck.arrive = null; f(); }
     } else { truck.wheel += nx - truck.x; truck.x = nx; }
     if (Math.abs(truck.v) > 0.05) active = 1.5;
-    if (ph === "back") { truck.beep -= dt; if (truck.beep <= 0) { truck.beep = 0.65; snd.beep(); } }
+    if (ph === "back") { truck.beep -= dt; if (truck.beep <= 0) { truck.beep = 0.65; } }
     truck.sink *= Math.pow(0.02, dt);
   }
 
@@ -716,20 +675,18 @@
   function grip(i) {
     arm.grip = i; arm.lifted = false; arm.wasFull = bins[i].full; arm.saidEmpty = false;
     bins[i].held = true; bins[i].askew = 0; bins[i].peek = 0;
-    snd.clunk();
     if (rac && rac.i === i && rac.t < 3) rac.t = 3;   // the raccoon hops out before the bin goes up
   }
   function release() {
     const b = bins[arm.grip];
     b.held = false; b.askew = (Math.random() - 0.5) * 0.16; b.wob = 1; b.lid = 0;
-    arm.grip = -1; arm.glide = 0.5; arm.auto = false; arm.noGrip = true; snd.tick();
+    arm.grip = -1; arm.glide = 0.5; arm.auto = false; arm.noGrip = true;
     if (allDone() && !streetDone) { streetDone = true; Toybox.kind(); }
     save();
   }
   function dumpBin() {
     const b = bins[arm.grip];
     b.full = false; arm.dumping = 0.9;
-    snd.tumble();
     const p = armPose(arm.s);
     for (let i = 0; i < PER_BIN; i++) {
       const it = newItem(-0.35 + (Math.random() - 0.5) * 0.4, p.z - 0.2 + i * 0.12, i);
@@ -758,7 +715,7 @@
         const i = binAtArm(0.4);
         if (i >= 0) grip(i);
         else if (arm.s <= -0.99 && !arm.snapped && !driving()) {
-          arm.snapped = true; arm.snap = 1; snd.tick();
+          arm.snapped = true; arm.snap = 1;
           coach.say("Drive the truck to the next bin.", 3);
           const n = nextFull(); if (n >= 0) sparkle(binWX(n), 0.8, CURB_E);
           if (!arm.held) arm.glide = 0.8;
@@ -793,13 +750,13 @@
   const bladeX = () => lerp(HOP1 - 0.14, HOP0 + 0.2, pk.p);
   function startPack(byHand) {
     if (pk.st === "push" || pk.st === "ret") return false;
-    pk.st = "push"; pk.byHand = !!byHand; snd.groan(); return true;
+    pk.st = "push"; pk.byHand = !!byHand; return true;
   }
   function transfer() {
     const n = items.length;
     items.length = 0;
     if (n > 0) {
-      fill = Math.min(1, fill + n / BODY_ITEMS); bulge = 1; truck.sink = -0.05; snd.crunch();
+      fill = Math.min(1, fill + n / BODY_ITEMS); bulge = 1; truck.sink = -0.05;
       for (let i = 0; i < (reduce ? 3 : 8); i++) addFx("crumb", truck.x + HOP0 + Math.random() * 0.4, 2.4 + Math.random() * 0.6, 0.6, (Math.random() - 0.5) * 2, 1 + Math.random(), 1.0, BAGS[i % BAGS.length], 0.07);
       if (fill >= 0.999 && !saidFull) { saidFull = true; coach.say("The truck is full.", 3); }
       else if (!saidPack) { saidPack = true; coach.say("The packer blade squashes the trash.", 3); }
@@ -833,7 +790,7 @@
     const r = bodyPt(BODY0 + 0.1, FLOOR + 0.6), n = reduce ? 4 : 8;
     for (let i = 0; i < n; i++) chunks.push({ x: truck.x + r[0] - Math.random() * 0.8, z: r[1] + Math.random() * 0.8, vx: -1.2 - Math.random() * 1.6, vz: Math.random() * 0.6, r: Math.random(), vr: (Math.random() - 0.5) * 3, w: 0.5 + Math.random() * 0.4, h: 0.35 + Math.random() * 0.25, amt: fill / n, life: -1 });
     fill = 0; ul.slide = 0; ul.sv = 0; ul.shake = 0.6; ul.lower = 1.0;
-    snd.thud(); spookGulls(false);
+    spookGulls(false);
     save();
   }
   function updateUnload(dt) {
@@ -884,12 +841,12 @@
   function twoStep() {
     if (ul.taT > 0.5) return true;
     ul.tries++;
-    if (ul.tries < 2) { ul.flash = 1.6; coach.say("Drag the tailgate up to open it.", 3); snd.tick(); return false; }
-    ul.taT = 1; snd.clunk(); return true;
+    if (ul.tries < 2) { ul.flash = 1.6; coach.say("Drag the tailgate up to open it.", 3); return false; }
+    ul.taT = 1; return true;
   }
   function gateTap() {
     if (ul.tt > 0.05) { hint(); return; }
-    ul.taT = ul.ta > 0.5 ? 0 : 1; snd.clunk();
+    ul.taT = ul.ta > 0.5 ? 0 : 1;
   }
 
   // ---------- Small moments ----------
@@ -971,7 +928,7 @@
   // Coach, ring and ghost hand
   // =====================================================================================================
   const coach = Toybox.coach($("coach"));
-  function tag(name, p) { Toybox.nametag(name, p.x, p.y - 20, 2200); snd.tick(); }
+  function tag(name, p) { Toybox.nametag(name, p.x, p.y - 20, 2200); }
   const LINES = {
     reach: "Drag the arm down to the bin.",
     lift: "Drag the arm up to lift the bin.",
@@ -1175,10 +1132,10 @@
         if (arm.grip >= 0) { if (arm.lifted && arm.target < -0.8) { arm.target = -1; arm.auto = true; } else if (bins[arm.grip].full && arm.target > 0.85) { arm.target = 1; arm.auto = true; } }
         else if (arm.target < -0.05) arm.glide = 1.2;
       } else if (d.k === "pack") {
-        if (pk.p > 0.5) { pk.st = "push"; pk.byHand = true; snd.groan(); learned("pack"); } else pk.st = "ret";
+        if (pk.p > 0.5) { pk.st = "push"; pk.byHand = true; learned("pack"); } else pk.st = "ret";
       } else if (d.k === "gate") {
         ul.held = "";
-        if (ul.taT > 0.5) { ul.taT = 1; learned("gate"); snd.clunk(); }
+        if (ul.taT > 0.5) { ul.taT = 1; learned("gate"); }
       } else if (d.k === "body") {
         ul.held = "";
         if (ul.ttT > 0.3) learned("tip");
@@ -1197,8 +1154,8 @@
     tap: (part) => {
       if (locked()) return;
       if (part && typeof part === "object") {
-        if (part.house) { const h = part.house, i = Math.floor(Math.random() * (h.two ? 4 : 2)); h.lit[i] = h.lit[i] ? 0 : 1; snd.tick(); return; }
-        if (part.tree) { part.tree.shake = 1; snd.tick(); return; }
+        if (part.house) { const h = part.house, i = Math.floor(Math.random() * (h.two ? 4 : 2)); h.lit[i] = h.lit[i] ? 0 : 1; return; }
+        if (part.tree) { part.tree.shake = 1; return; }
       }
       const wantK = cur ? cur.k : null;
       if (part === "arm") { if (ph === "street") { armTap(); if (cur) learned(cur.k); } else tag("Arm", vpx(truck.x, 2, -0.5)); return; }
@@ -1245,13 +1202,13 @@
       const vis = bins.map((b, i) => i).filter((i) => !bins[i].held && binWX(i) > xa && binWX(i) < xb);
       const pick = vis.filter((i) => !bins[i].full)[0];
       const i = pick !== undefined ? pick : vis[vis.length - 1];
-      if (i !== undefined && !rac) { rac = { i: i, t: 0 }; snd.tick(); return; }
+      if (i !== undefined && !rac) { rac = { i: i, t: 0 }; return; }
     }
     if (k === "pigeons" && !pigeons.length && Math.abs(truck.v) < 0.3 && ul.tt < 0.05) {
       for (let i = 0; i < 4; i++) pigeons.push({ hx: -4.8 + i * 1.0 + hash(i, spTurn) * 0.3, x: truck.x + 6 + i * 1.5, z: 9 + i, st: "in", t: 0, ph: i });
       return;
     }
-    truck.honk = 1.3; truck.wave = 2.6; snd.horn();
+    truck.honk = 1.3; truck.wave = 2.6;
     if (ph === "street") {
       const hs = houses(seg).filter((h) => Math.abs(segX() + h.x0 + h.w / 2 - 10 * KX - truck.x) < 9);
       if (hs.length) kid = { hs: hs[0], t: 3.5 };
@@ -1404,12 +1361,10 @@
     restLine: "The garbage truck is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft hydraulic, packer and horn sounds. Hold for 2 seconds.",
     onEnding: onEnding,
-    onGoodbye: () => { truck.honk = 1.3; truck.wave = 2.6; snd.horn(); },
+    onGoodbye: () => { truck.honk = 1.3; truck.wave = 2.6; },
     onRest: () => { ending = true; },
-    onWake: onWake,
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: onWake
   });
   requestAnimationFrame(loop);
 

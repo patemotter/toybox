@@ -321,7 +321,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     return "";
   }
   function eqText(r, c) { return r + " " + opSym() + " " + c + " = " + val(r, c); }
-  function sayEq(r, c) { say(r + (mode === "times" ? " times " : " plus ") + c + " is " + val(r, c)); }
 
   var eqEl = $("eq");
   function setEq(t, pop) {
@@ -398,8 +397,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       build.i++;
       build.next += build.iv;
       setEq(String(build.i), true);
-      note(build.i, 0.035);
-      if (build.plan.length <= 20 || build.i % 5 === 0) say(String(build.i));
     }
     if (build && build.i >= build.plan.length && t >= build.next + 0.25) {
       build = null;
@@ -407,8 +404,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       var cc = cellCenter(sel.r, sel.c);
       burst(cc.x, cc.y, 30, null);
       ring(cc.x, cc.y, cs * 2, "#FFC93C");
-      chime();
-      setTimeout(function () { sayEq(sel.r, sel.c); }, 350);
     }
   }
 
@@ -424,7 +419,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         t = clamp((now - b.t0) / 870, 0, 1);
         var e = easeOutBack(t);
         b.x = b.fx + (b.hx - b.fx) * e; b.y = b.fy + (b.hy - b.fy) * e; b.rot = b.fr * (1 - t);
-        if (t >= 1) { b.st = "home"; b.x = b.hx; b.y = b.hy; b.rot = 0; if (Math.random() < 0.15) note(b.n, 0.02); }
+        if (t >= 1) { b.st = "home"; b.x = b.hx; b.y = b.hy; b.rot = 0; }
       } else if (b.st === "settle") {
         t = clamp((now - b.t0) / 1100, 0, 1);
         var es = easeOutBounce(t);
@@ -586,14 +581,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     e.preventDefault();
     var h = hit(e.clientX, e.clientY, false);
     var rc = cv.getBoundingClientRect();
-    if (!h) { ring(e.clientX - rc.left, e.clientY - rc.top, 40, "#FFFFFF"); blip(); return; }
+    if (!h) { ring(e.clientX - rc.left, e.clientY - rc.top, 40, "#FFFFFF"); return; }
     var p = { start: h, cur: h, moved: false, slot: slotN++ };
     ptrs[e.pointerId] = p;
     ghost.learned();
     if (h.ri > 0 && h.ci > 0) {
       var cc = cellCenter(h.ri, h.ci);
       ring(cc.x, cc.y, cs, crossCols[p.slot % crossCols.length]);
-      note(val(h.ri, h.ci), 0.04);
       setEq(eqText(h.ri, h.ci), true);
     }
     try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -615,8 +609,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
     // Drag: a rectangle of blocks fills in from the corner to this square.
     sel = { r: h.ri, c: h.ci };
-    var added = fillBlocks(sel.r, sel.c, true);
-    if (added) note(val(sel.r, sel.c), 0.03);
+    fillBlocks(sel.r, sel.c, true);
     setEq(mode === "times" ? sel.r + (sel.r === 1 ? " row" : " rows") + " of " + sel.c + " = " + val(sel.r, sel.c) : eqText(sel.r, sel.c), false);
   });
   function endPtr(e) {
@@ -629,8 +622,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       selT = now - 1000;
       var cc = cellCenter(h.ri, h.ci);
       burst(cc.x, cc.y, 16, null);
-      chime();
-      sayEq(sel.r, sel.c);
       save();
       return;
     }
@@ -652,7 +643,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     burst(cc.x, cc.y, 18, null);
     ring(cc.x, cc.y, cs * 1.4, "#FFC93C");
     setEq(pat === "same" ? patText() : eqText(r, c), true);
-    sayEq(r, c);
     save();
   }
   function tapHeader(v, h) {
@@ -681,10 +671,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     Array.prototype.forEach.call(document.querySelectorAll("[data-size]"), function (b) { b.setAttribute("aria-pressed", String(Number(b.dataset.size) === n)); });
     restEq();
     save();
-    chime();
   }
   function setPat(p, force) {
-    if (pat === p && !force) { pat = ""; patT = now; updateButtons(); restEq(); save(); blip(); return; }
+    if (pat === p && !force) { pat = ""; patT = now; updateButtons(); restEq(); save(); return; }
     pat = p;
     if (p === "dbl" && mode !== "add") setMode("add");
     if (p === "sq" && mode !== "times") setMode("times");
@@ -694,11 +683,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     sel = null;
     updateButtons();
     setEq(patText(), true);
-    if (p === "mult") say("Multiples of " + multN);
-    else if (p === "same") say(waysCount() + " ways to make " + sameV);
-    else if (p === "dbl") say("Doubles");
-    else say("Squares");
-    chime();
     save();
   }
   // The block-counting button names the sum it will count (the tapped square, or 3 × 4).
@@ -723,7 +707,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       return;
     }
     if (ending || Toybox.timer.locked()) return;
-    if (t.dataset.mode) { setMode(t.dataset.mode); blip(); }
+    if (t.dataset.mode) { setMode(t.dataset.mode); }
     else if (t.dataset.size) { setSize(Number(t.dataset.size)); }
     else if (t.dataset.pat) { setPat(t.dataset.pat, false); }
     else if (t.dataset.step) {
@@ -731,67 +715,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       setPat("mult", true);
     }
     else if (t.id === "buildBtn") { startBuild(); }
-    else if (t.id === "clearBtn") { clearBlocks(true); sel = null; pat = ""; patT = now; updateButtons(); restEq(); save(); whoosh(); }
+    else if (t.id === "clearBtn") { clearBlocks(true); sel = null; pat = ""; patT = now; updateButtons(); restEq(); save(); }
   });
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
   document.addEventListener("touchmove", function (e) { if (!e.target.closest(".sheet")) e.preventDefault(); }, { passive: false });
-
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. Math Grid keeps its own master gain.
-  var master = null, masterCtx = null;
-  function out(ac) {
-    if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    var actx = Toybox.sound.ready();
-    if (!actx) return;
-    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(actx));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  var PENTA = [0, 2, 4, 7, 9];
-  // Bigger numbers play higher notes (pentatonic, so any mix sounds nice).
-  function note(v, vol) {
-    var k = Math.min(Math.round(Math.sqrt(Math.max(0, v)) * 3), 24);
-    var semi = PENTA[k % 5] + 12 * Math.floor(k / 5);
-    tone(330 * Math.pow(2, semi / 12), 0.22, vol || 0.04, "triangle");
-  }
-  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
-  function whoosh() { tone(700, 0.25, 0.035, "sine", 250); }
-  function chime() { tone(523, 0.4, 0.04); setTimeout(function () { tone(784, 0.6, 0.04); }, 120); }
-  // ---------- Spoken numbers (device voice; off by default; a grown-up setting on the home screen) ----------
-  var hasVoice = typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
-  // Carry Math Grid's old saved choice over to the shared setting once, then forget the old key.
-  try {
-    var OLD_VKEY = "mathgrid-voice-v1";
-    if (localStorage.getItem(OLD_VKEY) === "on" && Toybox.settings.get("mathgrid-voice") === false) Toybox.settings.set("mathgrid-voice", true);
-    localStorage.removeItem(OLD_VKEY);
-  } catch (e) { /* ignore */ }
-  var voiceOn = hasVoice && !!Toybox.settings.get("mathgrid-voice");
-  Toybox.settings.onChange(function (id, on) {
-    if (id !== "mathgrid-voice") return;
-    voiceOn = hasVoice && !!on;
-    if (!voiceOn && hasVoice) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
-  });
-  function say(t) {
-    if (!voiceOn || !hasVoice) return;
-    try {
-      window.speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(t);
-      u.rate = 0.95; u.pitch = 1.1; u.volume = 0.9;
-      window.speechSynthesis.speak(u);
-    } catch (e) { /* ignore */ }
-  }
 
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   var ending = false, endingStartedAt = 0, endingDone = null;
@@ -818,8 +747,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     settleBlocks();
   }
   function goodnight() {
-    say("Goodnight, numbers");
-    chime();
   }
   // Next time, the blocks are back in their squares.
   function onRest() {
@@ -858,8 +785,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   updateButtons();
   restEq();
   if (pat && !sel) setEq(patText(), false);
-  // The old Math Grid sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("mathgrid-sound-v1") === "on") localStorage.setItem("mathgrid-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "math-grid",
     timerIntro: "When time is up, the blocks settle and rest, and the controls lock.",
@@ -870,13 +795,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine: "The numbers are resting.",
     restLine2: "They will be right here next time.",
     restArt: restSVG,
-    soundNote: "Soft notes. Hold for 2 seconds.",
-    legacy: { timer: "mathgrid-timer-v1", sound: "mathgrid-sound-v1" },
+    legacy: { timer: "mathgrid-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodnight,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(chime, 60); },
     onTimer: drawFuel
   });
   resize();

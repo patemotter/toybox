@@ -298,14 +298,13 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function plantAt(kind, x, y) {
     var i = nearestEmpty(x);
-    if (i < 0) { say("The bed is full! Tap New."); bonk(); return false; }
+    if (i < 0) { say("The bed is full! Tap New."); return false; }
     var p = mkSpot(kind, 0);
     if (kind === "strawberry" && !hasGiant() && Math.random() < 0.5) p.g = true;
     p.pa = 0; p.from = { x: x, y: Math.min(y, L.soilTop - 10) };
     S.spots[i] = p;
     learned.plant = true;
     setSel(null);
-    plop();
     save();
     return true;
   }
@@ -317,7 +316,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (p.s === 4 && p.g) { var gp = fruitPt(i, 0); sparkle(gp.x, gp.y, 18); say("A giant strawberry!"); }
     var top = plantPt(i, 0, -TOPS[p.k][p.s] * 0.7);
     sparkle(top.x, top.y, p.s === 4 ? 14 : 7, p.s === 4 ? null : "#9BF07A");
-    if (!quiet) growSnd(p.s);
     save();
     return true;
   }
@@ -329,7 +327,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (p.w >= NEED && now() >= p.next) { if (grow(i)) learned.water = true; }
   }
   function sunTap() {
-    shine = 1; sunSnd();
+    shine = 1;
     learned.sun = true;
     var t = now();
     if (t - sunGrowAt < 1300) return;
@@ -348,9 +346,8 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var pt = fruitPt(i, j);
     p.m &= ~(1 << j); p.pull = null; p.taps = 0;
     learned.pick = true;
-    if (p.g) { flyers.push({ k: p.k, big: true, x0: pt.x, y0: pt.y, t: 0, r: GIANT[0][2] * L.k, rot: 0 }); sparkle(pt.x, pt.y, 22); boing(); }
+    if (p.g) { flyers.push({ k: p.k, big: true, x0: pt.x, y0: pt.y, t: 0, r: GIANT[0][2] * L.k, rot: 0 }); sparkle(pt.x, pt.y, 22); }
     else flyers.push({ k: p.k, x0: pt.x, y0: pt.y, t: 0, r: FRUITS[p.k][j][2] * p.sc, rot: 0 });
-    popSnd();
     sparkle(pt.x, pt.y, 6);
     if (p.k === "carrot") { dirt(L.spots[i], L.soilTop, 10); S.spots[i] = null; }
     else if (!p.m) { p.s = 3; p.w = 0; p.next = now() + 700; }
@@ -358,7 +355,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function wiggle(i) {
     var p = S.spots[i];
-    p.wig = 1; rustle();
+    p.wig = 1;
     var t = plantPt(i, 0, -TOPS[p.k][p.s] * 0.6);
     for (var n = 0; n < 3; n++) part({ t: "leaf", x: t.x + rand(-10, 10), y: t.y, vx: rand(-40, 40), vy: rand(-50, -10), life: 1.4, max: 1.4, c: LEAF, r: rand(4, 6), a: rand(0, TAU) });
   }
@@ -368,7 +365,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     rainbowUntil = 0;
     if (V.worm) V.worm.mode = "down";
     wet = [0, 0, 0, 0, 0];
-    whoosh();
     save();
   }
   var surpriseN = 0;
@@ -376,7 +372,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var any = S.spots.some(function (p) { return p && p.pa >= 1; });
     var kind = any && surpriseN % 2 === 0 ? "rainbow" : "parade";
     surpriseN++;
-    if (kind === "rainbow" || !any) { rainbowUntil = now() + 12000; gliss(); }
+    if (kind === "rainbow" || !any) { rainbowUntil = now() + 12000; }
     if (kind === "rainbow") {
       var j = 0;
       var berries = [];
@@ -392,7 +388,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         if (p.s < 4) { var q = p, d = 700 + j++ * 300; setTimeout(function () { if (!ending && S.spots[i] === q) { q.next = 0; grow(i, true); } }, d); }
         else { var pt = plantPt(i, 0, -TOPS[p.k][4] * 0.7); sparkle(pt.x, pt.y, 10); }
       });
-      if (j) setTimeout(function () { growSnd(4); }, 700);
     } else parade();
   }
 
@@ -565,7 +560,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function wormAt(x) {
     x = clamp(x, W * 0.05, W * 0.95);
     if (V.worm) { V.worm.wig = 1; V.worm.stay = 5; if (V.worm.mode === "down") V.worm.mode = "up"; return; }
-    V.worm = newWorm(x); boing();
+    V.worm = newWorm(x);
   }
   function want(name, cond, delay) {
     if (!cond) { due[name] = 0; return false; }
@@ -581,7 +576,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var gaps = fenceSpots();
     wormAt(gaps[Math.floor(Math.random() * (gaps.length - 2))]);
     notes(W / 2, L.fenceTop, 4);
-    gliss();
   }
   function visitorsLeave() {
     if (V.bee) V.bee.leave = true;
@@ -618,11 +612,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     v = V.worm; if (v) { var hd = wormHead(v); cand("worm", hd.x, hd.y, r); }
     if (!best) return false;
     v = V[best];
-    if (best === "bee") { v.spin = 1.3; v.sx = v.x; v.sy = v.y; heart(v.x, v.y, 2); buzz(); }
-    else if (best === "fly") { v.tgt = { x: rand(W * 0.15, W * 0.85), y: rand(H * 0.08, L.fenceTop * 0.6), wander: true }; v.mode = "fly"; sparkle(v.x, v.y, 6); chime(); }
-    else if (best === "lady") { ladyTarget(v); heart(v.x, v.y, 1); boing(); }
-    else if (best === "bird") { var xs = fenceSpots(); birdHop(v, xs[Math.floor(Math.random() * xs.length)]); notes(v.x, v.y - sz2() * 2, 2); chirp(); }
-    else { var h = wormHead(v); v.wig = 1.4; v.stay = Math.max(v.stay, 4); heart(h.x, h.y, 2); boing(); }
+    if (best === "bee") { v.spin = 1.3; v.sx = v.x; v.sy = v.y; heart(v.x, v.y, 2); }
+    else if (best === "fly") { v.tgt = { x: rand(W * 0.15, W * 0.85), y: rand(H * 0.08, L.fenceTop * 0.6), wander: true }; v.mode = "fly"; sparkle(v.x, v.y, 6); }
+    else if (best === "lady") { ladyTarget(v); heart(v.x, v.y, 1); }
+    else if (best === "bird") { var xs = fenceSpots(); birdHop(v, xs[Math.floor(Math.random() * xs.length)]); notes(v.x, v.y - sz2() * 2, 2); }
+    else { var h = wormHead(v); v.wig = 1.4; v.stay = Math.max(v.stay, 4); heart(h.x, h.y, 2); }
     return true;
   }
   function sz2() { return bodySize(); }
@@ -836,7 +830,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       dp.hidden = false;
       drag.b.classList.add("lift");
       setSel(null);
-      rustle();
     }
     if (drag.moved) dp.style.transform = "translate(" + (e.clientX - 39) + "px," + (e.clientY - 60) + "px) rotate(-10deg)";
   }
@@ -848,7 +841,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     dp.hidden = true;
     d.b.classList.remove("lift");
     if (e.type === "pointercancel" || locked()) return;
-    if (!d.moved) { setSel(sel === d.k ? null : d.k); blip(); return; }
+    if (!d.moved) { setSel(sel === d.k ? null : d.k); return; }
     var r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top - 20;
     if (x >= -20 && x <= r.width + 20 && y >= -20 && y <= r.height + 20) plantAt(d.k, clamp(x, 0, W), clamp(y, 0, H));
   }
@@ -909,14 +902,12 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       can.acc += dt * 16;
       var tip = spoutTip();
       while (can.acc >= 1) { can.acc--; part({ t: "drop", x: tip.x + rand(-3, 3), y: tip.y + rand(-2, 2), vx: 0, vy: rand(20, 60), life: 3, max: 3, r: rand(2.5, 3.6) }); }
-      if (Math.random() < dt * 5) plink();
     }
     // Cloud: rains while he holds it (or for a moment after a tap), then drifts gently.
     var raining = cloud.held !== null || t < cloud.rainUntil;
     if (raining && !ending) {
       cloud.acc += dt * 26;
       while (cloud.acc >= 1) { cloud.acc--; part({ t: "drop", x: cloud.x + rand(-L.cw * 0.38, L.cw * 0.38), y: cloud.y + L.ch * 0.3, vx: rand(-6, 6), vy: rand(120, 180), life: 3, max: 3, r: rand(2, 3) }); }
-      if (Math.random() < dt * 4) plink();
     }
     if (cloud.held === null) { cloud.x += Math.sin(t / 3000) * dt * 3; }
     // Trowel: a tap digs by itself; let go and it goes back.
@@ -959,7 +950,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           S.giants++; S.picked++;
           if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1200);
           var gr = giantRest(Math.min(S.giants, 2) - 1);
-          sparkle(gr.x, gr.y, 16); thud();
+          sparkle(gr.x, gr.y, 16);
           save();
           return false;
         }
@@ -972,7 +963,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         S.picked++;
         if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1200);
         sparkle(L.bx, L.base - L.bw * 0.45, 6);
-        thud();
         save();
         return false;
       }
@@ -1643,41 +1633,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   var ghost = Toybox.ghost({ plan: ghostPlan, max: 2, ok: function () { return !ending; } });
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null;
-  function out(ac) {
-    if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var actx = Toybox.sound.ready();
-    if (!actx) return;
-    var t = actx.currentTime + (delay || 0), o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(actx));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function plink() { tone(rand(1300, 2100), 0.09, 0.015, "sine", null); }
-  function plop() { tone(330, 0.18, 0.05, "sine", 150); tone(900, 0.08, 0.02, "sine", null, 0.12); }
-  function growSnd(s) { var b = 392 + (s || 1) * 40; tone(b, 0.25, 0.03); tone(b * 1.25, 0.25, 0.03, "sine", null, 0.09); tone(b * 1.5, 0.35, 0.03, "sine", null, 0.18); }
-  function popSnd() { tone(420, 0.14, 0.05, "sine", 900); }
-  function thud() { tone(220, 0.14, 0.04, "triangle", 160); }
-  function sunSnd() { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.6, 0.022, "triangle", null, i * 0.06); }); }
-  function buzz() { tone(220, 0.4, 0.02, "triangle", 260); }
-  function chirp() { tone(2200, 0.08, 0.025, "sine", 3200); tone(2400, 0.1, 0.025, "sine", 3400, 0.12); }
-  function chime() { tone(784, 0.4, 0.03); tone(1047, 0.5, 0.025, "sine", null, 0.1); }
-  function boing() { tone(200, 0.3, 0.04, "sine", 480); }
-  function rustle() { tone(700, 0.08, 0.015, "triangle", 500); }
-  function blip() { tone(600, 0.12, 0.03, "sine", 820); }
-  function bonk() { tone(260, 0.22, 0.035, "sine", 200); }
-  function whoosh() { tone(700, 0.35, 0.03, "sine", 200); }
-  function gliss() { [523, 587, 659, 784, 880, 1047].forEach(function (f, i) { tone(f, 0.3, 0.025, "sine", null, i * 0.07); }); }
-
   // ---------- Play timer hooks ----------
   // Ending: the sun sets, the flowers close, the visitors go home, the garden sleeps.
   function onEnding(done) {
@@ -1688,7 +1643,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     rainbowUntil = 0;
     setTimeout(done, 6500);
   }
-  function onGoodbye() { notes(W / 2, L.fenceTop, 3); chime(); }
+  function onGoodbye() { notes(W / 2, L.fenceTop, 3); }
   function onWake() { ending = false; due = {}; }
   function restSVG() {
     var o = '<svg class="rest-art" viewBox="0 0 100 100" aria-hidden="true">';
@@ -1727,11 +1682,9 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine: "The garden is sleeping.",
     restLine2: "It will be right here next time.",
     restArt: restSVG,
-    soundNote: "Soft drips and chimes. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: onGoodbye,
-    onWake: onWake,
-    onSound: function (on) { if (on) setTimeout(chime, 60); }
+    onWake: onWake
   });
   requestAnimationFrame(loop);
 

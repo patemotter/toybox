@@ -87,7 +87,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // pin, the ground at y = +0.55), farmer and spade (origin at his feet), worm, mole, blackbird.
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2;
   var P = SH.P, R = SH.R, C = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs, rr = SH.rr;
   var NAME = (Farm.NAMES && Farm.NAMES.tracks) || "Caterpillar Hunt";
   document.title = NAME; $("title").textContent = NAME;
@@ -468,22 +468,22 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     cmode = kind;
     setPhase("arrive");
   }
-  function arrived() { m.v = 0; tagRig(); snd.clunk(); setSub(sub); }
+  function arrived() { m.v = 0; tagRig(); setSub(sub); }
   // Drive: the tractor sets off across the field (a tap drives it all the way; a drag drives it by hand).
   function drive() {
     setPhase("drive"); auto = true;
-    snd.horn(); say(JOBS[job].work, 4);
+    say(JOBS[job].work, 4);
     return true;
   }
   // Lower: the subsoiler's legs go down into the soil at the edge of the field.
   function lower() {
-    setPhase("lower"); m.lowered = true; snd.clunk();
+    setPhase("lower"); m.lowered = true;
     for (var i = 0; i < 6; i++) parts.add({ kind: "chunk", x: m.x + LEG + (Math.random() - 0.3) * 0.5, h: 0.05, r: 0.995, vx: (Math.random() - 0.5) * 1.2, vh: 1.0 + Math.random(), life: 0.7, size: 0.07, spin: 5, col: "#7B4E2E" });
     say("The subsoiler's legs go into the soil.", 3.5);
     return true;
   }
   // Dig: the spade goes into the soil (his foot pushes it down); Lift: it levers back and lifts out the soil.
-  function dig(goal) { setPhase("dig"); dg.goal = goal; fm.state = "dig"; snd.tick(); if (goal > 1) say(JOBS.look.work, 4); return true; }
+  function dig(goal) { setPhase("dig"); dg.goal = goal; fm.state = "dig"; if (goal > 1) say(JOBS.look.work, 4); return true; }
   var DIG_IN = 0.85, DIG_END = 2.35 + 4 * 0.7 + 0.5;
   // He touched `part` while it is his turn: do it if it is the next thing (true), or not (false).
   function act(part) {
@@ -551,7 +551,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   function hint() { var d = NEXT[key()]; if (d) say(d.say, 3); glow = 3; if (ghost) ghost.poke(); }
   function busyHint() {
     if (phase === "grow") say("The field is getting wet again.", 3);
-    else if (phase === "drive") { snd.horn(); if (m) m.flash = 1.2; say(JOBS[job].busy, 3); }
+    else if (phase === "drive") { if (m) m.flash = 1.2; say(JOBS[job].busy, 3); }
     else if (phase === "arrive") say(job === "sub" ? "Here comes the subsoiler." : "Here comes the tractor.", 3);
     else if (phase === "lower") say("The subsoiler's legs go into the soil.", 3);
     else if (phase === "walk") say("Here comes Farmer Tom.", 3);
@@ -1093,15 +1093,15 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       // the subsoiler is still up: the first time a hint, the second time its legs go down for him
       if (k === "sub.lower" && part === "rig") { if (misses++ >= 1) { lower(); if (ghost) ghost.learned(k); glow = 0; } else hint(); return; }
     }
-    if (part === "rig") { snd.horn(); if (m) m.flash = 1.2; tagRig(); if (phase !== "ready") busyHint(); return; }
-    if (part === "rigc") { tagAt(closeName(px - RG.c.x, py - RG.c.y), px, py - 30); snd.tick(); return; }
-    if (part === "sub" || part === "spade" || part === "farmer") { tagAt(NAMES[part], px, py - 40); snd.tick(); return; }
-    if (part === "slice") { wiggleWorms(); tagAt(dg.t > 2.3 ? "Earthworms" : "Crumbly soil", px, py - 40); snd.pop(); return; }
+    if (part === "rig") { if (m) m.flash = 1.2; tagRig(); if (phase !== "ready") busyHint(); return; }
+    if (part === "rigc") { tagAt(closeName(px - RG.c.x, py - RG.c.y), px, py - 30); return; }
+    if (part === "sub" || part === "spade" || part === "farmer") { tagAt(NAMES[part], px, py - 40); return; }
+    if (part === "slice") { wiggleWorms(); tagAt(dg.t > 2.3 ? "Earthworms" : "Crumbly soil", px, py - 40); return; }
     // in the close-up: say what is there (and wiggle a worm under the finger)
     if (px >= RG.c.x && py >= RG.c.y) {
       var lx = px - RG.c.x, ly = py - RG.c.y, w = wormAt(lx, ly);
-      if (w) { w.wig = 1.2; tagAt("Earthworm", px, py - 30); snd.pop(); }
-      else { tagAt(closeName(lx, ly), px, py - 30); snd.tick(); }
+      if (w) { w.wig = 1.2; tagAt("Earthworm", px, py - 30); }
+      else { tagAt(closeName(lx, ly), px, py - 30); }
       if (phase === "ready") glow = 2;
       if (ghost) ghost.poke();
       return;
@@ -1210,11 +1210,10 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (m && m.lift < 0.04) { m.lift = 0; setSub("drive"); }
     } else if (phase === "dig") {
       var t0 = dg.t; dg.t = Math.min(dg.goal, dg.t + dt);
-      if (t0 < 0.8 && dg.t >= 0.8) snd.soil(0);
-      if (t0 < 2.2 && dg.t >= 2.2) { snd.clunk(); for (i = 0; i < 6; i++) cbit(fm.x + 0.5 + Math.random() * 0.4, 0.0, (Math.random() - 0.5) * 1.2, -1.2 - Math.random(), "#7B4E2E", 0.025); }
+      if (t0 < 2.2 && dg.t >= 2.2) { for (i = 0; i < 6; i++) cbit(fm.x + 0.5 + Math.random() * 0.4, 0.0, (Math.random() - 0.5) * 1.2, -1.2 - Math.random(), "#7B4E2E", 0.025); }
       for (i = 0; i < SLW.length; i++) {
         var te = 2.35 + i * 0.7 + 0.3;
-        if (t0 < te && dg.t >= te) { count++; dg.n = i + 1; save(); snd.pop(); if (i === SLW.length - 1) snd.chime(); }
+        if (t0 < te && dg.t >= te) { count++; dg.n = i + 1; save(); }
       }
       if (dg.t >= dg.goal) { if (dg.goal >= DIG_END) finishJob(); else setSub("lift"); }
     } else if (phase === "grow") {
@@ -1233,9 +1232,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     for (i = 0; i < NC; i++) if (ln.lt[i] >= 0 && ln.loose[i] < 1) { ln.loose[i] = clamp((time - ln.lt[i]) / 0.9, 0, 1); }
     if (sur) {
       var s0 = sur.t; sur.t += dt;
-      if (sur.kind === "boot" && s0 < 4.0 && sur.t >= 4.0) { snd.pop(); var cx0 = CXi(RG.c.w * sur.fx); for (i = 0; i < 6; i++) cbit(cx0 + (Math.random() - 0.5) * 0.2, -0.05, (Math.random() - 0.5) * 2, -1.5 - Math.random() * 1.5, MUD_D, 0.035); }
-      if (sur.kind === "mole" && s0 < 3.0 && sur.t >= 3.0) snd.pop();
-      if (sur.kind === "bird" && s0 < 3.0 && sur.t >= 3.0) snd.pop();
+      if (sur.kind === "boot" && s0 < 4.0 && sur.t >= 4.0) { var cx0 = CXi(RG.c.w * sur.fx); for (i = 0; i < 6; i++) cbit(cx0 + (Math.random() - 0.5) * 0.2, -0.05, (Math.random() - 0.5) * 2, -1.5 - Math.random() * 1.5, MUD_D, 0.035); }
       if (sur.t > (SUR_T[sur.kind] || 5)) sur = null;
     }
     if (ending) dusk = Math.min(1, dusk + dt * 0.5);
@@ -1246,8 +1243,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     scF.follow(camTarget(), dt); updateCam(dt);
     var lvl = phase === "drive" ? 0.3 + drive * 0.7 : (phase === "arrive" ? 0.6 : (m ? 0.15 : (leaving ? 0.5 : 0)));
     engLevel += (lvl - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending || (!m && !leaving) ? -1 : engLevel);
-    snd.soil(working() ? 0.5 * drive : 0);
   }
 
   // ---------- Drawing the field ----------
@@ -1384,7 +1379,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; if (m) m.v = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; auto = false; grab = null; if (m) m.v = 0; setTimeout(function () { done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -1407,11 +1402,9 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine and squelchy soil sounds. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   requestAnimationFrame(loop);
 

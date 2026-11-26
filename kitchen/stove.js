@@ -6,7 +6,6 @@
 //   - Saved state
 //   - Canvas and layout
 //   - The stove's state
-//   - Sound (off by default; soft and synthesized)
 //   - Coach and counter
 //   - Panel: what to cook, then the food or the toppings
 //   - Picking what to cook: the pan and the pot change places on the burner
@@ -277,64 +276,6 @@
     return "";
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null, loops = null, noiseBuf = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; loops = null; noiseBuf = null; } return master; }
-  function noise(ac) {
-    if (noiseBuf) return noiseBuf;
-    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
-    var d = noiseBuf.getChannelData(0);
-    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    return noiseBuf;
-  }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function puff(dur, vol, freq) {
-    // A soft filtered noise burst: the gas lighting, a flip whoosh.
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    s.buffer = noise(ac); f.type = "lowpass"; f.frequency.value = freq || 700;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(out(ac)); s.start(t, Math.random()); s.stop(t + dur + 0.05);
-  }
-  function plop() { tone(rand(300, 420), 0.16, 0.05, "sine", 160); }
-  function click() { tone(900, 0.05, 0.04, "square", 600); tone(1100, 0.04, 0.03, "square", 700, 0.07); }
-  function pat() { tone(180, 0.12, 0.06, "sine", 110); }
-  function blub() { tone(rand(140, 220), 0.1, 0.018, "sine", rand(260, 340)); }
-  function pip() { tone(rand(1300, 1700), 0.05, 0.012, "sine", 900); }
-  function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
-  function gentle() { tone(330, 0.14, 0.04, "triangle", 300); }
-  // Loops: the gas hiss and the sizzle of batter in the pan.
-  function updateLoops(sizzle) {
-    var ac = Toybox.sound.ready();
-    if (!ac) { if (loops) { try { loops.gG.gain.value = 0; loops.sG.gain.value = 0; } catch (e) { /* ignore */ } } return; }
-    if (!loops || masterCtx !== ac) {
-      out(ac);
-      var mk = function (type, f0, q) {
-        var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-        s.buffer = noise(ac); s.loop = true; f.type = type; f.frequency.value = f0; f.Q.value = q; g.gain.value = 0;
-        s.connect(f); f.connect(g); g.connect(out(ac)); s.start();
-        return g;
-      };
-      loops = { gG: mk("lowpass", 500, 0.7), sG: mk("bandpass", 4200, 0.8) };
-    }
-    var t = ac.currentTime;
-    loops.gG.gain.setTargetAtTime(flame * 0.012, t, 0.1);
-    loops.sG.gain.setTargetAtTime(sizzle * 0.02, t, 0.15);
-  }
-
   // ---------- Coach and counter ----------
   var coachEl = $("coach"), coach = Toybox.coach(coachEl);
   // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
@@ -392,7 +333,6 @@
     f.style.display = "none";
     document.body.appendChild(f);
     tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, food: b.getAttribute("data-food"), top: b.getAttribute("data-top") };
-    tone(620, 0.08, 0.03, "sine", 820);
   });
   function tileMove(e) {
     var d = tileDrags[e.pointerId];
@@ -425,8 +365,7 @@
     var from = isPan() ? "pan" : "pot", to = id === "pancakes" ? "pan" : "pot";
     cancelDrags();
     S.recipe = id;
-    if (from !== to) { swap = { from: from, to: to, t0: now(), dur: reduce ? 0.2 : 1.1 }; tone(520, 0.12, 0.035, "sine", 700); }
-    else tone(700, 0.08, 0.03, "sine", 900);
+    if (from !== to) { swap = { from: from, to: to, t0: now(), dur: reduce ? 0.2 : 1.1 }; }
     learned("recipe");
     hush();
     save();
@@ -440,8 +379,7 @@
   function knobTo(v) {
     var was = on();
     K.anim = { from: K.v, to: v, t0: now(), dur: reduce ? 0.1 : 0.45 };
-    click();
-    if (!was && v > 0.08) { setTimeout(function () { puff(0.5, 0.05, 900); }, 160); learned("knob"); if (coach.text() === "Turn on the stove!") hush(); }
+    if (!was && v > 0.08) { learned("knob"); if (coach.text() === "Turn on the stove!") hush(); }
   }
   // Two-step rule: cooking with the stove off says "Turn on the stove!" and flashes the knob;
   // the second try turns it on for him.
@@ -451,7 +389,6 @@
     if (K.tries >= 2) { K.tries = 0; hush(); knobTo(0.75); return true; }
     say("Turn on the stove!");
     K.flashUntil = now() + 3; K.wig = 1;
-    gentle();
     return false;
   }
   function knobAngle(p) { return Math.atan2(p.x - KNOB.x, -(p.y - KNOB.y)); }
@@ -492,8 +429,6 @@
     pc.fly = { t0: now(), dur: dur, h: h, turns: turns, z0: pc.z || 0, x0: pc.x, x1: clamp(pc.x * 0.6 + rand(-0.04, 0.04), -0.2, 0.2), magic: !!magic, wasFlipped: pc.flipped };
     pc.ph = "fly";
     spat.held = false; spat.until = now() + 0.7;
-    puff(0.35, 0.03 + 0.03 * s, 1200);
-    tone(400, 0.3 + s * 0.3, 0.03, "sine", 900);
     if (!magic) learned("flip");
   }
   function landPancake() {
@@ -502,7 +437,6 @@
     if (!f.magic) pc.flipped = !pc.flipped;
     pc.fly = null; pc.sqT = now();
     fitPc();
-    pat();
     burst(PAN.x + pc.x, PAN.y, f.magic ? 22 : 8, f.magic ? null : "#FFF3C4", f.magic);
     save();
   }
@@ -521,7 +455,6 @@
     S.stack.list.push({ r: pc.r, j: rand(-0.025, 0.025) });
     S.pc = null;
     S.nP++;
-    pat(); tone(520, 0.12, 0.03, "sine", 780, 0.05);
     burst(PLATE.x, stackTopY(), 10, null, true);
     spat.held = false; spat.until = now() + 0.3;
     save();
@@ -534,16 +467,14 @@
   }
   function addTop(id) {
     if (!S.stack.list.length || !TOPS[id]) return;
-    if (S.stack.tops.indexOf(id) >= 0) { burst(PLATE.x, stackTopY() - 0.1, 10, null, true); tone(880, 0.12, 0.03); return; }
+    if (S.stack.tops.indexOf(id) >= 0) { burst(PLATE.x, stackTopY() - 0.1, 10, null, true); return; }
     S.stack.tops.push(id);
     tops[id] = now();
     learned("top");
-    if (id === "berries") { plop(); setTimeout(plop, 120); } else if (id === "butter") pat(); else tone(300, 0.6, 0.03, "sine", 200);
     if (!S.stack.done) {
       S.stack.done = true; S.stack.t = Date.now();
       addToTable({ k: "pancakes", c: GOLD, s: TOPS[id].col, t: S.stack.t });
       if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
-      setTimeout(chime, 500);
       for (var i = 0; i < 3; i++) setTimeout(function () { burst(PLATE.x, stackTopY() - 0.1, 14, null, true); }, 600 + i * 260);
     } else updateTable(S.stack.t, TOPS[id].col);
     save();
@@ -597,7 +528,6 @@
   function runFaucet(fill) {
     if (faucet.run) return;
     faucet.run = { t0: now(), dur: reduce ? 0.5 : (fill ? 2.2 : 0.9), from: S.pot.level, fill: !!fill };
-    tone(500, 0.08, 0.03, "sine", 650);
   }
   // Ladle: fill it in the pot, pour it in the bowl. Two ladles fill the bowl.
   function ladleTo(path) { ladle.path = path; ladle.pi = 0; ladle.t0 = now(); ladle.from = { x: ladle.x, y: ladle.y, a: ladle.a }; }
@@ -621,7 +551,6 @@
     var x = ladle.x, y = waterY();
     ripples.push({ x: x, y: y, t0: now() });
     for (var i = 0; i < 5; i++) drip(x, y, potColor());
-    plop();
   }
   function pourIntoBowl() {
     // One ladle of soup lands in the bowl.
@@ -638,7 +567,6 @@
     while (S.bowl.bits.length > 12) S.bowl.bits.shift();
     S.pot.level = Math.max(0.25, S.pot.level - 0.37);
     burst(BOWL.x, BOWL.y - 0.2, 5, S.bowl.c);
-    plop();
     if (S.bowl.fill >= 0.999) finishBowl();
     save();
   }
@@ -647,7 +575,6 @@
     S.nB++;
     addToTable({ k: S.bowl.k || "soup", c: S.bowl.c || "#F4A340", s: "", t: Date.now() });
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
-    chime();
     for (var i = 0; i < 3; i++) setTimeout(function () { burst(BOWL.x, BOWL.y - 0.25, 14, null, true); }, i * 260);
     S.pot.items = []; S.pot.stir = 0; pieces = [];
     setTimeout(function () { if (!isPan() && S.pot.level < 0.99) runFaucet(true); }, reduce ? 200 : 1300);
@@ -700,7 +627,6 @@
     }
     K.tries = 0; hush();
     save();
-    tone(500, 0.2, 0.04, "sine", 300);
   }
   // Stove moments. The pan: the magic flip (the pancake spins way up and lands the same side up, so it
   // changes nothing), the tools swing on the rail. The pot: the lid rattles and pops up with a puff of
@@ -723,13 +649,13 @@
     var id = funPick(FUN_ORDER, funOk);
     if (!id) { burst(isPan() ? PAN.x : POT.x, isPan() ? PAN.y - 0.3 : POT.ty - 0.1, 14, null, true); return; }
     if (id === "flip") { funStart("flip", 3); launch(1, true); say("Magic flip!"); }
-    else if (id === "lid") { funStart("lid", reduce ? 4.5 : 5.6); FUN.popped = false; say("Pop goes the lid!"); tone(500, 0.1, 0.03, "sine", 650); }
+    else if (id === "lid") { funStart("lid", reduce ? 4.5 : 5.6); FUN.popped = false; say("Pop goes the lid!"); }
     else if (id === "bubbles") {
       funStart("bubbles", reduce ? 5 : 6.5);
       FUN.bub = [];
       for (var i = 0; i < 7; i++) FUN.bub.push({ u: rand(-0.7, 0.7), v: rand(-0.5, 0.6), d: i * (reduce ? 0.4 : 0.42), r: rand(0.08, 0.14), w: rand(0, TAU), h: rand(0.55, 1.15), popped: false });
       say("Big bubbles!");
-    } else { funStart("swing", reduce ? 3 : 4.2); say("Swing, swing!"); tone(1500, 0.2, 0.02, "triangle", 1400); tone(1700, 0.2, 0.02, "triangle", 1600, 0.6); }
+    } else { funStart("swing", reduce ? 3 : 4.2); say("Swing, swing!"); }
   }
   // The tools' swing on the rail (radians), 0 when they are still.
   function swingA(ph) {
@@ -753,11 +679,10 @@
       if (!FUN.popped) {
         FUN.popped = true;
         for (var i = 0; i < (reduce ? 4 : 16); i++) parts.push({ x: x + rand(-0.45, 0.45), y: ty - rand(0, 0.08), vx: rand(-0.25, 0.25), vy: rand(-0.7, -0.35), life: 0, max: rand(1.4, 2.2), r: rand(0.06, 0.1), steam: true });
-        puff(0.6, 0.05, 900); tone(700, 0.2, 0.03, "sine", 1100);
       }
       var u = (tt - rat) / (pop - rat);
       y = ty - 4 * u * (1 - u) * 0.55 * MAMP; a = Math.sin(u * Math.PI) * 0.25 * MAMP;
-    } else if (tt < set) { var v = (tt - pop) / (set - pop); y = ty - Math.abs(Math.sin(v * Math.PI * 2)) * 0.05 * (1 - v); if (!FUN.landed) { FUN.landed = true; tone(900, 0.08, 0.03, "triangle", 700); } }
+    } else if (tt < set) { var v = (tt - pop) / (set - pop); y = ty - Math.abs(Math.sin(v * Math.PI * 2)) * 0.05 * (1 - v); if (!FUN.landed) { FUN.landed = true; } }
     else if (tt > rest) { var w = ease((tt - rest) / (T - rest)); y = lerp(ty, ty - 1.4, w); al = 1 - w; FUN.landed = false; }
     ctx.save(); ctx.globalAlpha *= al; ctx.translate(x, y); ctx.rotate(a);
     ell(0, 0, POT.rx + 0.03, POT.ry + 0.01); fs("#AEB8C6", 1.1);
@@ -782,7 +707,7 @@
         bx += Math.sin(t * 2.2 + b.w) * 0.05 * Math.min(1, rise * 3);
         by -= rise;
         if (rise > b.h || by - r < top) {
-          b.popped = true; blub();
+          b.popped = true;
           for (var i = 0; i < 6; i++) { var an = i * TAU / 6; parts.push({ x: bx + Math.cos(an) * r, y: by + Math.sin(an) * r, vx: Math.cos(an) * 0.6, vy: Math.sin(an) * 0.6 - 0.2, life: 0, max: 0.5, col: "#FFFFFF", r: 0.018, star: false }); }
           burst(bx, by, 3, null, true);
           return;
@@ -832,7 +757,7 @@
     if (pc && pc.ph === "pan" && (onPancake(p) || inPan(p) || onSpatRest(p))) {
       if (pcReady1()) {
         // Spatula under the pancake; a flick up flips it.
-        d.kind = "flip"; d.px0 = pc.x; pc.ph = "lift"; pc.z = 0; spat.held = true; tone(420, 0.08, 0.03, "sine", 520);
+        d.kind = "flip"; d.px0 = pc.x; pc.ph = "lift"; pc.z = 0; spat.held = true;
       } else if (pcReady2()) {
         d.kind = "slide"; pc.ph = "carry"; pc.wx = PAN.x + pc.x; pc.wy = PAN.y; d.dx = pc.wx - p.x; d.dy = pc.wy - p.y; spat.held = true;
       } else {
@@ -853,7 +778,7 @@
       d.kind = "tap";
       if (!canPour()) { jug.wig = 1; if (stackFull()) say("Add a topping!"); return; }
       if (!needHeat()) { jug.wig = 1; return; }
-      d.kind = "jug"; jug.st = "drag"; d.dx = jug.x - p.x; d.dy = jug.y - p.y; tone(420, 0.1, 0.03, "sine", 520);
+      d.kind = "jug"; jug.st = "drag"; d.dx = jug.x - p.x; d.dy = jug.y - p.y;
       return;
     }
     if (!pc && inPan(p) && jug.st === "home") {
@@ -897,8 +822,7 @@
       if (d.turn > 0.15) d.moved = true;
       var was = on();
       K.v = clamp(K.v + da / KNOB_SWEEP, 0, 1);
-      if (!was && on()) { click(); puff(0.5, 0.05, 900); learned("knob"); K.tries = 0; hush(); }
-      else if (was && !on()) click();
+      if (!was && on()) { learned("knob"); K.tries = 0; hush(); }
     } else if (d.kind === "jug") {
       jug.x = clamp(p.x + d.dx, X_L + 0.1, X_R - 0.1); jug.y = clamp(p.y + d.dy, -H_UP + 0.3, -0.25);
     } else if (d.kind === "flip" && pc && pc.ph === "lift") {
@@ -928,7 +852,6 @@
     }
   });
   function potCooked() {
-    chime();
     burst(POT.x, waterY(), 16, null, true);
     save();
   }
@@ -952,7 +875,7 @@
         var inside = Math.abs(pc.wx - PAN.x) < PAN.fx && Math.abs(pc.wy - PAN.y) < 0.3;
         if (cancel) { pc.ph = "pan"; spat.held = false; }
         else if (!d.moved || nearPlate || !inside) toPlate();
-        else { pc.ph = "pan"; pc.x = pc.wx - PAN.x; fitPc(); spat.held = false; pat(); }
+        else { pc.ph = "pan"; pc.x = pc.wx - PAN.x; fitPc(); spat.held = false; }
       }
     } else if (d.kind === "stir") {
       spoon.drag = false;
@@ -1054,7 +977,6 @@
       if (q.life >= q.max) parts.splice(i, 1);
     }
     if (parts.length > 320) parts.splice(0, parts.length - 320);
-    updateLoops(w === "pan" && pc && (pc.ph === "pan" || pc.ph === "pour" || pc.ph === "lift") ? hot : 0);
     renderChoices();
     updateCoach();
     updateGhostPhase();
@@ -1112,13 +1034,13 @@
         pc.c1 = Math.min(1, pc.c1 + dt * rate2 / 6.5);
         if (pc.bub) for (i = 0; i < pc.bub.length; i++) {
           var b = pc.bub[i];
-          if (!b.popped && before < b.p && pc.c1 >= b.p) { b.popped = true; pip(); }
+          if (!b.popped && before < b.p && pc.c1 >= b.p) { b.popped = true; }
         }
         if (before < 1 && pc.c1 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 6, "#FFF3C4"); save(); }
       } else {
         var b2 = pc.c2;
         pc.c2 = Math.min(1, pc.c2 + dt * rate2 / 4.5);
-        if (b2 < 1 && pc.c2 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 10, null, true); tone(880, 0.2, 0.03); save(); }
+        if (b2 < 1 && pc.c2 >= 1) { burst(PAN.x + pc.x, PAN.y - 0.05, 10, null, true); save(); }
       }
     }
     if (pc.ph === "fly") {
@@ -1158,7 +1080,7 @@
       var p = pieces[i];
       if (p.fy < 0) {
         p.vy += 5 * dt; p.fy += p.vy * dt;
-        if (p.fy >= 0) { p.fy = 0; ripples.push({ x: POT.x + Math.cos(p.phi) * p.rho * POT.rx * 0.8, y: wy + Math.sin(p.phi) * p.rho * POT.ry * 0.75, t0: t }); if (Math.random() < 0.4) plop(); }
+        if (p.fy >= 0) { p.fy = 0; ripples.push({ x: POT.x + Math.cos(p.phi) * p.rho * POT.rx * 0.8, y: wy + Math.sin(p.phi) * p.rho * POT.ry * 0.75, t0: t }); }
         continue;
       }
       p.phi += (potSwirl * (0.4 + 0.6 * p.rho) + drift * (0.5 + p.rho)) * dt;
@@ -1175,7 +1097,6 @@
     if (boil && !reduce && Math.random() < dt * (hot - 0.45) * 40) {
       var a = rand(0, TAU), d = Math.sqrt(Math.random()) * 0.85;
       potBub.push({ u: Math.cos(a) * d, v: Math.sin(a) * d, t0: t, life: rand(0.4, 0.8), r: rand(0.015, 0.035) * (1 + Math.abs(potSwirl) * 0.08) });
-      if (Math.random() < 0.15) blub();
     }
     for (i = potBub.length - 1; i >= 0; i--) if (t - potBub[i].t0 > potBub[i].life) potBub.splice(i, 1);
     if (potBub.length > 60) potBub.splice(0, potBub.length - 60);
@@ -1845,11 +1766,9 @@
     restLine: "The kitchen is resting.",
     restLine2: "Your food will be on the table next time.",
     restArt: restArt,
-    soundNote: "Soft sizzles, bubbles and clicks. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: function () { K.anim = null; K.v = 0; },
-    onWake: function () { lastT = now(); },
-    onSound: function (on) { if (on) chime(); }
+    onWake: function () { lastT = now(); }
   });
   setTimeout(layout, 30);
   Toybox.offFirst({

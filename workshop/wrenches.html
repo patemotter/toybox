@@ -481,58 +481,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function addFx(o) { o.t0 = now; fx.push(o); if (fx.length > 80) fx.shift(); }
   function busy() { return Toybox.timer.locked(); }
 
-  // ---------- Sound (off by default; soft synthesized) ----------
-  var AC = null, master = null, noiseBuf = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.3), a.sampleRate);
-      var data = noiseBuf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      AC = a;
-    } catch (e) { AC = null; }
-  }
-  function blip(freq, dur, vol, type, freq2, delay) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime + (delay || 0);
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function thud(freqF, dur, vol) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime;
-      var n = AC.createBufferSource(); n.buffer = noiseBuf;
-      var f = AC.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freqF; f.Q.value = 1.4;
-      var g = AC.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      n.connect(f); f.connect(g); g.connect(master);
-      n.start(t); n.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function sClunk() { blip(150, 0.22, 0.2, "sine", 60); thud(700, 0.09, 0.12); blip(900, 0.08, 0.03, "triangle", 700, 0.01); }
-  function sSlip() { blip(330, 0.3, 0.06, "triangle", 240); blip(280, 0.25, 0.04, "sine", 220, 0.12); }
-  function sClick() { thud(3200, 0.025, 0.09); blip(2100, 0.02, 0.025, "triangle"); }
-  function sTurn() { thud(1400, 0.04, 0.035); }
-  function sOut() { blip(420, 0.16, 0.08, "sine", 880); blip(880, 0.12, 0.05, "sine", 1320, 0.1); }
-  function sTray() { blip(1500, 0.14, 0.05, "triangle"); blip(2250, 0.16, 0.04, "triangle", null, 0.06); }
-  function sPlace() { blip(620, 0.12, 0.06, "sine", 460); }
-  function sSnug() { blip(200, 0.1, 0.06, "triangle", 180); }
-  function sPick() { blip(520, 0.07, 0.04, "sine", 700); }
-
   // ---------- Drawing: bolts ----------
   // The board is seen from above and a little in front: flat things are squashed by K, heights go straight up.
   function hexPts(r, a) {
@@ -1082,9 +1030,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       b.l = nl;
       T.ang += applied;
       T.swing += Math.abs(applied);
-      if (T.swing > 0.7) { T.swing = 0; sTurn(); var hp = headTop(i); addFx({ type: "swish", x: hp.x, y: hp.y, r: toolGeom(toolMM()).ro + U * 0.12, a0: T.ang - applied * 6, a1: T.ang, dur: 0.35 }); }
+      if (T.swing > 0.7) { T.swing = 0; var hp = headTop(i); addFx({ type: "swish", x: hp.x, y: hp.y, r: toolGeom(toolMM()).ro + U * 0.12, a0: T.ang - applied * 6, a1: T.ang, dur: 0.35 }); }
       if (d > 0 && nl <= 0 && Math.abs(applied) < Math.abs(d) * 0.5 && now - (R.snugAt || -9) > 1.2) {
-        R.snugAt = now; sSnug();
+        R.snugAt = now;
         var p = headTop(i); addFx({ type: "word", text: "Snug!", x: p.x, y: p.y - dims(SIZES[i]).r * 1.6, dur: 1.4, color: "#BFD7FF" });
       }
       if (d < 0 && nl >= MAXL - 1e-6) boltOut(i, before < MAXL - 1e-6);
@@ -1094,7 +1042,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       T.click += Math.abs(d);
       while (T.click > 0.24) {
         T.click -= 0.24;
-        sClick();
         var hp2 = headTop(i), a = T.ang + Math.PI + (Math.random() - 0.5) * 1.2;
         addFx({ type: "click", x: hp2.x + Math.cos(a) * U * 0.5, y: hp2.y + Math.sin(a) * U * 0.5 * K, a: a, dur: 0.4 });
       }
@@ -1107,7 +1054,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     for (var id in drags) { if (drags[id].kind === "turn") delete drags[id]; }
     liftTool(true);
     if (fresh) {
-      sOut();
       addFx({ type: "stars", x: p.x, y: p.y, r: dims(SIZES[i]).r * 1.3, dur: 1.1, seed: Math.random() * 6 });
     }
     say("It's out! Drag the bolt to the tray.");
@@ -1142,7 +1088,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       T.slot = best;
       T.wob = { t0: now, dur: reduce ? 0.6 : 1.05, big: mm > want };
       rt[best].wig = now;
-      sSlip();
       say(mm > want ? "Too big! Try a smaller one." : "Too small! Try a bigger one.");
     }
   }
@@ -1150,7 +1095,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     T.state = "on"; T.slot = i; T.click = 0; T.swing = 0;
     var p = headTop(i);
     rt[i].shake = now;
-    sClunk();
     addFx({ type: "clunk", x: p.x, y: p.y, r: toolGeom(toolMM()).ro, dur: 0.8 });
     if (!hinted.turn) {
       hinted.turn = true;
@@ -1190,8 +1134,8 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var r = rt[i];
       if (r.fly && now - r.fly.t0 >= r.fly.dur) {
         r.fly = null;
-        if (S.bolts[i].tray) { sTray(); var tp = trayPos(i); addFx({ type: "stars", x: tp.x, y: tp.y - U * 0.3, r: U * 0.5, dur: 0.85, seed: i }); }
-        else { sPlace(); r.pop = now; }
+        if (S.bolts[i].tray) { var tp = trayPos(i); addFx({ type: "stars", x: tp.x, y: tp.y - U * 0.3, r: U * 0.5, dur: 0.85, seed: i }); }
+        else { r.pop = now; }
       }
     }
   }
@@ -1237,14 +1181,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     T.state = "held"; T.slot = -1; T.fly = null; T.wob = null;
     T.px = p.x; T.py = p.y; T.offx = T.x - p.x; T.offy = T.y - p.y;
     drags[e.pointerId] = { kind: "tool" };
-    sPick();
   }
   function grabBolt(e, p, i, from) {
     var pose = boltPose(i), d = dims(SIZES[i]);
     rt[i].carry = { x: pose.x, y: pose.y, ox: pose.x - p.x, oy: pose.y - p.y, from: from };
     if (from === "tray") { rt[i].carry.oy = d.Z + d.h * 0.5; rt[i].carry.ox = 0; rt[i].carry.y = p.y + rt[i].carry.oy; rt[i].carry.x = p.x; }
     drags[e.pointerId] = { kind: "bolt", i: i };
-    sPick();
   }
 
   cv.addEventListener("pointerdown", function (e) {
@@ -1292,7 +1234,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
         T.state = "held"; T.slot = -1; T.fly = null; T.wob = null;
         T.px = p0.x; T.py = p0.y; T.x = p0.x; T.y = p0.y; T.offx = 0; T.offy = 0; T.sc = 0.6; T.ang = -Math.PI / 2 + 0.35;
         drags[e.pointerId] = { kind: "tool" };
-        sPick();
       }
       return;
     }
@@ -1463,7 +1404,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (i === S.size) return;
     S.size = i;
     newTool();
-    sPick();
     updateToolbar();
     save();
   }
@@ -1471,7 +1411,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (busy() || m === S.mode) return;
     S.mode = m;
     newTool();
-    sPick();
     updateToolbar();
     save();
   }
@@ -1480,7 +1419,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   $("dirBtn").addEventListener("click", function () {
     if (busy()) return;
     S.dir = S.dir === "loosen" ? "tighten" : "loosen";
-    blip(S.dir === "loosen" ? 700 : 520, 0.06, 0.05, "square");
     if (T.state === "on") { var p = headTop(T.slot); addFx({ type: "word", text: S.dir === "loosen" ? "Loosen" : "Tighten", x: p.x, y: p.y - U * 0.9, dur: 1.2, color: S.dir === "loosen" ? "#BDF0C8" : "#BFD7FF" }); }
     updateToolbar();
     save();
@@ -1524,7 +1462,7 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
   }
   function goodbye() {
-    if (T.state !== "ready") { setDown(); sClunk(); }
+    if (T.state !== "ready") { setDown(); }
   }
   function endingFrame() {
     if (endingDone && now - endingAt > 9) setDown();
@@ -1569,13 +1507,11 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     restLine: "The wrenches are resting.",
     restLine2: "The bolt board will be right here next time.",
     restArt: restArt,
-    soundNote: "A clunk when a tool fits, ratchet clicks and soft pops. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
-    onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
+    onWake: onWake
   });
 
   // ---------- Idle help: the Toybox ghost hand ----------

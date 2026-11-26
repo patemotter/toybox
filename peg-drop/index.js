@@ -1,7 +1,6 @@
 // Script of peg-drop/index.html, loaded by a plain <script src> at the same place in the page.
 // Sections, in order (search for the title to jump to one):
 //   - Saved settings
-//   - Sound (off by default; soft synthesized plinks)
 //   - Canvas and world
 //   - Kinematic pieces (spinners, bucket)
 //   - Balls
@@ -21,8 +20,8 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var KEY = "pegdrop-v1";
-  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "pegdrop-timer-v1", OLD_SKEY = "pegdrop-sound-v1";
+  // The timer is shared Toybox-wide (common/toybox.js); this old key carries over once.
+  var OLD_TKEY = "pegdrop-timer-v1";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var COLORS = [
@@ -84,71 +83,7 @@
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
 
-  // ---------- Sound (off by default; soft synthesized plinks) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js);
-  // the module starts/resumes audio on every touch while sound is on.
-  var master = null, masterCtx = null;
-  function audio() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return null;
-    if (masterCtx !== ac) {
-      try {
-        var lp = ac.createBiquadFilter();
-        lp.type = "lowpass";
-        lp.frequency.value = 3200;
-        master = ac.createGain();
-        master.gain.value = 0.55;
-        master.connect(lp);
-        lp.connect(ac.destination);
-        masterCtx = ac;
-      } catch (e) { return null; }
-    }
-    return ac;
-  }
-
-  var tokens = 4, tokenT = 0, lastSoundT = 0;
-  function takeToken() {
-    var now = performance.now();
-    tokens = Math.min(4, tokens + (now - tokenT) * 0.012);   // about 12 sounds a second at most
-    tokenT = now;
-    if (tokens < 1 || now - lastSoundT < 38) return false;
-    tokens -= 1;
-    lastSoundT = now;
-    return true;
-  }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var actx = audio();
-    if (!actx) return;
-    try {
-      var t = actx.currentTime + (delay || 0);
-      var o = actx.createOscillator(), g = actx.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur * 0.7);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g);
-      g.connect(master);
-      o.start(t);
-      o.stop(t + dur + 0.03);
-    } catch (e) { /* ignore */ }
-  }
   // Pentatonic notes from high (top rows) to low (bottom rows).
-  var NOTES = [1318.5, 1174.7, 1046.5, 880, 784, 659.3, 587.3, 523.3, 440, 392, 329.6, 293.7, 261.6];
-  function plink(row, strength) {
-    if (!Toybox.sound.on() || !takeToken()) return;
-    var idx = Math.round(clamp(row / Math.max(1, pegRows - 1), 0, 1) * (NOTES.length - 1));
-    tone(NOTES[idx], 0.25, 0.03 + 0.03 * strength, "sine");
-  }
-  function boing() { if (Toybox.sound.on() && takeToken()) tone(330, 0.3, 0.06, "sine", 620); }
-  function thup(i) { if (Toybox.sound.on() && takeToken()) tone(196 + i * 12, 0.18, 0.05, "triangle"); }
-  function chime() {
-    [784, 988, 1175].forEach(function (f, k) { tone(f, 0.35, 0.05, "sine", 0, k * 0.09); });
-  }
-  function whoosh() {
-    [880, 740, 587, 440, 330].forEach(function (f, k) { tone(f, 0.3, 0.04, "sine", 0, k * 0.07); });
-  }
 
   // ---------- Canvas and world ----------
   var stage = $("stage"), canvas = $("board"), ctx = canvas.getContext("2d");
@@ -839,14 +774,12 @@
     p.c = b.c;
     if (!p.active) { p.active = true; activePegs.push(p); }
     if (impact > 260 * su && Math.random() < 0.6) burst(p.x, p.y, b.c, 3, 150, 0.35);
-    plink(p.row, Math.min(1, impact / (700 * su)));
   }
   function onBumper(p, b) {
     p.flash = 1;
     p.c = b.c;
     burst(b.x, b.y, b.c, 8, 260, 0.5);
     ring(p.x, p.y, b.c, p.r, 0.45);
-    boing();
   }
 
   function ballPairs() {
@@ -954,7 +887,6 @@
         bn = bins[bi];
         bn.glow = 1; bn.gc = b.c;
         burst(b.x, binTop + 6 * su, b.c, 5, 170, 0.45);
-        thup(bi);
         b.lastBin = bi;
       }
       b.bin = bi;
@@ -1612,10 +1544,8 @@
     burst(mx, my, b.c, 10 + Math.round(8 * p), 240 + 160 * p, 0.5);
     burst(mx, my, WHITE, 4, 200, 0.3);
     ring(mx, my, b.c, b.r, 0.4);
-    pop3(p);
     return true;
   }
-  function pop3(p) { if (Toybox.sound.on() && takeToken()) tone(240 + 160 * p, 0.22, 0.06, "triangle", 520 + 300 * p); }
 
   // Predicted flight until the first thing it would hit (for the dotted aiming line).
   var predPts = [], predEnd = null;
@@ -1819,7 +1749,6 @@
     wakeAll();
     countsDirty = true;
     saveCounts();
-    whoosh();
   }
 
 
@@ -1991,7 +1920,6 @@
     state.color = "rainbow";
     for (var k = 0; k < 5; k++) spawn(W / 2 + (k - 2) * bw * 0.6);
     state.color = keep;
-    chime();
   }
 
   function allSettled() {
@@ -2047,9 +1975,7 @@
   $("shootBtn").setAttribute("aria-pressed", String(state.mode === "shoot"));
   canvas.classList.toggle("aimcursor", state.mode === "shoot");
   build();
-  // The old sound key said "on"/"off"; the shared module reads "1" for on.
-  try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer and sound. It may start the ending right away
+  // The shared grown-up layer: the play timer. It may start the ending right away
   // (a timer that ran out while away), so the board is built first.
   Toybox.init({
     app: "peg-drop",
@@ -2061,13 +1987,11 @@
     restLine: "The pegs are resting.",
     restLine2: "They will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft plinks as the balls bounce. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
+    legacy: { timer: OLD_TKEY },
     onEnding: onEnding,
     onGoodbye: lastDrop,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
   $("stage").appendChild($("tb-toast"));

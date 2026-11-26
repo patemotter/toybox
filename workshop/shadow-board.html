@@ -963,54 +963,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     drawTimerBadge(ctx);
   }
 
-  // ================= Sound (off by default; soft and synthesized) =================
-  var AC = null, master = null, noiseBuf = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.3), a.sampleRate);
-      var data = noiseBuf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      AC = a;
-    } catch (e) { AC = null; }
-  }
-  function blip(freq, dur, vol, type, freq2, delay) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime + (delay || 0);
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function clack(vol, freq, delay) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC || !noiseBuf) return;
-    try {
-      var t = AC.currentTime + (delay || 0);
-      var n = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
-      n.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 3;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-      n.connect(f); f.connect(g); g.connect(master);
-      n.start(t); n.stop(t + 0.1);
-    } catch (e) { /* ignore */ }
-  }
-  function sndLift() { blip(520, 0.08, 0.04, "triangle", 700); }
-  function sndSnap() { clack(0.35, 3200); blip(440, 0.14, 0.08, "sine", 990, 0.03); }
-  function sndBack() { blip(330, 0.35, 0.035, "sine", 200); }
-  function sndDown() { clack(0.18, 900); }
-  function sndTurn() { clack(0.12, 1400); blip(600, 0.06, 0.03, "triangle"); }
-  function sndCheer() { [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) { blip(f, 0.3, 0.06, "triangle", null, i * 0.1); }); }
-
   // ================= Play =================
   function snapR(t) { return 85 + 0.18 * Math.max(t.w, t.h); }
   function inBench(x, y) { return x >= BENCH.x && x <= BENCH.x + BENCH.w && y >= BENCH.y - 10 && y <= BENCH.y + BENCH.h; }
@@ -1018,7 +970,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
   function startSlide(t) {
     t.mode = "slide";
     t.sl = { x0: t.x, y0: t.y, a0: t.a, l0: t.lift, p: 0 };
-    sndBack();
   }
   function startSnap(t) {
     t.mode = "snap";
@@ -1035,14 +986,12 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     var p = homePos(t);
     t.x = p.x; t.y = p.y; t.a = t.home.a;
     addDust(t.x, t.y + t.h * 0.2, 5);
-    sndDown();
   }
   function placedNow(t) {
     t.mode = "placed"; t.x = t.tx; t.y = t.ty; t.a = 0; t.lift = 0; t.bt = 0;
     var i = BD.order.indexOf(t); if (i !== -1) BD.order.splice(i, 1);
     addRing(t.tx, t.ty, Math.max(t.w, t.h) * 0.75);
     addStars(t.tx, t.ty, 16, 420);
-    sndSnap();
     updateCount(true);
     save();
     if (countPlaced() === BD.total && !full) celebrate();
@@ -1051,7 +1000,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     full = true; cheerT = now;
     BD.tools.forEach(function (t, i) { addStars(t.tx, t.ty, 8, 520, 1.3); t.wig = 1; });
     addConfetti(140);
-    sndCheer();
     setTimeout(function () { if (full) { $("doneBox").hidden = false; } }, reduce ? 100 : 1000);
   }
   function messUp() {
@@ -1065,7 +1013,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     list.forEach(function (t) { t.mode = "bench"; });   // count them as on the bench for spacing
     scatter(list);
     list.forEach(function (t, i) { startTumble(t, t.tx, t.ty, 0, i * (reduce ? 0.02 : 0.11)); t.tm.hop = reduce ? 0 : rnd(40, 160); });
-    for (var k = 0; k < list.length; k++) clack(0.15, rnd(700, 1800), k * 0.11 + 0.65);
     updateCount(false);
     save();
   }
@@ -1182,7 +1129,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
   function onDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-    ensureAudio();
     if (busy() || !BD) return;
     var p = localPt(e), w = toWorld(p.x, p.y), t = hitTool(w), d;
     if (!t) { addDust(w.x, w.y, 2); return; }
@@ -1200,7 +1146,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     if (t.mode === "placed") {
       t.wig = 1;
       addStars(w.x, w.y, 5, 260);
-      clack(0.1, 2400);
       return;
     }
     toTop(t);
@@ -1215,7 +1160,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
   function liftUp(t, d) {
     d.lifted = true;
     t.mode = "drag"; t.drag = d; t.va = 0;
-    sndLift();
   }
   function onMove(e) {
     var d = drags[e.pointerId];
@@ -1237,7 +1181,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     if (p2) tw.p2 = p2;
     var ang = Math.atan2(tw.p2.y - d.wy, tw.p2.x - d.wx);
     var na = wrapD(tw.a0 + (ang - tw.ang0) * 180 / Math.PI);
-    if (Math.abs(wrapD(na - t.home.a)) > 12) { clack(0.06, 1600); }
     var pos = { x: t.x, y: t.y };
     setHomeAt(t, pos.x, pos.y, na);
     t.a = na; t.va = 0;
@@ -1249,7 +1192,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     d.twist = null;
     var p = homePos(t);
     setHomeAt(t, p.x, p.y, t.home.a);
-    sndTurn();
     save();
   }
   function onUp(e) {
@@ -1268,7 +1210,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
       if (t.mode === "bench") {
         t.home.a = wrapD(t.home.a + 45);
         t.va += 120;
-        sndTurn();
         save();
       }
       return;
@@ -1282,7 +1223,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
       setHomeAt(t, t.x, t.y, Math.round(t.a));
       t.mode = "bench"; t.va = 0;
       addDust(t.x, t.y + t.h * 0.2, 4);
-      sndDown();
       save();
       return;
     }
@@ -1345,7 +1285,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     S.board = k;
     buildBoard(k, true);
     updateToolbar();
-    blip(700, 0.06, 0.05, "triangle");
     save();
   }
 
@@ -1362,7 +1301,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
   }
   function goodbye() {
     BD.tools.forEach(function (t) { if (t.mode === "placed") t.wig = 1; });
-    blip(660, 0.2, 0.05, "sine", 440);
   }
   function onRest() { endingDone = null; drags = {}; parts = []; }
   function onWake() { endingDone = null; }
@@ -1400,8 +1338,6 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
   window.addEventListener("pagehide", function () { stash(); try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignore */ } });
-
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-shadow",
     timerIntro: "When time is up, any tool being carried drops back onto the bench, the board rests, and the controls lock. The timer carries on across Workshop pages.",
@@ -1412,13 +1348,11 @@ body.ending .messbig { pointer-events: none; opacity: 0.4; }
     restLine: "Every tool is put away.",
     restLine2: "The shadow board will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft clicks and pops. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } },
     onTimer: function (info) { TI = info; }
   });
 

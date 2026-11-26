@@ -23,7 +23,6 @@
 //   - Simulation
 //   - Input: drag the forks; tap the cab to honk
 //   - Coach line
-//   - Sound (off by default; soft and synthesized)
 //   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
 //   - Loop
 //   - Ghost hand
@@ -172,13 +171,13 @@
     if (truck.state === "arrive") {
       var u = clamp(truck.t / 4.5, 0, 1);
       truck.off = -760 * (1 - ease(u));
-      if (u >= 1) { truck.state = "parked"; truck.off = 0; hiss(); puff(TR_X - 20, 4, 0.6, 1); saveState(); }
+      if (u >= 1) { truck.state = "parked"; truck.off = 0; puff(TR_X - 20, 4, 0.6, 1); saveState(); }
     } else if (truck.state === "parked") {
       truck.ready = truckCanGo() ? truck.ready + dt : 0;
       if (truck.ready > 1.4) {
         var loaded = truckEmpties();
         truck.state = "leave"; truck.t = 0; truck.toot = clock;
-        toot(); rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 });
+        rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 });
         if (loaded) flashCoach("Truck loaded!", 3200);
         trucks++;
         if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 2600);
@@ -429,7 +428,6 @@
   function bump() {
     if (clock - lastBump < 0.3) return;
     lastBump = clock; bumps++;
-    clink();
     puff(tipX(), F.h + 4, 0.3, 1);
     if (bumps >= 2 && !F.assist) {
       bumps = 0;
@@ -470,7 +468,7 @@
   function engage(o) {
     F.engaged = o; o.placed = false; F.assist = null; bumps = 0;
     F.slide = { x: nearFace(o) - F.dir, h: o.y + SLOT };
-    clunk(); flashCoach("Forks in!", 2400);
+    flashCoach("Forks in!", 2400);
     regrab();
     rings.push({ x: nearFace(o), y: o.y + 8, t: 0 });
   }
@@ -485,7 +483,6 @@
     pickFrom = { x: wx(o), y: o.y };
     o.tr = false; o.placed = false;
     F.load = o; F.engaged = null; F.assist = null;
-    hydraulic();
     flashCoach("Up it goes!", 2400);
   }
   function setDown(c, sup) {
@@ -497,7 +494,6 @@
     o.placed = true;
     objs.push(o);
     F.engaged = o; F.assist = null;
-    thud();
     puff(c - 40, sup + 2, 0.5, 1); puff(c + 40, sup + 2, 0.5, 1);
     var same = pickFrom && Math.abs(pickFrom.x - c) < 10 && Math.abs(pickFrom.y - sup) < 3;
     pickFrom = null;
@@ -546,7 +542,6 @@
     F.turn = { t: 0 }; F.vx = 0; F.assist = null;
     var M = F.x - F.dir * MID;
     skids.push({ x: M, t: 0, d: F.dir });
-    beep();
   }
   function finishTurn() {
     var M = F.x - F.dir * MID;
@@ -666,7 +661,6 @@
     auto = true; autoPlaced = 0; autoWait = 0;
     if (!steps.length) planAuto();
     if (!auto && !steps.length) { wiggle($("goBtn")); return; }
-    whirr();
   }
   function wiggle(b) { b.classList.remove("wiggle"); void b.offsetWidth; b.classList.add("wiggle"); }
 
@@ -709,7 +703,6 @@
         bl.lifts = done;
         bl.job.left = 6 - bl.lifts;
         pieceT.push(clock);
-        tap();
         if (bl.lifts >= 6) finishRow();
       }
     } else if (bl.st === "back") {
@@ -728,13 +721,11 @@
     mergeEmpties();
     puff(WALL_L + 40, wallTop(), 0.6, 1); puff(WALL_R - 40, wallTop(), 0.6, 1);
     sparkles((WALL_L + WALL_R) / 2, wallTop() + 10, 6);
-    chime();
     if (rows >= ROWS) {
       wallDone = true;
       bl.flag = true;
       roof.t = clock + 1.5;
       flashCoach("The wall is done!", 6000);
-      setTimeout(fanfare, 400);
       confetti((WALL_L + WALL_R) / 2, wallTop() + 60, reduce ? 20 : 80);
       if (Toybox.kind) setTimeout(function () { Toybox.kind(); }, 3500);
     } else flashCoach("A new row!", 3000);
@@ -755,7 +746,6 @@
     bird = null;
     if (drag) drag.paused = false;
     newTruck();
-    chime();
     coachAgain();
     saveState();
   }
@@ -783,11 +773,9 @@
       crossing = { x: from, to: Math.min(visRight() + 80, mid + visW * 0.75 + 200), honked: false, wave: -9 };
     } else if (m === "hop") {
       hop = { o: hopTarget(), t: clock };
-      boing();
     } else if (m === "bird") {
       var g = guardPoint();
       bird = { st: "in", t: 0, x: g[0] - 300, y: g[1] + 220, sx: g[0] - 300, sy: g[1] + 220 };
-      tweet();
     }
   }
   function hopTarget() {
@@ -803,7 +791,7 @@
   function stepMoments(dt) {
     if (crossing) {
       var c = crossing, mid = F.x - F.dir * MID, close = Math.abs(c.x - mid) < 230;
-      if (close && !c.honked && Math.abs(c.x - mid) < 210) { c.honked = true; horn(); c.wave = clock; }
+      if (close && !c.honked && Math.abs(c.x - mid) < 210) { c.honked = true; c.wave = clock; }
       var pause = c.wave > 0 && clock - c.wave < 1.4;
       if (!pause) c.x += 80 * dt;
       stopFor = close ? 0.2 : 0;
@@ -819,7 +807,7 @@
         if (u >= 1) { bird.st = "ride"; bird.t = 0; }
       } else if (bird.st === "ride") {
         bird.x = g[0]; bird.y = g[1];
-        if (bird.t > 9) { bird.st = "out"; bird.t = 0; bird.sx = g[0]; bird.sy = g[1]; tweet(); }
+        if (bird.t > 9) { bird.st = "out"; bird.t = 0; bird.sx = g[0]; bird.sy = g[1]; }
       } else if (bird.st === "out") {
         var v = clamp(bird.t / 2.6, 0, 1), tx = WALL_R - 40, ty = wallTop() + (wallDone ? 16 : 0);
         bird.x = bird.sx + (tx - bird.sx) * ease(v); bird.y = bird.sy + (ty - bird.sy) * ease(v) + Math.sin(v * Math.PI) * 80;
@@ -1428,7 +1416,7 @@
       ctx.restore();
     }
     ctx.globalAlpha = 1;
-    // Beep and horn rings: arcs that grow (seen with the sound off).
+    // Beep and horn rings: arcs that grow.
     for (i = 0; i < rings.length; i++) {
       var g = rings[i], q = g.t / 0.7, x = g.tr ? g.x + truck.off : g.x;
       ctx.globalAlpha = 1 - q;
@@ -1509,7 +1497,7 @@
     // Reversing: the beacon flashes and beep rings pop from the back.
     if (F.dir * F.vx < -25 && !F.turn) {
       beepT -= dt;
-      if (beepT <= 0) { beepT = 0.8; rings.push({ x: F.x - F.dir * (BACK + 6), y: 112, t: 0, arc: -F.dir }); beep(); }
+      if (beepT <= 0) { beepT = 0.8; rings.push({ x: F.x - F.dir * (BACK + 6), y: 112, t: 0, arc: -F.dir }); }
     } else beepT = 0;
   }
 
@@ -1524,7 +1512,7 @@
     if (ending || Toybox.timer.locked()) return;
     if (drag && drag.id !== e.pointerId) return;
     var w = screenToWorld(e.clientX, e.clientY);
-    if (onTruckCab(w)) { toot(); rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 }); return; }
+    if (onTruckCab(w)) { rings.push({ x: 40, y: 150, t: 0, tr: true, big: 1 }); return; }
     if (!stepsLocked) { steps = []; }
     auto = false;
     // Grabbing the forks, the load or the machine itself moves it from where it is; a touch anywhere else calls the forks over.
@@ -1556,7 +1544,7 @@
   }
   cv.addEventListener("pointerup", endDrag);
   cv.addEventListener("pointercancel", endDrag);
-  function honk() { horn(); F.waveArm = clock; rings.push({ x: F.x + F.dir * (FORK + 20), y: 150, t: 0, arc: F.dir }); flashCoach("Beep beep!", 2000); }
+  function honk() { F.waveArm = clock; rings.push({ x: F.x + F.dir * (FORK + 20), y: 150, t: 0, arc: F.dir }); flashCoach("Beep beep!", 2000); }
 
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
@@ -1600,63 +1588,6 @@
     if (t !== coachShown) { coachShown = t; coach.say(t, Math.max(6000, now < flashUntil ? flashUntil - now : 0) / 1000); }
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; hum = null; } return master; }
-  function tone(freq, dur, vol, type, slideTo, delay, filt) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    if (filt) { var f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filt; o.connect(f); f.connect(g); }
-    else o.connect(g);
-    g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function clunk() { tone(140, 0.22, 0.05, "triangle", 70); tone(900, 0.04, 0.012, "square", 500); }
-  function clink() { tone(520, 0.08, 0.015, "triangle", 380); }
-  function thud() { tone(110, 0.28, 0.06, "sine", 55); }
-  function hydraulic() { tone(180, 0.45, 0.018, "sawtooth", 260, 0, 500); }
-  function hiss() { tone(2400, 0.35, 0.008, "sawtooth", 1200, 0, 3000); }
-  function beep() { tone(1000, 0.3, 0.012, "sine"); }
-  function horn() { tone(420, 0.18, 0.03, "square", null, 0, 900); tone(420, 0.24, 0.03, "square", null, 0.24, 900); }
-  function toot() { tone(300, 0.2, 0.03, "square", null, 0, 700); tone(360, 0.3, 0.03, "square", null, 0.22, 700); }
-  function whirr() { tone(200, 0.35, 0.015, "sine", 320); }
-  function tap() { tone(700, 0.06, 0.02, "triangle", 500); }
-  function boing() { tone(300, 0.3, 0.03, "sine", 700); }
-  function tweet() { tone(2200, 0.08, 0.012, "sine", 2800); tone(2400, 0.08, 0.012, "sine", 3000, 0.12); }
-  function chime() { tone(523, 0.4, 0.035); tone(659, 0.4, 0.035, "sine", 0, 0.14); tone(784, 0.6, 0.035, "sine", 0, 0.28); }
-  function fanfare() { [523, 659, 784, 1047, 784, 1047].forEach(function (f, i) { tone(f, i === 5 ? 0.9 : 0.3, 0.035, "triangle", 0, i * 0.17); }); }
-  // Engine hum (two detuned triangles, lowpassed) follows the speed; a soft whine follows the lift.
-  var hum = null;
-  function humTick() {
-    var ac = Toybox.sound.ready();
-    var level = clamp(Math.abs(F.vx) / 230, 0, 1), lift = clamp(Math.abs(F.vh) / 130, 0, 1);
-    if (!ac) { if (hum) { try { hum.a.stop(); hum.b.stop(); hum.w.stop(); } catch (e) { /* ignore */ } hum = null; } return; }
-    if (!hum) {
-      if (level < 0.05 && lift < 0.05) return;
-      var dest = out(ac), a = ac.createOscillator(), b = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      var w = ac.createOscillator(), wf = ac.createBiquadFilter(), wg = ac.createGain();
-      a.type = "triangle"; b.type = "triangle"; a.frequency.value = 60; b.frequency.value = 61.5;
-      f.type = "lowpass"; f.frequency.value = 300; g.gain.value = 0;
-      a.connect(f); b.connect(f); f.connect(g); g.connect(dest);
-      w.type = "sawtooth"; w.frequency.value = 200; wf.type = "bandpass"; wf.frequency.value = 600; wf.Q.value = 4; wg.gain.value = 0;
-      w.connect(wf); wf.connect(wg); wg.connect(dest);
-      a.start(); b.start(); w.start();
-      hum = { a: a, b: b, g: g, w: w, wg: wg };
-    }
-    hum.g.gain.setTargetAtTime(0.004 + level * 0.02, ac.currentTime, 0.1);
-    hum.a.frequency.setTargetAtTime(58 + level * 26, ac.currentTime, 0.12);
-    hum.b.frequency.setTargetAtTime(59.5 + level * 26, ac.currentTime, 0.12);
-    hum.wg.gain.setTargetAtTime(lift * 0.01, ac.currentTime, 0.08);
-    hum.w.frequency.setTargetAtTime(180 + (F.vh > 0 ? 60 : 0) * lift, ac.currentTime, 0.1);
-  }
-
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   function drawTimer(info) {
     var active = info.phase === "running" || info.phase === "ending";
@@ -1676,7 +1607,7 @@
     coach.clear();
     if (!info.goodbye) parking = true;
   }
-  function goodbyePark() { parking = true; chime(); }
+  function goodbyePark() { parking = true; }
   function restSVG() {
     var o = '<rect width="240" height="200" fill="#2B3A67"/>';
     o += '<circle cx="206" cy="30" r="14" fill="#FFF4CC" stroke="#1D2340" stroke-width="2.5"/><circle cx="212" cy="26" r="12" fill="#2B3A67"/>';
@@ -1721,7 +1652,7 @@
     camera(dt);
     draw(clock);
     coachTick();
-    humT += dt; if (humT > 0.1) { humT = 0; humTick(); }
+    humT += dt; if (humT > 0.1) { humT = 0; }
     requestAnimationFrame(loop);
   }
   document.addEventListener("visibilitychange", function () { if (document.hidden) saveState(); });
@@ -1774,13 +1705,11 @@
     restLine: "The forklift is resting.",
     restLine2: "The forklift will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft engine hums, beeps and clunks. Hold for 2 seconds.",
-    legacy: { timer: "site-timer-v1", sound: "site-sound-v1" },
+    legacy: { timer: "site-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbyePark,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
   resize(); requestAnimationFrame(resize);

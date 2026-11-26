@@ -2,7 +2,6 @@
 // Sections, in order (search for the title to jump to one):
 //   - Piece catalog
 //   - Saved state
-//   - Sound (only when the grown-up turned it on)
 //   - Drawing helpers
 //   - Thumbnails for the picture buttons
 //   - Effects in screen px (bits, rings, "Clunk!", words)
@@ -103,64 +102,6 @@
     } catch (e) { /* ignore */ }
   }
   if (startFresh) save();
-
-  // ---------- Sound (only when the grown-up turned it on) ----------
-  function ac() { return Toybox.sound.ready(); }
-  function tone(ctx, type, f0, f1, t0, dur, vol) {
-    var o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = type; o.frequency.setValueAtTime(f0, t0);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(ctx.destination);
-    o.start(t0); o.stop(t0 + dur + 0.05);
-  }
-  function sClunk() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime;
-    tone(ctx, "sine", 150, 55, t, 0.22, 0.22);
-    tone(ctx, "triangle", 420, 180, t, 0.07, 0.06);
-  }
-  function sWhistle() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime, d = 1.1;
-    [523, 659, 784].forEach(function (f) {
-      var o = ctx.createOscillator(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
-      o.type = "sine"; o.frequency.value = f;
-      lfo.frequency.value = 5.5; lg.gain.value = f * 0.006; lfo.connect(lg); lg.connect(o.frequency);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.045, t + 0.08);
-      g.gain.setValueAtTime(0.045, t + d - 0.3);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(t); lfo.start(t); o.stop(t + d + 0.05); lfo.stop(t + d + 0.05);
-    });
-  }
-  function sPoof() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 700, 200, ctx.currentTime, 0.25, 0.08); }
-  function sClick() { var ctx = ac(); if (!ctx) return; tone(ctx, "square", 900, 600, ctx.currentTime, 0.05, 0.03); }
-  function sDing() { var ctx = ac(); if (!ctx) return; tone(ctx, "sine", 988, 980, ctx.currentTime, 0.35, 0.04); }
-  function sChime() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime;
-    tone(ctx, "sine", 659, 659, t, 0.5, 0.06); tone(ctx, "sine", 523, 523, t + 0.25, 0.7, 0.06);
-  }
-  // A soft "chuff": a short puff of filtered noise, once per half turn of the driving wheels.
-  var noiseBuf = null, noiseCtx = null;
-  function sChuff(vol) {
-    var ctx = ac(); if (!ctx) return;
-    if (!noiseBuf || noiseCtx !== ctx) {
-      noiseCtx = ctx;
-      noiseBuf = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.12), ctx.sampleRate);
-      var d = noiseBuf.getChannelData(0);
-      for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    }
-    var src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), t = ctx.currentTime;
-    src.buffer = noiseBuf; bp.type = "bandpass"; bp.frequency.value = 520; bp.Q.value = 0.7;
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-    src.connect(bp); bp.connect(g); g.connect(ctx.destination); src.start(t);
-  }
-
 
   // ---------- Drawing helpers ----------
   function rr(c, x, y, w, h, r) {
@@ -616,7 +557,6 @@
     if (engineCount() >= 2 && TYPES[state.pieces[0].t].eng) {
       var old = state.pieces[0], cp = carPoses()[0];
       if (cp) { var sc = screenOf(cp, 16); burst(sc.x, sc.y, old.color, 18, true); fx.push({ k: "ring", x: sc.x, y: sc.y, t: 0, life: 0.5 }); }
-      sPoof();
       state.pieces.shift();
       run.d -= plen(old) + CG;
       if (sel === 0) endSel(); else if (sel > 0) sel--;
@@ -656,7 +596,6 @@
     var sc = screenOf(cp, 16);
     burst(sc.x, sc.y, p.color, 24, true);
     fx.push({ k: "ring", x: sc.x, y: sc.y, t: 0, life: 0.5 });
-    sPoof();
     var gap = plen(p) + CG;
     state.pieces.splice(i, 1);
     if (i === 0) {
@@ -673,7 +612,6 @@
     if (i <= 0 || i >= poses.length) { if (poses[i]) poses[i].p.jig = 0.6; return; }
     var cp = poses[i], fxp = cp.x + Math.cos(cp.ang) * cp.len / 2, fyp = cp.y + Math.sin(cp.ang) * cp.len / 2;
     var X = SX(fxp), Y = SY(fyp, cp.z + 30);
-    sClunk();
     fx.push({ k: "clunk", x: X, y: Y, t: 0, life: 0.9 });
     for (var k = 0; k < 8; k++) {
       var ang = rand(-Math.PI, 0), sp = rand(120, 300);
@@ -754,7 +692,7 @@
     if (cowNear()) near = true;
     stepMoment(dt, poses, hs);
     run.gate += ((near ? 1 : 0) - run.gate) * Math.min(1, dt * 2.5);
-    if (near) { run.ding -= dt; if (run.ding <= 0) { run.ding = 0.8; sDing(); } } else run.ding = 0;
+    if (near) { run.ding -= dt; if (run.ding <= 0) { run.ding = 0.8; } } else run.ding = 0;
     stepRoad(dt);
     // Smoke from steam engines, a little exhaust from diesels.
     run.smokeT -= dt;
@@ -767,7 +705,7 @@
     }
     if (run.v > 5 && P.length && P[0].t === "steam") {
       run.chuffT -= dt * run.v / 60;
-      if (run.chuffT <= 0) { run.chuffT = 1; sChuff(0.05); }
+      if (run.chuffT <= 0) { run.chuffT = 1; }
     }
     for (var k = run.puffs.length - 1; k >= 0; k--) {
       var f = run.puffs[k]; f.t += dt;
@@ -779,7 +717,7 @@
     for (var s = 0; s < lay.switches.length; s++) lay.switches[s].flip = Math.max(0, lay.switches[s].flip - dt * 2.5);
   }
   function arrive() {
-    run.v = 0; run.atStation = true; run.dwell = 5.5; sChime();
+    run.v = 0; run.atStation = true; run.dwell = 5.5;
     // A real trip round the loop with a proper train: sometimes a kind word.
     if (run.travel > 600 && carCount() >= 3 && !kindGiven && !run.ending) {
       kindGiven = true;
@@ -1683,7 +1621,7 @@
   });
 
   function flipSwitch(sw) {
-    sw.on = 1 - sw.on; sw.flip = 1; sClick();
+    sw.on = 1 - sw.on; sw.flip = 1;
     flipped = true; ghostDone();
     buildLayer(); updateCoach();
   }
@@ -1691,15 +1629,9 @@
     if (!run || Toybox.timer.locked() || !hasEngine()) return;
     run.toot = TOOT_T;
     var poses = carPoses(), h = poses[0];
-    if (h && h.p.t === "steam") sWhistle(); else sHorn();
     if (h) for (var i = 0; i < 6; i++) { puff(h, h.p.t === "steam" ? 0.39 : 0.3, 1.5); var f = run.puffs[run.puffs.length - 1]; f.vz = 60 + i * 12; f.vx = rand(-30, 30); }
     var b = $("toot"); b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
     tooted = true; updateCoach();
-  }
-  function sHorn() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime;
-    [311, 392].forEach(function (f) { tone(ctx, "triangle", f, f, t, 0.8, 0.05); });
   }
 
   // ---------- Panel ----------
@@ -1725,7 +1657,7 @@
     if (Toybox.timer.locked() || !hasEngine()) return;
     state.go = on;
     if (state.go && run && run.atStation) run.dwell = 0;
-    if (state.go) { sWhistleSoft(); ghostDone(); }
+    if (state.go) { ghostDone(); }
     save(); updateGo(); updateCoach();
   }
   // No engine yet: a gentle hint and the engine tiles hop (the Go row stays, so the stage never resizes).
@@ -1736,7 +1668,6 @@
     Array.prototype.forEach.call(document.querySelectorAll("#engPicks .pick"), function (b) { b.classList.remove("hop"); void b.offsetWidth; b.classList.add("hop"); });
   }
   $("go").addEventListener("click", function () { if (!hasEngine()) { needEngine(); return; } setGo(!state.go); });
-  function sWhistleSoft() { var h = state.pieces[0]; if (h && h.t === "steam") sWhistle(); else sHorn(); }
   $("toot").addEventListener("click", function () { if (!hasEngine()) { needEngine(); return; } toot(); });
   $("newBtn").addEventListener("click", function () {
     if (Toybox.timer.locked()) return;
@@ -1745,7 +1676,6 @@
     poses.forEach(function (q, k) {
       setTimeout(function () { var X = SX(q.x), Y = SY(q.y, q.z + 14); burst(X, Y, q.p.color, 10, false); }, k * 40);
     });
-    if (poses.length) sPoof();
     state.pieces = []; state.go = false; kindGiven = false; sel = -1;
     startRun();
     setTab("engines");
@@ -1762,7 +1692,7 @@
   function trainRunning() { return !!(run && hasEngine() && (state.go || run.v > 5)); }
   $("surprise").addEventListener("click", function () {
     if (Toybox.timer.locked() || !run) return;
-    if (TM) { var f = momentFocus(); burst(f.x, f.y, "#FFC93C", 6, false); sClick(); return; }
+    if (TM) { var f = momentFocus(); burst(f.x, f.y, "#FFC93C", 6, false); return; }
     for (var i = 0; i < MOMENTS.length; i++) {
       var k = MOMENTS[(momentAt + i) % MOMENTS.length];
       if (k === lastMoment) continue;
@@ -1851,12 +1781,6 @@
     }
     return true;
   }
-  function sMoo() {
-    var ctx = ac(); if (!ctx) return;
-    var t = ctx.currentTime;
-    tone(ctx, "sawtooth", 150, 118, t, 0.9, 0.03);
-    tone(ctx, "sine", 300, 236, t, 0.9, 0.03);
-  }
   function stepMoment(dt, poses, hs) {
     if (!TM) return;
     var now = performance.now() / 1000, el = now - TM.t0, SPD = 34;
@@ -1869,10 +1793,10 @@
         if (run.gate > 0.85 && crossingClear(poses, hs)) { TM.ph = "on"; TM.pk = 0; }
         else if (TM.waitT > 9) {
           // the train is in the way for a long time: it moos from the side and goes back
-          fx.push({ k: "text", x: SX(TM.pt.x), y: SY(TM.pt.y, 90), t: 0, life: 3, text: "Moo!", size: 30 }); sMoo();
+          fx.push({ k: "text", x: SX(TM.pt.x), y: SY(TM.pt.y, 90), t: 0, life: 3, text: "Moo!", size: 30 });
           TM.ph = "back"; TM.pk = 0;
         }
-      } else if (TM.ph === "on") { if (walk(TM.Wt, TM.C)) { TM.ph = "stand"; TM.standT = 0; fx.push({ k: "text", x: SX(TM.C.x), y: SY(TM.C.y, 90), t: 0, life: 3.2, text: "Moo!", size: 34 }); sMoo(); } }
+      } else if (TM.ph === "on") { if (walk(TM.Wt, TM.C)) { TM.ph = "stand"; TM.standT = 0; fx.push({ k: "text", x: SX(TM.C.x), y: SY(TM.C.y, 90), t: 0, life: 3.2, text: "Moo!", size: 34 }); } }
       else if (TM.ph === "stand") { TM.standT += dt; if (TM.standT > 3.6) { TM.ph = "off"; TM.pk = 0; } }
       else if (TM.ph === "off") { if (walk(TM.C, TM.E)) { TM.ph = "out"; TM.pk = 0; } }
       else if (TM.ph === "out" || TM.ph === "back") {
@@ -1901,7 +1825,6 @@
             b.vx = Math.cos(a) * (70 + i * 6); b.vy = Math.sin(a) * (70 + i * 6); b.vz = 55 + (i % 3) * 12;
           });
           TM.end = 7;
-          var ctx = ac(); if (ctx) [0, 0.12, 0.24].forEach(function (d) { tone(ctx, "sine", 2400, 3000, ctx.currentTime + d, 0.08, 0.02); });
         }
         return;
       }
@@ -2129,7 +2052,7 @@
   });
   function showSel(i) {
     sel = i;
-    var p = state.pieces[i]; p.jig = 1; sClick();
+    var p = state.pieces[i]; p.jig = 1;
     panel.dataset.tab = "sel";
     Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function (b) { b.setAttribute("aria-selected", "false"); });
     refreshSel();
@@ -2155,7 +2078,7 @@
     p.color = col; p.jig = 1;
     var q = carPoses()[sel];
     if (q) burst(SX(q.x), SY(q.y, q.z + 16), col, 14, false);
-    sClick(); save(); refreshSel();
+    save(); refreshSel();
   }
   $("takeOff").addEventListener("click", function () { if (!Toybox.timer.locked() && sel >= 0) removeAt(sel); });
   $("selDone").addEventListener("click", function () { endSel(); });
@@ -2271,15 +2194,13 @@
     restLine: "The train is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft clunks, a whistle, a crossing bell and a station chime. Hold for 2 seconds.",
     endingMaxMs: 30000,
     onEnding: onEnding,
-    onGoodbye: function () { if (run && hasEngine()) { run.toot = TOOT_T; sWhistleSoft(); } },
+    onGoodbye: function () { if (run && hasEngine()) { run.toot = TOOT_T; } },
     onWake: function () {
       if (run) { run.ending = false; run.endDone = null; run.dwell = 1; }
       state.go = false; save(); updateGo(); updateCoach();
-    },
-    onSound: function (on) { if (on) setTimeout(sChime, 60); }
+    }
   });
   if ($("tb-farewell")) stage.appendChild($("tb-farewell"));
   if (/[?&]debug\b/.test(location.search)) window.__train = { state: state, run: function () { return run; }, upright: function () { return UPRIGHT; }, view: function () { return { vs: vs, tilt: TILT, W: W, H: H }; }, add: addPiece, ghost: ghost,

@@ -83,7 +83,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // grab (between the axles), cowSide (feet), cowFront / cowHead (feet / neck), cat (feet), hutch.
   var $ = function (id) { return document.getElementById(id); };
   var U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  var D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2;
+  var D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2;
   var Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   var NAME = (Farm.NAMES && Farm.NAMES.cows) || "Moooovie Time";
   document.title = NAME; $("title").textContent = NAME;
@@ -422,7 +422,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (phase === "arrive") { coach.say("The mixer wagon is backing up.", 3); return; }
     if (phase === "milk") { coach.say("The cows are walking to the milking parlor.", 3); return; }
     if (phase === "munch") { coach.say("The cows are munching.", 3); return; }
-    if (phase === "work") { snd.horn(); coach.say(BUSY[stepId], 3); }
+    if (phase === "work") { coach.say(BUSY[stepId], 3); }
   }
 
   function setPhase(p) { phase = p; phaseT = 0; }
@@ -434,16 +434,16 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   // the telehandler's moves: each is a run of the SEQ poses below
   var MOVES = { cut: [0, 3], drop: [3, 7], bale: [7, 10], drop2: [10, 14] };
   function teleRun(name, end) { var r = MOVES[name]; tele.st = "load"; tele.t = 0; tele.seg = undefined; tele.segs = SEQ.slice(r[0], r[1]); tele.end = end; setPhase("work"); }
-  function doCut() { snd.horn(); coach.say("The shear grab cuts a block of silage.", 4); teleRun("cut", function () { setSub("drop"); }); }
+  function doCut() { coach.say("The shear grab cuts a block of silage.", 4); teleRun("cut", function () { setSub("drop"); }); }
   function doDrop() { coach.say("The silage drops into the mixer wagon.", 4); teleRun("drop", function () { setSub("bale"); }); }
   function doBale() { coach.say("The shear grab picks up the straw bale.", 4); teleRun("bale", function () { setSub("drop2"); }); }
   function doDrop2() { coach.say("The straw goes into the mixer wagon.", 4); teleRun("drop2", function () { setSub("meal"); }); }
-  function doMeal() { meal = 0.01; snd.tick(); setPhase("work"); coach.say("The meal bin's auger pours in the meal.", 4); }
+  function doMeal() { meal = 0.01; setPhase("work"); coach.say("The meal bin's auger pours in the meal.", 4); }
   function mealDone() { bringIn("mix"); }
-  function doMix() { rig.mixT = 0; snd.horn(); setPhase("work"); coach.say("The auger mixes it all up.", 4); }
+  function doMix() { rig.mixT = 0; setPhase("work"); coach.say("The auger mixes it all up.", 4); }
   function mixDone() { coach.say("The food is all mixed!", 3); bringIn("feed"); }
   function doDrive() {
-    rig.st = "go"; auto = true; setPhase("work"); snd.horn();
+    rig.st = "go"; auto = true; setPhase("work");
     coach.say("The tractor pulls the mixer wagon into the cow barn.", 4);
   }
   function act(part) {
@@ -460,7 +460,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     return false;
   }
   function feedDone() {
-    feeds++; save(); snd.chime();
+    feeds++; save();
     Farm.world.update(function (w) { w.cows = (typeof w.cows === "number" && isFinite(w.cows) ? w.cows : 0) + 1; });
     grab = null; auto = true;
     setPhase("munch");
@@ -475,7 +475,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     setPhase("done");
     coach.say("All the cows are in the milking parlor.", 5);
     coach.step("Tap the farmyard to start again.");
-    snd.chime(); Toybox.kind();
+    Toybox.kind();
   }
   function again() {
     if (phase !== "done") return false;
@@ -522,31 +522,20 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (pick === "calf") {
       var hx = null;
       HUTCH.forEach(function (h) { var sx = PX(scF, h, 1.45); if (sx > 20 && sx < RF.w - 20) hx = h; });
-      if (hx !== null) { calfS = { x: hx, t: 0 }; coach.say("A calf peeks out!", 3); snd.pop(); return; }
+      if (hx !== null) { calfS = { x: hx, t: 0 }; coach.say("A calf peeks out!", 3); return; }
       pick = "moo";
     }
     if (pick === "moo") {
       var who;
       if (inYard() && phase !== "milk" && phase !== "done") who = { paddock: 1, i: surpriseN % 2 };
       else { var cc = cowNear(scF.cam); who = cc ? { cow: cc } : { door: 1 }; }
-      if (who) { mooS = { who: who, t: 0 }; mooSound(); coach.say("Moo! Says the cow.", 3); return; }
+      if (who) { mooS = { who: who, t: 0 }; coach.say("Moo! Says the cow.", 3); return; }
     }
     if (pick === "cat") {
       if (inYard() && phase !== "milk" && phase !== "done") catS = { where: "clamp", x: 4.6, t: 0, st: "walk", ph: 0 };
       else catS = { where: "barrier", x: (phase === "done" || phase === "milk") ? DOOR - 5 : scF.cam - 2.5, t: 0, st: "walk", ph: 0 };
       coach.say("The barn cat comes to see.", 3);
     }
-  }
-  function mooSound() {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) return;
-    try {
-      var t = ac.currentTime, o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      o.type = "sawtooth"; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(175, t + 0.25); o.frequency.linearRampToValueAtTime(120, t + 1.0);
-      f.type = "lowpass"; f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(900, t + 0.3); f.frequency.linearRampToValueAtTime(400, t + 1.0);
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
-      o.connect(f); f.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 1.2);
-    } catch (e) { /* ignore */ }
   }
 
   // =====================================================================================================
@@ -613,14 +602,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   var NAMES = { tele: "Telehandler", grab: "Shear grab", bale: "Straw bale", clamp: "Silage clamp", meal: "Meal bin", tub: "Mixer wagon", rig: "Tractor", parlor: "Milking parlor" };
   function tagPart(part) {
     if (!part) return false;
-    if (part.indexOf("hutch") === 0) { var hx = HUTCH[+part.slice(5)]; calfS = { x: hx, t: 0 }; tagW(scF, "Calf hutch", hx, 1.8, 1.45); snd.pop(); return true; }
-    if (part.indexOf("cow") === 0) { var c = cows[+part.slice(3)]; mooS = { who: { cow: c }, t: 0 }; mooSound(); tagW(scF, "Cow", c.x, 2.2, c.r); return true; }
+    if (part.indexOf("hutch") === 0) { var hx = HUTCH[+part.slice(5)]; calfS = { x: hx, t: 0 }; tagW(scF, "Calf hutch", hx, 1.8, 1.45); return true; }
+    if (part.indexOf("cow") === 0) { var c = cows[+part.slice(3)]; mooS = { who: { cow: c }, t: 0 }; tagW(scF, "Cow", c.x, 2.2, c.r); return true; }
     var name = NAMES[part];
     if (part === "tub" && rig.mixT >= 0) name = "Auger";
     if ((part === "tub" || part === "rig") && feeding() && feedOn) name = "Chute";
     if (!name) return false;
     var p = partScreen(part);
-    if (part === "tele" || part === "rig") snd.horn(); else snd.tick();
     if (p) Toybox.nametag(name, p.x, p.y - Math.min(60, scF.k * 1.2), 2400);
     return true;
   }
@@ -700,9 +688,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     updateParts(dt);
     follow(dt);
     engLevel += (work - engLevel) * Math.min(1, dt * 4);
-    snd.engine(ending ? -1 : 0.15 + engLevel * 0.85);
-    snd.soil(rig.mixT >= 0 ? 0.5 * clamp(rig.spinV / 6, 0, 1) : 0);
-    snd.pour(meal > 0.3 || (feedOn && feeding()) ? 0.5 : 0);
   }
   // the telehandler: cut a block of silage, drop it in the wagon; lift the straw bale in too
   var A_REST = 0.25, A_CUT = 0.013, A_LOW = 0.225, A_CARRY = -0.2, A_DROP = -0.357;
@@ -756,8 +741,8 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function seqEvent(ev, end) {
     if (!ev) return;
-    if (ev === "cut" && end) { tele.load = "silage"; clampS.notch = 1; clampS.fresh = 1; snd.clunk(); }
-    if (ev === "grab" && end) { tele.load = "straw"; clampS.bale = false; snd.clunk(); }
+    if (ev === "cut" && end) { tele.load = "silage"; clampS.notch = 1; clampS.fresh = 1; }
+    if (ev === "grab" && end) { tele.load = "straw"; clampS.bale = false; }
     if (ev === "drop" && end && tele.load) release();
   }
   function forkWorld() { var e = teleEnd(tele.a, tele.ext); return [tele.x + tele.d + tele.dir * e[0], -e[1]]; }
@@ -775,7 +760,6 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (f.kind === "silage") tub.mound = { col: SIL[0], h: 0.75 };
       else if (tub.mound) tub.mound.h = 0.95;
       tub.fill = Math.min(1, tub.fill + 0.5);
-      snd.clunk();
       for (var j = 0; j < 8; j++) addPart({ kind: "bit", x: cx + (Math.random() - 0.5) * 2.4, h: 2.9, vx: (Math.random() - 0.5) * 2, vh: 1 + Math.random() * 1.5, life: 0.6, size: 0.07, col: pickCol(cols), floor: 2.7, spin: 4 });
       falling = null;
     }
@@ -835,8 +819,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
       if (rig.x >= PARK) { rig.x = PARK; rig.v = 0; rig.st = "park"; grab = null; }
     } else if (rig.st === "back") {
       var d = rig.x - WAG; rig.v = -clamp(d * 2, 1.2, 8); rig.x += Math.max(rig.v * dt, -d); w = 0.5;
-      if (Math.random() < dt * 2) snd.tick();
-      if (d < 0.03) { rig.x = WAG; rig.v = 0; rig.st = "park"; snd.clunk(); if (phase === "arrive") bringIn("load"); }
+      if (d < 0.03) { rig.x = WAG; rig.v = 0; rig.st = "park"; if (phase === "arrive") bringIn("load"); }
     } else rig.chute = Math.max(0, rig.chute - dt * 2);
     rig.wheel += -rig.v * dt;
     return w;
@@ -863,13 +846,13 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
   }
   function updateCat(dt) {
     var c = catS; c.t += dt;
-    if (c.st === "walk") { c.x += dt * 1.6; c.ph += dt * 9; if (c.t > 2.2) { c.st = "sit"; c.t = 0; snd.pop(); } }
+    if (c.st === "walk") { c.x += dt * 1.6; c.ph += dt * 9; if (c.t > 2.2) { c.st = "sit"; c.t = 0; } }
     else if (c.st === "sit") { if (c.t > 2.4) { c.st = "go"; c.t = 0; } }
     else { c.x += dt * 2.4; c.ph += dt * 11; if (c.t > 2.5) catS = null; }
   }
   function updateLick(dt) {
     var l = lickS; l.t += dt;
-    if (l.t > 0.9 && !l.smear) { l.smear = 1; snd.pop(); }
+    if (l.t > 0.9 && !l.smear) { l.smear = 1; }
     if (l.t > 1.8) l.wipe = clamp((l.t - 1.8) / 1.0, 0, 1);
     if (l.t > 3.0) lickS = null;
   }
@@ -1235,7 +1218,7 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.spinV = 0; meal = 0; setTimeout(function () { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function onEnding(done) { ending = true; auto = false; grab = null; rig.v = 0; rig.spinV = 0; meal = 0; setTimeout(function () { done(); }, 2600); }
   function onWake() { ending = false; dusk = 0; }
 
   // ---------- Start ----------
@@ -1256,14 +1239,12 @@ body.ending .tb-panel, body.ending .homebtn, body.ending .mapbtn { pointer-event
     restLine: "The farm is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft engine sounds and a gentle moo. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: onWake,
-    onWake: onWake,
-    onSound: function (on) { if (on) snd.chime(); }
+    onWake: onWake
   });
   // leaving with the auger turning or the tractor driving: it stops quietly and the page goes at once
-  Toybox.offFirst({ running: function () { return rig.mixT >= 0 || rig.st === "go"; }, off: function (done) { rig.spinV = 0; rig.v = 0; auto = false; snd.engine(-1); snd.soil(0); snd.pour(0); if (done) done(); } });
+  Toybox.offFirst({ running: function () { return rig.mixT >= 0 || rig.st === "go"; }, off: function (done) { rig.spinV = 0; rig.v = 0; auto = false; if (done) done(); } });
   requestAnimationFrame(loop);
 
   if (/[?&]debug\b/.test(location.search)) window.__farm = {

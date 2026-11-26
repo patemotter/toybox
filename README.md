@@ -54,7 +54,7 @@ You can also install a single app on its own by opening its folder (for example 
 
 1. Put the app in its own folder with its own `index.html`, `manifest.webmanifest` and `icons/`. No `sw.js`: the whole Toybox shares the top-level service worker, which `common/toybox.js` registers. (The `sw.js` files in older app folders are stubs that retire the per-app workers earlier versions installed; keep them.)
 2. Give the app a Home button that links to `../` so there is a way back to the launcher (see the `homebtn` in `spin-shop/index.html`).
-3. Use the shared grown-up layer in `common/`: one play timer, one sound setting and the "Big" button for the whole Toybox. Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `peg-drop/` is a good example):
+3. Use the shared grown-up layer in `common/`: one play timer for the whole Toybox (the Toybox makes no sound). Add these two lines to the app's `<head>`, before its own style and script, then call `Toybox.init({...})` once the app is set up (the top of `common/toybox.js` explains the options and hooks; `peg-drop/` is a good example):
    ```html
    <link rel="stylesheet" href="../common/toybox.css">
    <script src="../common/toybox.js"></script>

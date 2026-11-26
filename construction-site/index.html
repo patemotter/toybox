@@ -649,7 +649,6 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
   function goStation(id) {
     if (going || locked()) return;
     going = true;
-    honk();
     var m = $("m-" + id), inner = m && m.firstChild;
     if (m) {
       var r = m.getBoundingClientRect();
@@ -766,7 +765,6 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     el.classList.remove("back");
     el.classList.add("drag");
     el.style.transform = "scale(1.12)";
-    blip();
   }
   function gearMove(e) {
     var el = e.currentTarget, d = gearDrags[el.id];
@@ -799,12 +797,10 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     p.slot.classList.add("on");
     var r = p.on.getBoundingClientRect();
     confetti(r.left + r.width / 2, r.top + r.height / 2, 22);
-    pop();
     if (allGearOn()) gearDone();
   }
   function gearDone() {
     setTimeout(function () {
-      chime();
       var c = $("charAll");
       c.classList.remove("hop"); void c.getBoundingClientRect(); if (!reduceMotion) c.classList.add("hop");
       var r = $("gChar").getBoundingClientRect();
@@ -863,7 +859,6 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     opening = true;
     setGearOn();
     gcard.classList.add("leaving");
-    creak();
     gateTimer = setTimeout(function () {
       gateEl.classList.add("open");
       gateTimer = setTimeout(function () {
@@ -894,32 +889,7 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
       void gateEl.offsetWidth;
     }
     gateEl.classList.remove("open");
-    creak();
   }
-
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts the audio on a tap while sound is on. This page keeps its own master gain per context.
-  var master = null, masterCtx = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; } return master; }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function blip() { tone(rand(520, 720), 0.14, 0.04, "sine", 880); }
-  function pop() { tone(380, 0.12, 0.05, "sine", 620); }
-  function honk() { tone(440, 0.16, 0.035, "triangle"); tone(440, 0.2, 0.035, "triangle", null, 0.22); }
-  function creak() { tone(180, 0.9, 0.03, "triangle", 120); }
-  function chime() { tone(523, 0.4, 0.04); tone(784, 0.6, 0.04, "sine", null, 0.12); }
 
   // ---------- Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js) ----------
   // The timer is the shared Toybox one, so it keeps going on every Construction Site page (and every app).
@@ -948,7 +918,7 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     endTimers.push(setTimeout(closeGate, 3000));
     endTimers.push(setTimeout(done, 4400));
   }
-  function goodbye() { closeGate(); chime(); }
+  function goodbye() { closeGate(); }
   function onWake() {
     clearEndTimers();
     try { mapSvg.unpauseAnimations(); } catch (e) { /* ignore */ }
@@ -997,13 +967,11 @@ body.ending .homebtn, body.ending .sbtn { opacity: 0.4; }
     restLine: "The site is resting.",
     restLine2: "The machines will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft beeps and engine hums. Hold for 2 seconds.",
-    legacy: { timer: "site-timer-v1", sound: "site-sound-v1" },
+    legacy: { timer: "site-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: function () { clearEndTimers(); try { mapSvg.pauseAnimations(); } catch (e) { /* ignore */ } },
     onWake: onWake,
-    onSound: function (on) { if (on) chime(); },
     onTimer: drawTimer
   });
   scheduleBuild();

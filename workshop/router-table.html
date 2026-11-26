@@ -995,71 +995,18 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   }
   function busy() { return Toybox.timer.locked(); }
 
-  // ---------- Sound (off by default; soft synthesized whine and cutting hiss) ----------
-  var AC = null, master = null, whG = null, whO1 = null, whO2 = null, cutG = null, cutF = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      var lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1600;
-      whG = a.createGain(); whG.gain.value = 0;
-      whO1 = a.createOscillator(); whO1.type = "sine"; whO1.frequency.value = 200;
-      whO2 = a.createOscillator(); whO2.type = "triangle"; whO2.frequency.value = 400;
-      whO1.connect(lp); whO2.connect(lp); lp.connect(whG); whG.connect(master);
-      whO1.start(); whO2.start();
-      var buf = a.createBuffer(1, a.sampleRate, a.sampleRate), data = buf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      var noise = a.createBufferSource(); noise.buffer = buf; noise.loop = true;
-      cutF = a.createBiquadFilter(); cutF.type = "bandpass"; cutF.frequency.value = 1400; cutF.Q.value = 0.9;
-      cutG = a.createGain(); cutG.gain.value = 0;
-      noise.connect(cutF); cutF.connect(cutG); cutG.connect(master);
-      noise.start();
-      AC = a;
-    } catch (e) { /* audio unavailable */ }
-  }
-  function updateSound() {
-    ensureAudio();
-    if (!AC) return;
-    var t = AC.currentTime;
-    var on = Toybox.sound.on() && Toybox.timer.phase() !== "resting";
-    var f = R.spin;
-    whG.gain.setTargetAtTime(on && f > 0.02 ? 0.01 + 0.022 * f : 0, t, 0.08);
-    whO1.frequency.setTargetAtTime(120 + 520 * f, t, 0.08);
-    whO2.frequency.setTargetAtTime(243 + 1050 * f, t, 0.08);
-    cutG.gain.setTargetAtTime(on ? Math.min(1, R.cutAmt) * 0.06 : 0, t, 0.05);
-    cutF.frequency.setTargetAtTime(S.wood === "pine" ? 1500 : (S.wood === "oak" ? 1200 : 1000), t, 0.1);
-  }
-  function blip(freq, dur, vol, type, freq2) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC) return;
-    try {
-      var t = AC.currentTime;
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-
   // ---------- Machine logic ----------
   function toggleSwitch() {
     if (busy() || R.chg) return;
     R.on = !R.on;
     if (R.on) coach.clear();
     R.pending = null;
-    blip(R.on ? 330 : 260, 0.08, 0.07, "square", R.on ? 440 : 180);
     updateAria();
   }
   function requestChange(bit, lvl) {
     if (bit === R.bitId && lvl === R.lvl && !R.pending) return;
     R.pending = { bit: bit, lvl: lvl };
-    if (R.on) { R.on = false; say("Router off to change the bit"); blip(260, 0.08, 0.07, "square", 180); }
+    if (R.on) { R.on = false; say("Router off to change the bit"); }
   }
   function startChange() {
     var p = R.pending; R.pending = null;
@@ -1076,12 +1023,12 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       var f = Math.min(1, c.t / 0.6), e = f * f * (3 - 2 * f);
       R.hCur = lerp(c.h0, expo(c.bit, c.lvl), e);
       R.lvl = c.lvl;
-      if (f >= 1) { R.chg = null; blip(600, 0.06, 0.04, "triangle"); }
+      if (f >= 1) { R.chg = null; }
       return;
     }
     if (c.t < 0.4) R.show = 1 - c.t / 0.4;
     else {
-      if (!c.swapped) { c.swapped = true; R.bitId = c.bit; R.lvl = c.lvl; R.hCur = expo(c.bit, c.lvl); blip(500, 0.07, 0.05, "triangle", 700); }
+      if (!c.swapped) { c.swapped = true; R.bitId = c.bit; R.lvl = c.lvl; R.hCur = expo(c.bit, c.lvl); }
       R.show = Math.min(1, (c.t - 0.4) / 0.48);
       if (c.t >= 0.88) { R.show = 1; R.chg = null; }
     }
@@ -1135,7 +1082,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
     var bp = boardScreen();
     R.fly = { t: 0, wood: S.wood, prof: prof, fx: bp.x, fy: bp.y, fs: TV.s };
-    blip(520, 0.12, 0.06, "sine", 820);
     newBoardIn();
   }
   function landFly() {
@@ -1146,7 +1092,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     if (S.shelf.length > 24) S.shelf.splice(0, S.shelf.length - 24);
     S.count++;
     R.shelfPop = 1;
-    blip(700, 0.1, 0.06, "triangle", 1050);
     save();
     updateAria();
   }
@@ -1160,13 +1105,13 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function newBoard() {
     if (busy()) return;
     if (anyCut()) finishBoard();
-    else { newBoardIn(); blip(440, 0.08, 0.05, "sine", 520); }
+    else { newBoardIn(); }
   }
   function setWood(w) {
     if (busy() || !WOODS[w]) return;
     if (w === S.wood) { R.woodPop = 1; return; }
     if (anyCut()) { finishBoard(); S.wood = w; }
-    else { S.wood = w; R.woodPop = 1; blip(500, 0.07, 0.05, "sine", 620); }
+    else { S.wood = w; R.woodPop = 1; }
     save(); updateToolbar(); updateAria();
   }
 
@@ -1225,7 +1170,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   function onDown(e) {
     if (busy()) return;
     var p = localPt(e);
-    ensureAudio();
     if (inRect(p, switchScreenRect(), 14)) { e.preventDefault(); toggleSwitch(); return; }
     var onBoard = R.board && inRect(p, boardScreenRect(), 30);
     if (onBoard || inRect(p, TV)) {
@@ -1359,10 +1303,9 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     tb.addEventListener("click", function (e) {
       var t = e.target.closest("button");
       if (!t || busy()) return;
-      ensureAudio();
-      if (t.dataset.grp) { tb.setAttribute("data-grp", t.dataset.grp); blip(640, 0.04, 0.03, "triangle"); }
-      else if (t.dataset.bit) { requestChange(t.dataset.bit, S.lvl); blip(560, 0.05, 0.04, "triangle"); }
-      else if (t.dataset.lvl) { requestChange(S.bit, +t.dataset.lvl); blip(520, 0.05, 0.04, "triangle"); }
+      if (t.dataset.grp) { tb.setAttribute("data-grp", t.dataset.grp); }
+      else if (t.dataset.bit) { requestChange(t.dataset.bit, S.lvl); }
+      else if (t.dataset.lvl) { requestChange(S.bit, +t.dataset.lvl); }
       else if (t.dataset.wood) setWood(t.dataset.wood);
       else if (t.id === "newBoard") newBoard();
       updateToolbar();
@@ -1407,7 +1350,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     }
   }
   function goodbye() {
-    if (R.on) blip(260, 0.1, 0.07, "square", 160);
     R.on = false;
   }
   function endingFrame() {
@@ -1437,8 +1379,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
-
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-router",
     timerIntro: "When time is up, the router switches off, the bit spins down and rests, and the controls lock. The timer carries on across Workshop pages.",
@@ -1449,19 +1389,16 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
     restLine: "The router is resting.",
     restLine2: "Your boards will be right here next time.",
     restArt: restArt,
-    soundNote: "A soft router whine and a cutting sound. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
-    onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
+    onWake: onWake
   });
   Toybox.offFirst({
     running: function () { return R.on || R.spin > 0.05; },
     name: "router table",
     off: function (done) {
-      if (R.on) blip(260, 0.08, 0.07, "square", 180);
       R.on = false; R.fastStop = true; R.pending = null; drags = {}; R.target = R.bx;
       updateAria();
       var t0 = performance.now();
@@ -1493,7 +1430,6 @@ body.ending .wallbtn { pointer-events: none; opacity: 0.4; }
       draw(now);
       if (now - ariaAt > 1) { ariaAt = now; updateAria(); }
     }
-    updateSound();
     requestAnimationFrame(frame);
   }
   if (params.debug === "1" || navigator.webdriver) window.__rt = { S: function () { return S; }, R: R, toScreen: toScreen, TV: function () { return TV; }, E: function () { return E; }, H: function () { return H; }, sw: switchScreenRect, board: boardScreenRect, done: function () { return doneCount; } };

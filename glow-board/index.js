@@ -11,7 +11,6 @@
   //
   // Sections:
   //   Setup and saved state
-  //   Sound
   //   Layout and button sprites
   //   Effects
   //   Drawing
@@ -84,53 +83,6 @@
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 400); }
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 0.9;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  // A pentatonic scale, so any run of lit buttons sounds pleasant; higher rows play higher notes.
-  const SCALE = [262, 294, 330, 392, 440, 523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093];
-  let lastBlip = 0;
-  const snd = {
-    blip(row) {
-      const t = now(); if (t - lastBlip < 45) return; lastBlip = t;
-      const f = SCALE[Math.round((N - 1 - row) * 15 / (N - 1))];
-      tone(f, f, 0.18, "sine", 0.05);
-    },
-    off() { const t = now(); if (t - lastBlip < 45) return; lastBlip = t; tone(330, 220, 0.12, "triangle", 0.035); },
-    fill() { [0, 0.12, 0.24, 0.36].forEach((d, k) => tone(SCALE[2 + k * 2], SCALE[2 + k * 2], 0.4, "sine", 0.04, d)); },
-    wipe() { tone(700, 260, 0.6, "sine", 0.035); },
-    show(id) {
-      if (id === "rainbow") tone(1400, 500, 0.9, "sine", 0.035);
-      else if (id === "ripple") { tone(440, 440, 0.5, "sine", 0.05); tone(660, 660, 0.5, "sine", 0.03, 0.4); }
-      else if (id === "firework") { tone(500, 1500, 0.7, "sine", 0.025); noise(0.5, 900, 0.06, 0.7); }
-      else if (id === "sparkle") { for (let k = 0; k < 5; k++) tone(1800 + k * 220, 1800 + k * 220, 0.12, "sine", 0.025, k * 0.2); }
-      else if (id === "spin") tone(500, 900, 1.6, "triangle", 0.025);
-      else tone(800, 1200, 0.5, "sine", 0.03);
-    },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); }
-  };
 
   // =====================================================================================================
   // Layout and button sprites
@@ -509,7 +461,6 @@
   function pickSlot(k) {
     if (job === "show") effect = EFFECTS[k].id; else color = k < COLORS.length ? k : -1;
     if (!reduce) { trayPopAt[k] = now(); popUntil = Math.max(popUntil, trayPopAt[k] + POP_MS); }
-    if (job === "show") snd.show(effect); else if (color < 0) snd.off(); else snd.blip(2);
     dirty = true; saveSoon();
   }
 
@@ -535,7 +486,6 @@
       pending.push({ i: k, c: color, at: t + d / speed * 1000 });
     }
     addEffect("ripple", x0, y0);
-    snd.fill();
     ghost.learned("fill");
   }
   function clearBoard() {
@@ -544,7 +494,6 @@
     effects = effects.filter((e) => e.type === "wipe");
     for (let k = 0; k < N * N; k++) if (board[k] >= 0) pending.push({ i: k, c: -1, at: t + (Math.floor(k / N) + 1) / N * 900 });
     addEffect("wipe", 0, 0);
-    snd.wipe();
   }
   function runPending(t) {
     if (!pending.length) return;
@@ -559,7 +508,6 @@
   function local(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function paintAt(i) {
     if (!setCell(i, color)) return;
-    if (color < 0) snd.off(); else snd.blip(Math.floor(i / N));
   }
   // A press on a lit button steps it to the next color, wrapping round, and turns it off once every color has
   // shown since it was lit.
@@ -567,11 +515,9 @@
     let next = (board[i] + 1) % COLORS.length;
     if (next === cycleFrom[i]) next = -1;
     cycling = true; setCell(i, next); cycling = false;
-    if (next < 0) snd.off(); else { lastBlip = 0; snd.blip(Math.floor(i / N)); }
   }
   function showAt(i) {
     addEffect(effect, i % N, Math.floor(i / N));
-    snd.show(effect);
     ghost.learned("show");
   }
   cv.addEventListener("pointerdown", (e) => {
@@ -668,13 +614,12 @@
   function surprise() {
     if (locked()) return;
     const k = surpriseNext; surpriseNext = (surpriseNext + 1) % 3;
-    if (k === 0) { addEffect("wave", 0, 0); snd.show("rainbow"); }
+    if (k === 0) { addEffect("wave", 0, 0); }
     else if (k === 1) {
       for (let n = 0; n < 3; n++) {
         addEffect("firework", Math.floor(rnd(1, N - 1)), Math.floor(rnd(1, N * 0.6)), n * 0.7);
-        setTimeout(() => snd.show("firework"), n * 700);
       }
-    } else { addEffect("twinkle", 0, 0); snd.show("sparkle"); }
+    } else { addEffect("twinkle", 0, 0); }
   }
 
   // =====================================================================================================
@@ -720,10 +665,8 @@
     restLine: "The Glow Board is resting.",
     restLine2: "The picture will be right here next time.",
     restArt,
-    soundNote: "Soft notes when buttons light up. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; dimTo = 1; },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; dimTo = 1; }
   });
   requestAnimationFrame(loop);
 

@@ -695,114 +695,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     }
   }
 
-  // ---------- Sound (only when the shared sound is on) ----------
-  var AC = null, master = null, noiseBuf = null;
-  function audio() {
-    var ac = window.Toybox ? Toybox.sound.ready() : null;
-    if (!ac) return null;
-    if (AC !== ac) {
-      try {
-        AC = ac;
-        var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5000;
-        master = ac.createGain(); master.gain.value = 0.55;
-        master.connect(lp); lp.connect(ac.destination);
-        var len = Math.floor(ac.sampleRate * 0.5);
-        noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
-        var dd = noiseBuf.getChannelData(0);
-        for (var i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
-        tops.forEach(function (t) { t.hum = null; });
-      } catch (e) { AC = null; return null; }
-    }
-    return ac;
-  }
-  var lastClack = 0;
-  function noise(ac, t0, dur, type, f0, f1, q, vol) {
-    var src = ac.createBufferSource(); src.buffer = noiseBuf;
-    var f = ac.createBiquadFilter(); f.type = type; f.Q.value = q;
-    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    var g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.02, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start(t0, Math.random() * 0.2); src.stop(t0 + dur + 0.05);
-  }
-  function tone(ac, t0, dur, type, f0, f1, vol) {
-    var o = ac.createOscillator(); o.type = type;
-    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    var g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
-  }
-  function sZip(p) {
-    var ac = audio(); if (!ac) return;
-    var t0 = ac.currentTime;
-    noise(ac, t0, 0.22 + 0.1 * p, "bandpass", 700, 2600 + 1800 * p, 2.5, 0.22);
-    tone(ac, t0 + 0.05, 0.3, "triangle", 300, 700 + 500 * p, 0.05);
-  }
-  function sClick() {
-    var ac = audio(); if (!ac) return;
-    var t0 = ac.currentTime;
-    tone(ac, t0, 0.05, "square", 1400, 900, 0.035);
-    tone(ac, t0, 0.12, "sine", 420, 300, 0.07);
-  }
-  function sClack(v) {
-    var now = performance.now();
-    if (now - lastClack < 45) return;
-    lastClack = now;
-    var ac = audio(); if (!ac) return;
-    var t0 = ac.currentTime, vol = clamp(v, 0.15, 1);
-    noise(ac, t0, 0.06, "bandpass", 2600, 1800, 3, 0.22 * vol);
-    tone(ac, t0, 0.09, "sine", 1500 + Math.random() * 400, 1100, 0.07 * vol);
-  }
-  function sTick(v) {
-    var ac = audio(); if (!ac) return;
-    tone(ac, ac.currentTime, 0.04, "triangle", 900 + Math.random() * 300, 600, 0.05 * v);
-  }
-  function sThump() {
-    var ac = audio(); if (!ac) return;
-    tone(ac, ac.currentTime, 0.12, "sine", 220, 110, 0.12);
-  }
-  function sWhoosh() {
-    var ac = audio(); if (!ac) return;
-    var t0 = ac.currentTime;
-    noise(ac, t0, 0.7, "bandpass", 400, 3000, 1.2, 0.16);
-    [523, 659, 784, 1047].forEach(function (f, i) { tone(ac, t0 + 0.1 + i * 0.09, 0.35, "sine", f, f, 0.05); });
-  }
-  function sPop() {
-    var ac = audio(); if (!ac) return;
-    tone(ac, ac.currentTime, 0.18, "sine", 500, 1100, 0.06);
-  }
-  // One soft humming whir per spinning top; the pitch follows its speed.
-  function humUpdate(t, ac) {
-    var spinning = (t.state === "spin" || t.state === "drop") && !document.hidden;
-    if (!ac || !spinning) {
-      if (t.hum) {
-        try {
-          var c = t.hum.g.context;
-          t.hum.g.gain.setTargetAtTime(0, c.currentTime, 0.08);
-          t.hum.o.stop(c.currentTime + 0.4); t.hum.o2.stop(c.currentTime + 0.4);
-        } catch (e) { /* ignore */ }
-        t.hum = null;
-      }
-      return;
-    }
-    if (!t.hum) {
-      try {
-        var o = ac.createOscillator(), o2 = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-        o.type = "triangle"; o2.type = "sine"; f.type = "lowpass"; f.frequency.value = 900;
-        g.gain.value = 0;
-        o.connect(f); o2.connect(f); f.connect(g); g.connect(master);
-        o.start(); o2.start();
-        t.hum = { o: o, o2: o2, g: g };
-      } catch (e) { return; }
-    }
-    var sp = t.omega / 52, fr = (t.giant ? 70 : 110) + 230 * sp + 6 * Math.sin(t.psi);
-    var now = ac.currentTime;
-    t.hum.o.frequency.setTargetAtTime(fr, now, 0.05);
-    t.hum.o2.frequency.setTargetAtTime(fr * 1.5, now, 0.05);
-    t.hum.g.gain.setTargetAtTime(0.028 * Math.min(1, t.s * 4 + 0.2) * (ending ? 0.6 : 1), now, 0.08);
-  }
-  function stopHums() { tops.forEach(function (t) { humUpdate(t, null); }); }
-
   // ---------- The launcher: one big button ----------
   // A tap on the button (or anywhere on the launcher or the top in it) launches with a good long spin. Holding
   // it a little longer fills a glow ring round the button for an extra-strong spin (it goes by itself when full).
@@ -820,7 +712,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     var m = Math.sqrt(t.x * t.x + t.y * t.y) || 1, sgn = dirX < 0 ? -1 : 1, sp = 0.4 + 0.35 * p;
     t.vx = -t.y / m * sp * sgn + rnd(-0.08, 0.08); t.vy = t.x / m * sp * sgn + rnd(-0.08, 0.08);
     tops.push(t);
-    sZip(p);
     learned.press = true;
     hang.pop = 0; hang.popT = 0; hang.since = 0; hang.flash = 1;
     // the top drops away: a puff of sparkles under the launcher
@@ -834,7 +725,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function pressDown(id) {
     if (press || Toybox.timer.locked()) return false;
     press = { ptr: id, t: 0 };
-    sClick();
     return true;
   }
   // Let go: every launch is a strong spin; a longer hold makes it the strongest.
@@ -957,15 +847,15 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         t.zr = (L.hL) * f + Math.sin(f * Math.PI) * 0.5;
         t.phi = t.phi0 * (1 - f); t.sc = 1 - 0.15 * Math.sin(f * Math.PI);
         t.theta += 8 * dt;
-        if (f >= 1) { t.dead = true; hang.design = t.d; hang.popT = 0.25; renderTiles(); sPop(); }
+        if (f >= 1) { t.dead = true; hang.design = t.d; hang.popT = 0.25; renderTiles(); }
         continue;
       }
       if (t.state === "drop") {
         t.vz -= 7 * dt; t.zr += t.vz * dt;
         if (t.zr <= 0) {
           t.zr = 0;
-          if (t.vz < -1.2 && !t.bounced) { t.vz = -t.vz * 0.22; t.bounced = true; sThump(); landPuff(t); }
-          else { t.vz = 0; t.state = "spin"; if (!t.bounced) { sThump(); landPuff(t); } }
+          if (t.vz < -1.2 && !t.bounced) { t.vz = -t.vz * 0.22; t.bounced = true; landPuff(t); }
+          else { t.vz = 0; t.state = "spin"; if (!t.bounced) { landPuff(t); } }
         }
       }
       // the lights: on while it spins (colors step every 2 s), fading off softly as it falls
@@ -995,7 +885,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         t.psiRate *= Math.exp(-1.25 * dt);
         t.psi += t.psiRate * dt;
         t.tick += t.psiRate * dt;
-        if (t.tick > 0.75) { t.tick = 0; sTick(Math.min(1, t.psiRate / 3)); }
+        if (t.tick > 0.75) { t.tick = 0; }
         t.omega *= Math.exp(-2.2 * dt);
         if (t.ft > 2.6 && t.psiRate < 0.35) { t.state = "down"; t.omega = 0; dirty = true; }
       } else if (t.state === "down") {
@@ -1034,7 +924,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         var vn = t.vx * nx + t.vy * ny;
         if (vn > 0) {
           t.vx -= vn * nx * 1.6; t.vy -= vn * ny * 1.6;
-          if (vn > 0.35) { sClack(vn * 0.6); var pp = proj(t.x + nx * t.r, t.y + ny * t.r, 0); sparksAt(pp[0], pp[1], -nx, -ny * Vw.k, DES[t.d].spark, 4, 0.7); }
+          if (vn > 0.35) { var pp = proj(t.x + nx * t.r, t.y + ny * t.r, 0); sparksAt(pp[0], pp[1], -nx, -ny * Vw.k, DES[t.d].spark, 4, 0.7); }
         }
       }
       if (t.pushT > 0) t.pushT -= dt;
@@ -1086,7 +976,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
           if (b1.state === "down") { b1.hop = Math.max(b1.hop, Math.min(1, imp)); }
           if (a1.state === "down") { a1.hop = Math.max(a1.hop, Math.min(1, imp)); }
           if (imp > 0.08) {
-            sClack(imp);
             var cx = b1.x + nx2 * b1.r, cy = b1.y + ny2 * b1.r;
             var cp = proj(cx, cy, zB(cx, cy) + 0.5 * (DES[b1.d].h - DES[b1.d].rim) * b1.r);
             var cols = (spinA ? DES[a1.d].spark : []).concat(spinB ? DES[b1.d].spark : []);
@@ -1100,7 +989,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     for (i = tops.length - 1; i >= 0; i--) {
       t = tops[i];
       t.z = zB(t.x, t.y) + t.zr + (t.hop > 0 ? Math.sin(t.hop * Math.PI) * 0.06 : 0);
-      if (t.dead || (t.state === "leave" && t.ft > 0.6)) { humUpdate(t, null); tops.splice(i, 1); }
+      if (t.dead || (t.state === "leave" && t.ft > 0.6)) { tops.splice(i, 1); }
     }
     // particles
     for (i = parts.length - 1; i >= 0; i--) {
@@ -1259,7 +1148,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
         q.pushT = 0.18;
         if (q.state === "spin") { q.bump = Math.min(0.3, q.bump + 0.12); learned.flick = true; coachUpdate(); if (learned.press) ghost.learned(); }
         else q.hop = 1;
-        sClack(0.35);
       }
     }
   });
@@ -1293,7 +1181,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   function goHome(t) {
     t.state = "home"; t.ft = 0; t.hx0 = t.x; t.hy0 = t.y; t.phi0 = t.phi; t.vx = t.vy = 0;
     hang.popT = 0; hang.pop = 0;
-    sPop();
     dirty = true;
   }
 
@@ -1328,7 +1215,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (hang.design === i && hang.pop > 0.9) { hang.popT = 0.25; return; }
     hang.design = i; hang.popT = 0; hang.pop = 0;
     renderTiles();
-    sPop();
   }
   // New: every top hops out of the bowl.
   function newBowl() {
@@ -1372,7 +1258,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       }
     }
     S.surprise = 1 - S.surprise;
-    sWhoosh();
     dirty = true;
     coachUpdate();
   }
@@ -1421,7 +1306,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   }
   function onGoodbye() {
     // the fallen tops give a little hop goodbye
-    tops.forEach(function (t, i) { setTimeout(function () { if (t.state === "down") t.hop = 1; sTick(0.6); }, i * 160); });
+    tops.forEach(function (t, i) { setTimeout(function () { if (t.state === "down") t.hop = 1; }, i * 160); });
   }
   function settled() {
     return tops.every(function (t) { return t.state === "down" && t.vx * t.vx + t.vy * t.vy < 0.002; });
@@ -1460,8 +1345,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       endingT += dt;
       if (settled() || endingT > 13) { var dn = endingDone; endingDone = null; dn(); }
     }
-    var ac = resting ? null : audio();
-    for (var i = 0; i < tops.length; i++) humUpdate(tops[i], ac);
     draw();
     var wk = performance.now() - w0;
     perf.n++; perf.work += wk; perf.workMax = Math.max(perf.workMax, wk);
@@ -1469,7 +1352,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (saveT > 1.5) { saveT = 0; if (dirty || tops.some(function (t) { return t.state === "spin"; })) saveNow(); coachUpdate(); }
     requestAnimationFrame(frame);
   }
-  document.addEventListener("visibilitychange", function () { if (document.hidden) { saveNow(); stopHums(); } });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { saveNow(); } });
   window.addEventListener("pagehide", saveNow);
 
   // ---------- Debug hooks (?debug only) ----------
@@ -1522,12 +1405,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine: "The tops are resting.",
     restLine2: "They will be right here next time.",
     restArt: restArt,
-    soundNote: "A soft whir while the tops spin and a click when they bump. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: onGoodbye,
-    onRest: function () { resting = true; endingDone = null; stopHums(); saveNow(); },
-    onWake: function () { ending = false; resting = false; endingDone = null; coachUpdate(); },
-    onSound: function (on) { if (!on) stopHums(); }
+    onRest: function () { resting = true; endingDone = null; saveNow(); },
+    onWake: function () { ending = false; resting = false; endingDone = null; coachUpdate(); }
   });
   stage.appendChild($("tb-toast"));
   stage.appendChild($("tb-farewell"));

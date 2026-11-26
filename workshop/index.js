@@ -17,7 +17,6 @@
 //   - Sanders
 //   - Big machines
 //   - App
-//   - Sound (off by default; soft, synthesized)
 //   - Fit a drawing into its SVG
 //   - Build the wall
 //   - Gear pictures
@@ -1230,92 +1229,9 @@
   function uid() { uidN += 1; return "u" + uidN; }
   function freshState(t) { var s = {}, k; if (t.st0) for (k in t.st0) s[k] = t.st0[k]; return s; }
 
-  // ---------- Sound (off by default; soft, synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. The Workshop keeps its own master gain and
-  // noise buffer, built once per context.
-  var ac = null, master = null, noiseBuf = null;
-  function audio() {
-    var a = Toybox.sound.ready();
-    if (!a) return null;
-    if (a !== ac) {
-      try {
-        master = a.createGain();
-        master.gain.value = 0.3;
-        master.connect(a.destination);
-        noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-        var d = noiseBuf.getChannelData(0), i;
-        for (i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        ac = a; motor = null;
-      } catch (e) { return null; }
-    }
-    return ac;
-  }
-  function envelope(g, t0, peak, dur) {
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  }
-  function tone(f, dur, type, vol, f2, delay) {
-    var a = audio(); if (!a) return;
-    try {
-      var t0 = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(f, t0);
-      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
-      envelope(g, t0, vol || 0.25, dur);
-      o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
-    } catch (e) { /* ignore */ }
-  }
-  function noise(dur, freq, q, vol, delay, type) {
-    var a = audio(); if (!a) return;
-    try {
-      var t0 = a.currentTime + (delay || 0), src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-      src.buffer = noiseBuf; src.loop = true;
-      f.type = type || "bandpass"; f.frequency.value = freq; f.Q.value = q || 1;
-      envelope(g, t0, vol || 0.2, dur);
-      src.connect(f); f.connect(g); g.connect(master);
-      src.start(t0, Math.random() * 0.5); src.stop(t0 + dur + 0.05);
-    } catch (e) { /* ignore */ }
-  }
-  var lastTok = 0;
-  var SND = {
-    tap: function () { tone(520, 0.08, "triangle", 0.16, 760); },
-    tok: function (p) { var t = now(); if (t - lastTok < 70) return; lastTok = t; tone(280 + (p || 0), 0.09, "triangle", 0.1, 240 + (p || 0)); },
-    snap: function () { noise(0.05, 2600, 1, 0.3); tone(700, 0.14, "sine", 0.22, 1300); },
-    chime: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.4, "sine", 0.18, null, i * 0.1); }); },
-    shutter: function (dur) {
-      noise(dur, 260, 0.7, 0.2);
-      for (var i = 0; i < dur / 0.09; i++) noise(0.035, 1100, 3, 0.06, i * 0.09);
-    },
-    bonk: function () { tone(420, 0.2, "sine", 0.35, 110); noise(0.05, 1800, 1, 0.18); },
-    rasp: function (v, f) { noise(0.12, f || 2000, 1.4, 0.05 + 0.1 * clamp(v, 0, 1)); },
-    click: function () { noise(0.025, 3600, 3, 0.22); },
-    whoosh: function () { noise(0.35, 1400, 0.8, 0.12); },
-    chop: function () { tone(220, 0.12, "triangle", 0.25, 90); noise(0.06, 1500, 1, 0.15); }
-  };
+  var ac = null;
   // A soft motor hum whose pitch and volume follow how fast the tool runs.
   var motor = null;
-  var MOTOR = { saw: [95, 1800], drill: [140, 2400], sand: [80, 1200], machine: [70, 1500], router: [190, 3200], hammerdrill: [120, 2000], impact: [110, 1600] };
-  function motorSet(kind, level) {
-    if (!Toybox.sound.on() || !kind || !MOTOR[kind]) { motorOff(); return; }
-    var a = audio(); if (!a) return;
-    try {
-      if (!motor || motor.kind !== kind) {
-        motorOff();
-        var o = a.createOscillator(), lp = a.createBiquadFilter(), src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain(), ng = a.createGain();
-        o.type = "sawtooth"; lp.type = "lowpass"; lp.frequency.value = 500;
-        src.buffer = noiseBuf; src.loop = true; bp.type = "bandpass"; bp.frequency.value = MOTOR[kind][1]; bp.Q.value = 0.8;
-        ng.gain.value = 0.35; g.gain.value = 0.0001;
-        o.connect(lp); lp.connect(g); src.connect(bp); bp.connect(ng); ng.connect(g); g.connect(master);
-        o.start(); src.start();
-        motor = { kind: kind, o: o, g: g, src: src };
-      }
-      var t = a.currentTime, base = MOTOR[kind][0];
-      motor.o.frequency.setTargetAtTime(base * (0.4 + 0.8 * level), t, 0.05);
-      motor.g.gain.setTargetAtTime(Math.max(0.0001, 0.11 * level), t, 0.05);
-    } catch (e) { /* ignore */ }
-  }
   function motorOff() {
     if (!motor) return;
     try {
@@ -1515,7 +1431,7 @@
   board.addEventListener("pointerdown", function (e) {
     brush[e.pointerId] = { x: e.clientX, y: e.clientY };
     var el = e.target.closest && e.target.closest(".tool");
-    if (el && !locked()) { wake(cards[el.dataset.id], (Math.random() < 0.5 ? -1 : 1) * 40); SND.tok(Math.random() * 80); }
+    if (el && !locked()) { wake(cards[el.dataset.id], (Math.random() < 0.5 ? -1 : 1) * 40); }
   });
   board.addEventListener("pointermove", function (e) {
     var b = brush[e.pointerId];
@@ -1526,7 +1442,7 @@
     var hit = document.elementFromPoint(e.clientX, e.clientY), el = hit && hit.closest && hit.closest(".tool");
     if (el && cards[el.dataset.id]) {
       var s = cards[el.dataset.id];
-      if (Math.abs(s.v) < 260) { wake(s, clamp(-dx * 7, -160, 160)); SND.tok(Math.random() * 120); }
+      if (Math.abs(s.v) < 260) { wake(s, clamp(-dx * 7, -160, 160)); }
     }
   });
   ["pointerup", "pointercancel"].forEach(function (ev) { board.addEventListener(ev, function (e) { delete brush[e.pointerId]; }); });
@@ -1571,7 +1487,6 @@
     var sec = $("sec-" + c.dataset.sec);
     setActiveChip(c.dataset.sec);
     jumping = now() + 700;
-    SND.tap();
     var top = Math.max(0, sec.offsetTop - 6);
     if (board.scrollTo) board.scrollTo({ top: top, behavior: reduce ? "auto" : "smooth" }); else board.scrollTop = top;
     // A little shake of the section's tools when you arrive.
@@ -1731,8 +1646,8 @@
       layoutD();
     }
   }
-  $("vUse").addEventListener("click", function () { if (D && D.view !== "use") { SND.tap(); setView("use"); } });
-  $("vParts").addEventListener("click", function () { if (D && D.view !== "parts") { SND.tap(); setView("parts"); } });
+  $("vUse").addEventListener("click", function () { if (D && D.view !== "use") { setView("use"); } });
+  $("vParts").addEventListener("click", function () { if (D && D.view !== "parts") { setView("parts"); } });
 
   function openDetail(t, card, pj) {
     closeDetail(true);
@@ -1778,7 +1693,6 @@
         setTimeout(function () { if (D) layoutD(); }, 540);
       }
     }
-    SND.whoosh();
     (pj ? $("dPlan") : $("dClose")).focus({ preventScroll: true });
   }
   function closeDetail(quiet) {
@@ -1796,14 +1710,13 @@
     if (card) {
       card.classList.remove("out");
       wake(cards[t.id], quiet ? 0 : 160);
-      if (!quiet) SND.tok(60);
     }
   }
   $("dClose").addEventListener("click", function () { closeDetail(false); });
   $("detail").addEventListener("click", function (e) { if (e.target === this && !(D && D.pj)) closeDetail(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && D && !D.pj && !e.defaultPrevented && !Toybox.sheetOpen()) closeDetail(false); });
   window.addEventListener("resize", function () { sizeFx(); if (D) layoutD(); syncChip(); });
-  $("dAgain").addEventListener("click", function () { if (D && !locked()) { SND.tap(); startJob(D.t, J && J.K.sw && J.on); } });
+  $("dAgain").addEventListener("click", function () { if (D && !locked()) { startJob(D.t, J && J.K.sw && J.on); } });
 
   // ================= Jobs engine =================
   // Every tool gets a short real job on a workpiece. The scene is one SVG (viewBox 0 0 400 300).
@@ -1873,7 +1786,6 @@
     }
     var r = dStage.getBoundingClientRect();
     burst(r.left + r.width / 2, r.top + r.height * 0.35, "confetti", 40);
-    SND.chime();
   }
   function hint(h) { J.hint = h; J.hintT = 0; }
   function jobRelease() {
@@ -2250,7 +2162,7 @@
           J.k = Math.min(g.depth, J.k + Math.abs(d) * g.depth / (c.travel || 330));
           J.dust += Math.abs(d);
           while (J.dust > 7) { J.dust -= 7; puff(g.round ? g.xm + 6 : g.xr, g.yc + J.k, g.mat === "steel" || g.mat === "pipe" ? "metal" : "dust", 2, (d > 0 ? 1 : -1) * 90, -30); }
-          if (now() - (J.lastSnd || 0) > 110) { J.lastSnd = now(); SND.rasp(Math.min(1, Math.abs(d) / 5), g.mat === "steel" ? 3400 : 2400); }
+          if (now() - (J.lastSnd || 0) > 110) { J.lastSnd = now(); }
           readout(KINDS.saw.mmText(J));
           if (J.k >= g.depth) finish(g.mat === "log" ? "Sawed through the log!" : g.mat === "steel" ? "Cut through the steel bar!" : "Cut in two! Right on the line.");
         } else if (J.k > 0) readout(c.cut === "pull" ? "Glide back… then pull" : "Glide back… then push");
@@ -2264,7 +2176,6 @@
         J.run += ((on ? 1 : 0) - J.run) * Math.min(1, dt * (on ? 6 : 2));
         if (J.run < 0.01 && !on) J.run = 0;
         if (J.run > 0) { spinArt(dt, J.run, c.mode === "recip" ? 3.2 : 5); shakeBy(J.run * 0.8); } else if (J.shake[0]) shakeBy(0);
-        motorSet(J.run > 0.02 ? "saw" : null, J.run);
         if (c.mode === "recip" && J.run > 0.5 && !J.done) {
           J.k = Math.min(g.depth, J.k + dt * g.depth / 2.4 * J.run);
           J.dust += dt * 30;
@@ -2403,7 +2314,7 @@
         J.si = ns; J.dist += dd;
         J.dustA = (J.dustA || 0) + dd;
         while (J.dustA > 6) { J.dustA -= 6; puff(J.cut.x, J.cut.y, "dust", 2, (Math.random() - 0.5) * 80, 40); }
-        if (now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); if (!J.cfg.power) SND.rasp(0.6, 2600); }
+        if (now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); }
         readout(Math.round(100 * J.si / g.total) + "%");
         KINDS.trace.place(J);
         if (J.si >= g.total - 0.5) finish(J.cfg.done || "Cut out!");
@@ -2415,7 +2326,6 @@
         J.run += ((on ? 1 : 0) - J.run) * Math.min(1, dt * (on ? 6 : 2));
         if (J.run < 0.01 && !on) J.run = 0;
         if (J.run > 0 || J.ph) { spinArt(dt, J.run); shakeBy(J.run * 0.6); }
-        motorSet(J.run > 0.02 ? "saw" : null, J.run);
       }
       if (J.done && J.fall < 1.6) { J.fall += dt; J.dirty = true; }
     },
@@ -2544,7 +2454,7 @@
       J.cr += da;
       if (da > 0) {
         J.tick = (J.tick || 0) + da;
-        if (J.tick > 45) { J.tick = 0; SND.click(); }
+        if (J.tick > 45) { J.tick = 0; }
         KINDS.bore.advance(J, da * (c.perDeg || 0.03));
       } else KINDS.bore.place(J);
       if (!J.done) readout(KINDS.bore.text(J));
@@ -2562,8 +2472,7 @@
       if (J.run < 0.01 && !on) J.run = 0;
       if (J.run > 0) { spinArt(dt, J.run, c.rps || 3.2); shakeBy(J.run * (c.shake || 0.5)); }
       else if (J.shake[0]) shakeBy(0);
-      motorSet(J.run > 0.02 ? (c.snd || "drill") : null, J.run);
-      if (c.snd === "hammerdrill" && J.run > 0.5) { J.imp = (J.imp || 0) + dt * 12; if (J.imp > 1) { J.imp = 0; SND.click(); } }
+      if (c.snd === "hammerdrill" && J.run > 0.5) { J.imp = (J.imp || 0) + dt * 12; if (J.imp > 1) { J.imp = 0; } }
       if (J.run > 0.4) KINDS.bore.advance(J, dt * J.run * (J.g.goal + 6) / (c.secs || 2.6));
       if (J.run > 0) J.dirty = true;
     },
@@ -2666,7 +2575,6 @@
       J.rot += deg;
       var was = J.p;
       J.p = Math.min(1, J.p + deg / (360 * (c.turns || 4)));
-      if (Math.floor(J.rot / 60) !== Math.floor((J.rot - deg) / 60) && !c.power) SND.click();
       if (Math.floor(J.p * 24) !== Math.floor(was * 24)) puff(J.g.sx, J.g.yT - 2, "fine", 1, 0, -20);
       readout(turnsText(J.rot) + (J.p >= 1 ? "" : " · " + c.size));
       KINDS.screw.place(J);
@@ -2687,13 +2595,12 @@
       J.run += ((on ? 1 : 0) - J.run) * Math.min(1, dt * (on ? 6 : 2));
       if (J.run < 0.01 && !on) J.run = 0;
       if (J.run > 0) { spinArt(dt, J.run); shakeBy(J.run * (c.shake || 0.4)); } else if (J.shake[0]) shakeBy(0);
-      motorSet(J.run > 0.02 ? (c.snd || "drill") : null, J.run);
-      if (c.snd === "impact" && J.run > 0.5 && J.p < 1) { J.imp = (J.imp || 0) + dt * 14; if (J.imp > 1) { J.imp = 0; SND.click(); } }
+      if (c.snd === "impact" && J.run > 0.5 && J.p < 1) { J.imp = (J.imp || 0) + dt * 14; if (J.imp > 1) { J.imp = 0; } }
       if (J.run > 0.5 && J.p < 1) {
         KINDS.screw.turn(J, dt * J.run * 360 * (c.turns || 4) / (c.secs || 2.2));
       } else if (J.p >= 1 && !J.done) {
         // The clutch slips with a click-click once the screw is in.
-        if (c.clutch) { J.clutch += dt; if (on && J.clutch > 0.12) { J.clutch = 0; SND.click(); J.clicks = (J.clicks || 0) + 1; readout("Click! Click!", true); } if ((J.clicks || 0) >= 3 || !on) finish(c.done); }
+        if (c.clutch) { J.clutch += dt; if (on && J.clutch > 0.12) { J.clutch = 0; J.clicks = (J.clicks || 0) + 1; readout("Click! Click!", true); } if ((J.clicks || 0) >= 3 || !on) finish(c.done); }
         else finish(c.done);
       }
       if (J.run > 0) J.dirty = true;
@@ -2772,7 +2679,7 @@
       var v = J.pull0 + ((p[0] - J.sx0) + (p[1] - J.sy0) * 0.5) * 0.35;
       J.pull = clamp(Math.max(J.pull, v), 0, 40);
       readout("Pulling… " + Math.round(J.pull / 36 * 100) + "%");
-      if (J.pull >= 36 && !J.done) { J.out = 0.001; SND.snap(); finish("The old nail is out! Claws pull nails."); }
+      if (J.pull >= 36 && !J.done) { J.out = 0.001; finish("The old nail is out! Claws pull nails."); }
     },
     frame: function (J, dt) {
       var c = J.cfg, g = J.g, dir = c.raiseDir || 1;
@@ -2789,7 +2696,6 @@
           var was = J.p;
           J.p = Math.min(1, J.p + 1 / g.tg.hits);
           var ty = KINDS.tap.targetY(J, was);
-          SND.bonk();
           puff(g.tx, ty, c.target === "rivet" ? "metal" : "stars", c.target === "rivet" ? 10 : 12, 0, 0);
           puff(g.tx, g.yT, c.target === "stake" ? "grit" : "dust", 6);
           readout((J.hits === 1 ? "1 hit" : J.hits + " hits"), true);
@@ -2870,7 +2776,6 @@
     if (J.run < 0.01 && !on) J.run = 0;
     if (J.run > 0) { spinArt(dt, J.run, rate); shakeBy(J.run * (shake == null ? 0.5 : shake)); J.dirty = true; }
     else if (J.shake[0] || J.shake[1]) shakeBy(0);
-    motorSet(J.run > 0.02 ? snd : null, J.run);
     return J.run;
   }
   function pct(f) { return Math.round(clamp(f, 0, 1) * 100) + "%"; }
@@ -2915,13 +2820,11 @@
   }
   function switchOn(J) {
     J.on = true; J.swMiss = 0; J.swFlash = 0; J.dirty = true;
-    SND.click();
     if (!J.done && J.swNext) { coach(J.swNext.coach); hint(J.swNext.hint); }
   }
   function switchOff(J) {
     var q = swOnPt(J);
     J.on = false; J.swMiss = 0; J.dirty = true;
-    SND.click();
     if (!J.done) {
       coach("Off. Tap the green button to run it again.");
       hint({ k: "tap", x: q[0], y: q[1] });
@@ -2989,7 +2892,7 @@
             g.bins[b] += c.chamfer ? 1 : -1;
             var m = toolPt(c.mouth[0], c.mouth[1]);
             puff(m[0], m[1], "curls", 2, -60, -80);
-            if (now() - (J.lastSnd || 0) > 90) { J.lastSnd = now(); SND.rasp(0.5, 1500); }
+            if (now() - (J.lastSnd || 0) > 90) { J.lastSnd = now(); }
           }
         }
         var sum = 0; g.bins.forEach(function (v) { sum += c.chamfer ? v : 3 - v; });
@@ -3051,11 +2954,10 @@
       if (ny < g.top - 4) J.armed = true;
       if (d > 0 && J.armed && ny > g.top) {
         J.low = Math.max(J.low, ny);
-        if (now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); SND.rasp(0.4, 1300); }
+        if (now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); }
         if (ny >= g.sh - 2) {
           J.armed = false; J.left -= 1; J.low = g.top;
           puff(KINDS.pare.xEdge(J) + 8, g.sh - 10, "curls", 6, 120, -60);
-          SND.chop();
           readout(J.left ? J.left + (J.left === 1 ? " slice" : " slices") + " to go" : "Flat!", true);
           if (J.left <= 0) finish("A flat, neat tenon. Paring takes thin slices.");
           else coach("Lift the chisel back up, then pare the next slice.");
@@ -3118,7 +3020,7 @@
         J.r = Math.min(g.R, J.r + d * (c.rate || 0.02));
         J.du = (J.du || 0) + d;
         while (J.du > 6) { J.du -= 6; var q = KINDS.file.edgeAt(J, J.sp - 30); puff(q[0], q[1], c.fx || "fine", c.fx === "chips" ? 2 : 1, -40, 40); }
-        if (now() - (J.lastSnd || 0) > 110) { J.lastSnd = now(); SND.rasp(0.5, c.fx === "chips" ? 1100 : c.fx === "metal" ? 3600 : 2600); }
+        if (now() - (J.lastSnd || 0) > 110) { J.lastSnd = now(); }
         readout(KINDS.file.text(J));
         if (J.r >= g.R) finish(c.done);
       }
@@ -3202,7 +3104,7 @@
       }
       J.dd = (J.dd || 0) + dist;
       while (J.dd > 8) { J.dd -= 8; puff(J.tl.x + (Math.random() - 0.5) * pw * 2, J.tl.y, "fine", 1, (Math.random() - 0.5) * 60, -30); }
-      if (!c.power && now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); SND.rasp(0.4, 900); }
+      if (!c.power && now() - (J.lastSnd || 0) > 120) { J.lastSnd = now(); }
       var done = 0; g.lv.forEach(function (l) { if (l > g.st) done++; });
       var f = done / g.lv.length;
       readout(g.grits[g.st] + " grit · " + pct(f / 0.92));
@@ -3213,7 +3115,6 @@
         if (g.st >= g.grits.length) finish(c.done || "Smooth as silk!");
         else {
           J.s.grit = g.grits[g.st]; setArt(J.t.f(J.s, "j" + D.u));
-          SND.snap();
           coach("Now finer paper makes it even smoother.");
           readout(g.grits[g.st] + " grit · 0%", true);
           puff(J.tl.x, J.tl.y - 40, "stars", 10);
@@ -3277,7 +3178,7 @@
         if (J.fly > 0) return;
         var i, best = -1;
         for (i = 0; i < SOCK.length; i++) if (Math.hypot(p[0] - (56 + i * 48), p[1] - 270) < 24) best = i;
-        if (best >= 0) { J.sock = best; J.fly = 0.001; SND.tap(); }
+        if (best >= 0) { J.sock = best; J.fly = 0.001; }
         return;
       }
       if (J.ptr !== null) return;
@@ -3291,8 +3192,8 @@
         var dy = p[1] - J.last[1]; J.last = p;
         J.s.gap = clamp(J.s.gap + dy * 0.12, 20, 36);
         setArt(J.t.f(J.s, "j" + D.u));
-        if (J.s.gap <= 20.6) { J.s.gap = 20; setArt(J.t.f(J.s, "j" + D.u)); SND.snap(); readout("Fits! 19 mm", true); J.ptr = null; KINDS.wrench.startTurn(J); J.idle = 0; }
-        else { if (Math.floor(J.s.gap) !== Math.floor(J.s.gap - dy * 0.12)) SND.click(); readout("Jaw " + KINDS.wrench.jaw(J) + " mm"); }
+        if (J.s.gap <= 20.6) { J.s.gap = 20; setArt(J.t.f(J.s, "j" + D.u)); readout("Fits! 19 mm", true); J.ptr = null; KINDS.wrench.startTurn(J); J.idle = 0; }
+        else { readout("Jaw " + KINDS.wrench.jaw(J) + " mm"); }
         return;
       }
       if (J.step !== 1) return;
@@ -3303,11 +3204,10 @@
       J.ta += da;
       if (c.ratchet && da < 0) {
         J.back = (J.back || 0) + da;
-        if (J.back < -12) { J.back = 0; SND.click(); }
+        if (J.back < -12) { J.back = 0; }
       } else {
         J.na += da;
         if (J.na < 0) J.na = 0;
-        if (Math.floor(J.na / 60) !== Math.floor((J.na - da) / 60)) SND.click();
       }
       J.p = clamp(J.na / g.goal, 0, 1);
       readout(c.size + " · " + turnsText(J.na));
@@ -3321,8 +3221,8 @@
         if (J.fly > 0.45 && !J.judged) {
           J.judged = 1;
           var sz = SOCK[J.sock];
-          if (sz === 13) { SND.snap(); readout("13 mm fits!", true); }
-          else { SND.tok(sz > 13 ? -40 : 80); readout(sz + " mm is too " + (sz > 13 ? "big" : "small"), true); }
+          if (sz === 13) { readout("13 mm fits!", true); }
+          else { readout(sz + " mm is too " + (sz > 13 ? "big" : "small"), true); }
         }
         if (J.fly > 1.1) {
           if (SOCK[J.sock] === 13) { J.step = 1; J.hideTool = false; J.fly = 0; KINDS.wrench.startTurn(J); coach("It fits! Now swing the ratchet to the right."); J.idle = 0; }
@@ -3396,7 +3296,6 @@
     pump: function (J) {
       var c = J.cfg, key = c.key;
       J.trig = 1; J.s.trig = 1;
-      SND.click();
       if (J.s[key] * c.cdir > KINDS.clamp.contact(J) * c.cdir + 0.5) {
         J.s[key] = c.cdir > 0 ? Math.max(KINDS.clamp.contact(J), J.s[key] - 7) : Math.min(KINDS.clamp.contact(J), J.s[key] + 7);
         readout("Pump!", true);
@@ -3417,7 +3316,7 @@
         v = c.cdir > 0 ? clamp(v, ct, c.open) : clamp(v, c.open, ct);
         J.s[key] = v;
         readout(c.slideRead || "Sliding…");
-        if (Math.abs(v - ct) < 0.6) { J.s[key] = ct; SND.snap(); readout("Touching!", true); J.ptr = null; KINDS.clamp.tighten(J); J.idle = 0; }
+        if (Math.abs(v - ct) < 0.6) { J.s[key] = ct; readout("Touching!", true); J.ptr = null; KINDS.clamp.tighten(J); J.idle = 0; }
         KINDS.clamp.redraw(J);
         return;
       }
@@ -3433,7 +3332,7 @@
         readout("Squeeze " + pct(J.p));
       }
       J.turn = (J.turn || 0) + tw;
-      if (J.turn > 14) { J.turn = 0; SND.click(); }
+      if (J.turn > 14) { J.turn = 0; }
       KINDS.clamp.redraw(J);
       if (J.p >= 1) finish(c.done);
     },
@@ -3467,13 +3366,12 @@
     down: function (J, p, e) { grab(J, p, e, [J.g.x1 - J.ext, J.g.yT]); },
     move: function (J, p, e) {
       if (!mine(J, e)) return;
-      var g = J.g, hx = clamp(p[0] + J.grab[0], g.x0 - 8, g.x1 - 8), was = J.ext;
+      var g = J.g, hx = clamp(p[0] + J.grab[0], g.x0 - 8, g.x1 - 8);
       J.ext = g.x1 - hx;
       if (hx <= g.x0 + 10) J.ext = g.x1 - g.x0;
-      if (Math.floor(J.ext / 25) !== Math.floor(was / 25)) SND.click();
       var cm = KINDS.tape.cm(J);
       readout(Math.round(cm) + " cm");
-      if (J.ext >= g.x1 - g.x0) { SND.snap(); readout("60 cm", true); finish("The board is 60 cm long."); J.ptr = null; }
+      if (J.ext >= g.x1 - g.x0) { readout("60 cm", true); finish("The board is 60 cm long."); J.ptr = null; }
     },
     work: function (J) {
       var g = J.g, s = slab(g.x0, g.yT, g.x1 - g.x0, 40, WOOD.pine, { seed: 14, dp: 36 }), x1 = g.x1, x0 = g.x1 - J.ext, k, x;
@@ -3510,7 +3408,7 @@
       if (J.step === 0) {
         J.tl.x = clamp(p[0] + J.grab[0], 40, 330); J.tl.y = clamp(p[1] + J.grab[1], 150, 300);
         if (Math.abs(J.tl.y - g.y1) < 16 && Math.abs(J.tl.x - g.ex) < 60) {
-          J.tl.x = g.ex; J.tl.y = g.y1; J.step = 1; J.ptr = null; SND.snap(); J.idle = 0;
+          J.tl.x = g.ex; J.tl.y = g.y1; J.step = 1; J.ptr = null; J.idle = 0;
           coach("Now draw a line up along the square's edge.");
           readout("90°", true);
           hint({ k: "drag", x: g.ex, y: g.y1 - 6, dx: 0, dy: g.y0 - g.y1 + 12 });
@@ -3518,7 +3416,7 @@
         return;
       }
       var ny = clamp(p[1] + J.grab[1], g.y0, g.y1);
-      if (ny < J.ly) { J.ly = ny; if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); SND.rasp(0.25, 3000); } }
+      if (ny < J.ly) { J.ly = ny; if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); } }
       if (J.ly <= g.y0 + 1) { J.ly = g.y0; finish("A square line, ready to cut on!"); }
     },
     work: function (J) {
@@ -3546,7 +3444,7 @@
     move: function (J, p, e) {
       if (!mine(J, e)) return;
       var g = J.g, ny = clamp(p[1] + J.grab[1], g.y0, g.y1);
-      if (ny < J.ly) { J.ly = ny; if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); SND.rasp(0.25, 3200); } }
+      if (ny < J.ly) { J.ly = ny; if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); } }
       J.tl.y = ny; J.tl.x = g.ex - 5;
       readout(Math.round((g.y1 - J.ly) / (g.y1 - g.y0) * 100) + "% marked");
       if (J.ly <= g.y0 + 1) { J.ly = g.y0; J.tl.y = g.y0; finish("A clean line. The saw cuts right here!"); }
@@ -3581,7 +3479,7 @@
     move: function (J, p, e) {
       if (!mine(J, e)) return;
       J.tl.x = clamp(p[0] + J.grab[0], 70, 270); J.tl.y = clamp(p[1] + J.grab[1], 20, 260);
-      if (Math.hypot(J.tl.x - 150, J.tl.y - 130) < 26) { J.tl.x = 150; J.tl.y = 130; J.ptr = null; SND.snap(); readout("90°", true); finish("No gaps anywhere. The corner is square: 90°!"); }
+      if (Math.hypot(J.tl.x - 150, J.tl.y - 130) < 26) { J.tl.x = 150; J.tl.y = 130; J.ptr = null; readout("90°", true); finish("No gaps anywhere. The corner is square: 90°!"); }
     },
     work: function (J) {
       var s = bdh(150, 130, 300, 120, WOOD.oak, 4);
@@ -3615,10 +3513,9 @@
     down: function (J, p, e) { if (J.ptr === null) { J.ptr = e.pointerId; J.grabY = KINDS.level.end(J)[1] - p[1]; } },
     move: function (J, p, e) {
       if (!mine(J, e)) return;
-      var g = J.g, y = p[1] + J.grabY, a = Math.asin(clamp((y - g.py) / g.len, -0.25, 0.25)) * 180 / Math.PI, was = J.ang;
+      var g = J.g, y = p[1] + J.grabY, a = Math.asin(clamp((y - g.py) / g.len, -0.25, 0.25)) * 180 / Math.PI;
       J.ang = clamp(a, -12, 12);
       if (Math.abs(J.ang) < 0.35) J.ang = 0;
-      if (Math.round(J.ang) !== Math.round(was)) SND.click();
       KINDS.level.place(J);
       readout(KINDS.level.text(J));
       if (J.ang === 0) {
@@ -3646,12 +3543,10 @@
     move: function (J, p, e) {
       if (!mine(J, e)) return;
       var dx = (p[0] - J.last[0]) / J.tl.s; J.last = p;
-      var was = J.s.g;
       J.s.g = clamp(J.s.g + dx, 19.05, 100);
-      if (Math.floor(was / 2) !== Math.floor(J.s.g / 2)) SND.click();
       setArt(J.t.f(J.s, "j" + D.u));
       readout(J.s.g.toFixed(2) + " mm");
-      if (J.s.g <= 19.06) { J.ptr = null; SND.snap(); readout("19.05 mm", true); finish("The dowel is 19.05 mm thick!"); }
+      if (J.s.g <= 19.06) { J.ptr = null; readout("19.05 mm", true); finish("The dowel is 19.05 mm thick!"); }
     },
     work: function (J) {
       var cx = 90 + 9.525 * 1.6, cy = 170, r = 9.525 * 1.6;
@@ -3680,9 +3575,7 @@
       if (!mine(J, e)) return;
       if (J.step === 0) {
         var dy = p[1] - J.last[1]; J.last = p;
-        var was = J.s.fx;
         J.s.fx = clamp(J.s.fx - dy, 30, 110);
-        if (Math.floor(was / 5) !== Math.floor(J.s.fx / 5)) SND.click();
         J.moved = true;
         setArt(J.t.f(J.s, "j" + D.u)); KINDS.gauge.place(J);
         readout(KINDS.gauge.mm(J) + " mm from the edge");
@@ -3690,7 +3583,7 @@
       }
       var nx = clamp(p[0] + J.grab[0], 20, 380);
       J.gx = nx; J.minx = Math.min(J.minx, nx); J.maxx = Math.max(J.maxx || nx, nx);
-      if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); SND.rasp(0.2, 3600); }
+      if (now() - (J.lastSnd || 0) > 140) { J.lastSnd = now(); }
       KINDS.gauge.place(J);
       var f = (J.maxx - J.minx) / 300;
       readout("Scribing " + pct(f));
@@ -3698,7 +3591,7 @@
     },
     up: function (J, e) {
       if (J.step === 0 && J.moved && mine(J, e)) {
-        J.step = 1; SND.snap();
+        J.step = 1;
         coach("Keep the fence on the edge and drag the gauge along the board.");
         hint({ k: "drag", x: J.gx, y: J.g.y1 - 20, dx: -200, dy: 0, back: true });
         J.minx = J.maxx = J.gx;
@@ -3737,15 +3630,14 @@
         var pv = toolPt(122, 107), phi = Math.atan2(-(p[1] - pv[1]), p[0] - pv[0]) * 180 / Math.PI, v = 180 - phi;
         if (v > 270) v -= 360;
         v = clamp(v, 15, 165);
-        if (Math.round(v / 5) !== Math.round(J.s.ang / 5)) SND.click();
         J.s.ang = v;
-        if (Math.abs(v - 60) < 4) { J.s.ang = 60; J.step = 1; J.ptr = null; SND.snap(); readout("Copied!", true); coach("Now slide the bevel over to the new board."); hint({ k: "drag", x: g.px1 - 40, y: g.e1 - 40, dx: 160, dy: 0 }); J.idle = 0; }
+        if (Math.abs(v - 60) < 4) { J.s.ang = 60; J.step = 1; J.ptr = null; readout("Copied!", true); coach("Now slide the bevel over to the new board."); hint({ k: "drag", x: g.px1 - 40, y: g.e1 - 40, dx: 160, dy: 0 }); J.idle = 0; }
         else readout(Math.round(v) + "°");
         setArt(J.t.f(J.s, "j" + D.u));
         return;
       }
       J.tl.x = clamp(p[0] + J.grab[0], 80, 360); J.tl.y = clamp(p[1] + J.grab[1], 100, 280);
-      if (Math.hypot(J.tl.x - g.px2, J.tl.y - g.e2) < 26) { J.tl.x = g.px2; J.tl.y = g.e2; J.ptr = null; SND.snap(); finish("The same angle, marked on the new board!"); }
+      if (Math.hypot(J.tl.x - g.px2, J.tl.y - g.e2) < 26) { J.tl.x = g.px2; J.tl.y = g.e2; J.ptr = null; finish("The same angle, marked on the new board!"); }
     },
     work: function (J) {
       var g = J.g, h = 110, t = Math.tan(60 * Math.PI / 180), s = "";
@@ -4149,7 +4041,6 @@
         if (t < imp && J.sw >= imp) {
           J.hits += 1;
           g.seg[J.at] = Math.min(g.Dm, g.seg[J.at] + g.Dm / 2);
-          SND.chop();
           var q = KINDS.mortise.surf(J, g.u0 + (J.at + 0.5) * (g.u1 - g.u0) / g.n);
           puff(q[0], q[1], "chips", 10, 0, -160);
           var depth = Math.min.apply(null, g.seg);
@@ -4346,7 +4237,6 @@
     el.classList.remove("back", "fly");
     el.classList.add("drag");
     el.style.transform = "scale(1.1)";
-    SND.tap();
   }
   function gearMove(e) {
     var el = e.currentTarget, d = gearDrags[el.id];
@@ -4370,7 +4260,6 @@
   function sendBack(el) {
     el.classList.add("back");
     el.style.transform = "";
-    SND.tok(0);
   }
   function putOn(el, d) {
     var tg = itemTarget(el);
@@ -4391,13 +4280,11 @@
       tg.t.style.display = "none";
       tg.slot.classList.add("on");
       burst(ct[0], ct[1], "confetti", 26);
-      SND.snap();
       if (GEAR.gog && GEAR.muf) gearDone();
     }, reduce ? 60 : 300);
   }
   function gearDone() {
     setTimeout(function () {
-      SND.chime();
       var c = $("charAll");
       c.classList.remove("hop"); void c.getBoundingClientRect(); if (!reduce) c.classList.add("hop");
       var r = $("gChar").getBoundingClientRect();
@@ -4429,7 +4316,6 @@
     gearEl.classList.add("leaving");
     setTimeout(function () {
       setShutter("up", 2000);
-      SND.shutter(1.7);
       for (var i = 0; i < 6; i++) burst(window.innerWidth * (i + 0.5) / 6, window.innerHeight - 30, "dust", 10, 0, -300);
     }, reduce ? 0 : 360);
     setTimeout(function () {
@@ -4483,7 +4369,6 @@
     if (closedAt) return;
     closedAt = now();
     setShutter("down", 1300);
-    SND.shutter(1.2);
   }
   // Every frame while ending: the door comes down (by itself without the goodbye button), then it is done.
   function endingFrame() {
@@ -4500,7 +4385,7 @@
     clickBlockUntil = now() + 900;
     endingDone = null; closedAt = 0;
     if (!gearIsOn()) showGear();
-    else { setShutter("up", 1500); SND.shutter(1.2); }
+    else { setShutter("up", 1500); }
   }
   // Links are disabled while the timer winds down (and during the rest screen).
   document.addEventListener("click", function (e) {
@@ -4520,8 +4405,6 @@
   document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest || !e.target.closest("input")) e.preventDefault(); });
-  // The old Workshop sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop",
     timerIntro: "When time is up, the shop door rolls down, the workshop rests, and the controls lock. The timer keeps going on every Workshop page.",
@@ -4532,13 +4415,11 @@
     restLine: "The workshop is resting.",
     restLine2: "The tools will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft tool sounds. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: closeShop,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) { if (on) SND.chime(); else motorOff(); },
     onTimer: drawTimer
   });
   Toybox.offFirst({

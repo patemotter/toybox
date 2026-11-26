@@ -13,7 +13,6 @@
 //   - Save and load
 //   - Layout
 //   - Touch
-//   - Sound (off by default; soft and synthesized)
 //   - Play timer hooks (the timer, sheet, toast and rest screen live in common/toybox.js)
 //   - Main loop
 (function () {
@@ -847,7 +846,7 @@
           sc.y = sc.hy;
           if (sc.x < edgeL(sc.y) + 26 * U || sc.x > edgeR(sc.y) - 26 * U) sc.x = clamp(sc.x, edgeL(sc.y) + 26 * U, edgeR(sc.y) - 26 * U);
           sc.state = "float"; sc.vx = 0; sc.vy = 0; sc.w = 1;
-          ring(sc.x, sc.y, 1.1); splashAt(sc.x, sc.y, 12); push(sc.x, sc.y, 0.6); plip();
+          ring(sc.x, sc.y, 1.1); splashAt(sc.x, sc.y, 12); push(sc.x, sc.y, 0.6);
         }
       }
       if (sc.state === "float" || (sc.state === "drag" && inWater(sc.x, sc.y + 14 * U))) sc.w = 1;
@@ -903,7 +902,6 @@
     for (var i = 1; i <= n; i++) got += wipeAt(lerp(x0, x1, i / n), lerp(y0, y1, i / n) - 22 * U, 56 * U, 12 * U);
     if (got) {
       for (var k = 0; k < Math.min(3, got); k++) addPart(x1 + (Math.random() < 0.5 ? -54 : 54) * U, y1 - 20 * U, rand(-20, 20), rand(0, 60), rand(2.5, 4) * U, g.land + rand(0, 10));
-      if (Math.random() < 0.4) squeak();
     }
   }
   function nozzle() { return { x: spr.x - 32 * U, y: spr.y - 44 * U }; }
@@ -918,7 +916,6 @@
       var ex = tx + Math.cos(a) * rr2, ey = ty + Math.sin(a) * rr2 * 0.8, life = rand(0.14, 0.24);
       parts.push({ x: n.x, y: n.y, vx: (ex - n.x) / life, vy: (ey - n.y) / life, r: rand(1.6, 3.6) * U, floor: 0, life: life, mist: true });
     }
-    spray();
   }
   function drawSqueegee() {
     ctx.save();
@@ -1440,15 +1437,6 @@
     updateDrops(dt);
     brushWig = Math.max(0, brushWig - dt * 1.5);
   }
-  function totalFlow() {
-    var q = 0;
-    W.spouts.forEach(function (s) { if (s.st.act) q += s.st.q; });
-    scoops.forEach(function (s) { if (s.st.act) q += s.st.q; });
-    W.funnels.forEach(function (f) { if (f.st.act) q += f.st.q; });
-    W.wheels.forEach(function (f) { if (f.st.act) q += f.st.q * 0.5; });
-    W.trays.forEach(function (f) { if (f.st.act) q += f.st.q * 0.5; });
-    return Math.min(1.5, q * 0.5);
-  }
   function bigSplash() {
     for (var i = 0; i < 9; i++) {
       var y = lerp(g.yb, g.yf, 0.5), x = lerp(edgeL(y) + 20, edgeR(y) - 20, (i + 0.5) / 9);
@@ -1508,12 +1496,11 @@
     markScroll();
   }
   function setLayout(i) {
-    if (i === lay) { W.funnels.forEach(function (f) { f.magic = Math.max(f.magic, 1.0); }); plip(); return; }
+    if (i === lay) { W.funnels.forEach(function (f) { f.magic = Math.max(f.magic, 1.0); }); return; }
     lay = i;
     W = buildWorld(lay, null);
     parts = []; rings = [];
     markPicker(); save();
-    blip();
   }
 
   // ---------- Layout ----------
@@ -1593,7 +1580,7 @@
     v.state = (v.state + dir + n) % n;
     v.pop = 1;
     (valveStates[LAYOUTS[lay].id] = valveStates[LAYOUTS[lay].id] || [])[v.idx] = v.state;
-    save(); click(v.state);
+    save();
   }
   cv.addEventListener("pointerdown", function (e) {
     e.preventDefault();
@@ -1611,16 +1598,15 @@
       $("coach").classList.add("off"); ghost.learned();
       var sc = h.o; sc.held = true; sc.state = "drag"; p.ox = w.x - sc.x; p.oy = w.y - sc.y; sc.rx = sc.x; sc.ry = sc.y; sc.snap = null;
       if (inWater(sc.x, sc.y)) { sc.w = 1; ring(sc.x, sc.y, 0.7); }
-      plip();
-    } else if (h.type === "sq") { sq.held = true; p.ox = w.x - sq.x; p.oy = w.y - sq.y; sq.px = sq.x; sq.py = sq.y; blip(); }
+    } else if (h.type === "sq") { sq.held = true; p.ox = w.x - sq.x; p.oy = w.y - sq.y; sq.px = sq.x; sq.py = sq.y; }
     else if (h.type === "spray") { spr.held = true; spr.acc = 0; p.ox = w.x - spr.x; p.oy = w.y - spr.y; squirt(); }
     else if (h.type === "valve") { p.a = Math.atan2(w.y - h.o.y, w.x - h.o.x); p.acc = 0; p.turned = false; h.o.pop = 0.6; }
-    else if (h.type === "funnel") { h.o.magic = Math.max(h.o.magic, 1.3); whooshSoft(); }
-    else if (h.type === "spin") { var sp = h.o; p.a = Math.atan2(w.y - sp.y, w.x - sp.x); p.lt = performance.now(); sp.om += (w.x < sp.x ? -1 : 1) * 3; blip(); }
-    else if (h.type === "gear") { var gq = h.o, dv2 = W.gearDrv; p.a = Math.atan2(w.y - gq.y, w.x - gq.x); p.lt = performance.now(); dv2.om = clamp(dv2.om + (w.x < gq.x ? -1 : 1) * 3 / gq.rho, -14, 14); blip(); }
-    else if (h.type === "tray") { var tq = h.o; if (tq.level > 0.05) { tq.dump = 0.9; whooshSoft(); } else { ring(w.x, w.y, 0.5); plip(); } }
-    else if (h.type === "brush") { brushWig = 1; blip(); }
-    else if (h.type === "water") { ring(w.x, w.y, 1); splashAt(w.x, w.y, 8); push(w.x, w.y, 0.8); plip(); }
+    else if (h.type === "funnel") { h.o.magic = Math.max(h.o.magic, 1.3); }
+    else if (h.type === "spin") { var sp = h.o; p.a = Math.atan2(w.y - sp.y, w.x - sp.x); p.lt = performance.now(); sp.om += (w.x < sp.x ? -1 : 1) * 3; }
+    else if (h.type === "gear") { var gq = h.o, dv2 = W.gearDrv; p.a = Math.atan2(w.y - gq.y, w.x - gq.x); p.lt = performance.now(); dv2.om = clamp(dv2.om + (w.x < gq.x ? -1 : 1) * 3 / gq.rho, -14, 14); }
+    else if (h.type === "tray") { var tq = h.o; if (tq.level > 0.05) { tq.dump = 0.9; } else { ring(w.x, w.y, 0.5); } }
+    else if (h.type === "brush") { brushWig = 1; }
+    else if (h.type === "water") { ring(w.x, w.y, 1); splashAt(w.x, w.y, 8); push(w.x, w.y, 0.8); }
     else if (h.type === "panel") { ring(w.x, w.y, 0.4); wipeAt(w.x, w.y, 24 * U, 24 * U); }
   });
   cv.addEventListener("pointermove", function (e) {
@@ -1710,7 +1696,6 @@
     if (!air) sc.w = 1;
     sc.auto = { phase: "up", t: 0, x0: air ? hx : sc.x, y0: air ? hy : sc.y, xs: sc.x, ys: sc.y, x1: ps.x, y1: ps.y };
     if (!air) { splashAt(sc.x, sc.y, 6); ring(sc.x, sc.y, 0.8); }
-    plip();
   }
   cv.addEventListener("pointerup", ptrEnd);
   cv.addEventListener("pointercancel", ptrEnd);
@@ -1719,91 +1704,7 @@
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts the audio on a tap while sound is on. This page builds its own master gain and noise per context.
-  var sctx = null, master = null, noiseBuf = null, flowSnd = null, humSnd = null;
-  function out(ac) {
-    if (sctx !== ac) {
-      sctx = ac; flowSnd = null; humSnd = null;
-      master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination);
-      var len = Math.floor(ac.sampleRate * 2);
-      noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
-      var d = noiseBuf.getChannelData(0), last = 0;
-      for (var i = 0; i < len; i++) { last = (last + 0.05 * (Math.random() * 2 - 1)) / 1.05; d[i] = last * 3.2; }
-    }
-    return master;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function plip() { tone(rand(500, 700), 0.12, 0.05, "sine", rand(1100, 1500)); }
-  function blip() { tone(660, 0.14, 0.04, "sine", 880); }
-  function click(kind) { if (kind === 0) tone(180, 0.18, 0.06, "triangle", 120); else tone(420, 0.08, 0.05, "triangle", 300); }
-  function whooshSoft() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain();
-    src.buffer = noiseBuf; f.type = "lowpass"; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(400, t + 1.2);
-    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.1, t + 0.12); g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
-    src.connect(f); f.connect(g2); g2.connect(mst); src.start(t); src.stop(t + 1.4);
-  }
-  function spray() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g2 = ac.createGain();
-    src.buffer = noiseBuf; f.type = "highpass"; f.frequency.value = 2500;
-    g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.09, t + 0.02); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
-    src.connect(f); f.connect(g2); g2.connect(mst); src.start(t, Math.random()); src.stop(t + 0.3);
-  }
-  function squeak() { tone(rand(900, 1100), 0.12, 0.025, "sine", rand(1300, 1500)); }
-  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
-  function whoosh() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime, mst = out(ac), src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    src.buffer = noiseBuf; f.type = "bandpass"; f.Q.value = 0.9;
-    f.frequency.setValueAtTime(1200, t); f.frequency.exponentialRampToValueAtTime(300, t + 1.6);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.14, t + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
-    src.connect(f); f.connect(g); g.connect(mst); src.start(t); src.stop(t + 1.9);
-  }
-  function loops(flow, pump) {
-    var ac = Toybox.sound.ready();
-    if (!ac) { stopLoops(); return; }
-    var t = ac.currentTime, mst = out(ac);
-    if (!flowSnd) {
-      var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-      src.buffer = noiseBuf; src.loop = true; f.type = "bandpass"; f.Q.value = 0.8; f.frequency.value = 800; g.gain.value = 0.0001;
-      src.connect(f); f.connect(g); g.connect(mst); src.start();
-      flowSnd = { src: src, f: f, g: g };
-      var o1 = ac.createOscillator(), lp = ac.createBiquadFilter(), g2 = ac.createGain();
-      o1.type = "triangle"; o1.frequency.value = 55; lp.type = "lowpass"; lp.frequency.value = 300; g2.gain.value = 0.0001;
-      o1.connect(lp); lp.connect(g2); g2.connect(mst); o1.start();
-      humSnd = { o: o1, g: g2 };
-    }
-    flowSnd.g.gain.setTargetAtTime(Math.max(0.0001, flow * 0.07), t, 0.25);
-    flowSnd.f.frequency.setTargetAtTime(600 + Math.random() * 700, t, 0.3);
-    humSnd.g.gain.setTargetAtTime(Math.max(0.0001, pump * 0.04), t, 0.25);
-    humSnd.o.frequency.setTargetAtTime(45 + pump * 35, t, 0.3);
-  }
-  function stopLoops() {
-    if (!flowSnd) return;
-    try {
-      flowSnd.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.1); flowSnd.src.stop(sctx.currentTime + 0.5);
-      humSnd.g.gain.setTargetAtTime(0.0001, sctx.currentTime, 0.1); humSnd.o.stop(sctx.currentTime + 0.5);
-    } catch (e) { /* ignore */ }
-    flowSnd = null; humSnd = null;
-  }
+  var sctx = null;
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { save(); if (sctx) sctx.suspend(); }
   });
@@ -1836,7 +1737,6 @@
   }
   function lastSplash() {
     bigSplash();
-    whoosh();
   }
   function restArt() {
     return '<svg class="rest-art" viewBox="0 0 240 200" aria-hidden="true"><rect x="0" y="0" width="240" height="200" rx="20" fill="#2B3A6B"/>' +
@@ -1863,7 +1763,7 @@
   });
 
   // ---------- Main loop ----------
-  var last = 0, sndAcc = 0;
+  var last = 0;
   function draw() {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = bgColor; ctx.fillRect(0, 0, CW, CH);
@@ -1879,7 +1779,6 @@
     flowOn = !Toybox.timer.locked();
     if (phase !== "resting") update(dt);
     draw();
-    sndAcc += dt; if (sndAcc > 0.15) { sndAcc = 0; if (Toybox.sound.on()) loops(phase === "resting" ? 0 : totalFlow(), 0); }
   }
 
   load();
@@ -1899,12 +1798,10 @@
     restLine: "The water is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft trickles, plips, splashes and squirts. Hold for 2 seconds.",
-    legacy: { timer: "waterworks-timer-v1", sound: "waterworks-sound-v1" },
+    legacy: { timer: "waterworks-timer-v1" },
     onEnding: function (done) { settle(); done(); },
     onGoodbye: lastSplash,
     onRest: function () { settle(); save(); },
-    onSound: function (on) { if (on) chime(); else stopLoops(); },
     onTimer: drawTimer
   });
   requestAnimationFrame(frame);

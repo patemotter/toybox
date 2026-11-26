@@ -6,7 +6,6 @@
 //   - Canvas and layout
 //   - Drawing helpers
 //   - The workbench (cached)
-//   - Sound (off by default; soft synthesized)
 //   - Hints
 //   - TAPE MEASURE
 //   - COMBINATION SQUARE (Project Mode + Free Play)
@@ -411,51 +410,6 @@
     }
   }
 
-  // ---------- Sound (off by default; soft synthesized) ----------
-  var AC = null, master = null, noiseBuf = null;
-  function ensureAudio() {
-    var a = Toybox.sound.ready();
-    if (!a || a === AC) return;
-    try {
-      master = a.createGain(); master.gain.value = 0.7; master.connect(a.destination);
-      noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 0.6), a.sampleRate);
-      var d = noiseBuf.getChannelData(0);
-      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      AC = a;
-    } catch (e) { /* audio unavailable */ }
-  }
-  function blip(freq, dur, vol, type, freq2) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC || Toybox.timer.phase() === "resting") return;
-    try {
-      var t = AC.currentTime;
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t + dur);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) { /* ignore */ }
-  }
-  function whoosh(dur, f0, f1, vol) {
-    ensureAudio();
-    if (!Toybox.sound.on() || !AC || !noiseBuf) return;
-    try {
-      var t = AC.currentTime;
-      var src = AC.createBufferSource(); src.buffer = noiseBuf;
-      var f = AC.createBiquadFilter(); f.type = "bandpass"; f.Q.value = 2;
-      f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
-      var g = AC.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f); f.connect(g); g.connect(master);
-      src.start(t); src.stop(t + dur + 0.05);
-    } catch (e) { /* ignore */ }
-  }
-  function chime() { blip(660, 0.25, 0.07, "sine", 660); setTimeout(function () { blip(990, 0.35, 0.06, "sine", 990); }, 110); }
-
   // ---------- Hints ----------
   function say(msg) {
     if (PJ) { pjSay(msg, "flash", 3); return; }
@@ -493,7 +447,7 @@
     PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
     T.a = 0;
     if (!PJ.onTarget) T.d = d;
-    else if (!was) { PJ.msg = null; blip(1200, 0.06, 0.05, "triangle", 1500); }  // the coach says "Let go!" now
+    else if (!was) { PJ.msg = null; }  // the coach says "Let go!" now
   }
   // Put the hook at (hx, hy): the case turns to face it and the blade runs out.
   function setHook(hx, hy) {
@@ -517,7 +471,6 @@
       var along = (h.x - m2.x) * ux + (h.y - m2.y) * uy, off = Math.abs(-(h.x - m2.x) * uy + (h.y - m2.y) * ux);
       var pulled = along > Math.min(70, L * 0.4) && along < L + sr && off < Math.max(34, along * 0.45);
       if (dist(h.x, h.y, o.x1, o.cy) < sr || pulled) {
-        if (T.snap !== o && !T.snapWas) blip(1500, 0.05, 0.05, "triangle", 1900);
         T.a = a2; T.d = L; T.snap = o;
         break;
       }
@@ -534,13 +487,10 @@
       T.d = PJ.target * T.ppi; T.shown = PJ.target;
       PJ.phase = "tick"; PJ.tick = 0.001; PJ.wait = 1.0;
       pjSay("Right on " + ToyboxProjects.fmt(PJ.target) + "!", "ok", 60);
-      chime();
       T.zip = true; T.zv = 120;
-      whoosh(0.6, 2000, 500, 0.05);
     } else if (T.d > 2) {
       PJ.misses++;
       pjSay(T.d < PJ.target * T.ppi ? "A bit more!" : "A bit less!", "flash", 3);
-      blip(520, 0.08, 0.04, "sine", 440);
     }
   }
   function releaseHook() {
@@ -549,14 +499,12 @@
     if (T.snap && T.d > 2) {
       // A real measurement: say it, and move on to the next thing once it has been admired.
       T.msg = { text: "The " + T.snap.id + " is " + tapeText(tapeValue(T.d)) + " long!", until: now + 4.5, ok: true };
-      chime();
       if (T.snap === goalObj()) T.goal = (T.goal + 1) % T.objs.length;
       T.moveAt = now + 4.5; T.ghostDone = false;
     }
     if (T.d > 2) {
       T.zip = true; T.zv = 200;
       T.shown = tapeValue(T.d);
-      whoosh(0.45, 2200, 500, 0.05);
     }
     T.live = false;
     T.snap = null;
@@ -567,8 +515,6 @@
       T.d -= T.zv * dt;
       if (T.d <= 0) {
         T.d = 0; T.zip = false; T.bump = 1;
-        blip(1300, 0.06, 0.08, "square", 700);
-        blip(300, 0.12, 0.08, "triangle", 120);
         if (!reduce) {
           var m = mouth();
           for (var i = 0; i < 10; i++) {
@@ -592,7 +538,7 @@
     if (T.hookHeld) {
       var step = S.unit === "cm" ? T.ppi / 2.54 * 5 : T.ppi;
       var n = Math.floor(T.d / step);
-      if (n !== T.lastIn) { if (n > T.lastIn) blip(1500 + Math.min(n, 30) * 20, 0.03, 0.03, "triangle"); T.lastIn = n; }
+      if (n !== T.lastIn) { T.lastIn = n; }
     }
   }
   function tapeBusy() { return T.hookHeld || T.zip || !!T.caseFly || Object.keys(drags).length > 0; }
@@ -1070,9 +1016,9 @@
     var was = PJ.onTarget;
     PJ.onTarget = Math.abs(d - tx) < (was ? zone * 1.4 : zone);
     if (!PJ.onTarget) { PJ.comboD = d; PJ.comboIn = d / T.ppi; }
-    else if (!was) { PJ.msg = null; blip(1200, 0.06, 0.05, "triangle", 1500); }
+    else if (!was) { PJ.msg = null; }
     var hStep = Math.round(PJ.comboD / (T.ppi * 0.5));
-    if (hStep !== PJ.lastHalf) { PJ.lastHalf = hStep; blip(1400 + Math.min(hStep, 24) * 18, 0.025, 0.025, "triangle"); }
+    if (hStep !== PJ.lastHalf) { PJ.lastHalf = hStep; }
   }
   function releaseComboPJ() {
     PJ.comboHeld = false;
@@ -1082,12 +1028,9 @@
       PJ.knobLock = 1;
       PJ.phase = "tick"; PJ.tick = 0.001; PJ.wait = 0.85;
       pjSay("Right on " + ToyboxProjects.fmt(PJ.target) + "!", "ok", 60);
-      chime();
-      blip(1500, 0.07, 0.06, "triangle", 1900);
     } else if (Math.abs(PJ.comboD - 1.5 * T.ppi) > 2) {
       PJ.misses++;
       pjSay(PJ.comboD < PJ.target * T.ppi ? "A bit more!" : "A bit less!", "flash", 3);
-      blip(520, 0.08, 0.04, "sine", 440);
     }
   }
   function comboDownPJ(p, id) {
@@ -1101,7 +1044,6 @@
       var dx = onHead ? hx - p.x : 0;
       drags[id] = { type: "comboPJ", dx: dx };
       if (!onHead) setComboPJ(p.x);
-      blip(900, 0.05, 0.05, "triangle");
       return true;
     }
     pjSay("Slide the rule!", "flash", 2.5);
@@ -1174,7 +1116,7 @@
     S.comboF = clamp((x - C.bx) / Math.max(1, C.bw), 0, 1);
     C.everSlid = true;
     var v = comboValue();
-    if (v !== C.lastTick) { C.lastTick = v; blip(1400 + Math.min(30, Math.round(S.comboF * 24)) * 18, 0.025, 0.025, "triangle"); }
+    if (v !== C.lastTick) { C.lastTick = v; }
   }
   function comboDown(p, id) {
     if (PJ) return comboDownPJ(p, id);
@@ -1190,20 +1132,17 @@
       var t0 = clamp((p.y - by) / bh, 0, 1);
       C.live = { t0: t0, t1: t0 };
       drags[id] = { type: "comboPencil" };
-      blip(1200, 0.04, 0.03, "triangle");
       return true;
     }
     if (nearLine && (onHead || onRule)) {
       var tStart = clamp((p.y - by) / bh, 0, 1);
       drags[id] = { type: "comboAuto", sx: p.x, sy: p.y, dx: hx - p.x, t0: tStart };
-      blip(700, 0.04, 0.04, "triangle");
       return true;
     }
     if (onHead || onRule) {
       var dx = onHead ? hx - p.x : 0;
       drags[id] = { type: "comboSlide", dx: dx };
       if (!onHead) comboSlideFree(p.x);
-      blip(600, 0.04, 0.04, "triangle");
       return true;
     }
     C.edgeFlash = 1;
@@ -1235,7 +1174,6 @@
       comboSlideFree(p.x + dr.dx);
     } else if (dr.type === "comboPencil" && C.live) {
       var t = clamp((p.y - C.by) / C.bh, 0, 1);
-      if (Math.abs(t - C.live.t1) * C.bh > 14) blip(1800 + rnd(-200, 200), 0.02, 0.015, "triangle");
       C.live.t1 = t;
     }
   }
@@ -1243,7 +1181,6 @@
     if (dr.type === "comboPJ") { releaseComboPJ(); return; }
     syncComboBoard();
     if (dr.type === "comboSlide") {
-      blip(300, 0.06, 0.05, "triangle", 220);
       save();
     } else if (dr.type === "comboPencil" && C.live) {
       var lv = C.live, hx = C.bx + S.comboF * C.bw;
@@ -1253,7 +1190,6 @@
         S.lines.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
         if (S.lines.length > 80) S.lines.shift();
         save();
-        blip(880, 0.08, 0.04, "sine", 1100);
       }
       C.live = null;
     }
@@ -1338,7 +1274,6 @@
       T.hookHeld = true; T.live = true;
       T.lastIn = Math.floor(T.d / T.ppi);
       drags[id] = { type: "hook", dx: h.x - p.x, dy: 0 };
-      blip(900, 0.05, 0.05, "triangle");
       return true;
     }
     pjSay("Pull the yellow hook!", "flash", 2.5);
@@ -1357,7 +1292,6 @@
       T.lastIn = Math.floor(T.d / T.ppi);
       drags[id] = { type: "hook", dx: h.x - p.x, dy: h.y - p.y };
       T.needAlign = false; if (!T.msg) T.moveAt = 0;
-      blip(900, 0.05, 0.05, "triangle");
       return true;
     }
     // Inside the case: carry it around
@@ -1366,7 +1300,6 @@
       T.caseFly = null;
       drags[id] = { type: "case", dx: T.c.x - p.x, dy: T.c.y - p.y };
       T.moveAt = 0; T.needAlign = false;
-      blip(500, 0.05, 0.05, "triangle");
       return true;
     }
     say(T.d < 1 ? "Pull the yellow hook!" : "Grab the tape case");
@@ -1403,7 +1336,6 @@
         while (fa > Math.PI) fa -= 2 * Math.PI;
         while (fa < -Math.PI) fa += 2 * Math.PI;
         T.caseFly = { fx: T.c.x, fy: T.c.y, fa: fa, tx: best.x0 - T.cs / 2, ty: best.cy, t: 0 };
-        blip(700, 0.06, 0.05, "triangle", 900);
       }
       // Left somewhere else for a while: it glides back to the thing the coach names.
       T.needAlign = true; T.moveAt = now + 6;
@@ -1436,7 +1368,6 @@
     });
     var lv = Math.abs(phi) < 0.5;
     if (lv && !L.wasLevel && Toybox.timer.phase() !== "resting") {
-      chime();
       if (!reduce) for (var k = 0; k < 18; k++) L.sparks.push({ a: rnd(0, Math.PI * 2), r: 0, v: rnd(160, 360), t: 0, c: ["#FFC93C", "#8FD694", "#FFFFFF", "#5BC0EB"][k % 4] });
     }
     L.wasLevel = lv;
@@ -1541,7 +1472,6 @@
     if (Math.abs(p.x - L.pv.x) < L.lb * 0.62 && Math.abs(p.y - L.pv.y) < reachY) {
       L.aT = null;
       drags[id] = { type: p.x < L.pv.x ? "lvll" : "lvlr" };
-      blip(520, 0.05, 0.05, "triangle");
       levelMove(drags[id], p);
       return true;
     }
@@ -1717,7 +1647,6 @@
         var t0 = Math.min(sp.t, Q.bh / Q.sl);
         Q.live = { t0: t0, t1: t0 };
         drags[id] = { type: "pencil" };
-        blip(1200, 0.04, 0.03, "triangle");
         return true;
       }
       Q.edgeFlash = 1;
@@ -1726,7 +1655,6 @@
     }
     if (near || inSquare(p)) {
       drags[id] = { type: "square", dx: Q.xd - p.x };
-      blip(480, 0.05, 0.05, "triangle");
       return true;
     }
     pjSay("Slide the square to the mark!", "flash", 2.5);
@@ -1739,7 +1667,6 @@
     var near = Math.abs(x - PJ.tickX) < (PJ.onTick ? zone * 2 : zone);
     if (near && !PJ.onTick) {
       PJ.onTick = true; Q.clack = 1; Q.edgeFlash = 1;
-      blip(380, 0.08, 0.06, "triangle", 260);
     } else if (!near && PJ.onTick) PJ.onTick = false;
     if (!PJ.onTick) Q.xd = x;   // on the tick it eases onto it (updateProject)
     PJ.sqOff = (Q.xd - PJ.tickX) / T.ppi;
@@ -1753,13 +1680,11 @@
       var a = toBoard(lerp(e.a.x, e.b.x, t0) + ox, lerp(e.a.y, e.b.y, t0)), b = toBoard(lerp(e.a.x, e.b.x, t1) + ox, lerp(e.a.y, e.b.y, t1));
       S.lines.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
       PJ.cover = PJ.cover ? [Math.min(PJ.cover[0], t0), Math.max(PJ.cover[1], t1)] : [t0, t1];
-      blip(880, 0.08, 0.04, "sine", 1100);
       if (PJ.cover[1] - PJ.cover[0] >= 0.7 * tb) {
         // close enough: the line finishes itself, from the near edge to the far edge
         S.lines = [];
         PJ.lineT = 0.001; PJ.wait = 1.2;
         pjSay("A straight line!", "ok", 60);
-        chime();
       } else pjSay("All the way across!", "flash", 3);
     }
   }
@@ -1770,12 +1695,10 @@
     if (!Q.live && sp.d < pr && !(inSquare(p) && sp.d > 30)) {
       Q.live = { t0: sp.t, t1: sp.t };
       drags[id] = { type: "pencil" };
-      blip(1200, 0.04, 0.03, "triangle");
       return true;
     }
     if (inSquare(p)) {
       drags[id] = { type: "square", dx: Q.xd - p.x };
-      blip(480, 0.05, 0.05, "triangle");
       return true;
     }
     Q.edgeFlash = 1;
@@ -1789,17 +1712,16 @@
       S.sqF = (Q.xd - Q.bx) / Math.max(1, Q.bw - Q.sl);
       var mid = Q.by + Q.bh / 2;
       var want = p.y > mid + Q.bh * 0.12 ? true : (p.y < mid - Q.bh * 0.12 ? false : S.flip);
-      if (want !== S.flip) { S.flip = want; Q.flipT = want ? 1 : 0; Q.clack = 1; blip(380, 0.08, 0.06, "triangle", 260); }
+      if (want !== S.flip) { S.flip = want; Q.flipT = want ? 1 : 0; Q.clack = 1; }
     } else if (dr.type === "pencil" && Q.live) {
       var e = sqEdge();
       var t = segParam(p, e.a, e.b).t;
       if (PJ) t = Math.min(t, Q.bh / Q.sl);  // the pencil stays on the wood
-      if (Math.abs(t - Q.live.t1) * Q.sl > 14) blip(1800 + rnd(-200, 200), 0.02, 0.015, "triangle");
       Q.live.t1 = t;
     }
   }
   function squareUp(dr) {
-    if (dr.type === "square") { blip(300, 0.08, 0.06, "triangle", 200); save(); }
+    if (dr.type === "square") { save(); }
     else if (dr.type === "pencil" && Q.live) {
       if (PJ) { squareStrokePJ(); return; }
       var e = sqEdge(), lv = Q.live;
@@ -1811,7 +1733,6 @@
         S.lines.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
         if (S.lines.length > 80) S.lines.shift();
         save();
-        blip(880, 0.08, 0.04, "sine", 1100);
       }
       Q.live = null;
     }
@@ -1820,7 +1741,6 @@
     if (Q.clearT > 0) return;
     if (!S.lines.length) { say("Draw a line first!"); return; }  // nothing to wipe: say so (never a dead tap)
     Q.clearT = 1;
-    whoosh(0.35, 900, 400, 0.04);
   }
   function updateSquare(dt) {
     Q.edgeFlash = Math.max(0, Q.edgeFlash - dt * 1.5);
@@ -2004,7 +1924,6 @@
       f.x = lerp(f.fx, to.x, e); f.y = lerp(f.fy, to.y, e) - Math.sin(f.t * Math.PI) * 30;
       if (f.t >= 1) {
         delete K.fly[id];
-        if (f.into) { blip(760, 0.06, 0.05, "triangle"); }
       }
     });
   }
@@ -2020,7 +1939,6 @@
   function takeOut(id, from) {
     if (S.item === id) S.item = null;
     K.fly[id] = { fx: from.x, fy: from.y, x: from.x, y: from.y, t: 0, into: false };
-    blip(520, 0.06, 0.04, "triangle", 420);
     save();
   }
   function hitItem(p) {
@@ -2045,7 +1963,6 @@
     if (onSlider && !(it && S.item !== it)) {
       drags[id] = { type: "slider", dx: g - mm.x };
       K.everDragged = true; K.open = null;
-      blip(600, 0.04, 0.04, "triangle");
       return true;
     }
     if (it) {
@@ -2053,7 +1970,6 @@
       K.fly[it] = { drag: true, x: o.x, y: o.y, fx: o.x, fy: o.y, t: 0 };
       drags[id] = { type: "item", item: it, dx: o.x - p.x, dy: o.y - p.y, sx: p.x, sy: p.y, moved: false, wasIn: S.item === it };
       if (S.item === it) S.item = null;
-      blip(700, 0.05, 0.04, "triangle");
       return true;
     }
     say(S.item ? "Slide the jaw to close it" : "Put a part in the jaws");
@@ -2071,11 +1987,9 @@
       var ng = clamp(want, minG, GMAX);
       if (ng !== want) { dr.g0 = ng; dr.ax = mm.x; }   // at a stop: turning back answers at once
       if (S.item && ng <= minG + 0.01 && S.gap > minG + 0.3) {
-        K.contact = 1; blip(1100, 0.05, 0.06, "square", 900); blip(400, 0.08, 0.05, "triangle");
+        K.contact = 1;
       }
-      var oldV = calValue();
       S.gap = ng;
-      if (calValue() !== oldV && Math.abs(calValue() - oldV) < 3) blip(2200, 0.012, 0.012, "square");
     } else if (dr.type === "item") {
       var f = K.fly[dr.item];
       if (!f) return;
@@ -2101,7 +2015,6 @@
   }
   function doZero() {
     S.zero = S.gap; K.zeroFlash = 1;
-    blip(1500, 0.08, 0.05, "square", 1500);
     save();
   }
 
@@ -2112,7 +2025,6 @@
   function localPt(e) { var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function onDown(e) {
     e.preventDefault();
-    ensureAudio();
     if (busy()) return;
     var p = localPt(e), ok = false, tool = S.tool;
     if (PJ) {
@@ -2235,7 +2147,6 @@
       PJ.onTick = false; PJ.sqOff = 1.2;
       Q.xd = clamp(PJ.tickX + PJ.sqOff * T.ppi, PJ.board.x0, Math.min(PJ.board.x1 - T.ppi * 0.3, CW - Q.sl * 0.3));
     }
-    blip(600, 0.08, 0.05, "triangle", 420);
   }
   // The job is done: record it, then the card with the one way on (a real link, never automatic).
   function finishJob() {
@@ -2251,7 +2162,6 @@
     $("stage").appendChild(card);
     PJ.href = ToyboxProjects.doneLink(a, PSTEP);
     PJ.card = card;
-    chime();
     updateAria(true);
   }
   // Called every frame in project mode: the marks that draw themselves and the calm pauses between phases.
@@ -2325,7 +2235,6 @@
       T.d = 0; T.zip = false; T.hookHeld = false; T.shown = 0;
       S.lines = []; Q.live = null; C.live = null;
       Array.prototype.forEach.call(document.querySelectorAll("[data-tool]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.tool === t)); });
-      if (!quiet) blip(560, 0.08, 0.06, "triangle", 840);
       T.lastTouch = now; T.coachKey = "";
       layoutProject();
       pjCoach();
@@ -2337,7 +2246,7 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-tool]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.tool === t)); });
     Array.prototype.forEach.call(document.querySelectorAll(".optset"), function (o) { o.classList.toggle("on", o.dataset.for === t); });
     if (t !== "tape") coach.clear();
-    if (!quiet) { blip(560, 0.08, 0.06, "triangle", 840); if (t !== "tape") say(HINTS[t]); save(); }
+    if (!quiet) { if (t !== "tape") say(HINTS[t]); save(); }
     T.lastTouch = now; T.coachKey = "";
     updateOpts();
     updateAria(true);
@@ -2349,17 +2258,15 @@
   $("toolbar").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b || busy()) return;
-    ensureAudio();
     setTool(b.dataset.tool);
   });
   $("opts").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (!b || busy()) return;
-    ensureAudio();
     if (b.dataset.unit) {
-      if (S.unit !== b.dataset.unit) { S.unit = b.dataset.unit; T.shown = S.unit === "cm" ? Math.round(T.shown * 2.54) : Math.round(T.shown / 2.54); blip(700, 0.06, 0.05, "triangle", 900); }
+      if (S.unit !== b.dataset.unit) { S.unit = b.dataset.unit; T.shown = S.unit === "cm" ? Math.round(T.shown * 2.54) : Math.round(T.shown / 2.54); }
     } else if (b.dataset.sq) {
-      S.sq = +b.dataset.sq; Q.edgeFlash = 1; blip(S.sq === 45 ? 880 : 660, 0.06, 0.05, "triangle");
+      S.sq = +b.dataset.sq; Q.edgeFlash = 1;
     } else if (b.id === "clearBtn" || b.classList.contains("clear")) clearLines();
     else if (b.id === "zeroBtn") doZero();
     updateOpts();
@@ -2372,7 +2279,7 @@
   function onEnding(done) {
     endingDone = done;
     releaseAll();
-    if (T.d > 1 && !T.zip) { T.hookHeld = false; T.zip = true; T.zv = 200; T.shown = tapeValue(T.d); whoosh(0.45, 2200, 500, 0.05); }
+    if (T.d > 1 && !T.zip) { T.hookHeld = false; T.zip = true; T.zv = 200; T.shown = tapeValue(T.d); }
     L.aT = 0;
     Q.live = null;
     C.live = null;
@@ -2381,7 +2288,6 @@
   function goodbye() {
     if (T.d > 1 && !T.zip) { T.zip = true; T.zv = 200; }
     L.aT = 0;
-    chime();
   }
   function settled() {
     var bubOk = L.bub.every(function (b) { return Math.abs(b.v) < 0.05; });
@@ -2465,8 +2371,6 @@
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", function () { setTimeout(resize, 120); });
   if (window.ResizeObserver) { try { new ResizeObserver(function () { resize(); }).observe($("stage")); } catch (e) { /* ignore */ } }
-
-  try { if (localStorage.getItem("workshop-sound-v1") === "on") localStorage.setItem("workshop-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "workshop-measuring",
     timerIntro: "When time is up, the tape zips back, the tools settle and rest, and the controls lock. The timer carries on across Workshop pages.",
@@ -2477,13 +2381,11 @@
     restLine: "The tools are put away.",
     restLine2: "They will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft clicks, a zip and a chime. Hold for 2 seconds.",
-    legacy: { timer: "workshop-timer-v1", sound: "workshop-sound-v1" },
+    legacy: { timer: "workshop-timer-v1" },
     onEnding: onEnding,
     onGoodbye: goodbye,
     onRest: onRest,
-    onWake: onWake,
-    onSound: function (on) { if (on) { ensureAudio(); blip(660, 0.15, 0.08, "sine", 880); } }
+    onWake: onWake
   });
 
   var lastT = performance.now(), ariaAt = 0;

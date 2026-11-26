@@ -37,7 +37,7 @@
   //   Loop and start
   const $ = (id) => document.getElementById(id);
   const U = Farm.u, clamp = U.clamp, lerp = U.lerp, ease = U.ease, hash = U.hash, mix = U.mix, INK = U.INK;
-  const D = Farm.draw, SH = Farm.shape, snd = Farm.sound, TAU = Math.PI * 2, PI = Math.PI;
+  const D = Farm.draw, SH = Farm.shape, TAU = Math.PI * 2, PI = Math.PI;
   const Pp = SH.P, Rr = SH.R, Cc = SH.C, Ln = SH.Ln, tube = SH.tube, fs = SH.fs;
   const NAME = (Farm.NAMES && Farm.NAMES.ewe) || "Hello Ewe!";
   document.title = NAME; $("title").textContent = NAME;
@@ -404,7 +404,7 @@
   });
   Toybox.bar($("bottom"), { onNew: startOver, onSurprise: surprise });
   function hint() { const d = SUB[key()]; if (d) coach.say(d.say, 3); glow = 3; ghost.poke(); }
-  function busyHint() { snd.horn(); coach.say(BUSY[stepId] || "Wait a moment.", 3); }
+  function busyHint() { coach.say(BUSY[stepId] || "Wait a moment.", 3); }
 
   // =====================================================================================================
   // The flow
@@ -428,7 +428,7 @@
   function stepDone(id) { const i = ORDER.indexOf(id); if (i < ORDER.length - 1) bringIn(ORDER[i + 1]); else finish(); }
   function finish() {
     setPhase("done"); mo = null;
-    beds++; save(); snd.chime(); Toybox.kind();
+    beds++; save(); Toybox.kind();
     coach.say("The sheep are back in the clean shed.", 5);
     coach.step("Tap the shed to start again.");
   }
@@ -498,10 +498,9 @@
     mo.drive = to < x0 ? -1 : 1;
   }
   function doScrape() {
-    snd.horn();
     coach.say("The rubber scraper pushes the old feed.", 3);
     driveBlue(SCR_END, 2.3, collect, () => {
-      collect(); snd.clunk();
+      collect();
       coach.say("The old feed is in a pile.", 3);
       // the tractor drives on a little and turns round so the bucket faces the pile
       const x0 = bt.x;
@@ -512,16 +511,14 @@
     });
   }
   function doScoop() {
-    driveBlue(scoopX(), 2.0, scoopFill, () => { bt.fill = 1; pile.amt = 0; snd.clunk(); setSub("lift"); coach.say("The bucket is full of old feed.", 3); });
+    driveBlue(scoopX(), 2.0, scoopFill, () => { bt.fill = 1; pile.amt = 0; setSub("lift"); coach.say("The bucket is full of old feed.", 3); });
   }
   function doLift() {
     const l0 = bt.lift;
-    snd.tick();
     run(1.6, (t) => { bt.lift = lerp(l0, LIFT, ease(t / 1.6)); }, () => { bt.lift = LIFT; setSub("heap"); });
   }
   function doHeap() {
-    snd.horn();
-    driveBlue(HEAP_STOP, 2.6, null, () => { snd.clunk(); setSub("tip"); });
+    driveBlue(HEAP_STOP, 2.6, null, () => { setSub("tip"); });
   }
   function doTip() {
     run(3.0, (t, dt) => {
@@ -531,7 +528,7 @@
         const lp = bucketLip();
         for (let i = 0; i < 2; i++) addPart({ kind: "muck", x: lp.x + (Math.random() - 0.5) * 0.4, h: lp.h, r: 1.02 + Math.random() * 0.1, vx: (Math.random() - 0.5) * 0.8, vh: -0.5 - Math.random(), life: 0.9, size: 0.1 + Math.random() * 0.09, col: FEEDC[i + (Math.random() * 2 | 0)], floor: heapTop() - 0.25 });
       }
-      if (t > 1.0 && onceM("heap")) { heap.n = Math.min(5, heap.n + 1); snd.clunk(); }
+      if (t > 1.0 && onceM("heap")) { heap.n = Math.min(5, heap.n + 1); }
       if (t > 1.5) { const f = ease((t - 1.5) / 1.5); bt.tilt = 1 - f; bt.lift = lerp(LIFT, 0.1, f); }
       void dt;
     }, () => {
@@ -569,12 +566,10 @@
     const s = q[0];
     s.num = ++counted; s.numT = time; s.spd = 1.6;
     s.path = [[RAMP[0] - 0.2, RPL], [SPOTS[counted - 1], RPL]];
-    snd.pop();
     q.slice(1).forEach((o, j) => { o.path = [[QUEUE[j], RPL]]; o.spd = 1.2; });
     if (counted < 4) { setSub("count"); return; }
     ghost.learned("parlor.count");
     run(20, () => sheep.slice(0, 4).every(arrived), () => {
-      snd.chime();
       coach.say("Four sheep stand on the milking platform.", 4);
       run(3.6, noop, () => {
         sheep.slice(0, 4).forEach((o, j) => { o.path = [[RAMP_DN + 0.6 + j * 0.2, RPL], [48.5 + j * 1.3, RPL]]; o.spd = 1.5; });
@@ -599,7 +594,6 @@
     const s = sheep[0];
     s.path = [[60.1, 1.3], [60.9, RRACE], [SPOT_RACE, RRACE]]; s.spd = 1.2;
     tom.tx = TOM_X;
-    snd.tick();
     run(12, (t) => t > 0.5 && arrived(s), () => { s.flip = false; setSub("check"); coach.say("The sheep stands still in the race.", 3); });
   }
   function checkFoot() {
@@ -615,12 +609,10 @@
     run(2.6, (t) => {
       tom.spray = t < 0.5 ? ease(t / 0.5) : (t < 1.9 ? 1 : 1 - ease((t - 1.9) / 0.6));
       if (t > 0.5 && t < 1.7) {
-        if (onceM("hiss")) snd.pour(0.5);
         s.blue = clamp((t - 0.6) / 0.8, 0, 1);
         const n = tom.nozzle;
         if (n && Math.random() < 0.8) addPart({ kind: "mist", x: n.x, h: n.h, r: n.r, vx: n.vx * (0.9 + Math.random() * 0.5), vh: n.vh + (Math.random() - 0.5) * 0.5, life: 0.8, size: 0.05, grow: 0.25, col: SPRAY, alpha: 0.55, g: 0 });
       }
-      if (t > 1.7 && onceM("quiet")) snd.pour(0);
     }, () => {
       tom.spray = 0; s.blue = 1;
       coach.say("The blue spray keeps the hoof healthy.", 4);
@@ -644,17 +636,16 @@
     bt.x = BT_PARK; bt.dir = -1; bt.lift = 0; bt.tilt = 0; bt.fill = 0;
     rt.vis = true; rt.x = RT0; rt.dir = -1; rt.on = false; rt.bale = 1;
     const x0 = rt.x, dur = 4.0;
-    run(dur, (t) => { const nx = lerp(x0, RT_START, ease(t / dur)); rt.wheel += Math.abs(nx - rt.x); rt.x = nx; }, () => { rt.x = RT_START; snd.clunk(); setSub("on"); });
+    run(dur, (t) => { const nx = lerp(x0, RT_START, ease(t / dur)); rt.wheel += Math.abs(nx - rt.x); rt.x = nx; }, () => { rt.x = RT_START; setSub("on"); });
     mo.drive = -1;
   }
   function chopperOn() {
-    rt.on = true; snd.clunk();
+    rt.on = true;
     run(1.4, (t) => { rt.rate = ease(t / 1.4); }, () => { rt.rate = 1; setSub("drive"); coach.say("The chopper shreds the straw bale.", 3); });
   }
   function redMoved() { const p = clamp((RT_START - rt.x) / (RT_START - RT_END), 0, 1); rt.bale = Math.min(rt.bale, lerp(1, 0.12, p)); }
   function driveRed() {
     if (!rt.on) { chopperOn(); return; }
-    snd.horn();
     const x0 = rt.x, dur = Math.max(0.6, Math.abs(x0 - RT_END) / 2.1);
     run(dur, (t) => { const nx = lerp(x0, RT_END, ease(t / dur)); rt.wheel += Math.abs(nx - rt.x); rt.x = nx; redMoved(); if (mo) mo.drive = -1; }, () => {
       rt.x = RT_END;
@@ -671,14 +662,13 @@
     });
   }
   function sheepIn() {
-    snd.clunk();
     sheep.forEach((s, i) => {
       s.num = 0; s.q = -1;
       s.tele = { x: -10 - i * 0.9, r: 1.43, plat: false, path: [[-0.8, 1.43], [1.6, 1.43], [PENS[i][0], PENS[i][1]]], spd: 2.4 };
     });
     gate.to = 1;
     run(30, (t) => t > 2 && sheep.every((s) => !s.tele && s.x > 1.2), () => {
-      gate.to = 0; snd.clunk();
+      gate.to = 0;
       sheep.forEach((s, i) => { s.flip = i % 2 === 1; });
       run(1.2, noop, finish);
     });
@@ -694,14 +684,13 @@
     const idle = sheep.filter((s) => arrived(s) && onStage(s.x, s.r, -20) && !(stepId === "foot" && s.i === 0 && phase !== "done"));
     if (pick === "hop" && idle.length) {
       const s = idle[Math.floor(Math.random() * idle.length)];
-      s.hop = 1; snd.pop();
+      s.hop = 1;
       coach.say("A sheep jumps for joy!", 3);
       return;
     }
     // Midge plays tag (the episode starts with her running round the sheep pens)
     const from = stepId === "foot" ? MIDGE_X : V.x + W / V.k / 2 + 1;
     dog = { x: from, t: 0, ph: 0, flip: true, r: stepId === "foot" ? 0.97 : 0.93, hop: 0 };
-    snd.pop();
     coach.say("Midge runs by to play tag.", 3);
   }
 
@@ -790,7 +779,6 @@
     if (!p) return false;
     const name = /^sheep\d$/.test(part) ? "Sheep" : NAMES[part];
     if (!name) return false;
-    if (part === "blue" || part === "red") snd.horn(); else snd.tick();
     if (/^sheep\d$/.test(part)) { const s = sheep[+part.slice(5)]; if (arrived(s) && !s.hop) s.hop = 0.5; }
     Toybox.nametag(name, p.x, p.y - Math.min(60, p.r * 0.6), 2400);
     return true;
@@ -907,10 +895,6 @@
     updateParts(dt);
     follow(dt);
     engLevel += (work - engLevel) * Math.min(1, dt * 4);
-    const machine = stepId === "scrape" || stepId === "bed";
-    snd.engine(ending || !machine ? -1 : 0.15 + engLevel * 0.85);
-    snd.pour(ending ? 0 : (rt.flow > 0.05 ? 0.45 * rt.flow : 0));
-    snd.soil(!ending && stepId === "scrape" && sub === "scrape" && phase === "work" ? 0.35 : 0);
   }
 
   // =====================================================================================================
@@ -1227,8 +1211,8 @@
     if (!(window.Toybox && Toybox.timer.phase() === "resting")) { update(dt); draw(); }
     requestAnimationFrame(loop);
   }
-  function chopperOff(done) { rt.on = false; rt.rate = 0; rt.flow = 0; snd.pour(0); if (done) done(); }
-  function onEnding(done) { ending = true; chopperOff(); setTimeout(() => { snd.engine(-1); snd.soil(0); snd.pour(0); done(); }, 2600); }
+  function chopperOff(done) { rt.on = false; rt.rate = 0; rt.flow = 0; if (done) done(); }
+  function onEnding(done) { ending = true; chopperOff(); setTimeout(() => { done(); }, 2600); }
   function onWake() { ending = false; }
 
   resetWorld();
@@ -1249,11 +1233,9 @@
     restLine: "The farm is resting.",
     restLine2: "The sheep will be right here next time.",
     restArt: Farm.restArt,
-    soundNote: "Soft tractor, scraper and straw chopper sounds. Hold for 2 seconds.",
     onEnding,
     onRest: onWake,
-    onWake,
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake
   });
   Toybox.offFirst({ running: () => rt.on, off: (done) => chopperOff(done) });
   requestAnimationFrame(loop);

@@ -383,47 +383,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     return "";
   }
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null, hum = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; hum = null; } return master; }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function plop() { tone(rand(260, 360), 0.16, 0.05, "sine", 140); }
-  function click() { tone(900, 0.06, 0.04, "square", 600); }
-  function notch() { tone(1200, 0.04, 0.025, "triangle", 900); }
-  function clunk() { tone(220, 0.12, 0.06, "triangle", 120); tone(700, 0.05, 0.03, "square", 500, 0.06); }
-  function puffSnd() { tone(180, 0.25, 0.03, "sine", 90); }
-  function crackSnd() { tone(1500, 0.05, 0.04, "triangle", 900); tone(1100, 0.05, 0.03, "triangle", 700, 0.07); }
-  function glug(d) { tone(rand(180, 240), 0.12, 0.035, "sine", 320, d || 0); }
-  function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
-  // The motor: a soft low whir that rises with the speed.
-  function updateHum() {
-    var ac = Toybox.sound.ready();
-    if (!ac) { if (hum) { try { hum.g.gain.value = 0; } catch (e) { /* ignore */ } } return; }
-    if (!hum || masterCtx !== ac) {
-      out(ac);
-      var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      o.type = "sawtooth"; f.type = "lowpass"; f.Q.value = 1.5; g.gain.value = 0;
-      o.connect(f); f.connect(g); g.connect(out(ac)); o.start();
-      hum = { o: o, f: f, g: g };
-    }
-    var t = ac.currentTime, s = M.speed;
-    hum.o.frequency.setTargetAtTime(48 + 80 * s, t, 0.08);
-    hum.f.frequency.setTargetAtTime(220 + 700 * s, t, 0.08);
-    hum.g.gain.setTargetAtTime(s > 0.02 ? 0.028 * Math.min(1, s * 1.5) : 0, t, 0.08);
-  }
-
   // ---------- Coach and counter ----------
   var coachEl = $("coach"), coach = Toybox.coach(coachEl);
   // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
@@ -503,7 +462,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var f = makeFloat(b.querySelector("svg").outerHTML);
     f.style.display = "none";
     tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, recipe: b.getAttribute("data-recipe"), ing: b.getAttribute("data-ing"), beater: b.getAttribute("data-beater") };
-    tone(620, 0.08, 0.03, "sine", 820);
   });
   function tileMove(e) {
     var d = tileDrags[e.pointerId];
@@ -543,7 +501,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     S.recipe = id; S.items = []; S.top = ""; pending = {};
     climb = 0; peaks = 0;
     head.tries = 0; M.tries = 0; hush();
-    tone(520, 0.12, 0.04, "sine", 780);
     learned("recipe");
     save();
   }
@@ -554,18 +511,17 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var from = head.a;
     if (Math.abs(from - to) < 0.001 && !head.anim) { head.a = to; if (S.up !== to > 0) headArrived(to); if (then) then(); return; }
     head.anim = { from: from, to: to, t0: now(), dur: reduce ? 0.15 : 0.35 + 0.6 * Math.abs(to - from) / UP, then: then ? [then] : [] };
-    if (to > from) click();
   }
   function headArrived(to) {
     S.up = to > 0;
-    if (to === 0) { clunk(); burst(LOCK.x - 0.1, LOCK.y, 6, "#FFFFFF"); learned("lower"); head.tries = 0; }
+    if (to === 0) { burst(LOCK.x - 0.1, LOCK.y, 6, "#FFFFFF"); learned("lower"); head.tries = 0; }
     else learned("up");
     save();
   }
   // The dad: no "switch it off first" step. Lifting the head, changing the beater or taking the bowl
   // while it runs switches it off by itself and carries on.
   function needOff(then) {
-    stopMotor(); click();
+    stopMotor();
     if (then) then();
   }
   function needHeadDown(then) {
@@ -574,7 +530,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     say("Lower the head!");
     head.flashUntil = now() + 3;
     head.wig = 1;
-    tone(330, 0.14, 0.04, "triangle", 300);
   }
   function toggleHead() {
     if (head.anim) { animHead(head.anim.to > 0 ? 0 : UP); return; }
@@ -590,7 +545,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var was = M.pos;
     M.pos = pos;
     M.labelUntil = now() + 2.5;
-    notch();
     if (was === 0 && pos > 0) { learned("run"); M.tries = 0; }
     if (pos === 0) learned("off");
   }
@@ -621,7 +575,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (S.beater && S.beater !== id) oldBeater = { id: S.beater, t0: now(), a: head.a };
     S.beater = id;
     twist = 1;
-    click(); setTimeout(click, 140);
     var sp = shaftScene();
     burst(sp.x, sp.y + 0.3, 8, "#FFFFFF");
     learned("beater");
@@ -669,12 +622,11 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       drops.push({ kind: "cube", id: "butter", x: -0.08 + i * 0.16, y: RIM_Y - 0.5 - i * 0.12, vx: 0, vy: 0, rot: rand(-0.4, 0.4), spin: rand(-3, 3), r: 0.075, col: "#FFE07A", amt: 0.5 });
     }
   }
-  function eggArrives() { eggWait = { t0: now() }; tone(500, 0.08, 0.03, "sine", 420); }
+  function eggArrives() { eggWait = { t0: now() }; }
   function crackEgg() {
     if (!eggWait) return;
     eggWait = null;
     eggCrack = { t0: now(), dropped: false };
-    crackSnd();
     learned("crack");
   }
   function landed(id, amt) {
@@ -699,7 +651,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var R = recipe();
     animHead(UP, function () {
       take = { t0: now(), dur: reduce ? 0.4 : 1.5, k: 0, rec: S.recipe, col: R.col, top: S.top };
-      tone(500, 0.3, 0.04, "sine", 900);
     });
   }
   function finishTake() {
@@ -711,7 +662,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     S.recipe = ""; S.items = []; S.top = ""; pending = {}; climb = 0; peaks = 0;
     take = null;
     foodPop = 0;
-    chime();
     for (var i = 0; i < 3; i++) setTimeout(function () { burst(FOOD_X, FOOD_Y - 0.3, 14, null, true); }, i * 260);
     save();
   }
@@ -756,7 +706,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     sendFoodAway();
     head.tries = 0; M.tries = 0; hush();
     save();
-    tone(500, 0.2, 0.04, "sine", 300);
   }
   // Stand Mixer moments: sprinkles or chocolate chips rain into the bowl; food coloring drops swirl into
   // the batter and blend back; the batter climbs the beater and plops back down; the mixer nods hello.
@@ -780,8 +729,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       FUN.cols = COLOR_SETS[(FUN.colN = ((FUN.colN || 0) + 1) % COLOR_SETS.length)];
       FUN.cols.forEach(function (c, i) { drops.push({ kind: "drop", id: "", x: -0.16 + i * 0.16, y: RIM_Y - 0.9 - i * 0.18, vx: 0, vy: 0, rot: 0, spin: 0, r: 0.035, col: c, amt: 0 }); });
       say("Pretty colors!");
-    } else if (id === "climb") { funStart("climb", reduce ? 3.5 : 4.6); FUN.plopped = false; say("Up it goes!"); tone(300, 1.6, 0.025, "sine", 700); }
-    else { funStart("nod", reduce ? 2.5 : 3.6); twist = 1; say("The mixer says hi!"); click(); setTimeout(click, 420); setTimeout(click, 840); }
+    } else if (id === "climb") { funStart("climb", reduce ? 3.5 : 4.6); FUN.plopped = false; say("Up it goes!"); }
+    else { funStart("nod", reduce ? 2.5 : 3.6); twist = 1; say("The mixer says hi!"); }
   }
   // The head's extra nod (a Surprise moment), added to its tilt when it is drawn.
   function nodA() {
@@ -821,7 +770,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     else if (tt < hold) y = topY + Math.sin((tt - up) * 14) * 0.012 * MAMP;
     else if (tt < fall) { var f = (tt - hold) / (fall - hold); y = lerp(topY, sf.y, f * f); }
     else {
-      if (!FUN.plopped) { FUN.plopped = true; plop(); burst(0, sf.y - 0.04, 12, col); puff(0, sf.y - 0.05, 4); bowl.wig = 0.8; }
+      if (!FUN.plopped) { FUN.plopped = true; burst(0, sf.y - 0.04, 12, col); puff(0, sf.y - 0.05, 4); bowl.wig = 0.8; }
       return;
     }
     var bx = ORB * Math.cos(M.orbit), r = 0.1 + 0.03 * Math.sin(tt * 6), sh = shade(col, -0.25);
@@ -843,7 +792,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       var c = kind === "chips" ? "#5A3418" : SPRINKLE_COLS[i % SPRINKLE_COLS.length];
       drops.push({ kind: kind === "chips" ? "chip" : "sprinkle", id: "", x: rand(-0.3, 0.3), y: RIM_Y - rand(0.5, 1.3), vx: 0, vy: rand(0, 0.4), rot: rand(0, 6), spin: rand(-6, 6), r: 0.02, col: c, amt: 0 });
     }
-    tone(880, 0.1, 0.03, "sine", 1320); tone(1100, 0.1, 0.03, "sine", 1600, 0.1);
     save();
   }
   $("newBtn").addEventListener("click", newBowl);
@@ -885,7 +833,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (running() && head.a < 0.01) { d.kind = "headHint"; }
       else if (head.anim) { delete stageDrags[e.pointerId]; }
     } else if (onFood(p) && (tall || !onBowl(p))) {
-      d.kind = "food"; foodPop = 0.55; burst(FOOD_X, FOOD_Y - 0.35, 8, null, true); tone(760, 0.12, 0.03, "sine", 980);
+      d.kind = "food"; foodPop = 0.55; burst(FOOD_X, FOOD_Y - 0.35, 8, null, true);
     } else if (onBowl(p)) {
       d.kind = "bowl";
       tapBowl();
@@ -908,7 +856,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     } else if (d.kind === "head" && d.moved) {
       var ang = Math.atan2(p.y - HY, p.x - HX);
       var na = clamp(d.a0 + normA(ang - d.ang0), 0, UP);
-      if (head.a < 0.001 && na > 0.001) click();
       head.a = na;
     }
   });
@@ -971,7 +918,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     M.spin -= M.speed * dt * 11;
     if (twist > 0) { M.spin += dt * 14 * twist; twist = Math.max(0, twist - dt * 2.4); }
     M.knob += ((M.drag != null ? M.drag : M.pos) - M.knob) * Math.min(1, dt * 16);
-    updateHum();
 
     // Head tilting.
     if (head.anim) {
@@ -993,7 +939,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       bowl.rot += dt * M.speed * 2.4;
       // Flour puffs up when it runs fast before the flour is mixed in.
       var fl = item("flour");
-      if (fl && fl.a > 0.3 && fl.m < 0.45 && M.speed > 0.6 && Math.random() < dt * 5) { var sf0 = surf(level()); puff(rand(-0.25, 0.25), sf0.y - 0.05, 3); if (Math.random() < 0.3) puffSnd(); }
+      if (fl && fl.a > 0.3 && fl.m < 0.45 && M.speed > 0.6 && Math.random() < dt * 5) { var sf0 = surf(level()); puff(rand(-0.25, 0.25), sf0.y - 0.05, 3); }
       if (Math.random() < dt * 2) save();
     }
     var P = progress();
@@ -1027,13 +973,13 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
         } else if (p.how === "drops") {
           var want = Math.floor((k - 0.22) / 0.64 * 3.2);
           while (p.drops < Math.min(3, want + 1)) { p.drops++; drops.push({ kind: "drop", id: "", x: sp.x, y: sp.y, vx: 0.15, vy: 0.2, rot: 0, spin: 0, r: 0.03, col: "#7A4A22", amt: 0 }); }
-        } else if (p.how === "liquid" && Math.random() < dt * 5) glug();
+        }
       }
       if (k >= 1) {
         rm(p.el); pours.splice(i, 1);
         it2.a = 1;
         pending[p.id] = Math.max(0, (pending[p.id] || 0) - 1);
-        if (p.how === "flour") { var sf1 = surf(level()); puff(-0.12, sf1.y - 0.04, 8, true); puffSnd(); }
+        if (p.how === "flour") { var sf1 = surf(level()); puff(-0.12, sf1.y - 0.04, 8, true); }
         if (p.id === "chips") it2.m = 1;
         save();
       }
@@ -1048,10 +994,9 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       var landY = level() > 0.01 ? sfl.y : BOT_Y - 0.02;
       if (q.y >= landY && Math.abs(q.x) < RIM_RX) {
         drops.splice(i, 1);
-        if (q.kind === "cube") { landed("butter", q.amt); plop(); burst(q.x, landY, 4, "#FFE07A"); }
-        else if (q.kind === "yolk") { landed("egg", 0.5); plop(); burst(q.x, landY, 4, "#FFFFFF"); }
+        if (q.kind === "cube") { landed("butter", q.amt); burst(q.x, landY, 4, "#FFE07A"); }
+        else if (q.kind === "yolk") { landed("egg", 0.5); burst(q.x, landY, 4, "#FFFFFF"); }
         else if (q.kind === "flour" && Math.random() < 0.12) puff(q.x, landY - 0.03, 1);
-        else if (q.kind === "drop") plop();
       }
     }
     // The egg: crack, the halves come apart and the egg drops in.
@@ -1733,18 +1678,16 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     restLine: "The kitchen is resting.",
     restLine2: "Your food will be on the table next time.",
     restArt: restArt,
-    soundNote: "Soft whirs, clicks and plops. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: function () { stopMotor(); },
-    onWake: function () { lastT = now(); },
-    onSound: function (on) { if (on) chime(); }
+    onWake: function () { lastT = now(); }
   });
   setTimeout(layout, 30);
   Toybox.offFirst({
     running: function () { return running() || M.speed > 0.05; },
     name: "stand mixer",
     off: function (done) {
-      stopMotor(); notch();
+      stopMotor();
       var t0 = performance.now();
       var iv = setInterval(function () {
         if (M.speed <= 0.05 || performance.now() - t0 > 1500) { clearInterval(iv); done(); }

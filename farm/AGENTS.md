@@ -69,7 +69,7 @@ Every station follows the hands-on pattern pioneered by *Timberrrrr!* (rebuilt 2
 
 ## 5. Shared code, state & test contract
 
-- **Shared script:** `farm/farm.js` exposes `window.Farm` (`NAMES`, `tom`, `world`, `Scene`, `draw.*`, `rear.*`, `Particles`, `sound`, `drawRing`, `avoid`, `locked`, `pic`, `restArt`, etc. — see [`common/API.md`](../common/API.md)).
+- **Shared script:** `farm/farm.js` exposes `window.Farm` (`NAMES`, `tom`, `world`, `Scene`, `draw.*`, `rear.*`, `Particles`, `drawRing`, `avoid`, `locked`, `pic`, `restArt`, etc. — see [`common/API.md`](../common/API.md)).
 - **Shared world state:** `localStorage["farm-world-v1"]` via `Farm.world.get()` / `.update(fn)` (keeps unknown fields, wrapped in `try/catch`).
 - **`?debug` test hook (`window.__farm`):** Every station exposes `window.__farm` behind `/[?&]debug\b/.test(location.search)` with:
   - `state()` — returns current step/sub-step, wanted part (`part` or `cur`), `finished`, `coach`, etc.

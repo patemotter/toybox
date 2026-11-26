@@ -2,7 +2,6 @@
 // Loaded by a plain <script src> at the same place in the page, so it runs exactly as the inline script did.
 // Sections, in order (search for the title to jump to one):
 //   - Saved settings
-//   - Sound (off by default; soft and synthesized)
 //   - Canvas
 //   - World pieces
 //   - Common frame: hopper, return chute, lift, tray
@@ -96,97 +95,6 @@
     saveDirty = false;
     lastSave = performance.now();
   }
-
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js); the module
-  // starts/resumes audio on every touch while sound is on. Marble Run builds its own master chain
-  // (soft low-pass, noise buffer, rolling rumble) once per context.
-  var actx = null, master = null, noiseBuf = null, rollGain = null;
-  function live() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return false;
-    if (ac !== actx) {
-      try {
-        var lp = ac.createBiquadFilter();
-        lp.type = "lowpass";
-        lp.frequency.value = 3600;
-        master = ac.createGain();
-        master.gain.value = 0.5;
-        master.connect(lp);
-        lp.connect(ac.destination);
-        noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
-        var d = noiseBuf.getChannelData(0);
-        for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-        // Soft rolling rumble: looped noise through a low filter; its volume follows the marbles.
-        var src = ac.createBufferSource();
-        src.buffer = noiseBuf;
-        src.loop = true;
-        var f = ac.createBiquadFilter();
-        f.type = "lowpass";
-        f.frequency.value = 260;
-        rollGain = ac.createGain();
-        rollGain.gain.value = 0;
-        src.connect(f); f.connect(rollGain); rollGain.connect(master);
-        src.start();
-        actx = ac;
-      } catch (e) { return false; }
-    }
-    return true;
-  }
-
-  var tokens = 5, tokenT = 0;
-  function takeToken() {
-    var now = performance.now();
-    tokens = Math.min(5, tokens + (now - tokenT) * 0.014);
-    tokenT = now;
-    if (tokens < 1) return false;
-    tokens -= 1;
-    return true;
-  }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    if (!live()) return;
-    try {
-      var t = actx.currentTime + (delay || 0);
-      var o = actx.createOscillator(), g = actx.createGain();
-      o.type = type || "sine";
-      o.frequency.setValueAtTime(freq, t);
-      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur * 0.7);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t + dur + 0.03);
-    } catch (e) { /* ignore */ }
-  }
-  function clack(k) {
-    if (!live() || !takeToken()) return;
-    try {
-      var t = actx.currentTime;
-      var s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-      s.buffer = noiseBuf;
-      f.type = "bandpass"; f.frequency.value = rand(2300, 3400); f.Q.value = 6;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.05 + 0.12 * k, t + 0.003);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-      s.connect(f); f.connect(g); g.connect(master);
-      s.start(t, Math.random() * 0.5); s.stop(t + 0.06);
-    } catch (e) { /* ignore */ }
-  }
-  var PENTA = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7, 1318.5, 1568, 1760];
-  function bellSound(i) {
-    if (!live() || !takeToken()) return;
-    var f = PENTA[i % PENTA.length];
-    tone(f, 1.1, 0.045, "sine"); tone(f * 2.76, 0.5, 0.012, "sine"); tone(f * 5.4, 0.25, 0.006, "sine");
-  }
-  function xyloSound(i) {
-    if (!live() || !takeToken()) return;
-    var f = PENTA[i % PENTA.length];
-    tone(f, 0.45, 0.06, "sine"); tone(f * 4, 0.12, 0.012, "sine");
-  }
-  function boing() { if (live() && takeToken()) tone(220, 0.35, 0.06, "sine", 480); }
-  function zoomSound() { if (live() && takeToken()) tone(300, 0.4, 0.05, "sine", 1000); }
-  function tick() { if (live() && takeToken()) tone(420, 0.06, 0.025, "triangle"); }
-  function chime() { [784, 988, 1175].forEach(function (f, k) { tone(f, 0.4, 0.045, "sine", 0, k * 0.09); }); }
 
   // ---------- Canvas ----------
   var stage = $("stage"), canvas = $("board"), ctx = canvas.getContext("2d");
@@ -590,7 +498,6 @@
     b.lane = lane; b.rl = laneL(lane); b.rp = RACE.slot; b.rph = "join"; b.rj = 0; b.jx0 = b.x; b.jy0 = b.y;
     b.vx = 0; b.vy = 0;
     race.sinceJoin = 0;
-    tick();
   }
   function raceGo() {
     if (race.phase === "go") return;
@@ -601,14 +508,12 @@
     }
     var gx = rxc(RACE.gate);
     burst(gx - raceHalf(), RACE.gate, 2, 6, 160, 0.5); burst(gx + raceHalf(), RACE.gate, 2, 6, 160, 0.5);
-    if (live()) { tone(523, 0.18, 0.05, "triangle"); tone(784, 0.3, 0.05, "triangle", 0, 0.16); }
   }
   function raceFinish(b) {
     race.n++;
     if (race.n === 1) {
       // A new winner: the podium starts over, the flags wave hard and the winner gets a spotlight.
       race.shown = []; race.win = b; race.winT = 2.2; race.flag = 1;
-      chime();
       burst(b.x, b.y, b.c, 18, 280, 0.8); ring(b.x, b.y, b.c, RM, 0.7);
     } else burst(b.x, b.y, b.c, 6, 160, 0.5);
     if (race.shown.length < 3) race.shown.push({ c: b.c, pop: 0 });
@@ -619,7 +524,7 @@
     var waiting = 0;
     for (var i = 0; i < balls.length; i++) if (balls[i].mode === "race" && balls[i].rph === "wait") waiting++;
     if (race.phase === "line" && waiting) { started = true; raceGo(); }
-    else { race.wig = 1; ring(pt.x, pt.y, 2, 18, 0.5); tick(); }
+    else { race.wig = 1; ring(pt.x, pt.y, 2, 18, 0.5); }
     return true;
   }
   function raceStep(h) {
@@ -680,10 +585,10 @@
       if (b.rl > W2 - RM) { b.rl = W2 - RM; if (b.rvl > 0) b.rvl = -b.rvl * 0.5; }
       if (!b.rpace) {
         for (j = 0; j < R.bumps.length; j++) {
-          if (p0 < R.bumps[j] && b.rp >= R.bumps[j]) { b.rv *= rand(0.7, 0.95); b.luck = rand(0.86, 1.14); b.hop = Math.max(b.hop, 0.8); burst(b.x, b.y + RM, b.c, 3, 110, 0.35); clack(0.4); }
+          if (p0 < R.bumps[j] && b.rp >= R.bumps[j]) { b.rv *= rand(0.7, 0.95); b.luck = rand(0.86, 1.14); b.hop = Math.max(b.hop, 0.8); burst(b.x, b.y + RM, b.c, 3, 110, 0.35); }
         }
         if (p0 < R.mix0 && b.rp >= R.mix0) { b.rvl = rand(-110, 110); b.luck = rand(0.86, 1.14); }
-        if (p0 < R.drop && b.rp >= R.drop) { b.rv += 70; b.hop = 1; burst(b.x, b.y + RM, 2, 4, 140, 0.4); clack(0.6); }
+        if (p0 < R.drop && b.rp >= R.drop) { b.rv += 70; b.hop = 1; burst(b.x, b.y + RM, 2, 4, 140, 0.4); }
         if (p0 < R.fin && b.rp >= R.fin) raceFinish(b);
         if (b.rp > R.mix0 - 30 && b.rp < R.mix1 + 30) {
           for (j = 0; j < R.pegs.length; j++) {
@@ -695,7 +600,6 @@
             b.rl += ex / ed * ov; b.rp += Math.max(0, ey / ed * ov);
             b.rvl += ex / ed * Math.max(60, b.rv * 0.6);
             b.rv *= 0.985;
-            if (ov > 3) { clack(0.3); }
           }
         }
       }
@@ -719,7 +623,7 @@
       var o2 = (2 * RM - qd) / 2, nx = qx / qd, ny = qy / qd;
       a.rl -= nx * o2; a.rp -= ny * o2; c.rl += nx * o2; c.rp += ny * o2;
       var back = a.rp < c.rp ? a : c, front = back === a ? c : a;
-      if (back.rv > front.rv) { var m = (back.rv + front.rv) / 2; back.rv = m - 12; front.rv = m + 12; if (back.rv - front.rv < -40) clack(0.3); }
+      if (back.rv > front.rv) { var m = (back.rv + front.rv) / 2; back.rv = m - 12; front.rv = m + 12; }
       a.rvl -= nx * 40; c.rvl += nx * 40;
       a.x = rxc(a.rp) + a.rl; a.y = a.rp; c.x = rxc(c.rp) + c.rl; c.y = c.rp;
     }
@@ -926,7 +830,7 @@
     var S = site, c = S.crane;
     if (b.scool > 0) return;
     if (b.x > 348 && b.x < 500 && b.y > 270 && b.y < 440 && c.ph === "wait" && c.load.length < CR.cap) {
-      holdIt(b, "crane"); b.slot = c.load.length; c.load.push(b); c.since = 0; tick(); return;
+      holdIt(b, "crane"); b.slot = c.load.length; c.load.push(b); c.since = 0; return;
     }
     if (b.x > 30 && b.x < 336 && b.y > 470 && b.y < 705 && b.vy > -60) {
       holdIt(b, "pit"); S.pit.push(b); if (S.pit.length === 1) S.dig.since = 0; return;
@@ -935,10 +839,10 @@
       holdIt(b, "belt"); b.bs = clamp((b.x - BELT.ax) * BELT.ux + (b.y - BELT.ay) * BELT.uy, 0, BELT.L - 10); S.belt.push(b); return;
     }
     if (b.x > 640 && b.x < 850 && b.y > 590 && b.y < 770 && b.vy > -40 && S.truck.ph === "wait" && S.truck.load.length < TRK_SLOTS.length) {
-      holdIt(b, "truck"); b.slot = S.truck.load.length; b.bx = TRK_SLOTS[b.slot][0]; b.by = TRK_SLOTS[b.slot][1]; S.truck.load.push(b); S.truck.since = 0; tick(); return;
+      holdIt(b, "truck"); b.slot = S.truck.load.length; b.bx = TRK_SLOTS[b.slot][0]; b.by = TRK_SLOTS[b.slot][1]; S.truck.load.push(b); S.truck.since = 0; return;
     }
     if (b.x > 535 && b.x < 650 && b.y > 780 && b.y < 890 && b.vy > -50) {
-      holdIt(b, "drum"); b.dt = 0; b.dph = rand(0, TAU); b.du = 0.8; S.drum.list.push(b); tick(); return;
+      holdIt(b, "drum"); b.dt = 0; b.dph = rand(0, TAU); b.du = 0.8; S.drum.list.push(b); return;
     }
   }
   function easeTo(b, x, y, k) { b.x += (x - b.x) * k; b.y += (y - b.y) * k; }
@@ -959,9 +863,9 @@
     for (var i = 0; i < site.belt.length; i++) if (site.belt[i].bs < 120) return false;
     return true;
   }
-  function digGo() { var d = site.dig; if (d.ph !== "idle" || !site.pit.length) return false; digPhase(d, "down", DIG_POSE.down); tick(); return true; }
-  function craneGo() { var c = site.crane; if (c.ph !== "wait" || !c.load.length) return false; c.ph = "go"; c.t = 0; tick(); return true; }
-  function truckGo() { var t = site.truck; if (t.ph !== "wait" || !t.load.length) return false; t.ph = "up"; t.t = 0; bellSound(1); return true; }
+  function digGo() { var d = site.dig; if (d.ph !== "idle" || !site.pit.length) return false; digPhase(d, "down", DIG_POSE.down); return true; }
+  function craneGo() { var c = site.crane; if (c.ph !== "wait" || !c.load.length) return false; c.ph = "go"; c.t = 0; return true; }
+  function truckGo() { var t = site.truck; if (t.ph !== "wait" || !t.load.length) return false; t.ph = "up"; t.t = 0; return true; }
   function siteStep(h) {
     var S = site, i, b;
     // --- Crane ---
@@ -976,7 +880,6 @@
     } else if (c.ph === "tip") {
       c.tip = -1.7 * ease3(c.t / 0.6);
       if (c.tip < -0.9 && c.load.length) {
-        bellSound(3);
         c.load.forEach(function (m) { letGo(m, rand(-50, 90), rand(0, 60)); });
         c.load = [];
       }
@@ -1016,13 +919,11 @@
           d.load = S.pit.splice(S.pit.length - n, n);
           d.load.forEach(function (m) { m.hold = "dig"; });
           burst(DIG.hx - 200, 650, 1, 6, 150, 0.5);
-          tick();
           digPhase(d, "lift", DIG_POSE.up);
         } else if (d.ph === "lift") { d.ph = "swing"; d.t = 0; d.from = null; }
         else if (d.ph === "swing") { d.sx = -1; digPhase(d, "dump", DIG_POSE.dump); }
         else if (d.ph === "dump") {
           d.load.forEach(function (m) { letGo(m, rand(-30, 30), 20); m.scool = 0; });
-          if (d.load.length) tick();
           d.load = [];
           d.ph = "hold"; d.t = 0; d.from = null;
         } else if (d.ph === "hold") digPhase(d, "back", DIG_POSE.rest);
@@ -1106,19 +1007,19 @@
     var S = site, c = S.crane;
     started = true;
     if (Math.abs(pt.x - c.x) < 85 && pt.y > CR.hy - 110 && pt.y < CR.hy + 45) {
-      if (!craneGo()) { c.wig = 1; tick(); }
+      if (!craneGo()) { c.wig = 1; }
       ring(pt.x, pt.y, 2, 18, 0.5); return true;
     }
     if (pt.x > PIT.x0 - 10 && pt.x < 500 && pt.y > 560 && pt.y < 730) {
-      if (!digGo()) { S.dig.wig = 1; tick(); }
+      if (!digGo()) { S.dig.wig = 1; }
       ring(pt.x, pt.y, 2, 18, 0.5); return true;
     }
-    if (pt.x > 520 && pt.x < 790 && pt.y > 580 && pt.y < 690) { S.beltBoost = 1; ring(pt.x, pt.y, 2, 18, 0.5); tick(); return true; }
+    if (pt.x > 520 && pt.x < 790 && pt.y > 580 && pt.y < 690) { S.beltBoost = 1; ring(pt.x, pt.y, 2, 18, 0.5); return true; }
     if (pt.x > 600 && pt.x < 875 && pt.y > 660 && pt.y < 820) {
-      if (!truckGo()) { S.truck.wig = 1; honk(); }
+      if (!truckGo()) { S.truck.wig = 1; }
       ring(pt.x, pt.y, 2, 18, 0.5); return true;
     }
-    if (pt.x > 150 && pt.x < 640 && pt.y > 820 && pt.y < 1040) { S.drum.boost = 1.2; ring(pt.x, pt.y, 1, 18, 0.5); tick(); return true; }
+    if (pt.x > 150 && pt.x < 640 && pt.y > 820 && pt.y < 1040) { S.drum.boost = 1.2; ring(pt.x, pt.y, 1, 18, 0.5); return true; }
     return false;
   }
 
@@ -1753,7 +1654,7 @@
       if (Math.abs(bk.a) < 0.05) { bk.a = 0; bk.w = 0; bk.phase = "wait"; bk.timer = 0; }
     }
   }
-  function tipBucket(bk) { bk.flash = 1; bellSound(1); burst(bk.cx, bk.cy, 2, 8, 200, 0.5); }
+  function tipBucket(bk) { bk.flash = 1; burst(bk.cx, bk.cy, 2, 8, 200, 0.5); }
 
   // ---------- Particles ----------
   function burst(x, y, c, n, speed, life) {
@@ -1807,7 +1708,6 @@
     b.ang = q.ang || 0;
     if (q.car) { b.car = true; b.carPh = "run"; b.carF = 1; b.carA = 0; b.carW = q.carW || 0; }
     hopper.wait = 0;
-    tick();
   }
   function outletClear() {
     for (var i = 0; i < balls.length; i++) {
@@ -1840,7 +1740,6 @@
     if (n <= 0) { ring(HOP_X, 170, RAINBOW, 20, 0.4); return; }
     for (i = 0; i < n; i++) hopper.queue.push({ c: nextColor(), x: HOP_X + rand(-50, 50), y: 40 - i * 14, ang: rand(0, 6.28) });
     ring(HOP_X, 170, RAINBOW, 26, 0.6);
-    tick();
   }
   // The hopper lets marbles out one at a time as the outlet clears, so marbles back from the lift go
   // round again by themselves. While the timer ends they wait here (only the last marble still goes).
@@ -1874,7 +1773,6 @@
         b.x = 912; b.y = LIFT_TOP - RM - 6;
         b.vx = -220; b.vy = -10;
         b.age = 0; b.nudges = 0;
-        tick();
       }
     }
     lift.u = (lift.u + du) % (LIFT_SPAN * 1000);
@@ -1960,14 +1858,13 @@
         // Always launch toward the seesaw and the small wheel, so a marble that rolls back off the
         // seesaw can't bounce straight up and down here forever.
         if (b.vx > -480) b.vx = -480;
-        if (tr.flash < 0.5) { boing(); burst(b.x, b.y + RM, b.c, 6, 220, 0.4); }
+        if (tr.flash < 0.5) { burst(b.x, b.y + RM, b.c, 6, 220, 0.4); }
         tr.flex = 1; tr.flash = 1;
       } else if (s.bar >= 0) {
         if (b.lastBar !== s.bar) {
           b.lastBar = s.bar;
           var br = bars[s.bar];
           br.lit = 1;
-          xyloSound(br.note);
           if (Math.random() < 0.5) burst((br.x0 + br.x1) / 2, br.y0, s.bar, 3, 140, 0.35);
         }
       } else if (s.bell >= 0 && imp > 40) {
@@ -1999,7 +1896,6 @@
     bl.cd = 0.25;
     bl.swing = 1;
     bl.flash = 1;
-    bellSound(bl.note);
     burst(bl.x, bl.y + 20, c, 5, 160, 0.4);
   }
 
@@ -2058,7 +1954,6 @@
       a.vx -= jn * nx * wa; a.vy -= jn * ny * wa;
       b.vx += jn * nx * wb; b.vy += jn * ny * wb;
       if (rvn < -140) {
-        clack(Math.min(1, -rvn / 900));
         var now = performance.now();
         if (now - lastClackSpark > 60) { lastClackSpark = now; burst(a.x + nx * RM, a.y + ny * RM, NC, 3, 120, 0.25); }
       }
@@ -2113,7 +2008,6 @@
           if (a.v > b.v) {
             var va = a.v, vb = b.v;
             a.v = vb + (va - vb) * 0.15; b.v = va - (va - vb) * 0.15;
-            if (va - vb > 140) clack(Math.min(1, (va - vb) / 900));
           }
         }
       }
@@ -2171,7 +2065,6 @@
       b.x = f.cx; b.y = f.cy + f.D + 2;
       b.vx = rand(-8, 8); b.vy = 160;
       b.cool = 0.4;
-      tick();
     }
   }
 
@@ -2210,7 +2103,6 @@
       var lm = dx * b.vy - dy * b.vx;
       bd.w = (bd.w * bd.I + lm) / (bd.I + bd.rp * bd.rp);
       bd.flash = 1;
-      tick();
       return true;
     }
     return false;
@@ -2312,7 +2204,6 @@
           b.boostT = 0;
           b.vx = z.dir * z.v; b.vy = 0;
           z.glow = 1;
-          zoomSound();
           burst(b.x, b.y, b.c, 10, 260, 0.5);
         }
       } else b.boostT = 0;
@@ -2417,7 +2308,6 @@
     var m = total();
     if (m !== shownM) { shownM = m; $("mNum").textContent = String(m); saveDirty = true; }
     if (saveDirty && performance.now() - lastSave > 3000) save();
-    updateRoll();
   }
   function toTray(b) {
     burst(b.x, clamp(b.y, 0, H), b.c, 6, 180, 0.4);
@@ -2429,20 +2319,6 @@
     recycles++;
   }
   var recycles = 0;
-  var rollLevel = 0;
-  function updateRoll() {
-    if (!rollGain || !live()) return;
-    var e = 0;
-    for (var i = 0; i < balls.length; i++) {
-      var b = balls[i];
-      if (b.mode === "free" && b.touch) e += Math.min(600, Math.sqrt(b.vx * b.vx + b.vy * b.vy));
-      else if (b.mode === "path") e += Math.min(600, Math.abs(b.v));
-    }
-    var target = Math.min(0.09, e / 600 * 0.025);
-    rollLevel += (target - rollLevel) * 0.1;
-    if (!rollGain) return;
-    try { rollGain.gain.setTargetAtTime(rollLevel, actx.currentTime, 0.05); } catch (err) { /* ignore */ }
-  }
 
   // ---------- Drawing ----------
   function drawMarble(b, x, y, sc) {
@@ -2965,10 +2841,10 @@
     for (i = 0; i < bodies.length; i++) {
       var bo = bodies[i];
       if (bo.kind === "wheel" && Math.hypot(pt.x - bo.cx, pt.y - bo.cy) < bo.L + 20) {
-        bo.w += (bo.w0 >= 0 ? 1 : -1) * 5; bo.flash = 1; burst(pt.x, pt.y, 2, 6, 180, 0.4); tick(); return;
+        bo.w += (bo.w0 >= 0 ? 1 : -1) * 5; bo.flash = 1; burst(pt.x, pt.y, 2, 6, 180, 0.4); return;
       }
       if (bo.kind === "seesaw" && Math.abs(pt.x - bo.cx) < bo.half + 20 && Math.abs(pt.y - bo.cy) < 70) {
-        bo.w += pt.x < bo.cx ? -3.5 : 3.5; bo.flash = 1; burst(pt.x, pt.y, 1, 6, 180, 0.4); tick(); return;
+        bo.w += pt.x < bo.cx ? -3.5 : 3.5; bo.flash = 1; burst(pt.x, pt.y, 1, 6, 180, 0.4); return;
       }
       if (bo.kind === "bucket" && Math.hypot(pt.x - bo.cx, pt.y - bo.cy) < bo.R + 10) {
         if (bo.phase === "wait") { bo.phase = "tip"; bo.timer = 0; tipBucket(bo); }
@@ -2977,28 +2853,27 @@
     }
     for (i = 0; i < funnels.length; i++) {
       var f = funnels[i], ex = (pt.x - f.cx) / f.R, ey = (pt.y - f.cy) / (f.R * f.sq);
-      if (ex * ex + ey * ey < 1.3) { f.boost = Math.min(2, f.boost + 1); f.flash = 1; burst(pt.x, pt.y, 4, 8, 200, 0.4); tick(); return; }
+      if (ex * ex + ey * ey < 1.3) { f.boost = Math.min(2, f.boost + 1); f.flash = 1; burst(pt.x, pt.y, 4, 8, 200, 0.4); return; }
     }
     for (i = 0; i < bells.length; i++) {
       if (Math.hypot(pt.x - bells[i].x, pt.y - bells[i].y) < 50) { bells[i].cd = 0; ringBell(bells[i], (Math.random() * NC) | 0); return; }
     }
     for (i = 0; i < bars.length; i++) {
       var br = bars[i];
-      if (pt.x > br.x0 - 6 && pt.x < br.x1 + 6 && Math.abs(pt.y - br.y0) < 40) { br.lit = 1; xyloSound(br.note); burst(pt.x, pt.y, i % NC, 5, 160, 0.4); return; }
+      if (pt.x > br.x0 - 6 && pt.x < br.x1 + 6 && Math.abs(pt.y - br.y0) < 40) { br.lit = 1; burst(pt.x, pt.y, i % NC, 5, 160, 0.4); return; }
     }
     for (i = 0; i < tramps.length; i++) {
       var t = tramps[i];
-      if (Math.hypot(pt.x - t.cx, pt.y - t.cy) < 80) { t.flex = 1; t.flash = 1; boing(); return; }
+      if (Math.hypot(pt.x - t.cx, pt.y - t.cy) < 80) { t.flex = 1; t.flash = 1; return; }
     }
     if (tower && Math.abs(pt.x - tower.cx) < tower.Rh && pt.y > tower.top - 70 && pt.y < tower.bot) {
       tower.flash = 1;
       balls.forEach(function (b) { if (b.mode === "path" && b.path === tower.path) b.v += 260; });
       burst(pt.x, pt.y, (Math.random() * NC) | 0, 8, 200, 0.4);
-      tick();
       return;
     }
     if (site && siteTap(pt)) return;
-    if (pt.x > 880 && pt.x < 990) { lift.boost = 1.2; burst(pt.x, pt.y, 2, 6, 180, 0.4); tick(); return; }
+    if (pt.x > 880 && pt.x < 990) { lift.boost = 1.2; burst(pt.x, pt.y, 2, 6, 180, 0.4); return; }
     // Anywhere else: a sparkle, big and long enough to see on a phone (every touch answers).
     var c = (Math.random() * NC) | 0;
     ring(pt.x, pt.y, c, 18, 0.75);
@@ -3013,7 +2888,6 @@
     else if (b.mode === "orbit") b.f.boost = Math.min(2, b.f.boost + 0.6);
     else if (b.mode === "wheel") { b.wb.w += b.wb.dir * 2; b.wb.flash = 1; }
     else if (b.mode === "race" && b.rph === "run") b.rv += 90;
-    tick();
   }
   function release(e) { stopDropHold(e.pointerId); }
 
@@ -3041,7 +2915,6 @@
       for (var k = 0; k < TRAIL; k++) { b.tx[k] = b.x; b.ty[k] = b.y; }
       ring(60, floorY(60), 4, 30, 0.7);
     }
-    honk();
   }
   // The car's own little drives along the tray (in at the start, out at the end). True: skip the marble rules.
   function carFrame(b, dt, i) {
@@ -3061,7 +2934,7 @@
       var want = clamp((b.x - 110) * 1.6, 0, 240);
       b.carV += (want - b.carV) * Math.min(1, dt * 3);
       vx = -Math.max(b.carV, b.x > 112 ? 24 : 0);
-      if (b.x <= 112) { b.carPh = "park"; b.carT = 0; ring(b.x, b.y, 2, 34, 0.7); honk(); }
+      if (b.x <= 112) { b.carPh = "park"; b.carT = 0; ring(b.x, b.y, 2, 34, 0.7); }
     } else if (b.carPh === "park") {
       b.hop = Math.max(b.hop, b.carT > 0.5 && b.carT < 0.9 ? 0.6 : 0);
       if (b.carT > (reduce ? 2.4 : 3.2)) { b.carPh = "off"; b.carV = 0; }
@@ -3088,12 +2961,10 @@
     for (i = balls.length - 1; i >= 0; i--) if (balls[i].car) { burst(balls[i].x, balls[i].y, 2, 8, 160, 0.5); balls.splice(i, 1); }
     for (i = hopper.queue.length - 1; i >= 0; i--) if (hopper.queue[i].car) hopper.queue.splice(i, 1);
   }
-  function honk() { if (live() && takeToken()) { tone(523, 0.12, 0.04, "triangle"); tone(659, 0.16, 0.04, "triangle", 0, 0.14); } }
   function carHop() {
     var i, b;
     for (i = 0; i < balls.length; i++) if (balls[i].car) { b = balls[i]; b.hop = Math.max(b.hop || 0, 0.7); ring(b.x, b.y, 4, 30, 0.6); }
     if (!b) ring(HOP_X, 170, 4, 26, 0.6);
-    honk();
   }
   function surprise() {
     if (Toybox.timer.locked() || !built) return;
@@ -3262,7 +3133,6 @@
     state.lift = id;
     drawLayers();
     burst(LIFT_X, 600, RAINBOW, 12, 240, 0.6);
-    tick();
     save();
   }
   // Every run starts with one marble already rolling (the dad: not an empty run at zero).
@@ -3355,7 +3225,6 @@
   // One last rainbow marble from the hopper.
   function lastMarble() {
     if (makeRoom()) { hopper.queue.push({ c: RAINBOW, x: HOP_X, y: 120, ang: 0 }); hopper.pending = hopper.queue.length; }
-    chime();
   }
   function allSettled() {
     if (hopper.pending > 0) return false;
@@ -3387,8 +3256,6 @@
   // Every visit starts with no marbles: the child adds them with Drop.
   renderControls();
   build();
-  // The old Marble Run sound key held "on"/"off"; the shared migration reads "1"/"true", so translate it once.
-  try { if (localStorage.getItem("marblerun-sound-v1") === "on") localStorage.setItem("marblerun-sound-v1", "1"); } catch (e) { /* ignore */ }
   Toybox.init({
     app: "marble-run",
     timerIntro: "When time is up, the lift stops, the marbles roll down to the tray and rest, and the controls lock.",
@@ -3399,16 +3266,11 @@
     restLine: "The marbles are resting.",
     restLine2: "They will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft clicks, bells and rolling. Hold for 2 seconds.",
-    legacy: { timer: "marblerun-timer-v1", sound: "marblerun-sound-v1" },
+    legacy: { timer: "marblerun-timer-v1" },
     onEnding: onEnding,
     onGoodbye: lastMarble,
     onRest: onRest,
     onWake: onWake,
-    onSound: function (on) {
-      if (on) chime();
-      else if (rollGain && actx) { try { rollGain.gain.setTargetAtTime(0, actx.currentTime, 0.05); } catch (e) { /* ignore */ } }
-    },
     onTimer: drawTimer
   });
   requestAnimationFrame(frame);

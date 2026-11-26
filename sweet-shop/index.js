@@ -26,7 +26,6 @@
   // Sections:
   //   Setup and saved state
   //   Flavors, molds and coatings
-  //   Sound
   //   Layout
   //   Tweens and particles
   //   The batch
@@ -112,45 +111,6 @@
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 400); }
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain, delay, q) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 0.9;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  const snd = {
-    pour() { noise(1.1, 500, 0.05, 0, 2); tone(300, 200, 0.2, "sine", 0.03, 0.2); tone(280, 190, 0.2, "sine", 0.03, 0.6); },
-    sprinkle() { noise(0.8, 4200, 0.03, 0, 1.5); },
-    click() { tone(900, 700, 0.06, "square", 0.02); noise(0.5, 1800, 0.02, 0.05); },
-    stir() { noise(0.6, 900, 0.03, 0, 1.2); },
-    clear() { tone(660, 660, 0.25, "sine", 0.04); tone(990, 990, 0.35, "sine", 0.035, 0.14); },
-    drip() { tone(900, 420, 0.16, "sine", 0.05); },
-    door() { tone(140, 90, 0.18, "sine", 0.06); },
-    hum() { tone(110, 110, 1.6, "triangle", 0.015); },
-    boing() { tone(260, 520, 0.18, "sine", 0.05); tone(520, 300, 0.25, "sine", 0.03, 0.12); },
-    shake() { for (let k = 0; k < 5; k++) noise(0.14, 3000, 0.03, k * 0.24, 2); },
-    plink(k) { const f = 700 + (k % 5) * 90; tone(f, f * 1.2, 0.14, "sine", 0.04); },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); tone(1320, 1320, 0.4, "sine", 0.03, 0.24); }
-  };
 
   // =====================================================================================================
   // Layout
@@ -337,7 +297,7 @@
     if (step === "heat" && V.knob > 0.5) heatReached();
   }
   // A gentle "not this one": the part wiggles and says its name.
-  function wiggleTag(name, x, y) { tag(name, x, y); snd.boing(); }
+  function wiggleTag(name, x, y) { tag(name, x, y); }
 
   // =====================================================================================================
   // Steps: pour, gelatin, heat, stir
@@ -370,7 +330,7 @@
       V.level = Math.min(1, V.level + dt * 0.55);
       const m = mouthOf(c.x, c.y, c.ang);
       V.stream = { x: m.x, y: m.y, a: 1 };
-      if (now() > pourSnd) { pourSnd = now() + 1.1; snd.pour(); }
+      if (now() > pourSnd) { pourSnd = now() + 1.1; }
       if (Math.random() < dt * 12) puff("drop", L.pot.x, surfY(), 1, hex());
       if (V.level >= 1) pourDone();
     } else V.stream = null;
@@ -392,7 +352,6 @@
       if (B.flavor < 0) { B.flavor = i; const tg = vp(L.pot.x, potRim() - 30); Toybox.nametag(FLAVORS[i].name, tg.x, tg.y, 2200); }
       const a0 = V.carry.ang;
       tween(0.35, (p) => { V.carry.ang = lerp(a0, -2.0, ease(p)); }, () => {
-        snd.pour();
         const l0 = V.level;
         tween(1.1, (p) => {
           const m = mouthOf(V.carry.x, V.carry.y, V.carry.ang);
@@ -417,7 +376,7 @@
     g.ang += ((over ? 1.9 * side : 0) - g.ang) * Math.min(1, dt * 7);
     if (over && Math.abs(g.ang) > 1.0) {
       if (Math.random() < dt * 30) puff("powder", g.x + side * 26, g.y + 4, 1);
-      if (now() > pourSnd) { pourSnd = now() + 0.8; snd.sprinkle(); }
+      if (now() > pourSnd) { pourSnd = now() + 0.8; }
       V.cloud = Math.min(1, V.cloud + dt * 0.7);
       if (V.cloud >= 1) gelDone();
     }
@@ -436,7 +395,6 @@
     const f0 = from || { x: L.gel.x, y: L.gel.y }, over = { x: L.pot.x + 30, y: potRim() - 34 };
     V.gelPose = { x: f0.x, y: f0.y, ang: 0, held: false };
     tween(0.55, (p) => { const e = ease(p); V.gelPose.x = lerp(f0.x, over.x, e); V.gelPose.y = lerp(f0.y, over.y, e) - Math.sin(p * Math.PI) * 26; }, () => {
-      snd.sprinkle();
       const c0 = V.cloud;
       tween(1.0, (p) => {
         V.gelPose.ang = -1.9 * ease(Math.min(1, p * 2.5));
@@ -453,9 +411,7 @@
   // The knob works at any time: a tap turns it on or off, a drag turns it as far as he turns it. The flame
   // follows the knob.
   function setKnob(v) {
-    const was = V.knob;
     V.knob = clamp(v, 0, 1);
-    if ((was < 0.5) !== (V.knob < 0.5)) snd.click();
     if (V.knob > 0.5 && B.step === "heat" && !busy) heatReached();
   }
   function knobTap() {
@@ -478,10 +434,8 @@
       if (now() > coldSaid) { coldSaid = now() + 4; coach.say("Turn the knob to heat the pot.", 3); }
       return;
     }
-    const before = V.clear;
     V.clear = Math.min(1, V.clear + dist / 360);
     V.cloud = 1 - V.clear;
-    if (Math.floor(before * 6) !== Math.floor(V.clear * 6)) snd.stir();
     if (V.clear >= 1) clearDone();
   }
   // Puts the whisk where his finger is, inside the pot.
@@ -493,7 +447,6 @@
   function stirTap() {
     if (B.step !== "stir" || busy || stirTw) return;
     if (V.knob < 0.5) { stirBy(0); return; }
-    snd.stir();
     let last = { x: V.whisk.x, y: V.whisk.y };
     stirTw = tween(0.9, (p) => {
       const a = p * TAU, x = L.pot.x + Math.cos(a) * L.pot.w * 0.28, y = surfY() + Math.sin(a) * 5;
@@ -503,7 +456,6 @@
   function clearDone() {
     busy = true; drag = null;
     if (stirTw) { tweens.splice(tweens.indexOf(stirTw), 1); stirTw = null; }
-    snd.clear();
     puff("spark", L.pot.x, surfY(), 10);
     coach.say("The mix is clear and glossy.", 3);
     // Off the heat: the knob turns off by itself.
@@ -550,7 +502,7 @@
     B.fill.forEach((f, j) => { if (!f && k < 0) { const c = cavPos(j); if (Math.hypot(d.x - c.x, d.y - (c.y - c.s * 0.3)) < c.s * 1.4) k = j; } });
     if (k < 0) { d.squeeze = Math.max(0, d.squeeze - dt * 4); return; }
     d.squeeze = Math.min(1, d.squeeze + dt * 6);
-    if (now() > dripAt) { dripAt = now() + 0.35; snd.drip(); }
+    if (now() > dripAt) { dripAt = now() + 0.35; }
     V.cavLevel[k] = Math.min(1, (V.cavLevel[k] || 0) + dt * 1.6);
     if (V.cavLevel[k] >= 1) { if (drag && drag.k === "dropper") drag.filled = true; cavFull(k); if (B.fill.every(Boolean)) { drag = null; d.held = false; fillDone(); } }
   }
@@ -567,7 +519,6 @@
     const d = V.drop, c = cavPos(k), x0 = d.x, y0 = d.y, tx = c.x, ty = c.y - c.s * 0.3;
     const go = Math.hypot(tx - x0, ty - y0) > 4 ? 0.3 : 0.01;
     tween(go, (p) => { const e = ease(p); d.x = lerp(x0, tx, e); d.y = lerp(y0, ty, e); }, () => {
-      snd.drip();
       const l0 = V.cavLevel[k] || 0;
       tween(0.55 * (1 - l0) + 0.05, (p) => {
         d.squeeze = Math.sin(Math.min(1, p * 1.3) * Math.PI);
@@ -592,19 +543,16 @@
     if (busy || B.step !== "chill") return;
     busy = true; drag = null;
     const m = V.mold, fi = fridgeIn(), k1 = (L.fridge.w * 0.78) / MOLD_W, x0 = L.work.x, y0 = L.work.y, mx = m.x, my = m.y, d0 = V.door;
-    snd.door();
     tween(0.45 * (1 - d0) + 0.01, (p) => { V.door = lerp(d0, 1, ease(p)); }, () => {
       tween(0.9, (p) => { const e = ease(p); m.x = lerp(mx, fi.x, e); m.y = lerp(my, fi.y, e) - Math.sin(p * Math.PI) * 40; m.k = lerp(1, k1, e); }, () => {
         m.inFridge = true;
         tween(0.45, (p) => { V.door = 1 - ease(p); }, () => {
-          snd.door(); snd.hum();
           coach.say("The fridge makes the gummies cold and firm.", 3.5);
           tween(2.0, (p) => {
             V.frost = Math.sin(p * Math.PI);
             if (Math.random() < 0.25) puff("flake", fi.x, fi.y, 1, "#FFFFFF");
             if (p > 0.5) V.set = true;
           }, () => {
-            snd.door();
             tween(0.45, (p) => { V.door = ease(p); }, () => {
               m.inFridge = false;
               tween(0.9, (p) => { const e = ease(p); m.x = lerp(fi.x, x0, e); m.y = lerp(fi.y, y0, e) - Math.sin(p * Math.PI) * 40; m.k = lerp(k1, 1, e); }, () => {
@@ -623,9 +571,9 @@
   // Out of turn, a tap on the fridge opens its door for a look inside.
   function fridgePeek() {
     if (busy || V.doorTw || drag) return;
-    V.doorTw = true; snd.door();
+    V.doorTw = true;
     tween(0.4, (p) => { V.door = ease(p); }, () => {
-      later(2.2, () => { tween(0.4, (p) => { V.door = 1 - ease(p); }, () => { V.doorTw = false; snd.door(); }); });
+      later(2.2, () => { tween(0.4, (p) => { V.door = 1 - ease(p); }, () => { V.doorTw = false; }); });
     });
   }
   // Popping: a push on one shape pops that gummy out with a boing; a push on the mold itself turns it over and
@@ -636,7 +584,6 @@
     const g = B.gum[k];
     if (!g || g.where !== "mold") return;
     g.where = "air";
-    snd.boing();
     ghost.learned("pop");
     tween(0.55, (p) => { g.y = g.hy - Math.sin(p * Math.PI) * 60; g.rot = Math.sin(p * Math.PI) * 0.6 * (k % 2 ? 1 : -1); }, () => {
       g.y = g.hy; g.rot = 0; g.where = "out"; g.wob = 0.4; g.ph = 0;
@@ -652,7 +599,6 @@
     const m = V.mold;
     rest.forEach((g) => { g.where = "air"; g.hide = true; });
     tween(0.45, (p) => { m.lift = ease(p) * 34; m.flip = Math.cos(p * Math.PI); }, () => {
-      snd.boing();
       rest.forEach((g, i) => {
         g.hide = false;
         const y0 = g.hy - 40;
@@ -696,7 +642,6 @@
       tween(0.5, (p) => { const e = ease(p); g.x = lerp(x0, tx, e); g.y = lerp(y0, ty, e) - Math.sin(p * Math.PI) * 50; g.sc = lerp(1, 0.5, e); }, () => { g.where = "bowl"; }, j * 0.07);
     });
     later(0.5 + n * 0.07, () => {
-      snd.shake();
       V.bowlShake = i;
       tween(1.2, (p) => {
         V.shakeAmt = Math.sin(p * Math.PI * 7) * (1 - p);
@@ -734,7 +679,6 @@
       jar.push({ s: g.sh, f: B.flavor, c: g.coat || "" });
       if (jar.length > JAR_MAX) jar.shift();
       V.jarBounce = 1;
-      snd.plink(jar.length);
       saveSoon();
       if (B.gum.every((q) => q.where === "jar")) finishBatch();
       else if (B.gum.every((q) => q.coat || q.where === "jar")) toJarStep();
@@ -748,7 +692,6 @@
     advance("done");
     busy = true;
     tween(0.4, (p) => { V.lid = 1 - ease(p); V.bowls = Math.min(V.bowls, 1 - ease(p)); });
-    snd.chime();
     const m = jarMouth();
     puff("spark", m.x, m.y + 30, 12);
     coach.say("The gummies are in the candy jar!", 3.5);
@@ -1294,7 +1237,6 @@
   function jvPoke(i) {
     const w = jv.wobs[i]; if (!w) return;
     w.wob = 0.4; w.ph = 0; w.v = 160;
-    snd.boing();
   }
   function drawJarView(t) {
     if (jv.a <= 0.01) return;
@@ -1504,7 +1446,7 @@
       const g = B.gum[+part.slice(3)];
       if (!g) return;
       if (st === "jar" && !busy) { ghost.learned("jar"); hopToJar(g); }
-      else { g.wob = 0.45; g.ph = 0; snd.boing(); }
+      else { g.wob = 0.45; g.ph = 0; }
     } else if (part === "jar") {
       if ((st === "jar" || st === "coat") && !busy) { ghost.learned("jar"); allToJar(); }
       else openJar(true);
@@ -1599,7 +1541,7 @@
         if (still && !locked()) { g.x = g.hx; g.y = g.hy; doTap("gum" + B.gum.indexOf(g)); }
         else if (!locked() && B.step === "coat" && bi >= 0) { g.x = g.hx; g.y = g.hy; ghost.learned("bowls"); coatIn(bi, [g]); }
         else if (!locked() && Math.hypot(w.x - L.jar.x, w.y - (L.jar.y - L.jar.h / 2)) < L.jar.w) { ghost.learned("jar"); hopToJar(g); }
-        else if (inRect(g, tray.x, tray.y, MOLD_W / 2 - 14, MOLD_H / 2 - 14)) { g.hx = g.x; g.hy = g.y; g.wob = 0.35; g.ph = 0; snd.boing(); }
+        else if (inRect(g, tray.x, tray.y, MOLD_W / 2 - 14, MOLD_H / 2 - 14)) { g.hx = g.x; g.hy = g.y; g.wob = 0.35; g.ph = 0; }
         else {
           const x0 = g.x, y0 = g.y;
           g.where = "air";
@@ -1716,11 +1658,9 @@
       V.bwob = V.bwob.map(() => 1); V.gelWob = 1; V.slosh = 1; moldWob = 1;
       V.jarBounce = 1;
       jv.wobs.forEach((w) => { w.wob = 0.4; w.ph = Math.random() * 3; w.v = 120 + Math.random() * 80; });
-      snd.boing(); setTimeout(() => snd.boing(), 250);
     } else {
       const f = B.flavor >= 0 ? B.flavor : Math.floor(Math.random() * FLAVORS.length);
       actor = { kind: k === 1 ? "bear" : "worm", f, t0: now(), dur: 5 };
-      snd.boing();
     }
   }
   function drawActor(t) {
@@ -1831,10 +1771,8 @@
     restLine: "The Sweet Shop is closed.",
     restLine2: "The candy jar will be right here next time.",
     restArt,
-    soundNote: "Soft pours, drips and boings. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; }
   });
   Toybox.offFirst({ running: () => V.knob > 0.01, off: (done) => { knobOff(); done(); } });
   requestAnimationFrame(frame);

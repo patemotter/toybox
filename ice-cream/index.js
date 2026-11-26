@@ -28,7 +28,6 @@
   // Sections:
   //   Setup and saved state
   //   Flavors, toppings, menus and customers
-  //   Sound
   //   Layout
   //   Tweens and particles
   //   Orders and matching
@@ -137,48 +136,6 @@
     return MENUS.includes(o.menu) && HOLDERS.includes(o.holder) && MENU_OF[o.holder] === o.menu && Array.isArray(o.scoops) &&
       o.scoops.length >= 1 && o.scoops.length <= MAXS && o.scoops.every(okF) && Array.isArray(o.tops) && o.tops.every((t) => TOP_IDS.includes(t));
   }
-
-  // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain, delay, q) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime + (delay || 0), s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = q || 0.9;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  const snd = {
-    bell() { tone(1320, 1320, 0.5, "sine", 0.04); tone(990, 990, 0.7, "sine", 0.035, 0.18); },
-    dig() { noise(0.5, 700, 0.04, 0, 1.4); },
-    plop() { tone(320, 160, 0.18, "sine", 0.06); },
-    clack() { tone(500, 380, 0.08, "triangle", 0.04); },
-    shake() { for (let k = 0; k < 4; k++) noise(0.12, 4200, 0.03, k * 0.2, 2); },
-    squeeze() { noise(0.6, 300, 0.04, 0, 2); },
-    hiss() { noise(0.35, 3000, 0.03, 0, 1.2); },
-    pour() { noise(0.5, 520, 0.03, 0, 1.6); },
-    whirr() { noise(0.55, 900, 0.025, 0, 3); },
-    hum() { noise(0.6, 170, 0.03, 0, 2); },
-    click() { tone(900, 650, 0.05, "square", 0.015); },
-    boing() { tone(260, 520, 0.18, "sine", 0.05); tone(520, 300, 0.25, "sine", 0.03, 0.12); },
-    talk() { tone(420, 520, 0.09, "sine", 0.025); tone(520, 440, 0.1, "sine", 0.025, 0.12); },
-    whoosh() { noise(0.45, 1200, 0.025, 0, 0.7); },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); tone(1320, 1320, 0.4, "sine", 0.03, 0.24); }
-  };
 
   // =====================================================================================================
   // Layout
@@ -499,9 +456,8 @@
     C.phase = "in"; C.hold = null; C.happy = 0; C.say = ""; C.sayUntil = 0; C.wave = 0;
     const x0 = vis().x1 + 80;
     C.x = x0;
-    snd.bell();
     keep(tween(reduce ? 0.6 : 2.6, (p) => { C.x = lerp(x0, L.custX, ease(p)); C.walk = p < 1 ? 1 : 0; }, () => {
-      C.walk = 0; C.phase = "order"; C.talk = now() + 1.4; snd.talk();
+      C.walk = 0; C.phase = "order"; C.talk = now() + 1.4;
       bubPop = 0; tween(0.35, (p) => { bubPop = p; });
       lastWant = null; ghost.poke(); saveSoon();
     }));
@@ -509,7 +465,6 @@
   function say(text, sec) {
     C.say = text; C.sayUntil = now() + (sec || 3.5); C.talk = now() + 1.2;
     bubPop = 0.6; tween(0.25, (p) => { bubPop = lerp(0.6, 1, p); });
-    snd.talk();
   }
 
   // =====================================================================================================
@@ -650,7 +605,7 @@
       if (B.holder !== kind) coach.say("Press New to start again.", 3);
       return;
     }
-    if (B.holder === kind) { V.squish = 1; snd.clack(); return; }
+    if (B.holder === kind) { V.squish = 1; return; }
     const a = from || { x: sp.x, y: sp.y + 24 };
     const was = B.holder;
     B.holder = null;
@@ -658,7 +613,7 @@
     V.hc = { kind, x: a.x, y: a.y };
     const to = { x: L.holder.x, y: L.holder.y };
     tween(0.4, (p) => { const e = ease(p); V.hc.x = lerp(a.x, to.x, e); V.hc.y = lerp(a.y, to.y, e) - Math.sin(p * Math.PI) * 40; }, () => {
-      V.hc = null; B = emptyBuild(); B.holder = kind; V.squish = 1; snd.clack();
+      V.hc = null; B = emptyBuild(); B.holder = kind; V.squish = 1;
       ghost.learned("holder"); did("holder"); lastWant = null; saveSoon();
       const o = C.order;
       if (C.phase === "order" && o.menu !== "any" && kind !== o.holder) say(cap(ASK[kind]) + "? I wanted " + ASK[o.holder] + "!");
@@ -680,7 +635,7 @@
     busy = true; S.home = false;
     const tp = tubPt(tub);
     const dig = () => {
-      S.f = tub; snd.dig();
+      S.f = tub;
       const x0 = S.x;
       if (S.tw) cancel(S.tw);
       S.tw = tween(0.8, (p) => {
@@ -709,7 +664,7 @@
   function addScoop(f) {
     const before = C.phase === "order" && !anyOrder() ? matchInfo(C.order, B) : null;
     B.scoops.push(f);
-    V.squish = 1; snd.plop();
+    V.squish = 1;
     const p = nextScoopPt();
     puff("spark", p.x, p.y - R, 5, FLAVORS[f].hex);
     ghost.learned("tub"); did("tub"); lastWant = null; saveSoon();
@@ -723,11 +678,11 @@
     if (!drag || drag.k !== "scoop") return;
     const tub = tubAt(S.x, S.y);
     if (tub >= 0 && (S.f < 0 || S.f === tub || S.ball < 0.05) && S.ball < 1) {
-      if (S.f !== tub) { S.f = tub; snd.dig(); }
+      if (S.f !== tub) { S.f = tub; }
       S.ball = Math.min(1, S.ball + dt * 1.5);
       S.ang = -Math.sin(S.ball * Math.PI) * 0.7;
       V.dent[tub] = 1;
-      if (S.ball >= 1) { snd.clack(); S.ang = 0; }
+      if (S.ball >= 1) { S.ang = 0; }
     }
   }
   function scoopRelease(still, wasTap) {
@@ -796,11 +751,11 @@
   function pourDone(id) {
     lastWant = null; saveSoon();
     if (TOP_IDS.includes(id)) {
-      snd.chime(); ghost.learned("top"); did("top");
+      ghost.learned("top"); did("top");
       const top = icTop(); puff("spark", top.x, top.y, 6);
       if (C.phase === "order" && !anyOrder() && !C.order.tops.includes(id)) say("Ooh, " + TOP_BY[id].say + " too!", 3);
-    } else if (id === "milk") { snd.plop(); ghost.learned("milk"); did("milk"); }
-    else { snd.plop(); ghost.learned("ing"); did("ing"); const s = spoutPt(); puff("spark", s.x, s.y, 4); }
+    } else if (id === "milk") { ghost.learned("milk"); did("milk"); }
+    else { ghost.learned("ing"); did("ing"); const s = spoutPt(); puff("spark", s.x, s.y, 4); }
   }
   // A pouring tool that has nothing to pour into says what to do first.
   function notReady(id) {
@@ -843,18 +798,14 @@
     if (id === "sprinkles") {
       tl.shake = Math.sin(t * 30) * 6;
       if (t > shakeT) { shakeT = t + 0.06; puff("sprinkle", m.x, m.y, 2); }
-      if (Math.random() < dt * 4) snd.shake();
     } else if (id === "sugar") {
       tl.shake = Math.sin(t * 24) * 3;
       if (t > shakeT) { shakeT = t + 0.05; puff("drop", m.x, m.y, 2, "#FFFFFF"); }
-      if (Math.random() < dt * 3) snd.shake();
     } else if (id === "cream") {
       if (t > shakeT) { shakeT = t + 0.08; puff("drop", m.x, m.y, 1, "#FFFFFF"); }
-      if (Math.random() < dt * 3) snd.hiss();
     } else {
       const col = id === "sauce" ? "#5A2E16" : id === "carton" ? "#FFF6DC" : "#FFFFFF";
       V.streams[id] = { x: m.x, y: m.y, tx: tgt.x, ty: tgt.y + 4, until: t + 0.08, col, w: id === "sauce" ? 5 : 7 };
-      if (Math.random() < dt * 2) (id === "sauce" ? snd.squeeze : snd.pour)();
     }
   }
   function toolHome(id, dur) {
@@ -886,7 +837,7 @@
     const top0 = icTop();
     tween(0.5, (p) => { const e = ease(p); tl.x = lerp(a.x, top0.x, e); tl.y = lerp(a.y, top0.y - 8, e) - Math.sin(p * Math.PI) * 60; }, () => {
       tl.out = false; const h = homeOf("cherry"); tl.x = h.x; tl.y = h.y;
-      busy = false; snd.boing(); V.squish = 1; addAmt("cherry", 1);
+      busy = false; V.squish = 1; addAmt("cherry", 1);
     });
   }
   function cherryTap() {
@@ -907,7 +858,7 @@
     const a = from || { x: L.holder.x, y: L.holder.y }, to = mixerCupPt();
     V.steel = { x: a.x, y: a.y, ang: 0 };
     tween(0.5, (p) => { const e = ease(p); V.steel.x = lerp(a.x, to.x, e); V.steel.y = lerp(a.y, to.y, e) - Math.sin(p * Math.PI) * 50; }, () => {
-      V.steel = null; B.at = "mixer"; busy = false; snd.clack();
+      V.steel = null; B.at = "mixer"; busy = false;
       ghost.learned("mixer"); did("mixer"); lastWant = null; saveSoon();
       V.glassIn = 0; tween(0.45, (p) => { V.glassIn = ease(p); });
       startMix();
@@ -919,7 +870,7 @@
     tween((reduce ? 1.5 : 3.6) * (1 - m0), (p) => {
       B.mix = lerp(m0, 1, p);
       if (Math.random() < 0.25) { const c = mixerCupPt(); puff("splash", c.x + (Math.random() - 0.5) * 30, c.y + RIM.steel, 1, shakeColor(B.scoops)); }
-    }, () => { B.mix = 1; V.spin = false; snd.chime(); lastWant = null; saveSoon(); });
+    }, () => { B.mix = 1; V.spin = false; lastWant = null; saveSoon(); });
   }
   // Pouring: the cup tips over the glass on the holder. Its middle is the pivot.
   const STEEL_MID = 42, STEEL_ANG = 2.0;
@@ -943,11 +894,10 @@
     if (!V.steel) return;
     const m = steelMouth(V.steel);
     V.streams.shake = { x: m.x, y: m.y, tx: L.holder.x, ty: L.holder.y - 30 - B.pour * 90, until: now() + 0.08, col: shakeColor(B.scoops), w: 8 };
-    if (Math.random() < 0.05) snd.pour();
   }
   function finishPour() {
     B.pour = 1; B.at = "glass"; busy = false;
-    snd.chime(); ghost.learned("pour"); did("pour"); lastWant = null; saveSoon();
+    ghost.learned("pour"); did("pour"); lastWant = null; saveSoon();
     puff("spark", L.holder.x, L.holder.y + GLASS_RIM, 6);
     // The empty cup goes back to its stack.
     const s = V.steel || Object.assign(mixerCupPt(), { ang: 0 }), a = { x: s.x, y: s.y, ang: s.ang || 0 }, h = L.stacks.steels;
@@ -958,7 +908,7 @@
   function mixerTap() {
     if (B.holder === "steel" && B.at === "spot" && B.scoops.length && B.milk >= 1) { toMixer(); return; }
     if (B.holder === "steel" && B.at === "mixer" && B.mix >= 1) { pourShake(); return; }
-    V.spinUntil = now() + 0.8; snd.whirr();
+    V.spinUntil = now() + 0.8;
     tag(NAMES.mixer, L.mixer.x, L.mixer.y - 180);
     if (B.holder === "steel" && B.at === "spot") hint();
   }
@@ -994,7 +944,6 @@
       V.fly = null; C.hold = build; C.phase = "take"; C.happy = 1; busy = false; served++;
       if (menu !== "any") servedBy[menu]++;
       say(any ? "Yum! Thank you!" : perfect ? "Yum! Just right. Thank you!" : "Thank you! Yum!", 3);
-      snd.chime();
       puff("heart", C.x, L.counterY - 150, perfect ? 6 : 3);
       if (perfect) Toybox.kind();
       lastWant = null; saveSoon();
@@ -1029,12 +978,12 @@
   const allIn = () => M.milk >= 1 && M.cream >= 1 && M.sugar >= 1 && M.flavor >= 0;
   function takeBowl(from) {
     if (busy || M.bowl !== "freezer") return;
-    busy = true; snd.whoosh();
+    busy = true;
     const go = () => {
       const a = from || bowlFzPt(), b = bowlMcPt(), s0 = from ? from.s : fzScale();
       MV.bowlFly = { x: a.x, y: a.y, s: s0 };
       tween(0.6, (p) => { const e = ease(p); MV.bowlFly.x = lerp(a.x, b.x, e); MV.bowlFly.y = lerp(a.y, b.y, e) - Math.sin(p * Math.PI) * 50; MV.bowlFly.s = lerp(s0, L.z.k, e); }, () => {
-        MV.bowlFly = null; M.bowl = "machine"; M.lid = 0; snd.clack();
+        MV.bowlFly = null; M.bowl = "machine"; M.lid = 0;
         puff("frost", b.x, b.y - 40 * L.z.k, 8);
         tween(0.4, (p) => { M.lid = ease(p); }, null, 0.15);
         tween(0.35, (p) => { MV.door = 1 - ease(p); });
@@ -1059,7 +1008,7 @@
   }
   function setOn(on) {
     if (M.on === on) return;
-    M.on = on; snd.click(); MV.switchGlow = 0;
+    M.on = on; MV.switchGlow = 0;
     if (on) { ghost.learned("switch"); did("switch"); }
     lastWant = null; saveSoon();
   }
@@ -1083,7 +1032,7 @@
     if (tl.tw) cancel(tl.tw);
     tl.out = true; tl.x = a.x; tl.y = a.y;
     tl.tw = tween(0.5, (p) => { const e = ease(p); tl.x = lerp(a.x, to.x, e); tl.y = lerp(a.y, to.y, e) - Math.sin(p * Math.PI) * 40; tl.ang = 2.1 * e; }, () => {
-      tl.tw = tween(0.9, (p) => { if (Math.random() < 0.5) puff("drop", sp.x, sp.y - 6, 1, FLAVORS[i].hex); if (p > 0.5 && M.flavor < 0) { M.flavor = i; snd.plop(); } }, () => {
+      tl.tw = tween(0.9, (p) => { if (Math.random() < 0.5) puff("drop", sp.x, sp.y - 6, 1, FLAVORS[i].hex); if (p > 0.5 && M.flavor < 0) { M.flavor = i; } }, () => {
         tl.tw = null; busy = false; M.flavor = i;
         ghost.learned("flavor"); did("flavor"); lastWant = null; saveSoon();
         toolHome(id);
@@ -1094,10 +1043,10 @@
   function stepMake(dt, t) {
     if (M.bowl === "machine" && M.on) {
       MV.rot += dt * (reduce ? 0.6 : 1.4);
-      if (t > humT && Z.on) { humT = t + 0.55; snd.hum(); }
+      if (t > humT && Z.on) { humT = t + 0.55; }
       if (allIn() && M.churn < 1) {
         M.churn = Math.min(1, M.churn + dt / (reduce ? 5 : 11));
-        if (M.churn >= 1) { snd.chime(); const b = bowlMcPt(); puff("spark", b.x, b.y - 90 * L.z.k, 8); did("churn"); lastWant = null; saveSoon(); }
+        if (M.churn >= 1) { const b = bowlMcPt(); puff("spark", b.x, b.y - 90 * L.z.k, 8); did("churn"); lastWant = null; saveSoon(); }
       }
     }
   }
@@ -1109,9 +1058,7 @@
     tween(0.35, (p) => { M.lid = 1 - ease(p); }, () => {
       MV.out = 0;
       tween(reduce ? 0.8 : 1.8, (p) => {
-        const was = Math.floor(MV.out * 3);
         MV.out = p;
-        if (Math.floor(p * 3) > was) snd.plop();
       }, () => {
         M.tub = "full"; MV.out = 0; busy = false;
         ghost.learned("spoon"); did("spoon"); lastWant = null; saveSoon();
@@ -1128,7 +1075,7 @@
       const a = { x: L.churn.x, y: L.churn.y - 20 }, b = tubPt(f);
       V.tubFly = { f, x: a.x, y: a.y };
       tween(0.9, (p) => { const e = ease(p); V.tubFly.x = lerp(a.x, b.x, e); V.tubFly.y = lerp(a.y, b.y, e) - Math.sin(p * Math.PI) * 90; }, () => {
-        V.tubFly = null; madeTub[f] = 1; snd.chime(); puff("spark", b.x, b.y, 10, FLAVORS[f].hex);
+        V.tubFly = null; madeTub[f] = 1; puff("spark", b.x, b.y, 10, FLAVORS[f].hex);
         Toybox.kind(); saveSoon();
       });
     });
@@ -1153,7 +1100,7 @@
   function zoomIn() {
     if (Z.on || Z.moving || locked()) return;
     drag = null; press.cancel(); Z.moving = true; parts = [];
-    setZoomUI(true); snd.whoosh(); coach.busy(); lastWant = "";
+    setZoomUI(true); coach.busy(); lastWant = "";
     keep(tween(reduce ? 0.25 : 0.75, (p) => { Z.t = ease(p); }, () => {
       Z.t = 1; Z.on = true; Z.moving = false; placeAll(); lastWant = null; ghost.poke(); saveSoon();
     }));
@@ -1161,7 +1108,7 @@
   function zoomOut(after) {
     if (!Z.on || Z.moving) return;
     drag = null; press.cancel(); Z.moving = true; Z.on = false; parts = [];
-    placeAll(); setZoomUI(false); snd.whoosh(); coach.busy(); lastWant = "";
+    placeAll(); setZoomUI(false); coach.busy(); lastWant = "";
     keep(tween(reduce ? 0.25 : 0.75, (p) => { Z.t = 1 - ease(p); }, () => {
       Z.t = 0; Z.moving = false; lastWant = null; saveSoon();
       if (after) after();
@@ -2322,7 +2269,7 @@
     else if (part === "churn") zoomIn();
     else if (part === "ic") {
       if (w && w.part === "serve") serve();
-      else { V.squish = 1; snd.boing(); if (w) hint(); }
+      else { V.squish = 1; if (w) hint(); }
     } else if (part === "holder") { V.holderGlow = 1; tag(NAMES.holder, L.holder.x, L.holder.y - 60); hint(); }
     else if (part === "customer") {
       if (w && w.part === "serve") serve();
@@ -2533,18 +2480,18 @@
     if (locked() || Z.moving) return;
     let k = surpriseNext; surpriseNext = (surpriseNext + 1) % 4;
     if (Z.on) {
-      if (k % 2 === 0) { for (let i = 0; i < 70; i++) puff("rain", 0, 0, 1); snd.shake(); }
-      else { const f = L.z.fz; MV.door = 1; tween(0.6, null, () => { tween(0.4, (p) => { MV.door = 1 - ease(p); }); }); puff("frost", f.x + f.w / 2, f.y + f.h * 0.4, 30); snd.whoosh(); }
+      if (k % 2 === 0) { for (let i = 0; i < 70; i++) puff("rain", 0, 0, 1); }
+      else { const f = L.z.fz; MV.door = 1; tween(0.6, null, () => { tween(0.4, (p) => { MV.door = 1 - ease(p); }); }); puff("frost", f.x + f.w / 2, f.y + f.h * 0.4, 30); }
       return;
     }
     if (k === 3 && C.phase !== "order") { k = 0; }
-    if (k === 0) { for (let i = 0; i < 70; i++) puff("rain", 0, 0, 1); snd.shake(); }
-    else if (k === 1) { actor = { kind: "dog", t0: now(), dur: 4 }; snd.boing(); }
-    else if (k === 2) { actor = { kind: "bird", t0: now(), dur: 5 }; snd.talk(); }
+    if (k === 0) { for (let i = 0; i < 70; i++) puff("rain", 0, 0, 1); }
+    else if (k === 1) { actor = { kind: "dog", t0: now(), dur: 4 }; }
+    else if (k === 2) { actor = { kind: "bird", t0: now(), dur: 5 }; }
     else {
       C.happy = 1;
       tween(1.4, (p) => { C.hop = Math.abs(Math.sin(p * Math.PI * 3)) * 26 * (1 - p * 0.3); }, () => { C.hop = 0; C.happy = 0; });
-      puff("heart", C.x, L.counterY - 150, 4); snd.boing();
+      puff("heart", C.x, L.counterY - 150, 4);
     }
   }
   // The dog pops up beside the customer, behind the counter, so it is drawn before the cabinet.
@@ -2593,7 +2540,7 @@
     runTweens(t);
     stepParts(dt);
     stepScoop(dt); stepPours(dt, t); stepSteel(dt); stepMake(dt, t);
-    if (V.spin && t > whirrT && !Z.on) { whirrT = t + 0.5; snd.whirr(); }
+    if (V.spin && t > whirrT && !Z.on) { whirrT = t + 0.5; }
     V.squish = Math.max(0, V.squish - dt * 2.5);
     V.holderGlow = Math.max(0, V.holderGlow - dt * 0.8);
     MV.switchGlow = Math.max(0, MV.switchGlow - dt * 0.5);
@@ -2688,10 +2635,8 @@
     restLine: "The Ice Cream Shop is closed.",
     restLine2: "The customers will be back next time.",
     restArt,
-    soundNote: "A soft door bell, scoops, plops and a gentle machine hum. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; if (C.phase === "none") keep(later(0.6, nextCustomer)); },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; if (C.phase === "none") keep(later(0.6, nextCustomer)); }
   });
   Toybox.offFirst({ running: () => M.on, off: (done) => { M.on = false; done(); } });
   requestAnimationFrame(frame);

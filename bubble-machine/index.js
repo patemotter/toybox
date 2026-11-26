@@ -10,7 +10,6 @@
 //   - Ducks (Surprise): a rubber duck inside a bubble; it drops to the grass when the bubble pops
 //   - Wand
 //   - Surprise: a giant wobbly bubble, a bubble with a rubber duck inside, or a bubble train
-//   - Sound (off by default; soft synthesized pops, a quiet motor)
 //   - Machine controls
 //   - Coach line and ghost hand
 //   - Touch: switch, dial, wand, bubbles (several fingers at once)
@@ -701,7 +700,6 @@
   }
 
   // ---------- Pops: a splash ring and droplets ----------
-  var lastPopSound = 0;
   function splashColor(soapId) {
     var s = SOAP_BY[soapId];
     if (!s.splash) return hsl(Math.random() * 360, 90, 62, 1);
@@ -721,7 +719,6 @@
     }
     if (parts.length > 500) parts.splice(0, parts.length - 500);
     if (b.duck) dropDuck(b);
-    if (b.kind === "giant") bigPopSound(); else popSound(r, soft);
   }
 
   // ---------- Ducks (Surprise): a rubber duck inside a bubble; it drops to the grass when the bubble pops ----------
@@ -775,7 +772,7 @@
         d.rot += d.vr * dt;
         if (d.y >= gy) {
           d.y = gy;
-          if (d.vy > 160) { d.vy = -d.vy * 0.38; d.vr *= -0.5; squeak(0.5); }
+          if (d.vy > 160) { d.vy = -d.vy * 0.38; d.vr *= -0.5; }
           else { d.vy = 0; d.state = "sit"; }
         }
       } else {
@@ -914,7 +911,6 @@
     b.life = r > wand.bub * 1.3 ? rnd(10, 14) : b.life;
     addBubble(b);
     useSoap(r);
-    if (!fast || fast < 0.5) blowSound(r);
     if (!learned.wand) { learned.wand = true; coachUpdate(); }
   }
   // Where the handle meets the loop (the fish's belly is higher than the others' bottoms).
@@ -1075,7 +1071,6 @@
     b.life = kind === "giant" ? 60 : 22;
     if (kind === "duck") b.duck = { c: DUCK_COLORS[Math.floor(Math.random() * DUCK_COLORS.length)] };
     growing = { b: b, t0: performance.now(), dur: kind === "giant" ? 2200 : 1500 };
-    inflateSound(kind === "giant");
   }
 
   // Surprise: a bubble train. A chain of linked bubbles comes out of the top of the machine one by one, snakes
@@ -1111,7 +1106,6 @@
     // calm: the front bubble crosses in about 9 s on any screen (45 to 110 px a second)
     var speed = clamp(L / 9, 45, 110) * (reduce ? 0.7 : 1);
     train = { pts: pts, cum: cum, L: L, gap: gap, r: r, cars: cars, s: 0, speed: speed, popAt: 0, popped: 0, t: 0 };
-    inflateSound(false);
   }
   function trainPoint(s) {
     var tr = train, c = tr.cum, lo = 0, hi = c.length - 1;
@@ -1195,102 +1189,8 @@
     }
   }
 
-  // ---------- Sound (off by default; soft synthesized pops, a quiet motor) ----------
-  var master = null, masterCtx = null, hum = null;
-  function audio() {
-    var ac = Toybox.sound.ready();
-    if (!ac) return null;
-    if (masterCtx !== ac) {
-      try {
-        var comp = ac.createDynamicsCompressor();
-        master = ac.createGain();
-        master.gain.value = 0.7;
-        master.connect(comp); comp.connect(ac.destination);
-        masterCtx = ac; hum = null;
-      } catch (e) { return null; }
-    }
-    return ac;
-  }
-  function tone(ac, type, f0, f1, dur, vol, when) {
-    var t = ac.currentTime + (when || 0);
-    var o = ac.createOscillator(), g = ac.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.03);
-  }
-  function popSound(r, soft) {
-    var now = performance.now();
-    if (now - lastPopSound < 45) return;
-    lastPopSound = now;
-    var ac = audio();
-    if (!ac) return;
-    var f = clamp(1300 - r * 9, 380, 1300) * rnd(0.92, 1.08);
-    tone(ac, "sine", f, f * 0.45, soft ? 0.07 : 0.09, soft ? 0.035 : 0.07);
-  }
-  function bigPopSound() {
-    var ac = audio();
-    if (!ac) return;
-    tone(ac, "sine", 420, 120, 0.25, 0.1);
-    tone(ac, "sine", 900, 300, 0.12, 0.04, 0.02);
-  }
-  function blowSound(r) {
-    var now = performance.now();
-    if (now - lastPopSound < 60) return;
-    var ac = audio();
-    if (!ac) return;
-    tone(ac, "sine", 260 + 2000 / (r + 10), 520, 0.22, 0.035);
-  }
-  function inflateSound(big) {
-    var ac = audio();
-    if (!ac) return;
-    tone(ac, "sine", 200, big ? 520 : 640, big ? 1.6 : 1.1, 0.04);
-  }
-  function clickSound(on) {
-    var ac = audio();
-    if (!ac) return;
-    tone(ac, "triangle", on ? 520 : 360, on ? 700 : 240, 0.06, 0.06);
-  }
-  function tickSound(i) {
-    var ac = audio();
-    if (!ac) return;
-    tone(ac, "sine", 700 + i * 220, 700 + i * 220, 0.05, 0.05);
-  }
-  function squeak(v) {
-    var ac = audio();
-    if (!ac) return;
-    var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-    o.type = "sine";
-    o.frequency.setValueAtTime(900, t); o.frequency.linearRampToValueAtTime(1400, t + 0.07); o.frequency.linearRampToValueAtTime(1000, t + 0.16);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 * (v || 1), t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.2);
-  }
+  var hum = null;
   // A quiet whirr while the fan turns (follows the wheel speed).
-  function updateHum() {
-    var ac = Toybox.sound.on() ? audio() : null;
-    var lvl = Math.abs(mach.wheelV) / WHEEL[2];
-    if (!ac) { if (hum) stopHum(); return; }
-    if (!hum && lvl > 0.02) {
-      try {
-        var len = ac.sampleRate, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-        var src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
-        var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
-        var g = ac.createGain(); g.gain.value = 0;
-        src.connect(lp); lp.connect(g); g.connect(master); src.start();
-        hum = { src: src, g: g, lp: lp };
-      } catch (e) { hum = null; }
-    }
-    if (hum) {
-      hum.g.gain.setTargetAtTime(0.02 * lvl, ac.currentTime, 0.1);
-      hum.lp.frequency.setTargetAtTime(260 + 400 * lvl, ac.currentTime, 0.1);
-      if (lvl < 0.01) stopHum();
-    }
-  }
   function stopHum() {
     if (!hum) return;
     try { hum.g.gain.value = 0; hum.src.stop(); } catch (e) { /* ignore */ }
@@ -1304,13 +1204,11 @@
     if (S.on === on) return;
     S.on = on;
     saveNow();
-    clickSound(on);
     if (on) { learned.sw = true; mach.flashUntil = 0; }
     coachUpdate();
   }
   function setSpeed(i) {
     i = (i + 3) % 3;
-    if (i !== S.speed) tickSound(i);
     S.speed = i;
     mach.speedLabelAt = performance.now();
     saveNow();
@@ -1446,7 +1344,7 @@
     if (trainAt(p.x, p.y)) { info.mode = "none"; trainPop(false); if (!learned.pop) { learned.pop = true; coachUpdate(); } return; }
     if (hitJar(p.x, p.y)) { info.mode = "none"; if (!wand.home && wand.held === null) sendHome(); else refill(true); return; }
     var d = duckAt(p.x, p.y);
-    if (d) { if (d.state === "sit") { d.hop = 1; squeak(1); } info.mode = "none"; return; }
+    if (d) { if (d.state === "sit") { d.hop = 1; } info.mode = "none"; return; }
     if (inMachine(p.x, p.y)) { info.mode = "none"; machineTap(); return; }
     puff(p.x, p.y);
   });
@@ -1693,7 +1591,6 @@
       var now = performance.now();
       update(dt, now);
       render(now);
-      updateHum();
     }
     if (DEBUG) {
       var wk = performance.now() - w0;
@@ -1777,7 +1674,6 @@
     // The machine's loops change shape too and dip in fresh soap.
     mach.film = [true, true, true, true, true, true];
     mach.spill = 1;
-    if (!quiet) tickSound(1);
   }
   renderWands();
   SOAPS.forEach(function (s) {
@@ -1802,7 +1698,6 @@
     mach.film = [true, true, true, true, true, true];
     mach.spill = 1;
     wand.filmAt = performance.now();
-    tickSound(1);
   }
   // Start over: every bubble pops in a quick ripple from the bottom up, and the ducks waddle off.
   function newSky() {
@@ -1827,7 +1722,6 @@
     if (t.classList.contains("tab")) {
       $("panel").dataset.tab = t.dataset.tab;
       Array.prototype.forEach.call(document.querySelectorAll(".tb-tabs .tab"), function (b) { b.setAttribute("aria-pressed", String(b === t)); });
-      tickSound(0);
     }
     else if (t.dataset.wand) pickWand(t.dataset.wand);
     else if (t.dataset.soap) pickSoap(t.dataset.soap);
@@ -1925,13 +1819,11 @@
     restLine: "The bubbles are resting.",
     restLine2: "They will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft pops and a quiet machine whirr. Hold for 2 seconds.",
     onEnding: onEnding,
     endingMaxMs: 16000,
     onGoodbye: onGoodbye,
     onRest: function () { endingDone = null; stopHum(); },
-    onWake: function () { ending = false; endingDone = null; coachUpdate(); },
-    onSound: function (on) { if (!on) stopHum(); }
+    onWake: function () { ending = false; endingDone = null; coachUpdate(); }
   });
   stage.appendChild($("tb-toast"));
   stage.appendChild($("tb-farewell"));

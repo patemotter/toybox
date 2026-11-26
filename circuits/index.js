@@ -13,7 +13,6 @@
   // Sections:
   //   Setup and saved state
   //   Solver
-  //   Sound
   //   Layout
   //   Running the circuit
   //   Drawing parts
@@ -265,58 +264,6 @@
   }
 
   // =====================================================================================================
-  // Sound (soft and synthesized; only when the grown-ups turned sound on)
-  // =====================================================================================================
-  let noiseBuf = null;
-  function tone(f0, f1, dur, type, gain, delay) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    const t = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(f0, t);
-    if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
-  }
-  function noise(dur, freq, gain) {
-    const a = Toybox.sound.ready(); if (!a) return;
-    if (!noiseBuf || noiseBuf.sampleRate !== a.sampleRate) {
-      noiseBuf = a.createBuffer(1, a.sampleRate, a.sampleRate);
-      const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
-    const t = a.currentTime, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf; s.loop = true; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 1.2;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(a.destination); s.start(t); s.stop(t + dur + 0.05);
-  }
-  const snd = {
-    snap() { noise(0.05, 2400, 0.08); tone(900, 600, 0.08, "triangle", 0.03); },
-    lift() { tone(500, 700, 0.1, "sine", 0.03); },
-    out() { tone(600, 260, 0.18, "sine", 0.035); },
-    click() { noise(0.04, 3000, 0.07); },
-    flip() { tone(500, 900, 0.18, "sine", 0.035); },
-    tick() { noise(0.02, 4000, 0.025); },
-    glow() { tone(660, 660, 0.3, "sine", 0.04); tone(990, 990, 0.4, "sine", 0.03, 0.12); },
-    wipe() { tone(700, 300, 0.5, "sine", 0.035); },
-    chime() { tone(660, 660, 0.25, "sine", 0.05); tone(880, 880, 0.3, "sine", 0.04, 0.12); }
-  };
-  // Steady voices for the buzzer and the motor: created once sound is ready, their loudness follows the current.
-  const voices = {};
-  function voice(name, type, freq, level) {
-    const a = Toybox.sound.ready();
-    let v = voices[name];
-    if (!a) { if (v) { try { v.o.stop(); } catch (e) { /* ignore */ } delete voices[name]; } return; }
-    if (!v) {
-      if (level < 0.002) return;
-      const o = a.createOscillator(), f = a.createBiquadFilter(), g = a.createGain();
-      o.type = type; f.type = "lowpass"; f.frequency.value = 1100; g.gain.value = 0;
-      o.connect(f); f.connect(g); g.connect(a.destination); o.start();
-      v = voices[name] = { o, g };
-    }
-    v.o.frequency.setTargetAtTime(freq, a.currentTime, 0.08);
-    v.g.gain.setTargetAtTime(level, a.currentTime, 0.06);
-  }
-
-  // =====================================================================================================
   // Layout
   // =====================================================================================================
   let W = 0, H = 0, dpr = 1;
@@ -436,7 +383,7 @@
         q.spd += (want - q.spd) * Math.min(1, dt * (want > q.spd ? 8 : 1.6));
         if (locked()) q.spd = Math.max(0, q.spd - dt);
         const tick = Math.floor(q.ang / (TAU / 8));
-        if (tick !== q.lastTick) { q.lastTick = tick; snd.tick(); }
+        if (tick !== q.lastTick) { q.lastTick = tick; }
       }
       if (q.t === "switch") q.lev += ((q.on ? 1 : 0) - q.lev) * Math.min(1, dt * 10);
       if (q.t === "button" && q.until && t > q.until && !q.finger) { q.until = 0; q.held = false; }
@@ -457,11 +404,8 @@
       }
     });
     HOUSE_LOADS.forEach((L) => { L.ph += dt * Math.min(3, L.r) * 0.9 * power; });
-    voice("buzz", "square", 190 + buzz * 40, buzz * 0.02);
-    voice("hum", "triangle", 70 + hum * 70, hum * 0.025);
-    // Something new lit up after his own action: a chime, and sometimes kind words.
+    // Something new lit up after his own action: sometimes kind words.
     if (n > lastWorking && t - lastAction < 2500) {
-      snd.glow();
       if (lastWorking === 0) Toybox.kind();
     }
     lastWorking = n;
@@ -963,7 +907,7 @@
     if (job === "house") {
       const k = surpriseNext++ % 3;
       if (k === 0) fx.push({ type: "cat", t0: t });
-      else if (k === 1) { fx = fx.filter((e) => e.type !== "parcel"); fx.push({ type: "parcel", t0: t }); snd.snap(); }
+      else if (k === 1) { fx = fx.filter((e) => e.type !== "parcel"); fx.push({ type: "parcel", t0: t }); }
       else fx.push({ type: "moth", t0: t, from: [W + 40, rnd(0, H * 0.4)], to: brightest() });
       return;
     }
@@ -976,8 +920,7 @@
       else if (k === 1) {
         const [x, y] = mid(partXY(motor));
         fx.push({ type: "streamers", t0: t, x, y, bits: Array.from({ length: 6 }, (_, i) => ({ a: i * TAU / 6 + rnd(-0.3, 0.3), v: bs * rnd(0.2, 0.32), len: bs * rnd(0.06, 0.09), col: RAINBOW[i] })) });
-        snd.wipe();
-      } else { fx.push({ type: "twinkle", t0: t }); snd.chime(); }
+      } else { fx.push({ type: "twinkle", t0: t }); }
       return;
     }
   }
@@ -997,7 +940,7 @@
     if (!parts[job].includes(q)) parts[job].push(q);
     if (q.t === "led" && q.c === ledNext && from == null) ledNext = (ledNext + 1) % LED_COLORS.length;
     lastAction = now();
-    snd.snap(); saveSoon(); refreshHint(true);
+    saveSoon(); refreshHint(true);
   }
   // Where a tapped tray part goes: the free spot where it makes the most work once switches and cranks are used,
   // then a spot next to loose ends, then the middle of the board.
@@ -1041,12 +984,11 @@
   function tapPart(q) {
     const e = mid(partXY(q)), v = vp(e[0], e[1]);
     lastAction = now();
-    if (q.t === "switch") { q.on = !q.on; snd.click(); ghost.learned("switch"); saveSoon(); }
-    else if (q.t === "button") { q.held = true; q.until = Math.max(q.until, now() + 600); snd.click(); ghost.learned("button"); }
+    if (q.t === "switch") { q.on = !q.on; ghost.learned("switch"); saveSoon(); }
+    else if (q.t === "button") { q.held = true; q.until = Math.max(q.until, now() + 600); ghost.learned("button"); }
     else if (q.t === "crank") { q.tapTurn = TAU; ghost.learned("crank"); }
     // The house's battery box has one way round (saved house parts are never flipped), so only board batteries turn.
-    else if (q.t === "led" || (q.t === "battery" && job === "board")) { q.f = !q.f; q.born = now(); snd.flip(); ghost.learned(q.t); saveSoon(); }
-    else snd.lift();
+    else if (q.t === "led" || (q.t === "battery" && job === "board")) { q.f = !q.f; q.born = now(); ghost.learned(q.t); saveSoon(); }
     if (!q.tagged || !["switch", "button", "crank"].includes(q.t)) Toybox.nametag(NAMES[q.t], v[0], v[1] - 30);
     q.tagged = true;
     refreshHint(true);
@@ -1055,7 +997,7 @@
     if (job === "board") parts.board = startBoard().parts;
     else { parts.house = startHouse(); HOUSE_LOADS.forEach((L) => { L.used = false; }); }
     fingers.clear(); fx = [];
-    snd.wipe(); save(); refreshHint(true);
+    save(); refreshHint(true);
   }
 
   // =====================================================================================================
@@ -1104,7 +1046,7 @@
       const q = partAt(pt.x, pt.y);
       if (q) {
         f.part = q;
-        if (q.t === "button") { q.held = true; q.finger = true; lastAction = now(); snd.click(); }
+        if (q.t === "button") { q.held = true; q.finger = true; lastAction = now(); }
         if (q.t === "crank") { const c = mid(partXY(q)); f.ang = Math.atan2(pt.y - c[1], pt.x - c[0]); }
       } else if (job === "house" && loadAt(pt.x, pt.y)) {
         const L = loadAt(pt.x, pt.y), v = vp(hx(L.at[0]), hy(L.at[1]));
@@ -1124,7 +1066,6 @@
       if (q.t === "button") { q.held = false; q.finger = false; }
       f.held = q; f.from = q.s;
       parts[job].splice(parts[job].indexOf(q), 1);
-      snd.lift();
     }
   }
   cv.addEventListener("pointermove", (e) => {
@@ -1166,7 +1107,7 @@
       if (s >= 0) { placeAt(q, s, f.from); ghost.learned("place"); }
       else if (f.from != null && !inTray(f.x, f.y) && !cancel) { placeAt(q, f.from, f.from); }
       else if (f.from != null && cancel) { q.s = f.from; parts[job].push(q); }
-      else { if (f.from != null) snd.out(); saveSoon(); refreshHint(true); }
+      else { saveSoon(); refreshHint(true); }
       return;
     }
     if (cancel || f.drag) return;
@@ -1399,10 +1340,8 @@
     restLine: "The circuits are resting.",
     restLine2: "The parts will be in the tray next time.",
     restArt,
-    soundNote: "Soft clicks, a buzz and a hum. Hold for 2 seconds.",
     onEnding,
-    onWake: () => { ending = false; powerTo = 1; refreshHint(true); },
-    onSound: (on) => { if (on) snd.chime(); }
+    onWake: () => { ending = false; powerTo = 1; refreshHint(true); }
   });
   requestAnimationFrame(loop);
 

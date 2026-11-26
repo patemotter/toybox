@@ -80,8 +80,6 @@
  *                               draw(ctx, scene), clear(), count().
  *   Farm.pic(id)                the step/tile picture of a machine ("bedformer", "destoner", "planter", "harvester",
  *                               "combine", "trailer", "grow", "wheat", "potato") as an <img> string.
- *   Farm.sound                  soft Web Audio through Toybox.sound.ready(): engine(level 0..1 | -1 off),
- *                               soil(level), pour(level), horn(), clunk(), tick(), pop(), chime(), stop().
  *   Farm.restArt()              the rest screen picture.
  *   Farm.u                      small helpers (clamp, lerp, ease, hash, mix, INK).
  */
@@ -129,79 +127,6 @@
     get: readWorld,
     update: function (fn) { var w = readWorld(); try { fn(w); } catch (e) { setTimeout(function () { throw e; }); } writeWorld(w); return w; }
   };
-
-  // =====================================================================================================
-  // Sound (soft, synthesized, only when sound is on)
-  // =====================================================================================================
-  var snd = { ac: null, out: null, eng: null, soil: null, pour: null, noise: null };
-  function audio() {
-    var ac = window.Toybox && Toybox.sound.ready();
-    if (!ac) { if (snd.ac) stopAll(); return null; }
-    if (ac !== snd.ac) { stopAll(); snd.ac = ac; snd.out = ac.createGain(); snd.out.gain.value = 0.8; snd.out.connect(ac.destination); }
-    return ac;
-  }
-  function noiseBuf(ac) {
-    if (snd.noise && snd.noise.sampleRate === ac.sampleRate) return snd.noise;
-    var b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0), last = 0;
-    for (var i = 0; i < d.length; i++) { var wv = Math.random() * 2 - 1; last = (last + 0.04 * wv) / 1.04; d[i] = last * 3.2; }
-    snd.noise = b; return b;
-  }
-  function stopNode(n) { if (!n) return; try { n.g.gain.setTargetAtTime(0, snd.ac.currentTime, 0.08); var s = n.srcs; setTimeout(function () { s.forEach(function (x) { try { x.stop(); } catch (e) { /* ignore */ } }); }, 400); } catch (e) { /* ignore */ } }
-  function stopAll() { stopNode(snd.eng); stopNode(snd.soil); stopNode(snd.pour); snd.eng = snd.soil = snd.pour = null; snd.ac = null; }
-  function engine(level) {
-    var ac = audio();
-    if (!ac) return;
-    if (level < 0) { stopNode(snd.eng); snd.eng = null; return; }
-    if (!snd.eng) {
-      var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain(), amp = ac.createGain();
-      o.type = "sawtooth"; o.frequency.value = 52; f.type = "lowpass"; f.frequency.value = 300;
-      lfo.type = "square"; lfo.frequency.value = 9; lg.gain.value = 0.4; amp.gain.value = 0.6;
-      g.gain.value = 0;
-      o.connect(f); f.connect(amp); amp.connect(g); g.connect(snd.out);
-      lfo.connect(lg); lg.connect(amp.gain);
-      o.start(); lfo.start();
-      snd.eng = { o: o, lfo: lfo, g: g, srcs: [o, lfo] };
-    }
-    var t = ac.currentTime, e = snd.eng;
-    e.g.gain.setTargetAtTime(0.04 + level * 0.02, t, 0.15);
-    e.o.frequency.setTargetAtTime(52 + level * 12, t, 0.2);
-    e.lfo.frequency.setTargetAtTime(9 + level * 5, t, 0.2);
-  }
-  function noiseLoop(key, type, freq, level, max) {
-    var ac = audio();
-    if (!ac) return;
-    var n = snd[key];
-    if (!n) {
-      if (level <= 0.01) return;
-      var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-      s.buffer = noiseBuf(ac); s.loop = true; f.type = type; f.frequency.value = freq; g.gain.value = 0;
-      s.connect(f); f.connect(g); g.connect(snd.out); s.start();
-      n = snd[key] = { g: g, srcs: [s] };
-    }
-    n.g.gain.setTargetAtTime(clamp(level, 0, 1) * max, ac.currentTime, 0.12);
-  }
-  function tone(freq, dur, vol, type, slideTo, delay, filt) {
-    var ac = audio();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine"; o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    if (filt) { var f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = filt; o.connect(f); f.connect(g); } else o.connect(g);
-    g.connect(snd.out); o.start(t); o.stop(t + dur + 0.05);
-  }
-  var sound = {
-    engine: engine,
-    soil: function (l) { noiseLoop("soil", "lowpass", 380, l, 0.05); },
-    pour: function (l) { noiseLoop("pour", "bandpass", 1800, l, 0.03); },
-    horn: function () { tone(392, 0.22, 0.035, "square", null, 0, 900); tone(330, 0.3, 0.035, "square", null, 0.24, 900); },
-    clunk: function () { tone(120, 0.18, 0.06, "triangle", 70); tone(900, 0.06, 0.02, "square", 600, 0.02, 2000); },
-    tick: function () { tone(1800 + Math.random() * 600, 0.04, 0.012, "sine"); },
-    pop: function () { tone(380, 0.12, 0.04, "sine", 620); },
-    chime: function () { tone(523, 0.4, 0.035); tone(659, 0.45, 0.035, "sine", null, 0.12); tone(784, 0.6, 0.035, "sine", null, 0.24); },
-    stop: stopAll
-  };
-  window.addEventListener("pagehide", function () { stopAll(); });
 
   // =====================================================================================================
   // Drawing helpers in machine units (metres; y up is negative). LW = outline width in units.
@@ -1514,7 +1439,6 @@
     tom: TOM,
     SPUDS: SPUDS,
     world: world,
-    sound: sound,
     Scene: Scene,
     Particles: Particles,
     MACHINES: MACHINES,

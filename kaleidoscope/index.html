@@ -369,8 +369,8 @@ body.ending #view { cursor: default; }
 
   var KEY = "kaleido-v1";          // settings
   var AKEY = "kaleido-art-v1";     // saved drawing (downscaled PNG data URL)
-  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "kaleido-timer-v1", OLD_SKEY = "kaleido-sound-v1";
+  // The timer is shared Toybox-wide (common/toybox.js); this old key carries over once.
+  var OLD_TKEY = "kaleido-timer-v1";
   var OUT = "#1D2340";
   var COUNTS = [2, 3, 4, 6, 8, 12];
   var PALETTE = [
@@ -635,7 +635,6 @@ body.ending #view { cursor: default; }
     path.lineTo(pt.x + 0.01, pt.y);
     strokeAll(path, baseWidth() * p.pr, p);
     addRipple(q.x, q.y, p);
-    toneFor(p, q.x, q.y);
     dirty = true;
   });
 
@@ -651,7 +650,6 @@ body.ending #view { cursor: default; }
     });
     var last = localXY(e);
     p.sx = last.x; p.sy = last.y;
-    toneFor(p, last.x, last.y);
   });
 
   function endPointer(e) {
@@ -751,7 +749,6 @@ body.ending #view { cursor: default; }
       p.q = [];
     });
     ripples = [];
-    whooshSound();
     scheduleSave();
     dirty = true;
   }
@@ -895,62 +892,6 @@ body.ending #view { cursor: default; }
   document.addEventListener("visibilitychange", function () { if (document.hidden && saveId) saveArt(); });
   window.addEventListener("pagehide", function () { if (saveId) saveArt(); });
 
-  // ---------- Sound (off by default; soft synthesized tones) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js);
-  // the module starts/resumes audio on every touch while sound is on.
-  var ac = null, master = null, masterCtx = null, lastNoteAt = 0;
-  var SCALE = [0, 2, 4, 7, 9];
-  function canPlay() {
-    ac = Toybox.sound.ready();
-    if (!ac) return false;
-    if (masterCtx !== ac) {
-      try {
-        var comp = ac.createDynamicsCompressor();
-        master = ac.createGain();
-        master.gain.value = 0.6;
-        master.connect(comp);
-        comp.connect(ac.destination);
-        masterCtx = ac;
-      } catch (e) { return false; }
-    }
-    return true;
-  }
-
-  function bell(freq, when, vol, len) {
-    var t = ac.currentTime + (when || 0);
-    var o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain(), g2 = ac.createGain();
-    o1.type = "sine"; o1.frequency.value = freq;
-    o2.type = "sine"; o2.frequency.value = freq * 2.01;
-    g2.gain.value = 0.18;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-    o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(master);
-    o1.start(t); o2.start(t);
-    o1.stop(t + len + 0.05); o2.stop(t + len + 0.05);
-  }
-
-  // Pitch follows the finger's distance from the middle: higher further out (pentatonic, so it always sounds nice).
-  function toneFor(p, sx, sy) {
-    if (!canPlay()) return;
-    var r = Math.sqrt((sx - W / 2) * (sx - W / 2) + (sy - H / 2) * (sy - H / 2)) / R;
-    var idx = clamp(Math.round(r * 9), 0, 11);
-    if (idx === p.note) return;
-    var now = performance.now();
-    if (now - lastNoteAt < 70) return;
-    lastNoteAt = now;
-    p.note = idx;
-    var st = SCALE[idx % 5] + 12 * Math.floor(idx / 5);
-    bell(196 * Math.pow(2, st / 12), 0, 0.07, 0.9);
-  }
-  function whooshSound() {
-    if (!canPlay()) return;
-    [9, 7, 5, 3, 1].forEach(function (idx, i) {
-      var st = SCALE[idx % 5] + 12 * Math.floor(idx / 5);
-      bell(196 * Math.pow(2, st / 12), i * 0.07, 0.05, 0.6);
-    });
-  }
-
   // ---------- Buttons ----------
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button");
@@ -1053,7 +994,6 @@ body.ending #view { cursor: default; }
   }
   function goodbyeSpin() {
     spinVel += reduce ? 0.6 : 4.5;
-    whooshSound();
   }
 
   // Small round picture for the rest screen: the child's own drawing, or a calm pattern if it is empty.
@@ -1120,7 +1060,6 @@ body.ending #view { cursor: default; }
     var kind = surpriseTurn % 2 === 0 ? "zoom" : "bloom";
     surpriseTurn++;
     moment = { kind: kind, t0: performance.now(), dur: kind === "zoom" ? (reduce ? 4200 : 9500) : (reduce ? 3600 : 6500), src: hasInk ? null : examplePic(), end: 0 };
-    whooshSound();
     dirty = true;
   }
   // A touch (or the timer) ends the moment: it fades straight back to his picture.
@@ -1228,9 +1167,7 @@ body.ending #view { cursor: default; }
   loadArt();
   renderControls();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { dirty = true; });
-  // The old sound key said "on"/"off"; the shared module reads "1" for on.
-  try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer and sound. It may start the ending right away
+  // The shared grown-up layer: the play timer. It may start the ending right away
   // (a timer that ran out while away), so the picture is set up first.
   Toybox.init({
     app: "kaleidoscope",
@@ -1242,13 +1179,11 @@ body.ending #view { cursor: default; }
     restLine: "The kaleidoscope is resting.",
     restLine2: "It will be right here next time.",
     restArt: drawRestArt,
-    soundNote: "Soft tones that go higher as a finger moves away from the middle. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
+    legacy: { timer: OLD_TKEY },
     onEnding: onEnding,
     onGoodbye: goodbyeSpin,
     onRest: function () { endingDone = null; spinVel = 0; },
     onWake: function () { endingDone = null; dirty = true; },
-    onSound: function (on) { if (on) whooshSound(); },
     onTimer: function (info) { timerInfo = info; drawTimer(); }
   });
   $("stage").appendChild($("tb-toast"));

@@ -548,7 +548,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (kind === "new") acts = [];
     rake = { kind: kind, t0: now(), dur: reduce ? ms * 0.6 : ms, k0: 0, y: -1.14, row: 0, passed: false };
     lastStamp.x = ball.x; lastStamp.y = ball.y;
-    ping(kind === "new" ? 520 : 440);
     renderPanel();
   }
   function rakeK() {
@@ -620,7 +619,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     prefs.sand = id;
     savePrefs();
     wash = { t0: now(), f: -WSOFT - WWOB, ph: Math.random() * TAU };
-    ping(560 + SANDS.indexOf(SAND_BY[id]) * 50);
     renderPanel();
   }
   function stepWash() {
@@ -740,7 +738,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     if (a.kind !== "wind") a.P.half = a.P.L * (0.42 + Math.random() * 0.16);
     a.t0 = a.t0 || now(); a.hop = 0;
     acts.push(a);
-    ping(kind === "turtle" ? 620 : (kind === "truck" ? 500 : 760));
     updateCoach();
   }
   function stepActs(dt) {
@@ -928,7 +925,6 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
       dirty = true;
     }
     if (acts.length) dirty = true;
-    hissTick(speed());
   }
   function finishRoute(R) {
     ball.vx = ball.vy = 0;
@@ -1314,53 +1310,11 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   ["gesturestart", "gesturechange"].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); });
   view.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
-  // ---------- Sound: a soft sandy hiss that follows the ball's speed (only when sound is on) ----------
   var hiss = null;
-  function makeHiss(ac) {
-    killHiss();
-    try {
-      var len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0), b = 0;
-      for (var i = 0; i < len; i++) { b = 0.85 * b + 0.15 * (Math.random() * 2 - 1); d[i] = b * 2.2; }
-      var src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
-      var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1600; bp.Q.value = 0.6;
-      var lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4200;
-      var g = ac.createGain(); g.gain.value = 0;
-      src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(ac.destination);
-      src.start();
-      hiss = { ac: ac, src: src, bp: bp, g: g, t: 0, last: -1 };
-    } catch (e) { hiss = null; }
-  }
   function killHiss() {
     if (!hiss) return;
     try { hiss.g.gain.cancelScheduledValues(0); hiss.g.gain.value = 0; hiss.src.stop(); hiss.g.disconnect(); } catch (e) { /* ignore */ }
     hiss = null;
-  }
-  function hissTick(sp) {
-    var ac = Toybox.sound.ready();
-    if (!ac) { if (hiss) killHiss(); return; }
-    if (!hiss || hiss.ac !== ac) { if (sp < 0.01) return; makeHiss(ac); if (!hiss) return; }
-    var t = now();
-    if (t - hiss.t < 70) return;
-    hiss.t = t;
-    var f = document.hidden ? 0 : Math.min(1, sp / 1.6);
-    var target = 0.05 * f;
-    if (Math.abs(target - hiss.last) < 0.001) return;
-    hiss.last = target;
-    try {
-      hiss.g.gain.setTargetAtTime(target, ac.currentTime, 0.12);
-      hiss.bp.frequency.setTargetAtTime(1200 + 1800 * f, ac.currentTime, 0.15);
-    } catch (e) { /* ignore */ }
-  }
-  function ping(freq) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    try {
-      var t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-      o.type = "sine"; o.frequency.value = freq;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 1);
-    } catch (e) { /* ignore */ }
   }
 
   // ---------- Panel ----------
@@ -1598,12 +1552,10 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     restLine: "The sand is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "A soft sandy hiss while the ball rolls. Hold for 2 seconds.",
     onEnding: onEnding,
     onGoodbye: onGoodbye,
     onRest: function () { endDone = null; route = null; steer = null; acts = []; if (rake) endRake(); ball.vx = ball.vy = 0; killHiss(); dirty = true; },
-    onWake: function () { ending = false; endDone = null; dimTarget = 1; renderPanel(); updateCoach(); },
-    onSound: function (on) { if (!on) killHiss(); }
+    onWake: function () { ending = false; endDone = null; dimTarget = 1; renderPanel(); updateCoach(); }
   });
   stage.appendChild($("tb-toast"));
   stage.appendChild($("tb-farewell"));

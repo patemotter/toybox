@@ -6,7 +6,6 @@
 //   - Controls
 //   - Ghost hand
 //   - Surprise: a fun moment on the launch pad, right now (his rocket never changes)
-//   - Sound (off by default; soft and synthesized)
 //   - Flight
 //   - separation
 //   - visitors: satellites, a friendly UFO, asteroids
@@ -22,8 +21,8 @@
 
   var OUT = "#1D2340";
   var KEY = "rocketbuilder-v1";
-  // Timer and sound are shared Toybox-wide (common/toybox.js); these old keys carry over once.
-  var OLD_TKEY = "rocketbuilder-timer-v1", OLD_SKEY = "rocketbuilder-sound-v1";
+  // The timer is shared Toybox-wide (common/toybox.js); this old key carries over once.
+  var OLD_TKEY = "rocketbuilder-timer-v1";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var PALETTE = [
@@ -562,7 +561,6 @@
     if (Toybox.timer.locked()) return;
     restartAnim($("rocketG"), "hop");
     puffs(0, 0, 6);
-    blip();
     tapPart(e.target);
   });
   // Tapping the rocket picks the part to color (nose, body or fins; anything else on it counts as the body),
@@ -709,7 +707,7 @@
           if (a2 >= 1) { trail.removeChild(s2); return; }
           s2.setAttribute("opacity", n2(1 - a2));
         });
-        if (t > Bt && !this.pop) { this.pop = 1; restartAnim($("rocketG"), "pop"); chimeSoft(); }
+        if (t > Bt && !this.pop) { this.pop = 1; restartAnim($("rocketG"), "pop"); }
       },
       cleanup: function () {}
     };
@@ -752,7 +750,7 @@
         left.setAttribute("transform", "rotate(" + n2(w) + " -26 0)");
         right.setAttribute("transform", "rotate(" + n2(-w * 0.15) + " 26 0)");
         blink.setAttribute("fill", Math.floor(t * 2) % 2 ? "#A7D129" : "#F26CA7");
-        if (t > W0 && !this.hi) { this.hi = 1; sparkles(x - 70, y - 30, 5, 40); chimeSoft(); }
+        if (t > W0 && !this.hi) { this.hi = 1; sparkles(x - 70, y - 30, 5, 40); }
       },
       cleanup: function () {}
     };
@@ -810,7 +808,7 @@
         beam.setAttribute("d", "M " + n2(x - 22) + " " + n2(y + 14) + " L " + n2(x + 22) + " " + n2(y + 14) + " L " + n2(x + 70) + " " + n2(cowY + 8) + " L " + n2(x - 70) + " " + n2(cowY + 8) + " Z");
         moo.setAttribute("opacity", t > Td + 0.2 && t < Tx + 1.6 ? "1" : "0");
         moo.setAttribute("transform", "translate(" + n2(cx2 - 34) + " " + n2(cowY - 120) + ")");
-        if (t > Td && !this.m) { this.m = 1; chimeSoft(); sparkles(cowX, cowY - 40, 5, 50); }
+        if (t > Td && !this.m) { this.m = 1; sparkles(cowX, cowY - 40, 5, 50); }
       },
       cleanup: function () {}
     };
@@ -861,7 +859,7 @@
     }
     if (Toybox.timer.locked()) return;
     if (t.id === "launch") { ghost.learned(); if (picking) setPicking(""); openFlight(false); return; }
-    if (t.dataset.trip) { state.trip = t.dataset.trip; updateTrips(); save(); blip(); return; }
+    if (t.dataset.trip) { state.trip = t.dataset.trip; updateTrips(); save(); return; }
     var changed = false;
     if (t.dataset.step) {
       var dir = Number(t.dataset.dir) || 1;
@@ -886,7 +884,6 @@
     var g = render();
     if (changed) {
       celebrate(g);
-      blip();
       if (t.dataset.color) restartAnim(t, "pop");
     }
   });
@@ -896,66 +893,7 @@
   document.addEventListener("dblclick", function (e) { e.preventDefault(); });
   document.addEventListener("contextmenu", function (e) { if (!e.target.closest("input")) e.preventDefault(); });
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  // The on/off setting and the AudioContext are shared Toybox-wide (common/toybox.js);
-  // the module starts/resumes audio on every touch while sound is on.
-  var actx = null, master = null, masterCtx = null, noiseBuf = null, rumble = null;
-  function canPlay() {
-    actx = Toybox.sound.ready();
-    if (!actx) return false;
-    if (masterCtx !== actx) {
-      try {
-        master = actx.createGain();
-        master.gain.value = 0.8;
-        master.connect(actx.destination);
-        var len = Math.floor(actx.sampleRate * 1.5);
-        noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
-        var d = noiseBuf.getChannelData(0), last = 0;
-        for (var i = 0; i < len; i++) { last = (last + 0.04 * (Math.random() * 2 - 1)) / 1.04; d[i] = last * 3.2; }
-        masterCtx = actx;
-      } catch (e) { return false; }
-    }
-    return true;
-  }
-  function tone(freq, dur, vol, type, slideTo) {
-    if (!canPlay()) return;
-    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master);
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function blip() { tone(rand(520, 720), 0.16, 0.05, "sine", 900); }
-  function beep(hi) { tone(hi ? 880 : 587, hi ? 0.5 : 0.28, 0.07, "sine"); }
-  function whoosh(vol) {
-    if (!canPlay()) return;
-    var t = actx.currentTime, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = noiseBuf;
-    f.type = "bandpass"; f.Q.value = 1.2;
-    f.frequency.setValueAtTime(300, t);
-    f.frequency.exponentialRampToValueAtTime(1400, t + 0.5);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol || 0.12, t + 0.08);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start(t); src.stop(t + 0.8);
-  }
-  function chime() { tone(523, 0.5, 0.05); setTimeout(function () { tone(784, 0.7, 0.05); }, 140); }
-  function chimeSoft() { tone(659, 0.6, 0.035); setTimeout(function () { tone(988, 0.8, 0.03); }, 180); }
-  function startRumble() {
-    if (!canPlay() || rumble) return;
-    var src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-    src.buffer = noiseBuf; src.loop = true;
-    f.type = "lowpass"; f.frequency.value = 220;
-    g.gain.value = 0.0001;
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start();
-    rumble = { src: src, f: f, g: g };
-  }
+  var actx = null, rumble = null;
   function setRumble(level) {
     if (!rumble || !actx) return;
     rumble.g.gain.setTargetAtTime(Math.max(0.0001, level), actx.currentTime, 0.12);
@@ -1120,7 +1058,6 @@
     $("fhint").hidden = true;
     $("fback").hidden = false;
     showCount(3);
-    beep(false);
     fl.lastCount = 3;
   }
   function closeFlight() {
@@ -1175,7 +1112,6 @@
       el.classList.remove("go");
       void el.offsetWidth;
       el.classList.add("go");
-      chimeSoft();
     }
     nameShown = text;
     if (ms) nameTimer = setTimeout(hideName, ms);
@@ -1337,7 +1273,6 @@
       banner("Boosters away!", 2600);
     }
     if (!reduce) fl.shake = Math.max(fl.shake, 7);
-    whoosh(0.08);
   }
 
   // ---- visitors: satellites, a friendly UFO, asteroids ----
@@ -1349,7 +1284,6 @@
     var side = Math.random() < 0.5 ? -1 : 1;
     var w = clamp(M * 0.3, 110, 250);
     fl.ufo = { side: side, x: W / 2 + side * (W / 2 + w), y: H * rand(0.24, 0.32), t: 0, st: "in", stay: stay || 3.2, w: w, vx: 0, tap: 0 };
-    tone(660, 0.5, 0.04, "sine", 990);
   }
   function updateVisitors(dt, speed) {
     fl.sats = fl.sats.filter(function (s) {
@@ -1368,7 +1302,7 @@
         if (u.t > 1.4) { u.st = "stay"; u.t = 0; }
       } else if (u.st === "stay") {
         u.x += (hx - u.x) * Math.min(1, dt * 2.6);
-        if (u.t > u.stay) { u.st = "out"; u.t = 0; whoosh(0.05); }
+        if (u.t > u.stay) { u.st = "out"; u.t = 0; }
       } else {
         u.vx -= u.side * W * 1.6 * dt;
         u.x += u.vx * dt;
@@ -1430,7 +1364,6 @@
       fl.ufo.tap = 2.2;
       if (fl.ufo.st === "stay") fl.ufo.t = Math.min(fl.ufo.t, fl.ufo.stay - 2.2);
       fl.texts.push({ text: "Hi!", x: fl.ufo.x, y: fl.ufo.y - fl.ufo.w * 0.4, age: 0, life: 1.6, col: "#A7D129" });
-      tone(880, 0.3, 0.04, "sine", 660);
       return;
     }
     if (ph === "tour" && popAsteroid(x, y)) return;
@@ -1449,7 +1382,6 @@
         }
         fl.texts.push({ text: pick(["Boost!", "Zoom!", "Whoosh!", "Faster!"]), x: clamp(x, W * 0.2, W * 0.8), y: y, age: 0, life: 1.3, col: pick(SPARK_COLS) });
       }
-      whoosh(0.1);
     } else if (ph === "count") {
       for (var k = 0; k < 6; k++) addP(1, W / 2 + fl.x + rand(-1, 1) * 80 * SC, padY - 4, rand(-1, 1) * H * 0.4, -H * rand(0.05, 0.2), rand(16, 30) * SC, Math.min(W, H) * 0.08, rand(0.9, 1.4), Math.random());
     } else if (ph === "descent") {
@@ -1474,7 +1406,6 @@
         sparkleBurst(a.x, a.y, 14, H * 0.6);
         for (var k = 0; k < 10; k++) addP(3, a.x, a.y, rand(-1, 1) * H * 0.3, rand(-1, 1) * H * 0.3, a.r * rand(0.15, 0.3), 0, rand(0.6, 1.0), pick(["#8B7B6B", "#A89584", "#6E6156"]));
         fl.texts.push({ text: "Pop!", x: a.x, y: a.y, age: 0, life: 1.2, col: "#FFC93C" });
-        tone(rand(440, 620), 0.18, 0.05, "triangle", 220);
         return true;
       }
     }
@@ -1491,7 +1422,6 @@
     if (rv && Math.abs(x - rv.x) < AH * 0.8 && Math.abs(y - (groundY(rv.x) - AH * 0.4)) < AH * 0.7) {
       if (!rv.air) { rv.air = true; rv.vy = -H * 0.32; }
       fl.texts.push({ text: "Beep!", x: rv.x, y: groundY(rv.x) - AH * 1.2, age: 0, life: 1.3, col: "#5BC0EB" });
-      tone(990, 0.12, 0.04, "square"); setTimeout(function () { tone(1320, 0.12, 0.04, "square"); }, 140);
       return;
     }
     var gy = groundY(x);
@@ -1503,7 +1433,6 @@
     a.vy = -H * 0.6;
     dustPuff(a.x, a.y, 6, M * 0.1);
     fl.texts.push({ text: pick(["Hop!", "Boing!", "Wheee!"]), x: a.x, y: a.y - astroH() * 1.6, age: 0, life: 1.3, col: pick(SPARK_COLS) });
-    tone(300, 0.45, 0.05, "sine", 620);
   }
 
   // ---- simulation ----
@@ -1538,14 +1467,12 @@
 
     if (ph === "count") {
       var n = 3 - Math.floor(f.t / COUNT_STEP);
-      if (n !== f.lastCount && n > 0) { f.lastCount = n; showCount(n); beep(false); }
+      if (n !== f.lastCount && n > 0) { f.lastCount = n; showCount(n); }
       // Venting steam while waiting.
       if (Math.random() < dt * 14) addP(1, W / 2 + rand(-1, 1) * 70 * SC, padY - rand(10, 60) * SC, rand(-1, 1) * H * 0.15, -H * 0.05, rand(10, 18) * SC, Math.min(W, H) * 0.04, rand(0.8, 1.2), Math.random());
       if (f.t >= COUNT_STEP * 3) {
         f.phase = "ignite"; f.t = 0;
         showCount(0);
-        beep(true);
-        startRumble();
         if (!reduce) f.shake = 12;
       }
     } else if (ph === "ignite") {
@@ -1573,7 +1500,6 @@
       if (f.satAt.length && f.alt >= f.satAt[0]) { spawnSat(); f.satAt.shift(); }
       if (f.alt >= 100000) {
         banner("Space!", 3000);
-        chime();
         $("fhint").classList.add("fade");
         if (f.trip === "home" || f.homeAsap) { f.phase = "coast"; f.t = 0; }
         else enterSpace();
@@ -1605,7 +1531,6 @@
       if (f.t >= CR) {
         f.phase = "flip"; f.t = 0; f.ang0 = f.ang;
         banner("Turn around!", 3000);
-        whoosh(0.06);
       }
     } else if (ph === "flip") {
       // Engine off; the rocket turns around so its engine points at the Moon.
@@ -1621,7 +1546,6 @@
         f.phase = "swing"; f.t = 0;
         f.sw = { r0: f.body.r, g0: f.body.d - f.body.r };
         banner("Slow down!", 3000);
-        startRumble();
       }
     } else if (ph === "swing") {
       // Engine burning to slow down; the view swings round until the Moon is the ground below.
@@ -1703,7 +1627,7 @@
       f.rise = f.D * Math.pow(1 - ud, 1.55);
       f.alt = f.apogee * Math.pow(f.rise / f.D, 3);
       f.chute = f.t < 0.4 ? 0 : Math.min(1, (f.t - 0.4) / 0.8);
-      if (f.t >= 0.4 && !f.chuteShown) { f.chuteShown = true; banner("Parachute!", 3000); tone(330, 0.25, 0.05, "sine", 160); }
+      if (f.t >= 0.4 && !f.chuteShown) { f.chuteShown = true; banner("Parachute!", 3000); }
       f.swayV += (-f.sway * 3 - f.swayV * 0.9) * dt;
       f.sway += f.swayV * dt;
       f.sway = clamp(f.sway, -0.35, 0.35);
@@ -1786,8 +1710,6 @@
     dustPuff(W / 2 + f.x, gy, 30, M * 0.22);
     if (!reduce) f.shake = 5;
     banner(LANDED_TEXT[f.trip] || "Landed!", 3200);
-    chime();
-    tone(110, 0.4, 0.07, "sine", 60);
     f.astro = { st: "wait", t: 0, x: 0, y: 0, vy: 0, air: false, face: 1, walk: 0 };
     f.flag = null;
     f.rover = f.trip === "mars" ? { x: W * 0.16, dir: 1, wheel: 0, air: false, vy: 0, yOff: 0 } : null;
@@ -1822,7 +1744,6 @@
         if (a.t >= 1.0) {
           a.st = "idle"; a.t = 0; a.face = -1;
           sparkleBurst(f.flag.x, groundY(f.flag.x) - AH * 1.4, 12, H * 0.4);
-          chimeSoft();
           if (f.phase === "explore" && !f.homeAsap) { f.waitHome = true; showLandbar(true); }
         }
       } else if (a.st === "idle") {
@@ -1888,7 +1809,6 @@
     var f = fl;
     f.phase = "leave"; f.t = 0; f.lv = 0;
     banner("Bye bye, " + (f.trip === "mars" ? "Mars!" : "Moon!"), 3000);
-    startRumble();
   }
   function startHomeward() {
     var f = fl;
@@ -1902,7 +1822,6 @@
     hideName();
     f.body = { kind: "earth", r: M * 0.06, d: H * 1.05, a: 0, rot: 0 };
     if (f.ufo && f.ufo.st !== "out") { f.ufo.st = "out"; f.ufo.t = 0; }
-    startRumble();
     placeBody();
   }
   // From space back to the sky above the launch pad (behind a white flash).
@@ -1986,7 +1905,6 @@
     $("landbar").hidden = true;
     if (f.phase === "explore") stow(false);
     else if (f.phase === "tourEnd") startHomeward();
-    blip();
   }
 
   function startDescent() {
@@ -2026,7 +1944,6 @@
     banner(f.goodbye ? "Home!" : "Welcome home!", 3200);
     $("fback").hidden = true;
     $("fhint").hidden = true;
-    chime();
   }
 
   function landedDone() {
@@ -2798,9 +2715,7 @@
 
   showTab(tab);
   render();
-  // The old sound key said "on"/"off"; the shared module reads "1" for on.
-  try { if (localStorage.getItem(OLD_SKEY) === "on") localStorage.setItem(OLD_SKEY, "1"); } catch (e) { /* ignore */ }
-  // The shared grown-up layer: play timer and sound. It may start the ending right away
+  // The shared grown-up layer: the play timer. It may start the ending right away
   // (a timer that ran out while away), so the rocket is drawn first.
   Toybox.init({
     app: "rocket-builder",
@@ -2812,8 +2727,7 @@
     restLine: "The rocket is resting.",
     restLine2: "It will be right here next time.",
     restArt: restArt,
-    soundNote: "Soft beeps and rocket rumble. Hold for 2 seconds.",
-    legacy: { timer: OLD_TKEY, sound: OLD_SKEY },
+    legacy: { timer: OLD_TKEY },
     onEnding: onEnding,
     // The goodbye flight takes about 26 s, and a trip cut short flies home in about 30 s at most;
     // give it room to land before the rest screen.
@@ -2822,7 +2736,6 @@
     // A goodbye flight still in the air finishes on top of the rest screen and closes itself when it lands.
     onRest: function () { endingDone = null; if (!F.hidden && !(fl && fl.goodbye && !fl.done)) closeFlight(); },
     onWake: function () { endingDone = null; goodbyeWanted = false; },
-    onSound: function (on) { if (on) setTimeout(chime, 60); else stopRumble(); },
     onTimer: drawTimer
   });
   $("stage").appendChild($("tb-farewell"));

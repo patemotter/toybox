@@ -320,44 +320,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     blend: "Watch it blend!", pour: "Pour it in the cup!", straw: "Add a straw!"
   };
 
-  // ---------- Sound (off by default; soft and synthesized) ----------
-  var master = null, masterCtx = null, hum = null;
-  function out(ac) { if (masterCtx !== ac) { master = ac.createGain(); master.gain.value = 0.8; master.connect(ac.destination); masterCtx = ac; hum = null; } return master; }
-  function tone(freq, dur, vol, type, slideTo, delay) {
-    var ac = Toybox.sound.ready();
-    if (!ac) return;
-    var t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || "sine";
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(out(ac));
-    o.start(t); o.stop(t + dur + 0.05);
-  }
-  function plop() { tone(rand(300, 420), 0.16, 0.05, "sine", 160); }
-  function clink() { tone(rand(1500, 1900), 0.18, 0.025, "triangle"); }
-  function click() { tone(900, 0.06, 0.04, "square", 600); }
-  function glug(d) { tone(rand(180, 240), 0.12, 0.04, "sine", 320, d || 0); }
-  function chime() { tone(660, 0.3, 0.04); tone(880, 0.35, 0.04, "sine", null, 0.12); tone(1320, 0.5, 0.03, "sine", null, 0.26); }
-  // The motor: a soft filtered buzz that rises with the speed.
-  function updateHum() {
-    var ac = Toybox.sound.ready();
-    if (!ac) { if (hum) { try { hum.g.gain.value = 0; } catch (e) { /* ignore */ } } return; }
-    if (!hum || masterCtx !== ac) {
-      out(ac);
-      var o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-      o.type = "sawtooth"; f.type = "lowpass"; f.Q.value = 2; g.gain.value = 0;
-      o.connect(f); f.connect(g); g.connect(out(ac)); o.start();
-      hum = { o: o, f: f, g: g };
-    }
-    var t = ac.currentTime, s = M.speed;
-    hum.o.frequency.setTargetAtTime(60 + 110 * s, t, 0.05);
-    hum.f.frequency.setTargetAtTime(300 + 1100 * s, t, 0.05);
-    hum.g.gain.setTargetAtTime(s > 0.02 ? 0.03 * Math.min(1, s * 1.4) : 0, t, 0.06);
-  }
-
   // ---------- Coach ----------
   var coachEl = $("coach"), coach = Toybox.coach(coachEl);
   // A passing line runs out before the step line comes back, even if the step changes meanwhile, because a new
@@ -409,7 +371,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     f.style.display = "none";
     document.body.appendChild(f);
     tileDrags[e.pointerId] = { b: b, f: f, sx: e.clientX, sy: e.clientY, moved: false, ing: b.getAttribute("data-ing"), straw: b.getAttribute("data-straw") };
-    tone(620, 0.08, 0.03, "sine", 820);
   });
   function tileMove(e) {
     var d = tileDrags[e.pointerId];
@@ -466,7 +427,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       }
     } else {
       makePieces(k, rand(-0.08, 0.08), -JAR_H - 0.2);
-      if (id === "ice") clink(); else plop();
     }
     save();
   }
@@ -485,7 +445,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     lid.drag = null;
     var sp = lidSpot();
     animLid(sp, 420, function () {
-      S.lid = true; lid.tries = 0; click(); save(); learned("lid");
+      S.lid = true; lid.tries = 0; save(); learned("lid");
       burst(sp.x, sp.y, 8, "#FFFFFF");
       if (then) then();
     });
@@ -496,7 +456,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     var sp = lidSpot();
     lid.x = sp.x; lid.y = sp.y;
     animLid(LID_PARK, 520, null);
-    click();
     save();
   }
 
@@ -511,13 +470,12 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     say("Put the lid on!");
     lid.flashUntil = now() + 3;
     lid.wig = 1;
-    tone(330, 0.14, 0.04, "triangle", 300);
   }
   function pressButton(which, pid) {
     if (jar.state !== "base") return;
     if (which === 2) {
       needLid(function () {
-        M.mode = 0; click(); learned("run");
+        M.mode = 0; learned("run");
         if (stageDrags[pid]) { M.pulse = pid + 1; return; }
         // The finger already lifted (the lid went on first): a short pulse.
         M.pulse = -1;
@@ -526,8 +484,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       return;
     }
     var mode = which === 0 ? 1 : 2;
-    if (M.mode === mode) { M.mode = 0; click(); learned("off"); return; }
-    needLid(function () { M.mode = mode; click(); learned("run"); });
+    if (M.mode === mode) { M.mode = 0; learned("off"); return; }
+    needLid(function () { M.mode = mode; learned("run"); });
   }
   function stopMotor() { M.mode = 0; M.pulse = 0; }
 
@@ -544,7 +502,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     learned("pour");
   }
   // The dad: no "switch it off first" step. Lifting the jar while it runs switches it off by itself.
-  function switchOffForHim() { stopMotor(); click(); }
+  function switchOffForHim() { stopMotor(); }
   function sendCupAway() {
     // The finished smoothie slides off to the table; a clean cup slides in.
     if (cup.anim) return;
@@ -564,7 +522,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     S.cup.straw = col;
     cup.strawK = 0;
     learned("straw");
-    tone(700, 0.1, 0.04, "sine", 500);
     setTimeout(finishSmoothie, reduce ? 100 : 700);
   }
   function finishSmoothie() {
@@ -573,7 +530,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     S.count++;
     if (window.Toybox && Toybox.kind) setTimeout(function () { Toybox.kind(); }, 1500);
     addToTable({ k: "smoothie", c: S.cup.c, s: S.cup.straw, t: Date.now() });
-    chime();
     for (var i = 0; i < 3; i++) setTimeout(function () { burst(CUP_X, -CUP_H * 0.7, 14, null, true); }, i * 260);
     save();
   }
@@ -616,7 +572,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (S.cup.fill > 0) sendCupAway();
     lid.tries = 0; hush();
     save();
-    tone(500, 0.2, 0.04, "sine", 300);
   }
   // Blender moments: it dances on the counter (lid bouncing, contents sloshing); whipped cream and a
   // cherry on the finished smoothie in the cup.
@@ -630,8 +585,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (locked()) return;
     var id = funPick(FUN_ORDER, funOk);
     if (!id) { burst(jar.x, jar.y - 0.2, 14, null, true); jar.wig = 0.6; return; }
-    if (id === "dance") { funStart("dance", reduce ? 3 : 5); say("Dance, blender, dance!"); tone(520, 0.12, 0.03, "sine", 660); tone(660, 0.12, 0.03, "sine", 780, 0.3); tone(780, 0.16, 0.03, "sine", 990, 0.6); }
-    else if (id === "cream") { funStart("cream", reduce ? 2 : 4); cup.cream = { t0: now() }; say("Whipped cream and a cherry!"); tone(400, 0.6, 0.03, "sine", 700); }
+    if (id === "dance") { funStart("dance", reduce ? 3 : 5); say("Dance, blender, dance!"); }
+    else if (id === "cream") { funStart("cream", reduce ? 2 : 4); cup.cream = { t0: now() }; say("Whipped cream and a cherry!"); }
   }
   // Dance offsets for the whole blender (scene units), 0 when it is not dancing.
   function danceNow() {
@@ -666,7 +621,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     stageDrags[e.pointerId] = d;
     var b = btnAt(p);
     if (onLidParked(p)) {
-      d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId; click();
+      d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId;
     } else if (b >= 0) {
       d.kind = "btn"; d.btn = b;
       pressButton(b, b === 2 ? e.pointerId : null);
@@ -674,12 +629,12 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (S.lid && p.y - jar.y < -JAR_H + 0.05 && !running()) {
         // Pull the lid off the top of the jar.
         S.lid = false; var sp = lidSpot(); lid.x = sp.x; lid.y = sp.y;
-        d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId; click(); save();
+        d.kind = "lid"; d.dx = lid.x - p.x; d.dy = lid.y - p.y; lid.drag = e.pointerId; save();
       } else if (canPour()) {
         if (running()) switchOffForHim();
         d.kind = "jar"; d.dx = jar.x - p.x; d.dy = jar.y - p.y;
         if (S.lid) takeLidOff();
-        jar.state = "drag"; jar.drag = e.pointerId; tone(420, 0.1, 0.03, "sine", 520);
+        jar.state = "drag"; jar.drag = e.pointerId;
       } else {
         jar.wig = 1;
         if (!S.items.length) say("Drag an ingredient into the jar!");
@@ -755,7 +710,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     if (M.speed < 0.003) M.speed = 0;
     M.blade += M.speed * dt * 40;
     M.stir += ((M.speed > 0.08 ? 1 : 0) - M.stir) * Math.min(1, dt * (M.speed > 0.08 ? 3 : 1.6));
-    updateHum();
 
     // Pouring from the milk carton / yogurt cup.
     for (var i = pourers.length - 1; i >= 0; i--) {
@@ -763,9 +717,8 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (!it) { pourers.splice(i, 1); continue; }
       if (pr.id === "milk") {
         it.f = clamp((k - 0.2) / 0.65, 0, 1);
-        if (k > 0.2 && k < 0.85 && Math.random() < 0.4) glug();
       } else if (pr.id === "yogurt") {
-        if (k > 0.3 && !pr.d1) { pr.d1 = true; dollops.push({ k: pr.k, x: jar.x + 0.03, y: jar.y - JAR_H - 0.25, vy: 0, amt: 0.5 }); plop(); }
+        if (k > 0.3 && !pr.d1) { pr.d1 = true; dollops.push({ k: pr.k, x: jar.x + 0.03, y: jar.y - JAR_H - 0.25, vy: 0, amt: 0.5 }); }
         if (k > 0.6 && !pr.d2) { pr.d2 = true; dollops.push({ k: pr.k, x: jar.x - 0.05, y: jar.y - JAR_H - 0.25, vy: 0, amt: 0.5 }); }
       }
       if (k >= 1) { if (pr.id === "milk") it.f = 1; pourers.splice(i, 1); save(); }
@@ -778,7 +731,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       if (dl.y - jar.y > Math.min(0.5, surfY)) {
         var di = S.items[dl.k];
         if (di) di.f = clamp(di.f + dl.amt, 0, 1);
-        plop();
         dollops.splice(i, 1);
         save();
       }
@@ -834,7 +786,6 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       jar.pourK = pk;
       var cmax = clamp(jar.level0 * 1.2, 0.45, 0.9);
       S.cup.fill = cmax * pk;
-      if (Math.random() < 0.12 && pk < 1) glug();
       if (pk < 1 && Math.random() < 0.3) drip(CUP_X + cup.off - 0.05, -CUP_H * 0.1 - S.cup.fill * 0.55 * CUP_H / 0.62, S.cup.c);
       if (pk >= 1) {
         S.items = []; pieces = []; jar.pourK = 0;
@@ -1209,7 +1160,7 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
       ctx.strokeStyle = "#3E9B3A"; ctx.lineWidth = 0.022; ctx.stroke();
       circ(0, cy, 0.075); fs("#E8213F", 1);
       ctx.fillStyle = "rgba(255,255,255,0.7)"; circ(-0.025, cy - 0.025, 0.02); ctx.fill();
-      if (!cup.cream.sparkled && ck >= 1) { cup.cream.sparkled = true; burst(CUP_X + cup.off, cy - 0.05, 12, null, true); tone(880, 0.12, 0.03, "sine", 1320); }
+      if (!cup.cream.sparkled && ck >= 1) { cup.cream.sparkled = true; burst(CUP_X + cup.off, cy - 0.05, 12, null, true); }
     }
     // The straw still pokes out of the top.
     if (S.cup.straw) {
@@ -1379,18 +1330,16 @@ body.ending .tb-panel, body.resting .tb-panel { pointer-events: none; }
     restLine: "The kitchen is resting.",
     restLine2: "Your food will be on the table next time.",
     restArt: restArt,
-    soundNote: "Soft whirs, plops and clinks. Hold for 2 seconds.",
     onEnding: onEnding,
     onRest: function () { stopMotor(); },
-    onWake: function () { lastT = now(); },
-    onSound: function (on) { if (on) chime(); }
+    onWake: function () { lastT = now(); }
   });
   setTimeout(layout, 30);
   Toybox.offFirst({
     running: function () { return running() || M.speed > 0.05; },
     name: "blender",
     off: function (done) {
-      stopMotor(); click();
+      stopMotor();
       var t0 = performance.now();
       var iv = setInterval(function () {
         if (M.speed <= 0.05 || performance.now() - t0 > 1500) { clearInterval(iv); done(); }
