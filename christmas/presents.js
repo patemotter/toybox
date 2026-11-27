@@ -232,6 +232,8 @@
   // The stocking hangs from a peg on the mantel; the bag stands on the mat.
   const pegPt = () => ({ x: L.fire.x + L.fire.w * 0.5, y: L.fire.y + 26 });
   const bagPt = () => ({ x: L.mat.x, y: L.mat.y + 70 });
+  // How big the bag, the stocking and his small present are drawn in this layout.
+  const bagK = () => L.bs * 0.92, stK = () => (L === TALL ? 1.25 : 1), mK = () => L.ms;
   const onTable = (r) => r.kind === "dog" || r.kind === "cat" || r.kind === "hamster";
   const recBase = (r) => L.back + (onTable(r) ? 30 : 0);
   function headPt(r) {
@@ -437,7 +439,7 @@
     if (busy || phase !== "make" || stepOf() !== "gift" || !GIFT_BY[id]) return;
     busy = true;
     const sl = shelfSlot(GIFT_BY[id].i), f = from || { x: sl.x, y: sl.y, s: sl.s };
-    const to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 84 } : inBoxPt(), s1 = K.job === "bag" ? 50 : 46 * L.bs;
+    const to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 84 * bagK() } : inBoxPt(), s1 = K.job === "bag" ? 50 : 46 * L.bs;
     V.carry = { kind: "gift", id, x: f.x, y: f.y, s: f.s || sl.s };
     const c = V.carry, s0 = c.s;
     tween(from ? 0.35 : 0.6, (p) => { const e = ease(p); c.x = lerp(f.x, to.x, e); c.y = lerp(f.y, to.y, e) - Math.sin(p * Math.PI) * (from ? 20 : 80); c.s = lerp(s0, s1, e); }, () => {
@@ -469,11 +471,11 @@
     } else V.roll.i = i;
     if (was !== K.paper) tag(PAPERS[i].name, rollMat().x, rollMat().y - rollMat().len / 2 - 10);
   }
-  function setPull(x) {
-    const g = matG();
-    V.edge = clamp(x, g.sx0, g.sx1);
-    K.pull = Math.max(K.pull, (g.sx1 - V.edge) / (g.sx1 - g.sx0));
-    V.edge = g.sx1 - K.pull * (g.sx1 - g.sx0);
+  // His finger's travel pulls the paper out (pulling to the left is fastest; any way counts a little).
+  function pullBy(a, b) {
+    const g = matG(), wd = g.sx1 - g.sx0, dx = b.x - a.x, dy = b.y - a.y;
+    K.pull = Math.min(1, K.pull + (Math.max(0, -dx) + 0.35 * (Math.max(0, dx) + Math.abs(dy))) / (0.6 * wd));
+    V.edge = g.sx1 - K.pull * wd;
     if (K.pull >= 0.999) { K.pull = 1; V.edge = g.sx0; }
   }
   function pullAuto(i) {
@@ -613,9 +615,8 @@
   // Extras (never a step): the gift tag and three stickers, stuck on where they fit.
   function extraSpot(id) {
     if (K.job === "bag") {
-      const b = bagPt();
-      if (id === "tag") return { x: b.x + 40, y: b.y - 122 };
-      return { star: { x: b.x - 26, y: b.y - 40 }, flake: { x: b.x + 24, y: b.y - 58 }, holly: { x: b.x + 6, y: b.y - 22 } }[id];
+      const b = bagPt(), k = bagK(), o = id === "tag" ? [40, -122] : { star: [-26, -40], flake: [24, -58], holly: [6, -22] }[id];
+      return { x: b.x + o[0] * k, y: b.y + o[1] * k };
     }
     const g = matG();
     if (id === "tag") return { x: g.x1 - 16, y: g.y0 + 12 };
@@ -646,7 +647,7 @@
     const sl = bagSlot(i), f = from || sl, to = bagPt();
     V.bag = { i, x: f.x, y: f.y, s: 0.55 };
     const b = V.bag;
-    tween(from ? 0.3 : 0.55, (p) => { const e = ease(p); b.x = lerp(f.x, to.x, e); b.y = lerp(f.y, to.y, e) - Math.sin(p * Math.PI) * 40; b.s = lerp(0.55, 1, e); }, () => {
+    tween(from ? 0.3 : 0.55, (p) => { const e = ease(p); b.x = lerp(f.x, to.x, e); b.y = lerp(f.y, to.y, e) - Math.sin(p * Math.PI) * 40; b.s = lerp(0.55, bagK(), e); }, () => {
       V.bag = null; K.bag = BAGS[i].id; busy = false; wobble("bag", 1); puff("spark", to.x, to.y - 60, 6); cheerStep(); changed();
     });
   }
@@ -655,7 +656,7 @@
     if (busy || K.job !== "bag" || !K.gift || K.tissue.length >= 4 || K.tissue.includes(i)) return;
     if (stepOf() !== "tissue" && stepOf() !== "tag" && stepOf() !== "give") return;
     busy = true;
-    const sl = tisSlot(i), f = from || sl, b = bagPt(), to = { x: b.x, y: b.y - 110 };
+    const sl = tisSlot(i), f = from || sl, b = bagPt(), to = { x: b.x, y: b.y - 110 * bagK() };
     V.carry = { kind: "tissue", id: i, x: f.x, y: f.y, s: 1 };
     const c = V.carry;
     tween(from ? 0.25 : 0.45, (p) => { const e = ease(p); c.x = lerp(f.x, to.x, e); c.y = lerp(f.y, to.y, e) - Math.sin(p * Math.PI) * (from ? 10 : 50); }, () => {
@@ -667,7 +668,7 @@
     });
   }
   // Stocking stuffers drop into the stocking; it swings and bulges a little more each time.
-  const stockTop = () => ({ x: V.stock.x, y: V.stock.y + 30 });
+  const stockTop = () => ({ x: V.stock.x, y: V.stock.y + 30 * stK() });
   function stuffIn(id, from) {
     if (busy || K.job !== "stocking" || phase !== "make" || K.items.length >= 8 || K.items.includes(id)) return;
     busy = true;
@@ -689,8 +690,8 @@
   // The present (box, bag or stocking) at its spot on the scene, for giving and the ring.
   function presentPt() {
     if (K.job === "box") { const g = geo(V.box.x, V.box.y); return { x: g.cx, y: g.cy + BF / 2, r: BW * 0.6 }; }
-    if (K.job === "bag") { const b = bagPt(); return { x: b.x, y: b.y - 60, r: 70 }; }
-    return { x: V.stock.x, y: V.stock.y + 90, r: 70 };
+    if (K.job === "bag") { const b = bagPt(); return { x: b.x, y: b.y - 60 * bagK(), r: 70 * bagK() }; }
+    return { x: V.stock.x, y: V.stock.y + 90 * stK(), r: 70 * stK() };
   }
   // Giving: it slides across to them. from = where his finger let it go.
   let given = null;
@@ -808,7 +809,7 @@
     wobble("mine", 0.4);
     if (m.tiss.every((v) => v >= 1)) mineOpen();
   }
-  const tissPt = (k) => { const m = V.mine; return { x: m.x + (k - 1) * 22, y: m.y - 40 }; };
+  const tissPt = (k) => { const m = V.mine; return { x: m.x + (k - 1) * 22 * mK(), y: m.y - 42 * mK() }; };
   // The cracker: he pulls one end while they hold the other; at full stretch it pops.
   function crackerPull(ext) {
     const m = V.mine;
@@ -1394,9 +1395,9 @@
     ctx.restore();
   }
   // The stocking hangs from the peg at (x, y): a fluffy cuff, then the leg and the foot, bulging as it fills.
-  function drawStocking(x, y, bulge, items, t, swing) {
+  function drawStocking(x, y, bulge, items, t, swing, sc) {
     const bw = 58 + bulge * 26, cw = bw + 12;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 6) * swing * 0.12);
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc || 1, sc || 1); ctx.rotate(Math.sin(t * 6) * swing * 0.12);
     line(0, -4, 0, 12, INK, 3);
     // The last few things poke out of the top.
     items.slice(-4).forEach((id, k) => { const n = Math.min(4, items.length); drawThing(id, (k - (n - 1) / 2) * 18, 18 - (k % 2) * 6, 30, { t }); });
@@ -1487,9 +1488,9 @@
         }
       });
     } else if (m.type === "bag") {
-      wob(m.x, m.y + 40, mw, t, () => {
+      wob(m.x, m.y + 40 * mK(), mw, t, () => {
         const tiss = [0, 1, 2].filter((k) => m.tiss[k] < 1 && k !== m.pullK).map((k) => (k + round) % 4);
-        drawBag({ paper: m.paper }, m.x, m.y + 40, 0.62, { tissue: tiss, t });
+        drawBag({ paper: m.paper }, m.x, m.y + 40 * mK(), 0.66 * mK(), { tissue: tiss, t });
         if (m.pullK >= 0 && V.tissPull) {
           const tp = V.tissPull;
           ctx.save(); ctx.translate(tp.x, tp.y);
@@ -1501,6 +1502,7 @@
     } else {
       // The cracker: a paper tube with twisted ends; it stretches as he pulls, then pops in two.
       const ext = m.open ? 1.4 : m.ext, gap = m.open ? 26 : 0, x = m.x, y = m.y;
+      ctx.save(); ctx.translate(x, y); ctx.scale(mK(), mK()); ctx.translate(-x, -y);
       const half = (sd) => {
         ctx.save(); ctx.translate(x + sd * (gap / 2) + (sd > 0 ? ext * 40 : 0), y);
         const L0 = 40;
@@ -1515,6 +1517,7 @@
       };
       ctx.save(); ctx.translate(0, 0); half(-1); half(1); ctx.restore();
       if (!m.open && m.ext > 0.05) { const mx = x + ext * 20; [-1, 1].forEach((sd) => line(mx - 4, y + sd * 6, mx + 4, y + sd * 8, INK, 1.4)); }
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -1694,7 +1697,7 @@
         if (it.id === "bball" && k === V.items.findIndex((q) => q.id === "bball")) y -= Math.abs(Math.sin(tt * 3.2 + k)) * 30;
         if (it.id === "car") { x += Math.sin(tt * 1.3) * 24; o.wheels = Math.sin(tt * 1.3) * 10; }
       }
-      drawThing(it.id, x, y, 28, o);
+      drawThing(it.id, x, y, 28 * L.bs, o);
     });
     const gp = V.gp;
     if (!gp) return;
@@ -1745,8 +1748,8 @@
   function drawWork(t) {
     if (given) {
       if (given.job === "box") drawGivenBox(given.x, given.y, given.s, given.a);
-      else if (given.job === "bag") drawBag(BAG_BY[K.bag], given.x, given.y + 50 * given.s, given.s, { tissue: K.tissue, t });
-      else { ctx.save(); ctx.globalAlpha = given.a; drawStocking(given.x, given.y - 80 * given.s, V.stock.bulge, K.items, t, 0); ctx.restore(); }
+      else if (given.job === "bag") { ctx.save(); ctx.globalAlpha = given.a; drawBag(BAG_BY[K.bag], given.x, given.y + 50 * given.s * bagK(), given.s * bagK(), { tissue: K.tissue, t }); ctx.restore(); }
+      else { ctx.save(); ctx.globalAlpha = given.a; drawStocking(given.x, given.y - 80 * given.s * stK(), V.stock.bulge, K.items, t, 0, given.s * stK()); ctx.restore(); }
     }
     if (phase !== "make") return;
     if (K.job === "box") {
@@ -1771,22 +1774,22 @@
     } else if (K.job === "bag") {
       if (!K.bag) {
         const b = bagPt();
-        ctx.save(); ctx.setLineDash([6, 6]); rr(b.x - 58, b.y - 116, 116, 116, 10); ctx.strokeStyle = "rgba(29,35,64,0.25)"; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore();
+        const k = bagK(); ctx.save(); ctx.setLineDash([6, 6]); rr(b.x - 58 * k, b.y - 116 * k, 116 * k, 116 * k, 10); ctx.strokeStyle = "rgba(29,35,64,0.25)"; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore();
         return;
       }
       const b = bagPt();
-      ell(b.x, b.y + 2, 64, 8); ctx.fillStyle = "rgba(29,35,64,0.12)"; ctx.fill();
+      ell(b.x, b.y + 2, 64 * bagK(), 8); ctx.fillStyle = "rgba(29,35,64,0.12)"; ctx.fill();
       wob(b.x, b.y, wv("bag"), t, () => {
         const dropping = V.drop.length && now() - V.drop[0].t0 < 0.4;
-        drawBag(BAG_BY[K.bag], b.x, b.y, 1, { tissue: K.tissue, pop: V.tissuePop, gift: K.gift && !K.tissue.length && !dropping ? K.gift : null, t });
+        drawBag(BAG_BY[K.bag], b.x, b.y, bagK(), { tissue: K.tissue, pop: V.tissuePop, gift: K.gift && !K.tissue.length && !dropping ? K.gift : null, t });
       });
-      if (K.tag) { const p = extraSpot("tag"); line(b.x + 30, b.y - 136, p.x, p.y - 12, INK, 1.4); drawTag(p.x, p.y, 1); }
+      if (K.tag) { const p = extraSpot("tag"); line(b.x + 30 * bagK(), b.y - 136 * bagK(), p.x, p.y - 12, INK, 1.4); drawTag(p.x, p.y, 1); }
       K.stickers.forEach((id) => { const p = extraSpot(id); drawSticker(id, p.x, p.y, 1); });
     }
   }
   function drawStockingWork(t) {
     if (phase !== "make" || K.job !== "stocking") return;
-    drawStocking(V.stock.x, V.stock.y, V.stock.bulge, K.items, t, V.stock.swing);
+    drawStocking(V.stock.x, V.stock.y, V.stock.bulge, K.items, t, V.stock.swing, stK());
   }
 
   // =====================================================================================================
@@ -2079,7 +2082,7 @@
       case "give": { const p = presentPt(); return { x: p.x, y: p.y, r: p.r }; }
       case "mine": { const m = V.mine; return { x: m.x, y: m.y - 8, r: 62 }; }
       case "tiss": { const m = V.mine, k = m.tiss.findIndex((v) => v < 1); const p = tissPt(Math.max(0, k)); return { x: p.x, y: p.y, r: 24 }; }
-      case "crk": { const m = V.mine; return { x: m.x + 62, y: m.y, r: 26 }; }
+      case "crk": { const m = V.mine; return { x: m.x + 62 * mK(), y: m.y, r: 26 }; }
     }
     return null;
   }
@@ -2116,7 +2119,7 @@
       const key = w.part, first = ghost.shown(key) < 1, P = (x, y) => { const v = vp(x, y); return [v.x, v.y]; };
       const g = matG(), tap = (x, y) => ({ pts: [P(x, y)], tap: true, key });
       const st = w.part;
-      if (st === "gift") { const s = shelfSlot(2), to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 70 } : inBoxPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(to.x, to.y)], dur: 1600, key }; }
+      if (st === "gift") { const s = shelfSlot(2), to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 70 * bagK() } : inBoxPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(to.x, to.y)], dur: 1600, key }; }
       if (st === "roll") { const s = rollSlot(4), m = rollMat(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(m.x - 10, m.y), P(g.sx0, m.y)], dur: 2200, key }; }
       if (st === "cut") return first ? tap(g.sx1, (g.sy0 + g.sy1) / 2) : { pts: [P(g.sx1, g.sy0), P(g.sx1, g.sy1)], dur: 1500, key };
       if (st === "place") return first ? tap(V.box.x, V.box.y) : { pts: [P(V.box.x, V.box.y), P(g.cx, g.cy)], dur: 1400, key };
@@ -2126,14 +2129,14 @@
       if (st === "ribbon") { const s = spoolSlot(0); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(g.x0, g.cy), P(g.x1, g.cy), P(g.cx, g.y0), P(g.cx, g.yf)], dur: 2600, key }; }
       if (st === "bow") { const h = loopHandle(K.loop[0] < 1 ? 0 : 1), n = knotPt(); return first ? tap(h.x, h.y) : { pts: [P(h.x, h.y), P(h.x + (h.x - n.x) * 2, h.y - 6)], dur: 1000, key }; }
       if (st === "curl") { const k = K.curl[0] < 1 ? 0 : 1, a = knotPt(), b = tailEnd(k); return first ? tap((a.x + b.x) / 2, (a.y + b.y) / 2) : { pts: [P(a.x, a.y), P(b.x, b.y)], dur: 1200, key }; }
-      if (st === "bag") { const s = bagSlot(0), b = bagPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(b.x, b.y - 50)], dur: 1400, key }; }
-      if (st === "tissue") { const i = [0, 1, 2, 3].find((k) => !K.tissue.includes(k)), s = tisSlot(i), b = bagPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(b.x, b.y - 110)], dur: 1400, key }; }
+      if (st === "bag") { const s = bagSlot(0), b = bagPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(b.x, b.y - 50 * bagK())], dur: 1400, key }; }
+      if (st === "tissue") { const i = [0, 1, 2, 3].find((k) => !K.tissue.includes(k)), s = tisSlot(i), b = bagPt(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(b.x, b.y - 110 * bagK())], dur: 1400, key }; }
       if (st === "tag") { const s = extraSlot(0), p = extraSpot("tag"); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(p.x, p.y)], dur: 1400, key }; }
       if (st === "fill") { const i = STUFF.findIndex((q) => !K.items.includes(q.id)), s = stuffSlot(i), tp = stockTop(); return first ? tap(s.x, s.y) : { pts: [P(s.x, s.y), P(tp.x, tp.y)], dur: 1400, key }; }
       if (st === "give") { const p = presentPt(); return first ? tap(p.x, p.y) : { pts: [P(p.x, p.y), P(L.give.x, L.give.y)], dur: 1400, key }; }
       if (st === "mine") { const m = V.mine; return first ? tap(m.x, m.y) : { pts: [P(m.x - 40, m.y - 30), P(m.x - 10, m.y + 20), P(m.x + 20, m.y - 30), P(m.x + 44, m.y + 20)], dur: 1800, key }; }
       if (st === "tiss") { const p = partPt("tiss"); return first ? tap(p.x, p.y) : { pts: [P(p.x, p.y), P(p.x, p.y - 60)], dur: 1000, key }; }
-      if (st === "crk") { const m = V.mine; return first ? tap(m.x + 62, m.y) : { pts: [P(m.x + 62, m.y), P(m.x + 130, m.y)], dur: 1000, key }; }
+      if (st === "crk") { const m = V.mine, k = mK(); return first ? tap(m.x + 62 * k, m.y) : { pts: [P(m.x + 62 * k, m.y), P(m.x + 130 * k, m.y)], dur: 1000, key }; }
       return null;
     }
   });
@@ -2154,8 +2157,8 @@
     if (phase === "mine" && V.mine) {
       const m = V.mine;
       if (m.type === "box" && !m.open && Math.abs(w.x - m.x) < MW / 2 + 20 && w.y > m.y - MH / 2 - MD - 20 && w.y < m.y + MH / 2 + 16) return "mine";
-      if (m.type === "bag" && !m.open) { m.tiss.forEach((v, k) => { if (v < 1) { const p = tissPt(k); cand("tiss" + k, p.x, p.y, 24); } }); if (best) return best; if (Math.abs(w.x - m.x) < 50 && Math.abs(w.y - m.y) < 60) return "minebag"; }
-      if (m.type === "cracker" && !m.open && w.x > m.x - 70 && w.x < m.x + 110 && Math.abs(w.y - m.y) < 40) return "crk";
+      if (m.type === "bag" && !m.open) { m.tiss.forEach((v, k) => { if (v < 1) { const p = tissPt(k); cand("tiss" + k, p.x, p.y, 24); } }); if (best) return best; if (Math.abs(w.x - m.x) < 50 * mK() && Math.abs(w.y - m.y) < 60 * mK()) return "minebag"; }
+      if (m.type === "cracker" && !m.open && w.x > m.x - 70 * mK() && w.x < m.x + 130 * mK() && Math.abs(w.y - m.y) < 44) return "crk";
     }
     // The tray.
     const k = V.tray.kind;
@@ -2190,10 +2193,10 @@
         if (st === "gift" && inRect(w, [g.x0, g.y0, g.x1, g.yf], 10)) return "box";
       } else if (K.job === "bag") {
         const b = bagPt();
-        if (Math.abs(w.x - b.x) < 64 && w.y > b.y - 150 && w.y < b.y + 8) return "bag";
+        if (Math.abs(w.x - b.x) < 64 * bagK() && w.y > b.y - 150 * bagK() && w.y < b.y + 8) return "bag";
       } else {
         const s = V.stock;
-        if (Math.abs(w.x - s.x - 16) < 70 && w.y > s.y - 10 && w.y < s.y + 175) return "stocking";
+        if (Math.abs(w.x - s.x - 16 * stK()) < 70 * stK() && w.y > s.y - 10 && w.y < s.y + 175 * stK()) return "stocking";
         const F = L.fire; if (w.x > F.x && w.x < F.x + F.w && w.y > F.y + F.h * 0.5) return "fire";
       }
     }
@@ -2316,7 +2319,7 @@
     if (!d) return;
     if (d.k === "carry" && V.carry) { V.carry.x = w.x + d.ox; V.carry.y = w.y + d.oy; }
     else if (d.k === "bag" && V.bag) { V.bag.x = w.x + d.ox; V.bag.y = w.y + d.oy; }
-    else if (d.k === "pull") { if (V.roll && stepOf() === "roll") setPull(w.x); if (K.pull >= 1) { drag = null; pullDone(); } }
+    else if (d.k === "pull") { if (V.roll && stepOf() === "roll") pullBy(d.last, w); if (K.pull >= 1) { drag = null; pullDone(); } }
     else if (d.k === "cut" && V.scis) {
       const near = Math.abs(w.x - g.sx1) < 34;
       V.scis.x = near ? g.sx1 : w.x; V.scis.y = w.y; V.scis.open = Math.abs(Math.sin(w.y * 0.15));
@@ -2338,7 +2341,7 @@
     else if (d.k === "give") { V.giveDrag = { x: w.x + d.ox, y: w.y + d.oy }; }
     else if (d.k === "tear") tearMineLine(d.last, w);
     else if (d.k === "tiss" && V.tissPull) { V.tissPull = { x: d.p.x + (w.x - d.p.x) * 0.3, y: Math.min(d.p.y, d.p.y + (w.y - d.y0)) }; if (d.y0 - w.y > 40) { const p = V.tissPull; drag = null; V.tissPull = null; tissOut(d.i, p); } }
-    else if (d.k === "crk") { crackerPull(d.e0 + (w.x - d.x0) / 70); if (V.mine && V.mine.open) drag = null; }
+    else if (d.k === "crk") { crackerPull(d.e0 + (w.x - d.x0) / (60 * mK())); if (V.mine && V.mine.open) drag = null; }
     if (drag) drag.last = w;
   }
   function endDrag(d, still) {
@@ -2349,9 +2352,9 @@
       const c = V.carry; busy = false;
       if (!c) return;
       let target = null;
-      if (c.kind === "gift") target = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 70, r: 80 } : { x: g.cx, y: g.cy, r: 80 };
-      else if (c.kind === "stuff") target = { x: V.stock.x + 10, y: V.stock.y + 70, r: 90 };
-      else if (c.kind === "tissue") target = { x: bagPt().x, y: bagPt().y - 70, r: 90 };
+      if (c.kind === "gift") target = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 70 * bagK(), r: 90 } : { x: g.cx, y: g.cy, r: 90 };
+      else if (c.kind === "stuff") target = { x: V.stock.x + 10, y: V.stock.y + 70 * stK(), r: 100 };
+      else if (c.kind === "tissue") target = { x: bagPt().x, y: bagPt().y - 70 * bagK(), r: 100 };
       else { const p = presentPt(); target = { x: p.x, y: p.y, r: 90 }; }
       const ok = still || dist(c, target) < target.r;
       V.carry = null;
@@ -2489,8 +2492,8 @@
     if (V.giveDrag && drag && drag.k === "give") {
       const p = V.giveDrag;
       if (K.job === "box") drawGivenBox(p.x, p.y - BF / 2, 1, 1);
-      else if (K.job === "bag") drawBag(BAG_BY[K.bag], p.x, p.y + 60, 1, { tissue: K.tissue, t });
-      else drawStocking(p.x, p.y - 90, V.stock.bulge, K.items, t, 0.3);
+      else if (K.job === "bag") drawBag(BAG_BY[K.bag], p.x, p.y + 60 * bagK(), bagK(), { tissue: K.tissue, t });
+      else drawStocking(p.x, p.y - 90 * stK(), V.stock.bulge, K.items, t, 0.3, stK());
     } else { drawWork(t); drawStockingWork(t); }
     drawPlay(t);
     drawMine(t);

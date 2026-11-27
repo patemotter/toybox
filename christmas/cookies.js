@@ -374,7 +374,7 @@
         cuts: C.cuts.map((q) => [q.sh, +q.u.toFixed(3), +q.v.toFixed(3), q.d]), holes: C.holes.map((q) => [q.sh, +q.u.toFixed(3), +q.v.toFixed(3)]),
         tray: C.tray.filter((q) => q.where !== "gone").map((q) => Object.assign(ser(q), { b: +q.bake.toFixed(2), sl: q.slot }))
       };
-      localStorage.setItem(KEY_WORK, JSON.stringify({ v: 1, job, pick, c, h: { placed: Hs.placed, dec: Hs.dec } }));
+      localStorage.setItem(KEY_WORK, JSON.stringify({ v: 2, job, pick, c, h: { placed: Hs.placed, d: Hs.d, dec: Hs.dec } }));
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(saveWork, 400); }
@@ -431,6 +431,34 @@
         last = y;
       }, () => { rollTw = null; if (C.roll >= 1) return; });
     });
+  }
+  // The two doughs sit in bowls at the back of the counter, in both jobs; a tap picks one. For cookies, a sheet
+  // already rolled is put away (its cut shapes hop onto the baking sheet first) and a fresh ball of the other dough
+  // comes; after the oven the pick is for the next batch. For the house, the pieces are baked in the picked dough.
+  function pickDough(i) {
+    V.bowlWob[i] = 1;
+    tag(DOUGHS[i].name + " dough", L.bowls[i].x, L.bowls[i].y - 20);
+    if (job === "house") {
+      if (Hs.d !== i) { Hs.d = i; Hs.dec.d = i; HV.wob = 1; puff("spark", L.house.x + GW / 2, L.house.y - WH, 5); if (built()) { savedHouse = Hs.dec; savePlateSoon(); } }
+      saveSoon(); return;
+    }
+    if (C.d === i) return;
+    if (C.stage === "prep" && (busy || rollTw || (drag && drag.k === "pin"))) return;
+    C.d = i;
+    if (C.stage === "prep") {
+      if (C.roll > 0 || C.holes.length || C.cuts.length) {
+        finishCut();
+        while (C.cuts.length && freeSlot() >= 0) liftCut(0);
+        C.cuts = [];
+        busy = true;
+        tween(0.45, (p) => { V.doughA = 1 - ease(p); }, () => {
+          C.roll = 0; C.holes = [];
+          if (V.pin.on) pinHome();
+          tween(0.45, (p) => { V.doughA = ease(p); }, () => { busy = false; lastWant = ""; });
+        });
+      } else { V.doughWob = 1; puff("flour", L.sheet.x, L.sheet.y, 6); }
+    }
+    lastWant = ""; refreshTiles(); saveSoon();
   }
   // The nearest spot (to x, y) where the picked cutter can press into smooth dough, or null.
   function freeSpot(x, y) {
@@ -531,7 +559,7 @@
   // the pose it is at, lets go and goes back to its hook.
   function slideIn(from) {
     if (busy || C.stage !== "prep" || !C.tray.length) return false;
-    if (!doorFirst()) { if (from) backToCounter(from); return false; }
+    if (!doorFirst()) return false;
     ghost.learned("mitt");
     busy = true; lastWant = "";
     // Shapes still in the dough hop onto the sheet first.
@@ -729,12 +757,15 @@
   const RIDGE = [RF, vadd(HR, BO)];
   const BINS = 12, DRAW_ORDER = [0, 1, 2, 4, 3, 5];
 
-  const Hs = { placed: 0, bins: new Array(BINS).fill(0), dec: { i: [], sn: [], all: 0, ic: [], k: [] } };
+  // d: the dough the pieces are baked in (0 sugar cookie, 1 gingerbread), also kept in dec for the saved house.
+  const Hs = { placed: 0, d: 1, bins: new Array(BINS).fill(0), dec: { i: [], sn: [], all: 0, ic: [], k: [], d: 1 } };
   (function restoreHouse() {
     const s = savedWork && savedWork.h;
     if (!s || typeof s !== "object") return;
     Hs.placed = okInt(s.placed, 7) ? s.placed : 0;
-    if (Hs.placed === 6 && okHouseDec(s.dec)) Hs.dec = { i: s.dec.i.filter(Array.isArray), sn: s.dec.sn.filter(Array.isArray), all: s.dec.all ? 1 : 0, ic: s.dec.ic.filter(Array.isArray), k: s.dec.k.filter((q) => Array.isArray(q) && CANDY_T.includes(q[0])) };
+    Hs.d = okInt(s.d, 2) ? s.d : 1;
+    if (Hs.placed === 6 && okHouseDec(s.dec)) Hs.dec = { i: s.dec.i.filter(Array.isArray), sn: s.dec.sn.filter(Array.isArray), all: s.dec.all ? 1 : 0, ic: s.dec.ic.filter(Array.isArray), k: s.dec.k.filter((q) => Array.isArray(q) && CANDY_T.includes(q[0])), d: Hs.d };
+    Hs.dec.d = Hs.d;
   })();
   const built = () => Hs.placed >= 6;
   const HV = { stand: null, slide: 0, bag: { x: 0, y: 0, held: false, auto: false }, wob: 0, pileWob: 0 };
@@ -816,7 +847,7 @@
   }
   function newHouse() {
     tweens = tweens.filter((tw) => tw.job !== "house"); busy = false; drag = null; V.hand = null; V.held = null;
-    Hs.placed = 0; Hs.bins.fill(0); Hs.dec = { i: [], sn: [], all: 0, ic: [], k: [] };
+    Hs.placed = 0; Hs.bins.fill(0); Hs.dec = { i: [], sn: [], all: 0, ic: [], k: [], d: Hs.d };
     HV.stand = null; HV.slide = 0; V.lit = 0; V.snowCap = 0;
     tween(0.5, (p) => { HV.slide = p; });
     placeHouse(); refreshTiles(); lastWant = ""; ghost.again(); saveSoon();
@@ -828,7 +859,9 @@
   // One surface at a time takes decorations: the cookie on the board (its own units) or the built house (world
   // units from the house's base point). Icing keeps every point his finger passes; candy follows the finger and
   // stays where he lets go (or where he taps).
-  const POINT_CAP = 700, ITEM_CAP = 60, SPRINK_CAP = 160;
+  // Icing never runs out: each finished line is thinned to the points that shape it, and when a cookie holds a lot
+  // of icing its older lines are thinned a little more, so drawing never stops. Candy and sprinkles have roomy caps.
+  const ITEM_CAP = 200, SPRINK_CAP = 1500, THIN_AT = 3000;
   let candyN = 0;
   function surface() {
     if (plateOpen) return null;
@@ -841,6 +874,32 @@
     return { kind: "house", tool: HTOOLS[pick.htool], loc: (w) => v2(w.x - L.house.x, w.y - L.house.y), minD: 3 };
   }
   const pointsIn = (list) => list.reduce((n, st) => n + (st.pts ? st.pts.length : st.length), 0);
+  // Keeps the points of a line (x, y, x, y, ...) that matter for its shape, within eps (Douglas-Peucker).
+  function thin(pts, eps) {
+    const n = pts.length / 2;
+    if (n < 3) return pts;
+    const keep = new Uint8Array(n); keep[0] = keep[n - 1] = 1;
+    const stack = [[0, n - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop(), ax = pts[a * 2], ay = pts[a * 2 + 1], bx = pts[b * 2], by = pts[b * 2 + 1], dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1e-9;
+      let far = -1, fd = eps;
+      for (let i = a + 1; i < b; i++) { const d = Math.abs((pts[i * 2] - ax) * dy - (pts[i * 2 + 1] - ay) * dx) / len; if (d > fd) { fd = d; far = i; } }
+      if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) if (keep[i]) out.push(pts[i * 2], pts[i * 2 + 1]);
+    return out;
+  }
+  function thinIcing(sf) {
+    if (sf.kind === "cookie") {
+      const c = sf.c;
+      let eps = 0.006;
+      while (pointsIn(c.i) > THIN_AT && eps < 0.08) { eps *= 1.6; c.i.slice(0, -1).forEach((st) => { st.pts = thin(st.pts, eps); }); }
+    } else {
+      let eps = 0.8;
+      while (pointsIn(Hs.dec.i) > THIN_AT && eps < 8) { eps *= 1.6; Hs.dec.i.slice(0, -1).forEach((st, i) => { Hs.dec.i[i] = thin(st, eps).map(Math.round); }); }
+    }
+  }
   function toolDown(sf, w) {
     const l = sf.loc(w), t = sf.tool;
     ghost.learned("deco");
@@ -848,12 +907,10 @@
     lastDeco = now();
     if (t.kind === "icing") {
       if (sf.kind === "cookie") {
-        if (pointsIn(sf.c.i) > POINT_CAP) return { kind: "none" };
         const st = { c: t.c, pts: [l.x, l.y] };
         sf.c.i.push(st);
         return { kind: "icing", st, last: l };
       }
-      if (pointsIn(Hs.dec.i) > POINT_CAP * 2) return { kind: "none" };
       const st = [Math.round(l.x), Math.round(l.y)];
       Hs.dec.i.push(st);
       return { kind: "hicing", st, last: l };
@@ -872,12 +929,12 @@
     const l = sf.loc(w);
     lastDeco = now();
     if (d.kind === "icing") {
-      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= sf.minD && pointsIn(sf.c.i) < POINT_CAP) { d.st.pts.push(l.x, l.y); d.last = l; }
+      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= sf.minD) { d.st.pts.push(l.x, l.y); d.last = l; }
     } else if (d.kind === "hicing") {
-      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= sf.minD && pointsIn(Hs.dec.i) < POINT_CAP * 2) { d.st.push(Math.round(l.x), Math.round(l.y)); d.last = l; }
+      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= sf.minD) { d.st.push(Math.round(l.x), Math.round(l.y)); d.last = l; }
     } else if (d.kind === "sprinkles") { d.l = l; d.acc += dt || 0; }
     else if (d.kind === "snow") {
-      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= 6 && Hs.dec.sn.length < 220) { snowAt(l); d.last = l; d.moved = 1; }
+      if (Math.hypot(l.x - d.last.x, l.y - d.last.y) >= 6 && Hs.dec.sn.length < 900) { snowAt(l); d.last = l; d.moved = 1; }
     } else if (d.kind === "icicles") {
       if (!d.last || Math.hypot(l.x - d.last.x, l.y - d.last.y) > 4) { const ic = icicleAt(l, d.last); if (ic) d.last = ic; }
     } else if (d.kind === "candy" && V.held) V.held.w = v2(w.x, w.y - 10);
@@ -890,6 +947,8 @@
     } else if (d.kind === "sprinkles" && tap) sprinkleBurst(sf, d.l, 14);
     else if (d.kind === "snow" && tap && !d.moved) snowAll();
     else if (d.kind === "icicles" && tap) { const l = sf.loc(w); icicleAt(l, null, 3); }
+    else if (d.kind === "icing") { d.st.pts = thin(d.st.pts, 0.006); thinIcing(sf); }
+    else if (d.kind === "hicing") { const i = Hs.dec.i.indexOf(d.st); if (i >= 0) Hs.dec.i[i] = thin(d.st, 0.8).map(Math.round); thinIcing(sf); }
     lastDeco = now(); saveSoon();
     if (sf.kind === "house") { savedHouse = Hs.dec; savePlateSoon(); }
   }
@@ -946,7 +1005,7 @@
   // Icicles hang from the nearest roof edge; n of them side by side for a tap.
   function icicleAt(l, last, n) {
     const q = nearestOn(EAVES, l);
-    if (q.d > 60 || Hs.dec.ic.length >= 120) return last;
+    if (q.d > 60 || Hs.dec.ic.length >= 400) return last;
     n = n || 1;
     let made = null;
     for (let k = 0; k < n; k++) {
@@ -968,7 +1027,8 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
   function fs(fill, lw) { ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = lw || LW; ctx.strokeStyle = INK; ctx.stroke(); }
-  function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, TAU); }
+  // (A tiny floor only: candy is drawn in cookie units, where an eye's pupil is a few hundredths wide.)
+  function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.0005, rx), Math.max(0.0005, ry), 0, 0, TAU); }
   const rgbOf = (h) => { const v = parseInt(h.slice(1), 16); return [v >> 16, (v >> 8) & 255, v & 255]; };
   function shade(h, t) {
     const c = rgbOf(h), to = t > 0 ? 255 : 0, k = Math.abs(t);
@@ -1009,8 +1069,9 @@
     if (c.bake > 0.02) { ctx.lineWidth = 0.24; ctx.strokeStyle = rgba(D.rim, 0.45 * c.bake); ctx.stroke(P); }
     ctx.fillStyle = c.d ? rgba("#5E3010", 0.35) : rgba("#FFFFFF", 0.5 * (1 - c.bake));
     for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc((hash(i, c.sh + 1) * 2 - 1) * 0.7, (hash(i, c.sh + 7) * 2 - 1) * 0.7, 0.03, 0, TAU); ctx.fill(); }
-    c.p.forEach((q) => { ctx.save(); ctx.translate(q[1], q[2]); ctx.rotate(q[3]); ctx.fillStyle = SPRINK[q[0]]; rr(-0.045, -0.015, 0.09, 0.03, 0.015); ctx.fill(); ctx.lineWidth = 0.6 / k; ctx.strokeStyle = rgba(INK, 0.5); ctx.stroke(); ctx.restore(); });
+    // Layers, bottom to top: the cookie, icing, sprinkles, candy (so new icing always goes under what is on it).
     c.i.forEach((st) => icingLine(st.pts, ICING[st.c], 0.11, k));
+    c.p.forEach((q) => { ctx.save(); ctx.translate(q[1], q[2]); ctx.rotate(q[3]); ctx.fillStyle = SPRINK[q[0]]; rr(-0.045, -0.015, 0.09, 0.03, 0.015); ctx.fill(); ctx.lineWidth = 0.6 / k; ctx.strokeStyle = rgba(INK, 0.5); ctx.stroke(); ctx.restore(); });
     ctx.restore();
     c.k.forEach((q) => drawCandy(q[0], q[1], q[2], q[3], 0.12, 1.4 / k));
     ctx.restore();
@@ -1224,8 +1285,10 @@
     ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(h0.x, h0.y); ctx.lineTo(h1.x, h1.y);
     ctx.strokeStyle = INK; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = "#C9302C"; ctx.lineWidth = 5; ctx.stroke();
   }
-  function drawMitt(x, y, s) {
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(-0.25);
+  // The quilted oven mitt; on its hook it hangs by its loop, gripping the sheet it turns to hold the edge.
+  function drawMitt(x, y, s, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(rot == null ? -0.25 : rot);
+    if (V.mitt.mode === "hook") { ctx.beginPath(); ctx.arc(0, 32, 5, 0, TAU); ctx.lineWidth = 2.4; ctx.strokeStyle = INK; ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(-14, 22); ctx.lineTo(-16, -6); ctx.bezierCurveTo(-16, -30, 16, -30, 16, -6); ctx.lineTo(14, 22); ctx.closePath(); fs("#E8303F");
     ctx.beginPath(); ctx.ellipse(-18, 2, 6, 11, -0.5, 0, TAU); fs("#E8303F");
     rr(-16, 16, 32, 12, 4); fs("#FFFFFF");
@@ -1270,23 +1333,54 @@
     rr(-13, -62, 26, 8, 3); fs("#E8303F", 1.8);
     ctx.restore();
   }
+  // The spatula: a flat metal blade on a red handle. Its blade's middle is at (x, y).
+  function drawSpatula(x, y, wob) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-0.75 + Math.sin(wob * 25) * wob * 0.15);
+    rr(-7, 26, 14, 50, 6); fs("#D63B35");
+    rr(-3, 14, 6, 16, 2); fs("#B9C4D0", 1.8);
+    rr(-22, -30, 44, 46, 10); fs("#DDE5EE");
+    ctx.strokeStyle = "rgba(29,35,64,0.25)"; ctx.lineWidth = 2;
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 10, -20); ctx.lineTo(i * 10, 6); ctx.stroke(); }
+    ctx.restore();
+  }
+  // The two doughs in their bowls at the back of the counter; the one he picked has the tick.
+  function drawBowls() {
+    const picked = job === "cookies" ? C.d : Hs.d;
+    L.bowls.forEach((b, i) => {
+      const wob = Math.sin(V.bowlWob[i] * 25) * V.bowlWob[i] * 0.1;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(wob);
+      ell(0, -4, 15, 12); fs(DOUGHS[i].raw);
+      ctx.fillStyle = "rgba(255,255,255,0.45)"; ell(-5, -9, 5, 3); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-23, -2); ctx.lineTo(23, -2); ctx.quadraticCurveTo(21, 20, 0, 20); ctx.quadraticCurveTo(-21, 20, -23, -2); ctx.closePath(); fs(i ? "#8FD3FF" : "#FFB3CF");
+      if (i === picked) {
+        ell(17, -15, 8, 8); fs("#FFC93C", 2);
+        ctx.beginPath(); ctx.moveTo(13, -15); ctx.lineTo(16, -12); ctx.lineTo(21, -18); ctx.lineWidth = 2.4; ctx.strokeStyle = INK; ctx.lineCap = "round"; ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
   function drawCookieScene(t) {
     drawBoard();
     drawDough();
     drawOven(t);
     if (V.trayWhere !== "oven") drawTray(V.tray);
-    if (V.mitt > 0.01) { const T = L.tray; ctx.globalAlpha = V.mitt; drawMitt(V.tray.x - T.w * V.tray.k / 2 - 4, V.tray.y + 4, 1.1); ctx.globalAlpha = 1; }
     drawPlateSmall();
     drawPin();
     if (C.stage === "prep" && C.roll >= 1 || V.cutter.moving) drawCutter(pick.cutter, V.cutter.x, V.cutter.y, L.cs * (V.cutter.moving || drag && drag.k === "cutter" ? 1 : 0.85), V.cutter.press, V.cutterWob);
     C.tray.forEach((c) => { if (c.where === "board") drawCookie(c, c.x, c.y, c.s, { wob: c.wob, ph: c.ph }); });
-    C.tray.forEach((c) => { if (c.where === "air" || c.where === "drag") drawCookie(c, c.x, c.y, c.s, { wob: c.wob, ph: c.ph }); });
+    if (C.stage === "decorate") drawSpatula(V.spat.x, V.spat.y, V.spatWob);
+    C.tray.forEach((c) => { if (c.where === "air" || c.where === "drag" || c.where === "spat") drawCookie(c, c.x, c.y, c.s, { wob: c.wob, ph: c.ph }); });
+    const m = V.mitt;
+    if (m.mode === "hook") { ell(m.x, m.y - 34, 3.5, 3.5); fs("#8A939E", 1.6); }
+    const mw = Math.sin(V.mittWob * 25) * V.mittWob * 0.2;
+    drawMitt(m.x, m.y, 1.05, (m.mode === "hook" ? Math.PI : m.mode === "grip" ? Math.PI / 2 : 0.3) + mw);
   }
 
   // =====================================================================================================
   // Drawing the house
   // =====================================================================================================
   const GINGER = "#B8743A";
+  const houseCol = () => (Hs.d ? GINGER : "#E8B66C");
   function drawCake() {
     const K = L.cake;
     ell(K.x, K.y + 6, K.rx, K.ry); fs("#C8D3DF");
@@ -1300,14 +1394,14 @@
   function drawPiece(i, P, o) {
     const kind = PIECES[i].kind, sh = SHAPE_OF[kind], pts = [];
     for (let k = 0; k < sh.length; k += 2) pts.push(affine(P, sh[k], sh[k + 1]));
-    const col = PIECES[i].id === "right" ? shade(GINGER, -0.08) : PIECES[i].id === "roofL" ? shade(GINGER, 0.08) : GINGER;
+    const G = houseCol(), col = PIECES[i].id === "right" ? shade(G, -0.08) : PIECES[i].id === "roofL" ? shade(G, 0.08) : G;
     polyPath(pts); ctx.lineJoin = "round"; fs(col);
     ctx.save(); polyPath(pts); ctx.clip();
     const T = (x, y) => affine(P, x, y), line = (a, b) => { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
     ctx.lineCap = "round";
     if (kind === "roof") {
       // Rows of roof tiles piped on in icing-brown.
-      ctx.strokeStyle = shade(GINGER, -0.3); ctx.lineWidth = 1.6;
+      ctx.strokeStyle = shade(G, -0.3); ctx.lineWidth = 1.6;
       for (let y = 18; y < SL; y += 18) {
         ctx.beginPath();
         for (let x = 0; x <= RL; x += 3) { const p = T(x, y + Math.abs(Math.sin(x / RL * Math.PI * 6)) * 6); if (x === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
@@ -1397,7 +1491,7 @@
   function drawPile() {
     const n = Math.max(0, 5 - Hs.placed - (HV.slide < 1 ? 0 : 0)), P = L.pile, wob = Math.sin(HV.pileWob * 25) * HV.pileWob * 0.05;
     ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(wob);
-    for (let k = 0; k < n; k++) { rr(-44 + k * 2, 10 - k * 9, 88, 16, 5); fs(k % 2 ? GINGER : shade(GINGER, -0.06)); }
+    for (let k = 0; k < n; k++) { rr(-44 + k * 2, 10 - k * 9, 88, 16, 5); fs(k % 2 ? houseCol() : shade(houseCol(), -0.06)); }
     ctx.restore();
   }
   function drawHouseScene(t) {
@@ -1457,9 +1551,10 @@
       // The saved house, drawn with its decorations at a small size.
       const h = lay.house, oldDec = Hs.dec, oldP = Hs.placed, oldL = L.house, oldLit = V.lit;
       ctx.save(); ctx.translate(h.x, h.y); ctx.scale(h.k, h.k);
-      Hs.dec = savedHouse; Hs.placed = 6; L.house = v2(0, 0); V.lit = 1;
+      const oldD = Hs.d;
+      Hs.dec = savedHouse; Hs.placed = 6; L.house = v2(0, 0); V.lit = 1; Hs.d = okInt(savedHouse.d, 2) ? savedHouse.d : 1;
       const st = HV.stand; HV.stand = null; const cap = V.snowCap; V.snowCap = 1;
-      try { ell(110, -20, 165, 52); fs("#F5F8FB"); drawHouse(t); } finally { Hs.dec = oldDec; Hs.placed = oldP; L.house = oldL; V.lit = oldLit; HV.stand = st; V.snowCap = cap; }
+      try { ell(110, -20, 165, 52); fs("#F5F8FB"); drawHouse(t); } finally { Hs.dec = oldDec; Hs.placed = oldP; L.house = oldL; V.lit = oldLit; HV.stand = st; V.snowCap = cap; Hs.d = oldD; }
       ctx.restore();
     }
     vs = 1;
@@ -1495,13 +1590,15 @@
           if (C.cuts.length) return { line: "Put the cookies on the baking sheet.", part: "cut0" };
           if (!C.tray.length) return { line: "Roll out the dough.", part: "pin" };
           if (V.door < 0.5) return { line: "Open the oven door.", part: "oven" };
-          return { line: "Slide the baking sheet into the oven.", part: "tray" };
+          return { line: "Use the oven mitt to slide the sheet into the oven.", part: "mitt" };
         case "oven": return V.door > 0.5 ? { line: "Close the oven door.", part: "oven" } : null;
-        case "baked": return { line: "Take the baking sheet out with the oven mitt.", part: "oven" };
+        case "baked":
+          if (V.door < 0.5) return { line: "Open the oven door.", part: "oven" };
+          return { line: "Use the oven mitt to take the sheet out of the oven.", part: "mitt" };
         case "decorate": {
           const sf = surface();
           if (!sf) return null;
-          if (sf.c.plateHint || (decoN(sf.c) >= 3 && now() - lastDeco > 3.5 && !drag)) { sf.c.plateHint = true; return { line: "Put the cookie on the plate.", part: "plate" }; }
+          if (sf.c.plateHint || (decoN(sf.c) >= 3 && now() - lastDeco > 3.5 && !drag)) { sf.c.plateHint = true; return { line: "Slide the spatula under the cookie and put it on the plate.", part: "spat" }; }
           return { line: toolLine(sf), part: "deco" };
         }
       }
@@ -1523,6 +1620,8 @@
     if (part === "oven") { const q = doorQuad(); return { x: (q.bl.x + q.br.x) / 2, y: (q.bl.y + q.tl.y) / 2, r: L.oven.w * 0.45 }; }
     if (part === "tray") return { x: V.tray.x, y: V.tray.y, r: Math.min(L.tray.w, L.tray.h) * 0.5 };
     if (part === "plate") return { x: L.plate.x, y: L.plate.y, r: L.plate.r };
+    if (part === "mitt") return { x: V.mitt.x, y: V.mitt.y, r: 30 };
+    if (part === "spat") return { x: V.spat.x, y: V.spat.y, r: 30 };
     if (part === "deco") return { x: L.big.x, y: L.big.y, r: L.big.s * 1.05 };
     if (part === "sheet") return { x: L.sheet.x, y: L.sheet.y, r: 60 };
     if (/^cut\d+$/.test(part)) { const q = C.cuts[+part.slice(3)]; if (!q) return null; const p = sheetXY(q); return { x: p.x, y: p.y, r: L.cs * 1.1 }; }
@@ -1582,7 +1681,11 @@
         const p = partPt(w.part), s = slotXY(Math.max(0, freeSlot()));
         return first ? { pts: [P(p.x, p.y)], tap: true, key } : { pts: [P(p.x, p.y), P(s.x, s.y)], dur: 1500, key };
       }
-      if (w.part === "tray" && !first) { const o = ovenPose(); return { pts: [P(V.tray.x, V.tray.y), P(o.x, o.y)], dur: 1600, key }; }
+      if (w.part === "mitt" && !first) {
+        const g = mittGrip(), o = C.stage === "baked" ? counterPose() : ovenPose(), off = g.x - V.tray.x;
+        return { pts: [P(V.mitt.x, V.mitt.y), P(g.x, g.y), P(o.x + off * (C.stage === "baked" ? 1 : ovenPose().k), o.y)], dur: 2200, key };
+      }
+      if (w.part === "spat" && !first) { const c = curCookie(); if (c) return { pts: [P(V.spat.x, V.spat.y), P(c.x, c.y), P(L.plate.x, L.plate.y)], dur: 2200, key }; }
       if (w.part === "deco") {
         const B = L.big, t = surface() && surface().tool;
         if (t && t.kind === "icing") return { pts: [P(B.x - B.s * 0.4, B.y - B.s * 0.1), P(B.x - B.s * 0.1, B.y + B.s * 0.15), P(B.x + B.s * 0.2, B.y - B.s * 0.1), P(B.x + B.s * 0.4, B.y + B.s * 0.1)], dur: 1600, key };
@@ -1609,6 +1712,9 @@
     const w = wpt(cx, cy), minR = 26 / vs;
     let best = null, bd = Infinity;
     const cand = (id, x, y, r) => { const d = Math.hypot(w.x - x, w.y - y); if (d <= Math.max(r, minR) && d - r * 0.3 < bd) { bd = d - r * 0.3; best = id; } };
+    // The dough bowls, in both jobs.
+    const bi = L.bowls.findIndex((b) => Math.hypot(w.x - b.x, w.y - b.y + 2) < 27);
+    if (bi >= 0) return "bowl" + bi;
     if (job === "house") {
       const i = activePiece();
       if (i >= 0) {
@@ -1628,8 +1734,10 @@
       return null;
     }
     const st = C.stage;
+    if (V.mitt.mode === "hook" && Math.hypot(w.x - V.mitt.x, w.y - V.mitt.y) < Math.max(32, minR)) return "mitt";
     if (st === "decorate") {
-      const c = curCookie();
+      const c = curCookie(), sp = V.spat;
+      if (Math.hypot(w.x - sp.x, w.y - sp.y) < 32 || Math.hypot(w.x - (sp.x + 34), w.y - (sp.y + 34)) < 22) return "spat";
       if (c && c.where === "board" && Math.hypot(w.x - L.big.x, w.y - L.big.y) < L.big.s * 1.25) return "deco";
       C.tray.forEach((q, i) => { if (q.where === "tray") cand("tc" + i, q.x, q.y, q.s * 1.1); });
     }
@@ -1677,7 +1785,10 @@
       if (st === "prep" && C.tray.length) slideIn();
       else { V.trayWob = 1; tag("Baking sheet", V.tray.x, V.tray.y - L.tray.h / 2); if (st === "prep") hint(); }
     } else if (part === "oven") ovenTap();
-    else if (part === "plate") { if (st === "decorate" && curCookie() && !busy) plateCookie(); else openPlate(true); }
+    else if (part === "plate") { if (st === "decorate" && curCookie() && !busy) spatTap(); else openPlate(true); }
+    else if (part === "spat") spatTap();
+    else if (part === "mitt") mittTap();
+    else if (/^bowl\d$/.test(part)) pickDough(+part.slice(4));
     else if (/^tc\d+$/.test(part)) swapTo(+part.slice(2));
     else if (part === "board") { if (w) tag("Pastry board", w.x, w.y); }
     else if (part === "piece" || part === "bag") autoIce();
@@ -1688,7 +1799,7 @@
   function ovenTap() {
     if (busy) return;
     const st = C.stage;
-    if (st === "baked") takeOut();
+    if (st === "baked") { if (V.door < 0.5) { ghost.learned("oven"); doorTo(1); } else takeOut(); }
     else if (baking()) { blinkLight(2); coach.say("The cookies are baking.", 3); }
     else if (st === "oven") { if (V.door > 0.5) closeDoor(); else doorTo(1); }
     else if (st === "prep" && C.tray.length && !C.cuts.length && V.door < 0.5) { ghost.learned("oven"); doorTo(1); shutTries = 1; }
@@ -1741,17 +1852,25 @@
         V.pin.y = y;
       } else if (drag.k === "cutter") { V.cutter.x = w.x; V.cutter.y = w.y - 8; }
       else if (drag.k === "cookie") { drag.c.x = w.x + drag.ox; drag.c.y = w.y + drag.oy; }
-      else if (drag.k === "tray") {
+      else if (drag.k === "mitt") {
+        V.mitt.x = w.x; V.mitt.y = w.y;
+        // The mitt reaches the sheet: it grips its edge, and from now on the sheet goes where the mitt goes.
+        const T = L.tray, k = V.tray.k, onSheet = Math.abs(w.x - V.tray.x) < T.w * k / 2 + 14 && Math.abs(w.y - V.tray.y) < T.h * k / 2 + 14;
+        if (onSheet && (canCarryIn() || canCarryOut())) startCarry(canCarryIn() ? "in" : "out", w);
+        else if (onSheet && C.stage === "baked" && V.door < 0.5 && !drag.said) { drag.said = true; V.doorWob = 1; coach.say("Open the oven door.", 3); }
+      } else if (drag.k === "carry") {
         V.tray.x = w.x + drag.ox; V.tray.y = w.y + drag.oy;
         const o = ovenPose(), c = counterPose(), dTot = Math.hypot(o.x - c.x, o.y - c.y), near = clamp(1 - Math.hypot(V.tray.x - o.x, V.tray.y - o.y) / dTot, 0, 1);
         V.tray.k = lerp(1, o.k, near);
       } else if (drag.k === "door") {
         const O = L.oven, top0 = O.y + O.h * 0.2, hy = O.y + O.h * 0.93;
         V.door = clamp(drag.d0 + (w.y - drag.y0) / ((hy - top0) * 0.9), 0, 1);
-      } else if (drag.k === "out") {
-        V.tray.x = w.x + drag.ox; V.tray.y = w.y + drag.oy;
-        const o = ovenPose(), c = counterPose(), dTot = Math.hypot(o.x - c.x, o.y - c.y), near = clamp(1 - Math.hypot(V.tray.x - o.x, V.tray.y - o.y) / dTot, 0, 1);
-        V.tray.k = lerp(1, o.k, near);
+      } else if (drag.k === "spat") {
+        const sp = V.spat, c = curCookie();
+        sp.x = w.x; sp.y = w.y;
+        // Slid under the cookie, the spatula lifts it; then the cookie rides on the spatula.
+        if (!sp.carry && c && c.where === "board" && Math.hypot(w.x - c.x, w.y - c.y) < c.s * 0.6) { sp.carry = c; c.where = "spat"; ghost.learned("spat"); }
+        if (sp.carry) { sp.carry.x = sp.x; sp.carry.y = sp.y; }
       }
     },
     up: (part, e, s) => {
@@ -1774,14 +1893,21 @@
         const c = d.c, i = C.cuts.indexOf(d.q);
         dragCookie = null; d.q.show = 1;
         if (i >= 0) liftCut(i, { x: c.x, y: c.y });
-      } else if (d.k === "tray") {
-        const o = ovenPose(), from = { x: V.tray.x, y: V.tray.y, k: V.tray.k };
-        if (!locked() && (still || Math.hypot(V.tray.x - o.x, V.tray.y - o.y) < L.oven.w * 0.8)) { if (!slideIn(from)) backToCounter(from); }
-        else { backToCounter(from); hint(); }
-      } else if (d.k === "door") {
+      } else if (d.k === "mitt") {
+        mittHome();
+        if (still && !locked()) mittTap(); else hint();
+      } else if (d.k === "carry") endCarry(d, still);
+      else if (d.k === "door") {
         if (still) ovenTap();
         else doorTo(V.door > 0.45 ? 1 : 0, 0.3, () => { if (C.stage === "oven" && V.door < 0.01) startBake(); });
-      } else if (d.k === "out") { busy = false; C.stage = "baked"; takeOut({ x: V.tray.x, y: V.tray.y, k: V.tray.k }); }
+      } else if (d.k === "spat") {
+        const c = V.spat.carry, B = L.board, P = L.plate;
+        if (c) {
+          const offBoard = !inBox(V.spat, B, -10);
+          if (!locked() && (Math.hypot(V.spat.x - P.x, V.spat.y - P.y) < P.r * 1.8 || offBoard)) plateCookie(); else cookieBack(c);
+        } else if (still && !locked()) spatTap();
+        else { spatBack(); hint(); }
+      }
     },
     tap: (part, x, y) => {
       if (skipTap) { skipTap = false; return; }
@@ -1818,22 +1944,19 @@
       q.show = 0; dragCookie = c;
       drag = { k: "cookie", c, q, ox: p.x - w0.x, oy: p.y - w0.y - 6 };
       ghost.learned("cut");
+    } else if (part === "mitt" && !busy) {
+      drag = { k: "mitt" }; V.mitt.mode = "free"; V.mitt.x = w.x; V.mitt.y = w.y;
     } else if (part === "tray" && st === "prep" && C.tray.length && !busy) {
+      // A hand on the sheet: the oven mitt comes to it and grips it (never a bare hand).
       if (V.door < 0.5 && shutTries < 1) { shutTries = 1; V.doorWob = 1; coach.say("Open the oven door.", 3); return true; }
       if (V.door < 0.5) doorTo(1);
-      drag = { k: "tray", ox: V.tray.x - w0.x, oy: V.tray.y - w0.y }; V.trayWhere = "held";
-      ghost.learned("tray");
+      startCarry("in", w0);
+    } else if (part === "spat" && st === "decorate" && !busy) {
+      drag = { k: "spat" }; V.spat.x = w.x; V.spat.y = w.y;
     } else if (part === "oven") {
       if (busy) return false;
-      if (st === "baked") {
-        ghost.learned("oven");
-        busy = true; C.stage = "out";
-        doorTo(1, 0.4);
-        tween(0.25, (p) => { V.mitt = ease(p); });
-        const o = ovenPose();
-        V.trayWhere = "held";
-        drag = { k: "out", ox: o.x - w0.x, oy: o.y - w0.y };
-      } else if (!baking()) {
+      if (canCarryOut()) startCarry("out", w0);
+      else if (!baking()) {
         const q = doorQuad();
         if (V.door < 0.5 && w0.y < q.tl.y + (q.bl.y - q.tl.y) * 0.4 && w0.y < L.oven.y + L.oven.h * 0.2) return false;
         if (doorTw) { untween(doorTw); doorTw = null; }
@@ -1843,6 +1966,20 @@
     return false;
   }
   let dragCookie = null;
+  // Carrying the sheet with the mitt: "in" from the counter to the oven, "out" from the oven to the counter.
+  function startCarry(dir, w) {
+    const pid = drag && drag.pid, far = drag ? drag.far : 0;
+    drag = { k: "carry", dir, ox: V.tray.x - w.x, oy: V.tray.y - w.y, pid, far };
+    V.mitt.mode = "grip"; V.trayWhere = "held";
+    ghost.learned("mitt");
+    if (dir === "out") { busy = true; C.stage = "out"; }
+  }
+  function endCarry(d, still) {
+    const from = { x: V.tray.x, y: V.tray.y, k: V.tray.k }, o = ovenPose();
+    if (d.dir === "out") { busy = false; C.stage = "baked"; takeOut(from); return; }
+    if (!locked() && (still || Math.hypot(V.tray.x - o.x, V.tray.y - o.y) < L.oven.w * 0.8)) { if (!slideIn(from)) backToCounter(from); }
+    else { backToCounter(from); hint(); }
+  }
 
   // =====================================================================================================
   // Panel, jobs and surprise
@@ -1859,7 +1996,6 @@
     };
   }
   const PIC = {
-    dough: (d) => picCanvas(() => { ell(0, 6, 34, 30); fs(DOUGHS[d].raw, 3); ctx.fillStyle = "rgba(255,255,255,0.45)"; ell(-12, -6, 12, 7); ctx.fill(); }),
     cutter: (sh) => picCanvas(() => { const c = newCookie(sh, 0); c.bake = 0.7; drawCookie(c, 0, 2, 36); }),
     icing: (col) => picCanvas(() => { ctx.translate(-14, 38); ctx.scale(1.25, 1.25); drawBag(0, 0, col, 0); }),
     sprinkles: picCanvas(() => {
@@ -1889,7 +2025,7 @@
   let tileMode = "";
   function modeNow() {
     if (job === "house") return "house";
-    if (C.stage === "prep") return C.roll < 1 && !C.cuts.length ? "dough" : "cutters";
+    if (C.stage === "prep") return "cutters";
     return "decor";
   }
   const waiting = () => (job === "house" ? !built() : C.stage !== "decorate");
@@ -1898,8 +2034,7 @@
     if (m !== tileMode) {
       tileMode = m;
       let items, value;
-      if (m === "dough") { items = DOUGHS.map((d, i) => ({ id: d.id, name: d.name, pic: PIC.dough(i) })); value = DOUGHS[C.d].id; }
-      else if (m === "cutters") { items = SHAPES.map((s, i) => ({ id: s.id, name: s.name, pic: PIC.cutter(i) })); value = SHAPES[pick.cutter].id; }
+      if (m === "cutters") { items = SHAPES.map((s, i) => ({ id: s.id, name: s.name, pic: PIC.cutter(i) })); value = SHAPES[pick.cutter].id; }
       else if (m === "decor") { items = TOOLS.map((t) => ({ id: t.id, name: t.name, pic: t.kind === "icing" ? PIC.icing(ICING[t.c]) : t.kind === "sprinkles" ? PIC.sprinkles : PIC.candy(t.t) })); value = TOOLS[pick.tool].id; }
       else { items = HTOOLS.map((t) => ({ id: t.id, name: t.name, pic: t.kind === "icing" ? PIC.icing("#FFFFFF") : t.kind === "candy" ? PIC.candy(t.t) : PIC[t.kind] })); value = HTOOLS[pick.htool].id; }
       tileOpts.rows = items.length <= 2 ? 1 : 2;
@@ -1912,12 +2047,7 @@
   function onTile(id) {
     if (locked()) return;
     const m = tileMode;
-    if (m === "dough") {
-      const d = DOUGHS.findIndex((q) => q.id === id);
-      if (d < 0 || C.stage !== "prep" || C.roll >= 1 || C.cuts.length) return;
-      C.d = d; V.doughWob = 1; puff("flour", L.sheet.x, L.sheet.y, 6);
-      tag(DOUGHS[d].name + " dough", L.sheet.x, L.sheet.y - 50);
-    } else if (m === "cutters") {
+    if (m === "cutters") {
       const k = SHAPES.findIndex((q) => q.id === id);
       if (k >= 0) { pick.cutter = k; V.cutterWob = 1; }
     } else if (m === "decor") {
@@ -1948,8 +2078,9 @@
     const d = drag;
     drag = null; V.hand = null; V.held = null;
     if (d.k === "cookie") { d.q.show = 1; dragCookie = null; }
-    if (d.k === "tray") backToCounter({ x: V.tray.x, y: V.tray.y, k: V.tray.k });
-    if (d.k === "out") { busy = false; C.stage = "baked"; takeOut({ x: V.tray.x, y: V.tray.y, k: V.tray.k }); }
+    if (d.k === "carry") endCarry(d, false);
+    if (d.k === "mitt") mittHome();
+    if (d.k === "spat") { if (V.spat.carry) cookieBack(V.spat.carry); else spatBack(); }
     if (d.k === "cutter") cutterHome();
     if (d.k === "ice") bagHome();
     if (d.k === "door") doorTo(V.door > 0.45 ? 1 : 0, 0.3);
@@ -2013,6 +2144,10 @@
     // Sprinkles keep falling while his finger holds the shaker.
     if (drag && drag.k === "tool" && drag.d.kind === "sprinkles") { drag.d.acc = (drag.d.acc || 0) + dt; while (drag.d.acc > 0.06) { drag.d.acc -= 0.06; sprinkleBurst(drag.sf, drag.d.l, 1); } }
     if (dragCookie && (!drag || drag.k !== "cookie")) dragCookie = null;
+    // The gripping mitt stays on the sheet's edge wherever the sheet goes.
+    if (V.mitt.mode === "grip") { const g = mittGrip(); V.mitt.x = g.x; V.mitt.y = g.y; }
+    ["mittWob", "spatWob"].forEach((k) => { V[k] = Math.max(0, V[k] - dt * 1.6); });
+    V.bowlWob = V.bowlWob.map((v) => Math.max(0, v - dt * 1.6));
     steamFrom(dt);
     updateCoach();
     refreshTiles();
@@ -2034,6 +2169,7 @@
       ctx.restore();
       if (V.held) drawCandy(V.held.t, V.held.w.x, V.held.w.y, V.held.c, V.held.t === "c" ? 13 : 10, 1.6);
     }
+    drawBowls();
     drawHand(t);
     drawParts();
     drawRing(t);
