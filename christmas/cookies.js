@@ -1720,8 +1720,8 @@
     let best = null, bd = Infinity;
     const cand = (id, x, y, r) => { const d = Math.hypot(w.x - x, w.y - y); if (d <= Math.max(r, minR) && d - r * 0.3 < bd) { bd = d - r * 0.3; best = id; } };
     // The dough bowls, in both jobs.
-    const bi = L.bowls.findIndex((b) => Math.hypot(w.x - b.x, w.y - b.y + 2) < 27);
-    if (bi >= 0) return "bowl" + bi;
+    const bd2 = L.bowls.map((b) => Math.hypot(w.x - b.x, w.y - b.y + 2)), bi = bd2[0] <= bd2[1] ? 0 : 1;
+    if (bd2[bi] < Math.max(27, 22 / vs)) return "bowl" + bi;
     if (job === "house") {
       const i = activePiece();
       if (i >= 0) {

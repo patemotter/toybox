@@ -1400,7 +1400,7 @@
     ctx.save(); ctx.translate(x, y); ctx.scale(sc || 1, sc || 1); ctx.rotate(Math.sin(t * 6) * swing * 0.12);
     line(0, -4, 0, 12, INK, 3);
     // The last few things poke out of the top.
-    items.slice(-4).forEach((id, k) => { const n = Math.min(4, items.length); drawThing(id, (k - (n - 1) / 2) * 18, 18 - (k % 2) * 6, 30, { t }); });
+    items.slice(-4).forEach((id, k) => { const n = Math.min(4, items.length); drawThing(id, (k - (n - 1) / 2) * 18, 2 - (k % 2) * 6, 30, { t }); });
     const top = 30, leg = 92, foot = 46;
     ctx.beginPath();
     ctx.moveTo(-bw / 2, top);
@@ -1647,7 +1647,7 @@
         if (K.stickers.includes(q.id) || (V.carry && V.carry.id === q.id)) return;
         const s = extraSlot(1 + i); at(s.x, s.y, "st" + i, () => drawSticker(q.id, 0, 0, 1.8));
       });
-    } else if (k === "bags") BAGS.forEach((b, i) => { if (V.bag && V.bag.i === i) return; const s = bagSlot(i); at(s.x, s.y + 30, "b" + i, () => drawBag(b, 0, 0, L === TALL ? 0.5 : 0.5, { t })); });
+    } else if (k === "bags") BAGS.forEach((b, i) => { if (V.bag && V.bag.i === i) return; const s = bagSlot(i); at(s.x, s.y + 32, "b" + i, () => drawBag(b, 0, 0, L === TALL ? 0.6 : 0.52, { t })); });
     else if (k === "tissue") TISSUE.forEach((c, i) => {
       if (K.tissue.includes(i) || (V.carry && V.carry.kind === "tissue" && V.carry.id === i)) return;
       const s = tisSlot(i); at(s.x, s.y, "ts" + i, () => drawTissueSheet(c, 1));
@@ -2107,7 +2107,7 @@
     if (!ln) { coach.busy(); return; }
     coach.step(ln);
     // The line keeps clear of the work in the middle (the mat or his present).
-    const p = phase === "mine" ? partPt(w.part) : K.job === "stocking" ? stockTop() : { x: L.mat.x, y: L.mat.y };
+    const p = phase === "mine" ? partPt(w.part) : K.job === "stocking" ? { x: V.stock.x, y: V.stock.y + 110 * stK() } : { x: L.mat.x, y: L.mat.y };
     if (p) { const v = vp(p.x, p.y); coach.avoid(v.x, v.y); }
   }
   const ghost = Toybox.ghost({
@@ -2186,8 +2186,15 @@
         if (/^(tri|flap)R$/.test(st) && inRect(w, [g.x1 - 10, g.y0, g.sx1, g.yf], 14)) return "endR";
         if (st === "bow") { [0, 1].forEach((kk) => { if (K.loop[kk] < 1) { const h = loopHandle(kk); cand("loop" + kk, h.x, h.y, 22); } }); if (best) return best; }
         if (st === "curl") {
-          [0, 1].forEach((kk) => { if (K.curl[kk] < 1) { const a = knotPt(), b = tailEnd(kk); cand("tail" + kk, lerp(a.x, b.x, 0.6), lerp(a.y, b.y, 0.6), 26); } });
-          if (best) return best;
+          // Anywhere along a ribbon end (from the knot to its tip) picks it up.
+          let tk = -1, td = 30;
+          [0, 1].forEach((kk) => {
+            if (K.curl[kk] >= 1) return;
+            const a = knotPt(), b = tailEnd(kk), dx = b.x - a.x, dy = b.y - a.y, u = clamp(((w.x - a.x) * dx + (w.y - a.y) * dy) / (dx * dx + dy * dy), 0, 1);
+            const dd = Math.hypot(w.x - (a.x + dx * u), w.y - (a.y + dy * u)) - (u < 0.15 ? 8 : 0);
+            if (dd < td) { td = dd; tk = kk; }
+          });
+          if (tk >= 0) return "tail" + tk;
         }
         if (K.placed && inRect(w, [g.x0, g.y0, g.x1, g.yf], 10)) return "box";
         if (st === "gift" && inRect(w, [g.x0, g.y0, g.x1, g.yf], 10)) return "box";
