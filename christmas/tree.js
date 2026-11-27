@@ -1,45 +1,61 @@
 (function () {
   "use strict";
-  // Christmas · Tree: a cozy evening living room with a big bare fir tree in its stand, a window with snow
-  // falling outside, a wreath on the wall, a box of ornaments on the floor and a wall socket by the baseboard.
+  // Christmas · Tree: a cozy evening living room with a big bare tree in its stand, a window with snow falling
+  // outside, a wreath on the wall, a box of ornaments and a box of lights and garland on the floor. The lights'
+  // cord is already plugged into the wall socket; the lights start switched off.
   // He decorates the tree the real way, with his hands on the scene:
-  //   1. Lights: he drags a finger across the tree and a light string drapes along his path (the wire sags a
-  //      little between the branches and the bulbs sit along it, kept on the tree). A tap on the tree winds one
-  //      whole wrap of lights round the tree at that height. The light colors (Colors, Warm white, Blue) are
-  //      the panel tiles: a real "pick one" for the next string.
-  //   2. Plug in: the strings' cord runs from the stand, through the light button, to a plug lying on the floor.
-  //      Drag the plug into the wall socket (or tap it) and every light switches on with a warm glow, the star
-  //      glows and the room dims a little. Pull it out (or tap it again) to switch off. Before there are lights
-  //      the plug still goes in (the star and the button's little lamp answer, and a line says what to do).
-  //   3. Ornaments: the ornament box on the floor holds balls in four colors, a bell, a candy cane, a pinecone,
-  //      a snowflake, an icicle and the star topper. Drag one onto the tree and it hangs from the nearest free
-  //      branch tip; tap one and it hops onto the next free branch by itself. The box always has more (the star
-  //      is the only one). Hung ornaments swing when touched and can be dragged to another branch or back into
-  //      the box.
-  //   4. The star topper has its own place at the very top of the tree.
-  //   5. The light button on the cord changes the lights: Steady, Twinkle or Slow fade (all calm, no flashing).
-  // A yellow ring and one instruction show the next part (tree, then plug, then the box, the star and the
-  // button); everything else still answers (a name tag, a swing, a wiggle). New = a bare tree again. Surprise
-  // takes turns between live moments: a slow chase runs round the lit tree, snow falls thickly outside, every
-  // ornament sparkles in turn, and a toy train rolls past the tree.
-  // A visit from the home screen starts with a bare tree; a reload keeps the tree as it was.
+  //   1. Lights: a coil of the picked lights sits in the lights box. He touches the coil and drags: the free end
+  //      follows his finger, the string pays out behind it, and wherever it crosses the tree it drapes onto the
+  //      branches (the wire sags a little between them and the bulbs sit along it). Letting go leaves it hanging.
+  //      A tap on the coil winds one whole wrap round the tree by itself (the next wrap goes where the tree is
+  //      barest). Dragging on the bare tree draws a string too (a second way; the kind last used).
+  //   2. The switch on the cord: each press goes Off, Steady, Twinkle, Slow fade, Off (all calm, no flashing),
+  //      and a name tag says which. With no lights up yet it still clicks and a line says what to do.
+  //   3. Garland: the coil of the picked garland sits beside the lights and works the same way (drag to drape
+  //      it, with a deeper sag; tap for a whole wrap). Tinsel is a shimmery fringe that glints, more when lit.
+  //   4. Ornaments: the ornament box holds balls in four colors, a bell, a candy cane, a pinecone, a snowflake,
+  //      an icicle and the star topper. Drag one onto the tree and it hangs from the nearest free branch tip; tap
+  //      one and it hops onto the next free branch by itself. The box always has more (the star is the only one).
+  //   5. The star topper has its own place at the very top of the tree.
+  //   6. Taking things off: drag a hung ornament or the star off the tree and it goes back into the box. Press
+  //      and pull a hung string or garland and it comes off the tree with his finger: let go off the tree (or on
+  //      a box) and it winds back into its coil; let go on the tree and it hangs there instead. The box lifts its
+  //      lid and glows while an ornament is carried over it, the lights box glows while a string is. A plain tap
+  //      on a string only wiggles it and says its name.
+  // The panel: folder tabs under the stage (Tree, Lights, Garland), each with pick-one tiles: the tree's shape
+  // (Classic, Tall and slim, Round and full, Little) and color (Green, Blue spruce, Snowy, Silver); eight light
+  // colors (they set the lights coil); eight garlands (they set the garland coil). Changing the tree keeps the
+  // decorating: strings are kept relative to the tree (height fraction, and side-to-side as a fraction of the half
+  // width there) and ornaments by branch tip, so everything glides to the new shape while the tree pops.
+  // A yellow ring and one instruction show the next part (the lights coil, the switch, the garland coil, the box,
+  // the star, the switch again); everything else still answers (a name tag, a swing, a wiggle). New = a bare tree
+  // again (strings wind back into their coils, ornaments hop into the box, the lights switch off). Surprise takes
+  // turns between live moments: a slow chase runs round the lit tree, snow falls thickly outside, every ornament
+  // sparkles in turn, and a toy train rolls past the tree.
+  // A visit from the home screen starts with a bare Classic green tree; a reload keeps the tree as it was.
+  // Saved (localStorage "christmas-tree-v1", key "tree"): { v: 2, shape, tc, s: [{ k: "l" | "g", c, r: [[u, v]
+  // x1000] }], o: [{ t, s (branch tip of that shape) }], star, power (0..3), color, gar, tried, tab }. Older saves
+  // ({ s: [{ c, a: [[x, y]] }] in Classic tree units, plug, mode }) still load: Classic, Green, lights off.
   // Units: the room is drawn in world units (the TALL, MID or WIDE layout, picked from the stage's shape) scaled to
-  // fit the stage; the tree, its lights and ornaments are drawn in tree units (the tree's own frame: 0 at the
-  // star, about 470 down to the floor), so the decorations stay put whichever layout shows.
+  // fit the stage; the tree, its strings and ornaments are drawn in tree units (the tree's own frame: 0 at the
+  // top of the Classic tree's star, about 470 down to the floor), so the decorations stay put whichever layout
+  // shows.
   //
   // Sections:
   //   Setup and saved state
-  //   Lights, ornaments and patterns
+  //   Choices: tree shapes and colors, lights, garland, ornaments
   //   Layout
-  //   The tree shape and branch tips
+  //   The tree shape, branch tips and tree-relative points
   //   Tweens and particles
-  //   Light strings
+  //   Strings: lights and garland
+  //   Live strings, wraps, pulling off and winding back
   //   Ornaments
-  //   Plug, socket and light button
+  //   Switch
+  //   Changing the tree
   //   Drawing helpers
   //   Drawing the room
-  //   Drawing the tree, lights, ornaments and star
-  //   Drawing the box, cord, plug and train
+  //   Drawing the tree, strings, ornaments and star
+  //   Drawing the boxes, coils, cord, switch and train
   //   What comes next: coach, ring and ghost hand
   //   Input
   //   Panel and surprise
@@ -49,12 +65,14 @@
   // Setup and saved state
   // =====================================================================================================
   const $ = (id) => document.getElementById(id);
-  const cv = $("cv"), ctx = cv.getContext("2d"), stage = $("stage");
+  const cv = $("cv"), stage = $("stage");
+  let ctx = cv.getContext("2d");
   const TAU = Math.PI * 2, INK = "#1D2340", LW = 2.4;
   const now = () => performance.now() / 1000;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const backOut = (t) => { const u = clamp(t, 0, 1) - 1; return 1 + 2.2 * u * u * u + 1.2 * u * u; };
   const hash = (i, k) => { const s = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return s - Math.floor(s); };
   const reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   let ending = false;
@@ -69,16 +87,60 @@
   const st0 = !fresh && saved.tree && typeof saved.tree === "object" ? saved.tree : null;
 
   // =====================================================================================================
-  // Lights, ornaments and patterns
+  // Choices: tree shapes and colors, lights, garland, ornaments
   // =====================================================================================================
+  // Each shape is tiers of branches, top to bottom (tree units): top yt with half width wt, bottom yb with half
+  // width wb, and n branch tips along the bottom. Every shape's lowest tier ends at YB.
+  const SHAPES = [
+    { id: "classic", name: "Classic", tiers: [
+      { yt: 12, yb: 104, wt: 0, wb: 58, n: 2 }, { yt: 62, yb: 172, wt: 22, wb: 88, n: 3 }, { yt: 122, yb: 246, wt: 36, wb: 118, n: 4 },
+      { yt: 186, yb: 322, wt: 50, wb: 146, n: 5 }, { yt: 254, yb: 400, wt: 64, wb: 172, n: 6 }] },
+    { id: "slim", name: "Tall and slim", tiers: [
+      { yt: 4, yb: 88, wt: 0, wb: 40, n: 2 }, { yt: 56, yb: 148, wt: 14, wb: 58, n: 2 }, { yt: 112, yb: 210, wt: 22, wb: 74, n: 3 },
+      { yt: 170, yb: 274, wt: 30, wb: 90, n: 4 }, { yt: 234, yb: 338, wt: 38, wb: 104, n: 4 }, { yt: 296, yb: 400, wt: 46, wb: 118, n: 5 }] },
+    { id: "round", name: "Round and full", tiers: [
+      { yt: 48, yb: 132, wt: 0, wb: 84, n: 3 }, { yt: 94, yb: 198, wt: 40, wb: 132, n: 4 }, { yt: 156, yb: 268, wt: 66, wb: 164, n: 4 },
+      { yt: 226, yb: 336, wt: 86, wb: 182, n: 5 }, { yt: 294, yb: 400, wt: 96, wb: 174, n: 5 }] },
+    { id: "little", name: "Little", tiers: [
+      { yt: 176, yb: 248, wt: 0, wb: 50, n: 2 }, { yt: 212, yb: 298, wt: 18, wb: 80, n: 3 }, { yt: 258, yb: 350, wt: 28, wb: 106, n: 4 },
+      { yt: 306, yb: 400, wt: 38, wb: 128, n: 5 }] }
+  ];
+  const SHAPE_BY = {};
+  SHAPES.forEach((s) => { SHAPE_BY[s.id] = s; });
+  // Tree colors: the branches, the shade under each tier, the lighter needles along the tips.
+  const TCOLS = [
+    { id: "green", name: "Green", tag: "Fir tree", fill: "#2E9A57", shade: "#237A45", tip: "#4CBB76" },
+    { id: "spruce", name: "Blue spruce", tag: "Blue spruce", fill: "#3F8F8C", shade: "#2D6E70", tip: "#82C6BF" },
+    { id: "snowy", name: "Snowy", tag: "Snowy tree", fill: "#EDF5F7", shade: "#86B99C", tip: "#FFFFFF", flock: "#5FA77A" },
+    { id: "silver", name: "Silver", tag: "Silver tree", fill: "#C9D2DE", shade: "#98A5B8", tip: "#F4F7FB", shine: true }
+  ];
+  const TC_BY = {};
+  TCOLS.forEach((c) => { TC_BY[c.id] = c; });
   const LIGHTS = [
     { id: "colors", name: "Colors", cols: ["#FF4A4A", "#3FD16A", "#3D8BFF", "#FFD23B", "#FF8A2E"] },
     { id: "warm", name: "Warm white", cols: ["#FFE09A"] },
-    { id: "blue", name: "Blue", cols: ["#4FA8FF"] }
+    { id: "cool", name: "Cool white", cols: ["#E4F3FF"] },
+    { id: "red", name: "Red", cols: ["#FF3B3B"] },
+    { id: "green", name: "Green", cols: ["#3FD16A"] },
+    { id: "blue", name: "Blue", cols: ["#4FA8FF"] },
+    { id: "gold", name: "Gold", cols: ["#FFB82E"] },
+    { id: "purple", name: "Purple", cols: ["#B57BFF"] }
   ];
   const LIGHT_BY = {};
   LIGHTS.forEach((l) => { LIGHT_BY[l.id] = l; });
-  const MODES = [{ id: "steady", name: "Steady" }, { id: "twinkle", name: "Twinkle" }, { id: "fade", name: "Slow fade" }];
+  // Garland: kind is how it is drawn; cols its colors (tinsel: base, dark, glint).
+  const GARLANDS = [
+    { id: "gold", name: "Gold tinsel", kind: "tinsel", cols: ["#FFC93C", "#D9900F", "#FFF1A6"] },
+    { id: "silver", name: "Silver tinsel", kind: "tinsel", cols: ["#D3DBE6", "#8F9CAF", "#FFFFFF"] },
+    { id: "red", name: "Red tinsel", kind: "tinsel", cols: ["#EE3445", "#A3162A", "#FFA3AA"] },
+    { id: "beads", name: "Beads", kind: "beads", cols: ["#FFC93C", "#E8303F"] },
+    { id: "popcorn", name: "Popcorn", kind: "popcorn", cols: ["#FFF8E4"] },
+    { id: "berries", name: "Cran\u00ADberries", kind: "berries", cols: ["#C8182F"] },
+    { id: "chain", name: "Paper chain", kind: "chain", cols: ["#E8303F", "#2FA84F", "#FFC93C"] },
+    { id: "ribbon", name: "Ribbon", kind: "ribbon", cols: ["#D7263D", "#FFC93C"] }
+  ];
+  const GAR_BY = {};
+  GARLANDS.forEach((g) => { GAR_BY[g.id] = g; });
   // Each ornament hangs from a hook at (0, 0) in its own frame; cy and r are its middle and size below the hook.
   const ORNS = [
     { id: "red", name: "Red ball", kind: "ball", col: "#E8303F", cy: 27, r: 15 },
@@ -96,51 +158,68 @@
   ORNS.forEach((o) => { ORN_BY[o.id] = o; });
   // The box: five across, two rows (the order of ORNS).
   const CELLS = ORNS.map((o) => o.id);
+  // The switch: Off, then the three patterns.
+  const POWER = ["Off", "Steady", "Twinkle", "Slow fade"];
+  const POWER_ID = ["off", "steady", "twinkle", "fade"];
 
-  // The tree right now. strands: [{ c: light id, a: [{x, y}] anchors in tree units, ...built }];
+  // The tree right now. strands: [{ k: "l" (lights) | "g" (garland), c: light or garland id, r: [{u, v}] anchors
+  // relative to the tree, a: [{x, y}] the same anchors in tree units for this shape, ...built }];
   // orns: [{ t: ornament id, s: branch tip index, sw, swv, sp }].
-  const S = { strands: [], orns: [], star: false, plugged: false, mode: 0, color: "colors", modeTried: false };
+  const S = { shape: "classic", tc: "green", strands: [], orns: [], star: false, power: 0, color: "colors", gar: "gold",
+    modeTried: false, tab: "lights", lastKind: "l" };
 
   let saveTimer = 0;
+  const q3 = (v) => Math.round(v * 1000);
   function save() {
     clearTimeout(saveTimer); saveTimer = 0;
     try {
       localStorage.setItem(KEY, JSON.stringify({
         tree: {
-          s: S.strands.map((st) => ({ c: st.c, a: st.a.map((p) => [Math.round(p.x), Math.round(p.y)]) })),
+          v: 2, shape: S.shape, tc: S.tc,
+          s: S.strands.map((sd) => ({ k: sd.k, c: sd.c, r: sd.r.map((q) => [q3(q.u), q3(q.v)]) })),
           o: S.orns.map((o) => ({ t: o.t, s: o.s })),
-          star: S.star, plug: S.plugged, mode: S.mode, color: S.color, tried: S.modeTried
+          star: S.star, power: S.power, color: S.color, gar: S.gar, tried: S.modeTried, tab: S.tab
         }
       }));
     } catch (e) { /* ignore */ }
   }
   function saveSoon() { if (!saveTimer) saveTimer = setTimeout(save, 400); }
 
+  // Little bits of state the drawing and input share (declared early: resize and the loop read them).
+  let boxWob = 0, trayWob = 0, ctrlPress = 0, starWob = 0, wreathWob = 0, plugWob = 0, boxHot = 0, trayHot = 0;
+  const coilWob = { l: 0, g: 0 };
+  let sway = 0, swayV = 0, pop = null, tcMorph = null, morph = null;
+  let drag = null, skipTap = false, live = null, pull = null, carry = null, actor = null, lastWant = null;
+  let fly = [], fading = [], winding = [], tweens = [], parts = [];
+
   // =====================================================================================================
   // Layout
   // =====================================================================================================
   // Three layouts in world units: TALL (upright phones), MID (tablets, a stage that is nearly square) and WIDE
-  // (sideways phones). tree: where the tree's frame sits (its star) and its scale.
+  // (sideways phones). tree: where the tree's frame sits and its scale; box: the ornament box; tray: the lights
+  // box with the two coils (coil: how big they are drawn); ctrl: the switch on the cord.
   const TALL = {
-    w: 400, h: 620, floor: 438,
-    tree: { x: 200, y: 48, s: 0.95 },
-    win: { x: 14, y: 46, w: 104, h: 148 },
-    wreath: { x: 340, y: 104, r: 32 },
-    socket: { x: 372, y: 400 },
-    box: { x: 12, y: 506, w: 236, h: 108 },
-    ctrl: { x: 290, y: 540 },
-    plugRest: { x: 354, y: 584 },
-    trainY: 500
+    w: 410, h: 562, floor: 370,
+    tree: { x: 205, y: 40, s: 0.88 },
+    win: { x: 12, y: 44, w: 96, h: 136 },
+    wreath: { x: 352, y: 100, r: 30 },
+    socket: { x: 390, y: 326 },
+    box: { x: 6, y: 450, w: 236, h: 106 },
+    tray: { x: 250, y: 452, w: 154, h: 104 },
+    ctrl: { x: 334, y: 404 },
+    coil: 1.25,
+    trainY: 446
   };
   const MID = {
     w: 620, h: 560, floor: 402,
-    tree: { x: 360, y: 48, s: 0.98 },
+    tree: { x: 340, y: 48, s: 0.98 },
     win: { x: 30, y: 52, w: 124, h: 172 },
     wreath: { x: 556, y: 112, r: 36 },
-    socket: { x: 588, y: 366 },
+    socket: { x: 588, y: 360 },
     box: { x: 14, y: 444, w: 236, h: 108 },
-    ctrl: { x: 520, y: 500 },
-    plugRest: { x: 584, y: 532 },
+    tray: { x: 466, y: 450, w: 144, h: 102 },
+    ctrl: { x: 546, y: 420 },
+    coil: 1.15,
     trainY: 534
   };
   const WIDE = {
@@ -148,10 +227,11 @@
     tree: { x: 410, y: 40, s: 0.875 },
     win: { x: 46, y: 46, w: 150, h: 180 },
     wreath: { x: 690, y: 114, r: 40 },
-    socket: { x: 772, y: 296 },
+    socket: { x: 772, y: 290 },
     box: { x: 22, y: 364, w: 236, h: 108 },
-    ctrl: { x: 600, y: 430 },
-    plugRest: { x: 694, y: 450 },
+    tray: { x: 600, y: 368, w: 150, h: 104 },
+    ctrl: { x: 556, y: 352 },
+    coil: 1.35,
     trainY: 458
   };
   let L = TALL, W = 0, H = 0, dpr = 1, vs = 1, vox = 0, voy = 0;
@@ -160,13 +240,10 @@
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    const was = L;
     const ar = W / H;
-    L = ar > 1.45 ? WIDE : ar > 0.82 ? MID : TALL;
+    L = ar > 1.45 ? WIDE : ar > 1 ? MID : TALL;
     vs = Math.min(W / L.w, H / L.h) * 0.97;
     vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) / 2;
-    if (was !== L && !P.in && !P.held) { P.x = L.plugRest.x; P.y = L.plugRest.y; }
-    if (P.in) { const s = socketPt(); P.x = s.x; P.y = s.y; }
   }
   // World <-> viewport px, and tree units <-> world.
   function vp(x, y) { const r = cv.getBoundingClientRect(); return { x: r.left + vox + x * vs, y: r.top + voy + y * vs }; }
@@ -174,26 +251,30 @@
   function tw(x, y) { const T = L.tree; return { x: T.x + x * T.s, y: T.y + y * T.s }; }
   function tl(x, y) { const T = L.tree; return { x: (x - T.x) / T.s, y: (y - T.y) / T.s }; }
   const tvp = (x, y) => { const w = tw(x, y); return vp(w.x, w.y); };
+  // The two coils sit in the lights box: the lights on the left, the garland on the right.
+  const COIL_R = 25;
+  const coilPos = (k) => { const T = L.tray; return { x: T.x + T.w * (k === "l" ? 0.27 : 0.73), y: T.y + T.h * 0.44 }; };
+  const coilS = () => L.tree.s * L.coil;
+  // Where a string leaves its coil (tree units).
+  const coilTreePt = (k) => { const c = coilPos(k); return tl(c.x, c.y - 6 * coilS()); };
+  const inBox = (w, m) => w.x >= L.box.x - m && w.x <= L.box.x + L.box.w + m && w.y >= L.box.y - 14 - m && w.y <= L.box.y + L.box.h + m;
+  const inTray = (w, m) => w.x >= L.tray.x - m && w.x <= L.tray.x + L.tray.w + m && w.y >= L.tray.y - 10 - m && w.y <= L.tray.y + L.tray.h + m;
 
   // =====================================================================================================
-  // The tree shape and branch tips
+  // The tree shape, branch tips and tree-relative points
   // =====================================================================================================
-  // Five tiers of branches, top to bottom (tree units): top yt with half width wt, bottom yb with half width
-  // wb, and n branch tips along the bottom.
-  const TIERS = [
-    { yt: 12, yb: 104, wt: 0, wb: 58, n: 2 },
-    { yt: 62, yb: 172, wt: 22, wb: 88, n: 3 },
-    { yt: 122, yb: 246, wt: 36, wb: 118, n: 4 },
-    { yt: 186, yb: 322, wt: 50, wb: 146, n: 5 },
-    { yt: 254, yb: 400, wt: 64, wb: 172, n: 6 }
-  ];
-  // The branch tips an ornament can hang from: one hook per tip, just inside it.
-  const SPOTS = [];
-  TIERS.forEach((t, i) => {
-    for (let j = 0; j < t.n; j++) SPOTS.push({ x: (-t.wb + (2 * j + 1) * t.wb / t.n) * 0.86, y: t.yb - 30, tier: i });
-  });
-  // The star's hook (its middle sits 28 below).
-  const TOP = { x: 0, y: -32 };
+  const YB = 400;
+  let SH = SHAPE_BY.classic, TIERS = SH.tiers, YT = 12, TOP = { x: 0, y: -32 }, SPOTS = [];
+  // Makes a shape the current one: its tiers, its branch tips (one hook per tip, just inside it) and the star's
+  // hook (the star's middle sits 28 below it).
+  function useShape(sh) {
+    SH = sh; TIERS = sh.tiers; YT = TIERS[0].yt; TOP = { x: 0, y: YT - 44 };
+    SPOTS = [];
+    TIERS.forEach((t, i) => {
+      for (let j = 0; j < t.n; j++) SPOTS.push({ x: (-t.wb + (2 * j + 1) * t.wb / t.n) * 0.86, y: t.yb - 30, tier: i, j, n: t.n });
+    });
+  }
+  useShape(SH);
   // Half the tree's width at height y (the widest tier there).
   function hwAt(y) {
     let w = 0;
@@ -201,19 +282,33 @@
     return w;
   }
   function overTree(p, m) {
-    if (p.y < TIERS[0].yt - m || p.y > 402 + m) return false;
-    return Math.abs(p.x) <= hwAt(clamp(p.y, 14, 400)) + m;
+    if (p.y < YT - m || p.y > YB + 2 + m) return false;
+    return Math.abs(p.x) <= hwAt(clamp(p.y, YT + 2, YB)) + m;
   }
-  // A point kept on the branches (lights never hang in the air).
+  // A point kept on the branches (strings never hang in the air).
   function onTree(p) {
-    const y = clamp(p.y, 30, 392), hw = Math.max(6, hwAt(y) - 10);
+    const y = clamp(p.y, YT + 18, YB - 8), hw = Math.max(6, hwAt(y) - 10);
     return { x: clamp(p.x, -hw, hw), y };
+  }
+  // Tree-relative points: v = how far down the branches (0 at the top tier, 1 at the bottom), u = side to side as a
+  // fraction of the half width at that height. They survive a change of shape.
+  function toRel(p) { const hw = Math.max(1, hwAt(p.y)); return { u: clamp(p.x / hw, -1, 1), v: clamp((p.y - YT) / (YB - YT), 0, 1) }; }
+  function fromRel(q) { const y = YT + q.v * (YB - YT); return onTree({ x: q.u * hwAt(y), y }); }
+  // A branch tip as fractions (which tier, where along it), and the free tip of the current shape closest to them.
+  function spotFrac(i) { const p = SPOTS[i]; return { tf: TIERS.length > 1 ? p.tier / (TIERS.length - 1) : 0, jf: (p.j + 0.5) / p.n }; }
+  function fitSpot(fr, taken) {
+    let best = -1, bd = Infinity;
+    SPOTS.forEach((p, i) => {
+      if (taken.has(i)) return;
+      const f = spotFrac(i), d = (f.tf - fr.tf) * (f.tf - fr.tf) * 3 + (f.jf - fr.jf) * (f.jf - fr.jf);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
   }
 
   // =====================================================================================================
   // Tweens and particles
   // =====================================================================================================
-  let tweens = [];
   function tween(dur, step, done, delay) {
     const t = { t0: now() + (delay || 0), dur: Math.max(0.01, dur), step, done };
     tweens.push(t);
@@ -229,7 +324,6 @@
     }
   }
   // Particles in world units: sparkles (four-point twinkles) and puffs (steam from the toy train).
-  let parts = [];
   function sparkle(x, y, n, spread, col) {
     if (reduce) n = Math.ceil(n / 2);
     for (let i = 0; i < n; i++) {
@@ -248,11 +342,12 @@
   }
 
   // =====================================================================================================
-  // Light strings
+  // Strings: lights and garland
   // =====================================================================================================
-  // A string is a list of anchors on the branches; the wire sags a little between neighbors (it drapes), and
-  // the bulbs sit along the wire every GAP.
-  const GAP = 14, SEG = 34, MAX_STRANDS = 28;
+  // A string is a list of anchors on the branches; the wire sags between neighbors (it drapes; garland sags
+  // deeper), and the bulbs (or beads, links, tinsel) sit along it. A loose anchor (the bit between a coil and the
+  // tree, or out to his finger) hangs in a deep curve.
+  const GAP = 14, SEG = 34, MAX_LIGHTS = 28, MAX_GAR = 16;
   let seedN = 1;
   function anchorsFrom(raw) {
     if (!raw.length) return [];
@@ -278,94 +373,244 @@
     for (let i = 1; i < poly.length; i++) {
       if (poly[i].d >= s) {
         const a = poly[i - 1], b = poly[i], k = (s - a.d) / Math.max(0.001, b.d - a.d);
-        return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) };
+        return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), ang: Math.atan2(b.y - a.y, b.x - a.x) };
       }
     }
-    const e = poly[poly.length - 1];
-    return { x: e.x, y: e.y };
+    const e = poly[poly.length - 1], f = poly[Math.max(0, poly.length - 2)];
+    return { x: e.x, y: e.y, ang: Math.atan2(e.y - f.y, e.x - f.x) };
   }
-  // Works out the wire (poly) and the bulbs of a string from its anchors.
-  function build(st) {
-    const a = st.a, poly = [];
-    if (!st.seed) st.seed = seedN++;
+  // How far apart the garland's pieces sit along it.
+  const GSTEP = { tinsel: 2.4, beads: 6.6, popcorn: 8.5, berries: 7.4, chain: 8.6, ribbon: 0 };
+  // Works out the wire (poly) and the bulbs or garland pieces of a string from its anchors.
+  function build(sd) {
+    const a = sd.a, poly = [], G = sd.k === "g";
+    if (!sd.seed) sd.seed = seedN++;
     if (a.length) poly.push({ x: a[0].x, y: a[0].y, d: 0 });
     for (let i = 0; i + 1 < a.length; i++) {
-      const A = a[i], B = a[i + 1], dist = Math.hypot(B.x - A.x, B.y - A.y), sag = Math.min(9, dist * 0.26);
-      const cx = (A.x + B.x) / 2, cy = (A.y + B.y) / 2 + sag;
-      for (let k = 1; k <= 8; k++) {
-        const t = k / 8, u = 1 - t;
+      const A = a[i], B = a[i + 1], dist = Math.hypot(B.x - A.x, B.y - A.y);
+      const sag = sd.flat ? 0 : B.loose ? Math.min(90, dist * 0.34) : G ? Math.min(15, dist * 0.42) : Math.min(9, dist * 0.26);
+      const cx = (A.x + B.x) / 2, cy = (A.y + B.y) / 2 + sag, n = B.loose ? 14 : 8;
+      for (let k = 1; k <= n; k++) {
+        const t = k / n, u = 1 - t;
         poly.push({ x: u * u * A.x + 2 * u * t * cx + t * t * B.x, y: u * u * A.y + 2 * u * t * cy + t * t * B.y, d: 0 });
       }
     }
     let d = 0;
     for (let i = 1; i < poly.length; i++) { d += Math.hypot(poly[i].x - poly[i - 1].x, poly[i].y - poly[i - 1].y); poly[i].d = d; }
-    st.poly = poly; st.len = d;
-    const cols = (LIGHT_BY[st.c] || LIGHTS[0]).cols, b = [];
-    let k = 0;
-    for (let s = Math.min(GAP * 0.5, d); s <= d + 0.01; s += GAP) {
-      const p = along(poly, s), col = cols[(k + st.seed) % cols.length];
-      b.push({ x: p.x, y: p.y, d: s, col, dim: mixHex(col, "#59627A", 0.5), ph: hash(k, st.seed) * TAU, w: 1.3 + hash(k, st.seed + 7) * 1.5, tilt: (k % 2 ? 1 : -1) * 0.32 });
-      k++;
+    sd.poly = poly; sd.len = d;
+    const b = [];
+    if (!G) {
+      const cols = (LIGHT_BY[sd.c] || LIGHTS[0]).cols;
+      let k = 0;
+      for (let s = Math.min(GAP * 0.5, d); s <= d + 0.01; s += GAP) {
+        const p = along(poly, s), col = cols[(k + sd.seed) % cols.length];
+        b.push({ x: p.x, y: p.y, d: s, col, dim: mixHex(col, "#59627A", 0.5), ph: hash(k, sd.seed) * TAU, w: 1.3 + hash(k, sd.seed + 7) * 1.5, tilt: (k % 2 ? 1 : -1) * 0.32, k: 1 });
+        k++;
+      }
+    } else {
+      const step = GSTEP[(GAR_BY[sd.c] || GARLANDS[0]).kind];
+      let k = 0;
+      if (step) for (let s = step * 0.5; s <= d + 0.01 && k < 1600; s += step) {
+        const p = along(poly, s);
+        b.push({ x: p.x, y: p.y, d: s, ang: p.ang, h: hash(k, sd.seed), h2: hash(k, sd.seed + 3), i: k });
+        k++;
+      }
     }
-    st.b = b;
-    if (st.grow == null) st.grow = 1;
-    return st;
+    sd.b = b;
+    if (sd.grow == null) sd.grow = 1;
+    return sd;
   }
-  // The string being draped right now (follows his finger).
-  let live = null;
-  function strokeStart(w) {
-    live = { c: S.color, raw: [onTree(tl(w.x, w.y))], a: [], grow: 1 };
-    live.a = anchorsFrom(live.raw); build(live);
+  // A new string from anchors in tree units (kept relative to the tree too).
+  function makeStrand(k, c, a) {
+    const sd = { k, c, a: a.map((p) => ({ x: p.x, y: p.y })), grow: 1 };
+    sd.r = sd.a.map(toRel);
+    return build(sd);
   }
-  function strokeTo(w) {
-    if (!live) return;
-    const p = onTree(tl(w.x, w.y)), q = live.raw[live.raw.length - 1];
-    if (Math.hypot(p.x - q.x, p.y - q.y) < 5) return;
-    if (live.raw.length > 600) return;
-    live.raw.push(p);
-    live.a = anchorsFrom(live.raw); build(live);
-  }
-  function addStrand(st) {
-    S.strands.push(st);
-    while (S.strands.length > MAX_STRANDS) S.strands.shift();
-    afterLights();
+  const lightN = () => S.strands.filter((s) => s.k === "l").length;
+  const garN = () => S.strands.filter((s) => s.k === "g").length;
+  const bulbCount = () => S.strands.reduce((n, sd) => n + (sd.k === "l" ? sd.b.length : 0), 0);
+  function addStrand(sd) {
+    S.strands.push(sd);
+    const max = sd.k === "l" ? MAX_LIGHTS : MAX_GAR;
+    while (S.strands.filter((s) => s.k === sd.k).length > max) S.strands.splice(S.strands.findIndex((s) => s.k === sd.k), 1);
+    lastWant = null;
     saveSoon();
   }
-  function strokeEnd(still) {
-    const st = live; live = null;
-    if (!st) return;
-    if (still || st.len < 14) { wrapAt(st.raw[0].y); return; }
-    delete st.raw;
-    ghost.learned("tree");
-    addStrand(st);
-    const e = st.poly[st.poly.length - 1], w = tw(e.x, e.y);
-    if (S.plugged) sparkle(w.x, w.y, 4, 10);
+  // "Colored lights", "Warm white lights"; "Gold tinsel".
+  const lightsWord = (id) => (id === "colors" ? "Colored" : (LIGHT_BY[id] || LIGHTS[0]).name) + " lights";
+  const strandName = (sd) => (sd.k === "l" ? lightsWord(sd.c) : (GAR_BY[sd.c] || GARLANDS[0]).name.replace("\u00AD", ""));
+  const nameOf = (k) => (k === "l" ? "lights" : "garland");
+  function centerOf(sd) {
+    let x = 0, y = 0;
+    sd.a.forEach((p) => { x += p.x; y += p.y; });
+    const n = Math.max(1, sd.a.length);
+    return { x: x / n, y: y / n };
   }
-  // A tap on the tree: one whole wrap of lights round the tree at that height. Seen from the front a wrap
-  // dips in the middle, and it climbs a little as it goes round.
-  function wrapAt(y) {
-    y = clamp(y, 34, 384);
-    const hw = Math.max(16, hwAt(y) - 8), a = [], n = Math.max(2, Math.round(2 * hw / SEG));
-    for (let i = 0; i <= n; i++) {
-      const u = -1 + 2 * i / n;
-      a.push(onTree({ x: u * hw, y: y + (6 + hw * 0.07) * (1 - u * u) + u * 6 }));
+  // The hung string under a point (tree units), or -1. The bulbs hang a little below the wire.
+  function segDist(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / l2, 0, 1) : 0;
+    return Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t);
+  }
+  function strandAt(p, tol) {
+    const q = { x: p.x, y: p.y - 5 };
+    for (let i = S.strands.length - 1; i >= 0; i--) {
+      const sd = S.strands[i], poly = sd.poly, m = tol + (sd.k === "g" ? 4 : 3);
+      if (sd.grow < 1) continue;
+      for (let j = 1; j < poly.length; j++) if (segDist(q, poly[j - 1], poly[j]) < m) return i;
     }
-    const st = build({ c: S.color, a, grow: 0 });
-    tween(reduce ? 0.3 : 0.9, (p) => { st.grow = ease(p); });
-    ghost.learned("tree");
-    addStrand(st);
+    return -1;
   }
-  function afterLights() { lastWant = null; }
-  const bulbCount = () => S.strands.reduce((n, st) => n + st.b.length, 0);
+
+  // =====================================================================================================
+  // Live strings, wraps, pulling off and winding back
+  // =====================================================================================================
+  // The string following his finger: from a coil (the free end follows his finger, the rest pays out from the
+  // coil and drapes wherever it crosses the tree) or drawn straight on the tree. raw: the points on the branches.
+  function liveStart(k, fromCoil, w) {
+    const p = tl(w.x, w.y);
+    live = { k, c: k === "l" ? S.color : S.gar, coil: fromCoil, raw: fromCoil ? [] : [onTree(p)], end: p, a: [], grow: 1, seed: seedN++ };
+    S.lastKind = k;
+    liveBuild();
+  }
+  function liveMove(w) {
+    if (!live) return;
+    const p = tl(w.x, w.y), last = live.raw[live.raw.length - 1];
+    live.end = p;
+    // Once on the tree the string keeps to the branches until his finger is well off the tree.
+    if (overTree(p, last ? 46 : 2) && live.raw.length < 600) {
+      const q = onTree(p);
+      if (!last || Math.hypot(q.x - last.x, q.y - last.y) >= 5) live.raw.push(q);
+    }
+    liveBuild();
+  }
+  function liveBuild() {
+    const lv = live, a = anchorsFrom(lv.raw), out = [];
+    if (lv.coil) out.push(coilTreePt(lv.k));
+    a.forEach((q, i) => out.push({ x: q.x, y: q.y, loose: i === 0 && lv.coil }));
+    if (!a.length || !overTree(lv.end, 2)) out.push({ x: lv.end.x, y: lv.end.y, loose: true });
+    lv.a = out;
+    build(lv);
+  }
+  // A short-lived bit of string that fades (the loose bits left between the coil, the tree and his finger).
+  function fadeOut(k, c, a, seed) {
+    const sd = build({ k, c, a, seed });
+    const f = { s: sd, a: 1 };
+    fading.push(f);
+    tween(0.35, (p) => { f.a = 1 - p; }, () => { fading.splice(fading.indexOf(f), 1); });
+  }
+  function liveEnd(still, far) {
+    const lv = live; live = null;
+    if (!lv) return;
+    if (still) { if (lv.coil) coilTap(lv.k); else treeTap(lv.end); return; }
+    const a = anchorsFrom(lv.raw);
+    const sd = a.length >= 2 ? makeStrand(lv.k, lv.c, a) : null;
+    if (sd && sd.len >= 14) {
+      ghost.learned(lv.k === "l" ? "coill" : "coilg");
+      addStrand(sd);
+      if (lv.coil) fadeOut(lv.k, lv.c, [coilTreePt(lv.k), { x: a[0].x, y: a[0].y, loose: true }], lv.seed);
+      if (!overTree(lv.end, 2)) { const e = a[a.length - 1]; fadeOut(lv.k, lv.c, [{ x: e.x, y: e.y }, { x: lv.end.x, y: lv.end.y, loose: true }], lv.seed + 1); }
+      const e = sd.poly[sd.poly.length - 1], w = tw(e.x, e.y);
+      if (S.power && lv.k === "l") sparkle(w.x, w.y, 4, 10);
+      if (lv.k === "g") sparkle(w.x, w.y, 3, 10, "#FFFFFF");
+    } else {
+      // Nothing reached the tree: it winds back into the coil.
+      if (lv.coil) windBack(lv);
+      if (lv.coil && far > 50) coach.say("Drag the " + nameOf(lv.k) + " all the way onto the tree.", 3);
+    }
+  }
+  // A tap on a coil: one whole wrap round the tree by itself, where the tree is barest of that kind. Seen from the
+  // front a wrap dips in the middle and climbs a little as it goes round; it starts on the coil's side and the
+  // string pays out from the coil as it goes.
+  const WRAP_V = [0.62, 0.38, 0.84, 0.2, 0.5, 0.74, 0.28, 0.92, 0.12, 0.56];
+  function nextWrapV(k) {
+    const have = S.strands.filter((s) => s.k === k).map((s) => s.r.reduce((n, q) => n + q.v, 0) / Math.max(1, s.r.length));
+    // The first height in WRAP_V that is clear of the wraps already there; when none is, the clearest.
+    let best = WRAP_V[0], bs = -1;
+    for (const v of WRAP_V) {
+      const d = have.length ? Math.min(...have.map((h) => Math.abs(h - v))) : 1;
+      if (d >= 0.14) return v;
+      if (d > bs) { bs = d; best = v; }
+    }
+    return best;
+  }
+  function wrapAt(k, v, fromCoil) {
+    if (v == null) v = nextWrapV(k);
+    const y = clamp(YT + v * (YB - YT), YT + 24, YB - 16);
+    const hw = Math.max(16, hwAt(y) - 8), a = [], n = Math.max(2, Math.round(2 * hw / SEG));
+    const dip = k === "g" ? 4 + hw * 0.06 : 6 + hw * 0.07;
+    for (let i = 0; i <= n; i++) {
+      const u = 1 - 2 * i / n;
+      a.push(onTree({ x: u * hw, y: y + dip * (1 - u * u) - u * 6 }));
+    }
+    const sd = makeStrand(k, k === "l" ? S.color : S.gar, a);
+    sd.grow = 0; sd.tail = !!fromCoil;
+    tween(reduce ? 0.3 : 1.1, (p) => { sd.grow = ease(p); }, () => { sd.tail = false; });
+    S.lastKind = k;
+    addStrand(sd);
+    return sd;
+  }
+  function coilTap(k) {
+    coilWob[k] = 1;
+    ghost.learned(k === "l" ? "coill" : "coilg");
+    wrapAt(k, null, true);
+  }
+  // Pulling a hung string off: it comes away with his finger, gathering up toward his hand the farther it goes.
+  // x0, y0: where he took hold (tree units); dx, dy: how far it has moved; k: how gathered it is (1 = not).
+  function pullStart(i, w0, w) {
+    const sd = S.strands[i];
+    if (!sd) return;
+    S.strands.splice(i, 1);
+    const p0 = tl(w0.x, w0.y);
+    pull = { sd, i, x0: p0.x, y0: p0.y, dx: 0, dy: 0, k: 1, fx: w.x, fy: w.y };
+    pullMove(w);
+  }
+  function pullMove(w) {
+    const p = tl(w.x, w.y);
+    pull.dx = p.x - pull.x0; pull.dy = p.y - pull.y0; pull.fx = w.x; pull.fy = w.y;
+    pull.k = Math.max(0.42, 1 - Math.hypot(pull.dx, pull.dy) / 320);
+  }
+  // Where a pulled string's middle is drawn now, and how gathered it is (for winding back from there).
+  function pullFrom(pl) {
+    const c = centerOf(pl.sd);
+    return { x: pl.x0 + pl.dx + (c.x - pl.x0) * pl.k, y: pl.y0 + pl.dy - 4 + (c.y - pl.y0) * pl.k, k: pl.k };
+  }
+  // Let go here, a pulled string goes back into its coil (off the tree, or on either box).
+  const pullOff = (pl) => { const f = { x: pl.fx, y: pl.fy }; return inTray(f, 8) || inBox(f, 8) || !overTree(tl(f.x, f.y), 6); };
+  function pullEnd(still) {
+    const pl = pull; pull = null;
+    if (!pl) return;
+    const sd = pl.sd;
+    if (still) { S.strands.splice(Math.min(pl.i, S.strands.length), 0, sd); return; }
+    if (pullOff(pl)) { windBack(sd, pullFrom(pl)); lastWant = null; saveSoon(); return; }
+    // Let go on the tree: it hangs where he left it.
+    sd.a = sd.a.map((q) => onTree({ x: q.x + pl.dx, y: q.y + pl.dy }));
+    sd.r = sd.a.map(toRel);
+    build(sd);
+    S.strands.push(sd);
+    lastWant = null;
+    saveSoon();
+  }
+  // A string winding back into its coil: it shrinks into the coil and the coil bobs. from: where its middle is
+  // drawn now and how big ({ x, y, k }; on the tree, unmoved, by default).
+  function windBack(sd, from, delay) {
+    const c = centerOf(sd), f = from || { x: c.x, y: c.y, k: 1 };
+    const w = { sd, cx: c.x, cy: c.y, fx: f.x, fy: f.y, k0: f.k, to: coilTreePt(sd.k), p: 0 };
+    winding.push(w);
+    tween(reduce ? 0.3 : 0.6, (p) => { w.p = p; }, () => {
+      winding.splice(winding.indexOf(w), 1);
+      coilWob[sd.k] = 1;
+      const cp = coilPos(sd.k);
+      sparkle(cp.x, cp.y - 8, 3, 14);
+    }, delay);
+  }
 
   // =====================================================================================================
   // Ornaments
   // =====================================================================================================
   // The flights: ornaments on their way to a branch tip, to the top or back into the box.
   // { t, x0, y0, sc0, to: { spot } | { top } | { cell }, p, o (hung ornament to restore) }
-  let fly = [];
-  // What his finger carries: { t, from: "box" | "tree", o (hung ornament it came from), x, y (world, the hook) }
-  let carry = null;
+  // What his finger carries: { t, from: "box" | "tree", o, x, y (world, the hook), fx, fy (world, his finger) }
   const takenAt = CELLS.map(() => -9);
   function usedSpots() {
     const u = new Set(S.orns.map((o) => o.s));
@@ -378,11 +623,12 @@
   function nextSpot() {
     const free = freeSpots(), u = [...usedSpots()];
     if (!free.length) return -1;
+    const mid = YT + (YB - YT) * 0.6;
     let best = free[0], bs = -Infinity;
     free.forEach((i) => {
       const p = SPOTS[i];
       let sc;
-      if (!u.length) sc = -Math.abs(p.x) - Math.abs(p.y - 240) * 0.8;
+      if (!u.length) sc = -Math.abs(p.x) - Math.abs(p.y - mid) * 0.8;
       else sc = Math.min(...u.map((j) => Math.hypot(p.x - SPOTS[j].x, (p.y - SPOTS[j].y) * 1.2))) - p.y * 0.01;
       if (sc > bs) { bs = sc; best = i; }
     });
@@ -406,8 +652,10 @@
   }
   const cellOf = (t) => CELLS.indexOf(t);
   const cellHas = (k) => CELLS[k] !== "star" || (!S.star && !(carry && carry.t === "star") && !fly.some((f) => f.t === "star"));
-  const ornHook = (o) => SPOTS[o.s];
+  // An ornament's hook (tree units); while the tree changes shape it glides from the old tip to the new one.
+  const ornHook = (o) => { const s = SPOTS[o.s]; if (o.mf && morph) { const e = ease(morph.p); return { x: lerp(o.mf.x, s.x, e), y: lerp(o.mf.y, s.y, e) }; } return s; };
   const ornMid = (o) => { const h = ornHook(o), d = ORN_BY[o.t]; return { x: h.x - Math.sin(o.sw) * d.cy, y: h.y + Math.cos(o.sw) * d.cy }; };
+  const topNow = () => (morph ? { x: 0, y: lerp(morph.top0, TOP.y, ease(morph.p)) } : TOP);
   function launch(t, from, to, o) {
     const f = { t, x0: from.x, y0: from.y, sc0: from.sc, to, p: 0, o };
     fly.push(f);
@@ -416,8 +664,12 @@
       fly.splice(fly.indexOf(f), 1);
       const to = f.to;
       if (to.spot != null) {
-        S.orns.push({ t, s: to.spot, sw: (Math.random() - 0.5) * 0.4, swv: 1.6, sp: 0 });
-        afterOrn();
+        // (If the tree changed shape on the way and that tip is gone or taken, the next free one; else the box.)
+        const s = to.spot < SPOTS.length && !S.orns.some((q) => q.s === to.spot) ? to.spot : nextSpot();
+        if (s >= 0) {
+          S.orns.push({ t, s, sw: (Math.random() - 0.5) * 0.4, swv: 1.6, sp: 0 });
+          afterOrn();
+        } else { const p = flyPos(f); launch(t, p, { cell: cellOf(t) }); }
       } else if (to.top) {
         S.star = true;
         const w = tw(0, TOP.y + 28);
@@ -425,13 +677,13 @@
         lastWant = null;
         if (S.strands.length || S.orns.length) Toybox.kind();
         saveSoon();
-      } else if (to.cell != null) takenAt[to.cell] = -9;
+      } else if (to.cell != null) { takenAt[to.cell] = -9; boxWob = Math.max(boxWob, 0.5); }
     });
     return f;
   }
   function flyPos(f) {
     let x1, y1, sc1;
-    if (f.to.spot != null) { const w = tw(SPOTS[f.to.spot].x, SPOTS[f.to.spot].y); x1 = w.x; y1 = w.y; sc1 = L.tree.s; }
+    if (f.to.spot != null) { const s = SPOTS[f.to.spot] || SPOTS[0], w = tw(s.x, s.y); x1 = w.x; y1 = w.y; sc1 = L.tree.s; }
     else if (f.to.top) { const w = tw(TOP.x, TOP.y); x1 = w.x; y1 = w.y; sc1 = L.tree.s; }
     else { const h = cellHook(f.to.cell); x1 = h.x; y1 = h.y; sc1 = h.sc; }
     const e = ease(f.p), lift = f.to.near ? 0 : Math.sin(f.p * Math.PI) * 50;
@@ -452,14 +704,15 @@
     takenAt[k] = now();
     launch(t, h, { spot: s });
   }
-  // Where a carried ornament would go if let go now: a branch tip, the top, the box, or nowhere (null).
+  // Where a carried ornament would go if let go now: a branch tip, the top, or the box. Off the tree it goes back
+  // into the box.
   function dropTarget(c) {
-    const p = tl(c.x, c.y);
-    if (c.from === "tree" && inBox(c, 6)) return { cell: cellOf(c.t) };
-    if (c.t === "star") return overTree(p, 50) || (Math.abs(p.x) < 90 && p.y < 60 && p.y > -120) ? { top: true } : null;
-    if (!overTree(p, 34)) return null;
+    const p = tl(c.x, c.y), f = { x: c.fx, y: c.fy };
+    if (inBox(f, 6)) return { cell: cellOf(c.t), box: true };
+    if (c.t === "star") return overTree(p, 50) || (Math.abs(p.x) < 90 && p.y < TOP.y + 92 && p.y > TOP.y - 88) ? { top: true } : { cell: cellOf("star") };
+    if (!overTree(p, 34)) return { cell: cellOf(c.t) };
     const s = nearSpot(p);
-    return s >= 0 ? { spot: s } : null;
+    return s >= 0 ? { spot: s } : { cell: cellOf(c.t) };
   }
   function dropCarry(still) {
     const c = carry; carry = null;
@@ -471,91 +724,120 @@
         const s = c.t === "star" ? 0 : nextSpot();
         if (c.t === "star") { ghost.learned("star"); launch("star", from, { top: true }); }
         else if (s >= 0) { ghost.learned("box"); launch(c.t, from, { spot: s }); }
-        else { launchHome(c, from); boxWob = 1; sayFull(); }
+        else { launch(c.t, from, { cell: cellOf(c.t) }); boxWob = 1; sayFull(); }
       }
       else if (c.t === "star") { launch("star", from, { top: true, near: true }); }
       else { launch(c.t, from, { spot: c.o.s, near: true }); }
       return;
     }
     const tg = dropTarget(c);
-    if (tg && tg.spot != null) { ghost.learned("box"); launch(c.t, from, { spot: tg.spot, near: true }); }
-    else if (tg && tg.top) { ghost.learned("star"); launch("star", from, { top: true, near: true }); }
-    else if (tg && tg.cell != null) { launch(c.t, from, { cell: tg.cell }); afterOrn(); }
+    if (tg.spot != null) { ghost.learned("box"); launch(c.t, from, { spot: tg.spot, near: true }); }
+    else if (tg.top) { ghost.learned("star"); launch("star", from, { top: true, near: true }); }
     else {
-      if (c.from === "tree" && c.t !== "star" && usedSpots().has(c.o.s)) launch(c.t, from, { cell: cellOf(c.t) });
-      else launchHome(c, from);
-      if (c.from === "box" && c.t !== "star" && !freeSpots().length) sayFull();
+      launch(c.t, from, { cell: tg.cell });
+      if (c.from === "tree") afterOrn();
+      else if (c.t !== "star" && !freeSpots().length) sayFull();
     }
-  }
-  // Back where it came from: its cell, its branch tip, or the top.
-  function launchHome(c, from) {
-    if (c.from === "box") return launch(c.t, from, { cell: cellOf(c.t) });
-    if (c.t === "star") return launch("star", from, { top: true, near: true });
-    return launch(c.t, from, { spot: c.o.s, near: true });
   }
   function swing(o, k) { o.swv += (o.sw > 0 ? 1 : -1) * (k || 2.4) + (Math.random() - 0.5); }
 
   // =====================================================================================================
-  // Plug, socket and light button
+  // Switch
   // =====================================================================================================
-  // The plug: where it is (world), its angle (0 = prongs up) and whether it is in the socket.
-  const P = { x: TALL.plugRest.x, y: TALL.plugRest.y, ang: -0.6, in: false, held: false };
+  // The lights' plug is in the wall socket from the start; the switch on the cord turns them on and changes the
+  // pattern: each press goes Off, Steady, Twinkle, Slow fade, Off.
   const socketPt = () => ({ x: L.socket.x, y: L.socket.y - 10 });
-  const lit = () => S.plugged;
-  function plugIn() {
-    const s = socketPt();
-    P.in = true; P.x = s.x; P.y = s.y; P.ang = 0;
-    S.plugged = true;
-    ghost.learned("plug");
-    lastWant = null;
-    sparkle(s.x, s.y, 5, 10);
-    if (S.strands.length) {
-      const c = tw(0, 220);
-      sparkle(c.x, c.y, 8, 120);
-      Toybox.kind();
-    } else coach.say("Now drag lights onto the tree.", 3);
-    saveSoon();
-  }
-  function unplug(to) {
-    S.plugged = false; P.in = false;
-    lastWant = null;
-    if (to) {
-      const x0 = P.x, y0 = P.y;
-      tween(0.45, (p) => { const e = ease(p); P.x = lerp(x0, to.x, e); P.y = lerp(y0, to.y, e) - Math.sin(p * Math.PI) * 30; });
-    }
-    saveSoon();
-  }
-  let plugTw = null;
-  function plugTap() {
-    if (plugTw || P.held) return;
-    if (P.in) { unplug(L.plugRest); return; }
-    const x0 = P.x, y0 = P.y, s = socketPt();
-    plugTw = tween(0.55, (p) => { const e = ease(p); P.x = lerp(x0, s.x, e); P.y = lerp(y0, s.y, e) - Math.sin(p * Math.PI) * 40; }, () => { plugTw = null; plugIn(); });
-  }
-  function dropPlug(still) {
-    P.held = false;
-    const s = socketPt();
-    if (still) { plugTap(); return; }
-    if (Math.hypot(P.x - s.x, P.y - s.y) < 60) {
-      const x0 = P.x, y0 = P.y;
-      plugTw = tween(0.15, (p) => { P.x = lerp(x0, s.x, p); P.y = lerp(y0, s.y, p); }, () => { plugTw = null; plugIn(); });
-    } else {
-      // Let go anywhere else, it drops to the floor there.
-      const to = { x: clamp(P.x, L.w * 0.55, L.w - 16), y: clamp(P.y, L.floor + 26, L.h - 16) };
-      const x0 = P.x, y0 = P.y;
-      tween(0.3, (p) => { const e = p * p; P.x = lerp(x0, to.x, e); P.y = lerp(y0, to.y, e); });
-      if (!S.plugged && S.strands.length) hint();
-    }
-  }
-  function cycleMode() {
-    S.mode = (S.mode + 1) % MODES.length;
-    S.modeTried = true;
+  const lit = () => S.power > 0;
+  function pressSwitch() {
+    S.power = (S.power + 1) % POWER.length;
+    if (S.power >= 2) S.modeTried = true;
     ctrlPress = 1;
     lastWant = null;
-    const v = vp(L.ctrl.x, L.ctrl.y - 14);
-    Toybox.nametag(MODES[S.mode].name, v.x, v.y, 2000);
-    ghost.learned("ctrl");
+    const v = vp(L.ctrl.x, L.ctrl.y - 18);
+    Toybox.nametag(POWER[S.power], v.x, v.y, 2000);
+    ghost.learned(S.power >= 2 ? "ctrl2" : "ctrl");
+    if (S.power === 1) {
+      if (lightN()) {
+        const c = tw(0, YT + (YB - YT) * 0.55);
+        sparkle(c.x, c.y, 8, 110);
+        Toybox.kind();
+      } else coach.say("Drag the lights from the box onto the tree.", 3);
+    }
     saveSoon();
+  }
+
+  // =====================================================================================================
+  // Changing the tree
+  // =====================================================================================================
+  // A new shape: the strings glide from where they are to the same places relative to the new shape, each
+  // ornament moves to the matching branch tip (one that does not fit hops back into the box), the star moves to
+  // the new top and the tree pops (a calm little squash and settle).
+  function setShape(id) {
+    const sh = SHAPE_BY[id];
+    if (!sh || sh === SH || locked()) return;
+    const hooks = S.orns.map((o) => ({ x: SPOTS[o.s].x, y: SPOTS[o.s].y })), fracs = S.orns.map((o) => spotFrac(o.s)), top0 = topNow().y;
+    const flyFr = fly.map((f) => (f.to.spot != null ? spotFrac(f.to.spot) : null));
+    S.strands.forEach((sd) => { sd.mA = sd.a.map((p) => ({ x: p.x, y: p.y })); });
+    useShape(sh);
+    S.shape = id;
+    const taken = new Set(), keep = [];
+    S.orns.forEach((o, i) => {
+      const s = fitSpot(fracs[i], taken);
+      if (s < 0) { const w = tw(hooks[i].x, hooks[i].y); launch(o.t, { x: w.x, y: w.y, sc: L.tree.s }, { cell: cellOf(o.t) }); return; }
+      taken.add(s); o.s = s; o.mf = hooks[i]; keep.push(o);
+    });
+    S.orns = keep;
+    fly.forEach((f, i) => {
+      if (!flyFr[i]) return;
+      const s = fitSpot(flyFr[i], taken);
+      if (s >= 0) { taken.add(s); f.to = { spot: s, near: f.to.near }; } else { const p = flyPos(f); f.x0 = p.x; f.y0 = p.y; f.sc0 = p.sc; f.to = { cell: cellOf(f.t) }; }
+    });
+    S.strands.forEach((sd) => { sd.mB = sd.r.map(fromRel); });
+    if (live) live.raw = live.raw.map(onTree);
+    const m = { p: 0, top0 };
+    morph = m;
+    tween(reduce ? 0.25 : 0.7, (p) => {
+      m.p = p;
+      const e = ease(p);
+      S.strands.forEach((sd) => {
+        if (!sd.mA || !sd.mB) return;
+        sd.a = sd.mA.map((q, j) => ({ x: lerp(q.x, sd.mB[j].x, e), y: lerp(q.y, sd.mB[j].y, e) }));
+        build(sd);
+      });
+    }, () => {
+      if (morph === m) morph = null;
+      S.strands.forEach((sd) => { if (sd.mB) { sd.a = sd.mB; build(sd); } delete sd.mA; delete sd.mB; });
+      S.orns.forEach((o) => { delete o.mf; });
+    });
+    popTree();
+    lastWant = null;
+    refreshShapePics();
+    saveSoon();
+  }
+  function popTree() {
+    const pp = { p: 0 };
+    pop = pp;
+    tween(reduce ? 0.2 : 0.7, (p) => { pp.p = p; }, () => { if (pop === pp) pop = null; });
+    const c = tw(0, YT + (YB - YT) * 0.5);
+    sparkle(c.x, c.y, 8, 120 * L.tree.s, "#FFFFFF");
+  }
+  // A new color: the branches blend to it.
+  function setTreeColor(id) {
+    if (!TC_BY[id] || id === S.tc || locked()) return;
+    const from = tcNow(), m = { from, p: 0 };
+    tcMorph = m;
+    S.tc = id;
+    tween(reduce ? 0.2 : 0.6, (p) => { m.p = p; }, () => { if (tcMorph === m) tcMorph = null; });
+    popTree();
+    refreshShapePics();
+    saveSoon();
+  }
+  // The tree's colors this frame.
+  function tcNow() {
+    const to = TC_BY[S.tc];
+    if (!tcMorph) return to;
+    const f = tcMorph.from, e = ease(tcMorph.p), mx = (a, b) => mixHex(a, b, e);
+    return { fill: mx(f.fill, to.fill), shade: mx(f.shade, to.shade), tip: mx(f.tip, to.tip), flock: e > 0.5 ? to.flock : f.flock, shine: e > 0.5 ? to.shine : f.shine };
   }
 
   // =====================================================================================================
@@ -569,7 +851,9 @@
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
   function fs(fill, lw) { ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = (lw || LW) / K; ctx.strokeStyle = INK; ctx.stroke(); }
-  function st(col, lw) { ctx.lineWidth = lw / K; ctx.strokeStyle = col; ctx.stroke(); }
+  function stk(col, lw) { ctx.lineWidth = lw / K; ctx.strokeStyle = col; ctx.stroke(); }
+  // A stroke w units wide in the current frame (garland ropes are sized in tree units).
+  function wide(col, w) { ctx.lineWidth = w; ctx.strokeStyle = col; ctx.stroke(); }
   function ell(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, TAU); }
   const rgbOf = (h) => { const v = parseInt(h.slice(1), 16); return [v >> 16, (v >> 8) & 255, v & 255]; };
   const rgba = (h, a) => "rgba(" + rgbOf(h).join(",") + "," + a + ")";
@@ -578,14 +862,15 @@
     return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("");
   }
   function worldFrame() { ctx.setTransform(dpr * vs, 0, 0, dpr * vs, dpr * vox, dpr * voy); K = 1; }
-  // The tree's frame, swaying a little about its foot when the stand is bumped.
-  let sway = 0, swayV = 0;
+  // The tree's frame, swaying a little about its foot when the stand is bumped, and popping when it changes.
   function treeFrame() {
     worldFrame();
     const T = L.tree;
     ctx.translate(T.x, T.y); ctx.scale(T.s, T.s);
     if (sway) { ctx.translate(0, 450); ctx.rotate(sway); ctx.translate(0, -450); }
-    K = T.s;
+    let k = 1;
+    if (pop) { k = 0.9 + 0.1 * backOut(pop.p); ctx.translate(0, 452); ctx.scale(k, k); ctx.translate(0, -452); }
+    K = T.s * k;
   }
   function star5(x, y, ro, ri) {
     ctx.beginPath();
@@ -611,6 +896,17 @@
     g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     glowC[col] = c;
     return c;
+  }
+  // A small picture for a tile, drawn with the scene's own drawing code on a 96 px canvas.
+  function picCanvas(fn) {
+    return () => {
+      const c = document.createElement("canvas");
+      c.width = 96; c.height = 96;
+      const old = ctx, oldK = K;
+      ctx = c.getContext("2d");
+      try { fn(); } finally { ctx = old; K = oldK; }
+      return c;
+    };
   }
 
   // =====================================================================================================
@@ -670,12 +966,11 @@
     // Frame bars and the sill (snow piles up on it in a big snowfall).
     ctx.lineWidth = 5; ctx.strokeStyle = "#FFF8EC";
     ctx.beginPath(); ctx.moveTo(w.x + w.w / 2, w.y + 2); ctx.lineTo(w.x + w.w / 2, w.y + w.h - 2); ctx.moveTo(w.x + 2, w.y + w.h * 0.48); ctx.lineTo(w.x + w.w - 2, w.y + w.h * 0.48); ctx.stroke();
-    rr(w.x + 4, w.y + 4, w.w - 8, w.h - 8, 3); st(INK, 1.6);
+    rr(w.x + 4, w.y + 4, w.w - 8, w.h - 8, 3); stk(INK, 1.6);
     rr(w.x - 10, w.y + w.h + 2, w.w + 20, 10, 4); fs("#FFF8EC");
     if (sill > 0.02) { rr(w.x - 6, w.y + w.h + 2 - 6 * sill, w.w + 12, 6 * sill + 2, 4); ctx.fillStyle = "#FFFFFF"; ctx.fill(); }
   }
-  let wreathWob = 0;
-  function drawWreath(t) {
+  function drawWreath() {
     const c = L.wreath, r = c.r;
     ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(Math.sin(wreathWob * 14) * wreathWob * 0.12);
     ell(0, 0, r, r); ctx.lineWidth = r * 0.5; ctx.strokeStyle = INK; ctx.stroke();
@@ -692,6 +987,7 @@
     ell(0, r, 4, 4); fs("#FF5A64", 1.6);
     ctx.restore();
   }
+  // The wall socket with the lights' plug pushed into its upper outlet.
   function drawSocket() {
     const s = L.socket;
     rr(s.x - 15, s.y - 24, 30, 48, 5); fs("#FFFDF6");
@@ -701,9 +997,16 @@
       ell(s.x, s.y + oy + 4, 1.6, 1.4); ctx.fill();
     });
   }
+  function drawPlug() {
+    const p = socketPt();
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.sin(plugWob * 16) * plugWob * 0.08);
+    rr(-10, -12, 20, 25, 6); fs("#F7F6F0");
+    ctx.beginPath(); ctx.moveTo(-6, 4); ctx.lineTo(6, 4); ctx.moveTo(-6, 8); ctx.lineTo(6, 8); stk("#B8BCC6", 1.6);
+    ctx.restore();
+  }
 
   // =====================================================================================================
-  // Drawing the tree, lights, ornaments and star
+  // Drawing the tree, strings, ornaments and star
   // =====================================================================================================
   function tierPath(T) {
     const y1 = T.yb - 10, n = T.n, wb = T.wb;
@@ -718,57 +1021,77 @@
     ctx.quadraticCurveTo(-cx, cy, -T.wt, T.yt);
     ctx.closePath();
   }
-  function drawTree() {
-    // The tree skirt on the floor, the stand and the trunk.
-    ell(0, 452, 154, 22); fs("#FFFFFF");
-    ell(0, 450, 140, 16); ctx.fillStyle = "#C8333A"; ctx.fill();
+  // The tree: its tiers in its colors (tc), with the stand and trunk, and the skirt on the floor (skirt).
+  function drawTree(tiers, tc, skirt) {
+    if (skirt) {
+      ell(0, 452, 154, 22); fs("#FFFFFF");
+      ell(0, 450, 140, 16); ctx.fillStyle = "#C8333A"; ctx.fill();
+    }
     ctx.beginPath(); ctx.moveTo(-40, 420); ctx.lineTo(40, 420); ctx.lineTo(54, 452); ctx.lineTo(-54, 452); ctx.closePath(); fs("#2F6F48");
     rr(-46, 414, 92, 12, 4); fs("#3E8A5C");
     rr(-13, 386, 26, 32, 3); fs("#8A5A33");
     // The tiers, bottom first so each upper tier lies over the one below; the upper tier's shadow darkens
     // the top of the one below.
-    for (let i = TIERS.length - 1; i >= 0; i--) {
-      const T = TIERS[i];
-      tierPath(T); ctx.fillStyle = "#2E9A57"; ctx.fill();
+    for (let i = tiers.length - 1; i >= 0; i--) {
+      const T = tiers[i];
+      tierPath(T); ctx.fillStyle = tc.fill; ctx.fill();
       if (i > 0) {
         ctx.save(); tierPath(T); ctx.clip();
-        ctx.translate(0, 12); tierPath(TIERS[i - 1]); ctx.fillStyle = "#237A45"; ctx.fill();
+        ctx.translate(0, 12); tierPath(tiers[i - 1]); ctx.fillStyle = tc.shade; ctx.fill();
         ctx.restore();
       }
-      // Lighter needles along each branch tip.
       const y1 = T.yb - 10;
+      // A flocked tree shows a little green under the snow along each tier.
+      if (tc.flock) {
+        for (let j = 0; j < T.n; j++) {
+          const x0 = -T.wb + 2 * T.wb * j / T.n, x1 = -T.wb + 2 * T.wb * (j + 1) / T.n, mx = (x0 + x1) / 2;
+          ctx.beginPath(); ctx.moveTo(mx - 9, y1 - 14); ctx.lineTo(mx - 3, y1 - 8); ctx.moveTo(mx + 6, y1 - 18); ctx.lineTo(mx + 11, y1 - 11);
+          ctx.lineCap = "round"; stk(tc.flock, 3 * K);
+        }
+      }
+      // Lighter needles along each branch tip.
       for (let j = 0; j < T.n; j++) {
         const x0 = -T.wb + 2 * T.wb * j / T.n, x1 = -T.wb + 2 * T.wb * (j + 1) / T.n;
         ctx.beginPath(); ctx.moveTo(x0 + 8, y1 - 2); ctx.quadraticCurveTo((x0 + x1) / 2, T.yb + 3, x1 - 8, y1 - 2);
-        st("#4CBB76", 3 * K);
+        stk(tc.tip, 3 * K);
       }
-      tierPath(T); st(INK, LW);
+      // A silver tree has bright streaks of foil.
+      if (tc.shine) {
+        ctx.beginPath();
+        for (let j = 0; j < T.n + 1; j++) { const x = -T.wb * 0.7 + 1.4 * T.wb * j / Math.max(1, T.n); ctx.moveTo(x * 0.6, lerp(T.yt, y1, 0.35)); ctx.lineTo(x * 0.85, lerp(T.yt, y1, 0.75)); }
+        ctx.lineCap = "round"; stk("#FFFFFF", 2.2 * K);
+      }
+      tierPath(T); stk(INK, LW);
     }
   }
-  // Brightness of a lit bulb (0..1): the light button's pattern, or the surprise chase.
+  // Brightness of a lit bulb (0..1): the switch's pattern, or the surprise chase.
   function bright(b, si, gi, t) {
     if (actor && actor.kind === "chase") {
       const c = Math.cos(gi * 0.42 - (t - actor.t0) * (reduce ? 1.2 : 2.4));
       return 0.1 + 0.9 * Math.pow(Math.max(0, c), 2);
     }
-    const m = MODES[S.mode].id, amp = reduce ? 0.5 : 1;
+    const m = POWER_ID[S.power], amp = reduce ? 0.5 : 1;
     if (m === "twinkle") return 1 - amp * 0.42 * (0.5 + 0.5 * Math.sin(t * b.w + b.ph));
     if (m === "fade") return 1 - amp * 0.62 * (0.5 + 0.5 * Math.sin(t * 1.3 + si * 0.9));
     return 1;
   }
-  // A string's wire and its bulbs (in the tree's frame). on: how far the lights are on (0..1).
-  function drawStrand(st0, on, t, si, alpha) {
-    const lim = st0.len * (st0.grow == null ? 1 : st0.grow), poly = st0.poly;
-    if (!poly || !poly.length) return;
-    ctx.globalAlpha = alpha;
+  // The path of a string's wire up to length lim.
+  function polyPath(poly, lim) {
     ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
     for (let i = 1; i < poly.length && poly[i - 1].d < lim; i++) {
       if (poly[i].d <= lim) ctx.lineTo(poly[i].x, poly[i].y);
       else { const p = along(poly, lim); ctx.lineTo(p.x, p.y); }
     }
     ctx.lineJoin = "round"; ctx.lineCap = "round";
-    st("#173B26", 2.4 * K);
-    for (const b of st0.b) {
+  }
+  // A light string's wire and its bulbs (in the tree's frame). on: how far the lights are on (0..1).
+  function drawLights(sd, on, alpha) {
+    const lim = sd.len * (sd.grow == null ? 1 : sd.grow), poly = sd.poly;
+    if (!poly || poly.length < 2) return;
+    ctx.globalAlpha = alpha;
+    polyPath(poly, lim);
+    stk("#173B26", 2.4 * K);
+    for (const b of sd.b) {
       if (b.d > lim) break;
       ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.tilt);
       ctx.fillStyle = "#173B26"; ctx.fillRect(-2.2, -1, 4.4, 4);
@@ -779,43 +1102,115 @@
     }
     ctx.globalAlpha = 1;
   }
+  // A garland along its wire (in the tree's frame). Tinsel glints now and then, more while the lights are on.
+  function drawGarland(sd, on, t, alpha) {
+    const G = GAR_BY[sd.c] || GARLANDS[0], lim = sd.len * (sd.grow == null ? 1 : sd.grow), poly = sd.poly, cols = G.cols;
+    if (!poly || poly.length < 2) return;
+    ctx.globalAlpha = alpha;
+    const ink = 2 * LW / K;
+    if (G.kind === "tinsel") {
+      polyPath(poly, lim); wide(INK, 8 + ink); wide(cols[1], 8);
+      // The fringe: short strands every way, in three shades.
+      for (let c = 0; c < 3; c++) {
+        ctx.beginPath();
+        for (const b of sd.b) {
+          if (b.d > lim) break;
+          if (b.i % 3 !== c) continue;
+          const a = b.h * TAU, l = 4.5 + b.h2 * 4;
+          ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(a) * l, b.y + Math.sin(a) * l);
+        }
+        ctx.lineCap = "round"; wide(c === 1 ? cols[1] : c === 2 ? cols[2] : cols[0], c === 2 ? 1.4 : 1.8);
+      }
+      const amp = (0.45 + 0.55 * on) * (reduce ? 0.6 : 1);
+      for (const b of sd.b) {
+        if (b.d > lim) break;
+        if (b.i % 9) continue;
+        const s = Math.sin(t * (1.1 + b.h2) + b.h * TAU * 3);
+        if (s > 0.55) twinkle4(b.x + Math.cos(b.h * TAU) * 3, b.y + Math.sin(b.h * TAU) * 3, (s - 0.55) * 13 * amp, "#FFFFFF");
+      }
+    } else if (G.kind === "ribbon") {
+      polyPath(poly, lim); wide(INK, 10 + ink); wide(cols[1], 10); wide(cols[0], 6.4);
+      ctx.setLineDash([5, 9]); wide("#FF8593", 2.2); ctx.setLineDash([]);
+    } else {
+      polyPath(poly, lim); wide(G.kind === "popcorn" ? "#B9A57E" : "#7C5A1E", 1.1);
+      for (const b of sd.b) {
+        if (b.d > lim) break;
+        if (G.kind === "beads") {
+          const big = b.i % 2 === 0;
+          ell(b.x, b.y, big ? 3.6 : 2.6, big ? 3.6 : 2.6); fs(cols[b.i % 4 < 2 ? 0 : 1], 1.1);
+          ell(b.x - 1, b.y - 1.2, 1, 1); ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fill();
+        } else if (G.kind === "berries") {
+          ell(b.x, b.y + 0.8, 3.5, 3.5); fs(cols[0], 1.1);
+          ell(b.x - 1.1, b.y - 0.4, 1.1, 0.9); ctx.fillStyle = "rgba(255,190,196,0.9)"; ctx.fill();
+        } else if (G.kind === "popcorn") {
+          const r = b.h * TAU;
+          [[0, 0, 3], [2.6, -1.4, 2.4], [-2.2, 1.6, 2.3]].forEach(([dx, dy, rad]) => {
+            const x = b.x + dx * Math.cos(r) - dy * Math.sin(r), y = b.y + 1 + dx * Math.sin(r) + dy * Math.cos(r);
+            ell(x, y, rad, rad); fs(cols[0], 1);
+          });
+        } else if (G.kind === "chain") {
+          ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.ang);
+          const col = cols[Math.floor(b.i / 2) % 3];
+          if (b.i % 2 === 0) { ell(0, 0, 6.4, 4.2); wide(INK, 3 + ink); wide(col, 3); }
+          else { ell(0, 0, 6.2, 1.8); fs(col, 1.1); }
+          ctx.restore();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawString(sd, on, t, alpha) {
+    if (sd.wig > 0) { ctx.save(); ctx.translate(0, Math.sin(sd.wig * 20) * sd.wig * 3); }
+    if (sd.k === "g") drawGarland(sd, on, t, alpha); else drawLights(sd, on, alpha);
+    if (sd.wig > 0) ctx.restore();
+  }
+  // The loose bit of string paying out from the coil to the tip of a wrap that is still winding on.
+  function tailOf(sd) {
+    const tip = along(sd.poly, sd.len * sd.grow);
+    if (!sd._t) sd._t = { k: sd.k, c: sd.c, seed: sd.seed + 5 };
+    sd._t.a = [coilTreePt(sd.k), { x: tip.x, y: tip.y, loose: true }];
+    return build(sd._t);
+  }
   // Works out each bulb's brightness for this frame (b.k) so the bulb and its glow agree.
   function lightLevels(t) {
     let gi = 0;
-    S.strands.forEach((s, si) => { s.b.forEach((b) => { b.k = bright(b, si, gi++, t); }); });
-    if (live) live.b.forEach((b) => { b.k = bright(b, S.strands.length, gi++, t); });
-    fading.forEach((f) => f.s.b.forEach((b) => { b.k = 1; }));
+    const each = (sd, si) => { if (sd.k === "l") sd.b.forEach((b) => { b.k = bright(b, si, gi++, t); }); };
+    S.strands.forEach(each);
+    if (live) each(live, S.strands.length);
+    if (pull) each(pull.sd, 0);
+    winding.forEach((w) => each(w.sd, 0));
+    fading.forEach((f) => each(f.s, 0));
   }
+  function glowsOf(sd, on, a) {
+    if (sd.k !== "l") return;
+    const lim = sd.len * (sd.grow == null ? 1 : sd.grow), R = 17;
+    for (const b of sd.b) {
+      if (b.d > lim) break;
+      ctx.globalAlpha = Math.min(1, on * a * b.k * 0.85);
+      const gx = b.x - Math.sin(b.tilt) * 7, gy = b.y + Math.cos(b.tilt) * 7;
+      ctx.drawImage(glow(b.col), gx - R, gy - R, R * 2, R * 2);
+    }
+  }
+  // Glows of everything on the tree (the tree's frame). Strings in his hand glow later, with him.
   function drawGlows(on, t) {
     if (on <= 0.01) return;
     ctx.globalCompositeOperation = "lighter";
-    const R = 17;
-    const each = (s, a) => {
-      const lim = s.len * (s.grow == null ? 1 : s.grow);
-      for (const b of s.b) {
-        if (b.d > lim) break;
-        ctx.globalAlpha = Math.min(1, on * a * b.k * 0.85);
-        const gx = b.x - Math.sin(b.tilt) * 7, gy = b.y + Math.cos(b.tilt) * 7;
-        ctx.drawImage(glow(b.col), gx - R, gy - R, R * 2, R * 2);
-      }
-    };
-    S.strands.forEach((s) => each(s, 1));
-    if (live) each(live, 1);
-    fading.forEach((f) => each(f.s, f.a));
+    S.strands.forEach((sd) => glowsOf(sd, on, 1));
+    fading.forEach((f) => glowsOf(f.s, on, f.a));
     if (S.star) {
-      const k = MODES[S.mode].id === "fade" && !reduce ? 0.85 + 0.15 * Math.sin(t * 1.3) : 1;
+      const k = POWER_ID[S.power] === "fade" && !reduce ? 0.85 + 0.15 * Math.sin(t * 1.3) : 1, tp = topNow();
       ctx.globalAlpha = on * 0.9 * k;
-      ctx.drawImage(glow("#FFD23B"), TOP.x - 70, TOP.y + 28 - 70, 140, 140);
+      ctx.drawImage(glow("#FFD23B"), tp.x - 70, tp.y + 28 - 70, 140, 140);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
   }
   // One ornament, hook at (x, y) in the current frame, scaled by sc and swung by sw.
-  function drawOrn(id, x, y, sc, sw, t) {
+  function drawOrn(id, x, y, sc, sw) {
     const o = ORN_BY[id];
     ctx.save(); ctx.translate(x, y); if (sw) ctx.rotate(sw); ctx.scale(sc, sc);
     const k0 = K; K *= sc;
-    const string = (len) => { ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, len); st("#C9A227", 1.6); };
+    const string = (len) => { ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, len); stk("#C9A227", 1.6); };
     if (o.kind === "ball") {
       string(8);
       rr(-4.5, 7, 9, 6, 1.5); fs("#E3C15A", 1.4);
@@ -830,19 +1225,19 @@
       ctx.beginPath(); ctx.moveTo(-4, 8); ctx.quadraticCurveTo(-11, 10, -11, 22); ctx.quadraticCurveTo(-11, 30, -15, 33); ctx.lineTo(15, 33);
       ctx.quadraticCurveTo(11, 30, 11, 22); ctx.quadraticCurveTo(11, 10, 4, 8); ctx.closePath(); fs(o.col);
       ell(0, 35.5, 3.6, 3.6); fs("#C98A1B", 1.4);
-      ctx.beginPath(); ctx.moveTo(-5, 14); ctx.quadraticCurveTo(-7, 22, -8, 28); st("rgba(255,255,255,0.7)", 2);
+      ctx.beginPath(); ctx.moveTo(-5, 14); ctx.quadraticCurveTo(-7, 22, -8, 28); stk("rgba(255,255,255,0.7)", 2);
       ell(-5, 7, 5, 3); fs("#E8303F", 1.4); ell(5, 7, 5, 3); fs("#E8303F", 1.4); ell(0, 7, 2.4, 2.4); fs("#E8303F", 1.4);
     } else if (o.kind === "cane") {
       ctx.beginPath(); ctx.moveTo(0, 44); ctx.lineTo(0, 10); ctx.arc(7, 10, 7, Math.PI, 0); ctx.lineTo(14, 18);
-      ctx.lineCap = "round"; st(INK, 10); st("#FFFFFF", 7);
-      ctx.setLineDash([4.5, 4.5]); st("#E8303F", 7); ctx.setLineDash([]);
+      ctx.lineCap = "round"; stk(INK, 10); stk("#FFFFFF", 7);
+      ctx.setLineDash([4.5, 4.5]); stk("#E8303F", 7); ctx.setLineDash([]);
     } else if (o.kind === "cone") {
       string(8);
       ctx.beginPath(); ctx.moveTo(0, 9); ctx.bezierCurveTo(14, 11, 13, 32, 0, 42); ctx.bezierCurveTo(-13, 32, -14, 11, 0, 9); ctx.closePath(); fs("#A0612F");
       ctx.save(); ctx.clip();
       for (let r = 0; r < 5; r++) for (let c = -2; c <= 2; c++) {
         const yy = 14 + r * 6, xx = c * 6 + (r % 2 ? 3 : 0);
-        ctx.beginPath(); ctx.arc(xx, yy, 4, 0.15 * Math.PI, 0.85 * Math.PI); st("#6E3E1C", 1.6);
+        ctx.beginPath(); ctx.arc(xx, yy, 4, 0.15 * Math.PI, 0.85 * Math.PI); stk("#6E3E1C", 1.6);
       }
       ctx.restore();
     } else if (o.kind === "flake") {
@@ -856,14 +1251,14 @@
         ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a1) * 5, by + Math.sin(a1) * 5);
         ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a2) * 5, by + Math.sin(a2) * 5);
       }
-      ctx.lineCap = "round"; st(INK, 5.4); st("#FFFFFF", 3);
+      ctx.lineCap = "round"; stk(INK, 5.4); stk("#FFFFFF", 3);
       ell(0, 0, 3, 3); ctx.fillStyle = "#DDF1FF"; ctx.fill();
       ctx.restore();
     } else if (o.kind === "icicle") {
       string(6);
       ctx.beginPath(); ctx.moveTo(-7, 7); ctx.lineTo(7, 7); ctx.quadraticCurveTo(5, 20, 3, 30); ctx.quadraticCurveTo(1.5, 42, 0, 48);
       ctx.quadraticCurveTo(-1.5, 42, -3, 30); ctx.quadraticCurveTo(-5, 20, -7, 7); ctx.closePath(); fs("#BFE9FF");
-      ctx.beginPath(); ctx.moveTo(-2.5, 11); ctx.quadraticCurveTo(-2.5, 24, -1, 36); st("#FFFFFF", 2);
+      ctx.beginPath(); ctx.moveTo(-2.5, 11); ctx.quadraticCurveTo(-2.5, 24, -1, 36); stk("#FFFFFF", 2);
     } else if (o.kind === "star") {
       star5(0, 28, 28, 12); fs("#FFD23B");
       star5(0, 28, 17, 7.5); ctx.fillStyle = "#FFE98A"; ctx.fill();
@@ -871,43 +1266,53 @@
     K = k0;
     ctx.restore();
   }
-  function drawOrnaments(t) {
+  function drawOrnaments() {
     S.orns.forEach((o) => {
       const h = ornHook(o);
-      drawOrn(o.t, h.x, h.y, 1, o.sw, t);
+      drawOrn(o.t, h.x, h.y, 1, o.sw);
       if (o.sp > 0) {
         const m = ornMid(o), d = ORN_BY[o.t], s = Math.sin(o.sp * Math.PI) * 9;
         twinkle4(m.x + d.r * 0.55, m.y - d.r * 0.55, s, "#FFFFFF");
       }
     });
-    if (S.star) drawOrn("star", TOP.x, TOP.y, 1, Math.sin(starWob * 12) * starWob * 0.15, t);
+    if (S.star) { const tp = topNow(); drawOrn("star", tp.x, tp.y, 1, Math.sin(starWob * 12) * starWob * 0.15); }
   }
 
   // =====================================================================================================
-  // Drawing the box, cord, plug and train
+  // Drawing the boxes, coils, cord, switch and train
   // =====================================================================================================
-  let boxWob = 0, ctrlPress = 0;
-  const inBox = (w, m) => w.x >= L.box.x - m && w.x <= L.box.x + L.box.w + m && w.y >= L.box.y - 14 - m && w.y <= L.box.y + L.box.h + m;
   function cellAt(w) {
     for (let k = 0; k < CELLS.length; k++) { const c = cellRect(k); if (w.x >= c.x && w.x < c.x + c.w && w.y >= c.y - 6 && w.y < c.y + c.h + 4) return k; }
     return -1;
   }
-  function drawBox(t) {
-    const B = L.box;
+  // A soft warm glow round a box while something can be dropped into it.
+  // (Drawn over the dimmed room, so it shows when the lights are on too.)
+  function hotGlow(x, y, w, h, hot) {
+    if (hot < 0.02) return;
+    ctx.save();
+    ctx.shadowColor = "rgba(255,214,80," + (0.95 * hot).toFixed(3) + ")"; ctx.shadowBlur = 30 * hot * vs * dpr;
+    rr(x - 3, y - 3, w + 6, h + 6, 11);
+    ctx.lineWidth = 5; ctx.strokeStyle = rgba("#FFE38A", hot); ctx.stroke();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = rgba("#FFFFFF", 0.8 * hot); ctx.stroke();
+    ctx.restore();
+  }
+  function drawBox() {
+    const B = L.box, hot = boxHot;
     ctx.save();
     if (boxWob > 0) { const a = Math.sin(boxWob * 16) * boxWob * 0.03; ctx.translate(B.x + B.w / 2, B.y + B.h); ctx.scale(1 + a, 1 - a); ctx.translate(-B.x - B.w / 2, -B.y - B.h); }
-    // The open lid leans behind the box.
-    ctx.beginPath(); ctx.moveTo(B.x + 10, B.y); ctx.lineTo(B.x + 22, B.y - 16); ctx.lineTo(B.x + B.w - 22, B.y - 16); ctx.lineTo(B.x + B.w - 10, B.y); ctx.closePath(); fs("#E8B67A");
+    // The open lid leans behind the box; it lifts up while something is carried over the box.
+    const lift = 16 + hot * 14;
+    ctx.beginPath(); ctx.moveTo(B.x + 10, B.y); ctx.lineTo(B.x + 22 - hot * 8, B.y - lift); ctx.lineTo(B.x + B.w - 22 + hot * 8, B.y - lift); ctx.lineTo(B.x + B.w - 10, B.y); ctx.closePath(); fs("#E8B67A");
     rr(B.x, B.y, B.w, B.h, 8); fs("#D9A066");
     rr(B.x + 6, B.y + 6, B.w - 12, B.h * 0.78 - 4, 6); fs("#F4DDB4", 2);
     for (let k = 0; k < CELLS.length; k++) {
       const c = cellRect(k);
       rr(c.x + 2, c.y + 2, c.w - 4, c.h - 4, 6); ctx.fillStyle = "#E9C893"; ctx.fill();
     }
-    ctx.beginPath(); ctx.moveTo(B.x + 4, B.y + B.h * 0.78 + 4); ctx.lineTo(B.x + B.w - 4, B.y + B.h * 0.78 + 4); st("#B98450", 2);
+    ctx.beginPath(); ctx.moveTo(B.x + 4, B.y + B.h * 0.78 + 4); ctx.lineTo(B.x + B.w - 4, B.y + B.h * 0.78 + 4); stk("#B98450", 2);
     // A red ribbon round the front of the box.
     rr(B.x + B.w / 2 - 9, B.y + B.h * 0.78 + 4, 18, B.h * 0.22 - 4, 2); ctx.fillStyle = "#C8333A"; ctx.fill();
-    rr(B.x, B.y, B.w, B.h, 8); st(INK, LW);
+    rr(B.x, B.y, B.w, B.h, 8); stk(INK, LW);
     ctx.restore();
     const tt = now();
     CELLS.forEach((id, k) => {
@@ -917,35 +1322,64 @@
       const a = age < 0.5 ? 0 : age < 0.9 ? (age - 0.5) / 0.4 : 1;
       if (a <= 0) return;
       ctx.globalAlpha = a;
-      drawOrn(id, h.x, h.y + (1 - a) * 8, h.sc, 0, t);
+      drawOrn(id, h.x, h.y + (1 - a) * 8, h.sc, 0);
       ctx.globalAlpha = 1;
     });
   }
-  // The plug's back, where the cord comes out (world).
-  const plugTail = () => ({ x: P.x - Math.sin(P.ang) * 13, y: P.y + Math.cos(P.ang) * 13 });
-  function drawCord() {
-    const a = tw(48, 446), c = L.ctrl, tail = plugTail();
-    ctx.lineCap = "round";
-    const path = (fn) => { ctx.beginPath(); fn(); st(INK, 6); ctx.stroke(); st("#2C6B3F", 3.4); };
-    path(() => { ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + 30, a.y + 14, c.x - 50, c.y + 6, c.x - 16, c.y); });
-    const bx = tail.x + Math.sin(P.ang) * 34, by = tail.y + Math.max(20, Math.cos(P.ang) * 34);
-    path(() => { ctx.moveTo(c.x + 16, c.y); ctx.bezierCurveTo(c.x + 50, c.y + 6, bx, Math.max(by, c.y + 4), tail.x, tail.y); });
-  }
-  function drawCtrl(t) {
-    const c = L.ctrl, pr = ctrlPress > 0 ? 1.5 * ctrlPress : 0;
-    rr(c.x - 17, c.y - 11, 34, 22, 7); fs("#2C6B3F");
-    ell(c.x + 5, c.y + pr * 0.5, 7, 7); fs("#F6F4EE", 1.8);
-    ell(c.x - 9, c.y, 2.6, 2.6); ctx.fillStyle = S.plugged ? "#7CFF8A" : "#1C4A2C"; ctx.fill();
-  }
-  function drawPlug() {
-    ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.ang);
-    if (!P.in) {
-      ctx.fillStyle = "#C9CED8"; ctx.strokeStyle = INK; ctx.lineWidth = 1.4;
-      [-6, 2].forEach((x) => { ctx.beginPath(); ctx.rect(x, -24, 4, 13); ctx.fill(); ctx.stroke(); });
+  // The coils lying in the lights box: a pseudo-string wound round in a flat spiral (coil units, about tree
+  // units), rebuilt when the pick changes.
+  const coilCache = { l: null, g: null };
+  function coilStrand(k) {
+    const c = k === "l" ? S.color : S.gar, cc = coilCache[k];
+    if (cc && cc.c === c) return cc;
+    const a = [], N = 46, loops = 2.6;
+    for (let i = 0; i <= N; i++) {
+      const f = i / N, ang = Math.PI * 0.9 + f * loops * TAU, R = COIL_R - 12 * f;
+      a.push({ x: Math.cos(ang) * R, y: Math.sin(ang) * R * 0.42 - f * 7 });
     }
-    rr(-10, -12, 20, 25, 6); fs("#F7F6F0");
-    ctx.beginPath(); ctx.moveTo(-6, 4); ctx.lineTo(6, 4); ctx.moveTo(-6, 8); ctx.lineTo(6, 8); st("#B8BCC6", 1.6);
+    coilCache[k] = build({ k, c, a, flat: true, seed: k === "l" ? 2 : 3 });
+    return coilCache[k];
+  }
+  function drawCoil(k, t) {
+    const c = coilPos(k), s = coilS(), wb = coilWob[k], sq = 1 + Math.sin(wb * 14) * wb * 0.08;
+    worldFrame();
+    ctx.translate(c.x, c.y); ctx.scale(s * sq, s / sq);
+    K = s;
+    ell(0, 4, COIL_R + 4, (COIL_R + 4) * 0.42); ctx.fillStyle = "rgba(60,30,10,0.22)"; ctx.fill();
+    const sd = coilStrand(k);
+    if (k === "l") drawLights(sd, 0, 1); else drawGarland(sd, 0, t, 1);
+    worldFrame();
+  }
+  // The lights box: a low open box with the lights coil and the garland coil lying in it.
+  function drawTray(t) {
+    const T = L.tray, fy = T.y + T.h * 0.6;
+    ctx.save();
+    if (trayWob > 0) { const a = Math.sin(trayWob * 16) * trayWob * 0.03; ctx.translate(T.x + T.w / 2, T.y + T.h); ctx.scale(1 + a, 1 - a); ctx.translate(-T.x - T.w / 2, -T.y - T.h); }
+    rr(T.x, T.y, T.w, T.h, 8); fs("#D9A066");
+    rr(T.x + 6, T.y + 6, T.w - 12, fy - T.y, 6); ctx.fillStyle = "#B9844E"; ctx.fill();
     ctx.restore();
+    drawCoil("l", t); drawCoil("g", t);
+    // The low front of the box, in front of the coils.
+    ctx.save();
+    if (trayWob > 0) { const a = Math.sin(trayWob * 16) * trayWob * 0.03; ctx.translate(T.x + T.w / 2, T.y + T.h); ctx.scale(1 + a, 1 - a); ctx.translate(-T.x - T.w / 2, -T.y - T.h); }
+    rr(T.x, fy, T.w, T.y + T.h - fy, 8); fs("#E2AE72");
+    ctx.beginPath(); ctx.moveTo(T.x + T.w / 2, fy + 2); ctx.lineTo(T.x + T.w / 2, T.y + T.h - 2); stk("#C08A52", 2);
+    rr(T.x, T.y, T.w, T.h, 8); stk(INK, LW);
+    ctx.restore();
+  }
+  // The cord: from the tree stand to the switch, then up to the plug in the wall socket.
+  function drawCord() {
+    const a = tw(48, 446), c = L.ctrl, p = socketPt(), tail = { x: p.x, y: p.y + 13 };
+    ctx.lineCap = "round";
+    const path = (fn) => { ctx.beginPath(); fn(); stk(INK, 6); stk("#2C6B3F", 3.4); };
+    path(() => { ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(a.x + 24, a.y + 10, c.x - 44, c.y + 8, c.x - 22, c.y); });
+    path(() => { ctx.moveTo(c.x + 22, c.y); ctx.bezierCurveTo(c.x + 44, c.y + 6, tail.x, Math.max(tail.y + 44, c.y + 6), tail.x, tail.y); });
+  }
+  function drawCtrl() {
+    const c = L.ctrl, pr = ctrlPress > 0 ? 1.6 * ctrlPress : 0;
+    rr(c.x - 22, c.y - 14, 44, 28, 9); fs("#2C6B3F");
+    ell(c.x + 7, c.y + pr * 0.5, 9, 9); fs("#F6F4EE", 1.8);
+    ell(c.x - 11, c.y, 3.2, 3.2); ctx.fillStyle = lit() ? "#7CFF8A" : "#1C4A2C"; ctx.fill();
   }
   // The surprise toy train rolling past the tree.
   function drawTrain(t) {
@@ -956,12 +1390,12 @@
       ell(x, y - 7, 7, 7); fs("#1D2340", 1.6);
       ell(x, y - 7, 3, 3); ctx.fillStyle = "#E8303F"; ctx.fill();
       const a = x0 * 0.12;
-      ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 5, y - 7 + Math.sin(a) * 5); ctx.lineTo(x - Math.cos(a) * 5, y - 7 - Math.sin(a) * 5); st("#F4F4F4", 1.4);
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 5, y - 7 + Math.sin(a) * 5); ctx.lineTo(x - Math.cos(a) * 5, y - 7 - Math.sin(a) * 5); stk("#F4F4F4", 1.4);
     };
     // Two wagons, then the engine at the front (on the right).
     rr(x0, y - 30, 46, 20, 3); fs("#3DAA68"); wheel(x0 + 10); wheel(x0 + 36);
     rr(x0 + 52, y - 30, 46, 20, 3); fs("#FFD23B");
-    rr(x0 + 62, y - 42, 16, 13, 2); fs("#E8303F"); ctx.beginPath(); ctx.moveTo(x0 + 70, y - 42); ctx.lineTo(x0 + 70, y - 29); st("#FFD23B", 2);
+    rr(x0 + 62, y - 42, 16, 13, 2); fs("#E8303F"); ctx.beginPath(); ctx.moveTo(x0 + 70, y - 42); ctx.lineTo(x0 + 70, y - 29); stk("#FFD23B", 2);
     wheel(x0 + 62); wheel(x0 + 88);
     const e = x0 + 104;
     rr(e, y - 46, 22, 34, 3); fs("#2F8CFF");
@@ -985,22 +1419,25 @@
   // =====================================================================================================
   // What comes next: coach, ring and ghost hand
   // =====================================================================================================
-  // The next part: lights, the plug, ornaments, the star, the light button; then nothing.
+  // The next part: the lights coil, the switch, the garland coil, ornaments, the star, the switch again; then
+  // nothing.
   function want() {
-    if (!S.strands.length && !live) return { part: "tree", line: "Drag lights onto the tree." };
-    if (!S.plugged) return { part: "plug", line: "Push the plug into the socket." };
-    if (S.orns.length < 3) return { part: "box", line: "Hang ornaments on the tree." };
+    if (!lightN() && !(live && live.k === "l")) return { part: "coill", line: "Drag the lights from the box onto the tree." };
+    if (!S.power) return { part: "ctrl", line: "Press the switch to turn on the lights." };
+    if (!garN() && !(live && live.k === "g")) return { part: "coilg", line: "Drag the garland from the box onto the tree." };
+    if (S.orns.length < 3) return { part: "box", line: "Drag ornaments from the box onto the tree." };
     if (!S.star) return { part: "starcell", line: "Put the star on top of the tree." };
-    if (!S.modeTried) return { part: "ctrl", line: "Press the light button." };
+    if (!S.modeTried) return { part: "ctrl2", line: "Press the switch to make the lights twinkle." };
     return null;
   }
   // A part's middle (world) and size, for the ring, the coach and the ghost hand.
   function partPt(part) {
-    if (part === "tree") { const w = tw(0, 250); return { x: w.x, y: w.y, r: 100 * L.tree.s }; }
-    if (part === "plug") return { x: P.x, y: P.y - 4, r: 24 };
-    if (part === "socket") return { x: L.socket.x, y: L.socket.y, r: 26 };
-    if (part === "ctrl") return { x: L.ctrl.x, y: L.ctrl.y, r: 22 };
+    if (part === "tree") { const w = tw(0, YT + (YB - YT) * 0.6); return { x: w.x, y: w.y, r: 100 * L.tree.s }; }
+    if (part === "coill" || part === "coilg") { const c = coilPos(part.slice(4)); return { x: c.x, y: c.y - 4, r: (COIL_R + 4) * coilS() }; }
+    if (part === "ctrl" || part === "ctrl2") return { x: L.ctrl.x, y: L.ctrl.y, r: 26 };
+    if (part === "socket" || part === "plug") return { x: L.socket.x, y: L.socket.y, r: 26 };
     if (part === "box") return { x: L.box.x + L.box.w / 2, y: L.box.y + L.box.h / 2, r: L.box.w / 2 };
+    if (part === "tray") return { x: L.tray.x + L.tray.w / 2, y: L.tray.y + L.tray.h / 2, r: L.tray.w / 2 };
     if (part === "starcell") { const c = cellRect(cellOf("star")); return { x: c.x + c.w / 2, y: c.y + c.h / 2, r: 26 }; }
     if (part === "top") { const w = tw(0, TOP.y + 28); return { x: w.x, y: w.y, r: 26 }; }
     if (/^cell\d$/.test(part)) { const c = cellRect(+part.slice(4)); return { x: c.x + c.w / 2, y: c.y + c.h / 2, r: 22 }; }
@@ -1019,13 +1456,9 @@
       const B = L.box, g = 4 + pulse * 4;
       rr(B.x - g, B.y - g, B.w + g * 2, B.h * 0.8 + g * 2, 10 + g);
       ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = "#FFC93C"; ctx.lineWidth = 4; ctx.stroke();
-    } else if (w.part === "plug") {
-      const p = partPt("plug"), s = partPt("socket");
-      ring(p.x, p.y, p.r); ring(s.x, s.y, s.r);
     } else { const p = partPt(w.part); if (p) ring(p.x, p.y, p.r); }
   }
   const coach = Toybox.coach($("coach"));
-  let lastWant = null;
   function updateCoach() {
     // While he holds something the line stays as it is, so a new instruction never pops up over his work.
     if (drag || carry) return;
@@ -1034,11 +1467,20 @@
     lastWant = line;
     if (!line) { coach.busy(); return; }
     coach.step(line);
+    // For a coil the pill keeps clear of the tree's middle, where he drags the string across: it moves up (never
+    // down onto the boxes and coils).
+    if (w.part === "coill" || w.part === "coilg") {
+      const q = tw(0, YT + (YB - YT) * DRAG_V), v = vp(q.x, q.y), r = stage.getBoundingClientRect();
+      coach.avoid(v.x, Math.max(v.y, r.top + r.height / 2 + 2));
+      return;
+    }
     const p = partPt(w.part);
     if (p) { const v = vp(p.x, p.y); coach.avoid(v.x, v.y); }
   }
+  const DRAG_V = 0.68;
   function hint() { const w = want(); if (w) { coach.say(w.line, 3); ghost.poke(); } }
-  // The ghost hand shows a tap first and the real move (a drag) after that.
+  // The ghost hand shows the real move: a drag from the coil across the tree, from the box to a branch, from the
+  // box to the top; a tap on the switch.
   const ghost = Toybox.ghost({
     max: 3,
     plan: () => {
@@ -1048,13 +1490,9 @@
       const key = w.part === "starcell" ? "star" : w.part, first = ghost.shown(key) < 1;
       const P2 = (x, y) => { const v = vp(x, y); return [v.x, v.y]; };
       const T2 = (x, y) => { const v = tvp(x, y); return [v.x, v.y]; };
-      if (w.part === "tree") {
-        if (first) return { pts: [T2(10, 280)], tap: true, key };
-        return { pts: [T2(-110, 270), T2(-40, 300), T2(30, 286), T2(110, 312)], dur: 2000, key };
-      }
-      if (w.part === "plug") {
-        const s = socketPt();
-        return first ? { pts: [P2(P.x, P.y)], tap: true, key } : { pts: [P2(P.x, P.y), P2(s.x, s.y)], dur: 1600, key };
+      if (w.part === "coill" || w.part === "coilg") {
+        const c = partPt(w.part), y = YT + (YB - YT) * DRAG_V, hw = hwAt(y) - 14;
+        return { pts: [P2(c.x, c.y), T2(hw, y - 6), T2(hw * 0.2, y + 12), T2(-hw, y + 2)], dur: 2400, key };
       }
       if (w.part === "box") {
         const k = S.orns.length % 9, c = partPt("cell" + k), s = nextSpot();
@@ -1075,20 +1513,22 @@
   // Input
   // =====================================================================================================
   function tag(name, x, y) { const v = vp(x, y); Toybox.nametag(name, v.x, v.y - 10, 1800); }
-  // The part under a press (client px). The things he works with (the plug, the box, the ornaments on the
-  // tree, the star) come before the tree behind them; everything drawn answers.
+  // The part under a press (client px). The things he works with (the switch, the coils, the boxes, the
+  // ornaments, the star, the hung strings) come before the tree behind them; everything drawn answers.
   function hitPart(cx, cy) {
     if (locked()) return null;
     const w = wpt(cx, cy), minR = 24 / vs, p = tl(w.x, w.y);
     const near = (q, r) => Math.hypot(w.x - q.x, w.y - q.y) <= Math.max(r, minR);
-    if (!P.held && near({ x: P.x - Math.sin(P.ang) * 4, y: P.y - Math.cos(P.ang) * 4 }, 26)) return "plug";
-    if (near(L.ctrl, 22)) return "ctrl";
+    if (near(L.ctrl, 28)) return "ctrl";
+    for (const k of ["l", "g"]) { const c = coilPos(k); if (Math.abs(w.x - c.x) <= Math.max((COIL_R + 8) * coilS(), minR) && Math.abs(w.y - c.y + 4) <= Math.max(26 * coilS(), minR)) return "coil" + k; }
+    if (inTray(w, 2)) return "tray";
     if (inBox(w, 4)) { const k = cellAt(w); return k >= 0 && cellHas(k) ? "cell" + k : "box"; }
-    if (S.star && Math.hypot(p.x - TOP.x, p.y - (TOP.y + 28)) < 34) return "star";
+    if (S.star && !morph && Math.hypot(p.x - TOP.x, p.y - (TOP.y + 28)) < 34) return "star";
     for (let i = S.orns.length - 1; i >= 0; i--) {
       const o = S.orns[i], m = ornMid(o);
       if (Math.hypot(p.x - m.x, p.y - m.y) < ORN_BY[o.t].r + 5) return "orn" + i;
     }
+    if (!morph) { const si = strandAt(p, Math.max(8, 14 / (vs * L.tree.s))); if (si >= 0) return "str" + si; }
     if (overTree(p, 18)) return "tree";
     if (p.y > 380 && p.y < 458 && Math.abs(p.x) < 62) return "stand";
     if (Math.abs(p.y - 452) < 24 && Math.abs(p.x) < 156) return "skirt";
@@ -1099,13 +1539,29 @@
     return null;
   }
   const SLOP = 12;
-  let drag = null, skipTap = false, starWob = 0;
+  // A tap on the bare tree rustles the branches (the ornaments swing) and says which tree it is.
+  function treeTap(p) {
+    swayV += 0.035;
+    S.orns.forEach((o) => swing(o, 1.4));
+    const w = tw(p.x, p.y);
+    tag(TC_BY[S.tc].tag, w.x, w.y);
+    if (!lightN()) hint();
+  }
   // A tap: each part does its own one motion.
   function doTap(part, cx, cy) {
     if (locked() || part == null) return;
-    if (part === "tree") { const w = wpt(cx, cy); wrapAt(tl(w.x, w.y).y); }
+    if (part === "tree") { const w = wpt(cx, cy); treeTap(tl(w.x, w.y)); }
+    else if (part === "coill" || part === "coilg") coilTap(part.slice(4));
+    else if (/^str\d+$/.test(part)) {
+      const sd = S.strands[+part.slice(3)];
+      if (!sd) return;
+      sd.wig = 1;
+      const w = wpt(cx, cy);
+      tag(strandName(sd), w.x, w.y - 8);
+    }
     else if (/^cell\d$/.test(part)) hopFromBox(+part.slice(4));
     else if (part === "box") { boxWob = 1; tag("Ornament box", L.box.x + L.box.w / 2, L.box.y - 10); }
+    else if (part === "tray") { trayWob = 1; tag("Lights box", L.tray.x + L.tray.w / 2, L.tray.y - 6); }
     else if (/^orn\d+$/.test(part)) {
       const o = S.orns[+part.slice(3)];
       if (!o) return;
@@ -1117,8 +1573,8 @@
       const w = tw(0, TOP.y + 28);
       sparkle(w.x, w.y, 5, 20);
       tag("Star", w.x, w.y - 24);
-    } else if (part === "plug" || part === "socket") plugTap();
-    else if (part === "ctrl") cycleMode();
+    } else if (part === "socket") { plugWob = 1; tag("Plug", L.socket.x, L.socket.y - 26); }
+    else if (part === "ctrl") pressSwitch();
     else if (part === "stand" || part === "skirt") {
       swayV += 0.05;
       const w = tw(0, part === "stand" ? 410 : 440);
@@ -1140,20 +1596,20 @@
       if (!drag || drag.pid !== e.pointerId || locked()) return;
       drag.far = Math.max(drag.far, Math.hypot(s.dx, s.dy));
       const w = wpt(s.x, s.y);
-      if (drag.k === "lights") strokeTo(w);
-      else if (drag.k === "carry" && carry) { carry.x = w.x + drag.ox; carry.y = w.y + drag.oy; }
-      else if (drag.k === "plug") { P.x = w.x; P.y = w.y + 6; }
+      if (drag.k === "live") liveMove(w);
+      else if (drag.k === "carry" && carry) { carry.x = w.x + drag.ox; carry.y = w.y + drag.oy; carry.fx = w.x; carry.fy = w.y; }
+      else if (drag.k === "pull" && pull) pullMove(w);
     },
     up: (part, e, s) => {
       const d = drag;
       if (!d || d.pid !== e.pointerId) return;
       drag = null; skipTap = !!s.tap;
       const still = d.far <= SLOP && Math.hypot(s.dx, s.dy) <= SLOP;
-      if (locked()) { live = null; if (carry) dropCarry(true); if (P.held) dropPlug(false); return; }
+      if (locked()) { live = null; if (carry) dropCarry(true); if (pull) pullEnd(true); return; }
       if (d.k === "hold") { if (still) doTap(d.part, s.x, s.y); }
-      else if (d.k === "lights") strokeEnd(still);
+      else if (d.k === "live") liveEnd(still, d.far);
       else if (d.k === "carry") dropCarry(still);
-      else if (d.k === "plug") dropPlug(still);
+      else if (d.k === "pull") { if (still) { pullEnd(true); doTap(d.part, s.x, s.y); } else pullEnd(false); }
     },
     tap: (part, x, y) => {
       if (skipTap) { skipTap = false; return; }
@@ -1163,12 +1619,19 @@
   // Starts the drag for a part (sets drag) when the part has one.
   function startDrag(part, s) {
     const w = wpt(s.x, s.y), w0 = wpt(s.x0, s.y0);
-    if (part === "tree") {
-      drag = { k: "lights" };
-      strokeStart(w0); strokeTo(w);
+    if (part === "coill" || part === "coilg") {
+      drag = { k: "live" };
+      coilWob[part.slice(4)] = 0.6;
+      liveStart(part.slice(4), true, w0); liveMove(w);
+    } else if (part === "tree") {
+      drag = { k: "live" };
+      liveStart(S.lastKind, false, w0); liveMove(w);
+    } else if (/^str\d+$/.test(part)) {
+      drag = { k: "pull", part };
+      pullStart(+part.slice(3), w0, w);
     } else if (/^cell\d$/.test(part)) {
       const k = +part.slice(4), h = cellHook(k);
-      carry = { t: CELLS[k], from: "box", x: h.x, y: h.y };
+      carry = { t: CELLS[k], from: "box", x: h.x, y: h.y, fx: w.x, fy: w.y };
       takenAt[k] = now();
       // He holds it by its hook: it hangs from just above his fingertip.
       drag = { k: "carry", ox: 0, oy: -ORN_BY[CELLS[k]].cy * L.tree.s - 6 };
@@ -1178,21 +1641,15 @@
       if (!o) return;
       S.orns.splice(i, 1);
       const h = tw(SPOTS[o.s].x, SPOTS[o.s].y);
-      carry = { t: o.t, from: "tree", o, x: h.x, y: h.y };
+      carry = { t: o.t, from: "tree", o, x: h.x, y: h.y, fx: w.x, fy: w.y };
       drag = { k: "carry", ox: h.x - w0.x, oy: h.y - w0.y };
       carry.x = w.x + drag.ox; carry.y = w.y + drag.oy;
     } else if (part === "star") {
       S.star = false;
       const h = tw(TOP.x, TOP.y);
-      carry = { t: "star", from: "tree", x: h.x, y: h.y };
+      carry = { t: "star", from: "tree", x: h.x, y: h.y, fx: w.x, fy: w.y };
       drag = { k: "carry", ox: h.x - w0.x, oy: h.y - w0.y };
       carry.x = w.x + drag.ox; carry.y = w.y + drag.oy;
-    } else if (part === "plug") {
-      if (plugTw) return;
-      if (P.in) unplug(null);
-      P.held = true;
-      drag = { k: "plug" };
-      P.x = w.x; P.y = w.y + 6;
     }
   }
 
@@ -1208,47 +1665,108 @@
     });
     return s + "</svg>";
   };
-  const tiles = Toybox.tiles($("tiles"), {
-    items: LIGHTS.map((l) => ({ id: l.id, name: l.name, pic: bulbPic(l.id === "colors" ? ["#FF4A4A", "#3FD16A", "#3D8BFF", "#FFD23B"] : l.cols) })),
-    value: S.color, rows: 1,
-    onPick: (id) => pickColor(id)
+  // A tree tile: the whole tree (no skirt) scaled into the tile, so a Little tree looks little.
+  const treePic = (sh, tc) => picCanvas(() => {
+    const s = 0.2;
+    ctx.translate(48, 4); ctx.scale(s, s);
+    K = LW * s / 4.6;
+    drawTree(sh.tiers, tc, false);
   });
+  // A garland tile: two swags of it.
+  const garPic = (g) => picCanvas(() => {
+    ctx.translate(48, 36); ctx.scale(2.7, 2.7);
+    K = LW * 2.7 / 4.4;
+    const sd = build({ k: "g", c: g.id, a: [{ x: -15, y: -6 }, { x: 0, y: -6 }, { x: 15, y: -6 }], seed: 4 });
+    drawGarland(sd, 0, 1.3, 1);
+  });
+  const JOB_PICS = {
+    tree: '<svg viewBox="0 0 50 50"><path d="M25 4 37 19h-5l9 13h-6l9 12H6l9-12H9l9-13h-5z" fill="#2E9A57" stroke="#1D2340" stroke-width="2.4" stroke-linejoin="round"/><path d="M21 44h8v4h-8z" fill="#8A5A33" stroke="#1D2340" stroke-width="2"/></svg>',
+    lights: bulbPic(["#FF4A4A", "#3FD16A", "#3D8BFF", "#FFD23B"]),
+    garland: '<svg viewBox="0 0 50 50"><path d="M4 16Q14 36 25 22 36 36 46 16" fill="none" stroke="#1D2340" stroke-width="10" stroke-linecap="round"/><path d="M4 16Q14 36 25 22 36 36 46 16" fill="none" stroke="#FFC93C" stroke-width="6.5" stroke-linecap="round"/><path d="M4 16Q14 36 25 22 36 36 46 16" fill="none" stroke="#FFF1A6" stroke-width="2" stroke-dasharray="2 4" stroke-linecap="round"/></svg>'
+  };
+  const shapeTiles = Toybox.tiles($("shapes"), { items: [], value: S.shape, rows: 1, onPick: (id) => setShape(id) });
+  function refreshShapePics() {
+    shapeTiles.items(SHAPES.map((sh) => ({ id: sh.id, name: sh.name, pic: treePic(sh, TC_BY[S.tc]) })));
+    shapeTiles.set(S.shape);
+  }
+  const tcTiles = Toybox.tiles($("tcols"), {
+    items: TCOLS.map((c) => ({ id: c.id, name: c.name, pic: treePic(SHAPE_BY.classic, c) })), value: S.tc, rows: 1,
+    onPick: (id) => setTreeColor(id)
+  });
+  const lightTiles = Toybox.tiles($("lights"), {
+    items: LIGHTS.map((l) => ({ id: l.id, name: l.name, pic: bulbPic(l.id === "colors" ? ["#FF4A4A", "#3FD16A", "#3D8BFF", "#FFD23B"] : l.cols) })),
+    value: S.color, rows: 2, onPick: (id) => pickColor(id)
+  });
+  const garTiles = Toybox.tiles($("garlands"), {
+    items: GARLANDS.map((g) => ({ id: g.id, name: g.name, pic: garPic(g) })), value: S.gar, rows: 2,
+    onPick: (id) => pickGarland(id)
+  });
+  // Picking lights or a garland changes its coil in the lights box (the coil bobs) and says what to do with it.
   function pickColor(id) {
     if (!LIGHT_BY[id] || locked()) return;
-    S.color = id;
-    coach.say("Drag the " + LIGHT_BY[id].name.toLowerCase() + " lights onto the tree.", 3);
-    ghost.again("tree");
+    S.color = id; S.lastKind = "l";
+    coilWob.l = 1;
+    const c = coilPos("l"); sparkle(c.x, c.y - 10, 4, 18);
+    coach.say("Drag the " + lightsWord(id).toLowerCase() + " from the box onto the tree.", 3);
+    ghost.again("coill");
     saveSoon();
   }
-  // New: a bare tree again. The ornaments hop back into the box and the lights fade away.
-  let fading = [];
+  function pickGarland(id) {
+    if (!GAR_BY[id] || locked()) return;
+    S.gar = id; S.lastKind = "g";
+    coilWob.g = 1;
+    const c = coilPos("g"); sparkle(c.x, c.y - 10, 4, 18);
+    coach.say("Drag the " + GAR_BY[id].name.replace("\u00AD", "").toLowerCase() + " from the box onto the tree.", 3);
+    ghost.again("coilg");
+    saveSoon();
+  }
+  const jobs = Toybox.jobs($("jobs"), {
+    jobs: [{ id: "tree", name: "Tree", pic: JOB_PICS.tree }, { id: "lights", name: "Lights", pic: JOB_PICS.lights }, { id: "garland", name: "Garland", pic: JOB_PICS.garland }],
+    value: S.tab,
+    onPick: (id) => pickTab(id)
+  });
+  function showTab() {
+    $("grp-tree").hidden = S.tab !== "tree";
+    $("grp-lights").hidden = S.tab !== "lights";
+    $("grp-garland").hidden = S.tab !== "garland";
+  }
+  function pickTab(id) {
+    S.tab = id;
+    if (id === "lights") S.lastKind = "l";
+    else if (id === "garland") S.lastKind = "g";
+    showTab();
+    saveSoon();
+  }
+  // New: a bare tree again. The strings wind back into their coils, the ornaments hop back into the box and the
+  // lights switch off. The tree's shape and color and the picks stay.
   function newTree() {
     if (locked()) return;
-    drag = null; press.cancel(); live = null;
+    drag = null; press.cancel();
+    if (live) { const lv = live; live = null; windBack(lv); }
+    if (pull) { const pl = pull; pull = null; windBack(pl.sd, pullFrom(pl)); }
     if (carry) { const c = carry; carry = null; launch(c.t, { x: c.x, y: c.y, sc: L.tree.s }, { cell: cellOf(c.t) }); }
     fly.forEach((f) => { if (f.to.spot != null || f.to.top) { const p = flyPos(f); f.x0 = p.x; f.y0 = p.y; f.sc0 = p.sc; f.to = { cell: cellOf(f.t) }; } });
     S.orns.forEach((o) => {
-      const h = tw(SPOTS[o.s].x, SPOTS[o.s].y);
-      launch(o.t, { x: h.x, y: h.y, sc: L.tree.s }, { cell: cellOf(o.t) });
+      const h = ornHook(o), w = tw(h.x, h.y);
+      launch(o.t, { x: w.x, y: w.y, sc: L.tree.s }, { cell: cellOf(o.t) });
     });
     if (S.star) { const h = tw(TOP.x, TOP.y); launch("star", { x: h.x, y: h.y, sc: L.tree.s }, { cell: cellOf("star") }); }
-    S.strands.forEach((s) => { const f = { s, a: 1 }; fading.push(f); tween(0.5, (p) => { f.a = 1 - p; }, () => { fading.splice(fading.indexOf(f), 1); }); });
+    S.strands.forEach((sd, i) => { sd.tail = false; sd.grow = 1; windBack(sd, null, Math.min(0.6, i * 0.05)); });
     S.strands = []; S.orns = []; S.star = false;
-    if (S.plugged) unplug(L.plugRest);
-    S.mode = 0; S.modeTried = false;
+    S.power = 0; S.modeTried = false;
     lastWant = null;
     ghost.again();
     saveSoon();
   }
-  const bar = Toybox.bar($("bottom"), { shelf: null, onNew: newTree, onSurprise: surprise });
+  Toybox.bar($("bottom"), { shelf: null, onNew: newTree, onSurprise: surprise });
   // Takes turns between live moments: a slow chase round the lit tree, a big snowfall outside, every ornament
   // sparkling in turn, and a toy train rolling past. The chase needs lit lights, so it waits its turn then.
   const MOMENTS = ["chase", "snow", "sparkle", "train"];
-  let momentNext = 0, actor = null;
+  let momentNext = 0;
   function surprise() {
     if (locked()) return;
     let k = momentNext;
-    if (MOMENTS[k] === "chase" && !(S.plugged && S.strands.length)) k = (k + 1) % MOMENTS.length;
+    if (MOMENTS[k] === "chase" && !(lit() && lightN())) k = (k + 1) % MOMENTS.length;
     momentNext = (k + 1) % MOMENTS.length;
     const m = MOMENTS[k];
     if (m === "chase") actor = { kind: "chase", t0: now(), dur: 7 };
@@ -1277,13 +1795,19 @@
       o.swv += (-26 * o.sw - 1.1 * o.swv) * dt; o.sw += o.swv * dt;
       if (o.sp > 0) { o.sp += dt * 1.4; if (o.sp >= 1) o.sp = 0; }
     });
+    S.strands.forEach((sd) => { if (sd.wig > 0) sd.wig = Math.max(0, sd.wig - dt * 1.4); });
     swayV += (-30 * sway - 2 * swayV) * dt; sway += swayV * dt;
     if (Math.abs(sway) < 0.0002 && Math.abs(swayV) < 0.0005) { sway = 0; swayV = 0; }
-    boxWob = Math.max(0, boxWob - dt * 2); wreathWob = Math.max(0, wreathWob - dt * 1.5);
+    boxWob = Math.max(0, boxWob - dt * 2); trayWob = Math.max(0, trayWob - dt * 2); wreathWob = Math.max(0, wreathWob - dt * 1.5);
+    coilWob.l = Math.max(0, coilWob.l - dt * 1.6); coilWob.g = Math.max(0, coilWob.g - dt * 1.6); plugWob = Math.max(0, plugWob - dt * 2);
     starWob = Math.max(0, starWob - dt * 1.5); ctrlPress = Math.max(0, ctrlPress - dt * 4);
+    // The box glows (and lifts its lid) while an ornament can go back in; the lights box glows while a string can.
+    const boxTo = carry && dropTarget(carry).cell != null && (carry.from === "tree" || dropTarget(carry).box) ? 1 : 0;
+    const trayTo = pull && pullOff(pull) ? 1 : 0;
+    boxHot += (boxTo - boxHot) * Math.min(1, dt * 10); trayHot += (trayTo - trayHot) * Math.min(1, dt * 10);
     // The lights switch on quickly and the room dims slowly.
-    on += ((S.plugged ? 1 : 0) - on) * Math.min(1, dt * 7);
-    const dimTo = S.plugged && (S.strands.length || S.star) ? 1 : 0;
+    on += ((lit() ? 1 : 0) - on) * Math.min(1, dt * 7);
+    const dimTo = lit() && (lightN() || S.star) ? 1 : 0;
     dim += (dimTo - dim) * Math.min(1, dt * 1.8);
     // Snow outside: a gentle fall, thicker in the surprise or after a tap on the window.
     gust = Math.max(0, gust - dt);
@@ -1295,8 +1819,6 @@
       if (f.y > 1.02) { f.y = -0.03; f.x = Math.random(); }
     });
     if (actor && actor.kind === "snow") sill = Math.min(1, sill + dt * 0.25);
-    // The plug turns its prongs toward the socket while it is out.
-    if (!P.in) { const s = socketPt(), a = clamp(Math.atan2(s.x - P.x, -(s.y - P.y)), -1.3, 1.3); P.ang += (a - P.ang) * Math.min(1, dt * 8); }
     lightLevels(t);
     updateCoach();
     draw(t);
@@ -1306,32 +1828,40 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     drawRoom(t);
+    // The tree and what hangs on it.
     treeFrame();
-    drawTree();
-    S.strands.forEach((s, i) => drawStrand(s, on, t, i, 1));
-    fading.forEach((f) => drawStrand(f.s, on, t, 0, f.a));
-    if (live) drawStrand(live, on, t, S.strands.length, 1);
-    drawOrnaments(t);
+    drawTree(TIERS, tcNow(), true);
+    S.strands.forEach((sd) => drawString(sd, on, t, 1));
+    drawOrnaments();
     // Where a carried ornament would hang if let go now.
     if (carry) {
       const tg = dropTarget(carry);
-      if (tg && (tg.spot != null || tg.top)) {
+      if (tg.spot != null || tg.top) {
         const h = tg.top ? { x: TOP.x, y: TOP.y + 28 } : { x: SPOTS[tg.spot].x, y: SPOTS[tg.spot].y + ORN_BY[carry.t].cy };
         ctx.beginPath(); ctx.arc(h.x, h.y, ORN_BY[carry.t].r + 6, 0, TAU);
-        ctx.setLineDash([6, 5]); st("#FFE36B", 3); ctx.setLineDash([]);
+        ctx.setLineDash([6, 5]); stk("#FFE36B", 3); ctx.setLineDash([]);
       }
     }
+    // The floor things: the cord, the switch, the boxes and the coils, the plug in the socket.
     worldFrame();
     drawTrain(t);
     drawCord();
-    drawCtrl(t);
-    drawBox(t);
+    drawCtrl();
+    drawBox();
+    drawTray(t);
     drawPlug();
+    // Strings on the move lie over the floor things: one paying out from a coil, the tails of wraps winding
+    // on, strings winding back into their coils and the loose bits fading away.
+    treeFrame();
+    S.strands.forEach((sd) => { if (sd.tail && sd.grow < 1) drawString(tailOf(sd), on, t, 1); });
+    winding.forEach((w) => windDraw(w, (sd, k) => drawString(sd, on, t, 1 - k * 0.5)));
+    fading.forEach((f) => drawString(f.s, on, t, f.a));
+    if (live) drawString(live, on, t, 1);
     // The room dims a little while the tree is lit, then the lights glow over everything.
     if (dim > 0.005) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = "rgba(16,20,52," + (0.36 * dim).toFixed(3) + ")"; ctx.fillRect(0, 0, W, H); }
-    if (on > 0.01 && S.strands.length) {
+    if (on > 0.01 && lightN()) {
       worldFrame();
-      const c = tw(0, 260), r = 260 * L.tree.s, g = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, r);
+      const c = tw(0, YT + (YB - YT) * 0.6), r = 260 * L.tree.s, g = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, r);
       const a = 0.22 * on * Math.min(1, bulbCount() / 60);
       g.addColorStop(0, "rgba(255,214,140," + a.toFixed(3) + ")"); g.addColorStop(1, "rgba(255,214,140,0)");
       ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
@@ -1339,19 +1869,48 @@
     }
     treeFrame();
     drawGlows(on, t);
+    if (on > 0.01) {
+      ctx.globalCompositeOperation = "lighter";
+      S.strands.forEach((sd) => { if (sd.tail && sd.grow < 1) glowsOf(tailOf(sd), on, 1); });
+      winding.forEach((w) => windDraw(w, (sd, k) => glowsOf(sd, on, 1 - k)));
+      if (live) glowsOf(live, on, 1);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    }
     worldFrame();
-    if (S.plugged) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.8; ctx.drawImage(glow("#7CFF8A"), L.ctrl.x - 9 - 8, L.ctrl.y - 8, 16, 16); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; }
+    hotGlow(L.box.x, L.box.y - 16 - boxHot * 14, L.box.w, L.box.h + 16 + boxHot * 14, boxHot);
+    hotGlow(L.tray.x, L.tray.y, L.tray.w, L.tray.h, trayHot);
+    if (lit()) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.8; ctx.drawImage(glow("#7CFF8A"), L.ctrl.x - 11 - 9, L.ctrl.y - 9, 18, 18); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; }
     // Things in the air and in his hand stay bright.
-    fly.forEach((f) => { const p = flyPos(f); drawOrn(f.t, p.x, p.y, p.sc, 0, t); });
-    if (carry) drawOrn(carry.t, carry.x, carry.y, L.tree.s, Math.sin(t * 5) * 0.06, t);
+    if (pull) {
+      treeFrame();
+      ctx.save(); ctx.translate(pull.x0 + pull.dx, pull.y0 + pull.dy - 4); ctx.scale(pull.k, pull.k); ctx.translate(-pull.x0, -pull.y0);
+      K *= pull.k;
+      drawString(pull.sd, on, t, 1);
+      if (on > 0.01) { ctx.globalCompositeOperation = "lighter"; glowsOf(pull.sd, on, 1); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; }
+      ctx.restore();
+      worldFrame();
+    }
+    fly.forEach((f) => { const p = flyPos(f); drawOrn(f.t, p.x, p.y, p.sc, 0); });
+    if (carry) drawOrn(carry.t, carry.x, carry.y, L.tree.s, Math.sin(t * 5) * 0.06);
     drawParts();
     drawRing(t);
   }
+  // Draws a string winding back into its coil: it shrinks toward the coil as it goes (in the tree's frame).
+  function windDraw(w, fn) {
+    const e = ease(w.p), sc = lerp(w.k0, 0.1, e);
+    ctx.save();
+    ctx.translate(lerp(w.fx, w.to.x, e), lerp(w.fy, w.to.y, e)); ctx.scale(sc, sc); ctx.translate(-w.cx, -w.cy);
+    const k0 = K; K *= sc;
+    fn(w.sd, e);
+    K = k0;
+    ctx.restore();
+  }
   function onEnding(done) {
     ending = true;
-    drag = null; press.cancel(); live = null;
+    drag = null; press.cancel();
+    if (live) { const lv = live; live = null; if (lv.coil) windBack(lv); }
     if (carry) dropCarry(true);
-    if (P.held) dropPlug(false);
+    if (pull) pullEnd(true);
     setTimeout(done, 1500);
   }
   function restArt() {
@@ -1363,14 +1922,27 @@
     return s + '<path d="M50 4 L53 11 L60 11 L54.5 15.5 L56.5 22.5 L50 18.3 L43.5 22.5 L45.5 15.5 L40 11 L47 11 Z" fill="#FFD23B" stroke="#1D2340" stroke-width="1.6" stroke-linejoin="round"/></svg>';
   }
 
-  // Restore the tree after a reload (a fresh visit starts bare).
+  // Restore the tree after a reload (a fresh visit starts bare). Old saves hold light anchors in Classic tree
+  // units: they are turned into tree-relative points with the Classic shape first.
   if (st0) {
+    const rels = [];
     if (Array.isArray(st0.s)) st0.s.forEach((q) => {
-      if (!q || !LIGHT_BY[q.c] || !Array.isArray(q.a)) return;
-      const a = q.a.filter((p) => Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1])).map(([x, y]) => onTree({ x, y }));
-      if (a.length) S.strands.push(build({ c: q.c, a }));
+      if (!q) return;
+      const k = q.k === "g" ? "g" : "l";
+      if (!(k === "l" ? LIGHT_BY : GAR_BY)[q.c]) return;
+      const ok = (p) => Array.isArray(p) && p.length === 2 && isFinite(p[0]) && isFinite(p[1]);
+      let r = null;
+      if (Array.isArray(q.r)) r = q.r.filter(ok).map(([u, v]) => ({ u: clamp(u / 1000, -1, 1), v: clamp(v / 1000, 0, 1) }));
+      else if (Array.isArray(q.a)) r = q.a.filter(ok).map(([x, y]) => toRel(onTree({ x, y })));
+      if (r && r.length >= 2) rels.push({ k, c: q.c, r });
     });
-    S.strands = S.strands.slice(-MAX_STRANDS);
+    if (SHAPE_BY[st0.shape]) { useShape(SHAPE_BY[st0.shape]); S.shape = st0.shape; }
+    if (TC_BY[st0.tc]) S.tc = st0.tc;
+    rels.forEach((q) => { const sd = { k: q.k, c: q.c, r: q.r, grow: 1 }; sd.a = q.r.map(fromRel); S.strands.push(build(sd)); });
+    ["l", "g"].forEach((k) => {
+      const max = k === "l" ? MAX_LIGHTS : MAX_GAR;
+      while (S.strands.filter((s) => s.k === k).length > max) S.strands.splice(S.strands.findIndex((s) => s.k === k), 1);
+    });
     if (Array.isArray(st0.o)) {
       const used = new Set();
       st0.o.forEach((q) => {
@@ -1379,15 +1951,18 @@
       });
     }
     S.star = !!st0.star;
-    S.plugged = !!st0.plug;
-    if (Number.isInteger(st0.mode) && st0.mode >= 0 && st0.mode < MODES.length) S.mode = st0.mode;
+    if (Number.isInteger(st0.power) && st0.power >= 0 && st0.power < POWER.length) S.power = st0.power;
     if (LIGHT_BY[st0.color]) S.color = st0.color;
-    S.modeTried = !!st0.tried;
+    if (GAR_BY[st0.gar]) S.gar = st0.gar;
+    if (["tree", "lights", "garland"].includes(st0.tab)) S.tab = st0.tab;
+    S.lastKind = S.tab === "garland" ? "g" : "l";
+    S.modeTried = !!st0.tried && st0.v === 2;
   }
-  tiles.set(S.color);
+  refreshShapePics();
+  tcTiles.set(S.tc); lightTiles.set(S.color); garTiles.set(S.gar); jobs.set(S.tab);
+  showTab();
   resize();
-  if (S.plugged) { P.in = true; const s = socketPt(); P.x = s.x; P.y = s.y; P.ang = 0; on = 1; dim = S.strands.length || S.star ? 1 : 0; }
-  else { P.x = L.plugRest.x; P.y = L.plugRest.y; }
+  if (lit()) { on = 1; dim = lightN() || S.star ? 1 : 0; }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
   document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
@@ -1410,36 +1985,53 @@
 
   // Test hooks, only with ?debug in the address.
   if (/[?&]debug\b/.test(location.search)) {
+    const strandVp = (i, f) => { const sd = S.strands[i]; if (!sd) return null; const p = along(sd.poly, sd.len * (f == null ? 0.5 : f)); return tvp(p.x, p.y); };
     window.__toybox = {
       state: () => {
         const w = want();
-        return { strands: S.strands.length, bulbs: bulbCount(), orns: S.orns.map((o) => o.t + "@" + o.s), star: S.star, plugged: S.plugged,
-          mode: MODES[S.mode].id, color: S.color, want: w && w.part, flying: fly.length, carrying: carry && carry.t,
-          surprise: actor && actor.kind, coach: coach.text(), done: !w };
+        return { lights: lightN(), garlands: garN(), strands: S.strands.map((sd) => sd.k + ":" + sd.c), bulbs: bulbCount(),
+          orns: S.orns.map((o) => o.t + "@" + o.s), star: S.star, power: POWER_ID[S.power], color: S.color, garland: S.gar,
+          shape: S.shape, treeColor: S.tc, tab: S.tab, spots: SPOTS.length, want: w && w.part, flying: fly.length,
+          carrying: carry && carry.t, pulling: pull && pull.sd.k, live: live && live.k, winding: winding.length, morphing: !!morph,
+          boxHot: +boxHot.toFixed(2), trayHot: +trayHot.toFixed(2), surprise: actor && actor.kind, coach: coach.text(), done: !w };
       },
       // Does the next wanted thing, the way a tap would.
       next: () => {
         const w = want();
         if (!w) return false;
-        if (w.part === "tree") wrapAt(250);
-        else if (w.part === "plug") plugTap();
+        if (w.part === "coill") coilTap("l");
+        else if (w.part === "coilg") coilTap("g");
+        else if (w.part === "ctrl" || w.part === "ctrl2") pressSwitch();
         else if (w.part === "box") hopFromBox(S.orns.length % 9);
         else if (w.part === "starcell") hopFromBox(cellOf("star"));
-        else if (w.part === "ctrl") cycleMode();
         return true;
       },
       tap: (part) => { const p = partPt(part) || { x: 0, y: 0 }, v = vp(p.x, p.y); doTap(part, v.x, v.y); },
-      wrap: (y) => wrapAt(y == null ? 250 : y),
-      plug: () => plugTap(),
+      wrap: (k, v) => wrapAt(k === "g" ? "g" : "l", v, true),
+      coilTap: (k) => coilTap(k === "g" ? "g" : "l"),
+      power: () => pressSwitch(),
       hang: (id) => hopFromBox(cellOf(id || "red")),
-      color: (id) => { tiles.set(id); pickColor(id); },
-      mode: () => cycleMode(),
+      color: (id) => { lightTiles.set(id); pickColor(id); },
+      garland: (id) => { garTiles.set(id); pickGarland(id); },
+      shape: (id) => { setShape(id); shapeTiles.set(S.shape); },
+      treeColor: (id) => { tcTiles.set(id); setTreeColor(id); },
+      tab: (id) => { jobs.set(id); pickTab(id); },
+      // Takes string i (or ornament i) off the tree into its coil (or the box), the way a drag to the box would.
+      remove: (i) => { const sd = S.strands[i]; if (!sd) return false; S.strands.splice(i, 1); windBack(sd); lastWant = null; saveSoon(); return true; },
+      unhang: (i) => { const o = S.orns[i]; if (!o) return false; S.orns.splice(i, 1); const h = ornHook(o), w = tw(h.x, h.y); launch(o.t, { x: w.x, y: w.y, sc: L.tree.s }, { cell: cellOf(o.t) }); afterOrn(); return true; },
       newTree: () => newTree(),
       surprise: () => surprise(),
-      // Viewport points for real pointer drags: a part, a point on the tree (tree units), a branch tip.
+      // Viewport points for real pointer drags: a part, a coil, a point on the tree (tree units, or tree-relative
+      // u, v), a branch tip, a point along hung string i (f: 0..1 along it), the ornament box, the lights box.
       pt: (part) => { const p = partPt(part); return p ? vp(p.x, p.y) : null; },
+      coilPt: (k) => { const c = coilPos(k === "g" ? "g" : "l"); return vp(c.x, c.y - 4); },
       treePt: (x, y) => tvp(x, y),
+      relPt: (u, v) => { const p = fromRel({ u, v }); return tvp(p.x, p.y); },
       spotPt: (i) => tvp(SPOTS[i].x, SPOTS[i].y + 20),
+      ornPt: (i) => { const o = S.orns[i]; if (!o) return null; const m = ornMid(o); return tvp(m.x, m.y); },
+      strandPt: strandVp,
+      boxPt: () => vp(L.box.x + L.box.w / 2, L.box.y + L.box.h / 2),
+      trayPt: () => vp(L.tray.x + L.tray.w / 2, L.tray.y + L.tray.h * 0.8),
       spots: () => SPOTS.length,
       hit: (x, y) => hitPart(x, y),
       ghost: () => ghost.show()
