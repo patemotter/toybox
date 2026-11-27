@@ -1001,6 +1001,8 @@
   // Running in the wheel. Each tap on the wheel while it runs is one step faster (the steps slip back
   // slowly when the taps stop); the fourth step is SUPER DUPER FAST: a blurred wheel, two loop-the-loops,
   // a tiny cage shake. More taps keep it going a little longer, but it always winds down within about 10 s.
+  // The loop-the-loops play with reduced motion too (they are the payoff; only the cage shake and extra
+  // streaks are dropped), and the dizzy finish comes only after the loops have gone all the way round.
   var LEVEL_V = [6.2, 8.2, 10.2, 12.2], SUPER_V = 17, SUPER_DUR = 4.5, SUPER_MAX = 6.5, superK = 0, superMsgUntil = -1;
   function speedUp(a) {
     if (a.sup) { a.sup.dur = Math.min(SUPER_MAX, a.sup.dur + 0.8); return; }
@@ -1012,7 +1014,6 @@
   }
   function startSuper(a) {
     a.sup = { t: 0, dur: SUPER_DUR };
-    ham.wasSuper = true;
     superMsgUntil = clock + 3.2;
     updateCoach();
   }
@@ -1028,9 +1029,13 @@
     if (!a.sup) tgt = a.t > a.dur - 1.4 ? 2.5 : LEVEL_V[Math.min(3, a.level)];
     a.v += (tgt - a.v) * Math.min(1, dt * (a.sup ? 2.2 : 1.5));
     wheel.w = ham.f * a.v * G.L / w.Ri; wheel.driven = true;
-    // super duper fast: the wheel flings it all the way round, twice (not with reduced motion)
+    // super duper fast: the wheel flings it all the way round, twice; once round, it earns the dizzy finish
     var phi = 0;
-    if (a.sup && !reduceMotion) { var u = (a.sup.t - 0.9) / 2.6; if (u > 0 && u < 1) phi = TAU * 2 * ease(u); }
+    if (a.sup) {
+      var u = (a.sup.t - 0.9) / 2.6;
+      if (u > 0 && u < 1) phi = TAU * 2 * ease(u);
+      else if (u >= 1) ham.wasSuper = true;
+    }
     var ang = Math.PI / 2 + sign(wheel.w) * phi;
     ham.x = w.x + Math.cos(ang) * w.Ri; ham.y = w.y + Math.sin(ang) * w.Ri;
     if (phi) { ham.thT = angNorm(ang - Math.PI / 2); ham.th = ham.thT; } else ham.thT = 0;
