@@ -1756,8 +1756,8 @@
       flake(32, 32, 11) + flake(68, 36, 9) + flake(36, 66, 8) + flake(66, 66, 10) + "</svg>";
   }
 
-  restore();
   resize();
+  restore();
   cam = camNow();
   scissorsHome(0);
   tiles.set(COLORS[S.next != null ? S.next : S.c].id);
