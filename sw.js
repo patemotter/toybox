@@ -373,7 +373,27 @@ const CORE = [
   "./ice-cream/icons/icon-180.png",
   "./ice-cream/icons/icon-192.png",
   "./ice-cream/icons/icon-512.png",
-  "./ice-cream/icons/icon-maskable-512.png"
+  "./ice-cream/icons/icon-maskable-512.png",
+
+  // Christmas
+  "./christmas/",
+  "./christmas/index.html",
+  "./christmas/index.js",
+  "./christmas/tree.html",
+  "./christmas/tree.js",
+  "./christmas/snowman.html",
+  "./christmas/snowman.js",
+  "./christmas/presents.html",
+  "./christmas/presents.js",
+  "./christmas/snowflakes.html",
+  "./christmas/snowflakes.js",
+  "./christmas/cookies.html",
+  "./christmas/cookies.js",
+  "./christmas/manifest.webmanifest",
+  "./christmas/icons/icon-180.png",
+  "./christmas/icons/icon-192.png",
+  "./christmas/icons/icon-512.png",
+  "./christmas/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -35,6 +35,7 @@ A collection of small kids' apps that work offline. Each app is a self-contained
 | Sweet Shop: a sweet shop counter for making gummies the real way: pour a flavor, tip in gelatin, heat and stir, fill a bear, worm or fruit mold with the candy dropper, chill it in the fridge, pop them out, coat them sour, sugary or shiny, and fill the candy jar (kept across visits) | [`sweet-shop/`](sweet-shop/) |
 | Drawing: a coloring book, free drawing and letter tracing (Color, Draw, Write); pages, glyphs and words in their own scripts | [`drawing/`](drawing/) |
 | Ice Cream Shop: customers order cones, sundaes and milkshakes (some say "anything you like"); start a cone, cup, sundae dish or steel cup, scoop the flavors, mix and pour a milkshake, add toppings and hand it over; tap the ice cream maker to churn a new tub; script in `index.js` | [`ice-cream/`](ice-cream/) |
+| Christmas: Christmas: decorate a tree, build a snowman, pick and wrap presents and help open them, fold and cut paper snowflakes, and bake and decorate sugar and gingerbread cookies. | [`christmas/`](christmas/) |
 
 Archived (kept in [`archive/`](archive/), no tile on the home screen, not saved for offline): [`fish-tank/`](archive/fish-tank/), [`color-mixing/`](archive/color-mixing/).
 
