@@ -66,6 +66,10 @@
  *                              ("You are doing great!") also show every few minutes of play.
  *      Toybox.fresh()          true when the page was just opened from the home screen: start the
  *                              play fresh (keep collections and grown-up settings). Works before init.
+ *      Toybox.place.set(v) / .clear() / .get()   the sub screen he is on inside this page (Car Builder's
+ *                              "drive", the Tool Wall's open tool, ...), kept for the session so a reload or a
+ *                              grown-up's trip to the home screen (timer) comes back to it. get() is null on a
+ *                              fresh visit. v is a short string.
  *      Toybox.turning()        true while the "turn the device" card covers the app.
  * 5. Leaving a page with a powered machine (the Workshop's big machines). Register once, after init:
  *      Toybox.offFirst({
@@ -1337,6 +1341,30 @@
     } catch (e) { return false; }
   })();
 
+  // ---------- Where he is (Toybox.place) ----------
+  // The sub screen inside this page, for the session: a fresh visit forgets it. Every app page also notes
+  // itself as the last page played (toybox-last-page), so the home screen can send a grown-up who just set a
+  // timer back to the exact page he left (a Workshop station, a Farm field), not only the app's front page.
+  var PLACE_KEY = "toybox-place:" + location.pathname.replace(/index\.html$/, "");
+  if (freshVisit) { try { sessionStorage.removeItem(PLACE_KEY); } catch (e) { /* ignore */ } }
+  var place = {
+    set: function (v) { try { sessionStorage.setItem(PLACE_KEY, String(v).slice(0, 80)); } catch (e) { /* ignore */ } },
+    clear: function () { try { sessionStorage.removeItem(PLACE_KEY); } catch (e) { /* ignore */ } },
+    get: function () { if (freshVisit) return null; try { return sessionStorage.getItem(PLACE_KEY); } catch (e) { return null; } }
+  };
+  function noteLastPage() {
+    if (!SCRIPT_SRC) return;
+    try {
+      var root = new URL("../", SCRIPT_SRC).pathname, path = location.pathname;
+      if (path.indexOf(root) !== 0) return;
+      var rel = path.slice(root.length), app = rel.split("/")[0];
+      if (!app || rel.indexOf("/") === -1) return;   // the home screen itself
+      sessionStorage.setItem("toybox-last-page", JSON.stringify({ app: app, url: rel + location.search }));
+    } catch (e) { /* ignore */ }
+  }
+  noteLastPage();
+  window.addEventListener("pageshow", noteLastPage);
+
   // =====================================================================================================
   // Shared components (plans/redesign.md section 2; API in the header above; demo: tools/shell-demo.html)
   // =====================================================================================================
@@ -2196,6 +2224,7 @@
   window.Toybox = {
     init: init,
     fresh: function () { return freshVisit; },
+    place: place,
     settings: {
       get: settingGet,
       set: settingSet,

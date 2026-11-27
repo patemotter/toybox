@@ -2813,6 +2813,7 @@
   } });
   function openDrive(park) {
     if (dv) { if (park) startPark(); return; }
+    Toybox.place.set("drive");
     F.hidden = false;
     sizeDrive();
     prepVehicle();
@@ -2827,6 +2828,7 @@
     if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(loop); }
   }
   function closeDrive() {
+    Toybox.place.clear();
     F.hidden = true;
     dv = null;
     running = false;
@@ -2960,6 +2962,8 @@
     onWake: onWake,
     onTimer: drawFuel
   });
+  // Back to the drive he was on (a reload, or a grown-up's trip to the home screen to set a timer).
+  if (Toybox.place.get() === "drive" && !Toybox.timer.locked()) openDrive(false);
 
   // Test hook, only with ?debug in the address: lets automated checks peek at the drive.
   if (/[?&]debug\b/.test(location.search)) window.__car = { drive: function () { return dv; }, action: function (a) { doAction(a); }, park: function () { startPark(); } };

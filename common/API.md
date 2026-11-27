@@ -21,6 +21,7 @@ Do not add Grown-ups sheet, toast, farewell, or rest markup in HTML — `Toybox.
   - Hooks (all optional): `onEnding(done, info)` (`info.goodbye`, `endingMaxMs` default `15000`), `onGoodbye()`, `onRest()`, `onWake()`, `onOpen()`, `onTimer({ phase, remainingMs, fraction, minutes, showMinutes })`, `onTurn(shown)`.
   - Legacy no-ops (don't add): `big`, `onBig`, `Toybox.setBig()`, `Toybox.isBig()`.
 - **`Toybox.fresh()`** — `true` on first load of a page under a new launcher tap (`toybox-launch` vs `toybox-seen:<path>`). Safe to call before `init()`. Reset play state/counters; keep collections & grown-up settings. The launcher skips the new launch id on the first tile tap after the Grown-ups sheet was opened, so returning to the app just left is not fresh.
+- **`Toybox.place`** — `.set(v)`, `.clear()`, `.get()`: the sub screen he is on inside this page (e.g. `"drive"`, `"tool:ryoba"`), kept in `sessionStorage` (`toybox-place:<path>`); `get()` is `null` on a fresh visit. Set it when a sub screen opens, clear it when it closes, and reopen it after `init()` when `get()` returns it (and the timer is not locked). Every app page also records `toybox-last-page` so the launcher can reopen the exact page after the Grown-ups sheet.
 - **`Toybox.timer`**:
   - `.phase()` → `"idle" | "running" | "ending" | "resting"`
   - `.locked()` → `true` while ending or resting (ignore play input)
