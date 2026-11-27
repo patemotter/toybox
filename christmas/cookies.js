@@ -195,7 +195,7 @@
   // tray, sheet, big and lie are centers; board and oven are boxes.
   const TALL = {
     w: 420, h: 480, wall: 54,
-    tray: { x: 127, y: 130, w: 210, h: 120, cols: 3, rows: 2 },
+    tray: { x: 121, y: 130, w: 210, h: 120, cols: 3, rows: 2 },
     oven: { x: 256, y: 8, w: 152, h: 198 },
     board: { x: 12, y: 214, w: 396, h: 198 },
     sheet: { x: 210, y: 313, w: 352, h: 168 }, cs: 26,
