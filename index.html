@@ -475,11 +475,18 @@ h1 {
       // Opening an app from here starts it fresh (see Toybox.fresh in common/toybox.js), except right after
       // a grown-up opened the Grown-ups sheet (keepPlace): then the launch id stays the same, so the app he
       // just left comes back as he left it (set a timer without losing his build). Other apps still start fresh.
-      a.addEventListener("click", function () {
+      // That app also opens on the exact page he left (a Workshop station, a Farm field), not its front page.
+      a.addEventListener("click", function (e) {
         try {
-          if (keepPlace && sessionStorage.getItem("toybox-launch")) keepPlace = false;
-          else sessionStorage.setItem("toybox-launch", String(Date.now()));
-        } catch (e) { /* storage blocked: apps keep their state */ }
+          if (keepPlace && sessionStorage.getItem("toybox-launch")) {
+            keepPlace = false;
+            var last = JSON.parse(sessionStorage.getItem("toybox-last-page") || "null");
+            if (last && typeof last.url === "string" && last.app + "/" === app.href && last.url.indexOf(last.app + "/") === 0 && !/^\/|:/.test(last.url)) {
+              e.preventDefault();
+              location.href = last.url;
+            }
+          } else sessionStorage.setItem("toybox-launch", String(Date.now()));
+        } catch (er) { /* storage blocked: apps keep their state */ }
       });
 
       var img = document.createElement("img");

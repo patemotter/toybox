@@ -1613,6 +1613,7 @@
   function openViewer(e) {
     var P = prep(e.m, e.n);
     view = { e: e, P: P, yaw: P.yaw, drag: null, spin: 0.5, pic: null };
+    if (shelf.indexOf(e) !== -1) Toybox.place.set("print:" + shelf.indexOf(e));
     $("vTitle").textContent = MODEL_BY[e.m].label + (e.m === "name" ? ": " + e.n : "");
     var names = [];
     e.c.forEach(function (f) { var nm = fil(f).name; if (names.indexOf(nm) === -1) names.push(nm); });
@@ -1654,7 +1655,7 @@
   ["pointerup", "pointercancel"].forEach(function (ev) {
     $("vcv").addEventListener(ev, function (e) { if (view && view.drag) { var d = e.clientX - view.drag.x; view.spin = Math.abs(d) > 4 ? -Math.sign(d) * 0.9 : view.spin; view.drag = null; } });
   });
-  function closeViewer() { view = null; $("viewer").hidden = true; }
+  function closeViewer() { view = null; $("viewer").hidden = true; Toybox.place.clear(); }
 
   // ---------- Tabs, buttons ----------
   var tab = "models";
@@ -2007,6 +2008,11 @@
     onWake: function () { endingDone = null; lightsOut = false; updateUI(); },
     onTimer: drawTimer
   });
+  // Back to the print he was looking at in the viewer (a reload, or a grown-up's trip home to set a timer).
+  (function () {
+    var was = Toybox.place.get(), k = was && /^print:\d+$/.test(was) ? Number(was.slice(6)) : -1;
+    if (k >= 0 && shelf[k] && !view) openViewer(shelf[k]);
+  })();
   Toybox.settings.action("printer-clear", clearShelfAndPile);
   requestAnimationFrame(frame);
 

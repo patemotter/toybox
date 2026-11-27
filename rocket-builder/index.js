@@ -1044,6 +1044,7 @@
   }
 
   function openFlight(goodbye) {
+    if (!goodbye) Toybox.place.set("flight");
     F.hidden = false;
     sizeFlight();
     startFlight(goodbye);
@@ -1061,6 +1062,7 @@
     fl.lastCount = 3;
   }
   function closeFlight() {
+    Toybox.place.clear();
     var wasGoodbye = !!(fl && fl.goodbye);
     F.hidden = true;
     fl = null;
@@ -2738,6 +2740,8 @@
     onWake: function () { endingDone = null; goodbyeWanted = false; },
     onTimer: drawTimer
   });
+  // Back to the flight he was on (a reload, or a grown-up's trip to the home screen to set a timer).
+  if (Toybox.place.get() === "flight" && !Toybox.timer.locked()) openFlight(false);
   $("stage").appendChild($("tb-farewell"));
 
   // Test hook for automated checks, only with ?debug in the address.

@@ -1652,6 +1652,7 @@
   function openDetail(t, card, pj) {
     closeDetail(true);
     D = { t: t, s: freshState(t), u: uid(), card: card, view: "use", pj: !!pj };
+    if (!pj) Toybox.place.set("tool:" + t.id);
     $("dName").textContent = t.n;
     $("dCat").textContent = kindName(t);
     $("dDesc").textContent = t.d;
@@ -1698,6 +1699,7 @@
   function closeDetail(quiet) {
     if (!D) return;
     var card = D.card, t = D.t;
+    Toybox.place.clear();
     jobRelease();
     motorOff();
     D = null; J = null;
@@ -4219,6 +4221,9 @@
   })();
   function openInitialTool() {
     var tid = PSTEP ? PSTEP.tool : (/^[a-z]{2,24}$/.test(QUERY.tool || "") ? QUERY.tool : "");
+    // Back to the tool he had open (a reload, or a grown-up's trip to the home screen to set a timer).
+    var was = Toybox.place.get();
+    if (!tid && was && /^tool:[a-z]{2,24}$/.test(was)) tid = was.slice(5);
     if (tid && TOOL[tid] && !D) {
       openDetail(TOOL[tid], cards[tid] && cards[tid].el, !!PSTEP);
     }

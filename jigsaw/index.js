@@ -1815,7 +1815,7 @@
   }
   function setMode(m) {
     st.mode = m;
-    if (m !== "shelf") view = null;
+    if (m !== "shelf") { if (view) Toybox.place.clear(); view = null; }
     document.body.classList.toggle("m-choose", m === "choose");
     document.body.classList.toggle("m-play", m === "play");
     document.body.classList.toggle("m-shelf", m === "shelf");
@@ -1843,6 +1843,7 @@
   function openView(id) {
     var pic = PIC_BY[id];
     view = { pic: pic, big: null };
+    Toybox.place.set("view:" + id);
     shelfEl.hidden = true;
     viewT0 = now() + 500;
     bigPic(pic, function (r) { if (view && view.pic === pic) { view.big = r; dirty = true; } });
@@ -1851,6 +1852,7 @@
   }
   function closeView() {
     view = null;
+    Toybox.place.clear();
     shelfEl.hidden = false;
     buildShelf(); fitCards();
     updateCoach();
@@ -1981,6 +1983,11 @@
   });
   stage.appendChild($("tb-toast"));
   stage.appendChild($("tb-farewell"));
+  // Back to the finished picture he was looking at on the shelf (a reload, or a grown-up's trip home to set a timer).
+  (function () {
+    var was = Toybox.place.get(), id = was && was.indexOf("view:") === 0 ? was.slice(5) : "";
+    if (id && st.mode === "shelf" && PIC_BY[id] && !view) openView(id);
+  })();
   requestAnimationFrame(frame);
 
   // Test hook (only with ?debug in the address).
