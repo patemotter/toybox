@@ -418,8 +418,8 @@
   // =====================================================================================================
   // Rolling
   // =====================================================================================================
-  // Each snowball keeps its own turn (a rotation matrix), so the specks of packed snow and bits of grass on it
-  // roll round as it goes. Rows are kept orthonormal.
+  // Each snowball keeps its own turn (a rotation matrix), so the soft shading and little bumps of packed snow on
+  // it roll round as it goes. Rows are kept orthonormal.
   function ortho(M) {
     let a = M[0], b = M[1], c = M[2], n = Math.hypot(a, b, c) || 1;
     a /= n; b /= n; c /= n;
@@ -451,13 +451,8 @@
     if (!b) return 0;
     const m = b.r * 0.9;
     let nx = clamp(b.x + dx, Y.x0 + m, Y.x1 - m), ny = clamp(b.gy + dy, Y.gy0, Y.gy1);
-    S.balls.forEach((o, j) => {
-      if (j === i || !o || o.stacked || o.lift) return;
-      const R = b.r + o.r, ex = (nx - o.x) / R, ey = (ny - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
-      if (e >= 1) return;
-      const ux = e > 1e-4 ? ex / e : (nx >= o.x ? 1 : -1), uy = e > 1e-4 ? ey / e : 0;
-      nx = clamp(o.x + ux * R, Y.x0 + m, Y.x1 - m); ny = clamp(o.gy + uy * R * 0.5, Y.gy0, Y.gy1);
-    });
+    const p = pushOut(S, b, nx, ny, b.r);
+    nx = clamp(p.x, Y.x0 + m, Y.x1 - m); ny = clamp(p.gy, Y.gy0, Y.gy1);
     const mx = nx - b.x, my = ny - b.gy, d = Math.hypot(mx, my * DEPTH);
     if (d < 0.01) return 0;
     b.x = nx; b.gy = ny;
@@ -473,7 +468,8 @@
     saveSoon();
     return d;
   }
-  // The rolled track: grass showing through, a packed rim of snow round it. Painted once into its own layer.
+  // The rolled trail: snow pressed down and packed (a little blue-grey in its own shade), with a soft raised rim
+  // of loose snow pushed aside. Painted once into its own layer.
   const K = 0.42;   // the snow is seen at a slant: a round patch on it looks this flat
   const tcv = document.createElement("canvas"), tctx = tcv.getContext("2d");
   let oldTrack = null;
@@ -491,16 +487,13 @@
     c.lineCap = "round"; c.lineJoin = "round";
     const line = (w, col) => { c.beginPath(); c.moveTo(a.x, a.y / K); c.lineTo(b.x + 0.01, b.y / K); c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
     c.globalCompositeOperation = "source-over";
-    line(b.w, "#A3C77A");
-    const n = hash(Math.round(b.x), Math.round(b.y));
-    if (n < 0.55) {
-      const ox = (hash(Math.round(b.y), Math.round(b.x)) - 0.5) * b.w * 0.6, oy = (n - 0.27) * b.w;
-      c.beginPath(); c.moveTo(b.x + ox, b.y / K + oy); c.lineTo(b.x + ox + 2.5, b.y / K + oy - 7);
-      c.lineWidth = 2.2; c.strokeStyle = n < 0.2 ? "#B79B6A" : "#6F9F45"; c.stroke();
-    }
-    // The rim goes under what is already there, so it never covers grass rolled earlier.
+    line(b.w, "#D3DEED");
+    // The rim goes under what is already there, so it never covers trail rolled earlier: a pale edge of loose
+    // snow, then its soft blue shadow.
     c.globalCompositeOperation = "destination-over";
-    line(b.w + 9, "#CFDDF0");
+    line(b.w + 5, "#BFCDE2");
+    line(b.w + 13, "#FFFFFF");
+    line(b.w + 17, "#E2EAF6");
     c.globalCompositeOperation = "source-over";
   }
   function redrawTrack() {
@@ -519,10 +512,9 @@
   }
   function openDir(b) {
     const h = b.heading, ax = b.x + h.x * 130, ay = b.gy + h.y * 130 / DEPTH;
-    const clear = (x, y) => x > Y.x0 + b.r && x < Y.x1 - b.r && y > Y.gy0 + 10 && y < Y.gy1 - 10 &&
-      S.balls.every((o) => !o || o === b || o.stacked || Math.hypot((x - o.x) / (o.r + b.r), (y - o.gy) / ((o.r + b.r) * 0.5)) > 1.1);
+    const clear = (x, y) => x > Y.x0 + b.r && x < Y.x1 - b.r && y > Y.gy0 + 10 && y < Y.gy1 - 10 && !blocked(S, b, x, y, b.r * 1.1);
     if (clear(ax, ay)) return { x: h.x, y: h.y };
-    let dx = (Y.x0 + Y.x1) / 2 - b.x, dy = ((Y.gy0 + Y.gy1) / 2 - b.gy) * DEPTH;
+    let dx = (Y.x0 + Y.x1) / 2 + 40 - b.x, dy = ((Y.gy0 + Y.gy1) / 2 - 30 - b.gy) * DEPTH;
     const o = S.balls[0];
     if (o && o !== b && o.done) { dx += (b.x - o.x) * 0.8; dy += (b.gy - o.gy) * DEPTH * 0.8; }
     const n = Math.hypot(dx, dy) || 1, a = (Math.random() - 0.5) * 0.8, c = Math.cos(a), s = Math.sin(a);
@@ -557,7 +549,7 @@
     ghost.learned("roll");
     busy = true;
     let tx = b.x, ty = b.gy;
-    if (i === 0) { tx = clamp(b.x, Y.bx0, Y.bx1); ty = clamp(b.gy, G_MIN, Y.gy1); }
+    if (i === 0) { const p = settleSpot(S, b); tx = p.x; ty = p.y; }
     const settle = () => {
       trackBreak();
       b.sq = 1;
@@ -635,14 +627,11 @@
     });
   }
   function dropBall(i, quiet) {
-    const b = S.balls[i], o = S.balls[0];
+    const b = S.balls[i];
     let gx = clamp(b.lx, Y.x0 + b.r * 0.9, Y.x1 - b.r * 0.9), gy = clamp(b.ly + b.r * SIT, Y.gy0, Y.gy1);
-    const R = b.r + o.r, ex = (gx - o.x) / R, ey = (gy - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
-    if (e < 1) {
-      const ux = e > 1e-4 ? ex / e : 1, uy = e > 1e-4 ? ey / e : 0;
-      gx = clamp(o.x + ux * R, Y.x0 + b.r, Y.x1 - b.r); gy = clamp(o.gy + uy * R * 0.5, Y.gy0, Y.gy1);
-      if (Math.hypot((gx - o.x) / R, (gy - o.gy) / (R * 0.5)) < 0.98) { const p = openSpot(S); gx = p.x; gy = p.y; }
-    }
+    const p = pushOut(S, b, gx, gy, b.r);
+    gx = clamp(p.x, Y.x0 + b.r * 0.9, Y.x1 - b.r * 0.9); gy = clamp(p.gy, Y.gy0, Y.gy1);
+    if (blocked(S, b, gx, gy, b.r)) { const q = openSpot(S); gx = q.x; gy = q.y; }
     const x0 = b.lx, y0 = b.ly, ty = gy - b.r * SIT;
     busy = true;
     tween(0.35, (p) => { b.lx = lerp(x0, gx, p); b.ly = lerp(y0, ty, p * p); }, () => {
@@ -654,79 +643,98 @@
   }
 
   // =====================================================================================================
-  // Dressing
+  // Dressing and taking off
   // =====================================================================================================
-  // Puts one piece on (eyes, nose and smile one at a time; buttons, arms and mittens all together). The scarf
-  // and hat change on a second tap. from: where the piece flies in from (his finger, or the tile).
-  function putPiece(k, from, btn) {
+  // Puts a piece on with choice opt, or swaps the choice when that piece is already on. Eyes and smile stones go on
+  // one at a time (the next empty place); buttons, arms and mittens go on together (mittens bring the stick arms).
+  // from: where it flies in from (his finger, or the tile). Returns true when something changed.
+  function putPiece(k, opt, from, btn) {
     if (locked() || !KIND[k]) return false;
-    const b = btn || tiles.button(k);
+    const K = KIND[k];
     if (S.step !== "dress") {
-      if (b) Toybox.wiggle(b);
+      if (btn) Toybox.wiggle(btn);
       coach.say("Build the snowman first. Then dress him.", 3);
       ghost.poke();
       return false;
     }
-    const D = S.D, g = geom(S), K = KIND[k];
-    if (k === "mittens" && D.arms < 2) {
-      if (b) Toybox.wiggle(b);
-      Toybox.wiggle(tiles.button("arms"));
-      coach.say("Put the stick arms on first.", 3);
-      return false;
-    }
+    const d = S.D[k], g = geom(S);
+    opt = clamp(opt | 0, 0, K.opts.length - 1);
     ghost.learned("dress");
-    if (k === "scarf") {
-      if (D.scarf < 0) { D.scarf = 0; fly("scarf", 0, from); }
-      else {
-        D.scarf = (D.scarf + 1) % SCARVES.length;
-        pwob.scarf = 1;
-        const sp = pieceSpot(g, "scarf", 0);
-        puff("spark", sp.x, sp.y, 6, SCARVES[D.scarf].hex);
-      }
-    } else if (k === "hat") {
-      const first = D.hat < 0;
-      D.hat = first ? 0 : (D.hat + 1) % HATS.length;
-      // A different hat drops on from above.
-      fly("hat", 0, first ? from : { x: g.hx, y: g.hy - g.hr * 3.4 });
-      const sp = pieceSpot(g, "hat", 0);
-      later(0.5, () => tag(HATS[D.hat].name, sp.x + g.hr * 1.4, sp.y - g.hr * 0.2));
+    if (anyOn(k) && d.opt !== opt) {
+      // A different choice: the old one goes back in the box and the new one goes on in its place.
+      d.on.forEach((v, j) => { if (v) sendToBox(k, K.slots ? j : -1, d.opt, 0, 0, 0.12); });
+      d.opt = opt;
+      d.on.forEach((v, j) => { if (v) fly(k, K.slots ? j : -1, from); });
+      tagSoon(k, opt);
+    } else if (K.slots) {
+      const j = d.on.indexOf(false);
+      if (j < 0) { fullNote(k, btn); return false; }
+      d.opt = opt; d.on[j] = true;
+      fly(k, j, from);
     } else {
-      if (D[k] >= K.max) {
-        if (b) Toybox.wiggle(b);
-        const sp = pieceSpot(g, k, K.max - 1);
-        tag(K.full, sp.x, sp.y - sp.r - 6);
-        return false;
-      }
-      if (K.face) { fly(k, D[k], from); D[k] += 1; }
-      else { const n0 = D[k]; for (let j = n0; j < K.max; j++) fly(k, j, from, (j - n0) * 0.14); D[k] = K.max; }
+      if (d.on[0]) { fullNote(k, btn); return false; }
+      d.opt = opt; d.on[0] = true;
+      fly(k, -1, from);
+      if (k === "mittens" && !S.D.arms.on[0]) { S.D.arms.on[0] = true; fly("arms", -1, from); }
+      if (many(k)) tagSoon(k, opt);
     }
     updateTiles();
     saveSoon();
     checkDone();
     return true;
   }
+  function fullNote(k, btn) {
+    if (btn) Toybox.wiggle(btn);
+    const g = geom(S), a = anchorOf(g, k, KIND[k].slots ? KIND[k].slots - 1 : 0);
+    tag(KIND[k].opts[S.D[k].opt].tag, a.x, a.y - 14);
+  }
+  function tagSoon(k, opt) {
+    later(0.55, () => { if (S.step !== "dress") return; const a = anchorOf(geom(S), k, 0); tag(KIND[k].opts[opt].tag, a.x, a.y - 16); });
+  }
+  // A piece flying to its place from a point (dx, dy from its place); j is -1 for a whole piece.
   function fly(k, j, from, delay) {
-    const sp = pieceSpot(geom(S), k, j), f = from || { x: sp.x, y: sp.y - 150 };
+    const a = anchorOf(geom(S), k, Math.max(0, j)), f = from || { x: a.x, y: a.y - 150 };
     flights = flights.filter((q) => !(q.k === k && q.j === j));
-    flights.push({ k, j, fx: f.x, fy: f.y, t0: now() + (delay || 0), dur: 0.5, arc: Math.hypot(f.x - sp.x, f.y - sp.y) > 80 ? 1 : 0.3 });
+    flights.push({ k, j, dx: f.x - a.x, dy: f.y - a.y, t0: now() + (delay || 0), dur: 0.5, arc: Math.hypot(f.x - a.x, f.y - a.y) > 80 ? 1 : 0.3 });
   }
   function landFlights(t) {
-    if (!flights.length || S.step !== "dress") { flights = []; return; }
+    if (S.step !== "dress") { flights = []; gone = []; return; }
     flights = flights.filter((f) => {
       if (t < f.t0 + f.dur) return true;
-      const sp = pieceSpot(geom(S), f.k, f.j), face = KIND[f.k].face;
-      puff("spark", sp.x, sp.y, face ? 3 : 6);
+      const a = anchorOf(geom(S), f.k, Math.max(0, f.j)), face = KIND[f.k].face;
+      puff("spark", a.x, a.y, face ? 3 : 6);
       if (!face) pwob[f.k] = 0.7;
       return false;
     });
+    gone = gone.filter((q) => {
+      if (t < q.t0 + q.dur) return true;
+      boxBounce = 1;
+      const bx = boxGeo();
+      puff("snow", bx.x, bx.gy - bx.h, 4);
+      return false;
+    });
+  }
+  // Takes a piece (or one eye, one smile stone) off: it goes back into the box from where he let go of it.
+  function takeOff(k, j, dx, dy) {
+    const d = S.D[k];
+    if (KIND[k].slots) d.on[j] = false; else d.on[0] = false;
+    sendToBox(k, KIND[k].slots ? j : -1, d.opt, dx, dy, 0);
+    if (k === "arms" && S.D.mittens.on[0]) { S.D.mittens.on[0] = false; sendToBox("mittens", -1, S.D.mittens.opt, dx, dy, 0); }
+    updateTiles();
+    saveSoon();
+  }
+  function sendToBox(k, j, opt, dx, dy, delay) {
+    const g = geom(S), a = anchorOf(g, k, Math.max(0, j)), bx = boxGeo();
+    gone.push({ k, j, opt, g, a, dx, dy, tx: bx.x - a.x, ty: bx.gy - bx.h - 6 - a.y, t0: now() + (delay || 0), dur: 0.5 });
   }
   // A real completion: some pieces on (and again when he has put everything on).
   function checkDone() {
-    const kinds = KINDS.filter((k) => count(k.id) > 0).length;
+    const kinds = KINDS.filter((k) => anyOn(k.id)).length;
     if (!S.k1 && kinds >= 3) { S.k1 = true; later(1.2, () => Toybox.kind()); }
     if (!S.all && allOn()) {
       S.all = true;
       later(0.8, () => {
+        if (S.step !== "dress") return;
         const g = geom(S);
         for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; puff("spark", g.mx + Math.cos(a) * 110, g.my + Math.sin(a) * 90 - 40, 2); }
         coach.say("The snowman is all dressed.", 4);
@@ -912,12 +920,78 @@
   }
 
   // =====================================================================================================
+  // Drawing the box
+  // =====================================================================================================
+  // An open cardboard box of snowman things. What is not on the snowman peeks out of it. While he carries a piece
+  // off the snowman its flaps open wider, and over it the box glows.
+  let boxBounce = 0, boxWob = 0, boxOpen = 0;
+  function overBox(w) { const b = boxGeo(); return w.x > b.x - b.w / 2 - 34 && w.x < b.x + b.w / 2 + 44 && w.y > b.gy - b.h - b.d - 60 && w.y < b.gy + 14; }
+  function drawBox(t) {
+    const b = boxGeo(), x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, top = b.gy - b.h, d = b.d;
+    const carrying = drag && drag.k === "piece", hover = carrying && overBox({ x: drag.x, y: drag.y });
+    ell(b.x + 6, b.gy - 3, b.w * 0.62, 10); ctx.fillStyle = "rgba(90, 120, 170, 0.22)"; ctx.fill();
+    ctx.save();
+    const sq = Math.sin(boxBounce * Math.PI * 3) * boxBounce * 0.06 + Math.sin(boxWob * 20) * boxWob * 0.03;
+    ctx.translate(b.x, b.gy); ctx.scale(1 + sq, 1 - sq); ctx.translate(-b.x, -b.gy);
+    if (hover) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+      ctx.globalAlpha = 0.45 + pulse * 0.25;
+      ctx.beginPath(); ctx.ellipse(b.x + 5, top - d / 2, b.w * 0.75, b.h * 0.95, 0, 0, TAU); ctx.fillStyle = "#FFE7A0"; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // Inside (the dark back of the open top).
+    ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(x0 + 10, top - d); ctx.lineTo(x1 + 10, top - d); ctx.lineTo(x1, top); ctx.closePath();
+    fillStroke("#8A5A36", 2);
+    drawBoxThings(b, top, t);
+    // The flaps stand open; wider while a piece is carried, widest over the box.
+    const th = lerp(0.42, 1.15, boxOpen), fl = 30;
+    const flap = (hx, sgn) => {
+      const vx = sgn * Math.sin(th) * fl, vy = -Math.cos(th) * fl;
+      ctx.beginPath(); ctx.moveTo(hx, top); ctx.lineTo(hx + 10, top - d); ctx.lineTo(hx + 10 + vx, top - d + vy); ctx.lineTo(hx + vx, top + vy); ctx.closePath();
+      fillStroke("#E2B07A", 2);
+    };
+    flap(x0, -1); flap(x1, 1);
+    // Right side and front.
+    ctx.beginPath(); ctx.moveTo(x1, top); ctx.lineTo(x1 + 10, top - d); ctx.lineTo(x1 + 10, b.gy - d); ctx.lineTo(x1, b.gy); ctx.closePath();
+    fillStroke("#B97B42", 2);
+    ctx.beginPath(); ctx.rect(x0, top, b.w, b.h); fillStroke("#D9A066");
+    ctx.fillStyle = "#E9C08E"; ctx.fillRect(b.x - 9, top + 1.5, 18, b.h - 3);
+    ctx.strokeStyle = "rgba(29, 35, 64, 0.25)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0 + 8, top + 14); ctx.lineTo(x1 - 8, top + 14); ctx.stroke();
+    // A scarf off the snowman hangs over the front edge.
+    if (!S.D.scarf.on[0] && S.step !== "dress" || (S.step === "dress" && !S.D.scarf.on[0])) {
+      const o = KIND.scarf.opts[S.D.scarf.opt];
+      rr(x1 - 30, top - 6, 15, 34, 4); fillStroke(o.hex, 1.8);
+      if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(x1 - 29, top + 10, 13, 4); ctx.fillRect(x1 - 29, top + 18, 13, 4); }
+    }
+    if (hover) {
+      rr(x0 - 8, top - d - 8, b.w + 26, b.h + d + 14, 12);
+      ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = "#FFC93C"; ctx.lineWidth = 4; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // The snowman things waiting in the box (only what is not on the snowman).
+  function drawBoxThings(b, top) {
+    const D = S.D, off = (k) => S.step !== "dress" || !full(k);
+    if (off("arms")) {
+      drawStick({ sx: b.x - 34, sy: top + 4, ex: b.x - 46, ey: top - 34, a: -1.82, L: 39, s: -1 }, false);
+      drawStick({ sx: b.x - 22, sy: top + 4, ex: b.x - 10, ey: top - 32, a: -1.2, L: 37, s: 1 }, false);
+    }
+    if (off("hat")) {
+      ctx.save(); ctx.translate(b.x + 26, top + 2); ctx.rotate(0.35);
+      drawHatKind(D.hat.opt, { hx: 0, hy: 12, hr: 19 }, 0);
+      ctx.restore();
+    }
+    if (off("nose")) drawCarrot(b.x - 4, top - 2, 30, 10, -0.75);
+    if (off("eyes") || off("smile")) { drawCoal(b.x - 16, top - 3, 5.5, 3); drawCoal(b.x + 2, top - 1, 5, 8); drawCoal(b.x - 7, top - 7, 4.5, 5); }
+  }
+
+  // =====================================================================================================
   // Drawing the snowballs and the snowman
   // =====================================================================================================
-  // Bits on a snowball's surface (packed-snow shading, little bumps, bits of grass), spread evenly round it.
+  // Soft shading and little bumps of packed snow on a snowball's surface, spread evenly round it (it stays clean).
   const SPECKS = Array.from({ length: 34 }, (_, i) => {
     const y = 1 - (i + 0.5) / 34 * 2, rad = Math.sqrt(1 - y * y), th = i * 2.39996;
-    return { p: [Math.cos(th) * rad, y, Math.sin(th) * rad], k: i % 7 === 3 ? 2 : (i % 3 === 0 ? 1 : 0), s: 0.6 + hash(i, 1) * 0.8, a: hash(i, 2) * TAU };
+    return { p: [Math.cos(th) * rad, y, Math.sin(th) * rad], k: i % 3 === 0 ? 1 : 0, s: 0.6 + hash(i, 1) * 0.8 };
   });
   const TILT = 0.38, CT = Math.cos(TILT), ST = Math.sin(TILT);
   function drawBallBody(x, y, r, M) {
@@ -933,9 +1007,8 @@
       if (v < 0.08) continue;
       const sx = x + qx * r * 0.96, sy = y - (qy * CT - qz * ST) * r * 0.96;
       ctx.globalAlpha = base * Math.min(1, v * 2.5);
-      if (sp.k === 0) { ell(sx, sy, r * 0.05 * sp.s + 0.6, (r * 0.05 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#B3C7E3"; ctx.fill(); }
-      else if (sp.k === 1) { ell(sx, sy, r * 0.1 * sp.s + 0.8, (r * 0.08 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#C3D3EA"; ctx.stroke(); }
-      else { const l = r * 0.07 + 1.5; ctx.beginPath(); ctx.moveTo(sx - Math.cos(sp.a) * l, sy - Math.sin(sp.a) * l); ctx.lineTo(sx + Math.cos(sp.a) * l, sy + Math.sin(sp.a) * l); ctx.lineWidth = 1.8; ctx.strokeStyle = "#7FA650"; ctx.stroke(); }
+      if (sp.k === 0) { const q = r * 0.05 * sp.s + 0.6; ell(sx, sy, q, q * (0.5 + 0.5 * v)); ctx.fillStyle = "#C3D3EA"; ctx.fill(); }
+      else { ell(sx, sy, r * 0.1 * sp.s + 0.8, (r * 0.08 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#C3D3EA"; ctx.stroke(); }
     }
     ctx.restore();
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
@@ -958,15 +1031,34 @@
     ell(b.lx, gy, b.r * 0.7, b.r * 0.18); ctx.fillStyle = "rgba(90, 120, 170, 0.16)"; ctx.fill();
     drawBallBody(b.lx, b.ly, b.r, b.M);
   }
-  // Draws piece (k, j) at its place, or on its way there while it flies on.
-  function withFlight(B, k, j, sp, t, fn) {
-    const f = B === S ? flights.find((q) => q.k === k && q.j === j) : null;
-    if (!f) { fn(); return; }
+  // The offset of piece (k, j) while it flies to its place: null when it is in place, "wait" before it starts.
+  function flightOff(k, j, t) {
+    const f = flights.find((q) => q.k === k && q.j === j);
+    if (!f) return null;
     const p = (t - f.t0) / f.dur;
-    if (p < 0) return;
-    const e = ease(Math.min(1, p)), dx = (f.fx - sp.x) * (1 - e), dy = (f.fy - sp.y) * (1 - e) - Math.sin(Math.min(1, p) * Math.PI) * 50 * f.arc;
-    ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore();
+    if (p < 0) return "wait";
+    const e = ease(Math.min(1, p));
+    return { x: f.dx * (1 - e), y: f.dy * (1 - e) - Math.sin(Math.min(1, p) * Math.PI) * 50 * f.arc };
   }
+  // Draws the bits of piece k with choice opt: all of them, or just bit j (one eye, one smile stone).
+  function drawPiece(g, k, opt, j, t, o) {
+    const w = o.w || 0, arms = (wob) => [0, 1].map((q) => armAt(g, q, wob + (o.wind || 0) * Math.sin(t * 7 + q) * 0.04));
+    const each = (n, fn) => { for (let q = 0; q < n; q++) if (j < 0 || j === q) fn(q); };
+    const O = KIND[k].opts[opt];
+    switch (k) {
+      case "eyes": each(2, (q) => { const sp = pieceSpot(g, "eyes", q); if (O.id === "coal") drawCoal(sp.x, sp.y, sp.r, q * 2 + 1); else drawButtonEye(sp.x, sp.y, sp.r * 1.05); }); break;
+      case "nose": { const sp = pieceSpot(g, "nose", 0); drawCarrot(sp.x, sp.y, g.hr * 0.82, g.hr * 0.27, 0.2); break; }
+      case "smile": each(5, (q) => { const sp = pieceSpot(g, "smile", q); drawCoal(sp.x, sp.y, sp.r, q + 7); }); break;
+      case "buttons": each(3, (q) => { const sp = pieceSpot(g, "buttons", q), r = sp.r * (1 + Math.sin(t * 18) * w * 0.25); if (O.id === "coal") drawCoal(sp.x, sp.y, r * 0.95, q + 11); else drawButton(sp.x, sp.y, r, O); }); break;
+      case "arms": arms(Math.sin(t * 16) * w * 0.18).forEach((am) => drawStick(am, o.mitts)); break;
+      case "mittens": arms(Math.sin(t * 16) * (o.aw || 0) * 0.18).forEach((am) => drawMitten(am, O, w, t)); break;
+      case "scarf": drawScarf(g, O, t, Math.max(w, o.wind || 0)); break;
+      case "hat": drawHatKind(opt, g, Math.abs(Math.sin(t * 9)) * w * 12); break;
+    }
+  }
+  // The snowman: the big snowball, the stacked ones, and the pieces he put on (each where it belongs, flying on,
+  // or left out while he carries it).
+  const ORDER_BACK = ["arms"], ORDER_MID = ["buttons"], ORDER_FRONT = ["scarf", "mittens", "eyes", "nose", "smile", "hat"];
   function drawSnowman(B, t) {
     const b0 = B.balls[0];
     if (!b0) return;
@@ -977,26 +1069,52 @@
     drawGroundBall(b0);
     const st1 = B.balls[1] && B.balls[1].stacked, st2 = st1 && B.balls[2] && B.balls[2].stacked;
     const g = st2 ? geom(B) : null;
-    const wob = (k) => (live ? (pwob[k] || 0) : 0);
-    const arms = [];
-    if (g) for (let j = 0; j < D.arms; j++) arms.push(armAt(g, j, Math.sin(t * 16) * wob("arms") * 0.18 + (live ? windNow(t) * Math.sin(t * 7 + j) * 0.04 : 0)));
-    if (g) arms.forEach((am, j) => withFlight(B, "arms", j, pieceSpot(g, "arms", j), t, () => drawStick(am, j < D.mittens)));
+    const pieces = (list) => {
+      if (!g) return;
+      list.forEach((k) => {
+        const d = D[k], n = KIND[k].slots || 0;
+        const o = { w: live ? (pwob[k] || 0) : 0, aw: live ? (pwob.arms || 0) : 0, wind: live ? windNow(t) : 0, mitts: D.mittens.on[0] };
+        const one = (j) => {
+          if (live && drag && drag.k === "piece" && drag.kind === k && (drag.j === j || (!n && drag.j < 0))) return;
+          if (live && k === "mittens" && drag && drag.k === "piece" && drag.kind === "arms") return;
+          let f = live ? flightOff(k, j, t) : null;
+          if (live && k === "mittens" && !f) f = flightOff("arms", -1, t);
+          if (f === "wait") return;
+          if (f) { ctx.save(); ctx.translate(f.x, f.y); drawPiece(g, k, d.opt, j, t, o); ctx.restore(); }
+          else drawPiece(g, k, d.opt, j, t, o);
+        };
+        if (n) d.on.forEach((v, j) => { if (v) one(j); });
+        else if (d.on[0]) one(-1);
+      });
+    };
+    pieces(ORDER_BACK);
     if (st1) { const c = stackAt(B, 1); drawBallBody(c.x, c.y, B.balls[1].r, B.balls[1].M); }
-    if (g) for (let j = 0; j < D.buttons; j++) { const sp = pieceSpot(g, "buttons", j); withFlight(B, "buttons", j, sp, t, () => drawButton(sp.x, sp.y, sp.r * (1 + Math.sin(t * 18) * wob("buttons") * 0.25))); }
+    pieces(ORDER_MID);
     if (st2) { const c = stackAt(B, 2); drawBallBody(c.x, c.y, B.balls[2].r, B.balls[2].M); }
-    if (g) {
-      if (D.scarf >= 0) withFlight(B, "scarf", 0, pieceSpot(g, "scarf", 0), t, () => drawScarf(g, D.scarf, t, live ? Math.max(wob("scarf"), windNow(t)) : 0));
-      arms.forEach((am, j) => { if (j < D.mittens) withFlight(B, "mittens", j, pieceSpot(g, "mittens", j), t, () => drawMitten(am, D.scarf, wob("mittens"), t)); });
-      // The face: only the pieces he put on, each where he put it; it never moves by itself.
-      for (let j = 0; j < D.eyes; j++) { const sp = pieceSpot(g, "eyes", j); withFlight(B, "eyes", j, sp, t, () => drawCoal(sp.x, sp.y, sp.r, j * 2 + 1)); }
-      if (D.nose) { const sp = pieceSpot(g, "nose", 0); withFlight(B, "nose", 0, sp, t, () => drawCarrot(sp.x, sp.y, g.hr * 0.82, g.hr * 0.27, 0.2)); }
-      for (let j = 0; j < D.smile; j++) { const sp = pieceSpot(g, "smile", j); withFlight(B, "smile", j, sp, t, () => drawCoal(sp.x, sp.y, sp.r, j + 7)); }
-      if (D.hat >= 0) {
-        const hop = Math.abs(Math.sin(t * 9)) * wob("hat") * 12;
-        withFlight(B, "hat", 0, pieceSpot(g, "hat", 0), t, () => (D.hat === 0 ? drawTopHat(g, hop) : drawKnitHat(g, D.scarf, hop)));
-      }
-    }
+    // The face: only the pieces he put on, each where he put it; it never moves by itself.
+    pieces(ORDER_FRONT);
     ctx.restore();
+  }
+  // The piece in his hand, and pieces on their way back into the box (drawn over everything).
+  function drawCarried(t) {
+    if (S.step !== "dress") return;
+    if (drag && drag.k === "piece") {
+      const g = geom(S), k = drag.kind, d = S.D[k];
+      ctx.save(); ctx.translate(drag.x - drag.gx, drag.y - drag.gy);
+      if (k === "arms") drawPiece(g, "arms", d.opt, -1, t, { mitts: S.D.mittens.on[0] });
+      if (k === "arms" && S.D.mittens.on[0]) drawPiece(g, "mittens", S.D.mittens.opt, -1, t, {});
+      if (k !== "arms") drawPiece(g, k, d.opt, drag.j, t, { mitts: S.D.mittens.on[0] });
+      ctx.restore();
+    }
+    gone.forEach((q) => {
+      const p = (t - q.t0) / q.dur;
+      if (p < 0) return;
+      const e = ease(Math.min(1, p)), dx = lerp(q.dx, q.tx, e), dy = lerp(q.dy, q.ty, e) - Math.sin(Math.min(1, p) * Math.PI) * 40, s = lerp(1, 0.35, e);
+      ctx.save(); ctx.globalAlpha = 1 - Math.max(0, (p - 0.8) / 0.2);
+      ctx.translate(q.a.x + dx, q.a.y + dy); ctx.scale(s, s); ctx.translate(-q.a.x, -q.a.y);
+      drawPiece(q.g, q.k, q.opt, q.j, t, { mitts: false });
+      ctx.restore();
+    });
   }
   function drawCoal(x, y, r, seed) {
     ctx.beginPath();
@@ -1008,6 +1126,12 @@
     fillStroke("#2B2F3A", 1.6);
     ell(x - r * 0.25, y - r * 0.3, r * 0.34, r * 0.18, -0.5); ctx.fillStyle = "#4E5568"; ctx.fill();
   }
+  function drawButtonEye(x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke("#2E3A5C", 1.6);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.66, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = "#5A6A92"; ctx.stroke();
+    ctx.fillStyle = "#8A97B8";
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(x + a * r * 0.24, y + b * r * 0.24, r * 0.12, 0, TAU); ctx.fill(); });
+  }
   function drawCarrot(x, y, len, wd, ang) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
     ctx.beginPath(); ctx.moveTo(0, -wd / 2);
@@ -1018,9 +1142,9 @@
     [0.28, 0.5, 0.72].forEach((f) => { const hw = (1 - f) * wd * 0.42; ctx.beginPath(); ctx.moveTo(len * f, -hw); ctx.lineTo(len * f + 2, -hw * 0.2); ctx.stroke(); });
     ctx.restore();
   }
-  function drawButton(x, y, r) {
-    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke("#E8303F", 1.8);
-    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = "#B81F2E"; ctx.stroke();
+  function drawButton(x, y, r, O) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke(O.hex, 1.8);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = O.dark; ctx.stroke();
     ctx.fillStyle = INK;
     ctx.beginPath(); ctx.arc(x - r * 0.28, y, r * 0.14, 0, TAU); ctx.arc(x + r * 0.28, y, r * 0.14, 0, TAU); ctx.fill();
   }
@@ -1033,47 +1157,58 @@
     segs.forEach(([x0, y0, x1, y1, w]) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineWidth = w; ctx.strokeStyle = "#8A5A36"; ctx.stroke(); });
     ctx.lineCap = "butt";
   }
-  function drawMitten(am, scarf, w, t) {
-    const sc = SCARVES[scarf >= 0 ? scarf : 0];
+  function drawMitten(am, O, w, t) {
     ctx.save(); ctx.translate(am.ex, am.ey); ctx.rotate(am.a + Math.sin(t * 16) * w * 0.15);
     if (am.s < 0) ctx.scale(1, -1);
-    ell(8, -9, 4.5, 6.5, -0.5); fillStroke(sc.hex, 1.8);
-    ell(13, 0, 11, 9.5); fillStroke(sc.hex, 1.8);
+    ell(8, -9, 4.5, 6.5, -0.5); fillStroke(O.hex, 1.8);
+    ell(13, 0, 11, 9.5); fillStroke(O.hex, 1.8);
     rr(-6, -8.5, 9, 17, 3); fillStroke("#FFFFFF", 1.8);
     ctx.restore();
   }
-  function drawScarf(g, col, t, flutter) {
-    const sc = SCARVES[col], x = g.mx, y = g.neck, nw = g.hr * 1.0, bh = g.hr * 0.38;
+  function drawScarf(g, O, t, flutter) {
+    const x = g.mx, y = g.neck, nw = g.hr * 1.0, bh = g.hr * 0.38;
     // The tail hangs down the front from the knot; it flutters in the wind.
     const ax = x + nw * 0.42, ay = y + bh * 0.3, len = g.mr * 0.95, tw = g.hr * 0.42;
     const ang = 0.12 + flutter * Math.sin(t * 10) * 0.3 - flutter * 0.25;
-    const bx = ax + Math.sin(-ang) * len * -1, by = ay + Math.cos(ang) * len;
+    const bx = ax + Math.sin(ang) * len, by = ay + Math.cos(ang) * len;
     const sway = flutter * Math.sin(t * 12 + 1) * 6;
     ctx.beginPath(); ctx.moveTo(ax - tw / 2, ay);
     ctx.lineTo(ax + tw / 2, ay); ctx.quadraticCurveTo((ax + bx) / 2 + tw / 2 + sway, (ay + by) / 2, bx + tw / 2, by);
     ctx.lineTo(bx - tw / 2, by); ctx.quadraticCurveTo((ax + bx) / 2 - tw / 2 + sway, (ay + by) / 2, ax - tw / 2, ay); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex, 2); ctx.clip();
-    ctx.fillStyle = sc.stripe;
-    [0.45, 0.7].forEach((f) => { const sx = lerp(ax, bx, f) + sway * Math.sin(f * Math.PI), sy = lerp(ay, by, f); ctx.fillRect(sx - tw, sy - 3.5, tw * 2, 7); });
+    ctx.save(); fillStroke(O.hex, 2); ctx.clip();
+    if (O.stripe) {
+      ctx.fillStyle = O.stripe;
+      [0.3, 0.55, 0.8].forEach((f) => { const sx = lerp(ax, bx, f) + sway * Math.sin(f * Math.PI), sy = lerp(ay, by, f); ctx.fillRect(sx - tw, sy - 3.5, tw * 2, 7); });
+    } else {
+      ctx.strokeStyle = "rgba(29, 35, 64, 0.18)"; ctx.lineWidth = 1.2;
+      [0.35, 0.6, 0.85].forEach((f) => { const sx = lerp(ax, bx, f), sy = lerp(ay, by, f); ctx.beginPath(); ctx.moveTo(sx - tw, sy); ctx.lineTo(sx + tw, sy); ctx.stroke(); });
+    }
     ctx.restore();
-    ctx.strokeStyle = sc.dark; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.strokeStyle = O.dark; ctx.lineWidth = 2; ctx.lineCap = "round";
     for (let k = 0; k < 4; k++) { const fx = bx - tw / 2 + tw * (k + 0.5) / 4; ctx.beginPath(); ctx.moveTo(fx, by + 1); ctx.lineTo(fx + sway * 0.3, by + 7); ctx.stroke(); }
     ctx.lineCap = "butt";
     // The band round the neck.
-    ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5);
-    ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
-    ctx.lineTo(x + nw * 0.96, y + bh * 0.5);
-    ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex, 2); ctx.clip();
-    ctx.fillStyle = sc.stripe;
-    [-0.55, 0, 0.55].forEach((f) => ctx.fillRect(x + f * nw - 3.5, y - bh, 7, bh * 2.2));
+    const band = () => {
+      ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5);
+      ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
+      ctx.lineTo(x + nw * 0.96, y + bh * 0.5);
+      ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
+    };
+    band();
+    ctx.save(); ctx.fillStyle = O.hex; ctx.fill(); ctx.clip();
+    if (O.stripe) { ctx.fillStyle = O.stripe; [-0.55, 0, 0.55].forEach((f) => ctx.fillRect(x + f * nw - 3.5, y - bh, 7, bh * 2.2)); }
     ctx.restore();
-    ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5); ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
-    ctx.lineTo(x + nw * 0.96, y + bh * 0.5); ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
-    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
-    ell(ax, ay + 1, tw * 0.6, bh * 0.5); fillStroke(sc.dark, 2);
+    band(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ell(ax, ay + 1, tw * 0.6, bh * 0.5); fillStroke(O.dark, 2);
   }
-  function hatTop(g, D) { return D.hat === 0 ? g.hy - g.hr * 2.08 : g.hy - g.hr * 1.56; }
+  // The top of each hat (where the robin perches).
+  function hatTop(g, opt) { return g.hy - g.hr * [2.08, 1.56, 1.62, 1.1][opt]; }
+  function drawHatKind(opt, g, hop) {
+    if (opt === 0) drawTopHat(g, hop);
+    else if (opt === 1) drawKnitHat(g, hop);
+    else if (opt === 2) drawSantaHat(g, hop);
+    else drawEarmuffs(g, hop);
+  }
   function drawTopHat(g, hop) {
     const r = g.hr;
     ctx.save(); ctx.translate(g.hx, g.hy - r * 0.8 - hop); ctx.rotate(-0.1);
@@ -1089,19 +1224,33 @@
     [[0.36, -0.24], [0.44, -0.2], [0.4, -0.3]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(r * dx, r * dy, r * 0.06, 0, TAU); fillStroke("#E8303F", 1.2); });
     ctx.restore();
   }
-  function drawKnitHat(g, scarf, hop) {
-    const r = g.hr, x = g.hx, y = g.hy - hop, sc = SCARVES[scarf >= 0 ? scarf : 0];
-    ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4);
-    ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex); ctx.clip();
-    ctx.fillStyle = sc.stripe; ctx.fillRect(x - r, y - r * 0.92, r * 2, r * 0.14);
+  function drawKnitHat(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    const dome = () => { ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4); ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4); };
+    dome(); ctx.closePath();
+    ctx.save(); fillStroke("#2F8CFF"); ctx.clip();
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(x - r, y - r * 0.92, r * 2, r * 0.14);
     ctx.restore();
-    ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4); ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4);
-    ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
-    rr(x - r * 1.03, y - r * 0.58, r * 2.06, r * 0.3, r * 0.13); fillStroke(sc.dark);
+    dome(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
+    rr(x - r * 1.03, y - r * 0.58, r * 2.06, r * 0.3, r * 0.13); fillStroke("#1F64C0");
     ctx.strokeStyle = "rgba(29, 35, 64, 0.35)"; ctx.lineWidth = 1.2;
     for (let k = -4; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(x + k * r * 0.22, y - r * 0.54); ctx.lineTo(x + k * r * 0.22, y - r * 0.32); ctx.stroke(); }
     ctx.beginPath(); ctx.arc(x, y - r * 1.3, r * 0.26, 0, TAU); fillStroke("#FFFFFF");
+  }
+  function drawSantaHat(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    ctx.beginPath(); ctx.moveTo(x - r * 0.92, y - r * 0.5);
+    ctx.bezierCurveTo(x - r * 0.85, y - r * 1.55, x + r * 0.2, y - r * 1.85, x + r * 1.15, y - r * 1.2);
+    ctx.bezierCurveTo(x + r * 0.7, y - r * 1.25, x + r * 0.85, y - r * 0.85, x + r * 0.92, y - r * 0.5);
+    ctx.closePath(); fillStroke("#E8303F");
+    ctx.beginPath(); ctx.arc(x + r * 1.18, y - r * 1.14, r * 0.24, 0, TAU); fillStroke("#FFFFFF");
+    rr(x - r * 1.04, y - r * 0.7, r * 2.08, r * 0.34, r * 0.17); fillStroke("#FFFFFF");
+  }
+  function drawEarmuffs(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    ctx.beginPath(); ctx.arc(x, y - r * 0.02, r * 1.02, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.lineWidth = 8; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4.5; ctx.strokeStyle = "#8E4FD9"; ctx.stroke();
+    [-1, 1].forEach((s) => { ell(x + s * r * 0.96, y - r * 0.1, r * 0.26, r * 0.32); fillStroke("#FF7FB5"); ell(x + s * r * 0.96, y - r * 0.1, r * 0.13, r * 0.17); ctx.fillStyle = "#FFC2DA"; ctx.fill(); });
   }
 
   // =====================================================================================================
