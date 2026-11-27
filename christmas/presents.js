@@ -122,7 +122,7 @@
     { id: "digger", name: "A tiny digger" }
   ];
   const BY = (list) => { const m = {}; list.forEach((x, i) => { m[x.id] = x; x.i = i; }); return m; };
-  const REC_BY = BY(RECIPS), GIFT_BY = BY(GIFTS), STUFF_BY = BY(STUFF), TREAT_BY = BY(TREATS);
+  BY(RECIPS); const GIFT_BY = BY(GIFTS), STUFF_BY = BY(STUFF), TREAT_BY = BY(TREATS);
   // Papers: four Christmas ones and four with toys and animals. Any paper is fine for anyone.
   const PAPERS = [
     { id: "stars", name: "Red with stars", bg: "#E8303F", fg: "#FFD23B" },
@@ -164,20 +164,26 @@
   const TALL = {
     w: 400, h: 740, back: 280, rec: 80,
     win: { x: 232, y: 62, w: 150, h: 118 }, garland: { x0: 6, x1: 394, y: 10 },
-    mat: { x: 190, y: 392 }, wait: { x: 352, y: 334 }, give: { x: 172, y: 316 }, mine: { x: 214, y: 438 },
+    mat: { x: 190, y: 404 }, wait: { x: 158, y: 294, s: 0.5 }, give: { x: 172, y: 316 }, mine: { x: 214, y: 430 }, bs: 1.35, ms: 1.3,
     tray: { x: 10, y: 556, w: 380, h: 178 }, shelf: { x: 10, y: 520, w: 380, h: 214, cols: 4 },
     fire: { x: 46, y: 300, w: 300, h: 236 }, wreath: null
   };
   const WIDE = {
     w: 820, h: 440, back: 200, rec: 100,
     win: { x: 412, y: 40, w: 128, h: 108 }, garland: { x0: 180, x1: 814, y: 6 },
-    mat: { x: 364, y: 292 }, wait: { x: 206, y: 300 }, give: { x: 200, y: 236 }, mine: { x: 376, y: 318 },
+    mat: { x: 364, y: 302 }, wait: { x: 206, y: 304, s: 0.62 }, give: { x: 200, y: 236 }, mine: { x: 376, y: 322 }, bs: 1.1, ms: 1.1,
     tray: { x: 566, y: 214, w: 246, h: 220 }, shelf: { x: 566, y: 92, w: 246, h: 342, cols: 3 },
     fire: { x: 236, y: 198, w: 280, h: 238 }, wreath: { x: 640, y: 96 }
   };
   // The box seen from above: a top face BW x BD and a strip of its front face BF. The paper reaches FF past the
   // far edge, NF past the front's bottom edge (so it goes up the front and over the top) and E past each end.
-  const BW = 112, BD = 64, BF = 20, FF = 38, NF = 58, E = 40, OV = BD * 0.56;
+  // Each layout scales these (bs) so the wrap is as big as the stage allows.
+  let BW = 112, BD = 64, BF = 20, FF = 38, NF = 58, E = 40, OV = BD * 0.56;
+  function setBox() {
+    const k = L.bs;
+    BW = 112 * k; BD = 64 * k; BF = 20 * k; FF = 38 * k; NF = 58 * k; E = 40 * k; OV = BD * 0.56;
+    MW = 100 * L.ms; MH = 58 * L.ms; MD = 24 * L.ms;
+  }
   let L = TALL, W = 0, H = 0, dpr = 1, vs = 1, vox = 0, voy = 0;
   function resize() {
     const r = stage.getBoundingClientRect();
@@ -186,6 +192,7 @@
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const was = L;
     L = W / H > 1.05 ? WIDE : TALL;
+    setBox();
     vs = Math.min(W / L.w, H / L.h) * 0.98;
     // Spare height goes mostly below the scene (more table), so the garland stays near the top of the wall.
     vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) * 0.2;
@@ -388,7 +395,7 @@
   function placeAll() {
     const g = matG(), st = stepOf();
     V.rec.x = L.rec; V.rec.walk = false; V.rec.hop = 0; V.rec.vy = 0;
-    V.box = K.job === "box" && (st === "roll" || st === "cut") ? { x: L.wait.x, y: L.wait.y, s: 0.7, a: 1 } : { x: g.cx, y: g.cy, s: 1, a: 1 };
+    V.box = K.job === "box" && (st === "roll" || st === "cut") ? { x: L.wait.x, y: L.wait.y, s: L.wait.s, a: 1 } : { x: g.cx, y: g.cy, s: 1, a: 1 };
     V.roll = null; V.scis = null; V.tapeCarry = null; V.tapeFly = []; V.carry = null; V.ribTrail = null;
     V.edge = K.pull >= 1 ? g.sx0 : g.sx1;
     V.cutBins = new Uint8Array(24); if (K.cut >= 1) V.cutBins.fill(1);
@@ -398,8 +405,8 @@
     const k = trayFor();
     V.tray = { kind: k, target: k, off: k ? 0 : 1 };
   }
-  let lastWant = "";
-  function changed() { lastWant = ""; if (typeof ghost !== "undefined") ghost.poke(); saveSoon(); }
+  let lastWant = null;
+  function changed() { lastWant = null; if (typeof ghost !== "undefined") ghost.poke(); saveSoon(); }
   // A new present for the one at the table; walk = the next one walks in first.
   function startBuild(walk) {
     tweens = []; busy = false; drag = null; press.cancel(); parts = [];
@@ -410,9 +417,9 @@
     Object.assign(V.rec, { happy: 0, cheer: 0, wave: 0, dance: 0, wob: 0, reach: 0 });
     if (walk) {
       V.rec.x = -150; V.rec.walk = true;
-      tween(2.4, (p) => { V.rec.x = lerp(-150, L.rec, ease(p)); }, () => { V.rec.walk = false; V.rec.hop = 0; V.rec.happy = now() + 1.2; hopRec(200); lastWant = ""; });
+      tween(2.4, (p) => { V.rec.x = lerp(-150, L.rec, ease(p)); }, () => { V.rec.walk = false; V.rec.hop = 0; V.rec.happy = now() + 1.2; hopRec(200); lastWant = null; });
     }
-    lastWant = "";
+    lastWant = null;
     ghost.again();
     saveSoon();
   }
@@ -430,7 +437,7 @@
     if (busy || phase !== "make" || stepOf() !== "gift" || !GIFT_BY[id]) return;
     busy = true;
     const sl = shelfSlot(GIFT_BY[id].i), f = from || { x: sl.x, y: sl.y, s: sl.s };
-    const to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 84 } : inBoxPt(), s1 = K.job === "bag" ? 50 : 54;
+    const to = K.job === "bag" ? { x: bagPt().x, y: bagPt().y - 84 } : inBoxPt(), s1 = K.job === "bag" ? 50 : 46 * L.bs;
     V.carry = { kind: "gift", id, x: f.x, y: f.y, s: f.s || sl.s };
     const c = V.carry, s0 = c.s;
     tween(from ? 0.35 : 0.6, (p) => { const e = ease(p); c.x = lerp(f.x, to.x, e); c.y = lerp(f.y, to.y, e) - Math.sin(p * Math.PI) * (from ? 20 : 80); c.s = lerp(s0, s1, e); }, () => {
@@ -445,7 +452,7 @@
       tween(0.4, (p) => { K.lid = ease(p); }, () => {
         wobble("box", 0.6); changed();
         const g = matG();
-        tween(0.6, (p) => { const e = ease(p); V.box.x = lerp(g.cx, L.wait.x, e); V.box.y = lerp(g.cy, L.wait.y, e) - Math.sin(p * Math.PI) * 30; V.box.s = lerp(1, 0.7, e); }, () => { busy = false; changed(); });
+        tween(0.6, (p) => { const e = ease(p); V.box.x = lerp(g.cx, L.wait.x, e); V.box.y = lerp(g.cy, L.wait.y, e) - Math.sin(p * Math.PI) * 30; V.box.s = lerp(1, L.wait.s, e); }, () => { busy = false; changed(); });
       });
     });
   }
@@ -587,7 +594,7 @@
     settle(K, "loop", k, 0, () => { wobble("bow", 1); cheerStep(); if (allOne(K.loop)) puff("spark", knotPt().x, knotPt().y, 8, RIBBONS[K.ribbon].hex); });
   }
   // The ribbon ends hang from the knot over the front of the box.
-  function tailEnd(k) { const g = matG(); return { x: g.cx + (k ? 30 : -30), y: g.yf + 26 }; }
+  function tailEnd(k) { const g = matG(); return { x: g.cx + (k ? 30 : -30) * L.bs, y: g.yf + 26 * L.bs }; }
   function curlAt(k, p) {
     const a = knotPt(), b = tailEnd(k), dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
     const along = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (len * len), off = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
@@ -743,7 +750,8 @@
   }
   function minePos(type) { return type === "cracker" ? { x: L.rec + 150, y: L.back + 26 } : { x: L.mine.x, y: L.mine.y }; }
   // His small box: a tear grid over its top (2 rows) and front (3 rows).
-  const MC = 6, MR = 5, MTOP = 2, MW = 100, MH = 58, MD = 24;
+  const MC = 6, MR = 5, MTOP = 2;
+  let MW = 100, MH = 58, MD = 24;
   function mineG() { const m = V.mine; return { x0: m.x - MW / 2, x1: m.x + MW / 2, yt: m.y - MH / 2, yb: m.y + MH / 2, d: MD, i: 10, cx: m.x, cy: m.y }; }
   function mgPt(g, i, j) {
     const u = i / MC;
@@ -1223,7 +1231,7 @@
     if (open) {
       rr(g.x0, g.y0, BW, BD, 3); fs(BOX);
       rr(g.x0 + 7, g.y0 + 7, BW - 14, BD - 14, 3); fs(BOX_IN);
-      if (K.gift && K.job === "box" && !V.carry) { ctx.save(); rr(g.x0 + 7, g.y0 + 7, BW - 14, BD - 14, 3); ctx.clip(); drawThing(K.gift, g.cx, g.cy - 2, 52, { t }); ctx.restore(); }
+      if (K.gift && K.job === "box" && !V.carry) { ctx.save(); rr(g.x0 + 7, g.y0 + 7, BW - 14, BD - 14, 3); ctx.clip(); drawThing(K.gift, g.cx, g.cy - 2, 46 * L.bs, { t }); ctx.restore(); }
     } else {
       rr(g.x0, g.y0, BW, BD, 3); fs(BOX);
       line(g.x0 + 4, g.y0 + 6, g.x1 - 4, g.y0 + 6, "rgba(255,255,255,0.45)", 2);
@@ -1425,7 +1433,7 @@
     }
     ctx.restore();
     // The firebox with a calm, low fire.
-    const fx = F.x + F.w * 0.24, fw = F.w * 0.52, fy = F.y + F.h * 0.5, fh = F.h * 0.5 - 4;
+    const fx = F.x + F.w * 0.24, fw = F.w * 0.52, fy = F.y + F.h * 0.5;
     ctx.beginPath(); ctx.moveTo(fx, F.y + F.h); ctx.lineTo(fx, fy + 30); ctx.quadraticCurveTo(fx, fy, fx + 30, fy); ctx.lineTo(fx + fw - 30, fy); ctx.quadraticCurveTo(fx + fw, fy, fx + fw, fy + 30); ctx.lineTo(fx + fw, F.y + F.h); ctx.closePath(); fs("#2B2238");
     const cx = fx + fw / 2, by = F.y + F.h - 14;
     [["#FF8A1F", 30, 46], ["#FFC93C", 18, 30]].forEach(([c, w, h]) => {
@@ -2168,7 +2176,7 @@
         if (st === "cut" && Math.abs(w.x - g.sx1) < 36 && w.y > g.sy0 - 20 && w.y < g.sy1 + 20) return "cutline";
         if (st === "roll" && V.roll && Math.abs(w.x - V.roll.x) < 30 && Math.abs(w.y - V.roll.y) < V.roll.len / 2) return "rollm";
         if (st === "roll" && K.pull > 0 && w.x > V.edge - 20 && w.x < g.sx1 && w.y > g.sy0 && w.y < g.sy1) return "edge";
-        if (!K.placed && V.box.s < 0.95 && Math.abs(w.x - V.box.x) < BW * 0.45 && Math.abs(w.y - V.box.y) < BD * 0.5 + 14) return "boxw";
+        if (!K.placed && V.box.s < 0.95 && Math.abs(w.x - V.box.x) < BW * V.box.s * 0.6 + 6 && Math.abs(w.y - V.box.y) < (BD + BF) * V.box.s * 0.6 + 14) return "boxw";
         if (st === "place" && w.x > g.sx0 && w.x < g.sx1 && w.y > g.sy0 && w.y < g.sy1) return "sheet";
         if (st === "sides") { if (K.side[0] < 1 && inRect(w, [g.x0, g.y0 - FF, g.x1, g.y0 + 10], 10)) return "flapF"; if (K.side[1] < 1 && inRect(w, [g.x0, g.y1, g.x1, g.yf + NF], 10)) return "flapN"; }
         if (/^(tri|flap)L$/.test(st) && inRect(w, [g.sx0, g.y0, g.x0 + 10, g.yf], 14)) return "endL";
@@ -2281,7 +2289,7 @@
   });
   // Starts the drag for a part (sets drag) when the part has a motion of its own right now.
   function startDrag(part, s) {
-    const w0 = wpt(s.x0, s.y0), st = phase === "make" ? stepOf() : null, g = matG();
+    const w0 = wpt(s.x0, s.y0), st = phase === "make" ? stepOf() : null;
     let m;
     const carry = (kind, id, home, size) => { busy = true; drag = { k: "carry", kind, id, ox: home.x - w0.x, oy: home.y - w0.y - 12, home: { ...home } }; V.carry = { kind, id, x: home.x, y: home.y, s: size || home.s || 40 }; };
     if ((m = /^g(\d+)$/.exec(part)) && st === "gift" && !busy) { const sl = shelfSlot(+m[1]); carry("gift", GIFTS[+m[1]].id, sl, sl.s * 1.1); ghost.learned("gift"); }
@@ -2314,7 +2322,7 @@
       V.scis.x = near ? g.sx1 : w.x; V.scis.y = w.y; V.scis.open = Math.abs(Math.sin(w.y * 0.15));
       cutAt({ x: V.scis.x, y: w.y });
       if (K.cut >= 1) { drag = null; V.scis = null; }
-    } else if (d.k === "box") { V.box.x = w.x + d.ox; V.box.y = w.y + d.oy; V.box.s = lerp(V.box.s, w.x > g.sx0 && w.x < g.sx1 && w.y > g.sy0 && w.y < g.sy1 ? 1 : 0.75, 0.25); }
+    } else if (d.k === "box") { V.box.x = w.x + d.ox; V.box.y = w.y + d.oy; V.box.s = lerp(V.box.s, w.x > g.sx0 && w.x < g.sx1 && w.y > g.sy0 && w.y < g.sy1 ? 1 : 0.8, 0.25); }
     else if (d.k === "side") {
       const span = d.i === 0 ? FF + OV : NF + BF + OV;
       K.side[d.i] = clamp(Math.max(d.v0, (d.i === 0 ? w.y - d.y0 : d.y0 - w.y) / span * 1.4), 0, 1);
@@ -2368,7 +2376,7 @@
         tween(0.4, (p) => { const e = ease(p); K.pull = lerp(p0, 0, e); V.edge = g.sx1 - K.pull * (g.sx1 - g.sx0); r.x = lerp(f.x, sl.x, e); r.y = lerp(f.y, sl.y, e); r.len = lerp(f.len, sl.len, e); r.dia = lerp(f.dia, sl.dia, e); r.ang = lerp(f.ang, sl.ang, e); }, () => { V.roll = null; K.paper = null; K.pull = 0; busy = false; hint(); });
       }
     } else if (d.k === "cut") { V.scis = null; if (still) cutAuto(); else if (K.cut < 1 && K.cut > 0.5) cutAuto(); }
-    else if (d.k === "box") { busy = false; const inSheet = V.box.x > g.sx0 && V.box.x < g.sx1 && V.box.y > g.sy0 - 20 && V.box.y < g.sy1; if (still || inSheet) placeBox({ x: V.box.x, y: V.box.y, s: V.box.s }); else { const f = { x: V.box.x, y: V.box.y, s: V.box.s }; busy = true; tween(0.3, (p) => { V.box.x = lerp(f.x, L.wait.x, ease(p)); V.box.y = lerp(f.y, L.wait.y, ease(p)); V.box.s = lerp(f.s, 0.7, ease(p)); }, () => { busy = false; hint(); }); } }
+    else if (d.k === "box") { busy = false; const inSheet = V.box.x > g.sx0 && V.box.x < g.sx1 && V.box.y > g.sy0 - 20 && V.box.y < g.sy1; if (still || inSheet) placeBox({ x: V.box.x, y: V.box.y, s: V.box.s }); else { const f = { x: V.box.x, y: V.box.y, s: V.box.s }; busy = true; tween(0.3, (p) => { V.box.x = lerp(f.x, L.wait.x, ease(p)); V.box.y = lerp(f.y, L.wait.y, ease(p)); V.box.s = lerp(f.s, L.wait.s, ease(p)); }, () => { busy = false; hint(); }); } }
     else if (d.k === "side") { if (still) sideAuto(d.i); else if (K.side[d.i] < 1) settle(K, "side", d.i, 0.35, () => { wobble("box", 0.4); cheerStep(); }); }
     else if (d.k === "tri" || d.k === "flap") { if (still) endAuto(d.e); else if (K[d.k][d.e] < 1) settle(K, d.k, d.e, 0.35, () => cheerStep()); }
     else if (d.k === "tape") {
@@ -2399,7 +2407,7 @@
   function cancelDrag(d) {
     if (d.k === "carry" && V.carry) back(V.carry, d.home);
     else if (d.k === "bag") { V.bag = null; busy = false; }
-    else if (d.k === "box") { busy = false; V.box = { x: L.wait.x, y: L.wait.y, s: 0.7, a: 1 }; }
+    else if (d.k === "box") { busy = false; V.box = { x: L.wait.x, y: L.wait.y, s: L.wait.s, a: 1 }; }
     else if (d.k === "give") { busy = false; V.giveDrag = null; }
     V.tapeCarry = null; V.ribTrail = null; V.scis = null; V.tissPull = null;
   }

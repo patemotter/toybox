@@ -436,7 +436,9 @@
     lastWant = null;
     saveSoon();
   }
-  const strandName = (sd) => (sd.k === "l" ? (LIGHT_BY[sd.c] || LIGHTS[0]).name + " lights" : (GAR_BY[sd.c] || GARLANDS[0]).name);
+  // "Colored lights", "Warm white lights"; "Gold tinsel".
+  const lightsWord = (id) => (id === "colors" ? "Colored" : (LIGHT_BY[id] || LIGHTS[0]).name) + " lights";
+  const strandName = (sd) => (sd.k === "l" ? lightsWord(sd.c) : (GAR_BY[sd.c] || GARLANDS[0]).name.replace("\u00AD", ""));
   const nameOf = (k) => (k === "l" ? "lights" : "garland");
   function centerOf(sd) {
     let x = 0, y = 0;
@@ -1465,11 +1467,17 @@
     lastWant = line;
     if (!line) { coach.busy(); return; }
     coach.step(line);
-    // For a coil the pill keeps clear of the tree's middle, where he drags the string across.
-    const p = w.part === "coill" || w.part === "coilg" ? (() => { const q = tw(0, YT + (YB - YT) * DRAG_V); return { x: q.x, y: q.y }; })() : partPt(w.part);
+    // For a coil the pill keeps clear of the tree's middle, where he drags the string across: it moves up (never
+    // down onto the boxes and coils).
+    if (w.part === "coill" || w.part === "coilg") {
+      const q = tw(0, YT + (YB - YT) * DRAG_V), v = vp(q.x, q.y), r = stage.getBoundingClientRect();
+      coach.avoid(v.x, Math.max(v.y, r.top + r.height / 2 + 2));
+      return;
+    }
+    const p = partPt(w.part);
     if (p) { const v = vp(p.x, p.y); coach.avoid(v.x, v.y); }
   }
-  const DRAG_V = 0.64;
+  const DRAG_V = 0.68;
   function hint() { const w = want(); if (w) { coach.say(w.line, 3); ghost.poke(); } }
   // The ghost hand shows the real move: a drag from the coil across the tree, from the box to a branch, from the
   // box to the top; a tap on the switch.
@@ -1699,7 +1707,7 @@
     S.color = id; S.lastKind = "l";
     coilWob.l = 1;
     const c = coilPos("l"); sparkle(c.x, c.y - 10, 4, 18);
-    coach.say("Drag the " + LIGHT_BY[id].name.toLowerCase() + " lights from the box onto the tree.", 3);
+    coach.say("Drag the " + lightsWord(id).toLowerCase() + " from the box onto the tree.", 3);
     ghost.again("coill");
     saveSoon();
   }
@@ -1708,7 +1716,7 @@
     S.gar = id; S.lastKind = "g";
     coilWob.g = 1;
     const c = coilPos("g"); sparkle(c.x, c.y - 10, 4, 18);
-    coach.say("Drag the " + GAR_BY[id].name.toLowerCase() + " from the box onto the tree.", 3);
+    coach.say("Drag the " + GAR_BY[id].name.replace("\u00AD", "").toLowerCase() + " from the box onto the tree.", 3);
     ghost.again("coilg");
     saveSoon();
   }

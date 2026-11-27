@@ -1878,7 +1878,10 @@
       if (!TEX) return null;
       const n = 240, c = mkCanvas(n), g = c.getContext("2d");
       g.drawImage(TEX.tex, 0, 0, n, n);
-      const d = g.getImageData(0, 0, n, n).data, al = (x, y) => { const i = (Math.round(y) * n + Math.round(x)) * 4 + 3; return d[i] || 0; };
+      const d = g.getImageData(0, 0, n, n).data, px = (x, y) => d[(y * n + x) * 4 + 3] || 0,
+        // Sampled smoothly between pixels (pixel i covers i..i+1), so a turn by any angle compares fairly.
+        al = (x, y) => { x -= 0.5; y -= 0.5; const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+          return (px(x0, y0) * (1 - fx) + px(x0 + 1, y0) * fx) * (1 - fy) + (px(x0, y0 + 1) * (1 - fx) + px(x0 + 1, y0 + 1) * fx) * fy; };
       let rot = 0, mir = 0, cnt = 0, paper = 0;
       for (let r = 0.05; r < 0.98; r += 0.03) for (let a = 0; a < 360; a += 3) {
         const P = (an) => [n / 2 + Math.cos(an * DEG) * r * n / 2, n / 2 + Math.sin(an * DEG) * r * n / 2];

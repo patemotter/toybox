@@ -195,12 +195,12 @@
   // tray, sheet, big and lie are centers; board and oven are boxes.
   const TALL = {
     w: 420, h: 480, wall: 54,
-    tray: { x: 125, y: 127, w: 222, h: 122, cols: 3, rows: 2 },
+    tray: { x: 127, y: 130, w: 210, h: 120, cols: 3, rows: 2 },
     oven: { x: 256, y: 8, w: 152, h: 198 },
     board: { x: 12, y: 214, w: 396, h: 198 },
     sheet: { x: 210, y: 313, w: 352, h: 168 }, cs: 26,
     pinRest: { x: 148, y: 448 }, pinLen: 230, cutterRest: { x: 294, y: 446 }, plate: { x: 370, y: 444, r: 44 },
-    big: { x: 210, y: 313, s: 80 },
+    big: { x: 196, y: 313, s: 80 }, spat: { x: 360, y: 368 }, mittHook: { x: 236, y: 92 }, bowls: [{ x: 32, y: 38 }, { x: 84, y: 38 }],
     house: { x: 118, y: 322 }, cake: { x: 228, y: 302, rx: 190, ry: 58 }, lie: { x: 222, y: 416, w: 200, h: 98 }, pile: { x: 56, y: 432 }, bag: { x: 372, y: 428 }
   };
   const WIDE = {
@@ -210,7 +210,7 @@
     board: { x: 196, y: 66, w: 306, h: 266 },
     sheet: { x: 349, y: 199, w: 274, h: 226 }, cs: 30,
     pinRest: { x: 330, y: 376 }, pinLen: 250, cutterRest: { x: 486, y: 374 }, plate: { x: 592, y: 362, r: 52 },
-    big: { x: 349, y: 199, s: 98 },
+    big: { x: 340, y: 199, s: 98 }, spat: { x: 464, y: 288 }, mittHook: { x: 650, y: 318 }, bowls: [{ x: 32, y: 38 }, { x: 84, y: 38 }],
     house: { x: 330, y: 330 }, cake: { x: 440, y: 310, rx: 200, ry: 58 }, lie: { x: 128, y: 220, w: 210, h: 150 }, pile: { x: 96, y: 362 }, bag: { x: 206, y: 362 }
   };
   let L = TALL, W = 0, H = 0, dpr = 1, vs = 1, vox = 0, voy = 0;
@@ -333,18 +333,21 @@
     pin: { x: 0, y: 0, on: false, spin: 0 }, pinWob: 0, doughA: 1, doughWob: 0,
     cutter: { x: 0, y: 0, press: 0, lift: 0, moving: false }, cutterWob: 0,
     tray: { x: 0, y: 0, k: 1 }, trayWhere: "counter", trayWob: 0,
-    door: 0, doorWob: 0, glow: 0, light: 0, blink: 0, mitt: 0, plateBounce: 0,
+    door: 0, doorWob: 0, glow: 0, light: 0, blink: 0, mitt: { x: 0, y: 0, mode: "hook" }, mittWob: 0, plateBounce: 0,
+    spat: { x: 0, y: 0, carry: null }, spatWob: 0, bowlWob: [0, 0],
     hand: null, held: null, steamUntil: 0, lit: 0, twinkle: 0, sparkleUntil: 0, snowCap: 0
   };
   function placeAll() {
     V.pin.on = false; V.pin.x = L.pinRest.x; V.pin.y = L.pinRest.y;
     V.cutter.x = L.cutterRest.x; V.cutter.y = L.cutterRest.y; V.cutter.press = 0; V.cutter.moving = false;
+    V.mitt.x = L.mittHook.x; V.mitt.y = L.mittHook.y; V.mitt.mode = "hook";
+    V.spat.x = L.spat.x; V.spat.y = L.spat.y; V.spat.carry = null;
     const inOven = C.stage === "oven" || C.stage === "baking" || C.stage === "baked";
     const tp = inOven ? ovenPose() : counterPose();
     V.tray.x = tp.x; V.tray.y = tp.y; V.tray.k = tp.k; V.trayWhere = inOven ? "oven" : "counter";
     V.doughA = C.stage === "prep" ? 1 : 0;
     C.tray.forEach((c, i) => {
-      if (c.where === "air" || c.where === "drag") c.where = "tray";
+      if (c.where === "air" || c.where === "drag" || c.where === "spat") c.where = "tray";
       if (C.stage === "decorate" && i === C.cur) { c.where = "board"; c.x = L.big.x; c.y = L.big.y; c.s = L.big.s; }
       else { const p = slotXY(c.slot, tp); c.where = "tray"; c.x = p.x; c.y = p.y; c.s = p.s; }
     });
@@ -354,7 +357,7 @@
     tweens = tweens.filter((tw) => tw.job !== "cookies"); rollTw = null; cutTw = null; doorTw = null; pendingCut = null;
     busy = false; drag = null; V.hand = null; V.held = null;
     C = newBatch(C.d);
-    V.door = 0; V.glow = 0; V.mitt = 0;
+    V.door = 0; V.glow = 0;
     placeAll();
     V.doughA = 0;
     tween(0.5, (p) => { V.doughA = ease(p); });
@@ -502,36 +505,57 @@
     doorTw = tween((dur || 0.45) * Math.max(0.2, Math.abs(to - from)), (p) => { V.door = lerp(from, to, ease(p)); }, () => { doorTw = null; if (then) then(); });
   }
   const baking = () => C.stage === "baking";
-  // Two-step: sliding the sheet in with the door shut first says so (and the door wiggles); the next try opens it.
+  // The oven mitt hangs on its hook beside the oven. Every move of the baking sheet into or out of the oven is done
+  // with it: the mitt grips the sheet's edge and the sheet goes where the mitt goes. No bare hand ever touches it.
+  const mittHook = () => L.mittHook;
+  const mittGrip = () => ({ x: V.tray.x - L.tray.w * V.tray.k / 2 + 4, y: V.tray.y + 2 });
+  function mittTo(to, dur, then) {
+    const m = V.mitt, a = { x: m.x, y: m.y };
+    m.mode = "free";
+    tween(dur, (p) => { const t = typeof to === "function" ? to() : to; m.x = lerp(a.x, t.x, ease(p)); m.y = lerp(a.y, t.y, ease(p)) - Math.sin(p * Math.PI) * 16; }, then);
+  }
+  function mittHome() { mittTo(mittHook(), 0.45, () => { V.mitt.mode = "hook"; }); }
+  const canCarryIn = () => C.stage === "prep" && C.tray.length > 0 && V.trayWhere === "counter";
+  const canCarryOut = () => C.stage === "baked" && V.trayWhere === "oven" && V.door > 0.5;
+  // Two-step: moving the sheet in or out with the door shut first says so (and the door wiggles); the next try
+  // opens the door by itself.
   let shutTries = 0;
+  function doorFirst() {
+    if (V.door >= 0.5) return true;
+    shutTries++;
+    if (shutTries < 2) { V.doorWob = 1; coach.say("Open the oven door.", 3); return false; }
+    doorTo(1, 0.45);
+    return true;
+  }
+  // The mitt slides the sheet into the oven: it grips the sheet (if it does not hold it yet), carries it in from
+  // the pose it is at, lets go and goes back to its hook.
   function slideIn(from) {
     if (busy || C.stage !== "prep" || !C.tray.length) return false;
-    if (V.door < 0.5) {
-      shutTries++;
-      if (shutTries < 2) { V.doorWob = 1; coach.say("Open the oven door.", 3); return false; }
-      doorTo(1, 0.45);
-    }
-    ghost.learned("tray");
-    busy = true;
+    if (!doorFirst()) { if (from) backToCounter(from); return false; }
+    ghost.learned("mitt");
+    busy = true; lastWant = "";
     // Shapes still in the dough hop onto the sheet first.
-    const wait = C.cuts.length ? 0.55 : 0;
+    const wait = Math.max(C.cuts.length ? 0.55 : 0, V.door < 0.5 ? 0.45 : 0);
     while (C.cuts.length) liftCut(0);
-    later(Math.max(wait, V.door < 0.5 ? 0.45 : 0), () => {
+    const carry = () => {
+      V.mitt.mode = "grip";
       const a = from || { x: V.tray.x, y: V.tray.y, k: V.tray.k }, b = ovenPose();
       V.trayWhere = "moving";
       tween(0.9, (p) => { const e = ease(p); V.tray.x = lerp(a.x, b.x, e); V.tray.y = lerp(a.y, b.y, e) - Math.sin(p * Math.PI) * 20; V.tray.k = lerp(a.k, b.k, e); }, () => {
         V.trayWhere = "oven"; C.stage = "oven"; busy = false; shutTries = 0; lastWant = "";
+        mittHome();
         // The left-over dough balls up and goes away until the next batch.
         tween(0.8, (p) => { C.roll = Math.min(C.roll, 1 - ease(p)); V.doughA = 1 - ease(Math.max(0, p - 0.4) / 0.6); }, () => { C.holes = []; C.roll = 0; });
         saveSoon();
       });
-    });
+    };
+    later(wait, () => { if (V.mitt.mode === "grip") carry(); else mittTo(mittGrip, 0.4, carry); });
     return true;
   }
   function backToCounter(from) {
     if (!from) return;
     const b = counterPose();
-    tween(0.35, (p) => { V.tray.x = lerp(from.x, b.x, ease(p)); V.tray.y = lerp(from.y, b.y, ease(p)); V.tray.k = lerp(from.k, 1, ease(p)); }, () => { V.trayWhere = "counter"; });
+    tween(0.35, (p) => { V.tray.x = lerp(from.x, b.x, ease(p)); V.tray.y = lerp(from.y, b.y, ease(p)); V.tray.k = lerp(from.k, 1, ease(p)); }, () => { V.trayWhere = "counter"; if (V.mitt.mode === "grip") mittHome(); });
   }
   function closeDoor() {
     ghost.learned("oven");
@@ -558,18 +582,19 @@
     saveSoon();
   }
   function blinkLight(n) { V.blink = n; tween(n * 0.9, (p) => { V.light = Math.sin(p * n * Math.PI) > 0 ? 1 : 0; }, () => { V.light = 0; }); }
-  // Out with the oven mitt: the door opens, the mitt takes the sheet out onto the counter, the door shuts.
+  // The mitt takes the hot sheet out onto the counter; then the door shuts and the mitt goes back on its hook.
   function takeOut(from) {
     if (busy || C.stage !== "baked") return;
-    ghost.learned("oven");
+    if (!from && !doorFirst()) return;
+    ghost.learned("mitt");
     busy = true; C.stage = "out"; lastWant = "";
-    const go = () => {
+    const carry = () => {
+      V.mitt.mode = "grip";
       const a = from || ovenPose(), b = counterPose();
       V.trayWhere = "moving";
-      tween(0.25, (p) => { V.mitt = Math.max(V.mitt, ease(p)); });
       tween(1.0, (p) => { const e = ease(p); V.tray.x = lerp(a.x, b.x, e); V.tray.y = lerp(a.y, b.y, e) - Math.sin(p * Math.PI) * 24; V.tray.k = lerp(a.k, 1, e); }, () => {
-        V.trayWhere = "counter";
-        tween(0.4, (p) => { V.mitt = 1 - ease(p); });
+        V.trayWhere = "counter"; shutTries = 0;
+        mittHome();
         doorTo(0, 0.5);
         V.steamUntil = now() + 5;
         C.stage = "decorate"; busy = false; refreshTiles();
@@ -578,7 +603,15 @@
         saveSoon();
       });
     };
-    if (from) go(); else doorTo(1, 0.45, go);
+    const go = () => { if (V.mitt.mode === "grip") carry(); else mittTo(mittGrip, 0.45, carry); };
+    if (V.door < 0.5) doorTo(1, 0.45, go); else go();
+  }
+  // A tap on the mitt plays its one move: the sheet in, or the hot sheet out.
+  function mittTap() {
+    if (busy) return;
+    if (C.stage === "prep" && C.tray.length) slideIn();
+    else if (C.stage === "baked") takeOut();
+    else { V.mittWob = 1; tag("Oven mitt", V.mitt.x, V.mitt.y - 24); }
   }
 
   // =====================================================================================================
@@ -609,13 +642,35 @@
     bringNext(i);
   }
   function platePos() { return { x: L.plate.x, y: L.plate.y }; }
+  // The spatula rests beside the board. Slid under the cookie it lifts it, and it carries the cookie to the plate.
+  const spatHome = () => L.spat;
+  function spatTo(to, dur, then) {
+    const sp = V.spat, a = { x: sp.x, y: sp.y };
+    tween(dur, (p) => { const t = typeof to === "function" ? to() : to; sp.x = lerp(a.x, t.x, ease(p)); sp.y = lerp(a.y, t.y, ease(p)); }, then);
+  }
+  function spatBack() { V.spat.carry = null; spatTo(spatHome(), 0.45); }
+  // A tap on the spatula (or the plate): it slides under the cookie, lifts it and puts it on the plate.
+  function spatTap() {
+    const c = curCookie();
+    if (!c || busy || c.where !== "board") { V.spatWob = 1; tag("Spatula", V.spat.x, V.spat.y - 20); return; }
+    ghost.learned("spat");
+    busy = true;
+    spatTo({ x: c.x, y: c.y }, 0.45, () => { V.spat.carry = c; c.where = "spat"; busy = false; plateCookie(); });
+  }
+  // The cookie on the spatula goes onto the plate (from wherever the spatula holds it).
   function plateCookie() {
     const c = curCookie();
     if (!c || busy) return;
-    ghost.learned("plate");
-    busy = true; c.where = "air";
+    ghost.learned("spat");
+    busy = true;
+    const onSpat = V.spat.carry === c;
+    c.where = onSpat ? "spat" : "air";
     const a = { x: c.x, y: c.y, s: c.s }, t = platePos();
-    tween(0.75, (p) => { const e = ease(p); c.x = lerp(a.x, t.x, e); c.y = lerp(a.y, t.y, e) - Math.sin(p * Math.PI) * 60; c.s = lerp(a.s, L.plate.r * 0.3, e); }, () => {
+    tween(0.8, (p) => {
+      const e = ease(p);
+      c.x = lerp(a.x, t.x, e); c.y = lerp(a.y, t.y, e) - Math.sin(p * Math.PI) * 50; c.s = lerp(a.s, L.plate.r * 0.3, e);
+      if (onSpat) { V.spat.x = c.x; V.spat.y = c.y; }
+    }, () => {
       c.where = "gone"; c.bake = 1;
       plate.push(des(ser(c)));
       if (plate.length > PLATE_MAX) plate.splice(0, plate.length - PLATE_MAX);
@@ -623,10 +678,18 @@
       V.plateBounce = 1; puff("spark", t.x, t.y, 6);
       C.tray = C.tray.filter((q) => q !== c);
       C.cur = -1; busy = false; lastWant = "";
+      spatBack();
       if (C.tray.some((q) => q.where === "tray")) bringNext();
       else finishBatch();
       saveSoon();
     });
+  }
+  // Let go of a cookie on the spatula away from the plate: it slides back onto the board.
+  function cookieBack(c) {
+    const a = { x: c.x, y: c.y }, B = L.big;
+    c.where = "air";
+    tween(0.4, (p) => { c.x = lerp(a.x, B.x, ease(p)); c.y = lerp(a.y, B.y, ease(p)); c.s = lerp(c.s, B.s, ease(p)); }, () => { c.where = "board"; });
+    spatBack();
   }
   function finishBatch() {
     C.stage = "done"; lastWant = "";

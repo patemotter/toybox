@@ -1553,7 +1553,7 @@
         // A piece on the snowman comes off in his hand (one eye or one smile stone; anything else whole).
         const [, k, js] = part.split(":");
         drag = { k: "piece", kind: k, j: KIND[k].slots ? +js : -1, gx: w0.x, gy: w0.y, x: w.x, y: w.y };
-        if (!tookHint) { tookHint = true; coach.say("Drop it in the box to take it off.", 3); }
+        if (!tookHint) { tookHint = true; coach.say("Drop it in the box to take it off.", 3); const bx = boxGeo(), v = vp(bx.x, bx.gy - bx.h); coach.avoid(v.x, v.y); lastWant = ""; }
       }
       if (!drag) drag = { k: "hold", part };
       drag.pid = e.pointerId; drag.far = Math.hypot(s.dx, s.dy);
