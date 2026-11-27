@@ -204,7 +204,9 @@
   const activeIndex = () => ACTIVE[S.step];
   const rolling = () => S.step.startsWith("roll");
   const stacking = () => S.step.startsWith("stack");
-  function newDress() { return { eyes: 0, nose: 0, smile: 0, buttons: 0, arms: 0, mittens: 0, scarf: -1, hat: -1 }; }
+  // What he has put on: for each piece its choice (kept when he takes it off) and which of its bits are on (one
+  // for most pieces; one per eye and per smile stone).
+  function newDress() { const D = {}; KINDS.forEach((k) => { D[k.id] = { opt: 0, on: new Array(k.slots || 1).fill(false) }; }); return D; }
   function newBuild() { return { step: "roll0", balls: [null, null, null], D: newDress(), k1: false, all: false, ww: WW }; }
   function newBall(i, x, gy) {
     const b = { i, x, gy, r: R0[i], rt: RT[i], r0: R0[i], M: [1, 0, 0, 0, 1, 0, 0, 0, 1], done: false, stacked: false,
@@ -215,7 +217,7 @@
   let busy = false, drag = null;
   // The whole snowman's wobble when touched, the pieces' own little moves, and the pieces flying on.
   const sm = { wob: 0, ph: 0 };
-  let pwob = {}, flights = [];
+  let pwob = {}, flights = [], gone = [];
   // The yard he leaves behind on New, fading into the snow.
   let oldB = null, oldA = 0;
 
@@ -254,13 +256,21 @@
       case "arms": { const a = armAt(g, j); return { x: lerp(a.sx, a.ex, 0.55), y: lerp(a.sy, a.ey, 0.55), r: 22 }; }
       case "mittens": { const a = armAt(g, j); return { x: a.ex, y: a.ey, r: 15 }; }
       case "scarf": return { x: g.mx, y: g.neck + 4, r: g.hr * 0.55 };
-      case "hat": return { x: g.hx, y: g.hy - g.hr * 1.2, r: g.hr * 0.9 };
+      case "hat": return { x: g.hx, y: g.hy - g.hr * 1.1, r: g.hr * 0.95 };
     }
     return { x: g.hx, y: g.hy, r: 10 };
   }
-  const count = (k) => (k === "scarf" || k === "hat" ? (S.D[k] >= 0 ? 1 : 0) : S.D[k]);
-  const isFull = (k) => k !== "scarf" && k !== "hat" && S.D[k] >= KIND[k].max;
-  const allOn = () => KINDS.every((k) => count(k.id) >= k.max);
+  // Where a whole piece is pinned (the point it flies to or is carried by).
+  function anchorOf(g, k, j) {
+    if (KIND[k].slots) return pieceSpot(g, k, j);
+    if (k === "buttons") return pieceSpot(g, "buttons", 1);
+    if (k === "arms" || k === "mittens") return { x: g.mx, y: g.my - g.mr * 0.3 };
+    return pieceSpot(g, k, 0);
+  }
+  const isOn = (k, j) => (KIND[k].slots ? !!S.D[k].on[j] : S.D[k].on[0]);
+  const anyOn = (k) => S.D[k].on.some(Boolean);
+  const full = (k) => S.D[k].on.every(Boolean);
+  const allOn = () => KINDS.every((k) => full(k.id));
 
   // Saving: the build in progress (fresh on a launch from the home screen; a reload keeps it).
   let track = [];
@@ -271,7 +281,7 @@
     try {
       const pk = [];
       track.slice(-2400).forEach((p) => { if (p) pk.push(Math.round(p.x), Math.round(p.y), Math.round(p.w)); else pk.push(-1, -1, -1); });
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, build: {
+      localStorage.setItem(KEY, JSON.stringify({ v: 2, build: {
         ww: S.ww, step: S.step, D: S.D, k1: S.k1, all: S.all, track: pk,
         balls: S.balls.map((b) => b && { x: +b.x.toFixed(1), gy: +b.gy.toFixed(1), r: +b.r.toFixed(2), done: b.done, stacked: b.stacked, M: b.M.map((v) => +v.toFixed(4)) })
       } }));
@@ -303,12 +313,12 @@
     else B.step = "dress";
     if (B.step === "dress" && sb.D && typeof sb.D === "object") {
       KINDS.forEach((k) => {
-        const v = sb.D[k.id];
-        if (k.id === "scarf") B.D.scarf = Number.isInteger(v) && v >= 0 && v < SCARVES.length ? v : -1;
-        else if (k.id === "hat") B.D.hat = Number.isInteger(v) && v >= 0 && v < HATS.length ? v : -1;
-        else B.D[k.id] = Number.isInteger(v) ? clamp(v, 0, k.max) : 0;
+        const v = sb.D[k.id], d = B.D[k.id];
+        if (!v || typeof v !== "object") return;
+        if (Number.isInteger(v.opt) && v.opt >= 0 && v.opt < k.opts.length) d.opt = v.opt;
+        if (Array.isArray(v.on) && v.on.length === d.on.length) d.on = v.on.map(Boolean);
       });
-      if (B.D.arms < 2) B.D.mittens = 0;
+      if (!B.D.arms.on[0]) B.D.mittens.on[0] = false;
       B.k1 = !!sb.k1; B.all = !!sb.all;
     }
     track = [];
@@ -321,6 +331,25 @@
     }
     return B;
   }
+  // The cardboard box of snowman things sits in the front corner of the yard; snowballs roll round it.
+  function boxGeo() { return { x: Y.x0 + 58, gy: HW - 66, w: 104, h: 54, d: 18 }; }
+  // Things on the snow a snowball must not roll into: the box and the other snowballs on the ground.
+  function obstacles(B, b) {
+    const bx = boxGeo(), list = [{ x: bx.x + 4, gy: bx.gy - 8, r: 54 }];
+    B.balls.forEach((o) => { if (o && o !== b && !o.stacked && !o.lift) list.push({ x: o.x, gy: o.gy, r: o.r }); });
+    return list;
+  }
+  // Moves (x, gy) for a snowball of radius r out of the obstacles (a round patch on the slanted snow is half as deep).
+  function pushOut(B, b, x, gy, r) {
+    obstacles(B, b).forEach((o) => {
+      const R = r + o.r, ex = (x - o.x) / R, ey = (gy - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
+      if (e >= 1) return;
+      const ux = e > 1e-4 ? ex / e : (x >= o.x ? 1 : -1), uy = e > 1e-4 ? ey / e : 0;
+      x = o.x + ux * R; gy = o.gy + uy * R * 0.5;
+    });
+    return { x, gy };
+  }
+  const blocked = (B, b, x, gy, r) => obstacles(B, b).some((o) => Math.hypot((x - o.x) / (r + o.r), (gy - o.gy) / ((r + o.r) * 0.5)) < 0.98);
   // When the stage changes shape the yard gets wider or narrower: everything moves with it.
   function rescale(B, k) {
     B.balls.forEach((b) => { if (b) b.x *= k; });
@@ -333,12 +362,24 @@
       b.x = clamp(b.x, Y.x0 + m, Y.x1 - m); b.gy = clamp(b.gy, Y.gy0, Y.gy1);
     });
     const b0 = B.balls[0];
-    if (b0 && b0.done) { b0.x = clamp(b0.x, Y.bx0, Y.bx1); b0.gy = clamp(b0.gy, G_MIN, Y.gy1); }
-    [1, 2].forEach((i) => {
+    if (b0 && b0.done) { const p = settleSpot(B, b0); b0.x = p.x; b0.gy = p.y; }
+    [0, 1, 2].forEach((i) => {
       const b = B.balls[i];
-      if (!b || b.stacked || !b0) return;
-      if (Math.hypot((b.x - b0.x) / (b.r + b0.r), (b.gy - b0.gy) / ((b.r + b0.r) * 0.5)) < 1) { const p = openSpot(B); b.x = p.x; b.gy = p.y; }
+      if (!b || b.stacked || (i === 0 && b.done)) return;
+      if (blocked(B, b, b.x, b.gy, b.r)) { const p = openSpot(B); b.x = p.x; b.gy = p.y; }
     });
+  }
+  // Where the finished big snowball settles: near where he finished rolling it, but where the whole snowman fits
+  // and clear of the box.
+  function settleSpot(B, b) {
+    let x = clamp(b.x, Y.bx0, Y.bx1), y = clamp(b.gy, G_MIN, Y.gy1);
+    const bx = boxGeo(), o = { x: bx.x + 4, gy: bx.gy - 8, r: 54 }, R = b.r + o.r, dy = (y - o.gy) / (R * 0.5);
+    if (Math.abs(dy) < 1 && Math.abs(x - o.x) < R) {
+      const ax = o.x + Math.sqrt(1 - dy * dy) * R + 2, ay = o.gy - R * 0.5 - 2;
+      const okX = ax <= Y.bx1, okY = ay >= G_MIN;
+      if (okX && (!okY || ax - x < y - ay)) x = ax; else if (okY) y = ay; else x = Y.bx1;
+    }
+    return { x, y };
   }
   // A clear spot in the yard for a new snowball: well away from the others, toward the front.
   function openSpot(B) {
@@ -346,8 +387,7 @@
     for (let x = Y.x0 + 50; x <= Y.x1 - 50; x += 26) {
       for (let y = Y.gy0 + 40; y <= Y.gy1 - 70; y += 22) {
         let d = 3;
-        B.balls.forEach((o) => {
-          if (!o || o.stacked) return;
+        obstacles(B, null).forEach((o) => {
           const R = o.r + 46;
           d = Math.min(d, Math.hypot((x - o.x) / R, (y - o.gy) / (R * 0.5)));
         });
