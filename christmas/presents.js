@@ -332,6 +332,7 @@
     tweens = []; busy = false; drag = null; press.cancel();
     B = newBuild();
     placeAll();
+    Object.assign(V.rec, { happy: 0, cheer: 0, wave: 0, dance: 0, wob: 0, reach: 0 });
     if (walk) {
       V.tray.kind = ""; V.tray.off = 1;
       V.rec.x = -150; V.rec.walk = true; V.bubPop = 0;
@@ -1427,6 +1428,7 @@
     const C = "#A8683C", M = "#5A3A22";
     // The neck runs down behind the table.
     poly([[-26, 40], [-20, -70], [22, -78], [28, 40]]); fs(C);
+    ctx.beginPath(); ctx.moveTo(14, -120); ctx.quadraticCurveTo(42, -90, 34, -30); ctx.lineTo(24, -30); ctx.quadraticCurveTo(28, -84, 4, -112); ctx.closePath(); fs(M);
     ctx.save(); ctx.translate(4, -116); ctx.rotate((P.tilt || 0) + (P.happy ? Math.sin(t * 6) * 0.06 : 0));
     [-1, 1].forEach((s) => { poly([[s * 10, -30], [s * 22, -62], [s * 26, -26]]); fs(C); });
     ell(0, 0, 30, 40); fs(C);
@@ -1436,7 +1438,6 @@
     // Forelock and mane.
     ctx.beginPath(); ctx.moveTo(-14, -34); ctx.quadraticCurveTo(-4, -18, 2, -40); ctx.quadraticCurveTo(10, -18, 16, -34); ctx.quadraticCurveTo(4, -46, -14, -34); ctx.closePath(); fs(M);
     ctx.restore();
-    ctx.beginPath(); ctx.moveTo(16, -150); ctx.quadraticCurveTo(40, -100, 30, -40); ctx.lineTo(22, -40); ctx.quadraticCurveTo(28, -100, 8, -146); ctx.closePath(); fs(M);
   }
   // The one at the table, with whatever they are doing right now.
   function drawRecipient(t, which) {
@@ -1521,7 +1522,8 @@
   // What comes next: coach, ring and ghost hand
   // =====================================================================================================
   function want() {
-    if (busy || V.rec.walk || V.tray.off > 0.05 && trayFor(B.step)) return null;
+    const tk = trayFor(B.step);
+    if (busy || V.rec.walk || (tk && (V.tray.kind !== tk || V.tray.off > 0.05))) return null;
     const rc = R();
     switch (B.step) {
       case "pick": return { line: "Pick a present for " + rc.name + ".", part: "shelf" };
@@ -1581,7 +1583,8 @@
     lastWant = line;
     if (!line) { coach.busy(); return; }
     coach.step(line);
-    const p = partPt(w.part);
+    // While the tray part is next (the lid, a roll, a bow), the line keeps clear of the box it goes onto.
+    const p = B.step === "lid" || B.step === "paper" || B.step === "bow" ? partPt("box") : partPt(w.part);
     if (p) { const v = vp(p.x, p.y); coach.avoid(v.x, v.y); }
   }
   // The ghost hand shows a tap first and the real move (a drag) after that.
@@ -2043,6 +2046,7 @@
       rip: (u) => { const g = paperG(); ripStrip(lerp(g.x0, g.x1, u == null ? 0.5 : u)); },
       lift: () => liftLid(),
       out: () => goOut(),
+      meet: (i) => { who = ((i % RECIPS.length) + RECIPS.length) % RECIPS.length; newBuildFor(false); },
       newTap,
       surprise,
       pt: (part) => { const p = partPt(part); return p ? vp(p.x, p.y) : null; },

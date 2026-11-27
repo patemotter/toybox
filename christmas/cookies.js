@@ -109,7 +109,7 @@
   const HTOOLS = [
     { id: "hicing", name: "Icing", kind: "icing" }, { id: "snow", name: "Icing snow", kind: "snow" },
     { id: "icicles", name: "Icicles", kind: "icicles" }, { id: "hgum", name: "Gumdrops", kind: "candy", t: "g" },
-    { id: "mint", name: "Peppermints", kind: "candy", t: "m" }, { id: "hcane", name: "Candy canes", kind: "candy", t: "c" },
+    { id: "mint", name: "Pepper\u00ADmints", kind: "candy", t: "m" }, { id: "hcane", name: "Candy canes", kind: "candy", t: "c" },
     { id: "hbutton", name: "Candy buttons", kind: "candy", t: "b" }
   ];
   const CANDY_T = ["g", "b", "r", "e", "m", "c"];
@@ -201,7 +201,7 @@
     sheet: { x: 210, y: 313, w: 352, h: 168 }, cs: 26,
     pinRest: { x: 148, y: 448 }, pinLen: 230, cutterRest: { x: 294, y: 446 }, plate: { x: 370, y: 444, r: 44 },
     big: { x: 210, y: 313, s: 80 },
-    house: { x: 118, y: 322 }, cake: { x: 232, y: 318, rx: 186, ry: 36 }, lie: { x: 222, y: 416, w: 200, h: 98 }, pile: { x: 56, y: 432 }, bag: { x: 372, y: 428 }
+    house: { x: 118, y: 322 }, cake: { x: 228, y: 302, rx: 190, ry: 58 }, lie: { x: 222, y: 416, w: 200, h: 98 }, pile: { x: 56, y: 432 }, bag: { x: 372, y: 428 }
   };
   const WIDE = {
     w: 680, h: 420, wall: 54,
@@ -211,7 +211,7 @@
     sheet: { x: 349, y: 199, w: 274, h: 226 }, cs: 30,
     pinRest: { x: 330, y: 376 }, pinLen: 250, cutterRest: { x: 486, y: 374 }, plate: { x: 592, y: 362, r: 52 },
     big: { x: 349, y: 199, s: 98 },
-    house: { x: 330, y: 330 }, cake: { x: 444, y: 326, rx: 196, ry: 38 }, lie: { x: 128, y: 220, w: 210, h: 150 }, pile: { x: 96, y: 362 }, bag: { x: 206, y: 362 }
+    house: { x: 330, y: 330 }, cake: { x: 440, y: 310, rx: 200, ry: 58 }, lie: { x: 128, y: 220, w: 210, h: 150 }, pile: { x: 96, y: 362 }, bag: { x: 206, y: 362 }
   };
   let L = TALL, W = 0, H = 0, dpr = 1, vs = 1, vox = 0, voy = 0;
   function resize() {
@@ -1360,14 +1360,14 @@
     bar.shelfOpen(on);
     pv.hops = plate.map(() => ({ y: 0, v: 0 }));
     lastWant = "";
-    if (on) { coach.step(plate.length || savedHouse ? "Tap a cookie to make it hop." : "The plate is empty. Bake some cookies!"); ghost.stop(); drag = null; }
+    if (on) { coach.busy(); if (!plate.length) coach.say("The plate is empty. Bake some cookies!", 3.5); ghost.stop(); drag = null; }
     tween(0.3, (p) => { pv.a = on ? ease(p) : 1 - ease(p); });
   }
   function pvLayout() {
     const fam = [], rest = [];
     plate.forEach((c, i) => (c.sh === PERSON ? fam : rest).push(i));
     const hasH = !!savedHouse, spots = [];
-    const famY = H * (hasH ? 0.64 : 0.42), fs0 = Math.min(H * 0.1, W / (fam.length + 1) / 2.3, 60);
+    const famY = H * (hasH ? 0.62 : 0.42), fs0 = Math.min(H * 0.085, W / (fam.length + 1) / 2.3, 54);
     fam.forEach((i, k) => spots[i] = { x: W / 2 + (k - (fam.length - 1) / 2) * fs0 * 2.1, y: famY, s: fs0 });
     const prx = Math.min(W * 0.44, 340), pry = Math.min(H * 0.13, prx * 0.32), py = H * 0.84;
     const rs = Math.min(pry * 0.75, prx * 2 / Math.max(1, rest.length) / 2.2, 48);
@@ -1375,8 +1375,8 @@
       const perRow = Math.max(1, Math.floor(prx * 1.8 / (rs * 2.2))), row = Math.floor(k / perRow), n = Math.min(perRow, rest.length - row * perRow);
       spots[i] = { x: W / 2 + (k % perRow - (n - 1) / 2) * rs * 2.2, y: py - pry * 0.25 + row * rs * 0.9, s: rs };
     });
-    const hk = Math.min(W * 0.5 / 250, H * 0.36 / 230);
-    return { spots, plate: { x: W / 2, y: py, rx: prx, ry: pry }, house: hasH ? { x: W / 2 - 115 * hk, y: H * 0.5, k: hk } : null };
+    const hk = Math.min(W * 0.42 / 250, H * 0.3 / 230);
+    return { spots, plate: { x: W / 2, y: py, rx: prx, ry: pry }, house: hasH ? { x: W / 2 - 115 * hk, y: H * 0.06 + 222 * hk, k: hk } : null };
   }
   function pvHit(sx, sy) {
     const lay = pvLayout();
@@ -1387,7 +1387,7 @@
   function drawPlateView(t) {
     if (pv.a <= 0.01) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "rgba(29,35,64," + 0.55 * pv.a + ")"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(29,35,64," + 0.72 * pv.a + ")"; ctx.fillRect(0, 0, W, H);
     const lay = pvLayout(), svs = vs;
     ctx.save(); ctx.globalAlpha = pv.a;
     if (lay.house) {
@@ -1396,7 +1396,7 @@
       ctx.save(); ctx.translate(h.x, h.y); ctx.scale(h.k, h.k);
       Hs.dec = savedHouse; Hs.placed = 6; L.house = v2(0, 0); V.lit = 1;
       const st = HV.stand; HV.stand = null; const cap = V.snowCap; V.snowCap = 1;
-      try { ell(116, -4, 150, 26); fs("#F5F8FB"); drawHouse(t); } finally { Hs.dec = oldDec; Hs.placed = oldP; L.house = oldL; V.lit = oldLit; HV.stand = st; V.snowCap = cap; }
+      try { ell(110, -20, 165, 52); fs("#F5F8FB"); drawHouse(t); } finally { Hs.dec = oldDec; Hs.placed = oldP; L.house = oldL; V.lit = oldLit; HV.stand = st; V.snowCap = cap; }
       ctx.restore();
     }
     vs = 1;
@@ -1671,8 +1671,10 @@
       else if (drag.k === "pin") {
         const S = L.sheet, y = clamp(w.y, L.board.y + 16, L.board.y + L.board.h - 16);
         V.pin.x = S.x; V.pin.on = true;
-        const b = doughBox(C.roll), over = Math.abs(y - b.y) < b.h / 2 + 24;
-        if (over && !busy) rollBy(Math.abs(y - V.pin.y) / (S.h * 4.2));
+        // It rolls by as much of its path as passes over the dough.
+        const b = doughBox(C.roll), lo = Math.min(y, V.pin.y), hi = Math.max(y, V.pin.y);
+        const over = Math.max(0, Math.min(hi, b.y + b.h / 2 + 24) - Math.max(lo, b.y - b.h / 2 - 24));
+        if (over > 0 && !busy) rollBy(over / (S.h * 3.4));
         V.pin.y = y;
       } else if (drag.k === "cutter") { V.cutter.x = w.x; V.cutter.y = w.y - 8; }
       else if (drag.k === "cookie") { drag.c.x = w.x + drag.ox; drag.c.y = w.y + drag.oy; }
@@ -2053,6 +2055,7 @@
       },
       next: stepNext,
       tap: (part) => doTap(part),
+      hitAt: (x, y) => hitPart(x, y),
       job: (id) => { pickJob(id); jobs.set(id); },
       tile: (id) => { const b = tiles.button(id); if (b) b.click(); return !!b; },
       pt: (part) => { const p = partPt(part); return p ? vp(p.x, p.y) : null; },

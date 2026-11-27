@@ -107,7 +107,7 @@
     // The paper keeps clear of the scissors resting at the right.
     const strip = LY.sc * 0.5;
     LY.pf = { x: LY.pa.x + (tall ? strip * 0.25 : 0), y: LY.pa.y, w: LY.pa.w - strip * (tall ? 1.25 : 1), h: LY.pa.h };
-    LY.flake = clamp(Math.sqrt(LY.glass.w * LY.glass.h) * 0.22, 34, 120);
+    LY.flake = clamp(Math.sqrt(LY.glass.w * LY.glass.h) * 0.25, 40, 130);
   }
   function resize() {
     const r = stage.getBoundingClientRect();
@@ -411,24 +411,36 @@
     const img = mk.g.getImageData(0, 0, w, h), a = img.data, seen = new Uint8Array(n), stack = new Int32Array(n);
     seeds.forEach(([fx, fy]) => {
       let x = Math.round((fx - MX0) * res - 0.5), y = Math.round((fy - MY0) * res - 0.5), found = -1;
-      for (let r = 0; r <= 3 && found < 0; r++) {
+      for (let r = 0; r <= 2 && found < 0; r++) {
         for (let dy = -r; dy <= r && found < 0; dy++) for (let dx = -r; dx <= r; dx++) {
           const xx = x + dx, yy = y + dy;
           if (xx >= 0 && yy >= 0 && xx < w && yy < h && a[(yy * w + xx) * 4 + 3] >= 128) { found = yy * w + xx; break; }
         }
       }
       if (found < 0 || seen[found]) return;
-      let sp = 0; stack[sp++] = found; seen[found] = 1;
+      // Flood the piece first; a piece that reaches the middle or both fold edges is never dropped (at a small
+      // size a seed can land on the main paper).
+      const list = [], soft = [];
+      let sp = 0, apex = false, e15 = false, e45 = false;
+      const tol = 2.5 / res;
+      stack[sp++] = found; seen[found] = 1;
       while (sp) {
-        const j = stack[--sp]; x = j % w;
-        a[j * 4 + 3] = 0;
+        const j = stack[--sp]; x = j % w; y = (j / w) | 0;
+        list.push(j);
+        const fx = MX0 + (x + 0.5) / res, fy = MY0 + (y + 0.5) / res;
+        if (fx * fx + fy * fy < 0.0036) apex = true;
+        if (-S15 * fx + C15 * fy < tol) e15 = true;
+        if (R2 * fx - R2 * fy < tol) e45 = true;
         const nb = [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, j - w, j + w];
         for (const q of nb) {
           if (q < 0 || q >= n || seen[q]) continue;
           if (a[q * 4 + 3] >= 128) { seen[q] = 1; stack[sp++] = q; }
-          else if (a[q * 4 + 3] > 0) { seen[q] = 2; }
+          else if (a[q * 4 + 3] > 0) { seen[q] = 3; soft.push(q); }
         }
       }
+      if (apex || (e15 && e45)) { soft.forEach((q) => { seen[q] = 0; }); return; }
+      list.forEach((j) => { a[j * 4 + 3] = 0; });
+      soft.forEach((q) => { seen[q] = 2; });
     });
     // Soft edge pixels next to a dropped piece go too, unless they touch paper that stays.
     for (let i = 0; i < n; i++) {
@@ -500,7 +512,7 @@
     const mk = newMask(clamp(s * dpr * 1.4, 160, 900));
     replay(mk, e.ops, e.drops);
     const N = Math.ceil(2 * s * dpr);
-    const f = composeFlake(mk, COLORS[e.c].hex, N, Math.max(1.1, 1.4 * dpr), Math.max(1, dpr));
+    const f = composeFlake(mk, COLORS[e.c].hex, N, Math.max(1, (s > 60 ? 1.8 : 1) * dpr), Math.max(0.8, 0.8 * dpr));
     const g = f.tex.getContext("2d");
     g.globalAlpha = 0.28; g.drawImage(f.cr, 0, 0); g.globalAlpha = 1;
     return { c: f.tex, s };
@@ -549,13 +561,15 @@
   // The free place on the glass farthest from the snowflakes already there.
   function bestSpot() {
     const g = LY.glass, wide = g.w >= g.h, cols = wide ? 4 : 3, rows = wide ? 3 : 4;
-    let best = null, bd = -1;
+    let best = null, bd = -Infinity;
     for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
-      const u = (i + 0.5 + (hash(i, j) - 0.5) * 0.35) / cols, v = (j + 0.5 + (hash(j, i + 7) - 0.5) * 0.3) / rows;
+      const u = (i + 0.5 + (hash(i, j) - 0.5) * 0.35) / cols, v = 0.08 + 0.92 * (j + 0.5 + (hash(j, i + 7) - 0.5) * 0.3) / rows;
       const p = glassPt(u, v);
-      let d = Infinity;
+      let d = 1e4;
       hung.forEach((e) => { const q = glassPt(e.u, e.v); d = Math.min(d, Math.hypot(p.x - q.x, p.y - q.y)); });
-      if (d > bd + 0.5) { bd = d; best = { u, v }; }
+      // Ties go to the place nearest the middle of the glass.
+      d -= Math.hypot(u - 0.5, v - 0.5) * 0.01 * LY.flake;
+      if (d > bd) { bd = d; best = { u, v }; }
     }
     return best;
   }
@@ -755,8 +769,9 @@
     const sc = V.sc, dx = sx - sc.x, dy = sy - sc.y, d = Math.hypot(dx, dy);
     if (d > 0.5) {
       // The blades turn toward where he cuts, a little at a time; they open and close as he goes.
-      const want = Math.atan2(dy, dx);
-      if (d > 2) sc.a = lerpAng(sc.a, want, Math.min(1, d / 40));
+      // The tips stay pointing up and lean toward the way he cuts, so the handles stay under his hand.
+      const want = -Math.PI / 2 + clamp(dx / d, -1, 1) * 0.7;
+      if (d > 2) sc.a = lerpAng(sc.a, want, Math.min(1, d / 60));
       sc.dist += d;
       sc.open = 0.5 + 0.45 * Math.cos(sc.dist * 0.09);
     }
@@ -1537,7 +1552,8 @@
       const p0 = local(s.x0, s.y0), p = local(s.x, s.y);
       if (S.ph === "fold" && part === "paper" && !busy) {
         if (foldStart(p0.x, p0.y)) { drag = { k: "fold" }; foldMove(p.x, p.y); }
-      } else if (S.ph === "cut" && !busy && part !== "lights" && !/^hung/.test(part) && part !== "glass" && part !== "frame") {
+      } else if (S.ph === "cut" && !busy) {
+        // Cutting is the job here: a drag from anywhere brings the scissors and cuts.
         if (cutStart(p0.x, p0.y)) { drag = { k: "cut" }; cutMove(p.x, p.y); }
       } else if (S.ph === "hang" && part === "flake" && !busy && V.flake) {
         drag = { k: "carry", ox: V.flake.x - p0.x, oy: V.flake.y - p0.y };
@@ -1845,6 +1861,7 @@
       grab: () => { const g = grabPts(); return { from: vp(g.from.x, g.from.y), to: vp(g.to.x, g.to.y) }; },
       glass: (u, v) => { const p = glassPt(u, v); return vp(p.x, p.y); },
       symmetry,
+      hungInfo: () => hung.map((e) => { const p = hungPic(e), d = p.c.getContext("2d").getImageData(0, 0, p.c.width, p.c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n++; return { w: p.c.width, paper: n, pos: glassPt(e.u, e.v) }; }),
       ghost: () => ghost.show()
     };
   }
