@@ -1,42 +1,46 @@
 (function () {
   "use strict";
   // Christmas · Snowman: a snowy front yard (the edge of the house with its lights, a wooden fence, pine trees,
-  // gentle snow falling) where he makes a snowman the real way, one hands-on step at a time.
+  // gentle snow falling, a cardboard box of snowman things) where he makes a snowman the real way.
   //   1. Roll the snowball: he drags the small snowball across the yard. It turns as it rolls, grows as it picks
-  //      up snow, and leaves a rolled track where the grass shows through. A tap on the snowball rolls it a short
-  //      way by itself; a tap on the snow rolls it toward that spot. Big enough, it settles with a sparkle (the
-  //      big one first rolls itself to a spot where the whole snowman will fit) and the next small one appears.
+  //      up snow (it stays clean white), and presses a packed-snow trail into the deep snow. A tap on the snowball
+  //      rolls it a short way by itself; a tap on the snow rolls it toward that spot. Big enough, it settles with
+  //      a sparkle (the big one first rolls itself to a spot where the whole snowman fits) and the next one appears.
   //   2. Roll the middle snowball the same way, then lift it onto the big one (drag it there, or tap it and it
   //      lifts and stacks itself).
   //   3. Roll the small snowball for the head and lift it on top.
-  //   4. Dress the snowman from the panel tiles: coal eyes, carrot nose, a smile of coal stones, buttons, stick
-  //      arms, mittens on the stick ends, a scarf (Scarf again: the next color) and a hat (Hat again: top hat or
-  //      woolly hat). He drags a piece onto the snowman (it snaps to its place) or taps its tile.
+  //   4. Dress the snowman from the panel tiles: eyes, nose, smile, buttons, arms, mittens, scarf, hat. A piece with
+  //      choices (eyes, buttons, mittens, scarf, hat) shows a little row of colored dots; a tap on it shows its
+  //      choices as picture tiles (with Back to all the pieces), and picking one puts it on or swaps it. A piece with
+  //      one choice (nose, smile, arms) goes straight on. He can also drag any tile onto the snowman.
+  //   5. Take things off: he drags a piece off the snowman into the box (it opens and glows while a piece is over
+  //      it). Let go anywhere else away from the snowman, the piece also goes back in the box.
   // FACE RULE (the dad: faces popping up on objects once scared him): the snowman has no face until he puts each
-  // face piece on himself. Every eye, the nose and every smile stone goes on by his own tap or drag only, one at a
+  // face piece on himself. Each eye, the nose and each smile stone goes on only by his own tap or drag, one at a
   // time. Nothing else ever adds a face piece (not New, Surprise, the ghost hand, a celebration or the debug
   // "next"), the snowballs carry no face while rolling, and the face never moves by itself (no blinking, no
-  // expressions). Buttons, arms and mittens go on together with one tap.
+  // expressions). Buttons, arms and mittens go on together (mittens bring the stick arms that hold them).
   // A yellow ring and one instruction show the next thing to do; everything drawn answers a touch (a wiggle, its
   // name, snow falling off a tree). Surprise takes turns between live moments that never touch his snowman: a
   // robin lands on the hat (or a stick arm, or the head) and hops, a puff of wind flutters the scarf and swirls the
   // snow, the snow falls thicker for a moment, a rabbit hops across the yard. New: the old snowman fades, the snow
-  // fills the tracks back in and a fresh small snowball sits in the yard. A fresh launch starts a new yard; a
+  // fills the trails back in and a fresh small snowball sits in the yard. A fresh launch starts a new yard; a
   // reload keeps the snowman as he left it.
   // Units: the scene is drawn in world units (HW tall, WW wide, WW following the stage's shape) and scaled to fit
   // the stage; x to the right, y down. A snowball's (x, gy) is where it touches the snow.
   //
   // Sections:
   //   Setup and saved state
-  //   Pieces and sizes
+  //   Pieces, choices and sizes
   //   Layout
   //   Tweens and particles
   //   The build
   //   Rolling
   //   Stacking
-  //   Dressing
+  //   Dressing and taking off
   //   Drawing helpers
   //   Drawing the yard
+  //   Drawing the box
   //   Drawing the snowballs and the snowman
   //   Visitors: robin, rabbit, wind and snow
   //   What comes next: coach, ring and ghost hand
@@ -60,7 +64,7 @@
   let ending = false;
   const locked = () => ending || Toybox.timer.locked();
 
-  const KEY = "christmas-snowman-v1";
+  const KEY = "christmas-snowman-v2";
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
   if (!saved || typeof saved !== "object" || Array.isArray(saved)) saved = {};
@@ -68,28 +72,39 @@
   const fresh = Toybox.fresh();
 
   // =====================================================================================================
-  // Pieces and sizes
+  // Pieces, choices and sizes
   // =====================================================================================================
-  const SCARVES = [
-    { id: "red", hex: "#E8303F", dark: "#B81F2E", stripe: "#FFFFFF" },
-    { id: "green", hex: "#3FA34D", dark: "#2A7A36", stripe: "#FFE36B" },
-    { id: "blue", hex: "#2F8CFF", dark: "#1F64C0", stripe: "#FFFFFF" },
-    { id: "yellow", hex: "#FFC93C", dark: "#D9A21B", stripe: "#E8303F" }
-  ];
-  const HATS = [{ id: "top", name: "Top hat" }, { id: "knit", name: "Woolly hat" }];
-  // The tiles, in panel order. face: one piece per tap or drag, never added any other way.
+  // The pieces, in panel order, each with the choices he can see and pick (a piece with one choice goes straight
+  // on). slots: a face piece made of separate bits that go on one at a time (each eye, each smile stone).
   const KINDS = [
-    { id: "eyes", name: "Eyes", max: 2, face: true, tag: "Coal eye", full: "Coal eyes" },
-    { id: "nose", name: "Nose", max: 1, face: true, tag: "Carrot nose", full: "Carrot nose" },
-    { id: "smile", name: "Smile", max: 5, face: true, tag: "Coal smile", full: "Coal smile" },
-    { id: "buttons", name: "Buttons", max: 3, tag: "Button", full: "Buttons" },
-    { id: "arms", name: "Arms", max: 2, tag: "Stick arm", full: "Stick arms" },
-    { id: "mittens", name: "Mittens", max: 2, tag: "Mitten", full: "Mittens" },
-    { id: "scarf", name: "Scarf", max: 1, tag: "Scarf" },
-    { id: "hat", name: "Hat", max: 1, tag: "Hat" }
+    { id: "eyes", name: "Eyes", face: true, slots: 2, opts: [
+      { id: "coal", name: "Coal", tag: "Coal eye" }, { id: "button", name: "Buttons", tag: "Button eye" }] },
+    { id: "nose", name: "Nose", face: true, opts: [{ id: "carrot", name: "Carrot", tag: "Carrot nose" }] },
+    { id: "smile", name: "Smile", face: true, slots: 5, opts: [{ id: "coal", name: "Coal", tag: "Coal smile" }] },
+    { id: "buttons", name: "Buttons", opts: [
+      { id: "coal", name: "Coal", tag: "Coal buttons" },
+      { id: "red", name: "Red", tag: "Red buttons", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "gold", name: "Gold", tag: "Gold buttons", hex: "#FFC93C", dark: "#C9961A" }] },
+    { id: "arms", name: "Arms", opts: [{ id: "sticks", name: "Sticks", tag: "Stick arms" }] },
+    { id: "mittens", name: "Mittens", opts: [
+      { id: "red", name: "Red", tag: "Red mittens", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "blue", name: "Blue", tag: "Blue mittens", hex: "#2F8CFF", dark: "#1F64C0" },
+      { id: "green", name: "Green", tag: "Green mittens", hex: "#3FA34D", dark: "#2A7A36" },
+      { id: "yellow", name: "Yellow", tag: "Yellow mittens", hex: "#FFC93C", dark: "#D9A21B" }] },
+    { id: "scarf", name: "Scarf", opts: [
+      { id: "red", name: "Red", tag: "Red scarf", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "blue", name: "Blue", tag: "Blue scarf", hex: "#2F8CFF", dark: "#1F64C0" },
+      { id: "green", name: "Green", tag: "Green scarf", hex: "#3FA34D", dark: "#2A7A36" },
+      { id: "striped", name: "Striped", tag: "Striped scarf", hex: "#E8303F", dark: "#B81F2E", stripe: "#FFFFFF" }] },
+    { id: "hat", name: "Hat", opts: [
+      { id: "top", name: "Top hat", tag: "Top hat" }, { id: "knit", name: "Woolly hat", tag: "Woolly hat" },
+      { id: "santa", name: "Santa hat", tag: "Santa hat" }, { id: "muffs", name: "Earmuffs", tag: "Earmuffs" }] }
   ];
   const KIND = {};
   KINDS.forEach((k) => { KIND[k.id] = k; });
+  const many = (k) => KIND[k].opts.length > 1;
+  // How many of each piece he can touch on the snowman (two eyes, five smile stones, three buttons, two arms...).
+  const PARTS = { eyes: 2, nose: 1, smile: 5, buttons: 3, arms: 2, mittens: 2, scarf: 1, hat: 1 };
   // The three snowballs: start radius, finished radius, and how far each rolls to get there (a few seconds).
   const R0 = [18, 16, 14], RT = [84, 62, 46], DIST = [900, 720, 540];
   const BALL_NAMES = ["Big snowball", "Middle snowball", "Small snowball"];
@@ -189,7 +204,9 @@
   const activeIndex = () => ACTIVE[S.step];
   const rolling = () => S.step.startsWith("roll");
   const stacking = () => S.step.startsWith("stack");
-  function newDress() { return { eyes: 0, nose: 0, smile: 0, buttons: 0, arms: 0, mittens: 0, scarf: -1, hat: -1 }; }
+  // What he has put on: for each piece its choice (kept when he takes it off) and which of its bits are on (one
+  // for most pieces; one per eye and per smile stone).
+  function newDress() { const D = {}; KINDS.forEach((k) => { D[k.id] = { opt: 0, on: new Array(k.slots || 1).fill(false) }; }); return D; }
   function newBuild() { return { step: "roll0", balls: [null, null, null], D: newDress(), k1: false, all: false, ww: WW }; }
   function newBall(i, x, gy) {
     const b = { i, x, gy, r: R0[i], rt: RT[i], r0: R0[i], M: [1, 0, 0, 0, 1, 0, 0, 0, 1], done: false, stacked: false,
@@ -200,7 +217,7 @@
   let busy = false, drag = null;
   // The whole snowman's wobble when touched, the pieces' own little moves, and the pieces flying on.
   const sm = { wob: 0, ph: 0 };
-  let pwob = {}, flights = [];
+  let pwob = {}, flights = [], gone = [];
   // The yard he leaves behind on New, fading into the snow.
   let oldB = null, oldA = 0;
 
@@ -239,13 +256,21 @@
       case "arms": { const a = armAt(g, j); return { x: lerp(a.sx, a.ex, 0.55), y: lerp(a.sy, a.ey, 0.55), r: 22 }; }
       case "mittens": { const a = armAt(g, j); return { x: a.ex, y: a.ey, r: 15 }; }
       case "scarf": return { x: g.mx, y: g.neck + 4, r: g.hr * 0.55 };
-      case "hat": return { x: g.hx, y: g.hy - g.hr * 1.2, r: g.hr * 0.9 };
+      case "hat": return { x: g.hx, y: g.hy - g.hr * 1.1, r: g.hr * 0.95 };
     }
     return { x: g.hx, y: g.hy, r: 10 };
   }
-  const count = (k) => (k === "scarf" || k === "hat" ? (S.D[k] >= 0 ? 1 : 0) : S.D[k]);
-  const isFull = (k) => k !== "scarf" && k !== "hat" && S.D[k] >= KIND[k].max;
-  const allOn = () => KINDS.every((k) => count(k.id) >= k.max);
+  // Where a whole piece is pinned (the point it flies to or is carried by).
+  function anchorOf(g, k, j) {
+    if (KIND[k].slots) return pieceSpot(g, k, j);
+    if (k === "buttons") return pieceSpot(g, "buttons", 1);
+    if (k === "arms" || k === "mittens") return { x: g.mx, y: g.my - g.mr * 0.3 };
+    return pieceSpot(g, k, 0);
+  }
+  const isOn = (k, j) => (KIND[k].slots ? !!S.D[k].on[j] : S.D[k].on[0]);
+  const anyOn = (k) => S.D[k].on.some(Boolean);
+  const full = (k) => S.D[k].on.every(Boolean);
+  const allOn = () => KINDS.every((k) => full(k.id));
 
   // Saving: the build in progress (fresh on a launch from the home screen; a reload keeps it).
   let track = [];
@@ -256,7 +281,7 @@
     try {
       const pk = [];
       track.slice(-2400).forEach((p) => { if (p) pk.push(Math.round(p.x), Math.round(p.y), Math.round(p.w)); else pk.push(-1, -1, -1); });
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, build: {
+      localStorage.setItem(KEY, JSON.stringify({ v: 2, build: {
         ww: S.ww, step: S.step, D: S.D, k1: S.k1, all: S.all, track: pk,
         balls: S.balls.map((b) => b && { x: +b.x.toFixed(1), gy: +b.gy.toFixed(1), r: +b.r.toFixed(2), done: b.done, stacked: b.stacked, M: b.M.map((v) => +v.toFixed(4)) })
       } }));
@@ -288,12 +313,12 @@
     else B.step = "dress";
     if (B.step === "dress" && sb.D && typeof sb.D === "object") {
       KINDS.forEach((k) => {
-        const v = sb.D[k.id];
-        if (k.id === "scarf") B.D.scarf = Number.isInteger(v) && v >= 0 && v < SCARVES.length ? v : -1;
-        else if (k.id === "hat") B.D.hat = Number.isInteger(v) && v >= 0 && v < HATS.length ? v : -1;
-        else B.D[k.id] = Number.isInteger(v) ? clamp(v, 0, k.max) : 0;
+        const v = sb.D[k.id], d = B.D[k.id];
+        if (!v || typeof v !== "object") return;
+        if (Number.isInteger(v.opt) && v.opt >= 0 && v.opt < k.opts.length) d.opt = v.opt;
+        if (Array.isArray(v.on) && v.on.length === d.on.length) d.on = v.on.map(Boolean);
       });
-      if (B.D.arms < 2) B.D.mittens = 0;
+      if (!B.D.arms.on[0]) B.D.mittens.on[0] = false;
       B.k1 = !!sb.k1; B.all = !!sb.all;
     }
     track = [];
@@ -306,6 +331,25 @@
     }
     return B;
   }
+  // The cardboard box of snowman things sits in the front corner of the yard; snowballs roll round it.
+  function boxGeo() { return { x: Y.x0 + 58, gy: HW - 66, w: 104, h: 54, d: 18 }; }
+  // Things on the snow a snowball must not roll into: the box and the other snowballs on the ground.
+  function obstacles(B, b) {
+    const bx = boxGeo(), list = [{ x: bx.x + 4, gy: bx.gy - 8, r: 54 }];
+    B.balls.forEach((o) => { if (o && o !== b && !o.stacked && !o.lift) list.push({ x: o.x, gy: o.gy, r: o.r }); });
+    return list;
+  }
+  // Moves (x, gy) for a snowball of radius r out of the obstacles (a round patch on the slanted snow is half as deep).
+  function pushOut(B, b, x, gy, r) {
+    obstacles(B, b).forEach((o) => {
+      const R = r + o.r, ex = (x - o.x) / R, ey = (gy - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
+      if (e >= 1) return;
+      const ux = e > 1e-4 ? ex / e : (x >= o.x ? 1 : -1), uy = e > 1e-4 ? ey / e : 0;
+      x = o.x + ux * R; gy = o.gy + uy * R * 0.5;
+    });
+    return { x, gy };
+  }
+  const blocked = (B, b, x, gy, r) => obstacles(B, b).some((o) => Math.hypot((x - o.x) / (r + o.r), (gy - o.gy) / ((r + o.r) * 0.5)) < 0.98);
   // When the stage changes shape the yard gets wider or narrower: everything moves with it.
   function rescale(B, k) {
     B.balls.forEach((b) => { if (b) b.x *= k; });
@@ -318,12 +362,24 @@
       b.x = clamp(b.x, Y.x0 + m, Y.x1 - m); b.gy = clamp(b.gy, Y.gy0, Y.gy1);
     });
     const b0 = B.balls[0];
-    if (b0 && b0.done) { b0.x = clamp(b0.x, Y.bx0, Y.bx1); b0.gy = clamp(b0.gy, G_MIN, Y.gy1); }
-    [1, 2].forEach((i) => {
+    if (b0 && b0.done) { const p = settleSpot(B, b0); b0.x = p.x; b0.gy = p.y; }
+    [0, 1, 2].forEach((i) => {
       const b = B.balls[i];
-      if (!b || b.stacked || !b0) return;
-      if (Math.hypot((b.x - b0.x) / (b.r + b0.r), (b.gy - b0.gy) / ((b.r + b0.r) * 0.5)) < 1) { const p = openSpot(B); b.x = p.x; b.gy = p.y; }
+      if (!b || b.stacked || (i === 0 && b.done)) return;
+      if (blocked(B, b, b.x, b.gy, b.r)) { const p = openSpot(B); b.x = p.x; b.gy = p.y; }
     });
+  }
+  // Where the finished big snowball settles: near where he finished rolling it, but where the whole snowman fits
+  // and clear of the box.
+  function settleSpot(B, b) {
+    let x = clamp(b.x, Y.bx0, Y.bx1), y = clamp(b.gy, G_MIN, Y.gy1);
+    const bx = boxGeo(), o = { x: bx.x + 4, gy: bx.gy - 8, r: 54 }, R = b.r + o.r, dy = (y - o.gy) / (R * 0.5);
+    if (Math.abs(dy) < 1 && Math.abs(x - o.x) < R) {
+      const ax = o.x + Math.sqrt(1 - dy * dy) * R + 2, ay = o.gy - R * 0.5 - 2;
+      const okX = ax <= Y.bx1, okY = ay >= G_MIN;
+      if (okX && (!okY || ax - x < y - ay)) x = ax; else if (okY) y = ay; else x = Y.bx1;
+    }
+    return { x, y };
   }
   // A clear spot in the yard for a new snowball: well away from the others, toward the front.
   function openSpot(B) {
@@ -331,8 +387,7 @@
     for (let x = Y.x0 + 50; x <= Y.x1 - 50; x += 26) {
       for (let y = Y.gy0 + 40; y <= Y.gy1 - 70; y += 22) {
         let d = 3;
-        B.balls.forEach((o) => {
-          if (!o || o.stacked) return;
+        obstacles(B, null).forEach((o) => {
           const R = o.r + 46;
           d = Math.min(d, Math.hypot((x - o.x) / R, (y - o.gy) / (R * 0.5)));
         });
@@ -363,8 +418,8 @@
   // =====================================================================================================
   // Rolling
   // =====================================================================================================
-  // Each snowball keeps its own turn (a rotation matrix), so the specks of packed snow and bits of grass on it
-  // roll round as it goes. Rows are kept orthonormal.
+  // Each snowball keeps its own turn (a rotation matrix), so the soft shading and little bumps of packed snow on
+  // it roll round as it goes. Rows are kept orthonormal.
   function ortho(M) {
     let a = M[0], b = M[1], c = M[2], n = Math.hypot(a, b, c) || 1;
     a /= n; b /= n; c /= n;
@@ -396,13 +451,8 @@
     if (!b) return 0;
     const m = b.r * 0.9;
     let nx = clamp(b.x + dx, Y.x0 + m, Y.x1 - m), ny = clamp(b.gy + dy, Y.gy0, Y.gy1);
-    S.balls.forEach((o, j) => {
-      if (j === i || !o || o.stacked || o.lift) return;
-      const R = b.r + o.r, ex = (nx - o.x) / R, ey = (ny - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
-      if (e >= 1) return;
-      const ux = e > 1e-4 ? ex / e : (nx >= o.x ? 1 : -1), uy = e > 1e-4 ? ey / e : 0;
-      nx = clamp(o.x + ux * R, Y.x0 + m, Y.x1 - m); ny = clamp(o.gy + uy * R * 0.5, Y.gy0, Y.gy1);
-    });
+    const p = pushOut(S, b, nx, ny, b.r);
+    nx = clamp(p.x, Y.x0 + m, Y.x1 - m); ny = clamp(p.gy, Y.gy0, Y.gy1);
     const mx = nx - b.x, my = ny - b.gy, d = Math.hypot(mx, my * DEPTH);
     if (d < 0.01) return 0;
     b.x = nx; b.gy = ny;
@@ -418,7 +468,8 @@
     saveSoon();
     return d;
   }
-  // The rolled track: grass showing through, a packed rim of snow round it. Painted once into its own layer.
+  // The rolled trail: snow pressed down and packed (a little blue-grey in its own shade), with a soft raised rim
+  // of loose snow pushed aside. Painted once into its own layer.
   const K = 0.42;   // the snow is seen at a slant: a round patch on it looks this flat
   const tcv = document.createElement("canvas"), tctx = tcv.getContext("2d");
   let oldTrack = null;
@@ -436,16 +487,13 @@
     c.lineCap = "round"; c.lineJoin = "round";
     const line = (w, col) => { c.beginPath(); c.moveTo(a.x, a.y / K); c.lineTo(b.x + 0.01, b.y / K); c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
     c.globalCompositeOperation = "source-over";
-    line(b.w, "#A3C77A");
-    const n = hash(Math.round(b.x), Math.round(b.y));
-    if (n < 0.55) {
-      const ox = (hash(Math.round(b.y), Math.round(b.x)) - 0.5) * b.w * 0.6, oy = (n - 0.27) * b.w;
-      c.beginPath(); c.moveTo(b.x + ox, b.y / K + oy); c.lineTo(b.x + ox + 2.5, b.y / K + oy - 7);
-      c.lineWidth = 2.2; c.strokeStyle = n < 0.2 ? "#B79B6A" : "#6F9F45"; c.stroke();
-    }
-    // The rim goes under what is already there, so it never covers grass rolled earlier.
+    line(b.w, "#D3DEED");
+    // The rim goes under what is already there, so it never covers trail rolled earlier: a pale edge of loose
+    // snow, then its soft blue shadow.
     c.globalCompositeOperation = "destination-over";
-    line(b.w + 9, "#CFDDF0");
+    line(b.w + 5, "#BFCDE2");
+    line(b.w + 13, "#FFFFFF");
+    line(b.w + 17, "#E2EAF6");
     c.globalCompositeOperation = "source-over";
   }
   function redrawTrack() {
@@ -464,10 +512,9 @@
   }
   function openDir(b) {
     const h = b.heading, ax = b.x + h.x * 130, ay = b.gy + h.y * 130 / DEPTH;
-    const clear = (x, y) => x > Y.x0 + b.r && x < Y.x1 - b.r && y > Y.gy0 + 10 && y < Y.gy1 - 10 &&
-      S.balls.every((o) => !o || o === b || o.stacked || Math.hypot((x - o.x) / (o.r + b.r), (y - o.gy) / ((o.r + b.r) * 0.5)) > 1.1);
+    const clear = (x, y) => x > Y.x0 + b.r && x < Y.x1 - b.r && y > Y.gy0 + 10 && y < Y.gy1 - 10 && !blocked(S, b, x, y, b.r * 1.1);
     if (clear(ax, ay)) return { x: h.x, y: h.y };
-    let dx = (Y.x0 + Y.x1) / 2 - b.x, dy = ((Y.gy0 + Y.gy1) / 2 - b.gy) * DEPTH;
+    let dx = (Y.x0 + Y.x1) / 2 + 40 - b.x, dy = ((Y.gy0 + Y.gy1) / 2 - 30 - b.gy) * DEPTH;
     const o = S.balls[0];
     if (o && o !== b && o.done) { dx += (b.x - o.x) * 0.8; dy += (b.gy - o.gy) * DEPTH * 0.8; }
     const n = Math.hypot(dx, dy) || 1, a = (Math.random() - 0.5) * 0.8, c = Math.cos(a), s = Math.sin(a);
@@ -502,7 +549,7 @@
     ghost.learned("roll");
     busy = true;
     let tx = b.x, ty = b.gy;
-    if (i === 0) { tx = clamp(b.x, Y.bx0, Y.bx1); ty = clamp(b.gy, G_MIN, Y.gy1); }
+    if (i === 0) { const p = settleSpot(S, b); tx = p.x; ty = p.y; }
     const settle = () => {
       trackBreak();
       b.sq = 1;
@@ -580,14 +627,11 @@
     });
   }
   function dropBall(i, quiet) {
-    const b = S.balls[i], o = S.balls[0];
+    const b = S.balls[i];
     let gx = clamp(b.lx, Y.x0 + b.r * 0.9, Y.x1 - b.r * 0.9), gy = clamp(b.ly + b.r * SIT, Y.gy0, Y.gy1);
-    const R = b.r + o.r, ex = (gx - o.x) / R, ey = (gy - o.gy) / (R * 0.5), e = Math.hypot(ex, ey);
-    if (e < 1) {
-      const ux = e > 1e-4 ? ex / e : 1, uy = e > 1e-4 ? ey / e : 0;
-      gx = clamp(o.x + ux * R, Y.x0 + b.r, Y.x1 - b.r); gy = clamp(o.gy + uy * R * 0.5, Y.gy0, Y.gy1);
-      if (Math.hypot((gx - o.x) / R, (gy - o.gy) / (R * 0.5)) < 0.98) { const p = openSpot(S); gx = p.x; gy = p.y; }
-    }
+    const p = pushOut(S, b, gx, gy, b.r);
+    gx = clamp(p.x, Y.x0 + b.r * 0.9, Y.x1 - b.r * 0.9); gy = clamp(p.gy, Y.gy0, Y.gy1);
+    if (blocked(S, b, gx, gy, b.r)) { const q = openSpot(S); gx = q.x; gy = q.y; }
     const x0 = b.lx, y0 = b.ly, ty = gy - b.r * SIT;
     busy = true;
     tween(0.35, (p) => { b.lx = lerp(x0, gx, p); b.ly = lerp(y0, ty, p * p); }, () => {
@@ -599,79 +643,98 @@
   }
 
   // =====================================================================================================
-  // Dressing
+  // Dressing and taking off
   // =====================================================================================================
-  // Puts one piece on (eyes, nose and smile one at a time; buttons, arms and mittens all together). The scarf
-  // and hat change on a second tap. from: where the piece flies in from (his finger, or the tile).
-  function putPiece(k, from, btn) {
+  // Puts a piece on with choice opt, or swaps the choice when that piece is already on. Eyes and smile stones go on
+  // one at a time (the next empty place); buttons, arms and mittens go on together (mittens bring the stick arms).
+  // from: where it flies in from (his finger, or the tile). Returns true when something changed.
+  function putPiece(k, opt, from, btn) {
     if (locked() || !KIND[k]) return false;
-    const b = btn || tiles.button(k);
+    const K = KIND[k];
     if (S.step !== "dress") {
-      if (b) Toybox.wiggle(b);
+      if (btn) Toybox.wiggle(btn);
       coach.say("Build the snowman first. Then dress him.", 3);
       ghost.poke();
       return false;
     }
-    const D = S.D, g = geom(S), K = KIND[k];
-    if (k === "mittens" && D.arms < 2) {
-      if (b) Toybox.wiggle(b);
-      Toybox.wiggle(tiles.button("arms"));
-      coach.say("Put the stick arms on first.", 3);
-      return false;
-    }
+    const d = S.D[k];
+    opt = clamp(opt | 0, 0, K.opts.length - 1);
     ghost.learned("dress");
-    if (k === "scarf") {
-      if (D.scarf < 0) { D.scarf = 0; fly("scarf", 0, from); }
-      else {
-        D.scarf = (D.scarf + 1) % SCARVES.length;
-        pwob.scarf = 1;
-        const sp = pieceSpot(g, "scarf", 0);
-        puff("spark", sp.x, sp.y, 6, SCARVES[D.scarf].hex);
-      }
-    } else if (k === "hat") {
-      const first = D.hat < 0;
-      D.hat = first ? 0 : (D.hat + 1) % HATS.length;
-      // A different hat drops on from above.
-      fly("hat", 0, first ? from : { x: g.hx, y: g.hy - g.hr * 3.4 });
-      const sp = pieceSpot(g, "hat", 0);
-      later(0.5, () => tag(HATS[D.hat].name, sp.x + g.hr * 1.4, sp.y - g.hr * 0.2));
+    if (anyOn(k) && d.opt !== opt) {
+      // A different choice: the old one goes back in the box and the new one goes on in its place.
+      d.on.forEach((v, j) => { if (v) sendToBox(k, K.slots ? j : -1, d.opt, 0, 0, 0.12); });
+      d.opt = opt;
+      d.on.forEach((v, j) => { if (v) fly(k, K.slots ? j : -1, from); });
+      tagSoon(k, opt);
+    } else if (K.slots) {
+      const j = d.on.indexOf(false);
+      if (j < 0) { fullNote(k, btn); return false; }
+      d.opt = opt; d.on[j] = true;
+      fly(k, j, from);
     } else {
-      if (D[k] >= K.max) {
-        if (b) Toybox.wiggle(b);
-        const sp = pieceSpot(g, k, K.max - 1);
-        tag(K.full, sp.x, sp.y - sp.r - 6);
-        return false;
-      }
-      if (K.face) { fly(k, D[k], from); D[k] += 1; }
-      else { const n0 = D[k]; for (let j = n0; j < K.max; j++) fly(k, j, from, (j - n0) * 0.14); D[k] = K.max; }
+      if (d.on[0]) { fullNote(k, btn); return false; }
+      d.opt = opt; d.on[0] = true;
+      fly(k, -1, from);
+      if (k === "mittens" && !S.D.arms.on[0]) { S.D.arms.on[0] = true; fly("arms", -1, from); }
+      if (many(k)) tagSoon(k, opt);
     }
     updateTiles();
     saveSoon();
     checkDone();
     return true;
   }
+  function fullNote(k, btn) {
+    if (btn) Toybox.wiggle(btn);
+    const g = geom(S), a = anchorOf(g, k, KIND[k].slots ? KIND[k].slots - 1 : 0);
+    tag(KIND[k].opts[S.D[k].opt].tag, a.x, a.y - 14);
+  }
+  function tagSoon(k, opt) {
+    later(0.55, () => { if (S.step !== "dress") return; const a = anchorOf(geom(S), k, 0); tag(KIND[k].opts[opt].tag, a.x, a.y - 16); });
+  }
+  // A piece flying to its place from a point (dx, dy from its place); j is -1 for a whole piece.
   function fly(k, j, from, delay) {
-    const sp = pieceSpot(geom(S), k, j), f = from || { x: sp.x, y: sp.y - 150 };
+    const a = anchorOf(geom(S), k, Math.max(0, j)), f = from || { x: a.x, y: a.y - 150 };
     flights = flights.filter((q) => !(q.k === k && q.j === j));
-    flights.push({ k, j, fx: f.x, fy: f.y, t0: now() + (delay || 0), dur: 0.5, arc: Math.hypot(f.x - sp.x, f.y - sp.y) > 80 ? 1 : 0.3 });
+    flights.push({ k, j, dx: f.x - a.x, dy: f.y - a.y, t0: now() + (delay || 0), dur: 0.5, arc: Math.hypot(f.x - a.x, f.y - a.y) > 80 ? 1 : 0.3 });
   }
   function landFlights(t) {
-    if (!flights.length || S.step !== "dress") { flights = []; return; }
+    if (S.step !== "dress") { flights = []; gone = []; return; }
     flights = flights.filter((f) => {
       if (t < f.t0 + f.dur) return true;
-      const sp = pieceSpot(geom(S), f.k, f.j), face = KIND[f.k].face;
-      puff("spark", sp.x, sp.y, face ? 3 : 6);
+      const a = anchorOf(geom(S), f.k, Math.max(0, f.j)), face = KIND[f.k].face;
+      puff("spark", a.x, a.y, face ? 3 : 6);
       if (!face) pwob[f.k] = 0.7;
       return false;
     });
+    gone = gone.filter((q) => {
+      if (t < q.t0 + q.dur) return true;
+      boxBounce = 1;
+      const bx = boxGeo();
+      puff("snow", bx.x, bx.gy - bx.h, 4);
+      return false;
+    });
+  }
+  // Takes a piece (or one eye, one smile stone) off: it goes back into the box from where he let go of it.
+  function takeOff(k, j, dx, dy) {
+    const d = S.D[k];
+    if (KIND[k].slots) d.on[j] = false; else d.on[0] = false;
+    sendToBox(k, KIND[k].slots ? j : -1, d.opt, dx, dy, 0);
+    if (k === "arms" && S.D.mittens.on[0]) { S.D.mittens.on[0] = false; sendToBox("mittens", -1, S.D.mittens.opt, dx, dy, 0); }
+    updateTiles();
+    saveSoon();
+  }
+  function sendToBox(k, j, opt, dx, dy, delay) {
+    const g = geom(S), a = anchorOf(g, k, Math.max(0, j)), bx = boxGeo();
+    gone.push({ k, j, opt, g, a, dx, dy, tx: bx.x - a.x, ty: bx.gy - bx.h - 6 - a.y, t0: now() + (delay || 0), dur: 0.5 });
   }
   // A real completion: some pieces on (and again when he has put everything on).
   function checkDone() {
-    const kinds = KINDS.filter((k) => count(k.id) > 0).length;
+    const kinds = KINDS.filter((k) => anyOn(k.id)).length;
     if (!S.k1 && kinds >= 3) { S.k1 = true; later(1.2, () => Toybox.kind()); }
     if (!S.all && allOn()) {
       S.all = true;
       later(0.8, () => {
+        if (S.step !== "dress") return;
         const g = geom(S);
         for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; puff("spark", g.mx + Math.cos(a) * 110, g.my + Math.sin(a) * 90 - 40, 2); }
         coach.say("The snowman is all dressed.", 4);
@@ -857,12 +920,78 @@
   }
 
   // =====================================================================================================
+  // Drawing the box
+  // =====================================================================================================
+  // An open cardboard box of snowman things. What is not on the snowman peeks out of it. While he carries a piece
+  // off the snowman its flaps open wider, and over it the box glows.
+  let boxBounce = 0, boxWob = 0, boxOpen = 0;
+  function overBox(w) { const b = boxGeo(); return w.x > b.x - b.w / 2 - 34 && w.x < b.x + b.w / 2 + 44 && w.y > b.gy - b.h - b.d - 60 && w.y < b.gy + 14; }
+  function drawBox(t) {
+    const b = boxGeo(), x0 = b.x - b.w / 2, x1 = b.x + b.w / 2, top = b.gy - b.h, d = b.d;
+    const carrying = drag && drag.k === "piece", hover = carrying && overBox({ x: drag.x, y: drag.y });
+    ell(b.x + 6, b.gy - 3, b.w * 0.62, 10); ctx.fillStyle = "rgba(90, 120, 170, 0.22)"; ctx.fill();
+    ctx.save();
+    const sq = Math.sin(boxBounce * Math.PI * 3) * boxBounce * 0.06 + Math.sin(boxWob * 20) * boxWob * 0.03;
+    ctx.translate(b.x, b.gy); ctx.scale(1 + sq, 1 - sq); ctx.translate(-b.x, -b.gy);
+    if (hover) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+      ctx.globalAlpha = 0.45 + pulse * 0.25;
+      ctx.beginPath(); ctx.ellipse(b.x + 5, top - d / 2, b.w * 0.75, b.h * 0.95, 0, 0, TAU); ctx.fillStyle = "#FFE7A0"; ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // Inside (the dark back of the open top).
+    ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(x0 + 10, top - d); ctx.lineTo(x1 + 10, top - d); ctx.lineTo(x1, top); ctx.closePath();
+    fillStroke("#8A5A36", 2);
+    drawBoxThings(b, top, t);
+    // The flaps stand open; wider while a piece is carried, widest over the box.
+    const th = lerp(0.42, 1.15, boxOpen), fl = 30;
+    const flap = (hx, sgn) => {
+      const vx = sgn * Math.sin(th) * fl, vy = -Math.cos(th) * fl;
+      ctx.beginPath(); ctx.moveTo(hx, top); ctx.lineTo(hx + 10, top - d); ctx.lineTo(hx + 10 + vx, top - d + vy); ctx.lineTo(hx + vx, top + vy); ctx.closePath();
+      fillStroke("#E2B07A", 2);
+    };
+    flap(x0, -1); flap(x1, 1);
+    // Right side and front.
+    ctx.beginPath(); ctx.moveTo(x1, top); ctx.lineTo(x1 + 10, top - d); ctx.lineTo(x1 + 10, b.gy - d); ctx.lineTo(x1, b.gy); ctx.closePath();
+    fillStroke("#B97B42", 2);
+    ctx.beginPath(); ctx.rect(x0, top, b.w, b.h); fillStroke("#D9A066");
+    ctx.fillStyle = "#E9C08E"; ctx.fillRect(b.x - 9, top + 1.5, 18, b.h - 3);
+    ctx.strokeStyle = "rgba(29, 35, 64, 0.25)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0 + 8, top + 14); ctx.lineTo(x1 - 8, top + 14); ctx.stroke();
+    // A scarf off the snowman hangs over the front edge.
+    if (S.step !== "dress" || !S.D.scarf.on[0]) {
+      const o = KIND.scarf.opts[S.D.scarf.opt];
+      rr(x1 - 30, top - 6, 15, 34, 4); fillStroke(o.hex, 1.8);
+      if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(x1 - 29, top + 10, 13, 4); ctx.fillRect(x1 - 29, top + 18, 13, 4); }
+    }
+    if (hover) {
+      rr(x0 - 8, top - d - 8, b.w + 26, b.h + d + 14, 12);
+      ctx.strokeStyle = INK; ctx.lineWidth = 7; ctx.stroke(); ctx.strokeStyle = "#FFC93C"; ctx.lineWidth = 4; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // The snowman things waiting in the box (only what is not on the snowman).
+  function drawBoxThings(b, top) {
+    const D = S.D, off = (k) => S.step !== "dress" || !full(k);
+    if (off("arms")) {
+      drawStick({ sx: b.x - 34, sy: top + 4, ex: b.x - 46, ey: top - 34, a: -1.82, L: 39, s: -1 }, false);
+      drawStick({ sx: b.x - 22, sy: top + 4, ex: b.x - 10, ey: top - 32, a: -1.2, L: 37, s: 1 }, false);
+    }
+    if (off("hat")) {
+      ctx.save(); ctx.translate(b.x + 26, top + 2); ctx.rotate(0.35);
+      drawHatKind(D.hat.opt, { hx: 0, hy: 12, hr: 19 }, 0);
+      ctx.restore();
+    }
+    if (off("nose")) drawCarrot(b.x - 4, top - 2, 30, 10, -0.75);
+    if (off("eyes") || off("smile")) { drawCoal(b.x - 16, top - 3, 5.5, 3); drawCoal(b.x + 2, top - 1, 5, 8); drawCoal(b.x - 7, top - 7, 4.5, 5); }
+  }
+
+  // =====================================================================================================
   // Drawing the snowballs and the snowman
   // =====================================================================================================
-  // Bits on a snowball's surface (packed-snow shading, little bumps, bits of grass), spread evenly round it.
+  // Soft shading and little bumps of packed snow on a snowball's surface, spread evenly round it (it stays clean).
   const SPECKS = Array.from({ length: 34 }, (_, i) => {
     const y = 1 - (i + 0.5) / 34 * 2, rad = Math.sqrt(1 - y * y), th = i * 2.39996;
-    return { p: [Math.cos(th) * rad, y, Math.sin(th) * rad], k: i % 7 === 3 ? 2 : (i % 3 === 0 ? 1 : 0), s: 0.6 + hash(i, 1) * 0.8, a: hash(i, 2) * TAU };
+    return { p: [Math.cos(th) * rad, y, Math.sin(th) * rad], k: i % 3 === 0 ? 1 : 0, s: 0.6 + hash(i, 1) * 0.8 };
   });
   const TILT = 0.38, CT = Math.cos(TILT), ST = Math.sin(TILT);
   function drawBallBody(x, y, r, M) {
@@ -878,9 +1007,8 @@
       if (v < 0.08) continue;
       const sx = x + qx * r * 0.96, sy = y - (qy * CT - qz * ST) * r * 0.96;
       ctx.globalAlpha = base * Math.min(1, v * 2.5);
-      if (sp.k === 0) { ell(sx, sy, r * 0.05 * sp.s + 0.6, (r * 0.05 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#B3C7E3"; ctx.fill(); }
-      else if (sp.k === 1) { ell(sx, sy, r * 0.1 * sp.s + 0.8, (r * 0.08 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#C3D3EA"; ctx.stroke(); }
-      else { const l = r * 0.07 + 1.5; ctx.beginPath(); ctx.moveTo(sx - Math.cos(sp.a) * l, sy - Math.sin(sp.a) * l); ctx.lineTo(sx + Math.cos(sp.a) * l, sy + Math.sin(sp.a) * l); ctx.lineWidth = 1.8; ctx.strokeStyle = "#7FA650"; ctx.stroke(); }
+      if (sp.k === 0) { const q = r * 0.05 * sp.s + 0.6; ell(sx, sy, q, q * (0.5 + 0.5 * v)); ctx.fillStyle = "#C3D3EA"; ctx.fill(); }
+      else { ell(sx, sy, r * 0.1 * sp.s + 0.8, (r * 0.08 * sp.s + 0.6) * (0.5 + 0.5 * v)); ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = "#C3D3EA"; ctx.stroke(); }
     }
     ctx.restore();
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
@@ -903,15 +1031,34 @@
     ell(b.lx, gy, b.r * 0.7, b.r * 0.18); ctx.fillStyle = "rgba(90, 120, 170, 0.16)"; ctx.fill();
     drawBallBody(b.lx, b.ly, b.r, b.M);
   }
-  // Draws piece (k, j) at its place, or on its way there while it flies on.
-  function withFlight(B, k, j, sp, t, fn) {
-    const f = B === S ? flights.find((q) => q.k === k && q.j === j) : null;
-    if (!f) { fn(); return; }
+  // The offset of piece (k, j) while it flies to its place: null when it is in place, "wait" before it starts.
+  function flightOff(k, j, t) {
+    const f = flights.find((q) => q.k === k && q.j === j);
+    if (!f) return null;
     const p = (t - f.t0) / f.dur;
-    if (p < 0) return;
-    const e = ease(Math.min(1, p)), dx = (f.fx - sp.x) * (1 - e), dy = (f.fy - sp.y) * (1 - e) - Math.sin(Math.min(1, p) * Math.PI) * 50 * f.arc;
-    ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore();
+    if (p < 0) return "wait";
+    const e = ease(Math.min(1, p));
+    return { x: f.dx * (1 - e), y: f.dy * (1 - e) - Math.sin(Math.min(1, p) * Math.PI) * 50 * f.arc };
   }
+  // Draws the bits of piece k with choice opt: all of them, or just bit j (one eye, one smile stone).
+  function drawPiece(g, k, opt, j, t, o) {
+    const w = o.w || 0, arms = (wob) => [0, 1].map((q) => armAt(g, q, wob + (o.wind || 0) * Math.sin(t * 7 + q) * 0.04));
+    const each = (n, fn) => { for (let q = 0; q < n; q++) if (j < 0 || j === q) fn(q); };
+    const O = KIND[k].opts[opt];
+    switch (k) {
+      case "eyes": each(2, (q) => { const sp = pieceSpot(g, "eyes", q); if (O.id === "coal") drawCoal(sp.x, sp.y, sp.r, q * 2 + 1); else drawButtonEye(sp.x, sp.y, sp.r * 1.05); }); break;
+      case "nose": { const sp = pieceSpot(g, "nose", 0); drawCarrot(sp.x, sp.y, g.hr * 0.82, g.hr * 0.27, 0.2); break; }
+      case "smile": each(5, (q) => { const sp = pieceSpot(g, "smile", q); drawCoal(sp.x, sp.y, sp.r, q + 7); }); break;
+      case "buttons": each(3, (q) => { const sp = pieceSpot(g, "buttons", q), r = sp.r * (1 + Math.sin(t * 18) * w * 0.25); if (O.id === "coal") drawCoal(sp.x, sp.y, r * 0.95, q + 11); else drawButton(sp.x, sp.y, r, O); }); break;
+      case "arms": arms(Math.sin(t * 16) * w * 0.18).forEach((am) => drawStick(am, o.mitts)); break;
+      case "mittens": arms(Math.sin(t * 16) * (o.aw || 0) * 0.18).forEach((am) => drawMitten(am, O, w, t)); break;
+      case "scarf": drawScarf(g, O, t, Math.max(w, o.wind || 0)); break;
+      case "hat": drawHatKind(opt, g, Math.abs(Math.sin(t * 9)) * w * 12); break;
+    }
+  }
+  // The snowman: the big snowball, the stacked ones, and the pieces he put on (each where it belongs, flying on,
+  // or left out while he carries it).
+  const ORDER_BACK = ["arms"], ORDER_MID = ["buttons"], ORDER_FRONT = ["scarf", "mittens", "eyes", "nose", "smile", "hat"];
   function drawSnowman(B, t) {
     const b0 = B.balls[0];
     if (!b0) return;
@@ -922,26 +1069,52 @@
     drawGroundBall(b0);
     const st1 = B.balls[1] && B.balls[1].stacked, st2 = st1 && B.balls[2] && B.balls[2].stacked;
     const g = st2 ? geom(B) : null;
-    const wob = (k) => (live ? (pwob[k] || 0) : 0);
-    const arms = [];
-    if (g) for (let j = 0; j < D.arms; j++) arms.push(armAt(g, j, Math.sin(t * 16) * wob("arms") * 0.18 + (live ? windNow(t) * Math.sin(t * 7 + j) * 0.04 : 0)));
-    if (g) arms.forEach((am, j) => withFlight(B, "arms", j, pieceSpot(g, "arms", j), t, () => drawStick(am, j < D.mittens)));
+    const pieces = (list) => {
+      if (!g) return;
+      list.forEach((k) => {
+        const d = D[k], n = KIND[k].slots || 0;
+        const o = { w: live ? (pwob[k] || 0) : 0, aw: live ? (pwob.arms || 0) : 0, wind: live ? windNow(t) : 0, mitts: D.mittens.on[0] };
+        const one = (j) => {
+          if (live && drag && drag.k === "piece" && drag.kind === k && drag.j === j) return;
+          if (live && k === "mittens" && drag && drag.k === "piece" && drag.kind === "arms") return;
+          let f = live ? flightOff(k, j, t) : null;
+          if (live && k === "mittens" && !f) f = flightOff("arms", -1, t);
+          if (f === "wait") return;
+          if (f) { ctx.save(); ctx.translate(f.x, f.y); drawPiece(g, k, d.opt, j, t, o); ctx.restore(); }
+          else drawPiece(g, k, d.opt, j, t, o);
+        };
+        if (n) d.on.forEach((v, j) => { if (v) one(j); });
+        else if (d.on[0]) one(-1);
+      });
+    };
+    pieces(ORDER_BACK);
     if (st1) { const c = stackAt(B, 1); drawBallBody(c.x, c.y, B.balls[1].r, B.balls[1].M); }
-    if (g) for (let j = 0; j < D.buttons; j++) { const sp = pieceSpot(g, "buttons", j); withFlight(B, "buttons", j, sp, t, () => drawButton(sp.x, sp.y, sp.r * (1 + Math.sin(t * 18) * wob("buttons") * 0.25))); }
+    pieces(ORDER_MID);
     if (st2) { const c = stackAt(B, 2); drawBallBody(c.x, c.y, B.balls[2].r, B.balls[2].M); }
-    if (g) {
-      if (D.scarf >= 0) withFlight(B, "scarf", 0, pieceSpot(g, "scarf", 0), t, () => drawScarf(g, D.scarf, t, live ? Math.max(wob("scarf"), windNow(t)) : 0));
-      arms.forEach((am, j) => { if (j < D.mittens) withFlight(B, "mittens", j, pieceSpot(g, "mittens", j), t, () => drawMitten(am, D.scarf, wob("mittens"), t)); });
-      // The face: only the pieces he put on, each where he put it; it never moves by itself.
-      for (let j = 0; j < D.eyes; j++) { const sp = pieceSpot(g, "eyes", j); withFlight(B, "eyes", j, sp, t, () => drawCoal(sp.x, sp.y, sp.r, j * 2 + 1)); }
-      if (D.nose) { const sp = pieceSpot(g, "nose", 0); withFlight(B, "nose", 0, sp, t, () => drawCarrot(sp.x, sp.y, g.hr * 0.82, g.hr * 0.27, 0.2)); }
-      for (let j = 0; j < D.smile; j++) { const sp = pieceSpot(g, "smile", j); withFlight(B, "smile", j, sp, t, () => drawCoal(sp.x, sp.y, sp.r, j + 7)); }
-      if (D.hat >= 0) {
-        const hop = Math.abs(Math.sin(t * 9)) * wob("hat") * 12;
-        withFlight(B, "hat", 0, pieceSpot(g, "hat", 0), t, () => (D.hat === 0 ? drawTopHat(g, hop) : drawKnitHat(g, D.scarf, hop)));
-      }
-    }
+    // The face: only the pieces he put on, each where he put it; it never moves by itself.
+    pieces(ORDER_FRONT);
     ctx.restore();
+  }
+  // The piece in his hand, and pieces on their way back into the box (drawn over everything).
+  function drawCarried(t) {
+    if (S.step !== "dress") return;
+    if (drag && drag.k === "piece") {
+      const g = geom(S), k = drag.kind, d = S.D[k];
+      ctx.save(); ctx.translate(drag.x - drag.gx, drag.y - drag.gy);
+      if (k === "arms") drawPiece(g, "arms", d.opt, -1, t, { mitts: S.D.mittens.on[0] });
+      if (k === "arms" && S.D.mittens.on[0]) drawPiece(g, "mittens", S.D.mittens.opt, -1, t, {});
+      if (k !== "arms") drawPiece(g, k, d.opt, drag.j, t, { mitts: S.D.mittens.on[0] });
+      ctx.restore();
+    }
+    gone.forEach((q) => {
+      const p = (t - q.t0) / q.dur;
+      if (p < 0) return;
+      const e = ease(Math.min(1, p)), dx = lerp(q.dx, q.tx, e), dy = lerp(q.dy, q.ty, e) - Math.sin(Math.min(1, p) * Math.PI) * 40, s = lerp(1, 0.35, e);
+      ctx.save(); ctx.globalAlpha = 1 - Math.max(0, (p - 0.8) / 0.2);
+      ctx.translate(q.a.x + dx, q.a.y + dy); ctx.scale(s, s); ctx.translate(-q.a.x, -q.a.y);
+      drawPiece(q.g, q.k, q.opt, q.j, t, { mitts: false });
+      ctx.restore();
+    });
   }
   function drawCoal(x, y, r, seed) {
     ctx.beginPath();
@@ -953,6 +1126,12 @@
     fillStroke("#2B2F3A", 1.6);
     ell(x - r * 0.25, y - r * 0.3, r * 0.34, r * 0.18, -0.5); ctx.fillStyle = "#4E5568"; ctx.fill();
   }
+  function drawButtonEye(x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke("#2E3A5C", 1.6);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.66, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = "#5A6A92"; ctx.stroke();
+    ctx.fillStyle = "#8A97B8";
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(x + a * r * 0.24, y + b * r * 0.24, r * 0.12, 0, TAU); ctx.fill(); });
+  }
   function drawCarrot(x, y, len, wd, ang) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
     ctx.beginPath(); ctx.moveTo(0, -wd / 2);
@@ -963,9 +1142,9 @@
     [0.28, 0.5, 0.72].forEach((f) => { const hw = (1 - f) * wd * 0.42; ctx.beginPath(); ctx.moveTo(len * f, -hw); ctx.lineTo(len * f + 2, -hw * 0.2); ctx.stroke(); });
     ctx.restore();
   }
-  function drawButton(x, y, r) {
-    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke("#E8303F", 1.8);
-    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = "#B81F2E"; ctx.stroke();
+  function drawButton(x, y, r, O) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); fillStroke(O.hex, 1.8);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, TAU); ctx.lineWidth = 1; ctx.strokeStyle = O.dark; ctx.stroke();
     ctx.fillStyle = INK;
     ctx.beginPath(); ctx.arc(x - r * 0.28, y, r * 0.14, 0, TAU); ctx.arc(x + r * 0.28, y, r * 0.14, 0, TAU); ctx.fill();
   }
@@ -978,47 +1157,58 @@
     segs.forEach(([x0, y0, x1, y1, w]) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineWidth = w; ctx.strokeStyle = "#8A5A36"; ctx.stroke(); });
     ctx.lineCap = "butt";
   }
-  function drawMitten(am, scarf, w, t) {
-    const sc = SCARVES[scarf >= 0 ? scarf : 0];
+  function drawMitten(am, O, w, t) {
     ctx.save(); ctx.translate(am.ex, am.ey); ctx.rotate(am.a + Math.sin(t * 16) * w * 0.15);
     if (am.s < 0) ctx.scale(1, -1);
-    ell(8, -9, 4.5, 6.5, -0.5); fillStroke(sc.hex, 1.8);
-    ell(13, 0, 11, 9.5); fillStroke(sc.hex, 1.8);
+    ell(8, -9, 4.5, 6.5, -0.5); fillStroke(O.hex, 1.8);
+    ell(13, 0, 11, 9.5); fillStroke(O.hex, 1.8);
     rr(-6, -8.5, 9, 17, 3); fillStroke("#FFFFFF", 1.8);
     ctx.restore();
   }
-  function drawScarf(g, col, t, flutter) {
-    const sc = SCARVES[col], x = g.mx, y = g.neck, nw = g.hr * 1.0, bh = g.hr * 0.38;
+  function drawScarf(g, O, t, flutter) {
+    const x = g.mx, y = g.neck, nw = g.hr * 1.0, bh = g.hr * 0.38;
     // The tail hangs down the front from the knot; it flutters in the wind.
     const ax = x + nw * 0.42, ay = y + bh * 0.3, len = g.mr * 0.95, tw = g.hr * 0.42;
     const ang = 0.12 + flutter * Math.sin(t * 10) * 0.3 - flutter * 0.25;
-    const bx = ax + Math.sin(-ang) * len * -1, by = ay + Math.cos(ang) * len;
+    const bx = ax + Math.sin(ang) * len, by = ay + Math.cos(ang) * len;
     const sway = flutter * Math.sin(t * 12 + 1) * 6;
     ctx.beginPath(); ctx.moveTo(ax - tw / 2, ay);
     ctx.lineTo(ax + tw / 2, ay); ctx.quadraticCurveTo((ax + bx) / 2 + tw / 2 + sway, (ay + by) / 2, bx + tw / 2, by);
     ctx.lineTo(bx - tw / 2, by); ctx.quadraticCurveTo((ax + bx) / 2 - tw / 2 + sway, (ay + by) / 2, ax - tw / 2, ay); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex, 2); ctx.clip();
-    ctx.fillStyle = sc.stripe;
-    [0.45, 0.7].forEach((f) => { const sx = lerp(ax, bx, f) + sway * Math.sin(f * Math.PI), sy = lerp(ay, by, f); ctx.fillRect(sx - tw, sy - 3.5, tw * 2, 7); });
+    ctx.save(); fillStroke(O.hex, 2); ctx.clip();
+    if (O.stripe) {
+      ctx.fillStyle = O.stripe;
+      [0.3, 0.55, 0.8].forEach((f) => { const sx = lerp(ax, bx, f) + sway * Math.sin(f * Math.PI), sy = lerp(ay, by, f); ctx.fillRect(sx - tw, sy - 3.5, tw * 2, 7); });
+    } else {
+      ctx.strokeStyle = "rgba(29, 35, 64, 0.18)"; ctx.lineWidth = 1.2;
+      [0.35, 0.6, 0.85].forEach((f) => { const sx = lerp(ax, bx, f), sy = lerp(ay, by, f); ctx.beginPath(); ctx.moveTo(sx - tw, sy); ctx.lineTo(sx + tw, sy); ctx.stroke(); });
+    }
     ctx.restore();
-    ctx.strokeStyle = sc.dark; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.strokeStyle = O.dark; ctx.lineWidth = 2; ctx.lineCap = "round";
     for (let k = 0; k < 4; k++) { const fx = bx - tw / 2 + tw * (k + 0.5) / 4; ctx.beginPath(); ctx.moveTo(fx, by + 1); ctx.lineTo(fx + sway * 0.3, by + 7); ctx.stroke(); }
     ctx.lineCap = "butt";
     // The band round the neck.
-    ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5);
-    ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
-    ctx.lineTo(x + nw * 0.96, y + bh * 0.5);
-    ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex, 2); ctx.clip();
-    ctx.fillStyle = sc.stripe;
-    [-0.55, 0, 0.55].forEach((f) => ctx.fillRect(x + f * nw - 3.5, y - bh, 7, bh * 2.2));
+    const band = () => {
+      ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5);
+      ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
+      ctx.lineTo(x + nw * 0.96, y + bh * 0.5);
+      ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
+    };
+    band();
+    ctx.save(); ctx.fillStyle = O.hex; ctx.fill(); ctx.clip();
+    if (O.stripe) { ctx.fillStyle = O.stripe; [-0.55, 0, 0.55].forEach((f) => ctx.fillRect(x + f * nw - 3.5, y - bh, 7, bh * 2.2)); }
     ctx.restore();
-    ctx.beginPath(); ctx.moveTo(x - nw, y - bh * 0.5); ctx.quadraticCurveTo(x, y - bh * 0.5 + bh * 0.6, x + nw, y - bh * 0.5);
-    ctx.lineTo(x + nw * 0.96, y + bh * 0.5); ctx.quadraticCurveTo(x, y + bh * 0.5 + bh * 0.75, x - nw * 0.96, y + bh * 0.5); ctx.closePath();
-    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
-    ell(ax, ay + 1, tw * 0.6, bh * 0.5); fillStroke(sc.dark, 2);
+    band(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.stroke();
+    ell(ax, ay + 1, tw * 0.6, bh * 0.5); fillStroke(O.dark, 2);
   }
-  function hatTop(g, D) { return D.hat === 0 ? g.hy - g.hr * 2.08 : g.hy - g.hr * 1.56; }
+  // The top of each hat (where the robin perches).
+  function hatTop(g, opt) { return g.hy - g.hr * [2.08, 1.56, 1.62, 1.1][opt]; }
+  function drawHatKind(opt, g, hop) {
+    if (opt === 0) drawTopHat(g, hop);
+    else if (opt === 1) drawKnitHat(g, hop);
+    else if (opt === 2) drawSantaHat(g, hop);
+    else drawEarmuffs(g, hop);
+  }
   function drawTopHat(g, hop) {
     const r = g.hr;
     ctx.save(); ctx.translate(g.hx, g.hy - r * 0.8 - hop); ctx.rotate(-0.1);
@@ -1034,19 +1224,33 @@
     [[0.36, -0.24], [0.44, -0.2], [0.4, -0.3]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(r * dx, r * dy, r * 0.06, 0, TAU); fillStroke("#E8303F", 1.2); });
     ctx.restore();
   }
-  function drawKnitHat(g, scarf, hop) {
-    const r = g.hr, x = g.hx, y = g.hy - hop, sc = SCARVES[scarf >= 0 ? scarf : 0];
-    ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4);
-    ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4); ctx.closePath();
-    ctx.save(); fillStroke(sc.hex); ctx.clip();
-    ctx.fillStyle = sc.stripe; ctx.fillRect(x - r, y - r * 0.92, r * 2, r * 0.14);
+  function drawKnitHat(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    const dome = () => { ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4); ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4); };
+    dome(); ctx.closePath();
+    ctx.save(); fillStroke("#2F8CFF"); ctx.clip();
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(x - r, y - r * 0.92, r * 2, r * 0.14);
     ctx.restore();
-    ctx.beginPath(); ctx.moveTo(x - r * 0.97, y - r * 0.4); ctx.bezierCurveTo(x - r * 0.95, y - r * 1.48, x + r * 0.95, y - r * 1.48, x + r * 0.97, y - r * 0.4);
-    ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
-    rr(x - r * 1.03, y - r * 0.58, r * 2.06, r * 0.3, r * 0.13); fillStroke(sc.dark);
+    dome(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
+    rr(x - r * 1.03, y - r * 0.58, r * 2.06, r * 0.3, r * 0.13); fillStroke("#1F64C0");
     ctx.strokeStyle = "rgba(29, 35, 64, 0.35)"; ctx.lineWidth = 1.2;
     for (let k = -4; k <= 4; k++) { ctx.beginPath(); ctx.moveTo(x + k * r * 0.22, y - r * 0.54); ctx.lineTo(x + k * r * 0.22, y - r * 0.32); ctx.stroke(); }
     ctx.beginPath(); ctx.arc(x, y - r * 1.3, r * 0.26, 0, TAU); fillStroke("#FFFFFF");
+  }
+  function drawSantaHat(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    ctx.beginPath(); ctx.moveTo(x - r * 0.92, y - r * 0.5);
+    ctx.bezierCurveTo(x - r * 0.85, y - r * 1.55, x + r * 0.2, y - r * 1.85, x + r * 1.15, y - r * 1.2);
+    ctx.bezierCurveTo(x + r * 0.7, y - r * 1.25, x + r * 0.85, y - r * 0.85, x + r * 0.92, y - r * 0.5);
+    ctx.closePath(); fillStroke("#E8303F");
+    ctx.beginPath(); ctx.arc(x + r * 1.18, y - r * 1.14, r * 0.24, 0, TAU); fillStroke("#FFFFFF");
+    rr(x - r * 1.04, y - r * 0.7, r * 2.08, r * 0.34, r * 0.17); fillStroke("#FFFFFF");
+  }
+  function drawEarmuffs(g, hop) {
+    const r = g.hr, x = g.hx, y = g.hy - hop;
+    ctx.beginPath(); ctx.arc(x, y - r * 0.02, r * 1.02, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.lineWidth = 8; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 4.5; ctx.strokeStyle = "#8E4FD9"; ctx.stroke();
+    [-1, 1].forEach((s) => { ell(x + s * r * 0.96, y - r * 0.1, r * 0.26, r * 0.32); fillStroke("#FF7FB5"); ell(x + s * r * 0.96, y - r * 0.1, r * 0.13, r * 0.17); ctx.fillStyle = "#FFC2DA"; ctx.fill(); });
   }
 
   // =====================================================================================================
@@ -1060,8 +1264,8 @@
   function perch() {
     if (S.step === "dress") {
       const g = geom(S);
-      if (S.D.hat >= 0) return { x: g.hx + g.hr * 0.1, y: hatTop(g, S.D), hop: 9 };
-      if (S.D.arms >= 2) { const a = armAt(g, 1); return { x: lerp(a.sx, a.ex, 0.72), y: lerp(a.sy, a.ey, 0.72) - 3, hop: 0 }; }
+      if (S.D.hat.on[0]) return { x: g.hx + g.hr * 0.1, y: hatTop(g, S.D.hat.opt), hop: S.D.hat.opt === 3 ? 6 : 9 };
+      if (S.D.arms.on[0]) { const a = armAt(g, 1); return { x: lerp(a.sx, a.ex, 0.72), y: lerp(a.sy, a.ey, 0.72) - 3, hop: 0 }; }
       return { x: g.hx, y: g.hy - g.hr * 0.98, hop: 7 };
     }
     let top = null;
@@ -1220,11 +1424,12 @@
         return { pts: [P(c.x, c.y), P((c.x + T.x) / 2, Math.min(c.y, T.y) - 60), P(T.x, T.y)], dur: 1800, key: "stack" };
       }
       if (w.part === "tiles") {
-        const k = ["hat", "scarf", "arms", "buttons"].find((id) => count(id) === 0);
+        if (optK) return null;
+        const k = ["hat", "scarf", "arms", "buttons"].find((id) => !anyOn(id));
         const btn = k && tiles.button(k);
         if (!btn) return null;
-        const r = btn.getBoundingClientRect(), sp = pieceSpot(geom(S), k, 0);
-        return { pts: [[r.left + r.width / 2, r.top + r.height / 2], P(sp.x, sp.y)], dur: 1800, carry: { html: PIC[k](), size: 56 }, key: "dress" };
+        const r = btn.getBoundingClientRect(), sp = anchorOf(geom(S), k, 0);
+        return { pts: [[r.left + r.width / 2, r.top + r.height / 2], P(sp.x, sp.y)], dur: 1800, carry: { html: OPTPIC(k, S.D[k].opt), size: 56 }, key: "dress" };
       }
       return null;
     }
@@ -1246,14 +1451,15 @@
       const g = geom(S);
       let best = null, bd = Infinity;
       KINDS.forEach((k) => {
-        const n = count(k.id);
-        for (let j = 0; j < n; j++) {
+        for (let j = 0; j < PARTS[k.id]; j++) {
+          if (!isOn(k.id, j)) continue;
           const sp = pieceSpot(g, k.id, j), d = Math.hypot(w.x - sp.x, w.y - sp.y);
           if (d <= sp.r + 10 && d < bd) { bd = d; best = "pc:" + k.id + ":" + j; }
         }
       });
       if (best) return best;
     }
+    { const b = boxGeo(); if (w.x > b.x - b.w / 2 - 6 && w.x < b.x + b.w / 2 + 14 && w.y > b.gy - b.h - b.d - 36 && w.y < b.gy + 6) return "box"; }
     for (let j = 2; j >= 0; j--) {
       const b = S.balls[j];
       if (!b || (j === i && !b.stacked)) continue;
@@ -1297,8 +1503,13 @@
       if (stacking() && j !== i && !busy) hint();
     } else if (part.startsWith("pc:")) {
       const [, k, js] = part.split(":"), sp = pieceSpot(geom(S), k, +js);
-      tag(k === "hat" ? HATS[S.D.hat].name : KIND[k].tag, sp.x, sp.y - sp.r - 4);
+      tag(KIND[k].opts[S.D[k].opt].tag, sp.x, sp.y - sp.r - 4);
       if (!KIND[k].face) pwob[k] = 1;
+    } else if (part === "box") {
+      boxWob = 1;
+      const b = boxGeo();
+      tag("Box", b.x, b.gy - b.h - b.d - 8);
+      if (S.step === "dress" && KINDS.some((k) => anyOn(k.id))) coach.say("Drag a piece into the box to take it off.", 3.5);
     } else if (part.startsWith("tree")) {
       const tr = Y.trees[+part.slice(4)];
       tr.shake = 1;
@@ -1311,6 +1522,17 @@
     else if (part === "sky") { puff("spark", w.x, w.y, 3, "#FFFFFF"); }
   }
   const SLOP = 12;
+  let tookHint = false;
+  // Let go of a piece: into the box (or anywhere away from the snowman) it comes off and goes in the box; back on
+  // the snowman it goes back to its place. A press held still is a tap (its name).
+  function pieceUp(d, still, cancel) {
+    const dx = d.x - d.gx, dy = d.y - d.gy, w = { x: d.x, y: d.y };
+    if (S.step !== "dress") return;
+    if (!still && !cancel && !locked() && (overBox(w) || !onBody(w))) { takeOff(d.kind, d.j, dx, dy); return; }
+    flights = flights.filter((q) => !(q.k === d.kind && q.j === d.j));
+    flights.push({ k: d.kind, j: d.j, dx, dy, t0: now(), dur: still ? 0.15 : 0.3, arc: 0 });
+    if (still) doTap("pc:" + d.kind + ":" + Math.max(0, d.j), 0, 0);
+  }
   const press = Toybox.press(cv, {
     any: true,
     hit: (x, y) => hitPart(x, y),
@@ -1327,6 +1549,12 @@
           if (drag && drag.k === "roll") { drag.lx = w.x; drag.ly = w.y; }
         } else if (stacking() && b.done && !b.stacked) startLift(i, w0);
       }
+      if (part.startsWith("pc:") && S.step === "dress" && !busy) {
+        // A piece on the snowman comes off in his hand (one eye or one smile stone; anything else whole).
+        const [, k, js] = part.split(":");
+        drag = { k: "piece", kind: k, j: KIND[k].slots ? +js : -1, gx: w0.x, gy: w0.y, x: w.x, y: w.y };
+        if (!tookHint) { tookHint = true; coach.say("Drop it in the box to take it off.", 3); const bx = boxGeo(), v = vp(bx.x, bx.gy - bx.h); coach.avoid(v.x, v.y); lastWant = ""; }
+      }
       if (!drag) drag = { k: "hold", part };
       drag.pid = e.pointerId; drag.far = Math.hypot(s.dx, s.dy);
     },
@@ -1339,6 +1567,7 @@
         moveBall(d.i, w.x - d.lx, w.y - d.ly);
         d.lx = w.x; d.ly = w.y;
       } else if (drag.k === "lift") liftMove(w);
+      else if (drag.k === "piece") { drag.x = w.x; drag.y = w.y; }
     },
     up: (part, e, s) => {
       const d = drag;
@@ -1348,6 +1577,7 @@
       if (d.k === "hold") { if (still && !locked() && !s.cancel) doTap(d.part, s.x, s.y); }
       else if (d.k === "roll") { if (still && !locked() && !s.cancel) doTap("ball", s.x, s.y); }
       else if (d.k === "lift") liftUp(d, still && !s.cancel);
+      else if (d.k === "piece") pieceUp(d, still && !s.cancel, s.cancel);
     },
     tap: (part, x, y) => { if (!drag) doTap(part, x, y); }
   });
@@ -1357,7 +1587,7 @@
   // =====================================================================================================
   // A piece can be carried from its tile onto the snowman: it follows his finger and goes on where it belongs
   // when he lets go over the snowman. Let go anywhere else, it floats back to its tile. A tap on a tile (the
-  // tile's own click) puts the piece on.
+  // tile's own click) shows that piece's choices, or puts on a piece that has only one.
   let pdrag = null, skipClickUntil = 0;
   const carryEl = document.createElement("div");
   carryEl.className = "sn-carry";
@@ -1374,22 +1604,36 @@
   function onSnowman(w) {
     if (S.step !== "dress") return false;
     const g = geom(S), b0 = S.balls[0];
-    return w.x > b0.x - b0.r - 70 && w.x < b0.x + b0.r + 70 && w.y > hatTop(g, { hat: 0 }) - 40 && w.y < b0.gy + 20;
+    return w.x > b0.x - b0.r - 70 && w.x < b0.x + b0.r + 70 && w.y > hatTop(g, 0) - 40 && w.y < b0.gy + 20;
+  }
+  // On the snowman itself (one of its snowballs, or just above its head): a piece let go here stays on.
+  function onBody(w) {
+    if (S.step !== "dress") return false;
+    const g = geom(S);
+    if (Math.abs(w.x - g.hx) < g.hr * 1.3 && w.y > hatTop(g, 0) - 20 && w.y < g.hy) return true;
+    return [0, 1, 2].some((i) => { const c = ballC(S, i); return Math.hypot(w.x - c.x, w.y - c.y) < S.balls[i].r + 14; });
+  }
+  // The tile under a press: { k, opt } (a piece tile carries its current choice), or null (Back).
+  function tileWhat(btn) {
+    const k = KINDS.find((q) => tiles.button(q.id) === btn);
+    if (k) return { k: k.id, opt: S.D[k.id].opt };
+    if (optK) for (let i = 0; i < KIND[optK].opts.length; i++) if (otiles.button("o" + i) === btn) return { k: optK, opt: i };
+    return null;
   }
   tilesEl.addEventListener("pointerdown", (e) => {
     const btn = e.target.closest ? e.target.closest(".tb-tile") : null;
     if (!btn || pdrag || locked()) return;
-    const k = KINDS.find((q) => tiles.button(q.id) === btn);
-    if (k) pdrag = { k: k.id, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, btn };
+    const what = tileWhat(btn);
+    if (what) pdrag = { k: what.k, opt: what.opt, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, btn };
   });
   document.addEventListener("pointermove", (e) => {
     if (!pdrag || e.pointerId !== pdrag.pid) return;
     if (!pdrag.on) {
       if (Math.hypot(e.clientX - pdrag.x0, e.clientY - pdrag.y0) < 14) return;
-      if (S.step !== "dress" || locked()) { pdrag.on = "no"; putPiece(pdrag.k, null, pdrag.btn); return; }
+      if (S.step !== "dress" || locked()) { pdrag.on = "no"; putPiece(pdrag.k, pdrag.opt, null, pdrag.btn); return; }
       pdrag.on = true;
       carryEl.classList.remove("back");
-      carryEl.innerHTML = (CARRY[pdrag.k] || PIC[pdrag.k])();
+      carryEl.innerHTML = CARRYPIC(pdrag.k, pdrag.opt);
       carryEl.hidden = false;
       ghost.learned("dress");
     }
@@ -1403,7 +1647,7 @@
     skipClickUntil = performance.now() + 600;
     if (d.on !== true) return;
     const c = carryPt(e), w = wpt(c.x, c.y);
-    if (!cancel && !locked() && onSnowman(w) && putPiece(d.k, w, d.btn)) { carryEl.hidden = true; return; }
+    if (!cancel && !locked() && onSnowman(w) && putPiece(d.k, d.opt, w, d.btn)) { carryEl.hidden = true; return; }
     // Back to its tile.
     const r = d.btn.getBoundingClientRect();
     carryEl.classList.add("back");
@@ -1414,21 +1658,25 @@
   document.addEventListener("pointerup", (e) => pEnd(e, false));
   document.addEventListener("pointercancel", (e) => pEnd(e, true));
   // While a piece is carried over the snowman, a soft ring shows where it will go.
-  function nextSpot(k) {
+  function nextSpot(k, opt) {
     const g = geom(S);
-    if (k === "scarf" || k === "hat") return pieceSpot(g, k, 0);
-    if (k === "mittens" && S.D.arms < 2) return null;
-    if (isFull(k)) return null;
-    return pieceSpot(g, k, S.D[k]);
+    if (KIND[k].slots) {
+      if (anyOn(k) && S.D[k].opt !== opt) return anchorOf(g, k, S.D[k].on.indexOf(true));
+      const j = S.D[k].on.indexOf(false);
+      return j < 0 ? null : pieceSpot(g, k, j);
+    }
+    if (S.D[k].on[0] && S.D[k].opt === opt) return null;
+    const a = anchorOf(g, k, 0), sp = pieceSpot(g, k, 0);
+    return { x: a.x, y: a.y, r: sp.r };
   }
   function drawCarryTarget(t) {
     if (!pdrag || pdrag.on !== true || S.step !== "dress" || pdrag.cx == null) return;
     const w = wpt(pdrag.cx, pdrag.cy - carrySize() * 0.45);
     if (!onSnowman(w)) return;
-    const sp = nextSpot(pdrag.k);
+    const sp = nextSpot(pdrag.k, pdrag.opt);
     if (!sp) return;
     const pulse = 0.5 + 0.5 * Math.sin(t * 6);
-    ctx.beginPath(); ctx.arc(sp.x, sp.y, Math.max(10, sp.r * 1.2) + pulse * 3, 0, TAU);
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, clamp(sp.r * 1.2, 10, 50) + pulse * 3, 0, TAU);
     ctx.fillStyle = "rgba(255, 201, 60, 0.3)"; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
   }
@@ -1436,71 +1684,130 @@
   // =====================================================================================================
   // Panel, New and Surprise
   // =====================================================================================================
+  // The pieces' pictures: each choice on its own, and for a piece with choices a tile picture showing a few of them.
   const S2 = 'stroke="#1D2340" stroke-width="2" stroke-linejoin="round"';
-  const mittenPic = (x, y, rot, col, flip) =>
+  const svg = (inner) => `<svg viewBox="0 0 50 50">${inner}</svg>`;
+  const lump = (x, y, sc) => `<path transform="translate(${x} ${y}) scale(${sc || 1})" d="M-8 1l5-6h7l4 6-3 7h-8z" fill="#2B2F3A" ${S2}/>`;
+  const btnEye = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#2E3A5C" ${S2}/><g fill="#8A97B8"><circle cx="${x - r * 0.28}" cy="${y - r * 0.28}" r="1.3"/><circle cx="${x + r * 0.28}" cy="${y - r * 0.28}" r="1.3"/><circle cx="${x - r * 0.28}" cy="${y + r * 0.28}" r="1.3"/><circle cx="${x + r * 0.28}" cy="${y + r * 0.28}" r="1.3"/></g>`;
+  const button = (x, y, o) => `<circle cx="${x}" cy="${y}" r="6.5" fill="${o.hex}" ${S2}/><g fill="#1D2340"><circle cx="${x - 2}" cy="${y}" r="1.3"/><circle cx="${x + 2}" cy="${y}" r="1.3"/></g>`;
+  const mitten = (x, y, rot, col, flip) =>
     `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${flip ? -1 : 1} 1)"><ellipse cx="-7" cy="-2" rx="3.6" ry="5.5" transform="rotate(-25 -7 -2)" fill="${col}" ${S2}/>` +
     `<path d="M-6 7v-10a6 6 0 0 1 12 0v10z" fill="${col}" ${S2}/><rect x="-7" y="6" width="14" height="6" rx="2" fill="#FFFFFF" ${S2}/></g>`;
-  const curScarf = () => SCARVES[S && S.D.scarf >= 0 ? S.D.scarf : 0];
-  const nextScarf = () => SCARVES[S && S.D.scarf >= 0 ? (S.D.scarf + 1) % SCARVES.length : 0];
-  const PIC = {
-    eyes: () => `<svg viewBox="0 0 50 50"><g fill="#2B2F3A" ${S2}><path d="M7 22l5-6h7l4 6-3 7h-8z"/><path d="M27 21l6-5 7 2 2 7-5 5-8-2z"/></g><g fill="#596075"><ellipse cx="12.5" cy="20" rx="2.6" ry="1.4"/><ellipse cx="32.5" cy="19.5" rx="2.6" ry="1.4"/></g></svg>`,
-    nose: () => `<svg viewBox="0 0 50 50"><path d="M7 20c3-3 7-4 10-3l26 7c2 1 2 3 0 3L17 34c-3 1-7 0-10-3-3-3-3-8 0-11z" fill="#FF8A1F" ${S2}/><path d="M18 21v3M25 23v3M32 25v2" stroke="#C9631A" stroke-width="2" stroke-linecap="round"/></svg>`,
-    smile: () => `<svg viewBox="0 0 50 50"><g fill="#2B2F3A" ${S2}><circle cx="8" cy="19" r="4"/><circle cx="15" cy="28" r="4"/><circle cx="25" cy="32" r="4"/><circle cx="35" cy="28" r="4"/><circle cx="42" cy="19" r="4"/></g></svg>`,
-    buttons: () => `<svg viewBox="0 0 50 50"><g fill="#E8303F" ${S2}><circle cx="25" cy="10" r="6.5"/><circle cx="25" cy="25" r="6.5"/><circle cx="25" cy="40" r="6.5"/></g><g fill="#1D2340"><circle cx="23" cy="10" r="1.3"/><circle cx="27" cy="10" r="1.3"/><circle cx="23" cy="25" r="1.3"/><circle cx="27" cy="25" r="1.3"/><circle cx="23" cy="40" r="1.3"/><circle cx="27" cy="40" r="1.3"/></g></svg>`,
-    arms: () => {
-      const d = "M21 34L6 15M11 21l-1-9M6 15l-4 0M29 34l15-19M39 21l1-9M44 15l4 0";
-      return `<svg viewBox="0 0 50 50"><path d="${d}" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#8A5A36" stroke-width="3.2" stroke-linecap="round"/></svg>`;
-    },
-    mittens: () => `<svg viewBox="0 0 50 50">${mittenPic(15, 24, -12, curScarf().hex, false)}${mittenPic(35, 24, 12, curScarf().hex, true)}</svg>`,
-    scarf: () => {
-      const s = nextScarf();
-      return `<svg viewBox="0 0 50 50"><path d="M29 22h9l2 20-10 1z" fill="${s.hex}" ${S2}/><path d="M31 30h8M31.5 36h8" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="${s.hex}" ${S2}/><path d="M16 16v9M25 17v9M34 16v9" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="none" ${S2}/><path d="M32 44v3M35 44v3M38 43v3" stroke="${s.dark}" stroke-width="2" stroke-linecap="round"/></svg>`;
-    },
-    hat: () => {
-      const next = S && S.D.hat >= 0 ? (S.D.hat + 1) % HATS.length : 0;
-      if (next === 0) {
-        return `<svg viewBox="0 0 50 50"><ellipse cx="25" cy="39" rx="21" ry="5" fill="#2B2F3A" ${S2}/><path d="M13 39V11h24v28c-8 2-16 2-24 0z" fill="#2B2F3A" ${S2}/>` +
-          `<path d="M13 29h24v6H13z" fill="#E8303F" ${S2}/><ellipse cx="25" cy="11" rx="12" ry="3" fill="#3A4050" ${S2}/></svg>`;
-      }
-      const s = curScarf();
-      return `<svg viewBox="0 0 50 50"><path d="M9 35C9 10 41 10 41 35z" fill="${s.hex}" ${S2}/><path d="M11 24h28" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<rect x="7" y="32" width="36" height="9" rx="4" fill="${s.dark}" ${S2}/><circle cx="25" cy="10" r="6" fill="#FFFFFF" ${S2}/></svg>`;
+  const scarf = (fill, tail, stripe) =>
+    `<path d="M29 22h9l2 20-10 1z" fill="${tail}" ${S2}/>` + (stripe ? `<path d="M31 30h8M31.5 36h8" stroke="${stripe}" stroke-width="3"/>` : "") +
+    `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="${fill}" ${S2}/>` + (stripe ? `<path d="M16 16v9M25 17v9M34 16v9" stroke="${stripe}" stroke-width="3"/><path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="none" ${S2}/>` : "");
+  const HATPIC = [
+    `<ellipse cx="25" cy="39" rx="21" ry="5" fill="#2B2F3A" ${S2}/><path d="M13 39V11h24v28c-8 2-16 2-24 0z" fill="#2B2F3A" ${S2}/><path d="M13 29h24v6H13z" fill="#E8303F" ${S2}/><ellipse cx="25" cy="11" rx="12" ry="3" fill="#3A4050" ${S2}/>`,
+    `<path d="M9 35C9 10 41 10 41 35z" fill="#2F8CFF" ${S2}/><path d="M11 24h28" stroke="#FFFFFF" stroke-width="3"/><rect x="7" y="32" width="36" height="9" rx="4" fill="#1F64C0" ${S2}/><circle cx="25" cy="10" r="6" fill="#FFFFFF" ${S2}/>`,
+    `<path d="M8 34C8 16 22 8 42 18c-8 0-10 6-8 16z" fill="#E8303F" ${S2}/><circle cx="42" cy="19" r="5" fill="#FFFFFF" ${S2}/><rect x="6" y="32" width="34" height="9" rx="4.5" fill="#FFFFFF" ${S2}/>`,
+    `<path d="M11 32a14 14 0 0 1 28 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M11 32a14 14 0 0 1 28 0" fill="none" stroke="#8E4FD9" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="11" cy="33" rx="7" ry="9" fill="#FF7FB5" ${S2}/><ellipse cx="39" cy="33" rx="7" ry="9" fill="#FF7FB5" ${S2}/>`
+  ];
+  const ARMS = (() => { const d = "M21 34L6 15M11 21l-1-9M6 15l-4 0M29 34l15-19M39 21l1-9M44 15l4 0"; return `<path d="${d}" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#8A5A36" stroke-width="3.2" stroke-linecap="round"/>`; })();
+  function OPTPIC(k, i) {
+    const o = KIND[k].opts[i];
+    switch (k) {
+      case "eyes": return svg(i === 0 ? lump(15, 23) + lump(35, 22) : btnEye(15, 24, 7.5) + btnEye(35, 24, 7.5));
+      case "nose": return svg(`<path d="M7 20c3-3 7-4 10-3l26 7c2 1 2 3 0 3L17 34c-3 1-7 0-10-3-3-3-3-8 0-11z" fill="#FF8A1F" ${S2}/><path d="M18 21v3M25 23v3M32 25v2" stroke="#C9631A" stroke-width="2" stroke-linecap="round"/>`);
+      case "smile": return svg(`<g fill="#2B2F3A" ${S2}><circle cx="8" cy="19" r="4"/><circle cx="15" cy="28" r="4"/><circle cx="25" cy="32" r="4"/><circle cx="35" cy="28" r="4"/><circle cx="42" cy="19" r="4"/></g>`);
+      case "buttons": return svg(o.id === "coal" ? lump(25, 9, 0.85) + lump(25, 24, 0.85) + lump(25, 39, 0.85) : button(25, 10, o) + button(25, 25, o) + button(25, 40, o));
+      case "arms": return svg(ARMS);
+      case "mittens": return svg(mitten(15, 24, -12, o.hex, false) + mitten(35, 24, 12, o.hex, true));
+      case "scarf": return svg(scarf(o.hex, o.hex, o.stripe) + `<path d="M32 44v3M35 44v3M38 43v3" stroke="${o.dark}" stroke-width="2" stroke-linecap="round"/>`);
+      case "hat": return svg(HATPIC[i]);
     }
-  };
-  // What his finger carries: one eye or one smile stone at a time (each goes on by itself).
-  const CARRY = {
-    eyes: () => `<svg viewBox="0 0 50 50"><path d="M15 24l7-9h10l6 9-4 10H20z" fill="#2B2F3A" ${S2}/><ellipse cx="23" cy="20" rx="3.6" ry="2" fill="#596075"/></svg>`,
-    smile: () => `<svg viewBox="0 0 50 50"><path d="M18 22l5-6h6l4 6-3 7h-8z" fill="#2B2F3A" ${S2}/></svg>`
-  };
-  const tiles = Toybox.tiles(tilesEl, {
-    items: KINDS.map((k) => ({ id: k.id, name: k.name, pic: PIC[k.id]() })),
+    return svg("");
+  }
+  // A piece with choices shows a few of them at once on its tile.
+  function MAINPIC(k) {
+    const O = KIND[k].opts;
+    switch (k) {
+      case "eyes": return svg(lump(15, 23) + btnEye(35, 24, 7.5));
+      case "buttons": return svg(lump(25, 9, 0.85) + button(25, 25, O[1]) + button(25, 40, O[2]));
+      case "mittens": return svg(mitten(15, 24, -12, O[0].hex, false) + mitten(35, 24, 12, O[1].hex, true));
+      case "scarf": return svg(`<path d="M29 22h9l2 20-10 1z" fill="#E8303F" ${S2}/><path d="M31 30h8M31.5 36h8" stroke="#FFFFFF" stroke-width="3"/>` +
+        `<path d="M7 13c4 2 8 3 12 3.5v10C15 26 11 25 6 23z" fill="#E8303F" ${S2}/><path d="M19 16.5c4 .5 8 .5 12 0v10c-4 .5-8 .5-12 0z" fill="#2F8CFF" ${S2}/><path d="M31 16.5c4-.5 8-1.5 12-3.5l1 10c-4 2-8 3-13 3.5z" fill="#3FA34D" ${S2}/>`);
+      case "hat": return svg(`<g transform="translate(-3 6) scale(0.8)">${HATPIC[2]}</g><g transform="translate(15 8) scale(0.72)">${HATPIC[0]}</g>`);
+    }
+    return OPTPIC(k, 0);
+  }
+  // What his finger carries: the chosen piece; one eye or one smile stone at a time (each goes on by itself).
+  function CARRYPIC(k, i) {
+    if (k === "eyes") return svg(i === 0 ? lump(25, 24, 1.4) : btnEye(25, 25, 10));
+    if (k === "smile") return svg(lump(25, 24, 1.1));
+    return OPTPIC(k, i);
+  }
+  const BACKPIC = svg(`<path d="M30 11L16 25l14 14" fill="none" stroke="#1D2340" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`);
+  tilesEl.innerHTML = '<div id="tilesMain"></div><div id="tilesOpt" hidden></div>';
+  const mainEl = $("tilesMain"), optEl = $("tilesOpt");
+  const fromTile = (btn) => { if (!btn) return null; const r = btn.getBoundingClientRect(); return wpt(r.left + r.width / 2, r.top + r.height / 2); };
+  // All the pieces. A tap on a piece with choices shows its choices; a piece with one choice goes straight on.
+  const tiles = Toybox.tiles(mainEl, {
+    items: KINDS.map((k) => ({ id: k.id, name: k.name, pic: MAINPIC(k.id) })),
     kind: "action", rows: 2,
     onPick: (id) => {
       if (performance.now() < skipClickUntil) return;
-      const btn = tiles.button(id), r = btn ? btn.getBoundingClientRect() : null;
-      putPiece(id, r ? wpt(r.left + r.width / 2, r.top + r.height / 2) : null, btn);
+      const btn = tiles.button(id);
+      if (S.step === "dress" && many(id)) { openOpts(id); return; }
+      putPiece(id, S.D[id].opt, fromTile(btn), btn);
     }
   });
+  // One piece's choices, with Back to all the pieces. The one on the snowman is marked (yellow, with a tick).
+  let optK = null;
+  const otiles = Toybox.tiles(optEl, {
+    items: [], kind: "action", rows: 2,
+    onPick: (id) => {
+      if (performance.now() < skipClickUntil || !optK) return;
+      if (id === "back") { closeOpts(); return; }
+      const btn = otiles.button(id);
+      putPiece(optK, +id.slice(1), fromTile(btn), btn);
+    }
+  });
+  function openOpts(k) {
+    optK = k;
+    otiles.items([{ id: "back", name: "Back", pic: BACKPIC }].concat(KIND[k].opts.map((o, i) => ({ id: "o" + i, name: o.name, pic: OPTPIC(k, i) }))));
+    const back = otiles.button("back");
+    if (back) { back.classList.add("sn-back"); back.setAttribute("aria-label", "Back to all the pieces"); }
+    mainEl.hidden = true; optEl.hidden = false;
+    updateTiles();
+    KIND[k].opts.forEach((o, i) => setTimeout(() => otiles.flash("o" + i), 40 + i * 60));
+  }
+  function closeOpts() {
+    if (!optK) return;
+    const k = optK;
+    optK = null;
+    optEl.hidden = true; mainEl.hidden = false;
+    tiles.flash(k);
+  }
   // The tiles wait (dimmed, still answering with a hint) until the snowman is built.
   function updateTiles() {
     if (!S) return;
     tilesEl.classList.toggle("sn-later", S.step !== "dress");
+    const none = KINDS.every((q) => !anyOn(q.id));
     KINDS.forEach((k) => {
       const b = tiles.button(k.id);
       if (!b) return;
-      b.classList.toggle("sn-full", S.step === "dress" && isFull(k.id));
-      b.classList.toggle("sn-next", S.step === "dress" && k.id === "hat" && KINDS.every((q) => count(q.id) === 0));
-      if (k.id === "scarf" || k.id === "hat" || k.id === "mittens") { const pic = b.querySelector(".tb-pic"); if (pic) pic.innerHTML = PIC[k.id](); }
+      b.classList.toggle("sn-opts", many(k.id));
+      b.classList.toggle("sn-on", S.step === "dress" && full(k.id));
+      b.classList.toggle("sn-next", S.step === "dress" && k.id === "hat" && none);
     });
+    if (optK) {
+      const d = S.D[optK];
+      KIND[optK].opts.forEach((o, i) => {
+        const b = otiles.button("o" + i);
+        if (!b) return;
+        const on = anyOn(optK) && d.opt === i;
+        b.classList.toggle("sn-on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    }
   }
   function popTiles() { KINDS.forEach((k, j) => setTimeout(() => tiles.flash(k.id), j * 60)); }
-  // New: the old snowman fades, the snow fills the tracks back in, and a fresh small snowball sits in the yard.
+  // New: the old snowman fades, the snow fills the trails back in, and a fresh small snowball sits in the yard.
   function newYard() {
     if (locked()) return;
     drag = null; press.cancel();
-    tweens = []; flights = []; pwob = {}; busy = false;
+    tweens = []; flights = []; gone = []; pwob = {}; busy = false;
+    closeOpts();
     if (bird) bird.t0 = Math.min(bird.t0, now() - 5.8);
     oldB = S; oldA = 1;
     const o = document.createElement("canvas");
@@ -1558,6 +1865,9 @@
     Object.keys(pwob).forEach((k) => { pwob[k] = Math.max(0, pwob[k] - dt * 1.4); });
     Y.trees.forEach((tr) => { tr.shake = Math.max(0, tr.shake - dt * 1.5); });
     lightsGlow = Math.max(0, lightsGlow - dt * 0.7);
+    boxBounce = Math.max(0, boxBounce - dt * 2); boxWob = Math.max(0, boxWob - dt * 1.8);
+    const carrying = drag && drag.k === "piece";
+    boxOpen += ((carrying ? (overBox({ x: drag.x, y: drag.y }) ? 1 : 0.6) : 0) - boxOpen) * Math.min(1, dt * 8);
     windowGlow = Math.max(0, windowGlow - dt * 0.7);
     updateCoach();
     draw(t);
@@ -1585,16 +1895,19 @@
       items.push({ y: b.gy, f: () => (i === 0 ? drawSnowman(S, t) : drawGroundBall(b)) });
     });
     if (rabbit) items.push({ y: rabbit.gy, f: () => drawRabbit(t) });
+    items.push({ y: boxGeo().gy - 8, f: () => drawBox(t) });
     items.sort((a, b) => a.y - b.y).forEach((it) => it.f());
     S.balls.forEach((b) => { if (b && b.lift) drawLifted(b); });
     drawParts();
     drawBird(t);
     drawFlakes(t);
+    drawCarried(t);
     drawRing(t);
     drawCarryTarget(t);
   }
   function onEnding(done) {
     ending = true;
+    if (drag && drag.k === "piece") pieceUp(drag, false, true);
     drag = null; press.cancel();
     if (pdrag) { pdrag = null; carryEl.hidden = true; }
     S.balls.forEach((b, i) => { if (b) { b.auto = null; if (b.lift) dropBall(i, true); } });
@@ -1660,22 +1973,28 @@
     };
     window.__toybox = {
       state: () => {
-        const w = want();
+        const w = want(), pieces = {};
+        KINDS.forEach((k) => { pieces[k.id] = { opt: k.opts[S.D[k.id].opt].id, on: S.D[k.id].on.filter(Boolean).length }; });
         return { step: S.step, r: S.balls.map((b) => (b ? +b.r.toFixed(1) : 0)), done: S.balls.map((b) => !!(b && b.done)),
-          stacked: S.balls.map((b) => !!(b && b.stacked)), pieces: Object.assign({}, S.D), busy, wanted: w && w.part,
-          coach: coach.text(), track: track.length, allOn: allOn(), bird: !!bird, rabbit: !!rabbit };
+          stacked: S.balls.map((b) => !!(b && b.stacked)), pieces, panel: optK || "pieces", busy, wanted: w && w.part,
+          coach: coach.text(), track: track.length, allOn: allOn(), bird: !!bird, rabbit: !!rabbit, carrying: !!(drag && drag.k === "piece") };
       },
+      // One step: rolls, stacks, or puts on the next piece that is not part of the face (never eyes, nose or smile).
       next: () => {
         if (busy) return "wait";
         if (rolling()) { doTapPart("ball"); return "roll"; }
         if (stacking()) { stackTap(activeIndex()); return "stack"; }
-        const k = ["hat", "scarf", "arms", "buttons", "mittens"].find((id) => count(id) === 0);
-        if (k) { putPiece(k, null); return k; }
+        const k = ["hat", "scarf", "arms", "buttons", "mittens"].find((id) => !anyOn(id));
+        if (k) { putPiece(k, S.D[k].opt, null); return k; }
         return "done";
       },
       finish,
       stack: () => stackTap(activeIndex()),
-      put: (k) => putPiece(k, null),
+      // put(kind, choice): as his tap on that choice (one eye or one smile stone at a time).
+      put: (k, opt) => putPiece(k, opt == null ? S.D[k].opt : opt, null),
+      // off(kind, bit): as his drag of that piece into the box.
+      off: (k, j) => { if (S.step === "dress" && isOn(k, j || 0)) takeOff(k, KIND[k].slots ? (j || 0) : -1, 0, 0); return S.D[k].on.filter(Boolean).length; },
+      choices: (k) => (k ? openOpts(k) : closeOpts()),
       newYard: () => newYard(),
       surprise: () => surprise(),
       hit: (x, y) => hitPart(x, y),
@@ -1683,9 +2002,14 @@
         const i = activeIndex();
         if (part === "ball" && i >= 0 && S.balls[i]) { const c = ballC(S, i); return vp(c.x, c.y); }
         if (part === "target" && i > 0) { const T = stackAt(S, i); return vp(T.x, T.y); }
+        if (part === "box") { const b = boxGeo(); return vp(b.x, b.gy - b.h / 2); }
+        if (S.step === "dress" && part && part.startsWith("pc:")) { const [, k, j] = part.split(":"); const sp = pieceSpot(geom(S), k, +j || 0); return vp(sp.x, sp.y); }
         if (part === "head" && S.step === "dress") { const g = geom(S); return vp(g.hx, g.hy); }
         if (part === "middle" && S.step === "dress") { const g = geom(S); return vp(g.mx, g.my); }
-        if (part && part.startsWith("tile:")) { const b = tiles.button(part.slice(5)); if (b) { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } }
+        if (part && part.startsWith("tile:")) {
+          const id = part.slice(5), b = tiles.button(id) && !mainEl.hidden ? tiles.button(id) : otiles.button(id);
+          if (b) { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+        }
         return null;
       },
       ghost: () => ghost.show()
