@@ -97,7 +97,7 @@
   // Lowest a finished big snowball may sit (its touch point) so the whole snowman, hat and a perching robin fit.
   const G_MIN = Math.ceil(RT[0] * SIT + (RT[0] + RT[1]) * STACK_K + (RT[1] + RT[2]) * STACK_K + RT[2] * 2.25 + 30);
   // How far the stick arms and mittens reach out from the middle (a finished snowman stays this far from the sides).
-  const ARM_X = 154;
+  const ARM_X = 176;
 
   // =====================================================================================================
   // Layout
@@ -238,7 +238,7 @@
       case "buttons": return { x: g.mx, y: g.my - g.mr * 0.36 + j * g.mr * 0.4, r: g.mr * 0.12 };
       case "arms": { const a = armAt(g, j); return { x: lerp(a.sx, a.ex, 0.55), y: lerp(a.sy, a.ey, 0.55), r: 22 }; }
       case "mittens": { const a = armAt(g, j); return { x: a.ex, y: a.ey, r: 15 }; }
-      case "scarf": return { x: g.mx, y: g.neck + 4, r: g.hr * 0.8 };
+      case "scarf": return { x: g.mx, y: g.neck + 4, r: g.hr * 0.55 };
       case "hat": return { x: g.hx, y: g.hy - g.hr * 1.2, r: g.hr * 0.9 };
     }
     return { x: g.hx, y: g.hy, r: 10 };
@@ -329,14 +329,15 @@
   function openSpot(B) {
     let best = { x: WW * 0.35, y: HY + (HW - HY) * 0.62 }, bs = -Infinity;
     for (let x = Y.x0 + 50; x <= Y.x1 - 50; x += 26) {
-      for (let y = Y.gy0 + 40; y <= Y.gy1 - 10; y += 22) {
+      for (let y = Y.gy0 + 40; y <= Y.gy1 - 70; y += 22) {
         let d = 3;
         B.balls.forEach((o) => {
           if (!o || o.stacked) return;
           const R = o.r + 46;
           d = Math.min(d, Math.hypot((x - o.x) / R, (y - o.gy) / (R * 0.5)));
         });
-        const sc = Math.min(d, 2.2) + (y - Y.gy0) / 500 - Math.abs(x - WW / 2) / 3000;
+        // Clear of the others first; then in the middle of the yard (not under the coach line at the bottom).
+        const sc = Math.min(d, 2.2) - Math.abs(y - (Y.gy0 + Y.gy1) / 2) / 900 - Math.abs(x - WW / 2) / 3000;
         if (sc > bs) { bs = sc; best = { x, y }; }
       }
     }
@@ -424,7 +425,7 @@
   function trackAdd(b) {
     const last = track.length ? track[track.length - 1] : null;
     if (last && Math.hypot(last.x - b.x, last.y - b.gy) < 3) return;
-    const p = { x: b.x, y: b.gy, w: b.r * 1.2 };
+    const p = { x: b.x, y: b.gy, w: b.r * 1.05 };
     track.push(p);
     paintSeg(last || p, p);
   }
@@ -633,7 +634,7 @@
       // A different hat drops on from above.
       fly("hat", 0, first ? from : { x: g.hx, y: g.hy - g.hr * 3.4 });
       const sp = pieceSpot(g, "hat", 0);
-      later(0.5, () => tag(HATS[D.hat].name, sp.x, sp.y - g.hr * 1.1));
+      later(0.5, () => tag(HATS[D.hat].name, sp.x + g.hr * 1.4, sp.y - g.hr * 0.2));
     } else {
       if (D[k] >= K.max) {
         if (b) Toybox.wiggle(b);
@@ -1388,7 +1389,7 @@
       if (S.step !== "dress" || locked()) { pdrag.on = "no"; putPiece(pdrag.k, null, pdrag.btn); return; }
       pdrag.on = true;
       carryEl.classList.remove("back");
-      carryEl.innerHTML = PIC[pdrag.k]();
+      carryEl.innerHTML = (CARRY[pdrag.k] || PIC[pdrag.k])();
       carryEl.hidden = false;
       ghost.learned("dress");
     }
@@ -1467,6 +1468,11 @@
       return `<svg viewBox="0 0 50 50"><path d="M9 35C9 10 41 10 41 35z" fill="${s.hex}" ${S2}/><path d="M11 24h28" stroke="${s.stripe}" stroke-width="3"/>` +
         `<rect x="7" y="32" width="36" height="9" rx="4" fill="${s.dark}" ${S2}/><circle cx="25" cy="10" r="6" fill="#FFFFFF" ${S2}/></svg>`;
     }
+  };
+  // What his finger carries: one eye or one smile stone at a time (each goes on by itself).
+  const CARRY = {
+    eyes: () => `<svg viewBox="0 0 50 50"><path d="M15 24l7-9h10l6 9-4 10H20z" fill="#2B2F3A" ${S2}/><ellipse cx="23" cy="20" rx="3.6" ry="2" fill="#596075"/></svg>`,
+    smile: () => `<svg viewBox="0 0 50 50"><path d="M18 22l5-6h6l4 6-3 7h-8z" fill="#2B2F3A" ${S2}/></svg>`
   };
   const tiles = Toybox.tiles(tilesEl, {
     items: KINDS.map((k) => ({ id: k.id, name: k.name, pic: PIC[k.id]() })),
