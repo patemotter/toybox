@@ -1,18 +1,25 @@
 (function () {
   "use strict";
-  // Christmas · Snowflakes: a craft table by a window. He makes a real fold-and-cut paper snowflake, with six
-  // points like real snowflakes. The paper's color is a real choice in the panel (White, Blue, Silver, Pink).
-  //   1. Fold the square in half into a triangle: drag the top corner down to the bottom corner (the paper's
-  //      corner follows his finger), or tap the paper and it folds by itself.
-  //   2. Fold the right side over, 3. fold the left side over: the fold into thirds (60 degrees each).
-  //   4. Fold the paper in half again: a thin wedge of 12 layers, each a 30 degree slice of the sheet.
-  //      The scissors then trim the top of the wedge by themselves (the real cut that makes the six points).
-  //   5. Cut: touching the paper brings the big craft scissors to his finger; dragging cuts a narrow strip of
+  // Christmas · Snowflakes: a craft table by a window. He makes a real fold-and-cut paper snowflake. Two rows of
+  // tiles are real choices: the fold type (4, 5, 6 or 8 points; each tile shows the kind of snowflake it makes)
+  // and the paper color (White, Blue, Silver, Pink). A pick takes effect on the flat sheet at once; once folding
+  // has started, it is for the next sheet. The fold types, each a real way to fold a square:
+  //   4 points: in half, the left side over, into a triangle (8 mirrored slices of 45 degrees).
+  //   5 points: in half, the right side over, the left side over, in half again (the five-point star fold, 10
+  //             slices of 36 degrees).
+  //   6 points: in half into a triangle, the right and left sides over (thirds), in half again (the real
+  //             snowflake, 12 slices of 30 degrees).
+  //   8 points: in half, the left side over, into a triangle, the triangle in half (16 slices of 22.5 degrees).
+  // Each fold is hands-on: drag the paper's corner across (it follows his finger) or tap the paper and it folds
+  // by itself. The coach line names each fold. Then:
+  //   Trim: the scissors trim the top of the wedge by themselves (the real cut that makes the points).
+  //   Cut: touching the paper brings the big craft scissors to his finger; dragging cuts a narrow strip of
   //      paper away along the path, and pieces cut off from the middle fall away. A tap snips one notch
   //      (a triangle, a half circle or a diamond, in turn). Little paper bits drop and fade.
-  //   6. Open: the "Open the paper" tile. The paper unfolds back through the four folds and the snowflake
-  //      grows big in the middle, glinting and turning slowly. It is the wedge's cuts mirrored 12 times.
-  //   7. Hang it: drag the snowflake to the window (or tap it, or tap the window) and it sticks to the glass.
+  //   Open: the "Open the paper" tile (in the colors' row while he cuts). The paper unfolds back through the
+  //      folds and the snowflake grows big in the middle, glinting and turning slowly: the wedge's cuts mirrored
+  //      into every slice.
+  //   Hang it: drag the snowflake to the window (or tap it, or tap the window) and it sticks to the glass.
   //      A fresh sheet of paper comes.
   // The window full of his snowflakes is his collection (up to 12, kept across visits; the oldest comes down
   // to make room). Tapping a hung snowflake shows it big. A yellow ring and one instruction show what is next;

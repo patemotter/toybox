@@ -1,39 +1,50 @@
 (function () {
   "use strict";
   // Christmas · Cookies: a warm Christmas kitchen counter with an oven, seen from where the baker stands.
-  // Two jobs, as folder tabs under the stage:
+  // First, getting ready as in the Kitchen (Toybox.gate, flag kitchen-ready, every 10 minutes): wash hands (a short
+  // wash plays on the baker's hands), apron, chef hat; one tap does all three, or drag each one onto the baker.
+  // Two jobs, as folder tabs under the stage. Both use the two doughs in the bowls at the back of the counter
+  // (Sugar cookie, Gingerbread; a tap picks one; the picked bowl has the yellow tick).
   //
   // Cookies: he makes a batch of Christmas cookies the real way, one hands-on step at a time. A drag does the real
   // motion for as long as he does it; a tap on the same part plays that part's motion once.
-  //   1. Pick the dough (tiles: Sugar cookie or Gingerbread) and roll it out: drag the rolling pin up and down over
-  //      the dough and it flattens into a sheet (a tap on the pin or the dough is one roll).
+  //   1. Roll out the dough: drag the rolling pin up and down over it and it flattens into a sheet (a tap on the
+  //      pin or the dough is one roll). Picking the other dough puts the sheet away and brings a fresh ball.
   //   2. Cut shapes: pick a cookie cutter (tiles) and drag it onto the dough, or tap the dough where it should press
   //      (a tap on the cutter presses it into the next smooth spot). The shapes stay in the dough.
   //   3. Put the cookies on the baking sheet: tap each cut shape or drag it off the dough.
-  //   4. Open the oven door (tap it or pull it down), slide the baking sheet in (drag or tap it) and close the door.
-  //      The oven window glows and the cookies puff up a little and turn golden (calm, about 5 s; nothing burns).
-  //   5. Take the baking sheet out with the oven mitt (tap the oven, or drag the sheet out). Steam curls up.
+  //   4. Open the oven door (tap it or pull it down). The baking sheet only ever moves with the oven mitt: drag the
+  //      mitt off its hook onto the sheet (it grips the edge) and carry the sheet into the oven; a drag on the sheet
+  //      itself brings the mitt to it; a tap on the mitt (or the sheet) plays that one move. Close the door. The
+  //      oven window glows and the cookies puff up a little and turn golden (calm, about 5 s; nothing burns).
+  //   5. Open the door and take the hot sheet out with the mitt the same way. Steam curls up.
   //   6. Decorate: each cookie comes to the board big. Tiles: White, Red and Green icing (the piping bag draws
   //      exactly where his finger goes; a tap is a dot), Sprinkles (they fall where he holds or taps), Gumdrops,
-  //      Candy buttons, Red hots and Candy eyes (one per tap, or drag one where it goes). Nothing is ever added for
-  //      him, so a gingerbread person only gets a face if he gives it one, one candy at a time.
-  //   7. Put the cookie on the plate (tap the plate); the next cookie comes up. A tap on a waiting cookie brings it
-  //      up instead. The plate is his collection, kept across visits (the last 12); the Plate button (or a tap on
-  //      the plate) shows it big, with the gingerbread people standing in a row (the family) and the last house.
+  //      Candy buttons, Red hots and Candy eyes (one per tap, or drag one where it goes). Every tool works at any
+  //      time; the layers stay cookie, icing, sprinkles, candy, so new icing goes under the candy. Icing never runs
+  //      out (finished lines are thinned to the points that shape them). Nothing is ever added for him, so a
+  //      gingerbread person only gets a face if he gives it one, one candy at a time.
+  //   7. Put the cookie on the plate with the spatula: drag the spatula under the cookie (it lifts it) and carry it
+  //      to the plate; a tap on the spatula (or the plate) does that move. The next cookie comes up; a tap on a
+  //      waiting cookie brings it up instead. The plate is his collection, kept across visits (the last 12); the
+  //      Plate button (or a tap on the plate) shows it big, with the gingerbread people standing in a row (the
+  //      family) and the last house.
   //   Left-over dough: once the shapes are lifted, the rolling pin balls the scraps up and rolls them out again.
   //
-  // House: a real gingerbread house. The baked pieces come one at a time (back wall, two side walls, front wall,
-  //   two roof pieces): squeeze royal icing along the edge with the piping bag (drag along it, or tap: the bag runs
-  //   along the edge) and the piece stands up into place on the cake board. When the roof is on, the windows light
-  //   up and icing sugar dusts the house. Then decorate with the tiles: Icing, Icing snow (on the roof), Icicles
-  //   (under the roof's edge), Gumdrops (they snap to the ridge), Peppermints, Candy canes (they snap to the door
-  //   frame) and Candy buttons. The latest built house is kept with the plate.
+  // House: a real gingerbread house, baked in the picked dough. The pieces come one at a time (back wall, two side
+  //   walls, front wall, two roof pieces): squeeze royal icing along the edge with the piping bag (drag along it, or
+  //   tap: the bag runs along the edge) and the piece stands up into place on the cake board. When the roof is on,
+  //   the windows light up and icing sugar dusts the house. Then decorate with the tiles: Icing, Icing snow (on the
+  //   roof), Icicles (under the roof's edge), Gumdrops (they snap to the ridge), Peppermints, Candy canes (they snap
+  //   to the door frame) and Candy buttons. The latest built house is kept with the plate.
   //
   // A yellow ring and one instruction show the next part; parts not needed right now still answer (a wiggle and
   // their name). Surprise takes turns between live moments (icing sugar snows down, the oven light blinks or the
   // house windows twinkle, steam curls off the cookies or the candy sparkles) and never changes his work.
   // Units: the scene is drawn in world units (the TALL or WIDE layout, picked from the stage's shape) and scaled to
   // fit the stage; x to the right, y down. Cookie decorations are kept in the cookie's own units (its size = 1).
+  // Saved: christmas-cookies-plate-v1 (the plate and the latest house, with its dough), christmas-cookies-work-v1
+  // (the job in progress; v2 adds the house dough; older saves load as gingerbread houses).
   //
   // Sections:
   //   Setup and saved state
@@ -42,8 +53,8 @@
   //   Tweens and particles
   //   The cookie batch
   //   Cookies: roll and cut
-  //   Cookies: baking sheet and oven
-  //   Cookies: decorate and plate
+  //   Cookies: baking sheet, oven and oven mitt
+  //   Cookies: decorate, spatula and plate
   //   The gingerbread house
   //   Decorating tools
   //   Drawing helpers
@@ -54,7 +65,7 @@
   //   What comes next: coach, ring and ghost hand
   //   Input
   //   Panel, jobs and surprise
-  //   Loop, timer, start and debug hook
+  //   Loop, getting ready, timer, start and debug hook
 
   // =====================================================================================================
   // Setup and saved state
@@ -200,7 +211,7 @@
     board: { x: 12, y: 214, w: 396, h: 198 },
     sheet: { x: 210, y: 313, w: 352, h: 168 }, cs: 26,
     pinRest: { x: 148, y: 448 }, pinLen: 230, cutterRest: { x: 294, y: 446 }, plate: { x: 370, y: 444, r: 44 },
-    big: { x: 196, y: 313, s: 80 }, spat: { x: 360, y: 368 }, mittHook: { x: 236, y: 92 }, bowls: [{ x: 32, y: 38 }, { x: 84, y: 38 }],
+    big: { x: 196, y: 313, s: 80 }, spat: { x: 360, y: 368 }, mittHook: { x: 242, y: 150 }, bowls: [{ x: 32, y: 38 }, { x: 84, y: 38 }],
     house: { x: 118, y: 322 }, cake: { x: 228, y: 302, rx: 190, ry: 58 }, lie: { x: 222, y: 416, w: 200, h: 98 }, pile: { x: 56, y: 432 }, bag: { x: 372, y: 428 }
   };
   const WIDE = {
@@ -301,7 +312,7 @@
   // C.stage: prep (rolling, cutting, filling the baking sheet), oven (the sheet is in, door may be open), baking,
   // baked (golden, still in the oven), out (coming out), decorate, done.
   let job = savedWork && savedWork.job === "house" ? "house" : "cookies";
-  let busy = false, drag = null, plateOpen = false;
+  let busy = false, drag = null, plateOpen = false, gateUp = false;
   const pick = { cutter: 0, tool: 0, htool: 0 };
   if (savedWork && savedWork.pick) {
     const sp = savedWork.pick;
@@ -524,7 +535,7 @@
   }
 
   // =====================================================================================================
-  // Cookies: baking sheet and oven
+  // Cookies: baking sheet, oven and oven mitt
   // =====================================================================================================
   let doorTw = null;
   function doorTo(to, dur, then) {
@@ -536,7 +547,8 @@
   // The oven mitt hangs on its hook beside the oven. Every move of the baking sheet into or out of the oven is done
   // with it: the mitt grips the sheet's edge and the sheet goes where the mitt goes. No bare hand ever touches it.
   const mittHook = () => L.mittHook;
-  const mittGrip = () => ({ x: V.tray.x - L.tray.w * V.tray.k / 2 + 4, y: V.tray.y + 2 });
+  // The mitt holds the sheet by one side edge (side -1 left, 1 right), as near to his finger as it was.
+  const mittGrip = () => ({ x: V.tray.x + (V.mitt.side || -1) * (L.tray.w * V.tray.k / 2 - 4), y: V.tray.y + (V.mitt.dy || 0) * V.tray.k });
   function mittTo(to, dur, then) {
     const m = V.mitt, a = { x: m.x, y: m.y };
     m.mode = "free";
@@ -577,7 +589,7 @@
         saveSoon();
       });
     };
-    later(wait, () => { if (V.mitt.mode === "grip") carry(); else mittTo(mittGrip, 0.4, carry); });
+    later(wait, () => { if (V.mitt.mode === "grip") carry(); else { V.mitt.side = 1; V.mitt.dy = 0; mittTo(mittGrip, 0.4, carry); } });
     return true;
   }
   function backToCounter(from) {
@@ -631,7 +643,7 @@
         saveSoon();
       });
     };
-    const go = () => { if (V.mitt.mode === "grip") carry(); else mittTo(mittGrip, 0.45, carry); };
+    const go = () => { if (V.mitt.mode === "grip") carry(); else { V.mitt.side = -1; V.mitt.dy = 0; mittTo(mittGrip, 0.45, carry); } };
     if (V.door < 0.5) doorTo(1, 0.45, go); else go();
   }
   // A tap on the mitt plays its one move: the sheet in, or the hot sheet out.
@@ -643,7 +655,7 @@
   }
 
   // =====================================================================================================
-  // Cookies: decorate and plate
+  // Cookies: decorate, spatula and plate
   // =====================================================================================================
   const curCookie = () => (C.stage === "decorate" && C.cur >= 0 ? C.tray[C.cur] : null);
   const decoN = (c) => c.i.length + c.p.length / 6 + c.k.length;
@@ -1373,7 +1385,7 @@
     const m = V.mitt;
     if (m.mode === "hook") { ell(m.x, m.y - 34, 3.5, 3.5); fs("#8A939E", 1.6); }
     const mw = Math.sin(V.mittWob * 25) * V.mittWob * 0.2;
-    drawMitt(m.x, m.y, 1.05, (m.mode === "hook" ? Math.PI : m.mode === "grip" ? Math.PI / 2 : 0.3) + mw);
+    drawMitt(m.x, m.y, 1.05, (m.mode === "hook" ? Math.PI : m.mode === "grip" ? -(m.side || -1) * Math.PI / 2 : 0.3) + mw);
   }
 
   // =====================================================================================================
@@ -1524,7 +1536,7 @@
     const fam = [], rest = [];
     plate.forEach((c, i) => (c.sh === PERSON ? fam : rest).push(i));
     const hasH = !!savedHouse, spots = [];
-    const famY = H * (hasH ? 0.62 : 0.42), fs0 = Math.min(H * 0.085, W / (fam.length + 1) / 2.3, 54);
+    const famY = H * (hasH ? 0.62 : 0.6), fs0 = Math.min(H * (hasH ? 0.085 : 0.12), W / (fam.length + 1) / 2.3, 60);
     fam.forEach((i, k) => spots[i] = { x: W / 2 + (k - (fam.length - 1) / 2) * fs0 * 2.1, y: famY, s: fs0 });
     const prx = Math.min(W * 0.44, 340), pry = Math.min(H * 0.13, prx * 0.32), py = H * 0.84;
     const rs = Math.min(pry * 0.75, prx * 2 / Math.max(1, rest.length) / 2.2, 48);
@@ -1570,16 +1582,11 @@
   // What comes next: coach, ring and ghost hand
   // =====================================================================================================
   let lastDeco = 0;
+  // One decorating line per surface: picking another tool never pops a new instruction over his work.
   function toolLine(sf) {
-    const t = sf.tool, on = sf.kind === "cookie" ? "cookie" : "house";
-    if (t.kind === "icing") return "Draw icing on the " + on + ".";
-    if (t.kind === "sprinkles") return "Shake sprinkles on the cookie.";
-    if (t.kind === "snow") return "Spread icing snow on the roof.";
-    if (t.kind === "icicles") return "Make icicles under the edge of the roof.";
-    if (t.t === "c") return "Put candy canes beside the door.";
-    if (t.t === "g" && sf.kind === "house") return "Put gumdrops along the top of the roof.";
-    return "Put " + t.name.toLowerCase() + " on the " + on + ".";
+    return sf.kind === "cookie" ? "Add icing, sprinkles and candy to the cookie." : "Add icing, snow and candy to the gingerbread house.";
   }
+
   function want() {
     if (busy || plateOpen) return null;
     if (job === "cookies") {
@@ -1649,7 +1656,7 @@
   let lastWant = "";
   function updateCoach() {
     // While he holds something the line stays as it is, so a new instruction never pops up over his work.
-    if (plateOpen || drag) return;
+    if (plateOpen || drag || gateUp) return;
     const w = want(), line = w ? w.line : "";
     if (line === lastWant) return;
     lastWant = line;
@@ -1662,7 +1669,7 @@
   const ghost = Toybox.ghost({
     max: 3,
     plan: () => {
-      if (locked() || press.active() || drag || plateOpen) return null;
+      if (gateUp || locked() || press.active() || drag || plateOpen) return null;
       const w = want();
       if (!w) return null;
       const key = w.part.replace(/\d+$/, ""), first = ghost.shown(key) < 1;
@@ -1855,7 +1862,7 @@
       else if (drag.k === "mitt") {
         V.mitt.x = w.x; V.mitt.y = w.y;
         // The mitt reaches the sheet: it grips its edge, and from now on the sheet goes where the mitt goes.
-        const T = L.tray, k = V.tray.k, onSheet = Math.abs(w.x - V.tray.x) < T.w * k / 2 + 14 && Math.abs(w.y - V.tray.y) < T.h * k / 2 + 14;
+        const T = L.tray, k = V.tray.k, onSheet = Math.abs(w.x - V.tray.x) < T.w * k / 2 - 4 && Math.abs(w.y - V.tray.y) < T.h * k / 2 + 6;
         if (onSheet && (canCarryIn() || canCarryOut())) startCarry(canCarryIn() ? "in" : "out", w);
         else if (onSheet && C.stage === "baked" && V.door < 0.5 && !drag.said) { drag.said = true; V.doorWob = 1; coach.say("Open the oven door.", 3); }
       } else if (drag.k === "carry") {
@@ -1968,8 +1975,11 @@
   let dragCookie = null;
   // Carrying the sheet with the mitt: "in" from the counter to the oven, "out" from the oven to the counter.
   function startCarry(dir, w) {
-    const pid = drag && drag.pid, far = drag ? drag.far : 0;
-    drag = { k: "carry", dir, ox: V.tray.x - w.x, oy: V.tray.y - w.y, pid, far };
+    const pid = drag && drag.pid, far = drag ? drag.far : 0, k = V.tray.k, hw = L.tray.w * k / 2 - 4;
+    // The mitt takes the side edge nearest his finger, and that edge comes under his finger.
+    V.mitt.side = w.x >= V.tray.x ? 1 : -1;
+    V.mitt.dy = clamp((w.y - V.tray.y) / k, -L.tray.h * 0.4, L.tray.h * 0.4);
+    drag = { k: "carry", dir, ox: -V.mitt.side * hw, oy: -V.mitt.dy * k, pid, far };
     V.mitt.mode = "grip"; V.trayWhere = "held";
     ghost.learned("mitt");
     if (dir === "out") { busy = true; C.stage = "out"; }
@@ -1977,7 +1987,7 @@
   function endCarry(d, still) {
     const from = { x: V.tray.x, y: V.tray.y, k: V.tray.k }, o = ovenPose();
     if (d.dir === "out") { busy = false; C.stage = "baked"; takeOut(from); return; }
-    if (!locked() && (still || Math.hypot(V.tray.x - o.x, V.tray.y - o.y) < L.oven.w * 0.8)) { if (!slideIn(from)) backToCounter(from); }
+    if (!locked() && (still || inBox(V.tray, L.oven, 20) || Math.hypot(V.tray.x - o.x, V.tray.y - o.y) < L.oven.w * 0.9)) { if (!slideIn(from)) backToCounter(from); }
     else { backToCounter(from); hint(); }
   }
 
@@ -2120,7 +2130,7 @@
   }
 
   // =====================================================================================================
-  // Loop, timer, start and debug hook
+  // Loop, getting ready, timer, start and debug hook
   // =====================================================================================================
   function drawParts() {
     parts.forEach((p) => {
@@ -2175,6 +2185,51 @@
     drawRing(t);
     drawPlateView(t);
   }
+  // Getting ready to bake, as in the Kitchen: wash hands, apron, chef hat (one tap does all three, or drag each one
+  // onto the baker). It shares the Kitchen's flag, so it comes back only every 10 minutes.
+  function getReady() {
+    let ready = false;
+    try { ready = sessionStorage.getItem("kitchen-ready") === "on"; } catch (e) { ready = true; }
+    if (ready) return;
+    gateUp = true;
+    const SKIN = "#F2C094", K = 'stroke="#1D2340" stroke-width="5" stroke-linejoin="round"';
+    const worker = '<path d="M64 272h30v14H58q0-14 6-14zM106 272h30q6 0 6 14h-36z" fill="#7A4B1E" ' + K + '/>' +
+      '<path d="M66 196h68l-2 78h-26l-6-44-6 44H68z" fill="#34508F" ' + K + '/>' +
+      '<rect x="38" y="112" width="26" height="78" rx="13" fill="#FFC93C" ' + K + '/><rect x="136" y="112" width="26" height="78" rx="13" fill="#FFC93C" ' + K + '/>' +
+      '<circle cx="51" cy="192" r="12" fill="' + SKIN + '" ' + K + '/><circle cx="149" cy="192" r="12" fill="' + SKIN + '" ' + K + '/>' +
+      '<path d="M62 200v-78q0-16 18-16h40q18 0 18 16v78z" fill="#FFC93C" ' + K + '/>' +
+      '<circle cx="100" cy="70" r="34" fill="' + SKIN + '" ' + K + '/><path d="M67 64q-1-28 33-28t33 28q-15-14-33-12-18-2-33 12z" fill="#6B3E1E" ' + K + '/>' +
+      '<circle cx="88" cy="72" r="4.5" fill="#1D2340"/><circle cx="112" cy="72" r="4.5" fill="#1D2340"/><path d="M88 86q12 10 24 0" fill="none" stroke="#1D2340" stroke-width="4" stroke-linecap="round"/>';
+    const sparkles = (cx, cy) => '<path d="M' + cx + ' ' + (cy - 10) + 'q2 8 10 10q-8 2-10 10q-2-8-10-10q8-2 10-10z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2"/>';
+    const apron = '<path d="M84 108q16 14 32 0" fill="none" stroke="#E8303F" stroke-width="5"/><path d="M72 132h56v86H72z" fill="#E8303F" ' + K + '/><rect x="86" y="170" width="28" height="20" rx="5" fill="#FFFFFF" stroke="#1D2340" stroke-width="3"/>';
+    const hat = '<path d="M70 42q-14-26 12-30q10-14 36 0q26 4 12 30z" fill="#FFFFFF" ' + K + '/><rect x="70" y="36" width="60" height="16" rx="5" fill="#FFFFFF" ' + K + '/>';
+    const pic = (inner) => '<svg viewBox="0 0 100 100">' + inner + '</svg>';
+    const items = [
+      { id: "hands", name: "Wash hands", art: pic('<rect x="8" y="50" width="84" height="14" rx="6" fill="#F4F7FA" stroke="#1D2340" stroke-width="3"/><path d="M14 62h72q-4 22-36 22T14 62z" fill="#C9DCEA" stroke="#1D2340" stroke-width="3"/><path d="M34 52V30q0-12 14-12t14 14v4" fill="none" stroke="#1D2340" stroke-width="9" stroke-linecap="round"/><path d="M34 52V30q0-12 14-12t14 14v4" fill="none" stroke="#DDE4EE" stroke-width="5" stroke-linecap="round"/><path d="M62 42v20" stroke="#7EC8FF" stroke-width="5" stroke-linecap="round"/><circle cx="80" cy="30" r="6" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5"/><circle cx="20" cy="36" r="5" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5"/>'),
+        onArt: sparkles(36, 178) + sparkles(164, 178) },
+      { id: "apron", name: "Apron", art: pic('<path d="M38 12q12 12 24 0" fill="none" stroke="#E8303F" stroke-width="5"/><path d="M26 30h48v62H26z" fill="#E8303F" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><path d="M26 34L10 40M74 34l16 6" stroke="#E8303F" stroke-width="5" stroke-linecap="round"/><rect x="38" y="56" width="24" height="16" rx="4" fill="#FFFFFF" stroke="#1D2340" stroke-width="2.5"/>'), onArt: apron },
+      { id: "hat", name: "Chef hat", art: pic('<path d="M22 62q-18-34 16-40q14-18 46 0q32 6 12 40z" fill="#FFFFFF" stroke="#1D2340" stroke-width="3.5" stroke-linejoin="round"/><rect x="22" y="58" width="56" height="20" rx="6" fill="#FFFFFF" stroke="#1D2340" stroke-width="3.5"/>'), onArt: hat }
+    ];
+    Toybox.gate({
+      flag: "kitchen-ready", title: "Get ready to bake!", viewBox: "0 0 200 300", worker, workerLabel: "Get ready to bake", items,
+      hint: "Tap to get ready, or drag each one onto the baker.",
+      // Washing plays on the baker's hands: soap bubbles, a rinse, then clean.
+      extra: { hands: (next, el) => {
+        const svg = el.querySelector("svg"), g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        svg.appendChild(g);
+        const dur = reduce ? 400 : 1600, t0 = performance.now();
+        (function step(t) {
+          const k = (t - t0) / dur;
+          let h = "";
+          if (k < 0.55) for (let i = 0; i < Math.floor(k / 0.55 * 14); i++) { const cx = (i % 2 ? 149 : 51) + (hash(i, 1) - 0.5) * 34, cy = 192 + (hash(i, 2) - 0.5) * 30; h += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (4 + hash(i, 3) * 4).toFixed(1) + '" fill="rgba(255,255,255,0.92)" stroke="#9ED8FF" stroke-width="2"/>'; }
+          else if (k < 1) h = '<path d="M51 140v40M149 140v40" stroke="#7EC8FF" stroke-width="7" stroke-linecap="round" opacity="' + (1 - (k - 0.55) / 0.45).toFixed(2) + '"/>';
+          g.innerHTML = h;
+          if (k < 1) requestAnimationFrame(step); else { g.remove(); next(); }
+        })(t0);
+      } },
+      done: () => { gateUp = false; lastWant = ""; ghost.poke(); }
+    });
+  }
   function onEnding(done) {
     ending = true;
     cancelDrag(); press.cancel();
@@ -2216,6 +2271,7 @@
     onWake: () => { ending = false; }
   });
   Toybox.offFirst({ running: () => baking(), off: (done) => { finishBakeNow(); done(); } });
+  getReady();
   requestAnimationFrame(frame);
 
   // Test hooks, only with ?debug in the address.
@@ -2230,6 +2286,8 @@
         case "oven": ovenTap(); break;
         case "tray": slideIn(); break;
         case "plate": plateCookie(); break;
+        case "mitt": mittTap(); break;
+        case "spat": spatTap(); break;
         case "deco": {
           const sf = surface();
           const d = toolDown(sf, v2(B.x - B.s * 0.4, B.y));
@@ -2250,10 +2308,16 @@
         return { job, stage: C.stage, dough: DOUGHS[C.d].id, roll: +C.roll.toFixed(2), cuts: C.cuts.length, holes: C.holes.length, tray: C.tray.length,
           baked: C.tray.length ? +C.tray[0].bake.toFixed(2) : 0, cur: C.cur, door: +V.door.toFixed(2), plate: plate.length, placed: Hs.placed, built: built(),
           houseDecor: Hs.dec.i.length + Hs.dec.sn.length + Hs.dec.ic.length + Hs.dec.k.length + Hs.dec.all, savedHouse: !!savedHouse, tiles: tileMode,
+          houseDough: DOUGHS[Hs.d].id, mitt: V.mitt.mode, trayWhere: V.trayWhere, spatCarry: !!V.spat.carry, gate: gateUp,
+          icingPts: curCookie() ? pointsIn(curCookie().i) : 0, icing: curCookie() ? curCookie().i.length : 0, candy: curCookie() ? curCookie().k.length : 0,
           busy, plateOpen, want: w && w.part, coach: coach.text() };
       },
       next: stepNext,
       tap: (part) => doTap(part),
+      dough: (i) => pickDough(i),
+      ovenPt: () => { const o = ovenPose(); return vp(o.x, o.y); },
+      cookie: () => { const c = curCookie(); return c ? ser(c) : null; },
+      plateData: () => plate.map(ser),
       hitAt: (x, y) => hitPart(x, y),
       job: (id) => { pickJob(id); jobs.set(id); },
       tile: (id) => { const b = tiles.button(id); if (b) b.click(); return !!b; },
