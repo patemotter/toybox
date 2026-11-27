@@ -3,7 +3,8 @@
   // Christmas: the app's front page. A snowy evening with the five Christmas stations standing in the snow, each
   // with a white button under it: the Tree (lights and ornaments), the Snowman, Presents (pick, wrap, open),
   // Snowflakes (fold and cut paper) and Cookies (sugar and gingerbread cookies and a gingerbread house).
-  // Tapping a station, or its button, hops it and goes there. Snow falls calmly and the tree's lights twinkle.
+  // Tapping a station, or its button, hops it and goes there. The map is a free choice, so it has no
+  // instruction line and no idle hand pointing at one station. Snow falls calmly and the tree's lights twinkle.
   // No station pictures have faces: the snowman and the gingerbread person only get faces when he makes them.
   // Each station is drawn in a 300 x 340 tile standing on the snow at y = 270; the tiles are laid out in one,
   // two or three rows, whichever gives the biggest pictures for the stage's shape.
@@ -14,7 +15,7 @@
   //   Station pictures
   //   Layout and drawing the evening
   //   Going to a station
-  //   Coach, ghost hand and timer
+  //   Timer
   //   Start and debug hook
 
   // =====================================================================================================
@@ -249,7 +250,6 @@
   function goStation(id) {
     if (going || locked()) return;
     going = true;
-    if (ghost) ghost.learned();
     const m = $("m-" + id);
     if (m) {
       const r = m.getBoundingClientRect();
@@ -277,15 +277,9 @@
   });
 
   // =====================================================================================================
-  // Coach, ghost hand and timer
+  // Timer
   // =====================================================================================================
-  const coach = Toybox.coach($("coach"));
-  coach.step("Tap the tree!");
-  const midOf = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
-  const ghost = Toybox.ghost({ max: 2, plan: () => {
-    const go = btnEls.tree;
-    return go && !going ? { pts: [midOf(go)], tap: true } : null;
-  } });
+  // The map is a free choice: no instruction line and no idle hand pointing at one station.
   function onEnding(done, info) {
     try { mapSvg.pauseAnimations(); } catch (e) { /* ignore */ }
     if (info.goodbye) { done(); return; }
@@ -333,8 +327,7 @@
       },
       layout: () => L && { rows: L.rows, s: L.s },
       stations: () => STATIONS.map((s) => s.id),
-      go: goStation,
-      ghost: () => ghost.show()
+      go: goStation
     };
   }
 })();
