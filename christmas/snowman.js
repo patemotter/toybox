@@ -185,7 +185,6 @@
   // The build
   // =====================================================================================================
   // Steps in order: roll the big snowball, roll the middle one, stack it, roll the head, stack it, dress.
-  const STEPS = ["roll0", "roll1", "stack1", "roll2", "stack2", "dress"];
   const ACTIVE = { roll0: 0, roll1: 1, stack1: 1, roll2: 2, stack2: 2, dress: -1 };
   const activeIndex = () => ACTIVE[S.step];
   const rolling = () => S.step.startsWith("roll");

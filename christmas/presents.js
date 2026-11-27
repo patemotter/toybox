@@ -133,7 +133,7 @@
     bubble: { x: 178, y: 54, w: 214, h: 132 },
     win: { x: 12, y: 58, w: 116, h: 92 },
     garland: { x0: 6, x1: 394, y: 10 },
-    wrap: { x: 232, y: 410 }, give: { x: 222, y: 346 },
+    wrap: { x: 238, y: 404 }, give: { x: 232, y: 336 }, box: [160, 96, 34, 16],
     tray: { x: 10, y: 484, w: 380, h: 250 }, shelf: { x: 10, y: 484, w: 380, h: 250, cols: 4 },
     unroll: "up", wreath: null
   };
@@ -142,12 +142,12 @@
     bubble: { x: 200, y: 46, w: 226, h: 140 },
     win: { x: 440, y: 52, w: 104, h: 104 },
     garland: { x0: 188, x1: 814, y: 8 },
-    wrap: { x: 392, y: 330 }, give: { x: 268, y: 272 },
+    wrap: { x: 394, y: 334 }, give: { x: 278, y: 274 }, box: [150, 90, 32, 15],
     tray: { x: 540, y: 228, w: 272, h: 206 }, shelf: { x: 562, y: 96, w: 250, h: 338, cols: 3 },
     unroll: "left", wreath: { x: 700, y: 112 }
   };
   // The box: front face BW x BH, top face BD deep and BI narrower at the back (seen from a little above).
-  const BW = 136, BH = 84, BD = 30, BI = 14;
+  let BW = 136, BH = 84, BD = 30, BI = 14;
   let L = TALL, W = 0, H = 0, dpr = 1, vs = 1, vox = 0, voy = 0;
   function resize() {
     const r = stage.getBoundingClientRect();
@@ -156,6 +156,7 @@
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const was = L;
     L = W / H > 1.05 ? WIDE : TALL;
+    [BW, BH, BD, BI] = L.box;
     vs = Math.min(W / L.w, H / L.h) * 0.98;
     vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) / 2;
     if (was !== L) placeAll();
@@ -175,16 +176,16 @@
   }
   function rollSlot(i) {
     const T = L.tray;
-    if (L.unroll === "up") return { x: T.x + T.w / 2, y: T.y + 32 + i * 56, len: 196, dia: 36 };
-    return { x: T.x + 36 + i * 67, y: T.y + T.h / 2, len: 160, dia: 34 };
+    if (L.unroll === "up") return { x: T.x + T.w / 2, y: T.y + 34 + i * 56, len: 204, dia: 36 };
+    return { x: T.x + 36 + i * 67, y: T.y + T.h / 2, len: 168, dia: 34 };
   }
   function bowSlot(i) {
     const T = L.tray;
-    if (L.unroll === "up") return { x: T.x + T.w * (i + 0.5) / 4, y: T.y + T.h * 0.45 };
+    if (L.unroll === "up") return { x: T.x + T.w * (i + 0.5) / 4, y: T.y + T.h * 0.3 };
     return { x: T.x + T.w * (i % 2 ? 0.72 : 0.28), y: T.y + T.h * (i < 2 ? 0.28 : 0.72) };
   }
-  const lidSlot = () => ({ x: L.tray.x + L.tray.w * 0.5, y: L.tray.y + L.tray.h * 0.42 });
-  const dispSlot = () => ({ x: L.tray.x + L.tray.w * 0.5, y: L.tray.y + L.tray.h * 0.55 });
+  const lidSlot = () => ({ x: L.tray.x + L.tray.w * 0.5, y: L.tray.y + L.tray.h * (L.unroll === "up" ? 0.3 : 0.42) });
+  const dispSlot = () => ({ x: L.tray.x + L.tray.w * 0.5, y: L.tray.y + L.tray.h * (L.unroll === "up" ? 0.36 : 0.55) });
   const mouthPt = () => { const d = dispSlot(); return { x: d.x + 46, y: d.y - 26 }; };
   // Where the recipient stands (people and the pony behind the table) or sits (on the table).
   const onTable = (r) => r.kind === "dog" || r.kind === "cat" || r.kind === "hamster";
@@ -352,8 +353,8 @@
   // Steps: pick and lid
   // =====================================================================================================
   // The gift lands inside the open box (its top peeks out above the front).
-  const inBoxPt = () => { const g = boxG(); return { x: g.cx, y: g.yt - 8 }; };
-  const GIFT_IN_S = 64;
+  const inBoxPt = () => { const g = boxG(); GIFT_IN_S = BW * 0.45; return { x: g.cx, y: g.yt - 8 }; };
+  let GIFT_IN_S = 64;
   function pickGift(id, from) {
     if (busy || B.step !== "pick" || !GIFT_BY[id]) return;
     busy = true;
@@ -1050,7 +1051,7 @@
   // =====================================================================================================
   let flakes = [];
   for (let k = 0; k < 70; k++) flakes.push({ x: Math.random(), y: Math.random(), s: 1 + Math.random() * 2, v: 0.05 + Math.random() * 0.06, ph: Math.random() * TAU });
-  let snowUntil = 0;
+  let snowUntil = 0, sill = 0;
   function drawRoom(t) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const by = voy + L.back * vs;
@@ -1084,18 +1085,27 @@
     const tx = w.x + w.w * 0.74, ty = w.y + w.h * 0.74;
     ctx.fillStyle = "#2E9455"; ctx.beginPath(); ctx.moveTo(tx, ty - 34); ctx.lineTo(tx + 14, ty); ctx.lineTo(tx - 14, ty); ctx.closePath(); ctx.fill();
     // Falling snow (a flurry for a Surprise).
-    const n = heavy ? 70 : 22, sp = heavy ? 2.2 : 1;
+    const n = heavy ? 70 : 22, sp = heavy ? 1.8 : 1;
     flakes.forEach((f, k) => {
       f.y += f.v * sp * dt; if (f.y > 1.05) { f.y = -0.05; f.x = Math.random(); }
       if (k >= n) return;
       const x = w.x + (f.x + Math.sin(t * 0.8 + f.ph) * 0.03) * w.w, y = w.y + f.y * w.h;
-      ctx.beginPath(); ctx.arc(x, y, f.s * (heavy ? 1.5 : 1), 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, f.s * (heavy ? 2.2 : 1), 0, TAU); ctx.fillStyle = "#FFFFFF"; ctx.fill();
     });
     ctx.restore();
     rr(w.x, w.y, w.w, w.h, 4); ctx.strokeStyle = INK; ctx.lineWidth = LW; ctx.stroke();
     line(w.x + w.w / 2, w.y, w.x + w.w / 2, w.y + w.h, INK, 5); line(w.x + w.w / 2, w.y, w.x + w.w / 2, w.y + w.h, "#FFFFFF", 2.4);
     line(w.x, w.y + w.h / 2, w.x + w.w, w.y + w.h / 2, INK, 5); line(w.x, w.y + w.h / 2, w.x + w.w, w.y + w.h / 2, "#FFFFFF", 2.4);
     rr(w.x - 10, w.y + w.h + 4, w.w + 20, 8, 3); fs("#FFFFFF");
+    // A flurry piles a little snow on the outside of the sill (it stays for this visit).
+    if (heavy) sill = Math.min(1, sill + dt * 0.25);
+    if (sill > 0.02) {
+      const sy = w.y + w.h - 1;
+      ctx.beginPath(); ctx.moveTo(w.x + 2, sy);
+      ctx.quadraticCurveTo(w.x + w.w * 0.3, sy - 12 * sill, w.x + w.w * 0.55, sy - 6 * sill);
+      ctx.quadraticCurveTo(w.x + w.w * 0.8, sy - 14 * sill, w.x + w.w - 2, sy); ctx.closePath();
+      ctx.fillStyle = "#FFFFFF"; ctx.fill(); ctx.strokeStyle = "#9CC3E8"; ctx.lineWidth = 1.4; ctx.stroke();
+    }
     ctx.restore();
   }
   function drawWreath(t) {
@@ -1313,7 +1323,7 @@
     if (P.cheer) { const w = Math.sin(t * 9) * 6; arms.push([-1, [-sw / 2 - 18 + w, shY - 46]], [1, [sw / 2 + 18 - w, shY - 46]]); }
     else if (P.wave) { arms.push([1, [sw / 2 + 22 + Math.sin(t * 10) * 10, shY - 44]]); }
     else if (P.reach > 0.05) { const k = P.reach; arms.push([1, [sw / 2 + 4 + 28 * k, shY + 50 - 10 * k]], [-1, [-sw / 2 + 10 + 30 * k, shY + 58]]); }
-    else arms.push([-1, [-sw / 2 - 2, shY + 76]], [1, [sw / 2 + 2, shY + 76]]);
+    else arms.push([-1, [-sw / 2 + 4, shY + 80]], [1, [sw / 2 - 4, shY + 80]]);
     // The body (it runs down behind the table).
     if (rc.role === "girl") { ell(-hr * 0.98, hy + hr * 0.25, 8, 13, 0.4); fs(rc.hair); ell(hr * 0.98, hy + hr * 0.25, 8, 13, -0.4); fs(rc.hair); }
     rr(-sw / 2, shY, sw, sh + 30, 24); fs(rc.shirt);

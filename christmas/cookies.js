@@ -1539,7 +1539,6 @@
   // =====================================================================================================
   function tag(name, x, y) { const v = vp(x, y); Toybox.nametag(name, v.x, v.y - 10, 1800); }
   const inBox = (w, B, pad) => w.x >= B.x - pad && w.x <= B.x + B.w + pad && w.y >= B.y - pad && w.y <= B.y + B.h + pad;
-  const doughName = () => DOUGHS[C.d].id === "sugar" ? "Sugar cookie dough" : "Gingerbread dough";
   // The part under a press (client px). The things he works with right now come before the scenery.
   function hitPart(cx, cy) {
     if (locked()) return null;

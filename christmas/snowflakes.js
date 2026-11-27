@@ -103,9 +103,10 @@
     const fw = LY.fw;
     LY.glass = { x: LY.win.x + fw, y: LY.win.y + fw, w: LY.win.w - fw * 2, h: LY.win.h - fw * 2 };
     LY.sc = clamp(Math.min(W, H) * 0.36, 110, 210);
-    LY.rest = { x: W - LY.sc * 0.2 - 12, y: H - 10 - LY.sc * 0.66, a: -Math.PI / 2 };
-    // Sideways, the paper keeps clear of the scissors resting at the right.
-    LY.pf = tall ? LY.pa : { x: LY.pa.x, y: LY.pa.y, w: LY.pa.w - LY.sc * 0.4, h: LY.pa.h };
+    LY.rest = { x: W - LY.sc * 0.24 - 14, y: H - 12 - LY.sc * 0.66, a: -Math.PI / 2 };
+    // The paper keeps clear of the scissors resting at the right.
+    const strip = LY.sc * 0.5;
+    LY.pf = { x: LY.pa.x + (tall ? strip * 0.25 : 0), y: LY.pa.y, w: LY.pa.w - strip * (tall ? 1.25 : 1), h: LY.pa.h };
     LY.flake = clamp(Math.sqrt(LY.glass.w * LY.glass.h) * 0.22, 34, 120);
   }
   function resize() {
