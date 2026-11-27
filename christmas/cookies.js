@@ -1387,7 +1387,7 @@
   function drawPlateView(t) {
     if (pv.a <= 0.01) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "rgba(29,35,64," + 0.72 * pv.a + ")"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(29,35,64," + 0.86 * pv.a + ")"; ctx.fillRect(0, 0, W, H);
     const lay = pvLayout(), svs = vs;
     ctx.save(); ctx.globalAlpha = pv.a;
     if (lay.house) {

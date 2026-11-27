@@ -594,7 +594,7 @@
   const paperHex = () => COLORS[S.c].hex;
   // The camera for each moment.
   const camFold = (k) => {
-    if (k === 0) return fitCam(FLAT[0], 0, LY.pf, 0.86);
+    if (k === 0) return fitCam(FLAT[0], 0, LY.pf, tall ? 0.86 : 0.8);
     return fitCam(FLAT[k], 45, LY.pf, 0.88, camFold(0).s * 1.7);
   };
   const camCutPre = () => fitCam(FLAT[4], 60, LY.ca, 0.88);

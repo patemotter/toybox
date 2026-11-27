@@ -158,7 +158,8 @@
     L = W / H > 1.05 ? WIDE : TALL;
     [BW, BH, BD, BI] = L.box;
     vs = Math.min(W / L.w, H / L.h) * 0.98;
-    vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) / 2;
+    // Spare height goes mostly below the scene (more table), so the garland stays near the top of the wall.
+    vox = (W - L.w * vs) / 2; voy = (H - L.h * vs) * 0.2;
     if (was !== L) placeAll();
   }
   function vp(x, y) { const r = cv.getBoundingClientRect(); return { x: r.left + vox + x * vs, y: r.top + voy + y * vs }; }
@@ -1427,7 +1428,7 @@
   function drawPony(t, P) {
     const C = "#A8683C", M = "#5A3A22";
     // The neck runs down behind the table.
-    poly([[-26, 40], [-20, -70], [22, -78], [28, 40]]); fs(C);
+    ctx.beginPath(); ctx.moveTo(-36, 40); ctx.quadraticCurveTo(-30, -40, -16, -84); ctx.lineTo(20, -90); ctx.quadraticCurveTo(30, -30, 40, 40); ctx.closePath(); fs(C);
     ctx.beginPath(); ctx.moveTo(14, -120); ctx.quadraticCurveTo(42, -90, 34, -30); ctx.lineTo(24, -30); ctx.quadraticCurveTo(28, -84, 4, -112); ctx.closePath(); fs(M);
     ctx.save(); ctx.translate(4, -116); ctx.rotate((P.tilt || 0) + (P.happy ? Math.sin(t * 6) * 0.06 : 0));
     [-1, 1].forEach((s) => { poly([[s * 10, -30], [s * 22, -62], [s * 26, -26]]); fs(C); });
