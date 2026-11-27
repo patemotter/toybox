@@ -195,14 +195,26 @@
   // A facet is one piece of one layer of the folded paper: the part of the sheet between the angles a0 and a1
   // round the middle M (every fold line passes through M, so every piece is a slice), its map to the folded
   // paper (flat angle = d * sheet angle + g; d = -1 means it lies face down) and its height z in the stack.
-  // The four real folds of a six-point snowflake, each a line through M at a flat angle and the side that moves
-  // (a flat angle on that side):
-  const FOLDS = [
-    { line: 135, move: -135 },  // the top-left corner down onto the bottom-right corner: a triangle
-    { line: 15, move: -15 },    // a third over (the right side as he sees it)
-    { line: 75, move: 105 },    // the other third over (the left side)
-    { line: 45, move: 60 }      // in half again: a 30 degree wedge, 12 layers
+  // Each fold type is a real way to fold a square for a paper snowflake: a list of folds (each a line through M
+  // at a flat angle, and a flat angle on the side that moves), ending in a wedge of 2n mirrored slices between
+  // the flat angles w0 and w0 + 180/n. After the last fold the scissors trim the wedge from the notch radius rv
+  // on one edge to the point radius RP on the edge at pAng, which makes the n points.
+  const TYPES = [
+    { id: "p4", n: 4, name: "4 points", w0: 0, pAng: 45, rotFold: 0, rv: 0.46,
+      folds: [{ line: 0, move: -90 }, { line: 90, move: 180 }, { line: 45, move: 67.5 }],
+      lines: ["Fold the paper in half.", "Fold the left side over.", "Fold the paper into a triangle."] },
+    { id: "p5", n: 5, name: "5 points", w0: 72, pAng: 72, rotFold: 0, rv: 0.52,
+      folds: [{ line: 0, move: -90 }, { line: 72, move: 36 }, { line: 144, move: 162 }, { line: 108, move: 126 }],
+      lines: ["Fold the paper in half.", "Fold the right side over.", "Fold the left side over.", "Fold the paper in half again."] },
+    { id: "p6", n: 6, name: "6 points", w0: 15, pAng: 45, rotFold: 45, rv: 0.7,
+      folds: [{ line: 135, move: -135 }, { line: 15, move: -15 }, { line: 75, move: 105 }, { line: 45, move: 60 }],
+      lines: ["Fold the paper in half.", "Fold the right side over.", "Fold the left side over.", "Fold the paper in half again."] },
+    { id: "p8", n: 8, name: "8 points", w0: 0, pAng: 0, rotFold: 0, rv: 0.74,
+      folds: [{ line: 0, move: -90 }, { line: 90, move: 180 }, { line: 45, move: 67.5 }, { line: 22.5, move: 33.75 }],
+      lines: ["Fold the paper in half.", "Fold the left side over.", "Fold the paper into a triangle.", "Fold the triangle in half."] }
   ];
+  const TYPE_BY = {};
+  TYPES.forEach((t, i) => { TYPE_BY[t.id] = i; });
   const facetMat = (f) => { const c = Math.cos(f.g * DEG), s = Math.sin(f.g * DEG); return f.d > 0 ? [c, s, -s, c, 0, 0] : [c, s, s, -c, 0, 0]; };
   // A fold in progress (p from 0 to 1): the moving side turns over the line, seen from above (it narrows, then
   // lands mirrored on the other side).
@@ -210,8 +222,8 @@
     const c = Math.cos(Math.PI * p) - 1, s = Math.sin(L * DEG), co = Math.cos(L * DEG);
     return [1 + c * s * s, -c * s * co, -c * s * co, 1 + c * co * co, 0, 0];
   }
-  function foldFacets(list, k) {
-    const F = FOLDS[k], L = F.line;
+  function foldFacets(list, F) {
+    const L = F.line;
     const side = (fa) => Math.sin((fa - L) * DEG) > 0;
     const mvSide = side(F.move), pieces = [];
     for (const f of list) {
@@ -254,60 +266,77 @@
     }
     return (polyCache[key] = poly);
   }
-  // The trimmed sheet is a six-point star: points at 45 + 60k degrees (radius RP), notches between (RV).
-  const RP = 0.97, RV = 0.7;
-  const starR = (a) => (Math.abs((((a - 45) % 60) + 60) % 60) < 1 || Math.abs((((a - 45) % 60) + 60) % 60 - 60) < 1 ? RP : RV);
-  function starPoly(f) {
-    const pts = f.a1 - f.a0 < 359 ? [[0, 0]] : [];
-    for (let a = f.a0; a <= f.a1 + 1e-6; a += 30) { const r = starR(a); pts.push([r * Math.cos(a * DEG), r * Math.sin(a * DEG)]); }
-    return pts;
-  }
+  const RP = 0.97;
   const mapPoly = (M, poly) => poly.map(([x, y]) => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]]);
-  // Every state of the sheet (0 = flat, 4 = the wedge) and the pieces of each fold.
-  const STATES = [[{ a0: -225, a1: 135, d: 1, g: 0, z: 0 }]], SPLITS = [];
-  for (let k = 0; k < 4; k++) { const r = foldFacets(STATES[k], k); SPLITS.push(r.pieces); STATES.push(r.after); }
-  const FLAT = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), facetPoly(f))));
-  const FLAT_STAR = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), starPoly(f))));
-  // Where the paper's corner (the moving side's farthest point) starts for each fold, how far it is from the
-  // fold line and the line's normal toward the moving side.
-  const GRAB = FOLDS.map((F, k) => {
-    const L = F.line * DEG;
-    let n = [-Math.sin(L), Math.cos(L)];
-    if (Math.sin((F.move - F.line) * DEG) < 0) n = [-n[0], -n[1]];
-    let best = null, bd = -1;
-    SPLITS[k].forEach((f) => { if (f.mv) mapPoly(facetMat(f), facetPoly(f)).forEach((p) => { const d = p[0] * n[0] + p[1] * n[1]; if (d > bd + 1e-6) { bd = d; best = p; } }); });
-    return { g: best, d0: bd, n, to: [best[0] - 2 * bd * n[0], best[1] - 2 * bd * n[1]] };
-  });
-  // The 12 slices of the wedge, each as a map from flat units back to the sheet.
-  const SECTORS = STATES[4].map((f) => facetMat({ d: f.d, g: f.d > 0 ? -f.g : f.g }));
-  // The trim line across the wedge (flat): from the notch radius on the 15 degree edge to the point radius on
-  // the 45 degree edge.
-  const TA = [RV * Math.cos(15 * DEG), RV * Math.sin(15 * DEG)], TB = [RP * Math.cos(45 * DEG), RP * Math.sin(45 * DEG)];
-  const WEDGE = [[0, 0], TA, TB];
-  // The paper the trim cuts off: every layer's part beyond the trim line.
-  const SCRAPS = (() => {
+  const dirPt = (a, r) => [r * Math.cos(a * DEG), r * Math.sin(a * DEG)];
+  // Everything about one fold type, worked out once: every state of the sheet (0 = flat, NF = the wedge), the
+  // pieces of each fold, the paper's corner for each fold, the wedge's slices as maps back to the sheet, the
+  // trim line and the scraps it cuts off, the mask's box and the camera turns.
+  function buildType(T) {
+    const sig = 180 / T.n, w1 = T.w0 + sig, vAng = T.pAng === T.w0 ? w1 : T.w0;
+    const L1 = T.folds[0].line, NF = T.folds.length;
+    const STATES = [[{ a0: L1 - 360, a1: L1, d: 1, g: 0, z: 0 }]], SPLITS = [];
+    T.folds.forEach((F) => { const r = foldFacets(STATES[STATES.length - 1], F); SPLITS.push(r.pieces); STATES.push(r.after); });
+    // The trimmed sheet is a star: points at pAng + k * 360/n (radius RP), notches between (rv).
+    const starR = (a) => { const q = Math.round((a - T.pAng) / sig); return ((q % 2) + 2) % 2 === 0 ? RP : T.rv; };
+    const starPoly = (f) => {
+      const pts = f.a1 - f.a0 < 359 ? [[0, 0]] : [];
+      for (let a = f.a0; a <= f.a1 + 1e-6; a += sig) pts.push(dirPt(a, starR(a)));
+      return pts;
+    };
+    const FLAT = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), facetPoly(f))));
+    const FLAT_STAR = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), starPoly(f))));
+    const GRAB = T.folds.map((F, k) => {
+      const L = F.line * DEG;
+      let n = [-Math.sin(L), Math.cos(L)];
+      if (Math.sin((F.move - F.line) * DEG) < 0) n = [-n[0], -n[1]];
+      let best = null, bd = -1;
+      SPLITS[k].forEach((f) => { if (f.mv) mapPoly(facetMat(f), facetPoly(f)).forEach((p) => { const d = p[0] * n[0] + p[1] * n[1]; if (d > bd + 1e-6) { bd = d; best = p; } }); });
+      return { g: best, d0: bd, n, to: [best[0] - 2 * bd * n[0], best[1] - 2 * bd * n[1]] };
+    });
+    const SECTORS = STATES[NF].map((f) => facetMat({ d: f.d, g: f.d > 0 ? -f.g : f.g }));
+    const TA = dirPt(vAng, T.rv), TB = dirPt(T.pAng, RP), WEDGE = [[0, 0], TA, TB];
     const nx = -(TB[1] - TA[1]), ny = TB[0] - TA[0];
     const sg = (nx * (0 - TA[0]) + ny * (0 - TA[1])) > 0 ? -1 : 1;   // keep the side away from M
-    const out = [];
-    FLAT[4].forEach((poly) => {
+    const SCRAPS = [];
+    FLAT[NF].forEach((poly) => {
       const sh = poly.map(([x, y]) => [x - TA[0], y - TA[1]]);
       const c = clipHalf(sh, sg * nx, sg * ny).map(([x, y]) => [x + TA[0], y + TA[1]]);
-      if (c.length > 2) out.push(c);
+      if (c.length > 2) SCRAPS.push(c);
     });
-    return out;
-  })();
+    const xs = WEDGE.map((p) => p[0]), ys = WEDGE.map((p) => p[1]);
+    const MX0 = Math.min(...xs) - 0.03, MY0 = Math.min(...ys) - 0.03;
+    // The camera turns: the wedge hangs straight down from M while he cuts; the snowflake has a point straight
+    // up when it is open.
+    const per = 360 / T.n;
+    let rotRev = -90 - T.pAng - T.rotFold;
+    rotRev = T.rotFold + (((rotRev % per) + per * 1.5) % per - per / 2);
+    return Object.assign({}, T, { sig, w1, NF, STATES, SPLITS, FLAT, FLAT_STAR, GRAB, SECTORS, TA, TB, WEDGE, SCRAPS,
+      MX0, MY0, MW: Math.max(...xs) - MX0 + 0.03, MH: Math.max(...ys) - MY0 + 0.03,
+      rotCut: 90 - (T.w0 + sig / 2), rotRev });
+  }
+  const GEO = TYPES.map(buildType);
+  // The fold type in use (the sheet's own type; a hung snowflake's type while it is drawn).
+  let G = GEO[TYPE_BY.p6], FOLDS = G.folds, STATES = G.STATES, SPLITS = G.SPLITS, FLAT = G.FLAT, FLAT_STAR = G.FLAT_STAR, GRAB = G.GRAB,
+    SECTORS = G.SECTORS, TA = G.TA, TB = G.TB, WEDGE = G.WEDGE, SCRAPS = G.SCRAPS, MX0 = G.MX0, MY0 = G.MY0, NF = G.NF;
+  function useType(i) {
+    G = GEO[i];
+    ({ folds: FOLDS, STATES, SPLITS, FLAT, FLAT_STAR, GRAB, SECTORS, TA, TB, WEDGE, SCRAPS, MX0, MY0, NF } = G);
+  }
+  function withType(i, fn) { const was = TYPE_BY[G.id]; useType(i); try { return fn(); } finally { useType(was); } }
 
   // =====================================================================================================
   // The cut mask
   // =====================================================================================================
-  // The wedge's paper as an alpha mask in flat units (it covers MX0..MX0+MSZ both ways at res px per unit).
+  // The wedge's paper as an alpha mask in flat units (its box starts at MX0, MY0 and is G.MW by G.MH units, at res
+  // px per unit; each fold type has its own box).
   // Cuts are kept as ops in flat units: { k: "s", p: [x, y, x, y, ...] } a cut along a path (a strip CUTW wide
   // is taken away) and { k: "n", t, x, y, a } a notch (t: 0 triangle, 1 half circle, 2 diamond; a = the
   // direction into the paper, degrees). Pieces that fall away are kept as drops [op index, x, y] (a point in the
   // piece) so the same snowflake comes back at any size.
-  const MX0 = -0.03, MY0 = -0.03, MSZ = 0.76, CUTW = 0.046, NOTCH = 0.075;
+  const CUTW = 0.046, NOTCH = 0.075;
   function newMask(res) {
-    const c = mkCanvas(MSZ * res), g = c.getContext("2d", { willReadFrequently: true });
+    const c = mkCanvas(G.MW * res, G.MH * res), g = c.getContext("2d", { willReadFrequently: true });
     g.setTransform(res, 0, 0, res, -MX0 * res, -MY0 * res);
     g.fillStyle = "#FFFFFF";
     g.beginPath(); g.moveTo(0, 0); g.lineTo(TA[0], TA[1]); g.lineTo(TB[0], TB[1]); g.closePath(); g.fill();
@@ -337,7 +366,9 @@
     } else { notchPath(g, op); g.fillStyle = "#000"; g.fill(); }
     g.globalCompositeOperation = "source-over";
   }
-  const S15 = Math.sin(15 * DEG), C15 = Math.cos(15 * DEG), R2 = Math.SQRT1_2;
+  // How far a point is inside each fold edge of the wedge (negative = outside).
+  const edge0 = (x, y) => -Math.sin(G.w0 * DEG) * x + Math.cos(G.w0 * DEG) * y;
+  const edge1 = (x, y) => Math.sin(G.w1 * DEG) * x - Math.cos(G.w1 * DEG) * y;
   // Pieces cut off from the middle fall away. A piece stays when it reaches the middle of the snowflake or both
   // fold edges (it then goes all the way round); if nothing would stay, the biggest piece stays. Returns the
   // fallen pieces (a point in each, and a picture of it when sprites is set).
@@ -357,8 +388,8 @@
         if (x < cp.x0) cp.x0 = x; if (x > cp.x1) cp.x1 = x; if (y < cp.y0) cp.y0 = y; if (y > cp.y1) cp.y1 = y;
         const fx = MX0 + (x + 0.5) / res, fy = MY0 + (y + 0.5) / res;
         if (fx * fx + fy * fy < 0.0036) cp.apex = true;
-        if (-S15 * fx + C15 * fy < tol) cp.e15 = true;
-        if (R2 * fx - R2 * fy < tol) cp.e45 = true;
+        if (edge0(fx, fy) < tol) cp.e15 = true;
+        if (edge1(fx, fy) < tol) cp.e45 = true;
         let all = 0;
         if (x > 0) { const q = j - 1; if (a[q * 4 + 3] >= 128) { all++; if (lab[q] < 0) { lab[q] = cp.id; stack[sp++] = q; } } }
         if (x < w - 1) { const q = j + 1; if (a[q * 4 + 3] >= 128) { all++; if (lab[q] < 0) { lab[q] = cp.id; stack[sp++] = q; } } }
@@ -429,8 +460,8 @@
         list.push(j);
         const fx = MX0 + (x + 0.5) / res, fy = MY0 + (y + 0.5) / res;
         if (fx * fx + fy * fy < 0.0036) apex = true;
-        if (-S15 * fx + C15 * fy < tol) e15 = true;
-        if (R2 * fx - R2 * fy < tol) e45 = true;
+        if (edge0(fx, fy) < tol) e15 = true;
+        if (edge1(fx, fy) < tol) e45 = true;
         const nb = [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, j - w, j + w];
         for (const q of nb) {
           if (q < 0 || q >= n || seen[q]) continue;
@@ -498,8 +529,8 @@
     const tex = rimify(fm, hex, rim);
     const cr = mkCanvas(N), c2 = cr.getContext("2d");
     c2.strokeStyle = INK; c2.lineWidth = creaseW;
-    for (let j = 0; j < 6; j++) {
-      const an = (15 + 30 * j) * DEG, cx = Math.cos(an) * k, cy = Math.sin(an) * k;
+    for (let j = 0; j < G.n; j++) {
+      const an = (G.pAng + j * G.sig) * DEG, cx = Math.cos(an) * k, cy = Math.sin(an) * k;
       c2.beginPath(); c2.moveTo(k - cx, k - cy); c2.lineTo(k + cx, k + cy); c2.stroke();
     }
     c2.globalCompositeOperation = "destination-in"; c2.drawImage(fm, 0, 0);
@@ -508,7 +539,8 @@
     return { tex, cr, sh, N };
   }
   // A finished snowflake as one picture (s = CSS px per sheet unit), creases faintly baked in.
-  function renderEntry(e, s) {
+  function renderEntry(e, s) { return withType(e.t, () => renderEntryNow(e, s)); }
+  function renderEntryNow(e, s) {
     const mk = newMask(clamp(s * dpr * 1.4, 160, 900));
     replay(mk, e.ops, e.drops);
     const N = Math.ceil(2 * s * dpr);
@@ -541,7 +573,9 @@
     const ops = decodeOps(e.ops); if (!ops) return null;
     const drops = decodeDrops(e.drops, ops.length); if (!drops) return null;
     if (![e.u, e.v, e.r].every(Number.isFinite)) return null;
-    return { c: e.c, ops, drops, u: clamp(e.u, 0, 1), v: clamp(e.v, 0, 1), r: e.r, pic: null };
+    // Snowflakes saved before there were fold types are six-point ones.
+    const t = TYPE_BY[e.t] != null ? TYPE_BY[e.t] : TYPE_BY.p6;
+    return { t, c: e.c, ops, drops, u: clamp(e.u, 0, 1), v: clamp(e.v, 0, 1), r: e.r, pic: null };
   }
   let hung = Array.isArray(saved.window) ? saved.window.map(decodeEntry).filter(Boolean).slice(-WIN_MAX) : [];
   const leaving = [];
@@ -584,7 +618,7 @@
   // =====================================================================================================
   // S.ph: "fold" (S.f folds done), "trim" (the scissors trim the top), "cut", "open" (unfolding), "hang" (the
   // snowflake waits to be hung), "hung" (it is on the window; a new sheet comes).
-  const S = { ph: "fold", f: 0, c: 0, next: null, ops: [], drops: [], mk: null, notchNext: 0 };
+  const S = { ph: "fold", f: 0, c: 0, next: null, t: TYPE_BY.p6, nextT: null, ops: [], drops: [], mk: null, notchNext: 0 };
   let busy = false, drag = null, sheetId = 0, TEX = null, WD = null, WDtmp = null, wdDirty = true;
   const V = {
     fold: null, unfold: null, shown: 4, creaseA: 0.7, slide: 0, flutter: 0, crease: null,
@@ -595,15 +629,15 @@
   // The camera for each moment.
   const camFold = (k) => {
     if (k === 0) return fitCam(FLAT[0], 0, LY.pf, tall ? 0.86 : 0.8);
-    return fitCam(FLAT[k], 45, LY.pf, 0.88, camFold(0).s * 1.7);
+    return fitCam(FLAT[k], G.rotFold, LY.pf, 0.88, camFold(0).s * 1.7);
   };
-  const camCutPre = () => fitCam(FLAT[4], 60, LY.ca, 0.88);
-  const camCut = () => fitCam([WEDGE], 60, LY.ca, 0.88);
+  const camCutPre = () => fitCam(FLAT[NF], G.rotCut, LY.ca, 0.88);
+  const camCut = () => fitCam([WEDGE], G.rotCut, LY.ca, 0.88, Math.min(W, H) * 1.6);
   const camOpen = (k) => {
     const s0 = LY.rv.r / RP;
-    if (k === 0) return { x: LY.rv.x, y: LY.rv.y, s: s0, r: 45 * DEG };
+    if (k === 0) return { x: LY.rv.x, y: LY.rv.y, s: s0, r: G.rotRev * DEG };
     const a = LY.rv.r * 2;
-    return fitCam(FLAT_STAR[k], 45, { x: LY.rv.x - a / 2, y: LY.rv.y - a / 2, w: a, h: a }, 0.9, s0 * 1.25);
+    return fitCam(FLAT_STAR[k], G.rotRev, { x: LY.rv.x - a / 2, y: LY.rv.y - a / 2, w: a, h: a }, 0.9, s0 * 1.25);
   };
   function camNow() {
     if (S.ph === "fold") return camFold(S.f);
@@ -626,6 +660,9 @@
     sheetId++;
     busy = false; drag = null;
     if (S.next != null) { S.c = S.next; S.next = null; }
+    if (S.nextT != null) { S.t = S.nextT; S.nextT = null; }
+    useType(S.t);
+    folds.set(GEO[S.t].id);
     S.ph = "fold"; S.f = 0; S.ops = []; S.drops = []; S.mk = null; S.notchNext = 0;
     TEX = null; WD = null;
     V.fold = null; V.unfold = null; V.flake = null; V.crease = null; V.falls = []; V.breath = 0;
@@ -649,7 +686,7 @@
   }
   // Starts a fold that follows his finger: the corner goes as far across as his finger goes.
   function foldStart(sx, sy) {
-    if (busy || S.ph !== "fold" || S.f >= 4 || V.fold) return false;
+    if (busy || S.ph !== "fold" || S.f >= NF || V.fold) return false;
     const c = paperCam(), f0 = fromScr(c, sx, sy);
     V.fold = { k: S.f, p: 0, f0, c };
     ghost.learned("fold");
@@ -681,7 +718,7 @@
   }
   // A tap on the paper: the fold plays by itself.
   function foldTap() {
-    if (busy || S.ph !== "fold" || S.f >= 4 || V.fold) return;
+    if (busy || S.ph !== "fold" || S.f >= NF || V.fold) return;
     ghost.learned("fold");
     V.fold = { k: S.f, p: 0, c: paperCam() };
     foldFinish();
@@ -693,7 +730,7 @@
     V.crease = { k, t0: now() };
     lastWant = "";
     saveSoon();
-    if (S.f >= 4) { startTrim(); return; }
+    if (S.f >= NF) { startTrim(); return; }
     camTween(camFold(S.f), 0.65);
     later(0.65, () => { busy = false; ghost.poke(); }, "sheet");
   }
@@ -745,7 +782,7 @@
   const inWedge = (f, m) => {
     // Inside the trimmed wedge, grown by m units.
     const ang = Math.atan2(f.y, f.x) / DEG, r = Math.hypot(f.x, f.y);
-    if (ang < 15 - m * 90 / Math.max(r, 0.05) || ang > 45 + m * 90 / Math.max(r, 0.05)) return false;
+    if (ang < G.w0 - m * 90 / Math.max(r, 0.05) || ang > G.w1 + m * 90 / Math.max(r, 0.05)) return false;
     const nx = -(TB[1] - TA[1]), ny = TB[0] - TA[0], ln = Math.hypot(nx, ny);
     return ((f.x - TA[0]) * nx + (f.y - TA[1]) * ny) / ln <= m;
   };
@@ -812,7 +849,7 @@
     const fall = settle(S.mk, paperHex(), true);
     fall.forEach((f) => {
       S.drops.push([i, f.x, f.y]);
-      if (f.cv) V.falls.push({ cv: f.cv, mx: f.mx, my: f.my, res: S.mk.res, c: { x: cam.x, y: cam.y, s: cam.s, r: cam.r }, t0: now(), dur: 1.2, vx: (Math.random() - 0.5) * 60, spin: (Math.random() - 0.5) * 1.6 });
+      if (f.cv) V.falls.push({ cv: f.cv, mx: f.mx, my: f.my, ox: MX0, oy: MY0, res: S.mk.res, c: { x: cam.x, y: cam.y, s: cam.s, r: cam.r }, t0: now(), dur: 1.2, vx: (Math.random() - 0.5) * 60, spin: (Math.random() - 0.5) * 1.6 });
     });
     if (fall.length) wdDirty = true;
     lastWant = "";
@@ -822,8 +859,8 @@
   function notchAt(fx, fy) {
     if (busy || S.ph !== "cut" || !S.mk) return;
     const edges = [
-      { a: [0, 0], b: [RP * 1.05 * Math.cos(15 * DEG), RP * 1.05 * Math.sin(15 * DEG)], n: [-S15, C15] },
-      { a: [0, 0], b: [RP * 1.05 * R2, RP * 1.05 * R2], n: [R2, -R2] },
+      { a: [0, 0], b: dirPt(G.w0, RP * 1.05), n: [-Math.sin(G.w0 * DEG), Math.cos(G.w0 * DEG)] },
+      { a: [0, 0], b: dirPt(G.w1, RP * 1.05), n: [Math.sin(G.w1 * DEG), -Math.cos(G.w1 * DEG)] },
       { a: TA, b: TB, n: null }
     ];
     let best = null, bd = 0.09;
@@ -877,14 +914,14 @@
     panelSync();
     makeTex();
     scissorsHome(0.5);
-    V.shown = 4; V.creaseA = 0.75;
-    let k = 3;
+    V.shown = NF; V.creaseA = 0.75;
+    let k = NF - 1;
     const step = () => {
       if (k < 0) { reveal(); return; }
       const kk = k;
       V.unfold = { k: kk, p: 1 };
       camTween(camOpen(kk), 0.8);
-      const c0 = V.creaseA, c1 = 0.75 - (4 - kk) * 0.11;
+      const c0 = V.creaseA, c1 = 0.75 - (NF - kk) * 0.44 / NF;
       tween(0.8, (p) => { V.unfold.p = 1 - ease(p); V.creaseA = lerp(c0, c1, p); }, () => {
         V.unfold = null; V.shown = kk; k--;
         later(0.12, step, "sheet");
@@ -898,8 +935,8 @@
     V.flake = { x: c.x, y: c.y, s: c.s, rot: c.r, spin: 0 };
     V.breath = 1; V.halo = 0;
     tween(0.8, (p) => { V.breath = 1 - p; V.halo = ease(p); }, null, 0, "sheet");
-    for (let j = 0; j < 6; j++) {
-      const an = c.r + (45 + 60 * j) * DEG;
+    for (let j = 0; j < G.n; j++) {
+      const an = c.r + (G.pAng + j * 360 / G.n) * DEG;
       puff("twinkle", c.x + Math.cos(an) * c.s * RP, c.y + Math.sin(an) * c.s * RP, 1);
     }
     puff("spark", c.x, c.y, 10, "#FFFFFF");
@@ -913,11 +950,11 @@
     if (S.ph !== "hang" || busy || !V.flake || locked()) return;
     busy = true; drag = null;
     ghost.learned("hang");
-    const f = V.flake, id = sheetId, entry = { c: S.c, ops: S.ops.slice(), drops: S.drops.slice(), u, v, r: 0, pic: null };
+    const f = V.flake, id = sheetId, entry = { t: S.t, c: S.c, ops: S.ops.slice(), drops: S.drops.slice(), u, v, r: 0, pic: null };
     V.flake = null; V.flying = f;
     const tgt = glassPt(u, v), s1 = hungS(), x0 = f.x, y0 = f.y, s0 = f.s;
     tween(0.75, (p) => { const e = ease(p); f.x = lerp(x0, tgt.x, e); f.y = lerp(y0, tgt.y, e) - Math.sin(p * Math.PI) * 30; f.s = lerp(s0, s1, e); }, () => {
-      entry.r = f.rot + f.spin - 45 * DEG;
+      entry.r = f.rot + f.spin;
       addHung(entry);
       hungPic(entry);
       V.flying = null;
@@ -1131,7 +1168,7 @@
       if (e.glint > 0) {
         const q = (t - e.glint) / 0.8;
         if (q >= 0 && q <= 1) {
-          const an = e.r + sway - Math.PI / 2;
+          const an = e.r + sway + GEO[e.t].pAng * DEG;
           twinkle(p.x + Math.cos(an) * s * RP * 0.8, p.y + Math.sin(an) * s * RP * 0.8, s * 0.55 * Math.sin(q * Math.PI), Math.sin(q * Math.PI));
         } else if (q > 1) e.glint = -1;
       }
@@ -1273,8 +1310,8 @@
     ctx.restore();
     // A glint runs round the points, one after another.
     if (!carried) {
-      const per = 0.7, j = Math.floor(t / per) % 6, ph = (t % per) / per;
-      const an = rot + (45 + 60 * j) * DEG;
+      const per = 0.7, j = Math.floor(t / per) % G.n, ph = (t % per) / per;
+      const an = rot + (G.pAng + j * 360 / G.n) * DEG;
       twinkle(f.x + Math.cos(an) * s * RP * 0.92, f.y + Math.sin(an) * s * RP * 0.92, s * 0.13 * Math.sin(ph * Math.PI), Math.sin(ph * Math.PI));
     }
   }
@@ -1298,7 +1335,7 @@
           ctx.closePath(); ctx.fillStyle = paperHex(); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
         });
       } else {
-        const ir = 1 / fl.res, T = mul(pre, mul(camMat(fl.c), [ir, 0, 0, ir, MX0 + fl.mx * ir, MY0 + fl.my * ir]));
+        const ir = 1 / fl.res, T = mul(pre, mul(camMat(fl.c), [ir, 0, 0, ir, fl.ox + fl.mx * ir, fl.oy + fl.my * ir]));
         ctx.setTransform(dpr * T[0], dpr * T[1], dpr * T[2], dpr * T[3], dpr * T[4], dpr * T[5]);
         ctx.drawImage(fl.cv, 0, 0);
       }
@@ -1363,10 +1400,9 @@
   // =====================================================================================================
   // What comes next: coach, ring and ghost hand
   // =====================================================================================================
-  const FOLD_LINES = ["Fold the paper in half.", "Fold the right side over.", "Fold the left side over.", "Fold the paper in half again."];
   function want() {
     if (busy || big || locked()) return null;
-    if (S.ph === "fold") return { line: FOLD_LINES[S.f], part: "corner" };
+    if (S.ph === "fold") return { line: G.lines[S.f], part: "corner" };
     if (S.ph === "cut") return S.ops.length < 3 ? { line: "Cut shapes into the paper.", part: "wedge" } : { line: "Cut more, or open the paper.", part: "open" };
     if (S.ph === "hang") return { line: "Hang the snowflake on the window.", part: "flake" };
     return null;
@@ -1600,6 +1636,36 @@
   // =====================================================================================================
   const paperPic = (hex) => '<svg viewBox="0 0 50 50"><path d="M8 8h25l9 9v25H8z" fill="' + hex + '" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>' +
     '<path d="M33 8v9h9" fill="#E3E8F2" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+  // A tiny paper snowflake for each fold type: its points, a ring of holes and a hole in the middle.
+  function typePic(T) {
+    const n = T.n, c = 25, R = 22, rv = R * T.rv / RP;
+    let d = "";
+    for (let k = 0; k < n * 2; k++) { const an = (k * 180 / n - 90) * DEG, r = k % 2 ? rv : R; d += (k ? "L" : "M") + (c + Math.cos(an) * r).toFixed(1) + " " + (c + Math.sin(an) * r).toFixed(1); }
+    let holes = "";
+    for (let k = 0; k < n; k++) { const an = (k * 360 / n - 90) * DEG; holes += '<circle cx="' + (c + Math.cos(an) * R * 0.52).toFixed(1) + '" cy="' + (c + Math.sin(an) * R * 0.52).toFixed(1) + '" r="2.6"/>'; }
+    return '<svg viewBox="0 0 50 50"><path d="' + d + 'Z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/>' +
+      '<g fill="#BFE3FF" stroke="#1D2340" stroke-width="1.4">' + holes + '<circle cx="25" cy="25" r="3.4"/></g></svg>';
+  }
+  const folds = Toybox.tiles($("folds"), {
+    items: GEO.map((T) => ({ id: T.id, name: T.name, pic: typePic(T) })),
+    value: "p6", rows: 1,
+    onPick: (id) => pickType(TYPE_BY[id])
+  });
+  // A fold type: the flat sheet takes it at once; once folding has started, the next sheet uses it.
+  function pickType(i) {
+    if (GEO[i] == null || locked()) return;
+    if (S.ph === "fold" && S.f === 0 && !V.fold && !busy) {
+      S.t = i; S.nextT = null; useType(i);
+      V.flutter = Math.max(V.flutter, 0.5);
+      lastWant = ""; ghost.again("fold");
+      saveSoon();
+      return;
+    }
+    if (i === S.t) { S.nextT = null; saveSoon(); return; }
+    S.nextT = i;
+    coach.say("The next paper makes " + GEO[i].n + " points.", 3);
+    saveSoon();
+  }
   const tiles = Toybox.tiles($("tiles"), {
     items: COLORS.map((c) => ({ id: c.id, name: c.name, pic: paperPic(c.hex) })),
     value: COLORS[0].id, rows: 1,
@@ -1648,7 +1714,7 @@
     } else if (k === 1) {
       hung.forEach((e, i) => { e.glint = t + i * 0.35; });
       lightsBright = 1;
-      if (S.ph === "hang" && V.flake) for (let j = 0; j < 6; j++) { const an = V.flake.rot + V.flake.spin + (45 + 60 * j) * DEG; puff("twinkle", V.flake.x + Math.cos(an) * V.flake.s * RP, V.flake.y + Math.sin(an) * V.flake.s * RP, 1); }
+      if (S.ph === "hang" && V.flake) for (let j = 0; j < G.n; j++) { const an = V.flake.rot + V.flake.spin + (G.pAng + j * 360 / G.n) * DEG; puff("twinkle", V.flake.x + Math.cos(an) * V.flake.s * RP, V.flake.y + Math.sin(an) * V.flake.s * RP, 1); }
       else if (S.ph === "cut") wedgeScr().forEach((p) => puff("twinkle", p.x, p.y, 1));
       else { const c = paperCam(); [[-1, -1], [1, 1], [1, -1], [-1, 1]].forEach(([x, y]) => { const p = toScr(c, x * 0.6, y * 0.6); puff("twinkle", p.x, p.y, 1); }); }
     } else {
@@ -1678,8 +1744,8 @@
     const ph = S.ph === "trim" ? "cut" : S.ph === "open" ? "hang" : S.ph;
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        window: hung.map((e) => ({ c: e.c, ops: encodeOps(e.ops), drops: encodeDrops(e.drops), u: +e.u.toFixed(3), v: +e.v.toFixed(3), r: +e.r.toFixed(3) })),
-        build: { c: S.c, next: S.next, f: S.f, ph: ph === "hung" ? "fold" : ph, ops: ph === "hung" ? [] : encodeOps(S.ops), drops: ph === "hung" ? [] : encodeDrops(S.drops), notch: S.notchNext }
+        window: hung.map((e) => ({ t: GEO[e.t].id, c: e.c, ops: encodeOps(e.ops), drops: encodeDrops(e.drops), u: +e.u.toFixed(3), v: +e.v.toFixed(3), r: +e.r.toFixed(3) })),
+        build: { t: GEO[S.t].id, nextT: S.nextT != null ? GEO[S.nextT].id : null, c: S.c, next: S.next, f: S.f, ph: ph === "hung" ? "fold" : ph, ops: ph === "hung" ? [] : encodeOps(S.ops), drops: ph === "hung" ? [] : encodeDrops(S.drops), notch: S.notchNext }
       }));
     } catch (e) { /* ignore */ }
   }
@@ -1690,11 +1756,14 @@
     if (fresh || !b || typeof b !== "object") return;
     if (okColor(b.c)) S.c = b.c;
     if (okColor(b.next)) S.next = b.next;
+    if (TYPE_BY[b.t] != null) S.t = TYPE_BY[b.t];
+    if (TYPE_BY[b.nextT] != null) S.nextT = TYPE_BY[b.nextT];
+    useType(S.t);
     const ops = decodeOps(b.ops) || [], drops = decodeDrops(b.drops, ops.length) || [];
     if ([0, 1, 2].includes(b.notch)) S.notchNext = b.notch;
-    if (b.ph === "fold" && Number.isInteger(b.f) && b.f >= 0 && b.f < 4) S.f = b.f;
+    if (b.ph === "fold" && Number.isInteger(b.f) && b.f >= 0 && b.f < NF) S.f = b.f;
     else if (b.ph === "cut" || b.ph === "hang") {
-      S.f = 4; S.ops = ops; S.drops = drops; S.ph = "cut";
+      S.f = NF; S.ops = ops; S.drops = drops; S.ph = "cut";
       startMask(); replay(S.mk, S.ops, S.drops);
       if (b.ph === "hang") { makeTex(); S.ph = "hang"; const c = camOpen(0); V.flake = { x: c.x, y: c.y, s: c.s, rot: c.r, spin: 0 }; V.halo = 1; }
     }
@@ -1751,7 +1820,7 @@
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
     ctx.drawImage(e.bigPic.c, -s, -s, s * 2, s * 2);
     ctx.restore();
-    const per = 0.7, j = Math.floor(t / per) % 6, ph = (t % per) / per, an = rot - Math.PI / 2 + j * Math.PI / 3;
+    const gt = GEO[e.t], per = 0.7, j = Math.floor(t / per) % gt.n, ph = (t % per) / per, an = rot + (gt.pAng + j * 360 / gt.n) * DEG;
     twinkle(x + Math.cos(an) * s * RP * 0.92, y + Math.sin(an) * s * RP * 0.92, s * 0.13 * Math.sin(ph * Math.PI) * a, Math.sin(ph * Math.PI) * a);
   }
   function onEnding(done) {
@@ -1778,6 +1847,7 @@
   cam = camNow();
   scissorsHome(0);
   tiles.set(COLORS[S.next != null ? S.next : S.c].id);
+  folds.set(GEO[S.nextT != null ? S.nextT : S.t].id);
   panelSync();
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
@@ -1812,19 +1882,21 @@
       let rot = 0, mir = 0, cnt = 0, paper = 0;
       for (let r = 0.05; r < 0.98; r += 0.03) for (let a = 0; a < 360; a += 3) {
         const P = (an) => [n / 2 + Math.cos(an * DEG) * r * n / 2, n / 2 + Math.sin(an * DEG) * r * n / 2];
-        const v0 = al(...P(a)), v1 = al(...P(a + 60)), v2 = al(...P(90 - a));
+        const v0 = al(...P(a)), v1 = al(...P(a + 360 / G.n)), v2 = al(...P(2 * G.pAng - a));
         rot += Math.abs(v0 - v1) / 255; mir += Math.abs(v0 - v2) / 255; cnt++; if (v0 > 128) paper++;
       }
-      return { rot: +(rot / cnt).toFixed(4), mirror: +(mir / cnt).toFixed(4), paper: +(paper / cnt).toFixed(3) };
+      return { type: G.id, rot: +(rot / cnt).toFixed(4), mirror: +(mir / cnt).toFixed(4), paper: +(paper / cnt).toFixed(3) };
     };
+    // Sample cuts in wedge terms: [radius, 0..1 across from the w0 edge to the w1 edge] (outside 0..1 = off the paper).
+    const wedgePt = (r, t) => dirPt(G.w0 + t * G.sig, r);
     const SAMPLE_CUTS = [
-      [[0.3, 0.02], [0.42, 0.2], [0.55, 0.06]],
-      [[0.75, 0.42], [0.55, 0.38], [0.62, 0.62], [0.7, 0.75]],
-      [[0.15, 0.22], [0.2, 0.12], [0.25, 0.2]]
+      [[0.36, -0.5], [0.44, 0.55], [0.52, -0.5]],
+      [[0.7, 1.5], [0.66, 0.4], [0.8, 0.5], [0.84, 1.5]],
+      [[0.2, 0.45], [0.27, 0.8], [0.3, 0.3]]
     ];
     const debugCut = (pts) => {
       if (S.ph !== "cut" || busy) return false;
-      const P = pts.map(([x, y]) => toScr(cam, x, y));
+      const P = pts.map(([r, t]) => { const q = wedgePt(r, t); return toScr(cam, q[0], q[1]); });
       cutStart(P[0].x, P[0].y);
       for (let i = 1; i < P.length; i++) {
         const a = P[i - 1], b = P[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
@@ -1837,14 +1909,15 @@
     window.__toybox = {
       state: () => {
         const w = want();
-        return { phase: S.ph, folds: S.f, color: COLORS[S.c].id, next: S.next != null ? COLORS[S.next].id : null, ops: S.ops.length, drops: S.drops.length,
+        return { type: G.id, nextType: S.nextT != null ? GEO[S.nextT].id : null, phase: S.ph, folds: S.f, foldsTotal: NF, color: COLORS[S.c].id, next: S.next != null ? COLORS[S.next].id : null, ops: S.ops.length, drops: S.drops.length,
           window: hung.length, busy, want: w && w.part, coach: coach.text(), big: !!big, unfold: V.unfold && V.unfold.k };
       },
       next: () => {
         if (busy) return "wait";
         if (S.ph === "fold") { foldTap(); return "fold"; }
         if (S.ph === "cut") { if (S.ops.length < 3) { debugCut(SAMPLE_CUTS[S.ops.length % 3]); return "cut"; } openPaper(); return "open"; }
-        if (S.ph === "hang") { const b = bestSpot(); hangAt(b.u, b.v); return "hang"; }
+        // Each finished snowflake is followed by the next fold type, so next() steps through them all.
+        if (S.ph === "hang") { const b = bestSpot(); S.nextT = (S.t + 1) % GEO.length; folds.set(GEO[S.nextT].id); hangAt(b.u, b.v); return "hang"; }
         return "wait";
       },
       fold: () => foldTap(),
@@ -1855,8 +1928,11 @@
       newSheet: () => newTap(),
       surprise: () => surprise(),
       color: (id) => pickColor(COLORS.findIndex((c) => c.id === id)),
+      type: (id) => { pickType(TYPE_BY[id]); folds.set(GEO[S.nextT != null ? S.nextT : S.t].id); },
+      types: () => GEO.map((T) => T.id),
       bigView: (i) => openBig(i || 0),
       flatVp,
+      wedgeVp: (r, t) => { const q = wedgePt(r, t); return flatVp(q[0], q[1]); },
       pt: (part) => { if (part === "open") { const p = openBtnPt(); return { x: p[0], y: p[1] }; } const p = partPt(part); return p ? vp(p.x, p.y) : null; },
       grab: () => { const g = grabPts(); return { from: vp(g.from.x, g.from.y), to: vp(g.to.x, g.to.y) }; },
       glass: (u, v) => { const p = glassPt(u, v); return vp(p.x, p.y); },

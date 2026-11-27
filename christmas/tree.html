@@ -34,19 +34,42 @@ body {
 .stage { background: #20345E; touch-action: none; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
-/* In the side column the three light tiles stand one above the other, picture beside word. */
-@media (orientation: landscape) {
-  .tb-v2 .tb-body .tb-panel { width: min(30%, 300px); }
-  #tiles { --tb-cols: 1 !important; }
-  #tiles .btn.tb-tile { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 6px 14px; }
+body.ending .tb-panel, body.ending .tb-jobs { pointer-events: none; opacity: 0.4; }
+/* Each folder tab shows one group of pick-one tiles. Every group keeps the same height, so a tab change never
+   moves the stage. The Tree group is two rows (shapes, colors); Lights and Garland are eight tiles each. */
+.grp { display: flex; flex-direction: column; gap: var(--tb-s2); }
+.grp[hidden] { display: none; }
+.grp > .tb-tilerow { flex: 1 1 0; min-height: 0; grid-auto-rows: 1fr; }
+.grp .btn.tb-tile { min-height: 0; padding-left: 1px; padding-right: 1px; }
+.grp .tb-tile-word { white-space: normal; text-align: center; line-height: 1.02; }
+.grp .tb-tile .tb-pic { width: calc(var(--tb-tile) * 0.48); height: calc(var(--tb-tile) * 0.48); }
+@media (max-width: 600px) { .grp .btn.tb-tile { font-size: 15px; } }
+@media (orientation: portrait) {
+  .grp { height: calc(var(--tb-tile) * 2 + var(--tb-s2)); }
 }
-@media (orientation: landscape) and (max-height: 520px) {
-  .tb-v2 .tb-body .tb-panel { width: 200px; }
-  #tiles .btn.tb-tile { min-height: 60px; gap: 8px; padding: 4px 10px; }
-  #tiles .tb-tile .tb-pic { width: 42px; height: 42px; }
+@media (orientation: portrait) and (min-width: 700px) and (min-height: 700px) {
+  .grp { gap: var(--tb-s3); height: calc(var(--tb-tile) * 2 + var(--tb-s3)); }
+}
+@media (orientation: landscape) {
+  /* Side column: two tiles across, four rows. */
+  .tb-v2 .tb-body .tb-panel { width: min(30%, 300px); justify-content: space-between; }
+  .grp > .tb-tilerow { --tb-cols: 2 !important; }
+  .grp { height: calc(var(--tb-tile) * 4 + var(--tb-s2) * 3); }
   .tb-v2 #bottom .btn { flex-direction: column; gap: 2px; padding: 6px 4px; font-size: 14px; min-height: 64px; }
 }
-body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
+@media (orientation: landscape) and (min-width: 700px) and (min-height: 700px) {
+  .grp { gap: var(--tb-s3); height: calc(var(--tb-tile) * 4 + var(--tb-s3) * 3); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Sideways phone: a wider column with the tiles four across in two rows. */
+  .tb-v2 .tb-body .tb-panel { width: 344px; }
+  .grp { gap: 6px; height: calc(78px * 2 + 6px); }
+  .grp > .tb-tilerow { --tb-cols: 4 !important; gap: 6px; }
+  .grp .btn.tb-tile { font-size: 14px; padding: 4px 1px 3px; }
+  .grp .tb-tile .tb-pic { width: 32px; height: 32px; }
+  .tb-job { min-height: 46px; }
+  .tb-v2 #bottom .btn { flex-direction: row; gap: 6px; min-height: 56px; font-size: 16px; }
+}
 .rest-art { width: min(70vw, 300px, 46vh); aspect-ratio: 1; border: 3px solid #1D2340; border-radius: 18px; background: #20345E; }
 </style>
 </head>
@@ -58,13 +81,18 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
     <h1 class="tb-title"><span class="tb-app">Christmas · </span><span class="tb-station">Tree</span></h1>
   </header>
   <div class="tb-body">
-    <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A cozy living room in the evening with a big bare fir tree in its stand, a window with snow falling outside, a box of ornaments on the floor and a wall socket. Drag lights onto the tree or tap the tree for a wrap of lights, push the plug into the socket to light them, hang ornaments from the box on the branches, put the star on top and press the light button to change the lights."></canvas>
-      <div id="coach"></div>
-      <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
-    </main>
+    <div class="tb-stagecol">
+      <main class="tb-stage stage" id="stage">
+        <canvas id="cv" role="img" aria-label="A cozy living room in the evening with a big bare tree in its stand, a window with snow falling outside, a box of ornaments and a box with a coil of lights and a coil of garland on the floor, and the lights' cord plugged into the wall socket. Drag the lights or the garland from the box onto the tree (or tap a coil for a whole wrap), press the switch on the cord to turn the lights on and change how they shine, hang ornaments from the box on the branches and put the star on top. Drag anything off the tree to put it back in its box. The tabs under the picture pick the tree's shape and color, the lights' color and the garland."></canvas>
+        <div id="coach"></div>
+        <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
+      </main>
+      <div id="jobs"></div>
+    </div>
     <section class="tb-panel" id="panel">
-      <div id="tiles"></div>
+      <div class="grp" id="grp-tree"><div id="shapes"></div><div id="tcols"></div></div>
+      <div class="grp" id="grp-lights"><div id="lights"></div></div>
+      <div class="grp" id="grp-garland"><div id="garlands"></div></div>
       <div id="bottom"></div>
     </section>
   </div>

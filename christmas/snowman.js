@@ -1528,7 +1528,7 @@
   function pieceUp(d, still, cancel) {
     const dx = d.x - d.gx, dy = d.y - d.gy, w = { x: d.x, y: d.y };
     if (S.step !== "dress") return;
-    if (!still && !cancel && !locked() && (overBox(w) || !onSnowman(w))) { takeOff(d.kind, d.j, dx, dy); return; }
+    if (!still && !cancel && !locked() && (overBox(w) || !onBody(w))) { takeOff(d.kind, d.j, dx, dy); return; }
     flights = flights.filter((q) => !(q.k === d.kind && q.j === d.j));
     flights.push({ k: d.kind, j: d.j, dx, dy, t0: now(), dur: still ? 0.15 : 0.3, arc: 0 });
     if (still) doTap("pc:" + d.kind + ":" + Math.max(0, d.j), 0, 0);
@@ -1605,6 +1605,13 @@
     if (S.step !== "dress") return false;
     const g = geom(S), b0 = S.balls[0];
     return w.x > b0.x - b0.r - 70 && w.x < b0.x + b0.r + 70 && w.y > hatTop(g, 0) - 40 && w.y < b0.gy + 20;
+  }
+  // On the snowman itself (one of its snowballs, or just above its head): a piece let go here stays on.
+  function onBody(w) {
+    if (S.step !== "dress") return false;
+    const g = geom(S);
+    if (Math.abs(w.x - g.hx) < g.hr * 1.3 && w.y > hatTop(g, 0) - 20 && w.y < g.hy) return true;
+    return [0, 1, 2].some((i) => { const c = ballC(S, i); return Math.hypot(w.x - c.x, w.y - c.y) < S.balls[i].r + 14; });
   }
   // The tile under a press: { k, opt } (a piece tile carries its current choice), or null (Back).
   function tileWhat(btn) {
