@@ -1,42 +1,46 @@
 (function () {
   "use strict";
   // Christmas · Snowman: a snowy front yard (the edge of the house with its lights, a wooden fence, pine trees,
-  // gentle snow falling) where he makes a snowman the real way, one hands-on step at a time.
+  // gentle snow falling, a cardboard box of snowman things) where he makes a snowman the real way.
   //   1. Roll the snowball: he drags the small snowball across the yard. It turns as it rolls, grows as it picks
-  //      up snow, and leaves a rolled track where the grass shows through. A tap on the snowball rolls it a short
-  //      way by itself; a tap on the snow rolls it toward that spot. Big enough, it settles with a sparkle (the
-  //      big one first rolls itself to a spot where the whole snowman will fit) and the next small one appears.
+  //      up snow (it stays clean white), and presses a packed-snow trail into the deep snow. A tap on the snowball
+  //      rolls it a short way by itself; a tap on the snow rolls it toward that spot. Big enough, it settles with
+  //      a sparkle (the big one first rolls itself to a spot where the whole snowman fits) and the next one appears.
   //   2. Roll the middle snowball the same way, then lift it onto the big one (drag it there, or tap it and it
   //      lifts and stacks itself).
   //   3. Roll the small snowball for the head and lift it on top.
-  //   4. Dress the snowman from the panel tiles: coal eyes, carrot nose, a smile of coal stones, buttons, stick
-  //      arms, mittens on the stick ends, a scarf (Scarf again: the next color) and a hat (Hat again: top hat or
-  //      woolly hat). He drags a piece onto the snowman (it snaps to its place) or taps its tile.
+  //   4. Dress the snowman from the panel tiles: eyes, nose, smile, buttons, arms, mittens, scarf, hat. A piece with
+  //      choices (eyes, buttons, mittens, scarf, hat) shows a little row of colored dots; a tap on it shows its
+  //      choices as picture tiles (with Back to all the pieces), and picking one puts it on or swaps it. A piece with
+  //      one choice (nose, smile, arms) goes straight on. He can also drag any tile onto the snowman.
+  //   5. Take things off: he drags a piece off the snowman into the box (it opens and glows while a piece is over
+  //      it). Let go anywhere else away from the snowman, the piece also goes back in the box.
   // FACE RULE (the dad: faces popping up on objects once scared him): the snowman has no face until he puts each
-  // face piece on himself. Every eye, the nose and every smile stone goes on by his own tap or drag only, one at a
+  // face piece on himself. Each eye, the nose and each smile stone goes on only by his own tap or drag, one at a
   // time. Nothing else ever adds a face piece (not New, Surprise, the ghost hand, a celebration or the debug
   // "next"), the snowballs carry no face while rolling, and the face never moves by itself (no blinking, no
-  // expressions). Buttons, arms and mittens go on together with one tap.
+  // expressions). Buttons, arms and mittens go on together (mittens bring the stick arms that hold them).
   // A yellow ring and one instruction show the next thing to do; everything drawn answers a touch (a wiggle, its
   // name, snow falling off a tree). Surprise takes turns between live moments that never touch his snowman: a
   // robin lands on the hat (or a stick arm, or the head) and hops, a puff of wind flutters the scarf and swirls the
   // snow, the snow falls thicker for a moment, a rabbit hops across the yard. New: the old snowman fades, the snow
-  // fills the tracks back in and a fresh small snowball sits in the yard. A fresh launch starts a new yard; a
+  // fills the trails back in and a fresh small snowball sits in the yard. A fresh launch starts a new yard; a
   // reload keeps the snowman as he left it.
   // Units: the scene is drawn in world units (HW tall, WW wide, WW following the stage's shape) and scaled to fit
   // the stage; x to the right, y down. A snowball's (x, gy) is where it touches the snow.
   //
   // Sections:
   //   Setup and saved state
-  //   Pieces and sizes
+  //   Pieces, choices and sizes
   //   Layout
   //   Tweens and particles
   //   The build
   //   Rolling
   //   Stacking
-  //   Dressing
+  //   Dressing and taking off
   //   Drawing helpers
   //   Drawing the yard
+  //   Drawing the box
   //   Drawing the snowballs and the snowman
   //   Visitors: robin, rabbit, wind and snow
   //   What comes next: coach, ring and ghost hand
@@ -60,7 +64,7 @@
   let ending = false;
   const locked = () => ending || Toybox.timer.locked();
 
-  const KEY = "christmas-snowman-v1";
+  const KEY = "christmas-snowman-v2";
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
   if (!saved || typeof saved !== "object" || Array.isArray(saved)) saved = {};
@@ -68,28 +72,39 @@
   const fresh = Toybox.fresh();
 
   // =====================================================================================================
-  // Pieces and sizes
+  // Pieces, choices and sizes
   // =====================================================================================================
-  const SCARVES = [
-    { id: "red", hex: "#E8303F", dark: "#B81F2E", stripe: "#FFFFFF" },
-    { id: "green", hex: "#3FA34D", dark: "#2A7A36", stripe: "#FFE36B" },
-    { id: "blue", hex: "#2F8CFF", dark: "#1F64C0", stripe: "#FFFFFF" },
-    { id: "yellow", hex: "#FFC93C", dark: "#D9A21B", stripe: "#E8303F" }
-  ];
-  const HATS = [{ id: "top", name: "Top hat" }, { id: "knit", name: "Woolly hat" }];
-  // The tiles, in panel order. face: one piece per tap or drag, never added any other way.
+  // The pieces, in panel order, each with the choices he can see and pick (a piece with one choice goes straight
+  // on). slots: a face piece made of separate bits that go on one at a time (each eye, each smile stone).
   const KINDS = [
-    { id: "eyes", name: "Eyes", max: 2, face: true, tag: "Coal eye", full: "Coal eyes" },
-    { id: "nose", name: "Nose", max: 1, face: true, tag: "Carrot nose", full: "Carrot nose" },
-    { id: "smile", name: "Smile", max: 5, face: true, tag: "Coal smile", full: "Coal smile" },
-    { id: "buttons", name: "Buttons", max: 3, tag: "Button", full: "Buttons" },
-    { id: "arms", name: "Arms", max: 2, tag: "Stick arm", full: "Stick arms" },
-    { id: "mittens", name: "Mittens", max: 2, tag: "Mitten", full: "Mittens" },
-    { id: "scarf", name: "Scarf", max: 1, tag: "Scarf" },
-    { id: "hat", name: "Hat", max: 1, tag: "Hat" }
+    { id: "eyes", name: "Eyes", face: true, slots: 2, opts: [
+      { id: "coal", name: "Coal", tag: "Coal eye" }, { id: "button", name: "Buttons", tag: "Button eye" }] },
+    { id: "nose", name: "Nose", face: true, opts: [{ id: "carrot", name: "Carrot", tag: "Carrot nose" }] },
+    { id: "smile", name: "Smile", face: true, slots: 5, opts: [{ id: "coal", name: "Coal", tag: "Coal smile" }] },
+    { id: "buttons", name: "Buttons", opts: [
+      { id: "coal", name: "Coal", tag: "Coal buttons" },
+      { id: "red", name: "Red", tag: "Red buttons", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "gold", name: "Gold", tag: "Gold buttons", hex: "#FFC93C", dark: "#C9961A" }] },
+    { id: "arms", name: "Arms", opts: [{ id: "sticks", name: "Sticks", tag: "Stick arms" }] },
+    { id: "mittens", name: "Mittens", opts: [
+      { id: "red", name: "Red", tag: "Red mittens", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "blue", name: "Blue", tag: "Blue mittens", hex: "#2F8CFF", dark: "#1F64C0" },
+      { id: "green", name: "Green", tag: "Green mittens", hex: "#3FA34D", dark: "#2A7A36" },
+      { id: "yellow", name: "Yellow", tag: "Yellow mittens", hex: "#FFC93C", dark: "#D9A21B" }] },
+    { id: "scarf", name: "Scarf", opts: [
+      { id: "red", name: "Red", tag: "Red scarf", hex: "#E8303F", dark: "#B81F2E" },
+      { id: "blue", name: "Blue", tag: "Blue scarf", hex: "#2F8CFF", dark: "#1F64C0" },
+      { id: "green", name: "Green", tag: "Green scarf", hex: "#3FA34D", dark: "#2A7A36" },
+      { id: "striped", name: "Striped", tag: "Striped scarf", hex: "#E8303F", dark: "#B81F2E", stripe: "#FFFFFF" }] },
+    { id: "hat", name: "Hat", opts: [
+      { id: "top", name: "Top hat", tag: "Top hat" }, { id: "knit", name: "Woolly hat", tag: "Woolly hat" },
+      { id: "santa", name: "Santa hat", tag: "Santa hat" }, { id: "muffs", name: "Earmuffs", tag: "Earmuffs" }] }
   ];
   const KIND = {};
   KINDS.forEach((k) => { KIND[k.id] = k; });
+  const many = (k) => KIND[k].opts.length > 1;
+  // How many of each piece he can touch on the snowman (two eyes, five smile stones, three buttons, two arms...).
+  const PARTS = { eyes: 2, nose: 1, smile: 5, buttons: 3, arms: 2, mittens: 2, scarf: 1, hat: 1 };
   // The three snowballs: start radius, finished radius, and how far each rolls to get there (a few seconds).
   const R0 = [18, 16, 14], RT = [84, 62, 46], DIST = [900, 720, 540];
   const BALL_NAMES = ["Big snowball", "Middle snowball", "Small snowball"];
