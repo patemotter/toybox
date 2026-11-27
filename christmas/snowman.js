@@ -657,7 +657,7 @@
       ghost.poke();
       return false;
     }
-    const d = S.D[k], g = geom(S);
+    const d = S.D[k];
     opt = clamp(opt | 0, 0, K.opts.length - 1);
     ghost.learned("dress");
     if (anyOn(k) && d.opt !== opt) {
@@ -958,7 +958,7 @@
     ctx.fillStyle = "#E9C08E"; ctx.fillRect(b.x - 9, top + 1.5, 18, b.h - 3);
     ctx.strokeStyle = "rgba(29, 35, 64, 0.25)"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x0 + 8, top + 14); ctx.lineTo(x1 - 8, top + 14); ctx.stroke();
     // A scarf off the snowman hangs over the front edge.
-    if (!S.D.scarf.on[0] && S.step !== "dress" || (S.step === "dress" && !S.D.scarf.on[0])) {
+    if (S.step !== "dress" || !S.D.scarf.on[0]) {
       const o = KIND.scarf.opts[S.D.scarf.opt];
       rr(x1 - 30, top - 6, 15, 34, 4); fillStroke(o.hex, 1.8);
       if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(x1 - 29, top + 10, 13, 4); ctx.fillRect(x1 - 29, top + 18, 13, 4); }
@@ -1075,7 +1075,7 @@
         const d = D[k], n = KIND[k].slots || 0;
         const o = { w: live ? (pwob[k] || 0) : 0, aw: live ? (pwob.arms || 0) : 0, wind: live ? windNow(t) : 0, mitts: D.mittens.on[0] };
         const one = (j) => {
-          if (live && drag && drag.k === "piece" && drag.kind === k && (drag.j === j || (!n && drag.j < 0))) return;
+          if (live && drag && drag.k === "piece" && drag.kind === k && drag.j === j) return;
           if (live && k === "mittens" && drag && drag.k === "piece" && drag.kind === "arms") return;
           let f = live ? flightOff(k, j, t) : null;
           if (live && k === "mittens" && !f) f = flightOff("arms", -1, t);
@@ -1264,8 +1264,8 @@
   function perch() {
     if (S.step === "dress") {
       const g = geom(S);
-      if (S.D.hat >= 0) return { x: g.hx + g.hr * 0.1, y: hatTop(g, S.D), hop: 9 };
-      if (S.D.arms >= 2) { const a = armAt(g, 1); return { x: lerp(a.sx, a.ex, 0.72), y: lerp(a.sy, a.ey, 0.72) - 3, hop: 0 }; }
+      if (S.D.hat.on[0]) return { x: g.hx + g.hr * 0.1, y: hatTop(g, S.D.hat.opt), hop: S.D.hat.opt === 3 ? 6 : 9 };
+      if (S.D.arms.on[0]) { const a = armAt(g, 1); return { x: lerp(a.sx, a.ex, 0.72), y: lerp(a.sy, a.ey, 0.72) - 3, hop: 0 }; }
       return { x: g.hx, y: g.hy - g.hr * 0.98, hop: 7 };
     }
     let top = null;
@@ -1424,11 +1424,12 @@
         return { pts: [P(c.x, c.y), P((c.x + T.x) / 2, Math.min(c.y, T.y) - 60), P(T.x, T.y)], dur: 1800, key: "stack" };
       }
       if (w.part === "tiles") {
-        const k = ["hat", "scarf", "arms", "buttons"].find((id) => count(id) === 0);
+        if (optK) return null;
+        const k = ["hat", "scarf", "arms", "buttons"].find((id) => !anyOn(id));
         const btn = k && tiles.button(k);
         if (!btn) return null;
-        const r = btn.getBoundingClientRect(), sp = pieceSpot(geom(S), k, 0);
-        return { pts: [[r.left + r.width / 2, r.top + r.height / 2], P(sp.x, sp.y)], dur: 1800, carry: { html: PIC[k](), size: 56 }, key: "dress" };
+        const r = btn.getBoundingClientRect(), sp = anchorOf(geom(S), k, 0);
+        return { pts: [[r.left + r.width / 2, r.top + r.height / 2], P(sp.x, sp.y)], dur: 1800, carry: { html: OPTPIC(k, S.D[k].opt), size: 56 }, key: "dress" };
       }
       return null;
     }
@@ -1450,14 +1451,15 @@
       const g = geom(S);
       let best = null, bd = Infinity;
       KINDS.forEach((k) => {
-        const n = count(k.id);
-        for (let j = 0; j < n; j++) {
+        for (let j = 0; j < PARTS[k.id]; j++) {
+          if (!isOn(k.id, j)) continue;
           const sp = pieceSpot(g, k.id, j), d = Math.hypot(w.x - sp.x, w.y - sp.y);
           if (d <= sp.r + 10 && d < bd) { bd = d; best = "pc:" + k.id + ":" + j; }
         }
       });
       if (best) return best;
     }
+    { const b = boxGeo(); if (w.x > b.x - b.w / 2 - 6 && w.x < b.x + b.w / 2 + 14 && w.y > b.gy - b.h - b.d - 36 && w.y < b.gy + 6) return "box"; }
     for (let j = 2; j >= 0; j--) {
       const b = S.balls[j];
       if (!b || (j === i && !b.stacked)) continue;
@@ -1501,8 +1503,13 @@
       if (stacking() && j !== i && !busy) hint();
     } else if (part.startsWith("pc:")) {
       const [, k, js] = part.split(":"), sp = pieceSpot(geom(S), k, +js);
-      tag(k === "hat" ? HATS[S.D.hat].name : KIND[k].tag, sp.x, sp.y - sp.r - 4);
+      tag(KIND[k].opts[S.D[k].opt].tag, sp.x, sp.y - sp.r - 4);
       if (!KIND[k].face) pwob[k] = 1;
+    } else if (part === "box") {
+      boxWob = 1;
+      const b = boxGeo();
+      tag("Box", b.x, b.gy - b.h - b.d - 8);
+      if (S.step === "dress" && KINDS.some((k) => anyOn(k.id))) coach.say("Drag a piece into the box to take it off.", 3.5);
     } else if (part.startsWith("tree")) {
       const tr = Y.trees[+part.slice(4)];
       tr.shake = 1;
@@ -1515,6 +1522,17 @@
     else if (part === "sky") { puff("spark", w.x, w.y, 3, "#FFFFFF"); }
   }
   const SLOP = 12;
+  let tookHint = false;
+  // Let go of a piece: into the box (or anywhere away from the snowman) it comes off and goes in the box; back on
+  // the snowman it goes back to its place. A press held still is a tap (its name).
+  function pieceUp(d, still, cancel) {
+    const dx = d.x - d.gx, dy = d.y - d.gy, w = { x: d.x, y: d.y };
+    if (S.step !== "dress") return;
+    if (!still && !cancel && !locked() && (overBox(w) || !onSnowman(w))) { takeOff(d.kind, d.j, dx, dy); return; }
+    flights = flights.filter((q) => !(q.k === d.kind && q.j === d.j));
+    flights.push({ k: d.kind, j: d.j, dx, dy, t0: now(), dur: still ? 0.15 : 0.3, arc: 0 });
+    if (still) doTap("pc:" + d.kind + ":" + Math.max(0, d.j), 0, 0);
+  }
   const press = Toybox.press(cv, {
     any: true,
     hit: (x, y) => hitPart(x, y),
@@ -1531,6 +1549,12 @@
           if (drag && drag.k === "roll") { drag.lx = w.x; drag.ly = w.y; }
         } else if (stacking() && b.done && !b.stacked) startLift(i, w0);
       }
+      if (part.startsWith("pc:") && S.step === "dress" && !busy) {
+        // A piece on the snowman comes off in his hand (one eye or one smile stone; anything else whole).
+        const [, k, js] = part.split(":");
+        drag = { k: "piece", kind: k, j: KIND[k].slots ? +js : -1, gx: w0.x, gy: w0.y, x: w.x, y: w.y };
+        if (!tookHint) { tookHint = true; coach.say("Drop it in the box to take it off.", 3); }
+      }
       if (!drag) drag = { k: "hold", part };
       drag.pid = e.pointerId; drag.far = Math.hypot(s.dx, s.dy);
     },
@@ -1543,6 +1567,7 @@
         moveBall(d.i, w.x - d.lx, w.y - d.ly);
         d.lx = w.x; d.ly = w.y;
       } else if (drag.k === "lift") liftMove(w);
+      else if (drag.k === "piece") { drag.x = w.x; drag.y = w.y; }
     },
     up: (part, e, s) => {
       const d = drag;
@@ -1552,6 +1577,7 @@
       if (d.k === "hold") { if (still && !locked() && !s.cancel) doTap(d.part, s.x, s.y); }
       else if (d.k === "roll") { if (still && !locked() && !s.cancel) doTap("ball", s.x, s.y); }
       else if (d.k === "lift") liftUp(d, still && !s.cancel);
+      else if (d.k === "piece") pieceUp(d, still && !s.cancel, s.cancel);
     },
     tap: (part, x, y) => { if (!drag) doTap(part, x, y); }
   });
@@ -1561,7 +1587,7 @@
   // =====================================================================================================
   // A piece can be carried from its tile onto the snowman: it follows his finger and goes on where it belongs
   // when he lets go over the snowman. Let go anywhere else, it floats back to its tile. A tap on a tile (the
-  // tile's own click) puts the piece on.
+  // tile's own click) shows that piece's choices, or puts on a piece that has only one.
   let pdrag = null, skipClickUntil = 0;
   const carryEl = document.createElement("div");
   carryEl.className = "sn-carry";
@@ -1578,22 +1604,29 @@
   function onSnowman(w) {
     if (S.step !== "dress") return false;
     const g = geom(S), b0 = S.balls[0];
-    return w.x > b0.x - b0.r - 70 && w.x < b0.x + b0.r + 70 && w.y > hatTop(g, { hat: 0 }) - 40 && w.y < b0.gy + 20;
+    return w.x > b0.x - b0.r - 70 && w.x < b0.x + b0.r + 70 && w.y > hatTop(g, 0) - 40 && w.y < b0.gy + 20;
+  }
+  // The tile under a press: { k, opt } (a piece tile carries its current choice), or null (Back).
+  function tileWhat(btn) {
+    const k = KINDS.find((q) => tiles.button(q.id) === btn);
+    if (k) return { k: k.id, opt: S.D[k.id].opt };
+    if (optK) for (let i = 0; i < KIND[optK].opts.length; i++) if (otiles.button("o" + i) === btn) return { k: optK, opt: i };
+    return null;
   }
   tilesEl.addEventListener("pointerdown", (e) => {
     const btn = e.target.closest ? e.target.closest(".tb-tile") : null;
     if (!btn || pdrag || locked()) return;
-    const k = KINDS.find((q) => tiles.button(q.id) === btn);
-    if (k) pdrag = { k: k.id, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, btn };
+    const what = tileWhat(btn);
+    if (what) pdrag = { k: what.k, opt: what.opt, pid: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, btn };
   });
   document.addEventListener("pointermove", (e) => {
     if (!pdrag || e.pointerId !== pdrag.pid) return;
     if (!pdrag.on) {
       if (Math.hypot(e.clientX - pdrag.x0, e.clientY - pdrag.y0) < 14) return;
-      if (S.step !== "dress" || locked()) { pdrag.on = "no"; putPiece(pdrag.k, null, pdrag.btn); return; }
+      if (S.step !== "dress" || locked()) { pdrag.on = "no"; putPiece(pdrag.k, pdrag.opt, null, pdrag.btn); return; }
       pdrag.on = true;
       carryEl.classList.remove("back");
-      carryEl.innerHTML = (CARRY[pdrag.k] || PIC[pdrag.k])();
+      carryEl.innerHTML = CARRYPIC(pdrag.k, pdrag.opt);
       carryEl.hidden = false;
       ghost.learned("dress");
     }
@@ -1607,7 +1640,7 @@
     skipClickUntil = performance.now() + 600;
     if (d.on !== true) return;
     const c = carryPt(e), w = wpt(c.x, c.y);
-    if (!cancel && !locked() && onSnowman(w) && putPiece(d.k, w, d.btn)) { carryEl.hidden = true; return; }
+    if (!cancel && !locked() && onSnowman(w) && putPiece(d.k, d.opt, w, d.btn)) { carryEl.hidden = true; return; }
     // Back to its tile.
     const r = d.btn.getBoundingClientRect();
     carryEl.classList.add("back");
@@ -1618,21 +1651,25 @@
   document.addEventListener("pointerup", (e) => pEnd(e, false));
   document.addEventListener("pointercancel", (e) => pEnd(e, true));
   // While a piece is carried over the snowman, a soft ring shows where it will go.
-  function nextSpot(k) {
+  function nextSpot(k, opt) {
     const g = geom(S);
-    if (k === "scarf" || k === "hat") return pieceSpot(g, k, 0);
-    if (k === "mittens" && S.D.arms < 2) return null;
-    if (isFull(k)) return null;
-    return pieceSpot(g, k, S.D[k]);
+    if (KIND[k].slots) {
+      if (anyOn(k) && S.D[k].opt !== opt) return anchorOf(g, k, S.D[k].on.indexOf(true));
+      const j = S.D[k].on.indexOf(false);
+      return j < 0 ? null : pieceSpot(g, k, j);
+    }
+    if (S.D[k].on[0] && S.D[k].opt === opt) return null;
+    const a = anchorOf(g, k, 0), sp = pieceSpot(g, k, 0);
+    return { x: a.x, y: a.y, r: sp.r };
   }
   function drawCarryTarget(t) {
     if (!pdrag || pdrag.on !== true || S.step !== "dress" || pdrag.cx == null) return;
     const w = wpt(pdrag.cx, pdrag.cy - carrySize() * 0.45);
     if (!onSnowman(w)) return;
-    const sp = nextSpot(pdrag.k);
+    const sp = nextSpot(pdrag.k, pdrag.opt);
     if (!sp) return;
     const pulse = 0.5 + 0.5 * Math.sin(t * 6);
-    ctx.beginPath(); ctx.arc(sp.x, sp.y, Math.max(10, sp.r * 1.2) + pulse * 3, 0, TAU);
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, clamp(sp.r * 1.2, 10, 50) + pulse * 3, 0, TAU);
     ctx.fillStyle = "rgba(255, 201, 60, 0.3)"; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = "#FFC93C"; ctx.stroke();
   }
@@ -1640,71 +1677,130 @@
   // =====================================================================================================
   // Panel, New and Surprise
   // =====================================================================================================
+  // The pieces' pictures: each choice on its own, and for a piece with choices a tile picture showing a few of them.
   const S2 = 'stroke="#1D2340" stroke-width="2" stroke-linejoin="round"';
-  const mittenPic = (x, y, rot, col, flip) =>
+  const svg = (inner) => `<svg viewBox="0 0 50 50">${inner}</svg>`;
+  const lump = (x, y, sc) => `<path transform="translate(${x} ${y}) scale(${sc || 1})" d="M-8 1l5-6h7l4 6-3 7h-8z" fill="#2B2F3A" ${S2}/>`;
+  const btnEye = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#2E3A5C" ${S2}/><g fill="#8A97B8"><circle cx="${x - r * 0.28}" cy="${y - r * 0.28}" r="1.3"/><circle cx="${x + r * 0.28}" cy="${y - r * 0.28}" r="1.3"/><circle cx="${x - r * 0.28}" cy="${y + r * 0.28}" r="1.3"/><circle cx="${x + r * 0.28}" cy="${y + r * 0.28}" r="1.3"/></g>`;
+  const button = (x, y, o) => `<circle cx="${x}" cy="${y}" r="6.5" fill="${o.hex}" ${S2}/><g fill="#1D2340"><circle cx="${x - 2}" cy="${y}" r="1.3"/><circle cx="${x + 2}" cy="${y}" r="1.3"/></g>`;
+  const mitten = (x, y, rot, col, flip) =>
     `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${flip ? -1 : 1} 1)"><ellipse cx="-7" cy="-2" rx="3.6" ry="5.5" transform="rotate(-25 -7 -2)" fill="${col}" ${S2}/>` +
     `<path d="M-6 7v-10a6 6 0 0 1 12 0v10z" fill="${col}" ${S2}/><rect x="-7" y="6" width="14" height="6" rx="2" fill="#FFFFFF" ${S2}/></g>`;
-  const curScarf = () => SCARVES[S && S.D.scarf >= 0 ? S.D.scarf : 0];
-  const nextScarf = () => SCARVES[S && S.D.scarf >= 0 ? (S.D.scarf + 1) % SCARVES.length : 0];
-  const PIC = {
-    eyes: () => `<svg viewBox="0 0 50 50"><g fill="#2B2F3A" ${S2}><path d="M7 22l5-6h7l4 6-3 7h-8z"/><path d="M27 21l6-5 7 2 2 7-5 5-8-2z"/></g><g fill="#596075"><ellipse cx="12.5" cy="20" rx="2.6" ry="1.4"/><ellipse cx="32.5" cy="19.5" rx="2.6" ry="1.4"/></g></svg>`,
-    nose: () => `<svg viewBox="0 0 50 50"><path d="M7 20c3-3 7-4 10-3l26 7c2 1 2 3 0 3L17 34c-3 1-7 0-10-3-3-3-3-8 0-11z" fill="#FF8A1F" ${S2}/><path d="M18 21v3M25 23v3M32 25v2" stroke="#C9631A" stroke-width="2" stroke-linecap="round"/></svg>`,
-    smile: () => `<svg viewBox="0 0 50 50"><g fill="#2B2F3A" ${S2}><circle cx="8" cy="19" r="4"/><circle cx="15" cy="28" r="4"/><circle cx="25" cy="32" r="4"/><circle cx="35" cy="28" r="4"/><circle cx="42" cy="19" r="4"/></g></svg>`,
-    buttons: () => `<svg viewBox="0 0 50 50"><g fill="#E8303F" ${S2}><circle cx="25" cy="10" r="6.5"/><circle cx="25" cy="25" r="6.5"/><circle cx="25" cy="40" r="6.5"/></g><g fill="#1D2340"><circle cx="23" cy="10" r="1.3"/><circle cx="27" cy="10" r="1.3"/><circle cx="23" cy="25" r="1.3"/><circle cx="27" cy="25" r="1.3"/><circle cx="23" cy="40" r="1.3"/><circle cx="27" cy="40" r="1.3"/></g></svg>`,
-    arms: () => {
-      const d = "M21 34L6 15M11 21l-1-9M6 15l-4 0M29 34l15-19M39 21l1-9M44 15l4 0";
-      return `<svg viewBox="0 0 50 50"><path d="${d}" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#8A5A36" stroke-width="3.2" stroke-linecap="round"/></svg>`;
-    },
-    mittens: () => `<svg viewBox="0 0 50 50">${mittenPic(15, 24, -12, curScarf().hex, false)}${mittenPic(35, 24, 12, curScarf().hex, true)}</svg>`,
-    scarf: () => {
-      const s = nextScarf();
-      return `<svg viewBox="0 0 50 50"><path d="M29 22h9l2 20-10 1z" fill="${s.hex}" ${S2}/><path d="M31 30h8M31.5 36h8" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="${s.hex}" ${S2}/><path d="M16 16v9M25 17v9M34 16v9" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="none" ${S2}/><path d="M32 44v3M35 44v3M38 43v3" stroke="${s.dark}" stroke-width="2" stroke-linecap="round"/></svg>`;
-    },
-    hat: () => {
-      const next = S && S.D.hat >= 0 ? (S.D.hat + 1) % HATS.length : 0;
-      if (next === 0) {
-        return `<svg viewBox="0 0 50 50"><ellipse cx="25" cy="39" rx="21" ry="5" fill="#2B2F3A" ${S2}/><path d="M13 39V11h24v28c-8 2-16 2-24 0z" fill="#2B2F3A" ${S2}/>` +
-          `<path d="M13 29h24v6H13z" fill="#E8303F" ${S2}/><ellipse cx="25" cy="11" rx="12" ry="3" fill="#3A4050" ${S2}/></svg>`;
-      }
-      const s = curScarf();
-      return `<svg viewBox="0 0 50 50"><path d="M9 35C9 10 41 10 41 35z" fill="${s.hex}" ${S2}/><path d="M11 24h28" stroke="${s.stripe}" stroke-width="3"/>` +
-        `<rect x="7" y="32" width="36" height="9" rx="4" fill="${s.dark}" ${S2}/><circle cx="25" cy="10" r="6" fill="#FFFFFF" ${S2}/></svg>`;
+  const scarf = (fill, tail, stripe) =>
+    `<path d="M29 22h9l2 20-10 1z" fill="${tail}" ${S2}/>` + (stripe ? `<path d="M31 30h8M31.5 36h8" stroke="${stripe}" stroke-width="3"/>` : "") +
+    `<path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="${fill}" ${S2}/>` + (stripe ? `<path d="M16 16v9M25 17v9M34 16v9" stroke="${stripe}" stroke-width="3"/><path d="M7 13c12 5 24 5 36 0l1 10c-13 5-25 5-38 0z" fill="none" ${S2}/>` : "");
+  const HATPIC = [
+    `<ellipse cx="25" cy="39" rx="21" ry="5" fill="#2B2F3A" ${S2}/><path d="M13 39V11h24v28c-8 2-16 2-24 0z" fill="#2B2F3A" ${S2}/><path d="M13 29h24v6H13z" fill="#E8303F" ${S2}/><ellipse cx="25" cy="11" rx="12" ry="3" fill="#3A4050" ${S2}/>`,
+    `<path d="M9 35C9 10 41 10 41 35z" fill="#2F8CFF" ${S2}/><path d="M11 24h28" stroke="#FFFFFF" stroke-width="3"/><rect x="7" y="32" width="36" height="9" rx="4" fill="#1F64C0" ${S2}/><circle cx="25" cy="10" r="6" fill="#FFFFFF" ${S2}/>`,
+    `<path d="M8 34C8 16 22 8 42 18c-8 0-10 6-8 16z" fill="#E8303F" ${S2}/><circle cx="42" cy="19" r="5" fill="#FFFFFF" ${S2}/><rect x="6" y="32" width="34" height="9" rx="4.5" fill="#FFFFFF" ${S2}/>`,
+    `<path d="M11 32a14 14 0 0 1 28 0" fill="none" stroke="#1D2340" stroke-width="7" stroke-linecap="round"/><path d="M11 32a14 14 0 0 1 28 0" fill="none" stroke="#8E4FD9" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="11" cy="33" rx="7" ry="9" fill="#FF7FB5" ${S2}/><ellipse cx="39" cy="33" rx="7" ry="9" fill="#FF7FB5" ${S2}/>`
+  ];
+  const ARMS = (() => { const d = "M21 34L6 15M11 21l-1-9M6 15l-4 0M29 34l15-19M39 21l1-9M44 15l4 0"; return `<path d="${d}" fill="none" stroke="#1D2340" stroke-width="6.5" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#8A5A36" stroke-width="3.2" stroke-linecap="round"/>`; })();
+  function OPTPIC(k, i) {
+    const o = KIND[k].opts[i];
+    switch (k) {
+      case "eyes": return svg(i === 0 ? lump(15, 23) + lump(35, 22) : btnEye(15, 24, 7.5) + btnEye(35, 24, 7.5));
+      case "nose": return svg(`<path d="M7 20c3-3 7-4 10-3l26 7c2 1 2 3 0 3L17 34c-3 1-7 0-10-3-3-3-3-8 0-11z" fill="#FF8A1F" ${S2}/><path d="M18 21v3M25 23v3M32 25v2" stroke="#C9631A" stroke-width="2" stroke-linecap="round"/>`);
+      case "smile": return svg(`<g fill="#2B2F3A" ${S2}><circle cx="8" cy="19" r="4"/><circle cx="15" cy="28" r="4"/><circle cx="25" cy="32" r="4"/><circle cx="35" cy="28" r="4"/><circle cx="42" cy="19" r="4"/></g>`);
+      case "buttons": return svg(o.id === "coal" ? lump(25, 9, 0.85) + lump(25, 24, 0.85) + lump(25, 39, 0.85) : button(25, 10, o) + button(25, 25, o) + button(25, 40, o));
+      case "arms": return svg(ARMS);
+      case "mittens": return svg(mitten(15, 24, -12, o.hex, false) + mitten(35, 24, 12, o.hex, true));
+      case "scarf": return svg(scarf(o.hex, o.hex, o.stripe) + `<path d="M32 44v3M35 44v3M38 43v3" stroke="${o.dark}" stroke-width="2" stroke-linecap="round"/>`);
+      case "hat": return svg(HATPIC[i]);
     }
-  };
-  // What his finger carries: one eye or one smile stone at a time (each goes on by itself).
-  const CARRY = {
-    eyes: () => `<svg viewBox="0 0 50 50"><path d="M15 24l7-9h10l6 9-4 10H20z" fill="#2B2F3A" ${S2}/><ellipse cx="23" cy="20" rx="3.6" ry="2" fill="#596075"/></svg>`,
-    smile: () => `<svg viewBox="0 0 50 50"><path d="M18 22l5-6h6l4 6-3 7h-8z" fill="#2B2F3A" ${S2}/></svg>`
-  };
-  const tiles = Toybox.tiles(tilesEl, {
-    items: KINDS.map((k) => ({ id: k.id, name: k.name, pic: PIC[k.id]() })),
+    return svg("");
+  }
+  // A piece with choices shows a few of them at once on its tile.
+  function MAINPIC(k) {
+    const O = KIND[k].opts;
+    switch (k) {
+      case "eyes": return svg(lump(15, 23) + btnEye(35, 24, 7.5));
+      case "buttons": return svg(lump(25, 9, 0.85) + button(25, 25, O[1]) + button(25, 40, O[2]));
+      case "mittens": return svg(mitten(15, 24, -12, O[0].hex, false) + mitten(35, 24, 12, O[1].hex, true));
+      case "scarf": return svg(`<path d="M29 22h9l2 20-10 1z" fill="#E8303F" ${S2}/><path d="M31 30h8M31.5 36h8" stroke="#FFFFFF" stroke-width="3"/>` +
+        `<path d="M7 13c4 2 8 3 12 3.5v10C15 26 11 25 6 23z" fill="#E8303F" ${S2}/><path d="M19 16.5c4 .5 8 .5 12 0v10c-4 .5-8 .5-12 0z" fill="#2F8CFF" ${S2}/><path d="M31 16.5c4-.5 8-1.5 12-3.5l1 10c-4 2-8 3-13 3.5z" fill="#3FA34D" ${S2}/>`);
+      case "hat": return svg(`<g transform="translate(-3 6) scale(0.8)">${HATPIC[2]}</g><g transform="translate(15 8) scale(0.72)">${HATPIC[0]}</g>`);
+    }
+    return OPTPIC(k, 0);
+  }
+  // What his finger carries: the chosen piece; one eye or one smile stone at a time (each goes on by itself).
+  function CARRYPIC(k, i) {
+    if (k === "eyes") return svg(i === 0 ? lump(25, 24, 1.4) : btnEye(25, 25, 10));
+    if (k === "smile") return svg(lump(25, 24, 1.1));
+    return OPTPIC(k, i);
+  }
+  const BACKPIC = svg(`<path d="M30 11L16 25l14 14" fill="none" stroke="#1D2340" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`);
+  tilesEl.innerHTML = '<div id="tilesMain"></div><div id="tilesOpt" hidden></div>';
+  const mainEl = $("tilesMain"), optEl = $("tilesOpt");
+  const fromTile = (btn) => { if (!btn) return null; const r = btn.getBoundingClientRect(); return wpt(r.left + r.width / 2, r.top + r.height / 2); };
+  // All the pieces. A tap on a piece with choices shows its choices; a piece with one choice goes straight on.
+  const tiles = Toybox.tiles(mainEl, {
+    items: KINDS.map((k) => ({ id: k.id, name: k.name, pic: MAINPIC(k.id) })),
     kind: "action", rows: 2,
     onPick: (id) => {
       if (performance.now() < skipClickUntil) return;
-      const btn = tiles.button(id), r = btn ? btn.getBoundingClientRect() : null;
-      putPiece(id, r ? wpt(r.left + r.width / 2, r.top + r.height / 2) : null, btn);
+      const btn = tiles.button(id);
+      if (S.step === "dress" && many(id)) { openOpts(id); return; }
+      putPiece(id, S.D[id].opt, fromTile(btn), btn);
     }
   });
+  // One piece's choices, with Back to all the pieces. The one on the snowman is marked (yellow, with a tick).
+  let optK = null;
+  const otiles = Toybox.tiles(optEl, {
+    items: [], kind: "action", rows: 2,
+    onPick: (id) => {
+      if (performance.now() < skipClickUntil || !optK) return;
+      if (id === "back") { closeOpts(); return; }
+      const btn = otiles.button(id);
+      putPiece(optK, +id.slice(1), fromTile(btn), btn);
+    }
+  });
+  function openOpts(k) {
+    optK = k;
+    otiles.items([{ id: "back", name: "Back", pic: BACKPIC }].concat(KIND[k].opts.map((o, i) => ({ id: "o" + i, name: o.name, pic: OPTPIC(k, i) }))));
+    const back = otiles.button("back");
+    if (back) { back.classList.add("sn-back"); back.setAttribute("aria-label", "Back to all the pieces"); }
+    mainEl.hidden = true; optEl.hidden = false;
+    updateTiles();
+    KIND[k].opts.forEach((o, i) => setTimeout(() => otiles.flash("o" + i), 40 + i * 60));
+  }
+  function closeOpts() {
+    if (!optK) return;
+    const k = optK;
+    optK = null;
+    optEl.hidden = true; mainEl.hidden = false;
+    tiles.flash(k);
+  }
   // The tiles wait (dimmed, still answering with a hint) until the snowman is built.
   function updateTiles() {
     if (!S) return;
     tilesEl.classList.toggle("sn-later", S.step !== "dress");
+    const none = KINDS.every((q) => !anyOn(q.id));
     KINDS.forEach((k) => {
       const b = tiles.button(k.id);
       if (!b) return;
-      b.classList.toggle("sn-full", S.step === "dress" && isFull(k.id));
-      b.classList.toggle("sn-next", S.step === "dress" && k.id === "hat" && KINDS.every((q) => count(q.id) === 0));
-      if (k.id === "scarf" || k.id === "hat" || k.id === "mittens") { const pic = b.querySelector(".tb-pic"); if (pic) pic.innerHTML = PIC[k.id](); }
+      b.classList.toggle("sn-opts", many(k.id));
+      b.classList.toggle("sn-on", S.step === "dress" && full(k.id));
+      b.classList.toggle("sn-next", S.step === "dress" && k.id === "hat" && none);
     });
+    if (optK) {
+      const d = S.D[optK];
+      KIND[optK].opts.forEach((o, i) => {
+        const b = otiles.button("o" + i);
+        if (!b) return;
+        const on = anyOn(optK) && d.opt === i;
+        b.classList.toggle("sn-on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    }
   }
   function popTiles() { KINDS.forEach((k, j) => setTimeout(() => tiles.flash(k.id), j * 60)); }
-  // New: the old snowman fades, the snow fills the tracks back in, and a fresh small snowball sits in the yard.
+  // New: the old snowman fades, the snow fills the trails back in, and a fresh small snowball sits in the yard.
   function newYard() {
     if (locked()) return;
     drag = null; press.cancel();
-    tweens = []; flights = []; pwob = {}; busy = false;
+    tweens = []; flights = []; gone = []; pwob = {}; busy = false;
+    closeOpts();
     if (bird) bird.t0 = Math.min(bird.t0, now() - 5.8);
     oldB = S; oldA = 1;
     const o = document.createElement("canvas");
@@ -1762,6 +1858,9 @@
     Object.keys(pwob).forEach((k) => { pwob[k] = Math.max(0, pwob[k] - dt * 1.4); });
     Y.trees.forEach((tr) => { tr.shake = Math.max(0, tr.shake - dt * 1.5); });
     lightsGlow = Math.max(0, lightsGlow - dt * 0.7);
+    boxBounce = Math.max(0, boxBounce - dt * 2); boxWob = Math.max(0, boxWob - dt * 1.8);
+    const carrying = drag && drag.k === "piece";
+    boxOpen += ((carrying ? (overBox({ x: drag.x, y: drag.y }) ? 1 : 0.6) : 0) - boxOpen) * Math.min(1, dt * 8);
     windowGlow = Math.max(0, windowGlow - dt * 0.7);
     updateCoach();
     draw(t);
@@ -1789,16 +1888,19 @@
       items.push({ y: b.gy, f: () => (i === 0 ? drawSnowman(S, t) : drawGroundBall(b)) });
     });
     if (rabbit) items.push({ y: rabbit.gy, f: () => drawRabbit(t) });
+    items.push({ y: boxGeo().gy - 8, f: () => drawBox(t) });
     items.sort((a, b) => a.y - b.y).forEach((it) => it.f());
     S.balls.forEach((b) => { if (b && b.lift) drawLifted(b); });
     drawParts();
     drawBird(t);
     drawFlakes(t);
+    drawCarried(t);
     drawRing(t);
     drawCarryTarget(t);
   }
   function onEnding(done) {
     ending = true;
+    if (drag && drag.k === "piece") pieceUp(drag, false, true);
     drag = null; press.cancel();
     if (pdrag) { pdrag = null; carryEl.hidden = true; }
     S.balls.forEach((b, i) => { if (b) { b.auto = null; if (b.lift) dropBall(i, true); } });
@@ -1864,22 +1966,28 @@
     };
     window.__toybox = {
       state: () => {
-        const w = want();
+        const w = want(), pieces = {};
+        KINDS.forEach((k) => { pieces[k.id] = { opt: k.opts[S.D[k.id].opt].id, on: S.D[k.id].on.filter(Boolean).length }; });
         return { step: S.step, r: S.balls.map((b) => (b ? +b.r.toFixed(1) : 0)), done: S.balls.map((b) => !!(b && b.done)),
-          stacked: S.balls.map((b) => !!(b && b.stacked)), pieces: Object.assign({}, S.D), busy, wanted: w && w.part,
-          coach: coach.text(), track: track.length, allOn: allOn(), bird: !!bird, rabbit: !!rabbit };
+          stacked: S.balls.map((b) => !!(b && b.stacked)), pieces, panel: optK || "pieces", busy, wanted: w && w.part,
+          coach: coach.text(), track: track.length, allOn: allOn(), bird: !!bird, rabbit: !!rabbit, carrying: !!(drag && drag.k === "piece") };
       },
+      // One step: rolls, stacks, or puts on the next piece that is not part of the face (never eyes, nose or smile).
       next: () => {
         if (busy) return "wait";
         if (rolling()) { doTapPart("ball"); return "roll"; }
         if (stacking()) { stackTap(activeIndex()); return "stack"; }
-        const k = ["hat", "scarf", "arms", "buttons", "mittens"].find((id) => count(id) === 0);
-        if (k) { putPiece(k, null); return k; }
+        const k = ["hat", "scarf", "arms", "buttons", "mittens"].find((id) => !anyOn(id));
+        if (k) { putPiece(k, S.D[k].opt, null); return k; }
         return "done";
       },
       finish,
       stack: () => stackTap(activeIndex()),
-      put: (k) => putPiece(k, null),
+      // put(kind, choice): as his tap on that choice (one eye or one smile stone at a time).
+      put: (k, opt) => putPiece(k, opt == null ? S.D[k].opt : opt, null),
+      // off(kind, bit): as his drag of that piece into the box.
+      off: (k, j) => { if (S.step === "dress" && isOn(k, j || 0)) takeOff(k, KIND[k].slots ? (j || 0) : -1, 0, 0); return S.D[k].on.filter(Boolean).length; },
+      choices: (k) => (k ? openOpts(k) : closeOpts()),
       newYard: () => newYard(),
       surprise: () => surprise(),
       hit: (x, y) => hitPart(x, y),
@@ -1887,9 +1995,14 @@
         const i = activeIndex();
         if (part === "ball" && i >= 0 && S.balls[i]) { const c = ballC(S, i); return vp(c.x, c.y); }
         if (part === "target" && i > 0) { const T = stackAt(S, i); return vp(T.x, T.y); }
+        if (part === "box") { const b = boxGeo(); return vp(b.x, b.gy - b.h / 2); }
+        if (S.step === "dress" && part && part.startsWith("pc:")) { const [, k, j] = part.split(":"); const sp = pieceSpot(geom(S), k, +j || 0); return vp(sp.x, sp.y); }
         if (part === "head" && S.step === "dress") { const g = geom(S); return vp(g.hx, g.hy); }
         if (part === "middle" && S.step === "dress") { const g = geom(S); return vp(g.mx, g.my); }
-        if (part && part.startsWith("tile:")) { const b = tiles.button(part.slice(5)); if (b) { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } }
+        if (part && part.startsWith("tile:")) {
+          const id = part.slice(5), b = tiles.button(id) && !mainEl.hidden ? tiles.button(id) : otiles.button(id);
+          if (b) { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+        }
         return null;
       },
       ghost: () => ghost.show()

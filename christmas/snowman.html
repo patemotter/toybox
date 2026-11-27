@@ -34,20 +34,40 @@ body {
 .stage { background: #E3F1FF; touch-action: none; }
 /* Pieces can be carried from their tiles onto the snowman. */
 #tiles .tb-tile { touch-action: none; }
+/* Two tile rows take turns in the same place: all the pieces, or one piece's choices. Both always take the same
+   room (two rows upright, three in the side column), so switching never moves the stage. */
+#tiles .tb-tilerow { --tb-cols: 4 !important; grid-auto-rows: var(--tb-tile); gap: 8px; align-content: start; min-height: calc(var(--tb-tile) * 2 + 8px); }
+@media (min-width: 700px) and (min-height: 700px) { #tiles .tb-tilerow { gap: 12px; min-height: calc(var(--tb-tile) * 2 + 12px); } }
+@media (orientation: landscape) {
+  #tiles .tb-tilerow { --tb-cols: 3 !important; min-height: calc(var(--tb-tile) * 3 + 16px); }
+  .tb-v2 .tb-panel { justify-content: space-between; }
+}
+@media (orientation: landscape) and (min-width: 700px) and (min-height: 700px) { #tiles .tb-tilerow { min-height: calc(var(--tb-tile) * 3 + 24px); } }
+@media (orientation: landscape) and (max-height: 520px) {
+  #tiles { --tb-tile: 62px; }
+  #tiles .tb-tilerow { gap: 6px; min-height: calc(62px * 3 + 12px); }
+  #tiles .btn.tb-tile { font-size: 14px; }
+}
+@media (max-width: 600px) { #tilesOpt .btn.tb-tile { font-size: 14px; } }
 /* Until the snowman is built the pieces wait (dimmed; a tap still answers with a hint). */
 #tiles.sn-later .tb-tile { opacity: 0.5; }
-#tiles .tb-tile.sn-full::after { display: none; }
+/* A piece with choices: a little row of colored dots instead of the plus. */
+#tiles .tb-tile.sn-opts::after { content: ""; width: 30px; height: 14px; border-radius: 7px; right: 3px; top: 3px; line-height: 0;
+  background: radial-gradient(circle at 7px 7px, #E8303F 3.4px, transparent 3.9px), radial-gradient(circle at 15px 7px, #FFC93C 3.4px, transparent 3.9px),
+    radial-gradient(circle at 23px 7px, #2F8CFF 3.4px, transparent 3.9px), #FFFFFF;
+  box-shadow: inset 0 0 0 1.5px #1D2340; }
+/* On the snowman: the choice he has on is yellow with a tick (a piece fully on also gets the tick). */
+#tiles .tb-tile.sn-on { background: #FFF1C2; }
+#tiles .tb-tile.sn-on::after { content: ""; width: 22px; height: 22px; border-radius: 50%; right: 3px; top: 3px; box-shadow: none;
+  background: #1D2340 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-6.5' fill='none' stroke='white' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat; }
+#tiles .tb-tile.sn-back { background: #FFFFFF; }
+#tiles .tb-tile.sn-back::after { display: none; }
 #tiles .tb-tile.sn-next { outline: 4px solid #FFC93C; outline-offset: 1px; animation: sn-glow 1.6s ease-in-out infinite; }
 @keyframes sn-glow { 50% { outline-color: #FFE7A0; } }
 .sn-carry { position: fixed; left: 0; top: 0; z-index: 40; pointer-events: none; filter: drop-shadow(0 4px 6px rgba(29, 35, 64, 0.25)); }
 .sn-carry svg { display: block; width: 100%; height: 100%; }
 .sn-carry.back { transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0; }
 @media (prefers-reduced-motion: reduce) { #tiles .tb-tile.sn-next { animation: none; } .sn-carry.back { transition: none; } }
-/* In the side column the eight piece tiles sit three to a row. */
-@media (orientation: landscape) { #tiles { --tb-cols: 3 !important; } .tb-v2 .tb-panel { justify-content: space-between; } }
-@media (orientation: landscape) and (max-height: 520px) { #tiles { --tb-tile: 62px; gap: 6px; } #tiles .btn.tb-tile { font-size: 14px; } }
-#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-.tbadge { position: absolute; top: 10px; right: 10px; z-index: 3; }
 body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
 .rest-art { width: min(70vw, 300px, 46vh); aspect-ratio: 1; border: 3px solid #1D2340; border-radius: 18px; background: #2B3A67; }
 </style>
@@ -61,7 +81,7 @@ body.ending .tb-panel { pointer-events: none; opacity: 0.4; }
   </header>
   <div class="tb-body">
     <main class="tb-stage stage" id="stage">
-      <canvas id="cv" role="img" aria-label="A snowy yard to roll snowballs, stack them into a snowman and dress him."></canvas>
+      <canvas id="cv" role="img" aria-label="A snowy yard to roll snowballs, stack them into a snowman and dress him, with a box to put pieces back in."></canvas>
       <div id="coach"></div>
       <svg class="tbadge" id="tbadge" viewBox="0 0 60 60" aria-hidden="true" hidden></svg>
     </main>
