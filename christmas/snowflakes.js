@@ -1,7 +1,7 @@
 (function () {
   "use strict";
-  // Christmas · Snowflakes: a craft table by a window. He makes a real fold-and-cut paper snowflake. Two rows of
-  // tiles are real choices: the fold type (4, 5, 6 or 8 points; each tile shows the kind of snowflake it makes)
+  // Christmas · Snowflakes: a craft table by a window. He makes a real fold-and-cut paper snowflake. Two groups
+  // of tiles are real choices: the fold type (Mirror, 4, 5, 6 or 8 points; each tile shows what it makes)
   // and the paper color (White, Blue, Silver, Pink). A pick takes effect on the flat sheet at once; once folding
   // has started, it is for the next sheet. The fold types, each a real way to fold a square:
   //   4 points: in half, the left side over, into a triangle (8 mirrored slices of 45 degrees).
@@ -10,6 +10,8 @@
   //   6 points: in half into a triangle, the right and left sides over (thirds), in half again (the real
   //             snowflake, 12 slices of 30 degrees).
   //   8 points: in half, the left side over, into a triangle, the triangle in half (16 slices of 22.5 degrees).
+  //   Mirror:   one fold in half and no trim. He cuts half a shape from the folded edge; a piece he cuts out
+  //             that way is kept and the rest of the sheet falls, so half a heart opens into a whole heart.
   // Each fold is hands-on: drag the paper's corner across (it follows his finger) or tap the paper and it folds
   // by itself. The coach line names each fold. Then:
   //   Trim: the scissors trim the top of the wedge by themselves (the real cut that makes the points).
@@ -1673,8 +1675,6 @@
   // =====================================================================================================
   // Panel and surprise
   // =====================================================================================================
-  const paperPic = (hex) => '<svg viewBox="0 0 50 50"><path d="M8 8h25l9 9v25H8z" fill="' + hex + '" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/>' +
-    '<path d="M33 8v9h9" fill="#E3E8F2" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/></svg>';
   // A tiny paper snowflake for each fold type: its points, a ring of holes and a hole in the middle.
   function typePic(T) {
     // The mirror fold: a heart with its fold line down the middle.
@@ -1708,9 +1708,10 @@
     coach.say("The next paper makes " + GEO[i].n + " points.", 3);
     saveSoon();
   }
+  // The paper colors: round swatches filled with the color, the color's name on each.
   const tiles = Toybox.tiles($("tiles"), {
-    items: COLORS.map((c) => ({ id: c.id, name: c.name, pic: paperPic(c.hex) })),
-    value: COLORS[0].id, rows: 1,
+    items: COLORS.map((c) => ({ id: c.id, name: c.name, color: c.hex })),
+    value: COLORS[0].id, rows: 1, kind: "swatch",
     onPick: (id) => pickColor(COLORS.findIndex((c) => c.id === id))
   });
   // A color for the paper: the flat sheet changes at once; once it is folded, the next sheet is that color.
