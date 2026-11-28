@@ -12,7 +12,7 @@
 //   - Treats, the ball, Surprise
 //   - Taps
 //   - Treat picture in the "Give a treat" button (shows the next treat)
-//   - Coach line and ghost hand
+//   - Coach line, yellow rings on the untried things, ghost hand
 //   - Timer ending: a yawn, a walk to the house, and to sleep
 //   - Resize: keep the hamster where it was
 //   - Main loop
@@ -1455,6 +1455,8 @@
   }
 
   // ---------- Taps ----------
+  // What he has tried this visit (a fresh variable on every page load). Each untried thing wears a soft yellow
+  // ring ("Coach line" below); "fill" (the jug, from a tap on a low bottle) has no ring of its own.
   var tried = { wheel: false, food: false, water: false, bed: false, pet: false, treat: false, bag: false, fill: false };
   function inRect(x, y, x0, y0, x1, y1) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
   function hitTest(x, y) {
@@ -1513,7 +1515,6 @@
     }
     if (what === "wheel") {
       tried.wheel = true; items.wheel.b = 1;
-      ghost.learned();
       // winding down after super duper fast: the taps sparkle, and the dizzy, proud finish still plays
       if (ham.wasSuper && ham.act && ((ham.act.name === "wheel" && ham.act.after) || ham.act.name === "hop")) {
         for (var j = 0; j < 3; j++) spawn("spark", G.wheel.x + rand(-1, 1) * G.wheel.R, G.wheel.y + rand(-1, 1) * G.wheel.R, { life: 0.7 });
@@ -1578,20 +1579,48 @@
   }
   function drawTreatPic() { $("treatPic").innerHTML = treatSVG(TREATS[treatIdx % TREATS.length]); }
 
-  // ---------- Coach line and ghost hand ----------
+  // ---------- Coach line, yellow rings on the untried things, ghost hand ----------
+  // He can tap anything in any order, so there is no tour: the coach line only speaks for a real need (an empty
+  // bowl or bottle, a sleeping hamster) or a moment (super duper fast). Instead, everything he has not tried yet
+  // this visit wears a soft yellow ring at the same time (the "Give a treat" button too), and a thing's ring goes
+  // once he has tried it.
   var coachEl = $("coach"), coachShown = "";
   function coachText() {
     if (clock < superMsgUntil) return "Super duper fast!";
     if (food < 0.04 && scoop.state === "home" && !pour) return "Fill the food bowl!";
     if (water < 0.06 && !jug) return "Fill the water!";
     if (ham.asleep && ham.act && ham.act.name === "sleep" && ham.act.t > 3) return "Tap to wake up!";
-    if (!tried.wheel) return "Tap the wheel!";
-    if (!tried.food) return "Tap the food!";
-    if (!tried.water) return "Tap the water!";
-    if (!tried.bed) return "Tap the bed!";
-    if (!tried.pet) return "Pet the hamster!";
-    if (!tried.treat) return "Give the hamster a treat!";
     return "";
+  }
+  // The rings, as ellipses { x, y, rx, ry } in canvas px, one per untried thing.
+  function invites() {
+    var out = [];
+    if (!G || ending) return out;
+    var L = G.L, w = G.wheel, b = G.bottle, g = G.bag, h = houseGeom();
+    if (!tried.wheel) out.push({ x: w.x, y: w.y + 0.06 * w.R, rx: 1.14 * w.R, ry: 1.2 * w.R });
+    if (!tried.food) out.push({ x: G.bowl.x, y: G.floorY - 0.26 * L, rx: 0.82 * L, ry: 0.46 * L });
+    if (!tried.water) out.push({ x: b.x, y: (b.bodyT - 0.3 * L + b.tipY) / 2, rx: 0.52 * L, ry: (b.tipY - b.bodyT + 0.3 * L) / 2 + 0.12 * L });
+    if (!tried.bed) out.push({ x: h.x, y: (h.top - 0.6 * L + G.floorY) / 2, rx: 1.12 * L, ry: (G.floorY - h.top + 0.6 * L) / 2 + 0.14 * L });
+    if (!tried.bag) out.push({ x: g.x, y: (g.y + g.ledge) / 2, rx: 0.86 * L, ry: (g.ledge - g.y) / 2 + 0.24 * L });
+    var running = ham.where === "wheel" && ham.act && ham.act.name === "wheel";
+    if (!tried.pet && ham.where !== "house" && !running) { var c = hamCenter(); out.push({ x: c.x, y: c.y, rx: 0.72 * L, ry: 0.62 * L }); }
+    return out;
+  }
+  // Calm: one slow breath every 2.6 s (a still ring with reduced motion). No ink edge, so a few at once stay quiet.
+  var treatBtn = $("treatBtn"), treatInvite = null;
+  function drawInvites() {
+    var want = !tried.treat && !ending;
+    if (want !== treatInvite) { treatInvite = want; treatBtn.classList.toggle("is-invite", want); }
+    var list = invites();
+    if (!list.length) return;
+    var k = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(clock * TAU / 2.6), grow = 0.05 * G.L * k;
+    ctx.save();
+    list.forEach(function (o) {
+      ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx + grow, o.ry + grow, 0, 0, TAU);
+      ctx.lineWidth = Math.max(6, 0.16 * G.L); ctx.strokeStyle = "rgba(255,201,60," + (0.18 + 0.12 * k).toFixed(3) + ")"; ctx.stroke();
+      ctx.lineWidth = Math.max(2.5, 0.055 * G.L); ctx.strokeStyle = "rgba(255,201,60," + (0.95 - 0.3 * k).toFixed(3) + ")"; ctx.stroke();
+    });
+    ctx.restore();
   }
   function updateCoach() {
     var t = coachText();
@@ -1600,11 +1629,12 @@
     coachShown = t;
   }
   function pagePt(x, y) { var r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; }
-  // The hand shows the wheel; while the bowl is empty (and he has never filled it) it shows the food bag.
+  // The hand only shows a real need, never a next thing to try: while the bowl is empty (and he has not filled it
+  // this visit) it carries the scoop from the food tub to the bowl; while the bottle is empty, it taps the bottle.
   var ghost = Toybox.ghost({ plan: function () {
     if (!G) return null;
-    if (food < 0.04 && !tried.bag && scoop.state === "home") { var sh = scoopHome(), pp = pourSpot(); return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L), pagePt(pp.x, pp.y + 0.45 * G.L)], dur: 3400 }; }
-    if (!tried.wheel) return { pts: [pagePt(G.wheel.x + 0.3 * G.wheel.R, G.wheel.y - 0.45 * G.wheel.R)], tap: true };
+    if (food < 0.04 && !tried.bag && scoop.state === "home") { var sh = scoopHome(), pp = pourSpot(); return { pts: [pagePt(sh.x + 0.35 * G.L, sh.y - 0.2 * G.L), pagePt(pp.x, pp.y + 0.45 * G.L)], dur: 3400, key: "food" }; }
+    if (water < 0.06 && !jug && !tried.fill) return { pts: [pagePt(G.bottle.x, (G.bottle.bodyT + G.bottle.bodyB) / 2)], tap: true, key: "water" };
     return null;
   }, max: 3, ok: function () { return !ending; } });
 
@@ -1742,6 +1772,7 @@
       for (var k = 0; k < 3; k++) { var an = clock * 4 + k * TAU / 3; drawStar(dc.x + Math.cos(an) * 0.4 * G.L, dc.y - 0.5 * G.L + Math.sin(an) * 0.1 * G.L, 0.1 * G.L, 1); }
     }
     ctx.drawImage(tubeCv, 0, 0, CW, CH);
+    drawInvites();
     drawParts();
     if (scoop.state !== "home") drawScoop(scoop.x, scoop.y, scoop.tilt, false, scoop.state !== "back" && pourSpot().d < 0);
     drawJug();
@@ -1812,6 +1843,9 @@
     treats: function () { return treats.length; },
     ball: function () { return !!ball; },
     ghost: ghost,
+    tried: function () { var o = {}; for (var k in tried) o[k] = tried[k]; return o; },
+    invites: function () { return invites().length + (treatInvite ? 1 : 0); },
+    coach: function () { return coachShown; },
     pt: function (name) {
       var L = G.L, p;
       if (name === "wheel") p = { x: G.wheel.x + 0.3 * G.wheel.R, y: G.wheel.y - 0.5 * G.wheel.R };
