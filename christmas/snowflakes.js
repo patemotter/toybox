@@ -207,6 +207,11 @@
   // the flat angles w0 and w0 + 180/n. After the last fold the scissors trim the wedge from the notch radius rv
   // on one edge to the point radius RP on the edge at pAng, which makes the n points.
   const TYPES = [
+    // The mirror fold: one fold in half (no trim). He cuts half a shape from the folded edge and it opens into a
+    // whole one (a heart, a butterfly, a tree): 2 mirrored halves.
+    { id: "mirror", n: 1, name: "Mirror", mirror: true, w0: -90, pAng: 90, rotFold: 0, rotCut: 0, rotRev: 0, rv: 1,
+      folds: [{ line: 90, move: 180 }],
+      lines: ["Fold the paper in half."] },
     { id: "p4", n: 4, name: "4 points", w0: 0, pAng: 45, rotFold: 0, rv: 0.46,
       folds: [{ line: 0, move: -90 }, { line: 90, move: 180 }, { line: 45, move: 67.5 }],
       lines: ["Fold the paper in half.", "Fold the left side over.", "Fold the paper into a triangle."] },
@@ -292,7 +297,7 @@
       return pts;
     };
     const FLAT = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), facetPoly(f))));
-    const FLAT_STAR = STATES.map((st) => st.map((f) => mapPoly(facetMat(f), starPoly(f))));
+    const FLAT_STAR = T.mirror ? FLAT : STATES.map((st) => st.map((f) => mapPoly(facetMat(f), starPoly(f))));
     const GRAB = T.folds.map((F, k) => {
       const L = F.line * DEG;
       let n = [-Math.sin(L), Math.cos(L)];
@@ -302,11 +307,16 @@
       return { g: best, d0: bd, n, to: [best[0] - 2 * bd * n[0], best[1] - 2 * bd * n[1]] };
     });
     const SECTORS = STATES[NF].map((f) => facetMat({ d: f.d, g: f.d > 0 ? -f.g : f.g }));
-    const TA = dirPt(vAng, T.rv), TB = dirPt(T.pAng, RP), WEDGE = [[0, 0], TA, TB];
+    const TA = dirPt(vAng, T.rv), TB = dirPt(T.pAng, RP), WEDGE = T.mirror ? [[0, -1], [1, -1], [1, 1], [0, 1]] : [[0, 0], TA, TB];
+    // The wedge's edges, each with its normal into the paper (null: work it out toward M). Notches snap to them.
+    const EDGES = T.mirror
+      ? [{ a: [0, -1], b: [0, 1], n: [1, 0] }, { a: [1, -1], b: [1, 1], n: [-1, 0] }, { a: [0, -1], b: [1, -1], n: [0, 1] }, { a: [0, 1], b: [1, 1], n: [0, -1] }]
+      : [{ a: [0, 0], b: dirPt(T.w0, RP * 1.05), n: [-Math.sin(T.w0 * DEG), Math.cos(T.w0 * DEG)] },
+        { a: [0, 0], b: dirPt(w1, RP * 1.05), n: [Math.sin(w1 * DEG), -Math.cos(w1 * DEG)] }, { a: TA, b: TB, n: null }];
     const nx = -(TB[1] - TA[1]), ny = TB[0] - TA[0];
     const sg = (nx * (0 - TA[0]) + ny * (0 - TA[1])) > 0 ? -1 : 1;   // keep the side away from M
     const SCRAPS = [];
-    FLAT[NF].forEach((poly) => {
+    if (!T.mirror) FLAT[NF].forEach((poly) => {
       const sh = poly.map(([x, y]) => [x - TA[0], y - TA[1]]);
       const c = clipHalf(sh, sg * nx, sg * ny).map(([x, y]) => [x + TA[0], y + TA[1]]);
       if (c.length > 2) SCRAPS.push(c);
@@ -318,9 +328,9 @@
     const per = 360 / T.n;
     let rotRev = -90 - T.pAng - T.rotFold;
     rotRev = T.rotFold + (((rotRev % per) + per * 1.5) % per - per / 2);
-    return Object.assign({}, T, { sig, w1, NF, STATES, SPLITS, FLAT, FLAT_STAR, GRAB, SECTORS, TA, TB, WEDGE, SCRAPS,
+    return Object.assign({}, T, { sig, w1, NF, STATES, SPLITS, FLAT, FLAT_STAR, GRAB, SECTORS, TA, TB, WEDGE, SCRAPS, EDGES,
       MX0, MY0, MW: Math.max(...xs) - MX0 + 0.03, MH: Math.max(...ys) - MY0 + 0.03,
-      rotCut: 90 - (T.w0 + sig / 2), rotRev });
+      rotCut: T.rotCut != null ? T.rotCut : 90 - (T.w0 + sig / 2), rotRev: T.rotRev != null ? T.rotRev : rotRev });
   }
   const GEO = TYPES.map(buildType);
   // The fold type in use (the sheet's own type; a hung snowflake's type while it is drawn).
@@ -346,7 +356,7 @@
     const c = mkCanvas(G.MW * res, G.MH * res), g = c.getContext("2d", { willReadFrequently: true });
     g.setTransform(res, 0, 0, res, -MX0 * res, -MY0 * res);
     g.fillStyle = "#FFFFFF";
-    g.beginPath(); g.moveTo(0, 0); g.lineTo(TA[0], TA[1]); g.lineTo(TB[0], TB[1]); g.closePath(); g.fill();
+    g.beginPath(); WEDGE.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill();
     return { c, g, res };
   }
   function notchPath(g, op) {
@@ -386,7 +396,7 @@
     const tol = 2.5 / res;
     for (let i = 0; i < n; i++) {
       if (lab[i] >= 0 || a[i * 4 + 3] < 128) continue;
-      const cp = { id: comps.length, n: 0, apex: false, e15: false, e45: false, seed: i, inner: -1, x0: w, x1: 0, y0: h, y1: 0 };
+      const cp = { id: comps.length, n: 0, apex: false, e15: false, e45: false, outer: false, seed: i, inner: -1, x0: w, x1: 0, y0: h, y1: 0 };
       comps.push(cp);
       let sp = 0; stack[sp++] = i; lab[i] = cp.id;
       while (sp) {
@@ -397,6 +407,7 @@
         if (fx * fx + fy * fy < 0.0036) cp.apex = true;
         if (edge0(fx, fy) < tol) cp.e15 = true;
         if (edge1(fx, fy) < tol) cp.e45 = true;
+        if (fx > 1 - tol * 2 || Math.abs(fy) > 1 - tol * 2) cp.outer = true;
         let all = 0;
         if (x > 0) { const q = j - 1; if (a[q * 4 + 3] >= 128) { all++; if (lab[q] < 0) { lab[q] = cp.id; stack[sp++] = q; } } }
         if (x < w - 1) { const q = j + 1; if (a[q * 4 + 3] >= 128) { all++; if (lab[q] < 0) { lab[q] = cp.id; stack[sp++] = q; } } }
@@ -406,6 +417,15 @@
       }
     }
     const keep = comps.map((c) => c.apex || (c.e15 && c.e45));
+    // The mirror fold: every piece on the folded edge opens into one mirrored piece and stays. When a cut has
+    // gone out from the fold and back to it, the shape it went round (a piece on the fold that no longer reaches
+    // the sheet's outer edge, and is not tiny) is what he cut out: it stays and the rest of the sheet falls away
+    // (half a heart opens into a whole heart). A tiny piece cut out like that is a hole: it falls.
+    if (G.mirror) {
+      const big = (c) => c.n / (res * res) > 0.06;
+      const shape = comps.some((c, i) => keep[i] && !c.outer && big(c));
+      comps.forEach((c, i) => { if (keep[i] && ((shape && c.outer) || (!c.outer && !big(c)))) keep[i] = false; });
+    }
     if (comps.length && !keep.some(Boolean)) { let b = 0; comps.forEach((c, i) => { if (c.n > comps[b].n) b = i; }); keep[b] = true; }
     if (keep.every(Boolean)) return [];
     // Sprites of the bigger fallen pieces, so they can be seen falling.
@@ -476,7 +496,7 @@
           else if (a[q * 4 + 3] > 0) { seen[q] = 3; soft.push(q); }
         }
       }
-      if (apex || (e15 && e45)) { soft.forEach((q) => { seen[q] = 0; }); return; }
+      if (!G.mirror && (apex || (e15 && e45))) { soft.forEach((q) => { seen[q] = 0; }); return; }
       list.forEach((j) => { a[j * 4 + 3] = 0; });
       soft.forEach((q) => { seen[q] = 2; });
     });
@@ -744,6 +764,14 @@
   // The scissors trim the top off the wedge, along the line that makes the six points.
   function startTrim() {
     S.ph = "trim"; busy = true; lastWant = "";
+    // The mirror fold has no points to trim: the folded sheet is ready to cut.
+    if (G.mirror) {
+      S.ph = "cut"; startMask();
+      camTween(camCut(), 0.7);
+      later(0.7, () => { busy = false; panelSync(); lastWant = ""; ghost.poke(); }, "sheet");
+      saveSoon();
+      return;
+    }
     const pre = camCutPre();
     camTween(pre, 0.8);
     const ext = 0.2, A2 = [TA[0] + (TA[0] - TB[0]) * ext, TA[1] + (TA[1] - TB[1]) * ext], B2 = [TB[0] + (TB[0] - TA[0]) * ext, TB[1] + (TB[1] - TA[1]) * ext];
@@ -788,6 +816,7 @@
   let cutOp = null;
   const inWedge = (f, m) => {
     // Inside the trimmed wedge, grown by m units.
+    if (G.mirror) return f.x > -m && f.x < 1 + m && Math.abs(f.y) < 1 + m;
     const ang = Math.atan2(f.y, f.x) / DEG, r = Math.hypot(f.x, f.y);
     if (ang < G.w0 - m * 90 / Math.max(r, 0.05) || ang > G.w1 + m * 90 / Math.max(r, 0.05)) return false;
     const nx = -(TB[1] - TA[1]), ny = TB[0] - TA[0], ln = Math.hypot(nx, ny);
@@ -865,11 +894,7 @@
   // A notch at a spot (flat units). Close to an edge it is cut into that edge.
   function notchAt(fx, fy) {
     if (busy || S.ph !== "cut" || !S.mk) return;
-    const edges = [
-      { a: [0, 0], b: dirPt(G.w0, RP * 1.05), n: [-Math.sin(G.w0 * DEG), Math.cos(G.w0 * DEG)] },
-      { a: [0, 0], b: dirPt(G.w1, RP * 1.05), n: [Math.sin(G.w1 * DEG), -Math.cos(G.w1 * DEG)] },
-      { a: TA, b: TB, n: null }
-    ];
+    const edges = G.EDGES;
     let best = null, bd = 0.09;
     edges.forEach((e) => {
       const ex = e.b[0] - e.a[0], ey = e.b[1] - e.a[1], t = clamp(((fx - e.a[0]) * ex + (fy - e.a[1]) * ey) / (ex * ex + ey * ey), 0, 1);
@@ -1410,7 +1435,10 @@
   function want() {
     if (busy || big || locked()) return null;
     if (S.ph === "fold") return { line: G.lines[S.f], part: "corner" };
-    if (S.ph === "cut") return S.ops.length < 3 ? { line: "Cut shapes into the paper.", part: "wedge" } : { line: "Cut more, or open the paper.", part: "open" };
+    if (S.ph === "cut") {
+      if (S.ops.length >= (G.mirror ? 1 : 3)) return { line: "Cut more, or open the paper.", part: "open" };
+      return { line: G.mirror ? "Cut a shape from the folded edge." : "Cut shapes into the paper.", part: "wedge" };
+    }
     if (S.ph === "hang") return { line: "Hang the snowflake on the window.", part: "flake" };
     return null;
   }
@@ -1445,6 +1473,8 @@
     }
   }
   const coach = Toybox.coach($("coach"));
+  // Half a heart on the folded edge (flat units; the fold is the line x = 0).
+  const HALF_HEART = [[-0.06, -0.32], [0.08, -0.52], [0.3, -0.64], [0.52, -0.56], [0.62, -0.34], [0.56, -0.06], [0.36, 0.22], [0.12, 0.46], [-0.06, 0.62]];
   let lastWant = "";
   function updateCoach() {
     // While he holds something the line stays as it is, so a new instruction never pops up over his work.
@@ -1471,11 +1501,13 @@
         return first ? { pts: [P(g.from)], tap: true, key: "fold" } : { pts: [P(g.from), P(g.to)], dur: 1600, key: "fold" };
       }
       if (w.part === "wedge") {
-        const first = ghost.shown("cut") < 1, c = cam;
-        if (first) return { pts: [P(toScr(c, 0.42, 0.27))], tap: true, key: "cut" };
+        const first = ghost.shown("cut") < 1, c = cam, F = (q) => P(toScr(c, q[0], q[1]));
+        // The mirror fold: half a heart, out from the folded edge and back to it.
+        if (G.mirror) return { pts: HALF_HEART.map(F), dur: 2400, key: "cut" };
+        const W2 = (r, t) => dirPt(G.w0 + t * G.sig, r);
+        if (first) return { pts: [F(W2(0.5, 0.5))], tap: true, key: "cut" };
         // A V-shaped snip into the side of the wedge and back out.
-        const pts = [[0.38, 0.03], [0.5, 0.25], [0.6, 0.06]].map(([x, y]) => P(toScr(c, x, y)));
-        return { pts, dur: 1800, key: "cut" };
+        return { pts: [F(W2(0.38, -0.3)), F(W2(0.5, 0.5)), F(W2(0.62, -0.3))], dur: 1800, key: "cut" };
       }
       if (w.part === "open") return { pts: [openBtnPt()], tap: true, key: "open" };
       if (w.part === "flake" && V.flake) {
@@ -1645,6 +1677,9 @@
     '<path d="M33 8v9h9" fill="#E3E8F2" stroke="#1D2340" stroke-width="2.2" stroke-linejoin="round"/></svg>';
   // A tiny paper snowflake for each fold type: its points, a ring of holes and a hole in the middle.
   function typePic(T) {
+    // The mirror fold: a heart with its fold line down the middle.
+    if (T.mirror) return '<svg viewBox="0 0 50 50"><path d="M25 43C14 35 5 27 5 17.5 5 11 10 6.5 15.5 6.5c4.2 0 7.6 2.4 9.5 6 1.9-3.6 5.3-6 9.5-6C40 6.5 45 11 45 17.5 45 27 36 35 25 43z" fill="#FFFFFF" stroke="#1D2340" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="M25 13v29" stroke="#1D2340" stroke-width="1.4" stroke-dasharray="3 2.5"/><circle cx="16" cy="20" r="3" fill="#BFE3FF" stroke="#1D2340" stroke-width="1.4"/><circle cx="34" cy="20" r="3" fill="#BFE3FF" stroke="#1D2340" stroke-width="1.4"/></svg>';
     const n = T.n, c = 25, R = 22, rv = R * T.rv / RP;
     let d = "";
     for (let k = 0; k < n * 2; k++) { const an = (k * 180 / n - 90) * DEG, r = k % 2 ? rv : R; d += (k ? "L" : "M") + (c + Math.cos(an) * r).toFixed(1) + " " + (c + Math.sin(an) * r).toFixed(1); }
@@ -1797,7 +1832,7 @@
     heavy = Math.max(0, heavy - dt * 0.12);
     lightsBright = Math.max(0, lightsBright - dt * 0.6);
     hung.forEach((e) => { e.sway = Math.max(0, e.sway - dt * 0.3); });
-    if (V.flake && !reduce && !(drag && drag.k === "carry")) V.flake.spin += dt * 0.12;
+    if (V.flake && !reduce && !G.mirror && !(drag && drag.k === "carry")) V.flake.spin += dt * 0.12;
     if (big && !big.closing && t - big.t0 > 5) closeBig();
     updateCoach();
     draw(t, dt);
@@ -1823,11 +1858,11 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "rgba(29,35,64," + (0.45 * a).toFixed(3) + ")"; ctx.fillRect(0, 0, W, H);
     const from = glassPt(e.u, e.v), sF = hungS(), sT = LY.rv.r / RP;
-    const x = lerp(from.x, W / 2, a), y = lerp(from.y, H / 2, a), s = lerp(sF, sT, a), rot = e.r + (t - b.t0) * (reduce ? 0 : 0.12);
+    const x = lerp(from.x, W / 2, a), y = lerp(from.y, H / 2, a), s = lerp(sF, sT, a), rot = e.r + (t - b.t0) * (reduce || GEO[e.t].mirror ? 0 : 0.12);
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
     ctx.drawImage(e.bigPic.c, -s, -s, s * 2, s * 2);
     ctx.restore();
-    const gt = GEO[e.t], per = 0.7, j = Math.floor(t / per) % gt.n, ph = (t % per) / per, an = rot + (gt.pAng + j * 360 / gt.n) * DEG;
+    const gt = GEO[e.t], per = 0.7, j = Math.floor(t / per) % gt.n, ph = (t % per) / per, an = rot + (gt.pAng + j * 360 / gt.n) * DEG + (gt.mirror ? Math.PI : 0);
     twinkle(x + Math.cos(an) * s * RP * 0.92, y + Math.sin(an) * s * RP * 0.92, s * 0.13 * Math.sin(ph * Math.PI) * a, Math.sin(ph * Math.PI) * a);
   }
   function onEnding(done) {
@@ -1904,9 +1939,10 @@
       [[0.7, 1.5], [0.66, 0.4], [0.8, 0.5], [0.84, 1.5]],
       [[0.2, 0.45], [0.27, 0.8], [0.3, 0.3]]
     ];
-    const debugCut = (pts) => {
+    // pts: [radius, across] wedge terms, or flat units when flat is set.
+    const debugCut = (pts, flat) => {
       if (S.ph !== "cut" || busy) return false;
-      const P = pts.map(([r, t]) => { const q = wedgePt(r, t); return toScr(cam, q[0], q[1]); });
+      const P = pts.map(([r, t]) => { const q = flat ? [r, t] : wedgePt(r, t); return toScr(cam, q[0], q[1]); });
       cutStart(P[0].x, P[0].y);
       for (let i = 1; i < P.length; i++) {
         const a = P[i - 1], b = P[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
@@ -1925,13 +1961,18 @@
       next: () => {
         if (busy) return "wait";
         if (S.ph === "fold") { foldTap(); return "fold"; }
-        if (S.ph === "cut") { if (S.ops.length < 3) { debugCut(SAMPLE_CUTS[S.ops.length % 3]); return "cut"; } openPaper(); return "open"; }
+        if (S.ph === "cut") {
+          if (G.mirror && !S.ops.length) { debugCut(HALF_HEART, true); return "cut"; }
+          if (!G.mirror && S.ops.length < 3) { debugCut(SAMPLE_CUTS[S.ops.length % 3]); return "cut"; }
+          openPaper(); return "open";
+        }
         // Each finished snowflake is followed by the next fold type, so next() steps through them all.
         if (S.ph === "hang") { const b = bestSpot(); S.nextT = (S.t + 1) % GEO.length; folds.set(GEO[S.nextT].id); hangAt(b.u, b.v); return "hang"; }
         return "wait";
       },
       fold: () => foldTap(),
-      cut: (pts) => debugCut(pts || SAMPLE_CUTS[0]),
+      cut: (pts, flat) => debugCut(pts || SAMPLE_CUTS[0], flat),
+      halfHeart: () => HALF_HEART.map(([x, y]) => flatVp(x, y)),
       notch: (x, y) => notchAt(x, y),
       open: () => openPaper(),
       hang: (u, v) => { const b = bestSpot(); hangAt(u == null ? b.u : u, v == null ? b.v : v); },
