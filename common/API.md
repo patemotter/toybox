@@ -61,7 +61,7 @@ All components respect `Toybox.timer.locked()` and include palm guarding.
 - **`Toybox.wiggle(el)`**, **`Toybox.icon(name)`** (`back|home|big|new|surprise|shelf|close`), **`Toybox.pics`** (`{ play, again }`).
 
 ### Storage keys & CSS conventions (`common/toybox.css`)
-- **`localStorage`:** `toybox-timer-v1`, `toybox-settings-v1`, `toybox-settings-done-v1`, `toybox-kind-v1`, `toybox-gear-v1`, `toybox-favorites-v1` (launcher).
+- **`localStorage`:** `toybox-code-v1` (grown-ups code: the Grown-ups button's 2 s hold and the rest screen's 4 s unlock then ask for it on a shuffled keypad; 3 wrong tries pause it 30 s), `toybox-timer-v1`, `toybox-settings-v1`, `toybox-settings-done-v1`, `toybox-kind-v1`, `toybox-gear-v1`, `toybox-favorites-v1` (launcher).
 - **`sessionStorage`:** `toybox-launch`, `toybox-seen:<path>`, `toybox-turn-ok:<app>`, gear flags (`workshop-gear`, `site-gear`, `kitchen-ready`, `forge-gear`).
 - **Tokens:** `--tb-ink` (`#1D2340`), `--tb-bg` (`#CDE9FF`), `--tb-surface`, `--tb-go`, `--tb-pick`, `--tb-new`, `--tb-shelf`, `--tb-job`, `--tb-off`, `--tb-outline` (`2px`), `--tb-frame` (`3px`), `--tb-key`, `--tb-s1..s6`, `--tb-fs-*`.
 - **Classes:** `.tb-app-shell` (+ `.tb-v2`), `.tb-head`, `.tb-title` (`<span class="tb-app">App · </span><span class="tb-station">Station</span>`), `.tb-stage`, `.tb-panel` (+ `.tb-panel-bar` for New/Surprise-only landscape rail), `.tb-coach` (`is-do`, `is-info`, `is-seen`), `.tb-counter`, `.btn` (`[aria-pressed="true"]`), `.tbadge`, `body.ending` / `.resting` / `.turn`.

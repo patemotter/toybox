@@ -18,7 +18,7 @@
  * 3. At the end of the app's script, once its scene is ready, call Toybox.init({...}):
  *      Toybox.init({
  *        app: "peg-drop",                         // folder name; keys the turn-the-device choice
- *        grownButton: el,                         // home screen only: opens the sheet. In apps it is hidden:
+ *        grownButton: el,                         // home screen only: a 2 s hold (then the grown-ups code, if set) opens the sheet. In apps it is hidden:
  *                                                 // the Grown-ups sheet lives only on the Toybox home screen.
  *        home: true,                              // only the launcher passes this (sheet + App settings)
  *        grownLabel: ["Grown-ups", "⏱ Grown-ups"],// optional [idle, timer on]
@@ -312,6 +312,94 @@
     btn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
 
+  // ---------- Grown-ups code (a press-and-hold, then a 4-digit code) ----------
+  // The child learned the Grown-ups button and the rest-screen lock (the dad, 2026-11-28), so both now take a
+  // press-and-hold and then, once a grown-up has set one in the Grown-ups sheet, a 4-digit code on a keypad.
+  // The keypad's digits are shuffled every time it opens (watching where a finger goes doesn't teach the
+  // code), and three wrong codes in a row pause the keypad for 30 seconds. With no code set, the hold alone opens.
+  var CODEKEY = "toybox-code-v1", PAD_WAIT_MS = 30000;
+  function codeGet() { var v = get(CODEKEY); return /^\d{4}$/.test(v || "") ? v : ""; }
+  var pad = { mode: "", entry: "", first: "", done: null, fails: 0, until: 0, timer: null };
+  function padShuffle() {
+    var d = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    for (var i = d.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = d[i]; d[i] = d[j]; d[j] = t; }
+    // Nine digits in a 3 x 3 block, then a row with a gap, the tenth digit and the delete key.
+    var keys = $("tb-keys"), html = "";
+    d.forEach(function (n, k) {
+      if (k === 9) html += '<span class="tb-keygap"></span>';
+      html += '<button class="btn tb-key" data-key="' + n + '">' + n + "</button>";
+    });
+    html += '<button class="btn tb-key tb-keydel" data-key="del" aria-label="Delete">⌫</button>';
+    keys.innerHTML = html;
+  }
+  function padDots() {
+    Array.prototype.forEach.call($("tb-dots").children, function (el, i) { el.classList.toggle("on", i < pad.entry.length); });
+  }
+  function padSay(title, sub) { $("tb-padTitle").textContent = title; $("tb-padSub").textContent = sub; }
+  function padLocked() { return now() < pad.until; }
+  function padOpen(mode, done) {
+    pad.mode = mode; pad.entry = ""; pad.first = ""; pad.done = done || null;
+    if (mode === "check") padSay("Grown-ups code", padLocked() ? "Wait a moment, then try again." : "Type the 4-digit code.");
+    else padSay("Set a code", "Type a new 4-digit code.");
+    padShuffle(); padDots();
+    $("tb-keys").classList.toggle("wait", mode === "check" && padLocked());
+    $("tb-pad").hidden = false;
+  }
+  function padClose() { $("tb-pad").hidden = true; pad.entry = ""; pad.done = null; }
+  function padShake() {
+    var d = $("tb-dots");
+    d.classList.remove("shake"); void d.offsetWidth; d.classList.add("shake");
+  }
+  function padFull() {
+    var e = pad.entry;
+    if (pad.mode === "check") {
+      if (e === codeGet()) { pad.fails = 0; var done = pad.done; padClose(); if (done) done(); return; }
+      pad.fails++;
+      padShake();
+      if (pad.fails >= 3) {
+        pad.fails = 0; pad.until = now() + PAD_WAIT_MS;
+        padSay("Grown-ups code", "Wait a moment, then try again.");
+        $("tb-keys").classList.add("wait");
+        clearTimeout(pad.timer);
+        pad.timer = setTimeout(function () { $("tb-keys").classList.remove("wait"); if (!$("tb-pad").hidden && pad.mode === "check") padSay("Grown-ups code", "Type the 4-digit code."); }, PAD_WAIT_MS);
+      } else padSay("Grown-ups code", "That isn't the code. Try again.");
+    } else if (pad.mode === "set") {
+      pad.first = e; pad.mode = "confirm";
+      padSay("Set a code", "Type the same code again.");
+      padShuffle();
+    } else if (pad.mode === "confirm") {
+      if (e === pad.first) {
+        put(CODEKEY, e); padClose(); refreshCode(); toast("Code saved");
+        return;
+      }
+      pad.mode = "set"; pad.first = "";
+      padShake();
+      padSay("Set a code", "The two codes were different. Type a new 4-digit code.");
+      padShuffle();
+    }
+    pad.entry = "";
+    setTimeout(padDots, 350);
+  }
+  function padKey(k) {
+    if (pad.mode === "check" && padLocked()) { padShake(); return; }
+    if (k === "del") pad.entry = pad.entry.slice(0, -1);
+    else if (pad.entry.length < 4) pad.entry += k;
+    padDots();
+    if (pad.entry.length === 4) setTimeout(padFull, 120);
+  }
+  // Runs done() once a grown-up got past the code (or right away when no code is set).
+  function grownGate(done) { if (codeGet()) padOpen("check", done); else done(); }
+  // The Grown-ups sheet's "Grown-ups code" section.
+  function refreshCode() {
+    if (!$("tb-codeSec")) return;
+    var has = !!codeGet();
+    $("tb-codeSub").textContent = has ?
+      "After the press-and-hold, the Grown-ups button and the rest-screen lock ask for this code." :
+      "No code yet. Set a 4-digit code so only grown-ups can open this sheet and unlock the rest screen.";
+    $("tb-codeSet").textContent = has ? "Change code" : "Set a code";
+    $("tb-codeOff").hidden = !has;
+  }
+
   // ---------- DOM (built by init) ----------
   function holdBtn(id, label, labelId) {
     return '<button class="btn hold" id="' + id + '"><span class="fill"></span><span class="label"' +
@@ -357,6 +445,13 @@
         "</div>" +
         '<button class="lock hold" id="tb-unlock" aria-label="Unlock (grown-ups: press and hold)"><span class="fill"></span><span class="label">🔒</span></button>' +
       "</div>" +
+      // The grown-ups code keypad (above the sheet and the rest screen).
+      '<div class="modal tb-pad" id="tb-pad" hidden><div class="sheet tb-padcard" role="dialog" aria-modal="true" aria-labelledby="tb-padTitle">' +
+        '<h2 id="tb-padTitle">Grown-ups code</h2><p class="sub" id="tb-padSub"></p>' +
+        '<div class="tb-dots" id="tb-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>' +
+        '<div class="tb-keys" id="tb-keys"></div>' +
+        '<div class="sheet-actions"><button class="btn" id="tb-padCancel">Cancel</button></div>' +
+      "</div></div>" +
       // "Turn the device" card (only used when init got an orientation): a tablet that turns, one line, a way out.
       '<div class="tb-turn" id="tb-turn" hidden role="dialog" aria-modal="true" aria-labelledby="tb-turnTitle">' +
         '<div class="tb-turn-card">' +
@@ -393,6 +488,13 @@
         el.hidden = false;
         $("tb-closeRow").parentNode.insertBefore(el, $("tb-closeRow"));
       });
+      var codeSec = document.createElement("section");
+      codeSec.id = "tb-codeSec";
+      codeSec.innerHTML = '<h3>Grown-ups code</h3><p class="sub" id="tb-codeSub"></p>' +
+        '<div class="sheet-actions"><button class="btn" id="tb-codeSet">Set a code</button>' + holdBtn("tb-codeOff", "Hold to remove the code") + "</div>";
+      $("tb-closeRow").parentNode.insertBefore(codeSec, $("tb-closeRow"));
+      $("tb-codeSet").addEventListener("click", function () { padOpen("set"); });
+      makeHold($("tb-codeOff"), HOLD_MS, function () { drop(CODEKEY); refreshCode(); toast("Code removed"); });
       $("tb-closeRow").parentNode.insertBefore(buildAppSettings(), $("tb-closeRow"));
     } else {
       // Apps have no grown-up sheet: the Grown-ups button and its extra sections stay hidden.
@@ -414,10 +516,22 @@
     $("tb-modal").addEventListener("click", function (e) { if (e.target === this) closeSheet(); });
     makeHold($("tb-holdAdd"), HOLD_MS, addFive);
     makeHold($("tb-holdStop"), HOLD_MS, stopTimer);
-    makeHold($("tb-unlock"), UNLOCK_MS, unlock);
+    makeHold($("tb-unlock"), UNLOCK_MS, function () { grownGate(unlock); });
+    $("tb-keys").addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-key]");
+      if (b) padKey(b.getAttribute("data-key"));
+    });
+    $("tb-padCancel").addEventListener("click", padClose);
 
     if (opts.grownButton) {
-      if (opts.home) opts.grownButton.addEventListener("click", openSheet);
+      if (opts.home) {
+        // Press and hold for 2 seconds, then the code (when one is set). A quick tap only says how.
+        var gb = opts.grownButton;
+        gb.classList.add("hold");
+        gb.innerHTML = '<span class="fill"></span><span class="label" id="tb-grownLabel"></span>';
+        makeHold(gb, HOLD_MS, function () { grownGate(openSheet); });
+        gb.addEventListener("click", function () { toast("Grown-ups: press and hold"); });
+      }
       else { opts.grownButton.hidden = true; opts.grownButton.style.display = "none"; opts.grownButton.setAttribute("aria-hidden", "true"); }
     }
 
@@ -487,7 +601,7 @@
 
   // ---------- Sheet ----------
   function sheetOpen() { return !!$("tb-modal") && !$("tb-modal").hidden; }
-  function openSheet() { updateTimerUI(); refreshAppSettings(); hook("onOpen"); $("tb-modal").hidden = false; }
+  function openSheet() { updateTimerUI(); refreshAppSettings(); refreshCode(); hook("onOpen"); $("tb-modal").hidden = false; }
   function closeSheet() { if ($("tb-modal")) $("tb-modal").hidden = true; }
 
   function updateTimerUI() {
@@ -495,7 +609,7 @@
     var on = timer.phase !== "idle";
     if (opts.grownButton) {
       var labels = opts.grownLabel || ["Grown-ups", "⏱ Grown-ups"];
-      opts.grownButton.textContent = on ? labels[1] : labels[0];
+      ($("tb-grownLabel") || opts.grownButton).textContent = on ? labels[1] : labels[0];
     }
     $("tb-setup").hidden = on;
     $("tb-running").hidden = !on;

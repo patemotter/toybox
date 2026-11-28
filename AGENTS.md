@@ -21,7 +21,7 @@ Read this before changing anything. It holds every universal rule and decision f
 - **Learning comes from doing the real thing.** Never frame apps as lessons, quizzes, or "educational" activities; make the real activity accurate.
 - **New app ideas** can come from anywhere — don't design from stereotypes about autism (assuming spinning, sorting, or lining things up); ask the dad when unsure.
 - Devices: **iPad** (offline on flights) and **iPhone**, both as home-screen web apps.
-- The dad is a software engineer; grown-up controls live behind a 2-second press-and-hold on the home screen.
+- The dad is a software engineer; grown-up controls live behind a 2-second press-and-hold on the home screen, then a 4-digit grown-ups code once one is set in the Grown-ups sheet (`toybox-code-v1`; the rest-screen unlock asks for it too; the child learned the plain hold, 2026-11-28).
 
 ### Privacy (hard invariant)
 **Never write the child's name anywhere** — not in code, comments, files, filenames, commit messages, PR text, or git history. Always say "the child" or "he".
